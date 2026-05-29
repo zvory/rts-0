@@ -17,6 +17,8 @@ export const C = Object.freeze({
   JOIN: "join",
   READY: "ready",
   START: "start",
+  ADD_AI: "addAi",
+  REMOVE_AI: "removeAi",
   COMMAND: "command",
   PING: "ping",
 });
@@ -82,6 +84,8 @@ export const msg = Object.freeze({
   join: (name, room = "main") => ({ t: C.JOIN, name, room }),
   ready: (ready) => ({ t: C.READY, ready: !!ready }),
   start: () => ({ t: C.START }),
+  addAi: () => ({ t: C.ADD_AI }),
+  removeAi: (id) => ({ t: C.REMOVE_AI, id }),
   command: (cmd) => ({ t: C.COMMAND, cmd }),
   ping: (ts) => ({ t: C.PING, ts }),
 });

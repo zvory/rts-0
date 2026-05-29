@@ -289,6 +289,20 @@ async fn handle_client_message(
             )
             .await;
         }
+        ClientMessage::AddAi => {
+            send_room_event(player_id, current_room, RoomEvent::AddAi { player_id }).await;
+        }
+        ClientMessage::RemoveAi { id } => {
+            send_room_event(
+                player_id,
+                current_room,
+                RoomEvent::RemoveAi {
+                    player_id,
+                    target: id,
+                },
+            )
+            .await;
+        }
         ClientMessage::Command { cmd } => {
             send_room_event(
                 player_id,

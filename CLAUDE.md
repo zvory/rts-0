@@ -29,7 +29,10 @@ cd server && cargo build && cargo clippy && cargo fmt
 # Tests — start the server first, then (from repo root):
 node tests/server_integration.mjs     # dep-free, full server pipeline
 node tests/regression.mjs             # dep-free, hardening/DoS/robustness guards
+node tests/ai_integration.mjs         # dep-free, AI opponent lobby flow (add/remove/start)
 cd tests && npm install && node client_smoke.mjs   # headless-Chrome client smoke
+
+# AI simulation behavior (no running server needed): cd server && cargo test
 ```
 
 There is **no JS build step** (plain ES modules + PixiJS from CDN). The client is served from

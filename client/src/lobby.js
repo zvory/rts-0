@@ -10,6 +10,9 @@ import { S } from "./protocol.js";
 
 const NAME_STORAGE_KEY = "rts.playerName";
 
+/** Max players in a match (humans + AI). Mirrors the server's `MAX_PLAYERS`. */
+const MAX_PLAYERS = 4;
+
 /**
  * The lobby screen controller.
  */
@@ -29,6 +32,7 @@ export class Lobby {
     this.roomBlock = rootEl.querySelector(".lobby-room");
     this.elPlayers = rootEl.querySelector("#lobby-players");
     this.btnReady = rootEl.querySelector("#lobby-ready");
+    this.btnAddAi = rootEl.querySelector("#lobby-add-ai");
     this.btnStart = rootEl.querySelector("#lobby-start");
     this.elStatus = rootEl.querySelector("#lobby-status");
 
@@ -37,6 +41,8 @@ export class Lobby {
     this._ready = false;
     this._hostId = null;
     this._canStart = false;
+    /** Total seated players (humans + AI) from the latest lobby message. */
+    this._playerCount = 0;
     /** @type {Array<() => void>} subscribers for the server `start` message. */
     this._startCbs = [];
 
@@ -104,6 +110,14 @@ export class Lobby {
       if (this.btnStart.disabled) return;
       this.net.start();
     });
+
+    // Add AI: host-only. The server ignores it from non-hosts / when full, but we gate the UI too.
+    if (this.btnAddAi) {
+      this.btnAddAi.addEventListener("click", () => {
+        if (this.btnAddAi.disabled) return;
+        this.net.addAi();
+      });
+    }
   }
 
   _join() {
@@ -151,10 +165,13 @@ export class Lobby {
     this._joined = true;
     if (this.roomBlock) this.roomBlock.hidden = false;
 
-    this._renderPlayers(m.players || []);
+    const players = m.players || [];
+    this._playerCount = players.length;
+    this._renderPlayers(players);
     this._reflectStartButton();
+    this._reflectAddAiButton();
 
-    const count = (m.players || []).length;
+    const count = players.length;
     this.setStatus(`Room "${m.room}" — ${count} player${count === 1 ? "" : "s"}.`);
   }
 
@@ -186,15 +203,43 @@ export class Lobby {
         host.textContent = "(host)";
         tags.appendChild(host);
       }
-
-      const ready = document.createElement("span");
-      ready.className = "player-ready" + (p.ready ? " ready" : "");
-      ready.textContent = p.ready ? "✓ Ready" : "…";
+      if (p.isAi) {
+        li.classList.add("is-ai");
+        const bot = document.createElement("span");
+        bot.className = "tag ai";
+        bot.textContent = "AI";
+        tags.appendChild(bot);
+      }
 
       li.appendChild(swatch);
       li.appendChild(name);
       li.appendChild(tags);
-      li.appendChild(ready);
+
+      if (p.isAi) {
+        // AI players are always "ready"; the host gets a remove control instead of a check.
+        const iAmHost = this.net.playerId != null && this.net.playerId === this._hostId;
+        if (iAmHost) {
+          const remove = document.createElement("button");
+          remove.className = "player-remove btn";
+          remove.type = "button";
+          remove.textContent = "✕";
+          remove.title = "Remove AI";
+          remove.setAttribute("aria-label", `Remove ${p.name || "AI"}`);
+          remove.addEventListener("click", () => this.net.removeAi(p.id));
+          li.appendChild(remove);
+        } else {
+          const ready = document.createElement("span");
+          ready.className = "player-ready ready";
+          ready.textContent = "✓ Ready";
+          li.appendChild(ready);
+        }
+      } else {
+        const ready = document.createElement("span");
+        ready.className = "player-ready" + (p.ready ? " ready" : "");
+        ready.textContent = p.ready ? "✓ Ready" : "…";
+        li.appendChild(ready);
+      }
+
       ul.appendChild(li);
 
       // Keep our own ready toggle in sync with the authoritative server state.
@@ -203,6 +248,17 @@ export class Lobby {
         this._reflectReadyButton();
       }
     }
+  }
+
+  /**
+   * Show the Add AI button only to the host, disabling it when the room is full
+   * ([`MAX_PLAYERS`]). The server enforces both rules regardless; this is just UI gating.
+   */
+  _reflectAddAiButton() {
+    if (!this.btnAddAi) return;
+    const isHost = this.net.playerId != null && this.net.playerId === this._hostId;
+    this.btnAddAi.hidden = !isHost;
+    this.btnAddAi.disabled = this._playerCount >= MAX_PLAYERS;
   }
 
   /** Enable Start only for the host and only when the server says the match can start. */

@@ -8,6 +8,7 @@
 //! separately via [`Game::snapshot_for`], fog-filtered so a player only ever sees neutral /
 //! enemy entities on tiles they currently see.
 
+pub mod ai;
 pub mod entity;
 pub mod fog;
 pub mod map;
@@ -21,6 +22,7 @@ use crate::protocol::{
     kinds, Command, EntityView, Event, MapInfo, PlayerStart, Snapshot, StartPayload,
 };
 
+use ai::AiController;
 use entity::{Entity, EntityStore, Order};
 use fog::Fog;
 use map::Map;
@@ -30,6 +32,9 @@ pub struct PlayerInit {
     pub id: u32,
     pub name: String,
     pub color: String,
+    /// When true this player is a computer opponent: it has no socket and is driven by an
+    /// internal [`AiController`] instead of receiving snapshots / sending commands.
+    pub is_ai: bool,
 }
 
 /// Per-player economy and bookkeeping carried for the whole match. Visible to `systems` (the
@@ -53,6 +58,9 @@ pub struct Game {
     entities: EntityStore,
     fog: Fog,
     players: Vec<PlayerState>,
+    /// One controller per AI-owned player. Driven at the top of [`tick`] to enqueue commands;
+    /// empty for an all-human match.
+    ai: Vec<AiController>,
     /// Commands received this tick window, drained at the start of [`tick`]. Each carries the
     /// issuing player so ownership can be validated on apply.
     pending: Vec<(u32, Command)>,
@@ -75,8 +83,12 @@ impl Game {
         let mut entities = EntityStore::new();
 
         let mut player_states = Vec::with_capacity(players.len());
+        let mut ai = Vec::new();
         for (i, p) in players.iter().enumerate() {
             let start = map.starts.get(i).copied().unwrap_or((0, 0));
+            if p.is_ai {
+                ai.push(AiController::new(p.id));
+            }
             let mut ps = PlayerState {
                 id: p.id,
                 name: p.name.clone(),
@@ -98,6 +110,7 @@ impl Game {
             entities,
             fog,
             players: player_states,
+            ai,
             pending: Vec::new(),
             tick: 0,
         };
@@ -156,10 +169,24 @@ impl Game {
             events.entry(p.id).or_default();
         }
 
+        // Let each AI player decide its actions first, appending ordinary commands to the same
+        // pending queue a human client feeds. They are validated on apply just like any client
+        // command — the AI gets no special authority over the simulation. Disjoint field borrows
+        // (`self.ai` mutably, the rest shared) keep this lock-free.
+        let mut pending = std::mem::take(&mut self.pending);
+        for controller in self.ai.iter_mut() {
+            controller.think(
+                &self.map,
+                &self.entities,
+                &self.players,
+                self.tick,
+                &mut pending,
+            );
+        }
+
         // Run every per-tick system in order. `run_tick` takes split borrows of the map,
         // entity store, player economy, and the event buckets, so it can mutate resources and
         // entities together without locks.
-        let pending = std::mem::take(&mut self.pending);
         systems::run_tick(
             &self.map,
             &mut self.entities,
@@ -380,4 +407,108 @@ fn spawn_player_start(entities: &mut EntityStore, map: &Map, owner: u32, start: 
     let gx = anchor_x + dir_x * ts * 1.5;
     let gy = anchor_y + dir_y * ts * 2.5;
     entities.spawn_node(kinds::GAS, gx, gy);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Drive a passive human vs. one AI and confirm the AI actually plays: it grows its economy,
+    /// expands supply, builds a barracks, produces soldiers, and marches them into the human base
+    /// to deal damage. This exercises the full command path the AI shares with human clients.
+    #[test]
+    fn ai_builds_economy_and_attacks() {
+        let players = [
+            PlayerInit {
+                id: 1,
+                name: "Human".into(),
+                color: "#fff".into(),
+                is_ai: false,
+            },
+            PlayerInit {
+                id: 2,
+                name: "Computer".into(),
+                color: "#000".into(),
+                is_ai: true,
+            },
+        ];
+        let mut game = Game::new(&players);
+
+        let mut max_workers = 0usize;
+        let mut max_soldiers = 0usize;
+        let mut ever_had_barracks = false;
+        let mut ai_supply_cap = 0u32;
+        let mut human_damaged = false;
+
+        // ~100s of simulation. The human issues no commands (passive target).
+        for _ in 0..3000 {
+            game.tick();
+
+            let ai = game.snapshot_for(2);
+            ai_supply_cap = ai.supply_cap.max(ai_supply_cap);
+            let workers = ai
+                .entities
+                .iter()
+                .filter(|e| e.owner == 2 && e.kind == kinds::WORKER)
+                .count();
+            let soldiers = ai
+                .entities
+                .iter()
+                .filter(|e| e.owner == 2 && e.kind == kinds::SOLDIER)
+                .count();
+            max_workers = max_workers.max(workers);
+            max_soldiers = max_soldiers.max(soldiers);
+            if ai
+                .entities
+                .iter()
+                .any(|e| e.owner == 2 && e.kind == kinds::BARRACKS)
+            {
+                ever_had_barracks = true;
+            }
+
+            // Any human entity below full hp means an AI attack landed.
+            let human = game.snapshot_for(1);
+            if human
+                .entities
+                .iter()
+                .any(|e| e.owner == 1 && e.hp < e.max_hp)
+            {
+                human_damaged = true;
+            }
+        }
+
+        assert!(
+            max_workers > config::STARTING_WORKERS as usize,
+            "AI should train workers beyond the {} it starts with (saw {max_workers})",
+            config::STARTING_WORKERS
+        );
+        assert!(
+            ai_supply_cap > config::HQ_SUPPLY,
+            "AI should build a depot to raise supply above the HQ's {} (saw {ai_supply_cap})",
+            config::HQ_SUPPLY
+        );
+        assert!(ever_had_barracks, "AI should build a barracks");
+        assert!(max_soldiers > 0, "AI should produce soldiers");
+        assert!(
+            human_damaged,
+            "AI soldiers should reach and damage the human base"
+        );
+    }
+
+    /// Adding an AI must not perturb a human-only game's construction: an all-human match has no
+    /// controllers and behaves exactly as before.
+    #[test]
+    fn no_ai_controllers_without_ai_players() {
+        let players = [PlayerInit {
+            id: 1,
+            name: "Solo".into(),
+            color: "#fff".into(),
+            is_ai: false,
+        }];
+        let game = Game::new(&players);
+        assert!(
+            game.ai.is_empty(),
+            "a human-only match has no AI controllers"
+        );
+    }
 }

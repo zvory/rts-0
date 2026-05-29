@@ -103,7 +103,11 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const beforeTrain = A.lastSnapshot.minerals;
   A.send({ t: "command", cmd: { c: "train", building: mine.find((e) => e.kind === "hq").id, unit: "worker" } });
   await sleep(1200);
-  ok(A.lastSnapshot.minerals <= beforeTrain - 50 + 8, `TRAIN: minerals dropped ~50 (before=${beforeTrain}, after=${A.lastSnapshot.minerals})`);
+  // The 4 workers keep mining during this 1.2s window, so income partially offsets the 50 spent.
+  // At 30 Hz that window is ~36 ticks — enough for a couple of 5-mineral deliveries — so allow a
+  // generous income margin; the point is only that the train was charged (~50 deducted).
+  const trainIncomeMargin = 25;
+  ok(A.lastSnapshot.minerals <= beforeTrain - 50 + trainIncomeMargin, `TRAIN: minerals dropped ~50 (before=${beforeTrain}, after=${A.lastSnapshot.minerals})`);
   const hq = A.lastSnapshot.entities.find((e) => e.kind === "hq" && e.owner === A.playerId);
   ok(hq && (hq.prodKind === "worker" || (hq.prodQueue || 0) >= 1), `TRAIN: HQ shows production (queue=${hq?.prodQueue})`);
 
