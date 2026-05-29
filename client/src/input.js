@@ -11,10 +11,12 @@
 //   - Build placement mode (started by the HUD via state.beginPlacement): track the
 //     hovered tile, validate the footprint, drive the renderer ghost via
 //     state.updatePlacement, confirm with a valid left-click, cancel with right/Esc.
-//   - Keyboard: A = attack-move targeting, S = stop, Esc = cancel placement/targeting.
+//   - Keyboard: command-card hotkeys take priority; A = attack-move targeting,
+//     S = stop, Esc = cancel placement/targeting.
 //   - Mouse wheel = camera zoom toward the cursor.
-//   - WASD/arrow pan state is OWNED here and exposed via `this.keys` so the camera can
+//   - Arrow-key pan state is OWNED here and exposed via `this.keys` so the camera can
 //     read it in Camera.update(dt, input) — see the `keys` field documentation below.
+//   - Middle-drag or Space+left-drag pans the camera without using build hotkeys.
 //
 // All world hit-testing goes through camera.screenToWorld. Entities are hit-tested
 // against the interpolated positions from state so clicks line up with what is drawn.
@@ -45,8 +47,8 @@ export class Input {
 
     /**
      * Continuous pan-key state, read by Camera.update(dt, input). Booleans for the
-     * four cardinal directions; the camera maps these to a pan velocity. WASD and the
-     * arrow keys both feed the same flags. This is the shared input-state object the
+     * four cardinal directions; the camera maps these to a pan velocity. Arrow keys
+     * feed the flags. This is the shared input-state object the
      * design refers to (DESIGN.md §4.1 camera/input seam).
      * @type {{up:boolean,down:boolean,left:boolean,right:boolean}}
      */
@@ -68,12 +70,18 @@ export class Input {
     this._drag = null;
     // Whether the current left press has moved far enough to count as a box drag.
     this._dragging = false;
+    // Space held: left-drag pans instead of selecting/placing.
+    this._spacePan = false;
+    // Active direct camera pan, in screen pixels, or null when not panning.
+    // { x, y, button } where button is the pointer button that started the pan.
+    this._panDrag = null;
 
     // Bound handlers retained so destroy() can remove the exact references.
     this._onMouseDown = this._handleMouseDown.bind(this);
     this._onMouseMove = this._handleMouseMove.bind(this);
     this._onMouseUp = this._handleMouseUp.bind(this);
     this._onContextMenu = this._handleContextMenu.bind(this);
+    this._onAuxClick = this._handleAuxClick.bind(this);
     this._onWheel = this._handleWheel.bind(this);
     this._onKeyDown = this._handleKeyDown.bind(this);
     this._onKeyUp = this._handleKeyUp.bind(this);
@@ -91,6 +99,7 @@ export class Input {
     window.addEventListener("mousemove", this._onMouseMove);
     window.addEventListener("mouseup", this._onMouseUp);
     el.addEventListener("contextmenu", this._onContextMenu);
+    el.addEventListener("auxclick", this._onAuxClick);
     el.addEventListener("wheel", this._onWheel, { passive: false });
     window.addEventListener("keydown", this._onKeyDown);
     window.addEventListener("keyup", this._onKeyUp);
@@ -104,6 +113,7 @@ export class Input {
     window.removeEventListener("mousemove", this._onMouseMove);
     window.removeEventListener("mouseup", this._onMouseUp);
     el.removeEventListener("contextmenu", this._onContextMenu);
+    el.removeEventListener("auxclick", this._onAuxClick);
     el.removeEventListener("wheel", this._onWheel);
     window.removeEventListener("keydown", this._onKeyDown);
     window.removeEventListener("keyup", this._onKeyUp);
@@ -139,6 +149,11 @@ export class Input {
   _handleMouseDown(ev) {
     const p = this._screenPos(ev);
     this.mouse = p;
+    if (ev.button === 1 || (ev.button === 0 && this._spacePan)) {
+      this._startPanDrag(p, ev.button);
+      ev.preventDefault();
+      return;
+    }
     if (ev.button === 0) {
       this._onLeftDown(p, ev);
     }
@@ -148,6 +163,15 @@ export class Input {
   _handleMouseMove(ev) {
     const p = this._screenPos(ev);
     this.mouse = p;
+
+    if (this._panDrag) {
+      this.camera.panByScreenDelta(p.x - this._panDrag.x, p.y - this._panDrag.y);
+      this._panDrag.x = p.x;
+      this._panDrag.y = p.y;
+      ev.preventDefault();
+      if (this.state.placement) this._refreshPlacement();
+      return;
+    }
 
     if (this._drag) {
       this._drag.x1 = p.x;
@@ -165,6 +189,11 @@ export class Input {
   }
 
   _handleMouseUp(ev) {
+    if (this._panDrag && ev.button === this._panDrag.button) {
+      this._panDrag = null;
+      ev.preventDefault();
+      return;
+    }
     if (ev.button !== 0) return;
     const p = this._screenPos(ev);
     this.mouse = p;
@@ -191,6 +220,10 @@ export class Input {
     this._onRightClick(p);
   }
 
+  _handleAuxClick(ev) {
+    if (ev.button === 1) ev.preventDefault();
+  }
+
   // --- Left-button logic --------------------------------------------------
 
   _onLeftDown(p, ev) {
@@ -209,6 +242,10 @@ export class Input {
     this._drag = { x0: p.x, y0: p.y, x1: p.x, y1: p.y };
     this._dragging = false;
     void ev;
+  }
+
+  _startPanDrag(p, button) {
+    this._panDrag = { x: p.x, y: p.y, button };
   }
 
   _dragDistance() {
@@ -479,32 +516,45 @@ export class Input {
     if (isTextEntry(ev.target)) return;
 
     switch (ev.code) {
-      case "KeyW":
       case "ArrowUp":
         this.keys.up = true;
-        return;
-      case "KeyS":
-        // S is also the Stop hotkey; pan is driven by ArrowDown only to avoid the
-        // clash, while WASD up/left/right still pan. (Down-pan via ArrowDown.)
-        this._issueStop();
+        ev.preventDefault();
         return;
       case "ArrowDown":
         this.keys.down = true;
-        return;
-      case "KeyA":
-        // A is both a pan key candidate and the attack-move hotkey. We use A for
-        // attack-move targeting (ArrowLeft pans left); avoids a pan/command clash.
-        this._enterAttackMove();
+        ev.preventDefault();
         return;
       case "ArrowLeft":
         this.keys.left = true;
+        ev.preventDefault();
         return;
-      case "KeyD":
       case "ArrowRight":
         this.keys.right = true;
+        ev.preventDefault();
         return;
       case "Escape":
         this._cancel();
+        ev.preventDefault();
+        return;
+      case "Space":
+        this._spacePan = true;
+        ev.preventDefault();
+        return;
+      default:
+        break;
+    }
+
+    if (ev.repeat) return;
+    if (this._activateCommandHotkey(ev)) return;
+
+    switch (ev.code) {
+      case "KeyA":
+        this._enterAttackMove();
+        ev.preventDefault();
+        return;
+      case "KeyS":
+        this._issueStop();
+        ev.preventDefault();
         return;
       default:
         return;
@@ -513,19 +563,25 @@ export class Input {
 
   _handleKeyUp(ev) {
     switch (ev.code) {
-      case "KeyW":
       case "ArrowUp":
         this.keys.up = false;
+        ev.preventDefault();
         return;
       case "ArrowDown":
         this.keys.down = false;
+        ev.preventDefault();
         return;
       case "ArrowLeft":
         this.keys.left = false;
+        ev.preventDefault();
         return;
-      case "KeyD":
       case "ArrowRight":
         this.keys.right = false;
+        ev.preventDefault();
+        return;
+      case "Space":
+        this._spacePan = false;
+        ev.preventDefault();
         return;
       default:
         return;
@@ -535,6 +591,27 @@ export class Input {
   /** Window blur: release all pan keys so the camera doesn't drift while away. */
   _handleBlur() {
     this.keys.up = this.keys.down = this.keys.left = this.keys.right = false;
+    this._spacePan = false;
+    this._panDrag = null;
+    if (this._drag) {
+      this._drag = null;
+      this._dragging = false;
+      this.renderer.drawSelectionBox(null);
+    }
+  }
+
+  _activateCommandHotkey(ev) {
+    const key = commandHotkeyFromEvent(ev);
+    if (!key) return false;
+    const card = document.getElementById("command-card");
+    if (!card) return false;
+    for (const btn of card.querySelectorAll("button[data-hotkey]")) {
+      if ((btn.dataset.hotkey || "").toUpperCase() !== key) continue;
+      ev.preventDefault();
+      if (!btn.disabled) btn.click();
+      return true;
+    }
+    return false;
   }
 
   _enterAttackMove() {
@@ -589,4 +666,10 @@ function isTextEntry(el) {
   if (!el) return false;
   const tag = el.tagName;
   return tag === "INPUT" || tag === "TEXTAREA" || el.isContentEditable === true;
+}
+
+/** Command-card hotkeys are single letter keys, matched against button data-hotkey. */
+function commandHotkeyFromEvent(ev) {
+  if (!ev || typeof ev.code !== "string" || !ev.code.startsWith("Key")) return "";
+  return ev.code.slice(3).toUpperCase();
 }
