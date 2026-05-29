@@ -21,7 +21,8 @@
         Game:   #game-screen, #viewport (Pixi canvas mounts here),
                 #hud, #res-minerals, #res-gas, #res-supply,
                 #minimap (canvas), #selected-panel, #command-card,
-                #game-over, #game-over-text, #game-over-button, #toast
+                #game-over, #game-over-text, #game-over-button
+        App:    #toast
     -->
     <div id="app">
       <!-- ============================ LOBBY ============================ -->
@@ -78,9 +79,6 @@
         <!-- Bottom-right command card -->
         <div id="command-card"></div>
 
-        <!-- Transient notice toast -->
-        <div id="toast" hidden></div>
-
         <!-- Game over overlay -->
         <div id="game-over" hidden>
           <div class="game-over-box">
@@ -89,6 +87,9 @@
           </div>
         </div>
       </section>
+
+      <!-- Transient notice toast -->
+      <div id="toast" hidden></div>
     </div>
 
     <script type="module" src="./src/main.js"></script>

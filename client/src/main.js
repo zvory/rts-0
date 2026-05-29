@@ -70,6 +70,8 @@ class App {
     this.toastTimer = undefined;
     /** @type {number|undefined} heartbeat interval id while connected. */
     this.heartbeatTimer = undefined;
+    /** Whether the WebSocket has ever reached open in this page session. */
+    this.hasConnected = false;
 
     // Bind handlers once so we can off() them symmetrically.
     this.onStart = this.onStart.bind(this);
@@ -93,7 +95,7 @@ class App {
     try {
       await this.net.connect();
     } catch (err) {
-      this.showToast(`Connection failed: ${err && err.message ? err.message : err}`);
+      this.showConnectionWarning();
     }
   }
 
@@ -112,6 +114,7 @@ class App {
    * so we never spam pings before then.
    */
   onOpen() {
+    this.hasConnected = true;
     this.stopHeartbeat();
     this.heartbeatTimer = window.setInterval(() => this.net.ping(), HEARTBEAT_MS);
   }
@@ -119,6 +122,10 @@ class App {
   /** Socket closed: stop the heartbeat so we don't leak the interval. */
   onClose() {
     this.stopHeartbeat();
+    const text = this.hasConnected
+      ? "Server connection lost. Refresh when the server is available."
+      : "Unable to connect to the server. Make sure it is running, then refresh.";
+    this.showConnectionWarning(text);
   }
 
   /** Clear the heartbeat interval if one is running. Idempotent. */
@@ -186,6 +193,18 @@ class App {
     this.toastTimer = window.setTimeout(() => {
       dom.toast.hidden = true;
     }, TOAST_MS);
+  }
+
+  /**
+   * Surface server connection failures in both the global toast and the lobby
+   * status line, so the warning is visible before a match starts.
+   * @param {string} [text]
+   */
+  showConnectionWarning(
+    text = "Unable to connect to the server. Make sure it is running, then refresh.",
+  ) {
+    this.showToast(text);
+    if (this.lobby) this.lobby.setStatus(text, true);
   }
 }
 
