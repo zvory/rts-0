@@ -182,7 +182,8 @@ src/
     entity.rs    # Entity, EntityKind, EntityStore (slotmap-style Vec + free list)
     pathfinding.rs # A* over the tile grid (impassable = terrain + building footprints)
     fog.rs       # per-player visibility grid (visible / explored)
-    systems.rs   # per-tick systems: orders, movement, combat, gather, production, death
+    systems.rs   # orchestrator: runs services in order each tick
+    services/    # per-tick internal services: commands, movement, combat, economy, production, construction, death, occupancy, supply
     ai.rs        # optional computer opponents: one AiController per AI player (see §8)
     replay.rs    # tick-stamped command log replay harness for determinism checks
     selfplay.rs  # test-only API-driven scripted self-play harness (see §9)
@@ -517,7 +518,7 @@ player standing wins; a 1-player match never ends (sandbox/exploration mode).
 ## 6. Conventions
 - Rust: edition 2021, `cargo fmt`, `#![deny(warnings)]` off (warnings ok), no `unwrap()` on
   network/parse paths — handle errors and keep the room alive. Prefer small pure functions in
-  `systems.rs`. Avoid panics in the tick loop.
+  `services/`. Avoid panics in the tick loop.
 - JS: ES2020 modules, no framework, small classes per §4, JSDoc on public methods, no global
   state except `PIXI`. Pure helpers where possible.
 - Both: names match this doc. Document any deviation here in the same change.
@@ -529,9 +530,9 @@ player standing wins; a 1-player match never ends (sandbox/exploration mode).
 The server treats every client as potentially hostile. Limits live next to the code:
 - **WebSocket frame cap** (`main.rs`): `max_message_size`/`max_frame_size` = 256 KiB. Oversized
   frames are rejected and the connection closed before they reach serde.
-- **Command unit cap** (`systems.rs` `MAX_UNITS_PER_COMMAND = 256`): unit-list commands are
+- **Command unit cap** (`services/commands.rs` `MAX_UNITS_PER_COMMAND = 256`): unit-list commands are
   deduped and capped before per-unit work, so a repeated/huge id list can't trigger an A* storm.
-- **Bounds-checked placement** (`systems.rs` `footprint_tiles`): tile math uses `checked_add` and
+- **Bounds-checked placement** (`services/occupancy.rs` `footprint_tiles`): tile math uses `checked_add` and
   out-of-range build coords are rejected — the tick loop never panics on adversarial input.
 - **Idle timeout + heartbeat**: the server drops connections idle for `IDLE_TIMEOUT = 40s`
   (`main.rs`); the client pings every 15s (`main.js`). This evicts half-open/stuck clients so a
@@ -555,7 +556,7 @@ empties of humans.
 **Where it runs.** `Game` holds one `AiController` per AI player and drives them at the top of
 `tick()`, *before* commands are applied. Each controller pushes ordinary `Command`s onto the same
 pending queue a human client feeds, so every AI action goes through the identical
-validation / cost / supply / placement path in `systems.rs` — the AI has **no special authority**
+validation / cost / supply / placement path in `services/commands.rs` — the AI has **no special authority**
 over the simulation and can't cheat economy or placement rules. Because the controller is
 server-side (not a network client) it reads authoritative state directly rather than a fog-filtered
 snapshot; that is not a fog violation (fog only guards what's sent to *human* clients over the

@@ -4,7 +4,7 @@
 //! [`crate::game::Game::tick`] every tick, *before* queued commands are applied, and it pushes
 //! ordinary [`Command`]s onto the same pending queue a human client would use. That means the AI
 //! has no special powers: its commands run through the identical validation/cost/supply/placement
-//! path in `systems.rs`, so it can never spend resources it lacks or place buildings illegally —
+//! path in `services/commands.rs`, so it can never spend resources it lacks or place buildings illegally —
 //! invalid attempts simply fail silently the same way a human's would.
 //!
 //! The strategy is deliberately simple ("very basic AI"): keep workers mining, expand supply with

@@ -3,7 +3,7 @@
 ## Active, In Order
 
  - [x] Replace stringly entity kind checks in hot simulation paths with typed internal enums, converting to protocol strings only at the boundary.
- - [ ] Split `systems.rs` into internal services before adding complex mechanics: commands, movement, combat, economy, production, construction, death, occupancy.
+ - [x] Split `systems.rs` into internal services before adding complex mechanics: commands, movement, combat, economy, production, construction, death, occupancy.
  - [ ] Add a spatial query layer used by combat, fog, resource search, collision/steering, and snapshot interest filtering.
  - [ ] Introduce a `PathingService` boundary with unit class, radius/footprint, terrain mask, dynamic blockers, path budget, and cached/reusable results.
  - [ ] Extend map/passability around movement classes before terrain-specific combat and tank/infantry rules land.

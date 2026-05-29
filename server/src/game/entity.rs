@@ -1,7 +1,7 @@
 //! Entities and their storage. See `DESIGN.md` §3 (`entity.rs`).
 //!
 //! An [`Entity`] is the single mutable record for any unit, building, or resource node
-//! in the simulation. The simulation systems (`systems.rs`) read and mutate these records
+//! in the simulation. The simulation services (`services/`) read and mutate these records
 //! every tick; the snapshot layer (`mod.rs`) projects them into `protocol::EntityView`.
 //!
 //! Storage is an [`EntityStore`]: a `HashMap<u32, Entity>` keyed by a stable, monotonically
