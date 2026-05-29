@@ -9,6 +9,14 @@ A server-authoritative RTS: a **Rust** server (`server/`, axum + tokio) runs the
 simulation and also serves the **HTML/CSS/JS + PixiJS** client (`client/`). Clients send commands;
 the server simulates at 30 Hz and sends per-player, fog-filtered snapshots.
 
+## Git / GitHub
+
+- This repo is **local-only git**. Do not add remotes, push branches, create/open/update PRs, or
+  use `gh`/GitHub/browser flows for repo work.
+- When work is complete, make a **local commit only**, staging only the files that belong to the
+  current task.
+- Branches are prefixed `zvorygin/`.
+
 ## Commands
 
 ```bash
@@ -69,5 +77,3 @@ There is **no JS build step** (plain ES modules + PixiJS from CDN). The client i
   drive the live server/client end to end). After any change, run all three and confirm green.
 - A 1-player match is a never-ending sandbox; only 2+ player matches resolve to a winner. Empty
   rooms reset to lobby so a room name is never stuck mid-match.
-- This repo is currently **local-only git** (no remote). Branches are prefixed `zvorygin/`.
-  Commit after making changes.
