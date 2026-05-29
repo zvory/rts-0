@@ -1,5 +1,5 @@
 /*
- * RTS client styles — muted low-resolution field-command palette.
+ * Bewegungskrieg client styles — muted low-resolution field-command palette.
  *
  * Goals (DESIGN.md §4.2): clean, modern, lightweight. No CSS frameworks.
  * The DOM is the pinned markup in index.html; PixiJS owns #viewport's canvas.

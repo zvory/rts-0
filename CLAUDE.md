@@ -5,7 +5,7 @@ architecture, the JSON wire protocol, every module's contract, the `Game` API se
 table, and the hardening limits (§7). Keep `DESIGN.md` updated in the same change whenever you
 alter a contract.
 
-A server-authoritative RTS: a **Rust** server (`server/`, axum + tokio) runs the one authoritative
+A server-authoritative Bewegungskrieg server (`server/`, axum + tokio) runs the one authoritative
 simulation and also serves the **HTML/CSS/JS + PixiJS** client (`client/`). Clients send commands;
 the server simulates at 30 Hz and sends per-player, fog-filtered snapshots.
 

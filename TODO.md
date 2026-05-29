@@ -7,7 +7,7 @@
  - [x] Add a spatial query layer used by combat, fog, resource search, collision/steering, and snapshot interest filtering.
   - [x] Introduce a `PathingService` boundary with unit class, radius/footprint, terrain mask, dynamic blockers, path budget, and cached/reusable results.
  - [x] Extend map/passability around movement classes before terrain-specific combat and tank/infantry rules land.
- - [ ] Rename the game officially to Bewegungskrieg.
+ - [x] Rename the game officially to Bewegungskrieg.
  - [ ] Restyle the main menu to be more ww2 themed, less scifi.
  - [ ] Enforce map-generation resource fairness: Industrial Centers must keep a minimum distance from minerals and gas, and spawn layouts should precisely control resource distances so no player gets an advantage from patches or geysers being too close or too far.
  - [ ] Fix workers getting stuck inside buildings after building them.

@@ -1,4 +1,4 @@
-# RTS
+# Bewegungskrieg
 
 A small but complete real-time-strategy game with a neutral World War II-inspired,
 PlayStation 1-style presentation — gather resources, build a base, train an army, scout
