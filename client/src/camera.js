@@ -1,0 +1,176 @@
+// Camera — the player's view into the world. See DESIGN.md §4.1 / §4.2.
+//
+// The camera holds the world-space coordinate of the viewport's top-left corner
+// (`x`, `y`) and a `zoom` factor. World units are pixels at zoom 1; on screen a
+// world distance `d` covers `d * zoom` device-independent pixels.
+//
+// Panning comes from three sources, all applied in `update(dt, input)`:
+//   - keyboard (WASD + arrow keys),
+//   - screen-edge scrolling (cursor within `CAMERA.edgeScrollPx` of a viewport edge),
+// and the result is always clamped so the visible rectangle stays inside the map.
+//
+// The renderer drives the Pixi world container from `x`, `y`, `zoom`; the input
+// layer uses `screenToWorld` for picking and `worldToScreen` for overlays.
+
+import { CAMERA } from "./config.js";
+
+export class Camera {
+  /**
+   * @param {number} [viewW] initial viewport width in screen px
+   * @param {number} [viewH] initial viewport height in screen px
+   */
+  constructor(viewW = 0, viewH = 0) {
+    /** World x of the viewport's top-left corner. */
+    this.x = 0;
+    /** World y of the viewport's top-left corner. */
+    this.y = 0;
+    /** Zoom factor: screen px per world px. */
+    this.zoom = 1;
+
+    /** Map extent in world px. Set via {@link Camera#setBounds}. */
+    this.worldW = 0;
+    this.worldH = 0;
+    /** Viewport extent in screen px. */
+    this.viewW = viewW;
+    this.viewH = viewH;
+  }
+
+  /**
+   * Record the map size (world px) and the viewport size (screen px). Used to
+   * clamp panning and to keep the zoom within a range that can still fill the
+   * viewport. Safe to call on every resize.
+   * @param {number} worldW map width in world px
+   * @param {number} worldH map height in world px
+   * @param {number} viewW viewport width in screen px
+   * @param {number} viewH viewport height in screen px
+   */
+  setBounds(worldW, worldH, viewW, viewH) {
+    this.worldW = worldW;
+    this.worldH = worldH;
+    this.viewW = viewW;
+    this.viewH = viewH;
+    this._clamp();
+  }
+
+  /**
+   * Advance the camera one frame: apply keyboard + screen-edge panning, then clamp.
+   * @param {number} dt seconds since the previous frame
+   * @param {object} [input] read-only view of current input state
+   * @param {{up:boolean,down:boolean,left:boolean,right:boolean}} [input.keys] pan flags
+   *   owned by Input (WASD and arrows both feed these; reset on blur)
+   * @param {{x:number,y:number}|null} [input.mouse] cursor position in screen px, or null if outside
+   */
+  update(dt, input) {
+    if (!input) return;
+
+    // Pan speed is defined at zoom 1; zooming in should pan slower in world space
+    // so the on-screen pan rate feels constant.
+    const speed = (CAMERA.panSpeed * dt) / this.zoom;
+    let dx = 0;
+    let dy = 0;
+
+    // Input owns the pan state as semantic direction flags (see input.js `this.keys`).
+    const keys = input.keys;
+    if (keys) {
+      if (keys.left) dx -= 1;
+      if (keys.right) dx += 1;
+      if (keys.up) dy -= 1;
+      if (keys.down) dy += 1;
+    }
+
+    // Screen-edge scrolling: nudge when the cursor hugs a viewport edge.
+    const m = input.mouse;
+    const band = CAMERA.edgeScrollPx;
+    if (m && this.viewW > 0 && this.viewH > 0) {
+      if (m.x <= band) dx -= 1;
+      else if (m.x >= this.viewW - band) dx += 1;
+      if (m.y <= band) dy -= 1;
+      else if (m.y >= this.viewH - band) dy += 1;
+    }
+
+    if (dx !== 0 || dy !== 0) {
+      this.x += dx * speed;
+      this.y += dy * speed;
+      this._clamp();
+    }
+  }
+
+  /**
+   * Convert a world point to its on-screen position (device-independent px).
+   * @param {number} wx
+   * @param {number} wy
+   * @returns {{x:number, y:number}}
+   */
+  worldToScreen(wx, wy) {
+    return {
+      x: (wx - this.x) * this.zoom,
+      y: (wy - this.y) * this.zoom,
+    };
+  }
+
+  /**
+   * Convert an on-screen point (device-independent px) to a world point.
+   * @param {number} sx
+   * @param {number} sy
+   * @returns {{x:number, y:number}}
+   */
+  screenToWorld(sx, sy) {
+    return {
+      x: this.x + sx / this.zoom,
+      y: this.y + sy / this.zoom,
+    };
+  }
+
+  /**
+   * Center the viewport on a world point (then clamp to bounds).
+   * @param {number} wx
+   * @param {number} wy
+   */
+  centerOn(wx, wy) {
+    this.x = wx - this.viewW / (2 * this.zoom);
+    this.y = wy - this.viewH / (2 * this.zoom);
+    this._clamp();
+  }
+
+  /**
+   * Set the zoom factor (clamped to CAMERA.min/maxZoom) keeping a screen anchor
+   * fixed in world space. With no anchor the viewport center is held.
+   * @param {number} zoom target zoom
+   * @param {number} [anchorSx] screen-space anchor x (defaults to viewport center)
+   * @param {number} [anchorSy] screen-space anchor y (defaults to viewport center)
+   */
+  setZoom(zoom, anchorSx, anchorSy) {
+    const ax = anchorSx == null ? this.viewW / 2 : anchorSx;
+    const ay = anchorSy == null ? this.viewH / 2 : anchorSy;
+    // World point currently under the anchor; we keep it pinned after zooming.
+    const before = this.screenToWorld(ax, ay);
+    this.zoom = Math.max(CAMERA.minZoom, Math.min(CAMERA.maxZoom, zoom));
+    const after = this.screenToWorld(ax, ay);
+    this.x += before.x - after.x;
+    this.y += before.y - after.y;
+    this._clamp();
+  }
+
+  /**
+   * Clamp `x`/`y` so the visible world rectangle stays within the map. When the
+   * map is smaller than the viewport along an axis it is centered on that axis.
+   * @private
+   */
+  _clamp() {
+    if (this.worldW <= 0 || this.worldH <= 0) return;
+    const visW = this.viewW / this.zoom;
+    const visH = this.viewH / this.zoom;
+
+    if (visW >= this.worldW) {
+      this.x = (this.worldW - visW) / 2; // center horizontally
+    } else {
+      this.x = Math.max(0, Math.min(this.worldW - visW, this.x));
+    }
+
+    if (visH >= this.worldH) {
+      this.y = (this.worldH - visH) / 2; // center vertically
+    } else {
+      this.y = Math.max(0, Math.min(this.worldH - visH, this.y));
+    }
+  }
+}

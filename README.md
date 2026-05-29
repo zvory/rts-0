@@ -60,6 +60,17 @@ The wire protocol is defined in two mirrored files that must stay in sync:
 `server/src/protocol.rs` and `client/src/protocol.js`. Balance lives in
 `server/src/config.rs` (authoritative) mirrored by `client/src/config.js`.
 
+### Tests
+
+End-to-end tests live in `tests/` and run against a live server (`cargo run` first):
+
+```bash
+node tests/server_integration.mjs    # no deps; drives the full server pipeline over WebSocket
+cd tests && npm install && node client_smoke.mjs   # headless-Chrome client smoke test
+```
+
+See `tests/README.md` for details.
+
 ## Known future work
 - Upgrade PixiJS v7 → v8 (async `Application.init`).
 - Unit-vs-unit collision avoidance / flocking (units currently soft-overlap).
