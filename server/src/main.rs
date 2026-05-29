@@ -14,6 +14,7 @@ mod lobby;
 mod protocol;
 
 use std::net::SocketAddr;
+use std::process::Command;
 use std::time::Duration;
 
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
@@ -42,6 +43,7 @@ const IDLE_TIMEOUT: Duration = Duration::from_secs(40);
 #[derive(Clone)]
 struct AppState {
     lobby: Lobby,
+    version: String,
 }
 
 #[tokio::main]
@@ -55,6 +57,7 @@ async fn main() {
 
     let state = AppState {
         lobby: Lobby::new(),
+        version: git_version(),
     };
 
     // Resolve the client dir relative to the crate, so the working directory doesn't matter.
@@ -65,6 +68,7 @@ async fn main() {
         ServeDir::new(client_dir).fallback(ServeFile::new(format!("{client_dir}/index.html")));
 
     let app = Router::new()
+        .route("/version", get(version_handler))
         .route("/ws", get(ws_handler))
         .fallback_service(static_service)
         .with_state(state);
@@ -99,6 +103,34 @@ async fn ws_handler(ws: WebSocketUpgrade, State(state): State<AppState>) -> impl
     ws.max_message_size(256 * 1024)
         .max_frame_size(256 * 1024)
         .on_upgrade(move |socket| handle_connection(socket, state.lobby))
+}
+
+/// Return the short git commit SHA that identifies this build.
+async fn version_handler(State(state): State<AppState>) -> String {
+    state.version
+}
+
+/// Resolve the current build version as the first four characters of `git rev-parse --short=4 HEAD`.
+/// If git is unavailable, fall back to `unknown` so the server still starts.
+fn git_version() -> String {
+    let output = Command::new("git")
+        .current_dir(env!("CARGO_MANIFEST_DIR"))
+        .args(["rev-parse", "--short=4", "HEAD"])
+        .output();
+
+    let Ok(output) = output else {
+        return "unknown".to_string();
+    };
+    if !output.status.success() {
+        return "unknown".to_string();
+    }
+
+    let text = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    if text.is_empty() {
+        "unknown".to_string()
+    } else {
+        text
+    }
 }
 
 /// Drive one client connection end to end.
