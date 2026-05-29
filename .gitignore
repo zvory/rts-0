@@ -1,0 +1,13 @@
+# Rust
+/server/target
+**/*.rs.bk
+Cargo.lock.orig
+
+# OS / editor
+.DS_Store
+*.swp
+.idea/
+.vscode/
+
+# Logs
+*.log
