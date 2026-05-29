@@ -12,6 +12,12 @@ import { cmd } from "./protocol.js";
 import { KIND, STATE, isBuilding, isUnit } from "./protocol.js";
 import { STATS, WORKER_BUILDABLE } from "./config.js";
 
+// Command-card hotkeys follow the keyboard grid (3 columns):
+//   Q W E
+//   A S D
+//   Z X C
+const GRID_HOTKEYS = Object.freeze(["Q", "W", "E", "A", "S", "D", "Z", "X", "C"]);
+
 /**
  * The bottom/top DOM HUD: resources, selected panel, and the command card.
  *
@@ -226,11 +232,11 @@ export class HUD {
     this._cardSig = sig;
 
     const frag = document.createDocumentFragment();
+    let idx = 0;
     const actionButtons = [
       {
         icon: "MV",
         label: "Move",
-        hotkey: "V",
         title: "Move to a target point",
         active: this.state.commandTarget === "move",
         onClick: () => this.state.beginCommandTarget("move"),
@@ -238,7 +244,6 @@ export class HUD {
       {
         icon: "AT",
         label: "Attack",
-        hotkey: "A",
         title: "Attack a target or attack-move to a point",
         active: this.state.commandTarget === "attack",
         onClick: () => this.state.beginCommandTarget("attack"),
@@ -246,7 +251,6 @@ export class HUD {
       {
         icon: "HD",
         label: "Hold",
-        hotkey: "S",
         title: "Hold position / stop selected units",
         onClick: () => {
           this.net.command(cmd.stop(unitIds));
@@ -258,6 +262,7 @@ export class HUD {
     for (const action of actionButtons) {
       frag.appendChild(this._cmdButton({
         ...action,
+        hotkey: GRID_HOTKEYS[idx++],
         enabled: unitIds.length > 0,
         cls: action.active ? "active" : "",
       }));
@@ -272,7 +277,7 @@ export class HUD {
         frag.appendChild(this._cmdButton({
           icon: st.icon,
           label: st.label,
-          hotkey: st.hotkey,
+          hotkey: GRID_HOTKEYS[idx++],
           cost: st.cost,
           enabled,
           title: reason,
@@ -301,6 +306,7 @@ export class HUD {
     this._cardSig = sig;
 
     const frag = document.createDocumentFragment();
+    let idx = 0;
     for (const kind of WORKER_BUILDABLE) {
       const st = STATS[kind];
       if (!st) continue;
@@ -309,7 +315,7 @@ export class HUD {
       const btn = this._cmdButton({
         icon: st.icon,
         label: st.label,
-        hotkey: st.hotkey,
+        hotkey: GRID_HOTKEYS[idx++],
         cost: st.cost,
         enabled,
         title: reason,
@@ -362,6 +368,7 @@ export class HUD {
     this._cardSig = sig;
 
     const frag = document.createDocumentFragment();
+    let idx = 0;
     for (const unit of trains) {
       const st = STATS[unit];
       if (!st) continue;
@@ -369,7 +376,7 @@ export class HUD {
       const btn = this._cmdButton({
         icon: st.icon,
         label: st.label,
-        hotkey: st.hotkey,
+        hotkey: GRID_HOTKEYS[idx++],
         cost: st.cost,
         enabled,
         title: this._trainDisabledReason(unit, res),
@@ -382,7 +389,7 @@ export class HUD {
       const cancelBtn = this._cmdButton({
         icon: "✕",
         label: "Cancel",
-        hotkey: "Esc",
+        hotkey: GRID_HOTKEYS[idx++],
         enabled: true,
         cls: "cancel",
         title: "Cancel current production",

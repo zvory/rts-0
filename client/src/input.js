@@ -11,8 +11,8 @@
 //   - Build placement mode (started by the HUD via state.beginPlacement): track the
 //     hovered tile, validate the footprint, drive the renderer ghost via
 //     state.updatePlacement, confirm with a valid left-click, cancel with right/Esc.
-//   - Keyboard: command-card hotkeys take priority; A = attack-move targeting,
-//     S = stop, Esc = cancel placement/targeting.
+//   - Keyboard: command-card grid hotkeys (QWE/ASD/ZXC) activate buttons directly;
+//     Esc cancels placement/targeting; A and S also fall back to attack-move and stop.
 //   - Mouse wheel = camera zoom toward the cursor.
 //   - Arrow-key pan state is OWNED here and exposed via `this.keys` so the camera can
 //     read it in Camera.update(dt, input) — see the `keys` field documentation below.
