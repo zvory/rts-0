@@ -72,6 +72,10 @@ pub enum ClientMessage {
     Ready { ready: bool },
     /// Host requests the match to begin.
     Start,
+    /// Host adds a computer-controlled opponent to the room (lobby phase only).
+    AddAi,
+    /// Host removes a previously-added AI opponent by its player id (lobby phase only).
+    RemoveAi { id: u32 },
     /// Issue a gameplay command (ignored unless in-game).
     Command { cmd: Command },
     /// Latency probe.
@@ -158,6 +162,9 @@ pub struct LobbyPlayer {
     pub name: String,
     pub ready: bool,
     pub color: String,
+    /// True for computer opponents (no socket). The client uses this to label the row and show a
+    /// host-only "remove" control instead of a ready indicator.
+    pub is_ai: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]

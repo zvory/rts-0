@@ -17,7 +17,7 @@
     <!--
       DOM contract (pinned). JS modules query these ids/classes — keep them stable.
         Lobby:  #lobby-screen, #lobby-name, #lobby-room, #lobby-join, #lobby-players,
-                #lobby-ready, #lobby-start, #lobby-status
+                #lobby-ready, #lobby-add-ai, #lobby-start, #lobby-status
         Game:   #game-screen, #viewport (Pixi canvas mounts here),
                 #hud, #res-minerals, #res-gas, #res-supply,
                 #minimap (canvas), #selected-panel, #command-card,
@@ -48,12 +48,13 @@
             <ul id="lobby-players" class="player-list"></ul>
             <div class="lobby-actions">
               <button id="lobby-ready" class="btn">Ready</button>
+              <button id="lobby-add-ai" class="btn host-only" hidden>+ Add AI</button>
               <button id="lobby-start" class="btn primary" disabled>Start match</button>
             </div>
           </div>
 
           <p id="lobby-status" class="status"></p>
-          <p class="hint">Open this page in two windows to play head-to-head. A solo start is a peaceful sandbox.</p>
+          <p class="hint">Open this page in two windows to play head-to-head, or add an AI opponent. A solo start with no AI is a peaceful sandbox.</p>
         </div>
       </section>
 

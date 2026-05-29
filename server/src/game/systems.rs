@@ -540,8 +540,9 @@ fn footprint_center(map: &Map, building: &str, tile_x: u32, tile_y: u32) -> (f32
 }
 
 /// Whether `building`'s footprint at `(tile_x, tile_y)` is fully in bounds, on passable
-/// terrain, and clear of existing building footprints and resource nodes.
-fn footprint_placeable(
+/// terrain, and clear of existing building footprints and resource nodes. `(tile_x, tile_y)` is
+/// the footprint's top-left tile. Shared with the AI (`ai.rs`) for picking valid build sites.
+pub(crate) fn footprint_placeable(
     map: &Map,
     entities: &EntityStore,
     building: &str,

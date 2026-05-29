@@ -62,6 +62,8 @@ short but readable. Coordinates are **world pixels** (floats) unless a field nam
 | `join`     | `name: string`, `room?: string` | Join (or create) a room. `room` defaults to `"main"`. |
 | `ready`    | `ready: bool` | Toggle ready state in the lobby. |
 | `start`    | — | Host asks to start the match (only honored from the room host). |
+| `addAi`    | — | Host adds a computer opponent to the room (lobby phase only, host-only). |
+| `removeAi` | `id: u32` | Host removes a previously-added AI opponent by id (lobby phase only, host-only). |
 | `command`  | `cmd: Command` | Issue a gameplay command (see below). Ignored unless in-game. |
 | `ping`     | `ts: number` | Latency probe; server replies with `pong`. |
 
@@ -93,7 +95,9 @@ illegal placements, or unaffordable actions (fail silently or emit a `notice` ev
 | `pong`     | `ts: number` (echo of the ping ts) |
 | `error`    | `msg: string` |
 
-`LobbyPlayer`: `{ id: u32, name: string, ready: bool, color: string }`.
+`LobbyPlayer`: `{ id: u32, name: string, ready: bool, color: string, isAi: bool }`. `isAi` is
+true for computer opponents (always shown ready; the client renders an "AI" tag and a host-only
+remove control instead of a ready toggle).
 
 ### 2.3 `start` payload
 Sent once when the match begins. Carries everything static for the whole match.
@@ -179,6 +183,7 @@ src/
     pathfinding.rs # A* over the tile grid (impassable = terrain + building footprints)
     fog.rs       # per-player visibility grid (visible / explored)
     systems.rs   # per-tick systems: orders, movement, combat, gather, production, death
+    ai.rs        # optional computer opponents: one AiController per AI player (see §8)
 ```
 
 ### 3.1 `game::Game` public API (seam between `game` and `lobby`/`main`)
@@ -215,18 +220,23 @@ impl Game {
     pub fn tick_count(&self) -> u32;
 }
 
-pub struct PlayerInit { pub id: u32, pub name: String, pub color: String }
+pub struct PlayerInit { pub id: u32, pub name: String, pub color: String, pub is_ai: bool }
 ```
 `StartPayload`, `Snapshot`, `Command`, `Event` are the serde types from `protocol.rs`.
 (`game` may use internal types and convert at the boundary, or use protocol types directly —
 implementer's choice, but `snapshot_for`/`start_payload` must return protocol types.)
 
+`PlayerInit.is_ai` marks a computer-controlled player. AI players are full players in every
+respect (they get a start position, HQ, workers, economy, and count toward win/elimination); the
+only difference is they have no socket. `Game` owns one `AiController` per AI player and drives
+them at the top of `tick()` — see §8.
+
 ### 3.2 Concurrency model
 - One tokio task per **room** owns its `Game` and runs the tick loop (`tokio::time::interval`).
 - Each **connection** is a task with an `mpsc::Sender<ServerMessage>` to push to its socket.
 - Connection→room communication uses an `mpsc` channel of internal `RoomEvent`
-  (`Join`, `Leave`, `Ready`, `StartRequest`, `Command`). The room task is the single
-  writer of game state — no locks around `Game`.
+  (`Join`, `Leave`, `Ready`, `StartRequest`, `AddAi`, `RemoveAi`, `Command`). The room task is the
+  single writer of game state — no locks around `Game`.
 - The room task, each tick: drain commands → `game.tick()` → for each connected player
   `game.snapshot_for(pid)` → send. Lobby phase: broadcast `lobby` on changes.
 
@@ -465,3 +475,35 @@ The server treats every client as potentially hostile. Limits live next to the c
   on an accept, so a rejected mid-match join doesn't wedge the socket.
 - **Fog is authoritative**: `snapshot_for` and per-recipient event delivery gate entity views,
   `target_id` tracers, and death events on visibility — hidden enemies are never sent.
+
+---
+
+## 8. AI opponents (optional, `game/ai.rs`)
+
+Computer opponents are **opt-in**: a room has none unless the host adds them from the lobby
+(`addAi` / `removeAi`, host-only, lobby phase only). They are capped with humans at
+`MAX_PLAYERS = 4` (the map lays out at most four symmetric starts). AI players are seated after
+the humans in the lobby player list; their colors come from the tail of `PLAYER_PALETTE` so they
+never collide with human colors. They persist across rematches and are cleared only when the room
+empties of humans.
+
+**Where it runs.** `Game` holds one `AiController` per AI player and drives them at the top of
+`tick()`, *before* commands are applied. Each controller pushes ordinary `Command`s onto the same
+pending queue a human client feeds, so every AI action goes through the identical
+validation / cost / supply / placement path in `systems.rs` — the AI has **no special authority**
+over the simulation and can't cheat economy or placement rules. Because the controller is
+server-side (not a network client) it reads authoritative state directly rather than a fog-filtered
+snapshot; that is not a fog violation (fog only guards what's sent to *human* clients over the
+wire). To stay fair it only ever targets enemy **start tiles**, which are public via the `start`
+payload.
+
+**Strategy (deliberately "very basic").** Each controller, on a staggered cadence
+(`DECISION_INTERVAL` ticks): keeps idle workers mining the nearest mineral patch; trains workers
+up to `TARGET_WORKERS`; builds a depot when supply is about to choke; builds up to
+`TARGET_BARRACKS` barracks; pumps soldiers from each barracks; and once `WAVE_SIZE` soldiers are
+free, attack-moves them at the nearest living enemy's base. It does not micro, tech to heavies, or
+scout. A local per-think budget prevents it from over-committing minerals/supply it doesn't have.
+
+**Win/elimination.** AI players count exactly like humans: a 1-human + N-AI match is a real match
+(it resolves to a winner), while a lone human with no AI remains a never-ending sandbox. The
+lobby's `match_player_count` is humans **+** AIs.

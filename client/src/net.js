@@ -119,6 +119,19 @@ export class Net {
     this._send(msg.start());
   }
 
+  /** Add a computer opponent to the room (host-only; ignored by the server otherwise). */
+  addAi() {
+    this._send(msg.addAi());
+  }
+
+  /**
+   * Remove a previously-added AI opponent by its player id (host-only).
+   * @param {number} id the AI player's id from the lobby list.
+   */
+  removeAi(id) {
+    this._send(msg.removeAi(id));
+  }
+
   /**
    * Issue a gameplay command.
    * @param {object} cmd a command object built via protocol.js `cmd.*`.

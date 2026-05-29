@@ -270,6 +270,65 @@ input[type="text"]:focus {
 .lobby-actions .btn {
   flex: 1 1 0;
 }
+/* The Add AI button is only shown to the host (toggled via [hidden] in lobby.js). */
+.lobby-actions #lobby-add-ai {
+  flex: 0 0 auto;
+}
+
+/* Player row pieces (class names emitted by lobby.js). */
+.player-list .player-color {
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  flex: 0 0 auto;
+  box-shadow: 0 0 8px currentColor;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+}
+.player-list .player-name {
+  flex: 1 1 auto;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.player-list .player-tags {
+  display: inline-flex;
+  gap: 6px;
+}
+.player-list .tag {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  border-radius: 4px;
+  padding: 1px 6px;
+}
+.player-list .tag.host {
+  color: var(--supply);
+  border: 1px solid rgba(240, 198, 74, 0.4);
+}
+.player-list .tag.ai {
+  color: var(--ink-faint);
+  border: 1px solid var(--panel-edge);
+}
+.player-list .player-ready {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink-faint);
+}
+.player-list .player-ready.ready {
+  color: var(--good);
+}
+/* Host-only remove control on AI rows. */
+.player-list .player-remove {
+  flex: 0 0 auto;
+  padding: 2px 8px;
+  font-size: 12px;
+  line-height: 1;
+  color: var(--bad);
+}
+.player-list li.is-ai {
+  opacity: 0.92;
+}
 
 .status {
   margin: 14px 0 0;

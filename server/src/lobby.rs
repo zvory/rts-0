@@ -33,6 +33,10 @@ const PLAYER_PALETTE: [&str; 6] = [
     "#3aa0ff", "#ff5a4d", "#46d36b", "#f0c64a", "#b96cff", "#ff9a3c",
 ];
 
+/// Hard cap on players in a single match (humans + AI). The map generator lays out at most four
+/// symmetric start positions, so we never seat more than this.
+const MAX_PLAYERS: usize = 4;
+
 /// Bound on a player's outbound message queue. Generous enough to absorb a brief render stall
 /// but small enough that a truly dead client is detected (a full queue ⇒ treated as gone) and
 /// dropped instead of buffering unboundedly.
@@ -70,6 +74,10 @@ pub enum RoomEvent {
     Ready { player_id: u32, ready: bool },
     /// The host requested the match to begin (honored only from the host when `can_start`).
     StartRequest { player_id: u32 },
+    /// The host asked to add a computer opponent (lobby phase only; honored only from the host).
+    AddAi { player_id: u32 },
+    /// The host asked to remove an AI opponent by id (lobby phase only; honored only from host).
+    RemoveAi { player_id: u32, target: u32 },
     /// A gameplay command (ignored unless the room is in-game and the sender is in the room).
     Command { player_id: u32, cmd: Command },
 }
@@ -130,6 +138,13 @@ struct RoomPlayer {
     msg_tx: mpsc::Sender<ServerMessage>,
 }
 
+/// A computer opponent seated in a room. Has an id (for the lobby list / removal) and a name, but
+/// no socket — it is materialized into an AI-driven player only when the match starts.
+struct AiSlot {
+    id: u32,
+    name: String,
+}
+
 /// The room's current mode. `InGame` owns the live simulation outright.
 enum Phase {
     Lobby,
@@ -142,11 +157,15 @@ struct RoomTask {
     /// Connected players in join order (join order drives color assignment and host fallback).
     order: Vec<u32>,
     players: HashMap<u32, RoomPlayer>,
+    /// Computer opponents the host has added, in add order. Persist across rematches; cleared
+    /// only when the room empties of humans.
+    ai_players: Vec<AiSlot>,
     /// Current host (first joiner; reassigned to the next in `order` when the host leaves).
     host_id: Option<u32>,
     phase: Phase,
-    /// Number of human players the in-progress match started with. Used so a 1-player sandbox
-    /// match never ends while a 2+ player match resolves to a winner. `0` outside a match.
+    /// Number of players (humans + AI) the in-progress match started with. Used so a lone-player
+    /// sandbox never ends while a 2+ player match (including human-vs-AI) resolves to a winner.
+    /// `0` outside a match.
     match_player_count: usize,
 }
 
@@ -156,6 +175,7 @@ impl RoomTask {
             room,
             order: Vec::new(),
             players: HashMap::new(),
+            ai_players: Vec::new(),
             host_id: None,
             phase: Phase::Lobby,
             match_player_count: 0,
@@ -201,6 +221,8 @@ impl RoomTask {
             RoomEvent::Leave { player_id } => self.on_leave(player_id),
             RoomEvent::Ready { player_id, ready } => self.on_ready(player_id, ready),
             RoomEvent::StartRequest { player_id } => self.on_start_request(player_id),
+            RoomEvent::AddAi { player_id } => self.on_add_ai(player_id),
+            RoomEvent::RemoveAi { player_id, target } => self.on_remove_ai(player_id, target),
             RoomEvent::Command { player_id, cmd } => self.on_command(player_id, cmd),
         }
     }
@@ -275,6 +297,9 @@ impl RoomTask {
             self.phase = Phase::Lobby;
             self.match_player_count = 0;
             self.host_id = None;
+            // Drop AI opponents too: with no humans there is nobody to host them, and a fresh
+            // joiner under this room name should start from a clean lobby.
+            self.ai_players.clear();
             debug!(room = %self.room, "room emptied; reset to lobby");
             return;
         }
@@ -312,6 +337,50 @@ impl RoomTask {
         self.start_match();
     }
 
+    /// Host-only: seat a computer opponent. Ignored outside the lobby, from non-hosts, or once
+    /// the room is full (humans + AI == [`MAX_PLAYERS`]).
+    fn on_add_ai(&mut self, player_id: u32) {
+        if !matches!(self.phase, Phase::Lobby) || self.host_id != Some(player_id) {
+            return;
+        }
+        if self.total_player_count() >= MAX_PLAYERS {
+            debug!(room = %self.room, "ignoring add-ai; room full");
+            return;
+        }
+        let id = next_player_id();
+        let name = format!("Computer {}", self.ai_players.len() + 1);
+        self.ai_players.push(AiSlot { id, name });
+        debug!(room = %self.room, ai_id = id, "AI opponent added");
+        self.broadcast_lobby();
+    }
+
+    /// Host-only: remove a previously-added AI opponent by id. Ignored outside the lobby, from
+    /// non-hosts, or for an unknown id.
+    fn on_remove_ai(&mut self, player_id: u32, target: u32) {
+        if !matches!(self.phase, Phase::Lobby) || self.host_id != Some(player_id) {
+            return;
+        }
+        let before = self.ai_players.len();
+        self.ai_players.retain(|a| a.id != target);
+        if self.ai_players.len() != before {
+            debug!(room = %self.room, ai_id = target, "AI opponent removed");
+            self.broadcast_lobby();
+        }
+    }
+
+    /// Total seated players: connected humans plus AI opponents.
+    fn total_player_count(&self) -> usize {
+        self.order.len() + self.ai_players.len()
+    }
+
+    /// Color for the `seat`-th AI opponent. AI colors are drawn from the *tail* of the palette so
+    /// they never collide with human colors (assigned from the head by join order), given the
+    /// [`MAX_PLAYERS`] cap.
+    fn ai_color(seat: usize) -> String {
+        let idx = (PLAYER_PALETTE.len() - 1 - (seat % PLAYER_PALETTE.len())) % PLAYER_PALETTE.len();
+        PLAYER_PALETTE[idx].to_string()
+    }
+
     fn on_command(&mut self, player_id: u32, cmd: Command) {
         // Commands are ignored unless in-game and the sender is actually in this room. The
         // simulation itself validates ownership/affordability when it applies the command.
@@ -332,7 +401,8 @@ impl RoomTask {
     /// Build and broadcast the current `lobby` message to everyone in the room.
     fn broadcast_lobby(&mut self) {
         let host_id = self.host_id.unwrap_or(0);
-        let players: Vec<LobbyPlayer> = self
+        // Humans first (in join order), then AI opponents. AIs always read as ready.
+        let mut players: Vec<LobbyPlayer> = self
             .order
             .iter()
             .filter_map(|id| {
@@ -341,9 +411,19 @@ impl RoomTask {
                     name: p.name.clone(),
                     ready: p.ready,
                     color: p.color.clone(),
+                    is_ai: false,
                 })
             })
             .collect();
+        for (seat, ai) in self.ai_players.iter().enumerate() {
+            players.push(LobbyPlayer {
+                id: ai.id,
+                name: ai.name.clone(),
+                ready: true,
+                color: Self::ai_color(seat),
+                is_ai: true,
+            });
+        }
         let msg = ServerMessage::Lobby {
             room: self.room.clone(),
             host_id,
@@ -356,7 +436,7 @@ impl RoomTask {
     /// Transition from `Lobby` to `InGame`: create the simulation and send each player their
     /// own `start` payload. Only called from `on_start_request` once preconditions hold.
     fn start_match(&mut self) {
-        let inits: Vec<PlayerInit> = self
+        let mut inits: Vec<PlayerInit> = self
             .order
             .iter()
             .filter_map(|id| {
@@ -364,9 +444,20 @@ impl RoomTask {
                     id: *id,
                     name: p.name.clone(),
                     color: p.color.clone(),
+                    is_ai: false,
                 })
             })
             .collect();
+        // Seat AI opponents after the humans, mirroring the lobby ordering (so colors match the
+        // lobby list and map start tiles line up with the seat order).
+        for (seat, ai) in self.ai_players.iter().enumerate() {
+            inits.push(PlayerInit {
+                id: ai.id,
+                name: ai.name.clone(),
+                color: Self::ai_color(seat),
+                is_ai: true,
+            });
+        }
 
         let game = Game::new(&inits);
         let payload = game.start_payload();
