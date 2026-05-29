@@ -37,3 +37,14 @@ flyctl scale count 1 -a rts-0-zvorygin
 
 The `-a rts-0-zvorygin` flag makes these commands work from any directory. If you are already in
 the repo directory with `fly.toml`, the `-a` flag is optional.
+
+## Redeploy after changes
+
+From the repo root, run:
+
+```bash
+flyctl deploy --ha=false
+```
+
+That updates the live Fly app with the current branch state. No GitHub push is required for the
+deployment itself.
