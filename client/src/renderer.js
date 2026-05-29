@@ -262,9 +262,9 @@ export class Renderer {
   }
 
   /**
-   * Worker = small rounded body, soldier = forward chevron/triangle, heavy = chunky
-   * rounded square. All tinted by owner, with a soft shadow, thin dark outline, and a
-   * short facing indicator pointing along `facing`.
+   * Worker = small rounded body, rifleman = forward chevron, support teams = compact
+   * specialists, tank = chunky armored body. All are tinted by owner with a soft shadow,
+   * thin dark outline, and a short facing indicator pointing along `facing`.
    * @private
    */
   _drawUnit(e, colorByOwner, state) {
@@ -283,7 +283,7 @@ export class Renderer {
     g.position.set(e.x, e.y);
     g.lineStyle(1.5, 0x0a0c10, 0.9);
 
-    if (e.kind === KIND.SOLDIER) {
+    if (e.kind === KIND.RIFLEMAN) {
       // Chevron/triangle pointing along facing.
       g.beginFill(tint);
       const a = facing;
@@ -295,14 +295,38 @@ export class Renderer {
       g.lineTo(right.x, right.y);
       g.closePath();
       g.endFill();
-    } else if (e.kind === KIND.HEAVY) {
-      // Chunky rounded square with a darker inner plate.
+    } else if (e.kind === KIND.MACHINE_GUNNER) {
+      // A short firing bar reads differently from riflemen at combat scale.
+      g.beginFill(tint);
+      g.drawRoundedRect(-r * 0.9, -r * 0.55, r * 1.8, r * 1.1, r * 0.25);
+      g.endFill();
+      g.beginFill(0x000000, 0.24);
+      g.drawRect(-r * 0.7, -r * 0.12, r * 1.4, r * 0.24);
+      g.endFill();
+    } else if (e.kind === KIND.AT_TEAM) {
+      // Diamond team marker with a dark launcher slash.
+      g.beginFill(tint);
+      g.moveTo(0, -r);
+      g.lineTo(r, 0);
+      g.lineTo(0, r);
+      g.lineTo(-r, 0);
+      g.closePath();
+      g.endFill();
+      g.lineStyle(2, 0x0a0c10, 0.75);
+      g.moveTo(-r * 0.55, r * 0.35);
+      g.lineTo(r * 0.55, -r * 0.35);
+    } else if (e.kind === KIND.TANK) {
+      // Chunky armored body with a darker inner plate and short barrel.
       g.beginFill(tint);
       g.drawRoundedRect(-r, -r, r * 2, r * 2, r * 0.4);
       g.endFill();
       g.beginFill(0x000000, 0.18);
       g.drawRoundedRect(-r * 0.5, -r * 0.5, r, r, r * 0.25);
       g.endFill();
+      const barrel = polar(facing, r * 1.2);
+      g.lineStyle(3, 0x0a0c10, 0.85);
+      g.moveTo(0, 0);
+      g.lineTo(barrel.x, barrel.y);
     } else {
       // Worker (and any other unit kind): small rounded body.
       g.beginFill(tint);

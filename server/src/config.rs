@@ -36,7 +36,7 @@ pub const GAS_GEYSER_AMOUNT: u32 = 5000;
 pub const MINERAL_PATCHES_PER_BASE: u32 = 8;
 
 // --- Supply -----------------------------------------------------------------
-pub const HQ_SUPPLY: u32 = 10;
+pub const INDUSTRIAL_CENTER_SUPPLY: u32 = 10;
 pub const DEPOT_SUPPLY: u32 = 8;
 pub const SUPPLY_CAP_MAX: u32 = 200;
 
@@ -67,7 +67,7 @@ pub struct BuildingStats {
     pub foot_h: u32,
     pub build_ticks: u32,
     pub provides_supply: u32,
-    // Defensive attack (turret). dmg == 0 means the building does not attack.
+    // Defensive attack (bunker). dmg == 0 means the building does not attack.
     pub dmg: u32,
     pub range_tiles: u32,
     pub cooldown: u32,
@@ -89,7 +89,7 @@ pub fn unit_stats(kind: &str) -> Option<UnitStats> {
             build_ticks: 120,
             radius: 9.0,
         },
-        kinds::SOLDIER => UnitStats {
+        kinds::RIFLEMAN => UnitStats {
             hp: 45,
             dmg: 5,
             range_tiles: 4,
@@ -102,7 +102,33 @@ pub fn unit_stats(kind: &str) -> Option<UnitStats> {
             build_ticks: 150,
             radius: 9.0,
         },
-        kinds::HEAVY => UnitStats {
+        kinds::MACHINE_GUNNER => UnitStats {
+            hp: 55,
+            dmg: 4,
+            range_tiles: 5,
+            cooldown: 3,
+            speed: 2.4,
+            sight_tiles: 8,
+            cost_min: 75,
+            cost_gas: 0,
+            supply: 2,
+            build_ticks: 200,
+            radius: 10.0,
+        },
+        kinds::AT_TEAM => UnitStats {
+            hp: 45,
+            dmg: 24,
+            range_tiles: 4,
+            cooldown: 24,
+            speed: 2.6,
+            sight_tiles: 8,
+            cost_min: 75,
+            cost_gas: 25,
+            supply: 2,
+            build_ticks: 220,
+            radius: 10.0,
+        },
+        kinds::TANK => UnitStats {
             hp: 130,
             dmg: 20,
             range_tiles: 3,
@@ -123,7 +149,7 @@ pub fn unit_stats(kind: &str) -> Option<UnitStats> {
 /// Stats for a building kind, or `None` if `kind` is not a building.
 pub fn building_stats(kind: &str) -> Option<BuildingStats> {
     let s = match kind {
-        kinds::HQ => BuildingStats {
+        kinds::INDUSTRIAL_CENTER => BuildingStats {
             hp: 600,
             sight_tiles: 9,
             cost_min: 400,
@@ -131,7 +157,7 @@ pub fn building_stats(kind: &str) -> Option<BuildingStats> {
             foot_w: 3,
             foot_h: 3,
             build_ticks: 400,
-            provides_supply: HQ_SUPPLY,
+            provides_supply: INDUSTRIAL_CENTER_SUPPLY,
             dmg: 0,
             range_tiles: 0,
             cooldown: 0,
@@ -162,13 +188,39 @@ pub fn building_stats(kind: &str) -> Option<BuildingStats> {
             range_tiles: 0,
             cooldown: 0,
         },
-        kinds::TURRET => BuildingStats {
+        kinds::ADVANCED_TRAINING_CENTRE => BuildingStats {
+            hp: 300,
+            sight_tiles: 6,
+            cost_min: 125,
+            cost_gas: 0,
+            foot_w: 3,
+            foot_h: 2,
+            build_ticks: 220,
+            provides_supply: 0,
+            dmg: 0,
+            range_tiles: 0,
+            cooldown: 0,
+        },
+        kinds::TANK_FACTORY => BuildingStats {
+            hp: 360,
+            sight_tiles: 6,
+            cost_min: 150,
+            cost_gas: 0,
+            foot_w: 3,
+            foot_h: 3,
+            build_ticks: 240,
+            provides_supply: 0,
+            dmg: 0,
+            range_tiles: 0,
+            cooldown: 0,
+        },
+        kinds::BUNKER => BuildingStats {
             hp: 200,
             sight_tiles: 6,
-            cost_min: 75,
+            cost_min: 150,
             cost_gas: 0,
-            foot_w: 1,
-            foot_h: 1,
+            foot_w: 2,
+            foot_h: 2,
             build_ticks: 120,
             provides_supply: 0,
             dmg: 10,
@@ -183,17 +235,30 @@ pub fn building_stats(kind: &str) -> Option<BuildingStats> {
 /// Which units a given building can train.
 pub fn trainable_units(building_kind: &str) -> &'static [&'static str] {
     match building_kind {
-        kinds::HQ => &[kinds::WORKER],
-        kinds::BARRACKS => &[kinds::SOLDIER, kinds::HEAVY],
+        kinds::INDUSTRIAL_CENTER => &[kinds::WORKER],
+        kinds::BARRACKS => &[kinds::RIFLEMAN, kinds::MACHINE_GUNNER, kinds::AT_TEAM],
+        kinds::TANK_FACTORY => &[kinds::TANK],
         _ => &[],
     }
 }
 
 /// Whether `building_kind` is allowed to be placed given the set of building kinds the
-/// player already owns (tech requirements). Barracks requires an existing HQ.
+/// player already owns (tech requirements). Most combat structures require an Industrial Center.
 pub fn build_requirement_met(building_kind: &str, owned_building_kinds: &[&str]) -> bool {
     match building_kind {
-        kinds::BARRACKS => owned_building_kinds.contains(&kinds::HQ),
+        kinds::BARRACKS | kinds::ADVANCED_TRAINING_CENTRE | kinds::TANK_FACTORY | kinds::BUNKER => {
+            owned_building_kinds.contains(&kinds::INDUSTRIAL_CENTER)
+        }
+        _ => true,
+    }
+}
+
+/// Whether a unit's training tech has been unlocked by completed buildings.
+pub fn train_requirement_met(unit_kind: &str, owned_complete_building_kinds: &[&str]) -> bool {
+    match unit_kind {
+        kinds::MACHINE_GUNNER | kinds::AT_TEAM => {
+            owned_complete_building_kinds.contains(&kinds::ADVANCED_TRAINING_CENTRE)
+        }
         _ => true,
     }
 }
@@ -204,5 +269,36 @@ pub fn node_amount(kind: &str) -> u32 {
         kinds::MINERALS => MINERAL_PATCH_AMOUNT,
         kinds::GAS => GAS_GEYSER_AMOUNT,
         _ => 0,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn ww2_production_chain_matches_design() {
+        assert_eq!(trainable_units(kinds::INDUSTRIAL_CENTER), &[kinds::WORKER]);
+        assert_eq!(
+            trainable_units(kinds::BARRACKS),
+            &[kinds::RIFLEMAN, kinds::MACHINE_GUNNER, kinds::AT_TEAM]
+        );
+        assert_eq!(trainable_units(kinds::TANK_FACTORY), &[kinds::TANK]);
+
+        assert!(train_requirement_met(kinds::RIFLEMAN, &[]));
+        assert!(!train_requirement_met(kinds::MACHINE_GUNNER, &[]));
+        assert!(!train_requirement_met(kinds::AT_TEAM, &[]));
+        assert!(train_requirement_met(
+            kinds::MACHINE_GUNNER,
+            &[kinds::ADVANCED_TRAINING_CENTRE]
+        ));
+        assert!(train_requirement_met(
+            kinds::AT_TEAM,
+            &[kinds::ADVANCED_TRAINING_CENTRE]
+        ));
+
+        let bunker = building_stats(kinds::BUNKER).expect("bunker stats");
+        assert_eq!(bunker.cost_min, 150);
+        assert_eq!((bunker.foot_w, bunker.foot_h), (2, 2));
     }
 }
