@@ -14,7 +14,6 @@ mod lobby;
 mod protocol;
 
 use std::net::SocketAddr;
-use std::process::Command;
 use std::time::Duration;
 
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
@@ -110,27 +109,14 @@ async fn version_handler(State(state): State<AppState>) -> String {
     state.version
 }
 
-/// Resolve the current build version as the first four characters of `git rev-parse --short=4 HEAD`.
-/// If git is unavailable, fall back to `unknown` so the server still starts.
+/// Return the short git commit SHA that identifies this build.
+///
+/// The hash is resolved at **compile time** by `build.rs` and baked into the binary via
+/// `cargo:rustc-env=COMMIT_HASH`. This works both for local `cargo run` (where `.git` is
+/// available at build time) and for deployed Docker images (where `.git` is present in the
+/// builder layer or injected via a `COMMIT_HASH` build arg).
 fn git_version() -> String {
-    let output = Command::new("git")
-        .current_dir(env!("CARGO_MANIFEST_DIR"))
-        .args(["rev-parse", "--short=4", "HEAD"])
-        .output();
-
-    let Ok(output) = output else {
-        return "unknown".to_string();
-    };
-    if !output.status.success() {
-        return "unknown".to_string();
-    }
-
-    let text = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    if text.is_empty() {
-        "unknown".to_string()
-    } else {
-        text
-    }
+    env!("COMMIT_HASH").to_string()
 }
 
 /// Drive one client connection end to end.
