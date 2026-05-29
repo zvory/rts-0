@@ -1,0 +1,23 @@
+ - [ ] command card should have grid style hotkeys
+ - [ ] feedback on move and attack commands
+ - [ ] selected unitss hould have a command card for hold position, move, attack, stock
+ - [ ] buildings should be able to rally units to a position
+ - [x] progress bars on top of buildings for their unit building progress
+ - [x] defeat screen should not black out the screen, but continue to show the latest state of the map
+ - [x] command card should be made bigger
+ - [ ] units should have collision, and not stack, unless they're mining workers. this is a tough change, because it requires complex pathfinding and careful thought and modular design. 
+ - [ ] rename gas to oil, minerals to steel
+ - [x] all units besides rifleman and workers should require gas
+ - [ ] workers can get stuck inside buildings after building them
+ - [x] halve the speed of infantry
+ - [x] unpassable terrain should have a darker sillouhette
+ - [ ] implement forests, LoS blockers unless you're inside them, provides cover, tanks cannot enter but can shoot into them
+ - [ ] forests should come in large blobs and block vision
+ - [x] tanks should be twice the size theya re
+ - [ ] ai should GG after losing all town halls
+ - [ ] restyle the main menu to be more ww2 themed, less scifi. 
+ - [ ] maps should be twice as large
+ - [ ] will support two different factions, soviets and germans, with different stats, and some special units and buildings
+ - [ ] machine gunner attacks should be the same as infantryman, unless the commadn "set up" is used, which will stop the machine gunner for five seconds (no omving or shooting), after which point they cannot move or rotate without changing tearing down for three seconds, but have the elevated damage output, and have a fixed 40 degree field of fire.
+ - [ ] halve the speed of a worker and AT gun too
+ - [ ] 

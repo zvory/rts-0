@@ -29,8 +29,6 @@ import {
   isResource,
 } from "./protocol.js";
 
-const TWO_PI = Math.PI * 2;
-
 // Frames an entity id may go unseen before its pooled objects are destroyed and
 // dropped. Short enough to keep dead ids from accumulating, long enough that a
 // one-frame vision flicker reuses the slot rather than churning it (~2s @60fps).
@@ -160,6 +158,8 @@ export class Renderer {
             g.endFill();
           }
         }
+
+        drawImpassableEdge(g, map, tx, ty, code, ts);
       }
     }
 
@@ -397,7 +397,7 @@ export class Renderer {
   /**
    * Blocky footprint tinted by owner, with a plain two-letter stencil. Under
    * construction (`buildProgress < 1`) → translucent with a horizontal progress bar.
-   * Producing (`prodProgress`) → a small progress arc in the corner.
+   * Producing (`prodProgress`) → a top-edge progress bar.
    * @private
    */
   _drawBuilding(e, colorByOwner, state) {
@@ -475,15 +475,16 @@ export class Renderer {
       g.drawRect(bx, by, bw * clamp01(e.buildProgress), 4);
       g.endFill();
     } else if (typeof e.prodProgress === "number" && e.prodProgress > 0) {
-      // Production progress arc in the top-right corner.
-      const ax = x0 + w - 9;
-      const ay = y0 + 9;
-      const rr = 6;
-      g.lineStyle(2.5, COLORS.hpBack, 0.85);
-      g.arc(ax, ay, rr, 0, TWO_PI);
-      g.lineStyle(2.5, COLORS.hpGood, 1);
-      const start = -Math.PI / 2;
-      g.arc(ax, ay, rr, start, start + TWO_PI * clamp01(e.prodProgress));
+      // Unit production progress bar along the roof line.
+      const bw = w * 0.78;
+      const bx = e.x - bw / 2;
+      const by = y0 + 6;
+      g.beginFill(COLORS.hpBack, 0.9);
+      g.drawRect(bx, by, bw, 5);
+      g.endFill();
+      g.beginFill(COLORS.hpGood);
+      g.drawRect(bx, by, bw * clamp01(e.prodProgress), 5);
+      g.endFill();
     }
   }
 
@@ -913,6 +914,32 @@ function terrainOverlayColor(code, n) {
   if (code === 1) return n > 0.74 ? 0x8a8777 : 0x4f4c43;
   if (code === 2) return n > 0.74 ? 0x527482 : 0x1d3d48;
   return n > 0.74 ? 0x817555 : 0x343127;
+}
+
+/** Draw dark perimeter strips only where impassable terrain borders passable ground. */
+function drawImpassableEdge(g, map, tx, ty, code, ts) {
+  if (!isImpassableTerrain(code)) return;
+
+  const edge = Math.max(3, Math.floor(ts * 0.16));
+  const color = code === 2 ? 0x0c2028 : 0x24231f;
+  const x = tx * ts;
+  const y = ty * ts;
+
+  g.beginFill(color, 0.72);
+  if (!isImpassableAt(map, tx, ty - 1)) g.drawRect(x, y, ts, edge);
+  if (!isImpassableAt(map, tx, ty + 1)) g.drawRect(x, y + ts - edge, ts, edge);
+  if (!isImpassableAt(map, tx - 1, ty)) g.drawRect(x, y, edge, ts);
+  if (!isImpassableAt(map, tx + 1, ty)) g.drawRect(x + ts - edge, y, edge, ts);
+  g.endFill();
+}
+
+function isImpassableAt(map, tx, ty) {
+  if (tx < 0 || ty < 0 || tx >= map.width || ty >= map.height) return false;
+  return isImpassableTerrain(map.terrain[ty * map.width + tx]);
+}
+
+function isImpassableTerrain(code) {
+  return code === 1 || code === 2;
 }
 
 /**

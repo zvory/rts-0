@@ -442,8 +442,8 @@ mod tests {
         let mut ai_supply_cap = 0u32;
         let mut human_damaged = false;
 
-        // ~100s of simulation. The human issues no commands (passive target).
-        for _ in 0..3000 {
+        // ~200s of simulation. The human issues no commands (passive target).
+        for _ in 0..6000 {
             game.tick();
 
             let ai = game.snapshot_for(2);
