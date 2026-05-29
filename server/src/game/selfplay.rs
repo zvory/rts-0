@@ -119,10 +119,10 @@ impl ScriptedPlayer for BuildTechAttackScript {
                 .map(|e| e.id),
         );
 
-        let hqs: Vec<&EntityView> = own
+        let industrial_centers: Vec<&EntityView> = own
             .iter()
             .copied()
-            .filter(|e| e.kind == kinds::HQ && is_complete(e))
+            .filter(|e| e.kind == kinds::INDUSTRIAL_CENTER && is_complete(e))
             .collect();
         let barracks: Vec<&EntityView> = own
             .iter()
@@ -134,13 +134,23 @@ impl ScriptedPlayer for BuildTechAttackScript {
             .copied()
             .filter(|e| is_complete(e))
             .collect();
+        let tank_factories: Vec<&EntityView> = own
+            .iter()
+            .copied()
+            .filter(|e| e.kind == kinds::TANK_FACTORY)
+            .collect();
+        let complete_tank_factories: Vec<&EntityView> = tank_factories
+            .iter()
+            .copied()
+            .filter(|e| is_complete(e))
+            .collect();
         let depot_count = own.iter().filter(|e| e.kind == kinds::DEPOT).count();
         let depot_under_construction = own
             .iter()
             .any(|e| e.kind == kinds::DEPOT && !is_complete(e));
         let barracks_count = barracks.len();
-        let soldier_count = own.iter().filter(|e| e.kind == kinds::SOLDIER).count();
-        let heavy_count = own.iter().filter(|e| e.kind == kinds::HEAVY).count();
+        let tank_factory_count = tank_factories.len();
+        let tank_count = own.iter().filter(|e| e.kind == kinds::TANK).count();
 
         let mut minerals = view.snapshot.minerals;
         let mut gas = view.snapshot.gas;
@@ -167,7 +177,7 @@ impl ScriptedPlayer for BuildTechAttackScript {
         }
 
         let wants_depot = !depot_under_construction
-            && (view.snapshot.supply_cap < config::HQ_SUPPLY + config::DEPOT_SUPPLY
+            && (view.snapshot.supply_cap < config::INDUSTRIAL_CENTER_SUPPLY + config::DEPOT_SUPPLY
                 || free_supply <= 4
                 || (depot_count == 0 && !complete_barracks.is_empty()));
         if wants_depot {
@@ -182,11 +192,24 @@ impl ScriptedPlayer for BuildTechAttackScript {
             }
         }
 
-        for hq in hqs {
+        let needs_tank_factory = !complete_barracks.is_empty() && tank_factory_count == 0;
+        if needs_tank_factory {
+            if let Some(cmd) = self.build_if_affordable(
+                view,
+                kinds::TANK_FACTORY,
+                &mut minerals,
+                &builder_workers,
+                &mut reserved_workers,
+            ) {
+                out.push(cmd);
+            }
+        }
+
+        for industrial_center in industrial_centers {
             if workers.len() >= self.target_workers {
                 break;
             }
-            if production_queue_len(hq) > 0 {
+            if production_queue_len(industrial_center) > 0 {
                 continue;
             }
             let Some(stats) = config::unit_stats(kinds::WORKER) else {
@@ -196,7 +219,7 @@ impl ScriptedPlayer for BuildTechAttackScript {
                 break;
             }
             out.push(Command::Train {
-                building: hq.id,
+                building: industrial_center.id,
                 unit: kinds::WORKER.to_string(),
             });
             minerals -= stats.cost_min;
@@ -204,30 +227,43 @@ impl ScriptedPlayer for BuildTechAttackScript {
             free_supply -= stats.supply;
         }
 
-        for rax in complete_barracks {
-            if production_queue_len(rax) > 0 {
-                continue;
-            }
+        let saving_for_first_tank =
+            needs_tank_factory || (tank_count == 0 && !complete_tank_factories.is_empty());
+        if !saving_for_first_tank {
+            for rax in complete_barracks {
+                if production_queue_len(rax) > 0 {
+                    continue;
+                }
 
-            let waiting_for_first_heavy = heavy_count == 0 && soldier_count >= 3;
-            let wants_first_heavy = heavy_count == 0 && gas >= heavy_cost_gas();
-            let unit = if wants_first_heavy {
-                kinds::HEAVY
-            } else {
-                kinds::SOLDIER
-            };
-            if waiting_for_first_heavy && unit == kinds::SOLDIER {
+                let Some(stats) = config::unit_stats(kinds::RIFLEMAN) else {
+                    continue;
+                };
+                if minerals < stats.cost_min || gas < stats.cost_gas || free_supply < stats.supply {
+                    continue;
+                }
+                out.push(Command::Train {
+                    building: rax.id,
+                    unit: kinds::RIFLEMAN.to_string(),
+                });
+                minerals -= stats.cost_min;
+                gas -= stats.cost_gas;
+                free_supply -= stats.supply;
+            }
+        }
+
+        for factory in complete_tank_factories {
+            if tank_count > 0 || production_queue_len(factory) > 0 {
                 continue;
             }
-            let Some(stats) = config::unit_stats(unit) else {
+            let Some(stats) = config::unit_stats(kinds::TANK) else {
                 continue;
             };
             if minerals < stats.cost_min || gas < stats.cost_gas || free_supply < stats.supply {
                 continue;
             }
             out.push(Command::Train {
-                building: rax.id,
-                unit: unit.to_string(),
+                building: factory.id,
+                unit: kinds::TANK.to_string(),
             });
             minerals -= stats.cost_min;
             gas -= stats.cost_gas;
@@ -238,10 +274,10 @@ impl ScriptedPlayer for BuildTechAttackScript {
 
         let combat_units: Vec<u32> = own
             .iter()
-            .filter(|e| e.kind == kinds::SOLDIER || e.kind == kinds::HEAVY)
+            .filter(|e| e.kind == kinds::RIFLEMAN || e.kind == kinds::TANK)
             .map(|e| e.id)
             .collect();
-        let has_tech_unit = heavy_count > 0;
+        let has_tech_unit = tank_count > 0;
         let has_army = combat_units.len() >= self.attack_size;
         let attack_due = view.tick.saturating_sub(self.last_attack_tick) >= ATTACK_REISSUE_TICKS;
         if has_army && has_tech_unit && attack_due {
@@ -415,10 +451,10 @@ impl ScriptedPlayer for EconomyScript {
             .copied()
             .filter(|e| e.kind == kinds::WORKER)
             .collect();
-        let hqs: Vec<&EntityView> = own
+        let industrial_centers: Vec<&EntityView> = own
             .iter()
             .copied()
-            .filter(|e| e.kind == kinds::HQ && is_complete(e))
+            .filter(|e| e.kind == kinds::INDUSTRIAL_CENTER && is_complete(e))
             .collect();
 
         let mut builder_workers: Vec<u32> = workers
@@ -461,11 +497,11 @@ impl ScriptedPlayer for EconomyScript {
             }
         }
 
-        for hq in hqs {
+        for industrial_center in industrial_centers {
             if workers.len() >= self.target_workers {
                 break;
             }
-            if production_queue_len(hq) > 0 {
+            if production_queue_len(industrial_center) > 0 {
                 continue;
             }
             let Some(stats) = config::unit_stats(kinds::WORKER) else {
@@ -475,7 +511,7 @@ impl ScriptedPlayer for EconomyScript {
                 break;
             }
             out.push(Command::Train {
-                building: hq.id,
+                building: industrial_center.id,
                 unit: kinds::WORKER.to_string(),
             });
             minerals -= stats.cost_min;
@@ -559,20 +595,20 @@ impl ScriptedPlayer for WorkerRushScript {
     }
 }
 
-struct TurretRushScript {
+struct BunkerRushScript {
     player_id: u32,
     target_player_id: u32,
     initial_gather_sent: bool,
-    last_turret_attempt_tick: u32,
+    last_bunker_attempt_tick: u32,
 }
 
-impl TurretRushScript {
+impl BunkerRushScript {
     fn new(player_id: u32, target_player_id: u32) -> Self {
-        TurretRushScript {
+        BunkerRushScript {
             player_id,
             target_player_id,
             initial_gather_sent: false,
-            last_turret_attempt_tick: 0,
+            last_bunker_attempt_tick: 0,
         }
     }
 
@@ -584,13 +620,13 @@ impl TurretRushScript {
     }
 }
 
-impl ScriptedPlayer for TurretRushScript {
+impl ScriptedPlayer for BunkerRushScript {
     fn player_id(&self) -> u32 {
         self.player_id
     }
 
     fn name(&self) -> &'static str {
-        "turret-rush"
+        "bunker-rush"
     }
 
     fn commands(&mut self, view: PlayerView<'_>) -> Vec<Command> {
@@ -625,18 +661,18 @@ impl ScriptedPlayer for TurretRushScript {
         let mut minerals = view.snapshot.minerals;
         let mut reserved_workers = HashSet::new();
         let mut out = Vec::new();
-        let turret_exists = own.iter().any(|e| e.kind == kinds::TURRET);
-        let turret_attempt_due = view.tick == 0
-            || view.tick.saturating_sub(self.last_turret_attempt_tick) >= ATTACK_REISSUE_TICKS;
-        if !turret_exists && turret_attempt_due {
-            if let Some(cmd) = self.build_offensive_turret_if_affordable(
+        let bunker_exists = own.iter().any(|e| e.kind == kinds::BUNKER);
+        let bunker_attempt_due = view.tick == 0
+            || view.tick.saturating_sub(self.last_bunker_attempt_tick) >= ATTACK_REISSUE_TICKS;
+        if !bunker_exists && bunker_attempt_due {
+            if let Some(cmd) = self.build_offensive_bunker_if_affordable(
                 view,
                 &mut minerals,
                 &builder_workers,
                 &mut reserved_workers,
             ) {
                 out.push(cmd);
-                self.last_turret_attempt_tick = view.tick;
+                self.last_bunker_attempt_tick = view.tick;
             }
         }
 
@@ -653,15 +689,15 @@ impl ScriptedPlayer for TurretRushScript {
     }
 }
 
-impl TurretRushScript {
-    fn build_offensive_turret_if_affordable(
+impl BunkerRushScript {
+    fn build_offensive_bunker_if_affordable(
         &self,
         view: PlayerView<'_>,
         minerals: &mut u32,
         builder_workers: &[u32],
         reserved_workers: &mut HashSet<u32>,
     ) -> Option<Command> {
-        let stats = config::building_stats(kinds::TURRET)?;
+        let stats = config::building_stats(kinds::BUNKER)?;
         if *minerals < stats.cost_min {
             return None;
         }
@@ -670,12 +706,12 @@ impl TurretRushScript {
             .copied()
             .find(|id| !reserved_workers.contains(id))?;
         let (tile_x, tile_y) =
-            find_offensive_turret_spot(view.start, view.snapshot, self.target_player_id)?;
+            find_offensive_bunker_spot(view.start, view.snapshot, self.target_player_id)?;
         reserved_workers.insert(worker);
         *minerals -= stats.cost_min;
         Some(Command::Build {
             worker,
-            building: kinds::TURRET.to_string(),
+            building: kinds::BUNKER.to_string(),
             tile_x,
             tile_y,
         })
@@ -983,7 +1019,7 @@ struct Milestones {
     death_events: u32,
     attack_events_by_player: BTreeMap<u32, u32>,
     worker_attack_events_by_player: BTreeMap<u32, u32>,
-    turret_attack_events_by_player: BTreeMap<u32, u32>,
+    bunker_attack_events_by_player: BTreeMap<u32, u32>,
 }
 
 impl Milestones {
@@ -1011,7 +1047,7 @@ impl Milestones {
             death_events: 0,
             attack_events_by_player: BTreeMap::new(),
             worker_attack_events_by_player: BTreeMap::new(),
-            turret_attack_events_by_player: BTreeMap::new(),
+            bunker_attack_events_by_player: BTreeMap::new(),
         }
     }
 
@@ -1042,9 +1078,9 @@ impl Milestones {
                             .entry(player_id)
                             .or_default() += 1;
                     }
-                    Some(kinds::TURRET) => {
+                    Some(kinds::BUNKER) => {
                         *self
-                            .turret_attack_events_by_player
+                            .bunker_attack_events_by_player
                             .entry(player_id)
                             .or_default() += 1;
                     }
@@ -1089,7 +1125,7 @@ struct CombatGoal {
     require_any_combat: bool,
     min_attacks_by_player: BTreeMap<u32, u32>,
     min_worker_attacks_by_player: BTreeMap<u32, u32>,
-    min_turret_attacks_by_player: BTreeMap<u32, u32>,
+    min_bunker_attacks_by_player: BTreeMap<u32, u32>,
 }
 
 impl CombatGoal {
@@ -1107,9 +1143,9 @@ impl CombatGoal {
         }
     }
 
-    fn turret_attack_by(player_id: u32) -> Self {
+    fn bunker_attack_by(player_id: u32) -> Self {
         CombatGoal {
-            min_turret_attacks_by_player: BTreeMap::from([(player_id, 1)]),
+            min_bunker_attacks_by_player: BTreeMap::from([(player_id, 1)]),
             ..CombatGoal::default()
         }
     }
@@ -1141,9 +1177,9 @@ impl CombatGoal {
                 return false;
             }
         }
-        for (player_id, required) in &self.min_turret_attacks_by_player {
+        for (player_id, required) in &self.min_bunker_attacks_by_player {
             if milestones
-                .turret_attack_events_by_player
+                .bunker_attack_events_by_player
                 .get(player_id)
                 .copied()
                 .unwrap_or(0)
@@ -1181,14 +1217,14 @@ impl CombatGoal {
                 out.push(format!("p{player_id}:worker-attacks>={required}"));
             }
         }
-        for (player_id, required) in &self.min_turret_attacks_by_player {
+        for (player_id, required) in &self.min_bunker_attacks_by_player {
             let seen = milestones
-                .turret_attack_events_by_player
+                .bunker_attack_events_by_player
                 .get(player_id)
                 .copied()
                 .unwrap_or(0);
             if seen < *required {
-                out.push(format!("p{player_id}:turret-attacks>={required}"));
+                out.push(format!("p{player_id}:bunker-attacks>={required}"));
             }
         }
         out
@@ -1201,12 +1237,12 @@ struct PlayerMilestoneGoal {
     require_gas: bool,
     require_depot_supply: bool,
     require_barracks_complete: bool,
-    require_soldier: bool,
-    require_heavy: bool,
-    require_turret_complete: bool,
+    require_rifleman: bool,
+    require_tank: bool,
+    require_bunker_complete: bool,
     require_damage_taken: bool,
     min_workers: u32,
-    min_turrets: u32,
+    min_bunkers: u32,
 }
 
 impl PlayerMilestoneGoal {
@@ -1216,17 +1252,17 @@ impl PlayerMilestoneGoal {
             require_gas: true,
             require_depot_supply: true,
             require_barracks_complete: true,
-            require_soldier: true,
-            require_heavy: true,
+            require_rifleman: true,
+            require_tank: true,
             ..PlayerMilestoneGoal::default()
         }
     }
 
-    fn turret_rush() -> Self {
+    fn bunker_rush() -> Self {
         PlayerMilestoneGoal {
             require_gathering: true,
-            require_turret_complete: true,
-            min_turrets: 1,
+            require_bunker_complete: true,
+            min_bunkers: 1,
             ..PlayerMilestoneGoal::default()
         }
     }
@@ -1248,27 +1284,27 @@ struct PlayerMilestones {
     depot_started: bool,
     barracks_started: bool,
     barracks_complete: bool,
-    turret_started: bool,
-    turret_complete: bool,
-    soldier_trained: bool,
-    heavy_trained: bool,
+    bunker_started: bool,
+    bunker_complete: bool,
+    rifleman_trained: bool,
+    tank_trained: bool,
     damage_taken: bool,
     max_workers: u32,
     max_minerals: u32,
     max_gas: u32,
     max_supply_cap: u32,
-    max_soldiers: u32,
-    max_heavies: u32,
-    max_turrets: u32,
+    max_riflemen: u32,
+    max_tanks: u32,
+    max_bunkers: u32,
 }
 
 impl PlayerMilestones {
     fn observe(&mut self, player_id: u32, snapshot: &Snapshot) -> bool {
         let before = self.clone();
         let mut workers = 0;
-        let mut soldiers = 0;
-        let mut heavies = 0;
-        let mut turrets = 0;
+        let mut riflemen = 0;
+        let mut tanks = 0;
+        let mut bunkers = 0;
         for e in snapshot.entities.iter().filter(|e| e.owner == player_id) {
             match e.kind.as_str() {
                 kinds::WORKER => {
@@ -1280,8 +1316,8 @@ impl PlayerMilestones {
                         self.gas_gathered = true;
                     }
                 }
-                kinds::SOLDIER => soldiers += 1,
-                kinds::HEAVY => heavies += 1,
+                kinds::RIFLEMAN => riflemen += 1,
+                kinds::TANK => tanks += 1,
                 kinds::DEPOT => self.depot_started = true,
                 kinds::BARRACKS => {
                     self.barracks_started = true;
@@ -1289,11 +1325,11 @@ impl PlayerMilestones {
                         self.barracks_complete = true;
                     }
                 }
-                kinds::TURRET => {
-                    self.turret_started = true;
+                kinds::BUNKER => {
+                    self.bunker_started = true;
                     if is_complete(e) {
-                        turrets += 1;
-                        self.turret_complete = true;
+                        bunkers += 1;
+                        self.bunker_complete = true;
                     }
                 }
                 _ => {}
@@ -1307,11 +1343,11 @@ impl PlayerMilestones {
         self.max_minerals = self.max_minerals.max(snapshot.minerals);
         self.max_gas = self.max_gas.max(snapshot.gas);
         self.max_supply_cap = self.max_supply_cap.max(snapshot.supply_cap);
-        self.max_soldiers = self.max_soldiers.max(soldiers);
-        self.max_heavies = self.max_heavies.max(heavies);
-        self.max_turrets = self.max_turrets.max(turrets);
-        self.soldier_trained |= soldiers > 0;
-        self.heavy_trained |= heavies > 0;
+        self.max_riflemen = self.max_riflemen.max(riflemen);
+        self.max_tanks = self.max_tanks.max(tanks);
+        self.max_bunkers = self.max_bunkers.max(bunkers);
+        self.rifleman_trained |= riflemen > 0;
+        self.tank_trained |= tanks > 0;
         before != *self
     }
 
@@ -1328,21 +1364,21 @@ impl PlayerMilestones {
             out.push("gas-gather".to_string());
         }
         if goal.require_depot_supply
-            && (!self.depot_started || self.max_supply_cap <= config::HQ_SUPPLY)
+            && (!self.depot_started || self.max_supply_cap <= config::INDUSTRIAL_CENTER_SUPPLY)
         {
             out.push("depot-supply".to_string());
         }
         if goal.require_barracks_complete && !self.barracks_complete {
             out.push("barracks".to_string());
         }
-        if goal.require_soldier && !self.soldier_trained {
-            out.push("soldier".to_string());
+        if goal.require_rifleman && !self.rifleman_trained {
+            out.push("rifleman".to_string());
         }
-        if goal.require_heavy && !self.heavy_trained {
-            out.push("heavy".to_string());
+        if goal.require_tank && !self.tank_trained {
+            out.push("tank".to_string());
         }
-        if goal.require_turret_complete && !self.turret_complete {
-            out.push("turret".to_string());
+        if goal.require_bunker_complete && !self.bunker_complete {
+            out.push("bunker".to_string());
         }
         if goal.require_damage_taken && !self.damage_taken {
             out.push("damage-taken".to_string());
@@ -1350,8 +1386,8 @@ impl PlayerMilestones {
         if self.max_workers < goal.min_workers {
             out.push(format!("workers>={}", goal.min_workers));
         }
-        if self.max_turrets < goal.min_turrets {
-            out.push(format!("turrets>={}", goal.min_turrets));
+        if self.max_bunkers < goal.min_bunkers {
+            out.push(format!("bunkers>={}", goal.min_bunkers));
         }
         out
     }
@@ -1464,12 +1500,16 @@ fn known_kind(kind: &str) -> bool {
     matches!(
         kind,
         kinds::WORKER
-            | kinds::SOLDIER
-            | kinds::HEAVY
-            | kinds::HQ
+            | kinds::RIFLEMAN
+            | kinds::MACHINE_GUNNER
+            | kinds::AT_TEAM
+            | kinds::TANK
+            | kinds::INDUSTRIAL_CENTER
             | kinds::DEPOT
             | kinds::BARRACKS
-            | kinds::TURRET
+            | kinds::ADVANCED_TRAINING_CENTRE
+            | kinds::TANK_FACTORY
+            | kinds::BUNKER
             | kinds::MINERALS
             | kinds::GAS
     )
@@ -1481,12 +1521,6 @@ fn is_complete(entity: &EntityView) -> bool {
 
 fn production_queue_len(entity: &EntityView) -> u32 {
     entity.prod_queue.unwrap_or(0)
-}
-
-fn heavy_cost_gas() -> u32 {
-    config::unit_stats(kinds::HEAVY)
-        .map(|s| s.cost_gas)
-        .unwrap_or(50)
 }
 
 fn build_near_own_start_if_affordable(
@@ -1590,7 +1624,7 @@ fn dist2(ax: f32, ay: f32, bx: f32, by: f32) -> f32 {
     dx * dx + dy * dy
 }
 
-fn find_offensive_turret_spot(
+fn find_offensive_bunker_spot(
     start: &StartPayload,
     snapshot: &Snapshot,
     target_player_id: u32,
@@ -1669,7 +1703,7 @@ fn offensive_build_spot_if_placeable(
         return None;
     }
     let (tile_x, tile_y) = (tile_x as u32, tile_y as u32);
-    footprint_placeable_from_snapshot(&start.map, kinds::TURRET, tile_x, tile_y, occupied)
+    footprint_placeable_from_snapshot(&start.map, kinds::BUNKER, tile_x, tile_y, occupied)
         .then_some((tile_x, tile_y))
 }
 
@@ -1876,11 +1910,11 @@ fn scripted_self_play_exercises_economy_tech_and_combat() {
 }
 
 #[test]
-fn scripted_self_play_turret_rush_vs_economy() {
+fn scripted_self_play_bunker_rush_vs_economy() {
     let players = vec![
         PlayerInit {
             id: 1,
-            name: "Turret Rush".into(),
+            name: "Bunker Rush".into(),
             color: "#ff9f1c".into(),
             is_ai: false,
         },
@@ -1895,18 +1929,18 @@ fn scripted_self_play_turret_rush_vs_economy() {
     let start = game.start_payload();
     let specs: Vec<PlayerSpec> = players.iter().map(PlayerSpec::from).collect();
     let scripts: Vec<Box<dyn ScriptedPlayer>> = vec![
-        Box::new(TurretRushScript::new(1, 2)),
+        Box::new(BunkerRushScript::new(1, 2)),
         Box::new(EconomyScript::new(2)),
     ];
     let milestones = Milestones::with_goals(
         [
-            (1, PlayerMilestoneGoal::turret_rush()),
+            (1, PlayerMilestoneGoal::bunker_rush()),
             (2, PlayerMilestoneGoal::damaged_economy()),
         ],
-        CombatGoal::turret_attack_by(1),
+        CombatGoal::bunker_attack_by(1),
     );
     let mut runner = SelfPlayRunner::with_milestones(
-        "scripted_self_play_turret_rush_vs_economy",
+        "scripted_self_play_bunker_rush_vs_economy",
         game,
         start,
         specs,

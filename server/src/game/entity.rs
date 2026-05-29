@@ -24,7 +24,7 @@ pub const NEUTRAL: u32 = 0;
 /// movement system.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Order {
-    /// No order: units hold position, idle combat units auto-defend, turrets auto-fire.
+    /// No order: units hold position, idle combat units auto-defend, bunkers auto-fire.
     Idle,
     /// Move to a world point; stop on arrival. No engaging en route.
     Move { x: f32, y: f32 },
@@ -32,7 +32,7 @@ pub enum Order {
     AttackMove { x: f32, y: f32 },
     /// Chase and attack a specific entity until it dies, then go idle.
     Attack { target: u32 },
-    /// Harvest from a resource node, ferrying loads back to the home HQ. See [`CarryState`].
+    /// Harvest from a resource node, ferrying loads back to the home Industrial Center. See [`CarryState`].
     Gather { node: u32 },
     /// Walk to a building site and construct it. `site` is the building entity id (the
     /// building already exists in CONSTRUCT state). Worker is occupied until completion.
@@ -42,7 +42,7 @@ pub enum Order {
 /// A queued production order on a building.
 #[derive(Debug, Clone)]
 pub struct ProdItem {
-    /// Unit kind being produced (e.g. `"worker"`, `"soldier"`).
+    /// Unit kind being produced (e.g. `"worker"`, `"rifleman"`).
     pub unit: String,
     /// Ticks of progress accumulated on this item so far.
     pub progress: u32,
@@ -67,7 +67,7 @@ pub enum GatherPhase {
     ToNode,
     /// Standing on the node, accumulating harvest ticks.
     Harvesting,
-    /// Walking back to the home HQ with a load.
+    /// Walking back to the home Industrial Center with a load.
     ToHome,
 }
 
@@ -105,7 +105,7 @@ pub struct Entity {
     /// Ticks until this entity may attack again (0 = ready).
     pub attack_cd: u32,
 
-    /// Current attack/interaction target id (enemy for combat, node/hq for gather). Used for
+    /// Current attack/interaction target id (enemy for combat, node/industrial_center for gather). Used for
     /// render tracers and to remember focus across ticks. `None` when not engaged.
     pub target_id: Option<u32>,
 
@@ -128,8 +128,8 @@ pub struct Entity {
     pub gather_phase: GatherPhase,
     /// Ticks accumulated while [`GatherPhase::Harvesting`].
     pub harvest_progress: u32,
-    /// The HQ this worker deposits into. Resolved lazily to the nearest own HQ.
-    pub home_hq: Option<u32>,
+    /// The Industrial Center this worker deposits into. Resolved lazily to the nearest own Industrial Center.
+    pub home_industrial_center: Option<u32>,
 
     // --- Resource nodes --------------------------------------------------------
     /// Remaining resource amount (resource nodes only).
@@ -163,7 +163,7 @@ impl Entity {
         !self.is_node()
     }
 
-    /// Whether this entity can deal damage (units with dmg, or turrets).
+    /// Whether this entity can deal damage (units with dmg, or bunkers).
     pub fn can_attack(&self) -> bool {
         if let Some(s) = config::unit_stats(&self.kind) {
             s.dmg > 0
@@ -302,7 +302,7 @@ impl EntityStore {
             carry: None,
             gather_phase: GatherPhase::ToNode,
             harvest_progress: 0,
-            home_hq: None,
+            home_industrial_center: None,
             remaining: 0,
             miner: None,
         };
@@ -343,7 +343,7 @@ impl EntityStore {
             carry: None,
             gather_phase: GatherPhase::ToNode,
             harvest_progress: 0,
-            home_hq: None,
+            home_industrial_center: None,
             remaining: 0,
             miner: None,
         };
@@ -376,7 +376,7 @@ impl EntityStore {
             carry: None,
             gather_phase: GatherPhase::ToNode,
             harvest_progress: 0,
-            home_hq: None,
+            home_industrial_center: None,
             remaining: amount,
             miner: None,
         };

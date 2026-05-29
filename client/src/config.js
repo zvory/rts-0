@@ -46,26 +46,41 @@ export const PLAYER_PALETTE = Object.freeze([
 export const STATS = Object.freeze({
   [KIND.WORKER]: { label: "Worker", hotkey: "W", icon: "⛏", size: 9, sight: 7,
     cost: { min: 50, gas: 0 }, supply: 1, buildTicks: 120 },
-  [KIND.SOLDIER]: { label: "Soldier", hotkey: "A", icon: "⚔", size: 9, sight: 8,
+  [KIND.RIFLEMAN]: { label: "Rifleman", hotkey: "R", icon: "⚔", size: 9, sight: 8,
     cost: { min: 50, gas: 0 }, supply: 1, buildTicks: 150 },
-  [KIND.HEAVY]: { label: "Heavy", hotkey: "D", icon: "✦", size: 13, sight: 7,
+  [KIND.MACHINE_GUNNER]: { label: "Machine Gunner", hotkey: "M", icon: "▰", size: 10, sight: 8,
+    cost: { min: 75, gas: 0 }, supply: 2, buildTicks: 200, requires: KIND.ADVANCED_TRAINING_CENTRE },
+  [KIND.AT_TEAM]: { label: "AT Team", hotkey: "A", icon: "◇", size: 10, sight: 8,
+    cost: { min: 75, gas: 25 }, supply: 2, buildTicks: 220, requires: KIND.ADVANCED_TRAINING_CENTRE },
+  [KIND.TANK]: { label: "Tank", hotkey: "T", icon: "▣", size: 13, sight: 7,
     cost: { min: 100, gas: 50 }, supply: 2, buildTicks: 250 },
 
-  [KIND.HQ]: { label: "HQ", hotkey: "H", icon: "🏛", footW: 3, footH: 3, sight: 9,
+  [KIND.INDUSTRIAL_CENTER]: { label: "Industrial Center", hotkey: "I", icon: "🏭", footW: 3, footH: 3, sight: 9,
     cost: { min: 400, gas: 0 }, buildTicks: 400, trains: [KIND.WORKER] },
   [KIND.DEPOT]: { label: "Supply Depot", hotkey: "S", icon: "▣", footW: 2, footH: 2, sight: 4,
     cost: { min: 50, gas: 0 }, buildTicks: 120, trains: [] },
   [KIND.BARRACKS]: { label: "Barracks", hotkey: "B", icon: "⚒", footW: 3, footH: 2, sight: 6,
-    cost: { min: 100, gas: 0 }, buildTicks: 200, trains: [KIND.SOLDIER, KIND.HEAVY], requires: KIND.HQ },
-  [KIND.TURRET]: { label: "Turret", hotkey: "T", icon: "◎", footW: 1, footH: 1, sight: 6,
-    cost: { min: 75, gas: 0 }, buildTicks: 120, trains: [] },
+    cost: { min: 100, gas: 0 }, buildTicks: 200, trains: [KIND.RIFLEMAN, KIND.MACHINE_GUNNER, KIND.AT_TEAM], requires: KIND.INDUSTRIAL_CENTER },
+  [KIND.ADVANCED_TRAINING_CENTRE]: { label: "Advanced Training Centre", hotkey: "C", icon: "◆", footW: 3, footH: 2, sight: 6,
+    cost: { min: 125, gas: 0 }, buildTicks: 220, trains: [], requires: KIND.INDUSTRIAL_CENTER },
+  [KIND.TANK_FACTORY]: { label: "Tank Factory", hotkey: "F", icon: "▤", footW: 3, footH: 3, sight: 6,
+    cost: { min: 150, gas: 0 }, buildTicks: 240, trains: [KIND.TANK], requires: KIND.INDUSTRIAL_CENTER },
+  [KIND.BUNKER]: { label: "Bunker", hotkey: "U", icon: "◎", footW: 2, footH: 2, sight: 6,
+    cost: { min: 150, gas: 0 }, buildTicks: 120, trains: [], requires: KIND.INDUSTRIAL_CENTER },
 
   [KIND.MINERALS]: { label: "Minerals", size: 11 },
   [KIND.GAS]: { label: "Gas", size: 14 },
 });
 
 // What a worker can build (command card when a worker is selected).
-export const WORKER_BUILDABLE = Object.freeze([KIND.HQ, KIND.DEPOT, KIND.BARRACKS, KIND.TURRET]);
+export const WORKER_BUILDABLE = Object.freeze([
+  KIND.INDUSTRIAL_CENTER,
+  KIND.DEPOT,
+  KIND.BARRACKS,
+  KIND.ADVANCED_TRAINING_CENTRE,
+  KIND.TANK_FACTORY,
+  KIND.BUNKER,
+]);
 
 // Camera defaults.
 export const CAMERA = Object.freeze({

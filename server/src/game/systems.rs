@@ -364,7 +364,7 @@ fn order_build(
         }
     };
 
-    // Tech requirement (e.g. barracks needs an HQ).
+    // Tech requirement (e.g. barracks needs an Industrial Center).
     let owned: Vec<&str> = entities
         .iter()
         .filter(|e| e.owner == player && e.is_building())
@@ -438,6 +438,15 @@ fn order_train(
         && config::trainable_units(&b.kind).contains(&unit));
     if !ok {
         notice(events, player, "Cannot train that here");
+        return;
+    }
+    let owned_complete: Vec<&str> = entities
+        .iter()
+        .filter(|e| e.owner == player && e.is_building() && !e.under_construction)
+        .map(|e| e.kind.as_str())
+        .collect();
+    if !config::train_requirement_met(unit, &owned_complete) {
+        notice(events, player, "Requirement not met");
         return;
     }
     let stats = match config::unit_stats(unit) {
@@ -671,7 +680,7 @@ fn tile_passable_at(occ: &Occupancy, map: &Map, x: f32, y: f32) -> bool {
 // ---------------------------------------------------------------------------
 
 /// Combat: acquire targets for aggressive / attack-move units, let idle units auto-defend,
-/// fire turrets, and deal damage when off cooldown. Damage is applied immediately and emits an
+/// fire bunkers, and deal damage when off cooldown. Damage is applied immediately and emits an
 /// `Attack` event (for tracers). Cooldowns tick down here too.
 fn combat_system(
     map: &Map,
@@ -707,7 +716,7 @@ fn combat_system(
             let (range_tiles, dmg, cd) = attack_profile(e);
             let range_px = range_tiles as f32 * config::TILE_SIZE as f32 + e.radius() + RANGE_SLACK;
             // Aggro radius: mobile units detect and chase enemies out to their sight radius so
-            // attack-move / auto-defend actually close the gap. Buildings (turrets) never move,
+            // attack-move / auto-defend actually close the gap. Buildings (bunkers) never move,
             // so they only ever engage within their firing range.
             let aggro_px = if e.is_unit() {
                 (e.sight_tiles() as f32 * config::TILE_SIZE as f32).max(range_px)
@@ -782,7 +791,7 @@ fn combat_system(
     }
 }
 
-/// Attack profile (range_tiles, dmg, cooldown) for a unit or turret.
+/// Attack profile (range_tiles, dmg, cooldown) for a unit or bunker.
 fn attack_profile(e: &Entity) -> (u32, u32, u32) {
     if let Some(s) = config::unit_stats(&e.kind) {
         (s.range_tiles, s.dmg, s.cooldown)
@@ -798,7 +807,7 @@ fn attack_profile(e: &Entity) -> (u32, u32, u32) {
 enum CombatMode {
     /// Has an explicit attack target id.
     Ordered,
-    /// Engages any enemy within range (attack-move, turrets, idle auto-defend).
+    /// Engages any enemy within range (attack-move, bunkers, idle auto-defend).
     Aggressive,
 }
 
@@ -876,7 +885,7 @@ fn apply_damage(
 // ---------------------------------------------------------------------------
 
 /// Worker harvest loop: walk to node → harvest `HARVEST_TICKS` → carry a load → return to the
-/// nearest own HQ → deposit → repeat. Depletes the node; when empty, retargets a nearby
+/// nearest own Industrial Center → deposit → repeat. Depletes the node; when empty, retargets a nearby
 /// same-kind node or goes idle.
 fn gather_system(
     map: &Map,
@@ -1022,7 +1031,7 @@ fn gather_harvesting(
         e.harvest_progress = 0;
         e.gather_phase = GatherPhase::ToHome;
     }
-    // Route to the nearest own HQ.
+    // Route to the nearest own Industrial Center.
     route_home(map, entities, occ, id);
 }
 
@@ -1039,19 +1048,19 @@ fn gather_to_home(
         Some(e) => (e.owner, e.pos_x, e.pos_y),
         None => return,
     };
-    // Find nearest own, finished HQ.
-    let hq = nearest_own_hq(entities, owner, wx, wy);
-    let Some((hq_id, hx, hy)) = hq else {
-        // No HQ to deposit into: hold the load and wait (idle path).
+    // Find nearest own, finished Industrial Center.
+    let industrial_center = nearest_own_industrial_center(entities, owner, wx, wy);
+    let Some((industrial_center_id, hx, hy)) = industrial_center else {
+        // No Industrial Center to deposit into: hold the load and wait (idle path).
         if let Some(e) = entities.get_mut(id) {
             e.path.clear();
         }
         return;
     };
 
-    // Deposit range accounts for the HQ footprint (a 3×3 building's center is ~1.5 tiles from
+    // Deposit range accounts for the Industrial Center footprint (a 3×3 building's center is ~1.5 tiles from
     // its passable edge, which is as close as the worker can path).
-    let deposit_range = interact_range(entities, hq_id).unwrap_or(interact);
+    let deposit_range = interact_range(entities, industrial_center_id).unwrap_or(interact);
     if dist2(wx, wy, hx, hy).sqrt() <= deposit_range {
         // Deposit.
         let (amount, is_gas) = entities
@@ -1070,7 +1079,7 @@ fn gather_to_home(
         }
         if let Some(e) = entities.get_mut(id) {
             e.carry = None;
-            e.home_hq = Some(hq_id);
+            e.home_industrial_center = Some(industrial_center_id);
             // Loop back to the node (or retarget if depleted).
             e.gather_phase = GatherPhase::ToNode;
             e.path.clear();
@@ -1082,15 +1091,17 @@ fn gather_to_home(
     }
 }
 
-/// Route a laden worker to its nearest own HQ.
+/// Route a laden worker to its nearest own Industrial Center.
 fn route_home(map: &Map, entities: &mut EntityStore, occ: &Occupancy, id: u32) {
     let (owner, wx, wy) = match entities.get(id) {
         Some(e) => (e.owner, e.pos_x, e.pos_y),
         None => return,
     };
-    if let Some((hq_id, hx, hy)) = nearest_own_hq(entities, owner, wx, wy) {
+    if let Some((industrial_center_id, hx, hy)) =
+        nearest_own_industrial_center(entities, owner, wx, wy)
+    {
         if let Some(e) = entities.get_mut(id) {
-            e.home_hq = Some(hq_id);
+            e.home_industrial_center = Some(industrial_center_id);
         }
         repath(map, entities, occ, id, hx, hy);
     }
@@ -1170,11 +1181,16 @@ fn retarget_or_idle(
     }
 }
 
-/// Nearest finished HQ owned by `owner` to a point, as `(id, x, y)`.
-fn nearest_own_hq(entities: &EntityStore, owner: u32, x: f32, y: f32) -> Option<(u32, f32, f32)> {
+/// Nearest finished Industrial Center owned by `owner` to a point, as `(id, x, y)`.
+fn nearest_own_industrial_center(
+    entities: &EntityStore,
+    owner: u32,
+    x: f32,
+    y: f32,
+) -> Option<(u32, f32, f32)> {
     let mut best: Option<(u32, f32, f32, f32)> = None;
     for e in entities.iter() {
-        if e.owner == owner && e.kind == kinds::HQ && !e.under_construction {
+        if e.owner == owner && e.kind == kinds::INDUSTRIAL_CENTER && !e.under_construction {
             let d = dist2(x, y, e.pos_x, e.pos_y);
             if best.map(|(_, _, _, bd)| d < bd).unwrap_or(true) {
                 best = Some((e.id, e.pos_x, e.pos_y, d));
@@ -1270,14 +1286,14 @@ fn spawn_point_near(map: &Map, building_kind: &str, bx: f32, by: f32) -> (f32, f
 /// completion the building leaves CONSTRUCT, the worker is freed (idle), and a `Build` event
 /// fires to the owner.
 fn construction_system(entities: &mut EntityStore, events: &mut HashMap<u32, Vec<Event>>) {
-    let arrive = config::TILE_SIZE as f32 * 2.0;
-
     // Collect (worker_id, site_id) build assignments where the worker has reached the site.
     let mut working: Vec<(u32, u32)> = Vec::new();
     for e in entities.iter() {
         if e.is_unit() {
             if let Order::Build { site } = e.order {
                 if let Some(b) = entities.get(site) {
+                    let arrive =
+                        interact_range(entities, site).unwrap_or(config::TILE_SIZE as f32 * 2.0);
                     if b.under_construction
                         && dist2(e.pos_x, e.pos_y, b.pos_x, b.pos_y).sqrt() <= arrive
                     {
@@ -1382,7 +1398,7 @@ fn death_system(entities: &mut EntityStore, fog: &Fog, events: &mut HashMap<u32,
 // 8. Supply
 // ---------------------------------------------------------------------------
 
-/// Recompute each player's supply cap (from completed HQs/Depots) and supply used (living
+/// Recompute each player's supply cap (from completed Industrial Centers/Depots) and supply used (living
 /// units + units still in production queues). Cap is clamped to `SUPPLY_CAP_MAX`.
 pub(crate) fn recompute_supply(players: &mut [PlayerState], entities: &EntityStore) {
     for ps in players.iter_mut() {
@@ -1426,7 +1442,7 @@ fn dist2(ax: f32, ay: f32, bx: f32, by: f32) -> f32 {
 }
 
 /// Distance (px) at which a worker is "in contact" with an entity for harvest / deposit.
-/// Accounts for the target's radius (a 3×3 HQ is ~1.5 tiles wide) so a worker standing just
+/// Accounts for the target's radius (a 3×3 Industrial Center is ~1.5 tiles wide) so a worker standing just
 /// outside a building footprint still counts as adjacent. `None` for a missing entity.
 fn interact_range(entities: &EntityStore, target: u32) -> Option<f32> {
     let t = entities.get(target)?;

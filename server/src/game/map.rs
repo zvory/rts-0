@@ -138,7 +138,7 @@ impl Map {
 
 /// Choose symmetric start tiles for `player_count` players.
 ///
-/// We inset the starts from the very edge so the HQ footprint and its resource cluster fit.
+/// We inset the starts from the very edge so the Industrial Center footprint and its resource cluster fit.
 /// - 2 players: opposite corners (rotational 180°).
 /// - 3 players: three evenly-spaced positions (two corners + one mid-edge).
 /// - 4 players: the four corners.
@@ -159,10 +159,10 @@ fn symmetric_starts(size: u32, player_count: usize) -> Vec<(u32, u32)> {
 }
 
 /// Tiles that must never be made impassable: a square around each start tile big enough to
-/// hold the HQ footprint, the worker spawn ring, and the mineral cluster + geyser.
+/// hold the Industrial Center footprint, the worker spawn ring, and the mineral cluster + geyser.
 fn protected_tiles(size: u32, starts: &[(u32, u32)]) -> Vec<bool> {
     let mut prot = vec![false; (size * size) as usize];
-    // Radius generously covers HQ (3x3) + a nearby resource cluster a few tiles out.
+    // Radius generously covers Industrial Center (3x3) + a nearby resource cluster a few tiles out.
     let r: i32 = 7;
     for &(sx, sy) in starts {
         for dy in -r..=r {

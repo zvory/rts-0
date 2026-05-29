@@ -8,8 +8,8 @@
 //! invalid attempts simply fail silently the same way a human's would.
 //!
 //! The strategy is deliberately simple ("very basic AI"): keep workers mining, expand supply with
-//! depots, build a couple of barracks, pump soldiers, and send them at the nearest enemy base in
-//! waves. It does not micro, tech to heavies, or scout — it just keeps building and attacking.
+//! depots, build a couple of barracks, pump riflemen, and send them at the nearest enemy base in
+//! waves. It does not micro, tech to tanks, or scout — it just keeps building and attacking.
 //!
 //! Because the controller is server-side (not a network client), it reads the authoritative world
 //! state directly rather than a fog-filtered snapshot. Fog is a guard against leaking state to
@@ -38,7 +38,7 @@ const TARGET_WORKERS: usize = 8;
 const TARGET_BARRACKS: usize = 2;
 /// Build a depot when free supply drops below this (and we're not already building one).
 const SUPPLY_BUFFER: u32 = 4;
-/// Free soldiers that must gather before a wave is committed to attacking. Small so the AI
+/// Free riflemen that must gather before a wave is committed to attacking. Small so the AI
 /// commits attacks within a reasonable time given its slow economy.
 const WAVE_SIZE: usize = 4;
 /// Max Chebyshev ring (in tiles) searched outward from the base for a build site.
@@ -78,7 +78,7 @@ impl AiController {
             Some(p) => p,
             None => return,
         };
-        // No HQ / nothing left → nothing to do (the match is resolving).
+        // No Industrial Center / nothing left → nothing to do (the match is resolving).
         if !entities.player_alive(self.player) {
             return;
         }
@@ -94,10 +94,10 @@ impl AiController {
         let mut idle_workers: Vec<u32> = Vec::new();
         let mut gathering_workers: Vec<u32> = Vec::new();
         let mut worker_count: usize = 0;
-        let mut soldier_count: usize = 0;
-        let mut free_soldiers: Vec<u32> = Vec::new();
-        // Finished HQs with an empty production queue (ready to train a worker).
-        let mut idle_hqs: Vec<u32> = Vec::new();
+        let mut rifleman_count: usize = 0;
+        let mut free_riflemen: Vec<u32> = Vec::new();
+        // Finished Industrial Centers with an empty production queue (ready to train a worker).
+        let mut idle_industrial_centers: Vec<u32> = Vec::new();
         // Finished barracks as (id, queue_len).
         let mut barracks: Vec<(u32, usize)> = Vec::new();
         let mut barracks_total: usize = 0; // finished + under construction
@@ -116,14 +116,14 @@ impl AiController {
                         _ => {}
                     }
                 }
-                kinds::SOLDIER => {
-                    soldier_count += 1;
-                    if is_free_soldier(e) {
-                        free_soldiers.push(e.id);
+                kinds::RIFLEMAN => {
+                    rifleman_count += 1;
+                    if is_free_rifleman(e) {
+                        free_riflemen.push(e.id);
                     }
                 }
-                kinds::HQ if !e.under_construction && e.prod_queue.is_empty() => {
-                    idle_hqs.push(e.id)
+                kinds::INDUSTRIAL_CENTER if !e.under_construction && e.prod_queue.is_empty() => {
+                    idle_industrial_centers.push(e.id)
                 }
                 kinds::BARRACKS => {
                     barracks_total += 1;
@@ -135,7 +135,7 @@ impl AiController {
                 _ => {}
             }
         }
-        let _ = soldier_count; // surveyed for clarity; waves key off free_soldiers.
+        let _ = rifleman_count; // surveyed for clarity; waves key off free_riflemen.
 
         // Workers we may pull onto a build job: prefer truly idle, fall back to a gatherer.
         let mut builder_pool = idle_workers.clone();
@@ -167,7 +167,7 @@ impl AiController {
             }
         }
 
-        // --- 2. Build barracks (our soldier production). -------------------
+        // --- 2. Build barracks (our rifleman production). -------------------
         let rax_cost = config::building_stats(kinds::BARRACKS)
             .map(|s| s.cost_min)
             .unwrap_or(100);
@@ -196,7 +196,7 @@ impl AiController {
         let worker_supply = config::unit_stats(kinds::WORKER)
             .map(|s| s.supply)
             .unwrap_or(1);
-        for hq in idle_hqs {
+        for industrial_center in idle_industrial_centers {
             if worker_count >= TARGET_WORKERS {
                 break;
             }
@@ -206,7 +206,7 @@ impl AiController {
             out.push((
                 self.player,
                 Command::Train {
-                    building: hq,
+                    building: industrial_center,
                     unit: kinds::WORKER.to_string(),
                 },
             ));
@@ -215,11 +215,11 @@ impl AiController {
             worker_count += 1;
         }
 
-        // --- 4. Pump soldiers from each barracks (keep a shallow queue). ---
-        let soldier_cost = config::unit_stats(kinds::SOLDIER)
+        // --- 4. Pump riflemen from each barracks (keep a shallow queue). ---
+        let rifleman_cost = config::unit_stats(kinds::RIFLEMAN)
             .map(|s| s.cost_min)
             .unwrap_or(50);
-        let soldier_supply = config::unit_stats(kinds::SOLDIER)
+        let rifleman_supply = config::unit_stats(kinds::RIFLEMAN)
             .map(|s| s.supply)
             .unwrap_or(1);
         for (rax, queue_len) in barracks {
@@ -227,18 +227,18 @@ impl AiController {
             if queue_len >= 2 {
                 continue;
             }
-            if minerals < soldier_cost || free_supply < soldier_supply {
+            if minerals < rifleman_cost || free_supply < rifleman_supply {
                 break;
             }
             out.push((
                 self.player,
                 Command::Train {
                     building: rax,
-                    unit: kinds::SOLDIER.to_string(),
+                    unit: kinds::RIFLEMAN.to_string(),
                 },
             ));
-            minerals -= soldier_cost;
-            free_supply -= soldier_supply;
+            minerals -= rifleman_cost;
+            free_supply -= rifleman_supply;
         }
 
         // --- 5. Send idle workers to mine the nearest mineral patch. -------
@@ -254,13 +254,13 @@ impl AiController {
             }
         }
 
-        // --- 6. Commit a wave once enough soldiers are free. ---------------
-        if free_soldiers.len() >= WAVE_SIZE {
+        // --- 6. Commit a wave once enough riflemen are free. ---------------
+        if free_riflemen.len() >= WAVE_SIZE {
             if let Some((x, y)) = self.nearest_enemy_base(map, entities, players) {
                 out.push((
                     self.player,
                     Command::AttackMove {
-                        units: free_soldiers,
+                        units: free_riflemen,
                         x,
                         y,
                     },
@@ -326,9 +326,9 @@ impl AiController {
     }
 }
 
-/// A soldier available to join a wave: idle, or one whose attack-move finished (no path, no
+/// A rifleman available to join a wave: idle, or one whose attack-move finished (no path, no
 /// target) so it's standing around and should regroup with the next push.
-fn is_free_soldier(e: &crate::game::entity::Entity) -> bool {
+fn is_free_rifleman(e: &crate::game::entity::Entity) -> bool {
     match e.order {
         Order::Idle => true,
         Order::AttackMove { .. } => e.path.is_empty() && e.target_id.is_none(),
