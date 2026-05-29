@@ -247,7 +247,16 @@ pub struct EntityView {
 
 impl EntityView {
     /// Minimal constructor; fill optional fields afterward.
-    pub fn new(id: u32, owner: u32, kind: &str, x: f32, y: f32, hp: u32, max_hp: u32, state: &str) -> Self {
+    pub fn new(
+        id: u32,
+        owner: u32,
+        kind: &str,
+        x: f32,
+        y: f32,
+        hp: u32,
+        max_hp: u32,
+        state: &str,
+    ) -> Self {
         EntityView {
             id,
             owner,
@@ -274,8 +283,21 @@ impl EntityView {
 #[derive(Debug, Clone, Serialize)]
 #[serde(tag = "e", rename_all = "camelCase", rename_all_fields = "camelCase")]
 pub enum Event {
-    Attack { from: u32, to: u32 },
-    Death { id: u32, x: f32, y: f32, kind: String },
-    Build { id: u32, kind: String },
-    Notice { msg: String },
+    Attack {
+        from: u32,
+        to: u32,
+    },
+    Death {
+        id: u32,
+        x: f32,
+        y: f32,
+        kind: String,
+    },
+    Build {
+        id: u32,
+        kind: String,
+    },
+    Notice {
+        msg: String,
+    },
 }
