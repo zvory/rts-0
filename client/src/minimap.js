@@ -9,17 +9,17 @@
 
 import { cmd } from "./protocol.js";
 import { TERRAIN, isResource } from "./protocol.js";
-import { COLORS, FOG_EXPLORED_ALPHA } from "./config.js";
+import { COLORS, FOG_EXPLORED_ALPHA, FOG_UNEXPLORED_ALPHA } from "./config.js";
 
 // Convert one of the 0xRRGGBB palette ints into a CSS color string.
 const hex = (n) => "#" + n.toString(16).padStart(6, "0");
 
 // Per-terrain fill (matches the renderer palette; rock reads as impassable).
-const TERRAIN_FILL = Object.freeze({
-  [TERRAIN.GRASS]: hex(COLORS.grass),
-  [TERRAIN.ROCK]: hex(COLORS.rock),
-  [TERRAIN.WATER]: hex(COLORS.water),
-});
+const terrainFill = (code, tx, ty) => {
+  if (code === TERRAIN.ROCK) return hex(COLORS.rock);
+  if (code === TERRAIN.WATER) return hex(COLORS.water);
+  return hex((tx + ty) % 2 === 0 ? COLORS.grass : COLORS.grassAlt);
+};
 
 /**
  * The minimap widget. Wiring (main.js) constructs one and calls `render()` once per
@@ -134,7 +134,7 @@ export class Minimap {
     for (let ty = 0; ty < map.height; ty++) {
       for (let tx = 0; tx < map.width; tx++) {
         const code = map.terrain[ty * map.width + tx];
-        ctx.fillStyle = TERRAIN_FILL[code] || hex(COLORS.grass);
+        ctx.fillStyle = terrainFill(code, tx, ty);
         const p = this._worldToCanvas(tx * ts, ty * ts);
         ctx.fillRect(p.x, p.y, cw, ch);
       }
@@ -142,7 +142,7 @@ export class Minimap {
   }
 
   /**
-   * Draw the fog overlay over the terrain/entities: unexplored solid dark, explored but
+   * Draw the fog overlay over the terrain/entities: unexplored heavily dimmed, explored but
    * not currently visible dimmed, visible clear. Drawn per tile from the fog grids.
    */
   _drawFog() {
@@ -163,7 +163,7 @@ export class Minimap {
           ctx.globalAlpha = FOG_EXPLORED_ALPHA;
           ctx.fillStyle = hex(COLORS.fogExplored);
         } else {
-          ctx.globalAlpha = 1;
+          ctx.globalAlpha = FOG_UNEXPLORED_ALPHA;
           ctx.fillStyle = hex(COLORS.fogUnexplored);
         }
         ctx.fillRect(p.x, p.y, cw, ch);

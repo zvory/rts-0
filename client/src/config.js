@@ -12,10 +12,10 @@ export const INTERP_DELAY_MS = SNAPSHOT_MS; // render this far in the past for s
 // Palette ------------------------------------------------------------------
 export const COLORS = Object.freeze({
   bgVoid: 0x05070d, // outside the map
-  grass: 0x2f3a2a, // base terrain
-  grassAlt: 0x36422f, // checker alternate
-  rock: 0x40392f,
-  water: 0x1c2c44,
+  grass: 0x2e6b3a, // base terrain
+  grassAlt: 0x3b7d42, // checker alternate
+  rock: 0x7a6250,
+  water: 0x115783,
   grid: 0x000000,
   minerals: 0x46e3ff,
   gas: 0x53e08a,
@@ -34,6 +34,7 @@ export const COLORS = Object.freeze({
   fogExplored: 0x000000, // drawn at fogExploredAlpha
 });
 export const FOG_EXPLORED_ALPHA = 0.55;
+export const FOG_UNEXPLORED_ALPHA = 0.82;
 
 // Player colors (server assigns from a matching palette; used as a fallback for blips).
 export const PLAYER_PALETTE = Object.freeze([
