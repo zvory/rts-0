@@ -389,10 +389,11 @@ start the rAF loop (compute `alpha` from snapshot timing, `camera.update`, `inpu
   construction → dashed/translucent with a progress bar; production → small progress arc.
 - Resource nodes: minerals = cyan crystals cluster; gas = green geyser; show remaining via
   size/opacity.
-- Terrain: subtle two-tone checker or noise so movement is readable; impassable tiles a
-  darker rocky tone. Thin grid optional at high zoom.
-- Fog: unexplored = solid near-black; explored-but-not-visible = 55% dark overlay; visible =
-  clear. Use a single overlay sprite/graphics updated from `fog` grids; soften edges if cheap.
+- Terrain: high-contrast two-tone grass checker or noise so movement is readable; impassable
+  rock and water tiles must remain visually distinct. Thin grid optional at high zoom.
+- Fog: unexplored = 82% dark overlay so terrain remains faintly readable; explored-but-not-visible =
+  55% dark overlay; visible = clear. Use a single overlay sprite/graphics updated from `fog`
+  grids; soften edges if cheap.
 - Selection: green for own, red tint for enemy, yellow for neutral. Drag-box translucent green.
 - Keep a cohesive palette; define colors in `config.js`.
 

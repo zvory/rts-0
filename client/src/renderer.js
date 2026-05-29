@@ -17,6 +17,7 @@
 import {
   COLORS,
   FOG_EXPLORED_ALPHA,
+  FOG_UNEXPLORED_ALPHA,
   STATS,
   PLAYER_PALETTE,
 } from "./config.js";
@@ -565,7 +566,7 @@ export class Renderer {
   // --- Overlays ------------------------------------------------------------
 
   /**
-   * Draw the fog overlay from the Fog grids: unexplored = solid dark, explored =
+   * Draw the fog overlay from the Fog grids: unexplored = heavily dimmed, explored =
    * dimmed at FOG_EXPLORED_ALPHA, visible = clear. Rendered in world space over the
    * whole map; merged into horizontal runs per row to keep the rect count low.
    * @private
@@ -586,8 +587,9 @@ export class Renderer {
         const level = tx < w ? this._fogLevel(fog, tx, ty) : -1;
         if (level !== runLevel) {
           if (runLevel > 0) {
-            const a = runLevel === 2 ? 1 : FOG_EXPLORED_ALPHA;
-            g.beginFill(COLORS.fogUnexplored, a);
+            const color = runLevel === 2 ? COLORS.fogUnexplored : COLORS.fogExplored;
+            const a = runLevel === 2 ? FOG_UNEXPLORED_ALPHA : FOG_EXPLORED_ALPHA;
+            g.beginFill(color, a);
             g.drawRect(runStart * ts, ty * ts, (tx - runStart) * ts, ts);
             g.endFill();
           }
