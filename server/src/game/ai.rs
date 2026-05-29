@@ -7,19 +7,16 @@
 //! path in `services/commands.rs`, so it can never spend resources it lacks or place buildings illegally —
 //! invalid attempts simply fail silently the same way a human's would.
 //!
-//! The strategy is deliberately simple ("very basic AI"): keep workers mining, expand supply with
-//! depots, build a couple of barracks, pump riflemen, and send them at the nearest enemy base in
-//! waves. It does not micro, tech to tanks, or scout — it just keeps building and attacking.
-//!
 //! Because the controller is server-side (not a network client), it reads the authoritative world
 //! state directly rather than a fog-filtered snapshot. Fog is a guard against leaking state to
 //! *human* clients over the wire; an internal bot reading full state is not a fog violation. To
-//! keep it fair anyway, the AI only ever targets enemy *start tiles* (which are public to everyone
-//! via the `start` payload), letting attack-move engage whatever it runs into.
+//! keep it fair anyway, the AI only ever targets enemy *start tiles*, which are public to everyone
+//! via the `start` payload.
 
 use crate::config;
 use crate::game::entity::{EntityKind, EntityStore, Order};
 use crate::game::map::Map;
+use crate::game::services::spatial::SpatialIndex;
 use crate::game::systems;
 use crate::game::PlayerState;
 use crate::protocol::{kinds, Command};
@@ -63,6 +60,7 @@ impl AiController {
         &mut self,
         map: &Map,
         entities: &EntityStore,
+        spatial: &SpatialIndex,
         players: &[PlayerState],
         tick: u32,
         out: &mut Vec<(u32, Command)>,
@@ -146,7 +144,7 @@ impl AiController {
             .unwrap_or(50);
         if !depot_building && !supply_capped && free_supply < SUPPLY_BUFFER && steel >= depot_cost {
             if let Some(worker) = builder_pool.pop() {
-                if let Some((tx, ty)) = self.find_build_spot(map, entities, EntityKind::Depot, me) {
+                if let Some((tx, ty)) = self.find_build_spot(map, entities, spatial, EntityKind::Depot, me) {
                     out.push((
                         self.player,
                         Command::Build {
@@ -162,14 +160,14 @@ impl AiController {
             }
         }
 
-        // --- 2. Build barracks (our rifleman production). -------------------
+        // --- 2. Build barracks (our rifleman production). --------------------
         let rax_cost = config::building_stats(EntityKind::Barracks)
             .map(|s| s.cost_steel)
             .unwrap_or(100);
         if barracks_total < TARGET_BARRACKS && steel >= rax_cost {
             if let Some(worker) = builder_pool.pop() {
                 if let Some((tx, ty)) =
-                    self.find_build_spot(map, entities, EntityKind::Barracks, me)
+                    self.find_build_spot(map, entities, spatial, EntityKind::Barracks, me)
                 {
                     out.push((
                         self.player,
@@ -240,7 +238,7 @@ impl AiController {
 
         // --- 5. Send idle workers to mine the nearest steel patch. -------
         for worker in idle_workers {
-            if let Some(node) = nearest_steel_node(entities, worker) {
+            if let Some(node) = nearest_steel_node(entities, spatial, worker) {
                 out.push((
                     self.player,
                     Command::Gather {
@@ -251,7 +249,7 @@ impl AiController {
             }
         }
 
-        // --- 6. Commit a wave once enough riflemen are free. ---------------
+        // --- 6. Commit a wave once enough riflemen are free. --------------
         if free_riflemen.len() >= WAVE_SIZE {
             if let Some((x, y)) = self.nearest_enemy_base(map, entities, players) {
                 out.push((
@@ -273,6 +271,7 @@ impl AiController {
         &self,
         map: &Map,
         entities: &EntityStore,
+        spatial: &SpatialIndex,
         building: EntityKind,
         me: &PlayerState,
     ) -> Option<(u32, u32)> {
@@ -289,7 +288,7 @@ impl AiController {
                         continue;
                     }
                     let (tx, ty) = (tx as u32, ty as u32);
-                    if systems::footprint_placeable(map, entities, building, tx, ty) {
+                    if systems::footprint_placeable(map, entities, spatial, building, tx, ty) {
                         return Some((tx, ty));
                     }
                 }
@@ -334,19 +333,18 @@ fn is_free_rifleman(e: &crate::game::entity::Entity) -> bool {
 }
 
 /// Nearest non-empty steel node to a worker (by id), or `None` if none remain / worker is gone.
-fn nearest_steel_node(entities: &EntityStore, worker: u32) -> Option<u32> {
+fn nearest_steel_node(entities: &EntityStore, spatial: &SpatialIndex, worker: u32) -> Option<u32> {
     let w = entities.get(worker)?;
     let (wx, wy) = (w.pos_x, w.pos_y);
-    let mut best: Option<(u32, f32)> = None;
-    for n in entities.iter() {
-        if n.kind == EntityKind::Steel && n.remaining > 0 {
-            let d = (n.pos_x - wx) * (n.pos_x - wx) + (n.pos_y - wy) * (n.pos_y - wy);
-            if best.map(|(_, bd)| d < bd).unwrap_or(true) {
-                best = Some((n.id, d));
-            }
-        }
-    }
-    best.map(|(id, _)| id)
+    let max_radius = config::TILE_SIZE as f32 * 48.0; // generous search radius
+    let result = spatial.nearest(
+        wx,
+        wy,
+        max_radius,
+        entities,
+        |e: &crate::game::entity::Entity| e.kind == EntityKind::Steel && e.remaining > 0,
+    );
+    result.map(|(id, _)| id)
 }
 
 /// Remove the first occurrence of `id` from `v` (used to keep a worker assigned to a build job

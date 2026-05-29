@@ -4,6 +4,7 @@ use crate::config;
 use crate::game::entity::{Entity, EntityStore, Order};
 use crate::game::map::Map;
 use crate::game::services::occupancy::Occupancy;
+use crate::game::services::spatial::SpatialIndex;
 use crate::game::services::{dist2, repath};
 use crate::protocol::Event;
 
@@ -17,6 +18,7 @@ pub(crate) fn combat_system(
     map: &Map,
     entities: &mut EntityStore,
     occ: &Occupancy,
+    spatial: &SpatialIndex,
     events: &mut HashMap<u32, Vec<Event>>,
 ) {
     // Tick down cooldowns first.
@@ -25,14 +27,6 @@ pub(crate) fn combat_system(
             e.attack_cd -= 1;
         }
     }
-
-    // Snapshot lightweight target candidates (id, owner, pos, alive) to avoid borrow conflicts
-    // while we mutate attackers and victims.
-    let candidates: Vec<(u32, u32, f32, f32)> = entities
-        .iter()
-        .filter(|e| e.is_targetable() && e.hp > 0)
-        .map(|e| (e.id, e.owner, e.pos_x, e.pos_y))
-        .collect();
 
     for id in entities.ids() {
         // Determine this attacker's combat parameters.
@@ -72,7 +66,7 @@ pub(crate) fn combat_system(
 
         // Resolve / acquire a target id (explicit target for Ordered, nearest enemy in aggro
         // radius for Aggressive).
-        let target = resolve_target(entities, &candidates, id, owner, px, py, aggro_px, mode);
+        let target = resolve_target(entities, spatial, id, owner, px, py, aggro_px, mode);
         let Some(tid) = target else {
             // No target: clear stale combat target id for non-attack orders.
             if let Some(e) = entities.get_mut(id) {
@@ -153,7 +147,7 @@ fn combat_mode(e: &Entity) -> CombatMode {
 #[allow(clippy::too_many_arguments)]
 fn resolve_target(
     entities: &EntityStore,
-    candidates: &[(u32, u32, f32, f32)],
+    spatial: &SpatialIndex,
     self_id: u32,
     owner: u32,
     px: f32,
@@ -175,17 +169,16 @@ fn resolve_target(
 
     // Aggressive acquisition: the nearest enemy within the acquire radius (weapon range for
     // buildings, sight range for mobile units so they chase).
-    let mut best: Option<(u32, f32)> = None;
-    for &(cid, c_owner, cx, cy) in candidates {
-        if cid == self_id || c_owner == owner || c_owner == crate::game::entity::NEUTRAL {
-            continue;
-        }
-        let d = dist2(px, py, cx, cy);
-        if d <= acquire_px * acquire_px && best.map(|(_, bd)| d < bd).unwrap_or(true) {
-            best = Some((cid, d));
-        }
-    }
-    best.map(|(cid, _)| cid)
+    spatial.nearest(
+        px,
+        py,
+        acquire_px,
+        entities,
+        |e: &Entity| {
+            e.id != self_id && e.owner != owner && e.owner != crate::game::entity::NEUTRAL && e.is_targetable() && e.hp > 0
+        },
+    )
+    .map(|(cid, _)| cid)
 }
 
 /// Apply `dmg` to `victim` from `attacker`, emitting an `Attack` event to the attacker's

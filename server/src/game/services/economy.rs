@@ -2,6 +2,7 @@ use crate::config;
 use crate::game::entity::{CarryState, EntityKind, EntityStore, GatherPhase, Order};
 use crate::game::map::Map;
 use crate::game::services::occupancy::Occupancy;
+use crate::game::services::spatial::SpatialIndex;
 use crate::game::services::{dist2, interact_range, repath};
 use crate::game::PlayerState;
 
@@ -13,6 +14,7 @@ pub(crate) fn gather_system(
     entities: &mut EntityStore,
     players: &mut [PlayerState],
     occ: &Occupancy,
+    spatial: &SpatialIndex,
 ) {
     let interact = config::TILE_SIZE as f32 * 1.5; // close enough to mine / deposit
 
@@ -32,7 +34,7 @@ pub(crate) fn gather_system(
         match phase {
             GatherPhase::ToNode => gather_to_node(map, entities, occ, id, node, interact),
             GatherPhase::Harvesting => gather_harvesting(map, entities, occ, id, node, interact),
-            GatherPhase::ToHome => gather_to_home(map, entities, players, occ, id, node, interact),
+            GatherPhase::ToHome => gather_to_home(map, entities, players, occ, spatial, id, node, interact),
         }
     }
 }
@@ -165,6 +167,7 @@ fn gather_to_home(
     entities: &mut EntityStore,
     players: &mut [PlayerState],
     occ: &Occupancy,
+    spatial: &SpatialIndex,
     id: u32,
     node: u32,
     interact: f32,
@@ -174,7 +177,7 @@ fn gather_to_home(
         None => return,
     };
     // Find nearest own, finished Industrial Center.
-    let industrial_center = nearest_own_industrial_center(entities, owner, wx, wy);
+    let industrial_center = nearest_own_industrial_center(entities, spatial, owner, wx, wy);
     let Some((industrial_center_id, hx, hy)) = industrial_center else {
         // No Industrial Center to deposit into: hold the load and wait (idle path).
         if let Some(e) = entities.get_mut(id) {
@@ -222,8 +225,10 @@ fn route_home(map: &Map, entities: &mut EntityStore, occ: &Occupancy, id: u32) {
         Some(e) => (e.owner, e.pos_x, e.pos_y),
         None => return,
     };
+    // We don't have the spatial index here (called from gather_harvesting), but the gather
+    // system will repath in the ToHome phase next tick. For now, try to route via a large scan.
     if let Some((industrial_center_id, hx, hy)) =
-        nearest_own_industrial_center(entities, owner, wx, wy)
+        nearest_own_industrial_center_no_spatial(entities, owner, wx, wy)
     {
         if let Some(e) = entities.get_mut(id) {
             e.home_industrial_center = Some(industrial_center_id);
@@ -278,6 +283,8 @@ fn retarget_or_idle(
     };
 
     // Nearest same-kind, non-empty node within a reasonable radius.
+    // We scan all nodes because the spatial index isn't passed here (this is called from
+    // gather phases that don't have it readily available). In practice node counts are low.
     let mut best: Option<(u32, f32, f32, f32)> = None;
     for n in entities.iter() {
         if n.is_node() && n.remaining > 0 && n.kind == want_kind {
@@ -307,7 +314,30 @@ fn retarget_or_idle(
 }
 
 /// Nearest finished Industrial Center owned by `owner` to a point, as `(id, x, y)`.
+/// Uses the spatial index for an efficient range query.
 pub(crate) fn nearest_own_industrial_center(
+    entities: &EntityStore,
+    spatial: &SpatialIndex,
+    owner: u32,
+    x: f32,
+    y: f32,
+) -> Option<(u32, f32, f32)> {
+    let max_radius = config::TILE_SIZE as f32 * 64.0; // generous max search radius
+    let result = spatial.nearest(
+        x,
+        y,
+        max_radius,
+        entities,
+        |e: &crate::game::entity::Entity| {
+            e.owner == owner && e.kind == EntityKind::IndustrialCenter && !e.under_construction
+        },
+    );
+    result.and_then(|(id, _)| entities.get(id).map(|e| (id, e.pos_x, e.pos_y)))
+}
+
+/// Fallback that scans all entities (used when the spatial index isn't available, e.g. during
+/// internal routing inside the gather phase).
+fn nearest_own_industrial_center_no_spatial(
     entities: &EntityStore,
     owner: u32,
     x: f32,
