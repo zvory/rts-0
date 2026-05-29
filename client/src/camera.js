@@ -4,9 +4,10 @@
 // (`x`, `y`) and a `zoom` factor. World units are pixels at zoom 1; on screen a
 // world distance `d` covers `d * zoom` device-independent pixels.
 //
-// Panning comes from three sources, all applied in `update(dt, input)`:
-//   - keyboard (WASD + arrow keys),
+// Panning comes from three sources:
+//   - keyboard arrows, applied in `update(dt, input)`,
 //   - screen-edge scrolling (cursor within `CAMERA.edgeScrollPx` of a viewport edge),
+//   - direct drag panning through `panByScreenDelta`,
 // and the result is always clamped so the visible rectangle stays inside the map.
 //
 // The renderer drives the Pixi world container from `x`, `y`, `zoom`; the input
@@ -57,7 +58,7 @@ export class Camera {
    * @param {number} dt seconds since the previous frame
    * @param {object} [input] read-only view of current input state
    * @param {{up:boolean,down:boolean,left:boolean,right:boolean}} [input.keys] pan flags
-   *   owned by Input (WASD and arrows both feed these; reset on blur)
+   *   owned by Input (arrow keys feed these; reset on blur)
    * @param {{x:number,y:number}|null} [input.mouse] cursor position in screen px, or null if outside
    */
   update(dt, input) {
@@ -129,6 +130,18 @@ export class Camera {
   centerOn(wx, wy) {
     this.x = wx - this.viewW / (2 * this.zoom);
     this.y = wy - this.viewH / (2 * this.zoom);
+    this._clamp();
+  }
+
+  /**
+   * Pan by a screen-space drag delta. Positive dx/dy means the pointer moved
+   * right/down, so the viewed world is pulled with it.
+   * @param {number} dx screen-space x delta in pixels
+   * @param {number} dy screen-space y delta in pixels
+   */
+  panByScreenDelta(dx, dy) {
+    this.x -= dx / this.zoom;
+    this.y -= dy / this.zoom;
     this._clamp();
   }
 

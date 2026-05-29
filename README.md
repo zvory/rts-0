@@ -114,7 +114,7 @@ End-to-end tests run against a live server (start it first with `cargo run`):
 node tests/server_integration.mjs    # no deps; full server pipeline over WebSocket (22 checks)
 node tests/regression.mjs            # no deps; hardening/DoS/robustness guards (5 checks)
 cd server && cargo test scripted_self_play_exercises_economy_tech_and_combat
-cd tests && npm install && node client_smoke.mjs   # headless-Chrome client smoke (17 checks)
+cd tests && npm install && node client_smoke.mjs   # headless-Chrome client smoke (19 checks)
 ```
 
 See `tests/README.md` for details and a CI sketch.
