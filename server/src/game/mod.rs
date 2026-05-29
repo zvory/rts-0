@@ -21,13 +21,11 @@ pub mod systems;
 use std::collections::HashMap;
 
 use crate::config;
-use crate::protocol::{
-    kinds, Command, EntityView, Event, MapInfo, PlayerStart, Snapshot, StartPayload,
-};
+use crate::protocol::{Command, EntityView, Event, MapInfo, PlayerStart, Snapshot, StartPayload};
 use serde::{Deserialize, Serialize};
 
 use ai::AiController;
-use entity::{Entity, EntityStore, Order};
+use entity::{Entity, EntityKind, EntityStore, Order};
 use fog::Fog;
 use map::Map;
 use replay::CommandLogEntry;
@@ -319,7 +317,7 @@ impl Game {
         let mut v = EntityView::new(
             e.id,
             e.owner,
-            &e.kind,
+            e.kind.to_protocol_str(),
             e.pos_x,
             e.pos_y,
             e.hp,
@@ -334,7 +332,7 @@ impl Game {
         // Production buildings: surface the front item + queue depth.
         if e.is_building() && !e.prod_queue.is_empty() {
             if let Some(front) = e.prod_queue.first() {
-                v.prod_kind = Some(front.unit.clone());
+                v.prod_kind = Some(front.unit.to_protocol_str().to_string());
                 v.prod_progress = Some(if front.total == 0 {
                     0.0
                 } else {
@@ -357,14 +355,7 @@ impl Game {
         if let Some(c) = e.carry {
             if c.amount > 0 {
                 v.carrying = Some(c.amount);
-                v.carrying_kind = Some(
-                    if c.is_oil {
-                        kinds::OIL
-                    } else {
-                        kinds::STEEL
-                    }
-                    .to_string(),
-                );
+                v.carrying_kind = Some(c.kind.to_protocol_str().to_string());
             }
         }
 
@@ -398,14 +389,14 @@ impl Game {
     }
 }
 
-    /// Spawn a player's full starting layout: a free, fully-built Industrial Center on the start tile, a ring of
+/// Spawn a player's full starting layout: a free, fully-built Industrial Center on the start tile, a ring of
 /// workers around it, and a nearby neutral resource cluster (steel + one oil node).
 fn spawn_player_start(entities: &mut EntityStore, map: &Map, owner: u32, start: (u32, u32)) {
     let (stx, sty) = start;
     let (hx, hy) = map.tile_center(stx, sty);
 
     // Industrial Center (free, fully built). Footprint is 3x3 centered on the start tile.
-    entities.spawn_building(owner, kinds::INDUSTRIAL_CENTER, hx, hy, true);
+    entities.spawn_building(owner, EntityKind::IndustrialCenter, hx, hy, true);
 
     // Starting workers arranged in a ring just outside the Industrial Center footprint.
     let ts = config::TILE_SIZE as f32;
@@ -415,7 +406,7 @@ fn spawn_player_start(entities: &mut EntityStore, map: &Map, owner: u32, start: 
         let ang = std::f32::consts::TAU * (i as f32) / (count.max(1) as f32);
         let wx = hx + ring_r * ang.cos();
         let wy = hy + ring_r * ang.sin();
-        entities.spawn_unit(owner, kinds::WORKER, wx, wy);
+        entities.spawn_unit(owner, EntityKind::Worker, wx, wy);
     }
 
     // Steel cluster: an arc of patches a few tiles from the Industrial Center, plus one oil node.
@@ -434,17 +425,18 @@ fn spawn_player_start(entities: &mut EntityStore, map: &Map, owner: u32, start: 
         let row = (i / 4) as f32;
         let px = anchor_x + (col - 1.5) * ts;
         let py = anchor_y + row * ts;
-        entities.spawn_node(kinds::STEEL, px, py);
+        entities.spawn_node(EntityKind::Steel, px, py);
     }
     // Oil node sits a little further out from the steel line.
     let gx = anchor_x + dir_x * ts * 1.5;
     let gy = anchor_y + dir_y * ts * 2.5;
-    entities.spawn_node(kinds::OIL, gx, gy);
+    entities.spawn_node(EntityKind::Oil, gx, gy);
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::protocol::kinds;
 
     /// Drive a passive human vs. one AI and confirm the AI actually plays: it grows its economy,
     /// expands supply, builds a barracks, produces riflemen, and marches them into the human base

@@ -17,12 +17,14 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::config;
-use crate::game::entity::{CarryState, Entity, EntityStore, GatherPhase, Order, ProdItem, NEUTRAL};
+use crate::game::entity::{
+    CarryState, Entity, EntityKind, EntityStore, GatherPhase, Order, ProdItem, NEUTRAL,
+};
 use crate::game::fog::Fog;
 use crate::game::map::Map;
 use crate::game::pathfinding::{self, Passability};
 use crate::game::PlayerState;
-use crate::protocol::{kinds, Command, Event};
+use crate::protocol::{Command, Event};
 
 /// World pixels at which a unit is considered "arrived" at a waypoint / target point.
 const ARRIVE_EPS: f32 = 2.0;
@@ -77,7 +79,7 @@ impl Passability for Occupancy<'_> {
 /// The set of tiles a building's footprint covers, centered on its position. Footprints are
 /// `foot_w × foot_h`; we center them on the tile under the building center.
 fn building_footprint(map: &Map, e: &Entity) -> Vec<(u32, u32)> {
-    let Some(s) = config::building_stats(&e.kind) else {
+    let Some(s) = config::building_stats(e.kind) else {
         return Vec::new();
     };
     let (cx, cy) = map.tile_of(e.pos_x, e.pos_y);
@@ -306,7 +308,7 @@ fn order_gather(
         return;
     }
     // Must be a worker, and the target must be a (non-empty) resource node.
-    let is_worker = matches!(entities.get(id), Some(e) if e.kind == kinds::WORKER);
+    let is_worker = matches!(entities.get(id), Some(e) if e.kind == EntityKind::Worker);
     let node_ok = matches!(entities.get(node), Some(n) if n.is_node() && n.remaining > 0);
     if !is_worker || !node_ok {
         return;
@@ -352,11 +354,18 @@ fn order_build(
     if !owns_unit(entities, player, worker) {
         return;
     }
-    if !matches!(entities.get(worker), Some(e) if e.kind == kinds::WORKER) {
+    if !matches!(entities.get(worker), Some(e) if e.kind == EntityKind::Worker) {
         notice(events, player, "Only workers can build");
         return;
     }
-    let stats = match config::building_stats(building) {
+    let kind = match building.parse::<EntityKind>() {
+        Ok(k) => k,
+        Err(_) => {
+            notice(events, player, "Unknown building");
+            return;
+        }
+    };
+    let stats = match config::building_stats(kind) {
         Some(s) => s,
         None => {
             notice(events, player, "Unknown building");
@@ -365,12 +374,12 @@ fn order_build(
     };
 
     // Tech requirement (e.g. barracks needs an Industrial Center).
-    let owned: Vec<&str> = entities
+    let owned: Vec<EntityKind> = entities
         .iter()
         .filter(|e| e.owner == player && e.is_building())
-        .map(|e| e.kind.as_str())
+        .map(|e| e.kind)
         .collect();
-    if !config::build_requirement_met(building, &owned) {
+    if !config::build_requirement_met(kind, &owned) {
         notice(events, player, "Requirement not met");
         return;
     }
@@ -383,7 +392,7 @@ fn order_build(
     }
 
     // Placement: footprint in bounds, on passable terrain, and not overlapping a building.
-    if !footprint_placeable(map, entities, building, tile_x, tile_y) {
+    if !footprint_placeable(map, entities, kind, tile_x, tile_y) {
         notice(events, player, "Cannot build there");
         return;
     }
@@ -401,8 +410,8 @@ fn order_build(
     ps.oil -= stats.cost_oil;
 
     // Spawn the building in CONSTRUCT state at the footprint center.
-    let (cx, cy) = footprint_center(map, building, tile_x, tile_y);
-    let site = match entities.spawn_building(player, building, cx, cy, false) {
+    let (cx, cy) = footprint_center(map, kind, tile_x, tile_y);
+    let site = match entities.spawn_building(player, kind, cx, cy, false) {
         Some(id) => id,
         None => return,
     };
@@ -432,24 +441,31 @@ fn order_train(
     unit: &str,
     events: &mut HashMap<u32, Vec<Event>>,
 ) {
+    let kind = match unit.parse::<EntityKind>() {
+        Ok(k) => k,
+        Err(_) => {
+            notice(events, player, "Unknown unit");
+            return;
+        }
+    };
     // Building must be owned, finished, and able to train this unit.
     let ok = matches!(entities.get(building), Some(b)
         if b.owner == player && b.is_building() && !b.under_construction
-        && config::trainable_units(&b.kind).contains(&unit));
+        && config::trainable_units(b.kind).contains(&kind));
     if !ok {
         notice(events, player, "Cannot train that here");
         return;
     }
-    let owned_complete: Vec<&str> = entities
+    let owned_complete: Vec<EntityKind> = entities
         .iter()
         .filter(|e| e.owner == player && e.is_building() && !e.under_construction)
-        .map(|e| e.kind.as_str())
+        .map(|e| e.kind)
         .collect();
-    if !config::train_requirement_met(unit, &owned_complete) {
+    if !config::train_requirement_met(kind, &owned_complete) {
         notice(events, player, "Requirement not met");
         return;
     }
-    let stats = match config::unit_stats(unit) {
+    let stats = match config::unit_stats(kind) {
         Some(s) => s,
         None => {
             notice(events, player, "Unknown unit");
@@ -476,7 +492,7 @@ fn order_train(
 
     if let Some(b) = entities.get_mut(building) {
         b.prod_queue.push(ProdItem {
-            unit: unit.to_string(),
+            unit: kind,
             progress: 0,
             total: stats.build_ticks,
         });
@@ -497,7 +513,7 @@ fn order_cancel(
         };
         b.prod_queue.remove(0).unit
     };
-    if let Some(stats) = config::unit_stats(&unit) {
+    if let Some(stats) = config::unit_stats(unit) {
         if let Some(ps) = players.iter_mut().find(|p| p.id == player) {
             ps.steel += stats.cost_steel;
             ps.oil += stats.cost_oil;
@@ -519,7 +535,7 @@ fn notice(events: &mut HashMap<u32, Vec<Event>>, player: u32, msg: &str) {
 
 /// The tiles a footprint of `building` would cover if its top-left tile were `(tile_x,
 /// tile_y)`. The command specifies the top-left tile of the footprint.
-fn footprint_tiles(building: &str, tile_x: u32, tile_y: u32) -> Vec<(u32, u32)> {
+fn footprint_tiles(building: EntityKind, tile_x: u32, tile_y: u32) -> Vec<(u32, u32)> {
     let Some(s) = config::building_stats(building) else {
         return Vec::new();
     };
@@ -538,7 +554,7 @@ fn footprint_tiles(building: &str, tile_x: u32, tile_y: u32) -> Vec<(u32, u32)> 
 }
 
 /// World-pixel center of a footprint placed at top-left tile `(tile_x, tile_y)`.
-fn footprint_center(map: &Map, building: &str, tile_x: u32, tile_y: u32) -> (f32, f32) {
+fn footprint_center(map: &Map, building: EntityKind, tile_x: u32, tile_y: u32) -> (f32, f32) {
     let s = config::building_stats(building).expect("building stats");
     let ts = config::TILE_SIZE as f32;
     let x = tile_x as f32 * ts + (s.foot_w as f32 * ts) * 0.5;
@@ -554,7 +570,7 @@ fn footprint_center(map: &Map, building: &str, tile_x: u32, tile_y: u32) -> (f32
 pub(crate) fn footprint_placeable(
     map: &Map,
     entities: &EntityStore,
-    building: &str,
+    building: EntityKind,
     tile_x: u32,
     tile_y: u32,
 ) -> bool {
@@ -603,7 +619,7 @@ fn movement_system(map: &Map, entities: &mut EntityStore, occ: &Occupancy) {
                 Some(e) if e.is_unit() && !e.path.is_empty() => e,
                 _ => continue,
             };
-            let speed = config::unit_stats(&e.kind).map(|s| s.speed).unwrap_or(0.0);
+            let speed = config::unit_stats(e.kind).map(|s| s.speed).unwrap_or(0.0);
             (speed, e.pos_x, e.pos_y)
         };
         if speed <= 0.0 {
@@ -793,9 +809,9 @@ fn combat_system(
 
 /// Attack profile (range_tiles, dmg, cooldown) for a unit or bunker.
 fn attack_profile(e: &Entity) -> (u32, u32, u32) {
-    if let Some(s) = config::unit_stats(&e.kind) {
+    if let Some(s) = config::unit_stats(e.kind) {
         (s.range_tiles, s.dmg, s.cooldown)
-    } else if let Some(s) = config::building_stats(&e.kind) {
+    } else if let Some(s) = config::building_stats(e.kind) {
         (s.range_tiles, s.dmg, s.cooldown)
     } else {
         (0, 0, 0)
@@ -897,7 +913,7 @@ fn gather_system(
 
     for id in entities.ids() {
         let node = match entities.get(id) {
-            Some(e) if e.kind == kinds::WORKER => match e.order {
+            Some(e) if e.kind == EntityKind::Worker => match e.order {
                 Order::Gather { node } => node,
                 _ => continue,
             },
@@ -970,7 +986,7 @@ fn gather_harvesting(
 ) {
     // Node still valid?
     let node_kind_amount = match entities.get(node) {
-        Some(n) if n.is_node() && n.remaining > 0 => (n.kind.clone(), n.remaining),
+        Some(n) if n.is_node() && n.remaining > 0 => (n.kind, n.remaining),
         _ => {
             retarget_or_idle(map, entities, occ, id, node);
             return;
@@ -1008,7 +1024,7 @@ fn gather_harvesting(
     }
 
     // Extract a load (capped by remaining), deplete the node, then head home.
-    let is_oil = node_kind_amount.0 == kinds::OIL;
+    let is_oil = node_kind_amount.0 == EntityKind::Oil;
     let load_cap = if is_oil {
         config::OIL_LOAD
     } else {
@@ -1026,7 +1042,11 @@ fn gather_harvesting(
     if let Some(e) = entities.get_mut(id) {
         e.carry = Some(CarryState {
             amount: taken,
-            is_oil,
+            kind: if is_oil {
+                EntityKind::Oil
+            } else {
+                EntityKind::Steel
+            },
         });
         e.harvest_progress = 0;
         e.gather_phase = GatherPhase::ToHome;
@@ -1063,14 +1083,14 @@ fn gather_to_home(
     let deposit_range = interact_range(entities, industrial_center_id).unwrap_or(interact);
     if dist2(wx, wy, hx, hy).sqrt() <= deposit_range {
         // Deposit.
-        let (amount, is_oil) = entities
+        let (amount, kind) = entities
             .get(id)
             .and_then(|e| e.carry)
-            .map(|c| (c.amount, c.is_oil))
-            .unwrap_or((0, false));
+            .map(|c| (c.amount, c.kind))
+            .unwrap_or((0, EntityKind::Steel));
         if amount > 0 {
             if let Some(ps) = players.iter_mut().find(|p| p.id == owner) {
-                if is_oil {
+                if kind == EntityKind::Oil {
                     ps.oil += amount;
                 } else {
                     ps.steel += amount;
@@ -1119,7 +1139,7 @@ fn slot_held(entities: &EntityStore, node: u32) -> Option<u32> {
     let w = entities.get(m)?;
     let on_this_node = matches!(w.order, Order::Gather { node: n } if n == node);
     if w.hp > 0
-        && w.kind == kinds::WORKER
+        && w.kind == EntityKind::Worker
         && on_this_node
         && w.gather_phase == GatherPhase::Harvesting
     {
@@ -1142,14 +1162,14 @@ fn retarget_or_idle(
             Some(e) => e,
             None => return,
         };
-        let want_oil = matches!(entities.get(old_node), Some(n) if n.kind == kinds::OIL);
+        let want_oil = matches!(entities.get(old_node), Some(n) if n.kind == EntityKind::Oil);
         (e.owner, e.pos_x, e.pos_y, want_oil)
     };
     let _ = owner;
     let want_kind = if want_oil {
-        kinds::OIL
+        EntityKind::Oil
     } else {
-        kinds::STEEL
+        EntityKind::Steel
     };
 
     // Nearest same-kind, non-empty node within a reasonable radius.
@@ -1190,7 +1210,7 @@ fn nearest_own_industrial_center(
 ) -> Option<(u32, f32, f32)> {
     let mut best: Option<(u32, f32, f32, f32)> = None;
     for e in entities.iter() {
-        if e.owner == owner && e.kind == kinds::INDUSTRIAL_CENTER && !e.under_construction {
+        if e.owner == owner && e.kind == EntityKind::IndustrialCenter && !e.under_construction {
             let d = dist2(x, y, e.pos_x, e.pos_y);
             if best.map(|(_, _, _, bd)| d < bd).unwrap_or(true) {
                 best = Some((e.id, e.pos_x, e.pos_y, d));
@@ -1246,9 +1266,9 @@ fn production_system(
             front.progress += 1;
             if front.progress >= front.total {
                 let unit = b.prod_queue.remove(0).unit;
-                (b.owner, b.kind.clone(), Some(unit))
+                (b.owner, b.kind, Some(unit))
             } else {
-                (b.owner, b.kind.clone(), None)
+                (b.owner, b.kind, None)
             }
         };
 
@@ -1258,14 +1278,14 @@ fn production_system(
                 Some(b) => (b.pos_x, b.pos_y),
                 None => continue,
             };
-            let (sx, sy) = spawn_point_near(map, &kind, bx, by);
-            entities.spawn_unit(owner, &unit, sx, sy);
+            let (sx, sy) = spawn_point_near(map, kind, bx, by);
+            entities.spawn_unit(owner, unit, sx, sy);
         }
     }
 }
 
 /// A reasonable spawn point just outside a building's footprint toward the map below it.
-fn spawn_point_near(map: &Map, building_kind: &str, bx: f32, by: f32) -> (f32, f32) {
+fn spawn_point_near(map: &Map, building_kind: EntityKind, bx: f32, by: f32) -> (f32, f32) {
     let ts = config::TILE_SIZE as f32;
     let half = config::building_stats(building_kind)
         .map(|s| (s.foot_h as f32 * ts) * 0.5)
@@ -1326,12 +1346,12 @@ fn construction_system(entities: &mut EntityStore, events: &mut HashMap<u32, Vec
         if completed {
             let (owner, kind) = entities
                 .get(site)
-                .map(|b| (b.owner, b.kind.clone()))
-                .unwrap_or((0, String::new()));
-            events
-                .entry(owner)
-                .or_default()
-                .push(Event::Build { id: site, kind });
+                .map(|b| (b.owner, b.kind))
+                .unwrap_or((0, EntityKind::Worker));
+            events.entry(owner).or_default().push(Event::Build {
+                id: site,
+                kind: kind.to_protocol_str().to_string(),
+            });
             // Free the worker.
             if let Some(w) = entities.get_mut(worker) {
                 w.clear_orders();
@@ -1351,10 +1371,10 @@ fn construction_system(entities: &mut EntityStore, events: &mut HashMap<u32, Vec
 /// who should see it die. A dead building drops its queue implicitly by being removed. Workers
 /// building a since-removed site are reset elsewhere.
 fn death_system(entities: &mut EntityStore, fog: &Fog, events: &mut HashMap<u32, Vec<Event>>) {
-    let dead: Vec<(u32, u32, f32, f32, String)> = entities
+    let dead: Vec<(u32, u32, f32, f32, EntityKind)> = entities
         .iter()
         .filter(|e| e.is_targetable() && e.hp == 0)
-        .map(|e| (e.id, e.owner, e.pos_x, e.pos_y, e.kind.clone()))
+        .map(|e| (e.id, e.owner, e.pos_x, e.pos_y, e.kind))
         .collect();
 
     for (id, owner, x, y, kind) in dead {
@@ -1370,7 +1390,7 @@ fn death_system(entities: &mut EntityStore, fog: &Fog, events: &mut HashMap<u32,
                 id,
                 x,
                 y,
-                kind: kind.clone(),
+                kind: kind.to_protocol_str().to_string(),
             });
         }
     }
@@ -1409,17 +1429,17 @@ pub(crate) fn recompute_supply(players: &mut [PlayerState], entities: &EntitySto
                 continue;
             }
             if e.is_building() && !e.under_construction {
-                if let Some(s) = config::building_stats(&e.kind) {
+                if let Some(s) = config::building_stats(e.kind) {
                     cap += s.provides_supply;
                 }
                 // Units queued for production reserve supply too.
                 for item in &e.prod_queue {
-                    if let Some(us) = config::unit_stats(&item.unit) {
+                    if let Some(us) = config::unit_stats(item.unit) {
                         used += us.supply;
                     }
                 }
             } else if e.is_unit() {
-                if let Some(us) = config::unit_stats(&e.kind) {
+                if let Some(us) = config::unit_stats(e.kind) {
                     used += us.supply;
                 }
             }
@@ -1430,20 +1450,20 @@ pub(crate) fn recompute_supply(players: &mut [PlayerState], entities: &EntitySto
 }
 
 // ---------------------------------------------------------------------------
-// Small pure helpers
+// Helpers
 // ---------------------------------------------------------------------------
 
-/// Squared euclidean distance (avoids a sqrt where only comparisons are needed).
-#[inline]
+/// Squared Euclidean distance.
 fn dist2(ax: f32, ay: f32, bx: f32, by: f32) -> f32 {
     let dx = ax - bx;
     let dy = ay - by;
     dx * dx + dy * dy
 }
 
-/// Distance (px) at which a worker is "in contact" with an entity for harvest / deposit.
-/// Accounts for the target's radius (a 3×3 Industrial Center is ~1.5 tiles wide) so a worker standing just
-/// outside a building footprint still counts as adjacent. `None` for a missing entity.
+/// Distance (px) at which a worker is "in contact" with an entity for harvest / deposit /
+/// construction. Accounts for the target's radius (a 3×3 Industrial Center is ~1.5 tiles wide)
+/// so a worker standing just outside a footprint still counts as adjacent. `None` for a missing
+/// entity.
 fn interact_range(entities: &EntityStore, target: u32) -> Option<f32> {
     let t = entities.get(target)?;
     // Target half-extent + roughly one worker reach (one tile) of slack.

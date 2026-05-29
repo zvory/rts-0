@@ -18,7 +18,7 @@
 //! via the `start` payload), letting attack-move engage whatever it runs into.
 
 use crate::config;
-use crate::game::entity::{EntityStore, Order};
+use crate::game::entity::{EntityKind, EntityStore, Order};
 use crate::game::map::Map;
 use crate::game::systems;
 use crate::game::PlayerState;
@@ -104,8 +104,8 @@ impl AiController {
             if e.owner != self.player {
                 continue;
             }
-            match e.kind.as_str() {
-                kinds::WORKER => {
+            match e.kind {
+                EntityKind::Worker => {
                     worker_count += 1;
                     match e.order {
                         Order::Idle => idle_workers.push(e.id),
@@ -113,22 +113,24 @@ impl AiController {
                         _ => {}
                     }
                 }
-                kinds::RIFLEMAN => {
+                EntityKind::Rifleman => {
                     rifleman_count += 1;
                     if is_free_rifleman(e) {
                         free_riflemen.push(e.id);
                     }
                 }
-                kinds::INDUSTRIAL_CENTER if !e.under_construction && e.prod_queue.is_empty() => {
+                EntityKind::IndustrialCenter
+                    if !e.under_construction && e.prod_queue.is_empty() =>
+                {
                     idle_industrial_centers.push(e.id)
                 }
-                kinds::BARRACKS => {
+                EntityKind::Barracks => {
                     barracks_total += 1;
                     if !e.under_construction {
                         barracks.push((e.id, e.prod_queue.len()));
                     }
                 }
-                kinds::DEPOT if e.under_construction => depot_building = true,
+                EntityKind::Depot if e.under_construction => depot_building = true,
                 _ => {}
             }
         }
@@ -139,16 +141,12 @@ impl AiController {
         builder_pool.extend(gathering_workers.iter().copied());
 
         // --- 1. Expand supply with a depot when we're about to choke. ------
-        let depot_cost = config::building_stats(kinds::DEPOT)
+        let depot_cost = config::building_stats(EntityKind::Depot)
             .map(|s| s.cost_steel)
             .unwrap_or(50);
-        if !depot_building
-            && !supply_capped
-            && free_supply < SUPPLY_BUFFER
-            && steel >= depot_cost
-        {
+        if !depot_building && !supply_capped && free_supply < SUPPLY_BUFFER && steel >= depot_cost {
             if let Some(worker) = builder_pool.pop() {
-                if let Some((tx, ty)) = self.find_build_spot(map, entities, kinds::DEPOT, me) {
+                if let Some((tx, ty)) = self.find_build_spot(map, entities, EntityKind::Depot, me) {
                     out.push((
                         self.player,
                         Command::Build {
@@ -165,12 +163,14 @@ impl AiController {
         }
 
         // --- 2. Build barracks (our rifleman production). -------------------
-        let rax_cost = config::building_stats(kinds::BARRACKS)
+        let rax_cost = config::building_stats(EntityKind::Barracks)
             .map(|s| s.cost_steel)
             .unwrap_or(100);
         if barracks_total < TARGET_BARRACKS && steel >= rax_cost {
             if let Some(worker) = builder_pool.pop() {
-                if let Some((tx, ty)) = self.find_build_spot(map, entities, kinds::BARRACKS, me) {
+                if let Some((tx, ty)) =
+                    self.find_build_spot(map, entities, EntityKind::Barracks, me)
+                {
                     out.push((
                         self.player,
                         Command::Build {
@@ -187,10 +187,10 @@ impl AiController {
         }
 
         // --- 3. Train workers up to the economy target. -------------------
-        let worker_cost = config::unit_stats(kinds::WORKER)
+        let worker_cost = config::unit_stats(EntityKind::Worker)
             .map(|s| s.cost_steel)
             .unwrap_or(50);
-        let worker_supply = config::unit_stats(kinds::WORKER)
+        let worker_supply = config::unit_stats(EntityKind::Worker)
             .map(|s| s.supply)
             .unwrap_or(1);
         for industrial_center in idle_industrial_centers {
@@ -213,10 +213,10 @@ impl AiController {
         }
 
         // --- 4. Pump riflemen from each barracks (keep a shallow queue). ---
-        let rifleman_cost = config::unit_stats(kinds::RIFLEMAN)
+        let rifleman_cost = config::unit_stats(EntityKind::Rifleman)
             .map(|s| s.cost_steel)
             .unwrap_or(50);
-        let rifleman_supply = config::unit_stats(kinds::RIFLEMAN)
+        let rifleman_supply = config::unit_stats(EntityKind::Rifleman)
             .map(|s| s.supply)
             .unwrap_or(1);
         for (rax, queue_len) in barracks {
@@ -273,7 +273,7 @@ impl AiController {
         &self,
         map: &Map,
         entities: &EntityStore,
-        building: &str,
+        building: EntityKind,
         me: &PlayerState,
     ) -> Option<(u32, u32)> {
         let (bx, by) = (me.start_tile.0 as i32, me.start_tile.1 as i32);
@@ -339,7 +339,7 @@ fn nearest_steel_node(entities: &EntityStore, worker: u32) -> Option<u32> {
     let (wx, wy) = (w.pos_x, w.pos_y);
     let mut best: Option<(u32, f32)> = None;
     for n in entities.iter() {
-        if n.kind == kinds::STEEL && n.remaining > 0 {
+        if n.kind == EntityKind::Steel && n.remaining > 0 {
             let d = (n.pos_x - wx) * (n.pos_x - wx) + (n.pos_y - wy) * (n.pos_y - wy);
             if best.map(|(_, bd)| d < bd).unwrap_or(true) {
                 best = Some((n.id, d));
