@@ -84,9 +84,10 @@ try {
   await sleep(250);
   ok(await page.evaluate(() => window.__rts.match.state.selection.size) >= 1, "box-select selected own units");
 
-  await page.click('#command-card [data-hotkey="S"]');
+  await page.evaluate(() => document.activeElement?.blur());
+  await page.keyboard.press("s");
   await sleep(150);
-  ok(await page.evaluate(() => window.__rts.match.state.placement?.building) === "depot", "build button entered placement mode");
+  ok(await page.evaluate(() => window.__rts.match.state.placement?.building) === "depot", "build hotkey entered placement mode");
 
   const target = await page.evaluate(() => {
     const m = window.__rts.match, s = m.state, map = s.map, ts = map.tileSize, PASS = { 0: true, 1: false, 2: false };
@@ -121,6 +122,27 @@ try {
     return !!document.querySelector('#command-card [data-hotkey="W"]');
   });
   ok(trainBtn, "TRAIN CARD: selecting the HQ shows a Worker train button");
+
+  const beforePan = await page.evaluate(() => ({
+    x: window.__rts.match.camera.x,
+    y: window.__rts.match.camera.y,
+    selected: window.__rts.match.state.selection.size,
+  }));
+  await page.keyboard.down("Space");
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width / 2 - 120, box.y + box.height / 2 - 80, { steps: 6 });
+  await page.mouse.up();
+  await page.keyboard.up("Space");
+  await sleep(100);
+  const afterPan = await page.evaluate(() => ({
+    x: window.__rts.match.camera.x,
+    y: window.__rts.match.camera.y,
+    selected: window.__rts.match.state.selection.size,
+  }));
+  ok(afterPan.x !== beforePan.x || afterPan.y !== beforePan.y,
+     `CAMERA: Space+drag pans the viewport (${beforePan.x.toFixed(1)},${beforePan.y.toFixed(1)} -> ${afterPan.x.toFixed(1)},${afterPan.y.toFixed(1)})`);
+  ok(afterPan.selected === beforePan.selected, "CAMERA: Space+drag does not change selection");
 
   ok(pageErrors.length === 0, `no uncaught page errors (${pageErrors.length})`);
   ok(consoleErrors.length === 0, `no console errors (${consoleErrors.length})`);
