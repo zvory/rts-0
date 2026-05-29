@@ -68,10 +68,7 @@ impl BuildTechAttackScript {
     }
 
     fn should_think(&self, tick: u32) -> bool {
-        tick == 0
-            || tick
-                .wrapping_add(self.player_id)
-                .is_multiple_of(THINK_INTERVAL)
+        tick == 0 || tick.wrapping_add(self.player_id) % THINK_INTERVAL == 0
     }
 }
 
@@ -419,10 +416,7 @@ impl EconomyScript {
     }
 
     fn should_think(&self, tick: u32) -> bool {
-        tick == 0
-            || tick
-                .wrapping_add(self.player_id)
-                .is_multiple_of(THINK_INTERVAL)
+        tick == 0 || tick.wrapping_add(self.player_id) % THINK_INTERVAL == 0
     }
 }
 
@@ -548,10 +542,7 @@ impl WorkerRushScript {
     }
 
     fn should_think(&self, tick: u32) -> bool {
-        tick == 0
-            || tick
-                .wrapping_add(self.player_id)
-                .is_multiple_of(THINK_INTERVAL)
+        tick == 0 || tick.wrapping_add(self.player_id) % THINK_INTERVAL == 0
     }
 }
 
@@ -613,10 +604,7 @@ impl BunkerRushScript {
     }
 
     fn should_think(&self, tick: u32) -> bool {
-        tick == 0
-            || tick
-                .wrapping_add(self.player_id)
-                .is_multiple_of(THINK_INTERVAL)
+        tick == 0 || tick.wrapping_add(self.player_id) % THINK_INTERVAL == 0
     }
 }
 
@@ -847,7 +835,7 @@ impl SelfPlayRunner {
     }
 
     fn record_observations(&mut self, tick: u32, snapshots: &BTreeMap<u32, Snapshot>) -> bool {
-        if tick == 0 || tick.is_multiple_of(SAMPLE_EVERY_TICKS) {
+        if tick == 0 || tick % SAMPLE_EVERY_TICKS == 0 {
             for (player_id, snapshot) in snapshots {
                 self.samples
                     .push(SnapshotSample::from_snapshot(tick, *player_id, snapshot));
