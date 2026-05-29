@@ -51,7 +51,7 @@ pub(crate) fn run_tick(
     services::economy::gather_system(map, entities, players, &occ, &spatial, pathing);
     services::movement::separation(entities, &spatial, map);
     services::production::production_system(map, entities, players, events);
-    services::construction::construction_system(entities, events);
+    services::construction::construction_system(map, entities, events);
     services::death::death_system(entities, fog, events);
     services::supply::recompute_supply(players, entities);
 
