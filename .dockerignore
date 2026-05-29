@@ -1,0 +1,9 @@
+.git
+.gitignore
+target
+server/target
+node_modules
+tests/node_modules
+.DS_Store
+docs
+TODO.md
