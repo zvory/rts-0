@@ -164,6 +164,7 @@ impl Game {
             &self.map,
             &mut self.entities,
             &mut self.players,
+            &self.fog,
             pending,
             &mut events,
             self.tick,
@@ -197,7 +198,7 @@ impl Game {
                     continue;
                 }
             }
-            entities.push(self.view_of(e));
+            entities.push(self.view_of(e, player));
         }
 
         Snapshot {
@@ -252,8 +253,9 @@ impl Game {
         self.players.iter().find(|p| p.id == id)
     }
 
-    /// Project an entity into its wire `EntityView`, filling the optional fields that apply.
-    fn view_of(&self, e: &Entity) -> EntityView {
+    /// Project an entity into its wire `EntityView` for `viewer`, filling the optional fields
+    /// that apply. `viewer` is needed to fog-gate the combat tracer target id.
+    fn view_of(&self, e: &Entity, viewer: u32) -> EntityView {
         let mut v = EntityView::new(
             e.id,
             e.owner,
@@ -317,8 +319,17 @@ impl Game {
             if matches!(e.order, Order::Attack { .. } | Order::AttackMove { .. })
                 || (e.is_building() && e.can_attack())
             {
-                if self.entities.contains(t) {
-                    v.target_id = Some(t);
+                // Fog-gate the tracer: reveal the target id only when the viewer owns the
+                // attacker or can currently see the target's tile. Otherwise withholding it
+                // avoids leaking the position/existence of an entity hidden in the viewer's fog.
+                if let Some(target) = self.entities.get(t) {
+                    let visible = e.owner == viewer
+                        || self
+                            .fog
+                            .is_visible_world(viewer, target.pos_x, target.pos_y);
+                    if visible {
+                        v.target_id = Some(t);
+                    }
                 }
             }
         }

@@ -66,6 +66,15 @@ try {
   });
   ok(own.hq === 1 && own.w === 4, `client sees own HQ + 4 workers (hq=${own.hq}, workers=${own.w})`);
 
+  // Interpolation must be live: GameState exposes recv timestamps so alpha isn't pinned to 1.
+  const interp = await page.evaluate(() => {
+    const s = window.__rts.match.state;
+    return { prev: typeof s.prevRecvTime, curr: typeof s.currRecvTime,
+             distinct: s.prevRecvTime != null && s.currRecvTime != null && s.prevRecvTime !== s.currRecvTime };
+  });
+  ok(interp.curr === "number" && interp.prev === "number" && interp.distinct,
+     `INTERP: GameState exposes two distinct recv timestamps (prev=${interp.prev}, curr=${interp.curr})`);
+
   const vp = await page.$("#viewport");
   const box = await vp.boundingBox();
   await page.mouse.move(box.x + 60, box.y + 60);

@@ -283,6 +283,8 @@ export class GameState {
   // snapshot buffering for interpolation:
   applySnapshot(msg)                     // pushes msg, keeps prev+current, stamps recvTime
   entitiesInterpolated(alpha)            // -> array of entities with lerped x,y
+  get prevRecvTime() / get currRecvTime()// recv timestamps of the two buffered snapshots
+                                         //   (null until two exist); main.js derives interp alpha
   resources                             // {minerals,gas,supplyUsed,supplyCap} (latest)
   events                                 // latest snapshot's events
   // selection (client-only):
@@ -439,3 +441,21 @@ player standing wins; a 1-player match never ends (sandbox/exploration mode).
   state except `PIXI`. Pure helpers where possible.
 - Both: names match this doc. Document any deviation here in the same change.
 - Coordinates: world pixels everywhere on the wire; tiles only where a field ends in `Tile`.
+
+---
+
+## 7. Hardening (input is untrusted)
+The server treats every client as potentially hostile. Limits live next to the code:
+- **WebSocket frame cap** (`main.rs`): `max_message_size`/`max_frame_size` = 256 KiB. Oversized
+  frames are rejected and the connection closed before they reach serde.
+- **Command unit cap** (`systems.rs` `MAX_UNITS_PER_COMMAND = 256`): unit-list commands are
+  deduped and capped before per-unit work, so a repeated/huge id list can't trigger an A* storm.
+- **Bounds-checked placement** (`systems.rs` `footprint_tiles`): tile math uses `checked_add` and
+  out-of-range build coords are rejected — the tick loop never panics on adversarial input.
+- **Idle timeout + heartbeat**: the server drops connections idle for `IDLE_TIMEOUT = 40s`
+  (`main.rs`); the client pings every 15s (`main.js`). This evicts half-open/stuck clients so a
+  silent player can't wedge a shared room, and frees the room slot.
+- **Join ack**: `RoomEvent::Join` carries a `oneshot<bool>`; a connection only marks itself joined
+  on an accept, so a rejected mid-match join doesn't wedge the socket.
+- **Fog is authoritative**: `snapshot_for` and per-recipient event delivery gate entity views,
+  `target_id` tracers, and death events on visibility — hidden enemies are never sent.

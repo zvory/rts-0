@@ -14,6 +14,7 @@ mod lobby;
 mod protocol;
 
 use std::net::SocketAddr;
+use std::time::Duration;
 
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use axum::extract::State;
@@ -31,6 +32,11 @@ use crate::protocol::{ClientMessage, ServerMessage};
 
 /// Default room name used when a client's `join` omits `room`.
 const DEFAULT_ROOM: &str = "main";
+
+/// How long a connection may go without any inbound frame before we evict it. The client sends
+/// app-level pings every ~15s, so a healthy connection never hits this; a silent/half-open socket
+/// (or a stuck never-ready client) is dropped instead of wedging a shared room forever.
+const IDLE_TIMEOUT: Duration = Duration::from_secs(40);
 
 /// Shared application state handed to every request via axum's `State` extractor.
 #[derive(Clone)]
@@ -88,7 +94,11 @@ async fn main() {
 
 /// Axum handler for `GET /ws`: perform the WebSocket upgrade and hand the socket to a task.
 async fn ws_handler(ws: WebSocketUpgrade, State(state): State<AppState>) -> impl IntoResponse {
-    ws.on_upgrade(move |socket| handle_connection(socket, state.lobby))
+    // Bound inbound frame/message size so multi-MB command frames never reach serde. Our protocol
+    // is tiny JSON, so 256 KiB is generous headroom.
+    ws.max_message_size(256 * 1024)
+        .max_frame_size(256 * 1024)
+        .on_upgrade(move |socket| handle_connection(socket, state.lobby))
 }
 
 /// Drive one client connection end to end.
@@ -147,7 +157,19 @@ async fn handle_connection(socket: WebSocket, lobby: Lobby) {
     // The room this connection has joined, if any. A client must `join` before other actions.
     let mut current_room: Option<lobby::RoomHandle> = None;
 
-    while let Some(frame) = stream.next().await {
+    loop {
+        // Bound the read so a silent/half-open client is evicted rather than parked forever. The
+        // post-loop code emits `Leave`, which cleans up membership and (mid-match) eliminates them.
+        let next = match tokio::time::timeout(IDLE_TIMEOUT, stream.next()).await {
+            Ok(next) => next,
+            Err(_) => {
+                debug!(player_id, "idle timeout; closing");
+                break;
+            }
+        };
+        let Some(frame) = next else {
+            break;
+        };
         let frame = match frame {
             Ok(f) => f,
             Err(err) => {
@@ -223,19 +245,32 @@ async fn handle_client_message(
                 .unwrap_or_else(|| DEFAULT_ROOM.to_string());
             let name = sanitize_name(name);
             let handle = lobby.get_or_create(&room_name).await;
-            let joined = handle
+            // The room decides whether the join is accepted (it may reject a mid-match join). Wait
+            // for its ack and only mark ourselves joined on `true`, so a rejected join leaves
+            // `current_room` None and the client is free to try another room.
+            let (ack_tx, ack_rx) = tokio::sync::oneshot::channel();
+            let sent = handle
                 .event_tx
                 .send(RoomEvent::Join {
                     player_id,
                     name,
                     msg_tx: msg_tx.clone(),
+                    ack: ack_tx,
                 })
                 .await
                 .is_ok();
-            if joined {
-                *current_room = Some(handle);
-            } else {
+            if !sent {
                 warn!(player_id, room = %room_name, "room task gone; cannot join");
+                return;
+            }
+            match ack_rx.await {
+                Ok(true) => *current_room = Some(handle),
+                Ok(false) => {
+                    debug!(player_id, room = %room_name, "join rejected by room");
+                }
+                Err(_) => {
+                    warn!(player_id, room = %room_name, "room dropped join ack; cannot join");
+                }
             }
         }
         ClientMessage::Ready { ready } => {
