@@ -1,0 +1,23 @@
+[package]
+name = "rts-server"
+version = "0.1.0"
+edition = "2021"
+description = "Authoritative server for a simple StarCraft-like RTS"
+
+[[bin]]
+name = "rts-server"
+path = "src/main.rs"
+
+[dependencies]
+tokio = { version = "1", features = ["full"] }
+axum = { version = "0.8", features = ["ws"] }
+tower-http = { version = "0.6", features = ["fs", "trace"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+futures-util = { version = "0.3", default-features = false, features = ["sink", "std"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+[profile.release]
+opt-level = 3
+lto = "thin"

@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+    <title>RTS</title>
+
+    <!--
+      PixiJS v7 (UMD) exposes the global `PIXI`. Loaded as a classic script so it is
+      defined before the deferred ES module `main.js` runs. Pinned for reproducibility;
+      upgrading to v8 (async Application.init) is a tracked future task — see README.
+    -->
+    <script src="https://cdn.jsdelivr.net/npm/pixi.js@7.4.2/dist/pixi.min.js"></script>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <!--
+      DOM contract (pinned). JS modules query these ids/classes — keep them stable.
+        Lobby:  #lobby-screen, #lobby-name, #lobby-room, #lobby-join, #lobby-players,
+                #lobby-ready, #lobby-start, #lobby-status
+        Game:   #game-screen, #viewport (Pixi canvas mounts here),
+                #hud, #res-minerals, #res-gas, #res-supply,
+                #minimap (canvas), #selected-panel, #command-card,
+                #game-over, #game-over-text, #game-over-button, #toast
+    -->
+    <div id="app">
+      <!-- ============================ LOBBY ============================ -->
+      <section id="lobby-screen" class="screen">
+        <div class="lobby-box">
+          <h1 class="logo">R T S</h1>
+          <p class="tagline">A small real-time-strategy skirmish</p>
+
+          <div class="lobby-form">
+            <label>
+              Name
+              <input id="lobby-name" type="text" maxlength="16" placeholder="Commander" autocomplete="off" />
+            </label>
+            <label>
+              Room
+              <input id="lobby-room" type="text" maxlength="24" value="main" autocomplete="off" />
+            </label>
+            <button id="lobby-join" class="btn primary">Join</button>
+          </div>
+
+          <div class="lobby-room" hidden>
+            <h2>Players</h2>
+            <ul id="lobby-players" class="player-list"></ul>
+            <div class="lobby-actions">
+              <button id="lobby-ready" class="btn">Ready</button>
+              <button id="lobby-start" class="btn primary" disabled>Start match</button>
+            </div>
+          </div>
+
+          <p id="lobby-status" class="status"></p>
+          <p class="hint">Open this page in two windows to play head-to-head. A solo start is a peaceful sandbox.</p>
+        </div>
+      </section>
+
+      <!-- ============================ GAME ============================= -->
+      <section id="game-screen" class="screen" hidden>
+        <div id="viewport"></div>
+
+        <!-- Top resource bar -->
+        <div id="hud">
+          <div class="res"><span class="res-icon mineral">◆</span><span id="res-minerals">0</span></div>
+          <div class="res"><span class="res-icon gas">●</span><span id="res-gas">0</span></div>
+          <div class="res"><span class="res-icon supply">▲</span><span id="res-supply">0 / 0</span></div>
+        </div>
+
+        <!-- Bottom-left minimap -->
+        <div id="minimap-wrap">
+          <canvas id="minimap" width="220" height="220"></canvas>
+        </div>
+
+        <!-- Bottom-center selection info -->
+        <div id="selected-panel"></div>
+
+        <!-- Bottom-right command card -->
+        <div id="command-card"></div>
+
+        <!-- Transient notice toast -->
+        <div id="toast" hidden></div>
+
+        <!-- Game over overlay -->
+        <div id="game-over" hidden>
+          <div class="game-over-box">
+            <h1 id="game-over-text">Victory</h1>
+            <button id="game-over-button" class="btn primary">Back to lobby</button>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>
