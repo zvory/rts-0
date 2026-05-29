@@ -278,6 +278,9 @@ input[type="text"]:focus {
   font-size: 13px;
   color: var(--warn);
 }
+.status.error {
+  color: var(--bad);
+}
 .hint {
   margin: 14px 0 0;
   text-align: center;
