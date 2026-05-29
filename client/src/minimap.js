@@ -52,6 +52,12 @@ export class Minimap {
 
     this._dragging = false;
 
+    // Bound handlers retained so destroy() can remove the exact references.
+    this._onContextMenu = (ev) => ev.preventDefault();
+    this._onCanvasMouseDown = this._handleCanvasMouseDown.bind(this);
+    this._onWinMouseMove = this._handleWinMouseMove.bind(this);
+    this._onWinMouseUp = this._handleWinMouseUp.bind(this);
+
     this._installInput();
   }
 
@@ -228,36 +234,51 @@ export class Minimap {
   /** Install pointer/context listeners for recenter (left) and move orders (right). */
   _installInput() {
     const c = this.canvas;
-
     // Suppress the browser context menu so right-click can mean "move here".
-    c.addEventListener("contextmenu", (ev) => ev.preventDefault());
+    c.addEventListener("contextmenu", this._onContextMenu);
+    c.addEventListener("mousedown", this._onCanvasMouseDown);
+    // Move/up on window so a drag that leaves the canvas still tracks & releases.
+    window.addEventListener("mousemove", this._onWinMouseMove);
+    window.addEventListener("mouseup", this._onWinMouseUp);
+  }
 
-    c.addEventListener("mousedown", (ev) => {
-      if (!this._ensureTransform()) return;
-      const cp = this._eventToCanvas(ev);
-      const w = this._canvasToWorld(cp.x, cp.y);
-      if (ev.button === 2) {
-        // Right-click: issue a move order for the currently selected own units.
-        ev.preventDefault();
-        this._issueMove(w.x, w.y);
-      } else if (ev.button === 0) {
-        // Left-click (and start of a drag): recenter the camera.
-        ev.preventDefault();
-        this._dragging = true;
-        this.camera.centerOn(w.x, w.y);
-      }
-    });
+  /**
+   * Remove all installed listeners (e.g. on game teardown / rematch) so stale
+   * minimaps stop driving an old camera. Mirrors Input.destroy().
+   */
+  destroy() {
+    const c = this.canvas;
+    c.removeEventListener("contextmenu", this._onContextMenu);
+    c.removeEventListener("mousedown", this._onCanvasMouseDown);
+    window.removeEventListener("mousemove", this._onWinMouseMove);
+    window.removeEventListener("mouseup", this._onWinMouseUp);
+  }
 
-    window.addEventListener("mousemove", (ev) => {
-      if (!this._dragging) return;
-      const cp = this._eventToCanvas(ev);
-      const w = this._canvasToWorld(cp.x, cp.y);
+  _handleCanvasMouseDown(ev) {
+    if (!this._ensureTransform()) return;
+    const cp = this._eventToCanvas(ev);
+    const w = this._canvasToWorld(cp.x, cp.y);
+    if (ev.button === 2) {
+      // Right-click: issue a move order for the currently selected own units.
+      ev.preventDefault();
+      this._issueMove(w.x, w.y);
+    } else if (ev.button === 0) {
+      // Left-click (and start of a drag): recenter the camera.
+      ev.preventDefault();
+      this._dragging = true;
       this.camera.centerOn(w.x, w.y);
-    });
+    }
+  }
 
-    window.addEventListener("mouseup", () => {
-      this._dragging = false;
-    });
+  _handleWinMouseMove(ev) {
+    if (!this._dragging) return;
+    const cp = this._eventToCanvas(ev);
+    const w = this._canvasToWorld(cp.x, cp.y);
+    this.camera.centerOn(w.x, w.y);
+  }
+
+  _handleWinMouseUp() {
+    this._dragging = false;
   }
 
   /** Issue a move command to the world point for any selected own units. */

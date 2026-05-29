@@ -563,14 +563,10 @@ export class Input {
   _handleWheel(ev) {
     ev.preventDefault();
     const p = this._screenPos(ev);
-    // Anchor the zoom on the world point under the cursor so it stays put.
-    const before = this.camera.screenToWorld(p.x, p.y);
+    // Anchor the zoom on the cursor; setZoom clamps zoom AND re-clamps x/y so we
+    // never reveal void outside the map near an edge.
     const factor = ev.deltaY < 0 ? 1 + ZOOM_STEP : 1 / (1 + ZOOM_STEP);
-    this.camera.zoom = clamp(this.camera.zoom * factor, CAMERA_MIN_ZOOM, CAMERA_MAX_ZOOM);
-    // Re-anchor: shift camera origin so `before` maps back under the cursor.
-    const after = this.camera.screenToWorld(p.x, p.y);
-    this.camera.x += before.x - after.x;
-    this.camera.y += before.y - after.y;
+    this.camera.setZoom(this.camera.zoom * factor, p.x, p.y);
   }
 }
 
@@ -587,13 +583,6 @@ const DEFAULT_HIT_RADIUS = 10;
 const DEFAULT_TILE_SIZE = 32;
 // Wheel zoom multiplier per notch.
 const ZOOM_STEP = 0.12;
-// Mirror of config CAMERA.minZoom/maxZoom; inlined to avoid a wider config import.
-const CAMERA_MIN_ZOOM = 0.4;
-const CAMERA_MAX_ZOOM = 2.0;
-
-function clamp(v, lo, hi) {
-  return v < lo ? lo : v > hi ? hi : v;
-}
 
 /** True if the event target is an editable text field we must not steal keys from. */
 function isTextEntry(el) {

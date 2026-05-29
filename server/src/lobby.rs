@@ -54,11 +54,15 @@ pub fn next_player_id() -> u32 {
 /// only consumer; see module docs.
 #[derive(Debug)]
 pub enum RoomEvent {
-    /// A player joins this room. `msg_tx` is the connection's outbound sink.
+    /// A player joins this room. `msg_tx` is the connection's outbound sink. `ack` carries the
+    /// accept/reject decision back to the connection: `true` once the player is actually in the
+    /// room, `false` if the join was rejected (duplicate, or mid-match). The connection must not
+    /// mark itself joined until it sees a `true`, so a rejected join doesn't wedge the socket.
     Join {
         player_id: u32,
         name: String,
         msg_tx: mpsc::Sender<ServerMessage>,
+        ack: tokio::sync::oneshot::Sender<bool>,
     },
     /// A player left (socket closed). During a match this eliminates them so it can resolve.
     Leave { player_id: u32 },
@@ -192,7 +196,8 @@ impl RoomTask {
                 player_id,
                 name,
                 msg_tx,
-            } => self.on_join(player_id, name, msg_tx),
+                ack,
+            } => self.on_join(player_id, name, msg_tx, ack),
             RoomEvent::Leave { player_id } => self.on_leave(player_id),
             RoomEvent::Ready { player_id, ready } => self.on_ready(player_id, ready),
             RoomEvent::StartRequest { player_id } => self.on_start_request(player_id),
@@ -200,9 +205,16 @@ impl RoomTask {
         }
     }
 
-    fn on_join(&mut self, player_id: u32, name: String, msg_tx: mpsc::Sender<ServerMessage>) {
+    fn on_join(
+        &mut self,
+        player_id: u32,
+        name: String,
+        msg_tx: mpsc::Sender<ServerMessage>,
+        ack: tokio::sync::oneshot::Sender<bool>,
+    ) {
         if self.players.contains_key(&player_id) {
             // Defensive: a connection should only ever join once.
+            let _ = ack.send(false);
             return;
         }
         if !matches!(self.phase, Phase::Lobby) {
@@ -218,6 +230,7 @@ impl RoomTask {
                 },
             );
             debug!(room = %self.room, player_id, "rejecting join; match in progress");
+            let _ = ack.send(false);
             return;
         }
         let color = PLAYER_PALETTE[self.order.len() % PLAYER_PALETTE.len()].to_string();
@@ -235,6 +248,8 @@ impl RoomTask {
             self.host_id = Some(player_id);
         }
         debug!(room = %self.room, player_id, "joined");
+        // The player is now in the room; tell the connection it may mark itself joined.
+        let _ = ack.send(true);
         // A player joining mid-match just sits in the (still in-game) room until it resolves;
         // they receive snapshots immediately. They are not added to the live `Game`.
         if matches!(self.phase, Phase::Lobby) {

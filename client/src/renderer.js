@@ -30,6 +30,11 @@ import {
 
 const TWO_PI = Math.PI * 2;
 
+// Frames an entity id may go unseen before its pooled objects are destroyed and
+// dropped. Short enough to keep dead ids from accumulating, long enough that a
+// one-frame vision flicker reuses the slot rather than churning it (~2s @60fps).
+const SWEEP_EVICT_FRAMES = 120;
+
 // Layer names in back-to-front draw order. Index in this array == child index in `world`.
 const LAYERS = [
   "terrain",
@@ -101,6 +106,9 @@ export class Renderer {
     // Ids touched this frame, per pool, so we can hide stale entries afterwards.
     this._seen = {};
     for (const key of Object.keys(this._pools)) this._seen[key] = new Set();
+    // Consecutive-frames-unseen counter per id (across all pools + icons), so we
+    // hide briefly but evict after a grace period — server ids are never reused.
+    this._unseen = new Map();
 
     /** Map metadata captured by buildStaticMap (tileSize, width, height in tiles). */
     this._map = null;
@@ -654,23 +662,105 @@ export class Renderer {
 
   /**
    * Hide every pooled object (per layer + icons) whose id was not touched this
-   * frame. We hide rather than destroy so re-appearing entities reuse their slot.
+   * frame. We hide rather than destroy during a brief grace period so entities
+   * that flicker out of vision for a frame reuse their slot; once an id has been
+   * unseen for SWEEP_EVICT_FRAMES we destroy its objects and drop the map
+   * entries (server ids are never reused, so they would otherwise grow forever).
    * @private
    */
   _sweep() {
+    // Tally which ids were touched in any pool this frame, then bump/reset the
+    // shared per-id unseen counter so an id alive in one layer isn't evicted
+    // from another (e.g. a building's footprint + its icon).
+    const seenAny = new Set();
+    for (const key of Object.keys(this._seen)) {
+      for (const id of this._seen[key]) seenAny.add(id);
+    }
+
+    const evict = new Set();
+    const ids = new Set([...this._unseen.keys()]);
+    for (const key of Object.keys(this._pools)) {
+      for (const id of this._pools[key].keys()) ids.add(id);
+    }
+    if (this._iconPool) for (const id of this._iconPool.keys()) ids.add(id);
+    for (const id of ids) {
+      if (seenAny.has(id)) {
+        this._unseen.delete(id);
+      } else {
+        const n = (this._unseen.get(id) || 0) + 1;
+        if (n >= SWEEP_EVICT_FRAMES) evict.add(id);
+        else this._unseen.set(id, n);
+      }
+    }
+
     for (const key of Object.keys(this._pools)) {
       const pool = this._pools[key];
       const seen = this._seen[key];
       for (const [id, g] of pool) {
-        if (!seen.has(id)) g.visible = false;
+        if (seen.has(id)) continue;
+        if (evict.has(id)) {
+          this.layers[key].removeChild(g);
+          g.destroy();
+          pool.delete(id);
+        } else {
+          g.visible = false;
+        }
       }
     }
     if (this._iconPool) {
       const seen = this._seen.buildings;
       for (const [id, t] of this._iconPool) {
-        if (!seen.has(id)) t.visible = false;
+        if (seen.has(id)) continue;
+        if (evict.has(id)) {
+          this.layers.buildings.removeChild(t);
+          t.destroy();
+          this._iconPool.delete(id);
+        } else {
+          t.visible = false;
+        }
       }
     }
+    for (const id of evict) this._unseen.delete(id);
+  }
+
+  /**
+   * Tear down the whole renderer: destroy every pooled and long-lived display
+   * object, the terrain texture, detach the canvas, and destroy the PIXI app
+   * (and its WebGL context). Guards against being called twice. main.js's
+   * Match.destroy() calls this on rematch so we don't leak a context per game.
+   */
+  destroy() {
+    if (this._destroyed) return;
+    this._destroyed = true;
+
+    // Per-id pooled Graphics across every layer.
+    for (const key of Object.keys(this._pools)) {
+      const pool = this._pools[key];
+      for (const g of pool.values()) g.destroy();
+      pool.clear();
+    }
+    // Pooled icon Text objects.
+    if (this._iconPool) {
+      for (const t of this._iconPool.values()) t.destroy();
+      this._iconPool.clear();
+    }
+    this._unseen.clear();
+
+    // Long-lived single Graphics.
+    this._fogGfx.destroy();
+    this._placementGfx.destroy();
+    this._dragGfx.destroy();
+
+    // Cached terrain sprite + its generated texture.
+    if (this._terrainSprite) {
+      this._terrainSprite.destroy(true);
+      this._terrainSprite = null;
+    }
+
+    // Detach the canvas from the DOM, then destroy the app + WebGL context.
+    const view = this.app.view;
+    if (view && view.parentNode) view.parentNode.removeChild(view);
+    this.app.destroy(true, { children: true, texture: true, baseTexture: true });
   }
 }
 

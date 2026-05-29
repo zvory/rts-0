@@ -14,10 +14,11 @@
 //! Everything is panic-free: entity lookups are fallible and stale ids are ignored. The
 //! functions are deliberately small and mostly pure helpers to keep the tick loop readable.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use crate::config;
 use crate::game::entity::{CarryState, Entity, EntityStore, GatherPhase, Order, ProdItem, NEUTRAL};
+use crate::game::fog::Fog;
 use crate::game::map::Map;
 use crate::game::pathfinding::{self, Passability};
 use crate::game::PlayerState;
@@ -27,6 +28,9 @@ use crate::protocol::{kinds, Command, Event};
 const ARRIVE_EPS: f32 = 2.0;
 /// Extra slack (px) added to attack range checks so units don't dance at the exact boundary.
 const RANGE_SLACK: f32 = 4.0;
+/// Max unique unit ids honored per multi-unit command. Caps the per-id work (one A* each) a
+/// single command can force, so a repeated/huge id list can't be used to stall the tick loop.
+const MAX_UNITS_PER_COMMAND: usize = 256;
 
 // ---------------------------------------------------------------------------
 // Occupancy: combined terrain + building-footprint passability for pathfinding.
@@ -103,6 +107,7 @@ pub(crate) fn run_tick(
     map: &Map,
     entities: &mut EntityStore,
     players: &mut [PlayerState],
+    fog: &Fog,
     pending: Vec<(u32, Command)>,
     events: &mut HashMap<u32, Vec<Event>>,
     _tick: u32,
@@ -116,7 +121,7 @@ pub(crate) fn run_tick(
     gather_system(map, entities, players, &occ);
     production_system(map, entities, players, events);
     construction_system(entities, events);
-    death_system(entities, events);
+    death_system(entities, fog, events);
     recompute_supply(players, entities);
 }
 
@@ -135,22 +140,22 @@ fn apply_commands(
     for (player, cmd) in pending {
         match cmd {
             Command::Move { units, x, y } => {
-                for id in units {
+                for id in dedupe_cap_units(units) {
                     order_move(map, entities, occ, player, id, x, y, false);
                 }
             }
             Command::AttackMove { units, x, y } => {
-                for id in units {
+                for id in dedupe_cap_units(units) {
                     order_move(map, entities, occ, player, id, x, y, true);
                 }
             }
             Command::Attack { units, target } => {
-                for id in units {
+                for id in dedupe_cap_units(units) {
                     order_attack(map, entities, occ, player, id, target);
                 }
             }
             Command::Gather { units, node } => {
-                for id in units {
+                for id in dedupe_cap_units(units) {
                     order_gather(map, entities, occ, player, id, node);
                 }
             }
@@ -171,7 +176,7 @@ fn apply_commands(
                 order_cancel(entities, players, player, building);
             }
             Command::Stop { units } => {
-                for id in units {
+                for id in dedupe_cap_units(units) {
                     if owns_unit(entities, player, id) {
                         if let Some(e) = entities.get_mut(id) {
                             e.clear_orders();
@@ -182,6 +187,23 @@ fn apply_commands(
             }
         }
     }
+}
+
+/// Dedupe a command's unit ids (preserving first-seen order) and cap the count at
+/// `MAX_UNITS_PER_COMMAND`. This stops a repeated or oversized id list from forcing one A* path
+/// per duplicate and stalling the tick loop.
+fn dedupe_cap_units(units: Vec<u32>) -> Vec<u32> {
+    let mut seen = HashSet::new();
+    let mut out = Vec::with_capacity(units.len().min(MAX_UNITS_PER_COMMAND));
+    for id in units {
+        if out.len() >= MAX_UNITS_PER_COMMAND {
+            break;
+        }
+        if seen.insert(id) {
+            out.push(id);
+        }
+    }
+    out
 }
 
 /// Whether `player` owns a *unit* with this id (buildings/nodes excluded).
@@ -245,9 +267,11 @@ fn order_attack(
     if !owns_unit(entities, player, id) {
         return;
     }
-    // Target must exist and be attackable; ignore self / friendly to keep it simple (attacking
-    // your own unit is not a thing in this game).
-    let target_ok = matches!(entities.get(target), Some(t) if t.is_targetable() && t.id != id);
+    // Target must exist and be attackable; ignore self and same-owner entities (no friendly
+    // fire — mirrors combat_system's `t_owner == owner` guard, so a unit can't be locked onto
+    // an allied/own target).
+    let target_ok = matches!(entities.get(target),
+        Some(t) if t.is_targetable() && t.id != id && t.owner != player);
     if !target_ok {
         return;
     }
@@ -348,6 +372,13 @@ fn order_build(
         .collect();
     if !config::build_requirement_met(building, &owned) {
         notice(events, player, "Requirement not met");
+        return;
+    }
+
+    // Reject clearly out-of-range top-left coords before footprint work (also avoids any
+    // coordinate overflow downstream).
+    if tile_x >= map.size || tile_y >= map.size {
+        notice(events, player, "Cannot build there");
         return;
     }
 
@@ -486,7 +517,12 @@ fn footprint_tiles(building: &str, tile_x: u32, tile_y: u32) -> Vec<(u32, u32)> 
     let mut out = Vec::with_capacity((s.foot_w * s.foot_h) as usize);
     for dy in 0..s.foot_h {
         for dx in 0..s.foot_w {
-            out.push((tile_x + dx, tile_y + dy));
+            // Guard against coordinate overflow on huge tile_x/tile_y. An empty footprint is
+            // treated as not-placeable by `footprint_placeable`, so the build is cleanly rejected.
+            let (Some(tx), Some(ty)) = (tile_x.checked_add(dx), tile_y.checked_add(dy)) else {
+                return Vec::new();
+            };
+            out.push((tx, ty));
         }
     }
     out
@@ -1236,21 +1272,28 @@ fn construction_system(entities: &mut EntityStore, events: &mut HashMap<u32, Vec
 // 7. Deaths
 // ---------------------------------------------------------------------------
 
-/// Remove entities whose hp has hit zero, emitting a `Death` event to every player (so all who
-/// can see it get a poof — events are best-effort flavor). A dead building drops its queue
-/// implicitly by being removed. Workers building a since-removed site are reset elsewhere.
-fn death_system(entities: &mut EntityStore, events: &mut HashMap<u32, Vec<Event>>) {
-    let dead: Vec<(u32, f32, f32, String)> = entities
+/// Remove entities whose hp has hit zero, emitting a fog-respecting `Death` event: a player
+/// gets the poof only if they owned the entity or its death position is currently visible to
+/// them (events are best-effort flavor). `death_system` runs before the fog recompute, so the
+/// current fog still reflects who could see the unit while it was alive — exactly the players
+/// who should see it die. A dead building drops its queue implicitly by being removed. Workers
+/// building a since-removed site are reset elsewhere.
+fn death_system(entities: &mut EntityStore, fog: &Fog, events: &mut HashMap<u32, Vec<Event>>) {
+    let dead: Vec<(u32, u32, f32, f32, String)> = entities
         .iter()
         .filter(|e| e.is_targetable() && e.hp == 0)
-        .map(|e| (e.id, e.pos_x, e.pos_y, e.kind.clone()))
+        .map(|e| (e.id, e.owner, e.pos_x, e.pos_y, e.kind.clone()))
         .collect();
 
-    for (id, x, y, kind) in dead {
+    for (id, owner, x, y, kind) in dead {
         entities.remove(id);
-        // Broadcast the death to all players' buckets so anyone watching sees the poof.
+        // Deliver the death only to players who owned the entity or could see where it died,
+        // so a death poof never reveals an entity hidden in a player's fog.
         let pids: Vec<u32> = events.keys().copied().collect();
         for pid in pids {
+            if pid != owner && !fog.is_visible_world(pid, x, y) {
+                continue;
+            }
             events.entry(pid).or_default().push(Event::Death {
                 id,
                 x,

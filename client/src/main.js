@@ -26,6 +26,12 @@ import { SNAPSHOT_MS, INTERP_DELAY_MS } from "./config.js";
 const TOAST_MS = 2600;
 
 /**
+ * App-level heartbeat interval (ms). The server drops connections idle for 40s,
+ * so we ping well inside that window to keep a healthy connection alive.
+ */
+const HEARTBEAT_MS = 15000;
+
+/**
  * Derive the WebSocket endpoint from the current page location, so the client
  * connects back to whichever host/port served it (the Rust process serves both).
  * @returns {string} e.g. "ws://localhost:8080/ws" or "wss://host/ws"
@@ -62,12 +68,16 @@ class App {
     this.match = null;
     /** @type {number|undefined} pending toast hide timer. */
     this.toastTimer = undefined;
+    /** @type {number|undefined} heartbeat interval id while connected. */
+    this.heartbeatTimer = undefined;
 
     // Bind handlers once so we can off() them symmetrically.
     this.onStart = this.onStart.bind(this);
     this.onError = this.onError.bind(this);
     this.onGameOver = this.onGameOver.bind(this);
     this.onBackToLobby = this.onBackToLobby.bind(this);
+    this.onOpen = this.onOpen.bind(this);
+    this.onClose = this.onClose.bind(this);
   }
 
   /** Connect, wire global server messages, and show the lobby. */
@@ -75,6 +85,8 @@ class App {
     this.net.on(S.START, this.onStart);
     this.net.on(S.ERROR, this.onError);
     this.net.on(S.GAME_OVER, this.onGameOver);
+    this.net.on("open", this.onOpen);
+    this.net.on("close", this.onClose);
     dom.gameOverButton.addEventListener("click", this.onBackToLobby);
 
     this.lobby.show();
@@ -92,6 +104,29 @@ class App {
    */
   onError(m) {
     this.showToast(m && m.msg ? m.msg : "Server error");
+  }
+
+  /**
+   * Socket opened: start an app-level heartbeat so a healthy connection is never
+   * dropped by the server's idle timeout. We only ping once the socket is open,
+   * so we never spam pings before then.
+   */
+  onOpen() {
+    this.stopHeartbeat();
+    this.heartbeatTimer = window.setInterval(() => this.net.ping(), HEARTBEAT_MS);
+  }
+
+  /** Socket closed: stop the heartbeat so we don't leak the interval. */
+  onClose() {
+    this.stopHeartbeat();
+  }
+
+  /** Clear the heartbeat interval if one is running. Idempotent. */
+  stopHeartbeat() {
+    if (this.heartbeatTimer !== undefined) {
+      clearInterval(this.heartbeatTimer);
+      this.heartbeatTimer = undefined;
+    }
   }
 
   /**

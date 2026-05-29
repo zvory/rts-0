@@ -56,6 +56,23 @@ export class GameState {
     return this.map.tileSize;
   }
 
+  /**
+   * Receive time of the previous snapshot, or null when no prior snapshot
+   * exists yet. main.js computeAlpha() reads this to interpolate.
+   * @returns {number|null}
+   */
+  get prevRecvTime() {
+    return this._prev ? this._prevRecvTime : null;
+  }
+
+  /**
+   * Receive time of the current snapshot, or null when none received yet.
+   * @returns {number|null}
+   */
+  get currRecvTime() {
+    return this._cur ? this._curRecvTime : null;
+  }
+
   // --- snapshots ----------------------------------------------------------
 
   /**
