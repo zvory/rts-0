@@ -37,8 +37,8 @@ pub(crate) fn movement_system(map: &Map, entities: &mut EntityStore, occ: &Occup
         // Consume waypoints (stored reversed, next = last element) within this tick's budget.
         loop {
             let next = {
-                let e = entities.get(id).unwrap();
-                e.path.last().copied()
+            let Some(e) = entities.get(id) else { break };
+            e.path.last().copied()
             };
             let Some((wx, wy)) = next else { break };
             let dx = wx - x;

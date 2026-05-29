@@ -195,7 +195,6 @@ export class HUD {
       if (!this._isOwn(e)) continue;
       if (isUnit(e.kind)) return e;
       if (isBuilding(e.kind) && this._trainsOf(e.kind).length > 0) return e;
-      if (e.kind === KIND.WORKER && !worker) worker = e;
     }
     return worker;
   }

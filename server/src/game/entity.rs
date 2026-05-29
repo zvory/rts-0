@@ -299,7 +299,9 @@ impl Entity {
             s.radius
         } else if self.is_building() {
             // Footprint half-extent (approx) for range/interaction checks.
-            let s = config::building_stats(self.kind).expect("building stats");
+            let Some(s) = config::building_stats(self.kind) else {
+                return config::TILE_SIZE as f32 * 0.5;
+            };
             (s.foot_w.max(s.foot_h) as f32) * config::TILE_SIZE as f32 * 0.5
         } else {
             // Resource node footprint ~1 tile.
@@ -506,14 +508,6 @@ impl EntityStore {
     /// Remove an entity, returning it if present.
     pub fn remove(&mut self, id: u32) -> Option<Entity> {
         self.map.remove(&id)
-    }
-
-    pub fn len(&self) -> usize {
-        self.map.len()
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.map.is_empty()
     }
 
     /// Iterate over all entities (shared).

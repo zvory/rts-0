@@ -6,6 +6,7 @@
 
 use serde::{Deserialize, Serialize};
 
+#[cfg(test)]
 use super::{Game, PlayerInit};
 use crate::protocol::{Command, Event, Snapshot};
 
@@ -44,6 +45,8 @@ pub struct PlayerSnapshot {
 }
 
 /// Replay `commands` through tick `ticks`, preserving command order within each tick.
+/// Used only by the test harness (`selfplay.rs`); kept alive for future replay UI.
+#[cfg(test)]
 pub fn replay_commands(
     players: &[PlayerInit],
     commands: &[CommandLogEntry],
@@ -104,6 +107,7 @@ pub fn replay_commands(
 }
 
 #[derive(Debug, Clone, PartialEq)]
+#[cfg(test)]
 pub enum ReplayError {
     OutOfOrder {
         index: usize,
@@ -117,6 +121,7 @@ pub enum ReplayError {
     },
 }
 
+#[cfg(test)]
 impl std::fmt::Display for ReplayError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -140,4 +145,5 @@ impl std::fmt::Display for ReplayError {
     }
 }
 
+#[cfg(test)]
 impl std::error::Error for ReplayError {}
