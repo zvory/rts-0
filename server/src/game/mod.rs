@@ -1,0 +1,372 @@
+//! The authoritative game simulation. See `DESIGN.md` §3.1 for the public API contract.
+//!
+//! [`Game`] is the single seam between the simulation and the networking/lobby layer. The
+//! networking layer calls ONLY the methods in §3.1; everything else here is private detail.
+//!
+//! The simulation is fixed-rate: each [`Game::tick`] drains queued commands, advances every
+//! system in a deterministic order, and recomputes per-player fog. Snapshots are pulled
+//! separately via [`Game::snapshot_for`], fog-filtered so a player only ever sees neutral /
+//! enemy entities on tiles they currently see.
+
+pub mod entity;
+pub mod fog;
+pub mod map;
+pub mod pathfinding;
+pub mod systems;
+
+use std::collections::HashMap;
+
+use crate::config;
+use crate::protocol::{
+    kinds, Command, EntityView, Event, MapInfo, PlayerStart, Snapshot, StartPayload,
+};
+
+use entity::{Entity, EntityStore, Order};
+use fog::Fog;
+use map::Map;
+
+/// Lobby-supplied identity for a player joining a match.
+pub struct PlayerInit {
+    pub id: u32,
+    pub name: String,
+    pub color: String,
+}
+
+/// Per-player economy and bookkeeping carried for the whole match. Visible to `systems` (the
+/// only other module that mutates economy), but not part of the public API.
+pub(crate) struct PlayerState {
+    pub(crate) id: u32,
+    pub(crate) name: String,
+    pub(crate) color: String,
+    pub(crate) start_tile: (u32, u32),
+    pub(crate) minerals: u32,
+    pub(crate) gas: u32,
+    /// Supply currently consumed by living + in-production units.
+    pub(crate) supply_used: u32,
+    /// Supply provided by completed HQs/Depots, capped at `SUPPLY_CAP_MAX`.
+    pub(crate) supply_cap: u32,
+}
+
+/// The authoritative match state.
+pub struct Game {
+    map: Map,
+    entities: EntityStore,
+    fog: Fog,
+    players: Vec<PlayerState>,
+    /// Commands received this tick window, drained at the start of [`tick`]. Each carries the
+    /// issuing player so ownership can be validated on apply.
+    pending: Vec<(u32, Command)>,
+    tick: u32,
+}
+
+impl Game {
+    /// Create a match for the given players. Generates a symmetric map sized for the player
+    /// count and spawns each player's starting HQ, workers, and a nearby resource cluster.
+    pub fn new(players: &[PlayerInit]) -> Game {
+        // Deterministic seed derived from the player set so a given lobby produces a stable
+        // map (helps reproducibility / debugging) without any external RNG.
+        let mut seed: u32 = 0x1234_5678 ^ (players.len() as u32).wrapping_mul(2_654_435_761);
+        for p in players {
+            seed ^= p.id.wrapping_mul(0x9E37_79B1).rotate_left(7);
+        }
+
+        let map = Map::generate(players.len(), seed);
+        let fog = Fog::new(map.size);
+        let mut entities = EntityStore::new();
+
+        let mut player_states = Vec::with_capacity(players.len());
+        for (i, p) in players.iter().enumerate() {
+            let start = map.starts.get(i).copied().unwrap_or((0, 0));
+            let mut ps = PlayerState {
+                id: p.id,
+                name: p.name.clone(),
+                color: p.color.clone(),
+                start_tile: start,
+                minerals: config::STARTING_MINERALS,
+                gas: config::STARTING_GAS,
+                supply_used: 0,
+                supply_cap: 0,
+            };
+            spawn_player_start(&mut entities, &map, p.id, start);
+            // The starting HQ contributes supply immediately.
+            ps.supply_cap = config::HQ_SUPPLY.min(config::SUPPLY_CAP_MAX);
+            player_states.push(ps);
+        }
+
+        let mut game = Game {
+            map,
+            entities,
+            fog,
+            players: player_states,
+            pending: Vec::new(),
+            tick: 0,
+        };
+        // Initialize supply accounting and fog so the very first snapshot is correct.
+        systems::recompute_supply(&mut game.players, &game.entities);
+        let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
+        game.fog.recompute(&ids, &game.entities);
+        game
+    }
+
+    /// Static info for the `start` message: terrain grid + each player's start tile. The
+    /// `player_id` is left 0; the networking layer overwrites it per recipient.
+    pub fn start_payload(&self) -> StartPayload {
+        let map = MapInfo {
+            width: self.map.size,
+            height: self.map.size,
+            tile_size: config::TILE_SIZE,
+            terrain: self.map.terrain.clone(),
+        };
+        let players = self
+            .players
+            .iter()
+            .map(|p| PlayerStart {
+                id: p.id,
+                name: p.name.clone(),
+                color: p.color.clone(),
+                start_tile_x: p.start_tile.0,
+                start_tile_y: p.start_tile.1,
+            })
+            .collect();
+        StartPayload {
+            player_id: 0,
+            tick: self.tick,
+            map,
+            players,
+        }
+    }
+
+    /// Queue a command for application at the next tick. No validation here (it happens on
+    /// apply, where the live state is known).
+    pub fn enqueue(&mut self, player: u32, cmd: Command) {
+        self.pending.push((player, cmd));
+    }
+
+    /// Advance the simulation by one tick and return per-player transient events.
+    ///
+    /// Ordered per `DESIGN.md` §3: drain+apply commands → movement → combat → gather →
+    /// production+spawn → construction → deaths → recompute supply → recompute fog. The whole
+    /// method is panic-free: every entity lookup is fallible and stale ids are ignored.
+    pub fn tick(&mut self) -> Vec<(u32, Vec<Event>)> {
+        self.tick = self.tick.wrapping_add(1);
+
+        // Per-player event buckets, accumulated by the systems below.
+        let mut events: HashMap<u32, Vec<Event>> = HashMap::new();
+        for p in &self.players {
+            events.entry(p.id).or_default();
+        }
+
+        // Run every per-tick system in order. `run_tick` takes split borrows of the map,
+        // entity store, player economy, and the event buckets, so it can mutate resources and
+        // entities together without locks.
+        let pending = std::mem::take(&mut self.pending);
+        systems::run_tick(
+            &self.map,
+            &mut self.entities,
+            &mut self.players,
+            pending,
+            &mut events,
+            self.tick,
+        );
+
+        // Fog last, from the post-systems world state.
+        let ids: Vec<u32> = self.players.iter().map(|p| p.id).collect();
+        self.fog.recompute(&ids, &self.entities);
+
+        // Return events in a stable order (by player id) for determinism.
+        let mut out: Vec<(u32, Vec<Event>)> = events.into_iter().collect();
+        out.sort_by_key(|(pid, _)| *pid);
+        out
+    }
+
+    /// Build the fog-filtered snapshot for one player at the current tick. Includes ALL of the
+    /// player's own entities plus neutral/enemy entities whose tile is currently visible.
+    pub fn snapshot_for(&self, player: u32) -> Snapshot {
+        let ps = self.player(player);
+        let (minerals, gas, supply_used, supply_cap) = match ps {
+            Some(p) => (p.minerals, p.gas, p.supply_used, p.supply_cap),
+            None => (0, 0, 0, 0),
+        };
+
+        let mut entities = Vec::new();
+        for e in self.entities.iter() {
+            let own = e.owner == player;
+            if !own {
+                // Reveal neutral / enemy entities only when their tile is currently visible.
+                if !self.fog.is_visible_world(player, e.pos_x, e.pos_y) {
+                    continue;
+                }
+            }
+            entities.push(self.view_of(e));
+        }
+
+        Snapshot {
+            tick: self.tick,
+            minerals,
+            gas,
+            supply_used,
+            supply_cap,
+            entities,
+            // Events are delivered via the `tick()` return value, not the snapshot.
+            events: Vec::new(),
+        }
+    }
+
+    /// Player ids that still own at least one entity.
+    pub fn alive_players(&self) -> Vec<u32> {
+        self.players
+            .iter()
+            .map(|p| p.id)
+            .filter(|&id| self.entities.player_alive(id))
+            .collect()
+    }
+
+    /// Remove every entity owned by `player` (e.g. on disconnect) so the match can resolve.
+    pub fn eliminate(&mut self, player: u32) {
+        let doomed: Vec<u32> = self
+            .entities
+            .iter()
+            .filter(|e| e.owner == player)
+            .map(|e| e.id)
+            .collect();
+        for id in doomed {
+            self.entities.remove(id);
+        }
+        if let Some(p) = self.players.iter_mut().find(|p| p.id == player) {
+            p.supply_used = 0;
+            p.supply_cap = 0;
+        }
+        // Recompute fog so the now-entity-less player's visibility goes dark immediately;
+        // otherwise a stale grid would keep leaking neutral/enemy entities into their snapshots.
+        let ids: Vec<u32> = self.players.iter().map(|p| p.id).collect();
+        self.fog.recompute(&ids, &self.entities);
+    }
+
+    pub fn tick_count(&self) -> u32 {
+        self.tick
+    }
+
+    // --- internal helpers ------------------------------------------------------
+
+    fn player(&self, id: u32) -> Option<&PlayerState> {
+        self.players.iter().find(|p| p.id == id)
+    }
+
+    /// Project an entity into its wire `EntityView`, filling the optional fields that apply.
+    fn view_of(&self, e: &Entity) -> EntityView {
+        let mut v = EntityView::new(
+            e.id,
+            e.owner,
+            &e.kind,
+            e.pos_x,
+            e.pos_y,
+            e.hp,
+            e.max_hp,
+            e.state_str(),
+        );
+
+        if e.is_unit() {
+            v.facing = Some(e.facing);
+        }
+
+        // Production buildings: surface the front item + queue depth.
+        if e.is_building() && !e.prod_queue.is_empty() {
+            if let Some(front) = e.prod_queue.first() {
+                v.prod_kind = Some(front.unit.clone());
+                v.prod_progress = Some(if front.total == 0 {
+                    0.0
+                } else {
+                    front.progress as f32 / front.total as f32
+                });
+            }
+            v.prod_queue = Some(e.prod_queue.len() as u32);
+        }
+
+        // Buildings under construction: surface progress so the client renders scaffolding.
+        if e.under_construction {
+            v.build_progress = Some(if e.build_total == 0 {
+                1.0
+            } else {
+                (e.build_progress as f32 / e.build_total as f32).min(1.0)
+            });
+        }
+
+        // Workers carrying a load.
+        if let Some(c) = e.carry {
+            if c.amount > 0 {
+                v.carrying = Some(c.amount);
+                v.carrying_kind = Some(
+                    if c.is_gas {
+                        kinds::GAS
+                    } else {
+                        kinds::MINERALS
+                    }
+                    .to_string(),
+                );
+            }
+        }
+
+        // Resource nodes: remaining amount.
+        if e.is_node() {
+            v.remaining = Some(e.remaining);
+        }
+
+        // Combat tracer target (only meaningful for attackers actively engaged).
+        if let Some(t) = e.target_id {
+            // Only expose a target that points at a real combat target, to keep tracers sane.
+            if matches!(e.order, Order::Attack { .. } | Order::AttackMove { .. })
+                || (e.is_building() && e.can_attack())
+            {
+                if self.entities.contains(t) {
+                    v.target_id = Some(t);
+                }
+            }
+        }
+
+        v
+    }
+}
+
+/// Spawn a player's full starting layout: a free, fully-built HQ on the start tile, a ring of
+/// workers around it, and a nearby neutral resource cluster (minerals + one gas geyser).
+fn spawn_player_start(entities: &mut EntityStore, map: &Map, owner: u32, start: (u32, u32)) {
+    let (stx, sty) = start;
+    let (hx, hy) = map.tile_center(stx, sty);
+
+    // HQ (free, fully built). Footprint is 3x3 centered on the start tile.
+    entities.spawn_building(owner, kinds::HQ, hx, hy, true);
+
+    // Starting workers arranged in a ring just outside the HQ footprint.
+    let ts = config::TILE_SIZE as f32;
+    let ring_r = ts * 2.5;
+    let count = config::STARTING_WORKERS;
+    for i in 0..count {
+        let ang = std::f32::consts::TAU * (i as f32) / (count.max(1) as f32);
+        let wx = hx + ring_r * ang.cos();
+        let wy = hy + ring_r * ang.sin();
+        entities.spawn_unit(owner, kinds::WORKER, wx, wy);
+    }
+
+    // Mineral cluster: an arc of patches a few tiles from the HQ, plus one gas geyser.
+    // Placement is offset toward the map center so it sits in open space, not off-map.
+    let center = (map.size as f32 * ts) * 0.5;
+    let dir_x = (center - hx).signum();
+    let dir_y = (center - hy).signum();
+    // Anchor the cluster ~4 tiles toward center from the HQ.
+    let anchor_x = hx + dir_x * ts * 4.0;
+    let anchor_y = hy + dir_y * ts * 4.0;
+
+    let patches = config::MINERAL_PATCHES_PER_BASE;
+    for i in 0..patches {
+        // Lay patches out in a short two-row block near the anchor.
+        let col = (i % 4) as f32;
+        let row = (i / 4) as f32;
+        let px = anchor_x + (col - 1.5) * ts;
+        let py = anchor_y + row * ts;
+        entities.spawn_node(kinds::MINERALS, px, py);
+    }
+    // Gas geyser sits a little further out from the mineral line.
+    let gx = anchor_x + dir_x * ts * 1.5;
+    let gy = anchor_y + dir_y * ts * 2.5;
+    entities.spawn_node(kinds::GAS, gx, gy);
+}

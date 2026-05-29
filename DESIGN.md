@@ -209,6 +209,9 @@ impl Game {
     /// Player ids still alive (have at least one entity). Lobby uses this for game-over.
     pub fn alive_players(&self) -> Vec<u32>;
 
+    /// Remove all of a player's entities (e.g. on disconnect) so the match can resolve.
+    pub fn eliminate(&mut self, player: u32);
+
     pub fn tick_count(&self) -> u32;
 }
 

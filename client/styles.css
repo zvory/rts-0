@@ -1,0 +1,631 @@
+/*
+ * RTS client styles — dark sci-fi command palette.
+ *
+ * Goals (DESIGN.md §4.2): clean, modern, lightweight. No CSS frameworks.
+ * The DOM is the pinned markup in index.html; PixiJS owns #viewport's canvas.
+ * HUD pieces are absolutely-positioned overlays; they only capture pointer
+ * events where interaction is needed so the canvas stays draggable underneath.
+ *
+ * Palette is kept in CSS custom properties and intentionally mirrors the
+ * in-canvas COLORS in config.js (e.g. minerals cyan #46e3ff, gas green #53e08a,
+ * the near-black void #05070d) so DOM chrome and the rendered world feel like
+ * one screen.
+ */
+
+:root {
+  /* Core surfaces */
+  --void: #05070d; /* matches COLORS.bgVoid */
+  --panel: #0d121d;
+  --panel-2: #131a28;
+  --panel-edge: #243246;
+  --panel-glow: rgba(58, 160, 255, 0.18);
+
+  /* Text */
+  --ink: #e6edf6;
+  --ink-dim: #93a4bd;
+  --ink-faint: #5f708a;
+
+  /* Accents (mirror in-canvas resource colors) */
+  --accent: #3aa0ff; /* primary action / command tint */
+  --accent-2: #46e3ff; /* minerals cyan (COLORS.minerals) */
+  --gas: #53e08a; /* gas green (COLORS.gas) */
+  --supply: #f0c64a;
+  --good: #4fd24f; /* COLORS.hpGood */
+  --warn: #e0c23a;
+  --bad: #e04646; /* COLORS.hpLow */
+
+  /* Misc */
+  --radius: 10px;
+  --radius-sm: 6px;
+  --shadow: 0 10px 30px rgba(0, 0, 0, 0.55);
+  --hud-z: 10;
+  --overlay-z: 100;
+
+  --font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica,
+    Arial, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  background: var(--void);
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+#app {
+  position: relative;
+  height: 100vh;
+  width: 100vw;
+}
+
+/* A full-screen screen container. Only one is visible at a time; the [hidden]
+   attribute (toggled from main.js) wins over display. */
+.screen {
+  position: absolute;
+  inset: 0;
+}
+[hidden] {
+  display: none !important;
+}
+
+/* ============================ Buttons ============================ */
+.btn {
+  appearance: none;
+  border: 1px solid var(--panel-edge);
+  background: linear-gradient(180deg, var(--panel-2), var(--panel));
+  color: var(--ink);
+  font: inherit;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 10px 16px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: border-color 0.12s ease, box-shadow 0.12s ease,
+    background 0.12s ease, transform 0.04s ease;
+}
+.btn:hover:not(:disabled) {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--panel-glow);
+}
+.btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+.btn.primary {
+  border-color: transparent;
+  background: linear-gradient(180deg, #4cb0ff, var(--accent));
+  color: #04101f;
+}
+.btn.primary:hover:not(:disabled) {
+  box-shadow: 0 0 18px rgba(58, 160, 255, 0.5);
+}
+.btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+/* Toggled "ready" state on the lobby ready button. */
+.btn.on {
+  border-color: var(--good);
+  box-shadow: 0 0 0 1px rgba(79, 210, 79, 0.4);
+  color: var(--good);
+}
+
+/* ============================ LOBBY ============================ */
+#lobby-screen {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* Subtle starfield-ish radial wash over the void. */
+  background:
+    radial-gradient(1200px 700px at 50% -10%, #0f1830 0%, transparent 60%),
+    radial-gradient(900px 600px at 80% 120%, #102032 0%, transparent 55%),
+    var(--void);
+  padding: 24px;
+}
+
+.lobby-box {
+  width: min(440px, 100%);
+  background: linear-gradient(180deg, rgba(19, 26, 40, 0.96), rgba(13, 18, 29, 0.96));
+  border: 1px solid var(--panel-edge);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow), inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  padding: 28px 28px 22px;
+}
+
+.logo {
+  margin: 0;
+  text-align: center;
+  font-size: 40px;
+  font-weight: 800;
+  letter-spacing: 0.32em;
+  color: var(--accent-2);
+  text-shadow: 0 0 22px rgba(70, 227, 255, 0.45);
+}
+.tagline {
+  margin: 6px 0 22px;
+  text-align: center;
+  color: var(--ink-dim);
+  font-size: 13px;
+}
+
+.lobby-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.lobby-form label,
+.lobby-room h2 {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-dim);
+}
+.lobby-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+input[type="text"] {
+  width: 100%;
+  background: var(--void);
+  border: 1px solid var(--panel-edge);
+  border-radius: var(--radius-sm);
+  color: var(--ink);
+  font: inherit;
+  font-size: 15px;
+  padding: 10px 12px;
+  outline: none;
+  transition: border-color 0.12s ease, box-shadow 0.12s ease;
+}
+input[type="text"]::placeholder {
+  color: var(--ink-faint);
+}
+input[type="text"]:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(58, 160, 255, 0.18);
+}
+
+.lobby-form .btn {
+  margin-top: 4px;
+}
+
+/* The "room" block (player list + actions) is revealed by removing [hidden]. */
+.lobby-room {
+  margin-top: 22px;
+  border-top: 1px solid var(--panel-edge);
+  padding-top: 18px;
+}
+.lobby-room h2 {
+  margin: 0 0 10px;
+}
+
+.player-list {
+  list-style: none;
+  margin: 0 0 16px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.player-list li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--void);
+  border: 1px solid var(--panel-edge);
+  border-radius: var(--radius-sm);
+  padding: 9px 12px;
+}
+/* Color swatch keyed off each player's assigned color. */
+.player-list .swatch {
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  flex: 0 0 auto;
+  box-shadow: 0 0 8px currentColor;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+}
+.player-list .name {
+  flex: 1 1 auto;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.player-list .host-tag {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--supply);
+  border: 1px solid rgba(240, 198, 74, 0.4);
+  border-radius: 4px;
+  padding: 1px 6px;
+}
+/* Ready check pill. .ready flips it to the "go" color. */
+.player-list .ready-check {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink-faint);
+}
+.player-list .ready-check.ready {
+  color: var(--good);
+}
+
+.lobby-actions {
+  display: flex;
+  gap: 10px;
+}
+.lobby-actions .btn {
+  flex: 1 1 0;
+}
+
+.status {
+  margin: 14px 0 0;
+  min-height: 1em;
+  text-align: center;
+  font-size: 13px;
+  color: var(--warn);
+}
+.hint {
+  margin: 14px 0 0;
+  text-align: center;
+  font-size: 11px;
+  color: var(--ink-faint);
+  line-height: 1.5;
+}
+
+/* ============================ GAME ============================= */
+#game-screen {
+  background: var(--void);
+}
+
+/* The Pixi canvas mounts here and fills the screen. It sits below the HUD. */
+#viewport {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  cursor: crosshair;
+}
+#viewport canvas {
+  display: block;
+}
+
+/* HUD overlays do not eat pointer events by default; only interactive
+   sub-panels opt back in via pointer-events:auto. */
+#hud,
+#minimap-wrap,
+#selected-panel,
+#command-card,
+#toast {
+  position: absolute;
+  z-index: var(--hud-z);
+}
+
+/* Shared frosted-panel look for HUD chrome. */
+.hud-panel,
+#hud,
+#minimap-wrap,
+#selected-panel,
+#command-card {
+  background: linear-gradient(180deg, rgba(19, 26, 40, 0.92), rgba(13, 18, 29, 0.92));
+  border: 1px solid var(--panel-edge);
+  box-shadow: var(--shadow), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(3px);
+}
+
+/* --- Top resource bar --- */
+#hud {
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 22px;
+  padding: 8px 18px;
+  border-radius: var(--radius);
+  pointer-events: none; /* read-only readout */
+  font-variant-numeric: tabular-nums;
+}
+#hud .res {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: 0.02em;
+}
+#hud .res-icon {
+  font-size: 13px;
+  line-height: 1;
+}
+#hud .res-icon.mineral {
+  color: var(--accent-2);
+  text-shadow: 0 0 8px rgba(70, 227, 255, 0.6);
+}
+#hud .res-icon.gas {
+  color: var(--gas);
+  text-shadow: 0 0 8px rgba(83, 224, 138, 0.6);
+}
+#hud .res-icon.supply {
+  color: var(--supply);
+}
+/* main.js / hud.js may add .over when supplyUsed >= supplyCap. */
+#hud .res.over #res-supply {
+  color: var(--bad);
+}
+
+/* --- Bottom-left minimap frame --- */
+#minimap-wrap {
+  left: 12px;
+  bottom: 12px;
+  padding: 8px;
+  border-radius: var(--radius);
+  pointer-events: auto; /* clickable: pan / move commands */
+  line-height: 0;
+}
+#minimap {
+  display: block;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--panel-edge);
+  background: var(--void);
+  cursor: pointer;
+}
+
+/* --- Bottom-center selected panel --- */
+#selected-panel {
+  left: 50%;
+  bottom: 12px;
+  transform: translateX(-50%);
+  min-width: 280px;
+  max-width: 46vw;
+  min-height: 92px;
+  padding: 10px 14px;
+  border-radius: var(--radius);
+  pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+/* When nothing is selected, keep it out of the way. hud.js can toggle .empty. */
+#selected-panel.empty {
+  opacity: 0;
+  pointer-events: none;
+}
+#selected-panel .sel-title {
+  font-weight: 700;
+  font-size: 14px;
+}
+#selected-panel .sel-sub {
+  font-size: 12px;
+  color: var(--ink-dim);
+}
+/* HP read-out / bar inside the selected panel. */
+#selected-panel .sel-hp {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--ink-dim);
+  font-variant-numeric: tabular-nums;
+}
+#selected-panel .bar {
+  flex: 1 1 auto;
+  height: 6px;
+  border-radius: 3px;
+  background: #101010; /* COLORS.hpBack */
+  overflow: hidden;
+}
+#selected-panel .bar > span {
+  display: block;
+  height: 100%;
+  background: var(--good);
+}
+#selected-panel .bar.mid > span {
+  background: var(--warn);
+}
+#selected-panel .bar.low > span {
+  background: var(--bad);
+}
+/* Multi-select roster: little icon chips. */
+#selected-panel .sel-roster {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+#selected-panel .sel-chip {
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  font-size: 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--panel-edge);
+  background: var(--void);
+}
+
+/* --- Bottom-right command card (3x3-ish grid of buttons) --- */
+#command-card {
+  right: 12px;
+  bottom: 12px;
+  padding: 10px;
+  border-radius: var(--radius);
+  pointer-events: auto;
+  display: grid;
+  grid-template-columns: repeat(3, 56px);
+  grid-auto-rows: 56px;
+  gap: 8px;
+}
+.cmd-btn {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  background: linear-gradient(180deg, var(--panel-2), var(--panel));
+  border: 1px solid var(--panel-edge);
+  border-radius: var(--radius-sm);
+  color: var(--ink);
+  cursor: pointer;
+  font: inherit;
+  padding: 0;
+  transition: border-color 0.1s ease, box-shadow 0.1s ease, transform 0.04s ease;
+}
+.cmd-btn:hover:not(:disabled) {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--panel-glow);
+}
+.cmd-btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+.cmd-btn:disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+}
+.cmd-btn .icon {
+  font-size: 20px;
+  line-height: 1;
+}
+.cmd-btn .label {
+  font-size: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink-dim);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Hotkey badge, top-left. */
+.cmd-btn .hotkey {
+  position: absolute;
+  top: 2px;
+  left: 4px;
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--ink-faint);
+}
+/* Cost badge, bottom edge. Mineral / gas costs colored to match the world. */
+.cmd-btn .cost {
+  position: absolute;
+  bottom: 2px;
+  right: 4px;
+  display: flex;
+  gap: 5px;
+  font-size: 9px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.cmd-btn .cost .min {
+  color: var(--accent-2);
+}
+.cmd-btn .cost .gas {
+  color: var(--gas);
+}
+/* Unaffordable cost shown in red even though the whole button may be disabled. */
+.cmd-btn.unaffordable .cost {
+  color: var(--bad);
+}
+
+/* --- Transient toast --- */
+#toast {
+  top: 64px;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 60vw;
+  padding: 10px 18px;
+  border-radius: var(--radius);
+  background: rgba(13, 18, 29, 0.95);
+  border: 1px solid var(--bad);
+  color: var(--ink);
+  font-weight: 600;
+  font-size: 13px;
+  text-align: center;
+  box-shadow: var(--shadow);
+  pointer-events: none;
+  animation: toast-in 0.16s ease-out;
+}
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -6px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+/* --- Game-over overlay --- */
+#game-over {
+  position: absolute;
+  inset: 0;
+  z-index: var(--overlay-z);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(5, 7, 13, 0.72);
+  backdrop-filter: blur(4px);
+}
+.game-over-box {
+  text-align: center;
+  background: linear-gradient(180deg, rgba(19, 26, 40, 0.98), rgba(13, 18, 29, 0.98));
+  border: 1px solid var(--panel-edge);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 36px 48px;
+}
+#game-over-text {
+  margin: 0 0 22px;
+  font-size: 44px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+/* Verdict tint set via data-verdict in main.js (won/lost/draw). */
+#game-over-text[data-verdict="won"] {
+  color: var(--good);
+  text-shadow: 0 0 26px rgba(79, 210, 79, 0.5);
+}
+#game-over-text[data-verdict="lost"] {
+  color: var(--bad);
+  text-shadow: 0 0 26px rgba(224, 70, 70, 0.5);
+}
+#game-over-text[data-verdict="draw"] {
+  color: var(--supply);
+}
+
+/* ============================ Responsive ============================ */
+/* Keep everything usable down to ~1280x720: shrink the command card grid and
+   tighten gaps so the bottom row of HUD panels does not overlap. */
+@media (max-width: 1366px), (max-height: 768px) {
+  #command-card {
+    grid-template-columns: repeat(3, 50px);
+    grid-auto-rows: 50px;
+    gap: 6px;
+  }
+  .cmd-btn .icon {
+    font-size: 18px;
+  }
+  #selected-panel {
+    min-width: 240px;
+    max-width: 40vw;
+  }
+  #minimap {
+    width: 180px;
+    height: 180px;
+  }
+  #game-over-text {
+    font-size: 36px;
+  }
+}
