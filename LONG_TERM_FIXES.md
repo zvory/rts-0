@@ -44,10 +44,9 @@ units, or competitive/multiplayer hardening.
   buildings. Search nearby passable spawn tiles around the footprint, or hold completed production
   until space opens.
 
-- [ ] P2: Replay determinism is not fully enforced around path-cache eviction.
+- [x] P2: Replay determinism is not fully enforced around path-cache eviction.
   Path cache eviction chooses the oldest `last_used`, but equal-age ties depend on `HashMap`
-  iteration order. Use a deterministic tie-break such as `(last_used, key)` or a stable LRU
-  structure.
+  iteration order. Fixed by using `(last_used, key)` as the tie-breaker in `min_by_key`.
 
 - [ ] P2: The intended `Game` seam is not enforced by Rust visibility.
   Several game internals are public modules even though the lobby/networking layer is supposed to
@@ -64,6 +63,6 @@ units, or competitive/multiplayer hardening.
 - [ ] Add pathing "approach target" semantics and harden movement passability.
 - [ ] Tighten fog/target visibility rules for combat acquisition and serialized events.
 - [ ] Add production spawn placement search.
-- [ ] Make path-cache eviction deterministic.
+- [x] Make path-cache eviction deterministic.
 - [ ] Clean up game module visibility around the `Game` API seam.
 - [ ] Wire or remove snapshot cadence configuration.
