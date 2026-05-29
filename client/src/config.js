@@ -5,9 +5,9 @@
 import { KIND } from "./protocol.js";
 
 // Timing (for snapshot interpolation). Must match server TICK_HZ / SNAPSHOT_EVERY_N_TICKS.
-export const TICK_HZ = 10;
-export const SNAPSHOT_MS = 100; // expected ms between snapshots; used to compute interp alpha
-export const INTERP_DELAY_MS = 100; // render this far in the past for smooth interpolation
+export const TICK_HZ = 30;
+export const SNAPSHOT_MS = 1000 / TICK_HZ; // expected ms between snapshots; used to compute interp alpha
+export const INTERP_DELAY_MS = SNAPSHOT_MS; // render this far in the past for smooth interpolation
 
 // Palette ------------------------------------------------------------------
 export const COLORS = Object.freeze({
