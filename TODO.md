@@ -9,7 +9,7 @@
  - [x] Extend map/passability around movement classes before terrain-specific combat and tank/infantry rules land.
  - [x] Rename the game officially to Bewegungskrieg.
  - [ ] Restyle the main menu to be more ww2 themed, less scifi.
- - [ ] Enforce map-generation resource fairness: Industrial Centers must keep a minimum distance from minerals and gas, and spawn layouts should precisely control resource distances so no player gets an advantage from patches or geysers being too close or too far.
+  - [x] Enforce map-generation resource fairness: Industrial Centers must keep a minimum distance from minerals and gas, and spawn layouts should precisely control resource distances so no player gets an advantage from patches or geysers being too close or too far.
  - [ ] Fix workers getting stuck inside buildings after building them.
  - [ ] Units should have collision and not stack, unless they're mining workers. This is a tough change because it requires complex pathfinding and careful thought and modular design.
  - [ ] Maps should be twice as large.

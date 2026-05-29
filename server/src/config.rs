@@ -34,6 +34,20 @@ pub const STEEL_PATCH_AMOUNT: u32 = 1500;
 pub const OIL_GEYSER_AMOUNT: u32 = 5000;
 pub const STEEL_PATCHES_PER_BASE: u32 = 8;
 
+/// Minimum distance (in tiles) from an Industrial Center center to any starting resource node.
+/// Prevents resources from spawning inside or too close to the building footprint.
+pub const IC_RESOURCE_MIN_DIST_TILES: f32 = 3.5;
+
+/// Maximum distance (in tiles) from an Industrial Center center to any starting resource node.
+/// Ensures no player is advantaged by resources being too far away.
+pub const IC_RESOURCE_MAX_DIST_TILES: f32 = 7.0;
+
+/// Distance (in tiles) from the Industrial Center to the center of the steel patch block.
+pub const STEEL_BLOCK_DIST_TILES: f32 = 5.5;
+
+/// Distance (in tiles) from the Industrial Center to the starting oil geyser.
+pub const OIL_DIST_TILES: f32 = 6.5;
+
 // --- Supply -----------------------------------------------------------------
 pub const INDUSTRIAL_CENTER_SUPPLY: u32 = 10;
 pub const DEPOT_SUPPLY: u32 = 8;
