@@ -1,29 +1,42 @@
 # RTS
 
-A small but functional real-time-strategy game inspired by StarCraft: Brood War.
-Build buildings, train units, gather minerals & gas, scout through fog of war, and wipe
-out your opponent. Server-authoritative multiplayer with a Rust server and an
-HTML/CSS/JS + PixiJS client. No sound.
+A small but complete real-time-strategy game inspired by **StarCraft: Brood War** — gather
+resources, build a base, train an army, scout through fog of war, and wipe out your opponent.
+Server-authoritative multiplayer with a **Rust** server (axum + tokio) and a zero-build
+**HTML/CSS/JS + PixiJS** client. No sound.
 
-> Status: v1 (focused MVP). One faction, 3 unit types, 4 building types, 2 resources,
-> fog of war, last-player-standing. Built to be iterated on — see `DESIGN.md` for the
-> architecture and the contracts every module follows.
+![In-game](docs/screenshot-game.png)
+
+> **Status:** v1 (focused MVP) — one faction, 3 unit types, 4 building types, 2 resources, fog of
+> war, last-player-standing. Built to be iterated on for years; `DESIGN.md` is the source of truth
+> for the architecture, wire protocol, module contracts, and balance.
+
+## Features
+
+- **Economy** — workers harvest minerals & gas on round trips to your HQ; nodes deplete.
+- **Base building** — HQ, Supply Depot, Barracks, Turret, placed by workers with live construction.
+- **Army** — train Workers/Soldiers/Heavies; supply cap gates your population.
+- **Fog of war** — server-authoritative and cheat-proof: you never receive entities you can't see.
+  Explored terrain stays revealed; the active vision around your units is clear.
+- **Multiplayer** — lobby + rooms, 2–4 players, fog-filtered snapshots, last-player-standing win.
+  A solo start is a peaceful sandbox.
+- **Clean look** — crisp PixiJS vector art, smooth snapshot interpolation, minimap, command card.
 
 ## Quick start
 
-You need a recent Rust toolchain (`cargo`). No JS build step — the client is plain ES
-modules and loads PixiJS from a CDN.
+You need a recent Rust toolchain (`cargo`). There is **no JS build step** — the client is plain ES
+modules and loads PixiJS from a CDN. The Rust process serves both the client and the WebSocket.
 
 ```bash
 cd server
-cargo run --release
+cargo run --release          # then open http://localhost:8080
 ```
 
-Then open <http://localhost:8080>. To play head-to-head, open it in **two browser
-windows**, join the same room, both click **Ready**, and the host clicks **Start match**.
-A solo start drops you into a peaceful sandbox so you can explore and build.
+To play head-to-head, open the page in **two browser windows**, join the same room, both click
+**Ready**, and the host clicks **Start match**. Set `RTS_ADDR` to change the bind address
+(default `0.0.0.0:8080`).
 
-Set `RTS_ADDR` to change the bind address (default `0.0.0.0:8080`).
+![Lobby](docs/screenshot-lobby.png)
 
 ## Controls
 
@@ -31,48 +44,90 @@ Set `RTS_ADDR` to change the bind address (default `0.0.0.0:8080`).
 |--------|-------|
 | Select unit / building | Left-click |
 | Box-select | Left-drag |
-| Move / gather / attack target | Right-click (context-sensitive) |
-| Attack-move | `A` then left-click |
+| Move / gather / attack (context-sensitive) | Right-click |
+| Attack-move | `A`, then left-click |
 | Stop | `S` |
-| Pan camera | Arrow keys / WASD / screen-edge / drag minimap |
+| Pan camera | WASD / arrow keys / screen edge / drag minimap |
 | Zoom | Mouse wheel |
-| Build (worker selected) | Command card buttons, then click to place |
-| Train (HQ/Barracks selected) | Command card buttons |
+| Build (worker selected) | Command-card buttons, then click to place; `Esc`/right-click cancels |
+| Train (HQ / Barracks selected) | Command-card buttons |
 
-## Layout
+## How it works
+
+The **server** runs the one authoritative simulation per room at a fixed 10 Hz tick. Clients send
+only **commands** (intent); they never mutate game state. Each tick the server produces a
+**per-player snapshot** with fog of war applied — hidden enemies are simply not sent, so the fog is
+a real security boundary. The **client** renders snapshots, interpolating positions between them for
+smoothness, and draws the fog overlay locally from its own units' sight.
 
 ```
-server/   Rust authoritative server (axum + tokio). Also serves the client files.
-client/   HTML/CSS/JS client (PixiJS via CDN). Served at /.
-DESIGN.md Architecture, wire protocol, module contracts, and balance. Read this first.
+Browser (PixiJS) ──ClientMessage (JSON/WS)──▶ Rust server (axum+tokio)
+   lobby / input / camera                       static files + /ws
+   renderer / fog / minimap  ◀──ServerMessage── Lobby ▸ Room ▸ Game (authoritative)
 ```
 
-## Development
+See **`DESIGN.md`** for the full architecture, the wire protocol, every module's contract, the
+`Game` API seam, and the balance table.
+
+## Project layout
+
+```
+server/        Rust authoritative server (also serves the client)
+  src/
+    main.rs        tokio + axum: static files, /ws upgrade, connection tasks
+    protocol.rs    serde wire types         ── keep in sync with client/src/protocol.js
+    config.rs      balance constants (authoritative) ── mirrored by client/src/config.js
+    lobby.rs       rooms, lobby, per-room tick loop
+    game/          the simulation: map, entity, pathfinding, fog, systems, mod (Game API)
+client/        HTML/CSS/JS client (PixiJS v7 via CDN), served at /
+  index.html, styles.css
+  src/           net, state, camera, renderer, fog, input, hud, minimap, lobby, main
+DESIGN.md      architecture, wire protocol, module contracts, balance, hardening  ← read first
+tests/         end-to-end tests (run against a live server) — see tests/README.md
+```
+
+## Gameplay & balance (v1)
+
+Start with 1 HQ, 4 workers, 50 minerals. Supply cap starts at 10 (HQ) and grows +8 per Depot.
+
+| Unit    | HP  | Dmg | Range | Sight | Cost          | Supply |
+|---------|-----|-----|-------|-------|---------------|--------|
+| Worker  | 40  | 4   | 1     | 7     | 50 min        | 1      |
+| Soldier | 45  | 6   | 4     | 8     | 50 min        | 1      |
+| Heavy   | 130 | 20  | 3     | 7     | 100 min/50 gas| 2      |
+
+| Building | HP  | Cost   | Footprint | Notes |
+|----------|-----|--------|-----------|-------|
+| HQ       | 600 | 400 min| 3×3       | trains Workers, resource drop-off, +10 supply (start free) |
+| Depot    | 220 | 50 min | 2×2       | +8 supply |
+| Barracks | 320 | 100 min| 3×2       | trains Soldier/Heavy; requires an HQ |
+| Turret   | 200 | 75 min | 1×1       | auto-fires (dmg 10, range 7) |
+
+Balance lives in `server/src/config.rs` (authoritative); the UI subset is mirrored in
+`client/src/config.js`. Change both together.
+
+## Testing
+
+End-to-end tests run against a live server (start it first with `cargo run`):
 
 ```bash
-cd server
-cargo run            # debug build, serves client/ and the websocket at :8080
-cargo fmt            # format
-cargo clippy         # lint
+node tests/server_integration.mjs    # no deps; full server pipeline over WebSocket (22 checks)
+node tests/regression.mjs            # no deps; hardening/DoS/robustness guards (5 checks)
+cd tests && npm install && node client_smoke.mjs   # headless-Chrome client smoke (17 checks)
 ```
 
-The wire protocol is defined in two mirrored files that must stay in sync:
-`server/src/protocol.rs` and `client/src/protocol.js`. Balance lives in
-`server/src/config.rs` (authoritative) mirrored by `client/src/config.js`.
+See `tests/README.md` for details and a CI sketch.
 
-### Tests
+## Security / hardening
 
-End-to-end tests live in `tests/` and run against a live server (`cargo run` first):
-
-```bash
-node tests/server_integration.mjs    # no deps; drives the full server pipeline over WebSocket
-cd tests && npm install && node client_smoke.mjs   # headless-Chrome client smoke test
-```
-
-See `tests/README.md` for details.
+The server treats every client as untrusted: bounded WebSocket frames, deduped/capped command
+unit lists, bounds-checked placement (no tick-loop panics), an idle timeout + client heartbeat to
+evict stuck connections, and authoritative fog for entities, attack tracers, and death events.
+See `DESIGN.md §7`.
 
 ## Known future work
-- Upgrade PixiJS v7 → v8 (async `Application.init`).
+
 - Unit-vs-unit collision avoidance / flocking (units currently soft-overlap).
-- Spectator mode, replays, and a binary wire format for scale.
-- AI opponents.
+- Automated combat-resolution test (army-vs-army), AI opponents, spectators/replays.
+- Upgrade PixiJS v7 → v8 (async `Application.init`).
+- A binary wire format for scale.
