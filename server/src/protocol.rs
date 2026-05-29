@@ -94,7 +94,7 @@ pub enum ClientMessage {
 }
 
 /// A gameplay command. Validated when applied, not when received.
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 #[serde(tag = "c", rename_all = "camelCase", rename_all_fields = "camelCase")]
 pub enum Command {
     Move {
@@ -178,7 +178,7 @@ pub struct LobbyPlayer {
     pub is_ai: bool,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct StartPayload {
     pub player_id: u32,
@@ -187,7 +187,7 @@ pub struct StartPayload {
     pub players: Vec<PlayerStart>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct MapInfo {
     pub width: u32,
@@ -197,7 +197,7 @@ pub struct MapInfo {
     pub terrain: Vec<u8>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct PlayerStart {
     pub id: u32,
@@ -207,7 +207,7 @@ pub struct PlayerStart {
     pub start_tile_y: u32,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct Snapshot {
     pub tick: u32,
@@ -220,7 +220,7 @@ pub struct Snapshot {
 }
 
 /// One entity as seen by one player. Optional fields are omitted when not applicable.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct EntityView {
     pub id: u32,
@@ -298,7 +298,7 @@ impl EntityView {
 }
 
 /// Transient, single-snapshot visual feedback. Clients must not rely on delivery.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "e", rename_all = "camelCase", rename_all_fields = "camelCase")]
 pub enum Event {
     Attack {
