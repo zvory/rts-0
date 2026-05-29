@@ -1,0 +1,2 @@
+ - buildings can be built on top of each other
+ - tank factory and advanced training center should require 100 and 50 oil respecitvely

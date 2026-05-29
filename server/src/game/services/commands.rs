@@ -240,6 +240,9 @@ fn order_gather(
     if !is_worker || !node_ok {
         return;
     }
+    if matches!(gather_slot_holder(entities, node), Some(holder) if holder != id) {
+        return;
+    }
     let (nx, ny, sx, sy) = {
         let n = match entities.get(node) {
             Some(n) => n,
@@ -266,13 +269,24 @@ fn order_gather(
         e.order = Order::Gather { node };
         e.target_id = Some(node);
         e.path = waypoints;
-        // Resume sensibly: if already laden, head home; else go to the node.
-        e.gather_phase = if e.carry.map(|c| c.amount > 0).unwrap_or(false) {
-            GatherPhase::ToHome
-        } else {
-            GatherPhase::ToNode
-        };
+        e.carry = None;
+        e.gather_phase = GatherPhase::ToNode;
         e.harvest_progress = 0;
+    }
+}
+
+fn gather_slot_holder(entities: &EntityStore, node: u32) -> Option<u32> {
+    let holder = entities.get(node).and_then(|n| n.miner)?;
+    let worker = entities.get(holder)?;
+    let on_this_node = matches!(worker.order, Order::Gather { node: n } if n == node);
+    if worker.hp > 0
+        && worker.kind == EntityKind::Worker
+        && on_this_node
+        && worker.gather_phase == GatherPhase::Harvesting
+    {
+        Some(holder)
+    } else {
+        None
     }
 }
 

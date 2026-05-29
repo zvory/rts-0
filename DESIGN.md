@@ -146,8 +146,7 @@ the player's own starting Industrial Center + workers.
   // buildings under construction:
   buildProgress?: f32,           // 0..1; when present and <1, render as scaffolding
   // workers:
-  carrying?: u32,                // amount of resource being carried (0 if none)
-  carryingKind?: string,         // "steel" | "oil"
+  latchedNode?: u32,             // node id the worker is currently harvesting (attached mining)
   // resource nodes:
   remaining?: u32,               // resource left in the node
   // combat feedback:
@@ -477,17 +476,19 @@ rules are future work.
 
 - `TICK_HZ = 30`, `SNAPSHOT_EVERY_N_TICKS = 1`.
 - Map: `TILE_SIZE = 32` px. Size scales with player count: 2p → 64×64, 3-4p → 96×96.
-- Start: `STARTING_MINERALS = 50`, `STARTING_GAS = 0`, `STARTING_WORKERS = 4`,
+- Start: `STARTING_STEEL = 50`, `STARTING_OIL = 0`, `STARTING_WORKERS = 4`,
   one Industrial Center at the player's start tile, a mineral cluster (8 patches) + 1 gas geyser nearby.
 - Supply: Industrial Center gives `+10`, Depot gives `+8`, hard cap `200`.
-- Resource trip: worker carries `MINERAL_LOAD = 5` / `GAS_LOAD = 4`; harvest takes
-  `HARVEST_TICKS`; mineral patch starts with `MINERAL_PATCH_AMOUNT = 1500`, geyser
-  `GAS_GEYSER_AMOUNT = 5000`.
-- One worker per patch: each node has a single harvest slot (`Entity::miner`). At most one
-  worker may be in `Harvesting` on a node at a time; extra workers queue in place (`ToNode`)
-  and take the slot when the current miner leaves to deposit. The slot is advisory and
-  self-heals — it's only honored while the recorded worker is alive and actively harvesting
-  that node, so death / re-order / retarget free it automatically.
+- Attached mining: workers walk to a patch, latch onto it, and mine in place.
+  Every `HARVEST_TICKS = 40` the load (`STEEL_LOAD = 5` / `OIL_LOAD = 4`) is deposited
+  directly into the player's economy. When a patch empties the worker goes idle
+  (no automatic retarget).
+- One worker per patch: each node has a single harvest slot (`Entity::miner`). A patch is
+  occupied only after the worker reaches `GatherPhase::Harvesting`; right-clicking a patch
+  does not reserve it. Extra workers that arrive while the slot is taken go idle. The slot
+  is advisory and self-heals — it's only honored while the recorded worker is alive and
+  actively harvesting that node, so death / re-order / retarget free it automatically.
+- Mineral patch starts with `STEEL_PATCH_AMOUNT = 1500`, geyser `OIL_GEYSER_AMOUNT = 5000`.
 
 Unit stats (hp, dmg, range[tiles], cooldown[ticks], speed[px/tick], sight[tiles], cost, supply, buildTicks):
 
@@ -503,7 +504,7 @@ Building stats (hp, sight, cost min, footprint tiles wxh, buildTicks, extra):
 
 | kind                       | hp  | sight | min | foot | buildTicks | notes |
 |----------------------------|-----|-------|-----|------|-----------|-------|
-| industrial_center          | 600 | 9     | 400 | 3x3  | 400       | trains worker; drop-off; +10 supply; players start with one free |
+| industrial_center          | 600 | 9     | 400 | 3x3  | 400       | trains worker; +10 supply; players start with one free |
 | depot                      | 220 | 4     | 50  | 2x2  | 120       | +8 supply |
 | barracks                   | 320 | 6     | 100 | 3x2  | 200       | trains rifleman, machine_gunner, at_team; requires an Industrial Center |
 | advanced_training_centre   | 300 | 6     | 125 | 3x2  | 220       | unlocks machine_gunner and at_team training at barracks; requires an Industrial Center |

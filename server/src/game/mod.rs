@@ -27,7 +27,7 @@ use crate::protocol::{Command, EntityView, Event, MapInfo, PlayerStart, Snapshot
 use serde::{Deserialize, Serialize};
 
 use ai::AiController;
-use entity::{Entity, EntityKind, EntityStore, Order};
+use entity::{Entity, EntityKind, EntityStore, GatherPhase, Order};
 use fog::Fog;
 use map::Map;
 use replay::CommandLogEntry;
@@ -383,6 +383,12 @@ impl Game {
         // Resource nodes: remaining amount.
         if e.is_node() {
             v.remaining = Some(e.remaining);
+        }
+
+        if e.kind == EntityKind::Worker && e.gather_phase == GatherPhase::Harvesting {
+            if let Order::Gather { node } = e.order {
+                v.latched_node = Some(node);
+            }
         }
 
         // Combat tracer target (only meaningful for attackers actively engaged).
