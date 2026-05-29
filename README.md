@@ -113,6 +113,7 @@ End-to-end tests run against a live server (start it first with `cargo run`):
 ```bash
 node tests/server_integration.mjs    # no deps; full server pipeline over WebSocket (22 checks)
 node tests/regression.mjs            # no deps; hardening/DoS/robustness guards (5 checks)
+cd server && cargo test scripted_self_play_exercises_economy_tech_and_combat
 cd tests && npm install && node client_smoke.mjs   # headless-Chrome client smoke (17 checks)
 ```
 
@@ -128,6 +129,6 @@ See `DESIGN.md §7`.
 ## Known future work
 
 - Unit-vs-unit collision avoidance / flocking (units currently soft-overlap).
-- Automated combat-resolution test (army-vs-army), AI opponents, spectators/replays.
+- Spectators/replays.
 - Upgrade PixiJS v7 → v8 (async `Application.init`).
 - A binary wire format for scale.

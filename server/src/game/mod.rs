@@ -13,6 +13,8 @@ pub mod entity;
 pub mod fog;
 pub mod map;
 pub mod pathfinding;
+#[cfg(test)]
+mod selfplay;
 pub mod systems;
 
 use std::collections::HashMap;
