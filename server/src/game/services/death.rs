@@ -39,6 +39,20 @@ pub(crate) fn death_system(
         }
     }
 
+    // Clear any node miner reservations pointing at dead workers.
+    let nodes_to_clear: Vec<u32> = entities
+        .iter()
+        .filter(|e| e.is_node())
+        .filter_map(|e| {
+            e.miner.and_then(|m| if !entities.contains(m) { Some(e.id) } else { None })
+        })
+        .collect();
+    for nid in nodes_to_clear {
+        if let Some(n) = entities.get_mut(nid) {
+            n.miner = None;
+        }
+    }
+
     // Clean up dangling orders that reference removed entities (build sites, attack targets)
     // so units don't chase ghosts. Gather orders self-heal via `retarget_or_idle`.
     for id in entities.ids() {

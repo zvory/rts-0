@@ -69,6 +69,11 @@ impl Fog {
         }
     }
 
+    /// Whether a grid has been allocated for `player`.
+    pub fn has_grid(&self, player: u32) -> bool {
+        self.grids.contains_key(&player)
+    }
+
     /// Whether `player` can currently see the world-pixel point `(x, y)`.
     pub fn is_visible_world(&self, player: u32, x: f32, y: f32) -> bool {
         let ts = config::TILE_SIZE as f32;

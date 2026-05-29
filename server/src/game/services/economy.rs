@@ -303,6 +303,7 @@ fn retarget_or_idle(
 
     match best {
         Some((nid, nx, ny, _)) => {
+            entities.release_miner(id);
             if let Some(e) = entities.get_mut(id) {
                 e.order = Order::Gather { node: nid };
                 e.target_id = Some(nid);
@@ -312,6 +313,7 @@ fn retarget_or_idle(
             pathing.repath_entity(map, entities, occ, id, nx, ny);
         }
         None => {
+            entities.release_miner(id);
             if let Some(e) = entities.get_mut(id) {
                 e.clear_orders();
             }

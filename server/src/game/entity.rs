@@ -534,4 +534,21 @@ impl EntityStore {
     pub fn player_alive(&self, player: u32) -> bool {
         self.map.values().any(|e| e.owner == player)
     }
+
+    /// If `worker_id` currently has a `Gather` order, clear that node's `miner` reservation
+    /// if it points to this worker.
+    pub fn release_miner(&mut self, worker_id: u32) {
+        let old_node = match self.get(worker_id) {
+            Some(e) => match e.order {
+                Order::Gather { node } => node,
+                _ => return,
+            },
+            None => return,
+        };
+        if let Some(n) = self.get_mut(old_node) {
+            if n.miner == Some(worker_id) {
+                n.miner = None;
+            }
+        }
+    }
 }
