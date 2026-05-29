@@ -30,7 +30,7 @@ use crate::protocol::{Command, Event, LobbyPlayer, ServerMessage, StartPayload};
 
 /// Player colors, assigned by join order. MUST match `client/src/config.js` `PLAYER_PALETTE`.
 const PLAYER_PALETTE: [&str; 6] = [
-    "#3aa0ff", "#ff5a4d", "#46d36b", "#f0c64a", "#b96cff", "#ff9a3c",
+    "#6f8fa8", "#b2775f", "#7f9462", "#c0a463", "#8d7aa8", "#b68a58",
 ];
 
 /// Hard cap on players in a single match (humans + AI). The map generator lays out at most four

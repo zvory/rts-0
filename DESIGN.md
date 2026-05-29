@@ -388,26 +388,30 @@ on `start` message build `GameState`, `Camera`, `Renderer`, `Fog`, `HUD`, `Minim
 start the rAF loop (compute `alpha` from snapshot timing, `camera.update`, `input.update`,
 `fog.update`, `renderer.render`, `hud.update`, `minimap.render`); on `gameOver` show overlay.
 
-### 4.2 Rendering & look (PixiJS, vector art — "simple but nice")
+### 4.2 Rendering & look (PixiJS, procedural art — neutral PS1 field-command style)
 - Layers (back→front): terrain → resource nodes → building shadows → buildings → unit
   shadows → units → selection rings → health bars → fog overlay → placement ghost →
   selection drag-box → (HUD is DOM, not Pixi).
-- Units: clean vector shapes tinted by player color, with a soft drop shadow, a thin dark
-  outline, a small facing indicator, an HP bar above when damaged/selected, and a glowing
-  selection ring when selected. Distinct silhouette per kind (worker: small rounded;
-  rifleman: chevron/triangle; machine gunner / AT team: compact specialist silhouettes;
-  tank: chunky armored square).
-- Buildings: rounded rectangles footprint-sized, player-tinted, with an icon glyph; under
-  construction → dashed/translucent with a progress bar; production → small progress arc.
-- Resource nodes: minerals = cyan crystals cluster; gas = green geyser; show remaining via
+- Units: low-detail hard-edged silhouettes tinted by player color, with a dark drop shadow,
+  dark outline, small facing indicator, HP bar above when damaged/selected, and glowing
+  selection ring when selected. Distinct silhouette per kind (engineer: compact block;
+  rifleman: infantry wedge; machine gunner / AT team: support silhouettes; tank: chunky
+  flat-shaded armor).
+- Buildings: footprint-sized blocky field structures with neutral geometry and plain
+  two-letter stencils; under construction → translucent with a progress bar; production →
+  small progress arc.
+- Resource nodes: minerals = tan supply crates; gas = olive fuel drums; show remaining via
   size/opacity.
-- Terrain: high-contrast two-tone grass checker or noise so movement is readable; impassable
-  rock and water tiles must remain visually distinct. Thin grid optional at high zoom.
-- Fog: unexplored = 82% dark overlay so terrain remains faintly readable; explored-but-not-visible =
+- Terrain: muted grass/field/mud, rock, and water tiles with deterministic coarse dithering
+  so movement is readable and the map has a PlayStation 1-era low-resolution texture feel.
+- Fog: unexplored = 86% dark overlay so terrain remains faintly readable; explored-but-not-visible =
   55% dark overlay; visible = clear. Use a single overlay sprite/graphics updated from `fog`
   grids; soften edges if cheap.
 - Selection: green for own, red tint for enemy, yellow for neutral. Drag-box translucent green.
-- Keep a cohesive palette; define colors in `config.js`.
+- Keep a cohesive muted palette; define colors in `config.js`.
+- Art must stay faction-agnostic: no Soviet, German, Nazi, imperial, national, or unit-branch
+  iconography. Avoid flags, stars, crosses, eagles, skulls, sickles, hammers, and historically
+  specific insignia.
 
 ---
 
@@ -417,9 +421,10 @@ sizes, colors). Keep both in sync; the comment in each file points at the other.
 
 ### 5.1 Target theme and MVP combat loop
 
-The target gameplay direction is a simplified World War II Eastern Front matchup:
-Germans vs. Soviets. This is not a full historical simulation. Historical accuracy should
-support readable gameplay, clear unit roles, and strong terrain identity.
+The target gameplay direction is a simplified World War II-inspired battlefield with
+fictional, faction-agnostic sides. This is not a historical simulation. The theme should
+support readable gameplay, clear unit roles, and strong terrain identity without national
+or regime-specific iconography.
 
 MVP scope:
 - No air forces.

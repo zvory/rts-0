@@ -1,7 +1,8 @@
 # RTS
 
-A small but complete real-time-strategy game inspired by **StarCraft: Brood War** — gather
-resources, build a base, train an army, scout through fog of war, and wipe out your opponent.
+A small but complete real-time-strategy game with a neutral World War II-inspired,
+PlayStation 1-style presentation — gather resources, build a base, train an army, scout
+through fog of war, and wipe out your opponent.
 Server-authoritative multiplayer with a **Rust** server (axum + tokio) and a zero-build
 **HTML/CSS/JS + PixiJS** client. No sound.
 
@@ -13,14 +14,18 @@ Server-authoritative multiplayer with a **Rust** server (axum + tokio) and a zer
 
 ## Features
 
-- **Economy** — workers harvest minerals & gas on round trips to your HQ; nodes deplete.
-- **Base building** — HQ, Supply Depot, Barracks, Turret, placed by workers with live construction.
-- **Army** — train Workers/Soldiers/Heavies; supply cap gates your population.
+- **Economy** — engineers harvest supplies & fuel on round trips to your Industrial Center;
+  nodes deplete.
+- **Base building** — Industrial Center, Depot, Barracks, Training Centre, Tank Factory, and
+  Bunker, placed by engineers with live construction.
+- **Army** — train Engineers, Riflemen, Machine Gunners, AT Teams, and Tanks; supply cap gates
+  your population.
 - **Fog of war** — server-authoritative and cheat-proof: you never receive entities you can't see.
   Explored terrain stays revealed; the active vision around your units is clear.
 - **Multiplayer** — lobby + rooms, 2–4 players, fog-filtered snapshots, last-player-standing win.
   A solo start is a peaceful sandbox.
-- **Clean look** — crisp PixiJS vector art, smooth snapshot interpolation, minimap, command card.
+- **Low-res field look** — muted PS1-style procedural art, smooth snapshot interpolation,
+  minimap, command card, and no historical faction iconography.
 
 ## Quick start
 
@@ -50,7 +55,7 @@ To play head-to-head, open the page in **two browser windows**, join the same ro
 | Pan camera | WASD / arrow keys / screen edge / drag minimap |
 | Zoom | Mouse wheel |
 | Build (worker selected) | Command-card buttons, then click to place; `Esc`/right-click cancels |
-| Train (HQ / Barracks selected) | Command-card buttons |
+| Train (Industrial Center / production building selected) | Command-card buttons |
 
 ## How it works
 
@@ -88,20 +93,25 @@ tests/         end-to-end tests (run against a live server) — see tests/README
 
 ## Gameplay & balance (v1)
 
-Start with 1 HQ, 4 workers, 50 minerals. Supply cap starts at 10 (HQ) and grows +8 per Depot.
+Start with 1 Industrial Center, 4 engineers, 50 supplies. Supply cap starts at 10 and grows
++8 per Depot.
 
 | Unit    | HP  | Dmg | Range | Sight | Cost          | Supply |
 |---------|-----|-----|-------|-------|---------------|--------|
-| Worker  | 40  | 4   | 1     | 7     | 50 min        | 1      |
-| Soldier | 45  | 6   | 4     | 8     | 50 min        | 1      |
-| Heavy   | 130 | 20  | 3     | 7     | 100 min/50 gas| 2      |
+| Engineer | 40  | 4   | 1     | 7     | 50 min        | 1      |
+| Rifleman | 45  | 5   | 4     | 8     | 50 min        | 1      |
+| Machine Gunner | 55 | 4 | 5   | 8     | 75 min        | 2      |
+| AT Team | 45  | 24  | 4     | 8     | 75 min/25 gas | 2      |
+| Tank    | 130 | 20  | 3     | 7     | 100 min/50 gas| 2      |
 
 | Building | HP  | Cost   | Footprint | Notes |
 |----------|-----|--------|-----------|-------|
-| HQ       | 600 | 400 min| 3×3       | trains Workers, resource drop-off, +10 supply (start free) |
-| Depot    | 220 | 50 min | 2×2       | +8 supply |
-| Barracks | 320 | 100 min| 3×2       | trains Soldier/Heavy; requires an HQ |
-| Turret   | 200 | 75 min | 1×1       | auto-fires (dmg 10, range 7) |
+| Industrial Center | 600 | 400 min | 3x3 | trains Engineers, resource drop-off, +10 supply (start free) |
+| Depot | 220 | 50 min | 2x2 | +8 supply |
+| Barracks | 320 | 100 min | 3x2 | trains Riflemen, Machine Gunners, AT Teams |
+| Advanced Training Centre | 300 | 125 min | 3x2 | unlocks support infantry |
+| Tank Factory | 360 | 150 min | 3x3 | trains Tanks |
+| Bunker | 200 | 150 min | 2x2 | static defense (dmg 10, range 7) |
 
 Balance lives in `server/src/config.rs` (authoritative); the UI subset is mirrored in
 `client/src/config.js`. Change both together.

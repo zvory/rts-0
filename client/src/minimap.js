@@ -18,7 +18,17 @@ const hex = (n) => "#" + n.toString(16).padStart(6, "0");
 const terrainFill = (code, tx, ty) => {
   if (code === TERRAIN.ROCK) return hex(COLORS.rock);
   if (code === TERRAIN.WATER) return hex(COLORS.water);
+  const n = hash2(tx, ty);
+  if (n > 0.78) return hex(COLORS.field);
+  if (n < 0.18) return hex(COLORS.mud);
   return hex((tx + ty) % 2 === 0 ? COLORS.grass : COLORS.grassAlt);
+};
+
+const hash2 = (x, y) => {
+  let n = (x * 374761393 + y * 668265263) | 0;
+  n = (n ^ (n >>> 13)) | 0;
+  n = Math.imul(n, 1274126177);
+  return ((n ^ (n >>> 16)) >>> 0) / 4294967295;
 };
 
 /**

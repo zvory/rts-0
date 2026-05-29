@@ -1,5 +1,5 @@
 /*
- * RTS client styles — dark sci-fi command palette.
+ * RTS client styles — muted low-resolution field-command palette.
  *
  * Goals (DESIGN.md §4.2): clean, modern, lightweight. No CSS frameworks.
  * The DOM is the pinned markup in index.html; PixiJS owns #viewport's canvas.
@@ -7,37 +7,36 @@
  * events where interaction is needed so the canvas stays draggable underneath.
  *
  * Palette is kept in CSS custom properties and intentionally mirrors the
- * in-canvas COLORS in config.js (e.g. minerals cyan #46e3ff, gas green #53e08a,
- * the near-black void #05070d) so DOM chrome and the rendered world feel like
+ * in-canvas COLORS in config.js so DOM chrome and the rendered world feel like
  * one screen.
  */
 
 :root {
   /* Core surfaces */
-  --void: #05070d; /* matches COLORS.bgVoid */
-  --panel: #0d121d;
-  --panel-2: #131a28;
-  --panel-edge: #243246;
-  --panel-glow: rgba(58, 160, 255, 0.18);
+  --void: #11110f; /* matches COLORS.bgVoid */
+  --panel: #27251f;
+  --panel-2: #343024;
+  --panel-edge: #5b5341;
+  --panel-glow: rgba(199, 208, 122, 0.2);
 
   /* Text */
-  --ink: #e6edf6;
-  --ink-dim: #93a4bd;
-  --ink-faint: #5f708a;
+  --ink: #e7dfc5;
+  --ink-dim: #b6ab88;
+  --ink-faint: #786f59;
 
   /* Accents (mirror in-canvas resource colors) */
-  --accent: #3aa0ff; /* primary action / command tint */
-  --accent-2: #46e3ff; /* minerals cyan (COLORS.minerals) */
-  --gas: #53e08a; /* gas green (COLORS.gas) */
-  --supply: #f0c64a;
-  --good: #4fd24f; /* COLORS.hpGood */
-  --warn: #e0c23a;
-  --bad: #e04646; /* COLORS.hpLow */
+  --accent: #c7d07a; /* primary action / command tint */
+  --accent-2: #b9b084; /* supply crates (COLORS.minerals) */
+  --gas: #86a36f; /* fuel drums (COLORS.gas) */
+  --supply: #c0a463;
+  --good: #7ca45a; /* COLORS.hpGood */
+  --warn: #c7a24a;
+  --bad: #b64a3f; /* COLORS.hpLow */
 
   /* Misc */
-  --radius: 10px;
-  --radius-sm: 6px;
-  --shadow: 0 10px 30px rgba(0, 0, 0, 0.55);
+  --radius: 4px;
+  --radius-sm: 2px;
+  --shadow: 6px 6px 0 rgba(0, 0, 0, 0.45);
   --hud-z: 10;
   --overlay-z: 100;
 
@@ -60,8 +59,9 @@ body {
   color: var(--ink);
   font-family: var(--font);
   font-size: 14px;
-  -webkit-font-smoothing: antialiased;
-  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: none;
+  text-rendering: geometricPrecision;
+  image-rendering: pixelated;
 }
 
 #app {
@@ -84,11 +84,11 @@ body {
 .btn {
   appearance: none;
   border: 1px solid var(--panel-edge);
-  background: linear-gradient(180deg, var(--panel-2), var(--panel));
+  background: var(--panel);
   color: var(--ink);
   font: inherit;
   font-weight: 600;
-  letter-spacing: 0.02em;
+  letter-spacing: 0;
   padding: 10px 16px;
   border-radius: var(--radius-sm);
   cursor: pointer;
@@ -97,18 +97,18 @@ body {
 }
 .btn:hover:not(:disabled) {
   border-color: var(--accent);
-  box-shadow: 0 0 0 1px var(--panel-glow);
+  box-shadow: inset 0 0 0 1px var(--panel-glow);
 }
 .btn:active:not(:disabled) {
   transform: translateY(1px);
 }
 .btn.primary {
-  border-color: transparent;
-  background: linear-gradient(180deg, #4cb0ff, var(--accent));
-  color: #04101f;
+  border-color: #e1d790;
+  background: var(--accent);
+  color: #191710;
 }
 .btn.primary:hover:not(:disabled) {
-  box-shadow: 0 0 18px rgba(58, 160, 255, 0.5);
+  box-shadow: inset 0 0 0 2px rgba(17, 17, 15, 0.25);
 }
 .btn:disabled {
   opacity: 0.4;
@@ -126,20 +126,21 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  /* Subtle starfield-ish radial wash over the void. */
   background:
-    radial-gradient(1200px 700px at 50% -10%, #0f1830 0%, transparent 60%),
-    radial-gradient(900px 600px at 80% 120%, #102032 0%, transparent 55%),
+    linear-gradient(45deg, rgba(255, 255, 255, 0.035) 25%, transparent 25% 75%, rgba(0, 0, 0, 0.08) 75%),
+    linear-gradient(45deg, rgba(0, 0, 0, 0.08) 25%, transparent 25% 75%, rgba(255, 255, 255, 0.035) 75%),
     var(--void);
+  background-position: 0 0, 8px 8px;
+  background-size: 16px 16px;
   padding: 24px;
 }
 
 .lobby-box {
   width: min(440px, 100%);
-  background: linear-gradient(180deg, rgba(19, 26, 40, 0.96), rgba(13, 18, 29, 0.96));
+  background: rgba(39, 37, 31, 0.98);
   border: 1px solid var(--panel-edge);
   border-radius: var(--radius);
-  box-shadow: var(--shadow), inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  box-shadow: var(--shadow), inset 0 1px 0 rgba(255, 255, 255, 0.08);
   padding: 28px 28px 22px;
 }
 
@@ -148,9 +149,9 @@ body {
   text-align: center;
   font-size: 40px;
   font-weight: 800;
-  letter-spacing: 0.32em;
-  color: var(--accent-2);
-  text-shadow: 0 0 22px rgba(70, 227, 255, 0.45);
+  letter-spacing: 0.12em;
+  color: var(--accent);
+  text-shadow: 2px 2px 0 #191710;
 }
 .tagline {
   margin: 6px 0 22px;
@@ -194,7 +195,7 @@ input[type="text"]::placeholder {
 }
 input[type="text"]:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(58, 160, 255, 0.18);
+  box-shadow: inset 0 0 0 1px rgba(199, 208, 122, 0.22);
 }
 
 .lobby-form .btn {
@@ -232,9 +233,9 @@ input[type="text"]:focus {
 .player-list .swatch {
   width: 14px;
   height: 14px;
-  border-radius: 4px;
+  border-radius: 1px;
   flex: 0 0 auto;
-  box-shadow: 0 0 8px currentColor;
+  box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.35);
   border: 1px solid rgba(255, 255, 255, 0.25);
 }
 .player-list .name {
@@ -381,10 +382,9 @@ input[type="text"]:focus {
 #minimap-wrap,
 #selected-panel,
 #command-card {
-  background: linear-gradient(180deg, rgba(19, 26, 40, 0.92), rgba(13, 18, 29, 0.92));
+  background: rgba(39, 37, 31, 0.94);
   border: 1px solid var(--panel-edge);
-  box-shadow: var(--shadow), inset 0 1px 0 rgba(255, 255, 255, 0.04);
-  backdrop-filter: blur(3px);
+  box-shadow: var(--shadow), inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 /* --- Top resource bar --- */
@@ -405,7 +405,7 @@ input[type="text"]:focus {
   gap: 7px;
   font-weight: 700;
   font-size: 15px;
-  letter-spacing: 0.02em;
+  letter-spacing: 0;
 }
 #hud .res-icon {
   font-size: 13px;
@@ -413,11 +413,11 @@ input[type="text"]:focus {
 }
 #hud .res-icon.mineral {
   color: var(--accent-2);
-  text-shadow: 0 0 8px rgba(70, 227, 255, 0.6);
+  text-shadow: 1px 1px 0 #191710;
 }
 #hud .res-icon.gas {
   color: var(--gas);
-  text-shadow: 0 0 8px rgba(83, 224, 138, 0.6);
+  text-shadow: 1px 1px 0 #191710;
 }
 #hud .res-icon.supply {
   color: var(--supply);
@@ -442,6 +442,7 @@ input[type="text"]:focus {
   border: 1px solid var(--panel-edge);
   background: var(--void);
   cursor: pointer;
+  image-rendering: pixelated;
 }
 
 /* --- Bottom-center selected panel --- */
@@ -484,7 +485,7 @@ input[type="text"]:focus {
 #selected-panel .bar {
   flex: 1 1 auto;
   height: 6px;
-  border-radius: 3px;
+  border-radius: 0;
   background: #101010; /* COLORS.hpBack */
   overflow: hidden;
 }
@@ -535,7 +536,7 @@ input[type="text"]:focus {
   align-items: center;
   justify-content: center;
   gap: 2px;
-  background: linear-gradient(180deg, var(--panel-2), var(--panel));
+  background: var(--panel);
   border: 1px solid var(--panel-edge);
   border-radius: var(--radius-sm);
   color: var(--ink);
@@ -546,7 +547,7 @@ input[type="text"]:focus {
 }
 .cmd-btn:hover:not(:disabled) {
   border-color: var(--accent);
-  box-shadow: 0 0 0 1px var(--panel-glow);
+  box-shadow: inset 0 0 0 1px var(--panel-glow);
 }
 .cmd-btn:active:not(:disabled) {
   transform: translateY(1px);
@@ -556,7 +557,9 @@ input[type="text"]:focus {
   cursor: not-allowed;
 }
 .cmd-btn .icon {
-  font-size: 20px;
+  font-family: var(--mono);
+  font-size: 15px;
+  font-weight: 800;
   line-height: 1;
 }
 .cmd-btn .label {
@@ -608,7 +611,7 @@ input[type="text"]:focus {
   max-width: 60vw;
   padding: 10px 18px;
   border-radius: var(--radius);
-  background: rgba(13, 18, 29, 0.95);
+  background: rgba(39, 37, 31, 0.96);
   border: 1px solid var(--bad);
   color: var(--ink);
   font-weight: 600;
@@ -642,7 +645,7 @@ input[type="text"]:focus {
 }
 .game-over-box {
   text-align: center;
-  background: linear-gradient(180deg, rgba(19, 26, 40, 0.98), rgba(13, 18, 29, 0.98));
+  background: rgba(39, 37, 31, 0.98);
   border: 1px solid var(--panel-edge);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
@@ -657,11 +660,11 @@ input[type="text"]:focus {
 /* Verdict tint set via data-verdict in main.js (won/lost/draw). */
 #game-over-text[data-verdict="won"] {
   color: var(--good);
-  text-shadow: 0 0 26px rgba(79, 210, 79, 0.5);
+  text-shadow: 2px 2px 0 #191710;
 }
 #game-over-text[data-verdict="lost"] {
   color: var(--bad);
-  text-shadow: 0 0 26px rgba(224, 70, 70, 0.5);
+  text-shadow: 2px 2px 0 #191710;
 }
 #game-over-text[data-verdict="draw"] {
   color: var(--supply);
