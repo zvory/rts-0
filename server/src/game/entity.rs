@@ -134,6 +134,11 @@ pub struct Entity {
     // --- Resource nodes --------------------------------------------------------
     /// Remaining resource amount (resource nodes only).
     pub remaining: u32,
+    /// The single worker currently occupying this node's harvest slot (resource nodes only).
+    /// At most one worker may be in [`GatherPhase::Harvesting`] on a node at a time; others
+    /// queue in [`GatherPhase::ToNode`] until the slot frees. Advisory: validated each tick
+    /// against the recorded worker's live state, so it self-heals on death/retarget/deposit.
+    pub miner: Option<u32>,
 }
 
 impl Entity {
@@ -299,6 +304,7 @@ impl EntityStore {
             harvest_progress: 0,
             home_hq: None,
             remaining: 0,
+            miner: None,
         };
         Some(self.insert(e))
     }
@@ -339,6 +345,7 @@ impl EntityStore {
             harvest_progress: 0,
             home_hq: None,
             remaining: 0,
+            miner: None,
         };
         Some(self.insert(e))
     }
@@ -371,6 +378,7 @@ impl EntityStore {
             harvest_progress: 0,
             home_hq: None,
             remaining: amount,
+            miner: None,
         };
         Some(self.insert(e))
     }

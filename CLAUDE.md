@@ -7,7 +7,7 @@ alter a contract.
 
 A server-authoritative RTS: a **Rust** server (`server/`, axum + tokio) runs the one authoritative
 simulation and also serves the **HTML/CSS/JS + PixiJS** client (`client/`). Clients send commands;
-the server simulates at 10 Hz and sends per-player, fog-filtered snapshots.
+the server simulates at 30 Hz and sends per-player, fog-filtered snapshots.
 
 ## Commands
 
@@ -70,3 +70,4 @@ There is **no JS build step** (plain ES modules + PixiJS from CDN). The client i
 - A 1-player match is a never-ending sandbox; only 2+ player matches resolve to a winner. Empty
   rooms reset to lobby so a room name is never stuck mid-match.
 - This repo is currently **local-only git** (no remote). Branches are prefixed `zvorygin/`.
+  Commit after making changes.

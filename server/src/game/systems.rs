@@ -927,12 +927,22 @@ fn gather_to_node(
         None => return,
     };
     if dist2(wx, wy, node_pos.0, node_pos.1).sqrt() <= interact {
-        // Arrived: begin harvesting.
+        // Arrived. Only one worker may occupy a node's harvest slot at a time. Claim it if
+        // free (or stale); otherwise queue in place — stop and face the node — until the
+        // current miner releases it (deposits, dies, or is re-ordered).
+        let can_mine = !matches!(slot_held(entities, node), Some(m) if m != id);
         if let Some(e) = entities.get_mut(id) {
             e.path.clear();
-            e.gather_phase = GatherPhase::Harvesting;
-            e.harvest_progress = 0;
             e.facing = (node_pos.1 - wy).atan2(node_pos.0 - wx);
+            if can_mine {
+                e.gather_phase = GatherPhase::Harvesting;
+                e.harvest_progress = 0;
+            }
+        }
+        if can_mine {
+            if let Some(n) = entities.get_mut(node) {
+                n.miner = Some(id);
+            }
         }
     } else if entities.get(id).map(|e| e.path.is_empty()).unwrap_or(true) {
         // Lost the path; recompute toward the node.
@@ -957,6 +967,24 @@ fn gather_harvesting(
         }
     };
 
+    // Re-affirm sole ownership of the harvest slot. If another live worker holds it (e.g. a
+    // race where two workers reached contact on the same tick), yield back to queuing; the
+    // slot owner keeps mining. Otherwise (re)claim it so the reservation tracks us.
+    match slot_held(entities, node) {
+        Some(m) if m != id => {
+            if let Some(e) = entities.get_mut(id) {
+                e.gather_phase = GatherPhase::ToNode;
+                e.harvest_progress = 0;
+            }
+            return;
+        }
+        _ => {
+            if let Some(n) = entities.get_mut(node) {
+                n.miner = Some(id);
+            }
+        }
+    }
+
     let done = {
         let e = match entities.get_mut(id) {
             Some(e) => e,
@@ -979,6 +1007,11 @@ fn gather_harvesting(
     let taken = load_cap.min(node_kind_amount.1);
     if let Some(n) = entities.get_mut(node) {
         n.remaining = n.remaining.saturating_sub(taken);
+        // Release the harvest slot now that we're leaving to deposit, so a queued worker can
+        // step in while we ferry the load home.
+        if n.miner == Some(id) {
+            n.miner = None;
+        }
     }
     if let Some(e) = entities.get_mut(id) {
         e.carry = Some(CarryState {
@@ -1059,6 +1092,28 @@ fn route_home(map: &Map, entities: &mut EntityStore, occ: &Occupancy, id: u32) {
             e.home_hq = Some(hq_id);
         }
         repath(map, entities, occ, id, hx, hy);
+    }
+}
+
+/// Resolve who, if anyone, currently holds `node`'s single harvest slot.
+///
+/// The node's `miner` field is advisory: it is only honored while the recorded worker is alive
+/// and still actively [`GatherPhase::Harvesting`] this very node. A worker that died, was
+/// re-ordered, retargeted, or walked off to deposit no longer holds the slot, so this returns
+/// `None` and the slot is free for the next worker to claim. This makes the reservation
+/// self-healing without needing an explicit release on every code path.
+fn slot_held(entities: &EntityStore, node: u32) -> Option<u32> {
+    let m = entities.get(node).and_then(|n| n.miner)?;
+    let w = entities.get(m)?;
+    let on_this_node = matches!(w.order, Order::Gather { node: n } if n == node);
+    if w.hp > 0
+        && w.kind == kinds::WORKER
+        && on_this_node
+        && w.gather_phase == GatherPhase::Harvesting
+    {
+        Some(m)
+    } else {
+        None
     }
 }
 

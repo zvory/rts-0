@@ -410,6 +410,11 @@ sizes, colors). Keep both in sync; the comment in each file points at the other.
 - Resource trip: worker carries `MINERAL_LOAD = 5` / `GAS_LOAD = 4`; harvest takes
   `HARVEST_TICKS`; mineral patch starts with `MINERAL_PATCH_AMOUNT = 1500`, geyser
   `GAS_GEYSER_AMOUNT = 5000`.
+- One worker per patch: each node has a single harvest slot (`Entity::miner`). At most one
+  worker may be in `Harvesting` on a node at a time; extra workers queue in place (`ToNode`)
+  and take the slot when the current miner leaves to deposit. The slot is advisory and
+  self-heals — it's only honored while the recorded worker is alive and actively harvesting
+  that node, so death / re-order / retarget free it automatically.
 
 Unit stats (hp, dmg, range[tiles], cooldown[ticks], speed[px/tick], sight[tiles], cost, supply, buildTicks):
 
