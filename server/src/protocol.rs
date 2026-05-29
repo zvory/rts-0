@@ -83,7 +83,7 @@ pub enum ClientMessage {
 }
 
 /// A gameplay command. Validated when applied, not when received.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(tag = "c", rename_all = "camelCase", rename_all_fields = "camelCase")]
 pub enum Command {
     Move {

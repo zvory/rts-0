@@ -184,6 +184,7 @@ src/
     fog.rs       # per-player visibility grid (visible / explored)
     systems.rs   # per-tick systems: orders, movement, combat, gather, production, death
     ai.rs        # optional computer opponents: one AiController per AI player (see §8)
+    selfplay.rs  # test-only API-driven scripted self-play harness (see §9)
 ```
 
 ### 3.1 `game::Game` public API (seam between `game` and `lobby`/`main`)
@@ -507,3 +508,35 @@ scout. A local per-think budget prevents it from over-committing minerals/supply
 **Win/elimination.** AI players count exactly like humans: a 1-human + N-AI match is a real match
 (it resolves to a winner), while a lone human with no AI remains a never-ending sandbox. The
 lobby's `match_player_count` is humans **+** AIs.
+
+---
+
+## 9. API-driven self-play test harness
+
+The automated self-play harness is a **test-only** layer in `game/selfplay.rs`. It is intentionally
+separate from the gameplay AI in `game/ai.rs`: gameplay AI is a player feature, while self-play is
+a regression harness for exercising the public simulation API.
+
+**Contract.** Self-play scripts may only drive the game through the `Game` seam in §3.1:
+`start_payload()`, `snapshot_for(player)`, `enqueue(player, Command)`, `tick()`, `alive_players()`,
+and `tick_count()`. Scripts observe the same fog-filtered snapshots a client would receive and
+issue ordinary wire-protocol `Command`s. They must not mutate entities, players, map state, or
+private system internals. This keeps the simulation architected for future API clients, replay
+tools, and external test drivers without adding a second privileged control path.
+
+**MVP coverage.** The first scripted self-play test spawns two non-AI players, gives each the same
+deterministic build/tech/attack script, and runs the match headlessly under `cargo test`. The
+scripts gather minerals and gas, construct a Depot and Barracks, train Soldiers and a Heavy, and
+attack-move toward a public map-center combat rendezvous. The harness checks per-tick invariants
+for invalid resources, supply overflow, malformed entity snapshots, out-of-bounds positions, and
+non-finite progress values. It also enforces progress deadlines so a stuck economy/tech/combat loop
+fails as a deadlock instead of timing out silently.
+
+**Failure artifacts.** On failure, the test writes `target/selfplay-failures/<test>-<pid>-<time>/`
+with:
+- `replay.json`: start payload, player specs, command log, event log, milestone state, and sampled
+  snapshot summaries.
+- `summary.log`: short human-readable failure summary and missing milestones.
+
+The artifact is meant to be enough to reproduce or inspect a failing run without manually
+playtesting first. It is only written on failure so successful test runs do not churn the worktree.

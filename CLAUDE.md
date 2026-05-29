@@ -32,7 +32,7 @@ node tests/regression.mjs             # dep-free, hardening/DoS/robustness guard
 node tests/ai_integration.mjs         # dep-free, AI opponent lobby flow (add/remove/start)
 cd tests && npm install && node client_smoke.mjs   # headless-Chrome client smoke
 
-# AI simulation behavior (no running server needed): cd server && cargo test
+# Simulation behavior, including scripted self-play (no running server needed): cd server && cargo test
 ```
 
 There is **no JS build step** (plain ES modules + PixiJS from CDN). The client is served from

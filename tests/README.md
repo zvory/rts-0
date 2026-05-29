@@ -18,6 +18,17 @@ node tests/server_integration.mjs
 # override endpoint: RTS_WS=ws://host:port/ws node tests/server_integration.mjs
 ```
 
+## Headless simulation self-play
+
+Runs inside the Rust test suite with no live server. The test creates two scripted API clients that
+drive `Game` through `enqueue`/`tick`/`snapshot_for`, exercising gathering, gas, Depot/Barracks
+construction, Soldier/Heavy training, and combat. On failure it writes replay artifacts under
+`server/target/selfplay-failures/`.
+
+```bash
+cd server && cargo test scripted_self_play_exercises_economy_tech_and_combat
+```
+
 ## Client smoke (headless browser)
 
 Loads the real client in headless Chrome and asserts it renders the PixiJS scene and that
