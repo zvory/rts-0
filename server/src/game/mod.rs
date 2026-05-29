@@ -76,6 +76,8 @@ pub struct Game {
     /// Post-tick spatial index, rebuilt every tick after all systems run so [`snapshot_for`]
     /// can use it for interest filtering without rebuilding.
     spatial: services::spatial::SpatialIndex,
+    /// Persistent pathfinding service with an LRU cache for verified paths.
+    pathing: services::pathing::PathingService,
 }
 
 impl Game {
@@ -125,6 +127,7 @@ impl Game {
         }
 
         let spatial = services::spatial::SpatialIndex::build(&entities, map.size);
+        let pathing = services::pathing::PathingService::new(8_192, 256);
         let mut game = Game {
             map,
             entities,
@@ -135,6 +138,7 @@ impl Game {
             command_log: Vec::new(),
             tick: 0,
             spatial,
+            pathing,
         };
         // Initialize supply accounting and fog so the very first snapshot is correct.
         systems::recompute_supply(&mut game.players, &game.entities);
@@ -184,6 +188,7 @@ impl Game {
     /// method is panic-free: every entity lookup is fallible and stale ids are ignored.
     pub fn tick(&mut self) -> Vec<(u32, Vec<Event>)> {
         self.tick = self.tick.wrapping_add(1);
+        self.pathing.advance_tick(self.tick);
 
         // Per-player event buckets, accumulated by the systems below.
         let mut events: HashMap<u32, Vec<Event>> = HashMap::new();
@@ -216,6 +221,7 @@ impl Game {
             &mut self.entities,
             &mut self.players,
             &self.fog,
+            &mut self.pathing,
             pending,
             &mut events,
             self.tick,

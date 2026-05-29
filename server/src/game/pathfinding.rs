@@ -91,6 +91,18 @@ const NEIGHBORS: [(i32, i32, u32); 8] = [
 /// "already there" or "nowhere useful to go". Diagonal moves are forbidden when they would
 /// cut a corner between two blocked tiles (prevents clipping through walls).
 pub fn find_path<P: Passability>(pass: &P, sx: i32, sy: i32, gx: i32, gy: i32) -> Vec<(i32, i32)> {
+    find_path_with_budget(pass, sx, sy, gx, gy, MAX_EXPANDED)
+}
+
+/// Like [`find_path`] but with a configurable expansion cap.
+pub fn find_path_with_budget<P: Passability>(
+    pass: &P,
+    sx: i32,
+    sy: i32,
+    gx: i32,
+    gy: i32,
+    max_expanded: usize,
+) -> Vec<(i32, i32)> {
     if sx == gx && sy == gy {
         return Vec::new();
     }
@@ -132,7 +144,7 @@ pub fn find_path<P: Passability>(pass: &P, sx: i32, sy: i32, gx: i32, gy: i32) -
         }
 
         expanded += 1;
-        if expanded > MAX_EXPANDED {
+        if expanded > max_expanded {
             break;
         }
 

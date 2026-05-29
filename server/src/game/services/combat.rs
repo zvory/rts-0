@@ -4,8 +4,9 @@ use crate::config;
 use crate::game::entity::{Entity, EntityStore, Order};
 use crate::game::map::Map;
 use crate::game::services::occupancy::Occupancy;
+use crate::game::services::pathing::PathingService;
 use crate::game::services::spatial::SpatialIndex;
-use crate::game::services::{dist2, repath};
+use crate::game::services::dist2;
 use crate::protocol::Event;
 
 /// Extra slack (px) added to attack range checks so units don't dance at the exact boundary.
@@ -19,6 +20,7 @@ pub(crate) fn combat_system(
     entities: &mut EntityStore,
     occ: &Occupancy,
     spatial: &SpatialIndex,
+    pathing: &mut PathingService,
     events: &mut HashMap<u32, Vec<Event>>,
 ) {
     // Tick down cooldowns first.
@@ -110,7 +112,7 @@ pub(crate) fn combat_system(
                 e.target_id = Some(tid);
             }
             if want_repath {
-                repath(map, entities, occ, id, tx, ty);
+                pathing.repath_entity(map, entities, occ, id, tx, ty);
             }
         }
     }
