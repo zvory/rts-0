@@ -91,7 +91,7 @@ pub fn unit_stats(kind: &str) -> Option<UnitStats> {
         },
         kinds::SOLDIER => UnitStats {
             hp: 45,
-            dmg: 6,
+            dmg: 5,
             range_tiles: 4,
             cooldown: 8,
             speed: 3.2,

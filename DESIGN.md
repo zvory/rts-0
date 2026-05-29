@@ -433,7 +433,7 @@ Unit stats (hp, dmg, range[tiles], cooldown[ticks], speed[px/tick], sight[tiles]
 | kind    | hp  | dmg | range | cd | speed | sight | min | gas | sup | buildTicks |
 |---------|-----|-----|-------|----|-------|-------|-----|-----|-----|-----------|
 | worker  | 40  | 4   | 1     | 12 | 3.0   | 7     | 50  | 0   | 1   | 120 (~12s)|
-| soldier | 45  | 6   | 4     | 8  | 3.2   | 8     | 50  | 0   | 1   | 150 (~15s)|
+| soldier | 45  | 5   | 4     | 8  | 3.2   | 8     | 50  | 0   | 1   | 150 (~15s)|
 | heavy   | 130 | 20  | 3     | 18 | 2.0   | 7     | 100 | 50  | 2   | 250 (~25s)|
 
 Building stats (hp, sight, cost min, footprint tiles wxh, buildTicks, extra):

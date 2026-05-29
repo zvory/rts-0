@@ -11,11 +11,12 @@ the server simulates at 30 Hz and sends per-player, fog-filtered snapshots.
 
 ## Git / GitHub
 
-- This repo is **local-only git**. Do not add remotes, push branches, create/open/update PRs, or
-  use `gh`/GitHub/browser flows for repo work.
-- When work is complete, make a **local commit only**, staging only the files that belong to the
-  current task.
-- Branches are prefixed `zvorygin/`.
+- The default branch is `main`.
+- Work directly on `main` for repo changes. When work is complete, stage only files that belong to
+  the current task, commit, and push `main` to `origin`.
+- Do not create, open, or update PRs for repo work unless the user explicitly asks for a PR.
+- Avoid feature branches unless the user asks for one. If a temporary branch is needed, prefix it
+  with `zvorygin/`.
 
 ## Commands
 
