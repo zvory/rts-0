@@ -127,11 +127,14 @@ fn order_move(
         Some(e) => e.kind,
         None => return,
     };
+    let radius_tiles = config::unit_stats(kind)
+        .map(|s| s.radius_tiles())
+        .unwrap_or(0);
     let req = PathRequest {
         start: (sx as i32, sy as i32),
         goal: (gx as i32, gy as i32),
         class: MobilityClass::from_kind(kind),
-        radius_tiles: 0,
+        radius_tiles,
         budget: None,
     };
     let mut waypoints = pathing.request(map, occ, req);
@@ -183,11 +186,14 @@ fn order_attack(
         let (sx, sy) = map.tile_of(e.pos_x, e.pos_y);
         (tx, ty, sx, sy, e.kind)
     };
+    let radius_tiles = config::unit_stats(kind)
+        .map(|s| s.radius_tiles())
+        .unwrap_or(0);
     let req = PathRequest {
         start: (sx as i32, sy as i32),
         goal: (tx as i32, ty as i32),
         class: MobilityClass::from_kind(kind),
-        radius_tiles: 0,
+        radius_tiles,
         budget: None,
     };
     let waypoints = pathing.request(map, occ, req);

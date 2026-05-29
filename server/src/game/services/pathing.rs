@@ -6,6 +6,7 @@
 
 use std::collections::HashMap;
 
+use crate::config;
 use crate::game::entity::{EntityKind, EntityStore};
 use crate::game::map::{Map, MobilityClass};
 use crate::game::pathfinding::{self, Passability};
@@ -41,12 +42,11 @@ struct ClassPassability<'a> {
     map: &'a Map,
     occupancy: &'a Occupancy<'a>,
     class: MobilityClass,
-    #[allow(dead_code)]
     radius_tiles: u32,
 }
 
-impl<'a> Passability for ClassPassability<'a> {
-    fn passable(&self, tx: i32, ty: i32) -> bool {
+impl<'a> ClassPassability<'a> {
+    fn tile_passable(&self, tx: i32, ty: i32) -> bool {
         if !self.map.in_bounds(tx, ty) {
             return false;
         }
@@ -55,6 +55,20 @@ impl<'a> Passability for ClassPassability<'a> {
         }
         if !self.occupancy.passable(tx, ty) {
             return false;
+        }
+        true
+    }
+}
+
+impl<'a> Passability for ClassPassability<'a> {
+    fn passable(&self, tx: i32, ty: i32) -> bool {
+        let r = self.radius_tiles as i32;
+        for dy in -r..=r {
+            for dx in -r..=r {
+                if !self.tile_passable(tx + dx, ty + dy) {
+                    return false;
+                }
+            }
         }
         true
     }
@@ -148,11 +162,14 @@ impl PathingService {
             Some(e) => e.kind,
             None => return,
         };
+        let radius_tiles = config::unit_stats(kind)
+            .map(|s| s.radius_tiles())
+            .unwrap_or(0);
         let req = PathRequest {
             start: (sx as i32, sy as i32),
             goal: (gtx as i32, gty as i32),
             class: MobilityClass::from_kind(kind),
-            radius_tiles: 0,
+            radius_tiles,
             budget: None,
         };
         let mut waypoints = self.request(map, occupancy, req);
