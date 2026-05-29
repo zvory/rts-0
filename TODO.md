@@ -29,6 +29,7 @@
  - [ ] Hotkeys in the command card should be grid style, as in the top left hotkey is always Q, the top middle is W, the one below the top left is A, etc. Match the keyboard.
  - [ ] workers should not auto attack
  - [ ] muzzle flare animations
+ - [ ] basic settings menu or something for surrendering
  - [ ] client should display latency to server in the top left in miliseconds
  - [ ] find a source of copyright free assets we can use for units, buildings, resources, and use it
  - [ ] implement a correct system for building buildings, currently a worker pulled away from building a building will stop construciton and the building will be permanently unbuildable, resumption is impossible
