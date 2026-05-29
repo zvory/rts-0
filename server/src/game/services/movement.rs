@@ -1,6 +1,6 @@
 use crate::config;
 use crate::game::entity::{EntityStore, Order};
-use crate::game::map::Map;
+use crate::game::map::{Map, MobilityClass};
 use crate::game::pathfinding::Passability;
 use crate::game::services::occupancy::Occupancy;
 use crate::game::services::spatial::SpatialIndex;
@@ -19,13 +19,14 @@ const SEPARATION_PUSH: f32 = 0.5;
 pub(crate) fn movement_system(map: &Map, entities: &mut EntityStore, occ: &Occupancy) {
     for id in entities.ids() {
         // Pull the data we need, then mutate.
-        let (speed, mut x, mut y) = {
+        let (speed, mut x, mut y, class) = {
             let e = match entities.get(id) {
                 Some(e) if e.is_unit() && !e.path.is_empty() => e,
                 _ => continue,
             };
             let speed = config::unit_stats(e.kind).map(|s| s.speed).unwrap_or(0.0);
-            (speed, e.pos_x, e.pos_y)
+            let class = MobilityClass::from_kind(e.kind);
+            (speed, e.pos_x, e.pos_y, class)
         };
         if speed <= 0.0 {
             continue;
@@ -65,8 +66,8 @@ pub(crate) fn movement_system(map: &Map, entities: &mut EntityStore, occ: &Occup
                 // Partial step toward the waypoint.
                 let nx = x + dx / dist * budget;
                 let ny = y + dy / dist * budget;
-                // Clamp landing to a passable tile (don't slide into rock/water/buildings).
-                if tile_passable_at(occ, map, nx, ny) {
+                // Clamp landing to a passable tile for this unit's class.
+                if tile_passable_at(occ, map, class, nx, ny) {
                     x = nx;
                     y = ny;
                 }
@@ -90,22 +91,24 @@ pub(crate) fn movement_system(map: &Map, entities: &mut EntityStore, occ: &Occup
     }
 }
 
-/// Whether a world point lands on a passable (terrain + building) tile.
-fn tile_passable_at(occ: &Occupancy, map: &Map, x: f32, y: f32) -> bool {
+/// Whether a world point lands on a passable tile for the given mobility class
+/// (terrain + building footprint).
+fn tile_passable_at(occ: &Occupancy, map: &Map, class: MobilityClass, x: f32, y: f32) -> bool {
     let (tx, ty) = map.tile_of(x, y);
-    occ.passable(tx as i32, ty as i32)
+    map.is_passable_for(class, tx as i32, ty as i32) && occ.passable(tx as i32, ty as i32)
 }
 
 /// Apply a soft separation force so units don't stack perfectly. For each unit, query the
-/// spatial index for other units within one tile and push away from them.
+/// spatial index for other units within one tile and push away from them. Pushes are clamped
+/// to terrain passable for the unit's mobility class so tanks don't get nudged into forests.
 pub(crate) fn separation(entities: &mut EntityStore, spatial: &SpatialIndex, map: &Map) {
     let sep_radius = config::TILE_SIZE as f32; // 1 tile
     let ids = entities.ids();
     let mut pushes: Vec<(u32, f32, f32)> = Vec::new();
 
     for id in &ids {
-        let (px, py) = match entities.get(*id) {
-            Some(e) if e.is_unit() => (e.pos_x, e.pos_y),
+        let (px, py, class) = match entities.get(*id) {
+            Some(e) if e.is_unit() => (e.pos_x, e.pos_y, MobilityClass::from_kind(e.kind)),
             _ => continue,
         };
 
@@ -137,7 +140,15 @@ pub(crate) fn separation(entities: &mut EntityStore, spatial: &SpatialIndex, map
         }
 
         if count > 0 {
-            pushes.push((*id, dx * SEPARATION_PUSH, dy * SEPARATION_PUSH));
+            let push_x = dx * SEPARATION_PUSH;
+            let push_y = dy * SEPARATION_PUSH;
+            let nx = (px + push_x).clamp(0.0, map.world_size_px() - 0.01);
+            let ny = (py + push_y).clamp(0.0, map.world_size_px() - 0.01);
+            // Only apply the push if the landing tile is passable for this unit's class.
+            let (tx, ty) = map.tile_of(nx, ny);
+            if map.is_passable_for(class, tx as i32, ty as i32) {
+                pushes.push((*id, nx - px, ny - py));
+            }
         }
     }
 

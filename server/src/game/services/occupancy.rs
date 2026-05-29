@@ -30,10 +30,9 @@ impl<'a> Occupancy<'a> {
 }
 
 impl Passability for Occupancy<'_> {
+    /// Building footprints only — terrain passability is checked separately by callers
+    /// so that movement classes (infantry vs vehicle) can be applied.
     fn passable(&self, tx: i32, ty: i32) -> bool {
-        if !self.map.is_passable(tx, ty) {
-            return false;
-        }
         let size = self.map.size as i32;
         if tx < 0 || ty < 0 || tx >= size || ty >= size {
             return false;

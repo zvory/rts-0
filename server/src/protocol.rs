@@ -18,6 +18,7 @@ pub mod terrain {
     pub const GRASS: u8 = 0; // passable
     pub const ROCK: u8 = 1; // impassable
     pub const WATER: u8 = 2; // impassable
+    pub const FOREST: u8 = 3; // passable for infantry, impassable for vehicles
 }
 
 /// `EntityView.kind` values.
