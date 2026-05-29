@@ -61,10 +61,6 @@ export class Input {
      */
     this.mouse = { x: 0, y: 0 };
 
-    // Pending attack-move targeting: when true, the next left-click issues an
-    // attackMove on the current selection instead of selecting.
-    this._attackMove = false;
-
     // Active left-drag selection box, in screen pixels, or null when not dragging.
     // { x0, y0, x1, y1 } where (x0,y0) is the press anchor.
     this._drag = null;
@@ -232,10 +228,10 @@ export class Input {
       this._confirmPlacement();
       return;
     }
-    // Attack-move targeting: the next left-click issues the command, no selection.
-    if (this._attackMove) {
-      this._issueAttackMove(p);
-      this._attackMove = false;
+    // Command-card targeting: the next left-click issues the armed command.
+    if (this.state.commandTarget) {
+      this._issueTargetedCommand(p);
+      this.state.endCommandTarget();
       return;
     }
     // Otherwise begin a (possible) selection drag from this anchor.
@@ -320,9 +316,9 @@ export class Input {
       this.state.endPlacement();
       return;
     }
-    // Right-click also cancels a pending attack-move targeting (consistent with Esc).
-    if (this._attackMove) {
-      this._attackMove = false;
+    // Right-click also cancels a pending command-card target (consistent with Esc).
+    if (this.state.commandTarget) {
+      this.state.endCommandTarget();
       return;
     }
 
@@ -336,6 +332,7 @@ export class Input {
     if (target && target.owner !== me && target.owner !== 0 && !isResource(target.kind)) {
       // Enemy entity -> attack.
       this.net.command(cmd.attack(ownUnits, target.id));
+      this.state.addCommandFeedback("attack", target.x, target.y);
       return;
     }
     if (target && isResource(target.kind)) {
@@ -349,13 +346,29 @@ export class Input {
     }
     // Default -> move to the world point.
     this.net.command(cmd.move(ownUnits, world.x, world.y));
+    this.state.addCommandFeedback("move", world.x, world.y);
   }
 
-  _issueAttackMove(p) {
+  _issueTargetedCommand(p) {
     const ownUnits = this._selectedOwnUnitIds();
     if (ownUnits.length === 0) return;
     const world = this._worldAt(p.x, p.y);
+    if (this.state.commandTarget === "move") {
+      this.net.command(cmd.move(ownUnits, world.x, world.y));
+      this.state.addCommandFeedback("move", world.x, world.y);
+      return;
+    }
+
+    const target = this._entityAtWorld(world.x, world.y, /*ownPreferred=*/ false);
+    const me = this.state.playerId;
+    if (target && target.owner !== me && target.owner !== 0 && !isResource(target.kind)) {
+      this.net.command(cmd.attack(ownUnits, target.id));
+      this.state.addCommandFeedback("attack", target.x, target.y);
+      return;
+    }
+
     this.net.command(cmd.attackMove(ownUnits, world.x, world.y));
+    this.state.addCommandFeedback("attack", world.x, world.y);
   }
 
   // --- Selection queries --------------------------------------------------
@@ -617,7 +630,7 @@ export class Input {
   _enterAttackMove() {
     // Only meaningful when own units are selected; otherwise it's a no-op arming.
     if (this._selectedOwnUnitIds().length === 0) return;
-    this._attackMove = true;
+    this.state.beginCommandTarget("attack");
   }
 
   _issueStop() {
@@ -632,7 +645,7 @@ export class Input {
       this.state.endPlacement();
       return;
     }
-    this._attackMove = false;
+    this.state.endCommandTarget();
   }
 
   // --- Mouse wheel: zoom toward cursor ------------------------------------

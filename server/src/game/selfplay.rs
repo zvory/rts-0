@@ -18,8 +18,8 @@ use crate::protocol::{
     kinds, states, terrain, Command, EntityView, Event, MapInfo, Snapshot, StartPayload,
 };
 
-const MAX_TICKS: u32 = 5_400;
-const MAX_STALL_TICKS: u32 = 1_200;
+const MAX_TICKS: u32 = 9_600;
+const MAX_STALL_TICKS: u32 = 1_800;
 const SAMPLE_EVERY_TICKS: u32 = 30;
 const THINK_INTERVAL: u32 = 6;
 const ATTACK_REISSUE_TICKS: u32 = 120;

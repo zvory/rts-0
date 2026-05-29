@@ -487,10 +487,10 @@ Unit stats (hp, dmg, range[tiles], cooldown[ticks], speed[px/tick], sight[tiles]
 
 | kind            | hp  | dmg | range | cd | speed | sight | min | gas | sup | buildTicks |
 |-----------------|-----|-----|-------|----|-------|-------|-----|-----|-----|-----------|
-| worker          | 40  | 4   | 1     | 12 | 3.0   | 7     | 50  | 0   | 1   | 120 (~4s) |
+| worker          | 40  | 4   | 1     | 12 | 1.5   | 7     | 50  | 0   | 1   | 120 (~4s) |
 | rifleman        | 45  | 5   | 4     | 8  | 1.6   | 8     | 50  | 0   | 1   | 150 (~5s) |
 | machine_gunner  | 55  | 4   | 5     | 3  | 1.2   | 8     | 75  | 25  | 2   | 200 (~7s) |
-| at_team         | 45  | 24  | 4     | 24 | 1.3   | 8     | 75  | 25  | 2   | 220 (~7s) |
+| at_team         | 45  | 24  | 4     | 24 | 0.65  | 8     | 75  | 25  | 2   | 220 (~7s) |
 | tank            | 130 | 20  | 3     | 18 | 2.0   | 7     | 100 | 50  | 2   | 250 (~8s) |
 
 Building stats (hp, sight, cost min, footprint tiles wxh, buildTicks, extra):

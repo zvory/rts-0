@@ -9,7 +9,7 @@
 // mutates game state directly.
 
 import { cmd } from "./protocol.js";
-import { KIND, STATE, isBuilding } from "./protocol.js";
+import { KIND, STATE, isBuilding, isUnit } from "./protocol.js";
 import { STATS, WORKER_BUILDABLE } from "./config.js";
 
 /**
@@ -146,7 +146,8 @@ export class HUD {
 
   /**
    * Render the context command card based on the current selection:
-   *  - a single selected WORKER → build buttons for WORKER_BUILDABLE.
+   *  - selected own units → action buttons for move / attack / stop.
+   *  - a selected WORKER → action buttons plus build buttons for WORKER_BUILDABLE.
    *  - a single selected production building (has `STATS[kind].trains`) → train
    *    buttons for each trainable unit, plus a cancel button while producing.
    *  - anything else → empty.
@@ -169,8 +170,8 @@ export class HUD {
       return;
     }
 
-    if (primary.kind === KIND.WORKER) {
-      this._renderBuildCard(card);
+    if (this._selectedOwnUnits(sel).length > 0) {
+      this._renderUnitCard(card, sel);
     } else {
       this._renderTrainCard(card, primary);
     }
@@ -186,6 +187,7 @@ export class HUD {
     let worker = null;
     for (const e of sel) {
       if (!this._isOwn(e)) continue;
+      if (isUnit(e.kind)) return e;
       if (isBuilding(e.kind) && this._trainsOf(e.kind).length > 0) return e;
       if (e.kind === KIND.WORKER && !worker) worker = e;
     }
@@ -200,6 +202,90 @@ export class HUD {
   _trainsOf(kind) {
     const st = STATS[kind];
     return (st && st.trains) || [];
+  }
+
+  /** Own selected entities that can receive unit commands. */
+  _selectedOwnUnits(sel) {
+    return sel.filter((e) => this._isOwn(e) && isUnit(e.kind));
+  }
+
+  // --- Unit card (units selected) ------------------------------------------
+
+  _renderUnitCard(card, sel) {
+    const ownUnits = this._selectedOwnUnits(sel);
+    const unitIds = ownUnits.map((e) => e.id);
+    const workerSelected = ownUnits.some((e) => e.kind === KIND.WORKER);
+    const res = this.state.resources || { minerals: 0, gas: 0 };
+
+    const sig =
+      `units|${unitIds.join(".")}|target:${this.state.commandTarget || ""}|` +
+      (workerSelected
+        ? WORKER_BUILDABLE.map((k) => `${k}:${this._canBuild(k, res) ? 1 : 0}`).join(",")
+        : "no-build");
+    if (sig === this._cardSig) return;
+    this._cardSig = sig;
+
+    const frag = document.createDocumentFragment();
+    const actionButtons = [
+      {
+        icon: "MV",
+        label: "Move",
+        hotkey: "V",
+        title: "Move to a target point",
+        active: this.state.commandTarget === "move",
+        onClick: () => this.state.beginCommandTarget("move"),
+      },
+      {
+        icon: "AT",
+        label: "Attack",
+        hotkey: "A",
+        title: "Attack a target or attack-move to a point",
+        active: this.state.commandTarget === "attack",
+        onClick: () => this.state.beginCommandTarget("attack"),
+      },
+      {
+        icon: "HD",
+        label: "Hold",
+        hotkey: "S",
+        title: "Hold position / stop selected units",
+        onClick: () => {
+          this.net.command(cmd.stop(unitIds));
+          this.state.endCommandTarget();
+        },
+      },
+    ];
+
+    for (const action of actionButtons) {
+      frag.appendChild(this._cmdButton({
+        ...action,
+        enabled: unitIds.length > 0,
+        cls: action.active ? "active" : "",
+      }));
+    }
+
+    if (workerSelected) {
+      for (const kind of WORKER_BUILDABLE) {
+        const st = STATS[kind];
+        if (!st) continue;
+        const enabled = this._canBuild(kind, res);
+        const reason = this._buildDisabledReason(kind, res);
+        frag.appendChild(this._cmdButton({
+          icon: st.icon,
+          label: st.label,
+          hotkey: st.hotkey,
+          cost: st.cost,
+          enabled,
+          title: reason,
+          onClick: () => {
+            this.state.endCommandTarget();
+            this.state.beginPlacement(kind);
+          },
+        }));
+      }
+    }
+
+    card.innerHTML = "";
+    card.appendChild(frag);
   }
 
   // --- Build card (worker selected) -----------------------------------------
