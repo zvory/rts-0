@@ -24,16 +24,16 @@ pub const fn map_size_for(players: usize) -> u32 {
 }
 
 // --- Economy ----------------------------------------------------------------
-pub const STARTING_MINERALS: u32 = 50;
-pub const STARTING_GAS: u32 = 0;
+pub const STARTING_STEEL: u32 = 50;
+pub const STARTING_OIL: u32 = 0;
 pub const STARTING_WORKERS: u32 = 4;
 
-pub const MINERAL_LOAD: u32 = 5;
-pub const GAS_LOAD: u32 = 4;
+pub const STEEL_LOAD: u32 = 5;
+pub const OIL_LOAD: u32 = 4;
 pub const HARVEST_TICKS: u32 = 20;
-pub const MINERAL_PATCH_AMOUNT: u32 = 1500;
-pub const GAS_GEYSER_AMOUNT: u32 = 5000;
-pub const MINERAL_PATCHES_PER_BASE: u32 = 8;
+pub const STEEL_PATCH_AMOUNT: u32 = 1500;
+pub const OIL_GEYSER_AMOUNT: u32 = 5000;
+pub const STEEL_PATCHES_PER_BASE: u32 = 8;
 
 // --- Supply -----------------------------------------------------------------
 pub const INDUSTRIAL_CENTER_SUPPLY: u32 = 10;
@@ -50,8 +50,8 @@ pub struct UnitStats {
     pub cooldown: u32, // ticks between attacks
     pub speed: f32,    // world px per tick
     pub sight_tiles: u32,
-    pub cost_min: u32,
-    pub cost_gas: u32,
+    pub cost_steel: u32,
+    pub cost_oil: u32,
     pub supply: u32,
     pub build_ticks: u32,
     pub radius: f32, // collision / render radius in world px
@@ -61,8 +61,8 @@ pub struct UnitStats {
 pub struct BuildingStats {
     pub hp: u32,
     pub sight_tiles: u32,
-    pub cost_min: u32,
-    pub cost_gas: u32,
+    pub cost_steel: u32,
+    pub cost_oil: u32,
     pub foot_w: u32, // footprint in tiles
     pub foot_h: u32,
     pub build_ticks: u32,
@@ -83,8 +83,8 @@ pub fn unit_stats(kind: &str) -> Option<UnitStats> {
             cooldown: 12,
             speed: 1.5,
             sight_tiles: 7,
-            cost_min: 50,
-            cost_gas: 0,
+            cost_steel: 50,
+            cost_oil: 0,
             supply: 1,
             build_ticks: 120,
             radius: 9.0,
@@ -96,8 +96,8 @@ pub fn unit_stats(kind: &str) -> Option<UnitStats> {
             cooldown: 8,
             speed: 1.6,
             sight_tiles: 8,
-            cost_min: 50,
-            cost_gas: 0,
+            cost_steel: 50,
+            cost_oil: 0,
             supply: 1,
             build_ticks: 150,
             radius: 9.0,
@@ -109,8 +109,8 @@ pub fn unit_stats(kind: &str) -> Option<UnitStats> {
             cooldown: 3,
             speed: 1.2,
             sight_tiles: 8,
-            cost_min: 75,
-            cost_gas: 25,
+            cost_steel: 75,
+            cost_oil: 25,
             supply: 2,
             build_ticks: 200,
             radius: 10.0,
@@ -122,8 +122,8 @@ pub fn unit_stats(kind: &str) -> Option<UnitStats> {
             cooldown: 24,
             speed: 0.65,
             sight_tiles: 8,
-            cost_min: 75,
-            cost_gas: 25,
+            cost_steel: 75,
+            cost_oil: 25,
             supply: 2,
             build_ticks: 220,
             radius: 10.0,
@@ -135,8 +135,8 @@ pub fn unit_stats(kind: &str) -> Option<UnitStats> {
             cooldown: 18,
             speed: 2.0,
             sight_tiles: 7,
-            cost_min: 100,
-            cost_gas: 50,
+            cost_steel: 100,
+            cost_oil: 50,
             supply: 2,
             build_ticks: 250,
             radius: 26.0,
@@ -152,8 +152,8 @@ pub fn building_stats(kind: &str) -> Option<BuildingStats> {
         kinds::INDUSTRIAL_CENTER => BuildingStats {
             hp: 600,
             sight_tiles: 9,
-            cost_min: 400,
-            cost_gas: 0,
+            cost_steel: 400,
+            cost_oil: 0,
             foot_w: 3,
             foot_h: 3,
             build_ticks: 400,
@@ -165,8 +165,8 @@ pub fn building_stats(kind: &str) -> Option<BuildingStats> {
         kinds::DEPOT => BuildingStats {
             hp: 220,
             sight_tiles: 4,
-            cost_min: 50,
-            cost_gas: 0,
+            cost_steel: 50,
+            cost_oil: 0,
             foot_w: 2,
             foot_h: 2,
             build_ticks: 120,
@@ -178,8 +178,8 @@ pub fn building_stats(kind: &str) -> Option<BuildingStats> {
         kinds::BARRACKS => BuildingStats {
             hp: 320,
             sight_tiles: 6,
-            cost_min: 100,
-            cost_gas: 0,
+            cost_steel: 100,
+            cost_oil: 0,
             foot_w: 3,
             foot_h: 2,
             build_ticks: 200,
@@ -191,8 +191,8 @@ pub fn building_stats(kind: &str) -> Option<BuildingStats> {
         kinds::ADVANCED_TRAINING_CENTRE => BuildingStats {
             hp: 300,
             sight_tiles: 6,
-            cost_min: 125,
-            cost_gas: 0,
+            cost_steel: 125,
+            cost_oil: 0,
             foot_w: 3,
             foot_h: 2,
             build_ticks: 220,
@@ -204,8 +204,8 @@ pub fn building_stats(kind: &str) -> Option<BuildingStats> {
         kinds::TANK_FACTORY => BuildingStats {
             hp: 360,
             sight_tiles: 6,
-            cost_min: 150,
-            cost_gas: 0,
+            cost_steel: 150,
+            cost_oil: 0,
             foot_w: 3,
             foot_h: 3,
             build_ticks: 240,
@@ -217,8 +217,8 @@ pub fn building_stats(kind: &str) -> Option<BuildingStats> {
         kinds::BUNKER => BuildingStats {
             hp: 200,
             sight_tiles: 6,
-            cost_min: 150,
-            cost_gas: 0,
+            cost_steel: 150,
+            cost_oil: 0,
             foot_w: 2,
             foot_h: 2,
             build_ticks: 120,
@@ -263,11 +263,11 @@ pub fn train_requirement_met(unit_kind: &str, owned_complete_building_kinds: &[&
     }
 }
 
-/// Resource node starting amount for a node kind (`minerals` | `gas`).
+/// Resource node starting amount for a node kind (`steel` | `oil`).
 pub fn node_amount(kind: &str) -> u32 {
     match kind {
-        kinds::MINERALS => MINERAL_PATCH_AMOUNT,
-        kinds::GAS => GAS_GEYSER_AMOUNT,
+        kinds::STEEL => STEEL_PATCH_AMOUNT,
+        kinds::OIL => OIL_GEYSER_AMOUNT,
         _ => 0,
     }
 }
@@ -298,7 +298,7 @@ mod tests {
         ));
 
         let bunker = building_stats(kinds::BUNKER).expect("bunker stats");
-        assert_eq!(bunker.cost_min, 150);
+        assert_eq!(bunker.cost_steel, 150);
         assert_eq!((bunker.foot_w, bunker.foot_h), (2, 2));
     }
 }

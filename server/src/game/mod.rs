@@ -50,8 +50,8 @@ pub(crate) struct PlayerState {
     pub(crate) name: String,
     pub(crate) color: String,
     pub(crate) start_tile: (u32, u32),
-    pub(crate) minerals: u32,
-    pub(crate) gas: u32,
+    pub(crate) steel: u32,
+    pub(crate) oil: u32,
     /// Supply currently consumed by living + in-production units.
     pub(crate) supply_used: u32,
     /// Supply provided by completed Industrial Centers/Depots, capped at `SUPPLY_CAP_MAX`.
@@ -111,8 +111,8 @@ impl Game {
                 name: p.name.clone(),
                 color: p.color.clone(),
                 start_tile: start,
-                minerals: config::STARTING_MINERALS,
-                gas: config::STARTING_GAS,
+                steel: config::STARTING_STEEL,
+                oil: config::STARTING_OIL,
                 supply_used: 0,
                 supply_cap: 0,
             };
@@ -230,8 +230,8 @@ impl Game {
     /// player's own entities plus neutral/enemy entities whose tile is currently visible.
     pub fn snapshot_for(&self, player: u32) -> Snapshot {
         let ps = self.player(player);
-        let (minerals, gas, supply_used, supply_cap) = match ps {
-            Some(p) => (p.minerals, p.gas, p.supply_used, p.supply_cap),
+        let (steel, oil, supply_used, supply_cap) = match ps {
+            Some(p) => (p.steel, p.oil, p.supply_used, p.supply_cap),
             None => (0, 0, 0, 0),
         };
 
@@ -249,8 +249,8 @@ impl Game {
 
         Snapshot {
             tick: self.tick,
-            minerals,
-            gas,
+            steel,
+            oil,
             supply_used,
             supply_cap,
             entities,
@@ -358,10 +358,10 @@ impl Game {
             if c.amount > 0 {
                 v.carrying = Some(c.amount);
                 v.carrying_kind = Some(
-                    if c.is_gas {
-                        kinds::GAS
+                    if c.is_oil {
+                        kinds::OIL
                     } else {
-                        kinds::MINERALS
+                        kinds::STEEL
                     }
                     .to_string(),
                 );
@@ -398,8 +398,8 @@ impl Game {
     }
 }
 
-/// Spawn a player's full starting layout: a free, fully-built Industrial Center on the start tile, a ring of
-/// workers around it, and a nearby neutral resource cluster (minerals + one gas geyser).
+    /// Spawn a player's full starting layout: a free, fully-built Industrial Center on the start tile, a ring of
+/// workers around it, and a nearby neutral resource cluster (steel + one oil node).
 fn spawn_player_start(entities: &mut EntityStore, map: &Map, owner: u32, start: (u32, u32)) {
     let (stx, sty) = start;
     let (hx, hy) = map.tile_center(stx, sty);
@@ -418,7 +418,7 @@ fn spawn_player_start(entities: &mut EntityStore, map: &Map, owner: u32, start: 
         entities.spawn_unit(owner, kinds::WORKER, wx, wy);
     }
 
-    // Mineral cluster: an arc of patches a few tiles from the Industrial Center, plus one gas geyser.
+    // Steel cluster: an arc of patches a few tiles from the Industrial Center, plus one oil node.
     // Placement is offset toward the map center so it sits in open space, not off-map.
     let center = (map.size as f32 * ts) * 0.5;
     let dir_x = (center - hx).signum();
@@ -427,19 +427,19 @@ fn spawn_player_start(entities: &mut EntityStore, map: &Map, owner: u32, start: 
     let anchor_x = hx + dir_x * ts * 4.0;
     let anchor_y = hy + dir_y * ts * 4.0;
 
-    let patches = config::MINERAL_PATCHES_PER_BASE;
+    let patches = config::STEEL_PATCHES_PER_BASE;
     for i in 0..patches {
         // Lay patches out in a short two-row block near the anchor.
         let col = (i % 4) as f32;
         let row = (i / 4) as f32;
         let px = anchor_x + (col - 1.5) * ts;
         let py = anchor_y + row * ts;
-        entities.spawn_node(kinds::MINERALS, px, py);
+        entities.spawn_node(kinds::STEEL, px, py);
     }
-    // Gas geyser sits a little further out from the mineral line.
+    // Oil node sits a little further out from the steel line.
     let gx = anchor_x + dir_x * ts * 1.5;
     let gy = anchor_y + dir_y * ts * 2.5;
-    entities.spawn_node(kinds::GAS, gx, gy);
+    entities.spawn_node(kinds::OIL, gx, gy);
 }
 
 #[cfg(test)]

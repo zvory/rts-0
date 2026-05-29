@@ -44,13 +44,13 @@ struct PlayerView<'a> {
 struct BuildTechAttackScript {
     player_id: u32,
     target_workers: usize,
-    gas_workers: usize,
+    oil_workers: usize,
     target_barracks: usize,
     attack_size: usize,
-    assigned_gas_workers: BTreeSet<u32>,
+    assigned_oil_workers: BTreeSet<u32>,
     initial_gather_sent: bool,
     last_attack_tick: u32,
-    last_gas_assignment_tick: u32,
+    last_oil_assignment_tick: u32,
 }
 
 impl BuildTechAttackScript {
@@ -58,13 +58,13 @@ impl BuildTechAttackScript {
         BuildTechAttackScript {
             player_id,
             target_workers: 6,
-            gas_workers: 2,
+            oil_workers: 2,
             target_barracks: 1,
             attack_size: 4,
-            assigned_gas_workers: BTreeSet::new(),
+            assigned_oil_workers: BTreeSet::new(),
             initial_gather_sent: false,
             last_attack_tick: 0,
-            last_gas_assignment_tick: 0,
+            last_oil_assignment_tick: 0,
         }
     }
 
@@ -107,13 +107,13 @@ impl ScriptedPlayer for BuildTechAttackScript {
         let mut builder_workers: Vec<u32> = idle_workers
             .iter()
             .copied()
-            .filter(|id| !self.assigned_gas_workers.contains(id))
+            .filter(|id| !self.assigned_oil_workers.contains(id))
             .collect();
         builder_workers.extend(
             workers
                 .iter()
                 .filter(|e| e.state != states::IDLE && e.state != states::BUILD)
-                .filter(|e| !self.assigned_gas_workers.contains(&e.id))
+                .filter(|e| !self.assigned_oil_workers.contains(&e.id))
                 .map(|e| e.id),
         );
 
@@ -150,8 +150,8 @@ impl ScriptedPlayer for BuildTechAttackScript {
         let tank_factory_count = tank_factories.len();
         let tank_count = own.iter().filter(|e| e.kind == kinds::TANK).count();
 
-        let mut minerals = view.snapshot.minerals;
-        let mut gas = view.snapshot.gas;
+        let mut steel = view.snapshot.steel;
+        let mut oil = view.snapshot.oil;
         let mut free_supply = view
             .snapshot
             .supply_cap
@@ -166,7 +166,7 @@ impl ScriptedPlayer for BuildTechAttackScript {
             if let Some(cmd) = self.build_if_affordable(
                 view,
                 kinds::BARRACKS,
-                &mut minerals,
+                &mut steel,
                 &builder_workers,
                 &mut reserved_workers,
             ) {
@@ -182,7 +182,7 @@ impl ScriptedPlayer for BuildTechAttackScript {
             if let Some(cmd) = self.build_if_affordable(
                 view,
                 kinds::DEPOT,
-                &mut minerals,
+                &mut steel,
                 &builder_workers,
                 &mut reserved_workers,
             ) {
@@ -195,7 +195,7 @@ impl ScriptedPlayer for BuildTechAttackScript {
             if let Some(cmd) = self.build_if_affordable(
                 view,
                 kinds::TANK_FACTORY,
-                &mut minerals,
+                &mut steel,
                 &builder_workers,
                 &mut reserved_workers,
             ) {
@@ -213,15 +213,15 @@ impl ScriptedPlayer for BuildTechAttackScript {
             let Some(stats) = config::unit_stats(kinds::WORKER) else {
                 continue;
             };
-            if minerals < stats.cost_min || gas < stats.cost_gas || free_supply < stats.supply {
+            if steel < stats.cost_steel || oil < stats.cost_oil || free_supply < stats.supply {
                 break;
             }
             out.push(Command::Train {
                 building: industrial_center.id,
                 unit: kinds::WORKER.to_string(),
             });
-            minerals -= stats.cost_min;
-            gas -= stats.cost_gas;
+            steel -= stats.cost_steel;
+            oil -= stats.cost_oil;
             free_supply -= stats.supply;
         }
 
@@ -236,15 +236,15 @@ impl ScriptedPlayer for BuildTechAttackScript {
                 let Some(stats) = config::unit_stats(kinds::RIFLEMAN) else {
                     continue;
                 };
-                if minerals < stats.cost_min || gas < stats.cost_gas || free_supply < stats.supply {
+                if steel < stats.cost_steel || oil < stats.cost_oil || free_supply < stats.supply {
                     continue;
                 }
                 out.push(Command::Train {
                     building: rax.id,
                     unit: kinds::RIFLEMAN.to_string(),
                 });
-                minerals -= stats.cost_min;
-                gas -= stats.cost_gas;
+                steel -= stats.cost_steel;
+                oil -= stats.cost_oil;
                 free_supply -= stats.supply;
             }
         }
@@ -256,15 +256,15 @@ impl ScriptedPlayer for BuildTechAttackScript {
             let Some(stats) = config::unit_stats(kinds::TANK) else {
                 continue;
             };
-            if minerals < stats.cost_min || gas < stats.cost_gas || free_supply < stats.supply {
+            if steel < stats.cost_steel || oil < stats.cost_oil || free_supply < stats.supply {
                 continue;
             }
             out.push(Command::Train {
                 building: factory.id,
                 unit: kinds::TANK.to_string(),
             });
-            minerals -= stats.cost_min;
-            gas -= stats.cost_gas;
+            steel -= stats.cost_steel;
+            oil -= stats.cost_oil;
             free_supply -= stats.supply;
         }
 
@@ -297,12 +297,12 @@ impl BuildTechAttackScript {
         &self,
         view: PlayerView<'_>,
         building: &str,
-        minerals: &mut u32,
+        steel: &mut u32,
         idle_workers: &[u32],
         reserved_workers: &mut HashSet<u32>,
     ) -> Option<Command> {
         let stats = config::building_stats(building)?;
-        if *minerals < stats.cost_min {
+        if *steel < stats.cost_steel {
             return None;
         }
         let worker = idle_workers
@@ -312,7 +312,7 @@ impl BuildTechAttackScript {
         let start = own_start_tile(view.start, view.player_id)?;
         let (tile_x, tile_y) = find_build_spot(&view.start.map, view.snapshot, start, building)?;
         reserved_workers.insert(worker);
-        *minerals -= stats.cost_min;
+        *steel -= stats.cost_steel;
         Some(Command::Build {
             worker,
             building: building.to_string(),
@@ -328,38 +328,38 @@ impl BuildTechAttackScript {
         reserved_workers: &HashSet<u32>,
         out: &mut Vec<Command>,
     ) {
-        let mineral_nodes: Vec<&EntityView> = view
+        let steel_nodes: Vec<&EntityView> = view
             .snapshot
             .entities
             .iter()
-            .filter(|e| e.owner == 0 && e.kind == kinds::MINERALS && e.remaining.unwrap_or(0) > 0)
+            .filter(|e| e.owner == 0 && e.kind == kinds::STEEL && e.remaining.unwrap_or(0) > 0)
             .collect();
-        let gas_nodes: Vec<&EntityView> = view
+        let oil_nodes: Vec<&EntityView> = view
             .snapshot
             .entities
             .iter()
-            .filter(|e| e.owner == 0 && e.kind == kinds::GAS && e.remaining.unwrap_or(0) > 0)
+            .filter(|e| e.owner == 0 && e.kind == kinds::OIL && e.remaining.unwrap_or(0) > 0)
             .collect();
-        if mineral_nodes.is_empty() && gas_nodes.is_empty() {
+        if steel_nodes.is_empty() && oil_nodes.is_empty() {
             return;
         }
 
         let mut sorted_workers: Vec<&EntityView> = workers.to_vec();
         sorted_workers.sort_by_key(|w| w.id);
 
-        let can_assign_gas = self.assigned_gas_workers.len() < self.gas_workers
+        let can_assign_oil = self.assigned_oil_workers.len() < self.oil_workers
             && view.tick > 0
-            && view.tick.saturating_sub(self.last_gas_assignment_tick) >= 90
-            && !gas_nodes.is_empty()
+            && view.tick.saturating_sub(self.last_oil_assignment_tick) >= 90
+            && !oil_nodes.is_empty()
             && view
                 .snapshot
                 .entities
                 .iter()
                 .any(|e| e.owner == view.player_id && e.kind == kinds::BARRACKS);
-        if can_assign_gas {
+        if can_assign_oil {
             let mut assigned = 0usize;
             for worker in &sorted_workers {
-                if assigned >= self.gas_workers {
+                if assigned >= self.oil_workers {
                     break;
                 }
                 if reserved_workers.contains(&worker.id) {
@@ -368,29 +368,29 @@ impl BuildTechAttackScript {
                 if worker.state == states::BUILD {
                     continue;
                 }
-                if let Some(node) = nearest_node(worker, &gas_nodes) {
+                if let Some(node) = nearest_node(worker, &oil_nodes) {
                     out.push(Command::Gather {
                         units: vec![worker.id],
                         node,
                     });
-                    self.assigned_gas_workers.insert(worker.id);
+                    self.assigned_oil_workers.insert(worker.id);
                     assigned += 1;
                 }
             }
-            self.last_gas_assignment_tick = view.tick;
+            self.last_oil_assignment_tick = view.tick;
         }
 
         for worker in sorted_workers {
             if reserved_workers.contains(&worker.id) {
                 continue;
             }
-            if self.assigned_gas_workers.contains(&worker.id) {
+            if self.assigned_oil_workers.contains(&worker.id) {
                 continue;
             }
             if self.initial_gather_sent && worker.state != states::IDLE {
                 continue;
             }
-            if let Some(node) = nearest_node(worker, &mineral_nodes) {
+            if let Some(node) = nearest_node(worker, &steel_nodes) {
                 out.push(Command::Gather {
                     units: vec![worker.id],
                     node,
@@ -468,8 +468,8 @@ impl ScriptedPlayer for EconomyScript {
         let depot_under_construction = own
             .iter()
             .any(|e| e.kind == kinds::DEPOT && !is_complete(e));
-        let mut minerals = view.snapshot.minerals;
-        let mut gas = view.snapshot.gas;
+        let mut steel = view.snapshot.steel;
+        let mut oil = view.snapshot.oil;
         let mut free_supply = view
             .snapshot
             .supply_cap
@@ -484,7 +484,7 @@ impl ScriptedPlayer for EconomyScript {
             if let Some(cmd) = build_near_own_start_if_affordable(
                 view,
                 kinds::DEPOT,
-                &mut minerals,
+                &mut steel,
                 &builder_workers,
                 &mut reserved_workers,
             ) {
@@ -502,19 +502,19 @@ impl ScriptedPlayer for EconomyScript {
             let Some(stats) = config::unit_stats(kinds::WORKER) else {
                 continue;
             };
-            if minerals < stats.cost_min || gas < stats.cost_gas || free_supply < stats.supply {
+            if steel < stats.cost_steel || oil < stats.cost_oil || free_supply < stats.supply {
                 break;
             }
             out.push(Command::Train {
                 building: industrial_center.id,
                 unit: kinds::WORKER.to_string(),
             });
-            minerals -= stats.cost_min;
-            gas -= stats.cost_gas;
+            steel -= stats.cost_steel;
+            oil -= stats.cost_oil;
             free_supply -= stats.supply;
         }
 
-        assign_mineral_workers(
+        assign_steel_workers(
             view,
             &workers,
             &reserved_workers,
@@ -647,7 +647,7 @@ impl ScriptedPlayer for BunkerRushScript {
                 .map(|e| e.id),
         );
 
-        let mut minerals = view.snapshot.minerals;
+        let mut steel = view.snapshot.steel;
         let mut reserved_workers = HashSet::new();
         let mut out = Vec::new();
         let bunker_exists = own.iter().any(|e| e.kind == kinds::BUNKER);
@@ -656,7 +656,7 @@ impl ScriptedPlayer for BunkerRushScript {
         if !bunker_exists && bunker_attempt_due {
             if let Some(cmd) = self.build_offensive_bunker_if_affordable(
                 view,
-                &mut minerals,
+                &mut steel,
                 &builder_workers,
                 &mut reserved_workers,
             ) {
@@ -665,7 +665,7 @@ impl ScriptedPlayer for BunkerRushScript {
             }
         }
 
-        assign_mineral_workers(
+        assign_steel_workers(
             view,
             &workers,
             &reserved_workers,
@@ -682,12 +682,12 @@ impl BunkerRushScript {
     fn build_offensive_bunker_if_affordable(
         &self,
         view: PlayerView<'_>,
-        minerals: &mut u32,
+        steel: &mut u32,
         builder_workers: &[u32],
         reserved_workers: &mut HashSet<u32>,
     ) -> Option<Command> {
         let stats = config::building_stats(kinds::BUNKER)?;
-        if *minerals < stats.cost_min {
+        if *steel < stats.cost_steel {
             return None;
         }
         let worker = builder_workers
@@ -697,7 +697,7 @@ impl BunkerRushScript {
         let (tile_x, tile_y) =
             find_offensive_bunker_spot(view.start, view.snapshot, self.target_player_id)?;
         reserved_workers.insert(worker);
-        *minerals -= stats.cost_min;
+        *steel -= stats.cost_steel;
         Some(Command::Build {
             worker,
             building: kinds::BUNKER.to_string(),
@@ -979,8 +979,8 @@ struct EventRecord {
 struct SnapshotSample {
     tick: u32,
     player_id: u32,
-    minerals: u32,
-    gas: u32,
+    steel: u32,
+    oil: u32,
     supply_used: u32,
     supply_cap: u32,
     own_counts: BTreeMap<String, u32>,
@@ -1002,8 +1002,8 @@ impl SnapshotSample {
         SnapshotSample {
             tick,
             player_id,
-            minerals: snapshot.minerals,
-            gas: snapshot.gas,
+            steel: snapshot.steel,
+            oil: snapshot.oil,
             supply_used: snapshot.supply_used,
             supply_cap: snapshot.supply_cap,
             own_counts,
@@ -1237,7 +1237,7 @@ impl CombatGoal {
 #[derive(Clone, Default, Serialize)]
 struct PlayerMilestoneGoal {
     require_gathering: bool,
-    require_gas: bool,
+    require_oil: bool,
     require_depot_supply: bool,
     require_barracks_complete: bool,
     require_rifleman: bool,
@@ -1252,7 +1252,7 @@ impl PlayerMilestoneGoal {
     fn tech_combat() -> Self {
         PlayerMilestoneGoal {
             require_gathering: true,
-            require_gas: true,
+            require_oil: true,
             require_depot_supply: true,
             require_barracks_complete: true,
             require_rifleman: true,
@@ -1283,7 +1283,7 @@ impl PlayerMilestoneGoal {
 #[derive(Clone, Default, PartialEq, Serialize)]
 struct PlayerMilestones {
     saw_gathering: bool,
-    gas_gathered: bool,
+    oil_gathered: bool,
     depot_started: bool,
     barracks_started: bool,
     barracks_complete: bool,
@@ -1293,8 +1293,8 @@ struct PlayerMilestones {
     tank_trained: bool,
     damage_taken: bool,
     max_workers: u32,
-    max_minerals: u32,
-    max_gas: u32,
+    max_steel: u32,
+    max_oil: u32,
     max_supply_cap: u32,
     max_riflemen: u32,
     max_tanks: u32,
@@ -1315,8 +1315,8 @@ impl PlayerMilestones {
                     if e.state == states::GATHER || e.carrying.unwrap_or(0) > 0 {
                         self.saw_gathering = true;
                     }
-                    if e.carrying_kind.as_deref() == Some(kinds::GAS) {
-                        self.gas_gathered = true;
+                    if e.carrying_kind.as_deref() == Some(kinds::OIL) {
+                        self.oil_gathered = true;
                     }
                 }
                 kinds::RIFLEMAN => riflemen += 1,
@@ -1341,10 +1341,10 @@ impl PlayerMilestones {
                 self.damage_taken = true;
             }
         }
-        self.gas_gathered |= snapshot.gas > 0;
+        self.oil_gathered |= snapshot.oil > 0;
         self.max_workers = self.max_workers.max(workers);
-        self.max_minerals = self.max_minerals.max(snapshot.minerals);
-        self.max_gas = self.max_gas.max(snapshot.gas);
+        self.max_steel = self.max_steel.max(snapshot.steel);
+        self.max_oil = self.max_oil.max(snapshot.oil);
         self.max_supply_cap = self.max_supply_cap.max(snapshot.supply_cap);
         self.max_riflemen = self.max_riflemen.max(riflemen);
         self.max_tanks = self.max_tanks.max(tanks);
@@ -1363,8 +1363,8 @@ impl PlayerMilestones {
         if goal.require_gathering && !self.saw_gathering {
             out.push("economy-gather".to_string());
         }
-        if goal.require_gas && !self.gas_gathered {
-            out.push("gas-gather".to_string());
+        if goal.require_oil && !self.oil_gathered {
+            out.push("oil-gather".to_string());
         }
         if goal.require_depot_supply
             && (!self.depot_started || self.max_supply_cap <= config::INDUSTRIAL_CENTER_SUPPLY)
@@ -1501,10 +1501,10 @@ fn first_replay_diff(live: &ReplayOutcome, replay: &ReplayOutcome) -> String {
                 live_view.player_id,
                 live_view.snapshot.entities.len(),
                 replay_view.snapshot.entities.len(),
-                live_view.snapshot.minerals,
-                live_view.snapshot.gas,
-                replay_view.snapshot.minerals,
-                replay_view.snapshot.gas,
+                live_view.snapshot.steel,
+                live_view.snapshot.oil,
+                replay_view.snapshot.steel,
+                replay_view.snapshot.oil,
                 live_view.snapshot.supply_used,
                 live_view.snapshot.supply_cap,
                 replay_view.snapshot.supply_used,
@@ -1536,10 +1536,10 @@ fn validate_snapshot(
             snapshot.supply_cap
         )));
     }
-    if snapshot.minerals > RESOURCE_SANITY_LIMIT || snapshot.gas > RESOURCE_SANITY_LIMIT {
+    if snapshot.steel > RESOURCE_SANITY_LIMIT || snapshot.oil > RESOURCE_SANITY_LIMIT {
         return Err(SelfPlayFailure::new(format!(
-            "player {player_id} resources look invalid: minerals={} gas={}",
-            snapshot.minerals, snapshot.gas
+            "player {player_id} resources look invalid: steel={} oil={}",
+            snapshot.steel, snapshot.oil
         )));
     }
 
@@ -1609,8 +1609,8 @@ fn known_kind(kind: &str) -> bool {
             | kinds::ADVANCED_TRAINING_CENTRE
             | kinds::TANK_FACTORY
             | kinds::BUNKER
-            | kinds::MINERALS
-            | kinds::GAS
+            | kinds::STEEL
+            | kinds::OIL
     )
 }
 
@@ -1625,12 +1625,12 @@ fn production_queue_len(entity: &EntityView) -> u32 {
 fn build_near_own_start_if_affordable(
     view: PlayerView<'_>,
     building: &str,
-    minerals: &mut u32,
+    steel: &mut u32,
     builder_workers: &[u32],
     reserved_workers: &mut HashSet<u32>,
 ) -> Option<Command> {
     let stats = config::building_stats(building)?;
-    if *minerals < stats.cost_min {
+    if *steel < stats.cost_steel {
         return None;
     }
     let worker = builder_workers
@@ -1640,7 +1640,7 @@ fn build_near_own_start_if_affordable(
     let start = own_start_tile(view.start, view.player_id)?;
     let (tile_x, tile_y) = find_build_spot(&view.start.map, view.snapshot, start, building)?;
     reserved_workers.insert(worker);
-    *minerals -= stats.cost_min;
+    *steel -= stats.cost_steel;
     Some(Command::Build {
         worker,
         building: building.to_string(),
@@ -1649,20 +1649,20 @@ fn build_near_own_start_if_affordable(
     })
 }
 
-fn assign_mineral_workers(
+fn assign_steel_workers(
     view: PlayerView<'_>,
     workers: &[&EntityView],
     reserved_workers: &HashSet<u32>,
     initial_gather_sent: bool,
     out: &mut Vec<Command>,
 ) {
-    let mineral_nodes: Vec<&EntityView> = view
+    let steel_nodes: Vec<&EntityView> = view
         .snapshot
         .entities
         .iter()
-        .filter(|e| e.owner == 0 && e.kind == kinds::MINERALS && e.remaining.unwrap_or(0) > 0)
+        .filter(|e| e.owner == 0 && e.kind == kinds::STEEL && e.remaining.unwrap_or(0) > 0)
         .collect();
-    if mineral_nodes.is_empty() {
+    if steel_nodes.is_empty() {
         return;
     }
 
@@ -1675,7 +1675,7 @@ fn assign_mineral_workers(
         if initial_gather_sent && worker.state != states::IDLE {
             continue;
         }
-        if let Some(node) = nearest_node(worker, &mineral_nodes) {
+        if let Some(node) = nearest_node(worker, &steel_nodes) {
             out.push(Command::Gather {
                 units: vec![worker.id],
                 node,
@@ -1879,7 +1879,7 @@ fn occupied_tiles_from_snapshot(map: &MapInfo, snapshot: &Snapshot) -> BTreeSet<
             for tile in building_footprint_tiles(map, e) {
                 occupied.insert(tile);
             }
-        } else if e.owner == 0 && (e.kind == kinds::MINERALS || e.kind == kinds::GAS) {
+        } else if e.owner == 0 && (e.kind == kinds::STEEL || e.kind == kinds::OIL) {
             occupied.insert(tile_of(map, e.x, e.y));
         }
     }

@@ -26,8 +26,8 @@
 
   /* Accents (mirror in-canvas resource colors) */
   --accent: #c7d07a; /* primary action / command tint */
-  --accent-2: #b9b084; /* supply crates (COLORS.minerals) */
-  --gas: #86a36f; /* fuel drums (COLORS.gas) */
+  --steel: #b9b084; /* supply crates (COLORS.steel) */
+  --oil: #86a36f; /* fuel drums (COLORS.oil) */
   --supply: #c0a463;
   --good: #7ca45a; /* COLORS.hpGood */
   --warn: #c7a24a;
@@ -425,12 +425,12 @@ input[type="text"]:focus {
   font-size: 13px;
   line-height: 1;
 }
-#hud .res-icon.mineral {
-  color: var(--accent-2);
+#hud .res-icon.steel {
+  color: var(--steel);
   text-shadow: 1px 1px 0 #191710;
 }
-#hud .res-icon.gas {
-  color: var(--gas);
+#hud .res-icon.oil {
+  color: var(--oil);
   text-shadow: 1px 1px 0 #191710;
 }
 #hud .res-icon.supply {
@@ -606,7 +606,7 @@ input[type="text"]:focus {
   border-right: 1px solid var(--panel-edge);
   border-bottom: 1px solid var(--panel-edge);
 }
-/* Cost badge, bottom edge. Mineral / gas costs colored to match the world. */
+/* Cost badge, bottom edge. Steel / oil costs colored to match the world. */
 .cmd-btn .cmd-cost {
   position: absolute;
   bottom: 4px;
@@ -617,11 +617,11 @@ input[type="text"]:focus {
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
-.cmd-btn .cmd-cost .c-min {
-  color: var(--accent-2);
+.cmd-btn .cmd-cost .c-steel {
+  color: var(--steel);
 }
-.cmd-btn .cmd-cost .c-gas {
-  color: var(--gas);
+.cmd-btn .cmd-cost .c-oil {
+  color: var(--oil);
 }
 /* Unaffordable cost shown in red even though the whole button may be disabled. */
 .cmd-btn.unaffordable .cmd-cost {

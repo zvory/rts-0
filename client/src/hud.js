@@ -30,8 +30,8 @@ export class HUD {
     this.net = net;
 
     // Resource / supply bar elements.
-    this.elMinerals = rootEl.querySelector("#res-minerals");
-    this.elGas = rootEl.querySelector("#res-gas");
+    this.elSteel = rootEl.querySelector("#res-steel");
+    this.elOil = rootEl.querySelector("#res-oil");
     this.elSupply = rootEl.querySelector("#res-supply");
 
     // Selected-units panel + command card containers.
@@ -57,9 +57,9 @@ export class HUD {
 
   /** Mirror `state.resources` into the top bar. */
   _renderResources() {
-    const r = this.state.resources || { minerals: 0, gas: 0, supplyUsed: 0, supplyCap: 0 };
-    if (this.elMinerals) this.elMinerals.textContent = String(r.minerals ?? 0);
-    if (this.elGas) this.elGas.textContent = String(r.gas ?? 0);
+    const r = this.state.resources || { steel: 0, oil: 0, supplyUsed: 0, supplyCap: 0 };
+    if (this.elSteel) this.elSteel.textContent = String(r.steel ?? 0);
+    if (this.elOil) this.elOil.textContent = String(r.oil ?? 0);
     if (this.elSupply) {
       const used = r.supplyUsed ?? 0;
       const cap = r.supplyCap ?? 0;
@@ -215,7 +215,7 @@ export class HUD {
     const ownUnits = this._selectedOwnUnits(sel);
     const unitIds = ownUnits.map((e) => e.id);
     const workerSelected = ownUnits.some((e) => e.kind === KIND.WORKER);
-    const res = this.state.resources || { minerals: 0, gas: 0 };
+    const res = this.state.resources || { steel: 0, oil: 0 };
 
     const sig =
       `units|${unitIds.join(".")}|target:${this.state.commandTarget || ""}|` +
@@ -291,7 +291,7 @@ export class HUD {
   // --- Build card (worker selected) -----------------------------------------
 
   _renderBuildCard(card) {
-    const res = this.state.resources || { minerals: 0, gas: 0 };
+    const res = this.state.resources || { steel: 0, oil: 0 };
 
     // Signature: which buttons exist + their enabled state. Rebuild only on change.
     const sig =
@@ -344,7 +344,7 @@ export class HUD {
   // --- Train card (production building selected) -----------------------------
 
   _renderTrainCard(card, building) {
-    const res = this.state.resources || { minerals: 0, gas: 0 };
+    const res = this.state.resources || { steel: 0, oil: 0 };
     const trains = this._trainsOf(building.kind);
     const producing = (building.prodQueue ?? 0) > 0 || building.state === STATE.TRAIN;
 
@@ -418,12 +418,12 @@ export class HUD {
 
   // --- Shared helpers --------------------------------------------------------
 
-  /** True if `cost` ({min,gas}) is affordable against `res` ({minerals,gas}). */
+  /** True if `cost` ({steel,oil}) is affordable against `res` ({steel,oil}). */
   _affordable(cost, res) {
     if (!cost) return true;
-    const minerals = res.minerals ?? 0;
-    const gas = res.gas ?? 0;
-    return minerals >= (cost.min ?? 0) && gas >= (cost.gas ?? 0);
+    const steel = res.steel ?? 0;
+    const oil = res.oil ?? 0;
+    return steel >= (cost.steel ?? 0) && oil >= (cost.oil ?? 0);
   }
 
   /** A unit can be trained if affordable and its completed-building tech is present. */
@@ -472,7 +472,7 @@ export class HUD {
    * @param {string} [opts.icon] glyph shown large.
    * @param {string} opts.label visible name.
    * @param {string} [opts.hotkey] keyboard hint shown in a corner.
-   * @param {{min:number,gas:number}} [opts.cost] cost badge (omitted if absent).
+   * @param {{steel:number,oil:number}} [opts.cost] cost badge (omitted if absent).
    * @param {boolean} opts.enabled whether the action is currently available.
    * @param {string} [opts.title] tooltip / disabled reason.
    * @param {string} [opts.cls] extra class (e.g. "cancel").
@@ -492,8 +492,8 @@ export class HUD {
 
     const costHtml = opts.cost
       ? `<span class="cmd-cost">` +
-        (opts.cost.min ? `<span class="c-min">${opts.cost.min}</span>` : "") +
-        (opts.cost.gas ? `<span class="c-gas">${opts.cost.gas}</span>` : "") +
+        (opts.cost.steel ? `<span class="c-steel">${opts.cost.steel}</span>` : "") +
+        (opts.cost.oil ? `<span class="c-oil">${opts.cost.oil}</span>` : "") +
         `</span>`
       : "";
 

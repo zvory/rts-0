@@ -37,8 +37,8 @@ export class GameState {
     this._prevById = new Map();
 
     // --- derived latest state ---
-    /** @type {{minerals:number,gas:number,supplyUsed:number,supplyCap:number}} */
-    this.resources = { minerals: 0, gas: 0, supplyUsed: 0, supplyCap: 0 };
+    /** @type {{steel:number,oil:number,supplyUsed:number,supplyCap:number}} */
+    this.resources = { steel: 0, oil: 0, supplyUsed: 0, supplyCap: 0 };
     /** @type {Array<object>} latest snapshot's transient events. */
     this.events = [];
 
@@ -102,8 +102,8 @@ export class GameState {
     for (const e of entities) this._curById.set(e.id, e);
 
     this.resources = {
-      minerals: msg.minerals | 0,
-      gas: msg.gas | 0,
+      steel: msg.steel | 0,
+      oil: msg.oil | 0,
       supplyUsed: msg.supplyUsed | 0,
       supplyCap: msg.supplyCap | 0,
     };

@@ -123,7 +123,7 @@ the player's own starting Industrial Center + workers.
 {
   t: "snapshot",
   tick: u32,
-  minerals: u32, gas: u32,       // your resources
+  steel: u32, oil: u32,       // your resources
   supplyUsed: u32, supplyCap: u32,
   entities: Entity[],            // your entities (always) + neutral/enemy on visible tiles
   events: Event[]                // transient things to surface (see 2.5)
@@ -134,7 +134,7 @@ the player's own starting Industrial Center + workers.
 {
   id: u32,
   owner: u32,                    // 0 = neutral (resources), else player id
-  kind: string,                  // EntityKind: "worker","rifleman","machine_gunner","at_team","tank","industrial_center","depot","barracks","advanced_training_centre","tank_factory","bunker","minerals","gas"
+  kind: string,                  // EntityKind: "worker","rifleman","machine_gunner","at_team","tank","industrial_center","depot","barracks","advanced_training_centre","tank_factory","bunker","steel","oil"
   x: f32, y: f32,                // world px (center)
   hp: u32, maxHp: u32,
   state: string,                 // "idle","move","attack","gather","build","train","construct","dead"
@@ -147,7 +147,7 @@ the player's own starting Industrial Center + workers.
   buildProgress?: f32,           // 0..1; when present and <1, render as scaffolding
   // workers:
   carrying?: u32,                // amount of resource being carried (0 if none)
-  carryingKind?: string,         // "minerals" | "gas"
+  carryingKind?: string,         // "steel" | "oil"
   // resource nodes:
   remaining?: u32,               // resource left in the node
   // combat feedback:
@@ -160,7 +160,7 @@ the player's own starting Industrial Center + workers.
 { e: "attack", from: u32, to: u32 }            // for muzzle flashes / tracers
 { e: "death",  id: u32, x: f32, y: f32, kind } // for death poofs
 { e: "build",  id: u32, kind: string }         // building completed
-{ e: "notice", msg: string }                   // "Not enough minerals", etc.
+{ e: "notice", msg: string }                   // "Not enough steel", etc.
 ```
 Events are best-effort visual flavor; the client must not depend on receiving them.
 
@@ -301,7 +301,7 @@ export class GameState {
   entitiesInterpolated(alpha)            // -> array of entities with lerped x,y
   get prevRecvTime() / get currRecvTime()// recv timestamps of the two buffered snapshots
                                          //   (null until two exist); main.js derives interp alpha
-  resources                             // {minerals,gas,supplyUsed,supplyCap} (latest)
+  resources                             // {steel,oil,supplyUsed,supplyCap} (latest)
   events                                 // latest snapshot's events
   // selection (client-only):
   selection                              // Set<entityId>
@@ -405,7 +405,7 @@ start the rAF loop (compute `alpha` from snapshot timing, `camera.update`, `inpu
 - Buildings: footprint-sized blocky field structures with neutral geometry and plain
   two-letter stencils; under construction → translucent with a progress bar; production →
   small progress arc.
-- Resource nodes: minerals = tan supply crates; gas = olive fuel drums; show remaining via
+- Resource nodes: steel = tan supply crates; oil = olive fuel drums; show remaining via
   size/opacity.
 - Terrain: muted grass/field/mud, rock, and water tiles with deterministic coarse dithering
   so movement is readable and the map has a PlayStation 1-era low-resolution texture feel.
@@ -490,7 +490,7 @@ rules are future work.
 
 Unit stats (hp, dmg, range[tiles], cooldown[ticks], speed[px/tick], sight[tiles], cost, supply, buildTicks):
 
-| kind            | hp  | dmg | range | cd | speed | sight | min | gas | sup | buildTicks |
+| kind            | hp  | dmg | range | cd | speed | sight | steel | oil | sup | buildTicks |
 |-----------------|-----|-----|-------|----|-------|-------|-----|-----|-----|-----------|
 | worker          | 40  | 4   | 1     | 12 | 1.5   | 7     | 50  | 0   | 1   | 120 (~4s) |
 | rifleman        | 45  | 5   | 4     | 8  | 1.6   | 8     | 50  | 0   | 1   | 150 (~5s) |

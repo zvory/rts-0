@@ -18,7 +18,7 @@
  - [ ] AI should GG after losing all town halls.
  - [ ] Machine gunner attacks should be the same as infantryman unless the command "set up" is used. Setup stops the machine gunner for five seconds with no moving or shooting; after setup they cannot move or rotate without tearing down for three seconds, but have elevated damage output and a fixed 40 degree field of fire.
  - [ ] Support two different factions, soviets and germans, with different stats and some special units and buildings.
- - [ ] Rename gas to oil, minerals to steel.
+- [x] Rename gas to oil, minerals to steel.
  - [ ] Rename the game officially to Bewegungskrieg.
  - [ ] Restyle the main menu to be more ww2 themed, less scifi.
 
@@ -27,6 +27,8 @@
  - [ ] lobby system to see active lobbies
  - [ ] All data should exist as TOML files, not hardcoded 
  - [ ] Hotkeys in the command card should be grid style, as in the top left hotkey is always Q, the top middle is W, the one below the top left is A, etc. Match the keyboard.
+ - [ ] workers should not auto attack
+ - [ ] muzzle flare animations
 
 ## Done
 
