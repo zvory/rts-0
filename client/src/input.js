@@ -212,7 +212,7 @@ export class Input {
     if (wasDragging) {
       this._commitBoxSelection(drag, ev.shiftKey);
     } else {
-      this._commitClickSelection(p, ev.shiftKey);
+      this._commitClickSelection(p, ev.shiftKey, ev.ctrlKey || ev.metaKey);
     }
   }
 
@@ -271,16 +271,47 @@ export class Input {
   /**
    * Single empty/entity click: select the one entity under the cursor (own
    * preferred), or clear when clicking empty space. Shift adds to the selection.
+   * Ctrl+click selects all own units of the same kind visible in the viewport.
    */
-  _commitClickSelection(p, additive) {
+  _commitClickSelection(p, additive, ctrl) {
     const world = this._worldAt(p.x, p.y);
     const hit = this._entityAtWorld(world.x, world.y, /*ownPreferred=*/ true);
     if (!hit) {
       if (!additive) this.state.clearSelection();
       return;
     }
+    if (ctrl && isUnit(hit.kind) && hit.owner === this.state.playerId) {
+      const ids = this._ownUnitKindInViewport(hit.kind);
+      if (additive) this.state.addToSelection(ids);
+      else this.state.setSelection(ids);
+      return;
+    }
     if (additive) this.state.addToSelection([hit.id]);
     else this.state.setSelection([hit.id]);
+  }
+
+  /** All own units of `kind` whose center is within the current viewport. */
+  _ownUnitKindInViewport(kind) {
+    const el = this.dom;
+    const w = el.clientWidth;
+    const h = el.clientHeight;
+    const topLeft = this.camera.screenToWorld(0, 0);
+    const botRight = this.camera.screenToWorld(w, h);
+    const minX = Math.min(topLeft.x, botRight.x);
+    const maxX = Math.max(topLeft.x, botRight.x);
+    const minY = Math.min(topLeft.y, botRight.y);
+    const maxY = Math.max(topLeft.y, botRight.y);
+    const me = this.state.playerId;
+    return this.state
+      .entitiesInterpolated(1)
+      .filter(
+        (e) =>
+          e.owner === me &&
+          e.kind === kind &&
+          e.x >= minX && e.x <= maxX &&
+          e.y >= minY && e.y <= maxY,
+      )
+      .map((e) => e.id);
   }
 
   /**
