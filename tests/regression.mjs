@@ -1,9 +1,9 @@
-// Regression tests for the hardening fixes (run against a live server on :8080):
+// Regression tests for the hardening fixes (run against a live server on :8081):
 //  - build command with overflow-range tile coords must NOT crash the room
 //  - a giant/duplicated units[] array must NOT stall the room (DoS guard)
 //  - a join rejected mid-match must NOT wedge the socket (can still join another room)
 // Usage: start the server, then `node tests/regression.mjs`.
-const URL = process.env.RTS_WS || "ws://127.0.0.1:8080/ws";
+const URL = process.env.RTS_WS || "ws://127.0.0.1:8081/ws";
 let failures = 0;
 const ok = (c, m) => { console.log((c ? "  PASS " : "  FAIL ") + m); if (!c) failures++; };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));

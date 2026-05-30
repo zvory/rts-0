@@ -23,7 +23,7 @@ missing. Everything below documents the individual suites the runner orchestrate
 The suites run against a **live server**. To run one on its own, start the server first:
 
 ```bash
-cd server && cargo run        # serves the client + websocket on :8080
+cd server && cargo run        # serves the client + websocket on :8080 (tests default to :8081)
 ```
 
 ## Server integration (no dependencies)
@@ -61,7 +61,7 @@ error. Needs `puppeteer-core` and a local Chrome binary.
 ```bash
 cd tests && npm install
 node client_smoke.mjs
-# env: RTS_URL (default http://127.0.0.1:8080/), CHROME (path to Chrome/Chromium)
+# env: RTS_URL (default http://127.0.0.1:8081/), CHROME (path to Chrome/Chromium)
 ```
 
 > CI note: `run-all.sh` is the CI entry point — it builds the server, launches it, waits for
