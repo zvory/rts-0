@@ -465,3 +465,5 @@ Use this index when deciding whether a TODO can start.
  - implement a way to view the self play tests with zero fog of war, because we spend an enormous amount of tokens breaking and debugging them, and letting me just watch will be super helpful and token efficient
  - DONE: building a building on top of a unit will lock that unit inside the building. it should be impossible to build a building on top of a unit.
  - halve the mining rate for steel
+ - contorl group system for units and buildings. ctrl+number creates a group. shift plus number adds to a group. tapping a group selects it. double tapping moves the camera to the centroid.
+ - make steel gray, and make oil black, change hte icons, and make the oil patch spawn 90 degrees away from the steel patch
