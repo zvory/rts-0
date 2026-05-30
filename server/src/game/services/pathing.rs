@@ -6,8 +6,7 @@
 
 use std::collections::HashMap;
 
-use crate::config;
-use crate::game::entity::{EntityKind, EntityStore};
+use crate::game::entity::EntityKind;
 use crate::game::map::{Map, MobilityClass};
 use crate::game::pathfinding::{self, Passability};
 use crate::game::services::occupancy::Occupancy;
@@ -46,7 +45,7 @@ struct ClassPassability<'a> {
     radius_tiles: u32,
 }
 
-impl<'a> ClassPassability<'a> {
+impl ClassPassability<'_> {
     fn tile_passable(&self, tx: i32, ty: i32) -> bool {
         if !self.map.in_bounds(tx, ty) {
             return false;
@@ -61,7 +60,7 @@ impl<'a> ClassPassability<'a> {
     }
 }
 
-impl<'a> Passability for ClassPassability<'a> {
+impl Passability for ClassPassability<'_> {
     fn passable(&self, tx: i32, ty: i32) -> bool {
         let r = self.radius_tiles as i32;
         for dy in -r..=r {
@@ -141,47 +140,6 @@ impl PathingService {
         let waypoints = pathfinding::to_world_waypoints(&tile_path);
         self.cache_insert(req.start, req.goal, req.class, req.radius_tiles, tile_path);
         waypoints
-    }
-
-    /// Convenience: re-path a single entity toward a world-pixel goal, snapping the final
-    /// waypoint to the exact goal point (mirrors the old `repath` helper).
-    pub fn repath_entity(
-        &mut self,
-        map: &Map,
-        entities: &mut EntityStore,
-        occupancy: &Occupancy,
-        id: u32,
-        gx: f32,
-        gy: f32,
-    ) {
-        let (sx, sy) = match entities.get(id) {
-            Some(e) => map.tile_of(e.pos_x, e.pos_y),
-            None => return,
-        };
-        let (gtx, gty) = map.tile_of(gx, gy);
-        let kind = match entities.get(id) {
-            Some(e) => e.kind,
-            None => return,
-        };
-        let radius_tiles = config::unit_stats(kind)
-            .map(|s| s.radius_tiles())
-            .unwrap_or(0);
-        let req = PathRequest {
-            start: (sx as i32, sy as i32),
-            goal: (gtx as i32, gty as i32),
-            class: MobilityClass::from_kind(kind),
-            radius_tiles,
-            budget: None,
-        };
-        let mut waypoints = self.request(map, occupancy, req);
-        if !waypoints.is_empty() {
-            waypoints[0] = (gx, gy);
-        } else {
-            waypoints = vec![(gx, gy)];
-        }
-        if let Some(e) = entities.get_mut(id) {
-            e.set_path(waypoints);
-        }
     }
 
     fn cache_lookup<P: Passability>(

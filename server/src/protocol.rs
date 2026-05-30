@@ -251,6 +251,7 @@ pub struct EntityView {
 
 impl EntityView {
     /// Minimal constructor; fill optional fields afterward.
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         id: u32,
         owner: u32,

@@ -116,7 +116,7 @@ pub struct RectIter<'a> {
     cell_idx: usize,
 }
 
-impl<'a> Iterator for RectIter<'a> {
+impl Iterator for RectIter<'_> {
     type Item = u32;
     fn next(&mut self) -> Option<u32> {
         loop {
