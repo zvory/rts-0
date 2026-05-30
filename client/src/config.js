@@ -51,10 +51,10 @@ export const STATS = Object.freeze({
   [KIND.RIFLEMAN]: { label: "Rifleman", hotkey: "R", icon: "RF", size: 9, sight: 8,
     cost: { min: 50, gas: 0 }, supply: 1, buildTicks: 150 },
   [KIND.MACHINE_GUNNER]: { label: "Machine Gunner", hotkey: "M", icon: "MG", size: 10, sight: 8,
-    cost: { min: 75, gas: 0 }, supply: 2, buildTicks: 200, requires: KIND.ADVANCED_TRAINING_CENTRE },
+    cost: { min: 75, gas: 25 }, supply: 2, buildTicks: 200, requires: KIND.ADVANCED_TRAINING_CENTRE },
   [KIND.AT_TEAM]: { label: "AT Team", hotkey: "A", icon: "AT", size: 10, sight: 8,
     cost: { min: 75, gas: 25 }, supply: 2, buildTicks: 220, requires: KIND.ADVANCED_TRAINING_CENTRE },
-  [KIND.TANK]: { label: "Tank", hotkey: "T", icon: "TK", size: 13, sight: 7,
+  [KIND.TANK]: { label: "Tank", hotkey: "T", icon: "TK", size: 26, sight: 7,
     cost: { min: 100, gas: 50 }, supply: 2, buildTicks: 250 },
 
   [KIND.INDUSTRIAL_CENTER]: { label: "Industrial Center", hotkey: "I", icon: "IC", footW: 3, footH: 3, sight: 9,

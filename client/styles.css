@@ -521,13 +521,13 @@ input[type="text"]:focus {
 #command-card {
   right: 12px;
   bottom: 12px;
-  padding: 10px;
+  padding: 12px;
   border-radius: var(--radius);
   pointer-events: auto;
   display: grid;
-  grid-template-columns: repeat(3, 56px);
-  grid-auto-rows: 56px;
-  gap: 8px;
+  grid-template-columns: repeat(3, 68px);
+  grid-auto-rows: 68px;
+  gap: 10px;
 }
 .cmd-btn {
   position: relative;
@@ -558,12 +558,12 @@ input[type="text"]:focus {
 }
 .cmd-btn .icon {
   font-family: var(--mono);
-  font-size: 15px;
+  font-size: 20px;
   font-weight: 800;
   line-height: 1;
 }
 .cmd-btn .label {
-  font-size: 8px;
+  font-size: 9px;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--ink-dim);
@@ -575,17 +575,17 @@ input[type="text"]:focus {
 /* Hotkey badge, top-left. */
 .cmd-btn .hotkey {
   position: absolute;
-  top: 2px;
-  left: 4px;
-  font-size: 9px;
+  top: 4px;
+  left: 5px;
+  font-size: 10px;
   font-weight: 700;
   color: var(--ink-faint);
 }
 /* Cost badge, bottom edge. Mineral / gas costs colored to match the world. */
 .cmd-btn .cost {
   position: absolute;
-  bottom: 2px;
-  right: 4px;
+  bottom: 4px;
+  right: 5px;
   display: flex;
   gap: 5px;
   font-size: 9px;
@@ -640,8 +640,8 @@ input[type="text"]:focus {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(5, 7, 13, 0.72);
-  backdrop-filter: blur(4px);
+  background: rgba(5, 7, 13, 0.18);
+  backdrop-filter: none;
 }
 .game-over-box {
   text-align: center;
@@ -675,9 +675,10 @@ input[type="text"]:focus {
    tighten gaps so the bottom row of HUD panels does not overlap. */
 @media (max-width: 1366px), (max-height: 768px) {
   #command-card {
-    grid-template-columns: repeat(3, 50px);
-    grid-auto-rows: 50px;
-    gap: 6px;
+    grid-template-columns: repeat(3, 58px);
+    grid-auto-rows: 58px;
+    gap: 7px;
+    padding: 10px;
   }
   .cmd-btn .icon {
     font-size: 18px;
