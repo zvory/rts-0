@@ -41,7 +41,9 @@ pub(crate) fn run_tick(
     // Pre-tick spatial index for commands (building placement checks).
     let spatial = services::spatial::SpatialIndex::build(entities, map.size);
 
-    services::commands::apply_commands(map, entities, players, &occ, &spatial, pathing, pending, events);
+    services::commands::apply_commands(
+        map, entities, players, &occ, &spatial, pathing, pending, events,
+    );
     services::movement::movement_system(map, entities, &occ);
 
     // Rebuild after movement so combat, gather, and separation see updated positions.

@@ -369,57 +369,57 @@ impl BuildTechAttackScript {
                 .entities
                 .iter()
                 .any(|e| e.owner == view.player_id && is_kind(e, EntityKind::Barracks));
-                let mut assigned_nodes: HashSet<u32> = HashSet::new();
-                if can_assign_oil {
-                    let mut assigned = 0usize;
-                    for worker in &sorted_workers {
-                        if assigned >= self.oil_workers {
-                            break;
-                        }
-                        if reserved_workers.contains(&worker.id) {
-                            continue;
-                        }
-                        if worker.state == states::BUILD {
-                            continue;
-                        }
-                        if worker.latched_node.is_some() {
-                            continue;
-                        }
-                        if let Some(node) = nearest_unassigned_node(worker, &oil_nodes, &assigned_nodes) {
-                            out.push(Command::Gather {
-                                units: vec![worker.id],
-                                node,
-                            });
-                            self.assigned_oil_workers.insert(worker.id);
-                            assigned += 1;
-                            assigned_nodes.insert(node);
-                        }
-                    }
-                    self.last_oil_assignment_tick = view.tick;
+        let mut assigned_nodes: HashSet<u32> = HashSet::new();
+        if can_assign_oil {
+            let mut assigned = 0usize;
+            for worker in &sorted_workers {
+                if assigned >= self.oil_workers {
+                    break;
                 }
+                if reserved_workers.contains(&worker.id) {
+                    continue;
+                }
+                if worker.state == states::BUILD {
+                    continue;
+                }
+                if worker.latched_node.is_some() {
+                    continue;
+                }
+                if let Some(node) = nearest_unassigned_node(worker, &oil_nodes, &assigned_nodes) {
+                    out.push(Command::Gather {
+                        units: vec![worker.id],
+                        node,
+                    });
+                    self.assigned_oil_workers.insert(worker.id);
+                    assigned += 1;
+                    assigned_nodes.insert(node);
+                }
+            }
+            self.last_oil_assignment_tick = view.tick;
+        }
 
-                for worker in sorted_workers {
-                    if reserved_workers.contains(&worker.id) {
-                        continue;
-                    }
-                    if self.assigned_oil_workers.contains(&worker.id) {
-                        continue;
-                    }
-                    if self.initial_gather_sent && worker.state != states::IDLE {
-                        continue;
-                    }
-                    if worker.latched_node.is_some() {
-                        continue;
-                    }
-                    if let Some(node) = nearest_unassigned_node(worker, &steel_nodes, &assigned_nodes) {
-                        out.push(Command::Gather {
-                            units: vec![worker.id],
-                            node,
-                        });
-                        assigned_nodes.insert(node);
-                    }
-                }
-                self.initial_gather_sent = true;
+        for worker in sorted_workers {
+            if reserved_workers.contains(&worker.id) {
+                continue;
+            }
+            if self.assigned_oil_workers.contains(&worker.id) {
+                continue;
+            }
+            if self.initial_gather_sent && worker.state != states::IDLE {
+                continue;
+            }
+            if worker.latched_node.is_some() {
+                continue;
+            }
+            if let Some(node) = nearest_unassigned_node(worker, &steel_nodes, &assigned_nodes) {
+                out.push(Command::Gather {
+                    units: vec![worker.id],
+                    node,
+                });
+                assigned_nodes.insert(node);
+            }
+        }
+        self.initial_gather_sent = true;
     }
 }
 
@@ -697,7 +697,10 @@ impl ScriptedPlayer for BunkerRushScript {
         }
         reserved_workers.extend(&self.scouts);
 
-        let bunker_count = own.iter().filter(|e| is_kind(e, EntityKind::Bunker)).count();
+        let bunker_count = own
+            .iter()
+            .filter(|e| is_kind(e, EntityKind::Bunker))
+            .count();
         let bunker_attempt_due = view.tick == 0
             || view.tick.saturating_sub(self.last_bunker_attempt_tick) >= ATTACK_REISSUE_TICKS;
         if bunker_count < 2 && bunker_attempt_due {
@@ -2494,13 +2497,17 @@ fn identical_scripted_runs_are_identical() {
     let start = Game::new(&players).start_payload();
 
     let mut game_a = Game::new(&players);
-    let mut scripts_a: Vec<Box<dyn ScriptedPlayer>> =
-        vec![Box::new(MineOnlyScript::new(1)), Box::new(MineOnlyScript::new(2))];
+    let mut scripts_a: Vec<Box<dyn ScriptedPlayer>> = vec![
+        Box::new(MineOnlyScript::new(1)),
+        Box::new(MineOnlyScript::new(2)),
+    ];
     let history_a = run_scripted_ticks(&players, &mut scripts_a, &start, &mut game_a, TICKS);
 
     let mut game_b = Game::new(&players);
-    let mut scripts_b: Vec<Box<dyn ScriptedPlayer>> =
-        vec![Box::new(MineOnlyScript::new(1)), Box::new(MineOnlyScript::new(2))];
+    let mut scripts_b: Vec<Box<dyn ScriptedPlayer>> = vec![
+        Box::new(MineOnlyScript::new(1)),
+        Box::new(MineOnlyScript::new(2)),
+    ];
     let history_b = run_scripted_ticks(&players, &mut scripts_b, &start, &mut game_b, TICKS);
 
     for (tick, (snaps_a, snaps_b)) in history_a.iter().zip(&history_b).enumerate() {

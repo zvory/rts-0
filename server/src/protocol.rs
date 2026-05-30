@@ -36,8 +36,6 @@ pub mod kinds {
     pub const BUNKER: &str = "bunker";
     pub const STEEL: &str = "steel";
     pub const OIL: &str = "oil";
-
-
 }
 
 /// `EntityView.state` values.
