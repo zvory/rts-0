@@ -155,9 +155,9 @@ Gates:
 
 ### 2.4 Explicit Order State Machines
 
-- [ ] Separate order intent from execution state.
-- [ ] Model gather, build, attack, rally, and future setup/teardown as explicit state machines.
-- [ ] Add transition tests for stale target, stop, death, retarget, no path, ownership loss,
+- [x] Separate order intent from execution state.
+- [x] Model gather, build, attack, rally, and future setup/teardown as explicit state machines.
+- [x] Add transition tests for stale target, stop, death, retarget, no path, ownership loss,
   cancel, interrupt, resume, and completion.
 
 Gates:

@@ -122,24 +122,204 @@ impl std::fmt::Display for EntityKind {
 /// The high-level order a unit/building is currently executing.
 ///
 /// Orders drive the per-tick systems. Buildings only ever sit in [`Order::Idle`]; their
-/// activity (production, construction) is tracked by their dedicated fields. Movement
-/// targets are stored as world-pixel goals plus a tile waypoint path consumed by the
-/// movement system.
+/// activity (production, construction) is tracked by their dedicated fields. Each active order
+/// keeps immutable intent separate from execution phase, so systems transition explicit state
+/// machines instead of smuggling progress through unrelated fields.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Order {
     /// No order: units hold position, idle combat units auto-defend, bunkers auto-fire.
     Idle,
     /// Move to a world point; stop on arrival. No engaging en route.
-    Move { x: f32, y: f32 },
+    Move(MoveOrder),
     /// Move to a world point while engaging enemies encountered along the way.
-    AttackMove { x: f32, y: f32 },
+    AttackMove(MoveOrder),
     /// Chase and attack a specific entity until it dies, then go idle.
-    Attack { target: u32 },
+    Attack(AttackOrder),
     /// Harvest from a resource node, ferrying loads back to the home Industrial Center. See [`CarryState`].
-    Gather { node: u32 },
+    Gather(GatherOrder),
     /// Walk to a building site and construct it. `site` is the building entity id (the
     /// building already exists in CONSTRUCT state). Worker is occupied until completion.
-    Build { site: u32 },
+    Build(BuildOrder),
+}
+
+impl Order {
+    pub fn move_to(x: f32, y: f32) -> Self {
+        Order::Move(MoveOrder::new(x, y))
+    }
+
+    pub fn attack_move_to(x: f32, y: f32) -> Self {
+        Order::AttackMove(MoveOrder::new(x, y))
+    }
+
+    pub fn attack(target: u32) -> Self {
+        Order::Attack(AttackOrder::new(target))
+    }
+
+    pub fn gather(node: u32) -> Self {
+        Order::Gather(GatherOrder::new(node))
+    }
+
+    pub fn build(site: u32) -> Self {
+        Order::Build(BuildOrder::new(site))
+    }
+
+    pub fn attack_target(&self) -> Option<u32> {
+        match self {
+            Order::Attack(order) => Some(order.intent.target),
+            _ => None,
+        }
+    }
+
+    pub fn gather_node(&self) -> Option<u32> {
+        match self {
+            Order::Gather(order) => Some(order.intent.node),
+            _ => None,
+        }
+    }
+
+    pub fn build_site(&self) -> Option<u32> {
+        match self {
+            Order::Build(order) => Some(order.intent.site),
+            _ => None,
+        }
+    }
+
+    pub fn gather_phase(&self) -> Option<GatherPhase> {
+        match self {
+            Order::Gather(order) => Some(order.execution.phase),
+            _ => None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct PointIntent {
+    pub x: f32,
+    pub y: f32,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct MoveOrder {
+    pub intent: PointIntent,
+    pub execution: MoveExecution,
+}
+
+impl MoveOrder {
+    fn new(x: f32, y: f32) -> Self {
+        MoveOrder {
+            intent: PointIntent { x, y },
+            execution: MoveExecution {
+                phase: MovePhase::Pathing,
+            },
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct MoveExecution {
+    pub phase: MovePhase,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MovePhase {
+    Pathing,
+    Moving,
+    Arrived,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TargetIntent {
+    pub target: u32,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct AttackOrder {
+    pub intent: TargetIntent,
+    pub execution: AttackExecution,
+}
+
+impl AttackOrder {
+    fn new(target: u32) -> Self {
+        AttackOrder {
+            intent: TargetIntent { target },
+            execution: AttackExecution {
+                phase: AttackPhase::Chasing,
+            },
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AttackExecution {
+    pub phase: AttackPhase,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AttackPhase {
+    Chasing,
+    Firing,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct GatherIntent {
+    pub node: u32,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct GatherOrder {
+    pub intent: GatherIntent,
+    pub execution: GatherExecution,
+}
+
+impl GatherOrder {
+    fn new(node: u32) -> Self {
+        GatherOrder {
+            intent: GatherIntent { node },
+            execution: GatherExecution {
+                phase: GatherPhase::ToNode,
+                harvest_progress: 0,
+            },
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct GatherExecution {
+    pub phase: GatherPhase,
+    pub harvest_progress: u32,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct BuildIntent {
+    pub site: u32,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct BuildOrder {
+    pub intent: BuildIntent,
+    pub execution: BuildExecution,
+}
+
+impl BuildOrder {
+    fn new(site: u32) -> Self {
+        BuildOrder {
+            intent: BuildIntent { site },
+            execution: BuildExecution {
+                phase: BuildPhase::ToSite,
+            },
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct BuildExecution {
+    pub phase: BuildPhase,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BuildPhase {
+    ToSite,
+    Constructing,
 }
 
 /// A queued production order on a building.
@@ -163,10 +343,10 @@ pub struct CarryState {
     pub kind: EntityKind,
 }
 
-/// The phase a gathering worker is in. Kept separate from [`Order::Gather`] so the order
-/// (which node) stays stable while the worker cycles through fetch/harvest/return.
+/// The phase a gathering worker is in. Kept inside [`GatherOrder`] so the order's intent
+/// (which node) stays stable while the worker's execution cycles through phases.
 #[allow(dead_code)]
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GatherPhase {
     /// Walking out to the resource node.
     ToNode,
@@ -230,27 +410,12 @@ pub struct ConstructionState {
 
 /// Worker-only gathering and carrying state.
 #[allow(dead_code)]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct WorkerState {
     /// Present when the worker is laden with a resource load.
     pub carry: Option<CarryState>,
-    /// Gathering sub-phase (only meaningful under [`Order::Gather`]).
-    pub gather_phase: GatherPhase,
-    /// Ticks accumulated while [`GatherPhase::Harvesting`].
-    pub harvest_progress: u32,
     /// The Industrial Center this worker deposits into. Resolved lazily to the nearest own Industrial Center.
     pub home_industrial_center: Option<u32>,
-}
-
-impl Default for WorkerState {
-    fn default() -> Self {
-        WorkerState {
-            carry: None,
-            gather_phase: GatherPhase::ToNode,
-            harvest_progress: 0,
-            home_industrial_center: None,
-        }
-    }
 }
 
 /// Resource-node state. Present only on steel/oil nodes.
@@ -421,6 +586,64 @@ impl Entity {
         }
     }
 
+    pub fn mark_move_phase(&mut self, phase: MovePhase) {
+        if let Some(m) = self.movement.as_mut() {
+            match &mut m.order {
+                Order::Move(order) | Order::AttackMove(order) => {
+                    order.execution.phase = phase;
+                }
+                _ => {}
+            }
+        }
+    }
+
+    pub fn mark_attack_phase(&mut self, phase: AttackPhase) {
+        if let Some(m) = self.movement.as_mut() {
+            if let Order::Attack(order) = &mut m.order {
+                order.execution.phase = phase;
+            }
+        }
+    }
+
+    pub fn mark_gather_phase(&mut self, phase: GatherPhase) {
+        if let Some(m) = self.movement.as_mut() {
+            if let Order::Gather(order) = &mut m.order {
+                order.execution.phase = phase;
+                if phase != GatherPhase::Harvesting {
+                    order.execution.harvest_progress = 0;
+                }
+            }
+        }
+    }
+
+    pub fn tick_gather_harvest(&mut self) -> Option<u32> {
+        let m = self.movement.as_mut()?;
+        let Order::Gather(order) = &mut m.order else {
+            return None;
+        };
+        if order.execution.phase != GatherPhase::Harvesting {
+            return None;
+        }
+        order.execution.harvest_progress = order.execution.harvest_progress.saturating_add(1);
+        Some(order.execution.harvest_progress)
+    }
+
+    pub fn reset_gather_harvest(&mut self) {
+        if let Some(m) = self.movement.as_mut() {
+            if let Order::Gather(order) = &mut m.order {
+                order.execution.harvest_progress = 0;
+            }
+        }
+    }
+
+    pub fn mark_build_phase(&mut self, phase: BuildPhase) {
+        if let Some(m) = self.movement.as_mut() {
+            if let Order::Build(order) = &mut m.order {
+                order.execution.phase = phase;
+            }
+        }
+    }
+
     pub fn path_is_empty(&self) -> bool {
         self.movement
             .as_ref()
@@ -519,13 +742,15 @@ impl Entity {
     }
 
     pub fn gather_phase(&self) -> Option<GatherPhase> {
-        self.worker.as_ref().map(|w| w.gather_phase)
+        self.movement.as_ref().and_then(|m| m.order.gather_phase())
     }
 
     pub fn reset_gather_state(&mut self) {
-        if let Some(w) = self.worker.as_mut() {
-            w.gather_phase = GatherPhase::ToNode;
-            w.harvest_progress = 0;
+        if let Some(m) = self.movement.as_mut() {
+            if let Order::Gather(order) = &mut m.order {
+                order.execution.phase = GatherPhase::ToNode;
+                order.execution.harvest_progress = 0;
+            }
         }
     }
 
@@ -605,17 +830,17 @@ impl Entity {
         }
         match self.order() {
             Order::Idle => states::IDLE,
-            Order::Move { .. } => states::MOVE,
-            Order::AttackMove { .. } => {
+            Order::Move(_) => states::MOVE,
+            Order::AttackMove(_) => {
                 if self.target_id().is_some() {
                     states::ATTACK
                 } else {
                     states::MOVE
                 }
             }
-            Order::Attack { .. } => states::ATTACK,
-            Order::Gather { .. } => states::GATHER,
-            Order::Build { .. } => states::BUILD,
+            Order::Attack(_) => states::ATTACK,
+            Order::Gather(_) => states::GATHER,
+            Order::Build(_) => states::BUILD,
         }
     }
 
@@ -627,11 +852,6 @@ impl Entity {
             m.path.clear();
         }
         self.set_target_id(None);
-        // A laden worker keeps its load but stops ferrying.
-        if let Some(w) = self.worker.as_mut() {
-            w.gather_phase = GatherPhase::ToNode;
-            w.harvest_progress = 0;
-        }
     }
 }
 
@@ -746,9 +966,9 @@ impl EntityStore {
     /// if it points to this worker.
     pub fn release_miner(&mut self, worker_id: u32) {
         let old_node = match self.get(worker_id) {
-            Some(e) => match e.order() {
-                Order::Gather { node } => node,
-                _ => return,
+            Some(e) => match e.order().gather_node() {
+                Some(node) => node,
+                None => return,
             },
             None => return,
         };
@@ -883,5 +1103,84 @@ mod tests {
                 "{kind:?}"
             );
         }
+    }
+
+    #[test]
+    fn order_state_machines_keep_intent_separate_from_execution() {
+        let mut worker =
+            Entity::new_unit(1, EntityKind::Worker, 10.0, 20.0).expect("worker should spawn");
+
+        worker.set_order(Order::gather(42));
+        assert_eq!(worker.order().gather_node(), Some(42));
+        assert_eq!(worker.gather_phase(), Some(GatherPhase::ToNode));
+
+        worker.mark_gather_phase(GatherPhase::Harvesting);
+        assert_eq!(worker.order().gather_node(), Some(42));
+        assert_eq!(worker.gather_phase(), Some(GatherPhase::Harvesting));
+        assert_eq!(worker.tick_gather_harvest(), Some(1));
+        assert_eq!(worker.tick_gather_harvest(), Some(2));
+
+        worker.mark_gather_phase(GatherPhase::ToNode);
+        assert_eq!(worker.order().gather_node(), Some(42));
+        assert_eq!(worker.gather_phase(), Some(GatherPhase::ToNode));
+        assert_eq!(worker.tick_gather_harvest(), None);
+
+        worker.clear_orders();
+        assert_eq!(worker.order(), Order::Idle);
+        assert_eq!(worker.gather_phase(), None);
+    }
+
+    #[test]
+    fn attack_and_build_orders_have_explicit_execution_phases() {
+        let mut unit =
+            Entity::new_unit(1, EntityKind::Rifleman, 10.0, 20.0).expect("unit should spawn");
+
+        unit.set_order(Order::attack(99));
+        assert_eq!(unit.order().attack_target(), Some(99));
+        assert!(matches!(
+            unit.order(),
+            Order::Attack(AttackOrder {
+                execution: AttackExecution {
+                    phase: AttackPhase::Chasing
+                },
+                ..
+            })
+        ));
+        unit.mark_attack_phase(AttackPhase::Firing);
+        assert_eq!(unit.order().attack_target(), Some(99));
+        assert!(matches!(
+            unit.order(),
+            Order::Attack(AttackOrder {
+                execution: AttackExecution {
+                    phase: AttackPhase::Firing
+                },
+                ..
+            })
+        ));
+
+        let mut worker =
+            Entity::new_unit(1, EntityKind::Worker, 10.0, 20.0).expect("worker should spawn");
+        worker.set_order(Order::build(7));
+        assert_eq!(worker.order().build_site(), Some(7));
+        assert!(matches!(
+            worker.order(),
+            Order::Build(BuildOrder {
+                execution: BuildExecution {
+                    phase: BuildPhase::ToSite
+                },
+                ..
+            })
+        ));
+        worker.mark_build_phase(BuildPhase::Constructing);
+        assert_eq!(worker.order().build_site(), Some(7));
+        assert!(matches!(
+            worker.order(),
+            Order::Build(BuildOrder {
+                execution: BuildExecution {
+                    phase: BuildPhase::Constructing
+                },
+                ..
+            })
+        ));
     }
 }

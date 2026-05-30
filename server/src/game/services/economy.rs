@@ -1,5 +1,5 @@
 use crate::config;
-use crate::game::entity::{EntityKind, EntityStore, GatherPhase, Order};
+use crate::game::entity::{EntityKind, EntityStore, GatherPhase};
 use crate::game::map::Map;
 use crate::game::services::dist2;
 use crate::game::services::occupancy::Occupancy;
@@ -21,9 +21,9 @@ pub(crate) fn gather_system(
 
     for id in entities.ids() {
         let node = match entities.get(id) {
-            Some(e) if e.kind == EntityKind::Worker => match e.order() {
-                Order::Gather { node } => node,
-                _ => continue,
+            Some(e) if e.kind == EntityKind::Worker => match e.order().gather_node() {
+                Some(node) => node,
+                None => continue,
             },
             _ => continue,
         };
@@ -68,10 +68,7 @@ fn gather_to_node(
             e.clear_path();
             e.set_facing((node_pos.1 - wy).atan2(node_pos.0 - wx));
             if can_mine {
-                if let Some(w) = e.worker.as_mut() {
-                    w.gather_phase = GatherPhase::Harvesting;
-                    w.harvest_progress = 0;
-                }
+                e.mark_gather_phase(GatherPhase::Harvesting);
             } else {
                 e.clear_orders();
             }
@@ -103,9 +100,6 @@ fn gather_harvesting(entities: &mut EntityStore, players: &mut [PlayerState], id
         Some(m) if m != id => {
             if let Some(e) = entities.get_mut(id) {
                 e.clear_orders();
-                if let Some(w) = e.worker.as_mut() {
-                    w.harvest_progress = 0;
-                }
             }
             return;
         }
@@ -123,11 +117,9 @@ fn gather_harvesting(entities: &mut EntityStore, players: &mut [PlayerState], id
             Some(e) => e,
             None => return,
         };
-        let Some(w) = e.worker.as_mut() else {
-            return;
-        };
-        w.harvest_progress += 1;
-        w.harvest_progress >= config::HARVEST_TICKS
+        e.tick_gather_harvest()
+            .map(|progress| progress >= config::HARVEST_TICKS)
+            .unwrap_or(false)
     };
     if !done {
         return;
@@ -162,9 +154,9 @@ fn gather_harvesting(entities: &mut EntityStore, players: &mut [PlayerState], id
 
     if let Some(e) = entities.get_mut(id) {
         if let Some(w) = e.worker.as_mut() {
-            w.harvest_progress = 0;
             w.carry = None;
         }
+        e.reset_gather_harvest();
         e.clear_path();
     }
     if taken == node_kind_amount.1 {
@@ -180,7 +172,7 @@ fn gather_harvesting(entities: &mut EntityStore, players: &mut [PlayerState], id
 fn slot_held(entities: &EntityStore, node: u32) -> Option<u32> {
     let m = entities.get(node).and_then(|n| n.miner())?;
     let w = entities.get(m)?;
-    let on_this_node = matches!(w.order(), Order::Gather { node: n } if n == node);
+    let on_this_node = w.order().gather_node() == Some(node);
     if w.hp > 0
         && w.kind == EntityKind::Worker
         && on_this_node

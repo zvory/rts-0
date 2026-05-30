@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::config;
-use crate::game::entity::{EntityStore, Order};
+use crate::game::entity::{BuildPhase, EntityStore};
 use crate::game::map::{Map, MobilityClass};
 use crate::game::pathfinding::Passability;
 use crate::game::services::occupancy::{building_footprint, Occupancy};
@@ -21,7 +21,7 @@ pub(crate) fn construction_system(
     let mut working: Vec<(u32, u32)> = Vec::new();
     for e in entities.iter() {
         if e.is_unit() {
-            if let Order::Build { site } = e.order() {
+            if let Some(site) = e.order().build_site() {
                 if let Some(b) = entities.get(site) {
                     let arrive =
                         interact_range(entities, site).unwrap_or(config::TILE_SIZE as f32 * 2.0);
@@ -39,6 +39,7 @@ pub(crate) fn construction_system(
         // Stop the worker moving while it builds.
         if let Some(w) = entities.get_mut(worker) {
             w.clear_path();
+            w.mark_build_phase(BuildPhase::Constructing);
         }
         let completed = {
             let b = match entities.get_mut(site) {

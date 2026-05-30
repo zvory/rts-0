@@ -145,7 +145,7 @@ impl Game {
                     e.id,
                     miner_id
                 );
-                let on_this_node = matches!(miner.order(), Order::Gather { node } if node == e.id);
+                let on_this_node = miner.order().gather_node() == Some(e.id);
                 assert!(
                     on_this_node,
                     "invariant: node {} miner {} does not have Gather order for this node (order {:?})",
@@ -171,7 +171,10 @@ impl Game {
                 continue;
             }
             match e.order() {
-                Order::Attack { target } => {
+                Order::Attack(_) => {
+                    let Some(target) = e.order().attack_target() else {
+                        continue;
+                    };
                     if let Some(t) = self.entities.get(target) {
                         assert!(
                             t.is_targetable() && t.hp > 0,
@@ -180,7 +183,10 @@ impl Game {
                         );
                     }
                 }
-                Order::Gather { node } => {
+                Order::Gather(_) => {
+                    let Some(node) = e.order().gather_node() else {
+                        continue;
+                    };
                     if let Some(n) = self.entities.get(node) {
                         assert!(
                             n.is_node() && n.remaining().unwrap_or(0) > 0,
@@ -189,7 +195,10 @@ impl Game {
                         );
                     }
                 }
-                Order::Build { site } => {
+                Order::Build(_) => {
+                    let Some(site) = e.order().build_site() else {
+                        continue;
+                    };
                     if let Some(b) = self.entities.get(site) {
                         assert!(
                             b.is_building() && b.under_construction(),

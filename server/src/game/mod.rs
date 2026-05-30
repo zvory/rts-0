@@ -382,7 +382,7 @@ impl Game {
         }
 
         if e.kind == EntityKind::Worker && e.gather_phase() == Some(GatherPhase::Harvesting) {
-            if let Order::Gather { node } = e.order() {
+            if let Some(node) = e.order().gather_node() {
                 v.latched_node = Some(node);
             }
         }
@@ -390,7 +390,7 @@ impl Game {
         // Combat tracer target (only meaningful for attackers actively engaged).
         if let Some(t) = e.target_id() {
             // Only expose a target that points at a real combat target, to keep tracers sane.
-            if matches!(e.order(), Order::Attack { .. } | Order::AttackMove { .. })
+            if matches!(e.order(), Order::Attack(_) | Order::AttackMove(_))
                 || (e.is_building() && e.can_attack())
             {
                 // Fog-gate the tracer: reveal the target id only when the viewer owns the
