@@ -28,7 +28,7 @@ pub const STARTING_OIL: u32 = 0;
 pub const STARTING_WORKERS: u32 = 4;
 
 pub const STEEL_LOAD: u32 = 5;
-pub const OIL_LOAD: u32 = 4;
+pub const OIL_LOAD: u32 = 1;
 pub const HARVEST_TICKS: u32 = 40;
 pub const STEEL_PATCH_AMOUNT: u32 = 1500;
 pub const OIL_GEYSER_AMOUNT: u32 = 5000;
@@ -46,7 +46,7 @@ pub const IC_RESOURCE_MAX_DIST_TILES: f32 = 7.0;
 pub const STEEL_BLOCK_DIST_TILES: f32 = 5.5;
 
 /// Distance (in tiles) from the Industrial Center to the starting oil geyser.
-pub const OIL_DIST_TILES: f32 = 6.5;
+pub const OIL_DIST_TILES: f32 = 6.0;
 
 // --- Supply -----------------------------------------------------------------
 pub const INDUSTRIAL_CENTER_SUPPLY: u32 = 10;
@@ -209,11 +209,11 @@ pub fn building_stats(kind: EntityKind) -> Option<BuildingStats> {
             range_tiles: 0,
             cooldown: 0,
         },
-        EntityKind::AdvancedTrainingCentre => BuildingStats {
+        EntityKind::TrainingCentre => BuildingStats {
             hp: 300,
             sight_tiles: 6,
-            cost_steel: 125,
-            cost_oil: 0,
+            cost_steel: 100,
+            cost_oil: 50,
             foot_w: 3,
             foot_h: 2,
             build_ticks: 220,
@@ -225,8 +225,8 @@ pub fn building_stats(kind: EntityKind) -> Option<BuildingStats> {
         EntityKind::TankFactory => BuildingStats {
             hp: 360,
             sight_tiles: 6,
-            cost_steel: 150,
-            cost_oil: 0,
+            cost_steel: 200,
+            cost_oil: 100,
             foot_w: 3,
             foot_h: 3,
             build_ticks: 240,
@@ -275,7 +275,7 @@ pub fn build_requirement_met(
 ) -> bool {
     match building_kind {
         EntityKind::Barracks
-        | EntityKind::AdvancedTrainingCentre
+        | EntityKind::TrainingCentre
         | EntityKind::TankFactory
         | EntityKind::Bunker => owned_building_kinds.contains(&EntityKind::IndustrialCenter),
         _ => true,
@@ -289,7 +289,7 @@ pub fn train_requirement_met(
 ) -> bool {
     match unit_kind {
         EntityKind::MachineGunner | EntityKind::AtTeam => {
-            owned_complete_building_kinds.contains(&EntityKind::AdvancedTrainingCentre)
+            owned_complete_building_kinds.contains(&EntityKind::TrainingCentre)
         }
         _ => true,
     }
@@ -332,11 +332,11 @@ mod tests {
         assert!(!train_requirement_met(EntityKind::AtTeam, &[]));
         assert!(train_requirement_met(
             EntityKind::MachineGunner,
-            &[EntityKind::AdvancedTrainingCentre]
+            &[EntityKind::TrainingCentre]
         ));
         assert!(train_requirement_met(
             EntityKind::AtTeam,
-            &[EntityKind::AdvancedTrainingCentre]
+            &[EntityKind::TrainingCentre]
         ));
 
         let bunker = building_stats(EntityKind::Bunker).expect("bunker stats");
