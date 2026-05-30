@@ -55,6 +55,9 @@ export class GameState {
     this.commandTarget = null;
     /** @type {Array<{kind:string,x:number,y:number,createdAt:number}>} */
     this.commandFeedback = [];
+
+    /** @type {Array<{from:number,to:number,createdAt:number}>} */
+    this.muzzleFlashes = [];
   }
 
   /** World pixels per tile. */
@@ -108,6 +111,26 @@ export class GameState {
       supplyCap: msg.supplyCap | 0,
     };
     this.events = msg.events || [];
+
+    for (const ev of this.events) {
+      if (ev && ev.e === "attack" && typeof ev.from === "number" && typeof ev.to === "number") {
+        this.muzzleFlashes.push({ from: ev.from, to: ev.to, createdAt: now });
+      }
+    }
+    if (this.muzzleFlashes.length > 256) {
+      this.muzzleFlashes.splice(0, this.muzzleFlashes.length - 256);
+    }
+  }
+
+  /**
+   * Return live muzzle-flash records, pruning expired ones.
+   * @param {number} now
+   * @returns {Array<{from:number,to:number,createdAt:number}>}
+   */
+  liveMuzzleFlashes(now) {
+    const ttlMs = 240;
+    this.muzzleFlashes = this.muzzleFlashes.filter((f) => now - f.createdAt <= ttlMs);
+    return this.muzzleFlashes;
   }
 
   /**

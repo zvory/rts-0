@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use crate::config;
 use crate::game::entity::{AttackPhase, Entity, EntityStore, Order};
+use crate::game::fog::Fog;
 use crate::game::map::Map;
 use crate::game::services::dist2;
 use crate::game::services::move_coordinator::MoveCoordinator;
@@ -22,6 +23,7 @@ pub(crate) fn combat_system(
     _occ: &Occupancy,
     spatial: &SpatialIndex,
     coordinator: &mut MoveCoordinator<'_>,
+    fog: &Fog,
     events: &mut HashMap<u32, Vec<Event>>,
 ) {
     // Tick down cooldowns first.
@@ -99,7 +101,7 @@ pub(crate) fn combat_system(
                 e.clear_path();
             }
             if ready {
-                apply_damage(entities, events, id, tid, dmg, owner);
+                apply_damage(entities, events, fog, id, tid, dmg, owner, px, py, tx, ty);
                 if let Some(e) = entities.get_mut(id) {
                     e.set_attack_cd(cd_reset);
                 }
@@ -177,22 +179,36 @@ fn resolve_target(
 
 /// Apply `dmg` to `victim` from `attacker`, emitting an `Attack` event to the attacker's
 /// owner. Death itself is handled by the death system (we only zero hp here).
+#[allow(clippy::too_many_arguments)]
 fn apply_damage(
     entities: &mut EntityStore,
     events: &mut HashMap<u32, Vec<Event>>,
+    fog: &Fog,
     attacker: u32,
     victim: u32,
     dmg: u32,
     attacker_owner: u32,
+    ax: f32,
+    ay: f32,
+    vx: f32,
+    vy: f32,
 ) {
     if let Some(v) = entities.get_mut(victim) {
         v.hp = v.hp.saturating_sub(dmg);
     }
-    events
-        .entry(attacker_owner)
-        .or_default()
-        .push(Event::Attack {
+    // Send the Attack event to every player who can either see the attacker or the victim, so
+    // friendly fire tracers + enemy muzzle flashes both render. Attacker's owner always gets it.
+    let player_ids: Vec<u32> = events.keys().copied().collect();
+    for pid in player_ids {
+        let visible = pid == attacker_owner
+            || fog.is_visible_world(pid, ax, ay)
+            || fog.is_visible_world(pid, vx, vy);
+        if !visible {
+            continue;
+        }
+        events.entry(pid).or_default().push(Event::Attack {
             from: attacker,
             to: victim,
         });
+    }
 }

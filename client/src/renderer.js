@@ -223,6 +223,7 @@ export class Renderer {
     // Overlays.
     this._drawFog(fog);
     this._drawCommandFeedback(state);
+    this._drawMuzzleFlashes(state);
     this._drawPlacement(state, fog);
   }
 
@@ -788,6 +789,61 @@ export class Renderer {
   }
 
   /**
+   * Draw a brief muzzle flash on the attacker plus a thin yellow tracer line to
+   * the target, for each Attack event in the latest snapshot. Size scales by
+   * attacker kind (tank > MG > bunker > rifleman).
+   * @private
+   */
+  _drawMuzzleFlashes(state) {
+    const g = this._feedbackGfx;
+    if (!state || typeof state.liveMuzzleFlashes !== "function") return;
+    const now = performance.now();
+    const flashes = state.liveMuzzleFlashes(now);
+    if (!flashes.length) return;
+
+    for (const f of flashes) {
+      const attacker = state.entityById(f.from);
+      if (!attacker) continue;
+      const target = state.entityById(f.to);
+
+      const age = now - f.createdAt;
+      const t = clamp01(age / 240);
+      const fade = 1 - t;
+
+      const baseR = muzzleFlashRadius(attacker.kind);
+      if (baseR <= 0) continue;
+
+      const facing = typeof attacker.facing === "number"
+        ? attacker.facing
+        : target
+        ? Math.atan2(target.y - attacker.y, target.x - attacker.x)
+        : 0;
+      const stat = STATS[attacker.kind] || {};
+      const reach = isBuilding(attacker.kind)
+        ? Math.max(stat.footW || 2, stat.footH || 2) * ((this._map && this._map.tileSize) || 32) * 0.5
+        : (stat.size || 9) * 1.1;
+      const mx = attacker.x + Math.cos(facing) * reach;
+      const my = attacker.y + Math.sin(facing) * reach;
+
+      if (target) {
+        g.lineStyle(1.5, 0xffe066, 0.9 * fade);
+        g.moveTo(mx, my);
+        g.lineTo(target.x, target.y);
+      }
+
+      // Flash: bright core that scales up slightly then fades.
+      const r = baseR * (0.7 + 0.45 * t);
+      g.lineStyle(0);
+      g.beginFill(0xfff2a8, 0.85 * fade);
+      g.drawCircle(mx, my, r);
+      g.endFill();
+      g.beginFill(0xffd84a, 0.55 * fade);
+      g.drawCircle(mx, my, r * 0.55);
+      g.endFill();
+    }
+  }
+
+  /**
    * Draw the drag selection rectangle in SCREEN space, or clear it when passed null.
    * @param {{x:number,y:number,w:number,h:number}|null} rect screen-space rect
    */
@@ -910,6 +966,16 @@ export class Renderer {
 }
 
 // --- Small pure helpers ----------------------------------------------------
+
+/** Per-attacker muzzle-flash radius in world px. 0 means no flash for this kind. */
+function muzzleFlashRadius(kind) {
+  if (kind === KIND.TANK) return 18;
+  if (kind === KIND.BUNKER) return 13;
+  if (kind === KIND.AT_TEAM) return 11;
+  if (kind === KIND.MACHINE_GUNNER) return 9;
+  if (kind === KIND.RIFLEMAN) return 7;
+  return 0;
+}
 
 /** Clamp a number to [0,1]. */
 function clamp01(v) {

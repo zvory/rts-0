@@ -62,7 +62,7 @@ pub(crate) fn run_tick(
     // Rebuild after movement so combat, gather, and collision resolution see updated positions.
     let spatial = services::spatial::SpatialIndex::build(entities, map.size);
 
-    services::combat::combat_system(map, entities, &occ, &spatial, &mut coordinator, events);
+    services::combat::combat_system(map, entities, &occ, &spatial, &mut coordinator, fog, events);
     services::economy::gather_system(map, entities, players, &occ, &spatial, &mut coordinator);
     services::production::production_system(map, entities, &coordinator, events);
     services::construction::construction_system(map, entities, players, &spatial, events);
