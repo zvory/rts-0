@@ -474,19 +474,28 @@ fn spawn_player_start(entities: &mut EntityStore, map: &Map, owner: u32, start: 
         entities.spawn_node(EntityKind::Steel, px, py);
     }
 
-    // Oil node sits at a fixed distance further out in the same direction.
+    // Four oil nodes arranged in a 2x2 block centered on OIL_DIST_TILES out from the IC,
+    // perpendicular to the base axis (mirrors the steel block layout but smaller).
     let oil_dist = config::OIL_DIST_TILES * ts;
-    let gx = hx + oil_dist * base_angle.cos();
-    let gy = hy + oil_dist * base_angle.sin();
-    let oil_tiles = oil_dist / ts;
-    debug_assert!(
-        (config::IC_RESOURCE_MIN_DIST_TILES..=config::IC_RESOURCE_MAX_DIST_TILES)
-            .contains(&oil_tiles),
-        "oil at {oil_tiles:.2} tiles from IC is out of [{:.1}, {:.1}] bounds",
-        config::IC_RESOURCE_MIN_DIST_TILES,
-        config::IC_RESOURCE_MAX_DIST_TILES
-    );
-    entities.spawn_node(EntityKind::Oil, gx, gy);
+    let block_cx = hx + oil_dist * base_angle.cos();
+    let block_cy = hy + oil_dist * base_angle.sin();
+    for i in 0..4u32 {
+        let col = (i % 2) as f32;
+        let row = (i / 2) as f32;
+        let off_x = (col - 0.5) * ts;
+        let off_y = (row - 0.5) * ts;
+        let px = block_cx + off_x * perp_x + off_y * base_angle.cos();
+        let py = block_cy + off_x * perp_y + off_y * base_angle.sin();
+        let dist_tiles = ((px - hx).powi(2) + (py - hy).powi(2)).sqrt() / ts;
+        debug_assert!(
+            (config::IC_RESOURCE_MIN_DIST_TILES..=config::IC_RESOURCE_MAX_DIST_TILES)
+                .contains(&dist_tiles),
+            "oil patch {i} at {dist_tiles:.2} tiles from IC is out of [{:.1}, {:.1}] bounds",
+            config::IC_RESOURCE_MIN_DIST_TILES,
+            config::IC_RESOURCE_MAX_DIST_TILES
+        );
+        entities.spawn_node(EntityKind::Oil, px, py);
+    }
 }
 
 #[cfg(test)]

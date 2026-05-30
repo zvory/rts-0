@@ -120,8 +120,8 @@ Start with 1 Industrial Center, 4 engineers, 50 supplies. Supply cap starts at 1
 | Industrial Center | 600 | 400 min | 3x3 | trains Engineers, resource drop-off, +10 supply (start free) |
 | Depot | 220 | 50 min | 2x2 | +8 supply |
 | Barracks | 320 | 100 min | 3x2 | trains Riflemen, Machine Gunners, AT Teams |
-| Advanced Training Centre | 300 | 125 min | 3x2 | unlocks support infantry |
-| Tank Factory | 360 | 150 min | 3x3 | trains Tanks |
+| Training Centre | 300 | 100 min/50 gas | 3x2 | unlocks support infantry |
+| Tank Factory | 360 | 200 min/100 gas | 3x3 | trains Tanks |
 | Bunker | 200 | 150 min | 2x2 | static defense (dmg 10, range 7) |
 
 Balance lives in `server/src/config.rs` (authoritative); the UI subset is mirrored in
