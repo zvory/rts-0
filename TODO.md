@@ -10,7 +10,6 @@
  - [x] Rename the game officially to Bewegungskrieg.
  - [ ] Restyle the main menu to be more ww2 themed, less scifi.
  - [ ] Enforce map-generation resource fairness: Industrial Centers must keep a minimum distance from minerals and gas, and spawn layouts should precisely control resource distances so no player gets an advantage from patches or geysers being too close or too far.
- - [ ] Fix workers getting stuck inside buildings after building them.
  - [ ] Units should have collision and not stack, unless they're mining workers. This is a tough change because it requires complex pathfinding and careful thought and modular design.
  - [ ] Maps should be twice as large.
  - [ ] Implement forests: LoS blockers unless you're inside them, provide cover (attacks on them have chance to miss), tanks cannot enter but can shoot into them. Forests should come in large blobs and block vision. Infantry attacking from inside are visible.
@@ -50,3 +49,4 @@
  - [x] Unpassable terrain should have a darker silhouette.
  - [x] Tanks should be twice the size they are.
  - [x] Halve the speed of a worker and AT gun too.
+ - [x] Fix workers getting stuck inside buildings after building them.
