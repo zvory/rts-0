@@ -1,23 +1,37 @@
- - [ ] command card should have grid style hotkeys
- - [ ] feedback on move and attack commands
- - [ ] selected unitss hould have a command card for hold position, move, attack, stock
- - [ ] buildings should be able to rally units to a position
- - [x] progress bars on top of buildings for their unit building progress
- - [x] defeat screen should not black out the screen, but continue to show the latest state of the map
- - [x] command card should be made bigger
- - [ ] units should have collision, and not stack, unless they're mining workers. this is a tough change, because it requires complex pathfinding and careful thought and modular design. 
- - [ ] rename gas to oil, minerals to steel
- - [x] all units besides rifleman and workers should require gas
- - [ ] workers can get stuck inside buildings after building them
- - [x] halve the speed of infantry
- - [x] unpassable terrain should have a darker sillouhette
- - [ ] implement forests, LoS blockers unless you're inside them, provides cover, tanks cannot enter but can shoot into them
- - [ ] forests should come in large blobs and block vision
- - [x] tanks should be twice the size theya re
- - [ ] ai should GG after losing all town halls
- - [ ] restyle the main menu to be more ww2 themed, less scifi. 
- - [ ] maps should be twice as large
- - [ ] will support two different factions, soviets and germans, with different stats, and some special units and buildings
- - [ ] machine gunner attacks should be the same as infantryman, unless the commadn "set up" is used, which will stop the machine gunner for five seconds (no omving or shooting), after which point they cannot move or rotate without changing tearing down for three seconds, but have the elevated damage output, and have a fixed 40 degree field of fire.
- - [ ] halve the speed of a worker and AT gun too
- - [ ] 
+# TODO
+
+## Active, In Order
+
+ - [ ] Add a tick-stamped command log and deterministic replay harness as a first-class internal artifact.
+ - [ ] Replace stringly entity kind checks in hot simulation paths with typed internal enums, converting to protocol strings only at the boundary.
+ - [ ] Split `systems.rs` into internal services before adding complex mechanics: commands, movement, combat, economy, production, construction, death, occupancy.
+ - [ ] Add a spatial query layer used by combat, fog, resource search, collision/steering, and snapshot interest filtering.
+ - [ ] Introduce a `PathingService` boundary with unit class, radius/footprint, terrain mask, dynamic blockers, path budget, and cached/reusable results.
+ - [ ] Extend map/passability around movement classes before terrain-specific combat and tank/infantry rules land.
+ - [ ] Evolve snapshots toward baseline + delta updates or entity dirty flags while preserving the current `snapshot_for(player)` API.
+ - [ ] Fix workers getting stuck inside buildings after building them.
+ - [ ] Units should have collision and not stack, unless they're mining workers. This is a tough change because it requires complex pathfinding and careful thought and modular design.
+ - [ ] Maps should be twice as large.
+ - [ ] Forests should come in large blobs and block vision.
+ - [ ] Implement forests: LoS blockers unless you're inside them, provide cover, tanks cannot enter but can shoot into them.
+ - [ ] Buildings should be able to rally units to a position.
+ - [ ] AI should GG after losing all town halls.
+ - [ ] Machine gunner attacks should be the same as infantryman unless the command "set up" is used. Setup stops the machine gunner for five seconds with no moving or shooting; after setup they cannot move or rotate without tearing down for three seconds, but have elevated damage output and a fixed 40 degree field of fire.
+ - [ ] Support two different factions, soviets and germans, with different stats and some special units and buildings.
+ - [ ] Rename gas to oil, minerals to steel.
+ - [ ] Rename the game officially to Bewegungskrieg.
+ - [ ] Restyle the main menu to be more ww2 themed, less scifi.
+
+## Done
+
+ - [x] Command card should have grid style hotkeys.
+ - [x] Feedback on move and attack commands.
+ - [x] Selected units should have a command card for hold position, move, attack, stop.
+ - [x] Progress bars on top of buildings for their unit building progress.
+ - [x] Defeat screen should not black out the screen, but continue to show the latest state of the map.
+ - [x] Command card should be made bigger.
+ - [x] All units besides rifleman and workers should require gas.
+ - [x] Halve the speed of infantry.
+ - [x] Unpassable terrain should have a darker silhouette.
+ - [x] Tanks should be twice the size they are.
+ - [x] Halve the speed of a worker and AT gun too.

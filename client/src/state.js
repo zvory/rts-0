@@ -49,6 +49,12 @@ export class GameState {
     // --- build placement preview (client-only) ---
     /** @type {null | {building:string, tileX:number, tileY:number, valid:boolean}} */
     this.placement = null;
+
+    // --- command targeting / feedback (client-only) ---
+    /** @type {null | "move" | "attack"} */
+    this.commandTarget = null;
+    /** @type {Array<{kind:string,x:number,y:number,createdAt:number}>} */
+    this.commandFeedback = [];
   }
 
   /** World pixels per tile. */
@@ -187,6 +193,7 @@ export class GameState {
    * @param {string} buildingKind a building EntityKind.
    */
   beginPlacement(buildingKind) {
+    this.commandTarget = null;
     this.placement = { building: buildingKind, tileX: 0, tileY: 0, valid: false };
   }
 
@@ -207,6 +214,46 @@ export class GameState {
   /** Stop previewing placement. */
   endPlacement() {
     this.placement = null;
+  }
+
+  // --- command targeting / feedback (client-only) ------------------------
+
+  /**
+   * Arm a one-click command target mode from the HUD.
+   * @param {"move"|"attack"} kind
+   */
+  beginCommandTarget(kind) {
+    this.placement = null;
+    this.commandTarget = kind;
+  }
+
+  /** Clear any armed command target mode. */
+  endCommandTarget() {
+    this.commandTarget = null;
+  }
+
+  /**
+   * Add a short-lived local command marker at a world point.
+   * @param {"move"|"attack"} kind
+   * @param {number} x
+   * @param {number} y
+   */
+  addCommandFeedback(kind, x, y) {
+    this.commandFeedback.push({ kind, x, y, createdAt: performance.now() });
+    if (this.commandFeedback.length > 12) {
+      this.commandFeedback.splice(0, this.commandFeedback.length - 12);
+    }
+  }
+
+  /**
+   * Return live command feedback markers, pruning expired ones.
+   * @param {number} now
+   * @returns {Array<{kind:string,x:number,y:number,createdAt:number}>}
+   */
+  liveCommandFeedback(now) {
+    const ttlMs = 650;
+    this.commandFeedback = this.commandFeedback.filter((f) => now - f.createdAt <= ttlMs);
+    return this.commandFeedback;
   }
 
   // --- map helpers --------------------------------------------------------

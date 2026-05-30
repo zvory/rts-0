@@ -85,7 +85,7 @@ try {
   ok(await page.evaluate(() => window.__rts.match.state.selection.size) >= 1, "box-select selected own units");
 
   await page.evaluate(() => document.activeElement?.blur());
-  await page.keyboard.press("s");
+  await page.keyboard.press("d");
   await sleep(150);
   ok(await page.evaluate(() => window.__rts.match.state.placement?.building) === "depot", "build hotkey entered placement mode");
 

@@ -45,6 +45,7 @@ const LAYERS = [
   "selectionRings",
   "hpBars",
   "fog",
+  "feedback",
   "placement",
 ];
 
@@ -87,6 +88,8 @@ export class Renderer {
     this._terrainSprite = null; // PIXI.Sprite of the cached terrain RenderTexture
     this._fogGfx = new PIXI.Graphics();
     this.layers.fog.addChild(this._fogGfx);
+    this._feedbackGfx = new PIXI.Graphics();
+    this.layers.feedback.addChild(this._feedbackGfx);
     this._placementGfx = new PIXI.Graphics();
     this.layers.placement.addChild(this._placementGfx);
 
@@ -219,6 +222,7 @@ export class Renderer {
 
     // Overlays.
     this._drawFog(fog);
+    this._drawCommandFeedback(state);
     this._drawPlacement(state, fog);
   }
 
@@ -750,6 +754,38 @@ export class Renderer {
     }
   }
 
+  /** Draw short-lived local markers for issued move / attack commands. @private */
+  _drawCommandFeedback(state) {
+    const g = this._feedbackGfx;
+    g.clear();
+    if (!state || typeof state.liveCommandFeedback !== "function") return;
+
+    const now = performance.now();
+    for (const f of state.liveCommandFeedback(now)) {
+      const age = now - f.createdAt;
+      const t = clamp01(age / 650);
+      const alpha = (1 - t) * 0.95;
+      const r = 12 + t * 10;
+      const color = f.kind === "attack" ? COLORS.selectEnemy : COLORS.selectOwn;
+
+      g.lineStyle(2, color, alpha);
+      if (f.kind === "attack") {
+        g.moveTo(f.x - r, f.y - r);
+        g.lineTo(f.x + r, f.y + r);
+        g.moveTo(f.x + r, f.y - r);
+        g.lineTo(f.x - r, f.y + r);
+        g.drawCircle(f.x, f.y, r * 0.72);
+      } else {
+        g.drawCircle(f.x, f.y, r * 0.72);
+        g.moveTo(f.x, f.y - r);
+        g.lineTo(f.x + r * 0.72, f.y);
+        g.lineTo(f.x, f.y + r);
+        g.lineTo(f.x - r * 0.72, f.y);
+        g.lineTo(f.x, f.y - r);
+      }
+    }
+  }
+
   /**
    * Draw the drag selection rectangle in SCREEN space, or clear it when passed null.
    * @param {{x:number,y:number,w:number,h:number}|null} rect screen-space rect
@@ -855,6 +891,7 @@ export class Renderer {
 
     // Long-lived single Graphics.
     this._fogGfx.destroy();
+    this._feedbackGfx.destroy();
     this._placementGfx.destroy();
     this._dragGfx.destroy();
 

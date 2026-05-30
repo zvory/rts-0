@@ -549,6 +549,10 @@ input[type="text"]:focus {
   border-color: var(--accent);
   box-shadow: inset 0 0 0 1px var(--panel-glow);
 }
+.cmd-btn.active:not(:disabled) {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 2px var(--accent), 0 0 10px var(--panel-glow);
+}
 .cmd-btn:active:not(:disabled) {
   transform: translateY(1px);
 }
@@ -556,16 +560,16 @@ input[type="text"]:focus {
   opacity: 0.38;
   cursor: not-allowed;
 }
-.cmd-btn .icon {
+.cmd-btn .cmd-icon {
   font-family: var(--mono);
   font-size: 20px;
   font-weight: 800;
   line-height: 1;
 }
-.cmd-btn .label {
+.cmd-btn .cmd-label {
   font-size: 9px;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0;
   color: var(--ink-dim);
   max-width: 100%;
   overflow: hidden;
@@ -573,16 +577,23 @@ input[type="text"]:focus {
   white-space: nowrap;
 }
 /* Hotkey badge, top-left. */
-.cmd-btn .hotkey {
+.cmd-btn .cmd-hotkey {
   position: absolute;
-  top: 4px;
-  left: 5px;
+  top: 0;
+  left: 0;
+  width: 17px;
+  height: 17px;
+  display: grid;
+  place-items: center;
   font-size: 10px;
   font-weight: 700;
-  color: var(--ink-faint);
+  color: var(--void);
+  background: var(--accent);
+  border-right: 1px solid var(--panel-edge);
+  border-bottom: 1px solid var(--panel-edge);
 }
 /* Cost badge, bottom edge. Mineral / gas costs colored to match the world. */
-.cmd-btn .cost {
+.cmd-btn .cmd-cost {
   position: absolute;
   bottom: 4px;
   right: 5px;
@@ -592,14 +603,14 @@ input[type="text"]:focus {
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
-.cmd-btn .cost .min {
+.cmd-btn .cmd-cost .c-min {
   color: var(--accent-2);
 }
-.cmd-btn .cost .gas {
+.cmd-btn .cmd-cost .c-gas {
   color: var(--gas);
 }
 /* Unaffordable cost shown in red even though the whole button may be disabled. */
-.cmd-btn.unaffordable .cost {
+.cmd-btn.unaffordable .cmd-cost {
   color: var(--bad);
 }
 
@@ -680,7 +691,7 @@ input[type="text"]:focus {
     gap: 7px;
     padding: 10px;
   }
-  .cmd-btn .icon {
+  .cmd-btn .cmd-icon {
     font-size: 18px;
   }
   #selected-panel {
