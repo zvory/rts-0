@@ -477,7 +477,7 @@ rules are future work.
 - `TICK_HZ = 30`, `SNAPSHOT_EVERY_N_TICKS = 1`.
 - Map: `TILE_SIZE = 32` px. Size scales with player count: 2p → 64×64, 3-4p → 96×96.
 - Start: `STARTING_STEEL = 50`, `STARTING_OIL = 0`, `STARTING_WORKERS = 4`,
-  one Industrial Center at the player's start tile, a mineral cluster (8 patches) + 1 gas geyser nearby.
+  one Industrial Center at the player's start tile, a mineral cluster (16 patches) + 1 gas geyser nearby.
 - Supply: Industrial Center gives `+10`, Depot gives `+8`, hard cap `200`.
 - Attached mining: workers walk to a patch, latch onto it, and mine in place.
   Every `HARVEST_TICKS = 40` the load (`STEEL_LOAD = 5` / `OIL_LOAD = 4`) is deposited

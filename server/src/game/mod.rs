@@ -457,13 +457,13 @@ fn spawn_player_start(entities: &mut EntityStore, map: &Map, owner: u32, start: 
     let perp_y = base_angle.cos();
 
     let patches = config::STEEL_PATCHES_PER_BASE;
-    let cols = 4;
+    let cols = 8;
     let _rows = 2;
     for i in 0..patches {
         let col = (i % cols) as f32;
         let row = (i / cols) as f32;
         // Local offsets within the block, centered on the block center.
-        let off_x = (col - 1.5) * ts; // -1.5 .. +1.5 tiles
+        let off_x = (col - 3.5) * ts; // -3.5 .. +3.5 tiles
         let off_y = (row - 0.5) * ts; // -0.5 .. +0.5 tiles
         let px = block_cx + off_x * perp_x + off_y * base_angle.cos();
         let py = block_cy + off_x * perp_y + off_y * base_angle.sin();
