@@ -5,7 +5,8 @@
 // Usage: start the server, then `node tests/regression.mjs`.
 const URL = process.env.RTS_WS || "ws://127.0.0.1:8081/ws";
 let failures = 0;
-const ok = (c, m) => { console.log((c ? "  PASS " : "  FAIL ") + m); if (!c) failures++; };
+const VERBOSE = !!process.env.RTS_VERBOSE;
+const ok = (c, m) => { if (!c) { console.log("  FAIL " + m); failures++; } else if (VERBOSE) { console.log("  PASS " + m); } };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 class Client {
@@ -117,6 +118,6 @@ async function soloStart(room) {
   }
 
   await sleep(200);
-  console.log(`\n${failures === 0 ? "REGRESSION: ALL PASS ✅" : "REGRESSION: " + failures + " FAILURE(S) ❌"}`);
+  if (failures > 0) console.log(`\nREGRESSION: ${failures} FAILURE(S) ❌`);
   process.exit(failures === 0 ? 0 : 1);
 })().catch((e) => { console.log("TEST ERROR:", e.message); process.exit(2); });
