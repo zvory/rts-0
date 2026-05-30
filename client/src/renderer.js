@@ -382,12 +382,13 @@ export class Renderer {
         -r * 0.85, -r * 0.25,
       ]);
       g.endFill();
-      // Carried-resource pip so harvesters read at a glance.
-      if (e.carrying) {
-        const cc = e.carryingKind === KIND.OIL ? COLORS.oil : COLORS.steel;
-        g.beginFill(cc);
-        g.drawRect(-r * 0.35, -r * 1.15, r * 0.7, r * 0.45);
-        g.endFill();
+      // Latched miners get a small clamp marker above the unit.
+      if (e.latchedNode) {
+        g.lineStyle(2, 0xf2d16b, 0.95);
+        g.moveTo(-r * 0.55, -r * 1.15);
+        g.lineTo(-r * 0.2, -r * 1.45);
+        g.lineTo(r * 0.2, -r * 1.45);
+        g.lineTo(r * 0.55, -r * 1.15);
       }
     }
 

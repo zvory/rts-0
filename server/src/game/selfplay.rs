@@ -369,48 +369,57 @@ impl BuildTechAttackScript {
                 .entities
                 .iter()
                 .any(|e| e.owner == view.player_id && is_kind(e, EntityKind::Barracks));
-        if can_assign_oil {
-            let mut assigned = 0usize;
-            for worker in &sorted_workers {
-                if assigned >= self.oil_workers {
-                    break;
+                let mut assigned_nodes: HashSet<u32> = HashSet::new();
+                if can_assign_oil {
+                    let mut assigned = 0usize;
+                    for worker in &sorted_workers {
+                        if assigned >= self.oil_workers {
+                            break;
+                        }
+                        if reserved_workers.contains(&worker.id) {
+                            continue;
+                        }
+                        if worker.state == states::BUILD {
+                            continue;
+                        }
+                        if worker.latched_node.is_some() {
+                            continue;
+                        }
+                        if let Some(node) = nearest_unassigned_node(worker, &oil_nodes, &assigned_nodes) {
+                            out.push(Command::Gather {
+                                units: vec![worker.id],
+                                node,
+                            });
+                            self.assigned_oil_workers.insert(worker.id);
+                            assigned += 1;
+                            assigned_nodes.insert(node);
+                        }
+                    }
+                    self.last_oil_assignment_tick = view.tick;
                 }
-                if reserved_workers.contains(&worker.id) {
-                    continue;
-                }
-                if worker.state == states::BUILD {
-                    continue;
-                }
-                if let Some(node) = nearest_node(worker, &oil_nodes) {
-                    out.push(Command::Gather {
-                        units: vec![worker.id],
-                        node,
-                    });
-                    self.assigned_oil_workers.insert(worker.id);
-                    assigned += 1;
-                }
-            }
-            self.last_oil_assignment_tick = view.tick;
-        }
 
-        for worker in sorted_workers {
-            if reserved_workers.contains(&worker.id) {
-                continue;
-            }
-            if self.assigned_oil_workers.contains(&worker.id) {
-                continue;
-            }
-            if self.initial_gather_sent && worker.state != states::IDLE {
-                continue;
-            }
-            if let Some(node) = nearest_node(worker, &steel_nodes) {
-                out.push(Command::Gather {
-                    units: vec![worker.id],
-                    node,
-                });
-            }
-        }
-        self.initial_gather_sent = true;
+                for worker in sorted_workers {
+                    if reserved_workers.contains(&worker.id) {
+                        continue;
+                    }
+                    if self.assigned_oil_workers.contains(&worker.id) {
+                        continue;
+                    }
+                    if self.initial_gather_sent && worker.state != states::IDLE {
+                        continue;
+                    }
+                    if worker.latched_node.is_some() {
+                        continue;
+                    }
+                    if let Some(node) = nearest_unassigned_node(worker, &steel_nodes, &assigned_nodes) {
+                        out.push(Command::Gather {
+                            units: vec![worker.id],
+                            node,
+                        });
+                        assigned_nodes.insert(node);
+                    }
+                }
+                self.initial_gather_sent = true;
     }
 }
 
@@ -1330,11 +1339,8 @@ impl PlayerMilestones {
             match k {
                 EntityKind::Worker => {
                     workers += 1;
-                    if e.state == states::GATHER || e.carrying.unwrap_or(0) > 0 {
+                    if e.state == states::GATHER || e.latched_node.is_some() {
                         self.saw_gathering = true;
-                    }
-                    if e.carrying_kind.as_deref() == Some(kinds::OIL) {
-                        self.oil_gathered = true;
                     }
                 }
                 EntityKind::Rifleman => riflemen += 1,
@@ -1684,6 +1690,13 @@ fn assign_steel_workers(
         return;
     }
 
+    let mut assigned_nodes: HashSet<u32> = HashSet::new();
+    for w in workers {
+        if let Some(node) = w.latched_node {
+            assigned_nodes.insert(node);
+        }
+    }
+
     let mut sorted_workers = workers.to_vec();
     sorted_workers.sort_by_key(|w| w.id);
     for worker in sorted_workers {
@@ -1693,11 +1706,15 @@ fn assign_steel_workers(
         if initial_gather_sent && worker.state != states::IDLE {
             continue;
         }
-        if let Some(node) = nearest_node(worker, &steel_nodes) {
+        if worker.latched_node.is_some() {
+            continue;
+        }
+        if let Some(node) = nearest_unassigned_node(worker, &steel_nodes, &assigned_nodes) {
             out.push(Command::Gather {
                 units: vec![worker.id],
                 node,
             });
+            assigned_nodes.insert(node);
         }
     }
 }
@@ -1724,9 +1741,16 @@ fn combat_rendezvous_world(view: PlayerView<'_>) -> (f32, f32) {
     )
 }
 
-fn nearest_node(worker: &EntityView, nodes: &[&EntityView]) -> Option<u32> {
+fn nearest_unassigned_node(
+    worker: &EntityView,
+    nodes: &[&EntityView],
+    assigned: &HashSet<u32>,
+) -> Option<u32> {
     let mut best = None;
     for node in nodes {
+        if assigned.contains(&node.id) {
+            continue;
+        }
         let d = dist2(worker.x, worker.y, node.x, node.y);
         if best.map(|(_, bd)| d < bd).unwrap_or(true) {
             best = Some((node.id, d));

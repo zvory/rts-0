@@ -29,7 +29,7 @@ pub const STARTING_WORKERS: u32 = 4;
 
 pub const STEEL_LOAD: u32 = 5;
 pub const OIL_LOAD: u32 = 4;
-pub const HARVEST_TICKS: u32 = 20;
+pub const HARVEST_TICKS: u32 = 40;
 pub const STEEL_PATCH_AMOUNT: u32 = 1500;
 pub const OIL_GEYSER_AMOUNT: u32 = 5000;
 pub const STEEL_PATCHES_PER_BASE: u32 = 8;

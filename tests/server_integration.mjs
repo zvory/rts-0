@@ -88,17 +88,17 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   ok(!snap.entities.some((e) => e.owner === B.playerId), `FOG: A cannot see B at start`);
 
   A.send({ t: "command", cmd: { c: "gather", units: workers.map((w) => w.id), node: steelNodes[0].id } });
-  let sawCarry = false, peak = snap.steel;
+  let sawLatch = false, peak = snap.steel;
   for (let i = 0; i < 30; i++) {
     await sleep(500);
     if (A.lastSnapshot) {
       peak = Math.max(peak, A.lastSnapshot.steel);
-      if (A.lastSnapshot.entities.some((e) => e.owner === A.playerId && e.kind === "worker" && (e.carrying || 0) > 0)) sawCarry = true;
+      if (A.lastSnapshot.entities.some((e) => e.owner === A.playerId && e.kind === "worker" && e.latchedNode)) sawLatch = true;
       if (A.lastSnapshot.steel > 50) break;
     }
   }
   ok(peak > 50, `GATHER: steel rose above 50 (peak=${peak})`);
-  ok(sawCarry, `GATHER: a worker carried steel`);
+  ok(sawLatch, `GATHER: a worker latched onto steel`);
 
   const beforeTrain = A.lastSnapshot.steel;
   A.send({ t: "command", cmd: { c: "train", building: mine.find((e) => e.kind === "industrial_center").id, unit: "worker" } });

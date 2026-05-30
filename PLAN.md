@@ -48,15 +48,15 @@ Goal: make future simulation changes easy to verify and hard to silently break.
 
 ### 1.1 Tick Invariant Checks
 
-- [ ] Add `Game::assert_invariants()` for tests/debug builds.
-- [ ] Check entity id/store-key consistency.
-- [ ] Check no NaN or out-of-world coordinates.
-- [ ] Check supply equals living plus queued units.
-- [ ] Check buildings never overlap.
-- [ ] Check resource-node miner reservations are valid or ignored.
-- [ ] Check orders do not point at invalid required targets except in documented transition windows.
-- [ ] Check fog grids exist for all players and never for neutral owner.
-- [ ] Check snapshots never expose hidden enemy ids through entities, targets, or events.
+- [x] Add `Game::assert_invariants()` for tests/debug builds.
+- [x] Check entity id/store-key consistency.
+- [x] Check no NaN or out-of-world coordinates.
+- [x] Check supply equals living plus queued units.
+- [x] Check buildings never overlap.
+- [x] Check resource-node miner reservations are valid or ignored.
+- [x] Check orders do not point at invalid required targets except in documented transition windows.
+- [x] Check fog grids exist for all players and never for neutral owner.
+- [x] Check snapshots never expose hidden enemy ids through entities, targets, or events.
 
 Gates:
 

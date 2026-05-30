@@ -239,6 +239,8 @@ pub struct EntityView {
     pub carrying: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub carrying_kind: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub latched_node: Option<u32>,
 
     // Resource nodes:
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -277,6 +279,7 @@ impl EntityView {
             build_progress: None,
             carrying: None,
             carrying_kind: None,
+            latched_node: None,
             remaining: None,
             target_id: None,
         }
