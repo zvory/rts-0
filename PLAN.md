@@ -242,14 +242,14 @@ Goal: handle the hard movement work before larger maps and real collision amplif
 
 ### 4.1 Movement and Pathing Coordinator
 
-- [ ] Add one coordinator for movement/path requests.
-- [ ] Own path request budgeting per tick.
-- [ ] Add shared paths or flow-field-style support for large selected groups where practical.
-- [ ] Add goal spreading around target points.
-- [ ] Add spawn-point search around buildings.
-- [ ] Add `PathFailed` semantics.
-- [ ] Add repath throttling and cache invalidation.
-- [ ] Route commands through the coordinator instead of directly creating per-unit A* paths.
+- [x] Add one coordinator for movement/path requests.
+- [x] Own path request budgeting per tick.
+- [x] Add shared paths or flow-field-style support for large selected groups where practical.
+- [x] Add goal spreading around target points.
+- [x] Add spawn-point search around buildings.
+- [x] Add `PathFailed` semantics.
+- [x] Add repath throttling and cache invalidation.
+- [x] Route commands through the coordinator instead of directly creating per-unit A* paths.
 
 Gates:
 
