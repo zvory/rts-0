@@ -104,7 +104,7 @@ impl LiveSelfPlay {
     }
 }
 
-#[derive(Clone, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub(crate) struct ReplayArtifact {
     pub(crate) replay_commands: Vec<super::replay::CommandLogEntry>,
     pub(crate) players: Vec<PlayerInit>,
@@ -2726,10 +2726,11 @@ fn identical_scripted_runs_are_identical() {
     );
 }
 
-/// Two AI opponents produce a deterministic command log; replaying it from a fresh game
-/// yields the exact same events and final snapshots.
+/// Two real AI opponents (AiController vs AiController) fight it out. Produces a
+/// deterministic command log and writes a replay artifact to
+/// `target/selfplay-artifacts/real_ai_vs_real_ai/replay.json`.
 #[test]
-fn ai_vs_ai_replay_is_deterministic() {
+fn real_ai_vs_real_ai() {
     let players = vec![
         PlayerInit {
             id: 1,
@@ -2747,7 +2748,7 @@ fn ai_vs_ai_replay_is_deterministic() {
     let mut game = Game::new(&players);
 
     let mut event_log = Vec::new();
-    for tick in 1..=1200 {
+    for tick in 1..=6000 {
         for (player_id, events) in game.tick() {
             for event in events {
                 event_log.push(EventLogEntry {
@@ -2762,4 +2763,17 @@ fn ai_vs_ai_replay_is_deterministic() {
     assert_replay_matches_live(&game, &players, &event_log).unwrap_or_else(|failure| {
         panic!("AI vs AI replay determinism failed: {}", failure.reason);
     });
+
+    // Write a replay artifact so the dev self-play viewer can load it.
+    let artifact = ReplayArtifact {
+        replay_commands: game.command_log().to_vec(),
+        players: players.clone(),
+    };
+    let dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("target")
+        .join("selfplay-artifacts")
+        .join("real_ai_vs_real_ai");
+    std::fs::create_dir_all(&dir).unwrap();
+    let json = serde_json::to_vec_pretty(&artifact).unwrap();
+    std::fs::write(dir.join("replay.json"), json).unwrap();
 }
