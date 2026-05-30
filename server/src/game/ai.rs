@@ -29,10 +29,6 @@ use std::collections::HashSet;
 /// idempotent enough that acting more often would just churn paths. Decisions are staggered per
 /// player so several AIs don't all think on the same tick.
 const DECISION_INTERVAL: u32 = 9;
-/// Worker count the AI saturates its economy to before it stops queueing more. Kept modest so
-/// the (deliberately slow) steel economy isn't entirely consumed by worker supply/cost — the
-/// AI needs steel and supply headroom left over to actually field an army.
-const TARGET_WORKERS: usize = 8;
 /// How many barracks the AI wants (finished + under construction).
 const TARGET_BARRACKS: usize = 2;
 /// Build a depot when free supply drops below this (and we're not already building one).
@@ -145,6 +141,7 @@ impl AiController {
         }
         let _ = rifleman_count; // surveyed for clarity; waves key off free_riflemen.
         let depot_in_progress = depot_under_construction || pending_depot_build;
+        let target_workers = main_base_miner_saturation_target(entities, me);
 
         // Workers we may pull onto a build job: prefer truly idle, fall back to a gatherer.
         let mut builder_pool = idle_workers.clone();
@@ -219,7 +216,7 @@ impl AiController {
             .map(|s| s.supply)
             .unwrap_or(1);
         for industrial_center in idle_industrial_centers {
-            if worker_count >= TARGET_WORKERS {
+            if worker_count >= target_workers {
                 break;
             }
             if steel < worker_cost || free_supply < worker_supply {
@@ -372,6 +369,28 @@ fn occupied_steel_nodes(entities: &EntityStore) -> HashSet<u32> {
         .collect()
 }
 
+/// Number of non-empty steel patches around this player's starting base, which is also the
+/// number of simultaneous miners that base can keep latched. The AI uses this as its worker
+/// target so balance changes to the starting patch count automatically propagate.
+fn main_base_miner_saturation_target(entities: &EntityStore, me: &PlayerState) -> usize {
+    let (hx, hy) = (
+        me.start_tile.0 as f32 * config::TILE_SIZE as f32 + config::TILE_SIZE as f32 * 0.5,
+        me.start_tile.1 as f32 * config::TILE_SIZE as f32 + config::TILE_SIZE as f32 * 0.5,
+    );
+    let max_dist_px =
+        (config::IC_RESOURCE_MAX_DIST_TILES + 0.5) * config::TILE_SIZE as f32;
+    let max_dist2 = max_dist_px * max_dist_px;
+    entities
+        .iter()
+        .filter(|e| e.kind == EntityKind::Steel && e.remaining().unwrap_or(0) > 0)
+        .filter(|e| {
+            let dx = e.pos_x - hx;
+            let dy = e.pos_y - hy;
+            dx * dx + dy * dy <= max_dist2
+        })
+        .count()
+}
+
 /// Nearest non-empty steel node to a worker (by id) that has not already been reserved this
 /// think, or `None` if none remain / worker is gone.
 fn nearest_free_steel_node(
@@ -520,5 +539,38 @@ mod tests {
             !out.iter().any(|(_, cmd)| matches!(cmd, Command::Build { building, .. } if building == crate::protocol::kinds::DEPOT)),
             "AI should treat a worker's pending depot build intent as supply already in progress"
         );
+    }
+
+    #[test]
+    fn main_base_miner_target_counts_only_nearby_nonempty_steel() {
+        let mut entities = EntityStore::default();
+        let (hx, hy) = (10.5 * config::TILE_SIZE as f32, 20.5 * config::TILE_SIZE as f32);
+        let in_range = (config::IC_RESOURCE_MAX_DIST_TILES - 0.25) * config::TILE_SIZE as f32;
+        let out_of_range = (config::IC_RESOURCE_MAX_DIST_TILES + 2.0) * config::TILE_SIZE as f32;
+
+        entities.spawn_node(EntityKind::Steel, hx + in_range, hy).unwrap();
+        entities.spawn_node(EntityKind::Steel, hx - in_range, hy).unwrap();
+        entities.spawn_node(EntityKind::Oil, hx, hy + in_range).unwrap();
+        entities.spawn_node(EntityKind::Steel, hx, hy + out_of_range).unwrap();
+
+        let depleted = entities.spawn_node(EntityKind::Steel, hx, hy - in_range).unwrap();
+        if let Some(node) = entities.get_mut(depleted) {
+            if let Some(resource) = node.resource_node.as_mut() {
+                resource.remaining = 0;
+            }
+        }
+
+        let me = PlayerState {
+            id: 2,
+            name: "Computer".into(),
+            color: "#000".into(),
+            start_tile: (10, 20),
+            steel: 0,
+            oil: 0,
+            supply_used: 0,
+            supply_cap: 0,
+        };
+
+        assert_eq!(main_base_miner_saturation_target(&entities, &me), 2);
     }
 }

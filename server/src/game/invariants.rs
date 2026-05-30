@@ -300,7 +300,9 @@ impl Game {
 
 #[cfg(test)]
 mod tests {
+    use crate::config;
     use crate::game::{Game, PlayerInit};
+    use crate::protocol::kinds;
 
     /// A freshly-created game must satisfy every invariant before any tick runs.
     #[test]
@@ -341,9 +343,44 @@ mod tests {
             },
         ];
         let mut game = Game::new(&players);
+        let target_workers = config::STEEL_PATCHES_PER_BASE as usize;
+        let mut max_workers = 0usize;
+        let mut max_riflemen = 0usize;
+        let mut human_damaged = false;
+
         for _ in 0..6000 {
             game.tick();
+
+            let ai = game.snapshot_for(2);
+            max_workers = max_workers.max(
+                ai.entities
+                    .iter()
+                    .filter(|e| e.owner == 2 && e.kind == kinds::WORKER)
+                    .count(),
+            );
+            max_riflemen = max_riflemen.max(
+                ai.entities
+                    .iter()
+                    .filter(|e| e.owner == 2 && e.kind == kinds::RIFLEMAN)
+                    .count(),
+            );
+
+            let human = game.snapshot_for(1);
+            if human
+                .entities
+                .iter()
+                .any(|e| e.owner == 1 && e.hp < e.max_hp)
+            {
+                human_damaged = true;
+            }
+
+            if max_workers >= target_workers && max_riflemen > 0 && human_damaged {
+                break;
+            }
         }
+        assert!(max_workers >= target_workers);
+        assert!(max_riflemen > 0);
+        assert!(human_damaged);
         game.assert_invariants();
     }
 
