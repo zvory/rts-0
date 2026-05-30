@@ -21,6 +21,14 @@ pub const STUCK_ARRIVAL_TICKS: u16 = 15;
 /// A stuck unit within this radius of its `path_goal` is forcibly marked Arrived.
 pub const TOLERANT_ARRIVAL_RADIUS_PX: f32 = 2.0 * TILE_SIZE as f32;
 
+// --- Sidestep (mid-path unstick) --------------------------------------------
+/// Consecutive stuck ticks before a mid-path unit injects a sidestep detour (~0.5 s at 30 Hz).
+pub const SIDESTEP_TRIGGER_TICKS: u16 = 15;
+/// Perpendicular detour distance in world pixels (~1 tile).
+pub const SIDESTEP_DISTANCE_PX: f32 = TILE_SIZE as f32;
+/// Ticks after a sidestep during which another sidestep is suppressed (~1 s at 30 Hz).
+pub const SIDESTEP_COOLDOWN_TICKS: u16 = 30;
+
 /// Map size (in tiles) for a given player count. Square, symmetric.
 pub const fn map_size_for(players: usize) -> u32 {
     if players <= 2 {

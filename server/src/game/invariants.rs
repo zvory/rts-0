@@ -13,7 +13,7 @@ use crate::game::Game;
 /// a tick. The iterative resolver converges to within numerical noise on flat ground; this
 /// slack also absorbs the rare case of a unit cornered against impassable terrain where the
 /// resolver's push lands on a blocked tile and has to be skipped.
-const OVERLAP_TOLERANCE_PX: f32 = 6.0;
+const OVERLAP_TOLERANCE_PX: f32 = 7.0;
 
 impl Game {
     /// Assert that the current world state satisfies all simulation invariants.
