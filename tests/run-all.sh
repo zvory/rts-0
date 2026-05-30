@@ -13,7 +13,8 @@
 # starts one and tears it down on exit.
 #
 # Usage:
-#   tests/run-all.sh                 # everything
+#   tests/run-all.sh                 # everything (silent unless failing)
+#   tests/run-all.sh -v              # verbose: print headers and passes
 #   tests/run-all.sh --no-rust       # skip the cargo test step
 #   tests/run-all.sh --no-client     # skip the headless-browser smoke test
 #   PORT=8090 tests/run-all.sh       # use a different port
@@ -29,13 +30,15 @@ SERVER_DIR="$REPO_ROOT/server"
 PORT="${PORT:-8081}"
 RUN_RUST=1
 RUN_CLIENT=1
+VERBOSE=0
 for arg in "$@"; do
   case "$arg" in
     --no-rust)   RUN_RUST=0 ;;
     --no-client) RUN_CLIENT=0 ;;
     --port) echo "use --port=N or PORT=N" >&2; exit 2 ;;
     --port=*) PORT="${arg#*=}" ;;
-    -h|--help) sed -n '2,26p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -v|--verbose) VERBOSE=1 ;;
+    -h|--help) sed -n '2,27p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "unknown arg: $arg" >&2; exit 2 ;;
   esac
 done
@@ -47,8 +50,8 @@ export RTS_URL="http://127.0.0.1:${PORT}/"  # consumed by client_smoke.mjs
 # --- Output helpers -------------------------------------------------------------------------
 if [ -t 1 ]; then BOLD=$'\033[1m'; RED=$'\033[31m'; GRN=$'\033[32m'; YEL=$'\033[33m'; RST=$'\033[0m'
 else BOLD=""; RED=""; GRN=""; YEL=""; RST=""; fi
-hdr()  { printf '\n%s== %s ==%s\n' "$BOLD" "$1" "$RST"; }
-info() { printf '%s\n' "$1"; }
+hdr()  { [ "$VERBOSE" = "1" ] && printf '\n%s== %s ==%s\n' "$BOLD" "$1" "$RST"; }
+info() { [ "$VERBOSE" = "1" ] && printf '%s\n' "$1"; }
 warn() { printf '%s! %s%s\n' "$YEL" "$1" "$RST"; }
 
 FAILED=()   # human-readable names of suites that failed
@@ -57,11 +60,19 @@ SKIPPED=()  # suites we deliberately did not run
 # Run a suite, record pass/fail. Args: <name> <command...>
 run_suite() {
   local name="$1"; shift
-  hdr "$name"
-  if "$@"; then
-    info "${GRN}PASS${RST} $name"
+  local logf
+  logf="$(mktemp -t rts-suite.XXXXXX)"
+  [ "$VERBOSE" = "1" ] && hdr "$name"
+  if "$@" >"$logf" 2>&1; then
+    rm -f "$logf"
+    if [ "$VERBOSE" = "1" ]; then
+      info "${GRN}PASS${RST} $name"
+    fi
   else
-    warn "FAIL $name (exit $?)"
+    local rc=$?
+    warn "FAIL $name (exit $rc)"
+    cat "$logf"
+    rm -f "$logf"
     FAILED+=("$name")
   fi
 }
@@ -77,19 +88,26 @@ cleanup() {
   if [ "$STARTED_SERVER" = "1" ] && [ -n "$SERVER_PID" ] && kill -0 "$SERVER_PID" 2>/dev/null; then
     kill "$SERVER_PID" 2>/dev/null
     wait "$SERVER_PID" 2>/dev/null
-    info "stopped server (pid $SERVER_PID)"
+    if [ "$VERBOSE" = "1" ]; then
+      info "stopped server (pid $SERVER_PID)"
+    fi
   fi
   [ -n "$SERVER_LOG" ] && rm -f "$SERVER_LOG" 2>/dev/null
 }
 trap cleanup EXIT INT TERM
 
 boot_server() {
-  hdr "Build server (debug)"
-  if ! cargo build --manifest-path "$SERVER_DIR/Cargo.toml"; then
+  [ "$VERBOSE" = "1" ] && hdr "Build server (debug)"
+  local build_log
+  build_log="$(mktemp -t rts-build.XXXXXX)"
+  if ! cargo build --manifest-path "$SERVER_DIR/Cargo.toml" >"$build_log" 2>&1; then
     warn "server build failed"
+    cat "$build_log"
+    rm -f "$build_log"
     FAILED+=("server build")
     return 1
   fi
+  rm -f "$build_log"
   local bin="$SERVER_DIR/target/debug/rts-server"
   if [ ! -x "$bin" ]; then
     warn "server binary not found at $bin"
@@ -97,7 +115,7 @@ boot_server() {
     return 1
   fi
 
-  hdr "Boot server on :$PORT"
+  [ "$VERBOSE" = "1" ] && hdr "Boot server on :$PORT"
   SERVER_LOG="$(mktemp -t rts-server-log.XXXXXX)"
   RTS_ADDR="0.0.0.0:${PORT}" "$bin" >"$SERVER_LOG" 2>&1 &
   SERVER_PID=$!
@@ -118,7 +136,9 @@ boot_server() {
     fi
     sleep 0.3
   done
-  info "server healthy (pid $SERVER_PID) at $HEALTH_URL"
+  if [ "$VERBOSE" = "1" ]; then
+    info "server healthy (pid $SERVER_PID) at $HEALTH_URL"
+  fi
 }
 
 # --- Preflight ------------------------------------------------------------------------------
@@ -128,7 +148,7 @@ if ! command -v node >/dev/null 2>&1; then
 fi
 NODE_MAJOR="$(node -p 'process.versions.node.split(".")[0]' 2>/dev/null || echo 0)"
 if [ "$NODE_MAJOR" -lt 22 ]; then
-  warn "Node $NODE_MAJOR detected; the API suites need >= 22 for the global WebSocket. Continuing anyway."
+  info "Node $NODE_MAJOR detected; the API suites need >= 22 for the global WebSocket. Continuing anyway."
 fi
 
 # --- 1. Rust scripted tests (no server needed) ---------------------------------------------
@@ -159,10 +179,10 @@ if [ "${SERVER_HEALTHY:-0}" = "1" ]; then
     if [ "$have_puppeteer" = "1" ] && [ -x "$CHROME" ]; then
       CHROME="$CHROME" run_suite "Client smoke (headless Chrome)" node "$SCRIPT_DIR/client_smoke.mjs"
     elif [ "$have_puppeteer" != "1" ]; then
-      warn "skipping client smoke: puppeteer-core not installed (cd tests && npm install)"
+      info "skipping client smoke: puppeteer-core not installed (cd tests && npm install)"
       SKIPPED+=("Client smoke (no puppeteer-core)")
     else
-      warn "skipping client smoke: no Chrome at \$CHROME ($CHROME)"
+      info "skipping client smoke: no Chrome at \$CHROME ($CHROME)"
       SKIPPED+=("Client smoke (no Chrome)")
     fi
   else
