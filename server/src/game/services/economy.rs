@@ -112,13 +112,19 @@ fn gather_harvesting(entities: &mut EntityStore, players: &mut [PlayerState], id
         }
     }
 
+    let harvest_ticks = if node_kind_amount.0 == EntityKind::Oil {
+        config::OIL_HARVEST_TICKS
+    } else {
+        config::STEEL_HARVEST_TICKS
+    };
+
     let done = {
         let e = match entities.get_mut(id) {
             Some(e) => e,
             None => return,
         };
         e.tick_gather_harvest()
-            .map(|progress| progress >= config::HARVEST_TICKS)
+            .map(|progress| progress >= harvest_ticks)
             .unwrap_or(false)
     };
     if !done {
