@@ -1,4 +1,4 @@
-# RTS — Design & Architecture
+# Bewegungskrieg — Design & Architecture
 
 A simple but functional real-time-strategy game inspired by StarCraft: Brood War.
 Server-authoritative simulation in **Rust**; client in **HTML/CSS/JS** rendered with

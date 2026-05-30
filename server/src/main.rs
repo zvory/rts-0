@@ -1,4 +1,4 @@
-//! RTS server entry point. See `DESIGN.md` §1, §3.
+//! Bewegungskrieg server entry point. See `DESIGN.md` §1, §3.
 //!
 //! Responsibilities of this binary:
 //! - Serve the static JS/HTML client (so `cargo run` + open a browser is the whole dev loop).
@@ -83,7 +83,7 @@ async fn main() {
     };
 
     let bound = listener.local_addr().map(|a| a.to_string()).unwrap_or(addr);
-    info!("RTS server listening — open http://{bound}/");
+    info!("Bewegungskrieg server listening — open http://{bound}/");
 
     if let Err(err) = axum::serve(
         listener,

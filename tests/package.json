@@ -2,7 +2,7 @@
   "name": "rts-tests",
   "private": true,
   "type": "module",
-  "description": "End-to-end tests for the RTS game (run against a live server on :8080).",
+  "description": "End-to-end tests for the Bewegungskrieg game (run against a live server on :8080).",
   "scripts": {
     "test:server": "node server_integration.mjs",
     "test:client": "node client_smoke.mjs"

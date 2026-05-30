@@ -2,7 +2,7 @@
 name = "rts-server"
 version = "0.1.0"
 edition = "2021"
-description = "Authoritative server for a simple StarCraft-like RTS"
+description = "Authoritative server for Bewegungskrieg, a simple real-time strategy game"
 
 [[bin]]
 name = "rts-server"
