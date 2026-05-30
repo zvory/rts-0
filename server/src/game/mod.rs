@@ -295,10 +295,8 @@ impl Game {
 
     /// Remove every entity owned by `player` (e.g. on disconnect) so the match can resolve.
     pub fn eliminate(&mut self, player: u32) {
-        let doomed: Vec<u32> = self
-            .entities
-            .iter()
-            .filter(|e| e.owner == player)
+        let doomed: Vec<u32> = services::world_query::owned_units(&self.entities, player)
+            .chain(services::world_query::owned_buildings(&self.entities, player))
             .map(|e| e.id)
             .collect();
         for id in doomed {
