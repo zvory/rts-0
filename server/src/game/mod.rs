@@ -374,14 +374,6 @@ impl Game {
             });
         }
 
-        // Workers carrying a load.
-        if let Some(c) = e.carry {
-            if c.amount > 0 {
-                v.carrying = Some(c.amount);
-                v.carrying_kind = Some(c.kind.to_protocol_str().to_string());
-            }
-        }
-
         // Resource nodes: remaining amount.
         if e.is_node() {
             v.remaining = Some(e.remaining);
@@ -520,10 +512,19 @@ mod tests {
         let mut ever_had_barracks = false;
         let mut ai_supply_cap = 0u32;
         let mut human_damaged = false;
+        let mut event_log = Vec::new();
 
         // ~200s of simulation. The human issues no commands (passive target).
-        for _ in 0..6000 {
-            game.tick();
+        for tick in 1..=6000 {
+            for (player_id, events) in game.tick() {
+                for event in events {
+                    event_log.push(super::replay::EventLogEntry {
+                        tick,
+                        player_id,
+                        event,
+                    });
+                }
+            }
 
             let ai = game.snapshot_for(2);
             ai_supply_cap = ai.supply_cap.max(ai_supply_cap);
@@ -574,6 +575,14 @@ mod tests {
             human_damaged,
             "AI riflemen should reach and damage the human base"
         );
+
+        // Replay determinism: the same command log fed into a fresh game must reproduce
+        // the exact events and final snapshots.
+        selfplay::assert_replay_matches_live(&game, &players, &event_log).unwrap_or_else(
+            |failure| {
+                panic!("AI replay determinism failed: {}", failure.reason());
+            },
+        );
     }
 
     /// Adding an AI must not perturb a human-only game's construction: an all-human match has no
@@ -590,6 +599,47 @@ mod tests {
         assert!(
             game.ai.is_empty(),
             "a human-only match has no AI controllers"
+        );
+    }
+
+    /// A one-player sandbox with no commands must still be deterministic: fog, supply, and the
+    /// spatial index rebuild identically every tick, and replaying the empty command log
+    /// reproduces the same final snapshot.
+    #[test]
+    fn no_commands_one_player_is_deterministic() {
+        let players = [PlayerInit {
+            id: 1,
+            name: "Solo".into(),
+            color: "#fff".into(),
+            is_ai: false,
+        }];
+        let mut game = Game::new(&players);
+
+        let mut event_log = Vec::new();
+        for tick in 1..=300 {
+            for (player_id, events) in game.tick() {
+                for event in events {
+                    event_log.push(super::replay::EventLogEntry {
+                        tick,
+                        player_id,
+                        event,
+                    });
+                }
+            }
+        }
+
+        assert!(
+            event_log.is_empty(),
+            "a one-player sandbox with no commands should emit no events"
+        );
+
+        selfplay::assert_replay_matches_live(&game, &players, &event_log).unwrap_or_else(
+            |failure| {
+                panic!(
+                    "one-player no-commands replay determinism failed: {}",
+                    failure.reason()
+                );
+            },
         );
     }
 

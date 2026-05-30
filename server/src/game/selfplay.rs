@@ -944,15 +944,19 @@ struct SelfPlayReport {
 }
 
 #[derive(Debug)]
-struct SelfPlayFailure {
+pub(crate) struct SelfPlayFailure {
     reason: String,
 }
 
 impl SelfPlayFailure {
-    fn new(reason: impl Into<String>) -> Self {
+    pub(crate) fn new(reason: impl Into<String>) -> Self {
         SelfPlayFailure {
             reason: reason.into(),
         }
+    }
+
+    pub(crate) fn reason(&self) -> &str {
+        &self.reason
     }
 }
 
@@ -1469,7 +1473,7 @@ fn live_outcome_for(
     }
 }
 
-fn assert_replay_matches_live(
+pub(crate) fn assert_replay_matches_live(
     game: &Game,
     players: &[PlayerInit],
     events: &[EventLogEntry],
@@ -2171,4 +2175,337 @@ fn scripted_self_play_worker_rush_vs_economy() {
             panic!("self-play failed: {}; artifact: {artifact}", failure.reason);
         }
     }
+}
+
+/// A scripted player that does nothing but send idle workers to mine the nearest steel node.
+/// No building, no training, no combat — pure passive mining.
+struct MineOnlyScript {
+    player_id: u32,
+    initial_gather_sent: bool,
+}
+
+impl MineOnlyScript {
+    fn new(player_id: u32) -> Self {
+        MineOnlyScript {
+            player_id,
+            initial_gather_sent: false,
+        }
+    }
+
+    fn should_think(&self, tick: u32) -> bool {
+        tick == 0 || tick.wrapping_add(self.player_id) % THINK_INTERVAL == 0
+    }
+}
+
+impl ScriptedPlayer for MineOnlyScript {
+    fn player_id(&self) -> u32 {
+        self.player_id
+    }
+
+    fn name(&self) -> &'static str {
+        "mine-only"
+    }
+
+    fn commands(&mut self, view: PlayerView<'_>) -> Vec<Command> {
+        if !self.should_think(view.tick) {
+            return Vec::new();
+        }
+
+        let workers: Vec<&EntityView> = view
+            .snapshot
+            .entities
+            .iter()
+            .filter(|e| e.owner == view.player_id && is_kind(e, EntityKind::Worker))
+            .collect();
+
+        let mut out = Vec::new();
+        assign_steel_workers(
+            view,
+            &workers,
+            &HashSet::new(),
+            self.initial_gather_sent,
+            &mut out,
+        );
+        self.initial_gather_sent = true;
+        out
+    }
+}
+
+/// Two players mine steel passively for two minutes. With attached mining the steady state
+/// has no pathfinding variance, so both players should end with nearly identical steel totals.
+#[test]
+fn scripted_self_play_mine_only_steel_fairness() {
+    const TWO_MINUTES_TICKS: u32 = 2 * 60 * config::TICK_HZ;
+    const STEEL_TOLERANCE: u32 = 5;
+
+    let players = vec![
+        PlayerInit {
+            id: 1,
+            name: "Miner A".into(),
+            color: "#4cc9f0".into(),
+            is_ai: false,
+        },
+        PlayerInit {
+            id: 2,
+            name: "Miner B".into(),
+            color: "#f72585".into(),
+            is_ai: false,
+        },
+    ];
+    let mut game = Game::new(&players);
+    let start = game.start_payload();
+
+    let mut scripts: Vec<Box<dyn ScriptedPlayer>> = vec![
+        Box::new(MineOnlyScript::new(1)),
+        Box::new(MineOnlyScript::new(2)),
+    ];
+
+    for tick in 0..TWO_MINUTES_TICKS {
+        let snapshots: BTreeMap<u32, Snapshot> = players
+            .iter()
+            .map(|p| (p.id, game.snapshot_for(p.id)))
+            .collect();
+
+        let mut commands = Vec::new();
+        for script in &mut scripts {
+            let pid = script.player_id();
+            let Some(snapshot) = snapshots.get(&pid) else {
+                continue;
+            };
+            let view = PlayerView {
+                player_id: pid,
+                tick,
+                start: &start,
+                snapshot,
+            };
+            for command in script.commands(view) {
+                commands.push((pid, command));
+            }
+        }
+
+        for (player_id, command) in commands {
+            game.enqueue(player_id, command);
+        }
+
+        game.tick();
+    }
+
+    let snap_a = game.snapshot_for(1);
+    let snap_b = game.snapshot_for(2);
+
+    let diff = snap_a.steel.abs_diff(snap_b.steel);
+
+    assert!(
+        diff <= STEEL_TOLERANCE,
+        "after two minutes of passive mining, player 1 has {} steel and player 2 has {} steel (diff = {}, tolerance = {})",
+        snap_a.steel,
+        snap_b.steel,
+        diff,
+        STEEL_TOLERANCE
+    );
+}
+
+/// 30-second smoke test for attached-mining fairness. Should be perfectly deterministic.
+#[test]
+fn mine_only_steel_fairness_30s() {
+    const THIRTY_SECONDS_TICKS: u32 = 30 * config::TICK_HZ;
+    const STEEL_TOLERANCE: u32 = 2;
+
+    let players = vec![
+        PlayerInit {
+            id: 1,
+            name: "Miner A".into(),
+            color: "#4cc9f0".into(),
+            is_ai: false,
+        },
+        PlayerInit {
+            id: 2,
+            name: "Miner B".into(),
+            color: "#f72585".into(),
+            is_ai: false,
+        },
+    ];
+    let mut game = Game::new(&players);
+    let start = game.start_payload();
+
+    let mut scripts: Vec<Box<dyn ScriptedPlayer>> = vec![
+        Box::new(MineOnlyScript::new(1)),
+        Box::new(MineOnlyScript::new(2)),
+    ];
+
+    for tick in 0..THIRTY_SECONDS_TICKS {
+        let snapshots: BTreeMap<u32, Snapshot> = players
+            .iter()
+            .map(|p| (p.id, game.snapshot_for(p.id)))
+            .collect();
+
+        let mut commands = Vec::new();
+        for script in &mut scripts {
+            let pid = script.player_id();
+            let Some(snapshot) = snapshots.get(&pid) else {
+                continue;
+            };
+            let view = PlayerView {
+                player_id: pid,
+                tick,
+                start: &start,
+                snapshot,
+            };
+            for command in script.commands(view) {
+                commands.push((pid, command));
+            }
+        }
+
+        for (player_id, command) in commands {
+            game.enqueue(player_id, command);
+        }
+
+        game.tick();
+    }
+
+    let snap_a = game.snapshot_for(1);
+    let snap_b = game.snapshot_for(2);
+
+    let diff = snap_a.steel.abs_diff(snap_b.steel);
+
+    assert!(
+        diff <= STEEL_TOLERANCE,
+        "after 30 seconds of passive mining, player 1 has {} steel and player 2 has {} steel (diff = {}, tolerance = {})",
+        snap_a.steel,
+        snap_b.steel,
+        diff,
+        STEEL_TOLERANCE
+    );
+}
+
+/// Run a scripted match for a fixed number of ticks and return the final game state plus
+/// the per-tick snapshots for every player.
+#[cfg(test)]
+fn run_scripted_ticks(
+    players: &[PlayerInit],
+    scripts: &mut [Box<dyn ScriptedPlayer>],
+    start: &StartPayload,
+    game: &mut Game,
+    ticks: u32,
+) -> Vec<BTreeMap<u32, Snapshot>> {
+    let mut history = Vec::with_capacity(ticks as usize);
+    for tick in 0..ticks {
+        let snapshots: BTreeMap<u32, Snapshot> = players
+            .iter()
+            .map(|p| (p.id, game.snapshot_for(p.id)))
+            .collect();
+        history.push(snapshots.clone());
+
+        let mut commands = Vec::new();
+        for script in scripts.iter_mut() {
+            let pid = script.player_id();
+            let Some(snapshot) = snapshots.get(&pid) else {
+                continue;
+            };
+            let view = PlayerView {
+                player_id: pid,
+                tick,
+                start,
+                snapshot,
+            };
+            for command in script.commands(view) {
+                commands.push((pid, command));
+            }
+        }
+
+        for (player_id, command) in commands {
+            game.enqueue(player_id, command);
+        }
+
+        game.tick();
+    }
+    history
+}
+
+/// Two fresh games with the same scripted players must evolve identically tick-for-tick.
+/// This catches any non-determinism that would diverge between process restarts.
+#[test]
+fn identical_scripted_runs_are_identical() {
+    const TICKS: u32 = 600;
+
+    let players = vec![
+        PlayerInit {
+            id: 1,
+            name: "A".into(),
+            color: "#4cc9f0".into(),
+            is_ai: false,
+        },
+        PlayerInit {
+            id: 2,
+            name: "B".into(),
+            color: "#f72585".into(),
+            is_ai: false,
+        },
+    ];
+    let start = Game::new(&players).start_payload();
+
+    let mut game_a = Game::new(&players);
+    let mut scripts_a: Vec<Box<dyn ScriptedPlayer>> =
+        vec![Box::new(MineOnlyScript::new(1)), Box::new(MineOnlyScript::new(2))];
+    let history_a = run_scripted_ticks(&players, &mut scripts_a, &start, &mut game_a, TICKS);
+
+    let mut game_b = Game::new(&players);
+    let mut scripts_b: Vec<Box<dyn ScriptedPlayer>> =
+        vec![Box::new(MineOnlyScript::new(1)), Box::new(MineOnlyScript::new(2))];
+    let history_b = run_scripted_ticks(&players, &mut scripts_b, &start, &mut game_b, TICKS);
+
+    for (tick, (snaps_a, snaps_b)) in history_a.iter().zip(&history_b).enumerate() {
+        for p in &players {
+            assert_eq!(
+                snaps_a[&p.id], snaps_b[&p.id],
+                "tick {tick}: player {} snapshots diverged between two fresh runs",
+                p.id
+            );
+        }
+    }
+
+    // Command logs must also be identical.
+    assert_eq!(
+        game_a.command_log(),
+        game_b.command_log(),
+        "command logs diverged between two fresh runs"
+    );
+}
+
+/// Two AI opponents produce a deterministic command log; replaying it from a fresh game
+/// yields the exact same events and final snapshots.
+#[test]
+fn ai_vs_ai_replay_is_deterministic() {
+    let players = vec![
+        PlayerInit {
+            id: 1,
+            name: "AI Alpha".into(),
+            color: "#4cc9f0".into(),
+            is_ai: true,
+        },
+        PlayerInit {
+            id: 2,
+            name: "AI Beta".into(),
+            color: "#f72585".into(),
+            is_ai: true,
+        },
+    ];
+    let mut game = Game::new(&players);
+
+    let mut event_log = Vec::new();
+    for tick in 1..=1200 {
+        for (player_id, events) in game.tick() {
+            for event in events {
+                event_log.push(EventLogEntry {
+                    tick,
+                    player_id,
+                    event,
+                });
+            }
+        }
+    }
+
+    assert_replay_matches_live(&game, &players, &event_log).unwrap_or_else(|failure| {
+        panic!("AI vs AI replay determinism failed: {}", failure.reason);
+    });
 }

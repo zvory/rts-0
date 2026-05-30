@@ -52,7 +52,7 @@ impl XorShift32 {
 }
 
 /// Mobility class determines which terrain a unit may traverse.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum MobilityClass {
     /// Walks on grass and forest.
     Infantry,

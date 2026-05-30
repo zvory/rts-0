@@ -24,6 +24,7 @@ impl MobilityClass {
 }
 
 /// Parameters for a single path query.
+#[derive(Clone)]
 pub struct PathRequest {
     /// Start tile (inclusive).
     pub start: (i32, i32),
@@ -211,7 +212,7 @@ impl PathingService {
             if let Some(oldest_key) = self
                 .cache
                 .iter()
-                .min_by_key(|(_, e)| e.last_used)
+                .min_by_key(|(k, e)| (e.last_used, *k))
                 .map(|(k, _)| *k)
             {
                 self.cache.remove(&oldest_key);
@@ -224,5 +225,93 @@ impl PathingService {
                 last_used: self.tick,
             },
         );
+    }
+}
+
+#[cfg(test)]
+impl PathingService {
+    pub fn cache_len(&self) -> usize {
+        self.cache.len()
+    }
+
+    pub fn cache_contains(
+        &self,
+        start: (i32, i32),
+        goal: (i32, i32),
+        class: MobilityClass,
+        radius: u32,
+    ) -> bool {
+        self.cache.contains_key(&(start, goal, class, radius))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::game::entity::EntityStore;
+    use crate::game::map::Map;
+    use crate::game::services::occupancy::Occupancy;
+
+    #[test]
+    fn path_cache_eviction_is_deterministic_across_instances() {
+        // Use a small empty map so most path requests are valid and cached.
+        let map = Map::generate(1, 0x1234_5678);
+        let entities = EntityStore::new();
+        let occ = Occupancy::build(&map, &entities);
+
+        // Two fresh services have independent HashMap seeds, so their internal
+        // bucket orders differ. If eviction only compared last_used, ties could
+        // resolve differently between the two instances.
+        let mut a = PathingService::new(1_000, 3);
+        let mut b = PathingService::new(1_000, 3);
+        a.advance_tick(1);
+        b.advance_tick(1);
+
+        let reqs = [
+            ((1, 1), (2, 2)),
+            ((1, 1), (3, 3)),
+            ((2, 2), (4, 4)),
+        ];
+        for (start, goal) in &reqs {
+            let req = PathRequest {
+                start: *start,
+                goal: *goal,
+                class: MobilityClass::Infantry,
+                radius_tiles: 0,
+                budget: None,
+            };
+            a.request(&map, &occ, req.clone());
+            b.request(&map, &occ, req.clone());
+        }
+
+        assert_eq!(a.cache_len(), 3);
+        assert_eq!(b.cache_len(), 3);
+
+        // This 4th insert triggers eviction (capacity is 3). All entries have
+        // last_used == 1, so the tie-breaker is the cache key itself.
+        let req4 = PathRequest {
+            start: (1, 1),
+            goal: (5, 5),
+            class: MobilityClass::Infantry,
+            radius_tiles: 0,
+            budget: None,
+        };
+        a.request(&map, &occ, req4.clone());
+        b.request(&map, &occ, req4.clone());
+
+        assert_eq!(a.cache_len(), 3);
+        assert_eq!(b.cache_len(), 3);
+
+        // Both instances should have evicted the same key: the one with the
+        // smallest (start, goal, class, radius) tuple.
+        let evicted = ((1, 1), (2, 2), MobilityClass::Infantry, 0);
+        assert!(!a.cache_contains(evicted.0, evicted.1, evicted.2, evicted.3));
+        assert!(!b.cache_contains(evicted.0, evicted.1, evicted.2, evicted.3));
+
+        // And both should still contain the other three.
+        for (start, goal) in &[((1, 1), (3, 3)), ((2, 2), (4, 4)), ((1, 1), (5, 5))] {
+            assert!(a.cache_contains(*start, *goal, MobilityClass::Infantry, 0));
+            assert!(b.cache_contains(*start, *goal, MobilityClass::Infantry, 0));
+        }
     }
 }
