@@ -3,10 +3,10 @@ use std::collections::HashMap;
 use crate::config;
 use crate::game::entity::{Entity, EntityStore, Order};
 use crate::game::map::Map;
+use crate::game::services::dist2;
 use crate::game::services::occupancy::Occupancy;
 use crate::game::services::pathing::PathingService;
 use crate::game::services::spatial::SpatialIndex;
-use crate::game::services::dist2;
 use crate::protocol::Event;
 
 /// Extra slack (px) added to attack range checks so units don't dance at the exact boundary.
@@ -25,9 +25,7 @@ pub(crate) fn combat_system(
 ) {
     // Tick down cooldowns first.
     for e in entities.iter_mut() {
-        if e.attack_cd > 0 {
-            e.attack_cd -= 1;
-        }
+        e.tick_attack_cd();
     }
 
     for id in entities.ids() {
@@ -72,8 +70,8 @@ pub(crate) fn combat_system(
         let Some(tid) = target else {
             // No target: clear stale combat target id for non-attack orders.
             if let Some(e) = entities.get_mut(id) {
-                if matches!(e.order, Order::AttackMove { .. } | Order::Idle) {
-                    e.target_id = None;
+                if matches!(e.order(), Order::AttackMove { .. } | Order::Idle) {
+                    e.set_target_id(None);
                 }
             }
             continue;
@@ -91,25 +89,25 @@ pub(crate) fn combat_system(
 
         if dist <= range_px {
             // In range: face it, stop, and fire if off cooldown.
-            let ready = matches!(entities.get(id), Some(e) if e.attack_cd == 0);
+            let ready = matches!(entities.get(id), Some(e) if e.attack_cd() == 0);
             if let Some(e) = entities.get_mut(id) {
-                e.facing = (ty - py).atan2(tx - px);
-                e.target_id = Some(tid);
+                e.set_facing((ty - py).atan2(tx - px));
+                e.set_target_id(Some(tid));
                 // Hold position while a target is in weapon range (don't overshoot it).
-                e.path.clear();
+                e.clear_path();
             }
             if ready {
                 apply_damage(entities, events, id, tid, dmg, owner);
                 if let Some(e) = entities.get_mut(id) {
-                    e.attack_cd = cd_reset;
+                    e.set_attack_cd(cd_reset);
                 }
             }
         } else if is_unit {
             // Out of weapon range but within aggro: chase. Re-path with A* toward the target
             // tile when we have no path, so units route around obstacles rather than stalling.
-            let want_repath = entities.get(id).map(|e| e.path.is_empty()).unwrap_or(false);
+            let want_repath = entities.get(id).map(|e| e.path_is_empty()).unwrap_or(false);
             if let Some(e) = entities.get_mut(id) {
-                e.target_id = Some(tid);
+                e.set_target_id(Some(tid));
             }
             if want_repath {
                 pathing.repath_entity(map, entities, occ, id, tx, ty);
@@ -139,7 +137,7 @@ enum CombatMode {
 }
 
 fn combat_mode(e: &Entity) -> CombatMode {
-    match e.order {
+    match e.order() {
         Order::Attack { .. } => CombatMode::Ordered,
         _ => CombatMode::Aggressive,
     }
@@ -160,7 +158,7 @@ fn resolve_target(
     // Ordered attackers keep their explicit target if it still exists.
     if mode == CombatMode::Ordered {
         if let Some(e) = entities.get(self_id) {
-            if let Order::Attack { target } = e.order {
+            if let Order::Attack { target } = e.order() {
                 if entities.get(target).map(|t| t.hp > 0).unwrap_or(false) {
                     return Some(target);
                 }
@@ -171,16 +169,15 @@ fn resolve_target(
 
     // Aggressive acquisition: the nearest enemy within the acquire radius (weapon range for
     // buildings, sight range for mobile units so they chase).
-    spatial.nearest(
-        px,
-        py,
-        acquire_px,
-        entities,
-        |e: &Entity| {
-            e.id != self_id && e.owner != owner && e.owner != crate::game::entity::NEUTRAL && e.is_targetable() && e.hp > 0
-        },
-    )
-    .map(|(cid, _)| cid)
+    spatial
+        .nearest(px, py, acquire_px, entities, |e: &Entity| {
+            e.id != self_id
+                && e.owner != owner
+                && e.owner != crate::game::entity::NEUTRAL
+                && e.is_targetable()
+                && e.hp > 0
+        })
+        .map(|(cid, _)| cid)
 }
 
 /// Apply `dmg` to `victim` from `attacker`, emitting an `Attack` event to the attacker's

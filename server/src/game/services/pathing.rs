@@ -180,7 +180,7 @@ impl PathingService {
             waypoints = vec![(gx, gy)];
         }
         if let Some(e) = entities.get_mut(id) {
-            e.path = waypoints;
+            e.set_path(waypoints);
         }
     }
 
@@ -267,11 +267,7 @@ mod tests {
         a.advance_tick(1);
         b.advance_tick(1);
 
-        let reqs = [
-            ((1, 1), (2, 2)),
-            ((1, 1), (3, 3)),
-            ((2, 2), (4, 4)),
-        ];
+        let reqs = [((1, 1), (2, 2)), ((1, 1), (3, 3)), ((2, 2), (4, 4))];
         for (start, goal) in &reqs {
             let req = PathRequest {
                 start: *start,

@@ -3,8 +3,8 @@ use std::collections::{HashMap, HashSet};
 use crate::config;
 use crate::game::entity::{EntityKind, EntityStore, GatherPhase, Order, ProdItem};
 use crate::game::map::Map;
-use crate::game::services::occupancy::{footprint_center, footprint_placeable, Occupancy};
 use crate::game::map::MobilityClass;
+use crate::game::services::occupancy::{footprint_center, footprint_placeable, Occupancy};
 use crate::game::services::pathing::{PathRequest, PathingService};
 use crate::game::services::spatial::SpatialIndex;
 use crate::game::PlayerState;
@@ -59,7 +59,18 @@ pub(crate) fn apply_commands(
                 tile_y,
             } => {
                 order_build(
-                    map, entities, players, occ, spatial, pathing, player, worker, &building, tile_x, tile_y, events,
+                    map,
+                    entities,
+                    players,
+                    occ,
+                    spatial,
+                    pathing,
+                    player,
+                    worker,
+                    &building,
+                    tile_x,
+                    tile_y,
+                    events,
                     &mut reserved_tiles,
                 );
             }
@@ -75,7 +86,9 @@ pub(crate) fn apply_commands(
                         entities.release_miner(id);
                         if let Some(e) = entities.get_mut(id) {
                             e.clear_orders();
-                            e.carry = None; // stop returns carried load is dropped intentionally
+                            if let Some(w) = e.worker.as_mut() {
+                                w.carry = None; // stop returns carried load is dropped intentionally
+                            }
                         }
                     }
                 }
@@ -153,16 +166,15 @@ fn order_move(
 
     entities.release_miner(id);
     if let Some(e) = entities.get_mut(id) {
-        e.path = waypoints;
-        e.target_id = None;
-        e.order = if attack_move {
+        e.set_path(waypoints);
+        e.set_target_id(None);
+        e.set_order(if attack_move {
             Order::AttackMove { x, y }
         } else {
             Order::Move { x, y }
-        };
+        });
         // Leaving a gather order: reset gather sub-state.
-        e.gather_phase = GatherPhase::ToNode;
-        e.harvest_progress = 0;
+        e.reset_gather_state();
     }
 }
 
@@ -213,11 +225,10 @@ fn order_attack(
     let waypoints = pathing.request(map, occ, req);
     entities.release_miner(id);
     if let Some(e) = entities.get_mut(id) {
-        e.order = Order::Attack { target };
-        e.target_id = Some(target);
-        e.path = waypoints;
-        e.gather_phase = GatherPhase::ToNode;
-        e.harvest_progress = 0;
+        e.set_order(Order::Attack { target });
+        e.set_target_id(Some(target));
+        e.set_path(waypoints);
+        e.reset_gather_state();
     }
 }
 
@@ -236,7 +247,8 @@ fn order_gather(
     }
     // Must be a worker, and the target must be a (non-empty) resource node.
     let is_worker = matches!(entities.get(id), Some(e) if e.kind == EntityKind::Worker);
-    let node_ok = matches!(entities.get(node), Some(n) if n.is_node() && n.remaining > 0);
+    let node_ok =
+        matches!(entities.get(node), Some(n) if n.is_node() && n.remaining().unwrap_or(0) > 0);
     if !is_worker || !node_ok {
         return;
     }
@@ -266,23 +278,25 @@ fn order_gather(
     let waypoints = pathing.request(map, occ, req);
     entities.release_miner(id);
     if let Some(e) = entities.get_mut(id) {
-        e.order = Order::Gather { node };
-        e.target_id = Some(node);
-        e.path = waypoints;
-        e.carry = None;
-        e.gather_phase = GatherPhase::ToNode;
-        e.harvest_progress = 0;
+        e.set_order(Order::Gather { node });
+        e.set_target_id(Some(node));
+        e.set_path(waypoints);
+        if let Some(w) = e.worker.as_mut() {
+            w.carry = None;
+            w.gather_phase = GatherPhase::ToNode;
+            w.harvest_progress = 0;
+        }
     }
 }
 
 fn gather_slot_holder(entities: &EntityStore, node: u32) -> Option<u32> {
-    let holder = entities.get(node).and_then(|n| n.miner)?;
+    let holder = entities.get(node).and_then(|n| n.miner())?;
     let worker = entities.get(holder)?;
-    let on_this_node = matches!(worker.order, Order::Gather { node: n } if n == node);
+    let on_this_node = matches!(worker.order(), Order::Gather { node: n } if n == node);
     if worker.hp > 0
         && worker.kind == EntityKind::Worker
         && on_this_node
-        && worker.gather_phase == GatherPhase::Harvesting
+        && worker.gather_phase() == Some(GatherPhase::Harvesting)
     {
         Some(holder)
     } else {
@@ -404,11 +418,10 @@ fn order_build(
     let waypoints = pathing.request(map, occ, req);
     entities.release_miner(worker);
     if let Some(e) = entities.get_mut(worker) {
-        e.order = Order::Build { site };
-        e.target_id = Some(site);
-        e.path = waypoints;
-        e.gather_phase = GatherPhase::ToNode;
-        e.harvest_progress = 0;
+        e.set_order(Order::Build { site });
+        e.set_target_id(Some(site));
+        e.set_path(waypoints);
+        e.reset_gather_state();
     }
 }
 
@@ -430,7 +443,7 @@ fn order_train(
     };
     // Building must be owned, finished, and able to train this unit.
     let ok = matches!(entities.get(building), Some(b)
-        if b.owner == player && b.is_building() && !b.under_construction
+        if b.owner == player && b.is_building() && !b.under_construction()
         && config::trainable_units(b.kind).contains(&kind));
     if !ok {
         notice(events, player, "Cannot train that here");
@@ -438,7 +451,7 @@ fn order_train(
     }
     let owned_complete: Vec<EntityKind> = entities
         .iter()
-        .filter(|e| e.owner == player && e.is_building() && !e.under_construction)
+        .filter(|e| e.owner == player && e.is_building() && !e.under_construction())
         .map(|e| e.kind)
         .collect();
     if !config::train_requirement_met(kind, &owned_complete) {
@@ -471,11 +484,13 @@ fn order_train(
     ps.supply_used += stats.supply;
 
     if let Some(b) = entities.get_mut(building) {
-        b.prod_queue.push(ProdItem {
-            unit: kind,
-            progress: 0,
-            total: stats.build_ticks,
-        });
+        if let Some(queue) = b.prod_queue_mut() {
+            queue.push(ProdItem {
+                unit: kind,
+                progress: 0,
+                total: stats.build_ticks,
+            });
+        }
     }
 }
 
@@ -488,10 +503,13 @@ fn order_cancel(
 ) {
     let unit = {
         let b = match entities.get_mut(building) {
-            Some(b) if b.owner == player && b.is_building() && !b.prod_queue.is_empty() => b,
+            Some(b) if b.owner == player && b.is_building() && !b.prod_queue().is_empty() => b,
             _ => return,
         };
-        b.prod_queue.remove(0).unit
+        match b.prod_queue_mut() {
+            Some(queue) => queue.remove(0).unit,
+            None => return,
+        }
     };
     if let Some(stats) = config::unit_stats(unit) {
         if let Some(ps) = players.iter_mut().find(|p| p.id == player) {
