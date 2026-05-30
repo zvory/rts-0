@@ -1,11 +1,12 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::config;
-use crate::game::entity::{EntityKind, EntityStore, GatherPhase, ProdItem};
+use crate::game::entity::{EntityKind, EntityStore, ProdItem};
 use crate::game::map::Map;
 use crate::game::services::move_coordinator::MoveCoordinator;
 use crate::game::services::occupancy::footprint_placeable;
 use crate::game::services::spatial::SpatialIndex;
+use crate::game::services::world_query;
 use crate::game::PlayerState;
 use crate::protocol::{Command, Event};
 
@@ -50,7 +51,7 @@ pub(crate) fn apply_commands(
                         continue;
                     }
                     let target_ok = matches!(entities.get(target),
-                        Some(t) if t.is_targetable() && t.id != id && t.owner != player);
+                        Some(t) if world_query::is_enemy_targetable(t, player, id));
                     if !target_ok {
                         continue;
                     }
@@ -69,7 +70,7 @@ pub(crate) fn apply_commands(
                     if !is_worker || !node_ok {
                         continue;
                     }
-                    if matches!(gather_slot_holder(entities, node), Some(holder) if holder != id) {
+                    if matches!(world_query::node_holder(entities, node), Some(holder) if holder != id) {
                         continue;
                     }
                     coordinator.order_gather(entities, id, node);
@@ -125,9 +126,10 @@ fn dedupe_cap_units(units: Vec<u32>) -> Vec<u32> {
     out
 }
 
-/// Whether `player` owns a *unit* with this id (buildings/nodes excluded).
+/// Whether `player` owns a *unit* with this id. Local re-export of
+/// [`world_query::owns_unit`] to keep call sites in this module terse.
 fn owns_unit(entities: &EntityStore, player: u32, id: u32) -> bool {
-    matches!(entities.get(id), Some(e) if e.owner == player && e.is_unit())
+    world_query::owns_unit(entities, player, id)
 }
 
 /// Issue a build order under the "reserve on arrival" model. Validates intent, emits
@@ -172,11 +174,7 @@ fn order_build(
         }
     };
 
-    let owned: Vec<EntityKind> = entities
-        .iter()
-        .filter(|e| e.owner == player && e.is_building())
-        .map(|e| e.kind)
-        .collect();
+    let owned = world_query::owned_building_kinds(entities, player);
     if !config::build_requirement_met(kind, &owned) {
         notice(events, player, "Requirement not met");
         return;
@@ -228,11 +226,7 @@ fn order_train(
         notice(events, player, "Cannot train that here");
         return;
     }
-    let owned_complete: Vec<EntityKind> = entities
-        .iter()
-        .filter(|e| e.owner == player && e.is_building() && !e.under_construction())
-        .map(|e| e.kind)
-        .collect();
+    let owned_complete = world_query::completed_building_kinds(entities, player);
     if !config::train_requirement_met(kind, &owned_complete) {
         notice(events, player, "Requirement not met");
         return;
@@ -305,18 +299,3 @@ pub(crate) fn notice(events: &mut HashMap<u32, Vec<Event>>, player: u32, msg: &s
     });
 }
 
-/// Resolve who, if anyone, currently holds `node`'s single harvest slot.
-fn gather_slot_holder(entities: &EntityStore, node: u32) -> Option<u32> {
-    let m = entities.get(node).and_then(|n| n.miner())?;
-    let w = entities.get(m)?;
-    let on_this_node = w.order().gather_node() == Some(node);
-    if w.hp > 0
-        && w.kind == EntityKind::Worker
-        && on_this_node
-        && w.gather_phase() == Some(GatherPhase::Harvesting)
-    {
-        Some(m)
-    } else {
-        None
-    }
-}
