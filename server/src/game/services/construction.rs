@@ -21,11 +21,11 @@ pub(crate) fn construction_system(
     let mut working: Vec<(u32, u32)> = Vec::new();
     for e in entities.iter() {
         if e.is_unit() {
-            if let Order::Build { site } = e.order {
+            if let Order::Build { site } = e.order() {
                 if let Some(b) = entities.get(site) {
                     let arrive =
                         interact_range(entities, site).unwrap_or(config::TILE_SIZE as f32 * 2.0);
-                    if b.under_construction
+                    if b.under_construction()
                         && dist2(e.pos_x, e.pos_y, b.pos_x, b.pos_y).sqrt() <= arrive
                     {
                         working.push((e.id, site));
@@ -38,20 +38,23 @@ pub(crate) fn construction_system(
     for (worker, site) in working {
         // Stop the worker moving while it builds.
         if let Some(w) = entities.get_mut(worker) {
-            w.path.clear();
+            w.clear_path();
         }
         let completed = {
             let b = match entities.get_mut(site) {
-                Some(b) if b.under_construction => b,
+                Some(b) if b.under_construction() => b,
                 _ => continue,
             };
-            b.build_progress += 1;
-            if b.build_progress >= b.build_total {
-                b.under_construction = false;
-                b.build_progress = b.build_total;
-                true
-            } else {
+            let Some(c) = b.construction.as_mut() else {
+                continue;
+            };
+            c.progress += 1;
+            if c.progress < c.total {
                 false
+            } else {
+                c.progress = c.total;
+                b.construction = None;
+                true
             }
         };
         if completed {
@@ -76,12 +79,7 @@ pub(crate) fn construction_system(
 /// If `worker` is standing on a tile inside `site`'s footprint, teleport it to the nearest
 /// passable tile outside the footprint. This prevents workers from getting permanently stuck
 /// when a building is placed on top of them.
-fn eject_worker_if_inside(
-    map: &Map,
-    entities: &mut EntityStore,
-    worker: u32,
-    site: u32,
-) {
+fn eject_worker_if_inside(map: &Map, entities: &mut EntityStore, worker: u32, site: u32) {
     let b = match entities.get(site) {
         Some(b) => b,
         None => return,

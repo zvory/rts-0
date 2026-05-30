@@ -105,7 +105,7 @@ impl AiController {
             match e.kind {
                 EntityKind::Worker => {
                     worker_count += 1;
-                    match e.order {
+                    match e.order() {
                         Order::Idle => idle_workers.push(e.id),
                         Order::Gather { .. } => gathering_workers.push(e.id),
                         _ => {}
@@ -118,17 +118,17 @@ impl AiController {
                     }
                 }
                 EntityKind::IndustrialCenter
-                    if !e.under_construction && e.prod_queue.is_empty() =>
+                    if !e.under_construction() && e.prod_queue().is_empty() =>
                 {
                     idle_industrial_centers.push(e.id)
                 }
                 EntityKind::Barracks => {
                     barracks_total += 1;
-                    if !e.under_construction {
-                        barracks.push((e.id, e.prod_queue.len()));
+                    if !e.under_construction() {
+                        barracks.push((e.id, e.prod_queue().len()));
                     }
                 }
-                EntityKind::Depot if e.under_construction => depot_building = true,
+                EntityKind::Depot if e.under_construction() => depot_building = true,
                 _ => {}
             }
         }
@@ -144,7 +144,9 @@ impl AiController {
             .unwrap_or(50);
         if !depot_building && !supply_capped && free_supply < SUPPLY_BUFFER && steel >= depot_cost {
             if let Some(worker) = builder_pool.pop() {
-                if let Some((tx, ty)) = self.find_build_spot(map, entities, spatial, EntityKind::Depot, me) {
+                if let Some((tx, ty)) =
+                    self.find_build_spot(map, entities, spatial, EntityKind::Depot, me)
+                {
                     out.push((
                         self.player,
                         Command::Build {
@@ -325,9 +327,9 @@ impl AiController {
 /// A rifleman available to join a wave: idle, or one whose attack-move finished (no path, no
 /// target) so it's standing around and should regroup with the next push.
 fn is_free_rifleman(e: &crate::game::entity::Entity) -> bool {
-    match e.order {
+    match e.order() {
         Order::Idle => true,
-        Order::AttackMove { .. } => e.path.is_empty() && e.target_id.is_none(),
+        Order::AttackMove { .. } => e.path_is_empty() && e.target_id().is_none(),
         _ => false,
     }
 }
@@ -342,7 +344,9 @@ fn nearest_steel_node(entities: &EntityStore, spatial: &SpatialIndex, worker: u3
         wy,
         max_radius,
         entities,
-        |e: &crate::game::entity::Entity| e.kind == EntityKind::Steel && e.remaining > 0,
+        |e: &crate::game::entity::Entity| {
+            e.kind == EntityKind::Steel && e.remaining().unwrap_or(0) > 0
+        },
     );
     result.map(|(id, _)| id)
 }

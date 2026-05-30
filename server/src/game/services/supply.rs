@@ -12,12 +12,12 @@ pub(crate) fn recompute_supply(players: &mut [PlayerState], entities: &EntitySto
             if e.owner != ps.id {
                 continue;
             }
-            if e.is_building() && !e.under_construction {
+            if e.is_building() && !e.under_construction() {
                 if let Some(s) = config::building_stats(e.kind) {
                     cap += s.provides_supply;
                 }
                 // Units queued for production reserve supply too.
-                for item in &e.prod_queue {
+                for item in e.prod_queue() {
                     if let Some(us) = config::unit_stats(item.unit) {
                         used += us.supply;
                     }

@@ -355,12 +355,12 @@ impl Game {
         );
 
         if e.is_unit() {
-            v.facing = Some(e.facing);
+            v.facing = Some(e.facing());
         }
 
         // Production buildings: surface the front item + queue depth.
-        if e.is_building() && !e.prod_queue.is_empty() {
-            if let Some(front) = e.prod_queue.first() {
+        if e.is_building() && !e.prod_queue().is_empty() {
+            if let Some(front) = e.prod_queue().first() {
                 v.prod_kind = Some(front.unit.to_protocol_str().to_string());
                 v.prod_progress = Some(if front.total == 0 {
                     0.0
@@ -368,33 +368,29 @@ impl Game {
                     front.progress as f32 / front.total as f32
                 });
             }
-            v.prod_queue = Some(e.prod_queue.len() as u32);
+            v.prod_queue = Some(e.prod_queue().len() as u32);
         }
 
         // Buildings under construction: surface progress so the client renders scaffolding.
-        if e.under_construction {
-            v.build_progress = Some(if e.build_total == 0 {
-                1.0
-            } else {
-                (e.build_progress as f32 / e.build_total as f32).min(1.0)
-            });
+        if let Some(progress) = e.build_progress_fraction() {
+            v.build_progress = Some(progress);
         }
 
         // Resource nodes: remaining amount.
         if e.is_node() {
-            v.remaining = Some(e.remaining);
+            v.remaining = e.remaining();
         }
 
-        if e.kind == EntityKind::Worker && e.gather_phase == GatherPhase::Harvesting {
-            if let Order::Gather { node } = e.order {
+        if e.kind == EntityKind::Worker && e.gather_phase() == Some(GatherPhase::Harvesting) {
+            if let Order::Gather { node } = e.order() {
                 v.latched_node = Some(node);
             }
         }
 
         // Combat tracer target (only meaningful for attackers actively engaged).
-        if let Some(t) = e.target_id {
+        if let Some(t) = e.target_id() {
             // Only expose a target that points at a real combat target, to keep tracers sane.
-            if matches!(e.order, Order::Attack { .. } | Order::AttackMove { .. })
+            if matches!(e.order(), Order::Attack { .. } | Order::AttackMove { .. })
                 || (e.is_building() && e.can_attack())
             {
                 // Fog-gate the tracer: reveal the target id only when the viewer owns the

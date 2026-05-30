@@ -15,15 +15,20 @@ pub(crate) fn production_system(
         // Is this a finished building with a non-empty queue?
         let (owner, kind, completed_unit) = {
             let b = match entities.get_mut(id) {
-                Some(b) if b.is_building() && !b.under_construction && !b.prod_queue.is_empty() => {
+                Some(b)
+                    if b.is_building() && !b.under_construction() && !b.prod_queue().is_empty() =>
+                {
                     b
                 }
                 _ => continue,
             };
-            let front = &mut b.prod_queue[0];
+            let Some(queue) = b.prod_queue_mut() else {
+                continue;
+            };
+            let front = &mut queue[0];
             front.progress += 1;
             if front.progress >= front.total {
-                let unit = b.prod_queue.remove(0).unit;
+                let unit = queue.remove(0).unit;
                 (b.owner, b.kind, Some(unit))
             } else {
                 (b.owner, b.kind, None)
