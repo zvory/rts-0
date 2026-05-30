@@ -455,12 +455,13 @@ Use this index when deciding whether a TODO can start.
 
 
 # Uncategorized Tasks:
- - buildings should not be able to be be built on top of each other
+ - DONE: buildings should not be able to be be built on top of each other
  - with a group of units selected, shift clicking a unit will deselect it
  - control left click a unit will select all units of that type that are visible in the viewport
- - tank factory and advanced training center should   require 100 and 50 oil respecitvely
- - Add four oil patches, but cut the rate of oil gathering by four
+ - DONE: tank factory and advanced training center should   require 100 and 50 oil respecitvely
+ - DONE: Add four oil patches, but cut the rate of oil gathering by four
  - should be possible to select multiple buildings at once
  - cheat menu for development (only available while running locally), buttons to grant money, oil, or clear the fog of war completely
  - implement a way to view the self play tests with zero fog of war, because we spend an enormous amount of tokens breaking and debugging them, and letting me just watch will be super helpful and token efficient
  - building a building on top of a unit will lock that unit inside the building. it should be impossible to build a building on top of a unit.
+ - halve the mining rate for steel
