@@ -414,6 +414,10 @@ impl Game {
 
 /// Spawn a player's full starting layout: a free, fully-built Industrial Center on the start tile, a ring of
 /// workers around it, and a nearby neutral resource cluster (steel + one oil node).
+///
+/// Resource placement is precisely controlled so every player receives the same relative layout,
+/// rotated to point toward the map center. All starting resources lie within
+/// [`IC_RESOURCE_MIN_DIST_TILES` .. `IC_RESOURCE_MAX_DIST_TILES`] from the Industrial Center.
 fn spawn_player_start(entities: &mut EntityStore, map: &Map, owner: u32, start: (u32, u32)) {
     let (stx, sty) = start;
     let (hx, hy) = map.tile_center(stx, sty);
@@ -432,27 +436,56 @@ fn spawn_player_start(entities: &mut EntityStore, map: &Map, owner: u32, start: 
         entities.spawn_unit(owner, EntityKind::Worker, wx, wy);
     }
 
-    // Steel cluster: an arc of patches a few tiles from the Industrial Center, plus one oil node.
-    // Placement is offset toward the map center so it sits in open space, not off-map.
-    let center = (map.size as f32 * ts) * 0.5;
-    let dir_x = (center - hx).signum();
-    let dir_y = (center - hy).signum();
-    // Anchor the cluster ~4 tiles toward center from the Industrial Center.
-    let anchor_x = hx + dir_x * ts * 4.0;
-    let anchor_y = hy + dir_y * ts * 4.0;
+    // Determine the angle toward the map center so the resource cluster points inward.
+    let center = map.world_size_px() * 0.5;
+    let dx = center - hx;
+    let dy = center - hy;
+    let base_angle = dy.atan2(dx);
+
+    // Steel cluster: a 4x2 block centered at a fixed distance from the IC, rotated to face
+    // the map center. This guarantees identical distances for every player.
+    let block_dist = config::STEEL_BLOCK_DIST_TILES * ts;
+    let block_cx = hx + block_dist * base_angle.cos();
+    let block_cy = hy + block_dist * base_angle.sin();
+
+    // Perpendicular axis (rotated 90 deg from base_angle) for the block width.
+    let perp_x = -base_angle.sin();
+    let perp_y = base_angle.cos();
 
     let patches = config::STEEL_PATCHES_PER_BASE;
+    let cols = 4;
+    let _rows = 2;
     for i in 0..patches {
-        // Lay patches out in a short two-row block near the anchor.
-        let col = (i % 4) as f32;
-        let row = (i / 4) as f32;
-        let px = anchor_x + (col - 1.5) * ts;
-        let py = anchor_y + row * ts;
+        let col = (i % cols) as f32;
+        let row = (i / cols) as f32;
+        // Local offsets within the block, centered on the block center.
+        let off_x = (col - 1.5) * ts; // -1.5 .. +1.5 tiles
+        let off_y = (row - 0.5) * ts; // -0.5 .. +0.5 tiles
+        let px = block_cx + off_x * perp_x + off_y * base_angle.cos();
+        let py = block_cy + off_x * perp_y + off_y * base_angle.sin();
+        let dist_tiles = ((px - hx).powi(2) + (py - hy).powi(2)).sqrt() / ts;
+        debug_assert!(
+            (config::IC_RESOURCE_MIN_DIST_TILES..=config::IC_RESOURCE_MAX_DIST_TILES)
+                .contains(&dist_tiles),
+            "steel patch {i} at {dist_tiles:.2} tiles from IC is out of [{:.1}, {:.1}] bounds",
+            config::IC_RESOURCE_MIN_DIST_TILES,
+            config::IC_RESOURCE_MAX_DIST_TILES
+        );
         entities.spawn_node(EntityKind::Steel, px, py);
     }
-    // Oil node sits a little further out from the steel line.
-    let gx = anchor_x + dir_x * ts * 1.5;
-    let gy = anchor_y + dir_y * ts * 2.5;
+
+    // Oil node sits at a fixed distance further out in the same direction.
+    let oil_dist = config::OIL_DIST_TILES * ts;
+    let gx = hx + oil_dist * base_angle.cos();
+    let gy = hy + oil_dist * base_angle.sin();
+    let oil_tiles = oil_dist / ts;
+    debug_assert!(
+        (config::IC_RESOURCE_MIN_DIST_TILES..=config::IC_RESOURCE_MAX_DIST_TILES)
+            .contains(&oil_tiles),
+        "oil at {oil_tiles:.2} tiles from IC is out of [{:.1}, {:.1}] bounds",
+        config::IC_RESOURCE_MIN_DIST_TILES,
+        config::IC_RESOURCE_MAX_DIST_TILES
+    );
     entities.spawn_node(EntityKind::Oil, gx, gy);
 }
 
@@ -558,5 +591,94 @@ mod tests {
             game.ai.is_empty(),
             "a human-only match has no AI controllers"
         );
+    }
+
+    /// Every player must receive the same relative resource layout, and all starting resources
+    /// must fall within the configured min/max distance from the Industrial Center.
+    #[test]
+    fn spawn_resource_distances_are_fair_and_symmetric() {
+        let counts = [1, 2, 3, 4];
+        for &pc in &counts {
+            let players: Vec<PlayerInit> = (1..=pc)
+                .map(|id| PlayerInit {
+                    id,
+                    name: format!("P{id}"),
+                    color: "#fff".into(),
+                    is_ai: false,
+                })
+                .collect();
+            let game = Game::new_for_replay(&players);
+
+            let mut all_player_dists: Vec<Vec<(EntityKind, f32)>> = Vec::new();
+            for p in &game.players {
+                let ic = game
+                    .entities
+                    .iter()
+                    .find(|e| e.owner == p.id && e.kind == EntityKind::IndustrialCenter)
+                    .expect("Industrial Center exists for every player");
+
+                let mut dists = Vec::new();
+                for e in game.entities.iter() {
+                    if e.owner != 0 || (!e.is_node()) {
+                        continue;
+                    }
+                    let d_x = e.pos_x - ic.pos_x;
+                    let d_y = e.pos_y - ic.pos_y;
+                    let dist_tiles = (d_x * d_x + d_y * d_y).sqrt() / config::TILE_SIZE as f32;
+
+                    // Only consider nodes that belong to this player's start cluster.
+                    if dist_tiles <= config::IC_RESOURCE_MAX_DIST_TILES + 1.0 {
+                        dists.push((e.kind, dist_tiles));
+                        assert!(
+                            dist_tiles >= config::IC_RESOURCE_MIN_DIST_TILES,
+                            "player {} has a {:?} node too close ({:.2} tiles) to their IC",
+                            p.id,
+                            e.kind,
+                            dist_tiles
+                        );
+                        assert!(
+                            dist_tiles <= config::IC_RESOURCE_MAX_DIST_TILES,
+                            "player {} has a {:?} node too far ({:.2} tiles) from their IC",
+                            p.id,
+                            e.kind,
+                            dist_tiles
+                        );
+                    }
+                }
+                // Sort for deterministic comparison.
+                dists.sort_by(|a, b| {
+                    let kind_ord = a.0.to_protocol_str().cmp(b.0.to_protocol_str());
+                    if kind_ord != std::cmp::Ordering::Equal {
+                        return kind_ord;
+                    }
+                    a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal)
+                });
+                all_player_dists.push(dists);
+            }
+
+            // Every player in the same match must have identical distance sets.
+            if let Some(first) = all_player_dists.first() {
+                for (i, other) in all_player_dists.iter().enumerate().skip(1) {
+                    assert_eq!(
+                        first.len(),
+                        other.len(),
+                        "player count {}: player {} has a different number of nearby resources",
+                        pc,
+                        i + 1
+                    );
+                    for (j, ((ek_a, da), (ek_b, db))) in first.iter().zip(other.iter()).enumerate()
+                    {
+                        assert_eq!(*ek_a, *ek_b, "mismatched resource kind at index {j}");
+                        assert!(
+                            (da - db).abs() < 0.01,
+                            "player count {pc}: resource {j} distance mismatch — player 1 has {:.3} tiles, player {} has {:.3} tiles",
+                            da,
+                            i + 1,
+                            db
+                        );
+                    }
+                }
+            }
+        }
     }
 }
