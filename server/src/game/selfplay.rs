@@ -2718,11 +2718,17 @@ fn real_ai_vs_real_ai() {
         replay_commands: game.command_log().to_vec(),
         players: players.clone(),
     };
+    let ts = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis();
+    let artifact_name = format!("real_ai_vs_real_ai_{ts}");
     let dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("target")
         .join("selfplay-artifacts")
-        .join("real_ai_vs_real_ai");
+        .join(&artifact_name);
     std::fs::create_dir_all(&dir).unwrap();
     let json = serde_json::to_vec_pretty(&artifact).unwrap();
     std::fs::write(dir.join("replay.json"), json).unwrap();
+    println!("REPLAY_ARTIFACT={artifact_name}");
 }
