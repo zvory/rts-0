@@ -26,7 +26,7 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 SERVER_DIR="$REPO_ROOT/server"
 
 # --- Options --------------------------------------------------------------------------------
-PORT="${PORT:-8080}"
+PORT="${PORT:-8081}"
 RUN_RUST=1
 RUN_CLIENT=1
 for arg in "$@"; do

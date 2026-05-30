@@ -4,8 +4,8 @@
 // payload) -> initial economy -> fog of war -> gather -> train -> disconnect/win.
 //
 // Usage: start the server (`cd server && cargo run`), then `node tests/server_integration.mjs`.
-// Override the endpoint with RTS_WS (default ws://127.0.0.1:8080/ws).
-const URL = process.env.RTS_WS || "ws://127.0.0.1:8080/ws";
+// Override the endpoint with RTS_WS (default ws://127.0.0.1:8081/ws).
+const URL = process.env.RTS_WS || "ws://127.0.0.1:8081/ws";
 const ROOM = "itest-" + Math.floor(performance.now());
 
 let failures = 0;

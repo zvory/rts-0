@@ -5,11 +5,11 @@
 //
 // Requires puppeteer-core and a local Chrome:
 //   cd tests && npm install
-//   node client_smoke.mjs              (server must be running on :8080)
-// Env: RTS_URL (default http://127.0.0.1:8080/), CHROME (path to a Chrome/Chromium binary).
+//   node client_smoke.mjs              (server must be running on :8081)
+// Env: RTS_URL (default http://127.0.0.1:8081/), CHROME (path to a Chrome/Chromium binary).
 import puppeteer from "puppeteer-core";
 
-const URL = process.env.RTS_URL || "http://127.0.0.1:8080/";
+const URL = process.env.RTS_URL || "http://127.0.0.1:8081/";
 const CHROME = process.env.CHROME ||
   "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const consoleErrors = [];
