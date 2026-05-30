@@ -202,6 +202,13 @@ export class Renderer {
     const selection = state.selection || new Set();
     const colorByOwner = this._ownerColors(state);
 
+    // Nodes currently being mined: any worker latched to them. Used by
+    // _drawResource to overlay an X marker.
+    this._miningNodes = new Set();
+    for (const e of entities) {
+      if (e.latchedNode) this._miningNodes.add(e.latchedNode);
+    }
+
     // Two passes so silhouettes layer correctly: resources + buildings first
     // (footprints sit under units), then units. Selection rings / hp bars are
     // their own layers and are filled inline.
@@ -539,6 +546,16 @@ export class Renderer {
         g.lineTo(c.dx, c.dy + cs * 0.3);
         g.lineStyle(1.2, 0x1a1712, 0.85);
       }
+    }
+
+    // X marker over a node that a worker is actively mining.
+    if (this._miningNodes && this._miningNodes.has(e.id)) {
+      const xr = r * 0.9;
+      g.lineStyle(2.5, 0x1a1712, 0.95);
+      g.moveTo(-xr, -xr);
+      g.lineTo(xr, xr);
+      g.moveTo(xr, -xr);
+      g.lineTo(-xr, xr);
     }
   }
 
