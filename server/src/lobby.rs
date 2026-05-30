@@ -26,7 +26,7 @@ use tokio::time::{interval, MissedTickBehavior};
 use tracing::{debug, info, warn};
 
 use crate::config;
-use crate::game::selfplay::{LiveSelfPlay, ReplayArtifact, ReplayDriver};
+use crate::game::selfplay::{is_safe_artifact_name, LiveSelfPlay, ReplayArtifact, ReplayDriver};
 use crate::game::{Game, PlayerInit};
 use crate::protocol::{Command, Event, LobbyPlayer, ServerMessage, StartPayload};
 
@@ -817,21 +817,22 @@ fn load_replay_artifact(name: &str) -> Result<ReplayArtifact, String> {
     if !is_safe_artifact_name(name) {
         return Err("invalid replay artifact name".to_string());
     }
-    let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("target")
-        .join("selfplay-failures")
-        .join(name)
-        .join("replay.json");
-    let json = fs::read_to_string(&path).map_err(|e| format!("failed to read {path:?}: {e}"))?;
-    serde_json::from_str(&json).map_err(|e| format!("failed to parse replay artifact: {e}"))
-}
-
-fn is_safe_artifact_name(name: &str) -> bool {
-    !name.is_empty()
-        && !name.contains('/')
-        && !name.contains('\\')
-        && !name.contains("..")
-        && name
-            .chars()
-            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+    let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("target");
+    let candidates = [
+        root.join("selfplay-artifacts")
+            .join(name)
+            .join("replay.json"),
+        root.join("selfplay-failures")
+            .join(name)
+            .join("replay.json"),
+    ];
+    for path in candidates {
+        if let Ok(json) = fs::read_to_string(&path) {
+            return serde_json::from_str(&json)
+                .map_err(|e| format!("failed to parse replay artifact: {e}"));
+        }
+    }
+    Err(format!(
+        "failed to read replay artifact {name:?} from target/selfplay-artifacts or target/selfplay-failures"
+    ))
 }

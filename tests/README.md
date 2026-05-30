@@ -45,10 +45,14 @@ drive `Game` through `enqueue`/`tick`/`snapshot_for`, exercising gathering, gas,
 Depot/Barracks/Tank Factory construction, Rifleman/Tank training, rush pressure, and combat.
 Successful runs replay the authoritative tick-stamped command log through a fresh game and compare
 the replayed event stream and final snapshots against the live run. On failure it writes replay
-artifacts under `server/target/selfplay-failures/`.
+artifacts under `server/target/selfplay-failures/`. To save a successful run too, set
+`RTS_SELFPLAY_SAVE_REPLAY` to either `1` for an auto-generated artifact name or to an explicit safe
+artifact name; successful runs are then written under `server/target/selfplay-artifacts/<name>/`.
 
 ```bash
 cd server && cargo test scripted_self_play_exercises_economy_tech_and_combat
+RTS_SELFPLAY_SAVE_REPLAY=manual_bunker_rush_latest \
+  cargo test scripted_self_play_bunker_rush_vs_economy
 ```
 
 ## Client smoke (headless browser)
