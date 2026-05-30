@@ -31,7 +31,7 @@ pub mod kinds {
     pub const INDUSTRIAL_CENTER: &str = "industrial_center";
     pub const DEPOT: &str = "depot";
     pub const BARRACKS: &str = "barracks";
-    pub const ADVANCED_TRAINING_CENTRE: &str = "advanced_training_centre";
+    pub const TRAINING_CENTRE: &str = "training_centre";
     pub const TANK_FACTORY: &str = "tank_factory";
     pub const BUNKER: &str = "bunker";
     pub const STEEL: &str = "steel";
