@@ -34,14 +34,6 @@ impl SpatialIndex {
         SpatialIndex { size: map_size, cells }
     }
 
-    /// All entity ids on a specific tile.
-    pub fn cell(&self, tx: u32, ty: u32) -> &[u32] {
-        if tx >= self.size || ty >= self.size {
-            return &[];
-        }
-        &self.cells[(ty * self.size + tx) as usize]
-    }
-
     /// Iterate all entity ids whose tile center lies within the inclusive tile rectangle.
     pub fn ids_in_rect(&self, min_tx: i32, min_ty: i32, max_tx: i32, max_ty: i32) -> RectIter {
         let min_tx = min_tx.clamp(0, self.size as i32 - 1);
@@ -53,7 +45,6 @@ impl SpatialIndex {
             x: min_tx,
             y: min_ty,
             min_tx,
-            min_ty,
             max_tx,
             max_ty,
             cell_idx: 0,
@@ -112,7 +103,6 @@ pub struct RectIter<'a> {
     x: i32,
     y: i32,
     min_tx: i32,
-    min_ty: i32,
     max_tx: i32,
     max_ty: i32,
     cell_idx: usize,

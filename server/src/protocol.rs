@@ -37,22 +37,7 @@ pub mod kinds {
     pub const STEEL: &str = "steel";
     pub const OIL: &str = "oil";
 
-    pub const UNITS: [&str; 5] = [WORKER, RIFLEMAN, MACHINE_GUNNER, AT_TEAM, TANK];
-    pub const BUILDINGS: [&str; 6] = [
-        INDUSTRIAL_CENTER,
-        DEPOT,
-        BARRACKS,
-        ADVANCED_TRAINING_CENTRE,
-        TANK_FACTORY,
-        BUNKER,
-    ];
 
-    pub fn is_unit(k: &str) -> bool {
-        UNITS.contains(&k)
-    }
-    pub fn is_building(k: &str) -> bool {
-        BUILDINGS.contains(&k)
-    }
 }
 
 /// `EntityView.state` values.

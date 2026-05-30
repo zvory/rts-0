@@ -180,8 +180,14 @@ fn order_attack(
         return;
     }
     let (tx, ty, sx, sy, kind) = {
-        let t = entities.get(target).unwrap();
-        let e = entities.get(id).unwrap();
+        let t = match entities.get(target) {
+            Some(t) => t,
+            None => return,
+        };
+        let e = match entities.get(id) {
+            Some(e) => e,
+            None => return,
+        };
         let (tx, ty) = map.tile_of(t.pos_x, t.pos_y);
         let (sx, sy) = map.tile_of(e.pos_x, e.pos_y);
         (tx, ty, sx, sy, e.kind)
@@ -226,8 +232,14 @@ fn order_gather(
         return;
     }
     let (nx, ny, sx, sy) = {
-        let n = entities.get(node).unwrap();
-        let e = entities.get(id).unwrap();
+        let n = match entities.get(node) {
+            Some(n) => n,
+            None => return,
+        };
+        let e = match entities.get(id) {
+            Some(e) => e,
+            None => return,
+        };
         let (nx, ny) = map.tile_of(n.pos_x, n.pos_y);
         let (sx, sy) = map.tile_of(e.pos_x, e.pos_y);
         (nx, ny, sx, sy)
@@ -338,7 +350,10 @@ fn order_build(
 
     // Walk the worker to the site and mark it occupied with a build order.
     let (sx, sy) = {
-        let e = entities.get(worker).unwrap();
+        let e = match entities.get(worker) {
+            Some(e) => e,
+            None => return,
+        };
         map.tile_of(e.pos_x, e.pos_y)
     };
     let req = PathRequest {

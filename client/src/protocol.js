@@ -37,7 +37,7 @@ export const CMD = Object.freeze({
 
 // --- Terrain codes (must match protocol::terrain) ---
 export const TERRAIN = Object.freeze({ GRASS: 0, ROCK: 1, WATER: 2, FOREST: 3 });
-export const PASSABLE = Object.freeze({ 0: true, 1: false, 2: false, 3: false });
+export const PASSABLE = Object.freeze({ 0: true, 1: false, 2: false, 3: true });
 
 // --- Entity kinds (must match protocol::kinds) ---
 export const KIND = Object.freeze({

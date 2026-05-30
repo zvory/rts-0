@@ -299,7 +299,6 @@ export class Lobby {
         cb();
       } catch (err) {
         // A faulty subscriber must not break the others or the lobby.
-        console.error("Lobby onGameStart callback failed:", err);
       }
     }
   }

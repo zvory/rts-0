@@ -15,10 +15,7 @@ use std::collections::{BinaryHeap, HashMap};
 
 use crate::config;
 
-/// Maximum number of nodes A* will expand before giving up and returning a best-effort path.
-/// Generous for our map sizes (up to 96×96) but bounded so a pathological request can never
-/// stall a tick.
-const MAX_EXPANDED: usize = 8_192;
+
 
 /// A passability oracle the pathfinder queries per tile: terrain AND dynamic building
 /// footprints. Implemented by `systems`/`mod` which own the occupancy grid.
@@ -84,17 +81,12 @@ const NEIGHBORS: [(i32, i32, u32); 8] = [
     (-1, -1, 14),
 ];
 
-/// Find a tile path from `(sx, sy)` to `(gx, gy)`.
+/// Find a tile path from `(sx, sy)` to `(gx, gy)` with a configurable expansion cap.
 ///
 /// Returns the sequence of tile coordinates to traverse, EXCLUDING the start tile and
 /// INCLUDING the goal tile (or the closest reachable tile on best-effort). An empty vec means
 /// "already there" or "nowhere useful to go". Diagonal moves are forbidden when they would
 /// cut a corner between two blocked tiles (prevents clipping through walls).
-pub fn find_path<P: Passability>(pass: &P, sx: i32, sy: i32, gx: i32, gy: i32) -> Vec<(i32, i32)> {
-    find_path_with_budget(pass, sx, sy, gx, gy, MAX_EXPANDED)
-}
-
-/// Like [`find_path`] but with a configurable expansion cap.
 pub fn find_path_with_budget<P: Passability>(
     pass: &P,
     sx: i32,

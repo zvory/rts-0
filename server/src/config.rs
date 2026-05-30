@@ -9,7 +9,6 @@ use crate::game::entity::EntityKind;
 // --- Timing -----------------------------------------------------------------
 pub const TICK_HZ: u32 = 30;
 pub const TICK_MS: u64 = 1000 / TICK_HZ as u64;
-pub const SNAPSHOT_EVERY_N_TICKS: u32 = 1;
 
 // --- Map --------------------------------------------------------------------
 pub const TILE_SIZE: u32 = 32;

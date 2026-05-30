@@ -43,7 +43,7 @@ pub(crate) fn death_system(
     // so units don't chase ghosts. Gather orders self-heal via `retarget_or_idle`.
     for id in entities.ids() {
         let stale = {
-            let e = entities.get(id).unwrap();
+            let Some(e) = entities.get(id) else { continue };
             match e.order {
                 Order::Attack { target } => !entities.contains(target),
                 Order::Build { site } => !entities.contains(site),

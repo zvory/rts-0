@@ -91,7 +91,9 @@ pub(crate) fn footprint_center(
     tile_x: u32,
     tile_y: u32,
 ) -> (f32, f32) {
-    let s = config::building_stats(building).expect("building stats");
+    let Some(s) = config::building_stats(building) else {
+        return (0.0, 0.0);
+    };
     let ts = config::TILE_SIZE as f32;
     let x = tile_x as f32 * ts + (s.foot_w as f32 * ts) * 0.5;
     let y = tile_y as f32 * ts + (s.foot_h as f32 * ts) * 0.5;

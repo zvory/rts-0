@@ -87,6 +87,7 @@ impl Game {
         Self::new_inner(players, true)
     }
 
+    #[cfg(test)]
     pub(crate) fn new_for_replay(players: &[PlayerInit]) -> Game {
         Self::new_inner(players, false)
     }
@@ -307,11 +308,13 @@ impl Game {
         self.fog.recompute(&ids, &self.entities);
     }
 
+    #[cfg(test)]
     pub fn tick_count(&self) -> u32 {
         self.tick
     }
 
     /// Authoritative commands applied so far, in exact application order.
+    #[cfg(test)]
     pub fn command_log(&self) -> &[CommandLogEntry] {
         &self.command_log
     }

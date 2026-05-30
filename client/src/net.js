@@ -211,8 +211,7 @@ export class Net {
       try {
         handler(payload);
       } catch (err) {
-        // eslint-disable-next-line no-console
-        console.error(`Net handler for "${type}" threw:`, err);
+        // Isolate handler exceptions so one bad subscriber cannot break dispatch.
       }
     }
   }
