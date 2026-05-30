@@ -4,7 +4,7 @@
 
  - [x] Replace stringly entity kind checks in hot simulation paths with typed internal enums, converting to protocol strings only at the boundary.
  - [x] Split `systems.rs` into internal services before adding complex mechanics: commands, movement, combat, economy, production, construction, death, occupancy.
- - [ ] Add a spatial query layer used by combat, fog, resource search, collision/steering, and snapshot interest filtering.
+ - [x] Add a spatial query layer used by combat, fog, resource search, collision/steering, and snapshot interest filtering.
  - [ ] Introduce a `PathingService` boundary with unit class, radius/footprint, terrain mask, dynamic blockers, path budget, and cached/reusable results.
  - [ ] Extend map/passability around movement classes before terrain-specific combat and tank/infantry rules land.
  - [ ] Enforce map-generation resource fairness: Industrial Centers must keep a minimum distance from minerals and gas, and spawn layouts should precisely control resource distances so no player gets an advantage from patches or geysers being too close or too far.

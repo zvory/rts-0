@@ -5,6 +5,7 @@ use crate::game::entity::{EntityKind, EntityStore, GatherPhase, Order, ProdItem}
 use crate::game::map::Map;
 use crate::game::pathfinding;
 use crate::game::services::occupancy::{footprint_center, footprint_placeable, Occupancy};
+use crate::game::services::spatial::SpatialIndex;
 use crate::game::PlayerState;
 use crate::protocol::{Command, Event};
 
@@ -18,6 +19,7 @@ pub(crate) fn apply_commands(
     entities: &mut EntityStore,
     players: &mut [PlayerState],
     occ: &Occupancy,
+    spatial: &SpatialIndex,
     pending: Vec<(u32, Command)>,
     events: &mut HashMap<u32, Vec<Event>>,
 ) {
@@ -50,7 +52,7 @@ pub(crate) fn apply_commands(
                 tile_y,
             } => {
                 order_build(
-                    map, entities, players, occ, player, worker, &building, tile_x, tile_y, events,
+                    map, entities, players, occ, spatial, player, worker, &building, tile_x, tile_y, events,
                 );
             }
             Command::Train { building, unit } => {
@@ -227,6 +229,7 @@ fn order_build(
     entities: &mut EntityStore,
     players: &mut [PlayerState],
     occ: &Occupancy,
+    spatial: &SpatialIndex,
     player: u32,
     worker: u32,
     building: &str,
@@ -275,7 +278,7 @@ fn order_build(
     }
 
     // Placement: footprint in bounds, on passable terrain, and not overlapping a building.
-    if !footprint_placeable(map, entities, kind, tile_x, tile_y) {
+    if !footprint_placeable(map, entities, spatial, kind, tile_x, tile_y) {
         notice(events, player, "Cannot build there");
         return;
     }

@@ -6,6 +6,7 @@ pub mod economy;
 pub mod movement;
 pub mod occupancy;
 pub mod production;
+pub mod spatial;
 pub mod supply;
 
 use crate::game::entity::EntityStore;

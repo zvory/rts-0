@@ -73,6 +73,9 @@ pub struct Game {
     /// because they are emitted into the same pending queue before command application.
     command_log: Vec<CommandLogEntry>,
     tick: u32,
+    /// Post-tick spatial index, rebuilt every tick after all systems run so [`snapshot_for`]
+    /// can use it for interest filtering without rebuilding.
+    spatial: services::spatial::SpatialIndex,
 }
 
 impl Game {
@@ -121,6 +124,7 @@ impl Game {
             player_states.push(ps);
         }
 
+        let spatial = services::spatial::SpatialIndex::build(&entities, map.size);
         let mut game = Game {
             map,
             entities,
@@ -130,6 +134,7 @@ impl Game {
             pending: Vec::new(),
             command_log: Vec::new(),
             tick: 0,
+            spatial,
         };
         // Initialize supply accounting and fog so the very first snapshot is correct.
         systems::recompute_supply(&mut game.players, &game.entities);
@@ -195,6 +200,7 @@ impl Game {
             controller.think(
                 &self.map,
                 &self.entities,
+                &self.spatial,
                 &self.players,
                 self.tick,
                 &mut pending,
@@ -205,7 +211,7 @@ impl Game {
         // Run every per-tick system in order. `run_tick` takes split borrows of the map,
         // entity store, player economy, and the event buckets, so it can mutate resources and
         // entities together without locks.
-        systems::run_tick(
+        self.spatial = systems::run_tick(
             &self.map,
             &mut self.entities,
             &mut self.players,
@@ -235,7 +241,12 @@ impl Game {
         };
 
         let mut entities = Vec::new();
-        for e in self.entities.iter() {
+        // Use the spatial index for interest filtering instead of a full entity scan.
+        for id in self.spatial.all_ids() {
+            let e = match self.entities.get(id) {
+                Some(e) => e,
+                None => continue,
+            };
             let own = e.owner == player;
             if !own {
                 // Reveal neutral / enemy entities only when their tile is currently visible.
@@ -245,6 +256,8 @@ impl Game {
             }
             entities.push(self.view_of(e, player));
         }
+        // Deterministic order (stable for tests / replays).
+        entities.sort_by_key(|v| v.id);
 
         Snapshot {
             tick: self.tick,
