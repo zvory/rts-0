@@ -34,17 +34,23 @@ the server simulates at 30 Hz and sends per-player, fog-filtered snapshots.
   unless explicitly told to. Avoid parallel edits to shared contracts such as protocol, config,
   generated files, or design docs.
 - Stage and commit only files belonging to the current task. Never revert unrelated changes.
-- Do not merge, rebase, or delete another agent's branch/worktree unless explicitly asked.
+- When the task is complete, merge the worktree branch directly into `main` and push `main` to
+  `origin`. Do not create a PR unless the user explicitly asks for one.
+- Do not merge, rebase, or delete another agent's branch/worktree unless explicitly asked. Only merge
+  the branch assigned to the current task.
 - If running local servers, use different ports per worktree or stop the other server first.
 
 ## Git / GitHub
 
 - The default branch is `main`.
-- Work directly on `main` for repo changes. When work is complete, stage only files that belong to
-  the current task, commit, and push `main` to `origin`.
+- Work directly on `main` for simple single-agent changes. For parallel worktree changes, use one
+  `zvorygin/` branch per worktree.
+- When work is complete, stage and commit only files that belong to the current task.
 - Do not create, open, or update PRs for repo work unless the user explicitly asks for a PR.
-- Avoid feature branches unless the user asks for one. If a temporary branch is needed, prefix it
-  with `zvorygin/`.
+- If work was done on a branch, the AI should merge that branch into `main` directly and push `main`
+  to `origin` without opening a PR.
+- Before merging, make sure the worktree is clean, update `main` from `origin/main`, and merge only
+  the current task branch.
 
 ## Commands
 
