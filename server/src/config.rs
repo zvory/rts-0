@@ -32,7 +32,7 @@ pub const OIL_LOAD: u32 = 4;
 pub const HARVEST_TICKS: u32 = 40;
 pub const STEEL_PATCH_AMOUNT: u32 = 1500;
 pub const OIL_GEYSER_AMOUNT: u32 = 5000;
-pub const STEEL_PATCHES_PER_BASE: u32 = 8;
+pub const STEEL_PATCHES_PER_BASE: u32 = 16;
 
 /// Minimum distance (in tiles) from an Industrial Center center to any starting resource node.
 /// Prevents resources from spawning inside or too close to the building footprint.
@@ -102,7 +102,7 @@ pub fn unit_stats(kind: EntityKind) -> Option<UnitStats> {
             dmg: 4,
             range_tiles: 1,
             cooldown: 12,
-            speed: 1.5,
+            speed: 1.6,
             sight_tiles: 7,
             cost_steel: 50,
             cost_oil: 0,
