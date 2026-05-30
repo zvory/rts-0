@@ -50,7 +50,7 @@ pub(crate) struct PlayerState {
     pub(crate) gas: u32,
     /// Supply currently consumed by living + in-production units.
     pub(crate) supply_used: u32,
-    /// Supply provided by completed HQs/Depots, capped at `SUPPLY_CAP_MAX`.
+    /// Supply provided by completed Industrial Centers/Depots, capped at `SUPPLY_CAP_MAX`.
     pub(crate) supply_cap: u32,
 }
 
@@ -71,7 +71,7 @@ pub struct Game {
 
 impl Game {
     /// Create a match for the given players. Generates a symmetric map sized for the player
-    /// count and spawns each player's starting HQ, workers, and a nearby resource cluster.
+    /// count and spawns each player's starting Industrial Center, workers, and a nearby resource cluster.
     pub fn new(players: &[PlayerInit]) -> Game {
         // Deterministic seed derived from the player set so a given lobby produces a stable
         // map (helps reproducibility / debugging) without any external RNG.
@@ -102,8 +102,8 @@ impl Game {
                 supply_cap: 0,
             };
             spawn_player_start(&mut entities, &map, p.id, start);
-            // The starting HQ contributes supply immediately.
-            ps.supply_cap = config::HQ_SUPPLY.min(config::SUPPLY_CAP_MAX);
+            // The starting Industrial Center contributes supply immediately.
+            ps.supply_cap = config::INDUSTRIAL_CENTER_SUPPLY.min(config::SUPPLY_CAP_MAX);
             player_states.push(ps);
         }
 
@@ -367,16 +367,16 @@ impl Game {
     }
 }
 
-/// Spawn a player's full starting layout: a free, fully-built HQ on the start tile, a ring of
+/// Spawn a player's full starting layout: a free, fully-built Industrial Center on the start tile, a ring of
 /// workers around it, and a nearby neutral resource cluster (minerals + one gas geyser).
 fn spawn_player_start(entities: &mut EntityStore, map: &Map, owner: u32, start: (u32, u32)) {
     let (stx, sty) = start;
     let (hx, hy) = map.tile_center(stx, sty);
 
-    // HQ (free, fully built). Footprint is 3x3 centered on the start tile.
-    entities.spawn_building(owner, kinds::HQ, hx, hy, true);
+    // Industrial Center (free, fully built). Footprint is 3x3 centered on the start tile.
+    entities.spawn_building(owner, kinds::INDUSTRIAL_CENTER, hx, hy, true);
 
-    // Starting workers arranged in a ring just outside the HQ footprint.
+    // Starting workers arranged in a ring just outside the Industrial Center footprint.
     let ts = config::TILE_SIZE as f32;
     let ring_r = ts * 2.5;
     let count = config::STARTING_WORKERS;
@@ -387,12 +387,12 @@ fn spawn_player_start(entities: &mut EntityStore, map: &Map, owner: u32, start: 
         entities.spawn_unit(owner, kinds::WORKER, wx, wy);
     }
 
-    // Mineral cluster: an arc of patches a few tiles from the HQ, plus one gas geyser.
+    // Mineral cluster: an arc of patches a few tiles from the Industrial Center, plus one gas geyser.
     // Placement is offset toward the map center so it sits in open space, not off-map.
     let center = (map.size as f32 * ts) * 0.5;
     let dir_x = (center - hx).signum();
     let dir_y = (center - hy).signum();
-    // Anchor the cluster ~4 tiles toward center from the HQ.
+    // Anchor the cluster ~4 tiles toward center from the Industrial Center.
     let anchor_x = hx + dir_x * ts * 4.0;
     let anchor_y = hy + dir_y * ts * 4.0;
 
@@ -416,7 +416,7 @@ mod tests {
     use super::*;
 
     /// Drive a passive human vs. one AI and confirm the AI actually plays: it grows its economy,
-    /// expands supply, builds a barracks, produces soldiers, and marches them into the human base
+    /// expands supply, builds a barracks, produces riflemen, and marches them into the human base
     /// to deal damage. This exercises the full command path the AI shares with human clients.
     #[test]
     fn ai_builds_economy_and_attacks() {
@@ -437,7 +437,7 @@ mod tests {
         let mut game = Game::new(&players);
 
         let mut max_workers = 0usize;
-        let mut max_soldiers = 0usize;
+        let mut max_riflemen = 0usize;
         let mut ever_had_barracks = false;
         let mut ai_supply_cap = 0u32;
         let mut human_damaged = false;
@@ -453,13 +453,13 @@ mod tests {
                 .iter()
                 .filter(|e| e.owner == 2 && e.kind == kinds::WORKER)
                 .count();
-            let soldiers = ai
+            let riflemen = ai
                 .entities
                 .iter()
-                .filter(|e| e.owner == 2 && e.kind == kinds::SOLDIER)
+                .filter(|e| e.owner == 2 && e.kind == kinds::RIFLEMAN)
                 .count();
             max_workers = max_workers.max(workers);
-            max_soldiers = max_soldiers.max(soldiers);
+            max_riflemen = max_riflemen.max(riflemen);
             if ai
                 .entities
                 .iter()
@@ -485,15 +485,15 @@ mod tests {
             config::STARTING_WORKERS
         );
         assert!(
-            ai_supply_cap > config::HQ_SUPPLY,
-            "AI should build a depot to raise supply above the HQ's {} (saw {ai_supply_cap})",
-            config::HQ_SUPPLY
+            ai_supply_cap > config::INDUSTRIAL_CENTER_SUPPLY,
+            "AI should build a depot to raise supply above the Industrial Center's {} (saw {ai_supply_cap})",
+            config::INDUSTRIAL_CENTER_SUPPLY
         );
         assert!(ever_had_barracks, "AI should build a barracks");
-        assert!(max_soldiers > 0, "AI should produce soldiers");
+        assert!(max_riflemen > 0, "AI should produce riflemen");
         assert!(
             human_damaged,
-            "AI soldiers should reach and damage the human base"
+            "AI riflemen should reach and damage the human base"
         );
     }
 

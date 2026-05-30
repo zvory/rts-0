@@ -23,17 +23,28 @@ pub mod terrain {
 /// `EntityView.kind` values.
 pub mod kinds {
     pub const WORKER: &str = "worker";
-    pub const SOLDIER: &str = "soldier";
-    pub const HEAVY: &str = "heavy";
-    pub const HQ: &str = "hq";
+    pub const RIFLEMAN: &str = "rifleman";
+    pub const MACHINE_GUNNER: &str = "machine_gunner";
+    pub const AT_TEAM: &str = "at_team";
+    pub const TANK: &str = "tank";
+    pub const INDUSTRIAL_CENTER: &str = "industrial_center";
     pub const DEPOT: &str = "depot";
     pub const BARRACKS: &str = "barracks";
-    pub const TURRET: &str = "turret";
+    pub const ADVANCED_TRAINING_CENTRE: &str = "advanced_training_centre";
+    pub const TANK_FACTORY: &str = "tank_factory";
+    pub const BUNKER: &str = "bunker";
     pub const MINERALS: &str = "minerals";
     pub const GAS: &str = "gas";
 
-    pub const UNITS: [&str; 3] = [WORKER, SOLDIER, HEAVY];
-    pub const BUILDINGS: [&str; 4] = [HQ, DEPOT, BARRACKS, TURRET];
+    pub const UNITS: [&str; 5] = [WORKER, RIFLEMAN, MACHINE_GUNNER, AT_TEAM, TANK];
+    pub const BUILDINGS: [&str; 6] = [
+        INDUSTRIAL_CENTER,
+        DEPOT,
+        BARRACKS,
+        ADVANCED_TRAINING_CENTRE,
+        TANK_FACTORY,
+        BUNKER,
+    ];
 
     pub fn is_unit(k: &str) -> bool {
         UNITS.contains(&k)

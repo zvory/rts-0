@@ -42,17 +42,34 @@ export const PASSABLE = Object.freeze({ 0: true, 1: false, 2: false });
 // --- Entity kinds (must match protocol::kinds) ---
 export const KIND = Object.freeze({
   WORKER: "worker",
-  SOLDIER: "soldier",
-  HEAVY: "heavy",
-  HQ: "hq",
+  RIFLEMAN: "rifleman",
+  MACHINE_GUNNER: "machine_gunner",
+  AT_TEAM: "at_team",
+  TANK: "tank",
+  INDUSTRIAL_CENTER: "industrial_center",
   DEPOT: "depot",
   BARRACKS: "barracks",
-  TURRET: "turret",
+  ADVANCED_TRAINING_CENTRE: "advanced_training_centre",
+  TANK_FACTORY: "tank_factory",
+  BUNKER: "bunker",
   MINERALS: "minerals",
   GAS: "gas",
 });
-export const UNIT_KINDS = Object.freeze([KIND.WORKER, KIND.SOLDIER, KIND.HEAVY]);
-export const BUILDING_KINDS = Object.freeze([KIND.HQ, KIND.DEPOT, KIND.BARRACKS, KIND.TURRET]);
+export const UNIT_KINDS = Object.freeze([
+  KIND.WORKER,
+  KIND.RIFLEMAN,
+  KIND.MACHINE_GUNNER,
+  KIND.AT_TEAM,
+  KIND.TANK,
+]);
+export const BUILDING_KINDS = Object.freeze([
+  KIND.INDUSTRIAL_CENTER,
+  KIND.DEPOT,
+  KIND.BARRACKS,
+  KIND.ADVANCED_TRAINING_CENTRE,
+  KIND.TANK_FACTORY,
+  KIND.BUNKER,
+]);
 export const RESOURCE_KINDS = Object.freeze([KIND.MINERALS, KIND.GAS]);
 
 export const isUnit = (k) => UNIT_KINDS.includes(k);
