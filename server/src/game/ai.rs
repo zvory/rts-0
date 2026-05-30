@@ -21,6 +21,7 @@ use crate::game::services::world_query;
 use crate::game::systems;
 use crate::game::PlayerState;
 use crate::protocol::{kinds, Command};
+use std::collections::HashSet;
 
 // --- Tuning knobs -----------------------------------------------------------
 
@@ -238,9 +239,12 @@ impl AiController {
             free_supply -= rifleman_supply;
         }
 
-        // --- 5. Send idle workers to mine the nearest steel patch. -------
+        // --- 5. Send idle workers to distinct steel patches. -------------
+        let mut reserved_nodes = occupied_steel_nodes(entities);
         for worker in idle_workers {
-            if let Some(node) = nearest_steel_node(entities, spatial, worker) {
+            if let Some(node) =
+                nearest_free_steel_node(entities, spatial, worker, &reserved_nodes)
+            {
                 out.push((
                     self.player,
                     Command::Gather {
@@ -248,6 +252,7 @@ impl AiController {
                         node,
                     },
                 ));
+                reserved_nodes.insert(node);
             }
         }
 
@@ -334,17 +339,38 @@ fn is_free_rifleman(e: &crate::game::entity::Entity) -> bool {
     }
 }
 
-/// Nearest non-empty steel node to a worker (by id), or `None` if none remain / worker is gone.
-fn nearest_steel_node(entities: &EntityStore, spatial: &SpatialIndex, worker: u32) -> Option<u32> {
+/// Steel patches already held by actively-harvesting workers.
+fn occupied_steel_nodes(entities: &EntityStore) -> HashSet<u32> {
+    entities
+        .iter()
+        .filter(|e| e.kind == EntityKind::Worker)
+        .filter_map(|e| e.order().gather_node())
+        .filter(|&node| world_query::node_holder(entities, node).is_some())
+        .collect()
+}
+
+/// Nearest non-empty steel node to a worker (by id) that has not already been reserved this
+/// think, or `None` if none remain / worker is gone.
+fn nearest_free_steel_node(
+    entities: &EntityStore,
+    spatial: &SpatialIndex,
+    worker: u32,
+    reserved_nodes: &HashSet<u32>,
+) -> Option<u32> {
     let w = entities.get(worker)?;
-    world_query::nearest_resource_node(
-        entities,
-        spatial,
-        EntityKind::Steel,
-        w.pos_x,
-        w.pos_y,
-        world_query::default_resource_search_radius_px(),
-    )
+    spatial
+        .nearest(
+            w.pos_x,
+            w.pos_y,
+            world_query::default_resource_search_radius_px(),
+            entities,
+            |e| {
+                e.kind == EntityKind::Steel
+                    && e.remaining().unwrap_or(0) > 0
+                    && !reserved_nodes.contains(&e.id)
+            },
+        )
+        .map(|(id, _)| id)
 }
 
 /// Remove the first occurrence of `id` from `v` (used to keep a worker assigned to a build job
@@ -352,5 +378,28 @@ fn nearest_steel_node(entities: &EntityStore, spatial: &SpatialIndex, worker: u3
 fn remove_id(v: &mut Vec<u32>, id: u32) {
     if let Some(pos) = v.iter().position(|&x| x == id) {
         v.swap_remove(pos);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn idle_workers_pick_distinct_steel_nodes() {
+        let mut entities = EntityStore::default();
+        let worker_a = entities.spawn_unit(1, EntityKind::Worker, 0.0, 0.0).unwrap();
+        let worker_b = entities.spawn_unit(1, EntityKind::Worker, 8.0, 0.0).unwrap();
+        let node_a = entities.spawn_node(EntityKind::Steel, 64.0, 0.0).unwrap();
+        let node_b = entities.spawn_node(EntityKind::Steel, 96.0, 0.0).unwrap();
+        let spatial = SpatialIndex::build(&entities, config::TILE_SIZE);
+        let mut reserved = HashSet::new();
+
+        let pick_a = nearest_free_steel_node(&entities, &spatial, worker_a, &reserved);
+        assert_eq!(pick_a, Some(node_a));
+        reserved.insert(node_a);
+
+        let pick_b = nearest_free_steel_node(&entities, &spatial, worker_b, &reserved);
+        assert_eq!(pick_b, Some(node_b));
     }
 }
