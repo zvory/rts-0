@@ -466,4 +466,6 @@ Use this index when deciding whether a TODO can start.
  - DONE: building a building on top of a unit will lock that unit inside the building. it should be impossible to build a building on top of a unit.
  - halve the mining rate for steel
  - contorl group system for units and buildings. ctrl+number creates a group. shift plus number adds to a group. tapping a group selects it. double tapping moves the camera to the centroid.
- - make steel gray, and make oil black, change hte icons, and make the oil patch spawn 90 degrees away from the steel patch
+ - DONE: make steel gray, and make oil black, change hte icons, and make the oil patch spawn 90 degrees away from the steel patch
+ - randomize the spawn positions
+ - halve the number of initial steel and oil patches, and create scattered patches of steel and oil across the map. there should be five such patches scattered, one near each starting position, and one near the centre.

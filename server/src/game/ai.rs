@@ -31,14 +31,14 @@ const DECISION_INTERVAL: u32 = 9;
 /// Worker count the AI saturates its economy to before it stops queueing more. Kept modest so
 /// the (deliberately slow) steel economy isn't entirely consumed by worker supply/cost — the
 /// AI needs steel and supply headroom left over to actually field an army.
-const TARGET_WORKERS: usize = 6;
+const TARGET_WORKERS: usize = 8;
 /// How many barracks the AI wants (finished + under construction).
 const TARGET_BARRACKS: usize = 2;
 /// Build a depot when free supply drops below this (and we're not already building one).
 const SUPPLY_BUFFER: u32 = 4;
 /// Free riflemen that must gather before a wave is committed to attacking. Small so the AI
 /// commits attacks within a reasonable time given its slow economy.
-const WAVE_SIZE: usize = 3;
+const WAVE_SIZE: usize = 4;
 /// Max Chebyshev ring (in tiles) searched outward from the base for a build site.
 const BUILD_SEARCH_RADIUS: i32 = 16;
 
@@ -142,11 +142,7 @@ impl AiController {
         let depot_cost = config::building_stats(EntityKind::Depot)
             .map(|s| s.cost_steel)
             .unwrap_or(50);
-        if !depot_building
-            && !supply_capped
-            && free_supply <= SUPPLY_BUFFER
-            && steel >= depot_cost
-        {
+        if !depot_building && !supply_capped && free_supply < SUPPLY_BUFFER && steel >= depot_cost {
             if let Some(worker) = builder_pool.pop() {
                 if let Some((tx, ty)) =
                     self.find_build_spot(map, entities, spatial, EntityKind::Depot, me)

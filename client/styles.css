@@ -26,8 +26,8 @@
 
   /* Accents (mirror in-canvas resource colors) */
   --accent: #c7d07a; /* primary action / command tint */
-  --steel: #b9b084; /* supply crates (COLORS.steel) */
-  --oil: #86a36f; /* fuel drums (COLORS.oil) */
+  --steel: #9a9a9a; /* supply crates (COLORS.steel) */
+  --oil: #111111; /* fuel drums (COLORS.oil) */
   --supply: #c0a463;
   --good: #7ca45a; /* COLORS.hpGood */
   --warn: #c7a24a;
