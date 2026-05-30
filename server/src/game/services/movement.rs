@@ -274,7 +274,9 @@ pub(crate) fn is_collision_anchored(e: &Entity) -> bool {
     // the site to keep advancing construction. Without this exemption, other workers passing
     // through can shove the builder out of `interact_range` of the site and the building
     // never finishes.
-    if e.kind == EntityKind::Worker && e.build_phase() == Some(BuildPhase::Constructing) {
+    if e.kind == EntityKind::Worker
+        && matches!(e.build_phase(), Some(BuildPhase::Constructing { .. }))
+    {
         return true;
     }
     false

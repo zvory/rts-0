@@ -51,7 +51,6 @@ pub(crate) fn run_tick(
         map,
         entities,
         players,
-        &occ,
         &spatial,
         &mut coordinator,
         pending,
@@ -66,7 +65,7 @@ pub(crate) fn run_tick(
     services::combat::combat_system(map, entities, &occ, &spatial, &mut coordinator, events);
     services::economy::gather_system(map, entities, players, &occ, &spatial, &mut coordinator);
     services::production::production_system(map, entities, &coordinator, events);
-    services::construction::construction_system(map, entities, events);
+    services::construction::construction_system(map, entities, players, &spatial, events);
     services::death::death_system(entities, fog, events);
 
     // Collision resolution runs after production so newly-spawned units (which can land on

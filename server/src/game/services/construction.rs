@@ -1,50 +1,137 @@
 use std::collections::HashMap;
 
 use crate::config;
-use crate::game::entity::{BuildPhase, EntityStore};
+use crate::game::entity::{BuildPhase, EntityKind, EntityStore};
 use crate::game::map::{Map, MobilityClass};
 use crate::game::pathfinding::Passability;
-use crate::game::services::occupancy::{building_footprint, Occupancy};
-use crate::game::services::{dist2, interact_range};
+use crate::game::services::occupancy::{
+    building_footprint, footprint_center, footprint_placeable, Occupancy,
+};
+use crate::game::services::spatial::SpatialIndex;
+use crate::game::services::{dist2, interact_range_for_kind};
+use crate::game::PlayerState;
 use crate::protocol::Event;
 
-/// Advance construction for buildings that have a worker actively building them. A worker on a
-/// `Build` order that has arrived at the site contributes one tick of progress per tick. On
-/// completion the building leaves CONSTRUCT, the worker is freed (idle), and a `Build` event
-/// fires to the owner.
+/// Advance build orders. Workers in `ToSite` that have walked into arrival range of their
+/// intended footprint re-validate placement and affordability, spawn the building, deduct
+/// cost, and transition to `Constructing`. Workers in `Constructing` accumulate one tick
+/// of progress per tick; on completion the building leaves CONSTRUCT, the worker is
+/// freed, and a `Build` event fires to the owner.
 pub(crate) fn construction_system(
     map: &Map,
     entities: &mut EntityStore,
+    players: &mut [PlayerState],
+    spatial: &SpatialIndex,
     events: &mut HashMap<u32, Vec<Event>>,
 ) {
-    // Collect (worker_id, site_id) build assignments where the worker has reached the site.
-    let mut working: Vec<(u32, u32)> = Vec::new();
-    for e in entities.iter() {
-        if e.is_unit() {
-            if let Some(site) = e.order().build_site() {
-                if let Some(b) = entities.get(site) {
-                    let arrive =
-                        interact_range(entities, site).unwrap_or(config::TILE_SIZE as f32 * 2.0);
-                    if b.under_construction()
-                        && dist2(e.pos_x, e.pos_y, b.pos_x, b.pos_y).sqrt() <= arrive
-                    {
-                        working.push((e.id, site));
-                    }
-                }
+    // ----- Arrival pass: ToSite workers that have reached their target -----
+    let arrivals: Vec<(u32, EntityKind, u32, u32)> = entities
+        .iter()
+        .filter_map(|e| {
+            if !e.is_unit() {
+                return None;
             }
+            if e.build_phase() != Some(BuildPhase::ToSite) {
+                return None;
+            }
+            let (kind, tx, ty) = e.order().build_intent_tile()?;
+            let (cx, cy) = footprint_center(map, kind, tx, ty);
+            let arrive = interact_range_for_kind(kind);
+            if dist2(e.pos_x, e.pos_y, cx, cy).sqrt() <= arrive {
+                Some((e.id, kind, tx, ty))
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    for (worker, kind, tx, ty) in arrivals {
+        let owner = match entities.get(worker) {
+            Some(w) => w.owner,
+            None => continue,
+        };
+
+        // Re-validate placement against the live entity set.
+        let occ = Occupancy::build(map, entities);
+        let _ = &occ; // placeable scans entities directly; rebuilt here for symmetry/future use.
+        let placeable = footprint_placeable(map, entities, spatial, kind, tx, ty);
+        let stats = match config::building_stats(kind) {
+            Some(s) => s,
+            None => {
+                if let Some(w) = entities.get_mut(worker) {
+                    w.clear_orders();
+                }
+                continue;
+            }
+        };
+        let affordable = players
+            .iter()
+            .find(|p| p.id == owner)
+            .map(|p| p.steel >= stats.cost_steel && p.oil >= stats.cost_oil)
+            .unwrap_or(false);
+
+        if !placeable {
+            events.entry(owner).or_default().push(Event::Notice {
+                msg: "Cannot build there".to_string(),
+            });
+            if let Some(w) = entities.get_mut(worker) {
+                w.clear_orders();
+            }
+            continue;
+        }
+        if !affordable {
+            events.entry(owner).or_default().push(Event::Notice {
+                msg: "Not enough resources".to_string(),
+            });
+            if let Some(w) = entities.get_mut(worker) {
+                w.clear_orders();
+            }
+            continue;
+        }
+
+        let ps = match players.iter_mut().find(|p| p.id == owner) {
+            Some(p) => p,
+            None => continue,
+        };
+        ps.steel -= stats.cost_steel;
+        ps.oil -= stats.cost_oil;
+
+        let (cx, cy) = footprint_center(map, kind, tx, ty);
+        let site = match entities.spawn_building(owner, kind, cx, cy, false) {
+            Some(id) => id,
+            None => continue,
+        };
+        if let Some(w) = entities.get_mut(worker) {
+            w.clear_path();
+            w.set_target_id(Some(site));
+            w.mark_build_phase(BuildPhase::Constructing { site });
         }
     }
 
+    // ----- Progress pass: workers actively constructing -----
+    let working: Vec<(u32, u32)> = entities
+        .iter()
+        .filter_map(|e| {
+            if !e.is_unit() {
+                return None;
+            }
+            match e.build_phase()? {
+                BuildPhase::Constructing { site } => Some((e.id, site)),
+                BuildPhase::ToSite => None,
+            }
+        })
+        .collect();
+
     for (worker, site) in working {
-        // Stop the worker moving while it builds.
-        if let Some(w) = entities.get_mut(worker) {
-            w.clear_path();
-            w.mark_build_phase(BuildPhase::Constructing);
-        }
         let completed = {
             let b = match entities.get_mut(site) {
                 Some(b) if b.under_construction() => b,
-                _ => continue,
+                _ => {
+                    if let Some(w) = entities.get_mut(worker) {
+                        w.clear_orders();
+                    }
+                    continue;
+                }
             };
             let Some(c) = b.construction.as_mut() else {
                 continue;
@@ -62,14 +149,12 @@ pub(crate) fn construction_system(
             let (owner, kind) = entities
                 .get(site)
                 .map(|b| (b.owner, b.kind))
-                .unwrap_or((0, crate::game::entity::EntityKind::Worker));
+                .unwrap_or((0, EntityKind::Worker));
             events.entry(owner).or_default().push(Event::Build {
                 id: site,
                 kind: kind.to_protocol_str().to_string(),
             });
-            // Move the worker out of the footprint so it doesn't get trapped.
             eject_worker_if_inside(map, entities, worker, site);
-            // Free the worker.
             if let Some(w) = entities.get_mut(worker) {
                 w.clear_orders();
             }
