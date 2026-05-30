@@ -411,7 +411,9 @@ impl EntityStore {
 
     /// Iterate over all entities (shared).
     pub fn iter(&self) -> impl Iterator<Item = &Entity> {
-        self.map.values()
+        let mut ids: Vec<u32> = self.map.keys().copied().collect();
+        ids.sort_unstable();
+        ids.into_iter().filter_map(|id| self.map.get(&id))
     }
 
     /// Iterate over all entities (mutable).
@@ -419,10 +421,12 @@ impl EntityStore {
         self.map.values_mut()
     }
 
-    /// All currently-live entity ids (order unspecified). Useful for index-free iteration
+    /// All currently-live entity ids in stable ascending order. Useful for index-free iteration
     /// when the body needs `&mut self` on the store.
     pub fn ids(&self) -> Vec<u32> {
-        self.map.keys().copied().collect()
+        let mut ids: Vec<u32> = self.map.keys().copied().collect();
+        ids.sort_unstable();
+        ids
     }
 
     /// Whether `player` owns at least one entity (unit or building).

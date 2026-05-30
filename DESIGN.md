@@ -184,6 +184,7 @@ src/
     fog.rs       # per-player visibility grid (visible / explored)
     systems.rs   # per-tick systems: orders, movement, combat, gather, production, death
     ai.rs        # optional computer opponents: one AiController per AI player (see §8)
+    replay.rs    # tick-stamped command log replay harness for determinism checks
     selfplay.rs  # test-only API-driven scripted self-play harness (see §9)
 ```
 
@@ -219,9 +220,13 @@ impl Game {
     pub fn eliminate(&mut self, player: u32);
 
     pub fn tick_count(&self) -> u32;
+
+    /// Authoritative commands applied so far, stamped with the tick that applied them.
+    pub fn command_log(&self) -> &[CommandLogEntry];
 }
 
 pub struct PlayerInit { pub id: u32, pub name: String, pub color: String, pub is_ai: bool }
+pub struct CommandLogEntry { pub tick: u32, pub player_id: u32, pub command: Command }
 ```
 `StartPayload`, `Snapshot`, `Command`, `Event` are the serde types from `protocol.rs`.
 (`game` may use internal types and convert at the boundary, or use protocol types directly —
@@ -583,6 +588,14 @@ issue ordinary wire-protocol `Command`s. They must not mutate entities, players,
 private system internals. This keeps the simulation architected for future API clients, replay
 tools, and external test drivers without adding a second privileged control path.
 
+**Command log replay.** `Game` records every command at the authoritative apply tick, after AI
+controllers have emitted their normal commands and before systems apply the pending queue.
+`game/replay.rs` can feed that log into a fresh `Game` with AI thinking disabled and compare the
+resulting event stream and final per-player snapshots. Replay uses the same public command path as
+clients, so a replay proves both the recorded command artifact and the deterministic simulation
+ordering. Entity iteration and A* tie-breaking must remain stable; avoid hash-order-dependent
+simulation behavior.
+
 **MVP coverage.** The first scripted self-play test spawns two non-AI players, gives each the same
 deterministic build/tech/attack script, and runs the match headlessly under `cargo test`. The
 scripts gather minerals and gas, construct a Depot, Barracks, and Tank Factory, train Riflemen and a Tank,
@@ -593,8 +606,8 @@ fails as a deadlock instead of timing out silently.
 
 **Failure artifacts.** On failure, the test writes `target/selfplay-failures/<test>-<pid>-<time>/`
 with:
-- `replay.json`: start payload, player specs, command log, event log, milestone state, and sampled
-  snapshot summaries.
+- `replay.json`: start payload, player specs, script decision log, authoritative tick-stamped
+  command log, event log, milestone state, and sampled snapshot summaries.
 - `summary.log`: short human-readable failure summary and missing milestones.
 
 The artifact is meant to be enough to reproduce or inspect a failing run without manually

@@ -40,14 +40,20 @@ struct Node {
 
 impl PartialEq for Node {
     fn eq(&self, other: &Self) -> bool {
-        self.f == other.f
+        self.f == other.f && self.g == other.g && self.tx == other.tx && self.ty == other.ty
     }
 }
 impl Eq for Node {}
 impl Ord for Node {
     fn cmp(&self, other: &Self) -> Ordering {
-        // Reverse so `BinaryHeap` (a max-heap) yields the smallest `f` first.
-        other.f.cmp(&self.f)
+        // Reverse so `BinaryHeap` (a max-heap) yields the smallest score first, with a total
+        // coordinate tie-break so replay cannot drift on equal-cost paths.
+        other
+            .f
+            .cmp(&self.f)
+            .then_with(|| other.g.cmp(&self.g))
+            .then_with(|| other.ty.cmp(&self.ty))
+            .then_with(|| other.tx.cmp(&self.tx))
     }
 }
 impl PartialOrd for Node {

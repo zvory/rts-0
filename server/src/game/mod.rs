@@ -13,6 +13,7 @@ pub mod entity;
 pub mod fog;
 pub mod map;
 pub mod pathfinding;
+pub mod replay;
 #[cfg(test)]
 mod selfplay;
 pub mod systems;
@@ -23,13 +24,16 @@ use crate::config;
 use crate::protocol::{
     kinds, Command, EntityView, Event, MapInfo, PlayerStart, Snapshot, StartPayload,
 };
+use serde::{Deserialize, Serialize};
 
 use ai::AiController;
 use entity::{Entity, EntityStore, Order};
 use fog::Fog;
 use map::Map;
+use replay::CommandLogEntry;
 
 /// Lobby-supplied identity for a player joining a match.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct PlayerInit {
     pub id: u32,
     pub name: String,
@@ -66,6 +70,9 @@ pub struct Game {
     /// Commands received this tick window, drained at the start of [`tick`]. Each carries the
     /// issuing player so ownership can be validated on apply.
     pending: Vec<(u32, Command)>,
+    /// Authoritative commands stamped with the tick where they were applied. Includes AI commands
+    /// because they are emitted into the same pending queue before command application.
+    command_log: Vec<CommandLogEntry>,
     tick: u32,
 }
 
@@ -73,6 +80,14 @@ impl Game {
     /// Create a match for the given players. Generates a symmetric map sized for the player
     /// count and spawns each player's starting Industrial Center, workers, and a nearby resource cluster.
     pub fn new(players: &[PlayerInit]) -> Game {
+        Self::new_inner(players, true)
+    }
+
+    pub(crate) fn new_for_replay(players: &[PlayerInit]) -> Game {
+        Self::new_inner(players, false)
+    }
+
+    fn new_inner(players: &[PlayerInit], enable_ai: bool) -> Game {
         // Deterministic seed derived from the player set so a given lobby produces a stable
         // map (helps reproducibility / debugging) without any external RNG.
         let mut seed: u32 = 0x1234_5678 ^ (players.len() as u32).wrapping_mul(2_654_435_761);
@@ -88,7 +103,7 @@ impl Game {
         let mut ai = Vec::new();
         for (i, p) in players.iter().enumerate() {
             let start = map.starts.get(i).copied().unwrap_or((0, 0));
-            if p.is_ai {
+            if enable_ai && p.is_ai {
                 ai.push(AiController::new(p.id));
             }
             let mut ps = PlayerState {
@@ -114,6 +129,7 @@ impl Game {
             players: player_states,
             ai,
             pending: Vec::new(),
+            command_log: Vec::new(),
             tick: 0,
         };
         // Initialize supply accounting and fog so the very first snapshot is correct.
@@ -185,6 +201,7 @@ impl Game {
                 &mut pending,
             );
         }
+        self.record_commands_for_tick(&pending);
 
         // Run every per-tick system in order. `run_tick` takes split borrows of the map,
         // entity store, player economy, and the event buckets, so it can mutate resources and
@@ -276,7 +293,21 @@ impl Game {
         self.tick
     }
 
+    /// Authoritative commands applied so far, in exact application order.
+    pub fn command_log(&self) -> &[CommandLogEntry] {
+        &self.command_log
+    }
+
     // --- internal helpers ------------------------------------------------------
+
+    fn record_commands_for_tick(&mut self, pending: &[(u32, Command)]) {
+        self.command_log
+            .extend(pending.iter().map(|(player_id, command)| CommandLogEntry {
+                tick: self.tick,
+                player_id: *player_id,
+                command: command.clone(),
+            }));
+    }
 
     fn player(&self, id: u32) -> Option<&PlayerState> {
         self.players.iter().find(|p| p.id == id)

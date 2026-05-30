@@ -12,6 +12,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde::Serialize;
 
+use super::replay::{replay_commands, EventLogEntry, PlayerSnapshot, ReplayOutcome};
 use super::{Game, PlayerInit};
 use crate::config;
 use crate::protocol::{
@@ -57,7 +58,7 @@ impl BuildTechAttackScript {
         BuildTechAttackScript {
             player_id,
             target_workers: 6,
-            gas_workers: 1,
+            gas_workers: 2,
             target_barracks: 1,
             attack_size: 4,
             assigned_gas_workers: BTreeSet::new(),
@@ -713,7 +714,9 @@ struct SelfPlayRunner {
     player_specs: Vec<PlayerSpec>,
     scripts: Vec<Box<dyn ScriptedPlayer>>,
     commands: Vec<CommandRecord>,
+    replay_commands_len: usize,
     events: Vec<EventRecord>,
+    event_log: Vec<EventLogEntry>,
     samples: Vec<SnapshotSample>,
     milestones: Milestones,
 }
@@ -745,7 +748,9 @@ impl SelfPlayRunner {
             player_specs,
             scripts,
             commands: Vec::new(),
+            replay_commands_len: 0,
             events: Vec::new(),
+            event_log: Vec::new(),
             samples: Vec::new(),
             milestones,
         }
@@ -765,6 +770,7 @@ impl SelfPlayRunner {
                 return Ok(SelfPlayReport {
                     ticks: tick,
                     commands: self.commands.len(),
+                    replay_commands: self.replay_commands_len,
                 });
             }
             if tick >= MAX_TICKS {
@@ -806,6 +812,7 @@ impl SelfPlayRunner {
             let tick_events =
                 std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| self.game.tick()))
                     .map_err(|_| SelfPlayFailure::new("Game::tick panicked during self-play"))?;
+            self.replay_commands_len = self.game.command_log().len();
             if self.record_events(self.game.tick_count(), tick_events) {
                 last_progress_tick = self.game.tick_count();
             }
@@ -857,6 +864,11 @@ impl SelfPlayRunner {
                     attacker_kind.as_deref(),
                     &event,
                 );
+                self.event_log.push(EventLogEntry {
+                    tick,
+                    player_id,
+                    event: event.clone(),
+                });
                 self.events.push(EventRecord {
                     tick,
                     player_id,
@@ -899,7 +911,9 @@ impl SelfPlayRunner {
             players: self.player_specs.clone(),
             milestones: self.milestones.clone(),
             commands: self.commands.clone(),
+            replay_commands: self.game.command_log().to_vec(),
             events: self.events.clone(),
+            replay_events: self.event_log.clone(),
             samples: self.samples.clone(),
         };
         let json = serde_json::to_vec_pretty(&artifact).map_err(|e| e.to_string())?;
@@ -913,6 +927,7 @@ impl SelfPlayRunner {
 struct SelfPlayReport {
     ticks: u32,
     commands: usize,
+    replay_commands: usize,
 }
 
 #[derive(Debug)]
@@ -1389,7 +1404,9 @@ struct FailureArtifact {
     players: Vec<PlayerSpec>,
     milestones: Milestones,
     commands: Vec<CommandRecord>,
+    replay_commands: Vec<super::replay::CommandLogEntry>,
     events: Vec<EventRecord>,
+    replay_events: Vec<EventLogEntry>,
     samples: Vec<SnapshotSample>,
 }
 
@@ -1399,6 +1416,10 @@ impl FailureArtifact {
         out.push_str(&format!("test: {}\n", self.test_name));
         out.push_str(&format!("failure: {}\n", self.failure));
         out.push_str(&format!("commands: {}\n", self.commands.len()));
+        out.push_str(&format!(
+            "replay commands: {}\n",
+            self.replay_commands.len()
+        ));
         out.push_str(&format!("events: {}\n", self.events.len()));
         out.push_str(&format!("missing: {}\n", self.milestones.missing_summary()));
         if let Some(last) = self.samples.last() {
@@ -1406,6 +1427,96 @@ impl FailureArtifact {
         }
         out
     }
+}
+
+fn replay_outcome_for(
+    game: &Game,
+    players: &[PlayerInit],
+) -> Result<ReplayOutcome, SelfPlayFailure> {
+    replay_commands(players, game.command_log(), game.tick_count())
+        .map_err(|e| SelfPlayFailure::new(format!("replay failed: {e}")))
+}
+
+fn live_outcome_for(
+    game: &Game,
+    players: &[PlayerInit],
+    events: &[EventLogEntry],
+) -> ReplayOutcome {
+    ReplayOutcome {
+        ticks: game.tick_count(),
+        events: events.to_vec(),
+        final_snapshots: players
+            .iter()
+            .map(|p| PlayerSnapshot {
+                player_id: p.id,
+                snapshot: game.snapshot_for(p.id),
+            })
+            .collect(),
+    }
+}
+
+fn assert_replay_matches_live(
+    game: &Game,
+    players: &[PlayerInit],
+    events: &[EventLogEntry],
+) -> Result<(), SelfPlayFailure> {
+    let live = live_outcome_for(game, players, events);
+    let replay = replay_outcome_for(game, players)?;
+    if replay != live {
+        return Err(SelfPlayFailure::new(format!(
+            "deterministic replay diverged from the live command-log run: {}",
+            first_replay_diff(&live, &replay)
+        )));
+    }
+    Ok(())
+}
+
+fn first_replay_diff(live: &ReplayOutcome, replay: &ReplayOutcome) -> String {
+    if live.ticks != replay.ticks {
+        return format!("ticks live={} replay={}", live.ticks, replay.ticks);
+    }
+    if live.events != replay.events {
+        for (idx, (live_event, replay_event)) in live.events.iter().zip(&replay.events).enumerate()
+        {
+            if live_event != replay_event {
+                return format!("event {idx} differs: live={live_event:?} replay={replay_event:?}");
+            }
+        }
+        return format!(
+            "events live={} replay={}",
+            live.events.len(),
+            replay.events.len()
+        );
+    }
+    for (live_view, replay_view) in live.final_snapshots.iter().zip(&replay.final_snapshots) {
+        if live_view.player_id != replay_view.player_id {
+            return format!(
+                "snapshot player order live={} replay={}",
+                live_view.player_id, replay_view.player_id
+            );
+        }
+        if live_view.snapshot != replay_view.snapshot {
+            return format!(
+                "snapshot mismatch for player {}: live_entities={} replay_entities={} live_resources={}/{} replay_resources={}/{} live_supply={}/{} replay_supply={}/{}",
+                live_view.player_id,
+                live_view.snapshot.entities.len(),
+                replay_view.snapshot.entities.len(),
+                live_view.snapshot.minerals,
+                live_view.snapshot.gas,
+                replay_view.snapshot.minerals,
+                replay_view.snapshot.gas,
+                live_view.snapshot.supply_used,
+                live_view.snapshot.supply_cap,
+                replay_view.snapshot.supply_used,
+                replay_view.snapshot.supply_cap
+            );
+        }
+    }
+    format!(
+        "snapshot counts live={} replay={}",
+        live.final_snapshots.len(),
+        replay.final_snapshots.len()
+    )
 }
 
 fn validate_snapshot(
@@ -1886,6 +1997,19 @@ fn scripted_self_play_exercises_economy_tech_and_combat() {
         Ok(report) => {
             assert!(report.ticks > 0);
             assert!(report.commands > 0);
+            assert_eq!(report.commands, report.replay_commands);
+            assert_replay_matches_live(&runner.game, &players, &runner.event_log).unwrap_or_else(
+                |failure| {
+                    let artifact = runner
+                        .write_failure_artifact(&failure)
+                        .map(|p| p.display().to_string())
+                        .unwrap_or_else(|e| format!("artifact write failed: {e}"));
+                    panic!(
+                        "self-play replay failed: {}; artifact: {artifact}",
+                        failure.reason
+                    );
+                },
+            );
         }
         Err(failure) => {
             let artifact = runner
@@ -1940,6 +2064,19 @@ fn scripted_self_play_bunker_rush_vs_economy() {
         Ok(report) => {
             assert!(report.ticks > 0);
             assert!(report.commands > 0);
+            assert_eq!(report.commands, report.replay_commands);
+            assert_replay_matches_live(&runner.game, &players, &runner.event_log).unwrap_or_else(
+                |failure| {
+                    let artifact = runner
+                        .write_failure_artifact(&failure)
+                        .map(|p| p.display().to_string())
+                        .unwrap_or_else(|e| format!("artifact write failed: {e}"));
+                    panic!(
+                        "self-play replay failed: {}; artifact: {artifact}",
+                        failure.reason
+                    );
+                },
+            );
         }
         Err(failure) => {
             let artifact = runner
@@ -1994,6 +2131,19 @@ fn scripted_self_play_worker_rush_vs_economy() {
         Ok(report) => {
             assert!(report.ticks > 0);
             assert!(report.commands > 0);
+            assert_eq!(report.commands, report.replay_commands);
+            assert_replay_matches_live(&runner.game, &players, &runner.event_log).unwrap_or_else(
+                |failure| {
+                    let artifact = runner
+                        .write_failure_artifact(&failure)
+                        .map(|p| p.display().to_string())
+                        .unwrap_or_else(|e| format!("artifact write failed: {e}"));
+                    panic!(
+                        "self-play replay failed: {}; artifact: {artifact}",
+                        failure.reason
+                    );
+                },
+            );
         }
         Err(failure) => {
             let artifact = runner
