@@ -30,8 +30,8 @@ fn is_kind(e: &EntityView, kind: EntityKind) -> bool {
     e.kind == kind.to_protocol_str()
 }
 
-const MAX_TICKS: u32 = 9_600;
-const MAX_STALL_TICKS: u32 = 1_800;
+const MAX_TICKS: u32 = 12_000;
+const MAX_STALL_TICKS: u32 = 2_400;
 const SAMPLE_EVERY_TICKS: u32 = 30;
 const THINK_INTERVAL: u32 = 6;
 const ATTACK_REISSUE_TICKS: u32 = 120;
@@ -75,6 +75,7 @@ struct BuildTechAttackScript {
 }
 
 const FAILED_SPOTS_CAP: usize = 16;
+const FORWARD_SCOUT_STAGE_RADIUS_TILES: f32 = 3.0;
 /// Force a pending build to be treated as failed if the building still hasn't appeared
 /// after this many ticks. Covers cases where the worker gets stuck pathing to the site
 /// (e.g. blocked by hard collision in a tight corner) and never leaves BUILD state —
@@ -749,14 +750,14 @@ impl ScriptedPlayer for BunkerRushScript {
 
         // Pre-position scouts toward the enemy base so they can start building immediately
         // when we can afford bunkers.
-        if let Some((target_x, target_y)) = player_start_world(view.start, self.target_player_id) {
+        if let Some((target_x, target_y)) = offensive_bunker_stage_world(view.start, view.snapshot, self.target_player_id) {
             let mut candidates: Vec<u32> = workers.iter().map(|w| w.id).collect();
             candidates.sort_unstable();
             for worker_id in candidates {
                 if self.scouts.contains(&worker_id) {
                     continue;
                 }
-                if self.scouts.len() >= 2 {
+                if self.scouts.len() >= 1 {
                     break;
                 }
                 out.push(Command::Move {
@@ -779,6 +780,7 @@ impl ScriptedPlayer for BunkerRushScript {
             if let Some(cmd) = self.build_offensive_bunker_if_affordable(
                 view,
                 &mut steel,
+                &workers,
                 &builder_workers,
                 &mut reserved_workers,
             ) {
@@ -805,6 +807,7 @@ impl BunkerRushScript {
         &self,
         view: PlayerView<'_>,
         steel: &mut u32,
+        workers: &[&EntityView],
         builder_workers: &[u32],
         reserved_workers: &mut HashSet<u32>,
     ) -> Option<Command> {
@@ -812,10 +815,30 @@ impl BunkerRushScript {
         if *steel < stats.cost_steel {
             return None;
         }
-        let worker = builder_workers
+        let staged_scout = offensive_bunker_stage_world(view.start, view.snapshot, self.target_player_id)
+            .and_then(|(sx, sy)| {
+                let max_dist2 = (FORWARD_SCOUT_STAGE_RADIUS_TILES * view.start.map.tile_size as f32)
+                    .powi(2);
+                workers
+                    .iter()
+                    .copied()
+                    .find(|worker| {
+                        self.scouts.contains(&worker.id)
+                            && dist2(worker.x, worker.y, sx, sy) <= max_dist2
+                    })
+                    .map(|worker| worker.id)
+            })?;
+        let worker = self
+            .scouts
             .iter()
             .copied()
-            .find(|id| !reserved_workers.contains(id))?;
+            .find(|id| *id == staged_scout)
+            .or_else(|| {
+                builder_workers
+                    .iter()
+                    .copied()
+                    .find(|id| !reserved_workers.contains(id))
+            })?;
         let (tile_x, tile_y) =
             find_offensive_bunker_spot(view.start, view.snapshot, self.target_player_id)?;
         reserved_workers.insert(worker);
@@ -1835,6 +1858,20 @@ fn player_start_world(start: &StartPayload, player_id: u32) -> Option<(f32, f32)
     Some((tile_x as f32 * ts + ts * 0.5, tile_y as f32 * ts + ts * 0.5))
 }
 
+fn offensive_bunker_stage_world(
+    start: &StartPayload,
+    snapshot: &Snapshot,
+    target_player_id: u32,
+) -> Option<(f32, f32)> {
+    let (tile_x, tile_y) = find_offensive_bunker_spot(start, snapshot, target_player_id)
+        .or_else(|| own_start_tile(start, target_player_id))?;
+    let ts = start.map.tile_size as f32;
+    Some((
+        tile_x as f32 * ts + ts,
+        tile_y as f32 * ts + ts,
+    ))
+}
+
 fn combat_rendezvous_world(view: PlayerView<'_>) -> (f32, f32) {
     let ts = view.start.map.tile_size as f32;
     (
@@ -1876,18 +1913,18 @@ fn find_offensive_bunker_spot(
     let (target_x, target_y) = own_start_tile(start, target_player_id)?;
     let center_x = start.map.width as f32 * 0.5;
     let center_y = start.map.height as f32 * 0.5;
-    let away_x = sign_step(target_x as f32 - center_x);
-    let away_y = sign_step(target_y as f32 - center_y);
+    let toward_x = sign_step(center_x - target_x as f32);
+    let toward_y = sign_step(center_y - target_y as f32);
     let target_x = target_x as i32;
     let target_y = target_y as i32;
 
     let preferred_offsets = [
-        (away_x * 7, -away_y),
-        (-away_x, away_y * 7),
-        (away_x * 7, 0),
-        (0, away_y * 7),
-        (away_x * 6, -away_y * 2),
-        (-away_x * 2, away_y * 6),
+        (toward_x * 3, toward_y),
+        (toward_x * 3, 0),
+        (0, toward_y * 3),
+        (toward_x * 4, toward_y),
+        (toward_x * 2, toward_y * 2),
+        (toward_x * 4, 0),
     ];
     for (dx, dy) in preferred_offsets {
         if let Some(spot) =
@@ -1898,7 +1935,7 @@ fn find_offensive_bunker_spot(
     }
 
     let mut best: Option<(u32, u32, i32, i32)> = None;
-    for radius in 4i32..=7 {
+    for radius in 2i32..=6 {
         for dy in -radius..=radius {
             for dx in -radius..=radius {
                 if dx.abs().max(dy.abs()) != radius {
@@ -1908,8 +1945,8 @@ fn find_offensive_bunker_spot(
                 if !(16..=49).contains(&dist2_tiles) {
                     continue;
                 }
-                let away_score = dx * away_x + dy * away_y;
-                if away_score <= 0 {
+                let toward_score = dx * toward_x + dy * toward_y;
+                if toward_score <= 0 {
                     continue;
                 }
                 let tx = target_x + dx;
@@ -1920,12 +1957,12 @@ fn find_offensive_bunker_spot(
                 };
                 let better = best
                     .map(|(_, _, best_score, best_dist)| {
-                        away_score > best_score
-                            || (away_score == best_score && dist2_tiles < best_dist)
+                        toward_score > best_score
+                            || (toward_score == best_score && dist2_tiles < best_dist)
                     })
                     .unwrap_or(true);
                 if better {
-                    best = Some((tx, ty, away_score, dist2_tiles));
+                    best = Some((tx, ty, toward_score, dist2_tiles));
                 }
             }
         }

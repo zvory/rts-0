@@ -480,8 +480,9 @@ rules are future work.
   one Industrial Center at the player's start tile, a mineral cluster (16 patches) + a 2x2 block of 4 oil patches nearby.
 - Supply: Industrial Center gives `+10`, Depot gives `+8`, hard cap `200`.
 - Attached mining: workers walk to a patch, latch onto it, and mine in place.
-  Every `HARVEST_TICKS = 40` the load (`STEEL_LOAD = 5` / `OIL_LOAD = 1`) is deposited
-  directly into the player's economy. When a patch empties the worker goes idle
+  Every `STEEL_HARVEST_TICKS = 48` the steel load (`STEEL_LOAD = 3`) is deposited, and
+  every `OIL_HARVEST_TICKS = 40` the oil load (`OIL_LOAD = 1`) is deposited, directly
+  into the player's economy. When a patch empties the worker goes idle
   (no automatic retarget).
 - One worker per patch: each node has a single harvest slot (`Entity::miner`). A patch is
   occupied only after the worker reaches `GatherPhase::Harvesting`; right-clicking a patch

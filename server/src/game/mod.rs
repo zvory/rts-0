@@ -529,8 +529,8 @@ mod tests {
         let mut human_damaged = false;
         let mut event_log = Vec::new();
 
-        // ~200s of simulation. The human issues no commands (passive target).
-        for tick in 1..=6000 {
+        // ~300s of simulation. The human issues no commands (passive target).
+        for tick in 1..=9000 {
             for (player_id, events) in game.tick() {
                 for event in events {
                     event_log.push(super::replay::EventLogEntry {
