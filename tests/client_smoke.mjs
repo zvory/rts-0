@@ -56,8 +56,8 @@ try {
   ok(canvas && canvas.w > 0 && canvas.h > 0, `canvas mounted and sized (${canvas?.w}x${canvas?.h})`);
 
   await sleep(2500);
-  const hud = await page.evaluate(() => ({ m: document.getElementById("res-minerals")?.textContent, s: document.getElementById("res-supply")?.textContent }));
-  ok(parseInt(hud.m, 10) >= 50, `HUD shows minerals (${hud.m})`);
+  const hud = await page.evaluate(() => ({ m: document.getElementById("res-steel")?.textContent, s: document.getElementById("res-supply")?.textContent }));
+  ok(parseInt(hud.m, 10) >= 50, `HUD shows steel (${hud.m})`);
   ok(/\d+\s*\/\s*\d+/.test(hud.s || ""), `HUD shows supply (${hud.s})`);
 
   const own = await page.evaluate(() => {
@@ -85,7 +85,7 @@ try {
   ok(await page.evaluate(() => window.__rts.match.state.selection.size) >= 1, "box-select selected own units");
 
   await page.evaluate(() => document.activeElement?.blur());
-  await page.keyboard.press("d");
+  await page.keyboard.press("s");
   await sleep(150);
   ok(await page.evaluate(() => window.__rts.match.state.placement?.building) === "depot", "build hotkey entered placement mode");
 
@@ -119,7 +119,7 @@ try {
     const s = window.__rts.match.state, industrialCenter = s.entitiesInterpolated(1).find((e) => e.owner === s.playerId && e.kind === "industrial_center");
     if (!industrialCenter) return false;
     s.setSelection([industrialCenter.id]); window.__rts.match.hud.update();
-    return !!document.querySelector('#command-card [data-hotkey="W"]');
+    return !!document.querySelector('#command-card [data-hotkey="Q"]');
   });
   ok(trainBtn, "TRAIN CARD: selecting the Industrial Center shows a Worker train button");
 
