@@ -124,10 +124,10 @@ Gates:
 
 ### 2.2 Central World Query and Mutation Helpers
 
-- [ ] Add canonical helpers for owned units, completed buildings, town halls, visible entities,
+- [x] Add canonical helpers for owned units, completed buildings, town halls, visible entities,
   targetable enemies, resource reservation, building placement, spawn search, and path requests.
-- [ ] Move repeated scans and predicates behind helpers where practical.
-- [ ] Prefer helpers in new systems; hand-rolled scans need a clear local reason.
+- [x] Move repeated scans and predicates behind helpers where practical.
+- [x] Prefer helpers in new systems; hand-rolled scans need a clear local reason.
 
 Gates:
 

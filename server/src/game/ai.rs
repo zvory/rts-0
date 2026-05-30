@@ -17,6 +17,7 @@ use crate::config;
 use crate::game::entity::{EntityKind, EntityStore, Order};
 use crate::game::map::Map;
 use crate::game::services::spatial::SpatialIndex;
+use crate::game::services::world_query;
 use crate::game::systems;
 use crate::game::PlayerState;
 use crate::protocol::{kinds, Command};
@@ -73,7 +74,7 @@ impl AiController {
             Some(p) => p,
             None => return,
         };
-        // No Industrial Center / nothing left → nothing to do (the match is resolving).
+        // No town hall / nothing left → nothing to do (the match is resolving).
         if !entities.player_alive(self.player) {
             return;
         }
@@ -98,10 +99,9 @@ impl AiController {
         let mut barracks_total: usize = 0; // finished + under construction
         let mut depot_building = false;
 
-        for e in entities.iter() {
-            if e.owner != self.player {
-                continue;
-            }
+        for e in world_query::owned_units(entities, self.player)
+            .chain(world_query::owned_buildings(entities, self.player))
+        {
             match e.kind {
                 EntityKind::Worker => {
                     worker_count += 1;
@@ -337,18 +337,14 @@ fn is_free_rifleman(e: &crate::game::entity::Entity) -> bool {
 /// Nearest non-empty steel node to a worker (by id), or `None` if none remain / worker is gone.
 fn nearest_steel_node(entities: &EntityStore, spatial: &SpatialIndex, worker: u32) -> Option<u32> {
     let w = entities.get(worker)?;
-    let (wx, wy) = (w.pos_x, w.pos_y);
-    let max_radius = config::TILE_SIZE as f32 * 48.0; // generous search radius
-    let result = spatial.nearest(
-        wx,
-        wy,
-        max_radius,
+    world_query::nearest_resource_node(
         entities,
-        |e: &crate::game::entity::Entity| {
-            e.kind == EntityKind::Steel && e.remaining().unwrap_or(0) > 0
-        },
-    );
-    result.map(|(id, _)| id)
+        spatial,
+        EntityKind::Steel,
+        w.pos_x,
+        w.pos_y,
+        world_query::default_resource_search_radius_px(),
+    )
 }
 
 /// Remove the first occurrence of `id` from `v` (used to keep a worker assigned to a build job
