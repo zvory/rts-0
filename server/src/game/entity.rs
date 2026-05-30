@@ -31,7 +31,7 @@ pub enum EntityKind {
     IndustrialCenter,
     Depot,
     Barracks,
-    AdvancedTrainingCentre,
+    TrainingCentre,
     TankFactory,
     Bunker,
     Steel,
@@ -56,7 +56,7 @@ impl EntityKind {
             EntityKind::IndustrialCenter
                 | EntityKind::Depot
                 | EntityKind::Barracks
-                | EntityKind::AdvancedTrainingCentre
+                | EntityKind::TrainingCentre
                 | EntityKind::TankFactory
                 | EntityKind::Bunker
         )
@@ -77,7 +77,7 @@ impl EntityKind {
             EntityKind::IndustrialCenter => kinds::INDUSTRIAL_CENTER,
             EntityKind::Depot => kinds::DEPOT,
             EntityKind::Barracks => kinds::BARRACKS,
-            EntityKind::AdvancedTrainingCentre => kinds::ADVANCED_TRAINING_CENTRE,
+            EntityKind::TrainingCentre => kinds::TRAINING_CENTRE,
             EntityKind::TankFactory => kinds::TANK_FACTORY,
             EntityKind::Bunker => kinds::BUNKER,
             EntityKind::Steel => kinds::STEEL,
@@ -99,7 +99,7 @@ impl std::str::FromStr for EntityKind {
             kinds::INDUSTRIAL_CENTER => Ok(EntityKind::IndustrialCenter),
             kinds::DEPOT => Ok(EntityKind::Depot),
             kinds::BARRACKS => Ok(EntityKind::Barracks),
-            kinds::ADVANCED_TRAINING_CENTRE => Ok(EntityKind::AdvancedTrainingCentre),
+            kinds::TRAINING_CENTRE => Ok(EntityKind::TrainingCentre),
             kinds::TANK_FACTORY => Ok(EntityKind::TankFactory),
             kinds::BUNKER => Ok(EntityKind::Bunker),
             kinds::STEEL => Ok(EntityKind::Steel),
@@ -1095,7 +1095,7 @@ mod tests {
                 groups(false, false, true, false, false, false),
             ),
             (
-                EntityKind::AdvancedTrainingCentre,
+                EntityKind::TrainingCentre,
                 groups(false, false, false, false, false, false),
             ),
             (
@@ -1121,7 +1121,7 @@ mod tests {
             EntityKind::IndustrialCenter,
             EntityKind::Depot,
             EntityKind::Barracks,
-            EntityKind::AdvancedTrainingCentre,
+            EntityKind::TrainingCentre,
             EntityKind::TankFactory,
             EntityKind::Bunker,
         ];

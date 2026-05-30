@@ -49,7 +49,7 @@ export const KIND = Object.freeze({
   INDUSTRIAL_CENTER: "industrial_center",
   DEPOT: "depot",
   BARRACKS: "barracks",
-  ADVANCED_TRAINING_CENTRE: "advanced_training_centre",
+  TRAINING_CENTRE: "training_centre",
   TANK_FACTORY: "tank_factory",
   BUNKER: "bunker",
   STEEL: "steel",
@@ -66,7 +66,7 @@ export const BUILDING_KINDS = Object.freeze([
   KIND.INDUSTRIAL_CENTER,
   KIND.DEPOT,
   KIND.BARRACKS,
-  KIND.ADVANCED_TRAINING_CENTRE,
+  KIND.TRAINING_CENTRE,
   KIND.TANK_FACTORY,
   KIND.BUNKER,
 ]);
