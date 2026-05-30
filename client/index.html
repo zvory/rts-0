@@ -19,7 +19,7 @@
         Lobby:  #lobby-screen, #lobby-name, #lobby-room, #lobby-join, #lobby-players,
                 #lobby-ready, #lobby-add-ai, #lobby-start, #lobby-status
         Game:   #game-screen, #viewport (Pixi canvas mounts here),
-                #hud, #res-minerals, #res-gas, #res-supply,
+                #hud, #res-steel, #res-oil, #res-supply,
                 #minimap (canvas), #selected-panel, #command-card,
                 #game-over, #game-over-text, #game-over-button
         App:    #toast
@@ -66,8 +66,8 @@
 
         <!-- Top resource bar -->
         <div id="hud">
-          <div class="res"><span class="res-icon mineral">◆</span><span id="res-minerals">0</span></div>
-          <div class="res"><span class="res-icon gas">●</span><span id="res-gas">0</span></div>
+          <div class="res"><span class="res-icon steel">◆</span><span id="res-steel">0</span></div>
+          <div class="res"><span class="res-icon oil">●</span><span id="res-oil">0</span></div>
           <div class="res"><span class="res-icon supply">▲</span><span id="res-supply">0 / 0</span></div>
         </div>
 

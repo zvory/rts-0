@@ -384,7 +384,7 @@ export class Renderer {
       g.endFill();
       // Carried-resource pip so harvesters read at a glance.
       if (e.carrying) {
-        const cc = e.carryingKind === KIND.GAS ? COLORS.gas : COLORS.minerals;
+        const cc = e.carryingKind === KIND.OIL ? COLORS.oil : COLORS.steel;
         g.beginFill(cc);
         g.drawRect(-r * 0.35, -r * 1.15, r * 0.7, r * 0.45);
         g.endFill();
@@ -493,7 +493,7 @@ export class Renderer {
   }
 
   /**
-   * Resource node: minerals = tan supply crates, gas = olive fuel drums; size/opacity
+    * Resource node: steel = tan supply crates, oil = olive fuel drums; size/opacity
    * scale with `remaining`. Dimmed when the tile is currently not visible (explored
    * memory) so it reads as a remembered node.
    * @private
@@ -502,7 +502,7 @@ export class Renderer {
     const stat = STATS[e.kind] || {};
     const base = stat.size || 11;
     // Scale a little with remaining amount (clamped) so depleted nodes shrink.
-    const full = e.kind === KIND.GAS ? 5000 : 1500;
+    const full = e.kind === KIND.OIL ? 5000 : 1500;
     const frac = e.remaining == null ? 1 : clamp01(e.remaining / full);
     const r = base * (0.55 + 0.45 * frac);
 
@@ -514,10 +514,10 @@ export class Renderer {
     g.position.set(e.x, e.y);
     g.alpha = alpha;
 
-    if (e.kind === KIND.GAS) {
+    if (e.kind === KIND.OIL) {
       // Fuel drums: industrial but faction-neutral.
       g.lineStyle(1.5, 0x1a1712, 0.85);
-      g.beginFill(COLORS.gas);
+      g.beginFill(COLORS.oil);
       g.drawRect(-r * 0.75, -r * 0.55, r * 0.48, r * 1.05);
       g.drawRect(-r * 0.18, -r * 0.68, r * 0.5, r * 1.18);
       g.drawRect(r * 0.38, -r * 0.5, r * 0.42, r);
@@ -537,7 +537,7 @@ export class Renderer {
       ];
       for (const c of crates) {
         const cs = r * c.s;
-        g.beginFill(COLORS.minerals);
+        g.beginFill(COLORS.steel);
         g.drawRect(c.dx - cs * 0.45, c.dy - cs * 0.35, cs * 0.9, cs * 0.7);
         g.endFill();
         g.lineStyle(1, 0x5a5134, 0.8);

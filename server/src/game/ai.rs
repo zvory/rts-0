@@ -31,8 +31,8 @@ use crate::protocol::{kinds, Command};
 /// player so several AIs don't all think on the same tick.
 const DECISION_INTERVAL: u32 = 9;
 /// Worker count the AI saturates its economy to before it stops queueing more. Kept modest so
-/// the (deliberately slow) mineral economy isn't entirely consumed by worker supply/cost — the
-/// AI needs minerals and supply headroom left over to actually field an army.
+/// the (deliberately slow) steel economy isn't entirely consumed by worker supply/cost — the
+/// AI needs steel and supply headroom left over to actually field an army.
 const TARGET_WORKERS: usize = 8;
 /// How many barracks the AI wants (finished + under construction).
 const TARGET_BARRACKS: usize = 2;
@@ -83,7 +83,7 @@ impl AiController {
         // Local economy budget. We decrement these as we *decide* to spend so a single think
         // never queues more than the AI can actually afford this tick (commands all apply in
         // order, so without this we'd over-commit on the pre-tick balance).
-        let mut minerals = me.minerals;
+        let mut steel = me.steel;
         let mut free_supply = me.supply_cap.saturating_sub(me.supply_used);
         let supply_capped = me.supply_cap >= config::SUPPLY_CAP_MAX;
 
@@ -140,12 +140,12 @@ impl AiController {
 
         // --- 1. Expand supply with a depot when we're about to choke. ------
         let depot_cost = config::building_stats(kinds::DEPOT)
-            .map(|s| s.cost_min)
+            .map(|s| s.cost_steel)
             .unwrap_or(50);
         if !depot_building
             && !supply_capped
             && free_supply < SUPPLY_BUFFER
-            && minerals >= depot_cost
+            && steel >= depot_cost
         {
             if let Some(worker) = builder_pool.pop() {
                 if let Some((tx, ty)) = self.find_build_spot(map, entities, kinds::DEPOT, me) {
@@ -158,7 +158,7 @@ impl AiController {
                             tile_y: ty,
                         },
                     ));
-                    minerals -= depot_cost;
+                    steel -= depot_cost;
                     remove_id(&mut idle_workers, worker);
                 }
             }
@@ -166,9 +166,9 @@ impl AiController {
 
         // --- 2. Build barracks (our rifleman production). -------------------
         let rax_cost = config::building_stats(kinds::BARRACKS)
-            .map(|s| s.cost_min)
+            .map(|s| s.cost_steel)
             .unwrap_or(100);
-        if barracks_total < TARGET_BARRACKS && minerals >= rax_cost {
+        if barracks_total < TARGET_BARRACKS && steel >= rax_cost {
             if let Some(worker) = builder_pool.pop() {
                 if let Some((tx, ty)) = self.find_build_spot(map, entities, kinds::BARRACKS, me) {
                     out.push((
@@ -180,7 +180,7 @@ impl AiController {
                             tile_y: ty,
                         },
                     ));
-                    minerals -= rax_cost;
+                    steel -= rax_cost;
                     remove_id(&mut idle_workers, worker);
                 }
             }
@@ -188,7 +188,7 @@ impl AiController {
 
         // --- 3. Train workers up to the economy target. -------------------
         let worker_cost = config::unit_stats(kinds::WORKER)
-            .map(|s| s.cost_min)
+            .map(|s| s.cost_steel)
             .unwrap_or(50);
         let worker_supply = config::unit_stats(kinds::WORKER)
             .map(|s| s.supply)
@@ -197,7 +197,7 @@ impl AiController {
             if worker_count >= TARGET_WORKERS {
                 break;
             }
-            if minerals < worker_cost || free_supply < worker_supply {
+            if steel < worker_cost || free_supply < worker_supply {
                 break;
             }
             out.push((
@@ -207,24 +207,24 @@ impl AiController {
                     unit: kinds::WORKER.to_string(),
                 },
             ));
-            minerals -= worker_cost;
+            steel -= worker_cost;
             free_supply -= worker_supply;
             worker_count += 1;
         }
 
         // --- 4. Pump riflemen from each barracks (keep a shallow queue). ---
         let rifleman_cost = config::unit_stats(kinds::RIFLEMAN)
-            .map(|s| s.cost_min)
+            .map(|s| s.cost_steel)
             .unwrap_or(50);
         let rifleman_supply = config::unit_stats(kinds::RIFLEMAN)
             .map(|s| s.supply)
             .unwrap_or(1);
         for (rax, queue_len) in barracks {
-            // Keep at most one queued behind the in-progress one so we don't lock up minerals.
+            // Keep at most one queued behind the in-progress one so we don't lock up steel.
             if queue_len >= 2 {
                 continue;
             }
-            if minerals < rifleman_cost || free_supply < rifleman_supply {
+            if steel < rifleman_cost || free_supply < rifleman_supply {
                 break;
             }
             out.push((
@@ -234,13 +234,13 @@ impl AiController {
                     unit: kinds::RIFLEMAN.to_string(),
                 },
             ));
-            minerals -= rifleman_cost;
+            steel -= rifleman_cost;
             free_supply -= rifleman_supply;
         }
 
-        // --- 5. Send idle workers to mine the nearest mineral patch. -------
+        // --- 5. Send idle workers to mine the nearest steel patch. -------
         for worker in idle_workers {
-            if let Some(node) = nearest_mineral_node(entities, worker) {
+            if let Some(node) = nearest_steel_node(entities, worker) {
                 out.push((
                     self.player,
                     Command::Gather {
@@ -333,13 +333,13 @@ fn is_free_rifleman(e: &crate::game::entity::Entity) -> bool {
     }
 }
 
-/// Nearest non-empty mineral node to a worker (by id), or `None` if none remain / worker is gone.
-fn nearest_mineral_node(entities: &EntityStore, worker: u32) -> Option<u32> {
+/// Nearest non-empty steel node to a worker (by id), or `None` if none remain / worker is gone.
+fn nearest_steel_node(entities: &EntityStore, worker: u32) -> Option<u32> {
     let w = entities.get(worker)?;
     let (wx, wy) = (w.pos_x, w.pos_y);
     let mut best: Option<(u32, f32)> = None;
     for n in entities.iter() {
-        if n.kind == kinds::MINERALS && n.remaining > 0 {
+        if n.kind == kinds::STEEL && n.remaining > 0 {
             let d = (n.pos_x - wx) * (n.pos_x - wx) + (n.pos_y - wy) * (n.pos_y - wy);
             if best.map(|(_, bd)| d < bd).unwrap_or(true) {
                 best = Some((n.id, d));

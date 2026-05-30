@@ -33,8 +33,8 @@ pub mod kinds {
     pub const ADVANCED_TRAINING_CENTRE: &str = "advanced_training_centre";
     pub const TANK_FACTORY: &str = "tank_factory";
     pub const BUNKER: &str = "bunker";
-    pub const MINERALS: &str = "minerals";
-    pub const GAS: &str = "gas";
+    pub const STEEL: &str = "steel";
+    pub const OIL: &str = "oil";
 
     pub const UNITS: [&str; 5] = [WORKER, RIFLEMAN, MACHINE_GUNNER, AT_TEAM, TANK];
     pub const BUILDINGS: [&str; 6] = [
@@ -211,8 +211,8 @@ pub struct PlayerStart {
 #[serde(rename_all = "camelCase")]
 pub struct Snapshot {
     pub tick: u32,
-    pub minerals: u32,
-    pub gas: u32,
+    pub steel: u32,
+    pub oil: u32,
     pub supply_used: u32,
     pub supply_cap: u32,
     pub entities: Vec<EntityView>,

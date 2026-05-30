@@ -393,12 +393,12 @@ fn order_build(
         Some(p) => p,
         None => return,
     };
-    if ps.minerals < stats.cost_min || ps.gas < stats.cost_gas {
+    if ps.steel < stats.cost_steel || ps.oil < stats.cost_oil {
         notice(events, player, "Not enough resources");
         return;
     }
-    ps.minerals -= stats.cost_min;
-    ps.gas -= stats.cost_gas;
+    ps.steel -= stats.cost_steel;
+    ps.oil -= stats.cost_oil;
 
     // Spawn the building in CONSTRUCT state at the footprint center.
     let (cx, cy) = footprint_center(map, building, tile_x, tile_y);
@@ -461,7 +461,7 @@ fn order_train(
         Some(p) => p,
         None => return,
     };
-    if ps.minerals < stats.cost_min || ps.gas < stats.cost_gas {
+    if ps.steel < stats.cost_steel || ps.oil < stats.cost_oil {
         notice(events, player, "Not enough resources");
         return;
     }
@@ -470,8 +470,8 @@ fn order_train(
         return;
     }
     // Reserve cost + supply now; refunded on cancel.
-    ps.minerals -= stats.cost_min;
-    ps.gas -= stats.cost_gas;
+    ps.steel -= stats.cost_steel;
+    ps.oil -= stats.cost_oil;
     ps.supply_used += stats.supply;
 
     if let Some(b) = entities.get_mut(building) {
@@ -499,8 +499,8 @@ fn order_cancel(
     };
     if let Some(stats) = config::unit_stats(&unit) {
         if let Some(ps) = players.iter_mut().find(|p| p.id == player) {
-            ps.minerals += stats.cost_min;
-            ps.gas += stats.cost_gas;
+            ps.steel += stats.cost_steel;
+            ps.oil += stats.cost_oil;
             ps.supply_used = ps.supply_used.saturating_sub(stats.supply);
         }
     }
@@ -1008,11 +1008,11 @@ fn gather_harvesting(
     }
 
     // Extract a load (capped by remaining), deplete the node, then head home.
-    let is_gas = node_kind_amount.0 == kinds::GAS;
-    let load_cap = if is_gas {
-        config::GAS_LOAD
+    let is_oil = node_kind_amount.0 == kinds::OIL;
+    let load_cap = if is_oil {
+        config::OIL_LOAD
     } else {
-        config::MINERAL_LOAD
+        config::STEEL_LOAD
     };
     let taken = load_cap.min(node_kind_amount.1);
     if let Some(n) = entities.get_mut(node) {
@@ -1026,7 +1026,7 @@ fn gather_harvesting(
     if let Some(e) = entities.get_mut(id) {
         e.carry = Some(CarryState {
             amount: taken,
-            is_gas,
+            is_oil,
         });
         e.harvest_progress = 0;
         e.gather_phase = GatherPhase::ToHome;
@@ -1063,17 +1063,17 @@ fn gather_to_home(
     let deposit_range = interact_range(entities, industrial_center_id).unwrap_or(interact);
     if dist2(wx, wy, hx, hy).sqrt() <= deposit_range {
         // Deposit.
-        let (amount, is_gas) = entities
+        let (amount, is_oil) = entities
             .get(id)
             .and_then(|e| e.carry)
-            .map(|c| (c.amount, c.is_gas))
+            .map(|c| (c.amount, c.is_oil))
             .unwrap_or((0, false));
         if amount > 0 {
             if let Some(ps) = players.iter_mut().find(|p| p.id == owner) {
-                if is_gas {
-                    ps.gas += amount;
+                if is_oil {
+                    ps.oil += amount;
                 } else {
-                    ps.minerals += amount;
+                    ps.steel += amount;
                 }
             }
         }
@@ -1137,19 +1137,19 @@ fn retarget_or_idle(
     id: u32,
     old_node: u32,
 ) {
-    let (owner, wx, wy, want_gas) = {
+    let (owner, wx, wy, want_oil) = {
         let e = match entities.get(id) {
             Some(e) => e,
             None => return,
         };
-        let want_gas = matches!(entities.get(old_node), Some(n) if n.kind == kinds::GAS);
-        (e.owner, e.pos_x, e.pos_y, want_gas)
+        let want_oil = matches!(entities.get(old_node), Some(n) if n.kind == kinds::OIL);
+        (e.owner, e.pos_x, e.pos_y, want_oil)
     };
     let _ = owner;
-    let want_kind = if want_gas {
-        kinds::GAS
+    let want_kind = if want_oil {
+        kinds::OIL
     } else {
-        kinds::MINERALS
+        kinds::STEEL
     };
 
     // Nearest same-kind, non-empty node within a reasonable radius.

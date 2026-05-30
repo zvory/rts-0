@@ -13,7 +13,7 @@ use std::collections::HashMap;
 use crate::config;
 use crate::protocol::{kinds, states};
 
-/// Neutral owner id used for resource nodes (minerals / gas geysers).
+/// Neutral owner id used for resource nodes (steel / oil nodes).
 pub const NEUTRAL: u32 = 0;
 
 /// The high-level order a unit/building is currently executing.
@@ -55,8 +55,8 @@ pub struct ProdItem {
 pub struct CarryState {
     /// Amount of resource currently held.
     pub amount: u32,
-    /// `true` if the load is gas, `false` for minerals.
-    pub is_gas: bool,
+    /// `true` if the load is oil, `false` for steel.
+    pub is_oil: bool,
 }
 
 /// The phase a gathering worker is in. Kept separate from [`Order::Gather`] so the order
@@ -152,9 +152,9 @@ impl Entity {
         kinds::is_building(&self.kind)
     }
 
-    /// Whether this entity is a resource node (minerals or gas).
+    /// Whether this entity is a resource node (steel or oil).
     pub fn is_node(&self) -> bool {
-        self.kind == kinds::MINERALS || self.kind == kinds::GAS
+        self.kind == kinds::STEEL || self.kind == kinds::OIL
     }
 
     /// Whether this building can be attacked / can take damage and die. Resource nodes are
@@ -350,7 +350,7 @@ impl EntityStore {
         Some(self.insert(e))
     }
 
-    /// Spawn a neutral resource node of `kind` (`minerals` | `gas`) at a world position.
+    /// Spawn a neutral resource node of `kind` (`steel` | `oil`) at a world position.
     pub fn spawn_node(&mut self, kind: &str, x: f32, y: f32) -> Option<u32> {
         let amount = config::node_amount(kind);
         if amount == 0 {

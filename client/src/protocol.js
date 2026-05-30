@@ -52,8 +52,8 @@ export const KIND = Object.freeze({
   ADVANCED_TRAINING_CENTRE: "advanced_training_centre",
   TANK_FACTORY: "tank_factory",
   BUNKER: "bunker",
-  MINERALS: "minerals",
-  GAS: "gas",
+  STEEL: "steel",
+  OIL: "oil",
 });
 export const UNIT_KINDS = Object.freeze([
   KIND.WORKER,
@@ -70,7 +70,7 @@ export const BUILDING_KINDS = Object.freeze([
   KIND.TANK_FACTORY,
   KIND.BUNKER,
 ]);
-export const RESOURCE_KINDS = Object.freeze([KIND.MINERALS, KIND.GAS]);
+export const RESOURCE_KINDS = Object.freeze([KIND.STEEL, KIND.OIL]);
 
 export const isUnit = (k) => UNIT_KINDS.includes(k);
 export const isBuilding = (k) => BUILDING_KINDS.includes(k);
