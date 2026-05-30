@@ -4,8 +4,8 @@ use crate::config;
 use crate::game::entity::{AttackPhase, Entity, EntityStore, Order};
 use crate::game::map::Map;
 use crate::game::services::dist2;
+use crate::game::services::move_coordinator::MoveCoordinator;
 use crate::game::services::occupancy::Occupancy;
-use crate::game::services::pathing::PathingService;
 use crate::game::services::spatial::SpatialIndex;
 use crate::protocol::Event;
 
@@ -16,11 +16,11 @@ const RANGE_SLACK: f32 = 4.0;
 /// fire bunkers, and deal damage when off cooldown. Damage is applied immediately and emits an
 /// `Attack` event (for tracers). Cooldowns tick down here too.
 pub(crate) fn combat_system(
-    map: &Map,
+    _map: &Map,
     entities: &mut EntityStore,
-    occ: &Occupancy,
+    _occ: &Occupancy,
     spatial: &SpatialIndex,
-    pathing: &mut PathingService,
+    coordinator: &mut MoveCoordinator<'_>,
     events: &mut HashMap<u32, Vec<Event>>,
 ) {
     // Tick down cooldowns first.
@@ -104,15 +104,15 @@ pub(crate) fn combat_system(
                 }
             }
         } else if is_unit {
-            // Out of weapon range but within aggro: chase. Re-path with A* toward the target
-            // tile when we have no path, so units route around obstacles rather than stalling.
+            // Out of weapon range but within aggro: chase. Re-path toward the target tile
+            // when we have no path, so units route around obstacles rather than stalling.
             let want_repath = entities.get(id).map(|e| e.path_is_empty()).unwrap_or(false);
             if let Some(e) = entities.get_mut(id) {
                 e.set_target_id(Some(tid));
                 e.mark_attack_phase(AttackPhase::Chasing);
             }
             if want_repath {
-                pathing.repath_entity(map, entities, occ, id, tx, ty);
+                coordinator.request_chase_path(entities, id, (tx, ty));
             }
         }
     }

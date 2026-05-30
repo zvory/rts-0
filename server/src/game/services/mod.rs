@@ -3,6 +3,7 @@ pub mod commands;
 pub mod construction;
 pub mod death;
 pub mod economy;
+pub mod move_coordinator;
 pub mod movement;
 pub mod occupancy;
 pub mod pathing;

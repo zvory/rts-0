@@ -34,25 +34,29 @@ pub(crate) fn run_tick(
     pathing: &mut PathingService,
     pending: Vec<(u32, Command)>,
     events: &mut HashMap<u32, Vec<Event>>,
-    _tick: u32,
+    tick: u32,
 ) -> SpatialIndex {
     // Build occupancy once up front; commands that need pathing reuse it.
     let occ = services::occupancy::Occupancy::build(map, entities);
     // Pre-tick spatial index for commands (building placement checks).
     let spatial = services::spatial::SpatialIndex::build(entities, map.size);
 
+    let mut coordinator =
+        services::move_coordinator::MoveCoordinator::new(pathing, map, &occ, tick);
+
     services::commands::apply_commands(
-        map, entities, players, &occ, &spatial, pathing, pending, events,
+        map, entities, players, &occ, &spatial, &mut coordinator, pending, events,
     );
+    coordinator.process_awaiting_paths(entities);
     services::movement::movement_system(map, entities, &occ);
 
     // Rebuild after movement so combat, gather, and separation see updated positions.
     let spatial = services::spatial::SpatialIndex::build(entities, map.size);
 
-    services::combat::combat_system(map, entities, &occ, &spatial, pathing, events);
-    services::economy::gather_system(map, entities, players, &occ, &spatial, pathing);
+    services::combat::combat_system(map, entities, &occ, &spatial, &mut coordinator, events);
+    services::economy::gather_system(map, entities, players, &occ, &spatial, &mut coordinator);
     services::movement::separation(entities, &spatial, map);
-    services::production::production_system(map, entities, players, events);
+    services::production::production_system(map, entities, &coordinator, events);
     services::construction::construction_system(map, entities, events);
     services::death::death_system(entities, fog, events);
     services::supply::recompute_supply(players, entities);
