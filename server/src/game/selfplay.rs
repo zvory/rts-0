@@ -5,7 +5,7 @@
 //! clients: observe a fog-filtered snapshot, issue ordinary commands, and let the authoritative
 //! simulation validate every action.
 
-use std::collections::{BTreeMap, BTreeSet, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::fs;
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -62,13 +62,30 @@ struct BuildTechAttackScript {
     initial_gather_sent: bool,
     last_attack_tick: u32,
     last_oil_assignment_tick: u32,
+    /// Outstanding Build orders we've issued: worker_id → (building kind, target tile).
+    /// Under the "reserve on arrival" model the building doesn't appear in the snapshot
+    /// until the worker arrives at the site, so without this we'd keep re-issuing the
+    /// same build every think tick. Entries are pruned when the worker leaves the BUILD
+    /// state.
+    pending_builds: BTreeMap<u32, (EntityKind, u32, u32, u32)>,
+    /// Tiles where a Build order failed at arrival (worker went idle without a building
+    /// appearing). Used to bias `find_build_spot` away from spots the server has
+    /// rejected so the script doesn't loop on the same deterministic tile forever.
+    failed_build_spots: HashMap<EntityKind, BTreeSet<(u32, u32)>>,
 }
+
+const FAILED_SPOTS_CAP: usize = 16;
+/// Force a pending build to be treated as failed if the building still hasn't appeared
+/// after this many ticks. Covers cases where the worker gets stuck pathing to the site
+/// (e.g. blocked by hard collision in a tight corner) and never leaves BUILD state —
+/// without this the entry would pin the spot forever.
+const PENDING_BUILD_WATCHDOG_TICKS: u32 = 300;
 
 impl BuildTechAttackScript {
     fn new(player_id: u32) -> Self {
         BuildTechAttackScript {
             player_id,
-            target_workers: 6,
+            target_workers: 10,
             oil_workers: 2,
             target_barracks: 1,
             attack_size: 4,
@@ -76,6 +93,8 @@ impl BuildTechAttackScript {
             initial_gather_sent: false,
             last_attack_tick: 0,
             last_oil_assignment_tick: 0,
+            pending_builds: BTreeMap::new(),
+            failed_build_spots: HashMap::new(),
         }
     }
 
@@ -109,6 +128,42 @@ impl ScriptedPlayer for BuildTechAttackScript {
             .copied()
             .filter(|e| is_kind(e, EntityKind::Worker))
             .collect();
+
+        // Drop pending-build entries whose worker is no longer in BUILD state — either the
+        // worker arrived and the building was spawned (it will appear in `own`), or the
+        // arrival failed/order was cleared and the worker went idle. For dropped entries,
+        // distinguish success (building of that kind now overlaps the target tile) from
+        // failure (no such building) and record failed tiles so future picks avoid them.
+        let mut dropped: Vec<(EntityKind, u32, u32)> = Vec::new();
+        let now = view.tick;
+        self.pending_builds.retain(|wid, (kind, tx, ty, issued_tick)| {
+            let in_build = workers
+                .iter()
+                .any(|w| w.id == *wid && w.state == states::BUILD);
+            let watchdog_expired =
+                now.saturating_sub(*issued_tick) >= PENDING_BUILD_WATCHDOG_TICKS;
+            let keep = in_build && !watchdog_expired;
+            if !keep {
+                dropped.push((*kind, *tx, *ty));
+            }
+            keep
+        });
+        for (kind, tx, ty) in dropped {
+            let succeeded = own.iter().any(|e| {
+                is_kind(e, kind)
+                    && building_footprint_tiles(&view.start.map, e).contains(&(tx, ty))
+            });
+            if succeeded {
+                self.failed_build_spots.remove(&kind);
+            } else {
+                let set = self.failed_build_spots.entry(kind).or_default();
+                set.insert((tx, ty));
+                if set.len() > FAILED_SPOTS_CAP {
+                    set.clear();
+                }
+            }
+        }
+
         let mut idle_workers: Vec<u32> = workers
             .iter()
             .filter(|e| e.state == states::IDLE)
@@ -153,12 +208,20 @@ impl ScriptedPlayer for BuildTechAttackScript {
             .copied()
             .filter(|e| is_complete(e))
             .collect();
-        let depot_count = own.iter().filter(|e| is_kind(e, EntityKind::Depot)).count();
+        let pending_count = |kind: EntityKind| -> usize {
+            self.pending_builds
+                .values()
+                .filter(|(k, _, _, _)| *k == kind)
+                .count()
+        };
+        let depot_count =
+            own.iter().filter(|e| is_kind(e, EntityKind::Depot)).count() + pending_count(EntityKind::Depot);
         let depot_under_construction = own
             .iter()
-            .any(|e| is_kind(e, EntityKind::Depot) && !is_complete(e));
-        let barracks_count = barracks.len();
-        let tank_factory_count = tank_factories.len();
+            .any(|e| is_kind(e, EntityKind::Depot) && !is_complete(e))
+            || pending_count(EntityKind::Depot) > 0;
+        let barracks_count = barracks.len() + pending_count(EntityKind::Barracks);
+        let tank_factory_count = tank_factories.len() + pending_count(EntityKind::TankFactory);
         let tank_count = own.iter().filter(|e| is_kind(e, EntityKind::Tank)).count();
 
         let mut steel = view.snapshot.steel;
@@ -305,13 +368,17 @@ impl ScriptedPlayer for BuildTechAttackScript {
 
 impl BuildTechAttackScript {
     fn build_if_affordable(
-        &self,
+        &mut self,
         view: PlayerView<'_>,
         building: EntityKind,
         steel: &mut u32,
         idle_workers: &[u32],
         reserved_workers: &mut HashSet<u32>,
     ) -> Option<Command> {
+        // Local steel debit is a conservative reservation, not a mirror of server state:
+        // under the "reserve on arrival" build model the server only deducts when the
+        // worker arrives at the site. The script over-reserves locally to avoid
+        // double-spending across decision ticks.
         let stats = config::building_stats(building)?;
         if *steel < stats.cost_steel {
             return None;
@@ -321,8 +388,13 @@ impl BuildTechAttackScript {
             .copied()
             .find(|id| !reserved_workers.contains(id))?;
         let start = own_start_tile(view.start, view.player_id)?;
-        let (tile_x, tile_y) = find_build_spot(&view.start.map, view.snapshot, start, building)?;
+        let empty = BTreeSet::new();
+        let skip = self.failed_build_spots.get(&building).unwrap_or(&empty);
+        let (tile_x, tile_y) =
+            find_build_spot(&view.start.map, view.snapshot, start, building, skip)?;
         reserved_workers.insert(worker);
+        self.pending_builds
+            .insert(worker, (building, tile_x, tile_y, view.tick));
         *steel -= stats.cost_steel;
         Some(Command::Build {
             worker,
@@ -1690,7 +1762,9 @@ fn build_near_own_start_if_affordable(
         .copied()
         .find(|id| !reserved_workers.contains(id))?;
     let start = own_start_tile(view.start, view.player_id)?;
-    let (tile_x, tile_y) = find_build_spot(&view.start.map, view.snapshot, start, building)?;
+    let empty = BTreeSet::new();
+    let (tile_x, tile_y) =
+        find_build_spot(&view.start.map, view.snapshot, start, building, &empty)?;
     reserved_workers.insert(worker);
     *steel -= stats.cost_steel;
     Some(Command::Build {
@@ -1891,6 +1965,7 @@ fn find_build_spot(
     snapshot: &Snapshot,
     start: (u32, u32),
     building: EntityKind,
+    skip: &BTreeSet<(u32, u32)>,
 ) -> Option<(u32, u32)> {
     let stats = config::building_stats(building)?;
     let occupied = occupied_tiles_from_snapshot(map, snapshot);
@@ -1912,6 +1987,9 @@ fn find_build_spot(
                     continue;
                 }
                 let (tx, ty) = (tx as u32, ty as u32);
+                if skip.contains(&(tx, ty)) {
+                    continue;
+                }
                 if footprint_placeable_from_snapshot(map, building, tx, ty, &occupied) {
                     let center_x = tx as f32 + stats.foot_w as f32 * 0.5;
                     let center_y = ty as f32 + stats.foot_h as f32 * 0.5;
@@ -2036,15 +2114,7 @@ fn tile_of(map: &MapInfo, x: f32, y: f32) -> (u32, u32) {
     (tx.min(map.width - 1), ty.min(map.height - 1))
 }
 
-// TODO(plan §4.3 follow-up): re-enable once the build pathing for sites tucked into the corner
-// of a player's start area routes around the construction footprint. After unit collision
-// went hard, this script deterministically picks tile (5, 5) for p1's depot — the goal tile
-// lies inside the depot footprint, so the path the build worker is handed at command time
-// (computed before the footprint enters the occupancy grid) stalls under the new physics.
-// The AI-vs-AI integration test (`ai_builds_economy_and_attacks`) still covers the
-// end-to-end "build economy → tech → attack" flow.
 #[test]
-#[ignore = "depot pathing into player corner regressed under hard collision; tracked in PLAN §4.3"]
 fn scripted_self_play_exercises_economy_tech_and_combat() {
     let players = vec![
         PlayerInit {

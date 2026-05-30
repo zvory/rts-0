@@ -137,8 +137,9 @@ pub enum Order {
     Attack(AttackOrder),
     /// Harvest from a resource node, ferrying loads back to the home Industrial Center. See [`CarryState`].
     Gather(GatherOrder),
-    /// Walk to a building site and construct it. `site` is the building entity id (the
-    /// building already exists in CONSTRUCT state). Worker is occupied until completion.
+    /// Walk to a target tile and construct a building of `kind` there. The building does
+    /// not exist until the worker arrives, re-validates placement/affordability, and pays
+    /// the cost; until then the order carries only the intent (kind + top-left tile).
     Build(BuildOrder),
 }
 
@@ -159,8 +160,8 @@ impl Order {
         Order::Gather(GatherOrder::new(node))
     }
 
-    pub fn build(site: u32) -> Self {
-        Order::Build(BuildOrder::new(site))
+    pub fn build(kind: EntityKind, tile_x: u32, tile_y: u32) -> Self {
+        Order::Build(BuildOrder::new(kind, tile_x, tile_y))
     }
 
     pub fn attack_target(&self) -> Option<u32> {
@@ -177,9 +178,27 @@ impl Order {
         }
     }
 
+    /// The id of the building being constructed, if construction has actually begun.
+    /// Returns `None` while the worker is still walking to the site.
     pub fn build_site(&self) -> Option<u32> {
         match self {
-            Order::Build(order) => Some(order.intent.site),
+            Order::Build(order) => match order.execution.phase {
+                BuildPhase::Constructing { site } => Some(site),
+                BuildPhase::ToSite => None,
+            },
+            _ => None,
+        }
+    }
+
+    /// The pending placement intent for a build order, if any: (kind, tile_x, tile_y) of
+    /// the footprint's top-left tile. Available in any build phase.
+    pub fn build_intent_tile(&self) -> Option<(EntityKind, u32, u32)> {
+        match self {
+            Order::Build(order) => Some((
+                order.intent.kind,
+                order.intent.tile_x,
+                order.intent.tile_y,
+            )),
             _ => None,
         }
     }
@@ -292,7 +311,9 @@ pub struct GatherExecution {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct BuildIntent {
-    pub site: u32,
+    pub kind: EntityKind,
+    pub tile_x: u32,
+    pub tile_y: u32,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -302,9 +323,13 @@ pub struct BuildOrder {
 }
 
 impl BuildOrder {
-    fn new(site: u32) -> Self {
+    fn new(kind: EntityKind, tile_x: u32, tile_y: u32) -> Self {
         BuildOrder {
-            intent: BuildIntent { site },
+            intent: BuildIntent {
+                kind,
+                tile_x,
+                tile_y,
+            },
             execution: BuildExecution {
                 phase: BuildPhase::ToSite,
             },
@@ -319,8 +344,12 @@ pub struct BuildExecution {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BuildPhase {
+    /// Worker is walking toward the target tile. No building has been spawned and no
+    /// resources have been deducted yet.
     ToSite,
-    Constructing,
+    /// Worker has arrived, the building has been spawned in CONSTRUCT state, and
+    /// construction is progressing. `site` is the building entity id.
+    Constructing { site: u32 },
 }
 
 /// A queued production order on a building.
@@ -1204,8 +1233,12 @@ mod tests {
 
         let mut worker =
             Entity::new_unit(1, EntityKind::Worker, 10.0, 20.0).expect("worker should spawn");
-        worker.set_order(Order::build(7));
-        assert_eq!(worker.order().build_site(), Some(7));
+        worker.set_order(Order::build(EntityKind::Depot, 4, 5));
+        assert_eq!(worker.order().build_site(), None);
+        assert_eq!(
+            worker.order().build_intent_tile(),
+            Some((EntityKind::Depot, 4, 5))
+        );
         assert!(matches!(
             worker.order(),
             Order::Build(BuildOrder {
@@ -1215,13 +1248,13 @@ mod tests {
                 ..
             })
         ));
-        worker.mark_build_phase(BuildPhase::Constructing);
+        worker.mark_build_phase(BuildPhase::Constructing { site: 7 });
         assert_eq!(worker.order().build_site(), Some(7));
         assert!(matches!(
             worker.order(),
             Order::Build(BuildOrder {
                 execution: BuildExecution {
-                    phase: BuildPhase::Constructing
+                    phase: BuildPhase::Constructing { site: 7 }
                 },
                 ..
             })

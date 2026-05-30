@@ -11,7 +11,7 @@ pub mod production;
 pub mod spatial;
 pub mod supply;
 
-use crate::game::entity::EntityStore;
+use crate::game::entity::EntityKind;
 
 /// Squared Euclidean distance.
 pub(crate) fn dist2(ax: f32, ay: f32, bx: f32, by: f32) -> f32 {
@@ -20,12 +20,13 @@ pub(crate) fn dist2(ax: f32, ay: f32, bx: f32, by: f32) -> f32 {
     dx * dx + dy * dy
 }
 
-/// Distance (px) at which a worker is "in contact" with an entity for harvest / deposit /
-/// construction. Accounts for the target's radius (a 3×3 Industrial Center is ~1.5 tiles wide)
-/// so a worker standing just outside a footprint still counts as adjacent. `None` for a missing
-/// entity.
-pub(crate) fn interact_range(entities: &EntityStore, target: u32) -> Option<f32> {
-    let t = entities.get(target)?;
-    // Target half-extent + roughly one worker reach (one tile) of slack.
-    Some(t.radius() + crate::config::TILE_SIZE as f32)
+/// Arrival distance for a worker walking to a building footprint of `kind` (footprint
+/// half-extent + one tile of slack). Used for build-arrival checks before any entity for
+/// the building exists.
+pub(crate) fn interact_range_for_kind(kind: EntityKind) -> f32 {
+    let ts = crate::config::TILE_SIZE as f32;
+    let half = crate::config::building_stats(kind)
+        .map(|s| (s.foot_w.max(s.foot_h) as f32) * ts * 0.5)
+        .unwrap_or(ts * 0.5);
+    half + ts
 }

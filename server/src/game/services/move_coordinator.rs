@@ -135,19 +135,22 @@ impl<'a> MoveCoordinator<'a> {
         self.request_path(entities, id, (nx, ny));
     }
 
-    /// Issue a build order: set the order and request a path to the site tile.
+    /// Issue a build order: record the placement intent on the worker and walk it to the
+    /// target top-left tile. No building is spawned and no resources are deducted here;
+    /// that happens on arrival in the construction system.
     pub fn order_build(
         &mut self,
         entities: &mut EntityStore,
         id: u32,
-        site_id: u32,
-        site_tile: (u32, u32),
+        kind: EntityKind,
+        tile_x: u32,
+        tile_y: u32,
     ) {
-        let (cx, cy) = self.map.tile_center(site_tile.0, site_tile.1);
+        let (cx, cy) = self.map.tile_center(tile_x, tile_y);
         entities.release_miner(id);
         if let Some(e) = entities.get_mut(id) {
-            e.set_order(Order::build(site_id));
-            e.set_target_id(Some(site_id));
+            e.set_order(Order::build(kind, tile_x, tile_y));
+            e.set_target_id(None);
             e.set_path(Vec::new());
             e.set_path_goal(Some((cx, cy)));
             e.reset_gather_state();

@@ -4,7 +4,7 @@ use crate::config;
 use crate::game::entity::{EntityKind, EntityStore, GatherPhase, ProdItem};
 use crate::game::map::Map;
 use crate::game::services::move_coordinator::MoveCoordinator;
-use crate::game::services::occupancy::{footprint_center, footprint_placeable, Occupancy};
+use crate::game::services::occupancy::footprint_placeable;
 use crate::game::services::spatial::SpatialIndex;
 use crate::game::PlayerState;
 use crate::protocol::{Command, Event};
@@ -19,17 +19,11 @@ pub(crate) fn apply_commands(
     map: &Map,
     entities: &mut EntityStore,
     players: &mut [PlayerState],
-    occ: &Occupancy,
     spatial: &SpatialIndex,
     coordinator: &mut MoveCoordinator<'_>,
     pending: Vec<(u32, Command)>,
     events: &mut HashMap<u32, Vec<Event>>,
 ) {
-    // Tiles reserved by build commands already applied this tick. Prevents two commands
-    // in the same tick from placing buildings on the same footprint before the spatial index
-    // is rebuilt.
-    let mut reserved_tiles: HashSet<(u32, u32)> = HashSet::new();
-
     for (player, cmd) in pending {
         match cmd {
             Command::Move { units, x, y } => {
@@ -88,19 +82,8 @@ pub(crate) fn apply_commands(
                 tile_y,
             } => {
                 order_build(
-                    map,
-                    entities,
-                    players,
-                    occ,
-                    spatial,
-                    coordinator,
-                    player,
-                    worker,
-                    &building,
-                    tile_x,
-                    tile_y,
-                    events,
-                    &mut reserved_tiles,
+                    map, entities, players, spatial, coordinator, player, worker, &building,
+                    tile_x, tile_y, events,
                 );
             }
             Command::Train { building, unit } => {
@@ -147,14 +130,17 @@ fn owns_unit(entities: &EntityStore, player: u32, id: u32) -> bool {
     matches!(entities.get(id), Some(e) if e.owner == player && e.is_unit())
 }
 
-/// Issue a build order. Deducts cost immediately, places the building in CONSTRUCT state, and
-/// sends the worker to the site.
+/// Issue a build order under the "reserve on arrival" model. Validates intent, emits
+/// best-effort feedback notices to the player, then walks the worker toward the target
+/// tile. Resources are not deducted and no building is spawned here; that happens in the
+/// construction system when the worker arrives, at which point placement and affordability
+/// are re-checked. Other units may walk through the tile and other build commands may race
+/// for it — first arrival wins.
 #[allow(clippy::too_many_arguments)]
 fn order_build(
     map: &Map,
     entities: &mut EntityStore,
-    players: &mut [PlayerState],
-    _occ: &Occupancy,
+    players: &[PlayerState],
     spatial: &SpatialIndex,
     coordinator: &mut MoveCoordinator<'_>,
     player: u32,
@@ -163,7 +149,6 @@ fn order_build(
     tile_x: u32,
     tile_y: u32,
     events: &mut HashMap<u32, Vec<Event>>,
-    reserved_tiles: &mut HashSet<(u32, u32)>,
 ) {
     if !owns_unit(entities, player, worker) {
         return;
@@ -187,7 +172,6 @@ fn order_build(
         }
     };
 
-    // Tech requirement.
     let owned: Vec<EntityKind> = entities
         .iter()
         .filter(|e| e.owner == player && e.is_building())
@@ -198,29 +182,18 @@ fn order_build(
         return;
     }
 
-    // Reject clearly out-of-range top-left coords.
     if tile_x >= map.size || tile_y >= map.size {
         notice(events, player, "Cannot build there");
         return;
     }
 
-    // Placement: footprint in bounds, on passable terrain, and not overlapping a building.
+    // Feedback only — re-checked at arrival.
     if !footprint_placeable(map, entities, spatial, kind, tile_x, tile_y) {
         notice(events, player, "Cannot build there");
         return;
     }
 
-    // Also reject footprints already reserved by another build command this tick.
-    let tiles = crate::game::services::occupancy::footprint_tiles(kind, tile_x, tile_y);
-    for t in &tiles {
-        if reserved_tiles.contains(t) {
-            notice(events, player, "Cannot build there");
-            return;
-        }
-    }
-
-    // Cost.
-    let ps = match players.iter_mut().find(|p| p.id == player) {
+    let ps = match players.iter().find(|p| p.id == player) {
         Some(p) => p,
         None => return,
     };
@@ -228,21 +201,8 @@ fn order_build(
         notice(events, player, "Not enough resources");
         return;
     }
-    ps.steel -= stats.cost_steel;
-    ps.oil -= stats.cost_oil;
 
-    // Spawn the building in CONSTRUCT state at the footprint center.
-    let (cx, cy) = footprint_center(map, kind, tile_x, tile_y);
-    let site = match entities.spawn_building(player, kind, cx, cy, false) {
-        Some(id) => id,
-        None => return,
-    };
-    for t in tiles {
-        reserved_tiles.insert(t);
-    }
-
-    // Walk the worker to the site.
-    coordinator.order_build(entities, worker, site, (tile_x, tile_y));
+    coordinator.order_build(entities, worker, kind, tile_x, tile_y);
 }
 
 /// Queue a unit at a production building. Reserves cost + supply on enqueue.
