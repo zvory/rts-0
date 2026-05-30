@@ -402,6 +402,12 @@ pub struct MovementState {
     pub last_repath_tick: u32,
     /// The goal world point of the most recently assigned path, for throttle-bypass checks.
     pub path_goal: Option<(f32, f32)>,
+    /// Consecutive ticks in which the unit moved less than `STUCK_EPS_PX`. Reset on progress
+    /// or when a new order is assigned. Used by tolerant arrival.
+    pub stuck_ticks: u16,
+    /// Position snapshot taken when `stuck_ticks` was last reset to 0. Used to measure
+    /// progress each tick for tolerant arrival.
+    pub last_progress_pos: (f32, f32),
 }
 
 impl Default for MovementState {
@@ -412,6 +418,8 @@ impl Default for MovementState {
             path: Vec::new(),
             last_repath_tick: 0,
             path_goal: None,
+            stuck_ticks: 0,
+            last_progress_pos: (0.0, 0.0),
         }
     }
 }
@@ -636,6 +644,15 @@ impl Entity {
             Order::Move(order) | Order::AttackMove(order) => Some(order.execution.phase),
             _ => None,
         })
+    }
+
+    /// Reset the stuck counter and reference position when a new order begins or progress
+    /// is made. Call this whenever a fresh move order is assigned.
+    pub fn reset_stuck(&mut self, pos_x: f32, pos_y: f32) {
+        if let Some(m) = self.movement.as_mut() {
+            m.stuck_ticks = 0;
+            m.last_progress_pos = (pos_x, pos_y);
+        }
     }
 
     pub fn set_last_repath_tick(&mut self, tick: u32) {

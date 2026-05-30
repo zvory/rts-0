@@ -95,6 +95,8 @@ impl<'a> MoveCoordinator<'a> {
             e.set_path_goal(Some(*g));
             e.mark_move_phase(MovePhase::AwaitingPath);
             e.reset_gather_state();
+            let (px, py) = (e.pos_x, e.pos_y);
+            e.reset_stuck(px, py);
         }
     }
 
@@ -112,6 +114,8 @@ impl<'a> MoveCoordinator<'a> {
             e.set_path(Vec::new());
             e.set_path_goal(Some((tx, ty)));
             e.reset_gather_state();
+            let (px, py) = (e.pos_x, e.pos_y);
+            e.reset_stuck(px, py);
         }
         self.request_path(entities, id, (tx, ty));
     }
@@ -131,6 +135,8 @@ impl<'a> MoveCoordinator<'a> {
             if let Some(w) = e.worker.as_mut() {
                 w.carry = None;
             }
+            let (px, py) = (e.pos_x, e.pos_y);
+            e.reset_stuck(px, py);
         }
         self.request_path(entities, id, (nx, ny));
     }
@@ -154,6 +160,8 @@ impl<'a> MoveCoordinator<'a> {
             e.set_path(Vec::new());
             e.set_path_goal(Some((cx, cy)));
             e.reset_gather_state();
+            let (px, py) = (e.pos_x, e.pos_y);
+            e.reset_stuck(px, py);
         }
         self.request_path(entities, id, (cx, cy));
     }
