@@ -25,6 +25,11 @@ pub(crate) fn apply_commands(
     pending: Vec<(u32, Command)>,
     events: &mut HashMap<u32, Vec<Event>>,
 ) {
+    // Tiles reserved by build commands already applied this tick. Prevents two commands
+    // in the same tick from placing buildings on the same footprint before the spatial index
+    // is rebuilt.
+    let mut reserved_tiles: HashSet<(u32, u32)> = HashSet::new();
+
     for (player, cmd) in pending {
         match cmd {
             Command::Move { units, x, y } => {
@@ -55,6 +60,7 @@ pub(crate) fn apply_commands(
             } => {
                 order_build(
                     map, entities, players, occ, spatial, pathing, player, worker, &building, tile_x, tile_y, events,
+                    &mut reserved_tiles,
                 );
             }
             Command::Train { building, unit } => {
@@ -66,6 +72,7 @@ pub(crate) fn apply_commands(
             Command::Stop { units } => {
                 for id in dedupe_cap_units(units) {
                     if owns_unit(entities, player, id) {
+                        entities.release_miner(id);
                         if let Some(e) = entities.get_mut(id) {
                             e.clear_orders();
                             e.carry = None; // stop returns carried load is dropped intentionally
@@ -144,6 +151,7 @@ fn order_move(
         waypoints[0] = (x, y);
     }
 
+    entities.release_miner(id);
     if let Some(e) = entities.get_mut(id) {
         e.path = waypoints;
         e.target_id = None;
@@ -203,6 +211,7 @@ fn order_attack(
         budget: None,
     };
     let waypoints = pathing.request(map, occ, req);
+    entities.release_miner(id);
     if let Some(e) = entities.get_mut(id) {
         e.order = Order::Attack { target };
         e.target_id = Some(target);
@@ -252,6 +261,7 @@ fn order_gather(
         budget: None,
     };
     let waypoints = pathing.request(map, occ, req);
+    entities.release_miner(id);
     if let Some(e) = entities.get_mut(id) {
         e.order = Order::Gather { node };
         e.target_id = Some(node);
@@ -282,6 +292,7 @@ fn order_build(
     tile_x: u32,
     tile_y: u32,
     events: &mut HashMap<u32, Vec<Event>>,
+    reserved_tiles: &mut HashSet<(u32, u32)>,
 ) {
     if !owns_unit(entities, player, worker) {
         return;
@@ -329,6 +340,15 @@ fn order_build(
         return;
     }
 
+    // Also reject footprints already reserved by another build command this tick.
+    let tiles = crate::game::services::occupancy::footprint_tiles(kind, tile_x, tile_y);
+    for t in &tiles {
+        if reserved_tiles.contains(t) {
+            notice(events, player, "Cannot build there");
+            return;
+        }
+    }
+
     // Cost.
     let ps = match players.iter_mut().find(|p| p.id == player) {
         Some(p) => p,
@@ -347,6 +367,10 @@ fn order_build(
         Some(id) => id,
         None => return,
     };
+    // Reserve the footprint so later build commands in this tick don't overlap.
+    for t in tiles {
+        reserved_tiles.insert(t);
+    }
 
     // Walk the worker to the site and mark it occupied with a build order.
     let (sx, sy) = {
@@ -364,6 +388,7 @@ fn order_build(
         budget: None,
     };
     let waypoints = pathing.request(map, occ, req);
+    entities.release_miner(worker);
     if let Some(e) = entities.get_mut(worker) {
         e.order = Order::Build { site };
         e.target_id = Some(site);

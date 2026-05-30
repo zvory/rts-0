@@ -108,7 +108,7 @@ pub(crate) fn footprint_center(
 pub(crate) fn footprint_placeable(
     map: &Map,
     entities: &EntityStore,
-    spatial: &SpatialIndex,
+    _spatial: &SpatialIndex,
     building: EntityKind,
     tile_x: u32,
     tile_y: u32,
@@ -128,31 +128,21 @@ pub(crate) fn footprint_placeable(
     }
 
     // Not overlapping another building's footprint or a resource node tile.
-    // Use the spatial index to only check entities near the footprint.
-    let stats = match config::building_stats(building) {
-        Some(s) => s,
-        None => return false,
-    };
-    let max_dim = stats.foot_w.max(stats.foot_h) as i32;
-    let min_tx = tile_x as i32;
-    let min_ty = tile_y as i32;
-    let max_tx = tile_x as i32 + max_dim - 1;
-    let max_ty = tile_y as i32 + max_dim - 1;
-
-    for id in spatial.ids_in_rect(min_tx, min_ty, max_tx, max_ty) {
-        if let Some(e) = entities.get(id) {
-            if e.is_building() {
-                let occupied = building_footprint(map, e);
-                for t in &tiles {
-                    if occupied.contains(t) {
-                        return false;
-                    }
-                }
-            } else if e.is_node() {
-                let node_tile = map.tile_of(e.pos_x, e.pos_y);
-                if tiles.contains(&node_tile) {
+    // We scan all buildings rather than use the spatial index because the spatial index keys
+    // by entity center tile, and a large building's center can lie outside the query rectangle
+    // even when its footprint overlaps the candidate footprint.
+    for e in entities.iter() {
+        if e.is_building() {
+            let occupied = building_footprint(map, e);
+            for t in &tiles {
+                if occupied.contains(t) {
                     return false;
                 }
+            }
+        } else if e.is_node() {
+            let node_tile = map.tile_of(e.pos_x, e.pos_y);
+            if tiles.contains(&node_tile) {
+                return false;
             }
         }
     }

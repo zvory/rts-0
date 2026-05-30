@@ -11,6 +11,7 @@
 pub mod ai;
 pub mod entity;
 pub mod fog;
+mod invariants;
 pub mod map;
 pub mod pathfinding;
 pub mod replay;
@@ -231,6 +232,11 @@ impl Game {
         // Fog last, from the post-systems world state.
         let ids: Vec<u32> = self.players.iter().map(|p| p.id).collect();
         self.fog.recompute(&ids, &self.entities);
+
+        // In debug builds, assert that the world state is internally consistent.
+        // Panics here mean a system violated a documented invariant.
+        #[cfg(debug_assertions)]
+        self.assert_invariants();
 
         // Return events in a stable order (by player id) for determinism.
         let mut out: Vec<(u32, Vec<Event>)> = events.into_iter().collect();
