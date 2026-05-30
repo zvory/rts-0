@@ -22,6 +22,10 @@
  - [ ] Rename the game officially to Bewegungskrieg.
  - [ ] Restyle the main menu to be more ww2 themed, less scifi.
 
+
+## Needs prioritization
+ - [ ] lobby system to see active lobbies
+
 ## Done
 
  - [x] Command card should have grid style hotkeys.
