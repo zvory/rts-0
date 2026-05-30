@@ -154,6 +154,7 @@ pub struct ProdItem {
 }
 
 /// What a worker is carrying back to base, if anything.
+#[allow(dead_code)]
 #[derive(Debug, Clone, Copy)]
 pub struct CarryState {
     /// Amount of resource currently held.
@@ -164,6 +165,7 @@ pub struct CarryState {
 
 /// The phase a gathering worker is in. Kept separate from [`Order::Gather`] so the order
 /// (which node) stays stable while the worker cycles through fetch/harvest/return.
+#[allow(dead_code)]
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum GatherPhase {
     /// Walking out to the resource node.
@@ -175,14 +177,116 @@ pub enum GatherPhase {
 }
 
 // ---------------------------------------------------------------------------
+// Component-shaped state groups
+// ---------------------------------------------------------------------------
+
+/// Mobile unit state. Only units have this group.
+#[derive(Debug, Clone)]
+pub struct MovementState {
+    /// Facing angle in radians (for unit orientation / render). Updated when moving/attacking.
+    pub facing: f32,
+    /// Current high-level order / AI state.
+    pub order: Order,
+    /// Tile-center waypoints remaining to walk through (world pixels), in reverse order so
+    /// the next waypoint is the last element (cheap `pop`). Empty when not moving.
+    pub path: Vec<(f32, f32)>,
+}
+
+impl Default for MovementState {
+    fn default() -> Self {
+        MovementState {
+            facing: 0.0,
+            order: Order::Idle,
+            path: Vec::new(),
+        }
+    }
+}
+
+/// Weapon and active target state. Present on combat-capable units and bunkers.
+#[derive(Debug, Clone, Default)]
+pub struct CombatState {
+    /// Ticks until this entity may attack again (0 = ready).
+    pub attack_cd: u32,
+    /// Current attack/interaction target id. Combat uses enemy ids; gather/build commands use
+    /// this for client feedback while the order executes.
+    pub target_id: Option<u32>,
+}
+
+/// Production queue state. Present only on buildings that can train units.
+#[derive(Debug, Clone, Default)]
+pub struct ProductionState {
+    /// FIFO production queue (front = item being produced).
+    pub queue: Vec<ProdItem>,
+}
+
+/// Construction progress state. Present only while a building is under construction.
+#[derive(Debug, Clone)]
+pub struct ConstructionState {
+    /// Ticks of construction accumulated so far.
+    pub progress: u32,
+    /// Total ticks of construction required (`building_stats.build_ticks`).
+    pub total: u32,
+}
+
+/// Worker-only gathering and carrying state.
+#[allow(dead_code)]
+#[derive(Debug, Clone)]
+pub struct WorkerState {
+    /// Present when the worker is laden with a resource load.
+    pub carry: Option<CarryState>,
+    /// Gathering sub-phase (only meaningful under [`Order::Gather`]).
+    pub gather_phase: GatherPhase,
+    /// Ticks accumulated while [`GatherPhase::Harvesting`].
+    pub harvest_progress: u32,
+    /// The Industrial Center this worker deposits into. Resolved lazily to the nearest own Industrial Center.
+    pub home_industrial_center: Option<u32>,
+}
+
+impl Default for WorkerState {
+    fn default() -> Self {
+        WorkerState {
+            carry: None,
+            gather_phase: GatherPhase::ToNode,
+            harvest_progress: 0,
+            home_industrial_center: None,
+        }
+    }
+}
+
+/// Resource-node state. Present only on steel/oil nodes.
+#[derive(Debug, Clone)]
+pub struct ResourceNodeState {
+    /// Remaining resource amount.
+    pub remaining: u32,
+    /// The single worker currently occupying this node's harvest slot.
+    ///
+    /// At most one worker may be in [`GatherPhase::Harvesting`] on a node at a time; others
+    /// queue in [`GatherPhase::ToNode`] until the slot frees. Advisory: validated each tick
+    /// against the recorded worker's live state, so it self-heals on death/retarget/deposit.
+    pub miner: Option<u32>,
+}
+
+/// Compact classification of which optional state groups an entity kind owns.
+#[cfg(test)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct EntityStateGroups {
+    pub movement: bool,
+    pub combat: bool,
+    pub production: bool,
+    pub construction: bool,
+    pub worker: bool,
+    pub resource_node: bool,
+}
+
+// ---------------------------------------------------------------------------
 // Entity
 // ---------------------------------------------------------------------------
 
 /// A single simulation entity: unit, building, or resource node.
 ///
 /// All positional state is in world pixels (`pos_x`/`pos_y` are the entity center).
-/// Fields that only apply to some kinds are present on every entity but left at their
-/// neutral defaults otherwise — this keeps the store homogeneous and lookup-free.
+/// State that only applies to a subset of kinds lives in typed optional groups, keeping
+/// the store homogeneous while making kind-specific state explicit.
 #[derive(Debug, Clone)]
 pub struct Entity {
     /// Stable unique id (never reused).
@@ -199,56 +303,232 @@ pub struct Entity {
     pub hp: u32,
     pub max_hp: u32,
 
-    /// Facing angle in radians (for unit orientation / render). Updated when moving/attacking.
-    pub facing: f32,
-
-    /// Current high-level order / AI state.
-    pub order: Order,
-
-    /// Tile-center waypoints remaining to walk through (world pixels), in reverse order so
-    /// the next waypoint is the last element (cheap `pop`). Empty when not moving.
-    pub path: Vec<(f32, f32)>,
-
-    /// Ticks until this entity may attack again (0 = ready).
-    pub attack_cd: u32,
-
-    /// Current attack/interaction target id (enemy for combat, node/industrial_center for gather). Used for
-    /// render tracers and to remember focus across ticks. `None` when not engaged.
-    pub target_id: Option<u32>,
-
-    // --- Buildings: production -------------------------------------------------
-    /// FIFO production queue (front = item being produced). Empty for non-producers.
-    pub prod_queue: Vec<ProdItem>,
-
-    // --- Buildings: construction ----------------------------------------------
-    /// `true` while a building is still being constructed (CONSTRUCT state).
-    pub under_construction: bool,
-    /// Ticks of construction accumulated so far.
-    pub build_progress: u32,
-    /// Total ticks of construction required (`building_stats.build_ticks`).
-    pub build_total: u32,
-
-    // --- Workers: carrying -----------------------------------------------------
-    /// Present when the worker is laden with a resource load.
-    pub carry: Option<CarryState>,
-    /// Gathering sub-phase (only meaningful under [`Order::Gather`]).
-    pub gather_phase: GatherPhase,
-    /// Ticks accumulated while [`GatherPhase::Harvesting`].
-    pub harvest_progress: u32,
-    /// The Industrial Center this worker deposits into. Resolved lazily to the nearest own Industrial Center.
-    pub home_industrial_center: Option<u32>,
-
-    // --- Resource nodes --------------------------------------------------------
-    /// Remaining resource amount (resource nodes only).
-    pub remaining: u32,
-    /// The single worker currently occupying this node's harvest slot (resource nodes only).
-    /// At most one worker may be in [`GatherPhase::Harvesting`] on a node at a time; others
-    /// queue in [`GatherPhase::ToNode`] until the slot frees. Advisory: validated each tick
-    /// against the recorded worker's live state, so it self-heals on death/retarget/deposit.
-    pub miner: Option<u32>,
+    pub movement: Option<MovementState>,
+    pub combat: Option<CombatState>,
+    pub production: Option<ProductionState>,
+    pub construction: Option<ConstructionState>,
+    pub worker: Option<WorkerState>,
+    pub resource_node: Option<ResourceNodeState>,
 }
 
 impl Entity {
+    pub fn new_unit(owner: u32, kind: EntityKind, x: f32, y: f32) -> Option<Self> {
+        let s = config::unit_stats(kind)?;
+        Some(Entity {
+            id: 0,
+            owner,
+            kind,
+            pos_x: x,
+            pos_y: y,
+            hp: s.hp,
+            max_hp: s.hp,
+            movement: Some(MovementState::default()),
+            combat: if s.dmg > 0 {
+                Some(CombatState::default())
+            } else {
+                None
+            },
+            production: None,
+            construction: None,
+            worker: (kind == EntityKind::Worker).then(WorkerState::default),
+            resource_node: None,
+        })
+    }
+
+    pub fn new_building(
+        owner: u32,
+        kind: EntityKind,
+        x: f32,
+        y: f32,
+        finished: bool,
+    ) -> Option<Self> {
+        let s = config::building_stats(kind)?;
+        Some(Entity {
+            id: 0,
+            owner,
+            kind,
+            pos_x: x,
+            pos_y: y,
+            hp: s.hp,
+            max_hp: s.hp,
+            movement: None,
+            combat: if s.dmg > 0 {
+                Some(CombatState::default())
+            } else {
+                None
+            },
+            production: if config::trainable_units(kind).is_empty() {
+                None
+            } else {
+                Some(ProductionState::default())
+            },
+            construction: (!finished).then_some(ConstructionState {
+                progress: 0,
+                total: s.build_ticks,
+            }),
+            worker: None,
+            resource_node: None,
+        })
+    }
+
+    pub fn new_node(kind: EntityKind, x: f32, y: f32) -> Option<Self> {
+        let amount = config::node_amount(kind);
+        if amount == 0 {
+            return None;
+        }
+        Some(Entity {
+            id: 0,
+            owner: NEUTRAL,
+            kind,
+            pos_x: x,
+            pos_y: y,
+            hp: 1,
+            max_hp: 1,
+            movement: None,
+            combat: None,
+            production: None,
+            construction: None,
+            worker: None,
+            resource_node: Some(ResourceNodeState {
+                remaining: amount,
+                miner: None,
+            }),
+        })
+    }
+
+    #[cfg(test)]
+    pub fn state_groups(&self) -> EntityStateGroups {
+        EntityStateGroups {
+            movement: self.movement.is_some(),
+            combat: self.combat.is_some(),
+            production: self.production.is_some(),
+            construction: self.construction.is_some(),
+            worker: self.worker.is_some(),
+            resource_node: self.resource_node.is_some(),
+        }
+    }
+
+    pub fn order(&self) -> Order {
+        self.movement
+            .as_ref()
+            .map(|m| m.order.clone())
+            .unwrap_or(Order::Idle)
+    }
+
+    pub fn set_order(&mut self, order: Order) {
+        if let Some(m) = self.movement.as_mut() {
+            m.order = order;
+        }
+    }
+
+    pub fn path_is_empty(&self) -> bool {
+        self.movement
+            .as_ref()
+            .map(|m| m.path.is_empty())
+            .unwrap_or(true)
+    }
+
+    pub fn set_path(&mut self, path: Vec<(f32, f32)>) {
+        if let Some(m) = self.movement.as_mut() {
+            m.path = path;
+        }
+    }
+
+    pub fn clear_path(&mut self) {
+        if let Some(m) = self.movement.as_mut() {
+            m.path.clear();
+        }
+    }
+
+    pub fn next_waypoint(&self) -> Option<(f32, f32)> {
+        self.movement.as_ref().and_then(|m| m.path.last().copied())
+    }
+
+    pub fn pop_waypoint(&mut self) {
+        if let Some(m) = self.movement.as_mut() {
+            m.path.pop();
+        }
+    }
+
+    pub fn facing(&self) -> f32 {
+        self.movement.as_ref().map(|m| m.facing).unwrap_or(0.0)
+    }
+
+    pub fn set_facing(&mut self, facing: f32) {
+        if let Some(m) = self.movement.as_mut() {
+            m.facing = facing;
+        }
+    }
+
+    pub fn target_id(&self) -> Option<u32> {
+        self.combat.as_ref().and_then(|c| c.target_id)
+    }
+
+    pub fn set_target_id(&mut self, target_id: Option<u32>) {
+        if let Some(c) = self.combat.as_mut() {
+            c.target_id = target_id;
+        }
+    }
+
+    pub fn attack_cd(&self) -> u32 {
+        self.combat.as_ref().map(|c| c.attack_cd).unwrap_or(0)
+    }
+
+    pub fn set_attack_cd(&mut self, attack_cd: u32) {
+        if let Some(c) = self.combat.as_mut() {
+            c.attack_cd = attack_cd;
+        }
+    }
+
+    pub fn tick_attack_cd(&mut self) {
+        if let Some(c) = self.combat.as_mut() {
+            c.attack_cd = c.attack_cd.saturating_sub(1);
+        }
+    }
+
+    pub fn prod_queue(&self) -> &[ProdItem] {
+        self.production
+            .as_ref()
+            .map(|p| p.queue.as_slice())
+            .unwrap_or(&[])
+    }
+
+    pub fn prod_queue_mut(&mut self) -> Option<&mut Vec<ProdItem>> {
+        self.production.as_mut().map(|p| &mut p.queue)
+    }
+
+    pub fn under_construction(&self) -> bool {
+        self.construction.is_some()
+    }
+
+    pub fn build_progress_fraction(&self) -> Option<f32> {
+        let c = self.construction.as_ref()?;
+        Some(if c.total == 0 {
+            1.0
+        } else {
+            (c.progress as f32 / c.total as f32).min(1.0)
+        })
+    }
+
+    pub fn remaining(&self) -> Option<u32> {
+        self.resource_node.as_ref().map(|n| n.remaining)
+    }
+
+    pub fn miner(&self) -> Option<u32> {
+        self.resource_node.as_ref().and_then(|n| n.miner)
+    }
+
+    pub fn gather_phase(&self) -> Option<GatherPhase> {
+        self.worker.as_ref().map(|w| w.gather_phase)
+    }
+
+    pub fn reset_gather_state(&mut self) {
+        if let Some(w) = self.worker.as_mut() {
+            w.gather_phase = GatherPhase::ToNode;
+            w.harvest_progress = 0;
+        }
+    }
+
     /// Whether this entity is a unit (mobile, combat-capable).
     pub fn is_unit(&self) -> bool {
         self.kind.is_unit()
@@ -275,7 +555,7 @@ impl Entity {
         if let Some(s) = config::unit_stats(self.kind) {
             s.dmg > 0
         } else if let Some(s) = config::building_stats(self.kind) {
-            s.dmg > 0 && !self.under_construction
+            s.dmg > 0 && !self.under_construction()
         } else {
             false
         }
@@ -314,20 +594,20 @@ impl Entity {
         if self.hp == 0 {
             return states::DEAD;
         }
-        if self.under_construction {
+        if self.under_construction() {
             return states::CONSTRUCT;
         }
         if self.is_building() {
-            if !self.prod_queue.is_empty() {
+            if !self.prod_queue().is_empty() {
                 return states::TRAIN;
             }
             return states::IDLE;
         }
-        match self.order {
+        match self.order() {
             Order::Idle => states::IDLE,
             Order::Move { .. } => states::MOVE,
             Order::AttackMove { .. } => {
-                if self.target_id.is_some() {
+                if self.target_id().is_some() {
                     states::ATTACK
                 } else {
                     states::MOVE
@@ -342,12 +622,16 @@ impl Entity {
     /// Clear all movement/combat orders and reset to idle (the `stop` command, deaths, etc.).
     /// Does not touch production queues (those belong to buildings).
     pub fn clear_orders(&mut self) {
-        self.order = Order::Idle;
-        self.path.clear();
-        self.target_id = None;
+        if let Some(m) = self.movement.as_mut() {
+            m.order = Order::Idle;
+            m.path.clear();
+        }
+        self.set_target_id(None);
         // A laden worker keeps its load but stops ferrying.
-        self.gather_phase = GatherPhase::ToNode;
-        self.harvest_progress = 0;
+        if let Some(w) = self.worker.as_mut() {
+            w.gather_phase = GatherPhase::ToNode;
+            w.harvest_progress = 0;
+        }
     }
 }
 
@@ -390,31 +674,7 @@ impl EntityStore {
     /// Spawn a unit of `kind` for `owner` at a world position, fully built and idle.
     /// Returns `None` if `kind` is not a known unit.
     pub fn spawn_unit(&mut self, owner: u32, kind: EntityKind, x: f32, y: f32) -> Option<u32> {
-        let s = config::unit_stats(kind)?;
-        let e = Entity {
-            id: 0,
-            owner,
-            kind,
-            pos_x: x,
-            pos_y: y,
-            hp: s.hp,
-            max_hp: s.hp,
-            facing: 0.0,
-            order: Order::Idle,
-            path: Vec::new(),
-            attack_cd: 0,
-            target_id: None,
-            prod_queue: Vec::new(),
-            under_construction: false,
-            build_progress: 0,
-            build_total: 0,
-            carry: None,
-            gather_phase: GatherPhase::ToNode,
-            harvest_progress: 0,
-            home_industrial_center: None,
-            remaining: 0,
-            miner: None,
-        };
+        let e = Entity::new_unit(owner, kind, x, y)?;
         Some(self.insert(e))
     }
 
@@ -429,66 +689,13 @@ impl EntityStore {
         y: f32,
         finished: bool,
     ) -> Option<u32> {
-        let s = config::building_stats(kind)?;
-        let e = Entity {
-            id: 0,
-            owner,
-            kind,
-            pos_x: x,
-            pos_y: y,
-            // Under-construction buildings still occupy their footprint and have full HP so
-            // they are not trivially destroyed; CONSTRUCT is purely a production gate here.
-            hp: s.hp,
-            max_hp: s.hp,
-            facing: 0.0,
-            order: Order::Idle,
-            path: Vec::new(),
-            attack_cd: 0,
-            target_id: None,
-            prod_queue: Vec::new(),
-            under_construction: !finished,
-            build_progress: 0,
-            build_total: s.build_ticks,
-            carry: None,
-            gather_phase: GatherPhase::ToNode,
-            harvest_progress: 0,
-            home_industrial_center: None,
-            remaining: 0,
-            miner: None,
-        };
+        let e = Entity::new_building(owner, kind, x, y, finished)?;
         Some(self.insert(e))
     }
 
     /// Spawn a neutral resource node of `kind` (`steel` | `oil`) at a world position.
     pub fn spawn_node(&mut self, kind: EntityKind, x: f32, y: f32) -> Option<u32> {
-        let amount = config::node_amount(kind);
-        if amount == 0 {
-            return None;
-        }
-        let e = Entity {
-            id: 0,
-            owner: NEUTRAL,
-            kind,
-            pos_x: x,
-            pos_y: y,
-            hp: 1,
-            max_hp: 1,
-            facing: 0.0,
-            order: Order::Idle,
-            path: Vec::new(),
-            attack_cd: 0,
-            target_id: None,
-            prod_queue: Vec::new(),
-            under_construction: false,
-            build_progress: 0,
-            build_total: 0,
-            carry: None,
-            gather_phase: GatherPhase::ToNode,
-            harvest_progress: 0,
-            home_industrial_center: None,
-            remaining: amount,
-            miner: None,
-        };
+        let e = Entity::new_node(kind, x, y)?;
         Some(self.insert(e))
     }
 
@@ -539,16 +746,142 @@ impl EntityStore {
     /// if it points to this worker.
     pub fn release_miner(&mut self, worker_id: u32) {
         let old_node = match self.get(worker_id) {
-            Some(e) => match e.order {
+            Some(e) => match e.order() {
                 Order::Gather { node } => node,
                 _ => return,
             },
             None => return,
         };
         if let Some(n) = self.get_mut(old_node) {
-            if n.miner == Some(worker_id) {
-                n.miner = None;
+            if let Some(node) = n.resource_node.as_mut() {
+                if node.miner == Some(worker_id) {
+                    node.miner = None;
+                }
             }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn groups(
+        movement: bool,
+        combat: bool,
+        production: bool,
+        construction: bool,
+        worker: bool,
+        resource_node: bool,
+    ) -> EntityStateGroups {
+        EntityStateGroups {
+            movement,
+            combat,
+            production,
+            construction,
+            worker,
+            resource_node,
+        }
+    }
+
+    #[test]
+    fn unit_kinds_have_exact_state_groups() {
+        let cases = [
+            (
+                EntityKind::Worker,
+                groups(true, true, false, false, true, false),
+            ),
+            (
+                EntityKind::Rifleman,
+                groups(true, true, false, false, false, false),
+            ),
+            (
+                EntityKind::MachineGunner,
+                groups(true, true, false, false, false, false),
+            ),
+            (
+                EntityKind::AtTeam,
+                groups(true, true, false, false, false, false),
+            ),
+            (
+                EntityKind::Tank,
+                groups(true, true, false, false, false, false),
+            ),
+        ];
+
+        for (kind, expected) in cases {
+            let entity = Entity::new_unit(1, kind, 10.0, 20.0).expect("unit kind should spawn");
+            assert_eq!(entity.state_groups(), expected, "{kind:?}");
+        }
+    }
+
+    #[test]
+    fn finished_building_kinds_have_exact_state_groups() {
+        let cases = [
+            (
+                EntityKind::IndustrialCenter,
+                groups(false, false, true, false, false, false),
+            ),
+            (
+                EntityKind::Depot,
+                groups(false, false, false, false, false, false),
+            ),
+            (
+                EntityKind::Barracks,
+                groups(false, false, true, false, false, false),
+            ),
+            (
+                EntityKind::AdvancedTrainingCentre,
+                groups(false, false, false, false, false, false),
+            ),
+            (
+                EntityKind::TankFactory,
+                groups(false, false, true, false, false, false),
+            ),
+            (
+                EntityKind::Bunker,
+                groups(false, true, false, false, false, false),
+            ),
+        ];
+
+        for (kind, expected) in cases {
+            let entity = Entity::new_building(1, kind, 10.0, 20.0, true)
+                .expect("building kind should spawn");
+            assert_eq!(entity.state_groups(), expected, "{kind:?}");
+        }
+    }
+
+    #[test]
+    fn unfinished_buildings_add_construction_state_only() {
+        let kinds = [
+            EntityKind::IndustrialCenter,
+            EntityKind::Depot,
+            EntityKind::Barracks,
+            EntityKind::AdvancedTrainingCentre,
+            EntityKind::TankFactory,
+            EntityKind::Bunker,
+        ];
+
+        for kind in kinds {
+            let finished = Entity::new_building(1, kind, 10.0, 20.0, true)
+                .expect("building kind should spawn");
+            let unfinished = Entity::new_building(1, kind, 10.0, 20.0, false)
+                .expect("building kind should spawn");
+            let mut expected = finished.state_groups();
+            expected.construction = true;
+            assert_eq!(unfinished.state_groups(), expected, "{kind:?}");
+        }
+    }
+
+    #[test]
+    fn resource_node_kinds_have_exact_state_groups() {
+        for kind in [EntityKind::Steel, EntityKind::Oil] {
+            let entity = Entity::new_node(kind, 10.0, 20.0).expect("node kind should spawn");
+            assert_eq!(
+                entity.state_groups(),
+                groups(false, false, false, false, false, true),
+                "{kind:?}"
+            );
         }
     }
 }

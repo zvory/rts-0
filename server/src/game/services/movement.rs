@@ -21,7 +21,7 @@ pub(crate) fn movement_system(map: &Map, entities: &mut EntityStore, occ: &Occup
         // Pull the data we need, then mutate.
         let (speed, mut x, mut y, class) = {
             let e = match entities.get(id) {
-                Some(e) if e.is_unit() && !e.path.is_empty() => e,
+                Some(e) if e.is_unit() && !e.path_is_empty() => e,
                 _ => continue,
             };
             let speed = config::unit_stats(e.kind).map(|s| s.speed).unwrap_or(0.0);
@@ -37,8 +37,8 @@ pub(crate) fn movement_system(map: &Map, entities: &mut EntityStore, occ: &Occup
         // Consume waypoints (stored reversed, next = last element) within this tick's budget.
         loop {
             let next = {
-            let Some(e) = entities.get(id) else { break };
-            e.path.last().copied()
+                let Some(e) = entities.get(id) else { break };
+                e.next_waypoint()
             };
             let Some((wx, wy)) = next else { break };
             let dx = wx - x;
@@ -47,7 +47,7 @@ pub(crate) fn movement_system(map: &Map, entities: &mut EntityStore, occ: &Occup
             if dist <= ARRIVE_EPS {
                 // Reached this waypoint exactly; drop it and continue with the remaining budget.
                 if let Some(e) = entities.get_mut(id) {
-                    e.path.pop();
+                    e.pop_waypoint();
                 }
                 x = wx;
                 y = wy;
@@ -60,7 +60,7 @@ pub(crate) fn movement_system(map: &Map, entities: &mut EntityStore, occ: &Occup
                 y = wy;
                 budget -= dist;
                 if let Some(e) = entities.get_mut(id) {
-                    e.path.pop();
+                    e.pop_waypoint();
                 }
             } else {
                 // Partial step toward the waypoint.
@@ -79,12 +79,12 @@ pub(crate) fn movement_system(map: &Map, entities: &mut EntityStore, occ: &Occup
             e.pos_x = x.clamp(0.0, map.world_size_px() - 0.01);
             e.pos_y = y.clamp(0.0, map.world_size_px() - 0.01);
             if let Some(f) = new_facing {
-                e.facing = f;
+                e.set_facing(f);
             }
             // A plain Move with an empty path has arrived → go idle.
-            if e.path.is_empty() {
-                if let Order::Move { .. } = e.order {
-                    e.order = Order::Idle;
+            if e.path_is_empty() {
+                if let Order::Move { .. } = e.order() {
+                    e.set_order(Order::Idle);
                 }
             }
         }
