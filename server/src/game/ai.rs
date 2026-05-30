@@ -56,6 +56,10 @@ impl AiController {
         AiController { player }
     }
 
+    pub(crate) fn player_id(&self) -> u32 {
+        self.player
+    }
+
     /// Decide this player's actions for the current tick, pushing any commands onto `out`. A
     /// no-op on most ticks (gated by [`DECISION_INTERVAL`]) and whenever the player is dead.
     pub(crate) fn think(
