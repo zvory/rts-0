@@ -34,6 +34,9 @@ update this file in the same change.
   smoothness, and computes the **fog overlay** locally from its own units'/buildings'
   sight radii (the server already withholds anything it shouldn't see, so the local
   overlay only needs to look right — it is not a security boundary).
+- Local development also exposes a dev-only watch entry at `/dev/selfplay` that auto-runs
+  scripted self-play and streams **full-world** snapshots (no fog) to the ordinary match
+  renderer. This path is isolated from normal lobby play and is only for debugging.
 - The same Rust process serves the static client files, so development is a single
   `cargo run` and then open `http://localhost:8080`.
 
@@ -213,6 +216,9 @@ impl Game {
     /// Build the fog-filtered snapshot for one player at the current tick.
     pub fn snapshot_for(&self, player: u32) -> Snapshot;
 
+    /// Build a full-world snapshot for a dev watch client. Normal gameplay must not use this.
+    pub fn snapshot_full_for(&self, player: u32) -> Snapshot;
+
     /// Player ids still alive (have at least one entity). Lobby uses this for game-over.
     pub fn alive_players(&self) -> Vec<u32>;
 
@@ -245,6 +251,9 @@ them at the top of `tick()` — see §8.
   single writer of game state — no locks around `Game`.
 - The room task, each tick: drain commands → `game.tick()` → for each connected player
   `game.snapshot_for(pid)` → send. Lobby phase: broadcast `lobby` on changes.
+- Dev self-play watch rooms are a special-case room mode inside the same task model: they own a
+  normal `Game`, feed it scripted commands from `game::selfplay`, and send watchers
+  `game.snapshot_full_for(view_pid)` instead of fog-filtered snapshots.
 
 ---
 
