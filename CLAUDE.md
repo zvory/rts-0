@@ -9,6 +9,34 @@ A server-authoritative RTS: a **Rust** server (`server/`, axum + tokio) runs the
 simulation and also serves the **HTML/CSS/JS + PixiJS** client (`client/`). Clients send commands;
 the server simulates at 30 Hz and sends per-player, fog-filtered snapshots.
 
+## Parallel Worktrees
+
+- For parallel feature work, each terminal/agent must work in its own git worktree. Do not run two
+  coding agents in the same checkout.
+- Before making changes, verify the checkout and branch:
+
+  ```bash
+  git rev-parse --show-toplevel
+  git branch --show-current
+  git status --short
+  ```
+
+- Use one branch per worktree. Branch names must start with `zvorygin/`.
+- Create worktrees from the repo root, for example:
+
+  ```bash
+  git worktree add ../rts-my-feature -b zvorygin/my-feature main
+  ```
+
+- Agents must only edit files inside their assigned worktree. Do not edit the original checkout or
+  another agent's worktree.
+- Coordinate write ownership before starting. If another agent owns a file or module, do not edit it
+  unless explicitly told to. Avoid parallel edits to shared contracts such as protocol, config,
+  generated files, or design docs.
+- Stage and commit only files belonging to the current task. Never revert unrelated changes.
+- Do not merge, rebase, or delete another agent's branch/worktree unless explicitly asked.
+- If running local servers, use different ports per worktree or stop the other server first.
+
 ## Git / GitHub
 
 - The default branch is `main`.
