@@ -1,5 +1,5 @@
 use crate::config;
-use crate::game::entity::{EntityStore, Order};
+use crate::game::entity::{EntityStore, MovePhase, Order};
 use crate::game::map::{Map, MobilityClass};
 use crate::game::pathfinding::Passability;
 use crate::game::services::occupancy::Occupancy;
@@ -48,6 +48,7 @@ pub(crate) fn movement_system(map: &Map, entities: &mut EntityStore, occ: &Occup
                 // Reached this waypoint exactly; drop it and continue with the remaining budget.
                 if let Some(e) = entities.get_mut(id) {
                     e.pop_waypoint();
+                    e.mark_move_phase(MovePhase::Moving);
                 }
                 x = wx;
                 y = wy;
@@ -61,6 +62,7 @@ pub(crate) fn movement_system(map: &Map, entities: &mut EntityStore, occ: &Occup
                 budget -= dist;
                 if let Some(e) = entities.get_mut(id) {
                     e.pop_waypoint();
+                    e.mark_move_phase(MovePhase::Moving);
                 }
             } else {
                 // Partial step toward the waypoint.
@@ -83,7 +85,8 @@ pub(crate) fn movement_system(map: &Map, entities: &mut EntityStore, occ: &Occup
             }
             // A plain Move with an empty path has arrived → go idle.
             if e.path_is_empty() {
-                if let Order::Move { .. } = e.order() {
+                e.mark_move_phase(MovePhase::Arrived);
+                if matches!(e.order(), Order::Move(_)) {
                     e.set_order(Order::Idle);
                 }
             }

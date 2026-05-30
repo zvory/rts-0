@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::config;
-use crate::game::entity::{Entity, EntityStore, Order};
+use crate::game::entity::{AttackPhase, Entity, EntityStore, Order};
 use crate::game::map::Map;
 use crate::game::services::dist2;
 use crate::game::services::occupancy::Occupancy;
@@ -70,7 +70,7 @@ pub(crate) fn combat_system(
         let Some(tid) = target else {
             // No target: clear stale combat target id for non-attack orders.
             if let Some(e) = entities.get_mut(id) {
-                if matches!(e.order(), Order::AttackMove { .. } | Order::Idle) {
+                if matches!(e.order(), Order::AttackMove(_) | Order::Idle) {
                     e.set_target_id(None);
                 }
             }
@@ -93,6 +93,7 @@ pub(crate) fn combat_system(
             if let Some(e) = entities.get_mut(id) {
                 e.set_facing((ty - py).atan2(tx - px));
                 e.set_target_id(Some(tid));
+                e.mark_attack_phase(AttackPhase::Firing);
                 // Hold position while a target is in weapon range (don't overshoot it).
                 e.clear_path();
             }
@@ -108,6 +109,7 @@ pub(crate) fn combat_system(
             let want_repath = entities.get(id).map(|e| e.path_is_empty()).unwrap_or(false);
             if let Some(e) = entities.get_mut(id) {
                 e.set_target_id(Some(tid));
+                e.mark_attack_phase(AttackPhase::Chasing);
             }
             if want_repath {
                 pathing.repath_entity(map, entities, occ, id, tx, ty);
@@ -138,7 +140,7 @@ enum CombatMode {
 
 fn combat_mode(e: &Entity) -> CombatMode {
     match e.order() {
-        Order::Attack { .. } => CombatMode::Ordered,
+        Order::Attack(_) => CombatMode::Ordered,
         _ => CombatMode::Aggressive,
     }
 }
@@ -158,7 +160,7 @@ fn resolve_target(
     // Ordered attackers keep their explicit target if it still exists.
     if mode == CombatMode::Ordered {
         if let Some(e) = entities.get(self_id) {
-            if let Order::Attack { target } = e.order() {
+            if let Some(target) = e.order().attack_target() {
                 if entities.get(target).map(|t| t.hp > 0).unwrap_or(false) {
                     return Some(target);
                 }

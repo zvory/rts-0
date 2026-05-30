@@ -107,7 +107,7 @@ impl AiController {
                     worker_count += 1;
                     match e.order() {
                         Order::Idle => idle_workers.push(e.id),
-                        Order::Gather { .. } => gathering_workers.push(e.id),
+                        Order::Gather(_) => gathering_workers.push(e.id),
                         _ => {}
                     }
                 }
@@ -329,7 +329,7 @@ impl AiController {
 fn is_free_rifleman(e: &crate::game::entity::Entity) -> bool {
     match e.order() {
         Order::Idle => true,
-        Order::AttackMove { .. } => e.path_is_empty() && e.target_id().is_none(),
+        Order::AttackMove(_) => e.path_is_empty() && e.target_id().is_none(),
         _ => false,
     }
 }

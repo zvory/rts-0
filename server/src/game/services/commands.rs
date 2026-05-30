@@ -169,9 +169,14 @@ fn order_move(
         e.set_path(waypoints);
         e.set_target_id(None);
         e.set_order(if attack_move {
-            Order::AttackMove { x, y }
+            Order::attack_move_to(x, y)
         } else {
-            Order::Move { x, y }
+            Order::move_to(x, y)
+        });
+        e.mark_move_phase(if e.path_is_empty() {
+            crate::game::entity::MovePhase::Arrived
+        } else {
+            crate::game::entity::MovePhase::Moving
         });
         // Leaving a gather order: reset gather sub-state.
         e.reset_gather_state();
@@ -225,7 +230,7 @@ fn order_attack(
     let waypoints = pathing.request(map, occ, req);
     entities.release_miner(id);
     if let Some(e) = entities.get_mut(id) {
-        e.set_order(Order::Attack { target });
+        e.set_order(Order::attack(target));
         e.set_target_id(Some(target));
         e.set_path(waypoints);
         e.reset_gather_state();
@@ -278,13 +283,11 @@ fn order_gather(
     let waypoints = pathing.request(map, occ, req);
     entities.release_miner(id);
     if let Some(e) = entities.get_mut(id) {
-        e.set_order(Order::Gather { node });
+        e.set_order(Order::gather(node));
         e.set_target_id(Some(node));
         e.set_path(waypoints);
         if let Some(w) = e.worker.as_mut() {
             w.carry = None;
-            w.gather_phase = GatherPhase::ToNode;
-            w.harvest_progress = 0;
         }
     }
 }
@@ -292,7 +295,7 @@ fn order_gather(
 fn gather_slot_holder(entities: &EntityStore, node: u32) -> Option<u32> {
     let holder = entities.get(node).and_then(|n| n.miner())?;
     let worker = entities.get(holder)?;
-    let on_this_node = matches!(worker.order(), Order::Gather { node: n } if n == node);
+    let on_this_node = worker.order().gather_node() == Some(node);
     if worker.hp > 0
         && worker.kind == EntityKind::Worker
         && on_this_node
@@ -418,7 +421,7 @@ fn order_build(
     let waypoints = pathing.request(map, occ, req);
     entities.release_miner(worker);
     if let Some(e) = entities.get_mut(worker) {
-        e.set_order(Order::Build { site });
+        e.set_order(Order::build(site));
         e.set_target_id(Some(site));
         e.set_path(waypoints);
         e.reset_gather_state();

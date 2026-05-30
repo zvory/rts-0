@@ -67,8 +67,16 @@ pub(crate) fn death_system(
         let stale = {
             let Some(e) = entities.get(id) else { continue };
             match e.order() {
-                Order::Attack { target } => !entities.contains(target),
-                Order::Build { site } => !entities.contains(site),
+                Order::Attack(_) => e
+                    .order()
+                    .attack_target()
+                    .map(|target| !entities.contains(target))
+                    .unwrap_or(false),
+                Order::Build(_) => e
+                    .order()
+                    .build_site()
+                    .map(|site| !entities.contains(site))
+                    .unwrap_or(false),
                 _ => false,
             }
         };
