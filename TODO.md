@@ -2,7 +2,7 @@
 
 ## Active, In Order
 
- - [ ] Replace stringly entity kind checks in hot simulation paths with typed internal enums, converting to protocol strings only at the boundary.
+ - [x] Replace stringly entity kind checks in hot simulation paths with typed internal enums, converting to protocol strings only at the boundary.
  - [ ] Split `systems.rs` into internal services before adding complex mechanics: commands, movement, combat, economy, production, construction, death, occupancy.
  - [ ] Add a spatial query layer used by combat, fog, resource search, collision/steering, and snapshot interest filtering.
  - [ ] Introduce a `PathingService` boundary with unit class, radius/footprint, terrain mask, dynamic blockers, path budget, and cached/reusable results.
@@ -29,6 +29,11 @@
  - [ ] Hotkeys in the command card should be grid style, as in the top left hotkey is always Q, the top middle is W, the one below the top left is A, etc. Match the keyboard.
  - [ ] workers should not auto attack
  - [ ] muzzle flare animations
+ - [ ] client should display latency to server in the top left in miliseconds
+ - [ ] find a source of copyright free assets we can use for units, buildings, resources, and use it
+ - [ ] implement a correct system for building buildings, currently a worker pulled away from building a building will stop construciton and the building will be permanently unbuildable, resumption is impossible
+ - [ ] switch font to DIN 1451 Mittelschrift everywhere
+ - [ ] display "connectino to server lost" when connection to server lost
 
 ## Done
 

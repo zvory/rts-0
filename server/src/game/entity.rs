@@ -11,10 +11,113 @@
 use std::collections::HashMap;
 
 use crate::config;
-use crate::protocol::{kinds, states};
+use crate::protocol::states;
 
 /// Neutral owner id used for resource nodes (steel / oil nodes).
 pub const NEUTRAL: u32 = 0;
+
+// ---------------------------------------------------------------------------
+// Typed entity kinds (internal simulation only; protocol strings live in
+// `protocol::kinds` and conversion happens only at the wire boundary).
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum EntityKind {
+    Worker,
+    Rifleman,
+    MachineGunner,
+    AtTeam,
+    Tank,
+    IndustrialCenter,
+    Depot,
+    Barracks,
+    AdvancedTrainingCentre,
+    TankFactory,
+    Bunker,
+    Steel,
+    Oil,
+}
+
+impl EntityKind {
+    pub fn is_unit(self) -> bool {
+        matches!(
+            self,
+            EntityKind::Worker
+                | EntityKind::Rifleman
+                | EntityKind::MachineGunner
+                | EntityKind::AtTeam
+                | EntityKind::Tank
+        )
+    }
+
+    pub fn is_building(self) -> bool {
+        matches!(
+            self,
+            EntityKind::IndustrialCenter
+                | EntityKind::Depot
+                | EntityKind::Barracks
+                | EntityKind::AdvancedTrainingCentre
+                | EntityKind::TankFactory
+                | EntityKind::Bunker
+        )
+    }
+
+    pub fn is_node(self) -> bool {
+        matches!(self, EntityKind::Steel | EntityKind::Oil)
+    }
+
+    pub fn to_protocol_str(self) -> &'static str {
+        use crate::protocol::kinds;
+        match self {
+            EntityKind::Worker => kinds::WORKER,
+            EntityKind::Rifleman => kinds::RIFLEMAN,
+            EntityKind::MachineGunner => kinds::MACHINE_GUNNER,
+            EntityKind::AtTeam => kinds::AT_TEAM,
+            EntityKind::Tank => kinds::TANK,
+            EntityKind::IndustrialCenter => kinds::INDUSTRIAL_CENTER,
+            EntityKind::Depot => kinds::DEPOT,
+            EntityKind::Barracks => kinds::BARRACKS,
+            EntityKind::AdvancedTrainingCentre => kinds::ADVANCED_TRAINING_CENTRE,
+            EntityKind::TankFactory => kinds::TANK_FACTORY,
+            EntityKind::Bunker => kinds::BUNKER,
+            EntityKind::Steel => kinds::STEEL,
+            EntityKind::Oil => kinds::OIL,
+        }
+    }
+}
+
+impl std::str::FromStr for EntityKind {
+    type Err = ();
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        use crate::protocol::kinds;
+        match s {
+            kinds::WORKER => Ok(EntityKind::Worker),
+            kinds::RIFLEMAN => Ok(EntityKind::Rifleman),
+            kinds::MACHINE_GUNNER => Ok(EntityKind::MachineGunner),
+            kinds::AT_TEAM => Ok(EntityKind::AtTeam),
+            kinds::TANK => Ok(EntityKind::Tank),
+            kinds::INDUSTRIAL_CENTER => Ok(EntityKind::IndustrialCenter),
+            kinds::DEPOT => Ok(EntityKind::Depot),
+            kinds::BARRACKS => Ok(EntityKind::Barracks),
+            kinds::ADVANCED_TRAINING_CENTRE => Ok(EntityKind::AdvancedTrainingCentre),
+            kinds::TANK_FACTORY => Ok(EntityKind::TankFactory),
+            kinds::BUNKER => Ok(EntityKind::Bunker),
+            kinds::STEEL => Ok(EntityKind::Steel),
+            kinds::OIL => Ok(EntityKind::Oil),
+            _ => Err(()),
+        }
+    }
+}
+
+impl std::fmt::Display for EntityKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.to_protocol_str())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Orders, production, carrying
+// ---------------------------------------------------------------------------
 
 /// The high-level order a unit/building is currently executing.
 ///
@@ -42,8 +145,8 @@ pub enum Order {
 /// A queued production order on a building.
 #[derive(Debug, Clone)]
 pub struct ProdItem {
-    /// Unit kind being produced (e.g. `"worker"`, `"rifleman"`).
-    pub unit: String,
+    /// Unit kind being produced.
+    pub unit: EntityKind,
     /// Ticks of progress accumulated on this item so far.
     pub progress: u32,
     /// Total ticks required to finish this item.
@@ -55,8 +158,8 @@ pub struct ProdItem {
 pub struct CarryState {
     /// Amount of resource currently held.
     pub amount: u32,
-    /// `true` if the load is oil, `false` for steel.
-    pub is_oil: bool,
+    /// Resource kind being carried.
+    pub kind: EntityKind,
 }
 
 /// The phase a gathering worker is in. Kept separate from [`Order::Gather`] so the order
@@ -71,6 +174,10 @@ pub enum GatherPhase {
     ToHome,
 }
 
+// ---------------------------------------------------------------------------
+// Entity
+// ---------------------------------------------------------------------------
+
 /// A single simulation entity: unit, building, or resource node.
 ///
 /// All positional state is in world pixels (`pos_x`/`pos_y` are the entity center).
@@ -82,8 +189,8 @@ pub struct Entity {
     pub id: u32,
     /// Owning player id, or [`NEUTRAL`] (0) for resource nodes.
     pub owner: u32,
-    /// Entity kind string from [`crate::protocol::kinds`].
-    pub kind: String,
+    /// Entity kind.
+    pub kind: EntityKind,
 
     /// Center position in world pixels.
     pub pos_x: f32,
@@ -144,17 +251,17 @@ pub struct Entity {
 impl Entity {
     /// Whether this entity is a unit (mobile, combat-capable).
     pub fn is_unit(&self) -> bool {
-        kinds::is_unit(&self.kind)
+        self.kind.is_unit()
     }
 
     /// Whether this entity is a building.
     pub fn is_building(&self) -> bool {
-        kinds::is_building(&self.kind)
+        self.kind.is_building()
     }
 
     /// Whether this entity is a resource node (steel or oil).
     pub fn is_node(&self) -> bool {
-        self.kind == kinds::STEEL || self.kind == kinds::OIL
+        self.kind.is_node()
     }
 
     /// Whether this building can be attacked / can take damage and die. Resource nodes are
@@ -165,9 +272,9 @@ impl Entity {
 
     /// Whether this entity can deal damage (units with dmg, or bunkers).
     pub fn can_attack(&self) -> bool {
-        if let Some(s) = config::unit_stats(&self.kind) {
+        if let Some(s) = config::unit_stats(self.kind) {
             s.dmg > 0
-        } else if let Some(s) = config::building_stats(&self.kind) {
+        } else if let Some(s) = config::building_stats(self.kind) {
             s.dmg > 0 && !self.under_construction
         } else {
             false
@@ -176,9 +283,9 @@ impl Entity {
 
     /// Sight radius in tiles for fog computation.
     pub fn sight_tiles(&self) -> u32 {
-        if let Some(s) = config::unit_stats(&self.kind) {
+        if let Some(s) = config::unit_stats(self.kind) {
             s.sight_tiles
-        } else if let Some(s) = config::building_stats(&self.kind) {
+        } else if let Some(s) = config::building_stats(self.kind) {
             s.sight_tiles
         } else {
             // Resource nodes contribute no sight.
@@ -188,11 +295,11 @@ impl Entity {
 
     /// The collision/interaction radius in world pixels.
     pub fn radius(&self) -> f32 {
-        if let Some(s) = config::unit_stats(&self.kind) {
+        if let Some(s) = config::unit_stats(self.kind) {
             s.radius
         } else if self.is_building() {
             // Footprint half-extent (approx) for range/interaction checks.
-            let s = config::building_stats(&self.kind).expect("building stats");
+            let s = config::building_stats(self.kind).expect("building stats");
             (s.foot_w.max(s.foot_h) as f32) * config::TILE_SIZE as f32 * 0.5
         } else {
             // Resource node footprint ~1 tile.
@@ -280,12 +387,12 @@ impl EntityStore {
 
     /// Spawn a unit of `kind` for `owner` at a world position, fully built and idle.
     /// Returns `None` if `kind` is not a known unit.
-    pub fn spawn_unit(&mut self, owner: u32, kind: &str, x: f32, y: f32) -> Option<u32> {
+    pub fn spawn_unit(&mut self, owner: u32, kind: EntityKind, x: f32, y: f32) -> Option<u32> {
         let s = config::unit_stats(kind)?;
         let e = Entity {
             id: 0,
             owner,
-            kind: kind.to_string(),
+            kind,
             pos_x: x,
             pos_y: y,
             hp: s.hp,
@@ -315,7 +422,7 @@ impl EntityStore {
     pub fn spawn_building(
         &mut self,
         owner: u32,
-        kind: &str,
+        kind: EntityKind,
         x: f32,
         y: f32,
         finished: bool,
@@ -324,7 +431,7 @@ impl EntityStore {
         let e = Entity {
             id: 0,
             owner,
-            kind: kind.to_string(),
+            kind,
             pos_x: x,
             pos_y: y,
             // Under-construction buildings still occupy their footprint and have full HP so
@@ -351,7 +458,7 @@ impl EntityStore {
     }
 
     /// Spawn a neutral resource node of `kind` (`steel` | `oil`) at a world position.
-    pub fn spawn_node(&mut self, kind: &str, x: f32, y: f32) -> Option<u32> {
+    pub fn spawn_node(&mut self, kind: EntityKind, x: f32, y: f32) -> Option<u32> {
         let amount = config::node_amount(kind);
         if amount == 0 {
             return None;
@@ -359,7 +466,7 @@ impl EntityStore {
         let e = Entity {
             id: 0,
             owner: NEUTRAL,
-            kind: kind.to_string(),
+            kind,
             pos_x: x,
             pos_y: y,
             hp: 1,

@@ -15,9 +15,20 @@ use serde::Serialize;
 use super::replay::{replay_commands, EventLogEntry, PlayerSnapshot, ReplayOutcome};
 use super::{Game, PlayerInit};
 use crate::config;
+use crate::game::entity::EntityKind;
 use crate::protocol::{
     kinds, states, terrain, Command, EntityView, Event, MapInfo, Snapshot, StartPayload,
 };
+
+/// Parse an `EntityView` wire kind into its internal enum.
+fn kind_of(e: &EntityView) -> Option<EntityKind> {
+    e.kind.parse().ok()
+}
+
+/// Convenience: check whether an `EntityView` has a given internal kind.
+fn is_kind(e: &EntityView, kind: EntityKind) -> bool {
+    e.kind == kind.to_protocol_str()
+}
 
 const MAX_TICKS: u32 = 9_600;
 const MAX_STALL_TICKS: u32 = 1_800;
@@ -96,7 +107,7 @@ impl ScriptedPlayer for BuildTechAttackScript {
         let workers: Vec<&EntityView> = own
             .iter()
             .copied()
-            .filter(|e| e.kind == kinds::WORKER)
+            .filter(|e| is_kind(e, EntityKind::Worker))
             .collect();
         let mut idle_workers: Vec<u32> = workers
             .iter()
@@ -120,12 +131,12 @@ impl ScriptedPlayer for BuildTechAttackScript {
         let industrial_centers: Vec<&EntityView> = own
             .iter()
             .copied()
-            .filter(|e| e.kind == kinds::INDUSTRIAL_CENTER && is_complete(e))
+            .filter(|e| is_kind(e, EntityKind::IndustrialCenter) && is_complete(e))
             .collect();
         let barracks: Vec<&EntityView> = own
             .iter()
             .copied()
-            .filter(|e| e.kind == kinds::BARRACKS)
+            .filter(|e| is_kind(e, EntityKind::Barracks))
             .collect();
         let complete_barracks: Vec<&EntityView> = barracks
             .iter()
@@ -135,20 +146,20 @@ impl ScriptedPlayer for BuildTechAttackScript {
         let tank_factories: Vec<&EntityView> = own
             .iter()
             .copied()
-            .filter(|e| e.kind == kinds::TANK_FACTORY)
+            .filter(|e| is_kind(e, EntityKind::TankFactory))
             .collect();
         let complete_tank_factories: Vec<&EntityView> = tank_factories
             .iter()
             .copied()
             .filter(|e| is_complete(e))
             .collect();
-        let depot_count = own.iter().filter(|e| e.kind == kinds::DEPOT).count();
+        let depot_count = own.iter().filter(|e| is_kind(e, EntityKind::Depot)).count();
         let depot_under_construction = own
             .iter()
-            .any(|e| e.kind == kinds::DEPOT && !is_complete(e));
+            .any(|e| is_kind(e, EntityKind::Depot) && !is_complete(e));
         let barracks_count = barracks.len();
         let tank_factory_count = tank_factories.len();
-        let tank_count = own.iter().filter(|e| e.kind == kinds::TANK).count();
+        let tank_count = own.iter().filter(|e| is_kind(e, EntityKind::Tank)).count();
 
         let mut steel = view.snapshot.steel;
         let mut oil = view.snapshot.oil;
@@ -165,7 +176,7 @@ impl ScriptedPlayer for BuildTechAttackScript {
         if needs_barracks {
             if let Some(cmd) = self.build_if_affordable(
                 view,
-                kinds::BARRACKS,
+                EntityKind::Barracks,
                 &mut steel,
                 &builder_workers,
                 &mut reserved_workers,
@@ -181,7 +192,7 @@ impl ScriptedPlayer for BuildTechAttackScript {
         if wants_depot {
             if let Some(cmd) = self.build_if_affordable(
                 view,
-                kinds::DEPOT,
+                EntityKind::Depot,
                 &mut steel,
                 &builder_workers,
                 &mut reserved_workers,
@@ -194,7 +205,7 @@ impl ScriptedPlayer for BuildTechAttackScript {
         if needs_tank_factory {
             if let Some(cmd) = self.build_if_affordable(
                 view,
-                kinds::TANK_FACTORY,
+                EntityKind::TankFactory,
                 &mut steel,
                 &builder_workers,
                 &mut reserved_workers,
@@ -210,7 +221,7 @@ impl ScriptedPlayer for BuildTechAttackScript {
             if production_queue_len(industrial_center) > 0 {
                 continue;
             }
-            let Some(stats) = config::unit_stats(kinds::WORKER) else {
+            let Some(stats) = config::unit_stats(EntityKind::Worker) else {
                 continue;
             };
             if steel < stats.cost_steel || oil < stats.cost_oil || free_supply < stats.supply {
@@ -233,7 +244,7 @@ impl ScriptedPlayer for BuildTechAttackScript {
                     continue;
                 }
 
-                let Some(stats) = config::unit_stats(kinds::RIFLEMAN) else {
+                let Some(stats) = config::unit_stats(EntityKind::Rifleman) else {
                     continue;
                 };
                 if steel < stats.cost_steel || oil < stats.cost_oil || free_supply < stats.supply {
@@ -253,7 +264,7 @@ impl ScriptedPlayer for BuildTechAttackScript {
             if tank_count > 0 || production_queue_len(factory) > 0 {
                 continue;
             }
-            let Some(stats) = config::unit_stats(kinds::TANK) else {
+            let Some(stats) = config::unit_stats(EntityKind::Tank) else {
                 continue;
             };
             if steel < stats.cost_steel || oil < stats.cost_oil || free_supply < stats.supply {
@@ -272,7 +283,7 @@ impl ScriptedPlayer for BuildTechAttackScript {
 
         let combat_units: Vec<u32> = own
             .iter()
-            .filter(|e| e.kind == kinds::RIFLEMAN || e.kind == kinds::TANK)
+            .filter(|e| is_kind(e, EntityKind::Rifleman) || is_kind(e, EntityKind::Tank))
             .map(|e| e.id)
             .collect();
         let has_tech_unit = tank_count > 0;
@@ -296,7 +307,7 @@ impl BuildTechAttackScript {
     fn build_if_affordable(
         &self,
         view: PlayerView<'_>,
-        building: &str,
+        building: EntityKind,
         steel: &mut u32,
         idle_workers: &[u32],
         reserved_workers: &mut HashSet<u32>,
@@ -315,7 +326,7 @@ impl BuildTechAttackScript {
         *steel -= stats.cost_steel;
         Some(Command::Build {
             worker,
-            building: building.to_string(),
+            building: building.to_protocol_str().to_string(),
             tile_x,
             tile_y,
         })
@@ -332,13 +343,15 @@ impl BuildTechAttackScript {
             .snapshot
             .entities
             .iter()
-            .filter(|e| e.owner == 0 && e.kind == kinds::STEEL && e.remaining.unwrap_or(0) > 0)
+            .filter(|e| {
+                e.owner == 0 && is_kind(e, EntityKind::Steel) && e.remaining.unwrap_or(0) > 0
+            })
             .collect();
         let oil_nodes: Vec<&EntityView> = view
             .snapshot
             .entities
             .iter()
-            .filter(|e| e.owner == 0 && e.kind == kinds::OIL && e.remaining.unwrap_or(0) > 0)
+            .filter(|e| e.owner == 0 && is_kind(e, EntityKind::Oil) && e.remaining.unwrap_or(0) > 0)
             .collect();
         if steel_nodes.is_empty() && oil_nodes.is_empty() {
             return;
@@ -355,7 +368,7 @@ impl BuildTechAttackScript {
                 .snapshot
                 .entities
                 .iter()
-                .any(|e| e.owner == view.player_id && e.kind == kinds::BARRACKS);
+                .any(|e| e.owner == view.player_id && is_kind(e, EntityKind::Barracks));
         if can_assign_oil {
             let mut assigned = 0usize;
             for worker in &sorted_workers {
@@ -444,12 +457,12 @@ impl ScriptedPlayer for EconomyScript {
         let workers: Vec<&EntityView> = own
             .iter()
             .copied()
-            .filter(|e| e.kind == kinds::WORKER)
+            .filter(|e| is_kind(e, EntityKind::Worker))
             .collect();
         let industrial_centers: Vec<&EntityView> = own
             .iter()
             .copied()
-            .filter(|e| e.kind == kinds::INDUSTRIAL_CENTER && is_complete(e))
+            .filter(|e| is_kind(e, EntityKind::IndustrialCenter) && is_complete(e))
             .collect();
 
         let mut builder_workers: Vec<u32> = workers
@@ -467,7 +480,7 @@ impl ScriptedPlayer for EconomyScript {
 
         let depot_under_construction = own
             .iter()
-            .any(|e| e.kind == kinds::DEPOT && !is_complete(e));
+            .any(|e| is_kind(e, EntityKind::Depot) && !is_complete(e));
         let mut steel = view.snapshot.steel;
         let mut oil = view.snapshot.oil;
         let mut free_supply = view
@@ -483,7 +496,7 @@ impl ScriptedPlayer for EconomyScript {
         {
             if let Some(cmd) = build_near_own_start_if_affordable(
                 view,
-                kinds::DEPOT,
+                EntityKind::Depot,
                 &mut steel,
                 &builder_workers,
                 &mut reserved_workers,
@@ -499,7 +512,7 @@ impl ScriptedPlayer for EconomyScript {
             if production_queue_len(industrial_center) > 0 {
                 continue;
             }
-            let Some(stats) = config::unit_stats(kinds::WORKER) else {
+            let Some(stats) = config::unit_stats(EntityKind::Worker) else {
                 continue;
             };
             if steel < stats.cost_steel || oil < stats.cost_oil || free_supply < stats.supply {
@@ -564,7 +577,7 @@ impl ScriptedPlayer for WorkerRushScript {
             .snapshot
             .entities
             .iter()
-            .filter(|e| e.owner == view.player_id && e.kind == kinds::WORKER)
+            .filter(|e| e.owner == view.player_id && is_kind(e, EntityKind::Worker))
             .map(|e| e.id)
             .collect();
         if workers.is_empty() {
@@ -632,7 +645,7 @@ impl ScriptedPlayer for BunkerRushScript {
         let workers: Vec<&EntityView> = own
             .iter()
             .copied()
-            .filter(|e| e.kind == kinds::WORKER)
+            .filter(|e| is_kind(e, EntityKind::Worker))
             .collect();
         let mut builder_workers: Vec<u32> = workers
             .iter()
@@ -650,7 +663,7 @@ impl ScriptedPlayer for BunkerRushScript {
         let mut steel = view.snapshot.steel;
         let mut reserved_workers = HashSet::new();
         let mut out = Vec::new();
-        let bunker_exists = own.iter().any(|e| e.kind == kinds::BUNKER);
+        let bunker_exists = own.iter().any(|e| is_kind(e, EntityKind::Bunker));
         let bunker_attempt_due = view.tick == 0
             || view.tick.saturating_sub(self.last_bunker_attempt_tick) >= ATTACK_REISSUE_TICKS;
         if !bunker_exists && bunker_attempt_due {
@@ -686,7 +699,7 @@ impl BunkerRushScript {
         builder_workers: &[u32],
         reserved_workers: &mut HashSet<u32>,
     ) -> Option<Command> {
-        let stats = config::building_stats(kinds::BUNKER)?;
+        let stats = config::building_stats(EntityKind::Bunker)?;
         if *steel < stats.cost_steel {
             return None;
         }
@@ -700,7 +713,7 @@ impl BunkerRushScript {
         *steel -= stats.cost_steel;
         Some(Command::Build {
             worker,
-            building: kinds::BUNKER.to_string(),
+            building: EntityKind::Bunker.to_protocol_str().to_string(),
             tile_x,
             tile_y,
         })
@@ -1309,8 +1322,9 @@ impl PlayerMilestones {
         let mut tanks = 0;
         let mut bunkers = 0;
         for e in snapshot.entities.iter().filter(|e| e.owner == player_id) {
-            match e.kind.as_str() {
-                kinds::WORKER => {
+            let Some(k) = kind_of(e) else { continue };
+            match k {
+                EntityKind::Worker => {
                     workers += 1;
                     if e.state == states::GATHER || e.carrying.unwrap_or(0) > 0 {
                         self.saw_gathering = true;
@@ -1319,16 +1333,16 @@ impl PlayerMilestones {
                         self.oil_gathered = true;
                     }
                 }
-                kinds::RIFLEMAN => riflemen += 1,
-                kinds::TANK => tanks += 1,
-                kinds::DEPOT => self.depot_started = true,
-                kinds::BARRACKS => {
+                EntityKind::Rifleman => riflemen += 1,
+                EntityKind::Tank => tanks += 1,
+                EntityKind::Depot => self.depot_started = true,
+                EntityKind::Barracks => {
                     self.barracks_started = true;
                     if is_complete(e) {
                         self.barracks_complete = true;
                     }
                 }
-                kinds::BUNKER => {
+                EntityKind::Bunker => {
                     self.bunker_started = true;
                     if is_complete(e) {
                         bunkers += 1;
@@ -1624,7 +1638,7 @@ fn production_queue_len(entity: &EntityView) -> u32 {
 
 fn build_near_own_start_if_affordable(
     view: PlayerView<'_>,
-    building: &str,
+    building: EntityKind,
     steel: &mut u32,
     builder_workers: &[u32],
     reserved_workers: &mut HashSet<u32>,
@@ -1643,7 +1657,7 @@ fn build_near_own_start_if_affordable(
     *steel -= stats.cost_steel;
     Some(Command::Build {
         worker,
-        building: building.to_string(),
+        building: building.to_protocol_str().to_string(),
         tile_x,
         tile_y,
     })
@@ -1660,7 +1674,7 @@ fn assign_steel_workers(
         .snapshot
         .entities
         .iter()
-        .filter(|e| e.owner == 0 && e.kind == kinds::STEEL && e.remaining.unwrap_or(0) > 0)
+        .filter(|e| e.owner == 0 && is_kind(e, EntityKind::Steel) && e.remaining.unwrap_or(0) > 0)
         .collect();
     if steel_nodes.is_empty() {
         return;
@@ -1802,7 +1816,7 @@ fn offensive_build_spot_if_placeable(
         return None;
     }
     let (tile_x, tile_y) = (tile_x as u32, tile_y as u32);
-    footprint_placeable_from_snapshot(&start.map, kinds::BUNKER, tile_x, tile_y, occupied)
+    footprint_placeable_from_snapshot(&start.map, EntityKind::Bunker, tile_x, tile_y, occupied)
         .then_some((tile_x, tile_y))
 }
 
@@ -1820,7 +1834,7 @@ fn find_build_spot(
     map: &MapInfo,
     snapshot: &Snapshot,
     start: (u32, u32),
-    building: &str,
+    building: EntityKind,
 ) -> Option<(u32, u32)> {
     let stats = config::building_stats(building)?;
     let occupied = occupied_tiles_from_snapshot(map, snapshot);
@@ -1875,11 +1889,11 @@ fn find_build_spot(
 fn occupied_tiles_from_snapshot(map: &MapInfo, snapshot: &Snapshot) -> BTreeSet<(u32, u32)> {
     let mut occupied = BTreeSet::new();
     for e in &snapshot.entities {
-        if e.owner != 0 && kinds::is_building(&e.kind) {
+        if e.owner != 0 && kind_of(e).map(|k| k.is_building()).unwrap_or(false) {
             for tile in building_footprint_tiles(map, e) {
                 occupied.insert(tile);
             }
-        } else if e.owner == 0 && (e.kind == kinds::STEEL || e.kind == kinds::OIL) {
+        } else if e.owner == 0 && (is_kind(e, EntityKind::Steel) || is_kind(e, EntityKind::Oil)) {
             occupied.insert(tile_of(map, e.x, e.y));
         }
     }
@@ -1888,7 +1902,7 @@ fn occupied_tiles_from_snapshot(map: &MapInfo, snapshot: &Snapshot) -> BTreeSet<
 
 fn footprint_placeable_from_snapshot(
     map: &MapInfo,
-    building: &str,
+    building: EntityKind,
     tile_x: u32,
     tile_y: u32,
     occupied: &BTreeSet<(u32, u32)>,
@@ -1936,7 +1950,11 @@ fn footprint_placeable_from_snapshot(
 }
 
 fn building_footprint_tiles(map: &MapInfo, entity: &EntityView) -> Vec<(u32, u32)> {
-    let Some(stats) = config::building_stats(&entity.kind) else {
+    let kind = match kind_of(entity) {
+        Some(k) => k,
+        None => return Vec::new(),
+    };
+    let Some(stats) = config::building_stats(kind) else {
         return Vec::new();
     };
     let (cx, cy) = tile_of(map, entity.x, entity.y);

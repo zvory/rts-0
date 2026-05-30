@@ -4,7 +4,7 @@
 //! UI / rendering / fog overlay needs (costs, supply, sight, sizes, colors). Keep both
 //! in sync; when you change a number here that the UI shows, change it there too.
 
-use crate::protocol::kinds;
+use crate::game::entity::EntityKind;
 
 // --- Timing -----------------------------------------------------------------
 pub const TICK_HZ: u32 = 30;
@@ -74,9 +74,9 @@ pub struct BuildingStats {
 }
 
 /// Stats for a unit kind, or `None` if `kind` is not a unit.
-pub fn unit_stats(kind: &str) -> Option<UnitStats> {
+pub fn unit_stats(kind: EntityKind) -> Option<UnitStats> {
     let s = match kind {
-        kinds::WORKER => UnitStats {
+        EntityKind::Worker => UnitStats {
             hp: 40,
             dmg: 4,
             range_tiles: 1,
@@ -89,7 +89,7 @@ pub fn unit_stats(kind: &str) -> Option<UnitStats> {
             build_ticks: 120,
             radius: 9.0,
         },
-        kinds::RIFLEMAN => UnitStats {
+        EntityKind::Rifleman => UnitStats {
             hp: 45,
             dmg: 5,
             range_tiles: 4,
@@ -102,7 +102,7 @@ pub fn unit_stats(kind: &str) -> Option<UnitStats> {
             build_ticks: 150,
             radius: 9.0,
         },
-        kinds::MACHINE_GUNNER => UnitStats {
+        EntityKind::MachineGunner => UnitStats {
             hp: 55,
             dmg: 4,
             range_tiles: 5,
@@ -115,7 +115,7 @@ pub fn unit_stats(kind: &str) -> Option<UnitStats> {
             build_ticks: 200,
             radius: 10.0,
         },
-        kinds::AT_TEAM => UnitStats {
+        EntityKind::AtTeam => UnitStats {
             hp: 45,
             dmg: 24,
             range_tiles: 4,
@@ -128,7 +128,7 @@ pub fn unit_stats(kind: &str) -> Option<UnitStats> {
             build_ticks: 220,
             radius: 10.0,
         },
-        kinds::TANK => UnitStats {
+        EntityKind::Tank => UnitStats {
             hp: 130,
             dmg: 20,
             range_tiles: 3,
@@ -147,9 +147,9 @@ pub fn unit_stats(kind: &str) -> Option<UnitStats> {
 }
 
 /// Stats for a building kind, or `None` if `kind` is not a building.
-pub fn building_stats(kind: &str) -> Option<BuildingStats> {
+pub fn building_stats(kind: EntityKind) -> Option<BuildingStats> {
     let s = match kind {
-        kinds::INDUSTRIAL_CENTER => BuildingStats {
+        EntityKind::IndustrialCenter => BuildingStats {
             hp: 600,
             sight_tiles: 9,
             cost_steel: 400,
@@ -162,7 +162,7 @@ pub fn building_stats(kind: &str) -> Option<BuildingStats> {
             range_tiles: 0,
             cooldown: 0,
         },
-        kinds::DEPOT => BuildingStats {
+        EntityKind::Depot => BuildingStats {
             hp: 220,
             sight_tiles: 4,
             cost_steel: 50,
@@ -175,7 +175,7 @@ pub fn building_stats(kind: &str) -> Option<BuildingStats> {
             range_tiles: 0,
             cooldown: 0,
         },
-        kinds::BARRACKS => BuildingStats {
+        EntityKind::Barracks => BuildingStats {
             hp: 320,
             sight_tiles: 6,
             cost_steel: 100,
@@ -188,7 +188,7 @@ pub fn building_stats(kind: &str) -> Option<BuildingStats> {
             range_tiles: 0,
             cooldown: 0,
         },
-        kinds::ADVANCED_TRAINING_CENTRE => BuildingStats {
+        EntityKind::AdvancedTrainingCentre => BuildingStats {
             hp: 300,
             sight_tiles: 6,
             cost_steel: 125,
@@ -201,7 +201,7 @@ pub fn building_stats(kind: &str) -> Option<BuildingStats> {
             range_tiles: 0,
             cooldown: 0,
         },
-        kinds::TANK_FACTORY => BuildingStats {
+        EntityKind::TankFactory => BuildingStats {
             hp: 360,
             sight_tiles: 6,
             cost_steel: 150,
@@ -214,7 +214,7 @@ pub fn building_stats(kind: &str) -> Option<BuildingStats> {
             range_tiles: 0,
             cooldown: 0,
         },
-        kinds::BUNKER => BuildingStats {
+        EntityKind::Bunker => BuildingStats {
             hp: 200,
             sight_tiles: 6,
             cost_steel: 150,
@@ -233,41 +233,52 @@ pub fn building_stats(kind: &str) -> Option<BuildingStats> {
 }
 
 /// Which units a given building can train.
-pub fn trainable_units(building_kind: &str) -> &'static [&'static str] {
+pub fn trainable_units(building_kind: EntityKind) -> &'static [EntityKind] {
     match building_kind {
-        kinds::INDUSTRIAL_CENTER => &[kinds::WORKER],
-        kinds::BARRACKS => &[kinds::RIFLEMAN, kinds::MACHINE_GUNNER, kinds::AT_TEAM],
-        kinds::TANK_FACTORY => &[kinds::TANK],
+        EntityKind::IndustrialCenter => &[EntityKind::Worker],
+        EntityKind::Barracks => &[
+            EntityKind::Rifleman,
+            EntityKind::MachineGunner,
+            EntityKind::AtTeam,
+        ],
+        EntityKind::TankFactory => &[EntityKind::Tank],
         _ => &[],
     }
 }
 
 /// Whether `building_kind` is allowed to be placed given the set of building kinds the
 /// player already owns (tech requirements). Most combat structures require an Industrial Center.
-pub fn build_requirement_met(building_kind: &str, owned_building_kinds: &[&str]) -> bool {
+pub fn build_requirement_met(
+    building_kind: EntityKind,
+    owned_building_kinds: &[EntityKind],
+) -> bool {
     match building_kind {
-        kinds::BARRACKS | kinds::ADVANCED_TRAINING_CENTRE | kinds::TANK_FACTORY | kinds::BUNKER => {
-            owned_building_kinds.contains(&kinds::INDUSTRIAL_CENTER)
-        }
+        EntityKind::Barracks
+        | EntityKind::AdvancedTrainingCentre
+        | EntityKind::TankFactory
+        | EntityKind::Bunker => owned_building_kinds.contains(&EntityKind::IndustrialCenter),
         _ => true,
     }
 }
 
 /// Whether a unit's training tech has been unlocked by completed buildings.
-pub fn train_requirement_met(unit_kind: &str, owned_complete_building_kinds: &[&str]) -> bool {
+pub fn train_requirement_met(
+    unit_kind: EntityKind,
+    owned_complete_building_kinds: &[EntityKind],
+) -> bool {
     match unit_kind {
-        kinds::MACHINE_GUNNER | kinds::AT_TEAM => {
-            owned_complete_building_kinds.contains(&kinds::ADVANCED_TRAINING_CENTRE)
+        EntityKind::MachineGunner | EntityKind::AtTeam => {
+            owned_complete_building_kinds.contains(&EntityKind::AdvancedTrainingCentre)
         }
         _ => true,
     }
 }
 
 /// Resource node starting amount for a node kind (`steel` | `oil`).
-pub fn node_amount(kind: &str) -> u32 {
+pub fn node_amount(kind: EntityKind) -> u32 {
     match kind {
-        kinds::STEEL => STEEL_PATCH_AMOUNT,
-        kinds::OIL => OIL_GEYSER_AMOUNT,
+        EntityKind::Steel => STEEL_PATCH_AMOUNT,
+        EntityKind::Oil => OIL_GEYSER_AMOUNT,
         _ => 0,
     }
 }
@@ -278,26 +289,36 @@ mod tests {
 
     #[test]
     fn ww2_production_chain_matches_design() {
-        assert_eq!(trainable_units(kinds::INDUSTRIAL_CENTER), &[kinds::WORKER]);
         assert_eq!(
-            trainable_units(kinds::BARRACKS),
-            &[kinds::RIFLEMAN, kinds::MACHINE_GUNNER, kinds::AT_TEAM]
+            trainable_units(EntityKind::IndustrialCenter),
+            &[EntityKind::Worker]
         );
-        assert_eq!(trainable_units(kinds::TANK_FACTORY), &[kinds::TANK]);
+        assert_eq!(
+            trainable_units(EntityKind::Barracks),
+            &[
+                EntityKind::Rifleman,
+                EntityKind::MachineGunner,
+                EntityKind::AtTeam
+            ]
+        );
+        assert_eq!(
+            trainable_units(EntityKind::TankFactory),
+            &[EntityKind::Tank]
+        );
 
-        assert!(train_requirement_met(kinds::RIFLEMAN, &[]));
-        assert!(!train_requirement_met(kinds::MACHINE_GUNNER, &[]));
-        assert!(!train_requirement_met(kinds::AT_TEAM, &[]));
+        assert!(train_requirement_met(EntityKind::Rifleman, &[]));
+        assert!(!train_requirement_met(EntityKind::MachineGunner, &[]));
+        assert!(!train_requirement_met(EntityKind::AtTeam, &[]));
         assert!(train_requirement_met(
-            kinds::MACHINE_GUNNER,
-            &[kinds::ADVANCED_TRAINING_CENTRE]
+            EntityKind::MachineGunner,
+            &[EntityKind::AdvancedTrainingCentre]
         ));
         assert!(train_requirement_met(
-            kinds::AT_TEAM,
-            &[kinds::ADVANCED_TRAINING_CENTRE]
+            EntityKind::AtTeam,
+            &[EntityKind::AdvancedTrainingCentre]
         ));
 
-        let bunker = building_stats(kinds::BUNKER).expect("bunker stats");
+        let bunker = building_stats(EntityKind::Bunker).expect("bunker stats");
         assert_eq!(bunker.cost_steel, 150);
         assert_eq!((bunker.foot_w, bunker.foot_h), (2, 2));
     }
