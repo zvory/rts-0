@@ -414,6 +414,54 @@ start the rAF loop (compute `alpha` from snapshot timing, `camera.update`, `inpu
 `client/src/config.js` mirrors the subset the UI/render/fog needs (costs, supply, sight,
 sizes, colors). Keep both in sync; the comment in each file points at the other.
 
+### 5.1 Target theme and MVP combat loop
+
+The target gameplay direction is a simplified World War II Eastern Front matchup:
+Germans vs. Soviets. This is not a full historical simulation. Historical accuracy should
+support readable gameplay, clear unit roles, and strong terrain identity.
+
+MVP scope:
+- No air forces.
+- No artillery or mortars yet.
+- No mines, morale, logistics, suppression-depth model, or detailed tank armor model yet.
+
+Core unit roles:
+- **Rifleman** is the baseline combat unit: cheap, flexible, useful for capturing and
+  holding ground, and the primary answer to enemy infantry in forests.
+- **Machine gun** is the defensive escalation unit: it takes 5 seconds (`50` ticks) to
+  set up, then fires at a very high rate inside a fixed field of fire. Machine-gun nests
+  are the main base-defense tool and should dominate open-ground infantry combat in the
+  second stage of the game.
+- **Tank** is the machine-gun breaker and open-ground power unit: immune to rifle and
+  machine-gun small-arms fire, strong against static defenses and exposed infantry, but
+  vulnerable to other tanks and anti-tank infantry.
+- **Anti-tank infantry team** is the ambush counter to tanks: dangerous from the side,
+  rear, or at close range, especially when operating from forests, but weak or inefficient
+  against regular infantry.
+
+Terrain rules:
+- **Open ground** favors machine guns and tanks.
+- **Forests** are passable by infantry and impassable to tanks.
+- Infantry in forests gets defensive and concealment bonuses.
+- Forests are intentionally "infantry country": the main way to clear infantry from a
+  forest is to send in your own infantry.
+- Tanks and machine guns can contain forests by covering exits, clearings, and forest
+  edges, but they should not reliably clear forest infantry from outside.
+
+Intended progression:
+- Early game: riflemen fight for map control.
+- Midgame: machine guns lock down open lanes and bases.
+- Armor phase: tanks break machine-gun-heavy defensive lines in open terrain.
+- Counter-armor phase: anti-tank infantry, forest ambushes, and other tanks punish
+  unsupported tanks.
+- Forest fights remain infantry-led so tanks and machine guns never become universal
+  answers.
+
+### 5.2 Current implementation constants
+
+The current implementation is still the generic RTS balance below. Keep these constants in
+sync with code until the unit, terrain, and theme overhaul lands.
+
 - `TICK_HZ = 10`, `SNAPSHOT_EVERY_N_TICKS = 1`.
 - Map: `TILE_SIZE = 32` px. Size scales with player count: 2p → 64×64, 3-4p → 96×96.
 - Start: `STARTING_MINERALS = 50`, `STARTING_GAS = 0`, `STARTING_WORKERS = 4`,
