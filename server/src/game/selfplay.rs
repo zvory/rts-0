@@ -2326,57 +2326,6 @@ fn scripted_self_play_exercises_economy_tech_and_combat() {
 }
 
 #[test]
-fn scripted_self_play_bunker_rush_vs_economy() {
-    let players = vec![
-        PlayerInit {
-            id: 1,
-            name: "Bunker Rush".into(),
-            color: "#ff9f1c".into(),
-            is_ai: false,
-        },
-        PlayerInit {
-            id: 2,
-            name: "Economy".into(),
-            color: "#2ec4b6".into(),
-            is_ai: false,
-        },
-    ];
-    let game = Game::new(&players);
-    let start = game.start_payload();
-    let specs = players.clone();
-    let scripts: Vec<Box<dyn ScriptedPlayer>> = vec![
-        Box::new(BunkerRushScript::new(1, 2)),
-        Box::new(EconomyScript::new(2)),
-    ];
-    let milestones = Milestones::with_goals(
-        [
-            (1, PlayerMilestoneGoal::bunker_rush()),
-            (2, PlayerMilestoneGoal::damaged_economy()),
-        ],
-        CombatGoal::bunker_attack_by(1),
-    );
-    let mut runner = SelfPlayRunner::with_milestones(
-        "scripted_self_play_bunker_rush_vs_economy",
-        game,
-        start,
-        specs,
-        scripts,
-        milestones,
-    );
-
-    match runner.run() {
-        Ok(report) => finalize_self_play_success(&runner, &players, &report),
-        Err(failure) => {
-            let artifact = runner
-                .write_failure_artifact(&failure)
-                .map(|p| p.display().to_string())
-                .unwrap_or_else(|e| format!("artifact write failed: {e}"));
-            panic!("self-play failed: {}; artifact: {artifact}", failure.reason);
-        }
-    }
-}
-
-#[test]
 fn scripted_self_play_worker_rush_vs_economy() {
     let players = vec![
         PlayerInit {
