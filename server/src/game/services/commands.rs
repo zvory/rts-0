@@ -1,17 +1,16 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::config;
-use crate::game::entity::{EntityKind, EntityStore, GatherPhase, Order, ProdItem};
+use crate::game::entity::{EntityKind, EntityStore, GatherPhase, ProdItem};
 use crate::game::map::Map;
-use crate::game::map::MobilityClass;
+use crate::game::services::move_coordinator::MoveCoordinator;
 use crate::game::services::occupancy::{footprint_center, footprint_placeable, Occupancy};
-use crate::game::services::pathing::{PathRequest, PathingService};
 use crate::game::services::spatial::SpatialIndex;
 use crate::game::PlayerState;
 use crate::protocol::{Command, Event};
 
-/// Max unique unit ids honored per multi-unit command. Caps the per-id work (one A* each) a
-/// single command can force, so a repeated/huge id list can't be used to stall the tick loop.
+/// Max unique unit ids honored per multi-unit command. Caps the per-id work a single command can
+/// force, so a repeated/huge id list can't be used to stall the tick loop.
 const MAX_UNITS_PER_COMMAND: usize = 256;
 
 /// Drain + apply queued commands (validate ownership / cost / supply / tech / placement).
@@ -21,7 +20,7 @@ pub(crate) fn apply_commands(
     players: &mut [PlayerState],
     occ: &Occupancy,
     spatial: &SpatialIndex,
-    pathing: &mut PathingService,
+    coordinator: &mut MoveCoordinator<'_>,
     pending: Vec<(u32, Command)>,
     events: &mut HashMap<u32, Vec<Event>>,
 ) {
@@ -33,23 +32,51 @@ pub(crate) fn apply_commands(
     for (player, cmd) in pending {
         match cmd {
             Command::Move { units, x, y } => {
-                for id in dedupe_cap_units(units) {
-                    order_move(map, entities, occ, pathing, player, id, x, y, false);
-                }
+                let valid: Vec<u32> = dedupe_cap_units(units)
+                    .into_iter()
+                    .filter(|id| owns_unit(entities, player, *id))
+                    .collect();
+                coordinator.order_group_move(entities, player, &valid, (x, y), false);
             }
             Command::AttackMove { units, x, y } => {
-                for id in dedupe_cap_units(units) {
-                    order_move(map, entities, occ, pathing, player, id, x, y, true);
-                }
+                let valid: Vec<u32> = dedupe_cap_units(units)
+                    .into_iter()
+                    .filter(|id| owns_unit(entities, player, *id))
+                    .collect();
+                coordinator.order_group_move(entities, player, &valid, (x, y), true);
             }
             Command::Attack { units, target } => {
                 for id in dedupe_cap_units(units) {
-                    order_attack(map, entities, occ, pathing, player, id, target);
+                    if let Some(e) = entities.get(id) {
+                        if !e.is_unit() || e.owner != player {
+                            continue;
+                        }
+                    } else {
+                        continue;
+                    }
+                    let target_ok = matches!(entities.get(target),
+                        Some(t) if t.is_targetable() && t.id != id && t.owner != player);
+                    if !target_ok {
+                        continue;
+                    }
+                    coordinator.order_attack(entities, id, target);
                 }
             }
             Command::Gather { units, node } => {
                 for id in dedupe_cap_units(units) {
-                    order_gather(map, entities, occ, pathing, player, id, node);
+                    if !owns_unit(entities, player, id) {
+                        continue;
+                    }
+                    let is_worker = matches!(entities.get(id), Some(e) if e.kind == EntityKind::Worker);
+                    let node_ok = matches!(entities.get(node), Some(n)
+                        if n.is_node() && n.remaining().unwrap_or(0) > 0);
+                    if !is_worker || !node_ok {
+                        continue;
+                    }
+                    if matches!(gather_slot_holder(entities, node), Some(holder) if holder != id) {
+                        continue;
+                    }
+                    coordinator.order_gather(entities, id, node);
                 }
             }
             Command::Build {
@@ -64,7 +91,7 @@ pub(crate) fn apply_commands(
                     players,
                     occ,
                     spatial,
-                    pathing,
+                    coordinator,
                     player,
                     worker,
                     &building,
@@ -98,8 +125,7 @@ pub(crate) fn apply_commands(
 }
 
 /// Dedupe a command's unit ids (preserving first-seen order) and cap the count at
-/// `MAX_UNITS_PER_COMMAND`. This stops a repeated or oversized id list from forcing one A* path
-/// per duplicate and stalling the tick loop.
+/// `MAX_UNITS_PER_COMMAND`.
 fn dedupe_cap_units(units: Vec<u32>) -> Vec<u32> {
     let mut seen = HashSet::new();
     let mut out = Vec::with_capacity(units.len().min(MAX_UNITS_PER_COMMAND));
@@ -119,204 +145,16 @@ fn owns_unit(entities: &EntityStore, player: u32, id: u32) -> bool {
     matches!(entities.get(id), Some(e) if e.owner == player && e.is_unit())
 }
 
-/// Issue a move / attack-move order to a unit, computing an A* path to the goal tile.
-#[allow(clippy::too_many_arguments)]
-fn order_move(
-    map: &Map,
-    entities: &mut EntityStore,
-    occ: &Occupancy,
-    pathing: &mut PathingService,
-    player: u32,
-    id: u32,
-    x: f32,
-    y: f32,
-    attack_move: bool,
-) {
-    if !owns_unit(entities, player, id) {
-        return;
-    }
-    let (sx, sy) = {
-        let e = match entities.get(id) {
-            Some(e) => e,
-            None => return,
-        };
-        map.tile_of(e.pos_x, e.pos_y)
-    };
-    let (gx, gy) = map.tile_of(x, y);
-    let kind = match entities.get(id) {
-        Some(e) => e.kind,
-        None => return,
-    };
-    let radius_tiles = config::unit_stats(kind)
-        .map(|s| s.radius_tiles())
-        .unwrap_or(0);
-    let req = PathRequest {
-        start: (sx as i32, sy as i32),
-        goal: (gx as i32, gy as i32),
-        class: MobilityClass::from_kind(kind),
-        radius_tiles,
-        budget: None,
-    };
-    let mut waypoints = pathing.request(map, occ, req);
-    // Waypoints are stored reversed (next = last element), so the goal is `waypoints[0]` — the
-    // element popped last. Snap it to the exact requested point for precise arrival.
-    if !waypoints.is_empty() {
-        waypoints[0] = (x, y);
-    }
-
-    entities.release_miner(id);
-    if let Some(e) = entities.get_mut(id) {
-        e.set_path(waypoints);
-        e.set_target_id(None);
-        e.set_order(if attack_move {
-            Order::attack_move_to(x, y)
-        } else {
-            Order::move_to(x, y)
-        });
-        e.mark_move_phase(if e.path_is_empty() {
-            crate::game::entity::MovePhase::Arrived
-        } else {
-            crate::game::entity::MovePhase::Moving
-        });
-        // Leaving a gather order: reset gather sub-state.
-        e.reset_gather_state();
-    }
-}
-
-/// Issue an attack order against a specific target entity.
-fn order_attack(
-    map: &Map,
-    entities: &mut EntityStore,
-    occ: &Occupancy,
-    pathing: &mut PathingService,
-    player: u32,
-    id: u32,
-    target: u32,
-) {
-    if !owns_unit(entities, player, id) {
-        return;
-    }
-    // Target must exist and be attackable; ignore self and same-owner entities (no friendly
-    // fire — mirrors combat_system's `t_owner == owner` guard, so a unit can't be locked onto
-    // an allied/own target).
-    let target_ok = matches!(entities.get(target),
-        Some(t) if t.is_targetable() && t.id != id && t.owner != player);
-    if !target_ok {
-        return;
-    }
-    let (tx, ty, sx, sy, kind) = {
-        let t = match entities.get(target) {
-            Some(t) => t,
-            None => return,
-        };
-        let e = match entities.get(id) {
-            Some(e) => e,
-            None => return,
-        };
-        let (tx, ty) = map.tile_of(t.pos_x, t.pos_y);
-        let (sx, sy) = map.tile_of(e.pos_x, e.pos_y);
-        (tx, ty, sx, sy, e.kind)
-    };
-    let radius_tiles = config::unit_stats(kind)
-        .map(|s| s.radius_tiles())
-        .unwrap_or(0);
-    let req = PathRequest {
-        start: (sx as i32, sy as i32),
-        goal: (tx as i32, ty as i32),
-        class: MobilityClass::from_kind(kind),
-        radius_tiles,
-        budget: None,
-    };
-    let waypoints = pathing.request(map, occ, req);
-    entities.release_miner(id);
-    if let Some(e) = entities.get_mut(id) {
-        e.set_order(Order::attack(target));
-        e.set_target_id(Some(target));
-        e.set_path(waypoints);
-        e.reset_gather_state();
-    }
-}
-
-/// Issue a gather order: only workers gather, only from resource nodes.
-fn order_gather(
-    map: &Map,
-    entities: &mut EntityStore,
-    occ: &Occupancy,
-    pathing: &mut PathingService,
-    player: u32,
-    id: u32,
-    node: u32,
-) {
-    if !owns_unit(entities, player, id) {
-        return;
-    }
-    // Must be a worker, and the target must be a (non-empty) resource node.
-    let is_worker = matches!(entities.get(id), Some(e) if e.kind == EntityKind::Worker);
-    let node_ok =
-        matches!(entities.get(node), Some(n) if n.is_node() && n.remaining().unwrap_or(0) > 0);
-    if !is_worker || !node_ok {
-        return;
-    }
-    if matches!(gather_slot_holder(entities, node), Some(holder) if holder != id) {
-        return;
-    }
-    let (nx, ny, sx, sy) = {
-        let n = match entities.get(node) {
-            Some(n) => n,
-            None => return,
-        };
-        let e = match entities.get(id) {
-            Some(e) => e,
-            None => return,
-        };
-        let (nx, ny) = map.tile_of(n.pos_x, n.pos_y);
-        let (sx, sy) = map.tile_of(e.pos_x, e.pos_y);
-        (nx, ny, sx, sy)
-    };
-    let req = PathRequest {
-        start: (sx as i32, sy as i32),
-        goal: (nx as i32, ny as i32),
-        class: MobilityClass::Infantry,
-        radius_tiles: 0,
-        budget: None,
-    };
-    let waypoints = pathing.request(map, occ, req);
-    entities.release_miner(id);
-    if let Some(e) = entities.get_mut(id) {
-        e.set_order(Order::gather(node));
-        e.set_target_id(Some(node));
-        e.set_path(waypoints);
-        if let Some(w) = e.worker.as_mut() {
-            w.carry = None;
-        }
-    }
-}
-
-fn gather_slot_holder(entities: &EntityStore, node: u32) -> Option<u32> {
-    let holder = entities.get(node).and_then(|n| n.miner())?;
-    let worker = entities.get(holder)?;
-    let on_this_node = worker.order().gather_node() == Some(node);
-    if worker.hp > 0
-        && worker.kind == EntityKind::Worker
-        && on_this_node
-        && worker.gather_phase() == Some(GatherPhase::Harvesting)
-    {
-        Some(holder)
-    } else {
-        None
-    }
-}
-
 /// Issue a build order. Deducts cost immediately, places the building in CONSTRUCT state, and
-/// sends the worker to the site. Emits a `Notice` on any validation failure.
+/// sends the worker to the site.
 #[allow(clippy::too_many_arguments)]
 fn order_build(
     map: &Map,
     entities: &mut EntityStore,
     players: &mut [PlayerState],
-    occ: &Occupancy,
+    _occ: &Occupancy,
     spatial: &SpatialIndex,
-    pathing: &mut PathingService,
+    coordinator: &mut MoveCoordinator<'_>,
     player: u32,
     worker: u32,
     building: &str,
@@ -347,7 +185,7 @@ fn order_build(
         }
     };
 
-    // Tech requirement (e.g. barracks needs an Industrial Center).
+    // Tech requirement.
     let owned: Vec<EntityKind> = entities
         .iter()
         .filter(|e| e.owner == player && e.is_building())
@@ -358,8 +196,7 @@ fn order_build(
         return;
     }
 
-    // Reject clearly out-of-range top-left coords before footprint work (also avoids any
-    // coordinate overflow downstream).
+    // Reject clearly out-of-range top-left coords.
     if tile_x >= map.size || tile_y >= map.size {
         notice(events, player, "Cannot build there");
         return;
@@ -398,34 +235,12 @@ fn order_build(
         Some(id) => id,
         None => return,
     };
-    // Reserve the footprint so later build commands in this tick don't overlap.
     for t in tiles {
         reserved_tiles.insert(t);
     }
 
-    // Walk the worker to the site and mark it occupied with a build order.
-    let (sx, sy) = {
-        let e = match entities.get(worker) {
-            Some(e) => e,
-            None => return,
-        };
-        map.tile_of(e.pos_x, e.pos_y)
-    };
-    let req = PathRequest {
-        start: (sx as i32, sy as i32),
-        goal: (tile_x as i32, tile_y as i32),
-        class: MobilityClass::Infantry,
-        radius_tiles: 0,
-        budget: None,
-    };
-    let waypoints = pathing.request(map, occ, req);
-    entities.release_miner(worker);
-    if let Some(e) = entities.get_mut(worker) {
-        e.set_order(Order::build(site));
-        e.set_target_id(Some(site));
-        e.set_path(waypoints);
-        e.reset_gather_state();
-    }
+    // Walk the worker to the site.
+    coordinator.order_build(entities, worker, site, (tile_x, tile_y));
 }
 
 /// Queue a unit at a production building. Reserves cost + supply on enqueue.
@@ -444,7 +259,6 @@ fn order_train(
             return;
         }
     };
-    // Building must be owned, finished, and able to train this unit.
     let ok = matches!(entities.get(building), Some(b)
         if b.owner == player && b.is_building() && !b.under_construction()
         && config::trainable_units(b.kind).contains(&kind));
@@ -481,7 +295,6 @@ fn order_train(
         notice(events, player, "Not enough supply");
         return;
     }
-    // Reserve cost + supply now; refunded on cancel.
     ps.steel -= stats.cost_steel;
     ps.oil -= stats.cost_oil;
     ps.supply_used += stats.supply;
@@ -528,4 +341,20 @@ pub(crate) fn notice(events: &mut HashMap<u32, Vec<Event>>, player: u32, msg: &s
     events.entry(player).or_default().push(Event::Notice {
         msg: msg.to_string(),
     });
+}
+
+/// Resolve who, if anyone, currently holds `node`'s single harvest slot.
+fn gather_slot_holder(entities: &EntityStore, node: u32) -> Option<u32> {
+    let m = entities.get(node).and_then(|n| n.miner())?;
+    let w = entities.get(m)?;
+    let on_this_node = w.order().gather_node() == Some(node);
+    if w.hp > 0
+        && w.kind == EntityKind::Worker
+        && on_this_node
+        && w.gather_phase() == Some(GatherPhase::Harvesting)
+    {
+        Some(m)
+    } else {
+        None
+    }
 }

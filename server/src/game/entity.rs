@@ -209,7 +209,7 @@ impl MoveOrder {
         MoveOrder {
             intent: PointIntent { x, y },
             execution: MoveExecution {
-                phase: MovePhase::Pathing,
+                phase: MovePhase::AwaitingPath,
             },
         }
     }
@@ -222,9 +222,10 @@ pub struct MoveExecution {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MovePhase {
-    Pathing,
+    AwaitingPath,
     Moving,
     Arrived,
+    PathFailed,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -370,6 +371,10 @@ pub struct MovementState {
     /// Tile-center waypoints remaining to walk through (world pixels), in reverse order so
     /// the next waypoint is the last element (cheap `pop`). Empty when not moving.
     pub path: Vec<(f32, f32)>,
+    /// Tick when this unit was last assigned a path. Used for repath throttling.
+    pub last_repath_tick: u32,
+    /// The goal world point of the most recently assigned path, for throttle-bypass checks.
+    pub path_goal: Option<(f32, f32)>,
 }
 
 impl Default for MovementState {
@@ -378,6 +383,8 @@ impl Default for MovementState {
             facing: 0.0,
             order: Order::Idle,
             path: Vec::new(),
+            last_repath_tick: 0,
+            path_goal: None,
         }
     }
 }
@@ -595,6 +602,33 @@ impl Entity {
                 _ => {}
             }
         }
+    }
+
+    pub fn move_phase(&self) -> Option<MovePhase> {
+        self.movement.as_ref().and_then(|m| match &m.order {
+            Order::Move(order) | Order::AttackMove(order) => Some(order.execution.phase),
+            _ => None,
+        })
+    }
+
+    pub fn set_last_repath_tick(&mut self, tick: u32) {
+        if let Some(m) = self.movement.as_mut() {
+            m.last_repath_tick = tick;
+        }
+    }
+
+    pub fn last_repath_tick(&self) -> u32 {
+        self.movement.as_ref().map(|m| m.last_repath_tick).unwrap_or(0)
+    }
+
+    pub fn set_path_goal(&mut self, goal: Option<(f32, f32)>) {
+        if let Some(m) = self.movement.as_mut() {
+            m.path_goal = goal;
+        }
+    }
+
+    pub fn path_goal(&self) -> Option<(f32, f32)> {
+        self.movement.as_ref().and_then(|m| m.path_goal)
     }
 
     pub fn mark_attack_phase(&mut self, phase: AttackPhase) {

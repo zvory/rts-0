@@ -2,8 +2,8 @@ use crate::config;
 use crate::game::entity::{EntityKind, EntityStore, GatherPhase};
 use crate::game::map::Map;
 use crate::game::services::dist2;
+use crate::game::services::move_coordinator::MoveCoordinator;
 use crate::game::services::occupancy::Occupancy;
-use crate::game::services::pathing::PathingService;
 use crate::game::services::spatial::SpatialIndex;
 use crate::game::PlayerState;
 
@@ -15,7 +15,7 @@ pub(crate) fn gather_system(
     players: &mut [PlayerState],
     occ: &Occupancy,
     _spatial: &SpatialIndex,
-    pathing: &mut PathingService,
+    coordinator: &mut MoveCoordinator<'_>,
 ) {
     let interact = config::TILE_SIZE as f32 * 1.5;
 
@@ -34,7 +34,7 @@ pub(crate) fn gather_system(
             .unwrap_or(GatherPhase::ToNode);
         match phase {
             GatherPhase::ToNode | GatherPhase::ToHome => {
-                gather_to_node(map, entities, occ, pathing, id, node, interact)
+                gather_to_node(map, entities, occ, coordinator, id, node, interact)
             }
             GatherPhase::Harvesting => gather_harvesting(entities, players, id, node),
         }
@@ -42,10 +42,10 @@ pub(crate) fn gather_system(
 }
 
 fn gather_to_node(
-    map: &Map,
+    _map: &Map,
     entities: &mut EntityStore,
-    occ: &Occupancy,
-    pathing: &mut PathingService,
+    _occ: &Occupancy,
+    coordinator: &mut MoveCoordinator<'_>,
     id: u32,
     node: u32,
     interact: f32,
@@ -81,7 +81,7 @@ fn gather_to_node(
             }
         }
     } else if entities.get(id).map(|e| e.path_is_empty()).unwrap_or(true) {
-        pathing.repath_entity(map, entities, occ, id, node_pos.0, node_pos.1);
+        coordinator.request_gather_path(entities, id, (node_pos.0, node_pos.1));
     }
 }
 
