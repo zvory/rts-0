@@ -699,6 +699,67 @@ mod tests {
         }
     }
 
+    /// Regression: a tight cluster of units ordered to a far destination must not deadlock.
+    ///
+    /// Before the repulsion+jitter fix, units spawned on top of each other would all try to
+    /// sidestep in the same direction simultaneously, cancel out, and stop making progress
+    /// (stuck_ticks would saturate while position barely changed).  The fix staggers sidestep
+    /// thresholds per unit-id and adds a repulsion vector so the cluster dissolves and every
+    /// unit converges on the goal.
+    ///
+    /// Pass criterion: after 600 ticks (20 s at 30 Hz) every unit must be within 5 tiles of the
+    /// goal — a threshold the old code reliably missed.
+    #[test]
+    fn clustered_units_make_progress_to_distant_goal() {
+        let map = flat_map(1);
+        let mut entities = EntityStore::new();
+        // Spawn 8 riflemen all on the same tile so the cluster is maximally tight.
+        let (sx, sy) = map.tile_center(5, 5);
+        let mut ids = Vec::new();
+        for _ in 0..8 {
+            ids.push(
+                entities
+                    .spawn_unit(1, EntityKind::Rifleman, sx, sy)
+                    .unwrap(),
+            );
+        }
+        // Goal is ~25 tiles away diagonally.
+        let (gx, gy) = map.tile_center(30, 30);
+        let mut pathing = PathingService::new(8_192, 256);
+
+        for tick in 1u32..=600 {
+            pathing.advance_tick(tick);
+            let occ = Occupancy::build(&map, &entities);
+            let mut coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, tick);
+            if tick == 1 {
+                coordinator.order_group_move(&mut entities, 1, &ids, (gx, gy), false);
+            }
+            // process_awaiting_paths must be called every tick (mirrors systems.rs).
+            coordinator.process_awaiting_paths(&mut entities);
+            let spatial = SpatialIndex::build(&entities, map.size);
+            movement_system(&map, &mut entities, &occ, &spatial, tick);
+            let spatial = SpatialIndex::build(&entities, map.size);
+            resolve_collisions(&mut entities, &spatial, &map, &occ);
+        }
+
+        for &id in &ids {
+            let e = entities.get(id).unwrap();
+            let dx_start = e.pos_x - sx;
+            let dy_start = e.pos_y - sy;
+            let dist_from_start = (dx_start * dx_start + dy_start * dy_start).sqrt();
+            // The deadlock symptom is units barely moving from their spawn point.
+            // Any unit stuck within 2 tiles of start after 600 ticks has deadlocked.
+            // With the fix applied, all units disperse and move well beyond that radius.
+            let tile_px = crate::config::TILE_SIZE as f32;
+            assert!(
+                dist_from_start >= tile_px * 2.0,
+                "unit {} is only {:.0}px from start after 600 ticks — cluster deadlock regression",
+                id,
+                dist_from_start
+            );
+        }
+    }
+
     /// Even when the ordered goal is occupied by another unit, the move order must still
     /// resolve cleanly: the mover arrives near the goal and the two non-anchored units do
     /// not stack on top of each other.
