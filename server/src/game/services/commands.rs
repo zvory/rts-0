@@ -3,8 +3,8 @@ use std::collections::{HashMap, HashSet};
 use crate::config;
 use crate::game::entity::{EntityKind, EntityStore, GatherPhase, Order, ProdItem};
 use crate::game::map::Map;
-use crate::game::pathfinding;
 use crate::game::services::occupancy::{footprint_center, footprint_placeable, Occupancy};
+use crate::game::services::pathing::{MobilityClass, PathRequest, PathingService};
 use crate::game::services::spatial::SpatialIndex;
 use crate::game::PlayerState;
 use crate::protocol::{Command, Event};
@@ -20,6 +20,7 @@ pub(crate) fn apply_commands(
     players: &mut [PlayerState],
     occ: &Occupancy,
     spatial: &SpatialIndex,
+    pathing: &mut PathingService,
     pending: Vec<(u32, Command)>,
     events: &mut HashMap<u32, Vec<Event>>,
 ) {
@@ -27,22 +28,22 @@ pub(crate) fn apply_commands(
         match cmd {
             Command::Move { units, x, y } => {
                 for id in dedupe_cap_units(units) {
-                    order_move(map, entities, occ, player, id, x, y, false);
+                    order_move(map, entities, occ, pathing, player, id, x, y, false);
                 }
             }
             Command::AttackMove { units, x, y } => {
                 for id in dedupe_cap_units(units) {
-                    order_move(map, entities, occ, player, id, x, y, true);
+                    order_move(map, entities, occ, pathing, player, id, x, y, true);
                 }
             }
             Command::Attack { units, target } => {
                 for id in dedupe_cap_units(units) {
-                    order_attack(map, entities, occ, player, id, target);
+                    order_attack(map, entities, occ, pathing, player, id, target);
                 }
             }
             Command::Gather { units, node } => {
                 for id in dedupe_cap_units(units) {
-                    order_gather(map, entities, occ, player, id, node);
+                    order_gather(map, entities, occ, pathing, player, id, node);
                 }
             }
             Command::Build {
@@ -52,7 +53,7 @@ pub(crate) fn apply_commands(
                 tile_y,
             } => {
                 order_build(
-                    map, entities, players, occ, spatial, player, worker, &building, tile_x, tile_y, events,
+                    map, entities, players, occ, spatial, pathing, player, worker, &building, tile_x, tile_y, events,
                 );
             }
             Command::Train { building, unit } => {
@@ -103,6 +104,7 @@ fn order_move(
     map: &Map,
     entities: &mut EntityStore,
     occ: &Occupancy,
+    pathing: &mut PathingService,
     player: u32,
     id: u32,
     x: f32,
@@ -120,8 +122,18 @@ fn order_move(
         map.tile_of(e.pos_x, e.pos_y)
     };
     let (gx, gy) = map.tile_of(x, y);
-    let path = pathfinding::find_path(occ, sx as i32, sy as i32, gx as i32, gy as i32);
-    let mut waypoints = pathfinding::to_world_waypoints(&path);
+    let kind = match entities.get(id) {
+        Some(e) => e.kind,
+        None => return,
+    };
+    let req = PathRequest {
+        start: (sx as i32, sy as i32),
+        goal: (gx as i32, gy as i32),
+        class: MobilityClass::from_kind(kind),
+        radius_tiles: 0,
+        budget: None,
+    };
+    let mut waypoints = pathing.request(map, occ, req);
     // Waypoints are stored reversed (next = last element), so the goal is `waypoints[0]` — the
     // element popped last. Snap it to the exact requested point for precise arrival.
     if !waypoints.is_empty() {
@@ -147,6 +159,7 @@ fn order_attack(
     map: &Map,
     entities: &mut EntityStore,
     occ: &Occupancy,
+    pathing: &mut PathingService,
     player: u32,
     id: u32,
     target: u32,
@@ -162,15 +175,21 @@ fn order_attack(
     if !target_ok {
         return;
     }
-    let (tx, ty, sx, sy) = {
+    let (tx, ty, sx, sy, kind) = {
         let t = entities.get(target).unwrap();
         let e = entities.get(id).unwrap();
         let (tx, ty) = map.tile_of(t.pos_x, t.pos_y);
         let (sx, sy) = map.tile_of(e.pos_x, e.pos_y);
-        (tx, ty, sx, sy)
+        (tx, ty, sx, sy, e.kind)
     };
-    let path = pathfinding::find_path(occ, sx as i32, sy as i32, tx as i32, ty as i32);
-    let waypoints = pathfinding::to_world_waypoints(&path);
+    let req = PathRequest {
+        start: (sx as i32, sy as i32),
+        goal: (tx as i32, ty as i32),
+        class: MobilityClass::from_kind(kind),
+        radius_tiles: 0,
+        budget: None,
+    };
+    let waypoints = pathing.request(map, occ, req);
     if let Some(e) = entities.get_mut(id) {
         e.order = Order::Attack { target };
         e.target_id = Some(target);
@@ -185,6 +204,7 @@ fn order_gather(
     map: &Map,
     entities: &mut EntityStore,
     occ: &Occupancy,
+    pathing: &mut PathingService,
     player: u32,
     id: u32,
     node: u32,
@@ -205,8 +225,14 @@ fn order_gather(
         let (sx, sy) = map.tile_of(e.pos_x, e.pos_y);
         (nx, ny, sx, sy)
     };
-    let path = pathfinding::find_path(occ, sx as i32, sy as i32, nx as i32, ny as i32);
-    let waypoints = pathfinding::to_world_waypoints(&path);
+    let req = PathRequest {
+        start: (sx as i32, sy as i32),
+        goal: (nx as i32, ny as i32),
+        class: MobilityClass::Infantry,
+        radius_tiles: 0,
+        budget: None,
+    };
+    let waypoints = pathing.request(map, occ, req);
     if let Some(e) = entities.get_mut(id) {
         e.order = Order::Gather { node };
         e.target_id = Some(node);
@@ -230,6 +256,7 @@ fn order_build(
     players: &mut [PlayerState],
     occ: &Occupancy,
     spatial: &SpatialIndex,
+    pathing: &mut PathingService,
     player: u32,
     worker: u32,
     building: &str,
@@ -307,8 +334,14 @@ fn order_build(
         let e = entities.get(worker).unwrap();
         map.tile_of(e.pos_x, e.pos_y)
     };
-    let path = pathfinding::find_path(occ, sx as i32, sy as i32, tile_x as i32, tile_y as i32);
-    let waypoints = pathfinding::to_world_waypoints(&path);
+    let req = PathRequest {
+        start: (sx as i32, sy as i32),
+        goal: (tile_x as i32, tile_y as i32),
+        class: MobilityClass::Infantry,
+        radius_tiles: 0,
+        budget: None,
+    };
+    let waypoints = pathing.request(map, occ, req);
     if let Some(e) = entities.get_mut(worker) {
         e.order = Order::Build { site };
         e.target_id = Some(site);

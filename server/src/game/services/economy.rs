@@ -2,8 +2,9 @@ use crate::config;
 use crate::game::entity::{CarryState, EntityKind, EntityStore, GatherPhase, Order};
 use crate::game::map::Map;
 use crate::game::services::occupancy::Occupancy;
+use crate::game::services::pathing::PathingService;
 use crate::game::services::spatial::SpatialIndex;
-use crate::game::services::{dist2, interact_range, repath};
+use crate::game::services::{dist2, interact_range};
 use crate::game::PlayerState;
 
 /// Worker harvest loop: walk to node → harvest → carry a load → return to the
@@ -15,6 +16,7 @@ pub(crate) fn gather_system(
     players: &mut [PlayerState],
     occ: &Occupancy,
     spatial: &SpatialIndex,
+    pathing: &mut PathingService,
 ) {
     let interact = config::TILE_SIZE as f32 * 1.5; // close enough to mine / deposit
 
@@ -32,9 +34,9 @@ pub(crate) fn gather_system(
             .map(|e| e.gather_phase)
             .unwrap_or(GatherPhase::ToNode);
         match phase {
-            GatherPhase::ToNode => gather_to_node(map, entities, occ, id, node, interact),
-            GatherPhase::Harvesting => gather_harvesting(map, entities, occ, id, node, interact),
-            GatherPhase::ToHome => gather_to_home(map, entities, players, occ, spatial, id, node, interact),
+            GatherPhase::ToNode => gather_to_node(map, entities, occ, pathing, id, node, interact),
+            GatherPhase::Harvesting => gather_harvesting(map, entities, occ, pathing, id, node, interact),
+            GatherPhase::ToHome => gather_to_home(map, entities, players, occ, spatial, pathing, id, node, interact),
         }
     }
 }
@@ -43,6 +45,7 @@ fn gather_to_node(
     map: &Map,
     entities: &mut EntityStore,
     occ: &Occupancy,
+    pathing: &mut PathingService,
     id: u32,
     node: u32,
     interact: f32,
@@ -51,7 +54,7 @@ fn gather_to_node(
     let node_pos = match entities.get(node) {
         Some(n) if n.is_node() && n.remaining > 0 => (n.pos_x, n.pos_y),
         _ => {
-            retarget_or_idle(map, entities, occ, id, node);
+            retarget_or_idle(map, entities, occ, pathing, id, node);
             return;
         }
     };
@@ -79,7 +82,7 @@ fn gather_to_node(
         }
     } else if entities.get(id).map(|e| e.path.is_empty()).unwrap_or(true) {
         // Lost the path; recompute toward the node.
-        repath(map, entities, occ, id, node_pos.0, node_pos.1);
+        pathing.repath_entity(map, entities, occ, id, node_pos.0, node_pos.1);
     }
 }
 
@@ -87,6 +90,7 @@ fn gather_harvesting(
     map: &Map,
     entities: &mut EntityStore,
     occ: &Occupancy,
+    pathing: &mut PathingService,
     id: u32,
     node: u32,
     _interact: f32,
@@ -95,7 +99,7 @@ fn gather_harvesting(
     let node_kind_amount = match entities.get(node) {
         Some(n) if n.is_node() && n.remaining > 0 => (n.kind, n.remaining),
         _ => {
-            retarget_or_idle(map, entities, occ, id, node);
+            retarget_or_idle(map, entities, occ, pathing, id, node);
             return;
         }
     };
@@ -159,7 +163,7 @@ fn gather_harvesting(
         e.gather_phase = GatherPhase::ToHome;
     }
     // Route to the nearest own Industrial Center.
-    route_home(map, entities, occ, id);
+    route_home(map, entities, occ, pathing, id);
 }
 
 fn gather_to_home(
@@ -168,6 +172,7 @@ fn gather_to_home(
     players: &mut [PlayerState],
     occ: &Occupancy,
     spatial: &SpatialIndex,
+    pathing: &mut PathingService,
     id: u32,
     node: u32,
     interact: f32,
@@ -213,14 +218,14 @@ fn gather_to_home(
             e.path.clear();
         }
         // Send back to the node now (handles depletion / retargeting).
-        gather_to_node(map, entities, occ, id, node, interact);
+        gather_to_node(map, entities, occ, pathing, id, node, interact);
     } else if entities.get(id).map(|e| e.path.is_empty()).unwrap_or(true) {
-        repath(map, entities, occ, id, hx, hy);
+        pathing.repath_entity(map, entities, occ, id, hx, hy);
     }
 }
 
 /// Route a laden worker to its nearest own Industrial Center.
-fn route_home(map: &Map, entities: &mut EntityStore, occ: &Occupancy, id: u32) {
+fn route_home(map: &Map, entities: &mut EntityStore, occ: &Occupancy, pathing: &mut PathingService, id: u32) {
     let (owner, wx, wy) = match entities.get(id) {
         Some(e) => (e.owner, e.pos_x, e.pos_y),
         None => return,
@@ -233,7 +238,7 @@ fn route_home(map: &Map, entities: &mut EntityStore, occ: &Occupancy, id: u32) {
         if let Some(e) = entities.get_mut(id) {
             e.home_industrial_center = Some(industrial_center_id);
         }
-        repath(map, entities, occ, id, hx, hy);
+        pathing.repath_entity(map, entities, occ, id, hx, hy);
     }
 }
 
@@ -264,6 +269,7 @@ fn retarget_or_idle(
     map: &Map,
     entities: &mut EntityStore,
     occ: &Occupancy,
+    pathing: &mut PathingService,
     id: u32,
     old_node: u32,
 ) {
@@ -303,7 +309,7 @@ fn retarget_or_idle(
                 e.gather_phase = GatherPhase::ToNode;
                 e.harvest_progress = 0;
             }
-            repath(map, entities, occ, id, nx, ny);
+            pathing.repath_entity(map, entities, occ, id, nx, ny);
         }
         None => {
             if let Some(e) = entities.get_mut(id) {

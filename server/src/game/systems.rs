@@ -16,6 +16,7 @@ use crate::game::entity::EntityStore;
 use crate::game::fog::Fog;
 use crate::game::map::Map;
 use crate::game::services;
+use crate::game::services::pathing::PathingService;
 use crate::game::services::spatial::SpatialIndex;
 use crate::game::PlayerState;
 use crate::protocol::{Command, Event};
@@ -30,6 +31,7 @@ pub(crate) fn run_tick(
     entities: &mut EntityStore,
     players: &mut [PlayerState],
     fog: &Fog,
+    pathing: &mut PathingService,
     pending: Vec<(u32, Command)>,
     events: &mut HashMap<u32, Vec<Event>>,
     _tick: u32,
@@ -39,14 +41,14 @@ pub(crate) fn run_tick(
     // Pre-tick spatial index for commands (building placement checks).
     let spatial = services::spatial::SpatialIndex::build(entities, map.size);
 
-    services::commands::apply_commands(map, entities, players, &occ, &spatial, pending, events);
+    services::commands::apply_commands(map, entities, players, &occ, &spatial, pathing, pending, events);
     services::movement::movement_system(map, entities, &occ);
 
     // Rebuild after movement so combat, gather, and separation see updated positions.
     let spatial = services::spatial::SpatialIndex::build(entities, map.size);
 
-    services::combat::combat_system(map, entities, &occ, &spatial, events);
-    services::economy::gather_system(map, entities, players, &occ, &spatial);
+    services::combat::combat_system(map, entities, &occ, &spatial, pathing, events);
+    services::economy::gather_system(map, entities, players, &occ, &spatial, pathing);
     services::movement::separation(entities, &spatial, map);
     services::production::production_system(map, entities, players, events);
     services::construction::construction_system(entities, events);
