@@ -26,11 +26,14 @@ between different lobbies.
 ## Stop spending after game night
 
 ```bash
-flyctl scale count 0
+flyctl scale count 0 -a rts-0-zvorygin
 ```
 
 To bring it back:
 
 ```bash
-flyctl scale count 1
+flyctl scale count 1 -a rts-0-zvorygin
 ```
+
+The `-a rts-0-zvorygin` flag makes these commands work from any directory. If you are already in
+the repo directory with `fly.toml`, the `-a` flag is optional.
