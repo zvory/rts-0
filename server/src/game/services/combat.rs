@@ -41,6 +41,12 @@ pub(crate) fn combat_system(
             if e.hp == 0 || !e.can_attack() {
                 continue;
             }
+            // Workers executing a Gather order ignore nearby enemies: chasing aggro would
+            // drag them off the resource node and stall the economy. An explicit Attack
+            // order overrides Gather upstream, so this only suppresses auto-acquisition.
+            if matches!(e.order(), Order::Gather(_)) {
+                continue;
+            }
             let (range_tiles, dmg, cd) = attack_profile(e);
             let range_px = range_tiles as f32 * config::TILE_SIZE as f32 + e.radius() + RANGE_SLACK;
             // Aggro radius: mobile units detect and chase enemies out to their sight radius so
