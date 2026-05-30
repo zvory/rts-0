@@ -152,7 +152,7 @@ export class HUD {
    *  - anything else → empty.
    *
    * Buttons are disabled when unaffordable (vs `state.resources`) or when tech
-   * requirements are unmet (e.g. barracks requires an existing HQ).
+   * requirements are unmet (e.g. barracks requires an existing Industrial Center).
    */
   _renderCommandCard() {
     const card = this.elCommand;
@@ -206,12 +206,11 @@ export class HUD {
 
   _renderBuildCard(card) {
     const res = this.state.resources || { minerals: 0, gas: 0 };
-    const haveHq = this._playerHasKind(KIND.HQ);
 
     // Signature: which buttons exist + their enabled state. Rebuild only on change.
     const sig =
       "build|" +
-      WORKER_BUILDABLE.map((k) => `${k}:${this._canBuild(k, res, haveHq) ? 1 : 0}`).join(",");
+      WORKER_BUILDABLE.map((k) => `${k}:${this._canBuild(k, res) ? 1 : 0}`).join(",");
     if (sig === this._cardSig) return;
     this._cardSig = sig;
 
@@ -219,8 +218,8 @@ export class HUD {
     for (const kind of WORKER_BUILDABLE) {
       const st = STATS[kind];
       if (!st) continue;
-      const enabled = this._canBuild(kind, res, haveHq);
-      const reason = this._buildDisabledReason(kind, res, haveHq);
+      const enabled = this._canBuild(kind, res);
+      const reason = this._buildDisabledReason(kind, res);
       const btn = this._cmdButton({
         icon: st.icon,
         label: st.label,
@@ -237,7 +236,7 @@ export class HUD {
   }
 
   /** A worker can build `kind` if affordable and any tech requirement is satisfied. */
-  _canBuild(kind, res, haveHq) {
+  _canBuild(kind, res) {
     const st = STATS[kind];
     if (!st) return false;
     if (st.requires && !this._playerHasKind(st.requires)) return false;
@@ -245,7 +244,7 @@ export class HUD {
   }
 
   /** Human-readable disabled reason for a build button tooltip ("" when enabled). */
-  _buildDisabledReason(kind, res, haveHq) {
+  _buildDisabledReason(kind, res) {
     const st = STATS[kind];
     if (!st) return "";
     if (st.requires && !this._playerHasKind(st.requires)) {
@@ -267,7 +266,7 @@ export class HUD {
     // trainable unit's affordability, and whether a cancel button is shown.
     const sig =
       `train|${building.id}|` +
-      trains.map((u) => `${u}:${this._affordable(STATS[u]?.cost, res) ? 1 : 0}`).join(",") +
+      trains.map((u) => `${u}:${this._canTrain(u, res) ? 1 : 0}`).join(",") +
       `|cancel:${producing ? 1 : 0}`;
     if (sig === this._cardSig) {
       // Even when the button set is unchanged, the progress label can move; refresh it.
@@ -280,14 +279,14 @@ export class HUD {
     for (const unit of trains) {
       const st = STATS[unit];
       if (!st) continue;
-      const enabled = this._affordable(st.cost, res);
+      const enabled = this._canTrain(unit, res);
       const btn = this._cmdButton({
         icon: st.icon,
         label: st.label,
         hotkey: st.hotkey,
         cost: st.cost,
         enabled,
-        title: enabled ? "" : "Not enough resources",
+        title: this._trainDisabledReason(unit, res),
         onClick: () => this.net.command(cmd.train(building.id, unit)),
       });
       frag.appendChild(btn);
@@ -341,6 +340,26 @@ export class HUD {
     return minerals >= (cost.min ?? 0) && gas >= (cost.gas ?? 0);
   }
 
+  /** A unit can be trained if affordable and its completed-building tech is present. */
+  _canTrain(unit, res) {
+    const st = STATS[unit];
+    if (!st) return false;
+    if (st.requires && !this._playerHasCompleteKind(st.requires)) return false;
+    return this._affordable(st.cost, res);
+  }
+
+  /** Human-readable disabled reason for a train button tooltip ("" when enabled). */
+  _trainDisabledReason(unit, res) {
+    const st = STATS[unit];
+    if (!st) return "";
+    if (st.requires && !this._playerHasCompleteKind(st.requires)) {
+      const reqLabel = (STATS[st.requires] && STATS[st.requires].label) || st.requires;
+      return `Requires ${reqLabel}`;
+    }
+    if (!this._affordable(st.cost, res)) return "Not enough resources";
+    return "";
+  }
+
   /** True if the player currently owns at least one entity of `kind`. */
   _playerHasKind(kind) {
     // entitiesInterpolated(1) reflects the latest snapshot positions but, more
@@ -348,6 +367,15 @@ export class HUD {
     const list = this.state.entitiesInterpolated(1);
     for (const e of list) {
       if (e.owner === this.state.playerId && e.kind === kind) return true;
+    }
+    return false;
+  }
+
+  /** True if the player owns at least one completed entity of `kind`. */
+  _playerHasCompleteKind(kind) {
+    const list = this.state.entitiesInterpolated(1);
+    for (const e of list) {
+      if (e.owner === this.state.playerId && e.kind === kind && e.buildProgress == null) return true;
     }
     return false;
   }

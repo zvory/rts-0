@@ -80,7 +80,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   ok(snap.supplyCap === 10, `A supply cap = 10 (${snap.supplyCap})`);
   ok(snap.supplyUsed === 4, `A supply used = 4 (${snap.supplyUsed})`);
   const mine = snap.entities.filter((e) => e.owner === A.playerId);
-  ok(mine.filter((e) => e.kind === "hq").length === 1, `A owns 1 HQ`);
+  ok(mine.filter((e) => e.kind === "industrial_center").length === 1, `A owns 1 Industrial Center`);
   const workers = mine.filter((e) => e.kind === "worker");
   ok(workers.length === 4, `A owns 4 workers (${workers.length})`);
   const minerals = snap.entities.filter((e) => e.kind === "minerals");
@@ -101,15 +101,15 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   ok(sawCarry, `GATHER: a worker carried minerals`);
 
   const beforeTrain = A.lastSnapshot.minerals;
-  A.send({ t: "command", cmd: { c: "train", building: mine.find((e) => e.kind === "hq").id, unit: "worker" } });
+  A.send({ t: "command", cmd: { c: "train", building: mine.find((e) => e.kind === "industrial_center").id, unit: "worker" } });
   await sleep(1200);
   // The 4 workers keep mining during this 1.2s window, so income partially offsets the 50 spent.
   // At 30 Hz that window is ~36 ticks — enough for a couple of 5-mineral deliveries — so allow a
   // generous income margin; the point is only that the train was charged (~50 deducted).
   const trainIncomeMargin = 25;
   ok(A.lastSnapshot.minerals <= beforeTrain - 50 + trainIncomeMargin, `TRAIN: minerals dropped ~50 (before=${beforeTrain}, after=${A.lastSnapshot.minerals})`);
-  const hq = A.lastSnapshot.entities.find((e) => e.kind === "hq" && e.owner === A.playerId);
-  ok(hq && (hq.prodKind === "worker" || (hq.prodQueue || 0) >= 1), `TRAIN: HQ shows production (queue=${hq?.prodQueue})`);
+  const industrialCenter = A.lastSnapshot.entities.find((e) => e.kind === "industrial_center" && e.owner === A.playerId);
+  ok(industrialCenter && (industrialCenter.prodKind === "worker" || (industrialCenter.prodQueue || 0) >= 1), `TRAIN: Industrial Center shows production (queue=${industrialCenter?.prodQueue})`);
 
   B.ws.close();
   const over = await A.waitFor((m) => m.t === "gameOver", 4000, "A gameOver");

@@ -116,7 +116,7 @@ Sent once when the match begins. Carries everything static for the whole match.
 }
 ```
 Resource nodes and all units/buildings arrive via snapshots (so they obey fog), including
-the player's own starting HQ + workers.
+the player's own starting Industrial Center + workers.
 
 ### 2.4 `snapshot` payload (per-player, fog-filtered)
 ```
@@ -134,7 +134,7 @@ the player's own starting HQ + workers.
 {
   id: u32,
   owner: u32,                    // 0 = neutral (resources), else player id
-  kind: string,                  // EntityKind: "worker","soldier","heavy","hq","depot","barracks","turret","minerals","gas"
+  kind: string,                  // EntityKind: "worker","rifleman","machine_gunner","at_team","tank","industrial_center","depot","barracks","advanced_training_centre","tank_factory","bunker","minerals","gas"
   x: f32, y: f32,                // world px (center)
   hp: u32, maxHp: u32,
   state: string,                 // "idle","move","attack","gather","build","train","construct","dead"
@@ -197,7 +197,7 @@ pub struct Game { /* private */ }
 impl Game {
     /// Create a match for the given players (ids + colors + names already assigned by lobby).
     /// Generates a symmetric map sized for `players.len()` and spawns each player's
-    /// starting HQ + STARTING_WORKERS workers + a nearby mineral cluster & geyser.
+    /// starting Industrial Center + STARTING_WORKERS workers + a nearby mineral cluster & geyser.
     pub fn new(players: &[PlayerInit]) -> Game;
 
     /// Static info for the `start` message (terrain + player start tiles). Call once.
@@ -228,7 +228,7 @@ pub struct PlayerInit { pub id: u32, pub name: String, pub color: String, pub is
 implementer's choice, but `snapshot_for`/`start_payload` must return protocol types.)
 
 `PlayerInit.is_ai` marks a computer-controlled player. AI players are full players in every
-respect (they get a start position, HQ, workers, economy, and count toward win/elimination); the
+respect (they get a start position, Industrial Center, workers, economy, and count toward win/elimination); the
 only difference is they have no socket. `Game` owns one `AiController` per AI player and drives
 them at the top of `tick()` — see §8.
 
@@ -395,7 +395,8 @@ start the rAF loop (compute `alpha` from snapshot timing, `camera.update`, `inpu
 - Units: clean vector shapes tinted by player color, with a soft drop shadow, a thin dark
   outline, a small facing indicator, an HP bar above when damaged/selected, and a glowing
   selection ring when selected. Distinct silhouette per kind (worker: small rounded;
-  soldier: chevron/triangle; heavy: chunky rounded square).
+  rifleman: chevron/triangle; machine gunner / AT team: compact specialist silhouettes;
+  tank: chunky armored square).
 - Buildings: rounded rectangles footprint-sized, player-tinted, with an icon glyph; under
   construction → dashed/translucent with a progress bar; production → small progress arc.
 - Resource nodes: minerals = cyan crystals cluster; gas = green geyser; show remaining via
@@ -459,14 +460,15 @@ Intended progression:
 
 ### 5.2 Current implementation constants
 
-The current implementation is still the generic RTS balance below. Keep these constants in
-sync with code until the unit, terrain, and theme overhaul lands.
+The current implementation uses the themed unit/building names below. Combat is still handled
+by the simple shared attack model; detailed machine-gun setup, armor facings, and forest-specific
+rules are future work.
 
-- `TICK_HZ = 10`, `SNAPSHOT_EVERY_N_TICKS = 1`.
+- `TICK_HZ = 30`, `SNAPSHOT_EVERY_N_TICKS = 1`.
 - Map: `TILE_SIZE = 32` px. Size scales with player count: 2p → 64×64, 3-4p → 96×96.
 - Start: `STARTING_MINERALS = 50`, `STARTING_GAS = 0`, `STARTING_WORKERS = 4`,
-  one HQ at the player's start tile, a mineral cluster (8 patches) + 1 gas geyser nearby.
-- Supply: HQ gives `+10`, Depot gives `+8`, hard cap `200`.
+  one Industrial Center at the player's start tile, a mineral cluster (8 patches) + 1 gas geyser nearby.
+- Supply: Industrial Center gives `+10`, Depot gives `+8`, hard cap `200`.
 - Resource trip: worker carries `MINERAL_LOAD = 5` / `GAS_LOAD = 4`; harvest takes
   `HARVEST_TICKS`; mineral patch starts with `MINERAL_PATCH_AMOUNT = 1500`, geyser
   `GAS_GEYSER_AMOUNT = 5000`.
@@ -478,20 +480,24 @@ sync with code until the unit, terrain, and theme overhaul lands.
 
 Unit stats (hp, dmg, range[tiles], cooldown[ticks], speed[px/tick], sight[tiles], cost, supply, buildTicks):
 
-| kind    | hp  | dmg | range | cd | speed | sight | min | gas | sup | buildTicks |
-|---------|-----|-----|-------|----|-------|-------|-----|-----|-----|-----------|
-| worker  | 40  | 4   | 1     | 12 | 3.0   | 7     | 50  | 0   | 1   | 120 (~12s)|
-| soldier | 45  | 5   | 4     | 8  | 3.2   | 8     | 50  | 0   | 1   | 150 (~15s)|
-| heavy   | 130 | 20  | 3     | 18 | 2.0   | 7     | 100 | 50  | 2   | 250 (~25s)|
+| kind            | hp  | dmg | range | cd | speed | sight | min | gas | sup | buildTicks |
+|-----------------|-----|-----|-------|----|-------|-------|-----|-----|-----|-----------|
+| worker          | 40  | 4   | 1     | 12 | 3.0   | 7     | 50  | 0   | 1   | 120 (~4s) |
+| rifleman        | 45  | 5   | 4     | 8  | 3.2   | 8     | 50  | 0   | 1   | 150 (~5s) |
+| machine_gunner  | 55  | 4   | 5     | 3  | 2.4   | 8     | 75  | 0   | 2   | 200 (~7s) |
+| at_team         | 45  | 24  | 4     | 24 | 2.6   | 8     | 75  | 25  | 2   | 220 (~7s) |
+| tank            | 130 | 20  | 3     | 18 | 2.0   | 7     | 100 | 50  | 2   | 250 (~8s) |
 
 Building stats (hp, sight, cost min, footprint tiles wxh, buildTicks, extra):
 
-| kind     | hp  | sight | min | foot | buildTicks | notes |
-|----------|-----|-------|-----|------|-----------|-------|
-| hq       | 600 | 9     | 400 | 3x3  | 400       | trains worker; drop-off; +10 supply; players start with one free |
-| depot    | 220 | 4     | 50  | 2x2  | 120       | +8 supply |
-| barracks | 320 | 6     | 100 | 3x2  | 200       | trains soldier, heavy; requires an existing hq |
-| turret   | 200 | 6     | 75  | 1x1  | 120       | auto-attacks: dmg 10, range 7, cd 10 |
+| kind                       | hp  | sight | min | foot | buildTicks | notes |
+|----------------------------|-----|-------|-----|------|-----------|-------|
+| industrial_center          | 600 | 9     | 400 | 3x3  | 400       | trains worker; drop-off; +10 supply; players start with one free |
+| depot                      | 220 | 4     | 50  | 2x2  | 120       | +8 supply |
+| barracks                   | 320 | 6     | 100 | 3x2  | 200       | trains rifleman, machine_gunner, at_team; requires an Industrial Center |
+| advanced_training_centre   | 300 | 6     | 125 | 3x2  | 220       | unlocks machine_gunner and at_team training at barracks; requires an Industrial Center |
+| tank_factory               | 360 | 6     | 150 | 3x3  | 240       | trains tank; requires an Industrial Center |
+| bunker                     | 200 | 6     | 150 | 2x2  | 120       | auto-attacks: dmg 10, range 7, cd 10; requires an Industrial Center |
 
 Win: a player is **eliminated** when they own zero entities (units AND buildings). Last
 player standing wins; a 1-player match never ends (sandbox/exploration mode).
@@ -549,8 +555,8 @@ payload.
 **Strategy (deliberately "very basic").** Each controller, on a staggered cadence
 (`DECISION_INTERVAL` ticks): keeps idle workers mining the nearest mineral patch; trains workers
 up to `TARGET_WORKERS`; builds a depot when supply is about to choke; builds up to
-`TARGET_BARRACKS` barracks; pumps soldiers from each barracks; and once `WAVE_SIZE` soldiers are
-free, attack-moves them at the nearest living enemy's base. It does not micro, tech to heavies, or
+`TARGET_BARRACKS` barracks; pumps riflemen from each barracks; and once `WAVE_SIZE` riflemen are
+free, attack-moves them at the nearest living enemy's base. It does not micro, tech to tanks, or
 scout. A local per-think budget prevents it from over-committing minerals/supply it doesn't have.
 
 **Win/elimination.** AI players count exactly like humans: a 1-human + N-AI match is a real match
@@ -574,8 +580,8 @@ tools, and external test drivers without adding a second privileged control path
 
 **MVP coverage.** The first scripted self-play test spawns two non-AI players, gives each the same
 deterministic build/tech/attack script, and runs the match headlessly under `cargo test`. The
-scripts gather minerals and gas, construct a Depot and Barracks, train Soldiers and a Heavy, and
-attack-move toward a public map-center combat rendezvous. The harness checks per-tick invariants
+scripts gather minerals and gas, construct a Depot, Barracks, and Tank Factory, train Riflemen and a Tank,
+and attack-move toward a public map-center combat rendezvous. The harness checks per-tick invariants
 for invalid resources, supply overflow, malformed entity snapshots, out-of-bounds positions, and
 non-finite progress values. It also enforces progress deadlines so a stuck economy/tech/combat loop
 fails as a deadlock instead of timing out silently.

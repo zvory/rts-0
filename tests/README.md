@@ -41,8 +41,8 @@ node tests/server_integration.mjs
 ## Headless simulation self-play
 
 Runs inside the Rust test suite with no live server. The test creates two scripted API clients that
-drive `Game` through `enqueue`/`tick`/`snapshot_for`, exercising gathering, gas, Depot/Barracks
-construction, Soldier/Heavy training, and combat. On failure it writes replay artifacts under
+drive `Game` through `enqueue`/`tick`/`snapshot_for`, exercising gathering, gas,
+Depot/Barracks/Tank Factory construction, Rifleman/Tank training, and combat. On failure it writes replay artifacts under
 `server/target/selfplay-failures/`.
 
 ```bash

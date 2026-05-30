@@ -62,9 +62,9 @@ try {
 
   const own = await page.evaluate(() => {
     const s = window.__rts.match.state, es = s.entitiesInterpolated(1).filter((e) => e.owner === s.playerId);
-    return { hq: es.filter((e) => e.kind === "hq").length, w: es.filter((e) => e.kind === "worker").length };
+    return { industrialCenter: es.filter((e) => e.kind === "industrial_center").length, w: es.filter((e) => e.kind === "worker").length };
   });
-  ok(own.hq === 1 && own.w === 4, `client sees own HQ + 4 workers (hq=${own.hq}, workers=${own.w})`);
+  ok(own.industrialCenter === 1 && own.w === 4, `client sees own Industrial Center + 4 workers (industrialCenter=${own.industrialCenter}, workers=${own.w})`);
 
   // Interpolation must be live: GameState exposes recv timestamps so alpha isn't pinned to 1.
   const interp = await page.evaluate(() => {
@@ -116,12 +116,12 @@ try {
   ok(depot, "BUILD: placing a Supply Depot created an own depot entity (server round-trip)");
 
   const trainBtn = await page.evaluate(() => {
-    const s = window.__rts.match.state, hq = s.entitiesInterpolated(1).find((e) => e.owner === s.playerId && e.kind === "hq");
-    if (!hq) return false;
-    s.setSelection([hq.id]); window.__rts.match.hud.update();
+    const s = window.__rts.match.state, industrialCenter = s.entitiesInterpolated(1).find((e) => e.owner === s.playerId && e.kind === "industrial_center");
+    if (!industrialCenter) return false;
+    s.setSelection([industrialCenter.id]); window.__rts.match.hud.update();
     return !!document.querySelector('#command-card [data-hotkey="W"]');
   });
-  ok(trainBtn, "TRAIN CARD: selecting the HQ shows a Worker train button");
+  ok(trainBtn, "TRAIN CARD: selecting the Industrial Center shows a Worker train button");
 
   const beforePan = await page.evaluate(() => ({
     x: window.__rts.match.camera.x,
