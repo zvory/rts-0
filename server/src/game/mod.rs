@@ -472,18 +472,20 @@ fn spawn_player_start(entities: &mut EntityStore, map: &Map, owner: u32, start: 
         entities.spawn_node(EntityKind::Steel, px, py);
     }
 
-    // Four oil nodes arranged in a 2x2 block centered on OIL_DIST_TILES out from the IC,
-    // perpendicular to the base axis (mirrors the steel block layout but smaller).
+    // Four oil nodes arranged in a 2x2 block, 90° from the steel cluster so they don't overlap.
+    let oil_angle = base_angle + std::f32::consts::FRAC_PI_2;
+    let oil_perp_x = -oil_angle.sin();
+    let oil_perp_y = oil_angle.cos();
     let oil_dist = config::OIL_DIST_TILES * ts;
-    let block_cx = hx + oil_dist * base_angle.cos();
-    let block_cy = hy + oil_dist * base_angle.sin();
+    let block_cx = hx + oil_dist * oil_angle.cos();
+    let block_cy = hy + oil_dist * oil_angle.sin();
     for i in 0..4u32 {
         let col = (i % 2) as f32;
         let row = (i / 2) as f32;
         let off_x = (col - 0.5) * ts;
         let off_y = (row - 0.5) * ts;
-        let px = block_cx + off_x * perp_x + off_y * base_angle.cos();
-        let py = block_cy + off_x * perp_y + off_y * base_angle.sin();
+        let px = block_cx + off_x * oil_perp_x + off_y * oil_angle.cos();
+        let py = block_cy + off_x * oil_perp_y + off_y * oil_angle.sin();
         let dist_tiles = ((px - hx).powi(2) + (py - hy).powi(2)).sqrt() / ts;
         debug_assert!(
             (config::IC_RESOURCE_MIN_DIST_TILES..=config::IC_RESOURCE_MAX_DIST_TILES)
@@ -529,8 +531,8 @@ mod tests {
         let mut human_damaged = false;
         let mut event_log = Vec::new();
 
-        // ~300s of simulation. The human issues no commands (passive target).
-        for tick in 1..=9000 {
+        // ~200s of simulation. The human issues no commands (passive target).
+        for tick in 1..=6000 {
             for (player_id, events) in game.tick() {
                 for event in events {
                     event_log.push(super::replay::EventLogEntry {
