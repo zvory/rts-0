@@ -14,7 +14,8 @@ const URL = process.env.RTS_WS || "ws://127.0.0.1:8081/ws";
 const ROOM = "ai-itest-" + Math.floor(performance.now());
 
 let failures = 0;
-const ok = (cond, msg) => { console.log((cond ? "  PASS " : "  FAIL ") + msg); if (!cond) failures++; };
+const VERBOSE = !!process.env.RTS_VERBOSE;
+const ok = (cond, msg) => { if (!cond) { console.log("  FAIL " + msg); failures++; } else if (VERBOSE) { console.log("  PASS " + msg); } };
 
 class Client {
   constructor(tag) {
@@ -110,6 +111,6 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
   A.ws.close();
   await sleep(200);
-  console.log(`\n${failures === 0 ? "ALL PASS ✅" : failures + " FAILURE(S) ❌"}`);
+  if (failures > 0) console.log(`\n${failures} FAILURE(S) ❌`);
   process.exit(failures === 0 ? 0 : 1);
 })().catch((e) => { console.log("TEST ERROR:", e.message); process.exit(2); });

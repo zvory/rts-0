@@ -15,7 +15,8 @@ const CHROME = process.env.CHROME ||
 const consoleErrors = [];
 const pageErrors = [];
 let failures = 0;
-const ok = (c, m) => { console.log((c ? "  PASS " : "  FAIL ") + m); if (!c) failures++; };
+const VERBOSE = !!process.env.RTS_VERBOSE;
+const ok = (c, m) => { if (!c) { console.log("  FAIL " + m); failures++; } else if (VERBOSE) { console.log("  PASS " + m); } };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const browser = await puppeteer.launch({
@@ -151,5 +152,5 @@ try {
 } finally {
   await browser.close();
 }
-console.log(`\n${failures === 0 ? "CLIENT SMOKE: ALL PASS ✅" : "CLIENT SMOKE: " + failures + " FAILURE(S) ❌"}`);
+if (failures > 0) console.log(`\nCLIENT SMOKE: ${failures} FAILURE(S) ❌`);
 process.exit(failures === 0 ? 0 : 1);
