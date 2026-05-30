@@ -182,7 +182,7 @@ src/
     pathfinding.rs # A* over the tile grid (impassable = terrain + building footprints)
     fog.rs       # per-player visibility grid (visible / explored)
     systems.rs   # orchestrator: runs services in order each tick
-    services/    # per-tick internal services: commands, move_coordinator, movement, combat, economy, production, construction, death, occupancy, supply, pathing
+    services/    # per-tick internal services: commands, move_coordinator, movement (incl. unit collision), combat, economy, production, construction, death, occupancy, supply, pathing
     ai.rs        # optional computer opponents: one AiController per AI player (see §8)
     replay.rs    # tick-stamped command log replay harness for determinism checks
     selfplay.rs  # test-only API-driven scripted self-play harness (see §9)
@@ -542,6 +542,14 @@ The server treats every client as potentially hostile. Limits live next to the c
   on an accept, so a rejected mid-match join doesn't wedge the socket.
 - **Fog is authoritative**: `snapshot_for` and per-recipient event delivery gate entity views,
   `target_id` tracers, and death events on visibility — hidden enemies are never sent.
+- **Unit collision**: `services::movement::resolve_collisions` runs after production each tick
+  and pair-wise pushes overlapping mobile units apart along the connecting line (50/50 split
+  when neither is anchored). A worker is *anchored* while it is in
+  `GatherPhase::Harvesting` or `BuildPhase::Constructing` — anchored units neither push nor
+  are pushed, which keeps walking units from being deadlocked by miners or active builders
+  (PLAN §4.3). `Game::assert_invariants` then asserts that no two non-anchored mobile units
+  overlap by more than `OVERLAP_TOLERANCE_PX` (residue from pushes that landed against
+  impassable terrain).
 
 ---
 

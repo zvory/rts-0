@@ -8,7 +8,9 @@
 //!   5. production progression + spawning
 //!   6. construction progression
 //!   7. deaths
-//!   8. recompute supply cap
+//!   8. unit-unit collision resolution (hard non-stacking; runs after spawning so newly
+//!      produced units that land on the same spawn point are unstacked in the same tick)
+//!   9. recompute supply cap
 
 use std::collections::HashMap;
 
@@ -58,15 +60,21 @@ pub(crate) fn run_tick(
     coordinator.process_awaiting_paths(entities);
     services::movement::movement_system(map, entities, &occ);
 
-    // Rebuild after movement so combat, gather, and separation see updated positions.
+    // Rebuild after movement so combat, gather, and collision resolution see updated positions.
     let spatial = services::spatial::SpatialIndex::build(entities, map.size);
 
     services::combat::combat_system(map, entities, &occ, &spatial, &mut coordinator, events);
     services::economy::gather_system(map, entities, players, &occ, &spatial, &mut coordinator);
-    services::movement::separation(entities, &spatial, map);
     services::production::production_system(map, entities, &coordinator, events);
     services::construction::construction_system(map, entities, events);
     services::death::death_system(entities, fog, events);
+
+    // Collision resolution runs after production so newly-spawned units (which can land on
+    // the same spawn point as their predecessors) are unstacked in the same tick they appear.
+    // Rebuild the spatial index first so the resolver sees the post-production entity set.
+    let spatial = services::spatial::SpatialIndex::build(entities, map.size);
+    services::movement::resolve_collisions(entities, &spatial, map, &occ);
+
     services::supply::recompute_supply(players, entities);
 
     // Rebuild after all mutations so the returned index reflects the final positions.

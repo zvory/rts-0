@@ -1,8 +1,8 @@
 //! Spatial query layer: uniform grid index for fast nearest-neighbor and range queries.
 //!
 //! Rebuilt each tick from the live [`EntityStore`] so it always reflects current positions.
-//! Used by combat target acquisition, resource search, building overlap checks, movement
-//! separation, and snapshot interest filtering.
+//! Used by combat target acquisition, resource search, building overlap checks, unit
+//! collision resolution, and snapshot interest filtering.
 
 use crate::config;
 use crate::game::entity::{Entity, EntityStore};

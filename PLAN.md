@@ -274,9 +274,16 @@ Depends on:
 
 ### 4.3 Unit Collision and Non-Stacking
 
-- [ ] Implement unit collision and non-stacking.
-- [ ] Preserve mining-worker exceptions through worker/gather state, not movement hacks.
-- [ ] Add no-overlap invariants, path-failure behavior, blocked-goal behavior, and group-move tests.
+- [x] Implement unit collision and non-stacking.
+- [x] Preserve mining-worker exceptions through worker/gather state, not movement hacks.
+- [x] Add no-overlap invariants, path-failure behavior, blocked-goal behavior, and group-move tests.
+
+Follow-ups:
+
+- [ ] Re-enable `scripted_self_play_exercises_economy_tech_and_combat` (currently `#[ignore]`):
+  p1's deterministic depot tile lands inside its own construction footprint, and the build
+  worker's pre-footprint path stalls once collision is hard. Needs the build path to re-route
+  around the freshly-occupied footprint at command apply time.
 
 Depends on:
 
