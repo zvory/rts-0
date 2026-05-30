@@ -70,7 +70,8 @@ pub(crate) fn apply_commands(
                     if !is_worker || !node_ok {
                         continue;
                     }
-                    if matches!(world_query::node_holder(entities, node), Some(holder) if holder != id) {
+                    if matches!(world_query::node_holder(entities, node), Some(holder) if holder != id)
+                    {
                         continue;
                     }
                     coordinator.order_gather(entities, id, node);
@@ -83,8 +84,17 @@ pub(crate) fn apply_commands(
                 tile_y,
             } => {
                 order_build(
-                    map, entities, players, spatial, coordinator, player, worker, &building,
-                    tile_x, tile_y, events,
+                    map,
+                    entities,
+                    players,
+                    spatial,
+                    coordinator,
+                    player,
+                    worker,
+                    &building,
+                    tile_x,
+                    tile_y,
+                    events,
                 );
             }
             Command::Train { building, unit } => {
@@ -298,4 +308,3 @@ pub(crate) fn notice(events: &mut HashMap<u32, Vec<Event>>, player: u32, msg: &s
         msg: msg.to_string(),
     });
 }
-

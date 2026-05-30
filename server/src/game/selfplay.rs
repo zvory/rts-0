@@ -226,22 +226,22 @@ impl ScriptedPlayer for BuildTechAttackScript {
         // failure (no such building) and record failed tiles so future picks avoid them.
         let mut dropped: Vec<(EntityKind, u32, u32)> = Vec::new();
         let now = view.tick;
-        self.pending_builds.retain(|wid, (kind, tx, ty, issued_tick)| {
-            let in_build = workers
-                .iter()
-                .any(|w| w.id == *wid && w.state == states::BUILD);
-            let watchdog_expired =
-                now.saturating_sub(*issued_tick) >= PENDING_BUILD_WATCHDOG_TICKS;
-            let keep = in_build && !watchdog_expired;
-            if !keep {
-                dropped.push((*kind, *tx, *ty));
-            }
-            keep
-        });
+        self.pending_builds
+            .retain(|wid, (kind, tx, ty, issued_tick)| {
+                let in_build = workers
+                    .iter()
+                    .any(|w| w.id == *wid && w.state == states::BUILD);
+                let watchdog_expired =
+                    now.saturating_sub(*issued_tick) >= PENDING_BUILD_WATCHDOG_TICKS;
+                let keep = in_build && !watchdog_expired;
+                if !keep {
+                    dropped.push((*kind, *tx, *ty));
+                }
+                keep
+            });
         for (kind, tx, ty) in dropped {
             let succeeded = own.iter().any(|e| {
-                is_kind(e, kind)
-                    && building_footprint_tiles(&view.start.map, e).contains(&(tx, ty))
+                is_kind(e, kind) && building_footprint_tiles(&view.start.map, e).contains(&(tx, ty))
             });
             if succeeded {
                 self.failed_build_spots.remove(&kind);
@@ -304,8 +304,8 @@ impl ScriptedPlayer for BuildTechAttackScript {
                 .filter(|(k, _, _, _)| *k == kind)
                 .count()
         };
-        let depot_count =
-            own.iter().filter(|e| is_kind(e, EntityKind::Depot)).count() + pending_count(EntityKind::Depot);
+        let depot_count = own.iter().filter(|e| is_kind(e, EntityKind::Depot)).count()
+            + pending_count(EntityKind::Depot);
         let depot_under_construction = own
             .iter()
             .any(|e| is_kind(e, EntityKind::Depot) && !is_complete(e))

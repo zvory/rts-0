@@ -110,7 +110,9 @@ async fn version_handler(State(state): State<AppState>) -> String {
     state.version
 }
 
-async fn dev_selfplay_handler(Query(params): Query<std::collections::HashMap<String, String>>) -> impl IntoResponse {
+async fn dev_selfplay_handler(
+    Query(params): Query<std::collections::HashMap<String, String>>,
+) -> impl IntoResponse {
     let mut target = "/?watchSelfplay=1".to_string();
     if let Some(replay) = params.get("replay").filter(|s| !s.trim().is_empty()) {
         target.push_str("&replay=");

@@ -98,7 +98,8 @@ impl AiController {
         // Finished barracks as (id, queue_len).
         let mut barracks: Vec<(u32, usize)> = Vec::new();
         let mut barracks_total: usize = 0; // finished + under construction
-        let mut depot_building = false;
+        let mut depot_under_construction = false;
+        let mut pending_depot_build = false;
 
         for e in world_query::owned_units(entities, self.player)
             .chain(world_query::owned_buildings(entities, self.player))
@@ -109,6 +110,15 @@ impl AiController {
                     match e.order() {
                         Order::Idle => idle_workers.push(e.id),
                         Order::Gather(_) => gathering_workers.push(e.id),
+                        Order::Build(_) => {
+                            if let Some((kind, _, _)) = e.order().build_intent_tile() {
+                                match kind {
+                                    EntityKind::Depot => pending_depot_build = true,
+                                    EntityKind::Barracks => barracks_total += 1,
+                                    _ => {}
+                                }
+                            }
+                        }
                         _ => {}
                     }
                 }
@@ -129,22 +139,33 @@ impl AiController {
                         barracks.push((e.id, e.prod_queue().len()));
                     }
                 }
-                EntityKind::Depot if e.under_construction() => depot_building = true,
+                EntityKind::Depot if e.under_construction() => depot_under_construction = true,
                 _ => {}
             }
         }
         let _ = rifleman_count; // surveyed for clarity; waves key off free_riflemen.
+        let depot_in_progress = depot_under_construction || pending_depot_build;
 
         // Workers we may pull onto a build job: prefer truly idle, fall back to a gatherer.
         let mut builder_pool = idle_workers.clone();
         builder_pool.extend(gathering_workers.iter().copied());
+        let mut reserved_workers = HashSet::new();
 
         // --- 1. Expand supply with a depot when we're about to choke. ------
         let depot_cost = config::building_stats(EntityKind::Depot)
             .map(|s| s.cost_steel)
             .unwrap_or(50);
-        if !depot_building && !supply_capped && free_supply < SUPPLY_BUFFER && steel >= depot_cost {
-            if let Some(worker) = builder_pool.pop() {
+        if !depot_in_progress
+            && !supply_capped
+            && free_supply < SUPPLY_BUFFER
+            && steel >= depot_cost
+        {
+            if let Some(worker) = pop_builder(
+                &mut idle_workers,
+                &mut gathering_workers,
+                &mut builder_pool,
+                &mut reserved_workers,
+            ) {
                 if let Some((tx, ty)) =
                     self.find_build_spot(map, entities, spatial, EntityKind::Depot, me)
                 {
@@ -158,7 +179,6 @@ impl AiController {
                         },
                     ));
                     steel -= depot_cost;
-                    remove_id(&mut idle_workers, worker);
                 }
             }
         }
@@ -168,7 +188,12 @@ impl AiController {
             .map(|s| s.cost_steel)
             .unwrap_or(100);
         if barracks_total < TARGET_BARRACKS && steel >= rax_cost {
-            if let Some(worker) = builder_pool.pop() {
+            if let Some(worker) = pop_builder(
+                &mut idle_workers,
+                &mut gathering_workers,
+                &mut builder_pool,
+                &mut reserved_workers,
+            ) {
                 if let Some((tx, ty)) =
                     self.find_build_spot(map, entities, spatial, EntityKind::Barracks, me)
                 {
@@ -182,7 +207,6 @@ impl AiController {
                         },
                     ));
                     steel -= rax_cost;
-                    remove_id(&mut idle_workers, worker);
                 }
             }
         }
@@ -242,8 +266,7 @@ impl AiController {
         // --- 5. Send idle workers to distinct steel patches. -------------
         let mut reserved_nodes = occupied_steel_nodes(entities);
         for worker in idle_workers {
-            if let Some(node) =
-                nearest_free_steel_node(entities, spatial, worker, &reserved_nodes)
+            if let Some(node) = nearest_free_steel_node(entities, spatial, worker, &reserved_nodes)
             {
                 out.push((
                     self.player,
@@ -381,15 +404,79 @@ fn remove_id(v: &mut Vec<u32>, id: u32) {
     }
 }
 
+/// Reserve one worker for a build decision, preferring idle workers over active gatherers and
+/// keeping every local worker list in sync so later decisions in the same think cannot reuse it.
+fn pop_builder(
+    idle_workers: &mut Vec<u32>,
+    gathering_workers: &mut Vec<u32>,
+    builder_pool: &mut Vec<u32>,
+    reserved_workers: &mut HashSet<u32>,
+) -> Option<u32> {
+    let worker = idle_workers.pop().or_else(|| gathering_workers.pop())?;
+    if !reserved_workers.insert(worker) {
+        return None;
+    }
+    remove_id(builder_pool, worker);
+    remove_id(idle_workers, worker);
+    remove_id(gathering_workers, worker);
+    Some(worker)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::game::entity::Order;
+    use crate::protocol::Command;
+
+    #[test]
+    fn pop_builder_prefers_idle_and_does_not_reuse_workers() {
+        let mut idle_workers = vec![11, 12];
+        let mut gathering_workers = vec![21];
+        let mut builder_pool = vec![11, 12, 21];
+        let mut reserved = HashSet::new();
+
+        let first = pop_builder(
+            &mut idle_workers,
+            &mut gathering_workers,
+            &mut builder_pool,
+            &mut reserved,
+        );
+        let second = pop_builder(
+            &mut idle_workers,
+            &mut gathering_workers,
+            &mut builder_pool,
+            &mut reserved,
+        );
+        let third = pop_builder(
+            &mut idle_workers,
+            &mut gathering_workers,
+            &mut builder_pool,
+            &mut reserved,
+        );
+        let fourth = pop_builder(
+            &mut idle_workers,
+            &mut gathering_workers,
+            &mut builder_pool,
+            &mut reserved,
+        );
+
+        assert_eq!(first, Some(12));
+        assert_eq!(second, Some(11));
+        assert_eq!(third, Some(21));
+        assert_eq!(fourth, None);
+        assert!(builder_pool.is_empty());
+        assert_eq!(reserved.len(), 3);
+    }
 
     #[test]
     fn idle_workers_pick_distinct_steel_nodes() {
         let mut entities = EntityStore::default();
-        let worker_a = entities.spawn_unit(1, EntityKind::Worker, 0.0, 0.0).unwrap();
-        let worker_b = entities.spawn_unit(1, EntityKind::Worker, 8.0, 0.0).unwrap();
+        let worker_a = entities
+            .spawn_unit(1, EntityKind::Worker, 0.0, 0.0)
+            .unwrap();
+        let worker_b = entities
+            .spawn_unit(1, EntityKind::Worker, 8.0, 0.0)
+            .unwrap();
         let node_a = entities.spawn_node(EntityKind::Steel, 64.0, 0.0).unwrap();
         let node_b = entities.spawn_node(EntityKind::Steel, 96.0, 0.0).unwrap();
         let spatial = SpatialIndex::build(&entities, config::TILE_SIZE);
@@ -401,5 +488,37 @@ mod tests {
 
         let pick_b = nearest_free_steel_node(&entities, &spatial, worker_b, &reserved);
         assert_eq!(pick_b, Some(node_b));
+    }
+
+    #[test]
+    fn pending_depot_build_blocks_repeat_supply_depot_plan() {
+        let mut entities = EntityStore::default();
+        let worker = entities
+            .spawn_unit(2, EntityKind::Worker, 0.0, 0.0)
+            .unwrap();
+        if let Some(e) = entities.get_mut(worker) {
+            e.set_order(Order::build(EntityKind::Depot, 5, 6));
+        }
+        let spatial = SpatialIndex::build(&entities, config::TILE_SIZE);
+        let mut ai = AiController::new(2);
+        let players = vec![PlayerState {
+            id: 2,
+            name: "Computer".into(),
+            color: "#000".into(),
+            start_tile: (10, 10),
+            steel: 999,
+            oil: 0,
+            supply_used: 8,
+            supply_cap: 10,
+        }];
+        let map = Map::generate(2, 1234);
+        let mut out = Vec::new();
+
+        ai.think(&map, &entities, &spatial, &players, 7, &mut out);
+
+        assert!(
+            !out.iter().any(|(_, cmd)| matches!(cmd, Command::Build { building, .. } if building == crate::protocol::kinds::DEPOT)),
+            "AI should treat a worker's pending depot build intent as supply already in progress"
+        );
     }
 }
