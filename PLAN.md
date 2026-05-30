@@ -446,7 +446,10 @@ Use this index when deciding whether a TODO can start.
 - Advanced AI: requires 1.2, 2.2, 2.3, 3.1, and later relevant unit mechanics.
 - Workers do not auto attack: prefer 2.2 and 3.1.
 
-## Recommended Immediate Next Task
 
-Start with **Phase 1.1 Tick Invariant Checks**. It is the cheapest foundation that improves every
-later feature and gives future agents a fast way to detect broken assumptions.
+
+# Uncategorized Tasks:
+ - buildings can be built on top of each other
+ - tank factory and advanced training center should   require 100 and 50 oil respecitvely
+ - Add four oil patches, but cut the rate of oil gathering by four
+ - should be possible to select multiple buildings at once

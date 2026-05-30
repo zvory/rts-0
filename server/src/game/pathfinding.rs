@@ -15,8 +15,6 @@ use std::collections::{BinaryHeap, HashMap};
 
 use crate::config;
 
-
-
 /// A passability oracle the pathfinder queries per tile: terrain AND dynamic building
 /// footprints. Implemented by `systems`/`mod` which own the occupancy grid.
 pub trait Passability {

@@ -31,7 +31,10 @@ impl SpatialIndex {
             let idx = (ty as u32 * map_size + tx as u32) as usize;
             cells[idx].push(e.id);
         }
-        SpatialIndex { size: map_size, cells }
+        SpatialIndex {
+            size: map_size,
+            cells,
+        }
     }
 
     /// Iterate all entity ids whose tile center lies within the inclusive tile rectangle.
@@ -53,7 +56,12 @@ impl SpatialIndex {
 
     /// Iterate all entity ids whose tile center lies within the bounding box of the circle
     /// centered at `(cx, cy)` with radius `radius_px`.
-    pub fn ids_in_circle_bbox(&self, cx: f32, cy: f32, radius_px: f32) -> impl Iterator<Item = u32> + '_ {
+    pub fn ids_in_circle_bbox(
+        &self,
+        cx: f32,
+        cy: f32,
+        radius_px: f32,
+    ) -> impl Iterator<Item = u32> + '_ {
         let ts = config::TILE_SIZE as f32;
         let min_tx = ((cx - radius_px) / ts).floor() as i32;
         let min_ty = ((cy - radius_px) / ts).floor() as i32;
