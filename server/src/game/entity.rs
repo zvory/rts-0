@@ -618,7 +618,10 @@ impl Entity {
     }
 
     pub fn last_repath_tick(&self) -> u32 {
-        self.movement.as_ref().map(|m| m.last_repath_tick).unwrap_or(0)
+        self.movement
+            .as_ref()
+            .map(|m| m.last_repath_tick)
+            .unwrap_or(0)
     }
 
     pub fn set_path_goal(&mut self, goal: Option<(f32, f32)>) {

@@ -26,6 +26,7 @@ use crate::protocol::{Command, Event};
 ///
 /// Returns the [`SpatialIndex`] built from the post-tick entity positions so the snapshot layer
 /// can use it for interest filtering without rebuilding.
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn run_tick(
     map: &Map,
     entities: &mut EntityStore,
@@ -45,7 +46,14 @@ pub(crate) fn run_tick(
         services::move_coordinator::MoveCoordinator::new(pathing, map, &occ, tick);
 
     services::commands::apply_commands(
-        map, entities, players, &occ, &spatial, &mut coordinator, pending, events,
+        map,
+        entities,
+        players,
+        &occ,
+        &spatial,
+        &mut coordinator,
+        pending,
+        events,
     );
     coordinator.process_awaiting_paths(entities);
     services::movement::movement_system(map, entities, &occ);

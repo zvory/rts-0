@@ -148,7 +148,7 @@ struct AiSlot {
 /// The room's current mode. `InGame` owns the live simulation outright.
 enum Phase {
     Lobby,
-    InGame(Game),
+    InGame(Box<Game>),
 }
 
 /// All state owned by a single room task. Lives entirely on that task — never shared.
@@ -480,7 +480,7 @@ impl RoomTask {
         }
 
         info!(room = %self.room, players = self.match_player_count, "match started");
-        self.phase = Phase::InGame(game);
+        self.phase = Phase::InGame(Box::new(game));
     }
 
     // -- In-game phase -------------------------------------------------------
