@@ -62,8 +62,7 @@ The first-time setup steps, app name, and machine management commands live in
 | Select unit / building | Left-click |
 | Box-select | Left-drag |
 | Move / gather / attack (context-sensitive) | Right-click |
-| Attack-move | `A`, then left-click |
-| Stop | `S` |
+| Command card | Grid hotkeys: Q W E / A S D / Z X C (top-left is Q) |
 | Pan camera | WASD / arrow keys / screen edge / drag minimap |
 | Zoom | Mouse wheel |
 | Build (worker selected) | Command-card buttons, then click to place; `Esc`/right-click cancels |
