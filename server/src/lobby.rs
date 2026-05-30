@@ -16,6 +16,7 @@
 //!    room returns to the `Lobby` phase (ready flags reset) so the same players can rematch.
 
 use std::collections::HashMap;
+use std::fs;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
@@ -25,6 +26,7 @@ use tokio::time::{interval, MissedTickBehavior};
 use tracing::{debug, info, warn};
 
 use crate::config;
+use crate::game::selfplay::{LiveSelfPlay, ReplayArtifact, ReplayDriver};
 use crate::game::{Game, PlayerInit};
 use crate::protocol::{Command, Event, LobbyPlayer, ServerMessage, StartPayload};
 
@@ -45,6 +47,7 @@ const PLAYER_CHANNEL_CAP: usize = 256;
 /// Bound on a room's inbound event queue. Commands/joins past this are dropped rather than
 /// allowed to grow without limit; in practice the room drains this every tick.
 const ROOM_EVENT_CHANNEL_CAP: usize = 1024;
+const DEV_SELFPLAY_ROOM_PREFIX: &str = "__dev_selfplay__";
 
 /// Monotonic source of globally-unique player ids (ids are never reused within a process run).
 static NEXT_PLAYER_ID: AtomicU32 = AtomicU32::new(1);
@@ -114,8 +117,9 @@ impl Lobby {
         rooms.insert(room.to_string(), handle.clone());
 
         let name = room.to_string();
+        let mode = room_mode_for(&name);
         tokio::spawn(async move {
-            let mut task = RoomTask::new(name.clone());
+            let mut task = RoomTask::new(name.clone(), mode);
             task.run(event_rx).await;
             info!(room = %name, "room task exited");
         });
@@ -151,9 +155,27 @@ enum Phase {
     InGame(Box<Game>),
 }
 
+#[derive(Clone)]
+enum RoomMode {
+    Normal,
+    DevSelfPlay(DevSelfPlayConfig),
+}
+
+#[derive(Clone)]
+enum DevSelfPlayConfig {
+    Live,
+    Replay { artifact: String },
+}
+
+enum DevDriver {
+    Live(LiveSelfPlay),
+    Replay(ReplayDriver),
+}
+
 /// All state owned by a single room task. Lives entirely on that task — never shared.
 struct RoomTask {
     room: String,
+    mode: RoomMode,
     /// Connected players in join order (join order drives color assignment and host fallback).
     order: Vec<u32>,
     players: HashMap<u32, RoomPlayer>,
@@ -167,18 +189,23 @@ struct RoomTask {
     /// sandbox never ends while a 2+ player match (including human-vs-AI) resolves to a winner.
     /// `0` outside a match.
     match_player_count: usize,
+    dev_driver: Option<DevDriver>,
+    dev_view_player_id: Option<u32>,
 }
 
 impl RoomTask {
-    fn new(room: String) -> Self {
+    fn new(room: String, mode: RoomMode) -> Self {
         RoomTask {
             room,
+            mode,
             order: Vec::new(),
             players: HashMap::new(),
             ai_players: Vec::new(),
             host_id: None,
             phase: Phase::Lobby,
             match_player_count: 0,
+            dev_driver: None,
+            dev_view_player_id: None,
         }
     }
 
@@ -234,6 +261,10 @@ impl RoomTask {
         msg_tx: mpsc::Sender<ServerMessage>,
         ack: tokio::sync::oneshot::Sender<bool>,
     ) {
+        if matches!(self.mode, RoomMode::DevSelfPlay(_)) {
+            self.on_join_dev_selfplay(player_id, name, msg_tx, ack);
+            return;
+        }
         if self.players.contains_key(&player_id) {
             // Defensive: a connection should only ever join once.
             let _ = ack.send(false);
@@ -300,6 +331,8 @@ impl RoomTask {
             // Drop AI opponents too: with no humans there is nobody to host them, and a fresh
             // joiner under this room name should start from a clean lobby.
             self.ai_players.clear();
+            self.dev_driver = None;
+            self.dev_view_player_id = None;
             debug!(room = %self.room, "room emptied; reset to lobby");
             return;
         }
@@ -314,6 +347,9 @@ impl RoomTask {
     }
 
     fn on_ready(&mut self, player_id: u32, ready: bool) {
+        if matches!(self.mode, RoomMode::DevSelfPlay(_)) {
+            return;
+        }
         if let Phase::Lobby = self.phase {
             if let Some(player) = self.players.get_mut(&player_id) {
                 player.ready = ready;
@@ -323,6 +359,9 @@ impl RoomTask {
     }
 
     fn on_start_request(&mut self, player_id: u32) {
+        if matches!(self.mode, RoomMode::DevSelfPlay(_)) {
+            return;
+        }
         if !matches!(self.phase, Phase::Lobby) {
             return;
         }
@@ -340,6 +379,9 @@ impl RoomTask {
     /// Host-only: seat a computer opponent. Ignored outside the lobby, from non-hosts, or once
     /// the room is full (humans + AI == [`MAX_PLAYERS`]).
     fn on_add_ai(&mut self, player_id: u32) {
+        if matches!(self.mode, RoomMode::DevSelfPlay(_)) {
+            return;
+        }
         if !matches!(self.phase, Phase::Lobby) || self.host_id != Some(player_id) {
             return;
         }
@@ -357,6 +399,9 @@ impl RoomTask {
     /// Host-only: remove a previously-added AI opponent by id. Ignored outside the lobby, from
     /// non-hosts, or for an unknown id.
     fn on_remove_ai(&mut self, player_id: u32, target: u32) {
+        if matches!(self.mode, RoomMode::DevSelfPlay(_)) {
+            return;
+        }
         if !matches!(self.phase, Phase::Lobby) || self.host_id != Some(player_id) {
             return;
         }
@@ -382,6 +427,9 @@ impl RoomTask {
     }
 
     fn on_command(&mut self, player_id: u32, cmd: Command) {
+        if matches!(self.mode, RoomMode::DevSelfPlay(_)) {
+            return;
+        }
         // Commands are ignored unless in-game and the sender is actually in this room. The
         // simulation itself validates ownership/affordability when it applies the command.
         if let Phase::InGame(game) = &mut self.phase {
@@ -392,6 +440,35 @@ impl RoomTask {
     }
 
     // -- Lobby phase ---------------------------------------------------------
+
+    fn on_join_dev_selfplay(
+        &mut self,
+        player_id: u32,
+        name: String,
+        msg_tx: mpsc::Sender<ServerMessage>,
+        ack: tokio::sync::oneshot::Sender<bool>,
+    ) {
+        if self.players.contains_key(&player_id) {
+            let _ = ack.send(false);
+            return;
+        }
+        self.order.push(player_id);
+        self.players.insert(
+            player_id,
+            RoomPlayer {
+                name,
+                color: "#6f8fa8".to_string(),
+                ready: true,
+                msg_tx,
+            },
+        );
+        let _ = ack.send(true);
+        if !matches!(self.phase, Phase::InGame(_)) {
+            self.start_dev_session();
+        } else {
+            self.send_dev_start_to(player_id);
+        }
+    }
 
     /// A match may start with at least one player present and every player marked ready.
     fn can_start(&self) -> bool {
@@ -483,11 +560,93 @@ impl RoomTask {
         self.phase = Phase::InGame(Box::new(game));
     }
 
+    fn start_dev_session(&mut self) {
+        let (game, driver, view_player_id) = match self.build_dev_session() {
+            Ok(session) => session,
+            Err(err) => {
+                warn!(room = %self.room, error = %err, "dev self-play bootstrap failed");
+                self.send_dev_error(&err);
+                return;
+            }
+        };
+        self.phase = Phase::InGame(Box::new(game));
+        self.match_player_count = 2;
+        self.dev_driver = Some(driver);
+        self.dev_view_player_id = Some(view_player_id);
+        let recipients = self.order.clone();
+        for player_id in recipients {
+            self.send_dev_start_to(player_id);
+        }
+        info!(room = %self.room, "dev self-play session started");
+    }
+
+    fn build_dev_session(&self) -> Result<(Game, DevDriver, u32), String> {
+        match &self.mode {
+            RoomMode::Normal => Err("room is not configured for dev self-play".to_string()),
+            RoomMode::DevSelfPlay(DevSelfPlayConfig::Live) => {
+                let driver = LiveSelfPlay::default_match();
+                let players = driver.players().to_vec();
+                let view_player_id = players
+                    .first()
+                    .map(|p| p.id)
+                    .ok_or_else(|| "live self-play configured with no players".to_string())?;
+                let game = Game::new(&players);
+                Ok((game, DevDriver::Live(driver), view_player_id))
+            }
+            RoomMode::DevSelfPlay(DevSelfPlayConfig::Replay { artifact }) => {
+                let artifact_name = artifact.clone();
+                let artifact = load_replay_artifact(artifact)?;
+                let (players, driver) = ReplayDriver::from_artifact(artifact);
+                let view_player_id = players
+                    .first()
+                    .map(|p| p.id)
+                    .ok_or_else(|| format!("replay artifact {artifact_name:?} has no players"))?;
+                let game = Game::new_for_replay(&players);
+                Ok((game, DevDriver::Replay(driver), view_player_id))
+            }
+        }
+    }
+
+    fn send_dev_start_to(&self, watcher_id: u32) {
+        let Some(Phase::InGame(game)) = Some(&self.phase) else {
+            return;
+        };
+        let Some(player) = self.players.get(&watcher_id) else {
+            return;
+        };
+        let per_player = StartPayload {
+            player_id: self.dev_view_player_id.unwrap_or(watcher_id),
+            ..game.start_payload()
+        };
+        send_or_log(
+            &self.room,
+            watcher_id,
+            &player.msg_tx,
+            ServerMessage::Start(per_player),
+        );
+    }
+
+    fn send_dev_error(&self, msg: &str) {
+        let payload = ServerMessage::Error {
+            msg: msg.to_string(),
+        };
+        for &watcher_id in &self.order {
+            let Some(player) = self.players.get(&watcher_id) else {
+                continue;
+            };
+            send_or_log(&self.room, watcher_id, &player.msg_tx, payload.clone());
+        }
+    }
+
     // -- In-game phase -------------------------------------------------------
 
     /// One simulation step. No-op in the `Lobby` phase (the ticker keeps running so a room is
     /// always live and ready to start).
     fn on_tick(&mut self) {
+        if matches!(self.mode, RoomMode::DevSelfPlay(_)) {
+            self.on_tick_dev_selfplay();
+            return;
+        }
         // Take ownership of the game for the duration of the tick so we can both mutate it and
         // freely borrow `self` for sending. Restored (or replaced with `Lobby`) before return.
         let mut game = match std::mem::replace(&mut self.phase, Phase::Lobby) {
@@ -529,6 +688,49 @@ impl RoomTask {
             return;
         }
 
+        self.phase = Phase::InGame(game);
+    }
+
+    fn on_tick_dev_selfplay(&mut self) {
+        let mut game = match std::mem::replace(&mut self.phase, Phase::Lobby) {
+            Phase::Lobby => return,
+            Phase::InGame(game) => game,
+        };
+        let Some(mut driver) = self.dev_driver.take() else {
+            self.phase = Phase::InGame(game);
+            return;
+        };
+        match &mut driver {
+            DevDriver::Live(scripted) => scripted.enqueue_for_tick(&mut game),
+            DevDriver::Replay(replay) => replay.enqueue_for_tick(&mut game),
+        }
+        let _ = game.tick();
+
+        let recipients = self.order.clone();
+        let view_player_id = self.dev_view_player_id.unwrap_or(0);
+        for id in recipients {
+            let Some(player) = self.players.get(&id) else {
+                continue;
+            };
+            let snapshot = game.snapshot_full_for(view_player_id);
+            send_or_log(
+                &self.room,
+                id,
+                &player.msg_tx,
+                ServerMessage::Snapshot(snapshot),
+            );
+        }
+
+        let alive = game.alive_players();
+        if alive.len() <= 1 {
+            self.phase = Phase::Lobby;
+            self.dev_driver = None;
+            self.dev_view_player_id = None;
+            self.start_dev_session();
+            return;
+        }
+
+        self.dev_driver = Some(driver);
         self.phase = Phase::InGame(game);
     }
 
@@ -597,4 +799,39 @@ fn send_or_log(room: &str, player_id: u32, tx: &mpsc::Sender<ServerMessage>, msg
 /// channel with the same bound the room expects.
 pub const fn player_channel_cap() -> usize {
     PLAYER_CHANNEL_CAP
+}
+
+fn room_mode_for(room: &str) -> RoomMode {
+    if room == format!("{DEV_SELFPLAY_ROOM_PREFIX}live") {
+        return RoomMode::DevSelfPlay(DevSelfPlayConfig::Live);
+    }
+    if let Some(artifact) = room.strip_prefix(&format!("{DEV_SELFPLAY_ROOM_PREFIX}replay:")) {
+        return RoomMode::DevSelfPlay(DevSelfPlayConfig::Replay {
+            artifact: artifact.to_string(),
+        });
+    }
+    RoomMode::Normal
+}
+
+fn load_replay_artifact(name: &str) -> Result<ReplayArtifact, String> {
+    if !is_safe_artifact_name(name) {
+        return Err("invalid replay artifact name".to_string());
+    }
+    let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("target")
+        .join("selfplay-failures")
+        .join(name)
+        .join("replay.json");
+    let json = fs::read_to_string(&path).map_err(|e| format!("failed to read {path:?}: {e}"))?;
+    serde_json::from_str(&json).map_err(|e| format!("failed to parse replay artifact: {e}"))
+}
+
+fn is_safe_artifact_name(name: &str) -> bool {
+    !name.is_empty()
+        && !name.contains('/')
+        && !name.contains('\\')
+        && !name.contains("..")
+        && name
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
 }
