@@ -44,12 +44,17 @@ impl Game {
             assert!(
                 e.pos_x.is_finite() && e.pos_y.is_finite(),
                 "invariant: entity {} has non-finite position ({}, {})",
-                e.id, e.pos_x, e.pos_y
+                e.id,
+                e.pos_x,
+                e.pos_y
             );
             assert!(
                 e.pos_x >= 0.0 && e.pos_x < world_max && e.pos_y >= 0.0 && e.pos_y < world_max,
                 "invariant: entity {} position ({}, {}) out of world bounds [0, {})",
-                e.id, e.pos_x, e.pos_y, world_max
+                e.id,
+                e.pos_x,
+                e.pos_y,
+                world_max
             );
         }
 
@@ -63,11 +68,11 @@ impl Game {
                 if e.owner != ps.id {
                     continue;
                 }
-                if e.is_building() && !e.under_construction {
+                if e.is_building() && !e.under_construction() {
                     if let Some(s) = config::building_stats(e.kind) {
                         expected_cap += s.provides_supply;
                     }
-                    for item in &e.prod_queue {
+                    for item in e.prod_queue() {
                         if let Some(us) = config::unit_stats(item.unit) {
                             expected_used += us.supply;
                         }
@@ -104,7 +109,8 @@ impl Game {
                 assert!(
                     !occupied.contains(tile),
                     "invariant: building {} footprint overlaps another building at tile {:?}",
-                    e.id, tile
+                    e.id,
+                    tile
                 );
                 occupied.push(*tile);
             }
@@ -117,7 +123,7 @@ impl Game {
             if !e.is_node() {
                 continue;
             }
-            if let Some(miner_id) = e.miner {
+            if let Some(miner_id) = e.miner() {
                 let miner = match self.entities.get(miner_id) {
                     Some(m) => m,
                     None => {
@@ -129,23 +135,28 @@ impl Game {
                 assert!(
                     miner.kind == EntityKind::Worker,
                     "invariant: node {} miner {} is not a worker (kind {:?})",
-                    e.id, miner_id, miner.kind
+                    e.id,
+                    miner_id,
+                    miner.kind
                 );
                 assert!(
                     miner.hp > 0,
                     "invariant: node {} miner {} has hp == 0",
-                    e.id, miner_id
+                    e.id,
+                    miner_id
                 );
-                let on_this_node = matches!(miner.order, Order::Gather { node } if node == e.id);
+                let on_this_node = matches!(miner.order(), Order::Gather { node } if node == e.id);
                 assert!(
                     on_this_node,
                     "invariant: node {} miner {} does not have Gather order for this node (order {:?})",
-                    e.id, miner_id, miner.order
+                    e.id, miner_id, miner.order()
                 );
                 assert!(
-                    miner.gather_phase == GatherPhase::Harvesting,
+                    miner.gather_phase() == Some(GatherPhase::Harvesting),
                     "invariant: node {} miner {} gather_phase is not Harvesting ({:?})",
-                    e.id, miner_id, miner.gather_phase
+                    e.id,
+                    miner_id,
+                    miner.gather_phase()
                 );
             }
         }
@@ -159,7 +170,7 @@ impl Game {
             if !e.is_unit() {
                 continue;
             }
-            match e.order {
+            match e.order() {
                 Order::Attack { target } => {
                     if let Some(t) = self.entities.get(target) {
                         assert!(
@@ -172,18 +183,18 @@ impl Game {
                 Order::Gather { node } => {
                     if let Some(n) = self.entities.get(node) {
                         assert!(
-                            n.is_node() && n.remaining > 0,
+                            n.is_node() && n.remaining().unwrap_or(0) > 0,
                             "invariant: entity {} Gather order targets invalid node {} (kind {:?} remaining {})",
-                            e.id, node, n.kind, n.remaining
+                            e.id, node, n.kind, n.remaining().unwrap_or(0)
                         );
                     }
                 }
                 Order::Build { site } => {
                     if let Some(b) = self.entities.get(site) {
                         assert!(
-                            b.is_building() && b.under_construction,
+                            b.is_building() && b.under_construction(),
                             "invariant: entity {} Build order targets invalid site {} (building {} under_construction {})",
-                            e.id, site, b.is_building(), b.under_construction
+                            e.id, site, b.is_building(), b.under_construction()
                         );
                     }
                 }
@@ -219,12 +230,16 @@ impl Game {
                 assert!(
                     self.fog.is_visible_world(pid, v.x, v.y),
                     "invariant: snapshot for player {} exposes hidden enemy entity {} at ({}, {})",
-                    pid, v.id, v.x, v.y
+                    pid,
+                    v.id,
+                    v.x,
+                    v.y
                 );
                 // If a target_id is exposed, the target must be visible too.
                 if let Some(tid) = v.target_id {
                     if let Some(t) = self.entities.get(tid) {
-                        let visible = v.owner == pid || self.fog.is_visible_world(pid, t.pos_x, t.pos_y);
+                        let visible =
+                            v.owner == pid || self.fog.is_visible_world(pid, t.pos_x, t.pos_y);
                         assert!(
                             visible,
                             "invariant: snapshot for player {} exposes hidden target_id {} (target pos {}, {})",

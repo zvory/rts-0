@@ -44,12 +44,20 @@ pub(crate) fn death_system(
         .iter()
         .filter(|e| e.is_node())
         .filter_map(|e| {
-            e.miner.and_then(|m| if !entities.contains(m) { Some(e.id) } else { None })
+            e.miner().and_then(|m| {
+                if !entities.contains(m) {
+                    Some(e.id)
+                } else {
+                    None
+                }
+            })
         })
         .collect();
     for nid in nodes_to_clear {
         if let Some(n) = entities.get_mut(nid) {
-            n.miner = None;
+            if let Some(node) = n.resource_node.as_mut() {
+                node.miner = None;
+            }
         }
     }
 
@@ -58,7 +66,7 @@ pub(crate) fn death_system(
     for id in entities.ids() {
         let stale = {
             let Some(e) = entities.get(id) else { continue };
-            match e.order {
+            match e.order() {
                 Order::Attack { target } => !entities.contains(target),
                 Order::Build { site } => !entities.contains(site),
                 _ => false,

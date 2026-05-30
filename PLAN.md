@@ -109,12 +109,12 @@ mechanics.
 
 ### 2.1 Typed Component-Shaped Entity State
 
-- [ ] Split broad `Entity` fields into typed state groups while keeping `EntityStore` simple.
-- [ ] Introduce structures such as `MovementState`, `CombatState`, `ProductionState`,
+- [x] Split broad `Entity` fields into typed state groups while keeping `EntityStore` simple.
+- [x] Introduce structures such as `MovementState`, `CombatState`, `ProductionState`,
   `ConstructionState`, `WorkerState`, and `ResourceNodeState`.
-- [ ] Add constructors per `EntityKind`.
-- [ ] Add tests that each `EntityKind` has exactly the expected state groups.
-- [ ] Avoid adding new top-level optional fields to `Entity` unless they apply to most kinds.
+- [x] Add constructors per `EntityKind`.
+- [x] Add tests that each `EntityKind` has exactly the expected state groups.
+- [x] Avoid adding new top-level optional fields to `Entity` unless they apply to most kinds.
 
 Gates:
 

@@ -21,7 +21,7 @@ pub(crate) fn gather_system(
 
     for id in entities.ids() {
         let node = match entities.get(id) {
-            Some(e) if e.kind == EntityKind::Worker => match e.order {
+            Some(e) if e.kind == EntityKind::Worker => match e.order() {
                 Order::Gather { node } => node,
                 _ => continue,
             },
@@ -30,7 +30,7 @@ pub(crate) fn gather_system(
 
         let phase = entities
             .get(id)
-            .map(|e| e.gather_phase)
+            .and_then(|e| e.gather_phase())
             .unwrap_or(GatherPhase::ToNode);
         match phase {
             GatherPhase::ToNode | GatherPhase::ToHome => {
@@ -51,7 +51,7 @@ fn gather_to_node(
     interact: f32,
 ) {
     let node_pos = match entities.get(node) {
-        Some(n) if n.is_node() && n.remaining > 0 => (n.pos_x, n.pos_y),
+        Some(n) if n.is_node() && n.remaining().unwrap_or(0) > 0 => (n.pos_x, n.pos_y),
         _ => {
             idle_gatherer(entities, id);
             return;
@@ -65,28 +65,34 @@ fn gather_to_node(
     if dist2(wx, wy, node_pos.0, node_pos.1).sqrt() <= interact {
         let can_mine = !matches!(slot_held(entities, node), Some(m) if m != id);
         if let Some(e) = entities.get_mut(id) {
-            e.path.clear();
-            e.facing = (node_pos.1 - wy).atan2(node_pos.0 - wx);
+            e.clear_path();
+            e.set_facing((node_pos.1 - wy).atan2(node_pos.0 - wx));
             if can_mine {
-                e.gather_phase = GatherPhase::Harvesting;
-                e.harvest_progress = 0;
+                if let Some(w) = e.worker.as_mut() {
+                    w.gather_phase = GatherPhase::Harvesting;
+                    w.harvest_progress = 0;
+                }
             } else {
                 e.clear_orders();
             }
         }
         if can_mine {
             if let Some(n) = entities.get_mut(node) {
-                n.miner = Some(id);
+                if let Some(node) = n.resource_node.as_mut() {
+                    node.miner = Some(id);
+                }
             }
         }
-    } else if entities.get(id).map(|e| e.path.is_empty()).unwrap_or(true) {
+    } else if entities.get(id).map(|e| e.path_is_empty()).unwrap_or(true) {
         pathing.repath_entity(map, entities, occ, id, node_pos.0, node_pos.1);
     }
 }
 
 fn gather_harvesting(entities: &mut EntityStore, players: &mut [PlayerState], id: u32, node: u32) {
     let node_kind_amount = match entities.get(node) {
-        Some(n) if n.is_node() && n.remaining > 0 => (n.kind, n.remaining),
+        Some(n) if n.is_node() && n.remaining().unwrap_or(0) > 0 => {
+            (n.kind, n.remaining().unwrap_or(0))
+        }
         _ => {
             idle_gatherer(entities, id);
             return;
@@ -97,13 +103,17 @@ fn gather_harvesting(entities: &mut EntityStore, players: &mut [PlayerState], id
         Some(m) if m != id => {
             if let Some(e) = entities.get_mut(id) {
                 e.clear_orders();
-                e.harvest_progress = 0;
+                if let Some(w) = e.worker.as_mut() {
+                    w.harvest_progress = 0;
+                }
             }
             return;
         }
         _ => {
             if let Some(n) = entities.get_mut(node) {
-                n.miner = Some(id);
+                if let Some(node) = n.resource_node.as_mut() {
+                    node.miner = Some(id);
+                }
             }
         }
     }
@@ -113,8 +123,11 @@ fn gather_harvesting(entities: &mut EntityStore, players: &mut [PlayerState], id
             Some(e) => e,
             None => return,
         };
-        e.harvest_progress += 1;
-        e.harvest_progress >= config::HARVEST_TICKS
+        let Some(w) = e.worker.as_mut() else {
+            return;
+        };
+        w.harvest_progress += 1;
+        w.harvest_progress >= config::HARVEST_TICKS
     };
     if !done {
         return;
@@ -128,7 +141,9 @@ fn gather_harvesting(entities: &mut EntityStore, players: &mut [PlayerState], id
     };
     let taken = load_cap.min(node_kind_amount.1);
     if let Some(n) = entities.get_mut(node) {
-        n.remaining = n.remaining.saturating_sub(taken);
+        if let Some(node) = n.resource_node.as_mut() {
+            node.remaining = node.remaining.saturating_sub(taken);
+        }
     }
 
     let owner = match entities.get(id) {
@@ -146,9 +161,11 @@ fn gather_harvesting(entities: &mut EntityStore, players: &mut [PlayerState], id
     }
 
     if let Some(e) = entities.get_mut(id) {
-        e.harvest_progress = 0;
-        e.carry = None;
-        e.path.clear();
+        if let Some(w) = e.worker.as_mut() {
+            w.harvest_progress = 0;
+            w.carry = None;
+        }
+        e.clear_path();
     }
     if taken == node_kind_amount.1 {
         entities.release_miner(id);
@@ -161,13 +178,13 @@ fn gather_harvesting(entities: &mut EntityStore, players: &mut [PlayerState], id
 /// A patch is occupied only after the worker has actually latched, not merely because a gather
 /// command has been issued toward it.
 fn slot_held(entities: &EntityStore, node: u32) -> Option<u32> {
-    let m = entities.get(node).and_then(|n| n.miner)?;
+    let m = entities.get(node).and_then(|n| n.miner())?;
     let w = entities.get(m)?;
-    let on_this_node = matches!(w.order, Order::Gather { node: n } if n == node);
+    let on_this_node = matches!(w.order(), Order::Gather { node: n } if n == node);
     if w.hp > 0
         && w.kind == EntityKind::Worker
         && on_this_node
-        && w.gather_phase == GatherPhase::Harvesting
+        && w.gather_phase() == Some(GatherPhase::Harvesting)
     {
         Some(m)
     } else {
