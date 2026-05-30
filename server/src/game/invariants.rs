@@ -5,8 +5,15 @@
 
 use crate::config;
 use crate::game::entity::{EntityKind, GatherPhase, Order, NEUTRAL};
+use crate::game::services::movement::is_collision_anchored;
 use crate::game::services::occupancy::building_footprint;
 use crate::game::Game;
+
+/// Maximum residual overlap (world px) tolerated between two non-anchored mobile units after
+/// a tick. The iterative resolver converges to within numerical noise on flat ground; this
+/// slack also absorbs the rare case of a unit cornered against impassable terrain where the
+/// resolver's push lands on a blocked tile and has to be skipped.
+const OVERLAP_TOLERANCE_PX: f32 = 6.0;
 
 impl Game {
     /// Assert that the current world state satisfies all simulation invariants.
@@ -225,6 +232,36 @@ impl Game {
             !self.fog.has_grid(NEUTRAL),
             "invariant: fog grid must not exist for neutral owner (0)"
         );
+
+        // ------------------------------------------------------------------
+        // 8b. Mobile units do not stack on top of each other (PLAN §4.3).
+        //     Harvesting workers are anchored to their resource node and excluded — they
+        //     intentionally cannot be pushed by collision. All other mobile-unit pairs must
+        //     stay at sum-of-radii apart (within `OVERLAP_TOLERANCE_PX` of floating-point and
+        //     terrain-pinned residue).
+        // ------------------------------------------------------------------
+        let units: Vec<_> = self.entities.iter().filter(|e| e.is_unit()).collect();
+        for i in 0..units.len() {
+            let a = units[i];
+            if is_collision_anchored(a) {
+                continue;
+            }
+            for &b in units.iter().skip(i + 1) {
+                if is_collision_anchored(b) {
+                    continue;
+                }
+                let dx = a.pos_x - b.pos_x;
+                let dy = a.pos_y - b.pos_y;
+                let dist = (dx * dx + dy * dy).sqrt();
+                let min_d = a.radius() + b.radius();
+                assert!(
+                    dist + OVERLAP_TOLERANCE_PX >= min_d,
+                    "invariant: units {} ({:?}) and {} ({:?}) overlap by {:.2}px (min sep {:.1}, dist {:.2})",
+                    a.id, a.kind, b.id, b.kind,
+                    min_d - dist, min_d, dist
+                );
+            }
+        }
 
         // ------------------------------------------------------------------
         // 8. Snapshots never expose hidden enemy ids through entities or targets

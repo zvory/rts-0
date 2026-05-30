@@ -673,6 +673,13 @@ impl Entity {
         }
     }
 
+    pub fn build_phase(&self) -> Option<BuildPhase> {
+        self.movement.as_ref().and_then(|m| match &m.order {
+            Order::Build(order) => Some(order.execution.phase),
+            _ => None,
+        })
+    }
+
     pub fn mark_build_phase(&mut self, phase: BuildPhase) {
         if let Some(m) = self.movement.as_mut() {
             if let Order::Build(order) = &mut m.order {
