@@ -144,6 +144,11 @@ pub(crate) fn footprint_placeable(
             if tiles.contains(&node_tile) {
                 return false;
             }
+        } else if e.is_unit() {
+            let unit_tile = map.tile_of(e.pos_x, e.pos_y);
+            if tiles.contains(&unit_tile) {
+                return false;
+            }
         }
     }
     true
