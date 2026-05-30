@@ -7,20 +7,18 @@
  - [x] Add a spatial query layer used by combat, fog, resource search, collision/steering, and snapshot interest filtering.
   - [x] Introduce a `PathingService` boundary with unit class, radius/footprint, terrain mask, dynamic blockers, path budget, and cached/reusable results.
  - [ ] Extend map/passability around movement classes before terrain-specific combat and tank/infantry rules land.
+ - [ ] Rename the game officially to Bewegungskrieg.
+ - [ ] Restyle the main menu to be more ww2 themed, less scifi.
  - [ ] Enforce map-generation resource fairness: Industrial Centers must keep a minimum distance from minerals and gas, and spawn layouts should precisely control resource distances so no player gets an advantage from patches or geysers being too close or too far.
- - [ ] Evolve snapshots toward baseline + delta updates or entity dirty flags while preserving the current `snapshot_for(player)` API.
  - [ ] Fix workers getting stuck inside buildings after building them.
  - [ ] Units should have collision and not stack, unless they're mining workers. This is a tough change because it requires complex pathfinding and careful thought and modular design.
  - [ ] Maps should be twice as large.
- - [ ] Forests should come in large blobs and block vision.
- - [ ] Implement forests: LoS blockers unless you're inside them, provide cover, tanks cannot enter but can shoot into them.
+ - [ ] Implement forests: LoS blockers unless you're inside them, provide cover (attacks on them have chance to miss), tanks cannot enter but can shoot into them. Forests should come in large blobs and block vision. Infantry attacking from inside are visible.
  - [ ] Buildings should be able to rally units to a position.
- - [ ] AI should GG after losing all town halls.
+ - [ ] AI should GG and leaveafter losing all town halls.
  - [ ] Machine gunner attacks should be the same as infantryman unless the command "set up" is used. Setup stops the machine gunner for five seconds with no moving or shooting; after setup they cannot move or rotate without tearing down for three seconds, but have elevated damage output and a fixed 40 degree field of fire.
- - [ ] Support two different factions, soviets and germans, with different stats and some special units and buildings.
+ - [ ] Support two different factions, soviets and germans, with different stats and some special units and buildings. This one requires engineer inptu to design.
 - [x] Rename gas to oil, minerals to steel.
- - [ ] Rename the game officially to Bewegungskrieg.
- - [ ] Restyle the main menu to be more ww2 themed, less scifi.
 
 
 ## Needs prioritization
@@ -28,6 +26,7 @@
  - [ ] All data should exist as TOML files, not hardcoded 
  - [ ] Hotkeys in the command card should be grid style, as in the top left hotkey is always Q, the top middle is W, the one below the top left is A, etc. Match the keyboard.
  - [ ] workers should not auto attack
+ - [ ] Evolve snapshots toward baseline + delta updates or entity dirty flags while preserving the current `snapshot_for(player)` API.
  - [ ] muzzle flare animations
  - [ ] basic settings menu or something for surrendering
  - [ ] client should display latency to server in the top left in miliseconds

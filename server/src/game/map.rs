@@ -51,6 +51,15 @@ impl XorShift32 {
     }
 }
 
+/// Mobility class determines which terrain a unit may traverse.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum MobilityClass {
+    /// Walks on grass and forest.
+    Infantry,
+    /// Drives on grass only; blocked by forests and narrow passages.
+    Vehicle,
+}
+
 /// The terrain grid plus the chosen symmetric start tiles.
 pub struct Map {
     /// Side length in tiles (square map).
@@ -112,6 +121,20 @@ impl Map {
             return false;
         }
         self.terrain_at(x as u32, y as u32) == terrain::GRASS
+    }
+
+    /// Whether a tile is passable for a specific mobility class.
+    /// Infantry may traverse forests; vehicles may not.
+    #[inline]
+    pub fn is_passable_for(&self, class: MobilityClass, x: i32, y: i32) -> bool {
+        if !self.in_bounds(x, y) {
+            return false;
+        }
+        match self.terrain_at(x as u32, y as u32) {
+            terrain::GRASS => true,
+            terrain::FOREST => matches!(class, MobilityClass::Infantry),
+            _ => false,
+        }
     }
 
     /// World-pixel center of a tile.
@@ -199,11 +222,11 @@ fn scatter_symmetric_obstacles(
         // Pick a seed tile somewhere in the interior.
         let cx = inner_lo + rng.below((inner_hi - inner_lo) as u32) as i32;
         let cy = inner_lo + rng.below((inner_hi - inner_lo) as u32) as i32;
-        // Choose ROCK or WATER for the whole cluster.
-        let kind = if rng.unit_f32() < 0.5 {
-            terrain::ROCK
-        } else {
-            terrain::WATER
+        // Choose ROCK, WATER, or FOREST for the whole cluster.
+        let kind = match rng.unit_f32() {
+            f if f < 0.33 => terrain::ROCK,
+            f if f < 0.66 => terrain::WATER,
+            _ => terrain::FOREST,
         };
         // Blob radius 1..=3.
         let radius = 1 + rng.below(3) as i32;

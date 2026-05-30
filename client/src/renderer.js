@@ -940,6 +940,7 @@ function hash2(x, y) {
 function terrainColor(code, tx, ty) {
   if (code === 1) return COLORS.rock;
   if (code === 2) return COLORS.water;
+  if (code === 3) return COLORS.forest;
   const n = hash2(tx, ty);
   if (n > 0.78) return COLORS.field;
   if (n < 0.18) return COLORS.mud;
@@ -950,6 +951,7 @@ function terrainColor(code, tx, ty) {
 function terrainOverlayColor(code, n) {
   if (code === 1) return n > 0.74 ? 0x8a8777 : 0x4f4c43;
   if (code === 2) return n > 0.74 ? 0x527482 : 0x1d3d48;
+  if (code === 3) return n > 0.74 ? 0x4a5a3e : 0x2a3a1e;
   return n > 0.74 ? 0x817555 : 0x343127;
 }
 
@@ -976,7 +978,7 @@ function isImpassableAt(map, tx, ty) {
 }
 
 function isImpassableTerrain(code) {
-  return code === 1 || code === 2;
+  return code === 1 || code === 2 || code === 3;
 }
 
 /**

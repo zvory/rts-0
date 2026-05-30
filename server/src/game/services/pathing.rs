@@ -7,18 +7,9 @@
 use std::collections::HashMap;
 
 use crate::game::entity::{EntityKind, EntityStore};
-use crate::game::map::Map;
+use crate::game::map::{Map, MobilityClass};
 use crate::game::pathfinding::{self, Passability};
 use crate::game::services::occupancy::Occupancy;
-
-/// Mobility class determines which terrain a unit may traverse.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum MobilityClass {
-    /// Walks on grass; future: forests too.
-    Infantry,
-    /// Drives on grass only; blocked by forests and narrow passages.
-    Vehicle,
-}
 
 impl MobilityClass {
     /// Derive the mobility class from an entity kind.
@@ -59,17 +50,13 @@ impl<'a> Passability for ClassPassability<'a> {
         if !self.map.in_bounds(tx, ty) {
             return false;
         }
-        if !self.map.is_passable(tx, ty) {
+        if !self.map.is_passable_for(self.class, tx, ty) {
             return false;
         }
         if !self.occupancy.passable(tx, ty) {
             return false;
         }
-        // Future class-specific rules (e.g. vehicles blocked by forests).
-        match self.class {
-            MobilityClass::Infantry => true,
-            MobilityClass::Vehicle => true,
-        }
+        true
     }
 }
 
