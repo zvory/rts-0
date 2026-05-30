@@ -5,7 +5,7 @@ set -euo pipefail
 PID=$(lsof -t -i :8080 2>/dev/null || true)
 if [ -n "${PID:-}" ]; then
     echo "Killing existing server (PID: $PID)..."
-    kill "$PID"
+    kill $PID
     sleep 0.5
 fi
 
