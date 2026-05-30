@@ -11,61 +11,63 @@ export const INTERP_DELAY_MS = SNAPSHOT_MS; // render this far in the past for s
 
 // Palette ------------------------------------------------------------------
 export const COLORS = Object.freeze({
-  bgVoid: 0x05070d, // outside the map
-  grass: 0x2e6b3a, // base terrain
-  grassAlt: 0x3b7d42, // checker alternate
-  rock: 0x7a6250,
-  water: 0x115783,
+  bgVoid: 0x11110f, // outside the map
+  grass: 0x59633f, // base terrain
+  grassAlt: 0x66704a, // dither alternate
+  field: 0x746947,
+  mud: 0x4b3e32,
+  rock: 0x6a6659,
+  water: 0x2f5560,
   grid: 0x000000,
-  minerals: 0x46e3ff,
-  gas: 0x53e08a,
+  minerals: 0xb9b084,
+  gas: 0x86a36f,
   shadow: 0x000000,
   hpBack: 0x101010,
-  hpGood: 0x4fd24f,
-  hpMid: 0xe0c23a,
-  hpLow: 0xe04646,
-  selectOwn: 0x6cff6c,
-  selectEnemy: 0xff6c6c,
-  selectNeutral: 0xf0d24a,
-  dragBox: 0x6cff6c,
-  placeOk: 0x6cff6c,
-  placeBad: 0xff5555,
-  fogUnexplored: 0x05070d,
+  hpGood: 0x7ca45a,
+  hpMid: 0xc7a24a,
+  hpLow: 0xb64a3f,
+  selectOwn: 0xc7d07a,
+  selectEnemy: 0xd47a5f,
+  selectNeutral: 0xc9b56a,
+  dragBox: 0xc7d07a,
+  placeOk: 0xc7d07a,
+  placeBad: 0xd47a5f,
+  fogUnexplored: 0x11110f,
   fogExplored: 0x000000, // drawn at fogExploredAlpha
 });
 export const FOG_EXPLORED_ALPHA = 0.55;
-export const FOG_UNEXPLORED_ALPHA = 0.82;
+export const FOG_UNEXPLORED_ALPHA = 0.86;
 
 // Player colors (server assigns from a matching palette; used as a fallback for blips).
 export const PLAYER_PALETTE = Object.freeze([
-  "#3aa0ff", "#ff5a4d", "#46d36b", "#f0c64a", "#b96cff", "#ff9a3c",
+  "#6f8fa8", "#b2775f", "#7f9462", "#c0a463", "#8d7aa8", "#b68a58",
 ]);
 
 // Per-kind UI / render info. `size` is the render radius (units) or half-extent hint.
 // `sight` (tiles) drives the local fog overlay. `cost`/`supply` drive the command card.
 export const STATS = Object.freeze({
-  [KIND.WORKER]: { label: "Worker", hotkey: "W", icon: "⛏", size: 9, sight: 7,
+  [KIND.WORKER]: { label: "Engineer", hotkey: "W", icon: "EN", size: 9, sight: 7,
     cost: { min: 50, gas: 0 }, supply: 1, buildTicks: 120 },
-  [KIND.RIFLEMAN]: { label: "Rifleman", hotkey: "R", icon: "⚔", size: 9, sight: 8,
+  [KIND.RIFLEMAN]: { label: "Rifleman", hotkey: "R", icon: "RF", size: 9, sight: 8,
     cost: { min: 50, gas: 0 }, supply: 1, buildTicks: 150 },
-  [KIND.MACHINE_GUNNER]: { label: "Machine Gunner", hotkey: "M", icon: "▰", size: 10, sight: 8,
+  [KIND.MACHINE_GUNNER]: { label: "Machine Gunner", hotkey: "M", icon: "MG", size: 10, sight: 8,
     cost: { min: 75, gas: 0 }, supply: 2, buildTicks: 200, requires: KIND.ADVANCED_TRAINING_CENTRE },
-  [KIND.AT_TEAM]: { label: "AT Team", hotkey: "A", icon: "◇", size: 10, sight: 8,
+  [KIND.AT_TEAM]: { label: "AT Team", hotkey: "A", icon: "AT", size: 10, sight: 8,
     cost: { min: 75, gas: 25 }, supply: 2, buildTicks: 220, requires: KIND.ADVANCED_TRAINING_CENTRE },
-  [KIND.TANK]: { label: "Tank", hotkey: "T", icon: "▣", size: 13, sight: 7,
+  [KIND.TANK]: { label: "Tank", hotkey: "T", icon: "TK", size: 13, sight: 7,
     cost: { min: 100, gas: 50 }, supply: 2, buildTicks: 250 },
 
-  [KIND.INDUSTRIAL_CENTER]: { label: "Industrial Center", hotkey: "I", icon: "🏭", footW: 3, footH: 3, sight: 9,
+  [KIND.INDUSTRIAL_CENTER]: { label: "Industrial Center", hotkey: "I", icon: "IC", footW: 3, footH: 3, sight: 9,
     cost: { min: 400, gas: 0 }, buildTicks: 400, trains: [KIND.WORKER] },
-  [KIND.DEPOT]: { label: "Supply Depot", hotkey: "S", icon: "▣", footW: 2, footH: 2, sight: 4,
+  [KIND.DEPOT]: { label: "Supply Depot", hotkey: "S", icon: "SD", footW: 2, footH: 2, sight: 4,
     cost: { min: 50, gas: 0 }, buildTicks: 120, trains: [] },
-  [KIND.BARRACKS]: { label: "Barracks", hotkey: "B", icon: "⚒", footW: 3, footH: 2, sight: 6,
+  [KIND.BARRACKS]: { label: "Barracks", hotkey: "B", icon: "BK", footW: 3, footH: 2, sight: 6,
     cost: { min: 100, gas: 0 }, buildTicks: 200, trains: [KIND.RIFLEMAN, KIND.MACHINE_GUNNER, KIND.AT_TEAM], requires: KIND.INDUSTRIAL_CENTER },
-  [KIND.ADVANCED_TRAINING_CENTRE]: { label: "Advanced Training Centre", hotkey: "C", icon: "◆", footW: 3, footH: 2, sight: 6,
+  [KIND.ADVANCED_TRAINING_CENTRE]: { label: "Advanced Training Centre", hotkey: "C", icon: "TC", footW: 3, footH: 2, sight: 6,
     cost: { min: 125, gas: 0 }, buildTicks: 220, trains: [], requires: KIND.INDUSTRIAL_CENTER },
-  [KIND.TANK_FACTORY]: { label: "Tank Factory", hotkey: "F", icon: "▤", footW: 3, footH: 3, sight: 6,
+  [KIND.TANK_FACTORY]: { label: "Tank Factory", hotkey: "F", icon: "TF", footW: 3, footH: 3, sight: 6,
     cost: { min: 150, gas: 0 }, buildTicks: 240, trains: [KIND.TANK], requires: KIND.INDUSTRIAL_CENTER },
-  [KIND.BUNKER]: { label: "Bunker", hotkey: "U", icon: "◎", footW: 2, footH: 2, sight: 6,
+  [KIND.BUNKER]: { label: "Bunker", hotkey: "U", icon: "BN", footW: 2, footH: 2, sight: 6,
     cost: { min: 150, gas: 0 }, buildTicks: 120, trains: [], requires: KIND.INDUSTRIAL_CENTER },
 
   [KIND.MINERALS]: { label: "Minerals", size: 11 },

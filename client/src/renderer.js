@@ -59,13 +59,16 @@ export class Renderer {
 
     /** The PIXI.Application. Exposed for the render loop / ticker. */
     this.app = new PIXI.Application({
-      antialias: true,
+      antialias: false,
       resolution: window.devicePixelRatio || 1,
       autoDensity: true,
       backgroundColor: COLORS.bgVoid,
       width: canvasParent.clientWidth || window.innerWidth,
       height: canvasParent.clientHeight || window.innerHeight,
     });
+    PIXI.settings.SCALE_MODE = PIXI.SCALE_MODES.NEAREST;
+    this.app.renderer.roundPixels = true;
+    this.app.view.style.imageRendering = "pixelated";
     canvasParent.appendChild(this.app.view);
 
     // World container — moved/scaled by the camera every frame.
@@ -138,19 +141,32 @@ export class Renderer {
     for (let ty = 0; ty < map.height; ty++) {
       for (let tx = 0; tx < map.width; tx++) {
         const code = map.terrain[ty * map.width + tx];
-        let color;
-        if (code === 1) color = COLORS.rock; // TERRAIN.ROCK
-        else if (code === 2) color = COLORS.water; // TERRAIN.WATER
-        else color = (tx + ty) % 2 === 0 ? COLORS.grass : COLORS.grassAlt; // checker
+        let color = terrainColor(code, tx, ty);
         g.beginFill(color);
         g.drawRect(tx * ts, ty * ts, ts, ts);
         g.endFill();
+
+        // Coarse texture blocks keep the ground readable while selling the
+        // low-resolution PS1 look. No symbols or national markings are used.
+        const blocks = ts >= 32 ? 4 : 2;
+        const block = ts / blocks;
+        for (let by = 0; by < blocks; by++) {
+          for (let bx = 0; bx < blocks; bx++) {
+            const n = hash2(tx * 17 + bx, ty * 17 + by);
+            if (n < 0.42) continue;
+            const overlay = terrainOverlayColor(code, n);
+            g.beginFill(overlay, code === 2 ? 0.22 : 0.16);
+            g.drawRect(tx * ts + bx * block, ty * ts + by * block, Math.ceil(block), Math.ceil(block));
+            g.endFill();
+          }
+        }
       }
     }
 
     // Rasterize to a texture so the (potentially huge) terrain is a single sprite.
     const tex = this.app.renderer.generateTexture(g, {
       region: new PIXI.Rectangle(0, 0, map.width * ts, map.height * ts),
+      scaleMode: PIXI.SCALE_MODES.NEAREST,
     });
     g.destroy();
 
@@ -262,9 +278,8 @@ export class Renderer {
   }
 
   /**
-   * Worker = small rounded body, rifleman = forward chevron, support teams = compact
-   * specialists, tank = chunky armored body. All are tinted by owner with a soft shadow,
-   * thin dark outline, and a short facing indicator pointing along `facing`.
+   * Low-poly PS1 silhouettes tinted by owner. The shapes are intentionally neutral:
+   * no national insignia, flags, stars, crosses, eagles, or historical unit badges.
    * @private
    */
   _drawUnit(e, colorByOwner, state) {
@@ -281,30 +296,43 @@ export class Renderer {
     // Body on the unit layer.
     const g = this._slot("units", e.id);
     g.position.set(e.x, e.y);
-    g.lineStyle(1.5, 0x0a0c10, 0.9);
+    g.lineStyle(2, 0x1a1712, 0.95);
 
     if (e.kind === KIND.RIFLEMAN) {
-      // Chevron/triangle pointing along facing.
+      // Infantry wedge with a short rifle line.
       g.beginFill(tint);
       const a = facing;
-      const tip = polar(a, r * 1.15);
-      const left = polar(a + 2.5, r);
-      const right = polar(a - 2.5, r);
+      const tip = polar(a, r * 1.2);
+      const left = polar(a + 2.45, r * 0.85);
+      const right = polar(a - 2.45, r * 0.85);
       g.moveTo(tip.x, tip.y);
       g.lineTo(left.x, left.y);
+      g.lineTo(polar(a + Math.PI, r * 0.35).x, polar(a + Math.PI, r * 0.35).y);
       g.lineTo(right.x, right.y);
       g.closePath();
       g.endFill();
+      const rifleA = facing - 0.18;
+      const muzzle = polar(rifleA, r * 1.45);
+      const grip = polar(rifleA + Math.PI, r * 0.15);
+      g.lineStyle(2, 0x2a2119, 0.95);
+      g.moveTo(grip.x, grip.y);
+      g.lineTo(muzzle.x, muzzle.y);
     } else if (e.kind === KIND.MACHINE_GUNNER) {
-      // A short firing bar reads differently from riflemen at combat scale.
+      // Wider support team block with a braced gun line.
       g.beginFill(tint);
-      g.drawRoundedRect(-r * 0.9, -r * 0.55, r * 1.8, r * 1.1, r * 0.25);
+      g.drawPolygon([
+        -r * 0.95, -r * 0.55,
+        r * 0.75, -r * 0.55,
+        r * 1.0, 0,
+        r * 0.75, r * 0.55,
+        -r * 0.95, r * 0.55,
+      ]);
       g.endFill();
-      g.beginFill(0x000000, 0.24);
-      g.drawRect(-r * 0.7, -r * 0.12, r * 1.4, r * 0.24);
-      g.endFill();
+      g.lineStyle(3, 0x2a2119, 0.9);
+      g.moveTo(-r * 0.25, 0);
+      g.lineTo(r * 1.35, 0);
     } else if (e.kind === KIND.AT_TEAM) {
-      // Diamond team marker with a dark launcher slash.
+      // Two-person anti-armor marker with a long launcher slash.
       g.beginFill(tint);
       g.moveTo(0, -r);
       g.lineTo(r, 0);
@@ -312,44 +340,62 @@ export class Renderer {
       g.lineTo(-r, 0);
       g.closePath();
       g.endFill();
-      g.lineStyle(2, 0x0a0c10, 0.75);
-      g.moveTo(-r * 0.55, r * 0.35);
-      g.lineTo(r * 0.55, -r * 0.35);
-    } else if (e.kind === KIND.TANK) {
-      // Chunky armored body with a darker inner plate and short barrel.
-      g.beginFill(tint);
-      g.drawRoundedRect(-r, -r, r * 2, r * 2, r * 0.4);
+      g.beginFill(0x1a1712, 0.65);
+      g.drawRect(-r * 0.65, -r * 0.16, r * 1.3, r * 0.32);
       g.endFill();
-      g.beginFill(0x000000, 0.18);
-      g.drawRoundedRect(-r * 0.5, -r * 0.5, r, r, r * 0.25);
+      g.lineStyle(3, 0x2a2119, 0.9);
+      g.moveTo(-r * 0.85, r * 0.45);
+      g.lineTo(r * 0.85, -r * 0.45);
+    } else if (e.kind === KIND.TANK) {
+      // Chunky flat-shaded armor, closer to a low-poly model than an icon.
+      g.beginFill(tint);
+      g.drawPolygon([
+        -r * 1.05, -r * 0.75,
+        r * 0.85, -r * 0.75,
+        r * 1.08, -r * 0.38,
+        r * 1.08, r * 0.52,
+        r * 0.72, r * 0.82,
+        -r * 0.95, r * 0.82,
+        -r * 1.18, r * 0.35,
+        -r * 1.18, -r * 0.38,
+      ]);
+      g.endFill();
+      g.beginFill(0x1a1712, 0.28);
+      g.drawRect(-r * 0.55, -r * 0.42, r * 1.05, r * 0.82);
       g.endFill();
       const barrel = polar(facing, r * 1.2);
-      g.lineStyle(3, 0x0a0c10, 0.85);
+      g.lineStyle(4, 0x241d17, 0.95);
       g.moveTo(0, 0);
       g.lineTo(barrel.x, barrel.y);
     } else {
-      // Worker (and any other unit kind): small rounded body.
+      // Engineer (and any other unit kind): compact tool-carrying block.
       g.beginFill(tint);
-      g.drawCircle(0, 0, r);
+      g.drawPolygon([
+        0, -r,
+        r * 0.85, -r * 0.25,
+        r * 0.55, r * 0.9,
+        -r * 0.55, r * 0.9,
+        -r * 0.85, -r * 0.25,
+      ]);
       g.endFill();
       // Carried-resource pip so harvesters read at a glance.
       if (e.carrying) {
         const cc = e.carryingKind === KIND.GAS ? COLORS.gas : COLORS.minerals;
         g.beginFill(cc);
-        g.drawCircle(0, -r * 0.9, r * 0.35);
+        g.drawRect(-r * 0.35, -r * 1.15, r * 0.7, r * 0.45);
         g.endFill();
       }
     }
 
-    // Facing indicator: a short bright tick from center outward.
+    // Facing indicator: a short pale tick from center outward.
     const fp = polar(facing, r + 3);
-    g.lineStyle(2, 0xffffff, 0.85);
+    g.lineStyle(2, 0xd8d0b0, 0.85);
     g.moveTo(0, 0);
     g.lineTo(fp.x, fp.y);
   }
 
   /**
-   * Rounded-rectangle footprint tinted by owner, with an icon glyph. Under
+   * Blocky footprint tinted by owner, with a plain two-letter stencil. Under
    * construction (`buildProgress < 1`) → translucent with a horizontal progress bar.
    * Producing (`prodProgress`) → a small progress arc in the corner.
    * @private
@@ -370,22 +416,51 @@ export class Renderer {
     const sh = this._slot("buildingShadows", e.id);
     sh.position.set(0, 0);
     sh.beginFill(COLORS.shadow, 0.3);
-    sh.drawRoundedRect(x0 + 3, y0 + 5, w, h, 6);
+    sh.drawRect(x0 + 4, y0 + 6, w, h);
     sh.endFill();
 
     const g = this._slot("buildings", e.id);
     g.position.set(0, 0);
-    g.lineStyle(2, 0x0a0c10, underConstruction ? 0.55 : 0.9);
-    g.beginFill(tint, bodyAlpha);
-    g.drawRoundedRect(x0, y0, w, h, 6);
-    g.endFill();
-    // Inner darker plate for depth.
-    g.lineStyle(0);
-    g.beginFill(0x000000, underConstruction ? 0.1 : 0.18);
-    g.drawRoundedRect(x0 + w * 0.18, y0 + h * 0.18, w * 0.64, h * 0.64, 4);
+    g.lineStyle(2, 0x1a1712, underConstruction ? 0.55 : 0.95);
+    g.beginFill(0x2b2a23, bodyAlpha);
+    g.drawRect(x0, y0, w, h);
     g.endFill();
 
-    // Icon glyph — pooled Text reused per building id (see _icon).
+    // Player-tinted roof/yard slabs, all neutral geometry.
+    g.lineStyle(0);
+    g.beginFill(tint, bodyAlpha * 0.82);
+    if (e.kind === KIND.INDUSTRIAL_CENTER) {
+      g.drawRect(x0 + w * 0.12, y0 + h * 0.18, w * 0.62, h * 0.52);
+      g.drawRect(x0 + w * 0.68, y0 + h * 0.1, w * 0.16, h * 0.32);
+      g.beginFill(0x1a1712, bodyAlpha * 0.7);
+      g.drawRect(x0 + w * 0.76, y0 + h * 0.02, w * 0.08, h * 0.22);
+    } else if (e.kind === KIND.BUNKER) {
+      g.drawPolygon([
+        x0 + w * 0.18, y0 + h * 0.3,
+        x0 + w * 0.5, y0 + h * 0.12,
+        x0 + w * 0.82, y0 + h * 0.3,
+        x0 + w * 0.75, y0 + h * 0.75,
+        x0 + w * 0.25, y0 + h * 0.75,
+      ]);
+      g.beginFill(0x1a1712, bodyAlpha * 0.75);
+      g.drawRect(x0 + w * 0.3, y0 + h * 0.44, w * 0.4, h * 0.12);
+    } else if (e.kind === KIND.TANK_FACTORY) {
+      g.drawRect(x0 + w * 0.12, y0 + h * 0.18, w * 0.76, h * 0.26);
+      g.drawRect(x0 + w * 0.18, y0 + h * 0.54, w * 0.64, h * 0.26);
+      g.beginFill(0x1a1712, bodyAlpha * 0.55);
+      for (let i = 0; i < 3; i++) g.drawRect(x0 + w * (0.2 + i * 0.2), y0 + h * 0.56, w * 0.08, h * 0.22);
+    } else if (e.kind === KIND.DEPOT) {
+      g.drawRect(x0 + w * 0.16, y0 + h * 0.22, w * 0.68, h * 0.2);
+      g.drawRect(x0 + w * 0.16, y0 + h * 0.52, w * 0.68, h * 0.2);
+    } else {
+      g.drawRect(x0 + w * 0.12, y0 + h * 0.18, w * 0.76, h * 0.56);
+      g.beginFill(0x1a1712, bodyAlpha * 0.42);
+      g.drawRect(x0 + w * 0.22, y0 + h * 0.26, w * 0.56, h * 0.12);
+      g.drawRect(x0 + w * 0.22, y0 + h * 0.5, w * 0.56, h * 0.12);
+    }
+    g.endFill();
+
+    // Stencil label — pooled Text reused per building id (see _icon).
     this._icon(e, e.x, e.y, Math.min(w, h) * 0.5, bodyAlpha);
 
     if (underConstruction) {
@@ -413,7 +488,7 @@ export class Renderer {
   }
 
   /**
-   * Resource node: minerals = cyan crystal cluster, gas = green geyser; size/opacity
+   * Resource node: minerals = tan supply crates, gas = olive fuel drums; size/opacity
    * scale with `remaining`. Dimmed when the tile is currently not visible (explored
    * memory) so it reads as a remembered node.
    * @private
@@ -435,33 +510,37 @@ export class Renderer {
     g.alpha = alpha;
 
     if (e.kind === KIND.GAS) {
-      // Geyser: a rounded green mound with a couple of vents.
-      g.lineStyle(1.5, 0x0a0c10, 0.8);
+      // Fuel drums: industrial but faction-neutral.
+      g.lineStyle(1.5, 0x1a1712, 0.85);
       g.beginFill(COLORS.gas);
-      g.drawEllipse(0, 0, r, r * 0.8);
+      g.drawRect(-r * 0.75, -r * 0.55, r * 0.48, r * 1.05);
+      g.drawRect(-r * 0.18, -r * 0.68, r * 0.5, r * 1.18);
+      g.drawRect(r * 0.38, -r * 0.5, r * 0.42, r);
       g.endFill();
       g.lineStyle(0);
-      g.beginFill(0x0a2c18, 0.5);
-      g.drawCircle(-r * 0.35, -r * 0.1, r * 0.22);
-      g.drawCircle(r * 0.3, r * 0.05, r * 0.18);
+      g.beginFill(0x263225, 0.45);
+      g.drawRect(-r * 0.72, -r * 0.06, r * 1.48, r * 0.12);
+      g.drawRect(-r * 0.16, -r * 0.26, r * 0.46, r * 0.12);
       g.endFill();
     } else {
-      // Minerals: a small cluster of cyan crystals.
-      g.lineStyle(1.2, 0x0a0c10, 0.7);
-      const shards = [
-        { dx: 0, dy: -r * 0.2, s: 1 },
-        { dx: -r * 0.7, dy: r * 0.25, s: 0.75 },
-        { dx: r * 0.7, dy: r * 0.25, s: 0.75 },
+      // Supply crates: replaces sci-fi crystals with wartime materiel.
+      g.lineStyle(1.2, 0x1a1712, 0.85);
+      const crates = [
+        { dx: -r * 0.45, dy: -r * 0.25, s: 0.65 },
+        { dx: r * 0.25, dy: -r * 0.2, s: 0.7 },
+        { dx: -r * 0.05, dy: r * 0.35, s: 0.8 },
       ];
-      for (const sh of shards) {
-        const cs = r * 0.55 * sh.s;
+      for (const c of crates) {
+        const cs = r * c.s;
         g.beginFill(COLORS.minerals);
-        g.moveTo(sh.dx, sh.dy - cs);
-        g.lineTo(sh.dx + cs * 0.6, sh.dy);
-        g.lineTo(sh.dx, sh.dy + cs);
-        g.lineTo(sh.dx - cs * 0.6, sh.dy);
-        g.closePath();
+        g.drawRect(c.dx - cs * 0.45, c.dy - cs * 0.35, cs * 0.9, cs * 0.7);
         g.endFill();
+        g.lineStyle(1, 0x5a5134, 0.8);
+        g.moveTo(c.dx - cs * 0.38, c.dy);
+        g.lineTo(c.dx + cs * 0.38, c.dy);
+        g.moveTo(c.dx, c.dy - cs * 0.3);
+        g.lineTo(c.dx, c.dy + cs * 0.3);
+        g.lineStyle(1.2, 0x1a1712, 0.85);
       }
     }
   }
@@ -567,10 +646,11 @@ export class Renderer {
     const glyph = (STATS[e.kind] && STATS[e.kind].icon) || "?";
     if (!t) {
       t = new PIXI.Text(glyph, {
-        fontFamily: "system-ui, sans-serif",
+        fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
         fontSize: 24,
-        fill: 0xffffff,
+        fill: 0xd8d0b0,
         align: "center",
+        fontWeight: "700",
       });
       t.anchor.set(0.5);
       this._iconPool.set(e.id, t);
@@ -578,10 +658,10 @@ export class Renderer {
     }
     if (t.text !== glyph) t.text = glyph;
     t.visible = true;
-    t.alpha = 0.92 * alpha;
+    t.alpha = 0.78 * alpha;
     t.position.set(cx, cy);
     // Scale the (fixed-size) glyph to roughly fit the footprint.
-    const s = (size * 1.4) / 24;
+    const s = (size * 0.95) / 24;
     t.scale.set(s);
     // Track on the buildings pool's seen-set so the sweep keeps it alive.
     this._seen.buildings.add(e.id);
@@ -808,6 +888,31 @@ function normRect(r) {
   const x = Math.min(r.x, r.x + r.w);
   const y = Math.min(r.y, r.y + r.h);
   return { x, y, w: Math.abs(r.w), h: Math.abs(r.h) };
+}
+
+/** Deterministic 0..1 noise for terrain dithering. */
+function hash2(x, y) {
+  let n = (x * 374761393 + y * 668265263) | 0;
+  n = (n ^ (n >>> 13)) | 0;
+  n = Math.imul(n, 1274126177);
+  return ((n ^ (n >>> 16)) >>> 0) / 4294967295;
+}
+
+/** Base color for a terrain tile code. Codes match server terrain constants. */
+function terrainColor(code, tx, ty) {
+  if (code === 1) return COLORS.rock;
+  if (code === 2) return COLORS.water;
+  const n = hash2(tx, ty);
+  if (n > 0.78) return COLORS.field;
+  if (n < 0.18) return COLORS.mud;
+  return (tx + ty) % 2 === 0 ? COLORS.grass : COLORS.grassAlt;
+}
+
+/** Muted overlay tint for blocky terrain texture. */
+function terrainOverlayColor(code, n) {
+  if (code === 1) return n > 0.74 ? 0x8a8777 : 0x4f4c43;
+  if (code === 2) return n > 0.74 ? 0x527482 : 0x1d3d48;
+  return n > 0.74 ? 0x817555 : 0x343127;
 }
 
 /**
