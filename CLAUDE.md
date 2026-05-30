@@ -43,6 +43,7 @@ the server simulates at 30 Hz and sends per-player, fog-filtered snapshots.
 ## Git / GitHub
 
 - The default branch is `main`.
+- committing has a commit hook that silently runs all tests.
 - Work directly on `main` for simple single-agent changes. For parallel worktree changes, use one
   `zvorygin/` branch per worktree.
 - When work is complete, stage and commit only files that belong to the current task.
