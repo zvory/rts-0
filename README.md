@@ -16,8 +16,8 @@ Server-authoritative multiplayer with a **Rust** server (axum + tokio) and a zer
 
 - **Economy** — engineers harvest supplies & fuel on round trips to your Industrial Center;
   nodes deplete.
-- **Base building** — Industrial Center, Depot, Barracks, Training Centre, Tank Factory, and
-  Bunker, placed by engineers with live construction.
+- **Base building** — Industrial Center, Depot, Barracks, Training Centre, and Tank Factory,
+  placed by engineers with live construction.
 - **Army** — train Engineers, Riflemen, Machine Gunners, AT Teams, and Tanks; supply cap gates
   your population.
 - **Fog of war** — server-authoritative and cheat-proof: you never receive entities you can't see.
@@ -122,7 +122,6 @@ Start with 1 Industrial Center, 4 engineers, 50 supplies. Supply cap starts at 1
 | Barracks | 320 | 100 min | 3x2 | trains Riflemen, Machine Gunners, AT Teams |
 | Training Centre | 300 | 100 min/50 gas | 3x2 | unlocks support infantry |
 | Tank Factory | 360 | 200 min/100 gas | 3x3 | trains Tanks |
-| Bunker | 200 | 150 min | 2x2 | static defense (dmg 10, range 7) |
 
 Balance lives in `server/src/config.rs` (authoritative); the UI subset is mirrored in
 `client/src/config.js`. Change both together.

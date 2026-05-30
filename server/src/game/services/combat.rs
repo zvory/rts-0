@@ -14,9 +14,9 @@ use crate::protocol::Event;
 /// Extra slack (px) added to attack range checks so units don't dance at the exact boundary.
 const RANGE_SLACK: f32 = 4.0;
 
-/// Combat: acquire targets for aggressive / attack-move units, let idle units auto-defend,
-/// fire bunkers, and deal damage when off cooldown. Damage is applied immediately and emits an
-/// `Attack` event (for tracers). Cooldowns tick down here too.
+/// Combat: acquire targets for aggressive / attack-move units, let idle units auto-defend, and
+/// deal damage when off cooldown. Damage is applied immediately and emits an `Attack` event (for
+/// tracers). Cooldowns tick down here too.
 pub(crate) fn combat_system(
     _map: &Map,
     entities: &mut EntityStore,
@@ -44,8 +44,8 @@ pub(crate) fn combat_system(
             let (range_tiles, dmg, cd) = attack_profile(e);
             let range_px = range_tiles as f32 * config::TILE_SIZE as f32 + e.radius() + RANGE_SLACK;
             // Aggro radius: mobile units detect and chase enemies out to their sight radius so
-            // attack-move / auto-defend actually close the gap. Buildings (bunkers) never move,
-            // so they only ever engage within their firing range.
+            // attack-move / auto-defend actually close the gap. Buildings never move, so they
+            // only ever engage within their firing range.
             let aggro_px = if e.is_unit() {
                 (e.sight_tiles() as f32 * config::TILE_SIZE as f32).max(range_px)
             } else {
@@ -121,7 +121,7 @@ pub(crate) fn combat_system(
     }
 }
 
-/// Attack profile (range_tiles, dmg, cooldown) for a unit or bunker.
+/// Attack profile (range_tiles, dmg, cooldown) for a combat-capable entity.
 fn attack_profile(e: &Entity) -> (u32, u32, u32) {
     if let Some(s) = config::unit_stats(e.kind) {
         (s.range_tiles, s.dmg, s.cooldown)
@@ -137,7 +137,7 @@ fn attack_profile(e: &Entity) -> (u32, u32, u32) {
 enum CombatMode {
     /// Has an explicit attack target id.
     Ordered,
-    /// Engages any enemy within range (attack-move, bunkers, idle auto-defend).
+    /// Engages any enemy within range (attack-move, idle auto-defend).
     Aggressive,
 }
 

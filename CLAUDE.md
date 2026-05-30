@@ -120,7 +120,7 @@ There is **no JS build step** (plain ES modules + PixiJS from CDN). The client i
   open a local self-play spectation replay so the user can inspect the failure state directly. Do
   **not** use the Browser skill for this flow. Use
   `open "http://localhost:8080/dev/selfplay?replay=<artifact_name>"` (for example
-  `open "http://localhost:8080/dev/selfplay?replay=manual_bunker_rush_latest"`), not the in-app
+  `open "http://localhost:8080/dev/selfplay?replay=manual_worker_rush_latest"`), not the in-app
   browser.
 - A 1-player match is a never-ending sandbox; only 2+ player matches resolve to a winner. Empty
   rooms reset to lobby so a room name is never stuck mid-match.

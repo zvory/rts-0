@@ -104,7 +104,7 @@ pub struct BuildingStats {
     pub foot_h: u32,
     pub build_ticks: u32,
     pub provides_supply: u32,
-    // Defensive attack (bunker). dmg == 0 means the building does not attack.
+    // dmg == 0 means the building does not attack.
     pub dmg: u32,
     pub range_tiles: u32,
     pub cooldown: u32,
@@ -251,19 +251,6 @@ pub fn building_stats(kind: EntityKind) -> Option<BuildingStats> {
             range_tiles: 0,
             cooldown: 0,
         },
-        EntityKind::Bunker => BuildingStats {
-            hp: 200,
-            sight_tiles: 8,
-            cost_steel: 150,
-            cost_oil: 0,
-            foot_w: 2,
-            foot_h: 2,
-            build_ticks: 120,
-            provides_supply: 0,
-            dmg: 10,
-            range_tiles: 4,
-            cooldown: 10,
-        },
         _ => return None,
     };
     Some(s)
@@ -292,8 +279,7 @@ pub fn build_requirement_met(
     match building_kind {
         EntityKind::Barracks
         | EntityKind::TrainingCentre
-        | EntityKind::TankFactory
-        | EntityKind::Bunker => owned_building_kinds.contains(&EntityKind::IndustrialCenter),
+        | EntityKind::TankFactory => owned_building_kinds.contains(&EntityKind::IndustrialCenter),
         _ => true,
     }
 }
@@ -354,9 +340,5 @@ mod tests {
             EntityKind::AtTeam,
             &[EntityKind::TrainingCentre]
         ));
-
-        let bunker = building_stats(EntityKind::Bunker).expect("bunker stats");
-        assert_eq!(bunker.cost_steel, 150);
-        assert_eq!((bunker.foot_w, bunker.foot_h), (2, 2));
     }
 }

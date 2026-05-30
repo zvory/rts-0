@@ -68,8 +68,6 @@ export const STATS = Object.freeze({
     cost: { steel: 100, oil: 50 }, buildTicks: 220, trains: [], requires: KIND.INDUSTRIAL_CENTER },
   [KIND.TANK_FACTORY]: { label: "Tank Factory", icon: "TF", footW: 3, footH: 3, sight: 6,
     cost: { steel: 200, oil: 100 }, buildTicks: 240, trains: [KIND.TANK], requires: KIND.INDUSTRIAL_CENTER },
-  [KIND.BUNKER]: { label: "Bunker", icon: "BN", footW: 2, footH: 2, sight: 8,
-    cost: { steel: 150, oil: 0 }, buildTicks: 120, trains: [], requires: KIND.INDUSTRIAL_CENTER },
 
   [KIND.STEEL]: { label: "Steel", size: 11 },
   [KIND.OIL]: { label: "Oil", size: 14 },
@@ -82,7 +80,6 @@ export const WORKER_BUILDABLE = Object.freeze([
   KIND.BARRACKS,
   KIND.TRAINING_CENTRE,
   KIND.TANK_FACTORY,
-  KIND.BUNKER,
 ]);
 
 // Camera defaults.
