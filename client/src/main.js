@@ -43,6 +43,7 @@ function wsUrl() {
 
 /** Cached DOM handles for the pinned ids in index.html (see its DOM contract). */
 const dom = {
+  version: document.getElementById("version"),
   lobbyScreen: document.getElementById("lobby-screen"),
   gameScreen: document.getElementById("game-screen"),
   viewport: document.getElementById("viewport"),
@@ -91,6 +92,7 @@ class App {
     this.net.on("close", this.onClose);
     dom.gameOverButton.addEventListener("click", this.onBackToLobby);
 
+    void this.loadVersion();
     this.lobby.show();
     try {
       await this.net.connect();
@@ -205,6 +207,19 @@ class App {
   ) {
     this.showToast(text);
     if (this.lobby) this.lobby.setStatus(text, true);
+  }
+
+  /** Fetch and display the build version in the shared top-left badge. */
+  async loadVersion() {
+    if (!dom.version) return;
+    try {
+      const res = await fetch("/version", { cache: "no-store" });
+      if (!res.ok) throw new Error(`version request failed: ${res.status}`);
+      const text = await res.text();
+      dom.version.textContent = text.trim() || "unknown";
+    } catch {
+      dom.version.textContent = "unknown";
+    }
   }
 }
 
