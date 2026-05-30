@@ -124,7 +124,11 @@ pub(crate) fn movement_system(
                 }
             }
             let rlen = (rx * rx + ry * ry).sqrt();
-            if rlen > 1e-4 { (rx / rlen, ry / rlen) } else { (0.0, 0.0) }
+            if rlen > 1e-4 {
+                (rx / rlen, ry / rlen)
+            } else {
+                (0.0, 0.0)
+            }
         };
 
         if let Some(e) = entities.get_mut(id) {
@@ -184,8 +188,7 @@ pub(crate) fn movement_system(
                 // Sidestep: stuck mid-path (far from goal), cooldown elapsed,
                 // only for Move/AttackMove orders.
                 // Stagger trigger per unit so clustered units don't all sidestep at once.
-                let trigger_threshold =
-                    config::SIDESTEP_TRIGGER_TICKS + (id % 8) as u16;
+                let trigger_threshold = config::SIDESTEP_TRIGGER_TICKS + (id % 8) as u16;
                 if stuck_ticks >= trigger_threshold
                     && matches!(e.order(), Order::Move(_) | Order::AttackMove(_))
                 {
@@ -228,7 +231,11 @@ fn inject_sidestep(
         let dx = wx - x;
         let dy = wy - y;
         let d = (dx * dx + dy * dy).sqrt();
-        if d > 1e-4 { (dx / d, dy / d) } else { (e.facing().cos(), e.facing().sin()) }
+        if d > 1e-4 {
+            (dx / d, dy / d)
+        } else {
+            (e.facing().cos(), e.facing().sin())
+        }
     } else {
         (e.facing().cos(), e.facing().sin())
     };

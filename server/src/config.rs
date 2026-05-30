@@ -277,9 +277,9 @@ pub fn build_requirement_met(
     owned_building_kinds: &[EntityKind],
 ) -> bool {
     match building_kind {
-        EntityKind::Barracks
-        | EntityKind::TrainingCentre
-        | EntityKind::TankFactory => owned_building_kinds.contains(&EntityKind::IndustrialCenter),
+        EntityKind::Barracks | EntityKind::TrainingCentre | EntityKind::TankFactory => {
+            owned_building_kinds.contains(&EntityKind::IndustrialCenter)
+        }
         _ => true,
     }
 }
