@@ -25,6 +25,8 @@
 
 ## Needs prioritization
  - [ ] lobby system to see active lobbies
+ - [ ] All data should exist as TOML files, not hardcoded 
+ - [ ] Hotkeys in the command card should be grid style, as in the top left hotkey is always Q, the top middle is W, the one below the top left is A, etc. Match the keyboard.
 
 ## Done
 

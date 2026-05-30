@@ -41,6 +41,18 @@ To play head-to-head, open the page in **two browser windows**, join the same ro
 **Ready**, and the host clicks **Start match**. Set `RTS_ADDR` to change the bind address
 (default `0.0.0.0:8080`).
 
+## Deploy
+
+The app is configured for Fly.io via [`fly.toml`](/Users/az/Code/rts-0/fly.toml). After making a
+change, deploy from the repo root with:
+
+```bash
+flyctl deploy --ha=false
+```
+
+The first-time setup steps, app name, and machine management commands live in
+[`docs/fly.md`](/Users/az/Code/rts-0/docs/fly.md).
+
 ![Lobby](docs/screenshot-lobby.png)
 
 ## Controls
