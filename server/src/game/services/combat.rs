@@ -7,6 +7,7 @@ use crate::game::services::dist2;
 use crate::game::services::move_coordinator::MoveCoordinator;
 use crate::game::services::occupancy::Occupancy;
 use crate::game::services::spatial::SpatialIndex;
+use crate::game::services::world_query;
 use crate::protocol::Event;
 
 /// Extra slack (px) added to attack range checks so units don't dance at the exact boundary.
@@ -171,15 +172,7 @@ fn resolve_target(
 
     // Aggressive acquisition: the nearest enemy within the acquire radius (weapon range for
     // buildings, sight range for mobile units so they chase).
-    spatial
-        .nearest(px, py, acquire_px, entities, |e: &Entity| {
-            e.id != self_id
-                && e.owner != owner
-                && e.owner != crate::game::entity::NEUTRAL
-                && e.is_targetable()
-                && e.hp > 0
-        })
-        .map(|(cid, _)| cid)
+    world_query::nearest_enemy_in_range(entities, spatial, self_id, owner, px, py, acquire_px)
 }
 
 /// Apply `dmg` to `victim` from `attacker`, emitting an `Attack` event to the attacker's

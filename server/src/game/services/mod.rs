@@ -10,6 +10,7 @@ pub mod pathing;
 pub mod production;
 pub mod spatial;
 pub mod supply;
+pub mod world_query;
 
 use crate::game::entity::EntityKind;
 
