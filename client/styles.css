@@ -547,7 +547,7 @@ input[type="text"]:focus {
   background: var(--void);
 }
 
-/* --- Bottom-right command card (3x3-ish grid of buttons) --- */
+/* --- Bottom-right command card (3x3 fixed grid of buttons) --- */
 #command-card {
   right: 12px;
   bottom: 12px;
@@ -558,6 +558,16 @@ input[type="text"]:focus {
   grid-template-columns: repeat(3, 68px);
   grid-auto-rows: 68px;
   gap: 10px;
+}
+.cmd-empty {
+  background: var(--panel);
+  border: 1px solid var(--panel-edge);
+  border-radius: var(--radius-sm);
+  opacity: 0.25;
+  pointer-events: none;
+}
+.cmd-prod-status {
+  grid-column: 1 / -1;
 }
 .cmd-btn {
   position: relative;

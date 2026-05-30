@@ -288,6 +288,7 @@ export class HUD {
       }
     }
 
+    this._padCard(frag, idx);
     card.innerHTML = "";
     card.appendChild(frag);
   }
@@ -322,6 +323,7 @@ export class HUD {
       });
       frag.appendChild(btn);
     }
+    this._padCard(frag, idx);
     card.innerHTML = "";
     card.appendChild(frag);
   }
@@ -397,6 +399,8 @@ export class HUD {
       frag.appendChild(cancelBtn);
     }
 
+    this._padCard(frag, idx);
+
     // A small production status line (queue count + progress) under the buttons.
     const status = document.createElement("div");
     status.className = "cmd-prod-status";
@@ -470,6 +474,19 @@ export class HUD {
       if (e.owner === this.state.playerId && e.kind === kind && e.buildProgress == null) return true;
     }
     return false;
+  }
+
+  /**
+   * Pad a command-card fragment to exactly 9 slots with empty placeholders.
+   * @param {DocumentFragment} frag
+   * @param {number} filled number of real buttons already appended.
+   */
+  _padCard(frag, filled) {
+    for (let i = filled; i < 9; i++) {
+      const el = document.createElement("div");
+      el.className = "cmd-empty";
+      frag.appendChild(el);
+    }
   }
 
   /**
