@@ -251,6 +251,11 @@ Why first:
 
 ### Phase AI-2: Extract Shared Knowledge from Existing Code
 
+- [x] Centralize deterministic near-base build-site selection so live AI and self-play stop
+  carrying separate placement heuristics.
+- [x] Centralize worker saturation targeting, local spend reservation, and attack-wave selection
+  helpers so both AI entry points share the same small rules.
+
 Deliverables:
 - identify duplicated logic in `ai.rs` and `selfplay.rs`
 - move reusable economy/build/attack knowledge into shared helpers

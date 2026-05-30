@@ -14,6 +14,7 @@
 //! via the `start` payload.
 
 use crate::config;
+use crate::game::ai_shared;
 use crate::game::entity::{EntityKind, EntityStore, Order};
 use crate::game::map::Map;
 use crate::game::services::spatial::SpatialIndex;
@@ -21,7 +22,7 @@ use crate::game::services::world_query;
 use crate::game::systems;
 use crate::game::PlayerState;
 use crate::protocol::{kinds, Command};
-use std::collections::HashSet;
+use std::collections::{BTreeSet, HashSet};
 
 // --- Tuning knobs -----------------------------------------------------------
 
@@ -42,9 +43,6 @@ const SUPPLY_BUFFER: u32 = 4;
 /// Free riflemen that must gather before a wave is committed to attacking. Small so the AI
 /// commits attacks within a reasonable time given its slow economy.
 const WAVE_SIZE: usize = 4;
-/// Max Chebyshev ring (in tiles) searched outward from the base for a build site.
-const BUILD_SEARCH_RADIUS: i32 = 16;
-
 /// Drives a single AI-controlled player by emitting ordinary commands each think.
 ///
 /// Stateless beyond the player id: every decision is derived fresh from the current world state,
@@ -85,8 +83,8 @@ impl AiController {
         // Local economy budget. We decrement these as we *decide* to spend so a single think
         // never queues more than the AI can actually afford this tick (commands all apply in
         // order, so without this we'd over-commit on the pre-tick balance).
-        let mut steel = me.steel;
-        let mut free_supply = me.supply_cap.saturating_sub(me.supply_used);
+        let mut budget =
+            ai_shared::SpendBudget::new(me.steel, me.oil, me.supply_used, me.supply_cap);
         let supply_capped = me.supply_cap >= config::SUPPLY_CAP_MAX;
 
         // --- Survey the player's holdings in one pass. ---------------------
@@ -147,7 +145,8 @@ impl AiController {
         }
         let _ = rifleman_count; // surveyed for clarity; waves key off free_riflemen.
         let depot_in_progress = depot_under_construction || pending_depot_build;
-        let target_workers = main_base_miner_saturation_target(entities, me);
+        let target_workers =
+            ai_shared::main_base_steel_saturation_target_from_entities(entities, me.start_tile);
         let target_barracks = desired_barracks_target(me.steel);
 
         // Workers we may pull onto a build job: prefer truly idle, fall back to a gatherer.
@@ -156,13 +155,10 @@ impl AiController {
         let mut reserved_workers = HashSet::new();
 
         // --- 1. Expand supply with a depot when we're about to choke. ------
-        let depot_cost = config::building_stats(EntityKind::Depot)
-            .map(|s| s.cost_steel)
-            .unwrap_or(50);
         if !depot_in_progress
             && !supply_capped
-            && free_supply < SUPPLY_BUFFER
-            && steel >= depot_cost
+            && budget.free_supply() < SUPPLY_BUFFER
+            && budget.can_afford_building(EntityKind::Depot)
         {
             if let Some(worker) = pop_builder(
                 &mut idle_workers,
@@ -182,16 +178,14 @@ impl AiController {
                             tile_y: ty,
                         },
                     ));
-                    steel -= depot_cost;
+                    let reserved = budget.reserve_building(EntityKind::Depot);
+                    debug_assert!(reserved);
                 }
             }
         }
 
         // --- 2. Build barracks (our rifleman production). --------------------
-        let rax_cost = config::building_stats(EntityKind::Barracks)
-            .map(|s| s.cost_steel)
-            .unwrap_or(100);
-        if barracks_total < target_barracks && steel >= rax_cost {
+        if barracks_total < target_barracks && budget.can_afford_building(EntityKind::Barracks) {
             if let Some(worker) = pop_builder(
                 &mut idle_workers,
                 &mut gathering_workers,
@@ -210,23 +204,18 @@ impl AiController {
                             tile_y: ty,
                         },
                     ));
-                    steel -= rax_cost;
+                    let reserved = budget.reserve_building(EntityKind::Barracks);
+                    debug_assert!(reserved);
                 }
             }
         }
 
         // --- 3. Train workers up to the economy target. -------------------
-        let worker_cost = config::unit_stats(EntityKind::Worker)
-            .map(|s| s.cost_steel)
-            .unwrap_or(50);
-        let worker_supply = config::unit_stats(EntityKind::Worker)
-            .map(|s| s.supply)
-            .unwrap_or(1);
         for industrial_center in idle_industrial_centers {
             if worker_count >= target_workers {
                 break;
             }
-            if steel < worker_cost || free_supply < worker_supply {
+            if !budget.can_afford_unit(EntityKind::Worker) {
                 break;
             }
             out.push((
@@ -236,24 +225,18 @@ impl AiController {
                     unit: kinds::WORKER.to_string(),
                 },
             ));
-            steel -= worker_cost;
-            free_supply -= worker_supply;
+            let reserved = budget.reserve_unit(EntityKind::Worker);
+            debug_assert!(reserved);
             worker_count += 1;
         }
 
         // --- 4. Pump riflemen from each barracks (keep a shallow queue). ---
-        let rifleman_cost = config::unit_stats(EntityKind::Rifleman)
-            .map(|s| s.cost_steel)
-            .unwrap_or(50);
-        let rifleman_supply = config::unit_stats(EntityKind::Rifleman)
-            .map(|s| s.supply)
-            .unwrap_or(1);
         for (rax, queue_len) in barracks {
             // Keep at most one queued behind the in-progress one so we don't lock up steel.
             if queue_len >= 2 {
                 continue;
             }
-            if steel < rifleman_cost || free_supply < rifleman_supply {
+            if !budget.can_afford_unit(EntityKind::Rifleman) {
                 break;
             }
             out.push((
@@ -263,8 +246,8 @@ impl AiController {
                     unit: kinds::RIFLEMAN.to_string(),
                 },
             ));
-            steel -= rifleman_cost;
-            free_supply -= rifleman_supply;
+            let reserved = budget.reserve_unit(EntityKind::Rifleman);
+            debug_assert!(reserved);
         }
 
         // --- 5. Send idle workers to distinct steel patches. -------------
@@ -284,16 +267,9 @@ impl AiController {
         }
 
         // --- 6. Commit a wave once enough riflemen are free. --------------
-        if free_riflemen.len() >= WAVE_SIZE {
+        if let Some(units) = ai_shared::ready_attack_wave(free_riflemen, WAVE_SIZE, Some) {
             if let Some((x, y)) = self.nearest_enemy_base(map, entities, players) {
-                out.push((
-                    self.player,
-                    Command::AttackMove {
-                        units: free_riflemen,
-                        x,
-                        y,
-                    },
-                ));
+                out.push((self.player, Command::AttackMove { units, x, y }));
             }
         }
     }
@@ -309,26 +285,19 @@ impl AiController {
         building: EntityKind,
         me: &PlayerState,
     ) -> Option<(u32, u32)> {
-        let (bx, by) = (me.start_tile.0 as i32, me.start_tile.1 as i32);
-        for r in 2..=BUILD_SEARCH_RADIUS {
-            for dy in -r..=r {
-                for dx in -r..=r {
-                    // Ring only (Chebyshev distance == r) so we search nearest-first.
-                    if dx.abs().max(dy.abs()) != r {
-                        continue;
-                    }
-                    let (tx, ty) = (bx + dx, by + dy);
-                    if tx < 0 || ty < 0 {
-                        continue;
-                    }
-                    let (tx, ty) = (tx as u32, ty as u32);
-                    if systems::footprint_placeable(map, entities, spatial, building, tx, ty) {
-                        return Some((tx, ty));
-                    }
-                }
-            }
-        }
-        None
+        ai_shared::find_build_spot_near_start_with(
+            map.size,
+            map.size,
+            me.start_tile,
+            building,
+            ai_shared::BuildSearch {
+                min_radius: 2,
+                max_radius: ai_shared::DEFAULT_BUILD_SEARCH_MAX_RADIUS,
+                prefer_away_from_center: false,
+            },
+            &BTreeSet::new(),
+            |tx, ty| systems::footprint_placeable(map, entities, spatial, building, tx, ty),
+        )
     }
 
     /// World-pixel center of the nearest *living* enemy's start tile, or `None` if the AI is the
@@ -383,27 +352,6 @@ fn occupied_steel_nodes(entities: &EntityStore) -> HashSet<u32> {
         .filter_map(|e| e.order().gather_node())
         .filter(|&node| world_query::node_holder(entities, node).is_some())
         .collect()
-}
-
-/// Number of non-empty steel patches around this player's starting base, which is also the
-/// number of simultaneous miners that base can keep latched. The AI uses this as its worker
-/// target so balance changes to the starting patch count automatically propagate.
-fn main_base_miner_saturation_target(entities: &EntityStore, me: &PlayerState) -> usize {
-    let (hx, hy) = (
-        me.start_tile.0 as f32 * config::TILE_SIZE as f32 + config::TILE_SIZE as f32 * 0.5,
-        me.start_tile.1 as f32 * config::TILE_SIZE as f32 + config::TILE_SIZE as f32 * 0.5,
-    );
-    let max_dist_px = (config::IC_RESOURCE_MAX_DIST_TILES + 0.5) * config::TILE_SIZE as f32;
-    let max_dist2 = max_dist_px * max_dist_px;
-    entities
-        .iter()
-        .filter(|e| e.kind == EntityKind::Steel && e.remaining().unwrap_or(0) > 0)
-        .filter(|e| {
-            let dx = e.pos_x - hx;
-            let dy = e.pos_y - hy;
-            dx * dx + dy * dy <= max_dist2
-        })
-        .count()
 }
 
 /// Nearest non-empty steel node to a worker (by id) that has not already been reserved this
@@ -599,7 +547,10 @@ mod tests {
             supply_cap: 0,
         };
 
-        assert_eq!(main_base_miner_saturation_target(&entities, &me), 2);
+        assert_eq!(
+            ai_shared::main_base_steel_saturation_target_from_entities(&entities, me.start_tile),
+            2
+        );
     }
 
     #[test]

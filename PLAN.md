@@ -392,6 +392,10 @@ Depends on:
 
 ### 6.3 Advanced AI Tech Progression
 
+- [x] Start the shared AI knowledge extraction by centralizing deterministic near-base
+  build-site selection for both live AI and self-play.
+- [x] Extract shared worker-target, local spend-budget, and attack-wave selection helpers for
+  both live AI and self-play.
 - [ ] Follow [AI-PLAN.md](AI-PLAN.md) for the detailed dependency chain and rollout order.
 - [ ] Keep one shared AI knowledge and action layer used by both live AI and self-play.
 - [ ] Add at least three simple strategy profiles:
