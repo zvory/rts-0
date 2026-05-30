@@ -304,7 +304,10 @@ impl Game {
     /// Remove every entity owned by `player` (e.g. on disconnect) so the match can resolve.
     pub fn eliminate(&mut self, player: u32) {
         let doomed: Vec<u32> = services::world_query::owned_units(&self.entities, player)
-            .chain(services::world_query::owned_buildings(&self.entities, player))
+            .chain(services::world_query::owned_buildings(
+                &self.entities,
+                player,
+            ))
             .map(|e| e.id)
             .collect();
         for id in doomed {
@@ -509,14 +512,11 @@ fn spawn_player_start(entities: &mut EntityStore, map: &Map, owner: u32, start: 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::game::entity::{EntityKind, Order};
     use crate::protocol::kinds;
 
-    /// Drive a passive human vs. one AI and confirm the AI actually plays: it grows its economy,
-    /// expands supply, builds a barracks, produces riflemen, and marches them into the human base
-    /// to deal damage. This exercises the full command path the AI shares with human clients.
-    #[test]
-    fn ai_builds_economy_and_attacks() {
-        let players = [
+    fn human_vs_ai_players() -> [PlayerInit; 2] {
+        [
             PlayerInit {
                 id: 1,
                 name: "Human".into(),
@@ -529,7 +529,36 @@ mod tests {
                 color: "#000".into(),
                 is_ai: true,
             },
-        ];
+        ]
+    }
+
+    fn count_ai_pending_depot_builders(game: &Game, player_id: u32) -> usize {
+        game.entities
+            .iter()
+            .filter(|e| e.owner == player_id && e.kind == EntityKind::Worker)
+            .filter(|e| {
+                matches!(
+                    e.order().build_intent_tile(),
+                    Some((EntityKind::Depot, _, _))
+                )
+            })
+            .count()
+    }
+
+    fn count_ai_gathering_workers(game: &Game, player_id: u32) -> usize {
+        game.entities
+            .iter()
+            .filter(|e| e.owner == player_id && e.kind == EntityKind::Worker)
+            .filter(|e| matches!(e.order(), Order::Gather(_)))
+            .count()
+    }
+
+    /// Drive a passive human vs. one AI and confirm the AI actually plays: it grows its economy,
+    /// expands supply, builds a barracks, produces riflemen, and marches them into the human base
+    /// to deal damage. This exercises the full command path the AI shares with human clients.
+    #[test]
+    fn ai_builds_economy_and_attacks() {
+        let players = human_vs_ai_players();
         let mut game = Game::new(&players);
 
         let mut max_workers = 0usize;
@@ -537,18 +566,36 @@ mod tests {
         let mut ever_had_barracks = false;
         let mut ai_supply_cap = 0u32;
         let mut human_damaged = false;
+        let mut max_pending_depot_builders = 0usize;
+        let mut depot_completed_tick = None;
+        let mut gathering_workers_after_depot = 0usize;
         let mut event_log = Vec::new();
 
         // ~200s of simulation. The human issues no commands (passive target).
         for tick in 1..=6000 {
             for (player_id, events) in game.tick() {
                 for event in events {
+                    if player_id == 2
+                        && matches!(
+                            event,
+                            Event::Build { ref kind, .. } if kind == kinds::DEPOT
+                        )
+                    {
+                        depot_completed_tick.get_or_insert(tick);
+                    }
                     event_log.push(super::replay::EventLogEntry {
                         tick,
                         player_id,
                         event,
                     });
                 }
+            }
+
+            max_pending_depot_builders =
+                max_pending_depot_builders.max(count_ai_pending_depot_builders(&game, 2));
+            if depot_completed_tick.is_some() {
+                gathering_workers_after_depot =
+                    gathering_workers_after_depot.max(count_ai_gathering_workers(&game, 2));
             }
 
             let ai = game.snapshot_for(2);
@@ -594,6 +641,14 @@ mod tests {
             "AI should build a depot to raise supply above the Industrial Center's {} (saw {ai_supply_cap})",
             config::INDUSTRIAL_CENTER_SUPPLY
         );
+        assert!(
+            max_pending_depot_builders <= 1,
+            "AI should never have more than one depot builder pending simultaneously (saw {max_pending_depot_builders})"
+        );
+        assert!(
+            gathering_workers_after_depot > 0,
+            "AI should have workers mining again after the depot completes"
+        );
         assert!(ever_had_barracks, "AI should build a barracks");
         assert!(max_riflemen > 0, "AI should produce riflemen");
         assert!(
@@ -607,6 +662,97 @@ mod tests {
             |failure| {
                 panic!("AI replay determinism failed: {}", failure.reason());
             },
+        );
+    }
+
+    #[test]
+    fn base_ai_tracks_pending_depot_build_order() {
+        let players = human_vs_ai_players();
+        let mut game = Game::new(&players);
+        let mut saw_pending_without_scaffold = false;
+        let mut max_pending_depot_builders = 0usize;
+        let mut gathering_workers_while_pending = 0usize;
+
+        for _ in 0..600 {
+            game.tick();
+
+            let pending_depot_builders: Vec<_> = game
+                .entities
+                .iter()
+                .filter(|e| e.owner == 2 && e.kind == EntityKind::Worker)
+                .filter(|e| {
+                    matches!(
+                        e.order().build_intent_tile(),
+                        Some((EntityKind::Depot, _, _))
+                    )
+                })
+                .collect();
+            let scaffold_exists = game
+                .entities
+                .iter()
+                .any(|e| e.owner == 2 && e.kind == EntityKind::Depot && e.under_construction());
+
+            if !pending_depot_builders.is_empty() && !scaffold_exists {
+                saw_pending_without_scaffold = true;
+                max_pending_depot_builders =
+                    max_pending_depot_builders.max(pending_depot_builders.len());
+                gathering_workers_while_pending =
+                    gathering_workers_while_pending.max(count_ai_gathering_workers(&game, 2));
+            }
+        }
+
+        assert!(
+            saw_pending_without_scaffold,
+            "test should observe the window where a depot order is pending before the scaffold spawns"
+        );
+        assert!(
+            max_pending_depot_builders <= 1,
+            "AI should track pending depot build intents and keep them to one worker (saw {max_pending_depot_builders})"
+        );
+        assert!(
+            gathering_workers_while_pending >= (config::STARTING_WORKERS as usize).saturating_sub(1),
+            "AI should keep nearly all starting workers gathering while one depot order is pending (saw {gathering_workers_while_pending})"
+        );
+    }
+
+    #[test]
+    fn base_ai_reassigns_idle_workers_to_steel() {
+        let players = human_vs_ai_players();
+        let mut game = Game::new(&players);
+
+        // Advance to a point where the AI has active gathering assignments.
+        for _ in 0..30 {
+            game.tick();
+        }
+
+        let idle_worker = game
+            .entities
+            .iter()
+            .find(|e| {
+                e.owner == 2
+                    && e.kind == EntityKind::Worker
+                    && matches!(e.order(), Order::Gather(_))
+            })
+            .map(|e| e.id)
+            .expect("AI should have a gathering worker to perturb");
+        if let Some(worker) = game.entities.get_mut(idle_worker) {
+            worker.clear_orders();
+        }
+
+        let mut reassigned_to = None;
+        for _ in 0..20 {
+            game.tick();
+            if let Some(worker) = game.entities.get(idle_worker) {
+                if let Some(node) = worker.order().gather_node() {
+                    reassigned_to = Some(node);
+                    break;
+                }
+            }
+        }
+
+        assert!(
+            reassigned_to.is_some(),
+            "AI should send an idle worker back to gather on a later decision tick"
         );
     }
 

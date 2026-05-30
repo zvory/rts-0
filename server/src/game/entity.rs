@@ -194,11 +194,9 @@ impl Order {
     /// the footprint's top-left tile. Available in any build phase.
     pub fn build_intent_tile(&self) -> Option<(EntityKind, u32, u32)> {
         match self {
-            Order::Build(order) => Some((
-                order.intent.kind,
-                order.intent.tile_x,
-                order.intent.tile_y,
-            )),
+            Order::Build(order) => {
+                Some((order.intent.kind, order.intent.tile_x, order.intent.tile_y))
+            }
             _ => None,
         }
     }
