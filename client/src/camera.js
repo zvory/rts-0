@@ -174,16 +174,9 @@ export class Camera {
     const visW = this.viewW / this.zoom;
     const visH = this.viewH / this.zoom;
 
-    if (visW >= this.worldW) {
-      this.x = (this.worldW - visW) / 2; // center horizontally
-    } else {
-      this.x = Math.max(0, Math.min(this.worldW - visW, this.x));
-    }
-
-    if (visH >= this.worldH) {
-      this.y = (this.worldH - visH) / 2; // center vertically
-    } else {
-      this.y = Math.max(0, Math.min(this.worldH - visH, this.y));
-    }
+    // Allow up to one viewport of overscroll past each edge so UI chrome
+    // (command card, top HUD) can be scrolled clear of map content.
+    this.x = Math.max(-visW / 4, Math.min(this.worldW - visW * 3 / 4, this.x));
+    this.y = Math.max(-visH / 4, Math.min(this.worldH - visH * 3 / 4, this.y));
   }
 }
