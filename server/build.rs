@@ -14,7 +14,9 @@ fn main() {
                 Ok(output) if output.status.success() => {
                     let text = String::from_utf8_lossy(&output.stdout).trim().to_string();
                     if text.is_empty() {
-                        println!("cargo:warning=git rev-parse returned empty; version will be 'unknown'");
+                        println!(
+                            "cargo:warning=git rev-parse returned empty; version will be 'unknown'"
+                        );
                         "unknown".to_string()
                     } else {
                         text

@@ -16,6 +16,7 @@ pub mod pathfinding;
 pub mod replay;
 #[cfg(test)]
 mod selfplay;
+pub(crate) mod services;
 pub mod systems;
 
 use std::collections::HashMap;

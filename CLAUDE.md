@@ -95,8 +95,9 @@ There is **no JS build step** (plain ES modules + PixiJS from CDN). The client i
 ## Conventions
 
 - **Rust:** edition 2021, `cargo fmt`, keep warnings low. Prefer small pure helpers in
-  `game/systems.rs`. The room task is the single owner of its `Game` — no locks around it. Don't
-  panic on the network or tick paths; handle errors and keep the room alive.
+  `game/services/`. `systems.rs` is the thin orchestrator that calls services in order. The room
+  task is the single owner of its `Game` — no locks around it. Don't panic on the network or tick
+  paths; handle errors and keep the room alive.
 - **JS:** ES2020 modules, no framework, one small class per file (see `DESIGN.md §4`). Modules
   receive their collaborators via **dependency injection** from `main.js`; they do **not**
   cross-import each other (only `protocol.js`/`config.js`). PixiJS is the global `PIXI` (v7) — do
