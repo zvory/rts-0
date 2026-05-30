@@ -41,6 +41,22 @@ function wsUrl() {
   return `${scheme}://${window.location.host}/ws`;
 }
 
+function devWatchConfig() {
+  const params = new URLSearchParams(window.location.search);
+  const replay = (params.get("replay") || "").trim();
+  if (window.location.pathname !== "/dev/selfplay" && !params.has("watchSelfplay")) {
+    return null;
+  }
+  const room = replay
+    ? `__dev_selfplay__replay:${replay}`
+    : "__dev_selfplay__live";
+  return {
+    room,
+    noFog: true,
+    banner: replay ? `local dev  self-play replay  no fog  ${replay}` : "local dev  self-play  no fog",
+  };
+}
+
 /** Cached DOM handles for the pinned ids in index.html (see its DOM contract). */
 const dom = {
   version: document.getElementById("version"),
@@ -52,6 +68,7 @@ const dom = {
   gameOver: document.getElementById("game-over"),
   gameOverText: document.getElementById("game-over-text"),
   gameOverButton: document.getElementById("game-over-button"),
+  devBanner: document.getElementById("dev-banner"),
 };
 
 /**
@@ -63,6 +80,7 @@ class App {
   constructor() {
     /** @type {Net} persistent connection across lobby + matches. */
     this.net = new Net(wsUrl());
+    this.devWatch = devWatchConfig();
     /** @type {Lobby} */
     this.lobby = new Lobby(dom.lobbyScreen, this.net);
     /** @type {Match|null} the currently running match, if any. */
@@ -94,11 +112,33 @@ class App {
 
     void this.loadVersion();
     this.lobby.show();
+    this.applyDevBanner();
     try {
       await this.net.connect();
+      this.maybeAutoJoinDevWatch();
     } catch (err) {
       this.showConnectionWarning();
     }
+  }
+
+  applyDevBanner() {
+    if (!dom.devBanner) return;
+    if (!this.devWatch) {
+      dom.devBanner.hidden = true;
+      return;
+    }
+    dom.devBanner.textContent = this.devWatch.banner;
+    dom.devBanner.hidden = false;
+  }
+
+  maybeAutoJoinDevWatch() {
+    if (!this.devWatch) return;
+    const name = "Spectator";
+    if (this.lobby?.elName) this.lobby.elName.value = name;
+    if (this.lobby?.elRoom) this.lobby.elRoom.value = this.devWatch.room;
+    this.net.join(name, this.devWatch.room);
+    if (this.lobby?.roomBlock) this.lobby.roomBlock.hidden = true;
+    this.lobby.setStatus("Starting local self-play watch…");
   }
 
   /**
@@ -151,7 +191,7 @@ class App {
     dom.gameScreen.hidden = false;
     dom.gameOver.hidden = true;
 
-    this.match = new Match(this.net, payload, (msg) => this.showToast(msg));
+    this.match = new Match(this.net, payload, (msg) => this.showToast(msg), this.devWatch);
   }
 
   /**
@@ -233,15 +273,17 @@ class Match {
    * @param {object} payload §2.3 start payload
    * @param {(msg: string) => void} toast surface a notice in the App's toast
    */
-  constructor(net, payload, toast) {
+  constructor(net, payload, toast, devWatch) {
     this.net = net;
     this.toast = toast;
+    this.devWatch = devWatch;
 
     // --- Build the module graph from the static start payload (DESIGN.md §4.1). ---
     this.state = new GameState(payload);
     this.camera = new Camera();
     this.renderer = new Renderer(dom.viewport);
     this.fog = new Fog(this.state.map.width, this.state.map.height);
+    this.fog.setRevealAll(!!this.devWatch?.noFog);
     this.hud = new HUD(dom.gameScreen, this.state, this.net);
     this.minimap = new Minimap(dom.minimap, this.state, this.camera, this.fog, this.net);
     this.input = new Input(

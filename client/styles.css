@@ -84,6 +84,22 @@ body {
   user-select: none;
 }
 
+#dev-banner {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  z-index: 30;
+  padding: 6px 10px;
+  border: 1px solid var(--panel-edge);
+  background: rgba(17, 17, 15, 0.92);
+  color: var(--accent);
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  pointer-events: none;
+}
+
 /* A full-screen screen container. Only one is visible at a time; the [hidden]
    attribute (toggled from main.js) wins over display. */
 .screen {

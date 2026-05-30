@@ -30,6 +30,7 @@ export class Fog {
     this.visibleGrid = new Uint8Array(mapWidth * mapHeight);
     /** 1 = ever explored (cumulative). Length width*height, row-major. @type {Uint8Array} */
     this.exploredGrid = new Uint8Array(mapWidth * mapHeight);
+    this.revealAll = false;
   }
 
   /**
@@ -43,6 +44,11 @@ export class Fog {
    * @param {number} tileSize world px per tile
    */
   update(ownEntities, tileSize) {
+    if (this.revealAll) {
+      this.visibleGrid.fill(1);
+      this.exploredGrid.fill(1);
+      return;
+    }
     this.visibleGrid.fill(0);
     if (!ownEntities || !tileSize) return;
 
@@ -88,6 +94,7 @@ export class Fog {
    * @returns {boolean} true if the tile is visible this frame
    */
   isVisible(tileX, tileY) {
+    if (this.revealAll) return true;
     if (tileX < 0 || tileY < 0 || tileX >= this.width || tileY >= this.height) return false;
     return this.visibleGrid[tileY * this.width + tileX] === 1;
   }
@@ -98,7 +105,16 @@ export class Fog {
    * @returns {boolean} true if the tile has ever been explored
    */
   isExplored(tileX, tileY) {
+    if (this.revealAll) return true;
     if (tileX < 0 || tileY < 0 || tileX >= this.width || tileY >= this.height) return false;
     return this.exploredGrid[tileY * this.width + tileX] === 1;
+  }
+
+  setRevealAll(enabled) {
+    this.revealAll = !!enabled;
+    if (this.revealAll) {
+      this.visibleGrid.fill(1);
+      this.exploredGrid.fill(1);
+    }
   }
 }

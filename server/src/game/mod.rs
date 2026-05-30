@@ -15,8 +15,7 @@ mod invariants;
 pub mod map;
 pub mod pathfinding;
 pub mod replay;
-#[cfg(test)]
-mod selfplay;
+pub mod selfplay;
 pub(crate) mod services;
 pub mod systems;
 
@@ -88,7 +87,6 @@ impl Game {
         Self::new_inner(players, true)
     }
 
-    #[cfg(test)]
     pub(crate) fn new_for_replay(players: &[PlayerInit]) -> Game {
         Self::new_inner(players, false)
     }
@@ -247,6 +245,16 @@ impl Game {
     /// Build the fog-filtered snapshot for one player at the current tick. Includes ALL of the
     /// player's own entities plus neutral/enemy entities whose tile is currently visible.
     pub fn snapshot_for(&self, player: u32) -> Snapshot {
+        self.snapshot_for_mode(player, true)
+    }
+
+    /// Build a full-world snapshot for a viewer. Used only by dev watch flows where fog is
+    /// intentionally disabled; normal gameplay must keep using [`snapshot_for`].
+    pub fn snapshot_full_for(&self, player: u32) -> Snapshot {
+        self.snapshot_for_mode(player, false)
+    }
+
+    fn snapshot_for_mode(&self, player: u32, fogged: bool) -> Snapshot {
         let ps = self.player(player);
         let (steel, oil, supply_used, supply_cap) = match ps {
             Some(p) => (p.steel, p.oil, p.supply_used, p.supply_cap),
@@ -261,13 +269,13 @@ impl Game {
                 None => continue,
             };
             let own = e.owner == player;
-            if !own {
+            if fogged && !own {
                 // Reveal neutral / enemy entities only when their tile is currently visible.
                 if !self.fog.is_visible_world(player, e.pos_x, e.pos_y) {
                     continue;
                 }
             }
-            entities.push(self.view_of(e, player));
+            entities.push(self.view_of(e, player, fogged));
         }
         // Deterministic order (stable for tests / replays).
         entities.sort_by_key(|v| v.id);
@@ -312,13 +320,12 @@ impl Game {
         self.fog.recompute(&ids, &self.entities);
     }
 
-    #[cfg(test)]
     pub fn tick_count(&self) -> u32 {
         self.tick
     }
 
     /// Authoritative commands applied so far, in exact application order.
-    #[cfg(test)]
+    #[allow(dead_code)]
     pub fn command_log(&self) -> &[CommandLogEntry] {
         &self.command_log
     }
@@ -340,7 +347,7 @@ impl Game {
 
     /// Project an entity into its wire `EntityView` for `viewer`, filling the optional fields
     /// that apply. `viewer` is needed to fog-gate the combat tracer target id.
-    fn view_of(&self, e: &Entity, viewer: u32) -> EntityView {
+    fn view_of(&self, e: &Entity, viewer: u32, fogged: bool) -> EntityView {
         let mut v = EntityView::new(
             e.id,
             e.owner,
@@ -396,6 +403,7 @@ impl Game {
                 // avoids leaking the position/existence of an entity hidden in the viewer's fog.
                 if let Some(target) = self.entities.get(t) {
                     let visible = e.owner == viewer
+                        || !fogged
                         || self
                             .fog
                             .is_visible_world(viewer, target.pos_x, target.pos_y);

@@ -4,13 +4,14 @@
 //! of reaching into simulation internals. The scripted players behave like deterministic API
 //! clients: observe a fog-filtered snapshot, issue ordinary commands, and let the authoritative
 //! simulation validate every action.
+#![allow(dead_code)]
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::fs;
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use super::replay::{replay_commands, EventLogEntry, PlayerSnapshot, ReplayOutcome};
 use super::{Game, PlayerInit};
@@ -38,10 +39,99 @@ const ATTACK_REISSUE_TICKS: u32 = 120;
 const RESOURCE_SANITY_LIMIT: u32 = 1_000_000;
 const ECONOMY_TARGET_WORKERS: usize = 8;
 
-trait ScriptedPlayer {
+trait ScriptedPlayer: Send {
     fn player_id(&self) -> u32;
     fn name(&self) -> &'static str;
     fn commands(&mut self, view: PlayerView<'_>) -> Vec<Command>;
+}
+
+pub(crate) struct LiveSelfPlay {
+    players: Vec<PlayerInit>,
+    scripts: Vec<Box<dyn ScriptedPlayer>>,
+}
+
+impl LiveSelfPlay {
+    pub(crate) fn default_match() -> Self {
+        let players = vec![
+            PlayerInit {
+                id: 1,
+                name: "Alpha Script".to_string(),
+                color: "#6f8fa8".to_string(),
+                is_ai: false,
+            },
+            PlayerInit {
+                id: 2,
+                name: "Bravo Script".to_string(),
+                color: "#b2775f".to_string(),
+                is_ai: false,
+            },
+        ];
+        let scripts: Vec<Box<dyn ScriptedPlayer>> = vec![
+            Box::new(BuildTechAttackScript::new(players[0].id)),
+            Box::new(BuildTechAttackScript::new(players[1].id)),
+        ];
+        Self { players, scripts }
+    }
+
+    pub(crate) fn players(&self) -> &[PlayerInit] {
+        &self.players
+    }
+
+    pub(crate) fn enqueue_for_tick(&mut self, game: &mut Game) {
+        let tick = game.tick_count();
+        let start = game.start_payload();
+        let mut commands = Vec::new();
+        for script in &mut self.scripts {
+            let player_id = script.player_id();
+            let snapshot = game.snapshot_for(player_id);
+            let view = PlayerView {
+                player_id,
+                tick,
+                start: &start,
+                snapshot: &snapshot,
+            };
+            for command in script.commands(view) {
+                commands.push((player_id, command));
+            }
+        }
+        for (player_id, command) in commands {
+            game.enqueue(player_id, command);
+        }
+    }
+}
+
+#[derive(Clone, Deserialize)]
+pub(crate) struct ReplayArtifact {
+    pub(crate) replay_commands: Vec<super::replay::CommandLogEntry>,
+    pub(crate) players: Vec<PlayerInit>,
+}
+
+pub(crate) struct ReplayDriver {
+    commands: Vec<super::replay::CommandLogEntry>,
+    next: usize,
+}
+
+impl ReplayDriver {
+    pub(crate) fn from_artifact(artifact: ReplayArtifact) -> (Vec<PlayerInit>, Self) {
+        (
+            artifact.players,
+            Self {
+                commands: artifact.replay_commands,
+                next: 0,
+            },
+        )
+    }
+
+    pub(crate) fn enqueue_for_tick(&mut self, game: &mut Game) {
+        let next_tick = game.tick_count().saturating_add(1);
+        while let Some(entry) = self.commands.get(self.next) {
+            if entry.tick != next_tick {
+                break;
+            }
+            game.enqueue(entry.player_id, entry.command.clone());
+            self.next += 1;
+        }
+    }
 }
 
 #[derive(Clone, Copy)]

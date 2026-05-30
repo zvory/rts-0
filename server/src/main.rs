@@ -17,8 +17,8 @@ use std::net::SocketAddr;
 use std::time::Duration;
 
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
-use axum::extract::State;
-use axum::response::IntoResponse;
+use axum::extract::{Query, State};
+use axum::response::{IntoResponse, Redirect};
 use axum::routing::get;
 use axum::Router;
 use futures_util::{SinkExt, StreamExt};
@@ -69,6 +69,7 @@ async fn main() {
     let app = Router::new()
         .route("/version", get(version_handler))
         .route("/ws", get(ws_handler))
+        .route("/dev/selfplay", get(dev_selfplay_handler))
         .fallback_service(static_service)
         .with_state(state);
 
@@ -107,6 +108,15 @@ async fn ws_handler(ws: WebSocketUpgrade, State(state): State<AppState>) -> impl
 /// Return the short git commit SHA that identifies this build.
 async fn version_handler(State(state): State<AppState>) -> String {
     state.version
+}
+
+async fn dev_selfplay_handler(Query(params): Query<std::collections::HashMap<String, String>>) -> impl IntoResponse {
+    let mut target = "/?watchSelfplay=1".to_string();
+    if let Some(replay) = params.get("replay").filter(|s| !s.trim().is_empty()) {
+        target.push_str("&replay=");
+        target.push_str(replay);
+    }
+    Redirect::temporary(&target)
 }
 
 /// Return the short git commit SHA that identifies this build.
