@@ -43,6 +43,8 @@ for arg in "$@"; do
   esac
 done
 
+echo "running all tests silently, will take a while, patience"
+
 HEALTH_URL="http://127.0.0.1:${PORT}/"
 export RTS_WS="ws://127.0.0.1:${PORT}/ws"   # consumed by the Node API suites
 export RTS_URL="http://127.0.0.1:${PORT}/"  # consumed by client_smoke.mjs
