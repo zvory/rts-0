@@ -199,8 +199,15 @@ fn apply_damage(
     vx: f32,
     vy: f32,
 ) {
+    let attacker_is_ap = entities.get(attacker).map(|e| e.kind.is_ap()).unwrap_or(false);
+    let victim_is_armored = entities.get(victim).map(|e| e.kind.is_armored()).unwrap_or(false);
+    let effective_dmg = if victim_is_armored && !attacker_is_ap {
+        dmg / 2
+    } else {
+        dmg
+    };
     if let Some(v) = entities.get_mut(victim) {
-        v.hp = v.hp.saturating_sub(dmg);
+        v.hp = v.hp.saturating_sub(effective_dmg);
     }
     // Send the Attack event to every player who can either see the attacker or the victim, so
     // friendly fire tracers + enemy muzzle flashes both render. Attacker's owner always gets it.
