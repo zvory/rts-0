@@ -1,7 +1,0 @@
-test: scripted_self_play_bunker_rush_vs_economy
-failure: self-play did not complete all milestones within 9600 ticks: p1:bunker, p1:bunkers>=1, p1:bunker-attacks>=1
-commands: 20
-replay commands: 20
-events: 18
-missing: p1:bunker, p1:bunkers>=1, p1:bunker-attacks>=1
-last sample tick: 9600
