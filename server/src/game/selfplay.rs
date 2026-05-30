@@ -7,8 +7,9 @@
 #![allow(dead_code)]
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::env;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
@@ -38,6 +39,9 @@ const THINK_INTERVAL: u32 = 6;
 const ATTACK_REISSUE_TICKS: u32 = 120;
 const RESOURCE_SANITY_LIMIT: u32 = 1_000_000;
 const ECONOMY_TARGET_WORKERS: usize = 8;
+const SELFPLAY_FAILURE_DIR: &str = "selfplay-failures";
+const SELFPLAY_ARTIFACT_DIR: &str = "selfplay-artifacts";
+const SAVE_REPLAY_ENV: &str = "RTS_SELFPLAY_SAVE_REPLAY";
 
 trait ScriptedPlayer: Send {
     fn player_id(&self) -> u32;
@@ -923,7 +927,7 @@ struct SelfPlayRunner {
     test_name: &'static str,
     game: Game,
     start: StartPayload,
-    player_specs: Vec<PlayerSpec>,
+    player_specs: Vec<PlayerInit>,
     scripts: Vec<Box<dyn ScriptedPlayer>>,
     commands: Vec<CommandRecord>,
     replay_commands_len: usize,
@@ -938,7 +942,7 @@ impl SelfPlayRunner {
         test_name: &'static str,
         game: Game,
         start: StartPayload,
-        player_specs: Vec<PlayerSpec>,
+        player_specs: Vec<PlayerInit>,
         scripts: Vec<Box<dyn ScriptedPlayer>>,
     ) -> Self {
         let milestones = Milestones::tech_combat_for_players(player_specs.iter().map(|p| p.id));
@@ -949,7 +953,7 @@ impl SelfPlayRunner {
         test_name: &'static str,
         game: Game,
         start: StartPayload,
-        player_specs: Vec<PlayerSpec>,
+        player_specs: Vec<PlayerInit>,
         scripts: Vec<Box<dyn ScriptedPlayer>>,
         milestones: Milestones,
     ) -> Self {
@@ -1105,20 +1109,31 @@ impl SelfPlayRunner {
             .duration_since(UNIX_EPOCH)
             .map_err(|e| e.to_string())?
             .as_millis();
-        let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("target")
-            .join("selfplay-failures")
-            .join(format!(
-                "{}-{}-{}",
-                self.test_name,
-                std::process::id(),
-                now_ms
-            ));
-        fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+        let dir = self.artifact_root(SELFPLAY_FAILURE_DIR).join(format!(
+            "{}-{}-{}",
+            self.test_name,
+            std::process::id(),
+            now_ms
+        ));
+        let artifact = self.artifact_payload(Some(failure.reason.clone()));
+        self.write_artifact_dir(&dir, &artifact)?;
+        Ok(dir)
+    }
 
-        let artifact = FailureArtifact {
+    fn write_success_artifact_if_requested(&self) -> Result<Option<PathBuf>, String> {
+        let Some(name) = requested_replay_artifact_name(self.test_name)? else {
+            return Ok(None);
+        };
+        let dir = self.artifact_root(SELFPLAY_ARTIFACT_DIR).join(name);
+        let artifact = self.artifact_payload(None);
+        self.write_artifact_dir(&dir, &artifact)?;
+        Ok(Some(dir))
+    }
+
+    fn artifact_payload(&self, failure: Option<String>) -> SelfPlayArtifact {
+        SelfPlayArtifact {
             test_name: self.test_name,
-            failure: failure.reason.clone(),
+            failure,
             start: self.start.clone(),
             players: self.player_specs.clone(),
             milestones: self.milestones.clone(),
@@ -1127,12 +1142,63 @@ impl SelfPlayRunner {
             events: self.events.clone(),
             replay_events: self.event_log.clone(),
             samples: self.samples.clone(),
-        };
+        }
+    }
+
+    fn artifact_root(&self, dir_name: &str) -> PathBuf {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("target")
+            .join(dir_name)
+    }
+
+    fn write_artifact_dir(&self, dir: &Path, artifact: &SelfPlayArtifact) -> Result<(), String> {
+        fs::create_dir_all(dir).map_err(|e| e.to_string())?;
         let json = serde_json::to_vec_pretty(&artifact).map_err(|e| e.to_string())?;
         fs::write(dir.join("replay.json"), json).map_err(|e| e.to_string())?;
         fs::write(dir.join("summary.log"), artifact.summary_log()).map_err(|e| e.to_string())?;
-        Ok(dir)
+        Ok(())
     }
+}
+
+fn requested_replay_artifact_name(test_name: &str) -> Result<Option<String>, String> {
+    let Some(raw) = env::var_os(SAVE_REPLAY_ENV) else {
+        return Ok(None);
+    };
+    let raw = raw.to_string_lossy();
+    let value = raw.trim();
+    if value.is_empty()
+        || value.eq_ignore_ascii_case("0")
+        || value.eq_ignore_ascii_case("false")
+        || value.eq_ignore_ascii_case("no")
+    {
+        return Ok(None);
+    }
+    if value.eq_ignore_ascii_case("1")
+        || value.eq_ignore_ascii_case("true")
+        || value.eq_ignore_ascii_case("yes")
+    {
+        let now_ms = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_err(|e| e.to_string())?
+            .as_millis();
+        return Ok(Some(format!("{test_name}-{}-{now_ms}", std::process::id())));
+    }
+    if is_safe_artifact_name(value) {
+        return Ok(Some(value.to_string()));
+    }
+    Err(format!(
+        "{SAVE_REPLAY_ENV} must be 1/true/yes for an auto-generated name or a safe artifact name"
+    ))
+}
+
+pub(crate) fn is_safe_artifact_name(name: &str) -> bool {
+    !name.is_empty()
+        && !name.contains('/')
+        && !name.contains('\\')
+        && !name.contains("..")
+        && name
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
 }
 
 #[derive(Debug)]
@@ -1156,23 +1222,6 @@ impl SelfPlayFailure {
 
     pub(crate) fn reason(&self) -> &str {
         &self.reason
-    }
-}
-
-#[derive(Clone, Serialize)]
-struct PlayerSpec {
-    id: u32,
-    name: String,
-    color: String,
-}
-
-impl From<&PlayerInit> for PlayerSpec {
-    fn from(p: &PlayerInit) -> Self {
-        PlayerSpec {
-            id: p.id,
-            name: p.name.clone(),
-            color: p.color.clone(),
-        }
     }
 }
 
@@ -1611,11 +1660,11 @@ impl PlayerMilestones {
 }
 
 #[derive(Serialize)]
-struct FailureArtifact {
+struct SelfPlayArtifact {
     test_name: &'static str,
-    failure: String,
+    failure: Option<String>,
     start: StartPayload,
-    players: Vec<PlayerSpec>,
+    players: Vec<PlayerInit>,
     milestones: Milestones,
     commands: Vec<CommandRecord>,
     replay_commands: Vec<super::replay::CommandLogEntry>,
@@ -1624,11 +1673,15 @@ struct FailureArtifact {
     samples: Vec<SnapshotSample>,
 }
 
-impl FailureArtifact {
+impl SelfPlayArtifact {
     fn summary_log(&self) -> String {
         let mut out = String::new();
         out.push_str(&format!("test: {}\n", self.test_name));
-        out.push_str(&format!("failure: {}\n", self.failure));
+        if let Some(failure) = &self.failure {
+            out.push_str(&format!("failure: {failure}\n"));
+        } else {
+            out.push_str("result: success\n");
+        }
         out.push_str(&format!("commands: {}\n", self.commands.len()));
         out.push_str(&format!(
             "replay commands: {}\n",
@@ -1649,6 +1702,31 @@ fn replay_outcome_for(
 ) -> Result<ReplayOutcome, SelfPlayFailure> {
     replay_commands(players, game.command_log(), game.tick_count())
         .map_err(|e| SelfPlayFailure::new(format!("replay failed: {e}")))
+}
+
+fn finalize_self_play_success(
+    runner: &SelfPlayRunner,
+    players: &[PlayerInit],
+    report: &SelfPlayReport,
+) {
+    assert!(report.ticks > 0);
+    assert!(report.commands > 0);
+    assert_eq!(report.commands, report.replay_commands);
+    assert_replay_matches_live(&runner.game, players, &runner.event_log).unwrap_or_else(
+        |failure| {
+            let artifact = runner
+                .write_failure_artifact(&failure)
+                .map(|p| p.display().to_string())
+                .unwrap_or_else(|e| format!("artifact write failed: {e}"));
+            panic!(
+                "self-play replay failed: {}; artifact: {artifact}",
+                failure.reason
+            );
+        },
+    );
+    if let Err(err) = runner.write_success_artifact_if_requested() {
+        panic!("failed to save self-play replay artifact: {err}");
+    }
 }
 
 fn live_outcome_for(
@@ -2222,7 +2300,7 @@ fn scripted_self_play_exercises_economy_tech_and_combat() {
     ];
     let game = Game::new(&players);
     let start = game.start_payload();
-    let specs: Vec<PlayerSpec> = players.iter().map(PlayerSpec::from).collect();
+    let specs = players.clone();
     let scripts: Vec<Box<dyn ScriptedPlayer>> = vec![
         Box::new(BuildTechAttackScript::new(1)),
         Box::new(BuildTechAttackScript::new(2)),
@@ -2236,23 +2314,7 @@ fn scripted_self_play_exercises_economy_tech_and_combat() {
     );
 
     match runner.run() {
-        Ok(report) => {
-            assert!(report.ticks > 0);
-            assert!(report.commands > 0);
-            assert_eq!(report.commands, report.replay_commands);
-            assert_replay_matches_live(&runner.game, &players, &runner.event_log).unwrap_or_else(
-                |failure| {
-                    let artifact = runner
-                        .write_failure_artifact(&failure)
-                        .map(|p| p.display().to_string())
-                        .unwrap_or_else(|e| format!("artifact write failed: {e}"));
-                    panic!(
-                        "self-play replay failed: {}; artifact: {artifact}",
-                        failure.reason
-                    );
-                },
-            );
-        }
+        Ok(report) => finalize_self_play_success(&runner, &players, &report),
         Err(failure) => {
             let artifact = runner
                 .write_failure_artifact(&failure)
@@ -2281,7 +2343,7 @@ fn scripted_self_play_bunker_rush_vs_economy() {
     ];
     let game = Game::new(&players);
     let start = game.start_payload();
-    let specs: Vec<PlayerSpec> = players.iter().map(PlayerSpec::from).collect();
+    let specs = players.clone();
     let scripts: Vec<Box<dyn ScriptedPlayer>> = vec![
         Box::new(BunkerRushScript::new(1, 2)),
         Box::new(EconomyScript::new(2)),
@@ -2303,23 +2365,7 @@ fn scripted_self_play_bunker_rush_vs_economy() {
     );
 
     match runner.run() {
-        Ok(report) => {
-            assert!(report.ticks > 0);
-            assert!(report.commands > 0);
-            assert_eq!(report.commands, report.replay_commands);
-            assert_replay_matches_live(&runner.game, &players, &runner.event_log).unwrap_or_else(
-                |failure| {
-                    let artifact = runner
-                        .write_failure_artifact(&failure)
-                        .map(|p| p.display().to_string())
-                        .unwrap_or_else(|e| format!("artifact write failed: {e}"));
-                    panic!(
-                        "self-play replay failed: {}; artifact: {artifact}",
-                        failure.reason
-                    );
-                },
-            );
-        }
+        Ok(report) => finalize_self_play_success(&runner, &players, &report),
         Err(failure) => {
             let artifact = runner
                 .write_failure_artifact(&failure)
@@ -2348,7 +2394,7 @@ fn scripted_self_play_worker_rush_vs_economy() {
     ];
     let game = Game::new(&players);
     let start = game.start_payload();
-    let specs: Vec<PlayerSpec> = players.iter().map(PlayerSpec::from).collect();
+    let specs = players.clone();
     let scripts: Vec<Box<dyn ScriptedPlayer>> = vec![
         Box::new(WorkerRushScript::new(1, 2)),
         Box::new(EconomyScript::new(2)),
@@ -2370,23 +2416,7 @@ fn scripted_self_play_worker_rush_vs_economy() {
     );
 
     match runner.run() {
-        Ok(report) => {
-            assert!(report.ticks > 0);
-            assert!(report.commands > 0);
-            assert_eq!(report.commands, report.replay_commands);
-            assert_replay_matches_live(&runner.game, &players, &runner.event_log).unwrap_or_else(
-                |failure| {
-                    let artifact = runner
-                        .write_failure_artifact(&failure)
-                        .map(|p| p.display().to_string())
-                        .unwrap_or_else(|e| format!("artifact write failed: {e}"));
-                    panic!(
-                        "self-play replay failed: {}; artifact: {artifact}",
-                        failure.reason
-                    );
-                },
-            );
-        }
+        Ok(report) => finalize_self_play_success(&runner, &players, &report),
         Err(failure) => {
             let artifact = runner
                 .write_failure_artifact(&failure)

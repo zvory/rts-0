@@ -623,11 +623,14 @@ for invalid resources, supply overflow, malformed entity snapshots, out-of-bound
 non-finite progress values. It also enforces progress deadlines so a stuck economy/tech/combat loop
 fails as a deadlock instead of timing out silently.
 
-**Failure artifacts.** On failure, the test writes `target/selfplay-failures/<test>-<pid>-<time>/`
+**Artifacts.** On failure, the test writes `target/selfplay-failures/<test>-<pid>-<time>/`
 with:
 - `replay.json`: start payload, player specs, script decision log, authoritative tick-stamped
   command log, event log, milestone state, and sampled snapshot summaries.
 - `summary.log`: short human-readable failure summary and missing milestones.
 
 The artifact is meant to be enough to reproduce or inspect a failing run without manually
-playtesting first. It is only written on failure so successful test runs do not churn the worktree.
+playtesting first. By default successful runs do not write artifacts. For manual inspection,
+setting `RTS_SELFPLAY_SAVE_REPLAY=1` writes a successful run to
+`target/selfplay-artifacts/<test>-<pid>-<time>/`; setting `RTS_SELFPLAY_SAVE_REPLAY=<name>` uses
+that explicit safe artifact name instead.
