@@ -550,7 +550,7 @@ export class Renderer {
 
     // X marker over a node that a worker is actively mining.
     if (this._miningNodes && this._miningNodes.has(e.id)) {
-      const xr = r * 0.9;
+      const xr = r * 0.45;
       g.lineStyle(2.5, 0x1a1712, 0.95);
       g.moveTo(-xr, -xr);
       g.lineTo(xr, xr);
