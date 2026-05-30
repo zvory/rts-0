@@ -430,3 +430,202 @@ fn is_free_goal(map: &Map, occ: &Occupancy, tile: (u32, u32), taken: &[(u32, u32
     }
     true
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::game::entity::{EntityKind, EntityStore, MovePhase, Order};
+    use crate::game::map::Map;
+    use crate::game::services::occupancy::Occupancy;
+
+    #[test]
+    fn goal_spreading_assigns_unique_tiles_deterministically() {
+        let map = Map::generate(1, 0x1234_5678);
+        let entities = EntityStore::new();
+        let occ = Occupancy::build(&map, &entities);
+
+        let ids = vec![1, 2, 3, 4, 5];
+        let anchor = (10u32, 10u32);
+        let goals = spread_goals(&map, &occ, &ids, anchor);
+
+        assert_eq!(goals.len(), ids.len());
+
+        // All goals should be unique (no two units share the same tile center).
+        let mut seen = std::collections::HashSet::new();
+        for g in &goals {
+            let tile = map.tile_of(g.0, g.1);
+            assert!(
+                seen.insert(tile),
+                "duplicate goal tile {tile:?} for multi-unit spread"
+            );
+        }
+
+        // First goal should be the anchor itself when it's free.
+        let anchor_center = map.tile_center(anchor.0, anchor.1);
+        assert_eq!(goals[0], anchor_center);
+    }
+
+    #[test]
+    fn spawn_search_finds_point_outside_footprint() {
+        let map = Map::generate(1, 0x1234_5678);
+        let mut entities = EntityStore::new();
+        // Place a barracks at tile (15, 15); footprint is 3x2.
+        let (cx, cy) = map.tile_center(15, 15);
+        let b_id = entities
+            .spawn_building(1, EntityKind::Barracks, cx, cy, true)
+            .unwrap();
+        let occ = Occupancy::build(&map, &entities);
+
+        let mut pathing = PathingService::new(8_192, 256);
+        pathing.advance_tick(1);
+        let coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, 1);
+
+        let b = entities.get(b_id).unwrap();
+        let (sx, sy) = coordinator.find_spawn_point(&entities, b.kind, b.pos_x, b.pos_y);
+
+        let (stx, sty) = map.tile_of(sx, sy);
+        let (btx, bty) = map.tile_of(b.pos_x, b.pos_y);
+
+        // Spawn tile must be outside the barracks footprint.
+        assert!(
+            stx < btx || stx >= btx + 3 || sty < bty || sty >= bty + 2,
+            "spawn tile ({stx},{sty}) is inside the 3x2 footprint at ({btx},{bty})"
+        );
+
+        // Spawn tile must be passable for infantry.
+        assert!(map.is_passable_for(MobilityClass::Infantry, stx as i32, sty as i32));
+    }
+
+    #[test]
+    fn repath_throttle_respects_min_ticks_and_material_goal_change() {
+        let map = Map::generate(1, 0x1234_5678);
+        let mut entities = EntityStore::new();
+        let id = entities
+            .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
+            .unwrap();
+        let occ = Occupancy::build(&map, &entities);
+
+        let mut pathing = PathingService::new(8_192, 256);
+        pathing.advance_tick(10);
+        let coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, 10);
+
+        // Fresh unit: should be allowed to repath.
+        assert!(coordinator.can_repath(&entities, id, (200.0, 200.0)));
+
+        // Simulate a recent repath at tick 10.
+        if let Some(e) = entities.get_mut(id) {
+            e.set_last_repath_tick(10);
+            e.set_path_goal(Some((200.0, 200.0)));
+        }
+
+        let mut pathing = PathingService::new(8_192, 256);
+        pathing.advance_tick(11);
+        let coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, 11);
+
+        // Only 1 tick elapsed, goal unchanged: should NOT repath.
+        assert!(!coordinator.can_repath(&entities, id, (200.0, 200.0)));
+
+        // Goal moved materially (> TILE_SIZE): should bypass throttle.
+        assert!(
+            coordinator.can_repath(&entities, id, (250.0, 250.0)),
+            "material goal change should bypass throttle"
+        );
+
+        // 3 ticks elapsed, goal unchanged: should now be allowed (MIN_REPATH_TICKS = 3).
+        let mut pathing = PathingService::new(8_192, 256);
+        pathing.advance_tick(13);
+        let coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, 13);
+        assert!(
+            coordinator.can_repath(&entities, id, (200.0, 200.0)),
+            "3+ ticks elapsed should allow repath"
+        );
+    }
+
+    #[test]
+    fn path_failed_is_set_on_unreachable_goal() {
+        let map = Map::generate(1, 0x1234_5678);
+        let mut entities = EntityStore::new();
+        // Place the unit at tile (10, 10).
+        let (ux, uy) = map.tile_center(10, 10);
+        let id = entities
+            .spawn_unit(1, EntityKind::Rifleman, ux, uy)
+            .unwrap();
+
+        // Completely surround tile (10, 10) with a ring of 2x2 depots so the unit
+        // cannot leave.  Depots centered at tile-centers that keep (10,10) open.
+        let ring = [(8.0, 10.0), (12.0, 10.0), (10.0, 8.0), (10.0, 12.0)];
+        for &(cx, cy) in &ring {
+            let (wx, wy) = map.tile_center(cx as u32, cy as u32);
+            entities.spawn_building(1, EntityKind::Depot, wx, wy, true);
+        }
+
+        let occ = Occupancy::build(&map, &entities);
+        let mut pathing = PathingService::new(8_192, 256);
+        pathing.advance_tick(1);
+        let mut coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, 1);
+
+        // Order the unit to move far away (to tile (30, 30)).
+        let (gx, gy) = map.tile_center(30, 30);
+        coordinator.order_group_move(&mut entities, 1, &[id], (gx, gy), false);
+
+        // The unit should be in AwaitingPath after the order.
+        let e = entities.get(id).unwrap();
+        assert_eq!(e.move_phase(), Some(MovePhase::AwaitingPath));
+
+        // Process awaiting paths.
+        coordinator.process_awaiting_paths(&mut entities);
+
+        // The unit is fully enclosed, so no route exists → PathFailed.
+        let e = entities.get(id).unwrap();
+        assert_eq!(e.move_phase(), Some(MovePhase::PathFailed));
+        assert!(e.path_is_empty());
+    }
+
+    #[test]
+    fn process_awaiting_paths_respects_budget() {
+        let map = Map::generate(1, 0x1234_5678);
+        let mut entities = EntityStore::new();
+        let occ = Occupancy::build(&map, &entities);
+
+        // Spawn many units and order them all to move.
+        let mut ids = Vec::new();
+        for i in 0..10 {
+            let x = 32.0 + i as f32 * 32.0;
+            let id = entities.spawn_unit(1, EntityKind::Rifleman, x, 100.0).unwrap();
+            ids.push(id);
+        }
+
+        let mut pathing = PathingService::new(8_192, 256);
+        pathing.advance_tick(1);
+        let mut coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, 1);
+
+        // Set budget artificially low (3).
+        coordinator.budget = 3;
+
+        // Mark all units as awaiting path with a Move order.
+        for &id in &ids {
+            if let Some(e) = entities.get_mut(id) {
+                e.set_order(Order::move_to(500.0, 500.0));
+                e.set_path_goal(Some((500.0, 500.0)));
+                e.mark_move_phase(MovePhase::AwaitingPath);
+            }
+        }
+
+        coordinator.process_awaiting_paths(&mut entities);
+
+        // Count how many moved from AwaitingPath to Moving/PathFailed.
+        let mut processed = 0;
+        let mut still_waiting = 0;
+        for &id in &ids {
+            let e = entities.get(id).unwrap();
+            match e.move_phase() {
+                Some(MovePhase::Moving) | Some(MovePhase::PathFailed) => processed += 1,
+                Some(MovePhase::AwaitingPath) => still_waiting += 1,
+                _ => {}
+            }
+        }
+
+        assert_eq!(processed, 3, "only 3 paths should have been processed with budget=3");
+        assert_eq!(still_waiting, 7, "7 units should still be awaiting path");
+    }
+}

@@ -182,7 +182,7 @@ src/
     pathfinding.rs # A* over the tile grid (impassable = terrain + building footprints)
     fog.rs       # per-player visibility grid (visible / explored)
     systems.rs   # orchestrator: runs services in order each tick
-    services/    # per-tick internal services: commands, movement, combat, economy, production, construction, death, occupancy, supply
+    services/    # per-tick internal services: commands, move_coordinator, movement, combat, economy, production, construction, death, occupancy, supply, pathing
     ai.rs        # optional computer opponents: one AiController per AI player (see §8)
     replay.rs    # tick-stamped command log replay harness for determinism checks
     selfplay.rs  # test-only API-driven scripted self-play harness (see §9)
