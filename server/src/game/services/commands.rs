@@ -14,6 +14,7 @@ use crate::protocol::{Command, Event};
 const MAX_UNITS_PER_COMMAND: usize = 256;
 
 /// Drain + apply queued commands (validate ownership / cost / supply / tech / placement).
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn apply_commands(
     map: &Map,
     entities: &mut EntityStore,
@@ -67,7 +68,8 @@ pub(crate) fn apply_commands(
                     if !owns_unit(entities, player, id) {
                         continue;
                     }
-                    let is_worker = matches!(entities.get(id), Some(e) if e.kind == EntityKind::Worker);
+                    let is_worker =
+                        matches!(entities.get(id), Some(e) if e.kind == EntityKind::Worker);
                     let node_ok = matches!(entities.get(node), Some(n)
                         if n.is_node() && n.remaining().unwrap_or(0) > 0);
                     if !is_worker || !node_ok {

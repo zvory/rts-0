@@ -78,7 +78,9 @@ impl<'a> MoveCoordinator<'a> {
 
         for (id, g) in ids.iter().zip(goals.iter()) {
             entities.release_miner(*id);
-            let Some(e) = entities.get_mut(*id) else { continue };
+            let Some(e) = entities.get_mut(*id) else {
+                continue;
+            };
             if !e.is_unit() || e.owner != player {
                 continue;
             }
@@ -264,7 +266,10 @@ impl<'a> MoveCoordinator<'a> {
                     }
 
                     // Must be passable for infantry (spawning units are currently always infantry).
-                    if !self.map.is_passable_for(MobilityClass::Infantry, tx as i32, ty as i32) {
+                    if !self
+                        .map
+                        .is_passable_for(MobilityClass::Infantry, tx as i32, ty as i32)
+                    {
                         continue;
                     }
 
@@ -292,12 +297,7 @@ impl<'a> MoveCoordinator<'a> {
     // -------------------------------------------------------------------
 
     /// Direct path request without throttle check. Updates budget, entity path, and phase.
-    fn request_path(
-        &mut self,
-        entities: &mut EntityStore,
-        id: u32,
-        goal: (f32, f32),
-    ) -> bool {
+    fn request_path(&mut self, entities: &mut EntityStore, id: u32, goal: (f32, f32)) -> bool {
         let ((sx, sy), kind) = match entities.get(id) {
             Some(e) => (self.map.tile_of(e.pos_x, e.pos_y), e.kind),
             None => return false,
@@ -364,12 +364,7 @@ impl<'a> MoveCoordinator<'a> {
 
 /// Spread unit goals around the requested anchor tile. Returns one goal world point per unit
 /// in the same order as `ids`.
-fn spread_goals(
-    map: &Map,
-    occ: &Occupancy,
-    ids: &[u32],
-    anchor: (u32, u32),
-) -> Vec<(f32, f32)> {
+fn spread_goals(map: &Map, occ: &Occupancy, ids: &[u32], anchor: (u32, u32)) -> Vec<(f32, f32)> {
     let mut out = Vec::with_capacity(ids.len());
     let mut taken: Vec<(u32, u32)> = Vec::new();
 
@@ -591,7 +586,9 @@ mod tests {
         let mut ids = Vec::new();
         for i in 0..10 {
             let x = 32.0 + i as f32 * 32.0;
-            let id = entities.spawn_unit(1, EntityKind::Rifleman, x, 100.0).unwrap();
+            let id = entities
+                .spawn_unit(1, EntityKind::Rifleman, x, 100.0)
+                .unwrap();
             ids.push(id);
         }
 
@@ -625,7 +622,10 @@ mod tests {
             }
         }
 
-        assert_eq!(processed, 3, "only 3 paths should have been processed with budget=3");
+        assert_eq!(
+            processed, 3,
+            "only 3 paths should have been processed with budget=3"
+        );
         assert_eq!(still_waiting, 7, "7 units should still be awaiting path");
     }
 }

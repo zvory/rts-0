@@ -98,10 +98,10 @@ fn eject_worker_if_inside(map: &Map, entities: &mut EntityStore, worker: u32, si
     // Recompute occupancy so we respect other finished buildings.
     let occ = Occupancy::build(map, entities);
     let ts = config::TILE_SIZE as f32;
-    for r in 1..=4 {
+    for r in 1i32..=4 {
         for dy in -r..=r {
             for dx in -r..=r {
-                if (dx as i32).abs().max((dy as i32).abs()) != r {
+                if dx.abs().max(dy.abs()) != r {
                     continue;
                 }
                 let tx = wtx as i32 + dx;
