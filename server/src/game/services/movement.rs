@@ -105,6 +105,42 @@ pub(crate) fn movement_system(map: &Map, entities: &mut EntityStore, occ: &Occup
                 if matches!(e.order(), Order::Move(_)) {
                     e.set_order(Order::Idle);
                 }
+            } else if matches!(e.move_phase(), Some(MovePhase::Moving)) {
+                // Tolerant arrival: unit has a path but may be making no progress.
+                let (lx, ly) = e
+                    .movement
+                    .as_ref()
+                    .map(|m| m.last_progress_pos)
+                    .unwrap_or((x, y));
+                let dx = x - lx;
+                let dy = y - ly;
+                let moved = (dx * dx + dy * dy).sqrt();
+                if moved < config::STUCK_EPS_PX {
+                    if let Some(m) = e.movement.as_mut() {
+                        m.stuck_ticks = m.stuck_ticks.saturating_add(1);
+                    }
+                } else if let Some(m) = e.movement.as_mut() {
+                    m.stuck_ticks = 0;
+                    m.last_progress_pos = (x, y);
+                }
+                let stuck_ticks = e.movement.as_ref().map(|m| m.stuck_ticks).unwrap_or(0);
+                if stuck_ticks >= config::STUCK_ARRIVAL_TICKS {
+                    if let Some((gx, gy)) = e.path_goal() {
+                        let dx = x - gx;
+                        let dy = y - gy;
+                        let dist_to_goal = (dx * dx + dy * dy).sqrt();
+                        if dist_to_goal <= config::TOLERANT_ARRIVAL_RADIUS_PX {
+                            e.clear_path();
+                            e.mark_move_phase(MovePhase::Arrived);
+                            if let Some(m) = e.movement.as_mut() {
+                                m.stuck_ticks = 0;
+                            }
+                            if matches!(e.order(), Order::Move(_)) {
+                                e.set_order(Order::Idle);
+                            }
+                        }
+                    }
+                }
             }
         }
     }
