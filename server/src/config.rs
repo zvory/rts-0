@@ -29,6 +29,11 @@ pub const SIDESTEP_DISTANCE_PX: f32 = TILE_SIZE as f32;
 /// Ticks after a sidestep during which another sidestep is suppressed (~1 s at 30 Hz).
 pub const SIDESTEP_COOLDOWN_TICKS: u16 = 30;
 
+/// Radius within which an *intermediate* waypoint is considered reached. Tile centers are routing
+/// hints; brushing within half a tile satisfies the route. Must be ≥ largest unit radius so two
+/// units contesting the same tile center cannot both lock onto it simultaneously.
+pub const ARRIVE_RADIUS_INTERMEDIATE_PX: f32 = TILE_SIZE as f32 * 0.5; // 16 px
+
 /// Map size (in tiles) for a given player count. Square, symmetric.
 pub const fn map_size_for(players: usize) -> u32 {
     if players <= 2 {

@@ -289,6 +289,23 @@ impl AiController {
         building: EntityKind,
         me: &PlayerState,
     ) -> Option<(u32, u32)> {
+        // Pre-compute 1-tile margin around all existing buildings so placements keep a gap.
+        let mut building_margin: BTreeSet<(u32, u32)> = BTreeSet::new();
+        for e in entities.iter() {
+            if e.is_building() {
+                for (tx, ty) in crate::game::services::occupancy::building_footprint(map, e) {
+                    for dy in -1i32..=1 {
+                        for dx in -1i32..=1 {
+                            let nx = tx as i32 + dx;
+                            let ny = ty as i32 + dy;
+                            if nx >= 0 && ny >= 0 {
+                                building_margin.insert((nx as u32, ny as u32));
+                            }
+                        }
+                    }
+                }
+            }
+        }
         ai_shared::find_build_spot_near_start_with(
             map.size,
             map.size,
@@ -300,7 +317,22 @@ impl AiController {
                 prefer_away_from_center: false,
             },
             &BTreeSet::new(),
-            |tx, ty| systems::footprint_placeable(map, entities, spatial, building, tx, ty),
+            |tx, ty| {
+                if !systems::footprint_placeable(map, entities, spatial, building, tx, ty) {
+                    return false;
+                }
+                let Some(stats) = config::building_stats(building) else {
+                    return false;
+                };
+                for dy in 0..stats.foot_h {
+                    for dx in 0..stats.foot_w {
+                        if building_margin.contains(&(tx + dx, ty + dy)) {
+                            return false;
+                        }
+                    }
+                }
+                true
+            },
         )
     }
 
