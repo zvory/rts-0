@@ -166,7 +166,8 @@ pub(crate) fn movement_system(
             if let Some(f) = new_facing {
                 e.set_facing(f);
             }
-            // A plain Move with an empty path has arrived → go idle.
+            // A plain Move with an empty path has arrived → go idle so normal auto-acquire
+            // resumes after the destination is reached.
             if e.path_is_empty() {
                 e.mark_move_phase(MovePhase::Arrived);
                 if matches!(e.order(), Order::Move(_)) {
@@ -927,6 +928,27 @@ mod tests {
             "unit ended {:.2}px from final waypoint — too far",
             dist
         );
+    }
+
+    #[test]
+    fn plain_move_becomes_idle_after_arrival() {
+        let map = flat_map(1);
+        let mut entities = EntityStore::new();
+        let (gx, gy) = map.tile_center(25, 25);
+        let unit = entities
+            .spawn_unit(1, EntityKind::Rifleman, gx, gy)
+            .unwrap();
+        set_path_direct(&mut entities, unit, vec![(gx, gy)]);
+        if let Some(e) = entities.get_mut(unit) {
+            e.set_order(Order::move_to(gx, gy));
+        }
+
+        let occ = Occupancy::build(&map, &entities);
+        let spatial = SpatialIndex::build(&entities, map.size);
+        movement_system(&map, &mut entities, &occ, &spatial, 0);
+
+        let e = entities.get(unit).unwrap();
+        assert!(matches!(e.order(), Order::Idle));
     }
 
     /// A unit shoved sideways past an intermediate waypoint (but > ARRIVE_RADIUS away) should

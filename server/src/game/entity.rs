@@ -133,7 +133,8 @@ impl std::fmt::Display for EntityKind {
 /// machines instead of smuggling progress through unrelated fields.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Order {
-    /// No order: units hold position and idle combat units auto-defend.
+    /// No order: units hold position; idle army units and armed buildings may auto-acquire,
+    /// but workers stay passive unless explicitly ordered.
     Idle,
     /// Move to a world point; stop on arrival. No engaging en route.
     Move(MoveOrder),
