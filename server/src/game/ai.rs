@@ -40,6 +40,13 @@ const EXTRA_BARRACKS_STEEL_STEP: u32 = 200;
 const MAX_TARGET_BARRACKS: usize = 5;
 /// Build a depot when free supply drops below this (and we're not already building one).
 const SUPPLY_BUFFER: u32 = 4;
+/// Free riflemen stage on a forward rally line before a full wave launches.
+const COMBAT_RALLY_TILES_FROM_START: f32 = 8.0;
+/// Spacing between neighboring riflemen on the rally line.
+const COMBAT_RALLY_SLOT_SPACING_TILES: f32 = 1.5;
+/// Once a free rifleman is this much farther forward than the rally line, it should keep
+/// pressing toward the enemy base instead of being recycled backward into staging.
+const COMBAT_POINT_OF_NO_RETURN_TILES: f32 = 2.0;
 /// Initial free riflemen required before the AI launches its first attack wave.
 const BASE_WAVE_SIZE: usize = 3;
 /// Cap the requested wave size so an AI with a damaged economy eventually recovers.
@@ -280,11 +287,62 @@ impl AiController {
             }
         }
 
-        // --- 6. Commit a wave once enough riflemen are free. --------------
-        let wave_size = self.desired_wave_size(tick);
-        if let Some(units) = ai_shared::ready_attack_wave(free_riflemen, wave_size, Some) {
-            if let Some((x, y)) = self.nearest_enemy_base(map, entities, players) {
-                out.push((self.player, Command::AttackMove { units, x, y }));
+        // --- 6. Stage riflemen forward, then launch/continue pressure. ----
+        if let Some((enemy_x, enemy_y)) = self.nearest_enemy_base(map, entities, players) {
+            let mut staging = Vec::new();
+            let mut rally_ready = Vec::new();
+            let mut committed = Vec::new();
+            let rally_line_cohort = rally_line_cohort(map, entities, self.player, me.start_tile);
+            for id in free_riflemen {
+                let Some(rifleman) = entities.get(id) else {
+                    continue;
+                };
+                match classify_free_rifleman(map, me.start_tile, rifleman) {
+                    FreeRiflemanDisposition::Stage => staging.push(id),
+                    FreeRiflemanDisposition::RallyReady => rally_ready.push(id),
+                    FreeRiflemanDisposition::CommittedForward => committed.push(id),
+                }
+            }
+            staging.sort_unstable();
+            if !staging.is_empty() {
+                let rally_slots = combat_rally_slots(map, me.start_tile, rally_line_cohort.len());
+                for id in staging {
+                    let Some(slot_index) = rally_line_cohort.iter().position(|cohort_id| *cohort_id == id)
+                    else {
+                        continue;
+                    };
+                    let (x, y) = rally_slots[slot_index];
+                    out.push((
+                        self.player,
+                        Command::Move {
+                            units: vec![id],
+                            x,
+                            y,
+                        },
+                    ));
+                }
+            }
+            if !committed.is_empty() {
+                out.push((
+                    self.player,
+                    Command::AttackMove {
+                        units: committed,
+                        x: enemy_x,
+                        y: enemy_y,
+                    },
+                ));
+            }
+
+            let wave_size = self.desired_wave_size(tick);
+            if rally_ready.len() >= wave_size {
+                out.push((
+                    self.player,
+                    Command::AttackMove {
+                        units: rally_ready,
+                        x: enemy_x,
+                        y: enemy_y,
+                    },
+                ));
                 self.note_wave_launch(tick, wave_size);
             }
         }
@@ -385,6 +443,147 @@ impl AiController {
         }
         best.map(|(x, y, _)| (x, y))
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum FreeRiflemanDisposition {
+    Stage,
+    RallyReady,
+    CommittedForward,
+}
+
+fn combat_rally_world(map: &Map, start_tile: (u32, u32)) -> (f32, f32) {
+    let start = map.tile_center(start_tile.0, start_tile.1);
+    let center = map_center_world(map);
+    step_toward_world(
+        start,
+        center,
+        COMBAT_RALLY_TILES_FROM_START * config::TILE_SIZE as f32,
+    )
+}
+
+fn combat_rally_slots(map: &Map, start_tile: (u32, u32), count: usize) -> Vec<(f32, f32)> {
+    if count == 0 {
+        return Vec::new();
+    }
+    let rally = combat_rally_world(map, start_tile);
+    let start = map.tile_center(start_tile.0, start_tile.1);
+    let center = map_center_world(map);
+    let dx = center.0 - start.0;
+    let dy = center.1 - start.1;
+    let dist = (dx * dx + dy * dy).sqrt();
+    let (lx, ly) = if dist <= f32::EPSILON {
+        (1.0, 0.0)
+    } else {
+        (-dy / dist, dx / dist)
+    };
+    let spacing = COMBAT_RALLY_SLOT_SPACING_TILES * config::TILE_SIZE as f32;
+    let center_index = (count as f32 - 1.0) * 0.5;
+    (0..count)
+        .map(|i| {
+            let offset = (i as f32 - center_index) * spacing;
+            (rally.0 + lx * offset, rally.1 + ly * offset)
+        })
+        .collect()
+}
+
+fn map_center_world(map: &Map) -> (f32, f32) {
+    let size_px = map.size as f32 * config::TILE_SIZE as f32;
+    (size_px * 0.5, size_px * 0.5)
+}
+
+fn step_toward_world(from: (f32, f32), to: (f32, f32), step: f32) -> (f32, f32) {
+    let dx = to.0 - from.0;
+    let dy = to.1 - from.1;
+    let dist = (dx * dx + dy * dy).sqrt();
+    if dist <= f32::EPSILON {
+        return to;
+    }
+    let clamped = step.min(dist);
+    (from.0 + dx / dist * clamped, from.1 + dy / dist * clamped)
+}
+
+fn classify_free_rifleman(
+    map: &Map,
+    start_tile: (u32, u32),
+    rifleman: &crate::game::entity::Entity,
+) -> FreeRiflemanDisposition {
+    let start = map.tile_center(start_tile.0, start_tile.1);
+    let rally = combat_rally_world(map, start_tile);
+    let dx = rally.0 - start.0;
+    let dy = rally.1 - start.1;
+    let rally_dist = (dx * dx + dy * dy).sqrt();
+    if rally_dist <= f32::EPSILON {
+        return FreeRiflemanDisposition::RallyReady;
+    }
+    let ux = dx / rally_dist;
+    let uy = dy / rally_dist;
+    let progress = (rifleman.pos_x - start.0) * ux + (rifleman.pos_y - start.1) * uy;
+    let point_of_no_return =
+        rally_dist + COMBAT_POINT_OF_NO_RETURN_TILES * config::TILE_SIZE as f32;
+    if progress >= point_of_no_return {
+        FreeRiflemanDisposition::CommittedForward
+    } else if progress >= rally_dist {
+        FreeRiflemanDisposition::RallyReady
+    } else {
+        FreeRiflemanDisposition::Stage
+    }
+}
+
+fn rally_line_cohort(
+    map: &Map,
+    entities: &EntityStore,
+    player: u32,
+    start_tile: (u32, u32),
+) -> Vec<u32> {
+    let mut cohort: Vec<u32> = entities
+        .iter()
+        .filter(|e| e.owner == player && e.kind == EntityKind::Rifleman)
+        .filter(|e| is_rally_line_member(map, start_tile, e))
+        .map(|e| e.id)
+        .collect();
+    cohort.sort_unstable();
+    cohort
+}
+
+fn is_rally_line_member(
+    map: &Map,
+    start_tile: (u32, u32),
+    rifleman: &crate::game::entity::Entity,
+) -> bool {
+    if classify_free_rifleman(map, start_tile, rifleman) != FreeRiflemanDisposition::CommittedForward
+    {
+        return true;
+    }
+    match rifleman.order() {
+        Order::Move(_) => rifleman
+            .path_goal()
+            .map(|goal| goal_is_on_rally_line(map, start_tile, goal))
+            .unwrap_or(false),
+        _ => false,
+    }
+}
+
+fn goal_is_on_rally_line(map: &Map, start_tile: (u32, u32), goal: (f32, f32)) -> bool {
+    let rally = combat_rally_world(map, start_tile);
+    let start = map.tile_center(start_tile.0, start_tile.1);
+    let center = map_center_world(map);
+    let dx = center.0 - start.0;
+    let dy = center.1 - start.1;
+    let dist = (dx * dx + dy * dy).sqrt();
+    if dist <= f32::EPSILON {
+        return false;
+    }
+    let forward_x = dx / dist;
+    let forward_y = dy / dist;
+    let lateral_x = -forward_y;
+    let lateral_y = forward_x;
+    let from_rally_x = goal.0 - rally.0;
+    let from_rally_y = goal.1 - rally.1;
+    let forward_error = (from_rally_x * forward_x + from_rally_y * forward_y).abs();
+    let lateral_offset = (from_rally_x * lateral_x + from_rally_y * lateral_y).abs();
+    forward_error <= config::TILE_SIZE as f32
+        && lateral_offset <= COMBAT_RALLY_SLOT_SPACING_TILES * config::TILE_SIZE as f32 * 8.0
 }
 
 /// A rifleman available to join a wave: idle, or one whose attack-move finished (no path, no
@@ -651,5 +850,329 @@ mod tests {
 
         ai.note_wave_launch(90, MAX_WAVE_SIZE);
         assert_eq!(ai.desired_wave_size(120), MAX_WAVE_SIZE);
+    }
+
+    #[test]
+    fn classify_free_rifleman_splits_stage_ready_and_committed() {
+        let map = Map::generate(2, 1234);
+        let start_tile = (8, 8);
+        let start = map.tile_center(start_tile.0, start_tile.1);
+        let center = map_center_world(&map);
+        let rally = combat_rally_world(&map, start_tile);
+        let stage_pos = step_toward_world(start, center, 6.0 * config::TILE_SIZE as f32);
+        let committed_pos = step_toward_world(
+            start,
+            center,
+            (COMBAT_RALLY_TILES_FROM_START + COMBAT_POINT_OF_NO_RETURN_TILES + 1.0)
+                * config::TILE_SIZE as f32,
+        );
+
+        let stage = crate::game::entity::Entity::new_unit(
+            2,
+            EntityKind::Rifleman,
+            stage_pos.0,
+            stage_pos.1,
+        )
+        .unwrap();
+        let ready =
+            crate::game::entity::Entity::new_unit(2, EntityKind::Rifleman, rally.0, rally.1)
+                .unwrap();
+        let committed = crate::game::entity::Entity::new_unit(
+            2,
+            EntityKind::Rifleman,
+            committed_pos.0,
+            committed_pos.1,
+        )
+        .unwrap();
+
+        assert_eq!(
+            classify_free_rifleman(&map, start_tile, &stage),
+            FreeRiflemanDisposition::Stage
+        );
+        assert_eq!(
+            classify_free_rifleman(&map, start_tile, &ready),
+            FreeRiflemanDisposition::RallyReady
+        );
+        assert_eq!(
+            classify_free_rifleman(&map, start_tile, &committed),
+            FreeRiflemanDisposition::CommittedForward
+        );
+    }
+
+    #[test]
+    fn committed_free_rifleman_keeps_pressing_enemy_base() {
+        let map = Map::generate(2, 1234);
+        let mut entities = EntityStore::default();
+        let ai_start = (8, 8);
+        let enemy_start = (56, 56);
+        let ai_base = map.tile_center(ai_start.0, ai_start.1);
+        let enemy_base = map.tile_center(enemy_start.0, enemy_start.1);
+        entities
+            .spawn_building(2, EntityKind::IndustrialCenter, ai_base.0, ai_base.1, true)
+            .unwrap();
+        entities
+            .spawn_building(
+                1,
+                EntityKind::IndustrialCenter,
+                enemy_base.0,
+                enemy_base.1,
+                true,
+            )
+            .unwrap();
+        let committed_pos = step_toward_world(
+            ai_base,
+            map_center_world(&map),
+            (COMBAT_RALLY_TILES_FROM_START + COMBAT_POINT_OF_NO_RETURN_TILES + 1.0)
+                * config::TILE_SIZE as f32,
+        );
+        entities
+            .spawn_unit(2, EntityKind::Rifleman, committed_pos.0, committed_pos.1)
+            .unwrap();
+        let spatial = SpatialIndex::build(&entities, config::TILE_SIZE);
+        let mut ai = AiController::new(2);
+        let players = vec![
+            PlayerState {
+                id: 1,
+                name: "Enemy".into(),
+                color: "#fff".into(),
+                start_tile: enemy_start,
+                steel: 0,
+                oil: 0,
+                supply_used: 0,
+                supply_cap: 0,
+            },
+            PlayerState {
+                id: 2,
+                name: "Computer".into(),
+                color: "#000".into(),
+                start_tile: ai_start,
+                steel: 0,
+                oil: 0,
+                supply_used: 1,
+                supply_cap: 10,
+            },
+        ];
+        let mut out = Vec::new();
+
+        ai.think(&map, &entities, &spatial, &players, 7, &mut out);
+
+        assert!(out.iter().any(|(player, cmd)| {
+            *player == 2
+                && matches!(
+                    cmd,
+                    Command::AttackMove { units, x, y }
+                        if units.len() == 1
+                            && *x == enemy_base.0
+                            && *y == enemy_base.1
+                )
+        }));
+    }
+
+    #[test]
+    fn rally_wave_launch_sends_all_ready_riflemen() {
+        let map = Map::generate(2, 1234);
+        let mut entities = EntityStore::default();
+        let ai_start = (8, 8);
+        let enemy_start = (56, 56);
+        let ai_base = map.tile_center(ai_start.0, ai_start.1);
+        let enemy_base = map.tile_center(enemy_start.0, enemy_start.1);
+        entities
+            .spawn_building(2, EntityKind::IndustrialCenter, ai_base.0, ai_base.1, true)
+            .unwrap();
+        entities
+            .spawn_building(
+                1,
+                EntityKind::IndustrialCenter,
+                enemy_base.0,
+                enemy_base.1,
+                true,
+            )
+            .unwrap();
+        let rally = combat_rally_world(&map, ai_start);
+        for offset in [0.0_f32, 6.0, 12.0, 18.0] {
+            entities
+                .spawn_unit(2, EntityKind::Rifleman, rally.0 + offset, rally.1 + offset)
+                .unwrap();
+        }
+        let spatial = SpatialIndex::build(&entities, config::TILE_SIZE);
+        let mut ai = AiController::new(2);
+        let players = vec![
+            PlayerState {
+                id: 1,
+                name: "Enemy".into(),
+                color: "#fff".into(),
+                start_tile: enemy_start,
+                steel: 0,
+                oil: 0,
+                supply_used: 0,
+                supply_cap: 0,
+            },
+            PlayerState {
+                id: 2,
+                name: "Computer".into(),
+                color: "#000".into(),
+                start_tile: ai_start,
+                steel: 0,
+                oil: 0,
+                supply_used: 4,
+                supply_cap: 10,
+            },
+        ];
+        let mut out = Vec::new();
+
+        ai.think(&map, &entities, &spatial, &players, 7, &mut out);
+
+        assert!(out.iter().any(|(player, cmd)| {
+            *player == 2
+                && matches!(
+                    cmd,
+                    Command::AttackMove { units, x, y }
+                        if units.len() == 4
+                            && *x == enemy_base.0
+                            && *y == enemy_base.1
+                )
+        }));
+    }
+
+    #[test]
+    fn staging_riflemen_spread_across_rally_line_slots() {
+        let map = Map::generate(2, 1234);
+        let mut entities = EntityStore::default();
+        let ai_start = (8, 8);
+        let enemy_start = (56, 56);
+        let ai_base = map.tile_center(ai_start.0, ai_start.1);
+        let enemy_base = map.tile_center(enemy_start.0, enemy_start.1);
+        entities
+            .spawn_building(2, EntityKind::IndustrialCenter, ai_base.0, ai_base.1, true)
+            .unwrap();
+        entities
+            .spawn_building(
+                1,
+                EntityKind::IndustrialCenter,
+                enemy_base.0,
+                enemy_base.1,
+                true,
+            )
+            .unwrap();
+        for x in [ai_base.0, ai_base.0 + 8.0, ai_base.0 + 16.0] {
+            entities
+                .spawn_unit(2, EntityKind::Rifleman, x, ai_base.1)
+                .unwrap();
+        }
+        let spatial = SpatialIndex::build(&entities, config::TILE_SIZE);
+        let mut ai = AiController::new(2);
+        let players = vec![
+            PlayerState {
+                id: 1,
+                name: "Enemy".into(),
+                color: "#fff".into(),
+                start_tile: enemy_start,
+                steel: 0,
+                oil: 0,
+                supply_used: 0,
+                supply_cap: 0,
+            },
+            PlayerState {
+                id: 2,
+                name: "Computer".into(),
+                color: "#000".into(),
+                start_tile: ai_start,
+                steel: 0,
+                oil: 0,
+                supply_used: 3,
+                supply_cap: 10,
+            },
+        ];
+        let mut out = Vec::new();
+
+        ai.think(&map, &entities, &spatial, &players, 7, &mut out);
+
+        let move_targets: Vec<(f32, f32)> = out
+            .iter()
+            .filter_map(|(player, cmd)| match cmd {
+                Command::Move { units, x, y } if *player == 2 && units.len() == 1 => Some((*x, *y)),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(move_targets.len(), 3);
+        let unique_targets: std::collections::BTreeSet<(i32, i32)> = move_targets
+            .iter()
+            .map(|(x, y)| (x.round() as i32, y.round() as i32))
+            .collect();
+        assert_eq!(unique_targets.len(), 3);
+    }
+
+    #[test]
+    fn staging_slots_include_riflemen_already_moving_to_the_line() {
+        let map = Map::generate(2, 1234);
+        let mut entities = EntityStore::default();
+        let ai_start = (8, 8);
+        let enemy_start = (56, 56);
+        let ai_base = map.tile_center(ai_start.0, ai_start.1);
+        let enemy_base = map.tile_center(enemy_start.0, enemy_start.1);
+        entities
+            .spawn_building(2, EntityKind::IndustrialCenter, ai_base.0, ai_base.1, true)
+            .unwrap();
+        entities
+            .spawn_building(
+                1,
+                EntityKind::IndustrialCenter,
+                enemy_base.0,
+                enemy_base.1,
+                true,
+            )
+            .unwrap();
+        let first = entities
+            .spawn_unit(2, EntityKind::Rifleman, ai_base.0, ai_base.1)
+            .unwrap();
+        let second = entities
+            .spawn_unit(2, EntityKind::Rifleman, ai_base.0 + 8.0, ai_base.1)
+            .unwrap();
+        let slots = combat_rally_slots(&map, ai_start, 2);
+        if let Some(rifleman) = entities.get_mut(first) {
+            rifleman.set_order(Order::move_to(slots[0].0, slots[0].1));
+            rifleman.set_path_goal(Some(slots[0]));
+        }
+        let spatial = SpatialIndex::build(&entities, config::TILE_SIZE);
+        let mut ai = AiController::new(2);
+        let players = vec![
+            PlayerState {
+                id: 1,
+                name: "Enemy".into(),
+                color: "#fff".into(),
+                start_tile: enemy_start,
+                steel: 0,
+                oil: 0,
+                supply_used: 0,
+                supply_cap: 0,
+            },
+            PlayerState {
+                id: 2,
+                name: "Computer".into(),
+                color: "#000".into(),
+                start_tile: ai_start,
+                steel: 0,
+                oil: 0,
+                supply_used: 2,
+                supply_cap: 10,
+            },
+        ];
+        let mut out = Vec::new();
+
+        ai.think(&map, &entities, &spatial, &players, 7, &mut out);
+
+        let move_targets: Vec<(u32, f32, f32)> = out
+            .iter()
+            .filter_map(|(player, cmd)| match cmd {
+                Command::Move { units, x, y } if *player == 2 && units.len() == 1 => {
+                    Some((units[0], *x, *y))
+                }
+                _ => None,
+            })
+            .collect();
+        assert_eq!(move_targets.len(), 1);
+        assert_eq!(move_targets[0].0, second);
+        assert_eq!(move_targets[0].1, slots[1].0);
+        assert_eq!(move_targets[0].2, slots[1].1);
     }
 }
