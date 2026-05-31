@@ -39,6 +39,18 @@ pub(crate) fn death_system(
         }
     }
 
+    // Remove fully depleted resource nodes so they disappear from the world (and from
+    // client snapshots). Gather orders pointing at a since-removed node self-heal via
+    // the missing-node branches in `economy::gather_*`.
+    let depleted: Vec<u32> = entities
+        .iter()
+        .filter(|e| e.is_node() && e.remaining().unwrap_or(0) == 0)
+        .map(|e| e.id)
+        .collect();
+    for id in depleted {
+        entities.remove(id);
+    }
+
     // Clear any node miner reservations pointing at dead workers.
     let nodes_to_clear: Vec<u32> = entities
         .iter()
