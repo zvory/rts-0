@@ -589,10 +589,11 @@ payload.
 
 **Strategy (deliberately "very basic").** Each controller, on a staggered cadence
 (`DECISION_INTERVAL` ticks): keeps idle workers mining the nearest mineral patch; trains workers
-up to `TARGET_WORKERS`; builds a depot when supply is about to choke; builds up to
-`TARGET_BARRACKS` barracks; pumps riflemen from each barracks; and once `WAVE_SIZE` riflemen are
-free, attack-moves them at the nearest living enemy's base. It does not micro, tech to tanks, or
-scout. A local per-think budget prevents it from over-committing minerals/supply it doesn't have.
+up to the current miner saturation of its starting steel cluster; builds a depot when supply is
+about to choke; builds up to `TARGET_BARRACKS` barracks; pumps riflemen from each barracks; and
+once `WAVE_SIZE` riflemen are free, attack-moves them at the nearest living enemy's base. It does
+not micro, tech to tanks, or scout. A local per-think budget prevents it from over-committing
+minerals/supply it doesn't have.
 
 **Win/elimination.** AI players count exactly like humans: a 1-human + N-AI match is a real match
 (it resolves to a winner), while a lone human with no AI remains a never-ending sandbox. The

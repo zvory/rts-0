@@ -570,6 +570,7 @@ mod tests {
         let mut depot_completed_tick = None;
         let mut gathering_workers_after_depot = 0usize;
         let mut event_log = Vec::new();
+        let target_workers = config::STEEL_PATCHES_PER_BASE as usize;
 
         // ~200s of simulation. The human issues no commands (passive target).
         for tick in 1..=6000 {
@@ -629,12 +630,28 @@ mod tests {
             {
                 human_damaged = true;
             }
+
+            if max_workers >= target_workers
+                && ai_supply_cap > config::INDUSTRIAL_CENTER_SUPPLY
+                && max_pending_depot_builders <= 1
+                && gathering_workers_after_depot > 0
+                && ever_had_barracks
+                && max_riflemen > 0
+                && human_damaged
+            {
+                break;
+            }
         }
 
         assert!(
             max_workers > config::STARTING_WORKERS as usize,
             "AI should train workers beyond the {} it starts with (saw {max_workers})",
             config::STARTING_WORKERS
+        );
+        assert!(
+            max_workers >= target_workers,
+            "AI should train enough workers to saturate its starting steel patches (target {}, saw {max_workers})",
+            target_workers
         );
         assert!(
             ai_supply_cap > config::INDUSTRIAL_CENTER_SUPPLY,
