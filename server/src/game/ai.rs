@@ -393,8 +393,7 @@ fn main_base_miner_saturation_target(entities: &EntityStore, me: &PlayerState) -
         me.start_tile.0 as f32 * config::TILE_SIZE as f32 + config::TILE_SIZE as f32 * 0.5,
         me.start_tile.1 as f32 * config::TILE_SIZE as f32 + config::TILE_SIZE as f32 * 0.5,
     );
-    let max_dist_px =
-        (config::IC_RESOURCE_MAX_DIST_TILES + 0.5) * config::TILE_SIZE as f32;
+    let max_dist_px = (config::IC_RESOURCE_MAX_DIST_TILES + 0.5) * config::TILE_SIZE as f32;
     let max_dist2 = max_dist_px * max_dist_px;
     entities
         .iter()
@@ -560,16 +559,29 @@ mod tests {
     #[test]
     fn main_base_miner_target_counts_only_nearby_nonempty_steel() {
         let mut entities = EntityStore::default();
-        let (hx, hy) = (10.5 * config::TILE_SIZE as f32, 20.5 * config::TILE_SIZE as f32);
+        let (hx, hy) = (
+            10.5 * config::TILE_SIZE as f32,
+            20.5 * config::TILE_SIZE as f32,
+        );
         let in_range = (config::IC_RESOURCE_MAX_DIST_TILES - 0.25) * config::TILE_SIZE as f32;
         let out_of_range = (config::IC_RESOURCE_MAX_DIST_TILES + 2.0) * config::TILE_SIZE as f32;
 
-        entities.spawn_node(EntityKind::Steel, hx + in_range, hy).unwrap();
-        entities.spawn_node(EntityKind::Steel, hx - in_range, hy).unwrap();
-        entities.spawn_node(EntityKind::Oil, hx, hy + in_range).unwrap();
-        entities.spawn_node(EntityKind::Steel, hx, hy + out_of_range).unwrap();
+        entities
+            .spawn_node(EntityKind::Steel, hx + in_range, hy)
+            .unwrap();
+        entities
+            .spawn_node(EntityKind::Steel, hx - in_range, hy)
+            .unwrap();
+        entities
+            .spawn_node(EntityKind::Oil, hx, hy + in_range)
+            .unwrap();
+        entities
+            .spawn_node(EntityKind::Steel, hx, hy + out_of_range)
+            .unwrap();
 
-        let depleted = entities.spawn_node(EntityKind::Steel, hx, hy - in_range).unwrap();
+        let depleted = entities
+            .spawn_node(EntityKind::Steel, hx, hy - in_range)
+            .unwrap();
         if let Some(node) = entities.get_mut(depleted) {
             if let Some(resource) = node.resource_node.as_mut() {
                 resource.remaining = 0;
