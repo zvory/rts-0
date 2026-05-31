@@ -275,9 +275,9 @@ fn resolve_target(
         .map(|e| e.kind == EntityKind::AtTeam)
         .unwrap_or(false);
     if is_at_team {
-        if let Some(id) =
-            world_query::nearest_tank_in_range(entities, spatial, self_id, owner, px, py, acquire_px)
-        {
+        if let Some(id) = world_query::nearest_tank_in_range(
+            entities, spatial, self_id, owner, px, py, acquire_px,
+        ) {
             return Some(id);
         }
     }
@@ -304,11 +304,7 @@ fn apply_damage(
     vy: f32,
     range_px: f32,
 ) {
-    if entities
-        .get(victim)
-        .map(|e| e.is_node())
-        .unwrap_or(false)
-    {
+    if entities.get(victim).map(|e| e.is_node()).unwrap_or(false) {
         return;
     }
     let attacker_is_ap = entities

@@ -459,7 +459,11 @@ impl AiController {
             .collect();
         // Prefer human players; fall back to AI players only if no humans remain.
         let targets: Vec<&&PlayerState> = candidates.iter().filter(|p| !p.is_ai).collect();
-        let targets = if targets.is_empty() { candidates.iter().collect() } else { targets };
+        let targets = if targets.is_empty() {
+            candidates.iter().collect()
+        } else {
+            targets
+        };
         let mut best: Option<(f32, f32, f32)> = None;
         for p in targets {
             let (ex, ey) = map.tile_center(p.start_tile.0, p.start_tile.1);
@@ -842,7 +846,7 @@ mod tests {
             oil: 0,
             supply_used: 8,
             supply_cap: 10,
-                is_ai: false,
+            is_ai: false,
         }];
         let map = Map::generate(2, 1234);
         let mut out = Vec::new();
@@ -896,7 +900,7 @@ mod tests {
             oil: 0,
             supply_used: 0,
             supply_cap: 0,
-                is_ai: false,
+            is_ai: false,
         };
 
         assert_eq!(
@@ -1282,9 +1286,7 @@ mod tests {
         let move_targets: Vec<(f32, f32)> = out
             .iter()
             .filter_map(|(player, cmd)| match cmd {
-                Command::AttackMove { units, x, y }
-                    if *player == 2 && units.len() == 1 =>
-                {
+                Command::AttackMove { units, x, y } if *player == 2 && units.len() == 1 => {
                     Some((*x, *y))
                 }
                 _ => None,
