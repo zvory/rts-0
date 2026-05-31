@@ -981,6 +981,68 @@ mod tests {
         );
     }
 
+    /// A unit pressed against a building wall must physically reach its goal, not freeze
+    /// against the corner.
+    ///
+    /// Root cause: intermediate-waypoint arrival pops the preceding waypoints immediately
+    /// (radius hit then pass-by), leaving the unit targeting a waypoint whose straight-line
+    /// path clips the building tile.  The unit cannot step forward and freezes indefinitely.
+    /// Goal is placed >100 px away so tolerant arrival (64 px radius) never fires — the unit
+    /// must actually move.
+    #[test]
+    #[ignore = "documents known building-corner freeze regression"]
+    fn unit_pressed_against_building_wall_reaches_goal() {
+        let map = flat_map(1);
+        let mut entities = EntityStore::new();
+
+        // Depot (2×2): center (352, 288) → footprint tiles (10,8),(11,8),(10,9),(11,9).
+        // West wall at x=320, north wall at y=256.
+        entities
+            .spawn_building(1, EntityKind::Depot, 352.0, 288.0, true)
+            .expect("building spawn");
+
+        // Unit pressed against the building's west wall: x=319.5, tile (9,8), 0.5 px from
+        // the tile boundary with blocked tile (10,8).
+        let unit = entities
+            .spawn_unit(1, EntityKind::Rifleman, 319.5, 272.0)
+            .expect("unit spawn");
+
+        // Path along the building's north side to a goal well past it.  The arrival-radius
+        // logic pops (9,8) immediately (dist ≤ 16 px) and pass-by pops (9,7) (unit x is
+        // already past 304 in the direction of (10,7)).  The unit is left targeting (10,7)
+        // at (336,240) from (319.5,272): the first partial step lands in building tile (10,8)
+        // → blocked → frozen.  Goal (13,7) is ~117 px away, outside tolerant-arrival radius.
+        let (w0x, w0y) = map.tile_center(9, 8);
+        let (w1x, w1y) = map.tile_center(9, 7);
+        let (w2x, w2y) = map.tile_center(10, 7);
+        let (w3x, w3y) = map.tile_center(11, 7);
+        let (w4x, w4y) = map.tile_center(12, 7);
+        let (gx, gy) = map.tile_center(13, 7);
+        set_path_direct(
+            &mut entities,
+            unit,
+            vec![(w0x, w0y), (w1x, w1y), (w2x, w2y), (w3x, w3y), (w4x, w4y), (gx, gy)],
+        );
+
+        for tick in 0..150u32 {
+            let occ = Occupancy::build(&map, &entities);
+            let spatial = SpatialIndex::build(&entities, map.size);
+            movement_system(&map, &mut entities, &occ, &spatial, tick);
+            let spatial = SpatialIndex::build(&entities, map.size);
+            resolve_collisions(&mut entities, &spatial, &map, &occ);
+        }
+
+        let e = entities.get(unit).unwrap();
+        let dx = e.pos_x - gx;
+        let dy = e.pos_y - gy;
+        let dist_to_goal = (dx * dx + dy * dy).sqrt();
+        assert!(
+            dist_to_goal <= config::TILE_SIZE as f32,
+            "unit froze against building corner — {:.1}px from goal after 150 ticks",
+            dist_to_goal
+        );
+    }
+
     /// Even when the ordered goal is occupied by another unit, the move order must still
     /// resolve cleanly: the mover arrives near the goal and the two non-anchored units do
     /// not stack on top of each other.
