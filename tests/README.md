@@ -51,8 +51,8 @@ artifact name; successful runs are then written under `server/target/selfplay-ar
 
 ```bash
 cd server && cargo test scripted_self_play_exercises_economy_tech_and_combat
-RTS_SELFPLAY_SAVE_REPLAY=manual_bunker_rush_latest \
-  cargo test scripted_self_play_bunker_rush_vs_economy
+RTS_SELFPLAY_SAVE_REPLAY=manual_worker_rush_latest \
+  cargo test scripted_self_play_worker_rush_vs_economy
 ```
 
 ## Client smoke (headless browser)

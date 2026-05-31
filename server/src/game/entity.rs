@@ -33,7 +33,6 @@ pub enum EntityKind {
     Barracks,
     TrainingCentre,
     TankFactory,
-    Bunker,
     Steel,
     Oil,
 }
@@ -58,7 +57,6 @@ impl EntityKind {
                 | EntityKind::Barracks
                 | EntityKind::TrainingCentre
                 | EntityKind::TankFactory
-                | EntityKind::Bunker
         )
     }
 
@@ -79,7 +77,6 @@ impl EntityKind {
             EntityKind::Barracks => kinds::BARRACKS,
             EntityKind::TrainingCentre => kinds::TRAINING_CENTRE,
             EntityKind::TankFactory => kinds::TANK_FACTORY,
-            EntityKind::Bunker => kinds::BUNKER,
             EntityKind::Steel => kinds::STEEL,
             EntityKind::Oil => kinds::OIL,
         }
@@ -101,7 +98,6 @@ impl std::str::FromStr for EntityKind {
             kinds::BARRACKS => Ok(EntityKind::Barracks),
             kinds::TRAINING_CENTRE => Ok(EntityKind::TrainingCentre),
             kinds::TANK_FACTORY => Ok(EntityKind::TankFactory),
-            kinds::BUNKER => Ok(EntityKind::Bunker),
             kinds::STEEL => Ok(EntityKind::Steel),
             kinds::OIL => Ok(EntityKind::Oil),
             _ => Err(()),
@@ -127,7 +123,7 @@ impl std::fmt::Display for EntityKind {
 /// machines instead of smuggling progress through unrelated fields.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Order {
-    /// No order: units hold position, idle combat units auto-defend, bunkers auto-fire.
+    /// No order: units hold position and idle combat units auto-defend.
     Idle,
     /// Move to a world point; stop on arrival. No engaging en route.
     Move(MoveOrder),
@@ -428,7 +424,7 @@ impl Default for MovementState {
     }
 }
 
-/// Weapon and active target state. Present on combat-capable units and bunkers.
+/// Weapon and active target state. Present on combat-capable entities.
 #[derive(Debug, Clone, Default)]
 pub struct CombatState {
     /// Ticks until this entity may attack again (0 = ready).
@@ -876,7 +872,7 @@ impl Entity {
         !self.is_node()
     }
 
-    /// Whether this entity can deal damage (units with dmg, or bunkers).
+    /// Whether this entity can deal damage.
     pub fn can_attack(&self) -> bool {
         if let Some(s) = config::unit_stats(self.kind) {
             s.dmg > 0
@@ -1159,10 +1155,6 @@ mod tests {
                 EntityKind::TankFactory,
                 groups(false, false, true, false, false, false),
             ),
-            (
-                EntityKind::Bunker,
-                groups(false, true, false, false, false, false),
-            ),
         ];
 
         for (kind, expected) in cases {
@@ -1180,7 +1172,6 @@ mod tests {
             EntityKind::Barracks,
             EntityKind::TrainingCentre,
             EntityKind::TankFactory,
-            EntityKind::Bunker,
         ];
 
         for kind in kinds {

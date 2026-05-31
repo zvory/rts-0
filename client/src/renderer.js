@@ -440,16 +440,6 @@ export class Renderer {
       g.drawRect(x0 + w * 0.68, y0 + h * 0.1, w * 0.16, h * 0.32);
       g.beginFill(0x1a1712, bodyAlpha * 0.7);
       g.drawRect(x0 + w * 0.76, y0 + h * 0.02, w * 0.08, h * 0.22);
-    } else if (e.kind === KIND.BUNKER) {
-      g.drawPolygon([
-        x0 + w * 0.18, y0 + h * 0.3,
-        x0 + w * 0.5, y0 + h * 0.12,
-        x0 + w * 0.82, y0 + h * 0.3,
-        x0 + w * 0.75, y0 + h * 0.75,
-        x0 + w * 0.25, y0 + h * 0.75,
-      ]);
-      g.beginFill(0x1a1712, bodyAlpha * 0.75);
-      g.drawRect(x0 + w * 0.3, y0 + h * 0.44, w * 0.4, h * 0.12);
     } else if (e.kind === KIND.TANK_FACTORY) {
       g.drawRect(x0 + w * 0.12, y0 + h * 0.18, w * 0.76, h * 0.26);
       g.drawRect(x0 + w * 0.18, y0 + h * 0.54, w * 0.64, h * 0.26);
@@ -791,7 +781,7 @@ export class Renderer {
   /**
    * Draw a brief muzzle flash on the attacker plus a thin yellow tracer line to
    * the target, for each Attack event in the latest snapshot. Size scales by
-   * attacker kind (tank > MG > bunker > rifleman).
+   * attacker kind (tank > MG > rifleman).
    * @private
    */
   _drawMuzzleFlashes(state) {
@@ -970,7 +960,6 @@ export class Renderer {
 /** Per-attacker muzzle-flash radius in world px. 0 means no flash for this kind. */
 function muzzleFlashRadius(kind) {
   if (kind === KIND.TANK) return 18;
-  if (kind === KIND.BUNKER) return 13;
   if (kind === KIND.AT_TEAM) return 11;
   if (kind === KIND.MACHINE_GUNNER) return 9;
   if (kind === KIND.RIFLEMAN) return 7;

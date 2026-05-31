@@ -33,7 +33,6 @@ pub mod kinds {
     pub const BARRACKS: &str = "barracks";
     pub const TRAINING_CENTRE: &str = "training_centre";
     pub const TANK_FACTORY: &str = "tank_factory";
-    pub const BUNKER: &str = "bunker";
     pub const STEEL: &str = "steel";
     pub const OIL: &str = "oil";
 }

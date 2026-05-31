@@ -137,7 +137,7 @@ the player's own starting Industrial Center + workers.
 {
   id: u32,
   owner: u32,                    // 0 = neutral (resources), else player id
-  kind: string,                  // EntityKind: "worker","rifleman","machine_gunner","at_team","tank","industrial_center","depot","barracks","training_centre","tank_factory","bunker","steel","oil"
+  kind: string,                  // EntityKind: "worker","rifleman","machine_gunner","at_team","tank","industrial_center","depot","barracks","training_centre","tank_factory","steel","oil"
   x: f32, y: f32,                // world px (center)
   hp: u32, maxHp: u32,
   state: string,                 // "idle","move","attack","gather","build","train","construct","dead"
@@ -518,7 +518,6 @@ Building stats (hp, sight, cost min, footprint tiles wxh, buildTicks, extra):
 | barracks                   | 320 | 6     | 100 | 3x2  | 200       | trains rifleman, machine_gunner, at_team; requires an Industrial Center |
 | training_centre   | 300 | 6     | 100 min + 50 oil | 3x2  | 220       | unlocks machine_gunner and at_team training at barracks; requires an Industrial Center |
 | tank_factory               | 360 | 6     | 200 min + 100 oil | 3x3  | 240       | trains tank; requires an Industrial Center |
-| bunker                     | 200 | 6     | 150 | 2x2  | 120       | auto-attacks: dmg 10, range 7, cd 10; requires an Industrial Center |
 
 Win: a player is **eliminated** when they own zero entities (units AND buildings). Last
 player standing wins; a 1-player match never ends (sandbox/exploration mode).

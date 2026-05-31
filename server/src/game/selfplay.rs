@@ -775,154 +775,6 @@ impl ScriptedPlayer for WorkerRushScript {
     }
 }
 
-struct BunkerRushScript {
-    player_id: u32,
-    target_player_id: u32,
-    initial_gather_sent: bool,
-    last_bunker_attempt_tick: u32,
-    scouts: Vec<u32>,
-}
-
-impl BunkerRushScript {
-    fn new(player_id: u32, target_player_id: u32) -> Self {
-        BunkerRushScript {
-            player_id,
-            target_player_id,
-            initial_gather_sent: false,
-            last_bunker_attempt_tick: 0,
-            scouts: Vec::new(),
-        }
-    }
-
-    fn should_think(&self, tick: u32) -> bool {
-        tick == 0 || tick.wrapping_add(self.player_id) % THINK_INTERVAL == 0
-    }
-}
-
-impl ScriptedPlayer for BunkerRushScript {
-    fn player_id(&self) -> u32 {
-        self.player_id
-    }
-
-    fn name(&self) -> &'static str {
-        "bunker-rush"
-    }
-
-    fn commands(&mut self, view: PlayerView<'_>) -> Vec<Command> {
-        if !self.should_think(view.tick) {
-            return Vec::new();
-        }
-
-        let own: Vec<&EntityView> = view
-            .snapshot
-            .entities
-            .iter()
-            .filter(|e| e.owner == view.player_id)
-            .collect();
-        let workers: Vec<&EntityView> = own
-            .iter()
-            .copied()
-            .filter(|e| is_kind(e, EntityKind::Worker))
-            .collect();
-        let mut builder_workers: Vec<u32> = workers
-            .iter()
-            .filter(|e| e.state == states::IDLE)
-            .map(|e| e.id)
-            .collect();
-        builder_workers.sort_unstable();
-        builder_workers.extend(
-            workers
-                .iter()
-                .filter(|e| e.state != states::IDLE && e.state != states::BUILD)
-                .map(|e| e.id),
-        );
-
-        let mut steel = view.snapshot.steel;
-        let mut reserved_workers = HashSet::new();
-        let mut out = Vec::new();
-
-        // Pre-position scouts toward the enemy base so they can start building immediately
-        // when we can afford bunkers.
-        if let Some((target_x, target_y)) = player_start_world(view.start, self.target_player_id) {
-            let mut candidates: Vec<u32> = workers.iter().map(|w| w.id).collect();
-            candidates.sort_unstable();
-            for worker_id in candidates {
-                if self.scouts.contains(&worker_id) {
-                    continue;
-                }
-                if self.scouts.len() >= 2 {
-                    break;
-                }
-                out.push(Command::Move {
-                    units: vec![worker_id],
-                    x: target_x,
-                    y: target_y,
-                });
-                self.scouts.push(worker_id);
-            }
-        }
-        reserved_workers.extend(&self.scouts);
-
-        let bunker_count = own
-            .iter()
-            .filter(|e| is_kind(e, EntityKind::Bunker))
-            .count();
-        let bunker_attempt_due = view.tick == 0
-            || view.tick.saturating_sub(self.last_bunker_attempt_tick) >= ATTACK_REISSUE_TICKS;
-        if bunker_count < 2 && bunker_attempt_due {
-            if let Some(cmd) = self.build_offensive_bunker_if_affordable(
-                view,
-                &mut steel,
-                &builder_workers,
-                &mut reserved_workers,
-            ) {
-                out.push(cmd);
-                self.last_bunker_attempt_tick = view.tick;
-            }
-        }
-
-        assign_steel_workers(
-            view,
-            &workers,
-            &reserved_workers,
-            self.initial_gather_sent,
-            &mut out,
-        );
-        self.initial_gather_sent = true;
-
-        out
-    }
-}
-
-impl BunkerRushScript {
-    fn build_offensive_bunker_if_affordable(
-        &self,
-        view: PlayerView<'_>,
-        steel: &mut u32,
-        builder_workers: &[u32],
-        reserved_workers: &mut HashSet<u32>,
-    ) -> Option<Command> {
-        let stats = config::building_stats(EntityKind::Bunker)?;
-        if *steel < stats.cost_steel {
-            return None;
-        }
-        let worker = builder_workers
-            .iter()
-            .copied()
-            .find(|id| !reserved_workers.contains(id))?;
-        let (tile_x, tile_y) =
-            find_offensive_bunker_spot(view.start, view.snapshot, self.target_player_id)?;
-        reserved_workers.insert(worker);
-        *steel -= stats.cost_steel;
-        Some(Command::Build {
-            worker,
-            building: EntityKind::Bunker.to_protocol_str().to_string(),
-            tile_x,
-            tile_y,
-        })
-    }
-}
-
 struct SelfPlayRunner {
     test_name: &'static str,
     game: Game,
@@ -1287,7 +1139,6 @@ struct Milestones {
     death_events: u32,
     attack_events_by_player: BTreeMap<u32, u32>,
     worker_attack_events_by_player: BTreeMap<u32, u32>,
-    bunker_attack_events_by_player: BTreeMap<u32, u32>,
 }
 
 impl Milestones {
@@ -1315,7 +1166,6 @@ impl Milestones {
             death_events: 0,
             attack_events_by_player: BTreeMap::new(),
             worker_attack_events_by_player: BTreeMap::new(),
-            bunker_attack_events_by_player: BTreeMap::new(),
         }
     }
 
@@ -1343,12 +1193,6 @@ impl Milestones {
                     Some(kinds::WORKER) => {
                         *self
                             .worker_attack_events_by_player
-                            .entry(player_id)
-                            .or_default() += 1;
-                    }
-                    Some(kinds::BUNKER) => {
-                        *self
-                            .bunker_attack_events_by_player
                             .entry(player_id)
                             .or_default() += 1;
                     }
@@ -1393,7 +1237,6 @@ struct CombatGoal {
     require_any_combat: bool,
     min_attacks_by_player: BTreeMap<u32, u32>,
     min_worker_attacks_by_player: BTreeMap<u32, u32>,
-    min_bunker_attacks_by_player: BTreeMap<u32, u32>,
 }
 
 impl CombatGoal {
@@ -1407,13 +1250,6 @@ impl CombatGoal {
     fn worker_attack_by(player_id: u32) -> Self {
         CombatGoal {
             min_worker_attacks_by_player: BTreeMap::from([(player_id, 1)]),
-            ..CombatGoal::default()
-        }
-    }
-
-    fn bunker_attack_by(player_id: u32) -> Self {
-        CombatGoal {
-            min_bunker_attacks_by_player: BTreeMap::from([(player_id, 1)]),
             ..CombatGoal::default()
         }
     }
@@ -1437,17 +1273,6 @@ impl CombatGoal {
         for (player_id, required) in &self.min_worker_attacks_by_player {
             if milestones
                 .worker_attack_events_by_player
-                .get(player_id)
-                .copied()
-                .unwrap_or(0)
-                < *required
-            {
-                return false;
-            }
-        }
-        for (player_id, required) in &self.min_bunker_attacks_by_player {
-            if milestones
-                .bunker_attack_events_by_player
                 .get(player_id)
                 .copied()
                 .unwrap_or(0)
@@ -1485,16 +1310,6 @@ impl CombatGoal {
                 out.push(format!("p{player_id}:worker-attacks>={required}"));
             }
         }
-        for (player_id, required) in &self.min_bunker_attacks_by_player {
-            let seen = milestones
-                .bunker_attack_events_by_player
-                .get(player_id)
-                .copied()
-                .unwrap_or(0);
-            if seen < *required {
-                out.push(format!("p{player_id}:bunker-attacks>={required}"));
-            }
-        }
         out
     }
 }
@@ -1507,10 +1322,8 @@ struct PlayerMilestoneGoal {
     require_barracks_complete: bool,
     require_rifleman: bool,
     require_tank: bool,
-    require_bunker_complete: bool,
     require_damage_taken: bool,
     min_workers: u32,
-    min_bunkers: u32,
 }
 
 impl PlayerMilestoneGoal {
@@ -1522,15 +1335,6 @@ impl PlayerMilestoneGoal {
             require_barracks_complete: true,
             require_rifleman: true,
             require_tank: true,
-            ..PlayerMilestoneGoal::default()
-        }
-    }
-
-    fn bunker_rush() -> Self {
-        PlayerMilestoneGoal {
-            require_gathering: true,
-            require_bunker_complete: true,
-            min_bunkers: 1,
             ..PlayerMilestoneGoal::default()
         }
     }
@@ -1552,8 +1356,6 @@ struct PlayerMilestones {
     depot_started: bool,
     barracks_started: bool,
     barracks_complete: bool,
-    bunker_started: bool,
-    bunker_complete: bool,
     rifleman_trained: bool,
     tank_trained: bool,
     damage_taken: bool,
@@ -1563,7 +1365,6 @@ struct PlayerMilestones {
     max_supply_cap: u32,
     max_riflemen: u32,
     max_tanks: u32,
-    max_bunkers: u32,
 }
 
 impl PlayerMilestones {
@@ -1572,7 +1373,6 @@ impl PlayerMilestones {
         let mut workers = 0;
         let mut riflemen = 0;
         let mut tanks = 0;
-        let mut bunkers = 0;
         for e in snapshot.entities.iter().filter(|e| e.owner == player_id) {
             let Some(k) = kind_of(e) else { continue };
             match k {
@@ -1591,13 +1391,6 @@ impl PlayerMilestones {
                         self.barracks_complete = true;
                     }
                 }
-                EntityKind::Bunker => {
-                    self.bunker_started = true;
-                    if is_complete(e) {
-                        bunkers += 1;
-                        self.bunker_complete = true;
-                    }
-                }
                 _ => {}
             }
             if e.hp < e.max_hp {
@@ -1611,7 +1404,6 @@ impl PlayerMilestones {
         self.max_supply_cap = self.max_supply_cap.max(snapshot.supply_cap);
         self.max_riflemen = self.max_riflemen.max(riflemen);
         self.max_tanks = self.max_tanks.max(tanks);
-        self.max_bunkers = self.max_bunkers.max(bunkers);
         self.rifleman_trained |= riflemen > 0;
         self.tank_trained |= tanks > 0;
         before != *self
@@ -1643,17 +1435,11 @@ impl PlayerMilestones {
         if goal.require_tank && !self.tank_trained {
             out.push("tank".to_string());
         }
-        if goal.require_bunker_complete && !self.bunker_complete {
-            out.push("bunker".to_string());
-        }
         if goal.require_damage_taken && !self.damage_taken {
             out.push("damage-taken".to_string());
         }
         if self.max_workers < goal.min_workers {
             out.push(format!("workers>={}", goal.min_workers));
-        }
-        if self.max_bunkers < goal.min_bunkers {
-            out.push(format!("bunkers>={}", goal.min_bunkers));
         }
         out
     }
@@ -1900,7 +1686,6 @@ fn known_kind(kind: &str) -> bool {
             | kinds::BARRACKS
             | kinds::TRAINING_CENTRE
             | kinds::TANK_FACTORY
-            | kinds::BUNKER
             | kinds::STEEL
             | kinds::OIL
     )
@@ -2033,99 +1818,6 @@ fn dist2(ax: f32, ay: f32, bx: f32, by: f32) -> f32 {
     let dx = ax - bx;
     let dy = ay - by;
     dx * dx + dy * dy
-}
-
-fn find_offensive_bunker_spot(
-    start: &StartPayload,
-    snapshot: &Snapshot,
-    target_player_id: u32,
-) -> Option<(u32, u32)> {
-    let occupied = occupied_tiles_from_snapshot(&start.map, snapshot);
-    let (target_x, target_y) = own_start_tile(start, target_player_id)?;
-    let center_x = start.map.width as f32 * 0.5;
-    let center_y = start.map.height as f32 * 0.5;
-    let away_x = sign_step(target_x as f32 - center_x);
-    let away_y = sign_step(target_y as f32 - center_y);
-    let target_x = target_x as i32;
-    let target_y = target_y as i32;
-
-    let preferred_offsets = [
-        (away_x * 7, -away_y),
-        (-away_x, away_y * 7),
-        (away_x * 7, 0),
-        (0, away_y * 7),
-        (away_x * 6, -away_y * 2),
-        (-away_x * 2, away_y * 6),
-    ];
-    for (dx, dy) in preferred_offsets {
-        if let Some(spot) =
-            offensive_build_spot_if_placeable(start, &occupied, target_x + dx, target_y + dy)
-        {
-            return Some(spot);
-        }
-    }
-
-    let mut best: Option<(u32, u32, i32, i32)> = None;
-    for radius in 4i32..=7 {
-        for dy in -radius..=radius {
-            for dx in -radius..=radius {
-                if dx.abs().max(dy.abs()) != radius {
-                    continue;
-                }
-                let dist2_tiles = dx * dx + dy * dy;
-                if !(16..=49).contains(&dist2_tiles) {
-                    continue;
-                }
-                let away_score = dx * away_x + dy * away_y;
-                if away_score <= 0 {
-                    continue;
-                }
-                let tx = target_x + dx;
-                let ty = target_y + dy;
-                let Some((tx, ty)) = offensive_build_spot_if_placeable(start, &occupied, tx, ty)
-                else {
-                    continue;
-                };
-                let better = best
-                    .map(|(_, _, best_score, best_dist)| {
-                        away_score > best_score
-                            || (away_score == best_score && dist2_tiles < best_dist)
-                    })
-                    .unwrap_or(true);
-                if better {
-                    best = Some((tx, ty, away_score, dist2_tiles));
-                }
-            }
-        }
-        if let Some((tx, ty, _, _)) = best {
-            return Some((tx, ty));
-        }
-    }
-    None
-}
-
-fn offensive_build_spot_if_placeable(
-    start: &StartPayload,
-    occupied: &BTreeSet<(u32, u32)>,
-    tile_x: i32,
-    tile_y: i32,
-) -> Option<(u32, u32)> {
-    if tile_x < 0 || tile_y < 0 {
-        return None;
-    }
-    let (tile_x, tile_y) = (tile_x as u32, tile_y as u32);
-    footprint_placeable_from_snapshot(&start.map, EntityKind::Bunker, tile_x, tile_y, occupied)
-        .then_some((tile_x, tile_y))
-}
-
-fn sign_step(value: f32) -> i32 {
-    if value < 0.0 {
-        -1
-    } else if value > 0.0 {
-        1
-    } else {
-        0
-    }
 }
 
 fn find_build_spot(
