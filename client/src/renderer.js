@@ -612,6 +612,12 @@ export class Renderer {
 
     if (e.kind === KIND.OIL) {
       // Fuel drums: industrial but faction-neutral.
+      // White outline improves contrast against dark ground and fog.
+      g.lineStyle(2.5, 0xffffff, 0.95);
+      g.drawRect(-r * 0.78, -r * 0.58, r * 0.52, r * 1.09);
+      g.drawRect(-r * 0.21, -r * 0.71, r * 0.54, r * 1.23);
+      g.drawRect(r * 0.35, -r * 0.53, r * 0.46, r * 1.06);
+
       g.lineStyle(1.5, 0x1a1712, 0.85);
       g.beginFill(COLORS.oil);
       g.drawRect(-r * 0.75, -r * 0.55, r * 0.48, r * 1.05);
