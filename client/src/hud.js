@@ -139,12 +139,24 @@ export class HUD {
     const frac = maxHp > 0 ? Math.max(0, Math.min(1, hp / maxHp)) : 0;
     const hpClass = frac > 0.5 ? "good" : frac > 0.25 ? "mid" : "low";
 
+    let prodHtml = "";
+    const queue = e.prodQueue ?? 0;
+    if (queue > 0) {
+      const pct = Math.round((e.prodProgress ?? 0) * 100);
+      const kindLabel = (e.prodKind && STATS[e.prodKind] && STATS[e.prodKind].label) || e.prodKind || "";
+      const queued = queue > 1 ? ` (+${queue - 1})` : "";
+      prodHtml =
+        `<div class="sel-prod-label">${kindLabel}${queued}</div>` +
+        `<div class="sel-prod-bar"><div class="sel-prod-fill" style="width:${pct}%"></div></div>`;
+    }
+
     node.innerHTML =
       `<div class="sel-name"><span class="sel-icon">${st.icon || ""}</span>` +
       `${st.label || e.kind}</div>` +
       `<div class="sel-hpbar"><div class="sel-hpfill ${hpClass}" ` +
       `style="width:${(frac * 100).toFixed(0)}%"></div></div>` +
-      `<div class="sel-hptext">${hp} / ${maxHp}</div>`;
+      `<div class="sel-hptext">${hp} / ${maxHp}</div>` +
+      prodHtml;
     return node;
   }
 
@@ -361,11 +373,7 @@ export class HUD {
       `train|${building.id}|` +
       trains.map((u) => `${u}:${this._canTrain(u, res) ? 1 : 0}`).join(",") +
       `|cancel:${producing ? 1 : 0}`;
-    if (sig === this._cardSig) {
-      // Even when the button set is unchanged, the progress label can move; refresh it.
-      this._updateTrainProgress(card, building);
-      return;
-    }
+    if (sig === this._cardSig) return;
     this._cardSig = sig;
 
     const frag = document.createDocumentFragment();
@@ -401,29 +409,8 @@ export class HUD {
 
     this._padCard(frag, idx);
 
-    // A small production status line (queue count + progress) under the buttons.
-    const status = document.createElement("div");
-    status.className = "cmd-prod-status";
-    frag.appendChild(status);
-
     card.innerHTML = "";
     card.appendChild(frag);
-    this._updateTrainProgress(card, building);
-  }
-
-  /** Update only the production progress text/queue for the current train card. */
-  _updateTrainProgress(card, building) {
-    const status = card.querySelector(".cmd-prod-status");
-    if (!status) return;
-    const queue = building.prodQueue ?? 0;
-    if (queue <= 0) {
-      status.textContent = "";
-      return;
-    }
-    const pct = Math.round((building.prodProgress ?? 0) * 100);
-    const kind = building.prodKind;
-    const label = (kind && STATS[kind] && STATS[kind].label) || kind || "";
-    status.textContent = `${label} ${pct}%` + (queue > 1 ? `  (+${queue - 1} queued)` : "");
   }
 
   // --- Shared helpers --------------------------------------------------------

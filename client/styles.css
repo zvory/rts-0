@@ -547,6 +547,26 @@ input[type="text"]:focus {
   background: var(--void);
 }
 
+/* Production progress inside #selected-panel (buildings training units). */
+#selected-panel .sel-prod-label {
+  font-size: 11px;
+  color: var(--ink-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-top: 2px;
+}
+#selected-panel .sel-prod-bar {
+  height: 5px;
+  background: #101010;
+  border-radius: 0;
+  overflow: hidden;
+}
+#selected-panel .sel-prod-fill {
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.2s linear;
+}
+
 /* --- Bottom-right command card (3x3 fixed grid of buttons) --- */
 #command-card {
   right: 12px;
@@ -565,9 +585,6 @@ input[type="text"]:focus {
   border-radius: var(--radius-sm);
   opacity: 0.25;
   pointer-events: none;
-}
-.cmd-prod-status {
-  grid-column: 1 / -1;
 }
 .cmd-btn {
   position: relative;
