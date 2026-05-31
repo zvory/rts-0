@@ -231,7 +231,8 @@ export class HUD {
   _renderUnitCard(card, sel) {
     const ownUnits = this._selectedOwnUnits(sel);
     const unitIds = ownUnits.map((e) => e.id);
-    const workerSelected = ownUnits.some((e) => e.kind === KIND.WORKER);
+    const hasArmyUnit = ownUnits.some((e) => e.kind !== KIND.WORKER);
+    const workerSelected = !hasArmyUnit && ownUnits.some((e) => e.kind === KIND.WORKER);
     const res = this.state.resources || { steel: 0, oil: 0 };
 
     const sig =
