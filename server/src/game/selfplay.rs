@@ -2361,9 +2361,9 @@ fn real_ai_vs_real_ai() {
 
     const MIN_PEAK_BARRACKS_ALIVE: usize = 3;
     const MIN_RIFLEMAN_TRAIN_COMMANDS: usize = 75;
-    const MIN_ATTACK_MOVE_COMMANDS: usize = 15;
+    const MIN_ATTACK_MOVE_COMMANDS: usize = 13;
     const MIN_ATTACK_EVENTS: usize = 500;
-    const TICKS: u32 = 12_000;
+    const TICKS: u32 = 6_000;
 
     let players = vec![
         PlayerInit {

@@ -507,7 +507,7 @@ and forest-specific rules are future work.
   does not reserve it. Extra workers that arrive while the slot is taken go idle. The slot
   is advisory and self-heals — it's only honored while the recorded worker is alive and
   actively harvesting that node, so death / re-order / retarget free it automatically.
-- Mineral patch starts with `STEEL_PATCH_AMOUNT = 1500`, geyser `OIL_GEYSER_AMOUNT = 5000`.
+- Starting layout: each base gets 12 steel patches and 3 oil patches.
 
 Unit stats (hp, dmg, range[tiles], cooldown[ticks], speed[px/tick], sight[tiles], cost, supply, buildTicks):
 

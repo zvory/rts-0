@@ -492,13 +492,12 @@ fn spawn_player_start(entities: &mut EntityStore, map: &Map, owner: u32, start: 
     let perp_y = base_angle.cos();
 
     let patches = config::STEEL_PATCHES_PER_BASE;
-    let cols = 8;
-    let _rows = 2;
+    let cols = 6;
     for i in 0..patches {
         let col = (i % cols) as f32;
         let row = (i / cols) as f32;
         // Local offsets within the block, centered on the block center.
-        let off_x = (col - 3.5) * ts; // -3.5 .. +3.5 tiles
+        let off_x = (col - 2.5) * ts; // -2.5 .. +2.5 tiles
         let off_y = (row - 0.5) * ts; // -0.5 .. +0.5 tiles
         let px = block_cx + off_x * perp_x + off_y * base_angle.cos();
         let py = block_cy + off_x * perp_y + off_y * base_angle.sin();
@@ -513,18 +512,19 @@ fn spawn_player_start(entities: &mut EntityStore, map: &Map, owner: u32, start: 
         entities.spawn_node(EntityKind::Steel, px, py);
     }
 
-    // Four oil nodes arranged in a 2x2 block, 90° from the steel cluster so they don't overlap.
+    // Three oil nodes arranged in a compact triangle, 90° from the steel cluster so they don't overlap.
     let oil_angle = base_angle + std::f32::consts::FRAC_PI_2;
     let oil_perp_x = -oil_angle.sin();
     let oil_perp_y = oil_angle.cos();
     let oil_dist = config::OIL_DIST_TILES * ts;
     let block_cx = hx + oil_dist * oil_angle.cos();
     let block_cy = hy + oil_dist * oil_angle.sin();
-    for i in 0..4u32 {
-        let col = (i % 2) as f32;
-        let row = (i / 2) as f32;
-        let off_x = (col - 0.5) * ts;
-        let off_y = (row - 0.5) * ts;
+    for i in 0..config::OIL_PATCHES_PER_BASE {
+        let (off_x, off_y) = match i {
+            0 => (-0.5 * ts, -0.5 * ts),
+            1 => (0.5 * ts, -0.5 * ts),
+            _ => (0.0, 0.5 * ts),
+        };
         let px = block_cx + off_x * oil_perp_x + off_y * oil_angle.cos();
         let py = block_cy + off_x * oil_perp_y + off_y * oil_angle.sin();
         let dist_tiles = ((px - hx).powi(2) + (py - hy).powi(2)).sqrt() / ts;
