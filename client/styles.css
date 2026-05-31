@@ -655,7 +655,7 @@ input[type="text"]:focus {
   bottom: 4px;
   right: 5px;
   display: flex;
-  gap: 5px;
+  gap: 1px;
   font-size: 9px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
@@ -663,8 +663,12 @@ input[type="text"]:focus {
 .cmd-btn .cmd-cost .c-steel {
   color: var(--steel);
 }
+.cmd-btn .cmd-cost .c-sep {
+  color: inherit;
+  font-weight: 400;
+}
 .cmd-btn .cmd-cost .c-oil {
-  color: var(--oil);
+  color: #8aaf6a;
 }
 /* Unaffordable cost shown in red even though the whole button may be disabled. */
 .cmd-btn.unaffordable .cmd-cost {
