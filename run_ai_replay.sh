@@ -15,20 +15,26 @@ if [ -z "$ARTIFACT" ]; then
 fi
 echo "Artifact: $ARTIFACT"
 
-# Start the server if not already listening on :8080.
-if ! lsof -ti :8080 >/dev/null 2>&1; then
-    echo "Starting server..."
-    cd "$REPO_ROOT/server"
-    cargo run &
-    SERVER_PID=$!
-    echo "Server PID: $SERVER_PID"
-    # Wait until it accepts connections.
-    for i in $(seq 1 30); do
-        if lsof -ti :8080 >/dev/null 2>&1; then
-            break
-        fi
+# Kill any existing process on :8080 and spawn a fresh server.
+EXISTING_PID=$(lsof -ti :8080 2>/dev/null || true)
+if [ -n "$EXISTING_PID" ]; then
+    echo "Killing existing server (PID $EXISTING_PID)..."
+    kill $EXISTING_PID
+    for i in $(seq 1 10); do
+        lsof -ti :8080 >/dev/null 2>&1 || break
         sleep 1
     done
 fi
+echo "Starting server..."
+cd "$REPO_ROOT/server"
+cargo run &
+SERVER_PID=$!
+echo "Server PID: $SERVER_PID"
+for i in $(seq 1 30); do
+    if lsof -ti :8080 >/dev/null 2>&1; then
+        break
+    fi
+    sleep 1
+done
 
 open "http://localhost:8080/dev/selfplay?replay=${ARTIFACT}"
