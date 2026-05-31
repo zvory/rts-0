@@ -215,7 +215,7 @@ fn order_build(
     }
 
     // Feedback only — re-checked at arrival.
-    if !footprint_placeable(map, entities, spatial, kind, tile_x, tile_y) {
+    if !footprint_placeable(map, entities, spatial, kind, tile_x, tile_y, &[worker]) {
         notice(events, player, "Cannot build there");
         return;
     }

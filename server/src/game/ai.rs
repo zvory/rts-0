@@ -425,7 +425,7 @@ impl AiController {
             },
             &BTreeSet::new(),
             |tx, ty| {
-                if !systems::footprint_placeable(map, entities, spatial, building, tx, ty) {
+                if !systems::footprint_placeable(map, entities, spatial, building, tx, ty, &[]) {
                     return false;
                 }
                 let Some(stats) = config::building_stats(building) else {

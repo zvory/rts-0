@@ -112,6 +112,7 @@ pub(crate) fn footprint_placeable(
     building: EntityKind,
     tile_x: u32,
     tile_y: u32,
+    exempt_units: &[u32],
 ) -> bool {
     let tiles = footprint_tiles(building, tile_x, tile_y);
     if tiles.is_empty() {
@@ -145,6 +146,9 @@ pub(crate) fn footprint_placeable(
                 return false;
             }
         } else if e.is_unit() {
+            if exempt_units.contains(&e.id) {
+                continue;
+            }
             let unit_tile = map.tile_of(e.pos_x, e.pos_y);
             if tiles.contains(&unit_tile) {
                 return false;
@@ -152,4 +156,39 @@ pub(crate) fn footprint_placeable(
         }
     }
     true
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::game::entity::{EntityKind, EntityStore};
+    use crate::game::map::Map;
+
+    fn flat_map(size: u32) -> Map {
+        Map {
+            size,
+            terrain: vec![crate::protocol::terrain::GRASS; (size * size) as usize],
+            starts: Vec::new(),
+            expansion_sites: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn footprint_placeable_can_ignore_the_ordering_worker() {
+        let map = flat_map(6);
+        let mut entities = EntityStore::new();
+        let worker = entities
+            .spawn_unit(1, EntityKind::Worker, 48.0, 48.0)
+            .expect("worker");
+        let spatial = SpatialIndex::build(&entities, map.size);
+
+        assert!(
+            !footprint_placeable(&map, &entities, &spatial, EntityKind::Depot, 1, 1, &[]),
+            "worker should block the footprint when not exempted",
+        );
+        assert!(
+            footprint_placeable(&map, &entities, &spatial, EntityKind::Depot, 1, 1, &[worker]),
+            "ordering worker should be allowed to overlap its own build footprint",
+        );
+    }
 }
