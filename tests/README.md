@@ -48,6 +48,8 @@ the replayed event stream and final snapshots against the live run. On failure i
 artifacts under `server/target/selfplay-failures/`. To save a successful run too, set
 `RTS_SELFPLAY_SAVE_REPLAY` to either `1` for an auto-generated artifact name or to an explicit safe
 artifact name; successful runs are then written under `server/target/selfplay-artifacts/<name>/`.
+When you open a replay artifact in the browser, stop any existing server on `:8080` first and
+start a fresh one before loading `http://localhost:8080/dev/selfplay?replay=<artifact_name>`.
 
 ```bash
 cd server && cargo test scripted_self_play_exercises_economy_tech_and_combat

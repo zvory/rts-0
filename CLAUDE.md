@@ -116,8 +116,9 @@ There is **no JS build step** (plain ES modules + PixiJS from CDN). The client i
 - Tests need a **running** server on `:8080`; they are not `cargo test` (they're Node scripts that
   drive the live server/client end to end). After any change, run all three and confirm green.
 - If a self-play test fails and the reason is not immediately obvious, do **not** sink time into
-  speculative debugging first. Restart the server if needed, then use the macOS `open` command to
-  open a local self-play spectation replay so the user can inspect the failure state directly. Do
+  speculative debugging first. Stop any existing server on `:8080`, start a fresh server, then use
+  the macOS `open` command to open a local self-play spectation replay so the user can inspect the
+  failure state directly. Do
   **not** use the Browser skill for this flow. Use
   `open "http://localhost:8080/dev/selfplay?replay=<artifact_name>"` (for example
   `open "http://localhost:8080/dev/selfplay?replay=manual_worker_rush_latest"`), not the in-app

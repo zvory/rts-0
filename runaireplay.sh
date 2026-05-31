@@ -12,6 +12,27 @@ cleanup() {
 }
 trap cleanup EXIT
 
+kill_port_8080() {
+    local pids
+    pids=$(lsof -ti :8080 2>/dev/null || true)
+    if [ -z "$pids" ]; then
+        return
+    fi
+    echo "Stopping existing server on :8080..."
+    kill $pids 2>/dev/null || true
+    for i in $(seq 1 10); do
+        if ! lsof -ti :8080 >/dev/null 2>&1; then
+            return
+        fi
+        sleep 1
+    done
+    pids=$(lsof -ti :8080 2>/dev/null || true)
+    if [ -n "$pids" ]; then
+        echo "Force stopping lingering server on :8080..."
+        kill -9 $pids 2>/dev/null || true
+    fi
+}
+
 echo "Running real_ai_vs_real_ai test..."
 set +e
 (cd "$REPO_ROOT/server" && cargo test real_ai_vs_real_ai -- --nocapture) >"$LOG_FILE" 2>&1
@@ -29,16 +50,7 @@ if [ -z "$ARTIFACT" ]; then
 fi
 echo "Artifact: $ARTIFACT"
 
-# Kill any existing process on :8080 and spawn a fresh server.
-EXISTING_PID=$(lsof -ti :8080 2>/dev/null || true)
-if [ -n "$EXISTING_PID" ]; then
-    echo "Killing existing server (PID $EXISTING_PID)..."
-    kill $EXISTING_PID
-    for i in $(seq 1 10); do
-        lsof -ti :8080 >/dev/null 2>&1 || break
-        sleep 1
-    done
-fi
+kill_port_8080
 echo "Starting server..."
 cd "$REPO_ROOT/server"
 cargo run &
