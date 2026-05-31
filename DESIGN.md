@@ -259,7 +259,8 @@ them at the top of `tick()` — see §8.
   `game.snapshot_for(pid)` → send. Lobby phase: broadcast `lobby` on changes.
 - Dev self-play watch rooms are a special-case room mode inside the same task model: they own a
   normal `Game`, feed it scripted commands from `game::selfplay`, and send watchers
-  `game.snapshot_full_for(view_pid)` instead of fog-filtered snapshots.
+  `game.snapshot_full_for(view_pid)` instead of fog-filtered snapshots. Replay rooms advance at
+  1.5x the normal room tick rate so artifact playback finishes faster than live self-play.
 
 ---
 
