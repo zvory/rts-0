@@ -49,7 +49,7 @@ pub const fn map_size_for(players: usize) -> u32 {
 }
 
 // --- Economy ----------------------------------------------------------------
-pub const STARTING_STEEL: u32 = 50;
+pub const STARTING_STEEL: u32 = 100;
 pub const STARTING_OIL: u32 = 0;
 pub const STARTING_WORKERS: u32 = 4;
 

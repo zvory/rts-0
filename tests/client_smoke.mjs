@@ -62,7 +62,7 @@ try {
 
   await sleep(2500);
   const hud = await page.evaluate(() => ({ m: document.getElementById("res-steel")?.textContent, s: document.getElementById("res-supply")?.textContent }));
-  ok(parseInt(hud.m, 10) >= 50, `HUD shows steel (${hud.m})`);
+  ok(parseInt(hud.m, 10) >= 100, `HUD shows steel (${hud.m})`);
   ok(/\d+\s*\/\s*\d+/.test(hud.s || ""), `HUD shows supply (${hud.s})`);
 
   const own = await page.evaluate(() => {
