@@ -819,6 +819,7 @@ mod tests {
             })
             .map(|e| e.id)
             .expect("AI should have a gathering worker to perturb");
+        game.entities.release_miner(idle_worker);
         if let Some(worker) = game.entities.get_mut(idle_worker) {
             worker.clear_orders();
         }
