@@ -464,7 +464,7 @@ Use this index when deciding whether a TODO can start.
  - DONE: halve the mining rate for steel
  - contorl group system for units and buildings. ctrl+number creates a group. shift plus number adds to a group. tapping a group selects it. double tapping moves the camera to the centroid.
  - DONE: make steel gray, and make oil black, change hte icons, and make the oil patch spawn 90 degrees away from the steel patch
- - halve the number of initial steel and oil patches, and create scattered patches of steel and oil the map. scattered patches should be half the size of the main base.  there should be five such patches scattered, one near each starting position (like the natural expansion), and one near the centre.
+ - DONE: halve the number of initial steel and oil patches, and create scattered patches of steel and oil the map. scattered patches should be half the size of the main base.  there should be five such patches scattered, one near each starting position (like the natural expansion), and one near the centre.
  - DONE: workers should visually latch onto a steel patch with a line to the steel patch
  - shrink buildings so they don't take up their whole tile size, but leave some margin pixels on the sides. marginal, not enough for units to squeeze through, but enough for pathing to get easier
  - worker minin animatino
