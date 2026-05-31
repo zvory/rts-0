@@ -29,8 +29,14 @@ use std::collections::HashSet;
 /// idempotent enough that acting more often would just churn paths. Decisions are staggered per
 /// player so several AIs don't all think on the same tick.
 const DECISION_INTERVAL: u32 = 9;
-/// How many barracks the AI wants (finished + under construction).
-const TARGET_BARRACKS: usize = 2;
+/// Baseline barracks target (finished + under construction).
+const BASE_TARGET_BARRACKS: usize = 2;
+/// Once the AI floats at least this much steel, it starts adding more barracks.
+const EXTRA_BARRACKS_STEEL_THRESHOLD: u32 = 300;
+/// Additional banked steel needed for each barracks beyond the first extra one.
+const EXTRA_BARRACKS_STEEL_STEP: u32 = 200;
+/// Prevent runaway overbuilding if the AI banks absurdly high.
+const MAX_TARGET_BARRACKS: usize = 5;
 /// Build a depot when free supply drops below this (and we're not already building one).
 const SUPPLY_BUFFER: u32 = 4;
 /// Free riflemen that must gather before a wave is committed to attacking. Small so the AI
@@ -142,6 +148,7 @@ impl AiController {
         let _ = rifleman_count; // surveyed for clarity; waves key off free_riflemen.
         let depot_in_progress = depot_under_construction || pending_depot_build;
         let target_workers = main_base_miner_saturation_target(entities, me);
+        let target_barracks = desired_barracks_target(me.steel);
 
         // Workers we may pull onto a build job: prefer truly idle, fall back to a gatherer.
         let mut builder_pool = idle_workers.clone();
@@ -184,7 +191,7 @@ impl AiController {
         let rax_cost = config::building_stats(EntityKind::Barracks)
             .map(|s| s.cost_steel)
             .unwrap_or(100);
-        if barracks_total < TARGET_BARRACKS && steel >= rax_cost {
+        if barracks_total < target_barracks && steel >= rax_cost {
             if let Some(worker) = pop_builder(
                 &mut idle_workers,
                 &mut gathering_workers,
@@ -357,6 +364,15 @@ fn is_free_rifleman(e: &crate::game::entity::Entity) -> bool {
         Order::AttackMove(_) => e.path_is_empty() && e.target_id().is_none(),
         _ => false,
     }
+}
+
+/// The AI starts at two barracks, then scales production when it floats steel.
+fn desired_barracks_target(steel: u32) -> usize {
+    let extra = steel
+        .checked_sub(EXTRA_BARRACKS_STEEL_THRESHOLD + 1)
+        .map(|over| 1 + (over / EXTRA_BARRACKS_STEEL_STEP) as usize)
+        .unwrap_or(0);
+    (BASE_TARGET_BARRACKS + extra).min(MAX_TARGET_BARRACKS)
 }
 
 /// Steel patches already held by actively-harvesting workers.
@@ -572,5 +588,15 @@ mod tests {
         };
 
         assert_eq!(main_base_miner_saturation_target(&entities, &me), 2);
+    }
+
+    #[test]
+    fn barracks_target_scales_with_banked_steel() {
+        assert_eq!(desired_barracks_target(0), 2);
+        assert_eq!(desired_barracks_target(300), 2);
+        assert_eq!(desired_barracks_target(301), 3);
+        assert_eq!(desired_barracks_target(500), 3);
+        assert_eq!(desired_barracks_target(501), 4);
+        assert_eq!(desired_barracks_target(2_000), 5);
     }
 }
