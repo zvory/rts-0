@@ -513,7 +513,7 @@ export class Input {
     const maxX = (tileX + footW) * ts;
     const maxY = (tileY + footH) * ts;
     for (const e of this.state.entitiesInterpolated(1)) {
-      if (this._entityIntersectsRect(e, minX, minY, maxX, maxY)) return false;
+      if (this._entityIntersectsRect(e, minX + 1, minY + 1, maxX - 1, maxY - 1)) return false;
     }
     return true;
   }
