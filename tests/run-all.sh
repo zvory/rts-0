@@ -49,9 +49,6 @@ if ! command -v node >/dev/null 2>&1; then
   exit 2
 fi
 NODE_MAJOR="$(node -p 'process.versions.node.split(".")[0]' 2>/dev/null || echo 0)"
-if [ "$NODE_MAJOR" -lt 22 ]; then
-  info "Node $NODE_MAJOR detected; the API suites need >= 22 for the global WebSocket. Continuing anyway."
-fi
 
 alloc_port() {
   node -e 'const net = require("node:net"); const s = net.createServer(); s.listen(0, "127.0.0.1", () => { console.log(s.address().port); s.close(); });'
@@ -71,6 +68,10 @@ else BOLD=""; RED=""; GRN=""; YEL=""; RST=""; fi
 hdr()  { [ "$VERBOSE" = "1" ] && printf '\n%s== %s ==%s\n' "$BOLD" "$1" "$RST"; }
 info() { [ "$VERBOSE" = "1" ] && printf '%s\n' "$1"; }
 warn() { printf '%s! %s%s\n' "$YEL" "$1" "$RST"; }
+
+if [ "$NODE_MAJOR" -lt 22 ]; then
+  warn "Node $NODE_MAJOR detected; the API suites need >= 22 for the global WebSocket. Continuing anyway."
+fi
 
 FAILED=()   # human-readable names of suites that failed
 SKIPPED=()  # suites we deliberately did not run
@@ -135,7 +136,7 @@ boot_server() {
 
   [ "$VERBOSE" = "1" ] && hdr "Boot server on :$PORT"
   SERVER_LOG="$(mktemp -t rts-server-log.XXXXXX)"
-  RTS_ADDR="0.0.0.0:${PORT}" "$bin" >"$SERVER_LOG" 2>&1 &
+  RTS_ADDR="127.0.0.1:${PORT}" "$bin" >"$SERVER_LOG" 2>&1 &
   SERVER_PID=$!
   STARTED_SERVER=1
 

@@ -31,7 +31,7 @@ cat "$LOG_FILE"
 
 ARTIFACT=$(rg -o 'REPLAY_ARTIFACT=[^ ]+' "$LOG_FILE" | head -1 | cut -d= -f2)
 if [ -z "$ARTIFACT" ]; then
-    ARTIFACT=$(rg -o 'view replay: http://localhost:[0-9]+/dev/selfplay\?replay=[^ ]+' "$LOG_FILE" | head -1 | sed 's/.*replay=//')
+    ARTIFACT=$(rg -o 'view replay: /dev/selfplay\?replay=[^ ]+' "$LOG_FILE" | head -1 | sed 's/.*replay=//')
 fi
 if [ -z "$ARTIFACT" ]; then
     echo "ERROR: could not find REPLAY_ARTIFACT in test output" >&2
