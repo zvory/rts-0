@@ -23,6 +23,7 @@ import {
 } from "./config.js";
 import {
   KIND,
+  SETUP,
   STATE,
   isUnit,
   isBuilding,
@@ -331,6 +332,19 @@ export class Renderer {
       g.lineTo(muzzle.x, muzzle.y);
     } else if (e.kind === KIND.MACHINE_GUNNER) {
       // Wider support team block with a braced gun line.
+      if (e.setupState === SETUP.DEPLOYED) {
+        g.lineStyle(2, 0x17130f, 0.9);
+        const prongs = [
+          [-r * 0.55, -r * 0.35, -r * 1.35, -r * 1.05],
+          [r * 0.35, -r * 0.35, r * 1.15, -r * 1.05],
+          [-r * 0.55, r * 0.35, -r * 1.35, r * 1.05],
+          [r * 0.35, r * 0.35, r * 1.15, r * 1.05],
+        ];
+        for (const [x1, y1, x2, y2] of prongs) {
+          g.moveTo(x1, y1);
+          g.lineTo(x2, y2);
+        }
+      }
       g.beginFill(tint);
       g.drawPolygon([
         -r * 0.95, -r * 0.55,

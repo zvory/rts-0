@@ -86,6 +86,13 @@ export const STATE = Object.freeze({
   DEAD: "dead",
 });
 
+export const SETUP = Object.freeze({
+  PACKED: "packed",
+  SETTING_UP: "setting_up",
+  DEPLOYED: "deployed",
+  TEARING_DOWN: "tearing_down",
+});
+
 // --- Event discriminators (the `e` field) ---
 export const EVENT = Object.freeze({
   ATTACK: "attack",
