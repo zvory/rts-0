@@ -23,7 +23,7 @@ use std::time::Duration;
 
 use tokio::sync::{mpsc, Mutex};
 use tokio::time::{interval, MissedTickBehavior};
-use tracing::{debug, info, warn};
+use tracing::{debug, error, info, warn};
 
 use crate::config;
 use crate::game::selfplay::{is_safe_artifact_name, LiveSelfPlay, ReplayArtifact, ReplayDriver};
@@ -659,8 +659,18 @@ impl RoomTask {
         };
 
         // Advance the simulation; collect this tick's per-player transient events.
-        let mut per_player_events: HashMap<u32, Vec<Event>> =
-            game.tick().into_iter().collect::<HashMap<_, _>>();
+        // Wrap in `catch_unwind` so a panic on the tick path (including debug-build invariant
+        // failures) writes a replay artifact and resets the room instead of killing the task.
+        let tick_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| game.tick()));
+        let mut per_player_events: HashMap<u32, Vec<Event>> = match tick_result {
+            Ok(events) => events.into_iter().collect(),
+            Err(payload) => {
+                let reason = panic_reason(&payload);
+                dump_crash_replay(&self.room, &game, &reason);
+                self.end_match(None);
+                return;
+            }
+        };
 
         // Fan out a fog-filtered snapshot to every connected player, merging in their events.
         let recipients: Vec<u32> = self.order.clone();
@@ -704,7 +714,15 @@ impl RoomTask {
             DevDriver::Live(scripted) => scripted.enqueue_for_tick(&mut game),
             DevDriver::Replay(replay) => replay.enqueue_for_tick(&mut game),
         }
-        let _ = game.tick();
+        let tick_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| game.tick()));
+        if let Err(payload) = tick_result {
+            let reason = panic_reason(&payload);
+            dump_crash_replay(&self.room, &game, &reason);
+            self.phase = Phase::Lobby;
+            self.dev_driver = None;
+            self.dev_view_player_id = None;
+            return;
+        }
 
         let recipients = self.order.clone();
         let view_player_id = self.dev_view_player_id.unwrap_or(0);
@@ -811,6 +829,73 @@ fn room_mode_for(room: &str) -> RoomMode {
         });
     }
     RoomMode::Normal
+}
+
+/// Persist a replayable artifact when a room's tick panics (a true crash or, in debug
+/// builds, an `assert_invariants` failure). The path is logged and the full file contents
+/// are emitted to the log so an operator can copy them out of terminal output even if the
+/// disk write later disappears or the box is ephemeral.
+fn dump_crash_replay(room: &str, game: &Game, reason: &str) {
+    let artifact = ReplayArtifact {
+        replay_commands: game.command_log().to_vec(),
+        players: game.player_inits(),
+    };
+    let json = match serde_json::to_string_pretty(&artifact) {
+        Ok(s) => s,
+        Err(e) => {
+            error!(room = %room, reason = %reason, error = %e, "tick panic: failed to serialize crash replay");
+            return;
+        }
+    };
+    let now_ms = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis())
+        .unwrap_or(0);
+    let sanitized: String = room
+        .chars()
+        .map(|c| if c.is_ascii_alphanumeric() { c } else { '_' })
+        .collect();
+    let dir_name = format!("crash-{sanitized}-{}-{now_ms}", std::process::id());
+    let dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("target")
+        .join("selfplay-failures")
+        .join(&dir_name);
+    let path = dir.join("replay.json");
+    match fs::create_dir_all(&dir).and_then(|_| fs::write(&path, &json)) {
+        Ok(_) => {
+            error!(
+                room = %room,
+                tick = game.tick_count(),
+                reason = %reason,
+                path = %path.display(),
+                "tick panic: crash replay written"
+            );
+        }
+        Err(e) => {
+            error!(
+                room = %room,
+                tick = game.tick_count(),
+                reason = %reason,
+                error = %e,
+                "tick panic: failed to write crash replay; dumping inline only"
+            );
+        }
+    }
+    error!(
+        room = %room,
+        reason = %reason,
+        "tick panic: full crash replay follows (artifact name: {dir_name})\n----BEGIN CRASH REPLAY----\n{json}\n----END CRASH REPLAY----"
+    );
+}
+
+fn panic_reason(payload: &Box<dyn std::any::Any + Send>) -> String {
+    if let Some(s) = payload.downcast_ref::<&'static str>() {
+        return (*s).to_string();
+    }
+    if let Some(s) = payload.downcast_ref::<String>() {
+        return s.clone();
+    }
+    "panic with non-string payload".to_string()
 }
 
 fn load_replay_artifact(name: &str) -> Result<ReplayArtifact, String> {

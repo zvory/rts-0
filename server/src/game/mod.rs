@@ -334,6 +334,22 @@ impl Game {
         &self.command_log
     }
 
+    /// Reconstruct the `PlayerInit` list this game was created from, so a crash/invariant
+    /// failure can persist a replayable artifact.
+    pub fn player_inits(&self) -> Vec<PlayerInit> {
+        let ai_ids: std::collections::HashSet<u32> =
+            self.ai.iter().map(|a| a.player_id()).collect();
+        self.players
+            .iter()
+            .map(|p| PlayerInit {
+                id: p.id,
+                name: p.name.clone(),
+                color: p.color.clone(),
+                is_ai: ai_ids.contains(&p.id),
+            })
+            .collect()
+    }
+
     // --- internal helpers ------------------------------------------------------
 
     fn record_commands_for_tick(&mut self, pending: &[(u32, Command)]) {
