@@ -143,7 +143,7 @@ impl AiController {
                 }
                 EntityKind::Rifleman => {
                     rifleman_count += 1;
-                    if is_free_rifleman(e) {
+                    if is_free_rifleman(e) && !is_en_route_to_rally_line(map, me.start_tile, e) {
                         free_riflemen.push(e.id);
                     }
                 }
@@ -321,7 +321,7 @@ impl AiController {
                     let (x, y) = rally_slots[slot_index];
                     out.push((
                         self.player,
-                        Command::Move {
+                        Command::AttackMove {
                             units: vec![id],
                             x,
                             y,
@@ -608,12 +608,25 @@ fn is_rally_line_member(
         return true;
     }
     match rifleman.order() {
-        Order::Move(_) => rifleman
+        Order::Move(_) | Order::AttackMove(_) => rifleman
             .path_goal()
             .map(|goal| goal_is_on_rally_line(map, start_tile, goal))
             .unwrap_or(false),
         _ => false,
     }
+}
+
+fn is_en_route_to_rally_line(
+    map: &Map,
+    start_tile: (u32, u32),
+    rifleman: &crate::game::entity::Entity,
+) -> bool {
+    !rifleman.path_is_empty()
+        && matches!(rifleman.order(), Order::Move(_) | Order::AttackMove(_))
+        && rifleman
+            .path_goal()
+            .map(|goal| goal_is_on_rally_line(map, start_tile, goal))
+            .unwrap_or(false)
 }
 
 fn goal_is_on_rally_line(map: &Map, start_tile: (u32, u32), goal: (f32, f32)) -> bool {
@@ -1235,7 +1248,11 @@ mod tests {
         let move_targets: Vec<(f32, f32)> = out
             .iter()
             .filter_map(|(player, cmd)| match cmd {
-                Command::Move { units, x, y } if *player == 2 && units.len() == 1 => Some((*x, *y)),
+                Command::AttackMove { units, x, y }
+                    if *player == 2 && units.len() == 1 =>
+                {
+                    Some((*x, *y))
+                }
                 _ => None,
             })
             .collect();
@@ -1275,8 +1292,9 @@ mod tests {
             .unwrap();
         let slots = combat_rally_slots(&map, ai_start, 2);
         if let Some(rifleman) = entities.get_mut(first) {
-            rifleman.set_order(Order::move_to(slots[0].0, slots[0].1));
+            rifleman.set_order(Order::attack_move_to(slots[0].0, slots[0].1));
             rifleman.set_path_goal(Some(slots[0]));
+            rifleman.set_path(vec![slots[0]]);
         }
         let spatial = SpatialIndex::build(&entities, config::TILE_SIZE);
         let mut ai = AiController::new(2);
@@ -1309,7 +1327,7 @@ mod tests {
         let move_targets: Vec<(u32, f32, f32)> = out
             .iter()
             .filter_map(|(player, cmd)| match cmd {
-                Command::Move { units, x, y } if *player == 2 && units.len() == 1 => {
+                Command::AttackMove { units, x, y } if *player == 2 && units.len() == 1 => {
                     Some((units[0], *x, *y))
                 }
                 _ => None,
