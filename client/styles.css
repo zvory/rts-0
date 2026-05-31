@@ -297,6 +297,8 @@ input[type="text"]:focus {
 .lobby-actions {
   display: flex;
   gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
 }
 .lobby-actions .btn {
   flex: 1 1 0;
@@ -304,6 +306,23 @@ input[type="text"]:focus {
 /* The Add AI button is only shown to the host (toggled via [hidden] in lobby.js). */
 .lobby-actions #lobby-add-ai {
   flex: 0 0 auto;
+}
+
+.lobby-actions .toggle {
+  flex: 1 1 100%;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+  cursor: pointer;
+  user-select: none;
+}
+.lobby-actions .toggle input {
+  margin: 0;
+  accent-color: var(--accent);
 }
 
 /* Player row pieces (class names emitted by lobby.js). */

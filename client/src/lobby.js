@@ -33,6 +33,8 @@ export class Lobby {
     this.elPlayers = rootEl.querySelector("#lobby-players");
     this.btnReady = rootEl.querySelector("#lobby-ready");
     this.btnAddAi = rootEl.querySelector("#lobby-add-ai");
+    this.chkQuickstart = rootEl.querySelector("#lobby-quickstart");
+    this.chkQuickstartInput = this.chkQuickstart?.querySelector("input[type='checkbox']") || null;
     this.btnStart = rootEl.querySelector("#lobby-start");
     this.elStatus = rootEl.querySelector("#lobby-status");
 
@@ -41,6 +43,7 @@ export class Lobby {
     this._ready = false;
     this._hostId = null;
     this._canStart = false;
+    this._quickstart = false;
     /** Total seated players (humans + AI) from the latest lobby message. */
     this._playerCount = 0;
     /** @type {Array<() => void>} subscribers for the server `start` message. */
@@ -111,6 +114,12 @@ export class Lobby {
       this.net.start();
     });
 
+    if (this.chkQuickstartInput) {
+      this.chkQuickstartInput.addEventListener("change", () => {
+        this.net.setQuickstart(!!this.chkQuickstartInput.checked);
+      });
+    }
+
     // Add AI: host-only. The server ignores it from non-hosts / when full, but we gate the UI too.
     if (this.btnAddAi) {
       this.btnAddAi.addEventListener("click", () => {
@@ -154,12 +163,13 @@ export class Lobby {
 
   /**
    * Render a `lobby` server message (§2.2): room, hostId, players[], canStart.
-   * @param {{room:string,hostId:number,players:Array,canStart:boolean}} m
+   * @param {{room:string,hostId:number,players:Array,canStart:boolean,quickstart:boolean}} m
    */
   _renderLobby(m) {
     if (!m) return;
     this._hostId = m.hostId;
     this._canStart = !!m.canStart;
+    this._quickstart = !!m.quickstart;
 
     // Once a lobby arrives we are definitively joined; make sure the room block shows.
     this._joined = true;
@@ -170,6 +180,7 @@ export class Lobby {
     this._renderPlayers(players);
     this._reflectStartButton();
     this._reflectAddAiButton();
+    this._reflectQuickstart();
 
     const count = players.length;
     this.setStatus(`Room "${m.room}" — ${count} player${count === 1 ? "" : "s"}.`);
@@ -259,6 +270,15 @@ export class Lobby {
     const isHost = this.net.playerId != null && this.net.playerId === this._hostId;
     this.btnAddAi.hidden = !isHost;
     this.btnAddAi.disabled = this._playerCount >= MAX_PLAYERS;
+  }
+
+  /** Show the start-with-more-money toggle only to the host and keep it synced. */
+  _reflectQuickstart() {
+    if (!this.chkQuickstart) return;
+    const isHost = this.net.playerId != null && this.net.playerId === this._hostId;
+    this.chkQuickstart.hidden = !isHost;
+    this.chkQuickstart.disabled = !isHost;
+    this.chkQuickstartInput.checked = !!this._quickstart;
   }
 
   /** Enable Start only for the host and only when the server says the match can start. */

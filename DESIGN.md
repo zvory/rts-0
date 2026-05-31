@@ -67,6 +67,7 @@ short but readable. Coordinates are **world pixels** (floats) unless a field nam
 | `start`    | — | Host asks to start the match (only honored from the room host). |
 | `addAi`    | — | Host adds a computer opponent to the room (lobby phase only, host-only). |
 | `removeAi` | `id: u32` | Host removes a previously-added AI opponent by id (lobby phase only, host-only). |
+| `setQuickstart` | `enabled: bool` | Host toggles "Start with more money mode" for the next match in this room. |
 | `command`  | `cmd: Command` | Issue a gameplay command (see below). Ignored unless in-game. |
 | `ping`     | `ts: number` | Latency probe; server replies with `pong`. |
 
@@ -91,7 +92,7 @@ illegal placements, or unaffordable actions (fail silently or emit a `notice` ev
 | `t`        | Fields |
 |------------|--------|
 | `welcome`  | `playerId: u32` — assigned on connect. |
-| `lobby`    | `room: string`, `hostId: u32`, `players: LobbyPlayer[]`, `canStart: bool` |
+| `lobby`    | `room: string`, `hostId: u32`, `players: LobbyPlayer[]`, `canStart: bool`, `quickstart: bool` |
 | `start`    | `Game start payload` (see 2.3). |
 | `snapshot` | `Per-player snapshot` (see 2.4). |
 | `gameOver` | `winnerId: u32 | null`, `you: "won" | "lost" | "draw"` |
@@ -119,7 +120,8 @@ Sent once when the match begins. Carries everything static for the whole match.
 }
 ```
 Resource nodes and all units/buildings arrive via snapshots (so they obey fog), including
-the player's own starting Industrial Center + workers.
+the player's own starting Industrial Center + workers. When the lobby's `setQuickstart` toggle is
+enabled, every player starts with 700 steel and 300 oil instead of the default opening resources.
 
 ### 2.4 `snapshot` payload (per-player, fog-filtered)
 ```
@@ -204,6 +206,9 @@ impl Game {
     /// Generates a symmetric map sized for `players.len()` and spawns each player's
     /// starting Industrial Center + STARTING_WORKERS workers + a nearby mineral cluster & geyser.
     pub fn new(players: &[PlayerInit]) -> Game;
+
+    /// Create a match with explicit starting steel/oil for every player.
+    pub fn new_with_starting_resources(players: &[PlayerInit], steel: u32, oil: u32) -> Game;
 
     /// Static info for the `start` message (terrain + player start tiles). Call once.
     pub fn start_payload(&self) -> StartPayload;
@@ -509,7 +514,7 @@ Unit stats (hp, dmg, range[tiles], cooldown[ticks], speed[px/tick], sight[tiles]
 |-----------------|-----|-----|-------|----|-------|-------|-----|-----|-----|-----------|
 | worker          | 40  | 4   | 1     | 12 | 1.5   | 7     | 50  | 0   | 1   | 120 (~4s) |
 | rifleman        | 45  | 5   | 4     | 8  | 1.6   | 8     | 50  | 0   | 1   | 150 (~5s) |
-| machine_gunner  | 55  | 4   | 5     | 3  | 1.2   | 8     | 75  | 25  | 2   | 200 (~7s) |
+| machine_gunner  | 55  | 4   | 5     | 3  | 1.44  | 8     | 75  | 25  | 2   | 200 (~7s) |
 | at_team         | 45  | 24  | 4     | 24 | 0.65  | 8     | 75  | 25  | 2   | 220 (~7s) |
 | tank            | 130 | 20  | 3     | 18 | 2.0   | 7     | 100 | 50  | 2   | 250 (~8s) |
 
@@ -584,7 +589,9 @@ The server treats every client as potentially hostile. Limits live next to the c
 ## 8. AI opponents (optional, `game/ai.rs`)
 
 Computer opponents are **opt-in**: a room has none unless the host adds them from the lobby
-(`addAi` / `removeAi`, host-only, lobby phase only). They are capped with humans at
+(`addAi` / `removeAi`, host-only, lobby phase only). The lobby also has a host-only
+`setQuickstart` toggle labeled "Start with more money mode", which causes the next match to begin
+with 700 steel and 300 oil for every player. They are capped with humans at
 `MAX_PLAYERS = 4` (the map lays out at most four symmetric starts). AI players are seated after
 the humans in the lobby player list; their colors come from the tail of `PLAYER_PALETTE` so they
 never collide with human colors. They persist across rematches and are cleared only when the room

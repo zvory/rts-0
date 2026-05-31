@@ -81,6 +81,8 @@ pub enum RoomEvent {
     AddAi { player_id: u32 },
     /// The host asked to remove an AI opponent by id (lobby phase only; honored only from host).
     RemoveAi { player_id: u32, target: u32 },
+    /// The host toggled the lobby's start-with-more-money mode.
+    SetQuickstart { player_id: u32, enabled: bool },
     /// A gameplay command (ignored unless the room is in-game and the sender is in the room).
     Command { player_id: u32, cmd: Command },
 }
@@ -182,6 +184,8 @@ struct RoomTask {
     /// Computer opponents the host has added, in add order. Persist across rematches; cleared
     /// only when the room empties of humans.
     ai_players: Vec<AiSlot>,
+    /// Lobby toggle: start matches with boosted opening resources.
+    quickstart: bool,
     /// Current host (first joiner; reassigned to the next in `order` when the host leaves).
     host_id: Option<u32>,
     phase: Phase,
@@ -201,6 +205,7 @@ impl RoomTask {
             order: Vec::new(),
             players: HashMap::new(),
             ai_players: Vec::new(),
+            quickstart: false,
             host_id: None,
             phase: Phase::Lobby,
             match_player_count: 0,
@@ -250,6 +255,9 @@ impl RoomTask {
             RoomEvent::StartRequest { player_id } => self.on_start_request(player_id),
             RoomEvent::AddAi { player_id } => self.on_add_ai(player_id),
             RoomEvent::RemoveAi { player_id, target } => self.on_remove_ai(player_id, target),
+            RoomEvent::SetQuickstart { player_id, enabled } => {
+                self.on_set_quickstart(player_id, enabled)
+            }
             RoomEvent::Command { player_id, cmd } => self.on_command(player_id, cmd),
         }
     }
@@ -413,6 +421,21 @@ impl RoomTask {
         }
     }
 
+    /// Host-only: toggle the lobby's boosted opening resources.
+    fn on_set_quickstart(&mut self, player_id: u32, enabled: bool) {
+        if matches!(self.mode, RoomMode::DevSelfPlay(_)) {
+            return;
+        }
+        if !matches!(self.phase, Phase::Lobby) || self.host_id != Some(player_id) {
+            return;
+        }
+        if self.quickstart != enabled {
+            self.quickstart = enabled;
+            debug!(room = %self.room, enabled, "quickstart toggled");
+            self.broadcast_lobby();
+        }
+    }
+
     /// Total seated players: connected humans plus AI opponents.
     fn total_player_count(&self) -> usize {
         self.order.len() + self.ai_players.len()
@@ -506,6 +529,7 @@ impl RoomTask {
             host_id,
             players,
             can_start: self.can_start(),
+            quickstart: self.quickstart,
         };
         self.broadcast(&msg);
     }
@@ -536,7 +560,12 @@ impl RoomTask {
             });
         }
 
-        let game = Game::new(&inits);
+        let (starting_steel, starting_oil) = if self.quickstart {
+            (700, 300)
+        } else {
+            (config::STARTING_STEEL, config::STARTING_OIL)
+        };
+        let game = Game::new_with_starting_resources(&inits, starting_steel, starting_oil);
         let payload = game.start_payload();
         self.match_player_count = inits.len();
 

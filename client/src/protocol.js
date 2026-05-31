@@ -19,6 +19,7 @@ export const C = Object.freeze({
   START: "start",
   ADD_AI: "addAi",
   REMOVE_AI: "removeAi",
+  SET_QUICKSTART: "setQuickstart",
   COMMAND: "command",
   PING: "ping",
 });
@@ -108,6 +109,7 @@ export const msg = Object.freeze({
   start: () => ({ t: C.START }),
   addAi: () => ({ t: C.ADD_AI }),
   removeAi: (id) => ({ t: C.REMOVE_AI, id }),
+  setQuickstart: (enabled) => ({ t: C.SET_QUICKSTART, enabled: !!enabled }),
   command: (cmd) => ({ t: C.COMMAND, cmd }),
   ping: (ts) => ({ t: C.PING, ts }),
 });

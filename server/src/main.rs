@@ -333,6 +333,14 @@ async fn handle_client_message(
             )
             .await;
         }
+        ClientMessage::SetQuickstart { enabled } => {
+            send_room_event(
+                player_id,
+                current_room,
+                RoomEvent::SetQuickstart { player_id, enabled },
+            )
+            .await;
+        }
         ClientMessage::Command { cmd } => {
             send_room_event(
                 player_id,

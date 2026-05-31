@@ -70,6 +70,8 @@ pub enum ClientMessage {
     AddAi,
     /// Host removes a previously-added AI opponent by its player id (lobby phase only).
     RemoveAi { id: u32 },
+    /// Host toggles the lobby's quickstart starting-resource mode.
+    SetQuickstart { enabled: bool },
     /// Issue a gameplay command (ignored unless in-game).
     Command { cmd: Command },
     /// Latency probe.
@@ -131,6 +133,7 @@ pub enum ServerMessage {
         host_id: u32,
         players: Vec<LobbyPlayer>,
         can_start: bool,
+        quickstart: bool,
     },
     /// Match start (flattened: carries StartPayload's fields alongside `"t":"start"`).
     Start(StartPayload),
