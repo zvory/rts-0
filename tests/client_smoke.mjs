@@ -8,6 +8,9 @@
 //   node client_smoke.mjs              (server must be running on :8081)
 // Env: RTS_URL (default http://127.0.0.1:8081/), CHROME (path to a Chrome/Chromium binary).
 import puppeteer from "puppeteer-core";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 
 const URL = process.env.RTS_URL || "http://127.0.0.1:8081/";
 const CHROME = process.env.CHROME ||
@@ -18,11 +21,12 @@ let failures = 0;
 const VERBOSE = !!process.env.RTS_VERBOSE;
 const ok = (c, m) => { if (!c) { console.log("  FAIL " + m); failures++; } else if (VERBOSE) { console.log("  PASS " + m); } };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const chromeProfileDir = fs.mkdtempSync(path.join(os.tmpdir(), "rts-chrome-"));
 
 const browser = await puppeteer.launch({
   executablePath: CHROME,
   headless: "new",
-  args: ["--no-sandbox", "--window-size=1440,900", "--user-data-dir=/tmp/rts-chrome-profile"],
+  args: ["--no-sandbox", "--window-size=1440,900", `--user-data-dir=${chromeProfileDir}`],
   defaultViewport: { width: 1440, height: 900 },
 });
 
