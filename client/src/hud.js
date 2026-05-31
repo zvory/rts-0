@@ -503,6 +503,7 @@ export class HUD {
     const costHtml = opts.cost
       ? `<span class="cmd-cost">` +
         (opts.cost.steel ? `<span class="c-steel">${opts.cost.steel}</span>` : "") +
+        (opts.cost.steel && opts.cost.oil ? `<span class="c-sep">/</span>` : "") +
         (opts.cost.oil ? `<span class="c-oil">${opts.cost.oil}</span>` : "") +
         `</span>`
       : "";
