@@ -611,9 +611,12 @@ payload.
 (`DECISION_INTERVAL` ticks): keeps idle workers mining the nearest mineral patch; trains workers
 up to the current miner saturation of its starting steel cluster; builds a depot when supply is
 about to choke; builds up to `BASE_TARGET_BARRACKS` barracks by default, then adds more when its
-steel bank grows large; pumps riflemen from each barracks; and once `WAVE_SIZE` riflemen are free,
-attack-moves them at the nearest living enemy's base. It does not micro, tech to tanks, or scout.
-A local per-think budget prevents it from over-committing minerals/supply it doesn't have.
+steel bank grows large; pumps riflemen from each barracks; and attack-moves riflemen at the nearest
+living enemy's base in escalating waves. The wave planner starts at `BASE_WAVE_SIZE = 3`, bumps the
+target size by one after each launched wave, caps the requested size at `MAX_WAVE_SIZE`, and resets
+back to the baseline after `WAVE_STALL_RESET_TICKS` without a launch so a damaged AI does not stall
+forever waiting for an oversized regroup. It does not micro, tech to tanks, or scout. A local
+per-think budget prevents it from over-committing minerals/supply it doesn't have.
 
 **Win/elimination.** AI players count exactly like humans: a 1-human + N-AI match is a real match
 (it resolves to a winner), while a lone human with no AI remains a never-ending sandbox. The
