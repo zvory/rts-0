@@ -56,6 +56,7 @@ pub(crate) fn movement_system(
 
         let mut budget = speed;
         let mut new_facing = None;
+        let mut static_blocked_this_tick = false;
         // Consume waypoints (stored reversed, next = last element) within this tick's budget.
         loop {
             let (next, path_len, next_next) = {
@@ -108,6 +109,10 @@ pub(crate) fn movement_system(
             new_facing = Some(dy.atan2(dx));
             if dist <= budget {
                 // We can reach this waypoint this tick.
+                if !tile_passable_at(occ, map, class, wx, wy) {
+                    static_blocked_this_tick = true;
+                    break;
+                }
                 x = wx;
                 y = wy;
                 budget -= dist;
@@ -123,6 +128,8 @@ pub(crate) fn movement_system(
                 if tile_passable_at(occ, map, class, nx, ny) {
                     x = nx;
                     y = ny;
+                } else {
+                    static_blocked_this_tick = true;
                 }
                 break;
             }
@@ -170,6 +177,9 @@ pub(crate) fn movement_system(
             // resumes after the destination is reached.
             if e.path_is_empty() {
                 e.mark_move_phase(MovePhase::Arrived);
+                if let Some(m) = e.movement.as_mut() {
+                    m.static_blocked_ticks = 0;
+                }
                 if matches!(e.order(), Order::Move(_)) {
                     e.set_order(Order::Idle);
                 }
@@ -177,6 +187,29 @@ pub(crate) fn movement_system(
                 // Decrement sidestep cooldown each tick.
                 if let Some(m) = e.movement.as_mut() {
                     m.sidestep_cooldown = m.sidestep_cooldown.saturating_sub(1);
+                }
+
+                if static_blocked_this_tick {
+                    if let Some(m) = e.movement.as_mut() {
+                        m.static_blocked_ticks = m.static_blocked_ticks.saturating_add(1);
+                    }
+                } else if let Some(m) = e.movement.as_mut() {
+                    m.static_blocked_ticks = 0;
+                }
+
+                let static_blocked_ticks = e
+                    .movement
+                    .as_ref()
+                    .map(|m| m.static_blocked_ticks)
+                    .unwrap_or(0);
+                if static_blocked_ticks >= config::STATIC_BLOCKED_REPATH_TICKS
+                    && matches!(e.order(), Order::Move(_) | Order::AttackMove(_))
+                {
+                    e.set_path(Vec::new());
+                    e.mark_move_phase(MovePhase::AwaitingPath);
+                    let (px, py) = (e.pos_x, e.pos_y);
+                    e.reset_stuck(px, py);
+                    continue;
                 }
 
                 // Tolerant arrival: unit has a path but may be making no progress.
@@ -220,6 +253,7 @@ pub(crate) fn movement_system(
                 // Stagger trigger per unit so clustered units don't all sidestep at once.
                 let trigger_threshold = config::SIDESTEP_TRIGGER_TICKS + (id % 8) as u16;
                 if stuck_ticks >= trigger_threshold
+                    && static_blocked_ticks == 0
                     && matches!(e.order(), Order::Move(_) | Order::AttackMove(_))
                 {
                     let far_from_goal = e.path_goal().map_or(false, |(gx, gy)| {
@@ -981,6 +1015,58 @@ mod tests {
         );
     }
 
+    /// A path that becomes invalid because a building appeared on it should not sidestep
+    /// forever against the old route. After a one-second static-block debounce, movement
+    /// queues the unit for the existing path coordinator to compute a fresh route.
+    #[test]
+    fn static_building_blockage_queues_repath_after_debounce() {
+        let map = flat_map(1);
+        let mut entities = EntityStore::new();
+        let (w0x, w0y) = map.tile_center(11, 10);
+        let (gx, gy) = map.tile_center(20, 10);
+        let unit = entities
+            .spawn_unit(1, EntityKind::Rifleman, w0x - 16.5, w0y)
+            .unwrap();
+        set_path_direct(&mut entities, unit, vec![(w0x, w0y), (gx, gy)]);
+        if let Some(e) = entities.get_mut(unit) {
+            e.set_order(Order::move_to(gx, gy));
+            e.mark_move_phase(MovePhase::Moving);
+        }
+
+        // Depot centered on tile (12,10) covers (11,9),(12,9),(11,10),(12,10),
+        // so the next waypoint tile became blocked after the path was assigned.
+        let (bx, by) = map.tile_center(12, 10);
+        entities
+            .spawn_building(1, EntityKind::Depot, bx, by, true)
+            .expect("building spawn");
+
+        for tick in 0..config::STATIC_BLOCKED_REPATH_TICKS as u32 - 1 {
+            let occ = Occupancy::build(&map, &entities);
+            let spatial = SpatialIndex::build(&entities, map.size);
+            movement_system(&map, &mut entities, &occ, &spatial, tick);
+            assert_eq!(
+                entities.get(unit).and_then(|e| e.move_phase()),
+                Some(MovePhase::Moving),
+                "unit should debounce static blockage before repathing"
+            );
+        }
+
+        let occ = Occupancy::build(&map, &entities);
+        let spatial = SpatialIndex::build(&entities, map.size);
+        movement_system(
+            &map,
+            &mut entities,
+            &occ,
+            &spatial,
+            config::STATIC_BLOCKED_REPATH_TICKS as u32,
+        );
+
+        let e = entities.get(unit).unwrap();
+        assert_eq!(e.move_phase(), Some(MovePhase::AwaitingPath));
+        assert!(e.path_is_empty(), "stale blocked path should be cleared");
+        assert_eq!(e.path_goal(), Some((gx, gy)));
+    }
+
     /// A unit pressed against a building wall must physically reach its goal, not freeze
     /// against the corner.
     ///
@@ -1021,7 +1107,14 @@ mod tests {
         set_path_direct(
             &mut entities,
             unit,
-            vec![(w0x, w0y), (w1x, w1y), (w2x, w2y), (w3x, w3y), (w4x, w4y), (gx, gy)],
+            vec![
+                (w0x, w0y),
+                (w1x, w1y),
+                (w2x, w2y),
+                (w3x, w3y),
+                (w4x, w4y),
+                (gx, gy),
+            ],
         );
 
         for tick in 0..150u32 {

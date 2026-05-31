@@ -28,6 +28,8 @@ pub const SIDESTEP_TRIGGER_TICKS: u16 = 15;
 pub const SIDESTEP_DISTANCE_PX: f32 = TILE_SIZE as f32;
 /// Ticks after a sidestep during which another sidestep is suppressed (~1 s at 30 Hz).
 pub const SIDESTEP_COOLDOWN_TICKS: u16 = 30;
+/// Consecutive ticks blocked by a static obstacle before queuing a repath (~1 s at 30 Hz).
+pub const STATIC_BLOCKED_REPATH_TICKS: u16 = TICK_HZ as u16;
 
 /// Radius within which an *intermediate* waypoint is considered reached. Tile centers are routing
 /// hints; brushing within half a tile satisfies the route. Must be ≥ largest unit radius so two
