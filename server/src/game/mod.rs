@@ -293,12 +293,17 @@ impl Game {
         }
     }
 
-    /// Player ids that still own at least one entity.
+    /// Player ids that still own at least one building. A player with only units remaining
+    /// is considered defeated — buildings are the loss condition.
     pub fn alive_players(&self) -> Vec<u32> {
         self.players
             .iter()
             .map(|p| p.id)
-            .filter(|&id| self.entities.player_alive(id))
+            .filter(|&id| {
+                services::world_query::owned_buildings(&self.entities, id)
+                    .next()
+                    .is_some()
+            })
             .collect()
     }
 
