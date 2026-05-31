@@ -40,20 +40,30 @@ const EXTRA_BARRACKS_STEEL_STEP: u32 = 200;
 const MAX_TARGET_BARRACKS: usize = 5;
 /// Build a depot when free supply drops below this (and we're not already building one).
 const SUPPLY_BUFFER: u32 = 4;
-/// Free riflemen that must gather before a wave is committed to attacking. Small so the AI
-/// commits attacks within a reasonable time given its slow economy.
-const WAVE_SIZE: usize = 4;
+/// Initial free riflemen required before the AI launches its first attack wave.
+const BASE_WAVE_SIZE: usize = 3;
+/// Cap the requested wave size so an AI with a damaged economy eventually recovers.
+const MAX_WAVE_SIZE: usize = 8;
+/// If the AI cannot assemble its requested wave for this long, fall back to the baseline wave
+/// size so it resumes pressuring instead of stalling indefinitely.
+const WAVE_STALL_RESET_TICKS: u32 = 360;
 /// Drives a single AI-controlled player by emitting ordinary commands each think.
 ///
-/// Stateless beyond the player id: every decision is derived fresh from the current world state,
-/// which keeps the AI robust to losing units/buildings without bookkeeping to invalidate.
+/// Most decisions are derived fresh from the current world state. The only persistent planning
+/// state is the next desired rifleman wave size and the tick of the last launched wave.
 pub(crate) struct AiController {
     player: u32,
+    next_wave_size: usize,
+    last_wave_launch_tick: u32,
 }
 
 impl AiController {
     pub(crate) fn new(player: u32) -> Self {
-        AiController { player }
+        AiController {
+            player,
+            next_wave_size: BASE_WAVE_SIZE,
+            last_wave_launch_tick: 0,
+        }
     }
 
     pub(crate) fn player_id(&self) -> u32 {
@@ -271,11 +281,27 @@ impl AiController {
         }
 
         // --- 6. Commit a wave once enough riflemen are free. --------------
-        if let Some(units) = ai_shared::ready_attack_wave(free_riflemen, WAVE_SIZE, Some) {
+        let wave_size = self.desired_wave_size(tick);
+        if let Some(units) = ai_shared::ready_attack_wave(free_riflemen, wave_size, Some) {
             if let Some((x, y)) = self.nearest_enemy_base(map, entities, players) {
                 out.push((self.player, Command::AttackMove { units, x, y }));
+                self.note_wave_launch(tick, wave_size);
             }
         }
+    }
+
+    fn desired_wave_size(&mut self, tick: u32) -> usize {
+        if tick.saturating_sub(self.last_wave_launch_tick) >= WAVE_STALL_RESET_TICKS {
+            self.next_wave_size = BASE_WAVE_SIZE;
+        }
+        self.next_wave_size.min(MAX_WAVE_SIZE)
+    }
+
+    fn note_wave_launch(&mut self, tick: u32, launched_wave_size: usize) {
+        self.last_wave_launch_tick = tick;
+        self.next_wave_size = launched_wave_size
+            .saturating_add(1)
+            .clamp(BASE_WAVE_SIZE, MAX_WAVE_SIZE);
     }
 
     /// Find a placeable footprint for `building` by scanning rings outward from the AI's start
@@ -597,5 +623,33 @@ mod tests {
         assert_eq!(desired_barracks_target(500), 3);
         assert_eq!(desired_barracks_target(501), 4);
         assert_eq!(desired_barracks_target(2_000), 5);
+    }
+
+    #[test]
+    fn wave_size_escalates_after_launches() {
+        let mut ai = AiController::new(2);
+
+        assert_eq!(ai.desired_wave_size(0), 3);
+        ai.note_wave_launch(90, 3);
+        assert_eq!(ai.desired_wave_size(99), 4);
+        ai.note_wave_launch(180, 4);
+        assert_eq!(ai.desired_wave_size(189), 5);
+    }
+
+    #[test]
+    fn wave_size_resets_after_stall() {
+        let mut ai = AiController::new(2);
+
+        ai.note_wave_launch(90, 5);
+        assert_eq!(ai.desired_wave_size(90 + WAVE_STALL_RESET_TICKS - 1), 6);
+        assert_eq!(ai.desired_wave_size(90 + WAVE_STALL_RESET_TICKS), 3);
+    }
+
+    #[test]
+    fn wave_size_caps_at_maximum() {
+        let mut ai = AiController::new(2);
+
+        ai.note_wave_launch(90, MAX_WAVE_SIZE);
+        assert_eq!(ai.desired_wave_size(120), MAX_WAVE_SIZE);
     }
 }
