@@ -2,13 +2,27 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")" && pwd)"
+LOG_FILE="$(mktemp -t runaireplay.XXXXXX.log)"
+SERVER_PID=""
 
-# Run the test and capture stdout to extract the artifact name.
+cleanup() {
+    if [ -n "$SERVER_PID" ] && kill -0 "$SERVER_PID" 2>/dev/null; then
+        kill "$SERVER_PID" 2>/dev/null || true
+    fi
+}
+trap cleanup EXIT
+
 echo "Running real_ai_vs_real_ai test..."
-TEST_OUTPUT=$(cd "$REPO_ROOT/server" && cargo test real_ai_vs_real_ai -- --nocapture 2>&1)
-echo "$TEST_OUTPUT"
+set +e
+(cd "$REPO_ROOT/server" && cargo test real_ai_vs_real_ai -- --nocapture) >"$LOG_FILE" 2>&1
+TEST_STATUS=$?
+set -e
+cat "$LOG_FILE"
 
-ARTIFACT=$(echo "$TEST_OUTPUT" | grep -o 'REPLAY_ARTIFACT=[^ ]*' | head -1 | cut -d= -f2)
+ARTIFACT=$(rg -o 'REPLAY_ARTIFACT=[^ ]+' "$LOG_FILE" | head -1 | cut -d= -f2)
+if [ -z "$ARTIFACT" ]; then
+    ARTIFACT=$(rg -o 'view replay: http://localhost:8080/dev/selfplay\?replay=[^ ]+' "$LOG_FILE" | head -1 | sed 's/.*replay=//')
+fi
 if [ -z "$ARTIFACT" ]; then
     echo "ERROR: could not find REPLAY_ARTIFACT in test output" >&2
     exit 1
@@ -38,3 +52,8 @@ for i in $(seq 1 30); do
 done
 
 open "http://localhost:8080/dev/selfplay?replay=${ARTIFACT}"
+
+if [ "$TEST_STATUS" -ne 0 ]; then
+    echo "Test failed with status $TEST_STATUS; replay opened above." >&2
+    exit "$TEST_STATUS"
+fi
