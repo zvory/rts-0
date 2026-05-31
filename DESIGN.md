@@ -74,8 +74,8 @@ short but readable. Coordinates are **world pixels** (floats) unless a field nam
 
 | `c`          | Fields | Meaning |
 |--------------|--------|---------|
-| `move`       | `units: u32[]`, `x: f32`, `y: f32` | Move selected units to a world point. |
-| `attackMove` | `units: u32[]`, `x: f32`, `y: f32` | Move while attacking enemies encountered. |
+| `move`       | `units: u32[]`, `x: f32`, `y: f32` | Move selected units to a world point, ignoring enemies until they arrive or receive another order. |
+| `attackMove` | `units: u32[]`, `x: f32`, `y: f32` | Move while attacking enemies encountered; this is the aggressive movement order. |
 | `attack`     | `units: u32[]`, `target: u32` | Attack a specific entity. |
 | `gather`     | `units: u32[]`, `node: u32` | Send workers to harvest a resource node. |
 | `build`      | `worker: u32`, `building: string`, `tileX: u32`, `tileY: u32` | Worker constructs a building at a tile. `building` ∈ building kinds. |

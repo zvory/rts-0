@@ -14,9 +14,9 @@ use crate::protocol::Event;
 /// Extra slack (px) added to attack range checks so units don't dance at the exact boundary.
 const RANGE_SLACK: f32 = 4.0;
 
-/// Combat: acquire targets for aggressive / attack-move units, let idle units auto-defend, and
-/// deal damage when off cooldown. Damage is applied immediately and emits an `Attack` event (for
-/// tracers). Cooldowns tick down here too.
+/// Combat: acquire targets for aggressive / attack-move units, let eligible idle units
+/// auto-acquire enemies, and deal damage when off cooldown. Damage is applied immediately and
+/// emits an `Attack` event (for tracers). Cooldowns tick down here too.
 pub(crate) fn combat_system(
     _map: &Map,
     entities: &mut EntityStore,
@@ -73,11 +73,10 @@ pub(crate) fn combat_system(
             continue;
         }
 
-        // Resolve / acquire a target id (explicit target for Ordered, nearest enemy in aggro
-        // radius for Aggressive).
+        // Resolve / acquire a target id based on the current order semantics.
         let target = resolve_target(entities, spatial, id, owner, px, py, aggro_px, mode);
         let Some(tid) = target else {
-            // No target: clear stale combat target id for non-attack orders.
+            // No target: clear stale combat target id for opportunistic-combat orders.
             if let Some(e) = entities.get_mut(id) {
                 if matches!(e.order(), Order::AttackMove(_) | Order::Idle) {
                     e.set_target_id(None);
@@ -143,14 +142,21 @@ fn attack_profile(e: &Entity) -> (u32, u32, u32) {
 enum CombatMode {
     /// Has an explicit attack target id.
     Ordered,
-    /// Engages any enemy within range (attack-move, idle auto-defend).
+    /// Engages any enemy within range.
     Aggressive,
+    /// Ignores nearby enemies unless explicitly ordered to attack.
+    Passive,
 }
 
 fn combat_mode(e: &Entity) -> CombatMode {
     match e.order() {
         Order::Attack(_) => CombatMode::Ordered,
-        _ => CombatMode::Aggressive,
+        Order::AttackMove(_) => CombatMode::Aggressive,
+        Order::Idle if e.is_building() => CombatMode::Aggressive,
+        Order::Idle if e.is_unit() && e.kind != crate::game::entity::EntityKind::Worker => {
+            CombatMode::Aggressive
+        }
+        _ => CombatMode::Passive,
     }
 }
 
@@ -176,6 +182,10 @@ fn resolve_target(
             }
         }
         // Explicit target gone → fall through to acquisition so we don't stand idle.
+    }
+
+    if mode == CombatMode::Passive {
+        return None;
     }
 
     // Aggressive acquisition: the nearest enemy within the acquire radius (weapon range for
@@ -223,5 +233,111 @@ fn apply_damage(
             from: attacker,
             to: victim,
         });
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::game::entity::{EntityKind, EntityStore, Order};
+    use crate::game::services::spatial::SpatialIndex;
+
+    fn rifleman_with_enemy() -> (EntityStore, u32, u32) {
+        let mut entities = EntityStore::new();
+        let self_id = entities
+            .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
+            .expect("rifleman should spawn");
+        let enemy_id = entities
+            .spawn_unit(2, EntityKind::Rifleman, 120.0, 100.0)
+            .expect("enemy rifleman should spawn");
+        (entities, self_id, enemy_id)
+    }
+
+    #[test]
+    fn idle_army_units_auto_acquire_targets() {
+        let (entities, self_id, enemy_id) = rifleman_with_enemy();
+        let spatial = SpatialIndex::build(&entities, 32);
+        let attacker = entities.get(self_id).expect("attacker should exist");
+
+        let target = resolve_target(
+            &entities,
+            &spatial,
+            self_id,
+            attacker.owner,
+            attacker.pos_x,
+            attacker.pos_y,
+            128.0,
+            combat_mode(attacker),
+        );
+
+        assert_eq!(target, Some(enemy_id));
+    }
+
+    #[test]
+    fn move_orders_ignore_nearby_enemies() {
+        let (mut entities, self_id, _) = rifleman_with_enemy();
+        let spatial = SpatialIndex::build(&entities, 32);
+        let attacker = entities.get_mut(self_id).expect("attacker should exist");
+        attacker.set_order(Order::move_to(300.0, 300.0));
+
+        let target = resolve_target(
+            &entities,
+            &spatial,
+            self_id,
+            1,
+            100.0,
+            100.0,
+            128.0,
+            combat_mode(entities.get(self_id).expect("attacker should exist")),
+        );
+
+        assert_eq!(target, None);
+    }
+
+    #[test]
+    fn attack_move_keeps_auto_acquisition() {
+        let (mut entities, self_id, enemy_id) = rifleman_with_enemy();
+        let spatial = SpatialIndex::build(&entities, 32);
+        let attacker = entities.get_mut(self_id).expect("attacker should exist");
+        attacker.set_order(Order::attack_move_to(300.0, 300.0));
+
+        let target = resolve_target(
+            &entities,
+            &spatial,
+            self_id,
+            1,
+            100.0,
+            100.0,
+            128.0,
+            combat_mode(entities.get(self_id).expect("attacker should exist")),
+        );
+
+        assert_eq!(target, Some(enemy_id));
+    }
+
+    #[test]
+    fn idle_workers_do_not_auto_acquire_targets() {
+        let mut entities = EntityStore::new();
+        let worker_id = entities
+            .spawn_unit(1, EntityKind::Worker, 100.0, 100.0)
+            .expect("worker should spawn");
+        entities
+            .spawn_unit(2, EntityKind::Rifleman, 120.0, 100.0)
+            .expect("enemy rifleman should spawn");
+        let spatial = SpatialIndex::build(&entities, 32);
+        let worker = entities.get(worker_id).expect("worker should exist");
+
+        let target = resolve_target(
+            &entities,
+            &spatial,
+            worker_id,
+            worker.owner,
+            worker.pos_x,
+            worker.pos_y,
+            128.0,
+            combat_mode(worker),
+        );
+
+        assert_eq!(target, None);
     }
 }
