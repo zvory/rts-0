@@ -164,9 +164,9 @@ pub fn unit_stats(kind: EntityKind) -> Option<UnitStats> {
         },
         EntityKind::AtTeam => UnitStats {
             hp: 45,
-            dmg: 24,
+            dmg: 48,
             range_tiles: 4,
-            cooldown: 24,
+            cooldown: 48,
             speed: 0.65,
             sight_tiles: 8,
             cost_steel: 75,
@@ -177,9 +177,9 @@ pub fn unit_stats(kind: EntityKind) -> Option<UnitStats> {
         },
         EntityKind::Tank => UnitStats {
             hp: 390,
-            dmg: 20,
+            dmg: 60,
             range_tiles: 3,
-            cooldown: 18,
+            cooldown: 36,
             speed: 2.0,
             sight_tiles: 7,
             cost_steel: 100,

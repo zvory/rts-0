@@ -1,7 +1,7 @@
 // Minimap — the bottom-left overview canvas (`#minimap`, 220×220). Draws the terrain,
 // the fog overlay, entity blips colored by owner, and the current camera viewport
-// rectangle. Left-click/drag recenters the camera; right-click issues a move order for
-// the current own-unit selection. See DESIGN.md §4.1 (Minimap) and §4.2 (look).
+// rectangle. Left-click/drag recenters the camera; right-click issues a context-sensitive
+// order for the current own-unit selection. See DESIGN.md §4.1 (Minimap) and §4.2 (look).
 //
 // The minimap is a plain 2D canvas (not Pixi). World↔canvas conversion is a uniform
 // scale derived from the map's pixel size and the (square) canvas size, letterboxed so
@@ -241,7 +241,7 @@ export class Minimap {
 
   // --- Input -----------------------------------------------------------------
 
-  /** Install pointer/context listeners for recenter (left) and move orders (right). */
+  /** Install pointer/context listeners for recenter (left) and commands (right). */
   _installInput() {
     const c = this.canvas;
     // Suppress the browser context menu so right-click can mean "move here".
@@ -269,9 +269,9 @@ export class Minimap {
     const cp = this._eventToCanvas(ev);
     const w = this._canvasToWorld(cp.x, cp.y);
     if (ev.button === 2) {
-      // Right-click: issue a move order for the currently selected own units.
+      // Right-click: issue a context-sensitive order for the currently selected own units.
       ev.preventDefault();
-      this._issueMove(w.x, w.y);
+      this._issueOrder(w.x, w.y);
     } else if (ev.button === 0) {
       // Left-click (and start of a drag): recenter the camera.
       ev.preventDefault();
@@ -291,8 +291,8 @@ export class Minimap {
     this._dragging = false;
   }
 
-  /** Issue a move command to the world point for any selected own units. */
-  _issueMove(wx, wy) {
+  /** Issue the minimap's current command to the world point for any selected own units. */
+  _issueOrder(wx, wy) {
     const sel = this.state.selectedEntities() || [];
     const unitIds = [];
     for (const e of sel) {
@@ -302,6 +302,12 @@ export class Minimap {
       }
     }
     if (unitIds.length === 0) return;
+    if (this.state.commandTarget === "attack") {
+      this.net.command(cmd.attackMove(unitIds, wx, wy));
+      this.state.addCommandFeedback("attack", wx, wy);
+      return;
+    }
     this.net.command(cmd.move(unitIds, wx, wy));
+    this.state.addCommandFeedback("move", wx, wy);
   }
 }

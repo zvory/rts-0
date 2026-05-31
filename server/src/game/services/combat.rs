@@ -299,7 +299,7 @@ fn apply_damage(
         .map(|e| e.kind.is_armored())
         .unwrap_or(false);
     let effective_dmg = if victim_is_armored && !attacker_is_ap {
-        dmg / 2
+        dmg / 4
     } else {
         dmg
     };
@@ -396,8 +396,13 @@ fn apply_overpenetration(
         let effective_dmg = entities
             .get(id)
             .map(|e| {
-                if e.kind.is_armored() && !entities.get(attacker).map(|a| a.kind.is_ap()).unwrap_or(false) {
-                    splash_dmg / 2
+                if e.kind.is_armored()
+                    && !entities
+                        .get(attacker)
+                        .map(|a| a.kind.is_ap())
+                        .unwrap_or(false)
+                {
+                    splash_dmg / 4
                 } else {
                     splash_dmg
                 }
@@ -416,7 +421,10 @@ fn apply_overpenetration(
             if !visible {
                 continue;
             }
-            events.entry(*pid).or_default().push(Event::Attack { from: attacker, to: id });
+            events.entry(*pid).or_default().push(Event::Attack {
+                from: attacker,
+                to: id,
+            });
         }
     }
 }
