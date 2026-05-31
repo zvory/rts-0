@@ -302,8 +302,9 @@ impl Game {
                 None => continue,
             };
             let own = e.owner == player;
-            if fogged && !own {
+            if fogged && !own && !e.kind.is_node() {
                 // Reveal neutral / enemy entities only when their tile is currently visible.
+                // Resource nodes are always included — they are static terrain features.
                 if !self.fog.is_visible_world(player, e.pos_x, e.pos_y) {
                     continue;
                 }
