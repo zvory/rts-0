@@ -435,11 +435,15 @@ impl AiController {
     ) -> Option<(f32, f32)> {
         let me = players.iter().find(|p| p.id == self.player)?;
         let (mx, my) = map.tile_center(me.start_tile.0, me.start_tile.1);
+        let candidates: Vec<&PlayerState> = players
+            .iter()
+            .filter(|p| p.id != self.player && entities.player_alive(p.id))
+            .collect();
+        // Prefer human players; fall back to AI players only if no humans remain.
+        let targets: Vec<&&PlayerState> = candidates.iter().filter(|p| !p.is_ai).collect();
+        let targets = if targets.is_empty() { candidates.iter().collect() } else { targets };
         let mut best: Option<(f32, f32, f32)> = None;
-        for p in players {
-            if p.id == self.player || !entities.player_alive(p.id) {
-                continue;
-            }
+        for p in targets {
             let (ex, ey) = map.tile_center(p.start_tile.0, p.start_tile.1);
             let d = (ex - mx) * (ex - mx) + (ey - my) * (ey - my);
             if best.map(|(_, _, bd)| d < bd).unwrap_or(true) {
@@ -820,6 +824,7 @@ mod tests {
             oil: 0,
             supply_used: 8,
             supply_cap: 10,
+                is_ai: false,
         }];
         let map = Map::generate(2, 1234);
         let mut out = Vec::new();
@@ -873,6 +878,7 @@ mod tests {
             oil: 0,
             supply_used: 0,
             supply_cap: 0,
+                is_ai: false,
         };
 
         assert_eq!(
@@ -1013,6 +1019,7 @@ mod tests {
                 oil: 0,
                 supply_used: 0,
                 supply_cap: 0,
+                is_ai: false,
             },
             PlayerState {
                 id: 2,
@@ -1023,6 +1030,7 @@ mod tests {
                 oil: 0,
                 supply_used: 1,
                 supply_cap: 10,
+                is_ai: false,
             },
         ];
         let mut out = Vec::new();
@@ -1079,6 +1087,7 @@ mod tests {
                 oil: 0,
                 supply_used: 0,
                 supply_cap: 0,
+                is_ai: false,
             },
             PlayerState {
                 id: 2,
@@ -1089,6 +1098,7 @@ mod tests {
                 oil: 0,
                 supply_used: 4,
                 supply_cap: 10,
+                is_ai: false,
             },
         ];
         let mut out = Vec::new();
@@ -1166,6 +1176,7 @@ mod tests {
                 oil: 0,
                 supply_used: 0,
                 supply_cap: 0,
+                is_ai: false,
             },
             PlayerState {
                 id: 2,
@@ -1176,6 +1187,7 @@ mod tests {
                 oil: 0,
                 supply_used: 3,
                 supply_cap: 10,
+                is_ai: false,
             },
         ];
         let mut out = Vec::new();
@@ -1231,6 +1243,7 @@ mod tests {
                 oil: 0,
                 supply_used: 0,
                 supply_cap: 0,
+                is_ai: false,
             },
             PlayerState {
                 id: 2,
@@ -1241,6 +1254,7 @@ mod tests {
                 oil: 0,
                 supply_used: 3,
                 supply_cap: 10,
+                is_ai: false,
             },
         ];
         let mut out = Vec::new();
@@ -1318,6 +1332,7 @@ mod tests {
                 oil: 0,
                 supply_used: 0,
                 supply_cap: 0,
+                is_ai: false,
             },
             PlayerState {
                 id: 2,
@@ -1328,6 +1343,7 @@ mod tests {
                 oil: 0,
                 supply_used: 2,
                 supply_cap: 10,
+                is_ai: false,
             },
         ];
         let mut out = Vec::new();
