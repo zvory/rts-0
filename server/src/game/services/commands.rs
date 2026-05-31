@@ -5,6 +5,7 @@ use crate::game::entity::{BuildPhase, EntityKind, EntityStore, ProdItem};
 use crate::game::map::Map;
 use crate::game::services::move_coordinator::MoveCoordinator;
 use crate::game::services::occupancy::footprint_placeable;
+use crate::game::services::occupancy::footprint_tiles;
 use crate::game::services::spatial::SpatialIndex;
 use crate::game::services::world_query;
 use crate::game::PlayerState;
@@ -215,7 +216,11 @@ fn order_build(
     }
 
     // Feedback only — re-checked at arrival.
-    if !footprint_placeable(map, entities, spatial, kind, tile_x, tile_y) {
+    let footprint = footprint_tiles(kind, tile_x, tile_y);
+    let worker_inside_footprint = matches!(entities.get(worker), Some(w) if footprint.contains(&map.tile_of(w.pos_x, w.pos_y)));
+    if !footprint_placeable(map, entities, spatial, kind, tile_x, tile_y)
+        && !worker_inside_footprint
+    {
         notice(events, player, "Cannot build there");
         return;
     }
@@ -229,7 +234,14 @@ fn order_build(
         return;
     }
 
-    coordinator.order_build(entities, worker, kind, tile_x, tile_y);
+    let built = coordinator.order_build(entities, worker, kind, tile_x, tile_y);
+    if !built {
+        if worker_inside_footprint {
+            notice(events, player, "Worker blocks building");
+        } else {
+            notice(events, player, "Cannot build there");
+        }
+    }
 }
 
 /// Queue a unit at a production building. Reserves cost + supply on enqueue.
