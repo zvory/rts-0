@@ -181,6 +181,18 @@ pub struct MapInfo {
     pub tile_size: u32,
     /// Row-major terrain codes, length = width * height. See [`terrain`].
     pub terrain: Vec<u8>,
+    /// Positions of all neutral resource nodes (steel/oil). Included so the
+    /// client can render them on the minimap before fog-of-war reveals them.
+    pub resources: Vec<ResourceNode>,
+}
+
+/// A static resource node position included in the start payload.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct ResourceNode {
+    pub kind: String,
+    pub x: f32,
+    pub y: f32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

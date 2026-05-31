@@ -114,12 +114,15 @@ Sent once when the match begins. Carries everything static for the whole match.
     width: u32, height: u32,     // in tiles
     tileSize: u32,               // world px per tile
     // terrain: row-major array length width*height, each a TerrainKind code (u8).
-    terrain: number[]
+    terrain: number[],
+    // All neutral resource nodes (static, never move). Sent so the client can
+    // render them on the minimap before fog-of-war reveals them.
+    resources: [ { kind: "steel"|"oil", x: f32, y: f32 } ]
   },
   players: [ { id, name, color, startTileX, startTileY } ],
 }
 ```
-Resource nodes and all units/buildings arrive via snapshots (so they obey fog), including
+Units/buildings arrive via snapshots (so they obey fog), including
 the player's own starting Industrial Center + workers. When the lobby's `setQuickstart` toggle is
 enabled, every player starts with 700 steel and 300 oil instead of the default opening resources.
 
