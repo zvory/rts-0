@@ -125,7 +125,6 @@ mechanics.
 Gates:
 
 - Required before full unit collision.
-- Required before machine-gunner setup/teardown.
 - Required before construction resumption.
 
 ### 2.2 Central World Query and Mutation Helpers
@@ -138,7 +137,6 @@ Gates:
 Gates:
 
 - Required before forests/LoS blockers.
-- Required before rally points.
 - Required before AI GG/leave.
 - Required before machine-gunner setup/teardown.
 - Required before factions.
@@ -162,38 +160,23 @@ Gates:
 ### 2.4 Explicit Order State Machines
 
 - [x] Separate order intent from execution state.
-- [x] Model gather, build, attack, rally, and future setup/teardown as explicit state machines.
+- [x] Model gather, build, attack, and future setup/teardown as explicit state machines.
 - [x] Add transition tests for stale target, stop, death, retarget, no path, ownership loss,
   cancel, interrupt, resume, and completion.
 
 Gates:
 
 - Required before full unit collision.
-- Required before rally points.
 - Required before machine-gunner setup/teardown.
 - Required before construction resumption.
 
-### 2.5 Correct Construction Resumption
-
-- [ ] Fix building construction so a worker pulled away does not leave the site permanently
-  unbuildable.
-- [ ] Support worker assignment, interruption, reassignment, cancellation, resumption, and
-  completion as explicit transitions.
-- [ ] Add invariants/tests for orphaned construction sites.
-
-Depends on:
-
-- Phase 2.1 typed entity state.
-- Phase 2.2 world helpers.
-- Phase 2.4 order state machines.
-- Phase 1.1 invariants.
 
 Parallel-safe for Agent B:
 
 - [ ] Lobby system to see active lobbies.
 - [ ] Basic settings menu, including surrender UI. Surrender should call a small
   `Game::eliminate(player)`-style API.
-- [ ] Muzzle flare animations if they stay client-side and do not alter event semantics.
+- [x] Muzzle flare animations if they stay client-side and do not alter event semantics.
 - [ ] Find a source of copyright-free assets for units, buildings, resources, and UI.
 
 ## Phase 3: Data Definitions and Balance Surface
@@ -220,6 +203,7 @@ Gates:
 
 ### 3.2 Workers Should Not Auto Attack
 
+This is already implemented, but probably using a hack.
 - [ ] Represent worker combat behavior as data, e.g. `auto_acquire: false` or
   `attack_requires_order: true`.
 - [ ] Route target acquisition through canonical world/combat predicates.
@@ -242,7 +226,7 @@ Depends on:
 - Phase 3.1 definitions.
 - Phase 1.3 executable contracts.
 
-## Phase 4: Movement, Rally, Collision, and Map Scale
+## Phase 4: Movement, Collision, and Map Scale
 
 Goal: handle the hard movement work before larger maps and real collision amplify pathing debt.
 
@@ -262,23 +246,8 @@ Gates:
 - Required before full unit collision.
 - Required before larger maps.
 - Required before forests/vehicle blockers.
-- Required before rally points if rally immediately path-orders produced units.
 
-### 4.2 Building Rally Points
-
-- [ ] Add rally target state to production buildings.
-- [ ] Add command/protocol/client support for setting rally points.
-- [ ] On unit production completion, spawn safely and issue the rally order through the movement
-  coordinator.
-- [ ] Add tests for rally to reachable, unreachable, and blocked points.
-
-Depends on:
-
-- Phase 2.2 world helpers.
-- Phase 2.4 order state machines.
-- Phase 4.1 movement coordinator.
-
-### 4.3 Unit Collision and Non-Stacking
+### 4.2 Unit Collision and Non-Stacking
 
 - [x] Implement unit collision and non-stacking.
 - [x] Preserve mining-worker exceptions through worker/gather state, not movement hacks.
@@ -297,7 +266,7 @@ Depends on:
 - Phase 2.4 order state machines.
 - Phase 4.1 movement coordinator.
 
-### 4.4 Maps Twice as Large
+### 4.3 Maps Twice as Large
 
 - [ ] Increase map dimensions.
 - [ ] Measure pathing, snapshot, fog, and AI cost.
@@ -439,7 +408,6 @@ Use this index when deciding whether a TODO can start.
 - Full unit collision: requires 1.1, 2.1, 2.4, 4.1.
 - Larger maps: requires 1.1, 1.2, 4.1.
 - Forests: requires 1.3, 2.2, 3.1, 4.1, 5.1.
-- Rally points: requires 2.2, 2.4, 4.1.
 - AI GG/leave: requires 2.2 and 1.3.
 - Machine-gunner setup: requires 1.1, 2.1, 2.2, 2.4, 3.1, and maybe 5.1.
 - Factions: requires 1.3, 2.2, 2.3, 3.1.
