@@ -136,6 +136,18 @@ impl Game {
             player_states.push(ps);
         }
 
+        // Always spawn resources at all four corners. Corners not claimed by a player get
+        // only resource patches (no IC, no workers) so there are always four resource sets.
+        let inset = 8u32.min(map.size / 4);
+        let lo = inset;
+        let hi = map.size - 1 - inset;
+        let all_corners = [(lo, lo), (hi, lo), (lo, hi), (hi, hi)];
+        for corner in all_corners {
+            if !map.starts.contains(&corner) {
+                spawn_corner_resources(&mut entities, &map, corner);
+            }
+        }
+
         let spatial = services::spatial::SpatialIndex::build(&entities, map.size);
         let pathing = services::pathing::PathingService::new(8_192, 256);
         let mut game = Game {
@@ -469,40 +481,21 @@ impl Game {
 /// Spawn a player's full starting layout: a free, fully-built Industrial Center on the start tile, a ring of
 /// workers around it, and a nearby neutral resource cluster (steel + one oil node).
 ///
-/// Resource placement is precisely controlled so every player receives the same relative layout,
-/// rotated to point toward the map center. All starting resources lie within
-/// [`IC_RESOURCE_MIN_DIST_TILES` .. `IC_RESOURCE_MAX_DIST_TILES`] from the Industrial Center.
-fn spawn_player_start(entities: &mut EntityStore, map: &Map, owner: u32, start: (u32, u32)) {
-    let (stx, sty) = start;
-    let (hx, hy) = map.tile_center(stx, sty);
-
-    // Industrial Center (free, fully built). Footprint is 3x3 centered on the start tile.
-    entities.spawn_building(owner, EntityKind::IndustrialCenter, hx, hy, true);
-
-    // Starting workers arranged in a ring just outside the Industrial Center footprint.
+/// Spawn the steel and oil clusters for a corner tile. The clusters point inward toward the
+/// map center so the layout is the same regardless of whether a player occupies the corner.
+fn spawn_corner_resources(entities: &mut EntityStore, map: &Map, tile: (u32, u32)) {
+    let (tx, ty) = tile;
+    let (hx, hy) = map.tile_center(tx, ty);
     let ts = config::TILE_SIZE as f32;
-    let ring_r = ts * 2.5;
-    let count = config::STARTING_WORKERS;
-    for i in 0..count {
-        let ang = std::f32::consts::TAU * (i as f32) / (count.max(1) as f32);
-        let wx = hx + ring_r * ang.cos();
-        let wy = hy + ring_r * ang.sin();
-        entities.spawn_unit(owner, EntityKind::Worker, wx, wy);
-    }
 
-    // Determine the angle toward the map center so the resource cluster points inward.
     let center = map.world_size_px() * 0.5;
     let dx = center - hx;
     let dy = center - hy;
     let base_angle = dy.atan2(dx);
 
-    // Steel cluster: a 4x2 block centered at a fixed distance from the IC, rotated to face
-    // the map center. This guarantees identical distances for every player.
     let block_dist = config::STEEL_BLOCK_DIST_TILES * ts;
     let block_cx = hx + block_dist * base_angle.cos();
     let block_cy = hy + block_dist * base_angle.sin();
-
-    // Perpendicular axis (rotated 90 deg from base_angle) for the block width.
     let perp_x = -base_angle.sin();
     let perp_y = base_angle.cos();
 
@@ -511,9 +504,8 @@ fn spawn_player_start(entities: &mut EntityStore, map: &Map, owner: u32, start: 
     for i in 0..patches {
         let col = (i % cols) as f32;
         let row = (i / cols) as f32;
-        // Local offsets within the block, centered on the block center.
-        let off_x = (col - 2.5) * ts; // -2.5 .. +2.5 tiles
-        let off_y = (row - 0.5) * ts; // -0.5 .. +0.5 tiles
+        let off_x = (col - 2.5) * ts;
+        let off_y = (row - 0.5) * ts;
         let px = block_cx + off_x * perp_x + off_y * base_angle.cos();
         let py = block_cy + off_x * perp_y + off_y * base_angle.sin();
         let dist_tiles = ((px - hx).powi(2) + (py - hy).powi(2)).sqrt() / ts;
@@ -527,21 +519,20 @@ fn spawn_player_start(entities: &mut EntityStore, map: &Map, owner: u32, start: 
         entities.spawn_node(EntityKind::Steel, px, py);
     }
 
-    // Three oil nodes arranged in a compact triangle, 90° from the steel cluster so they don't overlap.
     let oil_angle = base_angle + std::f32::consts::FRAC_PI_2;
     let oil_perp_x = -oil_angle.sin();
     let oil_perp_y = oil_angle.cos();
     let oil_dist = config::OIL_DIST_TILES * ts;
-    let block_cx = hx + oil_dist * oil_angle.cos();
-    let block_cy = hy + oil_dist * oil_angle.sin();
+    let oil_cx = hx + oil_dist * oil_angle.cos();
+    let oil_cy = hy + oil_dist * oil_angle.sin();
     for i in 0..config::OIL_PATCHES_PER_BASE {
         let (off_x, off_y) = match i {
             0 => (-0.5 * ts, -0.5 * ts),
             1 => (0.5 * ts, -0.5 * ts),
             _ => (0.0, 0.5 * ts),
         };
-        let px = block_cx + off_x * oil_perp_x + off_y * oil_angle.cos();
-        let py = block_cy + off_x * oil_perp_y + off_y * oil_angle.sin();
+        let px = oil_cx + off_x * oil_perp_x + off_y * oil_angle.cos();
+        let py = oil_cy + off_x * oil_perp_y + off_y * oil_angle.sin();
         let dist_tiles = ((px - hx).powi(2) + (py - hy).powi(2)).sqrt() / ts;
         debug_assert!(
             (config::IC_RESOURCE_MIN_DIST_TILES..=config::IC_RESOURCE_MAX_DIST_TILES)
@@ -552,6 +543,26 @@ fn spawn_player_start(entities: &mut EntityStore, map: &Map, owner: u32, start: 
         );
         entities.spawn_node(EntityKind::Oil, px, py);
     }
+}
+
+/// Spawn an Industrial Center, starting workers, and resource clusters for one player.
+fn spawn_player_start(entities: &mut EntityStore, map: &Map, owner: u32, start: (u32, u32)) {
+    let (stx, sty) = start;
+    let (hx, hy) = map.tile_center(stx, sty);
+
+    entities.spawn_building(owner, EntityKind::IndustrialCenter, hx, hy, true);
+
+    let ts = config::TILE_SIZE as f32;
+    let ring_r = ts * 2.5;
+    let count = config::STARTING_WORKERS;
+    for i in 0..count {
+        let ang = std::f32::consts::TAU * (i as f32) / (count.max(1) as f32);
+        let wx = hx + ring_r * ang.cos();
+        let wy = hy + ring_r * ang.sin();
+        entities.spawn_unit(owner, EntityKind::Worker, wx, wy);
+    }
+
+    spawn_corner_resources(entities, map, start);
 }
 
 #[cfg(test)]
