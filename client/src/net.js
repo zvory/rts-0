@@ -155,6 +155,14 @@ export class Net {
     this._send(msg.ping(ts));
   }
 
+  /**
+   * Set replay playback speed (replay rooms only; ignored elsewhere).
+   * @param {number} speed multiplier, e.g. 0.5, 1, 2, 4, 8
+   */
+  setReplaySpeed(speed) {
+    this._send(msg.setReplaySpeed(speed));
+  }
+
   // --- internals ----------------------------------------------------------
 
   /**

@@ -69,6 +69,7 @@ const dom = {
   gameOverText: document.getElementById("game-over-text"),
   gameOverButton: document.getElementById("game-over-button"),
   devBanner: document.getElementById("dev-banner"),
+  replaySpeed: document.getElementById("replay-speed"),
 };
 
 /**
@@ -277,6 +278,7 @@ class Match {
     this.net = net;
     this.toast = toast;
     this.devWatch = devWatch;
+    this.replaySpeedHandler = null;
 
     // --- Build the module graph from the static start payload (DESIGN.md §4.1). ---
     this.state = new GameState(payload);
@@ -315,6 +317,23 @@ class Match {
     window.addEventListener("resize", this.onResize);
 
     this.rafId = requestAnimationFrame(this.tickFn);
+
+    // Show replay speed controls only when watching a replay.
+    const isReplay = this.devWatch?.room?.includes("__dev_selfplay__replay:");
+    if (isReplay && dom.replaySpeed) {
+      dom.replaySpeed.hidden = false;
+      this.replaySpeedHandler = (e) => {
+        const btn = e.target.closest(".spd-btn");
+        if (!btn) return;
+        const speed = parseFloat(btn.dataset.speed);
+        if (!isFinite(speed)) return;
+        this.net.setReplaySpeed(speed);
+        for (const b of dom.replaySpeed.querySelectorAll(".spd-btn")) {
+          b.classList.toggle("active", b === btn);
+        }
+      };
+      dom.replaySpeed.addEventListener("click", this.replaySpeedHandler);
+    }
   }
 
   /** Compute world/viewport sizes and push them into the camera. */
@@ -455,6 +474,10 @@ class Match {
     this.stop();
     this.net.off(S.SNAPSHOT, this.onSnapshot);
     window.removeEventListener("resize", this.onResize);
+    if (dom.replaySpeed && this.replaySpeedHandler) {
+      dom.replaySpeed.removeEventListener("click", this.replaySpeedHandler);
+      dom.replaySpeed.hidden = true;
+    }
     // Let modules release DOM/WebGL resources if they own any.
     for (const m of [this.input, this.minimap, this.hud, this.renderer, this.fog]) {
       if (m && typeof m.destroy === "function") {

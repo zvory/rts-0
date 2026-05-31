@@ -85,6 +85,8 @@ pub enum RoomEvent {
     SetQuickstart { player_id: u32, enabled: bool },
     /// A gameplay command (ignored unless the room is in-game and the sender is in the room).
     Command { player_id: u32, cmd: Command },
+    /// Set replay playback speed multiplier (replay rooms only; ignored elsewhere).
+    SetReplaySpeed { speed: f32 },
 }
 
 /// Handle the lobby keeps for each live room: just the channel into its task.
@@ -195,10 +197,16 @@ struct RoomTask {
     match_player_count: usize,
     dev_driver: Option<DevDriver>,
     dev_view_player_id: Option<u32>,
+    /// Replay speed multiplier; 1.0 = real-time, 2.0 = 2× faster, etc.
+    replay_speed: f32,
 }
 
 impl RoomTask {
     fn new(room: String, mode: RoomMode) -> Self {
+        let replay_speed = match &mode {
+            RoomMode::DevSelfPlay(DevSelfPlayConfig::Replay { .. }) => 1.5,
+            _ => 1.0,
+        };
         RoomTask {
             room,
             mode,
@@ -211,6 +219,7 @@ impl RoomTask {
             match_player_count: 0,
             dev_driver: None,
             dev_view_player_id: None,
+            replay_speed,
         }
     }
 
@@ -218,12 +227,10 @@ impl RoomTask {
     /// the task ends) only when the event channel closes, which happens when the `Lobby`
     /// registry — and therefore the process — is gone.
     async fn run(&mut self, mut event_rx: mpsc::Receiver<RoomEvent>) {
-        let mut ticker = interval(room_tick_interval(&self.mode));
-        // If the loop ever falls behind (e.g. a long GC pause), skip missed ticks rather than
-        // bursting to catch up — the simulation stays close to real time.
-        ticker.set_missed_tick_behavior(MissedTickBehavior::Skip);
+        let mut ticker = self.make_ticker();
 
         loop {
+            let mut speed_changed = false;
             tokio::select! {
                 // Bias is irrelevant for correctness: events are timestamped only by arrival
                 // order, and a tick handles whatever has been applied so far.
@@ -232,12 +239,33 @@ impl RoomTask {
                 }
                 maybe_event = event_rx.recv() => {
                     match maybe_event {
-                        Some(event) => self.handle_event(event),
+                        Some(event) => {
+                            let old_speed = self.replay_speed;
+                            self.handle_event(event);
+                            speed_changed = self.replay_speed != old_speed;
+                        }
                         None => return, // registry dropped; shut the room down.
                     }
                 }
             }
+            if speed_changed {
+                ticker = self.make_ticker();
+            }
         }
+    }
+
+    fn make_ticker(&self) -> tokio::time::Interval {
+        let dur = self.current_tick_interval();
+        let mut t = interval(dur);
+        // If the loop ever falls behind (e.g. a long GC pause), skip missed ticks rather than
+        // bursting to catch up — the simulation stays close to real time.
+        t.set_missed_tick_behavior(MissedTickBehavior::Skip);
+        t
+    }
+
+    fn current_tick_interval(&self) -> Duration {
+        let base = Duration::from_millis(config::TICK_MS);
+        base.div_f32(self.replay_speed)
     }
 
     // -- Event handling ------------------------------------------------------
@@ -259,6 +287,7 @@ impl RoomTask {
                 self.on_set_quickstart(player_id, enabled)
             }
             RoomEvent::Command { player_id, cmd } => self.on_command(player_id, cmd),
+            RoomEvent::SetReplaySpeed { speed } => self.on_set_replay_speed(speed),
         }
     }
 
@@ -787,6 +816,15 @@ impl RoomTask {
         self.phase = Phase::InGame(game);
     }
 
+    fn on_set_replay_speed(&mut self, speed: f32) {
+        if !matches!(self.mode, RoomMode::DevSelfPlay(DevSelfPlayConfig::Replay { .. })) {
+            return;
+        }
+        // Clamp to sensible range matching the UI buttons (0.5× – 8×).
+        let clamped = speed.clamp(0.125, 8.0);
+        self.replay_speed = clamped;
+    }
+
     /// Resolve a finished match: tell everyone who won and return to the lobby for a rematch.
     fn end_match(&mut self, winner_id: Option<u32>) {
         info!(room = %self.room, ?winner_id, "match over");
@@ -831,34 +869,41 @@ impl RoomTask {
     }
 }
 
-fn room_tick_interval(mode: &RoomMode) -> Duration {
-    let base = Duration::from_millis(config::TICK_MS);
-    match mode {
-        RoomMode::DevSelfPlay(DevSelfPlayConfig::Replay { .. }) => base.mul_f64(2.0 / 3.0),
-        _ => base,
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn replay_rooms_tick_at_1_5x_speed() {
-        assert_eq!(
-            room_tick_interval(&RoomMode::Normal),
-            Duration::from_millis(33)
+    fn replay_rooms_default_to_1_5x_speed() {
+        let normal = RoomTask::new("r".to_string(), RoomMode::Normal);
+        let live = RoomTask::new(
+            "r".to_string(),
+            RoomMode::DevSelfPlay(DevSelfPlayConfig::Live),
         );
-        assert_eq!(
-            room_tick_interval(&RoomMode::DevSelfPlay(DevSelfPlayConfig::Live)),
-            Duration::from_millis(33)
-        );
-        assert_eq!(
-            room_tick_interval(&RoomMode::DevSelfPlay(DevSelfPlayConfig::Replay {
+        let replay = RoomTask::new(
+            "r".to_string(),
+            RoomMode::DevSelfPlay(DevSelfPlayConfig::Replay {
                 artifact: "demo".to_string(),
-            })),
-            Duration::from_millis(22)
+            }),
         );
+        assert_eq!(normal.current_tick_interval(), Duration::from_millis(33));
+        assert_eq!(live.current_tick_interval(), Duration::from_millis(33));
+        // 33ms / 1.5 = 22ms
+        assert_eq!(replay.current_tick_interval(), Duration::from_millis(22));
+    }
+
+    #[test]
+    fn replay_speed_clamped_and_applied() {
+        let mut task = RoomTask::new(
+            "r".to_string(),
+            RoomMode::DevSelfPlay(DevSelfPlayConfig::Replay {
+                artifact: "demo".to_string(),
+            }),
+        );
+        task.on_set_replay_speed(2.0);
+        // 33ms / 2.0 = 16.5ms → rounds to 16ms via div_f32
+        assert!(task.current_tick_interval() < Duration::from_millis(17));
+        assert!(task.current_tick_interval() > Duration::from_millis(15));
     }
 }
 
