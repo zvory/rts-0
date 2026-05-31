@@ -52,7 +52,6 @@ When you open a replay artifact in the browser, stop any existing server on `:80
 start a fresh one before loading `http://localhost:8080/dev/selfplay?replay=<artifact_name>`.
 
 ```bash
-cd server && cargo test scripted_self_play_exercises_economy_tech_and_combat
 RTS_SELFPLAY_SAVE_REPLAY=manual_worker_rush_latest \
   cargo test scripted_self_play_worker_rush_vs_economy
 ```
