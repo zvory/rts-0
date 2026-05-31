@@ -56,8 +56,13 @@ export class GameState {
     /** @type {Array<{kind:string,x:number,y:number,createdAt:number}>} */
     this.commandFeedback = [];
 
-    /** @type {Array<{from:number,to:number,createdAt:number}>} */
-    this.muzzleFlashes = [];
+  /** @type {Array<{from:number,to:number,createdAt:number}>} */
+  this.muzzleFlashes = [];
+  }
+
+  /** Maximum number of entities the local selection may contain. */
+  static get MAX_SELECTION_SIZE() {
+    return 12;
   }
 
   /** World pixels per tile. */
@@ -192,7 +197,11 @@ export class GameState {
    * @param {Iterable<number>} ids
    */
   setSelection(ids) {
-    this.selection = new Set(ids);
+    this.selection = new Set();
+    for (const id of ids) {
+      this.selection.add(id);
+      if (this.selection.size >= GameState.MAX_SELECTION_SIZE) break;
+    }
   }
 
   /**
@@ -200,7 +209,10 @@ export class GameState {
    * @param {Iterable<number>} ids
    */
   addToSelection(ids) {
-    for (const id of ids) this.selection.add(id);
+    for (const id of ids) {
+      if (this.selection.size >= GameState.MAX_SELECTION_SIZE) break;
+      this.selection.add(id);
+    }
   }
 
   /** Clear the selection. */

@@ -281,7 +281,7 @@ export class Input {
       return;
     }
     if (ctrl && isUnit(hit.kind) && hit.owner === this.state.playerId) {
-      const ids = this._ownUnitKindInViewport(hit.kind);
+      const ids = this._closestOwnUnitKindInViewport(hit.kind, hit.x, hit.y);
       if (additive) this.state.addToSelection(ids);
       else this.state.setSelection(ids);
       return;
@@ -290,8 +290,8 @@ export class Input {
     else this.state.setSelection([hit.id]);
   }
 
-  /** All own units of `kind` whose center is within the current viewport. */
-  _ownUnitKindInViewport(kind) {
+  /** Up to 12 own units of `kind` in the viewport, closest to `anchor`. */
+  _closestOwnUnitKindInViewport(kind, anchorX, anchorY) {
     const el = this.dom;
     const w = el.clientWidth;
     const h = el.clientHeight;
@@ -311,6 +311,12 @@ export class Input {
           e.x >= minX && e.x <= maxX &&
           e.y >= minY && e.y <= maxY,
       )
+      .sort((a, b) => {
+        const da = Math.hypot(a.x - anchorX, a.y - anchorY);
+        const db = Math.hypot(b.x - anchorX, b.y - anchorY);
+        return da - db || a.id - b.id;
+      })
+      .slice(0, 12)
       .map((e) => e.id);
   }
 
@@ -338,13 +344,30 @@ export class Input {
       else if (isBuilding(e.kind)) buildings.push(e.id);
     }
 
-    const picked = units.length > 0 ? units : buildings;
+    const picked = units.length > 0
+      ? this._closestIdsToPoint(units, drag.x0, drag.y0)
+      : buildings;
     if (picked.length === 0) {
       if (!additive) this.state.clearSelection();
       return;
     }
     if (additive) this.state.addToSelection(picked);
     else this.state.setSelection(picked);
+  }
+
+  /** Return up to 12 ids from `ids`, ordered by distance to the screen anchor. */
+  _closestIdsToPoint(ids, screenX, screenY) {
+    const anchor = this._worldAt(screenX, screenY);
+    return this.state
+      .entitiesInterpolated(1)
+      .filter((e) => ids.includes(e.id))
+      .sort((a, b) => {
+        const da = Math.hypot(a.x - anchor.x, a.y - anchor.y);
+        const db = Math.hypot(b.x - anchor.x, b.y - anchor.y);
+        return da - db || a.id - b.id;
+      })
+      .slice(0, 12)
+      .map((e) => e.id);
   }
 
   // --- Right-button logic (context-sensitive orders) ----------------------
