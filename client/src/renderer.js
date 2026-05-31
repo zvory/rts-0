@@ -35,6 +35,10 @@ import {
 // one-frame vision flicker reuses the slot rather than churning it (~2s @60fps).
 const SWEEP_EVICT_FRAMES = 120;
 
+// Machine-gunner setup / teardown visuals are time-based on the client so the
+// transition reads smoothly between snapshots.
+const MACHINE_GUNNER_ANIM_MS = 500;
+
 // Layer names in back-to-front draw order. Index in this array == child index in `world`.
 const LAYERS = [
   "terrain",
@@ -115,6 +119,8 @@ export class Renderer {
     // Consecutive-frames-unseen counter per id (across all pools + icons), so we
     // hide briefly but evict after a grace period — server ids are never reused.
     this._unseen = new Map();
+    // Local animation state for machine-gunner setup / teardown visuals.
+    this._setupVisuals = new Map();
 
     /** Map metadata captured by buildStaticMap (tileSize, width, height in tiles). */
     this._map = null;
@@ -202,6 +208,7 @@ export class Renderer {
     const entities = state.entitiesInterpolated(alpha) || [];
     const selection = state.selection || new Set();
     const colorByOwner = this._ownerColors(state);
+    const liveIds = new Set();
 
     // Nodes currently being mined: any worker latched to them. Used by
     // _drawResource to overlay an X marker.
@@ -214,19 +221,23 @@ export class Renderer {
     // (footprints sit under units), then units. Selection rings / hp bars are
     // their own layers and are filled inline.
     for (const e of entities) {
+      liveIds.add(e.id);
       if (isResource(e.kind)) this._drawResource(e, fog);
       else if (isBuilding(e.kind)) this._drawBuilding(e, colorByOwner, state);
     }
     for (const e of entities) {
+      liveIds.add(e.id);
       if (isUnit(e.kind)) this._drawUnit(e, colorByOwner, state);
     }
     // Selection rings + HP bars after shapes are placed so they read on top.
     for (const e of entities) {
+      liveIds.add(e.id);
       this._drawSelectionAndHp(e, selection, state);
     }
 
     // Hide pooled objects whose id was not touched this frame.
     this._sweep();
+    this._sweepSetupVisuals(liveIds);
 
     // Overlays.
     this._drawFog(fog);
@@ -264,6 +275,60 @@ export class Renderer {
   }
 
   /**
+   * Resolve the current visual transition progress for a machine gunner.
+   * The server only sends the discrete setup state, so the client smooths the
+   * transition locally between snapshots.
+   * @private
+   * @param {{id:number, setupState?:string}} e
+   * @returns {{prongFactor:number, barrel:boolean}}
+   */
+  _machineGunnerSetupVisual(e) {
+    const now = performance.now();
+    const setupState = e.setupState || SETUP.PACKED;
+    const prev = this._setupVisuals.get(e.id);
+    if (!prev || prev.state !== setupState) {
+      this._setupVisuals.set(e.id, { state: setupState, changedAt: now });
+    }
+    const rec = this._setupVisuals.get(e.id);
+    const elapsed = now - rec.changedAt;
+    const t = smoothstep01(elapsed / MACHINE_GUNNER_ANIM_MS);
+
+    if (setupState === SETUP.SETTING_UP) {
+      return { prongFactor: t, barrel: false };
+    }
+    if (setupState === SETUP.TEARING_DOWN) {
+      return { prongFactor: 1 - t, barrel: false };
+    }
+    if (setupState === SETUP.DEPLOYED) {
+      return { prongFactor: 1, barrel: true };
+    }
+    return { prongFactor: 0, barrel: false };
+  }
+
+  /**
+   * Four prongs that extend from the corners of the machine gunner body.
+   * @private
+   * @param {number} r
+   * @param {number} factor 0..1 extension amount
+   * @returns {Array<[number, number, number, number]>}
+   */
+  _machineGunnerProngs(r, factor) {
+    const t = clamp01(factor);
+    const body = [
+      [-0.95, -0.55, -1.35, -1.05],
+      [0.75, -0.55, 1.15, -1.05],
+      [-0.95, 0.55, -1.35, 1.05],
+      [0.75, 0.55, 1.15, 1.05],
+    ];
+    return body.map(([x1, y1, x2, y2]) => [
+      x1 * r,
+      y1 * r,
+      lerp(x1 * r, x2 * r, t),
+      lerp(y1 * r, y2 * r, t),
+    ]);
+  }
+
+  /**
    * Fetch (or lazily create) a pooled Graphics for `id` in `poolName`, mark it seen,
    * make it visible, and clear it ready for redraw.
    * @private
@@ -288,6 +353,17 @@ export class Renderer {
     g.beginFill(COLORS.shadow, 0.28);
     g.drawEllipse(cx, cy + radius * 0.35, radius, radius * 0.6);
     g.endFill();
+  }
+
+  /**
+   * Drop setup-animation state for entities that are no longer visible.
+   * @private
+   * @param {Set<number>} liveIds
+   */
+  _sweepSetupVisuals(liveIds) {
+    for (const id of [...this._setupVisuals.keys()]) {
+      if (!liveIds.has(id)) this._setupVisuals.delete(id);
+    }
   }
 
   /**
@@ -331,20 +407,7 @@ export class Renderer {
       g.moveTo(grip.x, grip.y);
       g.lineTo(muzzle.x, muzzle.y);
     } else if (e.kind === KIND.MACHINE_GUNNER) {
-      // Wider support team block with a braced gun line.
-      if (e.setupState === SETUP.DEPLOYED) {
-        g.lineStyle(2, 0x17130f, 0.9);
-        const prongs = [
-          [-r * 0.55, -r * 0.35, -r * 1.35, -r * 1.05],
-          [r * 0.35, -r * 0.35, r * 1.15, -r * 1.05],
-          [-r * 0.55, r * 0.35, -r * 1.35, r * 1.05],
-          [r * 0.35, r * 0.35, r * 1.15, r * 1.05],
-        ];
-        for (const [x1, y1, x2, y2] of prongs) {
-          g.moveTo(x1, y1);
-          g.lineTo(x2, y2);
-        }
-      }
+      // Wider support team block with deployable bracing.
       g.beginFill(tint);
       g.drawPolygon([
         -r * 0.95, -r * 0.55,
@@ -354,9 +417,20 @@ export class Renderer {
         -r * 0.95, r * 0.55,
       ]);
       g.endFill();
-      g.lineStyle(3, 0x2a2119, 0.9);
-      g.moveTo(-r * 0.25, 0);
-      g.lineTo(r * 1.35, 0);
+      const setup = this._machineGunnerSetupVisual(e);
+      if (setup.prongFactor > 0) {
+        g.lineStyle(2, 0x17130f, 0.9);
+        const prongs = this._machineGunnerProngs(r, setup.prongFactor);
+        for (const [x1, y1, x2, y2] of prongs) {
+          g.moveTo(x1, y1);
+          g.lineTo(x2, y2);
+        }
+      }
+      if (setup.barrel) {
+        g.lineStyle(3, 0x2a2119, 0.9);
+        g.moveTo(-r * 0.25, 0);
+        g.lineTo(r * 2.15, 0);
+      }
     } else if (e.kind === KIND.AT_TEAM) {
       // Two-person anti-armor marker with a long launcher slash.
       g.beginFill(tint);
@@ -811,9 +885,9 @@ export class Renderer {
   }
 
   /**
-   * Draw a brief muzzle flash on the attacker plus a thin yellow tracer line to
-   * the target, for each Attack event in the latest snapshot. Size scales by
-   * attacker kind (tank > MG > rifleman).
+   * Draw a brief muzzle flash on the attacker plus a yellow tracer line to the
+   * target, then a fainter continuation past the target for overpenetration.
+   * Size scales by attacker kind (tank > MG > rifleman).
    * @private
    */
   _drawMuzzleFlashes(state) {
@@ -848,9 +922,24 @@ export class Renderer {
       const my = attacker.y + Math.sin(facing) * reach;
 
       if (target) {
+        const dx = target.x - mx;
+        const dy = target.y - my;
+        const shotLen = Math.hypot(dx, dy);
+        const tailLen = (stat.rangeTiles || 0) * ((this._map && this._map.tileSize) || 32) * 0.25;
+
         g.lineStyle(1.5, 0xffe066, 0.9 * fade);
         g.moveTo(mx, my);
         g.lineTo(target.x, target.y);
+
+        if (shotLen > 0.001 && tailLen > 0) {
+          const ux = dx / shotLen;
+          const uy = dy / shotLen;
+          const ex = target.x + ux * tailLen;
+          const ey = target.y + uy * tailLen;
+          g.lineStyle(1.0, 0xffd84a, 0.42 * fade);
+          g.moveTo(target.x, target.y);
+          g.lineTo(ex, ey);
+        }
       }
 
       // Flash: bright core that scales up slightly then fades.
@@ -979,6 +1068,7 @@ export class Renderer {
       this._terrainSprite.destroy(true);
       this._terrainSprite = null;
     }
+    this._setupVisuals.clear();
 
     // Detach the canvas from the DOM, then destroy the app + WebGL context.
     const view = this.app.view;
@@ -1002,6 +1092,16 @@ function muzzleFlashRadius(kind) {
 function clamp01(v) {
   if (v == null || Number.isNaN(v)) return 0;
   return v < 0 ? 0 : v > 1 ? 1 : v;
+}
+
+/** Smoothstep easing on [0,1]. */
+function smoothstep01(v) {
+  const t = clamp01(v);
+  return t * t * (3 - 2 * t);
+}
+
+function lerp(a, b, t) {
+  return a + (b - a) * t;
 }
 
 /** Point at angle `a` (radians) and distance `d` from the origin. */
