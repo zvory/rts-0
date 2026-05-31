@@ -288,8 +288,12 @@ pub fn build_requirement_met(
     owned_building_kinds: &[EntityKind],
 ) -> bool {
     match building_kind {
-        EntityKind::Barracks | EntityKind::TrainingCentre | EntityKind::TankFactory => {
+        EntityKind::Barracks | EntityKind::TrainingCentre => {
             owned_building_kinds.contains(&EntityKind::IndustrialCenter)
+        }
+        EntityKind::TankFactory => {
+            owned_building_kinds.contains(&EntityKind::IndustrialCenter)
+                && owned_building_kinds.contains(&EntityKind::TrainingCentre)
         }
         _ => true,
     }
@@ -350,6 +354,21 @@ mod tests {
         assert!(train_requirement_met(
             EntityKind::AtTeam,
             &[EntityKind::TrainingCentre]
+        ));
+
+        // Tank Factory requires both IC and Training Centre
+        assert!(!build_requirement_met(EntityKind::TankFactory, &[]));
+        assert!(!build_requirement_met(
+            EntityKind::TankFactory,
+            &[EntityKind::IndustrialCenter]
+        ));
+        assert!(!build_requirement_met(
+            EntityKind::TankFactory,
+            &[EntityKind::TrainingCentre]
+        ));
+        assert!(build_requirement_met(
+            EntityKind::TankFactory,
+            &[EntityKind::IndustrialCenter, EntityKind::TrainingCentre]
         ));
     }
 }
