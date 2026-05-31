@@ -14,7 +14,7 @@
 //! - spawn-point search around buildings.
 
 use crate::config;
-use crate::game::entity::{EntityKind, EntityStore, MovePhase, Order};
+use crate::game::entity::{EntityKind, EntityStore, MovePhase, Order, WeaponSetup};
 use crate::game::map::{Map, MobilityClass};
 use crate::game::pathfinding::Passability;
 use crate::game::services::occupancy::Occupancy;
@@ -95,6 +95,7 @@ impl<'a> MoveCoordinator<'a> {
             e.set_path_goal(Some(*g));
             e.mark_move_phase(MovePhase::AwaitingPath);
             e.reset_gather_state();
+            begin_machine_gunner_teardown(e);
             let (px, py) = (e.pos_x, e.pos_y);
             e.reset_stuck(px, py);
         }
@@ -108,16 +109,23 @@ impl<'a> MoveCoordinator<'a> {
             None => return,
         };
         entities.release_miner(id);
+        let mut request_initial_path = true;
         if let Some(e) = entities.get_mut(id) {
             e.set_order(Order::attack(target));
             e.set_target_id(Some(target));
             e.set_path(Vec::new());
             e.set_path_goal(Some((tx, ty)));
             e.reset_gather_state();
+            // An explicit attack order is not necessarily a move command for a deployed MG:
+            // it may be able to slew and fire immediately. Combat requests a chase path only
+            // if the target is actually out of range, after teardown if needed.
+            request_initial_path = e.kind != EntityKind::MachineGunner;
             let (px, py) = (e.pos_x, e.pos_y);
             e.reset_stuck(px, py);
         }
-        self.request_path(entities, id, (tx, ty));
+        if request_initial_path {
+            self.request_path(entities, id, (tx, ty));
+        }
     }
 
     /// Issue a gather order. Sets the order and requests an initial path (budget permitting).
@@ -366,6 +374,17 @@ impl<'a> MoveCoordinator<'a> {
             }
         }
         false
+    }
+}
+
+fn begin_machine_gunner_teardown(e: &mut crate::game::entity::Entity) {
+    if e.kind != EntityKind::MachineGunner {
+        return;
+    }
+    if !matches!(e.weapon_setup(), WeaponSetup::Packed) {
+        e.set_weapon_setup(WeaponSetup::TearingDown {
+            ticks: config::MACHINE_GUNNER_SETUP_TICKS,
+        });
     }
 }
 

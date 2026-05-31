@@ -355,6 +355,7 @@ mod tests {
                     latched_node: None,
                     remaining: Some(100),
                     target_id: None,
+                    setup_state: None,
                 },
                 EntityView {
                     id: 2,
@@ -375,6 +376,7 @@ mod tests {
                     latched_node: None,
                     remaining: Some(100),
                     target_id: None,
+                    setup_state: None,
                 },
                 EntityView {
                     id: 3,
@@ -395,6 +397,7 @@ mod tests {
                     latched_node: None,
                     remaining: Some(100),
                     target_id: None,
+                    setup_state: None,
                 },
                 EntityView {
                     id: 4,
@@ -415,6 +418,7 @@ mod tests {
                     latched_node: None,
                     remaining: Some(100),
                     target_id: None,
+                    setup_state: None,
                 },
                 EntityView {
                     id: 5,
@@ -435,6 +439,7 @@ mod tests {
                     latched_node: None,
                     remaining: Some(0),
                     target_id: None,
+                    setup_state: None,
                 },
             ],
             events: Vec::new(),

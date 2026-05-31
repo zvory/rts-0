@@ -387,6 +387,9 @@ impl Game {
         if e.is_unit() {
             v.facing = Some(e.facing());
         }
+        if e.kind == EntityKind::MachineGunner {
+            v.setup_state = Some(e.weapon_setup().to_protocol_str().to_string());
+        }
 
         // Production buildings: surface the front item + queue depth.
         if e.is_building() && !e.prod_queue().is_empty() {
