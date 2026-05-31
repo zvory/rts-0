@@ -549,8 +549,8 @@ impl RoomTask {
                 })
             })
             .collect();
-        // Seat AI opponents after the humans, mirroring the lobby ordering (so colors match the
-        // lobby list and map start tiles line up with the seat order).
+        // Seat AI opponents after the humans so colors match the lobby list; the map randomizes
+        // which symmetric start each seat receives.
         for (seat, ai) in self.ai_players.iter().enumerate() {
             inits.push(PlayerInit {
                 id: ai.id,
