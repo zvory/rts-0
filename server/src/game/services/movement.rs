@@ -2,7 +2,7 @@ use crate::config;
 use crate::game::entity::{
     BuildPhase, Entity, EntityKind, EntityStore, GatherPhase, MovePhase, Order, WeaponSetup,
 };
-use crate::game::map::{Map, MobilityClass};
+use crate::game::map::Map;
 use crate::game::pathfinding::Passability;
 use crate::game::services::occupancy::Occupancy;
 use crate::game::services::spatial::SpatialIndex;
@@ -41,7 +41,7 @@ pub(crate) fn movement_system(
 ) {
     for id in entities.ids() {
         // Pull the data we need, then mutate.
-        let (speed, mut x, mut y, class) = {
+        let (speed, mut x, mut y) = {
             let e = match entities.get(id) {
                 Some(e) if e.is_unit() && !e.path_is_empty() => e,
                 _ => continue,
@@ -55,8 +55,7 @@ pub(crate) fn movement_system(
                 continue;
             }
             let speed = config::unit_stats(e.kind).map(|s| s.speed).unwrap_or(0.0);
-            let class = MobilityClass::from_kind(e.kind);
-            (speed, e.pos_x, e.pos_y, class)
+            (speed, e.pos_x, e.pos_y)
         };
         if speed <= 0.0 {
             continue;
@@ -117,7 +116,7 @@ pub(crate) fn movement_system(
             new_facing = Some(dy.atan2(dx));
             if dist <= budget {
                 // We can reach this waypoint this tick.
-                if !tile_passable_at(occ, map, class, wx, wy) {
+                if !tile_passable_at(occ, map, wx, wy) {
                     static_blocked_this_tick = true;
                     break;
                 }
@@ -132,8 +131,8 @@ pub(crate) fn movement_system(
                 // Partial step toward the waypoint.
                 let nx = x + dx / dist * budget;
                 let ny = y + dy / dist * budget;
-                // Clamp landing to a passable tile for this unit's class.
-                if tile_passable_at(occ, map, class, nx, ny) {
+                // Clamp landing to a passable tile.
+                if tile_passable_at(occ, map, nx, ny) {
                     x = nx;
                     y = ny;
                 } else {
@@ -142,8 +141,8 @@ pub(crate) fn movement_system(
                     // against zero movement (dy=0 ⟹ y-only slide is a no-op that would
                     // spuriously suppress static_blocked). Only mark static-blocked when
                     // neither axis makes progress.
-                    let slide_x = dx.abs() > 1e-4 && tile_passable_at(occ, map, class, nx, y);
-                    let slide_y = dy.abs() > 1e-4 && tile_passable_at(occ, map, class, x, ny);
+                    let slide_x = dx.abs() > 1e-4 && tile_passable_at(occ, map, nx, y);
+                    let slide_y = dy.abs() > 1e-4 && tile_passable_at(occ, map, x, ny);
                     if slide_x {
                         x = nx;
                     } else if slide_y {
@@ -309,8 +308,6 @@ fn inject_sidestep(
     repulsion_dir: (f32, f32),
     tick: u32,
 ) {
-    let class = MobilityClass::from_kind(e.kind);
-
     // Heading toward next waypoint; fall back to facing angle if no waypoint.
     let (hx, hy) = if let Some((wx, wy)) = e.next_waypoint() {
         let dx = wx - x;
@@ -346,7 +343,7 @@ fn inject_sidestep(
     let tx = x + px * d;
     let ty = y + py * d;
 
-    let point_clear = |cx: f32, cy: f32| tile_passable_at(occ, map, class, cx, cy);
+    let point_clear = |cx: f32, cy: f32| tile_passable_at(occ, map, cx, cy);
 
     let detour = if point_clear(tx, ty) {
         Some((tx, ty))
@@ -371,11 +368,10 @@ fn inject_sidestep(
     }
 }
 
-/// Whether a world point lands on a passable tile for the given mobility class
-/// (terrain + building footprint).
-fn tile_passable_at(occ: &Occupancy, map: &Map, class: MobilityClass, x: f32, y: f32) -> bool {
+/// Whether a world point lands on a passable tile (terrain + building footprint).
+fn tile_passable_at(occ: &Occupancy, map: &Map, x: f32, y: f32) -> bool {
     let (tx, ty) = map.tile_of(x, y);
-    map.is_passable_for(class, tx as i32, ty as i32) && occ.passable(tx as i32, ty as i32)
+    map.is_passable(tx as i32, ty as i32) && occ.passable(tx as i32, ty as i32)
 }
 
 /// Resolve unit-unit overlaps with iterative pair-wise pushes so units do not stack on top of
@@ -412,10 +408,8 @@ pub(crate) fn resolve_collisions(
         for &a in &ids {
             // Skip anchored units entirely (PLAN §4.3 mining-worker exception): they neither
             // push nor are pushed. Other units can transit through their position freely.
-            let (ar, a_class) = match entities.get(a) {
-                Some(e) if e.is_unit() && !is_collision_anchored(e) => {
-                    (e.radius(), MobilityClass::from_kind(e.kind))
-                }
+            let ar = match entities.get(a) {
+                Some(e) if e.is_unit() && !is_collision_anchored(e) => e.radius(),
                 _ => continue,
             };
             let (ax_idx, ay_idx) = match entities.get(a) {
@@ -432,13 +426,10 @@ pub(crate) fn resolve_collisions(
                 .collect();
 
             for b in candidates {
-                let (br, b_class, bx, by) = match entities.get(b) {
-                    Some(e) if e.is_unit() && !is_collision_anchored(e) => (
-                        e.radius(),
-                        MobilityClass::from_kind(e.kind),
-                        e.pos_x,
-                        e.pos_y,
-                    ),
+                let (br, bx, by) = match entities.get(b) {
+                    Some(e) if e.is_unit() && !is_collision_anchored(e) => {
+                        (e.radius(), e.pos_x, e.pos_y)
+                    }
                     _ => continue,
                 };
                 // Re-read A so we account for displacement applied by earlier pairs in this pass.
@@ -470,15 +461,15 @@ pub(crate) fn resolve_collisions(
                 let overlap = min_d - dist;
                 let a_target = (ax - nx * overlap * 0.5, ay - ny * overlap * 0.5);
                 let b_target = (bx + nx * overlap * 0.5, by + ny * overlap * 0.5);
-                let a_ok = stays_on_passable(map, occ, a_class, a_target.0, a_target.1);
-                let b_ok = stays_on_passable(map, occ, b_class, b_target.0, b_target.1);
+                let a_ok = stays_on_passable(map, occ, a_target.0, a_target.1);
+                let b_ok = stays_on_passable(map, occ, b_target.0, b_target.1);
 
                 let (a_push, b_push) = match (a_ok, b_ok) {
                     (true, true) => (Some(a_target), Some(b_target)),
                     (true, false) => {
                         let a_full = (ax - nx * overlap, ay - ny * overlap);
                         (
-                            if stays_on_passable(map, occ, a_class, a_full.0, a_full.1) {
+                            if stays_on_passable(map, occ, a_full.0, a_full.1) {
                                 Some(a_full)
                             } else {
                                 Some(a_target)
@@ -490,7 +481,7 @@ pub(crate) fn resolve_collisions(
                         let b_full = (bx + nx * overlap, by + ny * overlap);
                         (
                             None,
-                            if stays_on_passable(map, occ, b_class, b_full.0, b_full.1) {
+                            if stays_on_passable(map, occ, b_full.0, b_full.1) {
                                 Some(b_full)
                             } else {
                                 Some(b_target)
@@ -543,11 +534,11 @@ pub(crate) fn is_collision_anchored(e: &Entity) -> bool {
     false
 }
 
-/// Whether a world point lies on a tile that's passable terrain for `class` and free of
-/// building footprints, i.e. the kind of place a unit may legally stand after a push.
-fn stays_on_passable(map: &Map, occ: &Occupancy, class: MobilityClass, x: f32, y: f32) -> bool {
+/// Whether a world point lies on a tile that's passable terrain and free of building footprints,
+/// i.e. the kind of place a unit may legally stand after a push.
+fn stays_on_passable(map: &Map, occ: &Occupancy, x: f32, y: f32) -> bool {
     let (tx, ty) = map.tile_of(x, y);
-    map.is_passable_for(class, tx as i32, ty as i32) && occ.passable(tx as i32, ty as i32)
+    map.is_passable(tx as i32, ty as i32) && occ.passable(tx as i32, ty as i32)
 }
 
 #[cfg(test)]
