@@ -219,7 +219,7 @@ impl Game {
     /// Build a full-world snapshot for a dev watch client. Normal gameplay must not use this.
     pub fn snapshot_full_for(&self, player: u32) -> Snapshot;
 
-    /// Player ids still alive (have at least one entity). Lobby uses this for game-over.
+    /// Player ids still alive (have at least one building). Lobby uses this for game-over.
     pub fn alive_players(&self) -> Vec<u32>;
 
     /// Remove all of a player's entities (e.g. on disconnect) so the match can resolve.
@@ -519,8 +519,8 @@ Building stats (hp, sight, cost min, footprint tiles wxh, buildTicks, extra):
 | training_centre   | 300 | 6     | 100 min + 50 oil | 3x2  | 220       | unlocks machine_gunner and at_team training at barracks; requires an Industrial Center |
 | tank_factory               | 360 | 6     | 200 min + 100 oil | 3x3  | 240       | trains tank; requires an Industrial Center |
 
-Win: a player is **eliminated** when they own zero entities (units AND buildings). Last
-player standing wins; a 1-player match never ends (sandbox/exploration mode).
+Win: a player is **eliminated** when they own zero buildings (units alone do not keep them
+alive). Last player standing wins; a 1-player match never ends (sandbox/exploration mode).
 
 ---
 
