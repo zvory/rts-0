@@ -50,6 +50,7 @@ const LAYERS = [
   "selectionRings",
   "hpBars",
   "fog",
+  "staticResources",
   "feedback",
   "placement",
 ];
@@ -93,6 +94,8 @@ export class Renderer {
     this._terrainSprite = null; // PIXI.Sprite of the cached terrain RenderTexture
     this._fogGfx = new PIXI.Graphics();
     this.layers.fog.addChild(this._fogGfx);
+    this._staticResourcesGfx = new PIXI.Graphics();
+    this.layers.staticResources.addChild(this._staticResourcesGfx);
     this._feedbackGfx = new PIXI.Graphics();
     this.layers.feedback.addChild(this._feedbackGfx);
     this._placementGfx = new PIXI.Graphics();
@@ -187,6 +190,33 @@ export class Renderer {
     }
     this._terrainSprite = new PIXI.Sprite(tex);
     layer.addChild(this._terrainSprite);
+
+    this.buildStaticResources(map.resources || []);
+  }
+
+  /**
+   * Draw simple always-visible markers for all resource node positions into the
+   * staticResources layer (above fog). Called once from buildStaticMap; the
+   * detailed entity graphics in the resources layer still render when visible.
+   * @param {Array<{kind:string,x:number,y:number}>} resources
+   */
+  buildStaticResources(resources) {
+    const g = this._staticResourcesGfx;
+    g.clear();
+    const r = 5;
+    for (const node of resources) {
+      if (node.kind === "oil") {
+        g.lineStyle(1.5, 0xffffff, 0.9);
+        g.beginFill(COLORS.oil, 1);
+        g.drawRect(node.x - r, node.y - r, r * 2, r * 2);
+        g.endFill();
+      } else {
+        g.lineStyle(0);
+        g.beginFill(COLORS.steel, 1);
+        g.drawRect(node.x - r, node.y - r, r * 2, r * 2);
+        g.endFill();
+      }
+    }
   }
 
   /**
@@ -1074,6 +1104,7 @@ export class Renderer {
 
     // Long-lived single Graphics.
     this._fogGfx.destroy();
+    this._staticResourcesGfx.destroy();
     this._feedbackGfx.destroy();
     this._placementGfx.destroy();
     this._dragGfx.destroy();

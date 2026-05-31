@@ -130,10 +130,11 @@ export class Minimap {
     this._drawTerrain();
     this._drawEntities();
     this._drawFog();
+    this._drawResources();
     this._drawViewport();
   }
 
-  /** Fill one minimap cell per tile with its terrain color, then draw static resource blips. */
+  /** Fill one minimap cell per tile with its terrain color. */
   _drawTerrain() {
     const map = this.state.map;
     const ctx = this.ctx;
@@ -149,12 +150,25 @@ export class Minimap {
         ctx.fillRect(p.x, p.y, cw, ch);
       }
     }
-    // Resource nodes are static — draw them here so they show through fog.
+  }
+
+  /** Draw static resource blips after fog so they are always visible. */
+  _drawResources() {
+    const map = this.state.map;
+    const ctx = this.ctx;
     const r = 2.2;
     for (const node of map.resources || []) {
       const p = this._worldToCanvas(node.x, node.y);
-      ctx.fillStyle = node.kind === "oil" ? hex(COLORS.oil) : hex(COLORS.steel);
-      ctx.fillRect(p.x - r, p.y - r, r * 2, r * 2);
+      if (node.kind === "oil") {
+        ctx.fillStyle = hex(COLORS.oil);
+        ctx.fillRect(p.x - r, p.y - r, r * 2, r * 2);
+        ctx.strokeStyle = "#ffffff";
+        ctx.lineWidth = 0.8;
+        ctx.strokeRect(p.x - r, p.y - r, r * 2, r * 2);
+      } else {
+        ctx.fillStyle = hex(COLORS.steel);
+        ctx.fillRect(p.x - r, p.y - r, r * 2, r * 2);
+      }
     }
   }
 
