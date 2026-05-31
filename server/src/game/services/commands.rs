@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::config;
-use crate::game::entity::{EntityKind, EntityStore, ProdItem};
+use crate::game::entity::{BuildPhase, EntityKind, EntityStore, ProdItem};
 use crate::game::map::Map;
 use crate::game::services::move_coordinator::MoveCoordinator;
 use crate::game::services::occupancy::footprint_placeable;
@@ -30,14 +30,14 @@ pub(crate) fn apply_commands(
             Command::Move { units, x, y } => {
                 let valid: Vec<u32> = dedupe_cap_units(units)
                     .into_iter()
-                    .filter(|id| owns_unit(entities, player, *id))
+                    .filter(|id| owns_unit(entities, player, *id) && !is_constructing(entities, *id))
                     .collect();
                 coordinator.order_group_move(entities, player, &valid, (x, y), false);
             }
             Command::AttackMove { units, x, y } => {
                 let valid: Vec<u32> = dedupe_cap_units(units)
                     .into_iter()
-                    .filter(|id| owns_unit(entities, player, *id))
+                    .filter(|id| owns_unit(entities, player, *id) && !is_constructing(entities, *id))
                     .collect();
                 coordinator.order_group_move(entities, player, &valid, (x, y), true);
             }
@@ -48,6 +48,9 @@ pub(crate) fn apply_commands(
                             continue;
                         }
                     } else {
+                        continue;
+                    }
+                    if is_constructing(entities, id) {
                         continue;
                     }
                     let target_ok = matches!(entities.get(target),
@@ -61,6 +64,9 @@ pub(crate) fn apply_commands(
             Command::Gather { units, node } => {
                 for id in dedupe_cap_units(units) {
                     if !owns_unit(entities, player, id) {
+                        continue;
+                    }
+                    if is_constructing(entities, id) {
                         continue;
                     }
                     let is_worker =
@@ -105,7 +111,7 @@ pub(crate) fn apply_commands(
             }
             Command::Stop { units } => {
                 for id in dedupe_cap_units(units) {
-                    if owns_unit(entities, player, id) {
+                    if owns_unit(entities, player, id) && !is_constructing(entities, id) {
                         entities.release_miner(id);
                         if let Some(e) = entities.get_mut(id) {
                             e.clear_orders();
@@ -140,6 +146,15 @@ fn dedupe_cap_units(units: Vec<u32>) -> Vec<u32> {
 /// [`world_query::owns_unit`] to keep call sites in this module terse.
 fn owns_unit(entities: &EntityStore, player: u32, id: u32) -> bool {
     world_query::owns_unit(entities, player, id)
+}
+
+/// True if this unit is a worker that has already begun laying concrete — it cannot
+/// be pulled away until the building finishes or is destroyed.
+fn is_constructing(entities: &EntityStore, id: u32) -> bool {
+    matches!(
+        entities.get(id),
+        Some(e) if matches!(e.build_phase(), Some(BuildPhase::Constructing { .. }))
+    )
 }
 
 /// Issue a build order under the "reserve on arrival" model. Validates intent, emits

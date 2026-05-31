@@ -300,7 +300,7 @@ export class Renderer {
       return { prongFactor: 1 - t, barrel: false };
     }
     if (setupState === SETUP.DEPLOYED) {
-      return { prongFactor: 1, barrel: true };
+      return { prongFactor: 1, barrel: e.state !== STATE.MOVE };
     }
     return { prongFactor: 0, barrel: false };
   }
@@ -419,17 +419,24 @@ export class Renderer {
       g.endFill();
       const setup = this._machineGunnerSetupVisual(e);
       if (setup.prongFactor > 0) {
-        g.lineStyle(2, 0x17130f, 0.9);
+        g.lineStyle(3, 0xd8d0b0, 0.95);
         const prongs = this._machineGunnerProngs(r, setup.prongFactor);
         for (const [x1, y1, x2, y2] of prongs) {
-          g.moveTo(x1, y1);
-          g.lineTo(x2, y2);
+          const p1 = rotatePoint(x1, y1, facing);
+          const p2 = rotatePoint(x2, y2, facing);
+          g.moveTo(p1.x, p1.y);
+          g.lineTo(p2.x, p2.y);
         }
       }
       if (setup.barrel) {
-        g.lineStyle(3, 0x2a2119, 0.9);
-        g.moveTo(-r * 0.25, 0);
-        g.lineTo(r * 2.15, 0);
+        g.lineStyle(4, 0x241d17, 0.95);
+        const grip = polar(facing + Math.PI, r * 0.25);
+        const muzzle = polar(facing, r * 2.15);
+        g.moveTo(grip.x, grip.y);
+        g.lineTo(muzzle.x, muzzle.y);
+        g.beginFill(0x241d17, 0.95);
+        g.drawCircle(muzzle.x, muzzle.y, 1.6);
+        g.endFill();
       }
     } else if (e.kind === KIND.AT_TEAM) {
       // Two-person anti-armor marker with a long launcher slash.
@@ -489,10 +496,12 @@ export class Renderer {
     }
 
     // Facing indicator: a short pale tick from center outward.
-    const fp = polar(facing, r + 3);
-    g.lineStyle(2, 0xd8d0b0, 0.85);
-    g.moveTo(0, 0);
-    g.lineTo(fp.x, fp.y);
+    if (e.kind !== KIND.MACHINE_GUNNER) {
+      const fp = polar(facing, r + 3);
+      g.lineStyle(2, 0xd8d0b0, 0.85);
+      g.moveTo(0, 0);
+      g.lineTo(fp.x, fp.y);
+    }
   }
 
   /**
@@ -1107,6 +1116,12 @@ function lerp(a, b, t) {
 /** Point at angle `a` (radians) and distance `d` from the origin. */
 function polar(a, d) {
   return { x: Math.cos(a) * d, y: Math.sin(a) * d };
+}
+
+function rotatePoint(x, y, a) {
+  const c = Math.cos(a);
+  const s = Math.sin(a);
+  return { x: x * c - y * s, y: x * s + y * c };
 }
 
 /** Normalize a possibly-negative-size rect to positive width/height. */
