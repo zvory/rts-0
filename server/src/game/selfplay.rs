@@ -151,7 +151,7 @@ struct BuildTechAttackScript {
     player_id: u32,
     oil_workers: usize,
     target_barracks: usize,
-    attack_size: usize,
+    wave_number: usize,
     assigned_oil_workers: BTreeSet<u32>,
     initial_gather_sent: bool,
     last_attack_tick: u32,
@@ -181,7 +181,7 @@ impl BuildTechAttackScript {
             player_id,
             oil_workers: 2,
             target_barracks: 1,
-            attack_size: 4,
+            wave_number: 0,
             assigned_oil_workers: BTreeSet::new(),
             initial_gather_sent: false,
             last_attack_tick: 0,
@@ -438,8 +438,9 @@ impl ScriptedPlayer for BuildTechAttackScript {
         let has_tech_unit = tank_count > 0;
         let attack_due = view.tick.saturating_sub(self.last_attack_tick) >= ATTACK_REISSUE_TICKS;
         if has_tech_unit && attack_due {
+            let wave_size = 3 + self.wave_number;
             let Some(combat_units) =
-                ai_shared::ready_attack_wave(own.iter().copied(), self.attack_size, |e| {
+                ai_shared::ready_attack_wave(own.iter().copied(), wave_size, |e| {
                     (is_kind(e, EntityKind::Rifleman) || is_kind(e, EntityKind::Tank))
                         .then_some(e.id)
                 })
@@ -453,6 +454,7 @@ impl ScriptedPlayer for BuildTechAttackScript {
                 y,
             });
             self.last_attack_tick = view.tick;
+            self.wave_number += 1;
         }
 
         out
