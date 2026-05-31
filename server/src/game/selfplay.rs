@@ -1507,7 +1507,10 @@ fn finalize_self_play_success(
             let artifact = runner
                 .write_failure_artifact(&failure)
                 .map(|p| {
-                    let name = p.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_else(|| p.display().to_string());
+                    let name = p
+                        .file_name()
+                        .map(|n| n.to_string_lossy().into_owned())
+                        .unwrap_or_else(|| p.display().to_string());
                     format!("http://localhost:8080/dev/selfplay?replay={name}")
                 })
                 .unwrap_or_else(|e| format!("artifact write failed: {e}"));
@@ -1850,7 +1853,8 @@ fn occupied_tiles_from_snapshot(map: &MapInfo, snapshot: &Snapshot) -> BTreeSet<
                     for dx in -1i32..=1 {
                         let nx = tx as i32 + dx;
                         let ny = ty as i32 + dy;
-                        if nx >= 0 && ny >= 0 && (nx as u32) < map.width && (ny as u32) < map.height {
+                        if nx >= 0 && ny >= 0 && (nx as u32) < map.width && (ny as u32) < map.height
+                        {
                             occupied.insert((nx as u32, ny as u32));
                         }
                     }
@@ -1980,7 +1984,10 @@ fn scripted_self_play_exercises_economy_tech_and_combat() {
             let artifact = runner
                 .write_failure_artifact(&failure)
                 .map(|p| {
-                    let name = p.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_else(|| p.display().to_string());
+                    let name = p
+                        .file_name()
+                        .map(|n| n.to_string_lossy().into_owned())
+                        .unwrap_or_else(|| p.display().to_string());
                     format!("http://localhost:8080/dev/selfplay?replay={name}")
                 })
                 .unwrap_or_else(|e| format!("artifact write failed: {e}"));
@@ -2034,7 +2041,10 @@ fn scripted_self_play_worker_rush_vs_economy() {
             let artifact = runner
                 .write_failure_artifact(&failure)
                 .map(|p| {
-                    let name = p.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_else(|| p.display().to_string());
+                    let name = p
+                        .file_name()
+                        .map(|n| n.to_string_lossy().into_owned())
+                        .unwrap_or_else(|| p.display().to_string());
                     format!("http://localhost:8080/dev/selfplay?replay={name}")
                 })
                 .unwrap_or_else(|e| format!("artifact write failed: {e}"));
@@ -2413,7 +2423,8 @@ fn real_ai_vs_real_ai() {
 
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         for tick in 1..=6000 {
-            let tick_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| game.tick()));
+            let tick_result =
+                std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| game.tick()));
             let tick_output = match tick_result {
                 Ok(events) => events,
                 Err(_) => {
