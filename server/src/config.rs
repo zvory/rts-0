@@ -13,6 +13,14 @@ pub const TICK_MS: u64 = 1000 / TICK_HZ as u64;
 // --- Map --------------------------------------------------------------------
 pub const TILE_SIZE: u32 = 32;
 
+// --- Tolerant arrival -------------------------------------------------------
+/// Movement below this many world pixels per tick counts as "no progress" for stuck detection.
+pub const STUCK_EPS_PX: f32 = 2.0;
+/// Consecutive ticks of no progress before a near-goal unit is considered arrived (~0.5 s at 30 Hz).
+pub const STUCK_ARRIVAL_TICKS: u16 = 15;
+/// A stuck unit within this radius of its `path_goal` is forcibly marked Arrived.
+pub const TOLERANT_ARRIVAL_RADIUS_PX: f32 = 2.0 * TILE_SIZE as f32;
+
 /// Map size (in tiles) for a given player count. Square, symmetric.
 pub const fn map_size_for(players: usize) -> u32 {
     if players <= 2 {
