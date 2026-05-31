@@ -294,8 +294,14 @@ export class Minimap {
       ev.preventDefault();
       this._issueOrder(w.x, w.y);
     } else if (ev.button === 0) {
-      // Left-click (and start of a drag): recenter the camera.
       ev.preventDefault();
+      // Left-click while a command target is armed: issue the command instead of panning.
+      if (this.state.commandTarget) {
+        this._issueOrder(w.x, w.y);
+        this.state.endCommandTarget();
+        return;
+      }
+      // Default: recenter the camera (and start a drag).
       this._dragging = true;
       this.camera.centerOn(w.x, w.y);
     }
