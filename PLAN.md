@@ -91,7 +91,7 @@ Gates:
 - [ ] Add system-order tests.
 - [ ] Add command hardening tests.
 - [ ] Add fog leak tests for position-bearing events.
-- [ ] Add shot overpenetration so attacks continue 25% of range past the primary target and
+- [x] Add shot overpenetration so attacks continue 25% of range past the primary target and
   deal 50% reduced damage to enemies behind it, discouraging clumping.
 
 Gates:
@@ -360,22 +360,6 @@ Depends on:
 Goal: add distinctive RTS mechanics after the engine has data definitions, command handling,
 orders, visibility, and movement boundaries.
 
-### 6.1 Machine Gunner Setup / Teardown
-
-- [ ] Add setup command.
-- [ ] Setup takes five seconds with no moving or shooting.
-- [ ] Deployed machine gunner cannot move or rotate without a three-second teardown.
-- [ ] Deployed mode has elevated damage and a fixed 40-degree field of fire.
-- [ ] Add setup, teardown, arc, target, stop, death, and replay tests.
-
-Depends on:
-
-- Phase 2.1 typed entity state.
-- Phase 2.4 order state machines.
-- Phase 3.1 definitions.
-- Phase 2.2 world helpers.
-- Phase 5.1 visibility boundary if setup emits visible events.
-- Phase 1.1 invariants.
 
 ### 6.2 Two Factions: Soviets and Germans
 
@@ -484,7 +468,7 @@ Use this index when deciding whether a TODO can start.
  - DONE: workers should visually latch onto a steel patch with a line to the steel patch
  - shrink buildings so they don't take up their whole tile size, but leave some margin pixels on the sides. marginal, not enough for units to squeeze through, but enough for pathing to get easier
  - worker minin animatino
- - add a white outline to oil patches so they are more visible to the player
+ - DONE: add a white outline to oil patches so they are more visible to the player
  - limit how many units can be selected at a time to 12
  - create a sound system and a basic system for minimap alerts, for example when being attacked
  - make the tank deal 100 damage so it one-shots every unit
