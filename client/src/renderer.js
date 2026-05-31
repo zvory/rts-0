@@ -1150,7 +1150,6 @@ function hash2(x, y) {
 function terrainColor(code, tx, ty) {
   if (code === 1) return COLORS.rock;
   if (code === 2) return COLORS.water;
-  if (code === 3) return COLORS.forest;
   const n = hash2(tx, ty);
   if (n > 0.78) return COLORS.field;
   if (n < 0.18) return COLORS.mud;

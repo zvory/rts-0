@@ -18,7 +18,6 @@ export const COLORS = Object.freeze({
   mud: 0x4b3e32,
   rock: 0x6a6659,
   water: 0x2f5560,
-  forest: 0x3a4a2e,
   grid: 0x000000,
   steel: 0x9a9a9a,
   oil: 0x111111,
