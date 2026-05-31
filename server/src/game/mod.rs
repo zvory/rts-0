@@ -85,14 +85,19 @@ impl Game {
     /// Create a match for the given players. Generates a symmetric map sized for the player
     /// count and spawns each player's starting Industrial Center, workers, and a nearby resource cluster.
     pub fn new(players: &[PlayerInit]) -> Game {
-        Self::new_inner(players, true)
+        Self::new_with_starting_resources(players, config::STARTING_STEEL, config::STARTING_OIL)
+    }
+
+    /// Create a match with explicit starting resources for every player.
+    pub fn new_with_starting_resources(players: &[PlayerInit], steel: u32, oil: u32) -> Game {
+        Self::new_inner(players, true, steel, oil)
     }
 
     pub(crate) fn new_for_replay(players: &[PlayerInit]) -> Game {
-        Self::new_inner(players, false)
+        Self::new_inner(players, false, config::STARTING_STEEL, config::STARTING_OIL)
     }
 
-    fn new_inner(players: &[PlayerInit], enable_ai: bool) -> Game {
+    fn new_inner(players: &[PlayerInit], enable_ai: bool, steel: u32, oil: u32) -> Game {
         // Deterministic seed derived from the player set so a given lobby produces a stable
         // map (helps reproducibility / debugging) without any external RNG.
         let mut seed: u32 = 0x1234_5678 ^ (players.len() as u32).wrapping_mul(2_654_435_761);
@@ -116,8 +121,8 @@ impl Game {
                 name: p.name.clone(),
                 color: p.color.clone(),
                 start_tile: start,
-                steel: config::STARTING_STEEL,
-                oil: config::STARTING_OIL,
+                steel,
+                oil,
                 supply_used: 0,
                 supply_cap: 0,
             };

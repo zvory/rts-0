@@ -36,8 +36,8 @@ pub const STATIC_BLOCKED_REPATH_TICKS: u16 = TICK_HZ as u16;
 /// units contesting the same tile center cannot both lock onto it simultaneously.
 pub const ARRIVE_RADIUS_INTERMEDIATE_PX: f32 = TILE_SIZE as f32 * 0.5; // 16 px
 
-/// Machine-gunner setup/teardown time. Half a second at the simulation tick rate.
-pub const MACHINE_GUNNER_SETUP_TICKS: u16 = (TICK_HZ / 2) as u16;
+/// Machine-gunner setup/teardown time. One second at the simulation tick rate.
+pub const MACHINE_GUNNER_SETUP_TICKS: u16 = TICK_HZ as u16;
 
 /// Map size (in tiles) for a given player count. Square, symmetric.
 pub const fn map_size_for(players: usize) -> u32 {
@@ -154,7 +154,7 @@ pub fn unit_stats(kind: EntityKind) -> Option<UnitStats> {
             dmg: 4,
             range_tiles: 5,
             cooldown: 3,
-            speed: 1.2,
+            speed: 1.44,
             sight_tiles: 8,
             cost_steel: 75,
             cost_oil: 25,

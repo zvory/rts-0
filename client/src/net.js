@@ -132,6 +132,11 @@ export class Net {
     this._send(msg.removeAi(id));
   }
 
+  /** Toggle the lobby's start-with-more-money mode (host-only; ignored otherwise). */
+  setQuickstart(enabled) {
+    this._send(msg.setQuickstart(enabled));
+  }
+
   /**
    * Issue a gameplay command.
    * @param {object} cmd a command object built via protocol.js `cmd.*`.
