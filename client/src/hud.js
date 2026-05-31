@@ -167,7 +167,8 @@ export class HUD {
    *  - selected own units → action buttons for move / attack / stop.
    *  - a selected WORKER → action buttons plus build buttons for WORKER_BUILDABLE.
    *  - a single selected production building (has `STATS[kind].trains`) → train
-   *    buttons for each trainable unit, plus a cancel button while producing.
+   *    buttons for each trainable unit, plus a cancel button while producing
+   *    in the bottom-right cell (`C` hotkey).
    *  - anything else → empty.
    *
    * Buttons are disabled when unaffordable (vs `state.resources`) or when tech
@@ -408,6 +409,7 @@ export class HUD {
     const res = this.state.resources || { steel: 0, oil: 0 };
     const trains = this._trainsOf(building.kind);
     const producing = (building.prodQueue ?? 0) > 0 || building.state === STATE.TRAIN;
+    const cancelSlot = 8;
 
     // Signature includes the building id (so switching buildings rebuilds), each
     // trainable unit's affordability, and whether a cancel button is shown.
@@ -436,11 +438,13 @@ export class HUD {
       frag.appendChild(btn);
     }
 
+    this._padCard(frag, producing ? cancelSlot : 9);
+
     if (producing) {
       const cancelBtn = this._cmdButton({
         icon: "✕",
         label: "Cancel",
-        hotkey: GRID_HOTKEYS[idx++],
+        hotkey: GRID_HOTKEYS[cancelSlot],
         enabled: true,
         cls: "cancel",
         title: "Cancel current production",
@@ -448,8 +452,6 @@ export class HUD {
       });
       frag.appendChild(cancelBtn);
     }
-
-    this._padCard(frag, idx);
 
     card.innerHTML = "";
     card.appendChild(frag);
