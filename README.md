@@ -34,7 +34,7 @@ modules and loads PixiJS from a CDN. The Rust process serves both the client and
 
 ```bash
 cd server
-cargo run --release          # then open http://localhost:8080
+cargo run --release          # then open the printed URL
 ```
 
 To play head-to-head, open the page in **two browser windows**, join the same room, both click

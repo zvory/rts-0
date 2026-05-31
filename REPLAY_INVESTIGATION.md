@@ -5,7 +5,7 @@ Date: 2026-05-31
 This note records only confirmed facts relevant to the replay viewing bug where
 player 2 appears idle in the dev self-play replay viewer.
 
-Before opening any replay, stop any existing server on `:8080`, start a fresh
+Before opening any replay, use the server instance that wrote it, or start a fresh
 server, and then open the replay URL. The stale-server hypothesis in this note
 assumes that rule.
 
