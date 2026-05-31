@@ -23,7 +23,7 @@ missing. Everything below documents the individual suites the runner orchestrate
 The suites run against a **live server**. To run one on its own, start the server first:
 
 ```bash
-cd server && cargo run        # serves the client + websocket on :8080 (tests default to :8081)
+cd server && cargo run        # serves the client + websocket on the configured RTS_ADDR
 ```
 
 ## Server integration (no dependencies)
@@ -48,8 +48,8 @@ the replayed event stream and final snapshots against the live run. On failure i
 artifacts under `server/target/selfplay-failures/`. To save a successful run too, set
 `RTS_SELFPLAY_SAVE_REPLAY` to either `1` for an auto-generated artifact name or to an explicit safe
 artifact name; successful runs are then written under `server/target/selfplay-artifacts/<name>/`.
-When you open a replay artifact in the browser, stop any existing server on `:8080` first and
-start a fresh one before loading `http://localhost:8080/dev/selfplay?replay=<artifact_name>`.
+When you open a replay artifact in the browser, use the server instance that produced it, or
+start a fresh one on its own port before loading `/dev/selfplay?replay=<artifact_name>`.
 
 ```bash
 RTS_SELFPLAY_SAVE_REPLAY=manual_worker_rush_latest \
