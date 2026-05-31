@@ -303,7 +303,7 @@ mod tests {
 
     #[test]
     fn spend_budget_reserves_unit_and_building_costs() {
-        let mut budget = SpendBudget::new(150, 50, 2, 5);
+        let mut budget = SpendBudget::new(250, 100, 2, 5);
 
         assert!(budget.can_afford_unit(EntityKind::Tank));
         assert!(budget.reserve_unit(EntityKind::Tank));
