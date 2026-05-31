@@ -17,6 +17,7 @@ use serde::{Deserialize, Serialize};
 use super::replay::{replay_commands, EventLogEntry, PlayerSnapshot, ReplayOutcome};
 use super::{Game, PlayerInit};
 use crate::config;
+use crate::game::ai_shared;
 use crate::game::entity::EntityKind;
 use crate::protocol::{
     kinds, states, terrain, Command, EntityView, Event, MapInfo, Snapshot, StartPayload,
@@ -38,7 +39,7 @@ const SAMPLE_EVERY_TICKS: u32 = 30;
 const THINK_INTERVAL: u32 = 6;
 const ATTACK_REISSUE_TICKS: u32 = 120;
 const RESOURCE_SANITY_LIMIT: u32 = 1_000_000;
-const ECONOMY_TARGET_WORKERS: usize = 8;
+const SCRIPT_STEEL_WORKER_CAP: usize = 8;
 const SELFPLAY_FAILURE_DIR: &str = "selfplay-failures";
 const SELFPLAY_ARTIFACT_DIR: &str = "selfplay-artifacts";
 const SAVE_REPLAY_ENV: &str = "RTS_SELFPLAY_SAVE_REPLAY";
@@ -148,7 +149,6 @@ struct PlayerView<'a> {
 
 struct BuildTechAttackScript {
     player_id: u32,
-    target_workers: usize,
     oil_workers: usize,
     target_barracks: usize,
     attack_size: usize,
@@ -179,7 +179,6 @@ impl BuildTechAttackScript {
     fn new(player_id: u32) -> Self {
         BuildTechAttackScript {
             player_id,
-            target_workers: 10,
             oil_workers: 2,
             target_barracks: 1,
             attack_size: 4,
@@ -217,11 +216,21 @@ impl ScriptedPlayer for BuildTechAttackScript {
             .iter()
             .filter(|e| e.owner == view.player_id)
             .collect();
+        let Some(start_tile) = own_start_tile(view.start, view.player_id) else {
+            return Vec::new();
+        };
         let workers: Vec<&EntityView> = own
             .iter()
             .copied()
             .filter(|e| is_kind(e, EntityKind::Worker))
             .collect();
+        let target_workers = ai_shared::main_base_steel_saturation_target_from_snapshot(
+            &view.start.map,
+            view.snapshot,
+            start_tile,
+        )
+        .min(SCRIPT_STEEL_WORKER_CAP)
+        .saturating_add(self.oil_workers);
 
         // Drop pending-build entries whose worker is no longer in BUILD state — either the
         // worker arrived and the building was spawned (it will appear in `own`), or the
@@ -318,12 +327,12 @@ impl ScriptedPlayer for BuildTechAttackScript {
         let tank_factory_count = tank_factories.len() + pending_count(EntityKind::TankFactory);
         let tank_count = own.iter().filter(|e| is_kind(e, EntityKind::Tank)).count();
 
-        let mut steel = view.snapshot.steel;
-        let mut oil = view.snapshot.oil;
-        let mut free_supply = view
-            .snapshot
-            .supply_cap
-            .saturating_sub(view.snapshot.supply_used);
+        let mut budget = ai_shared::SpendBudget::new(
+            view.snapshot.steel,
+            view.snapshot.oil,
+            view.snapshot.supply_used,
+            view.snapshot.supply_cap,
+        );
         let mut reserved_workers = HashSet::new();
         let mut out = Vec::new();
 
@@ -334,7 +343,7 @@ impl ScriptedPlayer for BuildTechAttackScript {
             if let Some(cmd) = self.build_if_affordable(
                 view,
                 EntityKind::Barracks,
-                &mut steel,
+                &mut budget,
                 &builder_workers,
                 &mut reserved_workers,
             ) {
@@ -344,13 +353,13 @@ impl ScriptedPlayer for BuildTechAttackScript {
 
         let wants_depot = !depot_under_construction
             && (view.snapshot.supply_cap < config::INDUSTRIAL_CENTER_SUPPLY + config::DEPOT_SUPPLY
-                || free_supply <= 4
+                || budget.free_supply() <= 4
                 || (depot_count == 0 && !complete_barracks.is_empty()));
         if wants_depot {
             if let Some(cmd) = self.build_if_affordable(
                 view,
                 EntityKind::Depot,
-                &mut steel,
+                &mut budget,
                 &builder_workers,
                 &mut reserved_workers,
             ) {
@@ -363,7 +372,7 @@ impl ScriptedPlayer for BuildTechAttackScript {
             if let Some(cmd) = self.build_if_affordable(
                 view,
                 EntityKind::TankFactory,
-                &mut steel,
+                &mut budget,
                 &builder_workers,
                 &mut reserved_workers,
             ) {
@@ -372,25 +381,21 @@ impl ScriptedPlayer for BuildTechAttackScript {
         }
 
         for industrial_center in industrial_centers {
-            if workers.len() >= self.target_workers {
+            if workers.len() >= target_workers {
                 break;
             }
             if production_queue_len(industrial_center) > 0 {
                 continue;
             }
-            let Some(stats) = config::unit_stats(EntityKind::Worker) else {
-                continue;
-            };
-            if steel < stats.cost_steel || oil < stats.cost_oil || free_supply < stats.supply {
+            if !budget.can_afford_unit(EntityKind::Worker) {
                 break;
             }
             out.push(Command::Train {
                 building: industrial_center.id,
                 unit: kinds::WORKER.to_string(),
             });
-            steel -= stats.cost_steel;
-            oil -= stats.cost_oil;
-            free_supply -= stats.supply;
+            let reserved = budget.reserve_unit(EntityKind::Worker);
+            debug_assert!(reserved);
         }
 
         let saving_for_first_tank =
@@ -401,19 +406,15 @@ impl ScriptedPlayer for BuildTechAttackScript {
                     continue;
                 }
 
-                let Some(stats) = config::unit_stats(EntityKind::Rifleman) else {
-                    continue;
-                };
-                if steel < stats.cost_steel || oil < stats.cost_oil || free_supply < stats.supply {
+                if !budget.can_afford_unit(EntityKind::Rifleman) {
                     continue;
                 }
                 out.push(Command::Train {
                     building: rax.id,
                     unit: kinds::RIFLEMAN.to_string(),
                 });
-                steel -= stats.cost_steel;
-                oil -= stats.cost_oil;
-                free_supply -= stats.supply;
+                let reserved = budget.reserve_unit(EntityKind::Rifleman);
+                debug_assert!(reserved);
             }
         }
 
@@ -421,32 +422,30 @@ impl ScriptedPlayer for BuildTechAttackScript {
             if tank_count > 0 || production_queue_len(factory) > 0 {
                 continue;
             }
-            let Some(stats) = config::unit_stats(EntityKind::Tank) else {
-                continue;
-            };
-            if steel < stats.cost_steel || oil < stats.cost_oil || free_supply < stats.supply {
+            if !budget.can_afford_unit(EntityKind::Tank) {
                 continue;
             }
             out.push(Command::Train {
                 building: factory.id,
                 unit: kinds::TANK.to_string(),
             });
-            steel -= stats.cost_steel;
-            oil -= stats.cost_oil;
-            free_supply -= stats.supply;
+            let reserved = budget.reserve_unit(EntityKind::Tank);
+            debug_assert!(reserved);
         }
 
         self.assign_workers(view, &workers, &reserved_workers, &mut out);
 
-        let combat_units: Vec<u32> = own
-            .iter()
-            .filter(|e| is_kind(e, EntityKind::Rifleman) || is_kind(e, EntityKind::Tank))
-            .map(|e| e.id)
-            .collect();
         let has_tech_unit = tank_count > 0;
-        let has_army = combat_units.len() >= self.attack_size;
         let attack_due = view.tick.saturating_sub(self.last_attack_tick) >= ATTACK_REISSUE_TICKS;
-        if has_army && has_tech_unit && attack_due {
+        if has_tech_unit && attack_due {
+            let Some(combat_units) =
+                ai_shared::ready_attack_wave(own.iter().copied(), self.attack_size, |e| {
+                    (is_kind(e, EntityKind::Rifleman) || is_kind(e, EntityKind::Tank))
+                        .then_some(e.id)
+                })
+            else {
+                return out;
+            };
             let (x, y) = combat_rendezvous_world(view);
             out.push(Command::AttackMove {
                 units: combat_units,
@@ -465,7 +464,7 @@ impl BuildTechAttackScript {
         &mut self,
         view: PlayerView<'_>,
         building: EntityKind,
-        steel: &mut u32,
+        budget: &mut ai_shared::SpendBudget,
         idle_workers: &[u32],
         reserved_workers: &mut HashSet<u32>,
     ) -> Option<Command> {
@@ -473,23 +472,23 @@ impl BuildTechAttackScript {
         // under the "reserve on arrival" build model the server only deducts when the
         // worker arrives at the site. The script over-reserves locally to avoid
         // double-spending across decision ticks.
-        let stats = config::building_stats(building)?;
-        if *steel < stats.cost_steel {
+        if !budget.can_afford_building(building) {
             return None;
         }
         let worker = idle_workers
             .iter()
             .copied()
             .find(|id| !reserved_workers.contains(id))?;
-        let start = own_start_tile(view.start, view.player_id)?;
         let empty = BTreeSet::new();
         let skip = self.failed_build_spots.get(&building).unwrap_or(&empty);
+        let start = own_start_tile(view.start, view.player_id)?;
         let (tile_x, tile_y) =
             find_build_spot(&view.start.map, view.snapshot, start, building, skip)?;
         reserved_workers.insert(worker);
         self.pending_builds
             .insert(worker, (building, tile_x, tile_y, view.tick));
-        *steel -= stats.cost_steel;
+        let reserved = budget.reserve_building(building);
+        debug_assert!(reserved);
         Some(Command::Build {
             worker,
             building: building.to_protocol_str().to_string(),
@@ -591,7 +590,6 @@ impl BuildTechAttackScript {
 
 struct EconomyScript {
     player_id: u32,
-    target_workers: usize,
     initial_gather_sent: bool,
 }
 
@@ -599,7 +597,6 @@ impl EconomyScript {
     fn new(player_id: u32) -> Self {
         EconomyScript {
             player_id,
-            target_workers: ECONOMY_TARGET_WORKERS,
             initial_gather_sent: false,
         }
     }
@@ -634,11 +631,20 @@ impl ScriptedPlayer for EconomyScript {
             .copied()
             .filter(|e| is_kind(e, EntityKind::Worker))
             .collect();
+        let Some(start_tile) = own_start_tile(view.start, view.player_id) else {
+            return Vec::new();
+        };
         let industrial_centers: Vec<&EntityView> = own
             .iter()
             .copied()
             .filter(|e| is_kind(e, EntityKind::IndustrialCenter) && is_complete(e))
             .collect();
+        let target_workers = ai_shared::main_base_steel_saturation_target_from_snapshot(
+            &view.start.map,
+            view.snapshot,
+            start_tile,
+        )
+        .min(SCRIPT_STEEL_WORKER_CAP);
 
         let mut builder_workers: Vec<u32> = workers
             .iter()
@@ -656,23 +662,23 @@ impl ScriptedPlayer for EconomyScript {
         let depot_under_construction = own
             .iter()
             .any(|e| is_kind(e, EntityKind::Depot) && !is_complete(e));
-        let mut steel = view.snapshot.steel;
-        let mut oil = view.snapshot.oil;
-        let mut free_supply = view
-            .snapshot
-            .supply_cap
-            .saturating_sub(view.snapshot.supply_used);
+        let mut budget = ai_shared::SpendBudget::new(
+            view.snapshot.steel,
+            view.snapshot.oil,
+            view.snapshot.supply_used,
+            view.snapshot.supply_cap,
+        );
         let mut reserved_workers = HashSet::new();
         let mut out = Vec::new();
 
         if !depot_under_construction
-            && free_supply <= 2
+            && budget.free_supply() <= 2
             && view.snapshot.supply_cap < config::SUPPLY_CAP_MAX
         {
             if let Some(cmd) = build_near_own_start_if_affordable(
                 view,
                 EntityKind::Depot,
-                &mut steel,
+                &mut budget,
                 &builder_workers,
                 &mut reserved_workers,
             ) {
@@ -681,25 +687,21 @@ impl ScriptedPlayer for EconomyScript {
         }
 
         for industrial_center in industrial_centers {
-            if workers.len() >= self.target_workers {
+            if workers.len() >= target_workers {
                 break;
             }
             if production_queue_len(industrial_center) > 0 {
                 continue;
             }
-            let Some(stats) = config::unit_stats(EntityKind::Worker) else {
-                continue;
-            };
-            if steel < stats.cost_steel || oil < stats.cost_oil || free_supply < stats.supply {
+            if !budget.can_afford_unit(EntityKind::Worker) {
                 break;
             }
             out.push(Command::Train {
                 building: industrial_center.id,
                 unit: kinds::WORKER.to_string(),
             });
-            steel -= stats.cost_steel;
-            oil -= stats.cost_oil;
-            free_supply -= stats.supply;
+            let reserved = budget.reserve_unit(EntityKind::Worker);
+            debug_assert!(reserved);
         }
 
         assign_steel_workers(
@@ -1702,12 +1704,11 @@ fn production_queue_len(entity: &EntityView) -> u32 {
 fn build_near_own_start_if_affordable(
     view: PlayerView<'_>,
     building: EntityKind,
-    steel: &mut u32,
+    budget: &mut ai_shared::SpendBudget,
     builder_workers: &[u32],
     reserved_workers: &mut HashSet<u32>,
 ) -> Option<Command> {
-    let stats = config::building_stats(building)?;
-    if *steel < stats.cost_steel {
+    if !budget.can_afford_building(building) {
         return None;
     }
     let worker = builder_workers
@@ -1719,7 +1720,8 @@ fn build_near_own_start_if_affordable(
     let (tile_x, tile_y) =
         find_build_spot(&view.start.map, view.snapshot, start, building, &empty)?;
     reserved_workers.insert(worker);
-    *steel -= stats.cost_steel;
+    let reserved = budget.reserve_building(building);
+    debug_assert!(reserved);
     Some(Command::Build {
         worker,
         building: building.to_protocol_str().to_string(),
@@ -1827,57 +1829,10 @@ fn find_build_spot(
     building: EntityKind,
     skip: &BTreeSet<(u32, u32)>,
 ) -> Option<(u32, u32)> {
-    let stats = config::building_stats(building)?;
     let occupied = occupied_tiles_from_snapshot(map, snapshot);
-
-    let map_center = (map.width as f32 * 0.5, map.height as f32 * 0.5);
-    let away = (start.0 as f32 - map_center.0, start.1 as f32 - map_center.1);
-    let (sx, sy) = (start.0 as i32, start.1 as i32);
-    let mut fallback = None;
-    for radius in 3i32..=16 {
-        let mut best_in_ring: Option<(u32, u32, f32, f32)> = None;
-        for dy in -radius..=radius {
-            for dx in -radius..=radius {
-                if dx.abs().max(dy.abs()) != radius {
-                    continue;
-                }
-                let tx = sx + dx;
-                let ty = sy + dy;
-                if tx < 0 || ty < 0 {
-                    continue;
-                }
-                let (tx, ty) = (tx as u32, ty as u32);
-                if skip.contains(&(tx, ty)) {
-                    continue;
-                }
-                if footprint_placeable_from_snapshot(map, building, tx, ty, &occupied) {
-                    let center_x = tx as f32 + stats.foot_w as f32 * 0.5;
-                    let center_y = ty as f32 + stats.foot_h as f32 * 0.5;
-                    let from_start = (center_x - start.0 as f32, center_y - start.1 as f32);
-                    let away_score = from_start.0 * away.0 + from_start.1 * away.1;
-                    let dist = from_start.0 * from_start.0 + from_start.1 * from_start.1;
-                    if fallback.is_none() {
-                        fallback = Some((tx, ty));
-                    }
-                    let better = best_in_ring
-                        .map(|(_, _, best_score, best_dist)| {
-                            away_score > best_score
-                                || (away_score == best_score && dist < best_dist)
-                        })
-                        .unwrap_or(true);
-                    if better {
-                        best_in_ring = Some((tx, ty, away_score, dist));
-                    }
-                }
-            }
-        }
-        if let Some((tx, ty, away_score, _)) = best_in_ring {
-            if away_score >= 0.0 {
-                return Some((tx, ty));
-            }
-        }
-    }
-    fallback
+    ai_shared::find_build_spot_near_start(map.width, map.height, start, building, skip, |tx, ty| {
+        footprint_placeable_from_snapshot(map, building, tx, ty, &occupied)
+    })
 }
 
 fn occupied_tiles_from_snapshot(map: &MapInfo, snapshot: &Snapshot) -> BTreeSet<(u32, u32)> {

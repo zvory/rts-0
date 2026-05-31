@@ -9,6 +9,7 @@
 //! enemy entities on tiles they currently see.
 
 pub mod ai;
+pub(crate) mod ai_shared;
 pub mod entity;
 pub mod fog;
 mod invariants;
