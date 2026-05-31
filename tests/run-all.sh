@@ -151,33 +151,92 @@ if [ "$NODE_MAJOR" -lt 22 ]; then
   info "Node $NODE_MAJOR detected; the API suites need >= 22 for the global WebSocket. Continuing anyway."
 fi
 
-# --- 1. Rust scripted tests (no server needed) ---------------------------------------------
-if [ "$RUN_RUST" = "1" ]; then
-  run_suite "Rust scripted tests (cargo test)" \
-    cargo test --manifest-path "$SERVER_DIR/Cargo.toml"
-else
-  SKIPPED+=("Rust scripted tests (--no-rust)")
-fi
+# Parallel background runner — writes pass/fail result to a temp file.
+# Usage: run_suite_bg <name> <command...>
+# Caller must call collect_bg_results afterwards.
+BG_PIDS=()
+BG_NAMES=()
+BG_RESULT_FILES=()
 
-# --- 2/3. Anything needing a live server ----------------------------------------------------
+run_suite_bg() {
+  local name="$1"; shift
+  local logf resultf
+  logf="$(mktemp -t rts-suite.XXXXXX)"
+  resultf="$(mktemp -t rts-result.XXXXXX)"
+  [ "$VERBOSE" = "1" ] && hdr "$name (bg)"
+  (
+    if "$@" >"$logf" 2>&1; then
+      echo ok >"$resultf"
+    else
+      echo fail >"$resultf"
+    fi
+    echo "$logf" >>"$resultf"   # second line = log path
+  ) &
+  BG_PIDS+=($!)
+  BG_NAMES+=("$name")
+  BG_RESULT_FILES+=("$resultf")
+}
+
+collect_bg_results() {
+  local i
+  for i in "${!BG_PIDS[@]}"; do
+    wait "${BG_PIDS[$i]}" 2>/dev/null || true
+    local resultf="${BG_RESULT_FILES[$i]}"
+    local name="${BG_NAMES[$i]}"
+    local status logf
+    status="$(head -1 "$resultf" 2>/dev/null)"
+    logf="$(sed -n '2p' "$resultf" 2>/dev/null)"
+    if [ "$status" = "ok" ]; then
+      [ -n "$logf" ] && rm -f "$logf"
+      rm -f "$resultf"
+      [ "$VERBOSE" = "1" ] && info "${GRN}PASS${RST} $name"
+    else
+      warn "FAIL $name"
+      [ -n "$logf" ] && { cat "$logf"; rm -f "$logf"; }
+      rm -f "$resultf"
+      FAILED+=("$name")
+    fi
+  done
+  BG_PIDS=(); BG_NAMES=(); BG_RESULT_FILES=()
+}
+
+# --- 1. Build server first (both cargo build and cargo test share the target dir and
+#        serialize via cargo's file lock, so we build once, then run both in parallel
+#        — cargo test reuses the already-compiled artifacts and mostly just links+runs).
 if is_up; then
   info "reusing server already listening on :$PORT (will not stop it)"
   SERVER_HEALTHY=1
+  # No build needed; kick off cargo test immediately if requested.
+  if [ "$RUN_RUST" = "1" ]; then
+    run_suite_bg "Rust scripted tests (cargo test)" \
+      cargo test --manifest-path "$SERVER_DIR/Cargo.toml"
+  else
+    SKIPPED+=("Rust scripted tests (--no-rust)")
+  fi
 else
+  # Build the server binary first (blocks until done).
   if boot_server; then SERVER_HEALTHY=1; else SERVER_HEALTHY=0; fi
+  # Now artifacts are compiled; cargo test can reuse them with minimal recompilation.
+  if [ "$RUN_RUST" = "1" ]; then
+    run_suite_bg "Rust scripted tests (cargo test)" \
+      cargo test --manifest-path "$SERVER_DIR/Cargo.toml"
+  else
+    SKIPPED+=("Rust scripted tests (--no-rust)")
+  fi
 fi
 
+# --- 2/3. Node suites + client smoke (all parallelised) ------------------------------------
 if [ "${SERVER_HEALTHY:-0}" = "1" ]; then
-  run_suite "API: server_integration" node "$SCRIPT_DIR/server_integration.mjs"
-  run_suite "API: regression"         node "$SCRIPT_DIR/regression.mjs"
-  run_suite "API: ai_integration"     node "$SCRIPT_DIR/ai_integration.mjs"
+  run_suite_bg "API: server_integration" node "$SCRIPT_DIR/server_integration.mjs"
+  run_suite_bg "API: regression"         node "$SCRIPT_DIR/regression.mjs"
+  run_suite_bg "API: ai_integration"     node "$SCRIPT_DIR/ai_integration.mjs"
 
   if [ "$RUN_CLIENT" = "1" ]; then
     CHROME="${CHROME:-/Applications/Google Chrome.app/Contents/MacOS/Google Chrome}"
     have_puppeteer=0
     [ -d "$SCRIPT_DIR/node_modules/puppeteer-core" ] && have_puppeteer=1
     if [ "$have_puppeteer" = "1" ] && [ -x "$CHROME" ]; then
-      CHROME="$CHROME" run_suite "Client smoke (headless Chrome)" node "$SCRIPT_DIR/client_smoke.mjs"
+      CHROME="$CHROME" run_suite_bg "Client smoke (headless Chrome)" node "$SCRIPT_DIR/client_smoke.mjs"
     elif [ "$have_puppeteer" != "1" ]; then
       info "skipping client smoke: puppeteer-core not installed (cd tests && npm install)"
       SKIPPED+=("Client smoke (no puppeteer-core)")
@@ -192,6 +251,8 @@ else
   warn "server not healthy — skipping all live-server suites"
   SKIPPED+=("API + client suites (server unavailable)")
 fi
+
+collect_bg_results
 
 # --- Summary --------------------------------------------------------------------------------
 hdr "Summary"
