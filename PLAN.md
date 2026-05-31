@@ -91,6 +91,8 @@ Gates:
 - [ ] Add system-order tests.
 - [ ] Add command hardening tests.
 - [ ] Add fog leak tests for position-bearing events.
+- [ ] Add shot overpenetration so attacks continue 25% of range past the primary target and
+  deal 50% reduced damage to enemies behind it, discouraging clumping.
 
 Gates:
 
