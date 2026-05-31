@@ -51,10 +51,15 @@ pub(crate) fn combat_system(
             let (range_tiles, dmg, cd) = attack_profile(e);
             let range_px = range_tiles as f32 * config::TILE_SIZE as f32 + e.radius() + RANGE_SLACK;
             // Aggro radius: mobile units detect and chase enemies out to their sight radius so
-            // attack-move / auto-defend actually close the gap. Buildings never move, so they
-            // only ever engage within their firing range.
+            // attack-move / auto-defend actually close the gap. Idle machine gunners are the
+            // exception: they hold position and only auto-acquire enemies already in weapon
+            // range. Buildings never move, so they only ever engage within their firing range.
             let aggro_px = if e.is_unit() {
-                (e.sight_tiles() as f32 * config::TILE_SIZE as f32).max(range_px)
+                if e.kind == EntityKind::MachineGunner && matches!(e.order(), Order::Idle) {
+                    range_px
+                } else {
+                    (e.sight_tiles() as f32 * config::TILE_SIZE as f32).max(range_px)
+                }
             } else {
                 range_px
             };
@@ -111,7 +116,9 @@ pub(crate) fn combat_system(
             }
             let ready = matches!(entities.get(id), Some(e) if e.attack_cd() == 0);
             if ready {
-                apply_damage(entities, events, fog, id, tid, dmg, owner, px, py, tx, ty);
+                apply_damage(
+                    entities, events, fog, id, tid, dmg, owner, px, py, tx, ty, range_px,
+                );
                 if let Some(e) = entities.get_mut(id) {
                     e.set_attack_cd(cd_reset);
                 }
@@ -281,6 +288,7 @@ fn apply_damage(
     ay: f32,
     vx: f32,
     vy: f32,
+    range_px: f32,
 ) {
     let attacker_is_ap = entities
         .get(attacker)
@@ -298,6 +306,20 @@ fn apply_damage(
     if let Some(v) = entities.get_mut(victim) {
         v.hp = v.hp.saturating_sub(effective_dmg);
     }
+    apply_overpenetration(
+        entities,
+        events,
+        fog,
+        attacker,
+        victim,
+        effective_dmg,
+        attacker_owner,
+        ax,
+        ay,
+        vx,
+        vy,
+        range_px,
+    );
     // Send the Attack event to every player who can either see the attacker or the victim, so
     // friendly fire tracers + enemy muzzle flashes both render. Attacker's owner always gets it.
     let player_ids: Vec<u32> = events.keys().copied().collect();
@@ -312,6 +334,90 @@ fn apply_damage(
             from: attacker,
             to: victim,
         });
+    }
+}
+
+fn apply_overpenetration(
+    entities: &mut EntityStore,
+    events: &mut HashMap<u32, Vec<Event>>,
+    fog: &Fog,
+    attacker: u32,
+    primary_victim: u32,
+    primary_dmg: u32,
+    attacker_owner: u32,
+    ax: f32,
+    ay: f32,
+    vx: f32,
+    vy: f32,
+    range_px: f32,
+) {
+    let dx = vx - ax;
+    let dy = vy - ay;
+    let dist = (dx * dx + dy * dy).sqrt();
+    if dist <= f32::EPSILON {
+        return;
+    }
+    let overpenetration_limit = dist + range_px * 0.25;
+    let ux = dx / dist;
+    let uy = dy / dist;
+    let perpendicular_slack = RANGE_SLACK + 8.0;
+    let splash_dmg = primary_dmg / 2;
+    if splash_dmg == 0 {
+        return;
+    }
+
+    let player_ids: Vec<u32> = events.keys().copied().collect();
+    let mut hits: Vec<(u32, f32, f32, f32, f32)> = Vec::new();
+    for id in entities.ids() {
+        if id == attacker || id == primary_victim {
+            continue;
+        }
+        let Some(target) = entities.get(id) else {
+            continue;
+        };
+        if target.owner == attacker_owner || target.hp == 0 {
+            continue;
+        }
+        let tx = target.pos_x - ax;
+        let ty = target.pos_y - ay;
+        let along = tx * ux + ty * uy;
+        if along <= dist || along > overpenetration_limit {
+            continue;
+        }
+        let perp = (tx * uy - ty * ux).abs();
+        if perp > target.radius() + perpendicular_slack {
+            continue;
+        }
+        hits.push((id, target.pos_x, target.pos_y, along, target.radius()));
+    }
+
+    hits.sort_by(|a, b| a.3.partial_cmp(&b.3).unwrap_or(std::cmp::Ordering::Equal));
+    for (id, tx, ty, _, _) in hits {
+        let effective_dmg = entities
+            .get(id)
+            .map(|e| {
+                if e.kind.is_armored() && !entities.get(attacker).map(|a| a.kind.is_ap()).unwrap_or(false) {
+                    splash_dmg / 2
+                } else {
+                    splash_dmg
+                }
+            })
+            .unwrap_or(0);
+        if effective_dmg == 0 {
+            continue;
+        }
+        if let Some(v) = entities.get_mut(id) {
+            v.hp = v.hp.saturating_sub(effective_dmg);
+        }
+        for pid in &player_ids {
+            let visible = *pid == attacker_owner
+                || fog.is_visible_world(*pid, ax, ay)
+                || fog.is_visible_world(*pid, tx, ty);
+            if !visible {
+                continue;
+            }
+            events.entry(*pid).or_default().push(Event::Attack { from: attacker, to: id });
+        }
     }
 }
 
@@ -478,6 +584,29 @@ mod tests {
     }
 
     #[test]
+    fn idle_machine_gunner_does_not_chase_distant_enemies() {
+        let mut entities = EntityStore::new();
+        let mg_id = entities
+            .spawn_unit(1, EntityKind::MachineGunner, 100.0, 100.0)
+            .expect("machine gunner should spawn");
+        let enemy_id = entities
+            .spawn_unit(2, EntityKind::Rifleman, 330.0, 100.0)
+            .expect("enemy should spawn");
+        let enemy_hp = entities.get(enemy_id).expect("enemy should exist").hp;
+
+        run_combat_tick(&mut entities);
+
+        let mg = entities.get(mg_id).expect("mg should exist");
+        assert_eq!(mg.target_id(), None);
+        assert!(mg.path_is_empty(), "idle machine gunner should not chase");
+        assert_eq!(
+            entities.get(enemy_id).expect("enemy should exist").hp,
+            enemy_hp,
+            "distant enemies should not be attacked or chased"
+        );
+    }
+
+    #[test]
     fn machine_gunner_waits_to_deploy_before_first_shot() {
         let mut entities = EntityStore::new();
         entities
@@ -566,6 +695,45 @@ mod tests {
         assert!(
             entities.get(mg_id).expect("mg should exist").pos_x > start_x,
             "machine gunner should move after teardown completes"
+        );
+    }
+
+    #[test]
+    fn shots_overpenetrate_past_the_primary_target() {
+        let mut entities = EntityStore::new();
+        let attacker = entities
+            .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
+            .expect("attacker should spawn");
+        let primary = entities
+            .spawn_unit(2, EntityKind::Rifleman, 140.0, 100.0)
+            .expect("primary target should spawn");
+        let secondary = entities
+            .spawn_unit(2, EntityKind::Rifleman, 165.0, 100.0)
+            .expect("secondary target should spawn");
+        let fog = Fog::new(2);
+        let mut events: HashMap<u32, Vec<Event>> = HashMap::new();
+        events.insert(1, Vec::new());
+        events.insert(2, Vec::new());
+
+        apply_damage(
+            &mut entities,
+            &mut events,
+            &fog,
+            attacker,
+            primary,
+            10,
+            1,
+            100.0,
+            100.0,
+            140.0,
+            100.0,
+            128.0,
+        );
+
+        assert_eq!(entities.get(primary).expect("primary should exist").hp, 35);
+        assert_eq!(
+            entities.get(secondary).expect("secondary should exist").hp,
+            40
         );
     }
 }
