@@ -1,5 +1,5 @@
 app = "rts-0-zvorygin"
-primary_region = "iad"
+primary_region = "ewr"
 
 [build]
   dockerfile = "Dockerfile"
