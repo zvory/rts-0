@@ -135,9 +135,17 @@ export class Input {
     return { x: ev.clientX - r.left, y: ev.clientY - r.top };
   }
 
-  /** World point under the current screen cursor. */
+  /** World point under the current screen cursor, clamped to map bounds. */
   _worldAt(sx, sy) {
-    return this.camera.screenToWorld(sx, sy);
+    const w = this.camera.screenToWorld(sx, sy);
+    const map = this.state.map;
+    if (map) {
+      const maxX = map.width * map.tileSize;
+      const maxY = map.height * map.tileSize;
+      w.x = Math.max(0, Math.min(maxX - 1, w.x));
+      w.y = Math.max(0, Math.min(maxY - 1, w.y));
+    }
+    return w;
   }
 
   // --- Mouse: press / move / release --------------------------------------
