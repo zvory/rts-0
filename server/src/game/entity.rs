@@ -60,14 +60,14 @@ impl EntityKind {
         )
     }
 
-    /// Armored targets take 50% damage from non-AP weapons.
+    /// Armored targets take 75% damage reduction from non-AP weapons (dmg / 4).
     pub fn is_armored(self) -> bool {
         matches!(self, EntityKind::Tank) || self.is_building()
     }
 
     /// AP weapons deal full damage to armored targets.
     pub fn is_ap(self) -> bool {
-        matches!(self, EntityKind::AtTeam)
+        matches!(self, EntityKind::AtTeam | EntityKind::Tank)
     }
 
     pub fn is_node(self) -> bool {
