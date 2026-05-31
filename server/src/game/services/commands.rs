@@ -30,14 +30,18 @@ pub(crate) fn apply_commands(
             Command::Move { units, x, y } => {
                 let valid: Vec<u32> = dedupe_cap_units(units)
                     .into_iter()
-                    .filter(|id| owns_unit(entities, player, *id) && !is_constructing(entities, *id))
+                    .filter(|id| {
+                        owns_unit(entities, player, *id) && !is_constructing(entities, *id)
+                    })
                     .collect();
                 coordinator.order_group_move(entities, player, &valid, (x, y), false);
             }
             Command::AttackMove { units, x, y } => {
                 let valid: Vec<u32> = dedupe_cap_units(units)
                     .into_iter()
-                    .filter(|id| owns_unit(entities, player, *id) && !is_constructing(entities, *id))
+                    .filter(|id| {
+                        owns_unit(entities, player, *id) && !is_constructing(entities, *id)
+                    })
                     .collect();
                 coordinator.order_group_move(entities, player, &valid, (x, y), true);
             }

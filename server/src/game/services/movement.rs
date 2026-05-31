@@ -142,10 +142,8 @@ pub(crate) fn movement_system(
                     // against zero movement (dy=0 ⟹ y-only slide is a no-op that would
                     // spuriously suppress static_blocked). Only mark static-blocked when
                     // neither axis makes progress.
-                    let slide_x =
-                        dx.abs() > 1e-4 && tile_passable_at(occ, map, class, nx, y);
-                    let slide_y =
-                        dy.abs() > 1e-4 && tile_passable_at(occ, map, class, x, ny);
+                    let slide_x = dx.abs() > 1e-4 && tile_passable_at(occ, map, class, nx, y);
+                    let slide_y = dy.abs() > 1e-4 && tile_passable_at(occ, map, class, x, ny);
                     if slide_x {
                         x = nx;
                     } else if slide_y {
