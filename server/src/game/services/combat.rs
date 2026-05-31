@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::config;
-use crate::game::entity::{AttackPhase, Entity, EntityStore, Order};
+use crate::game::entity::{AttackPhase, Entity, EntityKind, EntityStore, Order, WeaponSetup};
 use crate::game::fog::Fog;
 use crate::game::map::Map;
 use crate::game::services::dist2;
@@ -29,6 +29,7 @@ pub(crate) fn combat_system(
     // Tick down cooldowns first.
     for e in entities.iter_mut() {
         e.tick_attack_cd();
+        tick_machine_gunner_setup(e);
     }
 
     for id in entities.ids() {
@@ -80,6 +81,7 @@ pub(crate) fn combat_system(
             if let Some(e) = entities.get_mut(id) {
                 if matches!(e.order(), Order::AttackMove(_) | Order::Idle) {
                     e.set_target_id(None);
+                    begin_idle_machine_gunner_setup(e);
                 }
             }
             continue;
@@ -96,8 +98,7 @@ pub(crate) fn combat_system(
         let dist = dist2(px, py, tx, ty).sqrt();
 
         if dist <= range_px {
-            // In range: face it, stop, and fire if off cooldown.
-            let ready = matches!(entities.get(id), Some(e) if e.attack_cd() == 0);
+            // In range: face it, stop, deploy if needed, and fire if off cooldown.
             if let Some(e) = entities.get_mut(id) {
                 e.set_facing((ty - py).atan2(tx - px));
                 e.set_target_id(Some(tid));
@@ -105,6 +106,10 @@ pub(crate) fn combat_system(
                 // Hold position while a target is in weapon range (don't overshoot it).
                 e.clear_path();
             }
+            if !machine_gunner_ready_to_fire(entities, id) {
+                continue;
+            }
+            let ready = matches!(entities.get(id), Some(e) if e.attack_cd() == 0);
             if ready {
                 apply_damage(entities, events, fog, id, tid, dmg, owner, px, py, tx, ty);
                 if let Some(e) = entities.get_mut(id) {
@@ -119,10 +124,78 @@ pub(crate) fn combat_system(
                 e.set_target_id(Some(tid));
                 e.mark_attack_phase(AttackPhase::Chasing);
             }
+            if !machine_gunner_ready_to_move(entities, id) {
+                continue;
+            }
             if want_repath {
                 coordinator.request_chase_path(entities, id, (tx, ty));
             }
         }
+    }
+}
+
+fn tick_machine_gunner_setup(e: &mut Entity) {
+    if e.kind != EntityKind::MachineGunner {
+        return;
+    }
+    e.tick_weapon_setup();
+}
+
+fn begin_idle_machine_gunner_setup(e: &mut Entity) {
+    if e.kind != EntityKind::MachineGunner {
+        return;
+    }
+    if !e.path_is_empty() {
+        return;
+    }
+    if !matches!(
+        e.order(),
+        Order::Idle | Order::Attack(_) | Order::AttackMove(_)
+    ) {
+        return;
+    }
+    if matches!(e.weapon_setup(), WeaponSetup::Packed) {
+        e.set_weapon_setup(WeaponSetup::SettingUp {
+            ticks: config::MACHINE_GUNNER_SETUP_TICKS,
+        });
+    }
+}
+
+fn machine_gunner_ready_to_fire(entities: &mut EntityStore, id: u32) -> bool {
+    let Some(e) = entities.get_mut(id) else {
+        return false;
+    };
+    if e.kind != EntityKind::MachineGunner {
+        return true;
+    }
+    match e.weapon_setup() {
+        WeaponSetup::Deployed => true,
+        WeaponSetup::Packed => {
+            e.set_weapon_setup(WeaponSetup::SettingUp {
+                ticks: config::MACHINE_GUNNER_SETUP_TICKS,
+            });
+            false
+        }
+        WeaponSetup::SettingUp { .. } | WeaponSetup::TearingDown { .. } => false,
+    }
+}
+
+fn machine_gunner_ready_to_move(entities: &mut EntityStore, id: u32) -> bool {
+    let Some(e) = entities.get_mut(id) else {
+        return false;
+    };
+    if e.kind != EntityKind::MachineGunner {
+        return true;
+    }
+    match e.weapon_setup() {
+        WeaponSetup::Packed => true,
+        WeaponSetup::Deployed | WeaponSetup::SettingUp { .. } => {
+            e.set_weapon_setup(WeaponSetup::TearingDown {
+                ticks: config::MACHINE_GUNNER_SETUP_TICKS,
+            });
+            false
+        }
+        WeaponSetup::TearingDown { .. } => false,
     }
 }
 
@@ -209,8 +282,14 @@ fn apply_damage(
     vx: f32,
     vy: f32,
 ) {
-    let attacker_is_ap = entities.get(attacker).map(|e| e.kind.is_ap()).unwrap_or(false);
-    let victim_is_armored = entities.get(victim).map(|e| e.kind.is_armored()).unwrap_or(false);
+    let attacker_is_ap = entities
+        .get(attacker)
+        .map(|e| e.kind.is_ap())
+        .unwrap_or(false);
+    let victim_is_armored = entities
+        .get(victim)
+        .map(|e| e.kind.is_armored())
+        .unwrap_or(false);
     let effective_dmg = if victim_is_armored && !attacker_is_ap {
         dmg / 2
     } else {
@@ -239,7 +318,12 @@ fn apply_damage(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::game::entity::{EntityKind, EntityStore, Order};
+    use crate::game::entity::{EntityKind, EntityStore, Order, WeaponSetup};
+    use crate::game::fog::Fog;
+    use crate::game::services::move_coordinator::MoveCoordinator;
+    use crate::game::services::movement::movement_system;
+    use crate::game::services::occupancy::Occupancy;
+    use crate::game::services::pathing::PathingService;
     use crate::game::services::spatial::SpatialIndex;
 
     fn rifleman_with_enemy() -> (EntityStore, u32, u32) {
@@ -251,6 +335,35 @@ mod tests {
             .spawn_unit(2, EntityKind::Rifleman, 120.0, 100.0)
             .expect("enemy rifleman should spawn");
         (entities, self_id, enemy_id)
+    }
+
+    fn run_combat_tick(entities: &mut EntityStore) -> HashMap<u32, Vec<Event>> {
+        let map = Map::generate(2, 0xC0FF_EE);
+        let occ = Occupancy::build(&map, entities);
+        let spatial = SpatialIndex::build(entities, config::TILE_SIZE);
+        let mut pathing = PathingService::new(256, 64);
+        let mut coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, 0);
+        let mut fog = Fog::new(map.size);
+        fog.recompute(&[1, 2], entities);
+        let mut events = HashMap::from([(1, Vec::new()), (2, Vec::new())]);
+
+        combat_system(
+            &map,
+            entities,
+            &occ,
+            &spatial,
+            &mut coordinator,
+            &fog,
+            &mut events,
+        );
+        events
+    }
+
+    fn run_movement_tick(entities: &mut EntityStore) {
+        let map = Map::generate(2, 0xC0FF_EE);
+        let occ = Occupancy::build(&map, entities);
+        let spatial = SpatialIndex::build(entities, map.size);
+        movement_system(&map, entities, &occ, &spatial, 0);
     }
 
     #[test]
@@ -339,5 +452,120 @@ mod tests {
         );
 
         assert_eq!(target, None);
+    }
+
+    #[test]
+    fn idle_machine_gunner_deploys_after_stationary_delay() {
+        let mut entities = EntityStore::new();
+        let mg_id = entities
+            .spawn_unit(1, EntityKind::MachineGunner, 100.0, 100.0)
+            .expect("machine gunner should spawn");
+
+        run_combat_tick(&mut entities);
+        assert!(matches!(
+            entities.get(mg_id).expect("mg should exist").weapon_setup(),
+            WeaponSetup::SettingUp { .. }
+        ));
+
+        for _ in 0..config::MACHINE_GUNNER_SETUP_TICKS {
+            run_combat_tick(&mut entities);
+        }
+
+        assert_eq!(
+            entities.get(mg_id).expect("mg should exist").weapon_setup(),
+            WeaponSetup::Deployed
+        );
+    }
+
+    #[test]
+    fn machine_gunner_waits_to_deploy_before_first_shot() {
+        let mut entities = EntityStore::new();
+        entities
+            .spawn_unit(1, EntityKind::MachineGunner, 100.0, 100.0)
+            .expect("machine gunner should spawn");
+        let enemy_id = entities
+            .spawn_unit(2, EntityKind::Rifleman, 120.0, 100.0)
+            .expect("enemy should spawn");
+        let enemy_hp = entities.get(enemy_id).expect("enemy should exist").hp;
+
+        run_combat_tick(&mut entities);
+        assert_eq!(
+            entities.get(enemy_id).expect("enemy should exist").hp,
+            enemy_hp
+        );
+
+        for _ in 0..config::MACHINE_GUNNER_SETUP_TICKS {
+            run_combat_tick(&mut entities);
+        }
+
+        assert!(
+            entities.get(enemy_id).expect("enemy should exist").hp < enemy_hp,
+            "machine gunner should fire once deployment completes"
+        );
+    }
+
+    #[test]
+    fn deployed_machine_gunner_can_fire_immediately() {
+        let mut entities = EntityStore::new();
+        let mg_id = entities
+            .spawn_unit(1, EntityKind::MachineGunner, 100.0, 100.0)
+            .expect("machine gunner should spawn");
+
+        run_combat_tick(&mut entities);
+        for _ in 0..config::MACHINE_GUNNER_SETUP_TICKS {
+            run_combat_tick(&mut entities);
+        }
+        assert_eq!(
+            entities.get(mg_id).expect("mg should exist").weapon_setup(),
+            WeaponSetup::Deployed
+        );
+
+        let enemy_id = entities
+            .spawn_unit(2, EntityKind::Rifleman, 120.0, 100.0)
+            .expect("enemy should spawn");
+        let enemy_hp = entities.get(enemy_id).expect("enemy should exist").hp;
+
+        run_combat_tick(&mut entities);
+
+        assert!(
+            entities.get(enemy_id).expect("enemy should exist").hp < enemy_hp,
+            "deployed machine gunner should not wait for another setup cycle"
+        );
+    }
+
+    #[test]
+    fn machine_gunner_tears_down_before_moving() {
+        let mut entities = EntityStore::new();
+        let mg_id = entities
+            .spawn_unit(1, EntityKind::MachineGunner, 100.0, 100.0)
+            .expect("machine gunner should spawn");
+        let start_x = entities.get(mg_id).expect("mg should exist").pos_x;
+
+        {
+            let mg = entities.get_mut(mg_id).expect("mg should exist");
+            mg.set_weapon_setup(WeaponSetup::TearingDown {
+                ticks: config::MACHINE_GUNNER_SETUP_TICKS,
+            });
+            mg.set_order(Order::move_to(120.0, 100.0));
+            mg.set_path(vec![(120.0, 100.0)]);
+            mg.set_path_goal(Some((120.0, 100.0)));
+        }
+
+        run_movement_tick(&mut entities);
+        assert_eq!(entities.get(mg_id).expect("mg should exist").pos_x, start_x);
+
+        for _ in 0..config::MACHINE_GUNNER_SETUP_TICKS {
+            run_combat_tick(&mut entities);
+        }
+        assert_eq!(
+            entities.get(mg_id).expect("mg should exist").weapon_setup(),
+            WeaponSetup::Packed
+        );
+
+        run_movement_tick(&mut entities);
+        assert!(
+            entities.get(mg_id).expect("mg should exist").pos_x > start_x,
+            "machine gunner should move after teardown completes"
+        );
     }
 }
