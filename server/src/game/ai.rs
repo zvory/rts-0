@@ -460,18 +460,19 @@ enum FreeRiflemanDisposition {
 fn combat_rally_world(map: &Map, start_tile: (u32, u32)) -> (f32, f32) {
     let start = map.tile_center(start_tile.0, start_tile.1);
     let center = map_center_world(map);
-    step_toward_world(
+    let stepped = step_toward_world(
         start,
         center,
         COMBAT_RALLY_TILES_FROM_START * config::TILE_SIZE as f32,
-    )
+    );
+    let diagonal = (stepped.0 + stepped.1) * 0.5;
+    (diagonal, diagonal)
 }
 
 fn combat_rally_slots(map: &Map, start_tile: (u32, u32), count: usize) -> Vec<(f32, f32)> {
     if count == 0 {
         return Vec::new();
     }
-    let rally = combat_rally_world(map, start_tile);
     let start = map.tile_center(start_tile.0, start_tile.1);
     let center = map_center_world(map);
     let dx = center.0 - start.0;
@@ -484,6 +485,7 @@ fn combat_rally_slots(map: &Map, start_tile: (u32, u32), count: usize) -> Vec<(f
     };
     let spacing = COMBAT_RALLY_SLOT_SPACING_TILES * config::TILE_SIZE as f32;
     let center_index = (count as f32 - 1.0) * 0.5;
+    let rally = combat_rally_world(map, start_tile);
     (0..count)
         .map(|i| {
             let offset = (i as f32 - center_index) * spacing;
@@ -1262,6 +1264,14 @@ mod tests {
             .map(|(x, y)| (x.round() as i32, y.round() as i32))
             .collect();
         assert_eq!(unique_targets.len(), 3);
+    }
+
+    #[test]
+    fn combat_rally_world_midpoint_lands_on_main_diagonal() {
+        let map = Map::generate(4, 1234);
+        let rally = combat_rally_world(&map, (56, 8));
+
+        assert!((rally.0 - rally.1).abs() < 0.01);
     }
 
     #[test]
