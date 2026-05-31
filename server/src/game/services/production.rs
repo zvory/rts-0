@@ -41,7 +41,7 @@ pub(crate) fn production_system(
                 Some(b) => (b.pos_x, b.pos_y),
                 None => continue,
             };
-            let (sx, sy) = coordinator.find_spawn_point(entities, kind, bx, by);
+            let (sx, sy) = coordinator.find_spawn_point(entities, kind, unit, bx, by);
             entities.spawn_unit(owner, unit, sx, sy);
         }
     }
