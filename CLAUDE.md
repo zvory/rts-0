@@ -11,7 +11,8 @@ the server simulates at 30 Hz and sends per-player, fog-filtered snapshots.
 
 ## Parallel Worktrees
 
-- For parallel feature work, each terminal/agent must work in its own git worktree. Do not run two
+- For parallel feature work (which is always the case), each terminal/agent must work in its own git worktree. Do not run two
+- Always make a worktree
   coding agents in the same checkout.
 - Before making changes, verify the checkout and branch:
 

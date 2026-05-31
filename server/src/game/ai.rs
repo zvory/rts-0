@@ -15,7 +15,7 @@
 
 use crate::config;
 use crate::game::ai_shared;
-use crate::game::entity::{EntityKind, EntityStore, Order};
+use crate::game::entity::{BuildPhase, EntityKind, EntityStore, Order};
 use crate::game::map::Map;
 use crate::game::services::spatial::SpatialIndex;
 use crate::game::services::world_query;
@@ -99,11 +99,6 @@ impl AiController {
             return;
         }
 
-        // Local economy budget. We decrement these as we *decide* to spend so a single think
-        // never queues more than the AI can actually afford this tick (commands all apply in
-        // order, so without this we'd over-commit on the pre-tick balance).
-        let mut budget =
-            ai_shared::SpendBudget::new(me.steel, me.oil, me.supply_used, me.supply_cap);
         let supply_capped = me.supply_cap >= config::SUPPLY_CAP_MAX;
 
         // --- Survey the player's holdings in one pass. ---------------------
@@ -119,6 +114,10 @@ impl AiController {
         let mut barracks_total: usize = 0; // finished + under construction
         let mut depot_under_construction = false;
         let mut pending_depot_build = false;
+        // Steel reserved by workers en route to a build site (cost not yet deducted by the
+        // construction system — deduction happens on arrival). Subtracted from the budget below
+        // so we don't double-spend the same steel on units and then fail placement.
+        let mut committed_steel: u32 = 0;
 
         for e in world_query::owned_units(entities, self.player)
             .chain(world_query::owned_buildings(entities, self.player))
@@ -131,6 +130,12 @@ impl AiController {
                         Order::Gather(_) => gathering_workers.push(e.id),
                         Order::Build(_) => {
                             if let Some((kind, _, _)) = e.order().build_intent_tile() {
+                                if e.build_phase() == Some(BuildPhase::ToSite) {
+                                    if let Some(stats) = config::building_stats(kind) {
+                                        committed_steel =
+                                            committed_steel.saturating_add(stats.cost_steel);
+                                    }
+                                }
                                 match kind {
                                     EntityKind::Depot => pending_depot_build = true,
                                     EntityKind::Barracks => barracks_total += 1,
@@ -164,6 +169,19 @@ impl AiController {
         }
         let _ = rifleman_count; // surveyed for clarity; waves key off free_riflemen.
         let depot_in_progress = depot_under_construction || pending_depot_build;
+
+        // Local economy budget. We decrement these as we *decide* to spend so a single think
+        // never queues more than the AI can actually afford this tick (commands all apply in
+        // order, so without this we'd over-commit on the pre-tick balance). Subtract
+        // committed_steel so units aren't trained with steel already spoken for by an en-route
+        // build order (whose cost is only deducted at placement, not at command time).
+        let mut budget = ai_shared::SpendBudget::new(
+            me.steel.saturating_sub(committed_steel),
+            me.oil,
+            me.supply_used,
+            me.supply_cap,
+        );
+
         let target_workers =
             ai_shared::main_base_steel_saturation_target_from_entities(entities, me.start_tile);
         let target_barracks = desired_barracks_target(me.steel);

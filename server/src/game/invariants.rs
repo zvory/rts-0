@@ -304,6 +304,19 @@ mod tests {
     use crate::game::{Game, PlayerInit};
     use crate::protocol::kinds;
 
+    /// Steel patch placement must stay within IC distance bounds for any STEEL_PATCHES_PER_BASE.
+    /// Regression: doubling patches to 24 caused rows 2/3 to exceed IC_RESOURCE_MAX_DIST_TILES.
+    #[test]
+    fn steel_patch_grid_fits_within_distance_bounds() {
+        // Game::new triggers spawn_player_base which debug_asserts every patch is in bounds.
+        let players = [
+            PlayerInit { id: 1, name: "A".into(), color: "#fff".into(), is_ai: false },
+            PlayerInit { id: 2, name: "B".into(), color: "#000".into(), is_ai: true },
+        ];
+        // This panics before the fix when STEEL_PATCHES_PER_BASE = 24.
+        let _game = Game::new(&players);
+    }
+
     /// A freshly-created game must satisfy every invariant before any tick runs.
     #[test]
     fn invariants_hold_at_game_start() {
