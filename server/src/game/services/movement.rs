@@ -137,7 +137,22 @@ pub(crate) fn movement_system(
                     x = nx;
                     y = ny;
                 } else {
-                    static_blocked_this_tick = true;
+                    // Wall-slide: try each axis independently so a unit pressed against a
+                    // building edge can slide along it rather than freezing. Guard each axis
+                    // against zero movement (dy=0 ⟹ y-only slide is a no-op that would
+                    // spuriously suppress static_blocked). Only mark static-blocked when
+                    // neither axis makes progress.
+                    let slide_x =
+                        dx.abs() > 1e-4 && tile_passable_at(occ, map, class, nx, y);
+                    let slide_y =
+                        dy.abs() > 1e-4 && tile_passable_at(occ, map, class, x, ny);
+                    if slide_x {
+                        x = nx;
+                    } else if slide_y {
+                        y = ny;
+                    } else {
+                        static_blocked_this_tick = true;
+                    }
                 }
                 break;
             }
@@ -1084,7 +1099,6 @@ mod tests {
     /// Goal is placed >100 px away so tolerant arrival (64 px radius) never fires — the unit
     /// must actually move.
     #[test]
-    #[ignore = "documents known building-corner freeze regression"]
     fn unit_pressed_against_building_wall_reaches_goal() {
         let map = flat_map(1);
         let mut entities = EntityStore::new();
