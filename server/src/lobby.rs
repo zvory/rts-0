@@ -218,7 +218,7 @@ impl RoomTask {
     /// the task ends) only when the event channel closes, which happens when the `Lobby`
     /// registry — and therefore the process — is gone.
     async fn run(&mut self, mut event_rx: mpsc::Receiver<RoomEvent>) {
-        let mut ticker = interval(Duration::from_millis(config::TICK_MS));
+        let mut ticker = interval(room_tick_interval(&self.mode));
         // If the loop ever falls behind (e.g. a long GC pause), skip missed ticks rather than
         // bursting to catch up — the simulation stays close to real time.
         ticker.set_missed_tick_behavior(MissedTickBehavior::Skip);
@@ -828,6 +828,37 @@ impl RoomTask {
                 send_or_log(&self.room, id, &player.msg_tx, msg.clone());
             }
         }
+    }
+}
+
+fn room_tick_interval(mode: &RoomMode) -> Duration {
+    let base = Duration::from_millis(config::TICK_MS);
+    match mode {
+        RoomMode::DevSelfPlay(DevSelfPlayConfig::Replay { .. }) => base.mul_f64(2.0 / 3.0),
+        _ => base,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn replay_rooms_tick_at_1_5x_speed() {
+        assert_eq!(
+            room_tick_interval(&RoomMode::Normal),
+            Duration::from_millis(33)
+        );
+        assert_eq!(
+            room_tick_interval(&RoomMode::DevSelfPlay(DevSelfPlayConfig::Live)),
+            Duration::from_millis(33)
+        );
+        assert_eq!(
+            room_tick_interval(&RoomMode::DevSelfPlay(DevSelfPlayConfig::Replay {
+                artifact: "demo".to_string(),
+            })),
+            Duration::from_millis(22)
+        );
     }
 }
 
