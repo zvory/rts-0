@@ -6,6 +6,10 @@ It incorporates the previous `TODO.md` and `ARCHITECTURE_PLAN.md`.
 Use this file as the operational source of truth. The main rule is simple: do not pull a large
 RTS feature forward unless its listed gates are complete.
 
+AI planning detail lives in [AI-PLAN.md](AI-PLAN.md). Keep the dependency chain summary here in
+`PLAN.md`, and keep the concrete AI architecture, rollout phases, and matchup-test details in the
+sub-plan so this file stays readable.
+
 ## Coordination Rules
 
 - With one agent, proceed strictly by phase and task order.
@@ -388,11 +392,14 @@ Depends on:
 
 ### 6.3 Advanced AI Tech Progression
 
-- [ ] AI attacks once with riflemen.
-- [ ] AI then ecos/techs to attack with machine gunner plus riflemen.
-- [ ] AI then ecos/techs to attack with tank plus riflemen and machine gunners.
-- [ ] AI reasons from definitions, tech availability, economy, army composition, and command
-  results rather than duplicated constants.
+- [ ] Follow [AI-PLAN.md](AI-PLAN.md) for the detailed dependency chain and rollout order.
+- [ ] Keep one shared AI knowledge and action layer used by both live AI and self-play.
+- [ ] Add at least three simple strategy profiles:
+  `rifle_flood_fast`, `rifle_flood_full_saturation`, and one tech-tree strategy.
+- [ ] Keep strategy differences mostly in priorities and thresholds, not duplicated mechanics.
+- [ ] Make AI reason from shared definitions, tech availability, economy, army composition, and
+  command results rather than duplicated constants.
+- [ ] Replace brittle self-play scripts over time with personality-vs-personality matchup tests.
 - [ ] Keep AI replay deterministic.
 
 Depends on:
@@ -462,11 +469,10 @@ Use this index when deciding whether a TODO can start.
  - DONE: Add four oil patches, but cut the rate of oil gathering by four
  - should be possible to select multiple buildings at once
  - cheat menu for development (only available while running locally), buttons to grant money, oil, or clear the fog of war completely
- - implement a way to view the self play tests with zero fog of war, because we spend an enormous amount of tokens breaking and debugging them, and letting me just watch will be super helpful and token efficient
+ - DONE: implement a way to view the self play tests with zero fog of war, because we spend an enormous amount of tokens breaking and debugging them, and letting me just watch will be super helpful and token efficient
  - DONE: building a building on top of a unit will lock that unit inside the building. it should be impossible to build a building on top of a unit.
  - DONE: halve the mining rate for steel
  - contorl group system for units and buildings. ctrl+number creates a group. shift plus number adds to a group. tapping a group selects it. double tapping moves the camera to the centroid.
  - DONE: make steel gray, and make oil black, change hte icons, and make the oil patch spawn 90 degrees away from the steel patch
- - randomize the spawn positions
- - halve the number of initial steel and oil patches, and create scattered patches of steel and oil across the map. there should be five such patches scattered, one near each starting position, and one near the centre.
+ - halve the number of initial steel and oil patches, and create scattered patches of steel and oil the map. scattered patches should be half the size of the main base.  there should be five such patches scattered, one near each starting position (like the natural expansion), and one near the centre.
  - workers should visually latch onto a steel patch with a line to the steel patch
