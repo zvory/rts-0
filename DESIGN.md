@@ -124,7 +124,7 @@ Sent once when the match begins. Carries everything static for the whole match.
 ```
 Units/buildings arrive via snapshots (so they obey fog), including
 the player's own starting Industrial Center + workers. When the lobby's `setQuickstart` toggle is
-enabled, every player starts with 700 steel and 300 oil instead of the default opening resources.
+enabled, every player starts with 1400 steel and 600 oil instead of the default opening resources.
 
 ### 2.4 `snapshot` payload (per-player, fog-filtered)
 ```
@@ -597,7 +597,7 @@ The server treats every client as potentially hostile. Limits live next to the c
 Computer opponents are **opt-in**: a room has none unless the host adds them from the lobby
 (`addAi` / `removeAi`, host-only, lobby phase only). The lobby also has a host-only
 `setQuickstart` toggle labeled "Start with more money mode", which causes the next match to begin
-with 700 steel and 300 oil for every player. They are capped with humans at
+with 1400 steel and 600 oil for every player. They are capped with humans at
 `MAX_PLAYERS = 4` (the map lays out exactly `2 × player_count` total base sites). AI players are seated after
 the humans in the lobby player list; their colors come from the tail of `PLAYER_PALETTE` so they
 never collide with human colors. They persist across rematches and are cleared only when the room

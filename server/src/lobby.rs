@@ -561,7 +561,7 @@ impl RoomTask {
         }
 
         let (starting_steel, starting_oil) = if self.quickstart {
-            (700, 300)
+            (1400, 600)
         } else {
             (config::STARTING_STEEL, config::STARTING_OIL)
         };
