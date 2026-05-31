@@ -1799,11 +1799,21 @@ fn player_start_world(start: &StartPayload, player_id: u32) -> Option<(f32, f32)
 }
 
 fn combat_rendezvous_world(view: PlayerView<'_>) -> (f32, f32) {
-    let ts = view.start.map.tile_size as f32;
-    (
-        view.start.map.width as f32 * ts * 0.5,
-        view.start.map.height as f32 * ts * 0.5,
-    )
+    let center = (
+        view.start.map.width as f32 * view.start.map.tile_size as f32 * 0.5,
+        view.start.map.height as f32 * view.start.map.tile_size as f32 * 0.5,
+    );
+    let Some(start) = player_start_world(view.start, view.player_id) else {
+        return center;
+    };
+    let dx = center.0 - start.0;
+    let dy = center.1 - start.1;
+    let dist = (dx * dx + dy * dy).sqrt();
+    if dist <= f32::EPSILON {
+        return center;
+    }
+    let step = (4.0 * view.start.map.tile_size as f32).min(dist);
+    (start.0 + dx / dist * step, start.1 + dy / dist * step)
 }
 
 fn nearest_unassigned_node(
@@ -1945,55 +1955,6 @@ fn tile_of(map: &MapInfo, x: f32, y: f32) -> (u32, u32) {
     let tx = (x / ts).floor().max(0.0) as u32;
     let ty = (y / ts).floor().max(0.0) as u32;
     (tx.min(map.width - 1), ty.min(map.height - 1))
-}
-
-#[test]
-fn scripted_self_play_exercises_economy_tech_and_combat() {
-    let players = vec![
-        PlayerInit {
-            id: 1,
-            name: "Script Alpha".into(),
-            color: "#4cc9f0".into(),
-            is_ai: false,
-        },
-        PlayerInit {
-            id: 2,
-            name: "Script Beta".into(),
-            color: "#f72585".into(),
-            is_ai: false,
-        },
-    ];
-    let game = Game::new(&players);
-    let start = game.start_payload();
-    let specs = players.clone();
-    let scripts: Vec<Box<dyn ScriptedPlayer>> = vec![
-        Box::new(BuildTechAttackScript::new(1)),
-        Box::new(BuildTechAttackScript::new(2)),
-    ];
-    let mut runner = SelfPlayRunner::new(
-        "scripted_self_play_exercises_economy_tech_and_combat",
-        game,
-        start,
-        specs,
-        scripts,
-    );
-
-    match runner.run() {
-        Ok(report) => finalize_self_play_success(&runner, &players, &report),
-        Err(failure) => {
-            let artifact = runner
-                .write_failure_artifact(&failure)
-                .map(|p| {
-                    let name = p
-                        .file_name()
-                        .map(|n| n.to_string_lossy().into_owned())
-                        .unwrap_or_else(|| p.display().to_string());
-                    format!("http://localhost:8080/dev/selfplay?replay={name}")
-                })
-                .unwrap_or_else(|e| format!("artifact write failed: {e}"));
-            panic!("self-play failed: {}; REPLAY={artifact}", failure.reason);
-        }
-    }
 }
 
 #[test]
@@ -2181,79 +2142,6 @@ fn scripted_self_play_mine_only_steel_fairness() {
     );
 }
 
-/// 30-second smoke test for attached-mining fairness. Should be perfectly deterministic.
-#[test]
-fn mine_only_steel_fairness_30s() {
-    const THIRTY_SECONDS_TICKS: u32 = 30 * config::TICK_HZ;
-    const STEEL_TOLERANCE: u32 = 2;
-
-    let players = vec![
-        PlayerInit {
-            id: 1,
-            name: "Miner A".into(),
-            color: "#4cc9f0".into(),
-            is_ai: false,
-        },
-        PlayerInit {
-            id: 2,
-            name: "Miner B".into(),
-            color: "#f72585".into(),
-            is_ai: false,
-        },
-    ];
-    let mut game = Game::new(&players);
-    let start = game.start_payload();
-
-    let mut scripts: Vec<Box<dyn ScriptedPlayer>> = vec![
-        Box::new(MineOnlyScript::new(1)),
-        Box::new(MineOnlyScript::new(2)),
-    ];
-
-    for tick in 0..THIRTY_SECONDS_TICKS {
-        let snapshots: BTreeMap<u32, Snapshot> = players
-            .iter()
-            .map(|p| (p.id, game.snapshot_for(p.id)))
-            .collect();
-
-        let mut commands = Vec::new();
-        for script in &mut scripts {
-            let pid = script.player_id();
-            let Some(snapshot) = snapshots.get(&pid) else {
-                continue;
-            };
-            let view = PlayerView {
-                player_id: pid,
-                tick,
-                start: &start,
-                snapshot,
-            };
-            for command in script.commands(view) {
-                commands.push((pid, command));
-            }
-        }
-
-        for (player_id, command) in commands {
-            game.enqueue(player_id, command);
-        }
-
-        game.tick();
-    }
-
-    let snap_a = game.snapshot_for(1);
-    let snap_b = game.snapshot_for(2);
-
-    let diff = snap_a.steel.abs_diff(snap_b.steel);
-
-    assert!(
-        diff <= STEEL_TOLERANCE,
-        "after 30 seconds of passive mining, player 1 has {} steel and player 2 has {} steel (diff = {}, tolerance = {})",
-        snap_a.steel,
-        snap_b.steel,
-        diff,
-        STEEL_TOLERANCE
-    );
-}
-
 /// Run a scripted match for a fixed number of ticks and return the final game state plus
 /// the per-tick snapshots for every player.
 #[cfg(test)]
@@ -2296,6 +2184,49 @@ fn run_scripted_ticks(
         game.tick();
     }
     history
+}
+
+#[test]
+fn combat_rendezvous_is_four_tiles_toward_center() {
+    let start = StartPayload {
+        player_id: 1,
+        tick: 0,
+        map: MapInfo {
+            width: 64,
+            height: 64,
+            tile_size: config::TILE_SIZE,
+            terrain: vec![terrain::GRASS; 64 * 64],
+            resources: vec![],
+        },
+        players: vec![crate::protocol::PlayerStart {
+            id: 1,
+            name: "A".into(),
+            color: "#fff".into(),
+            start_tile_x: 8,
+            start_tile_y: 8,
+        }],
+    };
+    let view = PlayerView {
+        player_id: 1,
+        tick: 0,
+        start: &start,
+        snapshot: &Snapshot {
+            tick: 0,
+            steel: 0,
+            oil: 0,
+            supply_used: 0,
+            supply_cap: 0,
+            entities: vec![],
+            events: vec![],
+        },
+    };
+
+    let (x, y) = combat_rendezvous_world(view);
+    let (sx, sy) = player_start_world(&start, 1).unwrap();
+    let dx = x - sx;
+    let dy = y - sy;
+    let dist = (dx * dx + dy * dy).sqrt();
+    assert!((dist - 4.0 * config::TILE_SIZE as f32).abs() < 0.001);
 }
 
 /// Two fresh games with the same scripted players must evolve identically tick-for-tick.

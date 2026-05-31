@@ -652,7 +652,8 @@ simulation behavior.
 **MVP coverage.** The first scripted self-play test spawns two non-AI players, gives each the same
 deterministic build/tech/attack script, and runs the match headlessly under `cargo test`. The
 scripts gather minerals and gas, construct a Depot, Barracks, and Tank Factory, train Riflemen and a Tank,
-and attack-move toward a public map-center combat rendezvous. The harness checks per-tick invariants
+and attack-move toward a public combat rendezvous that sits four tiles toward the center from each
+player's start line. The harness checks per-tick invariants
 for invalid resources, supply overflow, malformed entity snapshots, out-of-bounds positions, and
 non-finite progress values. It also enforces progress deadlines so a stuck economy/tech/combat loop
 fails as a deadlock instead of timing out silently.

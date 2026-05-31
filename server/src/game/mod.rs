@@ -23,7 +23,9 @@ pub mod systems;
 use std::collections::HashMap;
 
 use crate::config;
-use crate::protocol::{Command, EntityView, Event, MapInfo, PlayerStart, ResourceNode, Snapshot, StartPayload};
+use crate::protocol::{
+    Command, EntityView, Event, MapInfo, PlayerStart, ResourceNode, Snapshot, StartPayload,
+};
 use serde::{Deserialize, Serialize};
 
 use ai::AiController;
