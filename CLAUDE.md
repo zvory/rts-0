@@ -56,7 +56,7 @@ the server simulates at 30 Hz and sends per-player, fog-filtered snapshots.
 ## Commands
 
 ```bash
-# Run (serves client + /ws on :8080; open http://localhost:8080)
+# Run (serves client + /ws on the configured RTS_ADDR; open the printed URL)
 cd server && cargo run            # add --release for the fast build
 
 # Build / lint / format
@@ -113,15 +113,15 @@ There is **no JS build step** (plain ES modules + PixiJS from CDN). The client i
 
 - Debug builds have overflow checks **on** (a bad `Build` coord can panic in `cargo run` but
   silently wrap in `--release`) — that's why placement math is `checked_*`. Keep it that way.
-- Tests need a **running** server on `:8080`; they are not `cargo test` (they're Node scripts that
+- Tests need a **running** server on the test runner's private port; they are not `cargo test` (they're Node scripts that
   drive the live server/client end to end). After any change, run all three and confirm green.
 - If a self-play test fails and the reason is not immediately obvious, do **not** sink time into
-  speculative debugging first. Stop any existing server on `:8080`, start a fresh server, then use
+  speculative debugging first. Start a fresh server on its own port, then use
   the macOS `open` command to open a local self-play spectation replay so the user can inspect the
   failure state directly. Do
   **not** use the Browser skill for this flow. Use
-  `open "http://localhost:8080/dev/selfplay?replay=<artifact_name>"` (for example
-  `open "http://localhost:8080/dev/selfplay?replay=manual_worker_rush_latest"`), not the in-app
+  `open "http://localhost:<port>/dev/selfplay?replay=<artifact_name>"` (for example
+  `open "http://localhost:<port>/dev/selfplay?replay=manual_worker_rush_latest"`), not the in-app
   browser.
 - A 1-player match is a never-ending sandbox; only 2+ player matches resolve to a winner. Empty
   rooms reset to lobby so a room name is never stuck mid-match.

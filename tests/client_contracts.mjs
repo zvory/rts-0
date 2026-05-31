@@ -37,7 +37,7 @@ function assertHasGetter(obj, name, msgPrefix = "") {
 // Net
 // ---------------------------------------------------------------------------
 {
-  const net = new Net("ws://localhost:8080/ws");
+  const net = new Net("ws://example.test/ws");
   assert(net instanceof Net, "Net constructor should return an instance");
   assertHasMethod(net, "connect", "Net");
   assertHasMethod(net, "on", "Net");

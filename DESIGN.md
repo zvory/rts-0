@@ -38,7 +38,7 @@ update this file in the same change.
   scripted self-play and streams **full-world** snapshots (no fog) to the ordinary match
   renderer. This path is isolated from normal lobby play and is only for debugging.
 - The same Rust process serves the static client files, so development is a single
-  `cargo run` and then open `http://localhost:8080`.
+  `cargo run` and then open the printed local URL.
 
 ### Tick & networking model
 - `TICK_HZ = 10` (100 ms per simulated tick).

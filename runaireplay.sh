@@ -4,6 +4,7 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "$0")" && pwd)"
 LOG_FILE="$(mktemp -t runaireplay.XXXXXX.log)"
 SERVER_PID=""
+SERVER_URL=""
 
 cleanup() {
     if [ -n "$SERVER_PID" ] && kill -0 "$SERVER_PID" 2>/dev/null; then
@@ -12,26 +13,14 @@ cleanup() {
 }
 trap cleanup EXIT
 
-kill_port_8080() {
-    local pids
-    pids=$(lsof -ti :8080 2>/dev/null || true)
-    if [ -z "$pids" ]; then
-        return
-    fi
-    echo "Stopping existing server on :8080..."
-    kill $pids 2>/dev/null || true
-    for i in $(seq 1 10); do
-        if ! lsof -ti :8080 >/dev/null 2>&1; then
-            return
-        fi
-        sleep 1
-    done
-    pids=$(lsof -ti :8080 2>/dev/null || true)
-    if [ -n "$pids" ]; then
-        echo "Force stopping lingering server on :8080..."
-        kill -9 $pids 2>/dev/null || true
-    fi
+alloc_port() {
+    node -e 'const net = require("node:net"); const s = net.createServer(); s.listen(0, "127.0.0.1", () => { console.log(s.address().port); s.close(); });'
 }
+
+if ! command -v node >/dev/null 2>&1; then
+    echo "node not found on PATH — this script needs Node to allocate a free port." >&2
+    exit 2
+fi
 
 echo "Running real_ai_vs_real_ai test..."
 set +e
@@ -42,7 +31,7 @@ cat "$LOG_FILE"
 
 ARTIFACT=$(rg -o 'REPLAY_ARTIFACT=[^ ]+' "$LOG_FILE" | head -1 | cut -d= -f2)
 if [ -z "$ARTIFACT" ]; then
-    ARTIFACT=$(rg -o 'view replay: http://localhost:8080/dev/selfplay\?replay=[^ ]+' "$LOG_FILE" | head -1 | sed 's/.*replay=//')
+    ARTIFACT=$(rg -o 'view replay: http://localhost:[0-9]+/dev/selfplay\?replay=[^ ]+' "$LOG_FILE" | head -1 | sed 's/.*replay=//')
 fi
 if [ -z "$ARTIFACT" ]; then
     echo "ERROR: could not find REPLAY_ARTIFACT in test output" >&2
@@ -50,20 +39,20 @@ if [ -z "$ARTIFACT" ]; then
 fi
 echo "Artifact: $ARTIFACT"
 
-kill_port_8080
-echo "Starting server..."
+PORT="$(alloc_port)"
+SERVER_URL="http://127.0.0.1:${PORT}"
+echo "Starting server on $SERVER_URL..."
 cd "$REPO_ROOT/server"
-cargo run &
+RTS_ADDR="127.0.0.1:${PORT}" cargo run >"$LOG_FILE.server" 2>&1 &
 SERVER_PID=$!
-echo "Server PID: $SERVER_PID"
 for i in $(seq 1 30); do
-    if lsof -ti :8080 >/dev/null 2>&1; then
+    if curl -fsS --max-time 1 "$SERVER_URL/" >/dev/null 2>&1; then
         break
     fi
     sleep 1
 done
 
-open "http://localhost:8080/dev/selfplay?replay=${ARTIFACT}"
+open "${SERVER_URL}/dev/selfplay?replay=${ARTIFACT}"
 
 if [ "$TEST_STATUS" -ne 0 ]; then
     echo "Test failed with status $TEST_STATUS; replay opened above." >&2

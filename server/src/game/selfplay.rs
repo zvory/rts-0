@@ -1511,7 +1511,7 @@ fn finalize_self_play_success(
                         .file_name()
                         .map(|n| n.to_string_lossy().into_owned())
                         .unwrap_or_else(|| p.display().to_string());
-                    format!("http://localhost:8080/dev/selfplay?replay={name}")
+                    format!("/dev/selfplay?replay={name}")
                 })
                 .unwrap_or_else(|e| format!("artifact write failed: {e}"));
             panic!(
@@ -2006,7 +2006,7 @@ fn scripted_self_play_worker_rush_vs_economy() {
                         .file_name()
                         .map(|n| n.to_string_lossy().into_owned())
                         .unwrap_or_else(|| p.display().to_string());
-                    format!("http://localhost:8080/dev/selfplay?replay={name}")
+                    format!("/dev/selfplay?replay={name}")
                 })
                 .unwrap_or_else(|e| format!("artifact write failed: {e}"));
             panic!("self-play failed: {}; REPLAY={artifact}", failure.reason);
@@ -2346,7 +2346,7 @@ fn real_ai_vs_real_ai() {
                 let _ = std::fs::write(dir.join("replay.json"), json);
             }
         }
-        let url = format!("http://localhost:8080/dev/selfplay?replay={artifact_name}");
+        let url = format!("/dev/selfplay?replay={artifact_name}");
         println!("REPLAY_ARTIFACT={artifact_name}");
         eprintln!("real_ai_vs_real_ai failure: {reason}");
         eprintln!("view replay: {url}");

@@ -8,9 +8,8 @@
 #   3. Headless client smoke        (client_smoke — only if puppeteer-core + Chrome are present)
 #
 # The server is built in debug (overflow checks ON — the hardening regression tests rely on a
-# bad Build coord being caught, not silently wrapped) and booted on a free-ish port. If a server
-# is already answering on the chosen port it is reused (and left running); otherwise this script
-# starts one and tears it down on exit.
+# bad Build coord being caught, not silently wrapped) and booted on a private free port. The
+# runner owns that server process and tears it down on exit.
 #
 # Usage:
 #   tests/run-all.sh                 # everything (silent unless failing)
@@ -27,7 +26,7 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 SERVER_DIR="$REPO_ROOT/server"
 
 # --- Options --------------------------------------------------------------------------------
-PORT="${PORT:-8081}"
+PORT="${PORT:-}"
 RUN_RUST=1
 RUN_CLIENT=1
 VERBOSE=0
@@ -44,6 +43,23 @@ for arg in "$@"; do
 done
 
 echo "running all tests silently, will take a while, patience"
+
+if ! command -v node >/dev/null 2>&1; then
+  echo "node not found on PATH — the API suites need Node >= 22 (built-in WebSocket)." >&2
+  exit 2
+fi
+NODE_MAJOR="$(node -p 'process.versions.node.split(".")[0]' 2>/dev/null || echo 0)"
+if [ "$NODE_MAJOR" -lt 22 ]; then
+  info "Node $NODE_MAJOR detected; the API suites need >= 22 for the global WebSocket. Continuing anyway."
+fi
+
+alloc_port() {
+  node -e 'const net = require("node:net"); const s = net.createServer(); s.listen(0, "127.0.0.1", () => { console.log(s.address().port); s.close(); });'
+}
+
+if [ -z "$PORT" ]; then
+  PORT="$(alloc_port)"
+fi
 
 HEALTH_URL="http://127.0.0.1:${PORT}/"
 export RTS_WS="ws://127.0.0.1:${PORT}/ws"   # consumed by the Node API suites
@@ -142,16 +158,6 @@ boot_server() {
     info "server healthy (pid $SERVER_PID) at $HEALTH_URL"
   fi
 }
-
-# --- Preflight ------------------------------------------------------------------------------
-if ! command -v node >/dev/null 2>&1; then
-  echo "node not found on PATH — the API suites need Node >= 22 (built-in WebSocket)." >&2
-  exit 2
-fi
-NODE_MAJOR="$(node -p 'process.versions.node.split(".")[0]' 2>/dev/null || echo 0)"
-if [ "$NODE_MAJOR" -lt 22 ]; then
-  info "Node $NODE_MAJOR detected; the API suites need >= 22 for the global WebSocket. Continuing anyway."
-fi
 
 # Parallel background runner — writes pass/fail result to a temp file.
 # Usage: run_suite_bg <name> <command...>
