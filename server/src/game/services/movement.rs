@@ -32,7 +32,13 @@ const COLLISION_EPS_PX: f32 = 0.001;
 /// Advance every moving unit along its waypoint path at its speed. Clamps the final landing
 /// tile to passable terrain (soft overlap with other units is allowed, so we don't resolve
 /// unit-unit collisions here). Arriving at the last waypoint of a plain Move clears the order.
-pub(crate) fn movement_system(map: &Map, entities: &mut EntityStore, occ: &Occupancy) {
+pub(crate) fn movement_system(
+    map: &Map,
+    entities: &mut EntityStore,
+    occ: &Occupancy,
+    spatial: &SpatialIndex,
+    tick: u32,
+) {
     for id in entities.ids() {
         // Pull the data we need, then mutate.
         let (speed, mut x, mut y, class) = {
@@ -93,6 +99,34 @@ pub(crate) fn movement_system(map: &Map, entities: &mut EntityStore, occ: &Occup
             }
         }
 
+        // Compute neighbor repulsion before taking the mutable borrow.
+        let repulsion_dir: (f32, f32) = {
+            let unit_radius = entities
+                .get(id)
+                .and_then(|e| config::unit_stats(e.kind))
+                .map(|s| s.radius)
+                .unwrap_or(9.0);
+            let repulsion_range = unit_radius * 2.0 + MAX_UNIT_RADIUS_PX;
+            let mut rx = 0.0_f32;
+            let mut ry = 0.0_f32;
+            for bid in spatial.ids_in_circle_bbox(x, y, repulsion_range) {
+                if bid == id {
+                    continue;
+                }
+                if let Some(nb) = entities.get(bid) {
+                    let dx = x - nb.pos_x;
+                    let dy = y - nb.pos_y;
+                    let d = (dx * dx + dy * dy).sqrt();
+                    if d > 1e-4 {
+                        rx += dx / d;
+                        ry += dy / d;
+                    }
+                }
+            }
+            let rlen = (rx * rx + ry * ry).sqrt();
+            if rlen > 1e-4 { (rx / rlen, ry / rlen) } else { (0.0, 0.0) }
+        };
+
         if let Some(e) = entities.get_mut(id) {
             e.pos_x = x.clamp(0.0, map.world_size_px() - 0.01);
             e.pos_y = y.clamp(0.0, map.world_size_px() - 0.01);
@@ -106,6 +140,11 @@ pub(crate) fn movement_system(map: &Map, entities: &mut EntityStore, occ: &Occup
                     e.set_order(Order::Idle);
                 }
             } else if matches!(e.move_phase(), Some(MovePhase::Moving)) {
+                // Decrement sidestep cooldown each tick.
+                if let Some(m) = e.movement.as_mut() {
+                    m.sidestep_cooldown = m.sidestep_cooldown.saturating_sub(1);
+                }
+
                 // Tolerant arrival: unit has a path but may be making no progress.
                 let (lx, ly) = e
                     .movement
@@ -124,6 +163,7 @@ pub(crate) fn movement_system(map: &Map, entities: &mut EntityStore, occ: &Occup
                     m.last_progress_pos = (x, y);
                 }
                 let stuck_ticks = e.movement.as_ref().map(|m| m.stuck_ticks).unwrap_or(0);
+                // Tolerant arrival: stuck and near goal.
                 if stuck_ticks >= config::STUCK_ARRIVAL_TICKS {
                     if let Some((gx, gy)) = e.path_goal() {
                         let dx = x - gx;
@@ -141,7 +181,100 @@ pub(crate) fn movement_system(map: &Map, entities: &mut EntityStore, occ: &Occup
                         }
                     }
                 }
+                // Sidestep: stuck mid-path (far from goal), cooldown elapsed,
+                // only for Move/AttackMove orders.
+                // Stagger trigger per unit so clustered units don't all sidestep at once.
+                let trigger_threshold =
+                    config::SIDESTEP_TRIGGER_TICKS + (id % 8) as u16;
+                if stuck_ticks >= trigger_threshold
+                    && matches!(e.order(), Order::Move(_) | Order::AttackMove(_))
+                {
+                    let far_from_goal = e.path_goal().map_or(false, |(gx, gy)| {
+                        let dx = x - gx;
+                        let dy = y - gy;
+                        (dx * dx + dy * dy).sqrt() > config::TOLERANT_ARRIVAL_RADIUS_PX
+                    });
+                    let sidestep_cooldown = e
+                        .movement
+                        .as_ref()
+                        .map(|m| m.sidestep_cooldown)
+                        .unwrap_or(1);
+                    if far_from_goal && sidestep_cooldown == 0 {
+                        inject_sidestep(e, id, x, y, map, occ, repulsion_dir, tick);
+                    }
+                }
             }
+        }
+    }
+}
+
+/// Inject a perpendicular detour waypoint so a stuck mid-path unit can shimmy free.
+/// Direction is derived from repulsion away from neighbors (deterministic).
+/// `repulsion_dir` is the pre-computed normalized repulsion vector (or (0,0) if no neighbors).
+fn inject_sidestep(
+    e: &mut crate::game::entity::Entity,
+    entity_id: u32,
+    x: f32,
+    y: f32,
+    map: &Map,
+    occ: &Occupancy,
+    repulsion_dir: (f32, f32),
+    tick: u32,
+) {
+    let class = MobilityClass::from_kind(e.kind);
+
+    // Heading toward next waypoint; fall back to facing angle if no waypoint.
+    let (hx, hy) = if let Some((wx, wy)) = e.next_waypoint() {
+        let dx = wx - x;
+        let dy = wy - y;
+        let d = (dx * dx + dy * dy).sqrt();
+        if d > 1e-4 { (dx / d, dy / d) } else { (e.facing().cos(), e.facing().sin()) }
+    } else {
+        (e.facing().cos(), e.facing().sin())
+    };
+
+    // Use repulsion direction if meaningful; otherwise fall back to id-parity perpendicular.
+    let (bx, by) = if repulsion_dir.0 != 0.0 || repulsion_dir.1 != 0.0 {
+        repulsion_dir
+    } else if entity_id & 1 == 0 {
+        (-hy, hx)
+    } else {
+        (hy, -hx)
+    };
+
+    // Deterministic jitter seeded from both entity_id and tick so repeated sidestepping
+    // explores different directions rather than always re-entering the same blocked spot.
+    let seed = entity_id.wrapping_add(tick);
+    let jitter_angle = ((seed % 5) as f32 - 2.0) * (std::f32::consts::PI / 12.0); // ±30°
+    let (cos_j, sin_j) = (jitter_angle.cos(), jitter_angle.sin());
+    let (px, py) = (bx * cos_j - by * sin_j, bx * sin_j + by * cos_j);
+
+    // Distance jitter: 0.5×–0.75× of SIDESTEP_DISTANCE_PX (half the original average).
+    let d = config::SIDESTEP_DISTANCE_PX * (0.5 + (seed % 3) as f32 * 0.125);
+    let tx = x + px * d;
+    let ty = y + py * d;
+
+    let point_clear = |cx: f32, cy: f32| tile_passable_at(occ, map, class, cx, cy);
+
+    let detour = if point_clear(tx, ty) {
+        Some((tx, ty))
+    } else {
+        // Try opposite side.
+        let tx2 = x - px * d;
+        let ty2 = y - py * d;
+        if point_clear(tx2, ty2) {
+            Some((tx2, ty2))
+        } else {
+            None
+        }
+    };
+
+    if let Some(waypoint) = detour {
+        // path is reverse-ordered; push makes it the *next* waypoint.
+        e.push_waypoint(waypoint);
+        if let Some(m) = e.movement.as_mut() {
+            m.sidestep_cooldown = config::SIDESTEP_COOLDOWN_TICKS;
+            m.stuck_ticks = 0;
         }
     }
 }
@@ -541,7 +674,8 @@ mod tests {
                 coordinator.order_group_move(&mut entities, 1, &ids, (gx, gy), false);
                 coordinator.process_awaiting_paths(&mut entities);
             }
-            movement_system(&map, &mut entities, &occ);
+            let spatial = SpatialIndex::build(&entities, map.size);
+            movement_system(&map, &mut entities, &occ, &spatial, 0);
             let spatial = SpatialIndex::build(&entities, map.size);
             resolve_collisions(&mut entities, &spatial, &map, &occ);
         }
@@ -590,7 +724,8 @@ mod tests {
                 coordinator.order_group_move(&mut entities, 1, &[mover], (gx, gy), false);
                 coordinator.process_awaiting_paths(&mut entities);
             }
-            movement_system(&map, &mut entities, &occ);
+            let spatial = SpatialIndex::build(&entities, map.size);
+            movement_system(&map, &mut entities, &occ, &spatial, 0);
             let spatial = SpatialIndex::build(&entities, map.size);
             resolve_collisions(&mut entities, &spatial, &map, &occ);
         }

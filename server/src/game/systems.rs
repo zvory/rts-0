@@ -57,7 +57,7 @@ pub(crate) fn run_tick(
         events,
     );
     coordinator.process_awaiting_paths(entities);
-    services::movement::movement_system(map, entities, &occ);
+    services::movement::movement_system(map, entities, &occ, &spatial, tick);
 
     // Rebuild after movement so combat, gather, and collision resolution see updated positions.
     let spatial = services::spatial::SpatialIndex::build(entities, map.size);
