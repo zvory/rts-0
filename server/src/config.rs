@@ -28,7 +28,7 @@ pub const STARTING_OIL: u32 = 0;
 pub const STARTING_WORKERS: u32 = 4;
 
 pub const STEEL_LOAD: u32 = 5;
-pub const OIL_LOAD: u32 = 1;
+pub const OIL_LOAD: u32 = 2;
 pub const HARVEST_TICKS: u32 = 40;
 pub const STEEL_PATCH_AMOUNT: u32 = 1500;
 pub const OIL_GEYSER_AMOUNT: u32 = 5000;
@@ -150,7 +150,7 @@ pub fn unit_stats(kind: EntityKind) -> Option<UnitStats> {
             radius: 10.0,
         },
         EntityKind::Tank => UnitStats {
-            hp: 130,
+            hp: 390,
             dmg: 20,
             range_tiles: 3,
             cooldown: 18,
@@ -237,7 +237,7 @@ pub fn building_stats(kind: EntityKind) -> Option<BuildingStats> {
         },
         EntityKind::Bunker => BuildingStats {
             hp: 200,
-            sight_tiles: 6,
+            sight_tiles: 8,
             cost_steel: 150,
             cost_oil: 0,
             foot_w: 2,
@@ -245,7 +245,7 @@ pub fn building_stats(kind: EntityKind) -> Option<BuildingStats> {
             build_ticks: 120,
             provides_supply: 0,
             dmg: 10,
-            range_tiles: 7,
+            range_tiles: 4,
             cooldown: 10,
         },
         _ => return None,
