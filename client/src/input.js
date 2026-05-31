@@ -487,9 +487,8 @@ export class Input {
   }
 
   /**
-   * A footprint is valid when every tile it covers is in-bounds and passable.
-   * Being in bounds for the full footprint also satisfies "not overlapping the
-   * map edge". (Server re-validates authoritatively, incl. unit/building overlap.)
+   * A footprint is valid when every tile it covers is in-bounds and passable,
+   * and no existing entity (unit or building) occupies the same world area.
    */
   _footprintValid(tileX, tileY, footW, footH, map) {
     if (tileX < 0 || tileY < 0) return false;
@@ -499,6 +498,14 @@ export class Input {
         const code = map.terrain[ty * map.width + tx];
         if (!PASSABLE[code]) return false;
       }
+    }
+    const ts = map.tileSize;
+    const minX = tileX * ts;
+    const minY = tileY * ts;
+    const maxX = (tileX + footW) * ts;
+    const maxY = (tileY + footH) * ts;
+    for (const e of this.state.entitiesInterpolated(1)) {
+      if (this._entityIntersectsRect(e, minX, minY, maxX, maxY)) return false;
     }
     return true;
   }
