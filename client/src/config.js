@@ -45,18 +45,19 @@ export const PLAYER_PALETTE = Object.freeze([
 ]);
 
 // Per-kind UI / render info. `size` is the render radius (units) or half-extent hint.
-// `sight` (tiles) drives the local fog overlay. `cost`/`supply` drive the command card.
+// `sight` (tiles) drives the local fog overlay. `rangeTiles` mirrors weapon range for visuals.
+// `cost`/`supply` drive the command card.
 export const STATS = Object.freeze({
   [KIND.WORKER]: { label: "Engineer", icon: "EN", size: 9, sight: 7,
-    cost: { steel: 50, oil: 0 }, supply: 1, buildTicks: 120 },
+    rangeTiles: 1, cost: { steel: 50, oil: 0 }, supply: 1, buildTicks: 120 },
   [KIND.RIFLEMAN]: { label: "Rifleman", icon: "RF", size: 9, sight: 8,
-    cost: { steel: 50, oil: 0 }, supply: 1, buildTicks: 150 },
+    rangeTiles: 4, cost: { steel: 50, oil: 0 }, supply: 1, buildTicks: 150 },
   [KIND.MACHINE_GUNNER]: { label: "Machine Gunner", icon: "MG", size: 10, sight: 8,
-    cost: { steel: 75, oil: 25 }, supply: 2, buildTicks: 200, requires: KIND.TRAINING_CENTRE },
+    rangeTiles: 5, cost: { steel: 75, oil: 25 }, supply: 2, buildTicks: 200, requires: KIND.TRAINING_CENTRE },
   [KIND.AT_TEAM]: { label: "AT Team", icon: "AT", size: 10, sight: 8,
-    cost: { steel: 75, oil: 25 }, supply: 2, buildTicks: 220, requires: KIND.TRAINING_CENTRE },
+    rangeTiles: 4, cost: { steel: 75, oil: 25 }, supply: 2, buildTicks: 220, requires: KIND.TRAINING_CENTRE },
   [KIND.TANK]: { label: "Tank", icon: "TK", size: 26, sight: 7,
-    cost: { steel: 100, oil: 50 }, supply: 2, buildTicks: 250 },
+    rangeTiles: 3, cost: { steel: 100, oil: 50 }, supply: 2, buildTicks: 250 },
 
   [KIND.INDUSTRIAL_CENTER]: { label: "Industrial Center", icon: "IC", footW: 3, footH: 3, sight: 9,
     cost: { steel: 400, oil: 0 }, buildTicks: 400, trains: [KIND.WORKER] },
