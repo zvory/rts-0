@@ -2372,6 +2372,13 @@ fn identical_scripted_runs_are_identical() {
 /// `target/selfplay-artifacts/real_ai_vs_real_ai/replay.json`.
 #[test]
 fn real_ai_vs_real_ai() {
+    use std::collections::{BTreeMap, BTreeSet};
+
+    const MIN_PEAK_BARRACKS_ALIVE: usize = 3;
+    const MIN_RIFLEMAN_TRAIN_COMMANDS: usize = 75;
+    const MIN_ATTACK_MOVE_COMMANDS: usize = 15;
+    const MIN_ATTACK_EVENTS: usize = 500;
+
     let players = vec![
         PlayerInit {
             id: 1,
@@ -2389,9 +2396,23 @@ fn real_ai_vs_real_ai() {
     let mut game = Game::new(&players);
 
     let mut event_log = Vec::new();
+    let mut max_barracks_alive: BTreeMap<u32, usize> = BTreeMap::new();
+    let mut max_riflemen_alive: BTreeMap<u32, usize> = BTreeMap::new();
+    let mut seen_riflemen: BTreeMap<u32, BTreeSet<u32>> = BTreeMap::new();
+    let mut attack_events: BTreeMap<u32, usize> = BTreeMap::new();
+    let mut death_events: BTreeMap<u32, usize> = BTreeMap::new();
     for tick in 1..=6000 {
         for (player_id, events) in game.tick() {
             for event in events {
+                match event {
+                    Event::Attack { .. } => {
+                        *attack_events.entry(player_id).or_default() += 1;
+                    }
+                    Event::Death { .. } => {
+                        *death_events.entry(player_id).or_default() += 1;
+                    }
+                    _ => {}
+                }
                 event_log.push(EventLogEntry {
                     tick,
                     player_id,
@@ -2399,6 +2420,122 @@ fn real_ai_vs_real_ai() {
                 });
             }
         }
+
+        for player in &players {
+            let snapshot = game.snapshot_for(player.id);
+            let mut barracks_alive = 0usize;
+            let mut riflemen_alive = 0usize;
+            let seen = seen_riflemen.entry(player.id).or_default();
+            for entity in snapshot.entities.iter().filter(|e| e.owner == player.id) {
+                if entity.kind == kinds::BARRACKS {
+                    barracks_alive += 1;
+                }
+                if entity.kind == kinds::RIFLEMAN {
+                    riflemen_alive += 1;
+                    seen.insert(entity.id);
+                }
+            }
+            max_barracks_alive
+                .entry(player.id)
+                .and_modify(|max| *max = (*max).max(barracks_alive))
+                .or_insert(barracks_alive);
+            max_riflemen_alive
+                .entry(player.id)
+                .and_modify(|max| *max = (*max).max(riflemen_alive))
+                .or_insert(riflemen_alive);
+        }
+    }
+
+    let mut barracks_build_cmds: BTreeMap<u32, usize> = BTreeMap::new();
+    let mut rifleman_train_cmds: BTreeMap<u32, usize> = BTreeMap::new();
+    let mut attack_move_cmds: BTreeMap<u32, usize> = BTreeMap::new();
+    for entry in game.command_log() {
+        match &entry.command {
+            Command::Build { building, .. } if building == kinds::BARRACKS => {
+                *barracks_build_cmds.entry(entry.player_id).or_default() += 1;
+            }
+            Command::Train { unit, .. } if unit == kinds::RIFLEMAN => {
+                *rifleman_train_cmds.entry(entry.player_id).or_default() += 1;
+            }
+            Command::AttackMove { .. } => {
+                *attack_move_cmds.entry(entry.player_id).or_default() += 1;
+            }
+            _ => {}
+        }
+    }
+
+    for player in &players {
+        let peak_barracks = max_barracks_alive
+            .get(&player.id)
+            .copied()
+            .unwrap_or_default();
+        let rifleman_trains = rifleman_train_cmds
+            .get(&player.id)
+            .copied()
+            .unwrap_or_default();
+        let attack_moves = attack_move_cmds
+            .get(&player.id)
+            .copied()
+            .unwrap_or_default();
+        let attacks = attack_events.get(&player.id).copied().unwrap_or_default();
+        let seen_riflemen = seen_riflemen
+            .get(&player.id)
+            .map(|ids| ids.len())
+            .unwrap_or_default();
+        let peak_riflemen = max_riflemen_alive
+            .get(&player.id)
+            .copied()
+            .unwrap_or_default();
+        let barracks_builds = barracks_build_cmds
+            .get(&player.id)
+            .copied()
+            .unwrap_or_default();
+
+        assert!(
+            peak_barracks >= MIN_PEAK_BARRACKS_ALIVE,
+            "player {} peaked at only {} live barracks (build cmds {}, train cmds {}, peak riflemen {}, seen riflemen {}, attack moves {}, attack events {})",
+            player.id,
+            peak_barracks,
+            barracks_builds,
+            rifleman_trains,
+            peak_riflemen,
+            seen_riflemen,
+            attack_moves,
+            attacks,
+        );
+        assert!(
+            rifleman_trains >= MIN_RIFLEMAN_TRAIN_COMMANDS,
+            "player {} trained only {} riflemen (peak barracks {}, peak riflemen {}, seen riflemen {}, attack moves {}, attack events {})",
+            player.id,
+            rifleman_trains,
+            peak_barracks,
+            peak_riflemen,
+            seen_riflemen,
+            attack_moves,
+            attacks,
+        );
+        assert!(
+            attack_moves >= MIN_ATTACK_MOVE_COMMANDS,
+            "player {} issued only {} attack-move commands (peak barracks {}, rifleman train cmds {}, peak riflemen {}, attack events {})",
+            player.id,
+            attack_moves,
+            peak_barracks,
+            rifleman_trains,
+            peak_riflemen,
+            attacks,
+        );
+        assert!(
+            attacks >= MIN_ATTACK_EVENTS,
+            "player {} produced only {} attack events (peak barracks {}, rifleman train cmds {}, attack moves {}, peak riflemen {}, seen riflemen {}, deaths {})",
+            player.id,
+            attacks,
+            peak_barracks,
+            rifleman_trains,
+            attack_moves,
+            peak_riflemen,
+            seen_riflemen,
+            death_events.get(&player.id).copied().unwrap_or_default(),
+        );
     }
 
     assert_replay_matches_live(&game, &players, &event_log).unwrap_or_else(|failure| {
