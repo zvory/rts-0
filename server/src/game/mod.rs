@@ -23,7 +23,7 @@ pub mod systems;
 use std::collections::HashMap;
 
 use crate::config;
-use crate::protocol::{Command, EntityView, Event, MapInfo, PlayerStart, Snapshot, StartPayload};
+use crate::protocol::{Command, EntityView, Event, MapInfo, PlayerStart, ResourceNode, Snapshot, StartPayload};
 use serde::{Deserialize, Serialize};
 
 use ai::AiController;
@@ -156,11 +156,22 @@ impl Game {
     /// Static info for the `start` message: terrain grid + each player's start tile. The
     /// `player_id` is left 0; the networking layer overwrites it per recipient.
     pub fn start_payload(&self) -> StartPayload {
+        let resources = self
+            .entities
+            .iter()
+            .filter(|e| e.kind.is_node())
+            .map(|e| ResourceNode {
+                kind: e.kind.to_protocol_str().to_string(),
+                x: e.pos_x,
+                y: e.pos_y,
+            })
+            .collect();
         let map = MapInfo {
             width: self.map.size,
             height: self.map.size,
             tile_size: config::TILE_SIZE,
             terrain: self.map.terrain.clone(),
+            resources,
         };
         let players = self
             .players
