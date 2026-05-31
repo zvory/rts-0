@@ -153,7 +153,8 @@ the player's own starting Industrial Center + workers.
   // resource nodes:
   remaining?: u32,               // resource left in the node
   // combat feedback:
-  targetId?: u32                 // current attack target, for drawing tracers
+  targetId?: u32,                // current attack target, for drawing tracers
+  setupState?: string            // machine_gunner only: "packed","setting_up","deployed","tearing_down"
 }
 ```
 
@@ -448,8 +449,10 @@ MVP scope:
 Core unit roles:
 - **Rifleman** is the baseline combat unit: cheap, flexible, useful for capturing and
   holding ground, and the primary answer to enemy infantry in forests.
-- **Machine gun** is the defensive escalation unit: it takes 5 seconds (`50` ticks) to
-  set up, then fires at a very high rate inside a fixed field of fire. Machine-gun nests
+- **Machine gun** is the defensive escalation unit: it takes half a second
+  (`MACHINE_GUNNER_SETUP_TICKS`) to set up after stopping, then fires at a very high rate.
+  Once deployed it must spend the same half-second tearing down before it can move.
+  Machine-gun nests
   are the main base-defense tool and should dominate open-ground infantry combat in the
   second stage of the game.
 - **Tank** is the machine-gun breaker and open-ground power unit: immune to rifle and
@@ -480,10 +483,11 @@ Intended progression:
 ### 5.2 Current implementation constants
 
 The current implementation uses the themed unit/building names below. Combat is still handled
-by the simple shared attack model; detailed machine-gun setup, armor facings, and forest-specific
-rules are future work.
+by the simple shared attack model plus the machine-gunner setup/teardown state; armor facings
+and forest-specific rules are future work.
 
 - `TICK_HZ = 30`, `SNAPSHOT_EVERY_N_TICKS = 1`.
+- `MACHINE_GUNNER_SETUP_TICKS = 15` (~0.5s setup or teardown).
 - Map: `TILE_SIZE = 32` px. Size scales with player count: 2p → 64×64, 3-4p → 96×96.
 - Start: `STARTING_STEEL = 50`, `STARTING_OIL = 0`, `STARTING_WORKERS = 4`,
   one Industrial Center at the player's start tile, a mineral cluster (16 patches) + a 2x2 block of 4 oil patches nearby.

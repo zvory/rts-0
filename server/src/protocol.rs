@@ -246,6 +246,8 @@ pub struct EntityView {
     // Combat feedback:
     #[serde(skip_serializing_if = "Option::is_none")]
     pub target_id: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub setup_state: Option<String>,
 }
 
 impl EntityView {
@@ -280,6 +282,7 @@ impl EntityView {
             latched_node: None,
             remaining: None,
             target_id: None,
+            setup_state: None,
         }
     }
 }

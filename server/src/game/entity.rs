@@ -436,13 +436,45 @@ impl Default for MovementState {
 }
 
 /// Weapon and active target state. Present on combat-capable entities.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct CombatState {
     /// Ticks until this entity may attack again (0 = ready).
     pub attack_cd: u32,
     /// Current attack/interaction target id. Combat uses enemy ids; gather/build commands use
     /// this for client feedback while the order executes.
     pub target_id: Option<u32>,
+    /// Setup state for weapons that must deploy before firing. Non-MG combatants leave this
+    /// packed and ignore it.
+    pub setup: WeaponSetup,
+}
+
+impl Default for CombatState {
+    fn default() -> Self {
+        CombatState {
+            attack_cd: 0,
+            target_id: None,
+            setup: WeaponSetup::Packed,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WeaponSetup {
+    Packed,
+    SettingUp { ticks: u16 },
+    Deployed,
+    TearingDown { ticks: u16 },
+}
+
+impl WeaponSetup {
+    pub fn to_protocol_str(self) -> &'static str {
+        match self {
+            WeaponSetup::Packed => "packed",
+            WeaponSetup::SettingUp { .. } => "setting_up",
+            WeaponSetup::Deployed => "deployed",
+            WeaponSetup::TearingDown { .. } => "tearing_down",
+        }
+    }
 }
 
 /// Production queue state. Present only on buildings that can train units.
@@ -814,6 +846,43 @@ impl Entity {
     pub fn tick_attack_cd(&mut self) {
         if let Some(c) = self.combat.as_mut() {
             c.attack_cd = c.attack_cd.saturating_sub(1);
+        }
+    }
+
+    pub fn weapon_setup(&self) -> WeaponSetup {
+        self.combat
+            .as_ref()
+            .map(|c| c.setup)
+            .unwrap_or(WeaponSetup::Packed)
+    }
+
+    pub fn set_weapon_setup(&mut self, setup: WeaponSetup) {
+        if let Some(c) = self.combat.as_mut() {
+            c.setup = setup;
+        }
+    }
+
+    pub fn tick_weapon_setup(&mut self) {
+        if let Some(c) = self.combat.as_mut() {
+            c.setup = match c.setup {
+                WeaponSetup::SettingUp { ticks } => {
+                    let ticks = ticks.saturating_sub(1);
+                    if ticks == 0 {
+                        WeaponSetup::Deployed
+                    } else {
+                        WeaponSetup::SettingUp { ticks }
+                    }
+                }
+                WeaponSetup::TearingDown { ticks } => {
+                    let ticks = ticks.saturating_sub(1);
+                    if ticks == 0 {
+                        WeaponSetup::Packed
+                    } else {
+                        WeaponSetup::TearingDown { ticks }
+                    }
+                }
+                setup => setup,
+            };
         }
     }
 

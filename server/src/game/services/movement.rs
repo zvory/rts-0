@@ -1,6 +1,6 @@
 use crate::config;
 use crate::game::entity::{
-    BuildPhase, Entity, EntityKind, EntityStore, GatherPhase, MovePhase, Order,
+    BuildPhase, Entity, EntityKind, EntityStore, GatherPhase, MovePhase, Order, WeaponSetup,
 };
 use crate::game::map::{Map, MobilityClass};
 use crate::game::pathfinding::Passability;
@@ -46,6 +46,14 @@ pub(crate) fn movement_system(
                 Some(e) if e.is_unit() && !e.path_is_empty() => e,
                 _ => continue,
             };
+            if e.kind == EntityKind::MachineGunner
+                && matches!(
+                    e.weapon_setup(),
+                    WeaponSetup::SettingUp { .. } | WeaponSetup::TearingDown { .. }
+                )
+            {
+                continue;
+            }
             let speed = config::unit_stats(e.kind).map(|s| s.speed).unwrap_or(0.0);
             let class = MobilityClass::from_kind(e.kind);
             (speed, e.pos_x, e.pos_y, class)
