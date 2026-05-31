@@ -715,14 +715,17 @@ impl RoomTask {
             DevDriver::Replay(replay) => replay.enqueue_for_tick(&mut game),
         }
         let tick_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| game.tick()));
-        if let Err(payload) = tick_result {
-            let reason = panic_reason(&payload);
-            dump_crash_replay(&self.room, &game, &reason);
-            self.phase = Phase::Lobby;
-            self.dev_driver = None;
-            self.dev_view_player_id = None;
-            return;
-        }
+        let mut per_player_events: HashMap<u32, Vec<Event>> = match tick_result {
+            Ok(events) => events.into_iter().collect(),
+            Err(payload) => {
+                let reason = panic_reason(&payload);
+                dump_crash_replay(&self.room, &game, &reason);
+                self.phase = Phase::Lobby;
+                self.dev_driver = None;
+                self.dev_view_player_id = None;
+                return;
+            }
+        };
 
         let recipients = self.order.clone();
         let view_player_id = self.dev_view_player_id.unwrap_or(0);
@@ -730,7 +733,10 @@ impl RoomTask {
             let Some(player) = self.players.get(&id) else {
                 continue;
             };
-            let snapshot = game.snapshot_full_for(view_player_id);
+            let mut snapshot = game.snapshot_full_for(view_player_id);
+            if let Some(mut events) = per_player_events.remove(&id) {
+                snapshot.events.append(&mut events);
+            }
             send_or_log(
                 &self.room,
                 id,
