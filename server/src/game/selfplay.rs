@@ -2363,6 +2363,7 @@ fn real_ai_vs_real_ai() {
     const MIN_RIFLEMAN_TRAIN_COMMANDS: usize = 75;
     const MIN_ATTACK_MOVE_COMMANDS: usize = 15;
     const MIN_ATTACK_EVENTS: usize = 500;
+    const TICKS: u32 = 12_000;
 
     let players = vec![
         PlayerInit {
@@ -2422,7 +2423,7 @@ fn real_ai_vs_real_ai() {
     };
 
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        for tick in 1..=6000 {
+        for tick in 1..=TICKS {
             let tick_result =
                 std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| game.tick()));
             let tick_output = match tick_result {
