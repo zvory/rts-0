@@ -43,14 +43,12 @@ const SUPPLY_BUFFER: u32 = 4;
 /// Free riflemen stage on a forward rally line before a full wave launches.
 const COMBAT_RALLY_TILES_FROM_START: f32 = 8.0;
 /// Spacing between neighboring riflemen on the rally line.
-const COMBAT_RALLY_SLOT_SPACING_TILES: f32 = 1.5;
+const COMBAT_RALLY_SLOT_SPACING_TILES: f32 = 0.75;
 /// Once a free rifleman is this much farther forward than the rally line, it should keep
 /// pressing toward the enemy base instead of being recycled backward into staging.
 const COMBAT_POINT_OF_NO_RETURN_TILES: f32 = 2.0;
-/// Initial free riflemen required before the AI launches its first attack wave.
+/// Initial minimum free riflemen required before the AI launches a rally-line wave.
 const BASE_WAVE_SIZE: usize = 3;
-/// Cap the requested wave size so an AI with a damaged economy eventually recovers.
-const MAX_WAVE_SIZE: usize = 8;
 /// If the AI cannot assemble its requested wave for this long, fall back to the baseline wave
 /// size so it resumes pressuring instead of stalling indefinitely.
 const WAVE_STALL_RESET_TICKS: u32 = 360;
@@ -297,17 +295,26 @@ impl AiController {
                 let Some(rifleman) = entities.get(id) else {
                     continue;
                 };
-                match classify_free_rifleman(map, me.start_tile, rifleman) {
-                    FreeRiflemanDisposition::Stage => staging.push(id),
-                    FreeRiflemanDisposition::RallyReady => rally_ready.push(id),
-                    FreeRiflemanDisposition::CommittedForward => committed.push(id),
+                if is_committed_forward(map, me.start_tile, rifleman) {
+                    committed.push(id);
+                } else if position_is_on_or_adjacent_to_rally_line(
+                    map,
+                    me.start_tile,
+                    (rifleman.pos_x, rifleman.pos_y),
+                    rally_line_cohort.len(),
+                ) {
+                    rally_ready.push(id);
+                } else {
+                    staging.push(id);
                 }
             }
             staging.sort_unstable();
             if !staging.is_empty() {
                 let rally_slots = combat_rally_slots(map, me.start_tile, rally_line_cohort.len());
                 for id in staging {
-                    let Some(slot_index) = rally_line_cohort.iter().position(|cohort_id| *cohort_id == id)
+                    let Some(slot_index) = rally_line_cohort
+                        .iter()
+                        .position(|cohort_id| *cohort_id == id)
                     else {
                         continue;
                     };
@@ -343,7 +350,7 @@ impl AiController {
                         y: enemy_y,
                     },
                 ));
-                self.note_wave_launch(tick, wave_size);
+                self.note_wave_launch(tick);
             }
         }
     }
@@ -352,14 +359,12 @@ impl AiController {
         if tick.saturating_sub(self.last_wave_launch_tick) >= WAVE_STALL_RESET_TICKS {
             self.next_wave_size = BASE_WAVE_SIZE;
         }
-        self.next_wave_size.min(MAX_WAVE_SIZE)
+        self.next_wave_size
     }
 
-    fn note_wave_launch(&mut self, tick: u32, launched_wave_size: usize) {
+    fn note_wave_launch(&mut self, tick: u32) {
         self.last_wave_launch_tick = tick;
-        self.next_wave_size = launched_wave_size
-            .saturating_add(1)
-            .clamp(BASE_WAVE_SIZE, MAX_WAVE_SIZE);
+        self.next_wave_size = self.next_wave_size.saturating_add(1);
     }
 
     /// Find a placeable footprint for `building` by scanning rings outward from the AI's start
@@ -508,26 +513,72 @@ fn classify_free_rifleman(
     start_tile: (u32, u32),
     rifleman: &crate::game::entity::Entity,
 ) -> FreeRiflemanDisposition {
+    if is_committed_forward(map, start_tile, rifleman) {
+        return FreeRiflemanDisposition::CommittedForward;
+    }
+    if position_is_on_or_adjacent_to_rally_line(
+        map,
+        start_tile,
+        (rifleman.pos_x, rifleman.pos_y),
+        1,
+    ) {
+        FreeRiflemanDisposition::RallyReady
+    } else {
+        FreeRiflemanDisposition::Stage
+    }
+}
+
+fn is_committed_forward(
+    map: &Map,
+    start_tile: (u32, u32),
+    rifleman: &crate::game::entity::Entity,
+) -> bool {
     let start = map.tile_center(start_tile.0, start_tile.1);
     let rally = combat_rally_world(map, start_tile);
     let dx = rally.0 - start.0;
     let dy = rally.1 - start.1;
     let rally_dist = (dx * dx + dy * dy).sqrt();
     if rally_dist <= f32::EPSILON {
-        return FreeRiflemanDisposition::RallyReady;
+        return false;
     }
     let ux = dx / rally_dist;
     let uy = dy / rally_dist;
     let progress = (rifleman.pos_x - start.0) * ux + (rifleman.pos_y - start.1) * uy;
     let point_of_no_return =
         rally_dist + COMBAT_POINT_OF_NO_RETURN_TILES * config::TILE_SIZE as f32;
-    if progress >= point_of_no_return {
-        FreeRiflemanDisposition::CommittedForward
-    } else if progress >= rally_dist {
-        FreeRiflemanDisposition::RallyReady
-    } else {
-        FreeRiflemanDisposition::Stage
+    progress >= point_of_no_return
+}
+
+fn position_is_on_or_adjacent_to_rally_line(
+    map: &Map,
+    start_tile: (u32, u32),
+    pos: (f32, f32),
+    cohort_len: usize,
+) -> bool {
+    let rally = combat_rally_world(map, start_tile);
+    let start = map.tile_center(start_tile.0, start_tile.1);
+    let center = map_center_world(map);
+    let dx = center.0 - start.0;
+    let dy = center.1 - start.1;
+    let dist = (dx * dx + dy * dy).sqrt();
+    if dist <= f32::EPSILON {
+        return true;
     }
+    let forward_x = dx / dist;
+    let forward_y = dy / dist;
+    let lateral_x = -forward_y;
+    let lateral_y = forward_x;
+    let from_rally_x = pos.0 - rally.0;
+    let from_rally_y = pos.1 - rally.1;
+    let forward_error = (from_rally_x * forward_x + from_rally_y * forward_y).abs();
+    let lateral_offset = (from_rally_x * lateral_x + from_rally_y * lateral_y).abs();
+    let half_span = if cohort_len <= 1 {
+        0.0
+    } else {
+        (cohort_len as f32 - 1.0) * 0.5 * COMBAT_RALLY_SLOT_SPACING_TILES * config::TILE_SIZE as f32
+    };
+    forward_error <= config::TILE_SIZE as f32
+        && lateral_offset <= half_span + config::TILE_SIZE as f32
 }
 
 fn rally_line_cohort(
@@ -551,7 +602,8 @@ fn is_rally_line_member(
     start_tile: (u32, u32),
     rifleman: &crate::game::entity::Entity,
 ) -> bool {
-    if classify_free_rifleman(map, start_tile, rifleman) != FreeRiflemanDisposition::CommittedForward
+    if classify_free_rifleman(map, start_tile, rifleman)
+        != FreeRiflemanDisposition::CommittedForward
     {
         return true;
     }
@@ -828,10 +880,11 @@ mod tests {
     fn wave_size_escalates_after_launches() {
         let mut ai = AiController::new(2);
 
+        assert_eq!(ai.player_id(), 2);
         assert_eq!(ai.desired_wave_size(0), 3);
-        ai.note_wave_launch(90, 3);
+        ai.note_wave_launch(90);
         assert_eq!(ai.desired_wave_size(99), 4);
-        ai.note_wave_launch(180, 4);
+        ai.note_wave_launch(180);
         assert_eq!(ai.desired_wave_size(189), 5);
     }
 
@@ -839,17 +892,22 @@ mod tests {
     fn wave_size_resets_after_stall() {
         let mut ai = AiController::new(2);
 
-        ai.note_wave_launch(90, 5);
-        assert_eq!(ai.desired_wave_size(90 + WAVE_STALL_RESET_TICKS - 1), 6);
-        assert_eq!(ai.desired_wave_size(90 + WAVE_STALL_RESET_TICKS), 3);
+        ai.note_wave_launch(90);
+        ai.note_wave_launch(180);
+        ai.note_wave_launch(270);
+        assert_eq!(ai.desired_wave_size(270 + WAVE_STALL_RESET_TICKS - 1), 6);
+        assert_eq!(ai.desired_wave_size(270 + WAVE_STALL_RESET_TICKS), 3);
     }
 
     #[test]
-    fn wave_size_caps_at_maximum() {
+    fn wave_size_has_no_cap() {
         let mut ai = AiController::new(2);
 
-        ai.note_wave_launch(90, MAX_WAVE_SIZE);
-        assert_eq!(ai.desired_wave_size(120), MAX_WAVE_SIZE);
+        for tick in [90, 180, 270, 360, 450, 540, 630, 720] {
+            ai.note_wave_launch(tick);
+        }
+
+        assert_eq!(ai.desired_wave_size(729), 11);
     }
 
     #[test]
@@ -1028,6 +1086,93 @@ mod tests {
                     cmd,
                     Command::AttackMove { units, x, y }
                         if units.len() == 4
+                            && *x == enemy_base.0
+                            && *y == enemy_base.1
+                )
+        }));
+    }
+
+    #[test]
+    fn rally_wave_launch_includes_riflemen_adjacent_to_the_line() {
+        let map = Map::generate(2, 1234);
+        let mut entities = EntityStore::default();
+        let ai_start = (8, 8);
+        let enemy_start = (56, 56);
+        let ai_base = map.tile_center(ai_start.0, ai_start.1);
+        let enemy_base = map.tile_center(enemy_start.0, enemy_start.1);
+        entities
+            .spawn_building(2, EntityKind::IndustrialCenter, ai_base.0, ai_base.1, true)
+            .unwrap();
+        entities
+            .spawn_building(
+                1,
+                EntityKind::IndustrialCenter,
+                enemy_base.0,
+                enemy_base.1,
+                true,
+            )
+            .unwrap();
+        let rally = combat_rally_world(&map, ai_start);
+        let start = map.tile_center(ai_start.0, ai_start.1);
+        let center = map_center_world(&map);
+        let dx = center.0 - start.0;
+        let dy = center.1 - start.1;
+        let dist = (dx * dx + dy * dy).sqrt();
+        let (lateral_x, lateral_y) = if dist <= f32::EPSILON {
+            (1.0, 0.0)
+        } else {
+            (-dy / dist, dx / dist)
+        };
+
+        entities
+            .spawn_unit(2, EntityKind::Rifleman, rally.0, rally.1)
+            .unwrap();
+        entities
+            .spawn_unit(2, EntityKind::Rifleman, rally.0 + 8.0, rally.1)
+            .unwrap();
+        entities
+            .spawn_unit(
+                2,
+                EntityKind::Rifleman,
+                rally.0 + lateral_x * config::TILE_SIZE as f32,
+                rally.1 + lateral_y * config::TILE_SIZE as f32,
+            )
+            .unwrap();
+
+        let spatial = SpatialIndex::build(&entities, config::TILE_SIZE);
+        let mut ai = AiController::new(2);
+        let players = vec![
+            PlayerState {
+                id: 1,
+                name: "Enemy".into(),
+                color: "#fff".into(),
+                start_tile: enemy_start,
+                steel: 0,
+                oil: 0,
+                supply_used: 0,
+                supply_cap: 0,
+            },
+            PlayerState {
+                id: 2,
+                name: "Computer".into(),
+                color: "#000".into(),
+                start_tile: ai_start,
+                steel: 0,
+                oil: 0,
+                supply_used: 3,
+                supply_cap: 10,
+            },
+        ];
+        let mut out = Vec::new();
+
+        ai.think(&map, &entities, &spatial, &players, 7, &mut out);
+
+        assert!(out.iter().any(|(player, cmd)| {
+            *player == 2
+                && matches!(
+                    cmd,
+                    Command::AttackMove { units, x, y }
+                        if units.len() == 3
                             && *x == enemy_base.0
                             && *y == enemy_base.1
                 )
