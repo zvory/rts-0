@@ -58,24 +58,53 @@ pub(crate) fn movement_system(
         let mut new_facing = None;
         // Consume waypoints (stored reversed, next = last element) within this tick's budget.
         loop {
-            let next = {
+            let (next, path_len, next_next) = {
                 let Some(e) = entities.get(id) else { break };
-                e.next_waypoint()
+                let path_len = e.movement.as_ref().map(|m| m.path.len()).unwrap_or(0);
+                // next_next: the waypoint after the current one (path is reversed, so index len-2).
+                let next_next = e.movement.as_ref().and_then(|m| {
+                    if m.path.len() >= 2 {
+                        m.path.get(m.path.len() - 2).copied()
+                    } else {
+                        None
+                    }
+                });
+                (e.next_waypoint(), path_len, next_next)
             };
             let Some((wx, wy)) = next else { break };
             let dx = wx - x;
             let dy = wy - y;
             let dist = (dx * dx + dy * dy).sqrt();
-            if dist <= ARRIVE_EPS {
-                // Reached this waypoint exactly; drop it and continue with the remaining budget.
-                if let Some(e) = entities.get_mut(id) {
-                    e.pop_waypoint();
-                    e.mark_move_phase(MovePhase::Moving);
+
+            if path_len > 1 {
+                // Intermediate waypoint: pop on radius hit or geometric pass-by.
+                let radius_hit = dist <= config::ARRIVE_RADIUS_INTERMEDIATE_PX;
+                let passed = next_next.map_or(false, |(nnx, nny)| {
+                    // Positive projection of (pos - waypoint) onto (next_next - waypoint) means the
+                    // unit is on the far side of the waypoint relative to where it came from.
+                    (x - wx) * (nnx - wx) + (y - wy) * (nny - wy) > 0.0
+                });
+                if radius_hit || passed {
+                    if let Some(e) = entities.get_mut(id) {
+                        e.pop_waypoint();
+                        e.mark_move_phase(MovePhase::Moving);
+                    }
+                    // No position snap — steer toward the new next waypoint from current position.
+                    continue;
                 }
-                x = wx;
-                y = wy;
-                continue;
+            } else {
+                // Final waypoint: require exact arrival.
+                if dist <= ARRIVE_EPS {
+                    if let Some(e) = entities.get_mut(id) {
+                        e.pop_waypoint();
+                        e.mark_move_phase(MovePhase::Moving);
+                    }
+                    x = wx;
+                    y = wy;
+                    continue;
+                }
             }
+
             new_facing = Some(dy.atan2(dx));
             if dist <= budget {
                 // We can reach this waypoint this tick.
@@ -765,6 +794,169 @@ mod tests {
                 dist_from_start
             );
         }
+    }
+
+    /// Set a path directly on a unit. Path is stored reversed (last element = next waypoint).
+    /// `waypoints` should be in visit order: [first_to_visit, ..., final_goal].
+    fn set_path_direct(entities: &mut EntityStore, id: u32, waypoints: Vec<(f32, f32)>) {
+        let mut rev = waypoints;
+        rev.reverse();
+        if let Some(e) = entities.get_mut(id) {
+            e.set_path(rev);
+            e.set_path_goal(e.next_waypoint()); // placeholder; overwrite with actual goal
+        }
+        // Correct goal: last element of visit order = first element of stored reversed vec.
+        // The original last visit-order element is now path[0].
+        if let Some(e) = entities.get_mut(id) {
+            let goal = e.movement.as_ref().and_then(|m| m.path.first().copied());
+            e.set_path_goal(goal);
+            e.mark_move_phase(MovePhase::Moving);
+        }
+    }
+
+    /// An intermediate waypoint within ARRIVE_RADIUS_INTERMEDIATE_PX is popped in one tick
+    /// without waiting for exact arrival. The unit's position must not be snapped.
+    #[test]
+    fn intermediate_waypoint_consumed_by_radius() {
+        let map = flat_map(1);
+        let mut entities = EntityStore::new();
+        // Intermediate waypoint center.
+        let (iwx, iwy) = map.tile_center(20, 20);
+        // Final goal one tile further right.
+        let (gx, gy) = map.tile_center(21, 20);
+        // Place the unit 10 px to the left of the intermediate center (approaching from left).
+        let unit = entities
+            .spawn_unit(1, EntityKind::Rifleman, iwx - 10.0, iwy)
+            .unwrap();
+        set_path_direct(&mut entities, unit, vec![(iwx, iwy), (gx, gy)]);
+
+        let occ = Occupancy::build(&map, &entities);
+        let spatial = SpatialIndex::build(&entities, map.size);
+        movement_system(&map, &mut entities, &occ, &spatial, 0);
+
+        let e = entities.get(unit).unwrap();
+        // The intermediate waypoint should have been popped; only the final goal remains.
+        assert_eq!(
+            e.movement.as_ref().map(|m| m.path.len()).unwrap_or(0),
+            1,
+            "intermediate waypoint must be popped within ARRIVE_RADIUS"
+        );
+        // Position must not have snapped to the intermediate center.
+        assert!(
+            (e.pos_x - iwx).abs() > 1.0,
+            "unit position must not snap to intermediate waypoint"
+        );
+    }
+
+    /// Two units sharing an intermediate waypoint tile must not deadlock — both must reach
+    /// the goal with the new fly-by arrival predicate.
+    #[test]
+    fn two_units_sharing_waypoint_do_not_wedge() {
+        let map = flat_map(1);
+        let mut entities = EntityStore::new();
+        // Intermediate one tile ahead of start; final goal one tile further.
+        // Short path so the test runs quickly and focuses on the wedge-prevention logic.
+        let (iwx, iwy) = map.tile_center(20, 20);
+        let (gx, gy) = map.tile_center(22, 20);
+        // Both units start just before the intermediate, offset vertically so they share the tile.
+        let a = entities
+            .spawn_unit(1, EntityKind::Rifleman, iwx - 20.0, iwy - 10.0)
+            .unwrap();
+        let b = entities
+            .spawn_unit(1, EntityKind::Rifleman, iwx - 20.0, iwy + 10.0)
+            .unwrap();
+        set_path_direct(&mut entities, a, vec![(iwx, iwy), (gx, gy)]);
+        set_path_direct(&mut entities, b, vec![(iwx, iwy), (gx, gy)]);
+
+        // Rifleman speed 1.6 px/tick; total path ~84px; 100 ticks is generous even with
+        // collision slowdown.
+        for tick in 0..100u32 {
+            let occ = Occupancy::build(&map, &entities);
+            let spatial = SpatialIndex::build(&entities, map.size);
+            movement_system(&map, &mut entities, &occ, &spatial, tick);
+            let spatial = SpatialIndex::build(&entities, map.size);
+            resolve_collisions(&mut entities, &spatial, &map, &occ);
+        }
+
+        for &id in &[a, b] {
+            let e = entities.get(id).unwrap();
+            let dx = e.pos_x - gx;
+            let dy = e.pos_y - gy;
+            let d = (dx * dx + dy * dy).sqrt();
+            assert!(
+                d <= config::TILE_SIZE as f32 * 2.0,
+                "unit {} wedged — {:.1}px from goal after 100 ticks",
+                id,
+                d
+            );
+        }
+    }
+
+    /// The final waypoint still requires tight arrival (within ARRIVE_EPS or full-step reach).
+    #[test]
+    fn final_waypoint_still_requires_close_arrival() {
+        let map = flat_map(1);
+        let mut entities = EntityStore::new();
+        let (gx, gy) = map.tile_center(25, 25);
+        // Start far enough that exact arrival takes multiple ticks.
+        let unit = entities
+            .spawn_unit(1, EntityKind::Rifleman, map.tile_center(15, 25).0, gy)
+            .unwrap();
+        set_path_direct(&mut entities, unit, vec![(gx, gy)]);
+
+        for tick in 0..300u32 {
+            let occ = Occupancy::build(&map, &entities);
+            let spatial = SpatialIndex::build(&entities, map.size);
+            movement_system(&map, &mut entities, &occ, &spatial, tick);
+            if entities.get(unit).map_or(true, |e| e.path_is_empty()) {
+                break;
+            }
+        }
+
+        let e = entities.get(unit).unwrap();
+        assert!(
+            e.path_is_empty(),
+            "path must be empty after arrival at final waypoint"
+        );
+        let dx = e.pos_x - gx;
+        let dy = e.pos_y - gy;
+        let dist = (dx * dx + dy * dy).sqrt();
+        // Must be within ARRIVE_EPS OR tolerant arrival radius (stuck near goal).
+        assert!(
+            dist <= config::TOLERANT_ARRIVAL_RADIUS_PX,
+            "unit ended {:.2}px from final waypoint — too far",
+            dist
+        );
+    }
+
+    /// A unit shoved sideways past an intermediate waypoint (but > ARRIVE_RADIUS away) should
+    /// still pop it via the pass-by (dot-product) check.
+    #[test]
+    fn pass_by_waypoint_pops_when_overshooting_sideways() {
+        let map = flat_map(1);
+        let mut entities = EntityStore::new();
+        // Path: unit moves right. Intermediate at (20,20), final at (25,20).
+        let (iwx, iwy) = map.tile_center(20, 20);
+        let (gx, gy) = map.tile_center(25, 20);
+        // Unit is positioned past the intermediate along the path direction but 20 px above
+        // it — simulating a collision shove. dist to intermediate ≈ 20 px > ARRIVE_RADIUS (16).
+        let unit_x = iwx + 5.0;
+        let unit_y = iwy - 20.0;
+        let unit = entities
+            .spawn_unit(1, EntityKind::Rifleman, unit_x, unit_y)
+            .unwrap();
+        set_path_direct(&mut entities, unit, vec![(iwx, iwy), (gx, gy)]);
+
+        let occ = Occupancy::build(&map, &entities);
+        let spatial = SpatialIndex::build(&entities, map.size);
+        movement_system(&map, &mut entities, &occ, &spatial, 0);
+
+        let e = entities.get(unit).unwrap();
+        assert_eq!(
+            e.movement.as_ref().map(|m| m.path.len()).unwrap_or(0),
+            1,
+            "intermediate waypoint must be popped via pass-by when unit is geometrically past it"
+        );
     }
 
     /// Even when the ordered goal is occupied by another unit, the move order must still

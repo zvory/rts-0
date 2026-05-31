@@ -1504,10 +1504,13 @@ fn finalize_self_play_success(
         |failure| {
             let artifact = runner
                 .write_failure_artifact(&failure)
-                .map(|p| p.display().to_string())
+                .map(|p| {
+                    let name = p.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_else(|| p.display().to_string());
+                    format!("http://localhost:8080/dev/selfplay?replay={name}")
+                })
                 .unwrap_or_else(|e| format!("artifact write failed: {e}"));
             panic!(
-                "self-play replay failed: {}; artifact: {artifact}",
+                "self-play replay failed: {}; REPLAY={artifact}",
                 failure.reason
             );
         },
@@ -1839,8 +1842,17 @@ fn occupied_tiles_from_snapshot(map: &MapInfo, snapshot: &Snapshot) -> BTreeSet<
     let mut occupied = BTreeSet::new();
     for e in &snapshot.entities {
         if e.owner != 0 && kind_of(e).map(|k| k.is_building()).unwrap_or(false) {
-            for tile in building_footprint_tiles(map, e) {
-                occupied.insert(tile);
+            for (tx, ty) in building_footprint_tiles(map, e) {
+                // Mark footprint + 1-tile border so AI always leaves a gap between buildings.
+                for dy in -1i32..=1 {
+                    for dx in -1i32..=1 {
+                        let nx = tx as i32 + dx;
+                        let ny = ty as i32 + dy;
+                        if nx >= 0 && ny >= 0 && (nx as u32) < map.width && (ny as u32) < map.height {
+                            occupied.insert((nx as u32, ny as u32));
+                        }
+                    }
+                }
             }
         } else if e.owner == 0 && (is_kind(e, EntityKind::Steel) || is_kind(e, EntityKind::Oil)) {
             occupied.insert(tile_of(map, e.x, e.y));
@@ -1965,9 +1977,12 @@ fn scripted_self_play_exercises_economy_tech_and_combat() {
         Err(failure) => {
             let artifact = runner
                 .write_failure_artifact(&failure)
-                .map(|p| p.display().to_string())
+                .map(|p| {
+                    let name = p.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_else(|| p.display().to_string());
+                    format!("http://localhost:8080/dev/selfplay?replay={name}")
+                })
                 .unwrap_or_else(|e| format!("artifact write failed: {e}"));
-            panic!("self-play failed: {}; artifact: {artifact}", failure.reason);
+            panic!("self-play failed: {}; REPLAY={artifact}", failure.reason);
         }
     }
 }
@@ -2016,9 +2031,12 @@ fn scripted_self_play_worker_rush_vs_economy() {
         Err(failure) => {
             let artifact = runner
                 .write_failure_artifact(&failure)
-                .map(|p| p.display().to_string())
+                .map(|p| {
+                    let name = p.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_else(|| p.display().to_string());
+                    format!("http://localhost:8080/dev/selfplay?replay={name}")
+                })
                 .unwrap_or_else(|e| format!("artifact write failed: {e}"));
-            panic!("self-play failed: {}; artifact: {artifact}", failure.reason);
+            panic!("self-play failed: {}; REPLAY={artifact}", failure.reason);
         }
     }
 }
@@ -2356,8 +2374,42 @@ fn real_ai_vs_real_ai() {
     let mut seen_riflemen: BTreeMap<u32, BTreeSet<u32>> = BTreeMap::new();
     let mut attack_events: BTreeMap<u32, usize> = BTreeMap::new();
     let mut death_events: BTreeMap<u32, usize> = BTreeMap::new();
+    let save_failure_artifact = |game: &Game, reason: &str| -> String {
+        let ts = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis();
+        let artifact_name = format!("real_ai_vs_real_ai_failure_{ts}");
+        let dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("target")
+            .join("selfplay-artifacts")
+            .join(&artifact_name);
+        if std::fs::create_dir_all(&dir).is_ok() {
+            let artifact = ReplayArtifact {
+                replay_commands: game.command_log().to_vec(),
+                players: players.clone(),
+            };
+            if let Ok(json) = serde_json::to_vec_pretty(&artifact) {
+                let _ = std::fs::write(dir.join("replay.json"), json);
+            }
+        }
+        let url = format!("http://localhost:8080/dev/selfplay?replay={artifact_name}");
+        println!("REPLAY_ARTIFACT={artifact_name}");
+        eprintln!("real_ai_vs_real_ai failure: {reason}");
+        eprintln!("view replay: {url}");
+        url
+    };
+
     for tick in 1..=6000 {
-        for (player_id, events) in game.tick() {
+        let tick_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| game.tick()));
+        let tick_output = match tick_result {
+            Ok(events) => events,
+            Err(_) => {
+                let url = save_failure_artifact(&game, "Game::tick panicked");
+                panic!("real_ai_vs_real_ai: tick {tick} panicked; view replay: {url}");
+            }
+        };
+        for (player_id, events) in tick_output {
             for event in events {
                 match event {
                     Event::Attack { .. } => {
