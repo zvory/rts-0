@@ -322,6 +322,7 @@ mod tests {
             height: 64,
             tile_size: config::TILE_SIZE,
             terrain: vec![terrain::GRASS; 64 * 64],
+            resources: vec![],
         };
         let (hx, hy) = (
             10.5 * config::TILE_SIZE as f32,
