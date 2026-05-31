@@ -37,7 +37,7 @@ const SWEEP_EVICT_FRAMES = 120;
 
 // Machine-gunner setup / teardown visuals are time-based on the client so the
 // transition reads smoothly between snapshots.
-const MACHINE_GUNNER_ANIM_MS = 500;
+const MACHINE_GUNNER_ANIM_MS = 1000;
 
 // Layer names in back-to-front draw order. Index in this array == child index in `world`.
 const LAYERS = [
