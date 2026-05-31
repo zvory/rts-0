@@ -550,6 +550,9 @@ The server treats every client as potentially hostile. Limits live next to the c
   on an accept, so a rejected mid-match join doesn't wedge the socket.
 - **Fog is authoritative**: `snapshot_for` and per-recipient event delivery gate entity views,
   `target_id` tracers, and death events on visibility — hidden enemies are never sent.
+- **Shot overpenetration**: ranged attacks continue 25% of their weapon range past the primary
+  target and deal 50% reduced damage to additional enemies behind it, which discourages
+  clumping and rewards tighter army control.
 - **Tolerant arrival**: a unit on a `Move` or `AttackMove` order in `MovePhase::Moving` that has not
   moved more than `STUCK_EPS_PX` per tick for `STUCK_ARRIVAL_TICKS` consecutive ticks (~0.5 s at
   30 Hz) and is within `TOLERANT_ARRIVAL_RADIUS_PX` (2 tiles) of its `path_goal` is immediately
@@ -557,6 +560,12 @@ The server treats every client as potentially hostile. Limits live next to the c
   to the same tile fight each other for the last position. The two per-unit state fields
   (`stuck_ticks: u16`, `last_progress_pos: (f32, f32)`) live in `MovementState` and are reset
   whenever a fresh order is issued.
+- **Static-obstacle repath**: if a unit on a `Move` or `AttackMove` order repeatedly fails to take
+  its next path step because terrain/building occupancy blocks the landing tile, movement debounces
+  the failure for `STATIC_BLOCKED_REPATH_TICKS` (~1 s at 30 Hz), clears the stale path, and marks the
+  unit `AwaitingPath`. The existing path coordinator then recomputes under current occupancy within
+  the normal per-tick A* budget. This covers buildings constructed after a long path was assigned
+  without periodically repathing every moving unit.
 - **Unit collision**: `services::movement::resolve_collisions` runs after production each tick
   and pair-wise pushes overlapping mobile units apart along the connecting line (50/50 split
   when neither is anchored). A worker is *anchored* while it is in
