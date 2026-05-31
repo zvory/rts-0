@@ -206,8 +206,9 @@ pub struct Game { /* private */ }
 
 impl Game {
     /// Create a match for the given players (ids + colors + names already assigned by lobby).
-    /// Generates a symmetric map sized for `players.len()` and spawns each player's
-    /// starting Industrial Center + STARTING_WORKERS workers + a nearby mineral cluster & geyser.
+    /// Generates a symmetric map sized for `players.len()`, randomizes the seat-to-spawn
+    /// assignment per match, and spawns each player's starting Industrial Center +
+    /// STARTING_WORKERS workers + a nearby mineral cluster & geyser.
     pub fn new(players: &[PlayerInit]) -> Game;
 
     /// Create a match with explicit starting steel/oil for every player.
