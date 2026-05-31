@@ -244,39 +244,80 @@ export class HUD {
 
     const frag = document.createDocumentFragment();
     let idx = 0;
-    const actionButtons = [
-      {
+
+    if (workerSelected) {
+      // Workers: compact layout — Move/Attack/Hold at Q/W/E, build buttons fill A+.
+      const actionButtons = [
+        {
+          icon: "MV",
+          label: "Move",
+          title: "Move to a target point",
+          active: this.state.commandTarget === "move",
+          onClick: () => this.state.beginCommandTarget("move"),
+        },
+        {
+          icon: "AT",
+          label: "Attack",
+          title: "Attack a target or attack-move to a point",
+          active: this.state.commandTarget === "attack",
+          onClick: () => this.state.beginCommandTarget("attack"),
+        },
+        {
+          icon: "HD",
+          label: "Hold",
+          title: "Hold position / stop selected units",
+          onClick: () => {
+            this.net.command(cmd.stop(unitIds));
+            this.state.endCommandTarget();
+          },
+        },
+      ];
+      for (const action of actionButtons) {
+        frag.appendChild(this._cmdButton({
+          ...action,
+          hotkey: GRID_HOTKEYS[idx++],
+          enabled: unitIds.length > 0,
+          cls: action.active ? "active" : "",
+        }));
+      }
+    } else {
+      // Non-worker units: Q=Move, W/E=empty, A=Attack, S=Hold.
+      frag.appendChild(this._cmdButton({
         icon: "MV",
         label: "Move",
         title: "Move to a target point",
-        active: this.state.commandTarget === "move",
+        hotkey: GRID_HOTKEYS[0],
+        enabled: unitIds.length > 0,
+        cls: this.state.commandTarget === "move" ? "active" : "",
         onClick: () => this.state.beginCommandTarget("move"),
-      },
-      {
+      }));
+      for (let i = 0; i < 2; i++) {
+        const el = document.createElement("div");
+        el.className = "cmd-empty";
+        frag.appendChild(el);
+      }
+      frag.appendChild(this._cmdButton({
         icon: "AT",
         label: "Attack",
         title: "Attack a target or attack-move to a point",
-        active: this.state.commandTarget === "attack",
+        hotkey: GRID_HOTKEYS[3],
+        enabled: unitIds.length > 0,
+        cls: this.state.commandTarget === "attack" ? "active" : "",
         onClick: () => this.state.beginCommandTarget("attack"),
-      },
-      {
+      }));
+      frag.appendChild(this._cmdButton({
         icon: "HD",
         label: "Hold",
         title: "Hold position / stop selected units",
+        hotkey: GRID_HOTKEYS[4],
+        enabled: unitIds.length > 0,
+        cls: "",
         onClick: () => {
           this.net.command(cmd.stop(unitIds));
           this.state.endCommandTarget();
         },
-      },
-    ];
-
-    for (const action of actionButtons) {
-      frag.appendChild(this._cmdButton({
-        ...action,
-        hotkey: GRID_HOTKEYS[idx++],
-        enabled: unitIds.length > 0,
-        cls: action.active ? "active" : "",
       }));
+      idx = 5;
     }
 
     if (workerSelected) {

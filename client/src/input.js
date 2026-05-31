@@ -12,7 +12,7 @@
 //     hovered tile, validate the footprint, drive the renderer ghost via
 //     state.updatePlacement, confirm with a valid left-click, cancel with right/Esc.
 //   - Keyboard: command-card grid hotkeys (QWE/ASD/ZXC) activate buttons directly;
-//     Esc cancels placement/targeting; A and S also fall back to attack-move and stop.
+//     Esc cancels placement/targeting; S also falls back to stop when no card button is active.
 //   - Mouse wheel = camera zoom toward the cursor.
 //   - Arrow-key pan state is OWNED here and exposed via `this.keys` so the camera can
 //     read it in Camera.update(dt, input) — see the `keys` field documentation below.
