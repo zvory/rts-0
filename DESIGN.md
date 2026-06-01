@@ -277,10 +277,14 @@ context primitives, never mutate state, and never read fog or `EntityStore`.
 
 - `rules::combat` — AP/armor predicates (`is_ap`, `is_armored`, `prefers_armored_targets`),
   `attack_profile(kind) -> AttackProfile`, and `effective_damage(attacker_kind, victim_kind, base_dmg) -> u32`.
+- `rules::economy` — tech/production predicates (`trainable_units`, `build_requirement_met`,
+  `train_requirement_met`), resource-node amounts, and cost/supply wrappers (`cost`,
+  `supply_cost`, `supply_provided`).
 
 Services in `game/services/` orchestrate tick logic and call into `rules::*` for classification.
 Rules functions have no imports from `services/` or entity storage; they only import `EntityKind`
-and `config`.
+and `config`. `config.rs` answers "what number?"; `rules/economy.rs` answers "is this allowed /
+what does it cost?".
 
 ---
 

@@ -11,6 +11,7 @@ use crate::game::services::spatial::SpatialIndex;
 use crate::game::services::{dist2, interact_range_for_kind};
 use crate::game::PlayerState;
 use crate::protocol::Event;
+use crate::rules;
 
 /// Advance build orders. Workers in `ToSite` that have walked into arrival range of their
 /// intended footprint re-validate placement and affordability, spawn the building, deduct
@@ -53,19 +54,17 @@ pub(crate) fn construction_system(
 
         // Re-validate placement against the live entity set.
         let placeable = footprint_placeable(map, entities, spatial, kind, tx, ty);
-        let stats = match config::building_stats(kind) {
-            Some(s) => s,
-            None => {
-                if let Some(w) = entities.get_mut(worker) {
-                    w.clear_orders();
-                }
-                continue;
+        if config::building_stats(kind).is_none() {
+            if let Some(w) = entities.get_mut(worker) {
+                w.clear_orders();
             }
-        };
+            continue;
+        }
+        let (cost_steel, cost_oil) = rules::economy::cost(kind);
         let affordable = players
             .iter()
             .find(|p| p.id == owner)
-            .map(|p| p.steel >= stats.cost_steel && p.oil >= stats.cost_oil)
+            .map(|p| p.steel >= cost_steel && p.oil >= cost_oil)
             .unwrap_or(false);
 
         if !placeable {
@@ -91,8 +90,8 @@ pub(crate) fn construction_system(
             Some(p) => p,
             None => continue,
         };
-        ps.steel -= stats.cost_steel;
-        ps.oil -= stats.cost_oil;
+        ps.steel -= cost_steel;
+        ps.oil -= cost_oil;
 
         let (cx, cy) = footprint_center(map, kind, tx, ty);
         let site = match entities.spawn_building(owner, kind, cx, cy, false) {
