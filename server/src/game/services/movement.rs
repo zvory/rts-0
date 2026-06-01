@@ -559,8 +559,8 @@ mod tests {
         (dx * dx + dy * dy).sqrt()
     }
 
-    /// A grass-only test map: the seeded generator scatters obstacles, so for clean
-    /// movement/collision experiments we flatten the terrain after generation.
+    /// A grass-only test map: the authored map contains obstacles, so for clean
+    /// movement/collision experiments we flatten the terrain after loading.
     fn flat_map(player_count: usize) -> Map {
         let mut map = Map::generate(player_count, 0xC0FF_EE01);
         for v in &mut map.terrain {
