@@ -179,6 +179,7 @@ impl AiFacts {
             .total_planned()
     }
 
+    #[allow(dead_code)]
     pub(crate) fn complete_building_count(&self, kind: EntityKind) -> usize {
         self.building_counts
             .get(&kind)
@@ -186,6 +187,7 @@ impl AiFacts {
             .unwrap_or(0)
     }
 
+    #[allow(dead_code)]
     pub(crate) fn building_counts(&self, kind: EntityKind) -> BuildingCounts {
         self.building_counts.get(&kind).copied().unwrap_or_default()
     }

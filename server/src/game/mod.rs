@@ -32,6 +32,8 @@ use ai::AiController;
 use entity::{EntityKind, EntityStore};
 use fog::Fog;
 use map::Map;
+use rand::rngs::SmallRng;
+use rand::SeedableRng;
 use replay::CommandLogEntry;
 
 /// Lobby-supplied identity for a player joining a match.
@@ -85,6 +87,7 @@ pub struct Game {
     /// Match seed retained for replay metadata/API compatibility. The current hardcoded map
     /// ignores it until lobby map selection or randomized maps are reintroduced.
     seed: u32,
+    pub(crate) rng: SmallRng,
 }
 
 impl Game {
@@ -162,6 +165,7 @@ impl Game {
 
         let spatial = services::spatial::SpatialIndex::build(&entities, map.size);
         let pathing = services::pathing::PathingService::new(8_192, 256);
+        let rng = SmallRng::seed_from_u64(seed as u64);
         let mut game = Game {
             map,
             entities,
@@ -174,6 +178,7 @@ impl Game {
             spatial,
             pathing,
             seed,
+            rng,
         };
         // Initialize supply accounting and fog so the very first snapshot is correct.
         systems::recompute_supply(&mut game.players, &game.entities);
@@ -268,6 +273,7 @@ impl Game {
             &mut self.players,
             &self.fog,
             &mut self.pathing,
+            &mut self.rng,
             pending,
             &mut events,
             self.tick,
