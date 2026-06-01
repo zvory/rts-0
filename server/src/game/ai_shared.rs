@@ -1,6 +1,8 @@
 use std::collections::BTreeSet;
 
 use crate::config;
+use crate::game::ai_core::facts;
+use crate::game::ai_core::observation::AiResourceSummary;
 use crate::game::entity::EntityKind;
 use crate::game::entity::EntityStore;
 use crate::protocol::{MapInfo, Snapshot};
@@ -95,12 +97,18 @@ pub(crate) fn main_base_steel_saturation_target_from_entities(
     entities: &EntityStore,
     start_tile: (u32, u32),
 ) -> usize {
-    steel_saturation_target(
+    facts::main_base_steel_saturation_target(
         start_tile,
         config::TILE_SIZE,
-        entities
-            .iter()
-            .filter_map(|e| Some((e.kind, e.pos_x, e.pos_y, e.remaining()?))),
+        entities.iter().filter_map(|e| {
+            e.kind.is_node().then(|| AiResourceSummary {
+                id: e.id,
+                kind: e.kind,
+                x: e.pos_x,
+                y: e.pos_y,
+                remaining: e.remaining().unwrap_or(0),
+            })
+        }),
     )
 }
 
@@ -109,13 +117,19 @@ pub(crate) fn main_base_steel_saturation_target_from_snapshot(
     snapshot: &Snapshot,
     start_tile: (u32, u32),
 ) -> usize {
-    steel_saturation_target(
+    facts::main_base_steel_saturation_target(
         start_tile,
         map.tile_size,
-        snapshot
-            .entities
-            .iter()
-            .filter_map(|e| Some((e.kind.parse().ok()?, e.x, e.y, e.remaining?))),
+        snapshot.entities.iter().filter_map(|e| {
+            let kind: EntityKind = e.kind.parse().ok()?;
+            kind.is_node().then_some(AiResourceSummary {
+                id: e.id,
+                kind,
+                x: e.x,
+                y: e.y,
+                remaining: e.remaining.unwrap_or(0),
+            })
+        }),
     )
 }
 
@@ -226,28 +240,6 @@ pub(crate) fn find_build_spot_near_start_with(
     }
 
     fallback
-}
-
-fn steel_saturation_target(
-    start_tile: (u32, u32),
-    tile_size: u32,
-    steel_nodes: impl IntoIterator<Item = (EntityKind, f32, f32, u32)>,
-) -> usize {
-    let (hx, hy) = (
-        start_tile.0 as f32 * tile_size as f32 + tile_size as f32 * 0.5,
-        start_tile.1 as f32 * tile_size as f32 + tile_size as f32 * 0.5,
-    );
-    let max_dist_px = (config::IC_RESOURCE_MAX_DIST_TILES + 0.5) * tile_size as f32;
-    let max_dist2 = max_dist_px * max_dist_px;
-    steel_nodes
-        .into_iter()
-        .filter(|(kind, _, _, remaining)| *kind == EntityKind::Steel && *remaining > 0)
-        .filter(|(_, x, y, _)| {
-            let dx = *x - hx;
-            let dy = *y - hy;
-            dx * dx + dy * dy <= max_dist2
-        })
-        .count()
 }
 
 #[cfg(test)]
