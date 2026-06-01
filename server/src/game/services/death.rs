@@ -22,6 +22,7 @@ pub(crate) fn death_system(
         .collect();
 
     for (id, owner, x, y, kind) in dead {
+        entities.release_miner(id);
         entities.remove(id);
         // Deliver the death only to players who owned the entity or could see where it died,
         // so a death poof never reveals an entity hidden in a player's fog.
@@ -51,27 +52,8 @@ pub(crate) fn death_system(
         entities.remove(id);
     }
 
-    // Clear any node miner reservations pointing at dead workers.
-    let nodes_to_clear: Vec<u32> = entities
-        .iter()
-        .filter(|e| e.is_node())
-        .filter_map(|e| {
-            e.miner().and_then(|m| {
-                if !entities.contains(m) {
-                    Some(e.id)
-                } else {
-                    None
-                }
-            })
-        })
-        .collect();
-    for nid in nodes_to_clear {
-        if let Some(n) = entities.get_mut(nid) {
-            if let Some(node) = n.resource_node.as_mut() {
-                node.miner = None;
-            }
-        }
-    }
+    // Clear stale node reservations through the authoritative slot predicate.
+    entities.clear_stale_miner_slots();
 
     // Clean up dangling orders that reference removed entities (build sites, attack targets)
     // so units don't chase ghosts. Gather orders self-heal via `retarget_or_idle`.

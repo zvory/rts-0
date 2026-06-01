@@ -63,7 +63,7 @@ fn gather_to_node(
     };
 
     if dist2(wx, wy, node_pos.0, node_pos.1).sqrt() <= interact {
-        let can_mine = !matches!(slot_held(entities, node), Some(m) if m != id);
+        let can_mine = !matches!(entities.node_slot_holder(node), Some(m) if m != id);
         if let Some(e) = entities.get_mut(id) {
             e.clear_path();
             e.set_facing((node_pos.1 - wy).atan2(node_pos.0 - wx));
@@ -74,10 +74,8 @@ fn gather_to_node(
             }
         }
         if can_mine {
-            if let Some(n) = entities.get_mut(node) {
-                if let Some(node) = n.resource_node.as_mut() {
-                    node.miner = Some(id);
-                }
+            if !entities.claim_miner(node, id) {
+                idle_gatherer(entities, id);
             }
         }
     } else if entities.get(id).map(|e| e.path_is_empty()).unwrap_or(true) {
@@ -96,20 +94,18 @@ fn gather_harvesting(entities: &mut EntityStore, players: &mut [PlayerState], id
         }
     };
 
-    match slot_held(entities, node) {
+    match entities.node_slot_holder(node) {
         Some(m) if m != id => {
             if let Some(e) = entities.get_mut(id) {
                 e.clear_orders();
             }
             return;
         }
-        _ => {
-            if let Some(n) = entities.get_mut(node) {
-                if let Some(node) = n.resource_node.as_mut() {
-                    node.miner = Some(id);
-                }
-            }
-        }
+        _ => {}
+    }
+    if !entities.claim_miner(node, id) {
+        idle_gatherer(entities, id);
+        return;
     }
 
     let done = {
@@ -162,25 +158,6 @@ fn gather_harvesting(entities: &mut EntityStore, players: &mut [PlayerState], id
     if taken == node_kind_amount.1 {
         entities.release_miner(id);
         idle_gatherer(entities, id);
-    }
-}
-
-/// Resolve who, if anyone, currently holds `node`'s single harvest slot.
-///
-/// A patch is occupied only after the worker has actually latched, not merely because a gather
-/// command has been issued toward it.
-fn slot_held(entities: &EntityStore, node: u32) -> Option<u32> {
-    let m = entities.get(node).and_then(|n| n.miner())?;
-    let w = entities.get(m)?;
-    let on_this_node = w.order().gather_node() == Some(node);
-    if w.hp > 0
-        && w.kind == EntityKind::Worker
-        && on_this_node
-        && w.gather_phase() == Some(GatherPhase::Harvesting)
-    {
-        Some(m)
-    } else {
-        None
     }
 }
 

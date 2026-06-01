@@ -1145,18 +1145,65 @@ impl EntityStore {
         self.map.values().any(|e| e.owner == player)
     }
 
-    /// If `worker_id` currently has a `Gather` order, clear that node's `miner` reservation
-    /// if it points to this worker.
-    pub fn release_miner(&mut self, worker_id: u32) {
-        let old_node = match self.get(worker_id) {
-            Some(e) => match e.order().gather_node() {
-                Some(node) => node,
-                None => return,
-            },
-            None => return,
+    /// Whichever worker currently holds `node_id`'s single harvest slot, if any.
+    ///
+    /// A reservation is only authoritative while the recorded worker is alive, is still
+    /// gathering this exact node, and is in the `Harvesting` phase. Stale ids are ignored so
+    /// command handling and economy progression agree on when a slot is actually occupied.
+    pub fn node_slot_holder(&self, node_id: u32) -> Option<u32> {
+        let miner_id = self.get(node_id).and_then(|n| n.miner())?;
+        if self.worker_holds_node_slot(miner_id, node_id) {
+            Some(miner_id)
+        } else {
+            None
+        }
+    }
+
+    /// Claim `node_id`'s harvest slot for `worker_id` if the worker is in the authoritative
+    /// slot-holding state and no other valid worker already holds it.
+    pub fn claim_miner(&mut self, node_id: u32, worker_id: u32) -> bool {
+        if matches!(self.node_slot_holder(node_id), Some(holder) if holder != worker_id) {
+            return false;
+        }
+        if !self.worker_holds_node_slot(worker_id, node_id) {
+            return false;
+        }
+        let Some(node) = self.get_mut(node_id).and_then(|n| n.resource_node.as_mut()) else {
+            return false;
         };
-        if let Some(n) = self.get_mut(old_node) {
-            if let Some(node) = n.resource_node.as_mut() {
+        node.miner = Some(worker_id);
+        true
+    }
+
+    /// Clear any stale node `miner` fields that no longer point at a valid slot holder.
+    pub fn clear_stale_miner_slots(&mut self) {
+        let stale_nodes: Vec<u32> = self
+            .iter()
+            .filter(|e| e.miner().is_some() && self.node_slot_holder(e.id).is_none())
+            .map(|e| e.id)
+            .collect();
+        for node_id in stale_nodes {
+            if let Some(node) = self.get_mut(node_id).and_then(|n| n.resource_node.as_mut()) {
+                node.miner = None;
+            }
+        }
+    }
+
+    fn worker_holds_node_slot(&self, worker_id: u32, node_id: u32) -> bool {
+        let Some(worker) = self.get(worker_id) else {
+            return false;
+        };
+        worker.hp > 0
+            && worker.kind == EntityKind::Worker
+            && worker.order().gather_node() == Some(node_id)
+            && worker.gather_phase() == Some(GatherPhase::Harvesting)
+    }
+
+    /// Clear every node reservation pointing to this worker, even if the worker's order has
+    /// already changed or the worker has already been removed.
+    pub fn release_miner(&mut self, worker_id: u32) {
+        for entity in self.map.values_mut() {
+            if let Some(node) = entity.resource_node.as_mut() {
                 if node.miner == Some(worker_id) {
                     node.miner = None;
                 }
@@ -1306,6 +1353,66 @@ mod tests {
         worker.clear_orders();
         assert_eq!(worker.order(), Order::Idle);
         assert_eq!(worker.gather_phase(), None);
+    }
+
+    #[test]
+    fn node_slot_holder_requires_live_worker_harvesting_same_node() {
+        let mut store = EntityStore::new();
+        let worker = store.spawn_unit(1, EntityKind::Worker, 10.0, 20.0).unwrap();
+        let other_worker = store.spawn_unit(1, EntityKind::Worker, 20.0, 20.0).unwrap();
+        let node = store.spawn_node(EntityKind::Steel, 30.0, 20.0).unwrap();
+
+        assert!(!store.claim_miner(node, worker));
+
+        store
+            .get_mut(worker)
+            .unwrap()
+            .set_order(Order::gather(node));
+        assert!(!store.claim_miner(node, worker));
+
+        store
+            .get_mut(worker)
+            .unwrap()
+            .mark_gather_phase(GatherPhase::Harvesting);
+        assert!(store.claim_miner(node, worker));
+        assert_eq!(store.node_slot_holder(node), Some(worker));
+
+        store
+            .get_mut(other_worker)
+            .unwrap()
+            .set_order(Order::gather(node));
+        store
+            .get_mut(other_worker)
+            .unwrap()
+            .mark_gather_phase(GatherPhase::Harvesting);
+        assert!(!store.claim_miner(node, other_worker));
+        assert_eq!(store.node_slot_holder(node), Some(worker));
+
+        store.get_mut(worker).unwrap().clear_orders();
+        assert_eq!(store.node_slot_holder(node), None);
+        store.clear_stale_miner_slots();
+        assert_eq!(store.get(node).unwrap().miner(), None);
+    }
+
+    #[test]
+    fn release_miner_clears_slot_after_worker_order_changes() {
+        let mut store = EntityStore::new();
+        let worker = store.spawn_unit(1, EntityKind::Worker, 10.0, 20.0).unwrap();
+        let node = store.spawn_node(EntityKind::Oil, 30.0, 20.0).unwrap();
+
+        store
+            .get_mut(worker)
+            .unwrap()
+            .set_order(Order::gather(node));
+        store
+            .get_mut(worker)
+            .unwrap()
+            .mark_gather_phase(GatherPhase::Harvesting);
+        assert!(store.claim_miner(node, worker));
+
+        store.get_mut(worker).unwrap().clear_orders();
+        store.release_miner(worker);
+        assert_eq!(store.get(node).unwrap().miner(), None);
     }
 
     #[test]
