@@ -304,6 +304,13 @@ fn apply_damage(
     vy: f32,
     range_px: f32,
 ) {
+    if entities
+        .get(victim)
+        .map(|e| e.is_node())
+        .unwrap_or(false)
+    {
+        return;
+    }
     let attacker_is_ap = entities
         .get(attacker)
         .map(|e| e.kind.is_ap())
@@ -389,7 +396,7 @@ fn apply_overpenetration(
         let Some(target) = entities.get(id) else {
             continue;
         };
-        if target.owner == attacker_owner || target.hp == 0 {
+        if target.is_node() || target.owner == attacker_owner || target.hp == 0 {
             continue;
         }
         let tx = target.pos_x - ax;
@@ -757,5 +764,45 @@ mod tests {
             entities.get(secondary).expect("secondary should exist").hp,
             40
         );
+    }
+
+    #[test]
+    fn overpenetration_does_not_damage_resource_nodes() {
+        let mut entities = EntityStore::new();
+        let attacker = entities
+            .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
+            .expect("attacker should spawn");
+        let primary = entities
+            .spawn_unit(2, EntityKind::Rifleman, 140.0, 100.0)
+            .expect("primary target should spawn");
+        let node = entities
+            .spawn_node(EntityKind::Steel, 165.0, 100.0)
+            .expect("resource node should spawn");
+        let fog = Fog::new(2);
+        let mut events: HashMap<u32, Vec<Event>> = HashMap::new();
+        events.insert(1, Vec::new());
+        events.insert(2, Vec::new());
+
+        apply_damage(
+            &mut entities,
+            &mut events,
+            &fog,
+            attacker,
+            primary,
+            10,
+            1,
+            100.0,
+            100.0,
+            140.0,
+            100.0,
+            128.0,
+        );
+
+        assert_eq!(entities.get(primary).expect("primary should exist").hp, 35);
+        assert_eq!(
+            entities.get(node).expect("node should exist").remaining(),
+            Some(1500)
+        );
+        assert_eq!(entities.get(node).expect("node should exist").hp, 1);
     }
 }
