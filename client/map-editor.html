@@ -130,6 +130,12 @@
         gap: 8px;
       }
 
+      .mode-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+      }
+
       .tool {
         display: grid;
         grid-template-columns: 22px 1fr;
@@ -309,6 +315,12 @@
         </button>
       </div>
 
+      <h2>Drag</h2>
+      <div class="mode-grid" id="modes">
+        <button class="active" type="button" data-mode="paint">Paint</button>
+        <button type="button" data-mode="box">Box</button>
+      </div>
+
       <h2>Base Sites</h2>
       <div id="base-list" class="base-list"></div>
     </aside>
@@ -370,8 +382,11 @@
 
       let map = fallbackMap();
       let selectedTool = "grass";
+      let selectedMode = "paint";
       let selectedBase = 0;
       let pointerDown = false;
+      let dragStartTile = null;
+      let dragPreviewTile = null;
       let cellSize = 10;
 
       function normalizeMap(raw) {
@@ -530,6 +545,20 @@
           ctx.textBaseline = "middle";
           ctx.fillText(String(i + 1), cx, cy + 0.5);
         });
+
+        if (pointerDown && selectedMode === "box" && selectedTool !== "base" && dragStartTile && dragPreviewTile) {
+          const rect = tileRect(dragStartTile, dragPreviewTile);
+          ctx.fillStyle = "rgba(199,208,122,0.12)";
+          ctx.fillRect(rect.x0 * cellSize, rect.y0 * cellSize, rect.w * cellSize, rect.h * cellSize);
+          ctx.strokeStyle = "#e7dfc5";
+          ctx.lineWidth = 2;
+          ctx.strokeRect(
+            rect.x0 * cellSize + 1,
+            rect.y0 * cellSize + 1,
+            rect.w * cellSize - 2,
+            rect.h * cellSize - 2,
+          );
+        }
       }
 
       function renderBaseList() {
@@ -569,6 +598,12 @@
         });
       }
 
+      function syncModeButtons() {
+        document.querySelectorAll("[data-mode]").forEach((button) => {
+          button.classList.toggle("active", button.dataset.mode === selectedMode);
+        });
+      }
+
       function canvasTile(event) {
         const rect = canvas.getBoundingClientRect();
         const x = Math.floor((event.clientX - rect.left) / cellSize);
@@ -576,6 +611,14 @@
         const size = map.terrain.length;
         if (x < 0 || y < 0 || x >= size || y >= size) return null;
         return { x, y };
+      }
+
+      function tileRect(a, b) {
+        const x0 = Math.min(a.x, b.x);
+        const y0 = Math.min(a.y, b.y);
+        const x1 = Math.max(a.x, b.x);
+        const y1 = Math.max(a.y, b.y);
+        return { x0, y0, x1, y1, w: x1 - x0 + 1, h: y1 - y0 + 1 };
       }
 
       function applyTool(tile) {
@@ -596,6 +639,29 @@
         setTerrainAt(tile.x, tile.y, ch);
         draw();
         updateStatus();
+      }
+
+      function applyBox(a, b) {
+        if (!a || !b || selectedTool === "base") return;
+        const ch = TERRAIN[selectedTool];
+        if (!ch) return;
+        const rect = tileRect(a, b);
+        let skipped = 0;
+        for (let y = rect.y0; y <= rect.y1; y++) {
+          for (let x = rect.x0; x <= rect.x1; x++) {
+            if (ch !== TERRAIN.grass && isProtected(x, y)) {
+              skipped++;
+              continue;
+            }
+            setTerrainAt(x, y, ch);
+          }
+        }
+        draw();
+        if (skipped > 0) {
+          setStatus("protected base zones must stay grass", true);
+        } else {
+          updateStatus();
+        }
       }
 
       function resizeMap(nextSize) {
@@ -663,19 +729,50 @@
         syncToolButtons();
       });
 
+      document.getElementById("modes").addEventListener("click", (event) => {
+        const button = event.target.closest("[data-mode]");
+        if (!button) return;
+        selectedMode = button.dataset.mode;
+        syncModeButtons();
+      });
+
       canvas.addEventListener("pointerdown", (event) => {
+        const tile = canvasTile(event);
+        if (!tile) return;
         pointerDown = true;
+        dragStartTile = tile;
+        dragPreviewTile = tile;
         canvas.setPointerCapture(event.pointerId);
-        applyTool(canvasTile(event));
+        if (selectedTool === "base" || selectedMode === "paint") {
+          applyTool(tile);
+        } else {
+          draw();
+        }
       });
       canvas.addEventListener("pointermove", (event) => {
-        if (pointerDown && selectedTool !== "base") applyTool(canvasTile(event));
+        if (!pointerDown || selectedTool === "base") return;
+        const tile = canvasTile(event);
+        if (!tile) return;
+        dragPreviewTile = tile;
+        if (selectedMode === "paint") {
+          applyTool(tile);
+        } else {
+          draw();
+        }
       });
       canvas.addEventListener("pointerup", () => {
+        if (selectedMode === "box" && selectedTool !== "base") {
+          applyBox(dragStartTile, dragPreviewTile);
+        }
         pointerDown = false;
+        dragStartTile = null;
+        dragPreviewTile = null;
       });
       canvas.addEventListener("pointercancel", () => {
         pointerDown = false;
+        dragStartTile = null;
+        dragPreviewTile = null;
+        draw();
       });
 
       document.getElementById("load-file").addEventListener("click", () => fileInput.click());
@@ -700,6 +797,7 @@
       });
 
       syncToolButtons();
+      syncModeButtons();
       loadDefault();
     </script>
   </body>
