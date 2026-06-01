@@ -50,8 +50,9 @@ pub fn replay_commands(
     players: &[PlayerInit],
     commands: &[CommandLogEntry],
     ticks: u32,
+    seed: u32,
 ) -> Result<ReplayOutcome, ReplayError> {
-    let mut replay = Game::new_for_replay(players);
+    let mut replay = Game::new_for_replay(players, seed);
     let mut next_command = 0usize;
     let mut events = Vec::new();
 

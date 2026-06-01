@@ -21,6 +21,7 @@ pub(crate) mod services;
 pub mod systems;
 
 use std::collections::HashMap;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::config;
 use crate::protocol::{
@@ -82,6 +83,9 @@ pub struct Game {
     spatial: services::spatial::SpatialIndex,
     /// Persistent pathfinding service with an LRU cache for verified paths.
     pathing: services::pathing::PathingService,
+    /// Seed used to generate this game's map (including start-position shuffle). Stored so
+    /// replays can reconstruct the identical map without re-deriving it.
+    seed: u32,
 }
 
 impl Game {
@@ -93,21 +97,22 @@ impl Game {
 
     /// Create a match with explicit starting resources for every player.
     pub fn new_with_starting_resources(players: &[PlayerInit], steel: u32, oil: u32) -> Game {
-        Self::new_inner(players, true, steel, oil)
+        let seed = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_nanos() as u32)
+            .unwrap_or(0x1234_5678);
+        Self::new_inner(players, true, steel, oil, seed)
     }
 
-    pub(crate) fn new_for_replay(players: &[PlayerInit]) -> Game {
-        Self::new_inner(players, false, config::STARTING_STEEL, config::STARTING_OIL)
+    pub(crate) fn new_for_replay(players: &[PlayerInit], seed: u32) -> Game {
+        Self::new_inner(players, false, config::STARTING_STEEL, config::STARTING_OIL, seed)
     }
 
-    fn new_inner(players: &[PlayerInit], enable_ai: bool, steel: u32, oil: u32) -> Game {
-        // Deterministic seed derived from the player set so a given lobby produces a stable
-        // map (helps reproducibility / debugging) without any external RNG.
-        let mut seed: u32 = 0x1234_5678 ^ (players.len() as u32).wrapping_mul(2_654_435_761);
-        for p in players {
-            seed ^= p.id.wrapping_mul(0x9E37_79B1).rotate_left(7);
-        }
+    pub(crate) fn seed(&self) -> u32 {
+        self.seed
+    }
 
+    fn new_inner(players: &[PlayerInit], enable_ai: bool, steel: u32, oil: u32, seed: u32) -> Game {
         let map = Map::generate(players.len(), seed);
         let fog = Fog::new(map.size);
         let mut entities = EntityStore::new();
@@ -158,6 +163,7 @@ impl Game {
             tick: 0,
             spatial,
             pathing,
+            seed,
         };
         // Initialize supply accounting and fog so the very first snapshot is correct.
         systems::recompute_supply(&mut game.players, &game.entities);
@@ -913,7 +919,7 @@ mod tests {
                     is_ai: false,
                 })
                 .collect();
-            let game = Game::new_for_replay(&players);
+            let game = Game::new_for_replay(&players, 0x1234_5678);
 
             let mut all_player_dists: Vec<Vec<(EntityKind, f32)>> = Vec::new();
             for p in &game.players {
