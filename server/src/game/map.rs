@@ -148,7 +148,7 @@ impl Map {
 /// - 4 players: the four corners.
 fn symmetric_starts(size: u32, player_count: usize, rng: &mut XorShift32) -> Vec<(u32, u32)> {
     // Inset keeps the start area + resource cluster fully on-map.
-    let inset = 8u32.min(size / 4);
+    let inset = 11u32.min(size / 4);
     let lo = inset;
     let hi = size - 1 - inset;
     let nw = (lo, lo);
@@ -169,7 +169,7 @@ fn protected_tiles(size: u32, starts: &[(u32, u32)], expansion_sites: &[(u32, u3
     let r: i32 = 7;
 
     // Collect all tiles to protect: player starts + all four corners.
-    let inset = 8u32.min(size / 4);
+    let inset = 11u32.min(size / 4);
     let lo = inset;
     let hi = size - 1 - inset;
     let all_corners = [(lo, lo), (hi, lo), (lo, hi), (hi, hi)];
@@ -196,7 +196,7 @@ fn protected_tiles(size: u32, starts: &[(u32, u32)], expansion_sites: &[(u32, u3
 
 /// One neutral expansion site per player.
 fn expansion_sites(size: u32, player_count: usize, starts: &[(u32, u32)]) -> Vec<(u32, u32)> {
-    let inset = 8u32.min(size / 4);
+    let inset = 11u32.min(size / 4);
     let lo = inset;
     let hi = size - 1 - inset;
     let mid = size / 2;
@@ -293,7 +293,7 @@ mod tests {
 
     fn corner_tiles(player_count: usize) -> Vec<(u32, u32)> {
         let size = config::map_size_for(player_count);
-        let inset = 8u32.min(size / 4);
+        let inset = 11u32.min(size / 4);
         let lo = inset;
         let hi = size - 1 - inset;
         vec![(lo, lo), (lo, hi), (hi, lo), (hi, hi)]
