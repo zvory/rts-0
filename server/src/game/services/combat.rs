@@ -10,6 +10,7 @@ use crate::game::services::occupancy::Occupancy;
 use crate::game::services::spatial::SpatialIndex;
 use crate::game::services::world_query;
 use crate::protocol::Event;
+use crate::rules::combat as combat_rules;
 
 /// Extra slack (px) added to attack range checks so units don't dance at the exact boundary.
 const RANGE_SLACK: f32 = 4.0;
@@ -48,7 +49,8 @@ pub(crate) fn combat_system(
             if matches!(e.order(), Order::Gather(_)) {
                 continue;
             }
-            let (range_tiles, dmg, cd) = attack_profile(e);
+            let profile = combat_rules::attack_profile(e.kind);
+            let (range_tiles, dmg, cd) = (profile.range_tiles, profile.dmg, profile.cooldown);
             let range_px = range_tiles as f32 * config::TILE_SIZE as f32 + e.radius() + RANGE_SLACK;
             // Aggro radius: mobile units detect and chase enemies out to their sight radius so
             // attack-move / auto-defend actually close the gap. Idle machine gunners are the
@@ -224,16 +226,6 @@ fn machine_gunner_ready_to_move(entities: &mut EntityStore, id: u32) -> bool {
     }
 }
 
-/// Attack profile (range_tiles, dmg, cooldown) for a combat-capable entity.
-fn attack_profile(e: &Entity) -> (u32, u32, u32) {
-    if let Some(s) = config::unit_stats(e.kind) {
-        (s.range_tiles, s.dmg, s.cooldown)
-    } else if let Some(s) = config::building_stats(e.kind) {
-        (s.range_tiles, s.dmg, s.cooldown)
-    } else {
-        (0, 0, 0)
-    }
-}
 
 /// How a combatant chooses targets.
 #[derive(Copy, Clone, PartialEq)]
@@ -288,11 +280,11 @@ fn resolve_target(
 
     // AT teams prefer tanks over all other targets; fall back to nearest enemy if no tank
     // is in range.
-    let is_at_team = entities
+    let prefers_armored = entities
         .get(self_id)
-        .map(|e| e.kind == EntityKind::AtTeam)
+        .map(|e| combat_rules::prefers_armored_targets(e.kind))
         .unwrap_or(false);
-    if is_at_team {
+    if prefers_armored {
         if let Some(id) = world_query::nearest_tank_in_range(
             entities, spatial, self_id, owner, px, py, acquire_px,
         ) {
@@ -325,18 +317,11 @@ fn apply_damage(
     if entities.get(victim).map(|e| e.is_node()).unwrap_or(false) {
         return;
     }
-    let attacker_is_ap = entities
-        .get(attacker)
-        .map(|e| e.kind.is_ap())
-        .unwrap_or(false);
-    let victim_is_armored = entities
-        .get(victim)
-        .map(|e| e.kind.is_armored())
-        .unwrap_or(false);
-    let effective_dmg = if victim_is_armored && !attacker_is_ap {
-        dmg / 4
-    } else {
-        dmg
+    let attacker_kind = entities.get(attacker).map(|e| e.kind);
+    let victim_kind = entities.get(victim).map(|e| e.kind);
+    let effective_dmg = match (attacker_kind, victim_kind) {
+        (Some(ak), Some(vk)) => combat_rules::effective_damage(ak, vk, dmg),
+        _ => dmg,
     };
     if let Some(v) = entities.get_mut(victim) {
         v.hp = v.hp.saturating_sub(effective_dmg);
@@ -428,19 +413,12 @@ fn apply_overpenetration(
 
     hits.sort_by(|a, b| a.3.partial_cmp(&b.3).unwrap_or(std::cmp::Ordering::Equal));
     for (id, tx, ty, _, _) in hits {
+        let attacker_kind = entities.get(attacker).map(|e| e.kind);
         let effective_dmg = entities
             .get(id)
-            .map(|e| {
-                if e.kind.is_armored()
-                    && !entities
-                        .get(attacker)
-                        .map(|a| a.kind.is_ap())
-                        .unwrap_or(false)
-                {
-                    splash_dmg / 4
-                } else {
-                    splash_dmg
-                }
+            .map(|e| match attacker_kind {
+                Some(ak) => combat_rules::effective_damage(ak, e.kind, splash_dmg),
+                None => splash_dmg,
             })
             .unwrap_or(0);
         if effective_dmg == 0 {
