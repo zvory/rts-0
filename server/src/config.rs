@@ -194,6 +194,7 @@ pub fn unit_stats(kind: EntityKind) -> Option<UnitStats> {
     Some(s)
 }
 
+
 /// Stats for a building kind, or `None` if `kind` is not a building.
 pub fn building_stats(kind: EntityKind) -> Option<BuildingStats> {
     let s = match kind {

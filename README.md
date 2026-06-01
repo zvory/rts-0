@@ -8,13 +8,13 @@ Server-authoritative multiplayer with a **Rust** server (axum + tokio) and a zer
 
 ![In-game](docs/screenshot-game.png)
 
-> **Status:** v1 (focused MVP) — one faction, 3 unit types, 4 building types, 2 resources, fog of
+> **Status:** v1 (focused MVP) — one faction, 5 unit types, 5 building types, 2 resources, fog of
 > war, last-player-standing. Built to be iterated on for years; `DESIGN.md` is the source of truth
 > for the architecture, wire protocol, module contracts, and balance.
 
 ## Features
 
-- **Economy** — engineers harvest supplies & fuel on round trips to your Industrial Center;
+- **Economy** — engineers latch onto steel and oil patches, mine in place, and deposit directly;
   nodes deplete.
 - **Base building** — Industrial Center, Depot, Barracks, Training Centre, and Tank Factory,
   placed by engineers with live construction.
@@ -43,7 +43,7 @@ To play head-to-head, open the page in **two browser windows**, join the same ro
 
 ## Deploy
 
-The app is configured for Fly.io via [`fly.toml`](/Users/az/Code/rts-0/fly.toml). After making a
+The app is configured for Fly.io via [`fly.toml`](fly.toml). After making a
 change, deploy from the repo root with:
 
 ```bash
@@ -51,7 +51,7 @@ flyctl deploy --ha=false
 ```
 
 The first-time setup steps, app name, and machine management commands live in
-[`docs/fly.md`](/Users/az/Code/rts-0/docs/fly.md).
+[`docs/fly.md`](docs/fly.md).
 
 ![Lobby](docs/screenshot-lobby.png)
 
@@ -70,7 +70,7 @@ The first-time setup steps, app name, and machine management commands live in
 
 ## How it works
 
-The **server** runs the one authoritative simulation per room at a fixed 10 Hz tick. Clients send
+The **server** runs the one authoritative simulation per room at a fixed 30 Hz tick. Clients send
 only **commands** (intent); they never mutate game state. Each tick the server produces a
 **per-player snapshot** with fog of war applied — hidden enemies are simply not sent, so the fog is
 a real security boundary. The **client** renders snapshots, interpolating positions between them for
@@ -104,24 +104,24 @@ tests/         end-to-end tests (run against a live server) — see tests/README
 
 ## Gameplay & balance (v1)
 
-Start with 1 Industrial Center, 4 engineers, 50 supplies. Supply cap starts at 10 and grows
+Start with 1 Industrial Center, 4 engineers, 50 steel. Supply cap starts at 10 and grows
 +8 per Depot.
 
 | Unit    | HP  | Dmg | Range | Sight | Cost          | Supply |
 |---------|-----|-----|-------|-------|---------------|--------|
-| Engineer | 40  | 4   | 1     | 7     | 50 min        | 1      |
-| Rifleman | 45  | 5   | 4     | 8     | 50 min        | 1      |
-| Machine Gunner | 55 | 4 | 5   | 8     | 75 min        | 2      |
-| AT Team | 45  | 24  | 4     | 8     | 75 min/25 gas | 2      |
-| Tank    | 130 | 20  | 3     | 7     | 100 min/50 gas| 2      |
+| Engineer | 40  | 4   | 1     | 7     | 50 steel | 1      |
+| Rifleman | 45  | 5   | 4     | 8     | 50 steel | 1      |
+| Machine Gunner | 55 | 4 | 5   | 8     | 75 steel/25 oil | 2      |
+| AT Team | 45  | 48  | 5     | 8     | 75 steel/25 oil | 2      |
+| Tank    | 390 | 60  | 3     | 7     | 200 steel/100 oil | 6      |
 
 | Building | HP  | Cost   | Footprint | Notes |
 |----------|-----|--------|-----------|-------|
-| Industrial Center | 600 | 400 min | 3x3 | trains Engineers, resource drop-off, +10 supply (start free) |
-| Depot | 220 | 50 min | 2x2 | +8 supply |
-| Barracks | 320 | 100 min | 3x2 | trains Riflemen, Machine Gunners, AT Teams |
-| Training Centre | 300 | 100 min/50 gas | 3x2 | unlocks support infantry |
-| Tank Factory | 360 | 200 min/100 gas | 3x3 | trains Tanks |
+| Industrial Center | 600 | 400 steel | 3x3 | trains Engineers, +10 supply (start free) |
+| Depot | 220 | 100 steel | 2x2 | +8 supply |
+| Barracks | 320 | 150 steel | 3x2 | trains Riflemen, Machine Gunners, AT Teams |
+| Training Centre | 300 | 100 steel/50 oil | 3x2 | unlocks support infantry |
+| Tank Factory | 360 | 200 steel/100 oil | 3x3 | trains Tanks |
 
 Balance lives in `server/src/config.rs` (authoritative); the UI subset is mirrored in
 `client/src/config.js`. Change both together.
@@ -148,7 +148,6 @@ See `DESIGN.md §7`.
 
 ## Known future work
 
-- Unit-vs-unit collision avoidance / flocking (units currently soft-overlap).
-- Spectators/replays.
+- Spectators.
 - Upgrade PixiJS v7 → v8 (async `Application.init`).
 - A binary wire format for scale.

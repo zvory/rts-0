@@ -9,6 +9,8 @@ import { Net } from "../client/src/net.js";
 import { GameState } from "../client/src/state.js";
 import { Camera } from "../client/src/camera.js";
 import { Fog } from "../client/src/fog.js";
+import { STATS } from "../client/src/config.js";
+import { KIND } from "../client/src/protocol.js";
 import { footprintValidAgainstEntities } from "../client/src/input.js";
 
 // ---------------------------------------------------------------------------
@@ -52,6 +54,26 @@ function assertHasGetter(obj, name, msgPrefix = "") {
   assert(net.playerId === null, "Net.playerId should be null before welcome");
   assertHasMethod(net, "addAi", "Net");
   assertHasMethod(net, "removeAi", "Net");
+  assertHasMethod(net, "setQuickstart", "Net");
+  assertHasMethod(net, "setReplaySpeed", "Net");
+}
+
+// ---------------------------------------------------------------------------
+// Config
+// ---------------------------------------------------------------------------
+{
+  assert(
+    Array.isArray(STATS[KIND.TANK_FACTORY].requires),
+    "Tank Factory should expose all server-side build prerequisites",
+  );
+  assert(
+    STATS[KIND.TANK_FACTORY].requires.includes(KIND.INDUSTRIAL_CENTER),
+    "Tank Factory should require an Industrial Center in the command card",
+  );
+  assert(
+    STATS[KIND.TANK_FACTORY].requires.includes(KIND.TRAINING_CENTRE),
+    "Tank Factory should require a Training Centre in the command card",
+  );
 }
 
 // ---------------------------------------------------------------------------

@@ -113,7 +113,7 @@ impl std::fmt::Display for EntityKind {
 }
 
 // ---------------------------------------------------------------------------
-// Orders, production, carrying
+// Orders, production, worker economy
 // ---------------------------------------------------------------------------
 
 /// The high-level order a unit/building is currently executing.
@@ -133,7 +133,7 @@ pub enum Order {
     AttackMove(MoveOrder),
     /// Chase and attack a specific entity until it dies, then go idle.
     Attack(AttackOrder),
-    /// Harvest from a resource node, ferrying loads back to the home Industrial Center. See [`CarryState`].
+    /// Harvest from a resource node, depositing each completed load directly into the economy.
     Gather(GatherOrder),
     /// Walk to a target tile and construct a building of `kind` there. The building does
     /// not exist until the worker arrives, re-validates placement/affordability, and pays
@@ -359,7 +359,7 @@ pub struct ProdItem {
     pub total: u32,
 }
 
-/// What a worker is carrying back to base, if anything.
+/// Reserved for future round-trip harvesting if attached mining is replaced.
 #[allow(dead_code)]
 #[derive(Debug, Clone, Copy)]
 pub struct CarryState {
@@ -488,13 +488,13 @@ pub struct ConstructionState {
     pub total: u32,
 }
 
-/// Worker-only gathering and carrying state.
+/// Worker-only economy state.
 #[allow(dead_code)]
 #[derive(Debug, Clone, Default)]
 pub struct WorkerState {
-    /// Present when the worker is laden with a resource load.
+    /// Present only if round-trip harvesting is reintroduced.
     pub carry: Option<CarryState>,
-    /// The Industrial Center this worker deposits into. Resolved lazily to the nearest own Industrial Center.
+    /// Reserved drop-off target for future round-trip harvesting.
     pub home_industrial_center: Option<u32>,
 }
 
