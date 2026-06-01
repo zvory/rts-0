@@ -243,16 +243,30 @@ if [ "${SERVER_HEALTHY:-0}" = "1" ]; then
   run_suite_bg "API: ai_integration"     node "$SCRIPT_DIR/ai_integration.mjs"
 
   if [ "$RUN_CLIENT" = "1" ]; then
-    CHROME="${CHROME:-/Applications/Google Chrome.app/Contents/MacOS/Google Chrome}"
+    # Auto-detect Chrome if not set: macOS app bundle, then common Linux paths.
+    if [ -z "${CHROME:-}" ]; then
+      for candidate in \
+          "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
+          "/Applications/Chromium.app/Contents/MacOS/Chromium" \
+          "$(which google-chrome-stable 2>/dev/null)" \
+          "$(which google-chrome 2>/dev/null)" \
+          "$(which chromium-browser 2>/dev/null)" \
+          "$(which chromium 2>/dev/null)"; do
+        if [ -n "$candidate" ] && [ -x "$candidate" ]; then
+          CHROME="$candidate"
+          break
+        fi
+      done
+    fi
     have_puppeteer=0
     [ -d "$SCRIPT_DIR/node_modules/puppeteer-core" ] && have_puppeteer=1
-    if [ "$have_puppeteer" = "1" ] && [ -x "$CHROME" ]; then
+    if [ "$have_puppeteer" = "1" ] && [ -n "${CHROME:-}" ] && [ -x "$CHROME" ]; then
       CHROME="$CHROME" run_suite_bg "Client smoke (headless Chrome)" node "$SCRIPT_DIR/client_smoke.mjs"
     elif [ "$have_puppeteer" != "1" ]; then
       info "skipping client smoke: puppeteer-core not installed (cd tests && npm install)"
       SKIPPED+=("Client smoke (no puppeteer-core)")
     else
-      info "skipping client smoke: no Chrome at \$CHROME ($CHROME)"
+      info "skipping client smoke: no Chrome found (set CHROME=/path/to/chrome to override)"
       SKIPPED+=("Client smoke (no Chrome)")
     fi
   else
