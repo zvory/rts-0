@@ -510,7 +510,9 @@ and forest-specific rules are future work.
   does not reserve it. Extra workers that arrive while the slot is taken go idle. The slot
   is advisory and self-heals — it's only honored while the recorded worker is alive and
   actively harvesting that node, so death / re-order / retarget free it automatically.
-- Starting layout: each base gets 12 steel patches and 3 oil patches.
+- Starting layout: each base site gets 12 steel patches and 3 oil patches. The map seeds one
+  neutral expansion site per player, so every match has exactly `2 × player_count` total base
+  sites and every player has somewhere to expand without increasing the room-size cap.
 
 Unit stats (hp, dmg, range[tiles], cooldown[ticks], speed[px/tick], sight[tiles], cost, supply, buildTicks):
 
@@ -596,7 +598,7 @@ Computer opponents are **opt-in**: a room has none unless the host adds them fro
 (`addAi` / `removeAi`, host-only, lobby phase only). The lobby also has a host-only
 `setQuickstart` toggle labeled "Start with more money mode", which causes the next match to begin
 with 700 steel and 300 oil for every player. They are capped with humans at
-`MAX_PLAYERS = 4` (the map lays out at most four symmetric starts). AI players are seated after
+`MAX_PLAYERS = 4` (the map lays out exactly `2 × player_count` total base sites). AI players are seated after
 the humans in the lobby player list; their colors come from the tail of `PLAYER_PALETTE` so they
 never collide with human colors. They persist across rematches and are cleared only when the room
 empties of humans.
