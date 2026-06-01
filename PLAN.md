@@ -23,44 +23,11 @@ sub-plan so this file stays readable.
 - Prefer `go test ./...` for Go repos; this repo is Rust/JS, so use the repo commands in
   `CLAUDE.md`.
 
-## Foundation Already Done
-
-- [x] Replace stringly entity kind checks in hot simulation paths with typed internal enums.
-- [x] Split `systems.rs` into internal services.
-- [x] Add spatial query layer.
-- [x] Introduce `PathingService` boundary.
-- [x] Extend map/passability around movement classes.
-- [x] Rename the game to Bewegungskrieg.
-- [x] Rename gas/minerals to oil/steel.
-- [x] Enforce map-generation resource fairness.
-- [x] Add tick-stamped command log and deterministic replay harness.
-- [x] Command card grid hotkeys.
-- [x] Feedback on move and attack commands.
-- [x] Selected unit command card for hold/move/attack/stop.
-- [x] Building production progress bars.
-- [x] Defeat screen keeps latest map visible.
-- [x] Larger command card.
-- [x] Non-rifleman/non-worker units require oil.
-- [x] Slower infantry, workers, and AT gun.
-- [x] Darker silhouette for impassable terrain.
-- [x] Larger tanks.
-- [x] Fix workers getting stuck inside buildings after construction.
-
 ## Phase 1: Safety Harness Before More Simulation Complexity
 
 Goal: make future simulation changes easy to verify and hard to silently break.
 
-### 1.1 Tick Invariant Checks
-
-- [x] Add `Game::assert_invariants()` for tests/debug builds.
-- [x] Check entity id/store-key consistency.
-- [x] Check no NaN or out-of-world coordinates.
-- [x] Check supply equals living plus queued units.
-- [x] Check buildings never overlap.
-- [x] Check resource-node miner reservations are valid or ignored.
-- [x] Check orders do not point at invalid required targets except in documented transition windows.
-- [x] Check fog grids exist for all players and never for neutral owner.
-- [x] Check snapshots never expose hidden enemy ids through entities, targets, or events.
+### 1.1 Tick Invariant Checks — DONE (see DONE.md)
 
 Gates:
 
@@ -91,9 +58,6 @@ Gates:
 - [ ] Add system-order tests.
 - [ ] Add command hardening tests.
 - [ ] Add fog leak tests for position-bearing events.
-- [x] Add shot overpenetration so attacks continue 25% of range past the primary target and
-  deal 50% reduced damage to enemies behind it, discouraging clumping.
-
 Gates:
 
 - Required before forests/LoS blockers.
@@ -113,26 +77,14 @@ Parallel-safe for Agent B:
 Goal: prevent `Entity`, commands, and order state from becoming a blob before adding richer RTS
 mechanics.
 
-### 2.1 Typed Component-Shaped Entity State
-
-- [x] Split broad `Entity` fields into typed state groups while keeping `EntityStore` simple.
-- [x] Introduce structures such as `MovementState`, `CombatState`, `ProductionState`,
-  `ConstructionState`, `WorkerState`, and `ResourceNodeState`.
-- [x] Add constructors per `EntityKind`.
-- [x] Add tests that each `EntityKind` has exactly the expected state groups.
-- [x] Avoid adding new top-level optional fields to `Entity` unless they apply to most kinds.
+### 2.1 Typed Component-Shaped Entity State — DONE (see DONE.md)
 
 Gates:
 
 - Required before full unit collision.
 - Required before construction resumption.
 
-### 2.2 Central World Query and Mutation Helpers
-
-- [x] Add canonical helpers for owned units, completed buildings, town halls, visible entities,
-  targetable enemies, resource reservation, building placement, spawn search, and path requests.
-- [x] Move repeated scans and predicates behind helpers where practical.
-- [x] Prefer helpers in new systems; hand-rolled scans need a clear local reason.
+### 2.2 Central World Query and Mutation Helpers — DONE (see DONE.md)
 
 Gates:
 
@@ -157,12 +109,7 @@ Gates:
 - Required before factions.
 - Required before advanced AI tech progression.
 
-### 2.4 Explicit Order State Machines
-
-- [x] Separate order intent from execution state.
-- [x] Model gather, build, attack, and future setup/teardown as explicit state machines.
-- [x] Add transition tests for stale target, stop, death, retarget, no path, ownership loss,
-  cancel, interrupt, resume, and completion.
+### 2.4 Explicit Order State Machines — DONE (see DONE.md)
 
 Gates:
 
@@ -176,7 +123,6 @@ Parallel-safe for Agent B:
 - [ ] Lobby system to see active lobbies.
 - [ ] Basic settings menu, including surrender UI. Surrender should call a small
   `Game::eliminate(player)`-style API.
-- [x] Muzzle flare animations if they stay client-side and do not alter event semantics.
 - [ ] Find a source of copyright-free assets for units, buildings, resources, and UI.
 
 ## Phase 3: Data Definitions and Balance Surface
@@ -230,16 +176,7 @@ Depends on:
 
 Goal: handle the hard movement work before larger maps and real collision amplify pathing debt.
 
-### 4.1 Movement and Pathing Coordinator
-
-- [x] Add one coordinator for movement/path requests.
-- [x] Own path request budgeting per tick.
-- [x] Add shared paths or flow-field-style support for large selected groups where practical.
-- [x] Add goal spreading around target points.
-- [x] Add spawn-point search around buildings.
-- [x] Add `PathFailed` semantics.
-- [x] Add repath throttling and cache invalidation.
-- [x] Route commands through the coordinator instead of directly creating per-unit A* paths.
+### 4.1 Movement and Pathing Coordinator — DONE (see DONE.md)
 
 Gates:
 
@@ -247,17 +184,7 @@ Gates:
 - Required before larger maps.
 - Required before forests/vehicle blockers.
 
-### 4.2 Unit Collision and Non-Stacking
-
-- [x] Implement unit collision and non-stacking.
-- [x] Preserve mining-worker exceptions through worker/gather state, not movement hacks.
-- [x] Add no-overlap invariants, path-failure behavior, blocked-goal behavior, and group-move tests.
-
-Follow-ups:
-
-- [x] Re-enable `scripted_self_play_exercises_economy_tech_and_combat`: subsumed by the
-  "reserve on arrival" build model. Buildings no longer spawn at command apply time, so
-  the worker's path goal stays on a walkable tile until it arrives.
+### 4.2 Unit Collision and Non-Stacking — DONE (see DONE.md)
 
 Depends on:
 
@@ -347,10 +274,6 @@ Depends on:
 
 ### 6.3 Advanced AI Tech Progression
 
-- [x] Start the shared AI knowledge extraction by centralizing deterministic near-base
-  build-site selection for both live AI and self-play.
-- [x] Extract shared worker-target, local spend-budget, and attack-wave selection helpers for
-  both live AI and self-play.
 - [ ] Follow [AI-PLAN.md](AI-PLAN.md) for the detailed dependency chain and rollout order.
 - [ ] Keep one shared AI knowledge and action layer used by both live AI and self-play.
 - [ ] Add at least three simple strategy profiles:
@@ -397,10 +320,6 @@ coordination.
 - [ ] Find copyright-free assets for units, buildings, resources, and UI.
 - [ ] Switch font to DIN 1451 Mittelschrift everywhere.
 
-Already done:
-
-- [x] Hotkeys in the command card should be grid style.
-
 ## Dependency Index
 
 Use this index when deciding whether a TODO can start.
@@ -419,25 +338,13 @@ Use this index when deciding whether a TODO can start.
 
 
 
-# Uncategorized Tasks:
- - DONE: buildings should not be able to be be built on top of each other
- - with a group of units selected, shift clicking a unit will deselect it
- - DONE: control left click a unit will select all units of that type that are visible in the viewport
- - DONE: tank factory and advanced training center should   require 100 and 50 oil respecitvely
- - DONE: Add four oil patches, but cut the rate of oil gathering by four
- - should be possible to select multiple buildings at once
- - cheat menu for development (only available while running locally), buttons to grant money, oil, or clear the fog of war completely
- - DONE: implement a way to view the self play tests with zero fog of war, because we spend an enormous amount of tokens breaking and debugging them, and letting me just watch will be super helpful and token efficient
- - DONE: building a building on top of a unit will lock that unit inside the building. it should be impossible to build a building on top of a unit.
- - DONE: halve the mining rate for steel
- - contorl group system for units and buildings. ctrl+number creates a group. shift plus number adds to a group. tapping a group selects it. double tapping moves the camera to the centroid.
- - DONE: make steel gray, and make oil black, change hte icons, and make the oil patch spawn 90 degrees away from the steel patch
- - DONE: halve the number of initial steel and oil patches, and create scattered patches of steel and oil the map. scattered patches should be half the size of the main base.  there should be five such patches scattered, one near each starting position (like the natural expansion), and one near the centre.
- - DONE: workers should visually latch onto a steel patch with a line to the steel patch
- - shrink buildings so they don't take up their whole tile size, but leave some margin pixels on the sides. marginal, not enough for units to squeeze through, but enough for pathing to get easier
- - worker minin animatino
- - DONE: add a white outline to oil patches so they are more visible to the player
- - DONE: limit how many units can be selected at a time to 12
- - create a sound system and a basic system for minimap alerts, for example when being attacked
- - DONE: make the tank deal 100 damage so it one-shots every unit
- - add an urban area in the center of the map that is hard to path through, with cover that tanks struggle with and that AT gunners and machine gunners can hide in
+# Uncategorized Tasks
+
+- With a group of units selected, shift clicking a unit will deselect it.
+- Should be possible to select multiple buildings at once.
+- Cheat menu for development (only available while running locally): buttons to grant money, oil, or clear the fog of war completely.
+- Control group system for units and buildings. ctrl+number creates a group. shift+number adds to a group. Tapping a group selects it. Double tapping moves the camera to the centroid.
+- Shrink buildings so they don't take up their whole tile size, but leave some margin pixels on the sides — marginal, not enough for units to squeeze through, but enough for pathing to get easier.
+- Worker mining animation.
+- Create a sound system and a basic system for minimap alerts, for example when being attacked.
+- Add an urban area in the center of the map that is hard to path through, with cover that tanks struggle with and that AT gunners and machine gunners can hide in.
