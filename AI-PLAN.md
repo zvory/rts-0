@@ -1,434 +1,221 @@
 # AI PLAN
 
-This file is the detailed implementation plan for the gameplay AI and AI-driven self-play.
+This is the canonical AI planning index for gameplay AI and AI-driven self-play.
 
-Use `PLAN.md` as the top-level dependency map. Use this file when implementing AI work so smaller
-models do not have to reconstruct the intended architecture from code comments or scattered TODOs.
+Use this file to decide what phase comes next. Use the linked phase files for implementation
+details. `PLAN.md` stays the top-level project dependency map; this file owns the AI architecture,
+AI rollout order, and AI-specific handoff tasks.
+
+## How to Use This Plan
+
+- Work phases in order unless a later phase explicitly says it is parallel-safe.
+- Keep each implementation branch scoped to one phase or one subtask inside a phase.
+- Read `DESIGN.md` before implementation; update it in the same change if a public contract changes.
+- Keep live AI, self-play, replay, and human players on the ordinary `Command` path.
+- Prefer deterministic, inspectable heuristics over opaque planning/search frameworks.
+- Do not add a second AI roadmap. Update this index and the relevant detailed phase file instead.
+
+## Current State
+
+The live gameplay AI is currently a single `AiController` in `server/src/game/ai.rs`. It:
+
+- surveys authoritative state directly
+- keeps workers mining steel
+- trains workers up to starting steel saturation
+- builds depots and barracks
+- pumps riflemen
+- stages riflemen on a rally line
+- launches escalating rifleman waves at public enemy start tiles
+
+Shared helper extraction has started in `server/src/game/ai_shared.rs`:
+
+- deterministic near-base build-site search
+- worker saturation target helpers for entity and snapshot views
+- local spend reservation
+- basic attack-wave readiness
+
+Self-play still has separate scripted RTS logic in `server/src/game/selfplay.rs`, including
+`BuildTechAttackScript`, `EconomyScript`, `WorkerRushScript`, and `MineOnlyScript`. Those scripts
+duplicate worker assignment, production, pending-build tracking, tech progression, and attack
+logic that should eventually live in the shared AI core.
 
 ## Goal
 
-Build a decent but simple AI system that:
+Build a maintainable AI system that:
 
-- supports at least three maintainable strategies:
+- supports at least three first-class strategy profiles:
   - `rifle_flood_fast`
   - `rifle_flood_full_saturation`
-  - one tech-tree strategy that exercises oil, prerequisites, and tank production
+  - `tech_to_tanks`
+- can later add profiles such as `standard`, `proxy_rush`, and `eco_expand`
 - shares game knowledge across live AI and self-play
-- stays on the ordinary command path
 - stays deterministic under replay
-- is easy to update when balance, unlocks, or economy rules change
+- keeps strategy differences in profiles, priorities, and thresholds rather than copied mechanics
+- remains easy to update when balance, tech requirements, or command validation change
 
-Non-goals for this plan:
+## Non-Goals
 
-- advanced micro
-- scouting logic
-- adaptive opponent modeling
+These are intentionally out of scope for the first architecture pass:
+
 - machine learning
-- a large behavior-tree framework
+- deep future-branch search
+- generic GOAP/HTN framework adoption
+- large behavior-tree framework adoption
+- adaptive opponent modeling
 - perfect play
+- sophisticated scouting
+- advanced unit micro beyond small targeted controllers
 
-The target is maintainability first, then decent coverage and believable behavior.
+The near-term target is believable, maintainable, testable play.
 
 ## Main Architectural Decision
 
-Do not build three separate bots that each know how to play the whole game.
+Do not build several separate bots that each know how to play the whole game.
 
-Instead, build:
+Build one shared AI core with:
 
-1. one shared AI knowledge layer
-2. one shared action-synthesis layer
-3. one small decision loop
-4. several thin strategy profiles
-5. two adapters:
-   - live gameplay AI adapter
-   - self-play harness adapter
+1. a constrained world-model and facts layer
+2. a shared action-synthesis layer
+3. one deterministic decision loop
+4. thin strategy profiles
+5. adapters for live gameplay AI and self-play
+6. matchup tests that exercise personalities instead of brittle scripts
 
-This keeps "how the game works" in one place and keeps "which style to prefer" in small,
-replaceable strategy profiles.
+The useful model is not "give a generic optimizer levers and an objective function." The useful
+model is a small RTS-specific hierarchy where each layer has a limited action space and good
+derived facts.
 
-## Why This Approach
+## Proposed Module Ownership
 
-The current maintenance problem is duplicated RTS knowledge.
+This is the intended direction. Adjust names only if the implementation reveals a better local fit.
 
-Today, `server/src/game/ai.rs` already has a useful state-derived AI shape, while
-`server/src/game/selfplay.rs` contains several bespoke strategy scripts with duplicated economy,
-tech, worker assignment, and attack logic. That makes feature changes expensive because unlocking a
-tank, saturating a patch, or deciding when to attack must be updated in multiple places.
-
-This plan chooses a smaller architecture instead of a more ambitious one:
-
-- No big behavior-tree framework yet.
-- No planner that searches deep future branches.
-- No script zoo where each test owns custom game logic.
-
-Trade-off:
-
-- We give up some expressiveness now.
-- In return we get an AI system that is much easier to keep correct while the game is evolving.
-
-## Dependency Chain
-
-Implement AI work in this order. Do not skip downward in the chain unless the prerequisites are
-already complete and the skipped layer is truly unnecessary.
-
-### A. Shared World Queries and Definitions
-
-Purpose:
-- Give AI one authoritative way to ask game questions.
-
-Examples:
-- how many workers are mining steel
-- what is the saturation target for this base
-- which building unlocks tanks
-- whether supply is blocked
-- whether a building of a certain kind is complete, in progress, or only intended
-- what combat units exist and are free to join an attack
-
-Depends on:
-- `PLAN.md` Phase 2.2 world helpers
-- `PLAN.md` Phase 3.1 definitions
-
-Notes:
-- The AI should not own hard-coded copies of unlock chains or unit costs.
-- If a game mechanic changes, AI should learn it by asking defs/helpers again, not by editing
-  three separate strategies.
-
-### B. Shared AI Knowledge Layer
-
-Purpose:
-- Centralize all reusable "RTS common sense" logic.
-
-This layer should answer:
-- do I need more workers
-- do I need supply now
-- what should I build to unlock a target unit
-- can I afford this now
-- which worker should build
-- where is a safe/valid place to build near the base
-- which resource node should this idle worker take
-- is this army large enough to move out
-
-Examples of helpers to centralize here:
-- worker saturation target
-- supply pressure calculation
-- building prerequisite resolution
-- worker pool selection
-- pending-build tracking rules
-- attack readiness checks
-
-This layer is where "change one piece of code and all strategies inherit it" should become true.
-
-### C. Shared Action-Synthesis Layer
-
-Purpose:
-- Turn AI decisions into ordinary `Command`s.
-
-This should own:
-- train worker
-- train combat unit
-- build structure
-- assign gather order
-- issue attack-move
-- reserve local spending inside one think step
-
-Rules:
-- stay on the same command path as human clients and replay
-- centralize budget reservation logic
-- centralize common anti-duplication protections such as one pending depot builder
-
-Depends on:
-- shared AI knowledge layer
-- `PLAN.md` Phase 2.3 formal command processor
-
-### D. Small Decision Loop
-
-Purpose:
-- Decide what to do this think tick using the shared knowledge/actions.
-
-Recommended shape:
-- cheap periodic think loop
-- collect current facts
-- evaluate a small set of candidate macro actions
-- emit a few commands in priority order
-
-This does not need to be a full behavior tree.
-
-A ranked checklist or utility-style scorer is enough, as long as it is:
-- deterministic
-- easy to inspect
-- easy to parameterize by strategy profile
-
-### E. Strategy Profiles
-
-Purpose:
-- Express different personalities without forking AI mechanics.
-
-Each profile should mostly be data and thresholds, not custom control flow.
-
-Candidate fields:
-- target worker count behavior
-- rush vs eco preference
-- minimum free supply buffer
-- desired barracks count curve
-- desired tech timing
-- attack size threshold
-- whether to save for tech before continuing rifle production
-- preferred composition priorities
-
-The first required profiles are:
-
-#### `rifle_flood_fast`
-
-Intent:
-- pressure quickly
-- cut worker greed earlier
-- build early rifle production
-- attack with a smaller army threshold
-
-Use for:
-- proving early aggression still works
-- replacing fragile worker-rush-adjacent scripts with a more game-realistic early attack bot
-
-#### `rifle_flood_full_saturation`
-
-Intent:
-- saturate the starting steel economy first
-- then scale rifle production harder
-- attack later with a larger/more stable wave
-
-Use for:
-- proving the economy-first opening still transitions into pressure
-- catching regressions where worker assignment or supply planning breaks macro play
-
-#### `tech_tree`
-
-Intent:
-- exercise oil gathering
-- build the prerequisite chain
-- reach tank production
-- attack with a mixed army after teching
-
-Use for:
-- testing prerequisite logic
-- testing oil economy
-- testing tank unlock/progression changes
-
-### F. Perception Adapters
-
-Purpose:
-- share the AI brain while preserving the gameplay-vs-selfplay boundary.
-
-Two adapters are expected:
-
-#### Live AI Adapter
-
-- reads authoritative state
-- keeps the current gameplay AI contract
-- may use fuller knowledge because it is server-side
-
-#### Self-Play Adapter
-
-- reads the same snapshot-style view allowed by the self-play harness contract
-- uses the same shared decision machinery underneath
-
-Important:
-- These adapters may differ in what they can observe.
-- They should not differ in game-mechanics knowledge.
-
-## Rollout Plan
-
-Implement in small, reviewable phases.
-
-### Phase AI-1: Document and Freeze the AI Boundary
-
-Deliverables:
-- document the intended shared-layer architecture
-- name the first three strategy profiles
-- document that self-play should migrate away from bespoke scripts toward shared personalities
-
-Why first:
-- avoids coding toward two different mental models
-
-### Phase AI-2: Extract Shared Knowledge from Existing Code
-
-- [x] Centralize deterministic near-base build-site selection so live AI and self-play stop
-  carrying separate placement heuristics.
-- [x] Centralize worker saturation targeting, local spend reservation, and attack-wave selection
-  helpers so both AI entry points share the same small rules.
-
-Deliverables:
-- identify duplicated logic in `ai.rs` and `selfplay.rs`
-- move reusable economy/build/attack knowledge into shared helpers
-
-Expected duplicated areas:
-- worker saturation logic
-- supply logic
-- build placement
-- pending build intent tracking
-- unit training affordability
-- worker assignment to steel/oil
-- attack readiness
-
-Success condition:
-- at least one meaningful AI rule can be changed in one place and observed by more than one
-  strategy consumer
-
-### Phase AI-3: Introduce Strategy Profiles
-
-Deliverables:
-- add a profile/config object for AI personality selection
-- port the first three strategies onto the shared decision loop
-
-Rules:
-- avoid separate per-strategy script files that copy whole decision trees
-- allow small, explicit per-strategy overrides only when a profile field is not enough
-
-Success condition:
-- `rifle_flood_fast`, `rifle_flood_full_saturation`, and `tech_tree` all run off the same core
-
-### Phase AI-4: Move Live AI onto the Shared Core
-
-Deliverables:
-- live AI uses the shared knowledge/action system
-- current basic AI behavior remains deterministic
-
-Rules:
-- do not break the lobby/gameplay AI feature while improving architecture
-- keep one think cadence and shared command path semantics
-
-Success condition:
-- live AI can select one of the new strategy profiles without duplicating mechanics
-
-### Phase AI-5: Move Self-Play onto the Shared Core
-
-Deliverables:
-- self-play matchup configuration can choose AI personalities
-- old bespoke scripts are reduced or removed where equivalent shared-profile coverage exists
-
-Rules:
-- keep the self-play harness on the public `Game` seam
-- keep artifact logging, milestones, and replay checks
-
-Success condition:
-- matchup tests use shared AI personalities rather than owning separate strategy logic
-
-### Phase AI-6: Replace Brittle Scripted Coverage with Matchups
-
-Deliverables:
-- personality-vs-personality tests
-- milestone assertions tuned to each matchup
-
-Required initial matchups:
-- `rifle_flood_fast` vs `rifle_flood_full_saturation`
-- `rifle_flood_fast` vs `tech_tree`
-- `rifle_flood_full_saturation` vs `tech_tree`
-
-Possible assertions:
-- fast flood attacks before tech-tree reaches tanks often enough to matter
-- full-saturation flood reaches stronger economy milestones before first committed push
-- tech-tree reliably gathers oil, builds prerequisites, and produces tanks
-
-Rules:
-- prefer milestone and outcome assertions over exact tick-perfect command sequences
-- do not require pixel-perfect or queue-perfect behavior
-
-### Phase AI-7: Broaden Coverage as Mechanics Expand
-
-Future work after the first three strategies:
-- machine-gunner-aware profiles
-- faction-specific profiles
-- AI surrender/GG behavior
-- richer composition rules
-
-Do not start these until the initial shared architecture is stable.
-
-## Test Strategy
-
-The AI system must be tested at multiple levels.
-
-### Unit-Level AI Helper Tests
-
-Test small deterministic helpers such as:
-- saturation targets
-- supply pressure
-- prerequisite resolution
-- free-army selection
-- build-site selection filters
-- local spend reservation
-
-These tests should be fast and should not require a full live match.
-
-### Live AI Behavior Tests
-
-Keep or replace current focused gameplay AI tests with assertions such as:
-- trains workers beyond start
-- builds supply before deadlock
-- produces riflemen
-- reaches tech building goals when using the tech strategy
-- eventually damages or pressures an opponent
-
-### Self-Play Matchup Tests
-
-Use shared personalities and check:
-- economy milestones
-- tech milestones
-- combat-event milestones
-- replay determinism
-- no stalls before required goals
-
-### Replay and Determinism Tests
-
-Replay correctness is a hard requirement.
-
-The AI must:
-- emit ordinary commands only
-- remain deterministic under stable world iteration
-- keep replay output identical to live output
-
-If any AI change introduces nondeterminism, fix that before adding more strategy complexity.
-
-## Implementation Rules
-
-- Keep AI, replay, and human players on the same command path.
-- Avoid copying game-rule constants into strategy code when defs/helpers can answer the question.
-- Prefer small pure helper functions over large monolithic `think()` bodies.
-- Prefer deterministic ordering over hash-order-dependent scans.
-- Keep per-strategy differences visible and inspectable.
-- A strategy profile should say "prefer this timing/composition", not redefine mining, building,
-  and attack semantics from scratch.
-
-## File-Ownership Direction
-
-This is guidance, not a strict final module map.
-
-Likely ownership split:
 - `server/src/game/ai.rs`
   - live AI adapter
-  - profile selection wiring
-- new shared AI module(s)
-  - shared knowledge
-  - shared action synthesis
-  - shared decision loop
-  - strategy profile definitions
+  - `AiController` state and cadence
+  - profile selection wiring for real AI players
+- `server/src/game/ai_shared.rs`
+  - temporary compatibility home for already-extracted helpers
+  - should shrink over time as helpers move into the shared core
+- `server/src/game/ai_core/`
+  - `mod.rs`
+  - `observation.rs`
+  - `facts.rs`
+  - `actions.rs`
+  - `decision.rs`
+  - `profiles.rs`
+  - optional `tactics.rs` only when needed
 - `server/src/game/selfplay.rs`
-  - self-play adapter
-  - matchup configuration
-  - milestones and artifact/reporting logic
+  - test orchestration
+  - artifact writing
+  - milestone assertions
+  - adapter from self-play `PlayerView` to shared AI core
 
-Important:
-- the self-play harness should still own test orchestration
-- it should not keep owning separate RTS mechanics if the shared AI core can do that job
+Keep `ai.rs` as a file for the live adapter while the new core is introduced. Avoid creating an
+`ai/` directory unless `ai.rs` is deliberately moved, because Rust cannot use both module shapes
+for the same module name.
 
-## Exit Criteria for the First AI Refactor
+## Phase Map
 
-This AI refactor is successful when all of the following are true:
+| Phase | Detailed Plan | Status | Main Output |
+| --- | --- | --- | --- |
+| AI-0 | [Boundary and invariants](docs/ai/phase-00-boundary-and-invariants.md) | planned by this doc set | One AI architecture contract and handoff rules |
+| AI-1 | [Shared world model](docs/ai/phase-01-shared-world-model.md) | partial helper extraction exists | Deterministic AI observations and reusable facts |
+| AI-2 | [Action synthesis](docs/ai/phase-02-action-synthesis.md) | not started | Shared command builder with budget and reservation semantics |
+| AI-3 | [Decision loop and profiles](docs/ai/phase-03-decision-loop-and-profiles.md) | not started | `rifle_flood_fast`, `rifle_flood_full_saturation`, `tech_to_tanks` profiles |
+| AI-4 | [Live AI migration](docs/ai/phase-04-live-ai-migration.md) | not started | `AiController` delegates to the shared core |
+| AI-5 | [Self-play migration](docs/ai/phase-05-selfplay-migration.md) | not started | Self-play scripts replaced or reduced by shared profiles |
+| AI-6 | [Matchup tests](docs/ai/phase-06-matchup-tests.md) | not started | Personality-vs-personality coverage and replay checks |
+| AI-7 | [Future behavior expansion](docs/ai/phase-07-future-behavior-expansion.md) | future | Proxy, eco, standard, MG, AT, tank, and terrain-aware behavior |
 
-- there are at least three working strategy profiles:
-  - `rifle_flood_fast`
-  - `rifle_flood_full_saturation`
-  - `tech_tree`
-- live AI and self-play share the same AI knowledge/action core
-- changing a tech prerequisite or economy rule usually requires changing one shared helper, not
-  several strategy implementations
-- matchup tests exercise the strategies without relying on fragile scripted command sequences
+## Dependency Gates
+
+From `PLAN.md`, advanced AI depends on:
+
+- Phase 1.2 replay world hashing
+- Phase 2.2 world helpers
+- Phase 2.3 formal command processor
+- Phase 3.1 shared definition registry
+- later relevant unit mechanics, such as machine-gunner setup behavior
+
+Practical interpretation:
+
+- AI-1 and AI-2 can continue extracting current duplicated helper logic before all gates land.
+- Any change that depends on tech requirements, unlock chains, command error semantics, or
+  generated definitions should either wait for the relevant gate or be written as a narrow interim
+  adapter with a removal note.
+- AI-6 should not replace important scripted coverage until replay determinism diagnostics are good
+  enough to explain failures.
+
+## Required First Profiles
+
+### `rifle_flood_fast`
+
+Intent:
+
+- pressure quickly
+- train fewer extra workers before committing to production
+- build early rifle production
+- attack with smaller waves
+
+Use for:
+
+- early aggression coverage
+- pressure against tech-heavy opponents
+- a realistic replacement for worker-rush-adjacent scripts where appropriate
+
+### `rifle_flood_full_saturation`
+
+Intent:
+
+- saturate the starting steel economy first
+- scale rifle production after the economy is stable
+- attack later with larger waves
+
+Use for:
+
+- economy-first macro coverage
+- supply planning coverage
+- worker assignment regression coverage
+
+### `tech_to_tanks`
+
+Intent:
+
+- assign oil workers
+- build the prerequisite chain
+- save for key tech moments
+- produce tanks
+- attack with a mixed rifleman/tank army
+
+Use for:
+
+- oil economy coverage
+- prerequisite coverage
+- tank factory and tank production coverage
+
+Older notes may call this profile `tech_tree`. New code and docs should prefer
+`tech_to_tanks`.
+
+## Cross-Cutting Rules
+
+- AI commands must be ordinary `Command` values.
+- AI must not mutate game state directly.
+- AI helper tests should prefer pure functions and stable sorted inputs.
+- Do not rely on hash iteration order for command decisions.
+- Keep profile fields inspectable. A profile should say "prefer this timing/composition", not
+  redefine mining, building, production, and attack behavior.
+- Keep self-play artifact quality. Replacing scripts is only an improvement if failures remain easy
+  to inspect.
+- Keep the current live AI behavior covered while migrating it.
+
+## Exit Criteria for the First Refactor
+
+The first AI architecture pass is complete when:
+
+- the three required profiles run through the same shared decision loop
+- live gameplay AI uses the shared world-model and action-synthesis layers
+- self-play can run profile-vs-profile matchups without duplicating core RTS mechanics
+- changing a tech requirement, unit cost, or supply rule usually means changing one shared helper
 - replay determinism remains intact
+- important old self-play scenarios are either still present or replaced by better matchup
+  assertions
