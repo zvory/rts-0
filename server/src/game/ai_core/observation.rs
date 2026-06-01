@@ -24,6 +24,7 @@ pub(crate) struct AiPlayerSummary {
     pub(crate) id: u32,
     pub(crate) start_tile: (u32, u32),
     pub(crate) is_ai: bool,
+    pub(crate) is_alive: bool,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -146,6 +147,7 @@ impl AiObservation {
                 id: p.id,
                 start_tile: p.start_tile,
                 is_ai: p.is_ai,
+                is_alive: entities.player_alive(p.id),
             })
             .collect();
         player_summaries.sort_by_key(|p| p.id);
@@ -218,6 +220,7 @@ impl AiObservation {
                 id: p.id,
                 start_tile: (p.start_tile_x, p.start_tile_y),
                 is_ai: false,
+                is_alive: true,
             })
             .collect();
         players.sort_by_key(|p| p.id);
@@ -349,6 +352,7 @@ fn pending_build_intent_from_live_worker(worker: &Entity) -> Option<AiBuildInten
         return None;
     }
     let (kind, tile_x, tile_y) = worker.order().build_intent_tile()?;
+    crate::config::building_stats(kind)?;
     Some(AiBuildIntent::to_site(worker.id, kind, tile_x, tile_y))
 }
 
