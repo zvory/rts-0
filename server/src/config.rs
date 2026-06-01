@@ -99,7 +99,7 @@ pub struct UnitStats {
 
 impl UnitStats {
     /// Tile clearance radius for pathfinding: how many tiles around the center must be open.
-    /// A tank (radius ~26 px) needs 1 tile of clearance; infantry (~9 px) is point-sized.
+    /// A tank (radius ~20 px) needs 1 tile of clearance; infantry (~9 px) is point-sized.
     pub fn radius_tiles(&self) -> u32 {
         (self.radius / TILE_SIZE as f32).round() as u32
     }
@@ -187,7 +187,7 @@ pub fn unit_stats(kind: EntityKind) -> Option<UnitStats> {
             cost_oil: 100,
             supply: 2,
             build_ticks: 250,
-            radius: 26.0,
+            radius: 20.0,
         },
         _ => return None,
     };

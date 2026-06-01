@@ -56,7 +56,7 @@ export const STATS = Object.freeze({
     rangeTiles: 5, cost: { steel: 75, oil: 25 }, supply: 2, buildTicks: 200, requires: KIND.TRAINING_CENTRE },
   [KIND.AT_TEAM]: { label: "AT Team", icon: "AT", size: 10, sight: 8,
     rangeTiles: 4, cost: { steel: 75, oil: 25 }, supply: 2, buildTicks: 220, requires: KIND.TRAINING_CENTRE },
-  [KIND.TANK]: { label: "Tank", icon: "TK", size: 26, sight: 7,
+  [KIND.TANK]: { label: "Tank", icon: "TK", size: 20, sight: 7,
     rangeTiles: 3, cost: { steel: 200, oil: 100 }, supply: 2, buildTicks: 250 },
 
   [KIND.INDUSTRIAL_CENTER]: { label: "Industrial Center", icon: "IC", footW: 3, footH: 3, sight: 9,
