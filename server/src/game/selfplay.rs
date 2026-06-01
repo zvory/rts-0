@@ -109,11 +109,14 @@ impl LiveSelfPlay {
 pub(crate) struct ReplayArtifact {
     pub(crate) replay_commands: Vec<super::replay::CommandLogEntry>,
     pub(crate) players: Vec<PlayerInit>,
+    #[serde(default)]
+    pub(crate) seed: u32,
 }
 
 pub(crate) struct ReplayDriver {
     commands: Vec<super::replay::CommandLogEntry>,
     next: usize,
+    seed: u32,
 }
 
 impl ReplayDriver {
@@ -123,8 +126,13 @@ impl ReplayDriver {
             Self {
                 commands: artifact.replay_commands,
                 next: 0,
+                seed: artifact.seed,
             },
         )
+    }
+
+    pub(crate) fn seed(&self) -> u32 {
+        self.seed
     }
 
     pub(crate) fn enqueue_for_tick(&mut self, game: &mut Game) {
@@ -998,6 +1006,7 @@ impl SelfPlayRunner {
             events: self.events.clone(),
             replay_events: self.event_log.clone(),
             samples: self.samples.clone(),
+            seed: self.game.seed(),
         }
     }
 
@@ -1461,6 +1470,7 @@ struct SelfPlayArtifact {
     events: Vec<EventRecord>,
     replay_events: Vec<EventLogEntry>,
     samples: Vec<SnapshotSample>,
+    seed: u32,
 }
 
 impl SelfPlayArtifact {
@@ -1490,7 +1500,7 @@ fn replay_outcome_for(
     game: &Game,
     players: &[PlayerInit],
 ) -> Result<ReplayOutcome, SelfPlayFailure> {
-    replay_commands(players, game.command_log(), game.tick_count())
+    replay_commands(players, game.command_log(), game.tick_count(), game.seed())
         .map_err(|e| SelfPlayFailure::new(format!("replay failed: {e}")))
 }
 
@@ -2341,6 +2351,7 @@ fn real_ai_vs_real_ai() {
             let artifact = ReplayArtifact {
                 replay_commands: game.command_log().to_vec(),
                 players: players.clone(),
+                seed: game.seed(),
             };
             if let Ok(json) = serde_json::to_vec_pretty(&artifact) {
                 let _ = std::fs::write(dir.join("replay.json"), json);
@@ -2515,6 +2526,7 @@ fn real_ai_vs_real_ai() {
     let artifact = ReplayArtifact {
         replay_commands: game.command_log().to_vec(),
         players: players.clone(),
+        seed: game.seed(),
     };
     let ts = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
