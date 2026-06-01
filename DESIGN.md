@@ -79,7 +79,7 @@ short but readable. Coordinates are **world pixels** (floats) unless a field nam
 | `attackMove` | `units: u32[]`, `x: f32`, `y: f32` | Move while attacking enemies encountered; this is the aggressive movement order. |
 | `attack`     | `units: u32[]`, `target: u32` | Attack a specific entity. |
 | `gather`     | `units: u32[]`, `node: u32` | Send workers to harvest a resource node. |
-| `build`      | `worker: u32`, `building: string`, `tileX: u32`, `tileY: u32` | Worker constructs a building at a tile. `building` ∈ building kinds. |
+| `build`      | `worker: u32`, `building: string`, `tileX: u32`, `tileY: u32` | Worker constructs a building at a tile. If the worker is standing inside the requested footprint, the server first tries to walk it to a nearby point outside that footprint and then starts construction. `building` ∈ building kinds. |
 | `train`      | `building: u32`, `unit: string` | Queue a unit at a production building. |
 | `cancel`     | `building: u32` | Cancel the front of a building's production queue. |
 | `stop`       | `units: u32[]` | Clear orders, hold position. |
