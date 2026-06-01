@@ -194,7 +194,7 @@ src/
     projection.rs # fog-gated entity/event projection seam
   game/
     mod.rs       # Game struct + public API (the seam below)
-    map.rs       # Map: terrain grid, generation, passability, resource node placement
+    map.rs       # Map: handcrafted terrain asset loading, passability, base-site validation
     entity.rs    # Entity, EntityKind, EntityStore (slotmap-style Vec + free list)
     pathfinding.rs # A* over the tile grid (impassable = terrain + building footprints)
     fog.rs       # per-player visibility grid (visible / explored)
@@ -216,9 +216,10 @@ pub struct Game { /* private */ }
 
 impl Game {
     /// Create a match for the given players (ids + colors + names already assigned by lobby).
-    /// Generates a symmetric map sized for `players.len()`, randomizes the seat-to-spawn
-    /// assignment per match, and spawns each player's starting Industrial Center +
-    /// STARTING_WORKERS workers + nearby steel/oil resource clusters.
+    /// Loads the hardcoded handcrafted map, assigns the first N authored base sites to the N
+    /// players in order, and spawns each player's starting Industrial Center +
+    /// STARTING_WORKERS workers + nearby steel/oil resource clusters. The seed is retained for
+    /// replay/API compatibility but does not affect the map while lobby map selection is absent.
     pub fn new(players: &[PlayerInit], seed: u32) -> Game;
 
     /// Create a match with explicit starting steel/oil for every player.
@@ -317,6 +318,7 @@ PixiJS is loaded globally from CDN as `PIXI`.
 
 ```
 index.html        # PINNED — CDN + #app + module entry + screens markup
+map-editor.html   # standalone handcrafted-map editor; loads/saves server map JSON
 styles.css        # HUD, lobby, menus, command card
 src/
   protocol.js     # PINNED — message tag constants + builder helpers (mirror of §2)
@@ -489,7 +491,7 @@ start the rAF loop (compute `alpha` from snapshot timing, `camera.update`, `inpu
 ## 5. Balance definitions & constants
 Kind-specific server balance lives in `server/src/rules/defs.rs`; terrain movement/cover/
 concealment hooks live in `server/src/rules/terrain.rs` and currently return the all-open-ground
-defaults. `config.rs` is the thin constants module for timings, map sizes, starting resources,
+defaults. `config.rs` is the thin constants module for timings, tile size, starting resources,
 supply caps, mining amounts, and other scalar simulation constants; its `unit_stats(kind)` and
 `building_stats(kind)` helpers read the defs table.
 `client/src/config.js` mirrors the subset the UI/render/fog needs (costs, supply, sight, sizes,
@@ -550,7 +552,9 @@ the human-readable form of the authoritative `rules::defs` records.
 
 - `TICK_HZ = 30`, `SNAPSHOT_EVERY_N_TICKS = 1`.
 - `MACHINE_GUNNER_SETUP_TICKS = 30` (~1s setup or teardown).
-- Map: `TILE_SIZE = 32` px. Size scales with player count: 2p → 64×64, 3-4p → 96×96.
+- Map: `TILE_SIZE = 32` px. The live map is the hardcoded handcrafted asset at
+  `server/assets/maps/default.json` (96×96 today), served for tooling at `/maps/default.json`.
+  Its JSON uses row strings (`.` grass, `#` rock, `~` water) plus ordered `baseSites`.
 - Start: `STARTING_STEEL = 50`, `STARTING_OIL = 0`, `STARTING_WORKERS = 4`,
   one Industrial Center at the player's start tile, 18 steel patches + 3 oil patches nearby.
 - Supply: Industrial Center gives `+10`, Depot gives `+8`, hard cap `200`.
@@ -563,11 +567,10 @@ the human-readable form of the authoritative `rules::defs` records.
   does not reserve it. Extra workers that arrive while the slot is taken go idle. The slot
   is advisory and self-heals — it's only honored while the recorded worker is alive and
   actively harvesting that node, so death / re-order / retarget free it automatically.
-- Starting layout: each base site gets 18 steel patches and 3 oil patches. Player starts are
-  randomly assigned to distinct corners for 1-4 player matches. The map also seeds one neutral
-  expansion site per player, so every match has exactly `2 × player_count` total base sites and
-  every player has somewhere to expand without increasing the room-size cap. In 2-player matches,
-  the neutral expansions are the unused corners.
+- Starting layout: each base site gets 18 steel patches and 3 oil patches. For an N-player match,
+  the first N authored `baseSites` become player starts, and every remaining authored base site is
+  a neutral expansion resource base. The current default orders the first two starts on opposite
+  corners, then fills the other two corners before edge-midpoint expansion sites.
 
 Unit stats (hp, dmg, range[tiles], cooldown[ticks], speed[px/tick], sight[tiles], cost, supply, buildTicks):
 
@@ -654,9 +657,9 @@ Computer opponents are **opt-in**: a room has none unless the host adds them fro
 (`addAi` / `removeAi`, host-only, lobby phase only). The lobby also has a host-only
 `setQuickstart` toggle labeled "Start with more money mode", which causes the next match to begin
 with 1400 steel and 600 oil for every player. They are capped with humans at
-`MAX_PLAYERS = 4` (the map lays out exactly `2 × player_count` total base sites). AI players are seated after
-the humans in the lobby player list; their colors come from the tail of `PLAYER_PALETTE` so they
-never collide with human colors. They persist across rematches and are cleared only when the room
+`MAX_PLAYERS = 4` (the hardcoded map has enough ordered `baseSites` for four starts plus neutral
+expansions). AI players are seated after the humans in the lobby player list; their colors come
+from the tail of `PLAYER_PALETTE` so they never collide with human colors. They persist across rematches and are cleared only when the room
 empties of humans.
 
 **Where it runs.** `Game` holds one `AiController` per AI player and drives them at the top of

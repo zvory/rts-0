@@ -62,6 +62,7 @@ async fn main() {
 
     // Resolve the client dir relative to the crate, so the working directory doesn't matter.
     let client_dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../client");
+    let maps_dir = concat!(env!("CARGO_MANIFEST_DIR"), "/assets/maps");
     // Static files for everything except `/ws`; unknown paths fall back to `index.html` so the
     // single-page client loads regardless of the requested path.
     let static_service =
@@ -71,6 +72,7 @@ async fn main() {
         .route("/version", get(version_handler))
         .route("/ws", get(ws_handler))
         .route("/dev/selfplay", get(dev_selfplay_handler))
+        .nest_service("/maps", ServeDir::new(maps_dir))
         .fallback_service(static_service)
         .with_state(state);
 

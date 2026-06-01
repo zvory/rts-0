@@ -35,8 +35,8 @@ const PLAYER_PALETTE: [&str; 8] = [
     "#4878c8", "#c84848", "#30a090", "#8040c8", "#c83880", "#c87830", "#409840", "#c8b030",
 ];
 
-/// Hard cap on players in a single match (humans + AI). The map generator lays out at most four
-/// symmetric start positions, so we never seat more than this.
+/// Hard cap on players in a single match (humans + AI). The hardcoded map has four authored
+/// player-start slots, so we never seat more than this.
 const MAX_PLAYERS: usize = 4;
 
 /// Bound on a player's outbound message queue. Generous enough to absorb a brief render stall
@@ -579,8 +579,8 @@ impl RoomTask {
                 })
             })
             .collect();
-        // Seat AI opponents after the humans so colors match the lobby list; the map randomizes
-        // which symmetric start each seat receives.
+        // Seat AI opponents after the humans so colors match the lobby list and authored start
+        // sites are assigned in the same order the lobby displays players.
         for (seat, ai) in self.ai_players.iter().enumerate() {
             inits.push(PlayerInit {
                 id: ai.id,
