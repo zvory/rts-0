@@ -268,6 +268,20 @@ fn resolve_target(
         return None;
     }
 
+    // AT teams prefer tanks over all other targets; fall back to nearest enemy if no tank
+    // is in range.
+    let is_at_team = entities
+        .get(self_id)
+        .map(|e| e.kind == EntityKind::AtTeam)
+        .unwrap_or(false);
+    if is_at_team {
+        if let Some(id) =
+            world_query::nearest_tank_in_range(entities, spatial, self_id, owner, px, py, acquire_px)
+        {
+            return Some(id);
+        }
+    }
+
     // Aggressive acquisition: the nearest enemy within the acquire radius (weapon range for
     // buildings, sight range for mobile units so they chase).
     world_query::nearest_enemy_in_range(entities, spatial, self_id, owner, px, py, acquire_px)

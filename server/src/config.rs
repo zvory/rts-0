@@ -166,7 +166,7 @@ pub fn unit_stats(kind: EntityKind) -> Option<UnitStats> {
         EntityKind::AtTeam => UnitStats {
             hp: 45,
             dmg: 48,
-            range_tiles: 4,
+            range_tiles: 5,
             cooldown: 48,
             speed: 1.28,
             sight_tiles: 8,
