@@ -15,7 +15,7 @@
 
 use crate::config;
 use crate::game::entity::{EntityKind, EntityStore, MovePhase, Order, WeaponSetup};
-use crate::game::map::{Map, MobilityClass};
+use crate::game::map::Map;
 use crate::game::pathfinding::Passability;
 use crate::game::services::occupancy::{footprint_tiles, Occupancy};
 use crate::game::services::pathing::{PathRequest, PathingService};
@@ -299,11 +299,8 @@ impl<'a> MoveCoordinator<'a> {
                         continue;
                     }
 
-                    // Must be passable for infantry (spawning units are currently always infantry).
-                    if !self
-                        .map
-                        .is_passable_for(MobilityClass::Infantry, tx as i32, ty as i32)
-                    {
+                    // Must be passable terrain.
+                    if !self.map.is_passable(tx as i32, ty as i32) {
                         continue;
                     }
 
@@ -349,7 +346,6 @@ impl<'a> MoveCoordinator<'a> {
         let req = PathRequest {
             start: (sx as i32, sy as i32),
             goal: (gx as i32, gy as i32),
-            class: MobilityClass::from_kind(kind),
             radius_tiles,
             budget: None,
         };
@@ -465,7 +461,7 @@ fn find_unique_tile_near(
 }
 
 fn is_free_goal(map: &Map, occ: &Occupancy, tile: (u32, u32), taken: &[(u32, u32)]) -> bool {
-    if !map.is_passable_for(MobilityClass::Infantry, tile.0 as i32, tile.1 as i32) {
+    if !map.is_passable(tile.0 as i32, tile.1 as i32) {
         return false;
     }
     if !occ.passable(tile.0 as i32, tile.1 as i32) {
@@ -514,7 +510,7 @@ pub(crate) fn build_staging_goal(
                 if footprint.contains(&tile) {
                     continue;
                 }
-                if !map.is_passable_for(MobilityClass::Infantry, tx, ty) {
+                if !map.is_passable(tx, ty) {
                     continue;
                 }
                 if !occ.passable(tx, ty) {
@@ -626,8 +622,8 @@ mod tests {
             "spawn tile ({stx},{sty}) is inside the 3x2 footprint at ({btx},{bty})"
         );
 
-        // Spawn tile must be passable for infantry.
-        assert!(map.is_passable_for(MobilityClass::Infantry, stx as i32, sty as i32));
+        // Spawn tile must be passable terrain.
+        assert!(map.is_passable(stx as i32, sty as i32));
     }
 
     #[test]
