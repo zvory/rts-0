@@ -54,7 +54,7 @@ pub(crate) fn construction_system(
         // Re-validate placement against the live entity set.
         let occ = Occupancy::build(map, entities);
         let _ = &occ; // placeable scans entities directly; rebuilt here for symmetry/future use.
-        let placeable = footprint_placeable(map, entities, spatial, kind, tx, ty);
+        let placeable = footprint_placeable(map, entities, spatial, kind, tx, ty, &[worker]);
         let stats = match config::building_stats(kind) {
             Some(s) => s,
             None => {
