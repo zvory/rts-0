@@ -17,6 +17,7 @@ use serde::{Deserialize, Serialize};
 use super::replay::{replay_commands, EventLogEntry, PlayerSnapshot, ReplayOutcome};
 use super::{Game, PlayerInit};
 use crate::config;
+use crate::rules;
 use crate::game::ai_shared;
 use crate::game::entity::EntityKind;
 use crate::protocol::{
@@ -1917,7 +1918,7 @@ fn footprint_placeable_from_snapshot(
             }
         }
     }
-    if !config::trainable_units(building).is_empty() {
+    if !rules::economy::trainable_units(building).is_empty() {
         let spawn_x = tile_x + stats.foot_w / 2;
         let Some(spawn_y) = tile_y.checked_add(stats.foot_h) else {
             return false;

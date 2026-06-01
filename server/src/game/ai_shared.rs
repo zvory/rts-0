@@ -1,6 +1,7 @@
 use std::collections::BTreeSet;
 
 use crate::config;
+use crate::rules;
 use crate::game::entity::EntityKind;
 use crate::game::entity::EntityStore;
 use crate::protocol::{MapInfo, Snapshot};
@@ -50,33 +51,37 @@ impl SpendBudget {
     }
 
     pub(crate) fn can_afford_unit(&self, kind: EntityKind) -> bool {
-        let Some(stats) = config::unit_stats(kind) else {
+        if config::unit_stats(kind).is_none() {
             return false;
-        };
-        self.steel >= stats.cost_steel
-            && self.oil >= stats.cost_oil
-            && self.free_supply >= stats.supply
+        }
+        let (steel, oil) = rules::economy::cost(kind);
+        let supply = rules::economy::supply_cost(kind);
+        self.steel >= steel && self.oil >= oil && self.free_supply >= supply
     }
 
     pub(crate) fn reserve_unit(&mut self, kind: EntityKind) -> bool {
-        let Some(stats) = config::unit_stats(kind) else {
+        if config::unit_stats(kind).is_none() {
             return false;
-        };
-        self.reserve_cost(stats.cost_steel, stats.cost_oil, stats.supply)
+        }
+        let (steel, oil) = rules::economy::cost(kind);
+        let supply = rules::economy::supply_cost(kind);
+        self.reserve_cost(steel, oil, supply)
     }
 
     pub(crate) fn can_afford_building(&self, kind: EntityKind) -> bool {
-        let Some(stats) = config::building_stats(kind) else {
+        if config::building_stats(kind).is_none() {
             return false;
-        };
-        self.steel >= stats.cost_steel && self.oil >= stats.cost_oil
+        }
+        let (steel, oil) = rules::economy::cost(kind);
+        self.steel >= steel && self.oil >= oil
     }
 
     pub(crate) fn reserve_building(&mut self, kind: EntityKind) -> bool {
-        let Some(stats) = config::building_stats(kind) else {
+        if config::building_stats(kind).is_none() {
             return false;
-        };
-        self.reserve_cost(stats.cost_steel, stats.cost_oil, 0)
+        }
+        let (steel, oil) = rules::economy::cost(kind);
+        self.reserve_cost(steel, oil, 0)
     }
 
     fn reserve_cost(&mut self, steel: u32, oil: u32, supply: u32) -> bool {

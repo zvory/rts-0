@@ -1,6 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::config;
+use crate::rules;
 use crate::game::entity::{BuildPhase, EntityKind, EntityStore, ProdItem};
 use crate::game::map::Map;
 use crate::game::services::move_coordinator::MoveCoordinator;
@@ -205,7 +206,7 @@ fn order_build(
     };
 
     let owned = world_query::owned_building_kinds(entities, player);
-    if !config::build_requirement_met(kind, &owned) {
+    if !rules::economy::build_requirement_met(kind, &owned) {
         notice(events, player, "Requirement not met");
         return;
     }
@@ -262,13 +263,13 @@ fn order_train(
     };
     let ok = matches!(entities.get(building), Some(b)
         if b.owner == player && b.is_building() && !b.under_construction()
-        && config::trainable_units(b.kind).contains(&kind));
+        && rules::economy::trainable_units(b.kind).contains(&kind));
     if !ok {
         notice(events, player, "Cannot train that here");
         return;
     }
     let owned_complete = world_query::completed_building_kinds(entities, player);
-    if !config::train_requirement_met(kind, &owned_complete) {
+    if !rules::economy::train_requirement_met(kind, &owned_complete) {
         notice(events, player, "Requirement not met");
         return;
     }
