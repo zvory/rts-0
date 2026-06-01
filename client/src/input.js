@@ -24,6 +24,49 @@
 import { cmd, PASSABLE, isUnit, isBuilding, isResource, KIND } from "./protocol.js";
 import { STATS } from "./config.js";
 
+export function footprintValidAgainstEntities(
+  entities,
+  allowedOverlapIds,
+  tileX,
+  tileY,
+  footW,
+  footH,
+  map,
+) {
+  if (tileX < 0 || tileY < 0) return false;
+  if (tileX + footW > map.width || tileY + footH > map.height) return false;
+  for (let ty = tileY; ty < tileY + footH; ty++) {
+    for (let tx = tileX; tx < tileX + footW; tx++) {
+      const code = map.terrain[ty * map.width + tx];
+      if (!PASSABLE[code]) return false;
+    }
+  }
+  const ts = map.tileSize;
+  const minX = tileX * ts;
+  const minY = tileY * ts;
+  const maxX = (tileX + footW) * ts;
+  const maxY = (tileY + footH) * ts;
+  for (const e of entities) {
+    if (allowedOverlapIds?.has(e.id)) continue;
+    if (entityIntersectsRect(e, minX + 1, minY + 1, maxX - 1, maxY - 1, ts)) return false;
+  }
+  return true;
+}
+
+function entityIntersectsRect(e, minX, minY, maxX, maxY, tileSize) {
+  const stat = STATS[e.kind];
+  if (!stat) return false;
+  let halfW;
+  let halfH;
+  if (isBuilding(e.kind)) {
+    halfW = ((stat.footW ? stat.footW : 1) * tileSize) / 2;
+    halfH = ((stat.footH ? stat.footH : 1) * tileSize) / 2;
+  } else {
+    halfW = halfH = stat.size ? stat.size : 0;
+  }
+  return e.x + halfW >= minX && e.x - halfW <= maxX && e.y + halfH >= minY && e.y - halfH <= maxY;
+}
+
 /**
  * Translates raw DOM pointer/keyboard gestures on the viewport into selection
  * mutations (on `state`) and protocol commands (via `net.command`).
@@ -504,23 +547,7 @@ export class Input {
 
   /** True if an entity's hit area intersects an axis-aligned world rect. */
   _entityIntersectsRect(e, minX, minY, maxX, maxY) {
-    const tileSize = this.state.map ? this.state.map.tileSize : DEFAULT_TILE_SIZE;
-    const stat = STATS[e.kind];
-    let halfW;
-    let halfH;
-    if (isBuilding(e.kind)) {
-      halfW = ((stat && stat.footW ? stat.footW : 1) * tileSize) / 2;
-      halfH = ((stat && stat.footH ? stat.footH : 1) * tileSize) / 2;
-    } else {
-      halfW = halfH = stat && stat.size ? stat.size : DEFAULT_HIT_RADIUS;
-    }
-    // Box-vs-box overlap (entity AABB vs selection rect).
-    return (
-      e.x + halfW >= minX &&
-      e.x - halfW <= maxX &&
-      e.y + halfH >= minY &&
-      e.y - halfH <= maxY
-    );
+    return entityIntersectsRect(e, minX, minY, maxX, maxY, this.state.map ? this.state.map.tileSize : DEFAULT_TILE_SIZE);
   }
 
   // --- Build placement ----------------------------------------------------
@@ -553,23 +580,16 @@ export class Input {
    * and no existing entity (unit or building) occupies the same world area.
    */
   _footprintValid(tileX, tileY, footW, footH, map) {
-    if (tileX < 0 || tileY < 0) return false;
-    if (tileX + footW > map.width || tileY + footH > map.height) return false;
-    for (let ty = tileY; ty < tileY + footH; ty++) {
-      for (let tx = tileX; tx < tileX + footW; tx++) {
-        const code = map.terrain[ty * map.width + tx];
-        if (!PASSABLE[code]) return false;
-      }
-    }
-    const ts = map.tileSize;
-    const minX = tileX * ts;
-    const minY = tileY * ts;
-    const maxX = (tileX + footW) * ts;
-    const maxY = (tileY + footH) * ts;
-    for (const e of this.state.entitiesInterpolated(1)) {
-      if (this._entityIntersectsRect(e, minX + 1, minY + 1, maxX - 1, maxY - 1)) return false;
-    }
-    return true;
+    const allowed = new Set(this._selectedWorkerIds());
+    return footprintValidAgainstEntities(
+      this.state.entitiesInterpolated(1),
+      allowed,
+      tileX,
+      tileY,
+      footW,
+      footH,
+      map,
+    );
   }
 
   /**
