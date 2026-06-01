@@ -58,7 +58,7 @@ pub const OIL_LOAD: u32 = 2;
 pub const HARVEST_TICKS: u32 = 40;
 pub const STEEL_PATCH_AMOUNT: u32 = 1500;
 pub const OIL_GEYSER_AMOUNT: u32 = 5000;
-pub const STEEL_PATCHES_PER_BASE: u32 = 24;
+pub const STEEL_PATCHES_PER_BASE: u32 = 18;
 pub const OIL_PATCHES_PER_BASE: u32 = 3;
 
 /// Minimum distance (in tiles) from an Industrial Center center to any starting resource node.
@@ -70,7 +70,7 @@ pub const IC_RESOURCE_MIN_DIST_TILES: f32 = 3.5;
 pub const IC_RESOURCE_MAX_DIST_TILES: f32 = 7.0;
 
 /// Distance (in tiles) from the Industrial Center to the center of the steel patch block.
-pub const STEEL_BLOCK_DIST_TILES: f32 = 5.5;
+pub const STEEL_BLOCK_DIST_TILES: f32 = 5.0;
 
 /// Distance (in tiles) from the Industrial Center to the starting oil geyser.
 pub const OIL_DIST_TILES: f32 = 6.0;

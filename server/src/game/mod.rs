@@ -501,12 +501,14 @@ fn spawn_corner_resources(entities: &mut EntityStore, map: &Map, tile: (u32, u32
     let perp_y = base_angle.cos();
 
     let patches = config::STEEL_PATCHES_PER_BASE;
-    let cols = 6;
+    let cols = 6u32;
+    let rows = patches.div_ceil(cols);
+    let row_center = (rows - 1) as f32 / 2.0;
     for i in 0..patches {
         let col = (i % cols) as f32;
         let row = (i / cols) as f32;
         let off_x = (col - 2.5) * ts;
-        let off_y = (row - 0.5) * ts;
+        let off_y = (row - row_center) * ts;
         let px = block_cx + off_x * perp_x + off_y * base_angle.cos();
         let py = block_cy + off_x * perp_y + off_y * base_angle.sin();
         let dist_tiles = ((px - hx).powi(2) + (py - hy).powi(2)).sqrt() / ts;
@@ -747,7 +749,7 @@ mod tests {
         let mut max_pending_depot_builders = 0usize;
         let mut gathering_workers_while_pending = 0usize;
 
-        for _ in 0..600 {
+        for _ in 0..2000 {
             game.tick();
 
             let pending_depot_builders: Vec<_> = game
