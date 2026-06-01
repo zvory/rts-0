@@ -266,6 +266,18 @@ them at the top of `tick()` — see §8.
   `game.snapshot_full_for(view_pid)` instead of fog-filtered snapshots. Replay rooms advance at
   1.5x the normal room tick rate so artifact playback finishes faster than live self-play.
 
+### 3.3 Rules layer (`rules/`)
+
+`server/src/rules/` contains pure classification and formula functions. They take `EntityKind` and
+context primitives, never mutate state, and never read fog or `EntityStore`.
+
+- `rules::combat` — AP/armor predicates (`is_ap`, `is_armored`, `prefers_armored_targets`),
+  `attack_profile(kind) -> AttackProfile`, and `effective_damage(attacker_kind, victim_kind, base_dmg) -> u32`.
+
+Services in `game/services/` orchestrate tick logic and call into `rules::*` for classification.
+Rules functions have no imports from `services/` or entity storage; they only import `EntityKind`
+and `config`.
+
 ---
 
 ## 4. JS client — modules & exported APIs

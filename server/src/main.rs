@@ -12,6 +12,7 @@ mod config;
 mod game;
 mod lobby;
 mod protocol;
+mod rules;
 
 use std::net::SocketAddr;
 use std::time::Duration;
