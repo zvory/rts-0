@@ -58,6 +58,7 @@ pub(crate) struct PlayerState {
     pub(crate) supply_used: u32,
     /// Supply provided by completed Industrial Centers/Depots, capped at `SUPPLY_CAP_MAX`.
     pub(crate) supply_cap: u32,
+    pub(crate) is_ai: bool,
 }
 
 /// The authoritative match state.
@@ -127,6 +128,7 @@ impl Game {
                 oil,
                 supply_used: 0,
                 supply_cap: 0,
+                is_ai: enable_ai && p.is_ai,
             };
             spawn_player_start(&mut entities, &map, p.id, start);
             // The starting Industrial Center contributes supply immediately.
