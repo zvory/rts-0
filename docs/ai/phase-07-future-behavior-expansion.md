@@ -1,6 +1,6 @@
 # AI-7: Future Behavior Expansion
 
-Add richer personas and unit-specific behavior after the shared core is stable.
+Add richer profiles and unit-specific behavior after the shared core is stable.
 
 Do not start this phase to compensate for missing foundations. Advanced behavior becomes expensive
 quickly if observations, actions, profiles, and tests are still duplicated.
@@ -10,6 +10,10 @@ quickly if observations, actions, profiles, and tests are still duplicated.
 Use the shared AI core to add more interesting strategy and tactics without forking whole bots.
 
 ## Candidate New Profiles
+
+These come after the required first profiles are implemented and tested. Do not use this phase to
+rename or replace `rifle_flood_fast`, `rifle_flood_full_saturation`, or `tech_to_tanks`; extend
+those profiles in place when the strategic intent is the same.
 
 ### `standard`
 
@@ -35,6 +39,10 @@ Expected style:
 - build barracks closer to enemy or center
 - produce early riflemen
 - accept economic risk
+
+This is the likely strategic replacement for worker-rush-adjacent pressure tests that need more
+than `rifle_flood_fast`. It still should not become a duplicated bot; it should reuse the shared
+economy, build placement, production, and attack helpers.
 
 Required foundations:
 
@@ -71,6 +79,10 @@ Required foundations:
 
 - machine-gunner setup/teardown behavior in shared tactics
 - composition facts and threat facts
+
+This profile is separate from `tech_to_tanks`. Tank tech should stay under `tech_to_tanks`; support
+weapon tech should only become its own profile once MG/AT mechanics and tactical controllers need
+dedicated priorities.
 
 ## Tactical Controllers
 
@@ -123,7 +135,7 @@ Until then, choose profiles server-side for tests and default live AI behavior.
 
 ## Validation
 
-Every new persona should come with:
+Every new profile should come with:
 
 - profile-level unit tests
 - at least one self-play matchup or scenario milestone

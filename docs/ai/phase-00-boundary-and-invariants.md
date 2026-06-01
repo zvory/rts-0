@@ -66,6 +66,11 @@ Use these names consistently:
 Older notes may use `tech_tree`. Treat that as the same strategic intent, but prefer
 `tech_to_tanks` in new code.
 
+`AI-PLAN.md` owns the canonical strategy list and rollout order. Detailed phase files should explain
+how to build or migrate those profiles, not introduce another profile roadmap. Keep worker-rush,
+mine-only, or other scenario scripts clearly labeled as test harness coverage unless they become
+named profiles in the index.
+
 ## Recommended Worktree Scope
 
 A future implementation agent should take exactly one of these scopes:

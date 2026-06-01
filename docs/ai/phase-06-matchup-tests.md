@@ -9,6 +9,11 @@ This phase should start only after live AI and self-play can both use the shared
 Create deterministic matchups that prove the first profiles are meaningfully different and continue
 to exercise economy, tech, production, combat, and replay.
 
+The initial matchup set is exactly the pairwise combinations of the required first profiles in
+`AI-PLAN.md`: `rifle_flood_fast`, `rifle_flood_full_saturation`, and `tech_to_tanks`. Scenario
+scripts such as worker rush or mine-only can remain useful tests, but they are not matchup
+profiles unless the index promotes them to named profiles.
+
 ## Required Initial Matchups
 
 ### `rifle_flood_fast` vs `rifle_flood_full_saturation`
@@ -34,8 +39,8 @@ Purpose:
 Useful assertions:
 
 - fast flood attacks before the first tank
-- tech-to-tanks assigns oil workers
-- tech-to-tanks builds prerequisites when it survives long enough
+- `tech_to_tanks` assigns oil workers
+- `tech_to_tanks` builds prerequisites when it survives long enough
 
 ### `rifle_flood_full_saturation` vs `tech_to_tanks`
 
@@ -46,7 +51,7 @@ Purpose:
 Useful assertions:
 
 - full saturation reaches strong rifle production
-- tech-to-tanks reaches tank production
+- `tech_to_tanks` reaches tank production
 - combat happens after both sides have meaningful armies
 
 ## Test Style
@@ -114,11 +119,23 @@ Only after matchup tests are stable:
 - keep scenario-specific scripts that still cover unique behavior
 - update comments so future agents know why any script remains
 
+Expected script handling:
+
+- `EconomyScript` should be replaced or reduced once `rifle_flood_full_saturation` covers the same
+  economy milestones.
+- `BuildTechAttackScript` should be replaced or reduced once `tech_to_tanks` covers oil, tech, tank
+  production, and mixed attack milestones.
+- `WorkerRushScript` should remain until `proxy_rush` or an explicit all-in worker-pull helper
+  covers that scenario.
+- `MineOnlyScript` can remain as passive/minimal harness coverage where it helps isolate replay or
+  snapshot behavior.
+
 ## Non-Goals
 
 - No balance tuning wars.
 - No exact win-rate targets.
 - No nondeterministic random profile selection.
+- No new profile names outside `AI-PLAN.md`.
 - No replacing all self-play tests in one branch.
 
 ## Validation
