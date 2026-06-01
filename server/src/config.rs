@@ -168,7 +168,7 @@ pub fn unit_stats(kind: EntityKind) -> Option<UnitStats> {
             dmg: 48,
             range_tiles: 4,
             cooldown: 48,
-            speed: 0.65,
+            speed: 1.28,
             sight_tiles: 8,
             cost_steel: 75,
             cost_oil: 25,
