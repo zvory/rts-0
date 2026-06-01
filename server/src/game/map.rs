@@ -78,14 +78,15 @@ impl Map {
         let size = config::map_size_for(player_count);
         let mut terrain = vec![terrain::GRASS; (size * size) as usize];
 
-        let starts = symmetric_starts(size, player_count);
+        let mut starts = symmetric_starts(size, player_count);
+        let mut rng = XorShift32::new(seed);
+        shuffle(&mut starts, &mut rng);
         let expansion_sites = expansion_sites(size, player_count, &starts);
 
         // Tiles we must keep clear: each start area and its resource cluster footprint.
         // We protect a generous square around every start tile plus every neutral expansion site.
         let protected = protected_tiles(size, &starts, &expansion_sites);
 
-        let mut rng = XorShift32::new(seed);
         scatter_symmetric_obstacles(&mut terrain, size, &mut rng, &protected);
 
         Map {
@@ -295,4 +296,34 @@ fn paint_obstacle(terrain: &mut [u8], size: u32, protected: &[bool], tx: i32, ty
         return;
     }
     terrain[idx] = kind;
+}
+
+fn shuffle<T>(items: &mut [T], rng: &mut XorShift32) {
+    if items.len() < 2 {
+        return;
+    }
+    for i in (1..items.len()).rev() {
+        let j = rng.below((i + 1) as u32) as usize;
+        items.swap(i, j);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn generate_shuffles_starts_by_seed() {
+        let a = Map::generate(4, 1);
+        let b = Map::generate(4, 2);
+        assert_eq!(a.starts.len(), 4);
+        assert_eq!(b.starts.len(), 4);
+        assert_ne!(a.starts, b.starts);
+
+        let mut a_sorted = a.starts.clone();
+        let mut b_sorted = b.starts.clone();
+        a_sorted.sort_unstable();
+        b_sorted.sort_unstable();
+        assert_eq!(a_sorted, b_sorted);
+    }
 }
