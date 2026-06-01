@@ -511,7 +511,7 @@ and forest-specific rules are future work.
 - `TICK_HZ = 30`, `SNAPSHOT_EVERY_N_TICKS = 1`.
 - `MACHINE_GUNNER_SETUP_TICKS = 15` (~0.5s setup or teardown).
 - Map: `TILE_SIZE = 32` px. Size scales with player count: 2p → 64×64, 3-4p → 96×96.
-- Start: `STARTING_STEEL = 100`, `STARTING_OIL = 0`, `STARTING_WORKERS = 4`,
+- Start: `STARTING_STEEL = 50`, `STARTING_OIL = 0`, `STARTING_WORKERS = 4`,
   one Industrial Center at the player's start tile, a mineral cluster (16 patches) + a 2x2 block of 4 oil patches nearby.
 - Supply: Industrial Center gives `+10`, Depot gives `+8`, hard cap `200`.
 - Attached mining: workers walk to a patch, latch onto it, and mine in place.
