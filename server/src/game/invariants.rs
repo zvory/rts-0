@@ -324,7 +324,7 @@ mod tests {
             },
         ];
         // This panics before the fix when STEEL_PATCHES_PER_BASE = 24.
-        let _game = Game::new(&players);
+        let _game = Game::new(&players, 0x1234_5678);
     }
 
     /// A freshly-created game must satisfy every invariant before any tick runs.
@@ -344,7 +344,7 @@ mod tests {
                 is_ai: true,
             },
         ];
-        let game = Game::new(&players);
+        let game = Game::new(&players, 0x1234_5678);
         game.assert_invariants();
     }
 
@@ -365,7 +365,7 @@ mod tests {
                 is_ai: true,
             },
         ];
-        let mut game = Game::new(&players);
+        let mut game = Game::new(&players, 0x1234_5678);
         let target_workers = config::STEEL_PATCHES_PER_BASE as usize;
         let mut max_workers = 0usize;
         let mut max_riflemen = 0usize;
@@ -416,7 +416,7 @@ mod tests {
             color: "#fff".into(),
             is_ai: false,
         }];
-        let mut game = Game::new(&players);
+        let mut game = Game::new(&players, 0x1234_5678);
         for _ in 0..300 {
             game.tick();
         }

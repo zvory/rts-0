@@ -19,7 +19,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use tokio::sync::{mpsc, Mutex};
 use tokio::time::{interval, MissedTickBehavior};
@@ -594,7 +594,11 @@ impl RoomTask {
         } else {
             (config::STARTING_STEEL, config::STARTING_OIL)
         };
-        let game = Game::new_with_starting_resources(&inits, starting_steel, starting_oil);
+        let seed = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_nanos() as u32)
+            .unwrap_or(0x1234_5678);
+        let game = Game::new_with_starting_resources(&inits, starting_steel, starting_oil, seed);
         let payload = game.start_payload();
         self.match_player_count = inits.len();
 
@@ -648,7 +652,11 @@ impl RoomTask {
                     .first()
                     .map(|p| p.id)
                     .ok_or_else(|| "live self-play configured with no players".to_string())?;
-                let game = Game::new(&players);
+                let seed = SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .map(|d| d.as_nanos() as u32)
+                    .unwrap_or(0x1234_5678);
+                let game = Game::new(&players, seed);
                 Ok((game, DevDriver::Live(driver), view_player_id))
             }
             RoomMode::DevSelfPlay(DevSelfPlayConfig::Replay { artifact }) => {

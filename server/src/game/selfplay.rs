@@ -1984,7 +1984,7 @@ fn scripted_self_play_worker_rush_vs_economy() {
             is_ai: false,
         },
     ];
-    let game = Game::new(&players);
+    let game = Game::new(&players, 0x1234_5678);
     let start = game.start_payload();
     let specs = players.clone();
     let scripts: Vec<Box<dyn ScriptedPlayer>> = vec![
@@ -2100,7 +2100,7 @@ fn scripted_self_play_mine_only_steel_fairness() {
             is_ai: false,
         },
     ];
-    let mut game = Game::new(&players);
+    let mut game = Game::new(&players, 0x1234_5678);
     let start = game.start_payload();
 
     let mut scripts: Vec<Box<dyn ScriptedPlayer>> = vec![
@@ -2260,16 +2260,15 @@ fn identical_scripted_runs_are_identical() {
             is_ai: false,
         },
     ];
-    let start = Game::new(&players).start_payload();
-
-    let mut game_a = Game::new(&players);
+    let mut game_a = Game::new(&players, 0x1234_5678);
+    let start = game_a.start_payload();
     let mut scripts_a: Vec<Box<dyn ScriptedPlayer>> = vec![
         Box::new(MineOnlyScript::new(1)),
         Box::new(MineOnlyScript::new(2)),
     ];
     let history_a = run_scripted_ticks(&players, &mut scripts_a, &start, &mut game_a, TICKS);
 
-    let mut game_b = Game::new(&players);
+    let mut game_b = Game::new(&players, 0x1234_5678);
     let mut scripts_b: Vec<Box<dyn ScriptedPlayer>> = vec![
         Box::new(MineOnlyScript::new(1)),
         Box::new(MineOnlyScript::new(2)),
@@ -2321,7 +2320,7 @@ fn real_ai_vs_real_ai() {
             is_ai: true,
         },
     ];
-    let mut game = Game::new(&players);
+    let mut game = Game::new(&players, 0x1234_5678);
 
     let mut event_log = Vec::new();
     let mut max_barracks_alive: BTreeMap<u32, usize> = BTreeMap::new();

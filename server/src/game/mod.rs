@@ -21,7 +21,6 @@ pub(crate) mod services;
 pub mod systems;
 
 use std::collections::HashMap;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::config;
 use crate::protocol::{
@@ -89,18 +88,12 @@ pub struct Game {
 }
 
 impl Game {
-    /// Create a match for the given players. Generates a symmetric map sized for the player
-    /// count and spawns each player's starting Industrial Center, workers, and a nearby resource cluster.
-    pub fn new(players: &[PlayerInit]) -> Game {
-        Self::new_with_starting_resources(players, config::STARTING_STEEL, config::STARTING_OIL)
+    pub fn new(players: &[PlayerInit], seed: u32) -> Game {
+        Self::new_inner(players, true, config::STARTING_STEEL, config::STARTING_OIL, seed)
     }
 
     /// Create a match with explicit starting resources for every player.
-    pub fn new_with_starting_resources(players: &[PlayerInit], steel: u32, oil: u32) -> Game {
-        let seed = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map(|d| d.as_nanos() as u32)
-            .unwrap_or(0x1234_5678);
+    pub fn new_with_starting_resources(players: &[PlayerInit], steel: u32, oil: u32, seed: u32) -> Game {
         Self::new_inner(players, true, steel, oil, seed)
     }
 
@@ -632,7 +625,7 @@ mod tests {
     #[test]
     fn ai_builds_economy_and_attacks() {
         let players = human_vs_ai_players();
-        let mut game = Game::new(&players);
+        let mut game = Game::new(&players, 0x1234_5678);
 
         let mut max_workers = 0usize;
         let mut max_riflemen = 0usize;
@@ -758,7 +751,7 @@ mod tests {
     #[test]
     fn base_ai_tracks_pending_depot_build_order() {
         let players = human_vs_ai_players();
-        let mut game = Game::new(&players);
+        let mut game = Game::new(&players, 0x1234_5678);
         let mut saw_pending_without_scaffold = false;
         let mut max_pending_depot_builders = 0usize;
         let mut gathering_workers_while_pending = 0usize;
@@ -808,7 +801,7 @@ mod tests {
     #[test]
     fn base_ai_reassigns_idle_workers_to_steel() {
         let players = human_vs_ai_players();
-        let mut game = Game::new(&players);
+        let mut game = Game::new(&players, 0x1234_5678);
 
         // Advance to a point where the AI has active gathering assignments.
         for _ in 0..30 {
@@ -857,7 +850,7 @@ mod tests {
             color: "#fff".into(),
             is_ai: false,
         }];
-        let game = Game::new(&players);
+        let game = Game::new(&players, 0x1234_5678);
         assert!(
             game.ai.is_empty(),
             "a human-only match has no AI controllers"
@@ -875,7 +868,7 @@ mod tests {
             color: "#fff".into(),
             is_ai: false,
         }];
-        let mut game = Game::new(&players);
+        let mut game = Game::new(&players, 0x1234_5678);
 
         let mut event_log = Vec::new();
         for tick in 1..=300 {
