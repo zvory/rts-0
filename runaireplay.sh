@@ -56,5 +56,7 @@ open "${SERVER_URL}/dev/selfplay?replay=${ARTIFACT}"
 
 if [ "$TEST_STATUS" -ne 0 ]; then
     echo "Test failed with status $TEST_STATUS; replay opened above." >&2
-    exit "$TEST_STATUS"
 fi
+
+echo "Server running at ${SERVER_URL} — press Ctrl+C to stop."
+wait $SERVER_PID || true
