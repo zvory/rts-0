@@ -68,6 +68,8 @@ pub struct Map {
     pub terrain: Vec<u8>,
     /// One start tile `(tile_x, tile_y)` per player, in player-index order.
     pub starts: Vec<(u32, u32)>,
+    /// One neutral expansion site `(tile_x, tile_y)` per player.
+    pub expansion_sites: Vec<(u32, u32)>,
 }
 
 impl Map {
@@ -77,10 +79,11 @@ impl Map {
         let mut terrain = vec![terrain::GRASS; (size * size) as usize];
 
         let starts = symmetric_starts(size, player_count);
+        let expansion_sites = expansion_sites(size, player_count, &starts);
 
         // Tiles we must keep clear: each start area and its resource cluster footprint.
-        // We protect a generous square around every start tile.
-        let protected = protected_tiles(size, &starts);
+        // We protect a generous square around every start tile plus every neutral expansion site.
+        let protected = protected_tiles(size, &starts, &expansion_sites);
 
         let mut rng = XorShift32::new(seed);
         scatter_symmetric_obstacles(&mut terrain, size, &mut rng, &protected);
@@ -89,6 +92,7 @@ impl Map {
             size,
             terrain,
             starts,
+            expansion_sites,
         }
     }
 
@@ -157,6 +161,7 @@ impl Map {
     pub fn world_size_px(&self) -> f32 {
         self.size as f32 * config::TILE_SIZE as f32
     }
+
 }
 
 /// Choose symmetric start tiles for `player_count` players.
@@ -184,7 +189,7 @@ fn symmetric_starts(size: u32, player_count: usize) -> Vec<(u32, u32)> {
 /// Tiles that must never be made impassable: a square around each start tile big enough to
 /// hold the Industrial Center footprint, the worker spawn ring, and the mineral cluster + geyser.
 /// All four corners are always protected because resource patches always spawn there.
-fn protected_tiles(size: u32, starts: &[(u32, u32)]) -> Vec<bool> {
+fn protected_tiles(size: u32, starts: &[(u32, u32)], expansion_sites: &[(u32, u32)]) -> Vec<bool> {
     let mut prot = vec![false; (size * size) as usize];
     let r: i32 = 7;
 
@@ -197,6 +202,7 @@ fn protected_tiles(size: u32, starts: &[(u32, u32)]) -> Vec<bool> {
         .iter()
         .copied()
         .chain(all_corners)
+        .chain(expansion_sites.iter().copied())
         .collect();
 
     for (sx, sy) in to_protect {
@@ -211,6 +217,25 @@ fn protected_tiles(size: u32, starts: &[(u32, u32)]) -> Vec<bool> {
         }
     }
     prot
+}
+
+/// One neutral expansion site per player.
+fn expansion_sites(size: u32, player_count: usize, starts: &[(u32, u32)]) -> Vec<(u32, u32)> {
+    let inset = 8u32.min(size / 4);
+    let lo = inset;
+    let hi = size - 1 - inset;
+    let mid = size / 2;
+    let candidates = match player_count {
+        0 | 1 => vec![(hi, hi)],
+        2 => vec![(hi, lo), (lo, hi)],
+        3 => vec![(hi, hi), (lo, hi), (mid, lo)],
+        _ => vec![(mid, lo), (hi, mid), (mid, hi), (lo, mid)],
+    };
+    candidates
+        .into_iter()
+        .filter(|site| !starts.contains(site))
+        .take(player_count)
+        .collect()
 }
 
 /// Scatter a handful of obstacle clusters and mirror each one under 180° rotational symmetry

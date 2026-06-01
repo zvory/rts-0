@@ -136,15 +136,12 @@ impl Game {
             player_states.push(ps);
         }
 
-        // Always spawn resources at all four corners. Corners not claimed by a player get
-        // only resource patches (no IC, no workers) so there are always four resource sets.
-        let inset = 8u32.min(map.size / 4);
-        let lo = inset;
-        let hi = map.size - 1 - inset;
-        let all_corners = [(lo, lo), (hi, lo), (lo, hi), (hi, hi)];
-        for corner in all_corners {
-            if !map.starts.contains(&corner) {
-                spawn_corner_resources(&mut entities, &map, corner);
+        // Always spawn resources on the neutral expansion sites. Claimed sites get a full start;
+        // unclaimed sites still get their resource clusters so every player has somewhere to
+        // expand.
+        for site in &map.expansion_sites {
+            if !map.starts.contains(&site) {
+                spawn_base_resources(&mut entities, &map, *site);
             }
         }
 
@@ -493,9 +490,9 @@ impl Game {
 /// Spawn a player's full starting layout: a free, fully-built Industrial Center on the start tile, a ring of
 /// workers around it, and a nearby neutral resource cluster (steel + one oil node).
 ///
-/// Spawn the steel and oil clusters for a corner tile. The clusters point inward toward the
-/// map center so the layout is the same regardless of whether a player occupies the corner.
-fn spawn_corner_resources(entities: &mut EntityStore, map: &Map, tile: (u32, u32)) {
+/// Spawn the steel and oil clusters for a base site. The clusters point inward toward the map
+/// center so the layout is the same regardless of whether a player occupies the site.
+fn spawn_base_resources(entities: &mut EntityStore, map: &Map, tile: (u32, u32)) {
     let (tx, ty) = tile;
     let (hx, hy) = map.tile_center(tx, ty);
     let ts = config::TILE_SIZE as f32;
@@ -576,7 +573,7 @@ fn spawn_player_start(entities: &mut EntityStore, map: &Map, owner: u32, start: 
         entities.spawn_unit(owner, EntityKind::Worker, wx, wy);
     }
 
-    spawn_corner_resources(entities, map, start);
+    spawn_base_resources(entities, map, start);
 }
 
 #[cfg(test)]
