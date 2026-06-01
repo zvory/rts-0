@@ -17,6 +17,7 @@
 use crate::config;
 use crate::game::entity::{Entity, EntityKind, EntityStore, NEUTRAL};
 use crate::game::services::spatial::SpatialIndex;
+use crate::rules::terrain::{self, TerrainKind};
 
 // --- Ownership scans --------------------------------------------------------
 
@@ -104,11 +105,9 @@ pub(crate) fn nearest_enemy_in_range(
     py: f32,
     radius_px: f32,
 ) -> Option<u32> {
-    spatial
-        .nearest(px, py, radius_px, entities, |e: &Entity| {
-            is_enemy_targetable(e, owner, self_id)
-        })
-        .map(|(id, _)| id)
+    nearest_matching_enemy_in_range(entities, spatial, self_id, owner, px, py, radius_px, |_| {
+        true
+    })
 }
 
 /// Nearest hostile Tank to `(px, py)` within `radius_px`, or `None` if no tank is in range.
@@ -121,11 +120,44 @@ pub(crate) fn nearest_tank_in_range(
     py: f32,
     radius_px: f32,
 ) -> Option<u32> {
-    spatial
-        .nearest(px, py, radius_px, entities, |e: &Entity| {
-            e.kind == EntityKind::Tank && is_enemy_targetable(e, owner, self_id)
-        })
-        .map(|(id, _)| id)
+    nearest_matching_enemy_in_range(entities, spatial, self_id, owner, px, py, radius_px, |e| {
+        e.kind == EntityKind::Tank
+    })
+}
+
+#[allow(clippy::too_many_arguments)]
+fn nearest_matching_enemy_in_range(
+    entities: &EntityStore,
+    spatial: &SpatialIndex,
+    self_id: u32,
+    owner: u32,
+    px: f32,
+    py: f32,
+    radius_px: f32,
+    matches_kind: impl Fn(&Entity) -> bool,
+) -> Option<u32> {
+    let mut best: Option<(u32, f32)> = None;
+    for id in spatial.ids_in_circle_bbox(px, py, radius_px) {
+        let Some(entity) = entities.get(id) else {
+            continue;
+        };
+        if !is_enemy_targetable(entity, owner, self_id) || !matches_kind(entity) {
+            continue;
+        }
+        let concealment = terrain::concealment_modifier(entity.kind, TerrainKind::Open).max(0.0);
+        let effective_radius = radius_px * concealment;
+        if !effective_radius.is_finite() {
+            continue;
+        }
+        let dx = entity.pos_x - px;
+        let dy = entity.pos_y - py;
+        let d2 = dx * dx + dy * dy;
+        let r2 = effective_radius * effective_radius;
+        if d2 <= r2 && best.map(|(_, best_d2)| d2 < best_d2).unwrap_or(true) {
+            best = Some((id, d2));
+        }
+    }
+    best.map(|(id, _)| id)
 }
 
 /// Whichever worker currently holds `node`'s single harvest slot, if any. A reservation is

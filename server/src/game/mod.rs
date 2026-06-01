@@ -23,13 +23,12 @@ pub mod systems;
 use std::collections::HashMap;
 
 use crate::config;
-use crate::protocol::{
-    Command, EntityView, Event, MapInfo, PlayerStart, ResourceNode, Snapshot, StartPayload,
-};
+use crate::protocol::{Command, Event, MapInfo, PlayerStart, ResourceNode, Snapshot, StartPayload};
+use crate::rules::projection;
 use serde::{Deserialize, Serialize};
 
 use ai::AiController;
-use entity::{Entity, EntityKind, EntityStore, GatherPhase, Order};
+use entity::{EntityKind, EntityStore};
 use fog::Fog;
 use map::Map;
 use replay::CommandLogEntry;
@@ -314,15 +313,10 @@ impl Game {
                 Some(e) => e,
                 None => continue,
             };
-            let own = e.owner == player;
-            if fogged && !own && !e.kind.is_node() {
-                // Reveal neutral / enemy entities only when their tile is currently visible.
-                // Resource nodes are always included — they are static terrain features.
-                if !self.fog.is_visible_world(player, e.pos_x, e.pos_y) {
-                    continue;
-                }
+            let target = e.target_id().and_then(|target| self.entities.get(target));
+            if let Some(view) = projection::project_entity(player, e, &self.fog, fogged, target) {
+                entities.push(view);
             }
-            entities.push(self.view_of(e, player, fogged));
         }
         // Deterministic order (stable for tests / replays).
         entities.sort_by_key(|v| v.id);
@@ -425,83 +419,6 @@ impl Game {
     fn player(&self, id: u32) -> Option<&PlayerState> {
         self.players.iter().find(|p| p.id == id)
     }
-
-    /// Project an entity into its wire `EntityView` for `viewer`, filling the optional fields
-    /// that apply. `viewer` is needed to fog-gate the combat tracer target id.
-    fn view_of(&self, e: &Entity, viewer: u32, fogged: bool) -> EntityView {
-        let mut v = EntityView::new(
-            e.id,
-            e.owner,
-            e.kind.to_protocol_str(),
-            e.pos_x,
-            e.pos_y,
-            e.hp,
-            e.max_hp,
-            e.state_str(),
-        );
-
-        if e.is_unit() {
-            v.facing = Some(e.facing());
-        }
-        if e.kind == EntityKind::MachineGunner {
-            v.setup_state = Some(e.weapon_setup().to_protocol_str().to_string());
-        }
-
-        // Production buildings: surface the front item + queue depth.
-        if e.is_building() && !e.prod_queue().is_empty() {
-            if let Some(front) = e.prod_queue().first() {
-                v.prod_kind = Some(front.unit.to_protocol_str().to_string());
-                v.prod_progress = Some(if front.total == 0 {
-                    0.0
-                } else {
-                    front.progress as f32 / front.total as f32
-                });
-            }
-            v.prod_queue = Some(e.prod_queue().len() as u32);
-        }
-
-        // Buildings under construction: surface progress so the client renders scaffolding.
-        if let Some(progress) = e.build_progress_fraction() {
-            v.build_progress = Some(progress);
-        }
-
-        // Resource nodes are static terrain features and are always visible. Current behavior also
-        // includes remaining amount through fog; long-term explored fog should remember the last
-        // seen amount instead.
-        if e.is_node() {
-            v.remaining = e.remaining();
-        }
-
-        if e.kind == EntityKind::Worker && e.gather_phase() == Some(GatherPhase::Harvesting) {
-            if let Some(node) = e.order().gather_node() {
-                v.latched_node = Some(node);
-            }
-        }
-
-        // Combat tracer target (only meaningful for attackers actively engaged).
-        if let Some(t) = e.target_id() {
-            // Only expose a target that points at a real combat target, to keep tracers sane.
-            if matches!(e.order(), Order::Attack(_) | Order::AttackMove(_))
-                || (e.is_building() && e.can_attack())
-            {
-                // Fog-gate the tracer: reveal the target id only when the viewer owns the
-                // attacker or can currently see the target's tile. Otherwise withholding it
-                // avoids leaking the position/existence of an entity hidden in the viewer's fog.
-                if let Some(target) = self.entities.get(t) {
-                    let visible = e.owner == viewer
-                        || !fogged
-                        || self
-                            .fog
-                            .is_visible_world(viewer, target.pos_x, target.pos_y);
-                    if visible {
-                        v.target_id = Some(t);
-                    }
-                }
-            }
-        }
-
-        v
-    }
 }
 
 /// Spawn a player's full starting layout: a free, fully-built Industrial Center on the start tile, a ring of
@@ -596,8 +513,8 @@ fn spawn_player_start(entities: &mut EntityStore, map: &Map, owner: u32, start: 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::game::entity::{EntityKind, Order};
-    use crate::protocol::kinds;
+    use crate::game::entity::{Entity, EntityKind, GatherPhase, Order};
+    use crate::protocol::{kinds, EntityView};
 
     fn human_vs_ai_players() -> [PlayerInit; 2] {
         [
@@ -635,6 +552,118 @@ mod tests {
             .filter(|e| e.owner == player_id && e.kind == EntityKind::Worker)
             .filter(|e| matches!(e.order(), Order::Gather(_)))
             .count()
+    }
+
+    fn legacy_snapshot_entities(game: &Game, player: u32, fogged: bool) -> Vec<EntityView> {
+        let mut entities = Vec::new();
+        for id in game.spatial.all_ids() {
+            let Some(e) = game.entities.get(id) else {
+                continue;
+            };
+            let own = e.owner == player;
+            if fogged
+                && !own
+                && !e.kind.is_node()
+                && !game.fog.is_visible_world(player, e.pos_x, e.pos_y)
+            {
+                continue;
+            }
+            entities.push(legacy_view_of(game, e, player, fogged));
+        }
+        entities.sort_by_key(|v| v.id);
+        entities
+    }
+
+    fn legacy_view_of(game: &Game, e: &Entity, viewer: u32, fogged: bool) -> EntityView {
+        let mut v = EntityView::new(
+            e.id,
+            e.owner,
+            e.kind.to_protocol_str(),
+            e.pos_x,
+            e.pos_y,
+            e.hp,
+            e.max_hp,
+            e.state_str(),
+        );
+
+        if e.is_unit() {
+            v.facing = Some(e.facing());
+        }
+        if e.kind == EntityKind::MachineGunner {
+            v.setup_state = Some(e.weapon_setup().to_protocol_str().to_string());
+        }
+        if e.is_building() && !e.prod_queue().is_empty() {
+            if let Some(front) = e.prod_queue().first() {
+                v.prod_kind = Some(front.unit.to_protocol_str().to_string());
+                v.prod_progress = Some(if front.total == 0 {
+                    0.0
+                } else {
+                    front.progress as f32 / front.total as f32
+                });
+            }
+            v.prod_queue = Some(e.prod_queue().len() as u32);
+        }
+        if let Some(progress) = e.build_progress_fraction() {
+            v.build_progress = Some(progress);
+        }
+        if e.is_node() {
+            v.remaining = e.remaining();
+        }
+        if e.kind == EntityKind::Worker && e.gather_phase() == Some(GatherPhase::Harvesting) {
+            if let Some(node) = e.order().gather_node() {
+                v.latched_node = Some(node);
+            }
+        }
+        if let Some(t) = e.target_id() {
+            if matches!(e.order(), Order::Attack(_) | Order::AttackMove(_))
+                || (e.is_building() && e.can_attack())
+            {
+                if let Some(target) = game.entities.get(t) {
+                    let visible = e.owner == viewer
+                        || !fogged
+                        || game
+                            .fog
+                            .is_visible_world(viewer, target.pos_x, target.pos_y);
+                    if visible {
+                        v.target_id = Some(t);
+                    }
+                }
+            }
+        }
+        v
+    }
+
+    #[test]
+    fn phase4_projection_matches_legacy_snapshot_entities() {
+        let players = human_vs_ai_players();
+        let mut game = Game::new(&players, 0xCAFE_BABE);
+        let (sx, sy) = game
+            .map
+            .tile_center(game.players[0].start_tile.0, game.players[0].start_tile.1);
+        let attacker = game
+            .entities
+            .spawn_unit(1, EntityKind::Rifleman, sx + 64.0, sy)
+            .expect("attacker should spawn");
+        let target = game
+            .entities
+            .spawn_unit(2, EntityKind::Rifleman, sx + 96.0, sy)
+            .expect("target should spawn");
+        if let Some(e) = game.entities.get_mut(attacker) {
+            e.set_order(Order::attack(target));
+            e.set_target_id(Some(target));
+        }
+        game.spatial = services::spatial::SpatialIndex::build(&game.entities, game.map.size);
+        let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
+        game.fog.recompute(&ids, &game.entities);
+
+        assert_eq!(
+            game.snapshot_for(1).entities,
+            legacy_snapshot_entities(&game, 1, true)
+        );
+        assert_eq!(
+            game.snapshot_full_for(1).entities,
+            legacy_snapshot_entities(&game, 1, false)
+        );
     }
 
     /// Drive a passive human vs. one AI and confirm the AI actually plays: it grows its economy,
