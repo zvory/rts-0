@@ -185,7 +185,7 @@ pub fn unit_stats(kind: EntityKind) -> Option<UnitStats> {
             sight_tiles: 7,
             cost_steel: 200,
             cost_oil: 100,
-            supply: 2,
+            supply: 6,
             build_ticks: 250,
             radius: 20.0,
         },
