@@ -275,6 +275,9 @@ them at the top of `tick()` — see §8.
 `server/src/rules/` contains pure classification and formula functions. They take `EntityKind` and
 context primitives, never mutate state, and never read fog or `EntityStore`.
 
+- `rules::defs` — immutable unit/building/node definition tables keyed by `EntityKind`. These
+  records are the source of truth for kind-specific stats, armor class, weapon class, target
+  priority, production chains, tech requirements, and resource-node amounts.
 - `rules::combat` — AP/armor predicates (`is_ap`, `is_armored`, `prefers_armored_targets`),
   `attack_profile(kind) -> AttackProfile`, and `effective_damage(attacker_kind, victim_kind, base_dmg) -> u32`.
 - `rules::economy` — tech/production predicates (`trainable_units`, `build_requirement_met`,
@@ -282,9 +285,9 @@ context primitives, never mutate state, and never read fog or `EntityStore`.
   `supply_cost`, `supply_provided`).
 
 Services in `game/services/` orchestrate tick logic and call into `rules::*` for classification.
-Rules functions have no imports from `services/` or entity storage; they only import `EntityKind`
-and `config`. `config.rs` answers "what number?"; `rules/economy.rs` answers "is this allowed /
-what does it cost?".
+Rules functions have no imports from `services/` or entity storage; they read kind-specific data
+from `rules::defs`. `config.rs` holds scalar constants and compatibility wrappers such as
+`unit_stats(kind)` / `building_stats(kind)`, which return the stats embedded in defs.
 
 ---
 
@@ -464,9 +467,12 @@ start the rAF loop (compute `alpha` from snapshot timing, `camera.update`, `inpu
 
 ---
 
-## 5. Balance & constants (authoritative in `server/src/config.rs`)
-`client/src/config.js` mirrors the subset the UI/render/fog needs (costs, supply, sight,
-sizes, colors). Keep both in sync; the comment in each file points at the other.
+## 5. Balance definitions & constants
+Kind-specific server balance lives in `server/src/rules/defs.rs`. `config.rs` is the thin constants
+module for timings, map sizes, starting resources, supply caps, mining amounts, and other scalar
+simulation constants; its `unit_stats(kind)` and `building_stats(kind)` helpers read the defs table.
+`client/src/config.js` mirrors the subset the UI/render/fog needs (costs, supply, sight, sizes,
+colors). Keep both in sync; the comment in each file points at the other.
 
 ### 5.1 Target theme and MVP combat loop
 
@@ -518,7 +524,8 @@ Intended progression:
 
 The current implementation uses the themed unit/building names below. Combat is still handled
 by the simple shared attack model plus the machine-gunner setup/teardown state; armor facings
-and forest-specific rules are future work.
+and forest-specific rules are future work. The unit, building, and resource-node tables below are
+the human-readable form of the authoritative `rules::defs` records.
 
 - `TICK_HZ = 30`, `SNAPSHOT_EVERY_N_TICKS = 1`.
 - `MACHINE_GUNNER_SETUP_TICKS = 30` (~1s setup or teardown).
