@@ -587,6 +587,10 @@ export class Renderer {
       g.drawRect(bx, by, bw * clamp01(e.prodProgress), 5);
       g.endFill();
     }
+
+    // Queue depth label below the production progress bar.
+    const queueCount = e.prodQueue ?? 0;
+    this._queueLabel(e, e.x, y0 + 14, queueCount, bodyAlpha);
   }
 
   /**
@@ -783,6 +787,37 @@ export class Renderer {
     const s = (size * 0.95) / 24;
     t.scale.set(s);
     // Track on the buildings pool's seen-set so the sweep keeps it alive.
+    this._seen.buildings.add(e.id);
+  }
+
+  /**
+   * Show/hide the queued-unit count label for a building. Pooled by entity id.
+   * @private
+   */
+  _queueLabel(e, cx, cy, count, bodyAlpha) {
+    if (!this._queueLabelPool) this._queueLabelPool = new Map();
+    let t = this._queueLabelPool.get(e.id);
+    if (!t) {
+      t = new PIXI.Text("", {
+        fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
+        fontSize: 11,
+        fill: 0xffe080,
+        align: "center",
+        fontWeight: "700",
+      });
+      t.anchor.set(0.5, 0);
+      this._queueLabelPool.set(e.id, t);
+      this.layers.buildings.addChild(t);
+    }
+    if (count > 0) {
+      const label = `+${count}`;
+      if (t.text !== label) t.text = label;
+      t.visible = true;
+      t.alpha = bodyAlpha;
+      t.position.set(cx, cy);
+    } else {
+      t.visible = false;
+    }
     this._seen.buildings.add(e.id);
   }
 
@@ -1010,6 +1045,7 @@ export class Renderer {
       for (const id of this._pools[key].keys()) ids.add(id);
     }
     if (this._iconPool) for (const id of this._iconPool.keys()) ids.add(id);
+    if (this._queueLabelPool) for (const id of this._queueLabelPool.keys()) ids.add(id);
     for (const id of ids) {
       if (seenAny.has(id)) {
         this._unseen.delete(id);
@@ -1047,6 +1083,19 @@ export class Renderer {
         }
       }
     }
+    if (this._queueLabelPool) {
+      const seen = this._seen.buildings;
+      for (const [id, t] of this._queueLabelPool) {
+        if (seen.has(id)) continue;
+        if (evict.has(id)) {
+          this.layers.buildings.removeChild(t);
+          t.destroy();
+          this._queueLabelPool.delete(id);
+        } else {
+          t.visible = false;
+        }
+      }
+    }
     for (const id of evict) this._unseen.delete(id);
   }
 
@@ -1070,6 +1119,10 @@ export class Renderer {
     if (this._iconPool) {
       for (const t of this._iconPool.values()) t.destroy();
       this._iconPool.clear();
+    }
+    if (this._queueLabelPool) {
+      for (const t of this._queueLabelPool.values()) t.destroy();
+      this._queueLabelPool.clear();
     }
     this._unseen.clear();
 
