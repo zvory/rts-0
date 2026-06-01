@@ -1,7 +1,8 @@
 // Headless client smoke test. Drives the real client in headless Chrome and asserts it
 // loads, renders the PixiJS scene, and that the full UI command loop works end-to-end:
-// lobby -> ready -> start -> render -> box-select -> build placement (round-trips through
-// the server and the depot appears) -> train-card rendering. Fails on ANY console/page error.
+// lobby -> ready -> start -> render -> box-select -> mine enough steel -> build placement
+// (round-trips through the server and the depot appears) -> train-card rendering.
+// Fails on ANY console/page error.
 //
 // Requires puppeteer-core and a local Chrome:
 //   cd tests && npm install
@@ -88,6 +89,25 @@ try {
   await page.mouse.up();
   await sleep(250);
   ok(await page.evaluate(() => window.__rts.match.state.selection.size) >= 1, "box-select selected own units");
+
+  const gather = await page.evaluate(() => {
+    const m = window.__rts.match, s = m.state;
+    const workers = s.selectedEntities().filter((e) => e.owner === s.playerId && e.kind === "worker");
+    const steel = s.entitiesInterpolated(1)
+      .filter((e) => e.kind === "steel")
+      .sort((a, b) => a.id - b.id);
+    const n = Math.min(workers.length, steel.length);
+    for (let i = 0; i < n; i++) {
+      m.net.command({ c: "gather", units: [workers[i].id], node: steel[i].id });
+    }
+    return { workers: workers.length, nodes: steel.length, assigned: n };
+  });
+  ok(gather.assigned > 0, `assigned workers to steel before building (workers=${gather.workers}, nodes=${gather.nodes})`);
+  await page.waitForFunction(() => {
+    const btn = document.querySelector('#command-card button[data-hotkey="S"]');
+    return btn && !btn.disabled && /Supply Depot/.test(btn.textContent || "");
+  }, { timeout: 30000 });
+  ok(true, "Depot build button became affordable after mining");
 
   await page.evaluate(() => document.activeElement?.blur());
   await page.keyboard.press("s");
