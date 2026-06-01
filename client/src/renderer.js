@@ -588,9 +588,9 @@ export class Renderer {
       g.endFill();
     }
 
-    // Queue depth label below the production progress bar.
-    const queueCount = e.prodQueue ?? 0;
-    this._queueLabel(e, e.x, y0 + 14, queueCount, bodyAlpha);
+    // Queue depth label: show items waiting behind the active production slot.
+    const queueDepth = (e.prodQueue ?? 0) - 1;
+    this._queueLabel(e, e.x, y0 + 14, queueDepth, bodyAlpha);
   }
 
   /**
@@ -804,6 +804,8 @@ export class Renderer {
         fill: 0xffe080,
         align: "center",
         fontWeight: "700",
+        stroke: 0x000000,
+        strokeThickness: 3,
       });
       t.anchor.set(0.5, 0);
       this._queueLabelPool.set(e.id, t);

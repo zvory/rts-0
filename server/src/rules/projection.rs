@@ -74,7 +74,9 @@ pub fn project_entity(
                 front.progress as f32 / front.total as f32
             });
         }
-        view.prod_queue = Some(entity.prod_queue().len() as u32);
+        if entity.owner == viewer {
+            view.prod_queue = Some(entity.prod_queue().len() as u32);
+        }
     }
 
     if let Some(progress) = entity.build_progress_fraction() {
