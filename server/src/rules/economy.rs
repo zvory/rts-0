@@ -1,22 +1,22 @@
 //! Economy rules: tech requirements, production chains, resource node amounts, cost/supply lookups.
 //!
-//! `config.rs` answers "what number?"; this module answers "is this allowed / what does it cost?".
+//! `rules::defs` owns kind-specific data; this module answers allowed/cost/supply questions.
 
-use crate::config;
 use crate::game::entity::EntityKind;
+use crate::rules::defs;
 
 /// Which units a given building can train.
 pub fn trainable_units(building_kind: EntityKind) -> &'static [EntityKind] {
-    match building_kind {
-        EntityKind::IndustrialCenter => &[EntityKind::Worker],
-        EntityKind::Barracks => &[
-            EntityKind::Rifleman,
-            EntityKind::MachineGunner,
-            EntityKind::AtTeam,
-        ],
-        EntityKind::TankFactory => &[EntityKind::Tank],
-        _ => &[],
-    }
+    let units = defs::building_def(building_kind)
+        .map(|d| d.trains)
+        .unwrap_or(&[]);
+    debug_assert!(
+        defs::UNITS
+            .iter()
+            .all(|d| (d.trained_at == Some(building_kind)) == units.contains(&d.kind)),
+        "building train list and unit trained_at should agree for {building_kind}"
+    );
+    units
 }
 
 /// Whether `building_kind` is allowed to be placed given the set of building kinds the
@@ -25,16 +25,9 @@ pub fn build_requirement_met(
     building_kind: EntityKind,
     owned_building_kinds: &[EntityKind],
 ) -> bool {
-    match building_kind {
-        EntityKind::Barracks | EntityKind::TrainingCentre => {
-            owned_building_kinds.contains(&EntityKind::IndustrialCenter)
-        }
-        EntityKind::TankFactory => {
-            owned_building_kinds.contains(&EntityKind::IndustrialCenter)
-                && owned_building_kinds.contains(&EntityKind::TrainingCentre)
-        }
-        _ => true,
-    }
+    defs::building_def(building_kind)
+        .map(|d| requirements_met(d.build_requires, owned_building_kinds))
+        .unwrap_or(true)
 }
 
 /// Whether a unit's training tech has been unlocked by completed buildings.
@@ -42,28 +35,21 @@ pub fn train_requirement_met(
     unit_kind: EntityKind,
     owned_complete_building_kinds: &[EntityKind],
 ) -> bool {
-    match unit_kind {
-        EntityKind::MachineGunner | EntityKind::AtTeam => {
-            owned_complete_building_kinds.contains(&EntityKind::TrainingCentre)
-        }
-        _ => true,
-    }
+    defs::unit_def(unit_kind)
+        .map(|d| requirements_met(d.train_requires, owned_complete_building_kinds))
+        .unwrap_or(true)
 }
 
 /// Resource node starting amount for a node kind.
 pub fn node_amount(kind: EntityKind) -> u32 {
-    match kind {
-        EntityKind::Steel => config::STEEL_PATCH_AMOUNT,
-        EntityKind::Oil => config::OIL_GEYSER_AMOUNT,
-        _ => 0,
-    }
+    defs::node_def(kind).map(|d| d.amount).unwrap_or(0)
 }
 
 /// Cost of a unit or building kind as `(steel, oil)`. Returns `(0, 0)` for unknown kinds.
 pub fn cost(kind: EntityKind) -> (u32, u32) {
-    if let Some(s) = config::unit_stats(kind) {
+    if let Some(s) = defs::unit_def(kind).map(|d| d.stats) {
         (s.cost_steel, s.cost_oil)
-    } else if let Some(s) = config::building_stats(kind) {
+    } else if let Some(s) = defs::building_def(kind).map(|d| d.stats) {
         (s.cost_steel, s.cost_oil)
     } else {
         (0, 0)
@@ -72,14 +58,18 @@ pub fn cost(kind: EntityKind) -> (u32, u32) {
 
 /// Supply consumed by a unit kind. Returns 0 for non-units.
 pub fn supply_cost(kind: EntityKind) -> u32 {
-    config::unit_stats(kind).map(|s| s.supply).unwrap_or(0)
+    defs::unit_def(kind).map(|d| d.stats.supply).unwrap_or(0)
 }
 
 /// Supply provided by a building kind. Returns 0 for non-buildings.
 pub fn supply_provided(kind: EntityKind) -> u32 {
-    config::building_stats(kind)
-        .map(|s| s.provides_supply)
+    defs::building_def(kind)
+        .map(|d| d.stats.provides_supply)
         .unwrap_or(0)
+}
+
+fn requirements_met(requirements: &[EntityKind], owned: &[EntityKind]) -> bool {
+    requirements.iter().all(|req| owned.contains(req))
 }
 
 #[cfg(test)]
@@ -136,7 +126,10 @@ mod tests {
         assert_eq!(cost(EntityKind::Depot), (100, 0));
         assert_eq!(supply_cost(EntityKind::Tank), 6);
         assert_eq!(supply_cost(EntityKind::Depot), 0);
-        assert_eq!(supply_provided(EntityKind::Depot), config::DEPOT_SUPPLY);
+        assert_eq!(
+            supply_provided(EntityKind::Depot),
+            crate::config::DEPOT_SUPPLY
+        );
         assert_eq!(supply_provided(EntityKind::Tank), 0);
     }
 }
