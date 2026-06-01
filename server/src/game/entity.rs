@@ -11,6 +11,7 @@
 use std::collections::HashMap;
 
 use crate::config;
+use crate::rules;
 use crate::protocol::states;
 
 /// Neutral owner id used for resource nodes (steel / oil nodes).
@@ -601,7 +602,7 @@ impl Entity {
             } else {
                 None
             },
-            production: if config::trainable_units(kind).is_empty() {
+            production: if rules::economy::trainable_units(kind).is_empty() {
                 None
             } else {
                 Some(ProductionState::default())
@@ -616,7 +617,7 @@ impl Entity {
     }
 
     pub fn new_node(kind: EntityKind, x: f32, y: f32) -> Option<Self> {
-        let amount = config::node_amount(kind);
+        let amount = rules::economy::node_amount(kind);
         if amount == 0 {
             return None;
         }

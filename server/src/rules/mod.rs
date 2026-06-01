@@ -4,3 +4,4 @@
 //! Services in `game/services/` orchestrate; these rules classify.
 
 pub mod combat;
+pub mod economy;
