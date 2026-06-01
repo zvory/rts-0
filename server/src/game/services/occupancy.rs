@@ -103,8 +103,8 @@ pub(crate) fn footprint_center(
 }
 
 /// Whether `building`'s footprint at `(tile_x, tile_y)` is fully in bounds, on passable
-/// terrain, and clear of existing building footprints and resource nodes. `(tile_x, tile_y)` is
-/// the footprint's top-left tile. Shared with the AI (`ai.rs`) for picking valid build sites.
+/// terrain, and clear of existing buildings, units, and resource nodes. `(tile_x, tile_y)` is the
+/// footprint's top-left tile. Shared with the AI (`ai.rs`) for picking valid build sites.
 pub(crate) fn footprint_placeable(
     map: &Map,
     entities: &EntityStore,
@@ -127,7 +127,7 @@ pub(crate) fn footprint_placeable(
         }
     }
 
-    // Not overlapping another building's footprint or a resource node tile.
+    // Not overlapping another building footprint, resource node, or unit tile.
     // We scan all buildings rather than use the spatial index because the spatial index keys
     // by entity center tile, and a large building's center can lie outside the query rectangle
     // even when its footprint overlaps the candidate footprint.

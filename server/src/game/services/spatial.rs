@@ -38,7 +38,7 @@ impl SpatialIndex {
     }
 
     /// Iterate all entity ids whose tile center lies within the inclusive tile rectangle.
-    pub fn ids_in_rect(&self, min_tx: i32, min_ty: i32, max_tx: i32, max_ty: i32) -> RectIter {
+    pub fn ids_in_rect(&self, min_tx: i32, min_ty: i32, max_tx: i32, max_ty: i32) -> RectIter<'_> {
         let min_tx = min_tx.clamp(0, self.size as i32 - 1);
         let min_ty = min_ty.clamp(0, self.size as i32 - 1);
         let max_tx = max_tx.clamp(0, self.size as i32 - 1);
