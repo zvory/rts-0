@@ -76,7 +76,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
      `players start at distinct tiles A=(${a?.startTileX},${a?.startTileY}) B=(${b?.startTileX},${b?.startTileY})`);
 
   const snap = await A.waitFor((m) => m.t === "snapshot" && m.entities.length > 0, 3000, "A snapshot");
-  ok(snap.steel === 100, `A starts with 100 steel (${snap.steel})`);
+  ok(snap.steel === 50, `A starts with 50 steel (${snap.steel})`);
   ok(snap.oil === 0, `A starts with 0 oil (${snap.oil})`);
   ok(snap.supplyCap === 10, `A supply cap = 10 (${snap.supplyCap})`);
   ok(snap.supplyUsed === 4, `A supply used = 4 (${snap.supplyUsed})`);
@@ -95,10 +95,10 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     if (A.lastSnapshot) {
       peak = Math.max(peak, A.lastSnapshot.steel);
       if (A.lastSnapshot.entities.some((e) => e.owner === A.playerId && e.kind === "worker" && e.latchedNode)) sawLatch = true;
-      if (A.lastSnapshot.steel > 100) break;
+      if (A.lastSnapshot.steel > 50) break;
     }
   }
-  ok(peak > 100, `GATHER: steel rose above 100 (peak=${peak})`);
+  ok(peak > 50, `GATHER: steel rose above 50 (peak=${peak})`);
   ok(sawLatch, `GATHER: a worker latched onto steel`);
 
   const beforeTrain = A.lastSnapshot.steel;
