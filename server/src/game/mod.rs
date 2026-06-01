@@ -326,17 +326,28 @@ impl Game {
         }
     }
 
-    /// Player ids that still own at least one building. A player with only units remaining
-    /// is considered defeated — buildings are the loss condition.
+    /// Player ids that are not yet defeated. For human players, defeat requires losing all
+    /// buildings. AI players are also defeated if they have no units remaining (no path to
+    /// rebuild an army without player input).
     pub fn alive_players(&self) -> Vec<u32> {
         self.players
             .iter()
-            .map(|p| p.id)
-            .filter(|&id| {
-                services::world_query::owned_buildings(&self.entities, id)
+            .filter(|p| {
+                let has_building = services::world_query::owned_buildings(&self.entities, p.id)
                     .next()
-                    .is_some()
+                    .is_some();
+                if !has_building {
+                    return false;
+                }
+                if p.is_ai {
+                    services::world_query::owned_units(&self.entities, p.id)
+                        .next()
+                        .is_some()
+                } else {
+                    true
+                }
             })
+            .map(|p| p.id)
             .collect()
     }
 
