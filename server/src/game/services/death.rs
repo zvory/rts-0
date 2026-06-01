@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use crate::game::entity::{EntityKind, EntityStore, Order};
 use crate::game::fog::Fog;
 use crate::protocol::Event;
+use crate::rules::projection;
 
 /// Remove entities whose hp has hit zero, emitting a fog-respecting `Death` event: a player
 /// gets the poof only if they owned the entity or its death position is currently visible to
@@ -28,7 +29,7 @@ pub(crate) fn death_system(
         // so a death poof never reveals an entity hidden in a player's fog.
         let pids: Vec<u32> = events.keys().copied().collect();
         for pid in pids {
-            if pid != owner && !fog.is_visible_world(pid, x, y) {
+            if !projection::event_visible_to(pid, x, y, owner, fog) {
                 continue;
             }
             events.entry(pid).or_default().push(Event::Death {

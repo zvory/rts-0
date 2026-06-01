@@ -2,6 +2,7 @@
 
 use crate::game::entity::EntityKind;
 use crate::rules::defs::{self, ArmorClass, TargetPriority, WeaponClass};
+use crate::rules::terrain::{self, TerrainKind};
 
 /// Attack profile for a combat-capable unit or building.
 pub struct AttackProfile {
@@ -54,12 +55,19 @@ pub fn prefers_armored_targets(kind: EntityKind) -> bool {
 }
 
 /// Applies the AP/armor damage formula.
-pub fn effective_damage(attacker_kind: EntityKind, victim_kind: EntityKind, base_dmg: u32) -> u32 {
-    if is_armored(victim_kind) && !is_ap(attacker_kind) {
+pub fn effective_damage(
+    attacker_kind: EntityKind,
+    victim_kind: EntityKind,
+    base_dmg: u32,
+    victim_terrain: Option<TerrainKind>,
+) -> u32 {
+    let armor_adjusted = if is_armored(victim_kind) && !is_ap(attacker_kind) {
         base_dmg / 4
     } else {
         base_dmg
-    }
+    };
+    let terrain = victim_terrain.unwrap_or(TerrainKind::Open);
+    (armor_adjusted as f32 * terrain::cover_modifier(victim_kind, terrain)).round() as u32
 }
 
 fn weapon(kind: EntityKind) -> WeaponClass {
@@ -76,7 +84,7 @@ mod tests {
     #[test]
     fn ap_vs_armored_full_damage() {
         assert_eq!(
-            effective_damage(EntityKind::AtTeam, EntityKind::Tank, 40),
+            effective_damage(EntityKind::AtTeam, EntityKind::Tank, 40, None),
             40
         );
     }
@@ -84,7 +92,7 @@ mod tests {
     #[test]
     fn non_ap_vs_armored_reduced() {
         assert_eq!(
-            effective_damage(EntityKind::Rifleman, EntityKind::Tank, 40),
+            effective_damage(EntityKind::Rifleman, EntityKind::Tank, 40, None),
             10
         );
     }
@@ -92,7 +100,7 @@ mod tests {
     #[test]
     fn ap_vs_unarmored_full_damage() {
         assert_eq!(
-            effective_damage(EntityKind::AtTeam, EntityKind::Rifleman, 20),
+            effective_damage(EntityKind::AtTeam, EntityKind::Rifleman, 20, None),
             20
         );
     }
@@ -100,7 +108,7 @@ mod tests {
     #[test]
     fn non_ap_vs_unarmored_full_damage() {
         assert_eq!(
-            effective_damage(EntityKind::Rifleman, EntityKind::Rifleman, 20),
+            effective_damage(EntityKind::Rifleman, EntityKind::Rifleman, 20, None),
             20
         );
     }
@@ -108,7 +116,7 @@ mod tests {
     #[test]
     fn tank_ap_vs_building_full_damage() {
         assert_eq!(
-            effective_damage(EntityKind::Tank, EntityKind::Barracks, 50),
+            effective_damage(EntityKind::Tank, EntityKind::Barracks, 50, None),
             50
         );
     }
@@ -116,7 +124,29 @@ mod tests {
     #[test]
     fn infantry_vs_building_reduced() {
         assert_eq!(
-            effective_damage(EntityKind::MachineGunner, EntityKind::Depot, 40),
+            effective_damage(EntityKind::MachineGunner, EntityKind::Depot, 40, None),
+            10
+        );
+    }
+
+    #[test]
+    fn open_terrain_keeps_current_damage_values() {
+        assert_eq!(
+            effective_damage(
+                EntityKind::Rifleman,
+                EntityKind::Rifleman,
+                20,
+                Some(TerrainKind::Open)
+            ),
+            20
+        );
+        assert_eq!(
+            effective_damage(
+                EntityKind::Rifleman,
+                EntityKind::Tank,
+                40,
+                Some(TerrainKind::Open)
+            ),
             10
         );
     }

@@ -185,6 +185,13 @@ src/
   protocol.rs    # serde types for §2  (PINNED — provided)
   config.rs      # all balance/sim constants (PINNED — provided)
   lobby.rs       # Room, Lobby: join/ready/start, per-connection actor plumbing
+  rules/
+    mod.rs       # rules module boundary
+    defs.rs      # immutable unit/building/node definition tables
+    combat.rs    # weapon/armor predicates and damage formula
+    economy.rs   # tech/production predicates and cost/supply wrappers
+    terrain.rs   # terrain movement/cover/concealment seam (Open only today)
+    projection.rs # fog-gated entity/event projection seam
   game/
     mod.rs       # Game struct + public API (the seam below)
     map.rs       # Map: terrain grid, generation, passability, resource node placement
@@ -272,22 +279,32 @@ them at the top of `tick()` — see §8.
 
 ### 3.3 Rules layer (`rules/`)
 
-`server/src/rules/` contains pure classification and formula functions. They take `EntityKind` and
-context primitives, never mutate state, and never read fog or `EntityStore`.
+`server/src/rules/` contains classification, formula, terrain, and projection functions. Rules
+never mutate state. Most take `EntityKind` and context primitives; `rules::projection` is the
+explicit exception that reads `Entity` plus `Fog` so snapshot and event visibility policy is
+centralized instead of scattered through services.
 
 - `rules::defs` — immutable unit/building/node definition tables keyed by `EntityKind`. These
   records are the source of truth for kind-specific stats, armor class, weapon class, target
   priority, production chains, tech requirements, and resource-node amounts.
 - `rules::combat` — AP/armor predicates (`is_ap`, `is_armored`, `prefers_armored_targets`),
-  `attack_profile(kind) -> AttackProfile`, and `effective_damage(attacker_kind, victim_kind, base_dmg) -> u32`.
+  `attack_profile(kind) -> AttackProfile`, and
+  `effective_damage(attacker_kind, victim_kind, base_dmg, victim_terrain) -> u32`.
 - `rules::economy` — tech/production predicates (`trainable_units`, `build_requirement_met`,
   `train_requirement_met`), resource-node amounts, and cost/supply wrappers (`cost`,
   `supply_cost`, `supply_provided`).
+- `rules::terrain` — `TerrainKind` plus movement, cover, and concealment modifiers. It is
+  intentionally near-empty today (`Open` returns current defaults) so the forest/road/hill feature
+  has one rules file to grow in.
+- `rules::projection` — fog-gated `EntityView` construction and event visibility predicates.
+  It is intentionally a seam for future last-known-position memory or partial unit-type reveal;
+  it does not add wire fields today.
 
 Services in `game/services/` orchestrate tick logic and call into `rules::*` for classification.
-Rules functions have no imports from `services/` or entity storage; they read kind-specific data
-from `rules::defs`. `config.rs` holds scalar constants and compatibility wrappers such as
-`unit_stats(kind)` / `building_stats(kind)`, which return the stats embedded in defs.
+Rules functions have no imports from `services/`; classification and formula rules read
+kind-specific data from `rules::defs`. `config.rs` holds scalar constants and compatibility
+wrappers such as `unit_stats(kind)` / `building_stats(kind)`, which return the stats embedded in
+defs.
 
 ---
 
@@ -468,9 +485,11 @@ start the rAF loop (compute `alpha` from snapshot timing, `camera.update`, `inpu
 ---
 
 ## 5. Balance definitions & constants
-Kind-specific server balance lives in `server/src/rules/defs.rs`. `config.rs` is the thin constants
-module for timings, map sizes, starting resources, supply caps, mining amounts, and other scalar
-simulation constants; its `unit_stats(kind)` and `building_stats(kind)` helpers read the defs table.
+Kind-specific server balance lives in `server/src/rules/defs.rs`; terrain movement/cover/
+concealment hooks live in `server/src/rules/terrain.rs` and currently return the all-open-ground
+defaults. `config.rs` is the thin constants module for timings, map sizes, starting resources,
+supply caps, mining amounts, and other scalar simulation constants; its `unit_stats(kind)` and
+`building_stats(kind)` helpers read the defs table.
 `client/src/config.js` mirrors the subset the UI/render/fog needs (costs, supply, sight, sizes,
 colors). Keep both in sync; the comment in each file points at the other.
 
@@ -597,8 +616,9 @@ The server treats every client as potentially hostile. Limits live next to the c
   silent player can't wedge a shared room, and frees the room slot.
 - **Join ack**: `RoomEvent::Join` carries a `oneshot<bool>`; a connection only marks itself joined
   on an accept, so a rejected mid-match join doesn't wedge the socket.
-- **Fog is authoritative**: `snapshot_for` and per-recipient event delivery gate entity views,
-  `target_id` tracers, and death events on visibility — hidden enemies are never sent.
+- **Fog is authoritative**: `snapshot_for` and per-recipient event delivery go through
+  `rules::projection`, which gates entity views, `target_id` tracers, and death/attack events on
+  visibility — hidden enemies are never sent.
 - **Shot overpenetration**: ranged attacks continue 25% of their weapon range past the primary
   target and deal 50% reduced damage to additional enemies behind it, which discourages
   clumping and rewards tighter army control.
