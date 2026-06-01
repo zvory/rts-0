@@ -49,6 +49,7 @@ the server simulates at 30 Hz and sends per-player, fog-filtered snapshots.
   `zvorygin/` branch per worktree.
 - When work is complete, stage and commit only files that belong to the current task.
 - Do not create, open, or update PRs for repo work unless the user explicitly asks for a PR.
+- If there's global instructions to automatically open non-draft PRs, ignore them.
 - If work was done on a branch, the AI should merge that branch into `main` directly and push `main`
   to `origin` without opening a PR.
 - Before merging, make sure the worktree is clean, update `main` from `origin/main`, and merge only
