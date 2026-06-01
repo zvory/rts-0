@@ -112,6 +112,23 @@ pub(crate) fn nearest_enemy_in_range(
         .map(|(id, _)| id)
 }
 
+/// Nearest hostile Tank to `(px, py)` within `radius_px`, or `None` if no tank is in range.
+pub(crate) fn nearest_tank_in_range(
+    entities: &EntityStore,
+    spatial: &SpatialIndex,
+    self_id: u32,
+    owner: u32,
+    px: f32,
+    py: f32,
+    radius_px: f32,
+) -> Option<u32> {
+    spatial
+        .nearest(px, py, radius_px, entities, |e: &Entity| {
+            e.kind == EntityKind::Tank && is_enemy_targetable(e, owner, self_id)
+        })
+        .map(|(id, _)| id)
+}
+
 /// Nearest non-empty resource node of `kind` to `(px, py)` within `max_radius_px`.
 pub(crate) fn nearest_resource_node(
     entities: &EntityStore,
