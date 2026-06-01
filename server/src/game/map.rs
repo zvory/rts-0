@@ -183,11 +183,23 @@ fn symmetric_starts(size: u32, player_count: usize) -> Vec<(u32, u32)> {
 
 /// Tiles that must never be made impassable: a square around each start tile big enough to
 /// hold the Industrial Center footprint, the worker spawn ring, and the mineral cluster + geyser.
+/// All four corners are always protected because resource patches always spawn there.
 fn protected_tiles(size: u32, starts: &[(u32, u32)]) -> Vec<bool> {
     let mut prot = vec![false; (size * size) as usize];
-    // Radius generously covers Industrial Center (3x3) + a nearby resource cluster a few tiles out.
     let r: i32 = 7;
-    for &(sx, sy) in starts {
+
+    // Collect all tiles to protect: player starts + all four corners.
+    let inset = 8u32.min(size / 4);
+    let lo = inset;
+    let hi = size - 1 - inset;
+    let all_corners = [(lo, lo), (hi, lo), (lo, hi), (hi, hi)];
+    let to_protect: Vec<(u32, u32)> = starts
+        .iter()
+        .copied()
+        .chain(all_corners)
+        .collect();
+
+    for (sx, sy) in to_protect {
         for dy in -r..=r {
             for dx in -r..=r {
                 let tx = sx as i32 + dx;
