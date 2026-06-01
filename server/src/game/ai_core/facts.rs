@@ -237,7 +237,7 @@ fn nearest_public_enemy_base(observation: &AiObservation) -> Option<EnemyBaseFac
     for player in observation
         .players
         .iter()
-        .filter(|p| p.id != observation.player_id)
+        .filter(|p| p.id != observation.player_id && p.is_alive)
     {
         let x = player.start_tile.0 as f32 * ts + ts * 0.5;
         let y = player.start_tile.1 as f32 * ts + ts * 0.5;
@@ -311,6 +311,7 @@ mod tests {
                 id: 1,
                 start_tile: (10, 20),
                 is_ai: false,
+                is_alive: true,
             }],
             owned: Vec::new(),
             resources: Vec::new(),
@@ -513,22 +514,55 @@ mod tests {
                 id: 1,
                 start_tile: (10, 10),
                 is_ai: false,
+                is_alive: true,
             },
             AiPlayerSummary {
                 id: 3,
                 start_tile: (12, 10),
                 is_ai: false,
+                is_alive: true,
             },
             AiPlayerSummary {
                 id: 2,
                 start_tile: (8, 10),
                 is_ai: false,
+                is_alive: true,
             },
         ];
 
         let facts = AiFacts::from_observation(&observation);
 
         assert_eq!(facts.nearest_public_enemy_base.unwrap().player_id, 2);
+    }
+
+    #[test]
+    fn nearest_enemy_start_tile_ignores_dead_players() {
+        let mut observation = base_observation();
+        observation.own_start_tile = (10, 10);
+        observation.players = vec![
+            AiPlayerSummary {
+                id: 1,
+                start_tile: (10, 10),
+                is_ai: false,
+                is_alive: true,
+            },
+            AiPlayerSummary {
+                id: 2,
+                start_tile: (11, 10),
+                is_ai: false,
+                is_alive: false,
+            },
+            AiPlayerSummary {
+                id: 3,
+                start_tile: (14, 10),
+                is_ai: false,
+                is_alive: true,
+            },
+        ];
+
+        let facts = AiFacts::from_observation(&observation);
+
+        assert_eq!(facts.nearest_public_enemy_base.unwrap().player_id, 3);
     }
 
     #[test]
