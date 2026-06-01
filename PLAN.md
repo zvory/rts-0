@@ -275,9 +275,10 @@ Depends on:
 ### 6.3 Advanced AI Tech Progression
 
 - [ ] Follow [AI-PLAN.md](AI-PLAN.md) for the detailed dependency chain and rollout order.
+- [ ] Use the linked `docs/ai/phase-*.md` files as the serial implementation handoff plan.
 - [ ] Keep one shared AI knowledge and action layer used by both live AI and self-play.
 - [ ] Add at least three simple strategy profiles:
-  `rifle_flood_fast`, `rifle_flood_full_saturation`, and one tech-tree strategy.
+  `rifle_flood_fast`, `rifle_flood_full_saturation`, and `tech_to_tanks`.
 - [ ] Keep strategy differences mostly in priorities and thresholds, not duplicated mechanics.
 - [ ] Make AI reason from shared definitions, tech availability, economy, army composition, and
   command results rather than duplicated constants.
