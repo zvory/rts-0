@@ -213,7 +213,7 @@ pub fn building_stats(kind: EntityKind) -> Option<BuildingStats> {
         EntityKind::Depot => BuildingStats {
             hp: 220,
             sight_tiles: 4,
-            cost_steel: 50,
+            cost_steel: 100,
             cost_oil: 0,
             foot_w: 2,
             foot_h: 2,
