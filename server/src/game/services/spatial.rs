@@ -1,11 +1,11 @@
-//! Spatial query layer: uniform grid index for fast nearest-neighbor and range queries.
+//! Spatial query layer: uniform grid index for fast range queries.
 //!
 //! Rebuilt each tick from the live [`EntityStore`] so it always reflects current positions.
 //! Used by combat target acquisition, resource search, building overlap checks, unit
 //! collision resolution, and snapshot interest filtering.
 
 use crate::config;
-use crate::game::entity::{Entity, EntityStore};
+use crate::game::entity::EntityStore;
 
 /// A uniform grid index with 1-tile cells.
 ///
@@ -68,34 +68,6 @@ impl SpatialIndex {
         let max_tx = ((cx + radius_px) / ts).floor() as i32;
         let max_ty = ((cy + radius_px) / ts).floor() as i32;
         self.ids_in_rect(min_tx, min_ty, max_tx, max_ty)
-    }
-
-    /// Find the nearest entity to `(cx, cy)` within `max_radius_px` that satisfies `pred`.
-    /// Returns `(id, squared_distance)`.
-    pub fn nearest(
-        &self,
-        cx: f32,
-        cy: f32,
-        max_radius_px: f32,
-        entities: &EntityStore,
-        pred: impl Fn(&Entity) -> bool,
-    ) -> Option<(u32, f32)> {
-        let mut best: Option<(u32, f32)> = None;
-        for id in self.ids_in_circle_bbox(cx, cy, max_radius_px) {
-            let e = match entities.get(id) {
-                Some(e) => e,
-                None => continue,
-            };
-            if !pred(e) {
-                continue;
-            }
-            let d2 = (e.pos_x - cx) * (e.pos_x - cx) + (e.pos_y - cy) * (e.pos_y - cy);
-            let r2 = max_radius_px * max_radius_px;
-            if d2 <= r2 && best.map(|(_, bd2)| d2 < bd2).unwrap_or(true) {
-                best = Some((id, d2));
-            }
-        }
-        best
     }
 
     /// Iterate all entity ids in every cell (row-major order). Equivalent to a full scan but
