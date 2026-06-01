@@ -1,26 +1,14 @@
 //! PathingService: the single boundary for all pathfinding requests.
 //!
-//! Encapsulates unit mobility class, terrain mask, dynamic blockers, radius/footprint,
+//! Encapsulates terrain mask, dynamic blockers, radius/footprint,
 //! per-request path budget, and an LRU cache of verified tile paths so multiple units or
 //! ticks can reuse A* results.
 
 use std::collections::HashMap;
 
-use crate::game::entity::EntityKind;
-use crate::game::map::{Map, MobilityClass};
+use crate::game::map::Map;
 use crate::game::pathfinding::{self, Passability};
 use crate::game::services::occupancy::Occupancy;
-
-impl MobilityClass {
-    /// Derive the mobility class from an entity kind.
-    pub fn from_kind(kind: EntityKind) -> Self {
-        match kind {
-            EntityKind::Tank => MobilityClass::Vehicle,
-            _ if kind.is_unit() => MobilityClass::Infantry,
-            _ => MobilityClass::Infantry,
-        }
-    }
-}
 
 /// Parameters for a single path query.
 #[derive(Clone)]
@@ -29,28 +17,25 @@ pub struct PathRequest {
     pub start: (i32, i32),
     /// Goal tile (inclusive).
     pub goal: (i32, i32),
-    /// Unit mobility class.
-    pub class: MobilityClass,
     /// Unit radius in tiles for clearance. `0` means point-sized (current behavior).
     pub radius_tiles: u32,
     /// Max A* nodes to expand. `None` uses the service default.
     pub budget: Option<usize>,
 }
 
-/// Passability oracle that layers class-specific rules over terrain + occupancy.
-struct ClassPassability<'a> {
+/// Passability oracle that layers terrain + occupancy.
+struct TerrainPassability<'a> {
     map: &'a Map,
     occupancy: &'a Occupancy<'a>,
-    class: MobilityClass,
     radius_tiles: u32,
 }
 
-impl ClassPassability<'_> {
+impl TerrainPassability<'_> {
     fn tile_passable(&self, tx: i32, ty: i32) -> bool {
         if !self.map.in_bounds(tx, ty) {
             return false;
         }
-        if !self.map.is_passable_for(self.class, tx, ty) {
+        if !self.map.is_passable(tx, ty) {
             return false;
         }
         if !self.occupancy.passable(tx, ty) {
@@ -60,7 +45,7 @@ impl ClassPassability<'_> {
     }
 }
 
-impl Passability for ClassPassability<'_> {
+impl Passability for TerrainPassability<'_> {
     fn passable(&self, tx: i32, ty: i32) -> bool {
         let r = self.radius_tiles as i32;
         for dy in -r..=r {
@@ -74,7 +59,7 @@ impl Passability for ClassPassability<'_> {
     }
 }
 
-type CacheKey = ((i32, i32), (i32, i32), MobilityClass, u32);
+type CacheKey = ((i32, i32), (i32, i32), u32);
 
 struct CacheEntry {
     tile_path: Vec<(i32, i32)>,
@@ -116,10 +101,9 @@ impl PathingService {
         occupancy: &Occupancy,
         req: PathRequest,
     ) -> Vec<(f32, f32)> {
-        let pass = ClassPassability {
+        let pass = TerrainPassability {
             map,
             occupancy,
-            class: req.class,
             radius_tiles: req.radius_tiles,
         };
 
@@ -138,7 +122,7 @@ impl PathingService {
         );
 
         let waypoints = pathfinding::to_world_waypoints(&tile_path);
-        self.cache_insert(req.start, req.goal, req.class, req.radius_tiles, tile_path);
+        self.cache_insert(req.start, req.goal, req.radius_tiles, tile_path);
         waypoints
     }
 
@@ -147,7 +131,7 @@ impl PathingService {
         req: &PathRequest,
         pass: &P,
     ) -> Option<Vec<(i32, i32)>> {
-        let key: CacheKey = (req.start, req.goal, req.class, req.radius_tiles);
+        let key: CacheKey = (req.start, req.goal, req.radius_tiles);
         let entry = self.cache.get_mut(&key)?;
         for &(tx, ty) in &entry.tile_path {
             if !pass.passable(tx, ty) {
@@ -162,7 +146,6 @@ impl PathingService {
         &mut self,
         start: (i32, i32),
         goal: (i32, i32),
-        class: MobilityClass,
         radius: u32,
         tile_path: Vec<(i32, i32)>,
     ) {
@@ -177,7 +160,7 @@ impl PathingService {
             }
         }
         self.cache.insert(
-            (start, goal, class, radius),
+            (start, goal, radius),
             CacheEntry {
                 tile_path,
                 last_used: self.tick,
@@ -196,10 +179,9 @@ impl PathingService {
         &self,
         start: (i32, i32),
         goal: (i32, i32),
-        class: MobilityClass,
         radius: u32,
     ) -> bool {
-        self.cache.contains_key(&(start, goal, class, radius))
+        self.cache.contains_key(&(start, goal, radius))
     }
 }
 
@@ -230,7 +212,6 @@ mod tests {
             let req = PathRequest {
                 start: *start,
                 goal: *goal,
-                class: MobilityClass::Infantry,
                 radius_tiles: 0,
                 budget: None,
             };
@@ -246,7 +227,6 @@ mod tests {
         let req4 = PathRequest {
             start: (1, 1),
             goal: (5, 5),
-            class: MobilityClass::Infantry,
             radius_tiles: 0,
             budget: None,
         };
@@ -257,15 +237,15 @@ mod tests {
         assert_eq!(b.cache_len(), 3);
 
         // Both instances should have evicted the same key: the one with the
-        // smallest (start, goal, class, radius) tuple.
-        let evicted = ((1, 1), (2, 2), MobilityClass::Infantry, 0);
-        assert!(!a.cache_contains(evicted.0, evicted.1, evicted.2, evicted.3));
-        assert!(!b.cache_contains(evicted.0, evicted.1, evicted.2, evicted.3));
+        // smallest (start, goal, radius) tuple.
+        let evicted = ((1, 1), (2, 2), 0u32);
+        assert!(!a.cache_contains(evicted.0, evicted.1, evicted.2));
+        assert!(!b.cache_contains(evicted.0, evicted.1, evicted.2));
 
         // And both should still contain the other three.
         for (start, goal) in &[((1, 1), (3, 3)), ((2, 2), (4, 4)), ((1, 1), (5, 5))] {
-            assert!(a.cache_contains(*start, *goal, MobilityClass::Infantry, 0));
-            assert!(b.cache_contains(*start, *goal, MobilityClass::Infantry, 0));
+            assert!(a.cache_contains(*start, *goal, 0));
+            assert!(b.cache_contains(*start, *goal, 0));
         }
     }
 }

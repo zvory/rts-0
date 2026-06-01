@@ -15,9 +15,9 @@
 
 use crate::config;
 use crate::game::entity::{EntityKind, EntityStore, MovePhase, Order, WeaponSetup};
-use crate::game::map::{Map, MobilityClass};
+use crate::game::map::Map;
 use crate::game::pathfinding::Passability;
-use crate::game::services::occupancy::Occupancy;
+use crate::game::services::occupancy::{footprint_tiles, Occupancy};
 use crate::game::services::pathing::{PathRequest, PathingService};
 
 /// Maximum number of fresh A* path requests serviced in a single tick. Beyond this,
@@ -159,19 +159,26 @@ impl<'a> MoveCoordinator<'a> {
         kind: EntityKind,
         tile_x: u32,
         tile_y: u32,
-    ) {
-        let (cx, cy) = self.map.tile_center(tile_x, tile_y);
+    ) -> bool {
+        let goal = build_staging_goal(self.map, self.occ, entities, id, kind, tile_x, tile_y)
+            .unwrap_or_else(|| self.map.tile_center(tile_x, tile_y));
         entities.release_miner(id);
         if let Some(e) = entities.get_mut(id) {
             e.set_order(Order::build(kind, tile_x, tile_y));
             e.set_target_id(None);
             e.set_path(Vec::new());
-            e.set_path_goal(Some((cx, cy)));
+            e.set_path_goal(Some(goal));
             e.reset_gather_state();
             let (px, py) = (e.pos_x, e.pos_y);
             e.reset_stuck(px, py);
         }
-        self.request_path(entities, id, (cx, cy));
+        if !self.request_path(entities, id, goal) {
+            if let Some(e) = entities.get_mut(id) {
+                e.clear_orders();
+            }
+            return false;
+        }
+        true
     }
 
     // -------------------------------------------------------------------
@@ -292,11 +299,8 @@ impl<'a> MoveCoordinator<'a> {
                         continue;
                     }
 
-                    // Must be passable for infantry (spawning units are currently always infantry).
-                    if !self
-                        .map
-                        .is_passable_for(MobilityClass::Infantry, tx as i32, ty as i32)
-                    {
+                    // Must be passable terrain.
+                    if !self.map.is_passable(tx as i32, ty as i32) {
                         continue;
                     }
 
@@ -342,7 +346,6 @@ impl<'a> MoveCoordinator<'a> {
         let req = PathRequest {
             start: (sx as i32, sy as i32),
             goal: (gx as i32, gy as i32),
-            class: MobilityClass::from_kind(kind),
             radius_tiles,
             budget: None,
         };
@@ -458,7 +461,7 @@ fn find_unique_tile_near(
 }
 
 fn is_free_goal(map: &Map, occ: &Occupancy, tile: (u32, u32), taken: &[(u32, u32)]) -> bool {
-    if !map.is_passable_for(MobilityClass::Infantry, tile.0 as i32, tile.1 as i32) {
+    if !map.is_passable(tile.0 as i32, tile.1 as i32) {
         return false;
     }
     if !occ.passable(tile.0 as i32, tile.1 as i32) {
@@ -468,6 +471,56 @@ fn is_free_goal(map: &Map, occ: &Occupancy, tile: (u32, u32), taken: &[(u32, u32
         return false;
     }
     true
+}
+
+/// Pick a walk target for a build order.
+///
+/// If the worker is already standing inside the requested footprint, move it to a nearby
+/// tile outside that footprint first so the build can start from the perimeter. Returns
+/// `None` when the worker is not inside the footprint or when no outside tile is available.
+pub(crate) fn build_staging_goal(
+    map: &Map,
+    occ: &Occupancy,
+    entities: &EntityStore,
+    worker: u32,
+    kind: EntityKind,
+    tile_x: u32,
+    tile_y: u32,
+) -> Option<(f32, f32)> {
+    let worker = entities.get(worker)?;
+    let w_tile = map.tile_of(worker.pos_x, worker.pos_y);
+    let footprint = footprint_tiles(kind, tile_x, tile_y);
+    if !footprint.contains(&w_tile) {
+        return None;
+    }
+
+    // Search outward for the closest passable tile outside the requested footprint.
+    for r in 1i32..=6 {
+        for dy in -r..=r {
+            for dx in -r..=r {
+                if dx.abs().max(dy.abs()) != r {
+                    continue;
+                }
+                let tx = w_tile.0 as i32 + dx;
+                let ty = w_tile.1 as i32 + dy;
+                if !map.in_bounds(tx, ty) {
+                    continue;
+                }
+                let tile = (tx as u32, ty as u32);
+                if footprint.contains(&tile) {
+                    continue;
+                }
+                if !map.is_passable(tx, ty) {
+                    continue;
+                }
+                if !occ.passable(tx, ty) {
+                    continue;
+                }
+                return Some(map.tile_center(tile.0, tile.1));
+            }
+        }
+    }
+    None
 }
 
 fn spawn_point_has_clearance(map: &Map, occ: &Occupancy, cx: f32, cy: f32, radius: f32) -> bool {
@@ -569,8 +622,8 @@ mod tests {
             "spawn tile ({stx},{sty}) is inside the 3x2 footprint at ({btx},{bty})"
         );
 
-        // Spawn tile must be passable for infantry.
-        assert!(map.is_passable_for(MobilityClass::Infantry, stx as i32, sty as i32));
+        // Spawn tile must be passable terrain.
+        assert!(map.is_passable(stx as i32, sty as i32));
     }
 
     #[test]
@@ -720,6 +773,50 @@ mod tests {
         let e = entities.get(id).unwrap();
         assert_eq!(e.move_phase(), Some(MovePhase::PathFailed));
         assert!(e.path_is_empty());
+    }
+
+    #[test]
+    fn build_staging_goal_prefers_outside_tile_for_worker_inside_footprint() {
+        let map = Map::generate(1, 0x1234_5678);
+        let mut entities = EntityStore::new();
+        let (wx, wy) = map.tile_center(10, 10);
+        let worker = entities.spawn_unit(1, EntityKind::Worker, wx, wy).unwrap();
+        let occ = Occupancy::build(&map, &entities);
+
+        let goal = build_staging_goal(&map, &occ, &entities, worker, EntityKind::Depot, 9, 9)
+            .expect("worker should be able to stage outside the footprint");
+        let (tx, ty) = map.tile_of(goal.0, goal.1);
+        assert!(
+            !(9..=10).contains(&tx) || !(9..=10).contains(&ty),
+            "staging goal must be outside the 2x2 depot footprint, got ({tx},{ty})"
+        );
+    }
+
+    #[test]
+    fn build_order_fails_when_worker_cannot_escape_placement_area() {
+        let map = Map::generate(1, 0x1234_5678);
+        let mut entities = EntityStore::new();
+        let (wx, wy) = map.tile_center(10, 10);
+        let worker = entities.spawn_unit(1, EntityKind::Worker, wx, wy).unwrap();
+        // Box the worker in with depots so it cannot path out of the target area.
+        for &(tx, ty) in &[(8, 10), (12, 10), (10, 8), (10, 12)] {
+            let (px, py) = map.tile_center(tx, ty);
+            entities
+                .spawn_building(1, EntityKind::Depot, px, py, true)
+                .unwrap();
+        }
+        let occ = Occupancy::build(&map, &entities);
+        let mut pathing = PathingService::new(8_192, 256);
+        pathing.advance_tick(1);
+        let mut coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, 1);
+
+        let ok = coordinator.order_build(&mut entities, worker, EntityKind::Depot, 9, 9);
+        assert!(!ok, "build order should fail when the worker cannot escape");
+        let e = entities.get(worker).unwrap();
+        assert!(
+            matches!(e.order(), Order::Idle),
+            "failed build should clear the worker order"
+        );
     }
 
     #[test]

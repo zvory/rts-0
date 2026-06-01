@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::config;
 use crate::game::entity::{BuildPhase, EntityKind, EntityStore};
-use crate::game::map::{Map, MobilityClass};
+use crate::game::map::Map;
 use crate::game::pathfinding::Passability;
 use crate::game::services::occupancy::{
     building_footprint, footprint_center, footprint_placeable, Occupancy,
@@ -199,7 +199,7 @@ fn eject_worker_if_inside(map: &Map, entities: &mut EntityStore, worker: u32, si
                 if footprint.contains(&(tx, ty)) {
                     continue;
                 }
-                if !map.is_passable_for(MobilityClass::Infantry, tx as i32, ty as i32) {
+                if !map.is_passable(tx as i32, ty as i32) {
                     continue;
                 }
                 if !occ.passable(tx as i32, ty as i32) {

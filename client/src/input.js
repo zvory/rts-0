@@ -547,7 +547,14 @@ export class Input {
 
   /** True if an entity's hit area intersects an axis-aligned world rect. */
   _entityIntersectsRect(e, minX, minY, maxX, maxY) {
-    return entityIntersectsRect(e, minX, minY, maxX, maxY, this.state.map ? this.state.map.tileSize : DEFAULT_TILE_SIZE);
+    return entityIntersectsRect(
+      e,
+      minX,
+      minY,
+      maxX,
+      maxY,
+      this.state.map ? this.state.map.tileSize : DEFAULT_TILE_SIZE,
+    );
   }
 
   // --- Build placement ----------------------------------------------------

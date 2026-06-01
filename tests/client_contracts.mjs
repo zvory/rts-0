@@ -144,7 +144,6 @@ function assertHasGetter(obj, name, msgPrefix = "") {
   state.endPlacement();
   assert(state.placement === null, "endPlacement clears placement");
 
-  // Placement validator allows the selected worker to overlap the footprint.
   const map = { width: 6, height: 6, tileSize: 32, terrain: new Array(36).fill(0) };
   const worker = { id: 7, owner: 1, kind: "worker", x: 80, y: 80 };
   const other = { id: 8, owner: 1, kind: "worker", x: 80, y: 80 };
