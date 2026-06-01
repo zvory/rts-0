@@ -727,6 +727,16 @@ impl Entity {
         self.movement.as_ref().and_then(|m| m.path_goal)
     }
 
+    /// The intended destination for a move/attack-move order, if any.
+    pub fn move_intent(&self) -> Option<(f32, f32)> {
+        match self.movement.as_ref().map(|m| &m.order) {
+            Some(Order::Move(order)) | Some(Order::AttackMove(order)) => {
+                Some((order.intent.x, order.intent.y))
+            }
+            _ => None,
+        }
+    }
+
     pub fn mark_attack_phase(&mut self, phase: AttackPhase) {
         if let Some(m) = self.movement.as_mut() {
             if let Order::Attack(order) = &mut m.order {
