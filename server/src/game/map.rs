@@ -69,9 +69,8 @@ impl Map {
         let size = config::map_size_for(player_count);
         let mut terrain = vec![terrain::GRASS; (size * size) as usize];
 
-        let mut starts = symmetric_starts(size, player_count);
         let mut rng = XorShift32::new(seed);
-        shuffle(&mut starts, &mut rng);
+        let starts = symmetric_starts(size, player_count, &mut rng);
         let expansion_sites = expansion_sites(size, player_count, &starts);
 
         // Tiles we must keep clear: each start area and its resource cluster footprint.
@@ -144,23 +143,22 @@ impl Map {
 /// Choose symmetric start tiles for `player_count` players.
 ///
 /// We inset the starts from the very edge so the Industrial Center footprint and its resource cluster fit.
-/// - 2 players: opposite corners (rotational 180°).
-/// - 3 players: three evenly-spaced positions (two corners + one mid-edge).
+/// - 2 players: any two distinct corners.
+/// - 3 players: any three distinct corners.
 /// - 4 players: the four corners.
-fn symmetric_starts(size: u32, player_count: usize) -> Vec<(u32, u32)> {
+fn symmetric_starts(size: u32, player_count: usize, rng: &mut XorShift32) -> Vec<(u32, u32)> {
     // Inset keeps the start area + resource cluster fully on-map.
     let inset = 8u32.min(size / 4);
     let lo = inset;
     let hi = size - 1 - inset;
-    let mid = size / 2;
-
-    match player_count {
-        0 => Vec::new(),
-        1 => vec![(lo, lo)],
-        2 => vec![(lo, lo), (hi, hi)],
-        3 => vec![(lo, lo), (hi, lo), (mid, hi)],
-        _ => vec![(lo, lo), (hi, lo), (lo, hi), (hi, hi)],
-    }
+    let nw = (lo, lo);
+    let ne = (hi, lo);
+    let sw = (lo, hi);
+    let se = (hi, hi);
+    let mut corners = vec![nw, ne, sw, se];
+    shuffle(&mut corners, rng);
+    corners.truncate(player_count.min(corners.len()));
+    corners
 }
 
 /// Tiles that must never be made impassable: a square around each start tile big enough to
@@ -202,11 +200,15 @@ fn expansion_sites(size: u32, player_count: usize, starts: &[(u32, u32)]) -> Vec
     let lo = inset;
     let hi = size - 1 - inset;
     let mid = size / 2;
+    let corners = [(lo, lo), (hi, lo), (lo, hi), (hi, hi)];
+    let edge_midpoints = [(mid, lo), (hi, mid), (mid, hi), (lo, mid)];
     let candidates = match player_count {
-        0 | 1 => vec![(hi, hi)],
-        2 => vec![(hi, lo), (lo, hi)],
-        3 => vec![(hi, hi), (lo, hi), (mid, lo)],
-        _ => vec![(mid, lo), (hi, mid), (mid, hi), (lo, mid)],
+        0 => Vec::new(),
+        1..=3 => corners
+            .into_iter()
+            .chain(edge_midpoints)
+            .collect::<Vec<_>>(),
+        _ => edge_midpoints.to_vec(),
     };
     candidates
         .into_iter()
@@ -289,6 +291,14 @@ fn shuffle<T>(items: &mut [T], rng: &mut XorShift32) {
 mod tests {
     use super::*;
 
+    fn corner_tiles(player_count: usize) -> Vec<(u32, u32)> {
+        let size = config::map_size_for(player_count);
+        let inset = 8u32.min(size / 4);
+        let lo = inset;
+        let hi = size - 1 - inset;
+        vec![(lo, lo), (lo, hi), (hi, lo), (hi, hi)]
+    }
+
     #[test]
     fn generate_shuffles_starts_by_seed() {
         let a = Map::generate(4, 1);
@@ -302,5 +312,68 @@ mod tests {
         a_sorted.sort_unstable();
         b_sorted.sort_unstable();
         assert_eq!(a_sorted, b_sorted);
+    }
+
+    #[test]
+    fn starts_are_random_distinct_corners_by_seed() {
+        for player_count in 1..=4 {
+            let corners = corner_tiles(player_count);
+
+            for seed in 1..=64 {
+                let mut starts = Map::generate(player_count, seed).starts;
+                assert_eq!(starts.len(), player_count);
+                assert!(starts.iter().all(|start| corners.contains(start)));
+
+                starts.sort_unstable();
+                starts.dedup();
+                assert_eq!(starts.len(), player_count);
+            }
+        }
+    }
+
+    #[test]
+    fn two_player_starts_cover_every_ordered_corner_pair_by_seed() {
+        let corners = corner_tiles(2);
+        let mut observed = Vec::new();
+
+        for seed in 1..=1024 {
+            let starts = Map::generate(2, seed).starts;
+            if !observed.contains(&starts) {
+                observed.push(starts);
+            }
+        }
+        observed.sort_unstable();
+
+        let mut expected = Vec::new();
+        for a in &corners {
+            for b in &corners {
+                if a != b {
+                    expected.push(vec![*a, *b]);
+                }
+            }
+        }
+        expected.sort_unstable();
+
+        assert_eq!(observed, expected);
+    }
+
+    #[test]
+    fn two_player_expansions_are_the_unused_corners() {
+        let all_corners = corner_tiles(2);
+
+        for seed in 1..=64 {
+            let map = Map::generate(2, seed);
+            assert_eq!(map.starts.len(), 2);
+            assert_eq!(map.expansion_sites.len(), 2);
+
+            let mut all_sites = map.starts.clone();
+            all_sites.extend(map.expansion_sites.iter().copied());
+            all_sites.sort_unstable();
+            assert_eq!(all_sites, all_corners);
+
+            for start in &map.starts {
+                assert!(!map.expansion_sites.contains(start));
+            }
+        }
     }
 }
