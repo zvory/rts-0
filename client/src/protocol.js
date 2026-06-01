@@ -22,6 +22,7 @@ export const C = Object.freeze({
   SET_QUICKSTART: "setQuickstart",
   COMMAND: "command",
   PING: "ping",
+  SET_REPLAY_SPEED: "setReplaySpeed",
 });
 
 // --- Command discriminators (the `c` field) ---
@@ -112,6 +113,7 @@ export const msg = Object.freeze({
   setQuickstart: (enabled) => ({ t: C.SET_QUICKSTART, enabled: !!enabled }),
   command: (cmd) => ({ t: C.COMMAND, cmd }),
   ping: (ts) => ({ t: C.PING, ts }),
+  setReplaySpeed: (speed) => ({ t: C.SET_REPLAY_SPEED, speed }),
 });
 
 // --- Command builders (the `cmd` payload) ---

@@ -353,6 +353,14 @@ async fn handle_client_message(
             // Answer directly so latency probes work regardless of room state.
             let _ = msg_tx.try_send(ServerMessage::Pong { ts });
         }
+        ClientMessage::SetReplaySpeed { speed } => {
+            send_room_event(
+                player_id,
+                current_room,
+                RoomEvent::SetReplaySpeed { speed },
+            )
+            .await;
+        }
     }
 }
 

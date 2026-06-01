@@ -75,6 +75,8 @@ pub enum ClientMessage {
     Command { cmd: Command },
     /// Latency probe.
     Ping { ts: f64 },
+    /// Set replay playback speed multiplier (replay rooms only; ignored elsewhere).
+    SetReplaySpeed { speed: f32 },
 }
 
 /// A gameplay command. Validated when applied, not when received.
