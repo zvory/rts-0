@@ -41,7 +41,8 @@ export const FOG_UNEXPLORED_ALPHA = 0.86;
 
 // Player colors (server assigns from a matching palette; used as a fallback for blips).
 export const PLAYER_PALETTE = Object.freeze([
-  "#6f8fa8", "#b2775f", "#7f9462", "#c0a463", "#8d7aa8", "#b68a58",
+  "#4878c8", "#c84848", "#30a090", "#8040c8",
+  "#c83880", "#c87830", "#409840", "#c8b030",
 ]);
 
 // Per-kind UI / render info. `size` is the render radius (units) or half-extent hint.
