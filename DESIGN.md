@@ -201,6 +201,8 @@ src/
     systems.rs   # orchestrator: runs services in order each tick
     services/    # per-tick internal services: commands, move_coordinator, movement (incl. unit collision), combat, economy, production, construction, death, occupancy, supply, pathing
     ai.rs        # optional computer opponents: one AiController per AI player (see §8)
+    ai_core/     # shared AI observation/facts/action/profile core, introduced incrementally
+    ai_shared.rs # compatibility helpers while live AI and self-play migrate to ai_core
     replay.rs    # tick-stamped command log replay harness for determinism checks
     selfplay.rs  # test-only API-driven scripted self-play harness (see §9)
 ```
