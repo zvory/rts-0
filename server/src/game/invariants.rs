@@ -310,8 +310,18 @@ mod tests {
     fn steel_patch_grid_fits_within_distance_bounds() {
         // Game::new triggers spawn_player_base which debug_asserts every patch is in bounds.
         let players = [
-            PlayerInit { id: 1, name: "A".into(), color: "#fff".into(), is_ai: false },
-            PlayerInit { id: 2, name: "B".into(), color: "#000".into(), is_ai: true },
+            PlayerInit {
+                id: 1,
+                name: "A".into(),
+                color: "#fff".into(),
+                is_ai: false,
+            },
+            PlayerInit {
+                id: 2,
+                name: "B".into(),
+                color: "#000".into(),
+                is_ai: true,
+            },
         ];
         // This panics before the fix when STEEL_PATCHES_PER_BASE = 24.
         let _game = Game::new(&players);

@@ -161,7 +161,6 @@ impl Map {
     pub fn world_size_px(&self) -> f32 {
         self.size as f32 * config::TILE_SIZE as f32
     }
-
 }
 
 /// Choose symmetric start tiles for `player_count` players.
