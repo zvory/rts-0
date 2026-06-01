@@ -1,7 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::config;
-use crate::rules;
 use crate::game::entity::{BuildPhase, EntityKind, EntityStore, ProdItem};
 use crate::game::map::Map;
 use crate::game::services::move_coordinator::MoveCoordinator;
@@ -11,6 +10,7 @@ use crate::game::services::spatial::SpatialIndex;
 use crate::game::services::world_query;
 use crate::game::PlayerState;
 use crate::protocol::{Command, Event};
+use crate::rules;
 
 /// Max unique unit ids honored per multi-unit command. Caps the per-id work a single command can
 /// force, so a repeated/huge id list can't be used to stall the tick loop.

@@ -13,11 +13,23 @@ pub struct AttackProfile {
 /// Returns the attack profile for the given kind, or zeroes if non-combatant.
 pub fn attack_profile(kind: EntityKind) -> AttackProfile {
     if let Some(s) = config::unit_stats(kind) {
-        AttackProfile { range_tiles: s.range_tiles, dmg: s.dmg, cooldown: s.cooldown }
+        AttackProfile {
+            range_tiles: s.range_tiles,
+            dmg: s.dmg,
+            cooldown: s.cooldown,
+        }
     } else if let Some(s) = config::building_stats(kind) {
-        AttackProfile { range_tiles: s.range_tiles, dmg: s.dmg, cooldown: s.cooldown }
+        AttackProfile {
+            range_tiles: s.range_tiles,
+            dmg: s.dmg,
+            cooldown: s.cooldown,
+        }
     } else {
-        AttackProfile { range_tiles: 0, dmg: 0, cooldown: 0 }
+        AttackProfile {
+            range_tiles: 0,
+            dmg: 0,
+            cooldown: 0,
+        }
     }
 }
 
@@ -51,31 +63,49 @@ mod tests {
 
     #[test]
     fn ap_vs_armored_full_damage() {
-        assert_eq!(effective_damage(EntityKind::AtTeam, EntityKind::Tank, 40), 40);
+        assert_eq!(
+            effective_damage(EntityKind::AtTeam, EntityKind::Tank, 40),
+            40
+        );
     }
 
     #[test]
     fn non_ap_vs_armored_reduced() {
-        assert_eq!(effective_damage(EntityKind::Rifleman, EntityKind::Tank, 40), 10);
+        assert_eq!(
+            effective_damage(EntityKind::Rifleman, EntityKind::Tank, 40),
+            10
+        );
     }
 
     #[test]
     fn ap_vs_unarmored_full_damage() {
-        assert_eq!(effective_damage(EntityKind::AtTeam, EntityKind::Rifleman, 20), 20);
+        assert_eq!(
+            effective_damage(EntityKind::AtTeam, EntityKind::Rifleman, 20),
+            20
+        );
     }
 
     #[test]
     fn non_ap_vs_unarmored_full_damage() {
-        assert_eq!(effective_damage(EntityKind::Rifleman, EntityKind::Rifleman, 20), 20);
+        assert_eq!(
+            effective_damage(EntityKind::Rifleman, EntityKind::Rifleman, 20),
+            20
+        );
     }
 
     #[test]
     fn tank_ap_vs_building_full_damage() {
-        assert_eq!(effective_damage(EntityKind::Tank, EntityKind::Barracks, 50), 50);
+        assert_eq!(
+            effective_damage(EntityKind::Tank, EntityKind::Barracks, 50),
+            50
+        );
     }
 
     #[test]
     fn infantry_vs_building_reduced() {
-        assert_eq!(effective_damage(EntityKind::MachineGunner, EntityKind::Depot, 40), 10);
+        assert_eq!(
+            effective_damage(EntityKind::MachineGunner, EntityKind::Depot, 40),
+            10
+        );
     }
 }

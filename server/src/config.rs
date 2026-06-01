@@ -266,4 +266,3 @@ pub fn building_stats(kind: EntityKind) -> Option<BuildingStats> {
     };
     Some(s)
 }
-

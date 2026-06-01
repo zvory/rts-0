@@ -87,7 +87,10 @@ impl AiController {
         out: &mut Vec<(u32, Command)>,
     ) {
         // Stagger per player so multiple AIs spread their work across ticks.
-        if tick.wrapping_add(self.player) % DECISION_INTERVAL != 0 {
+        if !tick
+            .wrapping_add(self.player)
+            .is_multiple_of(DECISION_INTERVAL)
+        {
             return;
         }
         let me = match players.iter().find(|p| p.id == self.player) {

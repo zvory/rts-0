@@ -825,7 +825,10 @@ impl RoomTask {
     }
 
     fn on_set_replay_speed(&mut self, speed: f32) {
-        if !matches!(self.mode, RoomMode::DevSelfPlay(DevSelfPlayConfig::Replay { .. })) {
+        if !matches!(
+            self.mode,
+            RoomMode::DevSelfPlay(DevSelfPlayConfig::Replay { .. })
+        ) {
             return;
         }
         // Clamp to sensible range matching the UI buttons (0.5× – 8×).
@@ -874,44 +877,6 @@ impl RoomTask {
                 send_or_log(&self.room, id, &player.msg_tx, msg.clone());
             }
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn replay_rooms_default_to_1_5x_speed() {
-        let normal = RoomTask::new("r".to_string(), RoomMode::Normal);
-        let live = RoomTask::new(
-            "r".to_string(),
-            RoomMode::DevSelfPlay(DevSelfPlayConfig::Live),
-        );
-        let replay = RoomTask::new(
-            "r".to_string(),
-            RoomMode::DevSelfPlay(DevSelfPlayConfig::Replay {
-                artifact: "demo".to_string(),
-            }),
-        );
-        assert_eq!(normal.current_tick_interval(), Duration::from_millis(33));
-        assert_eq!(live.current_tick_interval(), Duration::from_millis(33));
-        // 33ms / 1.5 = 22ms
-        assert_eq!(replay.current_tick_interval(), Duration::from_millis(22));
-    }
-
-    #[test]
-    fn replay_speed_clamped_and_applied() {
-        let mut task = RoomTask::new(
-            "r".to_string(),
-            RoomMode::DevSelfPlay(DevSelfPlayConfig::Replay {
-                artifact: "demo".to_string(),
-            }),
-        );
-        task.on_set_replay_speed(2.0);
-        // 33ms / 2.0 = 16.5ms → rounds to 16ms via div_f32
-        assert!(task.current_tick_interval() < Duration::from_millis(17));
-        assert!(task.current_tick_interval() > Duration::from_millis(15));
     }
 }
 
@@ -1040,4 +1005,42 @@ fn load_replay_artifact(name: &str) -> Result<ReplayArtifact, String> {
     Err(format!(
         "failed to read replay artifact {name:?} from target/selfplay-artifacts or target/selfplay-failures"
     ))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn replay_rooms_default_to_1_5x_speed() {
+        let normal = RoomTask::new("r".to_string(), RoomMode::Normal);
+        let live = RoomTask::new(
+            "r".to_string(),
+            RoomMode::DevSelfPlay(DevSelfPlayConfig::Live),
+        );
+        let replay = RoomTask::new(
+            "r".to_string(),
+            RoomMode::DevSelfPlay(DevSelfPlayConfig::Replay {
+                artifact: "demo".to_string(),
+            }),
+        );
+        assert_eq!(normal.current_tick_interval(), Duration::from_millis(33));
+        assert_eq!(live.current_tick_interval(), Duration::from_millis(33));
+        // 33ms / 1.5 = 22ms
+        assert_eq!(replay.current_tick_interval(), Duration::from_millis(22));
+    }
+
+    #[test]
+    fn replay_speed_clamped_and_applied() {
+        let mut task = RoomTask::new(
+            "r".to_string(),
+            RoomMode::DevSelfPlay(DevSelfPlayConfig::Replay {
+                artifact: "demo".to_string(),
+            }),
+        );
+        task.on_set_replay_speed(2.0);
+        // 33ms / 2.0 = 16.5ms → rounds to 16ms via div_f32
+        assert!(task.current_tick_interval() < Duration::from_millis(17));
+        assert!(task.current_tick_interval() > Duration::from_millis(15));
+    }
 }

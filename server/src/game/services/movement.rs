@@ -87,7 +87,7 @@ pub(crate) fn movement_system(
             if path_len > 1 {
                 // Intermediate waypoint: pop on radius hit or geometric pass-by.
                 let radius_hit = dist <= config::ARRIVE_RADIUS_INTERMEDIATE_PX;
-                let passed = next_next.map_or(false, |(nnx, nny)| {
+                let passed = next_next.is_some_and(|(nnx, nny)| {
                     // Positive projection of (pos - waypoint) onto (next_next - waypoint) means the
                     // unit is on the far side of the waypoint relative to where it came from.
                     (x - wx) * (nnx - wx) + (y - wy) * (nny - wy) > 0.0
@@ -276,7 +276,7 @@ pub(crate) fn movement_system(
                     && static_blocked_ticks == 0
                     && matches!(e.order(), Order::Move(_) | Order::AttackMove(_))
                 {
-                    let far_from_goal = e.path_goal().map_or(false, |(gx, gy)| {
+                    let far_from_goal = e.path_goal().is_some_and(|(gx, gy)| {
                         let dx = x - gx;
                         let dy = y - gy;
                         (dx * dx + dy * dy).sqrt() > config::TOLERANT_ARRIVAL_RADIUS_PX
@@ -298,6 +298,7 @@ pub(crate) fn movement_system(
 /// Inject a perpendicular detour waypoint so a stuck mid-path unit can shimmy free.
 /// Direction is derived from repulsion away from neighbors (deterministic).
 /// `repulsion_dir` is the pre-computed normalized repulsion vector (or (0,0) if no neighbors).
+#[allow(clippy::too_many_arguments)]
 fn inject_sidestep(
     e: &mut crate::game::entity::Entity,
     entity_id: u32,
@@ -955,7 +956,7 @@ mod tests {
             let occ = Occupancy::build(&map, &entities);
             let spatial = SpatialIndex::build(&entities, map.size);
             movement_system(&map, &mut entities, &occ, &spatial, tick);
-            if entities.get(unit).map_or(true, |e| e.path_is_empty()) {
+            if entities.get(unit).is_none_or(|e| e.path_is_empty()) {
                 break;
             }
         }

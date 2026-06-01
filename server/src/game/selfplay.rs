@@ -17,12 +17,12 @@ use serde::{Deserialize, Serialize};
 use super::replay::{replay_commands, EventLogEntry, PlayerSnapshot, ReplayOutcome};
 use super::{Game, PlayerInit};
 use crate::config;
-use crate::rules;
 use crate::game::ai_shared;
 use crate::game::entity::EntityKind;
 use crate::protocol::{
     kinds, states, terrain, Command, EntityView, Event, MapInfo, Snapshot, StartPayload,
 };
+use crate::rules;
 
 /// Parse an `EntityView` wire kind into its internal enum.
 fn kind_of(e: &EntityView) -> Option<EntityKind> {
@@ -201,7 +201,10 @@ impl BuildTechAttackScript {
     }
 
     fn should_think(&self, tick: u32) -> bool {
-        tick == 0 || tick.wrapping_add(self.player_id) % THINK_INTERVAL == 0
+        tick == 0
+            || tick
+                .wrapping_add(self.player_id)
+                .is_multiple_of(THINK_INTERVAL)
     }
 }
 
@@ -613,7 +616,10 @@ impl EconomyScript {
     }
 
     fn should_think(&self, tick: u32) -> bool {
-        tick == 0 || tick.wrapping_add(self.player_id) % THINK_INTERVAL == 0
+        tick == 0
+            || tick
+                .wrapping_add(self.player_id)
+                .is_multiple_of(THINK_INTERVAL)
     }
 }
 
@@ -744,7 +750,10 @@ impl WorkerRushScript {
     }
 
     fn should_think(&self, tick: u32) -> bool {
-        tick == 0 || tick.wrapping_add(self.player_id) % THINK_INTERVAL == 0
+        tick == 0
+            || tick
+                .wrapping_add(self.player_id)
+                .is_multiple_of(THINK_INTERVAL)
     }
 }
 
@@ -923,7 +932,7 @@ impl SelfPlayRunner {
     }
 
     fn record_observations(&mut self, tick: u32, snapshots: &BTreeMap<u32, Snapshot>) -> bool {
-        if tick == 0 || tick % SAMPLE_EVERY_TICKS == 0 {
+        if tick == 0 || tick.is_multiple_of(SAMPLE_EVERY_TICKS) {
             for (player_id, snapshot) in snapshots {
                 self.samples
                     .push(SnapshotSample::from_snapshot(tick, *player_id, snapshot));
@@ -1203,14 +1212,11 @@ impl Milestones {
             Event::Attack { .. } => {
                 self.attack_events += 1;
                 *self.attack_events_by_player.entry(player_id).or_default() += 1;
-                match attacker_kind {
-                    Some(kinds::WORKER) => {
-                        *self
-                            .worker_attack_events_by_player
-                            .entry(player_id)
-                            .or_default() += 1;
-                    }
-                    _ => {}
+                if let Some(kinds::WORKER) = attacker_kind {
+                    *self
+                        .worker_attack_events_by_player
+                        .entry(player_id)
+                        .or_default() += 1;
                 }
                 true
             }
@@ -2041,7 +2047,10 @@ impl MineOnlyScript {
     }
 
     fn should_think(&self, tick: u32) -> bool {
-        tick == 0 || tick.wrapping_add(self.player_id) % THINK_INTERVAL == 0
+        tick == 0
+            || tick
+                .wrapping_add(self.player_id)
+                .is_multiple_of(THINK_INTERVAL)
     }
 }
 

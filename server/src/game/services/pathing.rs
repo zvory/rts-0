@@ -175,12 +175,7 @@ impl PathingService {
         self.cache.len()
     }
 
-    pub fn cache_contains(
-        &self,
-        start: (i32, i32),
-        goal: (i32, i32),
-        radius: u32,
-    ) -> bool {
+    pub fn cache_contains(&self, start: (i32, i32), goal: (i32, i32), radius: u32) -> bool {
         self.cache.contains_key(&(start, goal, radius))
     }
 }
