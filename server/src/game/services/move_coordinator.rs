@@ -249,6 +249,7 @@ impl<'a> MoveCoordinator<'a> {
         &self,
         _entities: &EntityStore,
         building_kind: EntityKind,
+        spawned_kind: EntityKind,
         bx: f32,
         by: f32,
     ) -> (f32, f32) {
@@ -257,6 +258,9 @@ impl<'a> MoveCoordinator<'a> {
             Some(s) => s,
             None => return (bx, by + ts),
         };
+        let spawn_radius = config::unit_stats(spawned_kind)
+            .map(|s| s.radius)
+            .unwrap_or(0.0);
         let (btx, bty) = self.map.tile_of(bx, by);
         let half_w = (bstats.foot_w as i32) / 2;
         let half_h = (bstats.foot_h as i32) / 2;
@@ -276,10 +280,14 @@ impl<'a> MoveCoordinator<'a> {
                     let (tx, ty) = (tx as u32, ty as u32);
 
                     // Must be outside the building footprint.
-                    let in_footprint = tx >= btx - half_w as u32
-                        && tx < btx + half_w as u32 + bstats.foot_w % 2
-                        && ty >= bty - half_h as u32
-                        && ty < bty + half_h as u32 + bstats.foot_h % 2;
+                    let min_x = btx as i32 - half_w;
+                    let max_x = btx as i32 + half_w + (bstats.foot_w % 2) as i32;
+                    let min_y = bty as i32 - half_h;
+                    let max_y = bty as i32 + half_h + (bstats.foot_h % 2) as i32;
+                    let in_footprint = (tx as i32) >= min_x
+                        && (tx as i32) < max_x
+                        && (ty as i32) >= min_y
+                        && (ty as i32) < max_y;
                     if in_footprint {
                         continue;
                     }
@@ -298,6 +306,9 @@ impl<'a> MoveCoordinator<'a> {
                     }
 
                     let (cx, cy) = self.map.tile_center(tx, ty);
+                    if !spawn_point_has_clearance(self.map, self.occ, cx, cy, spawn_radius) {
+                        continue;
+                    }
                     return (cx, cy);
                 }
             }
@@ -308,6 +319,9 @@ impl<'a> MoveCoordinator<'a> {
         let half = (bstats.foot_h as f32 * ts) * 0.5;
         let x = bx.clamp(0.0, max);
         let y = (by + half + ts * 0.5).clamp(0.0, max);
+        if spawn_point_has_clearance(self.map, self.occ, x, y, spawn_radius) {
+            return (x, y);
+        }
         (x, y)
     }
 
@@ -456,6 +470,43 @@ fn is_free_goal(map: &Map, occ: &Occupancy, tile: (u32, u32), taken: &[(u32, u32
     true
 }
 
+fn spawn_point_has_clearance(map: &Map, occ: &Occupancy, cx: f32, cy: f32, radius: f32) -> bool {
+    if radius <= 0.0 {
+        return true;
+    }
+
+    let max = map.world_size_px();
+    if cx - radius < 0.0 || cy - radius < 0.0 || cx + radius > max || cy + radius > max {
+        return false;
+    }
+
+    let min_tx = ((cx - radius) / config::TILE_SIZE as f32).floor() as i32;
+    let min_ty = ((cy - radius) / config::TILE_SIZE as f32).floor() as i32;
+    let max_tx = ((cx + radius) / config::TILE_SIZE as f32).floor() as i32;
+    let max_ty = ((cy + radius) / config::TILE_SIZE as f32).floor() as i32;
+
+    for ty in min_ty..=max_ty {
+        for tx in min_tx..=max_tx {
+            if !map.in_bounds(tx, ty) || !occ.passable(tx, ty) {
+                let tile_left = tx as f32 * config::TILE_SIZE as f32;
+                let tile_top = ty as f32 * config::TILE_SIZE as f32;
+                let tile_right = tile_left + config::TILE_SIZE as f32;
+                let tile_bottom = tile_top + config::TILE_SIZE as f32;
+
+                let nearest_x = cx.clamp(tile_left, tile_right);
+                let nearest_y = cy.clamp(tile_top, tile_bottom);
+                let dx = cx - nearest_x;
+                let dy = cy - nearest_y;
+                if dx * dx + dy * dy <= radius * radius {
+                    return false;
+                }
+            }
+        }
+    }
+
+    true
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -506,7 +557,8 @@ mod tests {
         let coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, 1);
 
         let b = entities.get(b_id).unwrap();
-        let (sx, sy) = coordinator.find_spawn_point(&entities, b.kind, b.pos_x, b.pos_y);
+        let (sx, sy) =
+            coordinator.find_spawn_point(&entities, b.kind, EntityKind::Tank, b.pos_x, b.pos_y);
 
         let (stx, sty) = map.tile_of(sx, sy);
         let (btx, bty) = map.tile_of(b.pos_x, b.pos_y);
@@ -519,6 +571,70 @@ mod tests {
 
         // Spawn tile must be passable for infantry.
         assert!(map.is_passable_for(MobilityClass::Infantry, stx as i32, sty as i32));
+    }
+
+    #[test]
+    fn tank_spawn_point_keeps_clear_of_top_map_edge() {
+        let map = Map::generate(1, 0x1234_5678);
+        let mut entities = EntityStore::new();
+        let (bx, by) = map.tile_center(3, 0);
+        let b_id = entities
+            .spawn_building(1, EntityKind::TankFactory, bx, by, true)
+            .unwrap();
+        let occ = Occupancy::build(&map, &entities);
+
+        let mut pathing = PathingService::new(8_192, 256);
+        pathing.advance_tick(1);
+        let coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, 1);
+
+        let b = entities.get(b_id).unwrap();
+        let (sx, sy) =
+            coordinator.find_spawn_point(&entities, b.kind, EntityKind::Tank, b.pos_x, b.pos_y);
+
+        assert!(
+            spawn_point_has_clearance(
+                &map,
+                &occ,
+                sx,
+                sy,
+                config::unit_stats(EntityKind::Tank).unwrap().radius,
+            ),
+            "tank spawn point clips the top map edge"
+        );
+    }
+
+    #[test]
+    fn tank_spawn_point_keeps_clear_of_adjacent_building() {
+        let map = Map::generate(1, 0x1234_5678);
+        let mut entities = EntityStore::new();
+        let (fx, fy) = map.tile_center(16, 16);
+        let factory_id = entities
+            .spawn_building(1, EntityKind::TankFactory, fx, fy, true)
+            .unwrap();
+        let (nx, ny) = map.tile_center(20, 16);
+        entities
+            .spawn_building(1, EntityKind::Depot, nx, ny, true)
+            .unwrap();
+        let occ = Occupancy::build(&map, &entities);
+
+        let mut pathing = PathingService::new(8_192, 256);
+        pathing.advance_tick(1);
+        let coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, 1);
+
+        let b = entities.get(factory_id).unwrap();
+        let (sx, sy) =
+            coordinator.find_spawn_point(&entities, b.kind, EntityKind::Tank, b.pos_x, b.pos_y);
+
+        assert!(
+            spawn_point_has_clearance(
+                &map,
+                &occ,
+                sx,
+                sy,
+                config::unit_stats(EntityKind::Tank).unwrap().radius,
+            ),
+            "tank spawn point is too close to the adjacent building"
+        );
     }
 
     #[test]
