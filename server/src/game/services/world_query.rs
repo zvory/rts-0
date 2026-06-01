@@ -49,8 +49,8 @@ pub(crate) fn completed_buildings(
     owned_buildings(entities, player).filter(|e| !e.under_construction())
 }
 
-/// Kinds of all owned buildings (any state) — convenient input for tech requirement checks
-/// where construction state should not matter.
+/// Kinds of all owned buildings (any state).
+#[cfg(test)]
 pub(crate) fn owned_building_kinds(entities: &EntityStore, player: u32) -> Vec<EntityKind> {
     owned_buildings(entities, player).map(|e| e.kind).collect()
 }

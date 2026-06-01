@@ -134,12 +134,12 @@ impl AiController {
                         Order::Gather(_) => gathering_workers.push(e.id),
                         Order::Build(_) => {
                             if let Some((kind, _, _)) = e.order().build_intent_tile() {
-                                if e.build_phase() == Some(BuildPhase::ToSite) {
-                                    if config::building_stats(kind).is_some() {
-                                        let (cost_steel, _) = rules::economy::cost(kind);
-                                        committed_steel =
-                                            committed_steel.saturating_add(cost_steel);
-                                    }
+                                if e.build_phase() == Some(BuildPhase::ToSite)
+                                    && config::building_stats(kind).is_some()
+                                {
+                                    let (cost_steel, _) = rules::economy::cost(kind);
+                                    committed_steel =
+                                        committed_steel.saturating_add(cost_steel);
                                 }
                                 match kind {
                                     EntityKind::Depot => pending_depot_build = true,

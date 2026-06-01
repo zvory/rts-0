@@ -73,10 +73,8 @@ fn gather_to_node(
                 e.clear_orders();
             }
         }
-        if can_mine {
-            if !entities.claim_miner(node, id) {
-                idle_gatherer(entities, id);
-            }
+        if can_mine && !entities.claim_miner(node, id) {
+            idle_gatherer(entities, id);
         }
     } else if entities.get(id).map(|e| e.path_is_empty()).unwrap_or(true) {
         coordinator.request_gather_path(entities, id, (node_pos.0, node_pos.1));
