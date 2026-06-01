@@ -442,7 +442,7 @@ export class HUD {
 
     if (producing) {
       const cancelBtn = this._cmdButton({
-        icon: "✕",
+        icon: "CNCL",
         label: "Cancel",
         hotkey: GRID_HOTKEYS[cancelSlot],
         enabled: true,
