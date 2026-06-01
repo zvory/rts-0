@@ -134,7 +134,7 @@ pub fn unit_stats(kind: EntityKind) -> Option<UnitStats> {
             cost_steel: 50,
             cost_oil: 0,
             supply: 1,
-            build_ticks: 120,
+            build_ticks: 240,
             radius: 9.0,
         },
         EntityKind::Rifleman => UnitStats {
@@ -147,7 +147,7 @@ pub fn unit_stats(kind: EntityKind) -> Option<UnitStats> {
             cost_steel: 50,
             cost_oil: 0,
             supply: 1,
-            build_ticks: 150,
+            build_ticks: 300,
             radius: 9.0,
         },
         EntityKind::MachineGunner => UnitStats {
@@ -160,7 +160,7 @@ pub fn unit_stats(kind: EntityKind) -> Option<UnitStats> {
             cost_steel: 75,
             cost_oil: 25,
             supply: 2,
-            build_ticks: 200,
+            build_ticks: 400,
             radius: 10.0,
         },
         EntityKind::AtTeam => UnitStats {
@@ -173,7 +173,7 @@ pub fn unit_stats(kind: EntityKind) -> Option<UnitStats> {
             cost_steel: 75,
             cost_oil: 25,
             supply: 2,
-            build_ticks: 220,
+            build_ticks: 440,
             radius: 10.0,
         },
         EntityKind::Tank => UnitStats {
@@ -186,7 +186,7 @@ pub fn unit_stats(kind: EntityKind) -> Option<UnitStats> {
             cost_steel: 200,
             cost_oil: 100,
             supply: 6,
-            build_ticks: 250,
+            build_ticks: 500,
             radius: 20.0,
         },
         _ => return None,
