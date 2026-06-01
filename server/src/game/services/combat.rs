@@ -89,6 +89,24 @@ pub(crate) fn combat_system(
                     begin_idle_machine_gunner_setup(e);
                 }
             }
+            if matches!(mode, CombatMode::Aggressive) {
+                if let Some(goal) = entities.get(id).and_then(|e| e.move_intent()) {
+                    let needs_resume = entities
+                        .get(id)
+                        .and_then(|e| e.path_goal())
+                        .map(|path_goal| {
+                            (path_goal.0 - goal.0).abs() > f32::EPSILON
+                                || (path_goal.1 - goal.1).abs() > f32::EPSILON
+                        })
+                        .unwrap_or(true);
+                    if needs_resume {
+                        if let Some(e) = entities.get_mut(id) {
+                            e.set_target_id(None);
+                        }
+                        coordinator.request_chase_path(entities, id, goal);
+                    }
+                }
+            }
             continue;
         };
 
@@ -473,7 +491,7 @@ mod tests {
         let occ = Occupancy::build(&map, entities);
         let spatial = SpatialIndex::build(entities, config::TILE_SIZE);
         let mut pathing = PathingService::new(256, 64);
-        let mut coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, 0);
+        let mut coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, 10);
         let mut fog = Fog::new(map.size);
         fog.recompute(&[1, 2], entities);
         let mut events = HashMap::from([(1, Vec::new()), (2, Vec::new())]);
@@ -557,6 +575,46 @@ mod tests {
         );
 
         assert_eq!(target, Some(enemy_id));
+    }
+
+    #[test]
+    fn attack_move_resumes_original_destination_after_target_is_gone() {
+        let mut entities = EntityStore::new();
+        let attacker_id = entities
+            .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
+            .expect("attacker should spawn");
+        let attacker = entities
+            .get_mut(attacker_id)
+            .expect("attacker should exist");
+        attacker.set_order(Order::attack_move_to(300.0, 300.0));
+        attacker.set_path_goal(Some((270.0, 100.0)));
+        attacker.set_path(Vec::new());
+
+        let map = Map::generate(2, 0xC0FF_EE);
+        let occ = Occupancy::build(&map, &entities);
+        let spatial = SpatialIndex::build(&entities, map.size);
+        let mut pathing = PathingService::new(256, 64);
+        let mut coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, 0);
+        let mut fog = Fog::new(map.size);
+        fog.recompute(&[1], &entities);
+        let mut events = HashMap::from([(1, Vec::new())]);
+
+        combat_system(
+            &map,
+            &mut entities,
+            &occ,
+            &spatial,
+            &mut coordinator,
+            &fog,
+            &mut events,
+        );
+        assert_eq!(
+            entities
+                .get(attacker_id)
+                .expect("attacker should exist")
+                .path_goal(),
+            Some((300.0, 300.0))
+        );
     }
 
     #[test]
