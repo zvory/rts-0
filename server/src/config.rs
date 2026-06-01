@@ -226,7 +226,7 @@ pub fn building_stats(kind: EntityKind) -> Option<BuildingStats> {
         EntityKind::Barracks => BuildingStats {
             hp: 320,
             sight_tiles: 6,
-            cost_steel: 100,
+            cost_steel: 150,
             cost_oil: 0,
             foot_w: 3,
             foot_h: 2,
