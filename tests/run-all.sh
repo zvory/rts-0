@@ -221,18 +221,24 @@ if is_up; then
   if [ "$RUN_RUST" = "1" ]; then
     run_suite_bg "Rust scripted tests (cargo test)" \
       cargo test --manifest-path "$SERVER_DIR/Cargo.toml"
+    run_suite_bg "Rust lint (cargo clippy)" \
+      cargo clippy --manifest-path "$SERVER_DIR/Cargo.toml" -- -D warnings
   else
     SKIPPED+=("Rust scripted tests (--no-rust)")
+    SKIPPED+=("Rust lint (--no-rust)")
   fi
 else
   # Build the server binary first (blocks until done).
   if boot_server; then SERVER_HEALTHY=1; else SERVER_HEALTHY=0; fi
-  # Now artifacts are compiled; cargo test can reuse them with minimal recompilation.
+  # Now artifacts are compiled; cargo test and clippy can reuse them with minimal recompilation.
   if [ "$RUN_RUST" = "1" ]; then
     run_suite_bg "Rust scripted tests (cargo test)" \
       cargo test --manifest-path "$SERVER_DIR/Cargo.toml"
+    run_suite_bg "Rust lint (cargo clippy)" \
+      cargo clippy --manifest-path "$SERVER_DIR/Cargo.toml" -- -D warnings
   else
     SKIPPED+=("Rust scripted tests (--no-rust)")
+    SKIPPED+=("Rust lint (--no-rust)")
   fi
 fi
 
