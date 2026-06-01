@@ -9,6 +9,7 @@ import { Net } from "../client/src/net.js";
 import { GameState } from "../client/src/state.js";
 import { Camera } from "../client/src/camera.js";
 import { Fog } from "../client/src/fog.js";
+import { footprintValidAgainstEntities } from "../client/src/input.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -142,6 +143,18 @@ function assertHasGetter(obj, name, msgPrefix = "") {
   assert(state.placement.valid === true, "updatePlacement sets valid");
   state.endPlacement();
   assert(state.placement === null, "endPlacement clears placement");
+
+  const map = { width: 6, height: 6, tileSize: 32, terrain: new Array(36).fill(0) };
+  const worker = { id: 7, owner: 1, kind: "worker", x: 80, y: 80 };
+  const other = { id: 8, owner: 1, kind: "worker", x: 80, y: 80 };
+  assert(
+    footprintValidAgainstEntities([worker], new Set([7]), 1, 1, 2, 2, map) === true,
+    "selected worker should be allowed inside the build footprint",
+  );
+  assert(
+    footprintValidAgainstEntities([other], new Set([7]), 1, 1, 2, 2, map) === false,
+    "unselected overlapping worker should still block placement",
+  );
 }
 
 // ---------------------------------------------------------------------------
