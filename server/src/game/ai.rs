@@ -208,10 +208,8 @@ impl AiController {
         }
 
         // --- 3. Train workers up to the economy target. -------------------
-        for (worker_count, industrial_center) in
-            (facts.worker_count..).zip(idle_industrial_centers)
-        {
-            if worker_count >= target_workers {
+        for (i, industrial_center) in (facts.worker_count..).zip(idle_industrial_centers) {
+            if i >= target_workers {
                 break;
             }
             if !budget.can_afford_unit(EntityKind::Worker) {

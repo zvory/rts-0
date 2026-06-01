@@ -13,6 +13,8 @@ use crate::protocol::Event;
 use crate::rules::combat as combat_rules;
 use crate::rules::projection;
 use crate::rules::terrain::TerrainKind;
+use rand::rngs::SmallRng;
+use rand::Rng;
 
 /// Extra slack (px) added to attack range checks so units don't dance at the exact boundary.
 const RANGE_SLACK: f32 = 4.0;
@@ -20,6 +22,7 @@ const RANGE_SLACK: f32 = 4.0;
 /// Combat: acquire targets for aggressive / attack-move units, let eligible idle units
 /// auto-acquire enemies, and deal damage when off cooldown. Damage is applied immediately and
 /// emits an `Attack` event (for tracers). Cooldowns tick down here too.
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn combat_system(
     _map: &Map,
     entities: &mut EntityStore,
@@ -27,6 +30,7 @@ pub(crate) fn combat_system(
     spatial: &SpatialIndex,
     coordinator: &mut MoveCoordinator<'_>,
     fog: &Fog,
+    rng: &mut SmallRng,
     events: &mut HashMap<u32, Vec<Event>>,
 ) {
     // Tick down cooldowns first.
@@ -139,7 +143,7 @@ pub(crate) fn combat_system(
             let ready = matches!(entities.get(id), Some(e) if e.attack_cd() == 0);
             if ready {
                 apply_damage(
-                    entities, events, fog, id, tid, dmg, owner, px, py, tx, ty, range_px,
+                    entities, events, fog, rng, id, tid, dmg, owner, px, py, tx, ty, range_px,
                 );
                 if let Some(e) = entities.get_mut(id) {
                     e.set_attack_cd(cd_reset);
@@ -305,6 +309,7 @@ fn apply_damage(
     entities: &mut EntityStore,
     events: &mut HashMap<u32, Vec<Event>>,
     fog: &Fog,
+    rng: &mut SmallRng,
     attacker: u32,
     victim: u32,
     dmg: u32,
@@ -320,6 +325,13 @@ fn apply_damage(
     }
     let attacker_kind = entities.get(attacker).map(|e| e.kind);
     let victim_kind = entities.get(victim).map(|e| e.kind);
+    // Roll for miss before computing damage.
+    if let (Some(ak), Some(vk)) = (attacker_kind, victim_kind) {
+        let mc = combat_rules::miss_chance(ak, vk);
+        if mc > 0.0 && rng.gen::<f32>() < mc {
+            return;
+        }
+    }
     let effective_dmg = match (attacker_kind, victim_kind) {
         (Some(ak), Some(vk)) => {
             combat_rules::effective_damage(ak, vk, dmg, Some(TerrainKind::Open))
@@ -452,6 +464,7 @@ mod tests {
     use crate::game::services::occupancy::Occupancy;
     use crate::game::services::pathing::PathingService;
     use crate::game::services::spatial::SpatialIndex;
+    use rand::SeedableRng;
 
     fn rifleman_with_enemy() -> (EntityStore, u32, u32) {
         let mut entities = EntityStore::new();
@@ -474,6 +487,7 @@ mod tests {
         fog.recompute(&[1, 2], entities);
         let mut events = HashMap::from([(1, Vec::new()), (2, Vec::new())]);
 
+        let mut rng = SmallRng::seed_from_u64(0);
         combat_system(
             &map,
             entities,
@@ -481,6 +495,7 @@ mod tests {
             &spatial,
             &mut coordinator,
             &fog,
+            &mut rng,
             &mut events,
         );
         events
@@ -577,6 +592,7 @@ mod tests {
         fog.recompute(&[1], &entities);
         let mut events = HashMap::from([(1, Vec::new())]);
 
+        let mut rng = SmallRng::seed_from_u64(0);
         combat_system(
             &map,
             &mut entities,
@@ -584,6 +600,7 @@ mod tests {
             &spatial,
             &mut coordinator,
             &fog,
+            &mut rng,
             &mut events,
         );
         assert_eq!(
@@ -776,10 +793,12 @@ mod tests {
         events.insert(1, Vec::new());
         events.insert(2, Vec::new());
 
+        let mut rng = SmallRng::seed_from_u64(0);
         apply_damage(
             &mut entities,
             &mut events,
             &fog,
+            &mut rng,
             attacker,
             primary,
             10,
@@ -815,10 +834,12 @@ mod tests {
         events.insert(1, Vec::new());
         events.insert(2, Vec::new());
 
+        let mut rng = SmallRng::seed_from_u64(0);
         apply_damage(
             &mut entities,
             &mut events,
             &fog,
+            &mut rng,
             attacker,
             primary,
             10,

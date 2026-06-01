@@ -22,6 +22,7 @@ use crate::game::services::pathing::PathingService;
 use crate::game::services::spatial::SpatialIndex;
 use crate::game::PlayerState;
 use crate::protocol::{Command, Event};
+use rand::rngs::SmallRng;
 
 /// Run all per-tick systems in order. `events` is the per-player event accumulator (already
 /// keyed for every player). `tick` is the new tick number (post-increment).
@@ -35,6 +36,7 @@ pub(crate) fn run_tick(
     players: &mut [PlayerState],
     fog: &Fog,
     pathing: &mut PathingService,
+    rng: &mut SmallRng,
     pending: Vec<(u32, Command)>,
     events: &mut HashMap<u32, Vec<Event>>,
     tick: u32,
@@ -62,7 +64,7 @@ pub(crate) fn run_tick(
     // Rebuild after movement so combat, gather, and collision resolution see updated positions.
     let spatial = services::spatial::SpatialIndex::build(entities, map.size);
 
-    services::combat::combat_system(map, entities, &occ, &spatial, &mut coordinator, fog, events);
+    services::combat::combat_system(map, entities, &occ, &spatial, &mut coordinator, fog, rng, events);
     services::economy::gather_system(map, entities, players, &occ, &spatial, &mut coordinator);
     services::production::production_system(map, entities, &coordinator, events);
     services::construction::construction_system(map, entities, players, &spatial, events);
@@ -97,6 +99,7 @@ mod tests {
     use crate::game::map::Map;
     use crate::game::services::occupancy::building_footprint;
     use crate::protocol::terrain;
+    use rand::SeedableRng;
 
     fn flat_map(size: u32) -> Map {
         Map {
@@ -152,6 +155,7 @@ mod tests {
             &mut players,
             &fog,
             &mut pathing,
+            &mut SmallRng::seed_from_u64(0),
             Vec::new(),
             &mut events,
             1,
