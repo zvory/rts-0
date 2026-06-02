@@ -34,6 +34,13 @@ Shared helper extraction has started in `server/src/game/ai_shared.rs`:
 - local spend reservation
 - basic attack-wave readiness
 
+Shared AI core scaffolding has started in `server/src/game/ai_core/`:
+
+- deterministic live-state and self-play snapshot observations
+- reusable facts for worker/building/production/supply/combat-unit/public-base queries
+- main-base steel saturation centralized under the facts layer while `ai_shared` keeps
+  compatibility entry points
+
 Self-play still has separate scripted RTS logic in `server/src/game/selfplay.rs`, including
 `BuildTechAttackScript`, `EconomyScript`, `WorkerRushScript`, and `MineOnlyScript`. Those scripts
 duplicate worker assignment, production, pending-build tracking, tech progression, and attack
@@ -119,7 +126,7 @@ for the same module name.
 | Phase | Detailed Plan | Status | Main Output |
 | --- | --- | --- | --- |
 | AI-0 | [Boundary and invariants](docs/ai/phase-00-boundary-and-invariants.md) | planned by this doc set | One AI architecture contract and handoff rules |
-| AI-1 | [Shared world model](docs/ai/phase-01-shared-world-model.md) | partial helper extraction exists | Deterministic AI observations and reusable facts |
+| AI-1 | [Shared world model](docs/ai/phase-01-shared-world-model.md) | in progress: observation/facts scaffolding exists | Deterministic AI observations and reusable facts |
 | AI-2 | [Action synthesis](docs/ai/phase-02-action-synthesis.md) | not started | Shared command builder with budget and reservation semantics |
 | AI-3 | [Decision loop and profiles](docs/ai/phase-03-decision-loop-and-profiles.md) | not started | `rifle_flood_fast`, `rifle_flood_full_saturation`, `tech_to_tanks` profiles |
 | AI-4 | [Live AI migration](docs/ai/phase-04-live-ai-migration.md) | not started | `AiController` delegates to the shared core |
