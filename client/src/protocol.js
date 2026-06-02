@@ -23,6 +23,7 @@ export const C = Object.freeze({
   COMMAND: "command",
   PING: "ping",
   SET_REPLAY_SPEED: "setReplaySpeed",
+  CLIENT_PERF: "clientPerf",
 });
 
 // --- Command discriminators (the `c` field) ---
@@ -114,6 +115,7 @@ export const msg = Object.freeze({
   command: (cmd) => ({ t: C.COMMAND, cmd }),
   ping: (ts) => ({ t: C.PING, ts }),
   setReplaySpeed: (speed) => ({ t: C.SET_REPLAY_SPEED, speed }),
+  clientPerf: (report) => ({ t: C.CLIENT_PERF, report }),
 });
 
 // --- Command builders (the `cmd` payload) ---

@@ -7,6 +7,10 @@ primary_region = "ewr"
 [env]
   RTS_ADDR = "0.0.0.0:8080"
   RUST_LOG = "info"
+  RTS_LOG_JSON = "1"
+  RTS_DATADOG_METRICS = "1"
+  DD_ENV = "prod"
+  DD_SERVICE = "rts"
 
 [http_service]
   internal_port = 8080

@@ -77,6 +77,23 @@ pub enum ClientMessage {
     Ping { ts: f64 },
     /// Set replay playback speed multiplier (replay rooms only; ignored elsewhere).
     SetReplaySpeed { speed: f32 },
+    /// Browser-side performance report for lag diagnostics. Best-effort and rate-limited by the
+    /// client; ignored unless the sender is in a room.
+    ClientPerf { report: ClientPerfReport },
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ClientPerfReport {
+    pub fps: f32,
+    pub avg_frame_ms: f32,
+    pub max_frame_ms: f32,
+    #[serde(default)]
+    pub snapshot_gap_ms: Option<f32>,
+    #[serde(default)]
+    pub rtt_ms: Option<f32>,
+    #[serde(default)]
+    pub slow_frames: u32,
 }
 
 /// A gameplay command. Validated when applied, not when received.

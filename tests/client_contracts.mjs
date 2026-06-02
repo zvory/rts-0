@@ -56,6 +56,7 @@ function assertHasGetter(obj, name, msgPrefix = "") {
   assertHasMethod(net, "removeAi", "Net");
   assertHasMethod(net, "setQuickstart", "Net");
   assertHasMethod(net, "setReplaySpeed", "Net");
+  assertHasMethod(net, "clientPerf", "Net");
 }
 
 // ---------------------------------------------------------------------------

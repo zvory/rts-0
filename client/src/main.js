@@ -31,6 +31,12 @@ const TOAST_MS = 2600;
  */
 const HEARTBEAT_MS = 15000;
 
+/** How often a running match reports aggregated browser performance to the server. */
+const CLIENT_PERF_REPORT_MS = 10000;
+
+/** A browser frame slower than this is counted as a client-side hitch. */
+const CLIENT_SLOW_FRAME_MS = 50;
+
 /**
  * Derive the WebSocket endpoint from the current page location, so the client
  * connects back to whichever host/port served it (the Rust process serves both).
@@ -55,6 +61,10 @@ function devWatchConfig() {
     noFog: true,
     banner: replay ? `local dev  self-play replay  no fog  ${replay}` : "local dev  self-play  no fog",
   };
+}
+
+function round1(value) {
+  return Math.round(value * 10) / 10;
 }
 
 /** Cached DOM handles for the pinned ids in index.html (see its DOM contract). */
@@ -309,6 +319,7 @@ class Match {
     this.lastFrame = performance.now();
     this.tickFn = this.frame.bind(this);
     this.rafId = undefined;
+    this.resetPerfWindow(this.lastFrame);
 
     // --- Listeners (bound so they can be removed on destroy). ---
     this.onSnapshot = (m) => this.state.applySnapshot(m);
@@ -427,8 +438,10 @@ class Match {
   frame(now) {
     if (!this.running) return;
 
-    const dt = (now - this.lastFrame) / 1000; // seconds since last frame
+    const frameMs = now - this.lastFrame;
+    const dt = frameMs / 1000; // seconds since last frame
     this.lastFrame = now;
+    this.recordFrame(frameMs);
 
     const alpha = this.computeAlpha();
 
@@ -441,8 +454,49 @@ class Match {
     this.minimap.render();
 
     this.drainNotices();
+    this.maybeReportPerf(now);
 
     this.rafId = requestAnimationFrame(this.tickFn);
+  }
+
+  /** Reset the rolling browser performance aggregation window. */
+  resetPerfWindow(now = performance.now()) {
+    this.perfWindowStart = now;
+    this.perfFrames = 0;
+    this.perfTotalFrameMs = 0;
+    this.perfMaxFrameMs = 0;
+    this.perfSlowFrames = 0;
+  }
+
+  /** Add one frame to the rolling browser performance aggregation window. */
+  recordFrame(frameMs) {
+    if (!isFinite(frameMs) || frameMs < 0) return;
+    this.perfFrames += 1;
+    this.perfTotalFrameMs += frameMs;
+    if (frameMs > this.perfMaxFrameMs) this.perfMaxFrameMs = frameMs;
+    if (frameMs >= CLIENT_SLOW_FRAME_MS) this.perfSlowFrames += 1;
+  }
+
+  /** Send one aggregated browser lag report to the server when the window elapses. */
+  maybeReportPerf(now) {
+    const elapsed = now - this.perfWindowStart;
+    if (elapsed < CLIENT_PERF_REPORT_MS || this.perfFrames <= 0) return;
+
+    const snapshotGapMs =
+      this.state.currRecvTime == null ? null : Math.max(0, now - this.state.currRecvTime);
+    const rttMs = typeof this.net.latency === "number" && isFinite(this.net.latency)
+      ? Math.max(0, this.net.latency)
+      : null;
+
+    this.net.clientPerf({
+      fps: round1((this.perfFrames * 1000) / elapsed),
+      avgFrameMs: round1(this.perfTotalFrameMs / this.perfFrames),
+      maxFrameMs: round1(this.perfMaxFrameMs),
+      snapshotGapMs: snapshotGapMs == null ? null : round1(snapshotGapMs),
+      rttMs: rttMs == null ? null : round1(rttMs),
+      slowFrames: this.perfSlowFrames,
+    });
+    this.resetPerfWindow(now);
   }
 
   /**

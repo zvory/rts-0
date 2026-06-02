@@ -163,6 +163,14 @@ export class Net {
     this._send(msg.setReplaySpeed(speed));
   }
 
+  /**
+   * Send an aggregated browser performance report for server-side lag diagnostics.
+   * @param {{fps:number,avgFrameMs:number,maxFrameMs:number,snapshotGapMs:number|null,rttMs:number|null,slowFrames:number}} report
+   */
+  clientPerf(report) {
+    this._send(msg.clientPerf(report));
+  }
+
   // --- internals ----------------------------------------------------------
 
   /**

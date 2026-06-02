@@ -11,6 +11,7 @@
 mod config;
 mod game;
 mod lobby;
+mod observability;
 mod protocol;
 mod rules;
 
@@ -49,15 +50,22 @@ struct AppState {
 #[tokio::main]
 async fn main() {
     // Honor `RUST_LOG`; default to `info` so a fresh checkout logs something useful.
-    tracing_subscriber::fmt()
-        .with_env_filter(
-            EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")),
-        )
-        .init();
+    let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
+    if env_flag("RTS_LOG_JSON") {
+        tracing_subscriber::fmt()
+            .json()
+            .with_env_filter(filter)
+            .init();
+    } else {
+        tracing_subscriber::fmt().with_env_filter(filter).init();
+    }
+
+    let version = git_version();
+    observability::init(version.clone());
 
     let state = AppState {
         lobby: Lobby::new(),
-        version: git_version(),
+        version,
     };
 
     // Resolve the client dir relative to the crate, so the working directory doesn't matter.
@@ -148,6 +156,7 @@ fn git_version() -> String {
 /// Bad input is logged and skipped; we never panic on the read path.
 async fn handle_connection(socket: WebSocket, lobby: Lobby) {
     let player_id = lobby::next_player_id();
+    observability::global().connection_opened();
     debug!(player_id, "connection opened");
 
     let (mut sink, mut stream) = socket.split();
@@ -184,6 +193,7 @@ async fn handle_connection(socket: WebSocket, lobby: Lobby) {
     {
         // Writer already gone — nothing more to do.
         writer.abort();
+        observability::global().connection_closed();
         return;
     }
 
@@ -247,6 +257,7 @@ async fn handle_connection(socket: WebSocket, lobby: Lobby) {
     // Dropping `msg_tx` closes the writer's channel, ending the writer task.
     drop(msg_tx);
     let _ = writer.await;
+    observability::global().connection_closed();
     debug!(player_id, "connection closed");
 }
 
@@ -359,6 +370,14 @@ async fn handle_client_message(
         ClientMessage::SetReplaySpeed { speed } => {
             send_room_event(player_id, current_room, RoomEvent::SetReplaySpeed { speed }).await;
         }
+        ClientMessage::ClientPerf { report } => {
+            send_room_event(
+                player_id,
+                current_room,
+                RoomEvent::ClientPerf { player_id, report },
+            )
+            .await;
+        }
     }
 }
 
@@ -389,4 +408,15 @@ fn sanitize_name(name: String) -> String {
     } else {
         cleaned
     }
+}
+
+fn env_flag(name: &str) -> bool {
+    std::env::var(name)
+        .map(|v| {
+            matches!(
+                v.trim().to_ascii_lowercase().as_str(),
+                "1" | "true" | "yes" | "on"
+            )
+        })
+        .unwrap_or(false)
 }

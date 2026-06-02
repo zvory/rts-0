@@ -71,6 +71,7 @@ short but readable. Coordinates are **world pixels** (floats) unless a field nam
 | `command`  | `cmd: Command` | Issue a gameplay command (see below). Ignored unless in-game. |
 | `ping`     | `ts: number` | Latency probe; server replies with `pong`. |
 | `setReplaySpeed` | `speed: f32` | Set replay playback speed multiplier in dev replay rooms; ignored elsewhere. |
+| `clientPerf` | `report: ClientPerfReport` | Aggregated browser performance report (FPS/frame time/snapshot gap/RTT) for lag diagnostics. Ignored unless the sender is in a room. |
 
 `Command` (the `cmd` object) — `c` is the command discriminator:
 
@@ -87,6 +88,10 @@ short but readable. Coordinates are **world pixels** (floats) unless a field nam
 
 Servers MUST ignore commands referencing entities the player does not own, unknown ids,
 illegal placements, or unaffordable actions (fail silently or emit a `notice` event).
+
+`ClientPerfReport` is best-effort telemetry, not gameplay input:
+`{ fps: f32, avgFrameMs: f32, maxFrameMs: f32, snapshotGapMs?: f32|null, rttMs?: f32|null, slowFrames: u32 }`.
+The server validates and bounds every numeric field before logging or metric emission.
 
 ### 2.2 Server → Client (`ServerMessage`)
 
@@ -185,6 +190,7 @@ src/
   protocol.rs    # serde types for §2  (PINNED — provided)
   config.rs      # all balance/sim constants (PINNED — provided)
   lobby.rs       # Room, Lobby: join/ready/start, per-connection actor plumbing
+  observability.rs # structured lag logs + optional Datadog Metrics API / DogStatsD emission
   rules/
     mod.rs       # rules module boundary
     defs.rs      # immutable unit/building/node definition tables
@@ -275,6 +281,10 @@ them at the top of `tick()` — see §8.
   single writer of game state — no locks around `Game`.
 - The room task, each tick: drain commands → `game.tick()` → for each connected player
   `game.snapshot_for(pid)` → send. Lobby phase: broadcast `lobby` on changes.
+- The room task measures `game.tick()` duration and snapshot fanout duration around that boundary.
+  Slow ticks are logged as `excessively slow tick`; optional Datadog metrics are emitted only when
+  the process is explicitly configured with `RTS_DATADOG_METRICS=1` + `DD_API_KEY` (direct Metrics
+  API) or `RTS_DOGSTATSD_ADDR` (DogStatsD/Agent).
 - Dev self-play watch rooms are a special-case room mode inside the same task model: they own a
   normal `Game`, feed it scripted commands from `game::selfplay`, and send watchers
   `game.snapshot_full_for(view_pid)` instead of fog-filtered snapshots. Replay rooms advance at
@@ -353,6 +363,7 @@ export class Net {
   command(cmd)                           // cmd built via protocol.js builders
   ping()
   setReplaySpeed(speed)                  // dev replay rooms only
+  clientPerf(report)                     // aggregated browser lag report (§2.1)
   get playerId()
 }
 ```
@@ -459,7 +470,8 @@ export class Lobby {
 `main.js` wires it all: create `Net`, derive ws url from `window.location`, show `Lobby`;
 on `start` message build `GameState`, `Camera`, `Renderer`, `Fog`, `HUD`, `Minimap`, `Input`,
 start the rAF loop (compute `alpha` from snapshot timing, `camera.update`, `input.update`,
-`fog.update`, `renderer.render`, `hud.update`, `minimap.render`); on `gameOver` show overlay.
+`fog.update`, `renderer.render`, `hud.update`, `minimap.render`); aggregate browser performance
+every 10 seconds and send `clientPerf`; on `gameOver` show overlay.
 
 ### 4.2 Rendering & look (PixiJS, procedural art — neutral PS1 field-command style)
 - Layers (back→front): terrain → resource nodes → building shadows → buildings → unit

@@ -19,7 +19,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use tokio::sync::{mpsc, Mutex};
 use tokio::time::{interval, MissedTickBehavior};
@@ -28,7 +28,8 @@ use tracing::{debug, error, info, warn};
 use crate::config;
 use crate::game::selfplay::{is_safe_artifact_name, LiveSelfPlay, ReplayArtifact, ReplayDriver};
 use crate::game::{Game, PlayerInit};
-use crate::protocol::{Command, Event, LobbyPlayer, ServerMessage, StartPayload};
+use crate::observability;
+use crate::protocol::{ClientPerfReport, Command, Event, LobbyPlayer, ServerMessage, StartPayload};
 
 /// Player colors, assigned by join order. MUST match `client/src/config.js` `PLAYER_PALETTE`.
 const PLAYER_PALETTE: [&str; 8] = [
@@ -88,6 +89,11 @@ pub enum RoomEvent {
     Command { player_id: u32, cmd: Command },
     /// Set replay playback speed multiplier (replay rooms only; ignored elsewhere).
     SetReplaySpeed { speed: f32 },
+    /// Browser-side lag/performance report.
+    ClientPerf {
+        player_id: u32,
+        report: ClientPerfReport,
+    },
 }
 
 /// Handle the lobby keeps for each live room: just the channel into its task.
@@ -289,6 +295,7 @@ impl RoomTask {
             }
             RoomEvent::Command { player_id, cmd } => self.on_command(player_id, cmd),
             RoomEvent::SetReplaySpeed { speed } => self.on_set_replay_speed(speed),
+            RoomEvent::ClientPerf { player_id, report } => self.on_client_perf(player_id, report),
         }
     }
 
@@ -324,6 +331,7 @@ impl RoomTask {
             let _ = ack.send(false);
             return;
         }
+        let was_empty = self.players.is_empty();
         let color = PLAYER_PALETTE[self.order.len() % PLAYER_PALETTE.len()].to_string();
         self.order.push(player_id);
         self.players.insert(
@@ -335,6 +343,10 @@ impl RoomTask {
                 msg_tx,
             },
         );
+        observability::global().player_joined();
+        if was_empty {
+            observability::global().room_activated();
+        }
         if self.host_id.is_none() {
             self.host_id = Some(player_id);
         }
@@ -352,6 +364,7 @@ impl RoomTask {
         if self.players.remove(&player_id).is_none() {
             return;
         }
+        observability::global().player_left();
         self.order.retain(|&id| id != player_id);
         if self.host_id == Some(player_id) {
             // Reassign the host to the next remaining player in join order.
@@ -363,6 +376,12 @@ impl RoomTask {
         // mid-match (otherwise a 1-player sandbox — which never "ends" — would poison the room
         // for the next person who joins under the same name). The idle room task lives on cheaply.
         if self.players.is_empty() {
+            let was_in_match =
+                matches!(self.phase, Phase::InGame(_)) && self.match_player_count > 0;
+            observability::global().room_deactivated();
+            if was_in_match {
+                observability::global().match_ended(self.mode_label());
+            }
             self.phase = Phase::Lobby;
             self.match_player_count = 0;
             self.host_id = None;
@@ -492,6 +511,30 @@ impl RoomTask {
         }
     }
 
+    fn on_client_perf(&self, player_id: u32, report: ClientPerfReport) {
+        if !self.players.contains_key(&player_id) {
+            return;
+        }
+        let Some(report) = sanitize_client_perf(report) else {
+            debug!(room = %self.room, player_id, "ignoring invalid client perf report");
+            return;
+        };
+        observability::global().record_client_perf(
+            &self.room,
+            self.mode_label(),
+            player_id,
+            &report,
+        );
+    }
+
+    fn mode_label(&self) -> &'static str {
+        match &self.mode {
+            RoomMode::Normal => "normal",
+            RoomMode::DevSelfPlay(DevSelfPlayConfig::Live) => "dev_selfplay_live",
+            RoomMode::DevSelfPlay(DevSelfPlayConfig::Replay { .. }) => "dev_selfplay_replay",
+        }
+    }
+
     // -- Lobby phase ---------------------------------------------------------
 
     fn on_join_dev_selfplay(
@@ -505,6 +548,7 @@ impl RoomTask {
             let _ = ack.send(false);
             return;
         }
+        let was_empty = self.players.is_empty();
         self.order.push(player_id);
         self.players.insert(
             player_id,
@@ -515,6 +559,10 @@ impl RoomTask {
                 msg_tx,
             },
         );
+        observability::global().player_joined();
+        if was_empty {
+            observability::global().room_activated();
+        }
         let _ = ack.send(true);
         if !matches!(self.phase, Phase::InGame(_)) {
             self.start_dev_session();
@@ -617,6 +665,7 @@ impl RoomTask {
         }
 
         info!(room = %self.room, players = self.match_player_count, "match started");
+        observability::global().match_started(self.mode_label(), self.match_player_count);
         self.phase = Phase::InGame(Box::new(game));
     }
 
@@ -638,6 +687,7 @@ impl RoomTask {
             self.send_dev_start_to(player_id);
         }
         info!(room = %self.room, "dev self-play session started");
+        observability::global().match_started(self.mode_label(), self.match_player_count);
     }
 
     fn build_dev_session(&self) -> Result<(Game, DevDriver, u32), String> {
@@ -722,7 +772,9 @@ impl RoomTask {
         // Advance the simulation; collect this tick's per-player transient events.
         // Wrap in `catch_unwind` so a panic on the tick path (including debug-build invariant
         // failures) writes a replay artifact and resets the room instead of killing the task.
+        let tick_started = Instant::now();
         let tick_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| game.tick()));
+        let tick_ms = tick_started.elapsed().as_secs_f64() * 1000.0;
         let mut per_player_events: HashMap<u32, Vec<Event>> = match tick_result {
             Ok(events) => events.into_iter().collect(),
             Err(payload) => {
@@ -734,7 +786,10 @@ impl RoomTask {
         };
 
         // Fan out a fog-filtered snapshot to every connected player, merging in their events.
+        let snapshot_started = Instant::now();
         let recipients: Vec<u32> = self.order.clone();
+        let mut snapshot_recipients = 0usize;
+        let mut entities_sent = 0usize;
         for id in &recipients {
             let Some(player) = self.players.get(id) else {
                 continue;
@@ -743,6 +798,8 @@ impl RoomTask {
             if let Some(mut events) = per_player_events.remove(id) {
                 snapshot.events.append(&mut events);
             }
+            snapshot_recipients += 1;
+            entities_sent += snapshot.entities.len();
             send_or_log(
                 &self.room,
                 *id,
@@ -750,6 +807,17 @@ impl RoomTask {
                 ServerMessage::Snapshot(snapshot),
             );
         }
+        let snapshot_ms = snapshot_started.elapsed().as_secs_f64() * 1000.0;
+        observability::global().record_tick(
+            &self.room,
+            self.mode_label(),
+            game.tick_count(),
+            self.match_player_count,
+            tick_ms,
+            snapshot_ms,
+            snapshot_recipients,
+            entities_sent,
+        );
 
         // Check for game over. A 1-player match never ends (sandbox/exploration mode).
         let alive = game.alive_players();
@@ -775,21 +843,30 @@ impl RoomTask {
             DevDriver::Live(scripted) => scripted.enqueue_for_tick(&mut game),
             DevDriver::Replay(replay) => replay.enqueue_for_tick(&mut game),
         }
+        let tick_started = Instant::now();
         let tick_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| game.tick()));
+        let tick_ms = tick_started.elapsed().as_secs_f64() * 1000.0;
         let mut per_player_events: HashMap<u32, Vec<Event>> = match tick_result {
             Ok(events) => events.into_iter().collect(),
             Err(payload) => {
                 let reason = panic_reason(&payload);
                 dump_crash_replay(&self.room, &game, &reason);
+                if self.match_player_count > 0 {
+                    observability::global().match_ended(self.mode_label());
+                }
                 self.phase = Phase::Lobby;
+                self.match_player_count = 0;
                 self.dev_driver = None;
                 self.dev_view_player_id = None;
                 return;
             }
         };
 
+        let snapshot_started = Instant::now();
         let recipients = self.order.clone();
         let view_player_id = self.dev_view_player_id.unwrap_or(0);
+        let mut snapshot_recipients = 0usize;
+        let mut entities_sent = 0usize;
         for id in recipients {
             let Some(player) = self.players.get(&id) else {
                 continue;
@@ -798,6 +875,8 @@ impl RoomTask {
             if let Some(mut events) = per_player_events.remove(&id) {
                 snapshot.events.append(&mut events);
             }
+            snapshot_recipients += 1;
+            entities_sent += snapshot.entities.len();
             send_or_log(
                 &self.room,
                 id,
@@ -805,10 +884,25 @@ impl RoomTask {
                 ServerMessage::Snapshot(snapshot),
             );
         }
+        let snapshot_ms = snapshot_started.elapsed().as_secs_f64() * 1000.0;
+        observability::global().record_tick(
+            &self.room,
+            self.mode_label(),
+            game.tick_count(),
+            self.match_player_count,
+            tick_ms,
+            snapshot_ms,
+            snapshot_recipients,
+            entities_sent,
+        );
 
         let alive = game.alive_players();
         if alive.len() <= 1 {
+            if self.match_player_count > 0 {
+                observability::global().match_ended(self.mode_label());
+            }
             self.phase = Phase::Lobby;
+            self.match_player_count = 0;
             self.dev_driver = None;
             self.dev_view_player_id = None;
             self.start_dev_session();
@@ -834,6 +928,9 @@ impl RoomTask {
     /// Resolve a finished match: tell everyone who won and return to the lobby for a rematch.
     fn end_match(&mut self, winner_id: Option<u32>) {
         info!(room = %self.room, ?winner_id, "match over");
+        if self.match_player_count > 0 {
+            observability::global().match_ended(self.mode_label());
+        }
         let recipients: Vec<u32> = self.order.clone();
         for id in &recipients {
             let Some(player) = self.players.get(id) else {
@@ -883,9 +980,11 @@ fn send_or_log(room: &str, player_id: u32, tx: &mpsc::Sender<ServerMessage>, msg
     if let Err(err) = tx.try_send(msg) {
         match err {
             mpsc::error::TrySendError::Full(_) => {
+                observability::global().outbound_dropped("full");
                 warn!(room = %room, player_id, "outbound queue full; dropping message");
             }
             mpsc::error::TrySendError::Closed(_) => {
+                observability::global().outbound_dropped("closed");
                 debug!(room = %room, player_id, "outbound channel closed; client gone");
             }
         }
@@ -1021,6 +1120,28 @@ fn load_replay_artifact(name: &str) -> Result<ReplayArtifact, String> {
     ))
 }
 
+fn sanitize_client_perf(mut report: ClientPerfReport) -> Option<ClientPerfReport> {
+    report.fps = bounded_f32(report.fps, 0.0, 240.0)?;
+    report.avg_frame_ms = bounded_f32(report.avg_frame_ms, 0.0, 10_000.0)?;
+    report.max_frame_ms = bounded_f32(report.max_frame_ms, 0.0, 10_000.0)?;
+    report.snapshot_gap_ms = sanitize_optional_ms(report.snapshot_gap_ms);
+    report.rtt_ms = sanitize_optional_ms(report.rtt_ms);
+    report.slow_frames = report.slow_frames.min(10_000);
+    Some(report)
+}
+
+fn sanitize_optional_ms(value: Option<f32>) -> Option<f32> {
+    value.and_then(|v| bounded_f32(v, 0.0, 60_000.0))
+}
+
+fn bounded_f32(value: f32, min: f32, max: f32) -> Option<f32> {
+    if value.is_finite() && value >= min && value <= max {
+        Some(value)
+    } else {
+        None
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1056,5 +1177,41 @@ mod tests {
         // 33ms / 2.0 = 16.5ms → rounds to 16ms via div_f32
         assert!(task.current_tick_interval() < Duration::from_millis(17));
         assert!(task.current_tick_interval() > Duration::from_millis(15));
+    }
+
+    #[test]
+    fn client_perf_reports_are_bounded() {
+        let good = sanitize_client_perf(ClientPerfReport {
+            fps: 59.0,
+            avg_frame_ms: 16.8,
+            max_frame_ms: 55.0,
+            snapshot_gap_ms: Some(80.0),
+            rtt_ms: Some(25.0),
+            slow_frames: 2,
+        })
+        .expect("valid report");
+        assert_eq!(good.slow_frames, 2);
+
+        let bad_required = sanitize_client_perf(ClientPerfReport {
+            fps: f32::INFINITY,
+            avg_frame_ms: 16.8,
+            max_frame_ms: 55.0,
+            snapshot_gap_ms: Some(80.0),
+            rtt_ms: Some(25.0),
+            slow_frames: 2,
+        });
+        assert!(bad_required.is_none());
+
+        let bad_optional = sanitize_client_perf(ClientPerfReport {
+            fps: 59.0,
+            avg_frame_ms: 16.8,
+            max_frame_ms: 55.0,
+            snapshot_gap_ms: Some(90_000.0),
+            rtt_ms: Some(25.0),
+            slow_frames: 20_000,
+        })
+        .expect("invalid optional values are dropped");
+        assert_eq!(bad_optional.snapshot_gap_ms, None);
+        assert_eq!(bad_optional.slow_frames, 10_000);
     }
 }
