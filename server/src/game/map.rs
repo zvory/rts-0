@@ -53,17 +53,21 @@ impl Map {
         if player_count == 0 {
             return Err("player_count must be at least 1".to_string());
         }
-        if player_count > base_sites.len() {
+        if 2 * player_count > base_sites.len() {
             return Err(format!(
-                "map has {} base sites, but {player_count} players were requested",
-                base_sites.len()
+                "map has {} base sites but needs {} (2 per player) for {player_count} players",
+                base_sites.len(),
+                2 * player_count,
             ));
         }
 
         validate_base_clearance(size, &terrain, &base_sites)?;
 
-        let starts = base_sites.iter().take(player_count).copied().collect();
-        let expansion_sites = base_sites.iter().skip(player_count).copied().collect();
+        // baseSites are interleaved pairs: [start0, expansion0, start1, expansion1, ...].
+        // Even indices are player starts; odd indices are the paired neutral expansion bases.
+        // Only the first 2N sites are active; sites beyond 2N are unused for this player count.
+        let starts = base_sites.iter().step_by(2).take(player_count).copied().collect();
+        let expansion_sites = base_sites.iter().skip(1).step_by(2).take(player_count).copied().collect();
 
         Ok(Map {
             size,
@@ -273,8 +277,11 @@ mod tests {
     fn two_player_match_uses_opposite_authored_starts() {
         let map = Map::generate(2, 0);
         assert_eq!(map.starts, vec![(10, 10), (85, 85)]);
-        assert!(map.expansion_sites.contains(&(85, 10)));
-        assert!(map.expansion_sites.contains(&(10, 85)));
+        // Each player gets one paired interior expansion; the other corners are not spawned.
+        assert_eq!(map.expansion_sites, vec![(48, 23), (48, 73)]);
+        assert!(!map.expansion_sites.contains(&(85, 10)));
+        assert!(!map.expansion_sites.contains(&(10, 85)));
+        assert_eq!(map.expansion_sites.len(), 2);
     }
 
     #[test]
@@ -294,13 +301,15 @@ mod tests {
 
     #[test]
     fn authored_map_rejects_impassable_base_protection_area() {
-        let mut rows = vec!["................".to_string(); 16];
+        // 32×32 map; rock at (8,8) sits inside the protection area of the first base site.
+        // A valid second site at (24,24) satisfies the 2-sites-per-player requirement.
+        let mut rows = vec![".".repeat(32); 32];
         rows[8].replace_range(8..9, "#");
         let json = format!(
             r#"{{
               "name": "bad-base",
               "terrain": {},
-              "baseSites": [{{"x": 8, "y": 8}}]
+              "baseSites": [{{"x": 8, "y": 8}}, {{"x": 24, "y": 24}}]
             }}"#,
             serde_json::to_string(&rows).unwrap()
         );
