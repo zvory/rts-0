@@ -601,7 +601,9 @@ mod tests {
                     front.progress as f32 / front.total as f32
                 });
             }
-            v.prod_queue = Some(e.prod_queue().len() as u32);
+            if e.owner == viewer {
+                v.prod_queue = Some(e.prod_queue().len() as u32);
+            }
         }
         if let Some(progress) = e.build_progress_fraction() {
             v.build_progress = Some(progress);
