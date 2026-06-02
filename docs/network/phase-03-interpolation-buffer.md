@@ -26,11 +26,11 @@ next frame arrives.
 Try a slightly larger delay:
 
 - `2 * SNAPSHOT_MS` as the first candidate;
-- `3 * SNAPSHOT_MS` only if measurement shows repeated smaller gaps still punch through;
+- `3 * SNAPSHOT_MS` only if repeated smaller gaps still punch through in manual reproduction;
 - keep `TICK_HZ` unchanged;
 - keep command send path unchanged.
 
-Do not guess in production. Measure snapshot receive gaps before and after the change.
+Keep the default conservative. Compare the same manual reproduction before and after the change.
 
 ## Suggested Implementation
 
@@ -48,16 +48,15 @@ Better pass:
 
 If a dev query flag is added, clamp it tightly and keep the default explicit in `config.js`.
 
-## Measurements
+## Validation
 
-Record before/after:
+Check before/after:
 
-- snapshot receive interval p50/p90/p99;
-- number of frames where interpolation alpha clamps to `1`;
-- visible stutter reports under the same network-loss setup;
-- user-perceived command feedback, if relevant.
+- visible stutter under the same reproduction setup;
+- whether unit movement looks less stop-start during the freeze pattern;
+- whether command feedback still feels acceptable.
 
-Useful derived metric:
+If debug counters already exist, this ratio is useful:
 
 ```text
 alpha_clamped_frames / total_frames
@@ -74,6 +73,6 @@ If this ratio drops when delay increases, the buffer is doing useful work.
 ## Done Criteria
 
 - The chosen interpolation delay is documented in `client/src/config.js`.
-- Measurement shows fewer alpha-clamped frames or smoother receive jitter handling.
+- Validation shows fewer alpha-clamped frames or smoother receive jitter handling.
 - Command send path is unchanged.
 - Existing tests pass.

@@ -17,14 +17,13 @@ though the authoritative simulation continues.
 
 Do the simpler WebSocket work in this order:
 
-1. Measure receive gaps, writer stalls, stale backlog, parse/apply cost, and server tick cost.
-2. Prioritize reliable messages so `pong`, `error`, `start`, and `gameOver` do not sit behind
+1. Prioritize reliable messages so `pong`, `error`, `start`, and `gameOver` do not sit behind
    pending snapshots.
-3. Make snapshots latest-only so old unsent snapshots are replaced by newer state.
-4. Slightly increase the interpolation buffer to absorb small receive jitter.
-5. Optionally remove the obvious redundant entity interpolation/allocation path.
-6. Compact or binary-encode WebSocket snapshots if measured payload size or parse/apply cost
-   justifies it.
+2. Make snapshots latest-only so old unsent snapshots are replaced by newer state.
+3. Slightly increase the interpolation buffer to absorb small receive jitter.
+4. Optionally remove the obvious redundant entity interpolation/allocation path.
+5. Compact or binary-encode WebSocket snapshots only if the simpler queue and buffer work still
+   leaves obvious snapshot-size or parse/apply pressure.
 
 ## Current Repo Facts
 
@@ -54,7 +53,7 @@ Current model:
 - `PLAYER_CHANNEL_CAP = 256`, so a backed-up player can accumulate about 8.5 s of stale 30 Hz
   snapshots.
 
-## Quick Baseline
+## Existing Payload Samples
 
 The first docs investigation sampled early-game frames only:
 
@@ -82,14 +81,13 @@ Dev self-play full-world watch, early run, one recipient, first ~15 s of snapsho
 | max | 4034 | 12 |
 | avg | 3803 | 10 |
 
-These are not worst-case numbers. Phase 00 should capture late-game or stress snapshots before
-payload work.
+These are not worst-case numbers. Treat them only as context. Do not block Phases 01-03 on better
+payload data.
 
 ## Phase Index
 
 | Phase | File | Scope | Difficulty |
 | --- | --- | --- | --- |
-| 00 | [measurement](phase-00-measurement.md) | Instrument and prove where the freeze happens. | Low |
 | 01 | [reliable message priority](phase-01-reliable-message-priority.md) | Keep control messages out from behind snapshot backlog. | Low-medium |
 | 02 | [latest-only snapshots](phase-02-latest-only-snapshots.md) | Replace stale unsent snapshots with the newest state. | Low-medium |
 | 03 | [interpolation buffer tuning](phase-03-interpolation-buffer.md) | Slightly increase render delay to absorb receive jitter. | Low |
@@ -100,14 +98,14 @@ Take only one phase per branch unless the user explicitly asks for a broader imp
 
 ## Recommendation
 
-Do Phases 00-03 first.
+Do Phases 01-03 first.
 
 Reasoning:
 
 - Reliable priority and latest-only snapshots directly target freeze/catch-up behavior.
 - Interpolation buffer tuning can absorb small receive jitter without changing server behavior.
 - Phase 04 is optional and intentionally narrow.
-- Phase 05 should be measurement-driven because binary protocols add test surface.
+- Phase 05 should stay later because compact or binary protocols add test surface.
 
 ## References
 
