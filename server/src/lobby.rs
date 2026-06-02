@@ -1035,6 +1035,7 @@ fn load_replay_artifact(name: &str) -> Result<ReplayArtifact, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::protocol::{EntityView, Event, ResourceDelta};
 
     #[test]
     fn replay_rooms_default_to_1_5x_speed() {
@@ -1067,5 +1068,36 @@ mod tests {
         // 33ms / 2.0 = 16.5ms → rounds to 16ms via div_f32
         assert!(task.current_tick_interval() < Duration::from_millis(17));
         assert!(task.current_tick_interval() > Duration::from_millis(15));
+    }
+
+    #[test]
+    fn wire_compaction_removes_resource_entities_but_keeps_deltas() {
+        let mut snapshot = Snapshot {
+            tick: 10,
+            steel: 75,
+            oil: 0,
+            supply_used: 1,
+            supply_cap: 10,
+            entities: vec![
+                EntityView::new(1, 1, kinds::WORKER, 10.0, 20.0, 40, 40, "idle"),
+                EntityView::new(2, 0, kinds::STEEL, 30.0, 40.0, 1, 1, "idle"),
+                EntityView::new(3, 0, kinds::OIL, 50.0, 60.0, 1, 1, "idle"),
+            ],
+            resource_deltas: vec![ResourceDelta {
+                id: 2,
+                remaining: 1498,
+            }],
+            events: vec![Event::Notice {
+                msg: "hello".to_string(),
+            }],
+        };
+
+        compact_snapshot_for_wire(&mut snapshot);
+
+        assert_eq!(snapshot.entities.len(), 1);
+        assert_eq!(snapshot.entities[0].kind, kinds::WORKER);
+        assert_eq!(snapshot.resource_deltas.len(), 1);
+        assert_eq!(snapshot.resource_deltas[0].remaining, 1498);
+        assert_eq!(snapshot.events.len(), 1);
     }
 }
