@@ -2096,6 +2096,7 @@ fn combat_rendezvous_is_four_tiles_toward_center() {
             supply_used: 0,
             supply_cap: 0,
             entities: vec![],
+            resource_deltas: vec![],
             events: vec![],
         },
     };

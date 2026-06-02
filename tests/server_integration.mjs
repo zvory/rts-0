@@ -84,8 +84,9 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   ok(mine.filter((e) => e.kind === "industrial_center").length === 1, `A owns 1 Industrial Center`);
   const workers = mine.filter((e) => e.kind === "worker");
   ok(workers.length === 4, `A owns 4 workers (${workers.length})`);
-  const steelNodes = snap.entities.filter((e) => e.kind === "steel");
-  ok(steelNodes.length > 0 && steelNodes[0].owner === 0, `A sees neutral steel nodes (${steelNodes.length})`);
+  const steelNodes = startA.map.resources.filter((e) => e.kind === "steel");
+  ok(steelNodes.length > 0 && typeof steelNodes[0].id === "number", `start lists neutral steel nodes (${steelNodes.length})`);
+  ok(!snap.entities.some((e) => e.kind === "steel" || e.kind === "oil"), "snapshot omits static resource entities");
   ok(!snap.entities.some((e) => e.owner === B.playerId), `FOG: A cannot see B at start`);
 
   A.send({ t: "command", cmd: { c: "gather", units: workers.map((w) => w.id), node: steelNodes[0].id } });

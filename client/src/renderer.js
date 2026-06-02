@@ -20,6 +20,7 @@ import {
   FOG_UNEXPLORED_ALPHA,
   STATS,
   PLAYER_PALETTE,
+  RESOURCE_AMOUNTS,
 } from "./config.js";
 import {
   KIND,
@@ -603,7 +604,7 @@ export class Renderer {
     const stat = STATS[e.kind] || {};
     const base = stat.size || 11;
     // Scale a little with remaining amount (clamped) so depleted nodes shrink.
-    const full = e.kind === KIND.OIL ? 5000 : 1500;
+    const full = RESOURCE_AMOUNTS[e.kind] || 1;
     const frac = e.remaining == null ? 1 : clamp01(e.remaining / full);
     const r = base * (0.55 + 0.45 * frac);
 
