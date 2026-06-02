@@ -694,6 +694,9 @@ ranked decision loop (`decision.rs`) that emits ordinary `Command`s through shar
 The first code-defined profiles are `rifle_flood_fast`, `rifle_flood_full_saturation`, and
 `tech_to_tanks`; they parameterize worker targets, supply buffers, building/tech goals, production
 priorities, resource timing, and attack thresholds without providing their own `think()` functions.
+`tech_to_tanks` is a steel-first fast-tech profile: it keeps worker production active while saving
+for the tank-factory step, delays oil workers until at least eight workers are already mining steel,
+and treats a single completed tank as a valid minimum attack wave.
 The live lobby AI uses this shared core through `AiController`, which only owns live identity,
 profile id, cadence, and persistent decision memory. Profiles are still not client-selectable.
 
