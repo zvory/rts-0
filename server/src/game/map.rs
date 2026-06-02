@@ -12,6 +12,9 @@ use std::collections::HashSet;
 
 use crate::config;
 use crate::protocol::terrain;
+use rand::rngs::SmallRng;
+use rand::seq::SliceRandom;
+use rand::SeedableRng;
 use serde::Deserialize;
 
 const DEFAULT_MAP_JSON: &str = include_str!("../../assets/maps/default.json");
@@ -37,14 +40,14 @@ pub struct Map {
 impl Map {
     /// Load the deterministic handcrafted map for `player_count` players.
     ///
-    /// The `seed` parameter is intentionally ignored while the hardcoded map is active; it remains
-    /// in the API so replay/lobby callers do not need to change before lobby map selection exists.
-    pub fn generate(player_count: usize, _seed: u32) -> Map {
-        Self::from_authored_json(player_count, DEFAULT_MAP_JSON)
+    /// The `seed` is used to shuffle which authored base pair each player draws, so the
+    /// human/AI seating in the lobby does not pin them to the same corner every match.
+    pub fn generate(player_count: usize, seed: u32) -> Map {
+        Self::from_authored_json(player_count, DEFAULT_MAP_JSON, seed)
             .unwrap_or_else(|err| panic!("invalid hardcoded map asset: {err}"))
     }
 
-    fn from_authored_json(player_count: usize, json: &str) -> Result<Map, String> {
+    fn from_authored_json(player_count: usize, json: &str, seed: u32) -> Result<Map, String> {
         let authored: AuthoredMap =
             serde_json::from_str(json).map_err(|err| format!("map JSON parse error: {err}"))?;
         let (size, terrain) = parse_terrain(&authored.terrain)?;
@@ -65,9 +68,17 @@ impl Map {
 
         // baseSites are interleaved pairs: [start0, expansion0, start1, expansion1, ...].
         // Even indices are player starts; odd indices are the paired neutral expansion bases.
-        // Only the first 2N sites are active; sites beyond 2N are unused for this player count.
-        let starts = base_sites.iter().step_by(2).take(player_count).copied().collect();
-        let expansion_sites = base_sites.iter().skip(1).step_by(2).take(player_count).copied().collect();
+        // Shuffle the pairs (keeping each start with its expansion) so the lobby seat order does
+        // not pin players to the same corner every match. Only the first N shuffled pairs are
+        // active; the remainder of the authored sites are unused for this player count.
+        let total_pairs = base_sites.len() / 2;
+        let mut pairs: Vec<((u32, u32), (u32, u32))> = (0..total_pairs)
+            .map(|i| (base_sites[2 * i], base_sites[2 * i + 1]))
+            .collect();
+        let mut rng = SmallRng::seed_from_u64(seed as u64);
+        pairs.shuffle(&mut rng);
+        let (starts, expansion_sites): (Vec<_>, Vec<_>) =
+            pairs.into_iter().take(player_count).unzip();
 
         Ok(Map {
             size,
@@ -263,9 +274,9 @@ mod tests {
     }
 
     #[test]
-    fn hardcoded_map_is_deterministic_across_seeds() {
-        let a = Map::generate(4, 1);
-        let b = Map::generate(4, 2);
+    fn same_seed_produces_identical_layout() {
+        let a = Map::generate(4, 0xdead_beef);
+        let b = Map::generate(4, 0xdead_beef);
 
         assert_eq!(a.size, b.size);
         assert_eq!(a.terrain, b.terrain);
@@ -274,14 +285,47 @@ mod tests {
     }
 
     #[test]
-    fn two_player_match_uses_opposite_authored_starts() {
-        let map = Map::generate(2, 0);
-        assert_eq!(map.starts, vec![(10, 10), (85, 85)]);
-        // Each player gets one paired interior expansion; the other corners are not spawned.
-        assert_eq!(map.expansion_sites, vec![(48, 23), (48, 73)]);
-        assert!(!map.expansion_sites.contains(&(85, 10)));
-        assert!(!map.expansion_sites.contains(&(10, 85)));
-        assert_eq!(map.expansion_sites.len(), 2);
+    fn different_seeds_produce_different_start_orderings() {
+        // With 4 authored pairs and at least one differing 2-player ordering, scanning a handful of
+        // seeds must yield more than one distinct starts vector. If shuffling silently breaks this
+        // catches it.
+        let layouts: HashSet<Vec<(u32, u32)>> = (0..32u32)
+            .map(|seed| Map::generate(2, seed).starts)
+            .collect();
+        assert!(
+            layouts.len() > 1,
+            "expected at least two distinct start orderings across seeds, got {layouts:?}"
+        );
+    }
+
+    #[test]
+    fn shuffled_starts_remain_paired_with_their_expansions() {
+        // Authored pairs (start -> expansion) from default.json.
+        let authored: &[((u32, u32), (u32, u32))] = &[
+            ((10, 10), (48, 23)),
+            ((85, 85), (48, 73)),
+            ((85, 10), (73, 47)),
+            ((10, 85), (23, 47)),
+        ];
+        for seed in 0..16u32 {
+            let map = Map::generate(4, seed);
+            assert_eq!(map.starts.len(), map.expansion_sites.len());
+            for (start, expansion) in map.starts.iter().zip(map.expansion_sites.iter()) {
+                assert!(
+                    authored.contains(&(*start, *expansion)),
+                    "start {start:?} paired with expansion {expansion:?} is not an authored pair (seed {seed})"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn each_player_gets_one_paired_expansion() {
+        for seed in 0..16u32 {
+            let map = Map::generate(2, seed);
+            assert_eq!(map.starts.len(), 2);
+            assert_eq!(map.expansion_sites.len(), 2);
+        }
     }
 
     #[test]
@@ -293,6 +337,7 @@ mod tests {
               "terrain": ["..", ".x"],
               "baseSites": [{"x": 0, "y": 0}]
             }"#,
+            0,
         )
         .expect_err("bad terrain should be rejected");
 
@@ -314,7 +359,7 @@ mod tests {
             serde_json::to_string(&rows).unwrap()
         );
 
-        let err = Map::from_authored_json(1, &json)
+        let err = Map::from_authored_json(1, &json, 0)
             .expect_err("blocked base protection area should be rejected");
 
         assert!(err.contains("impassable terrain"));
