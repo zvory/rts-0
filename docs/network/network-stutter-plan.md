@@ -1,6 +1,6 @@
 # Network Stutter Plan
 
-Status: docs-only plan.
+Status: Phases 01-03 implemented; Phases 04-05 remain planned.
 
 Date: 2026-06-02.
 
@@ -10,10 +10,10 @@ rewrite.
 
 ## Short Answer
 
-The best network-side work is to stop treating every outbound message as equal FIFO traffic. The
-current server sends snapshots at 30/s/player through the same per-player path as reliable control
-messages. Under writer stalls, this can create stale snapshot backlog and catch-up behavior even
-though the authoritative simulation continues.
+The best network-side work was to stop treating every outbound message as equal FIFO traffic. Before
+Phases 01-03, the server sent snapshots at 30/s/player through the same per-player path as reliable
+control messages. Under writer stalls, this could create stale snapshot backlog and catch-up
+behavior even though the authoritative simulation continued.
 
 Do the simpler WebSocket work in this order:
 
@@ -46,12 +46,14 @@ Current model:
 - `SNAPSHOT_EVERY_N_TICKS = 1`, so the server attempts 30 snapshots/s/player.
 - Client commands are small JSON messages sent upstream through the same WebSocket.
 - Server snapshots are full per-player state, fog-filtered, JSON text frames.
-- The room task does not await socket writes directly. It uses `try_send` into a per-player
-  `mpsc::Sender<ServerMessage>`.
-- The per-connection writer task serializes `ServerMessage` with `serde_json::to_string` and awaits
-  `sink.send(Message::Text(...))`.
-- `PLAYER_CHANNEL_CAP = 256`, so a backed-up player can accumulate about 8.5 s of stale 30 Hz
-  snapshots.
+- The room task does not await socket writes directly. It sends reliable messages through a bounded
+  per-player FIFO and snapshots through a replaceable latest-only slot.
+- The per-connection writer task drains reliable messages first, sends at most one latest snapshot,
+  then checks reliable messages again. It serializes `ServerMessage` with `serde_json::to_string`
+  and awaits `sink.send(Message::Text(...))`.
+- Pending snapshots are coalesced, so a backed-up player cannot accumulate seconds of stale 30 Hz
+  snapshot frames in server memory. Resource remaining deltas are carried forward when pending
+  snapshots are replaced.
 
 ## Existing Payload Samples
 
