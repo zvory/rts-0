@@ -31,6 +31,45 @@ The result is a useful simple system, but stationary combat units are still just
 ordinary movable circles in collision, and vehicle direction is only "where the
 last path segment or target was."
 
+## External Research Takeaways
+
+This pass looked at RTS/coordinated movement writing and crowd movement papers,
+then filtered it through this game's desire for bounded, deterministic, somewhat
+rough movement.
+
+- Dave Pottinger's 1999 Game Developer articles, [Coordinated Unit Movement][pottinger-1]
+  and [Implementing Coordinated Movement][pottinger-2], are the closest fit for
+  this problem. The main takeaway is that pathfinding is only half the system:
+  executing the path, resolving collision, and coordinating groups are equally
+  important. Pottinger also draws a useful distinction between a loose `Group`
+  and a `Formation`: a group mostly wants to stay together, while a formation has
+  an orientation and per-unit relative positions.
+- Pottinger describes several cohesion levels: same speed, same path, and same
+  arrival time. This game probably wants a lighter version: preserve arrival
+  shape on long orders, but do not force same-speed/same-arrival marching unless
+  a future explicit formation command needs it.
+- Craig Reynolds' [Steering Behaviors for Autonomous Characters][reynolds]
+  separates action selection, steering, and locomotion. That maps well to this
+  codebase: `Order`/`MoveCoordinator` choose intent, a local locomotion layer
+  should steer/collide, and body/turret turn-rate state should handle physical
+  execution.
+- Elijah Emerson's [Crowd Pathfinding and Steering Using Flow Field Tiles][emerson]
+  explains the Supreme Commander 2-style route: flow fields solve the cost of
+  moving hundreds or thousands of agents toward goals, support dynamic terrain,
+  and combine global fields with local steering. This is valuable reference, but
+  it is intentionally more polished and more global than we want right now.
+- Treuille, Cooper, and Popovic's [Continuum Crowds][continuum] shows the high
+  end of the field-based approach: dynamic potential fields integrate global
+  navigation with moving obstacles and produce smooth crowd behavior. That is a
+  good warning as much as a tool: it removes exactly the traffic friction and
+  imperfect local behavior we may want as gameplay texture.
+
+[pottinger-1]: https://www.gamedeveloper.com/programming/coordinated-unit-movement
+[pottinger-2]: https://www.gamedeveloper.com/programming/implementing-coordinated-movement
+[reynolds]: https://www.red3d.com/cwr/papers/1999/gdc99steer.html
+[emerson]: https://www.gameaipro.com/GameAIPro/GameAIPro_Chapter23_Crowd_Pathfinding_and_Steering_Using_Flow_Field_Tiles.pdf
+[continuum]: https://grail.cs.washington.edu/projects/crowd-flows/continuum-crowds.pdf
+
 ## Design Goals
 
 - Stationary combat units should hold ground better than moving units.
@@ -41,6 +80,8 @@ last path segment or target was."
 - Tanks need independent turret direction, and turret traverse must matter for
   firing.
 - Tanks should not jiggle their body at every tile-center direction change.
+- Far group-move orders should roughly preserve the selected units' starting
+  shape on arrival. Close group-move orders should still let units bunch up.
 - The game should keep some roughness: traffic jams, blocked lanes, and imperfect
   local motion are acceptable flavor.
 - Do not recreate StarCraft II-style global flow fields as the default solution.
@@ -112,7 +153,44 @@ attempt to make every group move perfect.
 This option gives nicer behavior but has more tuning risk. It can also erase too
 much jank if over-tuned.
 
-### Option D: Persistent Standing Slots
+### Option D: Distance-Sensitive Formation Goals
+
+Extend `MoveCoordinator::order_group_move` so group movement assigns per-unit
+destination slots from the selected units' starting layout.
+
+The current goal spreading searches tiles around the clicked point. That avoids
+every unit using the exact same tile, but it does not know whether the command is
+a long march or a tiny regroup click. A distance-sensitive formation pass would
+compute:
+
+- the selected group's centroid;
+- each selected unit's offset from that centroid;
+- the distance from centroid to clicked point;
+- a formation scale from `0.0` for near clicks to `1.0` for far clicks.
+
+Then each unit gets a desired destination:
+
+```text
+formation_goal = clicked_point + start_offset * formation_scale
+```
+
+Near click among the selected units: `formation_scale` is near `0.0`, so units
+use the existing compact goal spread around the click. Far click across the map:
+`formation_scale` is near `1.0`, so the group arrives in roughly the shape it
+started in. Mid-distance clicks blend between the two.
+
+This should not be a rigid formation lock. It is only arrival-slot assignment.
+Units can still path independently, get delayed, slide around obstacles, and
+arrive somewhat messy. That preserves the desired roughness while fixing the
+bad case where four well-spaced units are ordered across the map and all try to
+collapse onto one point at the end.
+
+The simple version preserves offsets in world orientation. A more polished
+version rotates offsets so the group's starting "front" faces the movement
+direction, but that is probably unnecessary early and may make movement feel too
+managed.
+
+### Option E: Persistent Standing Slots
 
 Add reservations for final standing positions, firing positions, and deployed
 weapon footprints. Goal spreading currently assigns target tiles at order time,
@@ -128,10 +206,10 @@ Useful reservations:
 
 This helps groups settle without all fighting for the same final point. It is
 also a good foundation for "set up AT gun facing this lane." It is more
-bookkeeping than Option B, so it should not be the first fix unless final-position
-behavior becomes the central problem.
+bookkeeping than Option B or Option D, so it should not be the first fix unless
+final-position behavior becomes the central problem.
 
-### Option E: Vehicle Locomotion
+### Option F: Vehicle Locomotion
 
 For vehicles, stop treating `facing` as instantaneous. Add explicit body
 orientation and limited turn rate:
@@ -152,7 +230,7 @@ This fixes tank body jiggle and makes side/rear armor meaningful. It intentional
 adds some clumsy vehicle behavior, which fits the requested flavor better than
 perfect steering.
 
-### Option F: Turret and Traverse Model
+### Option G: Turret and Traverse Model
 
 Add independent weapon direction for units that need it:
 
@@ -176,7 +254,7 @@ For AT guns, this gives several design knobs:
 
 This is the required path for turret swivel time and future firing arcs.
 
-### Option G: Full Dynamic Navigation / Flow Fields / ORCA
+### Option H: Full Dynamic Navigation / Flow Fields / ORCA
 
 Use a more advanced crowd system: flow fields, ORCA/RVO, navmesh agents, or a
 dynamic obstacle cost map.
@@ -192,11 +270,12 @@ Use a staged hybrid:
 
 1. Keep the current tile A* and `MoveCoordinator`.
 2. Replace symmetric collision with solid weighted collision profiles.
-3. Add body-facing turn rates for tanks first, then optionally for all units.
-4. Add turret/weapon-facing state and aim gates for tanks and deployed weapons.
-5. Add small local avoidance only after weighted collision exposes the remaining
+3. Add distance-sensitive formation goals for group move orders.
+4. Add body-facing turn rates for tanks first, then optionally for all units.
+5. Add turret/weapon-facing state and aim gates for tanks and deployed weapons.
+6. Add small local avoidance only after weighted collision exposes the remaining
    bad cases.
-6. Add persistent standing/deployment slots only when final-position behavior
+7. Add persistent standing/deployment slots only when final-position behavior
    needs it.
 
 The core concept is:
@@ -329,6 +408,8 @@ Recommended jank to keep:
 - Units do not block A* globally.
 - Chokes can clog.
 - Groups can arrive messy.
+- Formation preservation is an arrival preference, not a guaranteed marching
+  formation.
 - Tanks can slow, pivot, or get temporarily boxed in.
 - Deployed weapons are strong positional commitments.
 - Local avoidance is short-range only and never guarantees clean flow.
@@ -336,6 +417,7 @@ Recommended jank to keep:
 Jank to remove:
 
 - Stationary firing units sliding around because passers-by nudge them.
+- Far move orders collapsing a loose group into an artificial clump.
 - Tank hull direction snapping at every tile waypoint.
 - Tank barrel and hull being the same angle.
 - Firing being instant just because the target is in range.
@@ -351,20 +433,30 @@ Jank to remove:
 - Decide whether constructing workers should remain pass-through or become firm.
 - Add tests for planted units holding position against moving units.
 
-### Phase 2: Angle Interpolation Cleanup
+### Phase 2: Distance-Sensitive Formation Goals
+
+- In `MoveCoordinator::order_group_move`, compute the selected group's centroid
+  and each unit's starting offset.
+- Blend from compact goal spreading for near clicks to offset-preserving slots
+  for far clicks.
+- Search near each desired slot for a passable tile, using deterministic order.
+- Keep the result as per-unit goals, not a persistent formation lock.
+- Add tests for far-click preservation and near-click regrouping.
+
+### Phase 3: Angle Interpolation Cleanup
 
 - Keep the server's existing `facing` field, but make the client interpolate it
   by shortest angular distance.
 - This can reduce visible snap even before vehicle locomotion changes.
 
-### Phase 3: Tank Body Locomotion
+### Phase 4: Tank Body Locomotion
 
 - Add limited body turn rate for tanks.
 - Follow a path lookahead point instead of instantly facing each tile center.
 - Reduce speed when the hull is badly misaligned, or allow slow pivot-in-place.
 - Add tests that body facing changes gradually across a 90-degree turn.
 
-### Phase 4: Turrets and Aim Gates
+### Phase 5: Turrets and Aim Gates
 
 - Add weapon/turret facing to combat state.
 - Add aim tolerance before firing.
@@ -372,13 +464,13 @@ Jank to remove:
 - Make tank hull and barrel draw independently.
 - Add tests that a tank cannot fire until the turret has traversed onto target.
 
-### Phase 5: Facing-Aware Armor
+### Phase 6: Facing-Aware Armor
 
 - Add a `hit_facing` helper in `rules::combat`.
 - Apply front/side/rear multipliers for armored victims.
 - Add tests for front, side, and rear AT hits.
 
-### Phase 6: Deployed AT Guns
+### Phase 7: Deployed AT Guns
 
 - Add AT-gun or AT-team deployed state if desired.
 - Add fixed or slow-traverse firing arc.
@@ -396,6 +488,10 @@ Jank to remove:
 - Two equal moving units still split push and do not overlap.
 - Ghost harvesters keep the current economy behavior, if that behavior is still
   desired.
+- Four spaced units ordered far away arrive with roughly similar relative
+  spacing.
+- Four spaced units ordered to a point among themselves compact into a tighter
+  group.
 - A tank following a path with a sharp corner changes body facing gradually.
 - Client interpolation rotates angles through the shortest direction.
 - A tank with turret facing away from a target waits before firing.
@@ -411,10 +507,13 @@ Jank to remove:
   or as long as they have a target?
 - Should idle infantry be `Firm`, or only `Soft` until they are firing or given a
   hold-position command?
+- What distance threshold should switch a group command from regrouping to
+  preserving formation?
+- Should far-order formation offsets stay in world orientation, or rotate toward
+  the movement direction?
 - Should future AT guns be their own unit kind, or should AT teams deploy into an
   AT-gun stance?
 - Should tanks turn in place when path heading is too different, or keep moving
   slowly while turning?
 - Should side/rear damage be only for armored victims, or also for crew weapons
   and buildings later?
-
