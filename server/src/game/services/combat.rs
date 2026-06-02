@@ -11,6 +11,8 @@ use crate::game::services::spatial::SpatialIndex;
 use crate::game::services::world_query;
 use crate::protocol::Event;
 use crate::rules::combat as combat_rules;
+use crate::rules::projection;
+use crate::rules::terrain::TerrainKind;
 
 /// Extra slack (px) added to attack range checks so units don't dance at the exact boundary.
 const RANGE_SLACK: f32 = 4.0;
@@ -319,7 +321,9 @@ fn apply_damage(
     let attacker_kind = entities.get(attacker).map(|e| e.kind);
     let victim_kind = entities.get(victim).map(|e| e.kind);
     let effective_dmg = match (attacker_kind, victim_kind) {
-        (Some(ak), Some(vk)) => combat_rules::effective_damage(ak, vk, dmg),
+        (Some(ak), Some(vk)) => {
+            combat_rules::effective_damage(ak, vk, dmg, Some(TerrainKind::Open))
+        }
         _ => dmg,
     };
     if let Some(v) = entities.get_mut(victim) {
@@ -343,10 +347,7 @@ fn apply_damage(
     // friendly fire tracers + enemy muzzle flashes both render. Attacker's owner always gets it.
     let player_ids: Vec<u32> = events.keys().copied().collect();
     for pid in player_ids {
-        let visible = pid == attacker_owner
-            || fog.is_visible_world(pid, ax, ay)
-            || fog.is_visible_world(pid, vx, vy);
-        if !visible {
+        if !projection::attack_event_visible_to(pid, ax, ay, vx, vy, attacker_owner, fog) {
             continue;
         }
         events.entry(pid).or_default().push(Event::Attack {
@@ -417,7 +418,9 @@ fn apply_overpenetration(
         let effective_dmg = entities
             .get(id)
             .map(|e| match attacker_kind {
-                Some(ak) => combat_rules::effective_damage(ak, e.kind, splash_dmg),
+                Some(ak) => {
+                    combat_rules::effective_damage(ak, e.kind, splash_dmg, Some(TerrainKind::Open))
+                }
                 None => splash_dmg,
             })
             .unwrap_or(0);
@@ -428,10 +431,7 @@ fn apply_overpenetration(
             v.hp = v.hp.saturating_sub(effective_dmg);
         }
         for pid in &player_ids {
-            let visible = *pid == attacker_owner
-                || fog.is_visible_world(*pid, ax, ay)
-                || fog.is_visible_world(*pid, tx, ty);
-            if !visible {
+            if !projection::attack_event_visible_to(*pid, ax, ay, tx, ty, attacker_owner, fog) {
                 continue;
             }
             events.entry(*pid).or_default().push(Event::Attack {

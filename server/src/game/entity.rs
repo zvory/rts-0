@@ -22,7 +22,7 @@ pub const NEUTRAL: u32 = 0;
 // `protocol::kinds` and conversion happens only at the wire boundary).
 // ---------------------------------------------------------------------------
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum EntityKind {
     Worker,
     Rifleman,

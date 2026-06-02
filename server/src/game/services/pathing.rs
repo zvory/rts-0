@@ -6,13 +6,17 @@
 
 use std::collections::HashMap;
 
+use crate::game::entity::EntityKind;
 use crate::game::map::Map;
 use crate::game::pathfinding::{self, Passability};
 use crate::game::services::occupancy::Occupancy;
+use crate::rules::terrain::{self, TerrainKind};
 
 /// Parameters for a single path query.
 #[derive(Clone)]
 pub struct PathRequest {
+    /// Entity kind being routed.
+    pub kind: EntityKind,
     /// Start tile (inclusive).
     pub start: (i32, i32),
     /// Goal tile (inclusive).
@@ -27,6 +31,7 @@ pub struct PathRequest {
 struct TerrainPassability<'a> {
     map: &'a Map,
     occupancy: &'a Occupancy<'a>,
+    kind: EntityKind,
     radius_tiles: u32,
 }
 
@@ -35,7 +40,12 @@ impl TerrainPassability<'_> {
         if !self.map.in_bounds(tx, ty) {
             return false;
         }
-        if !self.map.is_passable(tx, ty) {
+        let Some(terrain_kind) =
+            TerrainKind::from_map_code(self.map.terrain_at(tx as u32, ty as u32))
+        else {
+            return false;
+        };
+        if !terrain::movement_allowed(self.kind, terrain_kind) {
             return false;
         }
         if !self.occupancy.passable(tx, ty) {
@@ -59,7 +69,7 @@ impl Passability for TerrainPassability<'_> {
     }
 }
 
-type CacheKey = ((i32, i32), (i32, i32), u32);
+type CacheKey = (EntityKind, (i32, i32), (i32, i32), u32);
 
 struct CacheEntry {
     tile_path: Vec<(i32, i32)>,
@@ -104,6 +114,7 @@ impl PathingService {
         let pass = TerrainPassability {
             map,
             occupancy,
+            kind: req.kind,
             radius_tiles: req.radius_tiles,
         };
 
@@ -123,7 +134,7 @@ impl PathingService {
 
         let waypoints = pathfinding::to_world_waypoints(&tile_path);
         if !tile_path.is_empty() {
-            self.cache_insert(req.start, req.goal, req.radius_tiles, tile_path);
+            self.cache_insert(req.kind, req.start, req.goal, req.radius_tiles, tile_path);
         }
         waypoints
     }
@@ -133,7 +144,7 @@ impl PathingService {
         req: &PathRequest,
         pass: &P,
     ) -> Option<Vec<(i32, i32)>> {
-        let key: CacheKey = (req.start, req.goal, req.radius_tiles);
+        let key: CacheKey = (req.kind, req.start, req.goal, req.radius_tiles);
         let entry = self.cache.get_mut(&key)?;
         for &(tx, ty) in &entry.tile_path {
             if !pass.passable(tx, ty) {
@@ -146,6 +157,7 @@ impl PathingService {
 
     fn cache_insert(
         &mut self,
+        kind: EntityKind,
         start: (i32, i32),
         goal: (i32, i32),
         radius: u32,
@@ -162,7 +174,7 @@ impl PathingService {
             }
         }
         self.cache.insert(
-            (start, goal, radius),
+            (kind, start, goal, radius),
             CacheEntry {
                 tile_path,
                 last_used: self.tick,
@@ -177,8 +189,14 @@ impl PathingService {
         self.cache.len()
     }
 
-    pub fn cache_contains(&self, start: (i32, i32), goal: (i32, i32), radius: u32) -> bool {
-        self.cache.contains_key(&(start, goal, radius))
+    pub fn cache_contains(
+        &self,
+        kind: EntityKind,
+        start: (i32, i32),
+        goal: (i32, i32),
+        radius: u32,
+    ) -> bool {
+        self.cache.contains_key(&(kind, start, goal, radius))
     }
 }
 
@@ -207,6 +225,7 @@ mod tests {
         let reqs = [((1, 1), (2, 2)), ((1, 1), (3, 3)), ((2, 2), (4, 4))];
         for (start, goal) in &reqs {
             let req = PathRequest {
+                kind: EntityKind::Worker,
                 start: *start,
                 goal: *goal,
                 radius_tiles: 0,
@@ -222,6 +241,7 @@ mod tests {
         // This 4th insert triggers eviction (capacity is 3). All entries have
         // last_used == 1, so the tie-breaker is the cache key itself.
         let req4 = PathRequest {
+            kind: EntityKind::Worker,
             start: (1, 1),
             goal: (5, 5),
             radius_tiles: 0,
@@ -236,13 +256,13 @@ mod tests {
         // Both instances should have evicted the same key: the one with the
         // smallest (start, goal, radius) tuple.
         let evicted = ((1, 1), (2, 2), 0u32);
-        assert!(!a.cache_contains(evicted.0, evicted.1, evicted.2));
-        assert!(!b.cache_contains(evicted.0, evicted.1, evicted.2));
+        assert!(!a.cache_contains(EntityKind::Worker, evicted.0, evicted.1, evicted.2));
+        assert!(!b.cache_contains(EntityKind::Worker, evicted.0, evicted.1, evicted.2));
 
         // And both should still contain the other three.
         for (start, goal) in &[((1, 1), (3, 3)), ((2, 2), (4, 4)), ((1, 1), (5, 5))] {
-            assert!(a.cache_contains(*start, *goal, 0));
-            assert!(b.cache_contains(*start, *goal, 0));
+            assert!(a.cache_contains(EntityKind::Worker, *start, *goal, 0));
+            assert!(b.cache_contains(EntityKind::Worker, *start, *goal, 0));
         }
     }
 
@@ -260,6 +280,7 @@ mod tests {
             &map,
             &occ,
             PathRequest {
+                kind: EntityKind::Worker,
                 start,
                 goal,
                 radius_tiles: 0,
@@ -268,12 +289,13 @@ mod tests {
         );
         assert!(failed.is_empty());
         assert_eq!(service.cache_len(), 0);
-        assert!(!service.cache_contains(start, goal, 0));
+        assert!(!service.cache_contains(EntityKind::Worker, start, goal, 0));
 
         let found = service.request(
             &map,
             &occ,
             PathRequest {
+                kind: EntityKind::Worker,
                 start,
                 goal,
                 radius_tiles: 0,
@@ -281,6 +303,6 @@ mod tests {
             },
         );
         assert!(!found.is_empty());
-        assert!(service.cache_contains(start, goal, 0));
+        assert!(service.cache_contains(EntityKind::Worker, start, goal, 0));
     }
 }
