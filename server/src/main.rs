@@ -286,7 +286,7 @@ async fn handle_connection(socket: WebSocket, lobby: Lobby) {
                     Ok(m) => m,
                     Err(err) => {
                         // Malformed input is the client's problem; tell it and keep the socket.
-                        debug!(player_id, %err, "ignoring malformed client message");
+                        debug!(player_id, %err, text = %text, "ignoring malformed client message");
                         let _ = msg_tx.try_send(ServerMessage::Error {
                             msg: "malformed message".to_string(),
                         });
