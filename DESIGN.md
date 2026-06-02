@@ -531,9 +531,11 @@ and forest-specific rules are future work.
   does not reserve it. Extra workers that arrive while the slot is taken go idle. The slot
   is advisory and self-heals — it's only honored while the recorded worker is alive and
   actively harvesting that node, so death / re-order / retarget free it automatically.
-- Starting layout: each base site gets 18 steel patches and 3 oil patches. The map seeds one
-  neutral expansion site per player, so every match has exactly `2 × player_count` total base
-  sites and every player has somewhere to expand without increasing the room-size cap.
+- Starting layout: each base site gets 18 steel patches and 3 oil patches. Player starts are
+  randomly assigned to distinct corners for 1-4 player matches. The map also seeds one neutral
+  expansion site per player, so every match has exactly `2 × player_count` total base sites and
+  every player has somewhere to expand without increasing the room-size cap. In 2-player matches,
+  the neutral expansions are the unused corners.
 
 Unit stats (hp, dmg, range[tiles], cooldown[ticks], speed[px/tick], sight[tiles], cost, supply, buildTicks):
 
