@@ -1,13 +1,13 @@
 # Phase 00: Measure The Freeze
 
 Purpose: prove where the half-second freeze happens before changing the transport. Do not claim
-network head-of-line blocking, JSON parse cost, render cost, or server tick cost without a trace.
+network head-of-line blocking, stale snapshot backlog, message parse/apply cost, or server tick
+cost without a trace.
 
 This phase is intentionally simple and can be done before WebTransport work starts.
 
 ## Questions To Answer
 
-- During a freeze, does browser JavaScript keep running or is there a long task?
 - Are snapshots arriving late, arriving in bursts, or arriving on time but taking too long to parse
   and apply?
 - Is the server tick loop falling behind?
@@ -38,19 +38,14 @@ Instrument `client/src/state.js` `applySnapshot`:
 - selection size before/after pruning;
 - muzzle flash count after pruning.
 
-Instrument `client/src/main.js` `Match.frame`:
+Instrument `client/src/main.js` only for snapshot timing state:
 
-- total frame duration;
-- `camera.update`;
-- `input.update`;
-- `fog.update`;
-- `renderer.render`;
-- `hud.update`;
-- `minimap.render`;
 - computed interpolation alpha;
-- `prevRecvTime`, `currRecvTime`, and the gap between them.
+- `prevRecvTime`, `currRecvTime`, and the gap between them;
+- current snapshot tick and previous snapshot tick.
 
-Also add a `PerformanceObserver` for `longtask` entries:
+Optionally add a `PerformanceObserver` for `longtask` entries as a sanity check. Do not turn this
+phase into unrelated UI optimization work:
 
 ```js
 if (typeof PerformanceObserver !== "undefined") {
@@ -105,7 +100,6 @@ Record p50/p90/p99/max for:
 - event count;
 - parse duration;
 - apply duration;
-- render duration.
 
 ## Network Loss Reproduction
 
@@ -120,18 +114,12 @@ Record:
 
 - snapshot receive interval histogram;
 - `net.latency` p50/p90/p99 from app-level pings;
-- browser long-task p50/p90/p99;
 - snapshot byte p50/p90/p99/max;
 - dropped/stale snapshot counts, if Phase 01 coalescing has been added.
 
 ## Interpretation Guide
 
-If there are browser long tasks during the freeze:
-
-- prioritize JSON parse/allocation, renderer work, minimap rendering, HUD churn, and GC;
-- WebTransport will not fix the dominant issue.
-
-If there are no long tasks, but snapshot receive intervals show 300-500 ms gaps under loss:
+If snapshot receive intervals show 300-500 ms gaps under loss:
 
 - network delivery or ordered-stream head-of-line is plausible;
 - Phase 01 coalescing should still be tried first because it is simpler;
@@ -151,5 +139,5 @@ If writer `sink.send(...)` stalls but the room tick loop does not:
 - There is one trace showing an actual freeze with client, server, and network timings.
 - Worst-case snapshot payload p50/p90/p99/max are recorded.
 - The trace identifies the dominant class of problem.
-- The next phase recommendation is explicit: render/parse fix, Phase 01 coalescing, or deeper
-  WebTransport work.
+- The next phase recommendation is explicit: message parse/apply cleanup, Phase 01 coalescing, or
+  deeper WebTransport work.

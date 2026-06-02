@@ -17,18 +17,17 @@ latest-only state over WebTransport datagrams or independent QUIC streams.
 Before WebTransport, do the simpler work:
 
 1. Measure the freeze so we know whether the dominant problem is network delivery, stale snapshot
-   backlog, JSON parse/allocation, rendering, or server tick work.
+   backlog, message parse/apply, or server tick work.
 2. Make WebSocket snapshot delivery latest-only so old snapshots do not queue behind socket stalls.
-3. Remove obvious client frame-budget waste: repeated entity cloning, every-frame HUD/minimap work,
-   and every-frame fog rebuilds.
+3. Optionally remove the obvious redundant entity interpolation/allocation path.
 4. Refactor the transport boundary so later WebTransport work does not touch `Game`.
 
 The current likely low-risk win is Phase 01: WebSocket snapshot coalescing. It directly addresses a
 real repo issue: `PLAYER_CHANNEL_CAP = 256` means a backed-up player can accumulate roughly 8.5 s
 of stale 30 Hz snapshots.
 
-Given the reported symptom, Phase 02 is also highly relevant: the game progresses while the browser
-freezes, which fits main-thread frame stalls just as well as ordered network delivery.
+Phase 02 is intentionally narrow. It does not claim client-side rendering is the stutter cause; it
+only removes repeated `entitiesInterpolated()` work that is obviously wasteful.
 
 ## Current Repo Facts
 
@@ -95,7 +94,7 @@ Interpretation:
   one datagram.
 - Full-world snapshots do not fit a conservative one-datagram budget.
 - These numbers do not explain a half-second freeze by themselves. Worst-case late-game snapshots,
-  frame timings, JSON parse cost, and renderer cost still need measurement.
+  receive gaps, stale backlog behavior, and message parse/apply cost still need measurement.
 
 ## Phase Index
 
@@ -103,7 +102,7 @@ Interpretation:
 | --- | --- | --- | --- |
 | 00 | [measurement](phase-00-measurement.md) | Instrument and prove where the freeze happens. | Low |
 | 01 | [WebSocket coalescing](phase-01-websocket-coalescing.md) | Keep WebSocket, but make snapshots latest-only. | Low-medium |
-| 02 | [client stutter easy wins](phase-02-client-stutter-easy-wins.md) | Reduce client main-thread/frame-budget waste. | Low-medium |
+| 02 | [entity interpolation cleanup](phase-02-entity-interpolation-cleanup.md) | Avoid redundant `entitiesInterpolated()` allocations. | Low |
 | 03 | [transport abstraction](phase-03-transport-abstraction.md) | Refactor boundaries without changing behavior. | Medium |
 | 04 | [WebTransport control plane](phase-04-webtransport-control-plane.md) | Dev-only reliable WebTransport setup. | Medium-high |
 | 05 | [unreliable snapshots](phase-05-unreliable-snapshots.md) | Datagrams or per-snapshot streams with stale rejection. | High |
@@ -126,7 +125,7 @@ Phases 00-02 are deliberately useful before WebTransport exists.
 
 ## Recommendation
 
-Do Phase 00, Phase 01, and Phase 02 before a full WebTransport implementation.
+Do Phase 00 and Phase 01 before a full WebTransport implementation. Phase 02 is optional but cheap.
 
 Reasoning:
 
@@ -134,7 +133,8 @@ Reasoning:
 - Dropping old snapshots is semantically valid because snapshots are already full visible state,
   except for the `resourceDeltas` caveat called out in Phase 05.
 - Coalescing directly targets freeze/catch-up behavior and keeps the simple deployment.
-- Phase 02 targets browser-side stalls that WebTransport will not fix.
+- Phase 02 removes redundant interpolation allocation without treating client rendering as the root
+  cause.
 - If packet-loss traces still show ordered-stream head-of-line after stale snapshot coalescing, the
   repo will have the measurement and reliability semantics needed for WebTransport datagrams.
 
