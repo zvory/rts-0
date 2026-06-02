@@ -5,6 +5,8 @@
 //
 // Usage: start the server (`cd server && cargo run`), then `node tests/server_integration.mjs`.
 // Override the endpoint with RTS_WS (default ws://127.0.0.1:8081/ws).
+import { decodeServerMessage } from "../client/src/protocol.js";
+
 const URL = process.env.RTS_WS || "ws://127.0.0.1:8081/ws";
 const ROOM = "itest-" + Math.floor(performance.now());
 
@@ -19,9 +21,12 @@ class Client {
     this.playerId = null;
     this.lastSnapshot = null;
     this.msgs = [];
+    this.rawSnapshots = [];
     this.waiters = [];
     this.ws.onmessage = (e) => {
-      const m = JSON.parse(e.data);
+      const raw = JSON.parse(e.data);
+      if (raw.t === "snapshot") this.rawSnapshots.push(raw);
+      const m = decodeServerMessage(raw);
       this.msgs.push(m);
       if (m.t === "welcome") this.playerId = m.playerId;
       if (m.t === "snapshot") this.lastSnapshot = m;
@@ -76,6 +81,8 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
      `players start at distinct tiles A=(${a?.startTileX},${a?.startTileY}) B=(${b?.startTileX},${b?.startTileY})`);
 
   const snap = await A.waitFor((m) => m.t === "snapshot" && m.entities.length > 0, 3000, "A snapshot");
+  ok(A.rawSnapshots.some((m) => m.t === "snapshot" && m.v === 1 && Array.isArray(m.s) && Array.isArray(m.e)),
+     "server sends compact v1 snapshot frames");
   ok(snap.steel === 75, `A starts with 75 steel (${snap.steel})`);
   ok(snap.oil === 0, `A starts with 0 oil (${snap.oil})`);
   ok(snap.supplyCap === 10, `A supply cap = 10 (${snap.supplyCap})`);

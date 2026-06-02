@@ -2,7 +2,7 @@
 // See DESIGN.md §4.1. All wire shapes come from protocol.js builders so the
 // client and server stay in lockstep; this module owns no game logic.
 
-import { S, msg, cmd as cmdBuilders } from "./protocol.js";
+import { S, decodeServerMessage, msg, cmd as cmdBuilders } from "./protocol.js";
 
 /**
  * Thin client transport over a single WebSocket connection.
@@ -185,7 +185,7 @@ export class Net {
   _onMessage(ev) {
     let m;
     try {
-      m = JSON.parse(ev.data);
+      m = decodeServerMessage(JSON.parse(ev.data));
     } catch (err) {
       // Ignore malformed frames rather than tearing down the connection.
       return;
