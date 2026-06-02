@@ -143,7 +143,7 @@ export class Renderer {
    * @param {{width:number,height:number,tileSize:number,terrain:number[]}} map
    */
   buildStaticMap(map) {
-    this._map = { width: map.width, height: map.height, tileSize: map.tileSize };
+    this._map = { width: map.width, height: map.height, tileSize: map.tileSize, terrain: map.terrain };
     const ts = map.tileSize;
 
     const g = new PIXI.Graphics();
