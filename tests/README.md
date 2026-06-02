@@ -56,6 +56,17 @@ RTS_SELFPLAY_SAVE_REPLAY=manual_worker_rush_latest \
   cargo test scripted_self_play_worker_rush_vs_economy
 ```
 
+For manual profile-vs-profile balance checks, use the fixed-horizon matchup CLI. It runs one
+directed match to elimination or a tick cap and reports the winner, first damage, first attacks,
+first tanks, command counts, and final army/base counts.
+
+```bash
+cd server
+cargo run --bin ai-matchup -- rush tech
+cargo run --bin ai-matchup -- saturation tech --seed 7 --ticks 20000 --json
+cargo run --bin ai-matchup -- --list-profiles
+```
+
 ## Client smoke (headless browser)
 
 Loads the real client in headless Chrome and asserts it renders the PixiJS scene and that

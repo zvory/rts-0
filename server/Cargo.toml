@@ -8,6 +8,12 @@ description = "Authoritative server for Bewegungskrieg, a simple real-time strat
 name = "rts-server"
 path = "src/main.rs"
 
+[[bin]]
+name = "ai-matchup"
+path = "src/ai_matchup.rs"
+test = false
+bench = false
+
 [dependencies]
 tokio = { version = "1", features = ["full"] }
 axum = { version = "0.8", features = ["ws"] }
