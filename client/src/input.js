@@ -98,11 +98,12 @@ export class Input {
     this.keys = { up: false, down: false, left: false, right: false };
 
     /**
-     * Last known cursor position in screen (viewport-local) pixels. Used by update()
-     * for placement hover and by edge logic the camera may consult.
-     * @type {{x:number,y:number}}
+     * Last known cursor position in screen (viewport-local) pixels, or null when
+     * the pointer has not entered the viewport. Used by update() for placement
+     * hover and by edge logic the camera may consult.
+     * @type {{x:number,y:number}|null}
      */
-    this.mouse = { x: 0, y: 0 };
+    this.mouse = null;
 
     // Active left-drag selection box, in screen pixels, or null when not dragging.
     // { x0, y0, x1, y1 } where (x0,y0) is the press anchor.
@@ -178,6 +179,16 @@ export class Input {
     return { x: ev.clientX - r.left, y: ev.clientY - r.top };
   }
 
+  /** True when a viewport-local point is inside the viewport bounds. */
+  _insideViewport(p) {
+    return p.x >= 0 && p.y >= 0 && p.x <= this.dom.clientWidth && p.y <= this.dom.clientHeight;
+  }
+
+  /** Update the camera-facing mouse position from a viewport-local point. */
+  _trackMouse(p) {
+    this.mouse = this._insideViewport(p) ? p : null;
+  }
+
   /** World point under the current screen cursor, clamped to map bounds. */
   _worldAt(sx, sy) {
     const w = this.camera.screenToWorld(sx, sy);
@@ -195,7 +206,7 @@ export class Input {
 
   _handleMouseDown(ev) {
     const p = this._screenPos(ev);
-    this.mouse = p;
+    this._trackMouse(p);
     if (ev.button === 1 || (ev.button === 0 && this._spacePan)) {
       this._startPanDrag(p, ev.button);
       ev.preventDefault();
@@ -209,7 +220,7 @@ export class Input {
 
   _handleMouseMove(ev) {
     const p = this._screenPos(ev);
-    this.mouse = p;
+    this._trackMouse(p);
 
     if (this._panDrag) {
       this.camera.panByScreenDelta(p.x - this._panDrag.x, p.y - this._panDrag.y);
@@ -243,7 +254,7 @@ export class Input {
     }
     if (ev.button !== 0) return;
     const p = this._screenPos(ev);
-    this.mouse = p;
+    this._trackMouse(p);
     if (!this._drag) return;
 
     const wasDragging = this._dragging;
@@ -263,7 +274,7 @@ export class Input {
     // Always suppress the native menu over the viewport; treat as a right-click.
     ev.preventDefault();
     const p = this._screenPos(ev);
-    this.mouse = p;
+    this._trackMouse(p);
     this._onRightClick(p);
   }
 
@@ -569,6 +580,7 @@ export class Input {
     if (!place) return;
     const map = this.state.map;
     if (!map) return;
+    if (!this.mouse) return;
 
     const world = this._worldAt(this.mouse.x, this.mouse.y);
     const stat = STATS[place.building];
@@ -700,6 +712,7 @@ export class Input {
   /** Window blur: release all pan keys so the camera doesn't drift while away. */
   _handleBlur() {
     this.keys.up = this.keys.down = this.keys.left = this.keys.right = false;
+    this.mouse = null;
     this._spacePan = false;
     this._panDrag = null;
     if (this._drag) {

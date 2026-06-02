@@ -48,6 +48,7 @@ const PLAYER_CHANNEL_CAP: usize = 256;
 /// allowed to grow without limit; in practice the room drains this every tick.
 const ROOM_EVENT_CHANNEL_CAP: usize = 1024;
 const DEV_SELFPLAY_ROOM_PREFIX: &str = "__dev_selfplay__";
+const MATCH_SEED_ENV: &str = "RTS_MATCH_SEED";
 
 /// Monotonic source of globally-unique player ids (ids are never reused within a process run).
 static NEXT_PLAYER_ID: AtomicU32 = AtomicU32::new(1);
@@ -594,10 +595,7 @@ impl RoomTask {
         } else {
             (config::STARTING_STEEL, config::STARTING_OIL)
         };
-        let seed = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map(|d| d.as_nanos() as u32)
-            .unwrap_or(0x1234_5678);
+        let seed = match_seed();
         let game = Game::new_with_starting_resources(&inits, starting_steel, starting_oil, seed);
         let payload = game.start_payload();
         self.match_player_count = inits.len();
@@ -652,10 +650,7 @@ impl RoomTask {
                     .first()
                     .map(|p| p.id)
                     .ok_or_else(|| "live self-play configured with no players".to_string())?;
-                let seed = SystemTime::now()
-                    .duration_since(UNIX_EPOCH)
-                    .map(|d| d.as_nanos() as u32)
-                    .unwrap_or(0x1234_5678);
+                let seed = match_seed();
                 let game = Game::new(&players, seed);
                 Ok((game, DevDriver::Live(driver), view_player_id))
             }
@@ -981,6 +976,25 @@ fn panic_reason(payload: &Box<dyn std::any::Any + Send>) -> String {
         return s.clone();
     }
     "panic with non-string payload".to_string()
+}
+
+fn match_seed() -> u32 {
+    if let Ok(raw) = std::env::var(MATCH_SEED_ENV) {
+        match raw.parse::<u32>() {
+            Ok(seed) => return seed,
+            Err(err) => warn!(
+                env = MATCH_SEED_ENV,
+                value = %raw,
+                error = %err,
+                "invalid match seed override; using time-based seed"
+            ),
+        }
+    }
+
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_nanos() as u32)
+        .unwrap_or(0x1234_5678)
 }
 
 fn load_replay_artifact(name: &str) -> Result<ReplayArtifact, String> {

@@ -17,6 +17,7 @@
 #   tests/run-all.sh --no-rust       # skip the cargo test step
 #   tests/run-all.sh --no-client     # skip the headless-browser smoke test
 #   PORT=8090 tests/run-all.sh       # use a different port
+#   RTS_MATCH_SEED=123 tests/run-all.sh  # use a different deterministic map seed
 #   CHROME=/path/to/chrome tests/run-all.sh
 set -uo pipefail
 
@@ -61,6 +62,7 @@ fi
 HEALTH_URL="http://127.0.0.1:${PORT}/"
 export RTS_WS="ws://127.0.0.1:${PORT}/ws"   # consumed by the Node API suites
 export RTS_URL="http://127.0.0.1:${PORT}/"  # consumed by client_smoke.mjs
+export RTS_MATCH_SEED="${RTS_MATCH_SEED:-1}" # consumed by the server for deterministic tests
 
 # --- Output helpers -------------------------------------------------------------------------
 if [ -t 1 ]; then BOLD=$'\033[1m'; RED=$'\033[31m'; GRN=$'\033[32m'; YEL=$'\033[33m'; RST=$'\033[0m'

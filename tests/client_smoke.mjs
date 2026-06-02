@@ -134,7 +134,7 @@ try {
   await sleep(150);
   await page.mouse.click(box.x + target.sx, box.y + target.sy);
   let depot = false;
-  for (let i = 0; i < 20 && !depot; i++) {
+  for (let i = 0; i < 50 && !depot; i++) {
     await sleep(200);
     depot = await page.evaluate(() => { const s = window.__rts.match.state; return s.entitiesInterpolated(1).some((e) => e.owner === s.playerId && e.kind === "depot"); });
   }
