@@ -143,7 +143,7 @@ where
     gathering_builders.sort_unstable();
     let builder_pools = [idle_builders.as_slice(), gathering_builders.as_slice()];
     let save_for_required_tech_building = should_save_for_required_tech_building(&facts, profile);
-    let expansion_blocks_tank_tech = expansion_blocks_tank_tech(&facts, profile);
+    let expansion_blocks_tech_path = expansion_blocks_tech_path(&facts, profile);
     let save_for_expansion = should_save_for_expansion(&facts, profile);
     let proxy_barracks_active = should_use_proxy_barracks(&facts, profile);
 
@@ -184,7 +184,7 @@ where
         if proxy_barracks_active && *kind == EntityKind::Barracks {
             continue;
         }
-        if expansion_blocks_tank_tech && *kind != EntityKind::Barracks {
+        if expansion_blocks_tech_path {
             continue;
         }
         if facts.building_count(*kind) + planned_in_intents(&intents, *kind) > 0 {
@@ -225,6 +225,7 @@ where
         + planned_in_intents(&intents, EntityKind::Barracks)
         < target_barracks
         && !(proxy_barracks_active && facts.building_count(EntityKind::Barracks) == 0)
+        && !expansion_blocks_tech_path
         && planned_in_intents(&intents, EntityKind::Barracks) == 0
         && try_build_kind(
             observation,
@@ -271,15 +272,19 @@ where
         TrainUnitsRequest {
             buildings: facts.production_buildings(EntityKind::IndustrialCenter),
             unit_priorities: &[EntityKind::Worker],
+            completed_building_kinds: facts.complete_building_kinds(),
             max_queue_depth: 1,
             save_for_tech: save_worker_training_for_tech,
             current_counts: &[(EntityKind::Worker, facts.worker_count)],
             max_counts: &[(EntityKind::Worker, target_workers)],
+            balance_unit_priorities: false,
         },
     ) {
         intents.push(AiIntent::Train { kind: trained.unit });
     }
 
+    let production_unit_counts =
+        unit_counts_for_priorities(&facts, profile.production.unit_priorities);
     for building_kind in production_building_order(profile.production.unit_priorities) {
         let buildings = facts.production_buildings(building_kind);
         if buildings.is_empty() {
@@ -297,10 +302,12 @@ where
             TrainUnitsRequest {
                 buildings,
                 unit_priorities: profile.production.unit_priorities,
+                completed_building_kinds: facts.complete_building_kinds(),
                 max_queue_depth: profile.production.queue_depth,
                 save_for_tech,
-                current_counts: &[],
+                current_counts: &production_unit_counts,
                 max_counts: &[],
+                balance_unit_priorities: profile.production.balance_unit_priorities,
             },
         ) {
             intents.push(AiIntent::Train { kind: trained.unit });
@@ -506,12 +513,11 @@ fn should_use_proxy_barracks(facts: &AiFacts, profile: &AiProfile) -> bool {
     profile.buildings.proxy_barracks.is_some() && facts.building_count(EntityKind::Barracks) == 0
 }
 
-fn expansion_blocks_tank_tech(facts: &AiFacts, profile: &AiProfile) -> bool {
+fn expansion_blocks_tech_path(facts: &AiFacts, profile: &AiProfile) -> bool {
     let Some(expansion) = profile.expansion else {
         return false;
     };
-    facts.complete_building_count(EntityKind::IndustrialCenter)
-        < expansion.target_industrial_centers
+    facts.building_count(EntityKind::IndustrialCenter) < expansion.target_industrial_centers
 }
 
 fn should_save_for_expansion(facts: &AiFacts, profile: &AiProfile) -> bool {
@@ -1196,7 +1202,7 @@ fn desired_oil_workers(
     if profile.workers.extra_oil_workers == 0 {
         return 0;
     }
-    if expansion_blocks_tank_tech(facts, profile) {
+    if expansion_blocks_tech_path(facts, profile) {
         return 0;
     }
     let current_steel_workers = resource_worker_counts(observation)
@@ -1290,12 +1296,28 @@ fn should_save_for_required_tech_building(facts: &AiFacts, profile: &AiProfile) 
     let Some(unit) = profile.production.save_for_first_tech_unit else {
         return false;
     };
+    if facts.unit_count(unit) > 0 {
+        return false;
+    }
     let Some(producer) = producer_for_unit(unit) else {
         return false;
     };
-    facts.building_count(producer) == 0
-        && profile.buildings.required_tech_path.contains(&producer)
-        && rules::economy::build_requirement_met(producer, facts.complete_building_kinds())
+    if facts.building_count(producer) == 0 {
+        return profile.buildings.required_tech_path.contains(&producer)
+            && rules::economy::build_requirement_met(producer, facts.complete_building_kinds());
+    }
+    if rules::economy::train_requirement_met(unit, facts.complete_building_kinds()) {
+        return false;
+    }
+    profile
+        .buildings
+        .required_tech_path
+        .iter()
+        .copied()
+        .any(|kind| {
+            facts.building_count(kind) == 0
+                && rules::economy::build_requirement_met(kind, facts.complete_building_kinds())
+        })
 }
 
 fn producer_for_unit(unit: EntityKind) -> Option<EntityKind> {
@@ -1315,6 +1337,17 @@ fn production_building_order(unit_priorities: &[EntityKind]) -> Vec<EntityKind> 
     }
     order.retain(|kind| *kind != EntityKind::IndustrialCenter);
     order
+}
+
+fn unit_counts_for_priorities(
+    facts: &AiFacts,
+    unit_priorities: &[EntityKind],
+) -> Vec<(EntityKind, usize)> {
+    unit_priorities
+        .iter()
+        .copied()
+        .map(|unit| (unit, facts.unit_count(unit)))
+        .collect()
 }
 
 fn resource_worker_counts(observation: &AiObservation) -> BTreeMap<EntityKind, usize> {
@@ -1469,7 +1502,8 @@ fn squared(value: f32) -> f32 {
 mod tests {
     use super::*;
     use crate::game::ai_core::observation::{
-        AiEconomy, AiEntityState, AiEntitySummary, AiMapSummary, AiPlayerSummary, AiResourceSummary,
+        AiBuildIntent, AiEconomy, AiEntityState, AiEntitySummary, AiMapSummary, AiPlayerSummary,
+        AiResourceSummary,
     };
     use crate::game::ai_core::profiles::{
         RIFLE_FLOOD_FAST, RIFLE_FLOOD_FULL_SATURATION, STEEL_EXPANSION_TANKS, TECH_TO_TANKS,
@@ -2219,19 +2253,15 @@ mod tests {
     }
 
     #[test]
-    fn steel_expansion_tanks_expands_before_tank_tech_after_defensive_rifles() {
+    fn steel_expansion_tanks_builds_expansion_ic_before_any_barracks() {
         let ts = config::TILE_SIZE as f32;
-        let mut owned = vec![
-            building_at(
-                10,
-                EntityKind::IndustrialCenter,
-                Some(0),
-                8.5 * ts,
-                8.5 * ts,
-            ),
-            building(11, EntityKind::Barracks, Some(0)),
-        ];
-        owned.extend((0..3).map(|i| combat(30 + i, EntityKind::Rifleman)));
+        let mut owned = vec![building_at(
+            10,
+            EntityKind::IndustrialCenter,
+            Some(0),
+            8.5 * ts,
+            8.5 * ts,
+        )];
         owned.extend((0..8).map(|i| steel_worker(40 + i, 100 + i)));
         owned.push(worker(60, AiEntityState::Idle));
         let observation = with_expansion_resources(observation(
@@ -2254,11 +2284,40 @@ mod tests {
             kind: EntityKind::IndustrialCenter
         }));
         assert!(!decision.intents.contains(&AiIntent::Build {
+            kind: EntityKind::Barracks
+        }));
+        assert!(!decision.intents.contains(&AiIntent::Build {
             kind: EntityKind::TrainingCentre
         }));
         assert!(!decision.intents.contains(&AiIntent::Build {
             kind: EntityKind::TankFactory
         }));
+        assert!(!decision.intents.contains(&AiIntent::Train {
+            kind: EntityKind::Rifleman
+        }));
+        assert!(!decision.intents.contains(&AiIntent::Train {
+            kind: EntityKind::MachineGunner
+        }));
+        assert!(!decision.intents.contains(&AiIntent::Train {
+            kind: EntityKind::AtTeam
+        }));
+        let non_depot_builds: Vec<_> = decision
+            .commands
+            .iter()
+            .filter_map(|command| match command {
+                Command::Build { building, .. }
+                    if building != EntityKind::Depot.to_protocol_str() =>
+                {
+                    Some(building.as_str())
+                }
+                _ => None,
+            })
+            .collect();
+        assert_eq!(
+            non_depot_builds,
+            vec![EntityKind::IndustrialCenter.to_protocol_str()],
+            "the first non-depot build should be the expansion IC"
+        );
         assert!(
             !decision.intents.iter().any(|intent| matches!(
                 intent,
@@ -2267,7 +2326,7 @@ mod tests {
                     ..
                 }
             )),
-            "expansion profile should not move into oil before the second IC is complete"
+            "expansion profile should not move into oil before the second IC is planned"
         );
     }
 
@@ -2275,17 +2334,13 @@ mod tests {
     fn steel_expansion_tanks_places_expansion_ic_in_range_of_whole_resource_line() {
         let map_size = 96;
         let ts = config::TILE_SIZE as f32;
-        let mut owned = vec![
-            building_at(
-                10,
-                EntityKind::IndustrialCenter,
-                Some(0),
-                10.5 * ts,
-                85.5 * ts,
-            ),
-            building(11, EntityKind::Barracks, Some(0)),
-        ];
-        owned.extend((0..3).map(|i| combat(30 + i, EntityKind::Rifleman)));
+        let mut owned = vec![building_at(
+            10,
+            EntityKind::IndustrialCenter,
+            Some(0),
+            10.5 * ts,
+            85.5 * ts,
+        )];
         owned.extend((0..8).map(|i| steel_worker(40 + i, 100 + i)));
         owned.push(worker(60, AiEntityState::Idle));
         let mut resources = base_site_resources(100, (10, 85), map_size);
@@ -2383,22 +2438,24 @@ mod tests {
     }
 
     #[test]
-    fn steel_expansion_tanks_trains_defensive_rifles_before_expanding() {
-        let mut owned = vec![
-            building(10, EntityKind::IndustrialCenter, Some(0)),
-            building(11, EntityKind::Barracks, Some(0)),
-        ];
-        owned.push(combat(30, EntityKind::Rifleman));
-        owned.extend((0..8).map(|i| steel_worker(40 + i, 100 + i)));
-        owned.push(worker(60, AiEntityState::Idle));
-        let observation = with_expansion_resources(observation(
+    fn steel_expansion_tanks_builds_barracks_after_expansion_ic_is_planned() {
+        let mut observation = with_expansion_resources(observation(
             AiEconomy {
                 steel: 500,
                 oil: 500,
                 supply_used: 10,
                 supply_cap: 30,
             },
-            owned,
+            vec![
+                building(10, EntityKind::IndustrialCenter, Some(0)),
+                worker(60, AiEntityState::Idle),
+            ],
+        ));
+        observation.pending_builds.push(AiBuildIntent::to_site(
+            60,
+            EntityKind::IndustrialCenter,
+            20,
+            30,
         ));
 
         let decision = decide(
@@ -2410,58 +2467,123 @@ mod tests {
         assert!(!decision.intents.contains(&AiIntent::Build {
             kind: EntityKind::IndustrialCenter
         }));
+        assert!(decision.intents.contains(&AiIntent::Build {
+            kind: EntityKind::Barracks
+        }));
         assert!(!decision.intents.contains(&AiIntent::Build {
             kind: EntityKind::TrainingCentre
-        }));
-        assert!(decision.intents.contains(&AiIntent::Train {
-            kind: EntityKind::Rifleman
         }));
     }
 
     #[test]
-    fn steel_expansion_tanks_biases_idle_workers_toward_tank_bottleneck() {
+    fn steel_expansion_tanks_builds_training_centre_before_training_support_units() {
+        let mut observation = with_expansion_resources(observation(
+            AiEconomy {
+                steel: 500,
+                oil: 500,
+                supply_used: 10,
+                supply_cap: 30,
+            },
+            vec![
+                building(10, EntityKind::IndustrialCenter, Some(0)),
+                building(11, EntityKind::Barracks, Some(0)),
+                worker(60, AiEntityState::Idle),
+            ],
+        ));
+        observation.pending_builds.push(AiBuildIntent::to_site(
+            60,
+            EntityKind::IndustrialCenter,
+            20,
+            30,
+        ));
+
+        let decision = decide(
+            &observation,
+            &STEEL_EXPANSION_TANKS,
+            &mut AiDecisionMemory::for_profile(&STEEL_EXPANSION_TANKS),
+        );
+
+        assert!(decision.intents.contains(&AiIntent::Build {
+            kind: EntityKind::TrainingCentre
+        }));
+        assert!(!decision.intents.contains(&AiIntent::Train {
+            kind: EntityKind::MachineGunner
+        }));
+        assert!(!decision.intents.contains(&AiIntent::Train {
+            kind: EntityKind::AtTeam
+        }));
+    }
+
+    #[test]
+    fn steel_expansion_tanks_balances_machine_gunner_and_at_team_training() {
+        let observation = with_expansion_resources(observation(
+            AiEconomy {
+                steel: 500,
+                oil: 200,
+                supply_used: 10,
+                supply_cap: 40,
+            },
+            vec![
+                building(10, EntityKind::IndustrialCenter, Some(0)),
+                building(11, EntityKind::IndustrialCenter, Some(0)),
+                building(12, EntityKind::Barracks, Some(0)),
+                building(13, EntityKind::Barracks, Some(0)),
+                building(14, EntityKind::TrainingCentre, None),
+                worker(60, AiEntityState::Idle),
+            ],
+        ));
+
+        let decision = decide(
+            &observation,
+            &STEEL_EXPANSION_TANKS,
+            &mut AiDecisionMemory::for_profile(&STEEL_EXPANSION_TANKS),
+        );
+
+        assert!(decision.intents.contains(&AiIntent::Train {
+            kind: EntityKind::MachineGunner
+        }));
+        assert!(decision.intents.contains(&AiIntent::Train {
+            kind: EntityKind::AtTeam
+        }));
+    }
+
+    #[test]
+    fn steel_expansion_tanks_sends_workers_to_oil_after_expansion_is_planned() {
         let ts = config::TILE_SIZE as f32;
-        let base_owned = || {
-            let mut owned = vec![
-                building_at(
+        let mut observation = with_expansion_resources(observation(
+            AiEconomy {
+                steel: 500,
+                oil: 0,
+                supply_used: 17,
+                supply_cap: 40,
+            },
+            {
+                let mut owned = vec![building_at(
                     10,
                     EntityKind::IndustrialCenter,
                     Some(0),
                     8.5 * ts,
                     8.5 * ts,
-                ),
-                building(11, EntityKind::Barracks, Some(0)),
-                building(12, EntityKind::TrainingCentre, None),
-                building_at(
-                    13,
-                    EntityKind::IndustrialCenter,
-                    Some(0),
-                    16.5 * ts,
-                    32.5 * ts,
-                ),
-            ];
-            owned.extend((0..3).map(|i| combat(30 + i, EntityKind::Rifleman)));
-            owned.extend((0..8).map(|i| steel_worker(40 + i, 100 + i)));
-            owned.extend((0..6).map(|i| worker(60 + i, AiEntityState::Idle)));
-            owned
-        };
-
-        let oil_starved = with_expansion_resources(observation(
-            AiEconomy {
-                steel: 1_000,
-                oil: 0,
-                supply_used: 17,
-                supply_cap: 40,
+                )];
+                owned.extend((0..8).map(|i| steel_worker(40 + i, 100 + i)));
+                owned.extend((0..6).map(|i| worker(60 + i, AiEntityState::Idle)));
+                owned
             },
-            base_owned(),
         ));
-        let oil_starved_decision = decide(
-            &oil_starved,
+        observation.pending_builds.push(AiBuildIntent::to_site(
+            60,
+            EntityKind::IndustrialCenter,
+            20,
+            30,
+        ));
+
+        let decision = decide(
+            &observation,
             &STEEL_EXPANSION_TANKS,
             &mut AiDecisionMemory::for_profile(&STEEL_EXPANSION_TANKS),
         );
 
-        let oil_assignments = oil_starved_decision
+        let oil_assignments = decision
             .intents
             .iter()
             .filter_map(|intent| match intent {
@@ -2474,42 +2596,7 @@ mod tests {
             .sum::<usize>();
         assert!(
             oil_assignments >= 5,
-            "oil-starved tank tech should send most idle workers to oil, got {oil_assignments}"
-        );
-
-        let steel_starved = with_expansion_resources(observation(
-            AiEconomy {
-                steel: 0,
-                oil: 1_000,
-                supply_used: 17,
-                supply_cap: 40,
-            },
-            base_owned(),
-        ));
-        let steel_starved_decision = decide(
-            &steel_starved,
-            &STEEL_EXPANSION_TANKS,
-            &mut AiDecisionMemory::for_profile(&STEEL_EXPANSION_TANKS),
-        );
-
-        let mut oil_assignments = 0usize;
-        let mut steel_assignments = 0usize;
-        for intent in &steel_starved_decision.intents {
-            match intent {
-                AiIntent::Gather {
-                    resource: EntityKind::Oil,
-                    assignments,
-                } => oil_assignments += *assignments,
-                AiIntent::Gather {
-                    resource: EntityKind::Steel,
-                    assignments,
-                } => steel_assignments += *assignments,
-                _ => {}
-            }
-        }
-        assert!(
-            steel_assignments > oil_assignments,
-            "steel-starved tank tech should favor steel workers, got steel={steel_assignments}, oil={oil_assignments}"
+            "support tech should send most idle workers to oil once expanding, got {oil_assignments}"
         );
     }
 
