@@ -17,7 +17,7 @@ pub(crate) fn gather_system(
     _spatial: &SpatialIndex,
     coordinator: &mut MoveCoordinator<'_>,
 ) {
-    let interact = config::TILE_SIZE as f32 * 1.5;
+    let interact = config::TILE_SIZE as f32 * 0.1;
 
     for id in entities.ids() {
         let node = match entities.get(id) {
