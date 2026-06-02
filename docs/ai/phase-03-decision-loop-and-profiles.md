@@ -5,6 +5,13 @@ Introduce the shared decision loop and the first strategy profiles.
 This is the phase where the AI starts becoming multiple strategy profiles. The implementation should
 still avoid multiple copied bots.
 
+## Status
+
+Done. Implemented in `server/src/game/ai_core/decision.rs` and
+`server/src/game/ai_core/profiles.rs`, with supporting action/fact extensions and unit tests for
+profile differences, tech-to-tanks priorities, attack thresholds, and starting-state command
+synthesis. The live AI controller path remains available for the AI-4 migration.
+
 ## Goal
 
 Create:
