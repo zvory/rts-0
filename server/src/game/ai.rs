@@ -14,6 +14,10 @@
 //! via the `start` payload.
 
 use crate::config;
+use crate::game::ai_core::actions::{
+    self, AiActionContext, BuildPlacementRequest, ResourceAssignmentPolicy, SpendBudget,
+    TrainUnitsRequest,
+};
 use crate::game::ai_core::facts::AiFacts;
 use crate::game::ai_core::observation::AiObservation;
 use crate::game::ai_shared;
@@ -23,8 +27,8 @@ use crate::game::services::spatial::SpatialIndex;
 use crate::game::services::world_query;
 use crate::game::systems;
 use crate::game::PlayerState;
-use crate::protocol::{kinds, Command};
-use std::collections::{BTreeSet, HashSet};
+use crate::protocol::Command;
+use std::collections::BTreeSet;
 
 // --- Tuning knobs -----------------------------------------------------------
 
@@ -112,155 +116,106 @@ impl AiController {
         let facts = AiFacts::from_observation(&observation);
         let supply_capped = facts.supply_capped;
 
-        let mut idle_workers = facts.idle_workers.clone();
-        let mut gathering_workers = facts.gathering_workers.clone();
         let free_riflemen = facts.free_combat_units(EntityKind::Rifleman).to_vec();
-        // Finished Industrial Centers with an empty production queue (ready to train a worker).
-        let idle_industrial_centers: Vec<u32> = facts
-            .production_buildings(EntityKind::IndustrialCenter)
-            .iter()
-            .filter(|building| building.queue_len == 0)
-            .map(|building| building.id)
-            .collect();
-        // Finished barracks as (id, queue_len).
-        let barracks: Vec<(u32, usize)> = facts
-            .production_buildings(EntityKind::Barracks)
-            .iter()
-            .map(|building| (building.id, building.queue_len))
-            .collect();
         let barracks_total = facts.building_count(EntityKind::Barracks);
         let depot_in_progress = facts.depot_in_progress;
 
-        // Local economy budget. We decrement these as we *decide* to spend so a single think
-        // never queues more than the AI can actually afford this tick (commands all apply in
-        // order, so without this we'd over-commit on the pre-tick balance). Subtract
-        // committed_steel so units aren't trained with steel already spoken for by an en-route
-        // build order (whose cost is only deducted at placement, not at command time).
-        let mut budget = ai_shared::SpendBudget::new(
-            me.steel.saturating_sub(facts.committed_steel),
+        let budget = SpendBudget::with_committed_steel(
+            me.steel,
             me.oil,
             me.supply_used,
             me.supply_cap,
+            facts.committed_steel,
         );
+        let mut actions = AiActionContext::new(&facts, budget);
 
         let target_workers = facts.target_steel_workers;
         let target_barracks = desired_barracks_target(me.steel);
 
         // Workers we may pull onto a build job: prefer truly idle, fall back to a gatherer.
-        let mut builder_pool = idle_workers.clone();
-        builder_pool.extend(gathering_workers.iter().copied());
-        let mut reserved_workers = HashSet::new();
+        // The previous implementation popped from ascending lists, so reverse here to preserve
+        // the same deterministic worker priority while the shared selector scans forward.
+        let mut idle_builders = facts.idle_workers.clone();
+        idle_builders.reverse();
+        let mut gathering_builders = facts.gathering_workers.clone();
+        gathering_builders.reverse();
+        let builder_pools = [idle_builders.as_slice(), gathering_builders.as_slice()];
 
         // --- 1. Expand supply with a depot when we're about to choke. ------
         if !depot_in_progress
             && !supply_capped
-            && budget.free_supply() < SUPPLY_BUFFER
-            && budget.can_afford_building(EntityKind::Depot)
+            && actions.budget().free_supply() < SUPPLY_BUFFER
+            && actions.budget().can_afford_building(EntityKind::Depot)
         {
-            if let Some(worker) = pop_builder(
-                &mut idle_workers,
-                &mut gathering_workers,
-                &mut builder_pool,
-                &mut reserved_workers,
-            ) {
-                if let Some((tx, ty)) =
-                    self.find_build_spot(map, entities, spatial, EntityKind::Depot, me)
-                {
-                    out.push((
-                        self.player,
-                        Command::Build {
-                            worker,
-                            building: kinds::DEPOT.to_string(),
-                            tile_x: tx,
-                            tile_y: ty,
-                        },
-                    ));
-                    let reserved = budget.reserve_building(EntityKind::Depot);
-                    debug_assert!(reserved);
-                }
-            }
+            Self::try_build(
+                map,
+                entities,
+                spatial,
+                EntityKind::Depot,
+                me,
+                &mut actions,
+                &builder_pools,
+            );
         }
 
         // --- 2. Build barracks (our rifleman production). --------------------
-        if barracks_total < target_barracks && budget.can_afford_building(EntityKind::Barracks) {
-            if let Some(worker) = pop_builder(
-                &mut idle_workers,
-                &mut gathering_workers,
-                &mut builder_pool,
-                &mut reserved_workers,
-            ) {
-                if let Some((tx, ty)) =
-                    self.find_build_spot(map, entities, spatial, EntityKind::Barracks, me)
-                {
-                    out.push((
-                        self.player,
-                        Command::Build {
-                            worker,
-                            building: kinds::BARRACKS.to_string(),
-                            tile_x: tx,
-                            tile_y: ty,
-                        },
-                    ));
-                    let reserved = budget.reserve_building(EntityKind::Barracks);
-                    debug_assert!(reserved);
-                }
-            }
+        if barracks_total < target_barracks
+            && actions.budget().can_afford_building(EntityKind::Barracks)
+        {
+            Self::try_build(
+                map,
+                entities,
+                spatial,
+                EntityKind::Barracks,
+                me,
+                &mut actions,
+                &builder_pools,
+            );
         }
 
         // --- 3. Train workers up to the economy target. -------------------
-        for (i, industrial_center) in (facts.worker_count..).zip(idle_industrial_centers) {
-            if i >= target_workers {
-                break;
-            }
-            if !budget.can_afford_unit(EntityKind::Worker) {
-                break;
-            }
-            out.push((
-                self.player,
-                Command::Train {
-                    building: industrial_center,
-                    unit: kinds::WORKER.to_string(),
-                },
-            ));
-            let reserved = budget.reserve_unit(EntityKind::Worker);
-            debug_assert!(reserved);
-        }
+        actions::train_units(
+            &mut actions,
+            TrainUnitsRequest {
+                buildings: facts.production_buildings(EntityKind::IndustrialCenter),
+                unit_priorities: &[EntityKind::Worker],
+                max_queue_depth: 1,
+                save_for_tech: false,
+                current_counts: &[(EntityKind::Worker, facts.worker_count)],
+                max_counts: &[(EntityKind::Worker, target_workers)],
+            },
+        );
 
         // --- 4. Pump riflemen from each barracks (keep a shallow queue). ---
-        for (rax, queue_len) in barracks {
-            // Keep at most one queued behind the in-progress one so we don't lock up steel.
-            if queue_len >= 2 {
-                continue;
-            }
-            if !budget.can_afford_unit(EntityKind::Rifleman) {
-                break;
-            }
-            out.push((
-                self.player,
-                Command::Train {
-                    building: rax,
-                    unit: kinds::RIFLEMAN.to_string(),
-                },
-            ));
-            let reserved = budget.reserve_unit(EntityKind::Rifleman);
-            debug_assert!(reserved);
-        }
+        actions::train_units(
+            &mut actions,
+            TrainUnitsRequest {
+                buildings: facts.production_buildings(EntityKind::Barracks),
+                unit_priorities: &[EntityKind::Rifleman],
+                // Keep at most one queued behind the in-progress one so we don't lock up steel.
+                max_queue_depth: 2,
+                save_for_tech: false,
+                current_counts: &[],
+                max_counts: &[],
+            },
+        );
 
         // --- 5. Send idle workers to distinct steel patches. -------------
-        let mut reserved_nodes = occupied_steel_nodes(entities);
-        for worker in idle_workers {
-            if let Some(node) = nearest_free_steel_node(entities, spatial, worker, &reserved_nodes)
-            {
-                out.push((
-                    self.player,
-                    Command::Gather {
-                        units: vec![worker],
-                        node,
-                    },
-                ));
-                reserved_nodes.insert(node);
-            }
-        }
+        let reserved_nodes = occupied_steel_nodes(entities);
+        let skipped_workers = BTreeSet::new();
+        actions::assign_workers_to_resource(
+            &mut actions,
+            ResourceAssignmentPolicy {
+                workers: &observation.owned,
+                resources: &observation.resources,
+                resource_kind: EntityKind::Steel,
+                candidate_worker_ids: Some(&facts.idle_workers),
+                skip_workers: &skipped_workers,
+                pre_reserved_nodes: &reserved_nodes,
+                idle_only: true,
+                max_assignments: None,
+            },
+        );
 
         // --- 6. Stage riflemen forward, then launch/continue pressure. ----
         if let Some((enemy_x, enemy_y)) = self.nearest_enemy_base(map, entities, players) {
@@ -296,40 +251,26 @@ impl AiController {
                         continue;
                     };
                     let (x, y) = rally_slots[slot_index];
-                    out.push((
-                        self.player,
-                        Command::AttackMove {
-                            units: vec![id],
-                            x,
-                            y,
-                        },
-                    ));
+                    actions::attack_move_units(&mut actions, [id], x, y);
                 }
             }
             if !committed.is_empty() {
-                out.push((
-                    self.player,
-                    Command::AttackMove {
-                        units: committed,
-                        x: enemy_x,
-                        y: enemy_y,
-                    },
-                ));
+                actions::attack_move_units(&mut actions, committed, enemy_x, enemy_y);
             }
 
             let wave_size = self.desired_wave_size(tick);
             if rally_ready.len() >= wave_size {
-                out.push((
-                    self.player,
-                    Command::AttackMove {
-                        units: rally_ready,
-                        x: enemy_x,
-                        y: enemy_y,
-                    },
-                ));
+                actions::attack_move_units(&mut actions, rally_ready, enemy_x, enemy_y);
                 self.note_wave_launch(tick);
             }
         }
+
+        out.extend(
+            actions
+                .into_commands()
+                .into_iter()
+                .map(|command| (self.player, command)),
+        );
     }
 
     fn desired_wave_size(&mut self, tick: u32) -> usize {
@@ -344,17 +285,18 @@ impl AiController {
         self.next_wave_size = self.next_wave_size.saturating_add(1);
     }
 
-    /// Find a placeable footprint for `building` by scanning rings outward from the AI's start
-    /// tile. Returns the top-left tile of the first placeable footprint, or `None` if the area is
-    /// too congested (caller then simply skips the build this think and retries later).
-    fn find_build_spot(
-        &self,
+    /// Try to synthesize a build command using live authoritative placement checks. Returns
+    /// `None` if the area is too congested, no worker is available, or the local budget cannot
+    /// reserve the cost.
+    fn try_build(
         map: &Map,
         entities: &EntityStore,
         spatial: &SpatialIndex,
         building: EntityKind,
         me: &PlayerState,
-    ) -> Option<(u32, u32)> {
+        actions: &mut AiActionContext<'_>,
+        worker_pools: &[&[u32]],
+    ) -> Option<actions::BuildAction> {
         // Pre-compute 1-tile margin around all existing buildings so placements keep a gap.
         let mut building_margin: BTreeSet<(u32, u32)> = BTreeSet::new();
         for e in entities.iter() {
@@ -372,32 +314,37 @@ impl AiController {
                 }
             }
         }
-        ai_shared::find_build_spot_near_start_with(
-            map.size,
-            map.size,
-            me.start_tile,
-            building,
-            ai_shared::BuildSearch {
-                min_radius: 2,
-                max_radius: ai_shared::DEFAULT_BUILD_SEARCH_MAX_RADIUS,
-                prefer_away_from_center: false,
-            },
-            &BTreeSet::new(),
-            |tx, ty| {
-                if !systems::footprint_placeable(map, entities, spatial, building, tx, ty) {
-                    return false;
-                }
-                let Some(stats) = config::building_stats(building) else {
-                    return false;
-                };
-                for dy in 0..stats.foot_h {
-                    for dx in 0..stats.foot_w {
-                        if building_margin.contains(&(tx + dx, ty + dy)) {
-                            return false;
+        let empty = BTreeSet::new();
+        actions::try_build(
+            actions,
+            worker_pools,
+            BuildPlacementRequest {
+                map_width: map.size,
+                map_height: map.size,
+                start_tile: me.start_tile,
+                building,
+                search: ai_shared::BuildSearch {
+                    min_radius: 2,
+                    max_radius: ai_shared::DEFAULT_BUILD_SEARCH_MAX_RADIUS,
+                    prefer_away_from_center: false,
+                },
+                skip_tiles: &empty,
+                placeable: |tx, ty| {
+                    if !systems::footprint_placeable(map, entities, spatial, building, tx, ty) {
+                        return false;
+                    }
+                    let Some(stats) = config::building_stats(building) else {
+                        return false;
+                    };
+                    for dy in 0..stats.foot_h {
+                        for dx in 0..stats.foot_w {
+                            if building_margin.contains(&(tx + dx, ty + dy)) {
+                                return false;
+                            }
                         }
                     }
-                }
-                true
+                    true
+                },
             },
         )
     }
@@ -635,7 +582,7 @@ fn desired_barracks_target(steel: u32) -> usize {
 }
 
 /// Steel patches already held by actively-harvesting workers.
-fn occupied_steel_nodes(entities: &EntityStore) -> HashSet<u32> {
+fn occupied_steel_nodes(entities: &EntityStore) -> BTreeSet<u32> {
     entities
         .iter()
         .filter(|e| e.kind == EntityKind::Worker)
@@ -644,123 +591,11 @@ fn occupied_steel_nodes(entities: &EntityStore) -> HashSet<u32> {
         .collect()
 }
 
-/// Nearest non-empty steel node to a worker (by id) that has not already been reserved this
-/// think, or `None` if none remain / worker is gone.
-fn nearest_free_steel_node(
-    entities: &EntityStore,
-    spatial: &SpatialIndex,
-    worker: u32,
-    reserved_nodes: &HashSet<u32>,
-) -> Option<u32> {
-    let w = entities.get(worker)?;
-    spatial
-        .nearest(
-            w.pos_x,
-            w.pos_y,
-            world_query::default_resource_search_radius_px(),
-            entities,
-            |e| {
-                e.kind == EntityKind::Steel
-                    && e.remaining().unwrap_or(0) > 0
-                    && !reserved_nodes.contains(&e.id)
-            },
-        )
-        .map(|(id, _)| id)
-}
-
-/// Remove the first occurrence of `id` from `v` (used to keep a worker assigned to a build job
-/// from also being told to mine in the same think).
-fn remove_id(v: &mut Vec<u32>, id: u32) {
-    if let Some(pos) = v.iter().position(|&x| x == id) {
-        v.swap_remove(pos);
-    }
-}
-
-/// Reserve one worker for a build decision, preferring idle workers over active gatherers and
-/// keeping every local worker list in sync so later decisions in the same think cannot reuse it.
-fn pop_builder(
-    idle_workers: &mut Vec<u32>,
-    gathering_workers: &mut Vec<u32>,
-    builder_pool: &mut Vec<u32>,
-    reserved_workers: &mut HashSet<u32>,
-) -> Option<u32> {
-    let worker = idle_workers.pop().or_else(|| gathering_workers.pop())?;
-    if !reserved_workers.insert(worker) {
-        return None;
-    }
-    remove_id(builder_pool, worker);
-    remove_id(idle_workers, worker);
-    remove_id(gathering_workers, worker);
-    Some(worker)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::game::entity::Order;
     use crate::protocol::Command;
-
-    #[test]
-    fn pop_builder_prefers_idle_and_does_not_reuse_workers() {
-        let mut idle_workers = vec![11, 12];
-        let mut gathering_workers = vec![21];
-        let mut builder_pool = vec![11, 12, 21];
-        let mut reserved = HashSet::new();
-
-        let first = pop_builder(
-            &mut idle_workers,
-            &mut gathering_workers,
-            &mut builder_pool,
-            &mut reserved,
-        );
-        let second = pop_builder(
-            &mut idle_workers,
-            &mut gathering_workers,
-            &mut builder_pool,
-            &mut reserved,
-        );
-        let third = pop_builder(
-            &mut idle_workers,
-            &mut gathering_workers,
-            &mut builder_pool,
-            &mut reserved,
-        );
-        let fourth = pop_builder(
-            &mut idle_workers,
-            &mut gathering_workers,
-            &mut builder_pool,
-            &mut reserved,
-        );
-
-        assert_eq!(first, Some(12));
-        assert_eq!(second, Some(11));
-        assert_eq!(third, Some(21));
-        assert_eq!(fourth, None);
-        assert!(builder_pool.is_empty());
-        assert_eq!(reserved.len(), 3);
-    }
-
-    #[test]
-    fn idle_workers_pick_distinct_steel_nodes() {
-        let mut entities = EntityStore::default();
-        let worker_a = entities
-            .spawn_unit(1, EntityKind::Worker, 0.0, 0.0)
-            .unwrap();
-        let worker_b = entities
-            .spawn_unit(1, EntityKind::Worker, 8.0, 0.0)
-            .unwrap();
-        let node_a = entities.spawn_node(EntityKind::Steel, 64.0, 0.0).unwrap();
-        let node_b = entities.spawn_node(EntityKind::Steel, 96.0, 0.0).unwrap();
-        let spatial = SpatialIndex::build(&entities, config::TILE_SIZE);
-        let mut reserved = HashSet::new();
-
-        let pick_a = nearest_free_steel_node(&entities, &spatial, worker_a, &reserved);
-        assert_eq!(pick_a, Some(node_a));
-        reserved.insert(node_a);
-
-        let pick_b = nearest_free_steel_node(&entities, &spatial, worker_b, &reserved);
-        assert_eq!(pick_b, Some(node_b));
-    }
 
     #[test]
     fn pending_depot_build_blocks_repeat_supply_depot_plan() {

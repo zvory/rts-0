@@ -14,7 +14,6 @@
 //! [`super::move_coordinator::MoveCoordinator::find_spawn_point`]; this module re-exports them
 //! through its docs so the placement / spawn surface is discoverable from one place.
 
-use crate::config;
 use crate::game::entity::{Entity, EntityKind, EntityStore, NEUTRAL};
 use crate::game::services::spatial::SpatialIndex;
 use crate::rules::terrain::{self, TerrainKind};
@@ -173,12 +172,6 @@ pub(crate) fn node_holder(entities: &EntityStore, node: u32) -> Option<u32> {
 /// Whether `player` owns a *unit* with this id (buildings and nodes excluded).
 pub(crate) fn owns_unit(entities: &EntityStore, player: u32, id: u32) -> bool {
     matches!(entities.get(id), Some(e) if e.owner == player && e.is_unit())
-}
-
-/// Generous "near my base" radius for resource searches around a unit (used by the AI). Tuned
-/// to comfortably span the map at current sizes; refine when maps grow.
-pub(crate) fn default_resource_search_radius_px() -> f32 {
-    config::TILE_SIZE as f32 * 48.0
 }
 
 #[cfg(test)]

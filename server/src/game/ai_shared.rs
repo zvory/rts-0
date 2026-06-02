@@ -6,7 +6,6 @@ use crate::game::ai_core::observation::AiResourceSummary;
 use crate::game::entity::EntityKind;
 use crate::game::entity::EntityStore;
 use crate::protocol::{MapInfo, Snapshot};
-use crate::rules;
 
 pub(crate) const DEFAULT_BUILD_SEARCH_MIN_RADIUS: i32 = 3;
 pub(crate) const DEFAULT_BUILD_SEARCH_MAX_RADIUS: i32 = 16;
@@ -28,71 +27,6 @@ impl Default for BuildSearch {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) struct SpendBudget {
-    steel: u32,
-    oil: u32,
-    free_supply: u32,
-}
-
-impl SpendBudget {
-    pub(crate) fn new(steel: u32, oil: u32, supply_used: u32, supply_cap: u32) -> Self {
-        Self {
-            steel,
-            oil,
-            free_supply: supply_cap.saturating_sub(supply_used),
-        }
-    }
-
-    pub(crate) fn free_supply(&self) -> u32 {
-        self.free_supply
-    }
-
-    pub(crate) fn can_afford_unit(&self, kind: EntityKind) -> bool {
-        if config::unit_stats(kind).is_none() {
-            return false;
-        }
-        let (steel, oil) = rules::economy::cost(kind);
-        let supply = rules::economy::supply_cost(kind);
-        self.steel >= steel && self.oil >= oil && self.free_supply >= supply
-    }
-
-    pub(crate) fn reserve_unit(&mut self, kind: EntityKind) -> bool {
-        if config::unit_stats(kind).is_none() {
-            return false;
-        }
-        let (steel, oil) = rules::economy::cost(kind);
-        let supply = rules::economy::supply_cost(kind);
-        self.reserve_cost(steel, oil, supply)
-    }
-
-    pub(crate) fn can_afford_building(&self, kind: EntityKind) -> bool {
-        if config::building_stats(kind).is_none() {
-            return false;
-        }
-        let (steel, oil) = rules::economy::cost(kind);
-        self.steel >= steel && self.oil >= oil
-    }
-
-    pub(crate) fn reserve_building(&mut self, kind: EntityKind) -> bool {
-        if config::building_stats(kind).is_none() {
-            return false;
-        }
-        let (steel, oil) = rules::economy::cost(kind);
-        self.reserve_cost(steel, oil, 0)
-    }
-
-    fn reserve_cost(&mut self, steel: u32, oil: u32, supply: u32) -> bool {
-        if self.steel < steel || self.oil < oil || self.free_supply < supply {
-            return false;
-        }
-        self.steel -= steel;
-        self.oil -= oil;
-        self.free_supply -= supply;
-        true
-    }
-}
-
 #[allow(dead_code)]
 pub(crate) fn main_base_steel_saturation_target_from_entities(
     entities: &EntityStore,
@@ -101,13 +35,16 @@ pub(crate) fn main_base_steel_saturation_target_from_entities(
     facts::main_base_steel_saturation_target(
         start_tile,
         config::TILE_SIZE,
-        entities.iter().filter(|e| e.kind.is_node()).map(|e| AiResourceSummary {
-            id: e.id,
-            kind: e.kind,
-            x: e.pos_x,
-            y: e.pos_y,
-            remaining: e.remaining().unwrap_or(0),
-        }),
+        entities
+            .iter()
+            .filter(|e| e.kind.is_node())
+            .map(|e| AiResourceSummary {
+                id: e.id,
+                kind: e.kind,
+                x: e.pos_x,
+                y: e.pos_y,
+                remaining: e.remaining().unwrap_or(0),
+            }),
     )
 }
 
@@ -133,17 +70,9 @@ pub(crate) fn main_base_steel_saturation_target_from_snapshot(
     )
 }
 
-pub(crate) fn ready_attack_wave<T>(
-    units: impl IntoIterator<Item = T>,
-    min_size: usize,
-    mut select: impl FnMut(T) -> Option<u32>,
-) -> Option<Vec<u32>> {
-    let ids: Vec<u32> = units.into_iter().filter_map(&mut select).collect();
-    (ids.len() >= min_size).then_some(ids)
-}
-
 /// Deterministically scan outward from `start`, preferring build sites that extend away from the
 /// map center so the local base grows outward instead of clogging its interior.
+#[allow(dead_code)]
 pub(crate) fn find_build_spot_near_start(
     map_width: u32,
     map_height: u32,
@@ -245,7 +174,9 @@ pub(crate) fn find_build_spot_near_start_with(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::game::ai_core::actions::{ready_attack_wave, SpendBudget};
     use crate::protocol::{terrain, EntityView, Snapshot};
+    use crate::rules;
 
     #[test]
     fn prefers_tiles_away_from_map_center() {
@@ -303,12 +234,11 @@ mod tests {
 
         assert!(budget.can_afford_unit(EntityKind::Tank));
         assert!(budget.reserve_unit(EntityKind::Tank));
-        assert_eq!(budget.steel, depot_steel);
         assert_eq!(budget.free_supply(), 1);
         assert!(!budget.can_afford_building(EntityKind::TankFactory));
         assert!(!budget.reserve_building(EntityKind::TankFactory));
         assert!(budget.reserve_building(EntityKind::Depot));
-        assert_eq!(budget.steel, 0);
+        assert!(!budget.can_afford_building(EntityKind::Depot));
     }
 
     #[test]
