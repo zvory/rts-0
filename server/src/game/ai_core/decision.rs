@@ -204,18 +204,18 @@ where
         });
     }
 
-    let desired_oil_workers =
-        desired_oil_workers(observation, &facts, profile, target_steel_workers);
+    let desired_oil_workers = desired_oil_workers(observation, profile, target_steel_workers);
     let target_workers = target_steel_workers.saturating_add(desired_oil_workers);
     let save_for_first_tech_unit = should_save_for_first_tech_unit(&facts, profile);
-    let save_for_tech = save_for_first_tech_unit || save_for_required_tech_building;
+    let save_worker_training_for_tech = save_for_first_tech_unit
+        || (save_for_required_tech_building && facts.worker_count >= target_workers);
     for trained in actions::train_units(
         &mut actions,
         TrainUnitsRequest {
             buildings: facts.production_buildings(EntityKind::IndustrialCenter),
             unit_priorities: &[EntityKind::Worker],
             max_queue_depth: 1,
-            save_for_tech,
+            save_for_tech: save_worker_training_for_tech,
             current_counts: &[(EntityKind::Worker, facts.worker_count)],
             max_counts: &[(EntityKind::Worker, target_workers)],
         },
@@ -395,7 +395,6 @@ where
 
 fn desired_oil_workers(
     observation: &AiObservation,
-    facts: &AiFacts,
     profile: &AiProfile,
     target_steel_workers: usize,
 ) -> usize {
@@ -406,9 +405,7 @@ fn desired_oil_workers(
         .get(&EntityKind::Steel)
         .copied()
         .unwrap_or(0);
-    if facts.worker_count >= profile.resources.oil_after_steel_workers
-        || current_steel_workers
-            >= target_steel_workers.min(profile.resources.oil_after_steel_workers)
+    if current_steel_workers >= target_steel_workers.min(profile.resources.oil_after_steel_workers)
     {
         profile.workers.extra_oil_workers
     } else {
@@ -530,6 +527,12 @@ mod tests {
             target_id: None,
             free_for_combat: false,
         }
+    }
+
+    fn steel_worker(id: u32, node: u32) -> AiEntitySummary {
+        let mut worker = worker(id, AiEntityState::Gather);
+        worker.latched_node = Some(node);
+        worker
     }
 
     fn resource(id: u32, kind: EntityKind, x: f32, y: f32) -> AiResourceSummary {
@@ -685,14 +688,14 @@ mod tests {
     }
 
     #[test]
-    fn tech_to_tanks_requests_oil_workers_and_tank_factory_path() {
+    fn tech_to_tanks_delays_oil_until_steel_floor_and_builds_tank_factory() {
         let mut owned = vec![
             building(10, EntityKind::IndustrialCenter, Some(0)),
             building(11, EntityKind::Barracks, Some(0)),
             building(12, EntityKind::TrainingCentre, None),
         ];
         owned.extend((0..4).map(|i| worker(20 + i, AiEntityState::Idle)));
-        let observation = observation(
+        let initial_observation = observation(
             AiEconomy {
                 steel: 1_000,
                 oil: 1_000,
@@ -703,7 +706,7 @@ mod tests {
         );
 
         let decision = decide(
-            &observation,
+            &initial_observation,
             &TECH_TO_TANKS,
             &mut AiDecisionMemory::for_profile(&TECH_TO_TANKS),
         );
@@ -712,10 +715,10 @@ mod tests {
             kind: EntityKind::TankFactory
         }));
         assert!(
-            !decision.intents.contains(&AiIntent::Train {
+            decision.intents.contains(&AiIntent::Train {
                 kind: EntityKind::Worker
             }),
-            "tech_to_tanks should save worker-training steel once the tank factory is buildable"
+            "tech_to_tanks should keep worker production alive while saving for the factory"
         );
         assert!(
             !decision.intents.contains(&AiIntent::Train {
@@ -723,7 +726,41 @@ mod tests {
             }),
             "tech_to_tanks should save barracks steel once the tank factory is buildable"
         );
-        assert!(decision.intents.iter().any(|intent| {
+        assert!(
+            !decision.intents.iter().any(|intent| matches!(
+                intent,
+                AiIntent::Gather {
+                    resource: EntityKind::Oil,
+                    ..
+                }
+            )),
+            "tech_to_tanks should not send workers to oil before the steel floor is saturated"
+        );
+
+        let mut steel_floor_owned = vec![
+            building(10, EntityKind::IndustrialCenter, Some(0)),
+            building(11, EntityKind::Barracks, Some(0)),
+            building(12, EntityKind::TrainingCentre, None),
+        ];
+        steel_floor_owned.extend((0..8).map(|i| steel_worker(20 + i, 100 + i)));
+        steel_floor_owned.extend((0..2).map(|i| worker(40 + i, AiEntityState::Idle)));
+        let steel_floor_observation = observation(
+            AiEconomy {
+                steel: 1_000,
+                oil: 1_000,
+                supply_used: 10,
+                supply_cap: 20,
+            },
+            steel_floor_owned,
+        );
+
+        let steel_floor_decision = decide(
+            &steel_floor_observation,
+            &TECH_TO_TANKS,
+            &mut AiDecisionMemory::for_profile(&TECH_TO_TANKS),
+        );
+
+        assert!(steel_floor_decision.intents.iter().any(|intent| {
             matches!(
                 intent,
                 AiIntent::Gather {
