@@ -1,7 +1,7 @@
 //! PathingService: the single boundary for all pathfinding requests.
 //!
 //! Encapsulates terrain mask, dynamic blockers, radius/footprint,
-//! per-request path budget, and an LRU cache of verified tile paths so multiple units or
+//! per-request path budget, and an LRU cache of verified non-empty tile paths so multiple units or
 //! ticks can reuse A* results.
 
 use std::collections::HashMap;
@@ -122,7 +122,9 @@ impl PathingService {
         );
 
         let waypoints = pathfinding::to_world_waypoints(&tile_path);
-        self.cache_insert(req.start, req.goal, req.radius_tiles, tile_path);
+        if !tile_path.is_empty() {
+            self.cache_insert(req.start, req.goal, req.radius_tiles, tile_path);
+        }
         waypoints
     }
 
@@ -242,5 +244,43 @@ mod tests {
             assert!(a.cache_contains(*start, *goal, 0));
             assert!(b.cache_contains(*start, *goal, 0));
         }
+    }
+
+    #[test]
+    fn empty_failed_paths_are_not_cached() {
+        let map = Map::generate(1, 0x1234_5678);
+        let entities = EntityStore::new();
+        let occ = Occupancy::build(&map, &entities);
+
+        let mut service = PathingService::new(1_000, 3);
+        let start = (1, 1);
+        let goal = (5, 5);
+
+        let failed = service.request(
+            &map,
+            &occ,
+            PathRequest {
+                start,
+                goal,
+                radius_tiles: 0,
+                budget: Some(0),
+            },
+        );
+        assert!(failed.is_empty());
+        assert_eq!(service.cache_len(), 0);
+        assert!(!service.cache_contains(start, goal, 0));
+
+        let found = service.request(
+            &map,
+            &occ,
+            PathRequest {
+                start,
+                goal,
+                radius_tiles: 0,
+                budget: None,
+            },
+        );
+        assert!(!found.is_empty());
+        assert!(service.cache_contains(start, goal, 0));
     }
 }
