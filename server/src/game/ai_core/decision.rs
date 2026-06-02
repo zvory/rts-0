@@ -8,7 +8,7 @@ use crate::game::ai_core::actions::{
     TrainUnitsRequest,
 };
 use crate::game::ai_core::facts::AiFacts;
-use crate::game::ai_core::observation::AiObservation;
+use crate::game::ai_core::observation::{AiEntitySummary, AiObservation};
 use crate::game::ai_core::profiles::AiProfile;
 use crate::game::ai_shared;
 use crate::game::entity::EntityKind;
@@ -20,6 +20,9 @@ const PRODUCTION_BUILDINGS: [EntityKind; 3] = [
     EntityKind::Barracks,
     EntityKind::IndustrialCenter,
 ];
+const LOCAL_DEFENSE_RADIUS_TILES: f32 = 12.0;
+const RESOURCE_LINE_DEFENSE_RADIUS_TILES: f32 = 4.0;
+const WORKER_DEFENSE_RADIUS_TILES: f32 = 5.0;
 
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct AiDecision {
@@ -301,41 +304,61 @@ where
         }
     }
 
-    if let Some(enemy_base) = facts.nearest_public_enemy_base {
-        let ready_units =
-            actions::select_ready_combat_units(&observation.owned, profile.attack.unit_kinds);
-        let required_unit_ready = profile
-            .attack
-            .required_unit
-            .map(|kind| {
-                observation
-                    .owned
-                    .iter()
-                    .any(|entity| entity.kind == kind && ready_units.contains(&entity.id))
-            })
-            .unwrap_or(true);
-        let attack_size = memory.desired_attack_size(profile, observation.tick);
-        if required_unit_ready
-            && ready_units.len() >= attack_size
-            && memory.attack_due(profile, observation.tick)
-        {
-            if let Some(units) =
-                actions::attack_move_units(&mut actions, ready_units, enemy_base.x, enemy_base.y)
-            {
-                memory.note_attack(profile, observation.tick);
-                intents.push(AiIntent::Attack { units });
-            }
-        } else if !ready_units.is_empty() {
-            let own_base = tile_center(observation.own_start_tile, observation.map.tile_size);
-            if let Some(units) = actions::stage_units_toward(
+    let ready_units =
+        actions::select_ready_combat_units(&observation.owned, profile.attack.unit_kinds);
+    if !ready_units.is_empty() {
+        let mut handled_local_defense = false;
+        if let Some(target) = local_defense_target(observation) {
+            if let Some(units) = actions::attack_units(
                 &mut actions,
-                ready_units,
-                own_base,
-                (enemy_base.x, enemy_base.y),
-                observation.map.tile_size,
-                profile.attack.stage_distance_tiles,
+                local_defense_units(observation, &ready_units),
+                target,
             ) {
-                intents.push(AiIntent::Stage { units });
+                intents.push(AiIntent::Attack { units });
+                handled_local_defense = true;
+            }
+        }
+
+        if !handled_local_defense {
+            if let Some(enemy_base) = facts.nearest_public_enemy_base {
+                let required_unit_ready = profile
+                    .attack
+                    .required_unit
+                    .map(|kind| {
+                        observation
+                            .owned
+                            .iter()
+                            .any(|entity| entity.kind == kind && ready_units.contains(&entity.id))
+                    })
+                    .unwrap_or(true);
+                let attack_size = memory.desired_attack_size(profile, observation.tick);
+                if required_unit_ready
+                    && ready_units.len() >= attack_size
+                    && memory.attack_due(profile, observation.tick)
+                {
+                    if let Some(units) = actions::attack_move_units(
+                        &mut actions,
+                        ready_units,
+                        enemy_base.x,
+                        enemy_base.y,
+                    ) {
+                        memory.note_attack(profile, observation.tick);
+                        intents.push(AiIntent::Attack { units });
+                    }
+                } else if !ready_units.is_empty() {
+                    let own_base =
+                        tile_center(observation.own_start_tile, observation.map.tile_size);
+                    if let Some(units) = actions::stage_units_toward(
+                        &mut actions,
+                        ready_units,
+                        own_base,
+                        (enemy_base.x, enemy_base.y),
+                        observation.map.tile_size,
+                        profile.attack.stage_distance_tiles,
+                    ) {
+                        intents.push(AiIntent::Stage { units });
+                    }
+                }
             }
         }
     }
@@ -489,6 +512,98 @@ fn occupied_resource_nodes(observation: &AiObservation) -> BTreeSet<u32> {
         .collect()
 }
 
+fn local_defense_target(observation: &AiObservation) -> Option<u32> {
+    let geometry = LocalDefenseGeometry::from_observation(observation);
+    observation
+        .visible_enemies
+        .iter()
+        .filter(|enemy| enemy.kind.is_unit() || enemy.kind.is_building())
+        .filter_map(|enemy| {
+            geometry
+                .contains(enemy)
+                .then_some((enemy.id, geometry.base_dist2(enemy)))
+        })
+        .min_by(|(left_id, left_dist), (right_id, right_dist)| {
+            left_dist
+                .total_cmp(right_dist)
+                .then_with(|| left_id.cmp(right_id))
+        })
+        .map(|(id, _)| id)
+}
+
+fn local_defense_units(observation: &AiObservation, ready_units: &[u32]) -> Vec<u32> {
+    let geometry = LocalDefenseGeometry::from_observation(observation);
+    let ready: BTreeSet<u32> = ready_units.iter().copied().collect();
+    observation
+        .owned
+        .iter()
+        .filter(|entity| ready.contains(&entity.id))
+        .filter(|entity| geometry.contains(entity))
+        .map(|entity| entity.id)
+        .collect()
+}
+
+struct LocalDefenseGeometry {
+    own_base: (f32, f32),
+    base_radius2: f32,
+    resource_radius2: f32,
+    worker_radius2: f32,
+    home_resources: Vec<(f32, f32)>,
+    workers: Vec<(f32, f32)>,
+}
+
+impl LocalDefenseGeometry {
+    fn from_observation(observation: &AiObservation) -> Self {
+        let own_base = tile_center(observation.own_start_tile, observation.map.tile_size);
+        let tile_size = observation.map.tile_size as f32;
+        let base_radius2 = squared(LOCAL_DEFENSE_RADIUS_TILES * tile_size);
+        let resource_radius2 = squared(RESOURCE_LINE_DEFENSE_RADIUS_TILES * tile_size);
+        let worker_radius2 = squared(WORKER_DEFENSE_RADIUS_TILES * tile_size);
+        let home_resource_radius2 = squared((config::IC_RESOURCE_MAX_DIST_TILES + 1.5) * tile_size);
+        let home_resources = observation
+            .resources
+            .iter()
+            .filter(|resource| {
+                matches!(resource.kind, EntityKind::Steel | EntityKind::Oil)
+                    && dist2(resource.x, resource.y, own_base.0, own_base.1)
+                        <= home_resource_radius2
+            })
+            .map(|resource| (resource.x, resource.y))
+            .collect();
+        let workers = observation
+            .owned
+            .iter()
+            .filter(|entity| entity.kind == EntityKind::Worker)
+            .map(|worker| (worker.x, worker.y))
+            .collect();
+
+        Self {
+            own_base,
+            base_radius2,
+            resource_radius2,
+            worker_radius2,
+            home_resources,
+            workers,
+        }
+    }
+
+    fn contains(&self, entity: &AiEntitySummary) -> bool {
+        self.base_dist2(entity) <= self.base_radius2
+            || self
+                .home_resources
+                .iter()
+                .any(|(x, y)| dist2(entity.x, entity.y, *x, *y) <= self.resource_radius2)
+            || self
+                .workers
+                .iter()
+                .any(|(x, y)| dist2(entity.x, entity.y, *x, *y) <= self.worker_radius2)
+    }
+
+    fn base_dist2(&self, entity: &AiEntitySummary) -> f32 {
+        dist2(entity.x, entity.y, self.own_base.0, self.own_base.1)
+    }
+}
+
 fn planned_in_intents(intents: &[AiIntent], kind: EntityKind) -> usize {
     intents
         .iter()
@@ -501,6 +616,16 @@ fn tile_center(tile: (u32, u32), tile_size: u32) -> (f32, f32) {
         tile.0 as f32 * tile_size as f32 + tile_size as f32 * 0.5,
         tile.1 as f32 * tile_size as f32 + tile_size as f32 * 0.5,
     )
+}
+
+fn dist2(ax: f32, ay: f32, bx: f32, by: f32) -> f32 {
+    let dx = ax - bx;
+    let dy = ay - by;
+    dx * dx + dy * dy
+}
+
+fn squared(value: f32) -> f32 {
+    value * value
 }
 
 #[cfg(test)]
@@ -565,18 +690,38 @@ mod tests {
     }
 
     fn combat(id: u32, kind: EntityKind) -> AiEntitySummary {
+        combat_at(id, kind, 0.0, 0.0)
+    }
+
+    fn combat_at(id: u32, kind: EntityKind, x: f32, y: f32) -> AiEntitySummary {
         AiEntitySummary {
             id,
             owner: 1,
             kind,
-            x: 0.0,
-            y: 0.0,
+            x,
+            y,
             state: AiEntityState::Idle,
             is_complete: true,
             production_queue_len: None,
             latched_node: None,
             target_id: None,
             free_for_combat: true,
+        }
+    }
+
+    fn enemy(id: u32, kind: EntityKind, x: f32, y: f32) -> AiEntitySummary {
+        AiEntitySummary {
+            id,
+            owner: 2,
+            kind,
+            x,
+            y,
+            state: AiEntityState::Idle,
+            is_complete: true,
+            production_queue_len: None,
+            latched_node: None,
+            target_id: None,
+            free_for_combat: false,
         }
     }
 
@@ -804,6 +949,97 @@ mod tests {
         assert!(!decision.intents.contains(&AiIntent::Train {
             kind: EntityKind::Rifleman
         }));
+    }
+
+    #[test]
+    fn visible_home_threat_preempts_outbound_tank_attack() {
+        let ts = config::TILE_SIZE as f32;
+        let mut observation = observation(
+            AiEconomy {
+                steel: 0,
+                oil: 0,
+                supply_used: 10,
+                supply_cap: 20,
+            },
+            vec![
+                building(10, EntityKind::IndustrialCenter, Some(0)),
+                building(11, EntityKind::Barracks, Some(0)),
+                building(12, EntityKind::TrainingCentre, None),
+                building(13, EntityKind::TankFactory, Some(0)),
+                combat_at(30, EntityKind::Tank, 8.5 * ts, 8.5 * ts),
+            ],
+        );
+        observation
+            .visible_enemies
+            .push(enemy(90, EntityKind::Rifleman, 10.5 * ts, 10.5 * ts));
+
+        let decision = decide(
+            &observation,
+            &TECH_TO_TANKS,
+            &mut AiDecisionMemory::for_profile(&TECH_TO_TANKS),
+        );
+
+        assert!(decision.commands.iter().any(|command| {
+            matches!(
+                command,
+                Command::Attack { units, target } if *target == 90 && units == &[30]
+            )
+        }));
+        assert!(
+            !decision
+                .commands
+                .iter()
+                .any(|command| matches!(command, Command::AttackMove { .. })),
+            "local defense should preempt the outbound tank wave"
+        );
+    }
+
+    #[test]
+    fn far_tank_is_not_recalled_for_home_threat() {
+        let ts = config::TILE_SIZE as f32;
+        let mut observation = observation(
+            AiEconomy {
+                steel: 0,
+                oil: 0,
+                supply_used: 10,
+                supply_cap: 20,
+            },
+            vec![
+                building(10, EntityKind::IndustrialCenter, Some(0)),
+                building(11, EntityKind::Barracks, Some(0)),
+                building(12, EntityKind::TrainingCentre, None),
+                building(13, EntityKind::TankFactory, Some(0)),
+                combat_at(30, EntityKind::Tank, 48.5 * ts, 48.5 * ts),
+            ],
+        );
+        observation
+            .visible_enemies
+            .push(enemy(90, EntityKind::Rifleman, 10.5 * ts, 10.5 * ts));
+
+        let decision = decide(
+            &observation,
+            &TECH_TO_TANKS,
+            &mut AiDecisionMemory::for_profile(&TECH_TO_TANKS),
+        );
+
+        assert!(
+            !decision.commands.iter().any(|command| {
+                matches!(
+                    command,
+                    Command::Attack { units, target } if *target == 90 && units == &[30]
+                )
+            }),
+            "far outbound tanks should not be pulled back by local defense"
+        );
+        assert!(
+            decision.commands.iter().any(|command| {
+                matches!(
+                    command,
+                    Command::AttackMove { units, .. } if units == &[30]
+                )
+            }),
+            "far tanks should keep their outbound attack behavior"
+        );
     }
 
     #[test]
