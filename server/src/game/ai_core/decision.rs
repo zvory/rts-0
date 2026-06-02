@@ -7,9 +7,9 @@ use crate::game::ai_core::actions::{
     self, AiActionContext, BuildPlacementRequest, ResourceAssignmentPolicy, SpendBudget,
     TrainUnitsRequest,
 };
-use crate::game::ai_core::facts::AiFacts;
+use crate::game::ai_core::facts::{AiFacts, EnemyBaseFact};
 use crate::game::ai_core::observation::{AiEntityState, AiEntitySummary, AiObservation};
-use crate::game::ai_core::profiles::AiProfile;
+use crate::game::ai_core::profiles::{AiProfile, ProxyBarracksPolicy};
 use crate::game::ai_shared;
 use crate::game::entity::EntityKind;
 use crate::protocol::Command;
@@ -415,8 +415,8 @@ where
     if counts.total_planned() > 0 {
         return None;
     }
-    let (tile_x, tile_y) =
-        proxy_barracks_site(observation, kind, policy.search_radius_tiles, placeable)?;
+    let enemy_base = facts.nearest_public_enemy_base?;
+    let (tile_x, tile_y) = proxy_barracks_site(observation, enemy_base, kind, policy, placeable)?;
     let worker = select_proxy_worker(observation, facts, memory)?;
     let worker_pool = [worker];
 
@@ -445,28 +445,99 @@ fn should_use_proxy_barracks(facts: &AiFacts, profile: &AiProfile) -> bool {
 
 fn proxy_barracks_site<F>(
     observation: &AiObservation,
+    enemy_base: EnemyBaseFact,
     kind: EntityKind,
-    search_radius_tiles: i32,
+    policy: ProxyBarracksPolicy,
     placeable: &mut F,
 ) -> Option<(u32, u32)>
 where
     F: FnMut(EntityKind, u32, u32) -> bool,
 {
-    let empty = BTreeSet::new();
-    let center = (observation.map.width / 2, observation.map.height / 2);
-    ai_shared::find_build_spot_near_start_with(
-        observation.map.width,
-        observation.map.height,
-        center,
-        kind,
-        ai_shared::BuildSearch {
-            min_radius: 0,
-            max_radius: search_radius_tiles,
-            prefer_away_from_center: false,
-        },
-        &empty,
-        |tx, ty| placeable(kind, tx, ty),
-    )
+    let stats = config::building_stats(kind)?;
+    let search_radius_tiles = policy
+        .search_radius_tiles
+        .max(policy.min_enemy_base_distance_tiles)
+        .max(0);
+    let min_distance2 = squared(policy.min_enemy_base_distance_tiles.max(0) as f32);
+    let enemy_center = (
+        enemy_base.start_tile.0 as f32 + 0.5,
+        enemy_base.start_tile.1 as f32 + 0.5,
+    );
+    let own_center = (
+        observation.own_start_tile.0 as f32 + 0.5,
+        observation.own_start_tile.1 as f32 + 0.5,
+    );
+    let toward_own = (own_center.0 - enemy_center.0, own_center.1 - enemy_center.1);
+    let (sx, sy) = (
+        enemy_base.start_tile.0 as i32,
+        enemy_base.start_tile.1 as i32,
+    );
+
+    let mut best_toward_own = None;
+    let mut fallback = None;
+    for dy in -search_radius_tiles..=search_radius_tiles {
+        for dx in -search_radius_tiles..=search_radius_tiles {
+            if dx.abs().max(dy.abs()) > search_radius_tiles {
+                continue;
+            }
+            let tx = sx + dx;
+            let ty = sy + dy;
+            if tx < 0 || ty < 0 {
+                continue;
+            }
+            let (tx, ty) = (tx as u32, ty as u32);
+            if tx >= observation.map.width || ty >= observation.map.height {
+                continue;
+            }
+
+            let center_x = tx as f32 + stats.foot_w as f32 * 0.5;
+            let center_y = ty as f32 + stats.foot_h as f32 * 0.5;
+            let dx = center_x - enemy_center.0;
+            let dy = center_y - enemy_center.1;
+            let distance2 = dx * dx + dy * dy;
+            if distance2 < min_distance2 || !placeable(kind, tx, ty) {
+                continue;
+            }
+            let toward_own_score = dx * toward_own.0 + dy * toward_own.1;
+            let candidate = ProxySiteCandidate {
+                tile: (tx, ty),
+                distance2,
+                toward_own_score,
+            };
+            if toward_own_score >= 0.0 {
+                if proxy_site_candidate_better(candidate, best_toward_own) {
+                    best_toward_own = Some(candidate);
+                }
+            } else if proxy_site_candidate_better(candidate, fallback) {
+                fallback = Some(candidate);
+            }
+        }
+    }
+
+    best_toward_own.or(fallback).map(|candidate| candidate.tile)
+}
+
+#[derive(Clone, Copy, Debug)]
+struct ProxySiteCandidate {
+    tile: (u32, u32),
+    distance2: f32,
+    toward_own_score: f32,
+}
+
+fn proxy_site_candidate_better(
+    candidate: ProxySiteCandidate,
+    current: Option<ProxySiteCandidate>,
+) -> bool {
+    let Some(current) = current else {
+        return true;
+    };
+    if candidate.distance2 != current.distance2 {
+        return candidate.distance2 < current.distance2;
+    }
+    if candidate.toward_own_score != current.toward_own_score {
+        return candidate.toward_own_score > current.toward_own_score;
+    }
+    candidate.tile < current.tile
 }
 
 fn select_proxy_worker(
@@ -480,13 +551,9 @@ fn select_proxy_worker(
         .filter(|entity| entity.kind == EntityKind::Worker)
         .map(|entity| (entity.id, entity))
         .collect();
-    if let Some(worker) = memory
-        .proxy_worker_id
-        .and_then(|id| workers_by_id.get(&id).copied())
-    {
-        if worker.state != AiEntityState::Build {
-            return Some(worker.id);
-        }
+    if let Some(worker_id) = memory.proxy_worker_id {
+        let worker = workers_by_id.get(&worker_id).copied()?;
+        return (worker.state != AiEntityState::Build).then_some(worker.id);
     }
 
     let mut candidates = facts.idle_workers.clone();
@@ -928,7 +995,8 @@ mod tests {
         profile: &'static AiProfile,
         memory: &mut AiDecisionMemory,
     ) -> AiDecision {
-        let center = (observation.map.width / 2, observation.map.height / 2);
+        let width = observation.map.width;
+        let height = observation.map.height;
         decide_profile(
             observation,
             profile,
@@ -938,8 +1006,71 @@ mod tests {
                 max_radius: 0,
                 prefer_away_from_center: false,
             },
-            |_, tx, ty| (tx, ty) == observation.own_start_tile || (tx, ty) == center,
+            |_, tx, ty| tx < width && ty < height,
         )
+    }
+
+    fn enemy_start_tile(observation: &AiObservation) -> (u32, u32) {
+        observation
+            .players
+            .iter()
+            .find(|player| player.id != observation.player_id)
+            .expect("test observation should have an enemy")
+            .start_tile
+    }
+
+    fn footprint_center_tiles(tile: (u32, u32), kind: EntityKind) -> (f32, f32) {
+        let stats = config::building_stats(kind).expect("test kind should be a building");
+        (
+            tile.0 as f32 + stats.foot_w as f32 * 0.5,
+            tile.1 as f32 + stats.foot_h as f32 * 0.5,
+        )
+    }
+
+    fn proxy_distance_to_enemy_tiles(observation: &AiObservation, tile: (u32, u32)) -> f32 {
+        let enemy = enemy_start_tile(observation);
+        let enemy_center = (enemy.0 as f32 + 0.5, enemy.1 as f32 + 0.5);
+        let barracks_center = footprint_center_tiles(tile, EntityKind::Barracks);
+        let dx = barracks_center.0 - enemy_center.0;
+        let dy = barracks_center.1 - enemy_center.1;
+        (dx * dx + dy * dy).sqrt()
+    }
+
+    fn proxy_site_is_on_own_side_of_enemy(observation: &AiObservation, tile: (u32, u32)) -> bool {
+        let enemy = enemy_start_tile(observation);
+        let enemy_center = (enemy.0 as f32 + 0.5, enemy.1 as f32 + 0.5);
+        let own_center = (
+            observation.own_start_tile.0 as f32 + 0.5,
+            observation.own_start_tile.1 as f32 + 0.5,
+        );
+        let barracks_center = footprint_center_tiles(tile, EntityKind::Barracks);
+        let to_barracks = (
+            barracks_center.0 - enemy_center.0,
+            barracks_center.1 - enemy_center.1,
+        );
+        let to_own = (own_center.0 - enemy_center.0, own_center.1 - enemy_center.1);
+        to_barracks.0 * to_own.0 + to_barracks.1 * to_own.1 >= 0.0
+    }
+
+    fn assert_enemy_proxy_site(observation: &AiObservation, tile: (u32, u32)) {
+        let distance = proxy_distance_to_enemy_tiles(observation, tile);
+        assert!(
+            distance >= 15.0,
+            "proxy barracks should not be within 15 tiles of the enemy base, got {distance}"
+        );
+        assert!(
+            distance < 16.0,
+            "proxy barracks should stay close to the enemy base, got {distance}"
+        );
+        assert!(
+            proxy_site_is_on_own_side_of_enemy(observation, tile),
+            "proxy barracks should be placed on the approach side of the enemy base"
+        );
+        assert_ne!(
+            tile,
+            (observation.map.width / 2, observation.map.height / 2),
+            "proxy barracks should no longer use the map center"
+        );
     }
 
     #[test]
@@ -973,8 +1104,21 @@ mod tests {
                 command,
                 Command::Move { units, x, y }
                     if units.as_slice() == [20]
-                        && *x > 0.0
-                        && *y > 0.0
+                        && dist2(
+                            *x,
+                            *y,
+                            enemy_start_tile(&observation).0 as f32 * observation.map.tile_size as f32
+                                + observation.map.tile_size as f32 * 0.5,
+                            enemy_start_tile(&observation).1 as f32 * observation.map.tile_size as f32
+                                + observation.map.tile_size as f32 * 0.5,
+                        ) < dist2(
+                            tile_center(observation.own_start_tile, observation.map.tile_size).0,
+                            tile_center(observation.own_start_tile, observation.map.tile_size).1,
+                            enemy_start_tile(&observation).0 as f32 * observation.map.tile_size as f32
+                                + observation.map.tile_size as f32 * 0.5,
+                            enemy_start_tile(&observation).1 as f32 * observation.map.tile_size as f32
+                                + observation.map.tile_size as f32 * 0.5,
+                        )
             )
         }));
         assert!(
@@ -1039,13 +1183,35 @@ mod tests {
         assert!(decision.intents.contains(&AiIntent::Build {
             kind: EntityKind::Barracks
         }));
+        let proxy_builds: Vec<_> = decision
+            .commands
+            .iter()
+            .filter_map(|command| match command {
+                Command::Build {
+                    worker,
+                    building,
+                    tile_x,
+                    tile_y,
+                } if building == EntityKind::Barracks.to_protocol_str() => {
+                    Some((*worker, (*tile_x, *tile_y)))
+                }
+                _ => None,
+            })
+            .collect();
+
+        assert_eq!(
+            proxy_builds.len(),
+            1,
+            "fast rush should send exactly one worker to build the proxy barracks"
+        );
+        assert_eq!(proxy_builds[0].0, 20);
+        assert_enemy_proxy_site(&observation, proxy_builds[0].1);
         assert!(decision.commands.iter().any(|command| {
             matches!(
                 command,
-                Command::Build { worker, building, tile_x, tile_y }
+                Command::Build { worker, building, .. }
                     if *worker == 20
                         && building == EntityKind::Barracks.to_protocol_str()
-                        && (*tile_x, *tile_y) == (observation.map.width / 2, observation.map.height / 2)
             )
         }));
         assert!(
@@ -1054,6 +1220,40 @@ mod tests {
                 .iter()
                 .any(|command| matches!(command, Command::Move { units, .. } if units.as_slice() == [20])),
             "the reserved proxy worker should build instead of receiving another move once affordable"
+        );
+    }
+
+    #[test]
+    fn fast_flood_does_not_replace_missing_proxy_worker() {
+        let mut owned = vec![building(10, EntityKind::IndustrialCenter, Some(0))];
+        owned.extend((0..5).map(|i| worker(20 + i, AiEntityState::Idle)));
+        let observation = observation(
+            AiEconomy {
+                steel: 150,
+                oil: 0,
+                supply_used: 5,
+                supply_cap: config::INDUSTRIAL_CENTER_SUPPLY,
+            },
+            owned,
+        );
+        let mut memory = AiDecisionMemory::for_profile(&RIFLE_FLOOD_FAST);
+        memory.proxy_worker_id = Some(999);
+
+        let decision = decide(&observation, &RIFLE_FLOOD_FAST, &mut memory);
+
+        assert!(!decision.commands.iter().any(|command| {
+            matches!(
+                command,
+                Command::Build { building, .. }
+                    if building == EntityKind::Barracks.to_protocol_str()
+            )
+        }));
+        assert!(
+            !decision
+                .commands
+                .iter()
+                .any(|command| matches!(command, Command::Move { units, .. } if units.len() == 1)),
+            "fast rush should not send a replacement proxy worker after committing one"
         );
     }
 

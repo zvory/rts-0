@@ -162,9 +162,10 @@ Practical interpretation:
 Intent:
 
 - build one engineer
-- mine steel with all engineers, except one which goes to the middle of the map
-- engineer in middle of map creates a barracks at 150 steel and returns home
-- nonstop rifleman production from the centre barracks
+- mine steel with all engineers, except one which goes toward the enemy base
+- that one engineer creates a proxy barracks near the enemy base at 150 steel, but not within 15
+  tiles of the enemy start
+- nonstop rifleman production from the proxy barracks
 - riflemen attack the enemy
 - after building a supply depot at 10, transition to another profile?
 
