@@ -93,6 +93,7 @@ impl SpendBudget {
     }
 }
 
+#[allow(dead_code)]
 pub(crate) fn main_base_steel_saturation_target_from_entities(
     entities: &EntityStore,
     start_tile: (u32, u32),
@@ -100,18 +101,17 @@ pub(crate) fn main_base_steel_saturation_target_from_entities(
     facts::main_base_steel_saturation_target(
         start_tile,
         config::TILE_SIZE,
-        entities.iter().filter_map(|e| {
-            e.kind.is_node().then(|| AiResourceSummary {
-                id: e.id,
-                kind: e.kind,
-                x: e.pos_x,
-                y: e.pos_y,
-                remaining: e.remaining().unwrap_or(0),
-            })
+        entities.iter().filter(|e| e.kind.is_node()).map(|e| AiResourceSummary {
+            id: e.id,
+            kind: e.kind,
+            x: e.pos_x,
+            y: e.pos_y,
+            remaining: e.remaining().unwrap_or(0),
         }),
     )
 }
 
+#[allow(dead_code)]
 pub(crate) fn main_base_steel_saturation_target_from_snapshot(
     map: &MapInfo,
     snapshot: &Snapshot,
