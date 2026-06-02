@@ -359,6 +359,7 @@ mod tests {
                     setup_state: None,
                 },
             ],
+            resource_deltas: Vec::new(),
             events: Vec::new(),
         };
 

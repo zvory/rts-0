@@ -40,11 +40,10 @@ resending static resource node data every tick.
 
 Use these budgets as gates. If a phase misses a budget, stop and investigate before continuing.
 
-- Phase 0 baseline: record current bytes; no budget.
-- Phase 1 normal early-game snapshot: less than 2 KB p95 for the measured 1 human + 3 AI quickstart
+- Phase 0 normal early-game snapshot: less than 2 KB p95 for the measured 1 human + 3 AI quickstart
   room.
-- Phase 2 normal early-game snapshot: less than 1.5 KB p95 after resource depletion deltas are
-  introduced.
+- Phase 1 normal early-game snapshot: less than 1.5 KB p95 after changed-only resource deltas are
+  introduced, if that extra optimization is still needed.
 - Phase 3 normal mid-game snapshot: less than 8 KB p95 in an AI self-play or scripted stress room.
 - Phase 4 steady-state snapshot delta: less than 4 KB p95 in normal mid-game and less than 10 KB p95
   in full-world dev watch.
@@ -52,46 +51,7 @@ Use these budgets as gates. If a phase misses a budget, stop and investigate bef
 These numbers are intentionally practical, not theoretical. Update this document with real measured
 numbers after each phase.
 
-## Phase 0: Add Measurement Before Changing Protocol
-
-Purpose: make payload size visible in tests and logs so every later phase can prove improvement.
-
-Expected files:
-
-- `tests/payload_metrics.mjs` or a helper inside `tests/server_integration.mjs`
-- optional: `tests/README.md`
-- optional: small logging helper in `server/src/main.rs`
-
-Implementation steps:
-
-1. Add a dependency-free Node script that connects to `RTS_WS`, creates a unique room, adds 3 AI
-   players, enables quickstart, starts the match, records raw byte length for each incoming
-   WebSocket frame, waits for at least 300 snapshots, and prints JSON metrics.
-2. Metrics must include count, min, p50, p95, max for each message type.
-3. Snapshot metrics must also include entity count p50/p95/max.
-4. Add a one-shot breakdown for the first non-empty snapshot:
-   - total snapshot bytes
-   - resource entity count
-   - non-resource entity count
-   - bytes after removing resource entities
-5. Keep the script independent of Puppeteer. Use Node's built-in `WebSocket` like the existing live
-   server tests.
-6. Do not fail the script on current large sizes yet. Phase 0 is measurement only.
-
-Suggested command:
-
-```bash
-RTS_WS=ws://127.0.0.1:<port>/ws node tests/payload_metrics.mjs
-```
-
-Acceptance:
-
-- The script runs against a local `cargo run` server.
-- The output is machine-readable JSON.
-- The output confirms the current resource-heavy snapshot shape.
-- Existing integration tests still pass.
-
-## Phase 1: Stop Resending Static Resource Nodes Every Snapshot
+## Phase 0: Stop Resending Static Resource Nodes Every Snapshot
 
 Purpose: remove the biggest known waste. Resource positions and kinds are already in the `start`
 payload as `map.resources`; snapshots should not resend every static node every tick.
@@ -101,65 +61,82 @@ Expected files:
 - `DESIGN.md`
 - `server/src/protocol.rs`
 - `server/src/game/mod.rs`
-- `server/src/rules/projection.rs`
-- `client/src/protocol.js`
+- `server/src/lobby.rs`
+- `server/src/game/services/death.rs`
+- `client/src/config.js`
 - `client/src/state.js`
 - `client/src/renderer.js`
 - `client/src/input.js`
-- `client/src/minimap.js`
 - tests near touched behavior
 
 Protocol shape:
 
-- Keep `start.map.resources` as the static resource catalog, but give each resource an `id`.
-- Stop including unchanged resource nodes in `snapshot.entities`.
-- A resource entity should appear in `snapshot.entities` only when it needs dynamic state that is not
-  already known from `start`, such as remaining amount during Phase 1 compatibility.
+- Keep `start.map.resources` as the static resource catalog, and give each resource an `id`.
+- Remove resource nodes from network `snapshot.entities`.
+- Send visible resource `remaining` through compact `resourceDeltas`.
+- When a visible resource is depleted and removed server-side, send a fog-gated `death` event as a
+  tombstone so the client can mark its last-known `remaining` as 0.
 
-Detailed steps:
+Implementation steps:
 
 1. Add `id` to the `ResourceNode` / start map resource protocol type.
 2. Populate `start.map.resources` from authoritative resource entities with `{ id, kind, x, y }`.
-3. Update `DESIGN.md` `start` payload docs before or in the same patch.
-4. Update the client `GameState` constructor to build a `resourceById` map from `start.map.resources`.
-5. Update renderer resource drawing so it draws static resources from `state.map.resources`, not only
-   from `snapshot.entities`.
-6. Preserve click/selection/gather behavior:
-   - resource hit testing must still find resource ids
-   - gather commands must still send the authoritative resource id
-   - minimap resource rendering must still work before any snapshot arrives
-7. Change server projection so neutral resource nodes are not included in `snapshot.entities` when
-   their state is unchanged.
-8. For Phase 1 only, choose the simplest dynamic rule:
-   - either send a resource entity when `remaining` is below full amount
-   - or add a temporary `resources` dynamic list to snapshot
-   The preferred rule is to add a dynamic resource list in Phase 2, not Phase 1. If keeping Phase 1
-   tiny, it is acceptable for rendered resource sizes to stay full until Phase 2.
-9. Update tests that currently expect resources in snapshots. Prefer changing those tests to inspect
+3. Add `resourceDeltas: [{ id, remaining }]` to snapshots.
+4. Populate resource deltas only for resources visible to that recipient. Dev full-world watch rooms
+   can receive all resource updates.
+5. Compact snapshots at the networking boundary by removing resource entities before serialization.
+   Keep internal `Game::snapshot_for` behavior available for self-play/replay consumers.
+6. Update the client `GameState` constructor to build a `resourceById` map from
    `start.map.resources`.
-10. Keep self-play compatibility in mind. If self-play AI currently reads resource nodes from
-    snapshots, update its observation adapter to merge static start resources with dynamic snapshot
-    state, or defer full self-play migration to Phase 2 with a clearly marked temporary fallback.
-
-Gotchas:
-
-- `client/src/input.js` currently picks entities from current snapshots. If resources move out of
-  snapshots, resource hit testing needs a new source. Do not remove gather targeting accidentally.
-- `client/src/renderer.js` scales resources using `remaining`. If `remaining` is temporarily unknown,
-  default to full scale.
-- Existing tests may assert `snapshot.entities` has steel nodes. Update the assertion to prove
-  `start.map.resources` has steel nodes and gather can still target them.
-- Do not make resource nodes grant fog vision.
+7. Have the client include known resources in its local entity index so renderer, input hit-testing,
+   placement blocking, and gather commands keep working.
+8. Apply `resourceDeltas` to the known resource cache.
+9. Apply visible resource death events as tombstones by setting last-known `remaining` to 0.
+10. Update tests that currently expect resources in snapshots. Prefer changing those tests to
+    inspect `start.map.resources`.
 
 Acceptance:
 
-- `tests/payload_metrics.mjs` p95 snapshot bytes are below 2 KB in the 1 human + 3 AI quickstart
-  scenario.
+- Network snapshots omit full resource entities.
+- `start.map.resources` includes resource ids.
 - The player can still click/gather visible starting resources.
 - Minimap still shows resource locations.
+- Visible depleted resources stop being gather targets.
 - `node tests/server_integration.mjs` passes against a running server.
 - `node tests/regression.mjs` passes against a running server.
 - `cd server && cargo test` passes.
+
+## Phase 1: Optional Payload Metrics Harness
+
+Purpose: make payload size visible in tests and logs if more reduction work is needed. This phase is
+optional after Phase 0 because the known waste has already been removed.
+
+Expected files:
+
+- `tests/payload_metrics.mjs` or a helper inside `tests/server_integration.mjs`
+- optional: `tests/README.md`
+
+Implementation steps:
+
+1. Add a dependency-free Node script that connects to `RTS_WS`, creates a unique room, adds 3 AI
+   players, enables quickstart, starts the match, records raw byte length for each incoming
+   WebSocket frame, waits for at least 300 snapshots, and prints JSON metrics.
+2. Metrics must include count, min, p50, p95, max for each message type.
+3. Snapshot metrics must also include entity count p50/p95/max.
+4. Keep the script independent of Puppeteer. Use Node's built-in `WebSocket` like the existing live
+   server tests.
+
+Suggested command:
+
+```bash
+RTS_WS=ws://127.0.0.1:<port>/ws node tests/payload_metrics.mjs
+```
+
+Acceptance:
+
+- The output is machine-readable JSON.
+- It does not make local development or CI depend on Puppeteer.
+- It is advisory unless a later phase decides to enforce budgets.
 
 ## Phase 2: Add Resource Remaining Deltas
 
