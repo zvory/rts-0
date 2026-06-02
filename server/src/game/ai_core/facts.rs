@@ -51,7 +51,9 @@ pub(crate) struct AiFacts {
     pub(crate) committed_steel: u32,
     pub(crate) nearest_public_enemy_base: Option<EnemyBaseFact>,
     building_counts: BTreeMap<EntityKind, BuildingCounts>,
+    complete_building_kinds: Vec<EntityKind>,
     production_buildings: BTreeMap<EntityKind, Vec<ProductionBuildingFact>>,
+    unit_counts: BTreeMap<EntityKind, usize>,
     free_combat_units: BTreeMap<EntityKind, Vec<u32>>,
 }
 
@@ -62,11 +64,17 @@ impl AiFacts {
         let mut gathering_workers = Vec::new();
         let mut build_capable_workers = Vec::new();
         let mut building_counts: BTreeMap<EntityKind, BuildingCounts> = BTreeMap::new();
+        let mut complete_building_kinds = Vec::new();
         let mut production_buildings: BTreeMap<EntityKind, Vec<ProductionBuildingFact>> =
             BTreeMap::new();
+        let mut unit_counts: BTreeMap<EntityKind, usize> = BTreeMap::new();
         let mut free_combat_units: BTreeMap<EntityKind, Vec<u32>> = BTreeMap::new();
 
         for entity in &observation.owned {
+            if entity.kind.is_unit() {
+                *unit_counts.entry(entity.kind).or_default() += 1;
+            }
+
             if entity.kind == EntityKind::Worker {
                 worker_count += 1;
                 match entity.state {
@@ -88,6 +96,7 @@ impl AiFacts {
                 counts.existing += 1;
                 if entity.is_complete {
                     counts.complete += 1;
+                    complete_building_kinds.push(entity.kind);
                 } else {
                     counts.incomplete += 1;
                 }
@@ -123,6 +132,8 @@ impl AiFacts {
         gathering_workers.sort_unstable();
         build_capable_workers.sort_unstable();
         build_capable_workers.dedup();
+        complete_building_kinds.sort_unstable();
+        complete_building_kinds.dedup();
         for buildings in production_buildings.values_mut() {
             buildings.sort_by_key(|b| b.id);
         }
@@ -166,7 +177,9 @@ impl AiFacts {
             committed_steel,
             nearest_public_enemy_base,
             building_counts,
+            complete_building_kinds,
             production_buildings,
+            unit_counts,
             free_combat_units,
         }
     }
@@ -190,6 +203,16 @@ impl AiFacts {
     #[allow(dead_code)]
     pub(crate) fn building_counts(&self, kind: EntityKind) -> BuildingCounts {
         self.building_counts.get(&kind).copied().unwrap_or_default()
+    }
+
+    #[allow(dead_code)]
+    pub(crate) fn complete_building_kinds(&self) -> &[EntityKind] {
+        &self.complete_building_kinds
+    }
+
+    #[allow(dead_code)]
+    pub(crate) fn unit_count(&self, kind: EntityKind) -> usize {
+        self.unit_counts.get(&kind).copied().unwrap_or(0)
     }
 
     pub(crate) fn production_buildings(&self, kind: EntityKind) -> &[ProductionBuildingFact] {
@@ -579,6 +602,8 @@ mod tests {
         let facts = AiFacts::from_observation(&observation);
 
         assert_eq!(facts.worker_count, 1);
+        assert_eq!(facts.unit_count(EntityKind::Worker), 1);
+        assert_eq!(facts.unit_count(EntityKind::Rifleman), 2);
         assert_eq!(facts.free_combat_units(EntityKind::Rifleman), &[1]);
         assert!(facts.free_combat_units(EntityKind::Worker).is_empty());
     }
