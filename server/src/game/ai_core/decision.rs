@@ -886,26 +886,9 @@ where
     if counts.incomplete + counts.intended >= profile.buildings.max_pending_per_kind {
         return None;
     }
-    let anchor = expansion_anchor_tile(observation)?;
-    let start_tile = footprint_top_left_for_center(anchor, kind)?;
-    let empty = BTreeSet::new();
-    actions::try_build(
-        actions,
-        builder_pools,
-        BuildPlacementRequest {
-            building: kind,
-            map_width: observation.map.width,
-            map_height: observation.map.height,
-            start_tile,
-            search: ai_shared::BuildSearch {
-                min_radius: 0,
-                max_radius: expansion.search_radius_tiles,
-                prefer_away_from_center: false,
-            },
-            skip_tiles: &empty,
-            placeable: |tx, ty| placeable(kind, tx, ty),
-        },
-    )
+    let (tile_x, tile_y) =
+        expansion_industrial_center_site(observation, expansion, kind, placeable)?;
+    actions::try_build_at(actions, builder_pools, kind, tile_x, tile_y)
 }
 
 fn footprint_top_left_for_center(center_tile: (u32, u32), kind: EntityKind) -> Option<(u32, u32)> {
@@ -916,68 +899,243 @@ fn footprint_top_left_for_center(center_tile: (u32, u32), kind: EntityKind) -> O
     ))
 }
 
-fn expansion_anchor_tile(observation: &AiObservation) -> Option<(u32, u32)> {
+fn expansion_industrial_center_site<F>(
+    observation: &AiObservation,
+    expansion: ExpansionPolicy,
+    kind: EntityKind,
+    placeable: &mut F,
+) -> Option<(u32, u32)>
+where
+    F: FnMut(EntityKind, u32, u32) -> bool,
+{
+    let stats = config::building_stats(kind)?;
+    let resources = expansion_candidate_resources(observation);
+    if resources.is_empty() {
+        return None;
+    }
+    let required_steel = resources
+        .iter()
+        .filter(|resource| resource.kind == EntityKind::Steel)
+        .count()
+        .min(config::STEEL_PATCHES_PER_BASE as usize);
+    let required_oil = resources
+        .iter()
+        .filter(|resource| resource.kind == EntityKind::Oil)
+        .count()
+        .min(config::OIL_PATCHES_PER_BASE as usize);
+    let mut seen = BTreeSet::new();
+    let mut best = None;
+
+    for anchor in expansion_anchor_tiles(observation, &resources) {
+        let Some(start_tile) = footprint_top_left_for_center(anchor, kind) else {
+            continue;
+        };
+        let (sx, sy) = (start_tile.0 as i32, start_tile.1 as i32);
+        for dy in -expansion.search_radius_tiles..=expansion.search_radius_tiles {
+            for dx in -expansion.search_radius_tiles..=expansion.search_radius_tiles {
+                if dx.abs().max(dy.abs()) > expansion.search_radius_tiles {
+                    continue;
+                }
+                let tx = sx + dx;
+                let ty = sy + dy;
+                if tx < 0 || ty < 0 {
+                    continue;
+                }
+                let (tx, ty) = (tx as u32, ty as u32);
+                if tx > observation.map.width.saturating_sub(stats.foot_w)
+                    || ty > observation.map.height.saturating_sub(stats.foot_h)
+                    || !seen.insert((tx, ty))
+                    || !placeable(kind, tx, ty)
+                {
+                    continue;
+                }
+                let Some(candidate) =
+                    expansion_site_candidate(observation, kind, tx, ty, &resources)
+                else {
+                    continue;
+                };
+                if candidate.steel_in_range < required_steel
+                    || candidate.oil_in_range < required_oil
+                {
+                    continue;
+                }
+                if expansion_site_candidate_better(candidate, best) {
+                    best = Some(candidate);
+                }
+            }
+        }
+    }
+
+    best.map(|candidate| candidate.tile)
+}
+
+fn expansion_candidate_resources(observation: &AiObservation) -> Vec<&AiResourceSummary> {
+    let start_resource_radius =
+        (config::IC_RESOURCE_MAX_DIST_TILES + 1.5) * observation.map.tile_size as f32;
+    let start_resource_radius2 = squared(start_resource_radius);
+    observation
+        .resources
+        .iter()
+        .filter(|resource| matches!(resource.kind, EntityKind::Steel | EntityKind::Oil))
+        .filter(|resource| resource.remaining > 0)
+        .filter(|resource| {
+            !resource_is_near_player_start(observation, resource, start_resource_radius2)
+        })
+        .collect()
+}
+
+fn expansion_anchor_tiles(
+    observation: &AiObservation,
+    resources: &[&AiResourceSummary],
+) -> Vec<(u32, u32)> {
     let tile_size = observation.map.tile_size as f32;
     if tile_size <= 0.0 {
-        return None;
+        return Vec::new();
     }
     let own = tile_center(observation.own_start_tile, observation.map.tile_size);
     let map_center_tiles = (
         observation.map.width as f32 * 0.5,
         observation.map.height as f32 * 0.5,
     );
-    let start_resource_radius =
-        (config::IC_RESOURCE_MAX_DIST_TILES + 1.5) * observation.map.tile_size as f32;
-    let start_resource_radius2 = squared(start_resource_radius);
-    let mut best: Option<(u32, (u32, u32), f32)> = None;
+    let mut anchors: Vec<((u32, u32), f32, u32)> = Vec::new();
 
-    for resource in observation
-        .resources
+    for resource in resources
         .iter()
-        .filter(|resource| resource.kind == EntityKind::Steel && resource.remaining > 0)
+        .copied()
+        .filter(|resource| resource.kind == EntityKind::Steel)
     {
-        if resource_is_near_player_start(observation, resource, start_resource_radius2) {
+        let Some(tile) =
+            estimated_expansion_center_tile(observation, resource, map_center_tiles, tile_size)
+        else {
             continue;
-        }
-        let resource_tile = (resource.x / tile_size, resource.y / tile_size);
-        let dir = (
-            map_center_tiles.0 - resource_tile.0,
-            map_center_tiles.1 - resource_tile.1,
-        );
-        let len = (dir.0 * dir.0 + dir.1 * dir.1).sqrt();
-        if len <= f32::EPSILON {
-            continue;
-        }
-        let estimated_center = (
-            resource_tile.0 - dir.0 / len * config::STEEL_BLOCK_DIST_TILES,
-            resource_tile.1 - dir.1 / len * config::STEEL_BLOCK_DIST_TILES,
-        );
-        if !estimated_center.0.is_finite() || !estimated_center.1.is_finite() {
-            continue;
-        }
-        let tile = (
-            estimated_center
-                .0
-                .round()
-                .clamp(0.0, observation.map.width.saturating_sub(1) as f32) as u32,
-            estimated_center
-                .1
-                .round()
-                .clamp(0.0, observation.map.height.saturating_sub(1) as f32) as u32,
-        );
+        };
         let center = tile_center(tile, observation.map.tile_size);
         let distance2 = dist2(center.0, center.1, own.0, own.1);
-        let better = best
-            .map(|(best_id, _, best_distance2)| {
-                distance2 < best_distance2 || (distance2 == best_distance2 && resource.id < best_id)
-            })
-            .unwrap_or(true);
-        if better {
-            best = Some((resource.id, tile, distance2));
-        }
+        anchors.push((tile, distance2, resource.id));
     }
 
-    best.map(|(_, tile, _)| tile)
+    anchors.sort_by(
+        |(left_tile, left_distance, left_id), (right_tile, right_distance, right_id)| {
+            left_distance
+                .total_cmp(right_distance)
+                .then_with(|| left_id.cmp(right_id))
+                .then_with(|| left_tile.cmp(right_tile))
+        },
+    );
+    anchors.dedup_by_key(|(tile, _, _)| *tile);
+    anchors.into_iter().map(|(tile, _, _)| tile).collect()
+}
+
+fn estimated_expansion_center_tile(
+    observation: &AiObservation,
+    resource: &AiResourceSummary,
+    map_center_tiles: (f32, f32),
+    tile_size: f32,
+) -> Option<(u32, u32)> {
+    let resource_tile = (resource.x / tile_size, resource.y / tile_size);
+    let dir = (
+        map_center_tiles.0 - resource_tile.0,
+        map_center_tiles.1 - resource_tile.1,
+    );
+    let len = (dir.0 * dir.0 + dir.1 * dir.1).sqrt();
+    if len <= f32::EPSILON {
+        return None;
+    }
+    let estimated_center = (
+        resource_tile.0 - dir.0 / len * config::STEEL_BLOCK_DIST_TILES,
+        resource_tile.1 - dir.1 / len * config::STEEL_BLOCK_DIST_TILES,
+    );
+    if !estimated_center.0.is_finite() || !estimated_center.1.is_finite() {
+        return None;
+    }
+    Some((
+        estimated_center
+            .0
+            .round()
+            .clamp(0.0, observation.map.width.saturating_sub(1) as f32) as u32,
+        estimated_center
+            .1
+            .round()
+            .clamp(0.0, observation.map.height.saturating_sub(1) as f32) as u32,
+    ))
+}
+
+#[derive(Clone, Copy, Debug)]
+struct ExpansionSiteCandidate {
+    tile: (u32, u32),
+    steel_in_range: usize,
+    oil_in_range: usize,
+    max_resource_distance2: f32,
+    sum_resource_distance2: f32,
+    own_distance2: f32,
+}
+
+fn expansion_site_candidate(
+    observation: &AiObservation,
+    kind: EntityKind,
+    tile_x: u32,
+    tile_y: u32,
+    resources: &[&AiResourceSummary],
+) -> Option<ExpansionSiteCandidate> {
+    let (cx, cy) = building_center((tile_x, tile_y), kind, observation.map.tile_size)?;
+    let max_dist = config::MINING_IC_RANGE_TILES * observation.map.tile_size as f32;
+    let max_dist2 = squared(max_dist);
+    let mut steel_in_range = 0usize;
+    let mut oil_in_range = 0usize;
+    let mut max_resource_distance2 = 0.0f32;
+    let mut sum_resource_distance2 = 0.0f32;
+
+    for resource in resources {
+        let distance2 = dist2(cx, cy, resource.x, resource.y);
+        if distance2 > max_dist2 {
+            continue;
+        }
+        match resource.kind {
+            EntityKind::Steel => steel_in_range += 1,
+            EntityKind::Oil => oil_in_range += 1,
+            _ => {}
+        }
+        max_resource_distance2 = max_resource_distance2.max(distance2);
+        sum_resource_distance2 += distance2;
+    }
+    if steel_in_range == 0 && oil_in_range == 0 {
+        return None;
+    }
+    let own = tile_center(observation.own_start_tile, observation.map.tile_size);
+    Some(ExpansionSiteCandidate {
+        tile: (tile_x, tile_y),
+        steel_in_range,
+        oil_in_range,
+        max_resource_distance2,
+        sum_resource_distance2,
+        own_distance2: dist2(cx, cy, own.0, own.1),
+    })
+}
+
+fn expansion_site_candidate_better(
+    candidate: ExpansionSiteCandidate,
+    current: Option<ExpansionSiteCandidate>,
+) -> bool {
+    let Some(current) = current else {
+        return true;
+    };
+    candidate
+        .oil_in_range
+        .cmp(&current.oil_in_range)
+        .then_with(|| candidate.steel_in_range.cmp(&current.steel_in_range))
+        .then_with(|| {
+            current
+                .max_resource_distance2
+                .total_cmp(&candidate.max_resource_distance2)
+        })
+        .then_with(|| {
+            current
+                .sum_resource_distance2
+                .total_cmp(&candidate.sum_resource_distance2)
+        })
+        .then_with(|| current.own_distance2.total_cmp(&candidate.own_distance2))
+        .then_with(|| current.tile.cmp(&candidate.tile))
+        == Ordering::Greater
 }
 
 fn resource_is_near_player_start(
@@ -1491,6 +1649,83 @@ mod tests {
         }
         observation.resources.sort_by_key(|resource| resource.id);
         observation
+    }
+
+    fn base_site_resources(
+        first_id: u32,
+        site: (u32, u32),
+        map_size: u32,
+    ) -> Vec<AiResourceSummary> {
+        let ts = config::TILE_SIZE as f32;
+        let hx = site.0 as f32 + 0.5;
+        let hy = site.1 as f32 + 0.5;
+        let map_center = map_size as f32 * 0.5;
+        let base_angle = (map_center - hy).atan2(map_center - hx);
+
+        let block_cx = hx + config::STEEL_BLOCK_DIST_TILES * base_angle.cos();
+        let block_cy = hy + config::STEEL_BLOCK_DIST_TILES * base_angle.sin();
+        let perp_x = -base_angle.sin();
+        let perp_y = base_angle.cos();
+        let rows = config::STEEL_PATCHES_PER_BASE.div_ceil(6);
+        let row_center = (rows - 1) as f32 / 2.0;
+        let mut resources = Vec::new();
+        for i in 0..config::STEEL_PATCHES_PER_BASE {
+            let col = (i % 6) as f32;
+            let row = (i / 6) as f32;
+            let off_x = col - 2.5;
+            let off_y = row - row_center;
+            resources.push(resource(
+                first_id + i,
+                EntityKind::Steel,
+                (block_cx + off_x * perp_x + off_y * base_angle.cos()) * ts,
+                (block_cy + off_x * perp_y + off_y * base_angle.sin()) * ts,
+            ));
+        }
+
+        let oil_angle = base_angle + std::f32::consts::FRAC_PI_2;
+        let oil_perp_x = -oil_angle.sin();
+        let oil_perp_y = oil_angle.cos();
+        let oil_cx = hx + config::OIL_DIST_TILES * oil_angle.cos();
+        let oil_cy = hy + config::OIL_DIST_TILES * oil_angle.sin();
+        for (i, (off_x, off_y)) in [(-0.5, -0.5), (0.5, -0.5), (0.0, 0.5)]
+            .into_iter()
+            .enumerate()
+        {
+            resources.push(resource(
+                first_id + config::STEEL_PATCHES_PER_BASE + i as u32,
+                EntityKind::Oil,
+                (oil_cx + off_x * oil_perp_x + off_y * oil_angle.cos()) * ts,
+                (oil_cy + off_x * oil_perp_y + off_y * oil_angle.sin()) * ts,
+            ));
+        }
+        resources
+    }
+
+    fn expansion_resource_counts_for_site(
+        observation: &AiObservation,
+        site: (u32, u32),
+    ) -> (usize, usize) {
+        let (cx, cy) = building_center(
+            site,
+            EntityKind::IndustrialCenter,
+            observation.map.tile_size,
+        )
+        .expect("industrial center should have a center");
+        let max_dist = config::MINING_IC_RANGE_TILES * observation.map.tile_size as f32;
+        let max_dist2 = squared(max_dist);
+        let mut steel = 0usize;
+        let mut oil = 0usize;
+        for resource in expansion_candidate_resources(observation) {
+            if dist2(cx, cy, resource.x, resource.y) > max_dist2 {
+                continue;
+            }
+            match resource.kind {
+                EntityKind::Steel => steel += 1,
+                EntityKind::Oil => oil += 1,
+                _ => {}
+            }
+        }
+        (steel, oil)
     }
 
     fn decide(
@@ -2033,6 +2268,117 @@ mod tests {
                 }
             )),
             "expansion profile should not move into oil before the second IC is complete"
+        );
+    }
+
+    #[test]
+    fn steel_expansion_tanks_places_expansion_ic_in_range_of_whole_resource_line() {
+        let map_size = 96;
+        let ts = config::TILE_SIZE as f32;
+        let mut owned = vec![
+            building_at(
+                10,
+                EntityKind::IndustrialCenter,
+                Some(0),
+                10.5 * ts,
+                85.5 * ts,
+            ),
+            building(11, EntityKind::Barracks, Some(0)),
+        ];
+        owned.extend((0..3).map(|i| combat(30 + i, EntityKind::Rifleman)));
+        owned.extend((0..8).map(|i| steel_worker(40 + i, 100 + i)));
+        owned.push(worker(60, AiEntityState::Idle));
+        let mut resources = base_site_resources(100, (10, 85), map_size);
+        resources.extend(base_site_resources(200, (48, 73), map_size));
+        resources.sort_by_key(|resource| resource.id);
+        let observation = AiObservation {
+            player_id: 1,
+            tick: 90,
+            map: AiMapSummary {
+                width: map_size,
+                height: map_size,
+                tile_size: config::TILE_SIZE,
+            },
+            economy: AiEconomy {
+                steel: 500,
+                oil: 500,
+                supply_used: 12,
+                supply_cap: 30,
+            },
+            own_start_tile: (10, 85),
+            players: vec![
+                AiPlayerSummary {
+                    id: 1,
+                    start_tile: (10, 85),
+                    is_ai: true,
+                    is_alive: true,
+                },
+                AiPlayerSummary {
+                    id: 2,
+                    start_tile: (85, 10),
+                    is_ai: false,
+                    is_alive: true,
+                },
+            ],
+            owned,
+            resources,
+            visible_enemies: Vec::new(),
+            pending_builds: Vec::new(),
+        };
+
+        let mut placeable = |_: EntityKind, tx: u32, ty: u32| tx < map_size && ty < map_size;
+        let site = expansion_industrial_center_site(
+            &observation,
+            STEEL_EXPANSION_TANKS.expansion.unwrap(),
+            EntityKind::IndustrialCenter,
+            &mut placeable,
+        )
+        .expect("expansion IC site should be found");
+
+        assert_eq!(
+            expansion_resource_counts_for_site(&observation, site),
+            (
+                config::STEEL_PATCHES_PER_BASE as usize,
+                config::OIL_PATCHES_PER_BASE as usize
+            ),
+            "expansion IC at {site:?} should cover the whole natural resource line"
+        );
+
+        let mut memory = AiDecisionMemory::for_profile(&STEEL_EXPANSION_TANKS);
+        let decision = decide_profile(
+            &observation,
+            &STEEL_EXPANSION_TANKS,
+            &mut memory,
+            ai_shared::BuildSearch {
+                min_radius: 0,
+                max_radius: 0,
+                prefer_away_from_center: false,
+            },
+            |_, tx, ty| tx < map_size && ty < map_size,
+        );
+        let command_site = decision
+            .commands
+            .iter()
+            .find_map(|command| match command {
+                Command::Build {
+                    building,
+                    tile_x,
+                    tile_y,
+                    ..
+                } if building == EntityKind::IndustrialCenter.to_protocol_str() => {
+                    Some((*tile_x, *tile_y))
+                }
+                _ => None,
+            })
+            .expect("decision should issue an expansion IC build");
+
+        assert_eq!(
+            expansion_resource_counts_for_site(&observation, command_site),
+            (
+                config::STEEL_PATCHES_PER_BASE as usize,
+                config::OIL_PATCHES_PER_BASE as usize
+            ),
+            "emitted expansion IC build at {command_site:?} should cover all expansion resources"
         );
     }
 
