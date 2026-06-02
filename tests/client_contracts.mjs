@@ -88,6 +88,10 @@ function assertHasGetter(obj, name, msgPrefix = "") {
       height: 4,
       tileSize: 32,
       terrain: new Array(16).fill(0),
+      resources: [
+        { id: 200, kind: KIND.STEEL, x: 64, y: 96 },
+        { id: 201, kind: KIND.OIL, x: 96, y: 96 },
+      ],
     },
     players: [
       { id: 1, name: "A", color: "#ff0000", startTileX: 1, startTileY: 1 },
@@ -98,6 +102,10 @@ function assertHasGetter(obj, name, msgPrefix = "") {
   assert(state.playerId === 1, "GameState.playerId");
   assert(state.startInfo === start, "GameState.startInfo");
   assert(state.map.width === 4, "GameState.map");
+  assert(state.map.resources.length === 2, "GameState keeps start payload resources");
+  assert(state.resourceById.get(200).kind === KIND.STEEL, "GameState indexes resources by id");
+  assert(state.resourceById.get(200).remaining === 1500, "steel defaults to full known amount");
+  assert(state.resourceById.get(201).remaining === 5000, "oil defaults to full known amount");
   assert(Array.isArray(state.players), "GameState.players");
   assertHasMethod(state, "applySnapshot", "GameState");
   assertHasMethod(state, "entitiesInterpolated", "GameState");
@@ -127,11 +135,14 @@ function assertHasGetter(obj, name, msgPrefix = "") {
     supplyUsed: 2,
     supplyCap: 10,
     entities: [{ id: 1, owner: 1, kind: "worker", x: 10, y: 20, hp: 40, maxHp: 40, state: "idle" }],
+    resourceDeltas: [{ id: 200, remaining: 1498 }],
     events: [],
   });
   assert(state.currRecvTime !== null, "currRecvTime set after first snapshot");
   assert(state.prevRecvTime === null, "prevRecvTime still null after one snapshot");
   assert(state.resources.steel === 10, "resources updated");
+  assert(state.entityById(200).kind === KIND.STEEL, "static resources are available as local entities");
+  assert(state.entityById(200).remaining === 1498, "resourceDeltas update known resource state");
 
   state.applySnapshot({
     tick: 1,
@@ -140,16 +151,19 @@ function assertHasGetter(obj, name, msgPrefix = "") {
     supplyUsed: 2,
     supplyCap: 10,
     entities: [{ id: 1, owner: 1, kind: "worker", x: 15, y: 25, hp: 40, maxHp: 40, state: "idle" }],
-    events: [],
+    events: [{ e: "death", id: 200, x: 64, y: 96, kind: KIND.STEEL }],
   });
   assert(state.prevRecvTime !== null, "prevRecvTime set after two snapshots");
+  assert(state.entityById(200).remaining === 0, "visible resource death tombstones known resource");
+  assert(state.entityById(201).remaining === 5000, "untouched resources keep their last-known amount");
 
   // Interpolation clamps alpha to [0,1]
   const entsNeg = state.entitiesInterpolated(-0.5);
   const entsOver = state.entitiesInterpolated(1.5);
   const entsMid = state.entitiesInterpolated(0.5);
-  assert(entsMid.length === 1, "entitiesInterpolated returns entities");
-  assert(entsMid[0].x >= 10 && entsMid[0].x <= 15, "interpolation works");
+  const midWorker = entsMid.find((e) => e.id === 1);
+  assert(entsMid.length === 3 && midWorker, "entitiesInterpolated returns units and known resources");
+  assert(midWorker.x >= 10 && midWorker.x <= 15, "interpolation works for moving units");
 
   // Selection resolves against current snapshot
   state.setSelection([1, 999]);
