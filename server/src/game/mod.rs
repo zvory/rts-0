@@ -82,8 +82,8 @@ pub struct Game {
     spatial: services::spatial::SpatialIndex,
     /// Persistent pathfinding service with an LRU cache for verified paths.
     pathing: services::pathing::PathingService,
-    /// Seed used to generate this game's map (including start-position shuffle). Stored so
-    /// replays can reconstruct the identical map without re-deriving it.
+    /// Match seed retained for replay metadata/API compatibility. The current hardcoded map
+    /// ignores it until lobby map selection or randomized maps are reintroduced.
     seed: u32,
 }
 

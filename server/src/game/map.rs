@@ -1,57 +1,28 @@
-//! The tile map: terrain grid, generation, and passability. See `DESIGN.md` §3 (`map.rs`).
+//! The tile map: terrain grid, authored map loading, and passability. See `DESIGN.md` §3 (`map.rs`).
 //!
-//! The map is square with side `config::map_size_for(players)`. It is mostly GRASS with a
-//! few ROCK/WATER obstacle clusters placed with rotational symmetry so no start position is
-//! advantaged. Start tiles are chosen symmetrically (corners / edge midpoints) and we never
-//! place an obstacle on a start area or its adjacent resource cluster.
+//! The live game currently uses one deterministic handcrafted map embedded in the server binary.
+//! The map file defines terrain and ordered base sites; the simulation still derives player
+//! starts, expansion sites, starting buildings, workers, and resource clusters from those sites.
 //!
 //! Terrain passability here is purely about *terrain* — building footprints are tracked
 //! dynamically by the simulation (a separate occupancy grid in `systems`/`pathfinding`),
 //! not baked into the map.
 
+use std::collections::HashSet;
+
 use crate::config;
 use crate::protocol::terrain;
+use serde::Deserialize;
 
-/// A tiny deterministic xorshift32 PRNG. We avoid pulling in `rand` (not a dependency) and
-/// want fully reproducible maps for a given seed so matches are deterministic and testable.
-pub struct XorShift32 {
-    state: u32,
-}
+const DEFAULT_MAP_JSON: &str = include_str!("../../assets/maps/default.json");
 
-impl XorShift32 {
-    /// Seed must be non-zero; zero is remapped to a fixed constant.
-    pub fn new(seed: u32) -> Self {
-        XorShift32 {
-            state: if seed == 0 { 0x9E37_79B9 } else { seed },
-        }
-    }
+/// Radius around every authored base site that must remain passable. This covers the starting
+/// Industrial Center footprint, worker ring, and the deterministic steel/oil cluster derived from
+/// that site.
+pub const BASE_PROTECTION_RADIUS_TILES: i32 = 7;
 
-    /// Next pseudo-random `u32`.
-    pub fn next_u32(&mut self) -> u32 {
-        let mut x = self.state;
-        x ^= x << 13;
-        x ^= x >> 17;
-        x ^= x << 5;
-        self.state = x;
-        x
-    }
-
-    /// Uniform integer in `[0, n)` (n > 0).
-    pub fn below(&mut self, n: u32) -> u32 {
-        if n == 0 {
-            0
-        } else {
-            self.next_u32() % n
-        }
-    }
-
-    /// Uniform float in `[0.0, 1.0)`.
-    pub fn unit_f32(&mut self) -> f32 {
-        (self.next_u32() >> 8) as f32 / (1u32 << 24) as f32
-    }
-}
-
-/// The terrain grid plus the chosen symmetric start tiles.
+/// The terrain grid plus the selected start and expansion tiles.
+#[derive(Debug)]
 pub struct Map {
     /// Side length in tiles (square map).
     pub size: u32,
@@ -59,32 +30,47 @@ pub struct Map {
     pub terrain: Vec<u8>,
     /// One start tile `(tile_x, tile_y)` per player, in player-index order.
     pub starts: Vec<(u32, u32)>,
-    /// One neutral expansion site `(tile_x, tile_y)` per player.
+    /// Neutral expansion sites. These receive resource clusters but no starting buildings.
     pub expansion_sites: Vec<(u32, u32)>,
 }
 
 impl Map {
-    /// Generate a symmetric map for `player_count` players using a deterministic seed.
-    pub fn generate(player_count: usize, seed: u32) -> Map {
-        let size = config::map_size_for(player_count);
-        let mut terrain = vec![terrain::GRASS; (size * size) as usize];
+    /// Load the deterministic handcrafted map for `player_count` players.
+    ///
+    /// The `seed` parameter is intentionally ignored while the hardcoded map is active; it remains
+    /// in the API so replay/lobby callers do not need to change before lobby map selection exists.
+    pub fn generate(player_count: usize, _seed: u32) -> Map {
+        Self::from_authored_json(player_count, DEFAULT_MAP_JSON)
+            .unwrap_or_else(|err| panic!("invalid hardcoded map asset: {err}"))
+    }
 
-        let mut rng = XorShift32::new(seed);
-        let starts = symmetric_starts(size, player_count, &mut rng);
-        let expansion_sites = expansion_sites(size, player_count, &starts);
+    fn from_authored_json(player_count: usize, json: &str) -> Result<Map, String> {
+        let authored: AuthoredMap =
+            serde_json::from_str(json).map_err(|err| format!("map JSON parse error: {err}"))?;
+        let (size, terrain) = parse_terrain(&authored.terrain)?;
+        let base_sites = parse_base_sites(size, &authored.base_sites)?;
 
-        // Tiles we must keep clear: each start area and its resource cluster footprint.
-        // We protect a generous square around every start tile plus every neutral expansion site.
-        let protected = protected_tiles(size, &starts, &expansion_sites);
+        if player_count == 0 {
+            return Err("player_count must be at least 1".to_string());
+        }
+        if player_count > base_sites.len() {
+            return Err(format!(
+                "map has {} base sites, but {player_count} players were requested",
+                base_sites.len()
+            ));
+        }
 
-        scatter_symmetric_obstacles(&mut terrain, size, &mut rng, &protected);
+        validate_base_clearance(size, &terrain, &base_sites)?;
 
-        Map {
+        let starts = base_sites.iter().take(player_count).copied().collect();
+        let expansion_sites = base_sites.iter().skip(player_count).copied().collect();
+
+        Ok(Map {
             size,
             terrain,
             starts,
             expansion_sites,
-        }
+        })
     }
 
     #[inline]
@@ -140,240 +126,188 @@ impl Map {
     }
 }
 
-/// Choose symmetric start tiles for `player_count` players.
-///
-/// We inset the starts from the very edge so the Industrial Center footprint and its resource cluster fit.
-/// - 2 players: any two distinct corners.
-/// - 3 players: any three distinct corners.
-/// - 4 players: the four corners.
-fn symmetric_starts(size: u32, player_count: usize, rng: &mut XorShift32) -> Vec<(u32, u32)> {
-    // Inset keeps the start area + resource cluster fully on-map.
-    let inset = 11u32.min(size / 4);
-    let lo = inset;
-    let hi = size - 1 - inset;
-    let nw = (lo, lo);
-    let ne = (hi, lo);
-    let sw = (lo, hi);
-    let se = (hi, hi);
-    let mut corners = vec![nw, ne, sw, se];
-    shuffle(&mut corners, rng);
-    corners.truncate(player_count.min(corners.len()));
-    corners
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct AuthoredMap {
+    #[allow(dead_code)]
+    name: String,
+    terrain: Vec<String>,
+    base_sites: Vec<AuthoredSite>,
 }
 
-/// Tiles that must never be made impassable: a square around each start tile big enough to
-/// hold the Industrial Center footprint, the worker spawn ring, and the steel/oil clusters.
-/// All four corners are always protected because resource patches always spawn there.
-fn protected_tiles(size: u32, starts: &[(u32, u32)], expansion_sites: &[(u32, u32)]) -> Vec<bool> {
-    let mut prot = vec![false; (size * size) as usize];
-    let r: i32 = 7;
+#[derive(Debug, Clone, Copy, Deserialize)]
+struct AuthoredSite {
+    x: u32,
+    y: u32,
+}
 
-    // Collect all tiles to protect: player starts + all four corners.
-    let inset = 11u32.min(size / 4);
-    let lo = inset;
-    let hi = size - 1 - inset;
-    let all_corners = [(lo, lo), (hi, lo), (lo, hi), (hi, hi)];
-    let to_protect: Vec<(u32, u32)> = starts
-        .iter()
-        .copied()
-        .chain(all_corners)
-        .chain(expansion_sites.iter().copied())
-        .collect();
+fn parse_terrain(rows: &[String]) -> Result<(u32, Vec<u8>), String> {
+    if rows.is_empty() {
+        return Err("terrain must contain at least one row".to_string());
+    }
 
-    for (sx, sy) in to_protect {
-        for dy in -r..=r {
-            for dx in -r..=r {
+    let size = rows[0].chars().count();
+    if size == 0 {
+        return Err("terrain rows must not be empty".to_string());
+    }
+    if rows.len() != size {
+        return Err(format!(
+            "terrain must be square; got {} rows by {size} columns",
+            rows.len()
+        ));
+    }
+
+    let size_u32 =
+        u32::try_from(size).map_err(|_| "terrain size does not fit in u32".to_string())?;
+    let mut out = Vec::with_capacity(size * size);
+    for (y, row) in rows.iter().enumerate() {
+        let width = row.chars().count();
+        if width != size {
+            return Err(format!(
+                "terrain row {y} has width {width}; expected {size}"
+            ));
+        }
+        for (x, ch) in row.chars().enumerate() {
+            let code = match ch {
+                '.' => terrain::GRASS,
+                '#' => terrain::ROCK,
+                '~' => terrain::WATER,
+                _ => {
+                    return Err(format!(
+                        "unknown terrain character '{ch}' at tile ({x},{y})"
+                    ))
+                }
+            };
+            out.push(code);
+        }
+    }
+
+    Ok((size_u32, out))
+}
+
+fn parse_base_sites(size: u32, authored: &[AuthoredSite]) -> Result<Vec<(u32, u32)>, String> {
+    if authored.is_empty() {
+        return Err("baseSites must contain at least one site".to_string());
+    }
+
+    let mut seen = HashSet::with_capacity(authored.len());
+    let mut out = Vec::with_capacity(authored.len());
+    for (i, site) in authored.iter().enumerate() {
+        if site.x >= size || site.y >= size {
+            return Err(format!(
+                "baseSites[{i}] = ({},{}) is outside the {size}x{size} map",
+                site.x, site.y
+            ));
+        }
+        if !seen.insert((site.x, site.y)) {
+            return Err(format!(
+                "baseSites[{i}] duplicates an earlier site at ({},{})",
+                site.x, site.y
+            ));
+        }
+        out.push((site.x, site.y));
+    }
+    Ok(out)
+}
+
+fn validate_base_clearance(
+    size: u32,
+    terrain_grid: &[u8],
+    base_sites: &[(u32, u32)],
+) -> Result<(), String> {
+    for (i, &(sx, sy)) in base_sites.iter().enumerate() {
+        for dy in -BASE_PROTECTION_RADIUS_TILES..=BASE_PROTECTION_RADIUS_TILES {
+            for dx in -BASE_PROTECTION_RADIUS_TILES..=BASE_PROTECTION_RADIUS_TILES {
                 let tx = sx as i32 + dx;
                 let ty = sy as i32 + dy;
-                if tx >= 0 && ty >= 0 && (tx as u32) < size && (ty as u32) < size {
-                    prot[(ty as u32 * size + tx as u32) as usize] = true;
+                if tx < 0 || ty < 0 || tx >= size as i32 || ty >= size as i32 {
+                    return Err(format!(
+                        "baseSites[{i}] at ({sx},{sy}) is too close to the map edge"
+                    ));
+                }
+                let idx = (ty as u32 * size + tx as u32) as usize;
+                if terrain_grid[idx] != terrain::GRASS {
+                    return Err(format!(
+                        "baseSites[{i}] at ({sx},{sy}) has impassable terrain in its protected area at ({tx},{ty})"
+                    ));
                 }
             }
         }
     }
-    prot
-}
-
-/// One neutral expansion site per player.
-fn expansion_sites(size: u32, player_count: usize, starts: &[(u32, u32)]) -> Vec<(u32, u32)> {
-    let inset = 11u32.min(size / 4);
-    let lo = inset;
-    let hi = size - 1 - inset;
-    let mid = size / 2;
-    let corners = [(lo, lo), (hi, lo), (lo, hi), (hi, hi)];
-    let edge_midpoints = [(mid, lo), (hi, mid), (mid, hi), (lo, mid)];
-    let candidates = match player_count {
-        0 => Vec::new(),
-        1..=3 => corners
-            .into_iter()
-            .chain(edge_midpoints)
-            .collect::<Vec<_>>(),
-        _ => edge_midpoints.to_vec(),
-    };
-    candidates
-        .into_iter()
-        .filter(|site| !starts.contains(site))
-        .take(player_count)
-        .collect()
-}
-
-/// Scatter a handful of obstacle clusters and mirror each one under 180° rotational symmetry
-/// so the layout is fair. Never writes onto a protected tile (its mirror is protected too, by
-/// symmetry of the start placement, but we guard both ends regardless).
-fn scatter_symmetric_obstacles(
-    terrain: &mut [u8],
-    size: u32,
-    rng: &mut XorShift32,
-    protected: &[bool],
-) {
-    // Number of *base* clusters; each is mirrored, so total obstacle area is doubled.
-    let clusters = 3 + (size / 32); // scales mildly with map size
-    let inner_lo = 6i32;
-    let inner_hi = size as i32 - 1 - 6;
-    if inner_hi <= inner_lo {
-        return;
-    }
-
-    for _ in 0..clusters {
-        // Pick a seed tile somewhere in the interior.
-        let cx = inner_lo + rng.below((inner_hi - inner_lo) as u32) as i32;
-        let cy = inner_lo + rng.below((inner_hi - inner_lo) as u32) as i32;
-        // Choose ROCK or WATER for the whole cluster.
-        let kind = if rng.unit_f32() < 0.5 {
-            terrain::ROCK
-        } else {
-            terrain::WATER
-        };
-        // Blob radius 1..=3.
-        let radius = 1 + rng.below(3) as i32;
-
-        for dy in -radius..=radius {
-            for dx in -radius..=radius {
-                // Rough circle so blobs look organic, not blocky.
-                if dx * dx + dy * dy > radius * radius {
-                    continue;
-                }
-                let tx = cx + dx;
-                let ty = cy + dy;
-                paint_obstacle(terrain, size, protected, tx, ty, kind);
-                // 180° rotational mirror: (size-1-tx, size-1-ty).
-                let mx = size as i32 - 1 - tx;
-                let my = size as i32 - 1 - ty;
-                paint_obstacle(terrain, size, protected, mx, my, kind);
-            }
-        }
-    }
-}
-
-/// Paint one obstacle tile if it is in bounds and not protected.
-fn paint_obstacle(terrain: &mut [u8], size: u32, protected: &[bool], tx: i32, ty: i32, kind: u8) {
-    if tx < 0 || ty < 0 || (tx as u32) >= size || (ty as u32) >= size {
-        return;
-    }
-    let idx = (ty as u32 * size + tx as u32) as usize;
-    if protected[idx] {
-        return;
-    }
-    terrain[idx] = kind;
-}
-
-fn shuffle<T>(items: &mut [T], rng: &mut XorShift32) {
-    if items.len() < 2 {
-        return;
-    }
-    for i in (1..items.len()).rev() {
-        let j = rng.below((i + 1) as u32) as usize;
-        items.swap(i, j);
-    }
+    Ok(())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn corner_tiles(player_count: usize) -> Vec<(u32, u32)> {
-        let size = config::map_size_for(player_count);
-        let inset = 11u32.min(size / 4);
-        let lo = inset;
-        let hi = size - 1 - inset;
-        vec![(lo, lo), (lo, hi), (hi, lo), (hi, hi)]
-    }
-
     #[test]
-    fn generate_shuffles_starts_by_seed() {
-        let a = Map::generate(4, 1);
-        let b = Map::generate(4, 2);
-        assert_eq!(a.starts.len(), 4);
-        assert_eq!(b.starts.len(), 4);
-        assert_ne!(a.starts, b.starts);
-
-        let mut a_sorted = a.starts.clone();
-        let mut b_sorted = b.starts.clone();
-        a_sorted.sort_unstable();
-        b_sorted.sort_unstable();
-        assert_eq!(a_sorted, b_sorted);
-    }
-
-    #[test]
-    fn starts_are_random_distinct_corners_by_seed() {
+    fn hardcoded_map_loads_for_every_supported_player_count() {
         for player_count in 1..=4 {
-            let corners = corner_tiles(player_count);
-
-            for seed in 1..=64 {
-                let mut starts = Map::generate(player_count, seed).starts;
-                assert_eq!(starts.len(), player_count);
-                assert!(starts.iter().all(|start| corners.contains(start)));
-
-                starts.sort_unstable();
-                starts.dedup();
-                assert_eq!(starts.len(), player_count);
-            }
-        }
-    }
-
-    #[test]
-    fn two_player_starts_cover_every_ordered_corner_pair_by_seed() {
-        let corners = corner_tiles(2);
-        let mut observed = Vec::new();
-
-        for seed in 1..=1024 {
-            let starts = Map::generate(2, seed).starts;
-            if !observed.contains(&starts) {
-                observed.push(starts);
-            }
-        }
-        observed.sort_unstable();
-
-        let mut expected = Vec::new();
-        for a in &corners {
-            for b in &corners {
-                if a != b {
-                    expected.push(vec![*a, *b]);
-                }
-            }
-        }
-        expected.sort_unstable();
-
-        assert_eq!(observed, expected);
-    }
-
-    #[test]
-    fn two_player_expansions_are_the_unused_corners() {
-        let all_corners = corner_tiles(2);
-
-        for seed in 1..=64 {
-            let map = Map::generate(2, seed);
-            assert_eq!(map.starts.len(), 2);
-            assert_eq!(map.expansion_sites.len(), 2);
-
-            let mut all_sites = map.starts.clone();
-            all_sites.extend(map.expansion_sites.iter().copied());
-            all_sites.sort_unstable();
-            assert_eq!(all_sites, all_corners);
+            let map = Map::generate(player_count, 0x1234_5678);
+            assert_eq!(map.terrain.len(), (map.size * map.size) as usize);
+            assert_eq!(map.starts.len(), player_count);
+            assert!(!map.expansion_sites.is_empty());
 
             for start in &map.starts {
-                assert!(!map.expansion_sites.contains(start));
+                assert!(map.is_passable(start.0 as i32, start.1 as i32));
+            }
+            for expansion in &map.expansion_sites {
+                assert!(map.is_passable(expansion.0 as i32, expansion.1 as i32));
             }
         }
+    }
+
+    #[test]
+    fn hardcoded_map_is_deterministic_across_seeds() {
+        let a = Map::generate(4, 1);
+        let b = Map::generate(4, 2);
+
+        assert_eq!(a.size, b.size);
+        assert_eq!(a.terrain, b.terrain);
+        assert_eq!(a.starts, b.starts);
+        assert_eq!(a.expansion_sites, b.expansion_sites);
+    }
+
+    #[test]
+    fn two_player_match_uses_opposite_authored_starts() {
+        let map = Map::generate(2, 0);
+        assert_eq!(map.starts, vec![(10, 10), (85, 85)]);
+        assert!(map.expansion_sites.contains(&(85, 10)));
+        assert!(map.expansion_sites.contains(&(10, 85)));
+    }
+
+    #[test]
+    fn authored_map_rejects_unknown_terrain_characters() {
+        let err = Map::from_authored_json(
+            1,
+            r#"{
+              "name": "bad",
+              "terrain": ["..", ".x"],
+              "baseSites": [{"x": 0, "y": 0}]
+            }"#,
+        )
+        .expect_err("bad terrain should be rejected");
+
+        assert!(err.contains("unknown terrain character"));
+    }
+
+    #[test]
+    fn authored_map_rejects_impassable_base_protection_area() {
+        let mut rows = vec!["................".to_string(); 16];
+        rows[8].replace_range(8..9, "#");
+        let json = format!(
+            r#"{{
+              "name": "bad-base",
+              "terrain": {},
+              "baseSites": [{{"x": 8, "y": 8}}]
+            }}"#,
+            serde_json::to_string(&rows).unwrap()
+        );
+
+        let err = Map::from_authored_json(1, &json)
+            .expect_err("blocked base protection area should be rejected");
+
+        assert!(err.contains("impassable terrain"));
     }
 }
