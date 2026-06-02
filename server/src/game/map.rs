@@ -66,8 +66,19 @@ impl Map {
         // baseSites are interleaved pairs: [start0, expansion0, start1, expansion1, ...].
         // Even indices are player starts; odd indices are the paired neutral expansion bases.
         // Only the first 2N sites are active; sites beyond 2N are unused for this player count.
-        let starts = base_sites.iter().step_by(2).take(player_count).copied().collect();
-        let expansion_sites = base_sites.iter().skip(1).step_by(2).take(player_count).copied().collect();
+        let starts = base_sites
+            .iter()
+            .step_by(2)
+            .take(player_count)
+            .copied()
+            .collect();
+        let expansion_sites = base_sites
+            .iter()
+            .skip(1)
+            .step_by(2)
+            .take(player_count)
+            .copied()
+            .collect();
 
         Ok(Map {
             size,
