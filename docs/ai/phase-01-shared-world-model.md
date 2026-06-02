@@ -1,5 +1,7 @@
 # AI-1: Shared World Model
 
+Status: Done.
+
 Build one deterministic way for AI code to ask "what is true right now?"
 
 This phase should not substantially change behavior. It should extract observations and facts from
