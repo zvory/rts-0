@@ -202,7 +202,7 @@ fn order_build(
         return;
     }
 
-    let owned = world_query::owned_building_kinds(entities, player);
+    let owned = world_query::completed_building_kinds(entities, player);
     if !rules::economy::build_requirement_met(kind, &owned) {
         notice(events, player, "Requirement not met");
         return;
