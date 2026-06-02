@@ -2128,6 +2128,131 @@ fn profile_matchup_rifle_flood_full_saturation_vs_tech_to_tanks() {
     });
 }
 
+/// Manual long-form matchup runner for inspecting the full result instead of stopping as soon as
+/// milestone coverage is complete.
+#[test]
+#[ignore]
+fn profile_matchup_rifle_flood_full_saturation_vs_tech_to_tanks_20k_result() {
+    const TICKS: u32 = 20_000;
+    const ARTIFACT_NAME: &str = "profile_full_saturation_vs_tech_to_tanks_20k";
+
+    let players = vec![
+        PlayerInit {
+            id: 1,
+            name: "Full Saturation".into(),
+            color: "#4cc9f0".into(),
+            is_ai: false,
+        },
+        PlayerInit {
+            id: 2,
+            name: "Tech Tanks".into(),
+            color: "#f72585".into(),
+            is_ai: false,
+        },
+    ];
+    let mut game = Game::new(&players, 0);
+    let start = game.start_payload();
+    let mut scripts: Vec<Box<dyn ScriptedPlayer>> = vec![
+        Box::new(ProfileBackedScript::new(1, RIFLE_FLOOD_FULL_SATURATION_ID)),
+        Box::new(ProfileBackedScript::new(2, TECH_TO_TANKS_ID)),
+    ];
+    let mut event_log = Vec::new();
+
+    while game.tick_count() < TICKS {
+        let alive = game.alive_players();
+        if alive.len() <= 1 {
+            break;
+        }
+
+        let tick = game.tick_count();
+        let mut commands = Vec::new();
+        for script in &mut scripts {
+            let player_id = script.player_id();
+            let snapshot = game.snapshot_for(player_id);
+            let view = PlayerView {
+                player_id,
+                tick,
+                start: &start,
+                snapshot: &snapshot,
+            };
+            for command in script.commands(view) {
+                commands.push((player_id, command));
+            }
+        }
+        for (player_id, command) in commands {
+            game.enqueue(player_id, command);
+        }
+
+        let tick_events = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| game.tick()))
+            .expect("Game::tick panicked during 20k profile matchup");
+        let event_tick = game.tick_count();
+        for (player_id, events) in tick_events {
+            for event in events {
+                event_log.push(EventLogEntry {
+                    tick: event_tick,
+                    player_id,
+                    event,
+                });
+            }
+        }
+    }
+
+    assert_replay_matches_live(&game, &players, &event_log).unwrap_or_else(|failure| {
+        panic!(
+            "20k profile matchup replay determinism failed: {}",
+            failure.reason
+        );
+    });
+
+    let artifact = ReplayArtifact {
+        replay_commands: game.command_log().to_vec(),
+        players: players.clone(),
+        seed: game.seed(),
+    };
+    let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("target")
+        .join("selfplay-artifacts")
+        .join(ARTIFACT_NAME);
+    fs::create_dir_all(&dir).unwrap();
+    let json = serde_json::to_vec_pretty(&artifact).unwrap();
+    fs::write(dir.join("replay.json"), json).unwrap();
+
+    let alive = game.alive_players();
+    let winner = if alive.len() == 1 {
+        Some(alive[0])
+    } else {
+        None
+    };
+    let final_counts = final_unit_counts(&game, &players);
+    println!(
+        "SIM_RESULT ticks={} winner={:?} alive={:?} artifact={} counts={:?}",
+        game.tick_count(),
+        winner,
+        alive,
+        ARTIFACT_NAME,
+        final_counts
+    );
+}
+
+fn final_unit_counts(game: &Game, players: &[PlayerInit]) -> BTreeMap<u32, BTreeMap<String, u32>> {
+    let viewer = players.first().map(|p| p.id).unwrap_or(0);
+    let snapshot = game.snapshot_full_for(viewer);
+    let player_ids: BTreeSet<u32> = players.iter().map(|p| p.id).collect();
+    let mut counts: BTreeMap<u32, BTreeMap<String, u32>> = BTreeMap::new();
+    for entity in snapshot
+        .entities
+        .iter()
+        .filter(|entity| player_ids.contains(&entity.owner))
+    {
+        *counts
+            .entry(entity.owner)
+            .or_default()
+            .entry(entity.kind.clone())
+            .or_default() += 1;
+    }
+    counts
+}
+
 #[test]
 fn profile_backed_self_play_exercises_tech_to_tanks() {
     let players = vec![

@@ -268,7 +268,7 @@ pub(crate) static TECH_TO_TANKS: AiProfile = AiProfile {
         save_for_first_tech_unit: Some(EntityKind::Tank),
     },
     attack: AttackPolicy {
-        first_attack_size: 4,
+        first_attack_size: 1,
         wave_growth: 1,
         regroup_reset_ticks: 540,
         reissue_cadence_ticks: 120,
@@ -277,7 +277,7 @@ pub(crate) static TECH_TO_TANKS: AiProfile = AiProfile {
         required_unit: Some(EntityKind::Tank),
     },
     resources: ResourcePolicy {
-        oil_after_steel_workers: 4,
+        oil_after_steel_workers: 8,
     },
 };
 
@@ -333,6 +333,7 @@ mod tests {
     #[test]
     fn tech_to_tanks_has_oil_workers_and_tank_factory_path() {
         assert_eq!(TECH_TO_TANKS.workers.extra_oil_workers, 3);
+        assert_eq!(TECH_TO_TANKS.resources.oil_after_steel_workers, 8);
         assert_eq!(
             TECH_TO_TANKS.buildings.required_tech_path,
             &[
@@ -345,6 +346,7 @@ mod tests {
             TECH_TO_TANKS.production.save_for_first_tech_unit,
             Some(EntityKind::Tank)
         );
+        assert_eq!(TECH_TO_TANKS.attack.first_attack_size, 1);
     }
 
     #[test]
