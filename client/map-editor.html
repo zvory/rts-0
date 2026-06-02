@@ -354,6 +354,11 @@
         expansion: "#b7c5d9",
       });
       const PROTECTION_RADIUS = 7;
+      const EXPANSION_PROTECTION_RADIUS = 4;
+
+      function siteRadius(i) {
+        return i % 2 === 1 ? EXPANSION_PROTECTION_RADIUS : PROTECTION_RADIUS;
+      }
       const MIN_SIZE = 24;
       const MAX_SIZE = 160;
 
@@ -437,15 +442,16 @@
       }
 
       function isProtected(x, y) {
-        return map.baseSites.some((site) =>
-          Math.abs(site.x - x) <= PROTECTION_RADIUS &&
-          Math.abs(site.y - y) <= PROTECTION_RADIUS
-        );
+        return map.baseSites.some((site, i) => {
+          const r = siteRadius(i);
+          return Math.abs(site.x - x) <= r && Math.abs(site.y - y) <= r;
+        });
       }
 
-      function clearProtectedArea(site) {
-        for (let y = site.y - PROTECTION_RADIUS; y <= site.y + PROTECTION_RADIUS; y++) {
-          for (let x = site.x - PROTECTION_RADIUS; x <= site.x + PROTECTION_RADIUS; x++) {
+      function clearProtectedArea(site, i) {
+        const r = siteRadius(i);
+        for (let y = site.y - r; y <= site.y + r; y++) {
+          for (let x = site.x - r; x <= site.x + r; x++) {
             if (x >= 0 && y >= 0 && x < map.terrain.length && y < map.terrain.length) {
               setTerrainAt(x, y, TERRAIN.grass);
             }
@@ -461,16 +467,17 @@
           const key = `${site.x},${site.y}`;
           if (seen.has(key)) errors.push(`duplicate base site ${i + 1}`);
           seen.add(key);
+          const r = siteRadius(i);
           if (
-            site.x < PROTECTION_RADIUS ||
-            site.y < PROTECTION_RADIUS ||
-            site.x >= size - PROTECTION_RADIUS ||
-            site.y >= size - PROTECTION_RADIUS
+            site.x < r ||
+            site.y < r ||
+            site.x >= size - r ||
+            site.y >= size - r
           ) {
             errors.push(`base ${i + 1} too close to edge`);
           }
-          for (let y = site.y - PROTECTION_RADIUS; y <= site.y + PROTECTION_RADIUS; y++) {
-            for (let x = site.x - PROTECTION_RADIUS; x <= site.x + PROTECTION_RADIUS; x++) {
+          for (let y = site.y - r; y <= site.y + r; y++) {
+            for (let x = site.x - r; x <= site.x + r; x++) {
               if (x < 0 || y < 0 || x >= size || y >= size) continue;
               if (terrainAt(x, y) !== TERRAIN.grass) {
                 errors.push(`base ${i + 1} protected zone blocked`);
@@ -518,15 +525,16 @@
           ctx.stroke();
         }
 
-        for (const site of map.baseSites) {
-          const x = (site.x - PROTECTION_RADIUS) * cellSize;
-          const y = (site.y - PROTECTION_RADIUS) * cellSize;
-          const w = (PROTECTION_RADIUS * 2 + 1) * cellSize;
+        map.baseSites.forEach((site, i) => {
+          const r = siteRadius(i);
+          const x = (site.x - r) * cellSize;
+          const y = (site.y - r) * cellSize;
+          const w = (r * 2 + 1) * cellSize;
           ctx.fillStyle = COLORS.protect;
           ctx.fillRect(x, y, w, w);
           ctx.strokeStyle = COLORS.protectEdge;
           ctx.strokeRect(x + 0.5, y + 0.5, w - 1, w - 1);
-        }
+        });
 
         map.baseSites.forEach((site, i) => {
           const cx = site.x * cellSize + cellSize / 2;
@@ -625,7 +633,7 @@
         if (!tile) return;
         if (selectedTool === "base") {
           map.baseSites[selectedBase] = { x: tile.x, y: tile.y };
-          clearProtectedArea(map.baseSites[selectedBase]);
+          clearProtectedArea(map.baseSites[selectedBase], selectedBase);
           refresh();
           return;
         }
@@ -676,10 +684,13 @@
           rows.push(row);
         }
         map.terrain = rows;
-        map.baseSites = map.baseSites.map((site) => ({
-          x: Math.max(PROTECTION_RADIUS, Math.min(size - PROTECTION_RADIUS - 1, site.x)),
-          y: Math.max(PROTECTION_RADIUS, Math.min(size - PROTECTION_RADIUS - 1, site.y)),
-        }));
+        map.baseSites = map.baseSites.map((site, i) => {
+          const r = siteRadius(i);
+          return {
+            x: Math.max(r, Math.min(size - r - 1, site.x)),
+            y: Math.max(r, Math.min(size - r - 1, site.y)),
+          };
+        });
         map.baseSites.forEach(clearProtectedArea);
         refresh();
       }
