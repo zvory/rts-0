@@ -19,10 +19,11 @@ use serde::Deserialize;
 
 const DEFAULT_MAP_JSON: &str = include_str!("../../assets/maps/default.json");
 
-/// Radius around every authored base site that must remain passable. This covers the starting
-/// Industrial Center footprint, worker ring, and the deterministic steel/oil cluster derived from
-/// that site.
+/// Radius around a player start site (even index) that must remain passable.
 pub const BASE_PROTECTION_RADIUS_TILES: i32 = 7;
+/// Radius around a natural expansion site (odd index) that must remain passable.
+/// Smaller than the start radius because naturals have no IC or worker ring.
+pub const EXPANSION_PROTECTION_RADIUS_TILES: i32 = 4;
 
 /// The terrain grid plus the selected start and expansion tiles.
 #[derive(Debug)]
@@ -232,8 +233,13 @@ fn validate_base_clearance(
     base_sites: &[(u32, u32)],
 ) -> Result<(), String> {
     for (i, &(sx, sy)) in base_sites.iter().enumerate() {
-        for dy in -BASE_PROTECTION_RADIUS_TILES..=BASE_PROTECTION_RADIUS_TILES {
-            for dx in -BASE_PROTECTION_RADIUS_TILES..=BASE_PROTECTION_RADIUS_TILES {
+        let radius = if i % 2 == 1 {
+            EXPANSION_PROTECTION_RADIUS_TILES
+        } else {
+            BASE_PROTECTION_RADIUS_TILES
+        };
+        for dy in -radius..=radius {
+            for dx in -radius..=radius {
                 let tx = sx as i32 + dx;
                 let ty = sy as i32 + dy;
                 if tx < 0 || ty < 0 || tx >= size as i32 || ty >= size as i32 {
