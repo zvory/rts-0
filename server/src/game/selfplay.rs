@@ -19,7 +19,7 @@ use super::ai_core::decision::{decide_profile, AiDecisionMemory, AiIntent};
 use super::ai_core::profiles::RIFLE_FLOOD_FAST_ID;
 use super::ai_core::profiles::{
     profile_by_id, required_profiles, AiProfile, RIFLE_FLOOD_FULL_SATURATION,
-    RIFLE_FLOOD_FULL_SATURATION_ID, TECH_TO_TANKS_ID,
+    RIFLE_FLOOD_FULL_SATURATION_ID, STEEL_EXPANSION_TANKS_ID, TECH_TO_TANKS_ID,
 };
 use super::replay::{replay_commands, EventLogEntry, PlayerSnapshot, ReplayOutcome};
 use super::{Game, PlayerInit};
@@ -219,6 +219,7 @@ pub(crate) fn canonical_profile_id(input: &str) -> Option<&'static str> {
         "rush" | "fast" => Some("rifle_flood_fast"),
         "saturation" | "full" | "macro" => Some(RIFLE_FLOOD_FULL_SATURATION_ID),
         "tech" | "tanks" => Some(TECH_TO_TANKS_ID),
+        "expand" | "expansion" | "steel" | "steel_tanks" => Some(STEEL_EXPANSION_TANKS_ID),
         id => profile_by_id(id).map(|profile| profile.id),
     }
 }
@@ -497,9 +498,8 @@ impl PlayerView<'_> {
 }
 
 const FAILED_SPOTS_CAP: usize = 16;
-/// Force a pending build to be treated as failed if the building still hasn't appeared after this
-/// many ticks. Covers cases where the worker gets stuck pathing to the site and never leaves BUILD
-/// state; without this the entry would pin the spot forever.
+/// Force a pending build to be treated as failed after this many ticks so stale commands do not
+/// suppress future build attempts forever if a worker dies or never reaches the site.
 const PENDING_BUILD_WATCHDOG_TICKS: u32 = 300;
 
 #[derive(Clone, Copy)]
@@ -542,7 +542,6 @@ impl PendingBuildTracker {
             }
             keep
         });
-
         for pending in dropped {
             let succeeded = own.iter().any(|e| {
                 is_kind(e, pending.kind)
@@ -2085,6 +2084,11 @@ fn player_start_world(start: &StartPayload, player_id: u32) -> Option<(f32, f32)
 
 fn occupied_tiles_from_snapshot(map: &MapInfo, snapshot: &Snapshot) -> BTreeSet<(u32, u32)> {
     let mut occupied = BTreeSet::new();
+    for resource in &map.resources {
+        if matches!(resource.kind.as_str(), kinds::STEEL | kinds::OIL) {
+            occupied.insert(tile_of(map, resource.x, resource.y));
+        }
+    }
     for e in &snapshot.entities {
         if e.owner != 0 && kind_of(e).map(|k| k.is_building()).unwrap_or(false) {
             for (tx, ty) in building_footprint_tiles(map, e) {
