@@ -114,7 +114,6 @@ impl AiController {
 
         let mut idle_workers = facts.idle_workers.clone();
         let mut gathering_workers = facts.gathering_workers.clone();
-        let mut worker_count = facts.worker_count;
         let free_riflemen = facts.free_combat_units(EntityKind::Rifleman).to_vec();
         // Finished Industrial Centers with an empty production queue (ready to train a worker).
         let idle_industrial_centers: Vec<u32> = facts
@@ -209,7 +208,9 @@ impl AiController {
         }
 
         // --- 3. Train workers up to the economy target. -------------------
-        for industrial_center in idle_industrial_centers {
+        for (worker_count, industrial_center) in
+            (facts.worker_count..).zip(idle_industrial_centers)
+        {
             if worker_count >= target_workers {
                 break;
             }
@@ -225,7 +226,6 @@ impl AiController {
             ));
             let reserved = budget.reserve_unit(EntityKind::Worker);
             debug_assert!(reserved);
-            worker_count += 1;
         }
 
         // --- 4. Pump riflemen from each barracks (keep a shallow queue). ---
