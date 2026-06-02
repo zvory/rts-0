@@ -344,6 +344,7 @@ impl<'a> MoveCoordinator<'a> {
             .map(|s| s.radius_tiles())
             .unwrap_or(0);
         let req = PathRequest {
+            kind,
             start: (sx as i32, sy as i32),
             goal: (gx as i32, gy as i32),
             radius_tiles,
