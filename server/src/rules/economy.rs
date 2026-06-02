@@ -75,6 +75,13 @@ pub fn supply_cost(kind: EntityKind) -> u32 {
     config::unit_stats(kind).map(|s| s.supply).unwrap_or(0)
 }
 
+/// Supply provided by a building kind. Returns 0 for non-buildings.
+pub fn supply_provided(kind: EntityKind) -> u32 {
+    config::building_stats(kind)
+        .map(|s| s.provides_supply)
+        .unwrap_or(0)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -123,5 +130,13 @@ mod tests {
             EntityKind::TankFactory,
             &[EntityKind::IndustrialCenter, EntityKind::TrainingCentre]
         ));
+
+        assert_eq!(cost(EntityKind::Worker), (50, 0));
+        assert_eq!(cost(EntityKind::Tank), (200, 100));
+        assert_eq!(cost(EntityKind::Depot), (100, 0));
+        assert_eq!(supply_cost(EntityKind::Tank), 6);
+        assert_eq!(supply_cost(EntityKind::Depot), 0);
+        assert_eq!(supply_provided(EntityKind::Depot), config::DEPOT_SUPPLY);
+        assert_eq!(supply_provided(EntityKind::Tank), 0);
     }
 }

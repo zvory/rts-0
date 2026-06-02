@@ -8,6 +8,7 @@ use crate::game::entity::{Order, NEUTRAL};
 use crate::game::services::movement::is_collision_anchored;
 use crate::game::services::occupancy::building_footprint;
 use crate::game::Game;
+use crate::rules;
 
 /// Maximum residual overlap (world px) tolerated between two non-anchored mobile units after
 /// a tick. The iterative resolver converges to within numerical noise on flat ground; this
@@ -76,18 +77,12 @@ impl Game {
                     continue;
                 }
                 if e.is_building() && !e.under_construction() {
-                    if let Some(s) = config::building_stats(e.kind) {
-                        expected_cap += s.provides_supply;
-                    }
+                    expected_cap += rules::economy::supply_provided(e.kind);
                     for item in e.prod_queue() {
-                        if let Some(us) = config::unit_stats(item.unit) {
-                            expected_used += us.supply;
-                        }
+                        expected_used += rules::economy::supply_cost(item.unit);
                     }
                 } else if e.is_unit() {
-                    if let Some(us) = config::unit_stats(e.kind) {
-                        expected_used += us.supply;
-                    }
+                    expected_used += rules::economy::supply_cost(e.kind);
                 }
             }
             expected_cap = expected_cap.min(config::SUPPLY_CAP_MAX);
