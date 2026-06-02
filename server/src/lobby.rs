@@ -30,7 +30,8 @@ use crate::game::selfplay::{is_safe_artifact_name, LiveSelfPlay, ReplayArtifact,
 use crate::game::{Game, PlayerInit};
 use crate::protocol::{Command, Event, LobbyPlayer, ServerMessage, StartPayload};
 
-/// Player colors, assigned by join order. MUST match `client/src/config.js` `PLAYER_PALETTE`.
+/// Player colors, assigned from the head of the palette. MUST match `client/src/config.js`
+/// `PLAYER_PALETTE`.
 const PLAYER_PALETTE: [&str; 8] = [
     "#4878c8", "#c84848", "#30a090", "#8040c8", "#c83880", "#c87830", "#409840", "#c8b030",
 ];
@@ -181,7 +182,7 @@ enum DevDriver {
 struct RoomTask {
     room: String,
     mode: RoomMode,
-    /// Connected players in join order (join order drives color assignment and host fallback).
+    /// Connected players in join order (join order drives lobby display and host fallback).
     order: Vec<u32>,
     players: HashMap<u32, RoomPlayer>,
     /// Computer opponents the host has added, in add order. Persist across rematches; cleared
@@ -324,7 +325,7 @@ impl RoomTask {
             let _ = ack.send(false);
             return;
         }
-        let color = PLAYER_PALETTE[self.order.len() % PLAYER_PALETTE.len()].to_string();
+        let color = self.next_human_color();
         self.order.push(player_id);
         self.players.insert(
             player_id,
@@ -471,9 +472,20 @@ impl RoomTask {
         self.order.len() + self.ai_players.len()
     }
 
+    /// Pick the first palette color not currently held by a human player. Join order alone is
+    /// not enough because earlier seats can leave while later players keep their colors.
+    fn next_human_color(&self) -> String {
+        PLAYER_PALETTE
+            .iter()
+            .copied()
+            .find(|color| !self.players.values().any(|p| p.color == *color))
+            .unwrap_or(PLAYER_PALETTE[self.order.len() % PLAYER_PALETTE.len()])
+            .to_string()
+    }
+
     /// Color for the `seat`-th AI opponent. AI colors are drawn from the *tail* of the palette so
-    /// they never collide with human colors (assigned from the head by join order), given the
-    /// [`MAX_PLAYERS`] cap.
+    /// they never collide with human colors (assigned from the first available head colors),
+    /// given the [`MAX_PLAYERS`] cap.
     fn ai_color(seat: usize) -> String {
         let idx = (PLAYER_PALETTE.len() - 1 - (seat % PLAYER_PALETTE.len())) % PLAYER_PALETTE.len();
         PLAYER_PALETTE[idx].to_string()
@@ -1024,6 +1036,31 @@ fn load_replay_artifact(name: &str) -> Result<ReplayArtifact, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn join_test_player(task: &mut RoomTask, player_id: u32) {
+        let (msg_tx, _msg_rx) = mpsc::channel(8);
+        let (ack, _ack_rx) = tokio::sync::oneshot::channel();
+        task.on_join(player_id, format!("Player {player_id}"), msg_tx, ack);
+    }
+
+    #[test]
+    fn joining_after_earlier_player_leaves_reuses_open_color() {
+        let mut task = RoomTask::new("r".to_string(), RoomMode::Normal);
+
+        join_test_player(&mut task, 1);
+        join_test_player(&mut task, 2);
+        join_test_player(&mut task, 3);
+        task.on_leave(1);
+        join_test_player(&mut task, 4);
+
+        let color_2 = &task.players.get(&2).unwrap().color;
+        let color_3 = &task.players.get(&3).unwrap().color;
+        let color_4 = &task.players.get(&4).unwrap().color;
+
+        assert_eq!(color_4, PLAYER_PALETTE[0]);
+        assert_ne!(color_4, color_2);
+        assert_ne!(color_4, color_3);
+    }
 
     #[test]
     fn replay_rooms_default_to_1_5x_speed() {
