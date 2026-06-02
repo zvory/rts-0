@@ -401,6 +401,24 @@ pub(crate) fn attack_move_units(
     Some(units)
 }
 
+pub(crate) fn attack_units(
+    ctx: &mut AiActionContext<'_>,
+    units: impl IntoIterator<Item = u32>,
+    target: u32,
+) -> Option<Vec<u32>> {
+    let mut units: Vec<u32> = units.into_iter().collect();
+    units.sort_unstable();
+    units.dedup();
+    if units.is_empty() {
+        return None;
+    }
+    ctx.emit_command(Command::Attack {
+        units: units.clone(),
+        target,
+    });
+    Some(units)
+}
+
 pub(crate) fn select_ready_combat_units(
     units: &[AiEntitySummary],
     kinds: &[EntityKind],
