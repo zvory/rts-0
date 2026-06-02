@@ -688,6 +688,15 @@ waiting forever for an oversized regroup. Riflemen already meaningfully past the
 pressing forward instead of being recalled into staging. It does not micro, tech to tanks, or
 scout. A local per-think budget prevents it from over-committing resources/supply it doesn't have.
 
+**Shared AI core.** The incremental `game::ai_core` path now has deterministic profile data
+(`profiles.rs`) and a generic ranked decision loop (`decision.rs`) that emits ordinary `Command`s
+through the shared action helpers. The first code-defined profiles are `rifle_flood_fast`,
+`rifle_flood_full_saturation`, and `tech_to_tanks`; they parameterize worker targets, supply
+buffers, building/tech goals, production priorities, resource timing, and attack thresholds
+without providing their own `think()` functions. The live lobby AI intentionally remains on the
+older controller path until the Phase 04 migration, so these profiles are tested in isolation and
+are not client-selectable.
+
 **Win/elimination.** AI players count as match players: a 1-human + N-AI match is a real match
 (it resolves to a winner), while a lone human with no AI remains a never-ending sandbox. They have
 one special elimination rule: an AI with no units left is defeated even if it still owns buildings,

@@ -411,6 +411,19 @@ pub(crate) fn select_ready_combat_units(
     selected
 }
 
+#[allow(dead_code)]
+pub(crate) fn stage_units_toward(
+    ctx: &mut AiActionContext<'_>,
+    units: impl IntoIterator<Item = u32>,
+    from: (f32, f32),
+    to: (f32, f32),
+    tile_size: u32,
+    distance_tiles: f32,
+) -> Option<Vec<u32>> {
+    let (x, y) = point_toward(from, to, distance_tiles * tile_size as f32);
+    attack_move_units(ctx, units, x, y)
+}
+
 fn candidate_worker_ids(workers: &[AiEntitySummary], explicit_ids: Option<&[u32]>) -> Vec<u32> {
     let ids: Vec<u32> = explicit_ids
         .map(|ids| ids.to_vec())
@@ -449,6 +462,18 @@ fn dist2(ax: f32, ay: f32, bx: f32, by: f32) -> f32 {
     let dx = ax - bx;
     let dy = ay - by;
     dx * dx + dy * dy
+}
+
+#[allow(dead_code)]
+fn point_toward(from: (f32, f32), to: (f32, f32), distance: f32) -> (f32, f32) {
+    let dx = to.0 - from.0;
+    let dy = to.1 - from.1;
+    let len = (dx * dx + dy * dy).sqrt();
+    if len <= f32::EPSILON {
+        return from;
+    }
+    let clamped = distance.min(len);
+    (from.0 + dx / len * clamped, from.1 + dy / len * clamped)
 }
 
 #[cfg(test)]
@@ -750,6 +775,31 @@ mod tests {
             ctx.into_commands().as_slice(),
             [Command::AttackMove { units, x: 10.0, y: 20.0 }]
                 if units == &vec![3, 4, 5]
+        ));
+    }
+
+    #[test]
+    fn staging_uses_point_toward_target_and_deterministic_units() {
+        let observation = observation(
+            AiEconomy {
+                steel: 0,
+                oil: 0,
+                supply_used: 0,
+                supply_cap: 10,
+            },
+            Vec::new(),
+            Vec::new(),
+        );
+        let facts = facts_from_observation(&observation);
+        let mut ctx = context_from_facts(&facts, &observation);
+
+        let units = stage_units_toward(&mut ctx, [8, 6, 8], (0.0, 0.0), (96.0, 0.0), 32, 2.0);
+
+        assert_eq!(units, Some(vec![6, 8]));
+        assert!(matches!(
+            ctx.into_commands().as_slice(),
+            [Command::AttackMove { units, x: 64.0, y: 0.0 }]
+                if units == &vec![6, 8]
         ));
     }
 }
