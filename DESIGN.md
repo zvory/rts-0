@@ -220,10 +220,11 @@ pub struct Game { /* private */ }
 
 impl Game {
     /// Create a match for the given players (ids + colors + names already assigned by lobby).
-    /// Loads the hardcoded handcrafted map, assigns the first N authored base sites to the N
-    /// players in order, and spawns each player's starting Industrial Center +
-    /// STARTING_WORKERS workers + nearby steel/oil resource clusters. The seed is retained for
-    /// replay/API compatibility but does not affect the map while lobby map selection is absent.
+    /// Loads the hardcoded handcrafted map, shuffles the authored (start, expansion) pairs by
+    /// `seed`, assigns the first N shuffled pairs to the N players in lobby order, and spawns
+    /// each player's starting Industrial Center + STARTING_WORKERS workers + nearby steel/oil
+    /// resource clusters. Shuffling keeps each start glued to its paired expansion but stops the
+    /// lobby seat order from pinning the human/AI to the same corner every match.
     pub fn new(players: &[PlayerInit], seed: u32) -> Game;
 
     /// Create a match with explicit starting steel/oil for every player.
@@ -572,10 +573,11 @@ the human-readable form of the authoritative `rules::defs` records.
   is advisory and self-heals — it's only honored while the recorded worker is alive and
   actively harvesting that node, so death / re-order / retarget free it automatically.
 - Starting layout: each base site gets 18 steel patches and 3 oil patches. `baseSites` are stored
-  as interleaved pairs: `[start0, expansion0, start1, expansion1, ...]`. For N players, even-indexed
-  sites 0,2,…,2N-2 become player starts and odd-indexed sites 1,3,…,2N-1 become the active neutral
-  expansion resource bases (one geometrically paired per player). Sites beyond index 2N are unused,
-  giving exactly 2N active bases on the map.
+  as interleaved pairs: `[start0, expansion0, start1, expansion1, ...]`. The pairs are shuffled
+  by the match seed (each start stays glued to its paired expansion), and the first N shuffled
+  pairs become the active player starts + paired neutral expansion bases. Sites beyond the first
+  N pairs are unused, giving exactly 2N active bases on the map. Shuffling stops the lobby seat
+  order from pinning the human/AI to the same corner every match.
 
 Unit stats (hp, dmg, range[tiles], cooldown[ticks], speed[px/tick], sight[tiles], cost, supply, buildTicks):
 
