@@ -22,3 +22,16 @@ rand = { version = "0.8", features = ["small_rng"] }
 [profile.release]
 opt-level = 3
 lto = "thin"
+
+# Tests are dominated by long-running AI self-play simulations (60s+ each at
+# opt-level=0). opt-level=1 with overflow-checks=true keeps the safety property
+# the hardening tests rely on (a bad Build coord must panic, not silently wrap)
+# while slashing test wall time. Dependencies get full optimization so the cold
+# compile stays reasonable. Build and test share this profile, so `cargo build`
+# followed by `cargo test` only rebuilds the test harness.
+[profile.dev]
+opt-level = 1
+overflow-checks = true
+
+[profile.dev.package."*"]
+opt-level = 3
