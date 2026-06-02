@@ -247,11 +247,7 @@ pub struct EntityView {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub build_progress: Option<f32>,
 
-    // Workers carrying resources:
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub carrying: Option<u32>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub carrying_kind: Option<String>,
+    // Workers harvesting resources:
     #[serde(skip_serializing_if = "Option::is_none")]
     pub latched_node: Option<u32>,
 
@@ -293,8 +289,6 @@ impl EntityView {
             prod_progress: None,
             prod_queue: None,
             build_progress: None,
-            carrying: None,
-            carrying_kind: None,
             latched_node: None,
             remaining: None,
             target_id: None,

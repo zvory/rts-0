@@ -339,9 +339,8 @@ impl Game {
         }
     }
 
-    /// Player ids that are not yet defeated. For human players, defeat requires losing all
-    /// buildings. AI players are also defeated if they have no units remaining (no path to
-    /// rebuild an army without player input).
+    /// Player ids that are not yet defeated. Human players are defeated when they lose all
+    /// buildings; AI players are also defeated when they have no units left.
     pub fn alive_players(&self) -> Vec<u32> {
         self.players
             .iter()
@@ -466,7 +465,9 @@ impl Game {
             v.build_progress = Some(progress);
         }
 
-        // Resource nodes: remaining amount.
+        // Resource nodes are static terrain features and are always visible. Current behavior also
+        // includes remaining amount through fog; long-term explored fog should remember the last
+        // seen amount instead.
         if e.is_node() {
             v.remaining = e.remaining();
         }
@@ -871,6 +872,56 @@ mod tests {
         assert!(
             game.ai.is_empty(),
             "a human-only match has no AI controllers"
+        );
+    }
+
+    #[test]
+    fn ai_with_building_but_no_units_is_eliminated() {
+        let players = human_vs_ai_players();
+        let mut game = Game::new(&players, 0x1234_5678);
+        let ai_units: Vec<u32> = game
+            .entities
+            .iter()
+            .filter(|e| e.owner == 2 && e.is_unit())
+            .map(|e| e.id)
+            .collect();
+        for id in ai_units {
+            game.entities.remove(id);
+        }
+
+        assert!(
+            !game.alive_players().contains(&2),
+            "AI players have special elimination: no units means defeated"
+        );
+    }
+
+    #[test]
+    fn resource_snapshots_include_remaining_even_through_fog() {
+        let players = [
+            PlayerInit {
+                id: 1,
+                name: "A".into(),
+                color: "#fff".into(),
+                is_ai: false,
+            },
+            PlayerInit {
+                id: 2,
+                name: "B".into(),
+                color: "#000".into(),
+                is_ai: false,
+            },
+        ];
+        let game = Game::new_for_replay(&players, 0x1234_5678);
+        let snapshot = game.snapshot_for(1);
+        let resources: Vec<_> = snapshot
+            .entities
+            .iter()
+            .filter(|e| e.owner == 0 && (e.kind == kinds::STEEL || e.kind == kinds::OIL))
+            .collect();
+
+        assert!(
+            resources.iter().all(|e| e.remaining.is_some()),
+            "current resource snapshots expose remaining for all static resource nodes"
         );
     }
 

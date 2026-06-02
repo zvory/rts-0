@@ -122,7 +122,7 @@ pub(crate) fn apply_commands(
                         if let Some(e) = entities.get_mut(id) {
                             e.clear_orders();
                             if let Some(w) = e.worker.as_mut() {
-                                w.carry = None; // stop returns carried load is dropped intentionally
+                                w.carry = None;
                             }
                         }
                     }

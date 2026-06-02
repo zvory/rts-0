@@ -49,15 +49,15 @@ export const PLAYER_PALETTE = Object.freeze([
 // `cost`/`supply` drive the command card.
 export const STATS = Object.freeze({
   [KIND.WORKER]: { label: "Engineer", icon: "EN", size: 9, sight: 7,
-    rangeTiles: 1, cost: { steel: 50, oil: 0 }, supply: 1, buildTicks: 120 },
+    rangeTiles: 1, cost: { steel: 50, oil: 0 }, supply: 1, buildTicks: 240 },
   [KIND.RIFLEMAN]: { label: "Rifleman", icon: "RF", size: 9, sight: 8,
-    rangeTiles: 4, cost: { steel: 50, oil: 0 }, supply: 1, buildTicks: 150 },
+    rangeTiles: 4, cost: { steel: 50, oil: 0 }, supply: 1, buildTicks: 300 },
   [KIND.MACHINE_GUNNER]: { label: "Machine Gunner", icon: "MG", size: 10, sight: 8,
-    rangeTiles: 5, cost: { steel: 75, oil: 25 }, supply: 2, buildTicks: 200, requires: KIND.TRAINING_CENTRE },
+    rangeTiles: 5, cost: { steel: 75, oil: 25 }, supply: 2, buildTicks: 400, requires: KIND.TRAINING_CENTRE },
   [KIND.AT_TEAM]: { label: "AT Team", icon: "AT", size: 10, sight: 8,
-    rangeTiles: 5, cost: { steel: 75, oil: 25 }, supply: 2, buildTicks: 220, requires: KIND.TRAINING_CENTRE },
+    rangeTiles: 5, cost: { steel: 75, oil: 25 }, supply: 2, buildTicks: 440, requires: KIND.TRAINING_CENTRE },
   [KIND.TANK]: { label: "Tank", icon: "TK", size: 20, sight: 7,
-    rangeTiles: 3, cost: { steel: 200, oil: 100 }, supply: 6, buildTicks: 250 },
+    rangeTiles: 3, cost: { steel: 200, oil: 100 }, supply: 6, buildTicks: 500 },
 
   [KIND.INDUSTRIAL_CENTER]: { label: "Industrial Center", icon: "IC", footW: 3, footH: 3, sight: 9,
     cost: { steel: 400, oil: 0 }, buildTicks: 400, trains: [KIND.WORKER] },
@@ -68,7 +68,8 @@ export const STATS = Object.freeze({
   [KIND.TRAINING_CENTRE]: { label: "Training Centre", icon: "TC", footW: 3, footH: 2, sight: 6,
     cost: { steel: 100, oil: 50 }, buildTicks: 220, trains: [], requires: KIND.INDUSTRIAL_CENTER },
   [KIND.TANK_FACTORY]: { label: "Tank Factory", icon: "TF", footW: 3, footH: 3, sight: 6,
-    cost: { steel: 200, oil: 100 }, buildTicks: 240, trains: [KIND.TANK], requires: KIND.TRAINING_CENTRE },
+    cost: { steel: 200, oil: 100 }, buildTicks: 240, trains: [KIND.TANK],
+    requires: [KIND.INDUSTRIAL_CENTER, KIND.TRAINING_CENTRE] },
 
   [KIND.STEEL]: { label: "Steel", size: 22 },
   [KIND.OIL]: { label: "Oil", size: 14 },

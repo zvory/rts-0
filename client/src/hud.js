@@ -59,6 +59,17 @@ export class HUD {
     this._renderCommandCard();
   }
 
+  /** Clear DOM-owned HUD state between matches. */
+  destroy() {
+    if (this.elSelected) {
+      this.elSelected.innerHTML = "";
+      this.elSelected.classList.add("empty");
+    }
+    if (this.elCommand) this.elCommand.innerHTML = "";
+    if (this.elSupply) this.elSupply.classList.remove("supply-capped");
+    this._cardSig = null;
+  }
+
   // --- Resource / supply bar -------------------------------------------------
 
   /** Mirror `state.resources` into the top bar. */
@@ -222,6 +233,12 @@ export class HUD {
     return (st && st.trains) || [];
   }
 
+  /** Building/unit prerequisite kinds as an array. */
+  _requirementsOf(st) {
+    if (!st || !st.requires) return [];
+    return Array.isArray(st.requires) ? st.requires : [st.requires];
+  }
+
   /** Own selected entities that can receive unit commands. */
   _selectedOwnUnits(sel) {
     return sel.filter((e) => this._isOwn(e) && isUnit(e.kind));
@@ -383,11 +400,11 @@ export class HUD {
     card.appendChild(frag);
   }
 
-  /** A worker can build `kind` if affordable and any tech requirement is satisfied. */
+  /** A worker can build `kind` if affordable and all tech requirements are satisfied. */
   _canBuild(kind, res) {
     const st = STATS[kind];
     if (!st) return false;
-    if (st.requires && !this._playerHasKind(st.requires)) return false;
+    if (this._requirementsOf(st).some((req) => !this._playerHasKind(req))) return false;
     return this._affordable(st.cost, res);
   }
 
@@ -395,8 +412,9 @@ export class HUD {
   _buildDisabledReason(kind, res) {
     const st = STATS[kind];
     if (!st) return "";
-    if (st.requires && !this._playerHasKind(st.requires)) {
-      const reqLabel = (STATS[st.requires] && STATS[st.requires].label) || st.requires;
+    const missing = this._requirementsOf(st).find((req) => !this._playerHasKind(req));
+    if (missing) {
+      const reqLabel = (STATS[missing] && STATS[missing].label) || missing;
       return `Requires ${reqLabel}`;
     }
     if (!this._affordable(st.cost, res)) return "Not enough resources";
@@ -438,7 +456,7 @@ export class HUD {
       frag.appendChild(btn);
     }
 
-    this._padCard(frag, producing ? cancelSlot : 9);
+    this._padCard(frag, producing ? cancelSlot : idx);
 
     if (producing) {
       const cancelBtn = this._cmdButton({
@@ -471,7 +489,7 @@ export class HUD {
   _canTrain(unit, res) {
     const st = STATS[unit];
     if (!st) return false;
-    if (st.requires && !this._playerHasCompleteKind(st.requires)) return false;
+    if (this._requirementsOf(st).some((req) => !this._playerHasCompleteKind(req))) return false;
     return this._affordable(st.cost, res);
   }
 
@@ -479,8 +497,9 @@ export class HUD {
   _trainDisabledReason(unit, res) {
     const st = STATS[unit];
     if (!st) return "";
-    if (st.requires && !this._playerHasCompleteKind(st.requires)) {
-      const reqLabel = (STATS[st.requires] && STATS[st.requires].label) || st.requires;
+    const missing = this._requirementsOf(st).find((req) => !this._playerHasCompleteKind(req));
+    if (missing) {
+      const reqLabel = (STATS[missing] && STATS[missing].label) || missing;
       return `Requires ${reqLabel}`;
     }
     if (!this._affordable(st.cost, res)) return "Not enough resources";

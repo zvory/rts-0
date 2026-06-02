@@ -8,7 +8,7 @@
 // non-square maps stay centered and undistorted.
 
 import { cmd } from "./protocol.js";
-import { TERRAIN, isResource } from "./protocol.js";
+import { TERRAIN, isResource, isUnit } from "./protocol.js";
 import { COLORS, FOG_EXPLORED_ALPHA, FOG_UNEXPLORED_ALPHA } from "./config.js";
 
 // Convert one of the 0xRRGGBB palette ints into a CSS color string.
@@ -99,9 +99,11 @@ export class Minimap {
   _canvasToWorld(cx, cy) {
     const wx = (cx - this._offX) / this._scale;
     const wy = (cy - this._offY) / this._scale;
+    const maxX = Math.max(0, this._mapW - 1);
+    const maxY = Math.max(0, this._mapH - 1);
     return {
-      x: Math.max(0, Math.min(this._mapW, wx)),
-      y: Math.max(0, Math.min(this._mapH, wy)),
+      x: Math.max(0, Math.min(maxX, wx)),
+      y: Math.max(0, Math.min(maxY, wy)),
     };
   }
 
@@ -324,7 +326,7 @@ export class Minimap {
     const unitIds = [];
     for (const e of sel) {
       // Only own, controllable units take move orders (skip buildings/resources/enemies).
-      if (e.owner === this.state.playerId && !isResource(e.kind)) {
+      if (e.owner === this.state.playerId && isUnit(e.kind)) {
         unitIds.push(e.id);
       }
     }

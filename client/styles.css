@@ -145,7 +145,8 @@ body {
   cursor: not-allowed;
 }
 /* Toggled "ready" state on the lobby ready button. */
-.btn.on {
+.btn.on,
+.btn.active {
   border-color: var(--good);
   box-shadow: 0 0 0 1px rgba(79, 210, 79, 0.4);
   color: var(--good);
@@ -478,8 +479,9 @@ input[type="text"]:focus {
 #hud .res-icon.supply {
   color: var(--supply);
 }
-/* main.js / hud.js may add .over when supplyUsed >= supplyCap. */
-#hud .res.over #res-supply {
+/* hud.js marks supply as capped when supplyUsed >= supplyCap. */
+#hud .res.over #res-supply,
+#res-supply.supply-capped {
   color: var(--bad);
 }
 
@@ -521,13 +523,16 @@ input[type="text"]:focus {
   opacity: 0;
   pointer-events: none;
 }
+#selected-panel .sel-name,
 #selected-panel .sel-title {
   font-weight: 700;
   font-size: 14px;
 }
+#selected-panel .sel-hptext,
 #selected-panel .sel-sub {
   font-size: 12px;
   color: var(--ink-dim);
+  font-variant-numeric: tabular-nums;
 }
 /* HP read-out / bar inside the selected panel. */
 #selected-panel .sel-hp {
@@ -537,6 +542,27 @@ input[type="text"]:focus {
   font-size: 12px;
   color: var(--ink-dim);
   font-variant-numeric: tabular-nums;
+}
+#selected-panel .sel-single {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+#selected-panel .sel-hpbar {
+  height: 6px;
+  border-radius: 0;
+  background: #101010;
+  overflow: hidden;
+}
+#selected-panel .sel-hpfill {
+  height: 100%;
+  background: var(--good);
+}
+#selected-panel .sel-hpfill.mid {
+  background: var(--warn);
+}
+#selected-panel .sel-hpfill.low {
+  background: var(--bad);
 }
 #selected-panel .bar {
   flex: 1 1 auto;
@@ -557,17 +583,22 @@ input[type="text"]:focus {
   background: var(--bad);
 }
 /* Multi-select roster: little icon chips. */
+#selected-panel .sel-grid,
 #selected-panel .sel-roster {
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
 }
 #selected-panel .sel-chip {
-  width: 26px;
+  min-width: 26px;
   height: 26px;
+  padding: 0 6px;
   display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: max-content;
+  gap: 4px;
   place-items: center;
-  font-size: 14px;
+  font-size: 12px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--panel-edge);
   background: var(--void);
