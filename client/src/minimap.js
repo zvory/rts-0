@@ -189,18 +189,19 @@ export class Minimap {
     const cw = ts * this._scale + 1;
     const ch = ts * this._scale + 1;
 
+    // Stone/water tiles keep only a light wash of fog so the map's shape stays legible.
+    const IMPASSABLE_FOG_SCALE = 0.35;
     ctx.save();
     for (let ty = 0; ty < map.height; ty++) {
       for (let tx = 0; tx < map.width; tx++) {
         if (fog.isVisible(tx, ty)) continue; // clear
-        // Stone/water tiles render unfogged so the map's shape is legible everywhere.
-        if (isImpassableTerrainCode(map.terrain[ty * map.width + tx])) continue;
+        const impassable = isImpassableTerrainCode(map.terrain[ty * map.width + tx]);
         const p = this._worldToCanvas(tx * ts, ty * ts);
         if (fog.isExplored(tx, ty)) {
-          ctx.globalAlpha = FOG_EXPLORED_ALPHA;
+          ctx.globalAlpha = FOG_EXPLORED_ALPHA * (impassable ? IMPASSABLE_FOG_SCALE : 1);
           ctx.fillStyle = hex(COLORS.fogExplored);
         } else {
-          ctx.globalAlpha = FOG_UNEXPLORED_ALPHA;
+          ctx.globalAlpha = FOG_UNEXPLORED_ALPHA * (impassable ? IMPASSABLE_FOG_SCALE : 1);
           ctx.fillStyle = hex(COLORS.fogUnexplored);
         }
         ctx.fillRect(p.x, p.y, cw, ch);
