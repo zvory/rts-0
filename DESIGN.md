@@ -567,10 +567,11 @@ the human-readable form of the authoritative `rules::defs` records.
   does not reserve it. Extra workers that arrive while the slot is taken go idle. The slot
   is advisory and self-heals — it's only honored while the recorded worker is alive and
   actively harvesting that node, so death / re-order / retarget free it automatically.
-- Starting layout: each base site gets 18 steel patches and 3 oil patches. For an N-player match,
-  the first N authored `baseSites` become player starts, and every remaining authored base site is
-  a neutral expansion resource base. The current default orders the first two starts on opposite
-  corners, then fills the other two corners before edge-midpoint expansion sites.
+- Starting layout: each base site gets 18 steel patches and 3 oil patches. `baseSites` are stored
+  as interleaved pairs: `[start0, expansion0, start1, expansion1, ...]`. For N players, even-indexed
+  sites 0,2,…,2N-2 become player starts and odd-indexed sites 1,3,…,2N-1 become the active neutral
+  expansion resource bases (one geometrically paired per player). Sites beyond index 2N are unused,
+  giving exactly 2N active bases on the map.
 
 Unit stats (hp, dmg, range[tiles], cooldown[ticks], speed[px/tick], sight[tiles], cost, supply, buildTicks):
 
