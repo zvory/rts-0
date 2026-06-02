@@ -18,8 +18,8 @@ use super::ai_core::decision::{decide_profile, AiDecisionMemory, AiIntent};
 #[cfg(test)]
 use super::ai_core::profiles::RIFLE_FLOOD_FAST_ID;
 use super::ai_core::profiles::{
-    profile_by_id, AiProfile, RIFLE_FLOOD_FULL_SATURATION, RIFLE_FLOOD_FULL_SATURATION_ID,
-    TECH_TO_TANKS_ID,
+    profile_by_id, required_profiles, AiProfile, RIFLE_FLOOD_FULL_SATURATION,
+    RIFLE_FLOOD_FULL_SATURATION_ID, TECH_TO_TANKS_ID,
 };
 use super::replay::{replay_commands, EventLogEntry, PlayerSnapshot, ReplayOutcome};
 use super::{Game, PlayerInit};
@@ -155,6 +155,322 @@ impl ReplayDriver {
             game.enqueue(entry.player_id, entry.command.clone());
             self.next += 1;
         }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct ProfileMatchupOptions {
+    pub(crate) profile_a: String,
+    pub(crate) profile_b: String,
+    pub(crate) seed: u32,
+    pub(crate) max_ticks: u32,
+    pub(crate) verify_replay: bool,
+    pub(crate) save_replay_name: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ProfileMatchupResult {
+    pub(crate) profile_a: String,
+    pub(crate) profile_b: String,
+    pub(crate) seed: u32,
+    pub(crate) max_ticks: u32,
+    pub(crate) ticks: u32,
+    pub(crate) completed_by_elimination: bool,
+    pub(crate) winner: Option<ProfileMatchupWinner>,
+    pub(crate) players: Vec<ProfileMatchupPlayerResult>,
+    pub(crate) first_damage_tick: Option<u32>,
+    pub(crate) attack_events: usize,
+    pub(crate) death_events: usize,
+    pub(crate) event_count: usize,
+    pub(crate) replay_verified: bool,
+    pub(crate) replay_artifact: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ProfileMatchupWinner {
+    pub(crate) player_id: u32,
+    pub(crate) profile: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ProfileMatchupPlayerResult {
+    pub(crate) player_id: u32,
+    pub(crate) profile: String,
+    pub(crate) alive: bool,
+    pub(crate) command_count: usize,
+    pub(crate) attack_command_count: usize,
+    pub(crate) first_attack_command_tick: Option<u32>,
+    pub(crate) first_tank_tick: Option<u32>,
+    pub(crate) final_counts: BTreeMap<String, u32>,
+}
+
+pub(crate) fn available_profile_ids() -> Vec<&'static str> {
+    required_profiles()
+        .into_iter()
+        .map(|profile| profile.id)
+        .collect()
+}
+
+pub(crate) fn canonical_profile_id(input: &str) -> Option<&'static str> {
+    match input {
+        "rush" | "fast" => Some("rifle_flood_fast"),
+        "saturation" | "full" | "macro" => Some(RIFLE_FLOOD_FULL_SATURATION_ID),
+        "tech" | "tanks" => Some(TECH_TO_TANKS_ID),
+        id => profile_by_id(id).map(|profile| profile.id),
+    }
+}
+
+pub(crate) fn run_profile_matchup_result(
+    options: ProfileMatchupOptions,
+) -> Result<ProfileMatchupResult, String> {
+    let profile_a = profile_by_id(&options.profile_a)
+        .ok_or_else(|| format!("unknown profile: {}", options.profile_a))?;
+    let profile_b = profile_by_id(&options.profile_b)
+        .ok_or_else(|| format!("unknown profile: {}", options.profile_b))?;
+    if options.max_ticks == 0 {
+        return Err("max ticks must be greater than zero".to_string());
+    }
+    if let Some(name) = &options.save_replay_name {
+        if !is_safe_artifact_name(name) {
+            return Err(format!("unsafe replay artifact name: {name}"));
+        }
+    }
+
+    let players = vec![
+        PlayerInit {
+            id: 1,
+            name: profile_a.id.to_string(),
+            color: "#4cc9f0".to_string(),
+            is_ai: false,
+        },
+        PlayerInit {
+            id: 2,
+            name: profile_b.id.to_string(),
+            color: "#f72585".to_string(),
+            is_ai: false,
+        },
+    ];
+    let mut game = Game::new(&players, options.seed);
+    let start = game.start_payload();
+    let mut scripts: Vec<Box<dyn ScriptedPlayer>> = vec![
+        Box::new(ProfileBackedScript::new(1, profile_a.id)),
+        Box::new(ProfileBackedScript::new(2, profile_b.id)),
+    ];
+    let mut event_log = Vec::new();
+    let mut first_tank_tick: BTreeMap<u32, u32> = BTreeMap::new();
+    let mut first_damage_tick = None;
+    let mut attack_events = 0usize;
+    let mut death_events = 0usize;
+
+    while game.tick_count() < options.max_ticks {
+        let alive = game.alive_players();
+        if alive.len() <= 1 {
+            break;
+        }
+
+        let tick = game.tick_count();
+        let mut commands = Vec::new();
+        for script in &mut scripts {
+            let player_id = script.player_id();
+            let snapshot = game.snapshot_for(player_id);
+            observe_first_tank_tick(tick, player_id, &snapshot, &mut first_tank_tick);
+            let view = PlayerView {
+                player_id,
+                tick,
+                start: &start,
+                snapshot: &snapshot,
+            };
+            for command in script.commands(view) {
+                commands.push((player_id, command));
+            }
+        }
+        for (player_id, command) in commands {
+            game.enqueue(player_id, command);
+        }
+
+        let tick_events = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| game.tick()))
+            .map_err(|payload| {
+                format!(
+                    "Game::tick panicked during profile matchup: {}",
+                    panic_payload_to_string(&payload)
+                )
+            })?;
+        let event_tick = game.tick_count();
+        for player in &players {
+            let snapshot = game.snapshot_for(player.id);
+            observe_first_tank_tick(event_tick, player.id, &snapshot, &mut first_tank_tick);
+        }
+        for (player_id, events) in tick_events {
+            for event in events {
+                match &event {
+                    Event::Attack { .. } => {
+                        first_damage_tick.get_or_insert(event_tick);
+                        attack_events += 1;
+                    }
+                    Event::Death { .. } => {
+                        death_events += 1;
+                    }
+                    Event::Build { .. } | Event::Notice { .. } => {}
+                }
+                event_log.push(EventLogEntry {
+                    tick: event_tick,
+                    player_id,
+                    event,
+                });
+            }
+        }
+    }
+
+    let replay_verified = if options.verify_replay {
+        assert_replay_matches_live(&game, &players, &event_log)
+            .map_err(|failure| format!("replay determinism failed: {}", failure.reason))?;
+        true
+    } else {
+        false
+    };
+
+    let replay_artifact = match &options.save_replay_name {
+        Some(name) => Some(
+            write_simple_replay_artifact(name, &game, &players)?
+                .display()
+                .to_string(),
+        ),
+        None => None,
+    };
+
+    let alive = game.alive_players();
+    let winner = if alive.len() == 1 {
+        let player_id = alive[0];
+        Some(ProfileMatchupWinner {
+            player_id,
+            profile: if player_id == 1 {
+                profile_a.id.to_string()
+            } else {
+                profile_b.id.to_string()
+            },
+        })
+    } else {
+        None
+    };
+    let final_counts = final_unit_counts(&game, &players);
+    let command_stats = command_stats_by_player(game.command_log());
+    let players = players
+        .iter()
+        .map(|player| {
+            let stats = command_stats.get(&player.id);
+            ProfileMatchupPlayerResult {
+                player_id: player.id,
+                profile: if player.id == 1 {
+                    profile_a.id.to_string()
+                } else {
+                    profile_b.id.to_string()
+                },
+                alive: alive.contains(&player.id),
+                command_count: stats.map(|s| s.command_count).unwrap_or_default(),
+                attack_command_count: stats.map(|s| s.attack_command_count).unwrap_or_default(),
+                first_attack_command_tick: stats.and_then(|s| s.first_attack_command_tick),
+                first_tank_tick: first_tank_tick.get(&player.id).copied(),
+                final_counts: final_counts.get(&player.id).cloned().unwrap_or_default(),
+            }
+        })
+        .collect();
+
+    Ok(ProfileMatchupResult {
+        profile_a: profile_a.id.to_string(),
+        profile_b: profile_b.id.to_string(),
+        seed: options.seed,
+        max_ticks: options.max_ticks,
+        ticks: game.tick_count(),
+        completed_by_elimination: alive.len() <= 1,
+        winner,
+        players,
+        first_damage_tick,
+        attack_events,
+        death_events,
+        event_count: event_log.len(),
+        replay_verified,
+        replay_artifact,
+    })
+}
+
+#[derive(Default)]
+struct CommandStats {
+    command_count: usize,
+    attack_command_count: usize,
+    first_attack_command_tick: Option<u32>,
+}
+
+fn command_stats_by_player(
+    commands: &[super::replay::CommandLogEntry],
+) -> BTreeMap<u32, CommandStats> {
+    let mut stats: BTreeMap<u32, CommandStats> = BTreeMap::new();
+    for entry in commands {
+        let player = stats.entry(entry.player_id).or_default();
+        player.command_count += 1;
+        match &entry.command {
+            Command::AttackMove { .. } | Command::Attack { .. } => {
+                player.attack_command_count += 1;
+                player.first_attack_command_tick.get_or_insert(entry.tick);
+            }
+            Command::Move { .. }
+            | Command::Gather { .. }
+            | Command::Build { .. }
+            | Command::Train { .. }
+            | Command::Cancel { .. }
+            | Command::Stop { .. } => {}
+        }
+    }
+    stats
+}
+
+fn observe_first_tank_tick(
+    tick: u32,
+    player_id: u32,
+    snapshot: &Snapshot,
+    first_tank_tick: &mut BTreeMap<u32, u32>,
+) {
+    if first_tank_tick.contains_key(&player_id) {
+        return;
+    }
+    if snapshot
+        .entities
+        .iter()
+        .any(|entity| entity.owner == player_id && entity.kind == kinds::TANK)
+    {
+        first_tank_tick.insert(player_id, tick);
+    }
+}
+
+fn write_simple_replay_artifact(
+    name: &str,
+    game: &Game,
+    players: &[PlayerInit],
+) -> Result<PathBuf, String> {
+    let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("target")
+        .join(SELFPLAY_ARTIFACT_DIR)
+        .join(name);
+    fs::create_dir_all(&dir).map_err(|err| err.to_string())?;
+    let artifact = ReplayArtifact {
+        replay_commands: game.command_log().to_vec(),
+        players: players.to_vec(),
+        seed: game.seed(),
+    };
+    let json = serde_json::to_vec_pretty(&artifact).map_err(|err| err.to_string())?;
+    fs::write(dir.join("replay.json"), json).map_err(|err| err.to_string())?;
+    Ok(dir)
+}
+
+fn panic_payload_to_string(payload: &Box<dyn std::any::Any + Send>) -> String {
+    if let Some(s) = payload.downcast_ref::<&'static str>() {
+        s.to_string()
+    } else if let Some(s) = payload.downcast_ref::<String>() {
+        s.clone()
+    } else {
+        "panic without string payload".to_string()
     }
 }
 

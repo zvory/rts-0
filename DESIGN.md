@@ -756,3 +756,18 @@ playtesting first. By default successful runs do not write artifacts. For manual
 setting `RTS_SELFPLAY_SAVE_REPLAY=1` writes a successful run to
 `target/selfplay-artifacts/<test>-<pid>-<time>/`; setting `RTS_SELFPLAY_SAVE_REPLAY=<name>` uses
 that explicit safe artifact name instead.
+
+**Profile matchup CLI.** The `ai-matchup` binary is the manual fixed-horizon matchup facility for
+profile-vs-profile runs. It composes the same self-play adapter and `Game` seam as the tests, runs
+one directed match to elimination or a tick cap, optionally verifies deterministic replay, and can
+write a replay artifact:
+
+```bash
+cd server
+cargo run --bin ai-matchup -- rush tech
+cargo run --bin ai-matchup -- saturation tech --seed 7 --ticks 20000 --json
+cargo run --bin ai-matchup -- --list-profiles
+```
+
+Keep invariant-style milestone coverage in `cargo test`; use the CLI for balance exploration,
+seed sweeps, and strategy result sampling.
