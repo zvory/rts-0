@@ -450,8 +450,8 @@ input[type="text"]:focus {
   left: 50%;
   transform: translateX(-50%);
   display: flex;
-  gap: 22px;
-  padding: 8px 18px;
+  gap: 24px;
+  padding: 9px 20px;
   border-radius: var(--radius);
   pointer-events: none; /* read-only readout */
   font-variant-numeric: tabular-nums;
@@ -461,11 +461,11 @@ input[type="text"]:focus {
   align-items: center;
   gap: 7px;
   font-weight: 700;
-  font-size: 15px;
+  font-size: 17px;
   letter-spacing: 0;
 }
 #hud .res-icon {
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1;
 }
 #hud .res-icon.steel {
@@ -628,13 +628,13 @@ input[type="text"]:focus {
 #command-card {
   right: 12px;
   bottom: 12px;
-  padding: 12px;
+  padding: 13px;
   border-radius: var(--radius);
   pointer-events: auto;
   display: grid;
-  grid-template-columns: repeat(3, 68px);
-  grid-auto-rows: 68px;
-  gap: 10px;
+  grid-template-columns: repeat(3, 75px);
+  grid-auto-rows: 75px;
+  gap: 11px;
 }
 .cmd-empty {
   background: var(--panel);
@@ -676,12 +676,12 @@ input[type="text"]:focus {
 }
 .cmd-btn .cmd-icon {
   font-family: var(--mono);
-  font-size: 20px;
+  font-size: 22px;
   font-weight: 800;
   line-height: 1;
 }
 .cmd-btn .cmd-label {
-  font-size: 9px;
+  font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0;
   color: var(--ink-dim);
@@ -695,11 +695,11 @@ input[type="text"]:focus {
   position: absolute;
   top: 0;
   left: 0;
-  width: 17px;
-  height: 17px;
+  width: 19px;
+  height: 19px;
   display: grid;
   place-items: center;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   color: var(--void);
   background: var(--accent);
@@ -713,7 +713,7 @@ input[type="text"]:focus {
   right: 5px;
   display: flex;
   gap: 1px;
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
@@ -768,17 +768,17 @@ input[type="text"]:focus {
 
 /* --- Transient toast --- */
 #toast {
-  top: 64px;
+  top: 70px;
   left: 50%;
   transform: translateX(-50%);
   max-width: 60vw;
-  padding: 10px 18px;
+  padding: 11px 20px;
   border-radius: var(--radius);
   background: rgba(39, 37, 31, 0.96);
   border: 1px solid var(--bad);
   color: var(--ink);
   font-weight: 600;
-  font-size: 13px;
+  font-size: 14px;
   text-align: center;
   box-shadow: var(--shadow);
   pointer-events: none;
@@ -838,21 +838,21 @@ input[type="text"]:focus {
    tighten gaps so the bottom row of HUD panels does not overlap. */
 @media (max-width: 1366px), (max-height: 768px) {
   #command-card {
-    grid-template-columns: repeat(3, 58px);
-    grid-auto-rows: 58px;
-    gap: 7px;
-    padding: 10px;
+    grid-template-columns: repeat(3, 64px);
+    grid-auto-rows: 64px;
+    gap: 8px;
+    padding: 11px;
   }
   .cmd-btn .cmd-icon {
-    font-size: 18px;
+    font-size: 20px;
   }
   #selected-panel {
     min-width: 240px;
     max-width: 40vw;
   }
   #minimap {
-    width: 180px;
-    height: 180px;
+    width: 198px;
+    height: 198px;
   }
   #game-over-text {
     font-size: 36px;
