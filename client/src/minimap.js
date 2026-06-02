@@ -9,6 +9,8 @@
 
 import { cmd } from "./protocol.js";
 import { TERRAIN, isResource, isUnit } from "./protocol.js";
+
+const isImpassableTerrainCode = (code) => code === TERRAIN.ROCK || code === TERRAIN.WATER;
 import { COLORS, FOG_EXPLORED_ALPHA, FOG_UNEXPLORED_ALPHA } from "./config.js";
 
 // Convert one of the 0xRRGGBB palette ints into a CSS color string.
@@ -191,6 +193,8 @@ export class Minimap {
     for (let ty = 0; ty < map.height; ty++) {
       for (let tx = 0; tx < map.width; tx++) {
         if (fog.isVisible(tx, ty)) continue; // clear
+        // Stone/water tiles render unfogged so the map's shape is legible everywhere.
+        if (isImpassableTerrainCode(map.terrain[ty * map.width + tx])) continue;
         const p = this._worldToCanvas(tx * ts, ty * ts);
         if (fog.isExplored(tx, ty)) {
           ctx.globalAlpha = FOG_EXPLORED_ALPHA;
