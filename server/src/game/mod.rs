@@ -89,16 +89,33 @@ pub struct Game {
 
 impl Game {
     pub fn new(players: &[PlayerInit], seed: u32) -> Game {
-        Self::new_inner(players, true, config::STARTING_STEEL, config::STARTING_OIL, seed)
+        Self::new_inner(
+            players,
+            true,
+            config::STARTING_STEEL,
+            config::STARTING_OIL,
+            seed,
+        )
     }
 
     /// Create a match with explicit starting resources for every player.
-    pub fn new_with_starting_resources(players: &[PlayerInit], steel: u32, oil: u32, seed: u32) -> Game {
+    pub fn new_with_starting_resources(
+        players: &[PlayerInit],
+        steel: u32,
+        oil: u32,
+        seed: u32,
+    ) -> Game {
         Self::new_inner(players, true, steel, oil, seed)
     }
 
     pub(crate) fn new_for_replay(players: &[PlayerInit], seed: u32) -> Game {
-        Self::new_inner(players, false, config::STARTING_STEEL, config::STARTING_OIL, seed)
+        Self::new_inner(
+            players,
+            false,
+            config::STARTING_STEEL,
+            config::STARTING_OIL,
+            seed,
+        )
     }
 
     pub(crate) fn seed(&self) -> u32 {
@@ -138,7 +155,7 @@ impl Game {
         // unclaimed sites still get their resource clusters so every player has somewhere to
         // expand.
         for site in &map.expansion_sites {
-            if !map.starts.contains(&site) {
+            if !map.starts.contains(site) {
                 spawn_base_resources(&mut entities, &map, *site);
             }
         }

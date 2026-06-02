@@ -226,7 +226,6 @@ fn machine_gunner_ready_to_move(entities: &mut EntityStore, id: u32) -> bool {
     }
 }
 
-
 /// How a combatant chooses targets.
 #[derive(Copy, Clone, PartialEq)]
 enum CombatMode {
@@ -357,6 +356,7 @@ fn apply_damage(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn apply_overpenetration(
     entities: &mut EntityStore,
     events: &mut HashMap<u32, Vec<Event>>,
@@ -465,7 +465,7 @@ mod tests {
     }
 
     fn run_combat_tick(entities: &mut EntityStore) -> HashMap<u32, Vec<Event>> {
-        let map = Map::generate(2, 0xC0FF_EE);
+        let map = Map::generate(2, 0x00C0_FFEE);
         let occ = Occupancy::build(&map, entities);
         let spatial = SpatialIndex::build(entities, config::TILE_SIZE);
         let mut pathing = PathingService::new(256, 64);
@@ -487,7 +487,7 @@ mod tests {
     }
 
     fn run_movement_tick(entities: &mut EntityStore) {
-        let map = Map::generate(2, 0xC0FF_EE);
+        let map = Map::generate(2, 0x00C0_FFEE);
         let occ = Occupancy::build(&map, entities);
         let spatial = SpatialIndex::build(entities, map.size);
         movement_system(&map, entities, &occ, &spatial, 0);
@@ -568,7 +568,7 @@ mod tests {
         attacker.set_path_goal(Some((270.0, 100.0)));
         attacker.set_path(Vec::new());
 
-        let map = Map::generate(2, 0xC0FF_EE);
+        let map = Map::generate(2, 0x00C0_FFEE);
         let occ = Occupancy::build(&map, &entities);
         let spatial = SpatialIndex::build(&entities, map.size);
         let mut pathing = PathingService::new(256, 64);

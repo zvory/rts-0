@@ -7,8 +7,7 @@
 //!
 //! Helpers fall into three buckets:
 //! - **Ownership scans**: owned units, owned buildings, completed buildings, town halls.
-//! - **Targeting / proximity**: `is_enemy_targetable`, `nearest_enemy_in_range`,
-//!   `nearest_resource_node`.
+//! - **Targeting / proximity**: `is_enemy_targetable`, `nearest_enemy_in_range`.
 //! - **Reservation**: `node_holder` (who currently owns a node's harvest slot).
 //!
 //! Building placement and spawn search remain in [`super::occupancy::footprint_placeable`] and
@@ -125,22 +124,6 @@ pub(crate) fn nearest_tank_in_range(
     spatial
         .nearest(px, py, radius_px, entities, |e: &Entity| {
             e.kind == EntityKind::Tank && is_enemy_targetable(e, owner, self_id)
-        })
-        .map(|(id, _)| id)
-}
-
-/// Nearest non-empty resource node of `kind` to `(px, py)` within `max_radius_px`.
-pub(crate) fn nearest_resource_node(
-    entities: &EntityStore,
-    spatial: &SpatialIndex,
-    kind: EntityKind,
-    px: f32,
-    py: f32,
-    max_radius_px: f32,
-) -> Option<u32> {
-    spatial
-        .nearest(px, py, max_radius_px, entities, |e: &Entity| {
-            e.kind == kind && e.remaining().unwrap_or(0) > 0
         })
         .map(|(id, _)| id)
 }

@@ -139,14 +139,9 @@ pub(crate) fn footprint_placeable(
                     return false;
                 }
             }
-        } else if e.is_node() {
-            let node_tile = map.tile_of(e.pos_x, e.pos_y);
-            if tiles.contains(&node_tile) {
-                return false;
-            }
-        } else if e.is_unit() {
-            let unit_tile = map.tile_of(e.pos_x, e.pos_y);
-            if tiles.contains(&unit_tile) {
+        } else if e.is_node() || e.is_unit() {
+            let tile = map.tile_of(e.pos_x, e.pos_y);
+            if tiles.contains(&tile) {
                 return false;
             }
         }

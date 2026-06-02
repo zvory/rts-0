@@ -11,8 +11,8 @@
 use std::collections::HashMap;
 
 use crate::config;
-use crate::rules;
 use crate::protocol::states;
+use crate::rules;
 
 /// Neutral owner id used for resource nodes (steel / oil nodes).
 pub const NEUTRAL: u32 = 0;
