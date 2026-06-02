@@ -39,30 +39,32 @@ pub enum EntityKind {
 }
 
 impl EntityKind {
+    #[cfg(test)]
+    pub const ALL: [EntityKind; 12] = [
+        EntityKind::Worker,
+        EntityKind::Rifleman,
+        EntityKind::MachineGunner,
+        EntityKind::AtTeam,
+        EntityKind::Tank,
+        EntityKind::IndustrialCenter,
+        EntityKind::Depot,
+        EntityKind::Barracks,
+        EntityKind::TrainingCentre,
+        EntityKind::TankFactory,
+        EntityKind::Steel,
+        EntityKind::Oil,
+    ];
+
     pub fn is_unit(self) -> bool {
-        matches!(
-            self,
-            EntityKind::Worker
-                | EntityKind::Rifleman
-                | EntityKind::MachineGunner
-                | EntityKind::AtTeam
-                | EntityKind::Tank
-        )
+        rules::defs::unit_def(self).is_some()
     }
 
     pub fn is_building(self) -> bool {
-        matches!(
-            self,
-            EntityKind::IndustrialCenter
-                | EntityKind::Depot
-                | EntityKind::Barracks
-                | EntityKind::TrainingCentre
-                | EntityKind::TankFactory
-        )
+        rules::defs::building_def(self).is_some()
     }
 
     pub fn is_node(self) -> bool {
-        matches!(self, EntityKind::Steel | EntityKind::Oil)
+        rules::defs::node_def(self).is_some()
     }
 
     pub fn to_protocol_str(self) -> &'static str {
