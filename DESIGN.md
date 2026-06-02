@@ -128,6 +128,8 @@ the player's own starting Industrial Center + workers. When the lobby's `setQuic
 enabled, every player starts with 1400 steel and 600 oil instead of the default opening resources.
 
 ### 2.4 `snapshot` payload (per-player, fog-filtered)
+`Snapshot` remains the semantic shape used by server game code and by client modules after
+transport decode:
 ```
 {
   t: "snapshot",
@@ -139,6 +141,41 @@ enabled, every player starts with 1400 steel and 600 oil instead of the default 
   events: Event[]                // transient things to surface (see 2.5)
 }
 ```
+
+Live WebSocket snapshot frames are sent as compact JSON text, version 1. `client/src/net.js`
+decodes this transport shape back into the semantic object above before dispatching `S.SNAPSHOT`.
+Older object-shaped JSON snapshots remain decodable by the client for fallback/dev use.
+
+```
+{
+  "t": "snapshot",
+  "v": 1,
+  "s": [tick, steel, oil, supplyUsed, supplyCap],
+  "e": [
+    [
+      id, owner, kind, x, y, hp, maxHp, state,
+      facing?, prodKind?, prodProgress?, prodQueue?,
+      buildProgress?, latchedNode?, targetId?, setupState?, remaining?
+    ]
+  ],
+  "r": [[id, remaining]],         // omitted when empty
+  "ev": [EventRecord]             // omitted when empty
+}
+```
+
+Compact numeric codes:
+
+| Vocabulary | Codes |
+|------------|-------|
+| `kind` | 1 `worker`, 2 `rifleman`, 3 `machine_gunner`, 4 `at_team`, 5 `tank`, 6 `industrial_center`, 7 `depot`, 8 `barracks`, 9 `training_centre`, 10 `tank_factory`, 11 `steel`, 12 `oil` |
+| `state` | 1 `idle`, 2 `move`, 3 `attack`, 4 `gather`, 5 `build`, 6 `train`, 7 `construct`, 8 `dead` |
+| `setupState` | 1 `packed`, 2 `setting_up`, 3 `deployed`, 4 `tearing_down` |
+| `EventRecord` | `[1, from, to]` attack, `[2, id, x, y, kind]` death, `[3, id, kind]` build, `[4, msg]` notice |
+
+Compact entity records are positional arrays. Optional fields keep the semantic order above and
+trailing missing optional fields are omitted; interior missing optional fields are encoded as
+`null`.
+
 `ResourceDelta`: `{ id: u32, remaining: u32 }`. Resource node positions/kinds are static and come
 from `start.map.resources`; clients keep last-known `remaining` locally. The server sends
 `remaining` updates only for resource nodes currently visible to that recipient (dev full-world
