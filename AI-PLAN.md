@@ -125,7 +125,7 @@ for the same module name.
 
 | Phase | Detailed Plan | Status | Main Output |
 | --- | --- | --- | --- |
-| AI-0 | [Boundary and invariants](docs/ai/phase-00-boundary-and-invariants.md) | planned by this doc set | One AI architecture contract and handoff rules |
+| AI-0 | [Boundary and invariants](docs/ai/phase-00-boundary-and-invariants.md) | complete | One AI architecture contract and handoff rules |
 | AI-1 | [Shared world model](docs/ai/phase-01-shared-world-model.md) | in progress: observation/facts scaffolding exists | Deterministic AI observations and reusable facts |
 | AI-2 | [Action synthesis](docs/ai/phase-02-action-synthesis.md) | not started | Shared command builder with budget and reservation semantics |
 | AI-3 | [Decision loop and profiles](docs/ai/phase-03-decision-loop-and-profiles.md) | not started | `rifle_flood_fast`, `rifle_flood_full_saturation`, `tech_to_tanks` profiles |
