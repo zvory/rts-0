@@ -1,5 +1,7 @@
 # AI-2: Shared Action Synthesis
 
+Status: Done.
+
 Build one deterministic way for AI decisions to turn facts into ordinary commands.
 
 This phase should centralize command construction, local resource reservation, worker reservation,
@@ -172,3 +174,7 @@ AI-2 is done when:
 - local budget and worker reservation logic exists in one place
 - common build/train/gather/attack commands are synthesized by shared code
 - behavior remains deterministic
+
+Implemented in `server/src/game/ai_core/actions.rs`. Live AI and the self-play scripts now use
+shared helpers for local spend reservation, build-worker reservation, build placement callbacks,
+training queue policy, resource-node reservation, and deterministic attack-move command emission.
