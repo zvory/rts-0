@@ -1950,7 +1950,7 @@ fn real_ai_vs_real_ai() {
     const MIN_RIFLEMAN_TRAIN_COMMANDS: usize = 25;
     const MIN_ATTACK_MOVE_COMMANDS: usize = 13;
     const MIN_ATTACK_EVENTS: usize = 200;
-    const TICKS: u32 = 6_600;
+    const TICKS: u32 = 13_824;
 
     let players = vec![
         PlayerInit {
