@@ -17,6 +17,8 @@ use serde::{Deserialize, Serialize};
 use super::replay::{replay_commands, EventLogEntry, PlayerSnapshot, ReplayOutcome};
 use super::{Game, PlayerInit};
 use crate::config;
+use crate::game::ai_core::facts::AiFacts;
+use crate::game::ai_core::observation::{AiBuildIntent, AiObservation};
 use crate::game::ai_shared;
 use crate::game::entity::EntityKind;
 use crate::protocol::{
@@ -156,6 +158,31 @@ struct PlayerView<'a> {
     snapshot: &'a Snapshot,
 }
 
+impl PlayerView<'_> {
+    fn observation(
+        self,
+        pending_builds: impl IntoIterator<Item = AiBuildIntent>,
+    ) -> Option<AiObservation> {
+        AiObservation::from_selfplay_snapshot(
+            self.start,
+            self.snapshot,
+            self.player_id,
+            pending_builds,
+        )
+    }
+}
+
+fn pending_build_intents(
+    pending_builds: &BTreeMap<u32, (EntityKind, u32, u32, u32)>,
+) -> Vec<AiBuildIntent> {
+    pending_builds
+        .iter()
+        .map(|(worker_id, (kind, tile_x, tile_y, _issued_tick))| {
+            AiBuildIntent::to_site(*worker_id, *kind, *tile_x, *tile_y)
+        })
+        .collect()
+}
+
 struct BuildTechAttackScript {
     player_id: u32,
     oil_workers: usize,
@@ -228,21 +255,11 @@ impl ScriptedPlayer for BuildTechAttackScript {
             .iter()
             .filter(|e| e.owner == view.player_id)
             .collect();
-        let Some(start_tile) = own_start_tile(view.start, view.player_id) else {
-            return Vec::new();
-        };
         let workers: Vec<&EntityView> = own
             .iter()
             .copied()
             .filter(|e| is_kind(e, EntityKind::Worker))
             .collect();
-        let target_workers = ai_shared::main_base_steel_saturation_target_from_snapshot(
-            &view.start.map,
-            view.snapshot,
-            start_tile,
-        )
-        .min(SCRIPT_STEEL_WORKER_CAP)
-        .saturating_add(self.oil_workers);
 
         // Drop pending-build entries whose worker is no longer in BUILD state — either the
         // worker arrived and the building was spawned (it will appear in `own`), or the
@@ -279,6 +296,16 @@ impl ScriptedPlayer for BuildTechAttackScript {
             }
         }
 
+        let Some(observation) = view.observation(pending_build_intents(&self.pending_builds))
+        else {
+            return Vec::new();
+        };
+        let facts = AiFacts::from_observation(&observation);
+        let target_workers = facts
+            .target_steel_workers
+            .min(SCRIPT_STEEL_WORKER_CAP)
+            .saturating_add(self.oil_workers);
+
         let mut idle_workers: Vec<u32> = workers
             .iter()
             .filter(|e| e.state == states::IDLE)
@@ -298,45 +325,13 @@ impl ScriptedPlayer for BuildTechAttackScript {
                 .map(|e| e.id),
         );
 
-        let industrial_centers: Vec<&EntityView> = own
-            .iter()
-            .copied()
-            .filter(|e| is_kind(e, EntityKind::IndustrialCenter) && is_complete(e))
-            .collect();
-        let barracks: Vec<&EntityView> = own
-            .iter()
-            .copied()
-            .filter(|e| is_kind(e, EntityKind::Barracks))
-            .collect();
-        let complete_barracks: Vec<&EntityView> = barracks
-            .iter()
-            .copied()
-            .filter(|e| is_complete(e))
-            .collect();
-        let tank_factories: Vec<&EntityView> = own
-            .iter()
-            .copied()
-            .filter(|e| is_kind(e, EntityKind::TankFactory))
-            .collect();
-        let complete_tank_factories: Vec<&EntityView> = tank_factories
-            .iter()
-            .copied()
-            .filter(|e| is_complete(e))
-            .collect();
-        let pending_count = |kind: EntityKind| -> usize {
-            self.pending_builds
-                .values()
-                .filter(|(k, _, _, _)| *k == kind)
-                .count()
-        };
-        let depot_count = own.iter().filter(|e| is_kind(e, EntityKind::Depot)).count()
-            + pending_count(EntityKind::Depot);
-        let depot_under_construction = own
-            .iter()
-            .any(|e| is_kind(e, EntityKind::Depot) && !is_complete(e))
-            || pending_count(EntityKind::Depot) > 0;
-        let barracks_count = barracks.len() + pending_count(EntityKind::Barracks);
-        let tank_factory_count = tank_factories.len() + pending_count(EntityKind::TankFactory);
+        let industrial_centers = facts.production_buildings(EntityKind::IndustrialCenter);
+        let complete_barracks = facts.production_buildings(EntityKind::Barracks);
+        let complete_tank_factories = facts.production_buildings(EntityKind::TankFactory);
+        let depot_count = facts.building_count(EntityKind::Depot);
+        let depot_under_construction = facts.depot_in_progress;
+        let barracks_count = facts.building_count(EntityKind::Barracks);
+        let tank_factory_count = facts.building_count(EntityKind::TankFactory);
         let tank_count = own.iter().filter(|e| is_kind(e, EntityKind::Tank)).count();
 
         let mut budget = ai_shared::SpendBudget::new(
@@ -396,7 +391,7 @@ impl ScriptedPlayer for BuildTechAttackScript {
             if workers.len() >= target_workers {
                 break;
             }
-            if production_queue_len(industrial_center) > 0 {
+            if industrial_center.queue_len > 0 {
                 continue;
             }
             if !budget.can_afford_unit(EntityKind::Worker) {
@@ -414,7 +409,7 @@ impl ScriptedPlayer for BuildTechAttackScript {
             needs_tank_factory || (tank_count == 0 && !complete_tank_factories.is_empty());
         if !saving_for_first_tank {
             for rax in complete_barracks {
-                if production_queue_len(rax) > 0 {
+                if rax.queue_len > 0 {
                     continue;
                 }
 
@@ -431,7 +426,7 @@ impl ScriptedPlayer for BuildTechAttackScript {
         }
 
         for factory in complete_tank_factories {
-            if tank_count > 0 || production_queue_len(factory) > 0 {
+            if tank_count > 0 || factory.queue_len > 0 {
                 continue;
             }
             if !budget.can_afford_unit(EntityKind::Tank) {
@@ -648,20 +643,12 @@ impl ScriptedPlayer for EconomyScript {
             .copied()
             .filter(|e| is_kind(e, EntityKind::Worker))
             .collect();
-        let Some(start_tile) = own_start_tile(view.start, view.player_id) else {
+        let Some(observation) = view.observation([]) else {
             return Vec::new();
         };
-        let industrial_centers: Vec<&EntityView> = own
-            .iter()
-            .copied()
-            .filter(|e| is_kind(e, EntityKind::IndustrialCenter) && is_complete(e))
-            .collect();
-        let target_workers = ai_shared::main_base_steel_saturation_target_from_snapshot(
-            &view.start.map,
-            view.snapshot,
-            start_tile,
-        )
-        .min(SCRIPT_STEEL_WORKER_CAP);
+        let facts = AiFacts::from_observation(&observation);
+        let industrial_centers = facts.production_buildings(EntityKind::IndustrialCenter);
+        let target_workers = facts.target_steel_workers.min(SCRIPT_STEEL_WORKER_CAP);
 
         let mut builder_workers: Vec<u32> = workers
             .iter()
@@ -676,9 +663,7 @@ impl ScriptedPlayer for EconomyScript {
                 .map(|e| e.id),
         );
 
-        let depot_under_construction = own
-            .iter()
-            .any(|e| is_kind(e, EntityKind::Depot) && !is_complete(e));
+        let depot_under_construction = facts.depot_in_progress;
         let mut budget = ai_shared::SpendBudget::new(
             view.snapshot.steel,
             view.snapshot.oil,
@@ -707,7 +692,7 @@ impl ScriptedPlayer for EconomyScript {
             if workers.len() >= target_workers {
                 break;
             }
-            if production_queue_len(industrial_center) > 0 {
+            if industrial_center.queue_len > 0 {
                 continue;
             }
             if !budget.can_afford_unit(EntityKind::Worker) {

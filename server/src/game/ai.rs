@@ -14,15 +14,16 @@
 //! via the `start` payload.
 
 use crate::config;
+use crate::game::ai_core::facts::AiFacts;
+use crate::game::ai_core::observation::AiObservation;
 use crate::game::ai_shared;
-use crate::game::entity::{BuildPhase, EntityKind, EntityStore, Order};
+use crate::game::entity::{EntityKind, EntityStore, Order};
 use crate::game::map::Map;
 use crate::game::services::spatial::SpatialIndex;
 use crate::game::services::world_query;
 use crate::game::systems;
 use crate::game::PlayerState;
 use crate::protocol::{kinds, Command};
-use crate::rules;
 use std::collections::{BTreeSet, HashSet};
 
 // --- Tuning knobs -----------------------------------------------------------
@@ -103,77 +104,33 @@ impl AiController {
             return;
         }
 
-        let supply_capped = me.supply_cap >= config::SUPPLY_CAP_MAX;
+        let Some(observation) =
+            AiObservation::from_live_state(map, entities, players, self.player, tick)
+        else {
+            return;
+        };
+        let facts = AiFacts::from_observation(&observation);
+        let supply_capped = facts.supply_capped;
 
-        // --- Survey the player's holdings in one pass. ---------------------
-        let mut idle_workers: Vec<u32> = Vec::new();
-        let mut gathering_workers: Vec<u32> = Vec::new();
-        let mut worker_count: usize = 0;
-        let mut rifleman_count: usize = 0;
-        let mut free_riflemen: Vec<u32> = Vec::new();
+        let mut idle_workers = facts.idle_workers.clone();
+        let mut gathering_workers = facts.gathering_workers.clone();
+        let mut worker_count = facts.worker_count;
+        let free_riflemen = facts.free_combat_units(EntityKind::Rifleman).to_vec();
         // Finished Industrial Centers with an empty production queue (ready to train a worker).
-        let mut idle_industrial_centers: Vec<u32> = Vec::new();
+        let idle_industrial_centers: Vec<u32> = facts
+            .production_buildings(EntityKind::IndustrialCenter)
+            .iter()
+            .filter(|building| building.queue_len == 0)
+            .map(|building| building.id)
+            .collect();
         // Finished barracks as (id, queue_len).
-        let mut barracks: Vec<(u32, usize)> = Vec::new();
-        let mut barracks_total: usize = 0; // finished + under construction
-        let mut depot_under_construction = false;
-        let mut pending_depot_build = false;
-        // Steel reserved by workers en route to a build site (cost not yet deducted by the
-        // construction system — deduction happens on arrival). Subtracted from the budget below
-        // so we don't double-spend the same steel on units and then fail placement.
-        let mut committed_steel: u32 = 0;
-
-        for e in world_query::owned_units(entities, self.player)
-            .chain(world_query::owned_buildings(entities, self.player))
-        {
-            match e.kind {
-                EntityKind::Worker => {
-                    worker_count += 1;
-                    match e.order() {
-                        Order::Idle => idle_workers.push(e.id),
-                        Order::Gather(_) => gathering_workers.push(e.id),
-                        Order::Build(_) => {
-                            if let Some((kind, _, _)) = e.order().build_intent_tile() {
-                                if e.build_phase() == Some(BuildPhase::ToSite)
-                                    && config::building_stats(kind).is_some()
-                                {
-                                    let (cost_steel, _) = rules::economy::cost(kind);
-                                    committed_steel =
-                                        committed_steel.saturating_add(cost_steel);
-                                }
-                                match kind {
-                                    EntityKind::Depot => pending_depot_build = true,
-                                    EntityKind::Barracks => barracks_total += 1,
-                                    _ => {}
-                                }
-                            }
-                        }
-                        _ => {}
-                    }
-                }
-                EntityKind::Rifleman => {
-                    rifleman_count += 1;
-                    if is_free_rifleman(e) && !is_en_route_to_rally_line(map, me.start_tile, e) {
-                        free_riflemen.push(e.id);
-                    }
-                }
-                EntityKind::IndustrialCenter
-                    if !e.under_construction() && e.prod_queue().is_empty() =>
-                {
-                    idle_industrial_centers.push(e.id)
-                }
-                EntityKind::Barracks => {
-                    barracks_total += 1;
-                    if !e.under_construction() {
-                        barracks.push((e.id, e.prod_queue().len()));
-                    }
-                }
-                EntityKind::Depot if e.under_construction() => depot_under_construction = true,
-                _ => {}
-            }
-        }
-        let _ = rifleman_count; // surveyed for clarity; waves key off free_riflemen.
-        let depot_in_progress = depot_under_construction || pending_depot_build;
+        let barracks: Vec<(u32, usize)> = facts
+            .production_buildings(EntityKind::Barracks)
+            .iter()
+            .map(|building| (building.id, building.queue_len))
+            .collect();
+        let barracks_total = facts.building_count(EntityKind::Barracks);
+        let depot_in_progress = facts.depot_in_progress;
 
         // Local economy budget. We decrement these as we *decide* to spend so a single think
         // never queues more than the AI can actually afford this tick (commands all apply in
@@ -181,14 +138,13 @@ impl AiController {
         // committed_steel so units aren't trained with steel already spoken for by an en-route
         // build order (whose cost is only deducted at placement, not at command time).
         let mut budget = ai_shared::SpendBudget::new(
-            me.steel.saturating_sub(committed_steel),
+            me.steel.saturating_sub(facts.committed_steel),
             me.oil,
             me.supply_used,
             me.supply_cap,
         );
 
-        let target_workers =
-            ai_shared::main_base_steel_saturation_target_from_entities(entities, me.start_tile);
+        let target_workers = facts.target_steel_workers;
         let target_barracks = desired_barracks_target(me.steel);
 
         // Workers we may pull onto a build job: prefer truly idle, fall back to a gatherer.
@@ -649,19 +605,6 @@ fn is_rally_line_member(
     }
 }
 
-fn is_en_route_to_rally_line(
-    map: &Map,
-    start_tile: (u32, u32),
-    rifleman: &crate::game::entity::Entity,
-) -> bool {
-    !rifleman.path_is_empty()
-        && matches!(rifleman.order(), Order::Move(_) | Order::AttackMove(_))
-        && rifleman
-            .path_goal()
-            .map(|goal| goal_is_on_rally_line(map, start_tile, goal))
-            .unwrap_or(false)
-}
-
 fn goal_is_on_rally_line(map: &Map, start_tile: (u32, u32), goal: (f32, f32)) -> bool {
     let rally = combat_rally_world(map, start_tile);
     let start = map.tile_center(start_tile.0, start_tile.1);
@@ -682,16 +625,6 @@ fn goal_is_on_rally_line(map: &Map, start_tile: (u32, u32), goal: (f32, f32)) ->
     let lateral_offset = (from_rally_x * lateral_x + from_rally_y * lateral_y).abs();
     forward_error <= config::TILE_SIZE as f32
         && lateral_offset <= COMBAT_RALLY_SLOT_SPACING_TILES * config::TILE_SIZE as f32 * 8.0
-}
-
-/// A rifleman available to join a wave: idle, or one whose attack-move finished (no path, no
-/// target) so it's standing around and should regroup with the next push.
-fn is_free_rifleman(e: &crate::game::entity::Entity) -> bool {
-    match e.order() {
-        Order::Idle => true,
-        Order::AttackMove(_) => e.path_is_empty() && e.target_id().is_none(),
-        _ => false,
-    }
 }
 
 /// The AI starts at two barracks, then scales production when it floats steel.
