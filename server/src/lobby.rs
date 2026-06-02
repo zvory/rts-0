@@ -19,16 +19,19 @@ use std::collections::HashMap;
 use std::fs;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
+use std::sync::Mutex as StdMutex;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use tokio::sync::{mpsc, Mutex};
+use tokio::sync::{mpsc, Mutex, Notify};
 use tokio::time::{interval, MissedTickBehavior};
 use tracing::{debug, error, info, warn};
 
 use crate::config;
 use crate::game::selfplay::{is_safe_artifact_name, LiveSelfPlay, ReplayArtifact, ReplayDriver};
 use crate::game::{Game, PlayerInit};
-use crate::protocol::{kinds, Command, Event, LobbyPlayer, ServerMessage, Snapshot, StartPayload};
+use crate::protocol::{
+    kinds, Command, Event, LobbyPlayer, ResourceDelta, ServerMessage, Snapshot, StartPayload,
+};
 
 /// Player colors, assigned from the head of the palette. MUST match `client/src/config.js`
 /// `PLAYER_PALETTE`.
@@ -40,10 +43,9 @@ const PLAYER_PALETTE: [&str; 8] = [
 /// player-start slots, so we never seat more than this.
 const MAX_PLAYERS: usize = 4;
 
-/// Bound on a player's outbound message queue. Generous enough to absorb a brief render stall
-/// but small enough that a truly dead client is detected (a full queue ⇒ treated as gone) and
-/// dropped instead of buffering unboundedly.
-const PLAYER_CHANNEL_CAP: usize = 256;
+/// Bound on a player's reliable outbound message queue. Snapshots do not use this FIFO; each
+/// connection has one replaceable latest-snapshot slot so stale world states cannot backlog.
+const PLAYER_RELIABLE_CHANNEL_CAP: usize = 64;
 
 /// Bound on a room's inbound event queue. Commands/joins past this are dropped rather than
 /// allowed to grow without limit; in practice the room drains this every tick.
@@ -59,6 +61,124 @@ pub fn next_player_id() -> u32 {
     NEXT_PLAYER_ID.fetch_add(1, Ordering::Relaxed)
 }
 
+/// Outbound connection handle shared with the room task. Reliable messages keep FIFO ordering;
+/// snapshots share a single latest-only slot because older unsent snapshots are superseded by
+/// newer full-state snapshots.
+#[derive(Clone)]
+pub struct ConnectionSink {
+    reliable_tx: mpsc::Sender<ServerMessage>,
+    snapshots: Arc<LatestSnapshotSlot>,
+}
+
+impl std::fmt::Debug for ConnectionSink {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ConnectionSink").finish_non_exhaustive()
+    }
+}
+
+pub struct ConnectionWriter {
+    pub(crate) reliable_rx: mpsc::Receiver<ServerMessage>,
+    pub(crate) snapshots: Arc<LatestSnapshotSlot>,
+}
+
+pub(crate) struct LatestSnapshotSlot {
+    pending: StdMutex<Option<Snapshot>>,
+    notify: Notify,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum SnapshotSendStatus {
+    Stored,
+    Replaced,
+    Closed,
+}
+
+impl ConnectionSink {
+    pub fn new() -> (Self, ConnectionWriter) {
+        let (reliable_tx, reliable_rx) = mpsc::channel(PLAYER_RELIABLE_CHANNEL_CAP);
+        let snapshots = Arc::new(LatestSnapshotSlot {
+            pending: StdMutex::new(None),
+            notify: Notify::new(),
+        });
+        (
+            ConnectionSink {
+                reliable_tx,
+                snapshots: snapshots.clone(),
+            },
+            ConnectionWriter {
+                reliable_rx,
+                snapshots,
+            },
+        )
+    }
+
+    pub async fn send_reliable(
+        &self,
+        msg: ServerMessage,
+    ) -> Result<(), mpsc::error::SendError<ServerMessage>> {
+        self.reliable_tx.send(msg).await
+    }
+
+    pub fn try_send_reliable(
+        &self,
+        msg: ServerMessage,
+    ) -> Result<(), mpsc::error::TrySendError<ServerMessage>> {
+        self.reliable_tx.try_send(msg)
+    }
+
+    pub(crate) fn try_send_snapshot(&self, mut snapshot: Snapshot) -> SnapshotSendStatus {
+        if self.reliable_tx.is_closed() {
+            return SnapshotSendStatus::Closed;
+        }
+
+        let mut pending = self.snapshots.lock_pending();
+        let replaced = if let Some(previous) = pending.as_ref() {
+            merge_resource_deltas(&mut snapshot, &previous.resource_deltas);
+            true
+        } else {
+            false
+        };
+        *pending = Some(snapshot);
+        drop(pending);
+
+        self.snapshots.notify.notify_one();
+        if replaced {
+            SnapshotSendStatus::Replaced
+        } else {
+            SnapshotSendStatus::Stored
+        }
+    }
+}
+
+impl LatestSnapshotSlot {
+    fn lock_pending(&self) -> std::sync::MutexGuard<'_, Option<Snapshot>> {
+        match self.pending.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => poisoned.into_inner(),
+        }
+    }
+
+    pub(crate) fn take(&self) -> Option<Snapshot> {
+        self.lock_pending().take()
+    }
+
+    pub(crate) async fn notified(&self) {
+        self.notify.notified().await;
+    }
+}
+
+fn merge_resource_deltas(snapshot: &mut Snapshot, previous: &[ResourceDelta]) {
+    if previous.is_empty() {
+        return;
+    }
+    for old in previous {
+        if !snapshot.resource_deltas.iter().any(|d| d.id == old.id) {
+            snapshot.resource_deltas.push(old.clone());
+        }
+    }
+    snapshot.resource_deltas.sort_by_key(|d| d.id);
+}
+
 /// Internal message from a connection (or the lobby) to a room task. The room task is the
 /// only consumer; see module docs.
 #[derive(Debug)]
@@ -70,7 +190,7 @@ pub enum RoomEvent {
     Join {
         player_id: u32,
         name: String,
-        msg_tx: mpsc::Sender<ServerMessage>,
+        msg_tx: ConnectionSink,
         ack: tokio::sync::oneshot::Sender<bool>,
     },
     /// A player left (socket closed). During a match this eliminates them so it can resolve.
@@ -145,7 +265,7 @@ struct RoomPlayer {
     name: String,
     color: String,
     ready: bool,
-    msg_tx: mpsc::Sender<ServerMessage>,
+    msg_tx: ConnectionSink,
 }
 
 /// A computer opponent seated in a room. Has an id (for the lobby list / removal) and a name, but
@@ -297,7 +417,7 @@ impl RoomTask {
         &mut self,
         player_id: u32,
         name: String,
-        msg_tx: mpsc::Sender<ServerMessage>,
+        msg_tx: ConnectionSink,
         ack: tokio::sync::oneshot::Sender<bool>,
     ) {
         if matches!(self.mode, RoomMode::DevSelfPlay(_)) {
@@ -510,7 +630,7 @@ impl RoomTask {
         &mut self,
         player_id: u32,
         name: String,
-        msg_tx: mpsc::Sender<ServerMessage>,
+        msg_tx: ConnectionSink,
         ack: tokio::sync::oneshot::Sender<bool>,
     ) {
         if self.players.contains_key(&player_id) {
@@ -889,18 +1009,29 @@ impl RoomTask {
     }
 }
 
-/// Send to one player's sink without ever blocking the room task. `try_send` is used so a slow
-/// or dead client cannot stall the tick loop: a full or closed channel is logged and the message
-/// is dropped (snapshots are idempotent, so a dropped one is harmless — the next tick supersedes
-/// it). A persistently dead socket is cleaned up when its connection task sends `Leave`.
-fn send_or_log(room: &str, player_id: u32, tx: &mpsc::Sender<ServerMessage>, msg: ServerMessage) {
-    if let Err(err) = tx.try_send(msg) {
-        match err {
-            mpsc::error::TrySendError::Full(_) => {
-                warn!(room = %room, player_id, "outbound queue full; dropping message");
+/// Send to one player's sink without ever blocking the room task. Reliable messages use a bounded
+/// FIFO and snapshots use a replaceable latest-only slot.
+fn send_or_log(room: &str, player_id: u32, tx: &ConnectionSink, msg: ServerMessage) {
+    match msg {
+        ServerMessage::Snapshot(snapshot) => match tx.try_send_snapshot(snapshot) {
+            SnapshotSendStatus::Stored => {}
+            SnapshotSendStatus::Replaced => {
+                debug!(room = %room, player_id, "coalesced pending snapshot");
             }
-            mpsc::error::TrySendError::Closed(_) => {
-                debug!(room = %room, player_id, "outbound channel closed; client gone");
+            SnapshotSendStatus::Closed => {
+                debug!(room = %room, player_id, "snapshot sink closed; client gone");
+            }
+        },
+        reliable => {
+            if let Err(err) = tx.try_send_reliable(reliable) {
+                match err {
+                    mpsc::error::TrySendError::Full(_) => {
+                        warn!(room = %room, player_id, "reliable outbound queue full; dropping message");
+                    }
+                    mpsc::error::TrySendError::Closed(_) => {
+                        debug!(room = %room, player_id, "reliable outbound channel closed; client gone");
+                    }
+                }
             }
         }
     }
@@ -910,15 +1041,26 @@ fn send_or_log(room: &str, player_id: u32, tx: &mpsc::Sender<ServerMessage>, msg
 /// updates in snapshots. Internal `Game::snapshot_for` still includes resource entities for
 /// self-play/replay paths that consume snapshots directly.
 fn compact_snapshot_for_wire(snapshot: &mut Snapshot) {
+    for event in &snapshot.events {
+        let Event::Death { id, kind, .. } = event else {
+            continue;
+        };
+        if kind != kinds::STEEL && kind != kinds::OIL {
+            continue;
+        }
+        if let Some(delta) = snapshot.resource_deltas.iter_mut().find(|d| d.id == *id) {
+            delta.remaining = 0;
+        } else {
+            snapshot.resource_deltas.push(ResourceDelta {
+                id: *id,
+                remaining: 0,
+            });
+        }
+    }
+    snapshot.resource_deltas.sort_by_key(|d| d.id);
     snapshot
         .entities
         .retain(|entity| entity.kind != kinds::STEEL && entity.kind != kinds::OIL);
-}
-
-/// Capacity for a new connection's outbound channel. Re-exported so `main.rs` builds the writer
-/// channel with the same bound the room expects.
-pub const fn player_channel_cap() -> usize {
-    PLAYER_CHANNEL_CAP
 }
 
 fn room_mode_for(room: &str) -> RoomMode {
@@ -1050,9 +1192,122 @@ mod tests {
     use crate::protocol::{EntityView, Event, ResourceDelta};
 
     fn join_test_player(task: &mut RoomTask, player_id: u32) {
-        let (msg_tx, _msg_rx) = mpsc::channel(8);
+        let (msg_tx, _writer) = ConnectionSink::new();
         let (ack, _ack_rx) = tokio::sync::oneshot::channel();
         task.on_join(player_id, format!("Player {player_id}"), msg_tx, ack);
+    }
+
+    fn test_snapshot(tick: u32, resource_deltas: Vec<ResourceDelta>) -> Snapshot {
+        Snapshot {
+            tick,
+            steel: 75,
+            oil: 0,
+            supply_used: 1,
+            supply_cap: 10,
+            entities: vec![EntityView::new(
+                1,
+                1,
+                kinds::WORKER,
+                10.0,
+                20.0,
+                40,
+                40,
+                "idle",
+            )],
+            resource_deltas,
+            events: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn connection_sink_keeps_reliable_fifo_separate_from_snapshots() {
+        let (sink, mut writer) = ConnectionSink::new();
+
+        sink.try_send_snapshot(test_snapshot(10, Vec::new()));
+        sink.try_send_reliable(ServerMessage::Error {
+            msg: "first".to_string(),
+        })
+        .unwrap();
+        sink.try_send_reliable(ServerMessage::Pong { ts: 42.0 })
+            .unwrap();
+
+        let first = writer.reliable_rx.try_recv().unwrap();
+        let second = writer.reliable_rx.try_recv().unwrap();
+
+        assert!(matches!(first, ServerMessage::Error { .. }));
+        assert!(matches!(second, ServerMessage::Pong { ts } if ts == 42.0));
+        assert_eq!(writer.snapshots.take().unwrap().tick, 10);
+    }
+
+    #[test]
+    fn connection_sink_coalesces_snapshots_to_latest_tick() {
+        let (sink, writer) = ConnectionSink::new();
+
+        assert_eq!(
+            sink.try_send_snapshot(test_snapshot(10, Vec::new())),
+            SnapshotSendStatus::Stored
+        );
+        assert_eq!(
+            sink.try_send_snapshot(test_snapshot(11, Vec::new())),
+            SnapshotSendStatus::Replaced
+        );
+
+        let snapshot = writer.snapshots.take().unwrap();
+        assert_eq!(snapshot.tick, 11);
+        assert!(writer.snapshots.take().is_none());
+    }
+
+    #[test]
+    fn connection_sink_carries_resource_deltas_across_snapshot_replacement() {
+        let (sink, writer) = ConnectionSink::new();
+
+        sink.try_send_snapshot(test_snapshot(
+            10,
+            vec![ResourceDelta {
+                id: 200,
+                remaining: 1498,
+            }],
+        ));
+        sink.try_send_snapshot(test_snapshot(11, Vec::new()));
+
+        let snapshot = writer.snapshots.take().unwrap();
+        assert_eq!(snapshot.tick, 11);
+        assert_eq!(
+            snapshot.resource_deltas,
+            vec![ResourceDelta {
+                id: 200,
+                remaining: 1498,
+            }]
+        );
+    }
+
+    #[test]
+    fn connection_sink_keeps_newest_resource_delta_for_same_node() {
+        let (sink, writer) = ConnectionSink::new();
+
+        sink.try_send_snapshot(test_snapshot(
+            10,
+            vec![ResourceDelta {
+                id: 200,
+                remaining: 1498,
+            }],
+        ));
+        sink.try_send_snapshot(test_snapshot(
+            11,
+            vec![ResourceDelta {
+                id: 200,
+                remaining: 1496,
+            }],
+        ));
+
+        let snapshot = writer.snapshots.take().unwrap();
+        assert_eq!(
+            snapshot.resource_deltas,
+            vec![ResourceDelta {
+                id: 200,
+                remaining: 1496,
+            }]
+        );
     }
 
     #[test]
@@ -1136,5 +1391,43 @@ mod tests {
         assert_eq!(snapshot.resource_deltas.len(), 1);
         assert_eq!(snapshot.resource_deltas[0].remaining, 1498);
         assert_eq!(snapshot.events.len(), 1);
+    }
+
+    #[test]
+    fn wire_compaction_converts_visible_resource_death_to_zero_delta() {
+        let mut snapshot = Snapshot {
+            tick: 10,
+            steel: 75,
+            oil: 0,
+            supply_used: 1,
+            supply_cap: 10,
+            entities: vec![EntityView::new(
+                1,
+                1,
+                kinds::WORKER,
+                10.0,
+                20.0,
+                40,
+                40,
+                "idle",
+            )],
+            resource_deltas: Vec::new(),
+            events: vec![Event::Death {
+                id: 200,
+                x: 30.0,
+                y: 40.0,
+                kind: kinds::STEEL.to_string(),
+            }],
+        };
+
+        compact_snapshot_for_wire(&mut snapshot);
+
+        assert_eq!(
+            snapshot.resource_deltas,
+            vec![ResourceDelta {
+                id: 200,
+                remaining: 0,
+            }]
+        );
     }
 }
