@@ -841,7 +841,7 @@ export class Renderer {
     const h = fog.height;
 
     for (let ty = 0; ty < h; ty++) {
-      // Run-length merge contiguous tiles sharing a fog level (0=clear,1=dim,2=dark).
+      // Run-length merge contiguous tiles sharing a fog level (0=clear,1=dim,2=dark,3=impassable-dim).
       let runStart = 0;
       let runLevel = this._fogLevel(fog, 0, ty);
       for (let tx = 1; tx <= w; tx++) {
@@ -849,7 +849,11 @@ export class Renderer {
         if (level !== runLevel) {
           if (runLevel > 0) {
             const color = runLevel === 2 ? COLORS.fogUnexplored : COLORS.fogExplored;
-            const a = runLevel === 2 ? FOG_UNEXPLORED_ALPHA : FOG_EXPLORED_ALPHA;
+            const a = runLevel === 2
+              ? FOG_UNEXPLORED_ALPHA
+              : runLevel === 3
+                ? FOG_UNEXPLORED_ALPHA * 0.35
+                : FOG_EXPLORED_ALPHA;
             g.beginFill(color, a);
             g.drawRect(runStart * ts, ty * ts, (tx - runStart) * ts, ts);
             g.endFill();
@@ -863,13 +867,13 @@ export class Renderer {
 
   /**
    * @private
-   * @returns {0|1|2} 0 visible (clear), 1 explored (dim), 2 unexplored (dark)
+   * @returns {0|1|2|3} 0 visible, 1 explored (dim), 2 unexplored (dark), 3 unexplored impassable (light dim)
    */
   _fogLevel(fog, tx, ty) {
     if (fog.isVisible(tx, ty)) return 0;
-    // Impassable terrain features (rock/water/trees) render unfogged so the map's
-    // shape is legible even in unexplored areas.
-    if (this._map && isImpassableAt(this._map, tx, ty)) return 0;
+    if (this._map && isImpassableAt(this._map, tx, ty)) {
+      return fog.isExplored(tx, ty) ? 0 : 3;
+    }
     if (fog.isExplored(tx, ty)) return 1;
     return 2;
   }
