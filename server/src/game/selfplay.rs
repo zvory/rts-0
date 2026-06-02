@@ -17,8 +17,12 @@ use serde::{Deserialize, Serialize};
 use super::replay::{replay_commands, EventLogEntry, PlayerSnapshot, ReplayOutcome};
 use super::{Game, PlayerInit};
 use crate::config;
+use crate::game::ai_core::actions::{
+    self, AiActionContext, BuildPlacementRequest, ResourceAssignmentPolicy, SpendBudget,
+    TrainUnitsRequest,
+};
 use crate::game::ai_core::facts::AiFacts;
-use crate::game::ai_core::observation::{AiBuildIntent, AiObservation};
+use crate::game::ai_core::observation::{AiBuildIntent, AiEntityState, AiObservation};
 use crate::game::ai_shared;
 use crate::game::entity::EntityKind;
 use crate::protocol::{
@@ -334,137 +338,98 @@ impl ScriptedPlayer for BuildTechAttackScript {
         let tank_factory_count = facts.building_count(EntityKind::TankFactory);
         let tank_count = own.iter().filter(|e| is_kind(e, EntityKind::Tank)).count();
 
-        let mut budget = ai_shared::SpendBudget::new(
+        let budget = SpendBudget::new(
             view.snapshot.steel,
             view.snapshot.oil,
             view.snapshot.supply_used,
             view.snapshot.supply_cap,
         );
-        let mut reserved_workers = HashSet::new();
-        let mut out = Vec::new();
+        let mut actions = AiActionContext::new(&facts, budget);
 
         // Build tech before spending the early economy on extra workers.
         let needs_barracks = complete_barracks.len() < self.target_barracks
             && barracks_count < self.target_barracks + 1;
         if needs_barracks {
-            if let Some(cmd) = self.build_if_affordable(
-                view,
-                EntityKind::Barracks,
-                &mut budget,
-                &builder_workers,
-                &mut reserved_workers,
-            ) {
-                out.push(cmd);
-            }
+            self.build_if_affordable(view, EntityKind::Barracks, &mut actions, &builder_workers);
         }
 
         let wants_depot = !depot_under_construction
             && (view.snapshot.supply_cap < config::INDUSTRIAL_CENTER_SUPPLY + config::DEPOT_SUPPLY
-                || budget.free_supply() <= 4
+                || actions.budget().free_supply() <= 4
                 || (depot_count == 0 && !complete_barracks.is_empty()));
         if wants_depot {
-            if let Some(cmd) = self.build_if_affordable(
-                view,
-                EntityKind::Depot,
-                &mut budget,
-                &builder_workers,
-                &mut reserved_workers,
-            ) {
-                out.push(cmd);
-            }
+            self.build_if_affordable(view, EntityKind::Depot, &mut actions, &builder_workers);
         }
 
         let needs_tank_factory = !complete_barracks.is_empty() && tank_factory_count == 0;
         if needs_tank_factory {
-            if let Some(cmd) = self.build_if_affordable(
+            self.build_if_affordable(
                 view,
                 EntityKind::TankFactory,
-                &mut budget,
+                &mut actions,
                 &builder_workers,
-                &mut reserved_workers,
-            ) {
-                out.push(cmd);
-            }
+            );
         }
 
-        for industrial_center in industrial_centers {
-            if workers.len() >= target_workers {
-                break;
-            }
-            if industrial_center.queue_len > 0 {
-                continue;
-            }
-            if !budget.can_afford_unit(EntityKind::Worker) {
-                break;
-            }
-            out.push(Command::Train {
-                building: industrial_center.id,
-                unit: kinds::WORKER.to_string(),
-            });
-            let reserved = budget.reserve_unit(EntityKind::Worker);
-            debug_assert!(reserved);
-        }
+        actions::train_units(
+            &mut actions,
+            TrainUnitsRequest {
+                buildings: industrial_centers,
+                unit_priorities: &[EntityKind::Worker],
+                max_queue_depth: 1,
+                save_for_tech: false,
+                current_counts: &[(EntityKind::Worker, workers.len())],
+                max_counts: &[(EntityKind::Worker, target_workers)],
+            },
+        );
 
         let saving_for_first_tank =
             needs_tank_factory || (tank_count == 0 && !complete_tank_factories.is_empty());
-        if !saving_for_first_tank {
-            for rax in complete_barracks {
-                if rax.queue_len > 0 {
-                    continue;
-                }
+        actions::train_units(
+            &mut actions,
+            TrainUnitsRequest {
+                buildings: complete_barracks,
+                unit_priorities: &[EntityKind::Rifleman],
+                max_queue_depth: 1,
+                save_for_tech: saving_for_first_tank,
+                current_counts: &[],
+                max_counts: &[],
+            },
+        );
 
-                if !budget.can_afford_unit(EntityKind::Rifleman) {
-                    continue;
-                }
-                out.push(Command::Train {
-                    building: rax.id,
-                    unit: kinds::RIFLEMAN.to_string(),
-                });
-                let reserved = budget.reserve_unit(EntityKind::Rifleman);
-                debug_assert!(reserved);
-            }
-        }
+        actions::train_units(
+            &mut actions,
+            TrainUnitsRequest {
+                buildings: complete_tank_factories,
+                unit_priorities: &[EntityKind::Tank],
+                max_queue_depth: 1,
+                save_for_tech: false,
+                current_counts: &[(EntityKind::Tank, tank_count)],
+                max_counts: &[(EntityKind::Tank, 1)],
+            },
+        );
 
-        for factory in complete_tank_factories {
-            if tank_count > 0 || factory.queue_len > 0 {
-                continue;
-            }
-            if !budget.can_afford_unit(EntityKind::Tank) {
-                continue;
-            }
-            out.push(Command::Train {
-                building: factory.id,
-                unit: kinds::TANK.to_string(),
-            });
-            let reserved = budget.reserve_unit(EntityKind::Tank);
-            debug_assert!(reserved);
-        }
-
-        self.assign_workers(view, &workers, &reserved_workers, &mut out);
+        self.assign_workers(view, &observation, &mut actions);
 
         let has_tech_unit = tank_count > 0;
         let attack_due = view.tick.saturating_sub(self.last_attack_tick) >= ATTACK_REISSUE_TICKS;
         if has_tech_unit && attack_due {
             let wave_size = 3 + self.wave_number;
-            let Some(combat_units) =
-                ai_shared::ready_attack_wave(own.iter().copied(), wave_size, |e| {
-                    (is_kind(e, EntityKind::Rifleman) || is_kind(e, EntityKind::Tank))
-                        .then_some(e.id)
-                })
+            let ready_combat = actions::select_ready_combat_units(
+                &observation.owned,
+                &[EntityKind::Rifleman, EntityKind::Tank],
+            );
+            let Some(combat_units) = actions::ready_attack_wave(ready_combat, wave_size, Some)
             else {
-                return out;
+                return actions.into_commands();
             };
             let (x, y) = combat_rendezvous_world(view);
-            out.push(Command::AttackMove {
-                units: combat_units,
-                x,
-                y,
-            });
+            actions::attack_move_units(&mut actions, combat_units, x, y);
             self.last_attack_tick = view.tick;
             self.wave_number += 1;
         }
 
-        out
+        actions.into_commands()
     }
 }
 
@@ -473,126 +438,103 @@ impl BuildTechAttackScript {
         &mut self,
         view: PlayerView<'_>,
         building: EntityKind,
-        budget: &mut ai_shared::SpendBudget,
-        idle_workers: &[u32],
-        reserved_workers: &mut HashSet<u32>,
-    ) -> Option<Command> {
-        // Local steel debit is a conservative reservation, not a mirror of server state:
-        // under the "reserve on arrival" build model the server only deducts when the
-        // worker arrives at the site. The script over-reserves locally to avoid
-        // double-spending across decision ticks.
-        if !budget.can_afford_building(building) {
-            return None;
-        }
-        let worker = idle_workers
-            .iter()
-            .copied()
-            .find(|id| !reserved_workers.contains(id))?;
+        actions: &mut AiActionContext<'_>,
+        builder_workers: &[u32],
+    ) -> Option<actions::BuildAction> {
         let empty = BTreeSet::new();
         let skip = self.failed_build_spots.get(&building).unwrap_or(&empty);
         let start = own_start_tile(view.start, view.player_id)?;
-        let (tile_x, tile_y) =
-            find_build_spot(&view.start.map, view.snapshot, start, building, skip)?;
-        reserved_workers.insert(worker);
-        self.pending_builds
-            .insert(worker, (building, tile_x, tile_y, view.tick));
-        let reserved = budget.reserve_building(building);
-        debug_assert!(reserved);
-        Some(Command::Build {
-            worker,
-            building: building.to_protocol_str().to_string(),
-            tile_x,
-            tile_y,
-        })
+        let occupied = occupied_tiles_from_snapshot(&view.start.map, view.snapshot);
+        let action = actions::try_build(
+            actions,
+            &[builder_workers],
+            BuildPlacementRequest {
+                building,
+                map_width: view.start.map.width,
+                map_height: view.start.map.height,
+                start_tile: start,
+                search: ai_shared::BuildSearch::default(),
+                skip_tiles: skip,
+                placeable: |tx, ty| {
+                    footprint_placeable_from_snapshot(&view.start.map, building, tx, ty, &occupied)
+                },
+            },
+        )?;
+        self.pending_builds.insert(
+            action.worker,
+            (building, action.tile_x, action.tile_y, view.tick),
+        );
+        Some(action)
     }
 
     fn assign_workers(
         &mut self,
         view: PlayerView<'_>,
-        workers: &[&EntityView],
-        reserved_workers: &HashSet<u32>,
-        out: &mut Vec<Command>,
+        observation: &AiObservation,
+        actions: &mut AiActionContext<'_>,
     ) {
-        let steel_nodes: Vec<&EntityView> = view
-            .snapshot
-            .entities
+        let has_steel = observation
+            .resources
             .iter()
-            .filter(|e| {
-                e.owner == 0 && is_kind(e, EntityKind::Steel) && e.remaining.unwrap_or(0) > 0
-            })
-            .collect();
-        let oil_nodes: Vec<&EntityView> = view
-            .snapshot
-            .entities
+            .any(|node| node.kind == EntityKind::Steel && node.remaining > 0);
+        let has_oil = observation
+            .resources
             .iter()
-            .filter(|e| e.owner == 0 && is_kind(e, EntityKind::Oil) && e.remaining.unwrap_or(0) > 0)
-            .collect();
-        if steel_nodes.is_empty() && oil_nodes.is_empty() {
+            .any(|node| node.kind == EntityKind::Oil && node.remaining > 0);
+        if !has_steel && !has_oil {
             return;
         }
-
-        let mut sorted_workers: Vec<&EntityView> = workers.to_vec();
-        sorted_workers.sort_by_key(|w| w.id);
 
         let can_assign_oil = self.assigned_oil_workers.len() < self.oil_workers
             && view.tick > 0
             && view.tick.saturating_sub(self.last_oil_assignment_tick) >= 90
-            && !oil_nodes.is_empty()
+            && has_oil
             && view
                 .snapshot
                 .entities
                 .iter()
                 .any(|e| e.owner == view.player_id && is_kind(e, EntityKind::Barracks));
-        let mut assigned_nodes: HashSet<u32> = HashSet::new();
+        let latched_nodes: BTreeSet<u32> = observation
+            .owned
+            .iter()
+            .filter_map(|worker| worker.latched_node)
+            .collect();
         if can_assign_oil {
-            let mut assigned = 0usize;
-            for worker in &sorted_workers {
-                if assigned >= self.oil_workers {
-                    break;
-                }
-                if reserved_workers.contains(&worker.id) {
-                    continue;
-                }
-                if worker.state == states::BUILD {
-                    continue;
-                }
-                if worker.latched_node.is_some() {
-                    continue;
-                }
-                if let Some(node) = nearest_unassigned_node(worker, &oil_nodes, &assigned_nodes) {
-                    out.push(Command::Gather {
-                        units: vec![worker.id],
-                        node,
-                    });
-                    self.assigned_oil_workers.insert(worker.id);
-                    assigned += 1;
-                    assigned_nodes.insert(node);
-                }
+            let remaining_oil_workers = self
+                .oil_workers
+                .saturating_sub(self.assigned_oil_workers.len());
+            let assigned = actions::assign_workers_to_resource(
+                actions,
+                ResourceAssignmentPolicy {
+                    workers: &observation.owned,
+                    resources: &observation.resources,
+                    resource_kind: EntityKind::Oil,
+                    candidate_worker_ids: None,
+                    skip_workers: &self.assigned_oil_workers,
+                    pre_reserved_nodes: &latched_nodes,
+                    idle_only: false,
+                    max_assignments: Some(remaining_oil_workers),
+                },
+            );
+            for assignment in assigned {
+                self.assigned_oil_workers.insert(assignment.worker);
             }
             self.last_oil_assignment_tick = view.tick;
         }
 
-        for worker in sorted_workers {
-            if reserved_workers.contains(&worker.id) {
-                continue;
-            }
-            if self.assigned_oil_workers.contains(&worker.id) {
-                continue;
-            }
-            if self.initial_gather_sent && worker.state != states::IDLE {
-                continue;
-            }
-            if worker.latched_node.is_some() {
-                continue;
-            }
-            if let Some(node) = nearest_unassigned_node(worker, &steel_nodes, &assigned_nodes) {
-                out.push(Command::Gather {
-                    units: vec![worker.id],
-                    node,
-                });
-                assigned_nodes.insert(node);
-            }
-        }
+        actions::assign_workers_to_resource(
+            actions,
+            ResourceAssignmentPolicy {
+                workers: &observation.owned,
+                resources: &observation.resources,
+                resource_kind: EntityKind::Steel,
+                candidate_worker_ids: None,
+                skip_workers: &self.assigned_oil_workers,
+                pre_reserved_nodes: &latched_nodes,
+                idle_only: self.initial_gather_sent,
+                max_assignments: None,
+            },
+        );
         self.initial_gather_sent = true;
     }
 }
@@ -632,17 +574,6 @@ impl ScriptedPlayer for EconomyScript {
             return Vec::new();
         }
 
-        let own: Vec<&EntityView> = view
-            .snapshot
-            .entities
-            .iter()
-            .filter(|e| e.owner == view.player_id)
-            .collect();
-        let workers: Vec<&EntityView> = own
-            .iter()
-            .copied()
-            .filter(|e| is_kind(e, EntityKind::Worker))
-            .collect();
         let Some(observation) = view.observation([]) else {
             return Vec::new();
         };
@@ -650,72 +581,59 @@ impl ScriptedPlayer for EconomyScript {
         let industrial_centers = facts.production_buildings(EntityKind::IndustrialCenter);
         let target_workers = facts.target_steel_workers.min(SCRIPT_STEEL_WORKER_CAP);
 
-        let mut builder_workers: Vec<u32> = workers
+        let mut builder_workers: Vec<u32> = observation
+            .owned
             .iter()
-            .filter(|e| e.state == states::IDLE)
+            .filter(|e| e.kind == EntityKind::Worker && e.state == AiEntityState::Idle)
             .map(|e| e.id)
             .collect();
         builder_workers.sort_unstable();
         builder_workers.extend(
-            workers
+            observation
+                .owned
                 .iter()
-                .filter(|e| e.state != states::IDLE && e.state != states::BUILD)
+                .filter(|e| e.kind == EntityKind::Worker)
+                .filter(|e| e.state != AiEntityState::Idle && e.state != AiEntityState::Build)
                 .map(|e| e.id),
         );
 
         let depot_under_construction = facts.depot_in_progress;
-        let mut budget = ai_shared::SpendBudget::new(
+        let budget = SpendBudget::new(
             view.snapshot.steel,
             view.snapshot.oil,
             view.snapshot.supply_used,
             view.snapshot.supply_cap,
         );
-        let mut reserved_workers = HashSet::new();
-        let mut out = Vec::new();
+        let mut actions = AiActionContext::new(&facts, budget);
 
         if !depot_under_construction
-            && budget.free_supply() <= 2
+            && actions.budget().free_supply() <= 2
             && view.snapshot.supply_cap < config::SUPPLY_CAP_MAX
         {
-            if let Some(cmd) = build_near_own_start_if_affordable(
+            build_near_own_start_if_affordable(
                 view,
                 EntityKind::Depot,
-                &mut budget,
+                &mut actions,
                 &builder_workers,
-                &mut reserved_workers,
-            ) {
-                out.push(cmd);
-            }
+            );
         }
 
-        for industrial_center in industrial_centers {
-            if workers.len() >= target_workers {
-                break;
-            }
-            if industrial_center.queue_len > 0 {
-                continue;
-            }
-            if !budget.can_afford_unit(EntityKind::Worker) {
-                break;
-            }
-            out.push(Command::Train {
-                building: industrial_center.id,
-                unit: kinds::WORKER.to_string(),
-            });
-            let reserved = budget.reserve_unit(EntityKind::Worker);
-            debug_assert!(reserved);
-        }
-
-        assign_steel_workers(
-            view,
-            &workers,
-            &reserved_workers,
-            self.initial_gather_sent,
-            &mut out,
+        actions::train_units(
+            &mut actions,
+            TrainUnitsRequest {
+                buildings: industrial_centers,
+                unit_priorities: &[EntityKind::Worker],
+                max_queue_depth: 1,
+                save_for_tech: false,
+                current_counts: &[(EntityKind::Worker, facts.worker_count)],
+                max_counts: &[(EntityKind::Worker, target_workers)],
+            },
         );
+
+        assign_steel_workers(&observation, &mut actions, self.initial_gather_sent);
         self.initial_gather_sent = true;
 
-        out
+        actions.into_commands()
     }
 }
 
@@ -773,12 +691,22 @@ impl ScriptedPlayer for WorkerRushScript {
         let Some((x, y)) = player_start_world(view.start, self.target_player_id) else {
             return Vec::new();
         };
+        let Some(observation) = view.observation([]) else {
+            return Vec::new();
+        };
+        let facts = AiFacts::from_observation(&observation);
+        let mut actions = AiActionContext::new(
+            &facts,
+            SpendBudget::new(
+                view.snapshot.steel,
+                view.snapshot.oil,
+                view.snapshot.supply_used,
+                view.snapshot.supply_cap,
+            ),
+        );
         self.last_attack_tick = view.tick;
-        vec![Command::AttackMove {
-            units: workers,
-            x,
-            y,
-        }]
+        actions::attack_move_units(&mut actions, workers, x, y);
+        actions.into_commands()
     }
 }
 
@@ -1714,76 +1642,60 @@ fn production_queue_len(entity: &EntityView) -> u32 {
 fn build_near_own_start_if_affordable(
     view: PlayerView<'_>,
     building: EntityKind,
-    budget: &mut ai_shared::SpendBudget,
+    actions: &mut AiActionContext<'_>,
     builder_workers: &[u32],
-    reserved_workers: &mut HashSet<u32>,
-) -> Option<Command> {
-    if !budget.can_afford_building(building) {
-        return None;
-    }
-    let worker = builder_workers
-        .iter()
-        .copied()
-        .find(|id| !reserved_workers.contains(id))?;
+) -> Option<actions::BuildAction> {
     let start = own_start_tile(view.start, view.player_id)?;
     let empty = BTreeSet::new();
-    let (tile_x, tile_y) =
-        find_build_spot(&view.start.map, view.snapshot, start, building, &empty)?;
-    reserved_workers.insert(worker);
-    let reserved = budget.reserve_building(building);
-    debug_assert!(reserved);
-    Some(Command::Build {
-        worker,
-        building: building.to_protocol_str().to_string(),
-        tile_x,
-        tile_y,
-    })
+    let occupied = occupied_tiles_from_snapshot(&view.start.map, view.snapshot);
+    actions::try_build(
+        actions,
+        &[builder_workers],
+        BuildPlacementRequest {
+            building,
+            map_width: view.start.map.width,
+            map_height: view.start.map.height,
+            start_tile: start,
+            search: ai_shared::BuildSearch::default(),
+            skip_tiles: &empty,
+            placeable: |tx, ty| {
+                footprint_placeable_from_snapshot(&view.start.map, building, tx, ty, &occupied)
+            },
+        },
+    )
 }
 
 fn assign_steel_workers(
-    view: PlayerView<'_>,
-    workers: &[&EntityView],
-    reserved_workers: &HashSet<u32>,
+    observation: &AiObservation,
+    actions: &mut AiActionContext<'_>,
     initial_gather_sent: bool,
-    out: &mut Vec<Command>,
 ) {
-    let steel_nodes: Vec<&EntityView> = view
-        .snapshot
-        .entities
+    let has_steel = observation
+        .resources
         .iter()
-        .filter(|e| e.owner == 0 && is_kind(e, EntityKind::Steel) && e.remaining.unwrap_or(0) > 0)
-        .collect();
-    if steel_nodes.is_empty() {
+        .any(|node| node.kind == EntityKind::Steel && node.remaining > 0);
+    if !has_steel {
         return;
     }
-
-    let mut assigned_nodes: HashSet<u32> = HashSet::new();
-    for w in workers {
-        if let Some(node) = w.latched_node {
-            assigned_nodes.insert(node);
-        }
-    }
-
-    let mut sorted_workers = workers.to_vec();
-    sorted_workers.sort_by_key(|w| w.id);
-    for worker in sorted_workers {
-        if reserved_workers.contains(&worker.id) || worker.state == states::BUILD {
-            continue;
-        }
-        if initial_gather_sent && worker.state != states::IDLE {
-            continue;
-        }
-        if worker.latched_node.is_some() {
-            continue;
-        }
-        if let Some(node) = nearest_unassigned_node(worker, &steel_nodes, &assigned_nodes) {
-            out.push(Command::Gather {
-                units: vec![worker.id],
-                node,
-            });
-            assigned_nodes.insert(node);
-        }
-    }
+    let latched_nodes: BTreeSet<u32> = observation
+        .owned
+        .iter()
+        .filter_map(|worker| worker.latched_node)
+        .collect();
+    let skipped_workers = BTreeSet::new();
+    actions::assign_workers_to_resource(
+        actions,
+        ResourceAssignmentPolicy {
+            workers: &observation.owned,
+            resources: &observation.resources,
+            resource_kind: EntityKind::Steel,
+            candidate_worker_ids: None,
+            skip_workers: &skipped_workers,
+            pre_reserved_nodes: &latched_nodes,
+            idle_only: initial_gather_sent,
+            max_assignments: None,
+        },
+    );
 }
 
 fn own_start_tile(start: &StartPayload, player_id: u32) -> Option<(u32, u32)> {
@@ -1816,43 +1728,6 @@ fn combat_rendezvous_world(view: PlayerView<'_>) -> (f32, f32) {
     }
     let step = (4.0 * view.start.map.tile_size as f32).min(dist);
     (start.0 + dx / dist * step, start.1 + dy / dist * step)
-}
-
-fn nearest_unassigned_node(
-    worker: &EntityView,
-    nodes: &[&EntityView],
-    assigned: &HashSet<u32>,
-) -> Option<u32> {
-    let mut best = None;
-    for node in nodes {
-        if assigned.contains(&node.id) {
-            continue;
-        }
-        let d = dist2(worker.x, worker.y, node.x, node.y);
-        if best.map(|(_, bd)| d < bd).unwrap_or(true) {
-            best = Some((node.id, d));
-        }
-    }
-    best.map(|(id, _)| id)
-}
-
-fn dist2(ax: f32, ay: f32, bx: f32, by: f32) -> f32 {
-    let dx = ax - bx;
-    let dy = ay - by;
-    dx * dx + dy * dy
-}
-
-fn find_build_spot(
-    map: &MapInfo,
-    snapshot: &Snapshot,
-    start: (u32, u32),
-    building: EntityKind,
-    skip: &BTreeSet<(u32, u32)>,
-) -> Option<(u32, u32)> {
-    let occupied = occupied_tiles_from_snapshot(map, snapshot);
-    ai_shared::find_build_spot_near_start(map.width, map.height, start, building, skip, |tx, ty| {
-        footprint_placeable_from_snapshot(map, building, tx, ty, &occupied)
-    })
 }
 
 fn occupied_tiles_from_snapshot(map: &MapInfo, snapshot: &Snapshot) -> BTreeSet<(u32, u32)> {
@@ -2053,23 +1928,22 @@ impl ScriptedPlayer for MineOnlyScript {
             return Vec::new();
         }
 
-        let workers: Vec<&EntityView> = view
-            .snapshot
-            .entities
-            .iter()
-            .filter(|e| e.owner == view.player_id && is_kind(e, EntityKind::Worker))
-            .collect();
-
-        let mut out = Vec::new();
-        assign_steel_workers(
-            view,
-            &workers,
-            &HashSet::new(),
-            self.initial_gather_sent,
-            &mut out,
+        let Some(observation) = view.observation([]) else {
+            return Vec::new();
+        };
+        let facts = AiFacts::from_observation(&observation);
+        let mut actions = AiActionContext::new(
+            &facts,
+            SpendBudget::new(
+                view.snapshot.steel,
+                view.snapshot.oil,
+                view.snapshot.supply_used,
+                view.snapshot.supply_cap,
+            ),
         );
+        assign_steel_workers(&observation, &mut actions, self.initial_gather_sent);
         self.initial_gather_sent = true;
-        out
+        actions.into_commands()
     }
 }
 

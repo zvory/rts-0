@@ -4,5 +4,6 @@
 //! the narrow compatibility layer that turns both surfaces into stable, deterministic summaries
 //! before later phases synthesize commands.
 
+pub(crate) mod actions;
 pub(crate) mod facts;
 pub(crate) mod observation;
