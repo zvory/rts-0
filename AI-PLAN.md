@@ -152,49 +152,34 @@ Practical interpretation:
 
 Intent:
 
-- pressure quickly
-- train fewer extra workers before committing to production
-- build early rifle production
-- attack with smaller waves
-
-Use for:
-
-- early aggression coverage
-- pressure against tech-heavy opponents
-- a realistic replacement for worker-rush-adjacent scripts where appropriate
+- build one engineer
+- mine steel with all engineers, except one which goes to the middle of the map
+- engineer in middle of map creates a barracks at 150 steel and returns home
+- nonstop rifleman production from the centre barracks
+- riflemen attack the enemy
+- after building a supply depot at 10, transition to another profile?
 
 ### `rifle_flood_full_saturation`
 
 Intent:
 
-- saturate the starting steel economy first
-- scale rifle production after the economy is stable
-- attack later with larger waves
 
-Use for:
+economic priorities:
+- build supply depots if low headroom
+- build workers until main steel patch is saturated
+- build riflemen
+- if everything else is in progress and there's >300 steel, build barracks
 
-- economy-first macro coverage
-- supply planning coverage
-- worker assignment regression coverage
+riflemen are sent to attack the enemy in increasing wave sizes, and the riflemen try to attack in a line
 
 ### `tech_to_tanks`
 
 Intent:
 
-- assign oil workers
-- build the prerequisite chain
-- save for key tech moments
-- produce tanks
-- attack with a mixed rifleman/tank army
-
-Use for:
-
-- oil economy coverage
-- prerequisite coverage
-- tank factory and tank production coverage
-
-Older notes may call this profile `tech_tree`. New code and docs should prefer
-`tech_to_tanks`.
+- standard play
+- should have constant worker production until steel then oil are saturated
+- should make defensive riflemen at first, then MGs for defense, and then mass tanks
+- tanks attack the enemy in increasing waves
 
 ## Cross-Cutting Rules
 
