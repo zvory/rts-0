@@ -737,7 +737,10 @@ impl ProfileBackedScript {
             match intent {
                 AiIntent::Attack { units } => attacking.extend(units.iter().copied()),
                 AiIntent::Stage { units } => staging.extend(units.iter().copied()),
-                AiIntent::Build { .. } | AiIntent::Train { .. } | AiIntent::Gather { .. } => {}
+                AiIntent::Move { .. }
+                | AiIntent::Build { .. }
+                | AiIntent::Train { .. }
+                | AiIntent::Gather { .. } => {}
             }
         }
         for id in &attacking {
@@ -2242,10 +2245,10 @@ fn rifle_flood_fast_goal() -> PlayerMilestoneGoal {
         require_barracks_complete: true,
         ..PlayerMilestoneGoal::default()
     }
-    .with_min_workers(6)
+    .with_min_workers(config::STARTING_WORKERS + 1)
     .with_min_supply_cap(config::INDUSTRIAL_CENTER_SUPPLY + config::DEPOT_SUPPLY)
-    .with_min_units(kinds::RIFLEMAN, 3)
-    .with_min_attack_command_units(3)
+    .with_min_units(kinds::RIFLEMAN, 1)
+    .with_min_attack_command_units(1)
 }
 
 fn rifle_flood_full_saturation_goal() -> PlayerMilestoneGoal {

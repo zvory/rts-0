@@ -8,7 +8,7 @@ use crate::game::ai_core::actions::{
     TrainUnitsRequest,
 };
 use crate::game::ai_core::facts::AiFacts;
-use crate::game::ai_core::observation::{AiEntitySummary, AiObservation};
+use crate::game::ai_core::observation::{AiEntityState, AiEntitySummary, AiObservation};
 use crate::game::ai_core::profiles::AiProfile;
 use crate::game::ai_shared;
 use crate::game::entity::EntityKind;
@@ -33,6 +33,9 @@ pub(crate) struct AiDecision {
 
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) enum AiIntent {
+    Move {
+        units: Vec<u32>,
+    },
     Build {
         kind: EntityKind,
     },
@@ -56,6 +59,7 @@ pub(crate) struct AiDecisionMemory {
     profile_id: Option<&'static str>,
     next_attack_size: usize,
     last_attack_tick: Option<u32>,
+    proxy_worker_id: Option<u32>,
 }
 
 impl AiDecisionMemory {
@@ -64,6 +68,7 @@ impl AiDecisionMemory {
             profile_id: Some(profile.id),
             next_attack_size: profile.attack.first_attack_size,
             last_attack_tick: None,
+            proxy_worker_id: None,
         }
     }
 
@@ -100,6 +105,7 @@ impl AiDecisionMemory {
         self.profile_id = Some(profile.id);
         self.next_attack_size = profile.attack.first_attack_size;
         self.last_attack_tick = None;
+        self.proxy_worker_id = None;
     }
 }
 
@@ -132,6 +138,20 @@ where
     gathering_builders.sort_unstable();
     let builder_pools = [idle_builders.as_slice(), gathering_builders.as_slice()];
     let save_for_required_tech_building = should_save_for_required_tech_building(&facts, profile);
+    let proxy_barracks_active = should_use_proxy_barracks(&facts, profile);
+
+    if proxy_barracks_active {
+        if let Some(intent) = try_proxy_barracks(
+            observation,
+            &facts,
+            &mut actions,
+            memory,
+            profile,
+            &mut placeable,
+        ) {
+            intents.push(intent);
+        }
+    }
 
     if wants_depot(&facts, profile)
         && (!save_for_required_tech_building
@@ -154,6 +174,9 @@ where
     }
 
     for kind in profile.buildings.required_tech_path {
+        if proxy_barracks_active && *kind == EntityKind::Barracks {
+            continue;
+        }
         if facts.building_count(*kind) + planned_in_intents(&intents, *kind) > 0 {
             continue;
         }
@@ -189,6 +212,7 @@ where
     if facts.building_count(EntityKind::Barracks)
         + planned_in_intents(&intents, EntityKind::Barracks)
         < target_barracks
+        && !(proxy_barracks_active && facts.building_count(EntityKind::Barracks) == 0)
         && planned_in_intents(&intents, EntityKind::Barracks) == 0
         && try_build_kind(
             observation,
@@ -368,6 +392,130 @@ where
         intents,
         commands: actions.into_commands(),
     }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn try_proxy_barracks<F>(
+    observation: &AiObservation,
+    facts: &AiFacts,
+    actions: &mut AiActionContext<'_>,
+    memory: &mut AiDecisionMemory,
+    profile: &AiProfile,
+    placeable: &mut F,
+) -> Option<AiIntent>
+where
+    F: FnMut(EntityKind, u32, u32) -> bool,
+{
+    let policy = profile.buildings.proxy_barracks?;
+    let kind = EntityKind::Barracks;
+    if !rules::economy::build_requirement_met(kind, facts.complete_building_kinds()) {
+        return None;
+    }
+    let counts = facts.building_counts(kind);
+    if counts.total_planned() > 0 {
+        return None;
+    }
+    let (tile_x, tile_y) =
+        proxy_barracks_site(observation, kind, policy.search_radius_tiles, placeable)?;
+    let worker = select_proxy_worker(observation, facts, memory)?;
+    let worker_pool = [worker];
+
+    if actions::try_build_at(actions, &[&worker_pool], kind, tile_x, tile_y).is_some() {
+        memory.proxy_worker_id = Some(worker);
+        return Some(AiIntent::Build { kind });
+    }
+
+    if !actions.reserve_worker(worker) {
+        return None;
+    }
+    let (x, y) = building_center((tile_x, tile_y), kind, observation.map.tile_size)?;
+    actions.emit_command(Command::Move {
+        units: vec![worker],
+        x,
+        y,
+    });
+    Some(AiIntent::Move {
+        units: vec![worker],
+    })
+}
+
+fn should_use_proxy_barracks(facts: &AiFacts, profile: &AiProfile) -> bool {
+    profile.buildings.proxy_barracks.is_some() && facts.building_count(EntityKind::Barracks) == 0
+}
+
+fn proxy_barracks_site<F>(
+    observation: &AiObservation,
+    kind: EntityKind,
+    search_radius_tiles: i32,
+    placeable: &mut F,
+) -> Option<(u32, u32)>
+where
+    F: FnMut(EntityKind, u32, u32) -> bool,
+{
+    let empty = BTreeSet::new();
+    let center = (observation.map.width / 2, observation.map.height / 2);
+    ai_shared::find_build_spot_near_start_with(
+        observation.map.width,
+        observation.map.height,
+        center,
+        kind,
+        ai_shared::BuildSearch {
+            min_radius: 0,
+            max_radius: search_radius_tiles,
+            prefer_away_from_center: false,
+        },
+        &empty,
+        |tx, ty| placeable(kind, tx, ty),
+    )
+}
+
+fn select_proxy_worker(
+    observation: &AiObservation,
+    facts: &AiFacts,
+    memory: &mut AiDecisionMemory,
+) -> Option<u32> {
+    let workers_by_id: BTreeMap<u32, &AiEntitySummary> = observation
+        .owned
+        .iter()
+        .filter(|entity| entity.kind == EntityKind::Worker)
+        .map(|entity| (entity.id, entity))
+        .collect();
+    if let Some(worker) = memory
+        .proxy_worker_id
+        .and_then(|id| workers_by_id.get(&id).copied())
+    {
+        if worker.state != AiEntityState::Build {
+            return Some(worker.id);
+        }
+    }
+
+    let mut candidates = facts.idle_workers.clone();
+    candidates.extend(facts.gathering_workers.iter().copied());
+    candidates.extend(facts.build_capable_workers.iter().copied());
+    candidates.sort_unstable();
+    candidates.dedup();
+
+    for worker_id in candidates {
+        let Some(worker) = workers_by_id.get(&worker_id).copied() else {
+            continue;
+        };
+        if worker.state == AiEntityState::Build {
+            continue;
+        }
+        memory.proxy_worker_id = Some(worker.id);
+        return Some(worker.id);
+    }
+    memory.proxy_worker_id = None;
+    None
+}
+
+fn building_center(tile: (u32, u32), kind: EntityKind, tile_size: u32) -> Option<(f32, f32)> {
+    let stats = config::building_stats(kind)?;
+    let tile_size = tile_size as f32;
+    Some((
+        tile.0 as f32 * tile_size + stats.foot_w as f32 * tile_size * 0.5,
+        tile.1 as f32 * tile_size + stats.foot_h as f32 * tile_size * 0.5,
+    ))
 }
 
 fn wants_depot(facts: &AiFacts, profile: &AiProfile) -> bool {
@@ -780,6 +928,7 @@ mod tests {
         profile: &'static AiProfile,
         memory: &mut AiDecisionMemory,
     ) -> AiDecision {
+        let center = (observation.map.width / 2, observation.map.height / 2);
         decide_profile(
             observation,
             profile,
@@ -789,8 +938,123 @@ mod tests {
                 max_radius: 0,
                 prefer_away_from_center: false,
             },
-            |_, tx, ty| (tx, ty) == observation.own_start_tile,
+            |_, tx, ty| (tx, ty) == observation.own_start_tile || (tx, ty) == center,
         )
+    }
+
+    #[test]
+    fn fast_flood_sends_proxy_worker_before_barracks_is_affordable() {
+        let mut owned = vec![building(10, EntityKind::IndustrialCenter, Some(0))];
+        owned.extend((0..4).map(|i| worker(20 + i, AiEntityState::Idle)));
+        let observation = observation(
+            AiEconomy {
+                steel: config::STARTING_STEEL,
+                oil: 0,
+                supply_used: config::STARTING_WORKERS,
+                supply_cap: config::INDUSTRIAL_CENTER_SUPPLY,
+            },
+            owned,
+        );
+
+        let decision = decide(
+            &observation,
+            &RIFLE_FLOOD_FAST,
+            &mut AiDecisionMemory::for_profile(&RIFLE_FLOOD_FAST),
+        );
+
+        assert!(decision.intents.iter().any(|intent| {
+            matches!(
+                intent,
+                AiIntent::Move { units } if units.as_slice() == [20]
+            )
+        }));
+        assert!(decision.commands.iter().any(|command| {
+            matches!(
+                command,
+                Command::Move { units, x, y }
+                    if units.as_slice() == [20]
+                        && *x > 0.0
+                        && *y > 0.0
+            )
+        }));
+        assert!(
+            !decision.commands.iter().any(|command| {
+                matches!(
+                    command,
+                    Command::Build { building, .. }
+                        if building == EntityKind::Barracks.to_protocol_str()
+                )
+            }),
+            "the proxy worker should move out before the barracks is affordable"
+        );
+        assert!(decision.intents.contains(&AiIntent::Train {
+            kind: EntityKind::Worker
+        }));
+    }
+
+    #[test]
+    fn fast_flood_stops_worker_training_after_one_extra_worker() {
+        let mut owned = vec![building(10, EntityKind::IndustrialCenter, Some(0))];
+        owned.extend((0..5).map(|i| worker(20 + i, AiEntityState::Idle)));
+        let observation = observation(
+            AiEconomy {
+                steel: 75,
+                oil: 0,
+                supply_used: 5,
+                supply_cap: config::INDUSTRIAL_CENTER_SUPPLY,
+            },
+            owned,
+        );
+
+        let decision = decide(
+            &observation,
+            &RIFLE_FLOOD_FAST,
+            &mut AiDecisionMemory::for_profile(&RIFLE_FLOOD_FAST),
+        );
+
+        assert!(!decision.intents.contains(&AiIntent::Train {
+            kind: EntityKind::Worker
+        }));
+    }
+
+    #[test]
+    fn fast_flood_builds_proxy_barracks_with_reserved_worker_once_affordable() {
+        let mut owned = vec![building(10, EntityKind::IndustrialCenter, Some(0))];
+        owned.push(worker(20, AiEntityState::Move));
+        owned.extend((0..4).map(|i| worker(21 + i, AiEntityState::Gather)));
+        let observation = observation(
+            AiEconomy {
+                steel: 150,
+                oil: 0,
+                supply_used: 5,
+                supply_cap: config::INDUSTRIAL_CENTER_SUPPLY,
+            },
+            owned,
+        );
+        let mut memory = AiDecisionMemory::for_profile(&RIFLE_FLOOD_FAST);
+        memory.proxy_worker_id = Some(20);
+
+        let decision = decide(&observation, &RIFLE_FLOOD_FAST, &mut memory);
+
+        assert!(decision.intents.contains(&AiIntent::Build {
+            kind: EntityKind::Barracks
+        }));
+        assert!(decision.commands.iter().any(|command| {
+            matches!(
+                command,
+                Command::Build { worker, building, tile_x, tile_y }
+                    if *worker == 20
+                        && building == EntityKind::Barracks.to_protocol_str()
+                        && (*tile_x, *tile_y) == (observation.map.width / 2, observation.map.height / 2)
+            )
+        }));
+        assert!(
+            !decision
+                .commands
+                .iter()
+                .any(|command| matches!(command, Command::Move { units, .. } if units.as_slice() == [20])),
+            "the reserved proxy worker should build instead of receiving another move once affordable"
+        );
     }
 
     #[test]
@@ -1045,12 +1309,12 @@ mod tests {
     #[test]
     fn attack_memory_uses_profile_thresholds_and_growth() {
         let mut owned = Vec::new();
-        owned.extend((0..3).map(|i| combat(30 + i, EntityKind::Rifleman)));
+        owned.push(combat(30, EntityKind::Rifleman));
         let observation = observation(
             AiEconomy {
                 steel: 0,
                 oil: 0,
-                supply_used: 3,
+                supply_used: 1,
                 supply_cap: 10,
             },
             owned,
@@ -1063,13 +1327,13 @@ mod tests {
 
         assert!(fast.intents.iter().any(|intent| matches!(
             intent,
-            AiIntent::Attack { units } if units.len() == 3
+            AiIntent::Attack { units } if units.as_slice() == [30]
         )));
         assert!(full.intents.iter().any(|intent| matches!(
             intent,
-            AiIntent::Stage { units } if units.len() == 3
+            AiIntent::Stage { units } if units.as_slice() == [30]
         )));
-        assert_eq!(fast_memory.desired_attack_size(&RIFLE_FLOOD_FAST, 91), 4);
+        assert_eq!(fast_memory.desired_attack_size(&RIFLE_FLOOD_FAST, 91), 1);
     }
 
     #[test]
