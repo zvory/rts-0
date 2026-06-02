@@ -222,6 +222,7 @@ impl AiFacts {
             .unwrap_or(&[])
     }
 
+    #[allow(dead_code)]
     pub(crate) fn free_combat_units(&self, kind: EntityKind) -> &[u32] {
         self.free_combat_units
             .get(&kind)

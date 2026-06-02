@@ -2,6 +2,11 @@
 
 Move real lobby/gameplay AI from the monolithic controller path onto the shared AI core.
 
+Done. `AiController` now acts as the live adapter for `ai_core`: it owns the AI player id, the
+selected profile id, and `AiDecisionMemory`, then builds a live observation and delegates command
+synthesis to the shared profile decision loop. The default live profile is
+`rifle_flood_full_saturation`.
+
 This phase must preserve the current gameplay feature: host adds AI, match starts, AI grows its
 economy, builds production, attacks, and remains replay-deterministic.
 
