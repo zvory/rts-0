@@ -81,8 +81,14 @@ pub(crate) struct SupplyPolicy {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct BuildingPolicy {
     pub(crate) barracks_curve: BarracksCurve,
+    pub(crate) proxy_barracks: Option<ProxyBarracksPolicy>,
     pub(crate) required_tech_path: &'static [EntityKind],
     pub(crate) max_pending_per_kind: usize,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct ProxyBarracksPolicy {
+    pub(crate) search_radius_tiles: i32,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -156,14 +162,14 @@ pub(crate) static RIFLE_FLOOD_FAST: AiProfile = AiProfile {
     id: RIFLE_FLOOD_FAST_ID,
     workers: WorkerPolicy {
         steel_saturation_fraction: Ratio::new(1, 2),
-        steel_worker_cap: Some(8),
+        steel_worker_cap: Some(5),
         extra_oil_workers: 0,
-        pressure_worker_cap: Some(6),
+        pressure_worker_cap: Some(5),
         pressure_until_complete: Some(EntityKind::Barracks),
     },
     supply: SupplyPolicy {
-        free_supply_buffer: 3,
-        emergency_depot_threshold: 1,
+        free_supply_buffer: 6,
+        emergency_depot_threshold: 2,
     },
     buildings: BuildingPolicy {
         barracks_curve: BarracksCurve {
@@ -173,6 +179,9 @@ pub(crate) static RIFLE_FLOOD_FAST: AiProfile = AiProfile {
             banked_steel_step: 250,
             max: 4,
         },
+        proxy_barracks: Some(ProxyBarracksPolicy {
+            search_radius_tiles: 12,
+        }),
         required_tech_path: &FAST_TECH_PATH,
         max_pending_per_kind: 1,
     },
@@ -182,10 +191,10 @@ pub(crate) static RIFLE_FLOOD_FAST: AiProfile = AiProfile {
         save_for_first_tech_unit: None,
     },
     attack: AttackPolicy {
-        first_attack_size: 3,
-        wave_growth: 1,
-        regroup_reset_ticks: 360,
-        reissue_cadence_ticks: 90,
+        first_attack_size: 1,
+        wave_growth: 0,
+        regroup_reset_ticks: 120,
+        reissue_cadence_ticks: 30,
         stage_distance_tiles: 8.0,
         unit_kinds: &RIFLE_ONLY,
         required_unit: None,
@@ -216,6 +225,7 @@ pub(crate) static RIFLE_FLOOD_FULL_SATURATION: AiProfile = AiProfile {
             banked_steel_step: 250,
             max: 5,
         },
+        proxy_barracks: None,
         required_tech_path: &FULL_TECH_PATH,
         max_pending_per_kind: 1,
     },
@@ -259,6 +269,7 @@ pub(crate) static TECH_TO_TANKS: AiProfile = AiProfile {
             banked_steel_step: 0,
             max: 1,
         },
+        proxy_barracks: None,
         required_tech_path: &TANK_TECH_PATH,
         max_pending_per_kind: 1,
     },
@@ -320,14 +331,13 @@ mod tests {
 
     #[test]
     fn fast_flood_attacks_with_smaller_waves_than_full_saturation() {
-        assert!(
-            RIFLE_FLOOD_FAST.attack.first_attack_size
-                < RIFLE_FLOOD_FULL_SATURATION.attack.first_attack_size
-        );
+        assert_eq!(RIFLE_FLOOD_FAST.attack.first_attack_size, 1);
+        assert_eq!(RIFLE_FLOOD_FAST.attack.wave_growth, 0);
         assert!(
             RIFLE_FLOOD_FAST.production.queue_depth
                 < RIFLE_FLOOD_FULL_SATURATION.production.queue_depth
         );
+        assert!(RIFLE_FLOOD_FAST.buildings.proxy_barracks.is_some());
     }
 
     #[test]
@@ -356,7 +366,7 @@ mod tests {
             .workers
             .target_steel_workers(18, 0);
 
-        assert_eq!(fast_target, 6);
+        assert_eq!(fast_target, 5);
         assert_eq!(full_target, 18);
     }
 }

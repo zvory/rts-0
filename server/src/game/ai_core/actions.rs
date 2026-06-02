@@ -161,6 +161,10 @@ impl<'a> AiActionContext<'a> {
         }
         None
     }
+
+    pub(crate) fn reserve_worker(&mut self, worker: u32) -> bool {
+        self.reservations.reserve_worker(worker)
+    }
 }
 
 pub(crate) struct BuildPlacementRequest<'a, F>
@@ -204,19 +208,32 @@ where
         request.skip_tiles,
         &mut request.placeable,
     )?;
+    try_build_at(ctx, worker_pools, request.building, tile_x, tile_y)
+}
+
+pub(crate) fn try_build_at(
+    ctx: &mut AiActionContext<'_>,
+    worker_pools: &[&[u32]],
+    building: EntityKind,
+    tile_x: u32,
+    tile_y: u32,
+) -> Option<BuildAction> {
+    if !ctx.budget.can_afford_building(building) {
+        return None;
+    }
     let worker = ctx.reserve_worker_from_pools(worker_pools)?;
-    if !ctx.budget.reserve_building(request.building) {
+    if !ctx.budget.reserve_building(building) {
         return None;
     }
     ctx.emit_command(Command::Build {
         worker,
-        building: request.building.to_protocol_str().to_string(),
+        building: building.to_protocol_str().to_string(),
         tile_x,
         tile_y,
     });
     Some(BuildAction {
         worker,
-        building: request.building,
+        building,
         tile_x,
         tile_y,
     })
