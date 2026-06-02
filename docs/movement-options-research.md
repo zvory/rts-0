@@ -61,7 +61,9 @@ weapons turn.
 
 ## Product Requirements
 
-- Stationary units should not casually slide around when other units pass.
+- Idle units should be easy to shove aside when active movement needs space.
+- Units that are actively firing, holding, or deployed should not casually slide
+  around when other units pass.
 - Deployed machine gunners and future AT guns should feel planted.
 - Firing riflemen should have some footing, but should not behave like buildings.
 - Tanks need stable body direction for front/side/rear armor.
@@ -100,8 +102,8 @@ Profiles:
 
 - `Ghost`: pass-through attachment states, such as current harvesters if that
   behavior remains.
-- `Soft`: moving infantry and workers.
-- `Firm`: idle or firing infantry.
+- `Soft`: moving infantry, workers, and idle infantry with no hold/deploy state.
+- `Firm`: firing infantry or units explicitly holding ground.
 - `Braced`: deployed or setting-up crew weapons.
 - `Heavy`: tanks and future vehicles.
 
@@ -118,14 +120,17 @@ else:
     push b by share_b * overlap away from a
 ```
 
-The lower-resistance unit moves more. If one push would land in terrain or a
-building footprint, transfer more push to the other side, similar to the current
-resolver. If neither can move, leave a bounded residual overlap and let stuck
-handling react.
+The lower-resistance unit moves more. Idle units should use a low enough
+resistance that a moving unit can noticeably shove them aside instead of being
+blocked by a passive body. If one push would land in terrain or a building
+footprint, transfer more push to the other side, similar to the current resolver.
+If neither can move, leave a bounded residual overlap and let stuck handling
+react.
 
 What this buys:
 
-- Stationary units hold ground without becoming buildings.
+- Idle units are easy to clear out of the way.
+- Active, holding, or deployed units hold ground without becoming buildings.
 - Moving units still collide and create jams.
 - Tanks can be physically heavier than infantry.
 - Deployed MGs and AT guns become real positional commitments.
@@ -169,6 +174,8 @@ Add a lightweight steering pass before or during movement:
 - follow a path lookahead point;
 - separate from nearby solid units;
 - steer more strongly away from `Firm`, `Braced`, and `Heavy` profiles;
+- treat idle `Soft` units as low-priority obstacles that can be pushed through
+  instead of routed around;
 - clamp to unit speed and terrain/building passability.
 
 This follows the Reynolds-style separation of "intent" from "steering", but it
@@ -320,7 +327,8 @@ Combat rules decide whether the shot is possible and how damage applies.
 
 This keeps rough RTS movement while removing the specific bad jank:
 
-- planted units sliding around;
+- passive idle bodies acting like planted obstacles;
+- planted combat units sliding around;
 - long-distance group commands collapsing into clumps;
 - tank bodies jittering as path waypoints change;
 - tank barrels being welded to hull direction;
@@ -362,6 +370,9 @@ Suggested first rule:
 - Deployed MG overlapped by moving rifleman keeps position; rifleman is displaced.
 - Firing rifleman is firmer than moving rifleman but less firm than deployed MG.
 - Tank pushes soft infantry more than infantry pushes tank.
+- Moving rifleman can shove an idle rifleman aside without getting stuck behind
+  it.
+- Idle rifleman is easier to displace than a firing or holding rifleman.
 - Tank colliding with braced weapon stalls or slides instead of casually moving
   the weapon.
 - Equal moving units still split push and do not overlap.
@@ -382,7 +393,7 @@ Suggested first rule:
   or crush it?
 - Should firing riflemen become `Firm` only during cooldown, or for as long as
   they have a target?
-- Should idle infantry be `Firm`, or only `Soft` until firing or holding?
+- How low should idle-unit resistance be relative to moving infantry?
 - What distance thresholds separate regrouping from formation preservation?
 - Should far-order formation offsets stay in world orientation, or rotate toward
   movement direction?
@@ -390,4 +401,3 @@ Suggested first rule:
   unit?
 - Should tanks pivot in place when misaligned, or crawl forward while turning?
 - How much useful jank should survive after local steering is added?
-
