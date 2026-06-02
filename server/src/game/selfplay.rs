@@ -15,6 +15,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use serde::{Deserialize, Serialize};
 
 use super::ai_core::decision::{decide_profile, AiDecisionMemory, AiIntent};
+#[cfg(test)]
+use super::ai_core::profiles::RIFLE_FLOOD_FAST_ID;
 use super::ai_core::profiles::{
     profile_by_id, AiProfile, RIFLE_FLOOD_FULL_SATURATION, RIFLE_FLOOD_FULL_SATURATION_ID,
     TECH_TO_TANKS_ID,
@@ -530,8 +532,10 @@ impl ScriptedPlayer for WorkerRushScript {
 
 struct SelfPlayRunner {
     test_name: &'static str,
+    max_ticks: u32,
     game: Game,
     start: StartPayload,
+    resource_kinds: BTreeMap<u32, EntityKind>,
     player_specs: Vec<PlayerInit>,
     scripts: Vec<Box<dyn ScriptedPlayer>>,
     commands: Vec<CommandRecord>,
@@ -562,10 +566,33 @@ impl SelfPlayRunner {
         scripts: Vec<Box<dyn ScriptedPlayer>>,
         milestones: Milestones,
     ) -> Self {
-        SelfPlayRunner {
+        SelfPlayRunner::with_options(
             test_name,
+            MAX_TICKS,
             game,
             start,
+            player_specs,
+            scripts,
+            milestones,
+        )
+    }
+
+    fn with_options(
+        test_name: &'static str,
+        max_ticks: u32,
+        game: Game,
+        start: StartPayload,
+        player_specs: Vec<PlayerInit>,
+        scripts: Vec<Box<dyn ScriptedPlayer>>,
+        milestones: Milestones,
+    ) -> Self {
+        let resource_kinds = resource_kinds_from_start(&start);
+        SelfPlayRunner {
+            test_name,
+            max_ticks,
+            game,
+            start,
+            resource_kinds,
             player_specs,
             scripts,
             commands: Vec::new(),
@@ -580,7 +607,7 @@ impl SelfPlayRunner {
     fn run(&mut self) -> Result<SelfPlayReport, SelfPlayFailure> {
         let mut last_progress_tick = 0;
 
-        for _ in 0..=MAX_TICKS {
+        for _ in 0..=self.max_ticks {
             let tick = self.game.tick_count();
             let snapshots = self.current_snapshots();
             self.validate_snapshots(&snapshots)?;
@@ -594,7 +621,7 @@ impl SelfPlayRunner {
                     replay_commands: self.replay_commands_len,
                 });
             }
-            if tick >= MAX_TICKS {
+            if tick >= self.max_ticks {
                 break;
             }
             if tick.saturating_sub(last_progress_tick) > MAX_STALL_TICKS {
@@ -620,6 +647,7 @@ impl SelfPlayRunner {
                 }
             }
 
+            let mut command_progressed = false;
             for (player_id, script, command) in commands {
                 self.commands.push(CommandRecord {
                     tick,
@@ -627,7 +655,11 @@ impl SelfPlayRunner {
                     script,
                     command: command.clone(),
                 });
+                command_progressed |= self.milestones.observe_command(tick, player_id, &command);
                 self.game.enqueue(player_id, command);
+            }
+            if command_progressed {
+                last_progress_tick = tick;
             }
 
             let tick_events =
@@ -640,7 +672,8 @@ impl SelfPlayRunner {
         }
 
         Err(SelfPlayFailure::new(format!(
-            "self-play did not complete all milestones within {MAX_TICKS} ticks: {}",
+            "self-play did not complete all milestones within {} ticks: {}",
+            self.max_ticks,
             self.milestones.missing_summary()
         )))
     }
@@ -669,22 +702,21 @@ impl SelfPlayRunner {
                     .push(SnapshotSample::from_snapshot(tick, *player_id, snapshot));
             }
         }
-        self.milestones.observe_snapshots(snapshots)
+        self.milestones
+            .observe_snapshots(tick, snapshots, &self.resource_kinds)
     }
 
     fn record_events(&mut self, tick: u32, tick_events: Vec<(u32, Vec<Event>)>) -> bool {
         let mut progressed = false;
         for (player_id, events) in tick_events {
             for event in events {
-                let attacker_kind = match &event {
-                    Event::Attack { from, .. } => self.attacker_kind(player_id, *from),
+                let attacker = match &event {
+                    Event::Attack { from, .. } => self.attacker_info(*from),
                     Event::Death { .. } | Event::Build { .. } | Event::Notice { .. } => None,
                 };
-                progressed |= self.milestones.observe_combat_event(
-                    player_id,
-                    attacker_kind.as_deref(),
-                    &event,
-                );
+                progressed |= self
+                    .milestones
+                    .observe_combat_event(tick, player_id, attacker, &event);
                 self.event_log.push(EventLogEntry {
                     tick,
                     player_id,
@@ -700,13 +732,19 @@ impl SelfPlayRunner {
         progressed
     }
 
-    fn attacker_kind(&self, player_id: u32, attacker: u32) -> Option<String> {
+    fn attacker_info(&self, attacker: u32) -> Option<AttackerInfo> {
+        let viewer = self.player_specs.first()?.id;
         self.game
-            .snapshot_for(player_id)
+            .snapshot_full_for(viewer)
             .entities
             .iter()
             .find(|e| e.id == attacker)
-            .map(|e| e.kind.clone())
+            .and_then(|e| {
+                kind_of(e).map(|kind| AttackerInfo {
+                    owner: e.owner,
+                    kind,
+                })
+            })
     }
 
     fn write_failure_artifact(&self, failure: &SelfPlayFailure) -> Result<PathBuf, String> {
@@ -797,6 +835,21 @@ fn requested_replay_artifact_name(test_name: &str) -> Result<Option<String>, Str
     ))
 }
 
+fn resource_kinds_from_start(start: &StartPayload) -> BTreeMap<u32, EntityKind> {
+    start
+        .map
+        .resources
+        .iter()
+        .filter_map(|resource| {
+            resource
+                .kind
+                .parse::<EntityKind>()
+                .ok()
+                .map(|kind| (resource.id, kind))
+        })
+        .collect()
+}
+
 pub(crate) fn is_safe_artifact_name(name: &str) -> bool {
     !name.is_empty()
         && !name.contains('/')
@@ -846,6 +899,12 @@ struct EventRecord {
     event: Event,
 }
 
+#[derive(Clone, Copy)]
+struct AttackerInfo {
+    owner: u32,
+    kind: EntityKind,
+}
+
 #[derive(Clone, Serialize)]
 struct SnapshotSample {
     tick: u32,
@@ -893,6 +952,8 @@ struct Milestones {
     death_events: u32,
     attack_events_by_player: BTreeMap<u32, u32>,
     worker_attack_events_by_player: BTreeMap<u32, u32>,
+    first_damage_tick: Option<u32>,
+    first_damage_tick_by_attacker: BTreeMap<u32, u32>,
 }
 
 impl Milestones {
@@ -920,34 +981,64 @@ impl Milestones {
             death_events: 0,
             attack_events_by_player: BTreeMap::new(),
             worker_attack_events_by_player: BTreeMap::new(),
+            first_damage_tick: None,
+            first_damage_tick_by_attacker: BTreeMap::new(),
         }
     }
 
-    fn observe_snapshots(&mut self, snapshots: &BTreeMap<u32, Snapshot>) -> bool {
+    fn observe_snapshots(
+        &mut self,
+        tick: u32,
+        snapshots: &BTreeMap<u32, Snapshot>,
+        resource_kinds: &BTreeMap<u32, EntityKind>,
+    ) -> bool {
         let mut changed = false;
         for (player_id, snapshot) in snapshots {
             if let Some(player) = self.players.get_mut(player_id) {
-                changed |= player.observe(*player_id, snapshot);
+                changed |= player.observe(tick, *player_id, snapshot, resource_kinds);
             }
         }
         changed
     }
 
+    fn observe_command(&mut self, tick: u32, player_id: u32, command: &Command) -> bool {
+        let Some(player) = self.players.get_mut(&player_id) else {
+            return false;
+        };
+        let Some(goal) = self.goals.get(&player_id) else {
+            return false;
+        };
+        player.observe_command(tick, goal, command)
+    }
+
     fn observe_combat_event(
         &mut self,
+        tick: u32,
         player_id: u32,
-        attacker_kind: Option<&str>,
+        attacker: Option<AttackerInfo>,
         event: &Event,
     ) -> bool {
-        match event {
+        let before_damage_tick = self.first_damage_tick;
+        let changed = match event {
             Event::Attack { .. } => {
                 self.attack_events += 1;
-                *self.attack_events_by_player.entry(player_id).or_default() += 1;
-                if let Some(kinds::WORKER) = attacker_kind {
+                self.first_damage_tick.get_or_insert(tick);
+                if let Some(attacker) = attacker {
                     *self
-                        .worker_attack_events_by_player
-                        .entry(player_id)
+                        .attack_events_by_player
+                        .entry(attacker.owner)
                         .or_default() += 1;
+                    self.first_damage_tick_by_attacker
+                        .entry(attacker.owner)
+                        .or_insert(tick);
+                    if attacker.kind == EntityKind::Worker {
+                        *self
+                            .worker_attack_events_by_player
+                            .entry(attacker.owner)
+                            .or_default() += 1;
+                    }
+                } else {
+                    *self.attack_events_by_player.entry(player_id).or_default() += 1;
                 }
                 true
             }
@@ -956,7 +1047,8 @@ impl Milestones {
                 true
             }
             Event::Build { .. } | Event::Notice { .. } => false,
-        }
+        };
+        changed || before_damage_tick != self.first_damage_tick
     }
 
     fn complete(&self) -> bool {
@@ -986,6 +1078,7 @@ impl Milestones {
 #[derive(Clone, Default, Serialize)]
 struct CombatGoal {
     require_any_combat: bool,
+    require_damage: bool,
     min_attacks_by_player: BTreeMap<u32, u32>,
     min_worker_attacks_by_player: BTreeMap<u32, u32>,
 }
@@ -994,6 +1087,13 @@ impl CombatGoal {
     fn any_combat() -> Self {
         CombatGoal {
             require_any_combat: true,
+            ..CombatGoal::default()
+        }
+    }
+
+    fn damage() -> Self {
+        CombatGoal {
+            require_damage: true,
             ..CombatGoal::default()
         }
     }
@@ -1008,6 +1108,9 @@ impl CombatGoal {
     fn complete(&self, milestones: &Milestones) -> bool {
         if self.require_any_combat && milestones.attack_events == 0 && milestones.death_events == 0
         {
+            return false;
+        }
+        if self.require_damage && milestones.first_damage_tick.is_none() {
             return false;
         }
         for (player_id, required) in &self.min_attacks_by_player {
@@ -1041,6 +1144,9 @@ impl CombatGoal {
         {
             out.push("combat-event".to_string());
         }
+        if self.require_damage && milestones.first_damage_tick.is_none() {
+            out.push("damage-event".to_string());
+        }
         for (player_id, required) in &self.min_attacks_by_player {
             let seen = milestones
                 .attack_events_by_player
@@ -1069,12 +1175,17 @@ impl CombatGoal {
 struct PlayerMilestoneGoal {
     require_gathering: bool,
     require_oil: bool,
+    require_oil_worker_assignment: bool,
     require_depot_supply: bool,
     require_barracks_complete: bool,
     require_rifleman: bool,
     require_tank: bool,
     require_damage_taken: bool,
     min_workers: u32,
+    min_supply_cap: u32,
+    min_attack_command_units: u32,
+    min_units_by_kind: BTreeMap<&'static str, u32>,
+    min_buildings_by_kind: BTreeMap<&'static str, u32>,
 }
 
 impl PlayerMilestoneGoal {
@@ -1098,39 +1209,91 @@ impl PlayerMilestoneGoal {
             ..PlayerMilestoneGoal::default()
         }
     }
+
+    fn with_min_workers(mut self, min_workers: u32) -> Self {
+        self.min_workers = min_workers;
+        self
+    }
+
+    fn with_min_supply_cap(mut self, min_supply_cap: u32) -> Self {
+        self.min_supply_cap = min_supply_cap;
+        self
+    }
+
+    fn with_min_attack_command_units(mut self, min_units: u32) -> Self {
+        self.min_attack_command_units = min_units;
+        self
+    }
+
+    fn with_min_units(mut self, kind: &'static str, count: u32) -> Self {
+        self.min_units_by_kind.insert(kind, count);
+        self
+    }
+
+    fn with_min_buildings(mut self, kind: &'static str, count: u32) -> Self {
+        self.min_buildings_by_kind.insert(kind, count);
+        self
+    }
 }
 
 #[derive(Clone, Default, PartialEq, Serialize)]
 struct PlayerMilestones {
     saw_gathering: bool,
     oil_gathered: bool,
+    oil_worker_assigned: bool,
     depot_started: bool,
     barracks_started: bool,
     barracks_complete: bool,
     rifleman_trained: bool,
     tank_trained: bool,
     damage_taken: bool,
+    first_attack_command_tick: Option<u32>,
+    first_goal_attack_command_tick: Option<u32>,
+    first_tank_tick: Option<u32>,
+    first_damage_tick: Option<u32>,
     max_workers: u32,
     max_steel: u32,
     max_oil: u32,
     max_supply_cap: u32,
     max_riflemen: u32,
     max_tanks: u32,
+    max_units_by_kind: BTreeMap<String, u32>,
+    max_buildings_by_kind: BTreeMap<String, u32>,
 }
 
 impl PlayerMilestones {
-    fn observe(&mut self, player_id: u32, snapshot: &Snapshot) -> bool {
+    fn observe(
+        &mut self,
+        tick: u32,
+        player_id: u32,
+        snapshot: &Snapshot,
+        resource_kinds: &BTreeMap<u32, EntityKind>,
+    ) -> bool {
         let before = self.clone();
         let mut workers = 0;
         let mut riflemen = 0;
         let mut tanks = 0;
+        let mut units_by_kind = BTreeMap::<String, u32>::new();
+        let mut buildings_by_kind = BTreeMap::<String, u32>::new();
         for e in snapshot.entities.iter().filter(|e| e.owner == player_id) {
             let Some(k) = kind_of(e) else { continue };
+            if k.is_unit() {
+                *units_by_kind.entry(e.kind.clone()).or_default() += 1;
+            }
+            if k.is_building() {
+                *buildings_by_kind.entry(e.kind.clone()).or_default() += 1;
+            }
             match k {
                 EntityKind::Worker => {
                     workers += 1;
                     if e.state == states::GATHER || e.latched_node.is_some() {
                         self.saw_gathering = true;
+                    }
+                    if e.latched_node
+                        .and_then(|node| resource_kinds.get(&node).copied())
+                        == Some(EntityKind::Oil)
+                    {
+                        self.oil_worker_assigned = true;
                     }
                 }
                 EntityKind::Rifleman => riflemen += 1,
@@ -1146,6 +1309,7 @@ impl PlayerMilestones {
             }
             if e.hp < e.max_hp {
                 self.damage_taken = true;
+                self.first_damage_tick.get_or_insert(tick);
             }
         }
         self.oil_gathered |= snapshot.oil > 0;
@@ -1155,8 +1319,50 @@ impl PlayerMilestones {
         self.max_supply_cap = self.max_supply_cap.max(snapshot.supply_cap);
         self.max_riflemen = self.max_riflemen.max(riflemen);
         self.max_tanks = self.max_tanks.max(tanks);
+        for (kind, count) in units_by_kind {
+            self.max_units_by_kind
+                .entry(kind)
+                .and_modify(|max| *max = (*max).max(count))
+                .or_insert(count);
+        }
+        for (kind, count) in buildings_by_kind {
+            self.max_buildings_by_kind
+                .entry(kind)
+                .and_modify(|max| *max = (*max).max(count))
+                .or_insert(count);
+        }
         self.rifleman_trained |= riflemen > 0;
-        self.tank_trained |= tanks > 0;
+        if tanks > 0 {
+            self.tank_trained = true;
+            self.first_tank_tick.get_or_insert(tick);
+        }
+        before != *self
+    }
+
+    fn observe_command(
+        &mut self,
+        tick: u32,
+        goal: &PlayerMilestoneGoal,
+        command: &Command,
+    ) -> bool {
+        let before = self.clone();
+        let attack_units = match command {
+            Command::AttackMove { units, .. } | Command::Attack { units, .. } => {
+                Some(units.len() as u32)
+            }
+            Command::Move { .. }
+            | Command::Gather { .. }
+            | Command::Build { .. }
+            | Command::Train { .. }
+            | Command::Cancel { .. }
+            | Command::Stop { .. } => None,
+        };
+        if let Some(attack_units) = attack_units {
+            self.first_attack_command_tick.get_or_insert(tick);
+            if goal.min_attack_command_units > 0 && attack_units >= goal.min_attack_command_units {
+                self.first_goal_attack_command_tick.get_or_insert(tick);
+            }
+        }
         before != *self
     }
 
@@ -1171,6 +1377,9 @@ impl PlayerMilestones {
         }
         if goal.require_oil && !self.oil_gathered {
             out.push("oil-gather".to_string());
+        }
+        if goal.require_oil_worker_assignment && !self.oil_worker_assigned {
+            out.push("oil-worker".to_string());
         }
         if goal.require_depot_supply
             && (!self.depot_started || self.max_supply_cap <= config::INDUSTRIAL_CENTER_SUPPLY)
@@ -1191,6 +1400,35 @@ impl PlayerMilestones {
         }
         if self.max_workers < goal.min_workers {
             out.push(format!("workers>={}", goal.min_workers));
+        }
+        if self.max_supply_cap < goal.min_supply_cap {
+            out.push(format!("supply-cap>={}", goal.min_supply_cap));
+        }
+        if goal.min_attack_command_units > 0 && self.first_goal_attack_command_tick.is_none() {
+            out.push(format!(
+                "attack-command-units>={}",
+                goal.min_attack_command_units
+            ));
+        }
+        for (kind, required) in &goal.min_units_by_kind {
+            let seen = self
+                .max_units_by_kind
+                .get(*kind)
+                .copied()
+                .unwrap_or_default();
+            if seen < *required {
+                out.push(format!("{kind}>={required}"));
+            }
+        }
+        for (kind, required) in &goal.min_buildings_by_kind {
+            let seen = self
+                .max_buildings_by_kind
+                .get(*kind)
+                .copied()
+                .unwrap_or_default();
+            if seen < *required {
+                out.push(format!("{kind}>={required}"));
+            }
         }
         out
     }
@@ -1602,6 +1840,292 @@ fn tile_of(map: &MapInfo, x: f32, y: f32) -> (u32, u32) {
     let tx = (x / ts).floor().max(0.0) as u32;
     let ty = (y / ts).floor().max(0.0) as u32;
     (tx.min(map.width - 1), ty.min(map.height - 1))
+}
+
+struct MatchupPlayerSpec {
+    id: u32,
+    name: &'static str,
+    color: &'static str,
+    profile_id: &'static str,
+    goal: PlayerMilestoneGoal,
+}
+
+struct MatchupConfig {
+    artifact_name: &'static str,
+    seed: u32,
+    max_ticks: u32,
+    players: [MatchupPlayerSpec; 2],
+    combat_goal: CombatGoal,
+    assert_outcome: fn(&Milestones),
+}
+
+fn run_profile_matchup(config: MatchupConfig) {
+    let players: Vec<PlayerInit> = config
+        .players
+        .iter()
+        .map(|player| PlayerInit {
+            id: player.id,
+            name: player.name.to_string(),
+            color: player.color.to_string(),
+            is_ai: false,
+        })
+        .collect();
+    let game = Game::new(&players, config.seed);
+    let start = game.start_payload();
+    let specs = players.clone();
+    let scripts: Vec<Box<dyn ScriptedPlayer>> = config
+        .players
+        .iter()
+        .map(|player| {
+            Box::new(ProfileBackedScript::new(player.id, player.profile_id))
+                as Box<dyn ScriptedPlayer>
+        })
+        .collect();
+    let milestones = Milestones::with_goals(
+        config
+            .players
+            .iter()
+            .map(|player| (player.id, player.goal.clone())),
+        config.combat_goal,
+    );
+    let mut runner = SelfPlayRunner::with_options(
+        config.artifact_name,
+        config.max_ticks,
+        game,
+        start,
+        specs,
+        scripts,
+        milestones,
+    );
+
+    match runner.run() {
+        Ok(report) => {
+            (config.assert_outcome)(&runner.milestones);
+            finalize_self_play_success(&runner, &players, &report);
+        }
+        Err(failure) => {
+            let artifact = runner
+                .write_failure_artifact(&failure)
+                .map(|p| {
+                    let name = p
+                        .file_name()
+                        .map(|n| n.to_string_lossy().into_owned())
+                        .unwrap_or_else(|| p.display().to_string());
+                    format!("/dev/selfplay?replay={name}")
+                })
+                .unwrap_or_else(|e| format!("artifact write failed: {e}"));
+            panic!("matchup failed: {}; REPLAY={artifact}", failure.reason);
+        }
+    }
+}
+
+fn rifle_flood_fast_goal() -> PlayerMilestoneGoal {
+    PlayerMilestoneGoal {
+        require_gathering: true,
+        require_depot_supply: true,
+        require_barracks_complete: true,
+        ..PlayerMilestoneGoal::default()
+    }
+    .with_min_workers(6)
+    .with_min_supply_cap(config::INDUSTRIAL_CENTER_SUPPLY + config::DEPOT_SUPPLY)
+    .with_min_units(kinds::RIFLEMAN, 3)
+    .with_min_attack_command_units(3)
+}
+
+fn rifle_flood_full_saturation_goal() -> PlayerMilestoneGoal {
+    PlayerMilestoneGoal {
+        require_gathering: true,
+        require_depot_supply: true,
+        require_barracks_complete: true,
+        ..PlayerMilestoneGoal::default()
+    }
+    .with_min_workers(12)
+    .with_min_supply_cap(config::INDUSTRIAL_CENTER_SUPPLY + config::DEPOT_SUPPLY)
+    .with_min_units(kinds::RIFLEMAN, 6)
+    .with_min_attack_command_units(6)
+}
+
+fn tech_to_tanks_goal() -> PlayerMilestoneGoal {
+    PlayerMilestoneGoal {
+        require_gathering: true,
+        require_oil: true,
+        require_oil_worker_assignment: true,
+        require_depot_supply: true,
+        require_barracks_complete: true,
+        require_tank: true,
+        ..PlayerMilestoneGoal::default()
+    }
+    .with_min_workers(8)
+    .with_min_supply_cap(config::INDUSTRIAL_CENTER_SUPPLY + config::DEPOT_SUPPLY)
+    .with_min_buildings(kinds::TRAINING_CENTRE, 1)
+    .with_min_buildings(kinds::TANK_FACTORY, 1)
+    .with_min_units(kinds::TANK, 1)
+}
+
+fn tech_to_tanks_under_pressure_goal() -> PlayerMilestoneGoal {
+    PlayerMilestoneGoal {
+        require_gathering: true,
+        require_oil: true,
+        require_oil_worker_assignment: true,
+        require_depot_supply: true,
+        require_barracks_complete: true,
+        ..PlayerMilestoneGoal::default()
+    }
+    .with_min_workers(8)
+    .with_min_supply_cap(config::INDUSTRIAL_CENTER_SUPPLY + config::DEPOT_SUPPLY)
+    .with_min_buildings(kinds::TRAINING_CENTRE, 1)
+    .with_min_buildings(kinds::TANK_FACTORY, 1)
+}
+
+fn player_milestones(milestones: &Milestones, player_id: u32) -> &PlayerMilestones {
+    milestones
+        .players
+        .get(&player_id)
+        .unwrap_or_else(|| panic!("missing milestones for player {player_id}"))
+}
+
+fn assert_fast_pressures_before_full_saturation(milestones: &Milestones) {
+    let fast = player_milestones(milestones, 1);
+    let full = player_milestones(milestones, 2);
+    let fast_attack = fast
+        .first_goal_attack_command_tick
+        .expect("fast flood did not issue a meaningful attack command");
+    let full_attack = full
+        .first_goal_attack_command_tick
+        .expect("full saturation did not issue a meaningful attack command");
+
+    assert!(
+        fast_attack < full_attack,
+        "fast flood should attack earlier than full saturation: fast={fast_attack} full={full_attack}"
+    );
+    assert!(
+        full.max_workers > fast.max_workers,
+        "full saturation should reach a stronger economy: full workers={} fast workers={}",
+        full.max_workers,
+        fast.max_workers
+    );
+}
+
+fn assert_fast_pressures_before_first_tank(milestones: &Milestones) {
+    let fast = player_milestones(milestones, 1);
+    let tech = player_milestones(milestones, 2);
+    let fast_attack = fast
+        .first_goal_attack_command_tick
+        .expect("fast flood did not issue a meaningful attack command");
+
+    if let Some(first_tank) = tech.first_tank_tick {
+        assert!(
+            fast_attack < first_tank,
+            "fast flood should attack before the first tank: attack={fast_attack} tank={first_tank}"
+        );
+    }
+    assert!(
+        tech.oil_worker_assigned,
+        "tech_to_tanks should assign at least one worker to oil"
+    );
+}
+
+fn assert_macro_rifles_and_tanks_both_function(milestones: &Milestones) {
+    let full = player_milestones(milestones, 1);
+    let tech = player_milestones(milestones, 2);
+
+    assert!(
+        full.max_units_by_kind
+            .get(kinds::RIFLEMAN)
+            .copied()
+            .unwrap_or_default()
+            >= 6,
+        "full saturation should reach strong rifle production"
+    );
+    assert!(
+        tech.first_tank_tick.is_some(),
+        "tech_to_tanks should reach tank production"
+    );
+    assert!(
+        milestones.first_damage_tick.is_some(),
+        "macro-vs-tech matchup should produce combat damage"
+    );
+}
+
+#[test]
+fn profile_matchup_rifle_flood_fast_vs_full_saturation() {
+    run_profile_matchup(MatchupConfig {
+        artifact_name: "profile_matchup_rifle_flood_fast_vs_full_saturation",
+        seed: 0x1234_5678,
+        max_ticks: MAX_TICKS,
+        players: [
+            MatchupPlayerSpec {
+                id: 1,
+                name: "Fast Flood",
+                color: "#4cc9f0",
+                profile_id: RIFLE_FLOOD_FAST_ID,
+                goal: rifle_flood_fast_goal(),
+            },
+            MatchupPlayerSpec {
+                id: 2,
+                name: "Full Saturation",
+                color: "#f72585",
+                profile_id: RIFLE_FLOOD_FULL_SATURATION_ID,
+                goal: rifle_flood_full_saturation_goal(),
+            },
+        ],
+        combat_goal: CombatGoal::damage(),
+        assert_outcome: assert_fast_pressures_before_full_saturation,
+    });
+}
+
+#[test]
+fn profile_matchup_rifle_flood_fast_vs_tech_to_tanks() {
+    run_profile_matchup(MatchupConfig {
+        artifact_name: "profile_matchup_rifle_flood_fast_vs_tech_to_tanks",
+        seed: 0,
+        max_ticks: MAX_TICKS,
+        players: [
+            MatchupPlayerSpec {
+                id: 1,
+                name: "Fast Flood",
+                color: "#4cc9f0",
+                profile_id: RIFLE_FLOOD_FAST_ID,
+                goal: rifle_flood_fast_goal(),
+            },
+            MatchupPlayerSpec {
+                id: 2,
+                name: "Tech Tanks",
+                color: "#f72585",
+                profile_id: TECH_TO_TANKS_ID,
+                goal: tech_to_tanks_under_pressure_goal(),
+            },
+        ],
+        combat_goal: CombatGoal::damage(),
+        assert_outcome: assert_fast_pressures_before_first_tank,
+    });
+}
+
+#[test]
+fn profile_matchup_rifle_flood_full_saturation_vs_tech_to_tanks() {
+    run_profile_matchup(MatchupConfig {
+        artifact_name: "profile_matchup_rifle_flood_full_saturation_vs_tech_to_tanks",
+        seed: 0,
+        max_ticks: MAX_TICKS,
+        players: [
+            MatchupPlayerSpec {
+                id: 1,
+                name: "Full Saturation",
+                color: "#4cc9f0",
+                profile_id: RIFLE_FLOOD_FULL_SATURATION_ID,
+                goal: rifle_flood_full_saturation_goal(),
+            },
+            MatchupPlayerSpec {
+                id: 2,
+                name: "Tech Tanks",
+                color: "#f72585",
+                profile_id: TECH_TO_TANKS_ID,
+                goal: tech_to_tanks_goal(),
+            },
+        ],
+        combat_goal: CombatGoal::damage(),
+        assert_outcome: assert_macro_rifles_and_tanks_both_function,
+    });
 }
 
 #[test]
