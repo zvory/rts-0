@@ -58,7 +58,7 @@ pub fn prefers_armored_targets(kind: EntityKind) -> bool {
 /// targets (dispersed infantry) — the shell flies straight through without finding anyone.
 /// Hits that do connect deal full damage.
 pub fn miss_chance(attacker_kind: EntityKind, victim_kind: EntityKind) -> f32 {
-    if is_ap(attacker_kind) && !is_armored(victim_kind) {
+    if attacker_kind == EntityKind::AtTeam && !is_armored(victim_kind) {
         0.65
     } else {
         0.0
