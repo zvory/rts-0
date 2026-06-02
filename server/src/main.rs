@@ -154,15 +154,56 @@ fn git_version() -> String {
     env!("COMMIT_HASH").to_string()
 }
 
-/// Read `index.html` and append `?v=<version>` to every local JS/CSS asset reference so that
-/// browsers treat updated assets as new URLs after a redeploy.
+/// Read `index.html`, inject a versioned import map for all `/src/*.js` modules, and append
+/// `?v=<version>` to the top-level `<script src>` and `<link href>` tags.
+///
+/// The import map causes the browser to rewrite every `import "./foo.js"` inside ES modules to
+/// `./foo.js?v=<version>`, so sub-modules (hud.js, net.js, …) are cache-busted alongside
+/// main.js without a build step.
 fn build_versioned_index(client_dir: &str, version: &str) -> String {
     let path = format!("{client_dir}/index.html");
     let html = std::fs::read_to_string(&path).unwrap_or_else(|err| {
         tracing::error!(%path, %err, "failed to read index.html");
         String::new()
     });
-    // Only patch relative (local) asset references; CDN and absolute URLs are left alone.
+
+    // Collect every .js file under client/src/ to populate the import map.
+    let src_dir = format!("{client_dir}/src");
+    let mut entries = String::new();
+    if let Ok(read_dir) = std::fs::read_dir(&src_dir) {
+        let mut names: Vec<String> = read_dir
+            .flatten()
+            .filter(|e| {
+                e.path()
+                    .extension()
+                    .map(|x| x == "js")
+                    .unwrap_or(false)
+            })
+            .filter_map(|e| e.file_name().into_string().ok())
+            .collect();
+        names.sort();
+        for name in names {
+            entries.push_str(&format!(
+                "    \"/src/{name}\": \"/src/{name}?v={version}\",\n"
+            ));
+        }
+        // Remove the trailing comma from the last entry so the JSON is valid.
+        if entries.ends_with(",\n") {
+            entries.truncate(entries.len() - 2);
+            entries.push('\n');
+        }
+    }
+    let import_map = format!(
+        "<script type=\"importmap\">\n{{\n  \"imports\": {{\n{entries}  }}\n}}\n</script>\n  "
+    );
+
+    // Insert the import map just before the main <script type="module"> tag.
+    let html = html.replace(
+        "<script type=\"module\"",
+        &format!("{import_map}<script type=\"module\""),
+    );
+
+    // Also version the top-level entry point and stylesheet so they bypass the cache too.
     html.replace("./src/main.js\"", &format!("./src/main.js?v={version}\""))
         .replace("./styles.css\"", &format!("./styles.css?v={version}\""))
 }
