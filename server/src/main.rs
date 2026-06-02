@@ -19,6 +19,7 @@ use std::time::Duration;
 
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use axum::extract::{Query, State};
+use axum::http::header;
 use axum::response::{IntoResponse, Redirect};
 use axum::routing::get;
 use axum::Router;
@@ -44,6 +45,9 @@ const IDLE_TIMEOUT: Duration = Duration::from_secs(40);
 struct AppState {
     lobby: Lobby,
     version: String,
+    /// `index.html` with `?v=<COMMIT_HASH>` appended to all JS/CSS asset URLs, computed once at
+    /// startup so cache-busting survives browser caches without a hard refresh.
+    index_html: String,
 }
 
 #[tokio::main]
@@ -55,13 +59,15 @@ async fn main() {
         )
         .init();
 
+    let version = git_version();
+    let client_dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../client");
+    let index_html = build_versioned_index(client_dir, &version);
     let state = AppState {
         lobby: Lobby::new(),
-        version: git_version(),
+        index_html,
+        version,
     };
 
-    // Resolve the client dir relative to the crate, so the working directory doesn't matter.
-    let client_dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../client");
     let maps_dir = concat!(env!("CARGO_MANIFEST_DIR"), "/assets/maps");
     // Static files for everything except `/ws`; unknown paths fall back to `index.html` so the
     // single-page client loads regardless of the requested path.
@@ -69,6 +75,7 @@ async fn main() {
         ServeDir::new(client_dir).fallback(ServeFile::new(format!("{client_dir}/index.html")));
 
     let app = Router::new()
+        .route("/", get(index_handler))
         .route("/version", get(version_handler))
         .route("/ws", get(ws_handler))
         .route("/dev/selfplay", get(dev_selfplay_handler))
@@ -108,6 +115,19 @@ async fn ws_handler(ws: WebSocketUpgrade, State(state): State<AppState>) -> impl
         .on_upgrade(move |socket| handle_connection(socket, state.lobby))
 }
 
+/// Serve `index.html` with `Cache-Control: no-cache` so browsers always revalidate it.
+/// The embedded asset URLs already carry `?v=<hash>`, so JS/CSS are fetched fresh only when the
+/// hash changes — subsequent loads hit the browser cache for unchanged builds.
+async fn index_handler(State(state): State<AppState>) -> impl IntoResponse {
+    (
+        [
+            (header::CONTENT_TYPE, "text/html; charset=utf-8"),
+            (header::CACHE_CONTROL, "no-cache"),
+        ],
+        state.index_html,
+    )
+}
+
 /// Return the short git commit SHA that identifies this build.
 async fn version_handler(State(state): State<AppState>) -> String {
     state.version
@@ -132,6 +152,19 @@ async fn dev_selfplay_handler(
 /// builder layer or injected via a `COMMIT_HASH` build arg).
 fn git_version() -> String {
     env!("COMMIT_HASH").to_string()
+}
+
+/// Read `index.html` and append `?v=<version>` to every local JS/CSS asset reference so that
+/// browsers treat updated assets as new URLs after a redeploy.
+fn build_versioned_index(client_dir: &str, version: &str) -> String {
+    let path = format!("{client_dir}/index.html");
+    let html = std::fs::read_to_string(&path).unwrap_or_else(|err| {
+        tracing::error!(%path, %err, "failed to read index.html");
+        String::new()
+    });
+    // Only patch relative (local) asset references; CDN and absolute URLs are left alone.
+    html.replace("./src/main.js\"", &format!("./src/main.js?v={version}\""))
+        .replace("./styles.css\"", &format!("./styles.css?v={version}\""))
 }
 
 /// Drive one client connection end to end.
