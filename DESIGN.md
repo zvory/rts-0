@@ -678,28 +678,22 @@ wire). To stay fair it only ever targets enemy **start tiles**, which are public
 payload.
 
 **Strategy (deliberately "very basic").** Each controller, on a staggered cadence
-(`DECISION_INTERVAL` ticks): keeps idle workers mining the nearest steel patch; trains workers
-up to the current miner saturation of its starting steel cluster; builds a depot when supply is
-about to choke; builds up to `BASE_TARGET_BARRACKS` barracks by default, then adds more when its
-steel bank grows large; pumps riflemen from each barracks; and attack-moves riflemen at the nearest
-living enemy's base in rally-line waves. Free riflemen first stage on a short perpendicular rally
-line a few tiles in front of the base; once at least `BASE_WAVE_SIZE = 3` free riflemen are on or
-immediately adjacent to that line, the AI attack-moves all of them together at the nearest living
-enemy base. After each launched wave, that minimum threshold grows by one with no explicit cap,
-though the launched wave itself always includes every ready rifleman, not just the minimum needed.
-If the AI stalls for `WAVE_STALL_RESET_TICKS`, it resets the threshold to the baseline instead of
-waiting forever for an oversized regroup. Riflemen already meaningfully past the rally line keep
-pressing forward instead of being recalled into staging. It does not micro, tech to tanks, or
-scout. A local per-think budget prevents it from over-committing resources/supply it doesn't have.
+(`DECISION_INTERVAL` ticks), builds a constrained live `AiObservation` and delegates RTS decisions
+to `game::ai_core::decision::decide_profile`. The default live profile is
+`rifle_flood_full_saturation`, selected server-side without a lobby protocol or UI change. It keeps
+idle workers mining steel, trains workers toward starting steel saturation, builds depots before
+supply deadlock, builds barracks, pumps riflemen, stages combat units forward, and attack-moves
+escalating rifleman waves at the nearest living enemy's public start tile. It does not micro,
+scout, or choose hidden enemy unit positions. A local per-think budget in the shared action layer
+prevents it from over-committing resources/supply it does not have.
 
-**Shared AI core.** The incremental `game::ai_core` path now has deterministic profile data
-(`profiles.rs`) and a generic ranked decision loop (`decision.rs`) that emits ordinary `Command`s
-through the shared action helpers. The first code-defined profiles are `rifle_flood_fast`,
-`rifle_flood_full_saturation`, and `tech_to_tanks`; they parameterize worker targets, supply
-buffers, building/tech goals, production priorities, resource timing, and attack thresholds
-without providing their own `think()` functions. The live lobby AI intentionally remains on the
-older controller path until the Phase 04 migration, so these profiles are tested in isolation and
-are not client-selectable.
+**Shared AI core.** `game::ai_core` has deterministic profile data (`profiles.rs`) and a generic
+ranked decision loop (`decision.rs`) that emits ordinary `Command`s through shared action helpers.
+The first code-defined profiles are `rifle_flood_fast`, `rifle_flood_full_saturation`, and
+`tech_to_tanks`; they parameterize worker targets, supply buffers, building/tech goals, production
+priorities, resource timing, and attack thresholds without providing their own `think()` functions.
+The live lobby AI uses this shared core through `AiController`, which only owns live identity,
+profile id, cadence, and persistent decision memory. Profiles are still not client-selectable.
 
 **Win/elimination.** AI players count as match players: a 1-human + N-AI match is a real match
 (it resolves to a winner), while a lone human with no AI remains a never-ending sandbox. They have

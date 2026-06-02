@@ -17,14 +17,16 @@ AI rollout order, and AI-specific handoff tasks.
 
 ## Current State
 
-The live gameplay AI is currently a single `AiController` in `server/src/game/ai.rs`. It:
+The live gameplay AI is currently a thin `AiController` adapter in `server/src/game/ai.rs`. It
+uses the shared `ai_core` live observation, facts, action helpers, decision loop, and the default
+`rifle_flood_full_saturation` profile. It:
 
-- surveys authoritative state directly
+- builds a constrained observation from authoritative state
 - keeps workers mining steel
 - trains workers up to starting steel saturation
 - builds depots and barracks
 - pumps riflemen
-- stages riflemen on a rally line
+- stages riflemen forward
 - launches escalating rifleman waves at public enemy start tiles
 
 Shared helper extraction has started in `server/src/game/ai_shared.rs`:
@@ -129,7 +131,7 @@ for the same module name.
 | AI-1 | [Shared world model](docs/ai/phase-01-shared-world-model.md) | in progress: observation/facts scaffolding exists | Deterministic AI observations and reusable facts |
 | AI-2 | [Action synthesis](docs/ai/phase-02-action-synthesis.md) | not started | Shared command builder with budget and reservation semantics |
 | AI-3 | [Decision loop and profiles](docs/ai/phase-03-decision-loop-and-profiles.md) | not started | `rifle_flood_fast`, `rifle_flood_full_saturation`, `tech_to_tanks` profiles |
-| AI-4 | [Live AI migration](docs/ai/phase-04-live-ai-migration.md) | not started | `AiController` delegates to the shared core |
+| AI-4 | [Live AI migration](docs/ai/phase-04-live-ai-migration.md) | complete | `AiController` delegates to the shared core |
 | AI-5 | [Self-play migration](docs/ai/phase-05-selfplay-migration.md) | not started | Self-play scripts replaced or reduced by shared profiles |
 | AI-6 | [Matchup tests](docs/ai/phase-06-matchup-tests.md) | not started | Personality-vs-personality coverage and replay checks |
 | AI-7 | [Future behavior expansion](docs/ai/phase-07-future-behavior-expansion.md) | future | Proxy, eco, standard, MG, AT, tank, and terrain-aware behavior |
