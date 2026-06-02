@@ -128,8 +128,11 @@ where
     idle_builders.sort_unstable();
     gathering_builders.sort_unstable();
     let builder_pools = [idle_builders.as_slice(), gathering_builders.as_slice()];
+    let save_for_required_tech_building = should_save_for_required_tech_building(&facts, profile);
 
     if wants_depot(&facts, profile)
+        && (!save_for_required_tech_building
+            || facts.free_supply <= profile.supply.emergency_depot_threshold)
         && try_build_kind(
             observation,
             &facts,
@@ -205,13 +208,14 @@ where
         desired_oil_workers(observation, &facts, profile, target_steel_workers);
     let target_workers = target_steel_workers.saturating_add(desired_oil_workers);
     let save_for_first_tech_unit = should_save_for_first_tech_unit(&facts, profile);
+    let save_for_tech = save_for_first_tech_unit || save_for_required_tech_building;
     for trained in actions::train_units(
         &mut actions,
         TrainUnitsRequest {
             buildings: facts.production_buildings(EntityKind::IndustrialCenter),
             unit_priorities: &[EntityKind::Worker],
             max_queue_depth: 1,
-            save_for_tech: save_for_first_tech_unit,
+            save_for_tech,
             current_counts: &[(EntityKind::Worker, facts.worker_count)],
             max_counts: &[(EntityKind::Worker, target_workers)],
         },
@@ -228,7 +232,7 @@ where
             .production
             .save_for_first_tech_unit
             .unwrap_or(EntityKind::Worker);
-        let save_for_tech = save_for_first_tech_unit
+        let save_for_tech = (save_for_first_tech_unit || save_for_required_tech_building)
             && !rules::economy::trainable_units(building_kind).contains(&key_tech_unit);
         for trained in actions::train_units(
             &mut actions,
@@ -423,6 +427,18 @@ fn should_save_for_first_tech_unit(facts: &AiFacts, profile: &AiProfile) -> bool
         return false;
     };
     facts.building_count(producer) > 0
+}
+
+fn should_save_for_required_tech_building(facts: &AiFacts, profile: &AiProfile) -> bool {
+    let Some(unit) = profile.production.save_for_first_tech_unit else {
+        return false;
+    };
+    let Some(producer) = producer_for_unit(unit) else {
+        return false;
+    };
+    facts.building_count(producer) == 0
+        && profile.buildings.required_tech_path.contains(&producer)
+        && rules::economy::build_requirement_met(producer, facts.complete_building_kinds())
 }
 
 fn producer_for_unit(unit: EntityKind) -> Option<EntityKind> {
@@ -695,6 +711,18 @@ mod tests {
         assert!(decision.intents.contains(&AiIntent::Build {
             kind: EntityKind::TankFactory
         }));
+        assert!(
+            !decision.intents.contains(&AiIntent::Train {
+                kind: EntityKind::Worker
+            }),
+            "tech_to_tanks should save worker-training steel once the tank factory is buildable"
+        );
+        assert!(
+            !decision.intents.contains(&AiIntent::Train {
+                kind: EntityKind::Rifleman
+            }),
+            "tech_to_tanks should save barracks steel once the tank factory is buildable"
+        );
         assert!(decision.intents.iter().any(|intent| {
             matches!(
                 intent,

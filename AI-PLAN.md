@@ -133,7 +133,7 @@ for the same module name.
 | AI-3 | [Decision loop and profiles](docs/ai/phase-03-decision-loop-and-profiles.md) | not started | `rifle_flood_fast`, `rifle_flood_full_saturation`, `tech_to_tanks` profiles |
 | AI-4 | [Live AI migration](docs/ai/phase-04-live-ai-migration.md) | complete | `AiController` delegates to the shared core |
 | AI-5 | [Self-play migration](docs/ai/phase-05-selfplay-migration.md) | not started | Self-play scripts replaced or reduced by shared profiles |
-| AI-6 | [Matchup tests](docs/ai/phase-06-matchup-tests.md) | not started | Personality-vs-personality coverage and replay checks |
+| AI-6 | [Matchup tests](docs/ai/phase-06-matchup-tests.md) | complete | Personality-vs-personality coverage and replay checks |
 | AI-7 | [Future behavior expansion](docs/ai/phase-07-future-behavior-expansion.md) | future | Proxy, eco, standard, MG, AT, tank, and terrain-aware behavior |
 
 ## Dependency Gates
