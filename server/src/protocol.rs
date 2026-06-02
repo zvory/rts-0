@@ -191,6 +191,7 @@ pub struct MapInfo {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct ResourceNode {
+    pub id: u32,
     pub kind: String,
     pub x: f32,
     pub y: f32,
@@ -215,7 +216,17 @@ pub struct Snapshot {
     pub supply_used: u32,
     pub supply_cap: u32,
     pub entities: Vec<EntityView>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub resource_deltas: Vec<ResourceDelta>,
     pub events: Vec<Event>,
+}
+
+/// Dynamic resource state the client is currently allowed to know.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct ResourceDelta {
+    pub id: u32,
+    pub remaining: u32,
 }
 
 /// One entity as seen by one player. Optional fields are omitted when not applicable.

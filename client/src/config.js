@@ -75,6 +75,11 @@ export const STATS = Object.freeze({
   [KIND.OIL]: { label: "Oil", size: 14 },
 });
 
+export const RESOURCE_AMOUNTS = Object.freeze({
+  [KIND.STEEL]: 1500,
+  [KIND.OIL]: 5000,
+});
+
 // What a worker can build (command card when a worker is selected).
 export const WORKER_BUILDABLE = Object.freeze([
   KIND.INDUSTRIAL_CENTER,

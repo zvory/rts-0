@@ -451,7 +451,7 @@ export class Input {
       this.state.addCommandFeedback("attack", target.x, target.y);
       return;
     }
-    if (target && isResource(target.kind)) {
+    if (target && isResource(target.kind) && target.remaining !== 0) {
       // Resource node -> gather, but only with the workers in the selection.
       const workers = this._selectedWorkerIds();
       if (workers.length > 0) {

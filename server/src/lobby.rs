@@ -28,7 +28,7 @@ use tracing::{debug, error, info, warn};
 use crate::config;
 use crate::game::selfplay::{is_safe_artifact_name, LiveSelfPlay, ReplayArtifact, ReplayDriver};
 use crate::game::{Game, PlayerInit};
-use crate::protocol::{Command, Event, LobbyPlayer, ServerMessage, StartPayload};
+use crate::protocol::{kinds, Command, Event, LobbyPlayer, ServerMessage, Snapshot, StartPayload};
 
 /// Player colors, assigned by join order. MUST match `client/src/config.js` `PLAYER_PALETTE`.
 const PLAYER_PALETTE: [&str; 8] = [
@@ -743,6 +743,7 @@ impl RoomTask {
             if let Some(mut events) = per_player_events.remove(id) {
                 snapshot.events.append(&mut events);
             }
+            compact_snapshot_for_wire(&mut snapshot);
             send_or_log(
                 &self.room,
                 *id,
@@ -798,6 +799,7 @@ impl RoomTask {
             if let Some(mut events) = per_player_events.remove(&id) {
                 snapshot.events.append(&mut events);
             }
+            compact_snapshot_for_wire(&mut snapshot);
             send_or_log(
                 &self.room,
                 id,
@@ -890,6 +892,15 @@ fn send_or_log(room: &str, player_id: u32, tx: &mpsc::Sender<ServerMessage>, msg
             }
         }
     }
+}
+
+/// Keep static resource positions in the start payload and send only compact visible remaining
+/// updates in snapshots. Internal `Game::snapshot_for` still includes resource entities for
+/// self-play/replay paths that consume snapshots directly.
+fn compact_snapshot_for_wire(snapshot: &mut Snapshot) {
+    snapshot
+        .entities
+        .retain(|entity| entity.kind != kinds::STEEL && entity.kind != kinds::OIL);
 }
 
 /// Capacity for a new connection's outbound channel. Re-exported so `main.rs` builds the writer

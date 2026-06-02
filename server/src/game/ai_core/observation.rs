@@ -369,6 +369,7 @@ mod tests {
             supply_used: 3,
             supply_cap: 10,
             entities: Vec::new(),
+            resource_deltas: Vec::new(),
             events: Vec::new(),
         }
     }

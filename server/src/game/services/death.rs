@@ -44,12 +44,24 @@ pub(crate) fn death_system(
     // Remove fully depleted resource nodes so they disappear from the world (and from
     // client snapshots). Gather orders pointing at a since-removed node self-heal via
     // the missing-node branches in `economy::gather_*`.
-    let depleted: Vec<u32> = entities
+    let depleted: Vec<(u32, f32, f32, EntityKind)> = entities
         .iter()
         .filter(|e| e.is_node() && e.remaining().unwrap_or(0) == 0)
-        .map(|e| e.id)
+        .map(|e| (e.id, e.pos_x, e.pos_y, e.kind))
         .collect();
-    for id in depleted {
+    for (id, x, y, kind) in depleted {
+        let pids: Vec<u32> = events.keys().copied().collect();
+        for pid in pids {
+            if !projection::event_visible_to(pid, x, y, 0, fog) {
+                continue;
+            }
+            events.entry(pid).or_default().push(Event::Death {
+                id,
+                x,
+                y,
+                kind: kind.to_protocol_str().to_string(),
+            });
+        }
         entities.remove(id);
     }
 

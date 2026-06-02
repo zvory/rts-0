@@ -24,7 +24,9 @@ pub mod systems;
 use std::collections::HashMap;
 
 use crate::config;
-use crate::protocol::{Command, Event, MapInfo, PlayerStart, ResourceNode, Snapshot, StartPayload};
+use crate::protocol::{
+    Command, Event, MapInfo, PlayerStart, ResourceDelta, ResourceNode, Snapshot, StartPayload,
+};
 use crate::rules::projection;
 use serde::{Deserialize, Serialize};
 
@@ -195,6 +197,7 @@ impl Game {
             .iter()
             .filter(|e| e.kind.is_node())
             .map(|e| ResourceNode {
+                id: e.id,
                 kind: e.kind.to_protocol_str().to_string(),
                 x: e.pos_x,
                 y: e.pos_y,
@@ -314,6 +317,7 @@ impl Game {
         };
 
         let mut entities = Vec::new();
+        let mut resource_deltas = Vec::new();
         // Use the spatial index for interest filtering instead of a full entity scan.
         for id in self.spatial.all_ids() {
             let e = match self.entities.get(id) {
@@ -321,12 +325,21 @@ impl Game {
                 None => continue,
             };
             let target = e.target_id().and_then(|target| self.entities.get(target));
+            if e.is_node() && (!fogged || self.fog.is_visible_world(player, e.pos_x, e.pos_y)) {
+                if let Some(remaining) = e.remaining() {
+                    resource_deltas.push(ResourceDelta {
+                        id: e.id,
+                        remaining,
+                    });
+                }
+            }
             if let Some(view) = projection::project_entity(player, e, &self.fog, fogged, target) {
                 entities.push(view);
             }
         }
         // Deterministic order (stable for tests / replays).
         entities.sort_by_key(|v| v.id);
+        resource_deltas.sort_by_key(|d| d.id);
 
         Snapshot {
             tick: self.tick,
@@ -335,6 +348,7 @@ impl Game {
             supply_used,
             supply_cap,
             entities,
+            resource_deltas,
             // Events are delivered via the `tick()` return value, not the snapshot.
             events: Vec::new(),
         }

@@ -410,6 +410,7 @@ mod tests {
                     view
                 })
                 .collect(),
+            resource_deltas: Vec::new(),
             events: Vec::new(),
         };
         let start = StartPayload {
