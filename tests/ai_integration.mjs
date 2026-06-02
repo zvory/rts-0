@@ -10,6 +10,8 @@
 //
 // Usage: start the server (`cd server && cargo run`), then `node tests/ai_integration.mjs`.
 // Override the endpoint with RTS_WS (default ws://127.0.0.1:8081/ws).
+import { decodeServerMessage } from "../client/src/protocol.js";
+
 const URL = process.env.RTS_WS || "ws://127.0.0.1:8081/ws";
 const ROOM = "ai-itest-" + Math.floor(performance.now());
 
@@ -26,7 +28,7 @@ class Client {
     this.msgs = [];
     this.waiters = [];
     this.ws.onmessage = (e) => {
-      const m = JSON.parse(e.data);
+      const m = decodeServerMessage(JSON.parse(e.data));
       this.msgs.push(m);
       if (m.t === "welcome") this.playerId = m.playerId;
       if (m.t === "snapshot") this.lastSnapshot = m;

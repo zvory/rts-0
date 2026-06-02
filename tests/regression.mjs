@@ -3,6 +3,8 @@
 //  - a giant/duplicated units[] array must NOT stall the room (DoS guard)
 //  - a join rejected mid-match must NOT wedge the socket (can still join another room)
 // Usage: start the server, then `node tests/regression.mjs`.
+import { decodeServerMessage } from "../client/src/protocol.js";
+
 const URL = process.env.RTS_WS || "ws://127.0.0.1:8081/ws";
 let failures = 0;
 const VERBOSE = !!process.env.RTS_VERBOSE;
@@ -13,7 +15,7 @@ class Client {
   constructor() {
     this.ws = new WebSocket(URL); this.playerId = null; this.lastSnapshot = null; this.msgs = []; this.waiters = [];
     this.ws.onmessage = (e) => {
-      const m = JSON.parse(e.data); this.msgs.push(m);
+      const m = decodeServerMessage(JSON.parse(e.data)); this.msgs.push(m);
       if (m.t === "welcome") this.playerId = m.playerId;
       if (m.t === "snapshot") this.lastSnapshot = m;
       this.waiters = this.waiters.filter((w) => !w.test(m) || (w.resolve(m), false));

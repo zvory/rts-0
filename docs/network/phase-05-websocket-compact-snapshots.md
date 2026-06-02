@@ -21,6 +21,18 @@ This still uses one reliable ordered WebSocket. It does not remove TCP head-of-l
 Optimize snapshots first. Keep lobby/control messages as JSON unless there is a concrete reason to
 change them.
 
+Implemented approach: versioned, array-shaped compact JSON for snapshots. The server still builds
+the semantic `Snapshot` type from `server/src/protocol.rs`, then the WebSocket writer serializes
+only `ServerMessage::Snapshot` as:
+
+```json
+{"t":"snapshot","v":1,"s":[tick,steel,oil,supplyUsed,supplyCap],"e":[...],"r":[...],"ev":[...]}
+```
+
+`client/src/net.js` decodes the compact transport payload back into the ordinary semantic snapshot
+before dispatching `S.SNAPSHOT`, so renderer/HUD/input/state modules continue to read the object
+shape documented in `DESIGN.md`.
+
 Candidate approaches, in increasing complexity:
 
 1. Compact JSON:

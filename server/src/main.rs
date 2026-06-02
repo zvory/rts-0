@@ -30,7 +30,7 @@ use tracing::{debug, info, warn};
 use tracing_subscriber::EnvFilter;
 
 use crate::lobby::{Lobby, RoomEvent};
-use crate::protocol::{ClientMessage, ServerMessage};
+use crate::protocol::{serialize_compact_snapshot, ClientMessage, ServerMessage};
 
 /// Default room name used when a client's `join` omits `room`.
 const DEFAULT_ROOM: &str = "main";
@@ -225,6 +225,7 @@ async fn handle_connection(socket: WebSocket, lobby: Lobby) {
     let (conn_tx, writer_rx) = lobby::ConnectionSink::new();
 
     // Writer task: serialize each ServerMessage to a JSON TEXT frame and push it to the socket.
+    // Reliable messages stay object-shaped JSON; snapshots use the compact v1 JSON schema.
     // Reliable messages are FIFO and prioritized over snapshots. Snapshots are latest-only:
     // while the socket is busy, newer snapshots replace older unsent snapshots.
     let writer = tokio::spawn(async move {
@@ -363,7 +364,11 @@ async fn send_server_message(
     sink: &mut futures_util::stream::SplitSink<WebSocket, Message>,
     msg: ServerMessage,
 ) -> bool {
-    match serde_json::to_string(&msg) {
+    let encoded = match msg {
+        ServerMessage::Snapshot(snapshot) => serialize_compact_snapshot(&snapshot),
+        reliable => serde_json::to_string(&reliable),
+    };
+    match encoded {
         Ok(json) => {
             if sink.send(Message::Text(json.into())).await.is_err() {
                 // Socket gone; stop writing. The reader side will emit Leave.
