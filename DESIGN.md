@@ -41,9 +41,9 @@ update this file in the same change.
   `cargo run` and then open the printed local URL.
 
 ### Tick & networking model
-- `TICK_HZ = 10` (100 ms per simulated tick).
+- `TICK_HZ = 30` (~33 ms per simulated tick).
 - The server broadcasts a snapshot every `SNAPSHOT_EVERY_N_TICKS` ticks (default 1 →
-  10 snapshots/s).
+  30 snapshots/s).
 - Commands are queued on arrival and drained at the start of each tick (deterministic
   ordering per connection; ordering across connections is arrival order).
 - The client renders at `requestAnimationFrame` (~60fps), interpolating between the two
@@ -70,6 +70,7 @@ short but readable. Coordinates are **world pixels** (floats) unless a field nam
 | `setQuickstart` | `enabled: bool` | Host toggles "Start with more money mode" for the next match in this room. |
 | `command`  | `cmd: Command` | Issue a gameplay command (see below). Ignored unless in-game. |
 | `ping`     | `ts: number` | Latency probe; server replies with `pong`. |
+| `setReplaySpeed` | `speed: f32` | Set replay playback speed multiplier in dev replay rooms; ignored elsewhere. |
 
 `Command` (the `cmd` object) — `c` is the command discriminator:
 
@@ -156,7 +157,7 @@ enabled, every player starts with 1400 steel and 600 oil instead of the default 
   // workers:
   latchedNode?: u32,             // node id the worker is currently harvesting (attached mining)
   // resource nodes:
-  remaining?: u32,               // resource left in the node
+  remaining?: u32,               // resource left in the node; currently sent even through fog
   // combat feedback:
   targetId?: u32,                // current attack target, for drawing tracers
   setupState?: string            // machine_gunner only: "packed","setting_up","deployed","tearing_down"
@@ -208,11 +209,11 @@ impl Game {
     /// Create a match for the given players (ids + colors + names already assigned by lobby).
     /// Generates a symmetric map sized for `players.len()`, randomizes the seat-to-spawn
     /// assignment per match, and spawns each player's starting Industrial Center +
-    /// STARTING_WORKERS workers + a nearby mineral cluster & geyser.
-    pub fn new(players: &[PlayerInit]) -> Game;
+    /// STARTING_WORKERS workers + nearby steel/oil resource clusters.
+    pub fn new(players: &[PlayerInit], seed: u32) -> Game;
 
     /// Create a match with explicit starting steel/oil for every player.
-    pub fn new_with_starting_resources(players: &[PlayerInit], steel: u32, oil: u32) -> Game;
+    pub fn new_with_starting_resources(players: &[PlayerInit], steel: u32, oil: u32, seed: u32) -> Game;
 
     /// Static info for the `start` message (terrain + player start tiles). Call once.
     pub fn start_payload(&self) -> StartPayload;
@@ -229,7 +230,7 @@ impl Game {
     /// Build a full-world snapshot for a dev watch client. Normal gameplay must not use this.
     pub fn snapshot_full_for(&self, player: u32) -> Snapshot;
 
-    /// Player ids still alive (have at least one building). Lobby uses this for game-over.
+    /// Player ids still alive. Humans need at least one building; AI players also need a unit.
     pub fn alive_players(&self) -> Vec<u32>;
 
     /// Remove all of a player's entities (e.g. on disconnect) so the match can resolve.
@@ -239,6 +240,9 @@ impl Game {
 
     /// Authoritative commands applied so far, stamped with the tick that applied them.
     pub fn command_log(&self) -> &[CommandLogEntry];
+
+    /// Reconstruct the player specs used to create this match for replay/crash artifacts.
+    pub fn player_inits(&self) -> Vec<PlayerInit>;
 }
 
 pub struct PlayerInit { pub id: u32, pub name: String, pub color: String, pub is_ai: bool }
@@ -315,8 +319,12 @@ export class Net {
   join(name, room)
   ready(isReady)
   start()
+  addAi()
+  removeAi(id)
+  setQuickstart(enabled)
   command(cmd)                           // cmd built via protocol.js builders
   ping()
+  setReplaySpeed(speed)                  // dev replay rooms only
   get playerId()
 }
 ```
@@ -471,9 +479,9 @@ MVP scope:
 Core unit roles:
 - **Rifleman** is the baseline combat unit: cheap, flexible, useful for capturing and
   holding ground, and the primary answer to enemy infantry in forests.
-- **Machine gun** is the defensive escalation unit: it takes half a second
+- **Machine gun** is the defensive escalation unit: it takes one second
   (`MACHINE_GUNNER_SETUP_TICKS`) to set up after stopping, then fires at a very high rate.
-  Once deployed it must spend the same half-second tearing down before it can move.
+  Once deployed it must spend the same one-second interval tearing down before it can move.
   Machine-gun nests
   are the main base-defense tool and should dominate open-ground infantry combat in the
   second stage of the game.
@@ -509,13 +517,13 @@ by the simple shared attack model plus the machine-gunner setup/teardown state; 
 and forest-specific rules are future work.
 
 - `TICK_HZ = 30`, `SNAPSHOT_EVERY_N_TICKS = 1`.
-- `MACHINE_GUNNER_SETUP_TICKS = 15` (~0.5s setup or teardown).
+- `MACHINE_GUNNER_SETUP_TICKS = 30` (~1s setup or teardown).
 - Map: `TILE_SIZE = 32` px. Size scales with player count: 2p → 64×64, 3-4p → 96×96.
 - Start: `STARTING_STEEL = 50`, `STARTING_OIL = 0`, `STARTING_WORKERS = 4`,
-  one Industrial Center at the player's start tile, a mineral cluster (16 patches) + a 2x2 block of 4 oil patches nearby.
+  one Industrial Center at the player's start tile, 18 steel patches + 3 oil patches nearby.
 - Supply: Industrial Center gives `+10`, Depot gives `+8`, hard cap `200`.
 - Attached mining: workers walk to a patch, latch onto it, and mine in place.
-  Every `HARVEST_TICKS = 40` the load (`STEEL_LOAD = 5` / `OIL_LOAD = 1`) is deposited
+  Every `HARVEST_TICKS = 40` the load (`STEEL_LOAD = 2` / `OIL_LOAD = 2`) is deposited
   directly into the player's economy. When a patch empties the worker goes idle
   (no automatic retarget).
 - One worker per patch: each node has a single harvest slot (`Entity::miner`). A patch is
@@ -523,7 +531,7 @@ and forest-specific rules are future work.
   does not reserve it. Extra workers that arrive while the slot is taken go idle. The slot
   is advisory and self-heals — it's only honored while the recorded worker is alive and
   actively harvesting that node, so death / re-order / retarget free it automatically.
-- Starting layout: each base site gets 12 steel patches and 3 oil patches. The map seeds one
+- Starting layout: each base site gets 18 steel patches and 3 oil patches. The map seeds one
   neutral expansion site per player, so every match has exactly `2 × player_count` total base
   sites and every player has somewhere to expand without increasing the room-size cap.
 
@@ -531,21 +539,21 @@ Unit stats (hp, dmg, range[tiles], cooldown[ticks], speed[px/tick], sight[tiles]
 
 | kind            | hp  | dmg | range | cd | speed | sight | steel | oil | sup | buildTicks |
 |-----------------|-----|-----|-------|----|-------|-------|-----|-----|-----|-----------|
-| worker          | 40  | 4   | 1     | 12 | 1.5   | 7     | 50  | 0   | 1   | 120 (~4s) |
-| rifleman        | 45  | 5   | 4     | 8  | 1.6   | 8     | 50  | 0   | 1   | 150 (~5s) |
-| machine_gunner  | 55  | 4   | 5     | 3  | 1.28  | 8     | 75  | 25  | 2   | 200 (~7s) |
-| at_team         | 45  | 24  | 4     | 24 | 0.65  | 8     | 75  | 25  | 2   | 220 (~7s) |
-| tank            | 130 | 20  | 3     | 18 | 2.0   | 7     | 100 | 50  | 2   | 250 (~8s) |
+| worker          | 40  | 4   | 1     | 12 | 1.6   | 7     | 50  | 0   | 1   | 240 (~8s) |
+| rifleman        | 45  | 5   | 4     | 8  | 1.6   | 8     | 50  | 0   | 1   | 300 (~10s) |
+| machine_gunner  | 55  | 4   | 5     | 3  | 1.28  | 8     | 75  | 25  | 2   | 400 (~13s) |
+| at_team         | 45  | 48  | 5     | 48 | 1.28  | 8     | 75  | 25  | 2   | 440 (~15s) |
+| tank            | 390 | 60  | 3     | 36 | 2.0   | 7     | 200 | 100 | 6   | 500 (~17s) |
 
-Building stats (hp, sight, cost min, footprint tiles wxh, buildTicks, extra):
+Building stats (hp, sight, cost, footprint tiles wxh, buildTicks, extra):
 
-| kind                       | hp  | sight | min | foot | buildTicks | notes |
+| kind                       | hp  | sight | cost | foot | buildTicks | notes |
 |----------------------------|-----|-------|-----|------|-----------|-------|
 | industrial_center          | 600 | 9     | 400 | 3x3  | 400       | trains worker; +10 supply; players start with one free |
 | depot                      | 220 | 4     | 100 | 2x2  | 120       | +8 supply |
-| barracks                   | 320 | 6     | 100 | 3x2  | 200       | trains rifleman, machine_gunner, at_team; requires an Industrial Center |
-| training_centre   | 300 | 6     | 100 min + 50 oil | 3x2  | 220       | unlocks machine_gunner and at_team training at barracks; requires an Industrial Center |
-| tank_factory               | 360 | 6     | 200 min + 100 oil | 3x3  | 240       | trains tank; requires an Industrial Center |
+| barracks                   | 320 | 6     | 150 | 3x2  | 200       | trains rifleman, machine_gunner, at_team; requires an Industrial Center |
+| training_centre   | 300 | 6     | 100 steel + 50 oil | 3x2  | 220       | unlocks machine_gunner and at_team training at barracks; requires an Industrial Center |
+| tank_factory               | 360 | 6     | 200 steel + 100 oil | 3x3  | 240       | trains tank; requires an Industrial Center and Training Centre |
 
 Win: a player is **eliminated** when they own zero buildings (units alone do not keep them
 alive). Last player standing wins; a 1-player match never ends (sandbox/exploration mode).
@@ -627,7 +635,7 @@ wire). To stay fair it only ever targets enemy **start tiles**, which are public
 payload.
 
 **Strategy (deliberately "very basic").** Each controller, on a staggered cadence
-(`DECISION_INTERVAL` ticks): keeps idle workers mining the nearest mineral patch; trains workers
+(`DECISION_INTERVAL` ticks): keeps idle workers mining the nearest steel patch; trains workers
 up to the current miner saturation of its starting steel cluster; builds a depot when supply is
 about to choke; builds up to `BASE_TARGET_BARRACKS` barracks by default, then adds more when its
 steel bank grows large; pumps riflemen from each barracks; and attack-moves riflemen at the nearest
@@ -639,11 +647,13 @@ though the launched wave itself always includes every ready rifleman, not just t
 If the AI stalls for `WAVE_STALL_RESET_TICKS`, it resets the threshold to the baseline instead of
 waiting forever for an oversized regroup. Riflemen already meaningfully past the rally line keep
 pressing forward instead of being recalled into staging. It does not micro, tech to tanks, or
-scout. A local per-think budget prevents it from over-committing minerals/supply it doesn't have.
+scout. A local per-think budget prevents it from over-committing resources/supply it doesn't have.
 
-**Win/elimination.** AI players count exactly like humans: a 1-human + N-AI match is a real match
-(it resolves to a winner), while a lone human with no AI remains a never-ending sandbox. The
-lobby's `match_player_count` is humans **+** AIs.
+**Win/elimination.** AI players count as match players: a 1-human + N-AI match is a real match
+(it resolves to a winner), while a lone human with no AI remains a never-ending sandbox. They have
+one special elimination rule: an AI with no units left is defeated even if it still owns buildings,
+because it has no player input path back into the game. The lobby's `match_player_count` is humans
+**+** AIs.
 
 ---
 
@@ -670,7 +680,7 @@ simulation behavior.
 
 **MVP coverage.** The first scripted self-play test spawns two non-AI players, gives each the same
 deterministic build/tech/attack script, and runs the match headlessly under `cargo test`. The
-scripts gather minerals and gas, construct a Depot, Barracks, and Tank Factory, train Riflemen and a Tank,
+scripts gather steel and oil, construct a Depot, Barracks, and Tank Factory, train Riflemen and a Tank,
 and attack-move toward a public combat rendezvous that sits four tiles toward the center from each
 player's start line. The harness checks per-tick invariants
 for invalid resources, supply overflow, malformed entity snapshots, out-of-bounds positions, and

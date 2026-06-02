@@ -1,10 +1,10 @@
 use std::collections::BTreeSet;
 
 use crate::config;
-use crate::rules;
 use crate::game::entity::EntityKind;
 use crate::game::entity::EntityStore;
 use crate::protocol::{MapInfo, Snapshot};
+use crate::rules;
 
 pub(crate) const DEFAULT_BUILD_SEARCH_MIN_RADIUS: i32 = 3;
 pub(crate) const DEFAULT_BUILD_SEARCH_MAX_RADIUS: i32 = 16;
@@ -311,8 +311,7 @@ mod tests {
         let (tank_steel, tank_oil) = rules::economy::cost(EntityKind::Tank);
         let tank_supply = rules::economy::supply_cost(EntityKind::Tank);
         let (depot_steel, _) = rules::economy::cost(EntityKind::Depot);
-        let mut budget =
-            SpendBudget::new(tank_steel + depot_steel, tank_oil, 0, tank_supply + 1);
+        let mut budget = SpendBudget::new(tank_steel + depot_steel, tank_oil, 0, tank_supply + 1);
 
         assert!(budget.can_afford_unit(EntityKind::Tank));
         assert!(budget.reserve_unit(EntityKind::Tank));
@@ -360,8 +359,6 @@ mod tests {
                     prod_progress: None,
                     prod_queue: None,
                     build_progress: None,
-                    carrying: None,
-                    carrying_kind: None,
                     latched_node: None,
                     remaining: Some(100),
                     target_id: None,
@@ -381,8 +378,6 @@ mod tests {
                     prod_progress: None,
                     prod_queue: None,
                     build_progress: None,
-                    carrying: None,
-                    carrying_kind: None,
                     latched_node: None,
                     remaining: Some(100),
                     target_id: None,
@@ -402,8 +397,6 @@ mod tests {
                     prod_progress: None,
                     prod_queue: None,
                     build_progress: None,
-                    carrying: None,
-                    carrying_kind: None,
                     latched_node: None,
                     remaining: Some(100),
                     target_id: None,
@@ -423,8 +416,6 @@ mod tests {
                     prod_progress: None,
                     prod_queue: None,
                     build_progress: None,
-                    carrying: None,
-                    carrying_kind: None,
                     latched_node: None,
                     remaining: Some(100),
                     target_id: None,
@@ -444,8 +435,6 @@ mod tests {
                     prod_progress: None,
                     prod_queue: None,
                     build_progress: None,
-                    carrying: None,
-                    carrying_kind: None,
                     latched_node: None,
                     remaining: Some(0),
                     target_id: None,

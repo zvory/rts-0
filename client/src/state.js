@@ -116,6 +116,7 @@ export class GameState {
       supplyCap: msg.supplyCap | 0,
     };
     this.events = msg.events || [];
+    this._pruneSelection();
 
     for (const ev of this.events) {
       if (ev && ev.e === "attack" && typeof ev.from === "number" && typeof ev.to === "number") {
@@ -184,6 +185,7 @@ export class GameState {
    * @returns {Array<object>}
    */
   selectedEntities() {
+    this._pruneSelection();
     const out = [];
     for (const id of this.selection) {
       const e = this._curById.get(id);
@@ -209,6 +211,7 @@ export class GameState {
    * @param {Iterable<number>} ids
    */
   addToSelection(ids) {
+    this._pruneSelection();
     for (const id of ids) {
       if (this.selection.size >= GameState.MAX_SELECTION_SIZE) break;
       this.selection.add(id);
@@ -218,6 +221,21 @@ export class GameState {
   /** Clear the selection. */
   clearSelection() {
     this.selection.clear();
+  }
+
+  /** Drop selected ids that are no longer present in the latest snapshot. */
+  _pruneSelection() {
+    if (!this.selection || this.selection.size === 0) return;
+    let changed = false;
+    const live = new Set();
+    for (const id of this.selection) {
+      if (this._curById.has(id)) {
+        live.add(id);
+      } else {
+        changed = true;
+      }
+    }
+    if (changed) this.selection = live;
   }
 
   // --- build placement (client-only) -------------------------------------

@@ -41,7 +41,7 @@ node tests/server_integration.mjs
 ## Headless simulation self-play
 
 Runs inside the Rust test suite with no live server. The tests create scripted API clients that
-drive `Game` through `enqueue`/`tick`/`snapshot_for`, exercising gathering, gas,
+drive `Game` through `enqueue`/`tick`/`snapshot_for`, exercising gathering, oil,
 Depot/Barracks/Tank Factory construction, Rifleman/Tank training, rush pressure, and combat.
 Successful runs replay the authoritative tick-stamped command log through a fresh game and compare
 the replayed event stream and final snapshots against the live run. On failure it writes replay

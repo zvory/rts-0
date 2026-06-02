@@ -16,7 +16,10 @@ pub(crate) fn production_system(
         let (owner, kind, completed_unit) = {
             let b = match entities.get_mut(id) {
                 Some(b)
-                    if b.is_building() && !b.under_construction() && !b.prod_queue().is_empty() =>
+                    if b.hp > 0
+                        && b.is_building()
+                        && !b.under_construction()
+                        && !b.prod_queue().is_empty() =>
                 {
                     b
                 }

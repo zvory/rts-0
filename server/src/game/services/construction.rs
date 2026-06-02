@@ -28,7 +28,7 @@ pub(crate) fn construction_system(
     let arrivals: Vec<(u32, EntityKind, u32, u32)> = entities
         .iter()
         .filter_map(|e| {
-            if !e.is_unit() {
+            if e.hp == 0 || !e.is_unit() {
                 return None;
             }
             if e.build_phase() != Some(BuildPhase::ToSite) {
@@ -52,8 +52,6 @@ pub(crate) fn construction_system(
         };
 
         // Re-validate placement against the live entity set.
-        let occ = Occupancy::build(map, entities);
-        let _ = &occ; // placeable scans entities directly; rebuilt here for symmetry/future use.
         let placeable = footprint_placeable(map, entities, spatial, kind, tx, ty);
         let stats = match config::building_stats(kind) {
             Some(s) => s,
@@ -112,7 +110,7 @@ pub(crate) fn construction_system(
     let working: Vec<(u32, u32)> = entities
         .iter()
         .filter_map(|e| {
-            if !e.is_unit() {
+            if e.hp == 0 || !e.is_unit() {
                 return None;
             }
             match e.build_phase()? {
@@ -125,7 +123,7 @@ pub(crate) fn construction_system(
     for (worker, site) in working {
         let completed = {
             let b = match entities.get_mut(site) {
-                Some(b) if b.under_construction() => b,
+                Some(b) if b.hp > 0 && b.under_construction() => b,
                 _ => {
                     if let Some(w) = entities.get_mut(worker) {
                         w.clear_orders();

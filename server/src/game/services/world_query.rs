@@ -130,6 +130,7 @@ pub(crate) fn nearest_tank_in_range(
 }
 
 /// Nearest non-empty resource node of `kind` to `(px, py)` within `max_radius_px`.
+#[allow(dead_code)]
 pub(crate) fn nearest_resource_node(
     entities: &EntityStore,
     spatial: &SpatialIndex,

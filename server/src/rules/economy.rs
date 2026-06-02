@@ -76,6 +76,7 @@ pub fn supply_cost(kind: EntityKind) -> u32 {
 }
 
 /// Supply provided by a building kind. Returns 0 for non-buildings.
+#[allow(dead_code)]
 pub fn supply_provided(kind: EntityKind) -> u32 {
     config::building_stats(kind)
         .map(|s| s.provides_supply)
