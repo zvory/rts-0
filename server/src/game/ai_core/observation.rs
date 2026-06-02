@@ -301,7 +301,7 @@ impl AiEntitySummary {
             production_queue_len: production_queue_len(kind, view.prod_queue.unwrap_or(0) as usize),
             latched_node: view.latched_node,
             target_id: view.target_id,
-            free_for_combat: state == AiEntityState::Idle && view.target_id.is_none(),
+            free_for_combat: snapshot_free_for_combat(state, view.target_id),
         })
     }
 }
@@ -345,6 +345,14 @@ fn live_free_for_combat(entity: &Entity) -> bool {
         Order::AttackMove(_) => entity.path_is_empty() && entity.target_id().is_none(),
         _ => false,
     }
+}
+
+fn snapshot_free_for_combat(state: AiEntityState, target_id: Option<u32>) -> bool {
+    target_id.is_none()
+        && matches!(
+            state,
+            AiEntityState::Idle | AiEntityState::Move | AiEntityState::Attack
+        )
 }
 
 fn pending_build_intent_from_live_worker(worker: &Entity) -> Option<AiBuildIntent> {
@@ -477,6 +485,53 @@ mod tests {
             vec![30]
         );
         assert_eq!(observation.pending_builds.len(), 1);
+    }
+
+    #[test]
+    fn selfplay_moving_combat_units_can_rejoin_profile_waves() {
+        let staged = EntityView::new(
+            10,
+            1,
+            EntityKind::Rifleman.to_protocol_str(),
+            32.0,
+            32.0,
+            1,
+            1,
+            states::MOVE,
+        );
+        let attack_moving = EntityView::new(
+            12,
+            1,
+            EntityKind::Tank.to_protocol_str(),
+            96.0,
+            32.0,
+            1,
+            1,
+            states::ATTACK,
+        );
+        let mut engaged = EntityView::new(
+            11,
+            1,
+            EntityKind::Rifleman.to_protocol_str(),
+            64.0,
+            32.0,
+            1,
+            1,
+            states::MOVE,
+        );
+        engaged.target_id = Some(20);
+        let mut snapshot = empty_snapshot(42);
+        snapshot.entities = vec![staged, engaged, attack_moving];
+        let start = start_payload();
+
+        let observation = AiObservation::from_selfplay_snapshot(&start, &snapshot, 1, []).unwrap();
+
+        let staged = observation.owned.iter().find(|e| e.id == 10).unwrap();
+        let attack_moving = observation.owned.iter().find(|e| e.id == 12).unwrap();
+        let engaged = observation.owned.iter().find(|e| e.id == 11).unwrap();
+        assert!(staged.free_for_combat);
+        assert!(attack_moving.free_for_combat);
+        assert!(!engaged.free_for_combat);
     }
 
     #[test]

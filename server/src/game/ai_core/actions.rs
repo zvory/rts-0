@@ -34,6 +34,7 @@ impl SpendBudget {
         }
     }
 
+    #[cfg(test)]
     pub(crate) fn free_supply(&self) -> u32 {
         self.free_supply
     }
@@ -133,6 +134,7 @@ impl<'a> AiActionContext<'a> {
         }
     }
 
+    #[cfg(test)]
     pub(crate) fn budget(&self) -> &SpendBudget {
         &self.budget
     }
@@ -367,6 +369,7 @@ pub(crate) fn assign_workers_to_resource(
     assignments
 }
 
+#[cfg(test)]
 pub(crate) fn ready_attack_wave<T>(
     units: impl IntoIterator<Item = T>,
     min_size: usize,

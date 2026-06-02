@@ -173,12 +173,7 @@ fn build_versioned_index(client_dir: &str, version: &str) -> String {
     if let Ok(read_dir) = std::fs::read_dir(&src_dir) {
         let mut names: Vec<String> = read_dir
             .flatten()
-            .filter(|e| {
-                e.path()
-                    .extension()
-                    .map(|x| x == "js")
-                    .unwrap_or(false)
-            })
+            .filter(|e| e.path().extension().map(|x| x == "js").unwrap_or(false))
             .filter_map(|e| e.file_name().into_string().ok())
             .collect();
         names.sort();
