@@ -867,6 +867,9 @@ export class Renderer {
    */
   _fogLevel(fog, tx, ty) {
     if (fog.isVisible(tx, ty)) return 0;
+    // Impassable terrain features (rock/water/trees) render unfogged so the map's
+    // shape is legible even in unexplored areas.
+    if (this._map && isImpassableAt(this._map, tx, ty)) return 0;
     if (fog.isExplored(tx, ty)) return 1;
     return 2;
   }
