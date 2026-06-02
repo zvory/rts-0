@@ -40,15 +40,6 @@ pub const ARRIVE_RADIUS_INTERMEDIATE_PX: f32 = TILE_SIZE as f32 * 0.5; // 16 px
 /// Machine-gunner setup/teardown time. One second at the simulation tick rate.
 pub const MACHINE_GUNNER_SETUP_TICKS: u16 = TICK_HZ as u16;
 
-/// Map size (in tiles) for a given player count. Square, symmetric.
-pub const fn map_size_for(players: usize) -> u32 {
-    if players <= 2 {
-        64
-    } else {
-        96
-    }
-}
-
 // --- Economy ----------------------------------------------------------------
 pub const STARTING_STEEL: u32 = 50;
 pub const STARTING_OIL: u32 = 0;
