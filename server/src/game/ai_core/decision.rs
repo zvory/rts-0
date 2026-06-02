@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 
+use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::config;
@@ -23,6 +24,8 @@ const PRODUCTION_BUILDINGS: [EntityKind; 3] = [
 const LOCAL_DEFENSE_RADIUS_TILES: f32 = 12.0;
 const RESOURCE_LINE_DEFENSE_RADIUS_TILES: f32 = 4.0;
 const WORKER_DEFENSE_RADIUS_TILES: f32 = 5.0;
+const PROXY_DISTANCE_BAND_TILES: f32 = 2.0;
+const PROXY_WORKER_BUILD_SEARCH_RADIUS_TILES: i32 = 4;
 
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct AiDecision {
@@ -416,11 +419,43 @@ where
         return None;
     }
     let enemy_base = facts.nearest_public_enemy_base?;
-    let (tile_x, tile_y) = proxy_barracks_site(observation, enemy_base, kind, policy, placeable)?;
+    let proxy_worker_was_committed = memory.proxy_worker_id.is_some();
     let worker = select_proxy_worker(observation, facts, memory)?;
     let worker_pool = [worker];
+    let worker_entity = observation
+        .owned
+        .iter()
+        .find(|entity| entity.id == worker && entity.kind == EntityKind::Worker)?;
 
-    if actions::try_build_at(actions, &[&worker_pool], kind, tile_x, tile_y).is_some() {
+    if proxy_worker_was_committed {
+        if let Some((tile_x, tile_y)) =
+            proxy_barracks_site_near_worker(observation, worker_entity, kind, placeable)
+        {
+            if actions::try_build_at(actions, &[&worker_pool], kind, tile_x, tile_y).is_some() {
+                memory.proxy_worker_id = Some(worker);
+                return Some(AiIntent::Build { kind });
+            }
+        }
+    }
+
+    let Some(transit_site) =
+        proxy_barracks_transit_site(observation, enemy_base, kind, policy, placeable)
+    else {
+        if !proxy_worker_was_committed {
+            memory.proxy_worker_id = None;
+        }
+        return None;
+    };
+
+    if actions::try_build_at(
+        actions,
+        &[&worker_pool],
+        kind,
+        transit_site.0,
+        transit_site.1,
+    )
+    .is_some()
+    {
         memory.proxy_worker_id = Some(worker);
         return Some(AiIntent::Build { kind });
     }
@@ -428,7 +463,7 @@ where
     if !actions.reserve_worker(worker) {
         return None;
     }
-    let (x, y) = building_center((tile_x, tile_y), kind, observation.map.tile_size)?;
+    let (x, y) = building_center(transit_site, kind, observation.map.tile_size)?;
     actions.emit_command(Command::Move {
         units: vec![worker],
         x,
@@ -443,7 +478,7 @@ fn should_use_proxy_barracks(facts: &AiFacts, profile: &AiProfile) -> bool {
     profile.buildings.proxy_barracks.is_some() && facts.building_count(EntityKind::Barracks) == 0
 }
 
-fn proxy_barracks_site<F>(
+fn proxy_barracks_transit_site<F>(
     observation: &AiObservation,
     enemy_base: EnemyBaseFact,
     kind: EntityKind,
@@ -454,11 +489,15 @@ where
     F: FnMut(EntityKind, u32, u32) -> bool,
 {
     let stats = config::building_stats(kind)?;
+    if stats.foot_w > observation.map.width || stats.foot_h > observation.map.height {
+        return None;
+    }
     let search_radius_tiles = policy
         .search_radius_tiles
         .max(policy.min_enemy_base_distance_tiles)
         .max(0);
-    let min_distance2 = squared(policy.min_enemy_base_distance_tiles.max(0) as f32);
+    let target_distance = policy.min_enemy_base_distance_tiles.max(0) as f32;
+    let min_distance2 = squared(target_distance);
     let enemy_center = (
         enemy_base.start_tile.0 as f32 + 0.5,
         enemy_base.start_tile.1 as f32 + 0.5,
@@ -467,14 +506,12 @@ where
         observation.own_start_tile.0 as f32 + 0.5,
         observation.own_start_tile.1 as f32 + 0.5,
     );
-    let toward_own = (own_center.0 - enemy_center.0, own_center.1 - enemy_center.1);
     let (sx, sy) = (
         enemy_base.start_tile.0 as i32,
         enemy_base.start_tile.1 as i32,
     );
 
-    let mut best_toward_own = None;
-    let mut fallback = None;
+    let mut best = None;
     for dy in -search_radius_tiles..=search_radius_tiles {
         for dx in -search_radius_tiles..=search_radius_tiles {
             if dx.abs().max(dy.abs()) > search_radius_tiles {
@@ -486,7 +523,9 @@ where
                 continue;
             }
             let (tx, ty) = (tx as u32, ty as u32);
-            if tx >= observation.map.width || ty >= observation.map.height {
+            if tx > observation.map.width - stats.foot_w
+                || ty > observation.map.height - stats.foot_h
+            {
                 continue;
             }
 
@@ -498,30 +537,95 @@ where
             if distance2 < min_distance2 || !placeable(kind, tx, ty) {
                 continue;
             }
-            let toward_own_score = dx * toward_own.0 + dy * toward_own.1;
+            let distance = distance2.sqrt();
+            let distance_over_target = (distance - target_distance).max(0.0);
+            let distance_band = (distance_over_target / PROXY_DISTANCE_BAND_TILES).floor() as i32;
             let candidate = ProxySiteCandidate {
                 tile: (tx, ty),
-                distance2,
-                toward_own_score,
+                distance_band,
+                distance_over_target,
+                edge_distance_tiles: footprint_edge_distance_tiles(
+                    (tx, ty),
+                    &stats,
+                    observation.map.width,
+                    observation.map.height,
+                ),
+                scout_path_distance2: point_line_distance2(
+                    (center_x, center_y),
+                    own_center,
+                    enemy_center,
+                ),
             };
-            if toward_own_score >= 0.0 {
-                if proxy_site_candidate_better(candidate, best_toward_own) {
-                    best_toward_own = Some(candidate);
-                }
-            } else if proxy_site_candidate_better(candidate, fallback) {
-                fallback = Some(candidate);
+            if proxy_site_candidate_better(candidate, best) {
+                best = Some(candidate);
             }
         }
     }
 
-    best_toward_own.or(fallback).map(|candidate| candidate.tile)
+    best.map(|candidate| candidate.tile)
+}
+
+fn proxy_barracks_site_near_worker<F>(
+    observation: &AiObservation,
+    worker: &AiEntitySummary,
+    kind: EntityKind,
+    placeable: &mut F,
+) -> Option<(u32, u32)>
+where
+    F: FnMut(EntityKind, u32, u32) -> bool,
+{
+    let stats = config::building_stats(kind)?;
+    if stats.foot_w > observation.map.width || stats.foot_h > observation.map.height {
+        return None;
+    }
+    let tile_size = observation.map.tile_size as f32;
+    if tile_size <= 0.0 {
+        return None;
+    }
+    let worker_tile = (worker.x / tile_size, worker.y / tile_size);
+    let sx = worker_tile.0.floor() as i32;
+    let sy = worker_tile.1.floor() as i32;
+    let mut best = None;
+
+    for dy in -PROXY_WORKER_BUILD_SEARCH_RADIUS_TILES..=PROXY_WORKER_BUILD_SEARCH_RADIUS_TILES {
+        for dx in -PROXY_WORKER_BUILD_SEARCH_RADIUS_TILES..=PROXY_WORKER_BUILD_SEARCH_RADIUS_TILES {
+            if dx.abs().max(dy.abs()) > PROXY_WORKER_BUILD_SEARCH_RADIUS_TILES {
+                continue;
+            }
+            let tx = sx + dx;
+            let ty = sy + dy;
+            if tx < 0 || ty < 0 {
+                continue;
+            }
+            let (tx, ty) = (tx as u32, ty as u32);
+            if tx > observation.map.width - stats.foot_w
+                || ty > observation.map.height - stats.foot_h
+                || !placeable(kind, tx, ty)
+            {
+                continue;
+            }
+            let center_x = tx as f32 + stats.foot_w as f32 * 0.5;
+            let center_y = ty as f32 + stats.foot_h as f32 * 0.5;
+            let candidate = WorkerBuildSiteCandidate {
+                tile: (tx, ty),
+                worker_distance2: dist2(center_x, center_y, worker_tile.0, worker_tile.1),
+            };
+            if worker_build_site_candidate_better(candidate, best) {
+                best = Some(candidate);
+            }
+        }
+    }
+
+    best.map(|candidate| candidate.tile)
 }
 
 #[derive(Clone, Copy, Debug)]
 struct ProxySiteCandidate {
     tile: (u32, u32),
-    distance2: f32,
-    toward_own_score: f32,
+    distance_band: i32,
+    distance_over_target: f32,
+    edge_distance_tiles: u32,
+    scout_path_distance2: f32,
 }
 
 fn proxy_site_candidate_better(
@@ -531,13 +635,79 @@ fn proxy_site_candidate_better(
     let Some(current) = current else {
         return true;
     };
-    if candidate.distance2 != current.distance2 {
-        return candidate.distance2 < current.distance2;
+    if candidate.distance_band != current.distance_band {
+        return candidate.distance_band < current.distance_band;
     }
-    if candidate.toward_own_score != current.toward_own_score {
-        return candidate.toward_own_score > current.toward_own_score;
+    if candidate.edge_distance_tiles != current.edge_distance_tiles {
+        return candidate.edge_distance_tiles < current.edge_distance_tiles;
+    }
+    match candidate
+        .scout_path_distance2
+        .total_cmp(&current.scout_path_distance2)
+    {
+        Ordering::Greater => return true,
+        Ordering::Less => return false,
+        Ordering::Equal => {}
+    }
+    match candidate
+        .distance_over_target
+        .total_cmp(&current.distance_over_target)
+    {
+        Ordering::Less => return true,
+        Ordering::Greater => return false,
+        Ordering::Equal => {}
     }
     candidate.tile < current.tile
+}
+
+#[derive(Clone, Copy, Debug)]
+struct WorkerBuildSiteCandidate {
+    tile: (u32, u32),
+    worker_distance2: f32,
+}
+
+fn worker_build_site_candidate_better(
+    candidate: WorkerBuildSiteCandidate,
+    current: Option<WorkerBuildSiteCandidate>,
+) -> bool {
+    let Some(current) = current else {
+        return true;
+    };
+    match candidate
+        .worker_distance2
+        .total_cmp(&current.worker_distance2)
+    {
+        Ordering::Less => return true,
+        Ordering::Greater => return false,
+        Ordering::Equal => {}
+    }
+    candidate.tile < current.tile
+}
+
+fn footprint_edge_distance_tiles(
+    tile: (u32, u32),
+    stats: &config::BuildingStats,
+    map_width: u32,
+    map_height: u32,
+) -> u32 {
+    let left = tile.0;
+    let top = tile.1;
+    let right = map_width.saturating_sub(tile.0.saturating_add(stats.foot_w));
+    let bottom = map_height.saturating_sub(tile.1.saturating_add(stats.foot_h));
+    left.min(top).min(right).min(bottom)
+}
+
+fn point_line_distance2(point: (f32, f32), line_start: (f32, f32), line_end: (f32, f32)) -> f32 {
+    let vx = line_end.0 - line_start.0;
+    let vy = line_end.1 - line_start.1;
+    let line_len2 = vx * vx + vy * vy;
+    if line_len2 <= f32::EPSILON {
+        return dist2(point.0, point.1, line_start.0, line_start.1);
+    }
+    let wx = point.0 - line_start.0;
+    let wy = point.1 - line_start.1;
+    let cross = wx * vy - wy * vx;
+    cross * cross / line_len2
 }
 
 fn select_proxy_worker(
@@ -869,6 +1039,13 @@ mod tests {
         }
     }
 
+    fn worker_at(id: u32, state: AiEntityState, x: f32, y: f32) -> AiEntitySummary {
+        let mut worker = worker(id, state);
+        worker.x = x;
+        worker.y = y;
+        worker
+    }
+
     fn steel_worker(id: u32, node: u32) -> AiEntitySummary {
         let mut worker = worker(id, AiEntityState::Gather);
         worker.latched_node = Some(node);
@@ -1036,35 +1213,80 @@ mod tests {
         (dx * dx + dy * dy).sqrt()
     }
 
-    fn proxy_site_is_on_own_side_of_enemy(observation: &AiObservation, tile: (u32, u32)) -> bool {
+    fn point_distance_to_enemy_tiles(observation: &AiObservation, point: (f32, f32)) -> f32 {
         let enemy = enemy_start_tile(observation);
         let enemy_center = (enemy.0 as f32 + 0.5, enemy.1 as f32 + 0.5);
+        let dx = point.0 - enemy_center.0;
+        let dy = point.1 - enemy_center.1;
+        (dx * dx + dy * dy).sqrt()
+    }
+
+    fn point_edge_distance_tiles(observation: &AiObservation, point: (f32, f32)) -> f32 {
+        point
+            .0
+            .min(point.1)
+            .min(observation.map.width as f32 - point.0)
+            .min(observation.map.height as f32 - point.1)
+    }
+
+    fn point_scout_path_distance_tiles(observation: &AiObservation, point: (f32, f32)) -> f32 {
         let own_center = (
             observation.own_start_tile.0 as f32 + 0.5,
             observation.own_start_tile.1 as f32 + 0.5,
         );
-        let barracks_center = footprint_center_tiles(tile, EntityKind::Barracks);
-        let to_barracks = (
-            barracks_center.0 - enemy_center.0,
-            barracks_center.1 - enemy_center.1,
-        );
-        let to_own = (own_center.0 - enemy_center.0, own_center.1 - enemy_center.1);
-        to_barracks.0 * to_own.0 + to_barracks.1 * to_own.1 >= 0.0
+        let enemy = enemy_start_tile(observation);
+        let enemy_center = (enemy.0 as f32 + 0.5, enemy.1 as f32 + 0.5);
+        point_line_distance2(point, own_center, enemy_center).sqrt()
     }
 
-    fn assert_enemy_proxy_site(observation: &AiObservation, tile: (u32, u32)) {
+    fn assert_hidden_proxy_point(observation: &AiObservation, point: (f32, f32)) {
+        let distance = point_distance_to_enemy_tiles(observation, point);
+        assert!(
+            distance >= 18.0,
+            "proxy transit target should not be within 18 tiles of the enemy base, got {distance}"
+        );
+        assert!(
+            distance < 20.0,
+            "proxy transit target should stay close to the requested 18-tile ring, got {distance}"
+        );
+        let edge_distance = point_edge_distance_tiles(observation, point);
+        assert!(
+            edge_distance <= 2.0,
+            "proxy transit target should hug a map edge, got {edge_distance} tiles from the edge"
+        );
+        let scout_path_distance = point_scout_path_distance_tiles(observation, point);
+        assert!(
+            scout_path_distance >= 8.0,
+            "proxy transit target should be off the direct scouting line, got {scout_path_distance}"
+        );
+    }
+
+    fn assert_hidden_proxy_site(observation: &AiObservation, tile: (u32, u32)) {
         let distance = proxy_distance_to_enemy_tiles(observation, tile);
         assert!(
-            distance >= 15.0,
-            "proxy barracks should not be within 15 tiles of the enemy base, got {distance}"
+            distance >= 18.0,
+            "proxy barracks target should not be within 18 tiles of the enemy base, got {distance}"
         );
         assert!(
-            distance < 16.0,
-            "proxy barracks should stay close to the enemy base, got {distance}"
+            distance < 20.0,
+            "proxy barracks target should stay close to the requested 18-tile ring, got {distance}"
+        );
+        let stats = config::building_stats(EntityKind::Barracks).expect("barracks stats");
+        let edge_distance = footprint_edge_distance_tiles(
+            tile,
+            &stats,
+            observation.map.width,
+            observation.map.height,
         );
         assert!(
-            proxy_site_is_on_own_side_of_enemy(observation, tile),
-            "proxy barracks should be placed on the approach side of the enemy base"
+            edge_distance <= 1,
+            "proxy barracks target should be near a map edge, got {edge_distance} tiles"
+        );
+        let center = footprint_center_tiles(tile, EntityKind::Barracks);
+        let scout_path_distance = point_scout_path_distance_tiles(observation, center);
+        assert!(
+            scout_path_distance >= 8.0,
+            "proxy barracks target should be off the direct scouting line, got {scout_path_distance}"
         );
         assert_ne!(
             tile,
@@ -1099,28 +1321,27 @@ mod tests {
                 AiIntent::Move { units } if units.as_slice() == [20]
             )
         }));
-        assert!(decision.commands.iter().any(|command| {
-            matches!(
-                command,
-                Command::Move { units, x, y }
-                    if units.as_slice() == [20]
-                        && dist2(
-                            *x,
-                            *y,
-                            enemy_start_tile(&observation).0 as f32 * observation.map.tile_size as f32
-                                + observation.map.tile_size as f32 * 0.5,
-                            enemy_start_tile(&observation).1 as f32 * observation.map.tile_size as f32
-                                + observation.map.tile_size as f32 * 0.5,
-                        ) < dist2(
-                            tile_center(observation.own_start_tile, observation.map.tile_size).0,
-                            tile_center(observation.own_start_tile, observation.map.tile_size).1,
-                            enemy_start_tile(&observation).0 as f32 * observation.map.tile_size as f32
-                                + observation.map.tile_size as f32 * 0.5,
-                            enemy_start_tile(&observation).1 as f32 * observation.map.tile_size as f32
-                                + observation.map.tile_size as f32 * 0.5,
-                        )
-            )
-        }));
+        let move_target = decision
+            .commands
+            .iter()
+            .find_map(|command| match command {
+                Command::Move { units, x, y } if units.as_slice() == [20] => Some((*x, *y)),
+                _ => None,
+            })
+            .expect("proxy worker should receive a move command");
+        let tile_size = observation.map.tile_size as f32;
+        let move_target_tiles = (move_target.0 / tile_size, move_target.1 / tile_size);
+        assert_hidden_proxy_point(&observation, move_target_tiles);
+        assert!(
+            point_distance_to_enemy_tiles(&observation, move_target_tiles)
+                < point_distance_to_enemy_tiles(
+                    &observation,
+                    (
+                        observation.own_start_tile.0 as f32 + 0.5,
+                        observation.own_start_tile.1 as f32 + 0.5,
+                    ),
+                )
+        );
         assert!(
             !decision.commands.iter().any(|command| {
                 matches!(
@@ -1162,9 +1383,61 @@ mod tests {
     }
 
     #[test]
+    fn fast_flood_initial_affordable_proxy_uses_hidden_edge_target() {
+        let mut owned = vec![building(10, EntityKind::IndustrialCenter, Some(0))];
+        owned.extend((0..5).map(|i| worker(20 + i, AiEntityState::Idle)));
+        let observation = observation(
+            AiEconomy {
+                steel: 150,
+                oil: 0,
+                supply_used: 5,
+                supply_cap: config::INDUSTRIAL_CENTER_SUPPLY,
+            },
+            owned,
+        );
+
+        let decision = decide(
+            &observation,
+            &RIFLE_FLOOD_FAST,
+            &mut AiDecisionMemory::for_profile(&RIFLE_FLOOD_FAST),
+        );
+
+        let proxy_builds: Vec<_> = decision
+            .commands
+            .iter()
+            .filter_map(|command| match command {
+                Command::Build {
+                    worker,
+                    building,
+                    tile_x,
+                    tile_y,
+                } if building == EntityKind::Barracks.to_protocol_str() => {
+                    Some((*worker, (*tile_x, *tile_y)))
+                }
+                _ => None,
+            })
+            .collect();
+
+        assert_eq!(
+            proxy_builds.len(),
+            1,
+            "fast rush should send exactly one worker to build the proxy barracks"
+        );
+        assert_eq!(proxy_builds[0].0, 20);
+        assert_hidden_proxy_site(&observation, proxy_builds[0].1);
+    }
+
+    #[test]
     fn fast_flood_builds_proxy_barracks_with_reserved_worker_once_affordable() {
         let mut owned = vec![building(10, EntityKind::IndustrialCenter, Some(0))];
-        owned.push(worker(20, AiEntityState::Move));
+        let tile_size = config::TILE_SIZE as f32;
+        let worker_tile = (30.5, 20.5);
+        owned.push(worker_at(
+            20,
+            AiEntityState::Move,
+            worker_tile.0 * tile_size,
+            worker_tile.1 * tile_size,
+        ));
         owned.extend((0..4).map(|i| worker(21 + i, AiEntityState::Gather)));
         let observation = observation(
             AiEconomy {
@@ -1205,7 +1478,11 @@ mod tests {
             "fast rush should send exactly one worker to build the proxy barracks"
         );
         assert_eq!(proxy_builds[0].0, 20);
-        assert_enemy_proxy_site(&observation, proxy_builds[0].1);
+        let build_center = footprint_center_tiles(proxy_builds[0].1, EntityKind::Barracks);
+        assert!(
+            dist2(build_center.0, build_center.1, worker_tile.0, worker_tile.1) <= squared(1.0),
+            "committed proxy worker should build near its current position"
+        );
         assert!(decision.commands.iter().any(|command| {
             matches!(
                 command,
