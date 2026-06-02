@@ -3,6 +3,13 @@
 Move self-play from bespoke RTS scripts toward shared AI profiles while preserving artifact and
 milestone quality.
 
+Done. Self-play now has a profile-backed `ScriptedPlayer` adapter that owns a shared profile id,
+`AiDecisionMemory`, pending-build tracking, and self-play-only staging guards, then delegates
+command synthesis to `ai_core::decision::decide_profile`. The tech self-play scenario runs
+`tech_to_tanks`, and the worker-rush economy target runs a combat-disabled
+`rifle_flood_full_saturation` profile. `WorkerRushScript` and `MineOnlyScript` remain as
+documented harness scenarios rather than strategy profiles.
+
 This phase should be incremental. Do not delete a scripted scenario until the replacement matchup
 or profile-driven script gives equal or better coverage.
 
@@ -14,15 +21,16 @@ and artifact writing.
 
 ## Current Scripts
 
-Important existing scripts include:
+Important historical scripts included:
 
 - `BuildTechAttackScript`
 - `EconomyScript`
 - `WorkerRushScript`
 - `MineOnlyScript`
 
-These scripts contain useful coverage, but they also duplicate AI mechanics. Migration should keep
-the coverage and remove duplication.
+`BuildTechAttackScript` and `EconomyScript` have been replaced by profile-backed self-play. The
+remaining script-only cases contain useful harness coverage without pretending to be strategy
+profiles.
 
 Treat these as harness scenarios, not as the strategy profile list. The intended mapping is:
 
