@@ -182,7 +182,7 @@ pub(crate) static RIFLE_FLOOD_FAST: AiProfile = AiProfile {
         },
         proxy_barracks: Some(ProxyBarracksPolicy {
             search_radius_tiles: 28,
-            min_enemy_base_distance_tiles: 15,
+            min_enemy_base_distance_tiles: 18,
         }),
         required_tech_path: &FAST_TECH_PATH,
         max_pending_per_kind: 1,

@@ -2290,6 +2290,19 @@ fn rifle_flood_full_saturation_goal() -> PlayerMilestoneGoal {
     .with_min_attack_command_units(6)
 }
 
+fn rifle_flood_full_saturation_under_proxy_pressure_goal() -> PlayerMilestoneGoal {
+    PlayerMilestoneGoal {
+        require_gathering: true,
+        require_depot_supply: true,
+        require_barracks_complete: true,
+        ..PlayerMilestoneGoal::default()
+    }
+    .with_min_workers(config::STARTING_WORKERS + 4)
+    .with_min_supply_cap(config::INDUSTRIAL_CENTER_SUPPLY + config::DEPOT_SUPPLY)
+    .with_min_units(kinds::RIFLEMAN, 1)
+    .with_min_attack_command_units(1)
+}
+
 fn tech_to_tanks_goal() -> PlayerMilestoneGoal {
     PlayerMilestoneGoal {
         require_gathering: true,
@@ -2414,7 +2427,7 @@ fn profile_matchup_rifle_flood_fast_vs_full_saturation() {
                 name: "Full Saturation",
                 color: "#f72585",
                 profile_id: RIFLE_FLOOD_FULL_SATURATION_ID,
-                goal: rifle_flood_full_saturation_goal(),
+                goal: rifle_flood_full_saturation_under_proxy_pressure_goal(),
             },
         ],
         combat_goal: CombatGoal::damage(),
