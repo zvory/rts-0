@@ -5,5 +5,7 @@
 //! before later phases synthesize commands.
 
 pub(crate) mod actions;
+pub(crate) mod decision;
 pub(crate) mod facts;
 pub(crate) mod observation;
+pub(crate) mod profiles;
