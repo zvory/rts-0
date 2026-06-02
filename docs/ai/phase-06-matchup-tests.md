@@ -1,5 +1,11 @@
 # AI-6: Matchup Tests
 
+Done. Self-play now has profile-vs-profile matchup configuration for the three required first
+profiles, shared milestone goals for economy/tech/production/combat behavior, and replay
+determinism checks through the existing self-play success path. The old economy/build-tech scripts
+were already removed by AI-5; `WorkerRushScript` and `MineOnlyScript` remain documented as
+intentional scenario coverage rather than matchup profiles.
+
 Replace brittle scripted coverage with profile-vs-profile tests where that gives better signal.
 
 This phase should start only after live AI and self-play can both use the shared AI core.
