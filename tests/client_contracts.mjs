@@ -10,7 +10,18 @@ import { GameState } from "../client/src/state.js";
 import { Camera } from "../client/src/camera.js";
 import { Fog } from "../client/src/fog.js";
 import { STATS } from "../client/src/config.js";
-import { KIND } from "../client/src/protocol.js";
+import {
+  COMPACT_SNAPSHOT_VERSION,
+  EVENT,
+  EVENT_CODE,
+  KIND,
+  KIND_CODE,
+  SETUP,
+  SETUP_CODE,
+  STATE,
+  STATE_CODE,
+  decodeServerMessage,
+} from "../client/src/protocol.js";
 import { footprintValidAgainstEntities } from "../client/src/input.js";
 
 // ---------------------------------------------------------------------------
@@ -19,6 +30,16 @@ import { footprintValidAgainstEntities } from "../client/src/input.js";
 
 function assert(cond, msg) {
   if (!cond) throw new Error(msg || "Assertion failed");
+}
+
+function assertThrows(fn, msg) {
+  let threw = false;
+  try {
+    fn();
+  } catch (err) {
+    threw = true;
+  }
+  assert(threw, msg);
 }
 
 function assertHasMethod(obj, name, msgPrefix = "") {
@@ -33,6 +54,115 @@ function assertHasGetter(obj, name, msgPrefix = "") {
   assert(
     d && typeof d.get === "function",
     `${msgPrefix || "Object"} missing getter "${name}"`,
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Protocol
+// ---------------------------------------------------------------------------
+{
+  const decoded = decodeServerMessage({
+    t: "snapshot",
+    v: COMPACT_SNAPSHOT_VERSION,
+    s: [42, 100, 25, 3, 10],
+    e: [
+      [
+        1,
+        1,
+        KIND_CODE[KIND.WORKER],
+        10,
+        20,
+        40,
+        40,
+        STATE_CODE[STATE.GATHER],
+        1.5,
+        null,
+        null,
+        null,
+        null,
+        200,
+        9,
+      ],
+      [
+        2,
+        1,
+        KIND_CODE[KIND.MACHINE_GUNNER],
+        30,
+        40,
+        55,
+        55,
+        STATE_CODE[STATE.ATTACK],
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        7,
+        SETUP_CODE[SETUP.DEPLOYED],
+      ],
+      [
+        3,
+        1,
+        KIND_CODE[KIND.INDUSTRIAL_CENTER],
+        100,
+        120,
+        450,
+        500,
+        STATE_CODE[STATE.TRAIN],
+        null,
+        KIND_CODE[KIND.WORKER],
+        0.25,
+        2,
+        0.75,
+      ],
+    ],
+    r: [[200, 1498]],
+    ev: [
+      [EVENT_CODE[EVENT.ATTACK], 1, 7],
+      [EVENT_CODE[EVENT.DEATH], 200, 64, 96, KIND_CODE[KIND.STEEL]],
+      [EVENT_CODE[EVENT.BUILD], 3, KIND_CODE[KIND.INDUSTRIAL_CENTER]],
+      [EVENT_CODE[EVENT.NOTICE], "Not enough steel"],
+    ],
+  });
+
+  assert(decoded.t === "snapshot", "compact snapshot keeps the semantic tag");
+  assert(decoded.tick === 42 && decoded.steel === 100 && decoded.supplyCap === 10, "compact scalars decode");
+  assert(decoded.entities.length === 3, "compact entities decode");
+  assert(decoded.entities[0].kind === KIND.WORKER, "entity kind code decodes");
+  assert(decoded.entities[0].state === STATE.GATHER, "entity state code decodes");
+  assert(decoded.entities[0].latchedNode === 200, "entity optional latchedNode decodes");
+  assert(decoded.entities[1].setupState === SETUP.DEPLOYED, "entity setupState code decodes");
+  assert(decoded.entities[2].prodKind === KIND.WORKER, "entity prodKind code decodes");
+  assert(decoded.entities[2].prodProgress === 0.25, "entity prodProgress decodes");
+  assert(decoded.resourceDeltas[0].remaining === 1498, "resource deltas decode");
+  assert(decoded.events[0].e === EVENT.ATTACK && decoded.events[0].to === 7, "attack event decodes");
+  assert(decoded.events[1].kind === KIND.STEEL, "death event kind decodes");
+  assert(decoded.events[3].msg === "Not enough steel", "notice event decodes");
+
+  assertThrows(
+    () => decodeServerMessage({ t: "snapshot", v: COMPACT_SNAPSHOT_VERSION, s: [1], e: [] }),
+    "compact snapshot rejects malformed scalar count",
+  );
+  assertThrows(
+    () =>
+      decodeServerMessage({
+        t: "snapshot",
+        v: COMPACT_SNAPSHOT_VERSION,
+        s: [1, 0, 0, 0, 0],
+        e: [[1, 1, 255, 0, 0, 1, 1, STATE_CODE[STATE.IDLE]]],
+      }),
+    "compact snapshot rejects unknown enum codes",
+  );
+  assertThrows(
+    () =>
+      decodeServerMessage({
+        t: "snapshot",
+        v: COMPACT_SNAPSHOT_VERSION,
+        s: [1, 0, 0, 0, 0],
+        e: new Array(20001),
+      }),
+    "compact snapshot enforces entity count bounds",
   );
 }
 
