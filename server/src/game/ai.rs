@@ -22,6 +22,7 @@ use crate::game::services::world_query;
 use crate::game::systems;
 use crate::game::PlayerState;
 use crate::protocol::{kinds, Command};
+use crate::rules;
 use std::collections::{BTreeSet, HashSet};
 
 // --- Tuning knobs -----------------------------------------------------------
@@ -134,9 +135,10 @@ impl AiController {
                         Order::Build(_) => {
                             if let Some((kind, _, _)) = e.order().build_intent_tile() {
                                 if e.build_phase() == Some(BuildPhase::ToSite) {
-                                    if let Some(stats) = config::building_stats(kind) {
+                                    if config::building_stats(kind).is_some() {
+                                        let (cost_steel, _) = rules::economy::cost(kind);
                                         committed_steel =
-                                            committed_steel.saturating_add(stats.cost_steel);
+                                            committed_steel.saturating_add(cost_steel);
                                     }
                                 }
                                 match kind {

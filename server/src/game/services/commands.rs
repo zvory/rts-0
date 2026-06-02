@@ -197,13 +197,10 @@ fn order_build(
             return;
         }
     };
-    let stats = match config::building_stats(kind) {
-        Some(s) => s,
-        None => {
-            notice(events, player, "Unknown building");
-            return;
-        }
-    };
+    if config::building_stats(kind).is_none() {
+        notice(events, player, "Unknown building");
+        return;
+    }
 
     let owned = world_query::owned_building_kinds(entities, player);
     if !rules::economy::build_requirement_met(kind, &owned) {
@@ -230,7 +227,8 @@ fn order_build(
         Some(p) => p,
         None => return,
     };
-    if ps.steel < stats.cost_steel || ps.oil < stats.cost_oil {
+    let (cost_steel, cost_oil) = rules::economy::cost(kind);
+    if ps.steel < cost_steel || ps.oil < cost_oil {
         notice(events, player, "Not enough resources");
         return;
     }
@@ -285,17 +283,19 @@ fn order_train(
         Some(p) => p,
         None => return,
     };
-    if ps.steel < stats.cost_steel || ps.oil < stats.cost_oil {
+    let (cost_steel, cost_oil) = rules::economy::cost(kind);
+    let supply = rules::economy::supply_cost(kind);
+    if ps.steel < cost_steel || ps.oil < cost_oil {
         notice(events, player, "Not enough resources");
         return;
     }
-    if ps.supply_used + stats.supply > ps.supply_cap {
+    if ps.supply_used + supply > ps.supply_cap {
         notice(events, player, "Not enough supply");
         return;
     }
-    ps.steel -= stats.cost_steel;
-    ps.oil -= stats.cost_oil;
-    ps.supply_used += stats.supply;
+    ps.steel -= cost_steel;
+    ps.oil -= cost_oil;
+    ps.supply_used += supply;
 
     if let Some(b) = entities.get_mut(building) {
         if let Some(queue) = b.prod_queue_mut() {
@@ -325,11 +325,14 @@ fn order_cancel(
             None => return,
         }
     };
-    if let Some(stats) = config::unit_stats(unit) {
+    if config::unit_stats(unit).is_some() {
         if let Some(ps) = players.iter_mut().find(|p| p.id == player) {
-            ps.steel += stats.cost_steel;
-            ps.oil += stats.cost_oil;
-            ps.supply_used = ps.supply_used.saturating_sub(stats.supply);
+            let (cost_steel, cost_oil) = rules::economy::cost(unit);
+            ps.steel += cost_steel;
+            ps.oil += cost_oil;
+            ps.supply_used = ps
+                .supply_used
+                .saturating_sub(rules::economy::supply_cost(unit));
         }
     }
 }

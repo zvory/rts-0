@@ -1,6 +1,7 @@
 use crate::config;
 use crate::game::entity::EntityStore;
 use crate::game::PlayerState;
+use crate::rules;
 
 /// Recompute each player's supply cap (from completed Industrial Centers/Depots) and supply used (living
 /// units + units still in production queues). Cap is clamped to `SUPPLY_CAP_MAX`.
@@ -13,19 +14,13 @@ pub(crate) fn recompute_supply(players: &mut [PlayerState], entities: &EntitySto
                 continue;
             }
             if e.is_building() && !e.under_construction() {
-                if let Some(s) = config::building_stats(e.kind) {
-                    cap += s.provides_supply;
-                }
+                cap += rules::economy::supply_provided(e.kind);
                 // Units queued for production reserve supply too.
                 for item in e.prod_queue() {
-                    if let Some(us) = config::unit_stats(item.unit) {
-                        used += us.supply;
-                    }
+                    used += rules::economy::supply_cost(item.unit);
                 }
             } else if e.is_unit() {
-                if let Some(us) = config::unit_stats(e.kind) {
-                    used += us.supply;
-                }
+                used += rules::economy::supply_cost(e.kind);
             }
         }
         ps.supply_cap = cap.min(config::SUPPLY_CAP_MAX);
