@@ -6,7 +6,8 @@
 // placement preview. Selection and placement are client-only concepts; the
 // server never sees them directly (only the resulting commands).
 
-import { PASSABLE } from "./protocol.js";
+import { RESOURCE_AMOUNTS } from "./config.js";
+import { KIND, PASSABLE, isResource } from "./protocol.js";
 
 export class GameState {
   /**
@@ -19,6 +20,12 @@ export class GameState {
     this.startInfo = startInfo;
     /** @type {{width:number,height:number,tileSize:number,terrain:number[]}} */
     this.map = startInfo.map;
+    this.map.resources = (this.map.resources || []).map((node, index) =>
+      this._normalizeResource(node, index),
+    );
+    /** @type {Map<number, object>} id -> static resource node with last-known remaining. */
+    this.resourceById = new Map();
+    for (const node of this.map.resources) this.resourceById.set(node.id, node);
     /** @type {Array<{id:number,name:string,color:string,startTileX:number,startTileY:number}>} */
     this.players = startInfo.players || [];
 
@@ -56,8 +63,8 @@ export class GameState {
     /** @type {Array<{kind:string,x:number,y:number,createdAt:number}>} */
     this.commandFeedback = [];
 
-  /** @type {Array<{from:number,to:number,createdAt:number}>} */
-  this.muzzleFlashes = [];
+    /** @type {Array<{from:number,to:number,createdAt:number}>} */
+    this.muzzleFlashes = [];
   }
 
   /** Maximum number of entities the local selection may contain. */
@@ -103,10 +110,14 @@ export class GameState {
     this._prevRecvTime = this._curRecvTime;
     this._prevById = this._curById;
 
-    this._cur = msg;
+    this._applyResourceDeltas(msg.resourceDeltas || []);
+    this._applyResourceDeaths(msg.events || []);
+    const wireEntities = (msg.entities || []).filter((e) => !isResource(e.kind));
+    const entities = wireEntities.concat(this._resourceEntityViews());
+
+    this._cur = { ...msg, entities };
     this._curRecvTime = now;
     this._curById = new Map();
-    const entities = msg.entities || [];
     for (const e of entities) this._curById.set(e.id, e);
 
     this.resources = {
@@ -175,6 +186,42 @@ export class GameState {
    */
   entityById(id) {
     return this._curById.get(id);
+  }
+
+  _normalizeResource(node, index) {
+    const kind = node.kind === KIND.OIL ? KIND.OIL : KIND.STEEL;
+    return {
+      id: typeof node.id === "number" ? node.id : -(index + 1),
+      owner: 0,
+      kind,
+      x: node.x,
+      y: node.y,
+      hp: 1,
+      maxHp: 1,
+      state: "idle",
+      remaining: node.remaining ?? RESOURCE_AMOUNTS[kind] ?? 0,
+    };
+  }
+
+  _applyResourceDeltas(deltas) {
+    for (const delta of deltas) {
+      if (!delta || typeof delta.id !== "number") continue;
+      const node = this.resourceById.get(delta.id);
+      if (!node || typeof delta.remaining !== "number") continue;
+      node.remaining = delta.remaining;
+    }
+  }
+
+  _applyResourceDeaths(events) {
+    for (const ev of events) {
+      if (!ev || ev.e !== "death" || typeof ev.id !== "number") continue;
+      const node = this.resourceById.get(ev.id);
+      if (node) node.remaining = 0;
+    }
+  }
+
+  _resourceEntityViews() {
+    return (this.map.resources || []).map((node) => ({ ...node }));
   }
 
   // --- selection (client-only) -------------------------------------------

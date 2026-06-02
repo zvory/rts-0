@@ -118,7 +118,7 @@ Sent once when the match begins. Carries everything static for the whole match.
     terrain: number[],
     // All neutral resource nodes (static, never move). Sent so the client can
     // render them on the minimap before fog-of-war reveals them.
-    resources: [ { kind: "steel"|"oil", x: f32, y: f32 } ]
+    resources: [ { id: u32, kind: "steel"|"oil", x: f32, y: f32 } ]
   },
   players: [ { id, name, color, startTileX, startTileY } ],
 }
@@ -134,16 +134,22 @@ enabled, every player starts with 1400 steel and 600 oil instead of the default 
   tick: u32,
   steel: u32, oil: u32,       // your resources
   supplyUsed: u32, supplyCap: u32,
-  entities: Entity[],            // your entities (always) + neutral/enemy on visible tiles
+  entities: Entity[],            // your non-resource entities (always) + enemy on visible tiles
+  resourceDeltas?: ResourceDelta[], // visible resource remaining updates; omitted when empty
   events: Event[]                // transient things to surface (see 2.5)
 }
 ```
+`ResourceDelta`: `{ id: u32, remaining: u32 }`. Resource node positions/kinds are static and come
+from `start.map.resources`; clients keep last-known `remaining` locally. The server sends
+`remaining` updates only for resource nodes currently visible to that recipient (dev full-world
+watch rooms receive all resource updates).
+
 `Entity` (lean; omit fields that don't apply):
 ```
 {
   id: u32,
   owner: u32,                    // 0 = neutral (resources), else player id
-  kind: string,                  // EntityKind: "worker","rifleman","machine_gunner","at_team","tank","industrial_center","depot","barracks","training_centre","tank_factory","steel","oil"
+  kind: string,                  // EntityKind: "worker","rifleman","machine_gunner","at_team","tank","industrial_center","depot","barracks","training_centre","tank_factory"
   x: f32, y: f32,                // world px (center)
   hp: u32, maxHp: u32,
   state: string,                 // "idle","move","attack","gather","build","train","construct","dead"
@@ -156,8 +162,6 @@ enabled, every player starts with 1400 steel and 600 oil instead of the default 
   buildProgress?: f32,           // 0..1; when present and <1, render as scaffolding
   // workers:
   latchedNode?: u32,             // node id the worker is currently harvesting (attached mining)
-  // resource nodes:
-  remaining?: u32,               // resource left in the node; currently sent even through fog
   // combat feedback:
   targetId?: u32,                // current attack target, for drawing tracers
   setupState?: string            // machine_gunner only: "packed","setting_up","deployed","tearing_down"
@@ -473,8 +477,8 @@ start the rAF loop (compute `alpha` from snapshot timing, `camera.update`, `inpu
 - Buildings: footprint-sized blocky field structures with neutral geometry and plain
   two-letter stencils; under construction → translucent with a progress bar; production →
   small progress arc.
-- Resource nodes: steel = tan supply crates; oil = olive fuel drums; show remaining via
-  size/opacity.
+- Resource nodes: steel = tan supply crates; oil = olive fuel drums; show last-known remaining
+  from `resourceDeltas` via size/opacity.
 - Terrain: muted grass/field/mud, rock, and water tiles with deterministic coarse dithering
   so movement is readable and the map has a PlayStation 1-era low-resolution texture feel.
 - Fog: unexplored = 86% dark overlay so terrain remains faintly readable; explored-but-not-visible =
