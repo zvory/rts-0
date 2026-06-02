@@ -15,7 +15,7 @@
 //! through its docs so the placement / spawn surface is discoverable from one place.
 
 use crate::config;
-use crate::game::entity::{Entity, EntityKind, EntityStore, GatherPhase, NEUTRAL};
+use crate::game::entity::{Entity, EntityKind, EntityStore, NEUTRAL};
 use crate::game::services::spatial::SpatialIndex;
 
 // --- Ownership scans --------------------------------------------------------
@@ -133,18 +133,7 @@ pub(crate) fn nearest_tank_in_range(
 /// `Harvesting` phase — stale ids are ignored so commands can race for a freed slot without
 /// being blocked by a dead/cancelled holder.
 pub(crate) fn node_holder(entities: &EntityStore, node: u32) -> Option<u32> {
-    let m = entities.get(node).and_then(|n| n.miner())?;
-    let w = entities.get(m)?;
-    let on_this_node = w.order().gather_node() == Some(node);
-    if w.hp > 0
-        && w.kind == EntityKind::Worker
-        && on_this_node
-        && w.gather_phase() == Some(GatherPhase::Harvesting)
-    {
-        Some(m)
-    } else {
-        None
-    }
+    entities.node_slot_holder(node)
 }
 
 // --- Cheap predicates re-exported for convenience ---------------------------

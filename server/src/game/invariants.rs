@@ -4,7 +4,7 @@
 //! panic-on-failure so broken assumptions surface immediately during development.
 
 use crate::config;
-use crate::game::entity::{EntityKind, GatherPhase, Order, NEUTRAL};
+use crate::game::entity::{Order, NEUTRAL};
 use crate::game::services::movement::is_collision_anchored;
 use crate::game::services::occupancy::building_footprint;
 use crate::game::Game;
@@ -131,39 +131,12 @@ impl Game {
                 continue;
             }
             if let Some(miner_id) = e.miner() {
-                let miner = match self.entities.get(miner_id) {
-                    Some(m) => m,
-                    None => {
-                        // Advisory field pointing at a dead entity is allowed as a
-                        // transient condition; the gather system self-heals it next tick.
-                        continue;
-                    }
-                };
-                assert!(
-                    miner.kind == EntityKind::Worker,
-                    "invariant: node {} miner {} is not a worker (kind {:?})",
-                    e.id,
-                    miner_id,
-                    miner.kind
-                );
-                assert!(
-                    miner.hp > 0,
-                    "invariant: node {} miner {} has hp == 0",
+                assert_eq!(
+                    self.entities.node_slot_holder(e.id),
+                    Some(miner_id),
+                    "invariant: node {} miner {} is not a valid harvest-slot holder",
                     e.id,
                     miner_id
-                );
-                let on_this_node = miner.order().gather_node() == Some(e.id);
-                assert!(
-                    on_this_node,
-                    "invariant: node {} miner {} does not have Gather order for this node (order {:?})",
-                    e.id, miner_id, miner.order()
-                );
-                assert!(
-                    miner.gather_phase() == Some(GatherPhase::Harvesting),
-                    "invariant: node {} miner {} gather_phase is not Harvesting ({:?})",
-                    e.id,
-                    miner_id,
-                    miner.gather_phase()
                 );
             }
         }
