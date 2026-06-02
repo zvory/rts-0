@@ -852,7 +852,7 @@ export class Renderer {
             const a = runLevel === 2
               ? FOG_UNEXPLORED_ALPHA
               : runLevel === 3
-                ? FOG_UNEXPLORED_ALPHA * 0.35
+                ? FOG_UNEXPLORED_ALPHA * 0.56
                 : FOG_EXPLORED_ALPHA;
             g.beginFill(color, a);
             g.drawRect(runStart * ts, ty * ts, (tx - runStart) * ts, ts);
