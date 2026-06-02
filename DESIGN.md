@@ -694,8 +694,9 @@ ranked decision loop (`decision.rs`) that emits ordinary `Command`s through shar
 The first code-defined profiles are `rifle_flood_fast`, `rifle_flood_full_saturation`, and
 `tech_to_tanks`; they parameterize worker targets, supply buffers, building/tech goals, production
 priorities, resource timing, and attack thresholds without providing their own `think()` functions.
-`rifle_flood_fast` sends a reserved worker toward the map center immediately, before it can afford
-the barracks, then uses that worker to place the first barracks as a proxy once steel is available;
+`rifle_flood_fast` sends exactly one reserved worker toward the nearest public enemy start tile
+immediately, before it can afford the barracks, then uses that same worker to place the first
+barracks as a proxy near the enemy base while staying at least 15 tiles away from the enemy start;
 it trains only one extra home worker and attack-moves riflemen as individual pressure units instead
 of waiting for escalating waves.
 `tech_to_tanks` is a steel-first fast-tech profile: it keeps worker production active while saving

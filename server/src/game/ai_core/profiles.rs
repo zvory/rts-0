@@ -89,6 +89,7 @@ pub(crate) struct BuildingPolicy {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct ProxyBarracksPolicy {
     pub(crate) search_radius_tiles: i32,
+    pub(crate) min_enemy_base_distance_tiles: i32,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -180,7 +181,8 @@ pub(crate) static RIFLE_FLOOD_FAST: AiProfile = AiProfile {
             max: 4,
         },
         proxy_barracks: Some(ProxyBarracksPolicy {
-            search_radius_tiles: 12,
+            search_radius_tiles: 28,
+            min_enemy_base_distance_tiles: 15,
         }),
         required_tech_path: &FAST_TECH_PATH,
         max_pending_per_kind: 1,
