@@ -207,9 +207,9 @@ fn build_versioned_index(client_dir: &str, version: &str) -> String {
 ///
 /// Layout (see `DESIGN.md` §3.2):
 /// - Split the socket into a sink (writer) and a stream (reader).
-/// - Spawn a dedicated **writer task** that drains an `mpsc::Receiver<ServerMessage>` to the
-///   sink. The room sends through the matching sender via [`RoomEvent::Join`], so a slow socket
-///   only backs up its own channel — it never blocks the room.
+/// - Spawn a dedicated **writer task** that drains reliable messages and latest-only snapshots
+///   to the sink. The room sends through the matching connection sink via [`RoomEvent::Join`],
+///   so a slow socket only backs up its own outbound state — it never blocks the room.
 /// - On this task, send `welcome`, then read `ClientMessage`s and translate them to
 ///   [`RoomEvent`]s for whichever room the client joins.
 /// - On stream close (or any fatal read error) emit a final [`RoomEvent::Leave`].
@@ -221,33 +221,71 @@ async fn handle_connection(socket: WebSocket, lobby: Lobby) {
 
     let (mut sink, mut stream) = socket.split();
 
-    // Outbound channel: room (and this task, for welcome/pong) -> writer task -> socket.
-    let (msg_tx, mut msg_rx) = mpsc::channel::<ServerMessage>(lobby::player_channel_cap());
+    // Outbound path: room (and this task, for welcome/pong) -> writer task -> socket.
+    let (conn_tx, writer_rx) = lobby::ConnectionSink::new();
 
     // Writer task: serialize each ServerMessage to a JSON TEXT frame and push it to the socket.
-    // Exits when the channel closes (connection cleanup) or the socket errors.
+    // Reliable messages are FIFO and prioritized over snapshots. Snapshots are latest-only:
+    // while the socket is busy, newer snapshots replace older unsent snapshots.
     let writer = tokio::spawn(async move {
-        while let Some(msg) = msg_rx.recv().await {
-            match serde_json::to_string(&msg) {
-                Ok(json) => {
-                    if sink.send(Message::Text(json.into())).await.is_err() {
-                        // Socket gone; stop writing. The reader side will emit Leave.
+        let lobby::ConnectionWriter {
+            mut reliable_rx,
+            snapshots,
+        } = writer_rx;
+        let mut reliable_closed = false;
+
+        'write_loop: loop {
+            while !reliable_closed {
+                match reliable_rx.try_recv() {
+                    Ok(msg) => {
+                        if !send_server_message(player_id, &mut sink, msg).await {
+                            break 'write_loop;
+                        }
+                    }
+                    Err(mpsc::error::TryRecvError::Empty) => break,
+                    Err(mpsc::error::TryRecvError::Disconnected) => {
+                        reliable_closed = true;
                         break;
                     }
                 }
-                Err(err) => {
-                    // Should never happen for our own types, but never let it kill the task.
-                    warn!(player_id, %err, "failed to serialize server message");
+            }
+
+            if let Some(snapshot) = snapshots.take() {
+                if !send_server_message(player_id, &mut sink, ServerMessage::Snapshot(snapshot))
+                    .await
+                {
+                    break 'write_loop;
                 }
+                // Send at most one snapshot before checking reliable messages again.
+                continue;
+            }
+
+            if reliable_closed {
+                break;
+            }
+
+            tokio::select! {
+                maybe_msg = reliable_rx.recv() => {
+                    match maybe_msg {
+                        Some(msg) => {
+                            if !send_server_message(player_id, &mut sink, msg).await {
+                                break 'write_loop;
+                            }
+                        }
+                        None => reliable_closed = true,
+                    }
+                }
+                _ = snapshots.notified() => {}
             }
         }
+
         // Best-effort close; ignore errors since the socket may already be gone.
         let _ = sink.close().await;
     });
 
     // Announce the assigned id before anything else.
-    if msg_tx
-        .send(ServerMessage::Welcome { player_id })
+    if conn_tx
+        .send_reliable(ServerMessage::Welcome { player_id })
         .await
         .is_err()
     {
@@ -287,13 +325,13 @@ async fn handle_connection(socket: WebSocket, lobby: Lobby) {
                     Err(err) => {
                         // Malformed input is the client's problem; tell it and keep the socket.
                         debug!(player_id, %err, "ignoring malformed client message");
-                        let _ = msg_tx.try_send(ServerMessage::Error {
+                        let _ = conn_tx.try_send_reliable(ServerMessage::Error {
                             msg: "malformed message".to_string(),
                         });
                         continue;
                     }
                 };
-                handle_client_message(player_id, parsed, &lobby, &msg_tx, &mut current_room).await;
+                handle_client_message(player_id, parsed, &lobby, &conn_tx, &mut current_room).await;
             }
             Message::Binary(_) => {
                 // The protocol is JSON text only; ignore stray binary frames.
@@ -313,10 +351,31 @@ async fn handle_connection(socket: WebSocket, lobby: Lobby) {
     if let Some(handle) = &current_room {
         let _ = handle.event_tx.send(RoomEvent::Leave { player_id }).await;
     }
-    // Dropping `msg_tx` closes the writer's channel, ending the writer task.
-    drop(msg_tx);
+    // Dropping `conn_tx` closes the writer's reliable channel, ending the writer task after it
+    // flushes any pending latest snapshot.
+    drop(conn_tx);
     let _ = writer.await;
     debug!(player_id, "connection closed");
+}
+
+async fn send_server_message(
+    player_id: u32,
+    sink: &mut futures_util::stream::SplitSink<WebSocket, Message>,
+    msg: ServerMessage,
+) -> bool {
+    match serde_json::to_string(&msg) {
+        Ok(json) => {
+            if sink.send(Message::Text(json.into())).await.is_err() {
+                // Socket gone; stop writing. The reader side will emit Leave.
+                return false;
+            }
+        }
+        Err(err) => {
+            // Should never happen for our own types, but never let it kill the task.
+            warn!(player_id, %err, "failed to serialize server message");
+        }
+    }
+    true
 }
 
 /// Translate one parsed [`ClientMessage`] into the appropriate side effect.
@@ -328,7 +387,7 @@ async fn handle_client_message(
     player_id: u32,
     msg: ClientMessage,
     lobby: &Lobby,
-    msg_tx: &mpsc::Sender<ServerMessage>,
+    conn_tx: &lobby::ConnectionSink,
     current_room: &mut Option<lobby::RoomHandle>,
 ) {
     match msg {
@@ -356,7 +415,7 @@ async fn handle_client_message(
                 .send(RoomEvent::Join {
                     player_id,
                     name,
-                    msg_tx: msg_tx.clone(),
+                    msg_tx: conn_tx.clone(),
                     ack: ack_tx,
                 })
                 .await
@@ -423,7 +482,7 @@ async fn handle_client_message(
         }
         ClientMessage::Ping { ts } => {
             // Answer directly so latency probes work regardless of room state.
-            let _ = msg_tx.try_send(ServerMessage::Pong { ts });
+            let _ = conn_tx.try_send_reliable(ServerMessage::Pong { ts });
         }
         ClientMessage::SetReplaySpeed { speed } => {
             send_room_event(player_id, current_room, RoomEvent::SetReplaySpeed { speed }).await;
