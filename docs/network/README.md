@@ -5,15 +5,13 @@ Rust server.
 
 Start here:
 
-- [WebTransport feasibility overview](webtransport-feasibility.md)
+- [Network stutter plan](network-stutter-plan.md)
 
 Phase docs:
 
 - [Phase 00: measure the freeze](phase-00-measurement.md)
-- [Phase 01: WebSocket snapshot coalescing](phase-01-websocket-coalescing.md)
-- [Phase 02: entity interpolation cleanup](phase-02-entity-interpolation-cleanup.md)
-- [Phase 03: transport abstraction](phase-03-transport-abstraction.md)
-- [Phase 04: WebTransport reliable control plane](phase-04-webtransport-control-plane.md)
-- [Phase 05: unreliable snapshot delivery](phase-05-unreliable-snapshots.md)
-- [Phase 06: payload optimization](phase-06-payload-optimization.md)
-- [Phase 07: deployment and rollout](phase-07-deployment-rollout.md)
+- [Phase 01: reliable message priority](phase-01-reliable-message-priority.md)
+- [Phase 02: latest-only snapshots](phase-02-latest-only-snapshots.md)
+- [Phase 03: interpolation buffer tuning](phase-03-interpolation-buffer.md)
+- [Phase 04: entity interpolation cleanup](phase-04-entity-interpolation-cleanup.md)
+- [Phase 05: compact/binary WebSocket snapshots](phase-05-websocket-compact-snapshots.md)

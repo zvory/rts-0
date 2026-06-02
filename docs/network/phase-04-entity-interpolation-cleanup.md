@@ -1,11 +1,11 @@
-# Phase 02: Entity Interpolation Cleanup
+# Phase 04: Entity Interpolation Cleanup
 
 Purpose: remove one obviously wasteful client-side allocation path without treating client
 rendering as the root cause of the stutter.
 
 This phase is optional. It is kept because repeated `entitiesInterpolated()` calls allocate and
-clone more than necessary, and that is easy to clean up. Do not broaden this phase into HUD,
-minimap, fog, or renderer throttling work.
+clone more than necessary, and that is easy to clean up. Do not broaden this phase into unrelated
+UI/rendering work.
 
 ## Current Waste
 

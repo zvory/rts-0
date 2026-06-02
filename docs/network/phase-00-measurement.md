@@ -4,7 +4,7 @@ Purpose: prove where the half-second freeze happens before changing the transpor
 network head-of-line blocking, stale snapshot backlog, message parse/apply cost, or server tick
 cost without a trace.
 
-This phase is intentionally simple and can be done before WebTransport work starts.
+This phase is intentionally simple and can be done before implementation starts.
 
 ## Questions To Answer
 
@@ -115,15 +115,18 @@ Record:
 - snapshot receive interval histogram;
 - `net.latency` p50/p90/p99 from app-level pings;
 - snapshot byte p50/p90/p99/max;
-- dropped/stale snapshot counts, if Phase 01 coalescing has been added.
+- dropped/stale snapshot counts, if Phase 02 latest-only delivery has been added;
+- active interpolation delay.
 
 ## Interpretation Guide
 
 If snapshot receive intervals show 300-500 ms gaps under loss:
 
 - network delivery or ordered-stream head-of-line is plausible;
-- Phase 01 coalescing should still be tried first because it is simpler;
-- WebTransport datagrams become more attractive if gaps remain after coalescing.
+- Phase 01 reliable priority and Phase 02 latest-only delivery should still be tried first because
+  they are simpler;
+- Phase 03 interpolation tuning may hide small receive jitter without changing the transport;
+- Phase 05 compact/binary snapshots may reduce the size and parse cost of each ordered frame.
 
 If the server tick loop falls behind:
 
@@ -132,12 +135,13 @@ If the server tick loop falls behind:
 
 If writer `sink.send(...)` stalls but the room tick loop does not:
 
-- Phase 01 is directly relevant because stale snapshots can accumulate per player.
+- Phase 01 is relevant because reliable messages should not wait behind snapshots.
+- Phase 02 is relevant because stale snapshots can accumulate per player.
 
 ## Done Criteria
 
 - There is one trace showing an actual freeze with client, server, and network timings.
 - Worst-case snapshot payload p50/p90/p99/max are recorded.
 - The trace identifies the dominant class of problem.
-- The next phase recommendation is explicit: message parse/apply cleanup, Phase 01 coalescing, or
-  deeper WebTransport work.
+- The next phase recommendation is explicit: message parse/apply cleanup, Phase 01/02 WebSocket
+  queue work, Phase 03 interpolation tuning, or Phase 05 snapshot compaction.
