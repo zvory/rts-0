@@ -1,14 +1,10 @@
 use std::collections::BTreeSet;
 
 use crate::config;
-#[cfg(test)]
 use crate::game::ai_core::facts;
-#[cfg(test)]
 use crate::game::ai_core::observation::AiResourceSummary;
 use crate::game::entity::EntityKind;
-#[cfg(test)]
 use crate::game::entity::EntityStore;
-#[cfg(test)]
 use crate::protocol::{MapInfo, Snapshot};
 use crate::rules;
 
@@ -97,7 +93,7 @@ impl SpendBudget {
     }
 }
 
-#[cfg(test)]
+#[allow(dead_code)]
 pub(crate) fn main_base_steel_saturation_target_from_entities(
     entities: &EntityStore,
     start_tile: (u32, u32),
@@ -115,7 +111,7 @@ pub(crate) fn main_base_steel_saturation_target_from_entities(
     )
 }
 
-#[cfg(test)]
+#[allow(dead_code)]
 pub(crate) fn main_base_steel_saturation_target_from_snapshot(
     map: &MapInfo,
     snapshot: &Snapshot,

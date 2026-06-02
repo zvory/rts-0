@@ -9,7 +9,7 @@ use crate::game::entity::EntityKind;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ArmorClass {
-    Soft,
+    Small,
     Armored,
 }
 
@@ -81,7 +81,7 @@ pub const UNITS: &[UnitDef] = &[
             build_ticks: 360,
             radius: 9.0,
         },
-        armor_class: ArmorClass::Soft,
+        armor_class: ArmorClass::Small,
         weapon: WeaponClass::SmallArms,
         target_priority: TargetPriority::Default,
         trained_at: Some(EntityKind::IndustrialCenter),
@@ -102,7 +102,7 @@ pub const UNITS: &[UnitDef] = &[
             build_ticks: 300,
             radius: 9.0,
         },
-        armor_class: ArmorClass::Soft,
+        armor_class: ArmorClass::Small,
         weapon: WeaponClass::SmallArms,
         target_priority: TargetPriority::Default,
         trained_at: Some(EntityKind::Barracks),
@@ -123,7 +123,7 @@ pub const UNITS: &[UnitDef] = &[
             build_ticks: 400,
             radius: 10.0,
         },
-        armor_class: ArmorClass::Soft,
+        armor_class: ArmorClass::Small,
         weapon: WeaponClass::SmallArms,
         target_priority: TargetPriority::Default,
         trained_at: Some(EntityKind::Barracks),
@@ -135,7 +135,7 @@ pub const UNITS: &[UnitDef] = &[
             hp: 45,
             dmg: 48,
             range_tiles: 5,
-            cooldown: 96,
+            cooldown: 72,
             speed: 1.28,
             sight_tiles: 8,
             cost_steel: 75,
@@ -144,7 +144,7 @@ pub const UNITS: &[UnitDef] = &[
             build_ticks: 440,
             radius: 10.0,
         },
-        armor_class: ArmorClass::Soft,
+        armor_class: ArmorClass::Small,
         weapon: WeaponClass::AntiTank,
         target_priority: TargetPriority::PrefersArmored,
         trained_at: Some(EntityKind::Barracks),

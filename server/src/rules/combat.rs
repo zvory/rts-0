@@ -54,14 +54,25 @@ pub fn prefers_armored_targets(kind: EntityKind) -> bool {
         .unwrap_or(false)
 }
 
-/// Applies the AP/armor damage formula.
+/// Miss probability [0.0, 1.0) for an attack. AP weapons have a high miss rate against small
+/// targets (dispersed infantry) — the shell flies straight through without finding anyone.
+/// Hits that do connect deal full damage.
+pub fn miss_chance(attacker_kind: EntityKind, victim_kind: EntityKind) -> f32 {
+    if is_ap(attacker_kind) && !is_armored(victim_kind) {
+        0.65
+    } else {
+        0.0
+    }
+}
+
+/// Applies the AP/armor damage formula. The miss_chance roll is handled at the call site.
 pub fn effective_damage(
     attacker_kind: EntityKind,
     victim_kind: EntityKind,
     base_dmg: u32,
     victim_terrain: Option<TerrainKind>,
 ) -> u32 {
-    let armor_adjusted = if is_armored(victim_kind) && !is_ap(attacker_kind) {
+    let armor_adjusted = if !is_ap(attacker_kind) && is_armored(victim_kind) {
         base_dmg / 4
     } else {
         base_dmg
@@ -98,7 +109,7 @@ mod tests {
     }
 
     #[test]
-    fn ap_vs_unarmored_full_damage() {
+    fn ap_vs_small_full_damage_on_hit() {
         assert_eq!(
             effective_damage(EntityKind::AtTeam, EntityKind::Rifleman, 20, None),
             20
