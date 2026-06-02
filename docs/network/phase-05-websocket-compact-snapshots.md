@@ -2,9 +2,8 @@
 
 Purpose: reduce WebSocket frame size and snapshot parse/apply pressure without changing transport.
 
-This phase should be measurement-driven. Do it after Phase 00 shows that snapshot size, JSON parse,
-or JSON object allocation is a material contributor, or after Phase 01/02 still leave unacceptable
-stutter under packet loss.
+Do this after Phase 01/02 if stutter remains and snapshot frames are large enough, frequent enough,
+or expensive enough to justify the extra protocol surface.
 
 ## Why This Helps The Current WebSocket Path
 
@@ -19,7 +18,8 @@ This still uses one reliable ordered WebSocket. It does not remove TCP head-of-l
 
 ## Scope
 
-Optimize snapshots first. Keep lobby/control messages as JSON unless measurement says otherwise.
+Optimize snapshots first. Keep lobby/control messages as JSON unless there is a concrete reason to
+change them.
 
 Candidate approaches, in increasing complexity:
 
@@ -55,7 +55,7 @@ bytes ...   event count + event records
 ```
 
 Entity records should use numeric kind/state ids mirrored between Rust and JS. Positions can be
-quantized if measurement shows it is worth it.
+quantized later if visual comparison shows the loss of precision is acceptable.
 
 Keep `server/src/protocol.rs` as the semantic source of truth even if snapshot wire encoding gets a
 binary transport-specific representation.
@@ -77,7 +77,7 @@ repeated while visible. That also helps Phase 02 and this phase.
 
 ## Done Criteria
 
-- Snapshot byte p50/p90/p99/max improves under representative load.
-- Parse/apply cost improves if that was the measured problem.
+- Snapshot byte size improves under representative load.
+- Parse/apply cost improves if it was a contributor.
 - Control messages can remain JSON and reliable.
 - WebSocket fallback and existing tests pass.
