@@ -726,14 +726,20 @@ clients, so a replay proves both the recorded command artifact and the determini
 ordering. Entity iteration and A* tie-breaking must remain stable; avoid hash-order-dependent
 simulation behavior.
 
-**MVP coverage.** The first scripted self-play test spawns two non-AI players, gives each the same
-deterministic build/tech/attack script, and runs the match headlessly under `cargo test`. The
-scripts gather steel and oil, construct a Depot, Barracks, and Tank Factory, train Riflemen and a Tank,
-and attack-move toward a public combat rendezvous that sits four tiles toward the center from each
-player's start line. The harness checks per-tick invariants
+**Profile-backed coverage.** The main scripted self-play test spawns two non-AI players, gives each
+the shared `tech_to_tanks` AI profile through the self-play adapter, and runs the match headlessly
+under `cargo test`. The profile gathers steel and oil, constructs supply and tech structures,
+trains Riflemen and Tanks, and launches mixed attack-move waves at public enemy start tiles. The
+self-play adapter owns harness-only state such as pending build intents, failed build spots, and
+staging/attack guards needed to interpret fog-filtered snapshots without duplicating profile
+strategy logic. The harness checks per-tick invariants
 for invalid resources, supply overflow, malformed entity snapshots, out-of-bounds positions, and
 non-finite progress values. It also enforces progress deadlines so a stuck economy/tech/combat loop
 fails as a deadlock instead of timing out silently.
+
+Special harness scripts remain where they cover behavior that is not a normal AI strategy profile:
+`WorkerRushScript` is an all-in worker-pull scenario, and `MineOnlyScript` is passive mining/fairness
+coverage. These scripts are kept isolated from the canonical profile list.
 
 **Artifacts.** On failure, the test writes `target/selfplay-failures/<test>-<pid>-<time>/`
 with:

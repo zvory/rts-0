@@ -14,15 +14,17 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
 
+use super::ai_core::decision::{decide_profile, AiDecisionMemory, AiIntent};
+use super::ai_core::profiles::{
+    profile_by_id, AiProfile, RIFLE_FLOOD_FULL_SATURATION, RIFLE_FLOOD_FULL_SATURATION_ID,
+    TECH_TO_TANKS_ID,
+};
 use super::replay::{replay_commands, EventLogEntry, PlayerSnapshot, ReplayOutcome};
 use super::{Game, PlayerInit};
 use crate::config;
-use crate::game::ai_core::actions::{
-    self, AiActionContext, BuildPlacementRequest, ResourceAssignmentPolicy, SpendBudget,
-    TrainUnitsRequest,
-};
+use crate::game::ai_core::actions::{self, AiActionContext, ResourceAssignmentPolicy, SpendBudget};
 use crate::game::ai_core::facts::AiFacts;
-use crate::game::ai_core::observation::{AiBuildIntent, AiEntityState, AiObservation};
+use crate::game::ai_core::observation::{AiBuildIntent, AiObservation};
 use crate::game::ai_shared;
 use crate::game::entity::EntityKind;
 use crate::protocol::{
@@ -45,8 +47,8 @@ const MAX_STALL_TICKS: u32 = 1_800;
 const SAMPLE_EVERY_TICKS: u32 = 30;
 const THINK_INTERVAL: u32 = 6;
 const ATTACK_REISSUE_TICKS: u32 = 120;
+const SELFPLAY_ATTACK_STAGE_SUPPRESSION_TICKS: u32 = 3_600;
 const RESOURCE_SANITY_LIMIT: u32 = 1_000_000;
-const SCRIPT_STEEL_WORKER_CAP: usize = 8;
 const SELFPLAY_FAILURE_DIR: &str = "selfplay-failures";
 const SELFPLAY_ARTIFACT_DIR: &str = "selfplay-artifacts";
 const SAVE_REPLAY_ENV: &str = "RTS_SELFPLAY_SAVE_REPLAY";
@@ -79,8 +81,8 @@ impl LiveSelfPlay {
             },
         ];
         let scripts: Vec<Box<dyn ScriptedPlayer>> = vec![
-            Box::new(BuildTechAttackScript::new(players[0].id)),
-            Box::new(BuildTechAttackScript::new(players[1].id)),
+            Box::new(ProfileBackedScript::new(players[0].id, TECH_TO_TANKS_ID)),
+            Box::new(ProfileBackedScript::new(players[1].id, TECH_TO_TANKS_ID)),
         ];
         Self { players, scripts }
     }
@@ -176,83 +178,28 @@ impl PlayerView<'_> {
     }
 }
 
-fn pending_build_intents(
-    pending_builds: &BTreeMap<u32, (EntityKind, u32, u32, u32)>,
-) -> Vec<AiBuildIntent> {
-    pending_builds
-        .iter()
-        .map(|(worker_id, (kind, tile_x, tile_y, _issued_tick))| {
-            AiBuildIntent::to_site(*worker_id, *kind, *tile_x, *tile_y)
-        })
-        .collect()
-}
-
-struct BuildTechAttackScript {
-    player_id: u32,
-    oil_workers: usize,
-    target_barracks: usize,
-    wave_number: usize,
-    assigned_oil_workers: BTreeSet<u32>,
-    initial_gather_sent: bool,
-    last_attack_tick: u32,
-    last_oil_assignment_tick: u32,
-    /// Outstanding Build orders we've issued: worker_id → (building kind, target tile).
-    /// Under the "reserve on arrival" model the building doesn't appear in the snapshot
-    /// until the worker arrives at the site, so without this we'd keep re-issuing the
-    /// same build every think tick. Entries are pruned when the worker leaves the BUILD
-    /// state.
-    pending_builds: BTreeMap<u32, (EntityKind, u32, u32, u32)>,
-    /// Tiles where a Build order failed at arrival (worker went idle without a building
-    /// appearing). Used to bias `find_build_spot` away from spots the server has
-    /// rejected so the script doesn't loop on the same deterministic tile forever.
-    failed_build_spots: HashMap<EntityKind, BTreeSet<(u32, u32)>>,
-}
-
 const FAILED_SPOTS_CAP: usize = 16;
-/// Force a pending build to be treated as failed if the building still hasn't appeared
-/// after this many ticks. Covers cases where the worker gets stuck pathing to the site
-/// (e.g. blocked by hard collision in a tight corner) and never leaves BUILD state —
-/// without this the entry would pin the spot forever.
+/// Force a pending build to be treated as failed if the building still hasn't appeared after this
+/// many ticks. Covers cases where the worker gets stuck pathing to the site and never leaves BUILD
+/// state; without this the entry would pin the spot forever.
 const PENDING_BUILD_WATCHDOG_TICKS: u32 = 300;
 
-impl BuildTechAttackScript {
-    fn new(player_id: u32) -> Self {
-        BuildTechAttackScript {
-            player_id,
-            oil_workers: 2,
-            target_barracks: 1,
-            wave_number: 0,
-            assigned_oil_workers: BTreeSet::new(),
-            initial_gather_sent: false,
-            last_attack_tick: 0,
-            last_oil_assignment_tick: 0,
-            pending_builds: BTreeMap::new(),
-            failed_build_spots: HashMap::new(),
-        }
-    }
-
-    fn should_think(&self, tick: u32) -> bool {
-        tick == 0
-            || tick
-                .wrapping_add(self.player_id)
-                .is_multiple_of(THINK_INTERVAL)
-    }
+#[derive(Clone, Copy)]
+struct PendingBuild {
+    kind: EntityKind,
+    tile_x: u32,
+    tile_y: u32,
+    issued_tick: u32,
 }
 
-impl ScriptedPlayer for BuildTechAttackScript {
-    fn player_id(&self) -> u32 {
-        self.player_id
-    }
+#[derive(Default)]
+struct PendingBuildTracker {
+    pending: BTreeMap<u32, PendingBuild>,
+    failed_spots: HashMap<EntityKind, BTreeSet<(u32, u32)>>,
+}
 
-    fn name(&self) -> &'static str {
-        "build-tech-attack"
-    }
-
-    fn commands(&mut self, view: PlayerView<'_>) -> Vec<Command> {
-        if !self.should_think(view.tick) {
-            return Vec::new();
-        }
-
+impl PendingBuildTracker {
+    fn observe(&mut self, view: PlayerView<'_>) {
         let own: Vec<&EntityView> = view
             .snapshot
             .entities
@@ -264,291 +211,125 @@ impl ScriptedPlayer for BuildTechAttackScript {
             .copied()
             .filter(|e| is_kind(e, EntityKind::Worker))
             .collect();
+        let mut dropped = Vec::new();
+        self.pending.retain(|worker_id, pending| {
+            let in_build = workers
+                .iter()
+                .any(|w| w.id == *worker_id && w.state == states::BUILD);
+            let watchdog_expired =
+                view.tick.saturating_sub(pending.issued_tick) >= PENDING_BUILD_WATCHDOG_TICKS;
+            let keep = in_build && !watchdog_expired;
+            if !keep {
+                dropped.push(*pending);
+            }
+            keep
+        });
 
-        // Drop pending-build entries whose worker is no longer in BUILD state — either the
-        // worker arrived and the building was spawned (it will appear in `own`), or the
-        // arrival failed/order was cleared and the worker went idle. For dropped entries,
-        // distinguish success (building of that kind now overlaps the target tile) from
-        // failure (no such building) and record failed tiles so future picks avoid them.
-        let mut dropped: Vec<(EntityKind, u32, u32)> = Vec::new();
-        let now = view.tick;
-        self.pending_builds
-            .retain(|wid, (kind, tx, ty, issued_tick)| {
-                let in_build = workers
-                    .iter()
-                    .any(|w| w.id == *wid && w.state == states::BUILD);
-                let watchdog_expired =
-                    now.saturating_sub(*issued_tick) >= PENDING_BUILD_WATCHDOG_TICKS;
-                let keep = in_build && !watchdog_expired;
-                if !keep {
-                    dropped.push((*kind, *tx, *ty));
-                }
-                keep
-            });
-        for (kind, tx, ty) in dropped {
+        for pending in dropped {
             let succeeded = own.iter().any(|e| {
-                is_kind(e, kind) && building_footprint_tiles(&view.start.map, e).contains(&(tx, ty))
+                is_kind(e, pending.kind)
+                    && building_footprint_tiles(&view.start.map, e)
+                        .contains(&(pending.tile_x, pending.tile_y))
             });
             if succeeded {
-                self.failed_build_spots.remove(&kind);
+                self.failed_spots.remove(&pending.kind);
             } else {
-                let set = self.failed_build_spots.entry(kind).or_default();
-                set.insert((tx, ty));
+                let set = self.failed_spots.entry(pending.kind).or_default();
+                set.insert((pending.tile_x, pending.tile_y));
                 if set.len() > FAILED_SPOTS_CAP {
                     set.clear();
                 }
             }
         }
-
-        let Some(observation) = view.observation(pending_build_intents(&self.pending_builds))
-        else {
-            return Vec::new();
-        };
-        let facts = AiFacts::from_observation(&observation);
-        let target_workers = facts
-            .target_steel_workers
-            .min(SCRIPT_STEEL_WORKER_CAP)
-            .saturating_add(self.oil_workers);
-
-        let mut idle_workers: Vec<u32> = workers
-            .iter()
-            .filter(|e| e.state == states::IDLE)
-            .map(|e| e.id)
-            .collect();
-        idle_workers.sort_unstable();
-        let mut builder_workers: Vec<u32> = idle_workers
-            .iter()
-            .copied()
-            .filter(|id| !self.assigned_oil_workers.contains(id))
-            .collect();
-        builder_workers.extend(
-            workers
-                .iter()
-                .filter(|e| e.state != states::IDLE && e.state != states::BUILD)
-                .filter(|e| !self.assigned_oil_workers.contains(&e.id))
-                .map(|e| e.id),
-        );
-
-        let industrial_centers = facts.production_buildings(EntityKind::IndustrialCenter);
-        let complete_barracks = facts.production_buildings(EntityKind::Barracks);
-        let complete_tank_factories = facts.production_buildings(EntityKind::TankFactory);
-        let depot_count = facts.building_count(EntityKind::Depot);
-        let depot_under_construction = facts.depot_in_progress;
-        let barracks_count = facts.building_count(EntityKind::Barracks);
-        let tank_factory_count = facts.building_count(EntityKind::TankFactory);
-        let tank_count = own.iter().filter(|e| is_kind(e, EntityKind::Tank)).count();
-
-        let budget = SpendBudget::new(
-            view.snapshot.steel,
-            view.snapshot.oil,
-            view.snapshot.supply_used,
-            view.snapshot.supply_cap,
-        );
-        let mut actions = AiActionContext::new(&facts, budget);
-
-        // Build tech before spending the early economy on extra workers.
-        let needs_barracks = complete_barracks.len() < self.target_barracks
-            && barracks_count < self.target_barracks + 1;
-        if needs_barracks {
-            self.build_if_affordable(view, EntityKind::Barracks, &mut actions, &builder_workers);
-        }
-
-        let wants_depot = !depot_under_construction
-            && (view.snapshot.supply_cap < config::INDUSTRIAL_CENTER_SUPPLY + config::DEPOT_SUPPLY
-                || actions.budget().free_supply() <= 4
-                || (depot_count == 0 && !complete_barracks.is_empty()));
-        if wants_depot {
-            self.build_if_affordable(view, EntityKind::Depot, &mut actions, &builder_workers);
-        }
-
-        let needs_tank_factory = !complete_barracks.is_empty() && tank_factory_count == 0;
-        if needs_tank_factory {
-            self.build_if_affordable(
-                view,
-                EntityKind::TankFactory,
-                &mut actions,
-                &builder_workers,
-            );
-        }
-
-        actions::train_units(
-            &mut actions,
-            TrainUnitsRequest {
-                buildings: industrial_centers,
-                unit_priorities: &[EntityKind::Worker],
-                max_queue_depth: 1,
-                save_for_tech: false,
-                current_counts: &[(EntityKind::Worker, workers.len())],
-                max_counts: &[(EntityKind::Worker, target_workers)],
-            },
-        );
-
-        let saving_for_first_tank =
-            needs_tank_factory || (tank_count == 0 && !complete_tank_factories.is_empty());
-        actions::train_units(
-            &mut actions,
-            TrainUnitsRequest {
-                buildings: complete_barracks,
-                unit_priorities: &[EntityKind::Rifleman],
-                max_queue_depth: 1,
-                save_for_tech: saving_for_first_tank,
-                current_counts: &[],
-                max_counts: &[],
-            },
-        );
-
-        actions::train_units(
-            &mut actions,
-            TrainUnitsRequest {
-                buildings: complete_tank_factories,
-                unit_priorities: &[EntityKind::Tank],
-                max_queue_depth: 1,
-                save_for_tech: false,
-                current_counts: &[(EntityKind::Tank, tank_count)],
-                max_counts: &[(EntityKind::Tank, 1)],
-            },
-        );
-
-        self.assign_workers(view, &observation, &mut actions);
-
-        let has_tech_unit = tank_count > 0;
-        let attack_due = view.tick.saturating_sub(self.last_attack_tick) >= ATTACK_REISSUE_TICKS;
-        if has_tech_unit && attack_due {
-            let wave_size = 3 + self.wave_number;
-            let ready_combat = actions::select_ready_combat_units(
-                &observation.owned,
-                &[EntityKind::Rifleman, EntityKind::Tank],
-            );
-            let Some(combat_units) = actions::ready_attack_wave(ready_combat, wave_size, Some)
-            else {
-                return actions.into_commands();
-            };
-            let (x, y) = combat_rendezvous_world(view);
-            actions::attack_move_units(&mut actions, combat_units, x, y);
-            self.last_attack_tick = view.tick;
-            self.wave_number += 1;
-        }
-
-        actions.into_commands()
     }
-}
 
-impl BuildTechAttackScript {
-    fn build_if_affordable(
-        &mut self,
-        view: PlayerView<'_>,
-        building: EntityKind,
-        actions: &mut AiActionContext<'_>,
-        builder_workers: &[u32],
-    ) -> Option<actions::BuildAction> {
-        let empty = BTreeSet::new();
-        let skip = self.failed_build_spots.get(&building).unwrap_or(&empty);
-        let start = own_start_tile(view.start, view.player_id)?;
-        let occupied = occupied_tiles_from_snapshot(&view.start.map, view.snapshot);
-        let action = actions::try_build(
-            actions,
-            &[builder_workers],
-            BuildPlacementRequest {
+    fn intents(&self) -> Vec<AiBuildIntent> {
+        self.pending
+            .iter()
+            .map(|(worker_id, pending)| {
+                AiBuildIntent::to_site(*worker_id, pending.kind, pending.tile_x, pending.tile_y)
+            })
+            .collect()
+    }
+
+    fn record_commands(&mut self, tick: u32, commands: &[Command]) {
+        for command in commands {
+            let Command::Build {
+                worker,
                 building,
-                map_width: view.start.map.width,
-                map_height: view.start.map.height,
-                start_tile: start,
-                search: ai_shared::BuildSearch::default(),
-                skip_tiles: skip,
-                placeable: |tx, ty| {
-                    footprint_placeable_from_snapshot(&view.start.map, building, tx, ty, &occupied)
-                },
-            },
-        )?;
-        self.pending_builds.insert(
-            action.worker,
-            (building, action.tile_x, action.tile_y, view.tick),
-        );
-        Some(action)
-    }
-
-    fn assign_workers(
-        &mut self,
-        view: PlayerView<'_>,
-        observation: &AiObservation,
-        actions: &mut AiActionContext<'_>,
-    ) {
-        let has_steel = observation
-            .resources
-            .iter()
-            .any(|node| node.kind == EntityKind::Steel && node.remaining > 0);
-        let has_oil = observation
-            .resources
-            .iter()
-            .any(|node| node.kind == EntityKind::Oil && node.remaining > 0);
-        if !has_steel && !has_oil {
-            return;
-        }
-
-        let can_assign_oil = self.assigned_oil_workers.len() < self.oil_workers
-            && view.tick > 0
-            && view.tick.saturating_sub(self.last_oil_assignment_tick) >= 90
-            && has_oil
-            && view
-                .snapshot
-                .entities
-                .iter()
-                .any(|e| e.owner == view.player_id && is_kind(e, EntityKind::Barracks));
-        let latched_nodes: BTreeSet<u32> = observation
-            .owned
-            .iter()
-            .filter_map(|worker| worker.latched_node)
-            .collect();
-        if can_assign_oil {
-            let remaining_oil_workers = self
-                .oil_workers
-                .saturating_sub(self.assigned_oil_workers.len());
-            let assigned = actions::assign_workers_to_resource(
-                actions,
-                ResourceAssignmentPolicy {
-                    workers: &observation.owned,
-                    resources: &observation.resources,
-                    resource_kind: EntityKind::Oil,
-                    candidate_worker_ids: None,
-                    skip_workers: &self.assigned_oil_workers,
-                    pre_reserved_nodes: &latched_nodes,
-                    idle_only: false,
-                    max_assignments: Some(remaining_oil_workers),
+                tile_x,
+                tile_y,
+            } = command
+            else {
+                continue;
+            };
+            let Ok(kind) = building.parse::<EntityKind>() else {
+                continue;
+            };
+            if config::building_stats(kind).is_none() {
+                continue;
+            }
+            self.pending.insert(
+                *worker,
+                PendingBuild {
+                    kind,
+                    tile_x: *tile_x,
+                    tile_y: *tile_y,
+                    issued_tick: tick,
                 },
             );
-            for assignment in assigned {
-                self.assigned_oil_workers.insert(assignment.worker);
-            }
-            self.last_oil_assignment_tick = view.tick;
         }
+    }
 
-        actions::assign_workers_to_resource(
-            actions,
-            ResourceAssignmentPolicy {
-                workers: &observation.owned,
-                resources: &observation.resources,
-                resource_kind: EntityKind::Steel,
-                candidate_worker_ids: None,
-                skip_workers: &self.assigned_oil_workers,
-                pre_reserved_nodes: &latched_nodes,
-                idle_only: self.initial_gather_sent,
-                max_assignments: None,
-            },
-        );
-        self.initial_gather_sent = true;
+    fn failed(&self, kind: EntityKind, tile_x: u32, tile_y: u32) -> bool {
+        self.failed_spots
+            .get(&kind)
+            .map(|spots| spots.contains(&(tile_x, tile_y)))
+            .unwrap_or(false)
     }
 }
 
-struct EconomyScript {
+struct ProfileBackedScript {
     player_id: u32,
-    initial_gather_sent: bool,
+    profile: &'static AiProfile,
+    memory: AiDecisionMemory,
+    pending_builds: PendingBuildTracker,
+    staged_units: BTreeSet<u32>,
+    active_attack_units: BTreeMap<u32, u32>,
+    allow_combat_commands: bool,
+    script_name: &'static str,
 }
 
-impl EconomyScript {
-    fn new(player_id: u32) -> Self {
-        EconomyScript {
+impl ProfileBackedScript {
+    fn new(player_id: u32, profile_id: &'static str) -> Self {
+        Self::with_combat(player_id, profile_id, true, profile_id)
+    }
+
+    fn economy_only(player_id: u32) -> Self {
+        Self::with_combat(
             player_id,
-            initial_gather_sent: false,
+            RIFLE_FLOOD_FULL_SATURATION_ID,
+            false,
+            "profile-economy",
+        )
+    }
+
+    fn with_combat(
+        player_id: u32,
+        profile_id: &'static str,
+        allow_combat_commands: bool,
+        script_name: &'static str,
+    ) -> Self {
+        let profile = profile_by_id(profile_id).unwrap_or(&RIFLE_FLOOD_FULL_SATURATION);
+        Self {
+            player_id,
+            profile,
+            memory: AiDecisionMemory::for_profile(profile),
+            pending_builds: PendingBuildTracker::default(),
+            staged_units: BTreeSet::new(),
+            active_attack_units: BTreeMap::new(),
+            allow_combat_commands,
+            script_name,
         }
     }
 
@@ -560,13 +341,13 @@ impl EconomyScript {
     }
 }
 
-impl ScriptedPlayer for EconomyScript {
+impl ScriptedPlayer for ProfileBackedScript {
     fn player_id(&self) -> u32 {
         self.player_id
     }
 
     fn name(&self) -> &'static str {
-        "economy"
+        self.script_name
     }
 
     fn commands(&mut self, view: PlayerView<'_>) -> Vec<Command> {
@@ -574,66 +355,101 @@ impl ScriptedPlayer for EconomyScript {
             return Vec::new();
         }
 
-        let Some(observation) = view.observation([]) else {
+        self.pending_builds.observe(view);
+        let Some(observation) = view.observation(self.pending_builds.intents()) else {
             return Vec::new();
         };
-        let facts = AiFacts::from_observation(&observation);
-        let industrial_centers = facts.production_buildings(EntityKind::IndustrialCenter);
-        let target_workers = facts.target_steel_workers.min(SCRIPT_STEEL_WORKER_CAP);
+        self.prune_combat_memory(&observation, view.tick);
 
-        let mut builder_workers: Vec<u32> = observation
-            .owned
-            .iter()
-            .filter(|e| e.kind == EntityKind::Worker && e.state == AiEntityState::Idle)
-            .map(|e| e.id)
-            .collect();
-        builder_workers.sort_unstable();
-        builder_workers.extend(
-            observation
-                .owned
-                .iter()
-                .filter(|e| e.kind == EntityKind::Worker)
-                .filter(|e| e.state != AiEntityState::Idle && e.state != AiEntityState::Build)
-                .map(|e| e.id),
-        );
-
-        let depot_under_construction = facts.depot_in_progress;
-        let budget = SpendBudget::new(
-            view.snapshot.steel,
-            view.snapshot.oil,
-            view.snapshot.supply_used,
-            view.snapshot.supply_cap,
-        );
-        let mut actions = AiActionContext::new(&facts, budget);
-
-        if !depot_under_construction
-            && actions.budget().free_supply() <= 2
-            && view.snapshot.supply_cap < config::SUPPLY_CAP_MAX
-        {
-            build_near_own_start_if_affordable(
-                view,
-                EntityKind::Depot,
-                &mut actions,
-                &builder_workers,
-            );
-        }
-
-        actions::train_units(
-            &mut actions,
-            TrainUnitsRequest {
-                buildings: industrial_centers,
-                unit_priorities: &[EntityKind::Worker],
-                max_queue_depth: 1,
-                save_for_tech: false,
-                current_counts: &[(EntityKind::Worker, facts.worker_count)],
-                max_counts: &[(EntityKind::Worker, target_workers)],
+        let occupied = occupied_tiles_from_snapshot(&view.start.map, view.snapshot);
+        let failed_builds = &self.pending_builds;
+        let decision = decide_profile(
+            &observation,
+            self.profile,
+            &mut self.memory,
+            ai_shared::BuildSearch::default(),
+            |building, tile_x, tile_y| {
+                !failed_builds.failed(building, tile_x, tile_y)
+                    && footprint_placeable_from_snapshot(
+                        &view.start.map,
+                        building,
+                        tile_x,
+                        tile_y,
+                        &occupied,
+                    )
             },
         );
+        debug_assert_eq!(decision.profile_id, self.profile.id);
 
-        assign_steel_workers(&observation, &mut actions, self.initial_gather_sent);
-        self.initial_gather_sent = true;
+        let mut commands =
+            self.filter_repeated_stage_commands(view.tick, &decision.intents, decision.commands);
+        if !self.allow_combat_commands {
+            commands.retain(|command| {
+                !matches!(command, Command::Attack { .. } | Command::AttackMove { .. })
+            });
+        }
+        self.pending_builds.record_commands(view.tick, &commands);
+        commands
+    }
+}
 
-        actions.into_commands()
+impl ProfileBackedScript {
+    fn prune_combat_memory(&mut self, observation: &AiObservation, tick: u32) {
+        let owned: BTreeSet<u32> = observation.owned.iter().map(|entity| entity.id).collect();
+        self.staged_units.retain(|id| owned.contains(id));
+        let suppress_ticks = self
+            .profile
+            .attack
+            .reissue_cadence_ticks
+            .max(SELFPLAY_ATTACK_STAGE_SUPPRESSION_TICKS);
+        self.active_attack_units.retain(|id, issued| {
+            owned.contains(id) && tick.saturating_sub(*issued) < suppress_ticks
+        });
+    }
+
+    fn filter_repeated_stage_commands(
+        &mut self,
+        tick: u32,
+        intents: &[AiIntent],
+        commands: Vec<Command>,
+    ) -> Vec<Command> {
+        let mut attacking = BTreeSet::new();
+        let mut staging = BTreeSet::new();
+        for intent in intents {
+            match intent {
+                AiIntent::Attack { units } => attacking.extend(units.iter().copied()),
+                AiIntent::Stage { units } => staging.extend(units.iter().copied()),
+                AiIntent::Build { .. } | AiIntent::Train { .. } | AiIntent::Gather { .. } => {}
+            }
+        }
+        for id in &attacking {
+            self.staged_units.remove(id);
+            self.active_attack_units.insert(*id, tick);
+        }
+        if staging.is_empty() {
+            return commands;
+        }
+
+        let mut filtered = Vec::new();
+        for command in commands {
+            match command {
+                Command::AttackMove { units, x, y }
+                    if units.iter().any(|id| staging.contains(id)) =>
+                {
+                    let fresh: Vec<u32> = units
+                        .into_iter()
+                        .filter(|id| !self.staged_units.contains(id))
+                        .filter(|id| !self.active_attack_units.contains_key(id))
+                        .collect();
+                    self.staged_units.extend(fresh.iter().copied());
+                    if !fresh.is_empty() {
+                        filtered.push(Command::AttackMove { units: fresh, x, y });
+                    }
+                }
+                other => filtered.push(other),
+            }
+        }
+        filtered
     }
 }
 
@@ -643,6 +459,8 @@ struct WorkerRushScript {
     last_attack_tick: u32,
 }
 
+// Intentionally retained as special harness coverage: this is an all-in worker pull, not a normal
+// strategy profile. The profile-backed `rifle_flood_fast` covers early rifle pressure separately.
 impl WorkerRushScript {
     fn new(player_id: u32, target_player_id: u32) -> Self {
         WorkerRushScript {
@@ -1635,36 +1453,6 @@ fn is_complete(entity: &EntityView) -> bool {
     entity.build_progress.is_none()
 }
 
-fn production_queue_len(entity: &EntityView) -> u32 {
-    entity.prod_queue.unwrap_or(0)
-}
-
-fn build_near_own_start_if_affordable(
-    view: PlayerView<'_>,
-    building: EntityKind,
-    actions: &mut AiActionContext<'_>,
-    builder_workers: &[u32],
-) -> Option<actions::BuildAction> {
-    let start = own_start_tile(view.start, view.player_id)?;
-    let empty = BTreeSet::new();
-    let occupied = occupied_tiles_from_snapshot(&view.start.map, view.snapshot);
-    actions::try_build(
-        actions,
-        &[builder_workers],
-        BuildPlacementRequest {
-            building,
-            map_width: view.start.map.width,
-            map_height: view.start.map.height,
-            start_tile: start,
-            search: ai_shared::BuildSearch::default(),
-            skip_tiles: &empty,
-            placeable: |tx, ty| {
-                footprint_placeable_from_snapshot(&view.start.map, building, tx, ty, &occupied)
-            },
-        },
-    )
-}
-
 fn assign_steel_workers(
     observation: &AiObservation,
     actions: &mut AiActionContext<'_>,
@@ -1710,24 +1498,6 @@ fn player_start_world(start: &StartPayload, player_id: u32) -> Option<(f32, f32)
     let (tile_x, tile_y) = own_start_tile(start, player_id)?;
     let ts = start.map.tile_size as f32;
     Some((tile_x as f32 * ts + ts * 0.5, tile_y as f32 * ts + ts * 0.5))
-}
-
-fn combat_rendezvous_world(view: PlayerView<'_>) -> (f32, f32) {
-    let center = (
-        view.start.map.width as f32 * view.start.map.tile_size as f32 * 0.5,
-        view.start.map.height as f32 * view.start.map.tile_size as f32 * 0.5,
-    );
-    let Some(start) = player_start_world(view.start, view.player_id) else {
-        return center;
-    };
-    let dx = center.0 - start.0;
-    let dy = center.1 - start.1;
-    let dist = (dx * dx + dy * dy).sqrt();
-    if dist <= f32::EPSILON {
-        return center;
-    }
-    let step = (4.0 * view.start.map.tile_size as f32).min(dist);
-    (start.0 + dx / dist * step, start.1 + dy / dist * step)
 }
 
 fn occupied_tiles_from_snapshot(map: &MapInfo, snapshot: &Snapshot) -> BTreeSet<(u32, u32)> {
@@ -1835,6 +1605,55 @@ fn tile_of(map: &MapInfo, x: f32, y: f32) -> (u32, u32) {
 }
 
 #[test]
+fn profile_backed_self_play_exercises_tech_to_tanks() {
+    let players = vec![
+        PlayerInit {
+            id: 1,
+            name: "Tank Profile A".into(),
+            color: "#4cc9f0".into(),
+            is_ai: false,
+        },
+        PlayerInit {
+            id: 2,
+            name: "Tank Profile B".into(),
+            color: "#f72585".into(),
+            is_ai: false,
+        },
+    ];
+    let game = Game::new(&players, 0x1234_5678);
+    let start = game.start_payload();
+    let specs = players.clone();
+    let scripts: Vec<Box<dyn ScriptedPlayer>> = vec![
+        Box::new(ProfileBackedScript::new(1, TECH_TO_TANKS_ID)),
+        Box::new(ProfileBackedScript::new(2, TECH_TO_TANKS_ID)),
+    ];
+    let mut runner = SelfPlayRunner::new(
+        "profile_backed_self_play_exercises_tech_to_tanks",
+        game,
+        start,
+        specs,
+        scripts,
+    );
+
+    match runner.run() {
+        Ok(report) => finalize_self_play_success(&runner, &players, &report),
+        Err(failure) => {
+            let artifact = runner
+                .write_failure_artifact(&failure)
+                .map(|p| {
+                    let name = p
+                        .file_name()
+                        .map(|n| n.to_string_lossy().into_owned())
+                        .unwrap_or_else(|| p.display().to_string());
+                    format!("/dev/selfplay?replay={name}")
+                })
+                .unwrap_or_else(|e| format!("artifact write failed: {e}"));
+            panic!("self-play failed: {}; REPLAY={artifact}", failure.reason);
+        }
+    }
+}
+
+#[test]
 fn scripted_self_play_worker_rush_vs_economy() {
     let players = vec![
         PlayerInit {
@@ -1855,7 +1674,7 @@ fn scripted_self_play_worker_rush_vs_economy() {
     let specs = players.clone();
     let scripts: Vec<Box<dyn ScriptedPlayer>> = vec![
         Box::new(WorkerRushScript::new(1, 2)),
-        Box::new(EconomyScript::new(2)),
+        Box::new(ProfileBackedScript::economy_only(2)),
     ];
     let milestones = Milestones::with_goals(
         [
@@ -1893,6 +1712,8 @@ fn scripted_self_play_worker_rush_vs_economy() {
 
 /// A scripted player that does nothing but send idle workers to mine the nearest steel node.
 /// No building, no training, no combat — pure passive mining.
+///
+/// Intentionally retained as passive/minimal harness coverage. This is not a strategy profile.
 struct MineOnlyScript {
     player_id: u32,
     initial_gather_sent: bool,
@@ -2063,50 +1884,6 @@ fn run_scripted_ticks(
         game.tick();
     }
     history
-}
-
-#[test]
-fn combat_rendezvous_is_four_tiles_toward_center() {
-    let start = StartPayload {
-        player_id: 1,
-        tick: 0,
-        map: MapInfo {
-            width: 64,
-            height: 64,
-            tile_size: config::TILE_SIZE,
-            terrain: vec![terrain::GRASS; 64 * 64],
-            resources: vec![],
-        },
-        players: vec![crate::protocol::PlayerStart {
-            id: 1,
-            name: "A".into(),
-            color: "#fff".into(),
-            start_tile_x: 8,
-            start_tile_y: 8,
-        }],
-    };
-    let view = PlayerView {
-        player_id: 1,
-        tick: 0,
-        start: &start,
-        snapshot: &Snapshot {
-            tick: 0,
-            steel: 0,
-            oil: 0,
-            supply_used: 0,
-            supply_cap: 0,
-            entities: vec![],
-            resource_deltas: vec![],
-            events: vec![],
-        },
-    };
-
-    let (x, y) = combat_rendezvous_world(view);
-    let (sx, sy) = player_start_world(&start, 1).unwrap();
-    let dx = x - sx;
-    let dy = y - sy;
-    let dist = (dx * dx + dy * dy).sqrt();
-    assert!((dist - 4.0 * config::TILE_SIZE as f32).abs() < 0.001);
 }
 
 /// Two fresh games with the same scripted players must evolve identically tick-for-tick.
