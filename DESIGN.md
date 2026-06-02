@@ -715,6 +715,12 @@ The automated self-play harness is a **test-only** layer in `game/selfplay.rs`. 
 separate from the gameplay AI in `game/ai.rs`: gameplay AI is a player feature, while self-play is
 a regression harness for exercising the public simulation API.
 
+**Completion.** Scripted self-play participants are AI-controlled test clients, even when the
+underlying `Game` is constructed with live `AiController`s disabled. Harness result runs and dev
+self-play/replay rooms therefore treat a scripted player with no remaining units as defeated and
+stop at that point. This is intentionally narrower than normal human match elimination, where
+buildings decide survival.
+
 **Contract.** Self-play scripts may only drive the game through the `Game` seam in §3.1:
 `start_payload()`, `snapshot_for(player)`, `enqueue(player, Command)`, `tick()`, `alive_players()`,
 and `tick_count()`. Scripts observe the same fog-filtered snapshots a client would receive and

@@ -15,11 +15,9 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use serde::{Deserialize, Serialize};
 
 use super::ai_core::decision::{decide_profile, AiDecisionMemory, AiIntent};
-#[cfg(test)]
-use super::ai_core::profiles::RIFLE_FLOOD_FAST_ID;
 use super::ai_core::profiles::{
-    profile_by_id, AiProfile, RIFLE_FLOOD_FULL_SATURATION, RIFLE_FLOOD_FULL_SATURATION_ID,
-    TECH_TO_TANKS_ID,
+    profile_by_id, AiProfile, RIFLE_FLOOD_FAST_ID, RIFLE_FLOOD_FULL_SATURATION,
+    RIFLE_FLOOD_FULL_SATURATION_ID, TECH_TO_TANKS_ID,
 };
 use super::replay::{replay_commands, EventLogEntry, PlayerSnapshot, ReplayOutcome};
 use super::{Game, PlayerInit};
@@ -128,18 +126,25 @@ pub(crate) struct ReplayDriver {
     commands: Vec<super::replay::CommandLogEntry>,
     next: usize,
     seed: u32,
+    players: Vec<PlayerInit>,
 }
 
 impl ReplayDriver {
     pub(crate) fn from_artifact(artifact: ReplayArtifact) -> (Vec<PlayerInit>, Self) {
+        let players = artifact.players;
         (
-            artifact.players,
+            players.clone(),
             Self {
                 commands: artifact.replay_commands,
                 next: 0,
                 seed: artifact.seed,
+                players,
             },
         )
+    }
+
+    pub(crate) fn players(&self) -> &[PlayerInit] {
+        &self.players
     }
 
     pub(crate) fn seed(&self) -> u32 {
@@ -156,6 +161,27 @@ impl ReplayDriver {
             self.next += 1;
         }
     }
+}
+
+/// Scripted self-play participants are AI-controlled even when `Game` was constructed without
+/// live `AiController`s. For harness/replay completion, losing all units means defeat.
+pub(crate) fn scripted_alive_players(game: &Game, players: &[PlayerInit]) -> Vec<u32> {
+    let viewer = players.first().map(|p| p.id).unwrap_or(0);
+    let player_ids: BTreeSet<u32> = players.iter().map(|p| p.id).collect();
+    let snapshot = game.snapshot_full_for(viewer);
+    let players_with_units: BTreeSet<u32> = snapshot
+        .entities
+        .iter()
+        .filter(|entity| player_ids.contains(&entity.owner))
+        .filter(|entity| kind_of(entity).map(|kind| kind.is_unit()).unwrap_or(false))
+        .map(|entity| entity.owner)
+        .collect();
+
+    players
+        .iter()
+        .filter(|player| players_with_units.contains(&player.id))
+        .map(|player| player.id)
+        .collect()
 }
 
 #[derive(Clone, Copy)]
@@ -2133,33 +2159,127 @@ fn profile_matchup_rifle_flood_full_saturation_vs_tech_to_tanks() {
 #[test]
 #[ignore]
 fn profile_matchup_rifle_flood_full_saturation_vs_tech_to_tanks_20k_result() {
-    const TICKS: u32 = 20_000;
-    const ARTIFACT_NAME: &str = "profile_full_saturation_vs_tech_to_tanks_20k";
+    run_profile_result_matchup(
+        "profile_full_saturation_vs_tech_to_tanks_20k",
+        20_000,
+        0,
+        "Full Saturation",
+        RIFLE_FLOOD_FULL_SATURATION_ID,
+        "Tech Tanks",
+        TECH_TO_TANKS_ID,
+    );
+}
 
+/// Manual long-form matchup runner for inspecting the full result instead of stopping as soon as
+/// milestone coverage is complete.
+#[test]
+#[ignore]
+fn profile_matchup_rifle_flood_fast_vs_tech_to_tanks_50k_result() {
+    run_profile_result_matchup(
+        "profile_rifle_flood_fast_vs_tech_to_tanks_50k",
+        50_000,
+        0,
+        "Fast Flood",
+        RIFLE_FLOOD_FAST_ID,
+        "Tech Tanks",
+        TECH_TO_TANKS_ID,
+    );
+}
+
+#[test]
+#[ignore]
+fn profile_matchup_result_tool() {
+    let p1_profile = env_profile_id("RTS_MATCHUP_P1", RIFLE_FLOOD_FAST_ID);
+    let p2_profile = env_profile_id("RTS_MATCHUP_P2", TECH_TO_TANKS_ID);
+    let ticks = env_u32("RTS_MATCHUP_TICKS", 50_000);
+    let seed = env_u32("RTS_MATCHUP_SEED", 0);
+    let artifact_name = env::var("RTS_MATCHUP_ARTIFACT")
+        .ok()
+        .filter(|name| is_safe_artifact_name(name))
+        .unwrap_or_else(|| {
+            format!(
+                "profile_{}_vs_{}_{}_seed_{}",
+                p1_profile, p2_profile, ticks, seed
+            )
+        });
+
+    run_profile_result_matchup(
+        &artifact_name,
+        ticks,
+        seed,
+        profile_display_name(p1_profile),
+        p1_profile,
+        profile_display_name(p2_profile),
+        p2_profile,
+    );
+}
+
+fn env_profile_id(name: &str, default: &'static str) -> &'static str {
+    let raw = env::var(name).unwrap_or_else(|_| default.to_string());
+    match raw.trim() {
+        RIFLE_FLOOD_FAST_ID => RIFLE_FLOOD_FAST_ID,
+        RIFLE_FLOOD_FULL_SATURATION_ID => RIFLE_FLOOD_FULL_SATURATION_ID,
+        TECH_TO_TANKS_ID => TECH_TO_TANKS_ID,
+        other => panic!(
+            "{name}={other:?} is not a known profile; use one of: {RIFLE_FLOOD_FAST_ID}, {RIFLE_FLOOD_FULL_SATURATION_ID}, {TECH_TO_TANKS_ID}"
+        ),
+    }
+}
+
+fn env_u32(name: &str, default: u32) -> u32 {
+    env::var(name)
+        .ok()
+        .filter(|value| !value.trim().is_empty())
+        .map(|value| {
+            value
+                .parse::<u32>()
+                .unwrap_or_else(|err| panic!("{name}={value:?} is not a u32: {err}"))
+        })
+        .unwrap_or(default)
+}
+
+fn profile_display_name(profile_id: &str) -> &'static str {
+    match profile_id {
+        RIFLE_FLOOD_FAST_ID => "Fast Flood",
+        RIFLE_FLOOD_FULL_SATURATION_ID => "Full Saturation",
+        TECH_TO_TANKS_ID => "Tech Tanks",
+        _ => "Profile",
+    }
+}
+
+fn run_profile_result_matchup(
+    artifact_name: &str,
+    ticks: u32,
+    seed: u32,
+    p1_name: &'static str,
+    p1_profile: &'static str,
+    p2_name: &'static str,
+    p2_profile: &'static str,
+) {
     let players = vec![
         PlayerInit {
             id: 1,
-            name: "Full Saturation".into(),
+            name: p1_name.into(),
             color: "#4cc9f0".into(),
             is_ai: false,
         },
         PlayerInit {
             id: 2,
-            name: "Tech Tanks".into(),
+            name: p2_name.into(),
             color: "#f72585".into(),
             is_ai: false,
         },
     ];
-    let mut game = Game::new(&players, 0);
+    let mut game = Game::new(&players, seed);
     let start = game.start_payload();
     let mut scripts: Vec<Box<dyn ScriptedPlayer>> = vec![
-        Box::new(ProfileBackedScript::new(1, RIFLE_FLOOD_FULL_SATURATION_ID)),
-        Box::new(ProfileBackedScript::new(2, TECH_TO_TANKS_ID)),
+        Box::new(ProfileBackedScript::new(1, p1_profile)),
+        Box::new(ProfileBackedScript::new(2, p2_profile)),
     ];
     let mut event_log = Vec::new();
 
-    while game.tick_count() < TICKS {
-        let alive = game.alive_players();
+    while game.tick_count() < ticks {
+        let alive = scripted_alive_players(&game, &players);
         if alive.len() <= 1 {
             break;
         }
@@ -2184,7 +2304,7 @@ fn profile_matchup_rifle_flood_full_saturation_vs_tech_to_tanks_20k_result() {
         }
 
         let tick_events = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| game.tick()))
-            .expect("Game::tick panicked during 20k profile matchup");
+            .expect("Game::tick panicked during profile matchup result run");
         let event_tick = game.tick_count();
         for (player_id, events) in tick_events {
             for event in events {
@@ -2212,12 +2332,12 @@ fn profile_matchup_rifle_flood_full_saturation_vs_tech_to_tanks_20k_result() {
     let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("target")
         .join("selfplay-artifacts")
-        .join(ARTIFACT_NAME);
+        .join(artifact_name);
     fs::create_dir_all(&dir).unwrap();
     let json = serde_json::to_vec_pretty(&artifact).unwrap();
     fs::write(dir.join("replay.json"), json).unwrap();
 
-    let alive = game.alive_players();
+    let alive = scripted_alive_players(&game, &players);
     let winner = if alive.len() == 1 {
         Some(alive[0])
     } else {
@@ -2229,7 +2349,7 @@ fn profile_matchup_rifle_flood_full_saturation_vs_tech_to_tanks_20k_result() {
         game.tick_count(),
         winner,
         alive,
-        ARTIFACT_NAME,
+        artifact_name,
         final_counts
     );
 }

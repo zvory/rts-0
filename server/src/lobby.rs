@@ -27,7 +27,9 @@ use tokio::time::{interval, MissedTickBehavior};
 use tracing::{debug, error, info, warn};
 
 use crate::config;
-use crate::game::selfplay::{is_safe_artifact_name, LiveSelfPlay, ReplayArtifact, ReplayDriver};
+use crate::game::selfplay::{
+    is_safe_artifact_name, scripted_alive_players, LiveSelfPlay, ReplayArtifact, ReplayDriver,
+};
 use crate::game::{Game, PlayerInit};
 use crate::protocol::{
     kinds, Command, Event, LobbyPlayer, ResourceDelta, ServerMessage, Snapshot, StartPayload,
@@ -296,6 +298,15 @@ enum DevSelfPlayConfig {
 enum DevDriver {
     Live(LiveSelfPlay),
     Replay(ReplayDriver),
+}
+
+impl DevDriver {
+    fn players(&self) -> &[PlayerInit] {
+        match self {
+            DevDriver::Live(driver) => driver.players(),
+            DevDriver::Replay(driver) => driver.players(),
+        }
+    }
 }
 
 /// All state owned by a single room task. Lives entirely on that task — never shared.
@@ -940,12 +951,10 @@ impl RoomTask {
             );
         }
 
-        let alive = game.alive_players();
+        let alive = scripted_alive_players(&game, driver.players());
         if alive.len() <= 1 {
-            self.phase = Phase::Lobby;
             self.dev_driver = None;
-            self.dev_view_player_id = None;
-            self.start_dev_session();
+            self.phase = Phase::InGame(game);
             return;
         }
 

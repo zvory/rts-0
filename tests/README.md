@@ -56,6 +56,14 @@ RTS_SELFPLAY_SAVE_REPLAY=manual_worker_rush_latest \
   cargo test scripted_self_play_worker_rush_vs_economy
 ```
 
+For repeated profile-vs-profile result checks, use the repo-level matchup runner. It saves a replay
+artifact every time and can optionally open it in a fresh local server.
+
+```bash
+./runaimatchup.sh --p1=rifle_flood_fast --p2=tech_to_tanks --ticks=50000
+./runaimatchup.sh --p1=rifle_flood_fast --p2=tech_to_tanks --ticks=50000 --open
+```
+
 ## Client smoke (headless browser)
 
 Loads the real client in headless Chrome and asserts it renders the PixiJS scene and that
