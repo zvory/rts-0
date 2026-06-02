@@ -82,6 +82,9 @@ pub(crate) fn apply_commands(
                     if !is_worker || !node_ok {
                         continue;
                     }
+                    if !world_query::resource_has_completed_mining_ic(entities, player, node) {
+                        continue;
+                    }
                     if matches!(world_query::node_holder(entities, node), Some(holder) if holder != id)
                     {
                         continue;

@@ -61,6 +61,11 @@ pub const IC_RESOURCE_MIN_DIST_TILES: f32 = 3.5;
 /// Ensures no player is advantaged by resources being too far away.
 pub const IC_RESOURCE_MAX_DIST_TILES: f32 = 7.0;
 
+/// Maximum distance (in tiles) from a completed Industrial Center center to a resource node for
+/// workers to mine that node. Matches the starting resource layout bound so every main patch is
+/// usable from the starting Industrial Center.
+pub const MINING_IC_RANGE_TILES: f32 = IC_RESOURCE_MAX_DIST_TILES;
+
 /// Distance (in tiles) from the Industrial Center to the center of the steel patch block.
 pub const STEEL_BLOCK_DIST_TILES: f32 = 5.0;
 

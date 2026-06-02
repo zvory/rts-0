@@ -244,6 +244,7 @@ export class Renderer {
     // Overlays.
     this._drawFog(fog);
     this._drawCommandFeedback(state);
+    this._drawResourceMiningPreview(state);
     this._drawMuzzleFlashes(state);
     this._drawPlacement(state, fog);
   }
@@ -945,6 +946,26 @@ export class Renderer {
     }
   }
 
+  /** Draw the resource hover's nearest-IC mining link. @private */
+  _drawResourceMiningPreview(state) {
+    if (!state || !state.resourceMiningPreview) return;
+    const g = this._feedbackGfx;
+    const p = state.resourceMiningPreview;
+    if (p.inRange) {
+      g.lineStyle(4, 0x4aa3ff, 0.95);
+      g.moveTo(p.resourceX, p.resourceY);
+      g.lineTo(p.icX, p.icY);
+      g.beginFill(0x4aa3ff, 0.18);
+      g.drawCircle(p.resourceX, p.resourceY, 9);
+      g.drawCircle(p.icX, p.icY, 9);
+      g.endFill();
+      return;
+    }
+
+    g.lineStyle(2.5, 0xd64d45, 0.9);
+    dashedLine(g, p.resourceX, p.resourceY, p.icX, p.icY, 14, 9);
+  }
+
   /**
    * Draw a brief muzzle flash on the attacker plus a yellow tracer line to the
    * target, then a fainter continuation past the target for overpenetration.
@@ -1181,6 +1202,22 @@ function smoothstep01(v) {
 
 function lerp(a, b, t) {
   return a + (b - a) * t;
+}
+
+function dashedLine(g, x1, y1, x2, y2, dash, gap) {
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  const len = Math.hypot(dx, dy);
+  if (len <= 0.001) return;
+  const ux = dx / len;
+  const uy = dy / len;
+  let cursor = 0;
+  while (cursor < len) {
+    const end = Math.min(cursor + dash, len);
+    g.moveTo(x1 + ux * cursor, y1 + uy * cursor);
+    g.lineTo(x1 + ux * end, y1 + uy * end);
+    cursor = end + gap;
+  }
 }
 
 /** Point at angle `a` (radians) and distance `d` from the origin. */

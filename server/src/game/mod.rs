@@ -928,6 +928,139 @@ mod tests {
     }
 
     #[test]
+    fn gather_command_ignores_nodes_without_nearby_completed_ic() {
+        let players = [PlayerInit {
+            id: 1,
+            name: "Solo".into(),
+            color: "#fff".into(),
+            is_ai: false,
+        }];
+        let mut game = Game::new_for_replay(&players, 0x1234_5678);
+        let worker = game
+            .entities
+            .iter()
+            .find(|e| e.owner == 1 && e.kind == EntityKind::Worker)
+            .map(|e| e.id)
+            .expect("starting worker");
+        let ic = game
+            .entities
+            .iter()
+            .find(|e| e.owner == 1 && e.kind == EntityKind::IndustrialCenter)
+            .expect("starting IC");
+        let world = game.map.world_size_px();
+        let far_x = if ic.pos_x < world * 0.5 {
+            world - config::TILE_SIZE as f32 * 0.5
+        } else {
+            config::TILE_SIZE as f32 * 0.5
+        };
+        let far_y = if ic.pos_y < world * 0.5 {
+            world - config::TILE_SIZE as f32 * 0.5
+        } else {
+            config::TILE_SIZE as f32 * 0.5
+        };
+        let far_node = game
+            .entities
+            .spawn_node(EntityKind::Steel, far_x, far_y)
+            .expect("far resource node");
+
+        game.enqueue(
+            1,
+            Command::Gather {
+                units: vec![worker],
+                node: far_node,
+            },
+        );
+        game.tick();
+
+        let worker_order = game.entities.get(worker).expect("worker survives").order();
+        assert!(
+            !matches!(worker_order, Order::Gather(_)),
+            "worker should ignore gather commands for patches outside IC mining range"
+        );
+    }
+
+    #[test]
+    fn active_mining_stops_when_nearby_ic_is_removed() {
+        let players = [PlayerInit {
+            id: 1,
+            name: "Solo".into(),
+            color: "#fff".into(),
+            is_ai: false,
+        }];
+        let mut game = Game::new_for_replay(&players, 0x1234_5678);
+        let worker = game
+            .entities
+            .iter()
+            .find(|e| e.owner == 1 && e.kind == EntityKind::Worker)
+            .map(|e| e.id)
+            .expect("starting worker");
+        let (worker_x, worker_y) = game
+            .entities
+            .get(worker)
+            .map(|e| (e.pos_x, e.pos_y))
+            .expect("worker position");
+        let node = game
+            .entities
+            .iter()
+            .filter(|e| e.is_node())
+            .min_by(|a, b| {
+                let da = (a.pos_x - worker_x).powi(2) + (a.pos_y - worker_y).powi(2);
+                let db = (b.pos_x - worker_x).powi(2) + (b.pos_y - worker_y).powi(2);
+                da.total_cmp(&db).then_with(|| a.id.cmp(&b.id))
+            })
+            .map(|e| e.id)
+            .expect("starting resource node");
+
+        game.enqueue(
+            1,
+            Command::Gather {
+                units: vec![worker],
+                node,
+            },
+        );
+        for _ in 0..600 {
+            game.tick();
+            if matches!(
+                game.entities.get(worker).and_then(|e| e.gather_phase()),
+                Some(GatherPhase::Harvesting)
+            ) {
+                break;
+            }
+        }
+        assert_eq!(
+            game.entities.get(worker).and_then(|e| e.gather_phase()),
+            Some(GatherPhase::Harvesting),
+            "worker should reach and latch the starting patch before the IC is removed"
+        );
+
+        let ic = game
+            .entities
+            .iter()
+            .find(|e| e.owner == 1 && e.kind == EntityKind::IndustrialCenter)
+            .map(|e| e.id)
+            .expect("starting IC");
+        game.entities.remove(ic);
+        let steel_before = game.players.iter().find(|p| p.id == 1).unwrap().steel;
+
+        for _ in 0..(config::HARVEST_TICKS + 5) {
+            game.tick();
+        }
+
+        let steel_after = game.players.iter().find(|p| p.id == 1).unwrap().steel;
+        assert_eq!(
+            steel_after, steel_before,
+            "mining should not continue without an IC"
+        );
+        assert!(
+            !matches!(
+                game.entities.get(worker).map(|e| e.order()),
+                Some(Order::Gather(_))
+            ),
+            "worker should go idle when its mining IC disappears"
+        );
+    }
+
+    #[test]
     fn ai_with_building_but_no_units_is_eliminated() {
         let players = human_vs_ai_players();
         let mut game = Game::new(&players, 0x1234_5678);
