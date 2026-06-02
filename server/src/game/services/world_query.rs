@@ -14,6 +14,7 @@
 //! [`super::move_coordinator::MoveCoordinator::find_spawn_point`]; this module re-exports them
 //! through its docs so the placement / spawn surface is discoverable from one place.
 
+use crate::config;
 use crate::game::entity::{Entity, EntityKind, EntityStore, NEUTRAL};
 use crate::game::services::spatial::SpatialIndex;
 use crate::rules::terrain::{self, TerrainKind};
@@ -59,6 +60,43 @@ pub(crate) fn completed_building_kinds(entities: &EntityStore, player: u32) -> V
     completed_buildings(entities, player)
         .map(|e| e.kind)
         .collect()
+}
+
+/// Whether a resource node is mineable by `player` because a completed Industrial Center is close
+/// enough to receive attached-mining income from that node.
+pub(crate) fn resource_has_completed_mining_ic(
+    entities: &EntityStore,
+    player: u32,
+    node: u32,
+) -> bool {
+    let Some(resource) = entities.get(node) else {
+        return false;
+    };
+    if !resource.is_node() || resource.remaining().unwrap_or(0) == 0 {
+        return false;
+    }
+    nearest_completed_mining_ic(entities, player, resource.pos_x, resource.pos_y)
+        .map(|(_, dist2)| {
+            let range_px = config::MINING_IC_RANGE_TILES * config::TILE_SIZE as f32;
+            dist2 <= range_px * range_px + 0.01
+        })
+        .unwrap_or(false)
+}
+
+fn nearest_completed_mining_ic(
+    entities: &EntityStore,
+    player: u32,
+    x: f32,
+    y: f32,
+) -> Option<(u32, f32)> {
+    completed_buildings(entities, player)
+        .filter(|e| e.kind == EntityKind::IndustrialCenter && e.hp > 0)
+        .map(|e| {
+            let dx = e.pos_x - x;
+            let dy = e.pos_y - y;
+            (e.id, dx * dx + dy * dy)
+        })
+        .min_by(|a, b| a.1.total_cmp(&b.1).then_with(|| a.0.cmp(&b.0)))
 }
 
 /// Town halls (Industrial Centers) owned by `player`, in any construction state.
@@ -222,5 +260,43 @@ mod tests {
         // ... but not their own worker (self) or their own building.
         assert!(!is_enemy_targetable(p1_worker, 1, p1_worker.id));
         assert!(!is_enemy_targetable(p1_ic, 1, p1_worker.id));
+    }
+
+    #[test]
+    fn resource_mining_requires_completed_ic_in_range() {
+        let ts = config::TILE_SIZE as f32;
+        let mut s = EntityStore::default();
+        s.spawn_building(1, EntityKind::IndustrialCenter, 100.0, 100.0, true)
+            .unwrap();
+        let near = s
+            .spawn_node(
+                EntityKind::Steel,
+                100.0 + config::MINING_IC_RANGE_TILES * ts,
+                100.0,
+            )
+            .unwrap();
+        let far = s
+            .spawn_node(
+                EntityKind::Steel,
+                100.0 + (config::MINING_IC_RANGE_TILES + 0.25) * ts,
+                100.0,
+            )
+            .unwrap();
+        let unfinished_ic = s
+            .spawn_building(
+                2,
+                EntityKind::IndustrialCenter,
+                100.0 + config::MINING_IC_RANGE_TILES * ts,
+                300.0,
+                false,
+            )
+            .unwrap();
+        let unfinished_near = s.spawn_node(EntityKind::Steel, 100.0, 300.0).unwrap();
+
+        assert!(resource_has_completed_mining_ic(&s, 1, near));
+        assert!(!resource_has_completed_mining_ic(&s, 1, far));
+        assert!(!resource_has_completed_mining_ic(&s, 2, unfinished_near));
+        s.remove(unfinished_ic);
+        assert!(!resource_has_completed_mining_ic(&s, 2, unfinished_near));
     }
 }

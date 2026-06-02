@@ -39,6 +39,9 @@ export const COLORS = Object.freeze({
 export const FOG_EXPLORED_ALPHA = 0.55;
 export const FOG_UNEXPLORED_ALPHA = 0.86;
 
+// Workers can mine a resource only when a completed Industrial Center is within this many tiles.
+export const MINING_IC_RANGE_TILES = 7.0;
+
 // Player colors (server assigns from a matching palette; used as a fallback for blips).
 export const PLAYER_PALETTE = Object.freeze([
   "#4878c8", "#c84848", "#30a090", "#8040c8",
@@ -61,7 +64,7 @@ export const STATS = Object.freeze({
     rangeTiles: 3, cost: { steel: 200, oil: 150 }, supply: 6, buildTicks: 750 },
 
   [KIND.INDUSTRIAL_CENTER]: { label: "Industrial Center", icon: "IC", footW: 3, footH: 3, sight: 9,
-    cost: { steel: 400, oil: 0 }, buildTicks: 400, trains: [KIND.WORKER] },
+    cost: { steel: 200, oil: 0 }, buildTicks: 400, trains: [KIND.WORKER] },
   [KIND.DEPOT]: { label: "Supply Depot", icon: "SD", footW: 2, footH: 2, sight: 4,
     cost: { steel: 100, oil: 0 }, buildTicks: 120, trains: [] },
   [KIND.BARRACKS]: { label: "Barracks", icon: "BK", footW: 3, footH: 2, sight: 6,

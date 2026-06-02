@@ -179,7 +179,7 @@ pub const BUILDINGS: &[BuildingDef] = &[
         stats: config::BuildingStats {
             hp: 600,
             sight_tiles: 9,
-            cost_steel: 400,
+            cost_steel: 200,
             cost_oil: 0,
             foot_w: 3,
             foot_h: 3,
