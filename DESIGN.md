@@ -696,6 +696,7 @@ The first code-defined profiles are `rifle_flood_fast`, `rifle_flood_full_satura
 priorities, resource timing, and attack thresholds without providing their own `think()` functions.
 `tech_to_tanks` is a steel-first fast-tech profile: it keeps worker production active while saving
 for the tank-factory step, delays oil workers until at least eight workers are already mining steel,
+uses ready combat units to clear visible threats in its home resource line before attacking out,
 and treats a single completed tank as a valid minimum attack wave.
 The live lobby AI uses this shared core through `AiController`, which only owns live identity,
 profile id, cadence, and persistent decision memory. Profiles are still not client-selectable.
