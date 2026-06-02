@@ -24,6 +24,16 @@ Important existing scripts include:
 These scripts contain useful coverage, but they also duplicate AI mechanics. Migration should keep
 the coverage and remove duplication.
 
+Treat these as harness scenarios, not as the strategy profile list. The intended mapping is:
+
+- `EconomyScript` -> `rifle_flood_full_saturation` or a profile-backed economy scenario.
+- `BuildTechAttackScript` -> `tech_to_tanks`.
+- `WorkerRushScript` -> keep as a special all-in worker-pull scenario until a real replacement
+  exists; `rifle_flood_fast` may replace generic early rifle pressure, but not worker-pull
+  semantics.
+- `MineOnlyScript` -> keep as passive/minimal harness coverage when needed; it is not an AI
+  strategy profile.
+
 ## Subtasks
 
 ### AI-5.1 Add Profile-Backed Script Wrapper
@@ -74,7 +84,11 @@ Good replacement profile:
 ### AI-5.4 Keep Worker Rush Until a Real Replacement Exists
 
 `WorkerRushScript` covers a special early aggression scenario. Do not delete it merely because it is
-not a normal persona.
+not a normal profile.
+
+`rifle_flood_fast` is the correct replacement for early rifle-pressure coverage. It is not a
+drop-in replacement for all-in worker-pull coverage, because its intent is to commit to production
+early, not to redefine the worker economy as the attack force.
 
 Possible replacements:
 
@@ -104,8 +118,9 @@ Examples:
 
 - economy profile reaches worker/supply thresholds
 - fast flood deals damage before a broad deadline
-- tech-to-tanks trains a tank
+- `tech_to_tanks` trains a tank
 - profile emits at least one combat command when attack conditions are met
+- worker-rush scenarios, while retained, assert their special worker-pull behavior explicitly
 
 ### AI-5.7 Remove Duplicated Mechanics Gradually
 
@@ -137,7 +152,9 @@ Browser skill for that replay flow.
 
 AI-5 is done when:
 
-- self-play can run at least one profile-backed script
+- self-play can run profile-backed scripts for the canonical profiles that have migrated
 - `BuildTechAttackScript` and `EconomyScript` are reduced or replaced by shared-profile logic
+- `WorkerRushScript` and `MineOnlyScript`, if still present, are documented as intentionally
+  retained scenario coverage rather than strategy profiles
 - artifacts and milestone diagnostics remain useful
 - replay comparison still passes

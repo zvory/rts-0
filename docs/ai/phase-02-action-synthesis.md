@@ -153,7 +153,7 @@ Use small fixtures. Avoid whole-match tests unless necessary.
 
 ## Non-Goals
 
-- No new personas yet.
+- No new profiles yet.
 - No live AI profile UI.
 - No self-play script replacement yet.
 - No expansion bases.

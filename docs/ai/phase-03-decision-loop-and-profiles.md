@@ -2,7 +2,7 @@
 
 Introduce the shared decision loop and the first strategy profiles.
 
-This is the phase where the AI starts becoming multiple personalities. The implementation should
+This is the phase where the AI starts becoming multiple strategy profiles. The implementation should
 still avoid multiple copied bots.
 
 ## Goal
@@ -11,7 +11,7 @@ Create:
 
 - one deterministic decision loop
 - profile data that parameterizes that loop
-- the first three required profiles:
+- the required first profiles from `AI-PLAN.md`:
   - `rifle_flood_fast`
   - `rifle_flood_full_saturation`
   - `tech_to_tanks`
@@ -70,30 +70,36 @@ Suggested fields:
 Do not let a profile provide its own full `think()` function unless a later phase proves that a
 small explicit override is unavoidable.
 
+The profile should describe timing, economy targets, tech intent, production priorities, and attack
+thresholds. It should not redefine generic mechanics such as mining, build placement, local budget
+reservation, or command validation.
+
 ## Required Profiles
 
 ### `rifle_flood_fast`
 
 Behavior targets:
 
-- lower worker target than full saturation
-- early barracks
-- shallow rifle queue
-- small first attack wave
-- frequent pressure
+- pressure quickly
+- train fewer extra workers before committing to production
+- build early rifle production
+- use a shallow rifle queue
+- attack with smaller, more frequent waves
 
 Validation examples:
 
 - produces riflemen before the full-saturation profile would normally move out
-- sends an attack before tech-to-tanks reaches tanks in a direct matchup
+- sends an attack before `tech_to_tanks` reaches tanks in a direct matchup
+- gives self-play a realistic rifle-pressure replacement for worker-rush-adjacent coverage where
+  that coverage does not require an all-in worker pull
 
 ### `rifle_flood_full_saturation`
 
 Behavior targets:
 
-- saturates starting steel first
+- saturates the starting steel economy first
 - builds supply before choking
-- scales barracks when steel bank grows
+- scales barracks after the economy is stable
 - attacks with a larger first wave than `rifle_flood_fast`
 
 Validation examples:
@@ -101,16 +107,17 @@ Validation examples:
 - reaches starting steel saturation
 - eventually transitions into rifle pressure
 - does not deadlock on supply
+- exercises worker assignment, supply planning, and economy-first macro coverage
 
 ### `tech_to_tanks`
 
 Behavior targets:
 
 - assigns oil workers
-- builds barracks if required for tech chain
-- builds tech prerequisites
-- builds tank factory
-- saves for first tank when needed
+- builds the prerequisite chain
+- saves for key tech moments
+- builds a tank factory
+- produces tanks
 - attacks with riflemen plus at least one tank
 
 Validation examples:
@@ -119,6 +126,10 @@ Validation examples:
 - builds required tech structures
 - trains a tank
 - can still defend or pressure enough to avoid idle deadlock
+- covers oil economy, tech prerequisites, tank factory, and tank production
+
+Older notes may call this strategic intent `tech_tree`; new code and docs should call the profile
+`tech_to_tanks`.
 
 ## Subtasks
 
@@ -156,7 +167,7 @@ Write small tests that compare decisions between profiles.
 Examples:
 
 - fast flood has lower first attack threshold than full saturation
-- tech-to-tanks requests oil workers and a tank factory path
+- `tech_to_tanks` requests oil workers and a tank factory path
 - full saturation requests more workers before production pressure
 - all profiles use deterministic profile ids and stable priorities
 

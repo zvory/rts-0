@@ -10,6 +10,9 @@ economy, builds production, attacks, and remains replay-deterministic.
 `server/src/game/ai.rs` should become a live adapter and small state holder. The actual RTS
 knowledge and command synthesis should come from `ai_core`.
 
+Live AI should run one of the required profiles from `AI-PLAN.md`; it should not become an extra
+live-only bot with copied economy, production, or attack code.
+
 ## Current Live Behavior to Preserve First
 
 The current AI:
@@ -68,8 +71,12 @@ Recommended default:
 - `rifle_flood_full_saturation` if preserving current macro behavior matters most
 - `rifle_flood_fast` if pressure and shorter matches matter most
 
-If multiple AIs are present, it is acceptable to assign deterministic profiles by AI slot later.
-Do not add UI in this phase.
+Do not choose `tech_to_tanks` as the default merely because it is available; that would introduce
+oil and tank behavior beyond the current live-AI feature. It is better covered first in profile and
+self-play tests.
+
+If multiple AIs are present, it is acceptable to assign deterministic profiles by AI slot later,
+but that should still select from the canonical profile ids. Do not add UI in this phase.
 
 ### AI-4.5 Preserve Fairness Rule
 
@@ -100,6 +107,7 @@ Add a test that the live controller uses a profile id, even if it is hard-coded.
 - No new protocol fields.
 - No advanced micro.
 - No behavior randomization.
+- No extra live-only strategy names.
 
 ## Validation
 
