@@ -265,6 +265,17 @@ export class GameState {
     }
   }
 
+  /**
+   * Remove ids from the existing selection.
+   * @param {Iterable<number>} ids
+   */
+  removeFromSelection(ids) {
+    this._pruneSelection();
+    for (const id of ids) {
+      this.selection.delete(id);
+    }
+  }
+
   /** Clear the selection. */
   clearSelection() {
     this.selection.clear();
