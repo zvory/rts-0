@@ -5,7 +5,6 @@ Cargo.lock.orig
 
 # Node (tests)
 **/node_modules
-tests/package-lock.json
 
 # OS / editor
 .DS_Store
