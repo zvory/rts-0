@@ -324,7 +324,8 @@ export class Input {
 
   /**
    * Single empty/entity click: select the one entity under the cursor (own
-   * preferred), or clear when clicking empty space. Shift adds to the selection.
+   * preferred), or clear when clicking empty space. Shift adds to the selection,
+   * but shift-clicking an already-selected entity removes it from the selection.
    * Ctrl+click selects all own units of the same kind visible in the viewport.
    */
   _commitClickSelection(p, additive, ctrl) {
@@ -340,7 +341,11 @@ export class Input {
       else this.state.setSelection(ids);
       return;
     }
-    if (additive) this.state.addToSelection([hit.id]);
+    if (additive) {
+      if (this.state.selection.has(hit.id)) this.state.removeFromSelection([hit.id]);
+      else this.state.addToSelection([hit.id]);
+      return;
+    }
     else this.state.setSelection([hit.id]);
   }
 

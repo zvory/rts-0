@@ -341,7 +341,7 @@ Use this index when deciding whether a TODO can start.
 
 # Uncategorized Tasks
 
-- With a group of units selected, shift clicking a unit will deselect it.
+- [x] With a group of units selected, shift clicking a unit will deselect it.
 - Should be possible to select multiple buildings at once.
 - Cheat menu for development (only available while running locally): buttons to grant money, oil, or clear the fog of war completely.
 - Control group system for units and buildings. ctrl+number creates a group. shift+number adds to a group. Tapping a group selects it. Double tapping moves the camera to the centroid.
