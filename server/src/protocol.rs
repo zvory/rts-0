@@ -80,6 +80,11 @@ pub enum ClientMessage {
     Ping { ts: f64 },
     /// Set replay playback speed multiplier (replay rooms only; ignored elsewhere).
     SetReplaySpeed { speed: f32 },
+    /// Rewind a replay by `ticks_back` simulation ticks (replay rooms only; clamped to start).
+    SeekReplay {
+        #[serde(rename = "ticksBack")]
+        ticks_back: u32,
+    },
 }
 
 /// A gameplay command. Validated when applied, not when received.

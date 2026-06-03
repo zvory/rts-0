@@ -72,6 +72,7 @@ short but readable. Coordinates are **world pixels** (floats) unless a field nam
 | `giveUp`   | — | Give up the active match. The server eliminates that player and sends their score screen. |
 | `ping`     | `ts: number` | Latency probe; server replies with `pong`. |
 | `setReplaySpeed` | `speed: f32` | Set replay playback speed multiplier in dev replay rooms; ignored elsewhere. |
+| `seekReplay` | `ticksBack: u32` | Rewind a dev replay by N simulation ticks; pass a large value (e.g. `2^31-1`) to reset to tick 0. Ignored outside replay rooms. The room rebuilds the game from the artifact, fast-forwards to `current - N`, and re-sends `start`. |
 
 `Command` (the `cmd` object) — `c` is the command discriminator:
 
@@ -435,6 +436,7 @@ export class Net {
   command(cmd)                           // cmd built via protocol.js builders
   ping()
   setReplaySpeed(speed)                  // dev replay rooms only
+  seekReplay(ticksBack)                  // dev replay rooms only; pass huge N for full reset
   get playerId()
 }
 ```

@@ -168,6 +168,15 @@ export class Net {
     this._send(msg.setReplaySpeed(speed));
   }
 
+  /**
+   * Rewind a replay by `ticksBack` ticks (replay rooms only). Pass a large value
+   * (e.g. 2**31 - 1) to reset to the start.
+   * @param {number} ticksBack
+   */
+  seekReplay(ticksBack) {
+    this._send(msg.seekReplay(ticksBack));
+  }
+
   // --- internals ----------------------------------------------------------
 
   /**
