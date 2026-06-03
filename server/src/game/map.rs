@@ -19,6 +19,9 @@ use serde::Deserialize;
 
 const DEFAULT_MAP_JSON: &str = include_str!("../../assets/maps/default-handcrafted.json");
 
+type Tile = (u32, u32);
+type BasePair = (Tile, Tile);
+
 /// Radius around a player start site (even index) that must remain passable.
 pub const BASE_PROTECTION_RADIUS_TILES: i32 = 7;
 /// Radius around a natural expansion site (odd index) that must remain passable.
@@ -68,18 +71,28 @@ impl Map {
         validate_base_clearance(size, &terrain, &base_sites)?;
 
         // baseSites are interleaved pairs: [start0, expansion0, start1, expansion1, ...].
-        // Even indices are player starts; odd indices are the paired neutral expansion bases.
-        // Shuffle the pairs (keeping each start with its expansion) so the lobby seat order does
-        // not pin players to the same corner every match. Only the first N shuffled pairs are
-        // active; the remainder of the authored sites are unused for this player count.
+        // Even indices are player starts; odd indices are neutral expansion bases.
+        // Shuffle the pairs so the lobby seat order does not pin players to the same corner every
+        // match. For 2-player games, keep the randomized starts but re-pick the natural assignment
+        // from the authored expansion pool so adjacent starts get symmetric naturals instead of one
+        // shared middle natural and one side natural.
         let total_pairs = base_sites.len() / 2;
-        let mut pairs: Vec<((u32, u32), (u32, u32))> = (0..total_pairs)
+        let authored_pairs: Vec<BasePair> = (0..total_pairs)
             .map(|i| (base_sites[2 * i], base_sites[2 * i + 1]))
             .collect();
+        let mut pairs = authored_pairs.clone();
         let mut rng = SmallRng::seed_from_u64(seed as u64);
         pairs.shuffle(&mut rng);
-        let (starts, expansion_sites): (Vec<_>, Vec<_>) =
-            pairs.into_iter().take(player_count).unzip();
+        let selected_pairs: Vec<_> = pairs.into_iter().take(player_count).collect();
+        let starts: Vec<_> = selected_pairs.iter().map(|(start, _)| *start).collect();
+        let expansion_sites = if player_count == 2 {
+            select_symmetric_two_player_expansions([starts[0], starts[1]], &authored_pairs)
+        } else {
+            selected_pairs
+                .iter()
+                .map(|(_, expansion)| *expansion)
+                .collect()
+        };
 
         Ok(Map {
             size,
@@ -139,6 +152,159 @@ impl Map {
     /// World size in pixels (square).
     pub fn world_size_px(&self) -> f32 {
         self.size as f32 * config::TILE_SIZE as f32
+    }
+}
+
+fn select_symmetric_two_player_expansions(
+    starts: [Tile; 2],
+    authored_pairs: &[BasePair],
+) -> Vec<Tile> {
+    let authored_expansions = [
+        authored_expansion_for_start(starts[0], authored_pairs),
+        authored_expansion_for_start(starts[1], authored_pairs),
+    ];
+    let mut best: Option<(TwoPlayerExpansionScore, [(u32, u32); 2])> = None;
+
+    for (left_index, &left_expansion) in authored_pairs
+        .iter()
+        .map(|(_, expansion)| expansion)
+        .enumerate()
+    {
+        for (right_index, &right_expansion) in authored_pairs
+            .iter()
+            .map(|(_, expansion)| expansion)
+            .enumerate()
+        {
+            if left_index == right_index {
+                continue;
+            }
+            let expansions = [left_expansion, right_expansion];
+            let score =
+                score_two_player_expansion_assignment(starts, expansions, authored_expansions);
+            if best
+                .as_ref()
+                .is_none_or(|(best_score, _)| score.is_better_than(best_score))
+            {
+                best = Some((score, expansions));
+            }
+        }
+    }
+
+    best.map(|(_, expansions)| expansions.to_vec())
+        .unwrap_or_else(|| {
+            starts
+                .iter()
+                .filter_map(|&start| authored_expansion_for_start(start, authored_pairs))
+                .collect()
+        })
+}
+
+fn authored_expansion_for_start(start: Tile, authored_pairs: &[BasePair]) -> Option<Tile> {
+    authored_pairs
+        .iter()
+        .find_map(|&(pair_start, expansion)| (pair_start == start).then_some(expansion))
+}
+
+#[derive(Debug, Clone, Copy)]
+struct TwoPlayerExpansionScore {
+    local_symmetry_error: f32,
+    distance_error: f32,
+    authored_mismatches: u8,
+    total_distance: f32,
+}
+
+impl TwoPlayerExpansionScore {
+    fn is_better_than(self, current: &Self) -> bool {
+        if let Some(is_better) =
+            compare_score_value(self.local_symmetry_error, current.local_symmetry_error)
+        {
+            return is_better;
+        }
+        if let Some(is_better) = compare_score_value(self.distance_error, current.distance_error) {
+            return is_better;
+        }
+        if self.authored_mismatches != current.authored_mismatches {
+            return self.authored_mismatches < current.authored_mismatches;
+        }
+        if let Some(is_better) = compare_score_value(self.total_distance, current.total_distance) {
+            return is_better;
+        }
+        false
+    }
+}
+
+fn score_two_player_expansion_assignment(
+    starts: [Tile; 2],
+    expansions: [Tile; 2],
+    authored_expansions: [Option<Tile>; 2],
+) -> TwoPlayerExpansionScore {
+    let left = local_expansion_coordinates(starts[0], starts[1], expansions[0]);
+    let right = local_expansion_coordinates(starts[1], starts[0], expansions[1]);
+    let local_symmetry_error =
+        (left.forward - right.forward).abs() + (left.lateral.abs() - right.lateral.abs()).abs();
+    let distance_error = (left.distance - right.distance).abs();
+    let total_distance = left.distance + right.distance;
+    let authored_mismatches = authored_expansions
+        .iter()
+        .zip(expansions.iter())
+        .filter(|(authored, expansion)| match authored {
+            Some(authored) => authored != *expansion,
+            None => false,
+        })
+        .count() as u8;
+
+    TwoPlayerExpansionScore {
+        local_symmetry_error,
+        distance_error,
+        authored_mismatches,
+        total_distance,
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+struct LocalExpansionCoordinates {
+    forward: f32,
+    lateral: f32,
+    distance: f32,
+}
+
+fn local_expansion_coordinates(
+    start: Tile,
+    enemy_start: Tile,
+    expansion: Tile,
+) -> LocalExpansionCoordinates {
+    let to_enemy_x = enemy_start.0 as f32 - start.0 as f32;
+    let to_enemy_y = enemy_start.1 as f32 - start.1 as f32;
+    let enemy_distance = (to_enemy_x * to_enemy_x + to_enemy_y * to_enemy_y).sqrt();
+    if enemy_distance <= f32::EPSILON {
+        return LocalExpansionCoordinates {
+            forward: 0.0,
+            lateral: 0.0,
+            distance: 0.0,
+        };
+    }
+
+    let unit_x = to_enemy_x / enemy_distance;
+    let unit_y = to_enemy_y / enemy_distance;
+    let expansion_x = expansion.0 as f32 - start.0 as f32;
+    let expansion_y = expansion.1 as f32 - start.1 as f32;
+
+    LocalExpansionCoordinates {
+        forward: expansion_x * unit_x + expansion_y * unit_y,
+        lateral: expansion_x * -unit_y + expansion_y * unit_x,
+        distance: (expansion_x * expansion_x + expansion_y * expansion_y).sqrt(),
+    }
+}
+
+const SCORE_EPSILON_TILES: f32 = 0.0001;
+
+fn compare_score_value(candidate: f32, current: f32) -> Option<bool> {
+    if candidate + SCORE_EPSILON_TILES < current {
+        Some(true)
+    } else if current + SCORE_EPSILON_TILES < candidate {
+        Some(false)
+    } else {
+        None
     }
 }
 
@@ -306,7 +472,7 @@ mod tests {
 
     #[test]
     fn shuffled_starts_get_expansions_from_authored_pool() {
-        // All authored expansions from default.json.
+        // All authored expansions from default-handcrafted.json.
         let authored_expansions: &[(u32, u32)] = &[(48, 23), (48, 73), (73, 47), (23, 47)];
         for seed in 0..16u32 {
             let map = Map::generate(4, seed);
@@ -329,18 +495,11 @@ mod tests {
     }
 
     #[test]
-    fn shuffled_starts_keep_their_paired_natural_expansions() {
-        let authored_pairs: HashSet<_> = [
-            ((10, 10), (48, 23)),
-            ((85, 85), (48, 73)),
-            ((85, 10), (73, 47)),
-            ((10, 85), (23, 47)),
-        ]
-        .into_iter()
-        .collect();
+    fn full_player_count_keeps_their_paired_natural_expansions() {
+        let authored_pairs: HashSet<_> = default_authored_pairs().into_iter().collect();
 
         for seed in 0..16u32 {
-            let map = Map::generate(2, seed);
+            let map = Map::generate(4, seed);
             for pair in map
                 .starts
                 .iter()
@@ -361,6 +520,59 @@ mod tests {
             let map = Map::generate(2, seed);
             assert_eq!(map.starts.len(), 2);
             assert_eq!(map.expansion_sites.len(), 2);
+        }
+    }
+
+    #[test]
+    fn adjacent_two_player_starts_get_symmetric_natural_expansions() {
+        let authored_pairs = default_authored_pairs();
+
+        assert_eq!(
+            select_symmetric_two_player_expansions([(10, 10), (85, 10)], &authored_pairs),
+            vec![(23, 47), (73, 47)],
+            "top-edge starts should both expand toward matching side naturals"
+        );
+        assert_eq!(
+            select_symmetric_two_player_expansions([(10, 85), (85, 85)], &authored_pairs),
+            vec![(23, 47), (73, 47)],
+            "bottom-edge starts should both expand toward matching side naturals"
+        );
+        assert_eq!(
+            select_symmetric_two_player_expansions([(10, 10), (10, 85)], &authored_pairs),
+            vec![(48, 23), (48, 73)],
+            "left-edge starts should both expand toward matching vertical naturals"
+        );
+        assert_eq!(
+            select_symmetric_two_player_expansions([(85, 10), (85, 85)], &authored_pairs),
+            vec![(48, 23), (48, 73)],
+            "right-edge starts should both expand toward matching vertical naturals"
+        );
+    }
+
+    #[test]
+    fn generated_two_player_layouts_use_symmetric_natural_assignments() {
+        for seed in 0..64u32 {
+            let map = Map::generate(2, seed);
+            let score = score_two_player_expansion_assignment(
+                [map.starts[0], map.starts[1]],
+                [map.expansion_sites[0], map.expansion_sites[1]],
+                [None, None],
+            );
+
+            assert!(
+                score.local_symmetry_error <= 2.0,
+                "seed {seed} assigned asymmetric naturals: starts {:?}, expansions {:?}, score {:?}",
+                map.starts,
+                map.expansion_sites,
+                score
+            );
+            assert!(
+                score.distance_error <= 2.0,
+                "seed {seed} assigned unequal natural distances: starts {:?}, expansions {:?}, score {:?}",
+                map.starts,
+                map.expansion_sites,
+                score
+            );
         }
     }
 
@@ -399,5 +611,14 @@ mod tests {
             .expect_err("blocked base protection area should be rejected");
 
         assert!(err.contains("impassable terrain"));
+    }
+
+    fn default_authored_pairs() -> [BasePair; 4] {
+        [
+            ((10, 10), (48, 23)),
+            ((85, 85), (48, 73)),
+            ((85, 10), (73, 47)),
+            ((10, 85), (23, 47)),
+        ]
     }
 }
