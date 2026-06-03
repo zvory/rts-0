@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 
 use crate::game::entity::{BuildPhase, Entity, EntityKind, EntityStore, Order, NEUTRAL};
+use crate::game::fog::Fog;
 use crate::game::map::Map;
 use crate::game::PlayerState;
 use crate::protocol::{states, EntityView, Snapshot, StartPayload};
@@ -127,6 +128,7 @@ impl AiObservation {
     pub(crate) fn from_live_state(
         map: &Map,
         entities: &EntityStore,
+        fog: &Fog,
         players: &[PlayerState],
         player_id: u32,
         tick: u32,
@@ -177,6 +179,15 @@ impl AiObservation {
         pending_builds.sort_unstable();
         pending_builds.dedup();
 
+        let mut visible_enemies: Vec<AiEntitySummary> = entities
+            .iter()
+            .filter(|e| e.owner != NEUTRAL && e.owner != player_id)
+            .filter(|e| e.is_unit() || e.is_building())
+            .filter(|e| fog.is_visible_world(player_id, e.pos_x, e.pos_y))
+            .map(AiEntitySummary::from_live_entity)
+            .collect();
+        visible_enemies.sort_by_key(|e| e.id);
+
         Some(Self {
             player_id,
             tick,
@@ -186,9 +197,9 @@ impl AiObservation {
             players: player_summaries,
             owned,
             resources,
-            // Live AI can read authoritative state, but the shared decision core should not learn
-            // hidden enemy positions until scouting/memory has an explicit contract.
-            visible_enemies: Vec::new(),
+            // Live AI only receives entities visible through its authoritative fog grid. It can
+            // react to scouted pressure without learning hidden enemy positions.
+            visible_enemies,
             pending_builds,
         })
     }
@@ -604,8 +615,11 @@ mod tests {
                 is_ai: false,
             },
         ];
+        let mut fog = Fog::new(map.size);
+        fog.recompute(&[1, 2], &entities);
 
-        let observation = AiObservation::from_live_state(&map, &entities, &players, 1, 9).unwrap();
+        let observation =
+            AiObservation::from_live_state(&map, &entities, &fog, &players, 1, 9).unwrap();
 
         assert_eq!(
             observation.players.iter().map(|p| p.id).collect::<Vec<_>>(),
@@ -615,6 +629,59 @@ mod tests {
         assert_eq!(
             observation.owned.iter().map(|e| e.id).collect::<Vec<_>>(),
             vec![1]
+        );
+    }
+
+    #[test]
+    fn live_observation_includes_only_fog_visible_enemies() {
+        let map = Map::generate(2, 1234);
+        let mut entities = EntityStore::new();
+        entities
+            .spawn_unit(1, EntityKind::Worker, 32.0, 32.0)
+            .unwrap();
+        let visible_enemy = entities
+            .spawn_unit(2, EntityKind::Rifleman, 64.0, 32.0)
+            .unwrap();
+        entities
+            .spawn_unit(2, EntityKind::Rifleman, 1_024.0, 1_024.0)
+            .unwrap();
+        let players = vec![
+            PlayerState {
+                id: 1,
+                name: "Alpha".into(),
+                color: "#111".into(),
+                start_tile: (8, 8),
+                steel: 100,
+                oil: 0,
+                supply_used: 1,
+                supply_cap: 10,
+                is_ai: true,
+            },
+            PlayerState {
+                id: 2,
+                name: "Bravo".into(),
+                color: "#222".into(),
+                start_tile: (48, 48),
+                steel: 100,
+                oil: 0,
+                supply_used: 1,
+                supply_cap: 10,
+                is_ai: false,
+            },
+        ];
+        let mut fog = Fog::new(map.size);
+        fog.recompute(&[1, 2], &entities);
+
+        let observation =
+            AiObservation::from_live_state(&map, &entities, &fog, &players, 1, 9).unwrap();
+
+        assert_eq!(
+            observation
+                .visible_enemies
+                .iter()
+                .map(|enemy| enemy.id)
+                .collect::<Vec<_>>(),
+            vec![visible_enemy]
         );
     }
 }

@@ -30,7 +30,7 @@ use crate::protocol::{
 use crate::rules::projection;
 use serde::{Deserialize, Serialize};
 
-use ai::AiController;
+use ai::{AiController, AiThinkContext};
 use entity::{EntityKind, EntityStore};
 use fog::Fog;
 use map::Map;
@@ -257,11 +257,14 @@ impl Game {
         let mut pending = std::mem::take(&mut self.pending);
         for controller in self.ai.iter_mut() {
             controller.think(
-                &self.map,
-                &self.entities,
-                &self.spatial,
-                &self.players,
-                self.tick,
+                AiThinkContext {
+                    map: &self.map,
+                    entities: &self.entities,
+                    fog: &self.fog,
+                    spatial: &self.spatial,
+                    players: &self.players,
+                    tick: self.tick,
+                },
                 &mut pending,
             );
         }

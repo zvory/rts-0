@@ -408,7 +408,9 @@ mod tests {
             supply_cap: 0,
             is_ai: true,
         }];
-        let live = AiObservation::from_live_state(&map, &entities, &players, 1, 0).unwrap();
+        let mut fog = crate::game::fog::Fog::new(map.size);
+        fog.recompute(&[1], &entities);
+        let live = AiObservation::from_live_state(&map, &entities, &fog, &players, 1, 0).unwrap();
         let live_facts = AiFacts::from_observation(&live);
 
         let snapshot = Snapshot {
@@ -489,7 +491,10 @@ mod tests {
             is_ai: true,
         }];
 
-        let observation = AiObservation::from_live_state(&map, &entities, &players, 1, 0).unwrap();
+        let mut fog = crate::game::fog::Fog::new(map.size);
+        fog.recompute(&[1], &entities);
+        let observation =
+            AiObservation::from_live_state(&map, &entities, &fog, &players, 1, 0).unwrap();
         let facts = AiFacts::from_observation(&observation);
         let counts = facts.building_counts(EntityKind::Depot);
 
