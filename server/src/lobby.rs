@@ -27,11 +27,11 @@ use tokio::time::{interval, MissedTickBehavior};
 use tracing::{debug, error, info, warn};
 
 use crate::config;
+use crate::game::command::SimCommand;
 use crate::game::selfplay::{is_safe_artifact_name, LiveSelfPlay, ReplayArtifact, ReplayDriver};
 use crate::game::{Game, PlayerInit};
 use crate::protocol::{
-    kinds, Command, Event, LobbyPlayer, PlayerScore, ResourceDelta, ServerMessage, Snapshot,
-    StartPayload,
+    kinds, Event, LobbyPlayer, PlayerScore, ResourceDelta, ServerMessage, Snapshot, StartPayload,
 };
 
 /// Player colors, assigned from the head of the palette. MUST match `client/src/config.js`
@@ -207,7 +207,7 @@ pub enum RoomEvent {
     /// The host toggled the lobby's start-with-more-money mode.
     SetQuickstart { player_id: u32, enabled: bool },
     /// A gameplay command (ignored unless the room is in-game and the sender is in the room).
-    Command { player_id: u32, cmd: Command },
+    Command { player_id: u32, cmd: SimCommand },
     /// Set replay playback speed multiplier (replay rooms only; ignored elsewhere).
     SetReplaySpeed { speed: f32 },
 }
@@ -617,7 +617,7 @@ impl RoomTask {
         PLAYER_PALETTE[idx].to_string()
     }
 
-    fn on_command(&mut self, player_id: u32, cmd: Command) {
+    fn on_command(&mut self, player_id: u32, cmd: SimCommand) {
         if matches!(self.mode, RoomMode::DevSelfPlay(_)) {
             return;
         }
