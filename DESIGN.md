@@ -738,9 +738,10 @@ prevents it from over-committing resources/supply it does not have.
 
 **Shared AI core.** `game::ai_core` has deterministic profile data (`profiles.rs`) and a generic
 ranked decision loop (`decision.rs`) that emits ordinary `Command`s through shared action helpers.
-The first code-defined profiles are `rifle_flood_fast`, `rifle_flood_full_saturation`, and
-`tech_to_tanks`; they parameterize worker targets, supply buffers, building/tech goals, production
-priorities, resource timing, and attack thresholds without providing their own `think()` functions.
+The first code-defined profiles are `rifle_flood_fast`, `rifle_flood_full_saturation`,
+`tech_to_tanks`, and `steel_expansion_tanks`; they parameterize worker targets, supply buffers,
+building/tech goals, production priorities, resource timing, expansion timing, and attack
+thresholds without providing their own `think()` functions.
 `rifle_flood_fast` sends exactly one reserved worker toward a hidden edge-biased proxy point near
 the nearest public enemy start tile immediately, before it can afford the barracks. The transit
 target stays at least 18 tiles from the enemy start, prefers map-edge footprints, and avoids the
@@ -753,6 +754,12 @@ individual pressure units instead of waiting for escalating waves.
 for the tank-factory step, delays oil workers until at least eight workers are already mining steel,
 uses ready combat units to clear visible threats in its home resource line before attacking out,
 and treats a single completed tank as a valid minimum attack wave.
+`steel_expansion_tanks` is a defensive economic tech profile: it builds one Barracks, trains a small
+Rifleman screen, saves for a second Industrial Center near a neutral steel expansion, then raises
+its worker target and resumes the tank tech path. Once tank tech is live, its idle-worker assignment
+adapts between steel and oil by comparing the current bank against the next tank-production
+bottleneck, so an oil-starved factory push receives more oil workers while an oil-floated state
+pushes new workers back to steel.
 The live lobby AI uses this shared core through `AiController`, which only owns live identity,
 profile id, cadence, and persistent decision memory. Profiles are still not client-selectable.
 

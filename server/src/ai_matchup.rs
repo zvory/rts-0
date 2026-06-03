@@ -280,6 +280,10 @@ fn print_profiles() {
     println!("  macro -> rifle_flood_full_saturation");
     println!("  tech -> tech_to_tanks");
     println!("  tanks -> tech_to_tanks");
+    println!("  expand -> steel_expansion_tanks");
+    println!("  expansion -> steel_expansion_tanks");
+    println!("  steel -> steel_expansion_tanks");
+    println!("  steel_tanks -> steel_expansion_tanks");
 }
 
 fn print_usage() {
@@ -300,6 +304,7 @@ Options:
 
 Examples:
   cargo run --bin ai-matchup -- rush tech
+  cargo run --bin ai-matchup -- expand tech
   cargo run --bin ai-matchup -- saturation tech --seed 7 --ticks 20000 --json
 "
     );
