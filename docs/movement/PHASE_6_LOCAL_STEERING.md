@@ -59,6 +59,9 @@ jams, and imperfect motion.
 1. Expose or reuse Phase 0 footing helpers. If they are still private inside collision code, either
    move them to a small local section in `movement.rs` or extract a `services::locomotion` module.
    Keep the helper deterministic and pure.
+   The implemented stack keeps the footing helpers in `movement.rs`, shared by steering and
+   collision, and uses `services::standability::unit_static_standable` for every steering
+   candidate landing check.
 
 2. Add steering constants in `movement.rs`:
 

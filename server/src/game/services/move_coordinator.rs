@@ -87,6 +87,7 @@ impl<'a> MoveCoordinator<'a> {
                 let e = entities.get(id)?;
                 (e.is_unit() && e.owner == player).then_some(FormationUnit {
                     id,
+                    kind: e.kind,
                     pos: (e.pos_x, e.pos_y),
                 })
             })
@@ -533,19 +534,28 @@ fn begin_machine_gunner_teardown(e: &mut crate::game::entity::Entity) {
 #[derive(Clone, Copy)]
 struct FormationUnit {
     id: u32,
+    kind: EntityKind,
     pos: (f32, f32),
 }
 
 /// Spread unit goals around the requested anchor tile. Returns one goal world point per unit
 /// in the same order as `ids`.
-fn spread_goals(map: &Map, occ: &Occupancy, ids: &[u32], anchor: (u32, u32)) -> Vec<(f32, f32)> {
-    let mut out = Vec::with_capacity(ids.len());
+fn spread_goals(
+    map: &Map,
+    occ: &Occupancy,
+    units: &[FormationUnit],
+    anchor: (u32, u32),
+) -> Vec<(f32, f32)> {
+    let mut out = Vec::with_capacity(units.len());
     let mut taken: Vec<(u32, u32)> = Vec::new();
 
-    for _ in ids {
-        let tile = find_unique_tile_near(map, occ, anchor, &taken);
-        taken.push(tile);
-        out.push(map.tile_center(tile.0, tile.1));
+    for unit in units {
+        if let Some(tile) = find_unique_tile_near(map, occ, unit.kind, anchor, &taken) {
+            taken.push(tile);
+            out.push(map.tile_center(tile.0, tile.1));
+        } else {
+            out.push(unit.pos);
+        }
     }
 
     out
@@ -560,7 +570,7 @@ fn formation_goals(
 ) -> Vec<(f32, f32)> {
     if units.len() <= 1 {
         let anchor = map.tile_of(goal.0, goal.1);
-        return spread_goals(map, occ, &[0], anchor);
+        return spread_goals(map, occ, units, anchor);
     }
 
     let inv_count = 1.0 / units.len() as f32;
@@ -589,9 +599,12 @@ fn formation_goals(
             (goal.1 + offset.1 * formation_scale).clamp(0.0, max),
         );
         let anchor = map.tile_of(desired.0, desired.1);
-        let tile = find_unique_tile_near(map, occ, anchor, &taken);
-        taken.push(tile);
-        out.push(map.tile_center(tile.0, tile.1));
+        if let Some(tile) = find_unique_tile_near(map, occ, unit.kind, anchor, &taken) {
+            taken.push(tile);
+            out.push(map.tile_center(tile.0, tile.1));
+        } else {
+            out.push(unit.pos);
+        }
     }
 
     out
@@ -613,17 +626,18 @@ fn clamp_offset(dx: f32, dy: f32, max_len: f32) -> (f32, f32) {
     (dx * scale, dy * scale)
 }
 
-/// Search outward from `anchor` in deterministic ring order and return the first passable tile
-/// not already in `taken`. Falls back to `anchor` itself if nothing better exists.
+/// Search outward from `anchor` in deterministic ring order and return the first body-standable
+/// tile not already in `taken`.
 fn find_unique_tile_near(
     map: &Map,
     occ: &Occupancy,
+    kind: EntityKind,
     anchor: (u32, u32),
     taken: &[(u32, u32)],
-) -> (u32, u32) {
+) -> Option<(u32, u32)> {
     // Try the anchor first.
-    if is_free_goal(map, occ, anchor, taken) {
-        return anchor;
+    if is_free_goal(map, occ, kind, anchor, taken) {
+        return Some(anchor);
     }
 
     for r in 1i32..=6 {
@@ -638,18 +652,23 @@ fn find_unique_tile_near(
                     continue;
                 }
                 let t = (tx as u32, ty as u32);
-                if is_free_goal(map, occ, t, taken) {
-                    return t;
+                if is_free_goal(map, occ, kind, t, taken) {
+                    return Some(t);
                 }
             }
         }
     }
 
-    // Absolute fallback: anchor itself even if occupied.
-    anchor
+    None
 }
 
-fn is_free_goal(map: &Map, occ: &Occupancy, tile: (u32, u32), taken: &[(u32, u32)]) -> bool {
+fn is_free_goal(
+    map: &Map,
+    occ: &Occupancy,
+    kind: EntityKind,
+    tile: (u32, u32),
+    taken: &[(u32, u32)],
+) -> bool {
     if !map.is_passable(tile.0 as i32, tile.1 as i32) {
         return false;
     }
@@ -659,7 +678,8 @@ fn is_free_goal(map: &Map, occ: &Occupancy, tile: (u32, u32), taken: &[(u32, u32
     if taken.contains(&tile) {
         return false;
     }
-    true
+    let center = map.tile_center(tile.0, tile.1);
+    standability::unit_static_standable(map, occ, kind, center.0, center.1)
 }
 
 /// Pick a walk target outside a build footprint.
@@ -767,8 +787,18 @@ mod tests {
     use crate::game::services::occupancy::Occupancy;
 
     fn formation_unit(id: u32, map: &Map, tile: (u32, u32)) -> FormationUnit {
+        formation_unit_kind(id, EntityKind::Rifleman, map, tile)
+    }
+
+    fn formation_unit_kind(
+        id: u32,
+        kind: EntityKind,
+        map: &Map,
+        tile: (u32, u32),
+    ) -> FormationUnit {
         FormationUnit {
             id,
+            kind,
             pos: map.tile_center(tile.0, tile.1),
         }
     }
@@ -916,6 +946,35 @@ mod tests {
         );
         assert!(map.is_passable(first_tile.0 as i32, first_tile.1 as i32));
         assert!(occ.passable(first_tile.0 as i32, first_tile.1 as i32));
+    }
+
+    #[test]
+    fn formation_goal_rejects_large_unit_body_clipping_building() {
+        let mut map = Map::generate(1, 0x1234_5678);
+        for tile in &mut map.terrain {
+            *tile = crate::protocol::terrain::GRASS;
+        }
+        let mut entities = EntityStore::new();
+        let (bx, by) = footprint_center(&map, EntityKind::Depot, 10, 10);
+        entities
+            .spawn_building(1, EntityKind::Depot, bx, by, true)
+            .expect("depot should spawn");
+        let occ = Occupancy::build(&map, &entities);
+        let units = vec![formation_unit_kind(1, EntityKind::Tank, &map, (6, 10))];
+        let body_clipping_goal = map.tile_center(12, 10);
+
+        let goals = formation_goals(&map, &occ, &units, body_clipping_goal);
+        let goal = goals[0];
+
+        assert_ne!(
+            map.tile_of(goal.0, goal.1),
+            (12, 10),
+            "formation goals must not assign a tile where only the unit center is clear"
+        );
+        assert!(
+            standability::unit_static_standable(&map, &occ, EntityKind::Tank, goal.0, goal.1),
+            "fallback formation goal must be body-standable"
+        );
     }
 
     #[test]
