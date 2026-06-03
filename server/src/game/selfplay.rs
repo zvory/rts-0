@@ -126,12 +126,29 @@ pub(crate) struct ReplayArtifact {
     pub(crate) players: Vec<PlayerInit>,
     #[serde(default)]
     pub(crate) seed: u32,
+    /// Starting steel each player began the match with. Defaults to [`config::STARTING_STEEL`]
+    /// so legacy replays (recorded before quickstart was persisted) still load.
+    #[serde(default = "default_starting_steel")]
+    pub(crate) starting_steel: u32,
+    /// Starting oil each player began the match with. See [`ReplayArtifact::starting_steel`].
+    #[serde(default = "default_starting_oil")]
+    pub(crate) starting_oil: u32,
+}
+
+fn default_starting_steel() -> u32 {
+    config::STARTING_STEEL
+}
+
+fn default_starting_oil() -> u32 {
+    config::STARTING_OIL
 }
 
 pub(crate) struct ReplayDriver {
     commands: Vec<super::replay::CommandLogEntry>,
     next: usize,
     seed: u32,
+    starting_steel: u32,
+    starting_oil: u32,
 }
 
 impl ReplayDriver {
@@ -142,12 +159,22 @@ impl ReplayDriver {
                 commands: artifact.replay_commands,
                 next: 0,
                 seed: artifact.seed,
+                starting_steel: artifact.starting_steel,
+                starting_oil: artifact.starting_oil,
             },
         )
     }
 
     pub(crate) fn seed(&self) -> u32 {
         self.seed
+    }
+
+    pub(crate) fn starting_steel(&self) -> u32 {
+        self.starting_steel
+    }
+
+    pub(crate) fn starting_oil(&self) -> u32 {
+        self.starting_oil
     }
 
     pub(crate) fn enqueue_for_tick(&mut self, game: &mut Game) {
@@ -467,6 +494,8 @@ fn write_simple_replay_artifact(
         replay_commands: game.command_log().to_vec(),
         players: players.to_vec(),
         seed: game.seed(),
+        starting_steel: game.starting_steel(),
+        starting_oil: game.starting_oil(),
     };
     let json = serde_json::to_vec_pretty(&artifact).map_err(|err| err.to_string())?;
     fs::write(dir.join("replay.json"), json).map_err(|err| err.to_string())?;
@@ -2613,6 +2642,8 @@ fn profile_matchup_rifle_flood_full_saturation_vs_tech_to_tanks_20k_result() {
         replay_commands: game.command_log().to_vec(),
         players: players.clone(),
         seed: game.seed(),
+        starting_steel: game.starting_steel(),
+        starting_oil: game.starting_oil(),
     };
     let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("target")
@@ -3160,6 +3191,8 @@ fn real_ai_vs_real_ai() {
                 replay_commands: game.command_log().to_vec(),
                 players: players.clone(),
                 seed: game.seed(),
+                starting_steel: game.starting_steel(),
+                starting_oil: game.starting_oil(),
             };
             if let Ok(json) = serde_json::to_vec_pretty(&artifact) {
                 let _ = std::fs::write(dir.join("replay.json"), json);
@@ -3335,6 +3368,8 @@ fn real_ai_vs_real_ai() {
         replay_commands: game.command_log().to_vec(),
         players: players.clone(),
         seed: game.seed(),
+        starting_steel: game.starting_steel(),
+        starting_oil: game.starting_oil(),
     };
     let ts = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)

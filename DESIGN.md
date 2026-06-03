@@ -923,8 +923,10 @@ coverage. These scripts are kept isolated from the canonical profile list.
 
 **Artifacts.** On failure, the test writes `target/selfplay-failures/<test>-<pid>-<time>/`
 with:
-- `replay.json`: start payload, player specs, script decision log, authoritative tick-stamped
-  command log, event log, milestone state, and sampled snapshot summaries.
+- `replay.json`: start payload, player specs, per-player starting steel/oil (so quickstart
+  "start with more money" matches replay with the same economy they were recorded with),
+  script decision log, authoritative tick-stamped command log, event log, milestone state,
+  and sampled snapshot summaries.
 - `summary.log`: short human-readable failure summary and missing milestones.
 
 The artifact is meant to be enough to reproduce or inspect a failing run without manually
