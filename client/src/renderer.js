@@ -951,19 +951,29 @@ export class Renderer {
     if (!state || !state.resourceMiningPreview) return;
     const g = this._feedbackGfx;
     const p = state.resourceMiningPreview;
+    const icStat = STATS[KIND.INDUSTRIAL_CENTER] || {};
+    const ts = (this._map && this._map.tileSize) || 32;
+    const icEndpoint = rectEdgePointTowardCenter(
+      p.resourceX,
+      p.resourceY,
+      p.icX,
+      p.icY,
+      ((icStat.footW || 3) * ts) / 2,
+      ((icStat.footH || 3) * ts) / 2,
+    );
+
     if (p.inRange) {
       g.lineStyle(4, 0x4aa3ff, 0.95);
       g.moveTo(p.resourceX, p.resourceY);
-      g.lineTo(p.icX, p.icY);
+      g.lineTo(icEndpoint.x, icEndpoint.y);
       g.beginFill(0x4aa3ff, 0.18);
       g.drawCircle(p.resourceX, p.resourceY, 9);
-      g.drawCircle(p.icX, p.icY, 9);
       g.endFill();
       return;
     }
 
     g.lineStyle(2.5, 0xd64d45, 0.9);
-    dashedLine(g, p.resourceX, p.resourceY, p.icX, p.icY, 14, 9);
+    dashedLine(g, p.resourceX, p.resourceY, icEndpoint.x, icEndpoint.y, 14, 9);
   }
 
   /**
@@ -1218,6 +1228,40 @@ function dashedLine(g, x1, y1, x2, y2, dash, gap) {
     g.lineTo(x1 + ux * end, y1 + uy * end);
     cursor = end + gap;
   }
+}
+
+function rectEdgePointTowardCenter(fromX, fromY, centerX, centerY, halfW, halfH) {
+  const dx = centerX - fromX;
+  const dy = centerY - fromY;
+  if (Math.hypot(dx, dy) <= 0.001) return { x: centerX, y: centerY };
+
+  const minX = centerX - halfW;
+  const maxX = centerX + halfW;
+  const minY = centerY - halfH;
+  const maxY = centerY + halfH;
+  let tEnter = 0;
+  let tExit = 1;
+
+  if (Math.abs(dx) > 0.001) {
+    const tx1 = (minX - fromX) / dx;
+    const tx2 = (maxX - fromX) / dx;
+    tEnter = Math.max(tEnter, Math.min(tx1, tx2));
+    tExit = Math.min(tExit, Math.max(tx1, tx2));
+  } else if (fromX < minX || fromX > maxX) {
+    return { x: centerX, y: centerY };
+  }
+
+  if (Math.abs(dy) > 0.001) {
+    const ty1 = (minY - fromY) / dy;
+    const ty2 = (maxY - fromY) / dy;
+    tEnter = Math.max(tEnter, Math.min(ty1, ty2));
+    tExit = Math.min(tExit, Math.max(ty1, ty2));
+  } else if (fromY < minY || fromY > maxY) {
+    return { x: centerX, y: centerY };
+  }
+
+  if (tEnter <= 0.001 || tEnter > tExit || tEnter > 1) return { x: centerX, y: centerY };
+  return { x: fromX + dx * tEnter, y: fromY + dy * tEnter };
 }
 
 /** Point at angle `a` (radians) and distance `d` from the origin. */
