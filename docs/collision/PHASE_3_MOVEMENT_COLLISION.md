@@ -94,8 +94,9 @@ Add or strengthen invariants:
 - Every non-ghost unit body must be static-standable at end of tick.
 - No non-ghost unit body intersects any building footprint rectangle.
 - Unit-unit overlap tolerance remains explicit and documented.
-- Optional: ghost workers may overlap their latched resource/build site, but spawning and new
-  construction still cannot place on top of them.
+- Optional: ghost workers may overlap their latched resource/build site. Production spawn and final
+  scaffold creation still cannot place on top of them. Build intent may ignore only the chosen
+  builder's own body as described in Phase 2.
 
 ## Tests
 

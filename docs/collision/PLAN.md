@@ -68,8 +68,13 @@ Use explicit policy names so callers cannot accidentally inherit the wrong behav
   targets. Dynamic unit overlap is handled separately by steering/collision.
 - `Spawn`: terrain plus building footprints plus all living unit bodies. Used before production
   creates a unit. Ghost units still block birth; pass-through does not mean "spawn on top of me."
+- `BuildIntent`: terrain, existing building footprints, resource nodes, and living unit bodies
+  except the chosen builder's own body. Used for command-time validation and client preview so a
+  worker can conveniently place a building over itself and then walk to an outside staging point.
+  This policy does not create a scaffold.
 - `BuildingPlacement`: terrain, existing building footprints, resource nodes, and all living unit
-  bodies intersecting the candidate footprint. Used before construction creates a scaffold.
+  bodies intersecting the candidate footprint. Used immediately before construction creates a
+  scaffold.
 - `EjectionFallback`: defensive only. Used for legacy cleanup if an existing bad state is found.
   New gameplay should avoid creating states that need ejection.
 
@@ -100,7 +105,9 @@ After the plan lands:
 1. Production never creates a unit whose body intersects terrain, a building footprint, or another
    living unit body.
 2. Construction never creates a scaffold whose footprint intersects terrain, another building,
-   a resource node, or any living unit body.
+   a resource node, or any living unit body. Build intent may still target the chosen builder's
+   current body as a convenience, provided the worker can path to an outside staging point before
+   scaffold creation.
 3. A non-ghost unit's body never intersects a building footprint at end of tick.
 4. Non-ghost unit-unit overlap is reduced by collision resolution in the same tick and remains
    within a documented tolerance only for cases where both legal exits are physically blocked.
