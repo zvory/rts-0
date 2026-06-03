@@ -763,10 +763,10 @@ or workers temporarily suspends expansion, worker training, and non-defensive te
 panicking, the AI classifies the visible local threat by weapon DPS: tank-dominated pressure (75%+
 of visible local DPS) prioritizes AT teams, infantry-dominated pressure prioritizes Machine
 Gunners, mixed pressure asks for a support mix, and no-DPS pressure falls back to Riflemen. Support
-panic may build a Training Centre and pull workers onto oil; if support tech or oil is not ready,
-Barracks production falls back through Riflemen. If the pressure persists through the panic window,
-the AI asks for an additional Barracks before resuming its normal profile once the threat has
-cleared.
+panic only uses an already-completed Training Centre and may pull workers onto oil for those support
+counters; if support tech is absent, Barracks production falls back to Riflemen and panic mode does
+not create the Training Centre. If the pressure persists through the panic window, the AI asks for
+an additional Barracks before resuming its normal profile once the threat has cleared.
 `steel_expansion_tanks` is a defensive economic support profile: it saves for a second Industrial
 Center near a neutral steel expansion before building any non-Depot tech structure. Once that
 expansion IC is planned, it builds Barracks and Training Centre tech, staffs oil, produces Machine
