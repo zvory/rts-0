@@ -84,14 +84,16 @@ export class Input {
    * @param {import("./net.js").Net} net command sender
    * @param {import("./renderer.js").Renderer} renderer for drawSelectionBox
    * @param {import("./fog.js").Fog} fog kept for parity / future hit-test filtering
+   * @param {import("./audio.js").Audio} [audio] optional audio engine for local cues
    */
-  constructor(domElement, camera, state, net, renderer, fog) {
+  constructor(domElement, camera, state, net, renderer, fog, audio) {
     this.dom = domElement;
     this.camera = camera;
     this.state = state;
     this.net = net;
     this.renderer = renderer;
     this.fog = fog;
+    this.audio = audio || null;
 
     /**
      * Continuous pan-key state, read by Camera.update(dt, input). Booleans for the
@@ -716,6 +718,7 @@ export class Input {
     }
     const worker = workers[0];
     this.net.command(cmd.build(worker, place.building, place.tileX, place.tileY));
+    if (this.audio) this.audio.play("build_confirm", { category: "ui", priority: 2 });
     this.state.endPlacement();
   }
 

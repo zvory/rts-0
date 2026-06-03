@@ -19,6 +19,7 @@ import { Input } from "./input.js";
 import { HUD } from "./hud.js";
 import { Minimap } from "./minimap.js";
 import { Lobby } from "./lobby.js";
+import { Audio, SOUND_MANIFEST, noticeSoundId } from "./audio.js";
 import { S, EVENT } from "./protocol.js";
 import { SNAPSHOT_MS, INTERP_DELAY_MS } from "./config.js";
 
@@ -89,6 +90,15 @@ class App {
     /** @type {Net} persistent connection across lobby + matches. */
     this.net = new Net(wsUrl());
     this.devWatch = devWatchConfig();
+    /**
+     * Audio engine. Long-lived across matches: the AudioContext is unlocked
+     * by the user's first gesture (anywhere in the page), and we want that
+     * unlock to survive lobby->match->lobby transitions.
+     * @type {Audio}
+     */
+    this.audio = new Audio();
+    void this.audio.preload(SOUND_MANIFEST);
+    if (dom.settingsMenu) buildAudioSettings(this.audio, dom.settingsMenu);
     /** @type {Lobby} */
     this.lobby = new Lobby(dom.lobbyScreen, this.net);
     /** @type {Match|null} the currently running match, if any. */
@@ -200,7 +210,13 @@ class App {
     dom.gameOver.hidden = true;
     this.clearScoreboard();
 
-    this.match = new Match(this.net, payload, (msg) => this.showToast(msg), this.devWatch);
+    this.match = new Match(
+      this.net,
+      payload,
+      (msg) => this.showToast(msg),
+      this.devWatch,
+      this.audio,
+    );
   }
 
   /**
@@ -212,6 +228,8 @@ class App {
     const verdict = m && m.you ? m.you : "draw";
     const text =
       verdict === "won" ? "Victory" : verdict === "lost" ? "Defeat" : "Draw";
+    if (verdict === "won") this.audio.play("victory", { category: "ui", priority: 5 });
+    else if (verdict === "lost") this.audio.play("defeat", { category: "ui", priority: 5 });
     dom.gameOverText.textContent = text;
     dom.gameOverText.dataset.verdict = verdict; // lets CSS tint win/lose/draw
     this.renderScoreboard(Array.isArray(m?.scores) ? m.scores : [], m?.winnerId ?? null);
@@ -376,10 +394,11 @@ class Match {
    * @param {object} payload §2.3 start payload
    * @param {(msg: string) => void} toast surface a notice in the App's toast
    */
-  constructor(net, payload, toast, devWatch) {
+  constructor(net, payload, toast, devWatch, audio) {
     this.net = net;
     this.toast = toast;
     this.devWatch = devWatch;
+    this.audio = audio;
     this.replaySpeedHandler = null;
     this.giveUpSent = false;
 
@@ -398,6 +417,7 @@ class Match {
       this.net,
       this.renderer,
       this.fog,
+      this.audio,
     );
 
     // Draw the static terrain once into the renderer's cached layer.
@@ -579,12 +599,21 @@ class Match {
     };
   }
 
-  /** Surface this snapshot's `notice` events as toasts (visual flavor only). */
+  /**
+   * Surface this snapshot's `notice` events as toasts and (phase 1) play a
+   * matching alert sound. Sound id is chosen by keyword from the notice text;
+   * any unmatched notice falls back to the generic notice sound.
+   */
   drainNotices() {
     const events = this.state.events;
     if (!events || !events.length) return;
     for (const ev of events) {
-      if (ev && ev.e === EVENT.NOTICE && ev.msg) this.toast(ev.msg);
+      if (ev && ev.e === EVENT.NOTICE && ev.msg) {
+        this.toast(ev.msg);
+        if (this.audio) {
+          this.audio.play(noticeSoundId(ev.msg), { category: "alert", priority: 3 });
+        }
+      }
     }
   }
 
@@ -664,6 +693,85 @@ class Match {
       }
     }
   }
+}
+
+/**
+ * Inject Phase-1 volume sliders into the in-match gear menu (#settings-menu).
+ * Sliders persist via Audio's localStorage layer; the rows are inserted above
+ * any pre-existing menu items (e.g. "Give up").
+ *
+ * UX choices for phase 1:
+ *  - Combat slider is bound to both `combat_self` and `combat_other` so the
+ *    player adjusts "combat noise" as one thing. Splitting them is a phase 4
+ *    decision once we have actual combat sounds wired.
+ *  - All other categories surface one-to-one.
+ *
+ * @param {import("./audio.js").Audio} audio
+ * @param {HTMLElement} menuEl
+ */
+function buildAudioSettings(audio, menuEl) {
+  if (menuEl.querySelector(".audio-settings")) return; // idempotent
+
+  const wrap = document.createElement("div");
+  wrap.className = "audio-settings";
+
+  const rows = [
+    {
+      label: "Master",
+      get: () => audio.getMasterVolume(),
+      set: (v) => audio.setMasterVolume(v),
+    },
+    {
+      label: "Alerts",
+      get: () => audio.getCategoryVolume("alert"),
+      set: (v) => audio.setCategoryVolume("alert", v),
+    },
+    {
+      label: "UI",
+      get: () => audio.getCategoryVolume("ui"),
+      set: (v) => audio.setCategoryVolume("ui", v),
+    },
+    {
+      label: "Combat",
+      get: () => audio.getCategoryVolume("combat_self"),
+      set: (v) => {
+        audio.setCategoryVolume("combat_self", v);
+        audio.setCategoryVolume("combat_other", v);
+      },
+    },
+    {
+      label: "Voices",
+      get: () => audio.getCategoryVolume("unit_voice"),
+      set: (v) => audio.setCategoryVolume("unit_voice", v),
+    },
+    {
+      label: "Ambient",
+      get: () => audio.getCategoryVolume("ambient"),
+      set: (v) => audio.setCategoryVolume("ambient", v),
+    },
+  ];
+
+  for (const row of rows) {
+    const r = document.createElement("label");
+    r.className = "audio-slider";
+
+    const label = document.createElement("span");
+    label.className = "audio-slider-label";
+    label.textContent = row.label;
+
+    const input = document.createElement("input");
+    input.type = "range";
+    input.min = "0";
+    input.max = "1";
+    input.step = "0.01";
+    input.value = String(row.get());
+    input.addEventListener("input", () => row.set(parseFloat(input.value)));
+
+    r.append(label, input);
+    wrap.appendChild(r);
+  }
+
+  menuEl.insertBefore(wrap, menuEl.firstChild);
 }
 
 // --- Entry point ---------------------------------------------------------
