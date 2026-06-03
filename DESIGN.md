@@ -542,8 +542,8 @@ victory/defeat overlay with the frozen score table.
   small progress arc.
 - Resource nodes: steel = tan supply crates; oil = olive fuel drums; show last-known remaining
   from `resourceDeltas` via size/opacity. When a worker is selected and the cursor hovers a
-  resource, draw a line from that resource to the nearest completed own Industrial Center:
-  blue/thicker when inside mining range, red/dashed when too far.
+  resource, draw a blue circle on the resource when the nearest completed own Industrial Center
+  is inside mining range; draw a red/dashed line to the Industrial Center when too far.
 - Terrain: muted grass/field/mud, rock, and water tiles with deterministic coarse dithering
   so movement is readable and the map has a PlayStation 1-era low-resolution texture feel.
 - Fog: unexplored = 86% dark overlay so terrain remains faintly readable; explored-but-not-visible =
