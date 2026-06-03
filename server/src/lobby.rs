@@ -208,6 +208,8 @@ pub enum RoomEvent {
     SetQuickstart { player_id: u32, enabled: bool },
     /// A gameplay command (ignored unless the room is in-game and the sender is in the room).
     Command { player_id: u32, cmd: SimCommand },
+    /// A connected player intentionally gave up the active match.
+    GiveUp { player_id: u32 },
     /// Set replay playback speed multiplier (replay rooms only; ignored elsewhere).
     SetReplaySpeed { speed: f32 },
 }
@@ -413,6 +415,7 @@ impl RoomTask {
                 self.on_set_quickstart(player_id, enabled)
             }
             RoomEvent::Command { player_id, cmd } => self.on_command(player_id, cmd),
+            RoomEvent::GiveUp { player_id } => self.on_give_up(player_id),
             RoomEvent::SetReplaySpeed { speed } => self.on_set_replay_speed(speed),
         }
     }
@@ -627,6 +630,59 @@ impl RoomTask {
             if self.players.contains_key(&player_id) && !self.outcome_sent.contains(&player_id) {
                 game.enqueue(player_id, cmd);
             }
+        }
+    }
+
+    fn on_give_up(&mut self, player_id: u32) {
+        if matches!(self.mode, RoomMode::DevSelfPlay(_)) {
+            return;
+        }
+        if !self.players.contains_key(&player_id) || self.outcome_sent.contains(&player_id) {
+            return;
+        }
+
+        let mut game = match std::mem::replace(&mut self.phase, Phase::Lobby) {
+            Phase::Lobby => {
+                self.phase = Phase::Lobby;
+                return;
+            }
+            Phase::InGame(game) => game,
+        };
+
+        debug!(room = %self.room, player_id, "player gave up");
+        game.eliminate(player_id);
+        let alive = game.alive_players();
+        let scores = game.scores();
+
+        if self.match_player_count >= 2 && alive.len() <= 1 {
+            self.end_match(alive.first().copied(), scores);
+            return;
+        }
+
+        if let Some(player) = self.players.get(&player_id) {
+            send_or_log(
+                &self.room,
+                player_id,
+                &player.msg_tx,
+                ServerMessage::GameOver {
+                    winner_id: None,
+                    you: "lost".to_string(),
+                    scores,
+                },
+            );
+            self.outcome_sent.insert(player_id);
+        }
+
+        if self.match_player_count < 2 {
+            self.phase = Phase::Lobby;
+            self.match_player_count = 0;
+            self.outcome_sent.clear();
+            for player in self.players.values_mut() {
+                player.ready = false;
+            }
+            self.broadcast_lobby();
+        } else {
+            self.phase = Phase::InGame(game);
         }
     }
 

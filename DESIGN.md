@@ -69,6 +69,7 @@ short but readable. Coordinates are **world pixels** (floats) unless a field nam
 | `removeAi` | `id: u32` | Host removes a previously-added AI opponent by id (lobby phase only, host-only). |
 | `setQuickstart` | `enabled: bool` | Host toggles "Start with more money mode" for the next match in this room. |
 | `command`  | `cmd: Command` | Issue a gameplay command (see below). Ignored unless in-game. |
+| `giveUp`   | — | Give up the active match. The server eliminates that player and sends their score screen. |
 | `ping`     | `ts: number` | Latency probe; server replies with `pong`. |
 | `setReplaySpeed` | `speed: f32` | Set replay playback speed multiplier in dev replay rooms; ignored elsewhere. |
 
@@ -327,7 +328,7 @@ them at the top of `tick()` — see §8.
 - One tokio task per **room** owns its `Game` and runs the tick loop (`tokio::time::interval`).
 - Each **connection** is a task with an `mpsc::Sender<ServerMessage>` to push to its socket.
 - Connection→room communication uses an `mpsc` channel of internal `RoomEvent`
-  (`Join`, `Leave`, `Ready`, `StartRequest`, `AddAi`, `RemoveAi`, `Command`). The room task is the
+  (`Join`, `Leave`, `Ready`, `StartRequest`, `AddAi`, `RemoveAi`, `Command`, `GiveUp`). The room task is the
   single writer of game state — no locks around `Game`.
 - The room task, each tick: drain commands → `game.tick()` → for each connected player
   `game.snapshot_for(pid)` → send. Lobby phase: broadcast `lobby` on changes.

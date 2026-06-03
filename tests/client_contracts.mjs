@@ -189,6 +189,7 @@ function assertHasGetter(obj, name, msgPrefix = "") {
   assertHasMethod(net, "join", "Net");
   assertHasMethod(net, "ready", "Net");
   assertHasMethod(net, "start", "Net");
+  assertHasMethod(net, "giveUp", "Net");
   assertHasMethod(net, "command", "Net");
   assertHasMethod(net, "ping", "Net");
   assertHasGetter(net, "playerId", "Net");

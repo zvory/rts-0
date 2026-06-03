@@ -25,6 +25,8 @@
         Game:   #game-screen, #viewport (Pixi canvas mounts here),
                 #hud, #res-steel, #res-oil, #res-supply,
                 #minimap (canvas), #selected-panel, #command-card,
+                #game-menu, #settings-button, #settings-menu,
+                #give-up-open, #give-up-confirm, #give-up-cancel, #give-up-confirm-button,
                 #game-over, #game-over-text, #game-over-scores, #game-over-button
         App:    #toast
     -->
@@ -89,8 +91,28 @@
         <!-- Bottom-center selection info -->
         <div id="selected-panel"></div>
 
+        <!-- Above-card settings menu -->
+        <div id="game-menu">
+          <button id="settings-button" type="button" aria-label="Settings" title="Settings">⚙</button>
+          <div id="settings-menu" class="hud-panel" role="menu" hidden>
+            <button id="give-up-open" type="button" role="menuitem">Give up</button>
+          </div>
+        </div>
+
         <!-- Bottom-right command card -->
         <div id="command-card"></div>
+
+        <!-- Give-up confirmation -->
+        <div id="give-up-confirm" hidden>
+          <div class="give-up-box" role="dialog" aria-modal="true" aria-labelledby="give-up-title">
+            <h2 id="give-up-title">Give up?</h2>
+            <p>You will lose this match and go to the score screen.</p>
+            <div class="give-up-actions">
+              <button id="give-up-cancel" class="btn" type="button">Cancel</button>
+              <button id="give-up-confirm-button" class="btn danger" type="button">Give up</button>
+            </div>
+          </div>
+        </div>
 
         <!-- Replay speed controls (only shown during replay dev-watch) -->
         <div id="replay-speed" hidden>
