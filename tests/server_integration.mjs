@@ -123,6 +123,11 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   B.ws.close();
   const over = await A.waitFor((m) => m.t === "gameOver", 4000, "A gameOver");
   ok(over.you === "won", `WIN: A wins after B disconnects (you=${over.you})`);
+  ok(Array.isArray(over.scores) && over.scores.length === 2, `SCORE: gameOver lists both players (${over.scores?.length})`);
+  const aScore = over.scores?.find((s) => s.id === A.playerId);
+  const bScore = over.scores?.find((s) => s.id === B.playerId);
+  ok(aScore && aScore.unitScore >= 200 && aScore.structureScore >= 200, `SCORE: A has unit/structure value (${aScore?.unitScore}/${aScore?.structureScore})`);
+  ok(bScore && bScore.unitsLost >= 4 && bScore.buildingsLost >= 1, `SCORE: disconnected B losses recorded (${bScore?.unitsLost}/${bScore?.buildingsLost})`);
 
   A.ws.close();
   await sleep(200);

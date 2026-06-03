@@ -145,6 +145,8 @@ pub enum ServerMessage {
         winner_id: Option<u32>,
         /// "won" | "lost" | "draw"
         you: String,
+        /// Frozen per-player score snapshot for the score screen.
+        scores: Vec<PlayerScore>,
     },
     Pong {
         ts: f64,
@@ -206,6 +208,20 @@ pub struct PlayerStart {
     pub color: String,
     pub start_tile_x: u32,
     pub start_tile_y: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct PlayerScore {
+    pub id: u32,
+    pub name: String,
+    pub color: String,
+    pub unit_score: u32,
+    pub structure_score: u32,
+    pub units_killed: u32,
+    pub units_lost: u32,
+    pub buildings_killed: u32,
+    pub buildings_lost: u32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

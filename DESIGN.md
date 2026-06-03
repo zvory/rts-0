@@ -96,13 +96,19 @@ illegal placements, or unaffordable actions (fail silently or emit a `notice` ev
 | `lobby`    | `room: string`, `hostId: u32`, `players: LobbyPlayer[]`, `canStart: bool`, `quickstart: bool` |
 | `start`    | `Game start payload` (see 2.3). |
 | `snapshot` | `Per-player snapshot` (see 2.4). |
-| `gameOver` | `winnerId: u32 | null`, `you: "won" | "lost" | "draw"` |
+| `gameOver` | `winnerId: u32 | null`, `you: "won" | "lost" | "draw"`, `scores: PlayerScore[]` |
 | `pong`     | `ts: number` (echo of the ping ts) |
 | `error`    | `msg: string` |
 
 `LobbyPlayer`: `{ id: u32, name: string, ready: bool, color: string, isAi: bool }`. `isAi` is
 true for computer opponents (always shown ready; the client renders an "AI" tag and a host-only
 remove control instead of a ready toggle).
+
+`PlayerScore`: `{ id: u32, name: string, color: string, unitScore: u32, structureScore: u32,
+unitsKilled: u32, unitsLost: u32, buildingsKilled: u32, buildingsLost: u32 }`. `scores` is a
+frozen server snapshot taken when that recipient gets `gameOver`; it is not live-updated while a
+3-4 player match continues. Unit/structure score is the configured steel+oil value of every
+unit/building entity created for that player, including starting entities.
 
 ### 2.3 `start` payload
 Sent once when the match begins. Carries everything static for the whole match.
@@ -287,6 +293,9 @@ impl Game {
     /// Player ids still alive. Humans need at least one building; AI players also need a unit.
     pub fn alive_players(&self) -> Vec<u32>;
 
+    /// Frozen score-screen rows for every match participant, in start/lobby order.
+    pub fn scores(&self) -> Vec<PlayerScore>;
+
     /// Remove all of a player's entities (e.g. on disconnect) so the match can resolve.
     pub fn eliminate(&mut self, player: u32);
 
@@ -302,7 +311,7 @@ impl Game {
 pub struct PlayerInit { pub id: u32, pub name: String, pub color: String, pub is_ai: bool }
 pub struct CommandLogEntry { pub tick: u32, pub player_id: u32, pub command: Command }
 ```
-`StartPayload`, `Snapshot`, `Command`, `Event` are the serde types from `protocol.rs`.
+`StartPayload`, `Snapshot`, `Command`, `Event`, `PlayerScore` are the serde types from `protocol.rs`.
 (`game` may use internal types and convert at the boundary, or use protocol types directly —
 implementer's choice, but `snapshot_for`/`start_payload` must return protocol types.)
 
@@ -506,7 +515,8 @@ export class Lobby {
 `main.js` wires it all: create `Net`, derive ws url from `window.location`, show `Lobby`;
 on `start` message build `GameState`, `Camera`, `Renderer`, `Fog`, `HUD`, `Minimap`, `Input`,
 start the rAF loop (compute `alpha` from snapshot timing, `camera.update`, `input.update`,
-`fog.update`, `renderer.render`, `hud.update`, `minimap.render`); on `gameOver` show overlay.
+`fog.update`, `renderer.render`, `hud.update`, `minimap.render`); on `gameOver` show the
+victory/defeat overlay with the frozen score table.
 
 ### 4.2 Rendering & look (PixiJS, procedural art — neutral PS1 field-command style)
 - Layers (back→front): terrain → resource nodes → building shadows → buildings → unit
@@ -653,7 +663,10 @@ Building stats (hp, sight, cost, footprint tiles wxh, buildTicks, extra):
 | tank_factory               | 360 | 6     | 200 steel + 100 oil | 3x3  | 240       | trains tank; requires an Industrial Center and Training Centre |
 
 Win: a player is **eliminated** when they own zero buildings (units alone do not keep them
-alive). Last player standing wins; a 1-player match never ends (sandbox/exploration mode).
+alive). Last player standing wins; a 1-player match never ends (sandbox/exploration mode). In a
+3-4 player match, a connected human who is eliminated receives a one-time `gameOver` score
+snapshot immediately while the remaining players keep playing; final match resolution sends
+`gameOver` only to players who have not already received one.
 
 ---
 
