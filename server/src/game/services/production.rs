@@ -1,6 +1,7 @@
 use crate::game::entity::EntityStore;
 use crate::game::map::Map;
 use crate::game::services::move_coordinator::MoveCoordinator;
+use crate::game::PlayerState;
 
 /// Advance each building's front production item; on completion spawn the unit adjacent to the
 /// building and remove the item from the queue. Supply was already reserved on enqueue, so
@@ -8,6 +9,7 @@ use crate::game::services::move_coordinator::MoveCoordinator;
 pub(crate) fn production_system(
     _map: &Map,
     entities: &mut EntityStore,
+    players: &mut [PlayerState],
     coordinator: &MoveCoordinator<'_>,
     _events: &mut std::collections::HashMap<u32, Vec<crate::protocol::Event>>,
 ) {
@@ -45,7 +47,11 @@ pub(crate) fn production_system(
                 None => continue,
             };
             let (sx, sy) = coordinator.find_spawn_point(entities, kind, unit, bx, by);
-            entities.spawn_unit(owner, unit, sx, sy);
+            if entities.spawn_unit(owner, unit, sx, sy).is_some() {
+                if let Some(player) = players.iter_mut().find(|p| p.id == owner) {
+                    player.record_entity_created(unit);
+                }
+            }
         }
     }
 }

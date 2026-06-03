@@ -812,7 +812,10 @@ input[type="text"]:focus {
   border: 1px solid var(--panel-edge);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
-  padding: 36px 48px;
+  width: min(960px, calc(100vw - 48px));
+  max-height: calc(100vh - 48px);
+  overflow: auto;
+  padding: 32px 40px;
 }
 #game-over-text {
   margin: 0 0 22px;
@@ -831,6 +834,70 @@ input[type="text"]:focus {
 }
 #game-over-text[data-verdict="draw"] {
   color: var(--supply);
+}
+.scoreboard {
+  margin: 0 0 24px;
+  overflow-x: auto;
+}
+.score-table {
+  width: 100%;
+  min-width: 760px;
+  border-collapse: collapse;
+  table-layout: fixed;
+  color: var(--ink);
+  font-size: 13px;
+  letter-spacing: 0;
+}
+.score-table th,
+.score-table td {
+  border-bottom: 1px solid rgba(91, 83, 65, 0.72);
+  padding: 9px 10px;
+  vertical-align: middle;
+}
+.score-table th {
+  color: var(--ink-dim);
+  font-size: 11px;
+  font-weight: 700;
+  text-align: right;
+  text-transform: uppercase;
+  white-space: normal;
+}
+.score-table th:first-child,
+.score-table td:first-child {
+  width: 28%;
+  text-align: left;
+}
+.score-table tbody tr.you {
+  background: rgba(199, 208, 122, 0.08);
+}
+.score-table tbody tr.winner .score-name {
+  color: var(--good);
+}
+.score-player {
+  white-space: nowrap;
+}
+.score-swatch {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 1px solid rgba(231, 223, 197, 0.45);
+  box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.35);
+  margin-right: 8px;
+  vertical-align: middle;
+}
+.score-name {
+  display: inline-block;
+  max-width: calc(100% - 24px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+.score-number {
+  color: var(--ink);
+  font-family: var(--mono);
+  text-align: right;
+  white-space: nowrap;
 }
 
 /* ============================ Responsive ============================ */
@@ -856,5 +923,11 @@ input[type="text"]:focus {
   }
   #game-over-text {
     font-size: 36px;
+  }
+  .game-over-box {
+    padding: 26px 28px;
+  }
+  .score-table {
+    font-size: 12px;
   }
 }

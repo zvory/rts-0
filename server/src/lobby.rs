@@ -15,7 +15,7 @@
 //!    snapshot to each connected player, and detects game-over. When the match resolves the
 //!    room returns to the `Lobby` phase (ready flags reset) so the same players can rematch.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
@@ -30,7 +30,8 @@ use crate::config;
 use crate::game::selfplay::{is_safe_artifact_name, LiveSelfPlay, ReplayArtifact, ReplayDriver};
 use crate::game::{Game, PlayerInit};
 use crate::protocol::{
-    kinds, Command, Event, LobbyPlayer, ResourceDelta, ServerMessage, Snapshot, StartPayload,
+    kinds, Command, Event, LobbyPlayer, PlayerScore, ResourceDelta, ServerMessage, Snapshot,
+    StartPayload,
 };
 
 /// Player colors, assigned from the head of the palette. MUST match `client/src/config.js`
@@ -317,6 +318,8 @@ struct RoomTask {
     /// sandbox never ends while a 2+ player match (including human-vs-AI) resolves to a winner.
     /// `0` outside a match.
     match_player_count: usize,
+    /// Connected human players who already received a terminal score screen for the active match.
+    outcome_sent: HashSet<u32>,
     dev_driver: Option<DevDriver>,
     dev_view_player_id: Option<u32>,
     /// Replay speed multiplier; 1.0 = real-time, 2.0 = 2× faster, etc.
@@ -339,6 +342,7 @@ impl RoomTask {
             host_id: None,
             phase: Phase::Lobby,
             match_player_count: 0,
+            outcome_sent: HashSet::new(),
             dev_driver: None,
             dev_view_player_id: None,
             replay_speed,
@@ -474,6 +478,7 @@ impl RoomTask {
             return;
         }
         self.order.retain(|&id| id != player_id);
+        self.outcome_sent.remove(&player_id);
         if self.host_id == Some(player_id) {
             // Reassign the host to the next remaining player in join order.
             self.host_id = self.order.first().copied();
@@ -486,6 +491,7 @@ impl RoomTask {
         if self.players.is_empty() {
             self.phase = Phase::Lobby;
             self.match_player_count = 0;
+            self.outcome_sent.clear();
             self.host_id = None;
             // Drop AI opponents too: with no humans there is nobody to host them, and a fresh
             // joiner under this room name should start from a clean lobby.
@@ -618,7 +624,7 @@ impl RoomTask {
         // Commands are ignored unless in-game and the sender is actually in this room. The
         // simulation itself validates ownership/affordability when it applies the command.
         if let Phase::InGame(game) = &mut self.phase {
-            if self.players.contains_key(&player_id) {
+            if self.players.contains_key(&player_id) && !self.outcome_sent.contains(&player_id) {
                 game.enqueue(player_id, cmd);
             }
         }
@@ -731,6 +737,7 @@ impl RoomTask {
         let game = Game::new_with_starting_resources(&inits, starting_steel, starting_oil, seed);
         let payload = game.start_payload();
         self.match_player_count = inits.len();
+        self.outcome_sent.clear();
 
         // Each player gets the shared static payload but stamped with their own id.
         for &id in &self.order {
@@ -860,7 +867,7 @@ impl RoomTask {
             Err(payload) => {
                 let reason = panic_reason(&payload);
                 dump_crash_replay(&self.room, &game, &reason);
-                self.end_match(None);
+                self.end_match(None, game.scores());
                 return;
             }
         };
@@ -868,6 +875,9 @@ impl RoomTask {
         // Fan out a fog-filtered snapshot to every connected player, merging in their events.
         let recipients: Vec<u32> = self.order.clone();
         for id in &recipients {
+            if self.outcome_sent.contains(id) {
+                continue;
+            }
             let Some(player) = self.players.get(id) else {
                 continue;
             };
@@ -887,9 +897,12 @@ impl RoomTask {
         // Check for game over. A 1-player match never ends (sandbox/exploration mode).
         let alive = game.alive_players();
         if self.match_player_count >= 2 && alive.len() <= 1 {
-            self.end_match(alive.first().copied());
+            self.end_match(alive.first().copied(), game.scores());
             // end_match leaves us in the Lobby phase; do not restore the game.
             return;
+        }
+        if self.match_player_count >= 2 {
+            self.send_new_defeats(&game, &alive);
         }
 
         self.phase = Phase::InGame(game);
@@ -965,11 +978,46 @@ impl RoomTask {
         self.replay_speed = clamped;
     }
 
+    /// Send a one-time score screen to connected players who have been eliminated while a
+    /// multi-player match continues.
+    fn send_new_defeats(&mut self, game: &Game, alive: &[u32]) {
+        let alive: HashSet<u32> = alive.iter().copied().collect();
+        let recipients: Vec<u32> = self
+            .order
+            .iter()
+            .copied()
+            .filter(|id| !alive.contains(id) && !self.outcome_sent.contains(id))
+            .collect();
+        if recipients.is_empty() {
+            return;
+        }
+        let scores = game.scores();
+        for id in recipients {
+            let Some(player) = self.players.get(&id) else {
+                continue;
+            };
+            send_or_log(
+                &self.room,
+                id,
+                &player.msg_tx,
+                ServerMessage::GameOver {
+                    winner_id: None,
+                    you: "lost".to_string(),
+                    scores: scores.clone(),
+                },
+            );
+            self.outcome_sent.insert(id);
+        }
+    }
+
     /// Resolve a finished match: tell everyone who won and return to the lobby for a rematch.
-    fn end_match(&mut self, winner_id: Option<u32>) {
+    fn end_match(&mut self, winner_id: Option<u32>, scores: Vec<PlayerScore>) {
         info!(room = %self.room, ?winner_id, "match over");
         let recipients: Vec<u32> = self.order.clone();
         for id in &recipients {
+            if self.outcome_sent.contains(id) {
+                continue;
+            }
             let Some(player) = self.players.get(id) else {
                 continue;
             };
@@ -983,13 +1031,19 @@ impl RoomTask {
                 &self.room,
                 *id,
                 &player.msg_tx,
-                ServerMessage::GameOver { winner_id, you },
+                ServerMessage::GameOver {
+                    winner_id,
+                    you,
+                    scores: scores.clone(),
+                },
             );
+            self.outcome_sent.insert(*id);
         }
 
         // Reset for the next match: drop the game, clear ready flags, and re-advertise the lobby.
         self.phase = Phase::Lobby;
         self.match_player_count = 0;
+        self.outcome_sent.clear();
         for player in self.players.values_mut() {
             player.ready = false;
         }
