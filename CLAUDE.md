@@ -13,6 +13,15 @@ the server simulates at 30 Hz and sends per-player, fog-filtered snapshots.
 
 - Once you're done a task, explain in plain language what you've done and the gameplay impact.
 
+## Balance and Gameplay Patch Notes
+
+- For balance or gameplay changes, collect patch-note bullets as you work so the final summary,
+  commit message, and any release notes can explain player-facing impact clearly.
+- Patch notes should call out changed unit/building stats, economy tuning, combat behavior, UI
+  affordances that affect play, and any expected strategic impact.
+- Keep patch notes factual and evidence-backed. If the impact is uncertain, say what changed and
+  what should be watched in playtests instead of guessing.
+
 ## Parallel Worktrees
 
 - For parallel feature work (which is always the case), each terminal/agent must work in its own
@@ -51,6 +60,8 @@ the server simulates at 30 Hz and sends per-player, fog-filtered snapshots.
 
 - The default branch is `main`.
 - committing has a commit hook that silently runs all tests.
+- Commit messages should be detailed. Use a clear subject and include a body when the change has
+  gameplay impact, contract changes, testing nuance, or non-obvious reasoning.
 - Work directly on `main` for simple single-agent changes. For parallel worktree changes, use one
   `zvorygin/` branch per worktree.
 - When work is complete, stage and commit only files that belong to the current task.
