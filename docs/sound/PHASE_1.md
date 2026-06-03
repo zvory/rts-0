@@ -50,6 +50,12 @@ suspend the `AudioContext` itself — resume latency is platform-dependent and a
 A `play()` for the same `id` within a per-sound cooldown (default 60 ms) is dropped. Pitch variance
 defaults to ±6% via `playbackRate`, drawn from a seeded RNG owned by the audio module.
 
+> **Known issue (deferred to phase 3 — *Voice-line debounce*):** 60 ms is correct for gunshots
+> but useless for spoken alert lines (1–2 s each). Mashing "Build" on a worker with insufficient
+> supply currently overlaps "Build more supply depots" with itself on every click. Phase 3 fixes
+> this by raising the per-id cooldown for `alert`/`ui`/`unit_voice` to `max(buffer.duration,
+> 1500 ms)` while leaving the toast un-debounced.
+
 ## Tests
 
 - Headless smoke (`tests/client_smoke.mjs`): mock `AudioContext` to a stub that records calls;
@@ -58,3 +64,9 @@ defaults to ±6% via `playbackRate`, drawn from a seeded RNG owned by the audio 
 
 Deliverable: every existing `Event::Notice` (and a hard-coded "click" on building-placement
 confirm) plays a non-spatial sound. Volume sliders work. No regressions in `client_smoke`.
+
+> **Known gap (deferred to phase 2 — *Combat SFX wiring*):** combat sounds are intentionally not
+> wired in phase 1. `Event::Attack` is silent right now even though `combat_kar98k_*`,
+> `combat_mg42_burst_*`, and `combat_tank_cannon_*` are already on disk. Combat needs positional
+> audio (a tank shot on the far side of the map should not punch your ears) so the wiring waits
+> for phase 2's spatialization graph. Until then: no firing audio, no tank cannons, no MG bursts.

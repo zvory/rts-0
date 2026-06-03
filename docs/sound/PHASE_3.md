@@ -29,6 +29,26 @@ Per-category `GainNode`s are ducked when higher-priority categories play:
 Per-sound cooldown is now per-`(id, listener-distance-bucket)`. 40 marines firing in the same tick
 produce 1–3 gunshots, not 40, but two squads on opposite sides of the map both fire normally.
 
+### Voice-line debounce (alerts/UI)
+
+Phase 1's 60 ms dedup is way too short for spoken lines (1–2 s each). Mashing **Build** on a
+worker with insufficient supply spams "Build more supply depots" once per click — unusable.
+
+Rules:
+
+- Per-id cooldown for `category in {alert, ui, unit_voice}` defaults to **`max(buffer.duration,
+  1500 ms)`**. A 2.3 s line cannot retrigger for at least 2.3 s.
+- Identical alert text within the cooldown window is dropped silently (no queue — the player
+  already heard it).
+- A *different* alert id within the cooldown plays normally (steel-low does not block supply-low).
+- Optional: per-category global cooldown of 400 ms so two distinct alerts fired in the same tick
+  don't talk over each other. Implemented as a thin scheduler in `audio.js`, not the voice pool.
+- Toast text on the screen is **not** debounced — visual repetition is fine and signals "yes the
+  game heard your click." Only the audio side is muted.
+
+Decoupling the toast from the sound is the key insight: the player needs the visual feedback to
+know the input registered, but the voice line is per-event, not per-input.
+
 ## Alert + minimap coupling
 
 `Event::Notice` with `msg` starting with `"alert:"` (proposed convention — confirm with server
