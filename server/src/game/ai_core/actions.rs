@@ -349,6 +349,7 @@ pub(crate) struct ResourceAssignmentPolicy<'a> {
     pub(crate) pre_reserved_nodes: &'a BTreeSet<u32>,
     pub(crate) idle_only: bool,
     pub(crate) max_assignments: Option<usize>,
+    pub(crate) max_worker_resource_distance_px: Option<f32>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -505,6 +506,10 @@ fn nearest_unreserved_node(
     reservations: &AiReservations,
 ) -> Option<u32> {
     let mut best: Option<(u32, f32)> = None;
+    let max_distance2 = policy
+        .max_worker_resource_distance_px
+        .filter(|distance| distance.is_finite() && *distance >= 0.0)
+        .map(|distance| distance * distance);
     for node in policy.resources {
         if node.kind != policy.resource_kind || node.remaining == 0 {
             continue;
@@ -515,6 +520,9 @@ fn nearest_unreserved_node(
             continue;
         }
         let d = dist2(worker.x, worker.y, node.x, node.y);
+        if max_distance2.map(|max| d > max).unwrap_or(false) {
+            continue;
+        }
         let better = best
             .map(|(best_id, best_dist)| d < best_dist || (d == best_dist && node.id < best_id))
             .unwrap_or(true);
@@ -902,12 +910,53 @@ mod tests {
                 pre_reserved_nodes: &empty,
                 idle_only: true,
                 max_assignments: None,
+                max_worker_resource_distance_px: None,
             },
         );
 
         assert_eq!(assigned.len(), 2);
         assert_eq!(assigned[0].node, 30);
         assert_eq!(assigned[1].node, 31);
+    }
+
+    #[test]
+    fn resource_assignment_ignores_nodes_beyond_worker_distance_limit() {
+        let observation = observation(
+            AiEconomy {
+                steel: 0,
+                oil: 0,
+                supply_used: 0,
+                supply_cap: 10,
+            },
+            vec![worker(10, 0.0, 0.0, AiEntityState::Idle)],
+            vec![
+                resource(30, EntityKind::Steel, 64.0, 0.0),
+                resource(31, EntityKind::Steel, 640.0, 0.0),
+            ],
+        );
+        let facts = facts_from_observation(&observation);
+        let mut ctx = context_from_facts(&facts, &observation);
+        let mut reserved = BTreeSet::new();
+        reserved.insert(30);
+        let empty = BTreeSet::new();
+
+        let assigned = assign_workers_to_resource(
+            &mut ctx,
+            ResourceAssignmentPolicy {
+                workers: &observation.owned,
+                resources: &observation.resources,
+                resource_kind: EntityKind::Steel,
+                candidate_worker_ids: None,
+                skip_workers: &empty,
+                pre_reserved_nodes: &reserved,
+                idle_only: true,
+                max_assignments: None,
+                max_worker_resource_distance_px: Some(128.0),
+            },
+        );
+
+        assert!(assigned.is_empty());
+        assert!(ctx.into_commands().is_empty());
     }
 
     #[test]

@@ -28,6 +28,7 @@ const RESOURCE_LINE_DEFENSE_RADIUS_TILES: f32 = 4.0;
 const WORKER_DEFENSE_RADIUS_TILES: f32 = 5.0;
 const PROXY_DISTANCE_BAND_TILES: f32 = 2.0;
 const PROXY_WORKER_BUILD_SEARCH_RADIUS_TILES: i32 = 4;
+const EXPANSION_LOCAL_RESOURCE_ASSIGNMENT_RADIUS_TILES: f32 = config::MINING_IC_RANGE_TILES + 3.0;
 
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct AiDecision {
@@ -317,6 +318,8 @@ where
     let occupied_nodes = occupied_resource_nodes(observation);
     let skipped_workers = BTreeSet::new();
     let resource_counts = resource_worker_counts(observation);
+    let max_worker_resource_distance_px =
+        max_worker_resource_assignment_distance_px(observation, &facts, profile);
     let current_oil_workers = resource_counts.get(&EntityKind::Oil).copied().unwrap_or(0);
     if desired_oil_workers > current_oil_workers {
         let assigned = actions::assign_workers_to_resource(
@@ -330,6 +333,7 @@ where
                 pre_reserved_nodes: &occupied_nodes,
                 idle_only: true,
                 max_assignments: Some(desired_oil_workers - current_oil_workers),
+                max_worker_resource_distance_px,
             },
         );
         if !assigned.is_empty() {
@@ -356,6 +360,7 @@ where
                 pre_reserved_nodes: &occupied_nodes,
                 idle_only: true,
                 max_assignments: Some(target_steel_workers - current_steel_workers),
+                max_worker_resource_distance_px,
             },
         );
         if !assigned.is_empty() {
@@ -580,6 +585,20 @@ fn completed_ic_steel_saturation_target(observation: &AiObservation) -> usize {
                 .any(|ic| dist2(resource.x, resource.y, ic.x, ic.y) <= max_dist2)
         })
         .count()
+}
+
+fn max_worker_resource_assignment_distance_px(
+    observation: &AiObservation,
+    facts: &AiFacts,
+    profile: &AiProfile,
+) -> Option<f32> {
+    let expansion = profile.expansion?;
+    if facts.complete_building_count(EntityKind::IndustrialCenter)
+        < expansion.target_industrial_centers
+    {
+        return None;
+    }
+    Some(EXPANSION_LOCAL_RESOURCE_ASSIGNMENT_RADIUS_TILES * observation.map.tile_size as f32)
 }
 
 fn proxy_barracks_transit_site<F>(
@@ -1533,6 +1552,10 @@ mod tests {
     }
 
     fn steel_worker(id: u32, node: u32) -> AiEntitySummary {
+        gathering_worker(id, node)
+    }
+
+    fn gathering_worker(id: u32, node: u32) -> AiEntitySummary {
         let mut worker = worker(id, AiEntityState::Gather);
         worker.latched_node = Some(node);
         worker
@@ -2597,6 +2620,109 @@ mod tests {
         assert!(
             oil_assignments >= 5,
             "support tech should send most idle workers to oil once expanding, got {oil_assignments}"
+        );
+    }
+
+    #[test]
+    fn steel_expansion_tanks_keeps_main_workers_off_distant_expansion_steel() {
+        let ts = config::TILE_SIZE as f32;
+        let mut owned = vec![
+            building_at(
+                10,
+                EntityKind::IndustrialCenter,
+                Some(0),
+                8.5 * ts,
+                8.5 * ts,
+            ),
+            building_at(
+                11,
+                EntityKind::IndustrialCenter,
+                Some(0),
+                23.5 * ts,
+                36.5 * ts,
+            ),
+        ];
+        owned.extend((0..18u32).map(|i| gathering_worker(40 + i, 100 + i)));
+        owned.extend((0..6u32).map(|i| {
+            let node = if i < 3 { 200 + i } else { 400 + (i - 3) };
+            gathering_worker(70 + i, node)
+        }));
+        owned.push(worker_at(90, AiEntityState::Idle, 8.5 * ts, 8.5 * ts));
+        owned.push(worker_at(91, AiEntityState::Idle, 9.5 * ts, 8.5 * ts));
+        let observation = with_expansion_resources(observation(
+            AiEconomy {
+                steel: 0,
+                oil: 0,
+                supply_used: 26,
+                supply_cap: 80,
+            },
+            owned,
+        ));
+
+        let decision = decide(
+            &observation,
+            &STEEL_EXPANSION_TANKS,
+            &mut AiDecisionMemory::for_profile(&STEEL_EXPANSION_TANKS),
+        );
+
+        assert!(
+            !decision.commands.iter().any(|command| {
+                matches!(command, Command::Gather { node, .. } if (300..318).contains(node))
+            }),
+            "main-base idle workers should not be sent to expansion steel patches"
+        );
+    }
+
+    #[test]
+    fn steel_expansion_tanks_sends_expansion_workers_to_expansion_steel() {
+        let ts = config::TILE_SIZE as f32;
+        let mut owned = vec![
+            building_at(
+                10,
+                EntityKind::IndustrialCenter,
+                Some(0),
+                8.5 * ts,
+                8.5 * ts,
+            ),
+            building_at(
+                11,
+                EntityKind::IndustrialCenter,
+                Some(0),
+                23.5 * ts,
+                36.5 * ts,
+            ),
+        ];
+        owned.extend((0..18u32).map(|i| gathering_worker(40 + i, 100 + i)));
+        owned.extend((0..6u32).map(|i| {
+            let node = if i < 3 { 200 + i } else { 400 + (i - 3) };
+            gathering_worker(70 + i, node)
+        }));
+        owned.push(worker_at(90, AiEntityState::Idle, 23.5 * ts, 36.5 * ts));
+        let observation = with_expansion_resources(observation(
+            AiEconomy {
+                steel: 0,
+                oil: 0,
+                supply_used: 25,
+                supply_cap: 80,
+            },
+            owned,
+        ));
+
+        let decision = decide(
+            &observation,
+            &STEEL_EXPANSION_TANKS,
+            &mut AiDecisionMemory::for_profile(&STEEL_EXPANSION_TANKS),
+        );
+
+        assert!(
+            decision.commands.iter().any(|command| {
+                matches!(
+                    command,
+                    Command::Gather { units, node }
+                        if units.as_slice() == [90] && (300..318).contains(node)
+                )
+            }),
+            "an idle expansion worker should take a local expansion steel patch"
         );
     }
 
