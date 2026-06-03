@@ -5,7 +5,6 @@ use crate::game::entity::{BuildPhase, EntityKind, EntityStore};
 use crate::game::map::Map;
 use crate::game::pathfinding::Passability;
 use crate::game::services::occupancy::{building_footprint, footprint_center, Occupancy};
-use crate::game::services::spatial::SpatialIndex;
 use crate::game::services::standability;
 use crate::game::services::{dist2, interact_range_for_kind};
 use crate::game::PlayerState;
@@ -21,7 +20,6 @@ pub(crate) fn construction_system(
     map: &Map,
     entities: &mut EntityStore,
     players: &mut [PlayerState],
-    _spatial: &SpatialIndex,
     events: &mut HashMap<u32, Vec<Event>>,
 ) {
     // ----- Arrival pass: ToSite workers that have reached their target -----
@@ -229,7 +227,6 @@ mod tests {
     use crate::game::entity::{EntityStore, Order};
     use crate::game::services::geometry::building_rect_for_footprint;
     use crate::game::services::occupancy::footprint_center;
-    use crate::game::services::spatial::SpatialIndex;
     use crate::game::ScoreState;
     use crate::protocol::terrain;
 
@@ -245,11 +242,10 @@ mod tests {
             .get_mut(worker)
             .expect("worker should exist")
             .set_order(Order::build(EntityKind::Depot, 4, 4));
-        let spatial = SpatialIndex::build(&entities, map.size);
         let mut players = vec![player_state(1)];
         let mut events = HashMap::new();
 
-        construction_system(&map, &mut entities, &mut players, &spatial, &mut events);
+        construction_system(&map, &mut entities, &mut players, &mut events);
 
         assert!(
             entities
@@ -292,11 +288,10 @@ mod tests {
         entities
             .spawn_unit(1, EntityKind::Tank, rect.max_x + 19.0, rect.min_y + 32.0)
             .expect("tank should spawn");
-        let spatial = SpatialIndex::build(&entities, map.size);
         let mut players = vec![player_state(1)];
         let mut events = HashMap::new();
 
-        construction_system(&map, &mut entities, &mut players, &spatial, &mut events);
+        construction_system(&map, &mut entities, &mut players, &mut events);
 
         assert!(
             entities
