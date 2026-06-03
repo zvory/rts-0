@@ -964,8 +964,6 @@ export class Renderer {
 
     if (p.inRange) {
       g.lineStyle(4, 0x4aa3ff, 0.95);
-      g.moveTo(p.resourceX, p.resourceY);
-      g.lineTo(icEndpoint.x, icEndpoint.y);
       g.beginFill(0x4aa3ff, 0.18);
       g.drawCircle(p.resourceX, p.resourceY, 9);
       g.endFill();
