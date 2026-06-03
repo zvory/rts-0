@@ -530,13 +530,27 @@ fn apply_overpenetration(
     vy: f32,
     range_px: f32,
 ) {
+    // A tank's armour stops the round dead: hitting a tank never overpenetrates, no exceptions.
+    if entities
+        .get(primary_victim)
+        .map(|e| e.kind == EntityKind::Tank)
+        .unwrap_or(false)
+    {
+        return;
+    }
     let dx = vx - ax;
     let dy = vy - ay;
     let dist = (dx * dx + dy * dy).sqrt();
     if dist <= f32::EPSILON {
         return;
     }
-    let overpenetration_limit = dist + range_px * 0.25;
+    // AT teams are built to punch through: their rounds carry twice the normal depth past the
+    // primary target. Everyone else gets the base 25% of weapon range.
+    let overpenetration_factor = match entities.get(attacker).map(|e| e.kind) {
+        Some(EntityKind::AtTeam) => 0.50,
+        _ => 0.25,
+    };
+    let overpenetration_limit = dist + range_px * overpenetration_factor;
     let ux = dx / dist;
     let uy = dy / dist;
     let perpendicular_slack = RANGE_SLACK + 8.0;
@@ -1279,5 +1293,86 @@ mod tests {
             Some(1500)
         );
         assert_eq!(entities.get(node).expect("node should exist").hp, 1);
+    }
+
+    #[test]
+    fn attacking_a_tank_never_overpenetrates() {
+        let mut entities = EntityStore::new();
+        let attacker = entities
+            .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
+            .expect("attacker should spawn");
+        let tank = entities
+            .spawn_unit(2, EntityKind::Tank, 140.0, 100.0)
+            .expect("tank primary target should spawn");
+        // Directly behind the tank, well inside the normal overpenetration band so the only
+        // reason it survives is the tank stopping the round.
+        let behind = entities
+            .spawn_unit(2, EntityKind::Rifleman, 165.0, 100.0)
+            .expect("unit behind the tank should spawn");
+        let behind_hp_before = entities.get(behind).expect("behind should exist").hp;
+        let mut events: HashMap<u32, Vec<Event>> = HashMap::new();
+        events.insert(1, Vec::new());
+        events.insert(2, Vec::new());
+
+        apply_test_damage(
+            &mut entities,
+            &mut events,
+            attacker,
+            tank,
+            20,
+            1,
+            100.0,
+            100.0,
+            140.0,
+            100.0,
+            128.0,
+        );
+
+        assert_eq!(
+            entities.get(behind).expect("behind should exist").hp,
+            behind_hp_before,
+            "a shot whose primary target is a tank must not overpenetrate"
+        );
+    }
+
+    #[test]
+    fn at_teams_overpenetrate_twice_as_far() {
+        let mut entities = EntityStore::new();
+        let attacker = entities
+            .spawn_unit(1, EntityKind::AtTeam, 100.0, 100.0)
+            .expect("AT team should spawn");
+        // An armored, non-tank primary: AT teams never miss armored targets, and a building does
+        // not trigger the tank-stops-the-round rule, so the shot reliably overpenetrates.
+        let primary = entities
+            .spawn_building(2, EntityKind::Barracks, 140.0, 100.0, true)
+            .expect("primary target should spawn");
+        // 90px along the shot line: past the 72px base band (dist 40 + 0.25*128) but inside the
+        // 104px AT band (dist 40 + 0.50*128). A normal attacker would miss it.
+        let deep = entities
+            .spawn_unit(2, EntityKind::Rifleman, 190.0, 100.0)
+            .expect("deep target should spawn");
+        let deep_hp_before = entities.get(deep).expect("deep should exist").hp;
+        let mut events: HashMap<u32, Vec<Event>> = HashMap::new();
+        events.insert(1, Vec::new());
+        events.insert(2, Vec::new());
+
+        apply_test_damage(
+            &mut entities,
+            &mut events,
+            attacker,
+            primary,
+            20,
+            1,
+            100.0,
+            100.0,
+            140.0,
+            100.0,
+            128.0,
+        );
+
+        assert!(
+            entities.get(deep).expect("deep should exist").hp < deep_hp_before,
+            "AT teams should overpenetrate to twice the normal depth"
+        );
     }
 }
