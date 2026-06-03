@@ -62,6 +62,8 @@ export class GameState {
     this.commandTarget = null;
     /** @type {Array<{kind:string,x:number,y:number,createdAt:number}>} */
     this.commandFeedback = [];
+    /** @type {null | {resourceId:number, resourceX:number, resourceY:number, icId:number, icX:number, icY:number, inRange:boolean}} */
+    this.resourceMiningPreview = null;
 
     /** @type {Array<{from:number,to:number,createdAt:number}>} */
     this.muzzleFlashes = [];
@@ -365,6 +367,14 @@ export class GameState {
     const ttlMs = 650;
     this.commandFeedback = this.commandFeedback.filter((f) => now - f.createdAt <= ttlMs);
     return this.commandFeedback;
+  }
+
+  /**
+   * Set or clear the hovered resource-to-Industrial-Center mining preview.
+   * @param {null | {resourceId:number, resourceX:number, resourceY:number, icId:number, icX:number, icY:number, inRange:boolean}} preview
+   */
+  updateResourceMiningPreview(preview) {
+    this.resourceMiningPreview = preview;
   }
 
   // --- map helpers --------------------------------------------------------

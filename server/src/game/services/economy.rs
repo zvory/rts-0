@@ -5,6 +5,7 @@ use crate::game::services::dist2;
 use crate::game::services::move_coordinator::MoveCoordinator;
 use crate::game::services::occupancy::Occupancy;
 use crate::game::services::spatial::SpatialIndex;
+use crate::game::services::world_query;
 use crate::game::PlayerState;
 
 /// Worker harvest loop: walk to node -> latch onto one free patch -> mine in place.
@@ -61,6 +62,15 @@ fn gather_to_node(
         Some(e) => (e.pos_x, e.pos_y),
         None => return,
     };
+    let owner = match entities.get(id) {
+        Some(e) => e.owner,
+        None => return,
+    };
+
+    if !world_query::resource_has_completed_mining_ic(entities, owner, node) {
+        idle_gatherer(entities, id);
+        return;
+    }
 
     if dist2(wx, wy, node_pos.0, node_pos.1).sqrt() <= interact {
         let can_mine = !matches!(entities.node_slot_holder(node), Some(m) if m != id);
@@ -82,6 +92,15 @@ fn gather_to_node(
 }
 
 fn gather_harvesting(entities: &mut EntityStore, players: &mut [PlayerState], id: u32, node: u32) {
+    let owner = match entities.get(id) {
+        Some(e) => e.owner,
+        None => return,
+    };
+    if !world_query::resource_has_completed_mining_ic(entities, owner, node) {
+        idle_gatherer(entities, id);
+        return;
+    }
+
     let node_kind_amount = match entities.get(node) {
         Some(n) if n.is_node() && n.remaining().unwrap_or(0) > 0 => {
             (n.kind, n.remaining().unwrap_or(0))
@@ -132,10 +151,6 @@ fn gather_harvesting(entities: &mut EntityStore, players: &mut [PlayerState], id
         }
     }
 
-    let owner = match entities.get(id) {
-        Some(e) => e.owner,
-        None => return,
-    };
     if taken > 0 {
         if let Some(ps) = players.iter_mut().find(|p| p.id == owner) {
             if is_oil {

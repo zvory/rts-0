@@ -22,7 +22,7 @@
 // against the interpolated positions from state so clicks line up with what is drawn.
 
 import { cmd, PASSABLE, isUnit, isBuilding, isResource, KIND } from "./protocol.js";
-import { STATS } from "./config.js";
+import { MINING_IC_RANGE_TILES, STATS } from "./config.js";
 
 export function footprintValidAgainstEntities(
   entities,
@@ -168,7 +168,12 @@ export class Input {
    */
   update(dt) {
     void dt;
-    if (this.state.placement) this._refreshPlacement();
+    if (this.state.placement) {
+      this.state.updateResourceMiningPreview(null);
+      this._refreshPlacement();
+      return;
+    }
+    this._refreshResourceMiningPreview();
   }
 
   // --- Coordinate helpers -------------------------------------------------
@@ -244,6 +249,7 @@ export class Input {
     }
 
     if (this.state.placement) this._refreshPlacement();
+    else this._refreshResourceMiningPreview();
   }
 
   _handleMouseUp(ev) {
@@ -510,6 +516,56 @@ export class Input {
       .selectedEntities()
       .filter((e) => e.owner === me && e.kind === KIND.WORKER)
       .map((e) => e.id);
+  }
+
+  _refreshResourceMiningPreview() {
+    if (this._drag || this.state.commandTarget || !this.mouse || this._selectedWorkerIds().length === 0) {
+      this.state.updateResourceMiningPreview(null);
+      return;
+    }
+
+    const world = this._worldAt(this.mouse.x, this.mouse.y);
+    const target = this._entityAtWorld(world.x, world.y, /*ownPreferred=*/ false);
+    if (!target || !isResource(target.kind) || target.remaining === 0) {
+      this.state.updateResourceMiningPreview(null);
+      return;
+    }
+
+    const nearest = this._nearestOwnCompletedIndustrialCenter(target.x, target.y);
+    if (!nearest) {
+      this.state.updateResourceMiningPreview(null);
+      return;
+    }
+
+    const rangePx = MINING_IC_RANGE_TILES * (this.state.map?.tileSize || DEFAULT_TILE_SIZE);
+    this.state.updateResourceMiningPreview({
+      resourceId: target.id,
+      resourceX: target.x,
+      resourceY: target.y,
+      icId: nearest.id,
+      icX: nearest.x,
+      icY: nearest.y,
+      inRange: nearest.dist <= rangePx + 0.001,
+    });
+  }
+
+  _nearestOwnCompletedIndustrialCenter(x, y) {
+    const me = this.state.playerId;
+    let best = null;
+    for (const e of this.state.entitiesInterpolated(1)) {
+      if (
+        e.owner !== me ||
+        e.kind !== KIND.INDUSTRIAL_CENTER ||
+        (typeof e.buildProgress === "number" && e.buildProgress < 1)
+      ) {
+        continue;
+      }
+      const dist = Math.hypot(e.x - x, e.y - y);
+      if (!best || dist < best.dist || (dist === best.dist && e.id < best.id)) {
+        best = { id: e.id, x: e.x, y: e.y, dist };
+      }
+    }
+    return best;
   }
 
   // --- Entity hit-testing -------------------------------------------------

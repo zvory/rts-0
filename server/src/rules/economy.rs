@@ -123,6 +123,7 @@ mod tests {
 
         assert_eq!(cost(EntityKind::Worker), (50, 0));
         assert_eq!(cost(EntityKind::Tank), (200, 150));
+        assert_eq!(cost(EntityKind::IndustrialCenter), (200, 0));
         assert_eq!(cost(EntityKind::Depot), (100, 0));
         assert_eq!(supply_cost(EntityKind::Tank), 6);
         assert_eq!(supply_cost(EntityKind::Depot), 0);
