@@ -77,7 +77,7 @@ short but readable. Coordinates are **world pixels** (floats) unless a field nam
 
 | `c`          | Fields | Meaning |
 |--------------|--------|---------|
-| `move`       | `units: u32[]`, `x: f32`, `y: f32` | Move selected units to a world point, ignoring enemies until they arrive or receive another order. |
+| `move`       | `units: u32[]`, `x: f32`, `y: f32` | Move selected units to a world point. Non-tank units ignore enemies until they arrive or receive another order; tanks keep driving and fire their turret at in-range enemies without chasing. |
 | `attackMove` | `units: u32[]`, `x: f32`, `y: f32` | Move while attacking enemies encountered; this is the aggressive movement order. |
 | `attack`     | `units: u32[]`, `target: u32` | Attack a specific entity. |
 | `gather`     | `units: u32[]`, `node: u32` | Send workers to harvest a resource node. |
@@ -637,10 +637,12 @@ Intended progression:
 The current implementation uses the themed unit/building names below. Combat is handled by the
 shared attack model plus the machine-gunner setup/teardown state, tank turret aim gates, and
 tank hull-facing damage modifiers for anti-tank hits against tank victims. Tanks keep their active
-movement path while firing; other mobile combat units still hold position once a target is in
-weapon range. When tanks chase an acquired target from outside weapon range, they path to a
-standoff point inside firing range instead of the target center. Forest-specific rules are future
-work. The unit, building, and resource-node tables below are the human-readable form of the
+movement path while firing on either `Move` or `AttackMove` orders; other mobile combat units still
+hold position once a target is in weapon range. Plain `Move` tanks only fire at enemies already in
+weapon range, while `AttackMove` tanks can chase acquired targets. When tanks chase an acquired
+target from outside weapon range, they path to a standoff point inside firing range instead of the
+target center. Forest-specific rules are future work. The unit, building, and resource-node tables
+below are the human-readable form of the
 authoritative `rules::defs` records.
 
 - `TICK_HZ = 30`, `SNAPSHOT_EVERY_N_TICKS = 1`.
@@ -754,8 +756,9 @@ The server treats every client as potentially hostile. Limits live next to the c
   independent turret/barrel angle. Tank combat rotates the turret toward the target at a bounded
   rate and fires only once the turret is within tolerance; the hull does not need to face the
   target. Tanks do not clear their movement path when they fire, so they can continue driving while
-  the turret tracks and shoots. Projection omits enemy `weaponFacing` when it would reveal a hidden
-  target direction.
+  the turret tracks and shoots on both `Move` and `AttackMove` orders. A tank on plain `Move` only
+  opportunistically fires at enemies already in range; it does not chase out-of-range enemies.
+  Projection omits enemy `weaponFacing` when it would reveal a hidden target direction.
 - **Tank armor facing**: tank and AT-team attacks against tank victims use the victim tank's hull
   `facing` and the attacker's position. Front hits (`<=45°` from the hull direction) deal normal
   damage, side hits (`>45°` and `<=135°`) deal `1.25x`, and rear hits (`>135°`) deal `1.75x`.
