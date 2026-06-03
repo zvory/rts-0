@@ -242,10 +242,12 @@ pub(crate) fn try_build_at(
 pub(crate) struct TrainUnitsRequest<'a> {
     pub(crate) buildings: &'a [ProductionBuildingFact],
     pub(crate) unit_priorities: &'a [EntityKind],
+    pub(crate) completed_building_kinds: &'a [EntityKind],
     pub(crate) max_queue_depth: usize,
     pub(crate) save_for_tech: bool,
     pub(crate) current_counts: &'a [(EntityKind, usize)],
     pub(crate) max_counts: &'a [(EntityKind, usize)],
+    pub(crate) balance_unit_priorities: bool,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -275,21 +277,15 @@ pub(crate) fn train_units(
             continue;
         }
 
-        let trainable = rules::economy::trainable_units(building.kind);
-        let Some(unit) = request
-            .unit_priorities
-            .iter()
-            .copied()
-            .filter(|unit| trainable.contains(unit))
-            .find(|unit| {
-                let current = current_counts.get(unit).copied().unwrap_or(0);
-                max_counts
-                    .get(unit)
-                    .map(|max| current < *max)
-                    .unwrap_or(true)
-                    && ctx.budget.can_afford_unit(*unit)
-            })
-        else {
+        let Some(unit) = train_unit_choice(
+            request.unit_priorities,
+            rules::economy::trainable_units(building.kind),
+            request.completed_building_kinds,
+            &current_counts,
+            &max_counts,
+            request.balance_unit_priorities,
+            &ctx.budget,
+        ) else {
             continue;
         };
 
@@ -309,6 +305,39 @@ pub(crate) fn train_units(
     }
 
     trained
+}
+
+fn train_unit_choice(
+    unit_priorities: &[EntityKind],
+    trainable: &[EntityKind],
+    completed_building_kinds: &[EntityKind],
+    current_counts: &BTreeMap<EntityKind, usize>,
+    max_counts: &BTreeMap<EntityKind, usize>,
+    balance_unit_priorities: bool,
+    budget: &SpendBudget,
+) -> Option<EntityKind> {
+    let eligible = unit_priorities
+        .iter()
+        .copied()
+        .enumerate()
+        .filter(|(_, unit)| trainable.contains(unit))
+        .filter(|(_, unit)| rules::economy::train_requirement_met(*unit, completed_building_kinds))
+        .filter(|(_, unit)| {
+            let current = current_counts.get(unit).copied().unwrap_or(0);
+            max_counts
+                .get(unit)
+                .map(|max| current < *max)
+                .unwrap_or(true)
+                && budget.can_afford_unit(*unit)
+        });
+
+    if balance_unit_priorities {
+        eligible
+            .min_by_key(|(index, unit)| (current_counts.get(unit).copied().unwrap_or(0), *index))
+            .map(|(_, unit)| unit)
+    } else {
+        eligible.map(|(_, unit)| unit).next()
+    }
 }
 
 pub(crate) struct ResourceAssignmentPolicy<'a> {
@@ -553,6 +582,22 @@ mod tests {
         }
     }
 
+    fn complete_building(id: u32, kind: EntityKind) -> AiEntitySummary {
+        AiEntitySummary {
+            id,
+            owner: 1,
+            kind,
+            x: 0.0,
+            y: 0.0,
+            state: AiEntityState::Idle,
+            is_complete: true,
+            production_queue_len: None,
+            latched_node: None,
+            target_id: None,
+            free_for_combat: false,
+        }
+    }
+
     fn resource(id: u32, kind: EntityKind, x: f32, y: f32) -> AiResourceSummary {
         AiResourceSummary {
             id,
@@ -738,16 +783,90 @@ mod tests {
             TrainUnitsRequest {
                 buildings: facts.production_buildings(EntityKind::IndustrialCenter),
                 unit_priorities: &[EntityKind::Worker],
+                completed_building_kinds: facts.complete_building_kinds(),
                 max_queue_depth: 1,
                 save_for_tech: false,
                 current_counts: &[(EntityKind::Worker, 0)],
                 max_counts: &[(EntityKind::Worker, 2)],
+                balance_unit_priorities: false,
             },
         );
 
         assert_eq!(trained.len(), 1);
         assert_eq!(ctx.budget().free_supply(), 0);
         assert_eq!(ctx.into_commands().len(), 1);
+    }
+
+    #[test]
+    fn support_training_requires_tech_and_can_balance_priorities() {
+        let without_tech = observation(
+            AiEconomy {
+                steel: 500,
+                oil: 200,
+                supply_used: 0,
+                supply_cap: 20,
+            },
+            vec![
+                production_building(20, EntityKind::Barracks, 0),
+                production_building(21, EntityKind::Barracks, 0),
+            ],
+            Vec::new(),
+        );
+        let facts = AiFacts::from_observation(&without_tech);
+        let mut ctx = AiActionContext::new(&facts, budget_from_observation(&without_tech));
+
+        let trained = train_units(
+            &mut ctx,
+            TrainUnitsRequest {
+                buildings: facts.production_buildings(EntityKind::Barracks),
+                unit_priorities: &[EntityKind::MachineGunner, EntityKind::AtTeam],
+                completed_building_kinds: facts.complete_building_kinds(),
+                max_queue_depth: 1,
+                save_for_tech: false,
+                current_counts: &[],
+                max_counts: &[],
+                balance_unit_priorities: true,
+            },
+        );
+
+        assert!(trained.is_empty());
+        assert!(ctx.into_commands().is_empty());
+
+        let with_tech = observation(
+            AiEconomy {
+                steel: 500,
+                oil: 200,
+                supply_used: 0,
+                supply_cap: 20,
+            },
+            vec![
+                production_building(20, EntityKind::Barracks, 0),
+                production_building(21, EntityKind::Barracks, 0),
+                complete_building(30, EntityKind::TrainingCentre),
+            ],
+            Vec::new(),
+        );
+        let facts = AiFacts::from_observation(&with_tech);
+        let mut ctx = AiActionContext::new(&facts, budget_from_observation(&with_tech));
+
+        let trained = train_units(
+            &mut ctx,
+            TrainUnitsRequest {
+                buildings: facts.production_buildings(EntityKind::Barracks),
+                unit_priorities: &[EntityKind::MachineGunner, EntityKind::AtTeam],
+                completed_building_kinds: facts.complete_building_kinds(),
+                max_queue_depth: 1,
+                save_for_tech: false,
+                current_counts: &[],
+                max_counts: &[],
+                balance_unit_priorities: true,
+            },
+        );
+
+        assert_eq!(
+            trained.iter().map(|action| action.unit).collect::<Vec<_>>(),
+            vec![EntityKind::MachineGunner, EntityKind::AtTeam]
+        );
     }
 
     #[test]
