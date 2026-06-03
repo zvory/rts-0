@@ -40,9 +40,11 @@ pub(crate) fn combat_system(
     events: &mut HashMap<u32, Vec<Event>>,
 ) {
     // Tick down cooldowns first.
-    for e in entities.iter_mut() {
-        e.tick_attack_cd();
-        tick_machine_gunner_setup(e);
+    for id in entities.ids() {
+        if let Some(e) = entities.get_mut(id) {
+            e.tick_attack_cd();
+            tick_machine_gunner_setup(e);
+        }
     }
 
     for id in entities.ids() {

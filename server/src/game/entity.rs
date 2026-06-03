@@ -1143,11 +1143,6 @@ impl EntityStore {
         ids.into_iter().filter_map(|id| self.map.get(&id))
     }
 
-    /// Iterate over all entities (mutable).
-    pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut Entity> {
-        self.map.values_mut()
-    }
-
     /// All currently-live entity ids in stable ascending order. Useful for index-free iteration
     /// when the body needs `&mut self` on the store.
     pub fn ids(&self) -> Vec<u32> {
