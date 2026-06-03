@@ -3,6 +3,7 @@ use crate::game::entity::{Entity, EntityKind, EntityStore};
 use crate::game::map::Map;
 use crate::game::pathfinding::Passability;
 use crate::game::services::spatial::SpatialIndex;
+use crate::game::services::standability;
 
 /// A snapshot of which tiles are blocked by buildings this tick, layered over terrain. Units
 /// never block (soft overlap is allowed), so only static structures appear here.
@@ -113,38 +114,5 @@ pub(crate) fn footprint_placeable(
     tile_x: u32,
     tile_y: u32,
 ) -> bool {
-    let tiles = footprint_tiles(building, tile_x, tile_y);
-    if tiles.is_empty() {
-        return false;
-    }
-    // In bounds + passable terrain.
-    for &(tx, ty) in &tiles {
-        if !map.in_bounds(tx as i32, ty as i32) {
-            return false;
-        }
-        if !map.is_passable(tx as i32, ty as i32) {
-            return false;
-        }
-    }
-
-    // Not overlapping another building footprint, resource node, or unit tile.
-    // We scan all buildings rather than use the spatial index because the spatial index keys
-    // by entity center tile, and a large building's center can lie outside the query rectangle
-    // even when its footprint overlaps the candidate footprint.
-    for e in entities.iter() {
-        if e.is_building() {
-            let occupied = building_footprint(map, e);
-            for t in &tiles {
-                if occupied.contains(t) {
-                    return false;
-                }
-            }
-        } else if e.is_node() || e.is_unit() {
-            let tile = map.tile_of(e.pos_x, e.pos_y);
-            if tiles.contains(&tile) {
-                return false;
-            }
-        }
-    }
-    true
+    standability::building_site_clear(map, entities, building, tile_x, tile_y)
 }

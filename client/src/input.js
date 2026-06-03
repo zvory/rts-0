@@ -48,7 +48,7 @@ export function footprintValidAgainstEntities(
   const maxY = (tileY + footH) * ts;
   for (const e of entities) {
     if (allowedOverlapIds?.has(e.id)) continue;
-    if (entityIntersectsRect(e, minX + 1, minY + 1, maxX - 1, maxY - 1, ts)) return false;
+    if (entityIntersectsRect(e, minX, minY, maxX, maxY, ts)) return false;
   }
   return true;
 }
@@ -61,10 +61,15 @@ function entityIntersectsRect(e, minX, minY, maxX, maxY, tileSize) {
   if (isBuilding(e.kind)) {
     halfW = ((stat.footW ? stat.footW : 1) * tileSize) / 2;
     halfH = ((stat.footH ? stat.footH : 1) * tileSize) / 2;
+    return e.x + halfW > minX && e.x - halfW < maxX && e.y + halfH > minY && e.y - halfH < maxY;
   } else {
-    halfW = halfH = stat.size ? stat.size : 0;
+    const radius = stat.size ? stat.size : 0;
+    const nearestX = Math.min(Math.max(e.x, minX), maxX);
+    const nearestY = Math.min(Math.max(e.y, minY), maxY);
+    const dx = e.x - nearestX;
+    const dy = e.y - nearestY;
+    return dx * dx + dy * dy <= radius * radius;
   }
-  return e.x + halfW >= minX && e.x - halfW <= maxX && e.y + halfH >= minY && e.y - halfH <= maxY;
 }
 
 /**
@@ -660,7 +665,8 @@ export class Input {
    * and no existing entity (unit or building) occupies the same world area.
    */
   _footprintValid(tileX, tileY, footW, footH, map) {
-    const allowed = new Set(this._selectedWorkerIds());
+    const chosenWorker = this._selectedWorkerIds()[0];
+    const allowed = chosenWorker === undefined ? new Set() : new Set([chosenWorker]);
     return footprintValidAgainstEntities(
       this.state.entitiesInterpolated(1),
       allowed,
