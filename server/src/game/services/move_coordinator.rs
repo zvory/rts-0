@@ -16,8 +16,9 @@
 use crate::config;
 use crate::game::entity::{EntityKind, EntityStore, MovePhase, Order, WeaponSetup};
 use crate::game::map::Map;
-use crate::game::pathfinding::Passability;
-use crate::game::services::occupancy::{footprint_tiles, Occupancy};
+use crate::game::pathfinding::{self, Passability};
+use crate::game::services::interact_range_for_kind;
+use crate::game::services::occupancy::{footprint_center, footprint_tiles, Occupancy};
 use crate::game::services::pathing::{PathRequest, PathingService};
 
 /// Maximum number of fresh A* path requests serviced in a single tick. Beyond this,
@@ -149,9 +150,9 @@ impl<'a> MoveCoordinator<'a> {
         self.request_path(entities, id, (nx, ny));
     }
 
-    /// Issue a build order: record the placement intent on the worker and walk it to the
-    /// target top-left tile. No building is spawned and no resources are deducted here;
-    /// that happens on arrival in the construction system.
+    /// Issue a build order: record the placement intent on the worker and walk it to an outside
+    /// staging tile. No building is spawned and no resources are deducted here; that happens on
+    /// arrival in the construction system.
     pub fn order_build(
         &mut self,
         entities: &mut EntityStore,
@@ -160,25 +161,27 @@ impl<'a> MoveCoordinator<'a> {
         tile_x: u32,
         tile_y: u32,
     ) -> bool {
-        let goal = build_staging_goal(self.map, self.occ, entities, id, kind, tile_x, tile_y)
-            .unwrap_or_else(|| self.map.tile_center(tile_x, tile_y));
         entities.release_miner(id);
         if let Some(e) = entities.get_mut(id) {
             e.set_order(Order::build(kind, tile_x, tile_y));
             e.set_target_id(None);
             e.set_path(Vec::new());
-            e.set_path_goal(Some(goal));
             e.reset_gather_state();
             let (px, py) = (e.pos_x, e.pos_y);
             e.reset_stuck(px, py);
         }
-        if !self.request_path(entities, id, goal) {
-            if let Some(e) = entities.get_mut(id) {
-                e.clear_orders();
-            }
-            return false;
+        if self.request_build_path(entities, id, kind, tile_x, tile_y) {
+            return true;
         }
-        true
+        for goal in build_staging_goals(self.map, self.occ, entities, id, kind, tile_x, tile_y) {
+            if self.request_exact_path_to_build_goal(entities, id, goal) {
+                return true;
+            }
+        }
+        if let Some(e) = entities.get_mut(id) {
+            e.clear_orders();
+        }
+        false
     }
 
     // -------------------------------------------------------------------
@@ -393,6 +396,141 @@ impl<'a> MoveCoordinator<'a> {
         }
         false
     }
+
+    fn request_build_path(
+        &mut self,
+        entities: &mut EntityStore,
+        id: u32,
+        kind: EntityKind,
+        tile_x: u32,
+        tile_y: u32,
+    ) -> bool {
+        let footprint = footprint_tiles(kind, tile_x, tile_y);
+        if footprint.is_empty() {
+            return false;
+        }
+        let footprint_set: std::collections::BTreeSet<(u32, u32)> =
+            footprint.iter().copied().collect();
+        if let Some(goal) = current_staging_goal(self.map, entities, id, kind, &footprint_set) {
+            set_entity_path(entities, id, Vec::new(), goal, self.tick);
+            return true;
+        }
+
+        let approach_goal = self.map.tile_center(tile_x, tile_y);
+        let Some(tile_path) = self.request_exact_tile_path(entities, id, approach_goal) else {
+            return false;
+        };
+        let Some(staging_index) = tile_path.iter().rposition(|(tx, ty)| {
+            *tx >= 0 && *ty >= 0 && !footprint_set.contains(&(*tx as u32, *ty as u32))
+        }) else {
+            return false;
+        };
+        let staging_tile = tile_path[staging_index];
+        let goal = self
+            .map
+            .tile_center(staging_tile.0 as u32, staging_tile.1 as u32);
+        if !build_staging_goal_in_range(self.map, kind, tile_x, tile_y, goal) {
+            return false;
+        }
+        let trimmed = tile_path[..=staging_index].to_vec();
+        let waypoints = pathfinding::to_world_waypoints(&trimmed);
+        set_entity_path(entities, id, waypoints, goal, self.tick);
+        true
+    }
+
+    fn request_exact_path_to_build_goal(
+        &mut self,
+        entities: &mut EntityStore,
+        id: u32,
+        goal: (f32, f32),
+    ) -> bool {
+        let Some(tile_path) = self.request_exact_tile_path(entities, id, goal) else {
+            return false;
+        };
+        let waypoints = pathfinding::to_world_waypoints(&tile_path);
+        set_entity_path(entities, id, waypoints, goal, self.tick);
+        true
+    }
+
+    fn request_exact_tile_path(
+        &mut self,
+        entities: &EntityStore,
+        id: u32,
+        goal: (f32, f32),
+    ) -> Option<Vec<(i32, i32)>> {
+        if self.budget == 0 {
+            return None;
+        }
+        let (unit_kind, sx, sy) = match entities.get(id) {
+            Some(e) if e.is_unit() => {
+                let (sx, sy) = self.map.tile_of(e.pos_x, e.pos_y);
+                (e.kind, sx, sy)
+            }
+            _ => return None,
+        };
+        let (gx, gy) = self.map.tile_of(goal.0, goal.1);
+        let radius_tiles = config::unit_stats(unit_kind)
+            .map(|s| s.radius_tiles())
+            .unwrap_or(0);
+        let req = PathRequest {
+            kind: unit_kind,
+            start: (sx as i32, sy as i32),
+            goal: (gx as i32, gy as i32),
+            radius_tiles,
+            budget: None,
+        };
+        let tile_path = self.pathing.request_tile_path(self.map, self.occ, req);
+        self.budget = self.budget.saturating_sub(1);
+        if tile_path.last().copied() == Some((gx as i32, gy as i32)) {
+            Some(tile_path)
+        } else {
+            None
+        }
+    }
+}
+
+fn set_entity_path(
+    entities: &mut EntityStore,
+    id: u32,
+    path: Vec<(f32, f32)>,
+    goal: (f32, f32),
+    tick: u32,
+) {
+    if let Some(e) = entities.get_mut(id) {
+        e.set_path(path);
+        e.set_last_repath_tick(tick);
+        e.set_path_goal(Some(goal));
+    }
+}
+
+fn current_staging_goal(
+    map: &Map,
+    entities: &EntityStore,
+    id: u32,
+    kind: EntityKind,
+    footprint: &std::collections::BTreeSet<(u32, u32)>,
+) -> Option<(f32, f32)> {
+    let worker = entities.get(id)?;
+    let tile = map.tile_of(worker.pos_x, worker.pos_y);
+    if footprint.contains(&tile) {
+        return None;
+    }
+    let &(tile_x, tile_y) = footprint.iter().min()?;
+    let goal = (worker.pos_x, worker.pos_y);
+    build_staging_goal_in_range(map, kind, tile_x, tile_y, goal).then_some(goal)
+}
+
+fn build_staging_goal_in_range(
+    map: &Map,
+    kind: EntityKind,
+    tile_x: u32,
+    tile_y: u32,
+    goal: (f32, f32),
+) -> bool {
+    let (cx, cy) = footprint_center(map, kind, tile_x, tile_y);
+    let dx = goal.0 - cx;
+    let dy = goal.1 - cy;
+    dx * dx + dy * dy <= interact_range_for_kind(kind).powi(2)
 }
 
 fn begin_machine_gunner_teardown(e: &mut crate::game::entity::Entity) {
@@ -474,11 +612,12 @@ fn is_free_goal(map: &Map, occ: &Occupancy, tile: (u32, u32), taken: &[(u32, u32
     true
 }
 
-/// Pick a walk target for a build order.
+/// Pick a walk target outside a build footprint.
 ///
-/// If the worker is already standing inside the requested footprint, move it to a nearby
-/// tile outside that footprint first so the build can start from the perimeter. Returns
-/// `None` when the worker is not inside the footprint or when no outside tile is available.
+/// Construction starts when the worker is close enough to the footprint center, so walking to an
+/// outside perimeter tile keeps the builder from ending up inside the completed building.
+/// Returns `None` when no outside staging tile is available.
+#[cfg(test)]
 pub(crate) fn build_staging_goal(
     map: &Map,
     occ: &Occupancy,
@@ -488,27 +627,55 @@ pub(crate) fn build_staging_goal(
     tile_x: u32,
     tile_y: u32,
 ) -> Option<(f32, f32)> {
-    let worker = entities.get(worker)?;
-    let w_tile = map.tile_of(worker.pos_x, worker.pos_y);
-    let footprint = footprint_tiles(kind, tile_x, tile_y);
-    if !footprint.contains(&w_tile) {
-        return None;
-    }
+    build_staging_goals(map, occ, entities, worker, kind, tile_x, tile_y)
+        .into_iter()
+        .next()
+}
 
-    // Search outward for the closest passable tile outside the requested footprint.
+fn build_staging_goals(
+    map: &Map,
+    occ: &Occupancy,
+    entities: &EntityStore,
+    worker: u32,
+    kind: EntityKind,
+    tile_x: u32,
+    tile_y: u32,
+) -> Vec<(f32, f32)> {
+    let Some(worker) = entities.get(worker) else {
+        return Vec::new();
+    };
+    let footprint = footprint_tiles(kind, tile_x, tile_y);
+    let Some(stats) = config::building_stats(kind) else {
+        return Vec::new();
+    };
+    if footprint.is_empty() {
+        return Vec::new();
+    }
+    let footprint_set: std::collections::BTreeSet<(u32, u32)> = footprint.iter().copied().collect();
+    let min_x = tile_x as i32;
+    let min_y = tile_y as i32;
+    let Some(max_x) = tile_x.checked_add(stats.foot_w.saturating_sub(1)) else {
+        return Vec::new();
+    };
+    let Some(max_y) = tile_y.checked_add(stats.foot_h.saturating_sub(1)) else {
+        return Vec::new();
+    };
+    let max_x = max_x as i32;
+    let max_y = max_y as i32;
+    let mut candidates = Vec::new();
+
+    // Search outward from the footprint, then order candidates by ring and worker distance.
     for r in 1i32..=6 {
-        for dy in -r..=r {
-            for dx in -r..=r {
-                if dx.abs().max(dy.abs()) != r {
+        for ty in (min_y - r)..=(max_y + r) {
+            for tx in (min_x - r)..=(max_x + r) {
+                if tx > min_x - r && tx < max_x + r && ty > min_y - r && ty < max_y + r {
                     continue;
                 }
-                let tx = w_tile.0 as i32 + dx;
-                let ty = w_tile.1 as i32 + dy;
                 if !map.in_bounds(tx, ty) {
                     continue;
                 }
                 let tile = (tx as u32, ty as u32);
-                if footprint.contains(&tile) {
+                if footprint_set.contains(&tile) {
                     continue;
                 }
                 if !map.is_passable(tx, ty) {
@@ -517,11 +684,29 @@ pub(crate) fn build_staging_goal(
                 if !occ.passable(tx, ty) {
                     continue;
                 }
-                return Some(map.tile_center(tile.0, tile.1));
+                let center = map.tile_center(tile.0, tile.1);
+                if !build_staging_goal_in_range(map, kind, tile_x, tile_y, center) {
+                    continue;
+                }
+                let dist2 = {
+                    let dx = worker.pos_x - center.0;
+                    let dy = worker.pos_y - center.1;
+                    dx * dx + dy * dy
+                };
+                candidates.push((r, dist2, tile));
             }
         }
     }
-    None
+    candidates.sort_by(|left, right| {
+        left.0
+            .cmp(&right.0)
+            .then_with(|| left.1.total_cmp(&right.1))
+            .then_with(|| left.2.cmp(&right.2))
+    });
+    candidates
+        .into_iter()
+        .map(|(_, _, tile)| map.tile_center(tile.0, tile.1))
+        .collect()
 }
 
 fn spawn_point_has_clearance(map: &Map, occ: &Occupancy, cx: f32, cy: f32, radius: f32) -> bool {
@@ -794,6 +979,35 @@ mod tests {
     }
 
     #[test]
+    fn build_staging_goal_uses_outside_tile_for_worker_approaching_footprint() {
+        let map = Map::generate(1, 0x1234_5678);
+        let mut entities = EntityStore::new();
+        let (wx, wy) = map.tile_center(10, 10);
+        let worker = entities.spawn_unit(1, EntityKind::Worker, wx, wy).unwrap();
+        let occ = Occupancy::build(&map, &entities);
+
+        let goal = build_staging_goal(
+            &map,
+            &occ,
+            &entities,
+            worker,
+            EntityKind::IndustrialCenter,
+            20,
+            20,
+        )
+        .expect("worker should be able to stage outside the footprint");
+        let tile = map.tile_of(goal.0, goal.1);
+        let footprint: std::collections::BTreeSet<(u32, u32)> =
+            footprint_tiles(EntityKind::IndustrialCenter, 20, 20)
+                .into_iter()
+                .collect();
+        assert!(
+            !footprint.contains(&tile),
+            "staging goal must be outside the 3x3 IC footprint, got {tile:?}"
+        );
+    }
+
+    #[test]
     fn build_order_fails_when_worker_cannot_escape_placement_area() {
         let map = Map::generate(1, 0x1234_5678);
         let mut entities = EntityStore::new();
@@ -817,6 +1031,38 @@ mod tests {
         assert!(
             matches!(e.order(), Order::Idle),
             "failed build should clear the worker order"
+        );
+    }
+
+    #[test]
+    fn build_order_accepts_long_expansion_route_to_outside_staging() {
+        let map = Map::generate(2, 0);
+        let mut entities = EntityStore::new();
+        let (wx, wy) = map.tile_center(10, 85);
+        let worker = entities.spawn_unit(1, EntityKind::Worker, wx, wy).unwrap();
+        let occ = Occupancy::build(&map, &entities);
+        let mut pathing = PathingService::new(8_192, 256);
+        pathing.advance_tick(1);
+        let mut coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, 1);
+
+        let ok =
+            coordinator.order_build(&mut entities, worker, EntityKind::IndustrialCenter, 48, 70);
+
+        assert!(ok, "expansion IC build order should find a staged route");
+        let e = entities.get(worker).unwrap();
+        let goal = e.path_goal().expect("build order should set a path goal");
+        let goal_tile = map.tile_of(goal.0, goal.1);
+        let footprint: std::collections::BTreeSet<(u32, u32)> =
+            footprint_tiles(EntityKind::IndustrialCenter, 48, 70)
+                .into_iter()
+                .collect();
+        assert!(
+            !footprint.contains(&goal_tile),
+            "build path goal should stop outside the expansion IC footprint"
+        );
+        assert!(
+            build_staging_goal_in_range(&map, EntityKind::IndustrialCenter, 48, 70, goal),
+            "outside staging goal should still be close enough to start construction"
         );
     }
 
