@@ -38,6 +38,12 @@ pub fn concealment_modifier(_kind: EntityKind, _terrain: TerrainKind) -> f32 {
     1.0
 }
 
+/// Whether this raw map terrain code blocks line-of-sight for fog and ranged attacks.
+/// Stone blocks today; forests can grow into this seam later with partial visibility rules.
+pub fn blocks_line_of_sight(code: u8) -> bool {
+    code == wire_terrain::ROCK
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -52,6 +58,13 @@ mod tests {
         );
         assert_eq!(TerrainKind::from_map_code(wire_terrain::ROCK), None);
         assert_eq!(TerrainKind::from_map_code(wire_terrain::WATER), None);
+    }
+
+    #[test]
+    fn stone_blocks_line_of_sight_but_water_does_not() {
+        assert!(!blocks_line_of_sight(wire_terrain::GRASS));
+        assert!(blocks_line_of_sight(wire_terrain::ROCK));
+        assert!(!blocks_line_of_sight(wire_terrain::WATER));
     }
 
     #[test]

@@ -967,7 +967,7 @@ mod tests {
     }
 
     #[test]
-    fn formation_goal_rejects_large_unit_body_clipping_building() {
+    fn formation_goal_accepts_v1_tank_tile_center_near_building() {
         let mut map = Map::generate(1, 0x1234_5678);
         for tile in &mut map.terrain {
             *tile = crate::protocol::terrain::GRASS;
@@ -979,19 +979,19 @@ mod tests {
             .expect("depot should spawn");
         let occ = Occupancy::build(&map, &entities);
         let units = vec![formation_unit_kind(1, EntityKind::Tank, &map, (6, 10))];
-        let body_clipping_goal = map.tile_center(12, 10);
+        let adjacent_tile_goal = map.tile_center(12, 10);
 
-        let goals = formation_goals(&map, &occ, &units, body_clipping_goal);
+        let goals = formation_goals(&map, &occ, &units, adjacent_tile_goal);
         let goal = goals[0];
 
-        assert_ne!(
+        assert_eq!(
             map.tile_of(goal.0, goal.1),
             (12, 10),
-            "formation goals must not assign a tile where only the unit center is clear"
+            "v1 tank radius should allow adjacent tile-center formation slots"
         );
         assert!(
             standability::unit_static_standable(&map, &occ, EntityKind::Tank, goal.0, goal.1),
-            "fallback formation goal must be body-standable"
+            "assigned formation goal must be body-standable"
         );
     }
 
@@ -1318,5 +1318,43 @@ mod tests {
             "only 3 paths should have been processed with budget=3"
         );
         assert_eq!(still_waiting, 7, "7 units should still be awaiting path");
+    }
+
+    #[test]
+    fn request_path_snaps_final_waypoint_to_exact_goal() {
+        let map = Map::generate(1, 0x1234_5678);
+        let mut entities = EntityStore::new();
+        let start = map.tile_center(10, 10);
+        let unit = entities
+            .spawn_unit(1, EntityKind::Rifleman, start.0, start.1)
+            .expect("unit should spawn");
+        let goal_tile_center = map.tile_center(20, 13);
+        let exact_goal = (goal_tile_center.0 + 7.25, goal_tile_center.1 - 5.5);
+        let occ = Occupancy::build(&map, &entities);
+
+        let mut pathing = PathingService::new(8_192, 256);
+        pathing.advance_tick(1);
+        let mut coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, 1);
+
+        assert!(
+            coordinator.request_path(&mut entities, unit, exact_goal),
+            "fixture path should be found"
+        );
+        let unit = entities.get(unit).expect("unit should still exist");
+        let path = &unit
+            .movement
+            .as_ref()
+            .expect("unit should have movement")
+            .path;
+        assert!(
+            path.len() > 1,
+            "fixture should produce an intermediate route plus final exact goal"
+        );
+        assert_eq!(
+            path.first().copied(),
+            Some(exact_goal),
+            "paths are reverse-ordered, so index 0 must remain the exact requested final goal"
+        );
+        assert_eq!(unit.path_goal(), Some(exact_goal));
     }
 }

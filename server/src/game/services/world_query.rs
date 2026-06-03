@@ -133,6 +133,7 @@ pub(crate) fn is_enemy_targetable(
 }
 
 /// Nearest hostile entity (`is_enemy_targetable`) to `(px, py)` within `radius_px`.
+#[allow(dead_code)]
 pub(crate) fn nearest_enemy_in_range(
     entities: &EntityStore,
     spatial: &SpatialIndex,
@@ -142,12 +143,46 @@ pub(crate) fn nearest_enemy_in_range(
     py: f32,
     radius_px: f32,
 ) -> Option<u32> {
-    nearest_matching_enemy_in_range(entities, spatial, self_id, owner, px, py, radius_px, |_| {
-        true
-    })
+    nearest_matching_enemy_in_range(
+        entities,
+        spatial,
+        self_id,
+        owner,
+        px,
+        py,
+        radius_px,
+        |_| true,
+        |_| true,
+    )
+}
+
+/// Nearest hostile entity to `(px, py)` within `radius_px` that also satisfies `target_filter`.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn nearest_enemy_in_range_filtered(
+    entities: &EntityStore,
+    spatial: &SpatialIndex,
+    self_id: u32,
+    owner: u32,
+    px: f32,
+    py: f32,
+    radius_px: f32,
+    target_filter: impl Fn(&Entity) -> bool,
+) -> Option<u32> {
+    nearest_matching_enemy_in_range(
+        entities,
+        spatial,
+        self_id,
+        owner,
+        px,
+        py,
+        radius_px,
+        |_| true,
+        target_filter,
+    )
 }
 
 /// Nearest hostile Tank to `(px, py)` within `radius_px`, or `None` if no tank is in range.
+#[allow(dead_code)]
 pub(crate) fn nearest_tank_in_range(
     entities: &EntityStore,
     spatial: &SpatialIndex,
@@ -157,9 +192,42 @@ pub(crate) fn nearest_tank_in_range(
     py: f32,
     radius_px: f32,
 ) -> Option<u32> {
-    nearest_matching_enemy_in_range(entities, spatial, self_id, owner, px, py, radius_px, |e| {
-        e.kind == EntityKind::Tank
-    })
+    nearest_matching_enemy_in_range(
+        entities,
+        spatial,
+        self_id,
+        owner,
+        px,
+        py,
+        radius_px,
+        |e| e.kind == EntityKind::Tank,
+        |_| true,
+    )
+}
+
+/// Nearest hostile Tank to `(px, py)` within `radius_px` that also satisfies `target_filter`.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn nearest_tank_in_range_filtered(
+    entities: &EntityStore,
+    spatial: &SpatialIndex,
+    self_id: u32,
+    owner: u32,
+    px: f32,
+    py: f32,
+    radius_px: f32,
+    target_filter: impl Fn(&Entity) -> bool,
+) -> Option<u32> {
+    nearest_matching_enemy_in_range(
+        entities,
+        spatial,
+        self_id,
+        owner,
+        px,
+        py,
+        radius_px,
+        |e| e.kind == EntityKind::Tank,
+        target_filter,
+    )
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -172,13 +240,17 @@ fn nearest_matching_enemy_in_range(
     py: f32,
     radius_px: f32,
     matches_kind: impl Fn(&Entity) -> bool,
+    target_filter: impl Fn(&Entity) -> bool,
 ) -> Option<u32> {
     let mut best: Option<(u32, f32)> = None;
     for id in spatial.ids_in_circle_bbox(px, py, radius_px) {
         let Some(entity) = entities.get(id) else {
             continue;
         };
-        if !is_enemy_targetable(entity, owner, self_id) || !matches_kind(entity) {
+        if !is_enemy_targetable(entity, owner, self_id)
+            || !matches_kind(entity)
+            || !target_filter(entity)
+        {
             continue;
         }
         let concealment = terrain::concealment_modifier(entity.kind, TerrainKind::Open).max(0.0);

@@ -21,6 +21,7 @@ import {
   SETUP_CODE,
   STATE,
   STATE_CODE,
+  TERRAIN,
   decodeServerMessage,
 } from "../client/src/protocol.js";
 import { Input, footprintValidAgainstEntities } from "../client/src/input.js";
@@ -526,6 +527,16 @@ function assertHasGetter(obj, name, msgPrefix = "") {
   fog.update([], 32);
   assert(fog.isVisible(2, 2) === false, "tile should no longer be visible");
   assert(fog.isExplored(2, 2) === true, "tile should still be explored");
+
+  const terrain = new Array(8 * 8).fill(TERRAIN.GRASS);
+  terrain[2 * 8 + 3] = TERRAIN.ROCK;
+  const blockedFog = new Fog(8, 8, terrain);
+  blockedFog.update(
+    [{ kind: "worker", x: 48, y: 80 }], // center of tile (1,2)
+    32,
+  );
+  assert(blockedFog.isVisible(3, 2) === true, "stone tile itself should be visible");
+  assert(blockedFog.isVisible(4, 2) === false, "stone should block fog behind it");
 }
 
 console.log("✅ client_contracts.mjs: all contract assertions passed");

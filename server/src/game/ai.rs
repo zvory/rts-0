@@ -236,7 +236,7 @@ mod tests {
         let map = Map::generate(2, 1234);
         let spatial = SpatialIndex::build(&entities, config::TILE_SIZE);
         let mut fog = Fog::new(map.size);
-        fog.recompute(&[2], &entities);
+        fog.recompute(&[2], &entities, &map);
         let players = vec![player(2, (10, 10), 999, 8, 10)];
         let mut ai = AiController::new(2);
         let mut out = Vec::new();
@@ -299,7 +299,7 @@ mod tests {
         ];
         let spatial = SpatialIndex::build(&entities, config::TILE_SIZE);
         let mut fog = Fog::new(map.size);
-        fog.recompute(&[1, 2], &entities);
+        fog.recompute(&[1, 2], &entities, &map);
         let mut ai = AiController::new(2);
         let mut out = Vec::new();
 

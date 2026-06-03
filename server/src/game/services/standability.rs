@@ -203,12 +203,15 @@ mod tests {
             .expect("depot should spawn");
         let occ = Occupancy::build(&map, &entities);
         let rect = building_rect_for_footprint(EntityKind::Depot, 4, 4).expect("depot rect");
+        let radius = config::unit_stats(EntityKind::Tank)
+            .expect("tank stats")
+            .radius;
 
         assert!(!unit_static_standable(
             &map,
             &occ,
             EntityKind::Tank,
-            rect.max_x + 19.0,
+            rect.max_x + radius - 1.0,
             rect.min_y + 32.0,
         ));
     }
@@ -237,8 +240,16 @@ mod tests {
         let map = flat_map(12);
         let mut entities = EntityStore::new();
         let rect = building_rect_for_footprint(EntityKind::Depot, 4, 4).expect("depot rect");
+        let radius = config::unit_stats(EntityKind::Tank)
+            .expect("tank stats")
+            .radius;
         entities
-            .spawn_unit(1, EntityKind::Tank, rect.max_x + 19.0, rect.min_y + 32.0)
+            .spawn_unit(
+                1,
+                EntityKind::Tank,
+                rect.max_x + radius - 1.0,
+                rect.min_y + 32.0,
+            )
             .expect("tank should spawn");
 
         assert!(!building_site_clear(

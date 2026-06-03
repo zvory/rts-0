@@ -2,9 +2,9 @@
 //!
 //! The server is authoritative about visibility: each tick we recompute, for every player, a
 //! boolean grid of which tiles that player can currently see. A tile is visible if it falls
-//! within the sight circle of any of that player's entities (`sight_tiles`). The snapshot
-//! layer uses this to withhold neutral/enemy entities standing on non-visible tiles, making
-//! the fog cheat-proof.
+//! within the sight circle of any of that player's entities (`sight_tiles`) and the line from
+//! the entity to that tile is not blocked by stone. The snapshot layer uses this to withhold
+//! neutral/enemy entities standing on non-visible tiles, making the fog cheat-proof.
 //!
 //! Note the server only needs *currently visible* — the client maintains the "explored but
 //! not currently visible" dimming locally (see `DESIGN.md` §4). So this module tracks only
@@ -14,6 +14,8 @@ use std::collections::HashMap;
 
 use crate::config;
 use crate::game::entity::{Entity, EntityStore};
+use crate::game::map::Map;
+use crate::game::services::line_of_sight::LineOfSight;
 
 /// Visible-tile grids, one per player. Recomputed every tick from scratch (cheap at our map
 /// sizes) so it always reflects current entity positions and never leaks stale visibility.
@@ -34,7 +36,8 @@ impl Fog {
 
     /// Recompute visibility for all `players` from the union of their entities' sight circles.
     /// Players with no entities get an all-dark grid.
-    pub fn recompute(&mut self, players: &[u32], store: &EntityStore) {
+    pub fn recompute(&mut self, players: &[u32], store: &EntityStore, map: &Map) {
+        let size = self.size;
         let cells = (self.size * self.size) as usize;
         // Reset / allocate a grid per player.
         for &p in players {
@@ -46,6 +49,7 @@ impl Fog {
             }
         }
 
+        let los = LineOfSight::new(map);
         for e in store.iter() {
             if e.owner == 0 {
                 continue; // neutral resource nodes do not grant a player vision
@@ -54,7 +58,7 @@ impl Fog {
             let Some(grid) = self.grids.get_mut(&e.owner) else {
                 continue;
             };
-            stamp_sight(grid, self.size, e);
+            stamp_sight(grid, size, e, &los);
         }
     }
 
@@ -90,7 +94,7 @@ impl Fog {
 }
 
 /// Mark every tile within an entity's sight radius (a filled circle in tile space) as visible.
-fn stamp_sight(grid: &mut [bool], size: u32, e: &Entity) {
+fn stamp_sight(grid: &mut [bool], size: u32, e: &Entity, los: &LineOfSight<'_>) {
     let r = e.sight_tiles() as i32;
     if r <= 0 {
         return;
@@ -109,7 +113,45 @@ fn stamp_sight(grid: &mut [bool], size: u32, e: &Entity) {
             if tx < 0 || ty < 0 || tx as u32 >= size || ty as u32 >= size {
                 continue;
             }
+            if !los.tile_visible_from_world((e.pos_x, e.pos_y), (tx as u32, ty as u32)) {
+                continue;
+            }
             grid[(ty as u32 * size + tx as u32) as usize] = true;
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::game::entity::{EntityKind, EntityStore};
+    use crate::protocol::terrain;
+
+    fn map_with_rock_at(tile: (u32, u32)) -> Map {
+        let size = 8;
+        let mut terrain = vec![terrain::GRASS; (size * size) as usize];
+        terrain[(tile.1 * size + tile.0) as usize] = terrain::ROCK;
+        Map {
+            size,
+            terrain,
+            starts: vec![(1, 1)],
+            expansion_sites: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn stone_blocks_authoritative_fog_behind_it() {
+        let map = map_with_rock_at((3, 2));
+        let mut entities = EntityStore::new();
+        let origin = map.tile_center(1, 2);
+        entities
+            .spawn_unit(1, EntityKind::Worker, origin.0, origin.1)
+            .expect("worker should spawn");
+        let mut fog = Fog::new(map.size);
+
+        fog.recompute(&[1], &entities, &map);
+
+        assert!(fog.is_visible(1, 3, 2));
+        assert!(!fog.is_visible(1, 4, 2));
     }
 }
