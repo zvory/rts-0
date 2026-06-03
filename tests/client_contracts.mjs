@@ -32,6 +32,13 @@ function assert(cond, msg) {
   if (!cond) throw new Error(msg || "Assertion failed");
 }
 
+function assertApprox(actual, expected, epsilon, msg) {
+  assert(
+    Math.abs(actual - expected) <= epsilon,
+    `${msg}: expected ${expected}, got ${actual}`,
+  );
+}
+
 function assertThrows(fn, msg) {
   let threw = false;
   try {
@@ -310,6 +317,76 @@ function assertHasGetter(obj, name, msgPrefix = "") {
   const midWorker = entsMid.find((e) => e.id === 1);
   assert(entsMid.length === 3 && midWorker, "entitiesInterpolated returns units and known resources");
   assert(midWorker.x >= 10 && midWorker.x <= 15, "interpolation works for moving units");
+  assert(!("facing" in midWorker), "entitiesInterpolated does not add missing facing");
+
+  const angleState = new GameState({ ...start, map: { ...start.map, resources: [] } });
+  angleState.applySnapshot({
+    tick: 0,
+    steel: 0,
+    oil: 0,
+    supplyUsed: 0,
+    supplyCap: 10,
+    entities: [
+      { id: 10, owner: 1, kind: "worker", x: 0, y: 0, hp: 40, maxHp: 40, state: "move", facing: 0 },
+      {
+        id: 11,
+        owner: 1,
+        kind: "tank",
+        x: 0,
+        y: 0,
+        hp: 100,
+        maxHp: 100,
+        state: "move",
+        facing: (170 * Math.PI) / 180,
+      },
+      { id: 13, owner: 1, kind: "worker", x: 0, y: 0, hp: 40, maxHp: 40, state: "idle", facing: 0.5 },
+      { id: 14, owner: 1, kind: "worker", x: 0, y: 0, hp: 40, maxHp: 40, state: "idle" },
+    ],
+    events: [],
+  });
+  angleState.applySnapshot({
+    tick: 1,
+    steel: 0,
+    oil: 0,
+    supplyUsed: 0,
+    supplyCap: 10,
+    entities: [
+      { id: 10, owner: 1, kind: "worker", x: 10, y: 20, hp: 40, maxHp: 40, state: "move", facing: Math.PI / 2 },
+      {
+        id: 11,
+        owner: 1,
+        kind: "tank",
+        x: 0,
+        y: 0,
+        hp: 100,
+        maxHp: 100,
+        state: "move",
+        facing: (-170 * Math.PI) / 180,
+      },
+      { id: 12, owner: 1, kind: "worker", x: 5, y: 5, hp: 40, maxHp: 40, state: "idle", facing: 1.25 },
+      { id: 13, owner: 1, kind: "worker", x: 0, y: 0, hp: 40, maxHp: 40, state: "idle" },
+      { id: 14, owner: 1, kind: "worker", x: 0, y: 0, hp: 40, maxHp: 40, state: "idle", facing: 0.75 },
+    ],
+    events: [],
+  });
+  const angleEnts = angleState.entitiesInterpolated(0.5);
+  const quarterTurn = angleEnts.find((e) => e.id === 10);
+  const wrapTurn = angleEnts.find((e) => e.id === 11);
+  const newFacing = angleEnts.find((e) => e.id === 12);
+  const missingCurrentFacing = angleEnts.find((e) => e.id === 13);
+  const missingPriorFacing = angleEnts.find((e) => e.id === 14);
+  assertApprox(quarterTurn.x, 5, 0.001, "x interpolation still works");
+  assertApprox(quarterTurn.y, 10, 0.001, "y interpolation still works");
+  assertApprox(quarterTurn.facing, Math.PI / 4, 0.001, "facing interpolates between snapshots");
+  assertApprox(
+    Math.abs(wrapTurn.facing),
+    Math.PI,
+    0.001,
+    "facing interpolation uses the short path across angle wrap",
+  );
+  assertApprox(newFacing.facing, 1.25, 0.001, "missing prior entity keeps current facing");
+  assert(!("facing" in missingCurrentFacing), "missing current facing does not add a field");
+  assertApprox(missingPriorFacing.facing, 0.75, 0.001, "missing prior facing keeps current facing");
 
   // Selection resolves against current snapshot
   state.setSelection([1, 999]);
