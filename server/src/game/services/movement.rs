@@ -3,9 +3,9 @@ use crate::game::entity::{
     BuildPhase, Entity, EntityKind, EntityStore, GatherPhase, MovePhase, Order, WeaponSetup,
 };
 use crate::game::map::Map;
-use crate::game::pathfinding::Passability;
 use crate::game::services::occupancy::Occupancy;
 use crate::game::services::spatial::SpatialIndex;
+use crate::game::services::standability;
 
 /// World pixels at which a unit is considered "arrived" at a waypoint / target point.
 const ARRIVE_EPS: f32 = 2.0;
@@ -47,7 +47,7 @@ pub(crate) fn movement_system(
 ) {
     for id in entities.ids() {
         // Pull the data we need, then mutate.
-        let (speed, mut x, mut y) = {
+        let (kind, speed, mut x, mut y) = {
             let e = match entities.get(id) {
                 Some(e) if e.is_unit() && !e.path_is_empty() => e,
                 _ => continue,
@@ -61,7 +61,7 @@ pub(crate) fn movement_system(
                 continue;
             }
             let speed = config::unit_stats(e.kind).map(|s| s.speed).unwrap_or(0.0);
-            (speed, e.pos_x, e.pos_y)
+            (e.kind, speed, e.pos_x, e.pos_y)
         };
         if speed <= 0.0 {
             continue;
@@ -147,7 +147,7 @@ pub(crate) fn movement_system(
             }
             if dist <= budget {
                 // We can reach this waypoint this tick.
-                if !tile_passable_at(occ, map, wx, wy) {
+                if !unit_static_standable(occ, map, kind, wx, wy) {
                     static_blocked_this_tick = true;
                     break;
                 }
@@ -162,8 +162,8 @@ pub(crate) fn movement_system(
                 // Partial step toward the waypoint.
                 let nx = x + dx / dist * budget;
                 let ny = y + dy / dist * budget;
-                // Clamp landing to a passable tile.
-                if tile_passable_at(occ, map, nx, ny) {
+                // Clamp landing to a body-legal static position.
+                if unit_static_standable(occ, map, kind, nx, ny) {
                     x = nx;
                     y = ny;
                 } else {
@@ -172,8 +172,8 @@ pub(crate) fn movement_system(
                     // against zero movement (dy=0 ⟹ y-only slide is a no-op that would
                     // spuriously suppress static_blocked). Only mark static-blocked when
                     // neither axis makes progress.
-                    let slide_x = dx.abs() > 1e-4 && tile_passable_at(occ, map, nx, y);
-                    let slide_y = dy.abs() > 1e-4 && tile_passable_at(occ, map, x, ny);
+                    let slide_x = dx.abs() > 1e-4 && unit_static_standable(occ, map, kind, nx, y);
+                    let slide_y = dy.abs() > 1e-4 && unit_static_standable(occ, map, kind, x, ny);
                     if slide_x {
                         x = nx;
                     } else if slide_y {
@@ -422,7 +422,7 @@ fn inject_sidestep(
     let tx = x + px * d;
     let ty = y + py * d;
 
-    let point_clear = |cx: f32, cy: f32| tile_passable_at(occ, map, cx, cy);
+    let point_clear = |cx: f32, cy: f32| unit_static_standable(occ, map, e.kind, cx, cy);
 
     let detour = if point_clear(tx, ty) {
         Some((tx, ty))
@@ -447,10 +447,9 @@ fn inject_sidestep(
     }
 }
 
-/// Whether a world point lands on a passable tile (terrain + building footprint).
-fn tile_passable_at(occ: &Occupancy, map: &Map, x: f32, y: f32) -> bool {
-    let (tx, ty) = map.tile_of(x, y);
-    map.is_passable(tx as i32, ty as i32) && occ.passable(tx as i32, ty as i32)
+/// Whether a unit body may stand at this world position against static blockers.
+fn unit_static_standable(occ: &Occupancy, map: &Map, kind: EntityKind, x: f32, y: f32) -> bool {
+    standability::unit_static_standable(map, occ, kind, x, y)
 }
 
 /// Resolve unit-unit overlaps with iterative pair-wise pushes so units do not stack on top of
@@ -510,19 +509,19 @@ pub(crate) fn resolve_collisions(
                 .collect();
 
             for b in candidates {
-                let (br, b_profile, bx, by) = match entities.get(b) {
+                let (br, b_kind, b_profile, bx, by) = match entities.get(b) {
                     Some(e) if e.is_unit() => {
                         let profile = footing_profile(e);
                         if profile == FootingProfile::Ghost {
                             continue;
                         }
-                        (e.radius(), profile, e.pos_x, e.pos_y)
+                        (e.radius(), e.kind, profile, e.pos_x, e.pos_y)
                     }
                     _ => continue,
                 };
                 // Re-read A so we account for displacement applied by earlier pairs in this pass.
-                let (ax, ay) = match entities.get(a) {
-                    Some(e) => (e.pos_x, e.pos_y),
+                let (a_kind, ax, ay) = match entities.get(a) {
+                    Some(e) => (e.kind, e.pos_x, e.pos_y),
                     None => break,
                 };
 
@@ -553,15 +552,15 @@ pub(crate) fn resolve_collisions(
                 let b_share = a_resistance / total_resistance;
                 let a_target = (ax - nx * overlap * a_share, ay - ny * overlap * a_share);
                 let b_target = (bx + nx * overlap * b_share, by + ny * overlap * b_share);
-                let a_ok = stays_on_passable(map, occ, a_target.0, a_target.1);
-                let b_ok = stays_on_passable(map, occ, b_target.0, b_target.1);
+                let a_ok = unit_static_standable(occ, map, a_kind, a_target.0, a_target.1);
+                let b_ok = unit_static_standable(occ, map, b_kind, b_target.0, b_target.1);
 
                 let (a_push, b_push) = match (a_ok, b_ok) {
                     (true, true) => (Some(a_target), Some(b_target)),
                     (true, false) => {
                         let a_full = (ax - nx * overlap, ay - ny * overlap);
                         (
-                            if stays_on_passable(map, occ, a_full.0, a_full.1) {
+                            if unit_static_standable(occ, map, a_kind, a_full.0, a_full.1) {
                                 Some(a_full)
                             } else {
                                 Some(a_target)
@@ -573,7 +572,7 @@ pub(crate) fn resolve_collisions(
                         let b_full = (bx + nx * overlap, by + ny * overlap);
                         (
                             None,
-                            if stays_on_passable(map, occ, b_full.0, b_full.1) {
+                            if unit_static_standable(occ, map, b_kind, b_full.0, b_full.1) {
                                 Some(b_full)
                             } else {
                                 Some(b_target)
@@ -662,19 +661,15 @@ pub(crate) fn is_collision_anchored(e: &Entity) -> bool {
     footing_profile(e) == FootingProfile::Ghost
 }
 
-/// Whether a world point lies on a tile that's passable terrain and free of building footprints,
-/// i.e. the kind of place a unit may legally stand after a push.
-fn stays_on_passable(map: &Map, occ: &Occupancy, x: f32, y: f32) -> bool {
-    let (tx, ty) = map.tile_of(x, y);
-    map.is_passable(tx as i32, ty as i32) && occ.passable(tx as i32, ty as i32)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::game::entity::EntityStore;
     use crate::game::map::Map;
+    use crate::game::pathfinding::Passability;
+    use crate::game::services::geometry::building_rect_for_footprint;
     use crate::game::services::move_coordinator::MoveCoordinator;
+    use crate::game::services::occupancy::footprint_center;
     use crate::game::services::pathing::PathingService;
 
     /// Distance (px) between two entity centers.
@@ -1115,6 +1110,169 @@ mod tests {
     }
 
     #[test]
+    fn movement_rejects_tank_body_clipping_building_corner() {
+        let map = flat_map(1);
+        let mut entities = EntityStore::new();
+        let (bx, by) = footprint_center(&map, EntityKind::Depot, 10, 10);
+        entities
+            .spawn_building(1, EntityKind::Depot, bx, by, true)
+            .expect("building spawn");
+        let rect = building_rect_for_footprint(EntityKind::Depot, 10, 10).expect("depot rect");
+
+        let start = (rect.max_x + 14.4, rect.min_y - 14.4);
+        let goal = (rect.max_x, rect.min_y);
+        let tank = entities
+            .spawn_unit(1, EntityKind::Tank, start.0, start.1)
+            .expect("tank spawn");
+        let desired = (goal.1 - start.1).atan2(goal.0 - start.0);
+        if let Some(e) = entities.get_mut(tank) {
+            e.set_facing(desired);
+        }
+        set_path_direct(&mut entities, tank, vec![goal]);
+
+        let occ = Occupancy::build(&map, &entities);
+        assert!(standability::unit_static_standable(
+            &map,
+            &occ,
+            EntityKind::Tank,
+            start.0,
+            start.1
+        ));
+        let center_tile = map.tile_of(rect.max_x + 13.0, rect.min_y - 13.0);
+        assert!(
+            map.is_passable(center_tile.0 as i32, center_tile.1 as i32)
+                && occ.passable(center_tile.0 as i32, center_tile.1 as i32),
+            "candidate center tile should remain passable so the body check is the blocker"
+        );
+
+        let spatial = SpatialIndex::build(&entities, map.size);
+        movement_system(&map, &mut entities, &occ, &spatial, 0);
+
+        let e = entities.get(tank).expect("tank should exist");
+        assert!(
+            moved_distance(start, (e.pos_x, e.pos_y)) <= 0.01,
+            "tank body must not step into the building corner"
+        );
+    }
+
+    #[test]
+    fn wall_slide_uses_unit_body_clearance() {
+        let map = flat_map(1);
+        let mut entities = EntityStore::new();
+        let (bx, by) = footprint_center(&map, EntityKind::Depot, 10, 10);
+        entities
+            .spawn_building(1, EntityKind::Depot, bx, by, true)
+            .expect("building spawn");
+        let rect = building_rect_for_footprint(EntityKind::Depot, 10, 10).expect("depot rect");
+
+        let start = (rect.min_x - 21.0, rect.min_y - 2.0);
+        let goal = (start.0 + 64.0, start.1 + 6.0);
+        let tank = entities
+            .spawn_unit(1, EntityKind::Tank, start.0, start.1)
+            .expect("tank spawn");
+        let desired = (goal.1 - start.1).atan2(goal.0 - start.0);
+        if let Some(e) = entities.get_mut(tank) {
+            e.set_facing(desired);
+        }
+        set_path_direct(&mut entities, tank, vec![goal]);
+
+        let occ = Occupancy::build(&map, &entities);
+        let spatial = SpatialIndex::build(&entities, map.size);
+        movement_system(&map, &mut entities, &occ, &spatial, 0);
+
+        let e = entities.get(tank).expect("tank should exist");
+        assert!(
+            (e.pos_x - start.0).abs() <= 0.01,
+            "x-only slide would clip the building body and must be rejected"
+        );
+        assert!(
+            e.pos_y > start.1,
+            "body-legal y-only slide should still make progress"
+        );
+        assert!(standability::unit_static_standable(
+            &map, &occ, e.kind, e.pos_x, e.pos_y
+        ));
+    }
+
+    #[test]
+    fn collision_push_does_not_move_tank_body_into_building() {
+        let map = flat_map(1);
+        let mut entities = EntityStore::new();
+        let (bx, by) = footprint_center(&map, EntityKind::Depot, 10, 10);
+        entities
+            .spawn_building(1, EntityKind::Depot, bx, by, true)
+            .expect("building spawn");
+        let rect = building_rect_for_footprint(EntityKind::Depot, 10, 10).expect("depot rect");
+
+        let tank_start = (rect.max_x + 20.1, rect.min_y + 32.0);
+        let tank = entities
+            .spawn_unit(1, EntityKind::Tank, tank_start.0, tank_start.1)
+            .expect("tank spawn");
+        let rifleman = entities
+            .spawn_unit(2, EntityKind::Rifleman, tank_start.0 + 8.0, tank_start.1)
+            .expect("rifleman spawn");
+        mark_moving(&mut entities, rifleman, (tank_start.0 + 64.0, tank_start.1));
+
+        let occ = Occupancy::build(&map, &entities);
+        let spatial = SpatialIndex::build(&entities, map.size);
+        resolve_collisions(&mut entities, &spatial, &map, &occ);
+
+        let tank_after = pos(&entities, tank);
+        assert!(
+            (tank_after.0 - tank_start.0).abs() <= 0.01
+                && (tank_after.1 - tank_start.1).abs() <= 0.01,
+            "blocked collision push must not move tank into the building body"
+        );
+        assert!(standability::unit_static_standable(
+            &map,
+            &occ,
+            EntityKind::Tank,
+            tank_after.0,
+            tank_after.1
+        ));
+        assert!(
+            pos(&entities, rifleman).0 > tank_start.0 + 8.0,
+            "the legal side should absorb the collision push"
+        );
+    }
+
+    #[test]
+    fn tank_body_locomotion_rotates_without_illegal_step_when_blocked() {
+        let map = flat_map(1);
+        let mut entities = EntityStore::new();
+        let (bx, by) = footprint_center(&map, EntityKind::Depot, 10, 10);
+        entities
+            .spawn_building(1, EntityKind::Depot, bx, by, true)
+            .expect("building spawn");
+        let rect = building_rect_for_footprint(EntityKind::Depot, 10, 10).expect("depot rect");
+
+        let start = (rect.max_x + 20.1, rect.min_y + 32.0);
+        let goal = (rect.min_x, rect.min_y + 32.0);
+        let tank = entities
+            .spawn_unit(1, EntityKind::Tank, start.0, start.1)
+            .expect("tank spawn");
+        let initial_facing = std::f32::consts::PI - 0.5;
+        if let Some(e) = entities.get_mut(tank) {
+            e.set_facing(initial_facing);
+        }
+        set_path_direct(&mut entities, tank, vec![goal]);
+
+        let occ = Occupancy::build(&map, &entities);
+        let spatial = SpatialIndex::build(&entities, map.size);
+        movement_system(&map, &mut entities, &occ, &spatial, 0);
+
+        let e = entities.get(tank).expect("tank should exist");
+        assert!(
+            moved_distance(start, (e.pos_x, e.pos_y)) <= 0.01,
+            "blocked tank must not take an illegal body step"
+        );
+        assert!(
+            e.facing() > initial_facing,
+            "tank should still rotate its body toward the path while blocked"
+        );
+    }
+
+    #[test]
     fn tank_body_facing_turns_gradually_along_path() {
         let map = flat_map(1);
         let mut entities = EntityStore::new();
@@ -1435,17 +1593,16 @@ mod tests {
             .spawn_building(1, EntityKind::Depot, 352.0, 288.0, true)
             .expect("building spawn");
 
-        // Unit pressed against the building's west wall: x=319.5, tile (9,8), 0.5 px from
-        // the tile boundary with blocked tile (10,8).
+        // Unit pressed against the building's west wall at body clearance: the rifleman radius
+        // is 9 px, so x=310.5 leaves a narrow legal gap before the west wall at x=320.
         let unit = entities
-            .spawn_unit(1, EntityKind::Rifleman, 319.5, 272.0)
+            .spawn_unit(1, EntityKind::Rifleman, 310.5, 272.0)
             .expect("unit spawn");
 
         // Path along the building's north side to a goal well past it.  The arrival-radius
-        // logic pops (9,8) immediately (dist ≤ 16 px) and pass-by pops (9,7) (unit x is
-        // already past 304 in the direction of (10,7)).  The unit is left targeting (10,7)
-        // at (336,240) from (319.5,272): the first partial step lands in building tile (10,8)
-        // → blocked → frozen.  Goal (13,7) is ~117 px away, outside tolerant-arrival radius.
+        // logic pops (9,8) immediately (dist ≤ 16 px). The route then asks the unit to skim
+        // the northwest corner before heading east. Goal (13,7) is far enough away that
+        // tolerant arrival cannot hide a wall-slide regression.
         let (w0x, w0y) = map.tile_center(9, 8);
         let (w1x, w1y) = map.tile_center(9, 7);
         let (w2x, w2y) = map.tile_center(10, 7);

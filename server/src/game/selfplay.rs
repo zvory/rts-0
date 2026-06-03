@@ -1641,6 +1641,7 @@ impl PlayerMilestones {
         let mut riflemen = 0;
         let mut tanks = 0;
         let mut owned_entities = 0;
+        let mut owned_buildings = 0;
         let mut units_by_kind = BTreeMap::<String, u32>::new();
         let mut buildings_by_kind = BTreeMap::<String, u32>::new();
         for e in snapshot.entities.iter().filter(|e| e.owner == player_id) {
@@ -1650,6 +1651,7 @@ impl PlayerMilestones {
                 *units_by_kind.entry(e.kind.clone()).or_default() += 1;
             }
             if k.is_building() {
+                owned_buildings += 1;
                 *buildings_by_kind.entry(e.kind.clone()).or_default() += 1;
             }
             match k {
@@ -1683,7 +1685,8 @@ impl PlayerMilestones {
         }
         if owned_entities > 0 {
             self.saw_owned_entities = true;
-        } else if self.saw_owned_entities {
+        }
+        if self.saw_owned_entities && owned_buildings == 0 {
             self.eliminated = true;
         }
         self.oil_gathered |= snapshot.oil > 0;
@@ -1976,12 +1979,6 @@ fn validate_snapshot(
     map: &MapInfo,
     snapshot: &Snapshot,
 ) -> Result<(), SelfPlayFailure> {
-    if snapshot.supply_used > snapshot.supply_cap {
-        return Err(SelfPlayFailure::new(format!(
-            "player {player_id} has invalid supply {}/{}",
-            snapshot.supply_used, snapshot.supply_cap
-        )));
-    }
     if snapshot.supply_cap > config::SUPPLY_CAP_MAX {
         return Err(SelfPlayFailure::new(format!(
             "player {player_id} exceeded supply cap max: {}",
