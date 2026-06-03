@@ -68,19 +68,7 @@ Acceptance criteria:
 - Existing compact snapshot/event wire shapes remain unchanged unless `DESIGN.md` is updated in the
   same change.
 
-### 3. Add deterministic-iteration guardrails
-
-Add a targeted guardrail, such as a unit test or lint-like check, that fails if a public raw mutable
-entity iterator is introduced or if simulation code starts relying on unordered entity map
-visitation in outcome-affecting paths.
-
-Acceptance criteria:
-
-- Outcome-affecting mutation uses stable entity-id visitation.
-- Any intentionally order-independent raw map mutation is documented at the call site.
-- The guardrail is narrow enough not to block internal order-independent maintenance helpers.
-
-### 4. Tighten tick phase ownership
+### 3. Tighten tick phase ownership
 
 Introduce a small `TickContext` or phase-specific context type so each system receives only the
 world access and derived state valid for its phase.
@@ -92,7 +80,7 @@ Acceptance criteria:
 - The result remains a small orchestrator, not a full ECS rewrite.
 - Targeted tests cover any newly introduced context/phase boundary.
 
-### 5. Add targeted replay regression fixtures
+### 4. Add targeted replay regression fixtures
 
 Add replay fixtures only where they catch specific remaining risk.
 
