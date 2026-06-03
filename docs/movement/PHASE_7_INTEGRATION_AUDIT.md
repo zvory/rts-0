@@ -24,6 +24,8 @@ Out of scope:
 ## Files To Check
 
 - `DESIGN.md`
+- `docs/collision/PLAN.md`
+- Implemented `docs/collision/PHASE_*.md` files if collision phases have landed.
 - `docs/movement-options-research.md`
 - `docs/movement/PLAN.md`
 - Implemented phase docs if behavior intentionally diverged.
@@ -41,6 +43,7 @@ Out of scope:
 
 - `DESIGN.md` accurately describes:
   - weighted collision and ghost exceptions,
+  - body-aware standability if collision phases landed,
   - formation goal behavior,
   - `facing` as body facing,
   - `weaponFacing` if Phase 4 landed,
@@ -59,6 +62,11 @@ Out of scope:
   - no `unwrap()` or `expect()` on stale ids in movement/combat,
   - no unchecked indexing into paths or compact fields,
   - no unbounded per-tick loops or all-pairs work outside spatial-index broad phase.
+- Static body legality is not duplicated in movement:
+  - movement landing, steering candidates, and collision push targets use shared standability once
+    `docs/collision` Phase 3 lands,
+  - production spawn and construction placement remain governed by `docs/collision`, not by local
+    movement heuristics.
 - Determinism is preserved:
   - no unseeded randomness in simulation,
   - neighbor iteration is stable or sorted,
@@ -78,6 +86,7 @@ Make sure tests or manual self-play cover:
 - Far group moves preserve rough shape.
 - Close group moves compact.
 - Tanks turn smoothly through path corners.
+- Large unit bodies do not clip through building footprints if collision phases landed.
 - Tank turrets rotate independently if Phase 4 landed.
 - Tank front/side/rear damage differs if Phase 5 landed.
 - Fogged snapshots do not leak hidden aim information.
@@ -110,4 +119,5 @@ can be inspected.
   and documented.
 - No protocol mirror drift remains.
 - No movement/combat fog leak is known.
-- No follow-up movement TODO is required for correctness.
+- No movement-only follow-up TODO is required for implemented movement behavior. Body legality
+  correctness is tracked by `docs/collision`.

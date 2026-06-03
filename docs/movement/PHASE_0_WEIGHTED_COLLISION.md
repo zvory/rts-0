@@ -96,6 +96,10 @@ Out of scope:
    - If one weighted target is blocked, try assigning that side's remaining push to the other unit.
    - If neither side can move, leave the bounded residual overlap.
 
+   This phase preserves the existing static-passability check. After `docs/collision` Phase 3
+   lands, the target validation should become body-aware `unit_static_standable` instead of a
+   center-tile passability test.
+
 9. Keep pair iteration deterministic. Do not add unordered collection iteration to the movement
    tick path.
 

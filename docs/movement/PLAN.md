@@ -14,9 +14,11 @@ Before coding any phase:
 
 1. Read `DESIGN.md`.
 2. Read `docs/movement-options-research.md`.
-3. Read this file.
-4. Read the specific phase file.
-5. Verify the checkout, branch, and worktree per `CLAUDE.md`.
+3. Read `docs/collision/PLAN.md` if the phase touches unit positions, collision, steering,
+   production spawn exits, building placement, or static passability.
+4. Read this file.
+5. Read the specific phase file.
+6. Verify the checkout, branch, and worktree per `CLAUDE.md`.
 
 ## Phases
 
@@ -33,26 +35,32 @@ Before coding any phase:
 
 - `server/src/game/services/movement.rs`
   - `movement_system` consumes waypoint paths and moves units in world pixels.
-  - `resolve_collisions` performs iterative unit overlap resolution.
+  - Tank body locomotion rate-limits tank hull facing and scales movement by body-angle error.
+  - `resolve_collisions` performs resistance-weighted iterative unit overlap resolution.
   - `is_collision_anchored` currently means pass-through ghost behavior for harvesting and
     constructing workers.
 - `server/src/game/services/move_coordinator.rs`
-  - `order_group_move` assigns per-unit goals.
-  - `spread_goals` currently spreads unique tiles around one clicked anchor.
+  - `order_group_move` assigns distance-sensitive formation goals.
+  - `formation_goals` preserves or compacts rough group shape based on order distance.
+  - `find_spawn_point` handles production exits today; `docs/collision` replaces its local
+    clearance checks with shared standability.
   - `process_awaiting_paths` budgets fresh A* requests.
 - `server/src/game/entity.rs`
   - `MovementState` owns `facing`, path state, repath state, and stuck/sidestep counters.
   - `CombatState` owns cooldown, target id, and machine-gunner setup state.
 - `server/src/game/services/combat.rs`
-  - Combat currently sets `facing` instantly toward the current target.
+  - Combat keeps non-tanks facing targets instantly.
+  - Tanks rotate hull facing toward targets and use a temporary body-aim fire gate until Phase 4
+    adds independent `weaponFacing`.
   - Machine gunners already have packed, setting-up, deployed, and tearing-down setup state.
 - `server/src/protocol.rs` and `client/src/protocol.js`
   - Snapshot entity optional fields are mirrored and compact-encoded.
   - Protocol changes must update both files and `DESIGN.md` together.
 - `client/src/state.js`
-  - `entitiesInterpolated` currently interpolates only `x` and `y`.
+  - `entitiesInterpolated` interpolates `x`, `y`, and shortest-arc `facing`.
 - `client/src/renderer.js`
-  - Tanks currently render hull and barrel from the same `facing`.
+  - Tanks currently render hull and barrel from the same body `facing` until Phase 4 adds
+    `weaponFacing`.
 
 ## Non-Negotiable Invariants
 
@@ -71,12 +79,17 @@ Before coding any phase:
 8. If a phase changes mirrored balance/config values, update `server/src/config.rs`,
    `client/src/config.js`, and `DESIGN.md` together.
 9. Each phase must add or update tests for the behavior it changes.
+10. Movement may remain a soft dynamic-traffic model, but static body legality belongs to
+    `docs/collision`: systems that accept final unit positions must use the shared standability
+    predicates once that plan lands.
 
 ## Default Product Choices
 
 Use these defaults unless the user overrides them:
 
-- Harvesting and actively constructing workers stay `Ghost`: pass-through, not solid.
+- Harvesting and actively constructing workers stay `Ghost` for movement and unit-unit collision:
+  pass-through, not solid. This does not make them ignorable for production spawn or building
+  placement; those policies are defined in `docs/collision`.
 - Idle and moving infantry are `Soft`.
 - Firing riflemen and explicit hold-like idle combatants are `Firm` once a hold/deploy command
   exists. Before that command exists, firing riflemen are the main `Firm` infantry case.
@@ -86,8 +99,9 @@ Use these defaults unless the user overrides them:
   direction in Phase 1.
 - `facing` remains the tank body/hull facing. `weaponFacing` is added later for turret/barrel
   facing.
-- Local steering is short-range only. Do not build flow fields, ORCA/RVO, continuum crowds, or a
-  dynamic global cost field in this plan.
+- Local steering is short-range only. It proposes movement directions; `docs/collision`
+  standability remains the authority for static body legality. Do not build flow fields, ORCA/RVO,
+  continuum crowds, or a dynamic global cost field in this plan.
 
 ## Deferred Options
 
