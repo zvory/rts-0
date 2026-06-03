@@ -1018,7 +1018,11 @@ export class Renderer {
         const dx = target.x - mx;
         const dy = target.y - my;
         const shotLen = Math.hypot(dx, dy);
-        const tailLen = (stat.rangeTiles || 0) * ((this._map && this._map.tileSize) || 32) * 0.25;
+        // Mirror the server overpenetration band: a round that hits a tank stops dead (no tail),
+        // and AT teams punch twice as deep as everyone else.
+        const tileSize = (this._map && this._map.tileSize) || 32;
+        const penFactor = target.kind === KIND.TANK ? 0 : attacker.kind === KIND.AT_TEAM ? 0.5 : 0.25;
+        const tailLen = (stat.rangeTiles || 0) * tileSize * penFactor;
 
         g.lineStyle(1.5, 0xffe066, 0.9 * fade);
         g.moveTo(mx, my);

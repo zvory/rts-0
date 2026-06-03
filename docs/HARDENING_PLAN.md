@@ -1,24 +1,19 @@
 # Hardening Plan
 
-This plan captures the next set of correctness and maintainability upgrades for the RTS server and
-client. The goal is not to add new gameplay. The goal is to remove latent footguns and make the
-simulation easier to reason about over time.
+This plan tracks only the remaining correctness and maintainability upgrades for the RTS server and
+client. Completed hardening tasks should be removed from this file instead of kept as status notes.
 
-The four priorities are:
-
-1. Make determinism a first-class invariant.
-2. Separate wire protocol types from internal simulation types.
-3. Make tick phases and derived state boundaries explicit.
-4. Keep client gameplay config in parity with the server.
+The goal is not to add new gameplay. The goal is to remove latent footguns and make the simulation
+easier to reason about over time.
 
 ## Read First
 
-Before implementing any phase:
+Before implementing any item:
 
 1. Read `DESIGN.md`.
 2. Read `CLAUDE.md`.
 3. Read this file.
-4. Read the specific phase file for the work you are taking on.
+4. Inspect the actual code paths before proposing or making changes.
 
 ## Hardening Principles
 
@@ -34,89 +29,84 @@ Before implementing any phase:
 5. **Changes must preserve replayability.** Any change that affects simulation behavior should be
    tested both in live play and replay mode when applicable.
 
-## Current Risks
+## Remaining Work
 
-### 1. Mutable entity access must use stable id iteration
+### 1. Enforce client rules parity
 
-`EntityStore::iter()` and `ids()` sort ids, which gives stable read ordering and stable mutable
-visitation when systems iterate ids and then call `get_mut(id)`. `EntityStore::iter_mut()` has been
-removed so simulation systems cannot accidentally depend on raw `HashMap::values_mut()` order.
+The client manually mirrors gameplay-facing values from the server for UI, fog, command cards,
+costs, supply, sight, footprint sizes, requirements, and build/train times. Manual mirroring will
+drift.
 
-Recommended policy:
+Implement one of these, in preference order:
 
-- Do not add a raw mutable entity iterator without documenting why order cannot affect outcomes.
-- Any mutation whose result could depend on visitation order must iterate over sorted ids first.
-- Prefer shared `iter()` for read-only scans and `ids()` + `get_mut(id)` for mutation.
+- Generate a client rules module or JSON blob from the server rule definitions.
+- Or add a build-breaking parity test that serializes the server rules and compares them to
+  `client/src/config.js`.
 
-### 2. Protocol coupling inside simulation code
+Acceptance criteria:
 
-Status: command input has been extracted. `ClientMessage::Command` and replay command artifacts are
-translated into `game::command::SimCommand` before they enter `Game`; AI and self-play also emit
-`SimCommand` directly, and command services operate on `EntityKind` instead of protocol strings.
-`Snapshot`, `StartPayload`, and `Event` remain protocol-facing output DTOs at the `Game` seam.
+- The check runs from the normal test/CI path, not only as an optional script.
+- Every gameplay-facing client value is either generated from the server truth or verified against
+  it.
+- Changing a server rule without updating/regenerating the client rule surface fails locally and in
+  CI.
+- `DESIGN.md` documents the chosen parity mechanism.
 
-Recommended policy:
+### 2. Extract internal simulation events
 
-- Keep the translation layer at the boundary: `ClientMessage -> SimCommand`.
-- Use typed domain commands internally, for example:
-  - `SimCommand::Move`
-  - `SimCommand::AttackMove`
-  - `SimCommand::Attack`
-  - `SimCommand::Gather`
-  - `SimCommand::Build { kind: EntityKind, ... }`
-  - `SimCommand::Train { unit: EntityKind, ... }`
-  - `SimCommand::Cancel`
-  - `SimCommand::Stop`
-- Keep protocol parsing, string-to-kind mapping, and JSON shape concerns outside the command
-  application core.
+Protocol output DTOs still leak through simulation services. In particular, game services append
+`protocol::Event` directly.
 
-### 3. Tick pipeline is implicit
+Implement internal domain events for simulation systems, then translate them to protocol events at
+the `Game`/transport boundary.
 
-Status: `systems::run_tick` now rebuilds named phase state at explicit boundaries:
-`PreCommandDerivedState`, `PostMovementDerivedState`, `PreCollisionDerivedState`, and
-`FinalDerivedState`. The pipeline still remains a small orchestrator rather than a full ECS, but
-occupancy and spatial indexes are no longer anonymous local variables whose validity has to be
-inferred from nearby comments.
+Acceptance criteria:
 
-Prior risk: `run_tick` accepted many inputs and manually rebuilt occupancy/spatial indexes at
-different points in the frame. That was workable, but it made it easy to pass a stale derived
-structure into a later system.
+- Simulation services do not need to import `crate::protocol::Event`.
+- Event generation remains fog-safe: hidden enemy ids and positions must not leak through events.
+- Replay comparison still uses the same core simulation output as live play.
+- Existing compact snapshot/event wire shapes remain unchanged unless `DESIGN.md` is updated in the
+  same change.
 
-Recommended policy:
+### 3. Add deterministic-iteration guardrails
 
-- Introduce a `TickContext` or similar world-access pattern.
-- Make the tick pipeline explicit, for example:
-  - `PreCommandDerivedState`
-  - `CommandPhase`
-  - `MovementPhase`
-  - `PostMovementDerivedState`
-  - `Combat/Economy/Production/Construction`
-  - `FinalDerivedState`
-- The important invariant is not a full ECS. The important invariant is that every phase knows
-  which derived state is valid and which derived state must be rebuilt before continuing.
+Add a targeted guardrail, such as a unit test or lint-like check, that fails if a public raw mutable
+entity iterator is introduced or if simulation code starts relying on unordered entity map
+visitation in outcome-affecting paths.
 
-### 4. Client rules table can drift
+Acceptance criteria:
 
-The client currently mirrors gameplay-facing values from the server for UI, fog, command cards,
-costs, supply, sight, and build times. Manual mirroring will eventually diverge.
+- Outcome-affecting mutation uses stable entity-id visitation.
+- Any intentionally order-independent raw map mutation is documented at the call site.
+- The guardrail is narrow enough not to block internal order-independent maintenance helpers.
 
-Recommended policy:
+### 4. Tighten tick phase ownership
 
-- Best option: generate a client rules module or JSON blob from the server rule definitions.
-- Acceptable interim option: add a parity test that serializes the server rules and compares them
-  to the client table.
-- Treat parity failures as build-breaking, not advisory.
+Introduce a small `TickContext` or phase-specific context type so each system receives only the
+world access and derived state valid for its phase.
 
-## Phases
+Acceptance criteria:
 
-- [Phase 0 - Determinism Audit](PHASE_0_DETERMINISM_AUDIT.md)
-- [Phase 1 - Protocol Boundary Extraction](PHASE_1_PROTOCOL_BOUNDARY.md)
-- [Phase 2 - Tick Context and Derived-State Boundaries](PHASE_2_TICK_CONTEXT.md)
-- [Phase 3 - Client Rules Parity](PHASE_3_CLIENT_RULES_PARITY.md)
-- [Phase 4 - Replay and Determinism Regression Harness](PHASE_4_REPLAY_HARNESS.md)
+- Each system receives only the derived state valid for that phase.
+- Rebuild points stay visible in `systems::run_tick`.
+- The result remains a small orchestrator, not a full ECS rewrite.
+- Targeted tests cover any newly introduced context/phase boundary.
 
-Do not combine phases unless the user explicitly asks for a larger change. Each phase should
-leave the repo in a playable, debuggable state.
+### 5. Add targeted replay regression fixtures
+
+Add replay fixtures only where they catch specific remaining risk.
+
+Candidate additions:
+
+- A stable fixture replay for protocol/event boundary refactors.
+- A rules-parity regression fixture when generated client rules are introduced.
+- A focused replay covering fog-gated events after internal event DTOs are added.
+
+Acceptance criteria:
+
+- Replays feed typed commands into a fresh game through the same simulation API as live play.
+- Failures identify the first divergent tick/event/snapshot with actionable detail.
+- Added fixtures are small enough to run in the normal Rust test suite.
 
 ## Non-Negotiable Invariants
 
@@ -135,12 +125,12 @@ leave the repo in a playable, debuggable state.
 
 ## Suggested Acceptance Criteria
 
-Phase work should be considered complete only when it satisfies the following where relevant:
+Work should be considered complete only when it satisfies the following where relevant:
 
 - Deterministic replay output remains stable across repeated runs with the same seed and command
   stream.
 - Any new domain command or tick phase is covered by targeted tests.
-- The translation layer keeps wire shapes isolated from simulation logic.
+- Translation layers keep wire shapes isolated from simulation logic.
 - The client rules parity check passes in CI or an equivalent local test.
 - Documentation remains in sync with any contract changes.
 
