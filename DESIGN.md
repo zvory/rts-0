@@ -421,6 +421,9 @@ export class GameState {
   // build placement (client-only):
   placement                              // null | { building, valid, tileX, tileY }
   beginPlacement(buildingKind), updatePlacement(tileX,tileY,valid), endPlacement()
+  // resource hover preview (client-only):
+  resourceMiningPreview                  // null | {resourceId, resourceX, resourceY, icId, icX, icY, inRange}
+  updateResourceMiningPreview(preview)
 }
 ```
 
@@ -505,7 +508,7 @@ start the rAF loop (compute `alpha` from snapshot timing, `camera.update`, `inpu
 
 ### 4.2 Rendering & look (PixiJS, procedural art — neutral PS1 field-command style)
 - Layers (back→front): terrain → resource nodes → building shadows → buildings → unit
-  shadows → units → selection rings → health bars → fog overlay → placement ghost →
+  shadows → units → selection rings → health bars → fog overlay → command/hover feedback → placement ghost →
   selection drag-box → (HUD is DOM, not Pixi).
 - Units: low-detail hard-edged silhouettes tinted by player color, with a dark drop shadow,
   dark outline, small facing indicator, HP bar above when damaged/selected, and glowing
@@ -516,7 +519,9 @@ start the rAF loop (compute `alpha` from snapshot timing, `camera.update`, `inpu
   two-letter stencils; under construction → translucent with a progress bar; production →
   small progress arc.
 - Resource nodes: steel = tan supply crates; oil = olive fuel drums; show last-known remaining
-  from `resourceDeltas` via size/opacity.
+  from `resourceDeltas` via size/opacity. When a worker is selected and the cursor hovers a
+  resource, draw a line from that resource to the nearest completed own Industrial Center:
+  blue/thicker when inside mining range, red/dashed when too far.
 - Terrain: muted grass/field/mud, rock, and water tiles with deterministic coarse dithering
   so movement is readable and the map has a PlayStation 1-era low-resolution texture feel.
 - Fog: unexplored = 86% dark overlay so terrain remains faintly readable; explored-but-not-visible =
@@ -602,8 +607,12 @@ the human-readable form of the authoritative `rules::defs` records.
 - Supply: Industrial Center gives `+10`, Depot gives `+8`, hard cap `200`.
 - Attached mining: workers walk to a patch, latch onto it, and mine in place.
   Every `HARVEST_TICKS = 40` the load (`STEEL_LOAD = 2` / `OIL_LOAD = 2`) is deposited
-  directly into the player's economy. When a patch empties the worker goes idle
-  (no automatic retarget).
+  directly into the player's economy only if the resource node is within
+  `MINING_IC_RANGE_TILES = 7.0` tiles of a completed Industrial Center owned by that player.
+  The range matches `IC_RESOURCE_MAX_DIST_TILES`, so each starting Industrial Center can mine
+  every patch in its main-base cluster. If no completed IC is close enough, workers ignore new
+  gather orders for that patch and active miners go idle. When a patch empties the worker goes
+  idle (no automatic retarget).
 - One worker per patch: each node has a single harvest slot (`Entity::miner`). A patch is
   occupied only after the worker reaches `GatherPhase::Harvesting`; right-clicking a patch
   does not reserve it. Extra workers that arrive while the slot is taken go idle. The slot
@@ -630,7 +639,7 @@ Building stats (hp, sight, cost, footprint tiles wxh, buildTicks, extra):
 
 | kind                       | hp  | sight | cost | foot | buildTicks | notes |
 |----------------------------|-----|-------|-----|------|-----------|-------|
-| industrial_center          | 600 | 9     | 400 | 3x3  | 400       | trains worker; +10 supply; players start with one free |
+| industrial_center          | 600 | 9     | 200 | 3x3  | 400       | trains worker; +10 supply; players start with one free |
 | depot                      | 220 | 4     | 100 | 2x2  | 120       | +8 supply |
 | barracks                   | 320 | 6     | 150 | 3x2  | 200       | trains rifleman, machine_gunner, at_team; requires an Industrial Center |
 | training_centre   | 300 | 6     | 100 steel + 50 oil | 3x2  | 220       | unlocks machine_gunner and at_team training at barracks; requires an Industrial Center |

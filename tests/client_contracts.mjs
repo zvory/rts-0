@@ -9,7 +9,7 @@ import { Net } from "../client/src/net.js";
 import { GameState } from "../client/src/state.js";
 import { Camera } from "../client/src/camera.js";
 import { Fog } from "../client/src/fog.js";
-import { STATS } from "../client/src/config.js";
+import { MINING_IC_RANGE_TILES, STATS } from "../client/src/config.js";
 import {
   COMPACT_SNAPSHOT_VERSION,
   EVENT,
@@ -192,6 +192,8 @@ function assertHasGetter(obj, name, msgPrefix = "") {
 // Config
 // ---------------------------------------------------------------------------
 {
+  assert(MINING_IC_RANGE_TILES === 7, "client mirrors the server mining IC range");
+  assert(STATS[KIND.INDUSTRIAL_CENTER].cost.steel === 200, "Industrial Center cost mirrors server");
   assert(
     Array.isArray(STATS[KIND.TANK_FACTORY].requires),
     "Tank Factory should expose all server-side build prerequisites",
@@ -245,6 +247,8 @@ function assertHasGetter(obj, name, msgPrefix = "") {
   assert(state.currRecvTime === null, "currRecvTime null before snapshots");
   assert(state.resources !== undefined, "GameState.resources");
   assert(Array.isArray(state.events), "GameState.events");
+  assert(state.resourceMiningPreview === null, "GameState.resourceMiningPreview initially null");
+  assertHasMethod(state, "updateResourceMiningPreview", "GameState");
   assert(state.selection instanceof Set, "GameState.selection");
   assertHasMethod(state, "setSelection", "GameState");
   assertHasMethod(state, "addToSelection", "GameState");
@@ -286,6 +290,18 @@ function assertHasGetter(obj, name, msgPrefix = "") {
   assert(state.prevRecvTime !== null, "prevRecvTime set after two snapshots");
   assert(state.entityById(200).remaining === 0, "visible resource death tombstones known resource");
   assert(state.entityById(201).remaining === 5000, "untouched resources keep their last-known amount");
+  state.updateResourceMiningPreview({
+    resourceId: 200,
+    resourceX: 64,
+    resourceY: 96,
+    icId: 3,
+    icX: 48,
+    icY: 48,
+    inRange: true,
+  });
+  assert(state.resourceMiningPreview?.resourceId === 200, "resource mining preview stores hover link");
+  state.updateResourceMiningPreview(null);
+  assert(state.resourceMiningPreview === null, "resource mining preview can be cleared");
 
   // Interpolation clamps alpha to [0,1]
   const entsNeg = state.entitiesInterpolated(-0.5);
