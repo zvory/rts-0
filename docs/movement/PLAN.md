@@ -50,17 +50,17 @@ Before coding any phase:
   - `CombatState` owns cooldown, target id, and machine-gunner setup state.
 - `server/src/game/services/combat.rs`
   - Combat keeps non-tanks facing targets instantly.
-  - Tanks rotate hull facing toward targets and use a temporary body-aim fire gate until Phase 4
-    adds independent `weaponFacing`.
+  - Tanks rotate independent `weaponFacing` toward targets and gate firing on turret alignment.
+    Hull/body `facing` remains movement locomotion state.
   - Machine gunners already have packed, setting-up, deployed, and tearing-down setup state.
 - `server/src/protocol.rs` and `client/src/protocol.js`
   - Snapshot entity optional fields are mirrored and compact-encoded.
   - Protocol changes must update both files and `DESIGN.md` together.
 - `client/src/state.js`
-  - `entitiesInterpolated` interpolates `x`, `y`, and shortest-arc `facing`.
+  - `entitiesInterpolated` interpolates `x`, `y`, and shortest-arc `facing` / `weaponFacing`.
 - `client/src/renderer.js`
-  - Tanks currently render hull and barrel from the same body `facing` until Phase 4 adds
-    `weaponFacing`.
+  - Tanks render hulls from body `facing` and barrels/muzzle flashes from
+    `weaponFacing ?? facing`.
 
 ## Non-Negotiable Invariants
 
@@ -98,8 +98,7 @@ Use these defaults unless the user overrides them:
 - Long-order formation offsets stay in world orientation. Do not rotate offsets toward movement
   direction in Phase 1. Formation goal tiles are still filtered through body-aware static
   standability for the specific unit kind.
-- `facing` remains the tank body/hull facing. `weaponFacing` is added later for turret/barrel
-  facing.
+- `facing` remains the tank body/hull facing. `weaponFacing` is turret/barrel facing.
 - Local steering is short-range only. It proposes movement directions; `docs/collision`
   standability remains the authority for static body legality. Do not build flow fields, ORCA/RVO,
   continuum crowds, or a dynamic global cost field in this plan.

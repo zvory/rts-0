@@ -160,7 +160,7 @@ Older object-shaped JSON snapshots remain decodable by the client for fallback/d
   "e": [
     [
       id, owner, kind, x, y, hp, maxHp, state,
-      facing?, prodKind?, prodProgress?, prodQueue?,
+      facing?, weaponFacing?, prodKind?, prodProgress?, prodQueue?,
       buildProgress?, latchedNode?, targetId?, setupState?, remaining?
     ]
   ],
@@ -196,7 +196,8 @@ watch rooms receive all resource updates).
   x: f32, y: f32,                // world px (center)
   hp: u32, maxHp: u32,
   state: string,                 // "idle","move","attack","gather","build","train","construct","dead"
-  facing?: f32,                  // radians, for unit orientation (optional)
+  facing?: f32,                  // radians, for unit body/hull orientation (optional)
+  weaponFacing?: f32,            // radians, for independent weapon/barrel orientation (optional)
   // production buildings:
   prodKind?: string,             // unit currently being produced
   prodProgress?: f32,            // 0..1
@@ -615,9 +616,9 @@ Intended progression:
 ### 5.2 Current implementation constants
 
 The current implementation uses the themed unit/building names below. Combat is still handled
-by the simple shared attack model plus the machine-gunner setup/teardown state; armor facings
-and forest-specific rules are future work. The unit, building, and resource-node tables below are
-the human-readable form of the authoritative `rules::defs` records.
+by the simple shared attack model plus the machine-gunner setup/teardown state and tank turret
+aim gates; armor facings and forest-specific rules are future work. The unit, building, and
+resource-node tables below are the human-readable form of the authoritative `rules::defs` records.
 
 - `TICK_HZ = 30`, `SNAPSHOT_EVERY_N_TICKS = 1`.
 - `MACHINE_GUNNER_SETUP_TICKS = 30` (~1s setup or teardown).
@@ -718,10 +719,12 @@ The server treats every client as potentially hostile. Limits live next to the c
 - **Shot overpenetration**: ranged attacks continue 25% of their weapon range past the primary
   target and deal 50% reduced damage to additional enemies behind it, which discourages
   clumping and rewards tighter army control.
-- **Tank body facing**: the snapshot `facing` field is the tank hull/body angle. Tanks rotate that
-  body angle at a bounded rate on movement paths and while aiming at combat targets; badly
-  misaligned tanks pivot in place instead of sliding sideways at full speed. Until independent
-  turret state exists, tank shots require the hull to be nearly aligned with the target.
+- **Tank body and weapon facing**: the snapshot `facing` field is the tank hull/body angle. Tanks
+  rotate that body angle at a bounded rate on movement paths; badly misaligned tanks pivot in
+  place instead of sliding sideways at full speed. The snapshot `weaponFacing` field is the
+  independent turret/barrel angle. Tank combat rotates the turret toward the target at a bounded
+  rate and fires only once the turret is within tolerance; the hull does not need to face the
+  target. Projection omits enemy `weaponFacing` when it would reveal a hidden target direction.
 - **Worker direct-hit retreat**: a worker that takes primary-target damage from an attacker gets a
   short move-away order through normal pathing. Overpenetration splash does not trigger this
   reaction, and workers actively constructing a scaffold stay latched so unfinished buildings are

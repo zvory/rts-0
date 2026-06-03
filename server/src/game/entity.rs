@@ -443,6 +443,10 @@ pub struct CombatState {
     /// Setup state for weapons that must deploy before firing. Non-MG combatants leave this
     /// packed and ignore it.
     pub setup: WeaponSetup,
+    /// Current weapon/barrel facing in radians. For tanks this is independent turret state.
+    pub weapon_facing: f32,
+    /// Target weapon/barrel facing in radians. Useful for projection/debugging and future arcs.
+    pub desired_weapon_facing: f32,
 }
 
 impl Default for CombatState {
@@ -451,6 +455,8 @@ impl Default for CombatState {
             attack_cd: 0,
             target_id: None,
             setup: WeaponSetup::Packed,
+            weapon_facing: 0.0,
+            desired_weapon_facing: 0.0,
         }
     }
 }
@@ -844,6 +850,22 @@ impl Entity {
     pub fn set_target_id(&mut self, target_id: Option<u32>) {
         if let Some(c) = self.combat.as_mut() {
             c.target_id = target_id;
+        }
+    }
+
+    pub fn weapon_facing(&self) -> Option<f32> {
+        self.combat.as_ref().map(|c| c.weapon_facing)
+    }
+
+    pub fn set_weapon_facing(&mut self, facing: f32) {
+        if let Some(c) = self.combat.as_mut() {
+            c.weapon_facing = facing;
+        }
+    }
+
+    pub fn set_desired_weapon_facing(&mut self, facing: f32) {
+        if let Some(c) = self.combat.as_mut() {
+            c.desired_weapon_facing = facing;
         }
     }
 
