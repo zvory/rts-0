@@ -37,20 +37,25 @@ const EXPANSION_DEFENSIVE_LINE_REISSUE_EPS_TILES: f32 = 0.75;
 const DEFENSIVE_PANIC_GRACE_TICKS: u32 = 90;
 const DEFENSIVE_PANIC_SUSTAINED_TICKS: u32 = 180;
 const DEFENSIVE_PANIC_SUSTAINED_BARRACKS: usize = 2;
-const DEFENSIVE_PANIC_TECH_PATH: [EntityKind; 1] = [EntityKind::Barracks];
-const DEFENSIVE_PANIC_UNITS: [EntityKind; 1] = [EntityKind::Rifleman];
+const DEFENSIVE_PANIC_DPS_DOMINANCE: f32 = 0.75;
+const DEFENSIVE_PANIC_OIL_WORKERS: usize = 2;
+const DEFENSIVE_PANIC_RIFLE_TECH_PATH: [EntityKind; 1] = [EntityKind::Barracks];
+const DEFENSIVE_PANIC_SUPPORT_TECH_PATH: [EntityKind; 2] =
+    [EntityKind::Barracks, EntityKind::TrainingCentre];
+const DEFENSIVE_PANIC_RIFLE_UNITS: [EntityKind; 1] = [EntityKind::Rifleman];
+const DEFENSIVE_PANIC_MG_UNITS: [EntityKind; 2] = [EntityKind::MachineGunner, EntityKind::Rifleman];
+const DEFENSIVE_PANIC_AT_UNITS: [EntityKind; 2] = [EntityKind::AtTeam, EntityKind::Rifleman];
+const DEFENSIVE_PANIC_SUPPORT_MIX_UNITS: [EntityKind; 3] = [
+    EntityKind::AtTeam,
+    EntityKind::MachineGunner,
+    EntityKind::Rifleman,
+];
 const ALL_COMBAT_UNITS: [EntityKind; 4] = [
     EntityKind::Rifleman,
     EntityKind::MachineGunner,
     EntityKind::AtTeam,
     EntityKind::Tank,
 ];
-const DEFENSIVE_PANIC_PRODUCTION: ProductionPolicy = ProductionPolicy {
-    queue_depth: 3,
-    unit_priorities: &DEFENSIVE_PANIC_UNITS,
-    save_for_first_tech_unit: None,
-    balance_unit_priorities: false,
-};
 
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct AiDecision {
@@ -91,6 +96,7 @@ pub(crate) struct AiDecisionMemory {
     proxy_worker_id: Option<u32>,
     defensive_panic_started_tick: Option<u32>,
     defensive_panic_last_tick: Option<u32>,
+    defensive_panic_response: DefensivePanicResponse,
 }
 
 impl AiDecisionMemory {
@@ -103,6 +109,7 @@ impl AiDecisionMemory {
             proxy_worker_id: None,
             defensive_panic_started_tick: None,
             defensive_panic_last_tick: None,
+            defensive_panic_response: DefensivePanicResponse::Riflemen,
         }
     }
 
@@ -151,6 +158,7 @@ impl AiDecisionMemory {
         self.proxy_worker_id = None;
         self.defensive_panic_started_tick = None;
         self.defensive_panic_last_tick = None;
+        self.defensive_panic_response = DefensivePanicResponse::Riflemen;
     }
 
     fn ensure_attack_policy(&mut self, profile: &AiProfile, attack: AttackPolicy) {
@@ -163,8 +171,12 @@ impl AiDecisionMemory {
         self.last_attack_tick = None;
     }
 
-    fn defensive_panic(&mut self, threat_active: bool, tick: u32) -> DefensivePanic {
-        if threat_active {
+    fn defensive_panic(
+        &mut self,
+        threat_response: Option<DefensivePanicResponse>,
+        tick: u32,
+    ) -> DefensivePanic {
+        if let Some(response) = threat_response {
             let should_restart = self
                 .defensive_panic_last_tick
                 .map(|last| tick.saturating_sub(last) > DEFENSIVE_PANIC_GRACE_TICKS)
@@ -173,6 +185,7 @@ impl AiDecisionMemory {
                 self.defensive_panic_started_tick = Some(tick);
             }
             self.defensive_panic_last_tick = Some(tick);
+            self.defensive_panic_response = response;
         }
 
         let active = self
@@ -181,20 +194,35 @@ impl AiDecisionMemory {
             .unwrap_or(false);
         if !active {
             self.defensive_panic_started_tick = None;
+            self.defensive_panic_response = DefensivePanicResponse::Riflemen;
         }
         let sustained = active
             && self
                 .defensive_panic_started_tick
                 .map(|started| tick.saturating_sub(started) >= DEFENSIVE_PANIC_SUSTAINED_TICKS)
                 .unwrap_or(false);
-        DefensivePanic { active, sustained }
+        DefensivePanic {
+            active,
+            sustained,
+            response: self.defensive_panic_response,
+        }
     }
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+enum DefensivePanicResponse {
+    #[default]
+    Riflemen,
+    MachineGunners,
+    AtTeams,
+    SupportMix,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 struct DefensivePanic {
     active: bool,
     sustained: bool,
+    response: DefensivePanicResponse,
 }
 
 pub(crate) fn decide_profile<F>(
@@ -220,15 +248,24 @@ where
     let mut actions = AiActionContext::new(&facts, budget);
     let mut intents = Vec::new();
 
-    let local_threat = local_defense_target(observation).is_some();
-    let defensive_panic = memory.defensive_panic(local_threat, observation.tick);
+    let local_threat_response = local_defense_target(observation)
+        .is_some()
+        .then(|| defensive_panic_response(observation));
+    let defensive_panic = memory.defensive_panic(local_threat_response, observation.tick);
+    let panic_plan = defensive_panic
+        .active
+        .then(|| defensive_panic_plan(defensive_panic.response));
     let required_tech_path = if defensive_panic.active {
-        &DEFENSIVE_PANIC_TECH_PATH
+        panic_plan
+            .map(|plan| plan.required_tech_path)
+            .unwrap_or(&DEFENSIVE_PANIC_RIFLE_TECH_PATH)
     } else {
         active_required_tech_path(observation, profile)
     };
     let production_policy = if defensive_panic.active {
-        DEFENSIVE_PANIC_PRODUCTION
+        panic_plan
+            .map(|plan| plan.production)
+            .unwrap_or_else(|| defensive_panic_plan(DefensivePanicResponse::Riflemen).production)
     } else {
         active_production_policy(observation, profile)
     };
@@ -364,8 +401,8 @@ where
         });
     }
 
-    let desired_oil_workers = if defensive_panic.active {
-        0
+    let desired_oil_workers = if let Some(plan) = panic_plan {
+        plan.oil_workers
     } else {
         desired_oil_workers(observation, &facts, profile, target_steel_workers)
     };
@@ -427,6 +464,19 @@ where
     let max_worker_resource_distance_px =
         max_worker_resource_assignment_distance_px(observation, &facts, profile);
     let current_oil_workers = resource_counts.get(&EntityKind::Oil).copied().unwrap_or(0);
+    let panic_support_oil = panic_plan.map(|plan| plan.oil_workers > 0).unwrap_or(false);
+    let mut panic_oil_candidates = Vec::new();
+    if panic_support_oil {
+        panic_oil_candidates.extend(facts.idle_workers.iter().copied());
+        panic_oil_candidates.extend(facts.gathering_workers.iter().copied());
+        panic_oil_candidates.sort_unstable();
+        panic_oil_candidates.dedup();
+    }
+    let oil_candidate_workers = if panic_support_oil {
+        panic_oil_candidates.as_slice()
+    } else {
+        facts.idle_workers.as_slice()
+    };
     if desired_oil_workers > current_oil_workers {
         let assigned = actions::assign_workers_to_resource(
             &mut actions,
@@ -434,10 +484,11 @@ where
                 workers: &observation.owned,
                 resources: &observation.resources,
                 resource_kind: EntityKind::Oil,
-                candidate_worker_ids: Some(&facts.idle_workers),
+                candidate_worker_ids: Some(oil_candidate_workers),
                 skip_workers: &skipped_workers,
                 pre_reserved_nodes: &occupied_nodes,
-                idle_only: true,
+                idle_only: !panic_support_oil,
+                allow_latched_reassignment: panic_support_oil,
                 max_assignments: Some(desired_oil_workers - current_oil_workers),
                 max_worker_resource_distance_px,
             },
@@ -465,6 +516,7 @@ where
                 skip_workers: &skipped_workers,
                 pre_reserved_nodes: &occupied_nodes,
                 idle_only: true,
+                allow_latched_reassignment: false,
                 max_assignments: Some(target_steel_workers - current_steel_workers),
                 max_worker_resource_distance_px,
             },
@@ -643,6 +695,127 @@ fn defensive_panic_barracks_target(panic: DefensivePanic) -> usize {
     } else {
         1
     }
+}
+
+#[derive(Clone, Copy, Debug)]
+struct DefensivePanicPlan {
+    required_tech_path: &'static [EntityKind],
+    production: ProductionPolicy,
+    oil_workers: usize,
+}
+
+fn defensive_panic_plan(response: DefensivePanicResponse) -> DefensivePanicPlan {
+    match response {
+        DefensivePanicResponse::Riflemen => DefensivePanicPlan {
+            required_tech_path: &DEFENSIVE_PANIC_RIFLE_TECH_PATH,
+            production: ProductionPolicy {
+                queue_depth: 3,
+                unit_priorities: &DEFENSIVE_PANIC_RIFLE_UNITS,
+                save_for_first_tech_unit: None,
+                balance_unit_priorities: false,
+            },
+            oil_workers: 0,
+        },
+        DefensivePanicResponse::MachineGunners => DefensivePanicPlan {
+            required_tech_path: &DEFENSIVE_PANIC_SUPPORT_TECH_PATH,
+            production: ProductionPolicy {
+                queue_depth: 3,
+                unit_priorities: &DEFENSIVE_PANIC_MG_UNITS,
+                save_for_first_tech_unit: None,
+                balance_unit_priorities: false,
+            },
+            oil_workers: DEFENSIVE_PANIC_OIL_WORKERS,
+        },
+        DefensivePanicResponse::AtTeams => DefensivePanicPlan {
+            required_tech_path: &DEFENSIVE_PANIC_SUPPORT_TECH_PATH,
+            production: ProductionPolicy {
+                queue_depth: 3,
+                unit_priorities: &DEFENSIVE_PANIC_AT_UNITS,
+                save_for_first_tech_unit: None,
+                balance_unit_priorities: false,
+            },
+            oil_workers: DEFENSIVE_PANIC_OIL_WORKERS,
+        },
+        DefensivePanicResponse::SupportMix => DefensivePanicPlan {
+            required_tech_path: &DEFENSIVE_PANIC_SUPPORT_TECH_PATH,
+            production: ProductionPolicy {
+                queue_depth: 3,
+                unit_priorities: &DEFENSIVE_PANIC_SUPPORT_MIX_UNITS,
+                save_for_first_tech_unit: None,
+                balance_unit_priorities: true,
+            },
+            oil_workers: DEFENSIVE_PANIC_OIL_WORKERS,
+        },
+    }
+}
+
+fn defensive_panic_response(observation: &AiObservation) -> DefensivePanicResponse {
+    let geometry = LocalDefenseGeometry::from_observation(observation);
+    let mut local_scores = DefensiveThreatScores::default();
+    let mut visible_scores = DefensiveThreatScores::default();
+
+    for enemy in &observation.visible_enemies {
+        let score = defensive_threat_dps(enemy);
+        if score <= 0.0 {
+            continue;
+        }
+        visible_scores.add(enemy.kind, score);
+        if geometry.contains(enemy) {
+            local_scores.add(enemy.kind, score);
+        }
+    }
+
+    if local_scores.non_empty() {
+        local_scores
+    } else {
+        visible_scores
+    }
+    .response()
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+struct DefensiveThreatScores {
+    armored_dps: f32,
+    infantry_dps: f32,
+}
+
+impl DefensiveThreatScores {
+    fn add(&mut self, kind: EntityKind, dps: f32) {
+        if kind == EntityKind::Tank {
+            self.armored_dps += dps;
+        } else if kind.is_unit() {
+            self.infantry_dps += dps;
+        }
+    }
+
+    fn non_empty(self) -> bool {
+        self.armored_dps + self.infantry_dps > f32::EPSILON
+    }
+
+    fn response(self) -> DefensivePanicResponse {
+        let total = self.armored_dps + self.infantry_dps;
+        if total <= f32::EPSILON {
+            return DefensivePanicResponse::Riflemen;
+        }
+        if self.armored_dps / total >= DEFENSIVE_PANIC_DPS_DOMINANCE {
+            DefensivePanicResponse::AtTeams
+        } else if self.infantry_dps / total >= DEFENSIVE_PANIC_DPS_DOMINANCE {
+            DefensivePanicResponse::MachineGunners
+        } else {
+            DefensivePanicResponse::SupportMix
+        }
+    }
+}
+
+fn defensive_threat_dps(enemy: &AiEntitySummary) -> f32 {
+    if !enemy.kind.is_unit() {
+        return 0.0;
+    }
+    let profile = rules::combat::attack_profile(enemy.kind);
+    if profile.dmg == 0 || profile.cooldown == 0 {
+        return 0.0;
+    }
+    profile.dmg as f32 / profile.cooldown as f32
 }
 
 fn expansion_blocks_tech_path(facts: &AiFacts, profile: &AiProfile) -> bool {
@@ -3476,7 +3649,7 @@ mod tests {
     }
 
     #[test]
-    fn home_threat_makes_tech_to_tanks_train_riflemen_before_tanks() {
+    fn infantry_heavy_home_threat_prefers_machine_gunners_before_tanks() {
         let ts = config::TILE_SIZE as f32;
         let mut observation = observation(
             AiEconomy {
@@ -3507,7 +3680,7 @@ mod tests {
         );
 
         assert!(decision.intents.contains(&AiIntent::Train {
-            kind: EntityKind::Rifleman
+            kind: EntityKind::MachineGunner
         }));
         assert!(!decision.intents.contains(&AiIntent::Train {
             kind: EntityKind::Tank
@@ -3518,7 +3691,49 @@ mod tests {
     }
 
     #[test]
-    fn sustained_home_threat_adds_barracks_instead_of_teching() {
+    fn armor_heavy_home_threat_prefers_at_teams_before_tanks() {
+        let ts = config::TILE_SIZE as f32;
+        let mut observation = observation(
+            AiEconomy {
+                steel: 200,
+                oil: 150,
+                supply_used: 4,
+                supply_cap: 20,
+            },
+            vec![
+                building(10, EntityKind::IndustrialCenter, Some(0)),
+                building(11, EntityKind::Barracks, Some(0)),
+                building(12, EntityKind::TrainingCentre, None),
+                building(13, EntityKind::TankFactory, Some(0)),
+                worker(20, AiEntityState::Gather),
+                worker(21, AiEntityState::Gather),
+                worker(22, AiEntityState::Gather),
+                worker(23, AiEntityState::Gather),
+            ],
+        );
+        observation
+            .visible_enemies
+            .push(enemy(90, EntityKind::Tank, 10.5 * ts, 10.5 * ts));
+
+        let decision = decide(
+            &observation,
+            &TECH_TO_TANKS,
+            &mut AiDecisionMemory::for_profile(&TECH_TO_TANKS),
+        );
+
+        assert!(decision.intents.contains(&AiIntent::Train {
+            kind: EntityKind::AtTeam
+        }));
+        assert!(!decision.intents.contains(&AiIntent::Train {
+            kind: EntityKind::Tank
+        }));
+        assert!(!decision.intents.contains(&AiIntent::Train {
+            kind: EntityKind::Worker
+        }));
+    }
+
+    #[test]
+    fn sustained_support_panic_adds_barracks_and_defensive_tech_only() {
         let ts = config::TILE_SIZE as f32;
         let mut observation = observation(
             AiEconomy {
@@ -3546,6 +3761,9 @@ mod tests {
             }),
             "fresh panic should use the existing barracks before adding another one"
         );
+        assert!(first_decision.intents.contains(&AiIntent::Build {
+            kind: EntityKind::TrainingCentre
+        }));
 
         let started_tick = observation.tick;
         observation.tick = started_tick.saturating_add(DEFENSIVE_PANIC_GRACE_TICKS);
@@ -3556,11 +3774,14 @@ mod tests {
         assert!(sustained_decision.intents.contains(&AiIntent::Build {
             kind: EntityKind::Barracks
         }));
+        assert!(sustained_decision.intents.contains(&AiIntent::Build {
+            kind: EntityKind::TrainingCentre
+        }));
         assert!(
             !sustained_decision.intents.iter().any(|intent| matches!(
                 intent,
                 AiIntent::Build {
-                    kind: EntityKind::TrainingCentre | EntityKind::TankFactory
+                    kind: EntityKind::TankFactory
                 }
             )),
             "panic mode should block non-defensive tech spending"

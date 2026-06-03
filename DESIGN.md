@@ -681,6 +681,10 @@ The server treats every client as potentially hostile. Limits live next to the c
 - **Shot overpenetration**: ranged attacks continue 25% of their weapon range past the primary
   target and deal 50% reduced damage to additional enemies behind it, which discourages
   clumping and rewards tighter army control.
+- **Worker direct-hit retreat**: a worker that takes primary-target damage from an attacker gets a
+  short move-away order through normal pathing. Overpenetration splash does not trigger this
+  reaction, and workers actively constructing a scaffold stay latched so unfinished buildings are
+  not stranded.
 - **Tolerant arrival**: a unit on a `Move` or `AttackMove` order in `MovePhase::Moving` that has not
   moved more than `STUCK_EPS_PX` per tick for `STUCK_ARRIVAL_TICKS` consecutive ticks (~0.5 s at
   30 Hz) and is within `TOLERANT_ARRIVAL_RADIUS_PX` (2 tiles) of its `path_goal` is immediately
@@ -755,10 +759,14 @@ for the tank-factory step, delays oil workers until at least eight workers are a
 uses ready combat units to clear visible threats in its home resource line before attacking out,
 and treats a single completed tank as a valid minimum attack wave.
 All profiles share a defensive panic mode. A visible enemy near the AI's base, home resource line,
-or workers temporarily suspends expansion, oil assignment, worker training, and non-defensive tech
-spending. While panicking, production switches to Riflemen from existing Barracks; if the pressure
-persists through the panic window, the AI asks for an additional Barracks before resuming its normal
-profile once the threat has cleared.
+or workers temporarily suspends expansion, worker training, and non-defensive tech spending. While
+panicking, the AI classifies the visible local threat by weapon DPS: tank-dominated pressure (75%+
+of visible local DPS) prioritizes AT teams, infantry-dominated pressure prioritizes Machine
+Gunners, mixed pressure asks for a support mix, and no-DPS pressure falls back to Riflemen. Support
+panic may build a Training Centre and pull workers onto oil; if support tech or oil is not ready,
+Barracks production falls back through Riflemen. If the pressure persists through the panic window,
+the AI asks for an additional Barracks before resuming its normal profile once the threat has
+cleared.
 `steel_expansion_tanks` is a defensive economic support profile: it saves for a second Industrial
 Center near a neutral steel expansion before building any non-Depot tech structure. Once that
 expansion IC is planned, it builds Barracks and Training Centre tech, staffs oil, produces Machine
