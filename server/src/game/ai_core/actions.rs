@@ -348,6 +348,7 @@ pub(crate) struct ResourceAssignmentPolicy<'a> {
     pub(crate) skip_workers: &'a BTreeSet<u32>,
     pub(crate) pre_reserved_nodes: &'a BTreeSet<u32>,
     pub(crate) idle_only: bool,
+    pub(crate) allow_latched_reassignment: bool,
     pub(crate) max_assignments: Option<usize>,
     pub(crate) max_worker_resource_distance_px: Option<f32>,
 }
@@ -394,7 +395,7 @@ pub(crate) fn assign_workers_to_resource(
         if policy.idle_only && worker.state != AiEntityState::Idle {
             continue;
         }
-        if worker.latched_node.is_some() {
+        if worker.latched_node.is_some() && !policy.allow_latched_reassignment {
             continue;
         }
 
@@ -912,6 +913,7 @@ mod tests {
                 skip_workers: &empty,
                 pre_reserved_nodes: &empty,
                 idle_only: true,
+                allow_latched_reassignment: false,
                 max_assignments: None,
                 max_worker_resource_distance_px: None,
             },
@@ -920,6 +922,52 @@ mod tests {
         assert_eq!(assigned.len(), 2);
         assert_eq!(assigned[0].node, 30);
         assert_eq!(assigned[1].node, 31);
+    }
+
+    #[test]
+    fn resource_assignment_can_reassign_latched_workers_when_allowed() {
+        let mut latched = worker(10, 0.0, 0.0, AiEntityState::Gather);
+        latched.latched_node = Some(30);
+        let observation = observation(
+            AiEconomy {
+                steel: 0,
+                oil: 0,
+                supply_used: 0,
+                supply_cap: 10,
+            },
+            vec![latched],
+            vec![
+                resource(30, EntityKind::Steel, 64.0, 0.0),
+                resource(31, EntityKind::Oil, 96.0, 0.0),
+            ],
+        );
+        let facts = facts_from_observation(&observation);
+        let mut ctx = context_from_facts(&facts, &observation);
+        let empty = BTreeSet::new();
+
+        let assigned = assign_workers_to_resource(
+            &mut ctx,
+            ResourceAssignmentPolicy {
+                workers: &observation.owned,
+                resources: &observation.resources,
+                resource_kind: EntityKind::Oil,
+                candidate_worker_ids: Some(&[10]),
+                skip_workers: &empty,
+                pre_reserved_nodes: &empty,
+                idle_only: false,
+                allow_latched_reassignment: true,
+                max_assignments: None,
+                max_worker_resource_distance_px: None,
+            },
+        );
+
+        assert_eq!(
+            assigned,
+            vec![ResourceAssignment {
+                worker: 10,
+                node: 31
+            }]
+        );
     }
 
     #[test]
@@ -953,6 +1001,7 @@ mod tests {
                 skip_workers: &empty,
                 pre_reserved_nodes: &reserved,
                 idle_only: true,
+                allow_latched_reassignment: false,
                 max_assignments: None,
                 max_worker_resource_distance_px: Some(128.0),
             },

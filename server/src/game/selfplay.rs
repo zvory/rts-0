@@ -2097,6 +2097,7 @@ fn assign_steel_workers(
             skip_workers: &skipped_workers,
             pre_reserved_nodes: &latched_nodes,
             idle_only: initial_gather_sent,
+            allow_latched_reassignment: false,
             max_assignments: None,
             max_worker_resource_distance_px: None,
         },
