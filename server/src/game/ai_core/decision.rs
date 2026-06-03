@@ -40,8 +40,6 @@ const DEFENSIVE_PANIC_SUSTAINED_BARRACKS: usize = 2;
 const DEFENSIVE_PANIC_DPS_DOMINANCE: f32 = 0.75;
 const DEFENSIVE_PANIC_OIL_WORKERS: usize = 2;
 const DEFENSIVE_PANIC_RIFLE_TECH_PATH: [EntityKind; 1] = [EntityKind::Barracks];
-const DEFENSIVE_PANIC_SUPPORT_TECH_PATH: [EntityKind; 2] =
-    [EntityKind::Barracks, EntityKind::TrainingCentre];
 const DEFENSIVE_PANIC_RIFLE_UNITS: [EntityKind; 1] = [EntityKind::Rifleman];
 const DEFENSIVE_PANIC_MG_UNITS: [EntityKind; 2] = [EntityKind::MachineGunner, EntityKind::Rifleman];
 const DEFENSIVE_PANIC_AT_UNITS: [EntityKind; 2] = [EntityKind::AtTeam, EntityKind::Rifleman];
@@ -254,7 +252,7 @@ where
     let defensive_panic = memory.defensive_panic(local_threat_response, observation.tick);
     let panic_plan = defensive_panic
         .active
-        .then(|| defensive_panic_plan(defensive_panic.response));
+        .then(|| defensive_panic_plan(defensive_panic.response, &facts));
     let required_tech_path = if defensive_panic.active {
         panic_plan
             .map(|plan| plan.required_tech_path)
@@ -263,9 +261,9 @@ where
         active_required_tech_path(observation, profile)
     };
     let production_policy = if defensive_panic.active {
-        panic_plan
-            .map(|plan| plan.production)
-            .unwrap_or_else(|| defensive_panic_plan(DefensivePanicResponse::Riflemen).production)
+        panic_plan.map(|plan| plan.production).unwrap_or_else(|| {
+            defensive_panic_plan(DefensivePanicResponse::Riflemen, &facts).production
+        })
     } else {
         active_production_policy(observation, profile)
     };
@@ -704,20 +702,12 @@ struct DefensivePanicPlan {
     oil_workers: usize,
 }
 
-fn defensive_panic_plan(response: DefensivePanicResponse) -> DefensivePanicPlan {
+fn defensive_panic_plan(response: DefensivePanicResponse, facts: &AiFacts) -> DefensivePanicPlan {
+    let support_tech_ready = facts.complete_building_count(EntityKind::TrainingCentre) > 0;
     match response {
-        DefensivePanicResponse::Riflemen => DefensivePanicPlan {
+        DefensivePanicResponse::Riflemen => defensive_panic_rifle_plan(),
+        DefensivePanicResponse::MachineGunners if support_tech_ready => DefensivePanicPlan {
             required_tech_path: &DEFENSIVE_PANIC_RIFLE_TECH_PATH,
-            production: ProductionPolicy {
-                queue_depth: 3,
-                unit_priorities: &DEFENSIVE_PANIC_RIFLE_UNITS,
-                save_for_first_tech_unit: None,
-                balance_unit_priorities: false,
-            },
-            oil_workers: 0,
-        },
-        DefensivePanicResponse::MachineGunners => DefensivePanicPlan {
-            required_tech_path: &DEFENSIVE_PANIC_SUPPORT_TECH_PATH,
             production: ProductionPolicy {
                 queue_depth: 3,
                 unit_priorities: &DEFENSIVE_PANIC_MG_UNITS,
@@ -726,8 +716,8 @@ fn defensive_panic_plan(response: DefensivePanicResponse) -> DefensivePanicPlan 
             },
             oil_workers: DEFENSIVE_PANIC_OIL_WORKERS,
         },
-        DefensivePanicResponse::AtTeams => DefensivePanicPlan {
-            required_tech_path: &DEFENSIVE_PANIC_SUPPORT_TECH_PATH,
+        DefensivePanicResponse::AtTeams if support_tech_ready => DefensivePanicPlan {
+            required_tech_path: &DEFENSIVE_PANIC_RIFLE_TECH_PATH,
             production: ProductionPolicy {
                 queue_depth: 3,
                 unit_priorities: &DEFENSIVE_PANIC_AT_UNITS,
@@ -736,8 +726,8 @@ fn defensive_panic_plan(response: DefensivePanicResponse) -> DefensivePanicPlan 
             },
             oil_workers: DEFENSIVE_PANIC_OIL_WORKERS,
         },
-        DefensivePanicResponse::SupportMix => DefensivePanicPlan {
-            required_tech_path: &DEFENSIVE_PANIC_SUPPORT_TECH_PATH,
+        DefensivePanicResponse::SupportMix if support_tech_ready => DefensivePanicPlan {
+            required_tech_path: &DEFENSIVE_PANIC_RIFLE_TECH_PATH,
             production: ProductionPolicy {
                 queue_depth: 3,
                 unit_priorities: &DEFENSIVE_PANIC_SUPPORT_MIX_UNITS,
@@ -746,6 +736,22 @@ fn defensive_panic_plan(response: DefensivePanicResponse) -> DefensivePanicPlan 
             },
             oil_workers: DEFENSIVE_PANIC_OIL_WORKERS,
         },
+        DefensivePanicResponse::MachineGunners
+        | DefensivePanicResponse::AtTeams
+        | DefensivePanicResponse::SupportMix => defensive_panic_rifle_plan(),
+    }
+}
+
+fn defensive_panic_rifle_plan() -> DefensivePanicPlan {
+    DefensivePanicPlan {
+        required_tech_path: &DEFENSIVE_PANIC_RIFLE_TECH_PATH,
+        production: ProductionPolicy {
+            queue_depth: 3,
+            unit_priorities: &DEFENSIVE_PANIC_RIFLE_UNITS,
+            save_for_first_tech_unit: None,
+            balance_unit_priorities: false,
+        },
+        oil_workers: 0,
     }
 }
 
@@ -3733,7 +3739,7 @@ mod tests {
     }
 
     #[test]
-    fn sustained_support_panic_adds_barracks_and_defensive_tech_only() {
+    fn sustained_support_panic_falls_back_to_riflemen_without_training_centre() {
         let ts = config::TILE_SIZE as f32;
         let mut observation = observation(
             AiEconomy {
@@ -3761,9 +3767,25 @@ mod tests {
             }),
             "fresh panic should use the existing barracks before adding another one"
         );
-        assert!(first_decision.intents.contains(&AiIntent::Build {
-            kind: EntityKind::TrainingCentre
+        assert!(
+            !first_decision.intents.contains(&AiIntent::Build {
+                kind: EntityKind::TrainingCentre
+            }),
+            "panic mode must not create support tech"
+        );
+        assert!(first_decision.intents.contains(&AiIntent::Train {
+            kind: EntityKind::Rifleman
         }));
+        assert!(
+            !first_decision.intents.iter().any(|intent| matches!(
+                intent,
+                AiIntent::Gather {
+                    resource: EntityKind::Oil,
+                    ..
+                }
+            )),
+            "support fallback should not pull workers onto oil"
+        );
 
         let started_tick = observation.tick;
         observation.tick = started_tick.saturating_add(DEFENSIVE_PANIC_GRACE_TICKS);
@@ -3774,17 +3796,14 @@ mod tests {
         assert!(sustained_decision.intents.contains(&AiIntent::Build {
             kind: EntityKind::Barracks
         }));
-        assert!(sustained_decision.intents.contains(&AiIntent::Build {
-            kind: EntityKind::TrainingCentre
-        }));
         assert!(
             !sustained_decision.intents.iter().any(|intent| matches!(
                 intent,
                 AiIntent::Build {
-                    kind: EntityKind::TankFactory
+                    kind: EntityKind::TrainingCentre | EntityKind::TankFactory
                 }
             )),
-            "panic mode should block non-defensive tech spending"
+            "panic mode should block all tech spending"
         );
         assert!(sustained_decision.intents.contains(&AiIntent::Train {
             kind: EntityKind::Rifleman
