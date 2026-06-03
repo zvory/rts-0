@@ -21,6 +21,7 @@ import {
   STATS,
   PLAYER_PALETTE,
   RESOURCE_AMOUNTS,
+  isProducerBuilding,
 } from "./config.js";
 import {
   KIND,
@@ -244,6 +245,7 @@ export class Renderer {
     // Overlays.
     this._drawFog(fog);
     this._drawCommandFeedback(state);
+    this._drawRallyPoints(state);
     this._drawResourceMiningPreview(state);
     this._drawMuzzleFlashes(state);
     this._drawPlacement(state, fog);
@@ -961,6 +963,42 @@ export class Renderer {
         g.lineTo(f.x - r * 0.72, f.y);
         g.lineTo(f.x, f.y - r);
       }
+    }
+  }
+
+  /**
+   * Draw rally-point markers for selected own unit-producing buildings: a faint line from the
+   * building to the rally point and a small flag at the point. Appends to the feedback graphics,
+   * which `_drawCommandFeedback` clears earlier this frame.
+   * @private
+   */
+  _drawRallyPoints(state) {
+    if (!state || typeof state.selectedEntities !== "function") return;
+    const g = this._feedbackGfx;
+    const color = COLORS.selectOwn;
+    for (const e of state.selectedEntities()) {
+      if (e.owner !== state.playerId) continue;
+      if (!isBuilding(e.kind) || !isProducerBuilding(e.kind)) continue;
+      const rally = e.rally;
+      if (!rally) continue;
+      const [rx, ry] = rally;
+
+      // Link from the building to the rally point.
+      g.lineStyle(2, color, 0.5);
+      g.moveTo(e.x, e.y);
+      g.lineTo(rx, ry);
+
+      // Flag: pole + pennant + base dot.
+      g.lineStyle(2.5, color, 0.95);
+      g.moveTo(rx, ry);
+      g.lineTo(rx, ry - 20);
+      g.beginFill(color, 0.9);
+      g.drawPolygon([rx, ry - 20, rx + 13, ry - 16, rx, ry - 11]);
+      g.endFill();
+      g.lineStyle(0);
+      g.beginFill(color, 0.85);
+      g.drawCircle(rx, ry, 3);
+      g.endFill();
     }
   }
 

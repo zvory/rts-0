@@ -282,6 +282,7 @@ mod tests {
                     remaining: Some(100),
                     target_id: None,
                     setup_state: None,
+                    rally: None,
                 },
                 EntityView {
                     id: 2,
@@ -302,6 +303,7 @@ mod tests {
                     remaining: Some(100),
                     target_id: None,
                     setup_state: None,
+                    rally: None,
                 },
                 EntityView {
                     id: 3,
@@ -322,6 +324,7 @@ mod tests {
                     remaining: Some(100),
                     target_id: None,
                     setup_state: None,
+                    rally: None,
                 },
                 EntityView {
                     id: 4,
@@ -342,6 +345,7 @@ mod tests {
                     remaining: Some(100),
                     target_id: None,
                     setup_state: None,
+                    rally: None,
                 },
                 EntityView {
                     id: 5,
@@ -362,6 +366,7 @@ mod tests {
                     remaining: Some(0),
                     target_id: None,
                     setup_state: None,
+                    rally: None,
                 },
             ],
             resource_deltas: Vec::new(),
