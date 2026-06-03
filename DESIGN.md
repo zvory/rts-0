@@ -85,6 +85,7 @@ short but readable. Coordinates are **world pixels** (floats) unless a field nam
 | `train`      | `building: u32`, `unit: string` | Queue a unit at a production building. |
 | `cancel`     | `building: u32` | Cancel the front of a building's production queue. |
 | `stop`       | `units: u32[]` | Clear orders, hold position. |
+| `setRally`   | `building: u32`, `x: f32`, `y: f32` | Set a unit-producing building's rally point. Freshly produced units receive a plain `move` order to the point and the building prefers the spawn exit nearest it. Ignored for buildings the player doesn't own, non-producers (depot, training centre), or buildings still under construction. The point is clamped into map bounds. |
 
 Servers MUST ignore commands referencing entities the player does not own, unknown ids,
 illegal placements, or unaffordable actions (fail silently or emit a `notice` event).
@@ -162,7 +163,7 @@ Older object-shaped JSON snapshots remain decodable by the client for fallback/d
     [
       id, owner, kind, x, y, hp, maxHp, state,
       facing?, weaponFacing?, prodKind?, prodProgress?, prodQueue?,
-      buildProgress?, latchedNode?, targetId?, setupState?, remaining?
+      buildProgress?, latchedNode?, targetId?, setupState?, remaining?, rally?
     ]
   ],
   "r": [[id, remaining]],         // omitted when empty
@@ -181,7 +182,7 @@ Compact numeric codes:
 
 Compact entity records are positional arrays. Optional fields keep the semantic order above and
 trailing missing optional fields are omitted; interior missing optional fields are encoded as
-`null`.
+`null`. The `rally` slot is itself a two-element `[x, y]` array (or `null`).
 
 `ResourceDelta`: `{ id: u32, remaining: u32 }`. Resource node positions/kinds are static and come
 from `start.map.resources`; clients keep last-known `remaining` locally. The server sends
@@ -209,7 +210,9 @@ watch rooms receive all resource updates).
   latchedNode?: u32,             // node id the worker is currently harvesting (attached mining)
   // combat feedback:
   targetId?: u32,                // current attack target, for drawing tracers
-  setupState?: string            // machine_gunner only: "packed","setting_up","deployed","tearing_down"
+  setupState?: string,           // machine_gunner only: "packed","setting_up","deployed","tearing_down"
+  // unit-producing buildings:
+  rally?: [f32, f32]             // rally point (world px); ONLY ever sent to the owner
 }
 ```
 
@@ -626,9 +629,10 @@ Intended progression:
 
 The current implementation uses the themed unit/building names below. Combat is handled by the
 shared attack model plus the machine-gunner setup/teardown state, tank turret aim gates, and
-tank hull-facing damage modifiers for anti-tank hits against tank victims. Forest-specific rules
-are future work. The unit, building, and resource-node tables below are the human-readable form of
-the authoritative `rules::defs` records.
+tank hull-facing damage modifiers for anti-tank hits against tank victims. Tanks keep their active
+movement path while firing; other mobile combat units still hold position once a target is in
+weapon range. Forest-specific rules are future work. The unit, building, and resource-node tables
+below are the human-readable form of the authoritative `rules::defs` records.
 
 - `TICK_HZ = 30`, `SNAPSHOT_EVERY_N_TICKS = 1`.
 - `MACHINE_GUNNER_SETUP_TICKS = 30` (~1s setup or teardown).
@@ -738,7 +742,9 @@ The server treats every client as potentially hostile. Limits live next to the c
   place instead of sliding sideways at full speed. The snapshot `weaponFacing` field is the
   independent turret/barrel angle. Tank combat rotates the turret toward the target at a bounded
   rate and fires only once the turret is within tolerance; the hull does not need to face the
-  target. Projection omits enemy `weaponFacing` when it would reveal a hidden target direction.
+  target. Tanks do not clear their movement path when they fire, so they can continue driving while
+  the turret tracks and shoots. Projection omits enemy `weaponFacing` when it would reveal a hidden
+  target direction.
 - **Tank armor facing**: tank and AT-team attacks against tank victims use the victim tank's hull
   `facing` and the attacker's position. Front hits (`<=45°` from the hull direction) deal normal
   damage, side hits (`>45°` and `<=135°`) deal `1.25x`, and rear hits (`>135°`) deal `1.75x`.
@@ -778,7 +784,11 @@ The server treats every client as potentially hostile. Limits live next to the c
   `standability::unit_spawn_standable` point. Spawn candidates must fit the unit body inside world
   bounds without clipping terrain, any building footprint, or any living unit body, including ghost
   workers. If every candidate is blocked, the complete queue item stays in place and retries on
-  later ticks; cost and supply remain reserved from enqueue time.
+  later ticks; cost and supply remain reserved from enqueue time. When the producer has a rally
+  point set, the search picks the closest standable candidate to the rally within the first ring
+  that has any (so units exit the rally-facing side), and the new unit is immediately given a plain
+  `move` order to the rally point; with no rally point the legacy first-found candidate is used and
+  the unit spawns idle.
 - **Unit collision**: `services::movement::resolve_collisions` runs after production each tick
   and pair-wise pushes overlapping mobile units apart along the connecting line. Workers in
   `GatherPhase::Harvesting` or `BuildPhase::Constructing` are ghost pass-through units: they

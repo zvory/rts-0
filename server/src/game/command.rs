@@ -43,6 +43,11 @@ pub enum SimCommand {
     Stop {
         units: Vec<u32>,
     },
+    SetRally {
+        building: u32,
+        x: f32,
+        y: f32,
+    },
     Rejected {
         reason: CommandRejection,
     },
@@ -94,6 +99,9 @@ impl SimCommand {
             },
             protocol::Command::Cancel { building } => SimCommand::Cancel { building },
             protocol::Command::Stop { units } => SimCommand::Stop { units },
+            protocol::Command::SetRally { building, x, y } => {
+                SimCommand::SetRally { building, x, y }
+            }
         }
     }
 
@@ -137,6 +145,11 @@ impl SimCommand {
             },
             SimCommand::Stop { units } => protocol::Command::Stop {
                 units: units.clone(),
+            },
+            SimCommand::SetRally { building, x, y } => protocol::Command::SetRally {
+                building: *building,
+                x: *x,
+                y: *y,
             },
             SimCommand::Rejected { .. } => return None,
         })

@@ -131,6 +131,9 @@ pub(crate) fn apply_commands(
                     }
                 }
             }
+            SimCommand::SetRally { building, x, y } => {
+                order_set_rally(map, entities, player, building, x, y);
+            }
             SimCommand::Rejected { reason } => {
                 notice(events, player, reason.notice_message());
             }
@@ -194,6 +197,9 @@ fn order_build(
     }
     if !matches!(entities.get(worker), Some(e) if e.kind == EntityKind::Worker) {
         notice(events, player, "Only workers can build");
+        return;
+    }
+    if is_constructing(entities, worker) {
         return;
     }
     if config::building_stats(building).is_none() {
@@ -291,6 +297,33 @@ fn order_train(
                 total: stats.build_ticks,
             });
         }
+    }
+}
+
+/// Set a unit-producing building's rally point. Validates ownership and that the building is a
+/// completed producer; sanitizes/clamps the point to the map. Invalid requests are ignored
+/// silently (consistent with movement commands), so a hostile client cannot wedge the tick loop.
+fn order_set_rally(
+    map: &Map,
+    entities: &mut EntityStore,
+    player: u32,
+    building: u32,
+    x: f32,
+    y: f32,
+) {
+    let ok = matches!(entities.get(building), Some(b)
+        if b.owner == player && b.is_building() && !b.under_construction()
+        && !rules::economy::trainable_units(b.kind).is_empty());
+    if !ok {
+        return;
+    }
+    if !x.is_finite() || !y.is_finite() {
+        return;
+    }
+    let max = (map.world_size_px() - 1.0).max(0.0);
+    let rally = (x.clamp(0.0, max), y.clamp(0.0, max));
+    if let Some(b) = entities.get_mut(building) {
+        b.set_rally_point(Some(rally));
     }
 }
 
@@ -392,6 +425,187 @@ mod tests {
         assert!(
             events.get(&1).is_none_or(Vec::is_empty),
             "valid build-over-self intent should not emit a failure notice"
+        );
+    }
+
+    #[test]
+    fn build_order_does_not_pull_worker_off_active_construction() {
+        let map = flat_map(16);
+        let mut entities = EntityStore::new();
+        let (site_x, site_y) = footprint_center(&map, EntityKind::Depot, 4, 4);
+        let worker = entities
+            .spawn_unit(1, EntityKind::Worker, site_x, site_y)
+            .expect("worker should spawn");
+        let site = entities
+            .spawn_building(1, EntityKind::Depot, site_x, site_y, false)
+            .expect("scaffold should spawn");
+        let worker_entity = entities.get_mut(worker).expect("worker should exist");
+        worker_entity.set_order(Order::build(EntityKind::Depot, 4, 4));
+        worker_entity.mark_build_phase(BuildPhase::Constructing { site });
+        worker_entity.set_target_id(Some(site));
+
+        let spatial = SpatialIndex::build(&entities, map.size);
+        let occ = Occupancy::build(&map, &entities);
+        let mut pathing = PathingService::new(1024, 32);
+        pathing.advance_tick(1);
+        let mut coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, 1);
+        let mut players = vec![player_state(1)];
+        let mut events = HashMap::new();
+
+        apply_commands(
+            &map,
+            &mut entities,
+            &mut players,
+            &spatial,
+            &mut coordinator,
+            vec![(
+                1,
+                SimCommand::Build {
+                    worker,
+                    building: EntityKind::Barracks,
+                    tile_x: 8,
+                    tile_y: 8,
+                },
+            )],
+            &mut events,
+        );
+
+        let worker = entities.get(worker).expect("worker should remain alive");
+        assert_eq!(
+            worker.build_phase(),
+            Some(BuildPhase::Constructing { site }),
+            "active build command should keep constructing the original scaffold"
+        );
+        assert_eq!(
+            worker.order().build_intent_tile(),
+            Some((EntityKind::Depot, 4, 4)),
+            "second build order must not replace the active construction intent"
+        );
+        assert_eq!(
+            worker.target_id(),
+            Some(site),
+            "worker should stay latched to the scaffold it is building"
+        );
+        assert!(
+            events.get(&1).is_none_or(Vec::is_empty),
+            "ignored build command should not emit a failure notice"
+        );
+    }
+
+    #[test]
+    fn set_rally_stores_point_on_producer_and_rejects_others() {
+        let map = flat_map(24);
+        let mut entities = EntityStore::new();
+        let (bx, by) = footprint_center(&map, EntityKind::Barracks, 6, 6);
+        let barracks = entities
+            .spawn_building(1, EntityKind::Barracks, bx, by, true)
+            .expect("barracks should spawn");
+        let (dx, dy) = footprint_center(&map, EntityKind::Depot, 12, 6);
+        let depot = entities
+            .spawn_building(1, EntityKind::Depot, dx, dy, true)
+            .expect("depot should spawn");
+        let (ex, ey) = footprint_center(&map, EntityKind::Barracks, 6, 12);
+        let enemy_barracks = entities
+            .spawn_building(2, EntityKind::Barracks, ex, ey, true)
+            .expect("enemy barracks should spawn");
+
+        apply(
+            &map,
+            &mut entities,
+            vec![
+                (
+                    1,
+                    SimCommand::SetRally {
+                        building: barracks,
+                        x: 100.0,
+                        y: 200.0,
+                    },
+                ),
+                // Depot trains nothing -> rejected.
+                (
+                    1,
+                    SimCommand::SetRally {
+                        building: depot,
+                        x: 50.0,
+                        y: 50.0,
+                    },
+                ),
+                // Not the owner -> rejected.
+                (
+                    1,
+                    SimCommand::SetRally {
+                        building: enemy_barracks,
+                        x: 10.0,
+                        y: 10.0,
+                    },
+                ),
+            ],
+        );
+
+        assert_eq!(
+            entities.get(barracks).unwrap().rally_point(),
+            Some((100.0, 200.0)),
+            "owned producer should store the rally point"
+        );
+        assert_eq!(
+            entities.get(depot).unwrap().rally_point(),
+            None,
+            "non-producer building should not accept a rally point"
+        );
+        assert_eq!(
+            entities.get(enemy_barracks).unwrap().rally_point(),
+            None,
+            "rally on an enemy building should be ignored"
+        );
+    }
+
+    #[test]
+    fn set_rally_clamps_out_of_bounds_point() {
+        let map = flat_map(24);
+        let mut entities = EntityStore::new();
+        let (bx, by) = footprint_center(&map, EntityKind::Barracks, 6, 6);
+        let barracks = entities
+            .spawn_building(1, EntityKind::Barracks, bx, by, true)
+            .expect("barracks should spawn");
+
+        apply(
+            &map,
+            &mut entities,
+            vec![(
+                1,
+                SimCommand::SetRally {
+                    building: barracks,
+                    x: 1.0e9,
+                    y: -50.0,
+                },
+            )],
+        );
+
+        let max = map.world_size_px() - 1.0;
+        assert_eq!(
+            entities.get(barracks).unwrap().rally_point(),
+            Some((max, 0.0)),
+            "rally point should be clamped into the map bounds"
+        );
+    }
+
+    /// Run `apply_commands` with throwaway derived state for command-validation tests.
+    fn apply(map: &Map, entities: &mut EntityStore, pending: Vec<(u32, SimCommand)>) {
+        let spatial = SpatialIndex::build(entities, map.size);
+        let occ = Occupancy::build(map, entities);
+        let mut pathing = PathingService::new(1024, 32);
+        pathing.advance_tick(1);
+        let mut coordinator = MoveCoordinator::new(&mut pathing, map, &occ, 1);
+        let mut players = vec![player_state(1), player_state(2)];
+        let mut events = HashMap::new();
+        apply_commands(
+            map,
+            entities,
+            &mut players,
+            &spatial,
+            &mut coordinator,
+            pending,
+            &mut events,
         );
     }
 

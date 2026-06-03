@@ -79,6 +79,10 @@ export const STATS = Object.freeze({
   [KIND.OIL]: { label: "Oil", size: 14 },
 });
 
+// A building that trains units — the only buildings that accept a rally point.
+export const isProducerBuilding = (kind) =>
+  Array.isArray(STATS[kind]?.trains) && STATS[kind].trains.length > 0;
+
 export const RESOURCE_AMOUNTS = Object.freeze({
   [KIND.STEEL]: 1500,
   [KIND.OIL]: 5000,
