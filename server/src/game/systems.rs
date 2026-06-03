@@ -1,16 +1,20 @@
 //! Per-tick simulation systems orchestrator. See `DESIGN.md` §3.
 //!
-//! [`run_tick`] delegates to the internal services in the order mandated by the design:
-//!   1. drain + apply queued commands
-//!   2. movement
-//!   3. combat
-//!   4. gather progression
-//!   5. production progression + spawning
-//!   6. construction progression
-//!   7. deaths
-//!   8. unit-unit collision resolution (hard non-stacking; runs after spawning so newly
-//!      produced units that land on the same spawn point are unstacked in the same tick)
-//!   9. recompute supply cap
+//! [`run_tick`] delegates to the internal services through explicit derived-state boundaries:
+//!   1. rebuild pre-command occupancy/spatial indexes
+//!   2. drain + apply queued commands
+//!   3. movement
+//!   4. rebuild post-movement occupancy/spatial indexes
+//!   5. combat
+//!   6. gather progression
+//!   7. production progression + spawning
+//!   8. construction progression
+//!   9. deaths
+//!   10. rebuild pre-collision occupancy/spatial indexes
+//!   11. unit-unit collision resolution (hard non-stacking; runs after spawning so newly
+//!       produced units that land on the same spawn point are unstacked in the same tick)
+//!   12. recompute supply cap
+//!   13. rebuild final spatial index for snapshot interest filtering
 
 use std::collections::HashMap;
 
@@ -19,11 +23,75 @@ use crate::game::entity::EntityStore;
 use crate::game::fog::Fog;
 use crate::game::map::Map;
 use crate::game::services;
+use crate::game::services::occupancy::Occupancy;
 use crate::game::services::pathing::PathingService;
 use crate::game::services::spatial::SpatialIndex;
 use crate::game::PlayerState;
 use crate::protocol::Event;
 use rand::rngs::SmallRng;
+
+/// Derived state valid before commands mutate orders or units move.
+///
+/// This state is intentionally phase-specific: adding a system after movement should require
+/// choosing a post-movement state instead of accidentally reusing this one.
+struct PreCommandDerivedState<'a> {
+    occupancy: Occupancy<'a>,
+    spatial: SpatialIndex,
+}
+
+impl<'a> PreCommandDerivedState<'a> {
+    fn rebuild(map: &'a Map, entities: &EntityStore) -> Self {
+        PreCommandDerivedState {
+            occupancy: Occupancy::build(map, entities),
+            spatial: SpatialIndex::build(entities, map.size),
+        }
+    }
+}
+
+/// Derived state valid after movement has updated unit positions.
+struct PostMovementDerivedState<'a> {
+    occupancy: Occupancy<'a>,
+    spatial: SpatialIndex,
+}
+
+impl<'a> PostMovementDerivedState<'a> {
+    fn rebuild(map: &'a Map, entities: &EntityStore) -> Self {
+        PostMovementDerivedState {
+            occupancy: Occupancy::build(map, entities),
+            spatial: SpatialIndex::build(entities, map.size),
+        }
+    }
+}
+
+/// Derived state valid after combat/economy/production/construction/death mutations and before
+/// collision resolution changes unit positions.
+struct PreCollisionDerivedState<'a> {
+    occupancy: Occupancy<'a>,
+    spatial: SpatialIndex,
+}
+
+impl<'a> PreCollisionDerivedState<'a> {
+    fn rebuild(map: &'a Map, entities: &EntityStore) -> Self {
+        PreCollisionDerivedState {
+            occupancy: Occupancy::build(map, entities),
+            spatial: SpatialIndex::build(entities, map.size),
+        }
+    }
+}
+
+/// Derived state valid after every tick mutation. This is the state handed back to `Game` for
+/// fog-filtered snapshot interest queries.
+struct FinalDerivedState {
+    spatial: SpatialIndex,
+}
+
+impl FinalDerivedState {
+    fn rebuild(map: &Map, entities: &EntityStore) -> Self {
+        FinalDerivedState {
+            spatial: SpatialIndex::build(entities, map.size),
+        }
+    }
+}
 
 /// Run all per-tick systems in order. `events` is the per-player event accumulator (already
 /// keyed for every player). `tick` is the new tick number (post-increment).
@@ -42,56 +110,68 @@ pub(crate) fn run_tick(
     events: &mut HashMap<u32, Vec<Event>>,
     tick: u32,
 ) -> SpatialIndex {
-    // Build occupancy once up front; commands that need pathing reuse it.
-    let occ = services::occupancy::Occupancy::build(map, entities);
-    // Pre-tick spatial index for commands (building placement checks).
-    let spatial = services::spatial::SpatialIndex::build(entities, map.size);
-
-    let mut coordinator =
-        services::move_coordinator::MoveCoordinator::new(pathing, map, &occ, tick);
+    let pre_command = PreCommandDerivedState::rebuild(map, entities);
+    let mut coordinator = services::move_coordinator::MoveCoordinator::new(
+        pathing,
+        map,
+        &pre_command.occupancy,
+        tick,
+    );
 
     services::commands::apply_commands(
         map,
         entities,
         players,
-        &spatial,
+        &pre_command.spatial,
         &mut coordinator,
         pending,
         events,
     );
     coordinator.process_awaiting_paths(entities);
-    services::movement::movement_system(map, entities, &occ, &spatial, tick);
+    services::movement::movement_system(
+        map,
+        entities,
+        &pre_command.occupancy,
+        &pre_command.spatial,
+        tick,
+    );
 
-    // Rebuild after movement so combat, gather, and collision resolution see updated positions.
-    let spatial = services::spatial::SpatialIndex::build(entities, map.size);
+    let post_movement = PostMovementDerivedState::rebuild(map, entities);
 
     services::combat::combat_system(
         map,
         entities,
         players,
-        &occ,
-        &spatial,
+        &post_movement.occupancy,
+        &post_movement.spatial,
         &mut coordinator,
         fog,
         rng,
         events,
     );
-    services::economy::gather_system(map, entities, players, &occ, &spatial, &mut coordinator);
+    services::economy::gather_system(
+        map,
+        entities,
+        players,
+        &post_movement.occupancy,
+        &post_movement.spatial,
+        &mut coordinator,
+    );
     services::production::production_system(map, entities, players, &coordinator, events);
-    services::construction::construction_system(map, entities, players, &spatial, events);
+    services::construction::construction_system(map, entities, players, events);
     services::death::death_system(entities, fog, players, events);
 
-    // Collision resolution runs after production/construction/deaths so spawned units are
-    // unstacked in the same tick and pushes respect the current building footprint set.
-    let collision_occ = services::occupancy::Occupancy::build(map, entities);
-    // Rebuild the spatial index first so the resolver sees the post-production entity set.
-    let spatial = services::spatial::SpatialIndex::build(entities, map.size);
-    services::movement::resolve_collisions(entities, &spatial, map, &collision_occ);
+    let pre_collision = PreCollisionDerivedState::rebuild(map, entities);
+    services::movement::resolve_collisions(
+        entities,
+        &pre_collision.spatial,
+        map,
+        &pre_collision.occupancy,
+    );
 
     services::supply::recompute_supply(players, entities);
 
-    // Rebuild after all mutations so the returned index reflects the final positions.
-    services::spatial::SpatialIndex::build(entities, map.size)
+    FinalDerivedState::rebuild(map, entities).spatial
 }
 
 // Re-exports for callers outside the services layer so the public surface of `systems` stays

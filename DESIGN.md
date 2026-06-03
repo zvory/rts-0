@@ -364,6 +364,13 @@ kind-specific data from `rules::defs`. `config.rs` holds scalar constants and co
 wrappers such as `unit_stats(kind)` / `building_stats(kind)`, which return the stats embedded in
 defs.
 
+`game::systems::run_tick` owns the tick pipeline and the lifecycle of tick-scoped derived state.
+It rebuilds named phase state at explicit boundaries: pre-command state for command validation,
+pathing, and movement; post-movement state for combat and economy queries; pre-collision state
+after production/construction/death mutations; and final state for snapshot interest filtering.
+Systems should consume the derived-state object for their phase instead of carrying occupancy or
+spatial indexes across later mutations.
+
 `services::geometry` owns shared body primitives: unit bodies are circles centered on `(x, y)`
 with the configured unit radius, building bodies are axis-aligned rectangles derived from
 footprint tiles, and resource node bodies are circles for build-site blocking. `services::standability`
