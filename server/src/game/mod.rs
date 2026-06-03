@@ -11,6 +11,7 @@
 pub mod ai;
 pub(crate) mod ai_core;
 pub(crate) mod ai_shared;
+pub mod command;
 pub mod entity;
 pub mod fog;
 mod invariants;
@@ -24,9 +25,9 @@ pub mod systems;
 use std::collections::HashMap;
 
 use crate::config;
+use crate::game::command::SimCommand;
 use crate::protocol::{
-    Command, Event, MapInfo, PlayerScore, PlayerStart, ResourceDelta, ResourceNode, Snapshot,
-    StartPayload,
+    Event, MapInfo, PlayerScore, PlayerStart, ResourceDelta, ResourceNode, Snapshot, StartPayload,
 };
 use crate::rules::{economy as economy_rules, projection};
 use serde::{Deserialize, Serialize};
@@ -122,7 +123,7 @@ pub struct Game {
     ai: Vec<AiController>,
     /// Commands received this tick window, drained at the start of [`tick`]. Each carries the
     /// issuing player so ownership can be validated on apply.
-    pending: Vec<(u32, Command)>,
+    pending: Vec<(u32, SimCommand)>,
     /// Authoritative commands stamped with the tick where they were applied. Includes AI commands
     /// because they are emitted into the same pending queue before command application.
     command_log: Vec<CommandLogEntry>,
@@ -285,7 +286,7 @@ impl Game {
 
     /// Queue a command for application at the next tick. No validation here (it happens on
     /// apply, where the live state is known).
-    pub fn enqueue(&mut self, player: u32, cmd: Command) {
+    pub fn enqueue(&mut self, player: u32, cmd: SimCommand) {
         self.pending.push((player, cmd));
     }
 
@@ -507,12 +508,14 @@ impl Game {
 
     // --- internal helpers ------------------------------------------------------
 
-    fn record_commands_for_tick(&mut self, pending: &[(u32, Command)]) {
+    fn record_commands_for_tick(&mut self, pending: &[(u32, SimCommand)]) {
         self.command_log
-            .extend(pending.iter().map(|(player_id, command)| CommandLogEntry {
-                tick: self.tick,
-                player_id: *player_id,
-                command: command.clone(),
+            .extend(pending.iter().filter_map(|(player_id, command)| {
+                command.to_protocol().map(|command| CommandLogEntry {
+                    tick: self.tick,
+                    player_id: *player_id,
+                    command,
+                })
             }));
     }
 
@@ -630,6 +633,7 @@ mod tests {
     use std::collections::HashMap;
 
     use super::*;
+    use crate::game::command::SimCommand as Command;
     use crate::game::entity::{Entity, EntityKind, GatherPhase, Order};
     use crate::protocol::{kinds, EntityView};
 

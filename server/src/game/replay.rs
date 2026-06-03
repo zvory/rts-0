@@ -7,6 +7,7 @@
 use serde::{Deserialize, Serialize};
 
 use super::{Game, PlayerInit};
+use crate::game::command::SimCommand;
 use crate::protocol::{Command, Event, Snapshot};
 
 /// One authoritative gameplay command, stamped with the simulation tick that applied it.
@@ -68,7 +69,10 @@ pub fn replay_commands(
             if entry.tick != tick {
                 break;
             }
-            replay.enqueue(entry.player_id, entry.command.clone());
+            replay.enqueue(
+                entry.player_id,
+                SimCommand::from_protocol(entry.command.clone()),
+            );
             next_command += 1;
         }
 

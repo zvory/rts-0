@@ -17,8 +17,8 @@ use crate::game::ai_core::profiles::{
     TechTransitionPolicy,
 };
 use crate::game::ai_shared;
+use crate::game::command::SimCommand as Command;
 use crate::game::entity::EntityKind;
-use crate::protocol::Command;
 use crate::rules;
 
 const PRODUCTION_BUILDINGS: [EntityKind; 3] = [
@@ -2543,7 +2543,7 @@ mod tests {
                 matches!(
                     command,
                     Command::Build { building, .. }
-                        if building == EntityKind::Barracks.to_protocol_str()
+                        if *building == EntityKind::Barracks
                 )
             }),
             "the proxy worker should move out before the barracks is affordable"
@@ -2607,9 +2607,7 @@ mod tests {
                     building,
                     tile_x,
                     tile_y,
-                } if building == EntityKind::Barracks.to_protocol_str() => {
-                    Some((*worker, (*tile_x, *tile_y)))
-                }
+                } if *building == EntityKind::Barracks => Some((*worker, (*tile_x, *tile_y))),
                 _ => None,
             })
             .collect();
@@ -2661,9 +2659,7 @@ mod tests {
                     building,
                     tile_x,
                     tile_y,
-                } if building == EntityKind::Barracks.to_protocol_str() => {
-                    Some((*worker, (*tile_x, *tile_y)))
-                }
+                } if *building == EntityKind::Barracks => Some((*worker, (*tile_x, *tile_y))),
                 _ => None,
             })
             .collect();
@@ -2684,7 +2680,7 @@ mod tests {
                 command,
                 Command::Build { worker, building, .. }
                     if *worker == 20
-                        && building == EntityKind::Barracks.to_protocol_str()
+                        && *building == EntityKind::Barracks
             )
         }));
         assert!(
@@ -2718,7 +2714,7 @@ mod tests {
             matches!(
                 command,
                 Command::Build { building, .. }
-                    if building == EntityKind::Barracks.to_protocol_str()
+                    if *building == EntityKind::Barracks
             )
         }));
         assert!(
@@ -2906,17 +2902,15 @@ mod tests {
             .commands
             .iter()
             .filter_map(|command| match command {
-                Command::Build { building, .. }
-                    if building != EntityKind::Depot.to_protocol_str() =>
-                {
-                    Some(building.as_str())
+                Command::Build { building, .. } if *building != EntityKind::Depot => {
+                    Some(*building)
                 }
                 _ => None,
             })
             .collect();
         assert_eq!(
             non_depot_builds,
-            vec![EntityKind::IndustrialCenter.to_protocol_str()],
+            vec![EntityKind::IndustrialCenter],
             "the first non-depot build should be the expansion IC"
         );
         assert!(
@@ -3021,9 +3015,7 @@ mod tests {
                     tile_x,
                     tile_y,
                     ..
-                } if building == EntityKind::IndustrialCenter.to_protocol_str() => {
-                    Some((*tile_x, *tile_y))
-                }
+                } if *building == EntityKind::IndustrialCenter => Some((*tile_x, *tile_y)),
                 _ => None,
             })
             .expect("decision should issue an expansion IC build");

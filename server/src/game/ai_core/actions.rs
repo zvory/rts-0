@@ -4,8 +4,8 @@ use crate::config;
 use crate::game::ai_core::facts::{AiFacts, ProductionBuildingFact};
 use crate::game::ai_core::observation::{AiEntityState, AiEntitySummary, AiResourceSummary};
 use crate::game::ai_shared;
+use crate::game::command::SimCommand as Command;
 use crate::game::entity::EntityKind;
-use crate::protocol::Command;
 use crate::rules;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -227,7 +227,7 @@ pub(crate) fn try_build_at(
     }
     ctx.emit_command(Command::Build {
         worker,
-        building: building.to_protocol_str().to_string(),
+        building,
         tile_x,
         tile_y,
     });
@@ -296,7 +296,7 @@ pub(crate) fn train_units(
         *current_counts.entry(unit).or_default() += 1;
         ctx.emit_command(Command::Train {
             building: building.id,
-            unit: unit.to_protocol_str().to_string(),
+            unit,
         });
         trained.push(TrainAction {
             building: building.id,
@@ -725,7 +725,7 @@ mod tests {
         assert!(matches!(
             ctx.into_commands().as_slice(),
             [Command::Build { worker: 10, building, tile_x: 8, tile_y: 8 }]
-                if building == EntityKind::Depot.to_protocol_str()
+                if *building == EntityKind::Depot
         ));
     }
 

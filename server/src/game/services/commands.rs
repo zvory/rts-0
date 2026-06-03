@@ -1,6 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::config;
+use crate::game::command::SimCommand;
 use crate::game::entity::{BuildPhase, EntityKind, EntityStore, ProdItem};
 use crate::game::map::Map;
 use crate::game::services::move_coordinator::MoveCoordinator;
@@ -8,7 +9,7 @@ use crate::game::services::spatial::SpatialIndex;
 use crate::game::services::standability;
 use crate::game::services::world_query;
 use crate::game::PlayerState;
-use crate::protocol::{Command, Event};
+use crate::protocol::Event;
 use crate::rules;
 
 /// Max unique unit ids honored per multi-unit command. Caps the per-id work a single command can
@@ -23,12 +24,12 @@ pub(crate) fn apply_commands(
     players: &mut [PlayerState],
     spatial: &SpatialIndex,
     coordinator: &mut MoveCoordinator<'_>,
-    pending: Vec<(u32, Command)>,
+    pending: Vec<(u32, SimCommand)>,
     events: &mut HashMap<u32, Vec<Event>>,
 ) {
     for (player, cmd) in pending {
         match cmd {
-            Command::Move { units, x, y } => {
+            SimCommand::Move { units, x, y } => {
                 let valid: Vec<u32> = dedupe_cap_units(units)
                     .into_iter()
                     .filter(|id| {
@@ -37,7 +38,7 @@ pub(crate) fn apply_commands(
                     .collect();
                 coordinator.order_group_move(entities, player, &valid, (x, y), false);
             }
-            Command::AttackMove { units, x, y } => {
+            SimCommand::AttackMove { units, x, y } => {
                 let valid: Vec<u32> = dedupe_cap_units(units)
                     .into_iter()
                     .filter(|id| {
@@ -46,7 +47,7 @@ pub(crate) fn apply_commands(
                     .collect();
                 coordinator.order_group_move(entities, player, &valid, (x, y), true);
             }
-            Command::Attack { units, target } => {
+            SimCommand::Attack { units, target } => {
                 for id in dedupe_cap_units(units) {
                     if let Some(e) = entities.get(id) {
                         if !e.is_unit() || e.owner != player {
@@ -66,7 +67,7 @@ pub(crate) fn apply_commands(
                     coordinator.order_attack(entities, id, target);
                 }
             }
-            Command::Gather { units, node } => {
+            SimCommand::Gather { units, node } => {
                 for id in dedupe_cap_units(units) {
                     if !owns_unit(entities, player, id) {
                         continue;
@@ -91,7 +92,7 @@ pub(crate) fn apply_commands(
                     coordinator.order_gather(entities, id, node);
                 }
             }
-            Command::Build {
+            SimCommand::Build {
                 worker,
                 building,
                 tile_x,
@@ -105,19 +106,19 @@ pub(crate) fn apply_commands(
                     coordinator,
                     player,
                     worker,
-                    &building,
+                    building,
                     tile_x,
                     tile_y,
                     events,
                 );
             }
-            Command::Train { building, unit } => {
-                order_train(entities, players, player, building, &unit, events);
+            SimCommand::Train { building, unit } => {
+                order_train(entities, players, player, building, unit, events);
             }
-            Command::Cancel { building } => {
+            SimCommand::Cancel { building } => {
                 order_cancel(entities, players, player, building);
             }
-            Command::Stop { units } => {
+            SimCommand::Stop { units } => {
                 for id in dedupe_cap_units(units) {
                     if owns_unit(entities, player, id) && !is_constructing(entities, id) {
                         entities.release_miner(id);
@@ -129,6 +130,9 @@ pub(crate) fn apply_commands(
                         }
                     }
                 }
+            }
+            SimCommand::Rejected { reason } => {
+                notice(events, player, reason.notice_message());
             }
         }
     }
@@ -180,7 +184,7 @@ fn order_build(
     coordinator: &mut MoveCoordinator<'_>,
     player: u32,
     worker: u32,
-    building: &str,
+    building: EntityKind,
     tile_x: u32,
     tile_y: u32,
     events: &mut HashMap<u32, Vec<Event>>,
@@ -192,20 +196,13 @@ fn order_build(
         notice(events, player, "Only workers can build");
         return;
     }
-    let kind = match building.parse::<EntityKind>() {
-        Ok(k) => k,
-        Err(_) => {
-            notice(events, player, "Unknown building");
-            return;
-        }
-    };
-    if config::building_stats(kind).is_none() {
+    if config::building_stats(building).is_none() {
         notice(events, player, "Unknown building");
         return;
     }
 
     let owned = world_query::completed_building_kinds(entities, player);
-    if !rules::economy::build_requirement_met(kind, &owned) {
+    if !rules::economy::build_requirement_met(building, &owned) {
         notice(events, player, "Requirement not met");
         return;
     }
@@ -217,7 +214,7 @@ fn order_build(
 
     // Feedback only; construction repeats a stricter final-placement check at arrival.
     if !standability::building_site_clear_for_build_intent(
-        map, entities, kind, tile_x, tile_y, worker,
+        map, entities, building, tile_x, tile_y, worker,
     ) {
         notice(events, player, "Cannot build there");
         return;
@@ -227,13 +224,13 @@ fn order_build(
         Some(p) => p,
         None => return,
     };
-    let (cost_steel, cost_oil) = rules::economy::cost(kind);
+    let (cost_steel, cost_oil) = rules::economy::cost(building);
     if ps.steel < cost_steel || ps.oil < cost_oil {
         notice(events, player, "Not enough resources");
         return;
     }
 
-    let built = coordinator.order_build(entities, worker, kind, tile_x, tile_y);
+    let built = coordinator.order_build(entities, worker, building, tile_x, tile_y);
     if !built {
         notice(events, player, "Cannot build there");
     }
@@ -245,29 +242,22 @@ fn order_train(
     players: &mut [PlayerState],
     player: u32,
     building: u32,
-    unit: &str,
+    unit: EntityKind,
     events: &mut HashMap<u32, Vec<Event>>,
 ) {
-    let kind = match unit.parse::<EntityKind>() {
-        Ok(k) => k,
-        Err(_) => {
-            notice(events, player, "Unknown unit");
-            return;
-        }
-    };
     let ok = matches!(entities.get(building), Some(b)
         if b.owner == player && b.is_building() && !b.under_construction()
-        && rules::economy::trainable_units(b.kind).contains(&kind));
+        && rules::economy::trainable_units(b.kind).contains(&unit));
     if !ok {
         notice(events, player, "Cannot train that here");
         return;
     }
     let owned_complete = world_query::completed_building_kinds(entities, player);
-    if !rules::economy::train_requirement_met(kind, &owned_complete) {
+    if !rules::economy::train_requirement_met(unit, &owned_complete) {
         notice(events, player, "Requirement not met");
         return;
     }
-    let stats = match config::unit_stats(kind) {
+    let stats = match config::unit_stats(unit) {
         Some(s) => s,
         None => {
             notice(events, player, "Unknown unit");
@@ -279,8 +269,8 @@ fn order_train(
         Some(p) => p,
         None => return,
     };
-    let (cost_steel, cost_oil) = rules::economy::cost(kind);
-    let supply = rules::economy::supply_cost(kind);
+    let (cost_steel, cost_oil) = rules::economy::cost(unit);
+    let supply = rules::economy::supply_cost(unit);
     if ps.steel < cost_steel || ps.oil < cost_oil {
         notice(events, player, "Not enough resources");
         return;
@@ -296,7 +286,7 @@ fn order_train(
     if let Some(b) = entities.get_mut(building) {
         if let Some(queue) = b.prod_queue_mut() {
             queue.push(ProdItem {
-                unit: kind,
+                unit,
                 progress: 0,
                 total: stats.build_ticks,
             });
@@ -376,9 +366,9 @@ mod tests {
             &mut coordinator,
             vec![(
                 1,
-                Command::Build {
+                SimCommand::Build {
                     worker,
-                    building: EntityKind::Depot.to_protocol_str().to_string(),
+                    building: EntityKind::Depot,
                     tile_x: 4,
                     tile_y: 4,
                 },

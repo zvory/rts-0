@@ -29,6 +29,7 @@ use tower_http::services::{ServeDir, ServeFile};
 use tracing::{debug, info, warn};
 use tracing_subscriber::EnvFilter;
 
+use crate::game::command::SimCommand;
 use crate::lobby::{Lobby, RoomEvent};
 use crate::protocol::{serialize_compact_snapshot, ClientMessage, ServerMessage};
 
@@ -481,7 +482,10 @@ async fn handle_client_message(
             send_room_event(
                 player_id,
                 current_room,
-                RoomEvent::Command { player_id, cmd },
+                RoomEvent::Command {
+                    player_id,
+                    cmd: SimCommand::from_protocol(cmd),
+                },
             )
             .await;
         }
