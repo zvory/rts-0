@@ -356,6 +356,7 @@ mod tests {
             state,
             is_complete: true,
             production_queue_len: None,
+            production_kind: None,
             latched_node: None,
             target_id: None,
             free_for_combat: state == AiEntityState::Idle,

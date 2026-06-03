@@ -94,6 +94,7 @@ pub(crate) struct AiEntitySummary {
     pub(crate) state: AiEntityState,
     pub(crate) is_complete: bool,
     pub(crate) production_queue_len: Option<usize>,
+    pub(crate) production_kind: Option<EntityKind>,
     pub(crate) latched_node: Option<u32>,
     pub(crate) target_id: Option<u32>,
     pub(crate) free_for_combat: bool,
@@ -311,6 +312,7 @@ impl AiEntitySummary {
             state: AiEntityState::from_protocol_state(entity.state_str()),
             is_complete: !entity.under_construction(),
             production_queue_len: production_queue_len(entity.kind, entity.prod_queue().len()),
+            production_kind: entity.prod_queue().first().map(|item| item.unit),
             latched_node: live_latched_node(entity),
             target_id: entity.target_id(),
             free_for_combat: live_free_for_combat(entity),
@@ -329,6 +331,10 @@ impl AiEntitySummary {
             state,
             is_complete: view.build_progress.is_none(),
             production_queue_len: production_queue_len(kind, view.prod_queue.unwrap_or(0) as usize),
+            production_kind: view
+                .prod_kind
+                .as_deref()
+                .and_then(|kind| kind.parse::<EntityKind>().ok()),
             latched_node: view.latched_node,
             target_id: view.target_id,
             free_for_combat: snapshot_free_for_combat(state, view.target_id),
