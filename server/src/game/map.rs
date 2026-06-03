@@ -17,7 +17,7 @@ use rand::seq::SliceRandom;
 use rand::SeedableRng;
 use serde::Deserialize;
 
-const DEFAULT_MAP_JSON: &str = include_str!("../../assets/maps/default.json");
+const DEFAULT_MAP_JSON: &str = include_str!("../../assets/maps/default-handcrafted.json");
 
 /// Radius around a player start site (even index) that must remain passable.
 pub const BASE_PROTECTION_RADIUS_TILES: i32 = 7;

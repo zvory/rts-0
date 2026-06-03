@@ -600,7 +600,8 @@ the human-readable form of the authoritative `rules::defs` records.
 - `TICK_HZ = 30`, `SNAPSHOT_EVERY_N_TICKS = 1`.
 - `MACHINE_GUNNER_SETUP_TICKS = 30` (~1s setup or teardown).
 - Map: `TILE_SIZE = 32` px. The live map is the hardcoded handcrafted asset at
-  `server/assets/maps/default.json` (96×96 today), served for tooling at `/maps/default.json`.
+  `server/assets/maps/default-handcrafted.json` (96×96 today), served for tooling at
+  `/maps/default-handcrafted.json`.
   Its JSON uses row strings (`.` grass, `#` rock, `~` water) plus ordered `baseSites`.
 - Start: `STARTING_STEEL = 50`, `STARTING_OIL = 0`, `STARTING_WORKERS = 4`,
   one Industrial Center at the player's start tile, 18 steel patches + 3 oil patches nearby.
