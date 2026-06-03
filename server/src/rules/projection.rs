@@ -61,6 +61,34 @@ pub fn project_entity(
     if entity.is_unit() {
         view.facing = Some(entity.facing());
     }
+    let active_combat_target = matches!(entity.order(), Order::Attack(_) | Order::AttackMove(_))
+        || (entity.is_building() && entity.can_attack());
+    let target_visible = if let Some(target_id) = entity.target_id() {
+        target
+            .filter(|target| target.id == target_id)
+            .map(|target| {
+                entity.owner == viewer
+                    || !fogged
+                    || fog.is_visible_world(viewer, target.pos_x, target.pos_y)
+            })
+            .unwrap_or(false)
+    } else {
+        false
+    };
+    let weapon_facing_useful =
+        entity.kind == crate::game::entity::EntityKind::Tank || active_combat_target;
+    if weapon_facing_useful {
+        if let Some(weapon_facing) = entity.weapon_facing() {
+            let weapon_facing_is_safe = entity.owner == viewer
+                || !fogged
+                || entity.target_id().is_none()
+                || !active_combat_target
+                || target_visible;
+            if weapon_facing_is_safe {
+                view.weapon_facing = Some(weapon_facing);
+            }
+        }
+    }
     if entity.kind == crate::game::entity::EntityKind::MachineGunner {
         view.setup_state = Some(entity.weapon_setup().to_protocol_str().to_string());
     }
@@ -97,14 +125,8 @@ pub fn project_entity(
     }
 
     if let Some(target_id) = entity.target_id() {
-        let active_combat_target =
-            matches!(entity.order(), Order::Attack(_) | Order::AttackMove(_))
-                || (entity.is_building() && entity.can_attack());
         if active_combat_target {
             if let Some(target) = target {
-                let target_visible = entity.owner == viewer
-                    || !fogged
-                    || fog.is_visible_world(viewer, target.pos_x, target.pos_y);
                 if target.id == target_id && target_visible {
                     view.target_id = Some(target_id);
                 }
@@ -113,4 +135,46 @@ pub fn project_entity(
     }
 
     Some(view)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::game::entity::{EntityKind, EntityStore, Order};
+
+    #[test]
+    fn weapon_facing_is_omitted_when_target_direction_is_hidden() {
+        let mut entities = EntityStore::new();
+        entities
+            .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
+            .expect("viewer spotter should spawn");
+        let tank_id = entities
+            .spawn_unit(2, EntityKind::Tank, 120.0, 100.0)
+            .expect("tank should spawn");
+        let hidden_target_id = entities
+            .spawn_unit(3, EntityKind::Rifleman, 700.0, 700.0)
+            .expect("hidden target should spawn");
+        {
+            let tank = entities.get_mut(tank_id).expect("tank should exist");
+            tank.set_order(Order::attack(hidden_target_id));
+            tank.set_target_id(Some(hidden_target_id));
+            tank.set_weapon_facing(1.2);
+        }
+        let mut fog = Fog::new(64);
+        fog.recompute(&[1, 2, 3], &entities);
+        let tank = entities.get(tank_id).expect("tank should exist");
+        let hidden_target = entities
+            .get(hidden_target_id)
+            .expect("hidden target should exist");
+
+        let enemy_view = project_entity(1, tank, &fog, true, Some(hidden_target))
+            .expect("viewer should see nearby tank");
+        assert_eq!(enemy_view.target_id, None);
+        assert_eq!(enemy_view.weapon_facing, None);
+
+        let owner_view = project_entity(2, tank, &fog, true, Some(hidden_target))
+            .expect("owner should see own tank");
+        assert_eq!(owner_view.target_id, Some(hidden_target_id));
+        assert_eq!(owner_view.weapon_facing, Some(1.2));
+    }
 }

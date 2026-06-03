@@ -379,6 +379,7 @@ export class Renderer {
     const r = stat.size || 9;
     const tint = this._tintFor(e.owner, colorByOwner);
     const facing = typeof e.facing === "number" ? e.facing : 0;
+    const weaponFacing = typeof e.weaponFacing === "number" ? e.weaponFacing : facing;
 
     // Shadow on its own layer (under all units).
     const sh = this._slot("unitShadows", e.id);
@@ -473,7 +474,7 @@ export class Renderer {
       g.beginFill(0x1a1712, 0.28);
       g.drawRect(-r * 0.55, -r * 0.42, r * 1.05, r * 0.82);
       g.endFill();
-      const barrel = polar(facing, r * 1.2);
+      const barrel = polar(weaponFacing, r * 1.2);
       g.lineStyle(4, 0x241d17, 0.95);
       g.moveTo(0, 0);
       g.lineTo(barrel.x, barrel.y);
@@ -999,7 +1000,9 @@ export class Renderer {
       const baseR = muzzleFlashRadius(attacker.kind);
       if (baseR <= 0) continue;
 
-      const facing = typeof attacker.facing === "number"
+      const facing = attacker.kind === KIND.TANK && typeof attacker.weaponFacing === "number"
+        ? attacker.weaponFacing
+        : typeof attacker.facing === "number"
         ? attacker.facing
         : target
         ? Math.atan2(target.y - attacker.y, target.x - attacker.x)

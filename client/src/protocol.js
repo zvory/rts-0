@@ -193,7 +193,7 @@ function decodeCompactSnapshot(raw) {
 }
 
 function decodeCompactEntity(record, index) {
-  const fields = readArray(record, `entity ${index}`, 17);
+  const fields = readArray(record, `entity ${index}`, 18);
   if (fields.length < 8) throw new Error(`entity ${index} is too short`);
   const entity = {
     id: readU32(fields[0], "entity.id"),
@@ -207,14 +207,15 @@ function decodeCompactEntity(record, index) {
   };
 
   assignOptional(entity, "facing", fields, 8, readNumber);
-  assignOptionalCode(entity, "prodKind", fields, 9, KIND_BY_CODE);
-  assignOptional(entity, "prodProgress", fields, 10, readNumber);
-  assignOptional(entity, "prodQueue", fields, 11, readU32);
-  assignOptional(entity, "buildProgress", fields, 12, readNumber);
-  assignOptional(entity, "latchedNode", fields, 13, readU32);
-  assignOptional(entity, "targetId", fields, 14, readU32);
-  assignOptionalCode(entity, "setupState", fields, 15, SETUP_BY_CODE);
-  assignOptional(entity, "remaining", fields, 16, readU32);
+  assignOptional(entity, "weaponFacing", fields, 9, readNumber);
+  assignOptionalCode(entity, "prodKind", fields, 10, KIND_BY_CODE);
+  assignOptional(entity, "prodProgress", fields, 11, readNumber);
+  assignOptional(entity, "prodQueue", fields, 12, readU32);
+  assignOptional(entity, "buildProgress", fields, 13, readNumber);
+  assignOptional(entity, "latchedNode", fields, 14, readU32);
+  assignOptional(entity, "targetId", fields, 15, readU32);
+  assignOptionalCode(entity, "setupState", fields, 16, SETUP_BY_CODE);
+  assignOptional(entity, "remaining", fields, 17, readU32);
   return entity;
 }
 
