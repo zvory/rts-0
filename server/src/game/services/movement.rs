@@ -23,7 +23,7 @@ const COLLISION_SEARCH_SLACK_PX: f32 = config::TILE_SIZE as f32;
 /// Maximum number of pair-resolution passes per tick. Each pass pushes overlapping pairs apart
 /// by the full violation; two-body cases converge in one pass and dense clusters typically
 /// converge in 2–3.
-const COLLISION_PASSES: usize = 4;
+const COLLISION_PASSES: usize = 6;
 
 /// Pairs whose center distance is at least `sum_radii - COLLISION_EPS_PX` are considered
 /// non-overlapping. Avoids endless micro-pushes from floating-point noise.
