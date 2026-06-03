@@ -10,6 +10,7 @@ use crate::game::entity::EntityKind;
 use crate::game::map::Map;
 use crate::game::pathfinding::{self, Passability};
 use crate::game::services::occupancy::Occupancy;
+use crate::game::services::standability;
 use crate::rules::terrain::{self, TerrainKind};
 
 /// Parameters for a single path query.
@@ -198,6 +199,50 @@ impl PathingService {
     }
 }
 
+/// Simplify reverse-ordered world waypoints by dropping intermediate tile centers when the unit
+/// body can travel straight to a later waypoint without clipping static terrain or buildings.
+pub(crate) fn simplify_reverse_waypoints(
+    map: &Map,
+    occupancy: &Occupancy,
+    kind: EntityKind,
+    start: (f32, f32),
+    waypoints: Vec<(f32, f32)>,
+) -> Vec<(f32, f32)> {
+    if waypoints.len() <= 1 {
+        return waypoints;
+    }
+
+    let forward: Vec<(f32, f32)> = waypoints.iter().rev().copied().collect();
+    let mut simplified = Vec::with_capacity(forward.len());
+    let mut from = start;
+    let mut next_index = 0;
+
+    while next_index < forward.len() {
+        let mut farthest_legal = None;
+        for candidate_index in (next_index..forward.len()).rev() {
+            if standability::unit_static_segment_standable(
+                map,
+                occupancy,
+                kind,
+                from,
+                forward[candidate_index],
+            ) {
+                farthest_legal = Some(candidate_index);
+                break;
+            }
+        }
+
+        let keep_index = farthest_legal.unwrap_or(next_index);
+        let keep = forward[keep_index];
+        simplified.push(keep);
+        from = keep;
+        next_index = keep_index + 1;
+    }
+
+    simplified.reverse();
+    simplified
+}
+
 #[cfg(test)]
 impl PathingService {
     pub fn cache_len(&self) -> usize {
@@ -283,6 +328,32 @@ mod tests {
         let tile_path = service.request_tile_path(map, &occ, req.clone());
         let world_path = service.request(map, &occ, req);
         (tile_path, world_path)
+    }
+
+    fn raw_world_path(
+        map: &Map,
+        kind: EntityKind,
+        start: (i32, i32),
+        goal: (i32, i32),
+    ) -> Vec<(f32, f32)> {
+        request_fixture_path(map, kind, start, goal).1
+    }
+
+    fn assert_reverse_segments_standable(
+        map: &Map,
+        occ: &Occupancy,
+        kind: EntityKind,
+        start: (f32, f32),
+        reverse_waypoints: &[(f32, f32)],
+    ) {
+        let mut from = start;
+        for to in reverse_waypoints.iter().rev().copied() {
+            assert!(
+                standability::unit_static_segment_standable(map, occ, kind, from, to),
+                "segment from {from:?} to {to:?} should be static-standable for {kind:?}"
+            );
+            from = to;
+        }
     }
 
     fn heading_changes_above(points: &[(f32, f32)], threshold_rad: f32) -> usize {
@@ -404,7 +475,174 @@ mod tests {
     }
 
     #[test]
-    fn open_tank_route_keeps_every_tile_center_waypoint_before_smoothing() {
+    fn simplify_open_diagonal_route_collapses_to_final_waypoint() {
+        let map = flat_test_map(40);
+        let start_tile = (4, 4);
+        let goal_tile = (28, 17);
+        let start = map.tile_center(start_tile.0 as u32, start_tile.1 as u32);
+        let entities = EntityStore::new();
+        let occ = Occupancy::build(&map, &entities);
+        let raw = raw_world_path(&map, EntityKind::Tank, start_tile, goal_tile);
+        let final_goal = raw[0];
+
+        let smoothed = simplify_reverse_waypoints(&map, &occ, EntityKind::Tank, start, raw.clone());
+
+        assert_eq!(
+            smoothed,
+            vec![final_goal],
+            "open route should collapse to only the final reverse-ordered waypoint"
+        );
+        assert!(smoothed.len() <= raw.len());
+        assert_reverse_segments_standable(&map, &occ, EntityKind::Tank, start, &smoothed);
+    }
+
+    #[test]
+    fn simplify_route_around_blocker_keeps_corner_waypoint() {
+        let map = map_with_rock_rect(24, 7, 6, 10, 8);
+        let start_tile = (4, 7);
+        let goal_tile = (13, 7);
+        let start = map.tile_center(start_tile.0 as u32, start_tile.1 as u32);
+        let entities = EntityStore::new();
+        let occ = Occupancy::build(&map, &entities);
+        let raw = raw_world_path(&map, EntityKind::Rifleman, start_tile, goal_tile);
+
+        let smoothed =
+            simplify_reverse_waypoints(&map, &occ, EntityKind::Rifleman, start, raw.clone());
+
+        assert!(
+            smoothed.len() > 1,
+            "blocked route should retain at least one waypoint before the final goal"
+        );
+        assert!(smoothed.len() <= raw.len());
+        assert_reverse_segments_standable(&map, &occ, EntityKind::Rifleman, start, &smoothed);
+
+        let forward: Vec<_> = smoothed.iter().rev().copied().collect();
+        assert!(
+            forward
+                .iter()
+                .any(|&(_, y)| (y - start.1).abs() > f32::EPSILON),
+            "smoothed route should keep a corner detour around the blocker, got {forward:?}"
+        );
+    }
+
+    #[test]
+    fn simplify_preserves_exact_final_command_goal() {
+        let map = flat_test_map(32);
+        let start_tile = (3, 3);
+        let goal_tile = (18, 11);
+        let exact_goal_center = map.tile_center(goal_tile.0 as u32, goal_tile.1 as u32);
+        let exact_goal = (exact_goal_center.0 + 6.75, exact_goal_center.1 - 4.25);
+        let start = map.tile_center(start_tile.0 as u32, start_tile.1 as u32);
+        let entities = EntityStore::new();
+        let occ = Occupancy::build(&map, &entities);
+        let mut raw = raw_world_path(&map, EntityKind::Rifleman, start_tile, goal_tile);
+        raw[0] = exact_goal;
+
+        let smoothed =
+            simplify_reverse_waypoints(&map, &occ, EntityKind::Rifleman, start, raw.clone());
+
+        assert_eq!(
+            smoothed.first().copied(),
+            Some(exact_goal),
+            "reverse-ordered index 0 must remain the exact command goal"
+        );
+        assert!(smoothed.len() <= raw.len());
+        assert_reverse_segments_standable(&map, &occ, EntityKind::Rifleman, start, &smoothed);
+    }
+
+    #[test]
+    fn simplify_never_increases_waypoint_count() {
+        let map = map_with_rock_rect(24, 7, 6, 10, 8);
+        let start_tile = (4, 7);
+        let goal_tile = (13, 7);
+        let start = map.tile_center(start_tile.0 as u32, start_tile.1 as u32);
+        let entities = EntityStore::new();
+        let occ = Occupancy::build(&map, &entities);
+        let raw = raw_world_path(&map, EntityKind::Rifleman, start_tile, goal_tile);
+
+        let smoothed =
+            simplify_reverse_waypoints(&map, &occ, EntityKind::Rifleman, start, raw.clone());
+
+        assert!(
+            smoothed.len() <= raw.len(),
+            "smoothing should only drop waypoints, raw={} smoothed={}",
+            raw.len(),
+            smoothed.len()
+        );
+    }
+
+    #[test]
+    fn simplify_is_deterministic_across_repeated_calls() {
+        let map = map_with_rock_rect(24, 7, 6, 10, 8);
+        let start_tile = (4, 7);
+        let goal_tile = (13, 7);
+        let start = map.tile_center(start_tile.0 as u32, start_tile.1 as u32);
+        let entities = EntityStore::new();
+        let occ = Occupancy::build(&map, &entities);
+        let raw = raw_world_path(&map, EntityKind::Rifleman, start_tile, goal_tile);
+
+        let first =
+            simplify_reverse_waypoints(&map, &occ, EntityKind::Rifleman, start, raw.clone());
+        let second =
+            simplify_reverse_waypoints(&map, &occ, EntityKind::Rifleman, start, raw.clone());
+        let third = simplify_reverse_waypoints(&map, &occ, EntityKind::Rifleman, start, raw);
+
+        assert_eq!(first, second);
+        assert_eq!(second, third);
+    }
+
+    #[test]
+    fn tank_smoothing_is_stricter_than_infantry_when_radius_matters() {
+        let mut map = flat_test_map(12);
+        let rock = map.index(5, 5);
+        map.terrain[rock] = terrain::ROCK;
+        let entities = EntityStore::new();
+        let occ = Occupancy::build(&map, &entities);
+        let ts = config::TILE_SIZE as f32;
+        let start = (3.5 * ts, 5.0 * ts - 10.0);
+        let final_goal = (7.5 * ts, 5.0 * ts - 10.0);
+        let detour = (7.5 * ts, 3.5 * ts);
+        let raw_reverse = vec![final_goal, detour];
+
+        assert!(standability::unit_static_segment_standable(
+            &map,
+            &occ,
+            EntityKind::Rifleman,
+            start,
+            final_goal,
+        ));
+        assert!(!standability::unit_static_segment_standable(
+            &map,
+            &occ,
+            EntityKind::Tank,
+            start,
+            final_goal,
+        ));
+
+        let infantry = simplify_reverse_waypoints(
+            &map,
+            &occ,
+            EntityKind::Rifleman,
+            start,
+            raw_reverse.clone(),
+        );
+        let tank = simplify_reverse_waypoints(&map, &occ, EntityKind::Tank, start, raw_reverse);
+
+        assert_eq!(
+            infantry,
+            vec![final_goal],
+            "infantry can take the shorter direct segment"
+        );
+        assert_eq!(
+            tank,
+            vec![final_goal, detour],
+            "tank must keep the detour because its body clips the direct segment"
+        );
+        assert_reverse_segments_standable(&map, &occ, EntityKind::Tank, start, &tank);
+    }
+
+    #[test]
+    fn raw_open_tank_route_keeps_every_tile_center_waypoint() {
         let map = flat_test_map(40);
         let start = (4, 4);
         let goal = (28, 17);
@@ -413,7 +651,7 @@ mod tests {
         assert_eq!(
             tile_path.len(),
             world_path.len(),
-            "world waypoint count should mirror original tile path length in phase 0"
+            "raw world waypoint count should mirror original tile path length"
         );
         assert!(
             tile_path.len() >= 20,
@@ -446,7 +684,7 @@ mod tests {
     }
 
     #[test]
-    fn obstacle_route_keeps_corner_waypoint_before_smoothing() {
+    fn raw_obstacle_route_keeps_corner_waypoint() {
         let map = map_with_rock_rect(24, 7, 6, 10, 8);
         let start = (4, 7);
         let goal = (13, 7);
@@ -456,7 +694,7 @@ mod tests {
         assert_eq!(
             tile_path.len(),
             world_path.len(),
-            "world waypoint count should mirror original tile path length around blockers"
+            "raw world waypoint count should mirror original tile path length around blockers"
         );
         assert!(
             tile_path
