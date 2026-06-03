@@ -9,6 +9,10 @@ A server-authoritative Bewegungskrieg server (`server/`, axum + tokio) runs the 
 simulation and also serves the **HTML/CSS/JS + PixiJS** client (`client/`). Clients send commands;
 the server simulates at 30 Hz and sends per-player, fog-filtered snapshots.
 
+## Completion Summary
+
+- Once you're done a task, explain in plain language what you've done and the gameplay impact.
+
 ## Parallel Worktrees
 
 - For parallel feature work (which is always the case), each terminal/agent must work in its own
