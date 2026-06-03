@@ -1,21 +1,10 @@
 # Sound Assets
 
-## Sources
-
-| Source | License | Attribution required |
-|---|---|---|
-| OpenGameArt.org | CC0 | No |
-| GfxSounds.com | GfxSounds Standard (royalty-free commercial) | No |
-| archive.org — USC Cinema GOLD TAPE series | CC0 1.0 Universal | No |
-
-## Attribution
-
-None required.
+See `SOUND_NOTES.md` for full review notes, rejection reasons, and source tracking policy.
 
 ## Format
 
-- Primary: OGG Vorbis (positional SFX, engine loops)
-- Fallback: MP3 (where OGG source was unavailable)
+- All current files: MP3 (OGG primary format deferred — no OGG sources found yet)
 - Sample rate: 44.1 kHz, mono
 - No WAV in production
 
@@ -25,23 +14,31 @@ Normalize to −16 LUFS integrated, true-peak ≤ −1 dBTP before shipping. Pla
 
 ## Naming convention
 
-`category_subject_variant.ogg` — e.g. `combat_kar98k_01.mp3`, `units_tank_engine_loop_01.ogg`
+`category_subject_variant.ext` — e.g. `combat_kar98k_03.mp3`, `units_tank_engine_idle_03.mp3`
 
-## Placeholder files
+## Current keepers
 
-| File | Description | License |
-|---|---|---|
-| `combat/combat_kar98k_01.mp3` | Single rifle shot (bolt-action) | CC0 |
-| `combat/combat_mg42_burst_01.mp3` | Automatic gunfire burst (USC Cinema GOLD TAPE 33) | CC0 |
-| `combat/combat_tank_cannon_01.mp3` | Tank cannon single shot | GfxSounds Standard |
-| `combat/combat_explosion_01.mp3` | Close explosion | CC0 |
-| `units/units_infantry_footstep_01.ogg` | Infantry footstep variant 1 | CC0 |
-| `units/units_infantry_footstep_02.ogg` | Infantry footstep variant 2 | CC0 |
-| `units/units_tank_engine_loop_01.mp3` | M-4 Sherman tank engine (USC Cinema GOLD TAPE 15) | CC0 |
+| File | Role | Source | License |
+|------|------|--------|---------|
+| `combat/combat_kar98k_02.mp3` | Kar98k variation | unknown | unknown |
+| `combat/combat_kar98k_03.mp3` | Kar98k primary (trimmed, bolt removed) | unknown | unknown |
+| `combat/combat_kar98k_03_with_bolt_action.mp3` | Kar98k original (bolt retained) | unknown | unknown |
+| `combat/combat_mg42_burst_02.mp3` | MG42 primary — clean isolated burst | unknown | unknown |
+| `combat/combat_mg42_burst_03.mp3` | MG42 backup | unknown | unknown |
+| `combat/combat_tank_cannon_01.mp3` | Tank cannon (a bit loud) | unknown | unknown |
+| `combat/combat_tank_cannon_06.mp3` | Tank cannon primary — extracted from US Army video, some compression artifacts | https://freesound.org/people/qubodup/sounds/161343/ | CC0 |
+| `units/units_tank_engine_idle_03.mp3` | Tank engine idle primary — clean, long, authentic | https://freesound.org/people/C-V/sounds/565598/ | unknown |
+| `buildings/buildings_construction_start_01.mp3` | Construction start — all buildings | https://freesound.org/people/dr19/sounds/353907/ | CC0 |
 
-## Gaps (placeholder quality only — replace before ship)
+### Attribution required
 
-- No authentic Kar98k recording; current file is a generic bolt-action shot
-- No authentic MG42; current file is a generic LMG burst
-- No German infantry voice acknowledgments
-- `ui/`, `buildings/`, `ambient/` directories are empty
+- `combat_tank_cannon_09.mp3` (not yet downloaded): CC-BY 4.0 — credit YleArkisto / yle.fi. Source: https://freesound.org/people/YleArkisto/sounds/332935/
+
+## Gaps
+
+- Sources unknown for most keepers — must resolve before ship
+- License unknown for `units_tank_engine_idle_03.mp3` — verify freesound.org/people/C-V/sounds/565598/
+- Grass infantry footstep pack: need 6–10 clean variations on grass surface
+- Tank engine running (moving): https://freesound.org/people/C-V/sounds/565597/ (same session as idle_03)
+- No explosion sounds (all candidates rejected — see SOUND_NOTES)
+- `ui/`, `ambient/` directories are empty
