@@ -246,7 +246,7 @@ src/
     pathfinding.rs # A* over the tile grid (impassable = terrain + building footprints)
     fog.rs       # per-player visibility grid (visible / explored)
     systems.rs   # orchestrator: runs services in order each tick
-    services/    # per-tick internal services: commands, move_coordinator, movement (incl. unit collision), combat, economy, production, construction, death, occupancy, supply, pathing
+    services/    # per-tick internal services: commands, move_coordinator, movement (incl. unit collision), combat, economy, production, construction, death, occupancy, supply, pathing, geometry, standability
     ai.rs        # optional computer opponents: one AiController per AI player (see §8)
     ai_core/     # shared AI observation/facts/action/profile core, introduced incrementally
     ai_shared.rs # compatibility helpers while live AI and self-play migrate to ai_core
@@ -361,6 +361,11 @@ Rules functions have no imports from `services/`; classification and formula rul
 kind-specific data from `rules::defs`. `config.rs` holds scalar constants and compatibility
 wrappers such as `unit_stats(kind)` / `building_stats(kind)`, which return the stats embedded in
 defs.
+
+`services::geometry` owns shared body primitives for unit circles and building footprint
+rectangles. `services::standability` owns reusable legality predicates for unit bodies and
+building sites. Production, construction, movement, and collision may migrate to these predicates
+incrementally; phase-zero helpers are pure and do not change the wire protocol or client contract.
 
 ---
 
