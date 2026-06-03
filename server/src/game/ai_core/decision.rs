@@ -1427,6 +1427,7 @@ where
     if resources.is_empty() {
         return None;
     }
+    let mut best = None;
     for anchor in expansion_anchor_tiles(observation, &resources) {
         let cluster_resources =
             expansion_cluster_resources_for_anchor(observation, anchor, &resources);
@@ -1444,7 +1445,6 @@ where
             .count()
             .min(config::OIL_PATCHES_PER_BASE as usize);
         let mut seen = BTreeSet::new();
-        let mut best = None;
         let Some(start_tile) = footprint_top_left_for_center(anchor, kind) else {
             continue;
         };
@@ -1482,12 +1482,9 @@ where
                 }
             }
         }
-        if let Some(candidate) = best {
-            return Some(candidate.tile);
-        }
     }
 
-    None
+    best.map(|candidate: ExpansionSiteCandidate| candidate.tile)
 }
 
 fn expansion_candidate_resources(observation: &AiObservation) -> Vec<&AiResourceSummary> {
@@ -1604,6 +1601,7 @@ struct ExpansionSiteCandidate {
     max_resource_distance2: f32,
     sum_resource_distance2: f32,
     own_distance2: f32,
+    approach_exposure: Option<f32>,
 }
 
 fn expansion_site_candidate(
@@ -1638,13 +1636,16 @@ fn expansion_site_candidate(
         return None;
     }
     let own = tile_center(observation.own_start_tile, observation.map.tile_size);
+    let own_distance2 = dist2(cx, cy, own.0, own.1);
+    let enemy_distance2 = nearest_enemy_start_distance2(observation, cx, cy);
     Some(ExpansionSiteCandidate {
         tile: (tile_x, tile_y),
         steel_in_range,
         oil_in_range,
         max_resource_distance2,
         sum_resource_distance2,
-        own_distance2: dist2(cx, cy, own.0, own.1),
+        own_distance2,
+        approach_exposure: expansion_approach_exposure(own_distance2, enemy_distance2),
     })
 }
 
@@ -1660,6 +1661,12 @@ fn expansion_site_candidate_better(
         .cmp(&current.oil_in_range)
         .then_with(|| candidate.steel_in_range.cmp(&current.steel_in_range))
         .then_with(|| {
+            expansion_approach_exposure_order(
+                candidate.approach_exposure,
+                current.approach_exposure,
+            )
+        })
+        .then_with(|| {
             current
                 .max_resource_distance2
                 .total_cmp(&candidate.max_resource_distance2)
@@ -1672,6 +1679,33 @@ fn expansion_site_candidate_better(
         .then_with(|| current.own_distance2.total_cmp(&candidate.own_distance2))
         .then_with(|| current.tile.cmp(&candidate.tile))
         == Ordering::Greater
+}
+
+fn expansion_approach_exposure(own_distance2: f32, enemy_distance2: Option<f32>) -> Option<f32> {
+    enemy_distance2
+        .filter(|distance2| distance2.is_finite() && *distance2 > f32::EPSILON)
+        .map(|distance2| own_distance2 / distance2)
+}
+
+fn expansion_approach_exposure_order(candidate: Option<f32>, current: Option<f32>) -> Ordering {
+    match (candidate, current) {
+        (Some(candidate), Some(current)) => current.total_cmp(&candidate),
+        (Some(_), None) => Ordering::Greater,
+        (None, Some(_)) => Ordering::Less,
+        (None, None) => Ordering::Equal,
+    }
+}
+
+fn nearest_enemy_start_distance2(observation: &AiObservation, x: f32, y: f32) -> Option<f32> {
+    observation
+        .players
+        .iter()
+        .filter(|player| player.id != observation.player_id && player.is_alive)
+        .map(|player| {
+            let center = tile_center(player.start_tile, observation.map.tile_size);
+            dist2(x, y, center.0, center.1)
+        })
+        .min_by(|left, right| left.total_cmp(right))
 }
 
 fn resource_is_near_player_start(
@@ -3085,6 +3119,90 @@ mod tests {
                 config::OIL_PATCHES_PER_BASE as usize
             ),
             "chosen closer natural should still cover its whole resource line"
+        );
+    }
+
+    #[test]
+    fn steel_expansion_tanks_prefers_safer_natural_when_distances_are_similar() {
+        let map_size = 96;
+        let ts = config::TILE_SIZE as f32;
+        let mut owned = vec![building_at(
+            10,
+            EntityKind::IndustrialCenter,
+            Some(0),
+            10.5 * ts,
+            85.5 * ts,
+        )];
+        owned.extend((0..8).map(|i| steel_worker(40 + i, 100 + i)));
+        owned.push(worker(60, AiEntityState::Idle));
+        let mut resources = base_site_resources(100, (10, 85), map_size);
+        resources.extend(base_site_resources(200, (23, 47), map_size));
+        resources.extend(base_site_resources(300, (48, 73), map_size));
+        resources.sort_by_key(|resource| resource.id);
+        let observation = AiObservation {
+            player_id: 1,
+            tick: 90,
+            map: AiMapSummary {
+                width: map_size,
+                height: map_size,
+                tile_size: config::TILE_SIZE,
+            },
+            economy: AiEconomy {
+                steel: 500,
+                oil: 500,
+                supply_used: 12,
+                supply_cap: 30,
+            },
+            own_start_tile: (10, 85),
+            players: vec![
+                AiPlayerSummary {
+                    id: 1,
+                    start_tile: (10, 85),
+                    is_ai: true,
+                    is_alive: true,
+                },
+                AiPlayerSummary {
+                    id: 2,
+                    start_tile: (85, 85),
+                    is_ai: false,
+                    is_alive: true,
+                },
+            ],
+            owned,
+            resources,
+            visible_enemies: Vec::new(),
+            pending_builds: Vec::new(),
+        };
+
+        let mut placeable = |_: EntityKind, tx: u32, ty: u32| tx < map_size && ty < map_size;
+        let site = expansion_industrial_center_site(
+            &observation,
+            STEEL_EXPANSION_TANKS.expansion.unwrap(),
+            EntityKind::IndustrialCenter,
+            &mut placeable,
+        )
+        .expect("expansion IC site should be found");
+        let center = building_center(
+            site,
+            EntityKind::IndustrialCenter,
+            observation.map.tile_size,
+        )
+        .expect("industrial center should have a center");
+        let safer_natural = tile_center((23, 47), observation.map.tile_size);
+        let exposed_natural = tile_center((48, 73), observation.map.tile_size);
+
+        assert!(
+            dist2(center.0, center.1, safer_natural.0, safer_natural.1)
+                < dist2(center.0, center.1, exposed_natural.0, exposed_natural.1),
+            "expansion IC at {site:?} should choose the natural farther from the enemy start"
+        );
+        assert_eq!(
+            expansion_resource_counts_for_site(&observation, site),
+            (
+                config::STEEL_PATCHES_PER_BASE as usize,
+                config::OIL_PATCHES_PER_BASE as usize
+            ),
+            "chosen safer natural should still cover its whole resource line"
         );
     }
 
