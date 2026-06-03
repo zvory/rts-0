@@ -5,6 +5,7 @@ use crate::game::entity::EntityKind;
 pub(crate) const RIFLE_FLOOD_FAST_ID: &str = "rifle_flood_fast";
 pub(crate) const RIFLE_FLOOD_FULL_SATURATION_ID: &str = "rifle_flood_full_saturation";
 pub(crate) const TECH_TO_TANKS_ID: &str = "tech_to_tanks";
+pub(crate) const STEEL_EXPANSION_TANKS_ID: &str = "steel_expansion_tanks";
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct AiProfile {
@@ -15,6 +16,7 @@ pub(crate) struct AiProfile {
     pub(crate) production: ProductionPolicy,
     pub(crate) attack: AttackPolicy,
     pub(crate) resources: ResourcePolicy,
+    pub(crate) expansion: Option<ExpansionPolicy>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -87,6 +89,17 @@ pub(crate) struct BuildingPolicy {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct ExpansionPolicy {
+    pub(crate) target_industrial_centers: usize,
+    pub(crate) required_complete_building: EntityKind,
+    pub(crate) defensive_unit: EntityKind,
+    pub(crate) defensive_unit_count: usize,
+    pub(crate) pre_expansion_steel_worker_cap: usize,
+    pub(crate) post_expansion_steel_worker_cap: Option<usize>,
+    pub(crate) search_radius_tiles: i32,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct ProxyBarracksPolicy {
     pub(crate) search_radius_tiles: i32,
     pub(crate) min_enemy_base_distance_tiles: i32,
@@ -130,6 +143,7 @@ pub(crate) struct ProductionPolicy {
     pub(crate) queue_depth: usize,
     pub(crate) unit_priorities: &'static [EntityKind],
     pub(crate) save_for_first_tech_unit: Option<EntityKind>,
+    pub(crate) balance_unit_priorities: bool,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -146,10 +160,19 @@ pub(crate) struct AttackPolicy {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct ResourcePolicy {
     pub(crate) oil_after_steel_workers: usize,
+    pub(crate) tank_adaptive: Option<TankResourcePolicy>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct TankResourcePolicy {
+    pub(crate) max_oil_workers: usize,
+    pub(crate) oil_workers_per_tank_factory: usize,
+    pub(crate) deficit_response_workers: usize,
 }
 
 const RIFLE_ONLY: [EntityKind; 1] = [EntityKind::Rifleman];
 const TANK_AND_RIFLE: [EntityKind; 2] = [EntityKind::Tank, EntityKind::Rifleman];
+const SUPPORT_WEAPONS: [EntityKind; 2] = [EntityKind::MachineGunner, EntityKind::AtTeam];
 
 const FAST_TECH_PATH: [EntityKind; 1] = [EntityKind::Barracks];
 const FULL_TECH_PATH: [EntityKind; 1] = [EntityKind::Barracks];
@@ -158,6 +181,7 @@ const TANK_TECH_PATH: [EntityKind; 3] = [
     EntityKind::TrainingCentre,
     EntityKind::TankFactory,
 ];
+const SUPPORT_TECH_PATH: [EntityKind; 2] = [EntityKind::Barracks, EntityKind::TrainingCentre];
 
 pub(crate) static RIFLE_FLOOD_FAST: AiProfile = AiProfile {
     id: RIFLE_FLOOD_FAST_ID,
@@ -191,6 +215,7 @@ pub(crate) static RIFLE_FLOOD_FAST: AiProfile = AiProfile {
         queue_depth: 2,
         unit_priorities: &RIFLE_ONLY,
         save_for_first_tech_unit: None,
+        balance_unit_priorities: false,
     },
     attack: AttackPolicy {
         first_attack_size: 1,
@@ -203,7 +228,9 @@ pub(crate) static RIFLE_FLOOD_FAST: AiProfile = AiProfile {
     },
     resources: ResourcePolicy {
         oil_after_steel_workers: usize::MAX,
+        tank_adaptive: None,
     },
+    expansion: None,
 };
 
 pub(crate) static RIFLE_FLOOD_FULL_SATURATION: AiProfile = AiProfile {
@@ -235,6 +262,7 @@ pub(crate) static RIFLE_FLOOD_FULL_SATURATION: AiProfile = AiProfile {
         queue_depth: 3,
         unit_priorities: &RIFLE_ONLY,
         save_for_first_tech_unit: None,
+        balance_unit_priorities: false,
     },
     attack: AttackPolicy {
         first_attack_size: 6,
@@ -247,7 +275,9 @@ pub(crate) static RIFLE_FLOOD_FULL_SATURATION: AiProfile = AiProfile {
     },
     resources: ResourcePolicy {
         oil_after_steel_workers: usize::MAX,
+        tank_adaptive: None,
     },
+    expansion: None,
 };
 
 pub(crate) static TECH_TO_TANKS: AiProfile = AiProfile {
@@ -279,6 +309,7 @@ pub(crate) static TECH_TO_TANKS: AiProfile = AiProfile {
         queue_depth: 1,
         unit_priorities: &TANK_AND_RIFLE,
         save_for_first_tech_unit: Some(EntityKind::Tank),
+        balance_unit_priorities: false,
     },
     attack: AttackPolicy {
         first_attack_size: 1,
@@ -291,14 +322,72 @@ pub(crate) static TECH_TO_TANKS: AiProfile = AiProfile {
     },
     resources: ResourcePolicy {
         oil_after_steel_workers: 8,
+        tank_adaptive: None,
     },
+    expansion: None,
 };
 
-pub(crate) fn required_profiles() -> [&'static AiProfile; 3] {
+pub(crate) static STEEL_EXPANSION_TANKS: AiProfile = AiProfile {
+    id: STEEL_EXPANSION_TANKS_ID,
+    workers: WorkerPolicy {
+        steel_saturation_fraction: Ratio::new(1, 1),
+        steel_worker_cap: Some(24),
+        extra_oil_workers: 6,
+        pressure_worker_cap: None,
+        pressure_until_complete: None,
+    },
+    supply: SupplyPolicy {
+        free_supply_buffer: 8,
+        emergency_depot_threshold: 2,
+    },
+    buildings: BuildingPolicy {
+        barracks_curve: BarracksCurve {
+            before_steel_saturation: 2,
+            after_steel_saturation: 4,
+            banked_steel_threshold: 500,
+            banked_steel_step: 0,
+            max: 4,
+        },
+        proxy_barracks: None,
+        required_tech_path: &SUPPORT_TECH_PATH,
+        max_pending_per_kind: 1,
+    },
+    production: ProductionPolicy {
+        queue_depth: 3,
+        unit_priorities: &SUPPORT_WEAPONS,
+        save_for_first_tech_unit: Some(EntityKind::MachineGunner),
+        balance_unit_priorities: true,
+    },
+    attack: AttackPolicy {
+        first_attack_size: usize::MAX,
+        wave_growth: 0,
+        regroup_reset_ticks: 540,
+        reissue_cadence_ticks: 120,
+        stage_distance_tiles: 6.0,
+        unit_kinds: &SUPPORT_WEAPONS,
+        required_unit: None,
+    },
+    resources: ResourcePolicy {
+        oil_after_steel_workers: 8,
+        tank_adaptive: None,
+    },
+    expansion: Some(ExpansionPolicy {
+        target_industrial_centers: 2,
+        required_complete_building: EntityKind::IndustrialCenter,
+        defensive_unit: EntityKind::MachineGunner,
+        defensive_unit_count: 0,
+        pre_expansion_steel_worker_cap: 8,
+        post_expansion_steel_worker_cap: Some(24),
+        search_radius_tiles: 6,
+    }),
+};
+
+pub(crate) fn required_profiles() -> [&'static AiProfile; 4] {
     [
         &RIFLE_FLOOD_FAST,
         &RIFLE_FLOOD_FULL_SATURATION,
         &TECH_TO_TANKS,
+        &STEEL_EXPANSION_TANKS,
     ]
 }
 
@@ -321,7 +410,8 @@ mod tests {
             [
                 RIFLE_FLOOD_FAST_ID,
                 RIFLE_FLOOD_FULL_SATURATION_ID,
-                TECH_TO_TANKS_ID
+                TECH_TO_TANKS_ID,
+                STEEL_EXPANSION_TANKS_ID
             ]
         );
         assert_eq!(
@@ -346,6 +436,7 @@ mod tests {
     fn tech_to_tanks_has_oil_workers_and_tank_factory_path() {
         assert_eq!(TECH_TO_TANKS.workers.extra_oil_workers, 3);
         assert_eq!(TECH_TO_TANKS.resources.oil_after_steel_workers, 8);
+        assert_eq!(TECH_TO_TANKS.resources.tank_adaptive, None);
         assert_eq!(
             TECH_TO_TANKS.buildings.required_tech_path,
             &[
@@ -359,6 +450,33 @@ mod tests {
             Some(EntityKind::Tank)
         );
         assert_eq!(TECH_TO_TANKS.attack.first_attack_size, 1);
+    }
+
+    #[test]
+    fn steel_expansion_tanks_expands_before_support_tech() {
+        let expansion = STEEL_EXPANSION_TANKS.expansion.unwrap();
+
+        assert_eq!(STEEL_EXPANSION_TANKS.buildings.barracks_curve.max, 4);
+        assert_eq!(
+            STEEL_EXPANSION_TANKS.buildings.required_tech_path,
+            &[EntityKind::Barracks, EntityKind::TrainingCentre]
+        );
+        assert_eq!(
+            STEEL_EXPANSION_TANKS.production.unit_priorities,
+            &[EntityKind::MachineGunner, EntityKind::AtTeam]
+        );
+        assert!(STEEL_EXPANSION_TANKS.production.balance_unit_priorities);
+        assert_eq!(expansion.target_industrial_centers, 2);
+        assert_eq!(
+            expansion.required_complete_building,
+            EntityKind::IndustrialCenter
+        );
+        assert_eq!(expansion.defensive_unit_count, 0);
+        assert_eq!(expansion.pre_expansion_steel_worker_cap, 8);
+        assert_eq!(expansion.post_expansion_steel_worker_cap, Some(24));
+        assert_eq!(STEEL_EXPANSION_TANKS.workers.extra_oil_workers, 6);
+        assert_eq!(STEEL_EXPANSION_TANKS.attack.first_attack_size, usize::MAX);
+        assert!(STEEL_EXPANSION_TANKS.resources.tank_adaptive.is_none());
     }
 
     #[test]

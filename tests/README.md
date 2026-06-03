@@ -63,6 +63,7 @@ first tanks, command counts, and final army/base counts.
 ```bash
 cd server
 cargo run --bin ai-matchup -- rush tech
+cargo run --bin ai-matchup -- expand tech
 cargo run --bin ai-matchup -- saturation tech --seed 7 --ticks 20000 --json
 cargo run --bin ai-matchup -- --list-profiles
 ```

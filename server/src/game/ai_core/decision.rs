@@ -9,8 +9,10 @@ use crate::game::ai_core::actions::{
     TrainUnitsRequest,
 };
 use crate::game::ai_core::facts::{AiFacts, EnemyBaseFact};
-use crate::game::ai_core::observation::{AiEntityState, AiEntitySummary, AiObservation};
-use crate::game::ai_core::profiles::{AiProfile, ProxyBarracksPolicy};
+use crate::game::ai_core::observation::{
+    AiEntityState, AiEntitySummary, AiObservation, AiResourceSummary,
+};
+use crate::game::ai_core::profiles::{AiProfile, ExpansionPolicy, ProxyBarracksPolicy};
 use crate::game::ai_shared;
 use crate::game::entity::EntityKind;
 use crate::protocol::Command;
@@ -141,6 +143,8 @@ where
     gathering_builders.sort_unstable();
     let builder_pools = [idle_builders.as_slice(), gathering_builders.as_slice()];
     let save_for_required_tech_building = should_save_for_required_tech_building(&facts, profile);
+    let expansion_blocks_tech_path = expansion_blocks_tech_path(&facts, profile);
+    let save_for_expansion = should_save_for_expansion(&facts, profile);
     let proxy_barracks_active = should_use_proxy_barracks(&facts, profile);
 
     if proxy_barracks_active {
@@ -180,6 +184,9 @@ where
         if proxy_barracks_active && *kind == EntityKind::Barracks {
             continue;
         }
+        if expansion_blocks_tech_path {
+            continue;
+        }
         if facts.building_count(*kind) + planned_in_intents(&intents, *kind) > 0 {
             continue;
         }
@@ -207,6 +214,8 @@ where
     let target_steel_workers = profile
         .workers
         .target_steel_workers(facts.target_steel_workers, complete_gate_count);
+    let target_steel_workers =
+        target_steel_workers_for_profile(observation, &facts, profile, target_steel_workers);
     let target_barracks = profile.buildings.barracks_curve.target(
         observation.economy.steel,
         facts.worker_count,
@@ -216,6 +225,7 @@ where
         + planned_in_intents(&intents, EntityKind::Barracks)
         < target_barracks
         && !(proxy_barracks_active && facts.building_count(EntityKind::Barracks) == 0)
+        && !expansion_blocks_tech_path
         && planned_in_intents(&intents, EntityKind::Barracks) == 0
         && try_build_kind(
             observation,
@@ -234,25 +244,47 @@ where
         });
     }
 
-    let desired_oil_workers = desired_oil_workers(observation, profile, target_steel_workers);
+    if save_for_expansion
+        && try_build_expansion_industrial_center(
+            observation,
+            &facts,
+            &mut actions,
+            &builder_pools,
+            profile,
+            &mut placeable,
+        )
+        .is_some()
+    {
+        intents.push(AiIntent::Build {
+            kind: EntityKind::IndustrialCenter,
+        });
+    }
+
+    let desired_oil_workers =
+        desired_oil_workers(observation, &facts, profile, target_steel_workers);
     let target_workers = target_steel_workers.saturating_add(desired_oil_workers);
     let save_for_first_tech_unit = should_save_for_first_tech_unit(&facts, profile);
-    let save_worker_training_for_tech = save_for_first_tech_unit
+    let save_worker_training_for_tech = save_for_expansion
+        || save_for_first_tech_unit
         || (save_for_required_tech_building && facts.worker_count >= target_workers);
     for trained in actions::train_units(
         &mut actions,
         TrainUnitsRequest {
             buildings: facts.production_buildings(EntityKind::IndustrialCenter),
             unit_priorities: &[EntityKind::Worker],
+            completed_building_kinds: facts.complete_building_kinds(),
             max_queue_depth: 1,
             save_for_tech: save_worker_training_for_tech,
             current_counts: &[(EntityKind::Worker, facts.worker_count)],
             max_counts: &[(EntityKind::Worker, target_workers)],
+            balance_unit_priorities: false,
         },
     ) {
         intents.push(AiIntent::Train { kind: trained.unit });
     }
 
+    let production_unit_counts =
+        unit_counts_for_priorities(&facts, profile.production.unit_priorities);
     for building_kind in production_building_order(profile.production.unit_priorities) {
         let buildings = facts.production_buildings(building_kind);
         if buildings.is_empty() {
@@ -262,17 +294,20 @@ where
             .production
             .save_for_first_tech_unit
             .unwrap_or(EntityKind::Worker);
-        let save_for_tech = (save_for_first_tech_unit || save_for_required_tech_building)
-            && !rules::economy::trainable_units(building_kind).contains(&key_tech_unit);
+        let save_for_tech =
+            (save_for_expansion || save_for_first_tech_unit || save_for_required_tech_building)
+                && !rules::economy::trainable_units(building_kind).contains(&key_tech_unit);
         for trained in actions::train_units(
             &mut actions,
             TrainUnitsRequest {
                 buildings,
                 unit_priorities: profile.production.unit_priorities,
+                completed_building_kinds: facts.complete_building_kinds(),
                 max_queue_depth: profile.production.queue_depth,
                 save_for_tech,
-                current_counts: &[],
+                current_counts: &production_unit_counts,
                 max_counts: &[],
+                balance_unit_priorities: profile.production.balance_unit_priorities,
             },
         ) {
             intents.push(AiIntent::Train { kind: trained.unit });
@@ -476,6 +511,75 @@ where
 
 fn should_use_proxy_barracks(facts: &AiFacts, profile: &AiProfile) -> bool {
     profile.buildings.proxy_barracks.is_some() && facts.building_count(EntityKind::Barracks) == 0
+}
+
+fn expansion_blocks_tech_path(facts: &AiFacts, profile: &AiProfile) -> bool {
+    let Some(expansion) = profile.expansion else {
+        return false;
+    };
+    facts.building_count(EntityKind::IndustrialCenter) < expansion.target_industrial_centers
+}
+
+fn should_save_for_expansion(facts: &AiFacts, profile: &AiProfile) -> bool {
+    let Some(expansion) = profile.expansion else {
+        return false;
+    };
+    facts.building_count(EntityKind::IndustrialCenter) < expansion.target_industrial_centers
+        && expansion_prerequisites_met(facts, expansion)
+}
+
+fn expansion_prerequisites_met(facts: &AiFacts, expansion: ExpansionPolicy) -> bool {
+    facts.complete_building_count(expansion.required_complete_building) > 0
+        && facts.unit_count(expansion.defensive_unit) >= expansion.defensive_unit_count
+}
+
+fn target_steel_workers_for_profile(
+    observation: &AiObservation,
+    facts: &AiFacts,
+    profile: &AiProfile,
+    base_target: usize,
+) -> usize {
+    let Some(expansion) = profile.expansion else {
+        return base_target;
+    };
+    if facts.complete_building_count(EntityKind::IndustrialCenter)
+        < expansion.target_industrial_centers
+    {
+        return base_target.min(expansion.pre_expansion_steel_worker_cap);
+    }
+
+    let expanded_target = base_target.max(completed_ic_steel_saturation_target(observation));
+    expansion
+        .post_expansion_steel_worker_cap
+        .map(|cap| expanded_target.min(cap))
+        .unwrap_or(expanded_target)
+}
+
+fn completed_ic_steel_saturation_target(observation: &AiObservation) -> usize {
+    let completed_ics: Vec<&AiEntitySummary> = observation
+        .owned
+        .iter()
+        .filter(|entity| {
+            entity.kind == EntityKind::IndustrialCenter
+                && entity.is_complete
+                && entity.state != AiEntityState::Dead
+        })
+        .collect();
+    if completed_ics.is_empty() {
+        return 0;
+    }
+    let max_dist_px = (config::IC_RESOURCE_MAX_DIST_TILES + 0.5) * observation.map.tile_size as f32;
+    let max_dist2 = squared(max_dist_px);
+    observation
+        .resources
+        .iter()
+        .filter(|resource| resource.kind == EntityKind::Steel && resource.remaining > 0)
+        .filter(|resource| {
+            completed_ics
+                .iter()
+                .any(|ic| dist2(resource.x, resource.y, ic.x, ic.y) <= max_dist2)
+        })
+        .count()
 }
 
 fn proxy_barracks_transit_site<F>(
@@ -764,6 +868,294 @@ fn wants_depot(facts: &AiFacts, profile: &AiProfile) -> bool {
 }
 
 #[allow(clippy::too_many_arguments)]
+fn try_build_expansion_industrial_center<F>(
+    observation: &AiObservation,
+    facts: &AiFacts,
+    actions: &mut AiActionContext<'_>,
+    builder_pools: &[&[u32]],
+    profile: &AiProfile,
+    placeable: &mut F,
+) -> Option<actions::BuildAction>
+where
+    F: FnMut(EntityKind, u32, u32) -> bool,
+{
+    let expansion = profile.expansion?;
+    let kind = EntityKind::IndustrialCenter;
+    config::building_stats(kind)?;
+    if !rules::economy::build_requirement_met(kind, facts.complete_building_kinds()) {
+        return None;
+    }
+    if facts.building_count(kind) >= expansion.target_industrial_centers {
+        return None;
+    }
+    let counts = facts.building_counts(kind);
+    if counts.incomplete + counts.intended >= profile.buildings.max_pending_per_kind {
+        return None;
+    }
+    let (tile_x, tile_y) =
+        expansion_industrial_center_site(observation, expansion, kind, placeable)?;
+    actions::try_build_at(actions, builder_pools, kind, tile_x, tile_y)
+}
+
+fn footprint_top_left_for_center(center_tile: (u32, u32), kind: EntityKind) -> Option<(u32, u32)> {
+    let stats = config::building_stats(kind)?;
+    Some((
+        center_tile.0.saturating_sub(stats.foot_w / 2),
+        center_tile.1.saturating_sub(stats.foot_h / 2),
+    ))
+}
+
+fn expansion_industrial_center_site<F>(
+    observation: &AiObservation,
+    expansion: ExpansionPolicy,
+    kind: EntityKind,
+    placeable: &mut F,
+) -> Option<(u32, u32)>
+where
+    F: FnMut(EntityKind, u32, u32) -> bool,
+{
+    let stats = config::building_stats(kind)?;
+    let resources = expansion_candidate_resources(observation);
+    if resources.is_empty() {
+        return None;
+    }
+    let required_steel = resources
+        .iter()
+        .filter(|resource| resource.kind == EntityKind::Steel)
+        .count()
+        .min(config::STEEL_PATCHES_PER_BASE as usize);
+    let required_oil = resources
+        .iter()
+        .filter(|resource| resource.kind == EntityKind::Oil)
+        .count()
+        .min(config::OIL_PATCHES_PER_BASE as usize);
+    let mut seen = BTreeSet::new();
+    let mut best = None;
+
+    for anchor in expansion_anchor_tiles(observation, &resources) {
+        let Some(start_tile) = footprint_top_left_for_center(anchor, kind) else {
+            continue;
+        };
+        let (sx, sy) = (start_tile.0 as i32, start_tile.1 as i32);
+        for dy in -expansion.search_radius_tiles..=expansion.search_radius_tiles {
+            for dx in -expansion.search_radius_tiles..=expansion.search_radius_tiles {
+                if dx.abs().max(dy.abs()) > expansion.search_radius_tiles {
+                    continue;
+                }
+                let tx = sx + dx;
+                let ty = sy + dy;
+                if tx < 0 || ty < 0 {
+                    continue;
+                }
+                let (tx, ty) = (tx as u32, ty as u32);
+                if tx > observation.map.width.saturating_sub(stats.foot_w)
+                    || ty > observation.map.height.saturating_sub(stats.foot_h)
+                    || !seen.insert((tx, ty))
+                    || !placeable(kind, tx, ty)
+                {
+                    continue;
+                }
+                let Some(candidate) =
+                    expansion_site_candidate(observation, kind, tx, ty, &resources)
+                else {
+                    continue;
+                };
+                if candidate.steel_in_range < required_steel
+                    || candidate.oil_in_range < required_oil
+                {
+                    continue;
+                }
+                if expansion_site_candidate_better(candidate, best) {
+                    best = Some(candidate);
+                }
+            }
+        }
+    }
+
+    best.map(|candidate| candidate.tile)
+}
+
+fn expansion_candidate_resources(observation: &AiObservation) -> Vec<&AiResourceSummary> {
+    let start_resource_radius =
+        (config::IC_RESOURCE_MAX_DIST_TILES + 1.5) * observation.map.tile_size as f32;
+    let start_resource_radius2 = squared(start_resource_radius);
+    observation
+        .resources
+        .iter()
+        .filter(|resource| matches!(resource.kind, EntityKind::Steel | EntityKind::Oil))
+        .filter(|resource| resource.remaining > 0)
+        .filter(|resource| {
+            !resource_is_near_player_start(observation, resource, start_resource_radius2)
+        })
+        .collect()
+}
+
+fn expansion_anchor_tiles(
+    observation: &AiObservation,
+    resources: &[&AiResourceSummary],
+) -> Vec<(u32, u32)> {
+    let tile_size = observation.map.tile_size as f32;
+    if tile_size <= 0.0 {
+        return Vec::new();
+    }
+    let own = tile_center(observation.own_start_tile, observation.map.tile_size);
+    let map_center_tiles = (
+        observation.map.width as f32 * 0.5,
+        observation.map.height as f32 * 0.5,
+    );
+    let mut anchors: Vec<((u32, u32), f32, u32)> = Vec::new();
+
+    for resource in resources
+        .iter()
+        .copied()
+        .filter(|resource| resource.kind == EntityKind::Steel)
+    {
+        let Some(tile) =
+            estimated_expansion_center_tile(observation, resource, map_center_tiles, tile_size)
+        else {
+            continue;
+        };
+        let center = tile_center(tile, observation.map.tile_size);
+        let distance2 = dist2(center.0, center.1, own.0, own.1);
+        anchors.push((tile, distance2, resource.id));
+    }
+
+    anchors.sort_by(
+        |(left_tile, left_distance, left_id), (right_tile, right_distance, right_id)| {
+            left_distance
+                .total_cmp(right_distance)
+                .then_with(|| left_id.cmp(right_id))
+                .then_with(|| left_tile.cmp(right_tile))
+        },
+    );
+    anchors.dedup_by_key(|(tile, _, _)| *tile);
+    anchors.into_iter().map(|(tile, _, _)| tile).collect()
+}
+
+fn estimated_expansion_center_tile(
+    observation: &AiObservation,
+    resource: &AiResourceSummary,
+    map_center_tiles: (f32, f32),
+    tile_size: f32,
+) -> Option<(u32, u32)> {
+    let resource_tile = (resource.x / tile_size, resource.y / tile_size);
+    let dir = (
+        map_center_tiles.0 - resource_tile.0,
+        map_center_tiles.1 - resource_tile.1,
+    );
+    let len = (dir.0 * dir.0 + dir.1 * dir.1).sqrt();
+    if len <= f32::EPSILON {
+        return None;
+    }
+    let estimated_center = (
+        resource_tile.0 - dir.0 / len * config::STEEL_BLOCK_DIST_TILES,
+        resource_tile.1 - dir.1 / len * config::STEEL_BLOCK_DIST_TILES,
+    );
+    if !estimated_center.0.is_finite() || !estimated_center.1.is_finite() {
+        return None;
+    }
+    Some((
+        estimated_center
+            .0
+            .round()
+            .clamp(0.0, observation.map.width.saturating_sub(1) as f32) as u32,
+        estimated_center
+            .1
+            .round()
+            .clamp(0.0, observation.map.height.saturating_sub(1) as f32) as u32,
+    ))
+}
+
+#[derive(Clone, Copy, Debug)]
+struct ExpansionSiteCandidate {
+    tile: (u32, u32),
+    steel_in_range: usize,
+    oil_in_range: usize,
+    max_resource_distance2: f32,
+    sum_resource_distance2: f32,
+    own_distance2: f32,
+}
+
+fn expansion_site_candidate(
+    observation: &AiObservation,
+    kind: EntityKind,
+    tile_x: u32,
+    tile_y: u32,
+    resources: &[&AiResourceSummary],
+) -> Option<ExpansionSiteCandidate> {
+    let (cx, cy) = building_center((tile_x, tile_y), kind, observation.map.tile_size)?;
+    let max_dist = config::MINING_IC_RANGE_TILES * observation.map.tile_size as f32;
+    let max_dist2 = squared(max_dist);
+    let mut steel_in_range = 0usize;
+    let mut oil_in_range = 0usize;
+    let mut max_resource_distance2 = 0.0f32;
+    let mut sum_resource_distance2 = 0.0f32;
+
+    for resource in resources {
+        let distance2 = dist2(cx, cy, resource.x, resource.y);
+        if distance2 > max_dist2 {
+            continue;
+        }
+        match resource.kind {
+            EntityKind::Steel => steel_in_range += 1,
+            EntityKind::Oil => oil_in_range += 1,
+            _ => {}
+        }
+        max_resource_distance2 = max_resource_distance2.max(distance2);
+        sum_resource_distance2 += distance2;
+    }
+    if steel_in_range == 0 && oil_in_range == 0 {
+        return None;
+    }
+    let own = tile_center(observation.own_start_tile, observation.map.tile_size);
+    Some(ExpansionSiteCandidate {
+        tile: (tile_x, tile_y),
+        steel_in_range,
+        oil_in_range,
+        max_resource_distance2,
+        sum_resource_distance2,
+        own_distance2: dist2(cx, cy, own.0, own.1),
+    })
+}
+
+fn expansion_site_candidate_better(
+    candidate: ExpansionSiteCandidate,
+    current: Option<ExpansionSiteCandidate>,
+) -> bool {
+    let Some(current) = current else {
+        return true;
+    };
+    candidate
+        .oil_in_range
+        .cmp(&current.oil_in_range)
+        .then_with(|| candidate.steel_in_range.cmp(&current.steel_in_range))
+        .then_with(|| {
+            current
+                .max_resource_distance2
+                .total_cmp(&candidate.max_resource_distance2)
+        })
+        .then_with(|| {
+            current
+                .sum_resource_distance2
+                .total_cmp(&candidate.sum_resource_distance2)
+        })
+        .then_with(|| current.own_distance2.total_cmp(&candidate.own_distance2))
+        .then_with(|| current.tile.cmp(&candidate.tile))
+        == Ordering::Greater
+}
+
+fn resource_is_near_player_start(
+    observation: &AiObservation,
+    resource: &AiResourceSummary,
+    radius2: f32,
+) -> bool {
+    observation.players.iter().any(|player| {
+        let center = tile_center(player.start_tile, observation.map.tile_size);
+        dist2(resource.x, resource.y, center.0, center.1) <= radius2
+    })
+}
+
+#[allow(clippy::too_many_arguments)]
 fn try_build_kind<F>(
     observation: &AiObservation,
     facts: &AiFacts,
@@ -803,22 +1195,88 @@ where
 
 fn desired_oil_workers(
     observation: &AiObservation,
+    facts: &AiFacts,
     profile: &AiProfile,
     target_steel_workers: usize,
 ) -> usize {
     if profile.workers.extra_oil_workers == 0 {
         return 0;
     }
+    if expansion_blocks_tech_path(facts, profile) {
+        return 0;
+    }
     let current_steel_workers = resource_worker_counts(observation)
         .get(&EntityKind::Steel)
         .copied()
         .unwrap_or(0);
-    if current_steel_workers >= target_steel_workers.min(profile.resources.oil_after_steel_workers)
-    {
-        profile.workers.extra_oil_workers
-    } else {
-        0
+    if current_steel_workers < target_steel_workers.min(profile.resources.oil_after_steel_workers) {
+        return 0;
     }
+
+    let Some(policy) = profile.resources.tank_adaptive else {
+        return profile.workers.extra_oil_workers;
+    };
+
+    let max_oil_workers = profile
+        .workers
+        .extra_oil_workers
+        .min(policy.max_oil_workers);
+    if max_oil_workers == 0 {
+        return 0;
+    }
+    let tank_factories = facts
+        .complete_building_count(EntityKind::TankFactory)
+        .max(1);
+    let mut target = tank_factories
+        .saturating_mul(policy.oil_workers_per_tank_factory)
+        .clamp(1, max_oil_workers);
+
+    if let Some(goal) = next_tank_resource_goal(facts, profile) {
+        let steel_deficit = goal.steel.saturating_sub(observation.economy.steel);
+        let oil_deficit = goal.oil.saturating_sub(observation.economy.oil);
+        if oil_deficit > steel_deficit / 2 {
+            target = target
+                .saturating_add(policy.deficit_response_workers)
+                .min(max_oil_workers);
+        } else if steel_deficit > oil_deficit.saturating_mul(2) {
+            target = target.saturating_sub(policy.deficit_response_workers);
+        } else if oil_deficit == 0 && observation.economy.oil >= goal.oil.saturating_mul(2) {
+            target = target.saturating_sub(1);
+        }
+    }
+
+    target.min(max_oil_workers)
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct ResourceGoal {
+    steel: u32,
+    oil: u32,
+}
+
+fn next_tank_resource_goal(facts: &AiFacts, profile: &AiProfile) -> Option<ResourceGoal> {
+    if profile.production.save_for_first_tech_unit != Some(EntityKind::Tank) {
+        return None;
+    }
+    let kind = if facts.complete_building_count(EntityKind::TrainingCentre) == 0 {
+        EntityKind::TrainingCentre
+    } else if facts.complete_building_count(EntityKind::TankFactory) == 0 {
+        EntityKind::TankFactory
+    } else {
+        EntityKind::Tank
+    };
+    let (steel, oil) = rules::economy::cost(kind);
+    let scale = if kind == EntityKind::Tank {
+        facts
+            .complete_building_count(EntityKind::TankFactory)
+            .max(1) as u32
+    } else {
+        1
+    };
+    Some(ResourceGoal {
+        steel: steel.saturating_mul(scale),
+        oil: oil.saturating_mul(scale),
+    })
 }
 
 fn should_save_for_first_tech_unit(facts: &AiFacts, profile: &AiProfile) -> bool {
@@ -838,12 +1296,28 @@ fn should_save_for_required_tech_building(facts: &AiFacts, profile: &AiProfile) 
     let Some(unit) = profile.production.save_for_first_tech_unit else {
         return false;
     };
+    if facts.unit_count(unit) > 0 {
+        return false;
+    }
     let Some(producer) = producer_for_unit(unit) else {
         return false;
     };
-    facts.building_count(producer) == 0
-        && profile.buildings.required_tech_path.contains(&producer)
-        && rules::economy::build_requirement_met(producer, facts.complete_building_kinds())
+    if facts.building_count(producer) == 0 {
+        return profile.buildings.required_tech_path.contains(&producer)
+            && rules::economy::build_requirement_met(producer, facts.complete_building_kinds());
+    }
+    if rules::economy::train_requirement_met(unit, facts.complete_building_kinds()) {
+        return false;
+    }
+    profile
+        .buildings
+        .required_tech_path
+        .iter()
+        .copied()
+        .any(|kind| {
+            facts.building_count(kind) == 0
+                && rules::economy::build_requirement_met(kind, facts.complete_building_kinds())
+        })
 }
 
 fn producer_for_unit(unit: EntityKind) -> Option<EntityKind> {
@@ -863,6 +1337,17 @@ fn production_building_order(unit_priorities: &[EntityKind]) -> Vec<EntityKind> 
     }
     order.retain(|kind| *kind != EntityKind::IndustrialCenter);
     order
+}
+
+fn unit_counts_for_priorities(
+    facts: &AiFacts,
+    unit_priorities: &[EntityKind],
+) -> Vec<(EntityKind, usize)> {
+    unit_priorities
+        .iter()
+        .copied()
+        .map(|unit| (unit, facts.unit_count(unit)))
+        .collect()
 }
 
 fn resource_worker_counts(observation: &AiObservation) -> BTreeMap<EntityKind, usize> {
@@ -1017,10 +1502,11 @@ fn squared(value: f32) -> f32 {
 mod tests {
     use super::*;
     use crate::game::ai_core::observation::{
-        AiEconomy, AiEntityState, AiEntitySummary, AiMapSummary, AiPlayerSummary, AiResourceSummary,
+        AiBuildIntent, AiEconomy, AiEntityState, AiEntitySummary, AiMapSummary, AiPlayerSummary,
+        AiResourceSummary,
     };
     use crate::game::ai_core::profiles::{
-        RIFLE_FLOOD_FAST, RIFLE_FLOOD_FULL_SATURATION, TECH_TO_TANKS,
+        RIFLE_FLOOD_FAST, RIFLE_FLOOD_FULL_SATURATION, STEEL_EXPANSION_TANKS, TECH_TO_TANKS,
     };
 
     fn worker(id: u32, state: AiEntityState) -> AiEntitySummary {
@@ -1063,12 +1549,22 @@ mod tests {
     }
 
     fn building(id: u32, kind: EntityKind, queue_len: Option<usize>) -> AiEntitySummary {
+        building_at(id, kind, queue_len, 0.0, 0.0)
+    }
+
+    fn building_at(
+        id: u32,
+        kind: EntityKind,
+        queue_len: Option<usize>,
+        x: f32,
+        y: f32,
+    ) -> AiEntitySummary {
         AiEntitySummary {
             id,
             owner: 1,
             kind,
-            x: 0.0,
-            y: 0.0,
+            x,
+            y,
             state: queue_len
                 .filter(|queue| *queue > 0)
                 .map(|_| AiEntityState::Train)
@@ -1165,6 +1661,105 @@ mod tests {
             visible_enemies: Vec::new(),
             pending_builds: Vec::new(),
         }
+    }
+
+    fn with_expansion_resources(mut observation: AiObservation) -> AiObservation {
+        let ts = observation.map.tile_size as f32;
+        for i in 0..18 {
+            observation.resources.push(resource(
+                300 + i,
+                EntityKind::Steel,
+                (21.5 + (i % 6) as f32) * ts,
+                (31.5 + (i / 6) as f32) * ts,
+            ));
+        }
+        for i in 0..3 {
+            observation.resources.push(resource(
+                400 + i,
+                EntityKind::Oil,
+                (16.5 + i as f32) * ts,
+                38.5 * ts,
+            ));
+        }
+        observation.resources.sort_by_key(|resource| resource.id);
+        observation
+    }
+
+    fn base_site_resources(
+        first_id: u32,
+        site: (u32, u32),
+        map_size: u32,
+    ) -> Vec<AiResourceSummary> {
+        let ts = config::TILE_SIZE as f32;
+        let hx = site.0 as f32 + 0.5;
+        let hy = site.1 as f32 + 0.5;
+        let map_center = map_size as f32 * 0.5;
+        let base_angle = (map_center - hy).atan2(map_center - hx);
+
+        let block_cx = hx + config::STEEL_BLOCK_DIST_TILES * base_angle.cos();
+        let block_cy = hy + config::STEEL_BLOCK_DIST_TILES * base_angle.sin();
+        let perp_x = -base_angle.sin();
+        let perp_y = base_angle.cos();
+        let rows = config::STEEL_PATCHES_PER_BASE.div_ceil(6);
+        let row_center = (rows - 1) as f32 / 2.0;
+        let mut resources = Vec::new();
+        for i in 0..config::STEEL_PATCHES_PER_BASE {
+            let col = (i % 6) as f32;
+            let row = (i / 6) as f32;
+            let off_x = col - 2.5;
+            let off_y = row - row_center;
+            resources.push(resource(
+                first_id + i,
+                EntityKind::Steel,
+                (block_cx + off_x * perp_x + off_y * base_angle.cos()) * ts,
+                (block_cy + off_x * perp_y + off_y * base_angle.sin()) * ts,
+            ));
+        }
+
+        let oil_angle = base_angle + std::f32::consts::FRAC_PI_2;
+        let oil_perp_x = -oil_angle.sin();
+        let oil_perp_y = oil_angle.cos();
+        let oil_cx = hx + config::OIL_DIST_TILES * oil_angle.cos();
+        let oil_cy = hy + config::OIL_DIST_TILES * oil_angle.sin();
+        for (i, (off_x, off_y)) in [(-0.5, -0.5), (0.5, -0.5), (0.0, 0.5)]
+            .into_iter()
+            .enumerate()
+        {
+            resources.push(resource(
+                first_id + config::STEEL_PATCHES_PER_BASE + i as u32,
+                EntityKind::Oil,
+                (oil_cx + off_x * oil_perp_x + off_y * oil_angle.cos()) * ts,
+                (oil_cy + off_x * oil_perp_y + off_y * oil_angle.sin()) * ts,
+            ));
+        }
+        resources
+    }
+
+    fn expansion_resource_counts_for_site(
+        observation: &AiObservation,
+        site: (u32, u32),
+    ) -> (usize, usize) {
+        let (cx, cy) = building_center(
+            site,
+            EntityKind::IndustrialCenter,
+            observation.map.tile_size,
+        )
+        .expect("industrial center should have a center");
+        let max_dist = config::MINING_IC_RANGE_TILES * observation.map.tile_size as f32;
+        let max_dist2 = squared(max_dist);
+        let mut steel = 0usize;
+        let mut oil = 0usize;
+        for resource in expansion_candidate_resources(observation) {
+            if dist2(cx, cy, resource.x, resource.y) > max_dist2 {
+                continue;
+            }
+            match resource.kind {
+                EntityKind::Steel => steel += 1,
+                EntityKind::Oil => oil += 1,
+                _ => {}
+            }
+        }
+        (steel, oil)
     }
 
     fn decide(
@@ -1655,6 +2250,354 @@ mod tests {
                 } if *assignments > 0
             )
         }));
+    }
+
+    #[test]
+    fn steel_expansion_tanks_builds_expansion_ic_before_any_barracks() {
+        let ts = config::TILE_SIZE as f32;
+        let mut owned = vec![building_at(
+            10,
+            EntityKind::IndustrialCenter,
+            Some(0),
+            8.5 * ts,
+            8.5 * ts,
+        )];
+        owned.extend((0..8).map(|i| steel_worker(40 + i, 100 + i)));
+        owned.push(worker(60, AiEntityState::Idle));
+        let observation = with_expansion_resources(observation(
+            AiEconomy {
+                steel: 500,
+                oil: 500,
+                supply_used: 12,
+                supply_cap: 30,
+            },
+            owned,
+        ));
+
+        let decision = decide(
+            &observation,
+            &STEEL_EXPANSION_TANKS,
+            &mut AiDecisionMemory::for_profile(&STEEL_EXPANSION_TANKS),
+        );
+
+        assert!(decision.intents.contains(&AiIntent::Build {
+            kind: EntityKind::IndustrialCenter
+        }));
+        assert!(!decision.intents.contains(&AiIntent::Build {
+            kind: EntityKind::Barracks
+        }));
+        assert!(!decision.intents.contains(&AiIntent::Build {
+            kind: EntityKind::TrainingCentre
+        }));
+        assert!(!decision.intents.contains(&AiIntent::Build {
+            kind: EntityKind::TankFactory
+        }));
+        assert!(!decision.intents.contains(&AiIntent::Train {
+            kind: EntityKind::Rifleman
+        }));
+        assert!(!decision.intents.contains(&AiIntent::Train {
+            kind: EntityKind::MachineGunner
+        }));
+        assert!(!decision.intents.contains(&AiIntent::Train {
+            kind: EntityKind::AtTeam
+        }));
+        let non_depot_builds: Vec<_> = decision
+            .commands
+            .iter()
+            .filter_map(|command| match command {
+                Command::Build { building, .. }
+                    if building != EntityKind::Depot.to_protocol_str() =>
+                {
+                    Some(building.as_str())
+                }
+                _ => None,
+            })
+            .collect();
+        assert_eq!(
+            non_depot_builds,
+            vec![EntityKind::IndustrialCenter.to_protocol_str()],
+            "the first non-depot build should be the expansion IC"
+        );
+        assert!(
+            !decision.intents.iter().any(|intent| matches!(
+                intent,
+                AiIntent::Gather {
+                    resource: EntityKind::Oil,
+                    ..
+                }
+            )),
+            "expansion profile should not move into oil before the second IC is planned"
+        );
+    }
+
+    #[test]
+    fn steel_expansion_tanks_places_expansion_ic_in_range_of_whole_resource_line() {
+        let map_size = 96;
+        let ts = config::TILE_SIZE as f32;
+        let mut owned = vec![building_at(
+            10,
+            EntityKind::IndustrialCenter,
+            Some(0),
+            10.5 * ts,
+            85.5 * ts,
+        )];
+        owned.extend((0..8).map(|i| steel_worker(40 + i, 100 + i)));
+        owned.push(worker(60, AiEntityState::Idle));
+        let mut resources = base_site_resources(100, (10, 85), map_size);
+        resources.extend(base_site_resources(200, (48, 73), map_size));
+        resources.sort_by_key(|resource| resource.id);
+        let observation = AiObservation {
+            player_id: 1,
+            tick: 90,
+            map: AiMapSummary {
+                width: map_size,
+                height: map_size,
+                tile_size: config::TILE_SIZE,
+            },
+            economy: AiEconomy {
+                steel: 500,
+                oil: 500,
+                supply_used: 12,
+                supply_cap: 30,
+            },
+            own_start_tile: (10, 85),
+            players: vec![
+                AiPlayerSummary {
+                    id: 1,
+                    start_tile: (10, 85),
+                    is_ai: true,
+                    is_alive: true,
+                },
+                AiPlayerSummary {
+                    id: 2,
+                    start_tile: (85, 10),
+                    is_ai: false,
+                    is_alive: true,
+                },
+            ],
+            owned,
+            resources,
+            visible_enemies: Vec::new(),
+            pending_builds: Vec::new(),
+        };
+
+        let mut placeable = |_: EntityKind, tx: u32, ty: u32| tx < map_size && ty < map_size;
+        let site = expansion_industrial_center_site(
+            &observation,
+            STEEL_EXPANSION_TANKS.expansion.unwrap(),
+            EntityKind::IndustrialCenter,
+            &mut placeable,
+        )
+        .expect("expansion IC site should be found");
+
+        assert_eq!(
+            expansion_resource_counts_for_site(&observation, site),
+            (
+                config::STEEL_PATCHES_PER_BASE as usize,
+                config::OIL_PATCHES_PER_BASE as usize
+            ),
+            "expansion IC at {site:?} should cover the whole natural resource line"
+        );
+
+        let mut memory = AiDecisionMemory::for_profile(&STEEL_EXPANSION_TANKS);
+        let decision = decide_profile(
+            &observation,
+            &STEEL_EXPANSION_TANKS,
+            &mut memory,
+            ai_shared::BuildSearch {
+                min_radius: 0,
+                max_radius: 0,
+                prefer_away_from_center: false,
+            },
+            |_, tx, ty| tx < map_size && ty < map_size,
+        );
+        let command_site = decision
+            .commands
+            .iter()
+            .find_map(|command| match command {
+                Command::Build {
+                    building,
+                    tile_x,
+                    tile_y,
+                    ..
+                } if building == EntityKind::IndustrialCenter.to_protocol_str() => {
+                    Some((*tile_x, *tile_y))
+                }
+                _ => None,
+            })
+            .expect("decision should issue an expansion IC build");
+
+        assert_eq!(
+            expansion_resource_counts_for_site(&observation, command_site),
+            (
+                config::STEEL_PATCHES_PER_BASE as usize,
+                config::OIL_PATCHES_PER_BASE as usize
+            ),
+            "emitted expansion IC build at {command_site:?} should cover all expansion resources"
+        );
+    }
+
+    #[test]
+    fn steel_expansion_tanks_builds_barracks_after_expansion_ic_is_planned() {
+        let mut observation = with_expansion_resources(observation(
+            AiEconomy {
+                steel: 500,
+                oil: 500,
+                supply_used: 10,
+                supply_cap: 30,
+            },
+            vec![
+                building(10, EntityKind::IndustrialCenter, Some(0)),
+                worker(60, AiEntityState::Idle),
+            ],
+        ));
+        observation.pending_builds.push(AiBuildIntent::to_site(
+            60,
+            EntityKind::IndustrialCenter,
+            20,
+            30,
+        ));
+
+        let decision = decide(
+            &observation,
+            &STEEL_EXPANSION_TANKS,
+            &mut AiDecisionMemory::for_profile(&STEEL_EXPANSION_TANKS),
+        );
+
+        assert!(!decision.intents.contains(&AiIntent::Build {
+            kind: EntityKind::IndustrialCenter
+        }));
+        assert!(decision.intents.contains(&AiIntent::Build {
+            kind: EntityKind::Barracks
+        }));
+        assert!(!decision.intents.contains(&AiIntent::Build {
+            kind: EntityKind::TrainingCentre
+        }));
+    }
+
+    #[test]
+    fn steel_expansion_tanks_builds_training_centre_before_training_support_units() {
+        let mut observation = with_expansion_resources(observation(
+            AiEconomy {
+                steel: 500,
+                oil: 500,
+                supply_used: 10,
+                supply_cap: 30,
+            },
+            vec![
+                building(10, EntityKind::IndustrialCenter, Some(0)),
+                building(11, EntityKind::Barracks, Some(0)),
+                worker(60, AiEntityState::Idle),
+            ],
+        ));
+        observation.pending_builds.push(AiBuildIntent::to_site(
+            60,
+            EntityKind::IndustrialCenter,
+            20,
+            30,
+        ));
+
+        let decision = decide(
+            &observation,
+            &STEEL_EXPANSION_TANKS,
+            &mut AiDecisionMemory::for_profile(&STEEL_EXPANSION_TANKS),
+        );
+
+        assert!(decision.intents.contains(&AiIntent::Build {
+            kind: EntityKind::TrainingCentre
+        }));
+        assert!(!decision.intents.contains(&AiIntent::Train {
+            kind: EntityKind::MachineGunner
+        }));
+        assert!(!decision.intents.contains(&AiIntent::Train {
+            kind: EntityKind::AtTeam
+        }));
+    }
+
+    #[test]
+    fn steel_expansion_tanks_balances_machine_gunner_and_at_team_training() {
+        let observation = with_expansion_resources(observation(
+            AiEconomy {
+                steel: 500,
+                oil: 200,
+                supply_used: 10,
+                supply_cap: 40,
+            },
+            vec![
+                building(10, EntityKind::IndustrialCenter, Some(0)),
+                building(11, EntityKind::IndustrialCenter, Some(0)),
+                building(12, EntityKind::Barracks, Some(0)),
+                building(13, EntityKind::Barracks, Some(0)),
+                building(14, EntityKind::TrainingCentre, None),
+                worker(60, AiEntityState::Idle),
+            ],
+        ));
+
+        let decision = decide(
+            &observation,
+            &STEEL_EXPANSION_TANKS,
+            &mut AiDecisionMemory::for_profile(&STEEL_EXPANSION_TANKS),
+        );
+
+        assert!(decision.intents.contains(&AiIntent::Train {
+            kind: EntityKind::MachineGunner
+        }));
+        assert!(decision.intents.contains(&AiIntent::Train {
+            kind: EntityKind::AtTeam
+        }));
+    }
+
+    #[test]
+    fn steel_expansion_tanks_sends_workers_to_oil_after_expansion_is_planned() {
+        let ts = config::TILE_SIZE as f32;
+        let mut observation = with_expansion_resources(observation(
+            AiEconomy {
+                steel: 500,
+                oil: 0,
+                supply_used: 17,
+                supply_cap: 40,
+            },
+            {
+                let mut owned = vec![building_at(
+                    10,
+                    EntityKind::IndustrialCenter,
+                    Some(0),
+                    8.5 * ts,
+                    8.5 * ts,
+                )];
+                owned.extend((0..8).map(|i| steel_worker(40 + i, 100 + i)));
+                owned.extend((0..6).map(|i| worker(60 + i, AiEntityState::Idle)));
+                owned
+            },
+        ));
+        observation.pending_builds.push(AiBuildIntent::to_site(
+            60,
+            EntityKind::IndustrialCenter,
+            20,
+            30,
+        ));
+
+        let decision = decide(
+            &observation,
+            &STEEL_EXPANSION_TANKS,
+            &mut AiDecisionMemory::for_profile(&STEEL_EXPANSION_TANKS),
+        );
+
+        let oil_assignments = decision
+            .intents
+            .iter()
+            .filter_map(|intent| match intent {
+                AiIntent::Gather {
+                    resource: EntityKind::Oil,
+                    assignments,
+                } => Some(*assignments),
+                _ => None,
+            })
+            .sum::<usize>();
+        assert!(
+            oil_assignments >= 5,
+            "support tech should send most idle workers to oil once expanding, got {oil_assignments}"
+        );
     }
 
     #[test]

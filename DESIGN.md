@@ -738,9 +738,10 @@ prevents it from over-committing resources/supply it does not have.
 
 **Shared AI core.** `game::ai_core` has deterministic profile data (`profiles.rs`) and a generic
 ranked decision loop (`decision.rs`) that emits ordinary `Command`s through shared action helpers.
-The first code-defined profiles are `rifle_flood_fast`, `rifle_flood_full_saturation`, and
-`tech_to_tanks`; they parameterize worker targets, supply buffers, building/tech goals, production
-priorities, resource timing, and attack thresholds without providing their own `think()` functions.
+The first code-defined profiles are `rifle_flood_fast`, `rifle_flood_full_saturation`,
+`tech_to_tanks`, and `steel_expansion_tanks`; they parameterize worker targets, supply buffers,
+building/tech goals, production priorities, resource timing, expansion timing, and attack
+thresholds without providing their own `think()` functions.
 `rifle_flood_fast` sends exactly one reserved worker toward a hidden edge-biased proxy point near
 the nearest public enemy start tile immediately, before it can afford the barracks. The transit
 target stays at least 18 tiles from the enemy start, prefers map-edge footprints, and avoids the
@@ -753,6 +754,11 @@ individual pressure units instead of waiting for escalating waves.
 for the tank-factory step, delays oil workers until at least eight workers are already mining steel,
 uses ready combat units to clear visible threats in its home resource line before attacking out,
 and treats a single completed tank as a valid minimum attack wave.
+`steel_expansion_tanks` is a defensive economic support profile: it saves for a second Industrial
+Center near a neutral steel expansion before building any non-Depot tech structure. Once that
+expansion IC is planned, it builds Barracks and Training Centre tech, staffs oil, mass-produces a
+balanced mix of Machine Gunners and AT teams, and keeps those support units staged on a defensive
+line instead of launching outbound attack waves.
 The live lobby AI uses this shared core through `AiController`, which only owns live identity,
 profile id, cadence, and persistent decision memory. Profiles are still not client-selectable.
 

@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use crate::game::entity::{BuildPhase, Entity, EntityKind, EntityStore, Order, NEUTRAL};
 use crate::game::map::Map;
 use crate::game::PlayerState;
@@ -234,12 +236,40 @@ impl AiObservation {
             .collect();
         owned.sort_by_key(|e| e.id);
 
-        let mut resources: Vec<AiResourceSummary> = snapshot
+        let mut resources_by_id: BTreeMap<u32, AiResourceSummary> = start
+            .map
+            .resources
+            .iter()
+            .filter_map(|resource| {
+                let kind: EntityKind = resource.kind.parse().ok()?;
+                kind.is_node().then_some((
+                    resource.id,
+                    AiResourceSummary {
+                        id: resource.id,
+                        kind,
+                        x: resource.x,
+                        y: resource.y,
+                        // Static start-payload resources are known positions, not known current
+                        // state. Treat them as available until a visible delta says otherwise.
+                        remaining: 1,
+                    },
+                ))
+            })
+            .collect();
+        for delta in &snapshot.resource_deltas {
+            if let Some(resource) = resources_by_id.get_mut(&delta.id) {
+                resource.remaining = delta.remaining;
+            }
+        }
+        for resource in snapshot
             .entities
             .iter()
             .filter(|e| e.owner == NEUTRAL)
             .filter_map(AiResourceSummary::from_entity_view)
-            .collect();
+        {
+            resources_by_id.insert(resource.id, resource);
+        }
+        let mut resources: Vec<AiResourceSummary> = resources_by_id.into_values().collect();
         resources.sort_by_key(|r| r.id);
 
         let mut visible_enemies: Vec<AiEntitySummary> = snapshot
