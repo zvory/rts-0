@@ -80,8 +80,8 @@ Before coding any phase:
    `client/src/config.js`, and `DESIGN.md` together.
 9. Each phase must add or update tests for the behavior it changes.
 10. Movement may remain a soft dynamic-traffic model, but static body legality belongs to
-    `docs/collision`: systems that accept final unit positions must use the shared standability
-    predicates once that plan lands.
+    `docs/collision`: systems that accept unit positions or static movement goals use the shared
+    standability predicates.
 
 ## Default Product Choices
 
@@ -96,7 +96,8 @@ Use these defaults unless the user overrides them:
 - Deployed or setting-up crew weapons are `Braced`.
 - Tanks are `Heavy`.
 - Long-order formation offsets stay in world orientation. Do not rotate offsets toward movement
-  direction in Phase 1.
+  direction in Phase 1. Formation goal tiles are still filtered through body-aware static
+  standability for the specific unit kind.
 - `facing` remains the tank body/hull facing. `weaponFacing` is added later for turret/barrel
   facing.
 - Local steering is short-range only. It proposes movement directions; `docs/collision`

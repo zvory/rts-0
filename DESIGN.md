@@ -362,10 +362,13 @@ kind-specific data from `rules::defs`. `config.rs` holds scalar constants and co
 wrappers such as `unit_stats(kind)` / `building_stats(kind)`, which return the stats embedded in
 defs.
 
-`services::geometry` owns shared body primitives for unit circles and building footprint
-rectangles. `services::standability` owns reusable legality predicates for unit bodies and
-building sites. Production, construction, movement, and collision may migrate to these predicates
-incrementally; phase-zero helpers are pure and do not change the wire protocol or client contract.
+`services::geometry` owns shared body primitives: unit bodies are circles centered on `(x, y)`
+with the configured unit radius, building bodies are axis-aligned rectangles derived from
+footprint tiles, and resource node bodies are circles for build-site blocking. `services::standability`
+owns reusable legality predicates for unit bodies and building sites. Production spawn exits,
+construction/build intent, movement landing, steering candidates, collision push targets, and
+formation goal selection all use this shared standability layer for static/body legality. These
+helpers are pure and do not change the wire protocol or client contract.
 
 ---
 
@@ -734,6 +737,11 @@ The server treats every client as potentially hostile. Limits live next to the c
   unit `AwaitingPath`. The existing path coordinator then recomputes under current occupancy within
   the normal per-tick A* budget. This covers buildings constructed after a long path was assigned
   without periodically repathing every moving unit.
+- **Formation goal legality**: group move goals keep the existing distance-sensitive formation
+  behavior, but candidate tiles are accepted only when the specific unit kind can stand there under
+  `standability::unit_static_standable`. This prevents large units from being assigned a center tile
+  whose body would clip terrain or a building footprint; dynamic unit traffic is still handled by
+  steering and collision after movement.
 - **Local steering**: before taking a partial path step for a plain `Move` order, movement computes a
   short-range separation proposal away from nearby firm/braced/heavy mobile units. Neighbor ids are
   sorted and capped so replay behavior stays deterministic, and separation uses the same footing
@@ -755,7 +763,9 @@ The server treats every client as potentially hostile. Limits live next to the c
   machine gunners and tanks hold ground better than soft moving infantry while equal-profile units
   still split pushes evenly. `Game::assert_invariants` then asserts that no two non-ghost mobile
   units overlap by more than `OVERLAP_TOLERANCE_PX` (residue from pushes that landed against
-  impassable terrain).
+  impassable terrain or building body clearance). Collision is deterministic overlap cleanup for
+  dynamic unit traffic; static correctness comes from standability checks before positions or
+  scaffolds are accepted.
 
 ---
 
