@@ -258,10 +258,12 @@ pub struct Game { /* private */ }
 impl Game {
     /// Create a match for the given players (ids + colors + names already assigned by lobby).
     /// Loads the hardcoded handcrafted map, shuffles the authored (start, expansion) pairs by
-    /// `seed`, assigns the first N shuffled pairs to the N players in lobby order, and spawns
+    /// `seed`, assigns the first N shuffled starts to the N players in lobby order, and spawns
     /// each player's starting Industrial Center + STARTING_WORKERS workers + nearby steel/oil
-    /// resource clusters. Shuffling keeps each start glued to its paired expansion but stops the
-    /// lobby seat order from pinning the human/AI to the same corner every match.
+    /// resource clusters. For one-, three-, and four-player games, each start keeps its authored
+    /// paired expansion. For two-player games, the selected starts are kept but the two active
+    /// neutral expansions are reselected from the authored expansion pool as the most symmetric
+    /// assignment for that start matchup, so adjacent starts both expand in comparable directions.
     pub fn new(players: &[PlayerInit], seed: u32) -> Game;
 
     /// Create a match with explicit starting steel/oil for every player.
@@ -621,9 +623,13 @@ the human-readable form of the authoritative `rules::defs` records.
   actively harvesting that node, so death / re-order / retarget free it automatically.
 - Starting layout: each base site gets 18 steel patches and 3 oil patches. `baseSites` are stored
   as interleaved pairs: `[start0, expansion0, start1, expansion1, ...]`. The pairs are shuffled
-  by the match seed (each start stays glued to its paired expansion), and the first N shuffled
-  pairs become the active player starts + paired neutral expansion bases. Sites beyond the first
-  N pairs are unused, giving exactly 2N active bases on the map. Shuffling stops the lobby seat
+  by the match seed, and the first N shuffled starts become the active player starts. For one-,
+  three-, and four-player games, each selected start keeps its authored paired neutral expansion.
+  For two-player games, the two neutral expansion sites are selected from the authored expansion
+  pool by scoring each assignment in the players' local start-to-enemy frames; this favors matching
+  forward/lateral offsets and natural distance, avoiding one player receiving a shared middle
+  natural while the other receives a side natural. Sites not selected as an active start or active
+  expansion are unused, giving exactly 2N active bases on the map. Shuffling stops the lobby seat
   order from pinning the human/AI to the same corner every match.
 
 Unit stats (hp, dmg, range[tiles], cooldown[ticks], speed[px/tick], sight[tiles], cost, supply, buildTicks):
