@@ -75,13 +75,13 @@ impl LiveSelfPlay {
                 id: 1,
                 name: "Alpha Script".to_string(),
                 color: "#6f8fa8".to_string(),
-                is_ai: false,
+                is_ai: true,
             },
             PlayerInit {
                 id: 2,
                 name: "Bravo Script".to_string(),
                 color: "#b2775f".to_string(),
-                is_ai: false,
+                is_ai: true,
             },
         ];
         let scripts: Vec<Box<dyn ScriptedPlayer>> = vec![
@@ -247,16 +247,16 @@ pub(crate) fn run_profile_matchup_result(
             id: 1,
             name: profile_a.id.to_string(),
             color: "#4cc9f0".to_string(),
-            is_ai: false,
+            is_ai: true,
         },
         PlayerInit {
             id: 2,
             name: profile_b.id.to_string(),
             color: "#f72585".to_string(),
-            is_ai: false,
+            is_ai: true,
         },
     ];
-    let mut game = Game::new(&players, options.seed);
+    let mut game = Game::new_without_ai_controllers(&players, options.seed);
     let start = game.start_payload();
     let mut scripts: Vec<Box<dyn ScriptedPlayer>> = vec![
         Box::new(ProfileBackedScript::new(1, profile_a.id)),
@@ -2249,10 +2249,10 @@ fn run_profile_matchup(config: MatchupConfig) {
             id: player.id,
             name: player.name.to_string(),
             color: player.color.to_string(),
-            is_ai: false,
+            is_ai: true,
         })
         .collect();
-    let game = Game::new(&players, config.seed);
+    let game = Game::new_without_ai_controllers(&players, config.seed);
     let start = game.start_payload();
     let specs = players.clone();
     let scripts: Vec<Box<dyn ScriptedPlayer>> = config
@@ -2539,16 +2539,16 @@ fn profile_matchup_rifle_flood_full_saturation_vs_tech_to_tanks_20k_result() {
             id: 1,
             name: "Full Saturation".into(),
             color: "#4cc9f0".into(),
-            is_ai: false,
+            is_ai: true,
         },
         PlayerInit {
             id: 2,
             name: "Tech Tanks".into(),
             color: "#f72585".into(),
-            is_ai: false,
+            is_ai: true,
         },
     ];
-    let mut game = Game::new(&players, 0);
+    let mut game = Game::new_without_ai_controllers(&players, 0);
     let start = game.start_payload();
     let mut scripts: Vec<Box<dyn ScriptedPlayer>> = vec![
         Box::new(ProfileBackedScript::new(1, RIFLE_FLOOD_FULL_SATURATION_ID)),
@@ -2658,16 +2658,16 @@ fn profile_backed_self_play_exercises_tech_to_tanks() {
             id: 1,
             name: "Tank Profile A".into(),
             color: "#4cc9f0".into(),
-            is_ai: false,
+            is_ai: true,
         },
         PlayerInit {
             id: 2,
             name: "Tank Profile B".into(),
             color: "#f72585".into(),
-            is_ai: false,
+            is_ai: true,
         },
     ];
-    let game = Game::new(&players, 0x1234_5678);
+    let game = Game::new_without_ai_controllers(&players, 0x1234_5678);
     let start = game.start_payload();
     let specs = players.clone();
     let scripts: Vec<Box<dyn ScriptedPlayer>> = vec![
@@ -2713,10 +2713,10 @@ fn scripted_self_play_worker_rush_vs_economy() {
             id: 2,
             name: "Economy".into(),
             color: "#3a86ff".into(),
-            is_ai: false,
+            is_ai: true,
         },
     ];
-    let game = Game::new(&players, 0x1234_5678);
+    let game = Game::new_without_ai_controllers(&players, 0x1234_5678);
     let start = game.start_payload();
     let specs = players.clone();
     let scripts: Vec<Box<dyn ScriptedPlayer>> = vec![
