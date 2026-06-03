@@ -715,7 +715,9 @@ The server treats every client as potentially hostile. Limits live next to the c
   existing building rectangles/resource bodies, and clear of every living unit circle. Build
   command intent uses the paired build-intent predicate, which ignores only the chosen builder's
   own body so a worker can be ordered to build over its current position and walk out first.
-  `construction_system` repeats the strict final policy at arrival before creating the scaffold.
+  `construction_system` repeats the build-intent unit-body policy at arrival before creating the
+  scaffold, so every other living unit still blocks the site but the chosen builder can start the
+  scaffold and become a ghost active builder.
   The client placement ghost mirrors the intent policy for the first selected worker, but remains
   advisory; the server is authoritative.
 - **Idle timeout + heartbeat**: the server drops connections idle for `IDLE_TIMEOUT = 40s`
