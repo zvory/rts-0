@@ -721,10 +721,10 @@ empties of humans.
 pending queue a human client feeds, so every AI action goes through the identical
 validation / cost / supply / placement path in `services/commands.rs` — the AI has **no special authority**
 over the simulation and can't cheat economy or placement rules. Because the controller is
-server-side (not a network client) it reads authoritative state directly rather than a fog-filtered
-snapshot; that is not a fog violation (fog only guards what's sent to *human* clients over the
-wire). To stay fair it only ever targets enemy **start tiles**, which are public via the `start`
-payload.
+server-side (not a network client) it reads authoritative own/resource state directly, but enemy
+entities are filtered through that player's authoritative fog grid. To stay fair, outbound attacks
+target enemy **start tiles**, which are public via the `start` payload; direct attacks only target
+currently visible enemy units/buildings during local defense.
 
 **Strategy (deliberately "very basic").** Each controller, on a staggered cadence
 (`DECISION_INTERVAL` ticks), builds a constrained live `AiObservation` and delegates RTS decisions
@@ -754,6 +754,11 @@ individual pressure units instead of waiting for escalating waves.
 for the tank-factory step, delays oil workers until at least eight workers are already mining steel,
 uses ready combat units to clear visible threats in its home resource line before attacking out,
 and treats a single completed tank as a valid minimum attack wave.
+All profiles share a defensive panic mode. A visible enemy near the AI's base, home resource line,
+or workers temporarily suspends expansion, oil assignment, worker training, and non-defensive tech
+spending. While panicking, production switches to Riflemen from existing Barracks; if the pressure
+persists through the panic window, the AI asks for an additional Barracks before resuming its normal
+profile once the threat has cleared.
 `steel_expansion_tanks` is a defensive economic support profile: it saves for a second Industrial
 Center near a neutral steel expansion before building any non-Depot tech structure. Once that
 expansion IC is planned, it builds Barracks and Training Centre tech, staffs oil, produces Machine

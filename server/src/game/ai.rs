@@ -6,9 +6,9 @@
 //! has no special powers: its commands run through the identical validation/cost/supply/placement
 //! path in `services/commands.rs`.
 //!
-//! The live controller may read authoritative state to build its own observation, but shared
-//! strategy code works from the constrained `ai_core` facts and attacks public enemy start tiles
-//! rather than hidden enemy unit positions.
+//! The live controller may read authoritative own/resource state to build its observation, but
+//! enemy entities are filtered through the player's fog grid. Shared strategy code attacks public
+//! enemy start tiles for outbound waves and only targets visible enemy entities for local defense.
 
 use crate::config;
 use crate::game::ai_core::decision::{decide_profile, AiDecisionMemory};
@@ -18,6 +18,7 @@ use crate::game::ai_core::profiles::{
 };
 use crate::game::ai_shared;
 use crate::game::entity::{EntityKind, EntityStore};
+use crate::game::fog::Fog;
 use crate::game::map::Map;
 use crate::game::services::spatial::SpatialIndex;
 use crate::game::systems;
@@ -32,6 +33,15 @@ const DECISION_INTERVAL: u32 = 9;
 /// Default live-lobby profile. This preserves the current macro-focused AI behavior better than
 /// the faster pressure profile, while still selecting from the canonical shared profile ids.
 pub(crate) const DEFAULT_LIVE_PROFILE_ID: &str = RIFLE_FLOOD_FULL_SATURATION_ID;
+
+pub(crate) struct AiThinkContext<'a> {
+    pub(crate) map: &'a Map,
+    pub(crate) entities: &'a EntityStore,
+    pub(crate) fog: &'a Fog,
+    pub(crate) spatial: &'a SpatialIndex,
+    pub(crate) players: &'a [PlayerState],
+    pub(crate) tick: u32,
+}
 
 /// Drives a single AI-controlled player by emitting ordinary commands each think.
 ///
@@ -67,31 +77,29 @@ impl AiController {
 
     /// Decide this player's actions for the current tick, pushing any commands onto `out`. This is
     /// a no-op on most ticks (gated by [`DECISION_INTERVAL`]) and whenever the player is dead.
-    pub(crate) fn think(
-        &mut self,
-        map: &Map,
-        entities: &EntityStore,
-        spatial: &SpatialIndex,
-        players: &[PlayerState],
-        tick: u32,
-        out: &mut Vec<(u32, Command)>,
-    ) {
-        if !tick
+    pub(crate) fn think(&mut self, context: AiThinkContext<'_>, out: &mut Vec<(u32, Command)>) {
+        if !context
+            .tick
             .wrapping_add(self.player)
             .is_multiple_of(DECISION_INTERVAL)
         {
             return;
         }
-        if !entities.player_alive(self.player) {
+        if !context.entities.player_alive(self.player) {
             return;
         }
-        let Some(observation) =
-            AiObservation::from_live_state(map, entities, players, self.player, tick)
-        else {
+        let Some(observation) = AiObservation::from_live_state(
+            context.map,
+            context.entities,
+            context.fog,
+            context.players,
+            self.player,
+            context.tick,
+        ) else {
             return;
         };
 
-        let building_margin = building_margin_tiles(map, entities);
+        let building_margin = building_margin_tiles(context.map, context.entities);
         let profile = self.profile();
         let decision = decide_profile(
             &observation,
@@ -104,9 +112,9 @@ impl AiController {
             },
             |building, tile_x, tile_y| {
                 live_building_placeable(
-                    map,
-                    entities,
-                    spatial,
+                    context.map,
+                    context.entities,
+                    context.spatial,
                     &building_margin,
                     building,
                     tile_x,
@@ -224,13 +232,25 @@ mod tests {
         if let Some(entity) = entities.get_mut(worker) {
             entity.set_order(Order::build(EntityKind::Depot, 5, 6));
         }
-        let spatial = SpatialIndex::build(&entities, config::TILE_SIZE);
         let map = Map::generate(2, 1234);
+        let spatial = SpatialIndex::build(&entities, config::TILE_SIZE);
+        let mut fog = Fog::new(map.size);
+        fog.recompute(&[2], &entities);
         let players = vec![player(2, (10, 10), 999, 8, 10)];
         let mut ai = AiController::new(2);
         let mut out = Vec::new();
 
-        ai.think(&map, &entities, &spatial, &players, 7, &mut out);
+        ai.think(
+            AiThinkContext {
+                map: &map,
+                entities: &entities,
+                fog: &fog,
+                spatial: &spatial,
+                players: &players,
+                tick: 7,
+            },
+            &mut out,
+        );
 
         assert!(
             !out.iter().any(|(_, command)| matches!(
@@ -266,7 +286,6 @@ mod tests {
                 .spawn_unit(2, EntityKind::Rifleman, ai_base.0 + i as f32, ai_base.1)
                 .unwrap();
         }
-        let spatial = SpatialIndex::build(&entities, config::TILE_SIZE);
         let players = vec![
             player(1, enemy_start, 0, 0, 0),
             player(
@@ -277,10 +296,23 @@ mod tests {
                 20,
             ),
         ];
+        let spatial = SpatialIndex::build(&entities, config::TILE_SIZE);
+        let mut fog = Fog::new(map.size);
+        fog.recompute(&[1, 2], &entities);
         let mut ai = AiController::new(2);
         let mut out = Vec::new();
 
-        ai.think(&map, &entities, &spatial, &players, 7, &mut out);
+        ai.think(
+            AiThinkContext {
+                map: &map,
+                entities: &entities,
+                fog: &fog,
+                spatial: &spatial,
+                players: &players,
+                tick: 7,
+            },
+            &mut out,
+        );
 
         assert!(out.iter().any(|(player_id, command)| {
             *player_id == 2
