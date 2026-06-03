@@ -21,7 +21,7 @@ use crate::game::services::interact_range_for_kind;
 use crate::game::services::occupancy::{
     building_footprint, footprint_center, footprint_tiles, Occupancy,
 };
-use crate::game::services::pathing::{PathRequest, PathingService};
+use crate::game::services::pathing::{simplify_reverse_waypoints, PathRequest, PathingService};
 use crate::game::services::standability;
 
 /// Maximum number of fresh A* path requests serviced in a single tick. Beyond this,
@@ -142,7 +142,7 @@ impl<'a> MoveCoordinator<'a> {
             e.reset_stuck(px, py);
         }
         if request_initial_path {
-            self.request_path(entities, id, (tx, ty));
+            self.request_path(entities, id, (tx, ty), false);
         }
     }
 
@@ -164,7 +164,7 @@ impl<'a> MoveCoordinator<'a> {
             let (px, py) = (e.pos_x, e.pos_y);
             e.reset_stuck(px, py);
         }
-        self.request_path(entities, id, (nx, ny));
+        self.request_path(entities, id, (nx, ny), false);
     }
 
     /// Issue a build order: record the placement intent on the worker and walk it to an outside
@@ -224,7 +224,7 @@ impl<'a> MoveCoordinator<'a> {
                 Some(g) => g,
                 None => continue,
             };
-            self.request_path(entities, id, goal);
+            self.request_path(entities, id, goal, true);
         }
     }
 
@@ -246,7 +246,7 @@ impl<'a> MoveCoordinator<'a> {
         if self.budget == 0 {
             return false;
         }
-        self.request_path(entities, id, target_pos)
+        self.request_path(entities, id, target_pos, false)
     }
 
     /// Request a path for a gatherer, respecting throttle and budget.
@@ -263,7 +263,7 @@ impl<'a> MoveCoordinator<'a> {
         if self.budget == 0 {
             return false;
         }
-        self.request_path(entities, id, node_pos)
+        self.request_path(entities, id, node_pos, false)
     }
 
     // -------------------------------------------------------------------
@@ -338,9 +338,19 @@ impl<'a> MoveCoordinator<'a> {
     // -------------------------------------------------------------------
 
     /// Direct path request without throttle check. Updates budget, entity path, and phase.
-    fn request_path(&mut self, entities: &mut EntityStore, id: u32, goal: (f32, f32)) -> bool {
-        let ((sx, sy), kind) = match entities.get(id) {
-            Some(e) => (self.map.tile_of(e.pos_x, e.pos_y), e.kind),
+    fn request_path(
+        &mut self,
+        entities: &mut EntityStore,
+        id: u32,
+        goal: (f32, f32),
+        smooth_static_segments: bool,
+    ) -> bool {
+        let ((sx, sy), kind, start_pos) = match entities.get(id) {
+            Some(e) => (
+                self.map.tile_of(e.pos_x, e.pos_y),
+                e.kind,
+                (e.pos_x, e.pos_y),
+            ),
             None => return false,
         };
         let (gx, gy) = self.map.tile_of(goal.0, goal.1);
@@ -359,6 +369,10 @@ impl<'a> MoveCoordinator<'a> {
         // Snap the final waypoint to the exact requested goal for precise arrival.
         if !waypoints.is_empty() {
             waypoints[0] = goal;
+            if smooth_static_segments && kind == EntityKind::Tank {
+                waypoints =
+                    simplify_reverse_waypoints(self.map, self.occ, kind, start_pos, waypoints);
+            }
         }
 
         let path_ok = !waypoints.is_empty();
@@ -1337,8 +1351,46 @@ mod tests {
         let mut coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, 1);
 
         assert!(
-            coordinator.request_path(&mut entities, unit, exact_goal),
+            coordinator.request_path(&mut entities, unit, exact_goal, true),
             "fixture path should be found"
+        );
+        let unit = entities.get(unit).expect("unit should still exist");
+        let path = &unit
+            .movement
+            .as_ref()
+            .expect("unit should have movement")
+            .path;
+        assert_eq!(
+            path.first().copied(),
+            Some(exact_goal),
+            "paths are reverse-ordered, so index 0 must remain the exact requested final goal"
+        );
+        assert_eq!(unit.path_goal(), Some(exact_goal));
+    }
+
+    #[test]
+    fn request_chase_path_keeps_tile_guided_interaction_route() {
+        let map = Map {
+            size: 40,
+            terrain: vec![crate::protocol::terrain::GRASS; 40 * 40],
+            starts: vec![],
+            expansion_sites: vec![],
+        };
+        let mut entities = EntityStore::new();
+        let start = map.tile_center(10, 10);
+        let unit = entities
+            .spawn_unit(1, EntityKind::Rifleman, start.0, start.1)
+            .expect("unit should spawn");
+        let goal = map.tile_center(24, 16);
+        let occ = Occupancy::build(&map, &entities);
+
+        let mut pathing = PathingService::new(8_192, 256);
+        pathing.advance_tick(MIN_REPATH_TICKS);
+        let mut coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, MIN_REPATH_TICKS);
+
+        assert!(
+            coordinator.request_chase_path(&mut entities, unit, goal),
+            "fixture chase path should be found"
         );
         let unit = entities.get(unit).expect("unit should still exist");
         let path = &unit
@@ -1348,13 +1400,12 @@ mod tests {
             .path;
         assert!(
             path.len() > 1,
-            "fixture should produce an intermediate route plus final exact goal"
+            "chase and other interaction paths should keep intermediate tile waypoints"
         );
         assert_eq!(
             path.first().copied(),
-            Some(exact_goal),
-            "paths are reverse-ordered, so index 0 must remain the exact requested final goal"
+            Some(goal),
+            "chase still snaps the final reverse waypoint to the interaction goal"
         );
-        assert_eq!(unit.path_goal(), Some(exact_goal));
     }
 }

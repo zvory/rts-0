@@ -39,10 +39,6 @@ pub(crate) fn unit_static_standable(
     true
 }
 
-#[expect(
-    dead_code,
-    reason = "phase 1 exposes this for later path smoothing without changing movement behavior yet"
-)]
 pub(crate) fn unit_static_segment_standable(
     map: &Map,
     occ: &Occupancy,
@@ -196,10 +192,11 @@ fn circle_inside_world(map: &Map, body: CircleBody) -> bool {
 
 fn circle_tile_range(body: CircleBody) -> impl Iterator<Item = (i32, i32)> {
     let ts = config::TILE_SIZE as f32;
-    let min_tx = ((body.x - body.radius) / ts).floor() as i32;
-    let min_ty = ((body.y - body.radius) / ts).floor() as i32;
-    let max_tx = ((body.x + body.radius) / ts).ceil() as i32 - 1;
-    let max_ty = ((body.y + body.radius) / ts).ceil() as i32 - 1;
+    let eps = 0.001;
+    let min_tx = ((body.x - body.radius - eps) / ts).floor() as i32;
+    let min_ty = ((body.y - body.radius - eps) / ts).floor() as i32;
+    let max_tx = ((body.x + body.radius + eps) / ts).ceil() as i32 - 1;
+    let max_ty = ((body.y + body.radius + eps) / ts).ceil() as i32 - 1;
 
     (min_ty..=max_ty).flat_map(move |ty| (min_tx..=max_tx).map(move |tx| (tx, ty)))
 }
@@ -248,6 +245,36 @@ mod tests {
             EntityKind::Tank,
             rect.max_x + radius - 1.0,
             rect.min_y + 32.0,
+        ));
+    }
+
+    #[test]
+    fn unit_static_standable_rejects_body_touching_building_edge() {
+        let map = flat_map(12);
+        let mut entities = EntityStore::new();
+        let rect = building_rect_for_footprint(EntityKind::Depot, 4, 4).expect("depot rect");
+        let radius = config::unit_stats(EntityKind::Rifleman)
+            .expect("rifleman stats")
+            .radius;
+        let building = footprint_center(&map, EntityKind::Depot, 4, 4);
+        entities
+            .spawn_building(1, EntityKind::Depot, building.0, building.1, true)
+            .expect("depot should spawn");
+        let occ = Occupancy::build(&map, &entities);
+
+        assert!(!unit_static_standable(
+            &map,
+            &occ,
+            EntityKind::Rifleman,
+            rect.min_x - radius,
+            rect.min_y + 32.0,
+        ));
+        assert!(!unit_static_standable(
+            &map,
+            &occ,
+            EntityKind::Rifleman,
+            rect.min_x + 32.0,
+            rect.max_y + radius,
         ));
     }
 

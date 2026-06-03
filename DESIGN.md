@@ -781,6 +781,15 @@ The server treats every client as potentially hostile. Limits live next to the c
   unit `AwaitingPath`. The existing path coordinator then recomputes under current occupancy within
   the normal per-tick A* budget. This covers buildings constructed after a long path was assigned
   without periodically repathing every moving unit.
+- **Tank path simplification**: player-issued tank `Move` / `AttackMove` path requests still use
+  tile A* for reachability, then snap the reverse-ordered final waypoint to the exact command goal
+  and simplify the waypoint list by dropping intermediate tile centers only when
+  `standability::unit_static_segment_standable` proves the unit body can travel the straight segment
+  without clipping terrain or building occupancy. The simplifier preserves the exact final command
+  goal, never adds waypoints, and falls back to the original next waypoint whenever segment legality
+  cannot be proven. Non-tank movement and interaction paths for attack chasing, gathering, and build
+  staging remain unsmoothed so combat, mining, construction range checks, and infantry/worker
+  traffic stay controlled by their existing logic.
 - **Formation goal legality**: group move goals keep the existing distance-sensitive formation
   behavior, but candidate tiles are accepted only when the specific unit kind can stand there under
   `standability::unit_static_standable`. This prevents large units from being assigned a center tile
