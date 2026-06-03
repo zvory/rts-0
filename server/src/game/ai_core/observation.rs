@@ -618,7 +618,7 @@ mod tests {
             },
         ];
         let mut fog = Fog::new(map.size);
-        fog.recompute(&[1, 2], &entities);
+        fog.recompute(&[1, 2], &entities, &map);
 
         let observation =
             AiObservation::from_live_state(&map, &entities, &fog, &players, 1, 9).unwrap();
@@ -674,7 +674,7 @@ mod tests {
             },
         ];
         let mut fog = Fog::new(map.size);
-        fog.recompute(&[1, 2], &entities);
+        fog.recompute(&[1, 2], &entities, &map);
 
         let observation =
             AiObservation::from_live_state(&map, &entities, &fog, &players, 1, 9).unwrap();

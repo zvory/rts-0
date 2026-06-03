@@ -2481,10 +2481,16 @@ fn profile_matchup_rifle_flood_fast_vs_full_saturation() {
 
 #[test]
 fn profile_matchup_rifle_flood_fast_vs_tech_to_tanks() {
+    let tank_factory_build_ticks = config::building_stats(EntityKind::TankFactory)
+        .expect("tank factory stats should exist")
+        .build_ticks;
     run_profile_matchup(MatchupConfig {
         artifact_name: "profile_matchup_rifle_flood_fast_vs_tech_to_tanks",
         seed: 0,
-        max_ticks: MAX_TICKS,
+        // LOS-aware fights delay the tech player's factory start under pressure, but the
+        // strategy still commits the factory before the old harness limit. Let the already
+        // issued build complete so the milestone observes the intended tech transition.
+        max_ticks: MAX_TICKS + tank_factory_build_ticks,
         players: [
             MatchupPlayerSpec {
                 id: 1,
