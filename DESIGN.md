@@ -757,10 +757,13 @@ and treats a single completed tank as a valid minimum attack wave.
 `steel_expansion_tanks` is a defensive economic support profile: it saves for a second Industrial
 Center near a neutral steel expansion before building any non-Depot tech structure. Once that
 expansion IC is planned, it builds Barracks and Training Centre tech, staffs oil, mass-produces a
-balanced mix of Machine Gunners and AT teams, and keeps those support units staged on a defensive
-line instead of launching outbound attack waves. After the expansion IC is complete, its worker
-resource assignment is locally bounded so main-base workers do not walk to expansion patches, and
-expansion workers do not walk back to main-base patches.
+balanced mix of Machine Gunners and AT teams, and keeps those support units staged in a short line
+on the enemy-facing side of its natural steel cluster instead of launching outbound attack waves.
+After 100 supply used, it switches to a Tank Factory tech path, stops Machine Gunner / AT team
+production, trains tanks, and launches outbound tank groups only once at least three tanks are
+ready. After the expansion IC is complete, its worker resource assignment is locally bounded so
+main-base workers do not walk to expansion patches, and expansion workers do not walk back to
+main-base patches.
 The live lobby AI uses this shared core through `AiController`, which only owns live identity,
 profile id, cadence, and persistent decision memory. Profiles are still not client-selectable.
 

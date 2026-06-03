@@ -10,9 +10,12 @@ use crate::game::ai_core::actions::{
 };
 use crate::game::ai_core::facts::{AiFacts, EnemyBaseFact};
 use crate::game::ai_core::observation::{
-    AiEntityState, AiEntitySummary, AiObservation, AiResourceSummary,
+    AiEntityState, AiEntitySummary, AiMapSummary, AiObservation, AiResourceSummary,
 };
-use crate::game::ai_core::profiles::{AiProfile, ExpansionPolicy, ProxyBarracksPolicy};
+use crate::game::ai_core::profiles::{
+    AiProfile, AttackPolicy, ExpansionPolicy, ProductionPolicy, ProxyBarracksPolicy,
+    TechTransitionPolicy,
+};
 use crate::game::ai_shared;
 use crate::game::entity::EntityKind;
 use crate::protocol::Command;
@@ -29,6 +32,8 @@ const WORKER_DEFENSE_RADIUS_TILES: f32 = 5.0;
 const PROXY_DISTANCE_BAND_TILES: f32 = 2.0;
 const PROXY_WORKER_BUILD_SEARCH_RADIUS_TILES: i32 = 4;
 const EXPANSION_LOCAL_RESOURCE_ASSIGNMENT_RADIUS_TILES: f32 = config::MINING_IC_RANGE_TILES + 3.0;
+const EXPANSION_DEFENSIVE_LINE_SPACING_TILES: f32 = 1.5;
+const EXPANSION_DEFENSIVE_LINE_REISSUE_EPS_TILES: f32 = 0.75;
 
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct AiDecision {
@@ -63,6 +68,7 @@ pub(crate) enum AiIntent {
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub(crate) struct AiDecisionMemory {
     profile_id: Option<&'static str>,
+    attack_first_size: Option<usize>,
     next_attack_size: usize,
     last_attack_tick: Option<u32>,
     proxy_worker_id: Option<u32>,
@@ -72,6 +78,7 @@ impl AiDecisionMemory {
     pub(crate) fn for_profile(profile: &AiProfile) -> Self {
         Self {
             profile_id: Some(profile.id),
+            attack_first_size: Some(profile.attack.first_attack_size),
             next_attack_size: profile.attack.first_attack_size,
             last_attack_tick: None,
             proxy_worker_id: None,
@@ -79,28 +86,36 @@ impl AiDecisionMemory {
     }
 
     pub(crate) fn desired_attack_size(&mut self, profile: &AiProfile, tick: u32) -> usize {
-        self.ensure_profile(profile);
+        self.desired_attack_size_for(profile, profile.attack, tick)
+    }
+
+    fn desired_attack_size_for(
+        &mut self,
+        profile: &AiProfile,
+        attack: AttackPolicy,
+        tick: u32,
+    ) -> usize {
+        self.ensure_attack_policy(profile, attack);
         if self
             .last_attack_tick
-            .map(|last| tick.saturating_sub(last) >= profile.attack.regroup_reset_ticks)
+            .map(|last| tick.saturating_sub(last) >= attack.regroup_reset_ticks)
             .unwrap_or(false)
         {
-            self.next_attack_size = profile.attack.first_attack_size;
+            self.next_attack_size = attack.first_attack_size;
         }
         self.next_attack_size
     }
 
-    fn note_attack(&mut self, profile: &AiProfile, tick: u32) {
-        self.ensure_profile(profile);
+    fn note_attack_for(&mut self, profile: &AiProfile, attack: AttackPolicy, tick: u32) {
+        self.ensure_attack_policy(profile, attack);
         self.last_attack_tick = Some(tick);
-        self.next_attack_size = self
-            .next_attack_size
-            .saturating_add(profile.attack.wave_growth);
+        self.next_attack_size = self.next_attack_size.saturating_add(attack.wave_growth);
     }
 
-    fn attack_due(&self, profile: &AiProfile, tick: u32) -> bool {
+    fn attack_due_for(&mut self, profile: &AiProfile, attack: AttackPolicy, tick: u32) -> bool {
+        self.ensure_attack_policy(profile, attack);
         self.last_attack_tick
-            .map(|last| tick.saturating_sub(last) >= profile.attack.reissue_cadence_ticks)
+            .map(|last| tick.saturating_sub(last) >= attack.reissue_cadence_ticks)
             .unwrap_or(true)
     }
 
@@ -109,9 +124,20 @@ impl AiDecisionMemory {
             return;
         }
         self.profile_id = Some(profile.id);
+        self.attack_first_size = Some(profile.attack.first_attack_size);
         self.next_attack_size = profile.attack.first_attack_size;
         self.last_attack_tick = None;
         self.proxy_worker_id = None;
+    }
+
+    fn ensure_attack_policy(&mut self, profile: &AiProfile, attack: AttackPolicy) {
+        self.ensure_profile(profile);
+        if self.attack_first_size == Some(attack.first_attack_size) && self.next_attack_size != 0 {
+            return;
+        }
+        self.attack_first_size = Some(attack.first_attack_size);
+        self.next_attack_size = attack.first_attack_size;
+        self.last_attack_tick = None;
     }
 }
 
@@ -138,12 +164,16 @@ where
     let mut actions = AiActionContext::new(&facts, budget);
     let mut intents = Vec::new();
 
+    let required_tech_path = active_required_tech_path(observation, profile);
+    let production_policy = active_production_policy(observation, profile);
+    let attack_policy = active_attack_policy(observation, profile);
     let mut idle_builders = facts.idle_workers.clone();
     let mut gathering_builders = facts.gathering_workers.clone();
     idle_builders.sort_unstable();
     gathering_builders.sort_unstable();
     let builder_pools = [idle_builders.as_slice(), gathering_builders.as_slice()];
-    let save_for_required_tech_building = should_save_for_required_tech_building(&facts, profile);
+    let save_for_required_tech_building =
+        should_save_for_required_tech_building(&facts, required_tech_path, production_policy);
     let expansion_blocks_tech_path = expansion_blocks_tech_path(&facts, profile);
     let save_for_expansion = should_save_for_expansion(&facts, profile);
     let proxy_barracks_active = should_use_proxy_barracks(&facts, profile);
@@ -181,7 +211,7 @@ where
         });
     }
 
-    for kind in profile.buildings.required_tech_path {
+    for kind in required_tech_path {
         if proxy_barracks_active && *kind == EntityKind::Barracks {
             continue;
         }
@@ -222,9 +252,10 @@ where
         facts.worker_count,
         target_steel_workers,
     );
-    if facts.building_count(EntityKind::Barracks)
-        + planned_in_intents(&intents, EntityKind::Barracks)
-        < target_barracks
+    if production_uses_building(production_policy, EntityKind::Barracks)
+        && facts.building_count(EntityKind::Barracks)
+            + planned_in_intents(&intents, EntityKind::Barracks)
+            < target_barracks
         && !(proxy_barracks_active && facts.building_count(EntityKind::Barracks) == 0)
         && !expansion_blocks_tech_path
         && planned_in_intents(&intents, EntityKind::Barracks) == 0
@@ -264,7 +295,7 @@ where
     let desired_oil_workers =
         desired_oil_workers(observation, &facts, profile, target_steel_workers);
     let target_workers = target_steel_workers.saturating_add(desired_oil_workers);
-    let save_for_first_tech_unit = should_save_for_first_tech_unit(&facts, profile);
+    let save_for_first_tech_unit = should_save_for_first_tech_unit(&facts, production_policy);
     let save_worker_training_for_tech = save_for_expansion
         || save_for_first_tech_unit
         || (save_for_required_tech_building && facts.worker_count >= target_workers);
@@ -285,14 +316,13 @@ where
     }
 
     let production_unit_counts =
-        unit_counts_for_priorities(&facts, profile.production.unit_priorities);
-    for building_kind in production_building_order(profile.production.unit_priorities) {
+        unit_counts_for_priorities(&facts, production_policy.unit_priorities);
+    for building_kind in production_building_order(production_policy.unit_priorities) {
         let buildings = facts.production_buildings(building_kind);
         if buildings.is_empty() {
             continue;
         }
-        let key_tech_unit = profile
-            .production
+        let key_tech_unit = production_policy
             .save_for_first_tech_unit
             .unwrap_or(EntityKind::Worker);
         let save_for_tech =
@@ -302,13 +332,13 @@ where
             &mut actions,
             TrainUnitsRequest {
                 buildings,
-                unit_priorities: profile.production.unit_priorities,
+                unit_priorities: production_policy.unit_priorities,
                 completed_building_kinds: facts.complete_building_kinds(),
-                max_queue_depth: profile.production.queue_depth,
+                max_queue_depth: production_policy.queue_depth,
                 save_for_tech,
                 current_counts: &production_unit_counts,
                 max_counts: &[],
-                balance_unit_priorities: profile.production.balance_unit_priorities,
+                balance_unit_priorities: production_policy.balance_unit_priorities,
             },
         ) {
             intents.push(AiIntent::Train { kind: trained.unit });
@@ -372,7 +402,7 @@ where
     }
 
     let ready_units =
-        actions::select_ready_combat_units(&observation.owned, profile.attack.unit_kinds);
+        actions::select_ready_combat_units(&observation.owned, attack_policy.unit_kinds);
     if !ready_units.is_empty() {
         let mut handled_local_defense = false;
         if let Some(target) = local_defense_target(observation) {
@@ -388,8 +418,7 @@ where
 
         if !handled_local_defense {
             if let Some(enemy_base) = facts.nearest_public_enemy_base {
-                let required_unit_ready = profile
-                    .attack
+                let required_unit_ready = attack_policy
                     .required_unit
                     .map(|kind| {
                         observation
@@ -398,10 +427,11 @@ where
                             .any(|entity| entity.kind == kind && ready_units.contains(&entity.id))
                     })
                     .unwrap_or(true);
-                let attack_size = memory.desired_attack_size(profile, observation.tick);
+                let attack_size =
+                    memory.desired_attack_size_for(profile, attack_policy, observation.tick);
                 if required_unit_ready
                     && ready_units.len() >= attack_size
-                    && memory.attack_due(profile, observation.tick)
+                    && memory.attack_due_for(profile, attack_policy, observation.tick)
                 {
                     if let Some(units) = actions::attack_move_units(
                         &mut actions,
@@ -409,20 +439,31 @@ where
                         enemy_base.x,
                         enemy_base.y,
                     ) {
-                        memory.note_attack(profile, observation.tick);
+                        memory.note_attack_for(profile, attack_policy, observation.tick);
                         intents.push(AiIntent::Attack { units });
                     }
                 } else if !ready_units.is_empty() {
-                    let own_base =
-                        tile_center(observation.own_start_tile, observation.map.tile_size);
-                    if let Some(units) = actions::stage_units_toward(
-                        &mut actions,
-                        ready_units,
-                        own_base,
-                        (enemy_base.x, enemy_base.y),
-                        observation.map.tile_size,
-                        profile.attack.stage_distance_tiles,
-                    ) {
+                    let staged = if stages_expansion_defensive_line(profile, attack_policy) {
+                        stage_expansion_defensive_line(
+                            &mut actions,
+                            observation,
+                            &ready_units,
+                            enemy_base,
+                            attack_policy.stage_distance_tiles,
+                        )
+                    } else {
+                        let own_base =
+                            tile_center(observation.own_start_tile, observation.map.tile_size);
+                        actions::stage_units_toward(
+                            &mut actions,
+                            ready_units,
+                            own_base,
+                            (enemy_base.x, enemy_base.y),
+                            observation.map.tile_size,
+                            attack_policy.stage_distance_tiles,
+                        )
+                    };
+                    if let Some(units) = staged {
                         intents.push(AiIntent::Stage { units });
                     }
                 }
@@ -538,6 +579,36 @@ fn expansion_prerequisites_met(facts: &AiFacts, expansion: ExpansionPolicy) -> b
         && facts.unit_count(expansion.defensive_unit) >= expansion.defensive_unit_count
 }
 
+fn active_tech_transition(
+    observation: &AiObservation,
+    profile: &AiProfile,
+) -> Option<TechTransitionPolicy> {
+    profile
+        .tech_transition
+        .filter(|transition| observation.economy.supply_used >= transition.supply_used_threshold)
+}
+
+fn active_required_tech_path(
+    observation: &AiObservation,
+    profile: &AiProfile,
+) -> &'static [EntityKind] {
+    active_tech_transition(observation, profile)
+        .map(|transition| transition.required_tech_path)
+        .unwrap_or(profile.buildings.required_tech_path)
+}
+
+fn active_production_policy(observation: &AiObservation, profile: &AiProfile) -> ProductionPolicy {
+    active_tech_transition(observation, profile)
+        .map(|transition| transition.production)
+        .unwrap_or(profile.production)
+}
+
+fn active_attack_policy(observation: &AiObservation, profile: &AiProfile) -> AttackPolicy {
+    active_tech_transition(observation, profile)
+        .map(|transition| transition.attack)
+        .unwrap_or(profile.attack)
+}
+
 fn target_steel_workers_for_profile(
     observation: &AiObservation,
     facts: &AiFacts,
@@ -599,6 +670,147 @@ fn max_worker_resource_assignment_distance_px(
         return None;
     }
     Some(EXPANSION_LOCAL_RESOURCE_ASSIGNMENT_RADIUS_TILES * observation.map.tile_size as f32)
+}
+
+fn stages_expansion_defensive_line(profile: &AiProfile, attack: AttackPolicy) -> bool {
+    profile.expansion.is_some() && attack.first_attack_size == usize::MAX
+}
+
+fn stage_expansion_defensive_line(
+    actions: &mut AiActionContext<'_>,
+    observation: &AiObservation,
+    ready_units: &[u32],
+    enemy_base: EnemyBaseFact,
+    distance_tiles: f32,
+) -> Option<Vec<u32>> {
+    let assignments =
+        expansion_defensive_line_assignments(observation, ready_units, enemy_base, distance_tiles)?;
+    let units_by_id: BTreeMap<u32, &AiEntitySummary> = observation
+        .owned
+        .iter()
+        .map(|entity| (entity.id, entity))
+        .collect();
+    let close_enough_px =
+        EXPANSION_DEFENSIVE_LINE_REISSUE_EPS_TILES * observation.map.tile_size as f32;
+    let close_enough2 = squared(close_enough_px);
+    let mut staged = Vec::new();
+
+    for assignment in assignments {
+        let Some(unit) = units_by_id.get(&assignment.unit_id).copied() else {
+            continue;
+        };
+        if dist2(unit.x, unit.y, assignment.x, assignment.y) <= close_enough2 {
+            continue;
+        }
+        if let Some(units) =
+            actions::attack_move_units(actions, [assignment.unit_id], assignment.x, assignment.y)
+        {
+            staged.extend(units);
+        }
+    }
+
+    (!staged.is_empty()).then_some(staged)
+}
+
+#[derive(Clone, Copy, Debug)]
+struct DefensiveLineAssignment {
+    unit_id: u32,
+    x: f32,
+    y: f32,
+}
+
+fn expansion_defensive_line_assignments(
+    observation: &AiObservation,
+    ready_units: &[u32],
+    enemy_base: EnemyBaseFact,
+    distance_tiles: f32,
+) -> Option<Vec<DefensiveLineAssignment>> {
+    if ready_units.is_empty() {
+        return None;
+    }
+    let steel_center = expansion_steel_cluster_center(observation)?;
+    let enemy = (enemy_base.x, enemy_base.y);
+    let (dir_x, dir_y) = normalized_direction(steel_center, enemy)?;
+    let tile_size = observation.map.tile_size as f32;
+    if tile_size <= 0.0 {
+        return None;
+    }
+    let front_distance = distance_tiles.max(1.0) * tile_size;
+    let line_center = clamp_to_map(
+        (
+            steel_center.0 + dir_x * front_distance,
+            steel_center.1 + dir_y * front_distance,
+        ),
+        observation.map,
+    );
+    let perp = (-dir_y, dir_x);
+    let spacing = EXPANSION_DEFENSIVE_LINE_SPACING_TILES * tile_size;
+    let mut units = ready_units.to_vec();
+    units.sort_unstable();
+    units.dedup();
+    let center_index = (units.len().saturating_sub(1)) as f32 * 0.5;
+
+    let assignments = units
+        .into_iter()
+        .enumerate()
+        .map(|(index, unit_id)| {
+            let offset = (index as f32 - center_index) * spacing;
+            let (x, y) = clamp_to_map(
+                (
+                    line_center.0 + perp.0 * offset,
+                    line_center.1 + perp.1 * offset,
+                ),
+                observation.map,
+            );
+            DefensiveLineAssignment { unit_id, x, y }
+        })
+        .collect();
+    Some(assignments)
+}
+
+fn expansion_steel_cluster_center(observation: &AiObservation) -> Option<(f32, f32)> {
+    let own_base = tile_center(observation.own_start_tile, observation.map.tile_size);
+    let mut steel: Vec<&AiResourceSummary> = expansion_candidate_resources(observation)
+        .into_iter()
+        .filter(|resource| resource.kind == EntityKind::Steel)
+        .collect();
+    steel.sort_by(|left, right| {
+        dist2(left.x, left.y, own_base.0, own_base.1)
+            .total_cmp(&dist2(right.x, right.y, own_base.0, own_base.1))
+            .then_with(|| left.id.cmp(&right.id))
+    });
+    let count = steel.len().min(config::STEEL_PATCHES_PER_BASE as usize);
+    if count == 0 {
+        return None;
+    }
+    let (sum_x, sum_y) = steel
+        .iter()
+        .take(count)
+        .fold((0.0, 0.0), |(sum_x, sum_y), resource| {
+            (sum_x + resource.x, sum_y + resource.y)
+        });
+    Some((sum_x / count as f32, sum_y / count as f32))
+}
+
+fn normalized_direction(from: (f32, f32), to: (f32, f32)) -> Option<(f32, f32)> {
+    let dx = to.0 - from.0;
+    let dy = to.1 - from.1;
+    let len = (dx * dx + dy * dy).sqrt();
+    if len <= f32::EPSILON || !len.is_finite() {
+        return None;
+    }
+    Some((dx / len, dy / len))
+}
+
+fn clamp_to_map(point: (f32, f32), map: AiMapSummary) -> (f32, f32) {
+    let tile_size = map.tile_size as f32;
+    let min = tile_size * 0.5;
+    let max_x = map.width as f32 * tile_size - min;
+    let max_y = map.height as f32 * tile_size - min;
+    (
+        point.0.clamp(min, max_x.max(min)),
+        point.1.clamp(min, max_y.max(min)),
+    )
 }
 
 fn proxy_barracks_transit_site<F>(
@@ -1298,8 +1510,8 @@ fn next_tank_resource_goal(facts: &AiFacts, profile: &AiProfile) -> Option<Resou
     })
 }
 
-fn should_save_for_first_tech_unit(facts: &AiFacts, profile: &AiProfile) -> bool {
-    let Some(unit) = profile.production.save_for_first_tech_unit else {
+fn should_save_for_first_tech_unit(facts: &AiFacts, production: ProductionPolicy) -> bool {
+    let Some(unit) = production.save_for_first_tech_unit else {
         return false;
     };
     if facts.unit_count(unit) > 0 {
@@ -1311,8 +1523,12 @@ fn should_save_for_first_tech_unit(facts: &AiFacts, profile: &AiProfile) -> bool
     facts.building_count(producer) > 0
 }
 
-fn should_save_for_required_tech_building(facts: &AiFacts, profile: &AiProfile) -> bool {
-    let Some(unit) = profile.production.save_for_first_tech_unit else {
+fn should_save_for_required_tech_building(
+    facts: &AiFacts,
+    required_tech_path: &[EntityKind],
+    production: ProductionPolicy,
+) -> bool {
+    let Some(unit) = production.save_for_first_tech_unit else {
         return false;
     };
     if facts.unit_count(unit) > 0 {
@@ -1322,21 +1538,16 @@ fn should_save_for_required_tech_building(facts: &AiFacts, profile: &AiProfile) 
         return false;
     };
     if facts.building_count(producer) == 0 {
-        return profile.buildings.required_tech_path.contains(&producer)
+        return required_tech_path.contains(&producer)
             && rules::economy::build_requirement_met(producer, facts.complete_building_kinds());
     }
     if rules::economy::train_requirement_met(unit, facts.complete_building_kinds()) {
         return false;
     }
-    profile
-        .buildings
-        .required_tech_path
-        .iter()
-        .copied()
-        .any(|kind| {
-            facts.building_count(kind) == 0
-                && rules::economy::build_requirement_met(kind, facts.complete_building_kinds())
-        })
+    required_tech_path.iter().copied().any(|kind| {
+        facts.building_count(kind) == 0
+            && rules::economy::build_requirement_met(kind, facts.complete_building_kinds())
+    })
 }
 
 fn producer_for_unit(unit: EntityKind) -> Option<EntityKind> {
@@ -1356,6 +1567,14 @@ fn production_building_order(unit_priorities: &[EntityKind]) -> Vec<EntityKind> 
     }
     order.retain(|kind| *kind != EntityKind::IndustrialCenter);
     order
+}
+
+fn production_uses_building(production: ProductionPolicy, building: EntityKind) -> bool {
+    production
+        .unit_priorities
+        .iter()
+        .copied()
+        .any(|unit| producer_for_unit(unit) == Some(building))
 }
 
 fn unit_counts_for_priorities(
@@ -2723,6 +2942,236 @@ mod tests {
                 )
             }),
             "an idle expansion worker should take a local expansion steel patch"
+        );
+    }
+
+    #[test]
+    fn steel_expansion_tanks_stages_support_weapons_on_enemy_facing_expansion_steel_line() {
+        let ts = config::TILE_SIZE as f32;
+        let observation = with_expansion_resources(observation(
+            AiEconomy {
+                steel: 500,
+                oil: 200,
+                supply_used: 24,
+                supply_cap: 80,
+            },
+            vec![
+                building_at(
+                    10,
+                    EntityKind::IndustrialCenter,
+                    Some(0),
+                    8.5 * ts,
+                    8.5 * ts,
+                ),
+                building_at(
+                    11,
+                    EntityKind::IndustrialCenter,
+                    Some(0),
+                    23.5 * ts,
+                    36.5 * ts,
+                ),
+                building(12, EntityKind::Barracks, Some(0)),
+                building(13, EntityKind::TrainingCentre, None),
+                combat_at(30, EntityKind::MachineGunner, 8.5 * ts, 8.5 * ts),
+                combat_at(31, EntityKind::AtTeam, 9.5 * ts, 8.5 * ts),
+                combat_at(32, EntityKind::MachineGunner, 10.5 * ts, 8.5 * ts),
+            ],
+        ));
+
+        let decision = decide(
+            &observation,
+            &STEEL_EXPANSION_TANKS,
+            &mut AiDecisionMemory::for_profile(&STEEL_EXPANSION_TANKS),
+        );
+
+        let stage_targets: Vec<(u32, f32, f32)> = decision
+            .commands
+            .iter()
+            .filter_map(|command| match command {
+                Command::AttackMove { units, x, y } if units.len() == 1 => Some((units[0], *x, *y)),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(
+            stage_targets
+                .iter()
+                .map(|(id, _, _)| *id)
+                .collect::<Vec<_>>(),
+            vec![30, 31, 32],
+            "support weapons should receive deterministic individual stage slots"
+        );
+
+        let steel_center = expansion_steel_cluster_center(&observation)
+            .expect("expansion steel cluster should be found");
+        let enemy = AiFacts::from_observation(&observation)
+            .nearest_public_enemy_base
+            .expect("enemy base should be public");
+        let dir = normalized_direction(steel_center, (enemy.x, enemy.y))
+            .expect("enemy should not overlap the expansion steel");
+        let perp = (-dir.1, dir.0);
+        let mut lateral_offsets = Vec::new();
+        for (_, x, y) in &stage_targets {
+            let dx = *x - steel_center.0;
+            let dy = *y - steel_center.1;
+            let front_tiles = (dx * dir.0 + dy * dir.1) / ts;
+            assert!(
+                (2.0..=4.0).contains(&front_tiles),
+                "stage point should be in front of the steel patch, got {front_tiles} tiles"
+            );
+            lateral_offsets.push((dx * perp.0 + dy * perp.1) / ts);
+        }
+        lateral_offsets.sort_by(|left, right| left.total_cmp(right));
+        let spread = lateral_offsets.last().unwrap() - lateral_offsets.first().unwrap();
+        assert!(
+            spread >= 2.5,
+            "support weapons should spread across a line, got {spread} tiles"
+        );
+    }
+
+    #[test]
+    fn steel_expansion_tanks_switches_to_tank_factory_at_one_hundred_supply() {
+        let observation = with_expansion_resources(observation(
+            AiEconomy {
+                steel: 500,
+                oil: 500,
+                supply_used: 100,
+                supply_cap: 130,
+            },
+            vec![
+                building(10, EntityKind::IndustrialCenter, Some(0)),
+                building(11, EntityKind::IndustrialCenter, Some(0)),
+                building(12, EntityKind::Barracks, Some(0)),
+                building(13, EntityKind::Barracks, Some(0)),
+                building(14, EntityKind::TrainingCentre, None),
+                worker(60, AiEntityState::Idle),
+            ],
+        ));
+
+        let decision = decide(
+            &observation,
+            &STEEL_EXPANSION_TANKS,
+            &mut AiDecisionMemory::for_profile(&STEEL_EXPANSION_TANKS),
+        );
+
+        assert!(decision.intents.contains(&AiIntent::Build {
+            kind: EntityKind::TankFactory
+        }));
+        assert!(!decision.intents.contains(&AiIntent::Train {
+            kind: EntityKind::MachineGunner
+        }));
+        assert!(!decision.intents.contains(&AiIntent::Train {
+            kind: EntityKind::AtTeam
+        }));
+    }
+
+    #[test]
+    fn steel_expansion_tanks_trains_only_tanks_after_one_hundred_supply() {
+        let observation = with_expansion_resources(observation(
+            AiEconomy {
+                steel: 500,
+                oil: 300,
+                supply_used: 100,
+                supply_cap: 130,
+            },
+            vec![
+                building(10, EntityKind::IndustrialCenter, Some(0)),
+                building(11, EntityKind::IndustrialCenter, Some(0)),
+                building(12, EntityKind::Barracks, Some(0)),
+                building(13, EntityKind::TrainingCentre, None),
+                building(14, EntityKind::TankFactory, Some(0)),
+            ],
+        ));
+
+        let decision = decide(
+            &observation,
+            &STEEL_EXPANSION_TANKS,
+            &mut AiDecisionMemory::for_profile(&STEEL_EXPANSION_TANKS),
+        );
+
+        assert!(decision.intents.contains(&AiIntent::Train {
+            kind: EntityKind::Tank
+        }));
+        assert!(!decision.intents.contains(&AiIntent::Train {
+            kind: EntityKind::MachineGunner
+        }));
+        assert!(!decision.intents.contains(&AiIntent::Train {
+            kind: EntityKind::AtTeam
+        }));
+    }
+
+    #[test]
+    fn steel_expansion_tanks_attacks_with_three_or_more_tanks_after_transition() {
+        let two_tanks = with_expansion_resources(observation(
+            AiEconomy {
+                steel: 0,
+                oil: 0,
+                supply_used: 100,
+                supply_cap: 130,
+            },
+            vec![
+                building(10, EntityKind::IndustrialCenter, Some(0)),
+                building(11, EntityKind::IndustrialCenter, Some(0)),
+                building(12, EntityKind::Barracks, Some(0)),
+                building(13, EntityKind::TrainingCentre, None),
+                building(14, EntityKind::TankFactory, Some(0)),
+                combat(30, EntityKind::Tank),
+                combat(31, EntityKind::Tank),
+            ],
+        ));
+        let two_tank_decision = decide(
+            &two_tanks,
+            &STEEL_EXPANSION_TANKS,
+            &mut AiDecisionMemory::for_profile(&STEEL_EXPANSION_TANKS),
+        );
+
+        assert!(
+            !two_tank_decision
+                .intents
+                .iter()
+                .any(|intent| matches!(intent, AiIntent::Attack { .. })),
+            "two tanks should not launch an outbound attack"
+        );
+
+        let three_tanks = with_expansion_resources(observation(
+            AiEconomy {
+                steel: 0,
+                oil: 0,
+                supply_used: 100,
+                supply_cap: 130,
+            },
+            vec![
+                building(10, EntityKind::IndustrialCenter, Some(0)),
+                building(11, EntityKind::IndustrialCenter, Some(0)),
+                building(12, EntityKind::Barracks, Some(0)),
+                building(13, EntityKind::TrainingCentre, None),
+                building(14, EntityKind::TankFactory, Some(0)),
+                combat(30, EntityKind::Tank),
+                combat(31, EntityKind::Tank),
+                combat(32, EntityKind::Tank),
+                combat(40, EntityKind::MachineGunner),
+                combat(41, EntityKind::AtTeam),
+            ],
+        ));
+        let three_tank_decision = decide(
+            &three_tanks,
+            &STEEL_EXPANSION_TANKS,
+            &mut AiDecisionMemory::for_profile(&STEEL_EXPANSION_TANKS),
+        );
+
+        assert!(three_tank_decision.intents.iter().any(|intent| {
+            matches!(
+                intent,
+                AiIntent::Attack { units } if units.as_slice() == [30, 31, 32]
+            )
+        }));
+        assert!(
+            three_tank_decision.commands.iter().any(|command| {
+                matches!(
+                    command,
+                    Command::AttackMove { units, .. } if units.as_slice() == [30, 31, 32]
+                )
+            }),
+            "three ready tanks should attack as a group"
         );
     }
 
