@@ -114,8 +114,13 @@
           </div>
         </div>
 
-        <!-- Replay speed controls (only shown during replay dev-watch) -->
+        <!-- Replay seek + speed controls (only shown during replay dev-watch) -->
         <div id="replay-speed" hidden>
+          <button class="spd-btn seek-btn" data-seek-back="2147483647" title="Restart from tick 0">⟲ Reset</button>
+          <button class="spd-btn seek-btn" data-seek-back="600" title="Rewind 20 seconds">−20s</button>
+          <button class="spd-btn seek-btn" data-seek-back="300" title="Rewind 10 seconds">−10s</button>
+          <button class="spd-btn seek-btn" data-seek-back="150" title="Rewind 5 seconds">−5s</button>
+          <span class="spd-sep"></span>
           <button class="spd-btn" data-speed="0.5">0.5×</button>
           <button class="spd-btn" data-speed="1">1×</button>
           <button class="spd-btn" data-speed="2">2×</button>

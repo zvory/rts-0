@@ -458,10 +458,16 @@ class Match {
       this.replaySpeedHandler = (e) => {
         const btn = e.target.closest(".spd-btn");
         if (!btn) return;
+        if (btn.dataset.seekBack !== undefined) {
+          const ticksBack = parseInt(btn.dataset.seekBack, 10);
+          if (!isFinite(ticksBack) || ticksBack <= 0) return;
+          this.net.seekReplay(ticksBack);
+          return;
+        }
         const speed = parseFloat(btn.dataset.speed);
         if (!isFinite(speed)) return;
         this.net.setReplaySpeed(speed);
-        for (const b of dom.replaySpeed.querySelectorAll(".spd-btn")) {
+        for (const b of dom.replaySpeed.querySelectorAll(".spd-btn:not(.seek-btn)")) {
           b.classList.toggle("active", b === btn);
         }
       };

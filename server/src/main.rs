@@ -499,6 +499,14 @@ async fn handle_client_message(
         ClientMessage::SetReplaySpeed { speed } => {
             send_room_event(player_id, current_room, RoomEvent::SetReplaySpeed { speed }).await;
         }
+        ClientMessage::SeekReplay { ticks_back } => {
+            send_room_event(
+                player_id,
+                current_room,
+                RoomEvent::SeekReplay { ticks_back },
+            )
+            .await;
+        }
     }
 }
 

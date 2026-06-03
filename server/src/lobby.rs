@@ -212,6 +212,8 @@ pub enum RoomEvent {
     GiveUp { player_id: u32 },
     /// Set replay playback speed multiplier (replay rooms only; ignored elsewhere).
     SetReplaySpeed { speed: f32 },
+    /// Rewind a replay by `ticks_back` simulation ticks (replay rooms only; clamped to start).
+    SeekReplay { ticks_back: u32 },
 }
 
 /// Handle the lobby keeps for each live room: just the channel into its task.
@@ -417,6 +419,7 @@ impl RoomTask {
             RoomEvent::Command { player_id, cmd } => self.on_command(player_id, cmd),
             RoomEvent::GiveUp { player_id } => self.on_give_up(player_id),
             RoomEvent::SetReplaySpeed { speed } => self.on_set_replay_speed(speed),
+            RoomEvent::SeekReplay { ticks_back } => self.on_seek_replay(ticks_back),
         }
     }
 
@@ -1041,6 +1044,64 @@ impl RoomTask {
         // Clamp to sensible range matching the UI buttons (0.5× – 8×).
         let clamped = speed.clamp(0.125, 8.0);
         self.replay_speed = clamped;
+    }
+
+    /// Rewind a replay by `ticks_back` ticks. Pass `u32::MAX` to reset to the start.
+    /// No-op outside replay rooms or when no game is active.
+    fn on_seek_replay(&mut self, ticks_back: u32) {
+        if !matches!(
+            self.mode,
+            RoomMode::DevSelfPlay(DevSelfPlayConfig::Replay { .. })
+        ) {
+            return;
+        }
+        let current_tick = match &self.phase {
+            Phase::InGame(game) => game.tick_count(),
+            Phase::Lobby => return,
+        };
+        let target_tick = current_tick.saturating_sub(ticks_back);
+
+        let (mut game, mut driver, view_player_id) = match self.build_dev_session() {
+            Ok(session) => session,
+            Err(err) => {
+                warn!(room = %self.room, error = %err, "replay seek rebuild failed");
+                self.send_dev_error(&err);
+                return;
+            }
+        };
+
+        // Fast-forward the fresh game by replaying commands up to `target_tick`.
+        // Snapshots and events from these ticks are discarded — the client gets a fresh Start.
+        for _ in 0..target_tick {
+            match &mut driver {
+                DevDriver::Live(scripted) => scripted.enqueue_for_tick(&mut game),
+                DevDriver::Replay(replay) => replay.enqueue_for_tick(&mut game),
+            }
+            let tick_result =
+                std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| game.tick()));
+            if let Err(payload) = tick_result {
+                let reason = panic_reason(&payload);
+                dump_crash_replay(&self.room, &game, &reason);
+                self.phase = Phase::Lobby;
+                self.dev_driver = None;
+                self.dev_view_player_id = None;
+                return;
+            }
+        }
+
+        self.phase = Phase::InGame(Box::new(game));
+        self.dev_driver = Some(driver);
+        self.dev_view_player_id = Some(view_player_id);
+        let recipients = self.order.clone();
+        for player_id in recipients {
+            self.send_dev_start_to(player_id);
+        }
+        info!(
+            room = %self.room,
+            from_tick = current_tick,
+            to_tick = target_tick,
+            "replay seek"
+        );
     }
 
     /// Send a one-time score screen to connected players who have been eliminated while a
