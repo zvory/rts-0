@@ -585,7 +585,8 @@ or regime-specific iconography.
 MVP scope:
 - No air forces.
 - No artillery or mortars yet.
-- No mines, morale, logistics, suppression-depth model, or detailed tank armor model yet.
+- No mines, morale, logistics, suppression-depth model, or detailed tank armor model yet. Tanks
+  do have a simple hull-facing armor rule for anti-tank damage.
 
 Core unit roles:
 - **Rifleman** is the baseline combat unit: cheap, flexible, useful for capturing and
@@ -623,10 +624,11 @@ Intended progression:
 
 ### 5.2 Current implementation constants
 
-The current implementation uses the themed unit/building names below. Combat is still handled
-by the simple shared attack model plus the machine-gunner setup/teardown state and tank turret
-aim gates; armor facings and forest-specific rules are future work. The unit, building, and
-resource-node tables below are the human-readable form of the authoritative `rules::defs` records.
+The current implementation uses the themed unit/building names below. Combat is handled by the
+shared attack model plus the machine-gunner setup/teardown state, tank turret aim gates, and
+tank hull-facing damage modifiers for anti-tank hits against tank victims. Forest-specific rules
+are future work. The unit, building, and resource-node tables below are the human-readable form of
+the authoritative `rules::defs` records.
 
 - `TICK_HZ = 30`, `SNAPSHOT_EVERY_N_TICKS = 1`.
 - `MACHINE_GUNNER_SETUP_TICKS = 30` (~1s setup or teardown).
@@ -733,6 +735,11 @@ The server treats every client as potentially hostile. Limits live next to the c
   independent turret/barrel angle. Tank combat rotates the turret toward the target at a bounded
   rate and fires only once the turret is within tolerance; the hull does not need to face the
   target. Projection omits enemy `weaponFacing` when it would reveal a hidden target direction.
+- **Tank armor facing**: tank and AT-team attacks against tank victims use the victim tank's hull
+  `facing` and the attacker's position. Front hits (`<=45°` from the hull direction) deal normal
+  damage, side hits (`>45°` and `<=135°`) deal `1.25x`, and rear hits (`>135°`) deal `1.75x`.
+  Infantry damage, building damage, non-tank victims, and non-anti-tank attackers ignore armor
+  facing. Overpenetration victims use the same facing rule.
 - **Worker direct-hit retreat**: a worker that takes primary-target damage from an attacker gets a
   short move-away order through normal pathing. Overpenetration splash does not trigger this
   reaction, and workers actively constructing a scaffold stay latched so unfinished buildings are
