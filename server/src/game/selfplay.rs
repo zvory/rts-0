@@ -29,6 +29,8 @@ use crate::game::ai_core::facts::AiFacts;
 use crate::game::ai_core::observation::{AiBuildIntent, AiObservation};
 use crate::game::ai_shared;
 use crate::game::entity::EntityKind;
+#[cfg(test)]
+use crate::protocol::PlayerStart;
 use crate::protocol::{
     kinds, states, terrain, Command, EntityView, Event, MapInfo, Snapshot, StartPayload,
 };
@@ -498,16 +500,42 @@ impl PlayerView<'_> {
 }
 
 const FAILED_SPOTS_CAP: usize = 16;
-/// Force a pending build to be treated as failed after this many ticks so stale commands do not
-/// suppress future build attempts forever if a worker dies or never reaches the site.
-const PENDING_BUILD_WATCHDOG_TICKS: u32 = 300;
+/// Force a pending build to be treated as failed after this many ticks without worker movement so
+/// stale commands do not suppress future build attempts forever if a worker gets stuck.
+const PENDING_BUILD_STALE_TICKS: u32 = 300;
+const PENDING_BUILD_PROGRESS_EPS_PX: f32 = 4.0;
 
 #[derive(Clone, Copy)]
 struct PendingBuild {
     kind: EntityKind,
     tile_x: u32,
     tile_y: u32,
-    issued_tick: u32,
+    last_x: Option<f32>,
+    last_y: Option<f32>,
+    last_progress_tick: u32,
+}
+
+impl PendingBuild {
+    fn observe_worker(&mut self, worker: &EntityView, tick: u32) {
+        let Some(last_x) = self.last_x else {
+            self.last_x = Some(worker.x);
+            self.last_y = Some(worker.y);
+            self.last_progress_tick = tick;
+            return;
+        };
+        let last_y = self.last_y.unwrap_or(worker.y);
+        let dx = worker.x - last_x;
+        let dy = worker.y - last_y;
+        if dx * dx + dy * dy >= PENDING_BUILD_PROGRESS_EPS_PX * PENDING_BUILD_PROGRESS_EPS_PX {
+            self.last_x = Some(worker.x);
+            self.last_y = Some(worker.y);
+            self.last_progress_tick = tick;
+        }
+    }
+
+    fn stale_at(self, tick: u32) -> bool {
+        tick.saturating_sub(self.last_progress_tick) >= PENDING_BUILD_STALE_TICKS
+    }
 }
 
 #[derive(Default)]
@@ -531,12 +559,16 @@ impl PendingBuildTracker {
             .collect();
         let mut dropped = Vec::new();
         self.pending.retain(|worker_id, pending| {
-            let in_build = workers
+            let worker = workers
                 .iter()
-                .any(|w| w.id == *worker_id && w.state == states::BUILD);
-            let watchdog_expired =
-                view.tick.saturating_sub(pending.issued_tick) >= PENDING_BUILD_WATCHDOG_TICKS;
-            let keep = in_build && !watchdog_expired;
+                .copied()
+                .find(|w| w.id == *worker_id && w.state == states::BUILD);
+            let keep = worker
+                .map(|worker| {
+                    pending.observe_worker(worker, view.tick);
+                    !pending.stale_at(view.tick)
+                })
+                .unwrap_or(false);
             if !keep {
                 dropped.push(*pending);
             }
@@ -592,7 +624,9 @@ impl PendingBuildTracker {
                     kind,
                     tile_x: *tile_x,
                     tile_y: *tile_y,
-                    issued_tick: tick,
+                    last_x: None,
+                    last_y: None,
+                    last_progress_tick: tick,
                 },
             );
         }
@@ -2899,6 +2933,114 @@ fn run_scripted_ticks(
         game.tick();
     }
     history
+}
+
+#[cfg(test)]
+fn pending_tracker_start_payload() -> StartPayload {
+    StartPayload {
+        player_id: 1,
+        tick: 0,
+        map: MapInfo {
+            width: 96,
+            height: 96,
+            tile_size: config::TILE_SIZE,
+            terrain: vec![terrain::GRASS; 96 * 96],
+            resources: Vec::new(),
+        },
+        players: vec![PlayerStart {
+            id: 1,
+            name: "Alpha".into(),
+            color: "#4cc9f0".into(),
+            start_tile_x: 10,
+            start_tile_y: 85,
+        }],
+    }
+}
+
+#[cfg(test)]
+fn pending_tracker_snapshot(tick: u32, worker_x: f32, worker_y: f32) -> Snapshot {
+    Snapshot {
+        tick,
+        steel: 0,
+        oil: 0,
+        supply_used: 1,
+        supply_cap: 10,
+        entities: vec![EntityView::new(
+            2,
+            1,
+            kinds::WORKER,
+            worker_x,
+            worker_y,
+            40,
+            40,
+            states::BUILD,
+        )],
+        resource_deltas: Vec::new(),
+        events: Vec::new(),
+    }
+}
+
+#[cfg(test)]
+fn pending_tracker_view<'a>(
+    tick: u32,
+    start: &'a StartPayload,
+    snapshot: &'a Snapshot,
+) -> PlayerView<'a> {
+    PlayerView {
+        player_id: 1,
+        tick,
+        start,
+        snapshot,
+    }
+}
+
+#[test]
+fn pending_build_tracker_keeps_moving_worker_past_stale_window() {
+    let start = pending_tracker_start_payload();
+    let mut tracker = PendingBuildTracker::default();
+    tracker.record_commands(
+        10,
+        &[Command::Build {
+            worker: 2,
+            building: kinds::INDUSTRIAL_CENTER.to_string(),
+            tile_x: 48,
+            tile_y: 70,
+        }],
+    );
+
+    for tick in [70, 130, 190, 250, 310, 370, 430] {
+        let snapshot = pending_tracker_snapshot(tick, 100.0 + tick as f32, 200.0);
+        tracker.observe(pending_tracker_view(tick, &start, &snapshot));
+        assert_eq!(
+            tracker.intents().len(),
+            1,
+            "moving expansion builder should remain reserved at tick {tick}"
+        );
+    }
+}
+
+#[test]
+fn pending_build_tracker_expires_stuck_worker() {
+    let start = pending_tracker_start_payload();
+    let mut tracker = PendingBuildTracker::default();
+    tracker.record_commands(
+        10,
+        &[Command::Build {
+            worker: 2,
+            building: kinds::INDUSTRIAL_CENTER.to_string(),
+            tile_x: 48,
+            tile_y: 70,
+        }],
+    );
+
+    let first_snapshot = pending_tracker_snapshot(20, 100.0, 200.0);
+    tracker.observe(pending_tracker_view(20, &start, &first_snapshot));
+    let stale_tick = 20 + PENDING_BUILD_STALE_TICKS;
+    let stale_snapshot = pending_tracker_snapshot(stale_tick, 100.0, 200.0);
+    tracker.observe(pending_tracker_view(stale_tick, &start, &stale_snapshot));
+
+    assert!(tracker.intents().is_empty());
+    assert!(tracker.failed(EntityKind::IndustrialCenter, 48, 70));
 }
 
 /// Two fresh games with the same scripted players must evolve identically tick-for-tick.
