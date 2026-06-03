@@ -458,9 +458,9 @@ export class Renderer {
       g.moveTo(-r * 0.85, r * 0.45);
       g.lineTo(r * 0.85, -r * 0.45);
     } else if (e.kind === KIND.TANK) {
-      // Chunky flat-shaded armor, closer to a low-poly model than an icon.
+      // Hull follows movement facing; turret/barrel follow weapon facing.
       g.beginFill(tint);
-      g.drawPolygon([
+      g.drawPolygon(rotatedPolygon([
         -r * 1.05, -r * 0.75,
         r * 0.85, -r * 0.75,
         r * 1.08, -r * 0.38,
@@ -469,15 +469,32 @@ export class Renderer {
         -r * 0.95, r * 0.82,
         -r * 1.18, r * 0.35,
         -r * 1.18, -r * 0.38,
-      ]);
+      ], facing));
       g.endFill();
+
       g.beginFill(0x1a1712, 0.28);
-      g.drawRect(-r * 0.55, -r * 0.42, r * 1.05, r * 0.82);
+      drawRotatedRect(g, 0, -r * 0.64, r * 2.0, r * 0.2, facing);
+      drawRotatedRect(g, 0, r * 0.66, r * 2.0, r * 0.2, facing);
       g.endFill();
-      const barrel = polar(weaponFacing, r * 1.2);
-      g.lineStyle(4, 0x241d17, 0.95);
+
+      g.beginFill(0x1a1712, 0.24);
+      drawRotatedRect(g, -r * 0.04, 0, r * 1.05, r * 0.74, facing);
+      g.endFill();
+
+      const barrel = polar(weaponFacing, r * 1.55);
+      g.lineStyle(5, 0x241d17, 0.95);
       g.moveTo(0, 0);
       g.lineTo(barrel.x, barrel.y);
+
+      g.lineStyle(2, 0x1a1712, 0.95);
+      g.beginFill(lightenColor(tint, 0.12));
+      drawRotatedRect(g, r * 0.05, 0, r * 0.78, r * 0.54, weaponFacing);
+      g.endFill();
+
+      const nose = polar(facing, r * 1.12);
+      g.lineStyle(2, 0xd8d0b0, 0.75);
+      g.moveTo(nose.x - Math.cos(facing) * r * 0.22, nose.y - Math.sin(facing) * r * 0.22);
+      g.lineTo(nose.x, nose.y);
     } else {
       // Engineer (and any other unit kind): compact tool-carrying block.
       g.beginFill(tint);
@@ -500,7 +517,7 @@ export class Renderer {
     }
 
     // Facing indicator: a short pale tick from center outward.
-    if (e.kind !== KIND.MACHINE_GUNNER) {
+    if (e.kind !== KIND.MACHINE_GUNNER && e.kind !== KIND.TANK) {
       const fp = polar(facing, r + 3);
       g.lineStyle(2, 0xd8d0b0, 0.85);
       g.moveTo(0, 0);
@@ -1278,6 +1295,39 @@ function rotatePoint(x, y, a) {
   const c = Math.cos(a);
   const s = Math.sin(a);
   return { x: x * c - y * s, y: x * s + y * c };
+}
+
+function rotatedPolygon(points, a) {
+  const out = [];
+  for (let i = 0; i < points.length; i += 2) {
+    const p = rotatePoint(points[i], points[i + 1], a);
+    out.push(p.x, p.y);
+  }
+  return out;
+}
+
+function drawRotatedRect(g, cx, cy, w, h, a) {
+  const hw = w / 2;
+  const hh = h / 2;
+  const corners = [
+    [cx - hw, cy - hh],
+    [cx + hw, cy - hh],
+    [cx + hw, cy + hh],
+    [cx - hw, cy + hh],
+  ];
+  const polygon = [];
+  for (const [x, y] of corners) {
+    const p = rotatePoint(x, y, a);
+    polygon.push(p.x, p.y);
+  }
+  g.drawPolygon(polygon);
+}
+
+function lightenColor(color, amount) {
+  const r = Math.min(255, ((color >> 16) & 0xff) + Math.round(255 * amount));
+  const g = Math.min(255, ((color >> 8) & 0xff) + Math.round(255 * amount));
+  const b = Math.min(255, (color & 0xff) + Math.round(255 * amount));
+  return (r << 16) | (g << 8) | b;
 }
 
 /** Normalize a possibly-negative-size rect to positive width/height. */
