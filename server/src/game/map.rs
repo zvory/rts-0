@@ -78,9 +78,8 @@ impl Map {
             .collect();
         let mut rng = SmallRng::seed_from_u64(seed as u64);
         pairs.shuffle(&mut rng);
-        let all_expansions: Vec<(u32, u32)> = pairs.iter().map(|&(_, exp)| exp).collect();
-        let (starts, _): (Vec<_>, Vec<_>) = pairs.into_iter().take(player_count).unzip();
-        let expansion_sites = assign_expansions_fair(&starts, &all_expansions);
+        let (starts, expansion_sites): (Vec<_>, Vec<_>) =
+            pairs.into_iter().take(player_count).unzip();
 
         Ok(Map {
             size,
@@ -259,81 +258,6 @@ fn validate_base_clearance(
     Ok(())
 }
 
-fn gen_perms(
-    n: usize,
-    m: usize,
-    used: &mut Vec<bool>,
-    current: &mut Vec<usize>,
-    result: &mut Vec<Vec<usize>>,
-) {
-    if current.len() == n {
-        result.push(current.clone());
-        return;
-    }
-    for i in 0..m {
-        if !used[i] {
-            used[i] = true;
-            current.push(i);
-            gen_perms(n, m, used, current, result);
-            current.pop();
-            used[i] = false;
-        }
-    }
-}
-
-fn permutation_indices(n: usize, m: usize) -> Vec<Vec<usize>> {
-    let mut result = Vec::new();
-    let mut used = vec![false; m];
-    let mut current = Vec::with_capacity(n);
-    gen_perms(n, m, &mut used, &mut current, &mut result);
-    result
-}
-
-fn assign_expansions_fair(starts: &[(u32, u32)], candidates: &[(u32, u32)]) -> Vec<(u32, u32)> {
-    let n = starts.len();
-    let m = candidates.len();
-    debug_assert!(
-        m >= n,
-        "need at least as many expansion candidates as players"
-    );
-
-    let dist = |a: (u32, u32), b: (u32, u32)| -> f64 {
-        let dx = a.0 as f64 - b.0 as f64;
-        let dy = a.1 as f64 - b.1 as f64;
-        (dx * dx + dy * dy).sqrt()
-    };
-
-    let score_perm = |idxs: &[usize]| -> f64 {
-        (0..n)
-            .map(|i| {
-                let exp = candidates[idxs[i]];
-                let own = dist(starts[i], exp);
-                let threat = (0..n)
-                    .filter(|&j| j != i)
-                    .map(|j| dist(starts[j], exp))
-                    .fold(f64::MAX, f64::min);
-                // 1-player game: no enemy threat — treat as always-safe
-                let threat = if threat == f64::MAX {
-                    own * 10.0
-                } else {
-                    threat
-                };
-                threat - own
-            })
-            .fold(f64::MAX, f64::min)
-    };
-
-    permutation_indices(n, m)
-        .into_iter()
-        .max_by(|a, b| {
-            score_perm(a)
-                .partial_cmp(&score_perm(b))
-                .unwrap_or(std::cmp::Ordering::Equal)
-        })
-        .map(|idxs| idxs.iter().map(|&i| candidates[i]).collect())
-        .unwrap_or_else(|| candidates[..n].to_vec())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -405,27 +329,30 @@ mod tests {
     }
 
     #[test]
-    fn fair_assignment_avoids_exposed_natural() {
-        // Bug case: top-left (10,10) and bottom-left (10,85).
-        // Authored expansions for these two are (48,23) and (23,47).
-        // (23,47) is the middle-left expansion — nearly equidistant from both players.
-        // The fair assignment should give bottom-left something safer, e.g. (48,73).
-        let starts: &[(u32, u32)] = &[(10, 10), (10, 85)];
-        let candidates: &[(u32, u32)] = &[(48, 23), (48, 73), (73, 47), (23, 47)];
-        let assigned = assign_expansions_fair(starts, candidates);
-        assert_eq!(assigned.len(), 2);
-        // bottom-left player (index 1) must NOT get (23,47) — the exposed middle-left expansion.
-        assert_ne!(
-            assigned[1],
-            (23, 47),
-            "bottom-left should not be assigned the exposed middle-left expansion (23,47)"
-        );
-        // bottom-left should get (48,73) — the bottom-middle expansion, far from the top-left enemy.
-        assert_eq!(
-            assigned[1],
-            (48, 73),
-            "bottom-left should be assigned the safe bottom expansion (48,73)"
-        );
+    fn shuffled_starts_keep_their_paired_natural_expansions() {
+        let authored_pairs: HashSet<_> = [
+            ((10, 10), (48, 23)),
+            ((85, 85), (48, 73)),
+            ((85, 10), (73, 47)),
+            ((10, 85), (23, 47)),
+        ]
+        .into_iter()
+        .collect();
+
+        for seed in 0..16u32 {
+            let map = Map::generate(2, seed);
+            for pair in map
+                .starts
+                .iter()
+                .copied()
+                .zip(map.expansion_sites.iter().copied())
+            {
+                assert!(
+                    authored_pairs.contains(&pair),
+                    "start/expansion pair {pair:?} is not an authored natural pair (seed {seed})"
+                );
+            }
+        }
     }
 
     #[test]

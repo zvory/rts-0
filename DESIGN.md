@@ -756,9 +756,10 @@ uses ready combat units to clear visible threats in its home resource line befor
 and treats a single completed tank as a valid minimum attack wave.
 `steel_expansion_tanks` is a defensive economic support profile: it saves for a second Industrial
 Center near a neutral steel expansion before building any non-Depot tech structure. Once that
-expansion IC is planned, it builds Barracks and Training Centre tech, staffs oil, mass-produces a
-balanced mix of Machine Gunners and AT teams, and keeps those support units staged in a short line
-on the enemy-facing side of its natural steel cluster instead of launching outbound attack waves.
+expansion IC is planned, it builds Barracks and Training Centre tech, staffs oil, produces Machine
+Gunners and AT teams toward a one-for-one support mix, and keeps those support units staged in a
+short line on the enemy-facing side of its main-base steel cluster instead of launching outbound
+attack waves.
 After 100 supply used, it switches to a Tank Factory tech path, stops Machine Gunner / AT team
 production, trains tanks, and launches outbound tank groups only once at least three tanks are
 ready. After the expansion IC is complete, its worker resource assignment is locally bounded so
