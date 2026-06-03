@@ -734,7 +734,11 @@ impl RoomTask {
             (config::STARTING_STEEL, config::STARTING_OIL)
         };
         let seed = match_seed();
-        let game = Game::new_with_starting_resources(&inits, starting_steel, starting_oil, seed);
+        let game = if self.quickstart {
+            Game::new_with_starting_resources(&inits, starting_steel, starting_oil, seed)
+        } else {
+            Game::new(&inits, seed)
+        };
         let payload = game.start_payload();
         self.match_player_count = inits.len();
         self.outcome_sent.clear();
@@ -790,7 +794,7 @@ impl RoomTask {
                     .map(|p| p.id)
                     .ok_or_else(|| "live self-play configured with no players".to_string())?;
                 let seed = match_seed();
-                let game = Game::new(&players, seed);
+                let game = Game::new_without_ai_controllers(&players, seed);
                 Ok((game, DevDriver::Live(driver), view_player_id))
             }
             RoomMode::DevSelfPlay(DevSelfPlayConfig::Replay { artifact }) => {
