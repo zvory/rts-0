@@ -25,9 +25,10 @@ use std::collections::HashMap;
 
 use crate::config;
 use crate::protocol::{
-    Command, Event, MapInfo, PlayerStart, ResourceDelta, ResourceNode, Snapshot, StartPayload,
+    Command, Event, MapInfo, PlayerScore, PlayerStart, ResourceDelta, ResourceNode, Snapshot,
+    StartPayload,
 };
-use crate::rules::projection;
+use crate::rules::{economy as economy_rules, projection};
 use serde::{Deserialize, Serialize};
 
 use ai::{AiController, AiThinkContext};
@@ -63,6 +64,51 @@ pub(crate) struct PlayerState {
     /// Supply provided by completed Industrial Centers/Depots, capped at `SUPPLY_CAP_MAX`.
     pub(crate) supply_cap: u32,
     pub(crate) is_ai: bool,
+    pub(crate) score: ScoreState,
+}
+
+/// Per-player score-screen counters. Values are accumulated from authoritative entity lifecycle
+/// events, not inferred from fog-filtered snapshots.
+#[derive(Debug, Clone, Default)]
+pub(crate) struct ScoreState {
+    unit_score: u32,
+    structure_score: u32,
+    units_killed: u32,
+    units_lost: u32,
+    buildings_killed: u32,
+    buildings_lost: u32,
+}
+
+impl PlayerState {
+    pub(crate) fn record_entity_created(&mut self, kind: EntityKind) {
+        let value = entity_score_value(kind);
+        if kind.is_unit() {
+            self.score.unit_score = self.score.unit_score.saturating_add(value);
+        } else if kind.is_building() {
+            self.score.structure_score = self.score.structure_score.saturating_add(value);
+        }
+    }
+
+    pub(crate) fn record_entity_lost(&mut self, kind: EntityKind) {
+        if kind.is_unit() {
+            self.score.units_lost = self.score.units_lost.saturating_add(1);
+        } else if kind.is_building() {
+            self.score.buildings_lost = self.score.buildings_lost.saturating_add(1);
+        }
+    }
+
+    pub(crate) fn record_entity_killed(&mut self, kind: EntityKind) {
+        if kind.is_unit() {
+            self.score.units_killed = self.score.units_killed.saturating_add(1);
+        } else if kind.is_building() {
+            self.score.buildings_killed = self.score.buildings_killed.saturating_add(1);
+        }
+    }
+}
+
+fn entity_score_value(kind: EntityKind) -> u32 {
+    let (steel, oil) = economy_rules::cost(kind);
+    steel.saturating_add(oil)
 }
 
 /// The authoritative match state.
@@ -149,8 +195,9 @@ impl Game {
                 supply_used: 0,
                 supply_cap: 0,
                 is_ai: enable_ai && p.is_ai,
+                score: ScoreState::default(),
             };
-            spawn_player_start(&mut entities, &map, p.id, start);
+            spawn_player_start(&mut entities, &map, &mut ps, start);
             // The starting Industrial Center contributes supply immediately.
             ps.supply_cap = config::INDUSTRIAL_CENTER_SUPPLY.min(config::SUPPLY_CAP_MAX);
             player_states.push(ps);
@@ -381,6 +428,24 @@ impl Game {
             .collect()
     }
 
+    /// Frozen score-screen snapshot for every match participant, in lobby/start order.
+    pub fn scores(&self) -> Vec<PlayerScore> {
+        self.players
+            .iter()
+            .map(|p| PlayerScore {
+                id: p.id,
+                name: p.name.clone(),
+                color: p.color.clone(),
+                unit_score: p.score.unit_score,
+                structure_score: p.score.structure_score,
+                units_killed: p.score.units_killed,
+                units_lost: p.score.units_lost,
+                buildings_killed: p.score.buildings_killed,
+                buildings_lost: p.score.buildings_lost,
+            })
+            .collect()
+    }
+
     /// Remove every entity owned by `player` (e.g. on disconnect) so the match can resolve.
     pub fn eliminate(&mut self, player: u32) {
         let doomed: Vec<u32> = services::world_query::owned_units(&self.entities, player)
@@ -391,7 +456,11 @@ impl Game {
             .map(|e| e.id)
             .collect();
         for id in doomed {
-            self.entities.remove(id);
+            if let Some(entity) = self.entities.remove(id) {
+                if let Some(p) = self.players.iter_mut().find(|p| p.id == entity.owner) {
+                    p.record_entity_lost(entity.kind);
+                }
+            }
         }
         if let Some(p) = self.players.iter_mut().find(|p| p.id == player) {
             p.supply_used = 0;
@@ -515,11 +584,21 @@ fn spawn_base_resources(entities: &mut EntityStore, map: &Map, tile: (u32, u32))
 }
 
 /// Spawn an Industrial Center, starting workers, and resource clusters for one player.
-fn spawn_player_start(entities: &mut EntityStore, map: &Map, owner: u32, start: (u32, u32)) {
+fn spawn_player_start(
+    entities: &mut EntityStore,
+    map: &Map,
+    player: &mut PlayerState,
+    start: (u32, u32),
+) {
     let (stx, sty) = start;
     let (hx, hy) = map.tile_center(stx, sty);
 
-    entities.spawn_building(owner, EntityKind::IndustrialCenter, hx, hy, true);
+    if entities
+        .spawn_building(player.id, EntityKind::IndustrialCenter, hx, hy, true)
+        .is_some()
+    {
+        player.record_entity_created(EntityKind::IndustrialCenter);
+    }
 
     let ts = config::TILE_SIZE as f32;
     let ring_r = ts * 2.5;
@@ -528,7 +607,12 @@ fn spawn_player_start(entities: &mut EntityStore, map: &Map, owner: u32, start: 
         let ang = std::f32::consts::TAU * (i as f32) / (count.max(1) as f32);
         let wx = hx + ring_r * ang.cos();
         let wy = hy + ring_r * ang.sin();
-        entities.spawn_unit(owner, EntityKind::Worker, wx, wy);
+        if entities
+            .spawn_unit(player.id, EntityKind::Worker, wx, wy)
+            .is_some()
+        {
+            player.record_entity_created(EntityKind::Worker);
+        }
     }
 
     spawn_base_resources(entities, map, start);
@@ -536,6 +620,8 @@ fn spawn_player_start(entities: &mut EntityStore, map: &Map, owner: u32, start: 
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+
     use super::*;
     use crate::game::entity::{Entity, EntityKind, GatherPhase, Order};
     use crate::protocol::{kinds, EntityView};
@@ -657,6 +743,77 @@ mod tests {
             }
         }
         v
+    }
+
+    #[test]
+    fn scores_count_starting_entities() {
+        let players = human_vs_ai_players();
+        let game = Game::new(&players, 0x515C_0DE);
+        let scores = game.scores();
+        let human = scores
+            .iter()
+            .find(|score| score.id == 1)
+            .expect("human score should exist");
+
+        assert_eq!(
+            human.unit_score,
+            config::STARTING_WORKERS * entity_score_value(EntityKind::Worker)
+        );
+        assert_eq!(
+            human.structure_score,
+            entity_score_value(EntityKind::IndustrialCenter)
+        );
+        assert_eq!(human.units_killed, 0);
+        assert_eq!(human.units_lost, 0);
+        assert_eq!(human.buildings_killed, 0);
+        assert_eq!(human.buildings_lost, 0);
+    }
+
+    #[test]
+    fn scores_record_kills_and_losses_on_death() {
+        let players = human_vs_ai_players();
+        let mut game = Game::new(&players, 0x515C_0DE);
+        let victim_unit = game
+            .entities
+            .iter()
+            .find(|e| e.owner == 2 && e.kind == EntityKind::Worker)
+            .map(|e| e.id)
+            .expect("victim unit should exist");
+        let victim_building = game
+            .entities
+            .iter()
+            .find(|e| e.owner == 2 && e.kind == EntityKind::IndustrialCenter)
+            .map(|e| e.id)
+            .expect("victim building should exist");
+        for id in [victim_unit, victim_building] {
+            let entity = game.entities.get_mut(id).expect("victim should exist");
+            entity.hp = 0;
+            entity.set_last_damage_owner(Some(1));
+        }
+
+        let mut events: HashMap<u32, Vec<Event>> =
+            game.players.iter().map(|p| (p.id, Vec::new())).collect();
+        services::death::death_system(
+            &mut game.entities,
+            &game.fog,
+            &mut game.players,
+            &mut events,
+        );
+
+        let scores = game.scores();
+        let attacker = scores
+            .iter()
+            .find(|score| score.id == 1)
+            .expect("attacker score should exist");
+        let victim = scores
+            .iter()
+            .find(|score| score.id == 2)
+            .expect("victim score should exist");
+
+        assert_eq!(attacker.units_killed, 1);
+        assert_eq!(attacker.buildings_killed, 1);
+        assert_eq!(victim.units_lost, 1);
+        assert_eq!(victim.buildings_lost, 1);
     }
 
     #[test]

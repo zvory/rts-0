@@ -75,9 +75,9 @@ pub(crate) fn run_tick(
         events,
     );
     services::economy::gather_system(map, entities, players, &occ, &spatial, &mut coordinator);
-    services::production::production_system(map, entities, &coordinator, events);
+    services::production::production_system(map, entities, players, &coordinator, events);
     services::construction::construction_system(map, entities, players, &spatial, events);
-    services::death::death_system(entities, fog, events);
+    services::death::death_system(entities, fog, players, events);
 
     // Collision resolution runs after production/construction/deaths so spawned units are
     // unstacked in the same tick and pushes respect the current building footprint set.
@@ -130,6 +130,7 @@ mod tests {
             supply_used: 0,
             supply_cap: 20,
             is_ai: false,
+            score: crate::game::ScoreState::default(),
         }
     }
 

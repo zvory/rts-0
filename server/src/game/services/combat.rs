@@ -358,7 +358,12 @@ fn apply_damage(
         _ => dmg,
     };
     if let Some(v) = entities.get_mut(victim) {
-        v.hp = v.hp.saturating_sub(effective_dmg);
+        if v.hp > 0 && effective_dmg > 0 {
+            v.hp = v.hp.saturating_sub(effective_dmg);
+            if v.owner != attacker_owner {
+                v.set_last_damage_owner(Some(attacker_owner));
+            }
+        }
     }
     retreat_worker_from_direct_hit(map, entities, coordinator, victim, attacker_owner, ax, ay);
     apply_overpenetration(
@@ -497,7 +502,10 @@ fn apply_overpenetration(
             continue;
         }
         if let Some(v) = entities.get_mut(id) {
-            v.hp = v.hp.saturating_sub(effective_dmg);
+            if v.hp > 0 {
+                v.hp = v.hp.saturating_sub(effective_dmg);
+                v.set_last_damage_owner(Some(attacker_owner));
+            }
         }
         for pid in &player_ids {
             if !projection::attack_event_visible_to(*pid, ax, ay, tx, ty, attacker_owner, fog) {

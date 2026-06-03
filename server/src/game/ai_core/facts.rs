@@ -407,6 +407,7 @@ mod tests {
             supply_used: 0,
             supply_cap: 0,
             is_ai: true,
+            score: crate::game::ScoreState::default(),
         }];
         let mut fog = crate::game::fog::Fog::new(map.size);
         fog.recompute(&[1], &entities);
@@ -489,6 +490,7 @@ mod tests {
             supply_used: 8,
             supply_cap: 10,
             is_ai: true,
+            score: crate::game::ScoreState::default(),
         }];
 
         let mut fog = crate::game::fog::Fog::new(map.size);
