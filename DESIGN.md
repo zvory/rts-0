@@ -758,7 +758,9 @@ and treats a single completed tank as a valid minimum attack wave.
 Center near a neutral steel expansion before building any non-Depot tech structure. Once that
 expansion IC is planned, it builds Barracks and Training Centre tech, staffs oil, mass-produces a
 balanced mix of Machine Gunners and AT teams, and keeps those support units staged on a defensive
-line instead of launching outbound attack waves.
+line instead of launching outbound attack waves. After the expansion IC is complete, its worker
+resource assignment is locally bounded so main-base workers do not walk to expansion patches, and
+expansion workers do not walk back to main-base patches.
 The live lobby AI uses this shared core through `AiController`, which only owns live identity,
 profile id, cadence, and persistent decision memory. Profiles are still not client-selectable.
 
