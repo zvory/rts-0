@@ -4,9 +4,8 @@ use crate::config;
 use crate::game::entity::{BuildPhase, EntityKind, EntityStore, ProdItem};
 use crate::game::map::Map;
 use crate::game::services::move_coordinator::MoveCoordinator;
-use crate::game::services::occupancy::footprint_placeable;
-use crate::game::services::occupancy::footprint_tiles;
 use crate::game::services::spatial::SpatialIndex;
+use crate::game::services::standability;
 use crate::game::services::world_query;
 use crate::game::PlayerState;
 use crate::protocol::{Command, Event};
@@ -177,7 +176,7 @@ fn order_build(
     map: &Map,
     entities: &mut EntityStore,
     players: &[PlayerState],
-    spatial: &SpatialIndex,
+    _spatial: &SpatialIndex,
     coordinator: &mut MoveCoordinator<'_>,
     player: u32,
     worker: u32,
@@ -216,12 +215,10 @@ fn order_build(
         return;
     }
 
-    // Feedback only — re-checked at arrival.
-    let footprint = footprint_tiles(kind, tile_x, tile_y);
-    let worker_inside_footprint = matches!(entities.get(worker), Some(w) if footprint.contains(&map.tile_of(w.pos_x, w.pos_y)));
-    if !footprint_placeable(map, entities, spatial, kind, tile_x, tile_y)
-        && !worker_inside_footprint
-    {
+    // Feedback only; construction repeats a stricter final-placement check at arrival.
+    if !standability::building_site_clear_for_build_intent(
+        map, entities, kind, tile_x, tile_y, worker,
+    ) {
         notice(events, player, "Cannot build there");
         return;
     }
@@ -238,11 +235,7 @@ fn order_build(
 
     let built = coordinator.order_build(entities, worker, kind, tile_x, tile_y);
     if !built {
-        if worker_inside_footprint {
-            notice(events, player, "Worker blocks building");
-        } else {
-            notice(events, player, "Cannot build there");
-        }
+        notice(events, player, "Cannot build there");
     }
 }
 
@@ -345,4 +338,94 @@ pub(crate) fn notice(events: &mut HashMap<u32, Vec<Event>>, player: u32, msg: &s
     events.entry(player).or_default().push(Event::Notice {
         msg: msg.to_string(),
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::game::entity::{EntityKind, EntityStore, Order};
+    use crate::game::map::Map;
+    use crate::game::services::move_coordinator::MoveCoordinator;
+    use crate::game::services::occupancy::{footprint_center, footprint_tiles, Occupancy};
+    use crate::game::services::pathing::PathingService;
+    use crate::game::services::spatial::SpatialIndex;
+    use crate::game::ScoreState;
+    use crate::protocol::terrain;
+
+    #[test]
+    fn build_order_can_start_when_worker_inside_intent_but_stages_outside() {
+        let map = flat_map(16);
+        let mut entities = EntityStore::new();
+        let (wx, wy) = footprint_center(&map, EntityKind::Depot, 4, 4);
+        let worker = entities
+            .spawn_unit(1, EntityKind::Worker, wx, wy)
+            .expect("worker should spawn");
+        let spatial = SpatialIndex::build(&entities, map.size);
+        let occ = Occupancy::build(&map, &entities);
+        let mut pathing = PathingService::new(1024, 32);
+        pathing.advance_tick(1);
+        let mut coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, 1);
+        let mut players = vec![player_state(1)];
+        let mut events = HashMap::new();
+
+        apply_commands(
+            &map,
+            &mut entities,
+            &mut players,
+            &spatial,
+            &mut coordinator,
+            vec![(
+                1,
+                Command::Build {
+                    worker,
+                    building: EntityKind::Depot.to_protocol_str().to_string(),
+                    tile_x: 4,
+                    tile_y: 4,
+                },
+            )],
+            &mut events,
+        );
+
+        let worker = entities.get(worker).expect("worker should remain alive");
+        assert!(
+            matches!(worker.order(), Order::Build(_)),
+            "worker should keep the accepted build order"
+        );
+        let goal = worker
+            .path_goal()
+            .expect("build order should set a staging goal");
+        let goal_tile = map.tile_of(goal.0, goal.1);
+        assert!(
+            !footprint_tiles(EntityKind::Depot, 4, 4).contains(&goal_tile),
+            "build-over-self order should stage outside the requested footprint"
+        );
+        assert!(
+            events.get(&1).is_none_or(Vec::is_empty),
+            "valid build-over-self intent should not emit a failure notice"
+        );
+    }
+
+    fn flat_map(size: u32) -> Map {
+        Map {
+            size,
+            terrain: vec![terrain::GRASS; (size * size) as usize],
+            starts: vec![],
+            expansion_sites: vec![],
+        }
+    }
+
+    fn player_state(id: u32) -> PlayerState {
+        PlayerState {
+            id,
+            name: format!("Player {id}"),
+            color: "#fff".to_string(),
+            start_tile: (0, 0),
+            steel: 1_000,
+            oil: 1_000,
+            supply_used: 0,
+            supply_cap: 20,
+            is_ai: false,
+            score: ScoreState::default(),
+        }
+    }
 }

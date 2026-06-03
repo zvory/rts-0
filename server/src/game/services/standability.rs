@@ -70,6 +70,28 @@ pub(crate) fn building_site_clear(
     tile_x: u32,
     tile_y: u32,
 ) -> bool {
+    building_site_clear_with_ignored_unit(map, entities, building, tile_x, tile_y, None)
+}
+
+pub(crate) fn building_site_clear_for_build_intent(
+    map: &Map,
+    entities: &EntityStore,
+    building: EntityKind,
+    tile_x: u32,
+    tile_y: u32,
+    builder_id: u32,
+) -> bool {
+    building_site_clear_with_ignored_unit(map, entities, building, tile_x, tile_y, Some(builder_id))
+}
+
+fn building_site_clear_with_ignored_unit(
+    map: &Map,
+    entities: &EntityStore,
+    building: EntityKind,
+    tile_x: u32,
+    tile_y: u32,
+    ignored_unit: Option<u32>,
+) -> bool {
     let Some(rect) = building_rect_for_footprint(building, tile_x, tile_y) else {
         return false;
     };
@@ -79,6 +101,9 @@ pub(crate) fn building_site_clear(
 
     entities.iter().all(|e| {
         if e.hp == 0 {
+            return true;
+        }
+        if e.is_unit() && ignored_unit == Some(e.id) {
             return true;
         }
         if e.is_building() {
@@ -224,6 +249,65 @@ mod tests {
             EntityKind::Depot,
             4,
             4,
+        ));
+    }
+
+    #[test]
+    fn building_site_rejects_tank_body_touching_footprint_edge() {
+        let map = flat_map(12);
+        let mut entities = EntityStore::new();
+        let rect = building_rect_for_footprint(EntityKind::Depot, 4, 4).expect("depot rect");
+        let radius = config::unit_stats(EntityKind::Tank)
+            .expect("tank stats")
+            .radius;
+        entities
+            .spawn_unit(1, EntityKind::Tank, rect.max_x + radius, rect.min_y + 32.0)
+            .expect("tank should spawn");
+
+        assert_eq!(
+            map.tile_of(rect.max_x + radius, rect.min_y + 32.0).0,
+            6,
+            "tank center should be outside the depot footprint tiles"
+        );
+        assert!(!building_site_clear(
+            &map,
+            &entities,
+            EntityKind::Depot,
+            4,
+            4,
+        ));
+    }
+
+    #[test]
+    fn build_intent_ignores_only_the_chosen_builder_body() {
+        let map = flat_map(12);
+        let mut entities = EntityStore::new();
+        let (x, y) = footprint_center(&map, EntityKind::Depot, 4, 4);
+        let builder = entities
+            .spawn_unit(1, EntityKind::Worker, x, y)
+            .expect("worker should spawn");
+        let other = entities
+            .spawn_unit(1, EntityKind::Worker, x, y)
+            .expect("other worker should spawn");
+
+        assert!(!building_site_clear_for_build_intent(
+            &map,
+            &entities,
+            EntityKind::Depot,
+            4,
+            4,
+            builder,
+        ));
+        if let Some(other) = entities.get_mut(other) {
+            other.hp = 0;
+        }
+        assert!(building_site_clear_for_build_intent(
+            &map,
+            &entities,
+            EntityKind::Depot,
+            4,
+            4,
+            builder,
         ));
     }
 
