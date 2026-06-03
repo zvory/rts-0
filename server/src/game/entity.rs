@@ -549,6 +549,9 @@ pub struct Entity {
 
     pub hp: u32,
     pub max_hp: u32,
+    /// Player id that most recently damaged this target. Used for score attribution when the
+    /// death system removes the entity.
+    last_damage_owner: Option<u32>,
 
     pub movement: Option<MovementState>,
     pub combat: Option<CombatState>,
@@ -569,6 +572,7 @@ impl Entity {
             pos_y: y,
             hp: s.hp,
             max_hp: s.hp,
+            last_damage_owner: None,
             movement: Some(MovementState::default()),
             combat: if s.dmg > 0 {
                 Some(CombatState::default())
@@ -598,6 +602,7 @@ impl Entity {
             pos_y: y,
             hp: s.hp,
             max_hp: s.hp,
+            last_damage_owner: None,
             movement: None,
             combat: if s.dmg > 0 {
                 Some(CombatState::default())
@@ -631,6 +636,7 @@ impl Entity {
             pos_y: y,
             hp: 1,
             max_hp: 1,
+            last_damage_owner: None,
             movement: None,
             combat: None,
             production: None,
@@ -855,6 +861,14 @@ impl Entity {
         if let Some(c) = self.combat.as_mut() {
             c.attack_cd = c.attack_cd.saturating_sub(1);
         }
+    }
+
+    pub fn last_damage_owner(&self) -> Option<u32> {
+        self.last_damage_owner
+    }
+
+    pub fn set_last_damage_owner(&mut self, owner: Option<u32>) {
+        self.last_damage_owner = owner;
     }
 
     pub fn weapon_setup(&self) -> WeaponSetup {

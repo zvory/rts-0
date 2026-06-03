@@ -98,6 +98,9 @@ pub(crate) fn construction_system(
             Some(id) => id,
             None => continue,
         };
+        if let Some(player) = players.iter_mut().find(|p| p.id == owner) {
+            player.record_entity_created(kind);
+        }
         if let Some(w) = entities.get_mut(worker) {
             w.clear_path();
             w.set_target_id(Some(site));

@@ -602,6 +602,7 @@ mod tests {
                 supply_used: 1,
                 supply_cap: 10,
                 is_ai: true,
+                score: crate::game::ScoreState::default(),
             },
             PlayerState {
                 id: 2,
@@ -613,6 +614,7 @@ mod tests {
                 supply_used: 1,
                 supply_cap: 10,
                 is_ai: false,
+                score: crate::game::ScoreState::default(),
             },
         ];
         let mut fog = Fog::new(map.size);
@@ -656,6 +658,7 @@ mod tests {
                 supply_used: 1,
                 supply_cap: 10,
                 is_ai: true,
+                score: crate::game::ScoreState::default(),
             },
             PlayerState {
                 id: 2,
@@ -667,6 +670,7 @@ mod tests {
                 supply_used: 1,
                 supply_cap: 10,
                 is_ai: false,
+                score: crate::game::ScoreState::default(),
             },
         ];
         let mut fog = Fog::new(map.size);

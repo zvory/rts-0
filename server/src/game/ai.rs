@@ -205,6 +205,7 @@ mod tests {
             supply_used,
             supply_cap,
             is_ai: id != 1,
+            score: crate::game::ScoreState::default(),
         }
     }
 
