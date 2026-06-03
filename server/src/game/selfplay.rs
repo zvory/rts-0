@@ -2064,6 +2064,7 @@ fn assign_steel_workers(
             pre_reserved_nodes: &latched_nodes,
             idle_only: initial_gather_sent,
             max_assignments: None,
+            max_worker_resource_distance_px: None,
         },
     );
 }
