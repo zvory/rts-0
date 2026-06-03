@@ -718,12 +718,13 @@ The server treats every client as potentially hostile. Limits live next to the c
   the normal per-tick A* budget. This covers buildings constructed after a long path was assigned
   without periodically repathing every moving unit.
 - **Unit collision**: `services::movement::resolve_collisions` runs after production each tick
-  and pair-wise pushes overlapping mobile units apart along the connecting line (50/50 split
-  when neither is anchored). A worker is *anchored* while it is in
-  `GatherPhase::Harvesting` or `BuildPhase::Constructing` — anchored units neither push nor
-  are pushed, which keeps walking units from being deadlocked by miners or active builders
-  (PLAN §4.3). `Game::assert_invariants` then asserts that no two non-anchored mobile units
-  overlap by more than `OVERLAP_TOLERANCE_PX` (residue from pushes that landed against
+  and pair-wise pushes overlapping mobile units apart along the connecting line. Workers in
+  `GatherPhase::Harvesting` or `BuildPhase::Constructing` are ghost pass-through units: they
+  neither push nor are pushed, which keeps walking units from being deadlocked by miners or active
+  builders. All other mobile-unit pairs split overlap by footing resistance, so braced/deployed
+  machine gunners and tanks hold ground better than soft moving infantry while equal-profile units
+  still split pushes evenly. `Game::assert_invariants` then asserts that no two non-ghost mobile
+  units overlap by more than `OVERLAP_TOLERANCE_PX` (residue from pushes that landed against
   impassable terrain).
 
 ---
