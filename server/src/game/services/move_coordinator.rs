@@ -18,8 +18,11 @@ use crate::game::entity::{EntityKind, EntityStore, MovePhase, Order, WeaponSetup
 use crate::game::map::Map;
 use crate::game::pathfinding::{self, Passability};
 use crate::game::services::interact_range_for_kind;
-use crate::game::services::occupancy::{footprint_center, footprint_tiles, Occupancy};
+use crate::game::services::occupancy::{
+    building_footprint, footprint_center, footprint_tiles, Occupancy,
+};
 use crate::game::services::pathing::{PathRequest, PathingService};
+use crate::game::services::standability;
 
 /// Maximum number of fresh A* path requests serviced in a single tick. Beyond this,
 /// remaining `AwaitingPath` units stay queued for the next tick.
@@ -267,82 +270,48 @@ impl<'a> MoveCoordinator<'a> {
     // -------------------------------------------------------------------
 
     /// Find a spawn point near a building using a deterministic outward search.
-    /// Falls back to just below the building if no valid point exists.
+    /// Returns `None` when no legal body-clearance point exists.
     pub fn find_spawn_point(
         &self,
-        _entities: &EntityStore,
-        building_kind: EntityKind,
+        entities: &EntityStore,
+        building: u32,
         spawned_kind: EntityKind,
-        bx: f32,
-        by: f32,
-    ) -> (f32, f32) {
-        let ts = config::TILE_SIZE as f32;
-        let bstats = match config::building_stats(building_kind) {
-            Some(s) => s,
-            None => return (bx, by + ts),
-        };
-        let spawn_radius = config::unit_stats(spawned_kind)
-            .map(|s| s.radius)
-            .unwrap_or(0.0);
-        let (btx, bty) = self.map.tile_of(bx, by);
-        let half_w = (bstats.foot_w as i32) / 2;
-        let half_h = (bstats.foot_h as i32) / 2;
+    ) -> Option<(f32, f32)> {
+        let building = entities.get(building)?;
+        config::building_stats(building.kind)?;
+        config::unit_stats(spawned_kind)?;
+        let footprint = building_footprint(self.map, building);
+        let min_x = footprint.iter().map(|(x, _)| *x).min()? as i32;
+        let max_x = footprint.iter().map(|(x, _)| *x).max()? as i32;
+        let min_y = footprint.iter().map(|(_, y)| *y).min()? as i32;
+        let max_y = footprint.iter().map(|(_, y)| *y).max()? as i32;
 
-        // Search outward in rings from the building footprint edge.
+        // Search outward in rings from the actual building footprint edge.
         for r in 1i32..=6 {
-            for dy in -r..=r {
-                for dx in -r..=r {
-                    if dx.abs().max(dy.abs()) != r {
+            for ty in (min_y - r)..=(max_y + r) {
+                for tx in (min_x - r)..=(max_x + r) {
+                    if tx > min_x - r && tx < max_x + r && ty > min_y - r && ty < max_y + r {
                         continue;
                     }
-                    let tx = btx as i32 + dx;
-                    let ty = bty as i32 + dy;
-                    if tx < 0 || ty < 0 {
+                    if !self.map.in_bounds(tx, ty) {
                         continue;
                     }
-                    let (tx, ty) = (tx as u32, ty as u32);
-
-                    // Must be outside the building footprint.
-                    let min_x = btx as i32 - half_w;
-                    let max_x = btx as i32 + half_w + (bstats.foot_w % 2) as i32;
-                    let min_y = bty as i32 - half_h;
-                    let max_y = bty as i32 + half_h + (bstats.foot_h % 2) as i32;
-                    let in_footprint = (tx as i32) >= min_x
-                        && (tx as i32) < max_x
-                        && (ty as i32) >= min_y
-                        && (ty as i32) < max_y;
-                    if in_footprint {
-                        continue;
+                    let (cx, cy) = self.map.tile_center(tx as u32, ty as u32);
+                    if standability::unit_spawn_standable(
+                        self.map,
+                        self.occ,
+                        entities,
+                        spawned_kind,
+                        cx,
+                        cy,
+                    ) {
+                        return Some((cx, cy));
                     }
-
-                    // Must be passable terrain.
-                    if !self.map.is_passable(tx as i32, ty as i32) {
-                        continue;
-                    }
-
-                    // Must not be occupied by another building footprint.
-                    if !self.occ.passable(tx as i32, ty as i32) {
-                        continue;
-                    }
-
-                    let (cx, cy) = self.map.tile_center(tx, ty);
-                    if !spawn_point_has_clearance(self.map, self.occ, cx, cy, spawn_radius) {
-                        continue;
-                    }
-                    return (cx, cy);
                 }
             }
         }
 
-        // Fallback: below the building, clamped to world bounds.
-        let max = self.map.world_size_px() - 1.0;
-        let half = (bstats.foot_h as f32 * ts) * 0.5;
-        let x = bx.clamp(0.0, max);
-        let y = (by + half + ts * 0.5).clamp(0.0, max);
-        if spawn_point_has_clearance(self.map, self.occ, x, y, spawn_radius) {
-            return (x, y);
-        }
-        (x, y)
+        None
     }
 
     // -------------------------------------------------------------------
@@ -790,43 +759,6 @@ fn build_staging_goals(
         .collect()
 }
 
-fn spawn_point_has_clearance(map: &Map, occ: &Occupancy, cx: f32, cy: f32, radius: f32) -> bool {
-    if radius <= 0.0 {
-        return true;
-    }
-
-    let max = map.world_size_px();
-    if cx - radius < 0.0 || cy - radius < 0.0 || cx + radius > max || cy + radius > max {
-        return false;
-    }
-
-    let min_tx = ((cx - radius) / config::TILE_SIZE as f32).floor() as i32;
-    let min_ty = ((cy - radius) / config::TILE_SIZE as f32).floor() as i32;
-    let max_tx = ((cx + radius) / config::TILE_SIZE as f32).floor() as i32;
-    let max_ty = ((cy + radius) / config::TILE_SIZE as f32).floor() as i32;
-
-    for ty in min_ty..=max_ty {
-        for tx in min_tx..=max_tx {
-            if !map.in_bounds(tx, ty) || !occ.passable(tx, ty) {
-                let tile_left = tx as f32 * config::TILE_SIZE as f32;
-                let tile_top = ty as f32 * config::TILE_SIZE as f32;
-                let tile_right = tile_left + config::TILE_SIZE as f32;
-                let tile_bottom = tile_top + config::TILE_SIZE as f32;
-
-                let nearest_x = cx.clamp(tile_left, tile_right);
-                let nearest_y = cy.clamp(tile_top, tile_bottom);
-                let dx = cx - nearest_x;
-                let dy = cy - nearest_y;
-                if dx * dx + dy * dy <= radius * radius {
-                    return false;
-                }
-            }
-        }
-    }
-
-    true
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1001,20 +933,18 @@ mod tests {
         pathing.advance_tick(1);
         let coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, 1);
 
-        let b = entities.get(b_id).unwrap();
-        let (sx, sy) =
-            coordinator.find_spawn_point(&entities, b.kind, EntityKind::Tank, b.pos_x, b.pos_y);
+        let (sx, sy) = coordinator
+            .find_spawn_point(&entities, b_id, EntityKind::Tank)
+            .expect("spawn point should exist");
 
         let (stx, sty) = map.tile_of(sx, sy);
-        let (btx, bty) = map.tile_of(b.pos_x, b.pos_y);
+        let footprint = building_footprint(&map, entities.get(b_id).unwrap());
 
-        // Spawn tile must be outside the barracks footprint.
         assert!(
-            stx < btx || stx >= btx + 3 || sty < bty || sty >= bty + 2,
-            "spawn tile ({stx},{sty}) is inside the 3x2 footprint at ({btx},{bty})"
+            !footprint.contains(&(stx, sty)),
+            "spawn tile ({stx},{sty}) is inside the barracks footprint {footprint:?}"
         );
 
-        // Spawn tile must be passable terrain.
         assert!(map.is_passable(stx as i32, sty as i32));
     }
 
@@ -1032,18 +962,12 @@ mod tests {
         pathing.advance_tick(1);
         let coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, 1);
 
-        let b = entities.get(b_id).unwrap();
-        let (sx, sy) =
-            coordinator.find_spawn_point(&entities, b.kind, EntityKind::Tank, b.pos_x, b.pos_y);
+        let (sx, sy) = coordinator
+            .find_spawn_point(&entities, b_id, EntityKind::Tank)
+            .expect("spawn point should exist");
 
         assert!(
-            spawn_point_has_clearance(
-                &map,
-                &occ,
-                sx,
-                sy,
-                config::unit_stats(EntityKind::Tank).unwrap().radius,
-            ),
+            standability::unit_spawn_standable(&map, &occ, &entities, EntityKind::Tank, sx, sy,),
             "tank spawn point clips the top map edge"
         );
     }
@@ -1066,18 +990,12 @@ mod tests {
         pathing.advance_tick(1);
         let coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, 1);
 
-        let b = entities.get(factory_id).unwrap();
-        let (sx, sy) =
-            coordinator.find_spawn_point(&entities, b.kind, EntityKind::Tank, b.pos_x, b.pos_y);
+        let (sx, sy) = coordinator
+            .find_spawn_point(&entities, factory_id, EntityKind::Tank)
+            .expect("spawn point should exist");
 
         assert!(
-            spawn_point_has_clearance(
-                &map,
-                &occ,
-                sx,
-                sy,
-                config::unit_stats(EntityKind::Tank).unwrap().radius,
-            ),
+            standability::unit_spawn_standable(&map, &occ, &entities, EntityKind::Tank, sx, sy,),
             "tank spawn point is too close to the adjacent building"
         );
     }
