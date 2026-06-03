@@ -752,13 +752,17 @@ The server treats every client as potentially hostile. Limits live next to the c
   Stone blocks target acquisition, primary fire, and overpenetration.
 - **Tank body and weapon facing**: the snapshot `facing` field is the tank hull/body angle. Tanks
   rotate that body angle at a bounded rate on movement paths; badly misaligned tanks pivot in
-  place instead of sliding sideways at full speed. The snapshot `weaponFacing` field is the
-  independent turret/barrel angle. Tank combat rotates the turret toward the target at a bounded
-  rate and fires only once the turret is within tolerance; the hull does not need to face the
-  target. Tanks do not clear their movement path when they fire, so they can continue driving while
-  the turret tracks and shoots on both `Move` and `AttackMove` orders. A tank on plain `Move` only
-  opportunistically fires at enemies already in range; it does not chase out-of-range enemies.
-  Projection omits enemy `weaponFacing` when it would reveal a hidden target direction.
+  place instead of sliding sideways at full speed. Tank hull movement intent uses a long route
+  lookahead, but the desired facing point is bounded to the current statically legal route segment
+  unless a farther waypoint is also reachable by `standability::unit_static_segment_standable` from
+  the tank's current position; local steering and collision displacement do not become hull intent.
+  The snapshot `weaponFacing` field is the independent turret/barrel angle. Tank combat rotates the
+  turret toward the target at a bounded rate and fires only once the turret is within tolerance; the
+  hull does not need to face the target. Tanks do not clear their movement path when they fire, so
+  they can continue driving while the turret tracks and shoots on both `Move` and `AttackMove`
+  orders. A tank on plain `Move` only opportunistically fires at enemies already in range; it does
+  not chase out-of-range enemies. Projection omits enemy `weaponFacing` when it would reveal a
+  hidden target direction.
 - **Tank armor facing**: tank and AT-team attacks against tank victims use the victim tank's hull
   `facing` and the attacker's position. Front hits (`<=45°` from the hull direction) deal normal
   damage, side hits (`>45°` and `<=135°`) deal `1.25x`, and rear hits (`>135°`) deal `1.75x`.
