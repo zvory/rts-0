@@ -1,10 +1,10 @@
 # RTS Movement Options Research
 
-This is a research and product-shaping note for a future movement system. It is
-not an implementation plan yet, and it does not change the live wire protocol or
-simulation contracts. Any later implementation that changes entity state,
-protocol fields, combat rules, balance, or module boundaries must update
-`DESIGN.md` in the same change.
+This is a research and product-shaping note for a future movement system. The
+phased implementation plan lives in `docs/movement/PLAN.md`. This note does not
+change the live wire protocol or simulation contracts. Any later implementation
+that changes entity state, protocol fields, combat rules, balance, or module
+boundaries must update `DESIGN.md` in the same change.
 
 ## Sources Considered
 
