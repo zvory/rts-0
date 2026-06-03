@@ -483,8 +483,35 @@ input[type="text"]:focus {
   position: absolute;
   right: 0;
   bottom: 44px;
-  min-width: 152px;
+  min-width: 240px;
   padding: 8px;
+}
+.audio-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 6px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(255, 245, 234, 0.12);
+}
+.audio-slider {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 4px;
+  font-size: 12px;
+  color: var(--ink);
+}
+.audio-slider-label {
+  flex: 0 0 64px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+.audio-slider input[type="range"] {
+  flex: 1;
+  min-width: 0;
+  accent-color: #d28a70;
+  cursor: pointer;
 }
 #settings-menu button {
   appearance: none;
