@@ -543,8 +543,16 @@ mod tests {
             .spawn_building(99, EntityKind::Depot, bx, by, true)
             .expect("building spawn");
         let rect = building_rect_for_footprint(EntityKind::Depot, 10, 10).expect("depot rect");
+        let radius = config::unit_stats(EntityKind::Tank)
+            .expect("tank stats")
+            .radius;
         game.entities
-            .spawn_unit(99, EntityKind::Tank, rect.max_x + 19.0, rect.min_y + 32.0)
+            .spawn_unit(
+                99,
+                EntityKind::Tank,
+                rect.max_x + radius - 1.0,
+                rect.min_y + 32.0,
+            )
             .expect("tank spawn");
 
         let message = invariant_panic_message(&game);

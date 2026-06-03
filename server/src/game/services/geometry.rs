@@ -137,8 +137,15 @@ mod tests {
     #[test]
     fn tank_body_intersects_building_even_when_center_tile_is_clear() {
         let rect = building_rect_for_footprint(EntityKind::Depot, 4, 4).expect("depot rect");
-        let tank =
-            unit_body(EntityKind::Tank, rect.max_x + 19.0, rect.min_y + 32.0).expect("tank body");
+        let radius = config::unit_stats(EntityKind::Tank)
+            .expect("tank stats")
+            .radius;
+        let tank = unit_body(
+            EntityKind::Tank,
+            rect.max_x + radius - 1.0,
+            rect.min_y + 32.0,
+        )
+        .expect("tank body");
 
         assert_eq!((tank.x / config::TILE_SIZE as f32).floor() as u32, 6);
         assert!(circle_intersects_rect(tank, rect));
