@@ -11,9 +11,9 @@ the server simulates at 30 Hz and sends per-player, fog-filtered snapshots.
 
 ## Parallel Worktrees
 
-- For parallel feature work (which is always the case), each terminal/agent must work in its own git worktree. Do not run two
-- Always make a worktree
-  coding agents in the same checkout.
+- For parallel feature work (which is always the case), each terminal/agent must work in its own
+  git worktree. Do not run two coding agents in the same checkout.
+- Always make a worktree.
 - Before making changes, verify the checkout and branch:
 
   ```bash
@@ -23,10 +23,12 @@ the server simulates at 30 Hz and sends per-player, fog-filtered snapshots.
   ```
 
 - Use one branch per worktree. Branch names must start with `zvorygin/`.
-- Create worktrees from the repo root, for example:
+- Create project worktrees under `/tmp/rts-worktrees` to keep the repo directory clean. Use a
+  descriptive directory name that matches the branch:
 
   ```bash
-  git worktree add ../rts-my-feature -b zvorygin/my-feature main
+  mkdir -p /tmp/rts-worktrees
+  git worktree add /tmp/rts-worktrees/my-feature -b zvorygin/my-feature main
   ```
 
 - Agents must only edit files inside their assigned worktree. Do not edit the original checkout or
