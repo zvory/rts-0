@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use crate::game::entity::{EntityKind, EntityStore, Order};
 use crate::game::fog::Fog;
+use crate::game::PlayerState;
 use crate::protocol::Event;
 use crate::rules::projection;
 
@@ -14,17 +15,28 @@ use crate::rules::projection;
 pub(crate) fn death_system(
     entities: &mut EntityStore,
     fog: &Fog,
+    players: &mut [PlayerState],
     events: &mut HashMap<u32, Vec<Event>>,
 ) {
-    let dead: Vec<(u32, u32, f32, f32, EntityKind)> = entities
+    let dead: Vec<(u32, u32, f32, f32, EntityKind, Option<u32>)> = entities
         .iter()
         .filter(|e| e.is_targetable() && e.hp == 0)
-        .map(|e| (e.id, e.owner, e.pos_x, e.pos_y, e.kind))
+        .map(|e| {
+            (
+                e.id,
+                e.owner,
+                e.pos_x,
+                e.pos_y,
+                e.kind,
+                e.last_damage_owner(),
+            )
+        })
         .collect();
 
-    for (id, owner, x, y, kind) in dead {
+    for (id, owner, x, y, kind, killer) in dead {
         entities.release_miner(id);
         entities.remove(id);
+        record_score_death(players, owner, kind, killer);
         // Deliver the death only to players who owned the entity or could see where it died,
         // so a death poof never reveals an entity hidden in a player's fog.
         let pids: Vec<u32> = events.keys().copied().collect();
@@ -92,5 +104,22 @@ pub(crate) fn death_system(
                 e.clear_orders();
             }
         }
+    }
+}
+
+fn record_score_death(
+    players: &mut [PlayerState],
+    owner: u32,
+    kind: EntityKind,
+    killer: Option<u32>,
+) {
+    if let Some(player) = players.iter_mut().find(|p| p.id == owner) {
+        player.record_entity_lost(kind);
+    }
+    let Some(killer) = killer.filter(|killer| *killer != owner) else {
+        return;
+    };
+    if let Some(player) = players.iter_mut().find(|p| p.id == killer) {
+        player.record_entity_killed(kind);
     }
 }

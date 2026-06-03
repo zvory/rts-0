@@ -25,7 +25,7 @@
         Game:   #game-screen, #viewport (Pixi canvas mounts here),
                 #hud, #res-steel, #res-oil, #res-supply,
                 #minimap (canvas), #selected-panel, #command-card,
-                #game-over, #game-over-text, #game-over-button
+                #game-over, #game-over-text, #game-over-scores, #game-over-button
         App:    #toast
     -->
     <div id="app">
@@ -105,6 +105,7 @@
         <div id="game-over" hidden>
           <div class="game-over-box">
             <h1 id="game-over-text">Victory</h1>
+            <div id="game-over-scores" class="scoreboard" hidden></div>
             <button id="game-over-button" class="btn primary">Back to lobby</button>
           </div>
         </div>

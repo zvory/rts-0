@@ -1,11 +1,16 @@
 use std::collections::HashMap;
 
 use crate::config;
-use crate::game::entity::{AttackPhase, Entity, EntityKind, EntityStore, Order, WeaponSetup};
+use crate::game::entity::{
+    AttackPhase, BuildPhase, Entity, EntityKind, EntityStore, Order, WeaponSetup,
+};
 use crate::game::fog::Fog;
 use crate::game::map::Map;
 use crate::game::services::dist2;
 use crate::game::services::move_coordinator::MoveCoordinator;
+use crate::game::services::movement::{
+    angle_delta, rotate_toward, TANK_BODY_FIRE_TOLERANCE_RAD, TANK_BODY_TURN_RATE_RAD_PER_TICK,
+};
 use crate::game::services::occupancy::Occupancy;
 use crate::game::services::spatial::SpatialIndex;
 use crate::game::services::world_query;
@@ -18,13 +23,14 @@ use rand::Rng;
 
 /// Extra slack (px) added to attack range checks so units don't dance at the exact boundary.
 const RANGE_SLACK: f32 = 4.0;
+const WORKER_DIRECT_HIT_RETREAT_TILES: f32 = 5.0;
 
 /// Combat: acquire targets for aggressive / attack-move units, let eligible idle units
 /// auto-acquire enemies, and deal damage when off cooldown. Damage is applied immediately and
 /// emits an `Attack` event (for tracers). Cooldowns tick down here too.
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn combat_system(
-    _map: &Map,
+    map: &Map,
     entities: &mut EntityStore,
     _occ: &Occupancy,
     spatial: &SpatialIndex,
@@ -130,12 +136,21 @@ pub(crate) fn combat_system(
 
         if dist <= range_px {
             // In range: face it, stop, deploy if needed, and fire if off cooldown.
+            let target_angle = (ty - py).atan2(tx - px);
+            let mut body_aligned = true;
             if let Some(e) = entities.get_mut(id) {
-                e.set_facing((ty - py).atan2(tx - px));
+                if e.kind == EntityKind::Tank {
+                    body_aligned = rotate_tank_body_for_combat(e, target_angle);
+                } else if target_angle.is_finite() {
+                    e.set_facing(target_angle);
+                }
                 e.set_target_id(Some(tid));
                 e.mark_attack_phase(AttackPhase::Firing);
                 // Hold position while a target is in weapon range (don't overshoot it).
                 e.clear_path();
+            }
+            if !body_aligned {
+                continue;
             }
             if !machine_gunner_ready_to_fire(entities, id) {
                 continue;
@@ -143,7 +158,21 @@ pub(crate) fn combat_system(
             let ready = matches!(entities.get(id), Some(e) if e.attack_cd() == 0);
             if ready {
                 apply_damage(
-                    entities, events, fog, rng, id, tid, dmg, owner, px, py, tx, ty, range_px,
+                    map,
+                    entities,
+                    events,
+                    fog,
+                    coordinator,
+                    rng,
+                    id,
+                    tid,
+                    dmg,
+                    owner,
+                    px,
+                    py,
+                    tx,
+                    ty,
+                    range_px,
                 );
                 if let Some(e) = entities.get_mut(id) {
                     e.set_attack_cd(cd_reset);
@@ -165,6 +194,17 @@ pub(crate) fn combat_system(
             }
         }
     }
+}
+
+fn rotate_tank_body_for_combat(e: &mut Entity, target_angle: f32) -> bool {
+    if !target_angle.is_finite() {
+        return false;
+    }
+    let rotated = rotate_toward(e.facing(), target_angle, TANK_BODY_TURN_RATE_RAD_PER_TICK);
+    if rotated.is_finite() {
+        e.set_facing(rotated);
+    }
+    angle_delta(rotated, target_angle).abs() <= TANK_BODY_FIRE_TOLERANCE_RAD
 }
 
 fn tick_machine_gunner_setup(e: &mut Entity) {
@@ -306,9 +346,11 @@ fn resolve_target(
 /// owner. Death itself is handled by the death system (we only zero hp here).
 #[allow(clippy::too_many_arguments)]
 fn apply_damage(
+    map: &Map,
     entities: &mut EntityStore,
     events: &mut HashMap<u32, Vec<Event>>,
     fog: &Fog,
+    coordinator: &mut MoveCoordinator<'_>,
     rng: &mut SmallRng,
     attacker: u32,
     victim: u32,
@@ -339,8 +381,14 @@ fn apply_damage(
         _ => dmg,
     };
     if let Some(v) = entities.get_mut(victim) {
-        v.hp = v.hp.saturating_sub(effective_dmg);
+        if v.hp > 0 && effective_dmg > 0 {
+            v.hp = v.hp.saturating_sub(effective_dmg);
+            if v.owner != attacker_owner {
+                v.set_last_damage_owner(Some(attacker_owner));
+            }
+        }
     }
+    retreat_worker_from_direct_hit(map, entities, coordinator, victim, attacker_owner, ax, ay);
     apply_overpenetration(
         entities,
         events,
@@ -367,6 +415,43 @@ fn apply_damage(
             to: victim,
         });
     }
+}
+
+fn retreat_worker_from_direct_hit(
+    map: &Map,
+    entities: &mut EntityStore,
+    coordinator: &mut MoveCoordinator<'_>,
+    victim: u32,
+    attacker_owner: u32,
+    ax: f32,
+    ay: f32,
+) {
+    let (owner, vx, vy) = match entities.get(victim) {
+        Some(worker)
+            if worker.kind == EntityKind::Worker
+                && worker.owner != attacker_owner
+                && worker.hp > 0
+                && !matches!(worker.build_phase(), Some(BuildPhase::Constructing { .. })) =>
+        {
+            (worker.owner, worker.pos_x, worker.pos_y)
+        }
+        _ => return,
+    };
+    let dx = vx - ax;
+    let dy = vy - ay;
+    let dist = (dx * dx + dy * dy).sqrt();
+    let (ux, uy) = if dist > f32::EPSILON && dist.is_finite() {
+        (dx / dist, dy / dist)
+    } else {
+        (1.0, 0.0)
+    };
+    let retreat_px = WORKER_DIRECT_HIT_RETREAT_TILES * config::TILE_SIZE as f32;
+    let max = map.world_size_px() - 0.01;
+    let target = (
+        (vx + ux * retreat_px).clamp(0.0, max),
+        (vy + uy * retreat_px).clamp(0.0, max),
+    );
+    coordinator.order_group_move(entities, owner, &[victim], target, false);
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -440,7 +525,10 @@ fn apply_overpenetration(
             continue;
         }
         if let Some(v) = entities.get_mut(id) {
-            v.hp = v.hp.saturating_sub(effective_dmg);
+            if v.hp > 0 {
+                v.hp = v.hp.saturating_sub(effective_dmg);
+                v.set_last_damage_owner(Some(attacker_owner));
+            }
         }
         for pid in &player_ids {
             if !projection::attack_event_visible_to(*pid, ax, ay, tx, ty, attacker_owner, fog) {
@@ -506,6 +594,45 @@ mod tests {
         let occ = Occupancy::build(&map, entities);
         let spatial = SpatialIndex::build(entities, map.size);
         movement_system(&map, entities, &occ, &spatial, 0);
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn apply_test_damage(
+        entities: &mut EntityStore,
+        events: &mut HashMap<u32, Vec<Event>>,
+        attacker: u32,
+        victim: u32,
+        dmg: u32,
+        attacker_owner: u32,
+        ax: f32,
+        ay: f32,
+        vx: f32,
+        vy: f32,
+        range_px: f32,
+    ) {
+        let map = Map::generate(2, 0x00C0_FFEE);
+        let occ = Occupancy::build(&map, entities);
+        let mut pathing = PathingService::new(256, 64);
+        let mut coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, 10);
+        let fog = Fog::new(map.size);
+        let mut rng = SmallRng::seed_from_u64(0);
+        apply_damage(
+            &map,
+            entities,
+            events,
+            &fog,
+            &mut coordinator,
+            &mut rng,
+            attacker,
+            victim,
+            dmg,
+            attacker_owner,
+            ax,
+            ay,
+            vx,
+            vy,
+            range_px,
+        );
     }
 
     #[test]
@@ -636,6 +763,60 @@ mod tests {
         );
 
         assert_eq!(target, None);
+    }
+
+    #[test]
+    fn directly_hit_workers_retreat_from_attacker() {
+        let mut entities = EntityStore::new();
+        let worker_id = entities
+            .spawn_unit(1, EntityKind::Worker, 140.0, 100.0)
+            .expect("worker should spawn");
+        entities
+            .spawn_unit(2, EntityKind::Rifleman, 100.0, 100.0)
+            .expect("enemy rifleman should spawn");
+
+        run_combat_tick(&mut entities);
+
+        let worker = entities.get(worker_id).expect("worker should exist");
+        assert!(
+            worker.hp < worker.max_hp,
+            "worker should have taken direct damage"
+        );
+        assert!(
+            matches!(worker.order(), Order::Move(_)),
+            "direct damage should issue a temporary move-away order"
+        );
+        let goal = worker.path_goal().expect("retreat should set a path goal");
+        assert!(
+            goal.0 > worker.pos_x,
+            "retreat should move away from the attacker on the left"
+        );
+    }
+
+    #[test]
+    fn direct_hits_do_not_pull_workers_off_active_construction() {
+        let mut entities = EntityStore::new();
+        let worker_id = entities
+            .spawn_unit(1, EntityKind::Worker, 140.0, 100.0)
+            .expect("worker should spawn");
+        entities
+            .spawn_unit(2, EntityKind::Rifleman, 100.0, 100.0)
+            .expect("enemy rifleman should spawn");
+        let site = entities
+            .spawn_building(1, EntityKind::Depot, 160.0, 100.0, false)
+            .expect("scaffold should spawn");
+        if let Some(worker) = entities.get_mut(worker_id) {
+            worker.set_order(Order::build(EntityKind::Depot, 4, 4));
+            worker.mark_build_phase(BuildPhase::Constructing { site });
+        }
+
+        run_combat_tick(&mut entities);
+
+        let worker = entities.get(worker_id).expect("worker should exist");
+        assert!(
+            matches!(worker.build_phase(), Some(BuildPhase::Constructing { .. })),
+            "active builders remain latched so scaffolds are not stranded"
+        );
     }
 
     #[test]
@@ -777,6 +958,87 @@ mod tests {
     }
 
     #[test]
+    fn tank_combat_does_not_snap_body_to_target() {
+        let mut entities = EntityStore::new();
+        let tank_id = entities
+            .spawn_unit(1, EntityKind::Tank, 100.0, 100.0)
+            .expect("tank should spawn");
+        let enemy_id = entities
+            .spawn_unit(2, EntityKind::Rifleman, 100.0, 140.0)
+            .expect("enemy should spawn");
+        if let Some(tank) = entities.get_mut(tank_id) {
+            tank.set_facing(0.0);
+            tank.set_order(Order::attack(enemy_id));
+        }
+
+        run_combat_tick(&mut entities);
+
+        let tank = entities.get(tank_id).expect("tank should exist");
+        assert!(
+            tank.facing() > 0.0 && tank.facing() <= TANK_BODY_TURN_RATE_RAD_PER_TICK + 0.0001,
+            "tank body should rotate gradually toward target, got {:.4}",
+            tank.facing()
+        );
+        assert_eq!(
+            tank.attack_cd(),
+            0,
+            "misaligned tank should not fire on the same tick it starts turning"
+        );
+    }
+
+    #[test]
+    fn tank_cannot_fire_until_body_aligned_before_turrets_exist() {
+        let mut entities = EntityStore::new();
+        let tank_id = entities
+            .spawn_unit(1, EntityKind::Tank, 100.0, 100.0)
+            .expect("tank should spawn");
+        let enemy_id = entities
+            .spawn_unit(2, EntityKind::Rifleman, 120.0, 100.0)
+            .expect("enemy should spawn");
+        if let Some(tank) = entities.get_mut(tank_id) {
+            tank.set_facing(std::f32::consts::FRAC_PI_2);
+            tank.set_order(Order::attack(enemy_id));
+        }
+        let enemy_hp = entities.get(enemy_id).expect("enemy should exist").hp;
+
+        for _ in 0..10 {
+            run_combat_tick(&mut entities);
+        }
+        assert_eq!(
+            entities.get(enemy_id).expect("enemy should exist").hp,
+            enemy_hp,
+            "tank should not damage the target while hull aim is outside tolerance"
+        );
+        assert_eq!(
+            entities
+                .get(tank_id)
+                .expect("tank should exist")
+                .attack_cd(),
+            0,
+            "tank cooldown should remain ready while firing is gated by hull alignment"
+        );
+
+        let mut fired = false;
+        for _ in 0..80 {
+            run_combat_tick(&mut entities);
+            if entities
+                .get(tank_id)
+                .expect("tank should exist")
+                .attack_cd()
+                > 0
+            {
+                fired = true;
+                break;
+            }
+        }
+
+        assert!(
+            fired,
+            "tank should fire once its hull rotates inside the temporary no-turret tolerance"
+        );
+    }
+
+    #[test]
     fn shots_overpenetrate_past_the_primary_target() {
         let mut entities = EntityStore::new();
         let attacker = entities
@@ -786,19 +1048,15 @@ mod tests {
             .spawn_unit(2, EntityKind::Rifleman, 140.0, 100.0)
             .expect("primary target should spawn");
         let secondary = entities
-            .spawn_unit(2, EntityKind::Rifleman, 165.0, 100.0)
+            .spawn_unit(2, EntityKind::Worker, 165.0, 100.0)
             .expect("secondary target should spawn");
-        let fog = Fog::new(2);
         let mut events: HashMap<u32, Vec<Event>> = HashMap::new();
         events.insert(1, Vec::new());
         events.insert(2, Vec::new());
 
-        let mut rng = SmallRng::seed_from_u64(0);
-        apply_damage(
+        apply_test_damage(
             &mut entities,
             &mut events,
-            &fog,
-            &mut rng,
             attacker,
             primary,
             10,
@@ -811,9 +1069,11 @@ mod tests {
         );
 
         assert_eq!(entities.get(primary).expect("primary should exist").hp, 35);
-        assert_eq!(
-            entities.get(secondary).expect("secondary should exist").hp,
-            40
+        let secondary = entities.get(secondary).expect("secondary should exist");
+        assert_eq!(secondary.hp, 35);
+        assert!(
+            matches!(secondary.order(), Order::Idle),
+            "overpenetration damage must not trigger worker retreat"
         );
     }
 
@@ -829,17 +1089,13 @@ mod tests {
         let node = entities
             .spawn_node(EntityKind::Steel, 165.0, 100.0)
             .expect("resource node should spawn");
-        let fog = Fog::new(2);
         let mut events: HashMap<u32, Vec<Event>> = HashMap::new();
         events.insert(1, Vec::new());
         events.insert(2, Vec::new());
 
-        let mut rng = SmallRng::seed_from_u64(0);
-        apply_damage(
+        apply_test_damage(
             &mut entities,
             &mut events,
-            &fog,
-            &mut rng,
             attacker,
             primary,
             10,

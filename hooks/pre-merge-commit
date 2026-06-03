@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Gate merges INTO main through the local CI suite, before the merge commit is
+# created (a failure aborts the merge). See hooks/_gate-main.sh.
+exec "$(dirname "$0")/_gate-main.sh" pre-merge-commit

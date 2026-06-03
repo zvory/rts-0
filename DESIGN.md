@@ -80,7 +80,7 @@ short but readable. Coordinates are **world pixels** (floats) unless a field nam
 | `attackMove` | `units: u32[]`, `x: f32`, `y: f32` | Move while attacking enemies encountered; this is the aggressive movement order. |
 | `attack`     | `units: u32[]`, `target: u32` | Attack a specific entity. |
 | `gather`     | `units: u32[]`, `node: u32` | Send workers to harvest a resource node. |
-| `build`      | `worker: u32`, `building: string`, `tileX: u32`, `tileY: u32` | Worker constructs a building at a tile. If the worker is standing inside the requested footprint, the server first tries to walk it to a nearby point outside that footprint and then starts construction. `building` ∈ building kinds. |
+| `build`      | `worker: u32`, `building: string`, `tileX: u32`, `tileY: u32` | Worker constructs a building at a tile. The server first walks the worker to a nearby point outside the requested footprint, then starts construction once it is in range. `building` ∈ building kinds. |
 | `train`      | `building: u32`, `unit: string` | Queue a unit at a production building. |
 | `cancel`     | `building: u32` | Cancel the front of a building's production queue. |
 | `stop`       | `units: u32[]` | Clear orders, hold position. |
@@ -96,13 +96,19 @@ illegal placements, or unaffordable actions (fail silently or emit a `notice` ev
 | `lobby`    | `room: string`, `hostId: u32`, `players: LobbyPlayer[]`, `canStart: bool`, `quickstart: bool` |
 | `start`    | `Game start payload` (see 2.3). |
 | `snapshot` | `Per-player snapshot` (see 2.4). |
-| `gameOver` | `winnerId: u32 | null`, `you: "won" | "lost" | "draw"` |
+| `gameOver` | `winnerId: u32 | null`, `you: "won" | "lost" | "draw"`, `scores: PlayerScore[]` |
 | `pong`     | `ts: number` (echo of the ping ts) |
 | `error`    | `msg: string` |
 
 `LobbyPlayer`: `{ id: u32, name: string, ready: bool, color: string, isAi: bool }`. `isAi` is
 true for computer opponents (always shown ready; the client renders an "AI" tag and a host-only
 remove control instead of a ready toggle).
+
+`PlayerScore`: `{ id: u32, name: string, color: string, unitScore: u32, structureScore: u32,
+unitsKilled: u32, unitsLost: u32, buildingsKilled: u32, buildingsLost: u32 }`. `scores` is a
+frozen server snapshot taken when that recipient gets `gameOver`; it is not live-updated while a
+3-4 player match continues. Unit/structure score is the configured steel+oil value of every
+unit/building entity created for that player, including starting entities.
 
 ### 2.3 `start` payload
 Sent once when the match begins. Carries everything static for the whole match.
@@ -240,7 +246,7 @@ src/
     pathfinding.rs # A* over the tile grid (impassable = terrain + building footprints)
     fog.rs       # per-player visibility grid (visible / explored)
     systems.rs   # orchestrator: runs services in order each tick
-    services/    # per-tick internal services: commands, move_coordinator, movement (incl. unit collision), combat, economy, production, construction, death, occupancy, supply, pathing
+    services/    # per-tick internal services: commands, move_coordinator, movement (incl. unit collision), combat, economy, production, construction, death, occupancy, supply, pathing, geometry, standability
     ai.rs        # optional computer opponents: one AiController per AI player (see §8)
     ai_core/     # shared AI observation/facts/action/profile core, introduced incrementally
     ai_shared.rs # compatibility helpers while live AI and self-play migrate to ai_core
@@ -258,10 +264,12 @@ pub struct Game { /* private */ }
 impl Game {
     /// Create a match for the given players (ids + colors + names already assigned by lobby).
     /// Loads the hardcoded handcrafted map, shuffles the authored (start, expansion) pairs by
-    /// `seed`, assigns the first N shuffled pairs to the N players in lobby order, and spawns
+    /// `seed`, assigns the first N shuffled starts to the N players in lobby order, and spawns
     /// each player's starting Industrial Center + STARTING_WORKERS workers + nearby steel/oil
-    /// resource clusters. Shuffling keeps each start glued to its paired expansion but stops the
-    /// lobby seat order from pinning the human/AI to the same corner every match.
+    /// resource clusters. For one-, three-, and four-player games, each start keeps its authored
+    /// paired expansion. For two-player games, the selected starts are kept but the two active
+    /// neutral expansions are reselected from the authored expansion pool as the most symmetric
+    /// assignment for that start matchup, so adjacent starts both expand in comparable directions.
     pub fn new(players: &[PlayerInit], seed: u32) -> Game;
 
     /// Create a match with explicit starting steel/oil for every player.
@@ -285,6 +293,9 @@ impl Game {
     /// Player ids still alive. Humans need at least one building; AI players also need a unit.
     pub fn alive_players(&self) -> Vec<u32>;
 
+    /// Frozen score-screen rows for every match participant, in start/lobby order.
+    pub fn scores(&self) -> Vec<PlayerScore>;
+
     /// Remove all of a player's entities (e.g. on disconnect) so the match can resolve.
     pub fn eliminate(&mut self, player: u32);
 
@@ -300,7 +311,7 @@ impl Game {
 pub struct PlayerInit { pub id: u32, pub name: String, pub color: String, pub is_ai: bool }
 pub struct CommandLogEntry { pub tick: u32, pub player_id: u32, pub command: Command }
 ```
-`StartPayload`, `Snapshot`, `Command`, `Event` are the serde types from `protocol.rs`.
+`StartPayload`, `Snapshot`, `Command`, `Event`, `PlayerScore` are the serde types from `protocol.rs`.
 (`game` may use internal types and convert at the boundary, or use protocol types directly —
 implementer's choice, but `snapshot_for`/`start_payload` must return protocol types.)
 
@@ -350,6 +361,11 @@ Rules functions have no imports from `services/`; classification and formula rul
 kind-specific data from `rules::defs`. `config.rs` holds scalar constants and compatibility
 wrappers such as `unit_stats(kind)` / `building_stats(kind)`, which return the stats embedded in
 defs.
+
+`services::geometry` owns shared body primitives for unit circles and building footprint
+rectangles. `services::standability` owns reusable legality predicates for unit bodies and
+building sites. Production, construction, movement, and collision may migrate to these predicates
+incrementally; phase-zero helpers are pure and do not change the wire protocol or client contract.
 
 ---
 
@@ -504,7 +520,8 @@ export class Lobby {
 `main.js` wires it all: create `Net`, derive ws url from `window.location`, show `Lobby`;
 on `start` message build `GameState`, `Camera`, `Renderer`, `Fog`, `HUD`, `Minimap`, `Input`,
 start the rAF loop (compute `alpha` from snapshot timing, `camera.update`, `input.update`,
-`fog.update`, `renderer.render`, `hud.update`, `minimap.render`); on `gameOver` show overlay.
+`fog.update`, `renderer.render`, `hud.update`, `minimap.render`); on `gameOver` show the
+victory/defeat overlay with the frozen score table.
 
 ### 4.2 Rendering & look (PixiJS, procedural art — neutral PS1 field-command style)
 - Layers (back→front): terrain → resource nodes → building shadows → buildings → unit
@@ -621,9 +638,13 @@ the human-readable form of the authoritative `rules::defs` records.
   actively harvesting that node, so death / re-order / retarget free it automatically.
 - Starting layout: each base site gets 18 steel patches and 3 oil patches. `baseSites` are stored
   as interleaved pairs: `[start0, expansion0, start1, expansion1, ...]`. The pairs are shuffled
-  by the match seed (each start stays glued to its paired expansion), and the first N shuffled
-  pairs become the active player starts + paired neutral expansion bases. Sites beyond the first
-  N pairs are unused, giving exactly 2N active bases on the map. Shuffling stops the lobby seat
+  by the match seed, and the first N shuffled starts become the active player starts. For one-,
+  three-, and four-player games, each selected start keeps its authored paired neutral expansion.
+  For two-player games, the two neutral expansion sites are selected from the authored expansion
+  pool by scoring each assignment in the players' local start-to-enemy frames; this favors matching
+  forward/lateral offsets and natural distance, avoiding one player receiving a shared middle
+  natural while the other receives a side natural. Sites not selected as an active start or active
+  expansion are unused, giving exactly 2N active bases on the map. Shuffling stops the lobby seat
   order from pinning the human/AI to the same corner every match.
 
 Unit stats (hp, dmg, range[tiles], cooldown[ticks], speed[px/tick], sight[tiles], cost, supply, buildTicks):
@@ -647,7 +668,10 @@ Building stats (hp, sight, cost, footprint tiles wxh, buildTicks, extra):
 | tank_factory               | 360 | 6     | 200 steel + 100 oil | 3x3  | 240       | trains tank; requires an Industrial Center and Training Centre |
 
 Win: a player is **eliminated** when they own zero buildings (units alone do not keep them
-alive). Last player standing wins; a 1-player match never ends (sandbox/exploration mode).
+alive). Last player standing wins; a 1-player match never ends (sandbox/exploration mode). In a
+3-4 player match, a connected human who is eliminated receives a one-time `gameOver` score
+snapshot immediately while the remaining players keep playing; final match resolution sends
+`gameOver` only to players who have not already received one.
 
 ---
 
@@ -670,6 +694,14 @@ The server treats every client as potentially hostile. Limits live next to the c
   deduped and capped before per-unit work, so a repeated/huge id list can't trigger an A* storm.
 - **Bounds-checked placement** (`services/occupancy.rs` `footprint_tiles`): tile math uses `checked_add` and
   out-of-range build coords are rejected — the tick loop never panics on adversarial input.
+- **Body-aware construction placement**: `services::standability::building_site_clear` is the
+  final scaffold policy. A building footprint rectangle must be in-bounds, passable, clear of
+  existing building rectangles/resource bodies, and clear of every living unit circle. Build
+  command intent uses the paired build-intent predicate, which ignores only the chosen builder's
+  own body so a worker can be ordered to build over its current position and walk out first.
+  `construction_system` repeats the strict final policy at arrival before creating the scaffold.
+  The client placement ghost mirrors the intent policy for the first selected worker, but remains
+  advisory; the server is authoritative.
 - **Idle timeout + heartbeat**: the server drops connections idle for `IDLE_TIMEOUT = 40s`
   (`main.rs`); the client pings every 15s (`main.js`). This evicts half-open/stuck clients so a
   silent player can't wedge a shared room, and frees the room slot.
@@ -681,6 +713,14 @@ The server treats every client as potentially hostile. Limits live next to the c
 - **Shot overpenetration**: ranged attacks continue 25% of their weapon range past the primary
   target and deal 50% reduced damage to additional enemies behind it, which discourages
   clumping and rewards tighter army control.
+- **Tank body facing**: the snapshot `facing` field is the tank hull/body angle. Tanks rotate that
+  body angle at a bounded rate on movement paths and while aiming at combat targets; badly
+  misaligned tanks pivot in place instead of sliding sideways at full speed. Until independent
+  turret state exists, tank shots require the hull to be nearly aligned with the target.
+- **Worker direct-hit retreat**: a worker that takes primary-target damage from an attacker gets a
+  short move-away order through normal pathing. Overpenetration splash does not trigger this
+  reaction, and workers actively constructing a scaffold stay latched so unfinished buildings are
+  not stranded.
 - **Tolerant arrival**: a unit on a `Move` or `AttackMove` order in `MovePhase::Moving` that has not
   moved more than `STUCK_EPS_PX` per tick for `STUCK_ARRIVAL_TICKS` consecutive ticks (~0.5 s at
   30 Hz) and is within `TOLERANT_ARRIVAL_RADIUS_PX` (2 tiles) of its `path_goal` is immediately
@@ -694,13 +734,20 @@ The server treats every client as potentially hostile. Limits live next to the c
   unit `AwaitingPath`. The existing path coordinator then recomputes under current occupancy within
   the normal per-tick A* budget. This covers buildings constructed after a long path was assigned
   without periodically repathing every moving unit.
+- **Production spawn legality**: production completes in two steps. The front queue item advances
+  to complete, then the producer searches deterministic rings around its actual footprint for a
+  `standability::unit_spawn_standable` point. Spawn candidates must fit the unit body inside world
+  bounds without clipping terrain, any building footprint, or any living unit body, including ghost
+  workers. If every candidate is blocked, the complete queue item stays in place and retries on
+  later ticks; cost and supply remain reserved from enqueue time.
 - **Unit collision**: `services::movement::resolve_collisions` runs after production each tick
-  and pair-wise pushes overlapping mobile units apart along the connecting line (50/50 split
-  when neither is anchored). A worker is *anchored* while it is in
-  `GatherPhase::Harvesting` or `BuildPhase::Constructing` — anchored units neither push nor
-  are pushed, which keeps walking units from being deadlocked by miners or active builders
-  (PLAN §4.3). `Game::assert_invariants` then asserts that no two non-anchored mobile units
-  overlap by more than `OVERLAP_TOLERANCE_PX` (residue from pushes that landed against
+  and pair-wise pushes overlapping mobile units apart along the connecting line. Workers in
+  `GatherPhase::Harvesting` or `BuildPhase::Constructing` are ghost pass-through units: they
+  neither push nor are pushed, which keeps walking units from being deadlocked by miners or active
+  builders. All other mobile-unit pairs split overlap by footing resistance, so braced/deployed
+  machine gunners and tanks hold ground better than soft moving infantry while equal-profile units
+  still split pushes evenly. `Game::assert_invariants` then asserts that no two non-ghost mobile
+  units overlap by more than `OVERLAP_TOLERANCE_PX` (residue from pushes that landed against
   impassable terrain).
 
 ---
@@ -721,10 +768,10 @@ empties of humans.
 pending queue a human client feeds, so every AI action goes through the identical
 validation / cost / supply / placement path in `services/commands.rs` — the AI has **no special authority**
 over the simulation and can't cheat economy or placement rules. Because the controller is
-server-side (not a network client) it reads authoritative state directly rather than a fog-filtered
-snapshot; that is not a fog violation (fog only guards what's sent to *human* clients over the
-wire). To stay fair it only ever targets enemy **start tiles**, which are public via the `start`
-payload.
+server-side (not a network client) it reads authoritative own/resource state directly, but enemy
+entities are filtered through that player's authoritative fog grid. To stay fair, outbound attacks
+target enemy **start tiles**, which are public via the `start` payload; direct attacks only target
+currently visible enemy units/buildings during local defense.
 
 **Strategy (deliberately "very basic").** Each controller, on a staggered cadence
 (`DECISION_INTERVAL` ticks), builds a constrained live `AiObservation` and delegates RTS decisions
@@ -754,13 +801,28 @@ individual pressure units instead of waiting for escalating waves.
 for the tank-factory step, delays oil workers until at least eight workers are already mining steel,
 uses ready combat units to clear visible threats in its home resource line before attacking out,
 and treats a single completed tank as a valid minimum attack wave.
+All profiles share a defensive panic mode. A visible enemy near the AI's base, home resource line,
+or workers temporarily suspends expansion, worker training, and non-defensive tech spending. While
+panicking, the AI classifies the visible local threat by weapon DPS: tank-dominated pressure (75%+
+of visible local DPS) prioritizes AT teams, infantry-dominated pressure prioritizes Machine
+Gunners, mixed pressure asks for a support mix, and no-DPS pressure falls back to Riflemen. Support
+panic only uses an already-completed Training Centre and may pull workers onto oil for those support
+counters; if support tech is absent, Barracks production falls back to Riflemen and panic mode does
+not create the Training Centre. If the pressure persists through the panic window, the AI asks for
+an additional Barracks before resuming its normal profile once the threat has cleared.
 `steel_expansion_tanks` is a defensive economic support profile: it saves for a second Industrial
-Center near a neutral steel expansion before building any non-Depot tech structure. Once that
-expansion IC is planned, it builds Barracks and Training Centre tech, staffs oil, mass-produces a
-balanced mix of Machine Gunners and AT teams, and keeps those support units staged on a defensive
-line instead of launching outbound attack waves. After the expansion IC is complete, its worker
-resource assignment is locally bounded so main-base workers do not walk to expansion patches, and
-expansion workers do not walk back to main-base patches.
+Center near a neutral steel expansion before building any non-Depot tech structure. Valid
+expansion sites must cover the full local resource line, then are ranked by own distance divided
+by nearest living enemy-start distance so similarly close naturals prefer the base farther from
+enemies. Once that expansion IC is planned, it builds Barracks and Training Centre tech, staffs
+oil, produces Machine Gunners and AT teams toward a one-for-one support mix, and keeps those
+support units staged in a short line on the enemy-facing side of its main-base steel cluster
+instead of launching outbound attack waves.
+After 100 supply used, it switches to a Tank Factory tech path, stops Machine Gunner / AT team
+production, trains tanks, and launches outbound tank groups only once at least three tanks are
+ready. After the expansion IC is complete, its worker resource assignment is locally bounded so
+main-base workers do not walk to expansion patches, and expansion workers do not walk back to
+main-base patches.
 The live lobby AI uses this shared core through `AiController`, which only owns live identity,
 profile id, cadence, and persistent decision memory. Profiles are still not client-selectable.
 

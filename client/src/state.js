@@ -9,6 +9,22 @@
 import { RESOURCE_AMOUNTS } from "./config.js";
 import { KIND, PASSABLE, isResource } from "./protocol.js";
 
+const TWO_PI = Math.PI * 2;
+
+function normalizeAngle(a) {
+  let out = (a + Math.PI) % TWO_PI;
+  if (out < 0) out += TWO_PI;
+  return out - Math.PI;
+}
+
+function shortestAngleDelta(from, to) {
+  return normalizeAngle(to - from);
+}
+
+function lerpAngle(from, to, t) {
+  return normalizeAngle(from + shortestAngleDelta(from, to) * t);
+}
+
 export class GameState {
   /**
    * @param {object} startInfo the §2.3 `start` payload.
@@ -106,7 +122,14 @@ export class GameState {
    * @param {object} msg a §2.4 snapshot payload.
    */
   applySnapshot(msg) {
-    const now = performance.now();
+    // Snapshots can arrive batched in a single event-loop turn (a throttled or
+    // backgrounded tab drains its socket buffer at once) and performance.now()
+    // is clamped to a coarse resolution, so two consecutive snapshots could
+    // otherwise share a receive time. Force the receive clock strictly forward
+    // so the interpolation window (curr - prev) is always positive and never
+    // collapses to a degenerate, alpha-pinned-to-1 span. Real time reasserts
+    // itself via Math.max as soon as performance.now() passes the floor.
+    const now = Math.max(performance.now(), this._curRecvTime + 1);
 
     this._prev = this._cur;
     this._prevRecvTime = this._curRecvTime;
@@ -167,11 +190,15 @@ export class GameState {
     for (const e of this._cur.entities || []) {
       const prior = this._prevById.get(e.id);
       if (prior) {
-        out.push({
+        const next = {
           ...e,
           x: prior.x + (e.x - prior.x) * t,
           y: prior.y + (e.y - prior.y) * t,
-        });
+        };
+        if (typeof prior.facing === "number" && typeof e.facing === "number") {
+          next.facing = lerpAngle(prior.facing, e.facing, t);
+        }
+        out.push(next);
       } else {
         // No previous sample: render at the current position (a shallow copy
         // keeps callers from mutating the live snapshot entity).
