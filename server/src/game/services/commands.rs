@@ -196,6 +196,9 @@ fn order_build(
         notice(events, player, "Only workers can build");
         return;
     }
+    if is_constructing(entities, worker) {
+        return;
+    }
     if config::building_stats(building).is_none() {
         notice(events, player, "Unknown building");
         return;
@@ -392,6 +395,70 @@ mod tests {
         assert!(
             events.get(&1).is_none_or(Vec::is_empty),
             "valid build-over-self intent should not emit a failure notice"
+        );
+    }
+
+    #[test]
+    fn build_order_does_not_pull_worker_off_active_construction() {
+        let map = flat_map(16);
+        let mut entities = EntityStore::new();
+        let (site_x, site_y) = footprint_center(&map, EntityKind::Depot, 4, 4);
+        let worker = entities
+            .spawn_unit(1, EntityKind::Worker, site_x, site_y)
+            .expect("worker should spawn");
+        let site = entities
+            .spawn_building(1, EntityKind::Depot, site_x, site_y, false)
+            .expect("scaffold should spawn");
+        let worker_entity = entities.get_mut(worker).expect("worker should exist");
+        worker_entity.set_order(Order::build(EntityKind::Depot, 4, 4));
+        worker_entity.mark_build_phase(BuildPhase::Constructing { site });
+        worker_entity.set_target_id(Some(site));
+
+        let spatial = SpatialIndex::build(&entities, map.size);
+        let occ = Occupancy::build(&map, &entities);
+        let mut pathing = PathingService::new(1024, 32);
+        pathing.advance_tick(1);
+        let mut coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, 1);
+        let mut players = vec![player_state(1)];
+        let mut events = HashMap::new();
+
+        apply_commands(
+            &map,
+            &mut entities,
+            &mut players,
+            &spatial,
+            &mut coordinator,
+            vec![(
+                1,
+                SimCommand::Build {
+                    worker,
+                    building: EntityKind::Barracks,
+                    tile_x: 8,
+                    tile_y: 8,
+                },
+            )],
+            &mut events,
+        );
+
+        let worker = entities.get(worker).expect("worker should remain alive");
+        assert_eq!(
+            worker.build_phase(),
+            Some(BuildPhase::Constructing { site }),
+            "active build command should keep constructing the original scaffold"
+        );
+        assert_eq!(
+            worker.order().build_intent_tile(),
+            Some((EntityKind::Depot, 4, 4)),
+            "second build order must not replace the active construction intent"
+        );
+        assert_eq!(
+            worker.target_id(),
+            Some(site),
+            "worker should stay latched to the scaffold it is building"
+        );
+        assert!(
+            events.get(&1).is_none_or(Vec::is_empty),
+            "ignored build command should not emit a failure notice"
         );
     }
 
