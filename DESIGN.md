@@ -2,7 +2,7 @@
 
 A simple but functional real-time-strategy game inspired by StarCraft: Brood War.
 Server-authoritative simulation in **Rust**; client in **HTML/CSS/JS** rendered with
-**PixiJS** (WebGL) loaded from a CDN. No sound. Built to be iterated on for years, so
+**PixiJS** (WebGL) loaded from a CDN, plus a small Web Audio sound engine. Built to be iterated on for years, so
 the boundaries below are contracts: keep them stable and well-documented.
 
 This document is the single source of truth for cross-file contracts. If you implement
@@ -412,6 +412,7 @@ src/
   renderer.js     # Renderer: PixiJS app + layers; render(state, camera, alpha)
   fog.js          # Fog overlay: accumulate explored, compute visible from own entities
   input.js        # Input: mouse/keyboard -> selection box, issue commands, build placement
+  audio.js        # Audio: Web Audio context, buses, one-shots, spatialization
   hud.js          # HUD: resources/supply bar, selected panel, command card (build/train)
   minimap.js      # Minimap: draw terrain+entities+viewport; click to move camera/command
   lobby.js        # Lobby screen: name entry, player list, ready/start buttons
@@ -508,11 +509,28 @@ export class Fog {
 `input.js`
 ```js
 export class Input {
-  constructor(domElement, camera, state, net, renderer, fog)
+  constructor(domElement, camera, state, net, renderer, fog, audio?)
   // installs listeners; translates gestures into selection + protocol commands.
   update(dt)                             // continuous handling (edge scroll handled by camera)
   // emits nothing to return; mutates state.selection / state.placement and calls net.command
 }
+```
+
+`audio.js`
+```js
+export class Audio {
+  preload(manifest): Promise<void>        // decode sounds once the AudioContext is unlocked
+  play(id, {x?, y?, priority?, category?, pitchVariance?})
+                                           // x/y present -> StereoPanner + lowpass + distance gain
+  playUI(id, opts)                        // non-spatial ui category convenience
+  setListener(x, y, zoom, viewW?)          // camera center in world px; derives screen-width refDist
+  pickVariant(ids) -> id|null             // seeded RNG variant choice
+  setMasterVolume(v), getMasterVolume()
+  setCategoryVolume(cat, v), getCategoryVolume(cat)
+  destroy()
+}
+export const SOUND_MANIFEST
+export function noticeSoundId(msg)
 ```
 
 `hud.js`
@@ -543,11 +561,12 @@ export class Lobby {
 }
 ```
 
-`main.js` wires it all: create `Net`, derive ws url from `window.location`, show `Lobby`;
-on `start` message build `GameState`, `Camera`, `Renderer`, `Fog`, `HUD`, `Minimap`, `Input`,
-start the rAF loop (compute `alpha` from snapshot timing, `camera.update`, `input.update`,
-`fog.update`, `renderer.render`, `hud.update`, `minimap.render`); on `gameOver` show the
-victory/defeat overlay with the frozen score table.
+`main.js` wires it all: create `Net` and `Audio`, derive ws url from `window.location`, show
+`Lobby`; on `start` message build `GameState`, `Camera`, `Renderer`, `Fog`, `HUD`, `Minimap`,
+`Input`, start the rAF loop (compute `alpha` from snapshot timing, `camera.update`,
+`audio.setListener`, `input.update`, `fog.update`, `renderer.render`, `hud.update`,
+`minimap.render`); on each snapshot it applies state and triggers transient event audio exactly
+once; on `gameOver` show the victory/defeat overlay with the frozen score table.
 
 ### 4.2 Rendering & look (PixiJS, procedural art — neutral PS1 field-command style)
 - Layers (back→front): terrain → resource nodes → building shadows → buildings → unit
