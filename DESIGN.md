@@ -792,12 +792,10 @@ The server treats every client as potentially hostile. Limits live next to the c
   `rules::projection`, which gates entity views, `target_id` tracers, and death/attack events on
   visibility — hidden enemies are never sent. Visibility is terrain-aware: stone blocks sight
   beyond itself on both the server fog grid and the client cosmetic fog overlay.
-- **Shot overpenetration**: ranged attacks continue 25% of their weapon range past the primary
-  target and deal 50% reduced damage to additional enemies behind it, which discourages
-  clumping and rewards tighter army control. Two exceptions: a shot whose primary target is a
-  **tank** never overpenetrates (the armour stops the round dead, no exceptions — even AT teams),
-  and **AT teams** punch deeper, carrying 50% of their weapon range past the primary target.
-  Stone blocks target acquisition, primary fire, and overpenetration.
+- **Shot blocking**: ranged attacks resolve against the first enemy tank body or building footprint
+  intersecting the line from attacker to intended target. That blocker takes the shot damage and
+  the intended target behind it is unharmed. Shots do not overpenetrate; after one entity takes
+  damage, the round is spent. Stone blocks target acquisition and primary fire.
 - **Tank body and weapon facing**: the snapshot `facing` field is the tank hull/body angle. Tanks
   rotate that body angle at a bounded rate on movement paths; badly misaligned tanks pivot in
   place instead of sliding sideways at full speed. Tank hull movement intent uses a long route
@@ -823,7 +821,7 @@ The server treats every client as potentially hostile. Limits live next to the c
   `facing` and the attacker's position. Front hits (`<=45°` from the hull direction) deal normal
   damage, side hits (`>45°` and `<=135°`) deal `1.25x`, and rear hits (`>135°`) deal `1.75x`.
   Infantry damage, building damage, non-tank victims, and non-anti-tank attackers ignore armor
-  facing. Overpenetration victims use the same facing rule.
+  facing.
 - **Worker direct-hit retreat**: combat stamps `last_damage_pos`/`last_damage_tick` on every
   damaged entity but never mutates orders or paths. AI controllers (`game/ai.rs`) read those fields
   on the following tick and issue an ordinary `Move` command pointing a few tiles away from the
