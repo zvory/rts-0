@@ -64,6 +64,7 @@ const CITY_CENTRE_REQUIRED: &[EntityKind] = &[EntityKind::CityCentre];
 const CITY_CENTRE_AND_BARRACKS_REQUIRED: &[EntityKind] =
     &[EntityKind::CityCentre, EntityKind::Barracks];
 const TRAINING_CENTRE_REQUIRED: &[EntityKind] = &[EntityKind::TrainingCentre];
+const STEELWORKS_REQUIRED: &[EntityKind] = &[EntityKind::Steelworks];
 const FACTORY_REQUIRED: &[EntityKind] = &[EntityKind::CityCentre, EntityKind::TrainingCentre];
 
 pub const UNITS: &[UnitDef] = &[
@@ -170,7 +171,7 @@ pub const UNITS: &[UnitDef] = &[
         weapon: WeaponClass::AntiTank,
         target_priority: TargetPriority::Default,
         trained_at: Some(EntityKind::Factory),
-        train_requires: &[],
+        train_requires: STEELWORKS_REQUIRED,
     },
     UnitDef {
         kind: EntityKind::ScoutCar,
@@ -294,6 +295,26 @@ pub const BUILDINGS: &[BuildingDef] = &[
         armor_class: ArmorClass::Armored,
         weapon: WeaponClass::None,
         trains: FACTORY_UNITS,
+        build_requires: FACTORY_REQUIRED,
+    },
+    BuildingDef {
+        kind: EntityKind::Steelworks,
+        stats: config::BuildingStats {
+            hp: 300,
+            sight_tiles: 6,
+            cost_steel: 125,
+            cost_oil: 125,
+            foot_w: 2,
+            foot_h: 2,
+            build_ticks: 220,
+            provides_supply: 0,
+            dmg: 0,
+            range_tiles: 0,
+            cooldown: 0,
+        },
+        armor_class: ArmorClass::Armored,
+        weapon: WeaponClass::None,
+        trains: &[],
         build_requires: FACTORY_REQUIRED,
     },
 ];

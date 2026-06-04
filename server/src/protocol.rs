@@ -34,6 +34,7 @@ pub mod kinds {
     pub const BARRACKS: &str = "barracks";
     pub const TRAINING_CENTRE: &str = "training_centre";
     pub const FACTORY: &str = "factory";
+    pub const STEELWORKS: &str = "steelworks";
     pub const STEEL: &str = "steel";
     pub const OIL: &str = "oil";
 }
@@ -653,7 +654,7 @@ fn kind_code(kind: &str) -> u8 {
         kinds::MACHINE_GUNNER => 3,
         kinds::AT_TEAM => 4,
         kinds::TANK => 5,
-        kinds::SCOUT_CAR => 13,
+        kinds::SCOUT_CAR => 14,
         kinds::CITY_CENTRE => 6,
         kinds::DEPOT => 7,
         kinds::BARRACKS => 8,
@@ -661,6 +662,7 @@ fn kind_code(kind: &str) -> u8 {
         kinds::FACTORY => 10,
         kinds::STEEL => 11,
         kinds::OIL => 12,
+        kinds::STEELWORKS => 13,
         _ => 255,
     }
 }
