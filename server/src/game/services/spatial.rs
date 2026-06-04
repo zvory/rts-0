@@ -31,6 +31,9 @@ impl SpatialIndex {
             let idx = (ty as u32 * map_size + tx as u32) as usize;
             cells[idx].push(e.id);
         }
+        for cell in &mut cells {
+            cell.sort_unstable();
+        }
         SpatialIndex {
             size: map_size,
             cells,
