@@ -3,13 +3,13 @@
 ## Run everything (one command)
 
 `run-all.sh` builds the server in debug (overflow checks **on**, which the hardening regression
-tests rely on), boots it, polls `GET /` until healthy, runs the Rust scripted tests and all the
-live-server suites, tears the server down, and exits non-zero if **any** suite fails. If a server
-is already answering on the port it is reused and left running.
+tests rely on), boots it, polls `GET /` until healthy, runs Rust formatting/lint/scripted tests
+and all the live-server suites, tears the server down, and exits non-zero if **any** suite fails.
+If a server is already answering on the port it is reused and left running.
 
 ```bash
-tests/run-all.sh                 # cargo test + 3 API suites + client smoke
-tests/run-all.sh --no-rust       # skip the cargo test step
+tests/run-all.sh                 # cargo fmt --check + cargo test + clippy + 3 API suites + client smoke
+tests/run-all.sh --no-rust       # skip Rust fmt/test/lint
 tests/run-all.sh --no-client     # skip the headless-browser smoke test
 PORT=8090 tests/run-all.sh       # use a different port
 CHROME=/path/to/chrome tests/run-all.sh
@@ -82,5 +82,6 @@ node client_smoke.mjs
 ```
 
 > CI note: `run-all.sh` is the CI entry point — it builds the server, launches it, waits for
-> `GET /` to return 200, runs every suite, and exits non-zero on any failure. In a headless CI
-> image without Chrome, the client smoke test self-skips; pass `CHROME=...` to include it.
+> `GET /` to return 200, checks Rust formatting, runs every suite, and exits non-zero on any
+> failure. In a headless CI image without Chrome, the client smoke test self-skips; pass
+> `CHROME=...` to include it.

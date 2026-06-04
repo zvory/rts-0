@@ -181,20 +181,7 @@ pub(crate) fn combat_system(
             let ready = matches!(entities.get(id), Some(e) if e.attack_cd() == 0);
             if ready {
                 apply_damage(
-                    map,
-                    entities,
-                    events,
-                    fog,
-                    rng,
-                    id,
-                    tid,
-                    dmg,
-                    owner,
-                    px,
-                    py,
-                    tx,
-                    ty,
-                    range_px,
+                    map, entities, events, fog, rng, id, tid, dmg, owner, px, py, tx, ty, range_px,
                     tick,
                 );
                 if let Some(e) = entities.get_mut(id) {
@@ -1390,11 +1377,7 @@ mod tests {
             matches!(worker.order(), Order::Idle),
             "combat must not mutate orders; retreat is now an AI command"
         );
-        assert_eq!(
-            worker.path_goal(),
-            None,
-            "combat must not issue path goals"
-        );
+        assert_eq!(worker.path_goal(), None, "combat must not issue path goals");
     }
 
     #[test]

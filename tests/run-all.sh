@@ -3,9 +3,11 @@
 # non-zero if anything failed. This is the canonical "is the build green?" command.
 #
 # What it runs, in order:
-#   1. Rust scripted tests          (cargo test — deterministic, in-process, no server)
-#   2. Node API suites              (server_integration, regression, ai_integration)
-#   3. Headless client smoke        (client_smoke — only if puppeteer-core + Chrome are present)
+#   1. Rust formatting              (cargo fmt --check)
+#   2. Rust scripted tests          (cargo test — deterministic, in-process, no server)
+#   3. Rust lint                    (cargo clippy)
+#   4. Node API suites              (server_integration, regression, ai_integration)
+#   5. Headless client smoke        (client_smoke — only if puppeteer-core + Chrome are present)
 #
 # The server is built in debug (overflow checks ON — the hardening regression tests rely on a
 # bad Build coord being caught, not silently wrapped) and booted on a private free port. The
@@ -14,7 +16,7 @@
 # Usage:
 #   tests/run-all.sh                 # everything (silent unless failing)
 #   tests/run-all.sh -v              # verbose: print headers and passes
-#   tests/run-all.sh --no-rust       # skip the cargo test step
+#   tests/run-all.sh --no-rust       # skip Rust fmt/test/lint
 #   tests/run-all.sh --no-client     # skip the headless-browser smoke test
 #   PORT=8090 tests/run-all.sh       # use a different port
 #   RTS_MATCH_SEED=123 tests/run-all.sh  # use a different deterministic map seed
@@ -211,35 +213,34 @@ collect_bg_results() {
   BG_PIDS=(); BG_NAMES=(); BG_RESULT_FILES=()
 }
 
+run_rust_suites_bg() {
+  if [ "$RUN_RUST" = "1" ]; then
+    run_suite_bg "Rust format (cargo fmt --check)" \
+      cargo fmt --manifest-path "$SERVER_DIR/Cargo.toml" --check
+    run_suite_bg "Rust scripted tests (cargo test)" \
+      cargo test --manifest-path "$SERVER_DIR/Cargo.toml"
+    run_suite_bg "Rust lint (cargo clippy)" \
+      cargo clippy --manifest-path "$SERVER_DIR/Cargo.toml" -- -D warnings
+  else
+    SKIPPED+=("Rust format (--no-rust)")
+    SKIPPED+=("Rust scripted tests (--no-rust)")
+    SKIPPED+=("Rust lint (--no-rust)")
+  fi
+}
+
 # --- 1. Build server first (both cargo build and cargo test share the target dir and
 #        serialize via cargo's file lock, so we build once, then run both in parallel
 #        — cargo test reuses the already-compiled artifacts and mostly just links+runs).
 if is_up; then
   info "reusing server already listening on :$PORT (will not stop it)"
   SERVER_HEALTHY=1
-  # No build needed; kick off cargo test immediately if requested.
-  if [ "$RUN_RUST" = "1" ]; then
-    run_suite_bg "Rust scripted tests (cargo test)" \
-      cargo test --manifest-path "$SERVER_DIR/Cargo.toml"
-    run_suite_bg "Rust lint (cargo clippy)" \
-      cargo clippy --manifest-path "$SERVER_DIR/Cargo.toml" -- -D warnings
-  else
-    SKIPPED+=("Rust scripted tests (--no-rust)")
-    SKIPPED+=("Rust lint (--no-rust)")
-  fi
+  # No build needed; kick off Rust suites immediately if requested.
+  run_rust_suites_bg
 else
   # Build the server binary first (blocks until done).
   if boot_server; then SERVER_HEALTHY=1; else SERVER_HEALTHY=0; fi
   # Now artifacts are compiled; cargo test and clippy can reuse them with minimal recompilation.
-  if [ "$RUN_RUST" = "1" ]; then
-    run_suite_bg "Rust scripted tests (cargo test)" \
-      cargo test --manifest-path "$SERVER_DIR/Cargo.toml"
-    run_suite_bg "Rust lint (cargo clippy)" \
-      cargo clippy --manifest-path "$SERVER_DIR/Cargo.toml" -- -D warnings
-  else
-    SKIPPED+=("Rust scripted tests (--no-rust)")
-    SKIPPED+=("Rust lint (--no-rust)")
-  fi
+  run_rust_suites_bg
 fi
 
 # --- 2/3. Node suites + client smoke (all parallelised) ------------------------------------

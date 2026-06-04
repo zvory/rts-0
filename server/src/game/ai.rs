@@ -168,16 +168,10 @@ fn emit_worker_retreat_commands(
     let last_tick = context.tick.checked_sub(1);
     let world_max = context.map.world_size_px() - 0.01;
     for entity in context.entities.iter() {
-        if entity.owner != player
-            || entity.kind != EntityKind::Worker
-            || entity.hp == 0
-        {
+        if entity.owner != player || entity.kind != EntityKind::Worker || entity.hp == 0 {
             continue;
         }
-        if matches!(
-            entity.build_phase(),
-            Some(BuildPhase::Constructing { .. })
-        ) {
+        if matches!(entity.build_phase(), Some(BuildPhase::Constructing { .. })) {
             continue;
         }
         if entity.last_damage_tick() != last_tick {
