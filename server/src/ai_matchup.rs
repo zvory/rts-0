@@ -9,6 +9,7 @@ mod game;
 mod protocol;
 mod rules;
 
+use std::path::PathBuf;
 use std::process;
 
 use game::selfplay::{
@@ -32,6 +33,7 @@ struct CliConfig {
     ticks: u32,
     verify_replay: bool,
     save_replay_name: Option<String>,
+    replay_dir: Option<PathBuf>,
     output_format: OutputFormat,
 }
 
@@ -47,6 +49,7 @@ fn main() {
         max_ticks: config.ticks,
         verify_replay: config.verify_replay,
         save_replay_name: config.save_replay_name,
+        replay_dir: config.replay_dir,
     });
 
     match result {
@@ -86,6 +89,7 @@ fn parse_args(args: impl IntoIterator<Item = String>) -> Result<Option<CliConfig
     let mut ticks = DEFAULT_TICKS;
     let mut verify_replay = true;
     let mut save_replay_name = None;
+    let mut replay_dir = None;
     let mut output_format = OutputFormat::Table;
     let mut positionals = Vec::new();
 
@@ -129,6 +133,9 @@ fn parse_args(args: impl IntoIterator<Item = String>) -> Result<Option<CliConfig
             "--save-replay" => {
                 save_replay_name = Some(required_value(&arg, &mut args)?);
             }
+            "--replay-dir" => {
+                replay_dir = Some(PathBuf::from(required_value(&arg, &mut args)?));
+            }
             _ if arg.starts_with('-') => {
                 return Err(format!("unknown flag: {arg}"));
             }
@@ -166,6 +173,7 @@ fn parse_args(args: impl IntoIterator<Item = String>) -> Result<Option<CliConfig
         ticks,
         verify_replay,
         save_replay_name,
+        replay_dir,
         output_format,
     }))
 }
@@ -221,15 +229,17 @@ fn print_table(result: &ProfileMatchupResult) {
     }
     println!();
     println!(
-        "{:<8} {:<32} {:<6} {:>6} {:>6} {:>9} {:>9}  final counts",
-        "player", "profile", "alive", "cmds", "atk", "firstAtk", "firstTank"
+        "{:<8} {:<32} {:<6} {:>6} {:>6} {:>6} {:>6} {:>9} {:>9}  final counts",
+        "player", "profile", "alive", "army", "bldg", "cmds", "atk", "firstAtk", "firstTank"
     );
     for player in &result.players {
         println!(
-            "{:<8} {:<32} {:<6} {:>6} {:>6} {:>9} {:>9}  {}",
+            "{:<8} {:<32} {:<6} {:>6} {:>6} {:>6} {:>6} {:>9} {:>9}  {}",
             player.player_id,
             player.profile,
             player.alive,
+            player.army_value,
+            player.building_value,
             player.command_count,
             player.attack_command_count,
             tick_text(player.first_attack_command_tick),
@@ -298,6 +308,7 @@ Options:
   --format table|json    Output format (default: table)
   --json                 Shortcut for --format json
   --save-replay <name>   Write target/selfplay-artifacts/<name>/replay.json
+  --replay-dir <path>    Parent directory for --save-replay artifacts
   --no-verify-replay     Skip deterministic command-log replay verification
   --list-profiles        Print available profiles and aliases
   -h, --help             Print this help
