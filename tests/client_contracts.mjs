@@ -304,8 +304,8 @@ function fakeAudioContext() {
   assert(STATS[KIND.SCOUT_CAR].cost.steel === 125, "Scout Car steel cost mirrors server");
   assert(STATS[KIND.SCOUT_CAR].cost.oil === 75, "Scout Car oil cost mirrors server");
   assert(STATS[KIND.SCOUT_CAR].sight === 10, "Scout Car has the largest mobile sight radius");
-  assert(STATS[KIND.SCOUT_CAR].body.length === 34, "Scout Car client body length mirrors server");
-  assert(STATS[KIND.SCOUT_CAR].body.width === 18, "Scout Car client body width mirrors server");
+  assert(STATS[KIND.SCOUT_CAR].body.length === 51, "Scout Car client body length mirrors server");
+  assert(STATS[KIND.SCOUT_CAR].body.width === 27, "Scout Car client body width mirrors server");
   assert(KIND_CODE[KIND.SCOUT_CAR] === 14, "Scout Car compact kind code should follow Steelworks");
   assert(
     STATS[KIND.STEELWORKS].footW === 2 && STATS[KIND.STEELWORKS].footH === 2,
