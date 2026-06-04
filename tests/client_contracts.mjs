@@ -541,6 +541,8 @@ function fakeAudioContext() {
     footprintValidAgainstEntities([tank], new Set(), 1, 1, 2, 2, map) === false,
     "client preview should reject a tank body touching a footprint edge",
   );
+  assert(STATS[KIND.TANK].body.length === 42, "tank client body length mirrors server");
+  assert(STATS[KIND.TANK].body.width === 24, "tank client body width mirrors server");
 
   const input = Object.create(Input.prototype);
   input.state = {
@@ -555,6 +557,16 @@ function fakeAudioContext() {
   assert(
     input._footprintValid(1, 1, 2, 2, map) === true,
     "preview should ignore the same first selected worker used for cmd.build",
+  );
+
+  const clickableTank = { id: 10, owner: 1, kind: KIND.TANK, x: 0, y: 0, facing: 0 };
+  assert(
+    input._worldPointHitsEntity(clickableTank, 21, 0, 32) === true,
+    "tank hit testing should reach the long hull axis",
+  );
+  assert(
+    input._worldPointHitsEntity(clickableTank, 0, 18, 32) === false,
+    "tank hit testing should not use a stale circular side radius",
   );
 }
 

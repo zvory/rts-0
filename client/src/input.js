@@ -22,7 +22,7 @@
 // against the interpolated positions from state so clicks line up with what is drawn.
 
 import { cmd, PASSABLE, isUnit, isBuilding, isResource, KIND } from "./protocol.js";
-import { MINING_IC_RANGE_TILES, STATS, isProducerBuilding } from "./config.js";
+import { MINING_IC_RANGE_TILES, STATS, TANK_BODY, isProducerBuilding } from "./config.js";
 
 export function footprintValidAgainstEntities(
   entities,
@@ -63,6 +63,7 @@ function entityIntersectsRect(e, minX, minY, maxX, maxY, tileSize) {
     halfH = ((stat.footH ? stat.footH : 1) * tileSize) / 2;
     return e.x + halfW > minX && e.x - halfW < maxX && e.y + halfH > minY && e.y - halfH < maxY;
   } else {
+    if (e.kind === KIND.TANK) return orientedTankIntersectsRect(e, minX, minY, maxX, maxY, 0);
     const radius = stat.size ? stat.size : 0;
     const nearestX = Math.min(Math.max(e.x, minX), maxX);
     const nearestY = Math.min(Math.max(e.y, minY), maxY);
@@ -631,8 +632,9 @@ export class Input {
   // --- Entity hit-testing -------------------------------------------------
 
   /**
-   * Pick the entity at a world point. Units/resources are tested against a circular
-   * render radius (config STATS[kind].size); buildings against their footprint box.
+   * Pick the entity at a world point. Infantry/resources are tested against a
+   * circular render radius, tanks against their oriented hull, and buildings
+   * against their footprint box.
    * When `ownPreferred`, a hit on an own entity wins over an overlapping foreign one,
    * and among equals the closest center is chosen. Forgiving by design (small pad).
    * @returns {object|null} the interpolated entity, or null.
@@ -673,6 +675,7 @@ export class Input {
         wy <= e.y + halfH + HIT_PAD_PX
       );
     }
+    if (e.kind === KIND.TANK) return pointHitsOrientedTank(e, wx, wy, HIT_PAD_PX);
     const radius = (stat && stat.size ? stat.size : DEFAULT_HIT_RADIUS) + HIT_PAD_PX;
     return Math.hypot(wx - e.x, wy - e.y) <= radius;
   }
@@ -909,6 +912,63 @@ const DEFAULT_HIT_RADIUS = 10;
 const DEFAULT_TILE_SIZE = 32;
 // Wheel zoom multiplier per notch.
 const ZOOM_STEP = 0.12;
+
+function pointHitsOrientedTank(e, wx, wy, pad) {
+  const body = tankBody(e, pad);
+  if (!body) return false;
+  const dx = wx - e.x;
+  const dy = wy - e.y;
+  const c = Math.cos(body.facing);
+  const s = Math.sin(body.facing);
+  const forward = dx * c + dy * s;
+  const side = -dx * s + dy * c;
+  return Math.abs(forward) <= body.halfLen && Math.abs(side) <= body.halfWidth;
+}
+
+function orientedTankIntersectsRect(e, minX, minY, maxX, maxY, pad) {
+  const body = tankBody(e, pad);
+  if (!body) return false;
+  return orientedBoxIntersectsRect(body, minX, minY, maxX, maxY);
+}
+
+function tankBody(e, pad) {
+  const stat = STATS[e.kind];
+  const body = (stat && stat.body) || TANK_BODY;
+  const facing = typeof e.facing === "number" && Number.isFinite(e.facing) ? e.facing : 0;
+  if (!Number.isFinite(e.x) || !Number.isFinite(e.y)) return null;
+  return {
+    x: e.x,
+    y: e.y,
+    halfLen: body.length * 0.5 + (body.clearance || 0) + pad,
+    halfWidth: body.width * 0.5 + (body.clearance || 0) + pad,
+    facing,
+  };
+}
+
+function orientedBoxIntersectsRect(body, minX, minY, maxX, maxY) {
+  const rectCx = (minX + maxX) * 0.5;
+  const rectCy = (minY + maxY) * 0.5;
+  const rectHalfW = (maxX - minX) * 0.5;
+  const rectHalfH = (maxY - minY) * 0.5;
+  const c = Math.cos(body.facing);
+  const s = Math.sin(body.facing);
+  const axes = [
+    [1, 0],
+    [0, 1],
+    [c, s],
+    [-s, c],
+  ];
+  for (const [ax, ay] of axes) {
+    const boxCenter = body.x * ax + body.y * ay;
+    const rectCenter = rectCx * ax + rectCy * ay;
+    const boxRadius =
+      Math.abs(ax * c + ay * s) * body.halfLen +
+      Math.abs(ax * -s + ay * c) * body.halfWidth;
+    const rectRadius = Math.abs(ax) * rectHalfW + Math.abs(ay) * rectHalfH;
+    if (Math.abs(boxCenter - rectCenter) > boxRadius + rectRadius) return false;
+  }
+  return true;
+}
 
 /** True if the event target is an editable text field we must not steal keys from. */
 function isTextEntry(el) {
