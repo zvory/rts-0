@@ -117,6 +117,7 @@ pub(crate) struct ProfileMatchupOptions {
     pub(crate) max_ticks: u32,
     pub(crate) verify_replay: bool,
     pub(crate) save_replay_name: Option<String>,
+    pub(crate) replay_dir: Option<PathBuf>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -151,6 +152,8 @@ pub(crate) struct ProfileMatchupPlayerResult {
     pub(crate) player_id: u32,
     pub(crate) profile: String,
     pub(crate) alive: bool,
+    pub(crate) army_value: u32,
+    pub(crate) building_value: u32,
     pub(crate) command_count: usize,
     pub(crate) attack_command_count: usize,
     pub(crate) first_attack_command_tick: Option<u32>,
@@ -286,7 +289,7 @@ pub(crate) fn run_profile_matchup_result(
 
     let replay_artifact = match &options.save_replay_name {
         Some(name) => Some(
-            write_simple_replay_artifact(name, &game, &players)?
+            write_simple_replay_artifact(name, options.replay_dir.as_ref(), &game, &players)?
                 .display()
                 .to_string(),
         ),
@@ -308,11 +311,13 @@ pub(crate) fn run_profile_matchup_result(
         None
     };
     let final_counts = final_unit_counts(&game, &players);
+    let final_values = final_material_values(&game, &players);
     let command_stats = command_stats_by_player(game.command_log());
     let players = players
         .iter()
         .map(|player| {
             let stats = command_stats.get(&player.id);
+            let values = final_values.get(&player.id).copied().unwrap_or_default();
             ProfileMatchupPlayerResult {
                 player_id: player.id,
                 profile: if player.id == 1 {
@@ -321,6 +326,8 @@ pub(crate) fn run_profile_matchup_result(
                     profile_b.id.to_string()
                 },
                 alive: alive.contains(&player.id),
+                army_value: values.army,
+                building_value: values.buildings,
                 command_count: stats.map(|s| s.command_count).unwrap_or_default(),
                 attack_command_count: stats.map(|s| s.attack_command_count).unwrap_or_default(),
                 first_attack_command_tick: stats.and_then(|s| s.first_attack_command_tick),
@@ -399,12 +406,17 @@ fn observe_first_tank_tick(
 
 fn write_simple_replay_artifact(
     name: &str,
+    replay_dir: Option<&PathBuf>,
     game: &Game,
     players: &[PlayerInit],
 ) -> Result<PathBuf, String> {
-    let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("target")
-        .join(SELFPLAY_ARTIFACT_DIR)
+    let dir = replay_dir
+        .cloned()
+        .unwrap_or_else(|| {
+            PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join("target")
+                .join(SELFPLAY_ARTIFACT_DIR)
+        })
         .join(name);
     fs::create_dir_all(&dir).map_err(|err| err.to_string())?;
     let artifact = ReplayArtifact {
@@ -553,4 +565,35 @@ fn final_unit_counts(game: &Game, players: &[PlayerInit]) -> BTreeMap<u32, BTree
             .or_default() += 1;
     }
     counts
+}
+
+#[derive(Clone, Copy, Default)]
+struct MaterialValues {
+    army: u32,
+    buildings: u32,
+}
+
+fn final_material_values(game: &Game, players: &[PlayerInit]) -> BTreeMap<u32, MaterialValues> {
+    let viewer = players.first().map(|p| p.id).unwrap_or(0);
+    let snapshot = game.snapshot_full_for(viewer);
+    let player_ids: BTreeSet<u32> = players.iter().map(|p| p.id).collect();
+    let mut values: BTreeMap<u32, MaterialValues> = BTreeMap::new();
+    for entity in snapshot
+        .entities
+        .iter()
+        .filter(|entity| player_ids.contains(&entity.owner))
+    {
+        let Ok(kind) = entity.kind.parse() else {
+            continue;
+        };
+        let (steel, oil) = crate::rules::economy::cost(kind);
+        let value = steel.saturating_add(oil);
+        let entry = values.entry(entity.owner).or_default();
+        if kind.is_unit() {
+            entry.army = entry.army.saturating_add(value);
+        } else if kind.is_building() {
+            entry.buildings = entry.buildings.saturating_add(value);
+        }
+    }
+    values
 }
