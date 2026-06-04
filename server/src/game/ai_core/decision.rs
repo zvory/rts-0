@@ -35,7 +35,7 @@ const EXPANSION_LOCAL_RESOURCE_ASSIGNMENT_RADIUS_TILES: f32 = config::MINING_IC_
 const EXPANSION_DEFENSIVE_LINE_SPACING_TILES: f32 = 1.5;
 const EXPANSION_DEFENSIVE_LINE_REISSUE_EPS_TILES: f32 = 0.75;
 const RIFLE_RAID_DEEPEN_TILES: f32 = 7.0;
-const RIFLE_RAID_BASE_RADIUS_TILES: f32 = 14.0;
+const RIFLE_RAID_STEEL_LINE_RADIUS_TILES: f32 = 4.0;
 const DEFENSIVE_PANIC_GRACE_TICKS: u32 = 90;
 const DEFENSIVE_PANIC_SUSTAINED_TICKS: u32 = 180;
 const DEFENSIVE_PANIC_SUSTAINED_BARRACKS: usize = 2;
@@ -2227,12 +2227,14 @@ fn rifle_raid_building_fallback_target(
     enemy_base: EnemyBaseFact,
 ) -> Option<u32> {
     let raid_ids: BTreeSet<u32> = raid_units.iter().copied().collect();
-    let radius_px = RIFLE_RAID_BASE_RADIUS_TILES * observation.map.tile_size as f32;
+    let fallback_center =
+        enemy_main_steel_center(observation, enemy_base).unwrap_or((enemy_base.x, enemy_base.y));
+    let radius_px = RIFLE_RAID_STEEL_LINE_RADIUS_TILES * observation.map.tile_size as f32;
     let radius2 = squared(radius_px);
     let raider_ready_to_burn_buildings = observation.owned.iter().any(|entity| {
         raid_ids.contains(&entity.id)
             && !matches!(entity.state, AiEntityState::Move)
-            && dist2(entity.x, entity.y, enemy_base.x, enemy_base.y) <= radius2
+            && dist2(entity.x, entity.y, fallback_center.0, fallback_center.1) <= radius2
     });
     if !raider_ready_to_burn_buildings {
         return None;
@@ -2250,6 +2252,31 @@ fn rifle_raid_building_fallback_target(
                 .then_with(|| left.0.cmp(&right.0))
         })
         .map(|(id, _)| id)
+}
+
+fn enemy_main_steel_center(
+    observation: &AiObservation,
+    enemy_base: EnemyBaseFact,
+) -> Option<(f32, f32)> {
+    let tile_size = observation.map.tile_size as f32;
+    let search_radius_px = (config::IC_RESOURCE_MAX_DIST_TILES + 0.5) * tile_size;
+    let search_radius2 = squared(search_radius_px);
+    let mut sum_x = 0.0;
+    let mut sum_y = 0.0;
+    let mut count = 0usize;
+    for resource in observation
+        .resources
+        .iter()
+        .filter(|r| r.kind == EntityKind::Steel)
+    {
+        if dist2(resource.x, resource.y, enemy_base.x, enemy_base.y) > search_radius2 {
+            continue;
+        }
+        sum_x += resource.x;
+        sum_y += resource.y;
+        count += 1;
+    }
+    (count > 0).then(|| (sum_x / count as f32, sum_y / count as f32))
 }
 
 fn rifle_raid_move_target(observation: &AiObservation, enemy_base: EnemyBaseFact) -> (f32, f32) {
@@ -2600,6 +2627,27 @@ mod tests {
         }
         observation.resources.sort_by_key(|resource| resource.id);
         observation
+    }
+
+    fn with_enemy_main_resources(mut observation: AiObservation) -> AiObservation {
+        observation.resources.extend(base_site_resources(
+            300,
+            enemy_start_tile(&observation),
+            observation.map.width,
+        ));
+        observation.resources.sort_by_key(|resource| resource.id);
+        observation
+    }
+
+    fn enemy_base_fact(observation: &AiObservation) -> EnemyBaseFact {
+        let start_tile = enemy_start_tile(observation);
+        let (x, y) = tile_center(start_tile, observation.map.tile_size);
+        EnemyBaseFact {
+            player_id: 2,
+            start_tile,
+            x,
+            y,
+        }
     }
 
     fn base_site_resources(
@@ -4709,7 +4757,7 @@ mod tests {
     }
 
     #[test]
-    fn rifle_raid_attacks_buildings_after_reaching_enemy_base_without_units() {
+    fn rifle_raid_attacks_buildings_after_reaching_enemy_main_steel_line_without_units() {
         let ts = config::TILE_SIZE as f32;
         let observation = {
             let mut observation = observation(
@@ -4719,11 +4767,18 @@ mod tests {
                     supply_used: 1,
                     supply_cap: 10,
                 },
-                vec![
-                    building(10, EntityKind::IndustrialCenter, Some(0)),
-                    combat_at(30, EntityKind::Rifleman, 49.0 * ts, 49.0 * ts),
-                ],
+                vec![building(10, EntityKind::IndustrialCenter, Some(0))],
             );
+            observation = with_enemy_main_resources(observation);
+            let enemy_base = enemy_base_fact(&observation);
+            let steel_center = enemy_main_steel_center(&observation, enemy_base)
+                .expect("enemy main steel should be present");
+            observation.owned.push(combat_at(
+                30,
+                EntityKind::Rifleman,
+                steel_center.0 + ts,
+                steel_center.1,
+            ));
             observation
                 .visible_enemies
                 .push(enemy(80, EntityKind::Depot, 48.5 * ts, 48.5 * ts));
@@ -4742,6 +4797,46 @@ mod tests {
                 Command::Attack { units, target } if units.as_slice() == [30] && *target == 80
             )
         }));
+    }
+
+    #[test]
+    fn rifle_raid_ignores_buildings_near_enemy_start_before_reaching_main_steel_line() {
+        let ts = config::TILE_SIZE as f32;
+        let observation = {
+            let mut observation = observation(
+                AiEconomy {
+                    steel: 0,
+                    oil: 0,
+                    supply_used: 1,
+                    supply_cap: 10,
+                },
+                vec![
+                    building(10, EntityKind::IndustrialCenter, Some(0)),
+                    combat_at(30, EntityKind::Rifleman, 49.0 * ts, 49.0 * ts),
+                ],
+            );
+            observation = with_enemy_main_resources(observation);
+            observation
+                .visible_enemies
+                .push(enemy(80, EntityKind::Depot, 48.5 * ts, 48.5 * ts));
+            observation
+        };
+
+        let decision = decide(
+            &observation,
+            &RIFLE_FLOOD_FAST,
+            &mut AiDecisionMemory::for_profile(&RIFLE_FLOOD_FAST),
+        );
+
+        assert!(
+            !decision.commands.iter().any(|command| {
+                matches!(
+                    command,
+                    Command::Attack { units, target } if units.as_slice() == [30] && *target == 80
+                )
+            }),
+            "rifle raids should not switch to buildings until they reach the enemy main steel line"
+        );
     }
 
     #[test]
