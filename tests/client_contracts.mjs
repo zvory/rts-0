@@ -10,7 +10,7 @@ import { GameState } from "../client/src/state.js";
 import { Camera } from "../client/src/camera.js";
 import { Fog } from "../client/src/fog.js";
 import { MINING_IC_RANGE_TILES, STATS } from "../client/src/config.js";
-import { playerHasCompletedKind } from "../client/src/hud.js";
+import { formatTankOilUsed, playerHasCompletedKind } from "../client/src/hud.js";
 import { Audio } from "../client/src/audio.js";
 import { machineGunnerHasAudibleTarget } from "../client/src/combat_audio.js";
 import {
@@ -302,6 +302,11 @@ function fakeAudioContext() {
     playerHasCompletedKind(completedTrainingCentre, playerId, KIND.TRAINING_CENTRE),
     "Tank Factory should unlock once the Training Centre is complete",
   );
+  assert(formatTankOilUsed(0.04) === "0.0", "tank oil panel rounds tiny values to tenths");
+  assert(formatTankOilUsed(9.94) === "9.9", "tank oil panel keeps tenths below ten oil");
+  assert(formatTankOilUsed(10.4) === "10", "tank oil panel rounds whole values above ten oil");
+  assert(formatTankOilUsed(-2) === "0.0", "tank oil panel clamps negative values");
+  assert(formatTankOilUsed(Number.NaN) === "0.0", "tank oil panel tolerates missing oilUsed");
 }
 
 // ---------------------------------------------------------------------------

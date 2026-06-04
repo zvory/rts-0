@@ -659,6 +659,19 @@ input[type="text"]:focus {
   color: var(--ink-dim);
   font-variant-numeric: tabular-nums;
 }
+#selected-panel .sel-stat {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  font-size: 12px;
+  color: var(--ink-dim);
+  font-variant-numeric: tabular-nums;
+}
+#selected-panel .sel-stat strong {
+  color: var(--supply);
+  font-weight: 700;
+}
 /* HP read-out / bar inside the selected panel. */
 #selected-panel .sel-hp {
   display: flex;

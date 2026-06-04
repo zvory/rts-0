@@ -594,8 +594,8 @@ once; on `gameOver` show the victory/defeat overlay with the frozen score table.
   from `resourceDeltas` via size/opacity. When a worker is selected and the cursor hovers a
   resource, draw a blue circle on the resource when the nearest completed own Industrial Center
   is inside mining range; draw a red/dashed line to the Industrial Center when too far.
-- Tanks: render `oilUsed` as a compact bottom/belly readout so fuel burn is visible while the
-  tank moves.
+- Tanks: expose `oilUsed` in the bottom selected-entity panel as `Oil Used:` when exactly one tank
+  is selected.
 - Terrain: muted grass/field/mud, rock, and water tiles with deterministic coarse dithering
   so movement is readable and the map has a PlayStation 1-era low-resolution texture feel.
 - Fog: unexplored = 86% dark overlay so terrain remains faintly readable; explored-but-not-visible =
@@ -801,8 +801,8 @@ The server treats every client as potentially hostile. Limits live next to the c
 - **Tank movement oil burn**: tanks consume oil based on distance actually moved, using
   `TANK_OIL_COST_PER_PX`. Fractional movement cost accumulates per tank until whole oil units are
   deducted from the owner's stockpile. The tank also tracks lifetime movement oil as `oilUsed` for
-  the client belly readout. If the owner has zero oil at the start of a movement tick, that tank
-  does not advance; turret/combat behavior still runs through the combat system.
+  the client selected-entity panel. If the owner has zero oil at the start of a movement tick, that
+  tank does not advance; turret/combat behavior still runs through the combat system.
 - **Tank armor facing**: tank and AT-team attacks against tank victims use the victim tank's hull
   `facing` and the attacker's position. Front hits (`<=45°` from the hull direction) deal normal
   damage, side hits (`>45°` and `<=135°`) deal `1.25x`, and rear hits (`>135°`) deal `1.75x`.
