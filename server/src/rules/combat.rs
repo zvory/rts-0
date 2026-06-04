@@ -67,15 +67,22 @@ pub fn prefers_armored_targets(kind: EntityKind) -> bool {
         .unwrap_or(false)
 }
 
-/// Miss probability [0.0, 1.0) for an attack. AP weapons have a high miss rate against small
-/// targets (dispersed infantry) — the shell flies straight through without finding anyone.
+/// Miss probability [0.0, 1.0) for an attack. AT guns have a high miss rate against
+/// infantry-sized targets — the shell flies straight through without finding anyone.
 /// Hits that do connect deal full damage.
 pub fn miss_chance(attacker_kind: EntityKind, victim_kind: EntityKind) -> f32 {
-    if attacker_kind == EntityKind::AtTeam && !is_armored(victim_kind) {
+    if attacker_kind == EntityKind::AtTeam && at_team_miss_target(victim_kind) {
         0.65
     } else {
         0.0
     }
+}
+
+fn at_team_miss_target(kind: EntityKind) -> bool {
+    matches!(
+        kind,
+        EntityKind::Worker | EntityKind::Rifleman | EntityKind::MachineGunner
+    )
 }
 
 /// Applies the AP/armor damage formula. The miss_chance roll is handled at the call site.
@@ -261,6 +268,20 @@ mod tests {
                 "{kind} target priority"
             );
         }
+    }
+
+    #[test]
+    fn at_team_miss_chance_applies_only_to_infantry_sized_targets() {
+        assert_eq!(miss_chance(EntityKind::AtTeam, EntityKind::Worker), 0.65);
+        assert_eq!(miss_chance(EntityKind::AtTeam, EntityKind::Rifleman), 0.65);
+        assert_eq!(
+            miss_chance(EntityKind::AtTeam, EntityKind::MachineGunner),
+            0.65
+        );
+
+        assert_eq!(miss_chance(EntityKind::AtTeam, EntityKind::ScoutCar), 0.0);
+        assert_eq!(miss_chance(EntityKind::AtTeam, EntityKind::AtTeam), 0.0);
+        assert_eq!(miss_chance(EntityKind::AtTeam, EntityKind::Tank), 0.0);
     }
 
     #[test]
