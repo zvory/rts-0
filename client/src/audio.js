@@ -66,6 +66,8 @@ const SPOKEN_CATEGORIES = new Set(["alert", "ui", "unit_voice"]);
 
 /** Multiple of `refDist` beyond which a spatial sound is dropped entirely. */
 const MAX_DIST_MULT = 3;
+/** Extra distance beyond `refDist` is scaled by this before attenuation/muffling. */
+const FAR_DISTANCE_EFFECT_MULT = 2;
 /** Lowpass cutoff at the listener (Hz). */
 const LP_NEAR_HZ = 20000;
 /** Lowpass cutoff at `maxDist` (Hz). Muffled-far cue. */
@@ -438,11 +440,12 @@ export class Audio {
     const d = Math.sqrt(dx * dx + dy * dy);
     const maxDist = MAX_DIST_MULT * refDist;
     if (d > maxDist) return null;
-    const gain = clamp01(refDist / Math.max(d, refDist));
+    const effectiveD = refDist + Math.max(0, d - refDist) * FAR_DISTANCE_EFFECT_MULT;
+    const gain = clamp01(refDist / Math.max(effectiveD, refDist));
     const pan = Math.max(-1, Math.min(1, dx / refDist));
-    const farT = clamp01(d / maxDist);
+    const farT = clamp01(effectiveD / maxDist);
     const lpHz = LP_NEAR_HZ + (LP_FAR_HZ - LP_NEAR_HZ) * farT;
-    const distancePenalty = Math.min(30, (d / refDist) * 10);
+    const distancePenalty = Math.min(30, (effectiveD / refDist) * 10);
     return { gain, pan, lpHz, distance: d, distancePenalty };
   }
 

@@ -1,0 +1,379 @@
+use std::collections::{BTreeMap, BTreeSet};
+
+use super::pending_build::PendingBuildTracker;
+use super::player_view::{
+    footprint_placeable_from_snapshot, is_kind, occupied_tiles_from_snapshot, player_start_world,
+    PlayerView,
+};
+use super::{ATTACK_REISSUE_TICKS, SELFPLAY_ATTACK_STAGE_SUPPRESSION_TICKS, THINK_INTERVAL};
+use crate::game::ai_core::actions::{self, AiActionContext, ResourceAssignmentPolicy, SpendBudget};
+use crate::game::ai_core::decision::{decide_profile, AiDecisionMemory, AiIntent};
+use crate::game::ai_core::facts::AiFacts;
+use crate::game::ai_core::observation::AiObservation;
+use crate::game::ai_core::profiles::{
+    profile_by_id, AiProfile, RIFLE_FLOOD_FULL_SATURATION, RIFLE_FLOOD_FULL_SATURATION_ID,
+};
+use crate::game::ai_shared;
+use crate::game::command::SimCommand as Command;
+use crate::game::entity::EntityKind;
+
+pub(super) trait ScriptedPlayer: Send {
+    fn player_id(&self) -> u32;
+    fn name(&self) -> &'static str;
+    fn commands(&mut self, view: PlayerView<'_>) -> Vec<Command>;
+}
+
+pub(super) struct ProfileBackedScript {
+    player_id: u32,
+    profile: &'static AiProfile,
+    memory: AiDecisionMemory,
+    pending_builds: PendingBuildTracker,
+    staged_units: BTreeSet<u32>,
+    active_attack_units: BTreeMap<u32, u32>,
+    allow_combat_commands: bool,
+    script_name: &'static str,
+}
+
+impl ProfileBackedScript {
+    pub(super) fn new(player_id: u32, profile_id: &'static str) -> Self {
+        Self::with_combat(player_id, profile_id, true, profile_id)
+    }
+
+    pub(super) fn economy_only(player_id: u32) -> Self {
+        Self::with_combat(
+            player_id,
+            RIFLE_FLOOD_FULL_SATURATION_ID,
+            false,
+            "profile-economy",
+        )
+    }
+
+    fn with_combat(
+        player_id: u32,
+        profile_id: &'static str,
+        allow_combat_commands: bool,
+        script_name: &'static str,
+    ) -> Self {
+        let profile = profile_by_id(profile_id).unwrap_or(&RIFLE_FLOOD_FULL_SATURATION);
+        Self {
+            player_id,
+            profile,
+            memory: AiDecisionMemory::for_profile(profile),
+            pending_builds: PendingBuildTracker::default(),
+            staged_units: BTreeSet::new(),
+            active_attack_units: BTreeMap::new(),
+            allow_combat_commands,
+            script_name,
+        }
+    }
+
+    fn should_think(&self, tick: u32) -> bool {
+        tick == 0
+            || tick
+                .wrapping_add(self.player_id)
+                .is_multiple_of(THINK_INTERVAL)
+    }
+}
+
+impl ScriptedPlayer for ProfileBackedScript {
+    fn player_id(&self) -> u32 {
+        self.player_id
+    }
+
+    fn name(&self) -> &'static str {
+        self.script_name
+    }
+
+    fn commands(&mut self, view: PlayerView<'_>) -> Vec<Command> {
+        if !self.should_think(view.tick) {
+            return Vec::new();
+        }
+
+        self.pending_builds.observe(view);
+        let Some(observation) = view.observation(self.pending_builds.intents()) else {
+            return Vec::new();
+        };
+        self.prune_combat_memory(&observation, view.tick);
+
+        let occupied = occupied_tiles_from_snapshot(&view.start.map, view.snapshot);
+        let failed_builds = &self.pending_builds;
+        let decision = decide_profile(
+            &observation,
+            self.profile,
+            &mut self.memory,
+            ai_shared::BuildSearch::default(),
+            |building, tile_x, tile_y| {
+                !failed_builds.failed(building, tile_x, tile_y)
+                    && footprint_placeable_from_snapshot(
+                        &view.start.map,
+                        view.snapshot,
+                        building,
+                        tile_x,
+                        tile_y,
+                        &occupied,
+                    )
+            },
+        );
+        debug_assert_eq!(decision.profile_id, self.profile.id);
+
+        let combat_intent_units = combat_intent_units(&decision.intents);
+        let mut commands =
+            self.filter_repeated_stage_commands(view.tick, &decision.intents, decision.commands);
+        if !self.allow_combat_commands {
+            commands.retain(|command| !is_combat_command(command, &combat_intent_units));
+        }
+        self.pending_builds.record_commands(view.tick, &commands);
+        commands
+    }
+}
+
+fn combat_intent_units(intents: &[AiIntent]) -> BTreeSet<u32> {
+    let mut units = BTreeSet::new();
+    for intent in intents {
+        if let AiIntent::Attack { units: attacking } = intent {
+            units.extend(attacking.iter().copied());
+        }
+    }
+    units
+}
+
+pub(super) fn is_combat_command(command: &Command, combat_intent_units: &BTreeSet<u32>) -> bool {
+    match command {
+        Command::Attack { .. } | Command::AttackMove { .. } => true,
+        Command::Move { units, .. } => units.iter().any(|id| combat_intent_units.contains(id)),
+        Command::Gather { .. }
+        | Command::Build { .. }
+        | Command::Train { .. }
+        | Command::Cancel { .. }
+        | Command::Stop { .. }
+        | Command::SetRally { .. }
+        | Command::Rejected { .. } => false,
+    }
+}
+
+impl ProfileBackedScript {
+    fn prune_combat_memory(&mut self, observation: &AiObservation, tick: u32) {
+        let owned: BTreeSet<u32> = observation.owned.iter().map(|entity| entity.id).collect();
+        self.staged_units.retain(|id| owned.contains(id));
+        let suppress_ticks = self
+            .profile
+            .attack
+            .reissue_cadence_ticks
+            .max(SELFPLAY_ATTACK_STAGE_SUPPRESSION_TICKS);
+        self.active_attack_units.retain(|id, issued| {
+            owned.contains(id) && tick.saturating_sub(*issued) < suppress_ticks
+        });
+    }
+
+    fn filter_repeated_stage_commands(
+        &mut self,
+        tick: u32,
+        intents: &[AiIntent],
+        commands: Vec<Command>,
+    ) -> Vec<Command> {
+        let mut attacking = BTreeSet::new();
+        let mut staging = BTreeSet::new();
+        for intent in intents {
+            match intent {
+                AiIntent::Attack { units } => attacking.extend(units.iter().copied()),
+                AiIntent::Stage { units } => staging.extend(units.iter().copied()),
+                AiIntent::Move { .. }
+                | AiIntent::Build { .. }
+                | AiIntent::Train { .. }
+                | AiIntent::Gather { .. } => {}
+            }
+        }
+        for id in &attacking {
+            self.staged_units.remove(id);
+            self.active_attack_units.insert(*id, tick);
+        }
+        if staging.is_empty() {
+            return commands;
+        }
+
+        let mut filtered = Vec::new();
+        for command in commands {
+            match command {
+                Command::AttackMove { units, x, y }
+                    if units.iter().any(|id| staging.contains(id)) =>
+                {
+                    let fresh: Vec<u32> = units
+                        .into_iter()
+                        .filter(|id| !self.staged_units.contains(id))
+                        .filter(|id| !self.active_attack_units.contains_key(id))
+                        .collect();
+                    self.staged_units.extend(fresh.iter().copied());
+                    if !fresh.is_empty() {
+                        filtered.push(Command::AttackMove { units: fresh, x, y });
+                    }
+                }
+                other => filtered.push(other),
+            }
+        }
+        filtered
+    }
+}
+
+pub(super) struct WorkerRushScript {
+    player_id: u32,
+    target_player_id: u32,
+    last_attack_tick: u32,
+}
+
+// Intentionally retained as special harness coverage: this is an all-in worker pull, not a normal
+// strategy profile. The profile-backed `rifle_flood_fast` covers early rifle pressure separately.
+impl WorkerRushScript {
+    pub(super) fn new(player_id: u32, target_player_id: u32) -> Self {
+        WorkerRushScript {
+            player_id,
+            target_player_id,
+            last_attack_tick: 0,
+        }
+    }
+
+    fn should_think(&self, tick: u32) -> bool {
+        tick == 0
+            || tick
+                .wrapping_add(self.player_id)
+                .is_multiple_of(THINK_INTERVAL)
+    }
+}
+
+impl ScriptedPlayer for WorkerRushScript {
+    fn player_id(&self) -> u32 {
+        self.player_id
+    }
+
+    fn name(&self) -> &'static str {
+        "worker-rush"
+    }
+
+    fn commands(&mut self, view: PlayerView<'_>) -> Vec<Command> {
+        if !self.should_think(view.tick) {
+            return Vec::new();
+        }
+        let workers: Vec<u32> = view
+            .snapshot
+            .entities
+            .iter()
+            .filter(|e| e.owner == view.player_id && is_kind(e, EntityKind::Worker))
+            .map(|e| e.id)
+            .collect();
+        if workers.is_empty() {
+            return Vec::new();
+        }
+        let attack_due = view.tick == 0
+            || view.tick.saturating_sub(self.last_attack_tick) >= ATTACK_REISSUE_TICKS;
+        if !attack_due {
+            return Vec::new();
+        }
+        let Some((x, y)) = player_start_world(view.start, self.target_player_id) else {
+            return Vec::new();
+        };
+        let Some(observation) = view.observation([]) else {
+            return Vec::new();
+        };
+        let facts = AiFacts::from_observation(&observation);
+        let mut actions = AiActionContext::new(
+            &facts,
+            SpendBudget::new(
+                view.snapshot.steel,
+                view.snapshot.oil,
+                view.snapshot.supply_used,
+                view.snapshot.supply_cap,
+            ),
+        );
+        self.last_attack_tick = view.tick;
+        actions::attack_move_units(&mut actions, workers, x, y);
+        actions.into_commands()
+    }
+}
+
+fn assign_steel_workers(
+    observation: &AiObservation,
+    actions: &mut AiActionContext<'_>,
+    initial_gather_sent: bool,
+) {
+    let has_steel = observation
+        .resources
+        .iter()
+        .any(|node| node.kind == EntityKind::Steel && node.remaining > 0);
+    if !has_steel {
+        return;
+    }
+    let latched_nodes: BTreeSet<u32> = observation
+        .owned
+        .iter()
+        .filter_map(|worker| worker.latched_node)
+        .collect();
+    let skipped_workers = BTreeSet::new();
+    actions::assign_workers_to_resource(
+        actions,
+        ResourceAssignmentPolicy {
+            workers: &observation.owned,
+            resources: &observation.resources,
+            resource_kind: EntityKind::Steel,
+            candidate_worker_ids: None,
+            skip_workers: &skipped_workers,
+            pre_reserved_nodes: &latched_nodes,
+            idle_only: initial_gather_sent,
+            allow_latched_reassignment: false,
+            max_assignments: None,
+            max_worker_resource_distance_px: None,
+        },
+    );
+}
+
+pub(super) struct MineOnlyScript {
+    player_id: u32,
+    initial_gather_sent: bool,
+}
+
+impl MineOnlyScript {
+    pub(super) fn new(player_id: u32) -> Self {
+        MineOnlyScript {
+            player_id,
+            initial_gather_sent: false,
+        }
+    }
+
+    fn should_think(&self, tick: u32) -> bool {
+        tick == 0
+            || tick
+                .wrapping_add(self.player_id)
+                .is_multiple_of(THINK_INTERVAL)
+    }
+}
+
+impl ScriptedPlayer for MineOnlyScript {
+    fn player_id(&self) -> u32 {
+        self.player_id
+    }
+
+    fn name(&self) -> &'static str {
+        "mine-only"
+    }
+
+    fn commands(&mut self, view: PlayerView<'_>) -> Vec<Command> {
+        if !self.should_think(view.tick) {
+            return Vec::new();
+        }
+
+        let Some(observation) = view.observation([]) else {
+            return Vec::new();
+        };
+        let facts = AiFacts::from_observation(&observation);
+        let mut actions = AiActionContext::new(
+            &facts,
+            SpendBudget::new(
+                view.snapshot.steel,
+                view.snapshot.oil,
+                view.snapshot.supply_used,
+                view.snapshot.supply_cap,
+            ),
+        );
+        assign_steel_workers(&observation, &mut actions, self.initial_gather_sent);
+        self.initial_gather_sent = true;
+        actions.into_commands()
+    }
+}
