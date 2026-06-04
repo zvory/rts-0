@@ -34,13 +34,14 @@ pub enum EntityKind {
     Barracks,
     TrainingCentre,
     Factory,
+    Steelworks,
     Steel,
     Oil,
 }
 
 impl EntityKind {
     #[cfg(test)]
-    pub const ALL: [EntityKind; 12] = [
+    pub const ALL: [EntityKind; 13] = [
         EntityKind::Worker,
         EntityKind::Rifleman,
         EntityKind::MachineGunner,
@@ -51,6 +52,7 @@ impl EntityKind {
         EntityKind::Barracks,
         EntityKind::TrainingCentre,
         EntityKind::Factory,
+        EntityKind::Steelworks,
         EntityKind::Steel,
         EntityKind::Oil,
     ];
@@ -80,6 +82,7 @@ impl EntityKind {
             EntityKind::Barracks => kinds::BARRACKS,
             EntityKind::TrainingCentre => kinds::TRAINING_CENTRE,
             EntityKind::Factory => kinds::FACTORY,
+            EntityKind::Steelworks => kinds::STEELWORKS,
             EntityKind::Steel => kinds::STEEL,
             EntityKind::Oil => kinds::OIL,
         }
@@ -101,6 +104,7 @@ impl std::str::FromStr for EntityKind {
             kinds::BARRACKS => Ok(EntityKind::Barracks),
             kinds::TRAINING_CENTRE => Ok(EntityKind::TrainingCentre),
             kinds::FACTORY => Ok(EntityKind::Factory),
+            kinds::STEELWORKS => Ok(EntityKind::Steelworks),
             kinds::STEEL => Ok(EntityKind::Steel),
             kinds::OIL => Ok(EntityKind::Oil),
             _ => Err(()),
@@ -1379,6 +1383,10 @@ mod tests {
                 EntityKind::Factory,
                 groups(false, false, true, false, false, false),
             ),
+            (
+                EntityKind::Steelworks,
+                groups(false, false, false, false, false, false),
+            ),
         ];
 
         for (kind, expected) in cases {
@@ -1396,6 +1404,7 @@ mod tests {
             EntityKind::Barracks,
             EntityKind::TrainingCentre,
             EntityKind::Factory,
+            EntityKind::Steelworks,
         ];
 
         for kind in kinds {
