@@ -485,6 +485,10 @@ impl WeaponSetup {
 pub struct ProductionState {
     /// FIFO production queue (front = item being produced).
     pub queue: Vec<ProdItem>,
+    /// Optional rally point (world pixels). When set, freshly produced units receive a move
+    /// order to this point and the producer prefers the spawn exit closest to it. `None` = units
+    /// spawn and idle next to the building (legacy behavior).
+    pub rally_point: Option<(f32, f32)>,
 }
 
 /// Construction progress state. Present only while a building is under construction.
@@ -939,6 +943,19 @@ impl Entity {
 
     pub fn prod_queue_mut(&mut self) -> Option<&mut Vec<ProdItem>> {
         self.production.as_mut().map(|p| &mut p.queue)
+    }
+
+    /// Rally point for a unit-producing building, if one has been set.
+    pub fn rally_point(&self) -> Option<(f32, f32)> {
+        self.production.as_ref().and_then(|p| p.rally_point)
+    }
+
+    /// Set (or clear with `None`) this building's rally point. No-op on entities without a
+    /// production component.
+    pub fn set_rally_point(&mut self, rally: Option<(f32, f32)>) {
+        if let Some(p) = self.production.as_mut() {
+            p.rally_point = rally;
+        }
     }
 
     pub fn under_construction(&self) -> bool {

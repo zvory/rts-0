@@ -22,7 +22,7 @@
 // against the interpolated positions from state so clicks line up with what is drawn.
 
 import { cmd, PASSABLE, isUnit, isBuilding, isResource, KIND } from "./protocol.js";
-import { MINING_IC_RANGE_TILES, STATS } from "./config.js";
+import { MINING_IC_RANGE_TILES, STATS, isProducerBuilding } from "./config.js";
 
 export function footprintValidAgainstEntities(
   entities,
@@ -455,7 +455,20 @@ export class Input {
     }
 
     const ownUnits = this._selectedOwnUnitIds();
-    if (ownUnits.length === 0) return; // nothing own selected -> ignore
+    if (ownUnits.length === 0) {
+      // No units selected: a buildings-only selection sets a rally point on any
+      // unit-producing buildings in it. Units in the selection take priority, so a
+      // mixed selection always moves the units (handled by the branch above).
+      const producers = this._selectedProducerBuildingIds();
+      if (producers.length > 0) {
+        const world = this._worldAt(p.x, p.y);
+        for (const building of producers) {
+          this.net.command(cmd.setRally(building, world.x, world.y));
+        }
+        this.state.addCommandFeedback("move", world.x, world.y);
+      }
+      return;
+    }
 
     const world = this._worldAt(p.x, p.y);
     const target = this._entityAtWorld(world.x, world.y, /*ownPreferred=*/ false);
@@ -511,6 +524,15 @@ export class Input {
     return this.state
       .selectedEntities()
       .filter((e) => e.owner === me && isUnit(e.kind))
+      .map((e) => e.id);
+  }
+
+  /** Ids of currently-selected own unit-producing buildings (eligible for rally points). */
+  _selectedProducerBuildingIds() {
+    const me = this.state.playerId;
+    return this.state
+      .selectedEntities()
+      .filter((e) => e.owner === me && isBuilding(e.kind) && isProducerBuilding(e.kind))
       .map((e) => e.id);
   }
 

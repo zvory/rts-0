@@ -428,7 +428,8 @@ fn command_stats_by_player(
             | WireCommand::Build { .. }
             | WireCommand::Train { .. }
             | WireCommand::Cancel { .. }
-            | WireCommand::Stop { .. } => {}
+            | WireCommand::Stop { .. }
+            | WireCommand::SetRally { .. } => {}
         }
     }
     stats
@@ -1737,6 +1738,7 @@ impl PlayerMilestones {
             | Command::Train { .. }
             | Command::Cancel { .. }
             | Command::Stop { .. }
+            | Command::SetRally { .. }
             | Command::Rejected { .. } => None,
         };
         if let Some(attack_units) = attack_units {
