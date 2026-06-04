@@ -16,6 +16,22 @@ Normalize to −16 LUFS integrated, true-peak ≤ −1 dBTP before shipping. Pla
 
 `category_subject_variant.ext` — e.g. `combat_kar98k_03.mp3`, `units_tank_engine_idle_03.mp3`
 
+## ElevenLabs voice lines — NON-COMMERCIAL ONLY
+
+Generated on ElevenLabs free plan. **Cannot be used in any commercial release.** Must be replaced
+with licensed recordings before any commercial distribution.
+
+| File | Line | Voice | Plan |
+|------|------|-------|------|
+| `alert/alert_under_attack_01.mp3` | "You Are Under Attack" | Commander Brake – Strict & Dominant | ElevenLabs free |
+| `alert/alert_supply_low_01.mp3` | "Build More Supply Depots" | Commander Brake – Strict & Dominant | ElevenLabs free |
+| `alert/alert_steel_low_01.mp3` | "Not Enough Steel" | Commander Brake – Strict & Dominant | ElevenLabs free |
+| `alert/alert_oil_low_01.mp3` | "Not Enough Oil" | Commander Brake – Strict & Dominant | ElevenLabs free |
+| `alert/alert_out_of_range_01.mp3` | "Too Far" | Commander Brake – Strict & Dominant | ElevenLabs free |
+| `ui/ui_victory_01.mp3` | "You Win" | Commander Brake – Strict & Dominant | ElevenLabs free |
+| `ui/ui_defeat_01.mp3` | "You Lose" | Commander Brake – Strict & Dominant | ElevenLabs free |
+| `alert/alert_cannot_build_01.mp3` | "Cannot Build There" | Commander Brake – Strict & Dominant | ElevenLabs free |
+
 ## Current keepers
 
 | File | Role | Source | License |
