@@ -7,7 +7,8 @@ use crate::config;
 use crate::game::entity::{Entity, EntityKind, Order, NEUTRAL};
 use crate::game::map::Map;
 use crate::game::services::geometry::{
-    building_rect_for_entity, circle_intersects_rect, unit_body, CircleBody, RectBody,
+    building_rect_for_entity, circle_intersects_rect, unit_body_for_entity,
+    unit_body_intersects_rect, CircleBody, RectBody, UnitBody,
 };
 use crate::game::services::movement::is_collision_anchored;
 use crate::game::services::occupancy::{building_footprint, Occupancy};
@@ -69,12 +70,11 @@ impl Game {
                 entity_context(&self.map, e)
             );
             if e.is_unit() {
-                let body = unit_body(e.kind, e.pos_x, e.pos_y);
+                let body = unit_body_for_entity(e);
                 assert!(
                     body.is_some(),
-                    "invariant: tick {} unit has invalid body with radius {:.2}; {}",
+                    "invariant: tick {} unit has invalid body; {}",
                     self.tick,
-                    e.radius(),
                     entity_context(&self.map, e)
                 );
             }
@@ -179,17 +179,17 @@ impl Game {
             if is_collision_anchored(e) {
                 continue;
             }
-            if let Some(body) = unit_body(e.kind, e.pos_x, e.pos_y) {
+            if let Some(body) = unit_body_for_entity(e) {
                 for &(building_id, building_kind, rect) in &building_rects {
                     assert!(
-                        !circle_intersects_rect(body, rect),
+                        !unit_body_intersects_rect(body, rect),
                         "invariant: tick {} unit body intersects building footprint; unit={}; building=id={} kind={} {}; collision={}",
                         self.tick,
                         entity_context(&self.map, e),
                         building_id,
                         building_kind,
                         rect_context(&self.map, rect),
-                        circle_rect_collision_context(&self.map, body, rect)
+                        unit_body_rect_collision_context(&self.map, body, rect)
                     );
                 }
             }
@@ -201,7 +201,14 @@ impl Game {
                 continue;
             }
             assert!(
-                standability::unit_static_standable(&self.map, &occ, e.kind, e.pos_x, e.pos_y),
+                standability::unit_static_standable_with_facing(
+                    &self.map,
+                    &occ,
+                    e.kind,
+                    e.pos_x,
+                    e.pos_y,
+                    e.facing()
+                ),
                 "invariant: tick {} unit body is not static-standable; {}",
                 self.tick,
                 entity_context(&self.map, e)
@@ -422,6 +429,26 @@ fn rect_context(map: &Map, rect: RectBody) -> String {
     )
 }
 
+fn unit_body_rect_collision_context(map: &Map, body: UnitBody, rect: RectBody) -> String {
+    match body {
+        UnitBody::Circle(circle) => circle_rect_collision_context(map, circle, rect),
+        UnitBody::OrientedBox(oriented) => {
+            let aabb = UnitBody::OrientedBox(oriented).aabb();
+            format!(
+                "oriented_box_center={} half_len={:.2} half_width={:.2} facing={:.3}rad bounding_aabb=[{:.2},{:.2}]-[{:.2},{:.2}]",
+                location_context(map, oriented.x, oriented.y),
+                oriented.half_len,
+                oriented.half_width,
+                oriented.facing,
+                aabb.min_x,
+                aabb.min_y,
+                aabb.max_x,
+                aabb.max_y
+            )
+        }
+    }
+}
+
 fn circle_rect_collision_context(map: &Map, circle: CircleBody, rect: RectBody) -> String {
     let nearest_x = circle.x.clamp(rect.min_x, rect.max_x);
     let nearest_y = circle.y.clamp(rect.min_y, rect.max_y);
@@ -563,7 +590,10 @@ mod tests {
         assert!(message.contains("world=("));
         assert!(message.contains("tile=("));
         assert!(message.contains("region="));
-        assert!(message.contains("overlap_depth="));
+        assert!(message.contains("oriented_box_center="));
+        assert!(message.contains("half_len="));
+        assert!(message.contains("half_width="));
+        assert!(message.contains("facing="));
     }
 
     #[test]
