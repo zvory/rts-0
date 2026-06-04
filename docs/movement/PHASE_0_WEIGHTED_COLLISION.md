@@ -1,5 +1,7 @@
 # Phase 0 - Weighted Collision and Footing
 
+Status: Done.
+
 Goal: replace symmetric 50/50 unit overlap resolution with resistance-weighted collision while
 preserving the current pass-through worker exceptions.
 
