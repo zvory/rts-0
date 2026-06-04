@@ -1,7 +1,7 @@
 // End-to-end server integration test — no dependencies (uses Node's built-in global
 // WebSocket, Node >= 22). Drives two clients through the full lifecycle and asserts the
 // authoritative pipeline: lobby/host/colors -> ready/canStart -> start (map + per-player
-// payload) -> initial economy -> fog of war -> gather -> train -> disconnect/win.
+// payload) -> initial economy -> fog of war -> gather -> train -> give-up/win.
 //
 // Usage: start the server (`cd server && cargo run`), then `node tests/server_integration.mjs`.
 // Override the endpoint with RTS_WS (default ws://127.0.0.1:8081/ws).
@@ -120,14 +120,16 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const industrialCenter = A.lastSnapshot.entities.find((e) => e.kind === "industrial_center" && e.owner === A.playerId);
   ok(industrialCenter && (industrialCenter.prodKind === "worker" || (industrialCenter.prodQueue || 0) >= 1), `TRAIN: Industrial Center shows production (queue=${industrialCenter?.prodQueue})`);
 
-  B.ws.close();
+  B.send({ t: "giveUp" });
+  const overB = await B.waitFor((m) => m.t === "gameOver", 4000, "B gameOver after giveUp");
+  ok(overB.you === "lost", `GIVE UP: B sees defeat after giving up (you=${overB.you})`);
   const over = await A.waitFor((m) => m.t === "gameOver", 4000, "A gameOver");
-  ok(over.you === "won", `WIN: A wins after B disconnects (you=${over.you})`);
+  ok(over.you === "won", `WIN: A wins after B gives up (you=${over.you})`);
   ok(Array.isArray(over.scores) && over.scores.length === 2, `SCORE: gameOver lists both players (${over.scores?.length})`);
   const aScore = over.scores?.find((s) => s.id === A.playerId);
   const bScore = over.scores?.find((s) => s.id === B.playerId);
   ok(aScore && aScore.unitScore >= 200 && aScore.structureScore >= 200, `SCORE: A has unit/structure value (${aScore?.unitScore}/${aScore?.structureScore})`);
-  ok(bScore && bScore.unitsLost >= 4 && bScore.buildingsLost >= 1, `SCORE: disconnected B losses recorded (${bScore?.unitsLost}/${bScore?.buildingsLost})`);
+  ok(bScore && bScore.unitsLost >= 4 && bScore.buildingsLost >= 1, `SCORE: surrendered B losses recorded (${bScore?.unitsLost}/${bScore?.buildingsLost})`);
 
   A.ws.close();
   await sleep(200);

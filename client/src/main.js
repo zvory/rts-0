@@ -69,6 +69,12 @@ const dom = {
   gameOverText: document.getElementById("game-over-text"),
   gameOverScores: document.getElementById("game-over-scores"),
   gameOverButton: document.getElementById("game-over-button"),
+  settingsButton: document.getElementById("settings-button"),
+  settingsMenu: document.getElementById("settings-menu"),
+  giveUpOpen: document.getElementById("give-up-open"),
+  giveUpConfirm: document.getElementById("give-up-confirm"),
+  giveUpCancel: document.getElementById("give-up-cancel"),
+  giveUpConfirmButton: document.getElementById("give-up-confirm-button"),
   devBanner: document.getElementById("dev-banner"),
   replaySpeed: document.getElementById("replay-speed"),
 };
@@ -349,6 +355,17 @@ function formatScore(value) {
   return Math.trunc(n).toLocaleString();
 }
 
+function isTextEntry(target) {
+  if (!(target instanceof HTMLElement)) return false;
+  const tag = target.tagName;
+  return (
+    tag === "INPUT" ||
+    tag === "TEXTAREA" ||
+    tag === "SELECT" ||
+    target.isContentEditable
+  );
+}
+
 /**
  * One running match. Owns the in-game modules and the render loop, and knows
  * how to dispose of itself so the App can start a brand-new match afterwards.
@@ -364,6 +381,7 @@ class Match {
     this.toast = toast;
     this.devWatch = devWatch;
     this.replaySpeedHandler = null;
+    this.giveUpSent = false;
 
     // --- Build the module graph from the static start payload (DESIGN.md §4.1). ---
     this.state = new GameState(payload);
@@ -398,8 +416,18 @@ class Match {
     // --- Listeners (bound so they can be removed on destroy). ---
     this.onSnapshot = (m) => this.state.applySnapshot(m);
     this.onResize = this.handleResize.bind(this);
+    this.onMenuKeyDown = this.handleMenuKeyDown.bind(this);
+    this.onSettingsClick = this.toggleSettingsMenu.bind(this);
+    this.onGiveUpOpen = this.openGiveUpConfirm.bind(this);
+    this.onGiveUpCancel = this.closeGiveUpConfirm.bind(this);
+    this.onGiveUpConfirm = this.requestGiveUp.bind(this);
     this.net.on(S.SNAPSHOT, this.onSnapshot);
     window.addEventListener("resize", this.onResize);
+    window.addEventListener("keydown", this.onMenuKeyDown, true);
+    dom.settingsButton?.addEventListener("click", this.onSettingsClick);
+    dom.giveUpOpen?.addEventListener("click", this.onGiveUpOpen);
+    dom.giveUpCancel?.addEventListener("click", this.onGiveUpCancel);
+    dom.giveUpConfirmButton?.addEventListener("click", this.onGiveUpConfirm);
 
     this.rafId = requestAnimationFrame(this.tickFn);
 
@@ -419,6 +447,62 @@ class Match {
       };
       dom.replaySpeed.addEventListener("click", this.replaySpeedHandler);
     }
+  }
+
+  handleMenuKeyDown(ev) {
+    if (ev.code !== "Escape" || ev.repeat || isTextEntry(ev.target)) return;
+    if (this.state.placement || this.state.commandTarget) return;
+    ev.preventDefault();
+    ev.stopPropagation();
+    if (dom.giveUpConfirm && !dom.giveUpConfirm.hidden) {
+      this.closeGiveUpConfirm();
+    } else {
+      this.toggleSettingsMenu();
+    }
+  }
+
+  toggleSettingsMenu() {
+    if (!dom.settingsMenu || this.giveUpSent) return;
+    if (dom.giveUpConfirm && !dom.giveUpConfirm.hidden) this.closeGiveUpConfirm();
+    dom.settingsMenu.hidden = !dom.settingsMenu.hidden;
+    dom.settingsButton?.setAttribute("aria-expanded", String(!dom.settingsMenu.hidden));
+  }
+
+  closeSettingsMenu() {
+    if (!dom.settingsMenu) return;
+    dom.settingsMenu.hidden = true;
+    dom.settingsButton?.setAttribute("aria-expanded", "false");
+  }
+
+  openGiveUpConfirm() {
+    if (!dom.giveUpConfirm || this.giveUpSent) return;
+    this.closeSettingsMenu();
+    dom.giveUpConfirm.hidden = false;
+    dom.giveUpConfirmButton?.focus();
+  }
+
+  closeGiveUpConfirm() {
+    if (!dom.giveUpConfirm) return;
+    dom.giveUpConfirm.hidden = true;
+    if (dom.giveUpConfirmButton) {
+      dom.giveUpConfirmButton.disabled = false;
+      dom.giveUpConfirmButton.textContent = "Give up";
+    }
+  }
+
+  closeMenus() {
+    this.closeSettingsMenu();
+    if (dom.giveUpConfirm) dom.giveUpConfirm.hidden = true;
+  }
+
+  requestGiveUp() {
+    if (this.giveUpSent) return;
+    this.giveUpSent = true;
+    if (dom.giveUpConfirmButton) {
+      dom.giveUpConfirmButton.disabled = true;
+      dom.giveUpConfirmButton.textContent = "Giving up...";
+    }
+    this.net.giveUp();
   }
 
   /** Compute world/viewport sizes and push them into the camera. */
@@ -544,6 +628,7 @@ class Match {
   /** Pause the loop (used while the game-over overlay is up). Idempotent. */
   stop() {
     this.running = false;
+    this.closeMenus();
     if (this.rafId !== undefined) {
       cancelAnimationFrame(this.rafId);
       this.rafId = undefined;
@@ -559,6 +644,11 @@ class Match {
     this.stop();
     this.net.off(S.SNAPSHOT, this.onSnapshot);
     window.removeEventListener("resize", this.onResize);
+    window.removeEventListener("keydown", this.onMenuKeyDown, true);
+    dom.settingsButton?.removeEventListener("click", this.onSettingsClick);
+    dom.giveUpOpen?.removeEventListener("click", this.onGiveUpOpen);
+    dom.giveUpCancel?.removeEventListener("click", this.onGiveUpCancel);
+    dom.giveUpConfirmButton?.removeEventListener("click", this.onGiveUpConfirm);
     if (dom.replaySpeed && this.replaySpeedHandler) {
       dom.replaySpeed.removeEventListener("click", this.replaySpeedHandler);
       dom.replaySpeed.hidden = true;

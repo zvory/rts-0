@@ -145,6 +145,11 @@ export class Net {
     this._send(msg.command(cmd));
   }
 
+  /** Give up the active match and request the score screen. */
+  giveUp() {
+    this._send(msg.giveUp());
+  }
+
   /**
    * Send a latency probe stamped with the current high-resolution time. The
    * matching pong is correlated by its echoed `ts` to compute `latency`.

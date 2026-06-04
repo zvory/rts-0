@@ -140,6 +140,14 @@ body {
 .btn.primary:hover:not(:disabled) {
   box-shadow: inset 0 0 0 2px rgba(17, 17, 15, 0.25);
 }
+.btn.danger {
+  border-color: #d28a70;
+  background: var(--bad);
+  color: #fff5ea;
+}
+.btn.danger:hover:not(:disabled) {
+  box-shadow: inset 0 0 0 2px rgba(17, 17, 15, 0.25);
+}
 .btn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
@@ -427,6 +435,7 @@ input[type="text"]:focus {
 #hud,
 #minimap-wrap,
 #selected-panel,
+#game-menu,
 #command-card,
 #toast {
   position: absolute;
@@ -442,6 +451,95 @@ input[type="text"]:focus {
   background: rgba(39, 37, 31, 0.94);
   border: 1px solid var(--panel-edge);
   box-shadow: var(--shadow), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+/* --- Above-card settings menu --- */
+#game-menu {
+  right: 12px;
+  bottom: 273px;
+  z-index: 20;
+  pointer-events: auto;
+}
+#settings-button {
+  appearance: none;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--panel-edge);
+  border-radius: var(--radius-sm);
+  background: rgba(39, 37, 31, 0.94);
+  color: var(--ink);
+  box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  cursor: pointer;
+  font-size: 20px;
+  line-height: 1;
+}
+#settings-button:hover {
+  border-color: var(--accent);
+  box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.4), inset 0 0 0 1px var(--panel-glow);
+}
+#settings-menu {
+  position: absolute;
+  right: 0;
+  bottom: 44px;
+  min-width: 152px;
+  padding: 8px;
+}
+#settings-menu button {
+  appearance: none;
+  width: 100%;
+  min-height: 36px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-align: left;
+  padding: 8px 10px;
+}
+#settings-menu button:hover {
+  border-color: #d28a70;
+  background: rgba(182, 74, 63, 0.18);
+  color: #fff5ea;
+}
+
+/* --- Give-up confirmation --- */
+#give-up-confirm {
+  position: absolute;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  background: rgba(17, 17, 15, 0.55);
+  pointer-events: auto;
+}
+.give-up-box {
+  width: min(380px, calc(100vw - 32px));
+  padding: 22px;
+  border: 1px solid var(--panel-edge);
+  border-radius: var(--radius);
+  background: rgba(39, 37, 31, 0.98);
+  box-shadow: var(--shadow), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+.give-up-box h2 {
+  margin: 0 0 8px;
+  color: var(--ink);
+  font-size: 24px;
+  letter-spacing: 0;
+}
+.give-up-box p {
+  margin: 0 0 18px;
+  color: var(--ink-dim);
+  line-height: 1.45;
+}
+.give-up-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
 }
 
 /* --- Top resource bar --- */
@@ -909,6 +1007,9 @@ input[type="text"]:focus {
     grid-auto-rows: 64px;
     gap: 8px;
     padding: 11px;
+  }
+  #game-menu {
+    bottom: 250px;
   }
   .cmd-btn .cmd-icon {
     font-size: 20px;

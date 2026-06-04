@@ -74,6 +74,8 @@ pub enum ClientMessage {
     SetQuickstart { enabled: bool },
     /// Issue a gameplay command (ignored unless in-game).
     Command { cmd: Command },
+    /// Give up the current match, removing this player's army and showing the score screen.
+    GiveUp,
     /// Latency probe.
     Ping { ts: f64 },
     /// Set replay playback speed multiplier (replay rooms only; ignored elsewhere).
