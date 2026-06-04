@@ -704,7 +704,7 @@ authoritative `rules::defs` records.
   `server/assets/maps/default-handcrafted.json` (96×96 today), served for tooling at
   `/maps/default-handcrafted.json`.
   Its JSON uses row strings (`.` grass, `#` rock, `~` water) plus ordered `baseSites`.
-- Start: `STARTING_STEEL = 50`, `STARTING_OIL = 0`, `STARTING_WORKERS = 4`,
+- Start: `STARTING_STEEL = 75`, `STARTING_OIL = 0`, `STARTING_WORKERS = 4`,
   one Industrial Center at the player's start tile, 18 steel patches + 3 oil patches nearby.
 - Supply: Industrial Center gives `+10`, Depot gives `+8`, hard cap `200`.
 - Attached mining: workers walk to a patch, latch onto it, and mine in place.
@@ -735,11 +735,11 @@ Unit stats (hp, dmg, range[tiles], cooldown[ticks], speed[px/tick], sight[tiles]
 
 | kind            | hp  | dmg | range | cd | speed | sight | steel | oil | sup | buildTicks |
 |-----------------|-----|-----|-------|----|-------|-------|-----|-----|-----|-----------|
-| worker          | 40  | 4   | 1     | 12 | 1.6   | 7     | 50  | 0   | 1   | 240 (~8s) |
-| rifleman        | 45  | 5   | 4     | 8  | 1.6   | 8     | 50  | 0   | 1   | 300 (~10s) |
-| machine_gunner  | 55  | 4   | 5     | 3  | 1.28  | 8     | 75  | 25  | 2   | 400 (~13s) |
-| at_team         | 45  | 48  | 5     | 48 | 1.28  | 8     | 75  | 25  | 2   | 440 (~15s) |
-| tank            | 390 | 60  | 3     | 36 | 2.0   | 7     | 200 | 100 | 6   | 500 (~17s) |
+| worker          | 40  | 4   | 1     | 24 | 1.6   | 7     | 50  | 0   | 1   | 360 (~12s) |
+| rifleman        | 45  | 5   | 4     | 16 | 1.6   | 8     | 50  | 0   | 1   | 300 (~10s) |
+| machine_gunner  | 55  | 4   | 5     | 6  | 1.28  | 8     | 75  | 25  | 2   | 400 (~13s) |
+| at_team         | 45  | 48  | 5     | 72 | 1.28  | 8     | 75  | 25  | 2   | 440 (~15s) |
+| tank            | 390 | 60  | 3     | 72 | 2.0   | 7     | 200 | 150 | 6   | 750 (~25s) |
 
 Building stats (hp, sight, cost, footprint tiles wxh, buildTicks, extra):
 
@@ -804,14 +804,23 @@ The server treats every client as potentially hostile. Limits live next to the c
   and **AT teams** punch deeper, carrying 50% of their weapon range past the primary target.
   Stone blocks target acquisition, primary fire, and overpenetration.
 - **Tank body and weapon facing**: the snapshot `facing` field is the tank hull/body angle. Tanks
-  rotate that body angle at a bounded rate on movement paths; badly misaligned tanks pivot in
-  place instead of sliding sideways at full speed. Tank hull movement intent uses a long route
-  lookahead, but the desired facing point is bounded to the current statically legal route segment
-  unless a farther waypoint is also reachable by `standability::unit_static_segment_standable` from
-  the tank's current position; local steering and collision displacement do not become hull intent.
-  Static terrain/building legality uses the oriented hull rather than the conservative circular
-  radius, so a lengthwise tank still fits through a 2-tile-wide straight corridor while front/rear
-  and side clearance near blockers match the hull shape.
+  rotate that body angle at a bounded rate (`TANK_BODY_TURN_RATE_RAD_PER_TICK = 0.035`) on
+  movement paths; badly misaligned tanks pivot in place instead of sliding sideways at full speed.
+  The current locomotion model is stateless per tick: it does not store velocity or acceleration,
+  but it does brake by scaling the tick movement budget for hull misalignment, frontal traffic, and
+  oil starvation. Tank hull movement intent uses a 5-tile route lookahead, but the desired facing
+  point is bounded to the current statically legal route segment unless a farther waypoint is also
+  reachable by `standability::unit_static_segment_standable` from the tank's current position;
+  local steering and collision displacement do not become hull intent. Static terrain/building
+  legality uses the oriented `42px` by `24px` hull plus `1.5px` clearance rather than the
+  conservative circular radius, so a lengthwise tank still fits through a 2-tile-wide straight
+  corridor while front/rear and side clearance near blockers match the hull shape.
+  A tank reverses toward a nearby goal within 3 tiles when that goal is more than 90 degrees behind
+  the hull; farther behind goals make it pivot first. Alignment error at or below `0.55` radians
+  keeps full drive speed, error at or above `1.25` radians pivots with no translation, and values
+  between those thresholds linearly reduce throttle. Frontal traffic within 2 tiles can reduce
+  throttle and add a bounded `0.28` radian turn bias toward open space, but does not inject a
+  perpendicular sidestep waypoint.
   The snapshot `weaponFacing` field is the independent turret/barrel angle. Tank combat rotates the
   turret toward the target at a bounded rate and fires only once the turret is within tolerance; the
   hull does not need to face the target. Tanks do not clear their movement path when they fire, so
