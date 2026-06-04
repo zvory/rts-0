@@ -929,6 +929,11 @@ becomes affordable, the AI places the barracks near that worker's current positi
 waiting for the ideal edge point; if it can afford the barracks immediately, it uses the hidden
 edge target as the build site. It trains only one extra home worker and attack-moves riflemen as
 individual pressure units instead of waiting for escalating waves.
+`rifle_flood_full_saturation` saturates the observed main-base steel line before assigning oil
+workers, so the oil timing follows the map's current steel patch count instead of a hardcoded worker
+number. At 50 supply it independently pivots into the tank tech path and becomes eligible to expand
+off a completed Training Centre instead of waiting for a finished Tank Factory; expansion site
+selection prefers oil coverage before extra steel output.
 `tech_to_tanks` is a steel-first fast-tech profile: it keeps worker production active while saving
 for the tank-factory step, delays oil workers until at least eight workers are already mining steel,
 uses ready combat units to clear visible threats in its home resource line before attacking out,
