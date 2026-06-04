@@ -70,6 +70,32 @@ the snapshot tick:
 
 `Event::Build` resolves via `id`; same fallback rule.
 
+## Combat SFX wiring (the phase-1 gap)
+
+Phase 1 ships silent combat. Phase 2 fixes that by routing `Event::Attack` to a per-attacker-kind
+sound through the spatial graph above. Initial mapping (assets already on disk):
+
+| Attacker kind                                       | Sound id           | Asset                                                                   |
+|-----------------------------------------------------|--------------------|-------------------------------------------------------------------------|
+| `tank`                                              | `combat_tank`      | `combat/combat_tank_cannon_01.mp3` (+ `_06` variant)                    |
+| `rifleman`, `at_team`                               | `combat_rifle`     | `combat/combat_kar98k_02.mp3`, `combat_kar98k_03.mp3` (variants)        |
+| `machine_gunner`                                    | `combat_mg_burst`  | `combat/combat_mg42_burst_02.mp3`, `combat_mg42_burst_03.mp3` (variants)|
+
+Notes:
+
+- Pick a variant per shot via the seeded RNG (one of N) — prevents the "machine gun" feel of
+  identical samples stacking.
+- Category split: shots whose `from` entity is owned by the local player use `combat_self`; all
+  other shots use `combat_other`. The phase-1 settings UI already exposes a combined Combat slider
+  bound to both.
+- Tank cannon and AT-team shots get higher base priority than rifle/MG shots (heavier weapons cut
+  through dense fights). Final values are tuned in phase 3.
+- `combat_kar98k_03_with_bolt_action.mp3` is **not** used: the bolt-action recovery should be a
+  separate per-shooter cooldown sound, not chained to every shot. Defer to phase 4 polish.
+
+If any attacker kind is missing from the table (e.g. a new unit added later), fall back to
+`combat_rifle` and log once per session so we notice.
+
 ## Tests
 
 - Extend the audio stub to capture `(pan, gain, lpHz)` per play; assert distance/pan math.
