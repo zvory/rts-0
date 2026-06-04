@@ -372,7 +372,29 @@ pub enum Event {
     },
     Notice {
         msg: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        x: Option<f32>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        y: Option<f32>,
+        #[serde(default, skip_serializing_if = "NoticeSeverity::is_info")]
+        severity: NoticeSeverity,
     },
+}
+
+/// Notice urgency. Alerts are allowed to cut through the mix and drive minimap pings.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "camelCase")]
+pub enum NoticeSeverity {
+    #[default]
+    Info,
+    Warn,
+    Alert,
+}
+
+impl NoticeSeverity {
+    fn is_info(&self) -> bool {
+        matches!(self, NoticeSeverity::Info)
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -570,10 +592,30 @@ impl Serialize for CompactEvent<'_> {
                 seq.serialize_element(&kind_code(kind))?;
                 seq.end()
             }
-            Event::Notice { msg } => {
-                let mut seq = serializer.serialize_seq(Some(2))?;
+            Event::Notice {
+                msg,
+                x,
+                y,
+                severity,
+            } => {
+                let has_position = x.is_some() && y.is_some();
+                let len = if has_position {
+                    5
+                } else if !severity.is_info() {
+                    3
+                } else {
+                    2
+                };
+                let mut seq = serializer.serialize_seq(Some(len))?;
                 seq.serialize_element(&4u8)?;
                 seq.serialize_element(msg)?;
+                if len > 2 {
+                    seq.serialize_element(&notice_severity_code(*severity))?;
+                }
+                if len > 3 {
+                    seq.serialize_element(x)?;
+                    seq.serialize_element(y)?;
+                }
                 seq.end()
             }
         }
@@ -619,6 +661,14 @@ fn setup_state_code(setup_state: &str) -> u8 {
         "deployed" => 3,
         "tearing_down" => 4,
         _ => 255,
+    }
+}
+
+fn notice_severity_code(severity: NoticeSeverity) -> u8 {
+    match severity {
+        NoticeSeverity::Info => 1,
+        NoticeSeverity::Warn => 2,
+        NoticeSeverity::Alert => 3,
     }
 }
 
@@ -687,6 +737,9 @@ mod tests {
                 },
                 Event::Notice {
                     msg: "Not enough steel".to_string(),
+                    x: None,
+                    y: None,
+                    severity: NoticeSeverity::Info,
                 },
             ],
         }
