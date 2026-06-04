@@ -794,9 +794,14 @@ impl RoomTask {
         };
         let seed = match_seed();
         let game = if self.quickstart {
-            Game::new_with_starting_resources(&inits, starting_steel, starting_oil, seed)
+            Game::new_with_starting_resources_and_random_ai_profiles(
+                &inits,
+                starting_steel,
+                starting_oil,
+                seed,
+            )
         } else {
-            Game::new(&inits, seed)
+            Game::new_with_random_ai_profiles(&inits, seed)
         };
         let payload = game.start_payload();
         self.match_player_count = inits.len();
