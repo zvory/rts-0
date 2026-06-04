@@ -290,7 +290,7 @@
       <div class="size-row">
         <label>
           Size
-          <input id="map-size" type="number" min="24" max="160" step="1" value="96" />
+          <input id="map-size" type="number" min="24" max="160" step="1" value="126" />
         </label>
         <button id="resize-map" type="button">Resize</button>
       </div>
@@ -365,7 +365,7 @@
 
       const fallbackMap = () => ({
         name: "blank-handcrafted",
-        terrain: Array.from({ length: 96 }, () => ".".repeat(96)),
+        terrain: Array.from({ length: 126 }, () => ".".repeat(126)),
         baseSites: [
           { x: 10, y: 10 },
           { x: 85, y: 85 },
