@@ -625,14 +625,14 @@ keeps the ordinary renderer/minimap/HUD pointed at full-world snapshots with `pl
   from `resourceDeltas` via size/opacity. When a worker is selected and the cursor hovers a
   resource, draw a blue circle on the resource when the nearest completed own City Centre
   is inside mining range; draw a red/dashed line to the City Centre when too far.
-- Tanks: render the hull from mirrored client `TANK_BODY` constants (`42px` length, `24px` width,
+- Tanks: render the hull from mirrored client `TANK_BODY` constants (`50.4px` length, `28.8px` width,
   `1.5px` clearance) so the visible body, selection ring, click target, and advisory build
   preview match the server's oriented vehicle body. Track tread offsets advance from actual
   interpolated movement and hull turn deltas: both tracks forward/backward for drive/reverse and
   opposite track motion for pivot turns. Own tanks show a small amber/red fuel cue when oil is low
   or movement is oil-starved; the selected-entity panel also exposes lifetime movement `oilUsed`
   as `Oil Used:` when exactly one tank is selected.
-- Scout cars render from mirrored client `SCOUT_CAR_BODY` constants (`51px` length, `27px` width,
+- Scout cars render from mirrored client `SCOUT_CAR_BODY` constants (`40.8px` length, `21.6px` width,
   `1px` clearance), matching the authoritative oriented vehicle body used for collision and
   click targeting.
 - Terrain: muted grass/field/mud, rock, and water tiles with deterministic coarse dithering
@@ -837,7 +837,7 @@ The server treats every client as potentially hostile. Limits live next to the c
   point is bounded to the current statically legal route segment unless a farther waypoint is also
   reachable by `standability::unit_static_segment_standable` from the tank's current position;
   local steering and collision displacement do not become hull intent. Static terrain/building
-  legality uses the oriented `42px` by `24px` hull plus `1.5px` clearance rather than the
+  legality uses the oriented `50.4px` by `28.8px` hull plus `1.5px` clearance rather than the
   conservative circular radius, so a lengthwise tank still fits through a 2-tile-wide straight
   corridor while front/rear and side clearance near blockers match the hull shape.
   A tank reverses toward a nearby goal within 3 tiles when that goal is more than 90 degrees behind
