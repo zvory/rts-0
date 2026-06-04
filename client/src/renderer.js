@@ -42,11 +42,12 @@ const SWEEP_EVICT_FRAMES = 120;
 // transition reads smoothly between snapshots.
 const MACHINE_GUNNER_ANIM_MS = 1000;
 const WEAPON_RECOIL_PX = {
-  [KIND.RIFLEMAN]: 3.2,
-  [KIND.MACHINE_GUNNER]: 4.0,
-  [KIND.AT_TEAM]: 5.2,
-  [KIND.TANK]: 6.5,
+  [KIND.RIFLEMAN]: 8.0,
+  [KIND.MACHINE_GUNNER]: 5.5,
+  [KIND.AT_TEAM]: 13.0,
+  [KIND.TANK]: 9.0,
 };
+const ZERO_OFFSET = Object.freeze({ x: 0, y: 0 });
 
 // Layer names in back-to-front draw order. Index in this array == child index in `world`.
 const LAYERS = [
@@ -431,18 +432,22 @@ export class Renderer {
     const tint = this._tintFor(e.owner, colorByOwner);
     const facing = typeof e.facing === "number" ? e.facing : 0;
     const weaponFacing = typeof e.weaponFacing === "number" ? e.weaponFacing : facing;
-    const recoil = typeof state.weaponRecoil === "function"
-      ? weaponRecoilOffset(e.kind, state.weaponRecoil(e.id, performance.now()))
+    const recoilProgress = typeof state.weaponRecoil === "function"
+      ? state.weaponRecoil(e.id, e.kind, performance.now())
       : 0;
+    const recoil = weaponRecoilOffset(e.kind, recoilProgress);
+    const tankKick = e.kind === KIND.TANK
+      ? recoilVector(weaponFacing, recoil * 0.85)
+      : ZERO_OFFSET;
 
     // Shadow on its own layer (under all units).
     const sh = this._slot("unitShadows", e.id);
-    sh.position.set(e.x, e.y);
+    sh.position.set(e.x + tankKick.x, e.y + tankKick.y);
     this._shadow(sh, 0, 0, e.kind === KIND.TANK ? tankBodyVisual(stat).shadowRadius : r);
 
     // Body on the unit layer.
     const g = this._slot("units", e.id);
-    g.position.set(e.x, e.y);
+    g.position.set(e.x + tankKick.x, e.y + tankKick.y);
     g.lineStyle(2, 0x1a1712, 0.95);
 
     if (e.kind === KIND.RIFLEMAN || e.kind === KIND.MACHINE_GUNNER || e.kind === KIND.AT_TEAM) {
@@ -1329,6 +1334,14 @@ function polar(a, d) {
   return { x: Math.cos(a) * d, y: Math.sin(a) * d };
 }
 
+function recoilVector(a, d) {
+  return d > 0 ? polar(a + Math.PI, d) : ZERO_OFFSET;
+}
+
+function offsetPoint(p, offset) {
+  return { x: p.x + offset.x, y: p.y + offset.y };
+}
+
 function rotatePoint(x, y, a) {
   const c = Math.cos(a);
   const s = Math.sin(a);
@@ -1345,6 +1358,10 @@ function rotatedPolygon(points, a) {
 }
 
 function drawRotatedRect(g, cx, cy, w, h, a) {
+  drawRotatedRectOffset(g, cx, cy, w, h, a, ZERO_OFFSET);
+}
+
+function drawRotatedRectOffset(g, cx, cy, w, h, a, offset) {
   const hw = w / 2;
   const hh = h / 2;
   const corners = [
@@ -1356,7 +1373,7 @@ function drawRotatedRect(g, cx, cy, w, h, a) {
   const polygon = [];
   for (const [x, y] of corners) {
     const p = rotatePoint(x, y, a);
-    polygon.push(p.x, p.y);
+    polygon.push(p.x + offset.x, p.y + offset.y);
   }
   g.drawPolygon(polygon);
 }
@@ -1496,9 +1513,10 @@ function drawInfantryBase(g, r, tint, facing) {
 
 function drawInfantryRifle(g, r, facing, recoil) {
   const a = facing - 0.2;
-  const stock = polar(a + Math.PI, r * 0.18 + recoil);
-  const muzzle = polar(a, Math.max(r * 0.9, r * 1.82 - recoil));
-  const hand = polar(a, Math.max(r * 0.25, r * 0.55 - recoil));
+  const kick = recoilVector(a, recoil);
+  const stock = offsetPoint(polar(a + Math.PI, r * 0.18), kick);
+  const muzzle = offsetPoint(polar(a, r * 1.82), kick);
+  const hand = offsetPoint(polar(a, r * 0.55), kick);
 
   g.lineStyle(3, 0x2a2119, 0.96);
   g.moveTo(stock.x, stock.y);
@@ -1510,19 +1528,24 @@ function drawInfantryRifle(g, r, facing, recoil) {
 
 function drawInfantryPanzerfaust(g, r, facing, recoil) {
   const a = facing - 0.12;
-  const rear = polar(a + Math.PI, r * 0.42 + recoil);
-  const muzzle = polar(a, Math.max(r * 1.1, r * 2.05 - recoil));
-  const warhead = polar(a, Math.max(r * 0.85, r * 1.55 - recoil));
+  const kick = recoilVector(a, recoil);
+  const rearDist = r * 0.42;
+  const muzzleDist = r * 2.05;
+  const warheadDist = r * 1.55;
+  const rear = offsetPoint(polar(a + Math.PI, rearDist), kick);
+  const muzzle = offsetPoint(polar(a, muzzleDist), kick);
+  const warhead = polar(a, warheadDist);
+  const rearBlock = polar(a + Math.PI, rearDist);
 
   g.lineStyle(5, 0x2a2119, 0.98);
   g.moveTo(rear.x, rear.y);
   g.lineTo(muzzle.x, muzzle.y);
 
   g.beginFill(0x3d3528, 0.98);
-  drawRotatedRect(g, warhead.x, warhead.y, r * 0.52, r * 0.62, a);
+  drawRotatedRectOffset(g, warhead.x, warhead.y, r * 0.52, r * 0.62, a, kick);
   g.endFill();
   g.beginFill(0xd8d0b0, 0.88);
-  drawRotatedRect(g, rear.x, rear.y, r * 0.34, r * 0.48, a);
+  drawRotatedRectOffset(g, rearBlock.x, rearBlock.y, r * 0.34, r * 0.48, a, kick);
   g.endFill();
 }
 
@@ -1531,56 +1554,65 @@ function drawInfantryMachineGun(g, r, facing, weaponFacing, setup, recoil) {
   const carryA = facing + 0.86;
   const aimA = weaponFacing;
   const a = angleLerp(carryA, aimA, smoothstep01(deploy));
-  const stockRearDist = lerp(r * 0.76, r * 0.58, deploy) + recoil;
-  const muzzleDist = Math.max(r * 0.92, lerp(r * 1.36, r * 2.46, deploy) - recoil);
-  const stockRear = polar(a + Math.PI, stockRearDist);
-  const muzzle = polar(a, muzzleDist);
+  const kick = recoilVector(a, recoil);
+  const stockRearDist = lerp(r * 0.76, r * 0.58, deploy);
+  const muzzleDist = lerp(r * 1.36, r * 2.46, deploy);
+  const stockRear = offsetPoint(polar(a + Math.PI, stockRearDist), kick);
+  const muzzle = offsetPoint(polar(a, muzzleDist), kick);
 
   // MG42-inspired profile: shoulder stock, box receiver, long perforated shroud, no rotary barrels.
   g.lineStyle(3, 0x17130f, 0.98);
   g.moveTo(stockRear.x, stockRear.y);
   g.lineTo(muzzle.x, muzzle.y);
 
-  const stockCenterX = lerp(-r * 0.42, -r * 0.28, deploy) - recoil;
+  const stockCenterX = lerp(-r * 0.42, -r * 0.28, deploy);
   g.beginFill(0x4a3420, 0.96);
-  drawRotatedRect(g, stockCenterX, 0, r * 0.62, r * 0.38, a);
+  drawRotatedRectOffset(g, stockCenterX, 0, r * 0.62, r * 0.38, a, kick);
   g.endFill();
 
-  const receiverX = lerp(r * 0.04, r * 0.2, deploy) - recoil;
+  const receiverX = lerp(r * 0.04, r * 0.2, deploy);
   g.beginFill(0x32291f, 0.98);
-  drawRotatedRect(g, receiverX, 0, r * 0.72, r * 0.48, a);
+  drawRotatedRectOffset(g, receiverX, 0, r * 0.72, r * 0.48, a, kick);
   g.endFill();
 
   g.beginFill(0xd8d0b0, 0.82);
-  drawRotatedRect(g, receiverX + r * 0.08, -r * 0.2, r * 0.56, r * 0.12, a);
+  drawRotatedRectOffset(g, receiverX + r * 0.08, -r * 0.2, r * 0.56, r * 0.12, a, kick);
   g.endFill();
 
-  const shroudX = lerp(r * 0.62, r * 1.08, deploy) - recoil;
+  const shroudX = lerp(r * 0.62, r * 1.08, deploy);
   const shroudW = lerp(r * 0.72, r * 1.22, deploy);
   g.beginFill(0x241d17, 0.98);
-  drawRotatedRect(g, shroudX, 0, shroudW, r * 0.24, a);
+  drawRotatedRectOffset(g, shroudX, 0, shroudW, r * 0.24, a, kick);
   g.endFill();
 
   g.beginFill(0xd8d0b0, 0.72);
   const slotCount = deploy > 0.55 ? 4 : 3;
   for (let i = 0; i < slotCount; i += 1) {
     const t = slotCount === 1 ? 0.5 : i / (slotCount - 1);
-    drawRotatedRect(g, shroudX - shroudW * 0.3 + shroudW * 0.6 * t, 0, r * 0.09, r * 0.14, a);
+    drawRotatedRectOffset(
+      g,
+      shroudX - shroudW * 0.3 + shroudW * 0.6 * t,
+      0,
+      r * 0.09,
+      r * 0.14,
+      a,
+      kick,
+    );
   }
   g.endFill();
 
-  const muzzleBase = polar(a, muzzleDist - r * 0.18);
+  const muzzleBase = offsetPoint(polar(a, muzzleDist - r * 0.18), kick);
   g.lineStyle(2, 0xd8d0b0, 0.78);
   g.moveTo(muzzleBase.x - Math.sin(a) * r * 0.22, muzzleBase.y + Math.cos(a) * r * 0.22);
   g.lineTo(muzzleBase.x + Math.sin(a) * r * 0.22, muzzleBase.y - Math.cos(a) * r * 0.22);
 
-  const grip = polar(a + Math.PI, r * 0.02);
+  const grip = offsetPoint(polar(a + Math.PI, r * 0.02), kick);
   g.lineStyle(3, 0xd8d0b0, 0.86);
   g.moveTo(grip.x - Math.sin(a) * r * 0.34, grip.y + Math.cos(a) * r * 0.34);
   g.lineTo(grip.x + Math.sin(a) * r * 0.34, grip.y - Math.cos(a) * r * 0.34);
 
   if (deploy > 0.02) {
-    const bipodRoot = polar(a, lerp(r * 0.9, r * 1.72, deploy));
+    const bipodRoot = offsetPoint(polar(a, lerp(r * 0.9, r * 1.72, deploy)), kick);
     const legLen = r * lerp(0.38, 1.0, deploy);
     const spread = lerp(0.32, 0.72, deploy);
     const left = {
@@ -1600,7 +1632,7 @@ function drawInfantryMachineGun(g, r, facing, weaponFacing, setup, recoil) {
 
   if (setup.barrel || deploy > 0.75) {
     g.beginFill(0x241d17, 0.96);
-    drawRotatedRect(g, muzzleDist, 0, r * 0.22, r * 0.16, a);
+    drawRotatedRectOffset(g, muzzleDist, 0, r * 0.22, r * 0.16, a, kick);
     g.endFill();
   }
 }
