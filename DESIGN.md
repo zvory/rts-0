@@ -599,8 +599,8 @@ once; on `gameOver` show the victory/defeat overlay with the frozen score table.
 - Units: low-detail hard-edged silhouettes tinted by player color, with a dark drop shadow,
   dark outline, HP bar above when damaged/selected, and glowing selection ring when selected.
   Distinct silhouette per kind (engineer: compact block; rifleman / machine gunner / AT team:
-  shared infantry body with oversized role weapons; scout car: light wheeled vehicle with a rear
-  gunner; tank: chunky flat-shaded armor). Riflemen carry a rifle, AT teams carry a large
+  shared infantry body with oversized role weapons; scout car: boxy WW2-style truck silhouette
+  with enclosed wheels and a rear-top machine-gunner; tank: chunky flat-shaded armor). Riflemen carry a rifle, AT teams carry a large
   panzerfaust-style launcher, and machine gunners carry an MG42-style long machine gun across the
   body while packed that extends forward with bracing during setup/deployment.
 - Buildings: footprint-sized blocky field structures with neutral geometry and plain
@@ -617,6 +617,9 @@ once; on `gameOver` show the victory/defeat overlay with the frozen score table.
   opposite track motion for pivot turns. Own tanks show a small amber/red fuel cue when oil is low
   or movement is oil-starved; the selected-entity panel also exposes lifetime movement `oilUsed`
   as `Oil Used:` when exactly one tank is selected.
+- Scout cars render from mirrored client `SCOUT_CAR_BODY` constants (`51px` length, `27px` width,
+  `1px` clearance), matching the authoritative oriented vehicle body used for collision and
+  click targeting.
 - Terrain: muted grass/field/mud, rock, and water tiles with deterministic coarse dithering
   so movement is readable and the map has a PlayStation 1-era low-resolution texture feel.
 - Fog: unexplored = 86% dark overlay so terrain remains faintly readable; explored-but-not-visible =
