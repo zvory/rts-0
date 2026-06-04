@@ -9,6 +9,22 @@
 import { RESOURCE_AMOUNTS } from "./config.js";
 import { KIND, PASSABLE, isResource } from "./protocol.js";
 
+const TWO_PI = Math.PI * 2;
+
+function normalizeAngle(a) {
+  let out = (a + Math.PI) % TWO_PI;
+  if (out < 0) out += TWO_PI;
+  return out - Math.PI;
+}
+
+function shortestAngleDelta(from, to) {
+  return normalizeAngle(to - from);
+}
+
+function lerpAngle(from, to, t) {
+  return normalizeAngle(from + shortestAngleDelta(from, to) * t);
+}
+
 export class GameState {
   /**
    * @param {object} startInfo the §2.3 `start` payload.
@@ -167,11 +183,15 @@ export class GameState {
     for (const e of this._cur.entities || []) {
       const prior = this._prevById.get(e.id);
       if (prior) {
-        out.push({
+        const next = {
           ...e,
           x: prior.x + (e.x - prior.x) * t,
           y: prior.y + (e.y - prior.y) * t,
-        });
+        };
+        if (typeof prior.facing === "number" && typeof e.facing === "number") {
+          next.facing = lerpAngle(prior.facing, e.facing, t);
+        }
+        out.push(next);
       } else {
         // No previous sample: render at the current position (a shallow copy
         // keeps callers from mutating the live snapshot entity).
