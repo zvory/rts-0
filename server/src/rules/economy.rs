@@ -107,6 +107,20 @@ mod tests {
             &[EntityKind::TrainingCentre]
         ));
 
+        assert!(!build_requirement_met(EntityKind::TrainingCentre, &[]));
+        assert!(!build_requirement_met(
+            EntityKind::TrainingCentre,
+            &[EntityKind::IndustrialCenter]
+        ));
+        assert!(!build_requirement_met(
+            EntityKind::TrainingCentre,
+            &[EntityKind::Barracks]
+        ));
+        assert!(build_requirement_met(
+            EntityKind::TrainingCentre,
+            &[EntityKind::IndustrialCenter, EntityKind::Barracks]
+        ));
+
         assert!(!build_requirement_met(EntityKind::TankFactory, &[]));
         assert!(!build_requirement_met(
             EntityKind::TankFactory,

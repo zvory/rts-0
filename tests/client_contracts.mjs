@@ -278,6 +278,18 @@ function fakeAudioContext() {
     "Tank Factory should expose all server-side build prerequisites",
   );
   assert(
+    Array.isArray(STATS[KIND.TRAINING_CENTRE].requires),
+    "Training Centre should expose all server-side build prerequisites",
+  );
+  assert(
+    STATS[KIND.TRAINING_CENTRE].requires.includes(KIND.INDUSTRIAL_CENTER),
+    "Training Centre should require an Industrial Center in the command card",
+  );
+  assert(
+    STATS[KIND.TRAINING_CENTRE].requires.includes(KIND.BARRACKS),
+    "Training Centre should require a Barracks in the command card",
+  );
+  assert(
     STATS[KIND.TANK_FACTORY].requires.includes(KIND.INDUSTRIAL_CENTER),
     "Tank Factory should require an Industrial Center in the command card",
   );
@@ -293,6 +305,14 @@ function fakeAudioContext() {
   assert(
     !playerHasCompletedKind(underConstructionTrainingCentre, playerId, KIND.TRAINING_CENTRE),
     "Tank Factory should not unlock while the Training Centre is still under construction",
+  );
+  const underConstructionBarracks = [
+    { owner: playerId, kind: KIND.INDUSTRIAL_CENTER, buildProgress: null },
+    { owner: playerId, kind: KIND.BARRACKS, buildProgress: 0.5 },
+  ];
+  assert(
+    !playerHasCompletedKind(underConstructionBarracks, playerId, KIND.BARRACKS),
+    "Training Centre should not unlock while the Barracks is still under construction",
   );
   const completedTrainingCentre = [
     { owner: playerId, kind: KIND.INDUSTRIAL_CENTER, buildProgress: null },
