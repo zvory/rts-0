@@ -85,12 +85,14 @@ export class GameState {
     this.placement = null;
 
     // --- command targeting / feedback (client-only) ---
-    /** @type {null | "move" | "attack"} */
+    /** @type {null | "move" | "attack" | "setupAtGuns"} */
     this.commandTarget = null;
     /** @type {Array<{kind:string,x:number,y:number,createdAt:number}>} */
     this.commandFeedback = [];
     /** @type {null | {resourceId:number, resourceX:number, resourceY:number, ccId:number, ccX:number, ccY:number, inRange:boolean}} */
     this.resourceMiningPreview = null;
+    /** @type {null | {mouseX:number, mouseY:number, guns:Array<object>}} */
+    this.atGunSetupPreview = null;
 
     /** @type {Array<{from:number,to:number,createdAt:number}>} */
     this.muzzleFlashes = [];
@@ -406,16 +408,18 @@ export class GameState {
 
   /**
    * Arm a one-click command target mode from the HUD.
-   * @param {"move"|"attack"} kind
+   * @param {"move"|"attack"|"setupAtGuns"} kind
    */
   beginCommandTarget(kind) {
     this.placement = null;
     this.commandTarget = kind;
+    if (kind !== "setupAtGuns") this.atGunSetupPreview = null;
   }
 
   /** Clear any armed command target mode. */
   endCommandTarget() {
     this.commandTarget = null;
+    this.atGunSetupPreview = null;
   }
 
   /**
@@ -448,6 +452,14 @@ export class GameState {
    */
   updateResourceMiningPreview(preview) {
     this.resourceMiningPreview = preview;
+  }
+
+  /**
+   * Set or clear the AT gun manual setup cone preview.
+   * @param {null | {mouseX:number, mouseY:number, guns:Array<object>}} preview
+   */
+  updateAtGunSetupPreview(preview) {
+    this.atGunSetupPreview = preview;
   }
 
   // --- map helpers --------------------------------------------------------

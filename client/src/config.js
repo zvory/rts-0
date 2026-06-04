@@ -54,6 +54,8 @@ export const SCOUT_CAR_BODY = Object.freeze({
 
 // Workers can mine a resource only when a completed City Centre is within this many tiles.
 export const MINING_CC_RANGE_TILES = 7.0;
+export const AT_GUN_DEPLOYED_RANGE_TILES = 7;
+export const AT_GUN_FIELD_OF_FIRE_RAD = Math.PI / 6;
 
 // Player colors (server assigns from a matching palette; used as a fallback for blips).
 export const PLAYER_PALETTE = Object.freeze([
@@ -72,7 +74,7 @@ export const STATS = Object.freeze({
   [KIND.MACHINE_GUNNER]: { label: "Machine Gunner", icon: "MG", size: 10, sight: 8,
     rangeTiles: 5, cost: { steel: 75, oil: 25 }, supply: 2, buildTicks: 400, requires: KIND.TRAINING_CENTRE },
   [KIND.AT_TEAM]: { label: "AT Gun", icon: "AT", size: 20, sight: 8,
-    rangeTiles: 5, cost: { steel: 75, oil: 25 }, supply: 3, buildTicks: 440, requires: KIND.STEELWORKS },
+    rangeTiles: AT_GUN_DEPLOYED_RANGE_TILES, cost: { steel: 75, oil: 25 }, supply: 3, buildTicks: 440, requires: KIND.STEELWORKS },
   [KIND.SCOUT_CAR]: { label: "Scout Car", icon: "SC", size: 14.4, sight: 10, body: SCOUT_CAR_BODY,
     rangeTiles: 5, cost: { steel: 125, oil: 75 }, supply: 3, buildTicks: 480 },
   [KIND.TANK]: { label: "Tank", icon: "TK", size: 18, sight: 7, body: TANK_BODY,

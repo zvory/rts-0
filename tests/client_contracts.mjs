@@ -9,7 +9,12 @@ import { Net } from "../client/src/net.js";
 import { GameState } from "../client/src/state.js";
 import { Camera } from "../client/src/camera.js";
 import { Fog } from "../client/src/fog.js";
-import { MINING_CC_RANGE_TILES, STATS } from "../client/src/config.js";
+import {
+  AT_GUN_DEPLOYED_RANGE_TILES,
+  AT_GUN_FIELD_OF_FIRE_RAD,
+  MINING_CC_RANGE_TILES,
+  STATS,
+} from "../client/src/config.js";
 import { HUD, formatTankOilUsed, playerHasCompletedKind } from "../client/src/hud.js";
 import { Audio } from "../client/src/audio.js";
 import { machineGunnerHasAudibleTarget } from "../client/src/combat_audio.js";
@@ -25,6 +30,7 @@ import {
   STATE,
   STATE_CODE,
   TERRAIN,
+  cmd,
   decodeServerMessage,
 } from "../client/src/protocol.js";
 import { Input, footprintValidAgainstEntities } from "../client/src/input.js";
@@ -244,6 +250,26 @@ function fakeAudioContext() {
   );
 }
 
+{
+  assert(
+    JSON.stringify(cmd.setupAtGuns([1, 2], 100, 200)) ===
+      JSON.stringify({ c: "setupAtGuns", units: [1, 2], x: 100, y: 200 }),
+    "setupAtGuns command builder emits the wire shape",
+  );
+  assert(
+    JSON.stringify(cmd.tearDownAtGuns([3, 4])) ===
+      JSON.stringify({ c: "tearDownAtGuns", units: [3, 4] }),
+    "tearDownAtGuns command builder emits the wire shape",
+  );
+  assert(AT_GUN_DEPLOYED_RANGE_TILES === 7, "client mirrors deployed AT gun range");
+  assertApprox(
+    AT_GUN_FIELD_OF_FIRE_RAD,
+    Math.PI / 6,
+    0.000001,
+    "client mirrors AT gun field of fire",
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Net
 // ---------------------------------------------------------------------------
@@ -435,6 +461,7 @@ function fakeAudioContext() {
   assert(state.resources !== undefined, "GameState.resources");
   assert(Array.isArray(state.events), "GameState.events");
   assert(state.resourceMiningPreview === null, "GameState.resourceMiningPreview initially null");
+  assert(state.atGunSetupPreview === null, "GameState.atGunSetupPreview initially null");
   assertHasMethod(state, "updateResourceMiningPreview", "GameState");
   assert(state.selection instanceof Set, "GameState.selection");
   assertHasMethod(state, "setSelection", "GameState");
@@ -489,6 +516,10 @@ function fakeAudioContext() {
   assert(state.resourceMiningPreview?.resourceId === 200, "resource mining preview stores hover link");
   state.updateResourceMiningPreview(null);
   assert(state.resourceMiningPreview === null, "resource mining preview can be cleared");
+  state.updateAtGunSetupPreview({ mouseX: 1, mouseY: 2, guns: [{ id: 9 }] });
+  assert(state.atGunSetupPreview?.guns?.[0]?.id === 9, "AT setup preview stores selected guns");
+  state.endCommandTarget();
+  assert(state.atGunSetupPreview === null, "ending command target clears AT setup preview");
 
   // Interpolation clamps alpha to [0,1]
   const entsNeg = state.entitiesInterpolated(-0.5);

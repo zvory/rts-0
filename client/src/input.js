@@ -178,9 +178,16 @@ export class Input {
     void dt;
     if (this.state.placement) {
       this.state.updateResourceMiningPreview(null);
+      this.state.updateAtGunSetupPreview(null);
       this._refreshPlacement();
       return;
     }
+    if (this.state.commandTarget === "setupAtGuns") {
+      this.state.updateResourceMiningPreview(null);
+      this._refreshAtGunSetupPreview();
+      return;
+    }
+    this.state.updateAtGunSetupPreview(null);
     this._refreshResourceMiningPreview();
   }
 
@@ -534,6 +541,14 @@ export class Input {
     const ownUnits = this._selectedOwnUnitIds();
     if (ownUnits.length === 0) return;
     const world = this._worldAt(p.x, p.y);
+    if (this.state.commandTarget === "setupAtGuns") {
+      const atGuns = this._selectedOwnAtGunIds();
+      if (atGuns.length > 0) {
+        this.net.command(cmd.setupAtGuns(atGuns, world.x, world.y));
+        this.state.addCommandFeedback("move", world.x, world.y);
+      }
+      return;
+    }
     if (this.state.commandTarget === "move") {
       this.net.command(cmd.move(ownUnits, world.x, world.y));
       this.state.addCommandFeedback("move", world.x, world.y);
@@ -579,6 +594,32 @@ export class Input {
       .selectedEntities()
       .filter((e) => e.owner === me && e.kind === KIND.WORKER)
       .map((e) => e.id);
+  }
+
+  /** Ids of currently-selected own AT guns. */
+  _selectedOwnAtGunIds() {
+    const me = this.state.playerId;
+    return this.state
+      .selectedEntities()
+      .filter((e) => e.owner === me && e.kind === KIND.AT_TEAM)
+      .map((e) => e.id);
+  }
+
+  _refreshAtGunSetupPreview() {
+    if (!this.mouse || this.state.commandTarget !== "setupAtGuns") {
+      this.state.updateAtGunSetupPreview(null);
+      return;
+    }
+    const me = this.state.playerId;
+    const guns = this.state
+      .selectedEntities()
+      .filter((e) => e.owner === me && e.kind === KIND.AT_TEAM);
+    if (guns.length === 0) {
+      this.state.updateAtGunSetupPreview(null);
+      return;
+    }
+    const world = this._worldAt(this.mouse.x, this.mouse.y);
+    this.state.updateAtGunSetupPreview({ mouseX: world.x, mouseY: world.y, guns });
   }
 
   _refreshResourceMiningPreview() {

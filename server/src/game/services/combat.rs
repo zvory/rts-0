@@ -75,7 +75,7 @@ pub(crate) fn combat_system(
             if matches!(e.order(), Order::Gather(_)) {
                 continue;
             }
-            let profile = combat_rules::attack_profile(e.kind);
+            let profile = effective_attack_profile(e);
             let (range_tiles, dmg, cd) = (profile.range_tiles, profile.dmg, profile.cooldown);
             let range_px = range_tiles as f32 * config::TILE_SIZE as f32 + e.radius() + RANGE_SLACK;
             // Aggro radius: mobile units detect and chase enemies out to their sight radius so
@@ -83,7 +83,7 @@ pub(crate) fn combat_system(
             // exception: they hold position and only auto-acquire enemies already in weapon
             // range. Buildings never move, so they only ever engage within their firing range.
             let aggro_px = if e.is_unit() {
-                if requires_weapon_setup(e.kind) && matches!(e.order(), Order::Idle) {
+                if uses_stationary_weapon_aggro(e) && matches!(e.order(), Order::Idle) {
                     range_px
                 } else {
                     (e.sight_tiles() as f32 * config::TILE_SIZE as f32).max(range_px)
@@ -207,6 +207,7 @@ pub(crate) fn combat_system(
                 .get(id)
                 .map(|e| chase_path_needs_refresh(e, chase_goal))
                 .unwrap_or(false);
+            let mut can_chase = true;
             if let Some(e) = entities.get_mut(id) {
                 if fires_while_moving(e.kind) {
                     rotate_vehicle_weapon_for_combat(e, target_angle);
@@ -217,6 +218,10 @@ pub(crate) fn combat_system(
                 }
                 e.set_target_id(Some(tid));
                 e.mark_attack_phase(AttackPhase::Chasing);
+                can_chase = at_gun_can_chase(e);
+            }
+            if !can_chase {
+                continue;
             }
             if !deployed_weapon_ready_to_move(entities, id) {
                 continue;
@@ -339,7 +344,8 @@ fn rotate_at_gun_for_combat(e: &mut Entity, target_angle: f32) -> bool {
     if !target_angle.is_finite() {
         return false;
     }
-    e.set_desired_weapon_facing(target_angle);
+    let desired = deployed_at_gun_desired_facing(e, target_angle);
+    e.set_desired_weapon_facing(desired);
     let current = e
         .weapon_facing()
         .filter(|facing| facing.is_finite())
@@ -351,14 +357,15 @@ fn rotate_at_gun_for_combat(e: &mut Entity, target_angle: f32) -> bool {
                 0.0
             }
         });
-    let rotated = rotate_toward(current, target_angle, AT_GUN_TURN_RATE_RAD_PER_TICK);
+    let rotated = rotate_toward(current, desired, AT_GUN_TURN_RATE_RAD_PER_TICK);
     if rotated.is_finite() {
         e.set_facing(rotated);
         e.set_weapon_facing(rotated);
     } else {
         return false;
     }
-    angle_delta(rotated, target_angle).abs() <= AT_GUN_FIRE_TOLERANCE_RAD
+    at_gun_target_inside_field_of_fire(e, target_angle)
+        && angle_delta(rotated, target_angle).abs() <= AT_GUN_FIRE_TOLERANCE_RAD
 }
 
 fn tick_deployed_weapon_setup(e: &mut Entity) {
@@ -369,7 +376,7 @@ fn tick_deployed_weapon_setup(e: &mut Entity) {
 }
 
 fn begin_idle_deployed_weapon_setup(e: &mut Entity) {
-    if !requires_weapon_setup(e.kind) {
+    if e.kind != EntityKind::MachineGunner {
         return;
     }
     if !e.path_is_empty() {
@@ -392,7 +399,7 @@ fn deployed_weapon_ready_to_fire(entities: &mut EntityStore, id: u32) -> bool {
     let Some(e) = entities.get_mut(id) else {
         return false;
     };
-    if !requires_weapon_setup(e.kind) {
+    if !requires_weapon_setup(e.kind) || e.kind == EntityKind::AtTeam {
         return true;
     }
     match e.weapon_setup() {
@@ -428,6 +435,69 @@ fn deployed_weapon_ready_to_move(entities: &mut EntityStore, id: u32) -> bool {
 
 fn requires_weapon_setup(kind: EntityKind) -> bool {
     matches!(kind, EntityKind::MachineGunner | EntityKind::AtTeam)
+}
+
+fn uses_stationary_weapon_aggro(e: &Entity) -> bool {
+    matches!(e.kind, EntityKind::MachineGunner)
+        || (e.kind == EntityKind::AtTeam && !matches!(e.weapon_setup(), WeaponSetup::Packed))
+}
+
+fn at_gun_can_chase(e: &Entity) -> bool {
+    e.kind != EntityKind::AtTeam || matches!(e.weapon_setup(), WeaponSetup::Packed)
+}
+
+fn effective_attack_profile(e: &Entity) -> combat_rules::AttackProfile {
+    let mut profile = combat_rules::attack_profile(e.kind);
+    if e.kind != EntityKind::AtTeam {
+        return profile;
+    }
+    match e.weapon_setup() {
+        WeaponSetup::Packed => {
+            profile.range_tiles = config::AT_GUN_PACKED_RANGE_TILES;
+            profile.dmg =
+                ((profile.dmg as f32) * config::AT_GUN_PACKED_DAMAGE_MULTIPLIER).round() as u32;
+        }
+        WeaponSetup::Deployed => {
+            profile.range_tiles = config::AT_GUN_DEPLOYED_RANGE_TILES;
+        }
+        WeaponSetup::SettingUp { .. } | WeaponSetup::TearingDown { .. } => {
+            profile.range_tiles = config::AT_GUN_PACKED_RANGE_TILES;
+            profile.dmg = 0;
+        }
+    }
+    profile
+}
+
+fn deployed_at_gun_desired_facing(e: &Entity, target_angle: f32) -> f32 {
+    if !matches!(e.weapon_setup(), WeaponSetup::Deployed) {
+        return target_angle;
+    }
+    let Some(center) = at_gun_field_center(e) else {
+        return target_angle;
+    };
+    let half = config::AT_GUN_FIELD_OF_FIRE_RAD * 0.5;
+    let delta = angle_delta(center, target_angle);
+    if delta.abs() <= half {
+        target_angle
+    } else {
+        center + delta.signum() * half
+    }
+}
+
+fn at_gun_target_inside_field_of_fire(e: &Entity, target_angle: f32) -> bool {
+    if !matches!(e.weapon_setup(), WeaponSetup::Deployed) {
+        return true;
+    }
+    let Some(center) = at_gun_field_center(e) else {
+        return true;
+    };
+    angle_delta(center, target_angle).abs() <= config::AT_GUN_FIELD_OF_FIRE_RAD * 0.5
+}
+
+fn at_gun_field_center(e: &Entity) -> Option<f32> {
+    e.emplacement_facing()
+        .or_else(|| e.weapon_facing())
+        .filter(|facing| facing.is_finite())
 }
 
 /// How a combatant chooses targets.
@@ -1610,29 +1680,73 @@ mod tests {
     }
 
     #[test]
-    fn at_team_waits_to_deploy_before_first_shot() {
+    fn idle_at_team_does_not_auto_setup() {
+        let mut entities = EntityStore::new();
+        let at_id = entities
+            .spawn_unit(1, EntityKind::AtTeam, 100.0, 100.0)
+            .expect("at team should spawn");
+
+        run_combat_tick(&mut entities);
+
+        assert_eq!(
+            entities
+                .get(at_id)
+                .expect("at team should exist")
+                .weapon_setup(),
+            WeaponSetup::Packed
+        );
+    }
+
+    #[test]
+    fn packed_at_team_fires_with_shorter_range_and_reduced_damage() {
         let mut entities = EntityStore::new();
         entities
             .spawn_unit(1, EntityKind::AtTeam, 100.0, 100.0)
             .expect("at team should spawn");
-        let enemy_id = entities
-            .spawn_unit(2, EntityKind::Tank, 120.0, 100.0)
+        let tank_id = entities
+            .spawn_unit(2, EntityKind::Tank, 220.0, 100.0)
             .expect("enemy tank should spawn");
-        let enemy_hp = entities.get(enemy_id).expect("enemy should exist").hp;
+        entities
+            .get_mut(tank_id)
+            .expect("tank should exist")
+            .set_facing(std::f32::consts::PI);
+        let enemy_hp = entities.get(tank_id).expect("enemy should exist").hp;
 
         run_combat_tick(&mut entities);
-        assert_eq!(
-            entities.get(enemy_id).expect("enemy should exist").hp,
-            enemy_hp
-        );
 
-        for _ in 0..config::MACHINE_GUNNER_SETUP_TICKS {
-            run_combat_tick(&mut entities);
+        assert_eq!(
+            entities.get(tank_id).expect("enemy should exist").hp,
+            enemy_hp - 36,
+            "packed AT gun should deal 75% of its deployed 48 damage"
+        );
+    }
+
+    #[test]
+    fn deployed_at_team_fires_at_long_range() {
+        let mut entities = EntityStore::new();
+        let at_id = entities
+            .spawn_unit(1, EntityKind::AtTeam, 100.0, 100.0)
+            .expect("at team should spawn");
+        let tank_id = entities
+            .spawn_unit(2, EntityKind::Tank, 310.0, 100.0)
+            .expect("enemy tank should spawn");
+        if let Some(at) = entities.get_mut(at_id) {
+            at.set_weapon_setup(WeaponSetup::Deployed);
+            at.set_emplacement_facing(Some(0.0));
+            at.set_facing(0.0);
+            at.set_weapon_facing(0.0);
         }
+        entities
+            .get_mut(tank_id)
+            .expect("tank should exist")
+            .set_facing(std::f32::consts::PI);
+        let enemy_hp = entities.get(tank_id).expect("enemy should exist").hp;
+
+        run_combat_tick(&mut entities);
 
         assert!(
-            entities.get(enemy_id).expect("enemy should exist").hp < enemy_hp,
-            "AT team should fire once deployment completes"
+            entities.get(tank_id).expect("enemy should exist").hp < enemy_hp,
+            "deployed AT team should fire at range 7"
         );
     }
 
@@ -1664,6 +1778,41 @@ mod tests {
             entities.get(enemy_id).expect("enemy should exist").hp,
             enemy_hp,
             "AT gun should not fire until its barrel is aligned"
+        );
+    }
+
+    #[test]
+    fn deployed_at_team_clamps_to_field_edge_and_does_not_fire_outside_arc() {
+        let mut entities = EntityStore::new();
+        let at_id = entities
+            .spawn_unit(1, EntityKind::AtTeam, 100.0, 100.0)
+            .expect("at team should spawn");
+        let enemy_id = entities
+            .spawn_unit(2, EntityKind::Tank, 100.0, 180.0)
+            .expect("enemy tank should spawn");
+        let enemy_hp = entities.get(enemy_id).expect("enemy should exist").hp;
+        if let Some(at) = entities.get_mut(at_id) {
+            at.set_weapon_setup(WeaponSetup::Deployed);
+            at.set_emplacement_facing(Some(0.0));
+            at.set_facing(0.0);
+            at.set_weapon_facing(0.0);
+        }
+
+        for _ in 0..20 {
+            run_combat_tick(&mut entities);
+        }
+
+        let at = entities.get(at_id).expect("at should exist");
+        let edge = config::AT_GUN_FIELD_OF_FIRE_RAD * 0.5;
+        assert!(
+            (at.facing() - edge).abs() <= AT_GUN_TURN_RATE_RAD_PER_TICK + 0.001,
+            "AT gun should clamp to the nearest arc edge, got {:.4}",
+            at.facing()
+        );
+        assert_eq!(
+            entities.get(enemy_id).expect("enemy should exist").hp,
+            enemy_hp,
+            "AT gun should not fire outside its deployed field of fire"
         );
     }
 

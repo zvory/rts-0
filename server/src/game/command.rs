@@ -23,6 +23,14 @@ pub enum SimCommand {
         units: Vec<u32>,
         target: u32,
     },
+    SetupAtGuns {
+        units: Vec<u32>,
+        x: f32,
+        y: f32,
+    },
+    TearDownAtGuns {
+        units: Vec<u32>,
+    },
     Gather {
         units: Vec<u32>,
         node: u32,
@@ -74,6 +82,10 @@ impl SimCommand {
             protocol::Command::Move { units, x, y } => SimCommand::Move { units, x, y },
             protocol::Command::AttackMove { units, x, y } => SimCommand::AttackMove { units, x, y },
             protocol::Command::Attack { units, target } => SimCommand::Attack { units, target },
+            protocol::Command::SetupAtGuns { units, x, y } => {
+                SimCommand::SetupAtGuns { units, x, y }
+            }
+            protocol::Command::TearDownAtGuns { units } => SimCommand::TearDownAtGuns { units },
             protocol::Command::Gather { units, node } => SimCommand::Gather { units, node },
             protocol::Command::Build {
                 worker,
@@ -120,6 +132,14 @@ impl SimCommand {
             SimCommand::Attack { units, target } => protocol::Command::Attack {
                 units: units.clone(),
                 target: *target,
+            },
+            SimCommand::SetupAtGuns { units, x, y } => protocol::Command::SetupAtGuns {
+                units: units.clone(),
+                x: *x,
+                y: *y,
+            },
+            SimCommand::TearDownAtGuns { units } => protocol::Command::TearDownAtGuns {
+                units: units.clone(),
             },
             SimCommand::Gather { units, node } => protocol::Command::Gather {
                 units: units.clone(),
@@ -193,6 +213,37 @@ mod tests {
             SimCommand::Rejected {
                 reason: CommandRejection::UnknownUnit,
             }
+        );
+    }
+
+    #[test]
+    fn protocol_at_gun_setup_commands_round_trip() {
+        let setup = protocol::Command::SetupAtGuns {
+            units: vec![3, 5],
+            x: 100.0,
+            y: 200.0,
+        };
+        assert_eq!(
+            SimCommand::from_protocol(setup.clone()),
+            SimCommand::SetupAtGuns {
+                units: vec![3, 5],
+                x: 100.0,
+                y: 200.0,
+            }
+        );
+        assert_eq!(
+            SimCommand::from_protocol(setup.clone()).to_protocol(),
+            Some(setup)
+        );
+
+        let teardown = protocol::Command::TearDownAtGuns { units: vec![7] };
+        assert_eq!(
+            SimCommand::from_protocol(teardown.clone()),
+            SimCommand::TearDownAtGuns { units: vec![7] }
+        );
+        assert_eq!(
+            SimCommand::from_protocol(teardown.clone()).to_protocol(),
+            Some(teardown)
         );
     }
 }

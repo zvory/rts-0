@@ -344,12 +344,14 @@ export class HUD {
   _renderUnitCard(card, sel) {
     const ownUnits = this._selectedOwnUnits(sel);
     const unitIds = ownUnits.map((e) => e.id);
+    const atGunIds = ownUnits.filter((e) => e.kind === KIND.AT_TEAM).map((e) => e.id);
     const hasArmyUnit = ownUnits.some((e) => e.kind !== KIND.WORKER);
     const workerSelected = !hasArmyUnit && ownUnits.some((e) => e.kind === KIND.WORKER);
     const res = this.state.resources || { steel: 0, oil: 0 };
 
     const sig =
       `units|${unitIds.join(".")}|target:${this.state.commandTarget || ""}|` +
+      `|at:${atGunIds.join(".")}|` +
       (workerSelected
         ? WORKER_BUILDABLE.map((k) => `${k}:${this._canBuild(k, res) ? 1 : 0}`).join(",")
         : "no-build");
@@ -432,6 +434,33 @@ export class HUD {
         },
       }));
       idx = 5;
+      if (atGunIds.length > 0) {
+        const empty = document.createElement("div");
+        empty.className = "cmd-empty";
+        frag.appendChild(empty);
+        idx = 6;
+        frag.appendChild(this._cmdButton({
+          icon: "Z",
+          label: "Set Up",
+          title: "Set up selected AT guns toward a target point",
+          hotkey: GRID_HOTKEYS[idx++],
+          enabled: true,
+          cls: this.state.commandTarget === "setupAtGuns" ? "active" : "",
+          onClick: () => this.state.beginCommandTarget("setupAtGuns"),
+        }));
+        frag.appendChild(this._cmdButton({
+          icon: "X",
+          label: "Tear Down",
+          title: "Pack up selected AT guns",
+          hotkey: GRID_HOTKEYS[idx++],
+          enabled: true,
+          cls: "",
+          onClick: () => {
+            this.net.command(cmd.tearDownAtGuns(atGunIds));
+            this.state.endCommandTarget();
+          },
+        }));
+      }
     }
 
     if (workerSelected) {

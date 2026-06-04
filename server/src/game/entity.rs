@@ -482,6 +482,8 @@ pub struct CombatState {
     pub weapon_facing: f32,
     /// Target weapon/barrel facing in radians. Useful for projection/debugging and future arcs.
     pub desired_weapon_facing: f32,
+    /// Fixed center of a manually emplaced AT gun's field of fire.
+    pub emplacement_facing: Option<f32>,
 }
 
 impl Default for CombatState {
@@ -492,6 +494,7 @@ impl Default for CombatState {
             setup: WeaponSetup::Packed,
             weapon_facing: 0.0,
             desired_weapon_facing: 0.0,
+            emplacement_facing: None,
         }
     }
 }
@@ -924,6 +927,16 @@ impl Entity {
         }
     }
 
+    pub fn emplacement_facing(&self) -> Option<f32> {
+        self.combat.as_ref().and_then(|c| c.emplacement_facing)
+    }
+
+    pub fn set_emplacement_facing(&mut self, facing: Option<f32>) {
+        if let Some(c) = self.combat.as_mut() {
+            c.emplacement_facing = facing.filter(|f| f.is_finite()).map(normalize_angle);
+        }
+    }
+
     pub fn attack_cd(&self) -> u32 {
         self.combat.as_ref().map(|c| c.attack_cd).unwrap_or(0)
     }
@@ -970,6 +983,9 @@ impl Entity {
 
     pub fn set_weapon_setup(&mut self, setup: WeaponSetup) {
         if let Some(c) = self.combat.as_mut() {
+            if matches!(setup, WeaponSetup::Packed) {
+                c.emplacement_facing = None;
+            }
             c.setup = setup;
         }
     }
@@ -988,6 +1004,7 @@ impl Entity {
                 WeaponSetup::TearingDown { ticks } => {
                     let ticks = ticks.saturating_sub(1);
                     if ticks == 0 {
+                        c.emplacement_facing = None;
                         WeaponSetup::Packed
                     } else {
                         WeaponSetup::TearingDown { ticks }
@@ -1155,6 +1172,11 @@ impl Entity {
         }
         self.set_target_id(None);
     }
+}
+
+fn normalize_angle(angle: f32) -> f32 {
+    let two_pi = std::f32::consts::TAU;
+    (angle + std::f32::consts::PI).rem_euclid(two_pi) - std::f32::consts::PI
 }
 
 /// The authoritative collection of all entities, keyed by stable id.
