@@ -67,6 +67,7 @@ pub(crate) fn run_tick(
     services::combat::combat_system(
         map,
         entities,
+        players,
         &occ,
         &spatial,
         &mut coordinator,

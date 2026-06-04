@@ -14,6 +14,7 @@ use crate::game::services::movement::{
 use crate::game::services::occupancy::Occupancy;
 use crate::game::services::spatial::SpatialIndex;
 use crate::game::services::world_query;
+use crate::game::PlayerState;
 use crate::protocol::Event;
 use crate::rules::combat as combat_rules;
 use crate::rules::projection;
@@ -32,6 +33,7 @@ const WORKER_DIRECT_HIT_RETREAT_TILES: f32 = 5.0;
 pub(crate) fn combat_system(
     map: &Map,
     entities: &mut EntityStore,
+    players: &[PlayerState],
     _occ: &Occupancy,
     spatial: &SpatialIndex,
     coordinator: &mut MoveCoordinator<'_>,
@@ -164,6 +166,7 @@ pub(crate) fn combat_system(
                     fog,
                     coordinator,
                     rng,
+                    players,
                     id,
                     tid,
                     dmg,
@@ -352,6 +355,7 @@ fn apply_damage(
     fog: &Fog,
     coordinator: &mut MoveCoordinator<'_>,
     rng: &mut SmallRng,
+    players: &[PlayerState],
     attacker: u32,
     victim: u32,
     dmg: u32,
@@ -388,7 +392,15 @@ fn apply_damage(
             }
         }
     }
-    retreat_worker_from_direct_hit(map, entities, coordinator, victim, attacker_owner, ax, ay);
+    retreat_worker_from_direct_hit(
+        map,
+        entities,
+        coordinator,
+        players,
+        victim,
+        attacker_owner,
+        (ax, ay),
+    );
     apply_overpenetration(
         entities,
         events,
@@ -421,15 +433,16 @@ fn retreat_worker_from_direct_hit(
     map: &Map,
     entities: &mut EntityStore,
     coordinator: &mut MoveCoordinator<'_>,
+    players: &[PlayerState],
     victim: u32,
     attacker_owner: u32,
-    ax: f32,
-    ay: f32,
+    attacker_pos: (f32, f32),
 ) {
     let (owner, vx, vy) = match entities.get(victim) {
         Some(worker)
             if worker.kind == EntityKind::Worker
                 && worker.owner != attacker_owner
+                && player_is_ai(players, worker.owner)
                 && worker.hp > 0
                 && !matches!(worker.build_phase(), Some(BuildPhase::Constructing { .. })) =>
         {
@@ -437,8 +450,8 @@ fn retreat_worker_from_direct_hit(
         }
         _ => return,
     };
-    let dx = vx - ax;
-    let dy = vy - ay;
+    let dx = vx - attacker_pos.0;
+    let dy = vy - attacker_pos.1;
     let dist = (dx * dx + dy * dy).sqrt();
     let (ux, uy) = if dist > f32::EPSILON && dist.is_finite() {
         (dx / dist, dy / dist)
@@ -452,6 +465,14 @@ fn retreat_worker_from_direct_hit(
         (vy + uy * retreat_px).clamp(0.0, max),
     );
     coordinator.order_group_move(entities, owner, &[victim], target, false);
+}
+
+fn player_is_ai(players: &[PlayerState], player_id: u32) -> bool {
+    players
+        .iter()
+        .find(|player| player.id == player_id)
+        .map(|player| player.is_ai)
+        .unwrap_or(false)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -552,6 +573,7 @@ mod tests {
     use crate::game::services::occupancy::Occupancy;
     use crate::game::services::pathing::PathingService;
     use crate::game::services::spatial::SpatialIndex;
+    use crate::game::ScoreState;
     use rand::SeedableRng;
 
     fn rifleman_with_enemy() -> (EntityStore, u32, u32) {
@@ -565,7 +587,29 @@ mod tests {
         (entities, self_id, enemy_id)
     }
 
+    fn player_state(id: u32, is_ai: bool) -> PlayerState {
+        PlayerState {
+            id,
+            name: format!("Player {id}"),
+            color: "#fff".to_string(),
+            start_tile: (4, 4),
+            steel: 1_000,
+            oil: 1_000,
+            supply_used: 0,
+            supply_cap: 20,
+            is_ai,
+            score: ScoreState::default(),
+        }
+    }
+
     fn run_combat_tick(entities: &mut EntityStore) -> HashMap<u32, Vec<Event>> {
+        run_combat_tick_with_players(entities, &[player_state(1, false), player_state(2, false)])
+    }
+
+    fn run_combat_tick_with_players(
+        entities: &mut EntityStore,
+        players: &[PlayerState],
+    ) -> HashMap<u32, Vec<Event>> {
         let map = Map::generate(2, 0x00C0_FFEE);
         let occ = Occupancy::build(&map, entities);
         let spatial = SpatialIndex::build(entities, config::TILE_SIZE);
@@ -579,6 +623,7 @@ mod tests {
         combat_system(
             &map,
             entities,
+            players,
             &occ,
             &spatial,
             &mut coordinator,
@@ -623,6 +668,7 @@ mod tests {
             &fog,
             &mut coordinator,
             &mut rng,
+            &[player_state(1, false), player_state(2, false)],
             attacker,
             victim,
             dmg,
@@ -723,6 +769,7 @@ mod tests {
         combat_system(
             &map,
             &mut entities,
+            &[player_state(1, false)],
             &occ,
             &spatial,
             &mut coordinator,
@@ -766,7 +813,38 @@ mod tests {
     }
 
     #[test]
-    fn directly_hit_workers_retreat_from_attacker() {
+    fn directly_hit_ai_workers_retreat_from_attacker() {
+        let mut entities = EntityStore::new();
+        let worker_id = entities
+            .spawn_unit(1, EntityKind::Worker, 140.0, 100.0)
+            .expect("worker should spawn");
+        entities
+            .spawn_unit(2, EntityKind::Rifleman, 100.0, 100.0)
+            .expect("enemy rifleman should spawn");
+
+        run_combat_tick_with_players(
+            &mut entities,
+            &[player_state(1, true), player_state(2, false)],
+        );
+
+        let worker = entities.get(worker_id).expect("worker should exist");
+        assert!(
+            worker.hp < worker.max_hp,
+            "worker should have taken direct damage"
+        );
+        assert!(
+            matches!(worker.order(), Order::Move(_)),
+            "direct damage should issue a temporary move-away order"
+        );
+        let goal = worker.path_goal().expect("retreat should set a path goal");
+        assert!(
+            goal.0 > worker.pos_x,
+            "retreat should move away from the attacker on the left"
+        );
+    }
+
+    #[test]
+    fn directly_hit_human_workers_do_not_retreat_from_attacker() {
         let mut entities = EntityStore::new();
         let worker_id = entities
             .spawn_unit(1, EntityKind::Worker, 140.0, 100.0)
@@ -783,13 +861,13 @@ mod tests {
             "worker should have taken direct damage"
         );
         assert!(
-            matches!(worker.order(), Order::Move(_)),
-            "direct damage should issue a temporary move-away order"
+            matches!(worker.order(), Order::Idle),
+            "human workers should not receive a forced retreat order"
         );
-        let goal = worker.path_goal().expect("retreat should set a path goal");
-        assert!(
-            goal.0 > worker.pos_x,
-            "retreat should move away from the attacker on the left"
+        assert_eq!(
+            worker.path_goal(),
+            None,
+            "human workers should not receive a retreat path goal"
         );
     }
 

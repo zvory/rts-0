@@ -160,6 +160,13 @@ impl Game {
     }
 
     pub(crate) fn new_for_replay(players: &[PlayerInit], seed: u32) -> Game {
+        Self::new_without_ai_controllers(players, seed)
+    }
+
+    /// Create a match that preserves player identity flags but does not attach live
+    /// [`AiController`]s. Used by command-log replay and scripted self-play, where commands come
+    /// from an external driver.
+    pub(crate) fn new_without_ai_controllers(players: &[PlayerInit], seed: u32) -> Game {
         Self::new_inner(
             players,
             false,
@@ -194,7 +201,7 @@ impl Game {
                 oil,
                 supply_used: 0,
                 supply_cap: 0,
-                is_ai: enable_ai && p.is_ai,
+                is_ai: p.is_ai,
                 score: ScoreState::default(),
             };
             spawn_player_start(&mut entities, &map, &mut ps, start);
@@ -1084,6 +1091,28 @@ mod tests {
         assert!(
             game.ai.is_empty(),
             "a human-only match has no AI controllers"
+        );
+    }
+
+    #[test]
+    fn replay_games_preserve_ai_identity_without_controllers() {
+        let players = [PlayerInit {
+            id: 1,
+            name: "Computer".into(),
+            color: "#fff".into(),
+            is_ai: true,
+        }];
+        let game = Game::new_without_ai_controllers(&players, 0x1234_5678);
+
+        assert!(
+            game.ai.is_empty(),
+            "replays should not run live AI controllers"
+        );
+        assert!(
+            game.players
+                .iter()
+                .any(|player| player.id == 1 && player.is_ai),
+            "replays must preserve AI identity for deterministic simulation rules"
         );
     }
 
