@@ -39,6 +39,37 @@ pub(crate) fn unit_static_standable(
     true
 }
 
+pub(crate) fn unit_static_segment_standable(
+    map: &Map,
+    occ: &Occupancy,
+    kind: EntityKind,
+    from: (f32, f32),
+    to: (f32, f32),
+) -> bool {
+    if !unit_static_standable(map, occ, kind, from.0, from.1)
+        || !unit_static_standable(map, occ, kind, to.0, to.1)
+    {
+        return false;
+    }
+
+    let dx = to.0 - from.0;
+    let dy = to.1 - from.1;
+    let distance = (dx * dx + dy * dy).sqrt();
+    let step_px = config::TILE_SIZE as f32 / 4.0;
+    let steps = (distance / step_px).ceil().max(1.0) as u32;
+
+    for i in 1..steps {
+        let t = i as f32 / steps as f32;
+        let x = from.0 + dx * t;
+        let y = from.1 + dy * t;
+        if !unit_static_standable(map, occ, kind, x, y) {
+            return false;
+        }
+    }
+
+    true
+}
+
 pub(crate) fn unit_spawn_standable(
     map: &Map,
     occ: &Occupancy,
@@ -364,6 +395,127 @@ mod tests {
         ));
     }
 
+    #[test]
+    fn unit_static_segment_standable_accepts_open_segment() {
+        let map = flat_map(12);
+        let entities = EntityStore::new();
+        let occ = Occupancy::build(&map, &entities);
+
+        assert!(unit_static_segment_standable(
+            &map,
+            &occ,
+            EntityKind::Rifleman,
+            map.tile_center(2, 2),
+            map.tile_center(8, 8),
+        ));
+    }
+
+    #[test]
+    fn unit_static_segment_standable_rejects_terrain_blockers() {
+        let mut map = flat_map(12);
+        set_tile(&mut map, 5, 4, crate::protocol::terrain::WATER);
+        set_tile(&mut map, 5, 5, crate::protocol::terrain::ROCK);
+        let entities = EntityStore::new();
+        let occ = Occupancy::build(&map, &entities);
+
+        assert!(!unit_static_segment_standable(
+            &map,
+            &occ,
+            EntityKind::Rifleman,
+            map.tile_center(2, 5),
+            map.tile_center(8, 5),
+        ));
+        assert!(!unit_static_segment_standable(
+            &map,
+            &occ,
+            EntityKind::Rifleman,
+            map.tile_center(5, 2),
+            map.tile_center(5, 8),
+        ));
+    }
+
+    #[test]
+    fn unit_static_segment_standable_rejects_building_footprint() {
+        let map = flat_map(12);
+        let mut entities = EntityStore::new();
+        let (bx, by) = footprint_center(&map, EntityKind::Depot, 4, 4);
+        entities
+            .spawn_building(1, EntityKind::Depot, bx, by, true)
+            .expect("depot should spawn");
+        let occ = Occupancy::build(&map, &entities);
+
+        assert!(!unit_static_segment_standable(
+            &map,
+            &occ,
+            EntityKind::Rifleman,
+            map.tile_center(2, 5),
+            map.tile_center(8, 5),
+        ));
+    }
+
+    #[test]
+    fn unit_static_segment_standable_rejects_out_of_bounds_endpoint() {
+        let map = flat_map(12);
+        let entities = EntityStore::new();
+        let occ = Occupancy::build(&map, &entities);
+
+        assert!(!unit_static_segment_standable(
+            &map,
+            &occ,
+            EntityKind::Worker,
+            map.tile_center(2, 2),
+            (map.world_size_px() + 1.0, map.tile_center(2, 2).1),
+        ));
+    }
+
+    #[test]
+    fn unit_static_segment_standable_rejects_tank_radius_clipping_blocker() {
+        let mut map = flat_map(12);
+        set_tile(&mut map, 5, 5, crate::protocol::terrain::ROCK);
+        let entities = EntityStore::new();
+        let occ = Occupancy::build(&map, &entities);
+        let y = 5.0 * config::TILE_SIZE as f32 - 10.0;
+
+        assert!(!unit_static_segment_standable(
+            &map,
+            &occ,
+            EntityKind::Tank,
+            (3.5 * config::TILE_SIZE as f32, y),
+            (7.5 * config::TILE_SIZE as f32, y),
+        ));
+    }
+
+    #[test]
+    fn unit_static_segment_standable_allows_rifleman_where_tank_clips() {
+        let mut map = flat_map(12);
+        set_tile(&mut map, 5, 5, crate::protocol::terrain::ROCK);
+        let entities = EntityStore::new();
+        let occ = Occupancy::build(&map, &entities);
+        let from = (
+            3.5 * config::TILE_SIZE as f32,
+            5.0 * config::TILE_SIZE as f32 - 10.0,
+        );
+        let to = (
+            7.5 * config::TILE_SIZE as f32,
+            5.0 * config::TILE_SIZE as f32 - 10.0,
+        );
+
+        assert!(unit_static_segment_standable(
+            &map,
+            &occ,
+            EntityKind::Rifleman,
+            from,
+            to,
+        ));
+        assert!(!unit_static_segment_standable(
+            &map,
+            &occ,
+            EntityKind::Tank,
+            from,
+            to,
+        ));
+    }
+
     fn flat_map(size: u32) -> Map {
         Map {
             size,
@@ -371,5 +523,10 @@ mod tests {
             starts: vec![],
             expansion_sites: vec![],
         }
+    }
+
+    fn set_tile(map: &mut Map, x: u32, y: u32, terrain: u8) {
+        let index = map.index(x, y);
+        map.terrain[index] = terrain;
     }
 }
