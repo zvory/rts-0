@@ -151,7 +151,12 @@ pub(super) fn advance_moving_units(
 
             if path_len > 1 {
                 // Intermediate waypoint: pop on radius hit or geometric pass-by.
-                let radius_hit = dist <= config::ARRIVE_RADIUS_INTERMEDIATE_PX;
+                let acceptance_radius = if is_car {
+                    config::SCOUT_CAR_WAYPOINT_ACCEPTANCE_RADIUS_PX
+                } else {
+                    config::ARRIVE_RADIUS_INTERMEDIATE_PX
+                };
+                let radius_hit = dist <= acceptance_radius;
                 let passed = next_next.is_some_and(|(nnx, nny)| {
                     // Positive projection of (pos - waypoint) onto (next_next - waypoint) means the
                     // unit is on the far side of the waypoint relative to where it came from.
@@ -166,7 +171,8 @@ pub(super) fn advance_moving_units(
                     continue;
                 }
             } else {
-                // Final waypoint: require exact arrival.
+                // Final waypoint: require exact arrival, except scout cars may settle when the
+                // remaining error is small and mostly lateral to their feasible travel direction.
                 if dist <= ARRIVE_EPS {
                     if let Some(e) = entities.get_mut(id) {
                         e.pop_waypoint();
@@ -174,6 +180,20 @@ pub(super) fn advance_moving_units(
                     }
                     x = wx;
                     y = wy;
+                    continue;
+                }
+                let scout_car_tolerant_arrival = is_car
+                    && dist <= config::SCOUT_CAR_FINAL_GOAL_TOLERANCE_PX
+                    && vehicle_step_dir.is_some_and(|dir| {
+                        let along = dx * dir.0 + dy * dir.1;
+                        let lateral = (dx * dir.1 - dy * dir.0).abs();
+                        lateral > along.abs() && lateral > ARRIVE_EPS
+                    });
+                if scout_car_tolerant_arrival {
+                    if let Some(e) = entities.get_mut(id) {
+                        e.pop_waypoint();
+                        e.mark_move_phase(MovePhase::Moving);
+                    }
                     continue;
                 }
             }
