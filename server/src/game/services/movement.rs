@@ -749,7 +749,43 @@ pub(crate) fn resolve_collisions(
                             },
                         )
                     }
-                    (false, false) => (None, None),
+                    (false, false) => {
+                        // Both line-of-centers pushes land on impassable terrain or a building
+                        // footprint. Happens when two units meet head-on inside a 1-tile-wide
+                        // corridor with a slight lateral offset: the diagonal connecting line has
+                        // a perpendicular component that clips into the corridor wall on both
+                        // sides. The line-of-centers nudge is hopeless, but a pure axial slide
+                        // (along ±X or ±Y by the full overlap) typically frees one side along the
+                        // corridor's open axis. Try both axes and accept the first push that
+                        // works for each side, so subsequent passes can finish the separation.
+                        let need = overlap + COLLISION_EPS_PX;
+                        // Push along the cardinal axis whose component most aligns with the
+                        // line-of-centers, so the axial slide actually increases separation
+                        // instead of accidentally driving the unit toward its partner.
+                        let a_sx = if nx >= 0.0 { -need } else { need };
+                        let a_sy = if ny >= 0.0 { -need } else { need };
+                        let (a_primary, a_secondary) = if nx.abs() >= ny.abs() {
+                            ((ax + a_sx, ay), (ax, ay + a_sy))
+                        } else {
+                            ((ax, ay + a_sy), (ax + a_sx, ay))
+                        };
+                        let b_sx = -a_sx;
+                        let b_sy = -a_sy;
+                        let (b_primary, b_secondary) = if nx.abs() >= ny.abs() {
+                            ((bx + b_sx, by), (bx, by + b_sy))
+                        } else {
+                            ((bx, by + b_sy), (bx + b_sx, by))
+                        };
+                        let a_candidates = [a_primary, a_secondary];
+                        let b_candidates = [b_primary, b_secondary];
+                        let a_alt = a_candidates.into_iter().find(|&(x, y)| {
+                            unit_static_standable(occ, map, a_kind, x, y)
+                        });
+                        let b_alt = b_candidates.into_iter().find(|&(x, y)| {
+                            unit_static_standable(occ, map, b_kind, x, y)
+                        });
+                        (a_alt, b_alt)
+                    }
                 };
 
                 if let Some((nax, nay)) = a_push {
@@ -2156,6 +2192,56 @@ mod tests {
         assert!(
             d + 2.0 >= ra + rb,
             "mover and stationary unit must not stack (dist {:.2}, min {:.1})",
+            d,
+            ra + rb
+        );
+    }
+
+    /// Regression for a tick-panic seen in live play: two infantry meeting head-on inside a
+    /// 1-tile-wide rock corridor with a slight lateral offset would lock at ~9.5 px (overlap
+    /// ~8.5 px, well past the 8 px invariant tolerance). The line-of-centers push was diagonal,
+    /// so both target positions clipped into the rock wall on either side of the corridor and
+    /// the resolver fell into the `(false, false)` branch and did nothing across all four passes.
+    /// The axis-aligned fallback must break the deadlock.
+    #[test]
+    fn head_on_in_one_tile_corridor_does_not_deadlock() {
+        let mut map = flat_map(1);
+        // Carve a horizontal 1-tile corridor at row 20 by filling rows 19 and 21 with rock.
+        let row = 20u32;
+        for ty in [row - 1, row + 1] {
+            for tx in 10..30u32 {
+                let idx = map.index(tx, ty);
+                map.terrain[idx] = crate::protocol::terrain::ROCK;
+            }
+        }
+
+        let mut entities = EntityStore::new();
+        // Place the two units in adjacent corridor tiles, each offset laterally toward the
+        // opposite wall so the connecting line has a real Y component. With radius 9 and a
+        // 32 px tile, ±5 px of Y drift still leaves the bodies clear of the walls but makes
+        // the diagonal push from line-of-centers clip into the walls.
+        let (ax, ay) = map.tile_center(19, row);
+        let (bx, by) = map.tile_center(20, row);
+        let a = entities
+            .spawn_unit(1, EntityKind::Worker, ax, ay - 5.0)
+            .unwrap();
+        let b = entities
+            .spawn_unit(2, EntityKind::Rifleman, bx, by + 5.0)
+            .unwrap();
+
+        let occ = Occupancy::build(&map, &entities);
+        let spatial = SpatialIndex::build(&entities, map.size);
+        resolve_collisions(&mut entities, &spatial, &map, &occ);
+
+        let ra = entities.get(a).unwrap().radius();
+        let rb = entities.get(b).unwrap().radius();
+        let d = dist(&entities, a, b);
+        // The invariant tolerates 8 px of residue; require at least that much breathing room
+        // so this case can't trip it.
+        assert!(
+            d + 8.0 >= ra + rb,
+            "head-on corridor units must separate to within the invariant tolerance \
+             (dist {:.2}, min {:.1})",
             d,
             ra + rb
         );
