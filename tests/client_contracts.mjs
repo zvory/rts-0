@@ -10,7 +10,7 @@ import { GameState } from "../client/src/state.js";
 import { Camera } from "../client/src/camera.js";
 import { Fog } from "../client/src/fog.js";
 import { MINING_CC_RANGE_TILES, STATS } from "../client/src/config.js";
-import { formatTankOilUsed, playerHasCompletedKind } from "../client/src/hud.js";
+import { HUD, formatTankOilUsed, playerHasCompletedKind } from "../client/src/hud.js";
 import { Audio } from "../client/src/audio.js";
 import { machineGunnerHasAudibleTarget } from "../client/src/combat_audio.js";
 import {
@@ -353,6 +353,42 @@ function fakeAudioContext() {
   assert(formatTankOilUsed(10.4) === "10", "tank oil panel rounds whole values above ten oil");
   assert(formatTankOilUsed(-2) === "0.0", "tank oil panel clamps negative values");
   assert(formatTankOilUsed(Number.NaN) === "0.0", "tank oil panel tolerates missing oilUsed");
+
+  const trained = [];
+  let selectedProductionBuildings = [
+    { id: 20, owner: playerId, kind: KIND.BARRACKS },
+    { id: 22, owner: playerId, kind: KIND.BARRACKS, buildProgress: 0.5 },
+    { id: 21, owner: playerId, kind: KIND.BARRACKS },
+    { id: 30, owner: playerId, kind: KIND.FACTORY },
+  ];
+  const hud = Object.create(HUD.prototype);
+  hud.state = {
+    playerId,
+    selectedEntities: () => selectedProductionBuildings,
+  };
+  hud.net = {
+    command: (command) => trained.push(command),
+  };
+  hud._trainRoundRobin = new Map();
+
+  hud._issueTrain(KIND.RIFLEMAN);
+  hud._issueTrain(KIND.MACHINE_GUNNER);
+  hud._issueTrain(KIND.RIFLEMAN);
+  hud._issueTrain(KIND.SCOUT_CAR);
+  assert(
+    trained.map((command) => command.building).join(",") === "20,21,20,30",
+    "selected production buildings should receive train commands round-robin by compatible producer set",
+  );
+
+  selectedProductionBuildings = [
+    { id: 21, owner: playerId, kind: KIND.BARRACKS },
+    { id: 20, owner: playerId, kind: KIND.BARRACKS },
+  ];
+  hud._issueTrain(KIND.RIFLEMAN);
+  assert(
+    trained[4].building === 21,
+    "changing selected producer order should start the new round-robin set at its first building",
+  );
 }
 
 // ---------------------------------------------------------------------------
