@@ -1235,6 +1235,7 @@ impl EntityStore {
     /// Clear every node reservation pointing to this worker, even if the worker's order has
     /// already changed or the worker has already been removed.
     pub fn release_miner(&mut self, worker_id: u32) {
+        // Order-independent: every matching resource node receives the same idempotent clear.
         for entity in self.map.values_mut() {
             if let Some(node) = entity.resource_node.as_mut() {
                 if node.miner == Some(worker_id) {
@@ -1359,6 +1360,51 @@ mod tests {
                 entity.state_groups(),
                 groups(false, false, false, false, false, true),
                 "{kind:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn entity_store_keeps_mutable_iteration_guardrails() {
+        let source = include_str!("entity.rs");
+
+        for disallowed_signature in [
+            concat!("pub fn ", "iter_mut"),
+            concat!("pub(crate) fn ", "iter_mut"),
+            concat!("pub(super) fn ", "iter_mut"),
+        ] {
+            assert!(
+                !source.contains(disallowed_signature),
+                "EntityStore must not expose raw mutable iteration; use ids() + get_mut(id) for outcome-affecting mutation"
+            );
+        }
+
+        let lines: Vec<&str> = source.lines().collect();
+        let raw_map_walks: Vec<(usize, &str)> = lines
+            .iter()
+            .enumerate()
+            .filter_map(|(idx, line)| {
+                let trimmed = line.trim();
+                let is_raw_mutable_map_walk = trimmed
+                    .contains(concat!("self.map.", "values_mut()"))
+                    || trimmed.contains(concat!("self.map.", "iter_mut()"));
+                is_raw_mutable_map_walk.then_some((idx, trimmed))
+            })
+            .collect();
+
+        assert!(
+            !raw_map_walks.is_empty(),
+            "guardrail should see at least the documented release_miner raw map walk"
+        );
+
+        for (idx, line) in raw_map_walks {
+            let context_start = idx.saturating_sub(4);
+            let preceding_context = lines[context_start..idx].join("\n");
+            assert!(
+                preceding_context.contains("Order-independent"),
+                "raw mutable EntityStore map walk at line {} must document why unordered visitation cannot affect outcomes: {}",
+                idx + 1,
+                line
             );
         }
     }
