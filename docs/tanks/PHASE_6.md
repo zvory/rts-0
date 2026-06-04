@@ -43,8 +43,8 @@ model.
 - `DESIGN.md` now records the implemented tank hull dimensions, standability contract, collision
   behavior, route-following lookahead, reverse/pivot thresholds, traffic braking, oil burn, and the
   current balance table.
-- `server/src/config.rs` and `client/src/config.js` already mirror the tank body values:
-  `42px` length, `24px` width, and `1.5px` clearance. No config code change was needed for Phase 6.
+- `server/src/config.rs` and `client/src/config.js` mirror the tank body values:
+  `50.4px` length, `28.8px` width, and `1.5px` clearance.
 - The current tank locomotion model has bounded hull turn and per-tick throttle scaling, but no
   persistent velocity or acceleration state. Alignment, traffic, and zero-oil checks are the
   implemented braking mechanisms.

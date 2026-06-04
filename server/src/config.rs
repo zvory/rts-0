@@ -89,11 +89,11 @@ pub const SUPPLY_CAP_MAX: u32 = 200;
 // --- Vehicle bodies ----------------------------------------------------------
 // Tank static legality uses the oriented hull instead of the legacy circular
 // fallback radius. Dimensions are world px and include a small collision margin.
-pub const TANK_BODY_LENGTH_PX: f32 = 42.0;
-pub const TANK_BODY_WIDTH_PX: f32 = 24.0;
+pub const TANK_BODY_LENGTH_PX: f32 = 50.4;
+pub const TANK_BODY_WIDTH_PX: f32 = 28.8;
 pub const TANK_BODY_CLEARANCE_PX: f32 = 1.5;
-pub const SCOUT_CAR_BODY_LENGTH_PX: f32 = 51.0;
-pub const SCOUT_CAR_BODY_WIDTH_PX: f32 = 27.0;
+pub const SCOUT_CAR_BODY_LENGTH_PX: f32 = 40.8;
+pub const SCOUT_CAR_BODY_WIDTH_PX: f32 = 21.6;
 pub const SCOUT_CAR_BODY_CLEARANCE_PX: f32 = 1.0;
 
 // --- Stats ------------------------------------------------------------------
@@ -115,10 +115,21 @@ pub struct UnitStats {
 
 impl UnitStats {
     /// Tile clearance radius for pathfinding: how many tiles around the center must be open.
-    /// Units below half a tile of radius, including the v1 tank, are point-sized for coarse A*.
+    /// Units below half a tile of radius are point-sized for coarse A*.
     pub fn radius_tiles(&self) -> u32 {
         (self.radius / TILE_SIZE as f32).round() as u32
     }
+}
+
+/// Tile clearance radius for coarse A* by kind. Vehicles stay point-sized here because static
+/// segment legality is checked with their oriented hulls.
+pub fn unit_radius_tiles(kind: EntityKind) -> u32 {
+    if matches!(kind, EntityKind::ScoutCar | EntityKind::Tank) {
+        return 0;
+    }
+    unit_stats(kind)
+        .map(|stats| stats.radius_tiles())
+        .unwrap_or(0)
 }
 
 #[derive(Debug, Clone, Copy)]
