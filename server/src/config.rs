@@ -44,6 +44,8 @@ pub const MACHINE_GUNNER_SETUP_TICKS: u16 = TICK_HZ as u16;
 pub const STARTING_STEEL: u32 = 75;
 pub const STARTING_OIL: u32 = 0;
 pub const STARTING_WORKERS: u32 = 4;
+pub const QUICKSTART_STEEL: u32 = 99_999;
+pub const QUICKSTART_OIL: u32 = 99_999;
 
 pub const STEEL_LOAD: u32 = 2;
 pub const OIL_LOAD: u32 = 2;
