@@ -311,29 +311,6 @@ export class Renderer {
   }
 
   /**
-   * Four prongs that extend from the corners of the machine gunner body.
-   * @private
-   * @param {number} r
-   * @param {number} factor 0..1 extension amount
-   * @returns {Array<[number, number, number, number]>}
-   */
-  _machineGunnerProngs(r, factor) {
-    const t = clamp01(factor);
-    const body = [
-      [-0.95, -0.55, -1.35, -1.05],
-      [0.75, -0.55, 1.15, -1.05],
-      [-0.95, 0.55, -1.35, 1.05],
-      [0.75, 0.55, 1.15, 1.05],
-    ];
-    return body.map(([x1, y1, x2, y2]) => [
-      x1 * r,
-      y1 * r,
-      lerp(x1 * r, x2 * r, t),
-      lerp(y1 * r, y2 * r, t),
-    ]);
-  }
-
-  /**
    * Fetch (or lazily create) a pooled Graphics for `id` in `poolName`, mark it seen,
    * make it visible, and clear it ready for redraw.
    * @private
@@ -393,72 +370,15 @@ export class Renderer {
     g.position.set(e.x, e.y);
     g.lineStyle(2, 0x1a1712, 0.95);
 
-    if (e.kind === KIND.RIFLEMAN) {
-      // Infantry wedge with a short rifle line.
-      g.beginFill(tint);
-      const a = facing;
-      const tip = polar(a, r * 1.2);
-      const left = polar(a + 2.45, r * 0.85);
-      const right = polar(a - 2.45, r * 0.85);
-      g.moveTo(tip.x, tip.y);
-      g.lineTo(left.x, left.y);
-      g.lineTo(polar(a + Math.PI, r * 0.35).x, polar(a + Math.PI, r * 0.35).y);
-      g.lineTo(right.x, right.y);
-      g.closePath();
-      g.endFill();
-      const rifleA = facing - 0.18;
-      const muzzle = polar(rifleA, r * 1.45);
-      const grip = polar(rifleA + Math.PI, r * 0.15);
-      g.lineStyle(2, 0x2a2119, 0.95);
-      g.moveTo(grip.x, grip.y);
-      g.lineTo(muzzle.x, muzzle.y);
-    } else if (e.kind === KIND.MACHINE_GUNNER) {
-      // Wider support team block with deployable bracing.
-      g.beginFill(tint);
-      g.drawPolygon([
-        -r * 0.95, -r * 0.55,
-        r * 0.75, -r * 0.55,
-        r * 1.0, 0,
-        r * 0.75, r * 0.55,
-        -r * 0.95, r * 0.55,
-      ]);
-      g.endFill();
-      const setup = this._machineGunnerSetupVisual(e);
-      if (setup.prongFactor > 0) {
-        g.lineStyle(3, 0xd8d0b0, 0.95);
-        const prongs = this._machineGunnerProngs(r, setup.prongFactor);
-        for (const [x1, y1, x2, y2] of prongs) {
-          const p1 = rotatePoint(x1, y1, facing);
-          const p2 = rotatePoint(x2, y2, facing);
-          g.moveTo(p1.x, p1.y);
-          g.lineTo(p2.x, p2.y);
-        }
+    if (e.kind === KIND.RIFLEMAN || e.kind === KIND.MACHINE_GUNNER || e.kind === KIND.AT_TEAM) {
+      drawInfantryBase(g, r, tint, facing);
+      if (e.kind === KIND.RIFLEMAN) {
+        drawInfantryRifle(g, r, facing);
+      } else if (e.kind === KIND.AT_TEAM) {
+        drawInfantryPanzerfaust(g, r, facing);
+      } else {
+        drawInfantryMachineGun(g, r, facing, weaponFacing, this._machineGunnerSetupVisual(e));
       }
-      if (setup.barrel) {
-        g.lineStyle(4, 0x241d17, 0.95);
-        const grip = polar(facing + Math.PI, r * 0.25);
-        const muzzle = polar(facing, r * 2.15);
-        g.moveTo(grip.x, grip.y);
-        g.lineTo(muzzle.x, muzzle.y);
-        g.beginFill(0x241d17, 0.95);
-        g.drawCircle(muzzle.x, muzzle.y, 1.6);
-        g.endFill();
-      }
-    } else if (e.kind === KIND.AT_TEAM) {
-      // Two-person anti-armor marker with a long launcher slash.
-      g.beginFill(tint);
-      g.moveTo(0, -r);
-      g.lineTo(r, 0);
-      g.lineTo(0, r);
-      g.lineTo(-r, 0);
-      g.closePath();
-      g.endFill();
-      g.beginFill(0x1a1712, 0.65);
-      g.drawRect(-r * 0.65, -r * 0.16, r * 1.3, r * 0.32);
-      g.endFill();
-      g.lineStyle(3, 0x2a2119, 0.9);
-      g.moveTo(-r * 0.85, r * 0.45);
-      g.lineTo(r * 0.85, -r * 0.45);
     } else if (e.kind === KIND.TANK) {
       // Hull follows movement facing; turret/barrel follow weapon facing.
       g.beginFill(tint);
@@ -519,7 +439,12 @@ export class Renderer {
     }
 
     // Facing indicator: a short pale tick from center outward.
-    if (e.kind !== KIND.MACHINE_GUNNER && e.kind !== KIND.TANK) {
+    if (
+      e.kind !== KIND.RIFLEMAN &&
+      e.kind !== KIND.MACHINE_GUNNER &&
+      e.kind !== KIND.AT_TEAM &&
+      e.kind !== KIND.TANK
+    ) {
       const fp = polar(facing, r + 3);
       g.lineStyle(2, 0xd8d0b0, 0.85);
       g.moveTo(0, 0);
@@ -1359,6 +1284,125 @@ function drawRotatedRect(g, cx, cy, w, h, a) {
     polygon.push(p.x, p.y);
   }
   g.drawPolygon(polygon);
+}
+
+function drawInfantryBase(g, r, tint, facing) {
+  // Shared combat-infantry body: same soldier, different oversized weapon.
+  g.lineStyle(2, 0x1a1712, 0.95);
+  g.beginFill(tint);
+  g.drawPolygon(rotatedPolygon([
+    r * 0.72, 0,
+    r * 0.22, -r * 0.62,
+    -r * 0.58, -r * 0.48,
+    -r * 0.78, 0,
+    -r * 0.58, r * 0.48,
+    r * 0.22, r * 0.62,
+  ], facing));
+  g.endFill();
+
+  const head = polar(facing, r * 0.72);
+  g.beginFill(lightenColor(tint, 0.16));
+  g.drawCircle(head.x, head.y, r * 0.34);
+  g.endFill();
+
+  const rear = polar(facing + Math.PI, r * 0.68);
+  const shoulderL = polar(facing - 1.42, r * 0.48);
+  const shoulderR = polar(facing + 1.42, r * 0.48);
+  g.lineStyle(2, 0x1a1712, 0.5);
+  g.moveTo(rear.x, rear.y);
+  g.lineTo(shoulderL.x, shoulderL.y);
+  g.moveTo(rear.x, rear.y);
+  g.lineTo(shoulderR.x, shoulderR.y);
+}
+
+function drawInfantryRifle(g, r, facing) {
+  const a = facing - 0.2;
+  const stock = polar(a + Math.PI, r * 0.18);
+  const muzzle = polar(a, r * 1.82);
+  const hand = polar(a, r * 0.55);
+
+  g.lineStyle(3, 0x2a2119, 0.96);
+  g.moveTo(stock.x, stock.y);
+  g.lineTo(muzzle.x, muzzle.y);
+  g.lineStyle(2, 0xd8d0b0, 0.85);
+  g.moveTo(hand.x - Math.sin(a) * r * 0.32, hand.y + Math.cos(a) * r * 0.32);
+  g.lineTo(hand.x + Math.sin(a) * r * 0.32, hand.y - Math.cos(a) * r * 0.32);
+}
+
+function drawInfantryPanzerfaust(g, r, facing) {
+  const a = facing - 0.12;
+  const rear = polar(a + Math.PI, r * 0.42);
+  const muzzle = polar(a, r * 2.05);
+  const warhead = polar(a, r * 1.55);
+
+  g.lineStyle(5, 0x2a2119, 0.98);
+  g.moveTo(rear.x, rear.y);
+  g.lineTo(muzzle.x, muzzle.y);
+
+  g.beginFill(0x3d3528, 0.98);
+  drawRotatedRect(g, warhead.x, warhead.y, r * 0.52, r * 0.62, a);
+  g.endFill();
+  g.beginFill(0xd8d0b0, 0.88);
+  drawRotatedRect(g, rear.x, rear.y, r * 0.34, r * 0.48, a);
+  g.endFill();
+}
+
+function drawInfantryMachineGun(g, r, facing, weaponFacing, setup) {
+  const deploy = clamp01(setup.prongFactor);
+  const carryA = facing + 0.86;
+  const aimA = weaponFacing;
+  const a = angleLerp(carryA, aimA, smoothstep01(deploy));
+  const rearDist = lerp(r * 0.72, r * 0.34, deploy);
+  const muzzleDist = lerp(r * 1.34, r * 2.45, deploy);
+  const rear = polar(a + Math.PI, rearDist);
+  const muzzle = polar(a, muzzleDist);
+
+  // Oversized carried MG: reads across-body when packed, then extends forward while setting up.
+  g.lineStyle(6, 0x241d17, 0.98);
+  g.moveTo(rear.x, rear.y);
+  g.lineTo(muzzle.x, muzzle.y);
+
+  const receiver = polar(a, lerp(r * 0.28, r * 0.55, deploy));
+  g.beginFill(0x3a3025, 0.98);
+  drawRotatedRect(g, receiver.x, receiver.y, r * 0.82, r * 0.5, a);
+  g.endFill();
+
+  const handle = polar(a + Math.PI, r * 0.25);
+  g.lineStyle(3, 0xd8d0b0, 0.88);
+  g.moveTo(handle.x - Math.sin(a) * r * 0.42, handle.y + Math.cos(a) * r * 0.42);
+  g.lineTo(handle.x + Math.sin(a) * r * 0.42, handle.y - Math.cos(a) * r * 0.42);
+
+  if (deploy > 0.02) {
+    const bipodRoot = polar(a, lerp(r * 0.92, r * 1.62, deploy));
+    const legLen = r * lerp(0.38, 1.0, deploy);
+    const spread = lerp(0.32, 0.72, deploy);
+    const left = {
+      x: bipodRoot.x + Math.cos(a + spread) * legLen,
+      y: bipodRoot.y + Math.sin(a + spread) * legLen,
+    };
+    const right = {
+      x: bipodRoot.x + Math.cos(a - spread) * legLen,
+      y: bipodRoot.y + Math.sin(a - spread) * legLen,
+    };
+    g.lineStyle(3, 0xd8d0b0, 0.9);
+    g.moveTo(bipodRoot.x, bipodRoot.y);
+    g.lineTo(left.x, left.y);
+    g.moveTo(bipodRoot.x, bipodRoot.y);
+    g.lineTo(right.x, right.y);
+  }
+
+  if (setup.barrel || deploy > 0.75) {
+    g.beginFill(0x241d17, 0.96);
+    g.drawCircle(muzzle.x, muzzle.y, r * 0.18);
+    g.endFill();
+  }
+}
+
+function angleLerp(a, b, t) {
+  let d = (b - a) % (Math.PI * 2);
+  if (d > Math.PI) d -= Math.PI * 2;
+  if (d < -Math.PI) d += Math.PI * 2;
+  return a + d * clamp01(t);
 }
 
 function lightenColor(color, amount) {

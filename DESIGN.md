@@ -554,10 +554,11 @@ victory/defeat overlay with the frozen score table.
   shadows → units → selection rings → health bars → fog overlay → command/hover feedback → placement ghost →
   selection drag-box → (HUD is DOM, not Pixi).
 - Units: low-detail hard-edged silhouettes tinted by player color, with a dark drop shadow,
-  dark outline, small facing indicator, HP bar above when damaged/selected, and glowing
-  selection ring when selected. Distinct silhouette per kind (engineer: compact block;
-  rifleman: infantry wedge; machine gunner / AT team: support silhouettes; tank: chunky
-  flat-shaded armor).
+  dark outline, HP bar above when damaged/selected, and glowing selection ring when selected.
+  Distinct silhouette per kind (engineer: compact block; rifleman / machine gunner / AT team:
+  shared infantry body with oversized role weapons; tank: chunky flat-shaded armor). Riflemen
+  carry a rifle, AT teams carry a large panzerfaust-style launcher, and machine gunners carry
+  an MG across the body while packed that extends forward with bracing during setup/deployment.
 - Buildings: footprint-sized blocky field structures with neutral geometry and plain
   two-letter stencils; under construction → translucent with a progress bar; production →
   small progress arc.
