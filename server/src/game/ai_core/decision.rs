@@ -276,8 +276,9 @@ where
     let save_for_required_tech_building =
         should_save_for_required_tech_building(&facts, required_tech_path, production_policy);
     let expansion_blocks_tech_path =
-        !defensive_panic.active && expansion_blocks_tech_path(&facts, profile);
-    let save_for_expansion = !defensive_panic.active && should_save_for_expansion(&facts, profile);
+        !defensive_panic.active && expansion_blocks_tech_path(observation, &facts, profile);
+    let save_for_expansion =
+        !defensive_panic.active && should_save_for_expansion(observation, &facts, profile);
     let proxy_barracks_active =
         !defensive_panic.active && should_use_proxy_barracks(&facts, profile);
 
@@ -824,15 +825,38 @@ fn defensive_threat_dps(enemy: &AiEntitySummary) -> f32 {
     profile.dmg as f32 / profile.cooldown as f32
 }
 
-fn expansion_blocks_tech_path(facts: &AiFacts, profile: &AiProfile) -> bool {
-    let Some(expansion) = profile.expansion else {
-        return false;
-    };
-    facts.building_count(EntityKind::IndustrialCenter) < expansion.target_industrial_centers
+fn active_expansion(
+    observation: &AiObservation,
+    profile: &AiProfile,
+) -> Option<ExpansionPolicy> {
+    let expansion = profile.expansion?;
+    if observation.economy.steel >= expansion.trigger_steel
+        || observation.economy.supply_used >= expansion.trigger_supply_used
+    {
+        Some(expansion)
+    } else {
+        None
+    }
 }
 
-fn should_save_for_expansion(facts: &AiFacts, profile: &AiProfile) -> bool {
-    let Some(expansion) = profile.expansion else {
+fn expansion_blocks_tech_path(
+    observation: &AiObservation,
+    facts: &AiFacts,
+    profile: &AiProfile,
+) -> bool {
+    let Some(expansion) = active_expansion(observation, profile) else {
+        return false;
+    };
+    expansion.blocks_tech_path
+        && facts.building_count(EntityKind::IndustrialCenter) < expansion.target_industrial_centers
+}
+
+fn should_save_for_expansion(
+    observation: &AiObservation,
+    facts: &AiFacts,
+    profile: &AiProfile,
+) -> bool {
+    let Some(expansion) = active_expansion(observation, profile) else {
         return false;
     };
     facts.building_count(EntityKind::IndustrialCenter) < expansion.target_industrial_centers
@@ -880,7 +904,7 @@ fn target_steel_workers_for_profile(
     profile: &AiProfile,
     base_target: usize,
 ) -> usize {
-    let Some(expansion) = profile.expansion else {
+    let Some(expansion) = active_expansion(observation, profile) else {
         return base_target;
     };
     if facts.complete_building_count(EntityKind::IndustrialCenter)
@@ -928,7 +952,7 @@ fn max_worker_resource_assignment_distance_px(
     facts: &AiFacts,
     profile: &AiProfile,
 ) -> Option<f32> {
-    let expansion = profile.expansion?;
+    let expansion = active_expansion(observation, profile)?;
     if facts.complete_building_count(EntityKind::IndustrialCenter)
         < expansion.target_industrial_centers
     {
@@ -1387,7 +1411,7 @@ fn try_build_expansion_industrial_center<F>(
 where
     F: FnMut(EntityKind, u32, u32) -> bool,
 {
-    let expansion = profile.expansion?;
+    let expansion = active_expansion(observation, profile)?;
     let kind = EntityKind::IndustrialCenter;
     config::building_stats(kind)?;
     if !rules::economy::build_requirement_met(kind, facts.complete_building_kinds()) {
@@ -1766,7 +1790,7 @@ fn desired_oil_workers(
     if profile.workers.extra_oil_workers == 0 {
         return 0;
     }
-    if expansion_blocks_tech_path(facts, profile) {
+    if expansion_blocks_tech_path(observation, facts, profile) {
         return 0;
     }
     let current_steel_workers = resource_worker_counts(observation)

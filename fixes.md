@@ -1,0 +1,4 @@
+- did the saturation AI get weaker?
+- all ai's should try flanking attacks around the back
+- machine gunners sometimes get stuck and don't move (need repro)
+- visual recoil system, match mg42 fire rate to real mg42 fire rate, just give it chance to miss until DPS is the same as before
