@@ -64,6 +64,8 @@ export class HUD {
     // Signature of the last-rendered command card so we only rebuild its buttons when
     // the relevant selection/affordability actually changes (keeps DOM + hotkeys stable).
     this._cardSig = null;
+    // Next producer index by selected eligible building ids, used to spread train clicks.
+    this._trainRoundRobin = new Map();
     // Signature for the resource bar to avoid unnecessary DOM rebuilds.
     this._resSig = null;
   }
@@ -87,6 +89,7 @@ export class HUD {
     if (this.elCommand) this.elCommand.innerHTML = "";
     if (this.elSupply) this.elSupply.classList.remove("supply-capped");
     this._cardSig = null;
+    this._trainRoundRobin.clear();
     this._resSig = null;
   }
 
@@ -260,9 +263,11 @@ export class HUD {
    * Render the context command card based on the current selection:
    *  - selected own units → action buttons for move / attack / stop.
    *  - a selected WORKER → action buttons plus build buttons for WORKER_BUILDABLE.
-   *  - a single selected production building (has `STATS[kind].trains`) → train
-   *    buttons for each trainable unit, plus a cancel button while producing
-   *    in the bottom-right cell (`C` hotkey).
+   *  - selected production buildings (have `STATS[kind].trains`) → train
+   *    buttons for the primary producer's trainable units. Successive train clicks
+   *    are distributed round-robin across the selected compatible producers. A
+   *    cancel button is shown for the primary producer while producing in the
+   *    bottom-right cell (`C` hotkey).
    *  - anything else → empty.
    *
    * Buttons are disabled when unaffordable (vs `state.resources`) or when tech
@@ -513,10 +518,14 @@ export class HUD {
     const cancelSlot = 8;
 
     // Signature includes the building id (so switching buildings rebuilds), each
-    // trainable unit's affordability, and whether a cancel button is shown.
+    // trainable unit's affordability, the selected compatible producer set for
+    // each unit, and whether a cancel button is shown.
     const sig =
       `train|${building.id}|` +
-      trains.map((u) => `${u}:${this._canTrain(u, res) ? 1 : 0}`).join(",") +
+      trains.map((u) => {
+        const producerIds = this._selectedProducerBuildingsForUnit(u).map((e) => e.id).join(".");
+        return `${u}:${this._canTrain(u, res) ? 1 : 0}:${producerIds}`;
+      }).join(",") +
       `|cancel:${producing ? 1 : 0}`;
     if (sig === this._cardSig) return;
     this._cardSig = sig;
@@ -534,7 +543,7 @@ export class HUD {
         cost: st.cost,
         enabled,
         title: this._trainDisabledReason(unit, res),
-        onClick: () => this.net.command(cmd.train(building.id, unit)),
+        onClick: () => this._issueTrain(unit),
       });
       frag.appendChild(btn);
     }
@@ -556,6 +565,36 @@ export class HUD {
 
     card.innerHTML = "";
     card.appendChild(frag);
+  }
+
+  /** Selected own production buildings that can train `unit`, in selection order. */
+  _selectedProducerBuildingsForUnit(unit) {
+    const sel = this.state.selectedEntities() || [];
+    return sel.filter(
+      (e) =>
+        this._isOwn(e) &&
+        isBuilding(e.kind) &&
+        e.buildProgress == null &&
+        this._trainsOf(e.kind).includes(unit),
+    );
+  }
+
+  /** Pick the next selected compatible producer for `unit` and advance its cursor. */
+  _nextProducerBuildingForUnit(unit) {
+    const producers = this._selectedProducerBuildingsForUnit(unit);
+    if (producers.length === 0) return null;
+
+    const key = producers.map((e) => e.id).join(".");
+    const idx = (this._trainRoundRobin.get(key) || 0) % producers.length;
+    this._trainRoundRobin.set(key, (idx + 1) % producers.length);
+    return producers[idx];
+  }
+
+  /** Queue `unit` at the next selected compatible production building. */
+  _issueTrain(unit) {
+    const building = this._nextProducerBuildingForUnit(unit);
+    if (!building) return;
+    this.net.command(cmd.train(building.id, unit));
   }
 
   // --- Shared helpers --------------------------------------------------------
