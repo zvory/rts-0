@@ -10,6 +10,8 @@ phases. Do not use this phase to replace A* or create polished crowd flow.
 
 - Phase 0 must be complete. Steering needs footing profiles or equivalent resistance data.
 - Phase 1 should be complete so final goals are less clumpy.
+- `docs/collision` Phases 0-3 should be complete, or this phase must integrate their shared
+  standability helpers as part of the same change.
 
 ## Scope
 
@@ -18,7 +20,7 @@ In scope:
 - Add local steering for units with active paths.
 - Steer away from nearby non-ghost units, weighted by footing/resistance.
 - Keep steering bounded by spatial-index neighbor queries.
-- Keep terrain/building passability checks authoritative.
+- Keep shared standability checks authoritative for static terrain/building body legality.
 - Add tests for avoidance, choke behavior, and determinism.
 
 Out of scope:
@@ -45,7 +47,7 @@ path_dir = normalized vector toward lookahead/next waypoint
 separation = sum over nearby solid units of away_dir * weight
 desired_dir = normalize(path_dir + separation * steer_strength)
 step = desired_dir * speed_budget
-if step landing is passable: use it
+if step landing passes unit_static_standable: use it
 else: fall back to existing path step / wall-slide behavior
 ```
 
@@ -100,11 +102,13 @@ jams, and imperfect motion.
 7. Integrate steering into `movement_system` only for normal path-following movement. Keep current
    static-obstacle repath, tolerant arrival, sidestep, and final waypoint behavior.
 
-8. If steered landing is blocked by terrain/building occupancy, fall back to the current landing
-   logic. Do not let steering move through buildings or impassable terrain.
+8. If the steered landing fails `unit_static_standable`, fall back to the current path step /
+   wall-slide logic. Do not let steering move through buildings or impassable terrain, including
+   cases where only a large unit's body, not its center tile, would clip static geometry.
 
-9. Keep collision resolution after movement. Steering reduces bad overlaps; collision remains the
-   authority that prevents stacking.
+9. Keep collision resolution after movement. Steering reduces bad dynamic unit overlaps; shared
+   standability remains the static legality authority, and collision remains the deterministic
+   unit-unit cleanup pass.
 
 ## Tests
 
@@ -114,6 +118,8 @@ Add Rust tests:
   moving rifleman gains lateral displacement instead of driving straight into it.
 - `choke_still_clogs_when_no_space_exists`: steering does not tunnel through buildings or terrain.
 - `steering_ignores_ghost_harvester`: harvesting worker does not create avoidance.
+- `steering_candidate_rejected_when_body_would_clip_building`: body-aware standability blocks a
+  steered candidate even if the center tile is passable.
 - `steering_neighbor_cap_is_deterministic`: same setup produces same position after repeated runs.
 - Existing stuck, sidestep, and collision tests still pass.
 
@@ -129,6 +135,6 @@ cd server && cargo test
 - Moving units make fewer direct overlaps with braced/heavy units when open space exists.
 - Chokes and traffic jams still happen.
 - Steering is bounded, deterministic, and panic-free.
-- Steering never bypasses terrain or building passability.
+- Steering never bypasses static standability.
 - Collision resolution remains active and tested.
 - No protocol or client files change in this phase.
