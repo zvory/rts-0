@@ -112,6 +112,12 @@ fn entity_score_value(kind: EntityKind) -> u32 {
     steel.saturating_add(oil)
 }
 
+#[derive(Clone, Copy)]
+enum AiProfileSelection {
+    Default,
+    Random,
+}
+
 /// The authoritative match state.
 pub struct Game {
     map: Map,
@@ -152,17 +158,41 @@ impl Game {
             config::STARTING_STEEL,
             config::STARTING_OIL,
             seed,
+            AiProfileSelection::Default,
+        )
+    }
+
+    /// Create a live lobby match where each AI picks one strategy from the live profile pool.
+    pub fn new_with_random_ai_profiles(players: &[PlayerInit], seed: u32) -> Game {
+        Self::new_inner(
+            players,
+            true,
+            config::STARTING_STEEL,
+            config::STARTING_OIL,
+            seed,
+            AiProfileSelection::Random,
         )
     }
 
     /// Create a match with explicit starting resources for every player.
+    #[allow(dead_code)]
     pub fn new_with_starting_resources(
         players: &[PlayerInit],
         steel: u32,
         oil: u32,
         seed: u32,
     ) -> Game {
-        Self::new_inner(players, true, steel, oil, seed)
+        Self::new_inner(players, true, steel, oil, seed, AiProfileSelection::Default)
+    }
+
+    /// Create a live lobby match with explicit starting resources and randomized AI strategies.
+    pub fn new_with_starting_resources_and_random_ai_profiles(
+        players: &[PlayerInit],
+        steel: u32,
+        oil: u32,
+        seed: u32,
+    ) -> Game {
+        Self::new_inner(players, true, steel, oil, seed, AiProfileSelection::Random)
     }
 
     #[cfg(test)]
@@ -179,7 +209,14 @@ impl Game {
         oil: u32,
         seed: u32,
     ) -> Game {
-        Self::new_inner(players, false, steel, oil, seed)
+        Self::new_inner(
+            players,
+            false,
+            steel,
+            oil,
+            seed,
+            AiProfileSelection::Default,
+        )
     }
 
     /// Create a match that preserves player identity flags but does not attach live
@@ -192,6 +229,7 @@ impl Game {
             config::STARTING_STEEL,
             config::STARTING_OIL,
             seed,
+            AiProfileSelection::Default,
         )
     }
 
@@ -207,17 +245,34 @@ impl Game {
         self.starting_oil
     }
 
-    fn new_inner(players: &[PlayerInit], enable_ai: bool, steel: u32, oil: u32, seed: u32) -> Game {
+    #[cfg(test)]
+    fn ai_profile_ids(&self) -> Vec<&'static str> {
+        self.ai.iter().map(AiController::profile_id).collect()
+    }
+
+    fn new_inner(
+        players: &[PlayerInit],
+        enable_ai: bool,
+        steel: u32,
+        oil: u32,
+        seed: u32,
+        ai_profile_selection: AiProfileSelection,
+    ) -> Game {
         let map = Map::generate(players.len(), seed);
         let fog = Fog::new(map.size);
         let mut entities = EntityStore::new();
+        let mut ai_profile_rng = SmallRng::seed_from_u64((seed as u64) ^ 0xA17E_5EED);
 
         let mut player_states = Vec::with_capacity(players.len());
         let mut ai = Vec::new();
         for (i, p) in players.iter().enumerate() {
             let start = map.starts.get(i).copied().unwrap_or((0, 0));
             if enable_ai && p.is_ai {
-                ai.push(AiController::new(p.id));
+                let profile_id = match ai_profile_selection {
+                    AiProfileSelection::Default => ai::DEFAULT_LIVE_PROFILE_ID,
+                    AiProfileSelection::Random => ai::random_live_profile_id(&mut ai_profile_rng),
+                };
+                ai.push(AiController::with_profile_id(p.id, profile_id));
             }
             let mut ps = PlayerState {
                 id: p.id,
@@ -656,9 +711,12 @@ fn spawn_player_start(
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
+    use std::collections::{BTreeSet, HashMap};
 
     use super::*;
+    use crate::game::ai_core::profiles::{
+        RIFLE_FLOOD_FAST_ID, RIFLE_FLOOD_FULL_SATURATION_ID, TECH_TO_TANKS_ID,
+    };
     use crate::game::command::SimCommand as Command;
     use crate::game::entity::{Entity, EntityKind, GatherPhase, Order};
     use crate::protocol::{kinds, EntityView};
@@ -699,6 +757,38 @@ mod tests {
             .filter(|e| e.owner == player_id && e.kind == EntityKind::Worker)
             .filter(|e| matches!(e.order(), Order::Gather(_)))
             .count()
+    }
+
+    #[test]
+    fn live_ai_profiles_are_selected_from_requested_pool_at_match_start() {
+        let players = human_vs_ai_players();
+        let requested_pool = [
+            TECH_TO_TANKS_ID,
+            RIFLE_FLOOD_FAST_ID,
+            RIFLE_FLOOD_FULL_SATURATION_ID,
+        ];
+        let mut observed = BTreeSet::new();
+
+        for seed in 0..64 {
+            let game = Game::new_with_random_ai_profiles(&players, seed);
+            let profiles = game.ai_profile_ids();
+
+            assert_eq!(profiles.len(), 1);
+            assert!(requested_pool.contains(&profiles[0]));
+            observed.insert(profiles[0]);
+        }
+
+        assert_eq!(observed, requested_pool.into_iter().collect());
+    }
+
+    #[test]
+    fn ordinary_game_new_uses_deterministic_ai_profile_for_tests() {
+        let players = human_vs_ai_players();
+
+        for seed in 0..16 {
+            let game = Game::new(&players, seed);
+            assert_eq!(game.ai_profile_ids(), vec![RIFLE_FLOOD_FULL_SATURATION_ID]);
+        }
     }
 
     fn legacy_snapshot_entities(game: &Game, player: u32, fogged: bool) -> Vec<EntityView> {
@@ -1009,9 +1099,10 @@ mod tests {
         );
     }
 
-    /// Drive a passive human vs. one AI and confirm the AI actually plays: it grows its economy,
-    /// expands supply, builds a barracks, produces riflemen, and marches them into the human base
-    /// to deal damage. This exercises the full command path the AI shares with human clients.
+    /// Drive a passive human vs. one AI and confirm the deterministic default AI actually plays:
+    /// it grows its economy, expands supply, builds a barracks, produces riflemen, and marches
+    /// them into the human base to deal damage. This exercises the full command path the AI shares
+    /// with human clients.
     #[test]
     fn ai_builds_economy_and_attacks() {
         let players = human_vs_ai_players();

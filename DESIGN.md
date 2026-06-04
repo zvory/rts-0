@@ -284,10 +284,18 @@ impl Game {
     /// paired expansion. For two-player games, the selected starts are kept but the two active
     /// neutral expansions are reselected from the authored expansion pool as the most symmetric
     /// assignment for that start matchup, so adjacent starts both expand in comparable directions.
+    /// AI players use the deterministic default profile; tests and self-play harnesses rely on
+    /// this stable behavior.
     pub fn new(players: &[PlayerInit], seed: u32) -> Game;
+
+    /// Create a live lobby match where each AI chooses one strategy from the live profile pool.
+    pub fn new_with_random_ai_profiles(players: &[PlayerInit], seed: u32) -> Game;
 
     /// Create a match with explicit starting steel/oil for every player.
     pub fn new_with_starting_resources(players: &[PlayerInit], steel: u32, oil: u32, seed: u32) -> Game;
+
+    /// Create a live lobby match with explicit starting steel/oil and random AI strategies.
+    pub fn new_with_starting_resources_and_random_ai_profiles(players: &[PlayerInit], steel: u32, oil: u32, seed: u32) -> Game;
 
     /// Static info for the `start` message (terrain + player start tiles). Call once.
     pub fn start_payload(&self) -> StartPayload;
@@ -896,13 +904,12 @@ currently visible enemy units/buildings during local defense.
 
 **Strategy (deliberately "very basic").** Each controller, on a staggered cadence
 (`DECISION_INTERVAL` ticks), builds a constrained live `AiObservation` and delegates RTS decisions
-to `game::ai_core::decision::decide_profile`. The default live profile is
-`rifle_flood_full_saturation`, selected server-side without a lobby protocol or UI change. It keeps
-idle workers mining steel, trains workers toward starting steel saturation, builds depots before
-supply deadlock, builds barracks, pumps riflemen, stages combat units forward, and attack-moves
-escalating rifleman waves at the nearest living enemy's public start tile. It does not micro,
-scout, or choose hidden enemy unit positions. A local per-think budget in the shared action layer
-prevents it from over-committing resources/supply it does not have.
+to `game::ai_core::decision::decide_profile`. Live lobby AIs randomly choose one server-side
+profile at match start, without a lobby protocol or UI change: `tech_to_tanks` (tank rush),
+`rifle_flood_fast` (proxy rush), or `rifle_flood_full_saturation` (the previous rifle saturation
+strategy). Each controller keeps its chosen profile for the whole match. It does not micro, scout,
+or choose hidden enemy unit positions. A local per-think budget in the shared action layer prevents
+it from over-committing resources/supply it does not have.
 
 **Shared AI core.** `game::ai_core` has deterministic profile data (`profiles.rs`) and a generic
 ranked decision loop (`decision.rs`) that emits ordinary `SimCommand`s through shared action helpers.

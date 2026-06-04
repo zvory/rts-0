@@ -14,7 +14,8 @@ use crate::config;
 use crate::game::ai_core::decision::{decide_profile, AiDecisionMemory};
 use crate::game::ai_core::observation::AiObservation;
 use crate::game::ai_core::profiles::{
-    profile_by_id, AiProfile, RIFLE_FLOOD_FULL_SATURATION, RIFLE_FLOOD_FULL_SATURATION_ID,
+    profile_by_id, AiProfile, RIFLE_FLOOD_FAST_ID, RIFLE_FLOOD_FULL_SATURATION,
+    RIFLE_FLOOD_FULL_SATURATION_ID, TECH_TO_TANKS_ID,
 };
 use crate::game::ai_shared;
 use crate::game::command::SimCommand;
@@ -24,6 +25,7 @@ use crate::game::map::Map;
 use crate::game::services::spatial::SpatialIndex;
 use crate::game::systems;
 use crate::game::PlayerState;
+use rand::Rng;
 use std::collections::BTreeSet;
 
 /// Re-plan cadence in ticks. The AI "thinks" this often (about 3 times/second at 30 Hz);
@@ -33,6 +35,18 @@ const DECISION_INTERVAL: u32 = 9;
 /// Default live-lobby profile. This preserves the current macro-focused AI behavior better than
 /// the faster pressure profile, while still selecting from the canonical shared profile ids.
 pub(crate) const DEFAULT_LIVE_PROFILE_ID: &str = RIFLE_FLOOD_FULL_SATURATION_ID;
+
+/// Profiles available to ordinary lobby AI opponents. The names map to player-facing behaviors:
+/// tank rush, proxy rush, and the previous rifle saturation strategy.
+const LIVE_PROFILE_IDS: [&str; 3] = [
+    TECH_TO_TANKS_ID,
+    RIFLE_FLOOD_FAST_ID,
+    RIFLE_FLOOD_FULL_SATURATION_ID,
+];
+
+pub(crate) fn random_live_profile_id(rng: &mut impl Rng) -> &'static str {
+    LIVE_PROFILE_IDS[rng.gen_range(0..LIVE_PROFILE_IDS.len())]
+}
 
 pub(crate) struct AiThinkContext<'a> {
     pub(crate) map: &'a Map,
@@ -58,7 +72,7 @@ impl AiController {
         Self::with_profile_id(player, DEFAULT_LIVE_PROFILE_ID)
     }
 
-    fn with_profile_id(player: u32, profile_id: &'static str) -> Self {
+    pub(crate) fn with_profile_id(player: u32, profile_id: &'static str) -> Self {
         let profile = profile_by_id(profile_id).unwrap_or(&RIFLE_FLOOD_FULL_SATURATION);
         Self {
             player,
@@ -69,6 +83,11 @@ impl AiController {
 
     fn profile(&self) -> &'static AiProfile {
         profile_by_id(self.profile_id).unwrap_or(&RIFLE_FLOOD_FULL_SATURATION)
+    }
+
+    #[cfg(test)]
+    pub(crate) fn profile_id(&self) -> &'static str {
+        self.profile_id
     }
 
     /// Decide this player's actions for the current tick, pushing any commands onto `out`. This is
@@ -183,6 +202,7 @@ mod tests {
     use super::*;
     use crate::game::command::SimCommand as Command;
     use crate::game::entity::{EntityStore, Order};
+    use rand::SeedableRng;
 
     fn player(
         id: u32,
@@ -211,6 +231,27 @@ mod tests {
 
         assert_eq!(ai.player, 2);
         assert_eq!(ai.profile_id, RIFLE_FLOOD_FULL_SATURATION_ID);
+    }
+
+    #[test]
+    fn live_profile_pool_has_requested_strategies() {
+        assert_eq!(
+            LIVE_PROFILE_IDS,
+            [
+                TECH_TO_TANKS_ID,
+                RIFLE_FLOOD_FAST_ID,
+                RIFLE_FLOOD_FULL_SATURATION_ID
+            ]
+        );
+    }
+
+    #[test]
+    fn random_live_profile_selection_uses_live_pool() {
+        let mut rng = rand::rngs::SmallRng::seed_from_u64(0xA1);
+        for _ in 0..32 {
+            let selected = random_live_profile_id(&mut rng);
+            assert!(LIVE_PROFILE_IDS.contains(&selected));
+        }
     }
 
     #[test]
