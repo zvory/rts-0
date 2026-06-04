@@ -24,6 +24,7 @@ export const C = Object.freeze({
   GIVE_UP: "giveUp",
   PING: "ping",
   SET_REPLAY_SPEED: "setReplaySpeed",
+  SEEK_REPLAY: "seekReplay",
 });
 
 // --- Command discriminators (the `c` field) ---
@@ -342,6 +343,7 @@ export const msg = Object.freeze({
   giveUp: () => ({ t: C.GIVE_UP }),
   ping: (ts) => ({ t: C.PING, ts }),
   setReplaySpeed: (speed) => ({ t: C.SET_REPLAY_SPEED, speed }),
+  seekReplay: (ticksBack) => ({ t: C.SEEK_REPLAY, ticksBack }),
 });
 
 // --- Command builders (the `cmd` payload) ---
