@@ -638,8 +638,10 @@ The current implementation uses the themed unit/building names below. Combat is 
 shared attack model plus the machine-gunner setup/teardown state, tank turret aim gates, and
 tank hull-facing damage modifiers for anti-tank hits against tank victims. Tanks keep their active
 movement path while firing; other mobile combat units still hold position once a target is in
-weapon range. Forest-specific rules are future work. The unit, building, and resource-node tables
-below are the human-readable form of the authoritative `rules::defs` records.
+weapon range. When tanks chase an acquired target from outside weapon range, they path to a
+standoff point inside firing range instead of the target center. Forest-specific rules are future
+work. The unit, building, and resource-node tables below are the human-readable form of the
+authoritative `rules::defs` records.
 
 - `TICK_HZ = 30`, `SNAPSHOT_EVERY_N_TICKS = 1`.
 - `MACHINE_GUNNER_SETUP_TICKS = 30` (~1s setup or teardown).

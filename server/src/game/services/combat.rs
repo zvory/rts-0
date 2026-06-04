@@ -26,6 +26,8 @@ const RANGE_SLACK: f32 = 4.0;
 const WORKER_DIRECT_HIT_RETREAT_TILES: f32 = 5.0;
 const TANK_TURRET_TURN_RATE_RAD_PER_TICK: f32 = 0.070;
 const TANK_TURRET_FIRE_TOLERANCE_RAD: f32 = 0.18;
+const TANK_STANDOFF_BUFFER_PX: f32 = config::TILE_SIZE as f32;
+const TANK_STANDOFF_REPATH_DELTA_PX: f32 = config::TILE_SIZE as f32;
 
 /// Combat: acquire targets for aggressive / attack-move units, let eligible idle units
 /// auto-acquire enemies, and deal damage when off cooldown. Damage is applied immediately and
@@ -194,9 +196,14 @@ pub(crate) fn combat_system(
                 }
             }
         } else if is_unit {
-            // Out of weapon range but within aggro: chase. Re-path toward the target tile
-            // when we have no path, so units route around obstacles rather than stalling.
-            let want_repath = entities.get(id).map(|e| e.path_is_empty()).unwrap_or(false);
+            // Out of weapon range but within aggro: chase. Tanks route to a standoff point
+            // inside firing range; other units still route toward the target center.
+            let chase_goal =
+                chase_goal_for_target(map, entities, id, (px, py), (tx, ty), range_px, dist);
+            let want_repath = entities
+                .get(id)
+                .map(|e| chase_path_needs_refresh(e, chase_goal))
+                .unwrap_or(false);
             if let Some(e) = entities.get_mut(id) {
                 if e.kind == EntityKind::Tank {
                     rotate_tank_weapon_for_combat(e, target_angle);
@@ -210,10 +217,77 @@ pub(crate) fn combat_system(
                 continue;
             }
             if want_repath {
-                coordinator.request_chase_path(entities, id, (tx, ty));
+                coordinator.request_chase_path(entities, id, chase_goal);
             }
         }
     }
+}
+
+fn chase_goal_for_target(
+    map: &Map,
+    entities: &EntityStore,
+    attacker_id: u32,
+    attacker_pos: (f32, f32),
+    target_pos: (f32, f32),
+    range_px: f32,
+    dist: f32,
+) -> (f32, f32) {
+    let is_out_of_range_tank = entities
+        .get(attacker_id)
+        .map(|e| e.kind == EntityKind::Tank && dist > range_px)
+        .unwrap_or(false);
+    if !is_out_of_range_tank {
+        return target_pos;
+    }
+    tank_standoff_goal(map, attacker_pos, target_pos, range_px).unwrap_or(target_pos)
+}
+
+fn tank_standoff_goal(
+    map: &Map,
+    attacker_pos: (f32, f32),
+    target_pos: (f32, f32),
+    range_px: f32,
+) -> Option<(f32, f32)> {
+    let (px, py) = attacker_pos;
+    let (tx, ty) = target_pos;
+    if !px.is_finite()
+        || !py.is_finite()
+        || !tx.is_finite()
+        || !ty.is_finite()
+        || !range_px.is_finite()
+    {
+        return None;
+    }
+    let dx = px - tx;
+    let dy = py - ty;
+    let dist = (dx * dx + dy * dy).sqrt();
+    if dist <= f32::EPSILON || !dist.is_finite() {
+        return None;
+    }
+    let buffer = TANK_STANDOFF_BUFFER_PX.min(range_px * 0.5);
+    let desired_dist = (range_px - buffer).max(0.0);
+    let ux = dx / dist;
+    let uy = dy / dist;
+    let max = map.world_size_px() - 0.01;
+    Some((
+        (tx + ux * desired_dist).clamp(0.0, max),
+        (ty + uy * desired_dist).clamp(0.0, max),
+    ))
+}
+
+fn chase_path_needs_refresh(e: &Entity, chase_goal: (f32, f32)) -> bool {
+    if e.path_is_empty() {
+        return true;
+    }
+    if e.kind != EntityKind::Tank {
+        return false;
+    }
+    e.path_goal()
+        .map(|goal| {
+            (goal.0 - chase_goal.0).abs() > TANK_STANDOFF_REPATH_DELTA_PX
+                || (goal.1 - chase_goal.1).abs() > TANK_STANDOFF_REPATH_DELTA_PX
+        })
+        .unwrap_or(true)
 }
 
 fn rotate_tank_weapon_for_combat(e: &mut Entity, target_angle: f32) -> bool {
@@ -1013,6 +1087,83 @@ mod tests {
             "tank should keep its movement path while firing"
         );
         assert_eq!(tank.next_waypoint(), Some((300.0, 100.0)));
+    }
+
+    #[test]
+    fn tank_chases_to_standoff_range_instead_of_target_center() {
+        let mut entities = EntityStore::new();
+        let tank_id = entities
+            .spawn_unit(1, EntityKind::Tank, 100.0, 100.0)
+            .expect("tank should spawn");
+        let enemy_id = entities
+            .spawn_unit(2, EntityKind::Rifleman, 280.0, 100.0)
+            .expect("enemy should spawn");
+        if let Some(tank) = entities.get_mut(tank_id) {
+            tank.set_order(Order::attack_move_to(400.0, 100.0));
+            tank.set_path(Vec::new());
+            tank.set_path_goal(Some((400.0, 100.0)));
+        }
+
+        let map = open_map(20);
+        run_combat_tick_on_map(
+            &mut entities,
+            &[player_state(1, false), player_state(2, false)],
+            &map,
+        );
+
+        let tank = entities.get(tank_id).expect("tank should exist");
+        let enemy = entities.get(enemy_id).expect("enemy should exist");
+        let goal = tank.path_goal().expect("tank should request a chase path");
+        let profile = combat_rules::attack_profile(EntityKind::Tank);
+        let range_px =
+            profile.range_tiles as f32 * config::TILE_SIZE as f32 + tank.radius() + RANGE_SLACK;
+        let goal_to_enemy = dist2(goal.0, goal.1, enemy.pos_x, enemy.pos_y).sqrt();
+
+        assert_ne!(goal, (enemy.pos_x, enemy.pos_y));
+        assert!(
+            goal_to_enemy < range_px,
+            "standoff goal should be comfortably inside weapon range"
+        );
+    }
+
+    #[test]
+    fn tank_chase_refreshes_stale_standoff_goal() {
+        let mut entities = EntityStore::new();
+        let tank_id = entities
+            .spawn_unit(1, EntityKind::Tank, 100.0, 100.0)
+            .expect("tank should spawn");
+        let enemy_id = entities
+            .spawn_unit(2, EntityKind::Rifleman, 320.0, 100.0)
+            .expect("enemy should spawn");
+        if let Some(tank) = entities.get_mut(tank_id) {
+            tank.set_order(Order::attack_move_to(500.0, 100.0));
+            tank.set_path(vec![(192.0, 100.0)]);
+            tank.set_path_goal(Some((192.0, 100.0)));
+            tank.set_last_repath_tick(10);
+        }
+
+        let map = open_map(20);
+        let old_goal = entities
+            .get(tank_id)
+            .expect("tank should exist")
+            .path_goal()
+            .expect("old goal should exist");
+
+        run_combat_tick_on_map(
+            &mut entities,
+            &[player_state(1, false), player_state(2, false)],
+            &map,
+        );
+
+        let tank = entities.get(tank_id).expect("tank should exist");
+        let enemy = entities.get(enemy_id).expect("enemy should exist");
+        let goal = tank.path_goal().expect("tank should keep a chase goal");
+
+        assert_ne!(goal, old_goal);
+        assert!(
+            goal.0 < enemy.pos_x,
+            "tank should route to the near side of the target, not the target center"
+        );
     }
 
     #[test]
