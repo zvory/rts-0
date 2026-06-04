@@ -31,6 +31,7 @@ const TOAST_MS = 2600;
  * so we ping well inside that window to keep a healthy connection alive.
  */
 const HEARTBEAT_MS = 15000;
+const KAR98K_GAIN = 0.25;
 
 const COMBAT_SOUNDS = Object.freeze({
   [KIND.TANK]: {
@@ -40,11 +41,12 @@ const COMBAT_SOUNDS = Object.freeze({
   [KIND.RIFLEMAN]: {
     ids: ["combat_rifle_02", "combat_rifle_03"],
     priority: 2,
-    gain: 0.5,
+    gain: KAR98K_GAIN,
   },
   [KIND.AT_TEAM]: {
     ids: ["combat_rifle_02", "combat_rifle_03"],
     priority: 4,
+    gain: KAR98K_GAIN,
   },
   [KIND.MACHINE_GUNNER]: {
     ids: ["combat_mg_burst_02", "combat_mg_burst_03"],
@@ -674,6 +676,7 @@ class Match {
       y: pos.y,
       category,
       priority: spec.priority,
+      gain: spec.gain,
     });
   }
 
