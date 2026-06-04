@@ -39,3 +39,6 @@ Track these before and after each phase:
 - The first extraction target and ownership boundary are explicit.
 - No runtime behavior changed.
 
+## Implementation Notes
+
+- [Phase 0 baseline](PHASE_0_BASELINE.md)
