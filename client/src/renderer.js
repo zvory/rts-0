@@ -1501,64 +1501,98 @@ function drawTankFuelCue(g, body, facing, motion) {
 }
 
 function drawScoutCar(g, body, tint, facing, weaponFacing, motion, recoil) {
-  const wheelR = 3.2;
-  const wheelX = body.halfLen * 0.58;
-  const wheelY = body.halfWidth + 2.2;
-  const wheelAlpha = lerp(0.72, 0.98, motion.activity);
+  const sideAlpha = lerp(0.62, 0.88, motion.activity);
 
-  g.beginFill(0x15120f, wheelAlpha);
-  for (const x of [-wheelX, wheelX]) {
-    for (const y of [-wheelY, wheelY]) {
-      drawRotatedRect(g, x, y, wheelR * 2.2, wheelR * 1.5, facing);
-    }
-  }
-  g.endFill();
-
+  // Single blocky truck hull with enclosed side running gear; nothing protrudes past the body.
   g.beginFill(tint);
-  g.drawPolygon(rotatedPolygon([
-    -body.halfLen + 2, -body.halfWidth + 3,
-    body.halfLen - 4, -body.halfWidth + 3,
-    body.halfLen, -body.halfWidth + 6,
-    body.halfLen, body.halfWidth - 6,
-    body.halfLen - 4, body.halfWidth - 3,
-    -body.halfLen + 2, body.halfWidth - 3,
-    -body.halfLen - 1, body.halfWidth - 6,
-    -body.halfLen - 1, -body.halfWidth + 6,
-  ], facing));
+  drawRotatedRect(g, 0, 0, body.halfLen * 2, body.halfWidth * 2, facing);
   g.endFill();
 
-  g.beginFill(0x1a1712, 0.22);
-  drawRotatedRect(g, body.halfLen * 0.08, 0, body.halfLen * 1.05, body.halfWidth * 0.9, facing);
+  g.beginFill(0x15120f, sideAlpha);
+  drawRotatedRect(g, -body.halfLen * 0.02, -body.halfWidth * 0.78, body.halfLen * 1.72, body.halfWidth * 0.22, facing);
+  drawRotatedRect(g, -body.halfLen * 0.02, body.halfWidth * 0.78, body.halfLen * 1.72, body.halfWidth * 0.22, facing);
+  g.endFill();
+
+  g.beginFill(lightenColor(tint, 0.08), 0.96);
+  drawRotatedRect(g, -body.halfLen * 0.32, 0, body.halfLen * 0.96, body.halfWidth * 1.44, facing);
   g.endFill();
 
   g.beginFill(lightenColor(tint, 0.14), 0.95);
-  drawRotatedRect(g, body.halfLen * 0.45, 0, body.halfLen * 0.48, body.halfWidth * 1.12, facing);
+  drawRotatedRect(g, body.halfLen * 0.36, 0, body.halfLen * 0.58, body.halfWidth * 1.42, facing);
   g.endFill();
 
-  const gunner = rotatePoint(-body.halfLen * 0.45, 0, facing);
-  g.beginFill(lightenColor(tint, 0.22), 0.98);
-  g.drawCircle(gunner.x, gunner.y, 4.2);
+  g.beginFill(0x211b14, 0.82);
+  drawRotatedRect(g, body.halfLen * 0.68, 0, body.halfLen * 0.22, body.halfWidth * 1.2, facing);
+  drawRotatedRect(g, body.halfLen * 0.24, -body.halfWidth * 0.36, body.halfLen * 0.18, body.halfWidth * 0.34, facing);
+  drawRotatedRect(g, body.halfLen * 0.24, body.halfWidth * 0.36, body.halfLen * 0.18, body.halfWidth * 0.34, facing);
+  g.endFill();
+
+  g.lineStyle(2, 0xd8d0b0, 0.6);
+  const hoodA = rotatePoint(body.halfLen * 0.48, -body.halfWidth * 0.45, facing);
+  const hoodB = rotatePoint(body.halfLen * 0.48, body.halfWidth * 0.45, facing);
+  g.moveTo(hoodA.x, hoodA.y);
+  g.lineTo(hoodB.x, hoodB.y);
+
+  const gunner = rotatePoint(-body.halfLen * 0.42, 0, facing);
+  const mount = rotatePoint(-body.halfLen * 0.32, 0, facing);
+  g.beginFill(0x1a1712, 0.9);
+  g.drawCircle(mount.x, mount.y, body.halfWidth * 0.32);
   g.endFill();
 
   const a = weaponFacing;
+  const gunnerTorso = offsetPoint(gunner, {
+    x: Math.cos(a + Math.PI) * body.halfWidth * 0.1,
+    y: Math.sin(a + Math.PI) * body.halfWidth * 0.1,
+  });
+  g.beginFill(lightenColor(tint, 0.14), 0.98);
+  drawFreeRotatedRect(g, gunnerTorso.x, gunnerTorso.y, body.halfWidth * 0.5, body.halfWidth * 0.64, a);
+  g.endFill();
+
+  const gunnerHead = {
+    x: gunner.x + Math.cos(a) * body.halfWidth * 0.2,
+    y: gunner.y + Math.sin(a) * body.halfWidth * 0.2,
+  };
+  g.beginFill(lightenColor(tint, 0.24), 0.98);
+  g.drawCircle(gunnerHead.x, gunnerHead.y, body.halfWidth * 0.18);
+  g.endFill();
+
   const kick = recoilVector(a, recoil);
+  const handSpan = body.halfWidth * 0.32;
+  const grip = offsetPoint({
+    x: gunner.x + Math.cos(a) * body.halfWidth * 0.2,
+    y: gunner.y + Math.sin(a) * body.halfWidth * 0.2,
+  }, kick);
+  g.lineStyle(2, 0xd8d0b0, 0.86);
+  g.moveTo(gunner.x - Math.sin(a) * handSpan, gunner.y + Math.cos(a) * handSpan);
+  g.lineTo(grip.x, grip.y);
+  g.moveTo(gunner.x + Math.sin(a) * handSpan, gunner.y - Math.cos(a) * handSpan);
+  g.lineTo(grip.x, grip.y);
+
   const stock = offsetPoint({
-    x: gunner.x + Math.cos(a + Math.PI) * 3.8,
-    y: gunner.y + Math.sin(a + Math.PI) * 3.8,
+    x: gunner.x + Math.cos(a + Math.PI) * body.halfWidth * 0.34,
+    y: gunner.y + Math.sin(a + Math.PI) * body.halfWidth * 0.34,
   }, kick);
   const muzzle = offsetPoint({
-    x: gunner.x + Math.cos(a) * (body.halfLen * 0.75),
-    y: gunner.y + Math.sin(a) * (body.halfLen * 0.75),
+    x: gunner.x + Math.cos(a) * (body.halfLen * 0.78),
+    y: gunner.y + Math.sin(a) * (body.halfLen * 0.78),
   }, kick);
   g.lineStyle(3, 0x17130f, 0.98);
   g.moveTo(stock.x, stock.y);
   g.lineTo(muzzle.x, muzzle.y);
   g.beginFill(0x32291f, 0.98);
   const receiver = offsetPoint({
-    x: gunner.x + Math.cos(a) * 5,
-    y: gunner.y + Math.sin(a) * 5,
+    x: gunner.x + Math.cos(a) * body.halfWidth * 0.42,
+    y: gunner.y + Math.sin(a) * body.halfWidth * 0.42,
   }, kick);
-  drawFreeRotatedRect(g, receiver.x, receiver.y, 7, 4, a);
+  drawFreeRotatedRect(g, receiver.x, receiver.y, body.halfWidth * 0.58, body.halfWidth * 0.3, a);
+  g.endFill();
+
+  const shroud = offsetPoint({
+    x: gunner.x + Math.cos(a) * body.halfWidth * 0.9,
+    y: gunner.y + Math.sin(a) * body.halfWidth * 0.9,
+  }, kick);
+  g.beginFill(0x241d17, 0.98);
+  drawFreeRotatedRect(g, shroud.x, shroud.y, body.halfWidth * 0.82, body.halfWidth * 0.18, a);
   g.endFill();
 
   const nose = polar(facing, body.halfLen - 2);

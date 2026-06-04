@@ -17,6 +17,7 @@ mod validation;
 #[cfg(test)]
 mod tests;
 
+#[allow(unused_imports)]
 pub(crate) use live::LiveSelfPlay;
 #[allow(unused_imports)]
 pub(crate) use replay::{

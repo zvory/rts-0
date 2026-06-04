@@ -47,8 +47,8 @@ export const TANK_BODY = Object.freeze({
   clearance: 1.5,
 });
 export const SCOUT_CAR_BODY = Object.freeze({
-  length: 34,
-  width: 18,
+  length: 51,
+  width: 27,
   clearance: 1.0,
 });
 
@@ -73,7 +73,7 @@ export const STATS = Object.freeze({
     rangeTiles: 5, cost: { steel: 75, oil: 25 }, supply: 2, buildTicks: 400, requires: KIND.TRAINING_CENTRE },
   [KIND.AT_TEAM]: { label: "AT Gun", icon: "AT", size: 20, sight: 8,
     rangeTiles: 5, cost: { steel: 75, oil: 25 }, supply: 2, buildTicks: 440, requires: KIND.TRAINING_CENTRE },
-  [KIND.SCOUT_CAR]: { label: "Scout Car", icon: "SC", size: 12, sight: 10, body: SCOUT_CAR_BODY,
+  [KIND.SCOUT_CAR]: { label: "Scout Car", icon: "SC", size: 18, sight: 10, body: SCOUT_CAR_BODY,
     rangeTiles: 5, cost: { steel: 125, oil: 75 }, supply: 3, buildTicks: 480 },
   [KIND.TANK]: { label: "Tank", icon: "TK", size: 15, sight: 7, body: TANK_BODY,
     rangeTiles: 3, cost: { steel: 200, oil: 150 }, supply: 6, buildTicks: 750, requires: KIND.STEELWORKS },
