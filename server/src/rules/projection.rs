@@ -148,6 +148,8 @@ pub fn project_entity(
 mod tests {
     use super::*;
     use crate::game::entity::{EntityKind, EntityStore, Order};
+    use crate::game::map::Map;
+    use crate::protocol::terrain;
 
     #[test]
     fn weapon_facing_is_omitted_when_target_direction_is_hidden() {
@@ -167,8 +169,14 @@ mod tests {
             tank.set_target_id(Some(hidden_target_id));
             tank.set_weapon_facing(1.2);
         }
-        let mut fog = Fog::new(64);
-        fog.recompute(&[1, 2, 3], &entities);
+        let map = Map {
+            size: 64,
+            terrain: vec![terrain::GRASS; 64 * 64],
+            starts: vec![(1, 1)],
+            expansion_sites: Vec::new(),
+        };
+        let mut fog = Fog::new(map.size);
+        fog.recompute(&[1, 2, 3], &entities, &map);
         let tank = entities.get(tank_id).expect("tank should exist");
         let hidden_target = entities
             .get(hidden_target_id)

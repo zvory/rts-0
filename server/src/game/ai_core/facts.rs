@@ -410,7 +410,7 @@ mod tests {
             score: crate::game::ScoreState::default(),
         }];
         let mut fog = crate::game::fog::Fog::new(map.size);
-        fog.recompute(&[1], &entities);
+        fog.recompute(&[1], &entities, &map);
         let live = AiObservation::from_live_state(&map, &entities, &fog, &players, 1, 0).unwrap();
         let live_facts = AiFacts::from_observation(&live);
 
@@ -494,7 +494,7 @@ mod tests {
         }];
 
         let mut fog = crate::game::fog::Fog::new(map.size);
-        fog.recompute(&[1], &entities);
+        fog.recompute(&[1], &entities, &map);
         let observation =
             AiObservation::from_live_state(&map, &entities, &fog, &players, 1, 0).unwrap();
         let facts = AiFacts::from_observation(&observation);

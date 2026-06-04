@@ -387,7 +387,7 @@ class Match {
     this.state = new GameState(payload);
     this.camera = new Camera();
     this.renderer = new Renderer(dom.viewport);
-    this.fog = new Fog(this.state.map.width, this.state.map.height);
+    this.fog = new Fog(this.state.map.width, this.state.map.height, this.state.map.terrain);
     this.fog.setRevealAll(!!this.devWatch?.noFog);
     this.hud = new HUD(dom.gameScreen, this.state, this.net);
     this.minimap = new Minimap(dom.minimap, this.state, this.camera, this.fog, this.net);
