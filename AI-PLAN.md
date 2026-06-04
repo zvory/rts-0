@@ -167,7 +167,8 @@ Intent:
   tiles of the enemy start
 - nonstop rifleman production from the proxy barracks
 - riflemen attack the enemy
-- after building a supply depot at 10, transition to another profile?
+- after the completed barracks has had time to produce seven riflemen, recover into main steel
+  saturation, oil workers, home barracks, Training Centre, and MG/AT support production
 
 ### `rifle_flood_full_saturation`
 
