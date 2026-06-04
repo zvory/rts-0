@@ -934,7 +934,12 @@ direct own-base-to-enemy-base scouting line. If the worker was already committed
 becomes affordable, the AI places the barracks near that worker's current position rather than
 waiting for the ideal edge point; if it can afford the barracks immediately, it uses the hidden
 edge target as the build site. It trains only one extra home worker and attack-moves riflemen as
-individual pressure units instead of waiting for escalating waves.
+individual pressure units instead of waiting for escalating waves. Once the first completed
+Barracks has had enough time to produce seven Riflemen, using the current Rifleman training time
+from shared unit stats, the profile stops treating the rush as a pure all-in: it resumes worker
+production toward main steel saturation, starts oil workers after a steel floor, adds a home
+Barracks, builds a Training Centre, and switches production toward Machine Gunners / AT teams with
+Riflemen as the fallback until support tech is ready.
 `rifle_flood_full_saturation` saturates the observed main-base steel line before assigning oil
 workers, so the oil timing follows the map's current steel patch count instead of a hardcoded worker
 number. At 50 supply it independently pivots into the tank tech path and becomes eligible to expand
