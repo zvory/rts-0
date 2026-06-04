@@ -7,7 +7,7 @@ use crate::game::services::occupancy::{footprint_center, Occupancy};
 use crate::game::services::standability;
 use crate::game::services::{dist2, interact_range_for_kind};
 use crate::game::PlayerState;
-use crate::protocol::Event;
+use crate::protocol::{Event, NoticeSeverity};
 use crate::rules;
 
 /// Advance build orders. Workers in `ToSite` that have walked into arrival range of their
@@ -67,6 +67,9 @@ pub(crate) fn construction_system(
         if !placeable {
             events.entry(owner).or_default().push(Event::Notice {
                 msg: "Cannot build there".to_string(),
+                x: None,
+                y: None,
+                severity: NoticeSeverity::Info,
             });
             if let Some(w) = entities.get_mut(worker) {
                 w.clear_orders();
@@ -76,6 +79,9 @@ pub(crate) fn construction_system(
         if !affordable {
             events.entry(owner).or_default().push(Event::Notice {
                 msg: "Not enough resources".to_string(),
+                x: None,
+                y: None,
+                severity: NoticeSeverity::Info,
             });
             if let Some(w) = entities.get_mut(worker) {
                 w.clear_orders();

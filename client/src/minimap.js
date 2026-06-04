@@ -13,6 +13,9 @@ import { TERRAIN, isResource, isUnit } from "./protocol.js";
 const isImpassableTerrainCode = (code) => code === TERRAIN.ROCK || code === TERRAIN.WATER;
 import { COLORS, FOG_EXPLORED_ALPHA, FOG_UNEXPLORED_ALPHA } from "./config.js";
 
+const PING_MS = 900;
+const BORDER_PULSE_MS = 700;
+
 // Convert one of the 0xRRGGBB palette ints into a CSS color string.
 const hex = (n) => "#" + n.toString(16).padStart(6, "0");
 
@@ -63,6 +66,8 @@ export class Minimap {
     this._mapH = 0;
 
     this._dragging = false;
+    this._pings = [];
+    this._borderPulseUntil = 0;
 
     // Bound handlers retained so destroy() can remove the exact references.
     this._onContextMenu = (ev) => ev.preventDefault();
@@ -136,6 +141,26 @@ export class Minimap {
     this._drawFog();
     this._drawResources();
     this._drawViewport();
+    this._drawPings(performance.now());
+  }
+
+  /**
+   * Add a transient world-position ping. Audio cooldown/suppression never gates this.
+   * @param {number} x world px
+   * @param {number} y world px
+   * @param {"info"|"warn"|"alert"} [severity]
+   */
+  ping(x, y, severity = "alert") {
+    if (!Number.isFinite(x) || !Number.isFinite(y)) {
+      this.pulseBorder();
+      return;
+    }
+    this._pings.push({ x, y, severity, startedAt: performance.now() });
+  }
+
+  /** Pulse the minimap border when an alert has no resolvable world position. */
+  pulseBorder() {
+    this._borderPulseUntil = Math.max(this._borderPulseUntil, performance.now() + BORDER_PULSE_MS);
   }
 
   /** Fill one minimap cell per tile with its terrain color. */
@@ -250,6 +275,34 @@ export class Minimap {
     ctx.lineWidth = 1;
     ctx.strokeRect(Math.round(tl.x) + 0.5, Math.round(tl.y) + 0.5, Math.round(w), Math.round(h));
     ctx.restore();
+  }
+
+  _drawPings(now) {
+    const ctx = this.ctx;
+    if (!ctx) return;
+    this._pings = this._pings.filter((p) => now - p.startedAt < PING_MS);
+    for (const ping of this._pings) {
+      const t = (now - ping.startedAt) / PING_MS;
+      const p = this._worldToCanvas(ping.x, ping.y);
+      const radius = 4 + 15 * t;
+      ctx.save();
+      ctx.globalAlpha = 1 - t;
+      ctx.strokeStyle = ping.severity === "warn" ? "#ffd166" : "#ff4d4d";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, radius, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+    if (now < this._borderPulseUntil) {
+      const t = 1 - (this._borderPulseUntil - now) / BORDER_PULSE_MS;
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, 1 - t);
+      ctx.strokeStyle = "#ff4d4d";
+      ctx.lineWidth = 3;
+      ctx.strokeRect(1.5, 1.5, this.size - 3, this.size - 3);
+      ctx.restore();
+    }
   }
 
   /**

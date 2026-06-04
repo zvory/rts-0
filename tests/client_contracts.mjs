@@ -18,6 +18,7 @@ import {
   EVENT_CODE,
   KIND,
   KIND_CODE,
+  NOTICE_SEVERITY,
   SETUP,
   SETUP_CODE,
   STATE,
@@ -65,6 +66,64 @@ function assertHasGetter(obj, name, msgPrefix = "") {
     d && typeof d.get === "function",
     `${msgPrefix || "Object"} missing getter "${name}"`,
   );
+}
+
+function fakeAudioParam(value = 1) {
+  return {
+    value,
+    cancelScheduledValues() {},
+    setValueAtTime(v) { this.value = v; },
+    linearRampToValueAtTime(v) { this.value = v; },
+  };
+}
+
+class FakeAudioNode {
+  connect() { return this; }
+  disconnect() {}
+}
+
+class FakeBufferSource extends FakeAudioNode {
+  constructor() {
+    super();
+    this.playbackRate = fakeAudioParam(1);
+    this.buffer = null;
+    this.onended = null;
+    this.started = false;
+    this.stopped = false;
+  }
+  start() {
+    this.started = true;
+  }
+  stop() {
+    this.stopped = true;
+    if (this.onended) this.onended();
+  }
+}
+
+function fakeGain() {
+  const node = new FakeAudioNode();
+  node.gain = fakeAudioParam(1);
+  return node;
+}
+
+function fakeAudioContext() {
+  return {
+    currentTime: 0,
+    createBufferSource() { return new FakeBufferSource(); },
+    createStereoPanner() {
+      const node = new FakeAudioNode();
+      node.pan = fakeAudioParam(0);
+      return node;
+    },
+    createBiquadFilter() {
+      const node = new FakeAudioNode();
+      node.type = "";
+      node.frequency = fakeAudioParam(0);
+      return node;
+    },
+    createGain: fakeGain,
+    close() {},
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -136,6 +195,7 @@ function assertHasGetter(obj, name, msgPrefix = "") {
       [EVENT_CODE[EVENT.DEATH], 200, 64, 96, KIND_CODE[KIND.STEEL]],
       [EVENT_CODE[EVENT.BUILD], 3, KIND_CODE[KIND.INDUSTRIAL_CENTER]],
       [EVENT_CODE[EVENT.NOTICE], "Not enough steel"],
+      [EVENT_CODE[EVENT.NOTICE], "alert:under_attack", 3, 512, 768],
     ],
   });
 
@@ -153,6 +213,9 @@ function assertHasGetter(obj, name, msgPrefix = "") {
   assert(decoded.events[0].e === EVENT.ATTACK && decoded.events[0].to === 7, "attack event decodes");
   assert(decoded.events[1].kind === KIND.STEEL, "death event kind decodes");
   assert(decoded.events[3].msg === "Not enough steel", "notice event decodes");
+  assert(decoded.events[3].severity === NOTICE_SEVERITY.INFO, "legacy notice defaults to info");
+  assert(decoded.events[4].severity === NOTICE_SEVERITY.ALERT, "notice severity decodes");
+  assert(decoded.events[4].x === 512 && decoded.events[4].y === 768, "notice position decodes");
 
   assertThrows(
     () => decodeServerMessage({ t: "snapshot", v: COMPACT_SNAPSHOT_VERSION, s: [1], e: [] }),
@@ -581,10 +644,92 @@ function assertHasGetter(obj, name, msgPrefix = "") {
   assertApprox(far.lpHz, 1200, 0.001, "Audio spatial lowpass reaches far cutoff");
   assert(audio._computeSpatial(1301, 100) === null, "Audio drops sounds beyond maxDist");
 
+  const priorPerformance = globalThis.performance;
+  let now = 0;
+  globalThis.performance = { now: () => now };
+  audio.ctx = fakeAudioContext();
+  audio.master = fakeGain();
+  audio.gains = {
+    ui: fakeGain(),
+    alert: fakeGain(),
+    combat_self: fakeGain(),
+    combat_other: fakeGain(),
+    unit_voice: fakeGain(),
+    ambient: fakeGain(),
+  };
+  for (const [cat, gain] of Object.entries(audio.gains)) {
+    gain.gain.value = audio.getCategoryVolume(cat);
+  }
+
+  for (let i = 0; i < 200; i++) audio.buffers.set(`pool_${i}`, { duration: 0.1 });
+  for (let i = 0; i < 120; i++) {
+    assert(audio.play(`pool_${i}`, { category: "ambient" }), "ambient voice should enqueue");
+    now += 1;
+  }
+  for (let i = 120; i < 200; i++) {
+    assert(audio.play(`pool_${i}`, { category: "alert" }), "alert voice should enqueue or evict");
+    now += 1;
+  }
+  assert(audio.voices.length <= 48, "Audio voice pool stays capped");
+  assert(audio.voices.every((v) => v.category === "alert"), "Audio priority eviction keeps highest-priority voices");
+
+  audio.voices.slice().forEach((v) => v.node.stop());
+  audio.buffers.set("notice_generic", { duration: 0.5 });
+  now = 10_000;
+  assert(
+    audio.play("notice_generic", {
+      category: "alert",
+      alertId: "under_attack",
+      alertX: 100,
+      alertY: 100,
+    }),
+    "first under-attack alert plays",
+  );
+  assert(
+    !audio.play("notice_generic", {
+      category: "alert",
+      alertId: "under_attack",
+      alertX: 120,
+      alertY: 140,
+    }),
+    "under-attack alert dedups within the same spatial bucket",
+  );
+  assert(
+    audio.play("notice_generic", {
+      category: "alert",
+      alertId: "under_attack",
+      alertX: 2000,
+      alertY: 100,
+    }),
+    "under-attack alert plays in a different spatial bucket",
+  );
+
+  audio.voices.slice().forEach((v) => v.node.stop());
+  audio.buffers.set("notice_supply", { duration: 2.3 });
+  now = 30_000;
+  assert(audio.play("notice_supply", { category: "alert" }), "first spoken alert plays");
+  now += 1500;
+  assert(!audio.play("notice_supply", { category: "alert" }), "spoken alert cooldown honors buffer duration");
+  now += 801;
+  assert(audio.play("notice_supply", { category: "alert" }), "spoken alert plays after buffer-duration cooldown");
+
+  audio.voices.slice().forEach((v) => v.node.stop());
+  audio.buffers.set("duck_alert", { duration: 0.1 });
+  now = 40_000;
+  const ambientBefore = audio.gains.ambient.gain.value;
+  const combatBefore = audio.gains.combat_self.gain.value;
+  assert(audio.play("duck_alert", { category: "alert" }), "ducking alert plays");
+  assert(audio.gains.ambient.gain.value < ambientBefore, "alert ducks ambient bus");
+  assert(audio.gains.combat_self.gain.value < combatBefore, "alert ducks combat bus");
+  audio.voices.slice().forEach((v) => v.node.stop());
+  assertApprox(audio.gains.ambient.gain.value, audio.getCategoryVolume("ambient"), 0.0001, "ambient bus restores");
+  assertApprox(audio.gains.combat_self.gain.value, audio.getCategoryVolume("combat_self"), 0.0001, "combat bus restores");
+
   audio.destroy();
   globalThis.window = priorWindow;
   globalThis.document = priorDocument;
   globalThis.localStorage = priorLocalStorage;
+  globalThis.performance = priorPerformance;
 }
 
 console.log("✅ client_contracts.mjs: all contract assertions passed");

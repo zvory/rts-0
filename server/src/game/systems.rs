@@ -269,7 +269,7 @@ mod tests {
         assert!(
             events
                 .get(&1)
-                .is_some_and(|events| matches!(events.as_slice(), [Event::Notice { msg }] if msg == "Cannot build there")),
+                .is_some_and(|events| matches!(events.as_slice(), [Event::Notice { msg, .. }] if msg == "Cannot build there")),
             "rejected construction should notify the owner"
         );
     }
