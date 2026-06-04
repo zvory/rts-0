@@ -36,6 +36,7 @@ const COMBAT_SOUNDS = Object.freeze({
   [KIND.TANK]: {
     ids: ["combat_tank_01", "combat_tank_06"],
     priority: 4,
+    gain: 2,
   },
   [KIND.RIFLEMAN]: {
     ids: ["combat_rifle_02", "combat_rifle_03"],
@@ -45,6 +46,7 @@ const COMBAT_SOUNDS = Object.freeze({
   [KIND.AT_TEAM]: {
     ids: ["combat_tank_01", "combat_tank_06"],
     priority: 4,
+    gain: 2,
   },
   [KIND.MACHINE_GUNNER]: {
     ids: ["combat_mg_burst_02", "combat_mg_burst_03"],
@@ -674,6 +676,7 @@ class Match {
       y: pos.y,
       category,
       priority: spec.priority,
+      gain: spec.gain ?? 1,
     });
   }
 

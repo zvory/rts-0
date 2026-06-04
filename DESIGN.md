@@ -522,7 +522,7 @@ export class Input {
 ```js
 export class Audio {
   preload(manifest): Promise<void>        // decode sounds once the AudioContext is unlocked
-  play(id, {x?, y?, priority?, category?, pitchVariance?})
+  play(id, {x?, y?, priority?, category?, pitchVariance?, gain?})
                                            // x/y present -> StereoPanner + lowpass + distance gain
   playUI(id, opts)                        // non-spatial ui category convenience
   setListener(x, y, zoom, viewW?)          // camera center in world px; derives screen-width refDist
