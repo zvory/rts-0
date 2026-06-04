@@ -17,6 +17,7 @@ pub(crate) struct AiProfile {
     pub(crate) attack: AttackPolicy,
     pub(crate) resources: ResourcePolicy,
     pub(crate) expansion: Option<ExpansionPolicy>,
+    pub(crate) recovery_transition: Option<RecoveryTransitionPolicy>,
     pub(crate) tech_transition: Option<TechTransitionPolicy>,
 }
 
@@ -169,6 +170,20 @@ pub(crate) struct TechTransitionPolicy {
     pub(crate) attack: AttackPolicy,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct RecoveryTransitionPolicy {
+    pub(crate) completed_building: EntityKind,
+    pub(crate) delay_unit: EntityKind,
+    pub(crate) delay_unit_build_count: u32,
+    pub(crate) workers: WorkerPolicy,
+    pub(crate) barracks_curve: BarracksCurve,
+    pub(crate) required_tech_path: &'static [EntityKind],
+    pub(crate) production: ProductionPolicy,
+    pub(crate) attack: AttackPolicy,
+    pub(crate) resources: ResourcePolicy,
+    pub(crate) expansion: Option<ExpansionPolicy>,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct ResourcePolicy {
     pub(crate) oil_after_steel_workers: usize,
@@ -187,6 +202,11 @@ const RIFLE_ONLY: [EntityKind; 1] = [EntityKind::Rifleman];
 const TANK_AND_RIFLE: [EntityKind; 2] = [EntityKind::Tank, EntityKind::Rifleman];
 const TANK_ONLY: [EntityKind; 1] = [EntityKind::Tank];
 const SUPPORT_WEAPONS: [EntityKind; 2] = [EntityKind::MachineGunner, EntityKind::AtTeam];
+const SUPPORT_WEAPONS_AND_RIFLE: [EntityKind; 3] = [
+    EntityKind::MachineGunner,
+    EntityKind::AtTeam,
+    EntityKind::Rifleman,
+];
 
 const FAST_TECH_PATH: [EntityKind; 1] = [EntityKind::Barracks];
 const FULL_TECH_PATH: [EntityKind; 1] = [EntityKind::Barracks];
@@ -256,6 +276,58 @@ pub(crate) static RIFLE_FLOOD_FAST: AiProfile = AiProfile {
         trigger_steel: 500,
         trigger_supply_used: 70,
         blocks_tech_path: false,
+    }),
+    recovery_transition: Some(RecoveryTransitionPolicy {
+        completed_building: EntityKind::Barracks,
+        delay_unit: EntityKind::Rifleman,
+        delay_unit_build_count: 7,
+        workers: WorkerPolicy {
+            steel_saturation_fraction: Ratio::new(1, 1),
+            steel_worker_cap: None,
+            extra_oil_workers: 3,
+            pressure_worker_cap: None,
+            pressure_until_complete: None,
+        },
+        barracks_curve: BarracksCurve {
+            before_steel_saturation: 2,
+            after_steel_saturation: 3,
+            banked_steel_threshold: 450,
+            banked_steel_step: 300,
+            max: 4,
+        },
+        required_tech_path: &SUPPORT_TECH_PATH,
+        production: ProductionPolicy {
+            queue_depth: 3,
+            unit_priorities: &SUPPORT_WEAPONS_AND_RIFLE,
+            save_for_first_tech_unit: None,
+            balance_unit_priorities: true,
+        },
+        attack: AttackPolicy {
+            first_attack_size: usize::MAX,
+            wave_growth: 0,
+            regroup_reset_ticks: 540,
+            reissue_cadence_ticks: 120,
+            stage_distance_tiles: 3.0,
+            unit_kinds: &SUPPORT_WEAPONS_AND_RIFLE,
+            required_unit: None,
+        },
+        resources: ResourcePolicy {
+            oil_after_steel_workers: 8,
+            oil_after_full_steel_saturation: false,
+            tank_adaptive: None,
+        },
+        expansion: Some(ExpansionPolicy {
+            target_industrial_centers: 2,
+            required_complete_building: EntityKind::TrainingCentre,
+            defensive_unit: EntityKind::MachineGunner,
+            defensive_unit_count: 0,
+            pre_expansion_steel_worker_cap: usize::MAX,
+            post_expansion_steel_worker_cap: Some(28),
+            search_radius_tiles: 6,
+            trigger_steel: 500,
+            trigger_supply_used: 50,
+            blocks_tech_path: false,
+        }),
     }),
     tech_transition: Some(TechTransitionPolicy {
         // If the proxy rush stalls and we accumulate supply, pivot to tanks so we can break a
@@ -337,6 +409,7 @@ pub(crate) static RIFLE_FLOOD_FULL_SATURATION: AiProfile = AiProfile {
         trigger_supply_used: 50,
         blocks_tech_path: false,
     }),
+    recovery_transition: None,
     tech_transition: Some(TechTransitionPolicy {
         // Once the rifle flood has put real bodies on the field, pivot to tanks so a stalemated
         // saturation push doesn't bleed out against superior tech.
@@ -417,6 +490,7 @@ pub(crate) static TECH_TO_TANKS: AiProfile = AiProfile {
         trigger_supply_used: 70,
         blocks_tech_path: false,
     }),
+    recovery_transition: None,
     tech_transition: None,
 };
 
@@ -477,6 +551,7 @@ pub(crate) static STEEL_EXPANSION_TANKS: AiProfile = AiProfile {
         trigger_supply_used: 0,
         blocks_tech_path: true,
     }),
+    recovery_transition: None,
     tech_transition: Some(TechTransitionPolicy {
         supply_used_threshold: 50,
         required_tech_path: &TANK_TECH_PATH,
@@ -546,6 +621,16 @@ mod tests {
                 < RIFLE_FLOOD_FULL_SATURATION.production.queue_depth
         );
         assert!(RIFLE_FLOOD_FAST.buildings.proxy_barracks.is_some());
+        let recovery = RIFLE_FLOOD_FAST.recovery_transition.unwrap();
+        assert_eq!(recovery.completed_building, EntityKind::Barracks);
+        assert_eq!(recovery.delay_unit, EntityKind::Rifleman);
+        assert_eq!(recovery.delay_unit_build_count, 7);
+        assert_eq!(recovery.workers.steel_worker_cap, None);
+        assert_eq!(recovery.workers.extra_oil_workers, 3);
+        assert_eq!(
+            recovery.required_tech_path,
+            &[EntityKind::Barracks, EntityKind::TrainingCentre]
+        );
     }
 
     #[test]
