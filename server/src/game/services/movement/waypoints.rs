@@ -24,6 +24,8 @@ use super::tank_drive::{
 };
 use super::{ARRIVE_EPS, MAX_UNIT_BOUNDING_RADIUS_PX};
 
+const TANK_ROTATION_UNJAM_EPS: f32 = 1.0e-4;
+
 /// Advance every moving unit along its waypoint path at its speed. Clamps the final landing
 /// tile to passable terrain (soft overlap with other units is allowed, so we don't resolve
 /// unit-unit collisions here). Arriving at the last waypoint of a plain Move clears the order.
@@ -299,7 +301,31 @@ pub(super) fn advance_moving_units(
             if let Some(facing) = new_facing {
                 if !unit_static_standable(occ, map, kind, x, y, facing) {
                     if unit_static_standable(occ, map, kind, x, y, original_facing) {
-                        new_facing = None;
+                        let route_target = entities
+                            .get(id)
+                            .and_then(|e| e.next_waypoint().or_else(|| e.path_goal()));
+                        if is_tank {
+                            if let Some((ux, uy)) = tank_rotation_unjam_candidate(
+                                occ,
+                                map,
+                                kind,
+                                TankRotationUnjamProbe {
+                                    pos: (x, y),
+                                    original_facing,
+                                    blocked_facing: facing,
+                                    step_px: speed,
+                                    route_target,
+                                },
+                            ) {
+                                x = ux;
+                                y = uy;
+                                static_blocked_this_tick = false;
+                            } else {
+                                new_facing = None;
+                            }
+                        } else {
+                            new_facing = None;
+                        }
                     } else {
                         x = orig_x;
                         y = orig_y;
@@ -483,4 +509,70 @@ pub(super) fn advance_moving_units(
             }
         }
     }
+}
+
+#[derive(Clone, Copy)]
+struct TankRotationUnjamProbe {
+    pos: (f32, f32),
+    original_facing: f32,
+    blocked_facing: f32,
+    step_px: f32,
+    route_target: Option<(f32, f32)>,
+}
+
+fn tank_rotation_unjam_candidate(
+    occ: &Occupancy,
+    map: &Map,
+    kind: EntityKind,
+    probe: TankRotationUnjamProbe,
+) -> Option<(f32, f32)> {
+    if !probe.original_facing.is_finite()
+        || !probe.blocked_facing.is_finite()
+        || !probe.step_px.is_finite()
+        || probe.step_px <= 0.0
+    {
+        return None;
+    }
+
+    let forward = (probe.original_facing.cos(), probe.original_facing.sin());
+    if !forward.0.is_finite() || !forward.1.is_finite() {
+        return None;
+    }
+
+    let mut best = None;
+    let mut best_score = f32::INFINITY;
+    for sign in [1.0_f32, -1.0] {
+        let candidate = (
+            probe.pos.0 + forward.0 * probe.step_px * sign,
+            probe.pos.1 + forward.1 * probe.step_px * sign,
+        );
+        if !unit_static_standable(
+            occ,
+            map,
+            kind,
+            candidate.0,
+            candidate.1,
+            probe.original_facing,
+        ) || !unit_static_standable(
+            occ,
+            map,
+            kind,
+            candidate.0,
+            candidate.1,
+            probe.blocked_facing,
+        ) {
+            continue;
+        }
+
+        let score = probe
+            .route_target
+            .map(|target| distance_between(candidate, target))
+            .unwrap_or(if sign > 0.0 { 0.0 } else { 1.0 });
+        if score + TANK_ROTATION_UNJAM_EPS < best_score {
+            best = Some(candidate);
+            best_score = score;
+        }
+    }
+
+    best
 }
