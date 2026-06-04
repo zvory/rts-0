@@ -432,6 +432,7 @@ mod tests {
     fn hardcoded_map_loads_for_every_supported_player_count() {
         for player_count in 1..=4 {
             let map = Map::generate(player_count, 0x1234_5678);
+            assert_eq!(map.size, 126);
             assert_eq!(map.terrain.len(), (map.size * map.size) as usize);
             assert_eq!(map.starts.len(), player_count);
             assert!(!map.expansion_sites.is_empty());
@@ -473,7 +474,7 @@ mod tests {
     #[test]
     fn shuffled_starts_get_expansions_from_authored_pool() {
         // All authored expansions from default-handcrafted.json.
-        let authored_expansions: &[(u32, u32)] = &[(48, 23), (48, 73), (73, 47), (23, 47)];
+        let authored_expansions: &[(u32, u32)] = &[(63, 38), (63, 88), (88, 62), (38, 62)];
         for seed in 0..16u32 {
             let map = Map::generate(4, seed);
             assert_eq!(map.starts.len(), map.expansion_sites.len());
@@ -528,23 +529,23 @@ mod tests {
         let authored_pairs = default_authored_pairs();
 
         assert_eq!(
-            select_symmetric_two_player_expansions([(10, 10), (85, 10)], &authored_pairs),
-            vec![(23, 47), (73, 47)],
+            select_symmetric_two_player_expansions([(25, 25), (100, 25)], &authored_pairs),
+            vec![(38, 62), (88, 62)],
             "top-edge starts should both expand toward matching side naturals"
         );
         assert_eq!(
-            select_symmetric_two_player_expansions([(10, 85), (85, 85)], &authored_pairs),
-            vec![(23, 47), (73, 47)],
+            select_symmetric_two_player_expansions([(25, 100), (100, 100)], &authored_pairs),
+            vec![(38, 62), (88, 62)],
             "bottom-edge starts should both expand toward matching side naturals"
         );
         assert_eq!(
-            select_symmetric_two_player_expansions([(10, 10), (10, 85)], &authored_pairs),
-            vec![(48, 23), (48, 73)],
+            select_symmetric_two_player_expansions([(25, 25), (25, 100)], &authored_pairs),
+            vec![(63, 38), (63, 88)],
             "left-edge starts should both expand toward matching vertical naturals"
         );
         assert_eq!(
-            select_symmetric_two_player_expansions([(85, 10), (85, 85)], &authored_pairs),
-            vec![(48, 23), (48, 73)],
+            select_symmetric_two_player_expansions([(100, 25), (100, 100)], &authored_pairs),
+            vec![(63, 38), (63, 88)],
             "right-edge starts should both expand toward matching vertical naturals"
         );
     }
@@ -615,10 +616,10 @@ mod tests {
 
     fn default_authored_pairs() -> [BasePair; 4] {
         [
-            ((10, 10), (48, 23)),
-            ((85, 85), (48, 73)),
-            ((85, 10), (73, 47)),
-            ((10, 85), (23, 47)),
+            ((25, 25), (63, 38)),
+            ((100, 100), (63, 88)),
+            ((100, 25), (88, 62)),
+            ((25, 100), (38, 62)),
         ]
     }
 }

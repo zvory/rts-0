@@ -48,9 +48,10 @@ pub const AT_GUN_PACKED_DAMAGE_MULTIPLIER: f32 = 0.75;
 /// Total deployed AT gun field of fire in radians.
 pub const AT_GUN_FIELD_OF_FIRE_RAD: f32 = std::f32::consts::PI / 6.0;
 
-/// Experimental: tanks burn this much oil per world pixel of movement. Calibrated so a tank
-/// driving from one edge of the 96-tile map to the other (3072 px) burns ~10 oil. When a
-/// player has zero oil their tanks pause movement before retrying.
+/// Experimental: tanks burn this much oil per world pixel of movement. Calibrated against the
+/// original 96-tile map span (3072 px), where a full-width drive burned ~10 oil. Larger maps keep
+/// the same per-pixel rate, so longer crossings cost proportionally more. When a player has zero
+/// oil their tanks pause movement before retrying.
 pub const TANK_OIL_COST_PER_PX: f32 = 10.0 / (96.0 * TILE_SIZE as f32);
 /// Ticks a moving tank waits after an oil-starved movement attempt before checking fuel again.
 pub const TANK_OIL_STARVED_PAUSE_TICKS: u16 = TICK_HZ as u16;

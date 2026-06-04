@@ -729,11 +729,13 @@ authoritative `rules::defs` records.
 - AT guns use `AT_GUN_PACKED_RANGE_TILES = 4`, `AT_GUN_DEPLOYED_RANGE_TILES = 7`,
   `AT_GUN_PACKED_DAMAGE_MULTIPLIER = 0.75`, and
   `AT_GUN_FIELD_OF_FIRE_RAD = PI / 6` (30 degrees total).
-- `TANK_OIL_COST_PER_PX = 10 / (96 * TILE_SIZE)`: a tank driving one full 96-tile map width
-  burns approximately 10 oil. Tanks cannot advance while their owner has zero oil.
+- `TANK_OIL_COST_PER_PX = 10 / (96 * TILE_SIZE)`: tank movement still uses the original
+  96-tile calibration, so driving the wider 126-tile map costs proportionally more oil than
+  before. Tanks cannot advance while their owner has zero oil.
 - Map: `TILE_SIZE = 32` px. The live map is the hardcoded handcrafted asset at
-  `server/assets/maps/default-handcrafted.json` (96×96 today), served for tooling at
-  `/maps/default-handcrafted.json`.
+  `server/assets/maps/default-handcrafted.json` (126×126 today), served for tooling at
+  `/maps/default-handcrafted.json`. The current asset is the original 96×96 handcrafted map
+  padded with 15 passable grass tiles on every edge.
   Its JSON uses row strings (`.` grass, `#` rock, `~` water) plus ordered `baseSites`.
 - Start: `STARTING_STEEL = 75`, `STARTING_OIL = 0`, `STARTING_WORKERS = 4`,
   one City Centre at the player's start tile, 18 steel patches + 3 oil patches nearby.
