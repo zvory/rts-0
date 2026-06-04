@@ -32,6 +32,8 @@ const COLLISION_EPS_PX: f32 = 0.001;
 
 pub(crate) const TANK_BODY_TURN_RATE_RAD_PER_TICK: f32 = 0.035;
 const TANK_BODY_LOOKAHEAD_PX: f32 = config::TILE_SIZE as f32 * 5.0;
+const TANK_REVERSE_GOAL_DISTANCE_PX: f32 = config::TILE_SIZE as f32 * 3.0;
+const TANK_REVERSE_MIN_BEHIND_ANGLE_RAD: f32 = std::f32::consts::FRAC_PI_2;
 const TANK_CRAWL_ANGLE_RAD: f32 = 0.55;
 const TANK_PIVOT_ANGLE_RAD: f32 = 1.25;
 
@@ -99,13 +101,15 @@ pub(crate) fn movement_system(
         let mut static_blocked_this_tick = false;
         if is_tank {
             if let Some(e) = entities.get(id) {
-                if let Some((desired_x, desired_y)) = tank_desired_path_point(map, occ, e, x, y) {
-                    let desired = (desired_y - y).atan2(desired_x - x);
-                    if desired.is_finite() {
-                        let rotated =
-                            rotate_toward(e.facing(), desired, TANK_BODY_TURN_RATE_RAD_PER_TICK);
+                if let Some(intent) = tank_drive_intent(map, occ, e, x, y) {
+                    if intent.desired_facing.is_finite() {
+                        let rotated = rotate_toward(
+                            e.facing(),
+                            intent.desired_facing,
+                            TANK_BODY_TURN_RATE_RAD_PER_TICK,
+                        );
                         if rotated.is_finite() {
-                            let error = angle_delta(rotated, desired).abs();
+                            let error = angle_delta(rotated, intent.desired_facing).abs();
                             budget *= tank_speed_scale(error);
                             new_facing = Some(rotated);
                         }
@@ -410,10 +414,48 @@ pub(crate) fn movement_system(
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct TankDriveIntent {
+    desired_facing: f32,
+}
+
+fn tank_drive_intent(
+    map: &Map,
+    occ: &Occupancy,
+    e: &Entity,
+    x: f32,
+    y: f32,
+) -> Option<TankDriveIntent> {
+    let (desired_x, desired_y) = tank_desired_path_point(map, occ, e, x, y)?;
+    let dx = desired_x - x;
+    let dy = desired_y - y;
+    let dist = (dx * dx + dy * dy).sqrt();
+    if !dist.is_finite() || dist <= 1.0e-4 {
+        return None;
+    }
+
+    let forward_desired = dy.atan2(dx);
+    if dist <= TANK_REVERSE_GOAL_DISTANCE_PX
+        && angle_delta(e.facing(), forward_desired).abs() > TANK_REVERSE_MIN_BEHIND_ANGLE_RAD
+    {
+        return Some(TankDriveIntent {
+            desired_facing: normalize_angle(forward_desired + std::f32::consts::PI),
+        });
+    }
+
+    Some(TankDriveIntent {
+        desired_facing: forward_desired,
+    })
+}
+
 /// Signed shortest angular delta from `from` to `to`, in radians.
 pub(crate) fn angle_delta(from: f32, to: f32) -> f32 {
     let two_pi = std::f32::consts::TAU;
     (to - from + std::f32::consts::PI).rem_euclid(two_pi) - std::f32::consts::PI
+}
+
+fn normalize_angle(angle: f32) -> f32 {
+    angle_delta(0.0, angle)
 }
 
 pub(crate) fn rotate_toward(current: f32, desired: f32, max_delta: f32) -> f32 {
@@ -2383,6 +2425,104 @@ mod tests {
             e.facing().abs() > 0.0 && e.facing().abs() <= TANK_BODY_TURN_RATE_RAD_PER_TICK + 0.0001,
             "tank should still rotate while paused, facing {:.4}",
             e.facing()
+        );
+    }
+
+    #[test]
+    fn tank_reverses_to_nearby_goal_behind() {
+        let map = flat_map(1);
+        let mut entities = EntityStore::new();
+        let (sx, sy) = map.tile_center(20, 20);
+        let goal = (sx - config::TILE_SIZE as f32, sy);
+        let tank = entities
+            .spawn_unit(1, EntityKind::Tank, sx, sy)
+            .expect("tank should spawn");
+        if let Some(e) = entities.get_mut(tank) {
+            e.set_facing(0.0);
+        }
+        set_path_direct(&mut entities, tank, vec![goal]);
+
+        let occ = Occupancy::build(&map, &entities);
+        let spatial = SpatialIndex::build(&entities, map.size);
+        movement_system(&map, &mut entities, &mut [], &occ, &spatial, 0);
+
+        let e = entities.get(tank).expect("tank should exist");
+        assert!(
+            e.pos_x < sx,
+            "near behind goal should make the tank reverse, start x {sx:.2}, got {:.2}",
+            e.pos_x
+        );
+        assert!(
+            angle_delta(0.0, e.facing()).abs() <= 0.001,
+            "directly reversing should not spin the hull, facing {:.4}",
+            e.facing()
+        );
+    }
+
+    #[test]
+    fn tank_still_pivots_for_far_goal_behind() {
+        let map = flat_map(1);
+        let mut entities = EntityStore::new();
+        let (sx, sy) = map.tile_center(20, 20);
+        let goal = (
+            sx - TANK_REVERSE_GOAL_DISTANCE_PX - config::TILE_SIZE as f32,
+            sy,
+        );
+        let tank = entities
+            .spawn_unit(1, EntityKind::Tank, sx, sy)
+            .expect("tank should spawn");
+        if let Some(e) = entities.get_mut(tank) {
+            e.set_facing(0.0);
+        }
+        set_path_direct(&mut entities, tank, vec![goal]);
+
+        let occ = Occupancy::build(&map, &entities);
+        let spatial = SpatialIndex::build(&entities, map.size);
+        movement_system(&map, &mut entities, &mut [], &occ, &spatial, 0);
+
+        let e = entities.get(tank).expect("tank should exist");
+        let moved = moved_distance((sx, sy), (e.pos_x, e.pos_y));
+        assert!(
+            moved <= 0.01,
+            "far behind goal should pivot before driving, moved {moved:.4}px"
+        );
+        assert!(
+            e.facing().abs() > 0.0 && e.facing().abs() <= TANK_BODY_TURN_RATE_RAD_PER_TICK + 0.0001,
+            "far behind goal should rotate hull toward the forward route, facing {:.4}",
+            e.facing()
+        );
+    }
+
+    #[test]
+    fn tank_reverse_correction_uses_short_angle_across_wrap() {
+        let map = flat_map(1);
+        let mut entities = EntityStore::new();
+        let (sx, sy) = map.tile_center(20, 20);
+        let goal = (sx + config::TILE_SIZE as f32, sy + 0.5);
+        let initial_facing = std::f32::consts::PI - 0.01;
+        let tank = entities
+            .spawn_unit(1, EntityKind::Tank, sx, sy)
+            .expect("tank should spawn");
+        if let Some(e) = entities.get_mut(tank) {
+            e.set_facing(initial_facing);
+        }
+        set_path_direct(&mut entities, tank, vec![goal]);
+
+        let occ = Occupancy::build(&map, &entities);
+        let spatial = SpatialIndex::build(&entities, map.size);
+        movement_system(&map, &mut entities, &mut [], &occ, &spatial, 0);
+
+        let e = entities.get(tank).expect("tank should exist");
+        let hull_delta = angle_delta(initial_facing, e.facing()).abs();
+        assert!(
+            hull_delta <= TANK_BODY_TURN_RATE_RAD_PER_TICK + 0.0001,
+            "reverse correction should use the short wrapped turn, delta {hull_delta:.4}, facing {:.4}",
+            e.facing()
+        );
+        assert!(
+            e.pos_x > sx,
+            "near behind wrapped goal should reverse toward positive x, got {:.2} from start {sx:.2}",
+            e.pos_x
         );
     }
 
