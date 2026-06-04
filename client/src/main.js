@@ -477,13 +477,16 @@ class Match {
 
   handleMenuKeyDown(ev) {
     if (ev.code !== "Escape" || ev.repeat || isTextEntry(ev.target)) return;
-    if (this.state.placement || this.state.commandTarget) return;
-    ev.preventDefault();
-    ev.stopPropagation();
     if (dom.giveUpConfirm && !dom.giveUpConfirm.hidden) {
+      ev.preventDefault();
+      ev.stopPropagation();
       this.closeGiveUpConfirm();
-    } else {
-      this.toggleSettingsMenu();
+      return;
+    }
+    if (dom.settingsMenu && !dom.settingsMenu.hidden) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      this.closeSettingsMenu();
     }
   }
 
