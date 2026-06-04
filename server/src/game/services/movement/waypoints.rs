@@ -1,0 +1,464 @@
+use std::collections::HashMap;
+
+use crate::config;
+use crate::game::entity::{
+    uses_car_movement_semantics, uses_oriented_vehicle_body, uses_tank_movement_semantics,
+    EntityKind, EntityStore, MovePhase, Order, WeaponSetup,
+};
+use crate::game::map::Map;
+use crate::game::services::geometry::unit_body_for_entity;
+use crate::game::services::occupancy::Occupancy;
+use crate::game::services::spatial::SpatialIndex;
+use crate::game::PlayerState;
+use crate::protocol::Event;
+
+use super::standability::{
+    footing_profile, requires_weapon_setup, unit_static_standable, FootingProfile,
+};
+use super::steering::{inject_sidestep, steered_candidate, steering_path_dir};
+use super::tank_drive::{
+    angle_delta, distance_between, normalize_angle, rotate_toward, scout_car_drive_intent,
+    scout_car_turn_delta_for_budget, step_can_reach_waypoint, tank_drive_intent,
+    tank_oil_starves_movement, tank_speed_scale, vehicle_traffic_adjustment,
+    AT_GUN_BODY_TURN_RATE_RAD_PER_TICK, TANK_BODY_TURN_RATE_RAD_PER_TICK,
+};
+use super::{ARRIVE_EPS, MAX_UNIT_BOUNDING_RADIUS_PX};
+
+/// Advance every moving unit along its waypoint path at its speed. Clamps the final landing
+/// tile to passable terrain (soft overlap with other units is allowed, so we don't resolve
+/// unit-unit collisions here). Arriving at the last waypoint of a plain Move clears the order.
+#[allow(clippy::too_many_arguments)]
+pub(super) fn advance_moving_units(
+    map: &Map,
+    entities: &mut EntityStore,
+    players: &mut [PlayerState],
+    occ: &Occupancy,
+    spatial: &SpatialIndex,
+    tick: u32,
+    events: &mut HashMap<u32, Vec<Event>>,
+) {
+    for id in entities.ids() {
+        // Pull the data we need, then mutate.
+        let (kind, speed, mut x, mut y, can_local_steer) = {
+            let e = match entities.get(id) {
+                Some(e) if e.is_unit() && !e.path_is_empty() => e,
+                _ => continue,
+            };
+            if requires_weapon_setup(e.kind)
+                && matches!(
+                    e.weapon_setup(),
+                    WeaponSetup::SettingUp { .. } | WeaponSetup::TearingDown { .. }
+                )
+            {
+                continue;
+            }
+            let speed = config::unit_stats(e.kind).map(|s| s.speed).unwrap_or(0.0);
+            (
+                e.kind,
+                speed,
+                e.pos_x,
+                e.pos_y,
+                !uses_oriented_vehicle_body(e.kind)
+                    && matches!(e.order(), Order::Move(_))
+                    && footing_profile(e) != FootingProfile::Ghost,
+            )
+        };
+        if speed <= 0.0 {
+            continue;
+        }
+
+        let uses_vehicle_movement = uses_oriented_vehicle_body(kind);
+        let is_tank = uses_tank_movement_semantics(kind);
+        let is_car = uses_car_movement_semantics(kind);
+        // Experimental tank fuel rule: an oil-starved tank pauses before retrying so sparse
+        // oil income does not make it lurch forward on isolated ticks.
+        if is_tank && tank_oil_starves_movement(entities, players, events, id) {
+            continue;
+        }
+        let orig_x = x;
+        let orig_y = y;
+        let mut budget = speed;
+        let mut new_facing = None;
+        let original_facing = entities.get(id).map(|e| e.facing()).unwrap_or(0.0);
+        let mut body_facing = original_facing;
+        let mut vehicle_step_dir = None;
+        let mut static_blocked_this_tick = false;
+        if is_tank {
+            if let Some(e) = entities.get(id) {
+                if let Some(mut intent) = tank_drive_intent(map, occ, e, x, y) {
+                    let traffic =
+                        vehicle_traffic_adjustment(entities, spatial, id, kind, x, y, e.facing());
+                    intent.desired_facing =
+                        normalize_angle(intent.desired_facing + traffic.turn_bias);
+                    if intent.desired_facing.is_finite() {
+                        let rotated = rotate_toward(
+                            e.facing(),
+                            intent.desired_facing,
+                            TANK_BODY_TURN_RATE_RAD_PER_TICK,
+                        );
+                        if rotated.is_finite() {
+                            let error = angle_delta(rotated, intent.desired_facing).abs();
+                            budget *= tank_speed_scale(error);
+                            budget *= traffic.throttle_scale;
+                            new_facing = Some(rotated);
+                            body_facing = rotated;
+                        }
+                    }
+                }
+            }
+        } else if is_car {
+            if let Some(e) = entities.get(id) {
+                if let Some(mut intent) = scout_car_drive_intent(map, occ, e, x, y) {
+                    let traffic =
+                        vehicle_traffic_adjustment(entities, spatial, id, kind, x, y, e.facing());
+                    budget *= traffic.throttle_scale;
+                    intent.desired_facing =
+                        normalize_angle(intent.desired_facing + traffic.turn_bias);
+                    if intent.desired_facing.is_finite() {
+                        let max_delta = scout_car_turn_delta_for_budget(budget);
+                        let rotated = rotate_toward(e.facing(), intent.desired_facing, max_delta);
+                        if rotated.is_finite() {
+                            new_facing = Some(rotated);
+                            body_facing = rotated;
+                            vehicle_step_dir = Some((
+                                rotated.cos() * intent.travel_sign,
+                                rotated.sin() * intent.travel_sign,
+                            ));
+                        }
+                    }
+                }
+            }
+        }
+        // Consume waypoints (stored reversed, next = last element) within this tick's budget.
+        loop {
+            let (next, path_len, next_next) = {
+                let Some(e) = entities.get(id) else { break };
+                let path_len = e.movement.as_ref().map(|m| m.path.len()).unwrap_or(0);
+                // next_next: the waypoint after the current one (path is reversed, so index len-2).
+                let next_next = e.movement.as_ref().and_then(|m| {
+                    if m.path.len() >= 2 {
+                        m.path.get(m.path.len() - 2).copied()
+                    } else {
+                        None
+                    }
+                });
+                (e.next_waypoint(), path_len, next_next)
+            };
+            let Some((wx, wy)) = next else { break };
+            let dx = wx - x;
+            let dy = wy - y;
+            let dist = (dx * dx + dy * dy).sqrt();
+
+            if path_len > 1 {
+                // Intermediate waypoint: pop on radius hit or geometric pass-by.
+                let radius_hit = dist <= config::ARRIVE_RADIUS_INTERMEDIATE_PX;
+                let passed = next_next.is_some_and(|(nnx, nny)| {
+                    // Positive projection of (pos - waypoint) onto (next_next - waypoint) means the
+                    // unit is on the far side of the waypoint relative to where it came from.
+                    (x - wx) * (nnx - wx) + (y - wy) * (nny - wy) > 0.0
+                });
+                if radius_hit || passed {
+                    if let Some(e) = entities.get_mut(id) {
+                        e.pop_waypoint();
+                        e.mark_move_phase(MovePhase::Moving);
+                    }
+                    // No position snap — steer toward the new next waypoint from current position.
+                    continue;
+                }
+            } else {
+                // Final waypoint: require exact arrival.
+                if dist <= ARRIVE_EPS {
+                    if let Some(e) = entities.get_mut(id) {
+                        e.pop_waypoint();
+                        e.mark_move_phase(MovePhase::Moving);
+                    }
+                    x = wx;
+                    y = wy;
+                    continue;
+                }
+            }
+
+            if !uses_vehicle_movement {
+                let facing = dy.atan2(dx);
+                if facing.is_finite() {
+                    if kind == EntityKind::AtTeam {
+                        let current = entities.get(id).map(|e| e.facing()).unwrap_or(0.0);
+                        let rotated =
+                            rotate_toward(current, facing, AT_GUN_BODY_TURN_RATE_RAD_PER_TICK);
+                        new_facing = Some(if rotated.is_finite() { rotated } else { facing });
+                    } else {
+                        new_facing = Some(facing);
+                    }
+                }
+            }
+            let can_reach_waypoint = if is_car {
+                vehicle_step_dir.is_some_and(|dir| step_can_reach_waypoint((dx, dy), dir, budget))
+            } else {
+                dist <= budget
+            };
+            if can_reach_waypoint {
+                // We can reach this waypoint this tick.
+                if !unit_static_standable(occ, map, kind, wx, wy, body_facing) {
+                    static_blocked_this_tick = true;
+                    break;
+                }
+                x = wx;
+                y = wy;
+                budget -= dist;
+                if let Some(e) = entities.get_mut(id) {
+                    e.pop_waypoint();
+                    e.mark_move_phase(MovePhase::Moving);
+                }
+            } else {
+                // Partial step toward the waypoint.
+                let path_dir = (dx / dist, dy / dist);
+                let step_dir = vehicle_step_dir.unwrap_or(path_dir);
+                let direct_nx = x + step_dir.0 * budget;
+                let direct_ny = y + step_dir.1 * budget;
+                let steered = if can_local_steer {
+                    let steering_path_dir = entities
+                        .get(id)
+                        .map(|e| steering_path_dir(e, x, y, path_dir))
+                        .unwrap_or(path_dir);
+                    steered_candidate(
+                        entities,
+                        spatial,
+                        occ,
+                        map,
+                        id,
+                        kind,
+                        x,
+                        y,
+                        steering_path_dir,
+                        budget,
+                    )
+                } else {
+                    None
+                };
+                let (nx, ny) = if let Some((sx, sy)) = steered {
+                    (sx, sy)
+                } else {
+                    (direct_nx, direct_ny)
+                };
+                // Clamp landing to a body-legal static position.
+                if unit_static_standable(occ, map, kind, nx, ny, body_facing) {
+                    x = nx;
+                    y = ny;
+                } else {
+                    // Wall-slide: try each axis independently so a unit pressed against a
+                    // building edge can slide along it rather than freezing. Guard each axis
+                    // against zero movement (dy=0 ⟹ y-only slide is a no-op that would
+                    // spuriously suppress static_blocked). Only mark static-blocked when
+                    // neither axis makes progress.
+                    let slide_x = dx.abs() > 1e-4
+                        && unit_static_standable(occ, map, kind, nx, y, body_facing);
+                    let slide_y = dy.abs() > 1e-4
+                        && unit_static_standable(occ, map, kind, x, ny, body_facing);
+                    if slide_x {
+                        x = nx;
+                    } else if slide_y {
+                        y = ny;
+                    } else {
+                        static_blocked_this_tick = true;
+                    }
+                }
+                break;
+            }
+        }
+
+        if is_car && distance_between((orig_x, orig_y), (x, y)) <= 0.01 {
+            // This is still a path-following approximation, not tire physics. The important
+            // car rule is that steering comes from translation, so blocked scout cars do not
+            // pivot their oriented body in place like tanks.
+            new_facing = None;
+        }
+
+        if uses_vehicle_movement {
+            if let Some(facing) = new_facing {
+                if !unit_static_standable(occ, map, kind, x, y, facing) {
+                    if unit_static_standable(occ, map, kind, x, y, original_facing) {
+                        new_facing = None;
+                    } else {
+                        x = orig_x;
+                        y = orig_y;
+                        new_facing = None;
+                        static_blocked_this_tick = true;
+                    }
+                }
+            }
+        }
+
+        // Compute neighbor repulsion before taking the mutable borrow.
+        let repulsion_dir: (f32, f32) = {
+            let unit_radius = entities
+                .get(id)
+                .and_then(|e| unit_body_for_entity(e).map(|body| body.bounding_radius()))
+                .unwrap_or(9.0);
+            let repulsion_range = unit_radius * 2.0 + MAX_UNIT_BOUNDING_RADIUS_PX;
+            let mut rx = 0.0_f32;
+            let mut ry = 0.0_f32;
+            for bid in spatial.ids_in_circle_bbox(x, y, repulsion_range) {
+                if bid == id {
+                    continue;
+                }
+                if let Some(nb) = entities.get(bid) {
+                    let dx = x - nb.pos_x;
+                    let dy = y - nb.pos_y;
+                    let d = (dx * dx + dy * dy).sqrt();
+                    if d > 1e-4 {
+                        rx += dx / d;
+                        ry += dy / d;
+                    }
+                }
+            }
+            let rlen = (rx * rx + ry * ry).sqrt();
+            if rlen > 1e-4 {
+                (rx / rlen, ry / rlen)
+            } else {
+                (0.0, 0.0)
+            }
+        };
+
+        if let Some(e) = entities.get_mut(id) {
+            e.pos_x = x.clamp(0.0, map.world_size_px() - 0.01);
+            e.pos_y = y.clamp(0.0, map.world_size_px() - 0.01);
+            if let Some(f) = new_facing {
+                e.set_facing(f);
+            }
+            // A plain Move with an empty path has arrived → go idle so normal auto-acquire
+            // resumes after the destination is reached.
+            if e.path_is_empty() {
+                e.mark_move_phase(MovePhase::Arrived);
+                if let Some(m) = e.movement.as_mut() {
+                    m.static_blocked_ticks = 0;
+                }
+                if matches!(e.order(), Order::Move(_)) {
+                    e.set_order(Order::Idle);
+                }
+            } else if matches!(e.move_phase(), Some(MovePhase::Moving)) {
+                // Decrement sidestep cooldown each tick.
+                if let Some(m) = e.movement.as_mut() {
+                    m.sidestep_cooldown = m.sidestep_cooldown.saturating_sub(1);
+                }
+
+                if static_blocked_this_tick {
+                    if let Some(m) = e.movement.as_mut() {
+                        m.static_blocked_ticks = m.static_blocked_ticks.saturating_add(1);
+                    }
+                } else if let Some(m) = e.movement.as_mut() {
+                    m.static_blocked_ticks = 0;
+                }
+
+                let static_blocked_ticks = e
+                    .movement
+                    .as_ref()
+                    .map(|m| m.static_blocked_ticks)
+                    .unwrap_or(0);
+                if static_blocked_ticks >= config::STATIC_BLOCKED_REPATH_TICKS
+                    && matches!(e.order(), Order::Move(_) | Order::AttackMove(_))
+                {
+                    e.set_path(Vec::new());
+                    e.mark_move_phase(MovePhase::AwaitingPath);
+                    let (px, py) = (e.pos_x, e.pos_y);
+                    e.reset_stuck(px, py);
+                    continue;
+                }
+
+                // Tolerant arrival: unit has a path but may be making no progress.
+                let (lx, ly) = e
+                    .movement
+                    .as_ref()
+                    .map(|m| m.last_progress_pos)
+                    .unwrap_or((x, y));
+                let dx = x - lx;
+                let dy = y - ly;
+                let moved = (dx * dx + dy * dy).sqrt();
+                if moved < config::STUCK_EPS_PX {
+                    if let Some(m) = e.movement.as_mut() {
+                        m.stuck_ticks = m.stuck_ticks.saturating_add(1);
+                    }
+                } else if let Some(m) = e.movement.as_mut() {
+                    m.stuck_ticks = 0;
+                    m.last_progress_pos = (x, y);
+                }
+                let stuck_ticks = e.movement.as_ref().map(|m| m.stuck_ticks).unwrap_or(0);
+                // Tolerant arrival: stuck and near goal.
+                if stuck_ticks >= config::STUCK_ARRIVAL_TICKS {
+                    if let Some((gx, gy)) = e.path_goal() {
+                        let dx = x - gx;
+                        let dy = y - gy;
+                        let dist_to_goal = (dx * dx + dy * dy).sqrt();
+                        if dist_to_goal <= config::TOLERANT_ARRIVAL_RADIUS_PX {
+                            e.clear_path();
+                            e.mark_move_phase(MovePhase::Arrived);
+                            if let Some(m) = e.movement.as_mut() {
+                                m.stuck_ticks = 0;
+                            }
+                            if matches!(e.order(), Order::Move(_)) {
+                                e.set_order(Order::Idle);
+                            }
+                        }
+                    }
+                }
+                // Sidestep: stuck mid-path (far from goal), cooldown elapsed,
+                // only for Move/AttackMove orders.
+                // Stagger trigger per unit so clustered units don't all sidestep at once.
+                let trigger_threshold = config::SIDESTEP_TRIGGER_TICKS + (id % 8) as u16;
+                if !uses_oriented_vehicle_body(kind)
+                    && stuck_ticks >= trigger_threshold
+                    && static_blocked_ticks == 0
+                    && matches!(e.order(), Order::Move(_) | Order::AttackMove(_))
+                {
+                    let far_from_goal = e.path_goal().is_some_and(|(gx, gy)| {
+                        let dx = x - gx;
+                        let dy = y - gy;
+                        (dx * dx + dy * dy).sqrt() > config::TOLERANT_ARRIVAL_RADIUS_PX
+                    });
+                    let sidestep_cooldown = e
+                        .movement
+                        .as_ref()
+                        .map(|m| m.sidestep_cooldown)
+                        .unwrap_or(1);
+                    if far_from_goal && sidestep_cooldown == 0 {
+                        inject_sidestep(e, id, x, y, map, occ, repulsion_dir, tick);
+                    }
+                }
+            }
+        }
+
+        // Experimental tank fuel: charge oil for the distance actually moved this tick.
+        if is_tank {
+            let (final_x, final_y, owner) = match entities.get(id) {
+                Some(e) => (e.pos_x, e.pos_y, e.owner),
+                None => continue,
+            };
+            let dx = final_x - orig_x;
+            let dy = final_y - orig_y;
+            let dist = (dx * dx + dy * dy).sqrt();
+            if dist > 0.0 {
+                let cost = dist * config::TANK_OIL_COST_PER_PX;
+                if let Some(e) = entities.get_mut(id) {
+                    if let Some(m) = e.movement.as_mut() {
+                        m.lifetime_oil_used += cost;
+                        m.oil_debt += cost;
+                        if m.oil_debt >= 1.0 {
+                            let whole = m.oil_debt.floor() as u32;
+                            m.oil_debt -= whole as f32;
+                            if let Some(p) = players.iter_mut().find(|p| p.id == owner) {
+                                let charged = whole.min(p.oil);
+                                p.oil = p.oil.saturating_sub(charged);
+                                // If we couldn't pay full amount, drop the unpaid remainder
+                                // so debt does not accumulate while the player has no oil.
+                                if charged < whole {
+                                    m.oil_debt = 0.0;
+                                }
+                            } else {
+                                m.oil_debt = 0.0;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
