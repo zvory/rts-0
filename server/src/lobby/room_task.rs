@@ -1,278 +1,13 @@
-//! Lobby & room orchestration. See `DESIGN.md` §3.2.
-//!
-//! Concurrency model: there is exactly **one tokio task per room** and that task is the
-//! sole owner/writer of its [`Game`]. There are no locks around the simulation. Everything
-//! else — connections, the lobby registry — talks to a room only by sending it
-//! [`RoomEvent`]s over an `mpsc` channel. A room task multiplexes (via `tokio::select!`)
-//! between its fixed-rate tick and that event stream, so a slow or disconnected client can
-//! never stall the simulation.
-//!
-//! Lifecycle:
-//! 1. A connection joins a room (creating it if needed). The room task is spawned lazily.
-//! 2. In the `Lobby` phase the room broadcasts a `lobby` message on every membership/ready
-//!    change. The host may start the match when everyone is ready.
-//! 3. In the `InGame` phase the room advances [`Game`] once per tick, fans out a fog-filtered
-//!    snapshot to each connected player, and detects game-over. When the match resolves the
-//!    room returns to the `Lobby` phase (ready flags reset) so the same players can rematch.
-
-use std::collections::{HashMap, HashSet};
-use std::fs;
-use std::sync::atomic::{AtomicU32, Ordering};
-use std::sync::Arc;
-use std::sync::Mutex as StdMutex;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
-
-use tokio::sync::{mpsc, Mutex, Notify};
-use tokio::time::{interval, MissedTickBehavior};
-use tracing::{debug, error, info, warn};
-
-use crate::config;
-use crate::game::command::SimCommand;
-use crate::game::selfplay::{is_safe_artifact_name, LiveSelfPlay, ReplayArtifact, ReplayDriver};
-use crate::game::{Game, PlayerInit};
-use crate::protocol::{
-    kinds, Event, LobbyPlayer, PlayerScore, ResourceDelta, ServerMessage, Snapshot, StartPayload,
-};
-
-/// Player colors, assigned from the head of the palette. MUST match `client/src/config.js`
-/// `PLAYER_PALETTE`.
-const PLAYER_PALETTE: [&str; 8] = [
-    "#4878c8", "#c84848", "#30a090", "#8040c8", "#c83880", "#c87830", "#409840", "#c8b030",
-];
-
-/// Hard cap on players in a single match (humans + AI). The hardcoded map has four authored
-/// player-start slots, so we never seat more than this.
-const MAX_PLAYERS: usize = 4;
-
-/// Bound on a player's reliable outbound message queue. Snapshots do not use this FIFO; each
-/// connection has one replaceable latest-snapshot slot so stale world states cannot backlog.
-const PLAYER_RELIABLE_CHANNEL_CAP: usize = 64;
-
-/// Bound on a room's inbound event queue. Commands/joins past this are dropped rather than
-/// allowed to grow without limit; in practice the room drains this every tick.
-const ROOM_EVENT_CHANNEL_CAP: usize = 1024;
-const DEV_SELFPLAY_ROOM_PREFIX: &str = "__dev_selfplay__";
-const MATCH_SEED_ENV: &str = "RTS_MATCH_SEED";
-
-/// Monotonic source of globally-unique player ids (ids are never reused within a process run).
-static NEXT_PLAYER_ID: AtomicU32 = AtomicU32::new(1);
-
-/// Allocate a fresh, process-unique player id. Called once per connection.
-pub fn next_player_id() -> u32 {
-    NEXT_PLAYER_ID.fetch_add(1, Ordering::Relaxed)
-}
-
-/// Outbound connection handle shared with the room task. Reliable messages keep FIFO ordering;
-/// snapshots share a single latest-only slot because older unsent snapshots are superseded by
-/// newer full-state snapshots.
-#[derive(Clone)]
-pub struct ConnectionSink {
-    reliable_tx: mpsc::Sender<ServerMessage>,
-    snapshots: Arc<LatestSnapshotSlot>,
-}
-
-impl std::fmt::Debug for ConnectionSink {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("ConnectionSink").finish_non_exhaustive()
-    }
-}
-
-pub struct ConnectionWriter {
-    pub(crate) reliable_rx: mpsc::Receiver<ServerMessage>,
-    pub(crate) snapshots: Arc<LatestSnapshotSlot>,
-}
-
-pub(crate) struct LatestSnapshotSlot {
-    pending: StdMutex<Option<Snapshot>>,
-    notify: Notify,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum SnapshotSendStatus {
-    Stored,
-    Replaced,
-    Closed,
-}
-
-impl ConnectionSink {
-    pub fn new() -> (Self, ConnectionWriter) {
-        let (reliable_tx, reliable_rx) = mpsc::channel(PLAYER_RELIABLE_CHANNEL_CAP);
-        let snapshots = Arc::new(LatestSnapshotSlot {
-            pending: StdMutex::new(None),
-            notify: Notify::new(),
-        });
-        (
-            ConnectionSink {
-                reliable_tx,
-                snapshots: snapshots.clone(),
-            },
-            ConnectionWriter {
-                reliable_rx,
-                snapshots,
-            },
-        )
-    }
-
-    pub async fn send_reliable(
-        &self,
-        msg: ServerMessage,
-    ) -> Result<(), mpsc::error::SendError<ServerMessage>> {
-        self.reliable_tx.send(msg).await
-    }
-
-    #[allow(clippy::result_large_err)]
-    pub fn try_send_reliable(
-        &self,
-        msg: ServerMessage,
-    ) -> Result<(), mpsc::error::TrySendError<ServerMessage>> {
-        self.reliable_tx.try_send(msg)
-    }
-
-    pub(crate) fn try_send_snapshot(&self, mut snapshot: Snapshot) -> SnapshotSendStatus {
-        if self.reliable_tx.is_closed() {
-            return SnapshotSendStatus::Closed;
-        }
-
-        let mut pending = self.snapshots.lock_pending();
-        let replaced = if let Some(previous) = pending.as_ref() {
-            merge_resource_deltas(&mut snapshot, &previous.resource_deltas);
-            true
-        } else {
-            false
-        };
-        *pending = Some(snapshot);
-        drop(pending);
-
-        self.snapshots.notify.notify_one();
-        if replaced {
-            SnapshotSendStatus::Replaced
-        } else {
-            SnapshotSendStatus::Stored
-        }
-    }
-}
-
-impl LatestSnapshotSlot {
-    fn lock_pending(&self) -> std::sync::MutexGuard<'_, Option<Snapshot>> {
-        match self.pending.lock() {
-            Ok(guard) => guard,
-            Err(poisoned) => poisoned.into_inner(),
-        }
-    }
-
-    pub(crate) fn take(&self) -> Option<Snapshot> {
-        self.lock_pending().take()
-    }
-
-    pub(crate) async fn notified(&self) {
-        self.notify.notified().await;
-    }
-}
-
-fn merge_resource_deltas(snapshot: &mut Snapshot, previous: &[ResourceDelta]) {
-    if previous.is_empty() {
-        return;
-    }
-    for old in previous {
-        if !snapshot.resource_deltas.iter().any(|d| d.id == old.id) {
-            snapshot.resource_deltas.push(old.clone());
-        }
-    }
-    snapshot.resource_deltas.sort_by_key(|d| d.id);
-}
-
-/// Internal message from a connection (or the lobby) to a room task. The room task is the
-/// only consumer; see module docs.
-#[derive(Debug)]
-pub enum RoomEvent {
-    /// A player joins this room. `msg_tx` is the connection's outbound sink. `ack` carries the
-    /// accept/reject decision back to the connection: `true` once the player is actually in the
-    /// room, `false` if the join was rejected (duplicate, or mid-match). The connection must not
-    /// mark itself joined until it sees a `true`, so a rejected join doesn't wedge the socket.
-    Join {
-        player_id: u32,
-        name: String,
-        spectator: bool,
-        msg_tx: ConnectionSink,
-        ack: tokio::sync::oneshot::Sender<bool>,
-    },
-    /// A player left (socket closed). During a match this eliminates them so it can resolve.
-    Leave { player_id: u32 },
-    /// A player toggled their lobby ready flag.
-    Ready { player_id: u32, ready: bool },
-    /// The host requested the match to begin (honored only from the host when `can_start`).
-    StartRequest { player_id: u32 },
-    /// The host asked to add a computer opponent (lobby phase only; honored only from the host).
-    AddAi { player_id: u32 },
-    /// The host asked to remove an AI opponent by id (lobby phase only; honored only from host).
-    RemoveAi { player_id: u32, target: u32 },
-    /// The host toggled the lobby's start-with-more-money mode.
-    SetQuickstart { player_id: u32, enabled: bool },
-    /// A connected human switched between active player and spectator role in the lobby.
-    SetSpectator { player_id: u32, spectator: bool },
-    /// A gameplay command (ignored unless the room is in-game and the sender is in the room).
-    Command { player_id: u32, cmd: SimCommand },
-    /// A connected player intentionally gave up the active match.
-    GiveUp { player_id: u32 },
-    /// Set replay playback speed multiplier (replay rooms only; ignored elsewhere).
-    SetReplaySpeed { speed: f32 },
-    /// Rewind a replay by `ticks_back` simulation ticks (replay rooms only; clamped to start).
-    SeekReplay { ticks_back: u32 },
-}
-
-/// Handle the lobby keeps for each live room: just the channel into its task.
-#[derive(Clone)]
-pub struct RoomHandle {
-    pub event_tx: mpsc::Sender<RoomEvent>,
-}
-
-/// Registry of rooms by name. Cheaply cloneable; share one instance across all connections.
-#[derive(Clone)]
-pub struct Lobby {
-    rooms: Arc<Mutex<HashMap<String, RoomHandle>>>,
-}
-
-impl Lobby {
-    pub fn new() -> Self {
-        Lobby {
-            rooms: Arc::new(Mutex::new(HashMap::new())),
-        }
-    }
-
-    /// Get the handle for `room`, spawning the room task on first use. The `Mutex` here only
-    /// guards the small name→handle map (cheap, never held across `.await` of game work); it is
-    /// emphatically *not* a lock around any `Game`.
-    pub async fn get_or_create(&self, room: &str) -> RoomHandle {
-        let mut rooms = self.rooms.lock().await;
-        if let Some(handle) = rooms.get(room) {
-            return handle.clone();
-        }
-        let (event_tx, event_rx) = mpsc::channel(ROOM_EVENT_CHANNEL_CAP);
-        let handle = RoomHandle { event_tx };
-        rooms.insert(room.to_string(), handle.clone());
-
-        let name = room.to_string();
-        let mode = room_mode_for(&name);
-        tokio::spawn(async move {
-            let mut task = RoomTask::new(name.clone(), mode);
-            task.run(event_rx).await;
-            info!(room = %name, "room task exited");
-        });
-        info!(room = %room, "room created");
-        handle
-    }
-}
-
-impl Default for Lobby {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+use super::connection::send_or_log;
+use super::crash_replay::{dump_crash_replay, panic_reason};
+use super::dev_replay::{load_replay_artifact, match_seed};
+use super::snapshots::{compact_snapshot_for_wire, union_events};
+use super::*;
 
 /// A connected player as tracked inside a room.
-struct RoomPlayer {
+pub(super) struct RoomPlayer {
     name: String,
-    color: String,
+    pub(super) color: String,
     ready: bool,
     spectator: bool,
     msg_tx: ConnectionSink,
@@ -292,13 +27,13 @@ enum Phase {
 }
 
 #[derive(Clone)]
-enum RoomMode {
+pub(super) enum RoomMode {
     Normal,
     DevSelfPlay(DevSelfPlayConfig),
 }
 
 #[derive(Clone)]
-enum DevSelfPlayConfig {
+pub(super) enum DevSelfPlayConfig {
     Live,
     Replay { artifact: String },
 }
@@ -309,12 +44,12 @@ enum DevDriver {
 }
 
 /// All state owned by a single room task. Lives entirely on that task — never shared.
-struct RoomTask {
+pub(super) struct RoomTask {
     room: String,
     mode: RoomMode,
     /// Connected players in join order (join order drives lobby display and host fallback).
     order: Vec<u32>,
-    players: HashMap<u32, RoomPlayer>,
+    pub(super) players: HashMap<u32, RoomPlayer>,
     /// Computer opponents the host has added, in add order. Persist across rematches; cleared
     /// only when the room empties of humans.
     ai_players: Vec<AiSlot>,
@@ -336,7 +71,7 @@ struct RoomTask {
 }
 
 impl RoomTask {
-    fn new(room: String, mode: RoomMode) -> Self {
+    pub(super) fn new(room: String, mode: RoomMode) -> Self {
         let replay_speed = match &mode {
             RoomMode::DevSelfPlay(DevSelfPlayConfig::Replay { .. }) => 1.5,
             _ => 1.0,
@@ -361,7 +96,7 @@ impl RoomTask {
     /// Main loop: multiplex the fixed-rate tick against the inbound event stream. Returns (and
     /// the task ends) only when the event channel closes, which happens when the `Lobby`
     /// registry — and therefore the process — is gone.
-    async fn run(&mut self, mut event_rx: mpsc::Receiver<RoomEvent>) {
+    pub(super) async fn run(&mut self, mut event_rx: mpsc::Receiver<RoomEvent>) {
         let mut ticker = self.make_ticker();
 
         loop {
@@ -398,7 +133,7 @@ impl RoomTask {
         t
     }
 
-    fn current_tick_interval(&self) -> Duration {
+    pub(super) fn current_tick_interval(&self) -> Duration {
         let base = Duration::from_millis(config::TICK_MS);
         base.div_f32(self.replay_speed)
     }
@@ -433,7 +168,7 @@ impl RoomTask {
         }
     }
 
-    fn on_join(
+    pub(super) fn on_join(
         &mut self,
         player_id: u32,
         name: String,
@@ -491,7 +226,7 @@ impl RoomTask {
         }
     }
 
-    fn on_leave(&mut self, player_id: u32) {
+    pub(super) fn on_leave(&mut self, player_id: u32) {
         let Some(removed) = self.players.remove(&player_id) else {
             return;
         };
@@ -1139,7 +874,7 @@ impl RoomTask {
         self.phase = Phase::InGame(game);
     }
 
-    fn on_set_replay_speed(&mut self, speed: f32) {
+    pub(super) fn on_set_replay_speed(&mut self, speed: f32) {
         if !matches!(
             self.mode,
             RoomMode::DevSelfPlay(DevSelfPlayConfig::Replay { .. })
@@ -1299,448 +1034,5 @@ impl RoomTask {
                 send_or_log(&self.room, id, &player.msg_tx, msg.clone());
             }
         }
-    }
-}
-
-/// Send to one player's sink without ever blocking the room task. Reliable messages use a bounded
-/// FIFO and snapshots use a replaceable latest-only slot.
-fn send_or_log(room: &str, player_id: u32, tx: &ConnectionSink, msg: ServerMessage) {
-    match msg {
-        ServerMessage::Snapshot(snapshot) => match tx.try_send_snapshot(snapshot) {
-            SnapshotSendStatus::Stored => {}
-            SnapshotSendStatus::Replaced => {
-                debug!(room = %room, player_id, "coalesced pending snapshot");
-            }
-            SnapshotSendStatus::Closed => {
-                debug!(room = %room, player_id, "snapshot sink closed; client gone");
-            }
-        },
-        reliable => {
-            if let Err(err) = tx.try_send_reliable(reliable) {
-                match err {
-                    mpsc::error::TrySendError::Full(_) => {
-                        warn!(room = %room, player_id, "reliable outbound queue full; dropping message");
-                    }
-                    mpsc::error::TrySendError::Closed(_) => {
-                        debug!(room = %room, player_id, "reliable outbound channel closed; client gone");
-                    }
-                }
-            }
-        }
-    }
-}
-
-/// Keep static resource positions in the start payload and send only compact visible remaining
-/// updates in snapshots. Internal `Game::snapshot_for` still includes resource entities for
-/// self-play/replay paths that consume snapshots directly.
-fn compact_snapshot_for_wire(snapshot: &mut Snapshot) {
-    for event in &snapshot.events {
-        let Event::Death { id, kind, .. } = event else {
-            continue;
-        };
-        if kind != kinds::STEEL && kind != kinds::OIL {
-            continue;
-        }
-        if let Some(delta) = snapshot.resource_deltas.iter_mut().find(|d| d.id == *id) {
-            delta.remaining = 0;
-        } else {
-            snapshot.resource_deltas.push(ResourceDelta {
-                id: *id,
-                remaining: 0,
-            });
-        }
-    }
-    snapshot.resource_deltas.sort_by_key(|d| d.id);
-    snapshot
-        .entities
-        .retain(|entity| entity.kind != kinds::STEEL && entity.kind != kinds::OIL);
-}
-
-fn union_events<'a>(event_sets: impl Iterator<Item = &'a Vec<Event>>) -> Vec<Event> {
-    let mut events = Vec::new();
-    for set in event_sets {
-        for event in set {
-            if !events.contains(event) {
-                events.push(event.clone());
-            }
-        }
-    }
-    events
-}
-
-fn room_mode_for(room: &str) -> RoomMode {
-    if room == format!("{DEV_SELFPLAY_ROOM_PREFIX}live") {
-        return RoomMode::DevSelfPlay(DevSelfPlayConfig::Live);
-    }
-    if let Some(artifact) = room.strip_prefix(&format!("{DEV_SELFPLAY_ROOM_PREFIX}replay:")) {
-        return RoomMode::DevSelfPlay(DevSelfPlayConfig::Replay {
-            artifact: artifact.to_string(),
-        });
-    }
-    RoomMode::Normal
-}
-
-/// Persist a replayable artifact when a room's tick panics (a true crash or, in debug
-/// builds, an `assert_invariants` failure). The path is logged and the full file contents
-/// are emitted to the log so an operator can copy them out of terminal output even if the
-/// disk write later disappears or the box is ephemeral.
-fn dump_crash_replay(room: &str, game: &Game, reason: &str) {
-    let artifact = ReplayArtifact {
-        replay_commands: game.command_log().to_vec(),
-        players: game.player_inits(),
-        seed: game.seed(),
-        starting_steel: game.starting_steel(),
-        starting_oil: game.starting_oil(),
-    };
-    let json = match serde_json::to_string_pretty(&artifact) {
-        Ok(s) => s,
-        Err(e) => {
-            error!(room = %room, reason = %reason, error = %e, "tick panic: failed to serialize crash replay");
-            return;
-        }
-    };
-    let now_ms = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_millis())
-        .unwrap_or(0);
-    let sanitized: String = room
-        .chars()
-        .map(|c| if c.is_ascii_alphanumeric() { c } else { '_' })
-        .collect();
-    let dir_name = format!("crash-{sanitized}-{}-{now_ms}", std::process::id());
-    let dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("target")
-        .join("selfplay-failures")
-        .join(&dir_name);
-    let path = dir.join("replay.json");
-    match fs::create_dir_all(&dir).and_then(|_| fs::write(&path, &json)) {
-        Ok(_) => {
-            error!(
-                room = %room,
-                tick = game.tick_count(),
-                reason = %reason,
-                path = %path.display(),
-                "tick panic: crash replay written"
-            );
-        }
-        Err(e) => {
-            error!(
-                room = %room,
-                tick = game.tick_count(),
-                reason = %reason,
-                error = %e,
-                "tick panic: failed to write crash replay; dumping inline only"
-            );
-        }
-    }
-    error!(
-        room = %room,
-        reason = %reason,
-        "tick panic: full crash replay follows (artifact name: {dir_name})\n----BEGIN CRASH REPLAY----\n{json}\n----END CRASH REPLAY----"
-    );
-}
-
-fn panic_reason(payload: &Box<dyn std::any::Any + Send>) -> String {
-    if let Some(s) = payload.downcast_ref::<&'static str>() {
-        return (*s).to_string();
-    }
-    if let Some(s) = payload.downcast_ref::<String>() {
-        return s.clone();
-    }
-    "panic with non-string payload".to_string()
-}
-
-fn match_seed() -> u32 {
-    if let Ok(raw) = std::env::var(MATCH_SEED_ENV) {
-        match raw.parse::<u32>() {
-            Ok(seed) => return seed,
-            Err(err) => warn!(
-                env = MATCH_SEED_ENV,
-                value = %raw,
-                error = %err,
-                "invalid match seed override; using time-based seed"
-            ),
-        }
-    }
-
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_nanos() as u32)
-        .unwrap_or(0x1234_5678)
-}
-
-fn load_replay_artifact(name: &str) -> Result<ReplayArtifact, String> {
-    if !is_safe_artifact_name(name) {
-        return Err("invalid replay artifact name".to_string());
-    }
-    let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("target");
-    let candidates = [
-        root.join("selfplay-artifacts")
-            .join(name)
-            .join("replay.json"),
-        root.join("selfplay-failures")
-            .join(name)
-            .join("replay.json"),
-    ];
-    for path in candidates {
-        if let Ok(json) = fs::read_to_string(&path) {
-            return serde_json::from_str(&json)
-                .map_err(|e| format!("failed to parse replay artifact: {e}"));
-        }
-    }
-    Err(format!(
-        "failed to read replay artifact {name:?} from target/selfplay-artifacts or target/selfplay-failures"
-    ))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::protocol::{EntityView, Event, ResourceDelta};
-
-    fn join_test_player(task: &mut RoomTask, player_id: u32) {
-        let (msg_tx, _writer) = ConnectionSink::new();
-        let (ack, _ack_rx) = tokio::sync::oneshot::channel();
-        task.on_join(player_id, format!("Player {player_id}"), false, msg_tx, ack);
-    }
-
-    fn test_snapshot(tick: u32, resource_deltas: Vec<ResourceDelta>) -> Snapshot {
-        Snapshot {
-            tick,
-            steel: 75,
-            oil: 0,
-            supply_used: 1,
-            supply_cap: 10,
-            entities: vec![EntityView::new(
-                1,
-                1,
-                kinds::WORKER,
-                10.0,
-                20.0,
-                40,
-                40,
-                "idle",
-            )],
-            resource_deltas,
-            events: Vec::new(),
-            player_resources: Vec::new(),
-        }
-    }
-
-    #[test]
-    fn connection_sink_keeps_reliable_fifo_separate_from_snapshots() {
-        let (sink, mut writer) = ConnectionSink::new();
-
-        sink.try_send_snapshot(test_snapshot(10, Vec::new()));
-        sink.try_send_reliable(ServerMessage::Error {
-            msg: "first".to_string(),
-        })
-        .unwrap();
-        sink.try_send_reliable(ServerMessage::Pong { ts: 42.0 })
-            .unwrap();
-
-        let first = writer.reliable_rx.try_recv().unwrap();
-        let second = writer.reliable_rx.try_recv().unwrap();
-
-        assert!(matches!(first, ServerMessage::Error { .. }));
-        assert!(matches!(second, ServerMessage::Pong { ts } if ts == 42.0));
-        assert_eq!(writer.snapshots.take().unwrap().tick, 10);
-    }
-
-    #[test]
-    fn connection_sink_coalesces_snapshots_to_latest_tick() {
-        let (sink, writer) = ConnectionSink::new();
-
-        assert_eq!(
-            sink.try_send_snapshot(test_snapshot(10, Vec::new())),
-            SnapshotSendStatus::Stored
-        );
-        assert_eq!(
-            sink.try_send_snapshot(test_snapshot(11, Vec::new())),
-            SnapshotSendStatus::Replaced
-        );
-
-        let snapshot = writer.snapshots.take().unwrap();
-        assert_eq!(snapshot.tick, 11);
-        assert!(writer.snapshots.take().is_none());
-    }
-
-    #[test]
-    fn connection_sink_carries_resource_deltas_across_snapshot_replacement() {
-        let (sink, writer) = ConnectionSink::new();
-
-        sink.try_send_snapshot(test_snapshot(
-            10,
-            vec![ResourceDelta {
-                id: 200,
-                remaining: 1498,
-            }],
-        ));
-        sink.try_send_snapshot(test_snapshot(11, Vec::new()));
-
-        let snapshot = writer.snapshots.take().unwrap();
-        assert_eq!(snapshot.tick, 11);
-        assert_eq!(
-            snapshot.resource_deltas,
-            vec![ResourceDelta {
-                id: 200,
-                remaining: 1498,
-            }]
-        );
-    }
-
-    #[test]
-    fn connection_sink_keeps_newest_resource_delta_for_same_node() {
-        let (sink, writer) = ConnectionSink::new();
-
-        sink.try_send_snapshot(test_snapshot(
-            10,
-            vec![ResourceDelta {
-                id: 200,
-                remaining: 1498,
-            }],
-        ));
-        sink.try_send_snapshot(test_snapshot(
-            11,
-            vec![ResourceDelta {
-                id: 200,
-                remaining: 1496,
-            }],
-        ));
-
-        let snapshot = writer.snapshots.take().unwrap();
-        assert_eq!(
-            snapshot.resource_deltas,
-            vec![ResourceDelta {
-                id: 200,
-                remaining: 1496,
-            }]
-        );
-    }
-
-    #[test]
-    fn joining_after_earlier_player_leaves_reuses_open_color() {
-        let mut task = RoomTask::new("r".to_string(), RoomMode::Normal);
-
-        join_test_player(&mut task, 1);
-        join_test_player(&mut task, 2);
-        join_test_player(&mut task, 3);
-        task.on_leave(1);
-        join_test_player(&mut task, 4);
-
-        let color_2 = &task.players.get(&2).unwrap().color;
-        let color_3 = &task.players.get(&3).unwrap().color;
-        let color_4 = &task.players.get(&4).unwrap().color;
-
-        assert_eq!(color_4, PLAYER_PALETTE[0]);
-        assert_ne!(color_4, color_2);
-        assert_ne!(color_4, color_3);
-    }
-
-    #[test]
-    fn replay_rooms_default_to_1_5x_speed() {
-        let normal = RoomTask::new("r".to_string(), RoomMode::Normal);
-        let live = RoomTask::new(
-            "r".to_string(),
-            RoomMode::DevSelfPlay(DevSelfPlayConfig::Live),
-        );
-        let replay = RoomTask::new(
-            "r".to_string(),
-            RoomMode::DevSelfPlay(DevSelfPlayConfig::Replay {
-                artifact: "demo".to_string(),
-            }),
-        );
-        assert_eq!(normal.current_tick_interval(), Duration::from_millis(33));
-        assert_eq!(live.current_tick_interval(), Duration::from_millis(33));
-        // 33ms / 1.5 = 22ms
-        assert_eq!(replay.current_tick_interval(), Duration::from_millis(22));
-    }
-
-    #[test]
-    fn replay_speed_clamped_and_applied() {
-        let mut task = RoomTask::new(
-            "r".to_string(),
-            RoomMode::DevSelfPlay(DevSelfPlayConfig::Replay {
-                artifact: "demo".to_string(),
-            }),
-        );
-        task.on_set_replay_speed(2.0);
-        // 33ms / 2.0 = 16.5ms → rounds to 16ms via div_f32
-        assert!(task.current_tick_interval() < Duration::from_millis(17));
-        assert!(task.current_tick_interval() > Duration::from_millis(15));
-    }
-
-    #[test]
-    fn wire_compaction_removes_resource_entities_but_keeps_deltas() {
-        let mut snapshot = Snapshot {
-            tick: 10,
-            steel: 75,
-            oil: 0,
-            supply_used: 1,
-            supply_cap: 10,
-            entities: vec![
-                EntityView::new(1, 1, kinds::WORKER, 10.0, 20.0, 40, 40, "idle"),
-                EntityView::new(2, 0, kinds::STEEL, 30.0, 40.0, 1, 1, "idle"),
-                EntityView::new(3, 0, kinds::OIL, 50.0, 60.0, 1, 1, "idle"),
-            ],
-            resource_deltas: vec![ResourceDelta {
-                id: 2,
-                remaining: 1498,
-            }],
-            events: vec![Event::Notice {
-                msg: "hello".to_string(),
-                x: None,
-                y: None,
-                severity: crate::protocol::NoticeSeverity::Info,
-            }],
-            player_resources: Vec::new(),
-        };
-
-        compact_snapshot_for_wire(&mut snapshot);
-
-        assert_eq!(snapshot.entities.len(), 1);
-        assert_eq!(snapshot.entities[0].kind, kinds::WORKER);
-        assert_eq!(snapshot.resource_deltas.len(), 1);
-        assert_eq!(snapshot.resource_deltas[0].remaining, 1498);
-        assert_eq!(snapshot.events.len(), 1);
-    }
-
-    #[test]
-    fn wire_compaction_converts_visible_resource_death_to_zero_delta() {
-        let mut snapshot = Snapshot {
-            tick: 10,
-            steel: 75,
-            oil: 0,
-            supply_used: 1,
-            supply_cap: 10,
-            entities: vec![EntityView::new(
-                1,
-                1,
-                kinds::WORKER,
-                10.0,
-                20.0,
-                40,
-                40,
-                "idle",
-            )],
-            resource_deltas: Vec::new(),
-            events: vec![Event::Death {
-                id: 200,
-                x: 30.0,
-                y: 40.0,
-                kind: kinds::STEEL.to_string(),
-            }],
-            player_resources: Vec::new(),
-        };
-
-        compact_snapshot_for_wire(&mut snapshot);
-
-        assert_eq!(
-            snapshot.resource_deltas,
-            vec![ResourceDelta {
-                id: 200,
-                remaining: 0,
-            }]
-        );
     }
 }
