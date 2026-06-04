@@ -42,11 +42,11 @@ pub const MACHINE_GUNNER_SETUP_TICKS: u16 = TICK_HZ as u16;
 /// Packed AT guns stay mobile and fight only at short range.
 pub const AT_GUN_PACKED_RANGE_TILES: u32 = 4;
 /// Manually deployed AT guns trade mobility for long-range ambush coverage.
-pub const AT_GUN_DEPLOYED_RANGE_TILES: u32 = 7;
+pub const AT_GUN_DEPLOYED_RANGE_TILES: u32 = 10;
 /// Packed AT gun damage as a fraction of deployed damage.
 pub const AT_GUN_PACKED_DAMAGE_MULTIPLIER: f32 = 0.75;
 /// Total deployed AT gun field of fire in radians.
-pub const AT_GUN_FIELD_OF_FIRE_RAD: f32 = std::f32::consts::PI / 6.0;
+pub const AT_GUN_FIELD_OF_FIRE_RAD: f32 = std::f32::consts::PI / 4.0;
 
 /// Experimental: tanks burn this much oil per world pixel of movement. Calibrated so a tank
 /// driving from one edge of the 96-tile map to the other (3072 px) burns ~10 oil. When a
