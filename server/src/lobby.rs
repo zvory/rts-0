@@ -120,6 +120,7 @@ impl ConnectionSink {
         self.reliable_tx.send(msg).await
     }
 
+    #[allow(clippy::result_large_err)]
     pub fn try_send_reliable(
         &self,
         msg: ServerMessage,
@@ -1403,6 +1404,7 @@ mod tests {
             )],
             resource_deltas,
             events: Vec::new(),
+            player_resources: Vec::new(),
         }
     }
 
@@ -1572,6 +1574,7 @@ mod tests {
                 y: None,
                 severity: crate::protocol::NoticeSeverity::Info,
             }],
+            player_resources: Vec::new(),
         };
 
         compact_snapshot_for_wire(&mut snapshot);
@@ -1608,6 +1611,7 @@ mod tests {
                 y: 40.0,
                 kind: kinds::STEEL.to_string(),
             }],
+            player_resources: Vec::new(),
         };
 
         compact_snapshot_for_wire(&mut snapshot);

@@ -147,7 +147,8 @@ transport decode:
   supplyUsed: u32, supplyCap: u32,
   entities: Entity[],            // your non-resource entities (always) + enemy on visible tiles
   resourceDeltas?: ResourceDelta[], // visible resource remaining updates; omitted when empty
-  events: Event[]                // transient things to surface (see 2.5)
+  events: Event[],               // transient things to surface (see 2.5)
+  playerResources?: {id, steel, oil, supplyUsed, supplyCap}[]  // all players; replay/no-fog mode only
 }
 ```
 
@@ -168,7 +169,8 @@ Older object-shaped JSON snapshots remain decodable by the client for fallback/d
     ]
   ],
   "r": [[id, remaining]],         // omitted when empty
-  "ev": [EventRecord]             // omitted when empty
+  "ev": [EventRecord],            // omitted when empty
+  "pr": [[id, steel, oil, supplyUsed, supplyCap]]  // omitted in normal play; present in no-fog/replay
 }
 ```
 

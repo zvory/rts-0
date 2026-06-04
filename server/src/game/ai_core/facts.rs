@@ -440,6 +440,7 @@ mod tests {
                 .collect(),
             resource_deltas: Vec::new(),
             events: Vec::new(),
+            player_resources: Vec::new(),
         };
         let start = StartPayload {
             player_id: 1,

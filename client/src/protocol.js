@@ -203,6 +203,21 @@ function decodeCompactSnapshot(raw) {
       MAX_COMPACT_RESOURCE_DELTAS,
     ).map(decodeCompactResourceDelta),
     events: readOptionalArray(raw.ev, "events", MAX_COMPACT_EVENTS).map(decodeCompactEvent),
+    playerResources: readOptionalArray(raw.pr, "playerResources", 32).map(
+      decodeCompactPlayerResource,
+    ),
+  };
+}
+
+function decodeCompactPlayerResource(record, index) {
+  const fields = readArray(record, `playerResource ${index}`, 5);
+  if (fields.length < 5) throw new Error(`playerResource ${index} is too short`);
+  return {
+    id: readU32(fields[0], "playerResource.id"),
+    steel: readU32(fields[1], "playerResource.steel"),
+    oil: readU32(fields[2], "playerResource.oil"),
+    supplyUsed: readU32(fields[3], "playerResource.supplyUsed"),
+    supplyCap: readU32(fields[4], "playerResource.supplyCap"),
   };
 }
 
