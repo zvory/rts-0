@@ -157,7 +157,7 @@ pub(crate) fn run_tick(
         &post_movement.spatial,
         &mut coordinator,
     );
-    services::production::production_system(map, entities, players, &coordinator, events);
+    services::production::production_system(map, entities, players, &mut coordinator, events);
     services::construction::construction_system(map, entities, players, events);
     services::death::death_system(entities, fog, players, events);
 

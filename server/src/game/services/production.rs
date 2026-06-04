@@ -11,7 +11,7 @@ pub(crate) fn production_system(
     _map: &Map,
     entities: &mut EntityStore,
     players: &mut [PlayerState],
-    coordinator: &MoveCoordinator<'_>,
+    coordinator: &mut MoveCoordinator<'_>,
     _events: &mut std::collections::HashMap<u32, Vec<crate::protocol::Event>>,
 ) {
     for id in entities.ids() {
@@ -43,10 +43,13 @@ pub(crate) fn production_system(
         };
 
         if let Some((owner, unit)) = ready {
-            let Some((sx, sy)) = coordinator.find_spawn_point(entities, id, unit) else {
+            // Prefer the spawn exit closest to the rally point (if any), so units leave from the
+            // side of the building facing the rally.
+            let rally = entities.get(id).and_then(|b| b.rally_point());
+            let Some((sx, sy)) = coordinator.find_spawn_point(entities, id, unit, rally) else {
                 continue;
             };
-            if entities.spawn_unit(owner, unit, sx, sy).is_some() {
+            if let Some(spawned) = entities.spawn_unit(owner, unit, sx, sy) {
                 if let Some(b) = entities.get_mut(id) {
                     if let Some(queue) = b.prod_queue_mut() {
                         if !queue.is_empty() {
@@ -57,6 +60,10 @@ pub(crate) fn production_system(
                 if let Some(player) = players.iter_mut().find(|p| p.id == owner) {
                     player.record_entity_created(unit);
                 }
+                // Send the new unit toward the rally point with a plain move order.
+                if let Some(rally) = rally {
+                    coordinator.order_group_move(entities, owner, &[spawned], rally, false);
+                }
             }
         }
     }
@@ -65,7 +72,7 @@ pub(crate) fn production_system(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::game::entity::{EntityKind, ProdItem};
+    use crate::game::entity::{EntityKind, Order, ProdItem};
     use crate::game::map::Map;
     use crate::game::services::occupancy::{footprint_center, Occupancy};
     use crate::game::services::pathing::PathingService;
@@ -188,6 +195,64 @@ mod tests {
         ));
     }
 
+    #[test]
+    fn rally_point_moves_spawned_unit_and_prefers_near_exit() {
+        let map = flat_map(40);
+        let mut entities = EntityStore::new();
+        let factory = spawn_factory(&map, &mut entities, 10, 10);
+        let factory_x = entities.get(factory).expect("factory").pos_x;
+        // Rally far to the +x side of the factory.
+        let rally = map.tile_center(30, 11);
+        entities
+            .get_mut(factory)
+            .expect("factory")
+            .set_rally_point(Some(rally));
+        let mut players = vec![player(1)];
+
+        tick_production(&map, &mut entities, &mut players);
+
+        let tank = tanks_owned_by(&entities, 1)
+            .into_iter()
+            .next()
+            .expect("a tank should spawn");
+        assert!(
+            tank.1 > factory_x,
+            "tank should exit toward the rally (+x side), got x={} vs factory x={}",
+            tank.1,
+            factory_x
+        );
+        let spawned = entities.get(tank.0).expect("spawned tank");
+        assert!(
+            matches!(spawned.order(), Order::Move(_)),
+            "spawned unit should receive a move order to the rally point"
+        );
+        let goal = spawned.path_goal().expect("rally move should set a goal");
+        let dist = ((goal.0 - rally.0).powi(2) + (goal.1 - rally.1).powi(2)).sqrt();
+        assert!(
+            dist <= crate::config::TILE_SIZE as f32 * 4.0,
+            "rally move goal should be near the rally point, was {dist} px away"
+        );
+    }
+
+    #[test]
+    fn no_rally_spawns_idle_unit() {
+        let map = flat_map(32);
+        let mut entities = EntityStore::new();
+        spawn_factory(&map, &mut entities, 10, 10);
+        let mut players = vec![player(1)];
+
+        tick_production(&map, &mut entities, &mut players);
+
+        let tank = tanks_owned_by(&entities, 1)
+            .into_iter()
+            .next()
+            .expect("a tank should spawn");
+        assert!(
+            matches!(entities.get(tank.0).expect("tank").order(), Order::Idle),
+            "without a rally point a freshly produced unit should stay idle"
+        );
+    }
+
     fn flat_map(size: u32) -> Map {
         Map {
             size,
@@ -234,9 +299,9 @@ mod tests {
         let occ = Occupancy::build(map, entities);
         let mut pathing = PathingService::new(8_192, 256);
         pathing.advance_tick(1);
-        let coordinator = MoveCoordinator::new(&mut pathing, map, &occ, 1);
+        let mut coordinator = MoveCoordinator::new(&mut pathing, map, &occ, 1);
         let mut events = HashMap::new();
-        production_system(map, entities, players, &coordinator, &mut events);
+        production_system(map, entities, players, &mut coordinator, &mut events);
     }
 
     fn current_spawn_point(map: &Map, entities: &EntityStore, factory: u32) -> Option<(f32, f32)> {
@@ -244,7 +309,7 @@ mod tests {
         let mut pathing = PathingService::new(8_192, 256);
         pathing.advance_tick(1);
         let coordinator = MoveCoordinator::new(&mut pathing, map, &occ, 1);
-        coordinator.find_spawn_point(entities, factory, EntityKind::Tank)
+        coordinator.find_spawn_point(entities, factory, EntityKind::Tank, None)
     }
 
     fn block_all_spawn_points(map: &Map, entities: &mut EntityStore, factory: u32) -> Vec<u32> {

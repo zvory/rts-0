@@ -120,6 +120,13 @@ pub enum Command {
     Stop {
         units: Vec<u32>,
     },
+    /// Set a unit-producing building's rally point to a world point. Produced units receive a
+    /// move order to it and the building prefers the spawn exit closest to it.
+    SetRally {
+        building: u32,
+        x: f32,
+        y: f32,
+    },
 }
 
 // ---------------------------------------------------------------------------
@@ -292,6 +299,10 @@ pub struct EntityView {
     pub target_id: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub setup_state: Option<String>,
+
+    // Unit-producing buildings: rally point [x, y] in world px. Only ever sent to the owner.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rally: Option<[f32; 2]>,
 }
 
 impl EntityView {
@@ -326,6 +337,7 @@ impl EntityView {
             remaining: None,
             target_id: None,
             setup_state: None,
+            rally: None,
         }
     }
 }
@@ -461,6 +473,9 @@ impl Serialize for CompactEntity<'_> {
         if entity.remaining.is_some() {
             len = 18;
         }
+        if entity.rally.is_some() {
+            len = 19;
+        }
 
         let mut seq = serializer.serialize_seq(Some(len))?;
         seq.serialize_element(&entity.id)?;
@@ -500,6 +515,9 @@ impl Serialize for CompactEntity<'_> {
         }
         if len > 17 {
             seq.serialize_element(&entity.remaining)?;
+        }
+        if len > 18 {
+            seq.serialize_element(&entity.rally)?;
         }
         seq.end()
     }
@@ -626,6 +644,7 @@ mod tests {
         center.prod_progress = Some(0.25);
         center.prod_queue = Some(2);
         center.build_progress = Some(0.75);
+        center.rally = Some([256.0, 512.0]);
 
         Snapshot {
             tick: 42,
@@ -679,6 +698,8 @@ mod tests {
         assert_eq!(value["e"][0][9], serde_json::json!(1.75));
         assert_eq!(value["e"][0][14], serde_json::json!(200));
         assert_eq!(value["e"][0][15], serde_json::json!(9));
+        // Rally point rides in slot 18 of the producing building's record.
+        assert_eq!(value["e"][2][18], serde_json::json!([256.0, 512.0]));
         assert_eq!(value["r"], serde_json::json!([[200, 1498]]));
         assert_eq!(value["ev"].as_array().unwrap().len(), 4);
     }
