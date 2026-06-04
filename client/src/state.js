@@ -198,6 +198,9 @@ export class GameState {
         if (typeof prior.facing === "number" && typeof e.facing === "number") {
           next.facing = lerpAngle(prior.facing, e.facing, t);
         }
+        if (typeof prior.weaponFacing === "number" && typeof e.weaponFacing === "number") {
+          next.weaponFacing = lerpAngle(prior.weaponFacing, e.weaponFacing, t);
+        }
         out.push(next);
       } else {
         // No previous sample: render at the current position (a shallow copy

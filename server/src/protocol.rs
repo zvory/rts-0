@@ -262,6 +262,8 @@ pub struct EntityView {
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub facing: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub weapon_facing: Option<f32>,
 
     // Production buildings:
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -313,6 +315,7 @@ impl EntityView {
             max_hp,
             state: state.to_string(),
             facing: None,
+            weapon_facing: None,
             prod_kind: None,
             prod_progress: None,
             prod_queue: None,
@@ -429,29 +432,32 @@ impl Serialize for CompactEntity<'_> {
         if entity.facing.is_some() {
             len = 9;
         }
-        if prod_kind.is_some() {
+        if entity.weapon_facing.is_some() {
             len = 10;
         }
-        if entity.prod_progress.is_some() {
+        if prod_kind.is_some() {
             len = 11;
         }
-        if entity.prod_queue.is_some() {
+        if entity.prod_progress.is_some() {
             len = 12;
         }
-        if entity.build_progress.is_some() {
+        if entity.prod_queue.is_some() {
             len = 13;
         }
-        if entity.latched_node.is_some() {
+        if entity.build_progress.is_some() {
             len = 14;
         }
-        if entity.target_id.is_some() {
+        if entity.latched_node.is_some() {
             len = 15;
         }
-        if setup_state.is_some() {
+        if entity.target_id.is_some() {
             len = 16;
         }
-        if entity.remaining.is_some() {
+        if setup_state.is_some() {
             len = 17;
+        }
+        if entity.remaining.is_some() {
+            len = 18;
         }
 
         let mut seq = serializer.serialize_seq(Some(len))?;
@@ -467,27 +473,30 @@ impl Serialize for CompactEntity<'_> {
             seq.serialize_element(&entity.facing)?;
         }
         if len > 9 {
-            seq.serialize_element(&prod_kind)?;
+            seq.serialize_element(&entity.weapon_facing)?;
         }
         if len > 10 {
-            seq.serialize_element(&entity.prod_progress)?;
+            seq.serialize_element(&prod_kind)?;
         }
         if len > 11 {
-            seq.serialize_element(&entity.prod_queue)?;
+            seq.serialize_element(&entity.prod_progress)?;
         }
         if len > 12 {
-            seq.serialize_element(&entity.build_progress)?;
+            seq.serialize_element(&entity.prod_queue)?;
         }
         if len > 13 {
-            seq.serialize_element(&entity.latched_node)?;
+            seq.serialize_element(&entity.build_progress)?;
         }
         if len > 14 {
-            seq.serialize_element(&entity.target_id)?;
+            seq.serialize_element(&entity.latched_node)?;
         }
         if len > 15 {
-            seq.serialize_element(&setup_state)?;
+            seq.serialize_element(&entity.target_id)?;
         }
         if len > 16 {
+            seq.serialize_element(&setup_state)?;
+        }
+        if len > 17 {
             seq.serialize_element(&entity.remaining)?;
         }
         seq.end()
@@ -584,6 +593,7 @@ mod tests {
     fn representative_snapshot() -> Snapshot {
         let mut worker = EntityView::new(1, 1, kinds::WORKER, 10.0, 20.0, 40, 40, states::GATHER);
         worker.facing = Some(1.5);
+        worker.weapon_facing = Some(1.75);
         worker.latched_node = Some(200);
         worker.target_id = Some(9);
 
@@ -663,6 +673,10 @@ mod tests {
         assert_eq!(value["v"], COMPACT_SNAPSHOT_VERSION);
         assert_eq!(value["s"], serde_json::json!([42, 100, 25, 3, 10]));
         assert_eq!(value["e"].as_array().unwrap().len(), 3);
+        assert_eq!(value["e"][0][8], serde_json::json!(1.5));
+        assert_eq!(value["e"][0][9], serde_json::json!(1.75));
+        assert_eq!(value["e"][0][14], serde_json::json!(200));
+        assert_eq!(value["e"][0][15], serde_json::json!(9));
         assert_eq!(value["r"], serde_json::json!([[200, 1498]]));
         assert_eq!(value["ev"].as_array().unwrap().len(), 4);
     }

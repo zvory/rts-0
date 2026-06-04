@@ -710,6 +710,35 @@ mod tests {
         if e.is_unit() {
             v.facing = Some(e.facing());
         }
+        let active_combat_target = matches!(e.order(), Order::Attack(_) | Order::AttackMove(_))
+            || (e.is_building() && e.can_attack());
+        let target_visible = if let Some(t) = e.target_id() {
+            game.entities
+                .get(t)
+                .map(|target| {
+                    e.owner == viewer
+                        || !fogged
+                        || game
+                            .fog
+                            .is_visible_world(viewer, target.pos_x, target.pos_y)
+                })
+                .unwrap_or(false)
+        } else {
+            false
+        };
+        let weapon_facing_useful = e.kind == EntityKind::Tank || active_combat_target;
+        if weapon_facing_useful {
+            if let Some(weapon_facing) = e.weapon_facing() {
+                let weapon_facing_is_safe = e.owner == viewer
+                    || !fogged
+                    || e.target_id().is_none()
+                    || !active_combat_target
+                    || target_visible;
+                if weapon_facing_is_safe {
+                    v.weapon_facing = Some(weapon_facing);
+                }
+            }
+        }
         if e.kind == EntityKind::MachineGunner {
             v.setup_state = Some(e.weapon_setup().to_protocol_str().to_string());
         }
@@ -738,16 +767,9 @@ mod tests {
             }
         }
         if let Some(t) = e.target_id() {
-            if matches!(e.order(), Order::Attack(_) | Order::AttackMove(_))
-                || (e.is_building() && e.can_attack())
-            {
-                if let Some(target) = game.entities.get(t) {
-                    let visible = e.owner == viewer
-                        || !fogged
-                        || game
-                            .fog
-                            .is_visible_world(viewer, target.pos_x, target.pos_y);
-                    if visible {
+            if active_combat_target {
+                if game.entities.get(t).is_some() {
+                    if target_visible {
                         v.target_id = Some(t);
                     }
                 }
