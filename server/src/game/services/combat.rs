@@ -7,6 +7,7 @@ use crate::game::entity::{
 use crate::game::fog::Fog;
 use crate::game::map::Map;
 use crate::game::services::dist2;
+use crate::game::services::line_of_sight::LineOfSight;
 use crate::game::services::move_coordinator::MoveCoordinator;
 use crate::game::services::movement::{angle_delta, rotate_toward};
 use crate::game::services::occupancy::Occupancy;
@@ -41,6 +42,7 @@ pub(crate) fn combat_system(
     rng: &mut SmallRng,
     events: &mut HashMap<u32, Vec<Event>>,
 ) {
+    let los = LineOfSight::new(map);
     // Tick down cooldowns first.
     for id in entities.ids() {
         if let Some(e) = entities.get_mut(id) {
@@ -98,7 +100,7 @@ pub(crate) fn combat_system(
         }
 
         // Resolve / acquire a target id based on the current order semantics.
-        let target = resolve_target(entities, spatial, id, owner, px, py, aggro_px, mode);
+        let target = resolve_target(entities, spatial, &los, id, owner, px, py, aggro_px, mode);
         let Some(tid) = target else {
             // No target: clear stale combat target id for opportunistic-combat orders.
             if let Some(e) = entities.get_mut(id) {
@@ -141,8 +143,9 @@ pub(crate) fn combat_system(
         }
         let dist = dist2(px, py, tx, ty).sqrt();
         let target_angle = (ty - py).atan2(tx - px);
+        let clear_shot = los.clear_between_world_points((px, py), (tx, ty));
 
-        if dist <= range_px {
+        if dist <= range_px && clear_shot {
             // In range: aim, stop, deploy if needed, and fire if off cooldown.
             let mut weapon_aligned = true;
             if let Some(e) = entities.get_mut(id) {
@@ -346,6 +349,7 @@ fn combat_mode(e: &Entity) -> CombatMode {
 fn resolve_target(
     entities: &EntityStore,
     spatial: &SpatialIndex,
+    los: &LineOfSight<'_>,
     self_id: u32,
     owner: u32,
     px: f32,
@@ -376,8 +380,15 @@ fn resolve_target(
         .map(|e| combat_rules::prefers_armored_targets(e.kind))
         .unwrap_or(false);
     if prefers_armored {
-        if let Some(id) = world_query::nearest_tank_in_range(
-            entities, spatial, self_id, owner, px, py, acquire_px,
+        if let Some(id) = world_query::nearest_tank_in_range_filtered(
+            entities,
+            spatial,
+            self_id,
+            owner,
+            px,
+            py,
+            acquire_px,
+            |target| los.clear_between_world_points((px, py), (target.pos_x, target.pos_y)),
         ) {
             return Some(id);
         }
@@ -385,7 +396,16 @@ fn resolve_target(
 
     // Aggressive acquisition: the nearest enemy within the acquire radius (weapon range for
     // buildings, sight range for mobile units so they chase).
-    world_query::nearest_enemy_in_range(entities, spatial, self_id, owner, px, py, acquire_px)
+    world_query::nearest_enemy_in_range_filtered(
+        entities,
+        spatial,
+        self_id,
+        owner,
+        px,
+        py,
+        acquire_px,
+        |target| los.clear_between_world_points((px, py), (target.pos_x, target.pos_y)),
+    )
 }
 
 /// Apply `dmg` to `victim` from `attacker`, emitting an `Attack` event to the attacker's
@@ -452,6 +472,7 @@ fn apply_damage(
         (ax, ay),
     );
     apply_overpenetration(
+        map,
         entities,
         events,
         fog,
@@ -527,6 +548,7 @@ fn player_is_ai(players: &[PlayerState], player_id: u32) -> bool {
 
 #[allow(clippy::too_many_arguments)]
 fn apply_overpenetration(
+    map: &Map,
     entities: &mut EntityStore,
     events: &mut HashMap<u32, Vec<Event>>,
     fog: &Fog,
@@ -571,6 +593,7 @@ fn apply_overpenetration(
 
     let player_ids: Vec<u32> = events.keys().copied().collect();
     let mut hits: Vec<(u32, f32, f32, f32, f32)> = Vec::new();
+    let los = LineOfSight::new(map);
     for id in entities.ids() {
         if id == attacker || id == primary_victim {
             continue;
@@ -589,6 +612,9 @@ fn apply_overpenetration(
         }
         let perp = (tx * uy - ty * ux).abs();
         if perp > target.radius() + perpendicular_slack {
+            continue;
+        }
+        if !los.clear_between_world_points((ax, ay), (target.pos_x, target.pos_y)) {
             continue;
         }
         hits.push((id, target.pos_x, target.pos_y, along, target.radius()));
@@ -644,6 +670,7 @@ mod tests {
     use crate::game::services::pathing::PathingService;
     use crate::game::services::spatial::SpatialIndex;
     use crate::game::ScoreState;
+    use crate::protocol::terrain;
     use rand::SeedableRng;
 
     fn rifleman_with_enemy() -> (EntityStore, u32, u32) {
@@ -655,6 +682,21 @@ mod tests {
             .spawn_unit(2, EntityKind::Rifleman, 120.0, 100.0)
             .expect("enemy rifleman should spawn");
         (entities, self_id, enemy_id)
+    }
+
+    fn open_map(size: u32) -> Map {
+        Map {
+            size,
+            terrain: vec![terrain::GRASS; (size * size) as usize],
+            starts: vec![(4, 4), (size - 5, size - 5)],
+            expansion_sites: Vec::new(),
+        }
+    }
+
+    fn map_with_rock_at(tile: (u32, u32)) -> Map {
+        let mut map = open_map(12);
+        map.terrain[(tile.1 * map.size + tile.0) as usize] = terrain::ROCK;
+        map
     }
 
     fn player_state(id: u32, is_ai: bool) -> PlayerState {
@@ -681,17 +723,25 @@ mod tests {
         players: &[PlayerState],
     ) -> HashMap<u32, Vec<Event>> {
         let map = Map::generate(2, 0x00C0_FFEE);
-        let occ = Occupancy::build(&map, entities);
-        let spatial = SpatialIndex::build(entities, config::TILE_SIZE);
+        run_combat_tick_on_map(entities, players, &map)
+    }
+
+    fn run_combat_tick_on_map(
+        entities: &mut EntityStore,
+        players: &[PlayerState],
+        map: &Map,
+    ) -> HashMap<u32, Vec<Event>> {
+        let occ = Occupancy::build(map, entities);
+        let spatial = SpatialIndex::build(entities, map.size);
         let mut pathing = PathingService::new(256, 64);
-        let mut coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, 10);
+        let mut coordinator = MoveCoordinator::new(&mut pathing, map, &occ, 10);
         let mut fog = Fog::new(map.size);
-        fog.recompute(&[1, 2], entities);
+        fog.recompute(&[1, 2], entities, map);
         let mut events = HashMap::from([(1, Vec::new()), (2, Vec::new())]);
 
         let mut rng = SmallRng::seed_from_u64(0);
         combat_system(
-            &map,
+            map,
             entities,
             players,
             &occ,
@@ -754,12 +804,15 @@ mod tests {
     #[test]
     fn idle_army_units_auto_acquire_targets() {
         let (entities, self_id, enemy_id) = rifleman_with_enemy();
-        let spatial = SpatialIndex::build(&entities, 32);
+        let map = open_map(8);
+        let los = LineOfSight::new(&map);
+        let spatial = SpatialIndex::build(&entities, map.size);
         let attacker = entities.get(self_id).expect("attacker should exist");
 
         let target = resolve_target(
             &entities,
             &spatial,
+            &los,
             self_id,
             attacker.owner,
             attacker.pos_x,
@@ -774,13 +827,16 @@ mod tests {
     #[test]
     fn move_orders_ignore_nearby_enemies() {
         let (mut entities, self_id, _) = rifleman_with_enemy();
-        let spatial = SpatialIndex::build(&entities, 32);
+        let map = open_map(8);
+        let los = LineOfSight::new(&map);
+        let spatial = SpatialIndex::build(&entities, map.size);
         let attacker = entities.get_mut(self_id).expect("attacker should exist");
         attacker.set_order(Order::move_to(300.0, 300.0));
 
         let target = resolve_target(
             &entities,
             &spatial,
+            &los,
             self_id,
             1,
             100.0,
@@ -795,13 +851,16 @@ mod tests {
     #[test]
     fn attack_move_keeps_auto_acquisition() {
         let (mut entities, self_id, enemy_id) = rifleman_with_enemy();
-        let spatial = SpatialIndex::build(&entities, 32);
+        let map = open_map(8);
+        let los = LineOfSight::new(&map);
+        let spatial = SpatialIndex::build(&entities, map.size);
         let attacker = entities.get_mut(self_id).expect("attacker should exist");
         attacker.set_order(Order::attack_move_to(300.0, 300.0));
 
         let target = resolve_target(
             &entities,
             &spatial,
+            &los,
             self_id,
             1,
             100.0,
@@ -811,6 +870,78 @@ mod tests {
         );
 
         assert_eq!(target, Some(enemy_id));
+    }
+
+    #[test]
+    fn stone_blocks_attack_move_auto_acquisition() {
+        let map = map_with_rock_at((3, 4));
+        let mut entities = EntityStore::new();
+        let attacker_pos = map.tile_center(2, 4);
+        let enemy_pos = map.tile_center(4, 4);
+        let self_id = entities
+            .spawn_unit(1, EntityKind::Rifleman, attacker_pos.0, attacker_pos.1)
+            .expect("attacker should spawn");
+        entities
+            .spawn_unit(2, EntityKind::Rifleman, enemy_pos.0, enemy_pos.1)
+            .expect("enemy should spawn");
+        let los = LineOfSight::new(&map);
+        let spatial = SpatialIndex::build(&entities, map.size);
+        entities
+            .get_mut(self_id)
+            .expect("attacker should exist")
+            .set_order(Order::attack_move_to(300.0, 300.0));
+        let attacker = entities.get(self_id).expect("attacker should exist");
+
+        let target = resolve_target(
+            &entities,
+            &spatial,
+            &los,
+            self_id,
+            attacker.owner,
+            attacker.pos_x,
+            attacker.pos_y,
+            128.0,
+            combat_mode(attacker),
+        );
+
+        assert_eq!(target, None);
+    }
+
+    #[test]
+    fn stone_blocks_explicit_attack_damage_until_shot_is_clear() {
+        let map = map_with_rock_at((3, 4));
+        let mut entities = EntityStore::new();
+        let attacker_pos = map.tile_center(2, 4);
+        let enemy_pos = map.tile_center(4, 4);
+        let attacker_id = entities
+            .spawn_unit(1, EntityKind::Rifleman, attacker_pos.0, attacker_pos.1)
+            .expect("attacker should spawn");
+        let enemy_id = entities
+            .spawn_unit(2, EntityKind::Rifleman, enemy_pos.0, enemy_pos.1)
+            .expect("enemy should spawn");
+        entities
+            .get_mut(attacker_id)
+            .expect("attacker should exist")
+            .set_order(Order::attack(enemy_id));
+        let before_hp = entities.get(enemy_id).expect("enemy should exist").hp;
+
+        let events = run_combat_tick_on_map(
+            &mut entities,
+            &[player_state(1, false), player_state(2, false)],
+            &map,
+        );
+
+        assert_eq!(
+            entities.get(enemy_id).expect("enemy should exist").hp,
+            before_hp
+        );
+        assert!(
+            events
+                .values()
+                .flatten()
+                .all(|event| !matches!(event, Event::Attack { .. })),
+            "blocked shots should not emit attack tracers"
+        );
     }
 
     #[test]
@@ -832,7 +963,7 @@ mod tests {
         let mut pathing = PathingService::new(256, 64);
         let mut coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, 0);
         let mut fog = Fog::new(map.size);
-        fog.recompute(&[1], &entities);
+        fog.recompute(&[1], &entities, &map);
         let mut events = HashMap::from([(1, Vec::new())]);
 
         let mut rng = SmallRng::seed_from_u64(0);
@@ -918,12 +1049,15 @@ mod tests {
         entities
             .spawn_unit(2, EntityKind::Rifleman, 120.0, 100.0)
             .expect("enemy rifleman should spawn");
-        let spatial = SpatialIndex::build(&entities, 32);
+        let map = open_map(8);
+        let los = LineOfSight::new(&map);
+        let spatial = SpatialIndex::build(&entities, map.size);
         let worker = entities.get(worker_id).expect("worker should exist");
 
         let target = resolve_target(
             &entities,
             &spatial,
+            &los,
             worker_id,
             worker.owner,
             worker.pos_x,
