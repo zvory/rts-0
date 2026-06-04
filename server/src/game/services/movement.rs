@@ -29,6 +29,12 @@ const COLLISION_PASSES: usize = 4;
 /// non-overlapping. Avoids endless micro-pushes from floating-point noise.
 const COLLISION_EPS_PX: f32 = 0.001;
 
+pub(crate) const TANK_BODY_TURN_RATE_RAD_PER_TICK: f32 = 0.035;
+const TANK_BODY_LOOKAHEAD_PX: f32 = config::TILE_SIZE as f32 * 2.0;
+const TANK_CRAWL_ANGLE_RAD: f32 = 0.55;
+const TANK_PIVOT_ANGLE_RAD: f32 = 1.25;
+pub(crate) const TANK_BODY_FIRE_TOLERANCE_RAD: f32 = 0.30;
+
 /// Advance every moving unit along its waypoint path at its speed. Clamps the final landing
 /// tile to passable terrain (soft overlap with other units is allowed, so we don't resolve
 /// unit-unit collisions here). Arriving at the last waypoint of a plain Move clears the order.
@@ -64,6 +70,26 @@ pub(crate) fn movement_system(
         let mut budget = speed;
         let mut new_facing = None;
         let mut static_blocked_this_tick = false;
+        let is_tank = entities
+            .get(id)
+            .map(|e| e.kind == EntityKind::Tank)
+            .unwrap_or(false);
+        if is_tank {
+            if let Some(e) = entities.get(id) {
+                if let Some((desired_x, desired_y)) = tank_desired_path_point(e, x, y) {
+                    let desired = (desired_y - y).atan2(desired_x - x);
+                    if desired.is_finite() {
+                        let rotated =
+                            rotate_toward(e.facing(), desired, TANK_BODY_TURN_RATE_RAD_PER_TICK);
+                        if rotated.is_finite() {
+                            let error = angle_delta(rotated, desired).abs();
+                            budget *= tank_speed_scale(error);
+                            new_facing = Some(rotated);
+                        }
+                    }
+                }
+            }
+        }
         // Consume waypoints (stored reversed, next = last element) within this tick's budget.
         loop {
             let (next, path_len, next_next) = {
@@ -113,7 +139,12 @@ pub(crate) fn movement_system(
                 }
             }
 
-            new_facing = Some(dy.atan2(dx));
+            if !is_tank {
+                let facing = dy.atan2(dx);
+                if facing.is_finite() {
+                    new_facing = Some(facing);
+                }
+            }
             if dist <= budget {
                 // We can reach this waypoint this tick.
                 if !tile_passable_at(occ, map, wx, wy) {
@@ -293,6 +324,53 @@ pub(crate) fn movement_system(
             }
         }
     }
+}
+
+/// Signed shortest angular delta from `from` to `to`, in radians.
+pub(crate) fn angle_delta(from: f32, to: f32) -> f32 {
+    let two_pi = std::f32::consts::TAU;
+    (to - from + std::f32::consts::PI).rem_euclid(two_pi) - std::f32::consts::PI
+}
+
+pub(crate) fn rotate_toward(current: f32, desired: f32, max_delta: f32) -> f32 {
+    if !current.is_finite() || !desired.is_finite() || !max_delta.is_finite() {
+        return current;
+    }
+    let delta = angle_delta(current, desired);
+    if delta.abs() <= max_delta {
+        desired
+    } else {
+        current + delta.signum() * max_delta
+    }
+}
+
+pub(crate) fn tank_speed_scale(abs_angle_error: f32) -> f32 {
+    if !abs_angle_error.is_finite() {
+        return 0.0;
+    }
+    if abs_angle_error <= TANK_CRAWL_ANGLE_RAD {
+        1.0
+    } else if abs_angle_error >= TANK_PIVOT_ANGLE_RAD {
+        0.0
+    } else {
+        let t = (abs_angle_error - TANK_CRAWL_ANGLE_RAD)
+            / (TANK_PIVOT_ANGLE_RAD - TANK_CRAWL_ANGLE_RAD);
+        1.0 - t
+    }
+}
+
+fn tank_desired_path_point(e: &Entity, x: f32, y: f32) -> Option<(f32, f32)> {
+    let path = &e.movement.as_ref()?.path;
+    let next = path.last().copied()?;
+    path.iter()
+        .rev()
+        .copied()
+        .find(|(px, py)| {
+            let dx = *px - x;
+            let dy = *py - y;
+            (dx * dx + dy * dy).sqrt() >= TANK_BODY_LOOKAHEAD_PX
+        })
+        .or(Some(next))
 }
 
 /// Inject a perpendicular detour waypoint so a stuck mid-path unit can shimmy free.
@@ -1034,6 +1112,90 @@ mod tests {
             e.set_path_goal(goal);
             e.mark_move_phase(MovePhase::Moving);
         }
+    }
+
+    #[test]
+    fn tank_body_facing_turns_gradually_along_path() {
+        let map = flat_map(1);
+        let mut entities = EntityStore::new();
+        let (sx, sy) = map.tile_center(20, 20);
+        let (_, gy) = map.tile_center(20, 26);
+        let tank = entities
+            .spawn_unit(1, EntityKind::Tank, sx, sy)
+            .expect("tank should spawn");
+        if let Some(e) = entities.get_mut(tank) {
+            e.set_facing(0.0);
+        }
+        set_path_direct(&mut entities, tank, vec![(sx, gy)]);
+
+        let occ = Occupancy::build(&map, &entities);
+        let spatial = SpatialIndex::build(&entities, map.size);
+        movement_system(&map, &mut entities, &occ, &spatial, 0);
+
+        let facing = entities.get(tank).expect("tank should exist").facing();
+        assert!(
+            facing > 0.0 && facing <= TANK_BODY_TURN_RATE_RAD_PER_TICK + 0.0001,
+            "tank body should turn by at most the turn-rate constant, got {facing:.4}"
+        );
+    }
+
+    #[test]
+    fn tank_pauses_when_body_badly_misaligned() {
+        let map = flat_map(1);
+        let mut entities = EntityStore::new();
+        let (sx, sy) = map.tile_center(20, 20);
+        let (gx, _) = map.tile_center(14, 20);
+        let tank = entities
+            .spawn_unit(1, EntityKind::Tank, sx, sy)
+            .expect("tank should spawn");
+        if let Some(e) = entities.get_mut(tank) {
+            e.set_facing(0.0);
+        }
+        set_path_direct(&mut entities, tank, vec![(gx, sy)]);
+
+        let occ = Occupancy::build(&map, &entities);
+        let spatial = SpatialIndex::build(&entities, map.size);
+        movement_system(&map, &mut entities, &occ, &spatial, 0);
+
+        let e = entities.get(tank).expect("tank should exist");
+        let moved = moved_distance((sx, sy), (e.pos_x, e.pos_y));
+        assert!(
+            moved <= 0.01,
+            "badly misaligned tank should pivot in place, moved {moved:.4}px"
+        );
+        assert!(
+            e.facing().abs() > 0.0 && e.facing().abs() <= TANK_BODY_TURN_RATE_RAD_PER_TICK + 0.0001,
+            "tank should still rotate while paused, facing {:.4}",
+            e.facing()
+        );
+    }
+
+    #[test]
+    fn rifleman_facing_remains_instant_for_path_segment() {
+        let map = flat_map(1);
+        let mut entities = EntityStore::new();
+        let (sx, sy) = map.tile_center(20, 20);
+        let (_, gy) = map.tile_center(20, 26);
+        let rifleman = entities
+            .spawn_unit(1, EntityKind::Rifleman, sx, sy)
+            .expect("rifleman should spawn");
+        if let Some(e) = entities.get_mut(rifleman) {
+            e.set_facing(0.0);
+        }
+        set_path_direct(&mut entities, rifleman, vec![(sx, gy)]);
+
+        let occ = Occupancy::build(&map, &entities);
+        let spatial = SpatialIndex::build(&entities, map.size);
+        movement_system(&map, &mut entities, &occ, &spatial, 0);
+
+        let facing = entities
+            .get(rifleman)
+            .expect("rifleman should exist")
+            .facing();
+        assert!(
+            (facing - std::f32::consts::FRAC_PI_2).abs() <= 0.0001,
+            "rifleman should snap to path-segment facing, got {facing:.4}"
+        );
     }
 
     /// An intermediate waypoint within ARRIVE_RADIUS_INTERMEDIATE_PX is popped in one tick

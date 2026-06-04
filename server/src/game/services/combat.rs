@@ -8,6 +8,9 @@ use crate::game::fog::Fog;
 use crate::game::map::Map;
 use crate::game::services::dist2;
 use crate::game::services::move_coordinator::MoveCoordinator;
+use crate::game::services::movement::{
+    angle_delta, rotate_toward, TANK_BODY_FIRE_TOLERANCE_RAD, TANK_BODY_TURN_RATE_RAD_PER_TICK,
+};
 use crate::game::services::occupancy::Occupancy;
 use crate::game::services::spatial::SpatialIndex;
 use crate::game::services::world_query;
@@ -133,12 +136,21 @@ pub(crate) fn combat_system(
 
         if dist <= range_px {
             // In range: face it, stop, deploy if needed, and fire if off cooldown.
+            let target_angle = (ty - py).atan2(tx - px);
+            let mut body_aligned = true;
             if let Some(e) = entities.get_mut(id) {
-                e.set_facing((ty - py).atan2(tx - px));
+                if e.kind == EntityKind::Tank {
+                    body_aligned = rotate_tank_body_for_combat(e, target_angle);
+                } else if target_angle.is_finite() {
+                    e.set_facing(target_angle);
+                }
                 e.set_target_id(Some(tid));
                 e.mark_attack_phase(AttackPhase::Firing);
                 // Hold position while a target is in weapon range (don't overshoot it).
                 e.clear_path();
+            }
+            if !body_aligned {
+                continue;
             }
             if !machine_gunner_ready_to_fire(entities, id) {
                 continue;
@@ -182,6 +194,17 @@ pub(crate) fn combat_system(
             }
         }
     }
+}
+
+fn rotate_tank_body_for_combat(e: &mut Entity, target_angle: f32) -> bool {
+    if !target_angle.is_finite() {
+        return false;
+    }
+    let rotated = rotate_toward(e.facing(), target_angle, TANK_BODY_TURN_RATE_RAD_PER_TICK);
+    if rotated.is_finite() {
+        e.set_facing(rotated);
+    }
+    angle_delta(rotated, target_angle).abs() <= TANK_BODY_FIRE_TOLERANCE_RAD
 }
 
 fn tick_machine_gunner_setup(e: &mut Entity) {
@@ -931,6 +954,87 @@ mod tests {
         assert!(
             entities.get(mg_id).expect("mg should exist").pos_x > start_x,
             "machine gunner should move after teardown completes"
+        );
+    }
+
+    #[test]
+    fn tank_combat_does_not_snap_body_to_target() {
+        let mut entities = EntityStore::new();
+        let tank_id = entities
+            .spawn_unit(1, EntityKind::Tank, 100.0, 100.0)
+            .expect("tank should spawn");
+        let enemy_id = entities
+            .spawn_unit(2, EntityKind::Rifleman, 100.0, 140.0)
+            .expect("enemy should spawn");
+        if let Some(tank) = entities.get_mut(tank_id) {
+            tank.set_facing(0.0);
+            tank.set_order(Order::attack(enemy_id));
+        }
+
+        run_combat_tick(&mut entities);
+
+        let tank = entities.get(tank_id).expect("tank should exist");
+        assert!(
+            tank.facing() > 0.0 && tank.facing() <= TANK_BODY_TURN_RATE_RAD_PER_TICK + 0.0001,
+            "tank body should rotate gradually toward target, got {:.4}",
+            tank.facing()
+        );
+        assert_eq!(
+            tank.attack_cd(),
+            0,
+            "misaligned tank should not fire on the same tick it starts turning"
+        );
+    }
+
+    #[test]
+    fn tank_cannot_fire_until_body_aligned_before_turrets_exist() {
+        let mut entities = EntityStore::new();
+        let tank_id = entities
+            .spawn_unit(1, EntityKind::Tank, 100.0, 100.0)
+            .expect("tank should spawn");
+        let enemy_id = entities
+            .spawn_unit(2, EntityKind::Rifleman, 120.0, 100.0)
+            .expect("enemy should spawn");
+        if let Some(tank) = entities.get_mut(tank_id) {
+            tank.set_facing(std::f32::consts::FRAC_PI_2);
+            tank.set_order(Order::attack(enemy_id));
+        }
+        let enemy_hp = entities.get(enemy_id).expect("enemy should exist").hp;
+
+        for _ in 0..10 {
+            run_combat_tick(&mut entities);
+        }
+        assert_eq!(
+            entities.get(enemy_id).expect("enemy should exist").hp,
+            enemy_hp,
+            "tank should not damage the target while hull aim is outside tolerance"
+        );
+        assert_eq!(
+            entities
+                .get(tank_id)
+                .expect("tank should exist")
+                .attack_cd(),
+            0,
+            "tank cooldown should remain ready while firing is gated by hull alignment"
+        );
+
+        let mut fired = false;
+        for _ in 0..80 {
+            run_combat_tick(&mut entities);
+            if entities
+                .get(tank_id)
+                .expect("tank should exist")
+                .attack_cd()
+                > 0
+            {
+                fired = true;
+                break;
+            }
+        }
+
+        assert!(
+            fired,
+            "tank should fire once its hull rotates inside the temporary no-turret tolerance"
         );
     }
 

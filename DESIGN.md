@@ -700,6 +700,10 @@ The server treats every client as potentially hostile. Limits live next to the c
 - **Shot overpenetration**: ranged attacks continue 25% of their weapon range past the primary
   target and deal 50% reduced damage to additional enemies behind it, which discourages
   clumping and rewards tighter army control.
+- **Tank body facing**: the snapshot `facing` field is the tank hull/body angle. Tanks rotate that
+  body angle at a bounded rate on movement paths and while aiming at combat targets; badly
+  misaligned tanks pivot in place instead of sliding sideways at full speed. Until independent
+  turret state exists, tank shots require the hull to be nearly aligned with the target.
 - **Worker direct-hit retreat**: a worker that takes primary-target damage from an attacker gets a
   short move-away order through normal pathing. Overpenetration splash does not trigger this
   reaction, and workers actively constructing a scaffold stay latched so unfinished buildings are
