@@ -121,15 +121,22 @@ fn merge_resource_deltas(snapshot: &mut Snapshot, previous: &[ResourceDelta]) {
 
 /// Send to one player's sink without ever blocking the room task. Reliable messages use a bounded
 /// FIFO and snapshots use a replaceable latest-only slot.
-pub(super) fn send_or_log(room: &str, player_id: u32, tx: &ConnectionSink, msg: ServerMessage) {
+pub(super) fn send_or_log(
+    room: &str,
+    player_id: u32,
+    tx: &ConnectionSink,
+    msg: ServerMessage,
+) -> Option<SnapshotSendStatus> {
     match msg {
         ServerMessage::Snapshot(snapshot) => match tx.try_send_snapshot(snapshot) {
-            SnapshotSendStatus::Stored => {}
+            SnapshotSendStatus::Stored => Some(SnapshotSendStatus::Stored),
             SnapshotSendStatus::Replaced => {
                 debug!(room = %room, player_id, "coalesced pending snapshot");
+                Some(SnapshotSendStatus::Replaced)
             }
             SnapshotSendStatus::Closed => {
                 debug!(room = %room, player_id, "snapshot sink closed; client gone");
+                Some(SnapshotSendStatus::Closed)
             }
         },
         reliable => {
@@ -143,6 +150,7 @@ pub(super) fn send_or_log(room: &str, player_id: u32, tx: &ConnectionSink, msg: 
                     }
                 }
             }
+            None
         }
     }
 }

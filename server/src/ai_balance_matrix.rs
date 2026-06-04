@@ -7,6 +7,7 @@
 
 mod config;
 mod game;
+mod perf;
 mod protocol;
 mod rules;
 

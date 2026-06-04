@@ -130,6 +130,20 @@ impl Game {
     /// production+spawn → construction → deaths → recompute supply → recompute fog. The whole
     /// method is panic-free: every entity lookup is fallible and stale ids are ignored.
     pub fn tick(&mut self) -> Vec<(u32, Vec<Event>)> {
+        self.tick_inner(None)
+    }
+
+    pub(crate) fn tick_with_perf(
+        &mut self,
+        perf: Option<&mut crate::perf::TickPerf>,
+    ) -> Vec<(u32, Vec<Event>)> {
+        self.tick_inner(perf)
+    }
+
+    fn tick_inner(
+        &mut self,
+        mut perf: Option<&mut crate::perf::TickPerf>,
+    ) -> Vec<(u32, Vec<Event>)> {
         self.tick = self.tick.wrapping_add(1);
         self.pathing.advance_tick(self.tick);
 
@@ -143,21 +157,26 @@ impl Game {
         // pending queue a human client feeds. They are validated on apply just like any client
         // command — the AI gets no special authority over the simulation. Disjoint field borrows
         // (`self.ai` mutably, the rest shared) keep this lock-free.
-        let mut pending = std::mem::take(&mut self.pending);
-        for controller in self.ai.iter_mut() {
-            controller.think(
-                AiThinkContext {
-                    map: &self.map,
-                    entities: &self.entities,
-                    fog: &self.fog,
-                    spatial: &self.spatial,
-                    players: &self.players,
-                    tick: self.tick,
-                },
-                &mut pending,
-            );
-        }
-        self.record_commands_for_tick(&pending);
+        let pending = crate::perf::timed(perf.as_deref_mut(), "ai_think", || {
+            let mut pending = std::mem::take(&mut self.pending);
+            for controller in self.ai.iter_mut() {
+                controller.think(
+                    AiThinkContext {
+                        map: &self.map,
+                        entities: &self.entities,
+                        fog: &self.fog,
+                        spatial: &self.spatial,
+                        players: &self.players,
+                        tick: self.tick,
+                    },
+                    &mut pending,
+                );
+            }
+            pending
+        });
+        crate::perf::timed(perf.as_deref_mut(), "record_commands", || {
+            self.record_commands_for_tick(&pending);
+        });
 
         // Run every per-tick system in order. `run_tick` takes split borrows of the map,
         // entity store, player economy, and the event buckets, so it can mutate resources and
@@ -172,21 +191,45 @@ impl Game {
             pending,
             &mut events,
             self.tick,
+            perf.as_deref_mut(),
         );
 
         // Fog last, from the post-systems world state.
         let ids: Vec<u32> = self.players.iter().map(|p| p.id).collect();
-        self.fog.recompute(&ids, &self.entities, &self.map);
+        crate::perf::timed(perf.as_deref_mut(), "fog_recompute", || {
+            self.fog.recompute(&ids, &self.entities, &self.map);
+        });
 
         // In debug builds, assert that the world state is internally consistent.
         // Panics here mean a system violated a documented invariant.
         #[cfg(debug_assertions)]
-        self.assert_invariants();
+        crate::perf::timed(perf, "debug_invariants", || {
+            self.assert_invariants();
+        });
 
         // Return events in a stable order (by player id) for determinism.
         let mut out: Vec<(u32, Vec<Event>)> = events.into_iter().collect();
         out.sort_by_key(|(pid, _)| *pid);
         out
+    }
+
+    pub(crate) fn current_tick(&self) -> u32 {
+        self.tick
+    }
+
+    pub(crate) fn perf_entity_counts(&self) -> crate::perf::EntityCounts {
+        let mut counts = crate::perf::EntityCounts::default();
+        for entity in self.entities.iter() {
+            counts.entities += 1;
+            if entity.is_unit() {
+                counts.units += 1;
+            } else if entity.is_building() {
+                counts.buildings += 1;
+            } else if entity.is_node() {
+                counts.resources += 1;
+            }
+        }
+        counts
     }
 
     /// Player ids that are not yet defeated. Human players are defeated when they lose all
