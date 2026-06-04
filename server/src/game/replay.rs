@@ -52,8 +52,11 @@ pub fn replay_commands(
     commands: &[CommandLogEntry],
     ticks: u32,
     seed: u32,
+    starting_steel: u32,
+    starting_oil: u32,
 ) -> Result<ReplayOutcome, ReplayError> {
-    let mut replay = Game::new_for_replay(players, seed);
+    let mut replay =
+        Game::new_for_replay_with_starting_resources(players, starting_steel, starting_oil, seed);
     let mut next_command = 0usize;
     let mut events = Vec::new();
 
@@ -149,3 +152,28 @@ impl std::fmt::Display for ReplayError {
 }
 
 impl std::error::Error for ReplayError {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn players() -> [PlayerInit; 1] {
+        [PlayerInit {
+            id: 1,
+            name: "Replay".into(),
+            color: "#fff".into(),
+            is_ai: false,
+        }]
+    }
+
+    #[test]
+    fn replay_commands_preserves_explicit_starting_resources() {
+        let players = players();
+        let outcome = replay_commands(&players, &[], 0, 0x1234_5678, 99_999, 88_888)
+            .expect("replay should succeed");
+        let snapshot = &outcome.final_snapshots[0].snapshot;
+
+        assert_eq!(snapshot.steel, 99_999);
+        assert_eq!(snapshot.oil, 88_888);
+    }
+}
