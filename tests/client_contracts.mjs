@@ -12,6 +12,7 @@ import { Fog } from "../client/src/fog.js";
 import { MINING_IC_RANGE_TILES, STATS } from "../client/src/config.js";
 import { playerHasCompletedKind } from "../client/src/hud.js";
 import { Audio } from "../client/src/audio.js";
+import { machineGunnerHasAudibleTarget } from "../client/src/combat_audio.js";
 import {
   COMPACT_SNAPSHOT_VERSION,
   EVENT,
@@ -752,6 +753,36 @@ function fakeAudioContext() {
   globalThis.document = priorDocument;
   globalThis.localStorage = priorLocalStorage;
   globalThis.performance = priorPerformance;
+}
+
+// ---------------------------------------------------------------------------
+// Combat audio
+// ---------------------------------------------------------------------------
+{
+  assert(
+    machineGunnerHasAudibleTarget({
+      kind: KIND.MACHINE_GUNNER,
+      state: STATE.MOVE,
+      setupState: SETUP.TEARING_DOWN,
+      targetId: 7,
+    }),
+    "MG combat loop stays active while the machine gunner still has a target",
+  );
+  assert(
+    !machineGunnerHasAudibleTarget({
+      kind: KIND.MACHINE_GUNNER,
+      state: STATE.ATTACK,
+      setupState: SETUP.DEPLOYED,
+    }),
+    "MG combat loop stops once the machine gunner has no target",
+  );
+  assert(
+    !machineGunnerHasAudibleTarget({
+      kind: KIND.RIFLEMAN,
+      targetId: 7,
+    }),
+    "non-MG targets do not hold the MG combat loop",
+  );
 }
 
 console.log("✅ client_contracts.mjs: all contract assertions passed");
