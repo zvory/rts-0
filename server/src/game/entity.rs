@@ -29,7 +29,7 @@ pub enum EntityKind {
     MachineGunner,
     AtTeam,
     Tank,
-    IndustrialCenter,
+    CityCentre,
     Depot,
     Barracks,
     TrainingCentre,
@@ -46,7 +46,7 @@ impl EntityKind {
         EntityKind::MachineGunner,
         EntityKind::AtTeam,
         EntityKind::Tank,
-        EntityKind::IndustrialCenter,
+        EntityKind::CityCentre,
         EntityKind::Depot,
         EntityKind::Barracks,
         EntityKind::TrainingCentre,
@@ -75,7 +75,7 @@ impl EntityKind {
             EntityKind::MachineGunner => kinds::MACHINE_GUNNER,
             EntityKind::AtTeam => kinds::AT_TEAM,
             EntityKind::Tank => kinds::TANK,
-            EntityKind::IndustrialCenter => kinds::INDUSTRIAL_CENTER,
+            EntityKind::CityCentre => kinds::CITY_CENTRE,
             EntityKind::Depot => kinds::DEPOT,
             EntityKind::Barracks => kinds::BARRACKS,
             EntityKind::TrainingCentre => kinds::TRAINING_CENTRE,
@@ -96,7 +96,7 @@ impl std::str::FromStr for EntityKind {
             kinds::MACHINE_GUNNER => Ok(EntityKind::MachineGunner),
             kinds::AT_TEAM => Ok(EntityKind::AtTeam),
             kinds::TANK => Ok(EntityKind::Tank),
-            kinds::INDUSTRIAL_CENTER => Ok(EntityKind::IndustrialCenter),
+            kinds::CITY_CENTRE => Ok(EntityKind::CityCentre),
             kinds::DEPOT => Ok(EntityKind::Depot),
             kinds::BARRACKS => Ok(EntityKind::Barracks),
             kinds::TRAINING_CENTRE => Ok(EntityKind::TrainingCentre),
@@ -518,7 +518,7 @@ pub struct WorkerState {
     /// Present only if round-trip harvesting is reintroduced.
     pub carry: Option<CarryState>,
     /// Reserved drop-off target for future round-trip harvesting.
-    pub home_industrial_center: Option<u32>,
+    pub home_city_centre: Option<u32>,
 }
 
 /// Resource-node state. Present only on steel/oil nodes.
@@ -1360,7 +1360,7 @@ mod tests {
     fn finished_building_kinds_have_exact_state_groups() {
         let cases = [
             (
-                EntityKind::IndustrialCenter,
+                EntityKind::CityCentre,
                 groups(false, false, true, false, false, false),
             ),
             (
@@ -1391,7 +1391,7 @@ mod tests {
     #[test]
     fn unfinished_buildings_add_construction_state_only() {
         let kinds = [
-            EntityKind::IndustrialCenter,
+            EntityKind::CityCentre,
             EntityKind::Depot,
             EntityKind::Barracks,
             EntityKind::TrainingCentre,

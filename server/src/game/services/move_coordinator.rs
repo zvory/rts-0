@@ -1237,19 +1237,19 @@ mod tests {
             &occ,
             &entities,
             worker,
-            EntityKind::IndustrialCenter,
+            EntityKind::CityCentre,
             20,
             20,
         )
         .expect("worker should be able to stage outside the footprint");
         let tile = map.tile_of(goal.0, goal.1);
         let footprint: std::collections::BTreeSet<(u32, u32)> =
-            footprint_tiles(EntityKind::IndustrialCenter, 20, 20)
+            footprint_tiles(EntityKind::CityCentre, 20, 20)
                 .into_iter()
                 .collect();
         assert!(
             !footprint.contains(&tile),
-            "staging goal must be outside the 3x3 IC footprint, got {tile:?}"
+            "staging goal must be outside the 3x3 City Centre footprint, got {tile:?}"
         );
     }
 
@@ -1291,23 +1291,25 @@ mod tests {
         pathing.advance_tick(1);
         let mut coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, 1);
 
-        let ok =
-            coordinator.order_build(&mut entities, worker, EntityKind::IndustrialCenter, 48, 70);
+        let ok = coordinator.order_build(&mut entities, worker, EntityKind::CityCentre, 48, 70);
 
-        assert!(ok, "expansion IC build order should find a staged route");
+        assert!(
+            ok,
+            "expansion City Centre build order should find a staged route"
+        );
         let e = entities.get(worker).unwrap();
         let goal = e.path_goal().expect("build order should set a path goal");
         let goal_tile = map.tile_of(goal.0, goal.1);
         let footprint: std::collections::BTreeSet<(u32, u32)> =
-            footprint_tiles(EntityKind::IndustrialCenter, 48, 70)
+            footprint_tiles(EntityKind::CityCentre, 48, 70)
                 .into_iter()
                 .collect();
         assert!(
             !footprint.contains(&goal_tile),
-            "build path goal should stop outside the expansion IC footprint"
+            "build path goal should stop outside the expansion City Centre footprint"
         );
         assert!(
-            build_staging_goal_in_range(&map, EntityKind::IndustrialCenter, 48, 70, goal),
+            build_staging_goal_in_range(&map, EntityKind::CityCentre, 48, 70, goal),
             "outside staging goal should still be close enough to start construction"
         );
     }

@@ -60,11 +60,11 @@ const BARRACKS_UNITS: &[EntityKind] = &[
     EntityKind::AtTeam,
 ];
 const TANK_ONLY: &[EntityKind] = &[EntityKind::Tank];
-const INDUSTRIAL_CENTER_REQUIRED: &[EntityKind] = &[EntityKind::IndustrialCenter];
-const INDUSTRIAL_CENTER_AND_BARRACKS_REQUIRED: &[EntityKind] =
-    &[EntityKind::IndustrialCenter, EntityKind::Barracks];
+const CITY_CENTRE_REQUIRED: &[EntityKind] = &[EntityKind::CityCentre];
+const CITY_CENTRE_AND_BARRACKS_REQUIRED: &[EntityKind] =
+    &[EntityKind::CityCentre, EntityKind::Barracks];
 const TRAINING_CENTRE_REQUIRED: &[EntityKind] = &[EntityKind::TrainingCentre];
-const FACTORY_REQUIRED: &[EntityKind] = &[EntityKind::IndustrialCenter, EntityKind::TrainingCentre];
+const FACTORY_REQUIRED: &[EntityKind] = &[EntityKind::CityCentre, EntityKind::TrainingCentre];
 
 pub const UNITS: &[UnitDef] = &[
     UnitDef {
@@ -85,7 +85,7 @@ pub const UNITS: &[UnitDef] = &[
         armor_class: ArmorClass::Small,
         weapon: WeaponClass::SmallArms,
         target_priority: TargetPriority::Default,
-        trained_at: Some(EntityKind::IndustrialCenter),
+        trained_at: Some(EntityKind::CityCentre),
         train_requires: &[],
     },
     UnitDef {
@@ -176,7 +176,7 @@ pub const UNITS: &[UnitDef] = &[
 
 pub const BUILDINGS: &[BuildingDef] = &[
     BuildingDef {
-        kind: EntityKind::IndustrialCenter,
+        kind: EntityKind::CityCentre,
         stats: config::BuildingStats {
             hp: 600,
             sight_tiles: 9,
@@ -185,7 +185,7 @@ pub const BUILDINGS: &[BuildingDef] = &[
             foot_w: 3,
             foot_h: 3,
             build_ticks: 400,
-            provides_supply: config::INDUSTRIAL_CENTER_SUPPLY,
+            provides_supply: config::CITY_CENTRE_SUPPLY,
             dmg: 0,
             range_tiles: 0,
             cooldown: 0,
@@ -233,7 +233,7 @@ pub const BUILDINGS: &[BuildingDef] = &[
         armor_class: ArmorClass::Armored,
         weapon: WeaponClass::None,
         trains: BARRACKS_UNITS,
-        build_requires: INDUSTRIAL_CENTER_REQUIRED,
+        build_requires: CITY_CENTRE_REQUIRED,
     },
     BuildingDef {
         kind: EntityKind::TrainingCentre,
@@ -253,7 +253,7 @@ pub const BUILDINGS: &[BuildingDef] = &[
         armor_class: ArmorClass::Armored,
         weapon: WeaponClass::None,
         trains: &[],
-        build_requires: INDUSTRIAL_CENTER_AND_BARRACKS_REQUIRED,
+        build_requires: CITY_CENTRE_AND_BARRACKS_REQUIRED,
     },
     BuildingDef {
         kind: EntityKind::Factory,

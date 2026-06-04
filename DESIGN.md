@@ -178,7 +178,7 @@ Compact numeric codes:
 
 | Vocabulary | Codes |
 |------------|-------|
-| `kind` | 1 `worker`, 2 `rifleman`, 3 `machine_gunner`, 4 `at_team`, 5 `tank`, 6 `industrial_center`, 7 `depot`, 8 `barracks`, 9 `training_centre`, 10 `factory`, 11 `steel`, 12 `oil` |
+| `kind` | 1 `worker`, 2 `rifleman`, 3 `machine_gunner`, 4 `at_team`, 5 `tank`, 6 `city_centre`, 7 `depot`, 8 `barracks`, 9 `training_centre`, 10 `factory`, 11 `steel`, 12 `oil` |
 | `state` | 1 `idle`, 2 `move`, 3 `attack`, 4 `gather`, 5 `build`, 6 `train`, 7 `construct`, 8 `dead` |
 | `setupState` | 1 `packed`, 2 `setting_up`, 3 `deployed`, 4 `tearing_down` |
 | `notice.severity` | 1 `info`, 2 `warn`, 3 `alert` |
@@ -198,7 +198,7 @@ watch rooms receive all resource updates).
 {
   id: u32,
   owner: u32,                    // 0 = neutral (resources), else player id
-  kind: string,                  // EntityKind: "worker","rifleman","machine_gunner","at_team","tank","industrial_center","depot","barracks","training_centre","factory"
+  kind: string,                  // EntityKind: "worker","rifleman","machine_gunner","at_team","tank","city_centre","depot","barracks","training_centre","factory"
   x: f32, y: f32,                // world px (center)
   hp: u32, maxHp: u32,
   state: string,                 // "idle","move","attack","gather","build","train","construct","dead"
@@ -485,7 +485,7 @@ export class GameState {
   placement                              // null | { building, valid, tileX, tileY }
   beginPlacement(buildingKind), updatePlacement(tileX,tileY,valid), endPlacement()
   // resource hover preview (client-only):
-  resourceMiningPreview                  // null | {resourceId, resourceX, resourceY, icId, icX, icY, inRange}
+  resourceMiningPreview                  // null | {resourceId, resourceX, resourceY, ccId, ccX, ccY, inRange}
   updateResourceMiningPreview(preview)
 }
 ```
@@ -710,9 +710,9 @@ authoritative `rules::defs` records.
 - Attached mining: workers walk to a patch, latch onto it, and mine in place.
   Every `HARVEST_TICKS = 40` the load (`STEEL_LOAD = 2` / `OIL_LOAD = 2`) is deposited
   directly into the player's economy only if the resource node is within
-  `MINING_IC_RANGE_TILES = 7.0` tiles of a completed City Centre owned by that player.
-  The range matches `IC_RESOURCE_MAX_DIST_TILES`, so each starting City Centre can mine
-  every patch in its main-base cluster. If no completed IC is close enough, workers ignore new
+  `MINING_CC_RANGE_TILES = 7.0` tiles of a completed City Centre owned by that player.
+  The range matches `CC_RESOURCE_MAX_DIST_TILES`, so each starting City Centre can mine
+  every patch in its main-base cluster. If no completed City Centre is close enough, workers ignore new
   gather orders for that patch and active miners go idle. When a patch empties the worker goes
   idle (no automatic retarget).
 - One worker per patch: each node has a single harvest slot (`Entity::miner`). A patch is
@@ -745,7 +745,7 @@ Building stats (hp, sight, cost, footprint tiles wxh, buildTicks, extra):
 
 | kind                       | hp  | sight | cost | foot | buildTicks | notes |
 |----------------------------|-----|-------|-----|------|-----------|-------|
-| industrial_center          | 600 | 9     | 200 | 3x3  | 400       | trains worker; +10 supply; players start with one free |
+| city_centre          | 600 | 9     | 200 | 3x3  | 400       | trains worker; +10 supply; players start with one free |
 | depot                      | 220 | 4     | 100 | 2x2  | 180       | +8 supply |
 | barracks                   | 320 | 6     | 150 | 3x2  | 200       | trains rifleman, machine_gunner, at_team; requires a City Centre |
 | training_centre   | 300 | 6     | 100 steel + 50 oil | 3x2  | 220       | unlocks machine_gunner and at_team training at barracks; requires a City Centre and Barracks |
@@ -988,17 +988,17 @@ panic only uses an already-completed Training Centre and may pull workers onto o
 counters; if support tech is absent, Barracks production falls back to Riflemen and panic mode does
 not create the Training Centre. If the pressure persists through the panic window, the AI asks for
 an additional Barracks before resuming its normal profile once the threat has cleared.
-`steel_expansion_tanks` is a defensive economic support profile: it saves for a second Industrial
-Center near a neutral steel expansion before building any non-Depot tech structure. Valid
+`steel_expansion_tanks` is a defensive economic support profile: it saves for a second City
+Centre near a neutral steel expansion before building any non-Depot tech structure. Valid
 expansion sites must cover the full local resource line, then are ranked by own distance divided
 by nearest living enemy-start distance so similarly close naturals prefer the base farther from
-enemies. Once that expansion IC is planned, it builds Barracks and Training Centre tech, staffs
+enemies. Once that expansion City Centre is planned, it builds Barracks and Training Centre tech, staffs
 oil, produces Machine Gunners and AT teams toward a one-for-one support mix, and keeps those
 support units staged in a short line on the enemy-facing side of its main-base steel cluster
 instead of launching outbound attack waves.
 After 50 supply used, it switches to a Factory tech path, stops Machine Gunner / AT team
 production, trains tanks, and launches outbound tank groups only once at least three tanks are
-ready. After the expansion IC is complete, its worker resource assignment is locally bounded so
+ready. After the expansion City Centre is complete, its worker resource assignment is locally bounded so
 main-base workers do not walk to expansion patches, and expansion workers do not walk back to
 main-base patches.
 The live lobby AI uses this shared core through `AiController`, which only owns live identity,

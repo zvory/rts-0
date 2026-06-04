@@ -240,7 +240,7 @@ pub(crate) fn main_base_steel_saturation_target(
         start_tile.0 as f32 * tile_size as f32 + tile_size as f32 * 0.5,
         start_tile.1 as f32 * tile_size as f32 + tile_size as f32 * 0.5,
     );
-    let max_dist_px = (config::IC_RESOURCE_MAX_DIST_TILES + 0.5) * tile_size as f32;
+    let max_dist_px = (config::CC_RESOURCE_MAX_DIST_TILES + 0.5) * tile_size as f32;
     let max_dist2 = max_dist_px * max_dist_px;
     resources
         .into_iter()
@@ -296,7 +296,7 @@ fn is_combat_unit(kind: EntityKind) -> bool {
         | EntityKind::AtTeam
         | EntityKind::Tank => true,
         EntityKind::Worker
-        | EntityKind::IndustrialCenter
+        | EntityKind::CityCentre
         | EntityKind::Depot
         | EntityKind::Barracks
         | EntityKind::TrainingCentre
@@ -370,8 +370,8 @@ mod tests {
             10.5 * config::TILE_SIZE as f32,
             20.5 * config::TILE_SIZE as f32,
         );
-        let in_range = (config::IC_RESOURCE_MAX_DIST_TILES - 0.25) * config::TILE_SIZE as f32;
-        let out_of_range = (config::IC_RESOURCE_MAX_DIST_TILES + 2.0) * config::TILE_SIZE as f32;
+        let in_range = (config::CC_RESOURCE_MAX_DIST_TILES - 0.25) * config::TILE_SIZE as f32;
+        let out_of_range = (config::CC_RESOURCE_MAX_DIST_TILES + 2.0) * config::TILE_SIZE as f32;
 
         let mut entities = EntityStore::new();
         entities

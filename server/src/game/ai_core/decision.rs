@@ -24,14 +24,14 @@ use crate::rules;
 const PRODUCTION_BUILDINGS: [EntityKind; 3] = [
     EntityKind::Factory,
     EntityKind::Barracks,
-    EntityKind::IndustrialCenter,
+    EntityKind::CityCentre,
 ];
 const LOCAL_DEFENSE_RADIUS_TILES: f32 = 12.0;
 const RESOURCE_LINE_DEFENSE_RADIUS_TILES: f32 = 4.0;
 const WORKER_DEFENSE_RADIUS_TILES: f32 = 5.0;
 const PROXY_DISTANCE_BAND_TILES: f32 = 2.0;
 const PROXY_WORKER_BUILD_SEARCH_RADIUS_TILES: i32 = 4;
-const EXPANSION_LOCAL_RESOURCE_ASSIGNMENT_RADIUS_TILES: f32 = config::MINING_IC_RANGE_TILES + 3.0;
+const EXPANSION_LOCAL_RESOURCE_ASSIGNMENT_RADIUS_TILES: f32 = config::MINING_CC_RANGE_TILES + 3.0;
 const EXPANSION_DEFENSIVE_LINE_SPACING_TILES: f32 = 1.5;
 const EXPANSION_DEFENSIVE_LINE_REISSUE_EPS_TILES: f32 = 0.75;
 const RIFLE_RAID_DEEPEN_TILES: f32 = 7.0;
@@ -421,7 +421,7 @@ where
     }
 
     if save_for_expansion
-        && try_build_expansion_industrial_center(
+        && try_build_expansion_city_centre(
             observation,
             &facts,
             &mut actions,
@@ -433,7 +433,7 @@ where
         .is_some()
     {
         intents.push(AiIntent::Build {
-            kind: EntityKind::IndustrialCenter,
+            kind: EntityKind::CityCentre,
         });
     }
 
@@ -457,7 +457,7 @@ where
     for trained in actions::train_units(
         &mut actions,
         TrainUnitsRequest {
-            buildings: facts.production_buildings(EntityKind::IndustrialCenter),
+            buildings: facts.production_buildings(EntityKind::CityCentre),
             unit_priorities: &[EntityKind::Worker],
             completed_building_kinds: facts.complete_building_kinds(),
             max_queue_depth: 1,
@@ -938,7 +938,7 @@ fn expansion_blocks_tech_path(
         return false;
     };
     expansion.blocks_tech_path
-        && facts.building_count(EntityKind::IndustrialCenter) < expansion.target_industrial_centers
+        && facts.building_count(EntityKind::CityCentre) < expansion.target_city_centres
 }
 
 fn should_save_for_expansion(
@@ -950,7 +950,7 @@ fn should_save_for_expansion(
     let Some(expansion) = active_expansion(observation, profile, recovery_active) else {
         return false;
     };
-    facts.building_count(EntityKind::IndustrialCenter) < expansion.target_industrial_centers
+    facts.building_count(EntityKind::CityCentre) < expansion.target_city_centres
         && expansion_prerequisites_met(facts, expansion)
 }
 
@@ -1052,42 +1052,40 @@ fn target_steel_workers_for_profile(
     let Some(expansion) = active_expansion(observation, profile, recovery_active) else {
         return base_target;
     };
-    if facts.complete_building_count(EntityKind::IndustrialCenter)
-        < expansion.target_industrial_centers
-    {
+    if facts.complete_building_count(EntityKind::CityCentre) < expansion.target_city_centres {
         return base_target.min(expansion.pre_expansion_steel_worker_cap);
     }
 
-    let expanded_target = base_target.max(completed_ic_steel_saturation_target(observation));
+    let expanded_target = base_target.max(completed_cc_steel_saturation_target(observation));
     expansion
         .post_expansion_steel_worker_cap
         .map(|cap| expanded_target.min(cap))
         .unwrap_or(expanded_target)
 }
 
-fn completed_ic_steel_saturation_target(observation: &AiObservation) -> usize {
-    let completed_ics: Vec<&AiEntitySummary> = observation
+fn completed_cc_steel_saturation_target(observation: &AiObservation) -> usize {
+    let completed_ccs: Vec<&AiEntitySummary> = observation
         .owned
         .iter()
         .filter(|entity| {
-            entity.kind == EntityKind::IndustrialCenter
+            entity.kind == EntityKind::CityCentre
                 && entity.is_complete
                 && entity.state != AiEntityState::Dead
         })
         .collect();
-    if completed_ics.is_empty() {
+    if completed_ccs.is_empty() {
         return 0;
     }
-    let max_dist_px = (config::IC_RESOURCE_MAX_DIST_TILES + 0.5) * observation.map.tile_size as f32;
+    let max_dist_px = (config::CC_RESOURCE_MAX_DIST_TILES + 0.5) * observation.map.tile_size as f32;
     let max_dist2 = squared(max_dist_px);
     observation
         .resources
         .iter()
         .filter(|resource| resource.kind == EntityKind::Steel && resource.remaining > 0)
         .filter(|resource| {
-            completed_ics
+            completed_ccs
                 .iter()
-                .any(|ic| dist2(resource.x, resource.y, ic.x, ic.y) <= max_dist2)
+                .any(|cc| dist2(resource.x, resource.y, cc.x, cc.y) <= max_dist2)
         })
         .count()
 }
@@ -1099,9 +1097,7 @@ fn max_worker_resource_assignment_distance_px(
     recovery_active: bool,
 ) -> Option<f32> {
     let expansion = active_expansion(observation, profile, recovery_active)?;
-    if facts.complete_building_count(EntityKind::IndustrialCenter)
-        < expansion.target_industrial_centers
-    {
+    if facts.complete_building_count(EntityKind::CityCentre) < expansion.target_city_centres {
         return None;
     }
     Some(EXPANSION_LOCAL_RESOURCE_ASSIGNMENT_RADIUS_TILES * observation.map.tile_size as f32)
@@ -1209,7 +1205,7 @@ fn main_steel_defensive_line_assignments(
 
 fn main_steel_cluster_center(observation: &AiObservation) -> Option<(f32, f32)> {
     let own_base = tile_center(observation.own_start_tile, observation.map.tile_size);
-    let radius = (config::IC_RESOURCE_MAX_DIST_TILES + 1.5) * observation.map.tile_size as f32;
+    let radius = (config::CC_RESOURCE_MAX_DIST_TILES + 1.5) * observation.map.tile_size as f32;
     let radius2 = squared(radius);
     steel_cluster_center(
         observation
@@ -1546,7 +1542,7 @@ fn wants_depot(facts: &AiFacts, profile: &AiProfile) -> bool {
 }
 
 #[allow(clippy::too_many_arguments)]
-fn try_build_expansion_industrial_center<F>(
+fn try_build_expansion_city_centre<F>(
     observation: &AiObservation,
     facts: &AiFacts,
     actions: &mut AiActionContext<'_>,
@@ -1559,20 +1555,19 @@ where
     F: FnMut(EntityKind, u32, u32) -> bool,
 {
     let expansion = active_expansion(observation, profile, recovery_active)?;
-    let kind = EntityKind::IndustrialCenter;
+    let kind = EntityKind::CityCentre;
     config::building_stats(kind)?;
     if !rules::economy::build_requirement_met(kind, facts.complete_building_kinds()) {
         return None;
     }
-    if facts.building_count(kind) >= expansion.target_industrial_centers {
+    if facts.building_count(kind) >= expansion.target_city_centres {
         return None;
     }
     let counts = facts.building_counts(kind);
     if counts.incomplete + counts.intended >= profile.buildings.max_pending_per_kind {
         return None;
     }
-    let (tile_x, tile_y) =
-        expansion_industrial_center_site(observation, expansion, kind, placeable)?;
+    let (tile_x, tile_y) = expansion_city_centre_site(observation, expansion, kind, placeable)?;
     actions::try_build_at(actions, builder_pools, kind, tile_x, tile_y)
 }
 
@@ -1584,7 +1579,7 @@ fn footprint_top_left_for_center(center_tile: (u32, u32), kind: EntityKind) -> O
     ))
 }
 
-fn expansion_industrial_center_site<F>(
+fn expansion_city_centre_site<F>(
     observation: &AiObservation,
     expansion: ExpansionPolicy,
     kind: EntityKind,
@@ -1660,7 +1655,7 @@ where
 
 fn expansion_candidate_resources(observation: &AiObservation) -> Vec<&AiResourceSummary> {
     let start_resource_radius =
-        (config::IC_RESOURCE_MAX_DIST_TILES + 1.5) * observation.map.tile_size as f32;
+        (config::CC_RESOURCE_MAX_DIST_TILES + 1.5) * observation.map.tile_size as f32;
     let start_resource_radius2 = squared(start_resource_radius);
     observation
         .resources
@@ -1721,7 +1716,7 @@ fn expansion_cluster_resources_for_anchor<'a>(
     resources: &[&'a AiResourceSummary],
 ) -> Vec<&'a AiResourceSummary> {
     let center = tile_center(anchor, observation.map.tile_size);
-    let radius = (config::MINING_IC_RANGE_TILES + 2.0) * observation.map.tile_size as f32;
+    let radius = (config::MINING_CC_RANGE_TILES + 2.0) * observation.map.tile_size as f32;
     let radius2 = squared(radius);
     resources
         .iter()
@@ -1783,7 +1778,7 @@ fn expansion_site_candidate(
     resources: &[&AiResourceSummary],
 ) -> Option<ExpansionSiteCandidate> {
     let (cx, cy) = building_center((tile_x, tile_y), kind, observation.map.tile_size)?;
-    let max_dist = config::MINING_IC_RANGE_TILES * observation.map.tile_size as f32;
+    let max_dist = config::MINING_CC_RANGE_TILES * observation.map.tile_size as f32;
     let max_dist2 = squared(max_dist);
     let mut steel_in_range = 0usize;
     let mut oil_in_range = 0usize;
@@ -2083,7 +2078,7 @@ fn production_building_order(unit_priorities: &[EntityKind]) -> Vec<EntityKind> 
             }
         }
     }
-    order.retain(|kind| *kind != EntityKind::IndustrialCenter);
+    order.retain(|kind| *kind != EntityKind::CityCentre);
     order
 }
 
@@ -2255,7 +2250,7 @@ fn enemy_main_steel_center(
     enemy_base: EnemyBaseFact,
 ) -> Option<(f32, f32)> {
     let tile_size = observation.map.tile_size as f32;
-    let search_radius_px = (config::IC_RESOURCE_MAX_DIST_TILES + 0.5) * tile_size;
+    let search_radius_px = (config::CC_RESOURCE_MAX_DIST_TILES + 0.5) * tile_size;
     let search_radius2 = squared(search_radius_px);
     let mut sum_x = 0.0;
     let mut sum_y = 0.0;
@@ -2355,7 +2350,7 @@ impl LocalDefenseGeometry {
         let base_radius2 = squared(LOCAL_DEFENSE_RADIUS_TILES * tile_size);
         let resource_radius2 = squared(RESOURCE_LINE_DEFENSE_RADIUS_TILES * tile_size);
         let worker_radius2 = squared(WORKER_DEFENSE_RADIUS_TILES * tile_size);
-        let home_resource_radius2 = squared((config::IC_RESOURCE_MAX_DIST_TILES + 1.5) * tile_size);
+        let home_resource_radius2 = squared((config::CC_RESOURCE_MAX_DIST_TILES + 1.5) * tile_size);
         let home_resources = observation
             .resources
             .iter()
@@ -2700,13 +2695,9 @@ mod tests {
         observation: &AiObservation,
         site: (u32, u32),
     ) -> (usize, usize) {
-        let (cx, cy) = building_center(
-            site,
-            EntityKind::IndustrialCenter,
-            observation.map.tile_size,
-        )
-        .expect("city centre should have a center");
-        let max_dist = config::MINING_IC_RANGE_TILES * observation.map.tile_size as f32;
+        let (cx, cy) = building_center(site, EntityKind::CityCentre, observation.map.tile_size)
+            .expect("city centre should have a center");
+        let max_dist = config::MINING_CC_RANGE_TILES * observation.map.tile_size as f32;
         let max_dist2 = squared(max_dist);
         let mut steel = 0usize;
         let mut oil = 0usize;
@@ -2854,14 +2845,14 @@ mod tests {
 
     #[test]
     fn fast_flood_sends_proxy_worker_before_barracks_is_affordable() {
-        let mut owned = vec![building(10, EntityKind::IndustrialCenter, Some(0))];
+        let mut owned = vec![building(10, EntityKind::CityCentre, Some(0))];
         owned.extend((0..4).map(|i| worker(20 + i, AiEntityState::Idle)));
         let observation = observation(
             AiEconomy {
                 steel: config::STARTING_STEEL,
                 oil: 0,
                 supply_used: config::STARTING_WORKERS,
-                supply_cap: config::INDUSTRIAL_CENTER_SUPPLY,
+                supply_cap: config::CITY_CENTRE_SUPPLY,
             },
             owned,
         );
@@ -2916,14 +2907,14 @@ mod tests {
 
     #[test]
     fn fast_flood_stops_worker_training_after_one_extra_worker() {
-        let mut owned = vec![building(10, EntityKind::IndustrialCenter, Some(0))];
+        let mut owned = vec![building(10, EntityKind::CityCentre, Some(0))];
         owned.extend((0..5).map(|i| worker(20 + i, AiEntityState::Idle)));
         let observation = observation(
             AiEconomy {
                 steel: 75,
                 oil: 0,
                 supply_used: 5,
-                supply_cap: config::INDUSTRIAL_CENTER_SUPPLY,
+                supply_cap: config::CITY_CENTRE_SUPPLY,
             },
             owned,
         );
@@ -2941,14 +2932,14 @@ mod tests {
 
     #[test]
     fn fast_flood_initial_affordable_proxy_uses_hidden_edge_target() {
-        let mut owned = vec![building(10, EntityKind::IndustrialCenter, Some(0))];
+        let mut owned = vec![building(10, EntityKind::CityCentre, Some(0))];
         owned.extend((0..5).map(|i| worker(20 + i, AiEntityState::Idle)));
         let observation = observation(
             AiEconomy {
                 steel: 150,
                 oil: 0,
                 supply_used: 5,
-                supply_cap: config::INDUSTRIAL_CENTER_SUPPLY,
+                supply_cap: config::CITY_CENTRE_SUPPLY,
             },
             owned,
         );
@@ -2984,7 +2975,7 @@ mod tests {
 
     #[test]
     fn fast_flood_builds_proxy_barracks_with_reserved_worker_once_affordable() {
-        let mut owned = vec![building(10, EntityKind::IndustrialCenter, Some(0))];
+        let mut owned = vec![building(10, EntityKind::CityCentre, Some(0))];
         let tile_size = config::TILE_SIZE as f32;
         let worker_tile = (30.5, 20.5);
         owned.push(worker_at(
@@ -2999,7 +2990,7 @@ mod tests {
                 steel: 150,
                 oil: 0,
                 supply_used: 5,
-                supply_cap: config::INDUSTRIAL_CENTER_SUPPLY,
+                supply_cap: config::CITY_CENTRE_SUPPLY,
             },
             owned,
         );
@@ -3055,14 +3046,14 @@ mod tests {
 
     #[test]
     fn fast_flood_does_not_replace_missing_proxy_worker() {
-        let mut owned = vec![building(10, EntityKind::IndustrialCenter, Some(0))];
+        let mut owned = vec![building(10, EntityKind::CityCentre, Some(0))];
         owned.extend((0..5).map(|i| worker(20 + i, AiEntityState::Idle)));
         let observation = observation(
             AiEconomy {
                 steel: 150,
                 oil: 0,
                 supply_used: 5,
-                supply_cap: config::INDUSTRIAL_CENTER_SUPPLY,
+                supply_cap: config::CITY_CENTRE_SUPPLY,
             },
             owned,
         );
@@ -3090,7 +3081,7 @@ mod tests {
     #[test]
     fn fast_flood_spends_first_fifty_steel_on_rifle_where_full_saturation_trains_worker() {
         let mut owned = vec![
-            building(10, EntityKind::IndustrialCenter, Some(0)),
+            building(10, EntityKind::CityCentre, Some(0)),
             building(11, EntityKind::Barracks, Some(0)),
         ];
         owned.extend((0..8).map(|i| worker(20 + i, AiEntityState::Gather)));
@@ -3129,7 +3120,7 @@ mod tests {
     #[test]
     fn fast_flood_recovers_after_barracks_rifle_window() {
         let mut owned = vec![
-            building(10, EntityKind::IndustrialCenter, Some(0)),
+            building(10, EntityKind::CityCentre, Some(0)),
             building(11, EntityKind::Barracks, Some(0)),
         ];
         owned.extend((0..5).map(|i| worker(20 + i, AiEntityState::Idle)));
@@ -3177,7 +3168,7 @@ mod tests {
     #[test]
     fn fast_flood_recovery_builds_support_tech_and_takes_oil() {
         let mut owned = vec![
-            building(10, EntityKind::IndustrialCenter, Some(0)),
+            building(10, EntityKind::CityCentre, Some(0)),
             building(11, EntityKind::Barracks, Some(0)),
         ];
         owned.extend((0..8).map(|i| steel_worker(20 + i, 100 + i)));
@@ -3219,7 +3210,7 @@ mod tests {
     #[test]
     fn tech_to_tanks_delays_oil_until_steel_floor_and_builds_factory() {
         let mut owned = vec![
-            building(10, EntityKind::IndustrialCenter, Some(0)),
+            building(10, EntityKind::CityCentre, Some(0)),
             building(11, EntityKind::Barracks, Some(0)),
             building(12, EntityKind::TrainingCentre, None),
         ];
@@ -3267,7 +3258,7 @@ mod tests {
         );
 
         let mut steel_floor_owned = vec![
-            building(10, EntityKind::IndustrialCenter, Some(0)),
+            building(10, EntityKind::CityCentre, Some(0)),
             building(11, EntityKind::Barracks, Some(0)),
             building(12, EntityKind::TrainingCentre, None),
         ];
@@ -3303,7 +3294,7 @@ mod tests {
     #[test]
     fn full_saturation_pivots_to_tank_tech_but_waits_for_full_steel_before_oil() {
         let mut owned = vec![
-            building(10, EntityKind::IndustrialCenter, Some(0)),
+            building(10, EntityKind::CityCentre, Some(0)),
             building(11, EntityKind::Barracks, Some(0)),
         ];
         owned.extend((0..17).map(|i| steel_worker(20 + i, 100 + i)));
@@ -3373,7 +3364,7 @@ mod tests {
     fn full_saturation_oil_timing_tracks_observed_steel_patch_count() {
         let ts = config::TILE_SIZE as f32;
         let mut owned = vec![
-            building(10, EntityKind::IndustrialCenter, Some(0)),
+            building(10, EntityKind::CityCentre, Some(0)),
             building(11, EntityKind::Barracks, Some(0)),
         ];
         owned.extend((0..18).map(|i| steel_worker(20 + i, 100 + i)));
@@ -3416,7 +3407,7 @@ mod tests {
     #[test]
     fn full_saturation_can_expand_while_teching_to_tanks() {
         let mut owned = vec![
-            building(10, EntityKind::IndustrialCenter, Some(0)),
+            building(10, EntityKind::CityCentre, Some(0)),
             building(11, EntityKind::Barracks, Some(0)),
             building(12, EntityKind::TrainingCentre, Some(0)),
         ];
@@ -3442,16 +3433,16 @@ mod tests {
             kind: EntityKind::Factory
         }));
         assert!(decision.intents.contains(&AiIntent::Build {
-            kind: EntityKind::IndustrialCenter
+            kind: EntityKind::CityCentre
         }));
     }
 
     #[test]
-    fn steel_expansion_tanks_builds_expansion_ic_before_any_barracks() {
+    fn steel_expansion_tanks_builds_expansion_cc_before_any_barracks() {
         let ts = config::TILE_SIZE as f32;
         let mut owned = vec![building_at(
             10,
-            EntityKind::IndustrialCenter,
+            EntityKind::CityCentre,
             Some(0),
             8.5 * ts,
             8.5 * ts,
@@ -3475,7 +3466,7 @@ mod tests {
         );
 
         assert!(decision.intents.contains(&AiIntent::Build {
-            kind: EntityKind::IndustrialCenter
+            kind: EntityKind::CityCentre
         }));
         assert!(!decision.intents.contains(&AiIntent::Build {
             kind: EntityKind::Barracks
@@ -3507,8 +3498,8 @@ mod tests {
             .collect();
         assert_eq!(
             non_depot_builds,
-            vec![EntityKind::IndustrialCenter],
-            "the first non-depot build should be the expansion IC"
+            vec![EntityKind::CityCentre],
+            "the first non-depot build should be the expansion City Centre"
         );
         assert!(
             !decision.intents.iter().any(|intent| matches!(
@@ -3518,17 +3509,17 @@ mod tests {
                     ..
                 }
             )),
-            "expansion profile should not move into oil before the second IC is planned"
+            "expansion profile should not move into oil before the second City Centre is planned"
         );
     }
 
     #[test]
-    fn steel_expansion_tanks_places_expansion_ic_in_range_of_whole_resource_line() {
+    fn steel_expansion_tanks_places_expansion_cc_in_range_of_whole_resource_line() {
         let map_size = 96;
         let ts = config::TILE_SIZE as f32;
         let mut owned = vec![building_at(
             10,
-            EntityKind::IndustrialCenter,
+            EntityKind::CityCentre,
             Some(0),
             10.5 * ts,
             85.5 * ts,
@@ -3574,13 +3565,13 @@ mod tests {
         };
 
         let mut placeable = |_: EntityKind, tx: u32, ty: u32| tx < map_size && ty < map_size;
-        let site = expansion_industrial_center_site(
+        let site = expansion_city_centre_site(
             &observation,
             STEEL_EXPANSION_TANKS.expansion.unwrap(),
-            EntityKind::IndustrialCenter,
+            EntityKind::CityCentre,
             &mut placeable,
         )
-        .expect("expansion IC site should be found");
+        .expect("expansion City Centre site should be found");
 
         assert_eq!(
             expansion_resource_counts_for_site(&observation, site),
@@ -3588,7 +3579,7 @@ mod tests {
                 config::STEEL_PATCHES_PER_BASE as usize,
                 config::OIL_PATCHES_PER_BASE as usize
             ),
-            "expansion IC at {site:?} should cover the whole natural resource line"
+            "expansion City Centre at {site:?} should cover the whole natural resource line"
         );
 
         let mut memory = AiDecisionMemory::for_profile(&STEEL_EXPANSION_TANKS);
@@ -3613,10 +3604,10 @@ mod tests {
                     tile_x,
                     tile_y,
                     ..
-                } if *building == EntityKind::IndustrialCenter => Some((*tile_x, *tile_y)),
+                } if *building == EntityKind::CityCentre => Some((*tile_x, *tile_y)),
                 _ => None,
             })
-            .expect("decision should issue an expansion IC build");
+            .expect("decision should issue an expansion City Centre build");
 
         assert_eq!(
             expansion_resource_counts_for_site(&observation, command_site),
@@ -3624,7 +3615,7 @@ mod tests {
                 config::STEEL_PATCHES_PER_BASE as usize,
                 config::OIL_PATCHES_PER_BASE as usize
             ),
-            "emitted expansion IC build at {command_site:?} should cover all expansion resources"
+            "emitted expansion City Centre build at {command_site:?} should cover all expansion resources"
         );
     }
 
@@ -3634,7 +3625,7 @@ mod tests {
         let ts = config::TILE_SIZE as f32;
         let mut owned = vec![building_at(
             10,
-            EntityKind::IndustrialCenter,
+            EntityKind::CityCentre,
             Some(0),
             10.5 * ts,
             85.5 * ts,
@@ -3681,26 +3672,22 @@ mod tests {
         };
 
         let mut placeable = |_: EntityKind, tx: u32, ty: u32| tx < map_size && ty < map_size;
-        let site = expansion_industrial_center_site(
+        let site = expansion_city_centre_site(
             &observation,
             STEEL_EXPANSION_TANKS.expansion.unwrap(),
-            EntityKind::IndustrialCenter,
+            EntityKind::CityCentre,
             &mut placeable,
         )
-        .expect("expansion IC site should be found");
-        let center = building_center(
-            site,
-            EntityKind::IndustrialCenter,
-            observation.map.tile_size,
-        )
-        .expect("city centre should have a center");
+        .expect("expansion City Centre site should be found");
+        let center = building_center(site, EntityKind::CityCentre, observation.map.tile_size)
+            .expect("city centre should have a center");
         let closer_natural = tile_center((23, 47), observation.map.tile_size);
         let farther_natural = tile_center((48, 73), observation.map.tile_size);
 
         assert!(
             dist2(center.0, center.1, closer_natural.0, closer_natural.1)
                 < dist2(center.0, center.1, farther_natural.0, farther_natural.1),
-            "expansion IC at {site:?} should choose the closer natural cluster"
+            "expansion City Centre at {site:?} should choose the closer natural cluster"
         );
         assert_eq!(
             expansion_resource_counts_for_site(&observation, site),
@@ -3718,7 +3705,7 @@ mod tests {
         let ts = config::TILE_SIZE as f32;
         let mut owned = vec![building_at(
             10,
-            EntityKind::IndustrialCenter,
+            EntityKind::CityCentre,
             Some(0),
             10.5 * ts,
             85.5 * ts,
@@ -3768,10 +3755,10 @@ mod tests {
         };
         let expansion = STEEL_EXPANSION_TANKS.expansion.unwrap();
 
-        let site = expansion_industrial_center_site(
+        let site = expansion_city_centre_site(
             &observation,
             expansion,
-            EntityKind::IndustrialCenter,
+            EntityKind::CityCentre,
             &mut |_, _, _| true,
         )
         .expect("oil-bearing expansion site should be found");
@@ -3786,7 +3773,7 @@ mod tests {
         let ts = config::TILE_SIZE as f32;
         let mut owned = vec![building_at(
             10,
-            EntityKind::IndustrialCenter,
+            EntityKind::CityCentre,
             Some(0),
             10.5 * ts,
             85.5 * ts,
@@ -3833,26 +3820,22 @@ mod tests {
         };
 
         let mut placeable = |_: EntityKind, tx: u32, ty: u32| tx < map_size && ty < map_size;
-        let site = expansion_industrial_center_site(
+        let site = expansion_city_centre_site(
             &observation,
             STEEL_EXPANSION_TANKS.expansion.unwrap(),
-            EntityKind::IndustrialCenter,
+            EntityKind::CityCentre,
             &mut placeable,
         )
-        .expect("expansion IC site should be found");
-        let center = building_center(
-            site,
-            EntityKind::IndustrialCenter,
-            observation.map.tile_size,
-        )
-        .expect("city centre should have a center");
+        .expect("expansion City Centre site should be found");
+        let center = building_center(site, EntityKind::CityCentre, observation.map.tile_size)
+            .expect("city centre should have a center");
         let safer_natural = tile_center((23, 47), observation.map.tile_size);
         let exposed_natural = tile_center((48, 73), observation.map.tile_size);
 
         assert!(
             dist2(center.0, center.1, safer_natural.0, safer_natural.1)
                 < dist2(center.0, center.1, exposed_natural.0, exposed_natural.1),
-            "expansion IC at {site:?} should choose the natural farther from the enemy start"
+            "expansion City Centre at {site:?} should choose the natural farther from the enemy start"
         );
         assert_eq!(
             expansion_resource_counts_for_site(&observation, site),
@@ -3865,7 +3848,7 @@ mod tests {
     }
 
     #[test]
-    fn steel_expansion_tanks_builds_barracks_after_expansion_ic_is_planned() {
+    fn steel_expansion_tanks_builds_barracks_after_expansion_cc_is_planned() {
         let mut observation = with_expansion_resources(observation(
             AiEconomy {
                 steel: 500,
@@ -3874,16 +3857,13 @@ mod tests {
                 supply_cap: 30,
             },
             vec![
-                building(10, EntityKind::IndustrialCenter, Some(0)),
+                building(10, EntityKind::CityCentre, Some(0)),
                 worker(60, AiEntityState::Idle),
             ],
         ));
-        observation.pending_builds.push(AiBuildIntent::to_site(
-            60,
-            EntityKind::IndustrialCenter,
-            20,
-            30,
-        ));
+        observation
+            .pending_builds
+            .push(AiBuildIntent::to_site(60, EntityKind::CityCentre, 20, 30));
 
         let decision = decide(
             &observation,
@@ -3892,7 +3872,7 @@ mod tests {
         );
 
         assert!(!decision.intents.contains(&AiIntent::Build {
-            kind: EntityKind::IndustrialCenter
+            kind: EntityKind::CityCentre
         }));
         assert!(decision.intents.contains(&AiIntent::Build {
             kind: EntityKind::Barracks
@@ -3912,17 +3892,14 @@ mod tests {
                 supply_cap: 30,
             },
             vec![
-                building(10, EntityKind::IndustrialCenter, Some(0)),
+                building(10, EntityKind::CityCentre, Some(0)),
                 building(11, EntityKind::Barracks, Some(0)),
                 worker(60, AiEntityState::Idle),
             ],
         ));
-        observation.pending_builds.push(AiBuildIntent::to_site(
-            60,
-            EntityKind::IndustrialCenter,
-            20,
-            30,
-        ));
+        observation
+            .pending_builds
+            .push(AiBuildIntent::to_site(60, EntityKind::CityCentre, 20, 30));
 
         let decision = decide(
             &observation,
@@ -3951,8 +3928,8 @@ mod tests {
                 supply_cap: 40,
             },
             vec![
-                building(10, EntityKind::IndustrialCenter, Some(0)),
-                building(11, EntityKind::IndustrialCenter, Some(0)),
+                building(10, EntityKind::CityCentre, Some(0)),
+                building(11, EntityKind::CityCentre, Some(0)),
                 building(12, EntityKind::Barracks, Some(0)),
                 building(13, EntityKind::Barracks, Some(0)),
                 building(14, EntityKind::TrainingCentre, None),
@@ -3984,8 +3961,8 @@ mod tests {
                 supply_cap: 50,
             },
             vec![
-                building(10, EntityKind::IndustrialCenter, Some(0)),
-                building(11, EntityKind::IndustrialCenter, Some(0)),
+                building(10, EntityKind::CityCentre, Some(0)),
+                building(11, EntityKind::CityCentre, Some(0)),
                 building_training(12, EntityKind::Barracks, EntityKind::MachineGunner),
                 building(13, EntityKind::Barracks, Some(0)),
                 building(15, EntityKind::TrainingCentre, None),
@@ -4022,7 +3999,7 @@ mod tests {
             {
                 let mut owned = vec![building_at(
                     10,
-                    EntityKind::IndustrialCenter,
+                    EntityKind::CityCentre,
                     Some(0),
                     8.5 * ts,
                     8.5 * ts,
@@ -4032,12 +4009,9 @@ mod tests {
                 owned
             },
         ));
-        observation.pending_builds.push(AiBuildIntent::to_site(
-            60,
-            EntityKind::IndustrialCenter,
-            20,
-            30,
-        ));
+        observation
+            .pending_builds
+            .push(AiBuildIntent::to_site(60, EntityKind::CityCentre, 20, 30));
 
         let decision = decide(
             &observation,
@@ -4066,20 +4040,8 @@ mod tests {
     fn steel_expansion_tanks_keeps_main_workers_off_distant_expansion_steel() {
         let ts = config::TILE_SIZE as f32;
         let mut owned = vec![
-            building_at(
-                10,
-                EntityKind::IndustrialCenter,
-                Some(0),
-                8.5 * ts,
-                8.5 * ts,
-            ),
-            building_at(
-                11,
-                EntityKind::IndustrialCenter,
-                Some(0),
-                23.5 * ts,
-                36.5 * ts,
-            ),
+            building_at(10, EntityKind::CityCentre, Some(0), 8.5 * ts, 8.5 * ts),
+            building_at(11, EntityKind::CityCentre, Some(0), 23.5 * ts, 36.5 * ts),
         ];
         owned.extend((0..18u32).map(|i| gathering_worker(40 + i, 100 + i)));
         owned.extend((0..6u32).map(|i| {
@@ -4116,20 +4078,8 @@ mod tests {
     fn steel_expansion_tanks_sends_expansion_workers_to_expansion_steel() {
         let ts = config::TILE_SIZE as f32;
         let mut owned = vec![
-            building_at(
-                10,
-                EntityKind::IndustrialCenter,
-                Some(0),
-                8.5 * ts,
-                8.5 * ts,
-            ),
-            building_at(
-                11,
-                EntityKind::IndustrialCenter,
-                Some(0),
-                23.5 * ts,
-                36.5 * ts,
-            ),
+            building_at(10, EntityKind::CityCentre, Some(0), 8.5 * ts, 8.5 * ts),
+            building_at(11, EntityKind::CityCentre, Some(0), 23.5 * ts, 36.5 * ts),
         ];
         owned.extend((0..18u32).map(|i| gathering_worker(40 + i, 100 + i)));
         owned.extend((0..6u32).map(|i| {
@@ -4176,20 +4126,8 @@ mod tests {
                 supply_cap: 80,
             },
             vec![
-                building_at(
-                    10,
-                    EntityKind::IndustrialCenter,
-                    Some(0),
-                    8.5 * ts,
-                    8.5 * ts,
-                ),
-                building_at(
-                    11,
-                    EntityKind::IndustrialCenter,
-                    Some(0),
-                    23.5 * ts,
-                    36.5 * ts,
-                ),
+                building_at(10, EntityKind::CityCentre, Some(0), 8.5 * ts, 8.5 * ts),
+                building_at(11, EntityKind::CityCentre, Some(0), 23.5 * ts, 36.5 * ts),
                 building(12, EntityKind::Barracks, Some(0)),
                 building(13, EntityKind::TrainingCentre, None),
                 combat_at(30, EntityKind::MachineGunner, 8.5 * ts, 8.5 * ts),
@@ -4258,8 +4196,8 @@ mod tests {
                 supply_cap: 130,
             },
             vec![
-                building(10, EntityKind::IndustrialCenter, Some(0)),
-                building(11, EntityKind::IndustrialCenter, Some(0)),
+                building(10, EntityKind::CityCentre, Some(0)),
+                building(11, EntityKind::CityCentre, Some(0)),
                 building(12, EntityKind::Barracks, Some(0)),
                 building(13, EntityKind::Barracks, Some(0)),
                 building(14, EntityKind::TrainingCentre, None),
@@ -4294,8 +4232,8 @@ mod tests {
                 supply_cap: 130,
             },
             vec![
-                building(10, EntityKind::IndustrialCenter, Some(0)),
-                building(11, EntityKind::IndustrialCenter, Some(0)),
+                building(10, EntityKind::CityCentre, Some(0)),
+                building(11, EntityKind::CityCentre, Some(0)),
                 building(12, EntityKind::Barracks, Some(0)),
                 building(13, EntityKind::TrainingCentre, None),
                 building(14, EntityKind::Factory, Some(0)),
@@ -4329,8 +4267,8 @@ mod tests {
                 supply_cap: 130,
             },
             vec![
-                building(10, EntityKind::IndustrialCenter, Some(0)),
-                building(11, EntityKind::IndustrialCenter, Some(0)),
+                building(10, EntityKind::CityCentre, Some(0)),
+                building(11, EntityKind::CityCentre, Some(0)),
                 building(12, EntityKind::Barracks, Some(0)),
                 building(13, EntityKind::TrainingCentre, None),
                 building(14, EntityKind::Factory, Some(0)),
@@ -4360,8 +4298,8 @@ mod tests {
                 supply_cap: 130,
             },
             vec![
-                building(10, EntityKind::IndustrialCenter, Some(0)),
-                building(11, EntityKind::IndustrialCenter, Some(0)),
+                building(10, EntityKind::CityCentre, Some(0)),
+                building(11, EntityKind::CityCentre, Some(0)),
                 building(12, EntityKind::Barracks, Some(0)),
                 building(13, EntityKind::TrainingCentre, None),
                 building(14, EntityKind::Factory, Some(0)),
@@ -4405,7 +4343,7 @@ mod tests {
                 supply_cap: 20,
             },
             vec![
-                building(10, EntityKind::IndustrialCenter, Some(0)),
+                building(10, EntityKind::CityCentre, Some(0)),
                 building(11, EntityKind::Barracks, Some(0)),
                 building(12, EntityKind::TrainingCentre, None),
                 building(13, EntityKind::Factory, Some(0)),
@@ -4441,7 +4379,7 @@ mod tests {
                 supply_cap: 20,
             },
             vec![
-                building(10, EntityKind::IndustrialCenter, Some(0)),
+                building(10, EntityKind::CityCentre, Some(0)),
                 building(11, EntityKind::Barracks, Some(0)),
                 building(12, EntityKind::TrainingCentre, None),
                 building(13, EntityKind::Factory, Some(0)),
@@ -4483,7 +4421,7 @@ mod tests {
                 supply_cap: 20,
             },
             vec![
-                building(10, EntityKind::IndustrialCenter, Some(0)),
+                building(10, EntityKind::CityCentre, Some(0)),
                 building(11, EntityKind::Barracks, Some(0)),
                 building(12, EntityKind::TrainingCentre, None),
                 building(13, EntityKind::Factory, Some(0)),
@@ -4525,7 +4463,7 @@ mod tests {
                 supply_cap: 30,
             },
             vec![
-                building(10, EntityKind::IndustrialCenter, Some(0)),
+                building(10, EntityKind::CityCentre, Some(0)),
                 building(11, EntityKind::Barracks, Some(0)),
                 worker(20, AiEntityState::Gather),
                 worker(21, AiEntityState::Gather),
@@ -4597,7 +4535,7 @@ mod tests {
                 supply_cap: 20,
             },
             vec![
-                building(10, EntityKind::IndustrialCenter, Some(0)),
+                building(10, EntityKind::CityCentre, Some(0)),
                 building(11, EntityKind::Barracks, Some(0)),
                 building(12, EntityKind::TrainingCentre, None),
                 building(13, EntityKind::Factory, Some(0)),
@@ -4640,7 +4578,7 @@ mod tests {
                 supply_cap: 20,
             },
             vec![
-                building(10, EntityKind::IndustrialCenter, Some(0)),
+                building(10, EntityKind::CityCentre, Some(0)),
                 building(11, EntityKind::Barracks, Some(0)),
                 building(12, EntityKind::TrainingCentre, None),
                 building(13, EntityKind::Factory, Some(0)),
@@ -4679,7 +4617,7 @@ mod tests {
 
     #[test]
     fn rifle_attack_wave_uses_plain_move_deeper_than_enemy_base() {
-        let mut owned = vec![building(10, EntityKind::IndustrialCenter, Some(0))];
+        let mut owned = vec![building(10, EntityKind::CityCentre, Some(0))];
         owned.extend((0..6).map(|i| combat(30 + i, EntityKind::Rifleman)));
         let observation = observation(
             AiEconomy {
@@ -4729,7 +4667,7 @@ mod tests {
                 supply_used: 1,
                 supply_cap: 10,
             },
-            vec![building(10, EntityKind::IndustrialCenter, Some(0)), raider],
+            vec![building(10, EntityKind::CityCentre, Some(0)), raider],
         );
         observation
             .visible_enemies
@@ -4763,7 +4701,7 @@ mod tests {
                     supply_used: 1,
                     supply_cap: 10,
                 },
-                vec![building(10, EntityKind::IndustrialCenter, Some(0))],
+                vec![building(10, EntityKind::CityCentre, Some(0))],
             );
             observation = with_enemy_main_resources(observation);
             let enemy_base = enemy_base_fact(&observation);
@@ -4807,7 +4745,7 @@ mod tests {
                     supply_cap: 10,
                 },
                 vec![
-                    building(10, EntityKind::IndustrialCenter, Some(0)),
+                    building(10, EntityKind::CityCentre, Some(0)),
                     combat_at(30, EntityKind::Rifleman, 49.0 * ts, 49.0 * ts),
                 ],
             );
@@ -4848,7 +4786,7 @@ mod tests {
                 supply_used: 1,
                 supply_cap: 10,
             },
-            vec![building(10, EntityKind::IndustrialCenter, Some(0)), raider],
+            vec![building(10, EntityKind::CityCentre, Some(0)), raider],
         );
         observation
             .visible_enemies
@@ -4903,7 +4841,7 @@ mod tests {
 
     #[test]
     fn each_required_profile_emits_a_starting_state_command() {
-        let mut owned = vec![building(10, EntityKind::IndustrialCenter, Some(0))];
+        let mut owned = vec![building(10, EntityKind::CityCentre, Some(0))];
         owned.extend((0..4).map(|i| worker(20 + i, AiEntityState::Idle)));
         let observation = observation(
             AiEconomy {

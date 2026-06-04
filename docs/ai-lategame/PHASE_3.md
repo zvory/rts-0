@@ -68,7 +68,7 @@ Profile-specific timing can remain:
 
 Keep `ExpansionPolicy` where it is, but define shared constants for repeated values:
 
-- target IC count;
+- target City Centre count;
 - post-expansion steel worker cap;
 - search radius;
 - expansion blocking behavior.
@@ -114,7 +114,7 @@ destination, not to guarantee that the proxy opening reaches it often.
 
 At the end:
 
-- every live profile has an eventual second-IC expansion policy;
+- every live profile has an eventual second City Centre expansion policy;
 - shared late-game expansion assumptions are named in one place;
 - profile-specific timing remains possible;
 - no live profile is intentionally one-base forever;

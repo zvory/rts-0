@@ -28,7 +28,7 @@ pub mod kinds {
     pub const MACHINE_GUNNER: &str = "machine_gunner";
     pub const AT_TEAM: &str = "at_team";
     pub const TANK: &str = "tank";
-    pub const INDUSTRIAL_CENTER: &str = "industrial_center";
+    pub const CITY_CENTRE: &str = "city_centre";
     pub const DEPOT: &str = "depot";
     pub const BARRACKS: &str = "barracks";
     pub const TRAINING_CENTRE: &str = "training_centre";
@@ -652,7 +652,7 @@ fn kind_code(kind: &str) -> u8 {
         kinds::MACHINE_GUNNER => 3,
         kinds::AT_TEAM => 4,
         kinds::TANK => 5,
-        kinds::INDUSTRIAL_CENTER => 6,
+        kinds::CITY_CENTRE => 6,
         kinds::DEPOT => 7,
         kinds::BARRACKS => 8,
         kinds::TRAINING_CENTRE => 9,
@@ -722,7 +722,7 @@ mod tests {
         let mut center = EntityView::new(
             3,
             1,
-            kinds::INDUSTRIAL_CENTER,
+            kinds::CITY_CENTRE,
             100.0,
             120.0,
             450,
@@ -756,7 +756,7 @@ mod tests {
                 },
                 Event::Build {
                     id: 3,
-                    kind: kinds::INDUSTRIAL_CENTER.to_string(),
+                    kind: kinds::CITY_CENTRE.to_string(),
                 },
                 Event::Notice {
                     msg: "Not enough steel".to_string(),

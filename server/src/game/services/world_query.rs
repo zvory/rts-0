@@ -64,7 +64,7 @@ pub(crate) fn completed_building_kinds(entities: &EntityStore, player: u32) -> V
 
 /// Whether a resource node is mineable by `player` because a completed City Centre is close
 /// enough to receive attached-mining income from that node.
-pub(crate) fn resource_has_completed_mining_ic(
+pub(crate) fn resource_has_completed_mining_cc(
     entities: &EntityStore,
     player: u32,
     node: u32,
@@ -75,22 +75,22 @@ pub(crate) fn resource_has_completed_mining_ic(
     if !resource.is_node() || resource.remaining().unwrap_or(0) == 0 {
         return false;
     }
-    nearest_completed_mining_ic(entities, player, resource.pos_x, resource.pos_y)
+    nearest_completed_mining_cc(entities, player, resource.pos_x, resource.pos_y)
         .map(|(_, dist2)| {
-            let range_px = config::MINING_IC_RANGE_TILES * config::TILE_SIZE as f32;
+            let range_px = config::MINING_CC_RANGE_TILES * config::TILE_SIZE as f32;
             dist2 <= range_px * range_px + 0.01
         })
         .unwrap_or(false)
 }
 
-fn nearest_completed_mining_ic(
+fn nearest_completed_mining_cc(
     entities: &EntityStore,
     player: u32,
     x: f32,
     y: f32,
 ) -> Option<(u32, f32)> {
     completed_buildings(entities, player)
-        .filter(|e| e.kind == EntityKind::IndustrialCenter && e.hp > 0)
+        .filter(|e| e.kind == EntityKind::CityCentre && e.hp > 0)
         .map(|e| {
             let dx = e.pos_x - x;
             let dy = e.pos_y - y;
@@ -106,7 +106,7 @@ pub(crate) fn town_halls(
     entities: &EntityStore,
     player: u32,
 ) -> impl Iterator<Item = &Entity> + '_ {
-    owned_buildings(entities, player).filter(|e| e.kind == EntityKind::IndustrialCenter)
+    owned_buildings(entities, player).filter(|e| e.kind == EntityKind::CityCentre)
 }
 
 /// Whether `player` still has at least one town hall (any state). Centralized so the
@@ -300,7 +300,7 @@ mod tests {
     fn store_with_two_players() -> EntityStore {
         let mut s = EntityStore::default();
         // P1: city centre (complete), barracks (under construction), worker.
-        s.spawn_building(1, EntityKind::IndustrialCenter, 100.0, 100.0, true)
+        s.spawn_building(1, EntityKind::CityCentre, 100.0, 100.0, true)
             .unwrap();
         s.spawn_building(1, EntityKind::Barracks, 200.0, 100.0, false)
             .unwrap();
@@ -322,7 +322,7 @@ mod tests {
         assert!(!has_town_hall(&s, 2));
         // Completed-kinds excludes the in-progress barracks.
         let ck = completed_building_kinds(&s, 1);
-        assert!(ck.contains(&EntityKind::IndustrialCenter));
+        assert!(ck.contains(&EntityKind::CityCentre));
         assert!(!ck.contains(&EntityKind::Barracks));
         // All-kinds includes it.
         let ak = owned_building_kinds(&s, 1);
@@ -334,12 +334,12 @@ mod tests {
         let s = store_with_two_players();
         let p2_rifleman = s.iter().find(|e| e.owner == 2).unwrap();
         let p1_worker = s.iter().find(|e| e.owner == 1 && e.is_unit()).unwrap();
-        let p1_ic = s.iter().find(|e| e.owner == 1 && e.is_building()).unwrap();
+        let p1_cc = s.iter().find(|e| e.owner == 1 && e.is_building()).unwrap();
         // P1 attacker can target the P2 rifleman.
         assert!(is_enemy_targetable(p2_rifleman, 1, p1_worker.id));
         // ... but not their own worker (self) or their own building.
         assert!(!is_enemy_targetable(p1_worker, 1, p1_worker.id));
-        assert!(!is_enemy_targetable(p1_ic, 1, p1_worker.id));
+        assert!(!is_enemy_targetable(p1_cc, 1, p1_worker.id));
     }
 
     #[test]
@@ -358,40 +358,40 @@ mod tests {
     }
 
     #[test]
-    fn resource_mining_requires_completed_ic_in_range() {
+    fn resource_mining_requires_completed_cc_in_range() {
         let ts = config::TILE_SIZE as f32;
         let mut s = EntityStore::default();
-        s.spawn_building(1, EntityKind::IndustrialCenter, 100.0, 100.0, true)
+        s.spawn_building(1, EntityKind::CityCentre, 100.0, 100.0, true)
             .unwrap();
         let near = s
             .spawn_node(
                 EntityKind::Steel,
-                100.0 + config::MINING_IC_RANGE_TILES * ts,
+                100.0 + config::MINING_CC_RANGE_TILES * ts,
                 100.0,
             )
             .unwrap();
         let far = s
             .spawn_node(
                 EntityKind::Steel,
-                100.0 + (config::MINING_IC_RANGE_TILES + 0.25) * ts,
+                100.0 + (config::MINING_CC_RANGE_TILES + 0.25) * ts,
                 100.0,
             )
             .unwrap();
-        let unfinished_ic = s
+        let unfinished_cc = s
             .spawn_building(
                 2,
-                EntityKind::IndustrialCenter,
-                100.0 + config::MINING_IC_RANGE_TILES * ts,
+                EntityKind::CityCentre,
+                100.0 + config::MINING_CC_RANGE_TILES * ts,
                 300.0,
                 false,
             )
             .unwrap();
         let unfinished_near = s.spawn_node(EntityKind::Steel, 100.0, 300.0).unwrap();
 
-        assert!(resource_has_completed_mining_ic(&s, 1, near));
-        assert!(!resource_has_completed_mining_ic(&s, 1, far));
-        assert!(!resource_has_completed_mining_ic(&s, 2, unfinished_near));
-        s.remove(unfinished_ic);
-        assert!(!resource_has_completed_mining_ic(&s, 2, unfinished_near));
+        assert!(resource_has_completed_mining_cc(&s, 1, near));
+        assert!(!resource_has_completed_mining_cc(&s, 1, far));
+        assert!(!resource_has_completed_mining_cc(&s, 2, unfinished_near));
+        s.remove(unfinished_cc);
+        assert!(!resource_has_completed_mining_cc(&s, 2, unfinished_near));
     }
 }

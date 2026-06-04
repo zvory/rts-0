@@ -796,8 +796,8 @@ mod tests {
                 supply_cap: 10,
             },
             vec![
-                production_building(20, EntityKind::IndustrialCenter, 0),
-                production_building(21, EntityKind::IndustrialCenter, 0),
+                production_building(20, EntityKind::CityCentre, 0),
+                production_building(21, EntityKind::CityCentre, 0),
             ],
             Vec::new(),
         );
@@ -815,7 +815,7 @@ mod tests {
         let trained = train_units(
             &mut ctx,
             TrainUnitsRequest {
-                buildings: facts.production_buildings(EntityKind::IndustrialCenter),
+                buildings: facts.production_buildings(EntityKind::CityCentre),
                 unit_priorities: &[EntityKind::Worker],
                 completed_building_kinds: facts.complete_building_kinds(),
                 max_queue_depth: 1,
