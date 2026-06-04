@@ -274,8 +274,8 @@ function fakeAudioContext() {
   assert(MINING_IC_RANGE_TILES === 7, "client mirrors the server mining IC range");
   assert(STATS[KIND.INDUSTRIAL_CENTER].cost.steel === 200, "City Centre cost mirrors server");
   assert(
-    Array.isArray(STATS[KIND.TANK_FACTORY].requires),
-    "Tank Factory should expose all server-side build prerequisites",
+    Array.isArray(STATS[KIND.FACTORY].requires),
+    "Factory should expose all server-side build prerequisites",
   );
   assert(
     Array.isArray(STATS[KIND.TRAINING_CENTRE].requires),
@@ -290,12 +290,12 @@ function fakeAudioContext() {
     "Training Centre should require a Barracks in the command card",
   );
   assert(
-    STATS[KIND.TANK_FACTORY].requires.includes(KIND.INDUSTRIAL_CENTER),
-    "Tank Factory should require a City Centre in the command card",
+    STATS[KIND.FACTORY].requires.includes(KIND.INDUSTRIAL_CENTER),
+    "Factory should require a City Centre in the command card",
   );
   assert(
-    STATS[KIND.TANK_FACTORY].requires.includes(KIND.TRAINING_CENTRE),
-    "Tank Factory should require a Training Centre in the command card",
+    STATS[KIND.FACTORY].requires.includes(KIND.TRAINING_CENTRE),
+    "Factory should require a Training Centre in the command card",
   );
   const playerId = 1;
   const underConstructionTrainingCentre = [
@@ -304,7 +304,7 @@ function fakeAudioContext() {
   ];
   assert(
     !playerHasCompletedKind(underConstructionTrainingCentre, playerId, KIND.TRAINING_CENTRE),
-    "Tank Factory should not unlock while the Training Centre is still under construction",
+    "Factory should not unlock while the Training Centre is still under construction",
   );
   const underConstructionBarracks = [
     { owner: playerId, kind: KIND.INDUSTRIAL_CENTER, buildProgress: null },
@@ -320,7 +320,7 @@ function fakeAudioContext() {
   ];
   assert(
     playerHasCompletedKind(completedTrainingCentre, playerId, KIND.TRAINING_CENTRE),
-    "Tank Factory should unlock once the Training Centre is complete",
+    "Factory should unlock once the Training Centre is complete",
   );
   assert(formatTankOilUsed(0.04) === "0.0", "tank oil panel rounds tiny values to tenths");
   assert(formatTankOilUsed(9.94) === "9.9", "tank oil panel keeps tenths below ten oil");

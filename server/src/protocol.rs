@@ -32,7 +32,7 @@ pub mod kinds {
     pub const DEPOT: &str = "depot";
     pub const BARRACKS: &str = "barracks";
     pub const TRAINING_CENTRE: &str = "training_centre";
-    pub const TANK_FACTORY: &str = "tank_factory";
+    pub const FACTORY: &str = "factory";
     pub const STEEL: &str = "steel";
     pub const OIL: &str = "oil";
 }
@@ -656,7 +656,7 @@ fn kind_code(kind: &str) -> u8 {
         kinds::DEPOT => 7,
         kinds::BARRACKS => 8,
         kinds::TRAINING_CENTRE => 9,
-        kinds::TANK_FACTORY => 10,
+        kinds::FACTORY => 10,
         kinds::STEEL => 11,
         kinds::OIL => 12,
         _ => 255,

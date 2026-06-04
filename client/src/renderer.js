@@ -556,7 +556,7 @@ export class Renderer {
       g.drawRect(x0 + w * 0.68, y0 + h * 0.1, w * 0.16, h * 0.32);
       g.beginFill(0x1a1712, bodyAlpha * 0.7);
       g.drawRect(x0 + w * 0.76, y0 + h * 0.02, w * 0.08, h * 0.22);
-    } else if (e.kind === KIND.TANK_FACTORY) {
+    } else if (e.kind === KIND.FACTORY) {
       g.drawRect(x0 + w * 0.12, y0 + h * 0.18, w * 0.76, h * 0.26);
       g.drawRect(x0 + w * 0.18, y0 + h * 0.54, w * 0.64, h * 0.26);
       g.beginFill(0x1a1712, bodyAlpha * 0.55);

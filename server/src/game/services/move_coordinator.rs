@@ -1076,7 +1076,7 @@ mod tests {
         let mut entities = EntityStore::new();
         let (bx, by) = map.tile_center(3, 0);
         let b_id = entities
-            .spawn_building(1, EntityKind::TankFactory, bx, by, true)
+            .spawn_building(1, EntityKind::Factory, bx, by, true)
             .unwrap();
         let occ = Occupancy::build(&map, &entities);
 
@@ -1100,7 +1100,7 @@ mod tests {
         let mut entities = EntityStore::new();
         let (fx, fy) = map.tile_center(16, 16);
         let factory_id = entities
-            .spawn_building(1, EntityKind::TankFactory, fx, fy, true)
+            .spawn_building(1, EntityKind::Factory, fx, fy, true)
             .unwrap();
         let (nx, ny) = map.tile_center(20, 16);
         entities
