@@ -107,7 +107,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const specSnap = await C.waitFor(
     (m) => m.t === "snapshot" && m.entities.some((e) => e.owner === A.playerId) && m.entities.some((e) => e.owner === B.playerId),
     3000,
-    "C full-vision snapshot",
+    "C spectator union-fog snapshot",
   );
   ok(specSnap.steel === 0 && specSnap.oil === 0 && specSnap.supplyUsed === 0 && specSnap.supplyCap === 0,
      `SPECTATOR: observer has no personal economy (${specSnap.steel}/${specSnap.oil}/${specSnap.supplyUsed}/${specSnap.supplyCap})`);
