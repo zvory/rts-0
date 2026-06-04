@@ -241,6 +241,7 @@ src/
     projection.rs # fog-gated entity/event projection seam
   game/
     mod.rs       # Game struct + public API (the seam below)
+    command.rs   # SimCommand domain commands + protocol translation helpers
     map.rs       # Map: handcrafted terrain asset loading, passability, base-site validation
     entity.rs    # Entity, EntityKind, EntityStore (slotmap-style Vec + free list)
     pathfinding.rs # A* over the tile grid (impassable = terrain + building footprints)
@@ -278,8 +279,8 @@ impl Game {
     /// Static info for the `start` message (terrain + player start tiles). Call once.
     pub fn start_payload(&self) -> StartPayload;
 
-    /// Queue a validated-on-apply command from `player`. Cheap; real work happens in tick().
-    pub fn enqueue(&mut self, player: u32, cmd: Command);
+    /// Queue a validated-on-apply domain command from `player`. Cheap; real work happens in tick().
+    pub fn enqueue(&mut self, player: u32, cmd: SimCommand);
 
     /// Advance the simulation by one tick. Returns per-player transient events.
     pub fn tick(&mut self) -> Vec<(u32 /*player*/, Vec<Event>)>;
@@ -311,9 +312,10 @@ impl Game {
 pub struct PlayerInit { pub id: u32, pub name: String, pub color: String, pub is_ai: bool }
 pub struct CommandLogEntry { pub tick: u32, pub player_id: u32, pub command: Command }
 ```
-`StartPayload`, `Snapshot`, `Command`, `Event`, `PlayerScore` are the serde types from `protocol.rs`.
-(`game` may use internal types and convert at the boundary, or use protocol types directly —
-implementer's choice, but `snapshot_for`/`start_payload` must return protocol types.)
+`SimCommand` is the internal command enum from `game::command`; `ClientMessage::Command` and
+replay artifacts are translated into it at the boundary. `CommandLogEntry.command` remains the
+serde `Command` from `protocol.rs` so replay JSON stays wire-compatible. `StartPayload`,
+`Snapshot`, `Event`, and `PlayerScore` are also serde types from `protocol.rs`.
 
 `PlayerInit.is_ai` marks a computer-controlled player. AI players are full players in every
 respect (they get a start position, Industrial Center, workers, economy, and count toward win/elimination); the
@@ -771,8 +773,8 @@ from the tail of `PLAYER_PALETTE` so they never collide with human colors. They 
 empties of humans.
 
 **Where it runs.** `Game` holds one `AiController` per AI player and drives them at the top of
-`tick()`, *before* commands are applied. Each controller pushes ordinary `Command`s onto the same
-pending queue a human client feeds, so every AI action goes through the identical
+`tick()`, *before* commands are applied. Each controller pushes ordinary `SimCommand`s onto the same
+pending queue as translated human client input, so every AI action goes through the identical
 validation / cost / supply / placement path in `services/commands.rs` — the AI has **no special authority**
 over the simulation and can't cheat economy or placement rules. Because the controller is
 server-side (not a network client) it reads authoritative own/resource state directly, but enemy
@@ -791,7 +793,7 @@ scout, or choose hidden enemy unit positions. A local per-think budget in the sh
 prevents it from over-committing resources/supply it does not have.
 
 **Shared AI core.** `game::ai_core` has deterministic profile data (`profiles.rs`) and a generic
-ranked decision loop (`decision.rs`) that emits ordinary `Command`s through shared action helpers.
+ranked decision loop (`decision.rs`) that emits ordinary `SimCommand`s through shared action helpers.
 The first code-defined profiles are `rifle_flood_fast`, `rifle_flood_full_saturation`,
 `tech_to_tanks`, and `steel_expansion_tanks`; they parameterize worker targets, supply buffers,
 building/tech goals, production priorities, resource timing, expansion timing, and attack
@@ -848,19 +850,19 @@ separate from the gameplay AI in `game/ai.rs`: gameplay AI is a player feature, 
 a regression harness for exercising the public simulation API.
 
 **Contract.** Self-play scripts may only drive the game through the `Game` seam in §3.1:
-`start_payload()`, `snapshot_for(player)`, `enqueue(player, Command)`, `tick()`, `alive_players()`,
-and `tick_count()`. Scripts observe the same fog-filtered snapshots a client would receive and
-issue ordinary wire-protocol `Command`s. They must not mutate entities, players, map state, or
+`start_payload()`, `snapshot_for(player)`, `enqueue(player, SimCommand)`, `tick()`,
+`alive_players()`, and `tick_count()`. Scripts observe the same fog-filtered snapshots a client
+would receive and issue ordinary domain commands. They must not mutate entities, players, map state, or
 private system internals. This keeps the simulation architected for future API clients, replay
 tools, and external test drivers without adding a second privileged control path.
 
 **Command log replay.** `Game` records every command at the authoritative apply tick, after AI
 controllers have emitted their normal commands and before systems apply the pending queue.
-`game/replay.rs` can feed that log into a fresh `Game` with AI thinking disabled and compare the
-resulting event stream and final per-player snapshots. Replay uses the same public command path as
-clients, so a replay proves both the recorded command artifact and the deterministic simulation
-ordering. Entity iteration and A* tie-breaking must remain stable; avoid hash-order-dependent
-simulation behavior.
+`game/replay.rs` translates that wire-compatible log into `SimCommand`s, feeds them into a fresh
+`Game` with AI thinking disabled, and compares the resulting event stream and final per-player
+snapshots. Replay and live play use the same typed command application path, so a replay proves both
+the recorded command artifact and the deterministic simulation ordering. Entity iteration and A*
+tie-breaking must remain stable; avoid hash-order-dependent simulation behavior.
 
 **Profile-backed coverage.** The main scripted self-play test spawns two non-AI players, gives each
 the shared `tech_to_tanks` AI profile through the self-play adapter, and runs the match headlessly

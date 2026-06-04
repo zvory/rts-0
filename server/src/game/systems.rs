@@ -14,6 +14,7 @@
 
 use std::collections::HashMap;
 
+use crate::game::command::SimCommand;
 use crate::game::entity::EntityStore;
 use crate::game::fog::Fog;
 use crate::game::map::Map;
@@ -21,7 +22,7 @@ use crate::game::services;
 use crate::game::services::pathing::PathingService;
 use crate::game::services::spatial::SpatialIndex;
 use crate::game::PlayerState;
-use crate::protocol::{Command, Event};
+use crate::protocol::Event;
 use rand::rngs::SmallRng;
 
 /// Run all per-tick systems in order. `events` is the per-player event accumulator (already
@@ -37,7 +38,7 @@ pub(crate) fn run_tick(
     fog: &Fog,
     pathing: &mut PathingService,
     rng: &mut SmallRng,
-    pending: Vec<(u32, Command)>,
+    pending: Vec<(u32, SimCommand)>,
     events: &mut HashMap<u32, Vec<Event>>,
     tick: u32,
 ) -> SpatialIndex {
