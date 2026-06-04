@@ -1,7 +1,9 @@
 # RTS Movement Options Research
 
 This is a research and product-shaping note for a future movement system. The
-phased implementation plan lives in `docs/movement/PLAN.md`. This note does not
+phased implementation plan it informed has been completed and its docs removed;
+see `DESIGN.md` for the implemented movement, collision, and steering behavior.
+This note does not
 change the live wire protocol or simulation contracts. Any later implementation
 that changes entity state, protocol fields, combat rules, balance, or module
 boundaries must update `DESIGN.md` in the same change.
