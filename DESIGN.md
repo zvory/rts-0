@@ -525,6 +525,7 @@ export class Audio {
   play(id, {x?, y?, priority?, category?, pitchVariance?, gain?})
                                            // x/y present -> StereoPanner + lowpass + distance gain
   playUI(id, opts)                        // non-spatial ui category convenience
+  stopByKey(key) -> number                // stop tagged active voices, for sustained/abortable cues
   setListener(x, y, zoom, viewW?)          // camera center in world px; derives screen-width refDist
   pickVariant(ids) -> id|null             // seeded RNG variant choice
   setMasterVolume(v), getMasterVolume()
