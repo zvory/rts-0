@@ -755,6 +755,7 @@ impl ScriptedPlayer for ProfileBackedScript {
                 !failed_builds.failed(building, tile_x, tile_y)
                     && footprint_placeable_from_snapshot(
                         &view.start.map,
+                        view.snapshot,
                         building,
                         tile_x,
                         tile_y,
@@ -2168,9 +2169,12 @@ fn occupied_tiles_from_snapshot(map: &MapInfo, snapshot: &Snapshot) -> BTreeSet<
     for e in &snapshot.entities {
         if e.owner != 0 && kind_of(e).map(|k| k.is_building()).unwrap_or(false) {
             for (tx, ty) in building_footprint_tiles(map, e) {
-                // Mark footprint + 1-tile border so AI always leaves a gap between buildings.
-                for dy in -1i32..=1 {
-                    for dx in -1i32..=1 {
+                let Some(kind) = kind_of(e) else {
+                    continue;
+                };
+                let clearance = ai_shared::building_clearance_tiles(kind);
+                for dy in -clearance..=clearance {
+                    for dx in -clearance..=clearance {
                         let nx = tx as i32 + dx;
                         let ny = ty as i32 + dy;
                         if nx >= 0 && ny >= 0 && (nx as u32) < map.width && (ny as u32) < map.height
@@ -2189,6 +2193,7 @@ fn occupied_tiles_from_snapshot(map: &MapInfo, snapshot: &Snapshot) -> BTreeSet<
 
 fn footprint_placeable_from_snapshot(
     map: &MapInfo,
+    snapshot: &Snapshot,
     building: EntityKind,
     tile_x: u32,
     tile_y: u32,
@@ -2197,6 +2202,35 @@ fn footprint_placeable_from_snapshot(
     let Some(stats) = config::building_stats(building) else {
         return false;
     };
+    for e in &snapshot.entities {
+        let Some(existing_kind) = kind_of(e) else {
+            continue;
+        };
+        if e.owner == 0 || !existing_kind.is_building() {
+            continue;
+        }
+        let existing_tile = tile_of(map, e.x, e.y);
+        let existing_tile_x = existing_tile.0.saturating_sub(
+            config::building_stats(existing_kind)
+                .map(|building| building.foot_w / 2)
+                .unwrap_or(0),
+        );
+        let existing_tile_y = existing_tile.1.saturating_sub(
+            config::building_stats(existing_kind)
+                .map(|building| building.foot_h / 2)
+                .unwrap_or(0),
+        );
+        if !ai_shared::footprints_respect_clearance(
+            building,
+            tile_x,
+            tile_y,
+            existing_kind,
+            existing_tile_x,
+            existing_tile_y,
+        ) {
+            return false;
+        }
+    }
     for dy in 0..stats.foot_h {
         for dx in 0..stats.foot_w {
             let Some(tx) = tile_x.checked_add(dx) else {

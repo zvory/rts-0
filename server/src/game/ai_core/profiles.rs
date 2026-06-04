@@ -172,6 +172,7 @@ pub(crate) struct TechTransitionPolicy {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct ResourcePolicy {
     pub(crate) oil_after_steel_workers: usize,
+    pub(crate) oil_after_full_steel_saturation: bool,
     pub(crate) tank_adaptive: Option<TankResourcePolicy>,
 }
 
@@ -241,6 +242,7 @@ pub(crate) static RIFLE_FLOOD_FAST: AiProfile = AiProfile {
     },
     resources: ResourcePolicy {
         oil_after_steel_workers: 10,
+        oil_after_full_steel_saturation: false,
         tank_adaptive: None,
     },
     expansion: Some(ExpansionPolicy {
@@ -283,7 +285,7 @@ pub(crate) static RIFLE_FLOOD_FULL_SATURATION: AiProfile = AiProfile {
     workers: WorkerPolicy {
         steel_saturation_fraction: Ratio::new(1, 1),
         steel_worker_cap: None,
-        extra_oil_workers: 0,
+        extra_oil_workers: 3,
         pressure_worker_cap: None,
         pressure_until_complete: None,
     },
@@ -320,24 +322,25 @@ pub(crate) static RIFLE_FLOOD_FULL_SATURATION: AiProfile = AiProfile {
     },
     resources: ResourcePolicy {
         oil_after_steel_workers: 10,
+        oil_after_full_steel_saturation: true,
         tank_adaptive: None,
     },
     expansion: Some(ExpansionPolicy {
         target_industrial_centers: 2,
-        required_complete_building: EntityKind::TankFactory,
+        required_complete_building: EntityKind::TrainingCentre,
         defensive_unit: EntityKind::Rifleman,
         defensive_unit_count: 0,
-        pre_expansion_steel_worker_cap: 18,
+        pre_expansion_steel_worker_cap: usize::MAX,
         post_expansion_steel_worker_cap: Some(28),
         search_radius_tiles: 6,
         trigger_steel: 500,
-        trigger_supply_used: 70,
+        trigger_supply_used: 50,
         blocks_tech_path: false,
     }),
     tech_transition: Some(TechTransitionPolicy {
         // Once the rifle flood has put real bodies on the field, pivot to tanks so a stalemated
         // saturation push doesn't bleed out against superior tech.
-        supply_used_threshold: 80,
+        supply_used_threshold: 50,
         required_tech_path: &TANK_TECH_PATH,
         production: ProductionPolicy {
             queue_depth: 2,
@@ -399,6 +402,7 @@ pub(crate) static TECH_TO_TANKS: AiProfile = AiProfile {
     },
     resources: ResourcePolicy {
         oil_after_steel_workers: 8,
+        oil_after_full_steel_saturation: false,
         tank_adaptive: None,
     },
     expansion: Some(ExpansionPolicy {
@@ -458,6 +462,7 @@ pub(crate) static STEEL_EXPANSION_TANKS: AiProfile = AiProfile {
     },
     resources: ResourcePolicy {
         oil_after_steel_workers: 8,
+        oil_after_full_steel_saturation: false,
         tank_adaptive: None,
     },
     expansion: Some(ExpansionPolicy {
@@ -561,6 +566,44 @@ mod tests {
             Some(EntityKind::Tank)
         );
         assert_eq!(TECH_TO_TANKS.attack.first_attack_size, 1);
+    }
+
+    #[test]
+    fn full_saturation_can_staff_oil_and_pivot_before_ultra_late_supply() {
+        let expansion = RIFLE_FLOOD_FULL_SATURATION.expansion.unwrap();
+        let transition = RIFLE_FLOOD_FULL_SATURATION.tech_transition.unwrap();
+
+        assert_eq!(RIFLE_FLOOD_FULL_SATURATION.workers.extra_oil_workers, 3);
+        assert_eq!(
+            RIFLE_FLOOD_FULL_SATURATION
+                .resources
+                .oil_after_steel_workers,
+            10
+        );
+        assert!(
+            RIFLE_FLOOD_FULL_SATURATION
+                .resources
+                .oil_after_full_steel_saturation
+        );
+        assert_eq!(
+            expansion.required_complete_building,
+            EntityKind::TrainingCentre
+        );
+        assert_eq!(expansion.pre_expansion_steel_worker_cap, usize::MAX);
+        assert_eq!(expansion.trigger_supply_used, 50);
+        assert_eq!(transition.supply_used_threshold, 50);
+        assert_eq!(
+            transition.required_tech_path,
+            &[
+                EntityKind::Barracks,
+                EntityKind::TrainingCentre,
+                EntityKind::TankFactory
+            ]
+        );
+        assert_eq!(
+            transition.production.save_for_first_tech_unit,
+            Some(EntityKind::Tank)
+        );
     }
 
     #[test]
