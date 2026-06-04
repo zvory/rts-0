@@ -734,6 +734,13 @@ The server treats every client as potentially hostile. Limits live next to the c
   unit `AwaitingPath`. The existing path coordinator then recomputes under current occupancy within
   the normal per-tick A* budget. This covers buildings constructed after a long path was assigned
   without periodically repathing every moving unit.
+- **Local steering**: before taking a partial path step for a plain `Move` order, movement computes a
+  short-range separation proposal away from nearby firm/braced/heavy mobile units. Neighbor ids are
+  sorted and capped so replay behavior stays deterministic, and separation uses the same footing
+  profiles as hard collision so braced/heavy units exert stronger local pressure than firm units.
+  The steered landing is only accepted if `standability::unit_static_standable` says the unit body
+  fits there; otherwise movement falls back to the ordinary path step / wall-slide logic. Steering
+  does not reserve space or replace collision.
 - **Production spawn legality**: production completes in two steps. The front queue item advances
   to complete, then the producer searches deterministic rings around its actual footprint for a
   `standability::unit_spawn_standable` point. Spawn candidates must fit the unit body inside world
