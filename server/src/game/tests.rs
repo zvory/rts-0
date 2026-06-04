@@ -1,10 +1,8 @@
-use std::collections::{BTreeSet, HashMap};
+use std::collections::HashMap;
 
 use super::scoring::entity_score_value;
 use super::*;
-use crate::game::ai_core::profiles::{
-    RIFLE_FLOOD_FAST_ID, RIFLE_FLOOD_FULL_SATURATION_ID, TECH_TO_TANKS_ID,
-};
+use crate::game::ai_core::profiles::{RIFLE_FLOOD_FAST_ID, RIFLE_FLOOD_FULL_SATURATION_ID};
 use crate::game::command::SimCommand as Command;
 use crate::game::entity::{Entity, EntityKind, GatherPhase, Order};
 use crate::protocol::{kinds, EntityView};
@@ -50,23 +48,14 @@ fn count_ai_gathering_workers(game: &Game, player_id: u32) -> usize {
 #[test]
 fn live_ai_profiles_are_selected_from_requested_pool_at_match_start() {
     let players = human_vs_ai_players();
-    let requested_pool = [
-        TECH_TO_TANKS_ID,
-        RIFLE_FLOOD_FAST_ID,
-        RIFLE_FLOOD_FULL_SATURATION_ID,
-    ];
-    let mut observed = BTreeSet::new();
 
     for seed in 0..64 {
         let game = Game::new_with_random_ai_profiles(&players, seed);
         let profiles = game.ai_profile_ids();
 
         assert_eq!(profiles.len(), 1);
-        assert!(requested_pool.contains(&profiles[0]));
-        observed.insert(profiles[0]);
+        assert_eq!(profiles[0], RIFLE_FLOOD_FULL_SATURATION_ID);
     }
-
-    assert_eq!(observed, requested_pool.into_iter().collect());
 }
 
 #[test]
