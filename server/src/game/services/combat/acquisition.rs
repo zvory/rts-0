@@ -85,6 +85,23 @@ pub(super) fn resolve_target(
         }
     }
 
+    // Units prefer engaging enemy units over buildings; fall back to any enemy if no unit in range.
+    let attacker_is_unit = entities.get(self_id).map(|e| e.is_unit()).unwrap_or(false);
+    if attacker_is_unit {
+        if let Some(id) = world_query::nearest_enemy_unit_in_range_filtered(
+            entities,
+            spatial,
+            self_id,
+            owner,
+            px,
+            py,
+            acquire_px,
+            |target| los.clear_between_world_points((px, py), (target.pos_x, target.pos_y)),
+        ) {
+            return Some(id);
+        }
+    }
+
     // Aggressive acquisition: the nearest enemy within the acquire radius (weapon range for
     // buildings, sight range for mobile units so they chase).
     world_query::nearest_enemy_in_range_filtered(
