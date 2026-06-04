@@ -825,10 +825,7 @@ fn defensive_threat_dps(enemy: &AiEntitySummary) -> f32 {
     profile.dmg as f32 / profile.cooldown as f32
 }
 
-fn active_expansion(
-    observation: &AiObservation,
-    profile: &AiProfile,
-) -> Option<ExpansionPolicy> {
+fn active_expansion(observation: &AiObservation, profile: &AiProfile) -> Option<ExpansionPolicy> {
     let expansion = profile.expansion?;
     if observation.economy.steel >= expansion.trigger_steel
         || observation.economy.supply_used >= expansion.trigger_supply_used
@@ -1797,7 +1794,12 @@ fn desired_oil_workers(
         .get(&EntityKind::Steel)
         .copied()
         .unwrap_or(0);
-    if current_steel_workers < target_steel_workers.min(profile.resources.oil_after_steel_workers) {
+    let oil_steel_floor = if profile.resources.oil_after_full_steel_saturation {
+        target_steel_workers
+    } else {
+        target_steel_workers.min(profile.resources.oil_after_steel_workers)
+    };
+    if current_steel_workers < oil_steel_floor {
         return 0;
     }
 
@@ -2874,6 +2876,146 @@ mod tests {
     }
 
     #[test]
+    fn full_saturation_pivots_to_tank_tech_but_waits_for_full_steel_before_oil() {
+        let mut owned = vec![
+            building(10, EntityKind::IndustrialCenter, Some(0)),
+            building(11, EntityKind::Barracks, Some(0)),
+        ];
+        owned.extend((0..17).map(|i| steel_worker(20 + i, 100 + i)));
+        owned.extend((0..40).map(|i| combat(200 + i, EntityKind::Rifleman)));
+        owned.extend((0..2).map(|i| worker(300 + i, AiEntityState::Idle)));
+        let mut observation = observation(
+            AiEconomy {
+                steel: 1_000,
+                oil: 1_000,
+                supply_used: 50,
+                supply_cap: 70,
+            },
+            owned,
+        );
+        let facts = AiFacts::from_observation(&observation);
+        let target_steel_workers = target_steel_workers_for_profile(
+            &observation,
+            &facts,
+            &RIFLE_FLOOD_FULL_SATURATION,
+            RIFLE_FLOOD_FULL_SATURATION
+                .workers
+                .target_steel_workers(facts.target_steel_workers, usize::MAX),
+        );
+        let desired_oil = desired_oil_workers(
+            &observation,
+            &facts,
+            &RIFLE_FLOOD_FULL_SATURATION,
+            target_steel_workers,
+        );
+
+        let decision = decide(
+            &observation,
+            &RIFLE_FLOOD_FULL_SATURATION,
+            &mut AiDecisionMemory::for_profile(&RIFLE_FLOOD_FULL_SATURATION),
+        );
+
+        assert!(decision.intents.contains(&AiIntent::Build {
+            kind: EntityKind::TrainingCentre
+        }));
+        assert_eq!(target_steel_workers, 18);
+        assert_eq!(desired_oil, 0);
+
+        observation.owned.push(steel_worker(37, 117));
+        let facts = AiFacts::from_observation(&observation);
+        let target_steel_workers = target_steel_workers_for_profile(
+            &observation,
+            &facts,
+            &RIFLE_FLOOD_FULL_SATURATION,
+            RIFLE_FLOOD_FULL_SATURATION
+                .workers
+                .target_steel_workers(facts.target_steel_workers, usize::MAX),
+        );
+        let desired_oil = desired_oil_workers(
+            &observation,
+            &facts,
+            &RIFLE_FLOOD_FULL_SATURATION,
+            target_steel_workers,
+        );
+        assert_eq!(desired_oil, 3);
+    }
+
+    #[test]
+    fn full_saturation_oil_timing_tracks_observed_steel_patch_count() {
+        let ts = config::TILE_SIZE as f32;
+        let mut owned = vec![
+            building(10, EntityKind::IndustrialCenter, Some(0)),
+            building(11, EntityKind::Barracks, Some(0)),
+        ];
+        owned.extend((0..18).map(|i| steel_worker(20 + i, 100 + i)));
+        owned.push(worker(300, AiEntityState::Idle));
+        let mut observation = observation(
+            AiEconomy {
+                steel: 1_000,
+                oil: 1_000,
+                supply_used: 50,
+                supply_cap: 70,
+            },
+            owned,
+        );
+        observation
+            .resources
+            .push(resource(118, EntityKind::Steel, 13.5 * ts, 11.5 * ts));
+
+        let facts = AiFacts::from_observation(&observation);
+        let target_steel_workers = target_steel_workers_for_profile(
+            &observation,
+            &facts,
+            &RIFLE_FLOOD_FULL_SATURATION,
+            RIFLE_FLOOD_FULL_SATURATION
+                .workers
+                .target_steel_workers(facts.target_steel_workers, usize::MAX),
+        );
+        let desired_oil = desired_oil_workers(
+            &observation,
+            &facts,
+            &RIFLE_FLOOD_FULL_SATURATION,
+            target_steel_workers,
+        );
+
+        assert_eq!(target_steel_workers, 19);
+        assert_eq!(desired_oil, 0);
+    }
+
+    #[test]
+    fn full_saturation_can_expand_while_teching_to_tanks() {
+        let mut owned = vec![
+            building(10, EntityKind::IndustrialCenter, Some(0)),
+            building(11, EntityKind::Barracks, Some(0)),
+            building(12, EntityKind::TrainingCentre, Some(0)),
+        ];
+        owned.extend((0..18).map(|i| steel_worker(20 + i, 100 + i)));
+        owned.extend((0..29).map(|i| combat(200 + i, EntityKind::Rifleman)));
+        let observation = with_expansion_resources(observation(
+            AiEconomy {
+                steel: 2_000,
+                oil: 2_000,
+                supply_used: 50,
+                supply_cap: 70,
+            },
+            owned,
+        ));
+
+        let decision = decide(
+            &observation,
+            &RIFLE_FLOOD_FULL_SATURATION,
+            &mut AiDecisionMemory::for_profile(&RIFLE_FLOOD_FULL_SATURATION),
+        );
+
+        assert!(decision.intents.contains(&AiIntent::Build {
+            kind: EntityKind::TankFactory
+        }));
+        assert!(decision.intents.contains(&AiIntent::Build {
+            kind: EntityKind::IndustrialCenter
+        }));
+    }
+
+    #[test]
     fn steel_expansion_tanks_builds_expansion_ic_before_any_barracks() {
         let ts = config::TILE_SIZE as f32;
         let mut owned = vec![building_at(
@@ -3136,6 +3278,74 @@ mod tests {
             ),
             "chosen closer natural should still cover its whole resource line"
         );
+    }
+
+    #[test]
+    fn expansion_site_selection_prefers_oil_over_steel_only_output() {
+        let map_size = 96;
+        let ts = config::TILE_SIZE as f32;
+        let mut owned = vec![building_at(
+            10,
+            EntityKind::IndustrialCenter,
+            Some(0),
+            10.5 * ts,
+            85.5 * ts,
+        )];
+        owned.extend((0..8).map(|i| steel_worker(40 + i, 100 + i)));
+        let mut resources = base_site_resources(100, (10, 85), map_size);
+        resources.extend(
+            base_site_resources(200, (22, 75), map_size)
+                .into_iter()
+                .filter(|resource| resource.kind == EntityKind::Steel),
+        );
+        resources.extend(base_site_resources(300, (55, 55), map_size));
+        resources.sort_by_key(|resource| resource.id);
+        let observation = AiObservation {
+            player_id: 1,
+            tick: 90,
+            map: AiMapSummary {
+                width: map_size,
+                height: map_size,
+                tile_size: config::TILE_SIZE,
+            },
+            economy: AiEconomy {
+                steel: 500,
+                oil: 500,
+                supply_used: 70,
+                supply_cap: 80,
+            },
+            own_start_tile: (10, 85),
+            players: vec![
+                AiPlayerSummary {
+                    id: 1,
+                    start_tile: (10, 85),
+                    is_ai: true,
+                    is_alive: true,
+                },
+                AiPlayerSummary {
+                    id: 2,
+                    start_tile: (86, 10),
+                    is_ai: false,
+                    is_alive: true,
+                },
+            ],
+            owned,
+            resources,
+            visible_enemies: Vec::new(),
+            pending_builds: Vec::new(),
+        };
+        let expansion = STEEL_EXPANSION_TANKS.expansion.unwrap();
+
+        let site = expansion_industrial_center_site(
+            &observation,
+            expansion,
+            EntityKind::IndustrialCenter,
+            &mut |_, _, _| true,
+        )
+        .expect("oil-bearing expansion site should be found");
+
+        let (_, oil) = expansion_resource_counts_for_site(&observation, site);
+        assert_eq!(oil, config::OIL_PATCHES_PER_BASE as usize);
     }
 
     #[test]
