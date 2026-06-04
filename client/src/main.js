@@ -39,7 +39,7 @@ const VIEWPORT_ALERT_MARGIN_PX = 64;
 
 const COMBAT_SOUNDS = Object.freeze({
   [KIND.TANK]: {
-    ids: ["combat_tank_01", "combat_tank_06"],
+    ids: ["combat_tank_01"],
     priority: 4,
     gain: 2,
   },
@@ -49,7 +49,7 @@ const COMBAT_SOUNDS = Object.freeze({
     gain: KAR98K_GAIN,
   },
   [KIND.AT_TEAM]: {
-    ids: ["combat_tank_01", "combat_tank_06"],
+    ids: ["combat_tank_01"],
     priority: 4,
     gain: 2,
   },
