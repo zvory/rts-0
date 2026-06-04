@@ -804,6 +804,107 @@ mod tests {
         v
     }
 
+    fn flat_tank_move_fixture() -> (Game, u32, (f32, f32)) {
+        let players = [PlayerInit {
+            id: 1,
+            name: "Solo".into(),
+            color: "#fff".into(),
+            is_ai: false,
+        }];
+        let mut game = Game::new_for_replay(&players, 0x1234_5678);
+        for tile in &mut game.map.terrain {
+            *tile = crate::protocol::terrain::GRASS;
+        }
+        for id in game.entities.ids() {
+            game.entities.remove(id);
+        }
+
+        let start = game.map.tile_center(4, 4);
+        let goal = game.map.tile_center(28, 17);
+        let tank = game
+            .entities
+            .spawn_unit(1, EntityKind::Tank, start.0, start.1)
+            .expect("tank should spawn");
+        systems::recompute_supply(&mut game.players, &game.entities);
+        game.spatial = services::spatial::SpatialIndex::build(&game.entities, game.map.size);
+        let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
+        game.fog.recompute(&ids, &game.entities, &game.map);
+        game.assert_invariants();
+
+        (game, tank, goal)
+    }
+
+    #[test]
+    fn tank_move_command_preserves_exact_goal_and_repeats_deterministically() {
+        let (mut live, tank, goal) = flat_tank_move_fixture();
+
+        live.enqueue(
+            1,
+            Command::Move {
+                units: vec![tank],
+                x: goal.0,
+                y: goal.1,
+            },
+        );
+        live.tick();
+
+        assert_eq!(
+            live.command_log(),
+            &[super::replay::CommandLogEntry {
+                tick: 1,
+                player_id: 1,
+                command: crate::protocol::Command::Move {
+                    units: vec![tank],
+                    x: goal.0,
+                    y: goal.1,
+                },
+            }]
+        );
+        let moved_tank = live.entities.get(tank).expect("tank should exist");
+        assert_eq!(moved_tank.path_goal(), Some(goal));
+        assert_eq!(
+            moved_tank
+                .movement
+                .as_ref()
+                .map(|movement| movement.path.as_slice()),
+            Some(&[goal][..]),
+            "flat tank move should smooth to the exact command goal only"
+        );
+
+        let (mut repeat_a, tank_a, goal_a) = flat_tank_move_fixture();
+        let (mut repeat_b, tank_b, goal_b) = flat_tank_move_fixture();
+        assert_eq!(tank_a, tank_b, "fixture entity ids should be reproducible");
+        assert_eq!(goal_a, goal_b, "fixture goals should be reproducible");
+        for game in [&mut repeat_a, &mut repeat_b] {
+            game.enqueue(
+                1,
+                Command::Move {
+                    units: vec![tank_a],
+                    x: goal_a.0,
+                    y: goal_a.1,
+                },
+            );
+        }
+
+        for _ in 0..120 {
+            repeat_a.tick();
+            repeat_b.tick();
+        }
+
+        let a = repeat_a.entities.get(tank_a).expect("tank A should exist");
+        let b = repeat_b.entities.get(tank_b).expect("tank B should exist");
+        assert_eq!(
+            (a.pos_x, a.pos_y, a.facing()),
+            (b.pos_x, b.pos_y, b.facing())
+        );
+        assert_eq!(a.path_goal(), b.path_goal());
+        assert_eq!(
+            a.movement.as_ref().map(|movement| movement.path.clone()),
+            b.movement.as_ref().map(|movement| movement.path.clone())
+        );
+        assert_eq!(repeat_a.command_log(), repeat_b.command_log());
+    }
+
     #[test]
     fn scores_count_starting_entities() {
         let players = human_vs_ai_players();
