@@ -27,7 +27,8 @@ use std::collections::HashMap;
 use crate::config;
 use crate::game::command::SimCommand;
 use crate::protocol::{
-    Event, MapInfo, PlayerScore, PlayerStart, ResourceDelta, ResourceNode, Snapshot, StartPayload,
+    Event, MapInfo, PlayerResourceSnapshot, PlayerScore, PlayerStart, ResourceDelta, ResourceNode,
+    Snapshot, StartPayload,
 };
 use crate::rules::{economy as economy_rules, projection};
 use serde::{Deserialize, Serialize};
@@ -151,6 +152,7 @@ pub struct Game {
 }
 
 impl Game {
+    #[allow(dead_code)]
     pub fn new(players: &[PlayerInit], seed: u32) -> Game {
         Self::new_inner(
             players,
@@ -482,6 +484,21 @@ impl Game {
         entities.sort_by_key(|v| v.id);
         resource_deltas.sort_by_key(|d| d.id);
 
+        let player_resources = if !fogged {
+            self.players
+                .iter()
+                .map(|p| PlayerResourceSnapshot {
+                    id: p.id,
+                    steel: p.steel,
+                    oil: p.oil,
+                    supply_used: p.supply_used,
+                    supply_cap: p.supply_cap,
+                })
+                .collect()
+        } else {
+            Vec::new()
+        };
+
         Snapshot {
             tick: self.tick,
             steel,
@@ -492,6 +509,7 @@ impl Game {
             resource_deltas,
             // Events are delivered via the `tick()` return value, not the snapshot.
             events: Vec::new(),
+            player_resources,
         }
     }
 

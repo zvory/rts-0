@@ -610,6 +610,37 @@ input[type="text"]:focus {
   color: var(--bad);
 }
 
+/* Replay mode: one row per player, color dot on the left. */
+#hud:has(.replay-player-res) {
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-start;
+  left: 12px;
+  transform: none;
+  padding: 8px 14px;
+}
+.replay-player-res {
+  gap: 8px;
+  font-size: 14px;
+}
+.replay-player-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.5);
+}
+.replay-res-val {
+  min-width: 28px;
+  display: inline-block;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.replay-res-val.supply-capped {
+  color: var(--bad);
+}
+
 /* --- Bottom-left minimap frame --- */
 #minimap-wrap {
   left: 12px;

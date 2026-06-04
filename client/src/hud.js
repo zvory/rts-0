@@ -10,7 +10,7 @@
 
 import { cmd } from "./protocol.js";
 import { KIND, STATE, isBuilding, isUnit } from "./protocol.js";
-import { STATS, WORKER_BUILDABLE } from "./config.js";
+import { STATS, WORKER_BUILDABLE, PLAYER_PALETTE } from "./config.js";
 
 // Command-card hotkeys follow the keyboard grid (3 columns):
 //   Q W E
@@ -52,6 +52,7 @@ export class HUD {
     this.net = net;
 
     // Resource / supply bar elements.
+    this.elHud = rootEl.querySelector("#hud");
     this.elSteel = rootEl.querySelector("#res-steel");
     this.elOil = rootEl.querySelector("#res-oil");
     this.elSupply = rootEl.querySelector("#res-supply");
@@ -63,6 +64,8 @@ export class HUD {
     // Signature of the last-rendered command card so we only rebuild its buttons when
     // the relevant selection/affordability actually changes (keeps DOM + hotkeys stable).
     this._cardSig = null;
+    // Signature for the resource bar to avoid unnecessary DOM rebuilds.
+    this._resSig = null;
   }
 
   /**
@@ -84,13 +87,36 @@ export class HUD {
     if (this.elCommand) this.elCommand.innerHTML = "";
     if (this.elSupply) this.elSupply.classList.remove("supply-capped");
     this._cardSig = null;
+    this._resSig = null;
   }
 
   // --- Resource / supply bar -------------------------------------------------
 
-  /** Mirror `state.resources` into the top bar. */
+  /** Mirror `state.resources` into the top bar, or all players' resources in replay mode. */
   _renderResources() {
+    const pr = this.state.playerResources;
+    if (pr && pr.length > 0) {
+      this._renderAllPlayersResources(pr);
+    } else {
+      this._renderSinglePlayerResources();
+    }
+  }
+
+  _renderSinglePlayerResources() {
     const r = this.state.resources || { steel: 0, oil: 0, supplyUsed: 0, supplyCap: 0 };
+    // Restore static HUD content if we previously switched to multi-player mode.
+    if (this._resSig && this._resSig.startsWith("multi:")) {
+      if (this.elHud) {
+        this.elHud.innerHTML =
+          `<div class="res"><span class="res-icon steel">▰</span><span id="res-steel">0</span></div>` +
+          `<div class="res"><span class="res-icon oil">⬤</span><span id="res-oil">0</span></div>` +
+          `<div class="res"><span class="res-icon supply">▲</span><span id="res-supply">0 / 0</span></div>`;
+        this.elSteel = this.elHud.querySelector("#res-steel");
+        this.elOil = this.elHud.querySelector("#res-oil");
+        this.elSupply = this.elHud.querySelector("#res-supply");
+      }
+      this._resSig = null;
+    }
     if (this.elSteel) this.elSteel.textContent = String(r.steel ?? 0);
     if (this.elOil) this.elOil.textContent = String(r.oil ?? 0);
     if (this.elSupply) {
@@ -100,6 +126,41 @@ export class HUD {
       // Flag over-cap (blocked production) so styles.css can color it.
       this.elSupply.classList.toggle("supply-capped", cap > 0 && used >= cap);
     }
+  }
+
+  /** Render one resource row per player, with a color-coded dot identifying each player. */
+  _renderAllPlayersResources(playerResources) {
+    if (!this.elHud) return;
+
+    // Build a signature to avoid rebuilding every frame.
+    const sig = "multi:" + playerResources.map(
+      (p) => `${p.id}:${p.steel}:${p.oil}:${p.supplyUsed}:${p.supplyCap}`,
+    ).join("|");
+    if (sig === this._resSig) return;
+    this._resSig = sig;
+
+    const players = this.state.players || [];
+    const frag = document.createDocumentFragment();
+    for (const pr of playerResources) {
+      // Look up this player's display color.
+      const playerInfo = players.find((p) => p.id === pr.id);
+      const idx = players.indexOf(playerInfo);
+      const color = (playerInfo && playerInfo.color) || PLAYER_PALETTE[idx % PLAYER_PALETTE.length] || "#888";
+      const name = (playerInfo && playerInfo.name) || `P${pr.id}`;
+      const supplyCapped = pr.supplyCap > 0 && pr.supplyUsed >= pr.supplyCap;
+
+      const row = document.createElement("div");
+      row.className = "res replay-player-res";
+      row.innerHTML =
+        `<span class="replay-player-dot" style="background:${color}" title="${name}"></span>` +
+        `<span class="res-icon steel">▰</span><span class="replay-res-val">${pr.steel}</span>` +
+        `<span class="res-icon oil">⬤</span><span class="replay-res-val">${pr.oil}</span>` +
+        `<span class="res-icon supply">▲</span>` +
+        `<span class="replay-res-val${supplyCapped ? " supply-capped" : ""}">${pr.supplyUsed} / ${pr.supplyCap}</span>`;
+      frag.appendChild(row);
+    }
+    this.elHud.innerHTML = "";
+    this.elHud.appendChild(frag);
   }
 
   // --- Selected-units panel --------------------------------------------------

@@ -68,6 +68,7 @@ pub(crate) struct AiController {
 }
 
 impl AiController {
+    #[allow(dead_code)]
     pub(crate) fn new(player: u32) -> Self {
         Self::with_profile_id(player, DEFAULT_LIVE_PROFILE_ID)
     }

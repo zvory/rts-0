@@ -250,6 +250,19 @@ pub struct Snapshot {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub resource_deltas: Vec<ResourceDelta>,
     pub events: Vec<Event>,
+    /// Per-player resources for all players. Populated only in no-fog (replay/spectator) mode.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub player_resources: Vec<PlayerResourceSnapshot>,
+}
+
+/// Resources for one player, included in no-fog snapshots so replay viewers see all players.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct PlayerResourceSnapshot {
+    pub id: u32,
+    pub steel: u32,
+    pub oil: u32,
+    pub supply_used: u32,
+    pub supply_cap: u32,
 }
 
 /// Dynamic resource state the client is currently allowed to know.
@@ -422,7 +435,7 @@ impl Serialize for CompactSnapshot<'_> {
         use serde::ser::SerializeMap;
 
         let snapshot = self.0;
-        let mut map = serializer.serialize_map(Some(6))?;
+        let mut map = serializer.serialize_map(None)?;
         map.serialize_entry("t", "snapshot")?;
         map.serialize_entry("v", &COMPACT_SNAPSHOT_VERSION)?;
         map.serialize_entry(
@@ -457,6 +470,16 @@ impl Serialize for CompactSnapshot<'_> {
             map.serialize_entry(
                 "ev",
                 &snapshot.events.iter().map(CompactEvent).collect::<Vec<_>>(),
+            )?;
+        }
+        if !snapshot.player_resources.is_empty() {
+            map.serialize_entry(
+                "pr",
+                &snapshot
+                    .player_resources
+                    .iter()
+                    .map(|p| [p.id, p.steel, p.oil, p.supply_used, p.supply_cap])
+                    .collect::<Vec<_>>(),
             )?;
         }
         map.end()
@@ -742,6 +765,7 @@ mod tests {
                     severity: NoticeSeverity::Info,
                 },
             ],
+            player_resources: Vec::new(),
         }
     }
 
@@ -793,6 +817,7 @@ mod tests {
             )],
             resource_deltas: Vec::new(),
             events: Vec::new(),
+            player_resources: Vec::new(),
         };
 
         let compact = serialize_compact_snapshot(&snapshot).unwrap();

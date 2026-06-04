@@ -376,6 +376,7 @@ mod tests {
             ],
             resource_deltas: Vec::new(),
             events: Vec::new(),
+            player_resources: Vec::new(),
         };
 
         assert_eq!(

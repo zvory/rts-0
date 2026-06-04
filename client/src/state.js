@@ -62,6 +62,8 @@ export class GameState {
     // --- derived latest state ---
     /** @type {{steel:number,oil:number,supplyUsed:number,supplyCap:number}} */
     this.resources = { steel: 0, oil: 0, supplyUsed: 0, supplyCap: 0 };
+    /** @type {Array<{id:number,steel:number,oil:number,supplyUsed:number,supplyCap:number}>} */
+    this.playerResources = [];
     /** @type {Array<object>} latest snapshot's transient events. */
     this.events = [];
 
@@ -151,6 +153,7 @@ export class GameState {
       supplyUsed: msg.supplyUsed | 0,
       supplyCap: msg.supplyCap | 0,
     };
+    this.playerResources = msg.playerResources || [];
     this.events = msg.events || [];
     this._pruneSelection();
 
