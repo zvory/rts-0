@@ -167,11 +167,36 @@ try {
   });
   ok(trainBtn, "TRAIN CARD: selecting the Industrial Center shows a Worker train button");
 
-  const beforePan = await page.evaluate(() => ({
-    x: window.__rts.match.camera.x,
-    y: window.__rts.match.camera.y,
+  await page.click("#settings-button");
+  await page.waitForFunction(() => !document.getElementById("settings-menu")?.hidden, { timeout: 2000 });
+  await page.keyboard.press("Escape");
+  await sleep(100);
+  const afterMenuEscape = await page.evaluate(() => ({
+    menuHidden: document.getElementById("settings-menu")?.hidden,
     selected: window.__rts.match.state.selection.size,
   }));
+  ok(afterMenuEscape.menuHidden && afterMenuEscape.selected === 1,
+     `ESCAPE: closes open settings menu without clearing selection (hidden=${afterMenuEscape.menuHidden}, selected=${afterMenuEscape.selected})`);
+
+  await page.keyboard.press("Escape");
+  await sleep(100);
+  const afterGameplayEscape = await page.evaluate(() => ({
+    menuHidden: document.getElementById("settings-menu")?.hidden,
+    selected: window.__rts.match.state.selection.size,
+  }));
+  ok(afterGameplayEscape.menuHidden && afterGameplayEscape.selected === 0,
+     `ESCAPE: gameplay cancel clears selection without opening settings (hidden=${afterGameplayEscape.menuHidden}, selected=${afterGameplayEscape.selected})`);
+
+  const beforePan = await page.evaluate(() => {
+    const s = window.__rts.match.state;
+    const industrialCenter = s.entitiesInterpolated(1).find((e) => e.owner === s.playerId && e.kind === "industrial_center");
+    if (industrialCenter) s.setSelection([industrialCenter.id]);
+    return {
+      x: window.__rts.match.camera.x,
+      y: window.__rts.match.camera.y,
+      selected: s.selection.size,
+    };
+  });
   await page.keyboard.down("Space");
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   await page.mouse.down();
