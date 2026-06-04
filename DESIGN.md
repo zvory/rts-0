@@ -736,7 +736,7 @@ Building stats (hp, sight, cost, footprint tiles wxh, buildTicks, extra):
 | kind                       | hp  | sight | cost | foot | buildTicks | notes |
 |----------------------------|-----|-------|-----|------|-----------|-------|
 | industrial_center          | 600 | 9     | 200 | 3x3  | 400       | trains worker; +10 supply; players start with one free |
-| depot                      | 220 | 4     | 100 | 2x2  | 120       | +8 supply |
+| depot                      | 220 | 4     | 100 | 2x2  | 180       | +8 supply |
 | barracks                   | 320 | 6     | 150 | 3x2  | 200       | trains rifleman, machine_gunner, at_team; requires an Industrial Center |
 | training_centre   | 300 | 6     | 100 steel + 50 oil | 3x2  | 220       | unlocks machine_gunner and at_team training at barracks; requires an Industrial Center and Barracks |
 | tank_factory               | 360 | 6     | 200 steel + 100 oil | 3x3  | 240       | trains tank; requires an Industrial Center and Training Centre |
