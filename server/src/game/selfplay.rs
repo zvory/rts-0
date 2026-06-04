@@ -28,11 +28,13 @@ use crate::game::ai_core::actions::{self, AiActionContext, ResourceAssignmentPol
 use crate::game::ai_core::facts::AiFacts;
 use crate::game::ai_core::observation::{AiBuildIntent, AiObservation};
 use crate::game::ai_shared;
+use crate::game::command::SimCommand as Command;
 use crate::game::entity::EntityKind;
 #[cfg(test)]
 use crate::protocol::PlayerStart;
 use crate::protocol::{
-    kinds, states, terrain, Command, EntityView, Event, MapInfo, Snapshot, StartPayload,
+    kinds, states, terrain, Command as WireCommand, EntityView, Event, MapInfo, Snapshot,
+    StartPayload,
 };
 use crate::rules;
 
@@ -154,7 +156,10 @@ impl ReplayDriver {
             if entry.tick != next_tick {
                 break;
             }
-            game.enqueue(entry.player_id, entry.command.clone());
+            game.enqueue(
+                entry.player_id,
+                Command::from_protocol(entry.command.clone()),
+            );
             self.next += 1;
         }
     }
@@ -414,16 +419,16 @@ fn command_stats_by_player(
         let player = stats.entry(entry.player_id).or_default();
         player.command_count += 1;
         match &entry.command {
-            Command::AttackMove { .. } | Command::Attack { .. } => {
+            WireCommand::AttackMove { .. } | WireCommand::Attack { .. } => {
                 player.attack_command_count += 1;
                 player.first_attack_command_tick.get_or_insert(entry.tick);
             }
-            Command::Move { .. }
-            | Command::Gather { .. }
-            | Command::Build { .. }
-            | Command::Train { .. }
-            | Command::Cancel { .. }
-            | Command::Stop { .. } => {}
+            WireCommand::Move { .. }
+            | WireCommand::Gather { .. }
+            | WireCommand::Build { .. }
+            | WireCommand::Train { .. }
+            | WireCommand::Cancel { .. }
+            | WireCommand::Stop { .. } => {}
         }
     }
     stats
@@ -612,16 +617,13 @@ impl PendingBuildTracker {
             else {
                 continue;
             };
-            let Ok(kind) = building.parse::<EntityKind>() else {
-                continue;
-            };
-            if config::building_stats(kind).is_none() {
+            if config::building_stats(*building).is_none() {
                 continue;
             }
             self.pending.insert(
                 *worker,
                 PendingBuild {
-                    kind,
+                    kind: *building,
                     tile_x: *tile_x,
                     tile_y: *tile_y,
                     last_x: None,
@@ -1008,12 +1010,14 @@ impl SelfPlayRunner {
 
             let mut command_progressed = false;
             for (player_id, script, command) in commands {
-                self.commands.push(CommandRecord {
-                    tick,
-                    player_id,
-                    script,
-                    command: command.clone(),
-                });
+                if let Some(wire_command) = command.to_protocol() {
+                    self.commands.push(CommandRecord {
+                        tick,
+                        player_id,
+                        script,
+                        command: wire_command,
+                    });
+                }
                 command_progressed |= self.milestones.observe_command(tick, player_id, &command);
                 self.game.enqueue(player_id, command);
             }
@@ -1248,7 +1252,7 @@ struct CommandRecord {
     tick: u32,
     player_id: u32,
     script: &'static str,
-    command: Command,
+    command: WireCommand,
 }
 
 #[derive(Clone, Serialize)]
@@ -1732,7 +1736,8 @@ impl PlayerMilestones {
             | Command::Build { .. }
             | Command::Train { .. }
             | Command::Cancel { .. }
-            | Command::Stop { .. } => None,
+            | Command::Stop { .. }
+            | Command::Rejected { .. } => None,
         };
         if let Some(attack_units) = attack_units {
             self.first_attack_command_tick.get_or_insert(tick);
@@ -3000,7 +3005,7 @@ fn pending_build_tracker_keeps_moving_worker_past_stale_window() {
         10,
         &[Command::Build {
             worker: 2,
-            building: kinds::INDUSTRIAL_CENTER.to_string(),
+            building: EntityKind::IndustrialCenter,
             tile_x: 48,
             tile_y: 70,
         }],
@@ -3025,7 +3030,7 @@ fn pending_build_tracker_expires_stuck_worker() {
         10,
         &[Command::Build {
             worker: 2,
-            building: kinds::INDUSTRIAL_CENTER.to_string(),
+            building: EntityKind::IndustrialCenter,
             tile_x: 48,
             tile_y: 70,
         }],
@@ -3225,13 +3230,13 @@ fn real_ai_vs_real_ai() {
         let mut attack_move_cmds: BTreeMap<u32, usize> = BTreeMap::new();
         for entry in game.command_log() {
             match &entry.command {
-                Command::Build { building, .. } if building == kinds::BARRACKS => {
+                WireCommand::Build { building, .. } if building == kinds::BARRACKS => {
                     *barracks_build_cmds.entry(entry.player_id).or_default() += 1;
                 }
-                Command::Train { unit, .. } if unit == kinds::RIFLEMAN => {
+                WireCommand::Train { unit, .. } if unit == kinds::RIFLEMAN => {
                     *rifleman_train_cmds.entry(entry.player_id).or_default() += 1;
                 }
-                Command::AttackMove { .. } => {
+                WireCommand::AttackMove { .. } => {
                     *attack_move_cmds.entry(entry.player_id).or_default() += 1;
                 }
                 _ => {}

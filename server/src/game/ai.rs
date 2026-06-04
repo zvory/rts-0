@@ -2,7 +2,7 @@
 //!
 //! An [`AiController`] drives one AI-owned player. It is invoked from
 //! [`crate::game::Game::tick`] every tick, before queued commands are applied, and it pushes
-//! ordinary [`Command`]s onto the same pending queue a human client would use. That means the AI
+//! ordinary [`SimCommand`]s onto the same pending queue a human client would use. That means the AI
 //! has no special powers: its commands run through the identical validation/cost/supply/placement
 //! path in `services/commands.rs`.
 //!
@@ -17,13 +17,13 @@ use crate::game::ai_core::profiles::{
     profile_by_id, AiProfile, RIFLE_FLOOD_FULL_SATURATION, RIFLE_FLOOD_FULL_SATURATION_ID,
 };
 use crate::game::ai_shared;
+use crate::game::command::SimCommand;
 use crate::game::entity::{EntityKind, EntityStore};
 use crate::game::fog::Fog;
 use crate::game::map::Map;
 use crate::game::services::spatial::SpatialIndex;
 use crate::game::systems;
 use crate::game::PlayerState;
-use crate::protocol::Command;
 use std::collections::BTreeSet;
 
 /// Re-plan cadence in ticks. The AI "thinks" this often (about 3 times/second at 30 Hz);
@@ -77,7 +77,7 @@ impl AiController {
 
     /// Decide this player's actions for the current tick, pushing any commands onto `out`. This is
     /// a no-op on most ticks (gated by [`DECISION_INTERVAL`]) and whenever the player is dead.
-    pub(crate) fn think(&mut self, context: AiThinkContext<'_>, out: &mut Vec<(u32, Command)>) {
+    pub(crate) fn think(&mut self, context: AiThinkContext<'_>, out: &mut Vec<(u32, SimCommand)>) {
         if !context
             .tick
             .wrapping_add(self.player)
@@ -185,8 +185,8 @@ fn building_margin_tiles(map: &Map, entities: &EntityStore) -> BTreeSet<(u32, u3
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::game::command::SimCommand as Command;
     use crate::game::entity::{EntityStore, Order};
-    use crate::protocol::Command;
 
     fn player(
         id: u32,
@@ -256,7 +256,7 @@ mod tests {
         assert!(
             !out.iter().any(|(_, command)| matches!(
                 command,
-                Command::Build { building, .. } if building == EntityKind::Depot.to_protocol_str()
+                Command::Build { building, .. } if *building == EntityKind::Depot
             )),
             "AI should treat a worker's pending depot build intent as supply already in progress"
         );

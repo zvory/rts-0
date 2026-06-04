@@ -50,13 +50,14 @@ Recommended policy:
 
 ### 2. Protocol coupling inside simulation code
 
-Today `Game` and the game services directly import and return protocol-level types such as
-`Command`, `Event`, `Snapshot`, and `StartPayload`. That keeps the MVP simple, but it tightly
-couples game logic to JSON wire shape.
+Status: command input has been extracted. `ClientMessage::Command` and replay command artifacts are
+translated into `game::command::SimCommand` before they enter `Game`; AI and self-play also emit
+`SimCommand` directly, and command services operate on `EntityKind` instead of protocol strings.
+`Snapshot`, `StartPayload`, and `Event` remain protocol-facing output DTOs at the `Game` seam.
 
 Recommended policy:
 
-- Introduce a translation layer at the boundary: `ClientMessage -> SimCommand`.
+- Keep the translation layer at the boundary: `ClientMessage -> SimCommand`.
 - Use typed domain commands internally, for example:
   - `SimCommand::Move`
   - `SimCommand::AttackMove`
@@ -66,8 +67,8 @@ Recommended policy:
   - `SimCommand::Train { unit: EntityKind, ... }`
   - `SimCommand::Cancel`
   - `SimCommand::Stop`
-- Keep protocol parsing, string-to-kind mapping, and JSON shape concerns outside the simulation
-  core.
+- Keep protocol parsing, string-to-kind mapping, and JSON shape concerns outside the command
+  application core.
 
 ### 3. Tick pipeline is implicit
 
