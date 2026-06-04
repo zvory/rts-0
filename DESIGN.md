@@ -401,13 +401,16 @@ orders may chase toward a blocked target but cannot fire until the shot is clear
 also stops at static LOS blockers. Future forest visibility/cover rules should extend the terrain
 rules and this service instead of adding ad hoc checks to fog or combat.
 
-`services::geometry` owns shared body primitives: unit bodies are circles centered on `(x, y)`
-with the configured unit radius, building bodies are axis-aligned rectangles derived from
-footprint tiles, and resource node bodies are circles for build-site blocking. `services::standability`
-owns reusable legality predicates for unit bodies and building sites. Production spawn exits,
-construction/build intent, movement landing, steering candidates, collision push targets, and
-formation goal selection all use this shared standability layer for static/body legality. These
-helpers are pure and do not change the wire protocol or client contract.
+`services::geometry` owns shared body primitives: infantry unit bodies are circles centered on
+`(x, y)` with the configured unit radius, tanks use an oriented vehicle hull derived from their
+body `facing`, configured length/width, and a small clearance margin, building bodies are
+axis-aligned rectangles derived from footprint tiles, and resource node bodies are circles for
+build-site blocking. `services::standability` owns reusable legality predicates for unit bodies and
+building sites. Production spawn exits, construction/build intent, movement landing, steering
+candidates, collision push targets, and formation goal selection all use this shared standability
+layer for static/body legality. Swept segment checks sample the same body shape along a straight
+segment, and broad-phase queries use each body's conservative bounding radius. These helpers are
+pure and do not change the wire protocol or client contract.
 
 ---
 
@@ -801,6 +804,9 @@ The server treats every client as potentially hostile. Limits live next to the c
   lookahead, but the desired facing point is bounded to the current statically legal route segment
   unless a farther waypoint is also reachable by `standability::unit_static_segment_standable` from
   the tank's current position; local steering and collision displacement do not become hull intent.
+  Static terrain/building legality uses the oriented hull rather than the conservative circular
+  radius, so a lengthwise tank still fits through a 2-tile-wide straight corridor while front/rear
+  and side clearance near blockers match the hull shape.
   The snapshot `weaponFacing` field is the independent turret/barrel angle. Tank combat rotates the
   turret toward the target at a bounded rate and fires only once the turret is within tolerance; the
   hull does not need to face the target. Tanks do not clear their movement path when they fire, so

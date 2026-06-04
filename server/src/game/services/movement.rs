@@ -3,6 +3,7 @@ use crate::game::entity::{
     BuildPhase, Entity, EntityKind, EntityStore, GatherPhase, MovePhase, Order, WeaponSetup,
 };
 use crate::game::map::Map;
+use crate::game::services::geometry::unit_body_for_entity;
 use crate::game::services::occupancy::Occupancy;
 use crate::game::services::spatial::SpatialIndex;
 use crate::game::services::standability;
@@ -11,10 +12,8 @@ use crate::game::PlayerState;
 /// World pixels at which a unit is considered "arrived" at a waypoint / target point.
 const ARRIVE_EPS: f32 = 2.0;
 
-/// Largest unit collision radius in the game (tank, see `config::unit_stats`). Used to size
-/// the broad-phase bounding-box query in [`resolve_collisions`] so the spatial index never
-/// misses an overlapping neighbor.
-const MAX_UNIT_RADIUS_PX: f32 = 26.0;
+/// Conservative fallback for broad-phase bounding-box queries if an entity body is unavailable.
+const MAX_UNIT_BOUNDING_RADIUS_PX: f32 = 32.0;
 
 /// Extra slack added to the broad-phase query so small per-pass position drift never causes a
 /// missed pair. One tile is generous: the largest per-tick displacement is bounded by speed
@@ -98,6 +97,8 @@ pub(crate) fn movement_system(
         let orig_y = y;
         let mut budget = speed;
         let mut new_facing = None;
+        let original_facing = entities.get(id).map(|e| e.facing()).unwrap_or(0.0);
+        let mut body_facing = original_facing;
         let mut static_blocked_this_tick = false;
         if is_tank {
             if let Some(e) = entities.get(id) {
@@ -112,6 +113,7 @@ pub(crate) fn movement_system(
                             let error = angle_delta(rotated, intent.desired_facing).abs();
                             budget *= tank_speed_scale(error);
                             new_facing = Some(rotated);
+                            body_facing = rotated;
                         }
                     }
                 }
@@ -174,7 +176,7 @@ pub(crate) fn movement_system(
             }
             if dist <= budget {
                 // We can reach this waypoint this tick.
-                if !unit_static_standable(occ, map, kind, wx, wy) {
+                if !unit_static_standable(occ, map, kind, wx, wy, body_facing) {
                     static_blocked_this_tick = true;
                     break;
                 }
@@ -216,7 +218,7 @@ pub(crate) fn movement_system(
                     (direct_nx, direct_ny)
                 };
                 // Clamp landing to a body-legal static position.
-                if unit_static_standable(occ, map, kind, nx, ny) {
+                if unit_static_standable(occ, map, kind, nx, ny, body_facing) {
                     x = nx;
                     y = ny;
                 } else {
@@ -225,8 +227,10 @@ pub(crate) fn movement_system(
                     // against zero movement (dy=0 ⟹ y-only slide is a no-op that would
                     // spuriously suppress static_blocked). Only mark static-blocked when
                     // neither axis makes progress.
-                    let slide_x = dx.abs() > 1e-4 && unit_static_standable(occ, map, kind, nx, y);
-                    let slide_y = dy.abs() > 1e-4 && unit_static_standable(occ, map, kind, x, ny);
+                    let slide_x = dx.abs() > 1e-4
+                        && unit_static_standable(occ, map, kind, nx, y, body_facing);
+                    let slide_y = dy.abs() > 1e-4
+                        && unit_static_standable(occ, map, kind, x, ny, body_facing);
                     if slide_x {
                         x = nx;
                     } else if slide_y {
@@ -239,14 +243,28 @@ pub(crate) fn movement_system(
             }
         }
 
+        if is_tank {
+            if let Some(facing) = new_facing {
+                if !unit_static_standable(occ, map, kind, x, y, facing) {
+                    if unit_static_standable(occ, map, kind, x, y, original_facing) {
+                        new_facing = None;
+                    } else {
+                        x = orig_x;
+                        y = orig_y;
+                        new_facing = None;
+                        static_blocked_this_tick = true;
+                    }
+                }
+            }
+        }
+
         // Compute neighbor repulsion before taking the mutable borrow.
         let repulsion_dir: (f32, f32) = {
             let unit_radius = entities
                 .get(id)
-                .and_then(|e| config::unit_stats(e.kind))
-                .map(|s| s.radius)
+                .and_then(|e| unit_body_for_entity(e).map(|body| body.bounding_radius()))
                 .unwrap_or(9.0);
-            let repulsion_range = unit_radius * 2.0 + MAX_UNIT_RADIUS_PX;
+            let repulsion_range = unit_radius * 2.0 + MAX_UNIT_BOUNDING_RADIUS_PX;
             let mut rx = 0.0_f32;
             let mut ry = 0.0_f32;
             for bid in spatial.ids_in_circle_bbox(x, y, repulsion_range) {
@@ -580,7 +598,12 @@ fn steered_candidate(
 
     let nx = x + steer_dir.0 * budget;
     let ny = y + steer_dir.1 * budget;
-    unit_static_standable(occ, map, kind, nx, ny).then_some((nx, ny))
+    let facing = if kind == EntityKind::Tank {
+        path_dir.1.atan2(path_dir.0)
+    } else {
+        0.0
+    };
+    unit_static_standable(occ, map, kind, nx, ny, facing).then_some((nx, ny))
 }
 
 fn local_steering_dir(
@@ -716,7 +739,8 @@ fn inject_sidestep(
     let tx = x + px * d;
     let ty = y + py * d;
 
-    let point_clear = |cx: f32, cy: f32| unit_static_standable(occ, map, e.kind, cx, cy);
+    let facing = e.facing();
+    let point_clear = |cx: f32, cy: f32| unit_static_standable(occ, map, e.kind, cx, cy, facing);
 
     let detour = if point_clear(tx, ty) {
         Some((tx, ty))
@@ -742,8 +766,15 @@ fn inject_sidestep(
 }
 
 /// Whether a unit body may stand at this world position against static blockers.
-fn unit_static_standable(occ: &Occupancy, map: &Map, kind: EntityKind, x: f32, y: f32) -> bool {
-    standability::unit_static_standable(map, occ, kind, x, y)
+fn unit_static_standable(
+    occ: &Occupancy,
+    map: &Map,
+    kind: EntityKind,
+    x: f32,
+    y: f32,
+    facing: f32,
+) -> bool {
+    standability::unit_static_standable_with_facing(map, occ, kind, x, y, facing)
 }
 
 /// Resolve unit-unit overlaps with iterative pair-wise pushes so units do not stack on top of
@@ -785,7 +816,12 @@ pub(crate) fn resolve_collisions(
                     if profile == FootingProfile::Ghost {
                         continue;
                     }
-                    (e.radius(), profile)
+                    (
+                        unit_body_for_entity(e)
+                            .map(|body| body.bounding_radius())
+                            .unwrap_or_else(|| e.radius()),
+                        profile,
+                    )
                 }
                 _ => continue,
             };
@@ -796,7 +832,7 @@ pub(crate) fn resolve_collisions(
 
             // Broad-phase: collect candidate neighbor ids using the (possibly stale) spatial
             // index plus a one-tile slack so small intra-tick drift never hides an overlap.
-            let search_r = ar + MAX_UNIT_RADIUS_PX + COLLISION_SEARCH_SLACK_PX;
+            let search_r = ar + MAX_UNIT_BOUNDING_RADIUS_PX + COLLISION_SEARCH_SLACK_PX;
             let mut candidates: Vec<u32> = spatial
                 .ids_in_circle_bbox(ax_idx, ay_idx, search_r)
                 .filter(|&b| b > a)
@@ -804,19 +840,28 @@ pub(crate) fn resolve_collisions(
             candidates.sort_unstable();
 
             for b in candidates {
-                let (br, b_kind, b_profile, bx, by) = match entities.get(b) {
+                let (br, b_kind, b_profile, b_facing, bx, by) = match entities.get(b) {
                     Some(e) if e.is_unit() => {
                         let profile = footing_profile(e);
                         if profile == FootingProfile::Ghost {
                             continue;
                         }
-                        (e.radius(), e.kind, profile, e.pos_x, e.pos_y)
+                        (
+                            unit_body_for_entity(e)
+                                .map(|body| body.bounding_radius())
+                                .unwrap_or_else(|| e.radius()),
+                            e.kind,
+                            profile,
+                            e.facing(),
+                            e.pos_x,
+                            e.pos_y,
+                        )
                     }
                     _ => continue,
                 };
                 // Re-read A so we account for displacement applied by earlier pairs in this pass.
-                let (a_kind, ax, ay) = match entities.get(a) {
-                    Some(e) => (e.kind, e.pos_x, e.pos_y),
+                let (a_kind, a_facing, ax, ay) = match entities.get(a) {
+                    Some(e) => (e.kind, e.facing(), e.pos_x, e.pos_y),
                     None => break,
                 };
 
@@ -847,15 +892,18 @@ pub(crate) fn resolve_collisions(
                 let b_share = a_resistance / total_resistance;
                 let a_target = (ax - nx * overlap * a_share, ay - ny * overlap * a_share);
                 let b_target = (bx + nx * overlap * b_share, by + ny * overlap * b_share);
-                let a_ok = unit_static_standable(occ, map, a_kind, a_target.0, a_target.1);
-                let b_ok = unit_static_standable(occ, map, b_kind, b_target.0, b_target.1);
+                let a_ok =
+                    unit_static_standable(occ, map, a_kind, a_target.0, a_target.1, a_facing);
+                let b_ok =
+                    unit_static_standable(occ, map, b_kind, b_target.0, b_target.1, b_facing);
 
                 let (a_push, b_push) = match (a_ok, b_ok) {
                     (true, true) => (Some(a_target), Some(b_target)),
                     (true, false) => {
                         let a_full = (ax - nx * overlap, ay - ny * overlap);
                         (
-                            if unit_static_standable(occ, map, a_kind, a_full.0, a_full.1) {
+                            if unit_static_standable(occ, map, a_kind, a_full.0, a_full.1, a_facing)
+                            {
                                 Some(a_full)
                             } else {
                                 Some(a_target)
@@ -867,7 +915,8 @@ pub(crate) fn resolve_collisions(
                         let b_full = (bx + nx * overlap, by + ny * overlap);
                         (
                             None,
-                            if unit_static_standable(occ, map, b_kind, b_full.0, b_full.1) {
+                            if unit_static_standable(occ, map, b_kind, b_full.0, b_full.1, b_facing)
+                            {
                                 Some(b_full)
                             } else {
                                 Some(b_target)
@@ -903,12 +952,12 @@ pub(crate) fn resolve_collisions(
                         };
                         let a_candidates = [a_primary, a_secondary];
                         let b_candidates = [b_primary, b_secondary];
-                        let a_alt = a_candidates
-                            .into_iter()
-                            .find(|&(x, y)| unit_static_standable(occ, map, a_kind, x, y));
-                        let b_alt = b_candidates
-                            .into_iter()
-                            .find(|&(x, y)| unit_static_standable(occ, map, b_kind, x, y));
+                        let a_alt = a_candidates.into_iter().find(|&(x, y)| {
+                            unit_static_standable(occ, map, a_kind, x, y, a_facing)
+                        });
+                        let b_alt = b_candidates.into_iter().find(|&(x, y)| {
+                            unit_static_standable(occ, map, b_kind, x, y, b_facing)
+                        });
                         (a_alt, b_alt)
                     }
                 };
@@ -1208,6 +1257,31 @@ mod tests {
             starts: vec![],
             expansion_sites: vec![],
         }
+    }
+
+    fn tank_body_half_len() -> f32 {
+        config::TANK_BODY_LENGTH_PX * 0.5 + config::TANK_BODY_CLEARANCE_PX
+    }
+
+    fn tank_body_half_width() -> f32 {
+        config::TANK_BODY_WIDTH_PX * 0.5 + config::TANK_BODY_CLEARANCE_PX
+    }
+
+    fn tank_standable_at_entity_facing(
+        map: &Map,
+        occ: &Occupancy,
+        entities: &EntityStore,
+        id: u32,
+    ) -> bool {
+        let e = entities.get(id).expect("tank should exist");
+        standability::unit_static_standable_with_facing(
+            map,
+            occ,
+            e.kind,
+            e.pos_x,
+            e.pos_y,
+            e.facing(),
+        )
     }
 
     /// Two riflemen spawned right on top of each other are pushed apart to non-overlap by
@@ -1594,8 +1668,8 @@ mod tests {
     fn tank_moves_through_long_two_tile_wide_corridor() {
         let map = two_tile_wide_horizontal_corridor_map();
         let mut entities = EntityStore::new();
-        let start = map.tile_center(2, 10);
-        let goal = map.tile_center(36, 10);
+        let start = map.tile_center(3, 10);
+        let goal = map.tile_center(35, 10);
         let tank = entities
             .spawn_unit(1, EntityKind::Tank, start.0, start.1)
             .expect("tank should spawn in corridor");
@@ -1616,7 +1690,14 @@ mod tests {
 
             let e = entities.get(tank).expect("tank should still exist");
             assert!(
-                standability::unit_static_standable(&map, &occ, EntityKind::Tank, e.pos_x, e.pos_y),
+                standability::unit_static_standable_with_facing(
+                    &map,
+                    &occ,
+                    EntityKind::Tank,
+                    e.pos_x,
+                    e.pos_y,
+                    e.facing()
+                ),
                 "tank body became illegal at tick {tick}: ({:.1}, {:.1})",
                 e.pos_x,
                 e.pos_y
@@ -1716,8 +1797,8 @@ mod tests {
     fn tank_phase0_baseline_two_tile_corridor() {
         let map = two_tile_wide_horizontal_corridor_map();
         let mut entities = EntityStore::new();
-        let start = map.tile_center(2, 10);
-        let goal = map.tile_center(36, 10);
+        let start = map.tile_center(3, 10);
+        let goal = map.tile_center(35, 10);
         let tank = entities
             .spawn_unit(1, EntityKind::Tank, start.0, start.1)
             .expect("tank should spawn");
@@ -2009,10 +2090,7 @@ mod tests {
             .spawn_building(1, EntityKind::Depot, bx, by, true)
             .expect("depot spawn");
         let rect = building_rect_for_footprint(EntityKind::Depot, 10, 10).expect("depot rect");
-        let tank_radius = config::unit_stats(EntityKind::Tank)
-            .expect("tank stats")
-            .radius;
-        let start = (rect.min_x - tank_radius - 0.1, rect.min_y + 32.0);
+        let start = (rect.min_x - tank_body_half_len() - 0.1, rect.min_y + 32.0);
         let tank = entities
             .spawn_unit(1, EntityKind::Tank, start.0, start.1)
             .expect("tank spawn");
@@ -2041,13 +2119,7 @@ mod tests {
             start,
             after
         );
-        assert!(standability::unit_static_standable(
-            &map,
-            &occ,
-            EntityKind::Tank,
-            after.0,
-            after.1
-        ));
+        assert!(tank_standable_at_entity_facing(&map, &occ, &entities, tank));
     }
 
     #[test]
@@ -2203,10 +2275,7 @@ mod tests {
             .expect("building spawn");
         let rect = building_rect_for_footprint(EntityKind::Depot, 10, 10).expect("depot rect");
 
-        let tank_radius = config::unit_stats(EntityKind::Tank)
-            .expect("tank stats")
-            .radius;
-        let corner_offset = (tank_radius + 0.5) / 2.0_f32.sqrt();
+        let corner_offset = (tank_body_half_len() + 0.5) / 2.0_f32.sqrt();
         let start = (rect.max_x + corner_offset, rect.min_y - corner_offset);
         let goal = (rect.max_x, rect.min_y);
         let tank = entities
@@ -2219,12 +2288,13 @@ mod tests {
         set_path_direct(&mut entities, tank, vec![goal]);
 
         let occ = Occupancy::build(&map, &entities);
-        assert!(standability::unit_static_standable(
+        assert!(standability::unit_static_standable_with_facing(
             &map,
             &occ,
             EntityKind::Tank,
             start.0,
-            start.1
+            start.1,
+            desired
         ));
         let center_tile = map.tile_of(
             rect.max_x + corner_offset - 1.0,
@@ -2256,17 +2326,20 @@ mod tests {
             .expect("building spawn");
         let rect = building_rect_for_footprint(EntityKind::Depot, 10, 10).expect("depot rect");
 
-        let tank_radius = config::unit_stats(EntityKind::Tank)
-            .expect("tank stats")
-            .radius;
-        let start = (rect.min_x - tank_radius - 1.0, rect.min_y - 2.0);
+        let future_extent_x = tank_body_half_len() * TANK_BODY_TURN_RATE_RAD_PER_TICK.cos()
+            + tank_body_half_width() * TANK_BODY_TURN_RATE_RAD_PER_TICK.sin();
+        let future_extent_y = tank_body_half_len() * TANK_BODY_TURN_RATE_RAD_PER_TICK.sin()
+            + tank_body_half_width() * TANK_BODY_TURN_RATE_RAD_PER_TICK.cos();
+        let start = (
+            rect.min_x - future_extent_x - 0.2,
+            rect.min_y - future_extent_y + 0.2,
+        );
         let goal = (start.0 + 64.0, start.1 + 6.0);
         let tank = entities
             .spawn_unit(1, EntityKind::Tank, start.0, start.1)
             .expect("tank spawn");
-        let desired = (goal.1 - start.1).atan2(goal.0 - start.0);
         if let Some(e) = entities.get_mut(tank) {
-            e.set_facing(desired);
+            e.set_facing(0.0);
         }
         set_path_direct(&mut entities, tank, vec![goal]);
 
@@ -2283,9 +2356,7 @@ mod tests {
             e.pos_y > start.1,
             "body-legal y-only slide should still make progress"
         );
-        assert!(standability::unit_static_standable(
-            &map, &occ, e.kind, e.pos_x, e.pos_y
-        ));
+        assert!(tank_standable_at_entity_facing(&map, &occ, &entities, tank));
     }
 
     #[test]
@@ -2298,10 +2369,7 @@ mod tests {
             .expect("building spawn");
         let rect = building_rect_for_footprint(EntityKind::Depot, 10, 10).expect("depot rect");
 
-        let tank_radius = config::unit_stats(EntityKind::Tank)
-            .expect("tank stats")
-            .radius;
-        let tank_start = (rect.max_x + tank_radius + 0.1, rect.min_y + 32.0);
+        let tank_start = (rect.max_x + tank_body_half_len() + 0.1, rect.min_y + 32.0);
         let tank = entities
             .spawn_unit(1, EntityKind::Tank, tank_start.0, tank_start.1)
             .expect("tank spawn");
@@ -2320,13 +2388,7 @@ mod tests {
                 && (tank_after.1 - tank_start.1).abs() <= 0.01,
             "blocked collision push must not move tank into the building body"
         );
-        assert!(standability::unit_static_standable(
-            &map,
-            &occ,
-            EntityKind::Tank,
-            tank_after.0,
-            tank_after.1
-        ));
+        assert!(tank_standable_at_entity_facing(&map, &occ, &entities, tank));
         assert!(
             pos(&entities, rifleman).0 > tank_start.0 + 8.0,
             "the legal side should absorb the collision push"
@@ -2334,7 +2396,7 @@ mod tests {
     }
 
     #[test]
-    fn tank_body_locomotion_rotates_without_illegal_step_when_blocked() {
+    fn tank_body_locomotion_suppresses_illegal_rotation_when_blocked() {
         let map = flat_map(1);
         let mut entities = EntityStore::new();
         let (bx, by) = footprint_center(&map, EntityKind::Depot, 10, 10);
@@ -2343,21 +2405,22 @@ mod tests {
             .expect("building spawn");
         let rect = building_rect_for_footprint(EntityKind::Depot, 10, 10).expect("depot rect");
 
-        let tank_radius = config::unit_stats(EntityKind::Tank)
-            .expect("tank stats")
-            .radius;
-        let start = (rect.max_x + tank_radius + 0.1, rect.min_y + 32.0);
+        let start = (
+            rect.max_x + tank_body_half_width() + 0.1,
+            rect.min_y + 32.0,
+        );
         let goal = (rect.min_x, rect.min_y + 32.0);
         let tank = entities
             .spawn_unit(1, EntityKind::Tank, start.0, start.1)
             .expect("tank spawn");
-        let initial_facing = std::f32::consts::PI - 0.5;
+        let initial_facing = std::f32::consts::FRAC_PI_2;
         if let Some(e) = entities.get_mut(tank) {
             e.set_facing(initial_facing);
         }
         set_path_direct(&mut entities, tank, vec![goal]);
 
         let occ = Occupancy::build(&map, &entities);
+        assert!(tank_standable_at_entity_facing(&map, &occ, &entities, tank));
         let spatial = SpatialIndex::build(&entities, map.size);
         movement_system(&map, &mut entities, &mut [], &occ, &spatial, 0);
 
@@ -2367,9 +2430,10 @@ mod tests {
             "blocked tank must not take an illegal body step"
         );
         assert!(
-            e.facing() > initial_facing,
-            "tank should still rotate its body toward the path while blocked"
+            (e.facing() - initial_facing).abs() <= 0.001,
+            "tank should not rotate its hull into a building footprint while blocked"
         );
+        assert!(tank_standable_at_entity_facing(&map, &occ, &entities, tank));
     }
 
     #[test]

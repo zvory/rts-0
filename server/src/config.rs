@@ -84,6 +84,13 @@ pub const INDUSTRIAL_CENTER_SUPPLY: u32 = 10;
 pub const DEPOT_SUPPLY: u32 = 8;
 pub const SUPPLY_CAP_MAX: u32 = 200;
 
+// --- Vehicle bodies ----------------------------------------------------------
+// Tank static legality uses the oriented hull instead of the legacy circular
+// fallback radius. Dimensions are world px and include a small collision margin.
+pub const TANK_BODY_LENGTH_PX: f32 = 42.0;
+pub const TANK_BODY_WIDTH_PX: f32 = 24.0;
+pub const TANK_BODY_CLEARANCE_PX: f32 = 1.5;
+
 // --- Stats ------------------------------------------------------------------
 
 #[derive(Debug, Clone, Copy)]
