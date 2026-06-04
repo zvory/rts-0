@@ -4,11 +4,24 @@ use crate::game::entity::EntityKind;
 use crate::rules::defs::{self, ArmorClass, TargetPriority, WeaponClass};
 use crate::rules::terrain::{self, TerrainKind};
 
+const FRONT_ARC_RAD: f32 = std::f32::consts::FRAC_PI_4;
+const SIDE_ARC_RAD: f32 = std::f32::consts::PI * 3.0 / 4.0;
+const FRONT_ARMOR_DAMAGE_MULTIPLIER: f32 = 1.0;
+const SIDE_ARMOR_DAMAGE_MULTIPLIER: f32 = 1.25;
+const REAR_ARMOR_DAMAGE_MULTIPLIER: f32 = 1.75;
+
 /// Attack profile for a combat-capable unit or building.
 pub struct AttackProfile {
     pub range_tiles: u32,
     pub dmg: u32,
     pub cooldown: u32,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ArmorFacing {
+    Front,
+    Side,
+    Rear,
 }
 
 /// Returns the attack profile for the given kind, or zeroes if non-combatant.
@@ -81,11 +94,69 @@ pub fn effective_damage(
     (armor_adjusted as f32 * terrain::cover_modifier(victim_kind, terrain)).round() as u32
 }
 
+pub fn classify_armor_facing(
+    victim_facing: f32,
+    victim_pos: (f32, f32),
+    attacker_pos: (f32, f32),
+) -> ArmorFacing {
+    let attacker_angle = (attacker_pos.1 - victim_pos.1).atan2(attacker_pos.0 - victim_pos.0);
+    let angle_error = normalized_angle_delta(attacker_angle, victim_facing).abs();
+    if angle_error <= FRONT_ARC_RAD {
+        ArmorFacing::Front
+    } else if angle_error <= SIDE_ARC_RAD {
+        ArmorFacing::Side
+    } else {
+        ArmorFacing::Rear
+    }
+}
+
+pub fn facing_damage_multiplier(
+    attacker_kind: EntityKind,
+    victim_kind: EntityKind,
+    facing: ArmorFacing,
+) -> f32 {
+    if victim_kind != EntityKind::Tank {
+        return 1.0;
+    }
+    if !matches!(attacker_kind, EntityKind::Tank | EntityKind::AtTeam) {
+        return 1.0;
+    }
+    match facing {
+        ArmorFacing::Front => FRONT_ARMOR_DAMAGE_MULTIPLIER,
+        ArmorFacing::Side => SIDE_ARMOR_DAMAGE_MULTIPLIER,
+        ArmorFacing::Rear => REAR_ARMOR_DAMAGE_MULTIPLIER,
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn effective_damage_with_facing(
+    attacker_kind: EntityKind,
+    victim_kind: EntityKind,
+    base_dmg: u32,
+    victim_terrain: Option<TerrainKind>,
+    victim_facing: Option<f32>,
+    victim_pos: (f32, f32),
+    attacker_pos: (f32, f32),
+) -> u32 {
+    let damage = effective_damage(attacker_kind, victim_kind, base_dmg, victim_terrain);
+    let Some(victim_facing) = victim_facing.filter(|facing| facing.is_finite()) else {
+        return damage;
+    };
+    let facing = classify_armor_facing(victim_facing, victim_pos, attacker_pos);
+    let multiplier = facing_damage_multiplier(attacker_kind, victim_kind, facing);
+    ((damage as f32) * multiplier).round().max(0.0) as u32
+}
+
 fn weapon(kind: EntityKind) -> WeaponClass {
     defs::unit_def(kind)
         .map(|d| d.weapon)
         .or_else(|| defs::building_def(kind).map(|d| d.weapon))
         .unwrap_or(WeaponClass::None)
+}
+
+fn normalized_angle_delta(from: f32, to: f32) -> f32 {
+    let two_pi = std::f32::consts::TAU;
+    (from - to + std::f32::consts::PI).rem_euclid(two_pi) - std::f32::consts::PI
 }
 
 #[cfg(test)]
@@ -188,5 +259,137 @@ mod tests {
                 "{kind} target priority"
             );
         }
+    }
+
+    #[test]
+    fn tank_front_hit_uses_normal_at_damage() {
+        assert_eq!(
+            effective_damage_with_facing(
+                EntityKind::AtTeam,
+                EntityKind::Tank,
+                48,
+                None,
+                Some(0.0),
+                (100.0, 100.0),
+                (140.0, 100.0),
+            ),
+            48
+        );
+    }
+
+    #[test]
+    fn tank_side_hit_boosts_at_damage() {
+        assert_eq!(
+            effective_damage_with_facing(
+                EntityKind::AtTeam,
+                EntityKind::Tank,
+                48,
+                None,
+                Some(0.0),
+                (100.0, 100.0),
+                (100.0, 140.0),
+            ),
+            60
+        );
+    }
+
+    #[test]
+    fn tank_rear_hit_boosts_at_damage() {
+        assert_eq!(
+            effective_damage_with_facing(
+                EntityKind::AtTeam,
+                EntityKind::Tank,
+                48,
+                None,
+                Some(0.0),
+                (100.0, 100.0),
+                (60.0, 100.0),
+            ),
+            84
+        );
+    }
+
+    #[test]
+    fn tank_shell_uses_same_facing_modifiers_against_tank() {
+        assert_eq!(
+            effective_damage_with_facing(
+                EntityKind::Tank,
+                EntityKind::Tank,
+                60,
+                None,
+                Some(0.0),
+                (100.0, 100.0),
+                (140.0, 100.0),
+            ),
+            60
+        );
+        assert_eq!(
+            effective_damage_with_facing(
+                EntityKind::Tank,
+                EntityKind::Tank,
+                60,
+                None,
+                Some(0.0),
+                (100.0, 100.0),
+                (100.0, 140.0),
+            ),
+            75
+        );
+        assert_eq!(
+            effective_damage_with_facing(
+                EntityKind::Tank,
+                EntityKind::Tank,
+                60,
+                None,
+                Some(0.0),
+                (100.0, 100.0),
+                (60.0, 100.0),
+            ),
+            105
+        );
+    }
+
+    #[test]
+    fn rifleman_vs_rifleman_ignores_facing() {
+        assert_eq!(
+            effective_damage_with_facing(
+                EntityKind::Rifleman,
+                EntityKind::Rifleman,
+                5,
+                None,
+                Some(0.0),
+                (100.0, 100.0),
+                (60.0, 100.0),
+            ),
+            5
+        );
+    }
+
+    #[test]
+    fn tank_vs_building_ignores_facing() {
+        assert_eq!(
+            effective_damage_with_facing(
+                EntityKind::Tank,
+                EntityKind::Barracks,
+                60,
+                None,
+                Some(0.0),
+                (100.0, 100.0),
+                (60.0, 100.0),
+            ),
+            60
+        );
+    }
+
+    #[test]
+    fn facing_classification_wraps_around_pi() {
+        assert_eq!(
+            classify_armor_facing(std::f32::consts::PI - 0.05, (100.0, 100.0), (60.0, 98.0),),
+            ArmorFacing::Front
+        );
+        assert_eq!(
+            classify_armor_facing(-std::f32::consts::PI + 0.05, (100.0, 100.0), (60.0, 102.0),),
+            ArmorFacing::Front
+        );
     }
 }

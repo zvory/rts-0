@@ -411,6 +411,7 @@ fn apply_damage(
     }
     let attacker_kind = entities.get(attacker).map(|e| e.kind);
     let victim_kind = entities.get(victim).map(|e| e.kind);
+    let victim_facing = entities.get(victim).map(|e| e.facing());
     // Roll for miss before computing damage.
     if let (Some(ak), Some(vk)) = (attacker_kind, victim_kind) {
         let mc = combat_rules::miss_chance(ak, vk);
@@ -419,9 +420,15 @@ fn apply_damage(
         }
     }
     let effective_dmg = match (attacker_kind, victim_kind) {
-        (Some(ak), Some(vk)) => {
-            combat_rules::effective_damage(ak, vk, dmg, Some(TerrainKind::Open))
-        }
+        (Some(ak), Some(vk)) => combat_rules::effective_damage_with_facing(
+            ak,
+            vk,
+            dmg,
+            Some(TerrainKind::Open),
+            victim_facing,
+            (vx, vy),
+            (ax, ay),
+        ),
         _ => dmg,
     };
     if let Some(v) = entities.get_mut(victim) {
@@ -576,9 +583,15 @@ fn apply_overpenetration(
         let effective_dmg = entities
             .get(id)
             .map(|e| match attacker_kind {
-                Some(ak) => {
-                    combat_rules::effective_damage(ak, e.kind, splash_dmg, Some(TerrainKind::Open))
-                }
+                Some(ak) => combat_rules::effective_damage_with_facing(
+                    ak,
+                    e.kind,
+                    splash_dmg,
+                    Some(TerrainKind::Open),
+                    Some(e.facing()),
+                    (e.pos_x, e.pos_y),
+                    (ax, ay),
+                ),
                 None => splash_dmg,
             })
             .unwrap_or(0);
@@ -1201,6 +1214,52 @@ mod tests {
         assert!(
             entities.get(enemy_id).expect("enemy should exist").hp < enemy_hp,
             "target should take tank damage once turret is aligned"
+        );
+    }
+
+    #[test]
+    fn tank_front_and_rear_hits_take_different_damage() {
+        fn tank_hp_after_at_hit(attacker_pos: (f32, f32)) -> u32 {
+            let mut entities = EntityStore::new();
+            let attacker = entities
+                .spawn_unit(1, EntityKind::AtTeam, attacker_pos.0, attacker_pos.1)
+                .expect("attacker should spawn");
+            let victim = entities
+                .spawn_unit(2, EntityKind::Tank, 100.0, 100.0)
+                .expect("victim tank should spawn");
+            entities
+                .get_mut(victim)
+                .expect("victim tank should exist")
+                .set_facing(0.0);
+            let mut events: HashMap<u32, Vec<Event>> = HashMap::new();
+            events.insert(1, Vec::new());
+            events.insert(2, Vec::new());
+
+            apply_test_damage(
+                &mut entities,
+                &mut events,
+                attacker,
+                victim,
+                48,
+                1,
+                attacker_pos.0,
+                attacker_pos.1,
+                100.0,
+                100.0,
+                128.0,
+            );
+
+            entities.get(victim).expect("victim tank should exist").hp
+        }
+
+        let front_hp = tank_hp_after_at_hit((140.0, 100.0));
+        let rear_hp = tank_hp_after_at_hit((60.0, 100.0));
+
+        assert_eq!(front_hp, 342);
+        assert_eq!(rear_hp, 306);
+        assert!(
+            front_hp > rear_hp,
+            "rear AT hits should deal more damage than front hits"
         );
     }
 
