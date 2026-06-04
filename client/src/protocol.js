@@ -196,7 +196,7 @@ function decodeCompactSnapshot(raw) {
 }
 
 function decodeCompactEntity(record, index) {
-  const fields = readArray(record, `entity ${index}`, 19);
+  const fields = readArray(record, `entity ${index}`, 20);
   if (fields.length < 8) throw new Error(`entity ${index} is too short`);
   const entity = {
     id: readU32(fields[0], "entity.id"),
@@ -220,6 +220,7 @@ function decodeCompactEntity(record, index) {
   assignOptionalCode(entity, "setupState", fields, 16, SETUP_BY_CODE);
   assignOptional(entity, "remaining", fields, 17, readU32);
   assignRally(entity, fields, 18);
+  assignOptional(entity, "oilUsed", fields, 19, readNumber);
   return entity;
 }
 

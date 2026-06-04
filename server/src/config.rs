@@ -40,6 +40,11 @@ pub const ARRIVE_RADIUS_INTERMEDIATE_PX: f32 = TILE_SIZE as f32 * 0.5; // 16 px
 /// Machine-gunner setup/teardown time. One second at the simulation tick rate.
 pub const MACHINE_GUNNER_SETUP_TICKS: u16 = TICK_HZ as u16;
 
+/// Experimental: tanks burn this much oil per world pixel of movement. Calibrated so a tank
+/// driving from one edge of the 96-tile map to the other (3072 px) burns ~10 oil. When a
+/// player has zero oil their tanks stop moving until oil is restocked.
+pub const TANK_OIL_COST_PER_PX: f32 = 10.0 / (96.0 * TILE_SIZE as f32);
+
 // --- Economy ----------------------------------------------------------------
 pub const STARTING_STEEL: u32 = 75;
 pub const STARTING_OIL: u32 = 0;

@@ -61,6 +61,9 @@ pub fn project_entity(
     if entity.is_unit() {
         view.facing = Some(entity.facing());
     }
+    if let Some(oil_used) = entity.lifetime_oil_used() {
+        view.oil_used = Some(oil_used);
+    }
     let active_combat_target = matches!(entity.order(), Order::Attack(_) | Order::AttackMove(_))
         || (entity.kind == crate::game::entity::EntityKind::Tank && entity.target_id().is_some())
         || (entity.is_building() && entity.can_attack());
@@ -228,5 +231,31 @@ mod tests {
 
         assert_eq!(viewer_view.target_id, Some(target_id));
         assert_eq!(viewer_view.weapon_facing, Some(0.0));
+    }
+
+    #[test]
+    fn tank_projects_lifetime_oil_used() {
+        let mut entities = EntityStore::new();
+        let tank_id = entities
+            .spawn_unit(1, EntityKind::Tank, 120.0, 100.0)
+            .expect("tank should spawn");
+        {
+            let tank = entities.get_mut(tank_id).expect("tank should exist");
+            if let Some(movement) = tank.movement.as_mut() {
+                movement.lifetime_oil_used = 3.25;
+            }
+        }
+        let map = Map {
+            size: 64,
+            terrain: vec![terrain::GRASS; 64 * 64],
+            starts: vec![(1, 1)],
+            expansion_sites: Vec::new(),
+        };
+        let mut fog = Fog::new(map.size);
+        fog.recompute(&[1], &entities, &map);
+        let tank = entities.get(tank_id).expect("tank should exist");
+
+        let view = project_entity(1, tank, &fog, true, None).expect("tank should be visible");
+        assert_eq!(view.oil_used, Some(3.25));
     }
 }

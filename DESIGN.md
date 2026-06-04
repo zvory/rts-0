@@ -164,7 +164,7 @@ Older object-shaped JSON snapshots remain decodable by the client for fallback/d
     [
       id, owner, kind, x, y, hp, maxHp, state,
       facing?, weaponFacing?, prodKind?, prodProgress?, prodQueue?,
-      buildProgress?, latchedNode?, targetId?, setupState?, remaining?, rally?
+      buildProgress?, latchedNode?, targetId?, setupState?, remaining?, rally?, oilUsed?
     ]
   ],
   "r": [[id, remaining]],         // omitted when empty
@@ -213,7 +213,9 @@ watch rooms receive all resource updates).
   targetId?: u32,                // current attack target, for drawing tracers
   setupState?: string,           // machine_gunner only: "packed","setting_up","deployed","tearing_down"
   // unit-producing buildings:
-  rally?: [f32, f32]             // rally point (world px); ONLY ever sent to the owner
+  rally?: [f32, f32],            // rally point (world px); ONLY ever sent to the owner
+  // tanks:
+  oilUsed?: f32                  // lifetime oil burned by movement, in resource units
 }
 ```
 
@@ -566,6 +568,8 @@ victory/defeat overlay with the frozen score table.
   from `resourceDeltas` via size/opacity. When a worker is selected and the cursor hovers a
   resource, draw a blue circle on the resource when the nearest completed own Industrial Center
   is inside mining range; draw a red/dashed line to the Industrial Center when too far.
+- Tanks: render `oilUsed` as a compact bottom/belly readout so fuel burn is visible while the
+  tank moves.
 - Terrain: muted grass/field/mud, rock, and water tiles with deterministic coarse dithering
   so movement is readable and the map has a PlayStation 1-era low-resolution texture feel.
 - Fog: unexplored = 86% dark overlay so terrain remains faintly readable; explored-but-not-visible =
@@ -650,6 +654,8 @@ authoritative `rules::defs` records.
 
 - `TICK_HZ = 30`, `SNAPSHOT_EVERY_N_TICKS = 1`.
 - `MACHINE_GUNNER_SETUP_TICKS = 30` (~1s setup or teardown).
+- `TANK_OIL_COST_PER_PX = 10 / (96 * TILE_SIZE)`: a tank driving one full 96-tile map width
+  burns approximately 10 oil. Tanks cannot advance while their owner has zero oil.
 - Map: `TILE_SIZE = 32` px. The live map is the hardcoded handcrafted asset at
   `server/assets/maps/default-handcrafted.json` (96×96 today), served for tooling at
   `/maps/default-handcrafted.json`.
@@ -762,6 +768,11 @@ The server treats every client as potentially hostile. Limits live next to the c
   the turret tracks and shoots on both `Move` and `AttackMove` orders. A tank on plain `Move` only
   opportunistically fires at enemies already in range; it does not chase out-of-range enemies.
   Projection omits enemy `weaponFacing` when it would reveal a hidden target direction.
+- **Tank movement oil burn**: tanks consume oil based on distance actually moved, using
+  `TANK_OIL_COST_PER_PX`. Fractional movement cost accumulates per tank until whole oil units are
+  deducted from the owner's stockpile. The tank also tracks lifetime movement oil as `oilUsed` for
+  the client belly readout. If the owner has zero oil at the start of a movement tick, that tank
+  does not advance; turret/combat behavior still runs through the combat system.
 - **Tank armor facing**: tank and AT-team attacks against tank victims use the victim tank's hull
   `facing` and the attacker's position. Front hits (`<=45°` from the hull direction) deal normal
   damage, side hits (`>45°` and `<=135°`) deal `1.25x`, and rear hits (`>135°`) deal `1.75x`.

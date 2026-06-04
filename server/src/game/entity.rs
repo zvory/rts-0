@@ -414,6 +414,12 @@ pub struct MovementState {
     /// Consecutive ticks where the next path step was blocked by terrain/building occupancy.
     /// Once this reaches the debounce threshold, movement queues a fresh path to `path_goal`.
     pub static_blocked_ticks: u16,
+    /// Experimental: total oil this tank has burnt over its lifetime (fractional units).
+    /// Used for the on-unit fuel readout; zero for non-tank units.
+    pub lifetime_oil_used: f32,
+    /// Experimental: sub-1 oil consumed since the last whole-oil deduction from the player's
+    /// stockpile. Used by the tank-fuel charge to round fractional cost up into integer oil.
+    pub oil_debt: f32,
 }
 
 impl Default for MovementState {
@@ -428,6 +434,8 @@ impl Default for MovementState {
             last_progress_pos: (0.0, 0.0),
             sidestep_cooldown: 0,
             static_blocked_ticks: 0,
+            lifetime_oil_used: 0.0,
+            oil_debt: 0.0,
         }
     }
 }
@@ -839,6 +847,12 @@ impl Entity {
 
     pub fn facing(&self) -> f32 {
         self.movement.as_ref().map(|m| m.facing).unwrap_or(0.0)
+    }
+
+    pub fn lifetime_oil_used(&self) -> Option<f32> {
+        self.movement
+            .as_ref()
+            .and_then(|m| (self.kind == EntityKind::Tank).then_some(m.lifetime_oil_used))
     }
 
     pub fn set_facing(&mut self, facing: f32) {

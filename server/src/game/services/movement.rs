@@ -6,6 +6,7 @@ use crate::game::map::Map;
 use crate::game::services::occupancy::Occupancy;
 use crate::game::services::spatial::SpatialIndex;
 use crate::game::services::standability;
+use crate::game::PlayerState;
 
 /// World pixels at which a unit is considered "arrived" at a waypoint / target point.
 const ARRIVE_EPS: f32 = 2.0;
@@ -45,6 +46,7 @@ const STEERING_MAX_NEIGHBORS: usize = 16;
 pub(crate) fn movement_system(
     map: &Map,
     entities: &mut EntityStore,
+    players: &mut [PlayerState],
     occ: &Occupancy,
     spatial: &SpatialIndex,
     tick: u32,
@@ -77,13 +79,24 @@ pub(crate) fn movement_system(
             continue;
         }
 
+        let is_tank = kind == EntityKind::Tank;
+        // Experimental tank fuel rule: a tank with a player that has zero oil cannot move.
+        // The fractional oil_debt may still carry; we just block this tick entirely.
+        if is_tank {
+            let owner = entities.get(id).map(|e| e.owner).unwrap_or(0);
+            if players
+                .iter()
+                .find(|p| p.id == owner)
+                .is_some_and(|p| p.oil == 0)
+            {
+                continue;
+            }
+        }
+        let orig_x = x;
+        let orig_y = y;
         let mut budget = speed;
         let mut new_facing = None;
         let mut static_blocked_this_tick = false;
-        let is_tank = entities
-            .get(id)
-            .map(|e| e.kind == EntityKind::Tank)
-            .unwrap_or(false);
         if is_tank {
             if let Some(e) = entities.get(id) {
                 if let Some((desired_x, desired_y)) = tank_desired_path_point(e, x, y) {
@@ -355,6 +368,41 @@ pub(crate) fn movement_system(
                         .unwrap_or(1);
                     if far_from_goal && sidestep_cooldown == 0 {
                         inject_sidestep(e, id, x, y, map, occ, repulsion_dir, tick);
+                    }
+                }
+            }
+        }
+
+        // Experimental tank fuel: charge oil for the distance actually moved this tick.
+        if is_tank {
+            let (final_x, final_y, owner) = match entities.get(id) {
+                Some(e) => (e.pos_x, e.pos_y, e.owner),
+                None => continue,
+            };
+            let dx = final_x - orig_x;
+            let dy = final_y - orig_y;
+            let dist = (dx * dx + dy * dy).sqrt();
+            if dist > 0.0 {
+                let cost = dist * config::TANK_OIL_COST_PER_PX;
+                if let Some(e) = entities.get_mut(id) {
+                    if let Some(m) = e.movement.as_mut() {
+                        m.lifetime_oil_used += cost;
+                        m.oil_debt += cost;
+                        if m.oil_debt >= 1.0 {
+                            let whole = m.oil_debt.floor() as u32;
+                            m.oil_debt -= whole as f32;
+                            if let Some(p) = players.iter_mut().find(|p| p.id == owner) {
+                                let charged = whole.min(p.oil);
+                                p.oil = p.oil.saturating_sub(charged);
+                                // If we couldn't pay full amount, drop the unpaid remainder
+                                // so debt does not accumulate while the player has no oil.
+                                if charged < whole {
+                                    m.oil_debt = 0.0;
+                                }
+                            } else {
+                                m.oil_debt = 0.0;
+                            }
+                        }
                     }
                 }
             }
@@ -881,6 +929,7 @@ mod tests {
     use crate::game::services::move_coordinator::MoveCoordinator;
     use crate::game::services::occupancy::footprint_center;
     use crate::game::services::pathing::PathingService;
+    use crate::game::{PlayerState, ScoreState};
 
     /// Distance (px) between two entity centers.
     fn dist(entities: &EntityStore, a: u32, b: u32) -> f32 {
@@ -919,6 +968,21 @@ mod tests {
             *v = crate::protocol::terrain::GRASS;
         }
         map
+    }
+
+    fn player_with_oil(id: u32, oil: u32) -> PlayerState {
+        PlayerState {
+            id,
+            name: format!("p{id}"),
+            color: "#ffffff".to_string(),
+            start_tile: (0, 0),
+            steel: 0,
+            oil,
+            supply_used: 0,
+            supply_cap: 0,
+            is_ai: false,
+            score: ScoreState::default(),
+        }
     }
 
     fn two_tile_wide_horizontal_corridor_map() -> Map {
@@ -1232,7 +1296,7 @@ mod tests {
                 coordinator.process_awaiting_paths(&mut entities);
             }
             let spatial = SpatialIndex::build(&entities, map.size);
-            movement_system(&map, &mut entities, &occ, &spatial, 0);
+            movement_system(&map, &mut entities, &mut [], &occ, &spatial, 0);
             let spatial = SpatialIndex::build(&entities, map.size);
             resolve_collisions(&mut entities, &spatial, &map, &occ);
         }
@@ -1294,7 +1358,7 @@ mod tests {
             // process_awaiting_paths must be called every tick (mirrors systems.rs).
             coordinator.process_awaiting_paths(&mut entities);
             let spatial = SpatialIndex::build(&entities, map.size);
-            movement_system(&map, &mut entities, &occ, &spatial, tick);
+            movement_system(&map, &mut entities, &mut [], &occ, &spatial, tick);
             let spatial = SpatialIndex::build(&entities, map.size);
             resolve_collisions(&mut entities, &spatial, &map, &occ);
         }
@@ -1337,7 +1401,7 @@ mod tests {
             }
             coordinator.process_awaiting_paths(&mut entities);
             let spatial = SpatialIndex::build(&entities, map.size);
-            movement_system(&map, &mut entities, &occ, &spatial, tick);
+            movement_system(&map, &mut entities, &mut [], &occ, &spatial, tick);
             let spatial = SpatialIndex::build(&entities, map.size);
             resolve_collisions(&mut entities, &spatial, &map, &occ);
 
@@ -1361,6 +1425,75 @@ mod tests {
             e.pos_x,
             e.pos_y
         );
+    }
+
+    #[test]
+    fn tank_with_zero_oil_does_not_move() {
+        let map = flat_map(1);
+        let mut entities = EntityStore::new();
+        let (sx, sy) = map.tile_center(20, 20);
+        let tank = entities
+            .spawn_unit(1, EntityKind::Tank, sx, sy)
+            .expect("tank should spawn");
+        set_path_direct(&mut entities, tank, vec![(sx + 128.0, sy)]);
+        if let Some(e) = entities.get_mut(tank) {
+            e.set_order(Order::move_to(sx + 128.0, sy));
+        }
+        let mut players = vec![player_with_oil(1, 0)];
+
+        let occ = Occupancy::build(&map, &entities);
+        let spatial = SpatialIndex::build(&entities, map.size);
+        movement_system(&map, &mut entities, &mut players, &occ, &spatial, 0);
+
+        assert_eq!(pos(&entities, tank), (sx, sy));
+        assert_eq!(
+            entities.get(tank).and_then(|e| e.lifetime_oil_used()),
+            Some(0.0)
+        );
+    }
+
+    #[test]
+    fn moving_tank_accrues_lifetime_oil_and_charges_player_stockpile() {
+        let map = flat_map(1);
+        let mut entities = EntityStore::new();
+        let (sx, sy) = map.tile_center(20, 20);
+        let tank = entities
+            .spawn_unit(1, EntityKind::Tank, sx, sy)
+            .expect("tank should spawn");
+        set_path_direct(&mut entities, tank, vec![(sx + 360.0, sy)]);
+        if let Some(e) = entities.get_mut(tank) {
+            e.set_order(Order::move_to(sx + 360.0, sy));
+            e.set_facing(0.0);
+        }
+        let mut players = vec![player_with_oil(1, 10)];
+
+        let mut total_moved = 0.0;
+        for tick in 0..300u32 {
+            let before = pos(&entities, tank);
+            let occ = Occupancy::build(&map, &entities);
+            let spatial = SpatialIndex::build(&entities, map.size);
+            movement_system(&map, &mut entities, &mut players, &occ, &spatial, tick);
+            let after = pos(&entities, tank);
+            total_moved += moved_distance(before, after);
+            if total_moved >= 330.0 {
+                break;
+            }
+        }
+
+        let oil_used = entities
+            .get(tank)
+            .and_then(|e| e.lifetime_oil_used())
+            .expect("tank should report oil used");
+        let expected = total_moved * config::TANK_OIL_COST_PER_PX;
+        assert!(
+            (oil_used - expected).abs() <= 0.001,
+            "expected oil used {expected:.4}, got {oil_used:.4}"
+        );
+        assert!(
+            oil_used >= 1.0,
+            "test should move far enough to burn at least one oil, got {oil_used:.4}"
+        );
+        assert_eq!(players[0].oil, 10 - oil_used.floor() as u32);
     }
 
     /// Set a path directly on a unit. Path is stored reversed (last element = next waypoint).
@@ -1402,7 +1535,7 @@ mod tests {
 
         let occ = Occupancy::build(&map, &entities);
         let spatial = SpatialIndex::build(&entities, map.size);
-        movement_system(&map, &mut entities, &occ, &spatial, 0);
+        movement_system(&map, &mut entities, &mut [], &occ, &spatial, 0);
 
         let after = pos(&entities, mover);
         assert!(after.0 > sx, "mover should still progress along its path");
@@ -1446,7 +1579,7 @@ mod tests {
 
         let occ = Occupancy::build(&map, &entities);
         let spatial = SpatialIndex::build(&entities, map.size);
-        movement_system(&map, &mut entities, &occ, &spatial, 0);
+        movement_system(&map, &mut entities, &mut [], &occ, &spatial, 0);
 
         let after = pos(&entities, tank);
         assert!(
@@ -1489,7 +1622,7 @@ mod tests {
 
         let occ = Occupancy::build(&map, &entities);
         let spatial = SpatialIndex::build(&entities, map.size);
-        movement_system(&map, &mut entities, &occ, &spatial, 0);
+        movement_system(&map, &mut entities, &mut [], &occ, &spatial, 0);
 
         let after = pos(&entities, mover);
         assert!(after.0 > sx, "mover should still progress along its path");
@@ -1534,7 +1667,7 @@ mod tests {
             start.1
         ));
         let spatial = SpatialIndex::build(&entities, map.size);
-        movement_system(&map, &mut entities, &occ, &spatial, 0);
+        movement_system(&map, &mut entities, &mut [], &occ, &spatial, 0);
 
         let after = pos(&entities, mover);
         assert!(
@@ -1591,7 +1724,7 @@ mod tests {
 
         let occ = Occupancy::build(&map, &entities);
         let spatial = SpatialIndex::build(&entities, map.size);
-        movement_system(&map, &mut entities, &occ, &spatial, 0);
+        movement_system(&map, &mut entities, &mut [], &occ, &spatial, 0);
         pos(&entities, mover)
     }
 
@@ -1651,7 +1784,7 @@ mod tests {
         );
 
         let spatial = SpatialIndex::build(&entities, map.size);
-        movement_system(&map, &mut entities, &occ, &spatial, 0);
+        movement_system(&map, &mut entities, &mut [], &occ, &spatial, 0);
 
         let e = entities.get(tank).expect("tank should exist");
         assert!(
@@ -1686,7 +1819,7 @@ mod tests {
 
         let occ = Occupancy::build(&map, &entities);
         let spatial = SpatialIndex::build(&entities, map.size);
-        movement_system(&map, &mut entities, &occ, &spatial, 0);
+        movement_system(&map, &mut entities, &mut [], &occ, &spatial, 0);
 
         let e = entities.get(tank).expect("tank should exist");
         assert!(
@@ -1773,7 +1906,7 @@ mod tests {
 
         let occ = Occupancy::build(&map, &entities);
         let spatial = SpatialIndex::build(&entities, map.size);
-        movement_system(&map, &mut entities, &occ, &spatial, 0);
+        movement_system(&map, &mut entities, &mut [], &occ, &spatial, 0);
 
         let e = entities.get(tank).expect("tank should exist");
         assert!(
@@ -1802,7 +1935,7 @@ mod tests {
 
         let occ = Occupancy::build(&map, &entities);
         let spatial = SpatialIndex::build(&entities, map.size);
-        movement_system(&map, &mut entities, &occ, &spatial, 0);
+        movement_system(&map, &mut entities, &mut [], &occ, &spatial, 0);
 
         let facing = entities.get(tank).expect("tank should exist").facing();
         assert!(
@@ -1827,7 +1960,7 @@ mod tests {
 
         let occ = Occupancy::build(&map, &entities);
         let spatial = SpatialIndex::build(&entities, map.size);
-        movement_system(&map, &mut entities, &occ, &spatial, 0);
+        movement_system(&map, &mut entities, &mut [], &occ, &spatial, 0);
 
         let e = entities.get(tank).expect("tank should exist");
         let moved = moved_distance((sx, sy), (e.pos_x, e.pos_y));
@@ -1858,7 +1991,7 @@ mod tests {
 
         let occ = Occupancy::build(&map, &entities);
         let spatial = SpatialIndex::build(&entities, map.size);
-        movement_system(&map, &mut entities, &occ, &spatial, 0);
+        movement_system(&map, &mut entities, &mut [], &occ, &spatial, 0);
 
         let facing = entities
             .get(rifleman)
@@ -1888,7 +2021,7 @@ mod tests {
 
         let occ = Occupancy::build(&map, &entities);
         let spatial = SpatialIndex::build(&entities, map.size);
-        movement_system(&map, &mut entities, &occ, &spatial, 0);
+        movement_system(&map, &mut entities, &mut [], &occ, &spatial, 0);
 
         let e = entities.get(unit).unwrap();
         // The intermediate waypoint should have been popped; only the final goal remains.
@@ -1929,7 +2062,7 @@ mod tests {
         for tick in 0..100u32 {
             let occ = Occupancy::build(&map, &entities);
             let spatial = SpatialIndex::build(&entities, map.size);
-            movement_system(&map, &mut entities, &occ, &spatial, tick);
+            movement_system(&map, &mut entities, &mut [], &occ, &spatial, tick);
             let spatial = SpatialIndex::build(&entities, map.size);
             resolve_collisions(&mut entities, &spatial, &map, &occ);
         }
@@ -1963,7 +2096,7 @@ mod tests {
         for tick in 0..300u32 {
             let occ = Occupancy::build(&map, &entities);
             let spatial = SpatialIndex::build(&entities, map.size);
-            movement_system(&map, &mut entities, &occ, &spatial, tick);
+            movement_system(&map, &mut entities, &mut [], &occ, &spatial, tick);
             if entities.get(unit).is_none_or(|e| e.path_is_empty()) {
                 break;
             }
@@ -2000,7 +2133,7 @@ mod tests {
 
         let occ = Occupancy::build(&map, &entities);
         let spatial = SpatialIndex::build(&entities, map.size);
-        movement_system(&map, &mut entities, &occ, &spatial, 0);
+        movement_system(&map, &mut entities, &mut [], &occ, &spatial, 0);
 
         let e = entities.get(unit).unwrap();
         assert!(matches!(e.order(), Order::Idle));
@@ -2026,7 +2159,7 @@ mod tests {
 
         let occ = Occupancy::build(&map, &entities);
         let spatial = SpatialIndex::build(&entities, map.size);
-        movement_system(&map, &mut entities, &occ, &spatial, 0);
+        movement_system(&map, &mut entities, &mut [], &occ, &spatial, 0);
 
         let e = entities.get(unit).unwrap();
         assert_eq!(
@@ -2064,7 +2197,7 @@ mod tests {
         for tick in 0..config::STATIC_BLOCKED_REPATH_TICKS as u32 - 1 {
             let occ = Occupancy::build(&map, &entities);
             let spatial = SpatialIndex::build(&entities, map.size);
-            movement_system(&map, &mut entities, &occ, &spatial, tick);
+            movement_system(&map, &mut entities, &mut [], &occ, &spatial, tick);
             assert_eq!(
                 entities.get(unit).and_then(|e| e.move_phase()),
                 Some(MovePhase::Moving),
@@ -2077,6 +2210,7 @@ mod tests {
         movement_system(
             &map,
             &mut entities,
+            &mut [],
             &occ,
             &spatial,
             config::STATIC_BLOCKED_REPATH_TICKS as u32,
@@ -2139,7 +2273,7 @@ mod tests {
         for tick in 0..150u32 {
             let occ = Occupancy::build(&map, &entities);
             let spatial = SpatialIndex::build(&entities, map.size);
-            movement_system(&map, &mut entities, &occ, &spatial, tick);
+            movement_system(&map, &mut entities, &mut [], &occ, &spatial, tick);
             let spatial = SpatialIndex::build(&entities, map.size);
             resolve_collisions(&mut entities, &spatial, &map, &occ);
         }
@@ -2181,7 +2315,7 @@ mod tests {
                 coordinator.process_awaiting_paths(&mut entities);
             }
             let spatial = SpatialIndex::build(&entities, map.size);
-            movement_system(&map, &mut entities, &occ, &spatial, 0);
+            movement_system(&map, &mut entities, &mut [], &occ, &spatial, 0);
             let spatial = SpatialIndex::build(&entities, map.size);
             resolve_collisions(&mut entities, &spatial, &map, &occ);
         }
