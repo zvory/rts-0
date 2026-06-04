@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::config;
 use crate::game::entity::{
     BuildPhase, Entity, EntityKind, EntityStore, GatherPhase, MovePhase, Order, WeaponSetup,
@@ -8,6 +10,7 @@ use crate::game::services::occupancy::Occupancy;
 use crate::game::services::spatial::SpatialIndex;
 use crate::game::services::standability;
 use crate::game::PlayerState;
+use crate::protocol::{Event, NoticeSeverity};
 
 /// World pixels at which a unit is considered "arrived" at a waypoint / target point.
 const ARRIVE_EPS: f32 = 2.0;
@@ -46,6 +49,7 @@ const STEERING_MAX_NEIGHBORS: usize = 16;
 /// Advance every moving unit along its waypoint path at its speed. Clamps the final landing
 /// tile to passable terrain (soft overlap with other units is allowed, so we don't resolve
 /// unit-unit collisions here). Arriving at the last waypoint of a plain Move clears the order.
+#[cfg(test)]
 pub(crate) fn movement_system(
     map: &Map,
     entities: &mut EntityStore,
@@ -53,6 +57,29 @@ pub(crate) fn movement_system(
     occ: &Occupancy,
     spatial: &SpatialIndex,
     tick: u32,
+) {
+    let mut ignored_events = HashMap::new();
+    movement_system_with_events(
+        map,
+        entities,
+        players,
+        occ,
+        spatial,
+        tick,
+        &mut ignored_events,
+    );
+}
+
+/// Movement entry point for the real tick loop, with access to transient player events.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn movement_system_with_events(
+    map: &Map,
+    entities: &mut EntityStore,
+    players: &mut [PlayerState],
+    occ: &Occupancy,
+    spatial: &SpatialIndex,
+    tick: u32,
+    events: &mut HashMap<u32, Vec<Event>>,
 ) {
     for id in entities.ids() {
         // Pull the data we need, then mutate.
@@ -85,17 +112,10 @@ pub(crate) fn movement_system(
         }
 
         let is_tank = kind == EntityKind::Tank;
-        // Experimental tank fuel rule: a tank with a player that has zero oil cannot move.
-        // The fractional oil_debt may still carry; we just block this tick entirely.
-        if is_tank {
-            let owner = entities.get(id).map(|e| e.owner).unwrap_or(0);
-            if players
-                .iter()
-                .find(|p| p.id == owner)
-                .is_some_and(|p| p.oil == 0)
-            {
-                continue;
-            }
+        // Experimental tank fuel rule: an oil-starved tank pauses before retrying so sparse
+        // oil income does not make it lurch forward on isolated ticks.
+        if is_tank && tank_oil_starves_movement(entities, players, events, id) {
+            continue;
         }
         let orig_x = x;
         let orig_y = y;
@@ -439,6 +459,53 @@ pub(crate) fn movement_system(
             }
         }
     }
+}
+
+fn tank_oil_starves_movement(
+    entities: &mut EntityStore,
+    players: &[PlayerState],
+    events: &mut HashMap<u32, Vec<Event>>,
+    id: u32,
+) -> bool {
+    let (owner, x, y) = match entities.get(id) {
+        Some(e) => (e.owner, e.pos_x, e.pos_y),
+        None => return false,
+    };
+
+    let pause_ticks = entities
+        .get(id)
+        .and_then(|e| e.movement.as_ref())
+        .map(|m| m.oil_starved_pause_ticks)
+        .unwrap_or(0);
+    if pause_ticks > 0 {
+        if let Some(e) = entities.get_mut(id) {
+            if let Some(m) = e.movement.as_mut() {
+                m.oil_starved_pause_ticks = pause_ticks.saturating_sub(1);
+            }
+        }
+        return true;
+    }
+
+    let out_of_oil = players
+        .iter()
+        .find(|p| p.id == owner)
+        .is_some_and(|p| p.oil == 0);
+    if out_of_oil {
+        if let Some(e) = entities.get_mut(id) {
+            if let Some(m) = e.movement.as_mut() {
+                m.oil_starved_pause_ticks = config::TANK_OIL_STARVED_PAUSE_TICKS.saturating_sub(1);
+            }
+        }
+        events.entry(owner).or_default().push(Event::Notice {
+            msg: "alert:out_of_oil".to_string(),
+            x: Some(x),
+            y: Some(y),
+            severity: NoticeSeverity::Alert,
+        });
+        return true;
+    }
+
+    false
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -2127,6 +2194,122 @@ mod tests {
         assert_eq!(
             entities.get(tank).and_then(|e| e.lifetime_oil_used()),
             Some(0.0)
+        );
+        assert_eq!(
+            entities
+                .get(tank)
+                .and_then(|e| e.movement.as_ref())
+                .map(|m| m.oil_starved_pause_ticks),
+            Some(config::TANK_OIL_STARVED_PAUSE_TICKS - 1)
+        );
+    }
+
+    #[test]
+    fn tank_oil_starvation_pauses_before_retrying() {
+        let map = flat_map(1);
+        let mut entities = EntityStore::new();
+        let (sx, sy) = map.tile_center(20, 20);
+        let tank = entities
+            .spawn_unit(1, EntityKind::Tank, sx, sy)
+            .expect("tank should spawn");
+        set_path_direct(&mut entities, tank, vec![(sx + 128.0, sy)]);
+        if let Some(e) = entities.get_mut(tank) {
+            e.set_order(Order::move_to(sx + 128.0, sy));
+            e.set_facing(0.0);
+        }
+        let mut players = vec![player_with_oil(1, 0)];
+
+        for tick in 0..config::TANK_OIL_STARVED_PAUSE_TICKS as u32 {
+            if tick == 1 {
+                players[0].oil = 1;
+            }
+            let occ = Occupancy::build(&map, &entities);
+            let spatial = SpatialIndex::build(&entities, map.size);
+            movement_system(&map, &mut entities, &mut players, &occ, &spatial, tick);
+            assert_eq!(
+                pos(&entities, tank),
+                (sx, sy),
+                "tank should stay paused on tick {tick}"
+            );
+        }
+
+        let occ = Occupancy::build(&map, &entities);
+        let spatial = SpatialIndex::build(&entities, map.size);
+        movement_system(
+            &map,
+            &mut entities,
+            &mut players,
+            &occ,
+            &spatial,
+            config::TANK_OIL_STARVED_PAUSE_TICKS as u32,
+        );
+
+        assert!(
+            moved_distance((sx, sy), pos(&entities, tank)) > 0.01,
+            "tank should retry movement after the pause when oil is available"
+        );
+    }
+
+    #[test]
+    fn tank_oil_starvation_emits_positioned_oil_alert_once_per_pause() {
+        let map = flat_map(1);
+        let mut entities = EntityStore::new();
+        let (sx, sy) = map.tile_center(20, 20);
+        let tank = entities
+            .spawn_unit(1, EntityKind::Tank, sx, sy)
+            .expect("tank should spawn");
+        set_path_direct(&mut entities, tank, vec![(sx + 128.0, sy)]);
+        if let Some(e) = entities.get_mut(tank) {
+            e.set_order(Order::move_to(sx + 128.0, sy));
+        }
+        let mut players = vec![player_with_oil(1, 0)];
+        let mut events = HashMap::new();
+
+        let occ = Occupancy::build(&map, &entities);
+        let spatial = SpatialIndex::build(&entities, map.size);
+        movement_system_with_events(
+            &map,
+            &mut entities,
+            &mut players,
+            &occ,
+            &spatial,
+            0,
+            &mut events,
+        );
+
+        assert!(
+            events.get(&1).is_some_and(|events| {
+                matches!(
+                    events.as_slice(),
+                    [Event::Notice {
+                        msg,
+                        x: Some(x),
+                        y: Some(y),
+                        severity: NoticeSeverity::Alert,
+                    }] if msg == "alert:out_of_oil"
+                        && (*x - sx).abs() < 0.001
+                        && (*y - sy).abs() < 0.001
+                )
+            }),
+            "starved tank should emit a positioned oil alert: {events:?}"
+        );
+
+        events.clear();
+        let occ = Occupancy::build(&map, &entities);
+        let spatial = SpatialIndex::build(&entities, map.size);
+        movement_system_with_events(
+            &map,
+            &mut entities,
+            &mut players,
+            &occ,
+            &spatial,
+            1,
+            &mut events,
+        );
+
+        assert!(
+            events.get(&1).map_or(true, Vec::is_empty),
+            "cooldown ticks should not repeat the oil alert: {events:?}"
         );
     }
 
