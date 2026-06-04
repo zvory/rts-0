@@ -564,6 +564,7 @@ function assertHasGetter(obj, name, msgPrefix = "") {
   const audio = new Audio();
   assertHasMethod(audio, "play", "Audio");
   assertHasMethod(audio, "playUI", "Audio");
+  assertHasMethod(audio, "stopByKey", "Audio");
   assertHasMethod(audio, "preload", "Audio");
   assertHasMethod(audio, "setListener", "Audio");
   assertHasMethod(audio, "pickVariant", "Audio");
@@ -580,6 +581,25 @@ function assertHasGetter(obj, name, msgPrefix = "") {
   assertApprox(far.gain, 1 / 3, 0.001, "Audio spatial gain attenuates at maxDist");
   assertApprox(far.lpHz, 1200, 0.001, "Audio spatial lowpass reaches far cutoff");
   assert(audio._computeSpatial(1301, 100) === null, "Audio drops sounds beyond maxDist");
+
+  let stopped = 0;
+  let disconnected = 0;
+  const keyedVoice = (key) => ({
+    key,
+    node: {
+      onended: () => {},
+      stop() { stopped += 1; },
+    },
+    trail: [{ disconnect() { disconnected += 1; } }],
+  });
+  audio.voices = [keyedVoice("mg:1"), keyedVoice("other"), keyedVoice("mg:1")];
+  assert(audio.stopByKey("mg:1") === 2, "Audio.stopByKey reports stopped voices");
+  assert(stopped === 2, "Audio.stopByKey stops matching voices");
+  assert(disconnected === 2, "Audio.stopByKey disconnects matching voice nodes");
+  assert(
+    audio.voices.length === 1 && audio.voices[0].key === "other",
+    "Audio.stopByKey keeps unrelated voices active",
+  );
 
   audio.destroy();
   globalThis.window = priorWindow;
