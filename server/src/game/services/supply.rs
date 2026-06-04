@@ -3,7 +3,7 @@ use crate::game::entity::EntityStore;
 use crate::game::PlayerState;
 use crate::rules;
 
-/// Recompute each player's supply cap (from completed Industrial Centers/Depots) and supply used (living
+/// Recompute each player's supply cap (from completed City Centres and Depots) and supply used (living
 /// units + units still in production queues). Cap is clamped to `SUPPLY_CAP_MAX`.
 pub(crate) fn recompute_supply(players: &mut [PlayerState], entities: &EntityStore) {
     for ps in players.iter_mut() {

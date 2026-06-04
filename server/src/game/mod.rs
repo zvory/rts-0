@@ -63,7 +63,7 @@ pub(crate) struct PlayerState {
     pub(crate) oil: u32,
     /// Supply currently consumed by living + in-production units.
     pub(crate) supply_used: u32,
-    /// Supply provided by completed Industrial Centers/Depots, capped at `SUPPLY_CAP_MAX`.
+    /// Supply provided by completed City Centres and Depots, capped at `SUPPLY_CAP_MAX`.
     pub(crate) supply_cap: u32,
     pub(crate) is_ai: bool,
     pub(crate) score: ScoreState,
@@ -289,7 +289,7 @@ impl Game {
                 score: ScoreState::default(),
             };
             spawn_player_start(&mut entities, &map, &mut ps, start);
-            // The starting Industrial Center contributes supply immediately.
+            // The starting City Centre contributes supply immediately.
             ps.supply_cap = config::INDUSTRIAL_CENTER_SUPPLY.min(config::SUPPLY_CAP_MAX);
             player_states.push(ps);
         }
@@ -623,7 +623,7 @@ impl Game {
     }
 }
 
-/// Spawn a player's full starting layout: a free, fully-built Industrial Center on the start tile, a ring of
+/// Spawn a player's full starting layout: a free, fully-built City Centre on the start tile, a ring of
 /// workers around it, and a nearby neutral resource cluster (steel + one oil node).
 ///
 /// Spawn the steel and oil clusters for a base site. The clusters point inward toward the map
@@ -692,7 +692,7 @@ fn spawn_base_resources(entities: &mut EntityStore, map: &Map, tile: (u32, u32))
     }
 }
 
-/// Spawn an Industrial Center, starting workers, and resource clusters for one player.
+/// Spawn a City Centre, starting workers, and resource clusters for one player.
 fn spawn_player_start(
     entities: &mut EntityStore,
     map: &Map,
@@ -1220,7 +1220,7 @@ mod tests {
         );
         assert!(
             ai_supply_cap > config::INDUSTRIAL_CENTER_SUPPLY,
-            "AI should build a depot to raise supply above the Industrial Center's {} (saw {ai_supply_cap})",
+            "AI should build a depot to raise supply above the City Centre's {} (saw {ai_supply_cap})",
             config::INDUSTRIAL_CENTER_SUPPLY
         );
         assert!(
@@ -1609,7 +1609,7 @@ mod tests {
     }
 
     /// Every player must receive the same relative resource layout, and all starting resources
-    /// must fall within the configured min/max distance from the Industrial Center.
+    /// must fall within the configured min/max distance from the City Centre.
     #[test]
     fn spawn_resource_distances_are_fair_and_symmetric() {
         let counts = [1, 2, 3, 4];
@@ -1630,7 +1630,7 @@ mod tests {
                     .entities
                     .iter()
                     .find(|e| e.owner == p.id && e.kind == EntityKind::IndustrialCenter)
-                    .expect("Industrial Center exists for every player");
+                    .expect("City Centre exists for every player");
 
                 let mut dists = Vec::new();
                 for e in game.entities.iter() {

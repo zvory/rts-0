@@ -58,7 +58,7 @@ Prove late-game behavior is shared:
 Prove expansion expectations are shared:
 
 - every live profile has an expansion policy;
-- every live profile targets at least 2 Industrial Centers eventually;
+- every live profile targets at least 2 City Centres eventually;
 - expansion policy does not block tank tech for live profiles unless explicitly documented;
 - shared expansion constants are not silently forked.
 

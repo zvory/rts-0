@@ -2709,7 +2709,7 @@ mod tests {
             EntityKind::IndustrialCenter,
             observation.map.tile_size,
         )
-        .expect("industrial center should have a center");
+        .expect("city centre should have a center");
         let max_dist = config::MINING_IC_RANGE_TILES * observation.map.tile_size as f32;
         let max_dist2 = squared(max_dist);
         let mut steel = 0usize;
@@ -3697,7 +3697,7 @@ mod tests {
             EntityKind::IndustrialCenter,
             observation.map.tile_size,
         )
-        .expect("industrial center should have a center");
+        .expect("city centre should have a center");
         let closer_natural = tile_center((23, 47), observation.map.tile_size);
         let farther_natural = tile_center((48, 73), observation.map.tile_size);
 
@@ -3849,7 +3849,7 @@ mod tests {
             EntityKind::IndustrialCenter,
             observation.map.tile_size,
         )
-        .expect("industrial center should have a center");
+        .expect("city centre should have a center");
         let safer_natural = tile_center((23, 47), observation.map.tile_size);
         let exposed_natural = tile_center((48, 73), observation.map.tile_size);
 

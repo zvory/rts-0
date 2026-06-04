@@ -133,7 +133,7 @@ Sent once when the match begins. Carries everything static for the whole match.
 }
 ```
 Units/buildings arrive via snapshots (so they obey fog), including
-the player's own starting Industrial Center + workers. When the lobby's `setQuickstart` toggle is
+the player's own starting City Centre + workers. When the lobby's `setQuickstart` toggle is
 enabled, every player starts with 99,999 steel and 99,999 oil instead of the default opening resources.
 
 ### 2.4 `snapshot` payload (per-player, fog-filtered)
@@ -281,7 +281,7 @@ impl Game {
     /// Create a match for the given players (ids + colors + names already assigned by lobby).
     /// Loads the hardcoded handcrafted map, shuffles the authored (start, expansion) pairs by
     /// `seed`, assigns the first N shuffled starts to the N players in lobby order, and spawns
-    /// each player's starting Industrial Center + STARTING_WORKERS workers + nearby steel/oil
+    /// each player's starting City Centre + STARTING_WORKERS workers + nearby steel/oil
     /// resource clusters. For one-, three-, and four-player games, each start keeps its authored
     /// paired expansion. For two-player games, the selected starts are kept but the two active
     /// neutral expansions are reselected from the authored expansion pool as the most symmetric
@@ -341,7 +341,7 @@ serde `Command` from `protocol.rs` so replay JSON stays wire-compatible. `StartP
 `Snapshot`, `Event`, and `PlayerScore` are also serde types from `protocol.rs`.
 
 `PlayerInit.is_ai` marks a computer-controlled player. AI players are full players in every
-respect (they get a start position, Industrial Center, workers, economy, and count toward win/elimination); the
+respect (they get a start position, City Centre, workers, economy, and count toward win/elimination); the
 only difference is they have no socket. `Game` owns one `AiController` per AI player and drives
 them at the top of `tick()` — see §8.
 
@@ -605,8 +605,8 @@ once; on `gameOver` show the victory/defeat overlay with the frozen score table.
   small progress arc.
 - Resource nodes: steel = tan supply crates; oil = olive fuel drums; show last-known remaining
   from `resourceDeltas` via size/opacity. When a worker is selected and the cursor hovers a
-  resource, draw a blue circle on the resource when the nearest completed own Industrial Center
-  is inside mining range; draw a red/dashed line to the Industrial Center when too far.
+  resource, draw a blue circle on the resource when the nearest completed own City Centre
+  is inside mining range; draw a red/dashed line to the City Centre when too far.
 - Tanks: render the hull from mirrored client `TANK_BODY` constants (`42px` length, `24px` width,
   `1.5px` clearance) so the visible body, selection ring, click target, and advisory build
   preview match the server's oriented vehicle body. Track tread offsets advance from actual
@@ -705,13 +705,13 @@ authoritative `rules::defs` records.
   `/maps/default-handcrafted.json`.
   Its JSON uses row strings (`.` grass, `#` rock, `~` water) plus ordered `baseSites`.
 - Start: `STARTING_STEEL = 75`, `STARTING_OIL = 0`, `STARTING_WORKERS = 4`,
-  one Industrial Center at the player's start tile, 18 steel patches + 3 oil patches nearby.
-- Supply: Industrial Center gives `+10`, Depot gives `+8`, hard cap `200`.
+  one City Centre at the player's start tile, 18 steel patches + 3 oil patches nearby.
+- Supply: City Centre gives `+10`, Depot gives `+8`, hard cap `200`.
 - Attached mining: workers walk to a patch, latch onto it, and mine in place.
   Every `HARVEST_TICKS = 40` the load (`STEEL_LOAD = 2` / `OIL_LOAD = 2`) is deposited
   directly into the player's economy only if the resource node is within
-  `MINING_IC_RANGE_TILES = 7.0` tiles of a completed Industrial Center owned by that player.
-  The range matches `IC_RESOURCE_MAX_DIST_TILES`, so each starting Industrial Center can mine
+  `MINING_IC_RANGE_TILES = 7.0` tiles of a completed City Centre owned by that player.
+  The range matches `IC_RESOURCE_MAX_DIST_TILES`, so each starting City Centre can mine
   every patch in its main-base cluster. If no completed IC is close enough, workers ignore new
   gather orders for that patch and active miners go idle. When a patch empties the worker goes
   idle (no automatic retarget).
@@ -747,9 +747,9 @@ Building stats (hp, sight, cost, footprint tiles wxh, buildTicks, extra):
 |----------------------------|-----|-------|-----|------|-----------|-------|
 | industrial_center          | 600 | 9     | 200 | 3x3  | 400       | trains worker; +10 supply; players start with one free |
 | depot                      | 220 | 4     | 100 | 2x2  | 180       | +8 supply |
-| barracks                   | 320 | 6     | 150 | 3x2  | 200       | trains rifleman, machine_gunner, at_team; requires an Industrial Center |
-| training_centre   | 300 | 6     | 100 steel + 50 oil | 3x2  | 220       | unlocks machine_gunner and at_team training at barracks; requires an Industrial Center and Barracks |
-| tank_factory               | 360 | 6     | 200 steel + 100 oil | 3x3  | 240       | trains tank; requires an Industrial Center and Training Centre |
+| barracks                   | 320 | 6     | 150 | 3x2  | 200       | trains rifleman, machine_gunner, at_team; requires a City Centre |
+| training_centre   | 300 | 6     | 100 steel + 50 oil | 3x2  | 220       | unlocks machine_gunner and at_team training at barracks; requires a City Centre and Barracks |
+| tank_factory               | 360 | 6     | 200 steel + 100 oil | 3x3  | 240       | trains tank; requires a City Centre and Training Centre |
 
 Win: a player is **eliminated** when they own zero buildings (units alone do not keep them
 alive). Last player standing wins; a 1-player match never ends (sandbox/exploration mode). In a

@@ -578,7 +578,7 @@ class Match {
     );
   }
 
-  /** Center the camera on this player's own starting tile (Industrial Center location). */
+  /** Center the camera on this player's own starting tile (City Centre location). */
   centerOnHome() {
     const me = this.state.players.find((p) => p.id === this.state.playerId);
     const ts = this.state.map.tileSize;

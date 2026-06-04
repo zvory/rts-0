@@ -88,7 +88,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   ok(snap.supplyCap === 10, `A supply cap = 10 (${snap.supplyCap})`);
   ok(snap.supplyUsed === 4, `A supply used = 4 (${snap.supplyUsed})`);
   const mine = snap.entities.filter((e) => e.owner === A.playerId);
-  ok(mine.filter((e) => e.kind === "industrial_center").length === 1, `A owns 1 Industrial Center`);
+  ok(mine.filter((e) => e.kind === "industrial_center").length === 1, `A owns 1 City Centre`);
   const workers = mine.filter((e) => e.kind === "worker");
   ok(workers.length === 4, `A owns 4 workers (${workers.length})`);
   const steelNodes = startA.map.resources.filter((e) => e.kind === "steel");
@@ -118,7 +118,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const trainIncomeMargin = 25;
   ok(A.lastSnapshot.steel <= beforeTrain - 50 + trainIncomeMargin, `TRAIN: steel dropped ~50 (before=${beforeTrain}, after=${A.lastSnapshot.steel})`);
   const industrialCenter = A.lastSnapshot.entities.find((e) => e.kind === "industrial_center" && e.owner === A.playerId);
-  ok(industrialCenter && (industrialCenter.prodKind === "worker" || (industrialCenter.prodQueue || 0) >= 1), `TRAIN: Industrial Center shows production (queue=${industrialCenter?.prodQueue})`);
+  ok(industrialCenter && (industrialCenter.prodKind === "worker" || (industrialCenter.prodQueue || 0) >= 1), `TRAIN: City Centre shows production (queue=${industrialCenter?.prodQueue})`);
 
   B.send({ t: "giveUp" });
   const overB = await B.waitFor((m) => m.t === "gameOver", 4000, "B gameOver after giveUp");

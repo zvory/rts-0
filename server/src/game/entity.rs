@@ -380,7 +380,7 @@ pub enum GatherPhase {
     ToNode,
     /// Standing on the node, accumulating harvest ticks.
     Harvesting,
-    /// Walking back to the home Industrial Center with a load.
+    /// Walking back to the home City Centre with a load.
     ToHome,
 }
 
