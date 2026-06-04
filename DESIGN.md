@@ -78,7 +78,7 @@ short but readable. Coordinates are **world pixels** (floats) unless a field nam
 
 | `c`          | Fields | Meaning |
 |--------------|--------|---------|
-| `move`       | `units: u32[]`, `x: f32`, `y: f32` | Move selected units to a world point. Non-tank units ignore enemies until they arrive or receive another order; tanks keep driving and fire their turret at in-range enemies without chasing. |
+| `move`       | `units: u32[]`, `x: f32`, `y: f32` | Move selected units to a world point. Infantry ignore enemies until they arrive or receive another order; tanks and scout cars keep driving and fire at in-range enemies without chasing. |
 | `attackMove` | `units: u32[]`, `x: f32`, `y: f32` | Move while attacking enemies encountered; this is the aggressive movement order. |
 | `attack`     | `units: u32[]`, `target: u32` | Attack a specific entity. |
 | `gather`     | `units: u32[]`, `node: u32` | Send workers to harvest a resource node. |
@@ -178,7 +178,7 @@ Compact numeric codes:
 
 | Vocabulary | Codes |
 |------------|-------|
-| `kind` | 1 `worker`, 2 `rifleman`, 3 `machine_gunner`, 4 `at_team`, 5 `tank`, 6 `industrial_center`, 7 `depot`, 8 `barracks`, 9 `training_centre`, 10 `factory`, 11 `steel`, 12 `oil` |
+| `kind` | 1 `worker`, 2 `rifleman`, 3 `machine_gunner`, 4 `at_team`, 5 `tank`, 6 `industrial_center`, 7 `depot`, 8 `barracks`, 9 `training_centre`, 10 `factory`, 11 `steel`, 12 `oil`, 13 `scout_car` |
 | `state` | 1 `idle`, 2 `move`, 3 `attack`, 4 `gather`, 5 `build`, 6 `train`, 7 `construct`, 8 `dead` |
 | `setupState` | 1 `packed`, 2 `setting_up`, 3 `deployed`, 4 `tearing_down` |
 | `notice.severity` | 1 `info`, 2 `warn`, 3 `alert` |
@@ -198,7 +198,7 @@ watch rooms receive all resource updates).
 {
   id: u32,
   owner: u32,                    // 0 = neutral (resources), else player id
-  kind: string,                  // EntityKind: "worker","rifleman","machine_gunner","at_team","tank","industrial_center","depot","barracks","training_centre","factory"
+  kind: string,                  // EntityKind: "worker","rifleman","machine_gunner","at_team","scout_car","tank","industrial_center","depot","barracks","training_centre","factory"
   x: f32, y: f32,                // world px (center)
   hp: u32, maxHp: u32,
   state: string,                 // "idle","move","attack","gather","build","train","construct","dead"
@@ -596,10 +596,10 @@ once; on `gameOver` show the victory/defeat overlay with the frozen score table.
 - Units: low-detail hard-edged silhouettes tinted by player color, with a dark drop shadow,
   dark outline, HP bar above when damaged/selected, and glowing selection ring when selected.
   Distinct silhouette per kind (engineer: compact block; rifleman / machine gunner / AT team:
-  shared infantry body with oversized role weapons; tank: chunky flat-shaded armor). Riflemen
-  carry a rifle, AT teams carry a large panzerfaust-style launcher, and machine gunners carry
-  an MG42-style long machine gun across the body while packed that extends forward with bracing
-  during setup/deployment.
+  shared infantry body with oversized role weapons; scout car: light wheeled vehicle with a rear
+  gunner; tank: chunky flat-shaded armor). Riflemen carry a rifle, AT teams carry a large
+  panzerfaust-style launcher, and machine gunners carry an MG42-style long machine gun across the
+  body while packed that extends forward with bracing during setup/deployment.
 - Buildings: footprint-sized blocky field structures with neutral geometry and plain
   two-letter stencils; under construction → translucent with a progress bar; production →
   small progress arc.
@@ -689,8 +689,10 @@ The current implementation uses the themed unit/building names below. Combat is 
 shared attack model plus the machine-gunner setup/teardown state, tank turret aim gates, and
 tank hull-facing damage modifiers for anti-tank hits against tank victims. Tanks keep their active
 movement path while firing on either `Move` or `AttackMove` orders; other mobile combat units still
-hold position once a target is in weapon range. Plain `Move` tanks only fire at enemies already in
-weapon range, while `AttackMove` tanks can chase acquired targets. When tanks chase an acquired
+hold position once a target is in weapon range. Scout cars also fire while moving using an
+independent rear machine-gun facing, but they are unarmored small targets and do not receive
+armored damage reduction. Plain `Move` tanks and scout cars only fire at enemies already in
+weapon range, while `AttackMove` tanks and scout cars can chase acquired targets. When they chase an acquired
 target from outside weapon range, they path to a standoff point inside firing range instead of the
 target center. Forest-specific rules are future work. The unit, building, and resource-node tables
 below are the human-readable form of the
@@ -739,6 +741,7 @@ Unit stats (hp, dmg, range[tiles], cooldown[ticks], speed[px/tick], sight[tiles]
 | rifleman        | 45  | 5   | 4     | 16 | 1.6   | 8     | 50  | 0   | 1   | 300 (~10s) |
 | machine_gunner  | 55  | 4   | 5     | 6  | 1.28  | 8     | 75  | 25  | 2   | 400 (~13s) |
 | at_team         | 45  | 48  | 5     | 72 | 1.28  | 8     | 75  | 25  | 2   | 440 (~15s) |
+| scout_car       | 150 | 4   | 5     | 6  | 2.35  | 10    | 125 | 75  | 3   | 480 (~16s) |
 | tank            | 390 | 60  | 3     | 72 | 2.0   | 7     | 200 | 150 | 6   | 750 (~25s) |
 
 Building stats (hp, sight, cost, footprint tiles wxh, buildTicks, extra):
@@ -749,7 +752,7 @@ Building stats (hp, sight, cost, footprint tiles wxh, buildTicks, extra):
 | depot                      | 220 | 4     | 100 | 2x2  | 180       | +8 supply |
 | barracks                   | 320 | 6     | 150 | 3x2  | 200       | trains rifleman, machine_gunner, at_team; requires a City Centre |
 | training_centre   | 300 | 6     | 100 steel + 50 oil | 3x2  | 220       | unlocks machine_gunner and at_team training at barracks; requires a City Centre and Barracks |
-| factory                    | 360 | 6     | 200 steel + 100 oil | 3x3  | 240       | trains tank; requires a City Centre and Training Centre |
+| factory                    | 360 | 6     | 200 steel + 100 oil | 3x3  | 240       | trains scout_car, tank; requires a City Centre and Training Centre |
 
 Win: a player is **eliminated** when they own zero buildings (units alone do not keep them
 alive). Last player standing wins; a 1-player match never ends (sandbox/exploration mode). In a
@@ -828,6 +831,11 @@ The server treats every client as potentially hostile. Limits live next to the c
   orders. A tank on plain `Move` only opportunistically fires at enemies already in range; it does
   not chase out-of-range enemies. Projection omits enemy `weaponFacing` when it would reveal a
   hidden target direction.
+- **Scout car movement and weapon facing**: scout cars are light unarmored vehicles with a
+  rear-mounted machine gun (same damage, range, and cooldown as machine gunners). They currently
+  borrow the tank oriented-body/pathing/facing movement model, including standoff firing and
+  firing while moving, but do not use tank armor or tank damage reduction. This is temporary:
+  replace the borrowed tank movement with truck/wheeled movement semantics when that model exists.
 - **Tank movement oil burn**: tanks consume oil based on distance actually moved, using
   `TANK_OIL_COST_PER_PX`. Fractional movement cost accumulates per tank until whole oil units are
   deducted from the owner's stockpile. The tank also tracks lifetime movement oil as `oilUsed` for

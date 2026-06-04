@@ -2,7 +2,8 @@ use std::collections::HashMap;
 
 use crate::config;
 use crate::game::entity::{
-    BuildPhase, Entity, EntityKind, EntityStore, GatherPhase, MovePhase, Order, WeaponSetup,
+    uses_tank_movement_semantics, BuildPhase, Entity, EntityKind, EntityStore, GatherPhase,
+    MovePhase, Order, WeaponSetup,
 };
 use crate::game::map::Map;
 use crate::game::services::geometry::{unit_body_for_entity, unit_body_overlap, UnitBody};
@@ -102,7 +103,7 @@ pub(crate) fn movement_system_with_events(
                 speed,
                 e.pos_x,
                 e.pos_y,
-                e.kind != EntityKind::Tank
+                !uses_tank_movement_semantics(e.kind)
                     && matches!(e.order(), Order::Move(_))
                     && footing_profile(e) != FootingProfile::Ghost,
             )
@@ -111,6 +112,7 @@ pub(crate) fn movement_system_with_events(
             continue;
         }
 
+        let uses_vehicle_movement = uses_tank_movement_semantics(kind);
         let is_tank = kind == EntityKind::Tank;
         // Experimental tank fuel rule: an oil-starved tank pauses before retrying so sparse
         // oil income does not make it lurch forward on isolated ticks.
@@ -124,7 +126,9 @@ pub(crate) fn movement_system_with_events(
         let original_facing = entities.get(id).map(|e| e.facing()).unwrap_or(0.0);
         let mut body_facing = original_facing;
         let mut static_blocked_this_tick = false;
-        if is_tank {
+        if uses_vehicle_movement {
+            // Scout cars temporarily borrow the tank hull/pathing movement model. Replace this
+            // with truck/wheeled movement semantics once that vehicle model exists.
             if let Some(e) = entities.get(id) {
                 if let Some(mut intent) = tank_drive_intent(map, occ, e, x, y) {
                     let traffic = tank_traffic_adjustment(entities, spatial, id, x, y, e.facing());
@@ -402,7 +406,7 @@ pub(crate) fn movement_system_with_events(
                 // only for Move/AttackMove orders.
                 // Stagger trigger per unit so clustered units don't all sidestep at once.
                 let trigger_threshold = config::SIDESTEP_TRIGGER_TICKS + (id % 8) as u16;
-                if kind != EntityKind::Tank
+                if !uses_tank_movement_semantics(kind)
                     && stuck_ticks >= trigger_threshold
                     && static_blocked_ticks == 0
                     && matches!(e.order(), Order::Move(_) | Order::AttackMove(_))
@@ -576,7 +580,7 @@ fn tank_traffic_adjustment(
 
         let closeness = 1.0 - (ahead / TANK_TRAFFIC_LOOKAHEAD_PX).clamp(0.0, 1.0);
         let resistance = footing_resistance(profile);
-        if neighbor.kind == EntityKind::Tank || profile == FootingProfile::Braced {
+        if uses_tank_movement_semantics(neighbor.kind) || profile == FootingProfile::Braced {
             throttle_scale = throttle_scale.min((1.0 - closeness * 0.95).clamp(0.0, 1.0));
         } else {
             throttle_scale = throttle_scale.min((1.0 - closeness * 0.65).clamp(0.25, 1.0));
@@ -688,8 +692,7 @@ fn tank_desired_path_point(
     let mut farthest_reachable = None;
 
     for waypoint in path.iter().rev().copied() {
-        if !standability::unit_static_segment_standable(map, occ, EntityKind::Tank, from, waypoint)
-        {
+        if !standability::unit_static_segment_standable(map, occ, e.kind, from, waypoint) {
             break;
         }
         farthest_reachable = Some(waypoint);
@@ -767,7 +770,7 @@ fn steered_candidate(
 
     let nx = x + steer_dir.0 * budget;
     let ny = y + steer_dir.1 * budget;
-    let facing = if kind == EntityKind::Tank {
+    let facing = if uses_tank_movement_semantics(kind) {
         path_dir.1.atan2(path_dir.0)
     } else {
         0.0
@@ -1193,11 +1196,11 @@ pub(crate) fn footing_profile(e: &Entity) -> FootingProfile {
     {
         return FootingProfile::Braced;
     }
-    if e.kind == EntityKind::Tank {
+    if uses_tank_movement_semantics(e.kind) {
         return FootingProfile::Heavy;
     }
     if e.kind != EntityKind::MachineGunner
-        && e.kind != EntityKind::Tank
+        && !uses_tank_movement_semantics(e.kind)
         && e.target_id().is_some()
         && e.path_is_empty()
     {

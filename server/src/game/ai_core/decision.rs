@@ -50,10 +50,11 @@ const DEFENSIVE_PANIC_SUPPORT_MIX_UNITS: [EntityKind; 3] = [
     EntityKind::MachineGunner,
     EntityKind::Rifleman,
 ];
-const ALL_COMBAT_UNITS: [EntityKind; 4] = [
+const ALL_COMBAT_UNITS: [EntityKind; 5] = [
     EntityKind::Rifleman,
     EntityKind::MachineGunner,
     EntityKind::AtTeam,
+    EntityKind::ScoutCar,
     EntityKind::Tank,
 ];
 

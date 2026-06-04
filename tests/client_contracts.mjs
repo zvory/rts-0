@@ -297,6 +297,15 @@ function fakeAudioContext() {
     STATS[KIND.FACTORY].requires.includes(KIND.TRAINING_CENTRE),
     "Factory should require a Training Centre in the command card",
   );
+  assert(
+    STATS[KIND.FACTORY].trains[0] === KIND.SCOUT_CAR,
+    "Factory should put Scout Car in the leftmost train slot",
+  );
+  assert(STATS[KIND.SCOUT_CAR].cost.steel === 125, "Scout Car steel cost mirrors server");
+  assert(STATS[KIND.SCOUT_CAR].cost.oil === 75, "Scout Car oil cost mirrors server");
+  assert(STATS[KIND.SCOUT_CAR].sight === 10, "Scout Car has the largest mobile sight radius");
+  assert(STATS[KIND.SCOUT_CAR].body.length === 34, "Scout Car client body length mirrors server");
+  assert(STATS[KIND.SCOUT_CAR].body.width === 18, "Scout Car client body width mirrors server");
   const playerId = 1;
   const underConstructionTrainingCentre = [
     { owner: playerId, kind: KIND.INDUSTRIAL_CENTER, buildProgress: null },

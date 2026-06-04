@@ -240,6 +240,7 @@ mod tests {
             (EntityKind::Rifleman, false, false, false),
             (EntityKind::MachineGunner, false, false, false),
             (EntityKind::AtTeam, false, true, true),
+            (EntityKind::ScoutCar, false, false, false),
             (EntityKind::Tank, true, true, false),
             (EntityKind::IndustrialCenter, true, false, false),
             (EntityKind::Depot, true, false, false),
