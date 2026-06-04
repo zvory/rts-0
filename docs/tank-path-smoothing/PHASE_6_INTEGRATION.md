@@ -66,3 +66,14 @@ If the impact is uncertain, state what changed mechanically and what should be w
 - The final summary names the gameplay impact plainly.
 - No unrelated files are staged or committed.
 
+## Implementation Notes
+
+- `DESIGN.md` already documents the final movement contract for static segment simplification,
+  segment-bounded tank lookahead, tank turn-cost pathing, and authoritative tank hull facing.
+- Unit coverage exists for path simplification, obstacle corner preservation, tank body clipping
+  prevention, final-goal preservation, tank corner-facing behavior, deterministic turn-cost path
+  requests, and unchanged non-tank facing.
+- Live command-path coverage exists in `tank_move_command_preserves_exact_goal_and_repeats_deterministically`,
+  which issues a player `Move` command to a tank through `Game::enqueue` / `Game::tick`, verifies
+  the exact command goal is preserved after smoothing, and checks repeated runs produce identical
+  tank position, facing, path, and command log.
