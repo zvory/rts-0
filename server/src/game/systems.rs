@@ -124,6 +124,7 @@ pub(crate) fn run_tick(
         players,
         &pre_command.spatial,
         &mut coordinator,
+        fog,
         pending,
         events,
     );

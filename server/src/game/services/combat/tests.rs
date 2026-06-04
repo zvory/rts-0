@@ -37,6 +37,12 @@ fn map_with_rock_at(tile: (u32, u32)) -> Map {
     map
 }
 
+fn visible_fog(map: &Map, entities: &EntityStore) -> Fog {
+    let mut fog = Fog::new(map.size);
+    fog.recompute(&[1, 2], entities, map);
+    fog
+}
+
 fn player_state(id: u32, is_ai: bool) -> PlayerState {
     PlayerState {
         id,
@@ -142,12 +148,14 @@ fn idle_army_units_auto_acquire_targets() {
     let map = open_map(8);
     let los = LineOfSight::new(&map);
     let spatial = SpatialIndex::build(&entities, map.size);
+    let fog = visible_fog(&map, &entities);
     let attacker = entities.get(self_id).expect("attacker should exist");
 
     let target = resolve_target(
         &entities,
         &spatial,
         &los,
+        &fog,
         self_id,
         attacker.owner,
         attacker.pos_x,
@@ -165,6 +173,7 @@ fn move_orders_ignore_nearby_enemies() {
     let map = open_map(8);
     let los = LineOfSight::new(&map);
     let spatial = SpatialIndex::build(&entities, map.size);
+    let fog = visible_fog(&map, &entities);
     let attacker = entities.get_mut(self_id).expect("attacker should exist");
     attacker.set_order(Order::move_to(300.0, 300.0));
 
@@ -172,6 +181,7 @@ fn move_orders_ignore_nearby_enemies() {
         &entities,
         &spatial,
         &los,
+        &fog,
         self_id,
         1,
         100.0,
@@ -189,6 +199,7 @@ fn attack_move_keeps_auto_acquisition() {
     let map = open_map(8);
     let los = LineOfSight::new(&map);
     let spatial = SpatialIndex::build(&entities, map.size);
+    let fog = visible_fog(&map, &entities);
     let attacker = entities.get_mut(self_id).expect("attacker should exist");
     attacker.set_order(Order::attack_move_to(300.0, 300.0));
 
@@ -196,6 +207,7 @@ fn attack_move_keeps_auto_acquisition() {
         &entities,
         &spatial,
         &los,
+        &fog,
         self_id,
         1,
         100.0,
@@ -221,6 +233,7 @@ fn stone_blocks_attack_move_auto_acquisition() {
         .expect("enemy should spawn");
     let los = LineOfSight::new(&map);
     let spatial = SpatialIndex::build(&entities, map.size);
+    let fog = visible_fog(&map, &entities);
     entities
         .get_mut(self_id)
         .expect("attacker should exist")
@@ -231,6 +244,7 @@ fn stone_blocks_attack_move_auto_acquisition() {
         &entities,
         &spatial,
         &los,
+        &fog,
         self_id,
         attacker.owner,
         attacker.pos_x,
@@ -466,6 +480,7 @@ fn shoot_while_moving_units_keep_existing_valid_target() {
         let map = open_map(8);
         let los = LineOfSight::new(&map);
         let spatial = SpatialIndex::build(&entities, map.size);
+        let fog = visible_fog(&map, &entities);
         let attacker = entities
             .get(attacker_id)
             .expect("attacker should still exist");
@@ -474,6 +489,7 @@ fn shoot_while_moving_units_keep_existing_valid_target() {
             &entities,
             &spatial,
             &los,
+            &fog,
             attacker_id,
             attacker.owner,
             attacker.pos_x,
@@ -514,6 +530,7 @@ fn shoot_while_moving_units_reacquire_when_existing_target_is_dead() {
         let map = open_map(8);
         let los = LineOfSight::new(&map);
         let spatial = SpatialIndex::build(&entities, map.size);
+        let fog = visible_fog(&map, &entities);
         let attacker = entities
             .get(attacker_id)
             .expect("attacker should still exist");
@@ -522,6 +539,7 @@ fn shoot_while_moving_units_reacquire_when_existing_target_is_dead() {
             &entities,
             &spatial,
             &los,
+            &fog,
             attacker_id,
             attacker.owner,
             attacker.pos_x,
@@ -648,12 +666,14 @@ fn idle_workers_do_not_auto_acquire_targets() {
     let map = open_map(8);
     let los = LineOfSight::new(&map);
     let spatial = SpatialIndex::build(&entities, map.size);
+    let fog = visible_fog(&map, &entities);
     let worker = entities.get(worker_id).expect("worker should exist");
 
     let target = resolve_target(
         &entities,
         &spatial,
         &los,
+        &fog,
         worker_id,
         worker.owner,
         worker.pos_x,
@@ -882,6 +902,67 @@ fn deployed_at_team_fires_at_long_range() {
     assert!(
         entities.get(tank_id).expect("enemy should exist").hp < enemy_hp,
         "deployed AT team should fire at range 7"
+    );
+}
+
+#[test]
+fn deployed_at_team_does_not_auto_acquire_targets_hidden_by_fog() {
+    let map = open_map(24);
+    let mut entities = EntityStore::new();
+    let at_id = entities
+        .spawn_unit(1, EntityKind::AtTeam, 100.0, 100.0)
+        .expect("at team should spawn");
+    let tank_id = entities
+        .spawn_unit(2, EntityKind::Tank, 356.0, 100.0)
+        .expect("enemy tank should spawn");
+    if let Some(at) = entities.get_mut(at_id) {
+        at.set_weapon_setup(WeaponSetup::Deployed);
+        at.set_emplacement_facing(Some(0.0));
+        at.set_facing(0.0);
+        at.set_weapon_facing(0.0);
+    }
+    entities
+        .get_mut(tank_id)
+        .expect("tank should exist")
+        .set_facing(std::f32::consts::PI);
+
+    let mut fog = Fog::new(map.size);
+    fog.recompute(&[1], &entities, &map);
+    assert!(
+        !fog.is_visible_world(
+            1,
+            entities.get(tank_id).expect("tank should exist").pos_x,
+            entities.get(tank_id).expect("tank should exist").pos_y,
+        ),
+        "test setup requires the tank to be outside the AT owner's sight"
+    );
+    let enemy_hp = entities.get(tank_id).expect("enemy should exist").hp;
+
+    let events = run_combat_tick_on_map(
+        &mut entities,
+        &[player_state(1, false), player_state(2, false)],
+        &map,
+    );
+
+    assert_eq!(
+        entities.get(tank_id).expect("enemy should exist").hp,
+        enemy_hp,
+        "deployed AT guns must not fire at targets hidden by fog"
+    );
+    assert_eq!(
+        entities
+            .get(at_id)
+            .expect("at team should exist")
+            .target_id(),
+        None,
+        "hidden targets should not be retained as combat targets"
+    );
+    assert!(
+        events
+            .values()
+            .flatten()
+            .all(|event| !matches!(event, Event::Attack { .. })),
+        "hidden-target suppression should not emit attack tracers"
     );
 }
 

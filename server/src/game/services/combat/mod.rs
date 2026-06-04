@@ -128,13 +128,15 @@ pub(crate) fn combat_system(
         }
 
         // Resolve / acquire a target id based on the current order semantics.
-        let target = resolve_target(entities, spatial, &los, id, owner, px, py, acquire_px, mode);
+        let target = resolve_target(
+            entities, spatial, &los, fog, id, owner, px, py, acquire_px, mode,
+        );
         let Some(tid) = target else {
             // No target: clear stale combat target id for opportunistic-combat orders.
             if let Some(e) = entities.get_mut(id) {
                 if matches!(
                     e.order(),
-                    Order::AttackMove(_) | Order::Move(_) | Order::Idle
+                    Order::Attack(_) | Order::AttackMove(_) | Order::Move(_) | Order::Idle
                 ) {
                     e.set_target_id(None);
                     begin_idle_deployed_weapon_setup(e);

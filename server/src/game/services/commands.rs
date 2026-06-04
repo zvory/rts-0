@@ -3,6 +3,7 @@ use std::collections::{HashMap, HashSet};
 use crate::config;
 use crate::game::command::SimCommand;
 use crate::game::entity::{BuildPhase, EntityKind, EntityStore, ProdItem, WeaponSetup};
+use crate::game::fog::Fog;
 use crate::game::map::Map;
 use crate::game::services::move_coordinator::MoveCoordinator;
 use crate::game::services::movement::angle_delta;
@@ -25,6 +26,7 @@ pub(crate) fn apply_commands(
     players: &mut [PlayerState],
     spatial: &SpatialIndex,
     coordinator: &mut MoveCoordinator<'_>,
+    fog: &Fog,
     pending: Vec<(u32, SimCommand)>,
     events: &mut HashMap<u32, Vec<Event>>,
 ) {
@@ -61,7 +63,8 @@ pub(crate) fn apply_commands(
                         continue;
                     }
                     let target_ok = matches!(entities.get(target),
-                        Some(t) if world_query::is_enemy_targetable(t, player, id));
+                        Some(t) if world_query::is_enemy_targetable(t, player, id)
+                            && fog.is_visible_world(player, t.pos_x, t.pos_y));
                     if !target_ok {
                         continue;
                     }
@@ -481,6 +484,8 @@ mod tests {
         pathing.advance_tick(1);
         let mut coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, 1);
         let mut players = vec![player_state(1)];
+        let mut fog = Fog::new(map.size);
+        fog.recompute(&[1], &entities, &map);
         let mut events = HashMap::new();
 
         apply_commands(
@@ -489,6 +494,7 @@ mod tests {
             &mut players,
             &spatial,
             &mut coordinator,
+            &fog,
             vec![(
                 1,
                 SimCommand::Build {
@@ -542,6 +548,8 @@ mod tests {
         pathing.advance_tick(1);
         let mut coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, 1);
         let mut players = vec![player_state(1)];
+        let mut fog = Fog::new(map.size);
+        fog.recompute(&[1], &entities, &map);
         let mut events = HashMap::new();
 
         apply_commands(
@@ -550,6 +558,7 @@ mod tests {
             &mut players,
             &spatial,
             &mut coordinator,
+            &fog,
             vec![(
                 1,
                 SimCommand::Build {
@@ -821,6 +830,38 @@ mod tests {
         );
     }
 
+    #[test]
+    fn attack_command_rejects_hidden_targets() {
+        let map = flat_map(24);
+        let mut entities = EntityStore::new();
+        let rifle = entities
+            .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
+            .expect("rifleman should spawn");
+        let hidden_target = entities
+            .spawn_unit(2, EntityKind::Tank, 420.0, 100.0)
+            .expect("hidden target should spawn");
+
+        apply(
+            &map,
+            &mut entities,
+            vec![(
+                1,
+                SimCommand::Attack {
+                    units: vec![rifle],
+                    target: hidden_target,
+                },
+            )],
+        );
+
+        let rifle = entities.get(rifle).expect("rifleman should exist");
+        assert!(
+            !matches!(rifle.order(), Order::Attack(_)),
+            "hidden target ids should not become attack orders"
+        );
+        assert_eq!(rifle.target_id(), None);
+        assert_eq!(rifle.path_goal(), None);
+    }
+
     /// Run `apply_commands` with throwaway derived state for command-validation tests.
     fn apply(map: &Map, entities: &mut EntityStore, pending: Vec<(u32, SimCommand)>) {
         let spatial = SpatialIndex::build(entities, map.size);
@@ -829,6 +870,8 @@ mod tests {
         pathing.advance_tick(1);
         let mut coordinator = MoveCoordinator::new(&mut pathing, map, &occ, 1);
         let mut players = vec![player_state(1), player_state(2)];
+        let mut fog = Fog::new(map.size);
+        fog.recompute(&[1, 2], entities, map);
         let mut events = HashMap::new();
         apply_commands(
             map,
@@ -836,6 +879,7 @@ mod tests {
             &mut players,
             &spatial,
             &mut coordinator,
+            &fog,
             pending,
             &mut events,
         );
