@@ -10,8 +10,8 @@
 //! - **Targeting / proximity**: `is_enemy_targetable`, `nearest_enemy_in_range`.
 //! - **Reservation**: `node_holder` (who currently owns a node's harvest slot).
 //!
-//! Building placement and spawn search remain in [`super::occupancy::footprint_placeable`] and
-//! [`super::move_coordinator::MoveCoordinator::find_spawn_point`]; this module re-exports them
+//! Building placement and spawn search remain in [`super::standability`] and
+//! [`super::move_coordinator::MoveCoordinator::find_spawn_point`]; this module points to them
 //! through its docs so the placement / spawn surface is discoverable from one place.
 
 use crate::config;

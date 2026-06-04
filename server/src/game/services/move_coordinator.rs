@@ -16,9 +16,13 @@
 use crate::config;
 use crate::game::entity::{EntityKind, EntityStore, MovePhase, Order, WeaponSetup};
 use crate::game::map::Map;
-use crate::game::pathfinding::Passability;
-use crate::game::services::occupancy::{footprint_tiles, Occupancy};
+use crate::game::pathfinding::{self, Passability};
+use crate::game::services::interact_range_for_kind;
+use crate::game::services::occupancy::{
+    building_footprint, footprint_center, footprint_tiles, Occupancy,
+};
 use crate::game::services::pathing::{PathRequest, PathingService};
+use crate::game::services::standability;
 
 /// Maximum number of fresh A* path requests serviced in a single tick. Beyond this,
 /// remaining `AwaitingPath` units stay queued for the next tick.
@@ -29,6 +33,10 @@ const MIN_REPATH_TICKS: u32 = 3;
 
 /// If the goal moves by more than this many world pixels, bypass the repath throttle.
 const MATERIAL_GOAL_DELTA_PX: f32 = config::TILE_SIZE as f32;
+
+const FORMATION_NEAR_DISTANCE_PX: f32 = config::TILE_SIZE as f32 * 4.0;
+const FORMATION_FAR_DISTANCE_PX: f32 = config::TILE_SIZE as f32 * 18.0;
+const FORMATION_MAX_OFFSET_PX: f32 = config::TILE_SIZE as f32 * 10.0;
 
 /// The movement/pathing coordinator for one tick.
 pub struct MoveCoordinator<'a> {
@@ -73,17 +81,26 @@ impl<'a> MoveCoordinator<'a> {
         if ids.is_empty() {
             return;
         }
-        let anchor = self.map.tile_of(goal.0, goal.1);
-        let goals = spread_goals(self.map, self.occ, ids, anchor);
+        let units: Vec<FormationUnit> = ids
+            .iter()
+            .filter_map(|&id| {
+                let e = entities.get(id)?;
+                (e.is_unit() && e.owner == player).then_some(FormationUnit {
+                    id,
+                    pos: (e.pos_x, e.pos_y),
+                })
+            })
+            .collect();
+        if units.is_empty() {
+            return;
+        }
+        let goals = formation_goals(self.map, self.occ, &units, goal);
 
-        for (id, g) in ids.iter().zip(goals.iter()) {
-            entities.release_miner(*id);
-            let Some(e) = entities.get_mut(*id) else {
+        for (unit, g) in units.iter().zip(goals.iter()) {
+            entities.release_miner(unit.id);
+            let Some(e) = entities.get_mut(unit.id) else {
                 continue;
             };
-            if !e.is_unit() || e.owner != player {
-                continue;
-            }
             let order = if attack_move {
                 Order::attack_move_to(g.0, g.1)
             } else {
@@ -149,9 +166,9 @@ impl<'a> MoveCoordinator<'a> {
         self.request_path(entities, id, (nx, ny));
     }
 
-    /// Issue a build order: record the placement intent on the worker and walk it to the
-    /// target top-left tile. No building is spawned and no resources are deducted here;
-    /// that happens on arrival in the construction system.
+    /// Issue a build order: record the placement intent on the worker and walk it to an outside
+    /// staging tile. No building is spawned and no resources are deducted here; that happens on
+    /// arrival in the construction system.
     pub fn order_build(
         &mut self,
         entities: &mut EntityStore,
@@ -160,25 +177,27 @@ impl<'a> MoveCoordinator<'a> {
         tile_x: u32,
         tile_y: u32,
     ) -> bool {
-        let goal = build_staging_goal(self.map, self.occ, entities, id, kind, tile_x, tile_y)
-            .unwrap_or_else(|| self.map.tile_center(tile_x, tile_y));
         entities.release_miner(id);
         if let Some(e) = entities.get_mut(id) {
             e.set_order(Order::build(kind, tile_x, tile_y));
             e.set_target_id(None);
             e.set_path(Vec::new());
-            e.set_path_goal(Some(goal));
             e.reset_gather_state();
             let (px, py) = (e.pos_x, e.pos_y);
             e.reset_stuck(px, py);
         }
-        if !self.request_path(entities, id, goal) {
-            if let Some(e) = entities.get_mut(id) {
-                e.clear_orders();
-            }
-            return false;
+        if self.request_build_path(entities, id, kind, tile_x, tile_y) {
+            return true;
         }
-        true
+        for goal in build_staging_goals(self.map, self.occ, entities, id, kind, tile_x, tile_y) {
+            if self.request_exact_path_to_build_goal(entities, id, goal) {
+                return true;
+            }
+        }
+        if let Some(e) = entities.get_mut(id) {
+            e.clear_orders();
+        }
+        false
     }
 
     // -------------------------------------------------------------------
@@ -251,82 +270,48 @@ impl<'a> MoveCoordinator<'a> {
     // -------------------------------------------------------------------
 
     /// Find a spawn point near a building using a deterministic outward search.
-    /// Falls back to just below the building if no valid point exists.
+    /// Returns `None` when no legal body-clearance point exists.
     pub fn find_spawn_point(
         &self,
-        _entities: &EntityStore,
-        building_kind: EntityKind,
+        entities: &EntityStore,
+        building: u32,
         spawned_kind: EntityKind,
-        bx: f32,
-        by: f32,
-    ) -> (f32, f32) {
-        let ts = config::TILE_SIZE as f32;
-        let bstats = match config::building_stats(building_kind) {
-            Some(s) => s,
-            None => return (bx, by + ts),
-        };
-        let spawn_radius = config::unit_stats(spawned_kind)
-            .map(|s| s.radius)
-            .unwrap_or(0.0);
-        let (btx, bty) = self.map.tile_of(bx, by);
-        let half_w = (bstats.foot_w as i32) / 2;
-        let half_h = (bstats.foot_h as i32) / 2;
+    ) -> Option<(f32, f32)> {
+        let building = entities.get(building)?;
+        config::building_stats(building.kind)?;
+        config::unit_stats(spawned_kind)?;
+        let footprint = building_footprint(self.map, building);
+        let min_x = footprint.iter().map(|(x, _)| *x).min()? as i32;
+        let max_x = footprint.iter().map(|(x, _)| *x).max()? as i32;
+        let min_y = footprint.iter().map(|(_, y)| *y).min()? as i32;
+        let max_y = footprint.iter().map(|(_, y)| *y).max()? as i32;
 
-        // Search outward in rings from the building footprint edge.
+        // Search outward in rings from the actual building footprint edge.
         for r in 1i32..=6 {
-            for dy in -r..=r {
-                for dx in -r..=r {
-                    if dx.abs().max(dy.abs()) != r {
+            for ty in (min_y - r)..=(max_y + r) {
+                for tx in (min_x - r)..=(max_x + r) {
+                    if tx > min_x - r && tx < max_x + r && ty > min_y - r && ty < max_y + r {
                         continue;
                     }
-                    let tx = btx as i32 + dx;
-                    let ty = bty as i32 + dy;
-                    if tx < 0 || ty < 0 {
+                    if !self.map.in_bounds(tx, ty) {
                         continue;
                     }
-                    let (tx, ty) = (tx as u32, ty as u32);
-
-                    // Must be outside the building footprint.
-                    let min_x = btx as i32 - half_w;
-                    let max_x = btx as i32 + half_w + (bstats.foot_w % 2) as i32;
-                    let min_y = bty as i32 - half_h;
-                    let max_y = bty as i32 + half_h + (bstats.foot_h % 2) as i32;
-                    let in_footprint = (tx as i32) >= min_x
-                        && (tx as i32) < max_x
-                        && (ty as i32) >= min_y
-                        && (ty as i32) < max_y;
-                    if in_footprint {
-                        continue;
+                    let (cx, cy) = self.map.tile_center(tx as u32, ty as u32);
+                    if standability::unit_spawn_standable(
+                        self.map,
+                        self.occ,
+                        entities,
+                        spawned_kind,
+                        cx,
+                        cy,
+                    ) {
+                        return Some((cx, cy));
                     }
-
-                    // Must be passable terrain.
-                    if !self.map.is_passable(tx as i32, ty as i32) {
-                        continue;
-                    }
-
-                    // Must not be occupied by another building footprint.
-                    if !self.occ.passable(tx as i32, ty as i32) {
-                        continue;
-                    }
-
-                    let (cx, cy) = self.map.tile_center(tx, ty);
-                    if !spawn_point_has_clearance(self.map, self.occ, cx, cy, spawn_radius) {
-                        continue;
-                    }
-                    return (cx, cy);
                 }
             }
         }
 
-        // Fallback: below the building, clamped to world bounds.
-        let max = self.map.world_size_px() - 1.0;
-        let half = (bstats.foot_h as f32 * ts) * 0.5;
-        let x = bx.clamp(0.0, max);
-        let y = (by + half + ts * 0.5).clamp(0.0, max);
-        if spawn_point_has_clearance(self.map, self.occ, x, y, spawn_radius) {
-            return (x, y);
-        }
-        (x, y)
+        None
     }
 
     // -------------------------------------------------------------------
@@ -393,6 +378,141 @@ impl<'a> MoveCoordinator<'a> {
         }
         false
     }
+
+    fn request_build_path(
+        &mut self,
+        entities: &mut EntityStore,
+        id: u32,
+        kind: EntityKind,
+        tile_x: u32,
+        tile_y: u32,
+    ) -> bool {
+        let footprint = footprint_tiles(kind, tile_x, tile_y);
+        if footprint.is_empty() {
+            return false;
+        }
+        let footprint_set: std::collections::BTreeSet<(u32, u32)> =
+            footprint.iter().copied().collect();
+        if let Some(goal) = current_staging_goal(self.map, entities, id, kind, &footprint_set) {
+            set_entity_path(entities, id, Vec::new(), goal, self.tick);
+            return true;
+        }
+
+        let approach_goal = self.map.tile_center(tile_x, tile_y);
+        let Some(tile_path) = self.request_exact_tile_path(entities, id, approach_goal) else {
+            return false;
+        };
+        let Some(staging_index) = tile_path.iter().rposition(|(tx, ty)| {
+            *tx >= 0 && *ty >= 0 && !footprint_set.contains(&(*tx as u32, *ty as u32))
+        }) else {
+            return false;
+        };
+        let staging_tile = tile_path[staging_index];
+        let goal = self
+            .map
+            .tile_center(staging_tile.0 as u32, staging_tile.1 as u32);
+        if !build_staging_goal_in_range(self.map, kind, tile_x, tile_y, goal) {
+            return false;
+        }
+        let trimmed = tile_path[..=staging_index].to_vec();
+        let waypoints = pathfinding::to_world_waypoints(&trimmed);
+        set_entity_path(entities, id, waypoints, goal, self.tick);
+        true
+    }
+
+    fn request_exact_path_to_build_goal(
+        &mut self,
+        entities: &mut EntityStore,
+        id: u32,
+        goal: (f32, f32),
+    ) -> bool {
+        let Some(tile_path) = self.request_exact_tile_path(entities, id, goal) else {
+            return false;
+        };
+        let waypoints = pathfinding::to_world_waypoints(&tile_path);
+        set_entity_path(entities, id, waypoints, goal, self.tick);
+        true
+    }
+
+    fn request_exact_tile_path(
+        &mut self,
+        entities: &EntityStore,
+        id: u32,
+        goal: (f32, f32),
+    ) -> Option<Vec<(i32, i32)>> {
+        if self.budget == 0 {
+            return None;
+        }
+        let (unit_kind, sx, sy) = match entities.get(id) {
+            Some(e) if e.is_unit() => {
+                let (sx, sy) = self.map.tile_of(e.pos_x, e.pos_y);
+                (e.kind, sx, sy)
+            }
+            _ => return None,
+        };
+        let (gx, gy) = self.map.tile_of(goal.0, goal.1);
+        let radius_tiles = config::unit_stats(unit_kind)
+            .map(|s| s.radius_tiles())
+            .unwrap_or(0);
+        let req = PathRequest {
+            kind: unit_kind,
+            start: (sx as i32, sy as i32),
+            goal: (gx as i32, gy as i32),
+            radius_tiles,
+            budget: None,
+        };
+        let tile_path = self.pathing.request_tile_path(self.map, self.occ, req);
+        self.budget = self.budget.saturating_sub(1);
+        if tile_path.last().copied() == Some((gx as i32, gy as i32)) {
+            Some(tile_path)
+        } else {
+            None
+        }
+    }
+}
+
+fn set_entity_path(
+    entities: &mut EntityStore,
+    id: u32,
+    path: Vec<(f32, f32)>,
+    goal: (f32, f32),
+    tick: u32,
+) {
+    if let Some(e) = entities.get_mut(id) {
+        e.set_path(path);
+        e.set_last_repath_tick(tick);
+        e.set_path_goal(Some(goal));
+    }
+}
+
+fn current_staging_goal(
+    map: &Map,
+    entities: &EntityStore,
+    id: u32,
+    kind: EntityKind,
+    footprint: &std::collections::BTreeSet<(u32, u32)>,
+) -> Option<(f32, f32)> {
+    let worker = entities.get(id)?;
+    let tile = map.tile_of(worker.pos_x, worker.pos_y);
+    if footprint.contains(&tile) {
+        return None;
+    }
+    let &(tile_x, tile_y) = footprint.iter().min()?;
+    let goal = (worker.pos_x, worker.pos_y);
+    build_staging_goal_in_range(map, kind, tile_x, tile_y, goal).then_some(goal)
+}
+
+fn build_staging_goal_in_range(
+    map: &Map,
+    kind: EntityKind,
+    tile_x: u32,
+    tile_y: u32,
+    goal: (f32, f32),
+) -> bool {
+    let (cx, cy) = footprint_center(map, kind, tile_x, tile_y);
+    let dx = goal.0 - cx;
+    let dy = goal.1 - cy;
+    dx * dx + dy * dy <= interact_range_for_kind(kind).powi(2)
 }
 
 fn begin_machine_gunner_teardown(e: &mut crate::game::entity::Entity) {
@@ -410,6 +530,12 @@ fn begin_machine_gunner_teardown(e: &mut crate::game::entity::Entity) {
 // Goal spreading
 // ---------------------------------------------------------------------------
 
+#[derive(Clone, Copy)]
+struct FormationUnit {
+    id: u32,
+    pos: (f32, f32),
+}
+
 /// Spread unit goals around the requested anchor tile. Returns one goal world point per unit
 /// in the same order as `ids`.
 fn spread_goals(map: &Map, occ: &Occupancy, ids: &[u32], anchor: (u32, u32)) -> Vec<(f32, f32)> {
@@ -423,6 +549,68 @@ fn spread_goals(map: &Map, occ: &Occupancy, ids: &[u32], anchor: (u32, u32)) -> 
     }
 
     out
+}
+
+/// Assign formation-aware path goals in the same order as `units`.
+fn formation_goals(
+    map: &Map,
+    occ: &Occupancy,
+    units: &[FormationUnit],
+    goal: (f32, f32),
+) -> Vec<(f32, f32)> {
+    if units.len() <= 1 {
+        let anchor = map.tile_of(goal.0, goal.1);
+        return spread_goals(map, occ, &[0], anchor);
+    }
+
+    let inv_count = 1.0 / units.len() as f32;
+    let centroid = units.iter().fold((0.0f32, 0.0f32), |acc, unit| {
+        (
+            acc.0 + unit.pos.0 * inv_count,
+            acc.1 + unit.pos.1 * inv_count,
+        )
+    });
+    let dx = goal.0 - centroid.0;
+    let dy = goal.1 - centroid.1;
+    let move_distance = (dx * dx + dy * dy).sqrt();
+    let formation_scale = formation_scale_for_distance(move_distance);
+    let max = map.world_size_px() - 1.0;
+    let mut out = Vec::with_capacity(units.len());
+    let mut taken: Vec<(u32, u32)> = Vec::new();
+
+    for unit in units {
+        let offset = clamp_offset(
+            unit.pos.0 - centroid.0,
+            unit.pos.1 - centroid.1,
+            FORMATION_MAX_OFFSET_PX,
+        );
+        let desired = (
+            (goal.0 + offset.0 * formation_scale).clamp(0.0, max),
+            (goal.1 + offset.1 * formation_scale).clamp(0.0, max),
+        );
+        let anchor = map.tile_of(desired.0, desired.1);
+        let tile = find_unique_tile_near(map, occ, anchor, &taken);
+        taken.push(tile);
+        out.push(map.tile_center(tile.0, tile.1));
+    }
+
+    out
+}
+
+fn formation_scale_for_distance(distance: f32) -> f32 {
+    let t = ((distance - FORMATION_NEAR_DISTANCE_PX)
+        / (FORMATION_FAR_DISTANCE_PX - FORMATION_NEAR_DISTANCE_PX))
+        .clamp(0.0, 1.0);
+    t * t * (3.0 - 2.0 * t)
+}
+
+fn clamp_offset(dx: f32, dy: f32, max_len: f32) -> (f32, f32) {
+    let len = (dx * dx + dy * dy).sqrt();
+    if len <= max_len || len <= f32::EPSILON {
+        return (dx, dy);
+    }
+    let scale = max_len / len;
+    (dx * scale, dy * scale)
 }
 
 /// Search outward from `anchor` in deterministic ring order and return the first passable tile
@@ -474,11 +662,12 @@ fn is_free_goal(map: &Map, occ: &Occupancy, tile: (u32, u32), taken: &[(u32, u32
     true
 }
 
-/// Pick a walk target for a build order.
+/// Pick a walk target outside a build footprint.
 ///
-/// If the worker is already standing inside the requested footprint, move it to a nearby
-/// tile outside that footprint first so the build can start from the perimeter. Returns
-/// `None` when the worker is not inside the footprint or when no outside tile is available.
+/// Construction starts when the worker is close enough to the footprint center, so walking to an
+/// outside perimeter tile keeps the builder from ending up inside the completed building.
+/// Returns `None` when no outside staging tile is available.
+#[cfg(test)]
 pub(crate) fn build_staging_goal(
     map: &Map,
     occ: &Occupancy,
@@ -488,27 +677,55 @@ pub(crate) fn build_staging_goal(
     tile_x: u32,
     tile_y: u32,
 ) -> Option<(f32, f32)> {
-    let worker = entities.get(worker)?;
-    let w_tile = map.tile_of(worker.pos_x, worker.pos_y);
-    let footprint = footprint_tiles(kind, tile_x, tile_y);
-    if !footprint.contains(&w_tile) {
-        return None;
-    }
+    build_staging_goals(map, occ, entities, worker, kind, tile_x, tile_y)
+        .into_iter()
+        .next()
+}
 
-    // Search outward for the closest passable tile outside the requested footprint.
+fn build_staging_goals(
+    map: &Map,
+    occ: &Occupancy,
+    entities: &EntityStore,
+    worker: u32,
+    kind: EntityKind,
+    tile_x: u32,
+    tile_y: u32,
+) -> Vec<(f32, f32)> {
+    let Some(worker) = entities.get(worker) else {
+        return Vec::new();
+    };
+    let footprint = footprint_tiles(kind, tile_x, tile_y);
+    let Some(stats) = config::building_stats(kind) else {
+        return Vec::new();
+    };
+    if footprint.is_empty() {
+        return Vec::new();
+    }
+    let footprint_set: std::collections::BTreeSet<(u32, u32)> = footprint.iter().copied().collect();
+    let min_x = tile_x as i32;
+    let min_y = tile_y as i32;
+    let Some(max_x) = tile_x.checked_add(stats.foot_w.saturating_sub(1)) else {
+        return Vec::new();
+    };
+    let Some(max_y) = tile_y.checked_add(stats.foot_h.saturating_sub(1)) else {
+        return Vec::new();
+    };
+    let max_x = max_x as i32;
+    let max_y = max_y as i32;
+    let mut candidates = Vec::new();
+
+    // Search outward from the footprint, then order candidates by ring and worker distance.
     for r in 1i32..=6 {
-        for dy in -r..=r {
-            for dx in -r..=r {
-                if dx.abs().max(dy.abs()) != r {
+        for ty in (min_y - r)..=(max_y + r) {
+            for tx in (min_x - r)..=(max_x + r) {
+                if tx > min_x - r && tx < max_x + r && ty > min_y - r && ty < max_y + r {
                     continue;
                 }
-                let tx = w_tile.0 as i32 + dx;
-                let ty = w_tile.1 as i32 + dy;
                 if !map.in_bounds(tx, ty) {
                     continue;
                 }
                 let tile = (tx as u32, ty as u32);
-                if footprint.contains(&tile) {
+                if footprint_set.contains(&tile) {
                     continue;
                 }
                 if !map.is_passable(tx, ty) {
@@ -517,48 +734,29 @@ pub(crate) fn build_staging_goal(
                 if !occ.passable(tx, ty) {
                     continue;
                 }
-                return Some(map.tile_center(tile.0, tile.1));
-            }
-        }
-    }
-    None
-}
-
-fn spawn_point_has_clearance(map: &Map, occ: &Occupancy, cx: f32, cy: f32, radius: f32) -> bool {
-    if radius <= 0.0 {
-        return true;
-    }
-
-    let max = map.world_size_px();
-    if cx - radius < 0.0 || cy - radius < 0.0 || cx + radius > max || cy + radius > max {
-        return false;
-    }
-
-    let min_tx = ((cx - radius) / config::TILE_SIZE as f32).floor() as i32;
-    let min_ty = ((cy - radius) / config::TILE_SIZE as f32).floor() as i32;
-    let max_tx = ((cx + radius) / config::TILE_SIZE as f32).floor() as i32;
-    let max_ty = ((cy + radius) / config::TILE_SIZE as f32).floor() as i32;
-
-    for ty in min_ty..=max_ty {
-        for tx in min_tx..=max_tx {
-            if !map.in_bounds(tx, ty) || !occ.passable(tx, ty) {
-                let tile_left = tx as f32 * config::TILE_SIZE as f32;
-                let tile_top = ty as f32 * config::TILE_SIZE as f32;
-                let tile_right = tile_left + config::TILE_SIZE as f32;
-                let tile_bottom = tile_top + config::TILE_SIZE as f32;
-
-                let nearest_x = cx.clamp(tile_left, tile_right);
-                let nearest_y = cy.clamp(tile_top, tile_bottom);
-                let dx = cx - nearest_x;
-                let dy = cy - nearest_y;
-                if dx * dx + dy * dy <= radius * radius {
-                    return false;
+                let center = map.tile_center(tile.0, tile.1);
+                if !build_staging_goal_in_range(map, kind, tile_x, tile_y, center) {
+                    continue;
                 }
+                let dist2 = {
+                    let dx = worker.pos_x - center.0;
+                    let dy = worker.pos_y - center.1;
+                    dx * dx + dy * dy
+                };
+                candidates.push((r, dist2, tile));
             }
         }
     }
-
-    true
+    candidates.sort_by(|left, right| {
+        left.0
+            .cmp(&right.0)
+            .then_with(|| left.1.total_cmp(&right.1))
+            .then_with(|| left.2.cmp(&right.2))
+    });
+    candidates
+        .into_iter()
+        .map(|(_, _, tile)| map.tile_center(tile.0, tile.1))
+        .collect()
 }
 
 #[cfg(test)]
@@ -568,31 +766,156 @@ mod tests {
     use crate::game::map::Map;
     use crate::game::services::occupancy::Occupancy;
 
+    fn formation_unit(id: u32, map: &Map, tile: (u32, u32)) -> FormationUnit {
+        FormationUnit {
+            id,
+            pos: map.tile_center(tile.0, tile.1),
+        }
+    }
+
+    fn square_formation(map: &Map) -> Vec<FormationUnit> {
+        vec![
+            formation_unit(1, map, (8, 63)),
+            formation_unit(2, map, (12, 63)),
+            formation_unit(3, map, (8, 67)),
+            formation_unit(4, map, (12, 67)),
+        ]
+    }
+
+    fn offset_from(point: (f32, f32), origin: (f32, f32)) -> (f32, f32) {
+        (point.0 - origin.0, point.1 - origin.1)
+    }
+
+    fn assert_close(actual: f32, expected: f32) {
+        assert!(
+            (actual - expected).abs() <= 0.01,
+            "expected {actual:.2} to be close to {expected:.2}"
+        );
+    }
+
     #[test]
-    fn goal_spreading_assigns_unique_tiles_deterministically() {
+    fn near_group_move_compacts_goals_near_click() {
         let map = Map::generate(1, 0x1234_5678);
         let entities = EntityStore::new();
         let occ = Occupancy::build(&map, &entities);
+        let units = square_formation(&map);
+        let click = map.tile_center(11, 65);
 
-        let ids = vec![1, 2, 3, 4, 5];
-        let anchor = (10u32, 10u32);
-        let goals = spread_goals(&map, &occ, &ids, anchor);
+        let goals = formation_goals(&map, &occ, &units, click);
 
-        assert_eq!(goals.len(), ids.len());
-
-        // All goals should be unique (no two units share the same tile center).
-        let mut seen = std::collections::HashSet::new();
-        for g in &goals {
-            let tile = map.tile_of(g.0, g.1);
+        assert_eq!(goals.len(), units.len());
+        for goal in goals {
+            let dx = goal.0 - click.0;
+            let dy = goal.1 - click.1;
+            let dist = (dx * dx + dy * dy).sqrt();
             assert!(
-                seen.insert(tile),
-                "duplicate goal tile {tile:?} for multi-unit spread"
+                dist <= config::TILE_SIZE as f32 * 1.5,
+                "near goals should stay clustered around the click, got {goal:?}"
             );
         }
+    }
 
-        // First goal should be the anchor itself when it's free.
-        let anchor_center = map.tile_center(anchor.0, anchor.1);
-        assert_eq!(goals[0], anchor_center);
+    #[test]
+    fn far_group_move_preserves_world_offsets() {
+        let map = Map::generate(1, 0x1234_5678);
+        let entities = EntityStore::new();
+        let occ = Occupancy::build(&map, &entities);
+        let units = square_formation(&map);
+        let click = map.tile_center(30, 65);
+
+        let goals = formation_goals(&map, &occ, &units, click);
+
+        let ts = config::TILE_SIZE as f32;
+        let expected = [
+            (-2.0 * ts, -2.0 * ts),
+            (2.0 * ts, -2.0 * ts),
+            (-2.0 * ts, 2.0 * ts),
+            (2.0 * ts, 2.0 * ts),
+        ];
+        for (goal, expected_offset) in goals.iter().zip(expected) {
+            let actual = offset_from(*goal, click);
+            assert_close(actual.0, expected_offset.0);
+            assert_close(actual.1, expected_offset.1);
+        }
+    }
+
+    #[test]
+    fn medium_group_move_blends_offsets() {
+        let map = Map::generate(1, 0x1234_5678);
+        let entities = EntityStore::new();
+        let occ = Occupancy::build(&map, &entities);
+        let units = square_formation(&map);
+        let click = map.tile_center(21, 65);
+
+        let goals = formation_goals(&map, &occ, &units, click);
+
+        let ts = config::TILE_SIZE as f32;
+        let expected = [(-ts, -ts), (ts, -ts), (-ts, ts), (ts, ts)];
+        for (goal, expected_offset) in goals.iter().zip(expected) {
+            let actual = offset_from(*goal, click);
+            assert_close(actual.0, expected_offset.0);
+            assert_close(actual.1, expected_offset.1);
+        }
+    }
+
+    #[test]
+    fn formation_goals_are_unique_when_tiles_are_free() {
+        let map = Map::generate(1, 0x1234_5678);
+        let entities = EntityStore::new();
+        let occ = Occupancy::build(&map, &entities);
+        let units = square_formation(&map);
+        let click = map.tile_center(11, 65);
+
+        let first = formation_goals(&map, &occ, &units, click);
+        let second = formation_goals(&map, &occ, &units, click);
+
+        assert_eq!(
+            first, second,
+            "formation assignment should be deterministic"
+        );
+        let mut seen = std::collections::HashSet::new();
+        for goal in first {
+            let tile = map.tile_of(goal.0, goal.1);
+            assert!(
+                seen.insert(tile),
+                "duplicate goal tile {tile:?} for multi-unit formation"
+            );
+        }
+    }
+
+    #[test]
+    fn blocked_formation_slot_falls_back_to_nearby_passable_tile() {
+        let map = Map::generate(1, 0x1234_5678);
+        let mut entities = EntityStore::new();
+        let blocked_tile = (28, 63);
+        let blocked_center = map.tile_center(blocked_tile.0, blocked_tile.1);
+        entities
+            .spawn_building(
+                1,
+                EntityKind::Depot,
+                blocked_center.0,
+                blocked_center.1,
+                true,
+            )
+            .unwrap();
+        let occ = Occupancy::build(&map, &entities);
+        let units = square_formation(&map);
+        let click = map.tile_center(30, 65);
+
+        let goals = formation_goals(&map, &occ, &units, click);
+        let first_tile = map.tile_of(goals[0].0, goals[0].1);
+
+        assert_ne!(
+            first_tile, blocked_tile,
+            "blocked desired formation slot should not be assigned"
+        );
+        assert_eq!(
+            first_tile,
+            (29, 62),
+            "nearby fallback should use deterministic ring order"
+        );
+        assert!(map.is_passable(first_tile.0 as i32, first_tile.1 as i32));
+        assert!(occ.passable(first_tile.0 as i32, first_tile.1 as i32));
     }
 
     #[test]
@@ -610,20 +933,18 @@ mod tests {
         pathing.advance_tick(1);
         let coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, 1);
 
-        let b = entities.get(b_id).unwrap();
-        let (sx, sy) =
-            coordinator.find_spawn_point(&entities, b.kind, EntityKind::Tank, b.pos_x, b.pos_y);
+        let (sx, sy) = coordinator
+            .find_spawn_point(&entities, b_id, EntityKind::Tank)
+            .expect("spawn point should exist");
 
         let (stx, sty) = map.tile_of(sx, sy);
-        let (btx, bty) = map.tile_of(b.pos_x, b.pos_y);
+        let footprint = building_footprint(&map, entities.get(b_id).unwrap());
 
-        // Spawn tile must be outside the barracks footprint.
         assert!(
-            stx < btx || stx >= btx + 3 || sty < bty || sty >= bty + 2,
-            "spawn tile ({stx},{sty}) is inside the 3x2 footprint at ({btx},{bty})"
+            !footprint.contains(&(stx, sty)),
+            "spawn tile ({stx},{sty}) is inside the barracks footprint {footprint:?}"
         );
 
-        // Spawn tile must be passable terrain.
         assert!(map.is_passable(stx as i32, sty as i32));
     }
 
@@ -641,18 +962,12 @@ mod tests {
         pathing.advance_tick(1);
         let coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, 1);
 
-        let b = entities.get(b_id).unwrap();
-        let (sx, sy) =
-            coordinator.find_spawn_point(&entities, b.kind, EntityKind::Tank, b.pos_x, b.pos_y);
+        let (sx, sy) = coordinator
+            .find_spawn_point(&entities, b_id, EntityKind::Tank)
+            .expect("spawn point should exist");
 
         assert!(
-            spawn_point_has_clearance(
-                &map,
-                &occ,
-                sx,
-                sy,
-                config::unit_stats(EntityKind::Tank).unwrap().radius,
-            ),
+            standability::unit_spawn_standable(&map, &occ, &entities, EntityKind::Tank, sx, sy,),
             "tank spawn point clips the top map edge"
         );
     }
@@ -675,18 +990,12 @@ mod tests {
         pathing.advance_tick(1);
         let coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, 1);
 
-        let b = entities.get(factory_id).unwrap();
-        let (sx, sy) =
-            coordinator.find_spawn_point(&entities, b.kind, EntityKind::Tank, b.pos_x, b.pos_y);
+        let (sx, sy) = coordinator
+            .find_spawn_point(&entities, factory_id, EntityKind::Tank)
+            .expect("spawn point should exist");
 
         assert!(
-            spawn_point_has_clearance(
-                &map,
-                &occ,
-                sx,
-                sy,
-                config::unit_stats(EntityKind::Tank).unwrap().radius,
-            ),
+            standability::unit_spawn_standable(&map, &occ, &entities, EntityKind::Tank, sx, sy,),
             "tank spawn point is too close to the adjacent building"
         );
     }
@@ -794,6 +1103,35 @@ mod tests {
     }
 
     #[test]
+    fn build_staging_goal_uses_outside_tile_for_worker_approaching_footprint() {
+        let map = Map::generate(1, 0x1234_5678);
+        let mut entities = EntityStore::new();
+        let (wx, wy) = map.tile_center(10, 10);
+        let worker = entities.spawn_unit(1, EntityKind::Worker, wx, wy).unwrap();
+        let occ = Occupancy::build(&map, &entities);
+
+        let goal = build_staging_goal(
+            &map,
+            &occ,
+            &entities,
+            worker,
+            EntityKind::IndustrialCenter,
+            20,
+            20,
+        )
+        .expect("worker should be able to stage outside the footprint");
+        let tile = map.tile_of(goal.0, goal.1);
+        let footprint: std::collections::BTreeSet<(u32, u32)> =
+            footprint_tiles(EntityKind::IndustrialCenter, 20, 20)
+                .into_iter()
+                .collect();
+        assert!(
+            !footprint.contains(&tile),
+            "staging goal must be outside the 3x3 IC footprint, got {tile:?}"
+        );
+    }
+
+    #[test]
     fn build_order_fails_when_worker_cannot_escape_placement_area() {
         let map = Map::generate(1, 0x1234_5678);
         let mut entities = EntityStore::new();
@@ -817,6 +1155,38 @@ mod tests {
         assert!(
             matches!(e.order(), Order::Idle),
             "failed build should clear the worker order"
+        );
+    }
+
+    #[test]
+    fn build_order_accepts_long_expansion_route_to_outside_staging() {
+        let map = Map::generate(2, 0);
+        let mut entities = EntityStore::new();
+        let (wx, wy) = map.tile_center(10, 85);
+        let worker = entities.spawn_unit(1, EntityKind::Worker, wx, wy).unwrap();
+        let occ = Occupancy::build(&map, &entities);
+        let mut pathing = PathingService::new(8_192, 256);
+        pathing.advance_tick(1);
+        let mut coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, 1);
+
+        let ok =
+            coordinator.order_build(&mut entities, worker, EntityKind::IndustrialCenter, 48, 70);
+
+        assert!(ok, "expansion IC build order should find a staged route");
+        let e = entities.get(worker).unwrap();
+        let goal = e.path_goal().expect("build order should set a path goal");
+        let goal_tile = map.tile_of(goal.0, goal.1);
+        let footprint: std::collections::BTreeSet<(u32, u32)> =
+            footprint_tiles(EntityKind::IndustrialCenter, 48, 70)
+                .into_iter()
+                .collect();
+        assert!(
+            !footprint.contains(&goal_tile),
+            "build path goal should stop outside the expansion IC footprint"
+        );
+        assert!(
+            build_staging_goal_in_range(&map, EntityKind::IndustrialCenter, 48, 70, goal),
+            "outside staging goal should still be close enough to start construction"
         );
     }
 

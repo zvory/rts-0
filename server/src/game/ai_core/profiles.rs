@@ -17,6 +17,7 @@ pub(crate) struct AiProfile {
     pub(crate) attack: AttackPolicy,
     pub(crate) resources: ResourcePolicy,
     pub(crate) expansion: Option<ExpansionPolicy>,
+    pub(crate) tech_transition: Option<TechTransitionPolicy>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -157,6 +158,14 @@ pub(crate) struct AttackPolicy {
     pub(crate) required_unit: Option<EntityKind>,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct TechTransitionPolicy {
+    pub(crate) supply_used_threshold: u32,
+    pub(crate) required_tech_path: &'static [EntityKind],
+    pub(crate) production: ProductionPolicy,
+    pub(crate) attack: AttackPolicy,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct ResourcePolicy {
     pub(crate) oil_after_steel_workers: usize,
@@ -172,6 +181,7 @@ pub(crate) struct TankResourcePolicy {
 
 const RIFLE_ONLY: [EntityKind; 1] = [EntityKind::Rifleman];
 const TANK_AND_RIFLE: [EntityKind; 2] = [EntityKind::Tank, EntityKind::Rifleman];
+const TANK_ONLY: [EntityKind; 1] = [EntityKind::Tank];
 const SUPPORT_WEAPONS: [EntityKind; 2] = [EntityKind::MachineGunner, EntityKind::AtTeam];
 
 const FAST_TECH_PATH: [EntityKind; 1] = [EntityKind::Barracks];
@@ -231,6 +241,7 @@ pub(crate) static RIFLE_FLOOD_FAST: AiProfile = AiProfile {
         tank_adaptive: None,
     },
     expansion: None,
+    tech_transition: None,
 };
 
 pub(crate) static RIFLE_FLOOD_FULL_SATURATION: AiProfile = AiProfile {
@@ -278,6 +289,7 @@ pub(crate) static RIFLE_FLOOD_FULL_SATURATION: AiProfile = AiProfile {
         tank_adaptive: None,
     },
     expansion: None,
+    tech_transition: None,
 };
 
 pub(crate) static TECH_TO_TANKS: AiProfile = AiProfile {
@@ -325,6 +337,7 @@ pub(crate) static TECH_TO_TANKS: AiProfile = AiProfile {
         tank_adaptive: None,
     },
     expansion: None,
+    tech_transition: None,
 };
 
 pub(crate) static STEEL_EXPANSION_TANKS: AiProfile = AiProfile {
@@ -363,7 +376,7 @@ pub(crate) static STEEL_EXPANSION_TANKS: AiProfile = AiProfile {
         wave_growth: 0,
         regroup_reset_ticks: 540,
         reissue_cadence_ticks: 120,
-        stage_distance_tiles: 6.0,
+        stage_distance_tiles: 3.0,
         unit_kinds: &SUPPORT_WEAPONS,
         required_unit: None,
     },
@@ -379,6 +392,25 @@ pub(crate) static STEEL_EXPANSION_TANKS: AiProfile = AiProfile {
         pre_expansion_steel_worker_cap: 8,
         post_expansion_steel_worker_cap: Some(24),
         search_radius_tiles: 6,
+    }),
+    tech_transition: Some(TechTransitionPolicy {
+        supply_used_threshold: 100,
+        required_tech_path: &TANK_TECH_PATH,
+        production: ProductionPolicy {
+            queue_depth: 2,
+            unit_priorities: &TANK_ONLY,
+            save_for_first_tech_unit: Some(EntityKind::Tank),
+            balance_unit_priorities: false,
+        },
+        attack: AttackPolicy {
+            first_attack_size: 3,
+            wave_growth: 0,
+            regroup_reset_ticks: 540,
+            reissue_cadence_ticks: 120,
+            stage_distance_tiles: 8.0,
+            unit_kinds: &TANK_ONLY,
+            required_unit: Some(EntityKind::Tank),
+        },
     }),
 };
 
@@ -477,6 +509,23 @@ mod tests {
         assert_eq!(STEEL_EXPANSION_TANKS.workers.extra_oil_workers, 6);
         assert_eq!(STEEL_EXPANSION_TANKS.attack.first_attack_size, usize::MAX);
         assert!(STEEL_EXPANSION_TANKS.resources.tank_adaptive.is_none());
+        let transition = STEEL_EXPANSION_TANKS.tech_transition.unwrap();
+        assert_eq!(transition.supply_used_threshold, 100);
+        assert_eq!(
+            transition.required_tech_path,
+            &[
+                EntityKind::Barracks,
+                EntityKind::TrainingCentre,
+                EntityKind::TankFactory
+            ]
+        );
+        assert_eq!(transition.production.unit_priorities, &[EntityKind::Tank]);
+        assert_eq!(
+            transition.production.save_for_first_tech_unit,
+            Some(EntityKind::Tank)
+        );
+        assert_eq!(transition.attack.first_attack_size, 3);
+        assert_eq!(transition.attack.unit_kinds, &[EntityKind::Tank]);
     }
 
     #[test]

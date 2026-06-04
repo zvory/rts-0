@@ -1,7 +1,3 @@
 #!/usr/bin/env bash
-set -euo pipefail
-
-repo_root="$(git rev-parse --show-toplevel)"
-cd "$repo_root"
-
-./tests/run-all.sh
+# Gate direct commits to main through the local CI suite. See hooks/_gate-main.sh.
+exec "$(dirname "$0")/_gate-main.sh" pre-commit

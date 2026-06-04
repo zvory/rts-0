@@ -111,6 +111,16 @@ impl PathingService {
         occupancy: &Occupancy,
         req: PathRequest,
     ) -> Vec<(f32, f32)> {
+        let tile_path = self.request_tile_path(map, occupancy, req);
+        pathfinding::to_world_waypoints(&tile_path)
+    }
+
+    pub(crate) fn request_tile_path(
+        &mut self,
+        map: &Map,
+        occupancy: &Occupancy,
+        req: PathRequest,
+    ) -> Vec<(i32, i32)> {
         let pass = TerrainPassability {
             map,
             occupancy,
@@ -119,7 +129,7 @@ impl PathingService {
         };
 
         if let Some(tile_path) = self.cache_lookup(&req, &pass) {
-            return pathfinding::to_world_waypoints(&tile_path);
+            return tile_path;
         }
 
         let budget = req.budget.unwrap_or(self.default_budget);
@@ -132,11 +142,16 @@ impl PathingService {
             budget,
         );
 
-        let waypoints = pathfinding::to_world_waypoints(&tile_path);
         if !tile_path.is_empty() {
-            self.cache_insert(req.kind, req.start, req.goal, req.radius_tiles, tile_path);
+            self.cache_insert(
+                req.kind,
+                req.start,
+                req.goal,
+                req.radius_tiles,
+                tile_path.clone(),
+            );
         }
-        waypoints
+        tile_path
     }
 
     fn cache_lookup<P: Passability>(

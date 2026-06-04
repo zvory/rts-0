@@ -4,10 +4,9 @@ use crate::config;
 use crate::game::entity::{BuildPhase, EntityKind, EntityStore};
 use crate::game::map::Map;
 use crate::game::pathfinding::Passability;
-use crate::game::services::occupancy::{
-    building_footprint, footprint_center, footprint_placeable, Occupancy,
-};
+use crate::game::services::occupancy::{building_footprint, footprint_center, Occupancy};
 use crate::game::services::spatial::SpatialIndex;
+use crate::game::services::standability;
 use crate::game::services::{dist2, interact_range_for_kind};
 use crate::game::PlayerState;
 use crate::protocol::Event;
@@ -22,7 +21,7 @@ pub(crate) fn construction_system(
     map: &Map,
     entities: &mut EntityStore,
     players: &mut [PlayerState],
-    spatial: &SpatialIndex,
+    _spatial: &SpatialIndex,
     events: &mut HashMap<u32, Vec<Event>>,
 ) {
     // ----- Arrival pass: ToSite workers that have reached their target -----
@@ -53,7 +52,7 @@ pub(crate) fn construction_system(
         };
 
         // Re-validate placement against the live entity set.
-        let placeable = footprint_placeable(map, entities, spatial, kind, tx, ty);
+        let placeable = standability::building_site_clear(map, entities, kind, tx, ty);
         if config::building_stats(kind).is_none() {
             if let Some(w) = entities.get_mut(worker) {
                 w.clear_orders();
@@ -98,6 +97,9 @@ pub(crate) fn construction_system(
             Some(id) => id,
             None => continue,
         };
+        if let Some(player) = players.iter_mut().find(|p| p.id == owner) {
+            player.record_entity_created(kind);
+        }
         if let Some(w) = entities.get_mut(worker) {
             w.clear_path();
             w.set_target_id(Some(site));
@@ -208,6 +210,121 @@ fn eject_worker_if_inside(map: &Map, entities: &mut EntityStore, worker: u32, si
                 }
                 return;
             }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::game::entity::{EntityStore, Order};
+    use crate::game::services::geometry::building_rect_for_footprint;
+    use crate::game::services::occupancy::footprint_center;
+    use crate::game::services::spatial::SpatialIndex;
+    use crate::game::ScoreState;
+    use crate::protocol::terrain;
+
+    #[test]
+    fn construction_revalidates_worker_body_outside_footprint() {
+        let map = flat_map(16);
+        let mut entities = EntityStore::new();
+        let (wx, wy) = footprint_center(&map, EntityKind::Depot, 4, 4);
+        let worker = entities
+            .spawn_unit(1, EntityKind::Worker, wx, wy)
+            .expect("worker should spawn");
+        entities
+            .get_mut(worker)
+            .expect("worker should exist")
+            .set_order(Order::build(EntityKind::Depot, 4, 4));
+        let spatial = SpatialIndex::build(&entities, map.size);
+        let mut players = vec![player_state(1)];
+        let mut events = HashMap::new();
+
+        construction_system(&map, &mut entities, &mut players, &spatial, &mut events);
+
+        assert!(
+            entities
+                .iter()
+                .all(|entity| entity.kind != EntityKind::Depot),
+            "worker body inside the footprint must prevent scaffold creation"
+        );
+        assert!(
+            matches!(
+                entities.get(worker).expect("worker should survive").order(),
+                Order::Idle
+            ),
+            "failed final placement should clear the worker order"
+        );
+        assert!(
+            events
+                .get(&1)
+                .is_some_and(|events| matches!(events.as_slice(), [Event::Notice { msg }] if msg == "Cannot build there")),
+            "failed final placement should notify the owner"
+        );
+    }
+
+    #[test]
+    fn construction_rejects_other_unit_body_intersecting_footprint() {
+        let map = flat_map(16);
+        let mut entities = EntityStore::new();
+        let rect = building_rect_for_footprint(EntityKind::Depot, 4, 4).expect("depot rect");
+        let worker = entities
+            .spawn_unit(
+                1,
+                EntityKind::Worker,
+                rect.max_x + config::TILE_SIZE as f32,
+                rect.min_y + config::TILE_SIZE as f32,
+            )
+            .expect("worker should spawn");
+        entities
+            .get_mut(worker)
+            .expect("worker should exist")
+            .set_order(Order::build(EntityKind::Depot, 4, 4));
+        entities
+            .spawn_unit(1, EntityKind::Tank, rect.max_x + 19.0, rect.min_y + 32.0)
+            .expect("tank should spawn");
+        let spatial = SpatialIndex::build(&entities, map.size);
+        let mut players = vec![player_state(1)];
+        let mut events = HashMap::new();
+
+        construction_system(&map, &mut entities, &mut players, &spatial, &mut events);
+
+        assert!(
+            entities
+                .iter()
+                .all(|entity| entity.kind != EntityKind::Depot),
+            "another living unit body intersecting the footprint must prevent scaffold creation"
+        );
+        assert!(
+            matches!(
+                entities.get(worker).expect("worker should survive").order(),
+                Order::Idle
+            ),
+            "blocked final placement should clear the worker order"
+        );
+    }
+
+    fn flat_map(size: u32) -> Map {
+        Map {
+            size,
+            terrain: vec![terrain::GRASS; (size * size) as usize],
+            starts: vec![],
+            expansion_sites: vec![],
+        }
+    }
+
+    fn player_state(id: u32) -> PlayerState {
+        PlayerState {
+            id,
+            name: format!("Player {id}"),
+            color: "#fff".to_string(),
+            start_tile: (0, 0),
+            steel: 1_000,
+            oil: 1_000,
+            supply_used: 0,
+            supply_cap: 20,
+            is_ai: false,
+            score: ScoreState::default(),
         }
     }
 }

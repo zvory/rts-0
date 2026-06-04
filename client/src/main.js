@@ -67,6 +67,7 @@ const dom = {
   toast: document.getElementById("toast"),
   gameOver: document.getElementById("game-over"),
   gameOverText: document.getElementById("game-over-text"),
+  gameOverScores: document.getElementById("game-over-scores"),
   gameOverButton: document.getElementById("game-over-button"),
   devBanner: document.getElementById("dev-banner"),
   replaySpeed: document.getElementById("replay-speed"),
@@ -191,6 +192,7 @@ class App {
     dom.lobbyScreen.hidden = true;
     dom.gameScreen.hidden = false;
     dom.gameOver.hidden = true;
+    this.clearScoreboard();
 
     this.match = new Match(this.net, payload, (msg) => this.showToast(msg), this.devWatch);
   }
@@ -206,9 +208,85 @@ class App {
       verdict === "won" ? "Victory" : verdict === "lost" ? "Defeat" : "Draw";
     dom.gameOverText.textContent = text;
     dom.gameOverText.dataset.verdict = verdict; // lets CSS tint win/lose/draw
+    this.renderScoreboard(Array.isArray(m?.scores) ? m.scores : [], m?.winnerId ?? null);
     dom.gameOver.hidden = false;
     // Freeze the loop but keep the final frame visible behind the overlay.
     if (this.match) this.match.stop();
+  }
+
+  /**
+   * Render the frozen score snapshot carried by the gameOver message.
+   * @param {Array<object>} scores
+   * @param {number|null} winnerId
+   */
+  renderScoreboard(scores, winnerId) {
+    const root = dom.gameOverScores;
+    if (!root) return;
+    root.replaceChildren();
+    if (!scores.length) {
+      root.hidden = true;
+      return;
+    }
+
+    const table = document.createElement("table");
+    table.className = "score-table";
+    const thead = document.createElement("thead");
+    const header = document.createElement("tr");
+    const columns = [
+      ["player", "Player"],
+      ["unitScore", "Unit score"],
+      ["structureScore", "Structure score"],
+      ["unitsKilled", "Units killed"],
+      ["unitsLost", "Units lost"],
+      ["buildingsKilled", "Buildings killed"],
+      ["buildingsLost", "Buildings lost"],
+    ];
+    for (const [, label] of columns) {
+      const th = document.createElement("th");
+      th.scope = "col";
+      th.textContent = label;
+      header.appendChild(th);
+    }
+    thead.appendChild(header);
+    table.appendChild(thead);
+
+    const tbody = document.createElement("tbody");
+    for (const score of scores) {
+      const tr = document.createElement("tr");
+      const id = Number(score?.id);
+      if (Number.isFinite(id) && id === this.net.playerId) tr.classList.add("you");
+      if (winnerId != null && Number.isFinite(id) && id === Number(winnerId)) {
+        tr.classList.add("winner");
+      }
+
+      const player = document.createElement("td");
+      player.className = "score-player";
+      const swatch = document.createElement("span");
+      swatch.className = "score-swatch";
+      swatch.style.backgroundColor = typeof score?.color === "string" ? score.color : "#888";
+      const name = document.createElement("span");
+      name.className = "score-name";
+      name.textContent = score?.name || (Number.isFinite(id) ? `Player ${id}` : "Player");
+      player.append(swatch, name);
+      tr.appendChild(player);
+
+      for (const [key] of columns.slice(1)) {
+        const td = document.createElement("td");
+        td.className = "score-number";
+        td.textContent = formatScore(score?.[key]);
+        tr.appendChild(td);
+      }
+      tbody.appendChild(tr);
+    }
+    table.appendChild(tbody);
+    root.appendChild(table);
+    root.hidden = false;
+  }
+
+  clearScoreboard() {
+    if (!dom.gameOverScores) return;
+    dom.gameOverScores.replaceChildren();
+    dom.gameOverScores.hidden = true;
   }
 
   /** "Back to lobby" button: tear down the match and restore the lobby. */
@@ -218,6 +296,7 @@ class App {
       this.match = null;
     }
     dom.gameOver.hidden = true;
+    this.clearScoreboard();
     dom.gameScreen.hidden = true;
     dom.lobbyScreen.hidden = false;
     this.lobby.show();
@@ -262,6 +341,12 @@ class App {
       dom.version.textContent = "unknown";
     }
   }
+}
+
+function formatScore(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n <= 0) return "0";
+  return Math.trunc(n).toLocaleString();
 }
 
 /**
