@@ -354,12 +354,43 @@ export class Input {
       else this.state.setSelection(ids);
       return;
     }
+    if (ctrl && isBuilding(hit.kind) && hit.owner === this.state.playerId) {
+      const ids = this._ownBuildingsOfKindInViewport(hit.kind);
+      if (additive) this.state.addToSelection(ids);
+      else this.state.setSelection(ids);
+      return;
+    }
     if (additive) {
       if (this.state.selection.has(hit.id)) this.state.removeFromSelection([hit.id]);
       else this.state.addToSelection([hit.id]);
       return;
     }
     else this.state.setSelection([hit.id]);
+  }
+
+  /** All own buildings of `kind` whose center lies in the viewport. Cap mirrors unit ctrl-click. */
+  _ownBuildingsOfKindInViewport(kind) {
+    const el = this.dom;
+    const w = el.clientWidth;
+    const h = el.clientHeight;
+    const topLeft = this.camera.screenToWorld(0, 0);
+    const botRight = this.camera.screenToWorld(w, h);
+    const minX = Math.min(topLeft.x, botRight.x);
+    const maxX = Math.max(topLeft.x, botRight.x);
+    const minY = Math.min(topLeft.y, botRight.y);
+    const maxY = Math.max(topLeft.y, botRight.y);
+    const me = this.state.playerId;
+    return this.state
+      .entitiesInterpolated(1)
+      .filter(
+        (e) =>
+          e.owner === me &&
+          e.kind === kind &&
+          e.x >= minX && e.x <= maxX &&
+          e.y >= minY && e.y <= maxY,
+      )
+      .sort((a, b) => a.id - b.id)
+      .map((e) => e.id);
   }
 
   /** Up to 12 own units of `kind` in the viewport, closest to `anchor`. */

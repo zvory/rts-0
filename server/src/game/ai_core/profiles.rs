@@ -98,6 +98,9 @@ pub(crate) struct ExpansionPolicy {
     pub(crate) pre_expansion_steel_worker_cap: usize,
     pub(crate) post_expansion_steel_worker_cap: Option<usize>,
     pub(crate) search_radius_tiles: i32,
+    pub(crate) trigger_steel: u32,
+    pub(crate) trigger_supply_used: u32,
+    pub(crate) blocks_tech_path: bool,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -237,11 +240,42 @@ pub(crate) static RIFLE_FLOOD_FAST: AiProfile = AiProfile {
         required_unit: None,
     },
     resources: ResourcePolicy {
-        oil_after_steel_workers: usize::MAX,
+        oil_after_steel_workers: 10,
         tank_adaptive: None,
     },
-    expansion: None,
-    tech_transition: None,
+    expansion: Some(ExpansionPolicy {
+        target_industrial_centers: 2,
+        required_complete_building: EntityKind::TankFactory,
+        defensive_unit: EntityKind::Rifleman,
+        defensive_unit_count: 0,
+        pre_expansion_steel_worker_cap: 12,
+        post_expansion_steel_worker_cap: Some(24),
+        search_radius_tiles: 6,
+        trigger_steel: 500,
+        trigger_supply_used: 70,
+        blocks_tech_path: false,
+    }),
+    tech_transition: Some(TechTransitionPolicy {
+        // If the proxy rush stalls and we accumulate supply, pivot to tanks so we can break a
+        // contained game instead of bleeding riflemen into entrenched defenses.
+        supply_used_threshold: 70,
+        required_tech_path: &TANK_TECH_PATH,
+        production: ProductionPolicy {
+            queue_depth: 2,
+            unit_priorities: &TANK_AND_RIFLE,
+            save_for_first_tech_unit: Some(EntityKind::Tank),
+            balance_unit_priorities: false,
+        },
+        attack: AttackPolicy {
+            first_attack_size: 3,
+            wave_growth: 1,
+            regroup_reset_ticks: 480,
+            reissue_cadence_ticks: 120,
+            stage_distance_tiles: 8.0,
+            unit_kinds: &TANK_AND_RIFLE,
+            required_unit: Some(EntityKind::Tank),
+        },
+    }),
 };
 
 pub(crate) static RIFLE_FLOOD_FULL_SATURATION: AiProfile = AiProfile {
@@ -285,11 +319,42 @@ pub(crate) static RIFLE_FLOOD_FULL_SATURATION: AiProfile = AiProfile {
         required_unit: None,
     },
     resources: ResourcePolicy {
-        oil_after_steel_workers: usize::MAX,
+        oil_after_steel_workers: 10,
         tank_adaptive: None,
     },
-    expansion: None,
-    tech_transition: None,
+    expansion: Some(ExpansionPolicy {
+        target_industrial_centers: 2,
+        required_complete_building: EntityKind::TankFactory,
+        defensive_unit: EntityKind::Rifleman,
+        defensive_unit_count: 0,
+        pre_expansion_steel_worker_cap: 18,
+        post_expansion_steel_worker_cap: Some(28),
+        search_radius_tiles: 6,
+        trigger_steel: 500,
+        trigger_supply_used: 70,
+        blocks_tech_path: false,
+    }),
+    tech_transition: Some(TechTransitionPolicy {
+        // Once the rifle flood has put real bodies on the field, pivot to tanks so a stalemated
+        // saturation push doesn't bleed out against superior tech.
+        supply_used_threshold: 80,
+        required_tech_path: &TANK_TECH_PATH,
+        production: ProductionPolicy {
+            queue_depth: 2,
+            unit_priorities: &TANK_AND_RIFLE,
+            save_for_first_tech_unit: Some(EntityKind::Tank),
+            balance_unit_priorities: false,
+        },
+        attack: AttackPolicy {
+            first_attack_size: 4,
+            wave_growth: 1,
+            regroup_reset_ticks: 480,
+            reissue_cadence_ticks: 120,
+            stage_distance_tiles: 8.0,
+            unit_kinds: &TANK_AND_RIFLE,
+            required_unit: Some(EntityKind::Tank),
+        },
+    }),
 };
 
 pub(crate) static TECH_TO_TANKS: AiProfile = AiProfile {
@@ -336,7 +401,18 @@ pub(crate) static TECH_TO_TANKS: AiProfile = AiProfile {
         oil_after_steel_workers: 8,
         tank_adaptive: None,
     },
-    expansion: None,
+    expansion: Some(ExpansionPolicy {
+        target_industrial_centers: 2,
+        required_complete_building: EntityKind::TankFactory,
+        defensive_unit: EntityKind::Tank,
+        defensive_unit_count: 0,
+        pre_expansion_steel_worker_cap: 12,
+        post_expansion_steel_worker_cap: Some(24),
+        search_radius_tiles: 6,
+        trigger_steel: 500,
+        trigger_supply_used: 70,
+        blocks_tech_path: false,
+    }),
     tech_transition: None,
 };
 
@@ -392,6 +468,9 @@ pub(crate) static STEEL_EXPANSION_TANKS: AiProfile = AiProfile {
         pre_expansion_steel_worker_cap: 8,
         post_expansion_steel_worker_cap: Some(24),
         search_radius_tiles: 6,
+        trigger_steel: 0,
+        trigger_supply_used: 0,
+        blocks_tech_path: true,
     }),
     tech_transition: Some(TechTransitionPolicy {
         supply_used_threshold: 100,
