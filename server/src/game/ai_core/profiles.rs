@@ -357,7 +357,7 @@ pub(crate) static STEEL_EXPANSION_TANKS: AiProfile = AiProfile {
         barracks_curve: BarracksCurve {
             before_steel_saturation: 2,
             after_steel_saturation: 4,
-            banked_steel_threshold: 500,
+            banked_steel_threshold: 0,
             banked_steel_step: 0,
             max: 4,
         },
@@ -394,7 +394,7 @@ pub(crate) static STEEL_EXPANSION_TANKS: AiProfile = AiProfile {
         search_radius_tiles: 6,
     }),
     tech_transition: Some(TechTransitionPolicy {
-        supply_used_threshold: 100,
+        supply_used_threshold: 50,
         required_tech_path: &TANK_TECH_PATH,
         production: ProductionPolicy {
             queue_depth: 2,
@@ -490,6 +490,13 @@ mod tests {
 
         assert_eq!(STEEL_EXPANSION_TANKS.buildings.barracks_curve.max, 4);
         assert_eq!(
+            STEEL_EXPANSION_TANKS
+                .buildings
+                .barracks_curve
+                .banked_steel_threshold,
+            0
+        );
+        assert_eq!(
             STEEL_EXPANSION_TANKS.buildings.required_tech_path,
             &[EntityKind::Barracks, EntityKind::TrainingCentre]
         );
@@ -510,7 +517,7 @@ mod tests {
         assert_eq!(STEEL_EXPANSION_TANKS.attack.first_attack_size, usize::MAX);
         assert!(STEEL_EXPANSION_TANKS.resources.tank_adaptive.is_none());
         let transition = STEEL_EXPANSION_TANKS.tech_transition.unwrap();
-        assert_eq!(transition.supply_used_threshold, 100);
+        assert_eq!(transition.supply_used_threshold, 50);
         assert_eq!(
             transition.required_tech_path,
             &[
