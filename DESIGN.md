@@ -214,7 +214,7 @@ watch rooms receive all resource updates).
   latchedNode?: u32,             // node id the worker is currently harvesting (attached mining)
   // combat feedback:
   targetId?: u32,                // current attack target, for drawing tracers
-  setupState?: string,           // machine_gunner only: "packed","setting_up","deployed","tearing_down"
+  setupState?: string,           // machine_gunner/at_team only: "packed","setting_up","deployed","tearing_down"
   // unit-producing buildings:
   rally?: [f32, f32],            // rally point (world px); ONLY ever sent to the owner
   // tanks:
@@ -595,11 +595,12 @@ once; on `gameOver` show the victory/defeat overlay with the frozen score table.
   selection drag-box → (HUD is DOM, not Pixi).
 - Units: low-detail hard-edged silhouettes tinted by player color, with a dark drop shadow,
   dark outline, HP bar above when damaged/selected, and glowing selection ring when selected.
-  Distinct silhouette per kind (engineer: compact block; rifleman / machine gunner / AT team:
-  shared infantry body with oversized role weapons; tank: chunky flat-shaded armor). Riflemen
-  carry a rifle, AT teams carry a large panzerfaust-style launcher, and machine gunners carry
-  an MG42-style long machine gun across the body while packed that extends forward with bracing
-  during setup/deployment.
+  Distinct silhouette per kind (engineer: compact block; rifleman / machine gunner: shared
+  infantry body with oversized role weapons; AT team: wheeled gun; tank: chunky flat-shaded armor). Riflemen
+  carry a rifle, AT teams field a wheeled anti-tank gun with a long recoiling barrel, carriage,
+  two wheels, and animated deployment bracing, and machine gunners carry an MG42-style long
+  machine gun across the body while packed that extends forward with bracing during
+  setup/deployment.
 - Buildings: footprint-sized blocky field structures with neutral geometry and plain
   two-letter stencils; under construction → translucent with a progress bar; production →
   small progress arc.
@@ -661,7 +662,7 @@ Core unit roles:
 - **Tank** is the machine-gun breaker and open-ground power unit: immune to rifle and
   machine-gun small-arms fire, strong against static defenses and exposed infantry, but
   vulnerable to other tanks and anti-tank infantry.
-- **Anti-tank infantry team** is the ambush counter to tanks: dangerous from the side,
+- **Anti-tank gun team** is the ambush counter to tanks: dangerous from the side,
   rear, or at close range, especially when operating from forests, but weak or inefficient
   against regular infantry.
 
@@ -686,7 +687,7 @@ Intended progression:
 ### 5.2 Current implementation constants
 
 The current implementation uses the themed unit/building names below. Combat is handled by the
-shared attack model plus the machine-gunner setup/teardown state, tank turret aim gates, and
+shared attack model plus the support-weapon setup/teardown state, tank turret aim gates, and
 tank hull-facing damage modifiers for anti-tank hits against tank victims. Tanks keep their active
 movement path while firing on either `Move` or `AttackMove` orders; other mobile combat units still
 hold position once a target is in weapon range. Plain `Move` tanks only fire at enemies already in
@@ -697,7 +698,7 @@ below are the human-readable form of the
 authoritative `rules::defs` records.
 
 - `TICK_HZ = 30`, `SNAPSHOT_EVERY_N_TICKS = 1`.
-- `MACHINE_GUNNER_SETUP_TICKS = 30` (~1s setup or teardown).
+- `MACHINE_GUNNER_SETUP_TICKS = 30` (~1s setup or teardown for machine gunners and AT teams).
 - `TANK_OIL_COST_PER_PX = 10 / (96 * TILE_SIZE)`: a tank driving one full 96-tile map width
   burns approximately 10 oil. Tanks cannot advance while their owner has zero oil.
 - Map: `TILE_SIZE = 32` px. The live map is the hardcoded handcrafted asset at
@@ -738,7 +739,7 @@ Unit stats (hp, dmg, range[tiles], cooldown[ticks], speed[px/tick], sight[tiles]
 | worker          | 40  | 4   | 1     | 24 | 1.6   | 7     | 50  | 0   | 1   | 360 (~12s) |
 | rifleman        | 45  | 5   | 4     | 16 | 1.6   | 8     | 50  | 0   | 1   | 300 (~10s) |
 | machine_gunner  | 55  | 4   | 5     | 6  | 1.28  | 8     | 75  | 25  | 2   | 400 (~13s) |
-| at_team         | 45  | 48  | 5     | 72 | 1.28  | 8     | 75  | 25  | 2   | 440 (~15s) |
+| at_team         | 45  | 48  | 5     | 72 | 1.152 | 8     | 75  | 25  | 2   | 440 (~15s) |
 | tank            | 390 | 60  | 3     | 72 | 2.0   | 7     | 200 | 150 | 6   | 750 (~25s); requires Steelworks |
 
 Building stats (hp, sight, cost, footprint tiles wxh, buildTicks, extra):
@@ -903,7 +904,7 @@ The server treats every client as potentially hostile. Limits live next to the c
   Workers in `GatherPhase::Harvesting` or `BuildPhase::Constructing` are ghost pass-through units:
   they neither push nor are pushed, which keeps walking units from being deadlocked by miners or
   active builders. All other mobile-unit pairs split overlap by footing resistance, so braced or
-  deployed machine gunners and tanks hold ground better than soft moving infantry while equal-profile
+  deployed support weapons and tanks hold ground better than soft moving infantry while equal-profile
   units still split pushes evenly. Moving tanks therefore displace idle soft infantry more readily,
   braced weapons hold ground, and tank-vs-tank contacts tend to stop or reverse along the hull axis
   rather than slide sideways past each other. Push targets are accepted only when the same

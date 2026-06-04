@@ -33,6 +33,7 @@ const COLLISION_PASSES: usize = 8;
 const COLLISION_EPS_PX: f32 = 0.001;
 
 pub(crate) const TANK_BODY_TURN_RATE_RAD_PER_TICK: f32 = 0.035;
+const AT_GUN_BODY_TURN_RATE_RAD_PER_TICK: f32 = 0.035;
 const TANK_BODY_LOOKAHEAD_PX: f32 = config::TILE_SIZE as f32 * 5.0;
 const TANK_REVERSE_GOAL_DISTANCE_PX: f32 = config::TILE_SIZE as f32 * 3.0;
 const TANK_REVERSE_MIN_BEHIND_ANGLE_RAD: f32 = std::f32::consts::FRAC_PI_2;
@@ -88,7 +89,7 @@ pub(crate) fn movement_system_with_events(
                 Some(e) if e.is_unit() && !e.path_is_empty() => e,
                 _ => continue,
             };
-            if e.kind == EntityKind::MachineGunner
+            if requires_weapon_setup(e.kind)
                 && matches!(
                     e.weapon_setup(),
                     WeaponSetup::SettingUp { .. } | WeaponSetup::TearingDown { .. }
@@ -199,7 +200,14 @@ pub(crate) fn movement_system_with_events(
             if !is_tank {
                 let facing = dy.atan2(dx);
                 if facing.is_finite() {
-                    new_facing = Some(facing);
+                    if kind == EntityKind::AtTeam {
+                        let current = entities.get(id).map(|e| e.facing()).unwrap_or(0.0);
+                        let rotated =
+                            rotate_toward(current, facing, AT_GUN_BODY_TURN_RATE_RAD_PER_TICK);
+                        new_facing = Some(if rotated.is_finite() { rotated } else { facing });
+                    } else {
+                        new_facing = Some(facing);
+                    }
                 }
             }
             if dist <= budget {
@@ -1185,7 +1193,7 @@ pub(crate) fn footing_profile(e: &Entity) -> FootingProfile {
     {
         return FootingProfile::Ghost;
     }
-    if e.kind == EntityKind::MachineGunner
+    if requires_weapon_setup(e.kind)
         && matches!(
             e.weapon_setup(),
             WeaponSetup::SettingUp { .. } | WeaponSetup::Deployed
@@ -1196,7 +1204,7 @@ pub(crate) fn footing_profile(e: &Entity) -> FootingProfile {
     if e.kind == EntityKind::Tank {
         return FootingProfile::Heavy;
     }
-    if e.kind != EntityKind::MachineGunner
+    if !requires_weapon_setup(e.kind)
         && e.kind != EntityKind::Tank
         && e.target_id().is_some()
         && e.path_is_empty()
@@ -1204,6 +1212,10 @@ pub(crate) fn footing_profile(e: &Entity) -> FootingProfile {
         return FootingProfile::Firm;
     }
     FootingProfile::Soft
+}
+
+fn requires_weapon_setup(kind: EntityKind) -> bool {
+    matches!(kind, EntityKind::MachineGunner | EntityKind::AtTeam)
 }
 
 pub(crate) fn footing_resistance(profile: FootingProfile) -> f32 {
@@ -3214,6 +3226,34 @@ mod tests {
         assert!(
             (facing - std::f32::consts::FRAC_PI_2).abs() <= 0.0001,
             "rifleman should snap to path-segment facing, got {facing:.4}"
+        );
+    }
+
+    #[test]
+    fn at_team_facing_turns_gradually_along_path() {
+        let map = flat_map(1);
+        let mut entities = EntityStore::new();
+        let (sx, sy) = map.tile_center(20, 20);
+        let (_, gy) = map.tile_center(20, 26);
+        let at_team = entities
+            .spawn_unit(1, EntityKind::AtTeam, sx, sy)
+            .expect("at team should spawn");
+        if let Some(e) = entities.get_mut(at_team) {
+            e.set_facing(0.0);
+        }
+        set_path_direct(&mut entities, at_team, vec![(sx, gy)]);
+
+        let occ = Occupancy::build(&map, &entities);
+        let spatial = SpatialIndex::build(&entities, map.size);
+        movement_system(&map, &mut entities, &mut [], &occ, &spatial, 0);
+
+        let facing = entities
+            .get(at_team)
+            .expect("at team should exist")
+            .facing();
+        assert!(
+            facing > 0.0 && facing <= AT_GUN_BODY_TURN_RATE_RAD_PER_TICK + 0.0001,
+            "AT gun should turn by at most the turn-rate constant, got {facing:.4}"
         );
     }
 

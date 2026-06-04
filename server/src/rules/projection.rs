@@ -93,7 +93,10 @@ pub fn project_entity(
             }
         }
     }
-    if entity.kind == crate::game::entity::EntityKind::MachineGunner {
+    if matches!(
+        entity.kind,
+        crate::game::entity::EntityKind::MachineGunner | crate::game::entity::EntityKind::AtTeam
+    ) {
         view.setup_state = Some(entity.weapon_setup().to_protocol_str().to_string());
     }
 
