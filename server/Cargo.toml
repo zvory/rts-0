@@ -21,6 +21,12 @@ path = "src/ai_balance_matrix.rs"
 test = false
 bench = false
 
+[[bin]]
+name = "ai-perf-harness"
+path = "src/ai_perf_harness.rs"
+test = false
+bench = false
+
 [dependencies]
 tokio = { version = "1", features = ["full"] }
 axum = { version = "0.8", features = ["ws"] }
