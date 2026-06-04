@@ -31,7 +31,8 @@ update this file in the same change.
   a player only receives neutral/enemy entities standing on tiles that player can
   currently see. This makes the fog cheat-proof (hidden enemies are never sent).
 - Lobby-time spectators are connected humans who are not seated in the simulation. They receive
-  full-world no-fog snapshots, all player resource rows, and no controllable units/buildings.
+  snapshots filtered to the union of all active players' current fog, all player resource rows,
+  and no controllable units/buildings.
   Spectators must join or switch roles before the match starts; mid-match joins are rejected.
 - The **client** renders snapshots, interpolating entity positions between them for
   smoothness, and computes the **fog overlay** locally from its own units'/buildings'
@@ -158,7 +159,7 @@ transport decode:
   entities: Entity[],            // your non-resource entities (always) + enemy on visible tiles
   resourceDeltas?: ResourceDelta[], // visible resource remaining updates; omitted when empty
   events: Event[],               // transient things to surface (see 2.5)
-  playerResources?: {id, steel, oil, supplyUsed, supplyCap}[]  // all players; replay/spectator no-fog mode only
+  playerResources?: {id, steel, oil, supplyUsed, supplyCap}[]  // all players; spectator/replay mode only
 }
 ```
 
@@ -181,7 +182,7 @@ Older object-shaped JSON snapshots remain decodable by the client for fallback/d
   ],
   "r": [[id, remaining]],         // omitted when empty
   "ev": [EventRecord],            // omitted when empty
-  "pr": [[id, steel, oil, supplyUsed, supplyCap]]  // omitted in normal play; present in spectator/no-fog/replay
+  "pr": [[id, steel, oil, supplyUsed, supplyCap]]  // omitted in normal play; present in spectator/replay
 }
 ```
 
@@ -323,6 +324,9 @@ impl Game {
     /// Build the fog-filtered snapshot for one player at the current tick.
     pub fn snapshot_for(&self, player: u32) -> Snapshot;
 
+    /// Build a spectator snapshot from the union of all active players' current fog.
+    pub fn snapshot_for_spectator(&self, visible_players: &[u32]) -> Snapshot;
+
     /// Build a full-world snapshot for a dev watch client. Normal gameplay must not use this.
     pub fn snapshot_full_for(&self, player: u32) -> Snapshot;
 
@@ -366,8 +370,8 @@ them at the top of `tick()` — see §8.
 - The room task, each tick: drain commands → `game.tick()` → for each connected player
   `game.snapshot_for(pid)` → send. Lobby phase: broadcast `lobby` on changes.
 - Normal rooms reject all mid-match joins. Spectators are lobby members only: they receive
-  `StartPayload.spectator = true` and live `game.snapshot_full_for(0)` snapshots, but are not
-  included in `PlayerInit`, command routing, elimination, or match-player counts.
+  `StartPayload.spectator = true` and live `game.snapshot_for_spectator(active_player_ids)`
+  snapshots, but are not included in `PlayerInit`, command routing, elimination, or match-player counts.
 - Dev self-play watch rooms are a special-case room mode inside the same task model: they own a
   normal `Game`, feed it scripted commands from `game::selfplay`, and send watchers
   `game.snapshot_full_for(view_pid)` instead of fog-filtered snapshots. Replay rooms advance at
@@ -612,8 +616,9 @@ export class Lobby {
 `audio.setListener`, `input.update`, `fog.update`, `renderer.render`, `hud.update`,
 `minimap.render`); on each snapshot it applies state and triggers transient event audio exactly
 once; on `gameOver` show the victory/defeat overlay with the frozen score table.
-For spectator starts, `match.js` reveals all fog, hides the command card and give-up action, and
-keeps the ordinary renderer/minimap/HUD pointed at full-world snapshots with `playerResources`.
+For spectator starts, `match.js` hides the command card and give-up action, computes local fog from
+the server-filtered union snapshot, and keeps the ordinary renderer/minimap/HUD pointed at snapshots
+with `playerResources`.
 
 ### 4.2 Rendering & look (PixiJS, procedural art — neutral PS1 field-command style)
 - Layers (back→front): terrain → resource nodes → building shadows → buildings → unit
