@@ -10,6 +10,7 @@ import { GameState } from "../client/src/state.js";
 import { Camera } from "../client/src/camera.js";
 import { Fog } from "../client/src/fog.js";
 import { MINING_IC_RANGE_TILES, STATS } from "../client/src/config.js";
+import { playerHasCompletedKind } from "../client/src/hud.js";
 import {
   COMPACT_SNAPSHOT_VERSION,
   EVENT,
@@ -217,6 +218,23 @@ function assertHasGetter(obj, name, msgPrefix = "") {
   assert(
     STATS[KIND.TANK_FACTORY].requires.includes(KIND.TRAINING_CENTRE),
     "Tank Factory should require a Training Centre in the command card",
+  );
+  const playerId = 1;
+  const underConstructionTrainingCentre = [
+    { owner: playerId, kind: KIND.INDUSTRIAL_CENTER, buildProgress: null },
+    { owner: playerId, kind: KIND.TRAINING_CENTRE, buildProgress: 0.5 },
+  ];
+  assert(
+    !playerHasCompletedKind(underConstructionTrainingCentre, playerId, KIND.TRAINING_CENTRE),
+    "Tank Factory should not unlock while the Training Centre is still under construction",
+  );
+  const completedTrainingCentre = [
+    { owner: playerId, kind: KIND.INDUSTRIAL_CENTER, buildProgress: null },
+    { owner: playerId, kind: KIND.TRAINING_CENTRE, buildProgress: null },
+  ];
+  assert(
+    playerHasCompletedKind(completedTrainingCentre, playerId, KIND.TRAINING_CENTRE),
+    "Tank Factory should unlock once the Training Centre is complete",
   );
 }
 

@@ -18,6 +18,14 @@ import { STATS, WORKER_BUILDABLE } from "./config.js";
 //   Z X C
 const GRID_HOTKEYS = Object.freeze(["Q", "W", "E", "A", "S", "D", "Z", "X", "C"]);
 
+/** True if `playerId` owns at least one completed entity of `kind` in `entities`. */
+export function playerHasCompletedKind(entities, playerId, kind) {
+  for (const e of entities || []) {
+    if (e.owner === playerId && e.kind === kind && e.buildProgress == null) return true;
+  }
+  return false;
+}
+
 /**
  * The bottom/top DOM HUD: resources, selected panel, and the command card.
  *
@@ -183,7 +191,7 @@ export class HUD {
    *  - anything else → empty.
    *
    * Buttons are disabled when unaffordable (vs `state.resources`) or when tech
-   * requirements are unmet (e.g. barracks requires an existing Industrial Center).
+   * requirements are unmet (e.g. tank factory requires completed prerequisites).
    */
   _renderCommandCard() {
     const card = this.elCommand;
@@ -404,7 +412,7 @@ export class HUD {
   _canBuild(kind, res) {
     const st = STATS[kind];
     if (!st) return false;
-    if (this._requirementsOf(st).some((req) => !this._playerHasKind(req))) return false;
+    if (this._requirementsOf(st).some((req) => !this._playerHasCompleteKind(req))) return false;
     return this._affordable(st.cost, res);
   }
 
@@ -412,7 +420,7 @@ export class HUD {
   _buildDisabledReason(kind, res) {
     const st = STATS[kind];
     if (!st) return "";
-    const missing = this._requirementsOf(st).find((req) => !this._playerHasKind(req));
+    const missing = this._requirementsOf(st).find((req) => !this._playerHasCompleteKind(req));
     if (missing) {
       const reqLabel = (STATS[missing] && STATS[missing].label) || missing;
       return `Requires ${reqLabel}`;
@@ -506,24 +514,11 @@ export class HUD {
     return "";
   }
 
-  /** True if the player currently owns at least one entity of `kind`. */
-  _playerHasKind(kind) {
-    // entitiesInterpolated(1) reflects the latest snapshot positions but, more
-    // importantly here, the latest set of entities. We only need owner+kind.
-    const list = this.state.entitiesInterpolated(1);
-    for (const e of list) {
-      if (e.owner === this.state.playerId && e.kind === kind) return true;
-    }
-    return false;
-  }
-
   /** True if the player owns at least one completed entity of `kind`. */
   _playerHasCompleteKind(kind) {
-    const list = this.state.entitiesInterpolated(1);
-    for (const e of list) {
-      if (e.owner === this.state.playerId && e.kind === kind && e.buildProgress == null) return true;
-    }
-    return false;
+    // entitiesInterpolated(1) reflects the latest snapshot positions but, more
+    // importantly here, the latest set of entities.
+    return playerHasCompletedKind(this.state.entitiesInterpolated(1), this.state.playerId, kind);
   }
 
   /**
