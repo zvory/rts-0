@@ -967,7 +967,7 @@ mod tests {
     }
 
     #[test]
-    fn formation_goal_rejects_large_unit_body_clipping_building() {
+    fn formation_goal_accepts_v1_tank_tile_center_near_building() {
         let mut map = Map::generate(1, 0x1234_5678);
         for tile in &mut map.terrain {
             *tile = crate::protocol::terrain::GRASS;
@@ -979,19 +979,19 @@ mod tests {
             .expect("depot should spawn");
         let occ = Occupancy::build(&map, &entities);
         let units = vec![formation_unit_kind(1, EntityKind::Tank, &map, (6, 10))];
-        let body_clipping_goal = map.tile_center(12, 10);
+        let adjacent_tile_goal = map.tile_center(12, 10);
 
-        let goals = formation_goals(&map, &occ, &units, body_clipping_goal);
+        let goals = formation_goals(&map, &occ, &units, adjacent_tile_goal);
         let goal = goals[0];
 
-        assert_ne!(
+        assert_eq!(
             map.tile_of(goal.0, goal.1),
             (12, 10),
-            "formation goals must not assign a tile where only the unit center is clear"
+            "v1 tank radius should allow adjacent tile-center formation slots"
         );
         assert!(
             standability::unit_static_standable(&map, &occ, EntityKind::Tank, goal.0, goal.1),
-            "fallback formation goal must be body-standable"
+            "assigned formation goal must be body-standable"
         );
     }
 

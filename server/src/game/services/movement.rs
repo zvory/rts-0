@@ -1519,7 +1519,11 @@ mod tests {
             .expect("building spawn");
         let rect = building_rect_for_footprint(EntityKind::Depot, 10, 10).expect("depot rect");
 
-        let start = (rect.max_x + 14.4, rect.min_y - 14.4);
+        let tank_radius = config::unit_stats(EntityKind::Tank)
+            .expect("tank stats")
+            .radius;
+        let corner_offset = (tank_radius + 0.5) / 2.0_f32.sqrt();
+        let start = (rect.max_x + corner_offset, rect.min_y - corner_offset);
         let goal = (rect.max_x, rect.min_y);
         let tank = entities
             .spawn_unit(1, EntityKind::Tank, start.0, start.1)
@@ -1538,7 +1542,10 @@ mod tests {
             start.0,
             start.1
         ));
-        let center_tile = map.tile_of(rect.max_x + 13.0, rect.min_y - 13.0);
+        let center_tile = map.tile_of(
+            rect.max_x + corner_offset - 1.0,
+            rect.min_y - corner_offset + 1.0,
+        );
         assert!(
             map.is_passable(center_tile.0 as i32, center_tile.1 as i32)
                 && occ.passable(center_tile.0 as i32, center_tile.1 as i32),
@@ -1565,7 +1572,10 @@ mod tests {
             .expect("building spawn");
         let rect = building_rect_for_footprint(EntityKind::Depot, 10, 10).expect("depot rect");
 
-        let start = (rect.min_x - 21.0, rect.min_y - 2.0);
+        let tank_radius = config::unit_stats(EntityKind::Tank)
+            .expect("tank stats")
+            .radius;
+        let start = (rect.min_x - tank_radius - 1.0, rect.min_y - 2.0);
         let goal = (start.0 + 64.0, start.1 + 6.0);
         let tank = entities
             .spawn_unit(1, EntityKind::Tank, start.0, start.1)
@@ -1604,7 +1614,10 @@ mod tests {
             .expect("building spawn");
         let rect = building_rect_for_footprint(EntityKind::Depot, 10, 10).expect("depot rect");
 
-        let tank_start = (rect.max_x + 20.1, rect.min_y + 32.0);
+        let tank_radius = config::unit_stats(EntityKind::Tank)
+            .expect("tank stats")
+            .radius;
+        let tank_start = (rect.max_x + tank_radius + 0.1, rect.min_y + 32.0);
         let tank = entities
             .spawn_unit(1, EntityKind::Tank, tank_start.0, tank_start.1)
             .expect("tank spawn");
@@ -1646,7 +1659,10 @@ mod tests {
             .expect("building spawn");
         let rect = building_rect_for_footprint(EntityKind::Depot, 10, 10).expect("depot rect");
 
-        let start = (rect.max_x + 20.1, rect.min_y + 32.0);
+        let tank_radius = config::unit_stats(EntityKind::Tank)
+            .expect("tank stats")
+            .radius;
+        let start = (rect.max_x + tank_radius + 0.1, rect.min_y + 32.0);
         let goal = (rect.min_x, rect.min_y + 32.0);
         let tank = entities
             .spawn_unit(1, EntityKind::Tank, start.0, start.1)

@@ -245,6 +245,22 @@ mod tests {
         map
     }
 
+    fn two_tile_wide_horizontal_corridor() -> Map {
+        let size = 8;
+        let mut terrain = vec![terrain::ROCK; size * size];
+        for y in 3..=4 {
+            for x in 1..=6 {
+                terrain[y * size + x] = terrain::GRASS;
+            }
+        }
+        Map {
+            size: size as u32,
+            terrain,
+            starts: vec![],
+            expansion_sites: vec![],
+        }
+    }
+
     fn request_fixture_path(
         map: &Map,
         kind: EntityKind,
@@ -494,5 +510,44 @@ mod tests {
             ),
             "direct segment across the rock rectangle should be illegal for later smoothing tests"
         );
+    }
+
+    #[test]
+    fn tank_pathing_uses_tile_center_corridors_for_v1_radius() {
+        let map = two_tile_wide_horizontal_corridor();
+        let entities = EntityStore::new();
+        let occ = Occupancy::build(&map, &entities);
+        let mut service = PathingService::new(1_000, 16);
+        let radius_tiles = config::unit_stats(EntityKind::Tank)
+            .expect("tank stats")
+            .radius_tiles();
+
+        assert_eq!(
+            radius_tiles, 0,
+            "v1 tanks must stay point-sized for coarse A* so they can use two-tile corridors"
+        );
+
+        let waypoints = service.request(
+            &map,
+            &occ,
+            PathRequest {
+                kind: EntityKind::Tank,
+                start: (1, 3),
+                goal: (6, 3),
+                radius_tiles,
+                budget: None,
+            },
+        );
+
+        assert!(
+            !waypoints.is_empty(),
+            "tank should find a coarse tile path through a two-tile-wide corridor"
+        );
+        for (x, y) in waypoints {
+            assert!(
+                standability::unit_static_standable(&map, &occ, EntityKind::Tank, x, y),
+                "tank waypoint ({x:.1}, {y:.1}) must be body-legal"
+            );
+        }
     }
 }
