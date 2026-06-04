@@ -832,7 +832,9 @@ The server treats every client as potentially hostile. Limits live next to the c
   `TANK_OIL_COST_PER_PX`. Fractional movement cost accumulates per tank until whole oil units are
   deducted from the owner's stockpile. The tank also tracks lifetime movement oil as `oilUsed` for
   the client selected-entity panel. If the owner has zero oil at the start of a movement tick, that
-  tank does not advance; turret/combat behavior still runs through the combat system.
+  tank does not advance and waits `TANK_OIL_STARVED_PAUSE_TICKS` (one second) before retrying, so
+  sparse oil income does not produce constant one-tick stuttering. Turret/combat behavior still
+  runs through the combat system while movement is paused.
 - **Tank armor facing**: tank and AT-team attacks against tank victims use the victim tank's hull
   `facing` and the attacker's position. Front hits (`<=45°` from the hull direction) deal normal
   damage, side hits (`>45°` and `<=135°`) deal `1.25x`, and rear hits (`>135°`) deal `1.75x`.

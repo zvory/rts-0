@@ -420,6 +420,8 @@ pub struct MovementState {
     /// Experimental: sub-1 oil consumed since the last whole-oil deduction from the player's
     /// stockpile. Used by the tank-fuel charge to round fractional cost up into integer oil.
     pub oil_debt: f32,
+    /// Ticks remaining before an oil-starved tank may try to advance again. Used only by tanks.
+    pub oil_starved_pause_ticks: u16,
 }
 
 impl Default for MovementState {
@@ -436,6 +438,7 @@ impl Default for MovementState {
             static_blocked_ticks: 0,
             lifetime_oil_used: 0.0,
             oil_debt: 0.0,
+            oil_starved_pause_ticks: 0,
         }
     }
 }

@@ -128,13 +128,14 @@ pub(crate) fn run_tick(
         events,
     );
     coordinator.process_awaiting_paths(entities);
-    services::movement::movement_system(
+    services::movement::movement_system_with_events(
         map,
         entities,
         players,
         &pre_command.occupancy,
         &pre_command.spatial,
         tick,
+        events,
     );
 
     let post_movement = PostMovementDerivedState::rebuild(map, entities);
