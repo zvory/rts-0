@@ -361,6 +361,7 @@
       }
       const MIN_SIZE = 24;
       const MAX_SIZE = 160;
+      const DEFAULT_MAP_URL = "/maps/default-handcrafted.json";
 
       const fallbackMap = () => ({
         name: "blank-handcrafted",
@@ -697,7 +698,7 @@
 
       async function loadDefault() {
         try {
-          const response = await fetch("/maps/default.json", { cache: "no-store" });
+          const response = await fetch(DEFAULT_MAP_URL, { cache: "no-store" });
           if (!response.ok) throw new Error(`HTTP ${response.status}`);
           map = normalizeMap(await response.json());
           selectedBase = Math.min(selectedBase, map.baseSites.length - 1);
