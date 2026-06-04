@@ -283,6 +283,7 @@ mod tests {
                     target_id: None,
                     setup_state: None,
                     rally: None,
+                    oil_used: None,
                 },
                 EntityView {
                     id: 2,
@@ -304,6 +305,7 @@ mod tests {
                     target_id: None,
                     setup_state: None,
                     rally: None,
+                    oil_used: None,
                 },
                 EntityView {
                     id: 3,
@@ -325,6 +327,7 @@ mod tests {
                     target_id: None,
                     setup_state: None,
                     rally: None,
+                    oil_used: None,
                 },
                 EntityView {
                     id: 4,
@@ -346,6 +349,7 @@ mod tests {
                     target_id: None,
                     setup_state: None,
                     rally: None,
+                    oil_used: None,
                 },
                 EntityView {
                     id: 5,
@@ -367,6 +371,7 @@ mod tests {
                     target_id: None,
                     setup_state: None,
                     rally: None,
+                    oil_used: None,
                 },
             ],
             resource_deltas: Vec::new(),

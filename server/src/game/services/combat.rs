@@ -842,7 +842,7 @@ mod tests {
         let map = Map::generate(2, 0x00C0_FFEE);
         let occ = Occupancy::build(&map, entities);
         let spatial = SpatialIndex::build(entities, map.size);
-        movement_system(&map, entities, &occ, &spatial, 0);
+        movement_system(&map, entities, &mut [], &occ, &spatial, 0);
     }
 
     #[allow(clippy::too_many_arguments)]

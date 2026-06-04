@@ -308,6 +308,10 @@ pub struct EntityView {
     // Unit-producing buildings: rally point [x, y] in world px. Only ever sent to the owner.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub rally: Option<[f32; 2]>,
+
+    // Tanks: lifetime oil burned by movement, in resource units.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub oil_used: Option<f32>,
 }
 
 impl EntityView {
@@ -343,6 +347,7 @@ impl EntityView {
             target_id: None,
             setup_state: None,
             rally: None,
+            oil_used: None,
         }
     }
 }
@@ -481,6 +486,9 @@ impl Serialize for CompactEntity<'_> {
         if entity.rally.is_some() {
             len = 19;
         }
+        if entity.oil_used.is_some() {
+            len = 20;
+        }
 
         let mut seq = serializer.serialize_seq(Some(len))?;
         seq.serialize_element(&entity.id)?;
@@ -523,6 +531,9 @@ impl Serialize for CompactEntity<'_> {
         }
         if len > 18 {
             seq.serialize_element(&entity.rally)?;
+        }
+        if len > 19 {
+            seq.serialize_element(&entity.oil_used)?;
         }
         seq.end()
     }

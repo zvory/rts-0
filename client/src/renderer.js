@@ -417,6 +417,7 @@ export class Renderer {
       g.lineStyle(2, 0xd8d0b0, 0.75);
       g.moveTo(nose.x - Math.cos(facing) * r * 0.22, nose.y - Math.sin(facing) * r * 0.22);
       g.lineTo(nose.x, nose.y);
+      this._tankOilLabel(e, r);
     } else {
       // Engineer (and any other unit kind): compact tool-carrying block.
       g.beginFill(tint);
@@ -770,6 +771,39 @@ export class Renderer {
     this._seen.buildings.add(e.id);
   }
 
+  /**
+   * Show a tank's lifetime movement oil burned as a compact belly readout.
+   * @private
+   */
+  _tankOilLabel(e, r) {
+    if (!this._tankOilLabelPool) this._tankOilLabelPool = new Map();
+    let t = this._tankOilLabelPool.get(e.id);
+    if (!t) {
+      t = new PIXI.Text("", {
+        fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
+        fontSize: 9,
+        fill: 0xffe080,
+        align: "center",
+        fontWeight: "700",
+        stroke: 0x000000,
+        strokeThickness: 3,
+      });
+      t.anchor.set(0.5, 0.5);
+      this._tankOilLabelPool.set(e.id, t);
+      this.layers.units.addChild(t);
+    }
+
+    const oilUsed = typeof e.oilUsed === "number" && Number.isFinite(e.oilUsed)
+      ? Math.max(0, e.oilUsed)
+      : 0;
+    const label = oilUsed >= 10 ? `${Math.round(oilUsed)}` : oilUsed.toFixed(1);
+    if (t.text !== label) t.text = label;
+    t.visible = true;
+    t.alpha = 0.95;
+    t.position.set(e.x, e.y + r * 0.86);
+    this._seen.units.add(e.id);
+  }
+
   // --- Overlays ------------------------------------------------------------
 
   /**
@@ -1072,6 +1106,7 @@ export class Renderer {
     }
     if (this._iconPool) for (const id of this._iconPool.keys()) ids.add(id);
     if (this._queueLabelPool) for (const id of this._queueLabelPool.keys()) ids.add(id);
+    if (this._tankOilLabelPool) for (const id of this._tankOilLabelPool.keys()) ids.add(id);
     for (const id of ids) {
       if (seenAny.has(id)) {
         this._unseen.delete(id);
@@ -1122,6 +1157,19 @@ export class Renderer {
         }
       }
     }
+    if (this._tankOilLabelPool) {
+      const seen = this._seen.units;
+      for (const [id, t] of this._tankOilLabelPool) {
+        if (seen.has(id)) continue;
+        if (evict.has(id)) {
+          this.layers.units.removeChild(t);
+          t.destroy();
+          this._tankOilLabelPool.delete(id);
+        } else {
+          t.visible = false;
+        }
+      }
+    }
     for (const id of evict) this._unseen.delete(id);
   }
 
@@ -1149,6 +1197,10 @@ export class Renderer {
     if (this._queueLabelPool) {
       for (const t of this._queueLabelPool.values()) t.destroy();
       this._queueLabelPool.clear();
+    }
+    if (this._tankOilLabelPool) {
+      for (const t of this._tankOilLabelPool.values()) t.destroy();
+      this._tankOilLabelPool.clear();
     }
     this._unseen.clear();
 

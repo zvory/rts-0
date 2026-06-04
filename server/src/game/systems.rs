@@ -131,6 +131,7 @@ pub(crate) fn run_tick(
     services::movement::movement_system(
         map,
         entities,
+        players,
         &pre_command.occupancy,
         &pre_command.spatial,
         tick,
