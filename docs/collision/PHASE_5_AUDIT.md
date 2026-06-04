@@ -73,6 +73,8 @@ Add direct tests or self-play assertions for:
 - tank moving along a building corner,
 - collision pushing near a new scaffold,
 - construction attempted near a tank body at the footprint edge,
+- build preview and command-time validation allow only the chosen builder's own body as the
+  build-over-self exception,
 - AI expansion building still finding legal sites,
 - movement Phase 3 tank body tests still passing,
 - movement Phase 6 steering tests still passing if steering landed.
@@ -85,6 +87,7 @@ Update `DESIGN.md` after implementation lands. It should describe:
 - standability policies,
 - production blocking on no legal spawn point,
 - construction placement using body-aware footprint checks,
+- client build preview mirroring server build-intent rules,
 - movement using body-aware static legality,
 - collision as deterministic overlap cleanup, not the only correctness layer.
 
