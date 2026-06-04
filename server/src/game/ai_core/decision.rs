@@ -13,8 +13,8 @@ use crate::game::ai_core::observation::{
     AiEntityState, AiEntitySummary, AiMapSummary, AiObservation, AiResourceSummary,
 };
 use crate::game::ai_core::profiles::{
-    AiProfile, AttackPolicy, ExpansionPolicy, ProductionPolicy, ProxyBarracksPolicy,
-    TechTransitionPolicy,
+    AiProfile, AttackPolicy, BarracksCurve, ExpansionPolicy, ProductionPolicy, ProxyBarracksPolicy,
+    RecoveryTransitionPolicy, ResourcePolicy, TechTransitionPolicy, WorkerPolicy,
 };
 use crate::game::ai_shared;
 use crate::game::command::SimCommand as Command;
@@ -94,6 +94,8 @@ pub(crate) struct AiDecisionMemory {
     next_attack_size: usize,
     last_attack_tick: Option<u32>,
     proxy_worker_id: Option<u32>,
+    recovery_gate_completed_tick: Option<u32>,
+    recovery_active: bool,
     defensive_panic_started_tick: Option<u32>,
     defensive_panic_last_tick: Option<u32>,
     defensive_panic_response: DefensivePanicResponse,
@@ -107,6 +109,8 @@ impl AiDecisionMemory {
             next_attack_size: profile.attack.first_attack_size,
             last_attack_tick: None,
             proxy_worker_id: None,
+            recovery_gate_completed_tick: None,
+            recovery_active: false,
             defensive_panic_started_tick: None,
             defensive_panic_last_tick: None,
             defensive_panic_response: DefensivePanicResponse::Riflemen,
@@ -156,6 +160,8 @@ impl AiDecisionMemory {
         self.next_attack_size = profile.attack.first_attack_size;
         self.last_attack_tick = None;
         self.proxy_worker_id = None;
+        self.recovery_gate_completed_tick = None;
+        self.recovery_active = false;
         self.defensive_panic_started_tick = None;
         self.defensive_panic_last_tick = None;
         self.defensive_panic_response = DefensivePanicResponse::Riflemen;
@@ -207,6 +213,28 @@ impl AiDecisionMemory {
             response: self.defensive_panic_response,
         }
     }
+
+    fn recovery_active(&mut self, profile: &AiProfile, facts: &AiFacts, tick: u32) -> bool {
+        let Some(policy) = profile.recovery_transition else {
+            self.recovery_gate_completed_tick = None;
+            self.recovery_active = false;
+            return false;
+        };
+        if self.recovery_active {
+            return true;
+        }
+        if facts.complete_building_count(policy.completed_building) == 0 {
+            return false;
+        }
+        let completed_tick = *self.recovery_gate_completed_tick.get_or_insert(tick);
+        let Some(delay_ticks) = recovery_delay_ticks(policy) else {
+            return false;
+        };
+        if tick.saturating_sub(completed_tick) >= delay_ticks {
+            self.recovery_active = true;
+        }
+        self.recovery_active
+    }
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -255,21 +283,23 @@ where
     let panic_plan = defensive_panic
         .active
         .then(|| defensive_panic_plan(defensive_panic.response, &facts));
+    let recovery_active =
+        !defensive_panic.active && memory.recovery_active(profile, &facts, observation.tick);
     let required_tech_path = if defensive_panic.active {
         panic_plan
             .map(|plan| plan.required_tech_path)
             .unwrap_or(&DEFENSIVE_PANIC_RIFLE_TECH_PATH)
     } else {
-        active_required_tech_path(observation, profile)
+        active_required_tech_path(observation, profile, recovery_active)
     };
     let production_policy = if defensive_panic.active {
         panic_plan.map(|plan| plan.production).unwrap_or_else(|| {
             defensive_panic_plan(DefensivePanicResponse::Riflemen, &facts).production
         })
     } else {
-        active_production_policy(observation, profile)
+        active_production_policy(observation, profile, recovery_active)
     };
-    let attack_policy = active_attack_policy(observation, profile);
+    let attack_policy = active_attack_policy(observation, profile, recovery_active);
     let mut idle_builders = facts.idle_workers.clone();
     let mut gathering_builders = facts.gathering_workers.clone();
     idle_builders.sort_unstable();
@@ -277,10 +307,10 @@ where
     let builder_pools = [idle_builders.as_slice(), gathering_builders.as_slice()];
     let save_for_required_tech_building =
         should_save_for_required_tech_building(&facts, required_tech_path, production_policy);
-    let expansion_blocks_tech_path =
-        !defensive_panic.active && expansion_blocks_tech_path(observation, &facts, profile);
-    let save_for_expansion =
-        !defensive_panic.active && should_save_for_expansion(observation, &facts, profile);
+    let expansion_blocks_tech_path = !defensive_panic.active
+        && expansion_blocks_tech_path(observation, &facts, profile, recovery_active);
+    let save_for_expansion = !defensive_panic.active
+        && should_save_for_expansion(observation, &facts, profile, recovery_active);
     let proxy_barracks_active =
         !defensive_panic.active && should_use_proxy_barracks(&facts, profile);
 
@@ -343,20 +373,24 @@ where
         }
     }
 
-    let complete_gate_count = profile
-        .workers
+    let worker_policy = active_worker_policy(profile, recovery_active);
+    let complete_gate_count = worker_policy
         .pressure_until_complete
         .map(|kind| facts.complete_building_count(kind))
         .unwrap_or(usize::MAX);
-    let target_steel_workers = profile
-        .workers
-        .target_steel_workers(facts.target_steel_workers, complete_gate_count);
     let target_steel_workers =
-        target_steel_workers_for_profile(observation, &facts, profile, target_steel_workers);
+        worker_policy.target_steel_workers(facts.target_steel_workers, complete_gate_count);
+    let target_steel_workers = target_steel_workers_for_profile(
+        observation,
+        &facts,
+        profile,
+        recovery_active,
+        target_steel_workers,
+    );
     let target_barracks = if defensive_panic.active {
         defensive_panic_barracks_target(defensive_panic)
     } else {
-        profile.buildings.barracks_curve.target(
+        active_barracks_curve(profile, recovery_active).target(
             observation.economy.steel,
             facts.worker_count,
             target_steel_workers,
@@ -393,6 +427,7 @@ where
             &mut actions,
             &builder_pools,
             profile,
+            recovery_active,
             &mut placeable,
         )
         .is_some()
@@ -405,7 +440,13 @@ where
     let desired_oil_workers = if let Some(plan) = panic_plan {
         plan.oil_workers
     } else {
-        desired_oil_workers(observation, &facts, profile, target_steel_workers)
+        desired_oil_workers(
+            observation,
+            &facts,
+            profile,
+            recovery_active,
+            target_steel_workers,
+        )
     };
     let target_workers = target_steel_workers.saturating_add(desired_oil_workers);
     let save_for_first_tech_unit = should_save_for_first_tech_unit(&facts, production_policy);
@@ -463,7 +504,7 @@ where
     let skipped_workers = BTreeSet::new();
     let resource_counts = resource_worker_counts(observation);
     let max_worker_resource_distance_px =
-        max_worker_resource_assignment_distance_px(observation, &facts, profile);
+        max_worker_resource_assignment_distance_px(observation, &facts, profile, recovery_active);
     let current_oil_workers = resource_counts.get(&EntityKind::Oil).copied().unwrap_or(0);
     let panic_support_oil = panic_plan.map(|plan| plan.oil_workers > 0).unwrap_or(false);
     let mut panic_oil_candidates = Vec::new();
@@ -872,8 +913,12 @@ fn defensive_threat_dps(enemy: &AiEntitySummary) -> f32 {
     profile.dmg as f32 / profile.cooldown as f32
 }
 
-fn active_expansion(observation: &AiObservation, profile: &AiProfile) -> Option<ExpansionPolicy> {
-    let expansion = profile.expansion?;
+fn active_expansion(
+    observation: &AiObservation,
+    profile: &AiProfile,
+    recovery_active: bool,
+) -> Option<ExpansionPolicy> {
+    let expansion = active_expansion_policy(profile, recovery_active)?;
     if observation.economy.steel >= expansion.trigger_steel
         || observation.economy.supply_used >= expansion.trigger_supply_used
     {
@@ -887,8 +932,9 @@ fn expansion_blocks_tech_path(
     observation: &AiObservation,
     facts: &AiFacts,
     profile: &AiProfile,
+    recovery_active: bool,
 ) -> bool {
-    let Some(expansion) = active_expansion(observation, profile) else {
+    let Some(expansion) = active_expansion(observation, profile, recovery_active) else {
         return false;
     };
     expansion.blocks_tech_path
@@ -899,8 +945,9 @@ fn should_save_for_expansion(
     observation: &AiObservation,
     facts: &AiFacts,
     profile: &AiProfile,
+    recovery_active: bool,
 ) -> bool {
-    let Some(expansion) = active_expansion(observation, profile) else {
+    let Some(expansion) = active_expansion(observation, profile, recovery_active) else {
         return false;
     };
     facts.building_count(EntityKind::IndustrialCenter) < expansion.target_industrial_centers
@@ -921,34 +968,88 @@ fn active_tech_transition(
         .filter(|transition| observation.economy.supply_used >= transition.supply_used_threshold)
 }
 
+fn active_recovery(profile: &AiProfile, recovery_active: bool) -> Option<RecoveryTransitionPolicy> {
+    if recovery_active {
+        profile.recovery_transition
+    } else {
+        None
+    }
+}
+
 fn active_required_tech_path(
     observation: &AiObservation,
     profile: &AiProfile,
+    recovery_active: bool,
 ) -> &'static [EntityKind] {
     active_tech_transition(observation, profile)
         .map(|transition| transition.required_tech_path)
+        .or_else(|| {
+            active_recovery(profile, recovery_active).map(|recovery| recovery.required_tech_path)
+        })
         .unwrap_or(profile.buildings.required_tech_path)
 }
 
-fn active_production_policy(observation: &AiObservation, profile: &AiProfile) -> ProductionPolicy {
+fn active_production_policy(
+    observation: &AiObservation,
+    profile: &AiProfile,
+    recovery_active: bool,
+) -> ProductionPolicy {
     active_tech_transition(observation, profile)
         .map(|transition| transition.production)
+        .or_else(|| active_recovery(profile, recovery_active).map(|recovery| recovery.production))
         .unwrap_or(profile.production)
 }
 
-fn active_attack_policy(observation: &AiObservation, profile: &AiProfile) -> AttackPolicy {
+fn active_attack_policy(
+    observation: &AiObservation,
+    profile: &AiProfile,
+    recovery_active: bool,
+) -> AttackPolicy {
     active_tech_transition(observation, profile)
         .map(|transition| transition.attack)
+        .or_else(|| active_recovery(profile, recovery_active).map(|recovery| recovery.attack))
         .unwrap_or(profile.attack)
+}
+
+fn active_worker_policy(profile: &AiProfile, recovery_active: bool) -> WorkerPolicy {
+    active_recovery(profile, recovery_active)
+        .map(|recovery| recovery.workers)
+        .unwrap_or(profile.workers)
+}
+
+fn active_resource_policy(profile: &AiProfile, recovery_active: bool) -> ResourcePolicy {
+    active_recovery(profile, recovery_active)
+        .map(|recovery| recovery.resources)
+        .unwrap_or(profile.resources)
+}
+
+fn active_barracks_curve(profile: &AiProfile, recovery_active: bool) -> BarracksCurve {
+    active_recovery(profile, recovery_active)
+        .map(|recovery| recovery.barracks_curve)
+        .unwrap_or(profile.buildings.barracks_curve)
+}
+
+fn active_expansion_policy(profile: &AiProfile, recovery_active: bool) -> Option<ExpansionPolicy> {
+    active_recovery(profile, recovery_active)
+        .and_then(|recovery| recovery.expansion)
+        .or(profile.expansion)
+}
+
+fn recovery_delay_ticks(policy: RecoveryTransitionPolicy) -> Option<u32> {
+    let build_ticks = config::unit_stats(policy.delay_unit)?.build_ticks;
+    // The fast proxy should not stay all-in forever. Wait long enough for the proxy to have
+    // produced a meaningful early rifle stream, then recover into economy and support tech.
+    Some(build_ticks.saturating_mul(policy.delay_unit_build_count))
 }
 
 fn target_steel_workers_for_profile(
     observation: &AiObservation,
     facts: &AiFacts,
     profile: &AiProfile,
+    recovery_active: bool,
     base_target: usize,
 ) -> usize {
-    let Some(expansion) = active_expansion(observation, profile) else {
+    let Some(expansion) = active_expansion(observation, profile, recovery_active) else {
         return base_target;
     };
     if facts.complete_building_count(EntityKind::IndustrialCenter)
@@ -995,8 +1096,9 @@ fn max_worker_resource_assignment_distance_px(
     observation: &AiObservation,
     facts: &AiFacts,
     profile: &AiProfile,
+    recovery_active: bool,
 ) -> Option<f32> {
-    let expansion = active_expansion(observation, profile)?;
+    let expansion = active_expansion(observation, profile, recovery_active)?;
     if facts.complete_building_count(EntityKind::IndustrialCenter)
         < expansion.target_industrial_centers
     {
@@ -1450,12 +1552,13 @@ fn try_build_expansion_industrial_center<F>(
     actions: &mut AiActionContext<'_>,
     builder_pools: &[&[u32]],
     profile: &AiProfile,
+    recovery_active: bool,
     placeable: &mut F,
 ) -> Option<actions::BuildAction>
 where
     F: FnMut(EntityKind, u32, u32) -> bool,
 {
-    let expansion = active_expansion(observation, profile)?;
+    let expansion = active_expansion(observation, profile, recovery_active)?;
     let kind = EntityKind::IndustrialCenter;
     config::building_stats(kind)?;
     if !rules::economy::build_requirement_met(kind, facts.complete_building_kinds()) {
@@ -1841,35 +1944,36 @@ fn desired_oil_workers(
     observation: &AiObservation,
     facts: &AiFacts,
     profile: &AiProfile,
+    recovery_active: bool,
     target_steel_workers: usize,
 ) -> usize {
-    if profile.workers.extra_oil_workers == 0 {
+    let worker_policy = active_worker_policy(profile, recovery_active);
+    let resource_policy = active_resource_policy(profile, recovery_active);
+
+    if worker_policy.extra_oil_workers == 0 {
         return 0;
     }
-    if expansion_blocks_tech_path(observation, facts, profile) {
+    if expansion_blocks_tech_path(observation, facts, profile, recovery_active) {
         return 0;
     }
     let current_steel_workers = resource_worker_counts(observation)
         .get(&EntityKind::Steel)
         .copied()
         .unwrap_or(0);
-    let oil_steel_floor = if profile.resources.oil_after_full_steel_saturation {
+    let oil_steel_floor = if resource_policy.oil_after_full_steel_saturation {
         target_steel_workers
     } else {
-        target_steel_workers.min(profile.resources.oil_after_steel_workers)
+        target_steel_workers.min(resource_policy.oil_after_steel_workers)
     };
     if current_steel_workers < oil_steel_floor {
         return 0;
     }
 
-    let Some(policy) = profile.resources.tank_adaptive else {
-        return profile.workers.extra_oil_workers;
+    let Some(policy) = resource_policy.tank_adaptive else {
+        return worker_policy.extra_oil_workers;
     };
 
-    let max_oil_workers = profile
-        .workers
-        .extra_oil_workers
-        .min(policy.max_oil_workers);
+    let max_oil_workers = worker_policy.extra_oil_workers.min(policy.max_oil_workers);
     if max_oil_workers == 0 {
         return 0;
     }
@@ -2979,6 +3083,96 @@ mod tests {
     }
 
     #[test]
+    fn fast_flood_recovers_after_barracks_rifle_window() {
+        let mut owned = vec![
+            building(10, EntityKind::IndustrialCenter, Some(0)),
+            building(11, EntityKind::Barracks, Some(0)),
+        ];
+        owned.extend((0..5).map(|i| worker(20 + i, AiEntityState::Idle)));
+        let mut observation = observation(
+            AiEconomy {
+                steel: 200,
+                oil: 0,
+                supply_used: 5,
+                supply_cap: 20,
+            },
+            owned,
+        );
+        let mut memory = AiDecisionMemory::for_profile(&RIFLE_FLOOD_FAST);
+        let before = decide(&observation, &RIFLE_FLOOD_FAST, &mut memory);
+
+        assert!(
+            !before.intents.contains(&AiIntent::Train {
+                kind: EntityKind::Worker
+            }),
+            "fast flood should keep its five-worker cap before the recovery window"
+        );
+
+        let rifle_build_ticks = config::unit_stats(EntityKind::Rifleman)
+            .expect("rifleman stats should exist")
+            .build_ticks;
+        observation.tick = observation
+            .tick
+            .saturating_add(rifle_build_ticks.saturating_mul(7));
+        let after = decide(&observation, &RIFLE_FLOOD_FAST, &mut memory);
+
+        assert!(
+            after.intents.contains(&AiIntent::Train {
+                kind: EntityKind::Worker
+            }),
+            "fast flood should resume worker production once the proxy window has passed"
+        );
+        assert!(
+            after.intents.contains(&AiIntent::Build {
+                kind: EntityKind::Barracks
+            }),
+            "fast flood should add a home barracks during recovery instead of relying only on the proxy"
+        );
+    }
+
+    #[test]
+    fn fast_flood_recovery_builds_support_tech_and_takes_oil() {
+        let mut owned = vec![
+            building(10, EntityKind::IndustrialCenter, Some(0)),
+            building(11, EntityKind::Barracks, Some(0)),
+        ];
+        owned.extend((0..8).map(|i| steel_worker(20 + i, 100 + i)));
+        owned.extend((0..3).map(|i| worker(40 + i, AiEntityState::Idle)));
+        let mut observation = observation(
+            AiEconomy {
+                steel: 300,
+                oil: 50,
+                supply_used: 11,
+                supply_cap: 28,
+            },
+            owned,
+        );
+        let mut memory = AiDecisionMemory::for_profile(&RIFLE_FLOOD_FAST);
+        let _ = decide(&observation, &RIFLE_FLOOD_FAST, &mut memory);
+        let rifle_build_ticks = config::unit_stats(EntityKind::Rifleman)
+            .expect("rifleman stats should exist")
+            .build_ticks;
+        observation.tick = observation
+            .tick
+            .saturating_add(rifle_build_ticks.saturating_mul(7));
+
+        let decision = decide(&observation, &RIFLE_FLOOD_FAST, &mut memory);
+
+        assert!(decision.intents.contains(&AiIntent::Build {
+            kind: EntityKind::TrainingCentre
+        }));
+        assert!(decision.intents.iter().any(|intent| {
+            matches!(
+                intent,
+                AiIntent::Gather {
+                    resource: EntityKind::Oil,
+                    assignments
+                } if *assignments > 0
+            )
+        }));
+    }
+
+    #[test]
     fn tech_to_tanks_delays_oil_until_steel_floor_and_builds_tank_factory() {
         let mut owned = vec![
             building(10, EntityKind::IndustrialCenter, Some(0)),
@@ -3085,6 +3279,7 @@ mod tests {
             &observation,
             &facts,
             &RIFLE_FLOOD_FULL_SATURATION,
+            false,
             RIFLE_FLOOD_FULL_SATURATION
                 .workers
                 .target_steel_workers(facts.target_steel_workers, usize::MAX),
@@ -3093,6 +3288,7 @@ mod tests {
             &observation,
             &facts,
             &RIFLE_FLOOD_FULL_SATURATION,
+            false,
             target_steel_workers,
         );
 
@@ -3114,6 +3310,7 @@ mod tests {
             &observation,
             &facts,
             &RIFLE_FLOOD_FULL_SATURATION,
+            false,
             RIFLE_FLOOD_FULL_SATURATION
                 .workers
                 .target_steel_workers(facts.target_steel_workers, usize::MAX),
@@ -3122,6 +3319,7 @@ mod tests {
             &observation,
             &facts,
             &RIFLE_FLOOD_FULL_SATURATION,
+            false,
             target_steel_workers,
         );
         assert_eq!(desired_oil, 3);
@@ -3154,6 +3352,7 @@ mod tests {
             &observation,
             &facts,
             &RIFLE_FLOOD_FULL_SATURATION,
+            false,
             RIFLE_FLOOD_FULL_SATURATION
                 .workers
                 .target_steel_workers(facts.target_steel_workers, usize::MAX),
@@ -3162,6 +3361,7 @@ mod tests {
             &observation,
             &facts,
             &RIFLE_FLOOD_FULL_SATURATION,
+            false,
             target_steel_workers,
         );
 
