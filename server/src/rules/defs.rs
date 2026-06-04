@@ -205,7 +205,7 @@ pub const BUILDINGS: &[BuildingDef] = &[
             cost_oil: 0,
             foot_w: 2,
             foot_h: 2,
-            build_ticks: 120,
+            build_ticks: 180,
             provides_supply: config::DEPOT_SUPPLY,
             dmg: 0,
             range_tiles: 0,
