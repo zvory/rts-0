@@ -61,6 +61,8 @@ const BARRACKS_UNITS: &[EntityKind] = &[
 ];
 const TANK_ONLY: &[EntityKind] = &[EntityKind::Tank];
 const INDUSTRIAL_CENTER_REQUIRED: &[EntityKind] = &[EntityKind::IndustrialCenter];
+const INDUSTRIAL_CENTER_AND_BARRACKS_REQUIRED: &[EntityKind] =
+    &[EntityKind::IndustrialCenter, EntityKind::Barracks];
 const TRAINING_CENTRE_REQUIRED: &[EntityKind] = &[EntityKind::TrainingCentre];
 const TANK_FACTORY_REQUIRED: &[EntityKind] =
     &[EntityKind::IndustrialCenter, EntityKind::TrainingCentre];
@@ -252,7 +254,7 @@ pub const BUILDINGS: &[BuildingDef] = &[
         armor_class: ArmorClass::Armored,
         weapon: WeaponClass::None,
         trains: &[],
-        build_requires: INDUSTRIAL_CENTER_REQUIRED,
+        build_requires: INDUSTRIAL_CENTER_AND_BARRACKS_REQUIRED,
     },
     BuildingDef {
         kind: EntityKind::TankFactory,
