@@ -62,6 +62,7 @@ pub fn project_entity(
         view.facing = Some(entity.facing());
     }
     let active_combat_target = matches!(entity.order(), Order::Attack(_) | Order::AttackMove(_))
+        || (entity.kind == crate::game::entity::EntityKind::Tank && entity.target_id().is_some())
         || (entity.is_building() && entity.can_attack());
     let target_visible = if let Some(target_id) = entity.target_id() {
         target
@@ -191,5 +192,41 @@ mod tests {
             .expect("owner should see own tank");
         assert_eq!(owner_view.target_id, Some(hidden_target_id));
         assert_eq!(owner_view.weapon_facing, Some(1.2));
+    }
+
+    #[test]
+    fn moving_tank_projects_visible_turret_target() {
+        let mut entities = EntityStore::new();
+        entities
+            .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
+            .expect("viewer spotter should spawn");
+        let tank_id = entities
+            .spawn_unit(2, EntityKind::Tank, 120.0, 100.0)
+            .expect("tank should spawn");
+        let target_id = entities
+            .spawn_unit(3, EntityKind::Rifleman, 140.0, 100.0)
+            .expect("target should spawn");
+        {
+            let tank = entities.get_mut(tank_id).expect("tank should exist");
+            tank.set_order(Order::move_to(300.0, 100.0));
+            tank.set_target_id(Some(target_id));
+            tank.set_weapon_facing(0.0);
+        }
+        let map = Map {
+            size: 16,
+            terrain: vec![terrain::GRASS; 16 * 16],
+            starts: vec![(1, 1)],
+            expansion_sites: Vec::new(),
+        };
+        let mut fog = Fog::new(map.size);
+        fog.recompute(&[1, 2, 3], &entities, &map);
+        let tank = entities.get(tank_id).expect("tank should exist");
+        let target = entities.get(target_id).expect("target should exist");
+
+        let viewer_view =
+            project_entity(1, tank, &fog, true, Some(target)).expect("viewer should see tank");
+
+        assert_eq!(viewer_view.target_id, Some(target_id));
+        assert_eq!(viewer_view.weapon_facing, Some(0.0));
     }
 }
