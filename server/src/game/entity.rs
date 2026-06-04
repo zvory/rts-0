@@ -33,7 +33,7 @@ pub enum EntityKind {
     Depot,
     Barracks,
     TrainingCentre,
-    TankFactory,
+    Factory,
     Steel,
     Oil,
 }
@@ -50,7 +50,7 @@ impl EntityKind {
         EntityKind::Depot,
         EntityKind::Barracks,
         EntityKind::TrainingCentre,
-        EntityKind::TankFactory,
+        EntityKind::Factory,
         EntityKind::Steel,
         EntityKind::Oil,
     ];
@@ -79,7 +79,7 @@ impl EntityKind {
             EntityKind::Depot => kinds::DEPOT,
             EntityKind::Barracks => kinds::BARRACKS,
             EntityKind::TrainingCentre => kinds::TRAINING_CENTRE,
-            EntityKind::TankFactory => kinds::TANK_FACTORY,
+            EntityKind::Factory => kinds::FACTORY,
             EntityKind::Steel => kinds::STEEL,
             EntityKind::Oil => kinds::OIL,
         }
@@ -100,7 +100,7 @@ impl std::str::FromStr for EntityKind {
             kinds::DEPOT => Ok(EntityKind::Depot),
             kinds::BARRACKS => Ok(EntityKind::Barracks),
             kinds::TRAINING_CENTRE => Ok(EntityKind::TrainingCentre),
-            kinds::TANK_FACTORY => Ok(EntityKind::TankFactory),
+            kinds::FACTORY => Ok(EntityKind::Factory),
             kinds::STEEL => Ok(EntityKind::Steel),
             kinds::OIL => Ok(EntityKind::Oil),
             _ => Err(()),
@@ -1376,7 +1376,7 @@ mod tests {
                 groups(false, false, false, false, false, false),
             ),
             (
-                EntityKind::TankFactory,
+                EntityKind::Factory,
                 groups(false, false, true, false, false, false),
             ),
         ];
@@ -1395,7 +1395,7 @@ mod tests {
             EntityKind::Depot,
             EntityKind::Barracks,
             EntityKind::TrainingCentre,
-            EntityKind::TankFactory,
+            EntityKind::Factory,
         ];
 
         for kind in kinds {

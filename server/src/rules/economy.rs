@@ -90,10 +90,7 @@ mod tests {
                 EntityKind::AtTeam
             ]
         );
-        assert_eq!(
-            trainable_units(EntityKind::TankFactory),
-            &[EntityKind::Tank]
-        );
+        assert_eq!(trainable_units(EntityKind::Factory), &[EntityKind::Tank]);
 
         assert!(train_requirement_met(EntityKind::Rifleman, &[]));
         assert!(!train_requirement_met(EntityKind::MachineGunner, &[]));
@@ -121,17 +118,17 @@ mod tests {
             &[EntityKind::IndustrialCenter, EntityKind::Barracks]
         ));
 
-        assert!(!build_requirement_met(EntityKind::TankFactory, &[]));
+        assert!(!build_requirement_met(EntityKind::Factory, &[]));
         assert!(!build_requirement_met(
-            EntityKind::TankFactory,
+            EntityKind::Factory,
             &[EntityKind::IndustrialCenter]
         ));
         assert!(!build_requirement_met(
-            EntityKind::TankFactory,
+            EntityKind::Factory,
             &[EntityKind::TrainingCentre]
         ));
         assert!(build_requirement_met(
-            EntityKind::TankFactory,
+            EntityKind::Factory,
             &[EntityKind::IndustrialCenter, EntityKind::TrainingCentre]
         ));
 

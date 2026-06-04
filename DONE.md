@@ -111,7 +111,7 @@ Completed tasks moved from PLAN.md.
 
 - Buildings should not be able to be built on top of each other.
 - Control left click a unit will select all units of that type that are visible in the viewport.
-- Tank factory and advanced training center should require 100 and 50 oil respectively.
+- Factory and advanced training center should require 100 and 50 oil respectively.
 - Add four oil patches, but cut the rate of oil gathering by four.
 - Implement a way to view the self play tests with zero fog of war.
 - Building a building on top of a unit will lock that unit inside the building — made impossible.

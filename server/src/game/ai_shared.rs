@@ -10,7 +10,7 @@ use crate::protocol::{MapInfo, Snapshot};
 pub(crate) const DEFAULT_BUILD_SEARCH_MIN_RADIUS: i32 = 3;
 pub(crate) const DEFAULT_BUILD_SEARCH_MAX_RADIUS: i32 = 16;
 pub(crate) const AI_DEFAULT_BUILDING_CLEARANCE_TILES: i32 = 1;
-pub(crate) const AI_TANK_FACTORY_CLEARANCE_TILES: i32 = 2;
+pub(crate) const AI_FACTORY_CLEARANCE_TILES: i32 = 2;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct BuildSearch {
@@ -33,7 +33,7 @@ impl Default for BuildSearch {
 
 pub(crate) fn building_clearance_tiles(kind: EntityKind) -> i32 {
     match kind {
-        EntityKind::TankFactory => AI_TANK_FACTORY_CLEARANCE_TILES,
+        EntityKind::Factory => AI_FACTORY_CLEARANCE_TILES,
         _ => AI_DEFAULT_BUILDING_CLEARANCE_TILES,
     }
 }
@@ -319,7 +319,7 @@ mod tests {
             30,
             30,
             (4, 15),
-            EntityKind::TankFactory,
+            EntityKind::Factory,
             BuildSearch {
                 min_radius: 2,
                 max_radius: 16,
@@ -334,9 +334,9 @@ mod tests {
     }
 
     #[test]
-    fn tank_factory_spacing_requires_two_clear_tiles() {
+    fn factory_spacing_requires_two_clear_tiles() {
         assert!(!footprints_respect_clearance(
-            EntityKind::TankFactory,
+            EntityKind::Factory,
             10,
             10,
             EntityKind::Depot,
@@ -344,7 +344,7 @@ mod tests {
             10,
         ));
         assert!(footprints_respect_clearance(
-            EntityKind::TankFactory,
+            EntityKind::Factory,
             10,
             10,
             EntityKind::Depot,
@@ -363,8 +363,8 @@ mod tests {
         assert!(budget.can_afford_unit(EntityKind::Tank));
         assert!(budget.reserve_unit(EntityKind::Tank));
         assert_eq!(budget.free_supply(), 1);
-        assert!(!budget.can_afford_building(EntityKind::TankFactory));
-        assert!(!budget.reserve_building(EntityKind::TankFactory));
+        assert!(!budget.can_afford_building(EntityKind::Factory));
+        assert!(!budget.reserve_building(EntityKind::Factory));
         assert!(budget.reserve_building(EntityKind::Depot));
         assert!(!budget.can_afford_building(EntityKind::Depot));
     }
