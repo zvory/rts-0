@@ -44,16 +44,23 @@ pub(super) const COLLISION_EPS_PX: f32 = 0.001;
 /// tick), which is required by the replay harness.
 pub(crate) fn resolve_collisions(
     entities: &mut EntityStore,
-    _spatial: &SpatialIndex,
+    spatial: &SpatialIndex,
     map: &Map,
     occ: &Occupancy,
 ) {
     let world_max = map.world_size_px() - 0.01;
+    let ids = entities.ids();
+    let mut candidates = Vec::new();
 
-    for _pass in 0..COLLISION_PASSES {
+    for pass in 0..COLLISION_PASSES {
         let mut moved_any = false;
-        let ids = entities.ids();
-        let spatial = SpatialIndex::build(entities, map.size);
+        let rebuilt_spatial;
+        let pass_spatial = if pass == 0 {
+            spatial
+        } else {
+            rebuilt_spatial = SpatialIndex::build(entities, map.size);
+            &rebuilt_spatial
+        };
 
         for &a in &ids {
             // Ghost units neither push nor are pushed. Other units can transit through their
@@ -79,13 +86,15 @@ pub(crate) fn resolve_collisions(
             // Broad-phase: collect candidate neighbor ids using the (possibly stale) spatial
             // index plus a one-tile slack so small intra-tick drift never hides an overlap.
             let search_r = ar + MAX_UNIT_BOUNDING_RADIUS_PX + COLLISION_SEARCH_SLACK_PX;
-            let mut candidates: Vec<u32> = spatial
-                .ids_in_circle_bbox(ax_idx, ay_idx, search_r)
-                .filter(|&b| b > a)
-                .collect();
+            candidates.clear();
+            candidates.extend(
+                pass_spatial
+                    .ids_in_circle_bbox(ax_idx, ay_idx, search_r)
+                    .filter(|&b| b > a),
+            );
             candidates.sort_unstable();
 
-            for b in candidates {
+            for &b in &candidates {
                 let (b_kind, b_profile, b_facing, bx, by, b_body) = match entities.get(b) {
                     Some(e) if e.is_unit() => {
                         let profile = footing_profile(e);
