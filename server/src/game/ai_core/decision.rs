@@ -36,6 +36,8 @@ const EXPANSION_DEFENSIVE_LINE_SPACING_TILES: f32 = 1.5;
 const EXPANSION_DEFENSIVE_LINE_REISSUE_EPS_TILES: f32 = 0.75;
 const RIFLE_RAID_DEEPEN_TILES: f32 = 7.0;
 const RIFLE_RAID_STEEL_LINE_RADIUS_TILES: f32 = 4.0;
+const RIFLE_RAID_RESUME_HOME_CLEARANCE_TILES: f32 = 12.0;
+const RIFLE_RAID_RESUME_REISSUE_EPS_TILES: f32 = 1.0;
 const DEFENSIVE_PANIC_GRACE_TICKS: u32 = 90;
 const DEFENSIVE_PANIC_SUSTAINED_TICKS: u32 = 180;
 const DEFENSIVE_PANIC_SUSTAINED_BARRACKS: usize = 2;
@@ -634,13 +636,11 @@ where
                         handled_raid_target = true;
                     }
                 } else {
-                    let continuing_units =
-                        active_rifle_raid_units(observation, &raid_units_available);
-                    if !continuing_units.is_empty() {
-                        let (x, y) = rifle_raid_move_target(observation, enemy_base);
-                        if let Some(units) =
-                            actions::move_units(&mut actions, continuing_units, x, y)
-                        {
+                    let (x, y) = rifle_raid_move_target(observation, enemy_base);
+                    let resume_units =
+                        rifle_raid_units_to_resume(observation, &raid_units_available, (x, y));
+                    if !resume_units.is_empty() {
+                        if let Some(units) = actions::move_units(&mut actions, resume_units, x, y) {
                             intents.push(AiIntent::Move { units });
                             handled_raid_target = true;
                         }
@@ -2193,17 +2193,47 @@ fn select_rifle_raid_units(observation: &AiObservation) -> Vec<u32> {
     units
 }
 
-fn active_rifle_raid_units(observation: &AiObservation, raid_units: &[u32]) -> Vec<u32> {
+fn rifle_raid_units_to_resume(
+    observation: &AiObservation,
+    raid_units: &[u32],
+    move_target: (f32, f32),
+) -> Vec<u32> {
     let raid_ids: BTreeSet<u32> = raid_units.iter().copied().collect();
+    let own_base = tile_center(observation.own_start_tile, observation.map.tile_size);
+    let home_clearance_px =
+        RIFLE_RAID_RESUME_HOME_CLEARANCE_TILES * observation.map.tile_size as f32;
+    let reissue_eps2 =
+        squared(RIFLE_RAID_RESUME_REISSUE_EPS_TILES * observation.map.tile_size as f32);
     let mut units: Vec<u32> = observation
         .owned
         .iter()
         .filter(|entity| raid_ids.contains(&entity.id))
-        .filter(|entity| matches!(entity.state, AiEntityState::Move | AiEntityState::Attack))
+        .filter(|entity| match entity.state {
+            AiEntityState::Move | AiEntityState::Attack => true,
+            AiEntityState::Idle => {
+                entity.free_for_combat
+                    && projected_raid_progress_px(own_base, move_target, (entity.x, entity.y))
+                        > home_clearance_px
+                    && dist2(entity.x, entity.y, move_target.0, move_target.1) > reissue_eps2
+            }
+            _ => false,
+        })
         .map(|entity| entity.id)
         .collect();
     units.sort_unstable();
     units
+}
+
+fn projected_raid_progress_px(from: (f32, f32), to: (f32, f32), point: (f32, f32)) -> f32 {
+    let vx = to.0 - from.0;
+    let vy = to.1 - from.1;
+    let len = (vx * vx + vy * vy).sqrt();
+    if len <= f32::EPSILON || !len.is_finite() {
+        return 0.0;
+    }
+    let px = point.0 - from.0;
+    let py = point.1 - from.1;
+    (px * vx + py * vy) / len
 }
 
 fn rifle_raid_unit_target(
@@ -4798,6 +4828,63 @@ mod tests {
                 Command::Attack { units, target } if units.as_slice() == [30] && *target == 90
             )
         }));
+    }
+
+    #[test]
+    fn idle_midfield_rifle_raid_resumes_after_cleared_fight() {
+        let ts = config::TILE_SIZE as f32;
+        let raider = combat_at(30, EntityKind::Rifleman, 30.0 * ts, 30.0 * ts);
+        let observation = observation(
+            AiEconomy {
+                steel: 0,
+                oil: 0,
+                supply_used: 1,
+                supply_cap: 10,
+            },
+            vec![building(10, EntityKind::CityCentre, Some(0)), raider],
+        );
+        let mut memory = AiDecisionMemory::for_profile(&RIFLE_FLOOD_FAST);
+        memory.note_attack_for(&RIFLE_FLOOD_FAST, RIFLE_FLOOD_FAST.attack, observation.tick);
+
+        let decision = decide(&observation, &RIFLE_FLOOD_FAST, &mut memory);
+
+        let enemy_base = tile_center(enemy_start_tile(&observation), observation.map.tile_size);
+        assert!(decision.commands.iter().any(|command| {
+            matches!(
+                command,
+                Command::Move { units, x, y }
+                    if units.as_slice() == [30] && *x > enemy_base.0 && *y > enemy_base.1
+            )
+        }));
+    }
+
+    #[test]
+    fn idle_home_rifle_does_not_resume_raid_before_wave_cadence() {
+        let ts = config::TILE_SIZE as f32;
+        let raider = combat_at(30, EntityKind::Rifleman, 8.5 * ts, 8.5 * ts);
+        let observation = observation(
+            AiEconomy {
+                steel: 0,
+                oil: 0,
+                supply_used: 1,
+                supply_cap: 10,
+            },
+            vec![building(10, EntityKind::CityCentre, Some(0)), raider],
+        );
+        let mut memory = AiDecisionMemory::for_profile(&RIFLE_FLOOD_FAST);
+        memory.note_attack_for(&RIFLE_FLOOD_FAST, RIFLE_FLOOD_FAST.attack, observation.tick);
+
+        let decision = decide(&observation, &RIFLE_FLOOD_FAST, &mut memory);
+
+        assert!(
+            !decision.commands.iter().any(|command| {
+                matches!(
+                    command,
+                    Command::Move { units, .. } if units.as_slice() == [30]
+                )
+            }),
+            "idle riflemen at home should wait for normal attack cadence"
+        );
     }
 
     #[test]
