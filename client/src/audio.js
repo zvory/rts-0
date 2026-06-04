@@ -32,12 +32,35 @@ const DEFAULT_OTHER = 1.0;
 const VOICE_CAP = 48;
 /** Drop repeats of the same `id` within this window (ms). */
 const DEDUP_MS = 60;
+/** Spoken feedback should never stack faster than the line itself. */
+const SPOKEN_MIN_COOLDOWN_MS = 1500;
+/** Spatial bucket used by under-attack voice dedup (30 tiles at 32 px). */
+const UNDER_ATTACK_BUCKET_PX = 960;
+/** Under-attack voice line cooldown per map bucket. */
+const UNDER_ATTACK_COOLDOWN_MS = 10000;
 /** Pitch jitter (±fraction) applied via playbackRate when caller does not override. */
 const PITCH_VARIANCE = 0.06;
 /** Master gain ramp time on tab show/hide (s). */
 const VISIBILITY_RAMP_S = 0.1;
-/** Aging bonus subtracted from priority per second of voice life (favors evicting old). */
-const AGE_BONUS_PER_S = 0.1;
+/** Alert ducking ramps in fast and releases slower so spoken lines cut through battles. */
+const DUCK_IN_S = 0.08;
+const DUCK_OUT_S = 0.4;
+const DB_ALERT_AMBIENT = -12;
+const DB_ALERT_COMBAT = -4;
+
+const BASE_PRIORITY = Object.freeze({
+  alert: 100,
+  ui: 90,
+  unit_voice: 70,
+  combat_self: 60,
+  combat_other: 40,
+  ambient: 10,
+});
+const STICKY_BONUS = Object.freeze({
+  alert: 20,
+  ui: 10,
+});
+const SPOKEN_CATEGORIES = new Set(["alert", "ui", "unit_voice"]);
 
 /** Multiple of `refDist` beyond which a spatial sound is dropped entirely. */
 const MAX_DIST_MULT = 3;
@@ -54,6 +77,10 @@ function clamp01(v) {
   v = Number(v);
   if (!isFinite(v)) return 0;
   return v < 0 ? 0 : v > 1 ? 1 : v;
+}
+
+function dbToGain(db) {
+  return Math.pow(10, db / 20);
 }
 
 function lsRead(key, fallback) {
@@ -110,6 +137,8 @@ export class Audio {
     this._queuedManifests = [];
     /** Listener pose in world pixels + reference distance (1 screen-width at current zoom). */
     this.listener = { x: 0, y: 0, refDist: DEFAULT_REF_DIST };
+    /** Number of active alert voices currently forcing lower-priority buses down. */
+    this.alertDuckDepth = 0;
 
     this.volume = { master: lsRead("audio.master", DEFAULT_MASTER) };
     for (const c of CATEGORIES) {
@@ -150,6 +179,8 @@ export class Audio {
    * @param {number} [opts.priority] higher wins eviction (default 1)
    * @param {string} [opts.category] one of CATEGORIES (default "ui")
    * @param {number} [opts.pitchVariance] override default jitter (0 to disable)
+   * @param {string} [opts.dedupKey] override per-sound dedup bucket
+   * @param {number} [opts.cooldownMs] override dedup cooldown
    * @returns {boolean} true if scheduled, false if dropped
    */
   play(id, opts) {
@@ -159,11 +190,8 @@ export class Audio {
     opts = opts || {};
 
     const now = performance.now();
-    const last = this.lastPlay.get(id);
-    if (last != null && now - last < DEDUP_MS) return false;
-
     const category = opts.category && CATEGORY_SET.has(opts.category) ? opts.category : "ui";
-    const priority = typeof opts.priority === "number" ? opts.priority : 1;
+    const priorityBonus = typeof opts.priority === "number" ? opts.priority : 0;
 
     // Spatial gate: if a position is supplied, compute attenuation/pan/lpHz from
     // the current listener. Beyond MAX_DIST_MULT * refDist the sound is dropped
@@ -174,8 +202,19 @@ export class Audio {
       if (!spatial) return false;
     }
 
+    const dedupKey = this._dedupKey(id, category, opts, spatial);
+    const cooldownMs = this._cooldownMs(id, category, opts, buf);
+    const last = this.lastPlay.get(dedupKey);
+    if (last != null && now - last < cooldownMs) return false;
+
+    const distancePenalty =
+      typeof opts.distancePenalty === "number"
+        ? Math.max(0, opts.distancePenalty)
+        : spatial?.distancePenalty || 0;
+    const incomingScore = this._score(category, now, now, distancePenalty, priorityBonus);
+
     if (this.voices.length >= VOICE_CAP) {
-      if (!this._evictLowest(priority, now)) return false;
+      if (!this._evictLowest(incomingScore, now)) return false;
     }
 
     const src = this.ctx.createBufferSource();
@@ -208,7 +247,15 @@ export class Audio {
     } catch {
       return false;
     }
-    const voice = { node: src, priority, startedAt: now, category, id, trail };
+    const voice = {
+      node: src,
+      priorityBonus,
+      startedAt: now,
+      category,
+      id,
+      trail,
+      distancePenalty,
+    };
     this.voices.push(voice);
     src.onended = () => {
       const i = this.voices.indexOf(voice);
@@ -216,8 +263,10 @@ export class Audio {
       for (const n of trail) {
         try { n.disconnect(); } catch { /* already disconnected */ }
       }
+      if (voice.category === "alert") this._releaseAlertDuck();
     };
-    this.lastPlay.set(id, now);
+    this.lastPlay.set(dedupKey, now);
+    if (category === "alert") this._beginAlertDuck();
     return true;
   }
 
@@ -316,6 +365,7 @@ export class Audio {
     }
     this.master = null;
     this.gains = {};
+    this.alertDuckDepth = 0;
   }
 
   // --- Internals ------------------------------------------------------------
@@ -365,7 +415,7 @@ export class Audio {
    * beyond max distance and should be dropped before voice allocation.
    * @param {number} x emitter world x
    * @param {number} y emitter world y
-   * @returns {{gain:number, pan:number, lpHz:number}|null}
+   * @returns {{gain:number, pan:number, lpHz:number,distance:number,distancePenalty:number}|null}
    */
   _computeSpatial(x, y) {
     const refDist = Math.max(1, this.listener.refDist || DEFAULT_REF_DIST);
@@ -378,7 +428,37 @@ export class Audio {
     const pan = Math.max(-1, Math.min(1, dx / refDist));
     const farT = clamp01(d / maxDist);
     const lpHz = LP_NEAR_HZ + (LP_FAR_HZ - LP_NEAR_HZ) * farT;
-    return { gain, pan, lpHz };
+    const distancePenalty = Math.min(30, (d / refDist) * 10);
+    return { gain, pan, lpHz, distance: d, distancePenalty };
+  }
+
+  _dedupKey(id, category, opts, spatial) {
+    if (typeof opts.dedupKey === "string" && opts.dedupKey) return `${id}:${opts.dedupKey}`;
+    if (id === "notice_generic" && opts.alertId === "under_attack") {
+      const x = Number(opts.alertX);
+      const y = Number(opts.alertY);
+      if (isFinite(x) && isFinite(y)) {
+        return `${id}:under_attack:${Math.floor(x / UNDER_ATTACK_BUCKET_PX)}:${Math.floor(y / UNDER_ATTACK_BUCKET_PX)}`;
+      }
+    }
+    if (category === "combat_self" || category === "combat_other") {
+      const refDist = Math.max(1, this.listener.refDist || DEFAULT_REF_DIST);
+      const bucketPx = Math.max(160, refDist / 3);
+      const bucket = spatial ? Math.floor(spatial.distance / bucketPx) : 0;
+      return `${id}:${category}:d${bucket}`;
+    }
+    return `${id}:${category}`;
+  }
+
+  _cooldownMs(id, category, opts, buf) {
+    if (typeof opts.cooldownMs === "number" && opts.cooldownMs >= 0) return opts.cooldownMs;
+    if (id === "notice_generic" && opts.alertId === "under_attack") {
+      return UNDER_ATTACK_COOLDOWN_MS;
+    }
+    if (SPOKEN_CATEGORIES.has(category)) {
+      return Math.max(buf.duration * 1000 || 0, SPOKEN_MIN_COOLDOWN_MS);
+    }
+    return DEDUP_MS;
   }
 
   async _decodeManifest(manifest) {
@@ -420,32 +500,82 @@ export class Audio {
   }
 
   /**
-   * Try to evict the worst-scoring voice (priority - age_bonus * age). If even
+   * Try to evict the worst-scoring voice. If even
    * the worst voice outranks the incoming call, the new sound is dropped.
    * @returns {boolean} true if a slot was freed
    */
-  _evictLowest(incomingPriority, now) {
+  _evictLowest(incomingScore, now) {
     if (this.voices.length === 0) return true;
     let worstIdx = -1;
     let worstScore = Infinity;
     for (let i = 0; i < this.voices.length; i++) {
       const v = this.voices[i];
-      const ageS = (now - v.startedAt) / 1000;
-      const score = v.priority - ageS * AGE_BONUS_PER_S;
+      const score = this._voiceScore(v, now);
       if (score < worstScore) {
         worstScore = score;
         worstIdx = i;
       }
     }
     if (worstIdx < 0) return false;
-    if (worstScore >= incomingPriority) return false;
+    if (worstScore >= incomingScore) return false;
+    const evicted = this.voices[worstIdx];
     try {
-      this.voices[worstIdx].node.stop();
+      evicted.node.stop();
     } catch {
       /* already ended */
     }
-    this.voices.splice(worstIdx, 1);
+    const i = this.voices.indexOf(evicted);
+    if (i >= 0) this.voices.splice(i, 1);
     return true;
+  }
+
+  _voiceScore(voice, now) {
+    return this._score(
+      voice.category,
+      voice.startedAt,
+      now,
+      voice.distancePenalty || 0,
+      voice.priorityBonus || 0,
+    );
+  }
+
+  _score(category, startedAt, now, distancePenalty, priorityBonus) {
+    const ageS = Math.max(0, (now - startedAt) / 1000);
+    return (
+      (BASE_PRIORITY[category] || 0) +
+      (STICKY_BONUS[category] || 0) +
+      priorityBonus -
+      ageS -
+      distancePenalty
+    );
+  }
+
+  _beginAlertDuck() {
+    this.alertDuckDepth++;
+    this._rampDuckedBuses(true);
+  }
+
+  _releaseAlertDuck() {
+    if (this.alertDuckDepth > 0) this.alertDuckDepth--;
+    if (this.alertDuckDepth === 0) this._rampDuckedBuses(false);
+  }
+
+  _rampDuckedBuses(duck) {
+    if (!this.ctx) return;
+    const now = this.ctx.currentTime;
+    const ramp = duck ? DUCK_IN_S : DUCK_OUT_S;
+    const targets = {
+      ambient: duck ? this.volume.ambient * dbToGain(DB_ALERT_AMBIENT) : this.volume.ambient,
+      combat_self: duck ? this.volume.combat_self * dbToGain(DB_ALERT_COMBAT) : this.volume.combat_self,
+      combat_other: duck ? this.volume.combat_other * dbToGain(DB_ALERT_COMBAT) : this.volume.combat_other,
+    };
+    for (const [cat, target] of Object.entries(targets)) {
+      const g = this.gains[cat];
+      if (!g) continue;
+      g.gain.cancelScheduledValues(now);
+      g.gain.setValueAtTime(g.gain.value, now);
+      g.gain.linearRampToValueAtTime(target, now + ramp);
+    }
   }
 }
 
@@ -477,6 +607,7 @@ export const SOUND_MANIFEST = Object.freeze([
  */
 export function noticeSoundId(msg) {
   const m = (msg || "").toLowerCase();
+  if (m.includes("under_attack") || m.includes("under attack")) return "notice_generic";
   if (m.includes("supply") || m.includes("depot")) return "notice_supply";
   if (m.includes("steel")) return "notice_steel";
   if (m.includes("oil")) return "notice_oil";

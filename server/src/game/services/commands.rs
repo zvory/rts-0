@@ -9,7 +9,7 @@ use crate::game::services::spatial::SpatialIndex;
 use crate::game::services::standability;
 use crate::game::services::world_query;
 use crate::game::PlayerState;
-use crate::protocol::Event;
+use crate::protocol::{Event, NoticeSeverity};
 use crate::rules;
 
 /// Max unique unit ids honored per multi-unit command. Caps the per-id work a single command can
@@ -360,6 +360,9 @@ fn order_cancel(
 pub(crate) fn notice(events: &mut HashMap<u32, Vec<Event>>, player: u32, msg: &str) {
     events.entry(player).or_default().push(Event::Notice {
         msg: msg.to_string(),
+        x: None,
+        y: None,
+        severity: NoticeSeverity::Info,
     });
 }
 

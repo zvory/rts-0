@@ -179,7 +179,8 @@ Compact numeric codes:
 | `kind` | 1 `worker`, 2 `rifleman`, 3 `machine_gunner`, 4 `at_team`, 5 `tank`, 6 `industrial_center`, 7 `depot`, 8 `barracks`, 9 `training_centre`, 10 `tank_factory`, 11 `steel`, 12 `oil` |
 | `state` | 1 `idle`, 2 `move`, 3 `attack`, 4 `gather`, 5 `build`, 6 `train`, 7 `construct`, 8 `dead` |
 | `setupState` | 1 `packed`, 2 `setting_up`, 3 `deployed`, 4 `tearing_down` |
-| `EventRecord` | `[1, from, to]` attack, `[2, id, x, y, kind]` death, `[3, id, kind]` build, `[4, msg]` notice |
+| `notice.severity` | 1 `info`, 2 `warn`, 3 `alert` |
+| `EventRecord` | `[1, from, to]` attack, `[2, id, x, y, kind]` death, `[3, id, kind]` build, `[4, msg]` notice, `[4, msg, severity]` position-free notice with severity, `[4, msg, severity, x, y]` positioned notice |
 
 Compact entity records are positional arrays. Optional fields keep the semantic order above and
 trailing missing optional fields are omitted; interior missing optional fields are encoded as
@@ -222,9 +223,13 @@ watch rooms receive all resource updates).
 { e: "attack", from: u32, to: u32 }            // for muzzle flashes / tracers
 { e: "death",  id: u32, x: f32, y: f32, kind } // for death poofs
 { e: "build",  id: u32, kind: string }         // building completed
-{ e: "notice", msg: string }                   // "Not enough steel", etc.
+{ e: "notice", msg: string, severity?: "info"|"warn"|"alert", x?: f32, y?: f32 }
 ```
-Events are best-effort visual flavor; the client must not depend on receiving them.
+Notices default to `severity: "info"` with no position. `alert:`-prefixed notice ids are
+gameplay alerts: the client plays alert audio and pings the minimap at `(x, y)` when present,
+or pulses the minimap border when absent. `alert:under_attack` is emitted at the damaged unit's
+position after normal fog/visibility filtering. Events are best-effort visual flavor; the client
+must not depend on receiving them.
 
 ---
 

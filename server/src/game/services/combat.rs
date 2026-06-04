@@ -14,7 +14,7 @@ use crate::game::services::occupancy::Occupancy;
 use crate::game::services::spatial::SpatialIndex;
 use crate::game::services::world_query;
 use crate::game::PlayerState;
-use crate::protocol::Event;
+use crate::protocol::{Event, NoticeSeverity};
 use crate::rules::combat as combat_rules;
 use crate::rules::projection;
 use crate::rules::terrain::TerrainKind;
@@ -572,6 +572,7 @@ fn apply_damage(
     );
     // Send the Attack event to every player who can either see the attacker or the victim, so
     // friendly fire tracers + enemy muzzle flashes both render. Attacker's owner always gets it.
+    let victim_owner = entities.get(victim).map(|e| e.owner).unwrap_or(0);
     let player_ids: Vec<u32> = events.keys().copied().collect();
     for pid in player_ids {
         if !projection::attack_event_visible_to(pid, ax, ay, vx, vy, attacker_owner, fog) {
@@ -581,7 +582,27 @@ fn apply_damage(
             from: attacker,
             to: victim,
         });
+        push_under_attack_notice(events, pid, victim_owner, attacker_owner, vx, vy);
     }
+}
+
+fn push_under_attack_notice(
+    events: &mut HashMap<u32, Vec<Event>>,
+    recipient: u32,
+    victim_owner: u32,
+    attacker_owner: u32,
+    x: f32,
+    y: f32,
+) {
+    if victim_owner == 0 || victim_owner == attacker_owner || recipient != victim_owner {
+        return;
+    }
+    events.entry(recipient).or_default().push(Event::Notice {
+        msg: "alert:under_attack".to_string(),
+        x: Some(x),
+        y: Some(y),
+        severity: NoticeSeverity::Alert,
+    });
 }
 
 fn retreat_worker_from_direct_hit(
@@ -725,6 +746,7 @@ fn apply_overpenetration(
         if effective_dmg == 0 {
             continue;
         }
+        let victim_owner = entities.get(id).map(|e| e.owner).unwrap_or(0);
         if let Some(v) = entities.get_mut(id) {
             if v.hp > 0 {
                 v.hp = v.hp.saturating_sub(effective_dmg);
@@ -739,6 +761,7 @@ fn apply_overpenetration(
                 from: attacker,
                 to: id,
             });
+            push_under_attack_notice(events, *pid, victim_owner, attacker_owner, tx, ty);
         }
     }
 }
@@ -1025,6 +1048,45 @@ mod tests {
                 .flatten()
                 .all(|event| !matches!(event, Event::Attack { .. })),
             "blocked shots should not emit attack tracers"
+        );
+    }
+
+    #[test]
+    fn visible_damage_emits_positioned_under_attack_alert_to_victim_owner() {
+        let mut entities = EntityStore::new();
+        let attacker_id = entities
+            .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
+            .expect("attacker should spawn");
+        let victim_id = entities
+            .spawn_unit(2, EntityKind::Rifleman, 120.0, 100.0)
+            .expect("victim should spawn");
+        entities
+            .get_mut(attacker_id)
+            .expect("attacker should exist")
+            .set_order(Order::attack(victim_id));
+
+        let events = run_combat_tick(&mut entities);
+        let victim_events = events
+            .get(&2)
+            .expect("victim owner should have an event queue");
+
+        assert!(
+            victim_events
+                .iter()
+                .any(|event| matches!(event, Event::Attack { from, to } if *from == attacker_id && *to == victim_id)),
+            "victim owner should receive the visible attack event"
+        );
+        assert!(
+            victim_events.iter().any(|event| matches!(
+                event,
+                Event::Notice {
+                    msg,
+                    x: Some(x),
+                    y: Some(y),
+                    severity: NoticeSeverity::Alert,
+                } if msg == "alert:under_attack" && (*x - 120.0).abs() < 0.001 && (*y - 100.0).abs() < 0.001
+            )),
+            "victim owner should receive a positioned under-attack alert"
         );
     }
 

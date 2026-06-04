@@ -1563,6 +1563,9 @@ mod tests {
             }],
             events: vec![Event::Notice {
                 msg: "hello".to_string(),
+                x: None,
+                y: None,
+                severity: crate::protocol::NoticeSeverity::Info,
             }],
         };
 

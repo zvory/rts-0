@@ -106,6 +106,12 @@ export const EVENT = Object.freeze({
   NOTICE: "notice",
 });
 
+export const NOTICE_SEVERITY = Object.freeze({
+  INFO: "info",
+  WARN: "warn",
+  ALERT: "alert",
+});
+
 // --- Compact snapshot wire schema (must match protocol.rs) ---
 export const COMPACT_SNAPSHOT_VERSION = 1;
 
@@ -153,6 +159,11 @@ const KIND_BY_CODE = Object.freeze(reverseCodes(KIND_CODE));
 const STATE_BY_CODE = Object.freeze(reverseCodes(STATE_CODE));
 const SETUP_BY_CODE = Object.freeze(reverseCodes(SETUP_CODE));
 const EVENT_BY_CODE = Object.freeze(reverseCodes(EVENT_CODE));
+const NOTICE_SEVERITY_BY_CODE = Object.freeze({
+  1: NOTICE_SEVERITY.INFO,
+  2: NOTICE_SEVERITY.WARN,
+  3: NOTICE_SEVERITY.ALERT,
+});
 
 const MAX_COMPACT_ENTITIES = 20000;
 const MAX_COMPACT_RESOURCE_DELTAS = 20000;
@@ -269,12 +280,30 @@ function decodeCompactEvent(record, index) {
         kind: readCode(fields[2], KIND_BY_CODE, "event.kind"),
       };
     case EVENT.NOTICE:
-      requireLength(fields, 2, `notice event ${index}`);
+      if (fields.length !== 2 && fields.length !== 3 && fields.length !== 5) {
+        throw new Error(`notice event ${index} field count mismatch`);
+      }
       if (typeof fields[1] !== "string") throw new Error(`notice event ${index} msg must be string`);
-      return { e: EVENT.NOTICE, msg: fields[1] };
+      return decodeCompactNotice(fields, index);
     default:
       throw new Error(`unknown compact event kind ${eventKind}`);
   }
+}
+
+function decodeCompactNotice(fields, index) {
+  const ev = {
+    e: EVENT.NOTICE,
+    msg: fields[1],
+    severity: NOTICE_SEVERITY.INFO,
+  };
+  if (fields.length >= 3) {
+    ev.severity = readCode(fields[2], NOTICE_SEVERITY_BY_CODE, `notice event ${index}.severity`);
+  }
+  if (fields.length === 5) {
+    ev.x = readNumber(fields[3], `notice event ${index}.x`);
+    ev.y = readNumber(fields[4], `notice event ${index}.y`);
+  }
+  return ev;
 }
 
 function assignOptional(target, field, fields, index, reader) {
