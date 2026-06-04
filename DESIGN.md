@@ -562,6 +562,9 @@ export class HUD {
   // command card buttons call net.command(...) or state.beginPlacement(...)
 }
 ```
+The train command card is driven by the first selected production building type, but train clicks
+are issued to the selected completed compatible production buildings in round-robin order so a
+multi-building selection spreads queued units across its producers.
 
 `minimap.js`
 ```js
