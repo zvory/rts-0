@@ -840,13 +840,17 @@ export class Input {
     this.net.command(cmd.stop(ownUnits));
   }
 
-  /** Esc / right-click cancel: drop placement first, then targeting. */
+  /** Esc cancel: drop placement first, then targeting, then selection. */
   _cancel() {
     if (this.state.placement) {
       this.state.endPlacement();
       return;
     }
-    this.state.endCommandTarget();
+    if (this.state.commandTarget) {
+      this.state.endCommandTarget();
+      return;
+    }
+    this.state.clearSelection();
   }
 
   // --- Mouse wheel: zoom toward cursor ------------------------------------
