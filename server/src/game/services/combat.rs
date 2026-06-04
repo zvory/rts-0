@@ -27,6 +27,8 @@ use rand::Rng;
 const RANGE_SLACK: f32 = 4.0;
 const TANK_TURRET_TURN_RATE_RAD_PER_TICK: f32 = 0.070;
 const TANK_TURRET_FIRE_TOLERANCE_RAD: f32 = 0.18;
+const AT_GUN_TURN_RATE_RAD_PER_TICK: f32 = 0.035;
+const AT_GUN_FIRE_TOLERANCE_RAD: f32 = 0.12;
 const TANK_STANDOFF_BUFFER_PX: f32 = config::TILE_SIZE as f32;
 const TANK_STANDOFF_REPATH_DELTA_PX: f32 = config::TILE_SIZE as f32;
 
@@ -51,7 +53,7 @@ pub(crate) fn combat_system(
     for id in entities.ids() {
         if let Some(e) = entities.get_mut(id) {
             e.tick_attack_cd();
-            tick_machine_gunner_setup(e);
+            tick_deployed_weapon_setup(e);
         }
     }
 
@@ -75,11 +77,11 @@ pub(crate) fn combat_system(
             let (range_tiles, dmg, cd) = (profile.range_tiles, profile.dmg, profile.cooldown);
             let range_px = range_tiles as f32 * config::TILE_SIZE as f32 + e.radius() + RANGE_SLACK;
             // Aggro radius: mobile units detect and chase enemies out to their sight radius so
-            // attack-move / auto-defend actually close the gap. Idle machine gunners are the
+            // attack-move / auto-defend actually close the gap. Idle deployed weapons are the
             // exception: they hold position and only auto-acquire enemies already in weapon
             // range. Buildings never move, so they only ever engage within their firing range.
             let aggro_px = if e.is_unit() {
-                if e.kind == EntityKind::MachineGunner && matches!(e.order(), Order::Idle) {
+                if requires_weapon_setup(e.kind) && matches!(e.order(), Order::Idle) {
                     range_px
                 } else {
                     (e.sight_tiles() as f32 * config::TILE_SIZE as f32).max(range_px)
@@ -119,7 +121,7 @@ pub(crate) fn combat_system(
                     Order::AttackMove(_) | Order::Move(_) | Order::Idle
                 ) {
                     e.set_target_id(None);
-                    begin_idle_machine_gunner_setup(e);
+                    begin_idle_deployed_weapon_setup(e);
                 }
                 if e.kind == EntityKind::Tank {
                     relax_tank_weapon_toward_body(e);
@@ -164,6 +166,8 @@ pub(crate) fn combat_system(
             if let Some(e) = entities.get_mut(id) {
                 if e.kind == EntityKind::Tank {
                     weapon_aligned = rotate_tank_weapon_for_combat(e, target_angle);
+                } else if e.kind == EntityKind::AtTeam {
+                    weapon_aligned = rotate_at_gun_for_combat(e, target_angle);
                 } else if target_angle.is_finite() {
                     e.set_facing(target_angle);
                     mirror_weapon_to_body(e, target_angle);
@@ -179,7 +183,7 @@ pub(crate) fn combat_system(
             if !weapon_aligned {
                 continue;
             }
-            if !machine_gunner_ready_to_fire(entities, id) {
+            if !deployed_weapon_ready_to_fire(entities, id) {
                 continue;
             }
             let ready = matches!(entities.get(id), Some(e) if e.attack_cd() == 0);
@@ -204,13 +208,15 @@ pub(crate) fn combat_system(
             if let Some(e) = entities.get_mut(id) {
                 if e.kind == EntityKind::Tank {
                     rotate_tank_weapon_for_combat(e, target_angle);
+                } else if e.kind == EntityKind::AtTeam {
+                    rotate_at_gun_for_combat(e, target_angle);
                 } else if target_angle.is_finite() {
                     mirror_weapon_to_body(e, e.facing());
                 }
                 e.set_target_id(Some(tid));
                 e.mark_attack_phase(AttackPhase::Chasing);
             }
-            if !machine_gunner_ready_to_move(entities, id) {
+            if !deployed_weapon_ready_to_move(entities, id) {
                 continue;
             }
             if want_repath {
@@ -327,15 +333,41 @@ fn mirror_weapon_to_body(e: &mut Entity, angle: f32) {
     e.set_weapon_facing(angle);
 }
 
-fn tick_machine_gunner_setup(e: &mut Entity) {
-    if e.kind != EntityKind::MachineGunner {
+fn rotate_at_gun_for_combat(e: &mut Entity, target_angle: f32) -> bool {
+    if !target_angle.is_finite() {
+        return false;
+    }
+    e.set_desired_weapon_facing(target_angle);
+    let current = e
+        .weapon_facing()
+        .filter(|facing| facing.is_finite())
+        .unwrap_or_else(|| {
+            let facing = e.facing();
+            if facing.is_finite() {
+                facing
+            } else {
+                0.0
+            }
+        });
+    let rotated = rotate_toward(current, target_angle, AT_GUN_TURN_RATE_RAD_PER_TICK);
+    if rotated.is_finite() {
+        e.set_facing(rotated);
+        e.set_weapon_facing(rotated);
+    } else {
+        return false;
+    }
+    angle_delta(rotated, target_angle).abs() <= AT_GUN_FIRE_TOLERANCE_RAD
+}
+
+fn tick_deployed_weapon_setup(e: &mut Entity) {
+    if !requires_weapon_setup(e.kind) {
         return;
     }
     e.tick_weapon_setup();
 }
 
-fn begin_idle_machine_gunner_setup(e: &mut Entity) {
-    if e.kind != EntityKind::MachineGunner {
+fn begin_idle_deployed_weapon_setup(e: &mut Entity) {
+    if !requires_weapon_setup(e.kind) {
         return;
     }
     if !e.path_is_empty() {
@@ -354,11 +386,11 @@ fn begin_idle_machine_gunner_setup(e: &mut Entity) {
     }
 }
 
-fn machine_gunner_ready_to_fire(entities: &mut EntityStore, id: u32) -> bool {
+fn deployed_weapon_ready_to_fire(entities: &mut EntityStore, id: u32) -> bool {
     let Some(e) = entities.get_mut(id) else {
         return false;
     };
-    if e.kind != EntityKind::MachineGunner {
+    if !requires_weapon_setup(e.kind) {
         return true;
     }
     match e.weapon_setup() {
@@ -373,11 +405,11 @@ fn machine_gunner_ready_to_fire(entities: &mut EntityStore, id: u32) -> bool {
     }
 }
 
-fn machine_gunner_ready_to_move(entities: &mut EntityStore, id: u32) -> bool {
+fn deployed_weapon_ready_to_move(entities: &mut EntityStore, id: u32) -> bool {
     let Some(e) = entities.get_mut(id) else {
         return false;
     };
-    if e.kind != EntityKind::MachineGunner {
+    if !requires_weapon_setup(e.kind) {
         return true;
     }
     match e.weapon_setup() {
@@ -390,6 +422,10 @@ fn machine_gunner_ready_to_move(entities: &mut EntityStore, id: u32) -> bool {
         }
         WeaponSetup::TearingDown { .. } => false,
     }
+}
+
+fn requires_weapon_setup(kind: EntityKind) -> bool {
+    matches!(kind, EntityKind::MachineGunner | EntityKind::AtTeam)
 }
 
 /// How a combatant chooses targets.
@@ -1568,6 +1604,64 @@ mod tests {
         assert!(
             entities.get(enemy_id).expect("enemy should exist").hp < enemy_hp,
             "machine gunner should fire once deployment completes"
+        );
+    }
+
+    #[test]
+    fn at_team_waits_to_deploy_before_first_shot() {
+        let mut entities = EntityStore::new();
+        entities
+            .spawn_unit(1, EntityKind::AtTeam, 100.0, 100.0)
+            .expect("at team should spawn");
+        let enemy_id = entities
+            .spawn_unit(2, EntityKind::Tank, 120.0, 100.0)
+            .expect("enemy tank should spawn");
+        let enemy_hp = entities.get(enemy_id).expect("enemy should exist").hp;
+
+        run_combat_tick(&mut entities);
+        assert_eq!(
+            entities.get(enemy_id).expect("enemy should exist").hp,
+            enemy_hp
+        );
+
+        for _ in 0..config::MACHINE_GUNNER_SETUP_TICKS {
+            run_combat_tick(&mut entities);
+        }
+
+        assert!(
+            entities.get(enemy_id).expect("enemy should exist").hp < enemy_hp,
+            "AT team should fire once deployment completes"
+        );
+    }
+
+    #[test]
+    fn at_team_turns_slowly_before_firing() {
+        let mut entities = EntityStore::new();
+        let at_id = entities
+            .spawn_unit(1, EntityKind::AtTeam, 100.0, 100.0)
+            .expect("at team should spawn");
+        let enemy_id = entities
+            .spawn_unit(2, EntityKind::Tank, 100.0, 20.0)
+            .expect("enemy tank should spawn");
+        let enemy_hp = entities.get(enemy_id).expect("enemy should exist").hp;
+        if let Some(at) = entities.get_mut(at_id) {
+            at.set_facing(0.0);
+            at.set_weapon_facing(0.0);
+            at.set_weapon_setup(WeaponSetup::Deployed);
+        }
+
+        run_combat_tick(&mut entities);
+
+        let at = entities.get(at_id).expect("at should exist");
+        assert!(
+            at.facing().abs() <= AT_GUN_TURN_RATE_RAD_PER_TICK + 0.001,
+            "AT gun should only slew by its turn-rate cap, got {:.4}",
+            at.facing()
+        );
+        assert_eq!(
+            entities.get(enemy_id).expect("enemy should exist").hp,
+            enemy_hp,
+            "AT gun should not fire until its barrel is aligned"
         );
     }
 
