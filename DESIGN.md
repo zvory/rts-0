@@ -250,7 +250,7 @@ src/
     command.rs   # SimCommand domain commands + protocol translation helpers
     map.rs       # Map: handcrafted terrain asset loading, passability, base-site validation
     entity.rs    # Entity, EntityKind, EntityStore (slotmap-style Vec + free list)
-    pathfinding.rs # A* over the tile grid (impassable = terrain + building footprints)
+    pathfinding.rs # A* over the tile grid, with optional turn-cost route shaping for tanks
     fog.rs       # per-player visibility grid (visible / explored)
     systems.rs   # orchestrator: runs services in order each tick
     services/    # per-tick internal services: commands, move_coordinator, movement (incl. unit collision), combat, economy, production, construction, death, occupancy, supply, pathing, geometry, standability, line_of_sight
@@ -788,9 +788,12 @@ The server treats every client as potentially hostile. Limits live next to the c
   unit `AwaitingPath`. The existing path coordinator then recomputes under current occupancy within
   the normal per-tick A* budget. This covers buildings constructed after a long path was assigned
   without periodically repathing every moving unit.
-- **Tank path simplification**: player-issued tank `Move` / `AttackMove` path requests still use
-  tile A* for reachability, then snap the reverse-ordered final waypoint to the exact command goal
-  and simplify the waypoint list by dropping intermediate tile centers only when
+- **Tank path simplification**: player-issued tank `Move` / `AttackMove` path requests use tile A*
+  with a small direction-change penalty so equivalent-cost routes prefer fewer bends. Path cache
+  keys include the route-shaping mode so tank turn-cost paths do not share cached routes with normal
+  interaction pathing. The returned route is still used for reachability, then snaps the
+  reverse-ordered final waypoint to the exact command goal and simplifies the waypoint list by
+  dropping intermediate tile centers only when
   `standability::unit_static_segment_standable` proves the unit body can travel the straight segment
   without clipping terrain or building occupancy. The simplifier preserves the exact final command
   goal, never adds waypoints, and falls back to the original next waypoint whenever segment legality
