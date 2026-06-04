@@ -264,6 +264,9 @@ mod tests {
         let map = flat_map(16);
         let mut entities = EntityStore::new();
         let rect = building_rect_for_footprint(EntityKind::Depot, 4, 4).expect("depot rect");
+        let radius = config::unit_stats(EntityKind::Tank)
+            .expect("tank stats")
+            .radius;
         let worker = entities
             .spawn_unit(
                 1,
@@ -277,7 +280,12 @@ mod tests {
             .expect("worker should exist")
             .set_order(Order::build(EntityKind::Depot, 4, 4));
         entities
-            .spawn_unit(1, EntityKind::Tank, rect.max_x + 19.0, rect.min_y + 32.0)
+            .spawn_unit(
+                1,
+                EntityKind::Tank,
+                rect.max_x + radius - 1.0,
+                rect.min_y + 32.0,
+            )
             .expect("tank should spawn");
         let mut players = vec![player_state(1)];
         let mut events = HashMap::new();

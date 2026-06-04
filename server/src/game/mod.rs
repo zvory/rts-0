@@ -267,7 +267,7 @@ impl Game {
         // Initialize supply accounting and fog so the very first snapshot is correct.
         systems::recompute_supply(&mut game.players, &game.entities);
         let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
-        game.fog.recompute(&ids, &game.entities);
+        game.fog.recompute(&ids, &game.entities, &game.map);
         game
     }
 
@@ -369,7 +369,7 @@ impl Game {
 
         // Fog last, from the post-systems world state.
         let ids: Vec<u32> = self.players.iter().map(|p| p.id).collect();
-        self.fog.recompute(&ids, &self.entities);
+        self.fog.recompute(&ids, &self.entities, &self.map);
 
         // In debug builds, assert that the world state is internally consistent.
         // Panics here mean a system violated a documented invariant.
@@ -504,7 +504,7 @@ impl Game {
         // Recompute fog so the now-entity-less player's visibility goes dark immediately;
         // otherwise a stale grid would keep leaking neutral/enemy entities into their snapshots.
         let ids: Vec<u32> = self.players.iter().map(|p| p.id).collect();
-        self.fog.recompute(&ids, &self.entities);
+        self.fog.recompute(&ids, &self.entities, &self.map);
     }
 
     pub fn tick_count(&self) -> u32 {
@@ -897,7 +897,7 @@ mod tests {
         }
         game.spatial = services::spatial::SpatialIndex::build(&game.entities, game.map.size);
         let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
-        game.fog.recompute(&ids, &game.entities);
+        game.fog.recompute(&ids, &game.entities, &game.map);
 
         assert_eq!(
             game.snapshot_for(1).entities,

@@ -32,8 +32,8 @@ update this file in the same change.
   currently see. This makes the fog cheat-proof (hidden enemies are never sent).
 - The **client** renders snapshots, interpolating entity positions between them for
   smoothness, and computes the **fog overlay** locally from its own units'/buildings'
-  sight radii (the server already withholds anything it shouldn't see, so the local
-  overlay only needs to look right — it is not a security boundary).
+  sight radii plus static terrain occlusion (the server already withholds anything it
+  shouldn't see, so the local overlay only needs to look right — it is not a security boundary).
 - Local development also exposes a dev-only watch entry at `/dev/selfplay` that auto-runs
   scripted self-play and streams **full-world** snapshots (no fog) to the ordinary match
   renderer. This path is isolated from normal lobby play and is only for debugging.
@@ -252,7 +252,7 @@ src/
     pathfinding.rs # A* over the tile grid (impassable = terrain + building footprints)
     fog.rs       # per-player visibility grid (visible / explored)
     systems.rs   # orchestrator: runs services in order each tick
-    services/    # per-tick internal services: commands, move_coordinator, movement (incl. unit collision), combat, economy, production, construction, death, occupancy, supply, pathing, geometry, standability
+    services/    # per-tick internal services: commands, move_coordinator, movement (incl. unit collision), combat, economy, production, construction, death, occupancy, supply, pathing, geometry, standability, line_of_sight
     ai.rs        # optional computer opponents: one AiController per AI player (see §8)
     ai_core/     # shared AI observation/facts/action/profile core, introduced incrementally
     ai_shared.rs # compatibility helpers while live AI and self-play migrate to ai_core
@@ -356,9 +356,9 @@ centralized instead of scattered through services.
 - `rules::economy` — tech/production predicates (`trainable_units`, `build_requirement_met`,
   `train_requirement_met`), resource-node amounts, and cost/supply wrappers (`cost`,
   `supply_cost`, `supply_provided`).
-- `rules::terrain` — `TerrainKind` plus movement, cover, and concealment modifiers. It is
-  intentionally near-empty today (`Open` returns current defaults) so the forest/road/hill feature
-  has one rules file to grow in.
+- `rules::terrain` — `TerrainKind` plus movement, cover, concealment, and static line-of-sight
+  opacity modifiers. It is intentionally small today (`Open` returns current defaults; raw stone
+  terrain blocks LOS) so the forest/road/hill feature has one rules file to grow in.
 - `rules::projection` — fog-gated `EntityView` construction and event visibility predicates.
   It is intentionally a seam for future last-known-position memory or partial unit-type reveal;
   it does not add wire fields today.
@@ -375,6 +375,13 @@ pathing, and movement; post-movement state for combat and economy queries; pre-c
 after production/construction/death mutations; and final state for snapshot interest filtering.
 Systems should consume the derived-state object for their phase instead of carrying occupancy or
 spatial indexes across later mutations.
+
+`services::line_of_sight` owns static terrain raycasts used by fog and combat. Stone/rock tiles
+block vision and ranged attacks. Fog may reveal the blocking stone tile itself, but not tiles
+behind it. Combat auto-acquisition only considers enemies with a clear line; explicit attack
+orders may chase toward a blocked target but cannot fire until the shot is clear. Overpenetration
+also stops at static LOS blockers. Future forest visibility/cover rules should extend the terrain
+rules and this service instead of adding ad hoc checks to fog or combat.
 
 `services::geometry` owns shared body primitives: unit bodies are circles centered on `(x, y)`
 with the configured unit radius, building bodies are axis-aligned rectangles derived from
@@ -631,8 +638,10 @@ The current implementation uses the themed unit/building names below. Combat is 
 shared attack model plus the machine-gunner setup/teardown state, tank turret aim gates, and
 tank hull-facing damage modifiers for anti-tank hits against tank victims. Tanks keep their active
 movement path while firing; other mobile combat units still hold position once a target is in
-weapon range. Forest-specific rules are future work. The unit, building, and resource-node tables
-below are the human-readable form of the authoritative `rules::defs` records.
+weapon range. When tanks chase an acquired target from outside weapon range, they path to a
+standoff point inside firing range instead of the target center. Forest-specific rules are future
+work. The unit, building, and resource-node tables below are the human-readable form of the
+authoritative `rules::defs` records.
 
 - `TICK_HZ = 30`, `SNAPSHOT_EVERY_N_TICKS = 1`.
 - `MACHINE_GUNNER_SETUP_TICKS = 30` (~1s setup or teardown).
@@ -731,12 +740,14 @@ The server treats every client as potentially hostile. Limits live next to the c
   on an accept, so a rejected mid-match join doesn't wedge the socket.
 - **Fog is authoritative**: `snapshot_for` and per-recipient event delivery go through
   `rules::projection`, which gates entity views, `target_id` tracers, and death/attack events on
-  visibility — hidden enemies are never sent.
+  visibility — hidden enemies are never sent. Visibility is terrain-aware: stone blocks sight
+  beyond itself on both the server fog grid and the client cosmetic fog overlay.
 - **Shot overpenetration**: ranged attacks continue 25% of their weapon range past the primary
   target and deal 50% reduced damage to additional enemies behind it, which discourages
   clumping and rewards tighter army control. Two exceptions: a shot whose primary target is a
   **tank** never overpenetrates (the armour stops the round dead, no exceptions — even AT teams),
   and **AT teams** punch deeper, carrying 50% of their weapon range past the primary target.
+  Stone blocks target acquisition, primary fire, and overpenetration.
 - **Tank body and weapon facing**: the snapshot `facing` field is the tank hull/body angle. Tanks
   rotate that body angle at a bounded rate on movement paths; badly misaligned tanks pivot in
   place instead of sliding sideways at full speed. The snapshot `weaponFacing` field is the
