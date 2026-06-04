@@ -2442,8 +2442,116 @@ fn scout_car_does_not_pivot_in_place_for_far_goal_behind() {
         "far behind goal should make the scout car drive through a turn, not pivot"
     );
     assert!(
+        e.pos_x > sx,
+        "far behind goal should start as a forward turning arc instead of backing up; start x {:.2}, got {:.2}",
+        sx,
+        e.pos_x
+    );
+    assert!(
+        e.movement
+            .as_ref()
+            .is_some_and(|m| m.scout_car_reverse_waypoint.is_none()),
+        "far behind goal must not latch reverse from the route lookahead point"
+    );
+    assert!(
         e.facing().abs() > 0.0,
         "scout car should still steer while it moves"
+    );
+}
+
+#[test]
+fn scout_car_far_behind_click_after_forward_motion_does_not_backtrack_first() {
+    let map = flat_map(1);
+    let mut entities = EntityStore::new();
+    let (sx, sy) = map.tile_center(20, 20);
+    let scout = entities
+        .spawn_unit(1, EntityKind::ScoutCar, sx, sy)
+        .expect("scout car should spawn");
+    if let Some(e) = entities.get_mut(scout) {
+        e.set_facing(0.0);
+        e.set_order(Order::move_to(sx + config::TILE_SIZE as f32 * 8.0, sy));
+    }
+    set_path_direct(
+        &mut entities,
+        scout,
+        vec![(sx + config::TILE_SIZE as f32 * 8.0, sy)],
+    );
+
+    for tick in 0..20 {
+        run_scout_car_movement_tick(&map, &mut entities, tick);
+    }
+    let before_click = pos(&entities, scout);
+    let behind_goal = (
+        before_click.0 - config::TILE_SIZE as f32 * 6.0,
+        before_click.1,
+    );
+    if let Some(e) = entities.get_mut(scout) {
+        e.set_order(Order::move_to(behind_goal.0, behind_goal.1));
+        e.reset_stuck(before_click.0, before_click.1);
+    }
+    set_path_direct(&mut entities, scout, vec![behind_goal]);
+
+    run_scout_car_movement_tick(&map, &mut entities, 21);
+
+    let e = entities.get(scout).expect("scout car should exist");
+    assert!(
+        e.pos_x > before_click.0,
+        "clicking far behind a moving scout car should begin with a forward turn, before x {:.2}, got {:.2}",
+        before_click.0,
+        e.pos_x
+    );
+    assert!(
+        e.movement
+            .as_ref()
+            .is_some_and(|m| m.scout_car_reverse_waypoint.is_none()),
+        "far-behind retarget should not enter reverse gear"
+    );
+}
+
+#[test]
+fn scout_car_close_reverse_keeps_waypoint_latched_until_arrival() {
+    let map = flat_map(1);
+    let mut entities = EntityStore::new();
+    let (sx, sy) = map.tile_center(20, 20);
+    let goal = (sx - config::TILE_SIZE as f32 * 2.0, sy + 20.0);
+    let scout = entities
+        .spawn_unit(1, EntityKind::ScoutCar, sx, sy)
+        .expect("scout car should spawn");
+    if let Some(e) = entities.get_mut(scout) {
+        e.set_facing(0.0);
+        e.set_order(Order::move_to(goal.0, goal.1));
+    }
+    set_path_direct(&mut entities, scout, vec![goal]);
+
+    let mut saw_reverse = false;
+    for tick in 0..120 {
+        run_scout_car_movement_tick(&map, &mut entities, tick);
+        let e = entities.get(scout).expect("scout car should exist");
+        if e.path_is_empty() {
+            break;
+        }
+        let reverse_waypoint = e
+            .movement
+            .as_ref()
+            .and_then(|m| m.scout_car_reverse_waypoint);
+        assert_eq!(
+            reverse_waypoint,
+            e.next_waypoint(),
+            "close reverse should stay latched to the immediate waypoint until it is consumed"
+        );
+        saw_reverse = true;
+    }
+
+    let e = entities.get(scout).expect("scout car should exist");
+    assert!(saw_reverse, "fixture should exercise reverse movement");
+    assert!(
+        e.path_is_empty() && matches!(e.order(), Order::Idle),
+        "latched reverse should still arrive cleanly; pos=({:.2},{:.2}) goal=({:.2},{:.2}) facing={:.3}",
+        e.pos_x,
+        e.pos_y,
+        goal.0,
+        goal.1,
+        e.facing()
     );
 }
 
