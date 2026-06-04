@@ -275,7 +275,7 @@ pub(crate) fn movement_system_with_events(
             }
         }
 
-        if is_tank {
+        if uses_vehicle_movement {
             if let Some(facing) = new_facing {
                 if !unit_static_standable(occ, map, kind, x, y, facing) {
                     if unit_static_standable(occ, map, kind, x, y, original_facing) {
@@ -2957,6 +2957,70 @@ mod tests {
             "tank should not rotate its hull into a building footprint while blocked"
         );
         assert!(tank_standable_at_entity_facing(&map, &occ, &entities, tank));
+    }
+
+    #[test]
+    fn scout_car_locomotion_suppresses_illegal_rotation_when_blocked() {
+        let map = flat_map(1);
+        let mut entities = EntityStore::new();
+        let (bx, by) = footprint_center(&map, EntityKind::Factory, 22, 9);
+        entities
+            .spawn_building(1, EntityKind::Factory, bx, by, true)
+            .expect("factory spawn");
+
+        // Regression for a live crash: the scout car center is below the factory and legal while
+        // nearly horizontal, but the borrowed tank-body turn model can rotate its long body into
+        // the factory footprint without moving.
+        let start = (784.0, 400.0);
+        let initial_facing = 0.05;
+        let illegal_next_facing = initial_facing + TANK_BODY_TURN_RATE_RAD_PER_TICK;
+        assert!(standability::unit_static_standable_with_facing(
+            &map,
+            &Occupancy::build(&map, &entities),
+            EntityKind::ScoutCar,
+            start.0,
+            start.1,
+            initial_facing
+        ));
+        assert!(!standability::unit_static_standable_with_facing(
+            &map,
+            &Occupancy::build(&map, &entities),
+            EntityKind::ScoutCar,
+            start.0,
+            start.1,
+            illegal_next_facing
+        ));
+
+        let scout = entities
+            .spawn_unit(1, EntityKind::ScoutCar, start.0, start.1)
+            .expect("scout car spawn");
+        if let Some(e) = entities.get_mut(scout) {
+            e.set_facing(initial_facing);
+            e.set_order(Order::move_to(start.0, start.1 + 128.0));
+        }
+        set_path_direct(&mut entities, scout, vec![(start.0, start.1 + 128.0)]);
+
+        let occ = Occupancy::build(&map, &entities);
+        let spatial = SpatialIndex::build(&entities, map.size);
+        movement_system(&map, &mut entities, &mut [], &occ, &spatial, 0);
+
+        let e = entities.get(scout).expect("scout car should exist");
+        assert!(
+            moved_distance(start, (e.pos_x, e.pos_y)) <= 0.01,
+            "blocked scout car must not take an illegal body step"
+        );
+        assert!(
+            (e.facing() - initial_facing).abs() <= 0.001,
+            "scout car should not rotate its body into a building footprint while blocked"
+        );
+        assert!(standability::unit_static_standable_with_facing(
+            &map,
+            &occ,
+            EntityKind::ScoutCar,
+            e.pos_x,
+            e.pos_y,
+            e.facing()
+        ));
     }
 
     #[test]
