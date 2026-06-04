@@ -19,7 +19,7 @@ use crate::game::ai_core::profiles::{
 };
 use crate::game::ai_shared;
 use crate::game::command::SimCommand;
-use crate::game::entity::{EntityKind, EntityStore};
+use crate::game::entity::{BuildPhase, EntityKind, EntityStore};
 use crate::game::fog::Fog;
 use crate::game::map::Map;
 use crate::game::services::spatial::SpatialIndex;
@@ -27,6 +27,10 @@ use crate::game::systems;
 use crate::game::PlayerState;
 use rand::Rng;
 use std::collections::BTreeSet;
+
+/// How far an AI worker retreats from a direct hit, in tiles. Matches the previous combat-side
+/// retreat distance so AI economy resilience is unchanged.
+const WORKER_RETREAT_TILES: f32 = 5.0;
 
 /// Re-plan cadence in ticks. The AI "thinks" this often (about 3 times/second at 30 Hz);
 /// decisions are staggered per player so several AIs do not all think on the same tick.
@@ -91,17 +95,21 @@ impl AiController {
         self.profile_id
     }
 
-    /// Decide this player's actions for the current tick, pushing any commands onto `out`. This is
-    /// a no-op on most ticks (gated by [`DECISION_INTERVAL`]) and whenever the player is dead.
+    /// Decide this player's actions for the current tick, pushing any commands onto `out`.
+    ///
+    /// Most strategic decisions are gated by [`DECISION_INTERVAL`], but the worker-retreat reflex
+    /// runs every tick so freshly damaged workers flee on the same cadence the combat system used
+    /// to enforce. Routing the reflex through ordinary commands keeps replays player-agnostic.
     pub(crate) fn think(&mut self, context: AiThinkContext<'_>, out: &mut Vec<(u32, SimCommand)>) {
+        if !context.entities.player_alive(self.player) {
+            return;
+        }
+        emit_worker_retreat_commands(&context, self.player, out);
         if !context
             .tick
             .wrapping_add(self.player)
             .is_multiple_of(DECISION_INTERVAL)
         {
-            return;
-        }
-        if !context.entities.player_alive(self.player) {
             return;
         }
         let Some(observation) = AiObservation::from_live_state(
@@ -146,6 +154,60 @@ impl AiController {
                 .into_iter()
                 .map(|command| (self.player, command)),
         );
+    }
+}
+
+/// Scan own workers for fresh direct hits and emit a `Move` away from the recorded attacker
+/// position. The combat system stamps `last_damage_pos`/`last_damage_tick` on the victim; the AI
+/// reacts on the very next tick (combat runs after `think`, so the previous tick's damage shows up
+/// here with `tick - 1`). Constructing workers stay latched to their scaffold; pulling them off
+/// strands the build.
+fn emit_worker_retreat_commands(
+    context: &AiThinkContext<'_>,
+    player: u32,
+    out: &mut Vec<(u32, SimCommand)>,
+) {
+    let last_tick = context.tick.checked_sub(1);
+    let world_max = context.map.world_size_px() - 0.01;
+    for entity in context.entities.iter() {
+        if entity.owner != player
+            || entity.kind != EntityKind::Worker
+            || entity.hp == 0
+        {
+            continue;
+        }
+        if matches!(
+            entity.build_phase(),
+            Some(BuildPhase::Constructing { .. })
+        ) {
+            continue;
+        }
+        if entity.last_damage_tick() != last_tick {
+            continue;
+        }
+        let Some((ax, ay)) = entity.last_damage_pos() else {
+            continue;
+        };
+        let (vx, vy) = (entity.pos_x, entity.pos_y);
+        let dx = vx - ax;
+        let dy = vy - ay;
+        let dist = (dx * dx + dy * dy).sqrt();
+        let (ux, uy) = if dist > f32::EPSILON && dist.is_finite() {
+            (dx / dist, dy / dist)
+        } else {
+            (1.0, 0.0)
+        };
+        let retreat_px = WORKER_RETREAT_TILES * config::TILE_SIZE as f32;
+        let target_x = (vx + ux * retreat_px).clamp(0.0, world_max);
+        let target_y = (vy + uy * retreat_px).clamp(0.0, world_max);
+        out.push((
+            player,
+            SimCommand::Move {
+                units: vec![entity.id],
+                x: target_x,
+                y: target_y,
+            },
+        ));
     }
 }
 

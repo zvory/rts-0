@@ -1,9 +1,7 @@
 use std::collections::HashMap;
 
 use crate::config;
-use crate::game::entity::{
-    AttackPhase, BuildPhase, Entity, EntityKind, EntityStore, Order, WeaponSetup,
-};
+use crate::game::entity::{AttackPhase, Entity, EntityKind, EntityStore, Order, WeaponSetup};
 use crate::game::fog::Fog;
 use crate::game::map::Map;
 use crate::game::services::dist2;
@@ -23,7 +21,6 @@ use rand::Rng;
 
 /// Extra slack (px) added to attack range checks so units don't dance at the exact boundary.
 const RANGE_SLACK: f32 = 4.0;
-const WORKER_DIRECT_HIT_RETREAT_TILES: f32 = 5.0;
 const TANK_TURRET_TURN_RATE_RAD_PER_TICK: f32 = 0.070;
 const TANK_TURRET_FIRE_TOLERANCE_RAD: f32 = 0.18;
 const TANK_STANDOFF_BUFFER_PX: f32 = config::TILE_SIZE as f32;
@@ -36,13 +33,14 @@ const TANK_STANDOFF_REPATH_DELTA_PX: f32 = config::TILE_SIZE as f32;
 pub(crate) fn combat_system(
     map: &Map,
     entities: &mut EntityStore,
-    players: &[PlayerState],
+    _players: &[PlayerState],
     _occ: &Occupancy,
     spatial: &SpatialIndex,
     coordinator: &mut MoveCoordinator<'_>,
     fog: &Fog,
     rng: &mut SmallRng,
     events: &mut HashMap<u32, Vec<Event>>,
+    tick: u32,
 ) {
     let los = LineOfSight::new(map);
     // Tick down cooldowns first.
@@ -187,9 +185,7 @@ pub(crate) fn combat_system(
                     entities,
                     events,
                     fog,
-                    coordinator,
                     rng,
-                    players,
                     id,
                     tid,
                     dmg,
@@ -199,6 +195,7 @@ pub(crate) fn combat_system(
                     tx,
                     ty,
                     range_px,
+                    tick,
                 );
                 if let Some(e) = entities.get_mut(id) {
                     e.set_attack_cd(cd_reset);
@@ -500,9 +497,7 @@ fn apply_damage(
     entities: &mut EntityStore,
     events: &mut HashMap<u32, Vec<Event>>,
     fog: &Fog,
-    coordinator: &mut MoveCoordinator<'_>,
     rng: &mut SmallRng,
-    players: &[PlayerState],
     attacker: u32,
     victim: u32,
     dmg: u32,
@@ -512,6 +507,7 @@ fn apply_damage(
     vx: f32,
     vy: f32,
     range_px: f32,
+    tick: u32,
 ) {
     if entities.get(victim).map(|e| e.is_node()).unwrap_or(false) {
         return;
@@ -556,18 +552,10 @@ fn apply_damage(
             v.hp = v.hp.saturating_sub(effective_dmg);
             if v.owner != attacker_owner {
                 v.set_last_damage_owner(Some(attacker_owner));
+                v.record_damage_from((ax, ay), tick);
             }
         }
     }
-    retreat_worker_from_direct_hit(
-        map,
-        entities,
-        coordinator,
-        players,
-        victim,
-        attacker_owner,
-        (ax, ay),
-    );
     apply_overpenetration(
         map,
         entities,
@@ -582,6 +570,7 @@ fn apply_damage(
         vx,
         vy,
         range_px,
+        tick,
     );
     push_under_attack_notices_for_visible_attack(
         events,
@@ -658,52 +647,6 @@ fn push_under_attack_notice(
     });
 }
 
-fn retreat_worker_from_direct_hit(
-    map: &Map,
-    entities: &mut EntityStore,
-    coordinator: &mut MoveCoordinator<'_>,
-    players: &[PlayerState],
-    victim: u32,
-    attacker_owner: u32,
-    attacker_pos: (f32, f32),
-) {
-    let (owner, vx, vy) = match entities.get(victim) {
-        Some(worker)
-            if worker.kind == EntityKind::Worker
-                && worker.owner != attacker_owner
-                && player_is_ai(players, worker.owner)
-                && worker.hp > 0
-                && !matches!(worker.build_phase(), Some(BuildPhase::Constructing { .. })) =>
-        {
-            (worker.owner, worker.pos_x, worker.pos_y)
-        }
-        _ => return,
-    };
-    let dx = vx - attacker_pos.0;
-    let dy = vy - attacker_pos.1;
-    let dist = (dx * dx + dy * dy).sqrt();
-    let (ux, uy) = if dist > f32::EPSILON && dist.is_finite() {
-        (dx / dist, dy / dist)
-    } else {
-        (1.0, 0.0)
-    };
-    let retreat_px = WORKER_DIRECT_HIT_RETREAT_TILES * config::TILE_SIZE as f32;
-    let max = map.world_size_px() - 0.01;
-    let target = (
-        (vx + ux * retreat_px).clamp(0.0, max),
-        (vy + uy * retreat_px).clamp(0.0, max),
-    );
-    coordinator.order_group_move(entities, owner, &[victim], target, false);
-}
-
-fn player_is_ai(players: &[PlayerState], player_id: u32) -> bool {
-    players
-        .iter()
-        .find(|player| player.id == player_id)
-        .map(|player| player.is_ai)
-        .unwrap_or(false)
-}
-
 #[allow(clippy::too_many_arguments)]
 fn apply_overpenetration(
     map: &Map,
@@ -719,6 +662,7 @@ fn apply_overpenetration(
     vx: f32,
     vy: f32,
     range_px: f32,
+    tick: u32,
 ) {
     // A tank's armour stops the round dead: hitting a tank never overpenetrates, no exceptions.
     if entities
@@ -804,6 +748,7 @@ fn apply_overpenetration(
             if v.hp > 0 {
                 v.hp = v.hp.saturating_sub(effective_dmg);
                 v.set_last_damage_owner(Some(attacker_owner));
+                v.record_damage_from((ax, ay), tick);
             }
         }
         for pid in &player_ids {
@@ -822,7 +767,7 @@ fn apply_overpenetration(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::game::entity::{EntityKind, EntityStore, Order, WeaponSetup};
+    use crate::game::entity::{BuildPhase, EntityKind, EntityStore, Order, WeaponSetup};
     use crate::game::fog::Fog;
     use crate::game::services::move_coordinator::MoveCoordinator;
     use crate::game::services::movement::movement_system;
@@ -910,6 +855,7 @@ mod tests {
             &fog,
             &mut rng,
             &mut events,
+            10,
         );
         events
     }
@@ -936,9 +882,6 @@ mod tests {
         range_px: f32,
     ) {
         let map = Map::generate(2, 0x00C0_FFEE);
-        let occ = Occupancy::build(&map, entities);
-        let mut pathing = PathingService::new(256, 64);
-        let mut coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, 10);
         let fog = Fog::new(map.size);
         let mut rng = SmallRng::seed_from_u64(0);
         apply_damage(
@@ -946,9 +889,7 @@ mod tests {
             entities,
             events,
             &fog,
-            &mut coordinator,
             &mut rng,
-            &[player_state(1, false), player_state(2, false)],
             attacker,
             victim,
             dmg,
@@ -958,6 +899,7 @@ mod tests {
             vx,
             vy,
             range_px,
+            10,
         );
     }
 
@@ -1176,6 +1118,7 @@ mod tests {
             &fog,
             &mut rng,
             &mut events,
+            10,
         );
         assert_eq!(
             entities
@@ -1401,38 +1344,7 @@ mod tests {
     }
 
     #[test]
-    fn directly_hit_ai_workers_retreat_from_attacker() {
-        let mut entities = EntityStore::new();
-        let worker_id = entities
-            .spawn_unit(1, EntityKind::Worker, 140.0, 100.0)
-            .expect("worker should spawn");
-        entities
-            .spawn_unit(2, EntityKind::Rifleman, 100.0, 100.0)
-            .expect("enemy rifleman should spawn");
-
-        run_combat_tick_with_players(
-            &mut entities,
-            &[player_state(1, true), player_state(2, false)],
-        );
-
-        let worker = entities.get(worker_id).expect("worker should exist");
-        assert!(
-            worker.hp < worker.max_hp,
-            "worker should have taken direct damage"
-        );
-        assert!(
-            matches!(worker.order(), Order::Move(_)),
-            "direct damage should issue a temporary move-away order"
-        );
-        let goal = worker.path_goal().expect("retreat should set a path goal");
-        assert!(
-            goal.0 > worker.pos_x,
-            "retreat should move away from the attacker on the left"
-        );
-    }
-
-    #[test]
-    fn directly_hit_human_workers_do_not_retreat_from_attacker() {
+    fn direct_hits_record_damage_signal_on_victim() {
         let mut entities = EntityStore::new();
         let worker_id = entities
             .spawn_unit(1, EntityKind::Worker, 140.0, 100.0)
@@ -1448,14 +1360,40 @@ mod tests {
             worker.hp < worker.max_hp,
             "worker should have taken direct damage"
         );
+        let pos = worker
+            .last_damage_pos()
+            .expect("victim should record attacker position");
+        assert!(
+            pos.0 < worker.pos_x,
+            "recorded attacker position should be on the attacker's side"
+        );
+        assert!(
+            worker.last_damage_tick().is_some(),
+            "victim should record damage tick so AI can react"
+        );
+    }
+
+    #[test]
+    fn combat_no_longer_issues_retreat_orders() {
+        let mut entities = EntityStore::new();
+        let worker_id = entities
+            .spawn_unit(1, EntityKind::Worker, 140.0, 100.0)
+            .expect("worker should spawn");
+        entities
+            .spawn_unit(2, EntityKind::Rifleman, 100.0, 100.0)
+            .expect("enemy rifleman should spawn");
+
+        run_combat_tick(&mut entities);
+
+        let worker = entities.get(worker_id).expect("worker should exist");
         assert!(
             matches!(worker.order(), Order::Idle),
-            "human workers should not receive a forced retreat order"
+            "combat must not mutate orders; retreat is now an AI command"
         );
         assert_eq!(
             worker.path_goal(),
             None,
-            "human workers should not receive a retreat path goal"
+            "combat must not issue path goals"
         );
     }
 
