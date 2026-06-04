@@ -272,11 +272,17 @@ impl<'a> MoveCoordinator<'a> {
 
     /// Find a spawn point near a building using a deterministic outward search.
     /// Returns `None` when no legal body-clearance point exists.
+    ///
+    /// When `rally` is `Some`, the closest standable point to the rally within the first ring that
+    /// has any legal candidate is chosen, so units exit the side of the building facing the rally
+    /// point. When `rally` is `None`, the first standable point in deterministic ring order is
+    /// returned (legacy behavior).
     pub fn find_spawn_point(
         &self,
         entities: &EntityStore,
         building: u32,
         spawned_kind: EntityKind,
+        rally: Option<(f32, f32)>,
     ) -> Option<(f32, f32)> {
         let building = entities.get(building)?;
         config::building_stats(building.kind)?;
@@ -289,6 +295,7 @@ impl<'a> MoveCoordinator<'a> {
 
         // Search outward in rings from the actual building footprint edge.
         for r in 1i32..=6 {
+            let mut best: Option<(f32, (f32, f32))> = None;
             for ty in (min_y - r)..=(max_y + r) {
                 for tx in (min_x - r)..=(max_x + r) {
                     if tx > min_x - r && tx < max_x + r && ty > min_y - r && ty < max_y + r {
@@ -298,7 +305,7 @@ impl<'a> MoveCoordinator<'a> {
                         continue;
                     }
                     let (cx, cy) = self.map.tile_center(tx as u32, ty as u32);
-                    if standability::unit_spawn_standable(
+                    if !standability::unit_spawn_standable(
                         self.map,
                         self.occ,
                         entities,
@@ -306,9 +313,20 @@ impl<'a> MoveCoordinator<'a> {
                         cx,
                         cy,
                     ) {
+                        continue;
+                    }
+                    let Some((rx, ry)) = rally else {
+                        // No rally: keep the legacy first-found behavior.
                         return Some((cx, cy));
+                    };
+                    let dist2 = (cx - rx).powi(2) + (cy - ry).powi(2);
+                    if best.is_none_or(|(best_d2, _)| dist2 < best_d2) {
+                        best = Some((dist2, (cx, cy)));
                     }
                 }
+            }
+            if let Some((_, point)) = best {
+                return Some(point);
             }
         }
 
@@ -993,7 +1011,7 @@ mod tests {
         let coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, 1);
 
         let (sx, sy) = coordinator
-            .find_spawn_point(&entities, b_id, EntityKind::Tank)
+            .find_spawn_point(&entities, b_id, EntityKind::Tank, None)
             .expect("spawn point should exist");
 
         let (stx, sty) = map.tile_of(sx, sy);
@@ -1022,7 +1040,7 @@ mod tests {
         let coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, 1);
 
         let (sx, sy) = coordinator
-            .find_spawn_point(&entities, b_id, EntityKind::Tank)
+            .find_spawn_point(&entities, b_id, EntityKind::Tank, None)
             .expect("spawn point should exist");
 
         assert!(
@@ -1050,7 +1068,7 @@ mod tests {
         let coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, 1);
 
         let (sx, sy) = coordinator
-            .find_spawn_point(&entities, factory_id, EntityKind::Tank)
+            .find_spawn_point(&entities, factory_id, EntityKind::Tank, None)
             .expect("spawn point should exist");
 
         assert!(

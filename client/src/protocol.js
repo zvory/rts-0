@@ -36,6 +36,7 @@ export const CMD = Object.freeze({
   TRAIN: "train",
   CANCEL: "cancel",
   STOP: "stop",
+  SET_RALLY: "setRally",
 });
 
 // --- Terrain codes (must match protocol::terrain) ---
@@ -194,7 +195,7 @@ function decodeCompactSnapshot(raw) {
 }
 
 function decodeCompactEntity(record, index) {
-  const fields = readArray(record, `entity ${index}`, 18);
+  const fields = readArray(record, `entity ${index}`, 19);
   if (fields.length < 8) throw new Error(`entity ${index} is too short`);
   const entity = {
     id: readU32(fields[0], "entity.id"),
@@ -217,7 +218,16 @@ function decodeCompactEntity(record, index) {
   assignOptional(entity, "targetId", fields, 15, readU32);
   assignOptionalCode(entity, "setupState", fields, 16, SETUP_BY_CODE);
   assignOptional(entity, "remaining", fields, 17, readU32);
+  assignRally(entity, fields, 18);
   return entity;
+}
+
+/** Decode the optional rally-point slot ([x, y] world px, owner-only) into `entity.rally`. */
+function assignRally(target, fields, index) {
+  if (index >= fields.length || fields[index] == null) return;
+  const pair = readArray(fields[index], "entity.rally", 2);
+  if (pair.length !== 2) throw new Error("entity.rally must have two elements");
+  target.rally = [readNumber(pair[0], "entity.rally.x"), readNumber(pair[1], "entity.rally.y")];
 }
 
 function decodeCompactResourceDelta(record, index) {
@@ -344,4 +354,5 @@ export const cmd = Object.freeze({
   train: (building, unit) => ({ c: CMD.TRAIN, building, unit }),
   cancel: (building) => ({ c: CMD.CANCEL, building }),
   stop: (units) => ({ c: CMD.STOP, units }),
+  setRally: (building, x, y) => ({ c: CMD.SET_RALLY, building, x, y }),
 });

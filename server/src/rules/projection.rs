@@ -107,6 +107,13 @@ pub fn project_entity(
         }
     }
 
+    // Rally point is a private planning aid: only ever revealed to the owner.
+    if entity.owner == viewer {
+        if let Some((rx, ry)) = entity.rally_point() {
+            view.rally = Some([rx, ry]);
+        }
+    }
+
     if let Some(progress) = entity.build_progress_fraction() {
         view.build_progress = Some(progress);
     }
