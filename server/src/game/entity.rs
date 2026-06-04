@@ -122,10 +122,16 @@ impl std::fmt::Display for EntityKind {
     }
 }
 
-pub(crate) fn uses_tank_movement_semantics(kind: EntityKind) -> bool {
-    // Scout cars temporarily borrow the tank hull/pathing movement model. Replace this
-    // with truck/wheeled movement semantics once that vehicle model exists.
+pub(crate) fn uses_oriented_vehicle_body(kind: EntityKind) -> bool {
     matches!(kind, EntityKind::Tank | EntityKind::ScoutCar)
+}
+
+pub(crate) fn uses_tank_movement_semantics(kind: EntityKind) -> bool {
+    matches!(kind, EntityKind::Tank)
+}
+
+pub(crate) fn uses_car_movement_semantics(kind: EntityKind) -> bool {
+    matches!(kind, EntityKind::ScoutCar)
 }
 
 pub(crate) fn fires_while_moving(kind: EntityKind) -> bool {

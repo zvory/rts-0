@@ -2,8 +2,8 @@ use std::collections::HashMap;
 
 use crate::config;
 use crate::game::entity::{
-    uses_tank_movement_semantics, BuildPhase, Entity, EntityKind, EntityStore, GatherPhase,
-    MovePhase, Order, WeaponSetup,
+    uses_car_movement_semantics, uses_oriented_vehicle_body, uses_tank_movement_semantics,
+    BuildPhase, Entity, EntityKind, EntityStore, GatherPhase, MovePhase, Order, WeaponSetup,
 };
 use crate::game::map::Map;
 use crate::game::services::geometry::{unit_body_for_entity, unit_body_overlap, UnitBody};
@@ -42,6 +42,7 @@ const TANK_CRAWL_ANGLE_RAD: f32 = 0.55;
 const TANK_PIVOT_ANGLE_RAD: f32 = 1.25;
 const TANK_TRAFFIC_LOOKAHEAD_PX: f32 = config::TILE_SIZE as f32 * 2.0;
 const TANK_TRAFFIC_TURN_BIAS_RAD: f32 = 0.28;
+const SCOUT_CAR_MIN_TURN_RADIUS_PX: f32 = config::TILE_SIZE as f32 * 3.0;
 
 const STEERING_LOOKAHEAD_PX: f32 = config::TILE_SIZE as f32 * 1.5;
 const STEERING_RADIUS_PX: f32 = config::TILE_SIZE as f32 * 2.5;
@@ -104,7 +105,7 @@ pub(crate) fn movement_system_with_events(
                 speed,
                 e.pos_x,
                 e.pos_y,
-                !uses_tank_movement_semantics(e.kind)
+                !uses_oriented_vehicle_body(e.kind)
                     && matches!(e.order(), Order::Move(_))
                     && footing_profile(e) != FootingProfile::Ghost,
             )
@@ -113,8 +114,9 @@ pub(crate) fn movement_system_with_events(
             continue;
         }
 
-        let uses_vehicle_movement = uses_tank_movement_semantics(kind);
-        let is_tank = kind == EntityKind::Tank;
+        let uses_vehicle_movement = uses_oriented_vehicle_body(kind);
+        let is_tank = uses_tank_movement_semantics(kind);
+        let is_car = uses_car_movement_semantics(kind);
         // Experimental tank fuel rule: an oil-starved tank pauses before retrying so sparse
         // oil income does not make it lurch forward on isolated ticks.
         if is_tank && tank_oil_starves_movement(entities, players, events, id) {
@@ -126,13 +128,13 @@ pub(crate) fn movement_system_with_events(
         let mut new_facing = None;
         let original_facing = entities.get(id).map(|e| e.facing()).unwrap_or(0.0);
         let mut body_facing = original_facing;
+        let mut vehicle_step_dir = None;
         let mut static_blocked_this_tick = false;
-        if uses_vehicle_movement {
-            // Scout cars temporarily borrow the tank hull/pathing movement model. Replace this
-            // with truck/wheeled movement semantics once that vehicle model exists.
+        if is_tank {
             if let Some(e) = entities.get(id) {
                 if let Some(mut intent) = tank_drive_intent(map, occ, e, x, y) {
-                    let traffic = tank_traffic_adjustment(entities, spatial, id, x, y, e.facing());
+                    let traffic =
+                        vehicle_traffic_adjustment(entities, spatial, id, kind, x, y, e.facing());
                     intent.desired_facing =
                         normalize_angle(intent.desired_facing + traffic.turn_bias);
                     if intent.desired_facing.is_finite() {
@@ -147,6 +149,28 @@ pub(crate) fn movement_system_with_events(
                             budget *= traffic.throttle_scale;
                             new_facing = Some(rotated);
                             body_facing = rotated;
+                        }
+                    }
+                }
+            }
+        } else if is_car {
+            if let Some(e) = entities.get(id) {
+                if let Some(mut intent) = scout_car_drive_intent(map, occ, e, x, y) {
+                    let traffic =
+                        vehicle_traffic_adjustment(entities, spatial, id, kind, x, y, e.facing());
+                    budget *= traffic.throttle_scale;
+                    intent.desired_facing =
+                        normalize_angle(intent.desired_facing + traffic.turn_bias);
+                    if intent.desired_facing.is_finite() {
+                        let max_delta = scout_car_turn_delta_for_budget(budget);
+                        let rotated = rotate_toward(e.facing(), intent.desired_facing, max_delta);
+                        if rotated.is_finite() {
+                            new_facing = Some(rotated);
+                            body_facing = rotated;
+                            vehicle_step_dir = Some((
+                                rotated.cos() * intent.travel_sign,
+                                rotated.sin() * intent.travel_sign,
+                            ));
                         }
                     }
                 }
@@ -201,7 +225,7 @@ pub(crate) fn movement_system_with_events(
                 }
             }
 
-            if !is_tank {
+            if !uses_vehicle_movement {
                 let facing = dy.atan2(dx);
                 if facing.is_finite() {
                     if kind == EntityKind::AtTeam {
@@ -214,7 +238,12 @@ pub(crate) fn movement_system_with_events(
                     }
                 }
             }
-            if dist <= budget {
+            let can_reach_waypoint = if is_car {
+                vehicle_step_dir.is_some_and(|dir| step_can_reach_waypoint((dx, dy), dir, budget))
+            } else {
+                dist <= budget
+            };
+            if can_reach_waypoint {
                 // We can reach this waypoint this tick.
                 if !unit_static_standable(occ, map, kind, wx, wy, body_facing) {
                     static_blocked_this_tick = true;
@@ -230,8 +259,9 @@ pub(crate) fn movement_system_with_events(
             } else {
                 // Partial step toward the waypoint.
                 let path_dir = (dx / dist, dy / dist);
-                let direct_nx = x + path_dir.0 * budget;
-                let direct_ny = y + path_dir.1 * budget;
+                let step_dir = vehicle_step_dir.unwrap_or(path_dir);
+                let direct_nx = x + step_dir.0 * budget;
+                let direct_ny = y + step_dir.1 * budget;
                 let steered = if can_local_steer {
                     let steering_path_dir = entities
                         .get(id)
@@ -281,6 +311,13 @@ pub(crate) fn movement_system_with_events(
                 }
                 break;
             }
+        }
+
+        if is_car && distance_between((orig_x, orig_y), (x, y)) <= 0.01 {
+            // This is still a path-following approximation, not tire physics. The important
+            // car rule is that steering comes from translation, so blocked scout cars do not
+            // pivot their oriented body in place like tanks.
+            new_facing = None;
         }
 
         if uses_vehicle_movement {
@@ -414,7 +451,7 @@ pub(crate) fn movement_system_with_events(
                 // only for Move/AttackMove orders.
                 // Stagger trigger per unit so clustered units don't all sidestep at once.
                 let trigger_threshold = config::SIDESTEP_TRIGGER_TICKS + (id % 8) as u16;
-                if !uses_tank_movement_semantics(kind)
+                if !uses_oriented_vehicle_body(kind)
                     && stuck_ticks >= trigger_threshold
                     && static_blocked_ticks == 0
                     && matches!(e.order(), Order::Move(_) | Order::AttackMove(_))
@@ -526,15 +563,22 @@ struct TankDriveIntent {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
+struct ScoutCarDriveIntent {
+    desired_facing: f32,
+    travel_sign: f32,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
 struct TankTrafficAdjustment {
     throttle_scale: f32,
     turn_bias: f32,
 }
 
-fn tank_traffic_adjustment(
+fn vehicle_traffic_adjustment(
     entities: &EntityStore,
     spatial: &SpatialIndex,
     id: u32,
+    kind: EntityKind,
     x: f32,
     y: f32,
     facing: f32,
@@ -548,7 +592,7 @@ fn tank_traffic_adjustment(
 
     let forward = (facing.cos(), facing.sin());
     let side = (-forward.1, forward.0);
-    let tank_half_width = config::TANK_BODY_WIDTH_PX * 0.5 + config::TANK_BODY_CLEARANCE_PX;
+    let vehicle_half_width = vehicle_body_half_width_with_clearance(kind);
     let query_radius = TANK_TRAFFIC_LOOKAHEAD_PX + MAX_UNIT_BOUNDING_RADIUS_PX;
     let mut throttle_scale = 1.0_f32;
     let mut side_pressure = 0.0_f32;
@@ -582,13 +626,13 @@ fn tank_traffic_adjustment(
         let neighbor_radius = unit_body_for_entity(neighbor)
             .map(|body| body.bounding_radius())
             .unwrap_or_else(|| neighbor.radius());
-        if lateral.abs() > tank_half_width + neighbor_radius {
+        if lateral.abs() > vehicle_half_width + neighbor_radius {
             continue;
         }
 
         let closeness = 1.0 - (ahead / TANK_TRAFFIC_LOOKAHEAD_PX).clamp(0.0, 1.0);
         let resistance = footing_resistance(profile);
-        if uses_tank_movement_semantics(neighbor.kind) || profile == FootingProfile::Braced {
+        if uses_oriented_vehicle_body(neighbor.kind) || profile == FootingProfile::Braced {
             throttle_scale = throttle_scale.min((1.0 - closeness * 0.95).clamp(0.0, 1.0));
         } else {
             throttle_scale = throttle_scale.min((1.0 - closeness * 0.65).clamp(0.25, 1.0));
@@ -618,6 +662,15 @@ fn tank_traffic_adjustment(
     }
 }
 
+fn vehicle_body_half_width_with_clearance(kind: EntityKind) -> f32 {
+    match kind {
+        EntityKind::ScoutCar => {
+            config::SCOUT_CAR_BODY_WIDTH_PX * 0.5 + config::SCOUT_CAR_BODY_CLEARANCE_PX
+        }
+        _ => config::TANK_BODY_WIDTH_PX * 0.5 + config::TANK_BODY_CLEARANCE_PX,
+    }
+}
+
 fn tank_drive_intent(
     map: &Map,
     occ: &Occupancy,
@@ -644,6 +697,37 @@ fn tank_drive_intent(
 
     Some(TankDriveIntent {
         desired_facing: forward_desired,
+    })
+}
+
+fn scout_car_drive_intent(
+    map: &Map,
+    occ: &Occupancy,
+    e: &Entity,
+    x: f32,
+    y: f32,
+) -> Option<ScoutCarDriveIntent> {
+    let (desired_x, desired_y) = tank_desired_path_point(map, occ, e, x, y)?;
+    let dx = desired_x - x;
+    let dy = desired_y - y;
+    let dist = (dx * dx + dy * dy).sqrt();
+    if !dist.is_finite() || dist <= 1.0e-4 {
+        return None;
+    }
+
+    let forward_desired = dy.atan2(dx);
+    if dist <= TANK_REVERSE_GOAL_DISTANCE_PX
+        && angle_delta(e.facing(), forward_desired).abs() > TANK_REVERSE_MIN_BEHIND_ANGLE_RAD
+    {
+        return Some(ScoutCarDriveIntent {
+            desired_facing: normalize_angle(forward_desired + std::f32::consts::PI),
+            travel_sign: -1.0,
+        });
+    }
+
+    Some(ScoutCarDriveIntent {
+        desired_facing: forward_desired,
+        travel_sign: 1.0,
     })
 }
 
@@ -685,6 +769,32 @@ pub(crate) fn tank_speed_scale(abs_angle_error: f32) -> f32 {
             / (TANK_PIVOT_ANGLE_RAD - TANK_CRAWL_ANGLE_RAD);
         1.0 - t
     }
+}
+
+fn scout_car_turn_delta_for_budget(budget: f32) -> f32 {
+    if !budget.is_finite() || budget <= 0.0 {
+        return 0.0;
+    }
+    budget / SCOUT_CAR_MIN_TURN_RADIUS_PX
+}
+
+fn step_can_reach_waypoint(delta: (f32, f32), step_dir: (f32, f32), budget: f32) -> bool {
+    if !budget.is_finite() || budget < 0.0 {
+        return false;
+    }
+    let dist = (delta.0 * delta.0 + delta.1 * delta.1).sqrt();
+    if !dist.is_finite() || dist > budget {
+        return false;
+    }
+    let along = delta.0 * step_dir.0 + delta.1 * step_dir.1;
+    let lateral = (delta.0 * step_dir.1 - delta.1 * step_dir.0).abs();
+    along >= -ARRIVE_EPS && lateral <= ARRIVE_EPS
+}
+
+fn distance_between(from: (f32, f32), to: (f32, f32)) -> f32 {
+    let dx = to.0 - from.0;
+    let dy = to.1 - from.1;
+    (dx * dx + dy * dy).sqrt()
 }
 
 fn tank_desired_path_point(
@@ -778,7 +888,7 @@ fn steered_candidate(
 
     let nx = x + steer_dir.0 * budget;
     let ny = y + steer_dir.1 * budget;
-    let facing = if uses_tank_movement_semantics(kind) {
+    let facing = if uses_oriented_vehicle_body(kind) {
         path_dir.1.atan2(path_dir.0)
     } else {
         0.0
@@ -1204,11 +1314,11 @@ pub(crate) fn footing_profile(e: &Entity) -> FootingProfile {
     {
         return FootingProfile::Braced;
     }
-    if uses_tank_movement_semantics(e.kind) {
+    if uses_oriented_vehicle_body(e.kind) {
         return FootingProfile::Heavy;
     }
     if !requires_weapon_setup(e.kind)
-        && !uses_tank_movement_semantics(e.kind)
+        && !uses_oriented_vehicle_body(e.kind)
         && e.target_id().is_some()
         && e.path_is_empty()
     {
@@ -3033,6 +3143,75 @@ mod tests {
             e.pos_y,
             e.facing()
         ));
+    }
+
+    #[test]
+    fn scout_car_turns_by_curvature_while_moving() {
+        let map = flat_map(1);
+        let mut entities = EntityStore::new();
+        let (sx, sy) = map.tile_center(20, 20);
+        let (_, gy) = map.tile_center(20, 26);
+        let scout = entities
+            .spawn_unit(1, EntityKind::ScoutCar, sx, sy)
+            .expect("scout car should spawn");
+        if let Some(e) = entities.get_mut(scout) {
+            e.set_facing(0.0);
+        }
+        set_path_direct(&mut entities, scout, vec![(sx, gy)]);
+
+        let occ = Occupancy::build(&map, &entities);
+        let spatial = SpatialIndex::build(&entities, map.size);
+        movement_system(&map, &mut entities, &mut [], &occ, &spatial, 0);
+
+        let e = entities.get(scout).expect("scout car should exist");
+        let moved = moved_distance((sx, sy), (e.pos_x, e.pos_y));
+        let max_turn = config::unit_stats(EntityKind::ScoutCar)
+            .expect("scout stats")
+            .speed
+            / SCOUT_CAR_MIN_TURN_RADIUS_PX;
+        assert!(moved > 0.01, "scout car should turn while translating");
+        assert!(
+            e.facing() > 0.0 && e.facing() <= max_turn + 0.0001,
+            "scout car yaw should be capped by movement curvature, got {:.4}",
+            e.facing()
+        );
+        assert!(
+            e.pos_x > sx,
+            "scout car should advance along its facing instead of sliding straight north"
+        );
+    }
+
+    #[test]
+    fn scout_car_does_not_pivot_in_place_for_far_goal_behind() {
+        let map = flat_map(1);
+        let mut entities = EntityStore::new();
+        let (sx, sy) = map.tile_center(20, 20);
+        let goal = (
+            sx - TANK_REVERSE_GOAL_DISTANCE_PX - config::TILE_SIZE as f32,
+            sy,
+        );
+        let scout = entities
+            .spawn_unit(1, EntityKind::ScoutCar, sx, sy)
+            .expect("scout car should spawn");
+        if let Some(e) = entities.get_mut(scout) {
+            e.set_facing(0.0);
+        }
+        set_path_direct(&mut entities, scout, vec![goal]);
+
+        let occ = Occupancy::build(&map, &entities);
+        let spatial = SpatialIndex::build(&entities, map.size);
+        movement_system(&map, &mut entities, &mut [], &occ, &spatial, 0);
+
+        let e = entities.get(scout).expect("scout car should exist");
+        let moved = moved_distance((sx, sy), (e.pos_x, e.pos_y));
+        assert!(
+            moved > 0.01,
+            "far behind goal should make the scout car drive through a turn, not pivot"
+        );
+        assert!(
+            e.facing().abs() > 0.0,
+            "scout car should still steer while it moves"
+        );
     }
 
     #[test]

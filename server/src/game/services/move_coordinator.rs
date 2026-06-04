@@ -15,7 +15,7 @@
 
 use crate::config;
 use crate::game::entity::{
-    uses_tank_movement_semantics, EntityKind, EntityStore, MovePhase, Order, WeaponSetup,
+    uses_oriented_vehicle_body, EntityKind, EntityStore, MovePhase, Order, WeaponSetup,
 };
 use crate::game::map::Map;
 use crate::game::pathfinding::{self, Passability};
@@ -366,7 +366,7 @@ impl<'a> MoveCoordinator<'a> {
             start: (sx as i32, sy as i32),
             goal: (gx as i32, gy as i32),
             radius_tiles,
-            route_shape: if smooth_static_segments && uses_tank_movement_semantics(kind) {
+            route_shape: if smooth_static_segments && uses_oriented_vehicle_body(kind) {
                 RouteShape::PreferFewerTurns
             } else {
                 RouteShape::Normal
@@ -378,7 +378,7 @@ impl<'a> MoveCoordinator<'a> {
         // Snap the final waypoint to the exact requested goal for precise arrival.
         if !waypoints.is_empty() {
             waypoints[0] = goal;
-            if smooth_static_segments && uses_tank_movement_semantics(kind) {
+            if smooth_static_segments && uses_oriented_vehicle_body(kind) {
                 waypoints =
                     simplify_reverse_waypoints(self.map, self.occ, kind, start_pos, waypoints);
             }
@@ -730,7 +730,7 @@ fn is_free_goal(
 }
 
 fn formation_goal_facing(unit: &FormationUnit, center: (f32, f32)) -> f32 {
-    if !uses_tank_movement_semantics(unit.kind) {
+    if !uses_oriented_vehicle_body(unit.kind) {
         return 0.0;
     }
     let dx = center.0 - unit.pos.0;
