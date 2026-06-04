@@ -21,8 +21,8 @@ const MAX_UNIT_RADIUS_PX: f32 = 26.0;
 const COLLISION_SEARCH_SLACK_PX: f32 = config::TILE_SIZE as f32;
 
 /// Maximum number of pair-resolution passes per tick. Each pass pushes overlapping pairs apart
-/// by the full violation; with the 50/50 split, two-body cases converge in one pass and dense
-/// clusters typically converge in 2–3.
+/// by the full violation; two-body cases converge in one pass and dense clusters typically
+/// converge in 2–3.
 const COLLISION_PASSES: usize = 4;
 
 /// Pairs whose center distance is at least `sum_radii - COLLISION_EPS_PX` are considered
@@ -377,15 +377,14 @@ fn tile_passable_at(occ: &Occupancy, map: &Map, x: f32, y: f32) -> bool {
 
 /// Resolve unit-unit overlaps with iterative pair-wise pushes so units do not stack on top of
 /// each other. For each overlapping pair the push is taken along the line connecting their
-/// centers; both sides move by half the overlap.
+/// centers; non-ghost units split the overlap by footing resistance, so lower-resistance units
+/// move more.
 ///
-/// **Mining-worker exception (PLAN §4.3).** Workers in [`GatherPhase::Harvesting`] are latched
-/// onto their resource node and are *fully exempt* from collision: they neither push nor are
-/// pushed. This is intentional — walking units (workers en route to other patches, soldiers
-/// transiting through a mining cluster) must be able to pass through a harvester without
-/// being kicked backward each tick, which would deadlock the economy. The exemption rides on
-/// the worker's gather-order state machine, never on the entity kind, so movement code stays
-/// free of kind-specific hacks.
+/// **Ghost pass-through exception.** Workers in [`GatherPhase::Harvesting`] or
+/// [`BuildPhase::Constructing`] are latched onto their resource/build site and are *fully
+/// exempt* from collision: they neither push nor are pushed. This is intentional — walking
+/// units must be able to pass through harvesters and active builders without kicking them
+/// backward each tick, which would deadlock the economy or strand construction.
 ///
 /// Pushes that would land on impassable terrain or a building footprint are skipped, so a
 /// unit cornered by terrain may keep a small residual overlap. The invariant
@@ -407,10 +406,16 @@ pub(crate) fn resolve_collisions(
         let ids = entities.ids();
 
         for &a in &ids {
-            // Skip anchored units entirely (PLAN §4.3 mining-worker exception): they neither
-            // push nor are pushed. Other units can transit through their position freely.
-            let ar = match entities.get(a) {
-                Some(e) if e.is_unit() && !is_collision_anchored(e) => e.radius(),
+            // Ghost units neither push nor are pushed. Other units can transit through their
+            // position freely.
+            let (ar, a_profile) = match entities.get(a) {
+                Some(e) if e.is_unit() => {
+                    let profile = footing_profile(e);
+                    if profile == FootingProfile::Ghost {
+                        continue;
+                    }
+                    (e.radius(), profile)
+                }
                 _ => continue,
             };
             let (ax_idx, ay_idx) = match entities.get(a) {
@@ -427,9 +432,13 @@ pub(crate) fn resolve_collisions(
                 .collect();
 
             for b in candidates {
-                let (br, bx, by) = match entities.get(b) {
-                    Some(e) if e.is_unit() && !is_collision_anchored(e) => {
-                        (e.radius(), e.pos_x, e.pos_y)
+                let (br, b_profile, bx, by) = match entities.get(b) {
+                    Some(e) if e.is_unit() => {
+                        let profile = footing_profile(e);
+                        if profile == FootingProfile::Ghost {
+                            continue;
+                        }
+                        (e.radius(), profile, e.pos_x, e.pos_y)
                     }
                     _ => continue,
                 };
@@ -455,13 +464,17 @@ pub(crate) fn resolve_collisions(
                     let d = d2.sqrt();
                     (dx / d, dy / d, d)
                 };
-                // Both sides are non-anchored at this point: take a symmetric half-overlap
-                // push along the connecting line. If one side's push lands on impassable
-                // terrain or a building footprint, the other side absorbs the full overlap
-                // so the pair still separates rather than getting stuck.
+                // Both sides are non-ghost at this point: split overlap by resistance. If one
+                // side's weighted push lands on impassable terrain or a building footprint, the
+                // other side tries to absorb the blocked side's remaining share.
                 let overlap = min_d - dist;
-                let a_target = (ax - nx * overlap * 0.5, ay - ny * overlap * 0.5);
-                let b_target = (bx + nx * overlap * 0.5, by + ny * overlap * 0.5);
+                let a_resistance = footing_resistance(a_profile);
+                let b_resistance = footing_resistance(b_profile);
+                let total_resistance = a_resistance + b_resistance;
+                let a_share = b_resistance / total_resistance;
+                let b_share = a_resistance / total_resistance;
+                let a_target = (ax - nx * overlap * a_share, ay - ny * overlap * a_share);
+                let b_target = (bx + nx * overlap * b_share, by + ny * overlap * b_share);
                 let a_ok = stays_on_passable(map, occ, a_target.0, a_target.1);
                 let b_ok = stays_on_passable(map, occ, b_target.0, b_target.1);
 
@@ -515,24 +528,60 @@ pub(crate) fn resolve_collisions(
     }
 }
 
-/// Whether this unit is currently latched to a fixed point and must not be pushed by
-/// collision. The only anchored case today is a worker actively harvesting a resource node;
-/// the exemption rides on the worker's gather-order state machine so movement code never
-/// needs to special-case the kind (PLAN §4.3).
-pub(crate) fn is_collision_anchored(e: &Entity) -> bool {
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum FootingProfile {
+    Ghost,
+    Soft,
+    Firm,
+    Braced,
+    Heavy,
+}
+
+fn footing_profile(e: &Entity) -> FootingProfile {
     if e.kind == EntityKind::Worker && e.gather_phase() == Some(GatherPhase::Harvesting) {
-        return true;
+        return FootingProfile::Ghost;
     }
-    // A worker constructing a building is similarly latched: it must hold position next to
-    // the site to keep advancing construction. Without this exemption, other workers passing
-    // through can shove the builder out of `interact_range` of the site and the building
-    // never finishes.
     if e.kind == EntityKind::Worker
         && matches!(e.build_phase(), Some(BuildPhase::Constructing { .. }))
     {
-        return true;
+        return FootingProfile::Ghost;
     }
-    false
+    if e.kind == EntityKind::MachineGunner
+        && matches!(
+            e.weapon_setup(),
+            WeaponSetup::SettingUp { .. } | WeaponSetup::Deployed
+        )
+    {
+        return FootingProfile::Braced;
+    }
+    if e.kind == EntityKind::Tank {
+        return FootingProfile::Heavy;
+    }
+    if e.kind != EntityKind::MachineGunner
+        && e.kind != EntityKind::Tank
+        && e.target_id().is_some()
+        && e.path_is_empty()
+    {
+        return FootingProfile::Firm;
+    }
+    FootingProfile::Soft
+}
+
+fn footing_resistance(profile: FootingProfile) -> f32 {
+    match profile {
+        FootingProfile::Ghost => 0.0,
+        FootingProfile::Soft => 1.0,
+        FootingProfile::Firm => 3.0,
+        FootingProfile::Braced => 8.0,
+        FootingProfile::Heavy => 12.0,
+    }
+}
+
+/// Whether this unit is currently a ghost for collision and must not be pushed by
+/// collision. Ghost units neither push nor are pushed, so other mobile units can pass
+/// through them freely.
+pub(crate) fn is_collision_anchored(e: &Entity) -> bool {
+    footing_profile(e) == FootingProfile::Ghost
 }
 
 /// Whether a world point lies on a tile that's passable terrain and free of building footprints,
@@ -557,6 +606,26 @@ mod tests {
         let dx = ea.pos_x - eb.pos_x;
         let dy = ea.pos_y - eb.pos_y;
         (dx * dx + dy * dy).sqrt()
+    }
+
+    fn pos(entities: &EntityStore, id: u32) -> (f32, f32) {
+        let e = entities.get(id).unwrap();
+        (e.pos_x, e.pos_y)
+    }
+
+    fn moved_distance(from: (f32, f32), to: (f32, f32)) -> f32 {
+        let dx = to.0 - from.0;
+        let dy = to.1 - from.1;
+        (dx * dx + dy * dy).sqrt()
+    }
+
+    fn mark_moving(entities: &mut EntityStore, id: u32, goal: (f32, f32)) {
+        if let Some(e) = entities.get_mut(id) {
+            e.set_order(Order::move_to(goal.0, goal.1));
+            e.set_path(vec![goal]);
+            e.set_path_goal(Some(goal));
+            e.mark_move_phase(MovePhase::Moving);
+        }
     }
 
     /// A grass-only test map: the authored map contains obstacles, so for clean
@@ -600,10 +669,10 @@ mod tests {
         );
     }
 
-    /// Slightly-overlapping units (centers closer than radius sum) are pushed apart in one
+    /// Slightly-overlapping soft units (centers closer than radius sum) are pushed apart in one
     /// tick — both move by half the overlap.
     #[test]
-    fn overlapping_units_are_pushed_apart_symmetrically() {
+    fn soft_units_still_split_push_evenly() {
         let map = flat_map(1);
         let mut entities = EntityStore::new();
         // Riflemen have radius 9, so spawning at 10 px apart leaves an 8 px overlap.
@@ -614,6 +683,10 @@ mod tests {
         let b = entities
             .spawn_unit(1, EntityKind::Rifleman, cx + 5.0, cy)
             .unwrap();
+        mark_moving(&mut entities, a, (cx - 64.0, cy));
+        mark_moving(&mut entities, b, (cx + 64.0, cy));
+        let a_before = pos(&entities, a);
+        let b_before = pos(&entities, b);
 
         let occ = Occupancy::build(&map, &entities);
         let spatial = SpatialIndex::build(&entities, map.size);
@@ -629,14 +702,115 @@ mod tests {
             d
         );
         // Each unit moved roughly half the overlap (4 px each from the 8 px violation).
-        let ax = entities.get(a).unwrap().pos_x;
-        let bx = entities.get(b).unwrap().pos_x;
+        let a_after = pos(&entities, a);
+        let b_after = pos(&entities, b);
+        let a_moved = moved_distance(a_before, a_after);
+        let b_moved = moved_distance(b_before, b_after);
         assert!(
-            ax < cx - 5.0 && bx > cx + 5.0,
+            (a_moved - b_moved).abs() <= 0.01,
+            "expected equal soft-unit push, got a {:.3}px and b {:.3}px",
+            a_moved,
+            b_moved
+        );
+        assert!(
+            a_after.0 < a_before.0 && b_after.0 > b_before.0,
             "expected both units pushed outward (a {:.2}, b {:.2}, center {:.2})",
-            ax,
-            bx,
+            a_after.0,
+            b_after.0,
             cx
+        );
+    }
+
+    #[test]
+    fn tank_pushes_soft_infantry_more_than_it_moves() {
+        let map = flat_map(1);
+        let mut entities = EntityStore::new();
+        let (cx, cy) = map.tile_center(20, 20);
+        let tank = entities
+            .spawn_unit(1, EntityKind::Tank, cx - 10.0, cy)
+            .unwrap();
+        let rifleman = entities
+            .spawn_unit(2, EntityKind::Rifleman, cx + 10.0, cy)
+            .unwrap();
+        mark_moving(&mut entities, rifleman, (cx + 64.0, cy));
+        let tank_before = pos(&entities, tank);
+        let rifleman_before = pos(&entities, rifleman);
+
+        let occ = Occupancy::build(&map, &entities);
+        let spatial = SpatialIndex::build(&entities, map.size);
+        resolve_collisions(&mut entities, &spatial, &map, &occ);
+
+        let tank_moved = moved_distance(tank_before, pos(&entities, tank));
+        let rifleman_moved = moved_distance(rifleman_before, pos(&entities, rifleman));
+        assert!(
+            rifleman_moved > tank_moved * 6.0,
+            "expected tank to displace rifleman much more than itself (tank {:.3}px, rifleman {:.3}px)",
+            tank_moved,
+            rifleman_moved
+        );
+    }
+
+    #[test]
+    fn braced_machine_gunner_holds_ground_against_soft_unit() {
+        let map = flat_map(1);
+        let mut entities = EntityStore::new();
+        let (cx, cy) = map.tile_center(20, 20);
+        let mg = entities
+            .spawn_unit(1, EntityKind::MachineGunner, cx - 5.0, cy)
+            .unwrap();
+        let rifleman = entities
+            .spawn_unit(2, EntityKind::Rifleman, cx + 5.0, cy)
+            .unwrap();
+        if let Some(e) = entities.get_mut(mg) {
+            e.set_weapon_setup(WeaponSetup::Deployed);
+        }
+        mark_moving(&mut entities, rifleman, (cx + 64.0, cy));
+        let mg_before = pos(&entities, mg);
+        let rifleman_before = pos(&entities, rifleman);
+
+        let occ = Occupancy::build(&map, &entities);
+        let spatial = SpatialIndex::build(&entities, map.size);
+        resolve_collisions(&mut entities, &spatial, &map, &occ);
+
+        let mg_moved = moved_distance(mg_before, pos(&entities, mg));
+        let rifleman_moved = moved_distance(rifleman_before, pos(&entities, rifleman));
+        assert!(
+            rifleman_moved > mg_moved * 5.0,
+            "expected braced MG to hold ground against soft rifleman (mg {:.3}px, rifleman {:.3}px)",
+            mg_moved,
+            rifleman_moved
+        );
+    }
+
+    #[test]
+    fn firing_rifleman_is_firmer_than_moving_rifleman() {
+        let map = flat_map(1);
+        let mut entities = EntityStore::new();
+        let (cx, cy) = map.tile_center(20, 20);
+        let firing = entities
+            .spawn_unit(1, EntityKind::Rifleman, cx - 5.0, cy)
+            .unwrap();
+        let moving = entities
+            .spawn_unit(2, EntityKind::Rifleman, cx + 5.0, cy)
+            .unwrap();
+        if let Some(e) = entities.get_mut(firing) {
+            e.set_target_id(Some(moving));
+        }
+        mark_moving(&mut entities, moving, (cx + 64.0, cy));
+        let firing_before = pos(&entities, firing);
+        let moving_before = pos(&entities, moving);
+
+        let occ = Occupancy::build(&map, &entities);
+        let spatial = SpatialIndex::build(&entities, map.size);
+        resolve_collisions(&mut entities, &spatial, &map, &occ);
+
+        let firing_moved = moved_distance(firing_before, pos(&entities, firing));
+        let moving_moved = moved_distance(moving_before, pos(&entities, moving));
+        assert!(
+            moving_moved > firing_moved * 2.0,
+            "expected firing rifleman to be firmer than moving rifleman (firing {:.3}px, moving {:.3}px)",
+            firing_moved,
+            moving_moved
         );
     }
 
