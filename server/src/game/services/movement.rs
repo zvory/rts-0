@@ -778,12 +778,12 @@ pub(crate) fn resolve_collisions(
                         };
                         let a_candidates = [a_primary, a_secondary];
                         let b_candidates = [b_primary, b_secondary];
-                        let a_alt = a_candidates.into_iter().find(|&(x, y)| {
-                            unit_static_standable(occ, map, a_kind, x, y)
-                        });
-                        let b_alt = b_candidates.into_iter().find(|&(x, y)| {
-                            unit_static_standable(occ, map, b_kind, x, y)
-                        });
+                        let a_alt = a_candidates
+                            .into_iter()
+                            .find(|&(x, y)| unit_static_standable(occ, map, a_kind, x, y));
+                        let b_alt = b_candidates
+                            .into_iter()
+                            .find(|&(x, y)| unit_static_standable(occ, map, b_kind, x, y));
                         (a_alt, b_alt)
                     }
                 };
