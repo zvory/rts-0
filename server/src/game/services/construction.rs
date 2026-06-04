@@ -153,7 +153,7 @@ pub(crate) fn construction_system(
                 id: site,
                 kind: kind.to_protocol_str().to_string(),
             });
-            eject_worker_if_inside(map, entities, worker, site);
+            defensively_eject_worker_from_legacy_overlap(map, entities, worker, site);
             if let Some(w) = entities.get_mut(worker) {
                 w.clear_orders();
             }
@@ -161,10 +161,19 @@ pub(crate) fn construction_system(
     }
 }
 
-/// If `worker` is standing on a tile inside `site`'s footprint, teleport it to the nearest
-/// passable tile outside the footprint. This prevents workers from getting permanently stuck
-/// when a building is placed on top of them.
-fn eject_worker_if_inside(map: &Map, entities: &mut EntityStore, worker: u32, site: u32) {
+/// Defensive fallback for malformed legacy states only.
+///
+/// Normal construction should never need this: scaffold creation is body-aware and rejects every
+/// living unit body, including the chosen builder after the build-intent staging exception has
+/// done its job. If an old replay or manual test fixture already has a constructing worker inside
+/// its site, move it before clearing the ghost construction phase so invariants report the source
+/// bug instead of leaving the worker permanently embedded.
+fn defensively_eject_worker_from_legacy_overlap(
+    map: &Map,
+    entities: &mut EntityStore,
+    worker: u32,
+    site: u32,
+) {
     let b = match entities.get(site) {
         Some(b) => b,
         None => return,

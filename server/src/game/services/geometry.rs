@@ -1,5 +1,3 @@
-#![allow(dead_code)] // Phase-zero helpers are intentionally staged before gameplay rewires.
-
 use crate::config;
 use crate::game::entity::{Entity, EntityKind};
 use crate::game::map::Map;

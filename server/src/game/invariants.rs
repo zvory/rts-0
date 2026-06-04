@@ -6,7 +6,7 @@
 use crate::config;
 use crate::game::entity::{Order, NEUTRAL};
 use crate::game::services::geometry::{
-    building_rect_for_entity, circle_intersects_rect, unit_body,
+    building_rect_for_entity, circle_intersects_rect, unit_body, CircleBody,
 };
 use crate::game::services::movement::is_collision_anchored;
 use crate::game::services::occupancy::{building_footprint, Occupancy};
@@ -51,7 +51,7 @@ impl Game {
         }
 
         // ------------------------------------------------------------------
-        // 2. No NaN or out-of-world coordinates
+        // 2. No NaN, invalid unit bodies, or out-of-world coordinates
         // ------------------------------------------------------------------
         for e in self.entities.iter() {
             assert!(
@@ -69,6 +69,18 @@ impl Game {
                 e.pos_y,
                 world_max
             );
+            if e.is_unit() {
+                let body = unit_body(e.kind, e.pos_x, e.pos_y);
+                assert!(
+                    body.is_some(),
+                    "invariant: unit {} ({:?}) has invalid body at ({}, {}) with radius {}",
+                    e.id,
+                    e.kind,
+                    e.pos_x,
+                    e.pos_y,
+                    e.radius()
+                );
+            }
         }
 
         // ------------------------------------------------------------------
@@ -123,9 +135,6 @@ impl Game {
             }
         }
 
-        // ------------------------------------------------------------------
-        // 5. Non-ghost unit bodies never intersect static blockers.
-        // ------------------------------------------------------------------
         let building_rects: Vec<_> = self
             .entities
             .iter()
@@ -137,6 +146,27 @@ impl Game {
                 }
             })
             .collect();
+        for node in self.entities.iter().filter(|e| e.is_node()) {
+            let body = CircleBody {
+                x: node.pos_x,
+                y: node.pos_y,
+                radius: node.radius(),
+            };
+            for &(building_id, building_kind, rect) in &building_rects {
+                assert!(
+                    !circle_intersects_rect(body, rect),
+                    "invariant: resource node {} ({:?}) body overlaps building {} ({:?}) footprint",
+                    node.id,
+                    node.kind,
+                    building_id,
+                    building_kind
+                );
+            }
+        }
+
+        // ------------------------------------------------------------------
+        // 5. Non-ghost unit bodies never intersect static blockers.
+        // ------------------------------------------------------------------
         for e in self.entities.iter().filter(|e| e.is_unit()) {
             if is_collision_anchored(e) {
                 continue;
@@ -393,6 +423,36 @@ mod tests {
         game.entities
             .spawn_unit(99, EntityKind::Tank, rect.max_x + 19.0, rect.min_y + 32.0)
             .expect("tank spawn");
+
+        game.assert_invariants();
+    }
+
+    #[test]
+    #[should_panic(expected = "resource node")]
+    fn resource_body_vs_building_invariant_catches_manual_bad_state() {
+        let players = [PlayerInit {
+            id: 1,
+            name: "Solo".into(),
+            color: "#fff".into(),
+            is_ai: false,
+        }];
+        let mut game = Game::new(&players, 0x1234_5678);
+        for tile in &mut game.map.terrain {
+            *tile = crate::protocol::terrain::GRASS;
+        }
+
+        let (bx, by) = footprint_center(&game.map, EntityKind::Depot, 10, 10);
+        game.entities
+            .spawn_building(99, EntityKind::Depot, bx, by, true)
+            .expect("building spawn");
+        let rect = building_rect_for_footprint(EntityKind::Depot, 10, 10).expect("depot rect");
+        game.entities
+            .spawn_node(
+                EntityKind::Steel,
+                rect.max_x + config::TILE_SIZE as f32 * 0.25,
+                rect.min_y + config::TILE_SIZE as f32 * 0.5,
+            )
+            .expect("resource spawn");
 
         game.assert_invariants();
     }
