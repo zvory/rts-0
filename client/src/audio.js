@@ -12,6 +12,8 @@
 //   - Spatial play (opts.x/y present) goes through StereoPanner + lowpass per-voice.
 //     `setListener()` must be called each frame from main.js to keep distance math
 //     in sync with the camera.
+//   - Callers can tag voices with `key` and stop them early for sustained cues
+//     whose authoritative game state has ended.
 
 const CATEGORIES = Object.freeze([
   "ui",
@@ -151,6 +153,7 @@ export class Audio {
    * @param {string} [opts.category] one of CATEGORIES (default "ui")
    * @param {number} [opts.pitchVariance] override default jitter (0 to disable)
    * @param {number} [opts.gain] linear gain multiplier applied before the category bus
+   * @param {string} [opts.key] caller-owned voice key for early stopping
    * @returns {boolean} true if scheduled, false if dropped
    */
   play(id, opts) {
@@ -215,15 +218,10 @@ export class Audio {
     } catch {
       return false;
     }
-    const voice = { node: src, priority, startedAt: now, category, id, trail };
+    const key = typeof opts.key === "string" && opts.key ? opts.key : null;
+    const voice = { node: src, priority, startedAt: now, category, id, key, trail };
     this.voices.push(voice);
-    src.onended = () => {
-      const i = this.voices.indexOf(voice);
-      if (i >= 0) this.voices.splice(i, 1);
-      for (const n of trail) {
-        try { n.disconnect(); } catch { /* already disconnected */ }
-      }
-    };
+    src.onended = () => this._finishVoice(voice);
     this.lastPlay.set(id, now);
     return true;
   }
@@ -231,6 +229,22 @@ export class Audio {
   /** Convenience: forces the ui category (non-spatial). */
   playUI(id, opts) {
     return this.play(id, { ...(opts || {}), category: "ui" });
+  }
+
+  /**
+   * Stop all active voices tagged with a caller-owned key.
+   * @param {string} key
+   * @returns {number} number of voices stopped
+   */
+  stopByKey(key) {
+    if (typeof key !== "string" || !key) return 0;
+    let stopped = 0;
+    for (const voice of [...this.voices]) {
+      if (voice.key !== key) continue;
+      this._stopVoice(voice);
+      stopped += 1;
+    }
+    return stopped;
   }
 
   /**
@@ -302,14 +316,7 @@ export class Audio {
     for (const ev of this._gestureEvents) {
       window.removeEventListener(ev, this._gesture, true);
     }
-    for (const v of this.voices) {
-      try {
-        v.node.stop();
-      } catch {
-        /* already stopped */
-      }
-    }
-    this.voices.length = 0;
+    for (const v of [...this.voices]) this._stopVoice(v);
     this.buffers.clear();
     this.pending.clear();
     this.lastPlay.clear();
@@ -426,6 +433,24 @@ export class Audio {
     });
   }
 
+  _stopVoice(voice) {
+    try {
+      voice.node.stop();
+    } catch {
+      /* already stopped */
+    }
+    this._finishVoice(voice);
+  }
+
+  _finishVoice(voice) {
+    const i = this.voices.indexOf(voice);
+    if (i >= 0) this.voices.splice(i, 1);
+    voice.node.onended = null;
+    for (const n of voice.trail || []) {
+      try { n.disconnect(); } catch { /* already disconnected */ }
+    }
+  }
+
   /**
    * Try to evict the worst-scoring voice (priority - age_bonus * age). If even
    * the worst voice outranks the incoming call, the new sound is dropped.
@@ -446,12 +471,7 @@ export class Audio {
     }
     if (worstIdx < 0) return false;
     if (worstScore >= incomingPriority) return false;
-    try {
-      this.voices[worstIdx].node.stop();
-    } catch {
-      /* already ended */
-    }
-    this.voices.splice(worstIdx, 1);
+    this._stopVoice(this.voices[worstIdx]);
     return true;
   }
 }

@@ -20,7 +20,7 @@ import { HUD } from "./hud.js";
 import { Minimap } from "./minimap.js";
 import { Lobby } from "./lobby.js";
 import { Audio, SOUND_MANIFEST, noticeSoundId } from "./audio.js";
-import { S, EVENT, KIND } from "./protocol.js";
+import { S, EVENT, KIND, SETUP, STATE } from "./protocol.js";
 import { SNAPSHOT_MS, INTERP_DELAY_MS } from "./config.js";
 
 /** How long (ms) a #toast notice stays on screen before fading out. */
@@ -53,6 +53,20 @@ const COMBAT_SOUNDS = Object.freeze({
     priority: 2.5,
   },
 });
+
+function machineGunSoundKey(id) {
+  return `combat:machine_gunner:${id}`;
+}
+
+function isAudiblyFiringMachineGunner(e) {
+  return !!(
+    e &&
+    e.kind === KIND.MACHINE_GUNNER &&
+    e.state === STATE.ATTACK &&
+    e.setupState === SETUP.DEPLOYED &&
+    typeof e.targetId === "number"
+  );
+}
 
 /**
  * Derive the WebSocket endpoint from the current page location, so the client
@@ -422,6 +436,7 @@ class Match {
     this.devWatch = devWatch;
     this.audio = audio;
     this.missingCombatSoundKinds = new Set();
+    this.activeMachineGunSoundKeys = new Map();
     this.replaySpeedHandler = null;
     this.giveUpSent = false;
 
@@ -459,6 +474,7 @@ class Match {
     // --- Listeners (bound so they can be removed on destroy). ---
     this.onSnapshot = (m) => {
       this.state.applySnapshot(m);
+      this.stopInactiveMachineGunSounds();
       this.handleSnapshotEvents(m.events || []);
     };
     this.onResize = this.handleResize.bind(this);
@@ -671,13 +687,39 @@ class Match {
     const id = this.audio.pickVariant(spec.ids);
     if (!id) return;
     const category = from && from.owner === this.state.playerId ? "combat_self" : "combat_other";
-    this.audio.play(id, {
+    const key =
+      kind === KIND.MACHINE_GUNNER && typeof ev.from === "number"
+        ? machineGunSoundKey(ev.from)
+        : undefined;
+    const played = this.audio.play(id, {
       x: pos.x,
       y: pos.y,
       category,
       priority: spec.priority,
       gain: spec.gain,
+      key,
     });
+    if (played && key) this.activeMachineGunSoundKeys.set(ev.from, key);
+  }
+
+  stopInactiveMachineGunSounds() {
+    if (!this.audio || this.activeMachineGunSoundKeys.size === 0) return;
+    for (const [id, key] of this.activeMachineGunSoundKeys) {
+      if (isAudiblyFiringMachineGunner(this.state.entityById(id))) continue;
+      this.audio.stopByKey(key);
+      this.activeMachineGunSoundKeys.delete(id);
+    }
+  }
+
+  stopAllMachineGunSounds() {
+    if (!this.audio) {
+      this.activeMachineGunSoundKeys.clear();
+      return;
+    }
+    for (const key of this.activeMachineGunSoundKeys.values()) {
+      this.audio.stopByKey(key);
+    }
+    this.activeMachineGunSoundKeys.clear();
   }
 
   /**
@@ -740,6 +782,7 @@ class Match {
    */
   destroy() {
     this.stop();
+    this.stopAllMachineGunSounds();
     this.net.off(S.SNAPSHOT, this.onSnapshot);
     window.removeEventListener("resize", this.onResize);
     window.removeEventListener("keydown", this.onMenuKeyDown, true);
