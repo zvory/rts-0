@@ -44,6 +44,9 @@ pub struct MovementState {
     /// Ticks remaining before this unit may sidestep again. Decremented each tick; reset to 0
     /// on new order.
     pub sidestep_cooldown: u16,
+    /// Ticks remaining before this scout car may inject another reverse recovery waypoint.
+    /// Used only by scout cars; reset to 0 on new order.
+    pub scout_car_recovery_cooldown: u16,
     /// Consecutive ticks where the next path step was blocked by terrain/building occupancy.
     /// Once this reaches the debounce threshold, movement queues a fresh path to `path_goal`.
     pub static_blocked_ticks: u16,
@@ -68,6 +71,7 @@ impl Default for MovementState {
             stuck_ticks: 0,
             last_progress_pos: (0.0, 0.0),
             sidestep_cooldown: 0,
+            scout_car_recovery_cooldown: 0,
             static_blocked_ticks: 0,
             lifetime_oil_used: 0.0,
             oil_debt: 0.0,

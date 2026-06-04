@@ -340,6 +340,20 @@ pub(super) fn scout_car_accepts_waypoint(
         return true;
     }
 
+    // Reverse-recovery waypoints sit behind the car. They must be reached by reversing, not
+    // discarded by the forward route pass-by tests below.
+    let facing = e.facing();
+    if facing.is_finite() {
+        let forward = (facing.cos(), facing.sin());
+        let to_waypoint = (waypoint.0 - current.0, waypoint.1 - current.1);
+        if forward.0.is_finite()
+            && forward.1.is_finite()
+            && along_track_error(to_waypoint, forward) < -ARRIVE_EPS
+        {
+            return false;
+        }
+    }
+
     let Some(next_waypoint) = next_waypoint else {
         return false;
     };

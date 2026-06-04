@@ -888,12 +888,18 @@ The server treats every client as potentially hostile. Limits live next to the c
   arrival still snaps to the ordered point when the car can actually reach it. Scout-car movement
   must never accept a rotated or translated oriented body that is statically illegal against terrain
   or building occupancy, and blocked cars preserve the player's movement order so bounded recovery
-  behavior can continue from the same command. Recovery constants live alongside
-  movement constants (`SCOUT_CAR_STUCK_RECOVERY_TRIGGER_TICKS`,
-  `SCOUT_CAR_REVERSE_RECOVERY_DISTANCE_PX`, `SCOUT_CAR_RECOVERY_COOLDOWN_TICKS`) and are reserved
-  for deterministic reverse-recovery injection; recovery must not add network fields or make normal
-  movement rotate in place. This is still a path-following approximation, not tire or Ackermann
-  steering physics; replace it with proper truck/wheeled movement semantics when that model exists.
+  behavior can continue from the same command. When a scout car on `Move` or `AttackMove` remains
+  stuck far from its `path_goal`, is still in a legal oriented body position, and its recovery
+  cooldown has elapsed, movement searches backward along the current hull axis for a legal reverse
+  waypoint up to `SCOUT_CAR_REVERSE_RECOVERY_DISTANCE_PX` (2 tiles). The candidate must be finite,
+  in bounds, statically standable at the current facing, and connected by a statically standable
+  segment. The waypoint is pushed into the existing reverse-ordered path so the car backs away and
+  then resumes the original route; `SCOUT_CAR_RECOVERY_COOLDOWN_TICKS` bounds duplicate injection.
+  Behind-the-car intermediate waypoints must be physically reached instead of pass-by consumed, so
+  reverse recovery cannot disappear on the same tick it is added. Recovery does not add network
+  fields, issue player-visible commands, add infantry sidesteps, or make scout cars pivot in place.
+  This is still a path-following approximation, not tire or Ackermann steering physics; replace it
+  with proper truck/wheeled movement semantics when that model exists.
   Scout cars do not use tank armor or tank damage reduction.
 - **Tank movement oil burn**: tanks consume oil based on distance actually moved, using
   `TANK_OIL_COST_PER_PX`. Fractional movement cost accumulates per tank until whole oil units are

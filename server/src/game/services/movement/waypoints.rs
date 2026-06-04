@@ -2,13 +2,14 @@ use std::collections::HashMap;
 
 use crate::config;
 use crate::game::entity::{
-    uses_car_movement_semantics, uses_oriented_vehicle_body, uses_tank_movement_semantics,
+    uses_car_movement_semantics, uses_oriented_vehicle_body, uses_tank_movement_semantics, Entity,
     EntityKind, EntityStore, MovePhase, Order, WeaponSetup,
 };
 use crate::game::map::Map;
 use crate::game::services::geometry::unit_body_for_entity;
 use crate::game::services::occupancy::Occupancy;
 use crate::game::services::spatial::SpatialIndex;
+use crate::game::services::standability as static_standability;
 use crate::game::PlayerState;
 use crate::protocol::Event;
 
@@ -26,6 +27,7 @@ use super::tank_drive::{
 use super::{ARRIVE_EPS, MAX_UNIT_BOUNDING_RADIUS_PX};
 
 const TANK_ROTATION_UNJAM_EPS: f32 = 1.0e-4;
+const SCOUT_CAR_RECOVERY_SEARCH_STEP_PX: f32 = config::TILE_SIZE as f32 * 0.5;
 
 /// Advance every moving unit along its waypoint path at its speed. Clamps the final landing
 /// tile to passable terrain (soft overlap with other units is allowed, so we don't resolve
@@ -388,9 +390,10 @@ pub(super) fn advance_moving_units(
                     e.set_order(Order::Idle);
                 }
             } else if matches!(e.move_phase(), Some(MovePhase::Moving)) {
-                // Decrement sidestep cooldown each tick.
+                // Decrement local recovery cooldowns each tick.
                 if let Some(m) = e.movement.as_mut() {
                     m.sidestep_cooldown = m.sidestep_cooldown.saturating_sub(1);
+                    m.scout_car_recovery_cooldown = m.scout_car_recovery_cooldown.saturating_sub(1);
                 }
 
                 if static_blocked_this_tick {
@@ -451,6 +454,12 @@ pub(super) fn advance_moving_units(
                             }
                         }
                     }
+                }
+                if is_car
+                    && stuck_ticks >= config::SCOUT_CAR_STUCK_RECOVERY_TRIGGER_TICKS
+                    && matches!(e.order(), Order::Move(_) | Order::AttackMove(_))
+                {
+                    inject_scout_car_reverse_recovery(e, map, occ);
                 }
                 // Sidestep: stuck mid-path (far from goal), cooldown elapsed,
                 // only for Move/AttackMove orders.
@@ -513,6 +522,93 @@ pub(super) fn advance_moving_units(
             }
         }
     }
+}
+
+fn inject_scout_car_reverse_recovery(e: &mut Entity, map: &Map, occ: &Occupancy) {
+    if e.kind != EntityKind::ScoutCar {
+        return;
+    }
+    let Some(movement) = e.movement.as_ref() else {
+        return;
+    };
+    if movement.scout_car_recovery_cooldown > 0 || movement.path.is_empty() {
+        return;
+    }
+    let Some((gx, gy)) = movement.path_goal else {
+        return;
+    };
+    let dx_goal = e.pos_x - gx;
+    let dy_goal = e.pos_y - gy;
+    if (dx_goal * dx_goal + dy_goal * dy_goal).sqrt() <= config::TOLERANT_ARRIVAL_RADIUS_PX {
+        return;
+    }
+    let facing = e.facing();
+    if !e.pos_x.is_finite() || !e.pos_y.is_finite() || !facing.is_finite() {
+        return;
+    }
+    if !unit_static_standable(occ, map, e.kind, e.pos_x, e.pos_y, facing) {
+        return;
+    }
+
+    let forward = (facing.cos(), facing.sin());
+    if !forward.0.is_finite() || !forward.1.is_finite() {
+        return;
+    }
+
+    let min_distance = (config::SCOUT_CAR_BODY_LENGTH_PX
+        + config::SCOUT_CAR_WAYPOINT_ACCEPTANCE_RADIUS_PX)
+        .min(config::SCOUT_CAR_REVERSE_RECOVERY_DISTANCE_PX);
+    let max_distance = config::SCOUT_CAR_REVERSE_RECOVERY_DISTANCE_PX.max(min_distance);
+    let mut distance = min_distance;
+    while distance <= max_distance + 0.001 {
+        let candidate = (
+            e.pos_x - forward.0 * distance,
+            e.pos_y - forward.1 * distance,
+        );
+        if recovery_candidate_is_legal(e, map, occ, candidate) {
+            e.push_waypoint(candidate);
+            if let Some(m) = e.movement.as_mut() {
+                m.stuck_ticks = 0;
+                m.last_progress_pos = (e.pos_x, e.pos_y);
+                m.static_blocked_ticks = 0;
+                m.scout_car_recovery_cooldown = config::SCOUT_CAR_RECOVERY_COOLDOWN_TICKS;
+            }
+            return;
+        }
+        distance += SCOUT_CAR_RECOVERY_SEARCH_STEP_PX;
+    }
+}
+
+fn recovery_candidate_is_legal(
+    e: &Entity,
+    map: &Map,
+    occ: &Occupancy,
+    candidate: (f32, f32),
+) -> bool {
+    if !candidate.0.is_finite() || !candidate.1.is_finite() {
+        return false;
+    }
+    let world_size = map.world_size_px();
+    if candidate.0 < 0.0
+        || candidate.1 < 0.0
+        || candidate.0 >= world_size
+        || candidate.1 >= world_size
+    {
+        return false;
+    }
+    if e.next_waypoint()
+        .is_some_and(|wp| distance_between(wp, candidate) <= ARRIVE_EPS)
+    {
+        return false;
+    }
+    unit_static_standable(occ, map, e.kind, candidate.0, candidate.1, e.facing())
+        && static_standability::unit_static_segment_standable(
+            map,
+            occ,
+            e.kind,
+            (e.pos_x, e.pos_y),
+            candidate,
+        )
 }
 
 #[derive(Clone, Copy)]
