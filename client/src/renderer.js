@@ -40,6 +40,12 @@ const SWEEP_EVICT_FRAMES = 120;
 // Machine-gunner setup / teardown visuals are time-based on the client so the
 // transition reads smoothly between snapshots.
 const MACHINE_GUNNER_ANIM_MS = 1000;
+const WEAPON_RECOIL_PX = {
+  [KIND.RIFLEMAN]: 3.2,
+  [KIND.MACHINE_GUNNER]: 4.0,
+  [KIND.AT_TEAM]: 5.2,
+  [KIND.TANK]: 6.5,
+};
 
 // Layer names in back-to-front draw order. Index in this array == child index in `world`.
 const LAYERS = [
@@ -361,6 +367,9 @@ export class Renderer {
     const tint = this._tintFor(e.owner, colorByOwner);
     const facing = typeof e.facing === "number" ? e.facing : 0;
     const weaponFacing = typeof e.weaponFacing === "number" ? e.weaponFacing : facing;
+    const recoil = typeof state.weaponRecoil === "function"
+      ? weaponRecoilOffset(e.kind, state.weaponRecoil(e.id, performance.now()))
+      : 0;
 
     // Shadow on its own layer (under all units).
     const sh = this._slot("unitShadows", e.id);
@@ -375,11 +384,11 @@ export class Renderer {
     if (e.kind === KIND.RIFLEMAN || e.kind === KIND.MACHINE_GUNNER || e.kind === KIND.AT_TEAM) {
       drawInfantryBase(g, r, tint, facing);
       if (e.kind === KIND.RIFLEMAN) {
-        drawInfantryRifle(g, r, facing);
+        drawInfantryRifle(g, r, facing, recoil);
       } else if (e.kind === KIND.AT_TEAM) {
-        drawInfantryPanzerfaust(g, r, facing);
+        drawInfantryPanzerfaust(g, r, facing, recoil);
       } else {
-        drawInfantryMachineGun(g, r, facing, weaponFacing, this._machineGunnerSetupVisual(e));
+        drawInfantryMachineGun(g, r, facing, weaponFacing, this._machineGunnerSetupVisual(e), recoil);
       }
     } else if (e.kind === KIND.TANK) {
       // Hull follows movement facing; turret/barrel follow weapon facing.
@@ -413,7 +422,7 @@ export class Renderer {
       drawRotatedRect(g, r * 1.03, 0, r * 0.18, r * 0.92, facing);
       g.endFill();
 
-      const barrel = polar(weaponFacing, r * 1.55);
+      const barrel = polar(weaponFacing, Math.max(r * 0.9, r * 1.55 - recoil));
       g.lineStyle(5, 0x241d17, 0.95);
       g.moveTo(0, 0);
       g.lineTo(barrel.x, barrel.y);
@@ -1193,6 +1202,10 @@ function muzzleFlashRadius(kind) {
   return 0;
 }
 
+function weaponRecoilOffset(kind, progress) {
+  return (WEAPON_RECOIL_PX[kind] || 0) * clamp01(progress);
+}
+
 /** Clamp a number to [0,1]. */
 function clamp01(v) {
   if (v == null || Number.isNaN(v)) return 0;
@@ -1325,11 +1338,11 @@ function drawInfantryBase(g, r, tint, facing) {
   g.lineTo(shoulderR.x, shoulderR.y);
 }
 
-function drawInfantryRifle(g, r, facing) {
+function drawInfantryRifle(g, r, facing, recoil) {
   const a = facing - 0.2;
-  const stock = polar(a + Math.PI, r * 0.18);
-  const muzzle = polar(a, r * 1.82);
-  const hand = polar(a, r * 0.55);
+  const stock = polar(a + Math.PI, r * 0.18 + recoil);
+  const muzzle = polar(a, Math.max(r * 0.9, r * 1.82 - recoil));
+  const hand = polar(a, Math.max(r * 0.25, r * 0.55 - recoil));
 
   g.lineStyle(3, 0x2a2119, 0.96);
   g.moveTo(stock.x, stock.y);
@@ -1339,11 +1352,11 @@ function drawInfantryRifle(g, r, facing) {
   g.lineTo(hand.x + Math.sin(a) * r * 0.32, hand.y - Math.cos(a) * r * 0.32);
 }
 
-function drawInfantryPanzerfaust(g, r, facing) {
+function drawInfantryPanzerfaust(g, r, facing, recoil) {
   const a = facing - 0.12;
-  const rear = polar(a + Math.PI, r * 0.42);
-  const muzzle = polar(a, r * 2.05);
-  const warhead = polar(a, r * 1.55);
+  const rear = polar(a + Math.PI, r * 0.42 + recoil);
+  const muzzle = polar(a, Math.max(r * 1.1, r * 2.05 - recoil));
+  const warhead = polar(a, Math.max(r * 0.85, r * 1.55 - recoil));
 
   g.lineStyle(5, 0x2a2119, 0.98);
   g.moveTo(rear.x, rear.y);
@@ -1357,13 +1370,13 @@ function drawInfantryPanzerfaust(g, r, facing) {
   g.endFill();
 }
 
-function drawInfantryMachineGun(g, r, facing, weaponFacing, setup) {
+function drawInfantryMachineGun(g, r, facing, weaponFacing, setup, recoil) {
   const deploy = clamp01(setup.prongFactor);
   const carryA = facing + 0.86;
   const aimA = weaponFacing;
   const a = angleLerp(carryA, aimA, smoothstep01(deploy));
-  const stockRearDist = lerp(r * 0.76, r * 0.58, deploy);
-  const muzzleDist = lerp(r * 1.36, r * 2.46, deploy);
+  const stockRearDist = lerp(r * 0.76, r * 0.58, deploy) + recoil;
+  const muzzleDist = Math.max(r * 0.92, lerp(r * 1.36, r * 2.46, deploy) - recoil);
   const stockRear = polar(a + Math.PI, stockRearDist);
   const muzzle = polar(a, muzzleDist);
 
@@ -1372,12 +1385,12 @@ function drawInfantryMachineGun(g, r, facing, weaponFacing, setup) {
   g.moveTo(stockRear.x, stockRear.y);
   g.lineTo(muzzle.x, muzzle.y);
 
-  const stockCenterX = lerp(-r * 0.42, -r * 0.28, deploy);
+  const stockCenterX = lerp(-r * 0.42, -r * 0.28, deploy) - recoil;
   g.beginFill(0x4a3420, 0.96);
   drawRotatedRect(g, stockCenterX, 0, r * 0.62, r * 0.38, a);
   g.endFill();
 
-  const receiverX = lerp(r * 0.04, r * 0.2, deploy);
+  const receiverX = lerp(r * 0.04, r * 0.2, deploy) - recoil;
   g.beginFill(0x32291f, 0.98);
   drawRotatedRect(g, receiverX, 0, r * 0.72, r * 0.48, a);
   g.endFill();
@@ -1386,7 +1399,7 @@ function drawInfantryMachineGun(g, r, facing, weaponFacing, setup) {
   drawRotatedRect(g, receiverX + r * 0.08, -r * 0.2, r * 0.56, r * 0.12, a);
   g.endFill();
 
-  const shroudX = lerp(r * 0.62, r * 1.08, deploy);
+  const shroudX = lerp(r * 0.62, r * 1.08, deploy) - recoil;
   const shroudW = lerp(r * 0.72, r * 1.22, deploy);
   g.beginFill(0x241d17, 0.98);
   drawRotatedRect(g, shroudX, 0, shroudW, r * 0.24, a);
