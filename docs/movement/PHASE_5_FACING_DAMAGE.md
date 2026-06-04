@@ -42,11 +42,11 @@ side: 45 degrees < absolute angle <= 135 degrees
 rear: absolute angle > 135 degrees
 ```
 
-Suggested first multipliers:
+Balance multipliers:
 
-- Front: `0.75`
-- Side: `1.0`
-- Rear: `1.35`
+- Front: `1.0`
+- Side: `1.25`
+- Rear: `1.75`
 
 Apply only when:
 
