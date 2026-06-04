@@ -50,7 +50,8 @@ pub(crate) fn construction_system(
         };
 
         // Re-validate placement against the live entity set.
-        let placeable = standability::building_site_clear(map, entities, kind, tx, ty);
+        let placeable =
+            standability::building_site_clear_for_build_intent(map, entities, kind, tx, ty, worker);
         if config::building_stats(kind).is_none() {
             if let Some(w) = entities.get_mut(worker) {
                 w.clear_orders();
@@ -161,11 +162,11 @@ pub(crate) fn construction_system(
 
 /// Defensive fallback for malformed legacy states only.
 ///
-/// Normal construction should never need this: scaffold creation is body-aware and rejects every
-/// living unit body, including the chosen builder after the build-intent staging exception has
-/// done its job. If an old replay or manual test fixture already has a constructing worker inside
-/// its site, move it before clearing the ghost construction phase so invariants report the source
-/// bug instead of leaving the worker permanently embedded.
+/// Normal construction should rarely need this: scaffold creation is body-aware and rejects every
+/// living unit body except the chosen builder, who becomes a ghost active builder immediately. If
+/// a build-over-self order or an old replay leaves a constructing worker inside its site, move it
+/// before clearing the ghost construction phase so the worker does not remain embedded after the
+/// building completes.
 fn defensively_eject_worker_from_legacy_overlap(
     map: &Map,
     entities: &mut EntityStore,
@@ -231,7 +232,7 @@ mod tests {
     use crate::protocol::terrain;
 
     #[test]
-    fn construction_revalidates_worker_body_outside_footprint() {
+    fn construction_allows_builder_body_inside_footprint() {
         let map = flat_map(16);
         let mut entities = EntityStore::new();
         let (wx, wy) = footprint_center(&map, EntityKind::Depot, 4, 4);
@@ -250,21 +251,22 @@ mod tests {
         assert!(
             entities
                 .iter()
-                .all(|entity| entity.kind != EntityKind::Depot),
-            "worker body inside the footprint must prevent scaffold creation"
+                .any(|entity| entity.kind == EntityKind::Depot && entity.under_construction()),
+            "chosen builder body inside the footprint should not prevent scaffold creation"
         );
         assert!(
             matches!(
-                entities.get(worker).expect("worker should survive").order(),
-                Order::Idle
+                entities
+                    .get(worker)
+                    .expect("worker should survive")
+                    .build_phase(),
+                Some(BuildPhase::Constructing { .. })
             ),
-            "failed final placement should clear the worker order"
+            "chosen builder should transition into active construction"
         );
         assert!(
-            events
-                .get(&1)
-                .is_some_and(|events| matches!(events.as_slice(), [Event::Notice { msg }] if msg == "Cannot build there")),
-            "failed final placement should notify the owner"
+            events.get(&1).is_none_or(Vec::is_empty),
+            "accepted build-over-self placement should not notify the owner"
         );
     }
 
