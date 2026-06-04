@@ -218,9 +218,98 @@ impl PathingService {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config;
     use crate::game::entity::EntityStore;
     use crate::game::map::Map;
     use crate::game::services::occupancy::Occupancy;
+    use crate::game::services::standability;
+    use crate::protocol::terrain;
+
+    fn flat_test_map(size: u32) -> Map {
+        Map {
+            size,
+            terrain: vec![terrain::GRASS; (size * size) as usize],
+            starts: vec![(1, 1)],
+            expansion_sites: Vec::new(),
+        }
+    }
+
+    fn map_with_rock_rect(size: u32, min_x: u32, min_y: u32, max_x: u32, max_y: u32) -> Map {
+        let mut map = flat_test_map(size);
+        for ty in min_y..=max_y {
+            for tx in min_x..=max_x {
+                let index = map.index(tx, ty);
+                map.terrain[index] = terrain::ROCK;
+            }
+        }
+        map
+    }
+
+    fn request_fixture_path(
+        map: &Map,
+        kind: EntityKind,
+        start: (i32, i32),
+        goal: (i32, i32),
+    ) -> (Vec<(i32, i32)>, Vec<(f32, f32)>) {
+        let entities = EntityStore::new();
+        let occ = Occupancy::build(map, &entities);
+        let mut service = PathingService::new(8_192, 256);
+        let radius_tiles = config::unit_stats(kind)
+            .map(|stats| stats.radius_tiles())
+            .unwrap_or(0);
+        let req = PathRequest {
+            kind,
+            start,
+            goal,
+            radius_tiles,
+            budget: None,
+        };
+        let tile_path = service.request_tile_path(map, &occ, req.clone());
+        let world_path = service.request(map, &occ, req);
+        (tile_path, world_path)
+    }
+
+    fn heading_changes_above(points: &[(f32, f32)], threshold_rad: f32) -> usize {
+        points
+            .windows(3)
+            .filter(|triple| {
+                let a = segment_angle(triple[0], triple[1]);
+                let b = segment_angle(triple[1], triple[2]);
+                angle_delta(a, b).abs() > threshold_rad
+            })
+            .count()
+    }
+
+    fn segment_angle(from: (f32, f32), to: (f32, f32)) -> f32 {
+        (to.1 - from.1).atan2(to.0 - from.0)
+    }
+
+    fn angle_delta(from: f32, to: f32) -> f32 {
+        (to - from + std::f32::consts::PI).rem_euclid(std::f32::consts::TAU) - std::f32::consts::PI
+    }
+
+    fn straight_segment_standable_for_test(
+        map: &Map,
+        occ: &Occupancy,
+        kind: EntityKind,
+        from: (f32, f32),
+        to: (f32, f32),
+    ) -> bool {
+        let dx = to.0 - from.0;
+        let dy = to.1 - from.1;
+        let distance = (dx * dx + dy * dy).sqrt();
+        let step_px = config::TILE_SIZE as f32 / 4.0;
+        let steps = (distance / step_px).ceil().max(1.0) as u32;
+        for i in 0..=steps {
+            let t = i as f32 / steps as f32;
+            let x = from.0 + dx * t;
+            let y = from.1 + dy * t;
+            if !standability::unit_static_standable(map, occ, kind, x, y) {
+                return false;
+            }
+        }
+        true
+    }
 
     #[test]
     fn path_cache_eviction_is_deterministic_across_instances() {
@@ -319,5 +408,91 @@ mod tests {
         );
         assert!(!found.is_empty());
         assert!(service.cache_contains(EntityKind::Worker, start, goal, 0));
+    }
+
+    #[test]
+    fn open_tank_route_keeps_every_tile_center_waypoint_before_smoothing() {
+        let map = flat_test_map(40);
+        let start = (4, 4);
+        let goal = (28, 17);
+        let (tile_path, world_path) = request_fixture_path(&map, EntityKind::Tank, start, goal);
+
+        assert_eq!(
+            tile_path.len(),
+            world_path.len(),
+            "world waypoint count should mirror original tile path length in phase 0"
+        );
+        assert!(
+            tile_path.len() >= 20,
+            "long open tank route should expose many tile-center waypoints before smoothing, got {}",
+            tile_path.len()
+        );
+
+        let forward_world: Vec<_> =
+            std::iter::once(map.tile_center(start.0 as u32, start.1 as u32))
+                .chain(world_path.iter().rev().copied())
+                .collect();
+        let heading_changes = heading_changes_above(&forward_world, 10.0_f32.to_radians());
+        assert!(
+            heading_changes >= 1,
+            "mixed diagonal/cardinal tile route should contain heading changes above 10 degrees"
+        );
+
+        let entities = EntityStore::new();
+        let occ = Occupancy::build(&map, &entities);
+        assert!(
+            straight_segment_standable_for_test(
+                &map,
+                &occ,
+                EntityKind::Tank,
+                map.tile_center(start.0 as u32, start.1 as u32),
+                world_path[0],
+            ),
+            "fixture should contain a legal straight segment from start to the final waypoint"
+        );
+    }
+
+    #[test]
+    fn obstacle_route_keeps_corner_waypoint_before_smoothing() {
+        let map = map_with_rock_rect(24, 7, 6, 10, 8);
+        let start = (4, 7);
+        let goal = (13, 7);
+        let (tile_path, world_path) = request_fixture_path(&map, EntityKind::Rifleman, start, goal);
+
+        assert!(!tile_path.is_empty(), "fixture route should be reachable");
+        assert_eq!(
+            tile_path.len(),
+            world_path.len(),
+            "world waypoint count should mirror original tile path length around blockers"
+        );
+        assert!(
+            tile_path
+                .iter()
+                .any(|tile| matches!(tile, (6, 5) | (11, 5) | (6, 9) | (11, 9))),
+            "route around the rectangular blocker should retain a corner waypoint, got {tile_path:?}"
+        );
+
+        let forward_world: Vec<_> =
+            std::iter::once(map.tile_center(start.0 as u32, start.1 as u32))
+                .chain(world_path.iter().rev().copied())
+                .collect();
+        let heading_changes = heading_changes_above(&forward_world, 10.0_f32.to_radians());
+        assert!(
+            heading_changes >= 2,
+            "rectangular obstacle route should include at least two heading changes, got {heading_changes}"
+        );
+
+        let entities = EntityStore::new();
+        let occ = Occupancy::build(&map, &entities);
+        assert!(
+            !straight_segment_standable_for_test(
+                &map,
+                &occ,
+                EntityKind::Rifleman,
+                map.tile_center(start.0 as u32, start.1 as u32),
+                map.tile_center(goal.0 as u32, goal.1 as u32),
+            ),
+            "direct segment across the rock rectangle should be illegal for later smoothing tests"
+        );
     }
 }
