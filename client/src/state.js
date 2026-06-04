@@ -14,6 +14,7 @@ const WEAPON_RECOIL_MS = Object.freeze({
   [KIND.RIFLEMAN]: 420,
   [KIND.MACHINE_GUNNER]: 160,
   [KIND.AT_TEAM]: 820,
+  [KIND.SCOUT_CAR]: 160,
   [KIND.TANK]: 650,
 });
 

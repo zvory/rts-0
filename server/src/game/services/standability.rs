@@ -1,5 +1,5 @@
 use crate::config;
-use crate::game::entity::{Entity, EntityKind, EntityStore};
+use crate::game::entity::{uses_tank_movement_semantics, Entity, EntityKind, EntityStore};
 use crate::game::map::Map;
 use crate::game::pathfinding::Passability;
 use crate::game::services::geometry::{
@@ -223,7 +223,7 @@ fn entity_circle_body(e: &Entity) -> CircleBody {
 }
 
 fn segment_body_facing(kind: EntityKind, from: (f32, f32), to: (f32, f32)) -> f32 {
-    if kind != EntityKind::Tank {
+    if !uses_tank_movement_semantics(kind) {
         return 0.0;
     }
     let dx = to.0 - from.0;

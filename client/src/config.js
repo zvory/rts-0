@@ -46,6 +46,11 @@ export const TANK_BODY = Object.freeze({
   width: 24,
   clearance: 1.5,
 });
+export const SCOUT_CAR_BODY = Object.freeze({
+  length: 34,
+  width: 18,
+  clearance: 1.0,
+});
 
 // Workers can mine a resource only when a completed City Centre is within this many tiles.
 export const MINING_CC_RANGE_TILES = 7.0;
@@ -68,8 +73,10 @@ export const STATS = Object.freeze({
     rangeTiles: 5, cost: { steel: 75, oil: 25 }, supply: 2, buildTicks: 400, requires: KIND.TRAINING_CENTRE },
   [KIND.AT_TEAM]: { label: "AT Team", icon: "AT", size: 10, sight: 8,
     rangeTiles: 5, cost: { steel: 75, oil: 25 }, supply: 2, buildTicks: 440, requires: KIND.TRAINING_CENTRE },
+  [KIND.SCOUT_CAR]: { label: "Scout Car", icon: "SC", size: 12, sight: 10, body: SCOUT_CAR_BODY,
+    rangeTiles: 5, cost: { steel: 125, oil: 75 }, supply: 3, buildTicks: 480 },
   [KIND.TANK]: { label: "Tank", icon: "TK", size: 15, sight: 7, body: TANK_BODY,
-    rangeTiles: 3, cost: { steel: 200, oil: 150 }, supply: 6, buildTicks: 750 },
+    rangeTiles: 3, cost: { steel: 200, oil: 150 }, supply: 6, buildTicks: 750, requires: KIND.STEELWORKS },
 
   [KIND.CITY_CENTRE]: { label: "City Centre", icon: "CC", footW: 3, footH: 3, sight: 9,
     cost: { steel: 200, oil: 0 }, buildTicks: 400, trains: [KIND.WORKER] },
@@ -81,7 +88,10 @@ export const STATS = Object.freeze({
     cost: { steel: 100, oil: 50 }, buildTicks: 220, trains: [],
     requires: [KIND.CITY_CENTRE, KIND.BARRACKS] },
   [KIND.FACTORY]: { label: "Factory", icon: "FY", footW: 3, footH: 3, sight: 6,
-    cost: { steel: 200, oil: 100 }, buildTicks: 240, trains: [KIND.TANK],
+    cost: { steel: 200, oil: 100 }, buildTicks: 240, trains: [KIND.SCOUT_CAR, KIND.TANK],
+    requires: [KIND.CITY_CENTRE, KIND.TRAINING_CENTRE] },
+  [KIND.STEELWORKS]: { label: "Steelworks", icon: "SW", footW: 2, footH: 2, sight: 6,
+    cost: { steel: 125, oil: 125 }, buildTicks: 220, trains: [],
     requires: [KIND.CITY_CENTRE, KIND.TRAINING_CENTRE] },
 
   [KIND.STEEL]: { label: "Steel", size: 22 },
@@ -104,6 +114,7 @@ export const WORKER_BUILDABLE = Object.freeze([
   KIND.BARRACKS,
   KIND.TRAINING_CENTRE,
   KIND.FACTORY,
+  KIND.STEELWORKS,
 ]);
 
 // Camera defaults.

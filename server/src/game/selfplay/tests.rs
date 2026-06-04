@@ -582,6 +582,7 @@ fn tech_to_tanks_goal() -> PlayerMilestoneGoal {
     .with_min_supply_cap(config::CITY_CENTRE_SUPPLY + config::DEPOT_SUPPLY)
     .with_min_buildings(kinds::TRAINING_CENTRE, 1)
     .with_min_buildings(kinds::FACTORY, 1)
+    .with_min_buildings(kinds::STEELWORKS, 1)
     .with_min_units(kinds::TANK, 1)
 }
 
@@ -598,6 +599,7 @@ fn tech_to_tanks_under_pressure_goal() -> PlayerMilestoneGoal {
     .with_min_supply_cap(config::CITY_CENTRE_SUPPLY + config::DEPOT_SUPPLY)
     .with_min_buildings(kinds::TRAINING_CENTRE, 1)
     .with_min_buildings(kinds::FACTORY, 1)
+    .with_min_buildings(kinds::STEELWORKS, 1)
     .allowing_elimination_before_milestones()
 }
 

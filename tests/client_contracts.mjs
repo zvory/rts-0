@@ -297,6 +297,32 @@ function fakeAudioContext() {
     STATS[KIND.FACTORY].requires.includes(KIND.TRAINING_CENTRE),
     "Factory should require a Training Centre in the command card",
   );
+  assert(
+    STATS[KIND.FACTORY].trains[0] === KIND.SCOUT_CAR,
+    "Factory should put Scout Car in the leftmost train slot",
+  );
+  assert(STATS[KIND.SCOUT_CAR].cost.steel === 125, "Scout Car steel cost mirrors server");
+  assert(STATS[KIND.SCOUT_CAR].cost.oil === 75, "Scout Car oil cost mirrors server");
+  assert(STATS[KIND.SCOUT_CAR].sight === 10, "Scout Car has the largest mobile sight radius");
+  assert(STATS[KIND.SCOUT_CAR].body.length === 34, "Scout Car client body length mirrors server");
+  assert(STATS[KIND.SCOUT_CAR].body.width === 18, "Scout Car client body width mirrors server");
+  assert(KIND_CODE[KIND.SCOUT_CAR] === 14, "Scout Car compact kind code should follow Steelworks");
+  assert(
+    STATS[KIND.STEELWORKS].footW === 2 && STATS[KIND.STEELWORKS].footH === 2,
+    "Steelworks should be a 2x2 building",
+  );
+  assert(
+    STATS[KIND.STEELWORKS].cost.steel === 125 && STATS[KIND.STEELWORKS].cost.oil === 125,
+    "Steelworks cost mirrors server",
+  );
+  assert(
+    STATS[KIND.STEELWORKS].requires.includes(KIND.TRAINING_CENTRE),
+    "Steelworks should require Training Centre tech in the command card",
+  );
+  assert(
+    STATS[KIND.TANK].requires === KIND.STEELWORKS,
+    "Tank training should require a completed Steelworks in the command card",
+  );
   const playerId = 1;
   const underConstructionTrainingCentre = [
     { owner: playerId, kind: KIND.CITY_CENTRE, buildProgress: null },
