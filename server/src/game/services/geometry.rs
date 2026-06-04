@@ -274,6 +274,42 @@ pub(crate) fn rects_intersect(a: RectBody, b: RectBody) -> bool {
         && a.max_y > b.min_y
 }
 
+pub(crate) fn segment_intersects_unit_body(
+    start: (f32, f32),
+    end: (f32, f32),
+    body: UnitBody,
+) -> Option<f32> {
+    if !valid_segment(start, end) || !valid_unit_body(body) {
+        return None;
+    }
+    match body {
+        UnitBody::Circle(circle) => segment_intersects_circle(start, end, circle),
+        UnitBody::OrientedBox(body) => segment_intersects_oriented_box(start, end, body),
+    }
+}
+
+pub(crate) fn segment_intersects_rect(
+    start: (f32, f32),
+    end: (f32, f32),
+    rect: RectBody,
+) -> Option<f32> {
+    if !valid_segment(start, end) || !valid_rect(rect) {
+        return None;
+    }
+    let dx = end.0 - start.0;
+    let dy = end.1 - start.1;
+    let mut t_min = 0.0f32;
+    let mut t_max = 1.0f32;
+
+    if !clip_segment_axis(start.0, dx, rect.min_x, rect.max_x, &mut t_min, &mut t_max) {
+        return None;
+    }
+    if !clip_segment_axis(start.1, dy, rect.min_y, rect.max_y, &mut t_min, &mut t_max) {
+        return None;
+    }
+    Some(t_min.clamp(0.0, 1.0))
+}
+
 fn oriented_box_intersects_rect(body: OrientedBoxBody, rect: RectBody) -> bool {
     let rect_center = (
         (rect.min_x + rect.max_x) * 0.5,
@@ -445,6 +481,83 @@ fn circles_intersect(a: CircleBody, b: CircleBody) -> bool {
     dx * dx + dy * dy <= r * r
 }
 
+fn segment_intersects_circle(
+    start: (f32, f32),
+    end: (f32, f32),
+    circle: CircleBody,
+) -> Option<f32> {
+    let dx = end.0 - start.0;
+    let dy = end.1 - start.1;
+    let fx = start.0 - circle.x;
+    let fy = start.1 - circle.y;
+    let a = dx * dx + dy * dy;
+    if a <= f32::EPSILON {
+        return None;
+    }
+    let b = 2.0 * (fx * dx + fy * dy);
+    let c = fx * fx + fy * fy - circle.radius * circle.radius;
+    let discriminant = b * b - 4.0 * a * c;
+    if discriminant < 0.0 {
+        return None;
+    }
+    let sqrt = discriminant.sqrt();
+    let t1 = (-b - sqrt) / (2.0 * a);
+    let t2 = (-b + sqrt) / (2.0 * a);
+    [t1, t2]
+        .into_iter()
+        .filter(|t| (0.0..=1.0).contains(t))
+        .min_by(|a, b| a.total_cmp(b))
+}
+
+fn segment_intersects_oriented_box(
+    start: (f32, f32),
+    end: (f32, f32),
+    body: OrientedBoxBody,
+) -> Option<f32> {
+    let (fx, fy) = body.forward_axis();
+    let (sx, sy) = body.side_axis();
+    let local_start = (
+        (start.0 - body.x) * fx + (start.1 - body.y) * fy,
+        (start.0 - body.x) * sx + (start.1 - body.y) * sy,
+    );
+    let local_end = (
+        (end.0 - body.x) * fx + (end.1 - body.y) * fy,
+        (end.0 - body.x) * sx + (end.1 - body.y) * sy,
+    );
+    segment_intersects_rect(
+        local_start,
+        local_end,
+        RectBody {
+            min_x: -body.half_len,
+            min_y: -body.half_width,
+            max_x: body.half_len,
+            max_y: body.half_width,
+        },
+    )
+}
+
+fn clip_segment_axis(
+    origin: f32,
+    delta: f32,
+    min: f32,
+    max: f32,
+    t_min: &mut f32,
+    t_max: &mut f32,
+) -> bool {
+    if delta.abs() <= f32::EPSILON {
+        return origin >= min && origin <= max;
+    }
+    let inv = 1.0 / delta;
+    let mut near = (min - origin) * inv;
+    let mut far = (max - origin) * inv;
+    if near > far {
+        std::mem::swap(&mut near, &mut far);
+    }
+    *t_min = (*t_min).max(near);
+    *t_max = (*t_max).min(far);
+    *t_min <= *t_max
+}
+
 fn dot_abs(a: (f32, f32), b: (f32, f32)) -> f32 {
     (a.0 * b.0 + a.1 * b.1).abs()
 }
@@ -480,6 +593,14 @@ fn valid_rect(rect: RectBody) -> bool {
         && rect.max_y.is_finite()
         && rect.min_x <= rect.max_x
         && rect.min_y <= rect.max_y
+}
+
+fn valid_segment(start: (f32, f32), end: (f32, f32)) -> bool {
+    start.0.is_finite()
+        && start.1.is_finite()
+        && end.0.is_finite()
+        && end.1.is_finite()
+        && ((end.0 - start.0).abs() > f32::EPSILON || (end.1 - start.1).abs() > f32::EPSILON)
 }
 
 #[cfg(test)]
@@ -559,6 +680,36 @@ mod tests {
         assert_eq!(
             building_rect_for_entity(&map, &building),
             building_rect_for_footprint(EntityKind::Depot, 4, 4)
+        );
+    }
+
+    #[test]
+    fn segment_intersection_reports_first_rect_contact() {
+        let rect = RectBody {
+            min_x: 20.0,
+            min_y: 5.0,
+            max_x: 40.0,
+            max_y: 15.0,
+        };
+
+        let hit = segment_intersects_rect((0.0, 10.0), (100.0, 10.0), rect)
+            .expect("segment should hit rect");
+
+        assert!((hit - 0.2).abs() < 0.001);
+    }
+
+    #[test]
+    fn segment_intersection_uses_oriented_tank_body() {
+        let body = unit_body_with_facing(EntityKind::Tank, 50.0, 50.0, std::f32::consts::FRAC_PI_2)
+            .expect("tank body");
+
+        assert!(
+            segment_intersects_unit_body((50.0, 0.0), (50.0, 100.0), body).is_some(),
+            "lengthwise segment should hit the oriented hull"
+        );
+        assert!(
+            segment_intersects_unit_body((0.0, 20.0), (100.0, 20.0), body).is_none(),
+            "segment outside the oriented hull should miss"
         );
     }
 
