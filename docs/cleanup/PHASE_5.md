@@ -29,6 +29,9 @@ through `MoveCoordinator`.
 Fog-safe event emission is a security boundary. Keep visibility checks explicit and near the event
 helpers so future combat feedback cannot leak hidden positions or target ids.
 
+Implementation note: combat damage still only applies damage and records damage metadata. Entity
+death, kill/loss accounting, and score updates remain owned by the death system.
+
 ## Tests
 
 - Run `cargo test` in `server/`.
@@ -41,4 +44,3 @@ helpers so future combat feedback cannot leak hidden positions or target ids.
 - Acquisition, chase, weapon readiness, damage, projection, and event emission have separate
   ownership.
 - Existing combat behavior and fog filtering are unchanged.
-
