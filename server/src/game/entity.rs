@@ -469,8 +469,8 @@ pub struct CombatState {
     /// Current attack/interaction target id. Combat uses enemy ids; gather/build commands use
     /// this for client feedback while the order executes.
     pub target_id: Option<u32>,
-    /// Setup state for weapons that must deploy before firing. Non-MG combatants leave this
-    /// packed and ignore it.
+    /// Setup state for support weapons that must deploy before firing. Other combatants leave
+    /// this packed and ignore it.
     pub setup: WeaponSetup,
     /// Current weapon/barrel facing in radians. For tanks this is independent turret state.
     pub weapon_facing: f32,

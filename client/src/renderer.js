@@ -38,14 +38,15 @@ import {
 // one-frame vision flicker reuses the slot rather than churning it (~2s @60fps).
 const SWEEP_EVICT_FRAMES = 120;
 
-// Machine-gunner setup / teardown visuals are time-based on the client so the
+// Deployed-weapon setup / teardown visuals are time-based on the client so the
 // transition reads smoothly between snapshots.
-const MACHINE_GUNNER_ANIM_MS = 1000;
+const DEPLOYED_WEAPON_ANIM_MS = 1000;
 const WEAPON_RECOIL_PX = {
   [KIND.RIFLEMAN]: 8.0,
   [KIND.MACHINE_GUNNER]: 5.5,
-  [KIND.AT_TEAM]: 13.0,
+  [KIND.AT_TEAM]: 26.0,
   [KIND.TANK]: 9.0,
+  [KIND.SCOUT_CAR]: 6.5,
 };
 const ZERO_OFFSET = Object.freeze({ x: 0, y: 0 });
 
@@ -131,7 +132,7 @@ export class Renderer {
     // Consecutive-frames-unseen counter per id (across all pools + icons), so we
     // hide briefly but evict after a grace period — server ids are never reused.
     this._unseen = new Map();
-    // Local animation state for machine-gunner setup / teardown visuals.
+    // Local animation state for deployed-weapon setup / teardown visuals.
     this._setupVisuals = new Map();
     // Local visual-only track phase for tanks. The server owns movement; this
     // just turns interpolated distance/facing deltas into tread offsets.
@@ -294,14 +295,14 @@ export class Renderer {
   }
 
   /**
-   * Resolve the current visual transition progress for a machine gunner.
+   * Resolve the current visual transition progress for a deployed weapon.
    * The server only sends the discrete setup state, so the client smooths the
    * transition locally between snapshots.
    * @private
    * @param {{id:number, setupState?:string}} e
    * @returns {{prongFactor:number, barrel:boolean}}
    */
-  _machineGunnerSetupVisual(e) {
+  _deployedWeaponSetupVisual(e) {
     const now = performance.now();
     const setupState = e.setupState || SETUP.PACKED;
     const prev = this._setupVisuals.get(e.id);
@@ -310,7 +311,7 @@ export class Renderer {
     }
     const rec = this._setupVisuals.get(e.id);
     const elapsed = now - rec.changedAt;
-    const t = smoothstep01(elapsed / MACHINE_GUNNER_ANIM_MS);
+    const t = smoothstep01(elapsed / DEPLOYED_WEAPON_ANIM_MS);
 
     if (setupState === SETUP.SETTING_UP) {
       return { prongFactor: t, barrel: false };
@@ -436,29 +437,31 @@ export class Renderer {
       ? state.weaponRecoil(e.id, e.kind, performance.now())
       : 0;
     const recoil = weaponRecoilOffset(e.kind, recoilProgress);
-    const tankKick = e.kind === KIND.TANK
+    const heavyKick = isVehicleBodyKind(e.kind)
       ? recoilVector(weaponFacing, recoil * 0.85)
-      : ZERO_OFFSET;
+      : e.kind === KIND.AT_TEAM
+        ? recoilVector(weaponFacing, recoil * 0.42)
+        : ZERO_OFFSET;
 
     // Shadow on its own layer (under all units).
     const sh = this._slot("unitShadows", e.id);
-    sh.position.set(e.x + tankKick.x, e.y + tankKick.y);
+    sh.position.set(e.x + heavyKick.x, e.y + heavyKick.y);
     this._shadow(sh, 0, 0, isVehicleBodyKind(e.kind) ? tankBodyVisual(stat).shadowRadius : r);
 
     // Body on the unit layer.
     const g = this._slot("units", e.id);
-    g.position.set(e.x + tankKick.x, e.y + tankKick.y);
+    g.position.set(e.x + heavyKick.x, e.y + heavyKick.y);
     g.lineStyle(2, 0x1a1712, 0.95);
 
-    if (e.kind === KIND.RIFLEMAN || e.kind === KIND.MACHINE_GUNNER || e.kind === KIND.AT_TEAM) {
+    if (e.kind === KIND.RIFLEMAN || e.kind === KIND.MACHINE_GUNNER) {
       drawInfantryBase(g, r, tint, facing);
       if (e.kind === KIND.RIFLEMAN) {
         drawInfantryRifle(g, r, facing, recoil);
-      } else if (e.kind === KIND.AT_TEAM) {
-        drawInfantryPanzerfaust(g, r, facing, recoil);
       } else {
-        drawInfantryMachineGun(g, r, facing, weaponFacing, this._machineGunnerSetupVisual(e), recoil);
+        drawInfantryMachineGun(g, r, facing, weaponFacing, this._deployedWeaponSetupVisual(e), recoil);
       }
+    } else if (e.kind === KIND.AT_TEAM) {
+      drawAtGun(g, r, tint, facing, weaponFacing, this._deployedWeaponSetupVisual(e), recoil);
     } else if (e.kind === KIND.SCOUT_CAR) {
       // Scout cars currently use the tank-like vehicle movement model server-side.
       // Replace with truck/wheeled movement semantics once that model exists.
@@ -1039,7 +1042,7 @@ export class Renderer {
   /**
    * Draw a brief muzzle flash on the attacker plus a yellow tracer line to the
    * target, then a fainter continuation past the target for overpenetration.
-   * Size scales by attacker kind (tank > MG > rifleman).
+   * Size scales by attacker kind (tank > AT gun > MG > rifleman).
    * @private
    */
   _drawMuzzleFlashes(state) {
@@ -1260,7 +1263,7 @@ export class Renderer {
 /** Per-attacker muzzle-flash radius in world px. 0 means no flash for this kind. */
 function muzzleFlashRadius(kind) {
   if (kind === KIND.TANK) return 18;
-  if (kind === KIND.AT_TEAM) return 11;
+  if (kind === KIND.AT_TEAM) return 15;
   if (kind === KIND.SCOUT_CAR) return 9;
   if (kind === KIND.MACHINE_GUNNER) return 9;
   if (kind === KIND.RIFLEMAN) return 7;
@@ -1622,29 +1625,6 @@ function drawInfantryRifle(g, r, facing, recoil) {
   g.lineTo(hand.x + Math.sin(a) * r * 0.32, hand.y - Math.cos(a) * r * 0.32);
 }
 
-function drawInfantryPanzerfaust(g, r, facing, recoil) {
-  const a = facing - 0.12;
-  const kick = recoilVector(a, recoil);
-  const rearDist = r * 0.42;
-  const muzzleDist = r * 2.05;
-  const warheadDist = r * 1.55;
-  const rear = offsetPoint(polar(a + Math.PI, rearDist), kick);
-  const muzzle = offsetPoint(polar(a, muzzleDist), kick);
-  const warhead = polar(a, warheadDist);
-  const rearBlock = polar(a + Math.PI, rearDist);
-
-  g.lineStyle(5, 0x2a2119, 0.98);
-  g.moveTo(rear.x, rear.y);
-  g.lineTo(muzzle.x, muzzle.y);
-
-  g.beginFill(0x3d3528, 0.98);
-  drawRotatedRectOffset(g, warhead.x, warhead.y, r * 0.52, r * 0.62, a, kick);
-  g.endFill();
-  g.beginFill(0xd8d0b0, 0.88);
-  drawRotatedRectOffset(g, rearBlock.x, rearBlock.y, r * 0.34, r * 0.48, a, kick);
-  g.endFill();
-}
-
 function drawInfantryMachineGun(g, r, facing, weaponFacing, setup, recoil) {
   const deploy = clamp01(setup.prongFactor);
   const carryA = facing + 0.86;
@@ -1731,6 +1711,97 @@ function drawInfantryMachineGun(g, r, facing, weaponFacing, setup, recoil) {
     drawRotatedRectOffset(g, muzzleDist, 0, r * 0.22, r * 0.16, a, kick);
     g.endFill();
   }
+}
+
+function drawAtGun(g, r, tint, facing, weaponFacing, setup, recoil) {
+  const deploy = clamp01(setup.prongFactor);
+  const a = angleLerp(facing, weaponFacing, smoothstep01(deploy));
+  const barrelKick = recoilVector(a, recoil);
+  const carriageKick = recoilVector(a, recoil * 0.12);
+  const wheelRadius = r * 0.36;
+  const wheelY = r * 0.42;
+  const axleX = -r * 0.16;
+  const trailRear = lerp(-r * 0.45, -r * 1.55, deploy);
+  const trailSpread = lerp(r * 0.18, r * 0.72, deploy);
+  const trailRootX = -r * 0.14;
+  const muzzleX = r * 1.9;
+  const breechX = -r * 0.28;
+
+  g.lineStyle(4, 0x1a1712, 0.9);
+  const axleL = rotatePoint(axleX, -wheelY, a);
+  const axleR = rotatePoint(axleX, wheelY, a);
+  g.moveTo(axleL.x + carriageKick.x, axleL.y + carriageKick.y);
+  g.lineTo(axleR.x + carriageKick.x, axleR.y + carriageKick.y);
+
+  const leftWheel = rotatePoint(axleX, -wheelY, a);
+  const rightWheel = rotatePoint(axleX, wheelY, a);
+  g.lineStyle(2.5, 0x17130f, 0.98);
+  g.beginFill(0x26221b, 0.98);
+  g.drawCircle(leftWheel.x + carriageKick.x, leftWheel.y + carriageKick.y, wheelRadius);
+  g.drawCircle(rightWheel.x + carriageKick.x, rightWheel.y + carriageKick.y, wheelRadius);
+  g.endFill();
+  g.beginFill(0xd8d0b0, 0.72);
+  g.drawCircle(leftWheel.x + carriageKick.x, leftWheel.y + carriageKick.y, wheelRadius * 0.38);
+  g.drawCircle(rightWheel.x + carriageKick.x, rightWheel.y + carriageKick.y, wheelRadius * 0.38);
+  g.endFill();
+  g.lineStyle(1.6, 0xd8d0b0, 0.62);
+  g.drawCircle(leftWheel.x + carriageKick.x, leftWheel.y + carriageKick.y, wheelRadius * 0.82);
+  g.drawCircle(rightWheel.x + carriageKick.x, rightWheel.y + carriageKick.y, wheelRadius * 0.82);
+
+  const shield = rotatePoint(r * 0.12, 0, a);
+  g.beginFill(tint, 0.96);
+  drawRotatedRectOffset(g, shield.x, shield.y, r * 0.46, r * 1.18, a, carriageKick);
+  g.endFill();
+  g.beginFill(0x1a1712, 0.28);
+  drawRotatedRectOffset(
+    g,
+    shield.x + Math.cos(a) * r * 0.1,
+    shield.y + Math.sin(a) * r * 0.1,
+    r * 0.12,
+    r,
+    a,
+    carriageKick,
+  );
+  g.endFill();
+
+  const trailRoot = offsetPoint(rotatePoint(trailRootX, 0, a), carriageKick);
+  const trailL = offsetPoint(rotatePoint(trailRear, -trailSpread, a), carriageKick);
+  const trailR = offsetPoint(rotatePoint(trailRear, trailSpread, a), carriageKick);
+  g.lineStyle(4, 0xd8d0b0, 0.9);
+  g.moveTo(trailRoot.x, trailRoot.y);
+  g.lineTo(trailL.x, trailL.y);
+  g.moveTo(trailRoot.x, trailRoot.y);
+  g.lineTo(trailR.x, trailR.y);
+  if (deploy > 0.05) {
+    const braceL = offsetPoint(
+      rotatePoint(lerp(-r * 0.2, -r * 0.95, deploy), -trailSpread * 0.72, a),
+      carriageKick,
+    );
+    const braceR = offsetPoint(
+      rotatePoint(lerp(-r * 0.2, -r * 0.95, deploy), trailSpread * 0.72, a),
+      carriageKick,
+    );
+    g.lineStyle(3, 0x2a2119, 0.96);
+    g.moveTo(trailRoot.x, trailRoot.y);
+    g.lineTo(braceL.x, braceL.y);
+    g.moveTo(trailRoot.x, trailRoot.y);
+    g.lineTo(braceR.x, braceR.y);
+  }
+
+  const breech = offsetPoint(rotatePoint(breechX, 0, a), barrelKick);
+  const muzzle = offsetPoint(rotatePoint(muzzleX, 0, a), barrelKick);
+  g.lineStyle(r * 0.22, 0x241d17, 0.98);
+  g.moveTo(breech.x, breech.y);
+  g.lineTo(muzzle.x, muzzle.y);
+  g.lineStyle(r * 0.07, 0xd8d0b0, 0.58);
+  g.moveTo(breech.x + Math.sin(a) * r * 0.07, breech.y - Math.cos(a) * r * 0.07);
+  g.lineTo(muzzle.x + Math.sin(a) * r * 0.07, muzzle.y - Math.cos(a) * r * 0.07);
+  g.lineStyle(r * 0.1, 0xd8d0b0, 0.75);
+  g.moveTo(muzzle.x - Math.cos(a) * r * 0.32, muzzle.y - Math.sin(a) * r * 0.32);
+  g.lineTo(muzzle.x, muzzle.y);
+  g.beginFill(0x3d3528, 0.98);
+  drawRotatedRectOffset(g, breechX - r * 0.1, 0, r * 0.52, r * 0.42, a, barrelKick);
+  g.endFill();
 }
 
 function angleLerp(a, b, t) {
