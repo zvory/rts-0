@@ -39,10 +39,6 @@ pub(crate) fn unit_static_standable(
     true
 }
 
-#[expect(
-    dead_code,
-    reason = "phase 1 exposes this for later path smoothing without changing movement behavior yet"
-)]
 pub(crate) fn unit_static_segment_standable(
     map: &Map,
     occ: &Occupancy,
