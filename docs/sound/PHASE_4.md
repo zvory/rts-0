@@ -18,8 +18,9 @@ A long, looping `ambient` track at low gain. Optional per-map. Loop with a small
 
 ## Building / production sounds
 
-Tie to inferred production-complete (snapshot diff: a `prod_progress` reaching the kind's build
-time, or the unit appearing). Positional, at the building's location, `combat_other` category.
+Keep the placement/command confirmation sound only. The client already plays the
+`buildings_construction_start_01.mp3` cue when the player issues a valid build command; do not
+add a second sound on `Event::Build` / construction completion.
 
 ## Death variety
 

@@ -633,7 +633,7 @@ class Match {
 
   /**
    * Surface one snapshot's transient events exactly once. Notices become toasts
-   * and alerts; combat/build/death events drive spatial sounds.
+   * and alerts; combat/death events drive spatial sounds.
    */
   handleSnapshotEvents(events) {
     if (!events || !events.length) return;
@@ -645,8 +645,6 @@ class Match {
         }
       } else if (ev && ev.e === EVENT.ATTACK) {
         this.playAttackSound(ev);
-      } else if (ev && ev.e === EVENT.BUILD) {
-        this.playBuildSound(ev);
       }
     }
   }
@@ -675,18 +673,6 @@ class Match {
       y: pos.y,
       category,
       priority: spec.priority,
-    });
-  }
-
-  playBuildSound(ev) {
-    if (!this.audio || typeof ev.id !== "number") return;
-    const e = this.state.entityById(ev.id);
-    if (!e || typeof e.x !== "number" || typeof e.y !== "number") return;
-    this.audio.play("build_confirm", {
-      x: e.x,
-      y: e.y,
-      category: "ui",
-      priority: 2,
     });
   }
 
