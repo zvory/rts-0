@@ -49,6 +49,24 @@ Rules:
 Decoupling the toast from the sound is the key insight: the player needs the visual feedback to
 know the input registered, but the voice line is per-event, not per-input.
 
+### "Under attack" specifically
+
+Standard per-id dedup is not enough — a sustained battle would either spam the line or, with a
+naive long cooldown, miss a second attack on the other side of the map. Mirror SC2:
+
+- **Per-id cooldown override:** `under_attack` gets **10 s**, not the default 1.5 s.
+- **Spatial bucket key:** dedup key is `(id, floor(x / R), floor(y / R))` with `R ≈ 30 tiles`
+  (~960 px). Two hits in the same bucket inside 10 s → no replay. A hit in a different bucket
+  plays normally. Same primitive as the combat `(id, listener-distance-bucket)` dedup above.
+- **Camera suppression:** if the event position lies inside the current viewport rect (with a
+  small margin), suppress the voice line. The player is already looking; telling them is noise.
+  Minimap ping and border flash **always** fire regardless.
+- **Minimap is independent.** Pings are not gated by audio cooldown or camera. Audio is the only
+  thing the dedup/suppression rules touch.
+
+Net effect: one "under attack" line per region per ~10 s, only when the player isn't already
+watching, plus a reliable visual every time.
+
 ## Alert + minimap coupling
 
 `Event::Notice` with `msg` starting with `"alert:"` (proposed convention — confirm with server
@@ -56,13 +74,19 @@ side) plays the alert SFX **and** pings the minimap at the event's resolved posi
 notice has no position, pulse the minimap border instead. Coordinate with `minimap.js` via DI from
 `main.js`.
 
-Open question: should `Notice` carry an optional `(x, y)` and a `severity` field? Probably yes,
-but that is a wire change — defer to phase 4 only if alert UX demands it.
+**Wire change (required for this phase):** `Notice` carries optional `(x, y)` in world pixels and
+a `severity` enum (`info | warn | alert`). `under_attack` is `alert` + position required; without
+a position, the spatial-bucket dedup and camera suppression above cannot work. Update
+`server/src/protocol.rs` and `client/src/protocol.js` together per the invariant in `CLAUDE.md`.
 
 ## Tests
 
 - Pool-saturation test: enqueue 200 sounds in a tick, assert ≤48 active, and that the 48 retained
   have the highest priorities.
 - Ducking test: fire an alert, assert ambient gain drops then recovers.
+- `under_attack` spatial dedup: fire two events in the same bucket within 10 s → one voice line;
+  fire one in a different bucket → second voice line plays.
+- `under_attack` camera suppression: event inside viewport rect → no voice, minimap ping still
+  fires; event outside viewport → voice plays.
 
 Deliverable: battles sound dense but not muddy; alerts cut through.
