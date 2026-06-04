@@ -3,12 +3,14 @@ pub mod commands;
 pub mod construction;
 pub mod death;
 pub mod economy;
+pub mod geometry;
 pub mod move_coordinator;
 pub mod movement;
 pub mod occupancy;
 pub mod pathing;
 pub mod production;
 pub mod spatial;
+pub mod standability;
 pub mod supply;
 pub mod world_query;
 
