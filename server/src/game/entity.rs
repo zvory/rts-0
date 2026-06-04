@@ -570,6 +570,10 @@ pub struct Entity {
     /// Player id that most recently damaged this target. Used for score attribution when the
     /// death system removes the entity.
     last_damage_owner: Option<u32>,
+    /// Tick on which this entity was most recently damaged by a direct hit, plus the attacker's
+    /// position. Set together by combat; used by the AI controller to issue retreat commands.
+    last_damage_tick: Option<u32>,
+    last_damage_pos: Option<(f32, f32)>,
 
     pub movement: Option<MovementState>,
     pub combat: Option<CombatState>,
@@ -591,6 +595,8 @@ impl Entity {
             hp: s.hp,
             max_hp: s.hp,
             last_damage_owner: None,
+            last_damage_tick: None,
+            last_damage_pos: None,
             movement: Some(MovementState::default()),
             combat: if s.dmg > 0 {
                 Some(CombatState::default())
@@ -621,6 +627,8 @@ impl Entity {
             hp: s.hp,
             max_hp: s.hp,
             last_damage_owner: None,
+            last_damage_tick: None,
+            last_damage_pos: None,
             movement: None,
             combat: if s.dmg > 0 {
                 Some(CombatState::default())
@@ -655,6 +663,8 @@ impl Entity {
             hp: 1,
             max_hp: 1,
             last_damage_owner: None,
+            last_damage_tick: None,
+            last_damage_pos: None,
             movement: None,
             combat: None,
             production: None,
@@ -909,6 +919,19 @@ impl Entity {
 
     pub fn set_last_damage_owner(&mut self, owner: Option<u32>) {
         self.last_damage_owner = owner;
+    }
+
+    pub fn last_damage_tick(&self) -> Option<u32> {
+        self.last_damage_tick
+    }
+
+    pub fn last_damage_pos(&self) -> Option<(f32, f32)> {
+        self.last_damage_pos
+    }
+
+    pub fn record_damage_from(&mut self, attacker_pos: (f32, f32), tick: u32) {
+        self.last_damage_tick = Some(tick);
+        self.last_damage_pos = Some(attacker_pos);
     }
 
     pub fn weapon_setup(&self) -> WeaponSetup {
