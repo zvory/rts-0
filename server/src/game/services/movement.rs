@@ -1020,6 +1020,138 @@ mod tests {
         }
     }
 
+    #[derive(Debug, Clone, Copy)]
+    struct TankMovementBaseline {
+        travel_ticks: u32,
+        path_length_px: f32,
+        final_error_px: f32,
+        facing_change_rad_per_sec: f32,
+        stuck_ticks: u32,
+        repath_count: u32,
+        collision_displacement_px: f32,
+        oil_burned: f32,
+    }
+
+    impl TankMovementBaseline {
+        fn assert_reference_envelope(&self, name: &str) {
+            assert!(
+                self.travel_ticks > 0 && self.travel_ticks <= 1_200,
+                "{name}: travel_ticks out of phase-0 envelope: {:?}",
+                self
+            );
+            assert!(
+                self.path_length_px > 16.0,
+                "{name}: path_length_px should prove the fixture moved: {:?}",
+                self
+            );
+            assert!(
+                self.final_error_px <= config::TILE_SIZE as f32 * 1.5,
+                "{name}: tank ended too far from goal: {:?}",
+                self
+            );
+            assert!(
+                self.facing_change_rad_per_sec.is_finite() && self.facing_change_rad_per_sec <= 2.0,
+                "{name}: facing changed implausibly fast: {:?}",
+                self
+            );
+            assert!(
+                self.oil_burned > 0.0,
+                "{name}: moving tank should burn oil: {:?}",
+                self
+            );
+        }
+    }
+
+    fn measure_tank_fixture(
+        name: &str,
+        map: &Map,
+        entities: &mut EntityStore,
+        tank: u32,
+        goal: (f32, f32),
+        max_ticks: u32,
+        order_via_coordinator: bool,
+    ) -> TankMovementBaseline {
+        let mut pathing = PathingService::new(8_192, 256);
+        let mut players = vec![player_with_oil(1, 10_000)];
+        let start = pos(entities, tank);
+        let mut last = start;
+        let mut last_facing = entities.get(tank).expect("tank should exist").facing();
+        let mut path_length_px = 0.0;
+        let mut facing_change = 0.0;
+        let mut stuck_ticks = 0;
+        let mut repath_count = 0;
+        let mut was_awaiting_path = false;
+        let mut collision_displacement_px = 0.0;
+        let mut travel_ticks = max_ticks;
+
+        if !order_via_coordinator {
+            set_path_direct(entities, tank, vec![goal]);
+            if let Some(e) = entities.get_mut(tank) {
+                e.set_order(Order::move_to(goal.0, goal.1));
+            }
+        }
+
+        for tick in 1..=max_ticks {
+            pathing.advance_tick(tick);
+            let occ = Occupancy::build(map, entities);
+            let mut coordinator = MoveCoordinator::new(&mut pathing, map, &occ, tick);
+            if tick == 1 && order_via_coordinator {
+                coordinator.order_group_move(entities, 1, &[tank], goal, false);
+            }
+            coordinator.process_awaiting_paths(entities);
+
+            let before = pos(entities, tank);
+            let spatial = SpatialIndex::build(entities, map.size);
+            movement_system(map, entities, &mut players, &occ, &spatial, tick);
+            let after_movement = pos(entities, tank);
+            let spatial = SpatialIndex::build(entities, map.size);
+            resolve_collisions(entities, &spatial, map, &occ);
+            let after_collision = pos(entities, tank);
+
+            path_length_px += moved_distance(last, after_collision);
+            collision_displacement_px += moved_distance(after_movement, after_collision);
+            let moved_this_tick = moved_distance(before, after_collision);
+            let e = entities.get(tank).expect("tank should still exist");
+            facing_change += angle_delta(e.facing(), last_facing).abs();
+            last_facing = e.facing();
+            last = after_collision;
+
+            let awaiting_path = e.move_phase() == Some(MovePhase::AwaitingPath);
+            if awaiting_path && !was_awaiting_path {
+                repath_count += 1;
+            }
+            was_awaiting_path = awaiting_path;
+
+            if moved_this_tick <= 0.01 && !e.path_is_empty() {
+                stuck_ticks += 1;
+            }
+            if e.path_is_empty() {
+                travel_ticks = tick;
+                break;
+            }
+        }
+
+        let final_pos = pos(entities, tank);
+        let final_error_px = moved_distance(final_pos, goal);
+        let seconds = (travel_ticks.max(1) as f32) / config::TICK_HZ as f32;
+        let oil_burned = entities
+            .get(tank)
+            .and_then(|e| e.lifetime_oil_used())
+            .unwrap_or(0.0);
+        let baseline = TankMovementBaseline {
+            travel_ticks,
+            path_length_px,
+            final_error_px,
+            facing_change_rad_per_sec: facing_change / seconds,
+            stuck_ticks,
+            repath_count,
+            collision_displacement_px,
+            oil_burned,
+        };
+        println!("TANK_PHASE0_BASELINE {name}: {baseline:?}");
+        baseline
+    }
+
     fn two_tile_wide_horizontal_corridor_map() -> Map {
         let size = 40;
         let mut terrain = vec![crate::protocol::terrain::ROCK; size * size];
@@ -1459,6 +1591,149 @@ mod tests {
             dist_to_goal,
             e.pos_x,
             e.pos_y
+        );
+    }
+
+    #[test]
+    fn tank_phase0_baseline_open_ground() {
+        let map = flat_map(1);
+        let mut entities = EntityStore::new();
+        let start = map.tile_center(12, 12);
+        let goal = map.tile_center(28, 12);
+        let tank = entities
+            .spawn_unit(1, EntityKind::Tank, start.0, start.1)
+            .expect("tank should spawn");
+        if let Some(e) = entities.get_mut(tank) {
+            e.set_facing(0.0);
+        }
+
+        let baseline =
+            measure_tank_fixture("open_ground", &map, &mut entities, tank, goal, 600, false);
+
+        baseline.assert_reference_envelope("open_ground");
+        assert_eq!(
+            baseline.stuck_ticks, 0,
+            "open-ground tank should not spend ticks stuck: {:?}",
+            baseline
+        );
+        assert_eq!(
+            baseline.repath_count, 0,
+            "direct open-ground fixture should not request a repath: {:?}",
+            baseline
+        );
+        assert!(
+            baseline.collision_displacement_px <= 0.01,
+            "single tank on open ground should not be collision-displaced: {:?}",
+            baseline
+        );
+    }
+
+    #[test]
+    fn tank_phase0_baseline_building_corner() {
+        let map = flat_map(1);
+        let mut entities = EntityStore::new();
+        let (bx, by) = footprint_center(&map, EntityKind::Depot, 18, 18);
+        entities
+            .spawn_building(2, EntityKind::Depot, bx, by, true)
+            .expect("depot spawn");
+        let rect = building_rect_for_footprint(EntityKind::Depot, 18, 18).expect("depot rect");
+        let tank_radius = config::unit_stats(EntityKind::Tank)
+            .expect("tank stats")
+            .radius;
+        let start = (
+            rect.min_x - tank_radius - config::TILE_SIZE as f32,
+            rect.max_y + tank_radius + config::TILE_SIZE as f32,
+        );
+        let goal = (
+            rect.max_x + tank_radius + config::TILE_SIZE as f32 * 2.0,
+            rect.min_y - tank_radius - config::TILE_SIZE as f32,
+        );
+        let tank = entities
+            .spawn_unit(1, EntityKind::Tank, start.0, start.1)
+            .expect("tank should spawn");
+
+        let baseline = measure_tank_fixture(
+            "building_corner",
+            &map,
+            &mut entities,
+            tank,
+            goal,
+            900,
+            true,
+        );
+
+        baseline.assert_reference_envelope("building_corner");
+        assert!(
+            baseline.path_length_px > moved_distance(start, goal),
+            "corner route should be longer than the blocked straight line: {:?}",
+            baseline
+        );
+    }
+
+    #[test]
+    fn tank_phase0_baseline_two_tile_corridor() {
+        let map = two_tile_wide_horizontal_corridor_map();
+        let mut entities = EntityStore::new();
+        let start = map.tile_center(2, 10);
+        let goal = map.tile_center(36, 10);
+        let tank = entities
+            .spawn_unit(1, EntityKind::Tank, start.0, start.1)
+            .expect("tank should spawn");
+        if let Some(e) = entities.get_mut(tank) {
+            e.set_facing(0.0);
+        }
+
+        let baseline = measure_tank_fixture(
+            "two_tile_corridor",
+            &map,
+            &mut entities,
+            tank,
+            goal,
+            900,
+            true,
+        );
+
+        baseline.assert_reference_envelope("two_tile_corridor");
+        assert!(
+            baseline.collision_displacement_px <= 0.01,
+            "corridor fixture has no traffic, so collision displacement should stay zero: {:?}",
+            baseline
+        );
+    }
+
+    #[test]
+    fn tank_phase0_baseline_traffic_cluster() {
+        let map = flat_map(1);
+        let mut entities = EntityStore::new();
+        let start = map.tile_center(12, 24);
+        let goal = map.tile_center(28, 24);
+        let tank = entities
+            .spawn_unit(1, EntityKind::Tank, start.0, start.1)
+            .expect("tank should spawn");
+        if let Some(e) = entities.get_mut(tank) {
+            e.set_facing(0.0);
+        }
+        for (dx, dy) in [(96.0, -18.0), (118.0, 16.0), (144.0, 0.0), (170.0, -14.0)] {
+            entities
+                .spawn_unit(2, EntityKind::Rifleman, start.0 + dx, start.1 + dy)
+                .expect("traffic spawn");
+        }
+
+        let baseline = measure_tank_fixture(
+            "traffic_cluster",
+            &map,
+            &mut entities,
+            tank,
+            goal,
+            900,
+            true,
+        );
+
+        baseline.assert_reference_envelope("traffic_cluster");
+        assert!(
+            baseline.collision_displacement_px > 0.0,
+            "traffic fixture should record collision displacement: {:?}",
+            baseline
         );
     }
 

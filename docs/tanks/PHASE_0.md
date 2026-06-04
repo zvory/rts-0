@@ -45,7 +45,7 @@ around too much.
 
 ## Done When
 
-- Baseline tests/replays exist.
-- Current tank behavior has measurable reference values.
+- Baseline tests/replays exist. See `server/src/game/services/movement.rs`
+  `tank_phase0_baseline_*` tests and the replay command in `docs/tanks/BASELINE.md`.
+- Current tank behavior has measurable reference values in `docs/tanks/BASELINE.md`.
 - Later phases have concrete pass/fail criteria instead of relying only on subjective feel.
-
