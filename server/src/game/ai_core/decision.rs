@@ -3607,12 +3607,12 @@ mod tests {
     }
 
     #[test]
-    fn steel_expansion_tanks_switches_to_tank_factory_at_one_hundred_supply() {
+    fn steel_expansion_tanks_switches_to_tank_factory_at_fifty_supply() {
         let observation = with_expansion_resources(observation(
             AiEconomy {
                 steel: 500,
                 oil: 500,
-                supply_used: 100,
+                supply_used: 50,
                 supply_cap: 130,
             },
             vec![
@@ -3643,12 +3643,12 @@ mod tests {
     }
 
     #[test]
-    fn steel_expansion_tanks_trains_only_tanks_after_one_hundred_supply() {
+    fn steel_expansion_tanks_trains_only_tanks_after_fifty_supply() {
         let observation = with_expansion_resources(observation(
             AiEconomy {
                 steel: 500,
                 oil: 300,
-                supply_used: 100,
+                supply_used: 50,
                 supply_cap: 130,
             },
             vec![
@@ -3683,7 +3683,7 @@ mod tests {
             AiEconomy {
                 steel: 0,
                 oil: 0,
-                supply_used: 100,
+                supply_used: 50,
                 supply_cap: 130,
             },
             vec![
@@ -3714,7 +3714,7 @@ mod tests {
             AiEconomy {
                 steel: 0,
                 oil: 0,
-                supply_used: 100,
+                supply_used: 50,
                 supply_cap: 130,
             },
             vec![
