@@ -87,7 +87,7 @@ export const STATS = Object.freeze({
   [KIND.TRAINING_CENTRE]: { label: "Training Centre", icon: "TC", footW: 3, footH: 2, sight: 6,
     cost: { steel: 100, oil: 50 }, buildTicks: 220, trains: [],
     requires: [KIND.CITY_CENTRE, KIND.BARRACKS] },
-  [KIND.FACTORY]: { label: "Factory", icon: "FY", footW: 3, footH: 3, sight: 6,
+  [KIND.FACTORY]: { label: "Factory", icon: "FCT", footW: 3, footH: 3, sight: 6,
     cost: { steel: 200, oil: 100 }, buildTicks: 240, trains: [KIND.SCOUT_CAR, KIND.TANK],
     requires: [KIND.CITY_CENTRE, KIND.TRAINING_CENTRE] },
   [KIND.STEELWORKS]: { label: "Steelworks", icon: "SW", footW: 2, footH: 2, sight: 6,
