@@ -1,5 +1,7 @@
 # Phase 1 - Distance-Sensitive Formation Goals
 
+Status: Done
+
 Goal: make group move destinations depend on order distance. Close clicks should compact the group;
 far clicks should roughly preserve the selected units' starting shape on arrival.
 

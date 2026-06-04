@@ -31,6 +31,10 @@ const MIN_REPATH_TICKS: u32 = 3;
 /// If the goal moves by more than this many world pixels, bypass the repath throttle.
 const MATERIAL_GOAL_DELTA_PX: f32 = config::TILE_SIZE as f32;
 
+const FORMATION_NEAR_DISTANCE_PX: f32 = config::TILE_SIZE as f32 * 4.0;
+const FORMATION_FAR_DISTANCE_PX: f32 = config::TILE_SIZE as f32 * 18.0;
+const FORMATION_MAX_OFFSET_PX: f32 = config::TILE_SIZE as f32 * 10.0;
+
 /// The movement/pathing coordinator for one tick.
 pub struct MoveCoordinator<'a> {
     pathing: &'a mut PathingService,
@@ -74,17 +78,26 @@ impl<'a> MoveCoordinator<'a> {
         if ids.is_empty() {
             return;
         }
-        let anchor = self.map.tile_of(goal.0, goal.1);
-        let goals = spread_goals(self.map, self.occ, ids, anchor);
+        let units: Vec<FormationUnit> = ids
+            .iter()
+            .filter_map(|&id| {
+                let e = entities.get(id)?;
+                (e.is_unit() && e.owner == player).then_some(FormationUnit {
+                    id,
+                    pos: (e.pos_x, e.pos_y),
+                })
+            })
+            .collect();
+        if units.is_empty() {
+            return;
+        }
+        let goals = formation_goals(self.map, self.occ, &units, goal);
 
-        for (id, g) in ids.iter().zip(goals.iter()) {
-            entities.release_miner(*id);
-            let Some(e) = entities.get_mut(*id) else {
+        for (unit, g) in units.iter().zip(goals.iter()) {
+            entities.release_miner(unit.id);
+            let Some(e) = entities.get_mut(unit.id) else {
                 continue;
             };
-            if !e.is_unit() || e.owner != player {
-                continue;
-            }
             let order = if attack_move {
                 Order::attack_move_to(g.0, g.1)
             } else {
@@ -548,6 +561,12 @@ fn begin_machine_gunner_teardown(e: &mut crate::game::entity::Entity) {
 // Goal spreading
 // ---------------------------------------------------------------------------
 
+#[derive(Clone, Copy)]
+struct FormationUnit {
+    id: u32,
+    pos: (f32, f32),
+}
+
 /// Spread unit goals around the requested anchor tile. Returns one goal world point per unit
 /// in the same order as `ids`.
 fn spread_goals(map: &Map, occ: &Occupancy, ids: &[u32], anchor: (u32, u32)) -> Vec<(f32, f32)> {
@@ -561,6 +580,68 @@ fn spread_goals(map: &Map, occ: &Occupancy, ids: &[u32], anchor: (u32, u32)) -> 
     }
 
     out
+}
+
+/// Assign formation-aware path goals in the same order as `units`.
+fn formation_goals(
+    map: &Map,
+    occ: &Occupancy,
+    units: &[FormationUnit],
+    goal: (f32, f32),
+) -> Vec<(f32, f32)> {
+    if units.len() <= 1 {
+        let anchor = map.tile_of(goal.0, goal.1);
+        return spread_goals(map, occ, &[0], anchor);
+    }
+
+    let inv_count = 1.0 / units.len() as f32;
+    let centroid = units.iter().fold((0.0f32, 0.0f32), |acc, unit| {
+        (
+            acc.0 + unit.pos.0 * inv_count,
+            acc.1 + unit.pos.1 * inv_count,
+        )
+    });
+    let dx = goal.0 - centroid.0;
+    let dy = goal.1 - centroid.1;
+    let move_distance = (dx * dx + dy * dy).sqrt();
+    let formation_scale = formation_scale_for_distance(move_distance);
+    let max = map.world_size_px() - 1.0;
+    let mut out = Vec::with_capacity(units.len());
+    let mut taken: Vec<(u32, u32)> = Vec::new();
+
+    for unit in units {
+        let offset = clamp_offset(
+            unit.pos.0 - centroid.0,
+            unit.pos.1 - centroid.1,
+            FORMATION_MAX_OFFSET_PX,
+        );
+        let desired = (
+            (goal.0 + offset.0 * formation_scale).clamp(0.0, max),
+            (goal.1 + offset.1 * formation_scale).clamp(0.0, max),
+        );
+        let anchor = map.tile_of(desired.0, desired.1);
+        let tile = find_unique_tile_near(map, occ, anchor, &taken);
+        taken.push(tile);
+        out.push(map.tile_center(tile.0, tile.1));
+    }
+
+    out
+}
+
+fn formation_scale_for_distance(distance: f32) -> f32 {
+    let t = ((distance - FORMATION_NEAR_DISTANCE_PX)
+        / (FORMATION_FAR_DISTANCE_PX - FORMATION_NEAR_DISTANCE_PX))
+        .clamp(0.0, 1.0);
+    t * t * (3.0 - 2.0 * t)
+}
+
+fn clamp_offset(dx: f32, dy: f32, max_len: f32) -> (f32, f32) {
+    let len = (dx * dx + dy * dy).sqrt();
+    if len <= max_len || len <= f32::EPSILON {
+        return (dx, dy);
+    }
+    let scale = max_len / len;
+    (dx * scale, dy * scale)
 }
 
 /// Search outward from `anchor` in deterministic ring order and return the first passable tile
@@ -753,31 +834,156 @@ mod tests {
     use crate::game::map::Map;
     use crate::game::services::occupancy::Occupancy;
 
+    fn formation_unit(id: u32, map: &Map, tile: (u32, u32)) -> FormationUnit {
+        FormationUnit {
+            id,
+            pos: map.tile_center(tile.0, tile.1),
+        }
+    }
+
+    fn square_formation(map: &Map) -> Vec<FormationUnit> {
+        vec![
+            formation_unit(1, map, (8, 63)),
+            formation_unit(2, map, (12, 63)),
+            formation_unit(3, map, (8, 67)),
+            formation_unit(4, map, (12, 67)),
+        ]
+    }
+
+    fn offset_from(point: (f32, f32), origin: (f32, f32)) -> (f32, f32) {
+        (point.0 - origin.0, point.1 - origin.1)
+    }
+
+    fn assert_close(actual: f32, expected: f32) {
+        assert!(
+            (actual - expected).abs() <= 0.01,
+            "expected {actual:.2} to be close to {expected:.2}"
+        );
+    }
+
     #[test]
-    fn goal_spreading_assigns_unique_tiles_deterministically() {
+    fn near_group_move_compacts_goals_near_click() {
         let map = Map::generate(1, 0x1234_5678);
         let entities = EntityStore::new();
         let occ = Occupancy::build(&map, &entities);
+        let units = square_formation(&map);
+        let click = map.tile_center(11, 65);
 
-        let ids = vec![1, 2, 3, 4, 5];
-        let anchor = (10u32, 10u32);
-        let goals = spread_goals(&map, &occ, &ids, anchor);
+        let goals = formation_goals(&map, &occ, &units, click);
 
-        assert_eq!(goals.len(), ids.len());
-
-        // All goals should be unique (no two units share the same tile center).
-        let mut seen = std::collections::HashSet::new();
-        for g in &goals {
-            let tile = map.tile_of(g.0, g.1);
+        assert_eq!(goals.len(), units.len());
+        for goal in goals {
+            let dx = goal.0 - click.0;
+            let dy = goal.1 - click.1;
+            let dist = (dx * dx + dy * dy).sqrt();
             assert!(
-                seen.insert(tile),
-                "duplicate goal tile {tile:?} for multi-unit spread"
+                dist <= config::TILE_SIZE as f32 * 1.5,
+                "near goals should stay clustered around the click, got {goal:?}"
             );
         }
+    }
 
-        // First goal should be the anchor itself when it's free.
-        let anchor_center = map.tile_center(anchor.0, anchor.1);
-        assert_eq!(goals[0], anchor_center);
+    #[test]
+    fn far_group_move_preserves_world_offsets() {
+        let map = Map::generate(1, 0x1234_5678);
+        let entities = EntityStore::new();
+        let occ = Occupancy::build(&map, &entities);
+        let units = square_formation(&map);
+        let click = map.tile_center(30, 65);
+
+        let goals = formation_goals(&map, &occ, &units, click);
+
+        let ts = config::TILE_SIZE as f32;
+        let expected = [
+            (-2.0 * ts, -2.0 * ts),
+            (2.0 * ts, -2.0 * ts),
+            (-2.0 * ts, 2.0 * ts),
+            (2.0 * ts, 2.0 * ts),
+        ];
+        for (goal, expected_offset) in goals.iter().zip(expected) {
+            let actual = offset_from(*goal, click);
+            assert_close(actual.0, expected_offset.0);
+            assert_close(actual.1, expected_offset.1);
+        }
+    }
+
+    #[test]
+    fn medium_group_move_blends_offsets() {
+        let map = Map::generate(1, 0x1234_5678);
+        let entities = EntityStore::new();
+        let occ = Occupancy::build(&map, &entities);
+        let units = square_formation(&map);
+        let click = map.tile_center(21, 65);
+
+        let goals = formation_goals(&map, &occ, &units, click);
+
+        let ts = config::TILE_SIZE as f32;
+        let expected = [(-ts, -ts), (ts, -ts), (-ts, ts), (ts, ts)];
+        for (goal, expected_offset) in goals.iter().zip(expected) {
+            let actual = offset_from(*goal, click);
+            assert_close(actual.0, expected_offset.0);
+            assert_close(actual.1, expected_offset.1);
+        }
+    }
+
+    #[test]
+    fn formation_goals_are_unique_when_tiles_are_free() {
+        let map = Map::generate(1, 0x1234_5678);
+        let entities = EntityStore::new();
+        let occ = Occupancy::build(&map, &entities);
+        let units = square_formation(&map);
+        let click = map.tile_center(11, 65);
+
+        let first = formation_goals(&map, &occ, &units, click);
+        let second = formation_goals(&map, &occ, &units, click);
+
+        assert_eq!(
+            first, second,
+            "formation assignment should be deterministic"
+        );
+        let mut seen = std::collections::HashSet::new();
+        for goal in first {
+            let tile = map.tile_of(goal.0, goal.1);
+            assert!(
+                seen.insert(tile),
+                "duplicate goal tile {tile:?} for multi-unit formation"
+            );
+        }
+    }
+
+    #[test]
+    fn blocked_formation_slot_falls_back_to_nearby_passable_tile() {
+        let map = Map::generate(1, 0x1234_5678);
+        let mut entities = EntityStore::new();
+        let blocked_tile = (28, 63);
+        let blocked_center = map.tile_center(blocked_tile.0, blocked_tile.1);
+        entities
+            .spawn_building(
+                1,
+                EntityKind::Depot,
+                blocked_center.0,
+                blocked_center.1,
+                true,
+            )
+            .unwrap();
+        let occ = Occupancy::build(&map, &entities);
+        let units = square_formation(&map);
+        let click = map.tile_center(30, 65);
+
+        let goals = formation_goals(&map, &occ, &units, click);
+        let first_tile = map.tile_of(goals[0].0, goals[0].1);
+
+        assert_ne!(
+            first_tile, blocked_tile,
+            "blocked desired formation slot should not be assigned"
+        );
+        assert_eq!(
+            first_tile,
+            (29, 62),
+            "nearby fallback should use deterministic ring order"
+        );
+        assert!(map.is_passable(first_tile.0 as i32, first_tile.1 as i32));
+        assert!(occ.passable(first_tile.0 as i32, first_tile.1 as i32));
     }
 
     #[test]
