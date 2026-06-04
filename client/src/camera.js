@@ -70,7 +70,7 @@ export class Camera {
     let dx = 0;
     let dy = 0;
 
-    // Input owns the pan state as semantic direction flags (see input.js `this.keys`).
+    // Input owns the pan state as semantic direction flags (see input/index.js `this.keys`).
     const keys = input.keys;
     if (keys) {
       if (keys.left) dx -= 1;

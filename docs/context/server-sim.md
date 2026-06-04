@@ -17,13 +17,13 @@ Use when changing tick logic, services, rules, AI, or the `Game` core.
 - `server/src/game/services/` — small pure helpers, called in order by `systems.rs`
 - `server/src/game/rules/` — declarative rules
 - `server/src/game/ai.rs` — AI opponents
-- `server/src/lobby.rs`, `server/src/main.rs` — only touch sim via `game::Game`
+- `server/src/lobby/`, `server/src/main.rs` — only touch sim via `game::Game`
 
 ## Invariants
 - `Game::tick()` is **panic-free**: no `unwrap`/`expect`/unchecked indexing; stale ids = no-op;
   `checked_*` for anything derived from client input. A panic kills the room task.
 - The room task is the single owner of its `Game`. No locks.
-- `lobby.rs`/`main.rs` only call the public `Game` API. Don't reach into internals.
+- `lobby/`/`main.rs` only call the public `Game` API. Don't reach into internals.
 
 ## Don't break
 - The `Game` API signatures (§3.1). If you must change one, update `DESIGN.md §3.1` and all callers

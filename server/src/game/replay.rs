@@ -45,7 +45,7 @@ pub struct PlayerSnapshot {
 }
 
 /// Replay `commands` through tick `ticks`, preserving command order within each tick.
-/// Used only by the test harness (`selfplay.rs`); kept alive for future replay UI.
+/// Used only by the test harness (`selfplay/`); kept alive for future replay UI.
 #[allow(dead_code)]
 pub fn replay_commands(
     players: &[PlayerInit],

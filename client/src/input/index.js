@@ -67,7 +67,7 @@ export class Input {
    * @param {import("../camera.js").Camera} camera world<->screen transforms & zoom
    * @param {import("../state.js").GameState} state selection + placement + entities
    * @param {import("../net.js").Net} net command sender
-   * @param {import("../renderer.js").Renderer} renderer for drawSelectionBox
+   * @param {import("../renderer/index.js").Renderer} renderer for drawSelectionBox
    * @param {import("../fog.js").Fog} fog kept for parity / future hit-test filtering
    * @param {import("../audio.js").Audio} [audio] optional audio engine for local cues
    */

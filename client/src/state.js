@@ -493,7 +493,7 @@ export class GameState {
   }
 
   /**
-   * Whether a tile is passable per the PASSABLE table (useful to input.js for
+   * Whether a tile is passable per the PASSABLE table (useful to input/index.js for
    * placement validity). Out-of-bounds tiles are impassable.
    * @param {number} tileX
    * @param {number} tileY

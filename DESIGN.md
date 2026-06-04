@@ -258,7 +258,7 @@ src/
   main.rs        # tokio runtime, axum router: static files + /ws, room manager task
   protocol.rs    # serde types for §2  (PINNED — provided)
   config.rs      # all balance/sim constants (PINNED — provided)
-  lobby.rs       # Room, Lobby: join/ready/start, per-connection actor plumbing
+  lobby/         # Lobby API plus room task, connection writers, snapshots, dev replay, crash replay
   rules/
     mod.rs       # rules module boundary
     defs.rs      # immutable unit/building/node definition tables
@@ -270,16 +270,16 @@ src/
     mod.rs       # Game struct + public API (the seam below)
     command.rs   # SimCommand domain commands + protocol translation helpers
     map.rs       # Map: handcrafted terrain asset loading, passability, base-site validation
-    entity.rs    # Entity, EntityKind, EntityStore (slotmap-style Vec + free list)
+    entity/      # Entity, EntityKind, Order state machines, grouped state, and EntityStore
     pathfinding.rs # A* over the tile grid, with optional turn-cost route shaping for tanks
     fog.rs       # per-player visibility grid (visible / explored)
     systems.rs   # orchestrator: runs services in order each tick
-    services/    # per-tick internal services: commands, move_coordinator, movement (incl. unit collision), combat, economy, production, construction, death, occupancy, supply, pathing, geometry, standability, line_of_sight
+    services/    # per-tick services: commands, move_coordinator, movement (incl. unit collision), combat, economy, production, construction, death, occupancy, supply, pathing, geometry, standability, line_of_sight
     ai.rs        # optional computer opponents: one AiController per AI player (see §8)
-    ai_core/     # shared AI observation/facts/action/profile core, introduced incrementally
-    ai_shared.rs # compatibility helpers while live AI and self-play migrate to ai_core
+    ai_core/     # shared AI observation, facts, actions, profiles, and decisions
+    ai_shared.rs # shared AI placement/resource helper functions
     replay.rs    # tick-stamped command log replay harness for determinism checks
-    selfplay.rs  # test-only API-driven scripted self-play harness (see §9)
+    selfplay/    # test-only API-driven scripted self-play harness (see §9)
 ```
 
 ### 3.1 `game::Game` public API (seam between `game` and `lobby`/`main`)
@@ -444,11 +444,9 @@ src/
   net.js          # Net: WebSocket wrapper, typed send helpers, event emitter
   state.js        # GameState: holds prev+current snapshot, selection, camera, placement
   camera.js       # Camera: pan/zoom, world<->screen transforms, edge/keyboard scroll
-  renderer.js     # Renderer facade re-export
   renderer/       # Pixi app facade plus layers, terrain, entities, units, buildings,
                   # resources, fog overlay, feedback, and renderer-local palette helpers
   fog.js          # Fog overlay: accumulate explored, compute visible from own entities
-  input.js        # Input facade re-export
   input/          # lifecycle facade plus selection, commands, placement, camera controls
   audio.js        # Audio: Web Audio context, buses, one-shots, spatialization
   hud.js          # HUD: resources/supply bar, selected panel, command card (build/train)
@@ -524,7 +522,7 @@ export class Camera {
 }
 ```
 
-`renderer.js`
+`renderer/index.js`
 ```js
 export class Renderer {
   constructor(canvasParent)              // creates PIXI.Application, layers
@@ -548,7 +546,7 @@ export class Fog {
 }
 ```
 
-`input.js`
+`input/index.js`
 ```js
 export class Input {
   constructor(domElement, camera, state, net, renderer, fog, audio?)
@@ -1109,7 +1107,7 @@ because it has no player input path back into the game. The lobby's `match_playe
 
 ## 9. API-driven self-play test harness
 
-The automated self-play harness is a **test-only** layer in `game/selfplay.rs`. It is intentionally
+The automated self-play harness is a **test-only** layer in `game/selfplay/`. It is intentionally
 separate from the gameplay AI in `game/ai.rs`: gameplay AI is a player feature, while self-play is
 a regression harness for exercising the public simulation API.
 

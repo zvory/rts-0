@@ -1,3 +1,9 @@
+//! Combat service.
+//!
+//! This module owns target acquisition, chase orders, weapon facing/setup, damage application,
+//! and combat events for a tick. It depends on read-only rules and derived spatial/LOS helpers,
+//! but all entity mutation for attacks flows through this service.
+
 use std::collections::HashMap;
 
 use crate::config;
