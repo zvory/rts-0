@@ -558,7 +558,8 @@ victory/defeat overlay with the frozen score table.
   Distinct silhouette per kind (engineer: compact block; rifleman / machine gunner / AT team:
   shared infantry body with oversized role weapons; tank: chunky flat-shaded armor). Riflemen
   carry a rifle, AT teams carry a large panzerfaust-style launcher, and machine gunners carry
-  an MG across the body while packed that extends forward with bracing during setup/deployment.
+  an MG42-style long machine gun across the body while packed that extends forward with bracing
+  during setup/deployment.
 - Buildings: footprint-sized blocky field structures with neutral geometry and plain
   two-letter stencils; under construction → translucent with a progress bar; production →
   small progress arc.

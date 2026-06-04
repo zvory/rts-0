@@ -1352,28 +1352,56 @@ function drawInfantryMachineGun(g, r, facing, weaponFacing, setup) {
   const carryA = facing + 0.86;
   const aimA = weaponFacing;
   const a = angleLerp(carryA, aimA, smoothstep01(deploy));
-  const rearDist = lerp(r * 0.72, r * 0.34, deploy);
-  const muzzleDist = lerp(r * 1.34, r * 2.45, deploy);
-  const rear = polar(a + Math.PI, rearDist);
+  const stockRearDist = lerp(r * 0.76, r * 0.58, deploy);
+  const muzzleDist = lerp(r * 1.36, r * 2.46, deploy);
+  const stockRear = polar(a + Math.PI, stockRearDist);
   const muzzle = polar(a, muzzleDist);
 
-  // Oversized carried MG: reads across-body when packed, then extends forward while setting up.
-  g.lineStyle(6, 0x241d17, 0.98);
-  g.moveTo(rear.x, rear.y);
+  // MG42-inspired profile: shoulder stock, box receiver, long perforated shroud, no rotary barrels.
+  g.lineStyle(3, 0x17130f, 0.98);
+  g.moveTo(stockRear.x, stockRear.y);
   g.lineTo(muzzle.x, muzzle.y);
 
-  const receiver = polar(a, lerp(r * 0.28, r * 0.55, deploy));
-  g.beginFill(0x3a3025, 0.98);
-  drawRotatedRect(g, receiver.x, receiver.y, r * 0.82, r * 0.5, a);
+  const stockCenterX = lerp(-r * 0.42, -r * 0.28, deploy);
+  g.beginFill(0x4a3420, 0.96);
+  drawRotatedRect(g, stockCenterX, 0, r * 0.62, r * 0.38, a);
   g.endFill();
 
-  const handle = polar(a + Math.PI, r * 0.25);
-  g.lineStyle(3, 0xd8d0b0, 0.88);
-  g.moveTo(handle.x - Math.sin(a) * r * 0.42, handle.y + Math.cos(a) * r * 0.42);
-  g.lineTo(handle.x + Math.sin(a) * r * 0.42, handle.y - Math.cos(a) * r * 0.42);
+  const receiverX = lerp(r * 0.04, r * 0.2, deploy);
+  g.beginFill(0x32291f, 0.98);
+  drawRotatedRect(g, receiverX, 0, r * 0.72, r * 0.48, a);
+  g.endFill();
+
+  g.beginFill(0xd8d0b0, 0.82);
+  drawRotatedRect(g, receiverX + r * 0.08, -r * 0.2, r * 0.56, r * 0.12, a);
+  g.endFill();
+
+  const shroudX = lerp(r * 0.62, r * 1.08, deploy);
+  const shroudW = lerp(r * 0.72, r * 1.22, deploy);
+  g.beginFill(0x241d17, 0.98);
+  drawRotatedRect(g, shroudX, 0, shroudW, r * 0.24, a);
+  g.endFill();
+
+  g.beginFill(0xd8d0b0, 0.72);
+  const slotCount = deploy > 0.55 ? 4 : 3;
+  for (let i = 0; i < slotCount; i += 1) {
+    const t = slotCount === 1 ? 0.5 : i / (slotCount - 1);
+    drawRotatedRect(g, shroudX - shroudW * 0.3 + shroudW * 0.6 * t, 0, r * 0.09, r * 0.14, a);
+  }
+  g.endFill();
+
+  const muzzleBase = polar(a, muzzleDist - r * 0.18);
+  g.lineStyle(2, 0xd8d0b0, 0.78);
+  g.moveTo(muzzleBase.x - Math.sin(a) * r * 0.22, muzzleBase.y + Math.cos(a) * r * 0.22);
+  g.lineTo(muzzleBase.x + Math.sin(a) * r * 0.22, muzzleBase.y - Math.cos(a) * r * 0.22);
+
+  const grip = polar(a + Math.PI, r * 0.02);
+  g.lineStyle(3, 0xd8d0b0, 0.86);
+  g.moveTo(grip.x - Math.sin(a) * r * 0.34, grip.y + Math.cos(a) * r * 0.34);
+  g.lineTo(grip.x + Math.sin(a) * r * 0.34, grip.y - Math.cos(a) * r * 0.34);
 
   if (deploy > 0.02) {
-    const bipodRoot = polar(a, lerp(r * 0.92, r * 1.62, deploy));
+    const bipodRoot = polar(a, lerp(r * 0.9, r * 1.72, deploy));
     const legLen = r * lerp(0.38, 1.0, deploy);
     const spread = lerp(0.32, 0.72, deploy);
     const left = {
@@ -1393,7 +1421,7 @@ function drawInfantryMachineGun(g, r, facing, weaponFacing, setup) {
 
   if (setup.barrel || deploy > 0.75) {
     g.beginFill(0x241d17, 0.96);
-    g.drawCircle(muzzle.x, muzzle.y, r * 0.18);
+    drawRotatedRect(g, muzzleDist, 0, r * 0.22, r * 0.16, a);
     g.endFill();
   }
 }
