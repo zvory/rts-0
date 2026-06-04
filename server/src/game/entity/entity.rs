@@ -191,6 +191,7 @@ impl Entity {
             m.last_progress_pos = (pos_x, pos_y);
             m.sidestep_cooldown = 0;
             m.scout_car_recovery_cooldown = 0;
+            m.scout_car_reverse_waypoint = None;
             m.static_blocked_ticks = 0;
         }
     }
@@ -292,12 +293,14 @@ impl Entity {
     pub fn set_path(&mut self, path: Vec<(f32, f32)>) {
         if let Some(m) = self.movement.as_mut() {
             m.path = path;
+            m.scout_car_reverse_waypoint = None;
         }
     }
 
     pub fn clear_path(&mut self) {
         if let Some(m) = self.movement.as_mut() {
             m.path.clear();
+            m.scout_car_reverse_waypoint = None;
         }
     }
 
@@ -308,6 +311,7 @@ impl Entity {
     pub fn pop_waypoint(&mut self) {
         if let Some(m) = self.movement.as_mut() {
             m.path.pop();
+            m.scout_car_reverse_waypoint = None;
         }
     }
 
@@ -316,6 +320,7 @@ impl Entity {
     pub fn push_waypoint(&mut self, wp: (f32, f32)) {
         if let Some(m) = self.movement.as_mut() {
             m.path.push(wp);
+            m.scout_car_reverse_waypoint = None;
         }
     }
 

@@ -81,6 +81,7 @@ pub(super) struct TankDriveIntent {
 pub(super) struct ScoutCarDriveIntent {
     pub(super) desired_facing: f32,
     pub(super) travel_sign: f32,
+    pub(super) reverse_waypoint: Option<(f32, f32)>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -222,6 +223,7 @@ pub(super) fn scout_car_drive_intent(
     x: f32,
     y: f32,
 ) -> Option<ScoutCarDriveIntent> {
+    let reverse_waypoint = scout_car_reverse_waypoint(e, x, y);
     let (desired_x, desired_y) = scout_car_desired_path_point(map, occ, e, x, y)?;
     let dx = desired_x - x;
     let dy = desired_y - y;
@@ -231,19 +233,52 @@ pub(super) fn scout_car_drive_intent(
     }
 
     let forward_desired = dy.atan2(dx);
-    if dist <= TANK_REVERSE_GOAL_DISTANCE_PX
-        && angle_delta(e.facing(), forward_desired).abs() > TANK_REVERSE_MIN_BEHIND_ANGLE_RAD
-    {
+    if reverse_waypoint.is_some() {
         return Some(ScoutCarDriveIntent {
             desired_facing: normalize_angle(forward_desired + std::f32::consts::PI),
             travel_sign: -1.0,
+            reverse_waypoint,
         });
     }
 
     Some(ScoutCarDriveIntent {
         desired_facing: forward_desired,
         travel_sign: 1.0,
+        reverse_waypoint: None,
     })
+}
+
+fn scout_car_reverse_waypoint(e: &Entity, x: f32, y: f32) -> Option<(f32, f32)> {
+    let movement = e.movement.as_ref()?;
+    let next = e.next_waypoint()?;
+    if movement
+        .scout_car_reverse_waypoint
+        .is_some_and(|latched| same_waypoint(latched, next))
+    {
+        return Some(next);
+    }
+
+    let dx = next.0 - x;
+    let dy = next.1 - y;
+    let dist = (dx * dx + dy * dy).sqrt();
+    if !dist.is_finite() || dist <= 1.0e-4 {
+        return None;
+    }
+    let forward_desired = dy.atan2(dx);
+    if angle_delta(e.facing(), forward_desired).abs() <= TANK_REVERSE_MIN_BEHIND_ANGLE_RAD {
+        return None;
+    }
+
+    let is_final_waypoint = movement.path.len() == 1;
+    if is_final_waypoint && dist <= TANK_REVERSE_GOAL_DISTANCE_PX {
+        return Some(next);
+    }
+
+    None
+}
+
+fn same_waypoint(a: (f32, f32), b: (f32, f32)) -> bool {
+    distance_between(a, b) <= ARRIVE_EPS
 }
 
 /// Signed shortest angular delta from `from` to `to`, in radians.
