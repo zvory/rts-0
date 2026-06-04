@@ -726,6 +726,12 @@ The server treats every client as potentially hostile. Limits live next to the c
   unit `AwaitingPath`. The existing path coordinator then recomputes under current occupancy within
   the normal per-tick A* budget. This covers buildings constructed after a long path was assigned
   without periodically repathing every moving unit.
+- **Production spawn legality**: production completes in two steps. The front queue item advances
+  to complete, then the producer searches deterministic rings around its actual footprint for a
+  `standability::unit_spawn_standable` point. Spawn candidates must fit the unit body inside world
+  bounds without clipping terrain, any building footprint, or any living unit body, including ghost
+  workers. If every candidate is blocked, the complete queue item stays in place and retries on
+  later ticks; cost and supply remain reserved from enqueue time.
 - **Unit collision**: `services::movement::resolve_collisions` runs after production each tick
   and pair-wise pushes overlapping mobile units apart along the connecting line. Workers in
   `GatherPhase::Harvesting` or `BuildPhase::Constructing` are ghost pass-through units: they
