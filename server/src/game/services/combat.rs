@@ -492,8 +492,8 @@ fn resolve_target(
     )
 }
 
-/// Apply `dmg` to `victim` from `attacker`, emitting an `Attack` event to the attacker's
-/// owner. Death itself is handled by the death system (we only zero hp here).
+/// Apply `dmg` to `victim` from `attacker`, emitting an `Attack` event for every fired shot.
+/// Death itself is handled by the death system (we only zero hp here).
 #[allow(clippy::too_many_arguments)]
 fn apply_damage(
     map: &Map,
@@ -519,6 +519,19 @@ fn apply_damage(
     let attacker_kind = entities.get(attacker).map(|e| e.kind);
     let victim_kind = entities.get(victim).map(|e| e.kind);
     let victim_facing = entities.get(victim).map(|e| e.facing());
+    let victim_owner = entities.get(victim).map(|e| e.owner).unwrap_or(0);
+    emit_attack_event(
+        events,
+        fog,
+        attacker,
+        victim,
+        attacker_owner,
+        ax,
+        ay,
+        vx,
+        vy,
+    );
+
     // Roll for miss before computing damage.
     if let (Some(ak), Some(vk)) = (attacker_kind, victim_kind) {
         let mc = combat_rules::miss_chance(ak, vk);
@@ -570,9 +583,30 @@ fn apply_damage(
         vy,
         range_px,
     );
-    // Send the Attack event to every player who can either see the attacker or the victim, so
-    // friendly fire tracers + enemy muzzle flashes both render. Attacker's owner always gets it.
-    let victim_owner = entities.get(victim).map(|e| e.owner).unwrap_or(0);
+    push_under_attack_notices_for_visible_attack(
+        events,
+        fog,
+        victim_owner,
+        attacker_owner,
+        ax,
+        ay,
+        vx,
+        vy,
+    );
+}
+
+#[allow(clippy::too_many_arguments)]
+fn emit_attack_event(
+    events: &mut HashMap<u32, Vec<Event>>,
+    fog: &Fog,
+    attacker: u32,
+    victim: u32,
+    attacker_owner: u32,
+    ax: f32,
+    ay: f32,
+    vx: f32,
+    vy: f32,
+) {
     let player_ids: Vec<u32> = events.keys().copied().collect();
     for pid in player_ids {
         if !projection::attack_event_visible_to(pid, ax, ay, vx, vy, attacker_owner, fog) {
@@ -582,6 +616,25 @@ fn apply_damage(
             from: attacker,
             to: victim,
         });
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn push_under_attack_notices_for_visible_attack(
+    events: &mut HashMap<u32, Vec<Event>>,
+    fog: &Fog,
+    victim_owner: u32,
+    attacker_owner: u32,
+    ax: f32,
+    ay: f32,
+    vx: f32,
+    vy: f32,
+) {
+    let player_ids: Vec<u32> = events.keys().copied().collect();
+    for pid in player_ids {
+        if !projection::attack_event_visible_to(pid, ax, ay, vx, vy, attacker_owner, fog) {
+            continue;
+        }
         push_under_attack_notice(events, pid, victim_owner, attacker_owner, vx, vy);
     }
 }
@@ -1781,6 +1834,57 @@ mod tests {
         assert!(
             matches!(secondary.order(), Order::Idle),
             "overpenetration damage must not trigger worker retreat"
+        );
+    }
+
+    #[test]
+    fn missed_primary_shot_still_emits_attack_event() {
+        let mut entities = EntityStore::new();
+        let attacker = entities
+            .spawn_unit(1, EntityKind::AtTeam, 100.0, 100.0)
+            .expect("attacker should spawn");
+        let victim = entities
+            .spawn_unit(2, EntityKind::Rifleman, 140.0, 100.0)
+            .expect("victim should spawn");
+        let victim_hp = entities.get(victim).expect("victim should exist").hp;
+        let mut events: HashMap<u32, Vec<Event>> = HashMap::new();
+        events.insert(1, Vec::new());
+        events.insert(2, Vec::new());
+
+        apply_test_damage(
+            &mut entities,
+            &mut events,
+            attacker,
+            victim,
+            48,
+            1,
+            100.0,
+            100.0,
+            140.0,
+            100.0,
+            128.0,
+        );
+
+        assert_eq!(
+            entities.get(victim).expect("victim should exist").hp,
+            victim_hp,
+            "seeded AT shot should miss the infantry target"
+        );
+        assert!(
+            events
+                .get(&1)
+                .expect("attacker owner events should exist")
+                .iter()
+                .any(|event| matches!(event, Event::Attack { from, to } if *from == attacker && *to == victim)),
+            "missed shots should still emit attack feedback for gun audio"
+        );
+        assert!(
+            events
+                .get(&2)
+                .expect("victim owner events should exist")
+                .iter()
+                .all(|event| !matches!(event, Event::Notice { msg, .. } if msg == "alert:under_attack")),
+            "misses should not emit under-attack damage alerts"
         );
     }
 
