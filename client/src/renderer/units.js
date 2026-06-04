@@ -35,6 +35,7 @@ import {
   hexToInt,
   isImpassableAt,
   isVehicleBodyKind,
+  lightenColor,
   muzzleFlashRadius,
   normRect,
   polar,
