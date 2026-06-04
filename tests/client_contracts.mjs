@@ -9,7 +9,7 @@ import { Net } from "../client/src/net.js";
 import { GameState } from "../client/src/state.js";
 import { Camera } from "../client/src/camera.js";
 import { Fog } from "../client/src/fog.js";
-import { MINING_IC_RANGE_TILES, STATS } from "../client/src/config.js";
+import { MINING_CC_RANGE_TILES, STATS } from "../client/src/config.js";
 import { formatTankOilUsed, playerHasCompletedKind } from "../client/src/hud.js";
 import { Audio } from "../client/src/audio.js";
 import { machineGunnerHasAudibleTarget } from "../client/src/combat_audio.js";
@@ -176,7 +176,7 @@ function fakeAudioContext() {
       [
         3,
         1,
-        KIND_CODE[KIND.INDUSTRIAL_CENTER],
+        KIND_CODE[KIND.CITY_CENTRE],
         100,
         120,
         450,
@@ -194,7 +194,7 @@ function fakeAudioContext() {
     ev: [
       [EVENT_CODE[EVENT.ATTACK], 1, 7],
       [EVENT_CODE[EVENT.DEATH], 200, 64, 96, KIND_CODE[KIND.STEEL]],
-      [EVENT_CODE[EVENT.BUILD], 3, KIND_CODE[KIND.INDUSTRIAL_CENTER]],
+      [EVENT_CODE[EVENT.BUILD], 3, KIND_CODE[KIND.CITY_CENTRE]],
       [EVENT_CODE[EVENT.NOTICE], "Not enough steel"],
       [EVENT_CODE[EVENT.NOTICE], "alert:under_attack", 3, 512, 768],
     ],
@@ -271,8 +271,8 @@ function fakeAudioContext() {
 // Config
 // ---------------------------------------------------------------------------
 {
-  assert(MINING_IC_RANGE_TILES === 7, "client mirrors the server mining IC range");
-  assert(STATS[KIND.INDUSTRIAL_CENTER].cost.steel === 200, "City Centre cost mirrors server");
+  assert(MINING_CC_RANGE_TILES === 7, "client mirrors the server mining City Centre range");
+  assert(STATS[KIND.CITY_CENTRE].cost.steel === 200, "City Centre cost mirrors server");
   assert(
     Array.isArray(STATS[KIND.FACTORY].requires),
     "Factory should expose all server-side build prerequisites",
@@ -282,7 +282,7 @@ function fakeAudioContext() {
     "Training Centre should expose all server-side build prerequisites",
   );
   assert(
-    STATS[KIND.TRAINING_CENTRE].requires.includes(KIND.INDUSTRIAL_CENTER),
+    STATS[KIND.TRAINING_CENTRE].requires.includes(KIND.CITY_CENTRE),
     "Training Centre should require a City Centre in the command card",
   );
   assert(
@@ -290,7 +290,7 @@ function fakeAudioContext() {
     "Training Centre should require a Barracks in the command card",
   );
   assert(
-    STATS[KIND.FACTORY].requires.includes(KIND.INDUSTRIAL_CENTER),
+    STATS[KIND.FACTORY].requires.includes(KIND.CITY_CENTRE),
     "Factory should require a City Centre in the command card",
   );
   assert(
@@ -299,7 +299,7 @@ function fakeAudioContext() {
   );
   const playerId = 1;
   const underConstructionTrainingCentre = [
-    { owner: playerId, kind: KIND.INDUSTRIAL_CENTER, buildProgress: null },
+    { owner: playerId, kind: KIND.CITY_CENTRE, buildProgress: null },
     { owner: playerId, kind: KIND.TRAINING_CENTRE, buildProgress: 0.5 },
   ];
   assert(
@@ -307,7 +307,7 @@ function fakeAudioContext() {
     "Factory should not unlock while the Training Centre is still under construction",
   );
   const underConstructionBarracks = [
-    { owner: playerId, kind: KIND.INDUSTRIAL_CENTER, buildProgress: null },
+    { owner: playerId, kind: KIND.CITY_CENTRE, buildProgress: null },
     { owner: playerId, kind: KIND.BARRACKS, buildProgress: 0.5 },
   ];
   assert(
@@ -315,7 +315,7 @@ function fakeAudioContext() {
     "Training Centre should not unlock while the Barracks is still under construction",
   );
   const completedTrainingCentre = [
-    { owner: playerId, kind: KIND.INDUSTRIAL_CENTER, buildProgress: null },
+    { owner: playerId, kind: KIND.CITY_CENTRE, buildProgress: null },
     { owner: playerId, kind: KIND.TRAINING_CENTRE, buildProgress: null },
   ];
   assert(
@@ -415,9 +415,9 @@ function fakeAudioContext() {
     resourceId: 200,
     resourceX: 64,
     resourceY: 96,
-    icId: 3,
-    icX: 48,
-    icY: 48,
+    ccId: 3,
+    ccX: 48,
+    ccY: 48,
     inRange: true,
   });
   assert(state.resourceMiningPreview?.resourceId === 200, "resource mining preview stores hover link");

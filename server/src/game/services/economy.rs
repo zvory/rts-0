@@ -67,7 +67,7 @@ fn gather_to_node(
         None => return,
     };
 
-    if !world_query::resource_has_completed_mining_ic(entities, owner, node) {
+    if !world_query::resource_has_completed_mining_cc(entities, owner, node) {
         idle_gatherer(entities, id);
         return;
     }
@@ -96,7 +96,7 @@ fn gather_harvesting(entities: &mut EntityStore, players: &mut [PlayerState], id
         Some(e) => e.owner,
         None => return,
     };
-    if !world_query::resource_has_completed_mining_ic(entities, owner, node) {
+    if !world_query::resource_has_completed_mining_cc(entities, owner, node) {
         idle_gatherer(entities, id);
         return;
     }

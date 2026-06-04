@@ -92,7 +92,7 @@ pub(crate) struct BuildingPolicy {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct ExpansionPolicy {
-    pub(crate) target_industrial_centers: usize,
+    pub(crate) target_city_centres: usize,
     pub(crate) required_complete_building: EntityKind,
     pub(crate) defensive_unit: EntityKind,
     pub(crate) defensive_unit_count: usize,
@@ -266,7 +266,7 @@ pub(crate) static RIFLE_FLOOD_FAST: AiProfile = AiProfile {
         tank_adaptive: None,
     },
     expansion: Some(ExpansionPolicy {
-        target_industrial_centers: 2,
+        target_city_centres: 2,
         required_complete_building: EntityKind::Factory,
         defensive_unit: EntityKind::Rifleman,
         defensive_unit_count: 0,
@@ -317,7 +317,7 @@ pub(crate) static RIFLE_FLOOD_FAST: AiProfile = AiProfile {
             tank_adaptive: None,
         },
         expansion: Some(ExpansionPolicy {
-            target_industrial_centers: 2,
+            target_city_centres: 2,
             required_complete_building: EntityKind::TrainingCentre,
             defensive_unit: EntityKind::MachineGunner,
             defensive_unit_count: 0,
@@ -398,7 +398,7 @@ pub(crate) static RIFLE_FLOOD_FULL_SATURATION: AiProfile = AiProfile {
         tank_adaptive: None,
     },
     expansion: Some(ExpansionPolicy {
-        target_industrial_centers: 2,
+        target_city_centres: 2,
         required_complete_building: EntityKind::TrainingCentre,
         defensive_unit: EntityKind::Rifleman,
         defensive_unit_count: 0,
@@ -479,7 +479,7 @@ pub(crate) static TECH_TO_TANKS: AiProfile = AiProfile {
         tank_adaptive: None,
     },
     expansion: Some(ExpansionPolicy {
-        target_industrial_centers: 2,
+        target_city_centres: 2,
         required_complete_building: EntityKind::Factory,
         defensive_unit: EntityKind::Tank,
         defensive_unit_count: 0,
@@ -540,8 +540,8 @@ pub(crate) static STEEL_EXPANSION_TANKS: AiProfile = AiProfile {
         tank_adaptive: None,
     },
     expansion: Some(ExpansionPolicy {
-        target_industrial_centers: 2,
-        required_complete_building: EntityKind::IndustrialCenter,
+        target_city_centres: 2,
+        required_complete_building: EntityKind::CityCentre,
         defensive_unit: EntityKind::MachineGunner,
         defensive_unit_count: 0,
         pre_expansion_steel_worker_cap: 8,
@@ -712,11 +712,8 @@ mod tests {
             &[EntityKind::MachineGunner, EntityKind::AtTeam]
         );
         assert!(STEEL_EXPANSION_TANKS.production.balance_unit_priorities);
-        assert_eq!(expansion.target_industrial_centers, 2);
-        assert_eq!(
-            expansion.required_complete_building,
-            EntityKind::IndustrialCenter
-        );
+        assert_eq!(expansion.target_city_centres, 2);
+        assert_eq!(expansion.required_complete_building, EntityKind::CityCentre);
         assert_eq!(expansion.defensive_unit_count, 0);
         assert_eq!(expansion.pre_expansion_steel_worker_cap, 8);
         assert_eq!(expansion.post_expansion_steel_worker_cap, Some(24));

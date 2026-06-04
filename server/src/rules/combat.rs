@@ -241,7 +241,7 @@ mod tests {
             (EntityKind::MachineGunner, false, false, false),
             (EntityKind::AtTeam, false, true, true),
             (EntityKind::Tank, true, true, false),
-            (EntityKind::IndustrialCenter, true, false, false),
+            (EntityKind::CityCentre, true, false, false),
             (EntityKind::Depot, true, false, false),
             (EntityKind::Barracks, true, false, false),
             (EntityKind::TrainingCentre, true, false, false),

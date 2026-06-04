@@ -22,7 +22,7 @@
 // against the interpolated positions from state so clicks line up with what is drawn.
 
 import { cmd, PASSABLE, isUnit, isBuilding, isResource, KIND } from "./protocol.js";
-import { MINING_IC_RANGE_TILES, STATS, TANK_BODY, isProducerBuilding } from "./config.js";
+import { MINING_CC_RANGE_TILES, STATS, TANK_BODY, isProducerBuilding } from "./config.js";
 
 export function footprintValidAgainstEntities(
   entities,
@@ -592,31 +592,31 @@ export class Input {
       return;
     }
 
-    const nearest = this._nearestOwnCompletedIndustrialCenter(target.x, target.y);
+    const nearest = this._nearestOwnCompletedCityCentre(target.x, target.y);
     if (!nearest) {
       this.state.updateResourceMiningPreview(null);
       return;
     }
 
-    const rangePx = MINING_IC_RANGE_TILES * (this.state.map?.tileSize || DEFAULT_TILE_SIZE);
+    const rangePx = MINING_CC_RANGE_TILES * (this.state.map?.tileSize || DEFAULT_TILE_SIZE);
     this.state.updateResourceMiningPreview({
       resourceId: target.id,
       resourceX: target.x,
       resourceY: target.y,
-      icId: nearest.id,
-      icX: nearest.x,
-      icY: nearest.y,
+      ccId: nearest.id,
+      ccX: nearest.x,
+      ccY: nearest.y,
       inRange: nearest.dist <= rangePx + 0.001,
     });
   }
 
-  _nearestOwnCompletedIndustrialCenter(x, y) {
+  _nearestOwnCompletedCityCentre(x, y) {
     const me = this.state.playerId;
     let best = null;
     for (const e of this.state.entitiesInterpolated(1)) {
       if (
         e.owner !== me ||
-        e.kind !== KIND.INDUSTRIAL_CENTER ||
+        e.kind !== KIND.CITY_CENTRE ||
         (typeof e.buildProgress === "number" && e.buildProgress < 1)
       ) {
         continue;

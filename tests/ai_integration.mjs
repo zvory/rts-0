@@ -105,7 +105,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   // AI's economy/attack behavior is covered by the Rust unit test — fog hides the AI base from
   // the human here, so there's nothing fast to observe over the wire beyond a running match.)
   const firstSnap = await A.waitNext((m) => m.t === "snapshot" && m.entities.length > 0, 3000, "first snapshot");
-  ok(firstSnap.entities.some((e) => e.owner === A.playerId && e.kind === "industrial_center"), "human owns its City Centre in-match");
+  ok(firstSnap.entities.some((e) => e.owner === A.playerId && e.kind === "city_centre"), "human owns its City Centre in-match");
   const tick0 = firstSnap.tick;
   await sleep(1500);
   ok(A.lastSnapshot && A.lastSnapshot.tick > tick0, `match advancing (tick ${tick0} -> ${A.lastSnapshot?.tick})`);
