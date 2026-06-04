@@ -35,6 +35,10 @@ const TANK_CRAWL_ANGLE_RAD: f32 = 0.55;
 const TANK_PIVOT_ANGLE_RAD: f32 = 1.25;
 pub(crate) const TANK_BODY_FIRE_TOLERANCE_RAD: f32 = 0.30;
 
+const STEERING_RADIUS_PX: f32 = config::TILE_SIZE as f32 * 2.5;
+const STEERING_STRENGTH: f32 = 0.65;
+const STEERING_MAX_NEIGHBORS: usize = 16;
+
 /// Advance every moving unit along its waypoint path at its speed. Clamps the final landing
 /// tile to passable terrain (soft overlap with other units is allowed, so we don't resolve
 /// unit-unit collisions here). Arriving at the last waypoint of a plain Move clears the order.
@@ -47,7 +51,7 @@ pub(crate) fn movement_system(
 ) {
     for id in entities.ids() {
         // Pull the data we need, then mutate.
-        let (kind, speed, mut x, mut y) = {
+        let (kind, speed, mut x, mut y, can_local_steer) = {
             let e = match entities.get(id) {
                 Some(e) if e.is_unit() && !e.path_is_empty() => e,
                 _ => continue,
@@ -61,7 +65,13 @@ pub(crate) fn movement_system(
                 continue;
             }
             let speed = config::unit_stats(e.kind).map(|s| s.speed).unwrap_or(0.0);
-            (e.kind, speed, e.pos_x, e.pos_y)
+            (
+                e.kind,
+                speed,
+                e.pos_x,
+                e.pos_y,
+                matches!(e.order(), Order::Move(_)),
+            )
         };
         if speed <= 0.0 {
             continue;
@@ -160,8 +170,21 @@ pub(crate) fn movement_system(
                 }
             } else {
                 // Partial step toward the waypoint.
-                let nx = x + dx / dist * budget;
-                let ny = y + dy / dist * budget;
+                let path_dir = (dx / dist, dy / dist);
+                let direct_nx = x + path_dir.0 * budget;
+                let direct_ny = y + path_dir.1 * budget;
+                let steered = if can_local_steer {
+                    steered_candidate(
+                        entities, spatial, occ, map, id, kind, x, y, path_dir, budget,
+                    )
+                } else {
+                    None
+                };
+                let (nx, ny) = if let Some((sx, sy)) = steered {
+                    (sx, sy)
+                } else {
+                    (direct_nx, direct_ny)
+                };
                 // Clamp landing to a body-legal static position.
                 if unit_static_standable(occ, map, kind, nx, ny) {
                     x = nx;
@@ -371,6 +394,113 @@ fn tank_desired_path_point(e: &Entity, x: f32, y: f32) -> Option<(f32, f32)> {
             (dx * dx + dy * dy).sqrt() >= TANK_BODY_LOOKAHEAD_PX
         })
         .or(Some(next))
+}
+
+#[allow(clippy::too_many_arguments)]
+fn steered_candidate(
+    entities: &EntityStore,
+    spatial: &SpatialIndex,
+    occ: &Occupancy,
+    map: &Map,
+    id: u32,
+    kind: EntityKind,
+    x: f32,
+    y: f32,
+    path_dir: (f32, f32),
+    budget: f32,
+) -> Option<(f32, f32)> {
+    let steer_dir = local_steering_dir(entities, spatial, id, x, y, path_dir);
+    if (steer_dir.0 - path_dir.0).abs() <= 1e-4 && (steer_dir.1 - path_dir.1).abs() <= 1e-4 {
+        return None;
+    }
+
+    let nx = x + steer_dir.0 * budget;
+    let ny = y + steer_dir.1 * budget;
+    unit_static_standable(occ, map, kind, nx, ny).then_some((nx, ny))
+}
+
+fn local_steering_dir(
+    entities: &EntityStore,
+    spatial: &SpatialIndex,
+    id: u32,
+    x: f32,
+    y: f32,
+    path_dir: (f32, f32),
+) -> (f32, f32) {
+    let Some(unit) = entities.get(id) else {
+        return path_dir;
+    };
+    let unit_radius = unit.radius();
+
+    let mut neighbors: Vec<u32> = spatial
+        .ids_in_circle_bbox(x, y, STEERING_RADIUS_PX)
+        .filter(|&neighbor_id| neighbor_id != id)
+        .filter(|&neighbor_id| {
+            let Some(neighbor) = entities.get(neighbor_id) else {
+                return false;
+            };
+            neighbor.hp > 0
+                && neighbor.is_unit()
+                && !matches!(
+                    footing_profile(neighbor),
+                    FootingProfile::Ghost | FootingProfile::Soft
+                )
+                && {
+                    let dx = x - neighbor.pos_x;
+                    let dy = y - neighbor.pos_y;
+                    dx * dx + dy * dy <= STEERING_RADIUS_PX * STEERING_RADIUS_PX
+                }
+        })
+        .collect();
+    neighbors.sort_unstable();
+    neighbors.truncate(STEERING_MAX_NEIGHBORS);
+
+    let mut sep_x = 0.0_f32;
+    let mut sep_y = 0.0_f32;
+    for neighbor_id in neighbors {
+        let Some(neighbor) = entities.get(neighbor_id) else {
+            continue;
+        };
+        let dx = x - neighbor.pos_x;
+        let dy = y - neighbor.pos_y;
+        let d2 = dx * dx + dy * dy;
+        let (away_x, away_y, d) = if d2 <= 1e-4 {
+            if id < neighbor_id {
+                (-path_dir.1, path_dir.0, 0.0)
+            } else {
+                (path_dir.1, -path_dir.0, 0.0)
+            }
+        } else {
+            let d = d2.sqrt();
+            (dx / d, dy / d, d)
+        };
+
+        let min_d = unit_radius + neighbor.radius();
+        let proximity = ((STEERING_RADIUS_PX - d) / STEERING_RADIUS_PX).clamp(0.0, 1.0);
+        let overlap_boost = if d < min_d {
+            1.0 + ((min_d - d) / min_d.max(1.0))
+        } else {
+            1.0
+        };
+        let footing_weight = footing_resistance(footing_profile(neighbor)).sqrt();
+        let weight = proximity * proximity * overlap_boost * footing_weight;
+        sep_x += away_x * weight;
+        sep_y += away_y * weight;
+    }
+
+    let sep_len = (sep_x * sep_x + sep_y * sep_y).sqrt();
+    if sep_len <= 1e-4 {
+        return path_dir;
+    }
+
+    let desired_x = path_dir.0 + (sep_x / sep_len) * STEERING_STRENGTH;
+    let desired_y = path_dir.1 + (sep_y / sep_len) * STEERING_STRENGTH;
+    let desired_len = (desired_x * desired_x + desired_y * desired_y).sqrt();
+    if desired_len <= 1e-4 {
+        path_dir
+    } else {
+        (desired_x / desired_len, desired_y / desired_len)
+    }
 }
 
 /// Inject a perpendicular detour waypoint so a stuck mid-path unit can shimmy free.
@@ -606,7 +736,7 @@ pub(crate) fn resolve_collisions(
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum FootingProfile {
+pub(crate) enum FootingProfile {
     Ghost,
     Soft,
     Firm,
@@ -614,7 +744,7 @@ enum FootingProfile {
     Heavy,
 }
 
-fn footing_profile(e: &Entity) -> FootingProfile {
+pub(crate) fn footing_profile(e: &Entity) -> FootingProfile {
     if e.kind == EntityKind::Worker && e.gather_phase() == Some(GatherPhase::Harvesting) {
         return FootingProfile::Ghost;
     }
@@ -644,7 +774,7 @@ fn footing_profile(e: &Entity) -> FootingProfile {
     FootingProfile::Soft
 }
 
-fn footing_resistance(profile: FootingProfile) -> f32 {
+pub(crate) fn footing_resistance(profile: FootingProfile) -> f32 {
     match profile {
         FootingProfile::Ghost => 0.0,
         FootingProfile::Soft => 1.0,
@@ -654,11 +784,15 @@ fn footing_resistance(profile: FootingProfile) -> f32 {
     }
 }
 
+pub(crate) fn is_pass_through(profile: FootingProfile) -> bool {
+    profile == FootingProfile::Ghost
+}
+
 /// Whether this unit is currently a ghost for collision and must not be pushed by
 /// collision. Ghost units neither push nor are pushed, so other mobile units can pass
 /// through them freely.
 pub(crate) fn is_collision_anchored(e: &Entity) -> bool {
-    footing_profile(e) == FootingProfile::Ghost
+    is_pass_through(footing_profile(e))
 }
 
 #[cfg(test)]
@@ -1106,6 +1240,232 @@ mod tests {
             let goal = e.movement.as_ref().and_then(|m| m.path.first().copied());
             e.set_path_goal(goal);
             e.mark_move_phase(MovePhase::Moving);
+        }
+    }
+
+    #[test]
+    fn moving_unit_steers_around_braced_unit_when_space_exists() {
+        let map = flat_map(1);
+        let mut entities = EntityStore::new();
+        let (sx, sy) = map.tile_center(20, 20);
+        let mover = entities
+            .spawn_unit(1, EntityKind::Rifleman, sx, sy)
+            .expect("mover spawn");
+        let blocker = entities
+            .spawn_unit(2, EntityKind::MachineGunner, sx + 34.0, sy + 8.0)
+            .expect("blocker spawn");
+        if let Some(e) = entities.get_mut(blocker) {
+            e.set_weapon_setup(WeaponSetup::Deployed);
+        }
+        set_path_direct(&mut entities, mover, vec![(sx + 200.0, sy)]);
+        if let Some(e) = entities.get_mut(mover) {
+            e.set_order(Order::move_to(sx + 200.0, sy));
+        }
+
+        let occ = Occupancy::build(&map, &entities);
+        let spatial = SpatialIndex::build(&entities, map.size);
+        movement_system(&map, &mut entities, &occ, &spatial, 0);
+
+        let after = pos(&entities, mover);
+        assert!(after.0 > sx, "mover should still progress along its path");
+        assert!(
+            after.1 < sy - 0.05,
+            "mover should gain lateral separation from the braced unit, before y {:.2}, after {:.2}",
+            sy,
+            after.1
+        );
+    }
+
+    #[test]
+    fn choke_still_clogs_when_no_space_exists() {
+        let map = flat_map(1);
+        let mut entities = EntityStore::new();
+        let (bx, by) = footprint_center(&map, EntityKind::Depot, 10, 10);
+        entities
+            .spawn_building(1, EntityKind::Depot, bx, by, true)
+            .expect("depot spawn");
+        let rect = building_rect_for_footprint(EntityKind::Depot, 10, 10).expect("depot rect");
+        let tank_radius = config::unit_stats(EntityKind::Tank)
+            .expect("tank stats")
+            .radius;
+        let start = (rect.min_x - tank_radius - 0.1, rect.min_y + 32.0);
+        let tank = entities
+            .spawn_unit(1, EntityKind::Tank, start.0, start.1)
+            .expect("tank spawn");
+        let blocker = entities
+            .spawn_unit(2, EntityKind::MachineGunner, start.0 - 12.0, start.1 - 18.0)
+            .expect("blocker spawn");
+        if let Some(e) = entities.get_mut(blocker) {
+            e.set_weapon_setup(WeaponSetup::Deployed);
+        }
+        if let Some(e) = entities.get_mut(tank) {
+            e.set_facing(0.0);
+        }
+        set_path_direct(&mut entities, tank, vec![(rect.max_x + 64.0, start.1)]);
+        if let Some(e) = entities.get_mut(tank) {
+            e.set_order(Order::move_to(rect.max_x + 64.0, start.1));
+        }
+
+        let occ = Occupancy::build(&map, &entities);
+        let spatial = SpatialIndex::build(&entities, map.size);
+        movement_system(&map, &mut entities, &occ, &spatial, 0);
+
+        let after = pos(&entities, tank);
+        assert!(
+            moved_distance(start, after) <= 0.01,
+            "steering must not move a tank through a blocked choke, moved from {:?} to {:?}",
+            start,
+            after
+        );
+        assert!(standability::unit_static_standable(
+            &map,
+            &occ,
+            EntityKind::Tank,
+            after.0,
+            after.1
+        ));
+    }
+
+    #[test]
+    fn steering_ignores_ghost_harvester() {
+        let map = flat_map(1);
+        let mut entities = EntityStore::new();
+        let (sx, sy) = map.tile_center(20, 20);
+        let mover = entities
+            .spawn_unit(1, EntityKind::Rifleman, sx, sy)
+            .expect("mover spawn");
+        let node = entities
+            .spawn_node(EntityKind::Steel, sx + 34.0, sy + 8.0)
+            .expect("node spawn");
+        let harvester = entities
+            .spawn_unit(1, EntityKind::Worker, sx + 34.0, sy + 8.0)
+            .expect("harvester spawn");
+        if let Some(e) = entities.get_mut(harvester) {
+            e.set_order(Order::gather(node));
+            e.mark_gather_phase(GatherPhase::Harvesting);
+        }
+        set_path_direct(&mut entities, mover, vec![(sx + 200.0, sy)]);
+        if let Some(e) = entities.get_mut(mover) {
+            e.set_order(Order::move_to(sx + 200.0, sy));
+        }
+
+        let occ = Occupancy::build(&map, &entities);
+        let spatial = SpatialIndex::build(&entities, map.size);
+        movement_system(&map, &mut entities, &occ, &spatial, 0);
+
+        let after = pos(&entities, mover);
+        assert!(after.0 > sx, "mover should still progress along its path");
+        assert!(
+            (after.1 - sy).abs() <= 0.001,
+            "ghost harvester should not create steering displacement, before y {:.2}, after {:.2}",
+            sy,
+            after.1
+        );
+    }
+
+    #[test]
+    fn steering_candidate_rejected_when_body_would_clip_building() {
+        let map = flat_map(1);
+        let mut entities = EntityStore::new();
+        let (bx, by) = footprint_center(&map, EntityKind::Depot, 10, 10);
+        entities
+            .spawn_building(1, EntityKind::Depot, bx, by, true)
+            .expect("depot spawn");
+        let rect = building_rect_for_footprint(EntityKind::Depot, 10, 10).expect("depot rect");
+        let start = (rect.min_x - 5.5, rect.min_y - 8.5);
+        let mover = entities
+            .spawn_unit(1, EntityKind::Rifleman, start.0, start.1)
+            .expect("mover spawn");
+        let blocker = entities
+            .spawn_unit(2, EntityKind::MachineGunner, start.0 + 24.0, start.1 - 12.0)
+            .expect("blocker spawn");
+        if let Some(e) = entities.get_mut(blocker) {
+            e.set_weapon_setup(WeaponSetup::Deployed);
+        }
+        set_path_direct(&mut entities, mover, vec![(rect.max_x + 64.0, start.1)]);
+        if let Some(e) = entities.get_mut(mover) {
+            e.set_order(Order::move_to(rect.max_x + 64.0, start.1));
+        }
+
+        let occ = Occupancy::build(&map, &entities);
+        assert!(standability::unit_static_standable(
+            &map,
+            &occ,
+            EntityKind::Rifleman,
+            start.0,
+            start.1
+        ));
+        let spatial = SpatialIndex::build(&entities, map.size);
+        movement_system(&map, &mut entities, &occ, &spatial, 0);
+
+        let after = pos(&entities, mover);
+        assert!(
+            after.0 > start.0,
+            "blocked steered candidate should fall back to the direct legal path step"
+        );
+        assert!(
+            (after.1 - start.1).abs() <= 0.001,
+            "body-clipping steered candidate must be rejected, before y {:.2}, after {:.2}",
+            start.1,
+            after.1
+        );
+        assert!(standability::unit_static_standable(
+            &map,
+            &occ,
+            EntityKind::Rifleman,
+            after.0,
+            after.1
+        ));
+    }
+
+    fn steering_neighbor_cap_position() -> (f32, f32) {
+        let map = flat_map(1);
+        let mut entities = EntityStore::new();
+        let (sx, sy) = map.tile_center(20, 20);
+        let mover = entities
+            .spawn_unit(1, EntityKind::Rifleman, sx, sy)
+            .expect("mover spawn");
+        for i in 0..32u32 {
+            let angle = i as f32 * 0.37;
+            let d = 28.0 + (i % 5) as f32 * 3.0;
+            let id = entities
+                .spawn_unit(
+                    2,
+                    if i % 3 == 0 {
+                        EntityKind::MachineGunner
+                    } else {
+                        EntityKind::Rifleman
+                    },
+                    sx + angle.cos() * d,
+                    sy + angle.sin() * d,
+                )
+                .expect("neighbor spawn");
+            if i % 3 == 0 {
+                if let Some(e) = entities.get_mut(id) {
+                    e.set_weapon_setup(WeaponSetup::Deployed);
+                }
+            }
+        }
+        set_path_direct(&mut entities, mover, vec![(sx + 200.0, sy)]);
+        if let Some(e) = entities.get_mut(mover) {
+            e.set_order(Order::move_to(sx + 200.0, sy));
+        }
+
+        let occ = Occupancy::build(&map, &entities);
+        let spatial = SpatialIndex::build(&entities, map.size);
+        movement_system(&map, &mut entities, &occ, &spatial, 0);
+        pos(&entities, mover)
+    }
+
+    #[test]
+    fn steering_neighbor_cap_is_deterministic() {
+        let first = steering_neighbor_cap_position();
+        for _ in 0..8 {
+            let next = steering_neighbor_cap_position();
+            assert_eq!(
+                first, next,
+                "steering with more than the neighbor cap must produce deterministic movement"
+            );
         }
     }
 
