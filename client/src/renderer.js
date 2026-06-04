@@ -19,6 +19,7 @@ import {
   FOG_EXPLORED_ALPHA,
   FOG_UNEXPLORED_ALPHA,
   STATS,
+  TANK_BODY,
   PLAYER_PALETTE,
   RESOURCE_AMOUNTS,
   isProducerBuilding,
@@ -40,6 +41,12 @@ const SWEEP_EVICT_FRAMES = 120;
 // Machine-gunner setup / teardown visuals are time-based on the client so the
 // transition reads smoothly between snapshots.
 const MACHINE_GUNNER_ANIM_MS = 1000;
+const WEAPON_RECOIL_PX = {
+  [KIND.RIFLEMAN]: 3.2,
+  [KIND.MACHINE_GUNNER]: 4.0,
+  [KIND.AT_TEAM]: 5.2,
+  [KIND.TANK]: 6.5,
+};
 
 // Layer names in back-to-front draw order. Index in this array == child index in `world`.
 const LAYERS = [
@@ -125,6 +132,9 @@ export class Renderer {
     this._unseen = new Map();
     // Local animation state for machine-gunner setup / teardown visuals.
     this._setupVisuals = new Map();
+    // Local visual-only track phase for tanks. The server owns movement; this
+    // just turns interpolated distance/facing deltas into tread offsets.
+    this._tankMotion = new Map();
 
     /** Map metadata captured by buildStaticMap (tileSize, width, height in tiles). */
     this._map = null;
@@ -243,6 +253,7 @@ export class Renderer {
     // Hide pooled objects whose id was not touched this frame.
     this._sweep();
     this._sweepSetupVisuals(liveIds);
+    this._sweepTankMotion(liveIds);
 
     // Overlays.
     this._drawFog(fog);
@@ -351,6 +362,65 @@ export class Renderer {
   }
 
   /**
+   * Drop track-animation state for tanks that are no longer visible.
+   * @private
+   * @param {Set<number>} liveIds
+   */
+  _sweepTankMotion(liveIds) {
+    for (const id of [...this._tankMotion.keys()]) {
+      if (!liveIds.has(id)) this._tankMotion.delete(id);
+    }
+  }
+
+  /**
+   * Derive visual tread movement from actual interpolated tank movement.
+   * @private
+   * @param {{id:number,x:number,y:number,owner:number,state?:string}} e
+   * @param {number} facing
+   * @param {import("./state.js").GameState} state
+   * @param {{halfLen:number,halfWidth:number}} body
+   */
+  _tankMotionVisual(e, facing, state, body) {
+    const prev = this._tankMotion.get(e.id);
+    let leftPhase = prev ? prev.leftPhase : 0;
+    let rightPhase = prev ? prev.rightPhase : 0;
+    let leftDir = 0;
+    let rightDir = 0;
+    let activity = 0;
+
+    if (prev) {
+      const dx = e.x - prev.x;
+      const dy = e.y - prev.y;
+      const dist = Math.hypot(dx, dy);
+      const turn = angleDelta(prev.facing, facing);
+      const avgFacing = prev.facing + turn * 0.5;
+      const forward = Math.cos(avgFacing);
+      const forwardY = Math.sin(avgFacing);
+      const forwardMove = dx * forward + dy * forwardY;
+      const lateralMove = -dx * forwardY + dy * forward;
+      const drive = Math.abs(forwardMove) >= Math.abs(lateralMove) * 0.5
+        ? forwardMove
+        : Math.sign(forwardMove || 1) * dist;
+      const turnTravel = turn * body.halfWidth;
+      const leftDelta = drive - turnTravel;
+      const rightDelta = drive + turnTravel;
+      leftPhase += leftDelta;
+      rightPhase += rightDelta;
+      leftDir = Math.sign(leftDelta);
+      rightDir = Math.sign(rightDelta);
+      activity = clamp01((Math.abs(leftDelta) + Math.abs(rightDelta)) / 4);
+    }
+
+    const ownTank = e.owner === state.playerId;
+    const oil = state.resources ? state.resources.oil : null;
+    const oilStarved = ownTank && oil === 0 && (e.state === STATE.MOVE || e.state === STATE.ATTACK);
+    const lowOil = ownTank && typeof oil === "number" && oil > 0 && oil <= 5;
+    const next = { x: e.x, y: e.y, facing, leftPhase, rightPhase };
+    this._tankMotion.set(e.id, next);
+    return { leftPhase, rightPhase, leftDir, rightDir, activity, lowOil, oilStarved };
+  }
+
+  /**
    * Low-poly PS1 silhouettes tinted by owner. The shapes are intentionally neutral:
    * no national insignia, flags, stars, crosses, eagles, or historical unit badges.
    * @private
@@ -361,11 +431,14 @@ export class Renderer {
     const tint = this._tintFor(e.owner, colorByOwner);
     const facing = typeof e.facing === "number" ? e.facing : 0;
     const weaponFacing = typeof e.weaponFacing === "number" ? e.weaponFacing : facing;
+    const recoil = typeof state.weaponRecoil === "function"
+      ? weaponRecoilOffset(e.kind, state.weaponRecoil(e.id, performance.now()))
+      : 0;
 
     // Shadow on its own layer (under all units).
     const sh = this._slot("unitShadows", e.id);
     sh.position.set(e.x, e.y);
-    this._shadow(sh, 0, 0, r);
+    this._shadow(sh, 0, 0, e.kind === KIND.TANK ? tankBodyVisual(stat).shadowRadius : r);
 
     // Body on the unit layer.
     const g = this._slot("units", e.id);
@@ -375,58 +448,34 @@ export class Renderer {
     if (e.kind === KIND.RIFLEMAN || e.kind === KIND.MACHINE_GUNNER || e.kind === KIND.AT_TEAM) {
       drawInfantryBase(g, r, tint, facing);
       if (e.kind === KIND.RIFLEMAN) {
-        drawInfantryRifle(g, r, facing);
+        drawInfantryRifle(g, r, facing, recoil);
       } else if (e.kind === KIND.AT_TEAM) {
-        drawInfantryPanzerfaust(g, r, facing);
+        drawInfantryPanzerfaust(g, r, facing, recoil);
       } else {
-        drawInfantryMachineGun(g, r, facing, weaponFacing, this._machineGunnerSetupVisual(e));
+        drawInfantryMachineGun(g, r, facing, weaponFacing, this._machineGunnerSetupVisual(e), recoil);
       }
     } else if (e.kind === KIND.TANK) {
       // Hull follows movement facing; turret/barrel follow weapon facing.
-      g.beginFill(tint);
-      g.drawPolygon(rotatedPolygon([
-        -r * 1.05, -r * 0.75,
-        r * 0.9, -r * 0.75,
-        r * 1.16, -r * 0.5,
-        r * 1.16, r * 0.54,
-        r * 0.9, r * 0.82,
-        -r * 0.95, r * 0.82,
-        -r * 1.18, r * 0.35,
-        -r * 1.18, -r * 0.38,
-      ], facing));
-      g.endFill();
+      const body = tankBodyVisual(STATS[e.kind]);
+      const motion = this._tankMotionVisual(e, facing, state, body);
+      drawTankTracks(g, body, facing, motion);
+      drawTankHull(g, body, tint, facing);
 
-      g.beginFill(0x1a1712, 0.28);
-      drawRotatedRect(g, 0, -r * 0.64, r * 2.0, r * 0.2, facing);
-      drawRotatedRect(g, 0, r * 0.66, r * 2.0, r * 0.2, facing);
-      g.endFill();
-
-      g.beginFill(0x1a1712, 0.24);
-      drawRotatedRect(g, -r * 0.04, 0, r * 1.05, r * 0.74, facing);
-      g.endFill();
-
-      g.beginFill(lightenColor(tint, 0.06), 0.95);
-      drawRotatedRect(g, r * 0.86, 0, r * 0.42, r * 1.02, facing);
-      g.endFill();
-
-      g.beginFill(0x1a1712, 0.22);
-      drawRotatedRect(g, r * 1.03, 0, r * 0.18, r * 0.92, facing);
-      g.endFill();
-
-      const barrel = polar(weaponFacing, r * 1.55);
+      const barrel = polar(weaponFacing, Math.max(body.halfLen * 0.8, body.halfLen + 8 - recoil));
       g.lineStyle(5, 0x241d17, 0.95);
       g.moveTo(0, 0);
       g.lineTo(barrel.x, barrel.y);
 
       g.lineStyle(2, 0x1a1712, 0.95);
       g.beginFill(lightenColor(tint, 0.12));
-      drawRotatedRect(g, r * 0.05, 0, r * 0.78, r * 0.54, weaponFacing);
+      drawRotatedRect(g, 1, 0, body.halfLen * 0.72, body.halfWidth * 0.9, weaponFacing);
       g.endFill();
 
-      const nose = polar(facing, r * 1.12);
+      const nose = polar(facing, body.halfLen - 2);
       g.lineStyle(2, 0xd8d0b0, 0.75);
-      g.moveTo(nose.x - Math.cos(facing) * r * 0.22, nose.y - Math.sin(facing) * r * 0.22);
+      g.moveTo(nose.x - Math.cos(facing) * 5, nose.y - Math.sin(facing) * 5);
       g.lineTo(nose.x, nose.y);
+      drawTankFuelCue(g, body, facing, motion);
     } else {
       // Engineer (and any other unit kind): compact tool-carrying block.
       g.beginFill(tint);
@@ -672,6 +721,10 @@ export class Renderer {
       const h = (stat.footH || 2) * ts;
       return { rx: w * 0.6, ry: h * 0.42, cy: 0 };
     }
+    if (e.kind === KIND.TANK) {
+      const body = tankBodyVisual(stat);
+      return { rx: body.halfLen + 4, ry: body.halfWidth + 5, cy: 2 };
+    }
     const r = (stat.size || 9) + 4;
     return { rx: r, ry: r * 0.7, cy: r * 0.35 };
   }
@@ -693,9 +746,15 @@ export class Renderer {
       halfW = Math.min(w * 0.45, 28);
       topY = e.y - h / 2 - 8;
     } else {
-      const r = stat.size || 9;
-      halfW = Math.max(10, r);
-      topY = e.y - r - 8;
+      if (e.kind === KIND.TANK) {
+        const body = tankBodyVisual(stat);
+        halfW = body.halfLen * 0.8;
+        topY = e.y - body.shadowRadius - 8;
+      } else {
+        const r = stat.size || 9;
+        halfW = Math.max(10, r);
+        topY = e.y - r - 8;
+      }
     }
     const x0 = e.x - halfW;
     const barW = halfW * 2;
@@ -1161,6 +1220,8 @@ export class Renderer {
       this._queueLabelPool.clear();
     }
     this._unseen.clear();
+    this._setupVisuals.clear();
+    this._tankMotion.clear();
 
     // Long-lived single Graphics.
     this._fogGfx.destroy();
@@ -1191,6 +1252,10 @@ function muzzleFlashRadius(kind) {
   if (kind === KIND.MACHINE_GUNNER) return 9;
   if (kind === KIND.RIFLEMAN) return 7;
   return 0;
+}
+
+function weaponRecoilOffset(kind, progress) {
+  return (WEAPON_RECOIL_PX[kind] || 0) * clamp01(progress);
 }
 
 /** Clamp a number to [0,1]. */
@@ -1296,6 +1361,110 @@ function drawRotatedRect(g, cx, cy, w, h, a) {
   g.drawPolygon(polygon);
 }
 
+function tankBodyVisual(stat = {}) {
+  const body = stat.body || TANK_BODY;
+  const halfLen = body.length * 0.5;
+  const halfWidth = body.width * 0.5;
+  const clearance = body.clearance || 0;
+  return {
+    halfLen,
+    halfWidth,
+    clearance,
+    shadowRadius: Math.hypot(halfLen + clearance, halfWidth + clearance),
+  };
+}
+
+function drawTankTracks(g, body, facing, motion) {
+  const trackW = 5;
+  const trackY = body.halfWidth - trackW * 0.5;
+  const trackLen = body.halfLen * 2;
+  g.lineStyle(1.5, 0x100d0a, 0.95);
+  g.beginFill(0x15120f, 0.96);
+  drawRotatedRect(g, 0, -trackY, trackLen, trackW, facing);
+  drawRotatedRect(g, 0, trackY, trackLen, trackW, facing);
+  g.endFill();
+
+  drawTrackTreads(g, body, facing, -trackY, motion.leftPhase, motion.leftDir, motion.activity);
+  drawTrackTreads(g, body, facing, trackY, motion.rightPhase, motion.rightDir, motion.activity);
+}
+
+function drawTrackTreads(g, body, facing, y, phase, dir, activity) {
+  const spacing = 6;
+  const treadW = 2.4;
+  const treadH = 4.4;
+  const alpha = lerp(0.35, 0.82, clamp01(activity));
+  const offset = positiveMod(phase * 0.85, spacing);
+  g.beginFill(dir < 0 ? 0x8f7f5e : 0xd8d0b0, alpha);
+  for (let x = -body.halfLen - spacing; x <= body.halfLen + spacing; x += spacing) {
+    const treadX = x + offset;
+    if (treadX < -body.halfLen || treadX > body.halfLen) continue;
+    drawRotatedRect(g, treadX, y, treadW, treadH, facing);
+  }
+  g.endFill();
+}
+
+function drawTankHull(g, body, tint, facing) {
+  const inset = 2;
+  g.beginFill(tint);
+  g.drawPolygon(rotatedPolygon([
+    -body.halfLen + inset, -body.halfWidth + 3,
+    body.halfLen - 6, -body.halfWidth + 3,
+    body.halfLen, -body.halfWidth + 7,
+    body.halfLen, body.halfWidth - 7,
+    body.halfLen - 6, body.halfWidth - 3,
+    -body.halfLen + inset, body.halfWidth - 3,
+    -body.halfLen, body.halfWidth - 7,
+    -body.halfLen, -body.halfWidth + 7,
+  ], facing));
+  g.endFill();
+
+  g.beginFill(0x1a1712, 0.24);
+  drawRotatedRect(g, -2, 0, body.halfLen * 1.15, body.halfWidth * 0.82, facing);
+  g.endFill();
+
+  g.beginFill(lightenColor(tint, 0.06), 0.95);
+  drawRotatedRect(g, body.halfLen - 7, 0, 7, body.halfWidth * 1.35, facing);
+  g.endFill();
+
+  g.beginFill(0x1a1712, 0.22);
+  drawRotatedRect(g, body.halfLen - 3, 0, 3, body.halfWidth * 1.2, facing);
+  g.endFill();
+}
+
+function drawTankFuelCue(g, body, facing, motion) {
+  if (!motion.lowOil && !motion.oilStarved) return;
+  const x = -body.halfLen + 6;
+  const y = -body.halfWidth - 4;
+  const color = motion.oilStarved ? 0xd47a5f : 0xc9b56a;
+  g.lineStyle(2, color, motion.oilStarved ? 0.95 : 0.75);
+  drawRotatedRectOutline(g, x, y, 8, 5, facing);
+  if (motion.oilStarved) {
+    const a = facing;
+    const p1 = rotatePoint(x - 3, y - 1.5, a);
+    const p2 = rotatePoint(x + 3, y + 1.5, a);
+    const p3 = rotatePoint(x + 3, y - 1.5, a);
+    const p4 = rotatePoint(x - 3, y + 1.5, a);
+    g.moveTo(p1.x, p1.y);
+    g.lineTo(p2.x, p2.y);
+    g.moveTo(p3.x, p3.y);
+    g.lineTo(p4.x, p4.y);
+  }
+}
+
+function drawRotatedRectOutline(g, cx, cy, w, h, a) {
+  const hw = w / 2;
+  const hh = h / 2;
+  const corners = [
+    rotatePoint(cx - hw, cy - hh, a),
+    rotatePoint(cx + hw, cy - hh, a),
+    rotatePoint(cx + hw, cy + hh, a),
+    rotatePoint(cx - hw, cy + hh, a),
+  ];
+  g.moveTo(corners[0].x, corners[0].y);
+  for (let i = 1; i < corners.length; i += 1) g.lineTo(corners[i].x, corners[i].y);
+  g.lineTo(corners[0].x, corners[0].y);
+}
+
 function drawInfantryBase(g, r, tint, facing) {
   // Shared combat-infantry body: same soldier, different oversized weapon.
   g.lineStyle(2, 0x1a1712, 0.95);
@@ -1325,11 +1494,11 @@ function drawInfantryBase(g, r, tint, facing) {
   g.lineTo(shoulderR.x, shoulderR.y);
 }
 
-function drawInfantryRifle(g, r, facing) {
+function drawInfantryRifle(g, r, facing, recoil) {
   const a = facing - 0.2;
-  const stock = polar(a + Math.PI, r * 0.18);
-  const muzzle = polar(a, r * 1.82);
-  const hand = polar(a, r * 0.55);
+  const stock = polar(a + Math.PI, r * 0.18 + recoil);
+  const muzzle = polar(a, Math.max(r * 0.9, r * 1.82 - recoil));
+  const hand = polar(a, Math.max(r * 0.25, r * 0.55 - recoil));
 
   g.lineStyle(3, 0x2a2119, 0.96);
   g.moveTo(stock.x, stock.y);
@@ -1339,11 +1508,11 @@ function drawInfantryRifle(g, r, facing) {
   g.lineTo(hand.x + Math.sin(a) * r * 0.32, hand.y - Math.cos(a) * r * 0.32);
 }
 
-function drawInfantryPanzerfaust(g, r, facing) {
+function drawInfantryPanzerfaust(g, r, facing, recoil) {
   const a = facing - 0.12;
-  const rear = polar(a + Math.PI, r * 0.42);
-  const muzzle = polar(a, r * 2.05);
-  const warhead = polar(a, r * 1.55);
+  const rear = polar(a + Math.PI, r * 0.42 + recoil);
+  const muzzle = polar(a, Math.max(r * 1.1, r * 2.05 - recoil));
+  const warhead = polar(a, Math.max(r * 0.85, r * 1.55 - recoil));
 
   g.lineStyle(5, 0x2a2119, 0.98);
   g.moveTo(rear.x, rear.y);
@@ -1357,13 +1526,13 @@ function drawInfantryPanzerfaust(g, r, facing) {
   g.endFill();
 }
 
-function drawInfantryMachineGun(g, r, facing, weaponFacing, setup) {
+function drawInfantryMachineGun(g, r, facing, weaponFacing, setup, recoil) {
   const deploy = clamp01(setup.prongFactor);
   const carryA = facing + 0.86;
   const aimA = weaponFacing;
   const a = angleLerp(carryA, aimA, smoothstep01(deploy));
-  const stockRearDist = lerp(r * 0.76, r * 0.58, deploy);
-  const muzzleDist = lerp(r * 1.36, r * 2.46, deploy);
+  const stockRearDist = lerp(r * 0.76, r * 0.58, deploy) + recoil;
+  const muzzleDist = Math.max(r * 0.92, lerp(r * 1.36, r * 2.46, deploy) - recoil);
   const stockRear = polar(a + Math.PI, stockRearDist);
   const muzzle = polar(a, muzzleDist);
 
@@ -1372,12 +1541,12 @@ function drawInfantryMachineGun(g, r, facing, weaponFacing, setup) {
   g.moveTo(stockRear.x, stockRear.y);
   g.lineTo(muzzle.x, muzzle.y);
 
-  const stockCenterX = lerp(-r * 0.42, -r * 0.28, deploy);
+  const stockCenterX = lerp(-r * 0.42, -r * 0.28, deploy) - recoil;
   g.beginFill(0x4a3420, 0.96);
   drawRotatedRect(g, stockCenterX, 0, r * 0.62, r * 0.38, a);
   g.endFill();
 
-  const receiverX = lerp(r * 0.04, r * 0.2, deploy);
+  const receiverX = lerp(r * 0.04, r * 0.2, deploy) - recoil;
   g.beginFill(0x32291f, 0.98);
   drawRotatedRect(g, receiverX, 0, r * 0.72, r * 0.48, a);
   g.endFill();
@@ -1386,7 +1555,7 @@ function drawInfantryMachineGun(g, r, facing, weaponFacing, setup) {
   drawRotatedRect(g, receiverX + r * 0.08, -r * 0.2, r * 0.56, r * 0.12, a);
   g.endFill();
 
-  const shroudX = lerp(r * 0.62, r * 1.08, deploy);
+  const shroudX = lerp(r * 0.62, r * 1.08, deploy) - recoil;
   const shroudW = lerp(r * 0.72, r * 1.22, deploy);
   g.beginFill(0x241d17, 0.98);
   drawRotatedRect(g, shroudX, 0, shroudW, r * 0.24, a);
@@ -1441,6 +1610,17 @@ function angleLerp(a, b, t) {
   if (d > Math.PI) d -= Math.PI * 2;
   if (d < -Math.PI) d += Math.PI * 2;
   return a + d * clamp01(t);
+}
+
+function angleDelta(from, to) {
+  let d = (to - from) % (Math.PI * 2);
+  if (d > Math.PI) d -= Math.PI * 2;
+  if (d < -Math.PI) d += Math.PI * 2;
+  return d;
+}
+
+function positiveMod(value, modulus) {
+  return ((value % modulus) + modulus) % modulus;
 }
 
 function lightenColor(color, amount) {
