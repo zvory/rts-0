@@ -192,7 +192,9 @@ pub(super) fn advance_moving_units(
                 }
             }
             let can_reach_waypoint = if is_car {
-                vehicle_step_dir.is_some_and(|dir| step_can_reach_waypoint((dx, dy), dir, budget))
+                path_len == 1 && dist <= budget
+                    || vehicle_step_dir
+                        .is_some_and(|dir| step_can_reach_waypoint((dx, dy), dir, budget))
             } else {
                 dist <= budget
             };
