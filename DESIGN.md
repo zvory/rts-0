@@ -629,9 +629,10 @@ Intended progression:
 
 The current implementation uses the themed unit/building names below. Combat is handled by the
 shared attack model plus the machine-gunner setup/teardown state, tank turret aim gates, and
-tank hull-facing damage modifiers for anti-tank hits against tank victims. Forest-specific rules
-are future work. The unit, building, and resource-node tables below are the human-readable form of
-the authoritative `rules::defs` records.
+tank hull-facing damage modifiers for anti-tank hits against tank victims. Tanks keep their active
+movement path while firing; other mobile combat units still hold position once a target is in
+weapon range. Forest-specific rules are future work. The unit, building, and resource-node tables
+below are the human-readable form of the authoritative `rules::defs` records.
 
 - `TICK_HZ = 30`, `SNAPSHOT_EVERY_N_TICKS = 1`.
 - `MACHINE_GUNNER_SETUP_TICKS = 30` (~1s setup or teardown).
@@ -741,7 +742,9 @@ The server treats every client as potentially hostile. Limits live next to the c
   place instead of sliding sideways at full speed. The snapshot `weaponFacing` field is the
   independent turret/barrel angle. Tank combat rotates the turret toward the target at a bounded
   rate and fires only once the turret is within tolerance; the hull does not need to face the
-  target. Projection omits enemy `weaponFacing` when it would reveal a hidden target direction.
+  target. Tanks do not clear their movement path when they fire, so they can continue driving while
+  the turret tracks and shoots. Projection omits enemy `weaponFacing` when it would reveal a hidden
+  target direction.
 - **Tank armor facing**: tank and AT-team attacks against tank victims use the victim tank's hull
   `facing` and the attacker's position. Front hits (`<=45°` from the hull direction) deal normal
   damage, side hits (`>45°` and `<=135°`) deal `1.25x`, and rear hits (`>135°`) deal `1.75x`.

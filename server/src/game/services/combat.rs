@@ -154,8 +154,11 @@ pub(crate) fn combat_system(
                 }
                 e.set_target_id(Some(tid));
                 e.mark_attack_phase(AttackPhase::Firing);
-                // Hold position while a target is in weapon range (don't overshoot it).
-                e.clear_path();
+                // Most units hold position while firing. Tanks have independent turret facing,
+                // so they can keep driving along their current path while the weapon tracks.
+                if e.kind != EntityKind::Tank {
+                    e.clear_path();
+                }
             }
             if !weapon_aligned {
                 continue;
@@ -850,6 +853,59 @@ mod tests {
                 .expect("attacker should exist")
                 .path_goal(),
             Some((300.0, 300.0))
+        );
+    }
+
+    #[test]
+    fn tank_keeps_moving_path_while_firing() {
+        let mut entities = EntityStore::new();
+        let tank_id = entities
+            .spawn_unit(1, EntityKind::Tank, 100.0, 100.0)
+            .expect("tank should spawn");
+        let enemy_id = entities
+            .spawn_unit(2, EntityKind::Rifleman, 120.0, 100.0)
+            .expect("enemy should spawn");
+        if let Some(tank) = entities.get_mut(tank_id) {
+            tank.set_facing(0.0);
+            tank.set_weapon_facing(0.0);
+            tank.set_order(Order::attack_move_to(300.0, 100.0));
+            tank.set_path(vec![(300.0, 100.0)]);
+            tank.set_path_goal(Some((300.0, 100.0)));
+        }
+
+        run_combat_tick(&mut entities);
+
+        let tank = entities.get(tank_id).expect("tank should exist");
+        assert_eq!(tank.target_id(), Some(enemy_id));
+        assert!(
+            !tank.path_is_empty(),
+            "tank should keep its movement path while firing"
+        );
+        assert_eq!(tank.next_waypoint(), Some((300.0, 100.0)));
+    }
+
+    #[test]
+    fn non_tank_attack_move_still_holds_position_while_firing() {
+        let mut entities = EntityStore::new();
+        let rifleman_id = entities
+            .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
+            .expect("rifleman should spawn");
+        let enemy_id = entities
+            .spawn_unit(2, EntityKind::Rifleman, 120.0, 100.0)
+            .expect("enemy should spawn");
+        if let Some(rifleman) = entities.get_mut(rifleman_id) {
+            rifleman.set_order(Order::attack_move_to(300.0, 100.0));
+            rifleman.set_path(vec![(300.0, 100.0)]);
+            rifleman.set_path_goal(Some((300.0, 100.0)));
+        }
+
+        run_combat_tick(&mut entities);
+
+        let rifleman = entities.get(rifleman_id).expect("rifleman should exist");
+        assert_eq!(rifleman.target_id(), Some(enemy_id));
+        assert!(
+            rifleman.path_is_empty(),
+            "non-tank units should still stop while firing"
         );
     }
 
