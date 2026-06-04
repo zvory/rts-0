@@ -890,6 +890,16 @@ input[type="text"]:focus {
   color: var(--accent);
   background: rgba(17, 17, 15, 0.95);
 }
+.spd-sep {
+  display: inline-block;
+  width: 1px;
+  align-self: stretch;
+  background: var(--panel-edge);
+  margin: 2px 4px;
+}
+.seek-btn {
+  color: var(--ink);
+}
 
 /* --- Transient toast --- */
 #toast {
