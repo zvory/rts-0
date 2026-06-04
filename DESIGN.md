@@ -818,10 +818,12 @@ The server treats every client as potentially hostile. Limits live next to the c
   damage, side hits (`>45°` and `<=135°`) deal `1.25x`, and rear hits (`>135°`) deal `1.75x`.
   Infantry damage, building damage, non-tank victims, and non-anti-tank attackers ignore armor
   facing. Overpenetration victims use the same facing rule.
-- **Worker direct-hit retreat**: a worker that takes primary-target damage from an attacker gets a
-  short move-away order through normal pathing. Overpenetration splash does not trigger this
-  reaction, and workers actively constructing a scaffold stay latched so unfinished buildings are
-  not stranded.
+- **Worker direct-hit retreat**: combat stamps `last_damage_pos`/`last_damage_tick` on every
+  damaged entity but never mutates orders or paths. AI controllers (`game/ai.rs`) read those fields
+  on the following tick and issue an ordinary `Move` command pointing a few tiles away from the
+  attacker for any own worker that was directly hit. Constructing workers stay latched, and human
+  players receive no automatic retreat — the reflex lives entirely in the AI command stream so
+  replays remain a pure series of player commands.
 - **Tolerant arrival**: a unit on a `Move` or `AttackMove` order in `MovePhase::Moving` that has not
   moved more than `STUCK_EPS_PX` per tick for `STUCK_ARRIVAL_TICKS` consecutive ticks (~0.5 s at
   30 Hz) and is within `TOLERANT_ARRIVAL_RADIUS_PX` (2 tiles) of its `path_goal` is immediately
