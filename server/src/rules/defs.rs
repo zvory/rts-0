@@ -64,8 +64,7 @@ const INDUSTRIAL_CENTER_REQUIRED: &[EntityKind] = &[EntityKind::IndustrialCenter
 const INDUSTRIAL_CENTER_AND_BARRACKS_REQUIRED: &[EntityKind] =
     &[EntityKind::IndustrialCenter, EntityKind::Barracks];
 const TRAINING_CENTRE_REQUIRED: &[EntityKind] = &[EntityKind::TrainingCentre];
-const TANK_FACTORY_REQUIRED: &[EntityKind] =
-    &[EntityKind::IndustrialCenter, EntityKind::TrainingCentre];
+const FACTORY_REQUIRED: &[EntityKind] = &[EntityKind::IndustrialCenter, EntityKind::TrainingCentre];
 
 pub const UNITS: &[UnitDef] = &[
     UnitDef {
@@ -170,7 +169,7 @@ pub const UNITS: &[UnitDef] = &[
         armor_class: ArmorClass::Armored,
         weapon: WeaponClass::AntiTank,
         target_priority: TargetPriority::Default,
-        trained_at: Some(EntityKind::TankFactory),
+        trained_at: Some(EntityKind::Factory),
         train_requires: &[],
     },
 ];
@@ -257,7 +256,7 @@ pub const BUILDINGS: &[BuildingDef] = &[
         build_requires: INDUSTRIAL_CENTER_AND_BARRACKS_REQUIRED,
     },
     BuildingDef {
-        kind: EntityKind::TankFactory,
+        kind: EntityKind::Factory,
         stats: config::BuildingStats {
             hp: 360,
             sight_tiles: 6,
@@ -274,7 +273,7 @@ pub const BUILDINGS: &[BuildingDef] = &[
         armor_class: ArmorClass::Armored,
         weapon: WeaponClass::None,
         trains: TANK_ONLY,
-        build_requires: TANK_FACTORY_REQUIRED,
+        build_requires: FACTORY_REQUIRED,
     },
 ];
 

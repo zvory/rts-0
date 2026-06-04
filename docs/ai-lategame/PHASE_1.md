@@ -38,7 +38,7 @@ Relevant selection logic lives in `server/src/game/ai_core/decision.rs`:
 
 Add shared late-game constants or helpers near the existing profile constants:
 
-- shared tank tech path: Barracks -> Training Centre -> Tank Factory;
+- shared tank tech path: Barracks -> Training Centre -> Factory;
 - shared tank late-game production policy;
 - shared tank late-game attack policy.
 

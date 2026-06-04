@@ -22,7 +22,7 @@ to a second City Centre.
 `tech_to_tanks` already has an expansion policy:
 
 - target City Centres: 2;
-- prerequisite: completed Tank Factory;
+- prerequisite: completed Factory;
 - trigger: 500 steel or 70 supply;
 - does not block tech path.
 
@@ -36,7 +36,7 @@ to a second City Centre.
 `rifle_flood_fast` already has an expansion policy:
 
 - target City Centres: 2;
-- prerequisite: completed Tank Factory;
+- prerequisite: completed Factory;
 - trigger: 500 steel or 70 supply;
 - does not block tech path.
 
@@ -57,7 +57,7 @@ Shared expectation:
 
 Profile-specific timing can remain:
 
-- `tech_to_tanks`: expand after Tank Factory is complete or when late-game tank plan is stable;
+- `tech_to_tanks`: expand after Factory is complete or when late-game tank plan is stable;
 - `rifle_flood_full_saturation`: expand earlier, around Training Centre or 50 supply, because it has
   a stronger worker base;
 - `rifle_flood_fast`: keep a conservative expansion gate until a separate recovery plan exists.

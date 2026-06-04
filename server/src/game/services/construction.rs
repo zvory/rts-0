@@ -321,18 +321,18 @@ mod tests {
         let map = flat_map(32);
         let mut entities = EntityStore::new();
         let ts = config::TILE_SIZE as f32;
-        // Two adjacent tank factory footprints.
-        let (ax, ay) = footprint_center(&map, EntityKind::TankFactory, 10, 10);
-        let (bx, by) = footprint_center(&map, EntityKind::TankFactory, 13, 10);
+        // Two adjacent factory footprints.
+        let (ax, ay) = footprint_center(&map, EntityKind::Factory, 10, 10);
+        let (bx, by) = footprint_center(&map, EntityKind::Factory, 13, 10);
         entities
-            .spawn_building(1, EntityKind::TankFactory, ax, ay, false)
-            .expect("tank factory A should spawn");
+            .spawn_building(1, EntityKind::Factory, ax, ay, false)
+            .expect("factory A should spawn");
         entities
-            .spawn_building(1, EntityKind::TankFactory, bx, by, false)
-            .expect("tank factory B should spawn");
+            .spawn_building(1, EntityKind::Factory, bx, by, false)
+            .expect("factory B should spawn");
         // Place the worker on the seam between them so its circle body bleeds into a footprint.
-        let rect_a = building_rect_for_footprint(EntityKind::TankFactory, 10, 10)
-            .expect("tank factory A rect");
+        let rect_a =
+            building_rect_for_footprint(EntityKind::Factory, 10, 10).expect("factory A rect");
         let worker = entities
             .spawn_unit(1, EntityKind::Worker, rect_a.max_x - 0.5, ay)
             .expect("worker should spawn");

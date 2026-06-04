@@ -22,7 +22,7 @@ use crate::game::entity::EntityKind;
 use crate::rules;
 
 const PRODUCTION_BUILDINGS: [EntityKind; 3] = [
-    EntityKind::TankFactory,
+    EntityKind::Factory,
     EntityKind::Barracks,
     EntityKind::IndustrialCenter,
 ];
@@ -1933,7 +1933,7 @@ fn build_search_for_kind(
     mut build_search: ai_shared::BuildSearch,
     kind: EntityKind,
 ) -> ai_shared::BuildSearch {
-    if kind == EntityKind::TankFactory {
+    if kind == EntityKind::Factory {
         build_search.prefer_away_from_center = false;
         build_search.prefer_toward_center = true;
     }
@@ -1977,11 +1977,9 @@ fn desired_oil_workers(
     if max_oil_workers == 0 {
         return 0;
     }
-    let tank_factories = facts
-        .complete_building_count(EntityKind::TankFactory)
-        .max(1);
+    let tank_factories = facts.complete_building_count(EntityKind::Factory).max(1);
     let mut target = tank_factories
-        .saturating_mul(policy.oil_workers_per_tank_factory)
+        .saturating_mul(policy.oil_workers_per_factory)
         .clamp(1, max_oil_workers);
 
     if let Some(goal) = next_tank_resource_goal(facts, profile) {
@@ -2013,16 +2011,14 @@ fn next_tank_resource_goal(facts: &AiFacts, profile: &AiProfile) -> Option<Resou
     }
     let kind = if facts.complete_building_count(EntityKind::TrainingCentre) == 0 {
         EntityKind::TrainingCentre
-    } else if facts.complete_building_count(EntityKind::TankFactory) == 0 {
-        EntityKind::TankFactory
+    } else if facts.complete_building_count(EntityKind::Factory) == 0 {
+        EntityKind::Factory
     } else {
         EntityKind::Tank
     };
     let (steel, oil) = rules::economy::cost(kind);
     let scale = if kind == EntityKind::Tank {
-        facts
-            .complete_building_count(EntityKind::TankFactory)
-            .max(1) as u32
+        facts.complete_building_count(EntityKind::Factory).max(1) as u32
     } else {
         1
     };
@@ -3221,7 +3217,7 @@ mod tests {
     }
 
     #[test]
-    fn tech_to_tanks_delays_oil_until_steel_floor_and_builds_tank_factory() {
+    fn tech_to_tanks_delays_oil_until_steel_floor_and_builds_factory() {
         let mut owned = vec![
             building(10, EntityKind::IndustrialCenter, Some(0)),
             building(11, EntityKind::Barracks, Some(0)),
@@ -3245,7 +3241,7 @@ mod tests {
         );
 
         assert!(decision.intents.contains(&AiIntent::Build {
-            kind: EntityKind::TankFactory
+            kind: EntityKind::Factory
         }));
         assert!(
             decision.intents.contains(&AiIntent::Train {
@@ -3257,7 +3253,7 @@ mod tests {
             !decision.intents.contains(&AiIntent::Train {
                 kind: EntityKind::Rifleman
             }),
-            "tech_to_tanks should save barracks steel once the tank factory is buildable"
+            "tech_to_tanks should save barracks steel once the factory is buildable"
         );
         assert!(
             !decision.intents.iter().any(|intent| matches!(
@@ -3443,7 +3439,7 @@ mod tests {
         );
 
         assert!(decision.intents.contains(&AiIntent::Build {
-            kind: EntityKind::TankFactory
+            kind: EntityKind::Factory
         }));
         assert!(decision.intents.contains(&AiIntent::Build {
             kind: EntityKind::IndustrialCenter
@@ -3488,7 +3484,7 @@ mod tests {
             kind: EntityKind::TrainingCentre
         }));
         assert!(!decision.intents.contains(&AiIntent::Build {
-            kind: EntityKind::TankFactory
+            kind: EntityKind::Factory
         }));
         assert!(!decision.intents.contains(&AiIntent::Train {
             kind: EntityKind::Rifleman
@@ -4253,7 +4249,7 @@ mod tests {
     }
 
     #[test]
-    fn steel_expansion_tanks_switches_to_tank_factory_at_fifty_supply() {
+    fn steel_expansion_tanks_switches_to_factory_at_fifty_supply() {
         let observation = with_expansion_resources(observation(
             AiEconomy {
                 steel: 500,
@@ -4278,7 +4274,7 @@ mod tests {
         );
 
         assert!(decision.intents.contains(&AiIntent::Build {
-            kind: EntityKind::TankFactory
+            kind: EntityKind::Factory
         }));
         assert!(!decision.intents.contains(&AiIntent::Train {
             kind: EntityKind::MachineGunner
@@ -4302,7 +4298,7 @@ mod tests {
                 building(11, EntityKind::IndustrialCenter, Some(0)),
                 building(12, EntityKind::Barracks, Some(0)),
                 building(13, EntityKind::TrainingCentre, None),
-                building(14, EntityKind::TankFactory, Some(0)),
+                building(14, EntityKind::Factory, Some(0)),
             ],
         ));
 
@@ -4337,7 +4333,7 @@ mod tests {
                 building(11, EntityKind::IndustrialCenter, Some(0)),
                 building(12, EntityKind::Barracks, Some(0)),
                 building(13, EntityKind::TrainingCentre, None),
-                building(14, EntityKind::TankFactory, Some(0)),
+                building(14, EntityKind::Factory, Some(0)),
                 combat(30, EntityKind::Tank),
                 combat(31, EntityKind::Tank),
             ],
@@ -4368,7 +4364,7 @@ mod tests {
                 building(11, EntityKind::IndustrialCenter, Some(0)),
                 building(12, EntityKind::Barracks, Some(0)),
                 building(13, EntityKind::TrainingCentre, None),
-                building(14, EntityKind::TankFactory, Some(0)),
+                building(14, EntityKind::Factory, Some(0)),
                 combat(30, EntityKind::Tank),
                 combat(31, EntityKind::Tank),
                 combat(32, EntityKind::Tank),
@@ -4412,7 +4408,7 @@ mod tests {
                 building(10, EntityKind::IndustrialCenter, Some(0)),
                 building(11, EntityKind::Barracks, Some(0)),
                 building(12, EntityKind::TrainingCentre, None),
-                building(13, EntityKind::TankFactory, Some(0)),
+                building(13, EntityKind::Factory, Some(0)),
                 worker(20, AiEntityState::Gather),
                 worker(21, AiEntityState::Gather),
                 worker(22, AiEntityState::Gather),
@@ -4448,7 +4444,7 @@ mod tests {
                 building(10, EntityKind::IndustrialCenter, Some(0)),
                 building(11, EntityKind::Barracks, Some(0)),
                 building(12, EntityKind::TrainingCentre, None),
-                building(13, EntityKind::TankFactory, Some(0)),
+                building(13, EntityKind::Factory, Some(0)),
                 worker(20, AiEntityState::Gather),
                 worker(21, AiEntityState::Gather),
                 worker(22, AiEntityState::Gather),
@@ -4490,7 +4486,7 @@ mod tests {
                 building(10, EntityKind::IndustrialCenter, Some(0)),
                 building(11, EntityKind::Barracks, Some(0)),
                 building(12, EntityKind::TrainingCentre, None),
-                building(13, EntityKind::TankFactory, Some(0)),
+                building(13, EntityKind::Factory, Some(0)),
                 worker(20, AiEntityState::Gather),
                 worker(21, AiEntityState::Gather),
                 worker(22, AiEntityState::Gather),
@@ -4580,7 +4576,7 @@ mod tests {
             !sustained_decision.intents.iter().any(|intent| matches!(
                 intent,
                 AiIntent::Build {
-                    kind: EntityKind::TrainingCentre | EntityKind::TankFactory
+                    kind: EntityKind::TrainingCentre | EntityKind::Factory
                 }
             )),
             "panic mode should block all tech spending"
@@ -4604,7 +4600,7 @@ mod tests {
                 building(10, EntityKind::IndustrialCenter, Some(0)),
                 building(11, EntityKind::Barracks, Some(0)),
                 building(12, EntityKind::TrainingCentre, None),
-                building(13, EntityKind::TankFactory, Some(0)),
+                building(13, EntityKind::Factory, Some(0)),
                 combat_at(30, EntityKind::Tank, 8.5 * ts, 8.5 * ts),
             ],
         );
@@ -4647,7 +4643,7 @@ mod tests {
                 building(10, EntityKind::IndustrialCenter, Some(0)),
                 building(11, EntityKind::Barracks, Some(0)),
                 building(12, EntityKind::TrainingCentre, None),
-                building(13, EntityKind::TankFactory, Some(0)),
+                building(13, EntityKind::Factory, Some(0)),
                 combat_at(30, EntityKind::Tank, 48.5 * ts, 48.5 * ts),
             ],
         );

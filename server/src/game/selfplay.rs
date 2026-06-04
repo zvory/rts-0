@@ -2124,7 +2124,7 @@ fn known_kind(kind: &str) -> bool {
             | kinds::DEPOT
             | kinds::BARRACKS
             | kinds::TRAINING_CENTRE
-            | kinds::TANK_FACTORY
+            | kinds::FACTORY
             | kinds::STEEL
             | kinds::OIL
     )
@@ -2454,7 +2454,7 @@ fn tech_to_tanks_goal() -> PlayerMilestoneGoal {
     .with_min_workers(8)
     .with_min_supply_cap(config::INDUSTRIAL_CENTER_SUPPLY + config::DEPOT_SUPPLY)
     .with_min_buildings(kinds::TRAINING_CENTRE, 1)
-    .with_min_buildings(kinds::TANK_FACTORY, 1)
+    .with_min_buildings(kinds::FACTORY, 1)
     .with_min_units(kinds::TANK, 1)
 }
 
@@ -2470,7 +2470,7 @@ fn tech_to_tanks_under_pressure_goal() -> PlayerMilestoneGoal {
     .with_min_workers(8)
     .with_min_supply_cap(config::INDUSTRIAL_CENTER_SUPPLY + config::DEPOT_SUPPLY)
     .with_min_buildings(kinds::TRAINING_CENTRE, 1)
-    .with_min_buildings(kinds::TANK_FACTORY, 1)
+    .with_min_buildings(kinds::FACTORY, 1)
     .allowing_elimination_before_milestones()
 }
 
@@ -2575,8 +2575,8 @@ fn profile_matchup_rifle_flood_fast_vs_full_saturation() {
 
 #[test]
 fn profile_matchup_rifle_flood_fast_vs_tech_to_tanks() {
-    let tank_factory_build_ticks = config::building_stats(EntityKind::TankFactory)
-        .expect("tank factory stats should exist")
+    let factory_build_ticks = config::building_stats(EntityKind::Factory)
+        .expect("factory stats should exist")
         .build_ticks;
     run_profile_matchup(MatchupConfig {
         artifact_name: "profile_matchup_rifle_flood_fast_vs_tech_to_tanks",
@@ -2584,7 +2584,7 @@ fn profile_matchup_rifle_flood_fast_vs_tech_to_tanks() {
         // LOS-aware fights delay the tech player's factory start under pressure, but the
         // strategy still commits the factory before the old harness limit. Let the already
         // issued build complete so the milestone observes the intended tech transition.
-        max_ticks: MAX_TICKS + tank_factory_build_ticks,
+        max_ticks: MAX_TICKS + factory_build_ticks,
         players: [
             MatchupPlayerSpec {
                 id: 1,
