@@ -4,6 +4,7 @@ use crate::game::map::Map;
 use crate::game::services::occupancy::building_footprint;
 
 const DEFAULT_FACING_RAD: f32 = 0.0;
+const CIRCLE_COLLISION_EPS_PX: f32 = 0.001;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub(crate) enum UnitBody {
@@ -41,6 +42,14 @@ pub(crate) struct BodyAabb {
     pub min_y: f32,
     pub max_x: f32,
     pub max_y: f32,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(crate) struct BodyOverlap {
+    /// Unit vector pointing from the first body toward the second body.
+    pub normal_x: f32,
+    pub normal_y: f32,
+    pub depth: f32,
 }
 
 impl UnitBody {
@@ -223,6 +232,29 @@ pub(crate) fn unit_bodies_intersect(a: UnitBody, b: UnitBody) -> bool {
     }
 }
 
+pub(crate) fn unit_body_overlap(a: UnitBody, b: UnitBody) -> Option<BodyOverlap> {
+    if !valid_unit_body(a) || !valid_unit_body(b) {
+        return None;
+    }
+
+    let overlap = match (a, b) {
+        (UnitBody::Circle(a), UnitBody::Circle(b)) => circle_circle_overlap(a, b),
+        (UnitBody::Circle(circle), UnitBody::OrientedBox(box_body)) => {
+            circle_oriented_box_overlap(circle, box_body)
+        }
+        (UnitBody::OrientedBox(box_body), UnitBody::Circle(circle)) => {
+            circle_oriented_box_overlap(circle, box_body).map(|overlap| BodyOverlap {
+                normal_x: -overlap.normal_x,
+                normal_y: -overlap.normal_y,
+                depth: overlap.depth,
+            })
+        }
+        (UnitBody::OrientedBox(a), UnitBody::OrientedBox(b)) => oriented_box_overlap(a, b),
+    }?;
+
+    (overlap.depth.is_finite() && overlap.depth > 0.0).then_some(overlap)
+}
+
 pub(crate) fn tile_rect(tx: i32, ty: i32) -> RectBody {
     let ts = config::TILE_SIZE as f32;
     RectBody {
@@ -296,6 +328,113 @@ fn oriented_boxes_intersect(a: OrientedBoxBody, b: OrientedBoxBody) -> bool {
         let b_extent =
             b.half_len * dot_abs(axis, (bfx, bfy)) + b.half_width * dot_abs(axis, (bsx, bsy));
         center_dist <= a_extent + b_extent
+    })
+}
+
+fn circle_circle_overlap(a: CircleBody, b: CircleBody) -> Option<BodyOverlap> {
+    let dx = b.x - a.x;
+    let dy = b.y - a.y;
+    let min_d = a.radius + b.radius;
+    let d2 = dx * dx + dy * dy;
+    if d2 + CIRCLE_COLLISION_EPS_PX >= min_d * min_d {
+        return None;
+    }
+
+    if d2 <= 1.0e-4 {
+        return Some(BodyOverlap {
+            normal_x: 1.0,
+            normal_y: 0.0,
+            depth: min_d,
+        });
+    }
+
+    let d = d2.sqrt();
+    Some(BodyOverlap {
+        normal_x: dx / d,
+        normal_y: dy / d,
+        depth: min_d - d,
+    })
+}
+
+fn circle_oriented_box_overlap(circle: CircleBody, body: OrientedBoxBody) -> Option<BodyOverlap> {
+    let (fx, fy) = body.forward_axis();
+    let (sx, sy) = body.side_axis();
+    let dx = circle.x - body.x;
+    let dy = circle.y - body.y;
+    let local_x = dx * fx + dy * fy;
+    let local_y = dx * sx + dy * sy;
+    let clamped_x = local_x.clamp(-body.half_len, body.half_len);
+    let clamped_y = local_y.clamp(-body.half_width, body.half_width);
+    let closest_x = body.x + fx * clamped_x + sx * clamped_y;
+    let closest_y = body.y + fy * clamped_x + sy * clamped_y;
+    let from_box_x = circle.x - closest_x;
+    let from_box_y = circle.y - closest_y;
+    let d2 = from_box_x * from_box_x + from_box_y * from_box_y;
+
+    if d2 > 1.0e-4 {
+        if d2 + 0.000001 >= circle.radius * circle.radius {
+            return None;
+        }
+        let d = d2.sqrt();
+        return Some(BodyOverlap {
+            normal_x: -from_box_x / d,
+            normal_y: -from_box_y / d,
+            depth: circle.radius - d,
+        });
+    }
+
+    let x_depth = body.half_len - local_x.abs() + circle.radius;
+    let y_depth = body.half_width - local_y.abs() + circle.radius;
+    if x_depth <= y_depth {
+        let sign = if local_x >= 0.0 { -1.0 } else { 1.0 };
+        Some(BodyOverlap {
+            normal_x: fx * sign,
+            normal_y: fy * sign,
+            depth: x_depth,
+        })
+    } else {
+        let sign = if local_y >= 0.0 { -1.0 } else { 1.0 };
+        Some(BodyOverlap {
+            normal_x: sx * sign,
+            normal_y: sy * sign,
+            depth: y_depth,
+        })
+    }
+}
+
+fn oriented_box_overlap(a: OrientedBoxBody, b: OrientedBoxBody) -> Option<BodyOverlap> {
+    let (afx, afy) = a.forward_axis();
+    let (asx, asy) = a.side_axis();
+    let (bfx, bfy) = b.forward_axis();
+    let (bsx, bsy) = b.side_axis();
+    let dx = b.x - a.x;
+    let dy = b.y - a.y;
+    let axes = [(afx, afy), (asx, asy), (bfx, bfy), (bsx, bsy)];
+
+    let mut best_axis = (1.0, 0.0);
+    let mut best_depth = f32::INFINITY;
+    for axis in axes {
+        let center_delta = dx * axis.0 + dy * axis.1;
+        let center_dist = center_delta.abs();
+        let a_extent =
+            a.half_len * dot_abs(axis, (afx, afy)) + a.half_width * dot_abs(axis, (asx, asy));
+        let b_extent =
+            b.half_len * dot_abs(axis, (bfx, bfy)) + b.half_width * dot_abs(axis, (bsx, bsy));
+        let depth = a_extent + b_extent - center_dist;
+        if depth <= 0.0 {
+            return None;
+        }
+        if depth < best_depth {
+            let sign = if center_delta >= 0.0 { 1.0 } else { -1.0 };
+            best_axis = (axis.0 * sign, axis.1 * sign);
+            best_depth = depth;
+        }
+    }
+
+    Some(BodyOverlap {
+        normal_x: best_axis.0,
+        normal_y: best_axis.1,
+        depth: best_depth,
     })
 }
 

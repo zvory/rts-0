@@ -860,12 +860,14 @@ The server treats every client as potentially hostile. Limits live next to the c
   `standability::unit_static_standable`. This prevents large units from being assigned a center tile
   whose body would clip terrain or a building footprint; dynamic unit traffic is still handled by
   steering and collision after movement.
-- **Local steering**: before taking a partial path step for a plain `Move` order, movement computes a
-  short-range separation proposal away from nearby firm/braced/heavy mobile units. Neighbor ids are
-  sorted and capped so replay behavior stays deterministic, and separation uses the same footing
-  profiles as hard collision so braced/heavy units exert stronger local pressure than firm units.
-  The steered landing is only accepted if `standability::unit_static_standable` says the unit body
-  fits there; otherwise movement falls back to the ordinary path step / wall-slide logic. Steering
+- **Local steering**: before taking a partial path step for a plain `Move` order, non-tank movement
+  computes a short-range separation proposal away from nearby firm/braced/heavy mobile units.
+  Neighbor ids are sorted and capped so replay behavior stays deterministic, and separation uses the
+  same footing profiles as hard collision so braced/heavy units exert stronger local pressure than
+  firm units. The steered landing is only accepted if `standability::unit_static_standable` says the
+  unit body fits there; otherwise movement falls back to the ordinary path step / wall-slide logic.
+  Tanks do not receive perpendicular steering waypoints or sidestep injections: frontal traffic
+  instead reduces throttle and biases the bounded hull turn toward reachable open space. Steering
   does not reserve space or replace collision.
 - **Production spawn legality**: production completes in two steps. The front queue item advances
   to complete, then the producer searches deterministic rings around its actual footprint for a
@@ -877,14 +879,20 @@ The server treats every client as potentially hostile. Limits live next to the c
   that has any (so units exit the rally-facing side), and the new unit is immediately given a plain
   `move` order to the rally point; with no rally point the legacy first-found candidate is used and
   the unit spawns idle.
-- **Unit collision**: `services::movement::resolve_collisions` runs after production each tick
-  and pair-wise pushes overlapping mobile units apart along the connecting line. Workers in
-  `GatherPhase::Harvesting` or `BuildPhase::Constructing` are ghost pass-through units: they
-  neither push nor are pushed, which keeps walking units from being deadlocked by miners or active
-  builders. All other mobile-unit pairs split overlap by footing resistance, so braced/deployed
-  machine gunners and tanks hold ground better than soft moving infantry while equal-profile units
-  still split pushes evenly. `Game::assert_invariants` then asserts that no two non-ghost mobile
-  units overlap by more than `OVERLAP_TOLERANCE_PX` (residue from pushes that landed against
+- **Unit collision**: `services::movement::resolve_collisions` runs after production each tick and
+  pair-wise pushes overlapping mobile units apart using `services::geometry::unit_body_overlap`.
+  Infantry resolve as circles while tanks resolve from their oriented hulls, so a tank front/back or
+  side contact separates on the actual hull axis instead of the center-to-center circle direction.
+  Workers in `GatherPhase::Harvesting` or `BuildPhase::Constructing` are ghost pass-through units:
+  they neither push nor are pushed, which keeps walking units from being deadlocked by miners or
+  active builders. All other mobile-unit pairs split overlap by footing resistance, so braced or
+  deployed machine gunners and tanks hold ground better than soft moving infantry while equal-profile
+  units still split pushes evenly. Moving tanks therefore displace idle soft infantry more readily,
+  braced weapons hold ground, and tank-vs-tank contacts tend to stop or reverse along the hull axis
+  rather than slide sideways past each other. Push targets are accepted only when the same
+  standability layer says the resulting body position is legal; blocked pushes are skipped or
+  absorbed by the other side. `Game::assert_invariants` then asserts that no two non-ghost mobile
+  unit bodies overlap by more than `OVERLAP_TOLERANCE_PX` (residue from pushes that landed against
   impassable terrain or building body clearance). Collision is deterministic overlap cleanup for
   dynamic unit traffic; static correctness comes from standability checks before positions or
   scaffolds are accepted.

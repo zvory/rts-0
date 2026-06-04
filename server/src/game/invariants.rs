@@ -8,7 +8,7 @@ use crate::game::entity::{Entity, EntityKind, Order, NEUTRAL};
 use crate::game::map::Map;
 use crate::game::services::geometry::{
     building_rect_for_entity, circle_intersects_rect, unit_body_for_entity,
-    unit_body_intersects_rect, CircleBody, RectBody, UnitBody,
+    unit_body_intersects_rect, unit_body_overlap, CircleBody, RectBody, UnitBody,
 };
 use crate::game::services::movement::is_collision_anchored;
 use crate::game::services::occupancy::{building_footprint, Occupancy};
@@ -302,8 +302,8 @@ impl Game {
         // 9. Mobile units do not stack on top of each other (PLAN §4.3).
         //     Harvesting workers are anchored to their resource node and excluded — they
         //     intentionally cannot be pushed by collision. All other mobile-unit pairs must
-        //     stay at sum-of-radii apart (within `OVERLAP_TOLERANCE_PX` of floating-point and
-        //     terrain-pinned residue).
+        //     keep body overlap within `OVERLAP_TOLERANCE_PX` of floating-point and terrain-pinned
+        //     residue.
         // ------------------------------------------------------------------
         let units: Vec<_> = self.entities.iter().filter(|e| e.is_unit()).collect();
         for i in 0..units.len() {
@@ -315,20 +315,25 @@ impl Game {
                 if is_collision_anchored(b) {
                     continue;
                 }
-                let dx = a.pos_x - b.pos_x;
-                let dy = a.pos_y - b.pos_y;
-                let dist = (dx * dx + dy * dy).sqrt();
-                let min_d = a.radius() + b.radius();
+                let Some(a_body) = unit_body_for_entity(a) else {
+                    continue;
+                };
+                let Some(b_body) = unit_body_for_entity(b) else {
+                    continue;
+                };
+                let overlap = unit_body_overlap(a_body, b_body).map_or(0.0, |o| o.depth);
                 assert!(
-                    dist + OVERLAP_TOLERANCE_PX >= min_d,
-                    "invariant: tick {} units overlap by {:.2}px (min sep {:.1}, dist {:.2}); a={}; b={}; midpoint={}",
+                    overlap <= OVERLAP_TOLERANCE_PX,
+                    "invariant: tick {} unit bodies overlap by {:.2}px; a={}; b={}; midpoint={}",
                     self.tick,
-                    min_d - dist,
-                    min_d,
-                    dist,
+                    overlap,
                     entity_context(&self.map, a),
                     entity_context(&self.map, b),
-                    location_context(&self.map, (a.pos_x + b.pos_x) * 0.5, (a.pos_y + b.pos_y) * 0.5)
+                    location_context(
+                        &self.map,
+                        (a.pos_x + b.pos_x) * 0.5,
+                        (a.pos_y + b.pos_y) * 0.5
+                    )
                 );
             }
         }
