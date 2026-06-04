@@ -9,12 +9,15 @@ use crate::protocol::{MapInfo, Snapshot};
 
 pub(crate) const DEFAULT_BUILD_SEARCH_MIN_RADIUS: i32 = 3;
 pub(crate) const DEFAULT_BUILD_SEARCH_MAX_RADIUS: i32 = 16;
+pub(crate) const AI_DEFAULT_BUILDING_CLEARANCE_TILES: i32 = 1;
+pub(crate) const AI_TANK_FACTORY_CLEARANCE_TILES: i32 = 2;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct BuildSearch {
     pub(crate) min_radius: i32,
     pub(crate) max_radius: i32,
     pub(crate) prefer_away_from_center: bool,
+    pub(crate) prefer_toward_center: bool,
 }
 
 impl Default for BuildSearch {
@@ -23,8 +26,47 @@ impl Default for BuildSearch {
             min_radius: DEFAULT_BUILD_SEARCH_MIN_RADIUS,
             max_radius: DEFAULT_BUILD_SEARCH_MAX_RADIUS,
             prefer_away_from_center: true,
+            prefer_toward_center: false,
         }
     }
+}
+
+pub(crate) fn building_clearance_tiles(kind: EntityKind) -> i32 {
+    match kind {
+        EntityKind::TankFactory => AI_TANK_FACTORY_CLEARANCE_TILES,
+        _ => AI_DEFAULT_BUILDING_CLEARANCE_TILES,
+    }
+}
+
+pub(crate) fn footprints_respect_clearance(
+    candidate_kind: EntityKind,
+    candidate_tile_x: u32,
+    candidate_tile_y: u32,
+    existing_kind: EntityKind,
+    existing_tile_x: u32,
+    existing_tile_y: u32,
+) -> bool {
+    let Some(candidate_stats) = config::building_stats(candidate_kind) else {
+        return false;
+    };
+    let Some(existing_stats) = config::building_stats(existing_kind) else {
+        return false;
+    };
+    let clearance =
+        building_clearance_tiles(candidate_kind).max(building_clearance_tiles(existing_kind));
+    let candidate_left = candidate_tile_x as i32;
+    let candidate_top = candidate_tile_y as i32;
+    let candidate_right = candidate_left + candidate_stats.foot_w as i32 - 1;
+    let candidate_bottom = candidate_top + candidate_stats.foot_h as i32 - 1;
+    let existing_left = existing_tile_x as i32;
+    let existing_top = existing_tile_y as i32;
+    let existing_right = existing_left + existing_stats.foot_w as i32 - 1;
+    let existing_bottom = existing_top + existing_stats.foot_h as i32 - 1;
+
+    candidate_left > existing_right + clearance
+        || existing_left > candidate_right + clearance
+        || candidate_top > existing_bottom + clearance
+        || existing_top > candidate_bottom + clearance
 }
 
 #[allow(dead_code)]
@@ -108,6 +150,51 @@ pub(crate) fn find_build_spot_near_start_with(
     let mut fallback = None;
 
     for radius in search.min_radius..=search.max_radius {
+        if search.prefer_toward_center {
+            let mut best_in_ring: Option<(u32, u32, f32, f32)> = None;
+            for dy in -radius..=radius {
+                for dx in -radius..=radius {
+                    if dx.abs().max(dy.abs()) != radius {
+                        continue;
+                    }
+                    let tx = sx + dx;
+                    let ty = sy + dy;
+                    if tx < 0 || ty < 0 {
+                        continue;
+                    }
+                    let (tx, ty) = (tx as u32, ty as u32);
+                    if skip.contains(&(tx, ty)) || !placeable(tx, ty) {
+                        continue;
+                    }
+                    let center_x = tx as f32 + stats.foot_w as f32 * 0.5;
+                    let center_y = ty as f32 + stats.foot_h as f32 * 0.5;
+                    let map_dx = center_x - map_center.0;
+                    let map_dy = center_y - map_center.1;
+                    let start_dx = center_x - start.0 as f32;
+                    let start_dy = center_y - start.1 as f32;
+                    let map_distance = map_dx * map_dx + map_dy * map_dy;
+                    let start_distance = start_dx * start_dx + start_dy * start_dy;
+                    if fallback.is_none() {
+                        fallback = Some((tx, ty));
+                    }
+                    let better = best_in_ring
+                        .map(|(_, _, best_map_distance, best_start_distance)| {
+                            map_distance < best_map_distance
+                                || (map_distance == best_map_distance
+                                    && start_distance < best_start_distance)
+                        })
+                        .unwrap_or(true);
+                    if better {
+                        best_in_ring = Some((tx, ty, map_distance, start_distance));
+                    }
+                }
+            }
+            if let Some((tx, ty, _, _)) = best_in_ring {
+                return Some((tx, ty));
+            }
+            continue;
+        }
+
         if !search.prefer_away_from_center {
             for dy in -radius..=radius {
                 for dx in -radius..=radius {
@@ -217,12 +304,53 @@ mod tests {
                 min_radius: 2,
                 max_radius: 16,
                 prefer_away_from_center: false,
+                prefer_toward_center: false,
             },
             &BTreeSet::new(),
             |tx, ty| matches!((tx, ty), (6, 4) | (2, 4)),
         );
 
         assert_eq!(spot, Some((2, 4)));
+    }
+
+    #[test]
+    fn prefers_tiles_toward_map_center_when_requested() {
+        let spot = find_build_spot_near_start_with(
+            30,
+            30,
+            (4, 15),
+            EntityKind::TankFactory,
+            BuildSearch {
+                min_radius: 2,
+                max_radius: 16,
+                prefer_away_from_center: false,
+                prefer_toward_center: true,
+            },
+            &BTreeSet::new(),
+            |tx, ty| matches!((tx, ty), (2, 15) | (6, 15)),
+        );
+
+        assert_eq!(spot, Some((6, 15)));
+    }
+
+    #[test]
+    fn tank_factory_spacing_requires_two_clear_tiles() {
+        assert!(!footprints_respect_clearance(
+            EntityKind::TankFactory,
+            10,
+            10,
+            EntityKind::Depot,
+            14,
+            10,
+        ));
+        assert!(footprints_respect_clearance(
+            EntityKind::TankFactory,
+            10,
+            10,
+            EntityKind::Depot,
+            15,
+            10,
+        ));
     }
 
     #[test]
