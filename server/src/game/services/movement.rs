@@ -22,8 +22,8 @@ const COLLISION_SEARCH_SLACK_PX: f32 = config::TILE_SIZE as f32;
 
 /// Maximum number of pair-resolution passes per tick. Each pass pushes overlapping pairs apart
 /// by the full violation; two-body cases converge in one pass and dense clusters typically
-/// converge in 2–3.
-const COLLISION_PASSES: usize = 6;
+/// converge in 2-3.
+const COLLISION_PASSES: usize = 8;
 
 /// Pairs whose center distance is at least `sum_radii - COLLISION_EPS_PX` are considered
 /// non-overlapping. Avoids endless micro-pushes from floating-point noise.
@@ -899,7 +899,7 @@ fn unit_static_standable(
 /// tick), which is required by the replay harness.
 pub(crate) fn resolve_collisions(
     entities: &mut EntityStore,
-    spatial: &SpatialIndex,
+    _spatial: &SpatialIndex,
     map: &Map,
     occ: &Occupancy,
 ) {
@@ -908,6 +908,7 @@ pub(crate) fn resolve_collisions(
     for _pass in 0..COLLISION_PASSES {
         let mut moved_any = false;
         let ids = entities.ids();
+        let spatial = SpatialIndex::build(entities, map.size);
 
         for &a in &ids {
             // Ghost units neither push nor are pushed. Other units can transit through their
