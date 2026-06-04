@@ -149,6 +149,7 @@ pub(crate) fn run_tick(
         fog,
         rng,
         events,
+        tick,
     );
     services::economy::gather_system(
         map,
