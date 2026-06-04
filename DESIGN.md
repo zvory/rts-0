@@ -178,7 +178,7 @@ Compact numeric codes:
 
 | Vocabulary | Codes |
 |------------|-------|
-| `kind` | 1 `worker`, 2 `rifleman`, 3 `machine_gunner`, 4 `at_team`, 5 `tank`, 6 `industrial_center`, 7 `depot`, 8 `barracks`, 9 `training_centre`, 10 `factory`, 11 `steel`, 12 `oil` |
+| `kind` | 1 `worker`, 2 `rifleman`, 3 `machine_gunner`, 4 `at_team`, 5 `tank`, 6 `industrial_center`, 7 `depot`, 8 `barracks`, 9 `training_centre`, 10 `factory`, 11 `steel`, 12 `oil`, 13 `steelworks` |
 | `state` | 1 `idle`, 2 `move`, 3 `attack`, 4 `gather`, 5 `build`, 6 `train`, 7 `construct`, 8 `dead` |
 | `setupState` | 1 `packed`, 2 `setting_up`, 3 `deployed`, 4 `tearing_down` |
 | `notice.severity` | 1 `info`, 2 `warn`, 3 `alert` |
@@ -198,7 +198,7 @@ watch rooms receive all resource updates).
 {
   id: u32,
   owner: u32,                    // 0 = neutral (resources), else player id
-  kind: string,                  // EntityKind: "worker","rifleman","machine_gunner","at_team","tank","industrial_center","depot","barracks","training_centre","factory"
+  kind: string,                  // EntityKind: "worker","rifleman","machine_gunner","at_team","tank","industrial_center","depot","barracks","training_centre","factory","steelworks"
   x: f32, y: f32,                // world px (center)
   hp: u32, maxHp: u32,
   state: string,                 // "idle","move","attack","gather","build","train","construct","dead"
@@ -739,7 +739,7 @@ Unit stats (hp, dmg, range[tiles], cooldown[ticks], speed[px/tick], sight[tiles]
 | rifleman        | 45  | 5   | 4     | 16 | 1.6   | 8     | 50  | 0   | 1   | 300 (~10s) |
 | machine_gunner  | 55  | 4   | 5     | 6  | 1.28  | 8     | 75  | 25  | 2   | 400 (~13s) |
 | at_team         | 45  | 48  | 5     | 72 | 1.28  | 8     | 75  | 25  | 2   | 440 (~15s) |
-| tank            | 390 | 60  | 3     | 72 | 2.0   | 7     | 200 | 150 | 6   | 750 (~25s) |
+| tank            | 390 | 60  | 3     | 72 | 2.0   | 7     | 200 | 150 | 6   | 750 (~25s); requires Steelworks |
 
 Building stats (hp, sight, cost, footprint tiles wxh, buildTicks, extra):
 
@@ -750,6 +750,7 @@ Building stats (hp, sight, cost, footprint tiles wxh, buildTicks, extra):
 | barracks                   | 320 | 6     | 150 | 3x2  | 200       | trains rifleman, machine_gunner, at_team; requires a City Centre |
 | training_centre   | 300 | 6     | 100 steel + 50 oil | 3x2  | 220       | unlocks machine_gunner and at_team training at barracks; requires a City Centre and Barracks |
 | factory                    | 360 | 6     | 200 steel + 100 oil | 3x3  | 240       | trains tank; requires a City Centre and Training Centre |
+| steelworks                 | 300 | 6     | 125 steel + 125 oil | 2x2  | 220       | unlocks tank training; requires a City Centre and Training Centre |
 
 Win: a player is **eliminated** when they own zero buildings (units alone do not keep them
 alive). Last player standing wins; a 1-player match never ends (sandbox/exploration mode). In a

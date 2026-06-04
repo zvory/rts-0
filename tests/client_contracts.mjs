@@ -297,6 +297,22 @@ function fakeAudioContext() {
     STATS[KIND.FACTORY].requires.includes(KIND.TRAINING_CENTRE),
     "Factory should require a Training Centre in the command card",
   );
+  assert(
+    STATS[KIND.STEELWORKS].footW === 2 && STATS[KIND.STEELWORKS].footH === 2,
+    "Steelworks should be a 2x2 building",
+  );
+  assert(
+    STATS[KIND.STEELWORKS].cost.steel === 125 && STATS[KIND.STEELWORKS].cost.oil === 125,
+    "Steelworks cost mirrors server",
+  );
+  assert(
+    STATS[KIND.STEELWORKS].requires.includes(KIND.TRAINING_CENTRE),
+    "Steelworks should require Training Centre tech in the command card",
+  );
+  assert(
+    STATS[KIND.TANK].requires === KIND.STEELWORKS,
+    "Tank training should require a completed Steelworks in the command card",
+  );
   const playerId = 1;
   const underConstructionTrainingCentre = [
     { owner: playerId, kind: KIND.INDUSTRIAL_CENTER, buildProgress: null },

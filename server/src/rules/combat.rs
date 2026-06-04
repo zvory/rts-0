@@ -246,6 +246,7 @@ mod tests {
             (EntityKind::Barracks, true, false, false),
             (EntityKind::TrainingCentre, true, false, false),
             (EntityKind::Factory, true, false, false),
+            (EntityKind::Steelworks, true, false, false),
             (EntityKind::Steel, false, false, false),
             (EntityKind::Oil, false, false, false),
         ];
