@@ -20,7 +20,7 @@ import { HUD } from "./hud.js";
 import { Minimap } from "./minimap.js";
 import { Lobby } from "./lobby.js";
 import { Audio, SOUND_MANIFEST, noticeSoundId } from "./audio.js";
-import { S, EVENT, KIND, SETUP, STATE } from "./protocol.js";
+import { S, EVENT, KIND, NOTICE_SEVERITY, SETUP, STATE } from "./protocol.js";
 import { SNAPSHOT_MS, INTERP_DELAY_MS } from "./config.js";
 
 /** How long (ms) a #toast notice stays on screen before fading out. */
@@ -32,6 +32,9 @@ const TOAST_MS = 2600;
  */
 const HEARTBEAT_MS = 15000;
 const KAR98K_GAIN = 0.25;
+const UNDER_ATTACK_ID = "under_attack";
+const ALERT_PREFIX = "alert:";
+const VIEWPORT_ALERT_MARGIN_PX = 64;
 
 const COMBAT_SOUNDS = Object.freeze({
   [KIND.TANK]: {
@@ -659,14 +662,49 @@ class Match {
     if (!events || !events.length) return;
     for (const ev of events) {
       if (ev && ev.e === EVENT.NOTICE && ev.msg) {
-        this.toast(ev.msg);
-        if (this.audio) {
-          this.audio.play(noticeSoundId(ev.msg), { category: "alert", priority: 3 });
-        }
+        this.handleNotice(ev);
       } else if (ev && ev.e === EVENT.ATTACK) {
         this.playAttackSound(ev);
       }
     }
+  }
+
+  handleNotice(ev) {
+    const alertId = noticeAlertId(ev.msg);
+    const severity = ev.severity || (alertId ? NOTICE_SEVERITY.ALERT : NOTICE_SEVERITY.INFO);
+    this.toast(noticeDisplayText(ev.msg));
+
+    const hasPos = Number.isFinite(ev.x) && Number.isFinite(ev.y);
+    const isAlert = severity === NOTICE_SEVERITY.ALERT || !!alertId;
+    if (isAlert) {
+      if (hasPos) this.minimap?.ping(ev.x, ev.y, severity);
+      else this.minimap?.pulseBorder();
+    }
+
+    if (!this.audio) return;
+    if (alertId === UNDER_ATTACK_ID && hasPos && this.pointInViewport(ev.x, ev.y, VIEWPORT_ALERT_MARGIN_PX)) {
+      return;
+    }
+    const opts = {
+      category: isAlert ? "alert" : "ui",
+      priority: isAlert ? 3 : 1,
+      alertId,
+    };
+    if (hasPos) {
+      opts.alertX = ev.x;
+      opts.alertY = ev.y;
+    }
+    this.audio.play(noticeSoundId(ev.msg), opts);
+  }
+
+  pointInViewport(x, y, marginPx = 0) {
+    const zoom = this.camera.zoom || 1;
+    const margin = marginPx / zoom;
+    const left = this.camera.x - margin;
+    const top = this.camera.y - margin;
+    const right = this.camera.x + this.camera.viewW / zoom + margin;
+    const bottom = this.camera.y + this.camera.viewH / zoom + margin;
+    return x >= left && x <= right && y >= top && y <= bottom;
   }
 
   playAttackSound(ev) {
@@ -806,6 +844,20 @@ class Match {
       }
     }
   }
+}
+
+function noticeAlertId(msg) {
+  const m = String(msg || "").trim().toLowerCase();
+  if (!m.startsWith(ALERT_PREFIX)) return "";
+  return m.slice(ALERT_PREFIX.length).trim();
+}
+
+function noticeDisplayText(msg) {
+  const raw = String(msg || "");
+  const id = noticeAlertId(raw);
+  if (id === UNDER_ATTACK_ID) return "Under attack";
+  if (id) return id.replaceAll("_", " ");
+  return raw;
 }
 
 /**
