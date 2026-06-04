@@ -10,7 +10,10 @@ pub(super) const RIFLE_RAID_RESUME_HOME_CLEARANCE_TILES: f32 = 12.0;
 pub(super) const RIFLE_RAID_RESUME_REISSUE_EPS_TILES: f32 = 1.0;
 
 pub(super) fn is_rifle_raid_policy(attack: AttackPolicy) -> bool {
-    matches!(attack.unit_kinds, [EntityKind::Rifleman]) && attack.required_unit.is_none()
+    matches!(attack.unit_kinds, [EntityKind::Rifleman])
+        && attack.required_unit.is_none()
+        && attack.first_attack_size <= 1
+        && attack.wave_growth == 0
 }
 
 pub(super) fn select_rifle_raid_units(observation: &AiObservation) -> Vec<u32> {
