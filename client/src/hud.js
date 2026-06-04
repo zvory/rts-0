@@ -584,9 +584,10 @@ export class HUD {
       frag.appendChild(btn);
     }
 
-    this._padCard(frag, producing ? cancelSlot : idx);
-
     if (producing) {
+      // Fill any gap between the train buttons and the fixed cancel slot so
+      // the card always renders as a complete 3x3 grid with C in slot 8.
+      this._padCard(frag, idx, cancelSlot);
       const cancelBtn = this._cmdButton({
         icon: "CNCL",
         label: "Cancel",
@@ -597,6 +598,8 @@ export class HUD {
         onClick: () => this.net.command(cmd.cancel(building.id)),
       });
       frag.appendChild(cancelBtn);
+    } else {
+      this._padCard(frag, idx);
     }
 
     card.innerHTML = "";
@@ -672,12 +675,15 @@ export class HUD {
   }
 
   /**
-   * Pad a command-card fragment to exactly 9 slots with empty placeholders.
+   * Pad a command-card fragment with empty placeholders up to `target` slots
+   * (default 9 — a full 3x3 grid). Use a smaller target to reserve trailing
+   * slots for fixed-position buttons (e.g. cancel in slot 8).
    * @param {DocumentFragment} frag
    * @param {number} filled number of real buttons already appended.
+   * @param {number} [target=9] desired total slot count after padding.
    */
-  _padCard(frag, filled) {
-    for (let i = filled; i < 9; i++) {
+  _padCard(frag, filled, target = 9) {
+    for (let i = filled; i < target; i++) {
       const el = document.createElement("div");
       el.className = "cmd-empty";
       frag.appendChild(el);
