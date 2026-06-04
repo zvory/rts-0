@@ -725,7 +725,9 @@ The server treats every client as potentially hostile. Limits live next to the c
   visibility — hidden enemies are never sent.
 - **Shot overpenetration**: ranged attacks continue 25% of their weapon range past the primary
   target and deal 50% reduced damage to additional enemies behind it, which discourages
-  clumping and rewards tighter army control.
+  clumping and rewards tighter army control. Two exceptions: a shot whose primary target is a
+  **tank** never overpenetrates (the armour stops the round dead, no exceptions — even AT teams),
+  and **AT teams** punch deeper, carrying 50% of their weapon range past the primary target.
 - **Tank body and weapon facing**: the snapshot `facing` field is the tank hull/body angle. Tanks
   rotate that body angle at a bounded rate on movement paths; badly misaligned tanks pivot in
   place instead of sliding sideways at full speed. The snapshot `weaponFacing` field is the
