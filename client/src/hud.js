@@ -26,6 +26,14 @@ export function playerHasCompletedKind(entities, playerId, kind) {
   return false;
 }
 
+/** Format tank lifetime movement oil for the selected-entity detail panel. */
+export function formatTankOilUsed(value) {
+  const oilUsed = typeof value === "number" && Number.isFinite(value)
+    ? Math.max(0, value)
+    : 0;
+  return oilUsed >= 10 ? `${Math.round(oilUsed)}` : oilUsed.toFixed(1);
+}
+
 /**
  * The bottom/top DOM HUD: resources, selected panel, and the command card.
  *
@@ -169,12 +177,18 @@ export class HUD {
         `<div class="sel-prod-bar"><div class="sel-prod-fill" style="width:${pct}%"></div></div>`;
     }
 
+    const tankOilHtml = e.kind === KIND.TANK
+      ? `<div class="sel-stat"><span>Oil Used:</span>` +
+        `<strong>${formatTankOilUsed(e.oilUsed)}</strong></div>`
+      : "";
+
     node.innerHTML =
       `<div class="sel-name"><span class="sel-icon">${st.icon || ""}</span>` +
       `${st.label || e.kind}</div>` +
       `<div class="sel-hpbar"><div class="sel-hpfill ${hpClass}" ` +
       `style="width:${(frac * 100).toFixed(0)}%"></div></div>` +
       `<div class="sel-hptext">${hp} / ${maxHp}</div>` +
+      tankOilHtml +
       prodHtml;
     return node;
   }
