@@ -11,6 +11,7 @@ import { Camera } from "../client/src/camera.js";
 import { Fog } from "../client/src/fog.js";
 import { MINING_IC_RANGE_TILES, STATS } from "../client/src/config.js";
 import { playerHasCompletedKind } from "../client/src/hud.js";
+import { Audio } from "../client/src/audio.js";
 import {
   COMPACT_SNAPSHOT_VERSION,
   EVENT,
@@ -537,6 +538,53 @@ function assertHasGetter(obj, name, msgPrefix = "") {
   );
   assert(blockedFog.isVisible(3, 2) === true, "stone tile itself should be visible");
   assert(blockedFog.isVisible(4, 2) === false, "stone should block fog behind it");
+}
+
+// ---------------------------------------------------------------------------
+// Audio
+// ---------------------------------------------------------------------------
+{
+  const priorWindow = globalThis.window;
+  const priorDocument = globalThis.document;
+  const priorLocalStorage = globalThis.localStorage;
+  globalThis.window = {
+    addEventListener() {},
+    removeEventListener() {},
+  };
+  globalThis.document = {
+    hidden: false,
+    addEventListener() {},
+    removeEventListener() {},
+  };
+  globalThis.localStorage = {
+    getItem() { return null; },
+    setItem() {},
+  };
+
+  const audio = new Audio();
+  assertHasMethod(audio, "play", "Audio");
+  assertHasMethod(audio, "playUI", "Audio");
+  assertHasMethod(audio, "preload", "Audio");
+  assertHasMethod(audio, "setListener", "Audio");
+  assertHasMethod(audio, "pickVariant", "Audio");
+  audio.setListener(100, 100, 2, 800);
+  assertApprox(audio.listener.refDist, 400, 0.001, "Audio listener refDist derives from zoom");
+
+  const near = audio._computeSpatial(300, 100);
+  assert(near !== null, "Audio spatial near emitter should play");
+  assertApprox(near.gain, 1, 0.001, "Audio spatial gain is flat inside refDist");
+  assertApprox(near.pan, 0.5, 0.001, "Audio spatial pan uses dx/refDist");
+
+  const far = audio._computeSpatial(1300, 100);
+  assert(far !== null, "Audio spatial max-distance edge should play");
+  assertApprox(far.gain, 1 / 3, 0.001, "Audio spatial gain attenuates at maxDist");
+  assertApprox(far.lpHz, 1200, 0.001, "Audio spatial lowpass reaches far cutoff");
+  assert(audio._computeSpatial(1301, 100) === null, "Audio drops sounds beyond maxDist");
+
+  audio.destroy();
+  globalThis.window = priorWindow;
+  globalThis.document = priorDocument;
+  globalThis.localStorage = priorLocalStorage;
 }
 
 console.log("✅ client_contracts.mjs: all contract assertions passed");
