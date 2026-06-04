@@ -20,6 +20,7 @@ export const C = Object.freeze({
   ADD_AI: "addAi",
   REMOVE_AI: "removeAi",
   SET_QUICKSTART: "setQuickstart",
+  SET_SPECTATOR: "setSpectator",
   COMMAND: "command",
   GIVE_UP: "giveUp",
   PING: "ping",
@@ -384,12 +385,18 @@ function reverseCodes(table) {
 
 // --- Client -> Server builders ---
 export const msg = Object.freeze({
-  join: (name, room = "main") => ({ t: C.JOIN, name, room }),
+  join: (name, room = "main", spectator = false) => ({
+    t: C.JOIN,
+    name,
+    room,
+    spectator: !!spectator,
+  }),
   ready: (ready) => ({ t: C.READY, ready: !!ready }),
   start: () => ({ t: C.START }),
   addAi: () => ({ t: C.ADD_AI }),
   removeAi: (id) => ({ t: C.REMOVE_AI, id }),
   setQuickstart: (enabled) => ({ t: C.SET_QUICKSTART, enabled: !!enabled }),
+  setSpectator: (spectator) => ({ t: C.SET_SPECTATOR, spectator: !!spectator }),
   command: (cmd) => ({ t: C.COMMAND, cmd }),
   giveUp: () => ({ t: C.GIVE_UP }),
   ping: (ts) => ({ t: C.PING, ts }),

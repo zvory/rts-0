@@ -223,6 +223,17 @@ body {
   flex-direction: column;
   gap: 6px;
 }
+.lobby-form .toggle {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+}
+.lobby-form .toggle input {
+  margin: 0;
+  accent-color: var(--accent);
+}
 
 input[type="text"] {
   width: 100%;
@@ -376,6 +387,10 @@ input[type="text"]:focus {
   color: var(--ink-faint);
   border: 1px solid var(--panel-edge);
 }
+.player-list .tag.spectator {
+  color: var(--accent);
+  border: 1px solid rgba(199, 208, 122, 0.38);
+}
 .player-list .player-ready {
   font-size: 12px;
   font-weight: 700;
@@ -383,6 +398,9 @@ input[type="text"]:focus {
 }
 .player-list .player-ready.ready {
   color: var(--good);
+}
+.player-list .player-ready.spectator {
+  color: var(--accent);
 }
 /* Host-only remove control on AI rows. */
 .player-list .player-remove {
@@ -394,6 +412,9 @@ input[type="text"]:focus {
 }
 .player-list li.is-ai {
   opacity: 0.92;
+}
+.player-list li.is-spectator {
+  opacity: 0.9;
 }
 
 .status {
