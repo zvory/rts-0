@@ -304,29 +304,6 @@ mod tests {
         (to - from + std::f32::consts::PI).rem_euclid(std::f32::consts::TAU) - std::f32::consts::PI
     }
 
-    fn straight_segment_standable_for_test(
-        map: &Map,
-        occ: &Occupancy,
-        kind: EntityKind,
-        from: (f32, f32),
-        to: (f32, f32),
-    ) -> bool {
-        let dx = to.0 - from.0;
-        let dy = to.1 - from.1;
-        let distance = (dx * dx + dy * dy).sqrt();
-        let step_px = config::TILE_SIZE as f32 / 4.0;
-        let steps = (distance / step_px).ceil().max(1.0) as u32;
-        for i in 0..=steps {
-            let t = i as f32 / steps as f32;
-            let x = from.0 + dx * t;
-            let y = from.1 + dy * t;
-            if !standability::unit_static_standable(map, occ, kind, x, y) {
-                return false;
-            }
-        }
-        true
-    }
-
     #[test]
     fn path_cache_eviction_is_deterministic_across_instances() {
         // Use a small empty map so most path requests are valid and cached.
@@ -457,7 +434,7 @@ mod tests {
         let entities = EntityStore::new();
         let occ = Occupancy::build(&map, &entities);
         assert!(
-            straight_segment_standable_for_test(
+            standability::unit_static_segment_standable(
                 &map,
                 &occ,
                 EntityKind::Tank,
@@ -501,7 +478,7 @@ mod tests {
         let entities = EntityStore::new();
         let occ = Occupancy::build(&map, &entities);
         assert!(
-            !straight_segment_standable_for_test(
+            !standability::unit_static_segment_standable(
                 &map,
                 &occ,
                 EntityKind::Rifleman,

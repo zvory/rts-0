@@ -55,7 +55,7 @@ pub(crate) fn combat_system(
 
     for id in entities.ids() {
         // Determine this attacker's combat parameters.
-        let (owner, px, py, range_px, aggro_px, dmg, cd_reset, mode, is_unit) = {
+        let (owner, px, py, range_px, acquire_px, dmg, cd_reset, mode, is_unit) = {
             let e = match entities.get(id) {
                 Some(e) => e,
                 None => continue,
@@ -85,15 +85,21 @@ pub(crate) fn combat_system(
             } else {
                 range_px
             };
+            let mode = combat_mode(e);
+            let acquire_px = if mode == CombatMode::Opportunistic {
+                range_px
+            } else {
+                aggro_px
+            };
             (
                 e.owner,
                 e.pos_x,
                 e.pos_y,
                 range_px,
-                aggro_px,
+                acquire_px,
                 dmg,
                 cd,
-                combat_mode(e),
+                mode,
                 e.is_unit(),
             )
         };
@@ -102,11 +108,14 @@ pub(crate) fn combat_system(
         }
 
         // Resolve / acquire a target id based on the current order semantics.
-        let target = resolve_target(entities, spatial, &los, id, owner, px, py, aggro_px, mode);
+        let target = resolve_target(entities, spatial, &los, id, owner, px, py, acquire_px, mode);
         let Some(tid) = target else {
             // No target: clear stale combat target id for opportunistic-combat orders.
             if let Some(e) = entities.get_mut(id) {
-                if matches!(e.order(), Order::AttackMove(_) | Order::Idle) {
+                if matches!(
+                    e.order(),
+                    Order::AttackMove(_) | Order::Move(_) | Order::Idle
+                ) {
                     e.set_target_id(None);
                     begin_idle_machine_gunner_setup(e);
                 }
@@ -400,8 +409,10 @@ fn machine_gunner_ready_to_move(entities: &mut EntityStore, id: u32) -> bool {
 enum CombatMode {
     /// Has an explicit attack target id.
     Ordered,
-    /// Engages any enemy within range.
+    /// Engages and chases any enemy within acquisition range.
     Aggressive,
+    /// Engages enemies already in weapon range, without chasing them.
+    Opportunistic,
     /// Ignores nearby enemies unless explicitly ordered to attack.
     Passive,
 }
@@ -410,10 +421,9 @@ fn combat_mode(e: &Entity) -> CombatMode {
     match e.order() {
         Order::Attack(_) => CombatMode::Ordered,
         Order::AttackMove(_) => CombatMode::Aggressive,
+        Order::Move(_) if e.kind == EntityKind::Tank => CombatMode::Opportunistic,
         Order::Idle if e.is_building() => CombatMode::Aggressive,
-        Order::Idle if e.is_unit() && e.kind != crate::game::entity::EntityKind::Worker => {
-            CombatMode::Aggressive
-        }
+        Order::Idle if e.is_unit() && e.kind != EntityKind::Worker => CombatMode::Aggressive,
         _ => CombatMode::Passive,
     }
 }
@@ -443,7 +453,7 @@ fn resolve_target(
         // Explicit target gone → fall through to acquisition so we don't stand idle.
     }
 
-    if mode == CombatMode::Passive {
+    if matches!(mode, CombatMode::Passive) {
         return None;
     }
 
@@ -1086,6 +1096,61 @@ mod tests {
             !tank.path_is_empty(),
             "tank should keep its movement path while firing"
         );
+        assert_eq!(tank.next_waypoint(), Some((300.0, 100.0)));
+    }
+
+    #[test]
+    fn tank_move_order_fires_without_leaving_move_path() {
+        let mut entities = EntityStore::new();
+        let tank_id = entities
+            .spawn_unit(1, EntityKind::Tank, 100.0, 100.0)
+            .expect("tank should spawn");
+        let enemy_id = entities
+            .spawn_unit(2, EntityKind::Rifleman, 120.0, 100.0)
+            .expect("enemy should spawn");
+        if let Some(tank) = entities.get_mut(tank_id) {
+            tank.set_facing(0.0);
+            tank.set_weapon_facing(0.0);
+            tank.set_order(Order::move_to(300.0, 100.0));
+            tank.set_path(vec![(300.0, 100.0)]);
+            tank.set_path_goal(Some((300.0, 100.0)));
+        }
+
+        run_combat_tick(&mut entities);
+
+        let tank = entities.get(tank_id).expect("tank should exist");
+        assert_eq!(tank.target_id(), Some(enemy_id));
+        assert!(
+            tank.attack_cd() > 0,
+            "aligned moving tank turret should fire"
+        );
+        assert!(
+            !tank.path_is_empty(),
+            "moving tank should keep its movement path while firing"
+        );
+        assert_eq!(tank.next_waypoint(), Some((300.0, 100.0)));
+    }
+
+    #[test]
+    fn tank_move_order_does_not_chase_targets_outside_weapon_range() {
+        let mut entities = EntityStore::new();
+        let tank_id = entities
+            .spawn_unit(1, EntityKind::Tank, 100.0, 100.0)
+            .expect("tank should spawn");
+        entities
+            .spawn_unit(2, EntityKind::Rifleman, 260.0, 100.0)
+            .expect("enemy should spawn");
+        if let Some(tank) = entities.get_mut(tank_id) {
+            tank.set_order(Order::move_to(300.0, 100.0));
+            tank.set_path(vec![(300.0, 100.0)]);
+            tank.set_path_goal(Some((300.0, 100.0)));
+        }
+
+        run_combat_tick(&mut entities);
+
+        let tank = entities.get(tank_id).expect("tank should exist");
+        assert_eq!(tank.target_id(), None);
+        assert_eq!(tank.path_goal(), Some((300.0, 100.0)));
         assert_eq!(tank.next_waypoint(), Some((300.0, 100.0)));
     }
 
