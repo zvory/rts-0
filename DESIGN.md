@@ -607,8 +607,13 @@ once; on `gameOver` show the victory/defeat overlay with the frozen score table.
   from `resourceDeltas` via size/opacity. When a worker is selected and the cursor hovers a
   resource, draw a blue circle on the resource when the nearest completed own Industrial Center
   is inside mining range; draw a red/dashed line to the Industrial Center when too far.
-- Tanks: expose `oilUsed` in the bottom selected-entity panel as `Oil Used:` when exactly one tank
-  is selected.
+- Tanks: render the hull from mirrored client `TANK_BODY` constants (`42px` length, `24px` width,
+  `1.5px` clearance) so the visible body, selection ring, click target, and advisory build
+  preview match the server's oriented vehicle body. Track tread offsets advance from actual
+  interpolated movement and hull turn deltas: both tracks forward/backward for drive/reverse and
+  opposite track motion for pivot turns. Own tanks show a small amber/red fuel cue when oil is low
+  or movement is oil-starved; the selected-entity panel also exposes lifetime movement `oilUsed`
+  as `Oil Used:` when exactly one tank is selected.
 - Terrain: muted grass/field/mud, rock, and water tiles with deterministic coarse dithering
   so movement is readable and the map has a PlayStation 1-era low-resolution texture feel.
 - Fog: unexplored = 86% dark overlay so terrain remains faintly readable; explored-but-not-visible =
