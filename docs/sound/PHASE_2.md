@@ -31,9 +31,10 @@ dy = emitter.y - listener.y
 d  = sqrt(dx*dx + dy*dy)
 refDist  = 1 screen-width worth of world pixels at current zoom
 maxDist  = 3 * refDist
-gain     = clamp(refDist / max(d, refDist), 0, 1)   // inverse-ish, flat inside refDist
+farD     = refDist + max(0, d - refDist) * 2
+gain     = clamp(refDist / max(farD, refDist), 0, 1) // inverse-ish, flat inside refDist
 pan      = clamp(dx / refDist, -1, 1)
-lpHz     = lerp(20000, 1200, clamp(d / maxDist, 0, 1))
+lpHz     = lerp(20000, 1200, clamp(farD / maxDist, 0, 1))
 ```
 
 Beyond `maxDist`, drop the sound entirely (do not even allocate a voice). This is the single
