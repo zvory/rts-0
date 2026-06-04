@@ -732,6 +732,83 @@ fn clustered_units_make_progress_to_distant_goal() {
 }
 
 #[test]
+fn tank_routes_around_diagonal_pinch_between_offset_factories() {
+    // Two factories arranged so their corners are diagonally opposite across a
+    // single-tile gap column. Before the diagonal-pinch fix, the tank would
+    // permanently stall trying to thread (3, 3)-style tiles in this gap.
+    let map = flat_map(1);
+    let mut entities = EntityStore::new();
+
+    // Factory A at top-left tile (10, 10) -> covers (10..=12, 10..=12).
+    // Factory B at top-left tile (14, 13) -> covers (14..=16, 13..=15).
+    // Gap column x = 13; diagonal pinch at tile (13, 13).
+    let (ax, ay) = footprint_center(&map, EntityKind::Factory, 10, 10);
+    entities
+        .spawn_building(2, EntityKind::Factory, ax, ay, true)
+        .expect("factory A spawn");
+    let (bx, by) = footprint_center(&map, EntityKind::Factory, 14, 13);
+    entities
+        .spawn_building(2, EntityKind::Factory, bx, by, true)
+        .expect("factory B spawn");
+
+    let start = map.tile_center(8, 8);
+    let goal = map.tile_center(18, 17);
+    let tank = entities
+        .spawn_unit(1, EntityKind::Tank, start.0, start.1)
+        .expect("tank spawn");
+
+    let mut pathing = PathingService::new(8_192, 256);
+    let mut stuck_ticks = 0u32;
+    let mut last_pos = start;
+
+    for tick in 1u32..=900 {
+        pathing.advance_tick(tick);
+        let occ = Occupancy::build(&map, &entities);
+        let mut coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, tick);
+        if tick == 1 {
+            coordinator.order_group_move(&mut entities, 1, &[tank], goal, false);
+        }
+        coordinator.process_awaiting_paths(&mut entities);
+        let spatial = SpatialIndex::build(&entities, map.size);
+        movement_system(&map, &mut entities, &mut [], &occ, &spatial, tick);
+        let spatial = SpatialIndex::build(&entities, map.size);
+        resolve_collisions(&mut entities, &spatial, &map, &occ);
+
+        let e = entities.get(tank).expect("tank should still exist");
+        let now = (e.pos_x, e.pos_y);
+        let moved = moved_distance(last_pos, now);
+        if moved <= 0.01 && !e.path_is_empty() {
+            stuck_ticks += 1;
+        } else if moved > 0.01 {
+            stuck_ticks = 0;
+        }
+        assert!(
+            stuck_ticks < 200,
+            "tank deadlocked at ({:.1}, {:.1}) at tick {tick} — diagonal-pinch regression",
+            now.0,
+            now.1
+        );
+        last_pos = now;
+
+        if e.path_is_empty() {
+            break;
+        }
+    }
+
+    let e = entities.get(tank).expect("tank should still exist");
+    let dx = e.pos_x - goal.0;
+    let dy = e.pos_y - goal.1;
+    let dist_to_goal = (dx * dx + dy * dy).sqrt();
+    assert!(
+        dist_to_goal <= config::TOLERANT_ARRIVAL_RADIUS_PX,
+        "tank failed to route around the diagonal pinch; ended {:.1}px from goal at ({:.1}, {:.1})",
+        dist_to_goal,
+        e.pos_x,
+        e.pos_y
+    );
+}
+
+#[test]
 fn tank_moves_through_long_two_tile_wide_corridor() {
     let map = two_tile_wide_horizontal_corridor_map();
     let mut entities = EntityStore::new();
