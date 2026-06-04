@@ -1,0 +1,69 @@
+use std::collections::HashMap;
+
+use crate::game::entity::EntityStore;
+use crate::game::map::Map;
+use crate::game::services::occupancy::Occupancy;
+use crate::game::services::spatial::SpatialIndex;
+use crate::game::PlayerState;
+use crate::protocol::Event;
+
+mod collision;
+mod standability;
+mod steering;
+mod tank_drive;
+mod waypoints;
+
+#[cfg(test)]
+mod tests;
+
+/// World pixels at which a unit is considered "arrived" at a waypoint / target point.
+pub(super) const ARRIVE_EPS: f32 = 2.0;
+
+/// Conservative fallback for broad-phase bounding-box queries if an entity body is unavailable.
+pub(super) const MAX_UNIT_BOUNDING_RADIUS_PX: f32 = 32.0;
+
+pub(super) const STEERING_MAX_NEIGHBORS: usize = 16;
+
+pub(crate) use collision::resolve_collisions;
+pub(crate) use standability::is_collision_anchored;
+#[cfg(test)]
+use tank_drive::TANK_BODY_TURN_RATE_RAD_PER_TICK;
+pub(crate) use tank_drive::{angle_delta, rotate_toward};
+
+/// Advance every moving unit along its waypoint path at its speed. Clamps the final landing
+/// tile to passable terrain (soft overlap with other units is allowed, so we don't resolve
+/// unit-unit collisions here). Arriving at the last waypoint of a plain Move clears the order.
+#[cfg(test)]
+pub(crate) fn movement_system(
+    map: &Map,
+    entities: &mut EntityStore,
+    players: &mut [PlayerState],
+    occ: &Occupancy,
+    spatial: &SpatialIndex,
+    tick: u32,
+) {
+    let mut ignored_events = HashMap::new();
+    movement_system_with_events(
+        map,
+        entities,
+        players,
+        occ,
+        spatial,
+        tick,
+        &mut ignored_events,
+    );
+}
+
+/// Movement entry point for the real tick loop, with access to transient player events.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn movement_system_with_events(
+    map: &Map,
+    entities: &mut EntityStore,
+    players: &mut [PlayerState],
+    occ: &Occupancy,
+    spatial: &SpatialIndex,
+    tick: u32,
+    events: &mut HashMap<u32, Vec<Event>>,
+) {
+    waypoints::advance_moving_units(map, entities, players, occ, spatial, tick, events);
+}
