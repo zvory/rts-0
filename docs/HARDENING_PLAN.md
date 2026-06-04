@@ -72,8 +72,14 @@ Recommended policy:
 
 ### 3. Tick pipeline is implicit
 
-`run_tick` currently accepts many inputs and manually rebuilds occupancy/spatial indexes at
-different points in the frame. That is workable, but it makes it easy to pass a stale derived
+Status: `systems::run_tick` now rebuilds named phase state at explicit boundaries:
+`PreCommandDerivedState`, `PostMovementDerivedState`, `PreCollisionDerivedState`, and
+`FinalDerivedState`. The pipeline still remains a small orchestrator rather than a full ECS, but
+occupancy and spatial indexes are no longer anonymous local variables whose validity has to be
+inferred from nearby comments.
+
+Prior risk: `run_tick` accepted many inputs and manually rebuilt occupancy/spatial indexes at
+different points in the frame. That was workable, but it made it easy to pass a stale derived
 structure into a later system.
 
 Recommended policy:
