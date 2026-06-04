@@ -36,17 +36,17 @@ Before implementing any phase:
 
 ## Current Risks
 
-### 1. Unstable iteration on mutable entity access
+### 1. Mutable entity access must use stable id iteration
 
-`EntityStore::iter()` and `ids()` already sort ids, which gives stable read ordering. `iter_mut()`
-returns raw `HashMap::values_mut()`, which is not order-stable. That is harmless only if callers
-never depend on the order of mutation. Over time this becomes a deterministic tick hazard.
+`EntityStore::iter()` and `ids()` sort ids, which gives stable read ordering and stable mutable
+visitation when systems iterate ids and then call `get_mut(id)`. `EntityStore::iter_mut()` has been
+removed so simulation systems cannot accidentally depend on raw `HashMap::values_mut()` order.
 
 Recommended policy:
 
-- Prefer removing `iter_mut()` if no genuinely order-agnostic use requires it.
-- If it stays, document it as order-unsafe and forbid order-sensitive mutation from using it.
+- Do not add a raw mutable entity iterator without documenting why order cannot affect outcomes.
 - Any mutation whose result could depend on visitation order must iterate over sorted ids first.
+- Prefer shared `iter()` for read-only scans and `ids()` + `get_mut(id)` for mutation.
 
 ### 2. Protocol coupling inside simulation code
 
@@ -152,4 +152,3 @@ cd tests && npm install && node client_smoke.mjs
 When a change alters protocol or rules parity, update the relevant docs and tests in the same
 change. If a phase changes a contract described in `DESIGN.md`, update `DESIGN.md` at the same
 time.
-
