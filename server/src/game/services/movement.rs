@@ -34,6 +34,7 @@ const TANK_BODY_LOOKAHEAD_PX: f32 = config::TILE_SIZE as f32 * 2.0;
 const TANK_CRAWL_ANGLE_RAD: f32 = 0.55;
 const TANK_PIVOT_ANGLE_RAD: f32 = 1.25;
 
+const STEERING_LOOKAHEAD_PX: f32 = config::TILE_SIZE as f32 * 1.5;
 const STEERING_RADIUS_PX: f32 = config::TILE_SIZE as f32 * 2.5;
 const STEERING_STRENGTH: f32 = 0.65;
 const STEERING_MAX_NEIGHBORS: usize = 16;
@@ -69,7 +70,7 @@ pub(crate) fn movement_system(
                 speed,
                 e.pos_x,
                 e.pos_y,
-                matches!(e.order(), Order::Move(_)),
+                matches!(e.order(), Order::Move(_)) && footing_profile(e) != FootingProfile::Ghost,
             )
         };
         if speed <= 0.0 {
@@ -173,8 +174,21 @@ pub(crate) fn movement_system(
                 let direct_nx = x + path_dir.0 * budget;
                 let direct_ny = y + path_dir.1 * budget;
                 let steered = if can_local_steer {
+                    let steering_path_dir = entities
+                        .get(id)
+                        .map(|e| steering_path_dir(e, x, y, path_dir))
+                        .unwrap_or(path_dir);
                     steered_candidate(
-                        entities, spatial, occ, map, id, kind, x, y, path_dir, budget,
+                        entities,
+                        spatial,
+                        occ,
+                        map,
+                        id,
+                        kind,
+                        x,
+                        y,
+                        steering_path_dir,
+                        budget,
                     )
                 } else {
                     None
@@ -393,6 +407,33 @@ fn tank_desired_path_point(e: &Entity, x: f32, y: f32) -> Option<(f32, f32)> {
             (dx * dx + dy * dy).sqrt() >= TANK_BODY_LOOKAHEAD_PX
         })
         .or(Some(next))
+}
+
+fn steering_path_dir(e: &Entity, x: f32, y: f32, fallback: (f32, f32)) -> (f32, f32) {
+    let Some(path) = e.movement.as_ref().map(|m| &m.path) else {
+        return fallback;
+    };
+    let Some((tx, ty)) = path
+        .iter()
+        .rev()
+        .copied()
+        .find(|(px, py)| {
+            let dx = *px - x;
+            let dy = *py - y;
+            (dx * dx + dy * dy).sqrt() >= STEERING_LOOKAHEAD_PX
+        })
+        .or_else(|| path.last().copied())
+    else {
+        return fallback;
+    };
+    let dx = tx - x;
+    let dy = ty - y;
+    let d = (dx * dx + dy * dy).sqrt();
+    if d <= 1e-4 || !d.is_finite() {
+        fallback
+    } else {
+        (dx / d, dy / d)
+    }
 }
 
 #[allow(clippy::too_many_arguments)]
