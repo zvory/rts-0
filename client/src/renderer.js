@@ -437,7 +437,7 @@ export class Renderer {
       ? state.weaponRecoil(e.id, e.kind, performance.now())
       : 0;
     const recoil = weaponRecoilOffset(e.kind, recoilProgress);
-    const heavyKick = isVehicleBodyKind(e.kind)
+    const heavyKick = e.kind === KIND.TANK
       ? recoilVector(weaponFacing, recoil * 0.85)
       : e.kind === KIND.AT_TEAM
         ? recoilVector(weaponFacing, recoil * 0.42)
@@ -1533,7 +1533,8 @@ function drawScoutCar(g, body, tint, facing, weaponFacing, motion, recoil) {
   g.moveTo(hoodA.x, hoodA.y);
   g.lineTo(hoodB.x, hoodB.y);
 
-  const gunner = rotatePoint(-body.halfLen * 0.42, 0, facing);
+  const gunnerAnchor = rotatePoint(-body.halfLen * 0.42, 0, facing);
+  const gunner = offsetPoint(gunnerAnchor, recoilVector(weaponFacing, recoil));
   const mount = rotatePoint(-body.halfLen * 0.32, 0, facing);
   g.beginFill(0x1a1712, 0.9);
   g.drawCircle(mount.x, mount.y, body.halfWidth * 0.32);
@@ -1556,41 +1557,40 @@ function drawScoutCar(g, body, tint, facing, weaponFacing, motion, recoil) {
   g.drawCircle(gunnerHead.x, gunnerHead.y, body.halfWidth * 0.18);
   g.endFill();
 
-  const kick = recoilVector(a, recoil);
   const handSpan = body.halfWidth * 0.32;
-  const grip = offsetPoint({
+  const grip = {
     x: gunner.x + Math.cos(a) * body.halfWidth * 0.2,
     y: gunner.y + Math.sin(a) * body.halfWidth * 0.2,
-  }, kick);
+  };
   g.lineStyle(2, 0xd8d0b0, 0.86);
   g.moveTo(gunner.x - Math.sin(a) * handSpan, gunner.y + Math.cos(a) * handSpan);
   g.lineTo(grip.x, grip.y);
   g.moveTo(gunner.x + Math.sin(a) * handSpan, gunner.y - Math.cos(a) * handSpan);
   g.lineTo(grip.x, grip.y);
 
-  const stock = offsetPoint({
+  const stock = {
     x: gunner.x + Math.cos(a + Math.PI) * body.halfWidth * 0.34,
     y: gunner.y + Math.sin(a + Math.PI) * body.halfWidth * 0.34,
-  }, kick);
-  const muzzle = offsetPoint({
+  };
+  const muzzle = {
     x: gunner.x + Math.cos(a) * (body.halfLen * 0.78),
     y: gunner.y + Math.sin(a) * (body.halfLen * 0.78),
-  }, kick);
+  };
   g.lineStyle(3, 0x17130f, 0.98);
   g.moveTo(stock.x, stock.y);
   g.lineTo(muzzle.x, muzzle.y);
   g.beginFill(0x32291f, 0.98);
-  const receiver = offsetPoint({
+  const receiver = {
     x: gunner.x + Math.cos(a) * body.halfWidth * 0.42,
     y: gunner.y + Math.sin(a) * body.halfWidth * 0.42,
-  }, kick);
+  };
   drawFreeRotatedRect(g, receiver.x, receiver.y, body.halfWidth * 0.58, body.halfWidth * 0.3, a);
   g.endFill();
 
-  const shroud = offsetPoint({
+  const shroud = {
     x: gunner.x + Math.cos(a) * body.halfWidth * 0.9,
     y: gunner.y + Math.sin(a) * body.halfWidth * 0.9,
-  }, kick);
+  };
   g.beginFill(0x241d17, 0.98);
   drawFreeRotatedRect(g, shroud.x, shroud.y, body.halfWidth * 0.82, body.halfWidth * 0.18, a);
   g.endFill();
