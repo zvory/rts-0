@@ -46,7 +46,6 @@ const COMBAT_SOUNDS = Object.freeze({
   [KIND.AT_TEAM]: {
     ids: ["combat_tank_01", "combat_tank_06"],
     priority: 4,
-    gain: KAR98K_GAIN,
   },
   [KIND.MACHINE_GUNNER]: {
     ids: ["combat_mg_burst_02", "combat_mg_burst_03"],
