@@ -797,10 +797,12 @@ The server treats every client as potentially hostile. Limits live next to the c
   `rules::projection`, which gates entity views, `target_id` tracers, and death/attack events on
   visibility — hidden enemies are never sent. Visibility is terrain-aware: stone blocks sight
   beyond itself on both the server fog grid and the client cosmetic fog overlay.
-- **Shot blocking**: ranged attacks resolve against the first enemy tank body or building footprint
-  intersecting the line from attacker to intended target. That blocker takes the shot damage and
-  the intended target behind it is unharmed. Shots do not overpenetrate; after one entity takes
-  damage, the round is spent. Stone blocks target acquisition and primary fire.
+- **Shot blocking and overpenetration**: ranged attacks first resolve against the first enemy tank
+  body or building footprint intersecting the line from attacker to intended target. That blocker
+  takes the shot damage and the intended target behind it is unharmed. Shots that hit ordinary
+  units still overpenetrate past the primary target, but any tank body or building footprint hit
+  by that carry-through damage absorbs the shot and stops further overpenetration. Stone blocks
+  target acquisition and primary fire.
 - **Tank body and weapon facing**: the snapshot `facing` field is the tank hull/body angle. Tanks
   rotate that body angle at a bounded rate (`TANK_BODY_TURN_RATE_RAD_PER_TICK = 0.035`) on
   movement paths; badly misaligned tanks pivot in place instead of sliding sideways at full speed.

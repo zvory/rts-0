@@ -497,7 +497,7 @@ fn apply_damage(
     ay: f32,
     vx: f32,
     vy: f32,
-    _range_px: f32,
+    range_px: f32,
     tick: u32,
 ) {
     if entities.get(victim).map(|e| e.is_node()).unwrap_or(false) {
@@ -561,6 +561,22 @@ fn apply_damage(
         false
     };
     if damaged {
+        apply_overpenetration(
+            map,
+            entities,
+            events,
+            fog,
+            attacker,
+            shot_victim,
+            effective_dmg,
+            attacker_owner,
+            ax,
+            ay,
+            shot_victim_pos.0,
+            shot_victim_pos.1,
+            range_px,
+            tick,
+        );
         push_under_attack_notices_for_visible_attack(
             events,
             fog,
@@ -571,6 +587,143 @@ fn apply_damage(
             shot_victim_pos.0,
             shot_victim_pos.1,
         );
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn apply_overpenetration(
+    map: &Map,
+    entities: &mut EntityStore,
+    events: &mut HashMap<u32, Vec<Event>>,
+    fog: &Fog,
+    attacker: u32,
+    primary_victim: u32,
+    primary_dmg: u32,
+    attacker_owner: u32,
+    ax: f32,
+    ay: f32,
+    vx: f32,
+    vy: f32,
+    range_px: f32,
+    tick: u32,
+) {
+    if entities
+        .get(primary_victim)
+        .map(|e| e.kind == EntityKind::Tank || e.is_building())
+        .unwrap_or(false)
+    {
+        return;
+    }
+    let dx = vx - ax;
+    let dy = vy - ay;
+    let dist = (dx * dx + dy * dy).sqrt();
+    if dist <= f32::EPSILON {
+        return;
+    }
+
+    let overpenetration_factor = match entities.get(attacker).map(|e| e.kind) {
+        Some(EntityKind::AtTeam) => 0.50,
+        _ => 0.25,
+    };
+    let overpenetration_limit = dist + range_px * overpenetration_factor;
+    let ux = dx / dist;
+    let uy = dy / dist;
+    let shot_end = (
+        ax + ux * overpenetration_limit,
+        ay + uy * overpenetration_limit,
+    );
+    let perpendicular_slack = RANGE_SLACK + 8.0;
+    let splash_dmg = primary_dmg / 2;
+    if splash_dmg == 0 {
+        return;
+    }
+
+    let player_ids: Vec<u32> = events.keys().copied().collect();
+    let mut hits: Vec<(u32, f32, f32, f32)> = Vec::new();
+    let los = LineOfSight::new(map);
+    for id in entities.ids() {
+        if id == attacker || id == primary_victim {
+            continue;
+        }
+        let Some(target) = entities.get(id) else {
+            continue;
+        };
+        if target.is_node() || target.owner == attacker_owner || target.hp == 0 {
+            continue;
+        }
+        let along = if target.kind == EntityKind::Tank || target.is_building() {
+            let Some(hit_t) = shot_blocker_intersection(map, target, (ax, ay), shot_end) else {
+                continue;
+            };
+            hit_t * overpenetration_limit
+        } else {
+            let tx = target.pos_x - ax;
+            let ty = target.pos_y - ay;
+            let along = tx * ux + ty * uy;
+            if along <= dist || along > overpenetration_limit {
+                continue;
+            }
+            let perp = (tx * uy - ty * ux).abs();
+            if perp > target.radius() + perpendicular_slack {
+                continue;
+            }
+            along
+        };
+        if along <= dist || along > overpenetration_limit {
+            continue;
+        }
+        if !los.clear_between_world_points((ax, ay), (target.pos_x, target.pos_y)) {
+            continue;
+        }
+        hits.push((id, target.pos_x, target.pos_y, along));
+    }
+
+    hits.sort_by(|a, b| a.3.total_cmp(&b.3).then_with(|| a.0.cmp(&b.0)));
+    for (id, tx, ty, _) in hits {
+        let attacker_kind = entities.get(attacker).map(|e| e.kind);
+        let effective_dmg = entities
+            .get(id)
+            .map(|e| match attacker_kind {
+                Some(ak) => combat_rules::effective_damage_with_facing(
+                    ak,
+                    e.kind,
+                    splash_dmg,
+                    Some(TerrainKind::Open),
+                    Some(e.facing()),
+                    (e.pos_x, e.pos_y),
+                    (ax, ay),
+                ),
+                None => splash_dmg,
+            })
+            .unwrap_or(0);
+        if effective_dmg == 0 {
+            continue;
+        }
+        let victim_owner = entities.get(id).map(|e| e.owner).unwrap_or(0);
+        let shot_blocked = entities
+            .get(id)
+            .map(|e| e.kind == EntityKind::Tank || e.is_building())
+            .unwrap_or(false);
+        if let Some(v) = entities.get_mut(id) {
+            if v.hp > 0 {
+                v.hp = v.hp.saturating_sub(effective_dmg);
+                v.set_last_damage_owner(Some(attacker_owner));
+                v.record_damage_from((ax, ay), tick);
+            }
+        }
+        for pid in &player_ids {
+            if !projection::attack_event_visible_to(*pid, ax, ay, tx, ty, attacker_owner, fog) {
+                continue;
+            }
+            events.entry(*pid).or_default().push(Event::Attack {
+                from: attacker,
+                to: id,
+            });
+            push_under_attack_notice(events, *pid, victim_owner, attacker_owner, tx, ty);
+        }
+        if shot_blocked {
+            break;
+        }
     }
 }
 
@@ -1659,7 +1812,7 @@ mod tests {
     }
 
     #[test]
-    fn shots_do_not_overpenetrate_past_the_primary_target() {
+    fn shots_overpenetrate_past_non_blocking_primary_target() {
         let mut entities = EntityStore::new();
         let attacker = entities
             .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
@@ -1690,10 +1843,10 @@ mod tests {
 
         assert_eq!(entities.get(primary).expect("primary should exist").hp, 35);
         let secondary = entities.get(secondary).expect("secondary should exist");
-        assert_eq!(secondary.hp, secondary.max_hp);
+        assert_eq!(secondary.hp, 35);
         assert!(
             matches!(secondary.order(), Order::Idle),
-            "undamaged secondary workers should remain idle"
+            "overpenetration damage must not trigger worker retreat"
         );
     }
 
@@ -1784,6 +1937,52 @@ mod tests {
             Some(1500)
         );
         assert_eq!(entities.get(node).expect("node should exist").hp, 1);
+    }
+
+    #[test]
+    fn tank_behind_primary_target_blocks_overpenetration() {
+        let mut entities = EntityStore::new();
+        let attacker = entities
+            .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
+            .expect("attacker should spawn");
+        let primary = entities
+            .spawn_unit(2, EntityKind::Rifleman, 140.0, 100.0)
+            .expect("primary target should spawn");
+        let blocker = entities
+            .spawn_unit(2, EntityKind::Tank, 165.0, 100.0)
+            .expect("blocking tank should spawn");
+        let behind = entities
+            .spawn_unit(2, EntityKind::Worker, 190.0, 100.0)
+            .expect("unit behind blocker should spawn");
+        let blocker_hp_before = entities.get(blocker).expect("blocker should exist").hp;
+        let behind_hp_before = entities.get(behind).expect("behind should exist").hp;
+        let mut events: HashMap<u32, Vec<Event>> = HashMap::new();
+        events.insert(1, Vec::new());
+        events.insert(2, Vec::new());
+
+        apply_test_damage(
+            &mut entities,
+            &mut events,
+            attacker,
+            primary,
+            20,
+            1,
+            100.0,
+            100.0,
+            140.0,
+            100.0,
+            128.0,
+        );
+
+        assert!(
+            entities.get(blocker).expect("blocker should exist").hp < blocker_hp_before,
+            "tank behind the primary target should take overpenetration damage"
+        );
+        assert_eq!(
+            entities.get(behind).expect("behind should exist").hp,
+            behind_hp_before,
+            "overpenetration should stop at the tank"
+        );
     }
 
     #[test]
