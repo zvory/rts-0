@@ -31,11 +31,16 @@ struct Node {
     g: u32,
     tx: i32,
     ty: i32,
+    dir: u8,
 }
 
 impl PartialEq for Node {
     fn eq(&self, other: &Self) -> bool {
-        self.f == other.f && self.g == other.g && self.tx == other.tx && self.ty == other.ty
+        self.f == other.f
+            && self.g == other.g
+            && self.tx == other.tx
+            && self.ty == other.ty
+            && self.dir == other.dir
     }
 }
 impl Eq for Node {}
@@ -49,6 +54,7 @@ impl Ord for Node {
             .then_with(|| other.g.cmp(&self.g))
             .then_with(|| other.ty.cmp(&self.ty))
             .then_with(|| other.tx.cmp(&self.tx))
+            .then_with(|| other.dir.cmp(&self.dir))
     }
 }
 impl PartialOrd for Node {
@@ -79,19 +85,28 @@ const NEIGHBORS: [(i32, i32, u32); 8] = [
     (-1, -1, 14),
 ];
 
+const NO_INCOMING_DIR: u8 = u8::MAX;
+
+type SearchKey = (i32, i32, u8);
+
 /// Find a tile path from `(sx, sy)` to `(gx, gy)` with a configurable expansion cap.
 ///
 /// Returns the sequence of tile coordinates to traverse, EXCLUDING the start tile and
 /// INCLUDING the goal tile (or the closest reachable tile on best-effort). An empty vec means
 /// "already there" or "nowhere useful to go". Diagonal moves are forbidden when they would
 /// cut a corner between two blocked tiles (prevents clipping through walls).
-pub fn find_path_with_budget<P: Passability>(
+/// Find a tile path with an optional deterministic direction-change penalty.
+///
+/// `turn_penalty` is added whenever a move's direction differs from the incoming direction.
+/// A value of `0` preserves the legacy tile-only A* scoring.
+pub fn find_path_with_budget_and_turn_cost<P: Passability>(
     pass: &P,
     sx: i32,
     sy: i32,
     gx: i32,
     gy: i32,
     max_expanded: usize,
+    turn_penalty: u32,
 ) -> Vec<(i32, i32)> {
     if sx == gx && sy == gy {
         return Vec::new();
@@ -102,32 +117,36 @@ pub fn find_path_with_budget<P: Passability>(
     let (gx, gy) = nearest_passable(pass, gx, gy).unwrap_or((gx, gy));
 
     let mut open: BinaryHeap<Node> = BinaryHeap::new();
-    // came_from[tile] = predecessor tile.
-    let mut came_from: HashMap<(i32, i32), (i32, i32)> = HashMap::new();
-    // best known g per tile.
-    let mut g_score: HashMap<(i32, i32), u32> = HashMap::new();
+    // came_from[state] = predecessor state. State includes incoming direction when turn costs
+    // are enabled, so paths to the same tile with different headings do not overwrite each other.
+    let mut came_from: HashMap<SearchKey, SearchKey> = HashMap::new();
+    // best known g per search state.
+    let mut g_score: HashMap<SearchKey, u32> = HashMap::new();
+    let start_key = (sx, sy, NO_INCOMING_DIR);
 
     open.push(Node {
         f: heuristic(sx, sy, gx, gy),
         g: 0,
         tx: sx,
         ty: sy,
+        dir: NO_INCOMING_DIR,
     });
-    g_score.insert((sx, sy), 0);
+    g_score.insert(start_key, 0);
 
     // Track the explored tile closest to the goal for the best-effort fallback.
-    let mut best_tile = (sx, sy);
+    let mut best_key = start_key;
     let mut best_h = heuristic(sx, sy, gx, gy);
 
     let mut expanded = 0usize;
 
     while let Some(cur) = open.pop() {
+        let cur_key = (cur.tx, cur.ty, cur.dir);
         if cur.tx == gx && cur.ty == gy {
-            return reconstruct(&came_from, (gx, gy));
+            return reconstruct(&came_from, cur_key);
         }
 
         // Skip stale heap entries (a better g was found after this was pushed).
-        if let Some(&best_g) = g_score.get(&(cur.tx, cur.ty)) {
+        if let Some(&best_g) = g_score.get(&cur_key) {
             if cur.g > best_g {
                 continue;
             }
@@ -138,7 +157,7 @@ pub fn find_path_with_budget<P: Passability>(
             break;
         }
 
-        for &(dx, dy, cost) in &NEIGHBORS {
+        for (dir, &(dx, dy, cost)) in NEIGHBORS.iter().enumerate() {
             let nx = cur.tx + dx;
             let ny = cur.ty + dy;
             if !pass.passable(nx, ny) {
@@ -152,32 +171,45 @@ pub fn find_path_with_budget<P: Passability>(
                 continue;
             }
 
-            let tentative = cur.g + cost;
-            let better = match g_score.get(&(nx, ny)) {
+            let dir = dir as u8;
+            let turn_cost = if turn_penalty > 0 && cur.dir != NO_INCOMING_DIR && cur.dir != dir {
+                turn_penalty
+            } else {
+                0
+            };
+            let next_dir = if turn_penalty > 0 {
+                dir
+            } else {
+                NO_INCOMING_DIR
+            };
+            let next_key = (nx, ny, next_dir);
+            let tentative = cur.g + cost + turn_cost;
+            let better = match g_score.get(&next_key) {
                 Some(&existing) => tentative < existing,
                 None => true,
             };
             if better {
-                came_from.insert((nx, ny), (cur.tx, cur.ty));
-                g_score.insert((nx, ny), tentative);
+                came_from.insert(next_key, cur_key);
+                g_score.insert(next_key, tentative);
                 let h = heuristic(nx, ny, gx, gy);
                 if h < best_h {
                     best_h = h;
-                    best_tile = (nx, ny);
+                    best_key = next_key;
                 }
                 open.push(Node {
                     f: tentative + h,
                     g: tentative,
                     tx: nx,
                     ty: ny,
+                    dir: next_dir,
                 });
             }
         }
     }
 
     // No complete path: head toward whatever we got closest to.
-    if best_tile != (sx, sy) {
-        reconstruct(&came_from, best_tile)
+    if (best_key.0, best_key.1) != (sx, sy) {
+        reconstruct(&came_from, best_key)
     } else {
         Vec::new()
     }
@@ -217,11 +249,11 @@ fn nearest_passable<P: Passability>(pass: &P, tx: i32, ty: i32) -> Option<(i32, 
 
 /// Walk the `came_from` chain from `goal` back to the start, returning tiles in forward order
 /// excluding the start tile.
-fn reconstruct(came_from: &HashMap<(i32, i32), (i32, i32)>, goal: (i32, i32)) -> Vec<(i32, i32)> {
-    let mut path = vec![goal];
+fn reconstruct(came_from: &HashMap<SearchKey, SearchKey>, goal: SearchKey) -> Vec<(i32, i32)> {
+    let mut path = vec![(goal.0, goal.1)];
     let mut cur = goal;
     while let Some(&prev) = came_from.get(&cur) {
-        path.push(prev);
+        path.push((prev.0, prev.1));
         cur = prev;
     }
     // path is goal..start; drop the start tile and reverse to start..goal forward order.

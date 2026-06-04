@@ -21,7 +21,9 @@ use crate::game::services::interact_range_for_kind;
 use crate::game::services::occupancy::{
     building_footprint, footprint_center, footprint_tiles, Occupancy,
 };
-use crate::game::services::pathing::{simplify_reverse_waypoints, PathRequest, PathingService};
+use crate::game::services::pathing::{
+    simplify_reverse_waypoints, PathRequest, PathingService, RouteShape,
+};
 use crate::game::services::standability;
 
 /// Maximum number of fresh A* path requests serviced in a single tick. Beyond this,
@@ -362,6 +364,11 @@ impl<'a> MoveCoordinator<'a> {
             start: (sx as i32, sy as i32),
             goal: (gx as i32, gy as i32),
             radius_tiles,
+            route_shape: if smooth_static_segments && kind == EntityKind::Tank {
+                RouteShape::PreferFewerTurns
+            } else {
+                RouteShape::Normal
+            },
             budget: None,
         };
         let mut waypoints = self.pathing.request(self.map, self.occ, req);
@@ -492,6 +499,7 @@ impl<'a> MoveCoordinator<'a> {
             start: (sx as i32, sy as i32),
             goal: (gx as i32, gy as i32),
             radius_tiles,
+            route_shape: RouteShape::Normal,
             budget: None,
         };
         let tile_path = self.pathing.request_tile_path(self.map, self.occ, req);
