@@ -938,6 +938,12 @@ The server treats every client as potentially hostile. Limits live next to the c
   cannot be proven. Non-tank movement and interaction paths for attack chasing, gathering, and build
   staging remain unsmoothed so combat, mining, construction range checks, and infantry/worker
   traffic stay controlled by their existing logic.
+- **Vehicle diagonal-pinch avoidance**: A* passability for oriented-vehicle bodies (tanks, scout
+  cars) rejects tiles wedged between two diagonally-opposite blocked corners — i.e. (NW blocked AND
+  SE blocked) OR (NE blocked AND SW blocked). The rotating hull cannot legally thread such 1-tile
+  gaps at any intermediate heading, so routing through them used to deadlock at the
+  static-blocked-repath threshold. Infantry pathing is unaffected; legitimate 2-tile-wide corridors
+  always leave at least one diagonal of each pair open and remain traversable.
 - **Formation goal legality**: group move goals keep the existing distance-sensitive formation
   behavior, but candidate tiles are accepted only when the specific unit kind can stand there under
   `standability::unit_static_standable`. This prevents large units from being assigned a center tile
