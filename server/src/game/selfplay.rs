@@ -765,15 +765,38 @@ impl ScriptedPlayer for ProfileBackedScript {
         );
         debug_assert_eq!(decision.profile_id, self.profile.id);
 
+        let combat_intent_units = combat_intent_units(&decision.intents);
         let mut commands =
             self.filter_repeated_stage_commands(view.tick, &decision.intents, decision.commands);
         if !self.allow_combat_commands {
-            commands.retain(|command| {
-                !matches!(command, Command::Attack { .. } | Command::AttackMove { .. })
-            });
+            commands.retain(|command| !is_combat_command(command, &combat_intent_units));
         }
         self.pending_builds.record_commands(view.tick, &commands);
         commands
+    }
+}
+
+fn combat_intent_units(intents: &[AiIntent]) -> BTreeSet<u32> {
+    let mut units = BTreeSet::new();
+    for intent in intents {
+        if let AiIntent::Attack { units: attacking } = intent {
+            units.extend(attacking.iter().copied());
+        }
+    }
+    units
+}
+
+fn is_combat_command(command: &Command, combat_intent_units: &BTreeSet<u32>) -> bool {
+    match command {
+        Command::Attack { .. } | Command::AttackMove { .. } => true,
+        Command::Move { units, .. } => units.iter().any(|id| combat_intent_units.contains(id)),
+        Command::Gather { .. }
+        | Command::Build { .. }
+        | Command::Train { .. }
+        | Command::Cancel { .. }
+        | Command::Stop { .. }
+        | Command::SetRally { .. }
+        | Command::Rejected { .. } => false,
     }
 }
 
@@ -1762,6 +1785,7 @@ impl PlayerMilestones {
             Command::AttackMove { units, .. } | Command::Attack { units, .. } => {
                 Some(units.len() as u32)
             }
+            Command::Move { units, .. } if self.rifleman_trained => Some(units.len() as u32),
             Command::Move { .. }
             | Command::Gather { .. }
             | Command::Build { .. }

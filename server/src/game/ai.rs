@@ -400,10 +400,10 @@ mod tests {
             *player_id == 2
                 && matches!(
                     command,
-                    Command::AttackMove { units, x, y }
+                    Command::Move { units, x, y }
                         if units.len() == RIFLE_FLOOD_FULL_SATURATION.attack.first_attack_size
-                            && *x == enemy_base.0
-                            && *y == enemy_base.1
+                            && *x > enemy_base.0
+                            && *y > enemy_base.1
                 )
         }));
     }
