@@ -874,14 +874,18 @@ The server treats every client as potentially hostile. Limits live next to the c
   behind goals are handled by reversing; farther behind goals make the scout car drive
   through a broad turn. Scout cars follow the route corridor rather than exact intermediate
   waypoint centers: an intermediate waypoint is consumed inside
-  `SCOUT_CAR_WAYPOINT_ACCEPTANCE_RADIUS_PX` (0.75 tiles) so a car that comes alongside the route can
-  continue to the next segment instead of oscillating around a point it cannot laterally reach. A
-  final move waypoint can settle inside `SCOUT_CAR_FINAL_GOAL_TOLERANCE_PX` (0.375 tiles) only when
-  the remaining error is small and mostly lateral to the car's feasible travel direction; ordinary
-  exact arrival still snaps to the ordered point when the car can actually reach it. Scout-car
-  movement must never accept a rotated or translated oriented body that is statically illegal
-  against terrain or building occupancy, and blocked cars preserve the player's movement order so
-  bounded recovery behavior can continue from the same command. Recovery constants live alongside
+  `SCOUT_CAR_WAYPOINT_ACCEPTANCE_RADIUS_PX` (0.75 tiles), after the car has passed the waypoint
+  along the next route segment, or when the next route segment is statically reachable from the
+  car's current legal body position. Scout-car drive intent uses a 3-tile lookahead on the current
+  statically legal route segment, so a car that comes alongside the route can continue to a drivable
+  point ahead instead of oscillating around a point it cannot laterally reach; the lookahead never
+  skips through terrain or building occupancy that fails oriented-body segment legality. A final
+  move waypoint can settle inside `SCOUT_CAR_FINAL_GOAL_TOLERANCE_PX` (0.375 tiles) only when the
+  remaining error is small and mostly lateral to the car's feasible travel direction; ordinary exact
+  arrival still snaps to the ordered point when the car can actually reach it. Scout-car movement
+  must never accept a rotated or translated oriented body that is statically illegal against terrain
+  or building occupancy, and blocked cars preserve the player's movement order so bounded recovery
+  behavior can continue from the same command. Recovery constants live alongside
   movement constants (`SCOUT_CAR_STUCK_RECOVERY_TRIGGER_TICKS`,
   `SCOUT_CAR_REVERSE_RECOVERY_DISTANCE_PX`, `SCOUT_CAR_RECOVERY_COOLDOWN_TICKS`) and are reserved
   for deterministic reverse-recovery injection; recovery must not add network fields or make normal
