@@ -20,13 +20,8 @@ use game::selfplay::{
 
 const DEFAULT_SEEDS: u32 = 5;
 const DEFAULT_TICKS: u32 = 20_000;
-const DEFAULT_PROFILES: &[&str] = &[
-    "rifle_flood_fast",
-    "rifle_flood_full_saturation",
-    "tech_to_tanks",
-    "steel_expansion_tanks",
-];
 
+#[derive(Debug)]
 struct CliConfig {
     seeds: u32,
     seed_start: u32,
@@ -92,7 +87,7 @@ fn main() {
 
     let mut aggregates = Vec::new();
     for i in 0..config.profiles.len() {
-        for j in i..config.profiles.len() {
+        for j in (i + 1)..config.profiles.len() {
             let mut aggregate =
                 MatchupAggregate::new(config.profiles[i].clone(), config.profiles[j].clone());
             for offset in 0..config.seeds {
@@ -194,10 +189,7 @@ fn parse_args(args: impl IntoIterator<Item = String>) -> Result<Option<CliConfig
     let mut seeds = DEFAULT_SEEDS;
     let mut seed_start = 0;
     let mut ticks = DEFAULT_TICKS;
-    let mut profiles = DEFAULT_PROFILES
-        .iter()
-        .map(|profile| (*profile).to_string())
-        .collect::<Vec<_>>();
+    let mut profiles = default_profiles();
     let mut out_dir = default_out_dir();
     let mut verify_replay = true;
 
@@ -244,6 +236,9 @@ fn parse_args(args: impl IntoIterator<Item = String>) -> Result<Option<CliConfig
     if profiles.is_empty() {
         return Err("--profiles must include at least one profile".to_string());
     }
+    if profiles.len() < 2 {
+        return Err("--profiles must include at least two distinct profiles".to_string());
+    }
 
     Ok(Some(CliConfig {
         seeds,
@@ -256,7 +251,7 @@ fn parse_args(args: impl IntoIterator<Item = String>) -> Result<Option<CliConfig
 }
 
 fn parse_profiles(value: &str) -> Result<Vec<String>, String> {
-    value
+    let profiles = value
         .split(',')
         .map(str::trim)
         .filter(|profile| !profile.is_empty())
@@ -270,7 +265,9 @@ fn parse_profiles(value: &str) -> Result<Vec<String>, String> {
                     )
                 })
         })
-        .collect()
+        .collect::<Result<Vec<_>, _>>()?;
+
+    ensure_distinct_profiles(profiles)
 }
 
 fn required_value(flag: &str, args: &mut impl Iterator<Item = String>) -> Result<String, String> {
@@ -287,6 +284,24 @@ fn parse_u32_flag(flag: &str, args: &mut impl Iterator<Item = String>) -> Result
 
 fn default_out_dir() -> PathBuf {
     std::env::temp_dir().join(format!("rts-ai-balance-matrix-{}", process::id()))
+}
+
+fn default_profiles() -> Vec<String> {
+    available_profile_ids()
+        .into_iter()
+        .map(str::to_string)
+        .collect()
+}
+
+fn ensure_distinct_profiles(profiles: Vec<String>) -> Result<Vec<String>, String> {
+    let mut distinct = Vec::with_capacity(profiles.len());
+    for profile in profiles {
+        if distinct.contains(&profile) {
+            return Err(format!("duplicate profile {profile:?} in selection"));
+        }
+        distinct.push(profile);
+    }
+    Ok(distinct)
 }
 
 fn replay_name(profile_a: &str, profile_b: &str, seed: u32) -> String {
@@ -338,11 +353,47 @@ Options:
   --seeds <u32>          Number of seeds per unordered matchup (default: {DEFAULT_SEEDS})
   --seed-start <u32>     First seed to run (default: 0)
   --ticks <u32>          Tick cap per run (default: {DEFAULT_TICKS})
-  --profiles <csv>       Comma-separated explicit profile list
+  --profiles <csv>       Comma-separated explicit profile list (default: all available profiles)
   --out-dir <path>       Replay parent directory (default: /tmp/rts-ai-balance-matrix-<pid>)
   --no-verify-replay     Skip deterministic command-log replay verification
   --list-profiles        Print available profiles
   -h, --help             Print this help
 "
     );
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{default_profiles, ensure_distinct_profiles, parse_args};
+
+    #[test]
+    fn default_profile_selection_uses_all_available_profiles() {
+        let config = parse_args(Vec::<String>::new())
+            .expect("default args should parse")
+            .expect("default args should return config");
+
+        assert_eq!(config.profiles, default_profiles());
+    }
+
+    #[test]
+    fn duplicate_profile_selection_is_rejected() {
+        let err = ensure_distinct_profiles(vec![
+            "rifle_flood_fast".to_string(),
+            "rifle_flood_fast".to_string(),
+        ])
+        .expect_err("duplicate profiles should fail");
+
+        assert!(err.contains("duplicate profile"));
+    }
+
+    #[test]
+    fn single_profile_selection_is_rejected() {
+        let err = parse_args(vec![
+            "--profiles".to_string(),
+            "rifle_flood_fast".to_string(),
+        ])
+        .expect_err("single profile should fail");
+
+        assert!(err.contains("at least two distinct profiles"));
+    }
 }
