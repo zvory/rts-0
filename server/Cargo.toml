@@ -31,6 +31,7 @@ futures-util = { version = "0.3", default-features = false, features = ["sink", 
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 rand = { version = "0.8", features = ["small_rng"] }
+rayon = "1"
 
 [profile.release]
 opt-level = 3

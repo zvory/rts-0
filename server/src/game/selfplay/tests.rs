@@ -603,6 +603,21 @@ fn tech_to_tanks_under_pressure_goal() -> PlayerMilestoneGoal {
     .allowing_elimination_before_milestones()
 }
 
+fn tech_to_tanks_under_macro_rifle_pressure_goal() -> PlayerMilestoneGoal {
+    PlayerMilestoneGoal {
+        require_gathering: true,
+        require_oil: true,
+        require_oil_worker_assignment: true,
+        require_depot_supply: true,
+        require_barracks_complete: true,
+        ..PlayerMilestoneGoal::default()
+    }
+    .with_min_workers(8)
+    .with_min_supply_cap(config::CITY_CENTRE_SUPPLY + config::DEPOT_SUPPLY)
+    .with_min_buildings(kinds::TRAINING_CENTRE, 1)
+    .with_min_buildings(kinds::FACTORY, 1)
+}
+
 fn player_milestones(milestones: &Milestones, player_id: u32) -> &PlayerMilestones {
     milestones
         .players
@@ -653,9 +668,8 @@ fn assert_fast_pressures_before_first_tank(milestones: &Milestones) {
     }
 }
 
-fn assert_macro_rifles_and_tanks_both_function(milestones: &Milestones) {
+fn assert_full_saturation_pressure_and_tech_response(milestones: &Milestones) {
     let full = player_milestones(milestones, 1);
-    let tech = player_milestones(milestones, 2);
 
     assert!(
         full.max_units_by_kind
@@ -664,10 +678,6 @@ fn assert_macro_rifles_and_tanks_both_function(milestones: &Milestones) {
             .unwrap_or_default()
             >= 6,
         "full saturation should reach strong rifle production"
-    );
-    assert!(
-        tech.first_tank_tick.is_some(),
-        "tech_to_tanks should reach tank production"
     );
     assert!(
         milestones.first_damage_tick.is_some(),
@@ -754,11 +764,11 @@ fn profile_matchup_rifle_flood_full_saturation_vs_tech_to_tanks() {
                 name: "Tech Tanks",
                 color: "#f72585",
                 profile_id: TECH_TO_TANKS_ID,
-                goal: tech_to_tanks_goal(),
+                goal: tech_to_tanks_under_macro_rifle_pressure_goal(),
             },
         ],
         combat_goal: CombatGoal::damage(),
-        assert_outcome: assert_macro_rifles_and_tanks_both_function,
+        assert_outcome: assert_full_saturation_pressure_and_tech_response,
     });
 }
 

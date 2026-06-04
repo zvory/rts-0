@@ -17,6 +17,7 @@ use game::selfplay::{
     available_profile_ids, canonical_profile_id, run_profile_matchup_result, ProfileMatchupOptions,
     ProfileMatchupResult,
 };
+use rayon::prelude::*;
 
 const DEFAULT_SEEDS: u32 = 5;
 const DEFAULT_TICKS: u32 = 20_000;
@@ -85,33 +86,69 @@ fn main() {
     );
     println!();
 
-    let mut aggregates = Vec::new();
+    // Build all (pair, seed) jobs upfront so rayon can distribute them freely.
+    struct Job {
+        profile_a: String,
+        profile_b: String,
+        seed: u32,
+    }
+
+    let mut jobs: Vec<Job> = Vec::new();
     for i in 0..config.profiles.len() {
         for j in (i + 1)..config.profiles.len() {
-            let mut aggregate =
-                MatchupAggregate::new(config.profiles[i].clone(), config.profiles[j].clone());
             for offset in 0..config.seeds {
-                let seed = config.seed_start.saturating_add(offset);
-                let replay_name = replay_name(&aggregate.profile_a, &aggregate.profile_b, seed);
-                let result = run_profile_matchup_result(ProfileMatchupOptions {
-                    profile_a: aggregate.profile_a.clone(),
-                    profile_b: aggregate.profile_b.clone(),
-                    seed,
-                    max_ticks: config.ticks,
-                    verify_replay: config.verify_replay,
-                    save_replay_name: Some(replay_name),
-                    replay_dir: Some(config.out_dir.clone()),
-                })
-                .unwrap_or_else(|err| {
-                    eprintln!(
-                        "matchup failed for {} vs {} seed {}: {err}",
-                        aggregate.profile_a, aggregate.profile_b, seed
-                    );
-                    process::exit(1);
+                jobs.push(Job {
+                    profile_a: config.profiles[i].clone(),
+                    profile_b: config.profiles[j].clone(),
+                    seed: config.seed_start.saturating_add(offset),
                 });
-                aggregate.record(&result);
             }
-            aggregates.push(aggregate);
+        }
+    }
+
+    let total = jobs.len();
+    println!("running {total} matches in parallel…");
+
+    let results: Vec<(Job, ProfileMatchupResult)> = jobs
+        .into_par_iter()
+        .map(|job| {
+            let name = replay_name(&job.profile_a, &job.profile_b, job.seed);
+            let result = run_profile_matchup_result(ProfileMatchupOptions {
+                profile_a: job.profile_a.clone(),
+                profile_b: job.profile_b.clone(),
+                seed: job.seed,
+                max_ticks: config.ticks,
+                verify_replay: config.verify_replay,
+                save_replay_name: Some(name),
+                replay_dir: Some(config.out_dir.clone()),
+            })
+            .unwrap_or_else(|err| {
+                eprintln!(
+                    "matchup failed for {} vs {} seed {}: {err}",
+                    job.profile_a, job.profile_b, job.seed
+                );
+                process::exit(1);
+            });
+            (job, result)
+        })
+        .collect();
+
+    // Re-group by ordered pair to preserve table order.
+    let mut aggregates: Vec<MatchupAggregate> = Vec::new();
+    for i in 0..config.profiles.len() {
+        for j in (i + 1)..config.profiles.len() {
+            aggregates.push(MatchupAggregate::new(
+                config.profiles[i].clone(),
+                config.profiles[j].clone(),
+            ));
+        }
+    }
+    for (job, result) in &results {
+        if let Some(agg) = aggregates
+            .iter_mut()
+            .find(|a| a.profile_a == job.profile_a && a.profile_b == job.profile_b)
+        {
+            agg.record(result);
         }
     }
 
