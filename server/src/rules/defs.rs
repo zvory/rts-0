@@ -155,7 +155,7 @@ pub const UNITS: &[UnitDef] = &[
         stats: config::UnitStats {
             hp: 390,
             dmg: 60,
-            range_tiles: 3,
+            range_tiles: 5,
             cooldown: 72,
             speed: 2.0,
             sight_tiles: 7,

@@ -1200,7 +1200,7 @@ mod tests {
             .spawn_unit(1, EntityKind::Tank, 100.0, 100.0)
             .expect("tank should spawn");
         entities
-            .spawn_unit(2, EntityKind::Rifleman, 260.0, 100.0)
+            .spawn_unit(2, EntityKind::Rifleman, 300.0, 100.0)
             .expect("enemy should spawn");
         if let Some(tank) = entities.get_mut(tank_id) {
             tank.set_order(Order::move_to(300.0, 100.0));
@@ -1264,8 +1264,8 @@ mod tests {
             .expect("enemy should spawn");
         if let Some(tank) = entities.get_mut(tank_id) {
             tank.set_order(Order::attack_move_to(500.0, 100.0));
-            tank.set_path(vec![(192.0, 100.0)]);
-            tank.set_path_goal(Some((192.0, 100.0)));
+            tank.set_path(vec![(128.0, 100.0)]);
+            tank.set_path_goal(Some((128.0, 100.0)));
             tank.set_last_repath_tick(10);
         }
 
