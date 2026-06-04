@@ -103,9 +103,13 @@ mod tests {
             EntityKind::MachineGunner,
             &[EntityKind::TrainingCentre]
         ));
-        assert!(train_requirement_met(
+        assert!(!train_requirement_met(
             EntityKind::AtTeam,
             &[EntityKind::TrainingCentre]
+        ));
+        assert!(train_requirement_met(
+            EntityKind::AtTeam,
+            &[EntityKind::Steelworks]
         ));
         assert!(train_requirement_met(
             EntityKind::Tank,

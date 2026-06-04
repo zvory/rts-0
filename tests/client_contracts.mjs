@@ -320,6 +320,10 @@ function fakeAudioContext() {
     "Steelworks should require Training Centre tech in the command card",
   );
   assert(
+    STATS[KIND.AT_TEAM].requires === KIND.STEELWORKS,
+    "AT Gun training should require a completed Steelworks in the command card",
+  );
+  assert(
     STATS[KIND.TANK].requires === KIND.STEELWORKS,
     "Tank training should require a completed Steelworks in the command card",
   );

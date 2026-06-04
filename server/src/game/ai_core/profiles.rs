@@ -216,7 +216,11 @@ const TANK_TECH_PATH: [EntityKind; 4] = [
     EntityKind::Factory,
     EntityKind::Steelworks,
 ];
-const SUPPORT_TECH_PATH: [EntityKind; 2] = [EntityKind::Barracks, EntityKind::TrainingCentre];
+const SUPPORT_TECH_PATH: [EntityKind; 3] = [
+    EntityKind::Barracks,
+    EntityKind::TrainingCentre,
+    EntityKind::Steelworks,
+];
 
 pub(crate) static RIFLE_FLOOD_FAST: AiProfile = AiProfile {
     id: RIFLE_FLOOD_FAST_ID,
@@ -630,7 +634,11 @@ mod tests {
         assert_eq!(recovery.workers.extra_oil_workers, 3);
         assert_eq!(
             recovery.required_tech_path,
-            &[EntityKind::Barracks, EntityKind::TrainingCentre]
+            &[
+                EntityKind::Barracks,
+                EntityKind::TrainingCentre,
+                EntityKind::Steelworks
+            ]
         );
     }
 
@@ -708,7 +716,11 @@ mod tests {
         );
         assert_eq!(
             STEEL_EXPANSION_TANKS.buildings.required_tech_path,
-            &[EntityKind::Barracks, EntityKind::TrainingCentre]
+            &[
+                EntityKind::Barracks,
+                EntityKind::TrainingCentre,
+                EntityKind::Steelworks
+            ]
         );
         assert_eq!(
             STEEL_EXPANSION_TANKS.production.unit_priorities,

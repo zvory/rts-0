@@ -761,7 +761,7 @@ Unit stats (hp, dmg, range[tiles], cooldown[ticks], speed[px/tick], sight[tiles]
 | worker          | 40  | 4   | 1     | 24 | 1.6   | 7     | 50  | 0   | 1   | 360 (~12s) |
 | rifleman        | 45  | 5   | 4     | 16 | 1.6   | 8     | 50  | 0   | 1   | 300 (~10s) |
 | machine_gunner  | 55  | 4   | 5     | 6  | 1.28  | 8     | 75  | 25  | 2   | 400 (~13s) |
-| at_team         | 45  | 48  | 5     | 72 | 1.152 | 8     | 75  | 25  | 2   | 440 (~15s) |
+| at_team         | 45  | 48  | 5     | 72 | 1.152 | 8     | 75  | 25  | 2   | 440 (~15s); requires Steelworks |
 | scout_car       | 150 | 4   | 5     | 6  | 2.35  | 10    | 125 | 75  | 3   | 480 (~16s) |
 | tank            | 390 | 60  | 3     | 72 | 2.0   | 7     | 200 | 150 | 6   | 750 (~25s); requires Steelworks |
 
@@ -772,9 +772,9 @@ Building stats (hp, sight, cost, footprint tiles wxh, buildTicks, extra):
 | city_centre          | 600 | 9     | 200 | 3x3  | 400       | trains worker; +10 supply; players start with one free |
 | depot                      | 220 | 4     | 100 | 2x2  | 180       | +8 supply |
 | barracks                   | 320 | 6     | 150 | 3x2  | 200       | trains rifleman, machine_gunner, at_team; requires a City Centre |
-| training_centre   | 300 | 6     | 100 steel + 50 oil | 3x2  | 220       | unlocks machine_gunner and at_team training at barracks; requires a City Centre and Barracks |
+| training_centre   | 300 | 6     | 100 steel + 50 oil | 3x2  | 220       | unlocks machine_gunner training at barracks; requires a City Centre and Barracks |
 | factory                    | 360 | 6     | 200 steel + 100 oil | 3x3  | 240       | trains scout_car, tank; requires a City Centre and Training Centre |
-| steelworks                 | 300 | 6     | 125 steel + 125 oil | 2x2  | 220       | unlocks tank training; requires a City Centre and Training Centre |
+| steelworks                 | 300 | 6     | 125 steel + 125 oil | 2x2  | 220       | unlocks at_team training at barracks and tank training; requires a City Centre and Training Centre |
 
 Win: a player is **eliminated** when they own zero buildings (units alone do not keep them
 alive). Last player standing wins; a 1-player match never ends (sandbox/exploration mode). In a
@@ -999,7 +999,8 @@ Rifleman training time from shared unit stats, the profile stops treating the ru
 all-in: it resumes worker production toward main steel saturation, starts oil workers after a
 steel floor, adds a home
 Barracks, builds a Training Centre, and switches production toward Machine Gunners / AT teams with
-Riflemen as the fallback until support tech is ready.
+Riflemen as the fallback until support tech is ready. Machine Gunners come online with the Training
+Centre; AT teams require the follow-up Steelworks.
 `rifle_flood_full_saturation` saturates the observed main-base steel line before assigning oil
 workers, so the oil timing follows the map's current steel patch count instead of a hardcoded worker
 number. At 50 supply it independently pivots into the tank tech path and becomes eligible to expand
@@ -1014,16 +1015,17 @@ or workers temporarily suspends expansion, worker training, and non-defensive te
 panicking, the AI classifies the visible local threat by weapon DPS: tank-dominated pressure (75%+
 of visible local DPS) prioritizes AT teams, infantry-dominated pressure prioritizes Machine
 Gunners, mixed pressure asks for a support mix, and no-DPS pressure falls back to Riflemen. Support
-panic only uses an already-completed Training Centre and may pull workers onto oil for those support
-counters; if support tech is absent, Barracks production falls back to Riflemen and panic mode does
-not create the Training Centre. If the pressure persists through the panic window, the AI asks for
+panic only uses already-completed support tech: Machine Gunners need a Training Centre and AT teams
+need a Steelworks. It may pull workers onto oil for those support counters; if the relevant support
+tech is absent, Barracks production falls back to Riflemen and panic mode does not create tech
+buildings. If the pressure persists through the panic window, the AI asks for
 an additional Barracks before resuming its normal profile once the threat has cleared.
 `steel_expansion_tanks` is a defensive economic support profile: it saves for a second City
 Centre near a neutral steel expansion before building any non-Depot tech structure. Valid
 expansion sites must cover the full local resource line, then are ranked by own distance divided
 by nearest living enemy-start distance so similarly close naturals prefer the base farther from
 enemies. Once that expansion City Centre is planned, it builds Barracks and Training Centre tech, staffs
-oil, produces Machine Gunners and AT teams toward a one-for-one support mix, and keeps those
+oil, produces Machine Gunners before Steelworks and then AT teams toward a one-for-one support mix, and keeps those
 support units staged in a short line on the enemy-facing side of its main-base steel cluster
 instead of launching outbound attack waves.
 After 50 supply used, it switches to a Factory tech path, stops Machine Gunner / AT team
