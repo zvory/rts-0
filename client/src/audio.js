@@ -44,6 +44,9 @@ const UNDER_ATTACK_COOLDOWN_MS = 10000;
 const PITCH_VARIANCE = 0.06;
 /** Master gain ramp time on tab show/hide (s). */
 const VISIBILITY_RAMP_S = 0.1;
+/** Spatial param ramp for in-flight voices when the listener moves (s).
+ *  Short enough to feel instant on a minimap jump, long enough to avoid zipper noise. */
+const SPATIAL_REFRESH_RAMP_S = 0.03;
 /** Alert ducking ramps in fast and releases slower so spoken lines cut through battles. */
 const DUCK_IN_S = 0.08;
 const DUCK_OUT_S = 0.4;
@@ -235,6 +238,7 @@ export class Audio {
     const trail = [];
     const gainNode = this.ctx.createGain();
     gainNode.gain.value = gainValue;
+    let spatialNodes = null;
     if (spatial) {
       const panner = this.ctx.createStereoPanner();
       panner.pan.value = spatial.pan;
@@ -249,6 +253,7 @@ export class Audio {
       distGain.connect(gainNode);
       gainNode.connect(bus);
       trail.push(panner, lp, distGain, gainNode);
+      spatialNodes = { panner, lp, distGain, x: opts.x, y: opts.y };
     } else {
       src.connect(gainNode);
       gainNode.connect(bus);
@@ -269,6 +274,7 @@ export class Audio {
       key,
       trail,
       distancePenalty,
+      spatial: spatialNodes,
     };
     this.voices.push(voice);
     src.onended = () => this._finishVoice(voice);
@@ -327,6 +333,42 @@ export class Audio {
     if (isFinite(zoom) && zoom > 0) {
       const w = isFinite(viewW) && viewW > 0 ? viewW : DEFAULT_REF_DIST;
       this.listener.refDist = Math.max(1, w / zoom);
+    }
+    this._refreshSpatialVoices();
+  }
+
+  /**
+   * Re-evaluate pan/lowpass/distance gain for every in-flight spatial voice
+   * against the current listener pose. Called from setListener so a minimap
+   * jump (or any large camera move) updates dampening within ~30ms instead of
+   * waiting for the next play() of the same sound.
+   */
+  _refreshSpatialVoices() {
+    if (!this.ctx || this.voices.length === 0) return;
+    const t = this.ctx.currentTime;
+    const ramp = t + SPATIAL_REFRESH_RAMP_S;
+    for (const voice of this.voices) {
+      const s = voice.spatial;
+      if (!s) continue;
+      const next = this._computeSpatial(s.x, s.y);
+      if (!next) {
+        // Beyond max distance — fade to zero quickly; let the voice finish naturally.
+        s.distGain.gain.cancelScheduledValues(t);
+        s.distGain.gain.setValueAtTime(s.distGain.gain.value, t);
+        s.distGain.gain.linearRampToValueAtTime(0, ramp);
+        voice.distancePenalty = 30;
+        continue;
+      }
+      s.panner.pan.cancelScheduledValues(t);
+      s.panner.pan.setValueAtTime(s.panner.pan.value, t);
+      s.panner.pan.linearRampToValueAtTime(next.pan, ramp);
+      s.lp.frequency.cancelScheduledValues(t);
+      s.lp.frequency.setValueAtTime(s.lp.frequency.value, t);
+      s.lp.frequency.linearRampToValueAtTime(next.lpHz, ramp);
+      s.distGain.gain.cancelScheduledValues(t);
+      s.distGain.gain.setValueAtTime(s.distGain.gain.value, t);
+      s.distGain.gain.linearRampToValueAtTime(next.gain, ramp);
+      voice.distancePenalty = next.distancePenalty;
     }
   }
 
