@@ -34,6 +34,8 @@ const PROXY_WORKER_BUILD_SEARCH_RADIUS_TILES: i32 = 4;
 const EXPANSION_LOCAL_RESOURCE_ASSIGNMENT_RADIUS_TILES: f32 = config::MINING_IC_RANGE_TILES + 3.0;
 const EXPANSION_DEFENSIVE_LINE_SPACING_TILES: f32 = 1.5;
 const EXPANSION_DEFENSIVE_LINE_REISSUE_EPS_TILES: f32 = 0.75;
+const RIFLE_RAID_DEEPEN_TILES: f32 = 7.0;
+const RIFLE_RAID_BASE_RADIUS_TILES: f32 = 14.0;
 const DEFENSIVE_PANIC_GRACE_TICKS: u32 = 90;
 const DEFENSIVE_PANIC_SUSTAINED_TICKS: u32 = 180;
 const DEFENSIVE_PANIC_SUSTAINED_BARRACKS: usize = 2;
@@ -532,7 +534,13 @@ where
         actions::select_ready_combat_units(&observation.owned, attack_policy.unit_kinds);
     let local_ready_units =
         actions::select_ready_combat_units(&observation.owned, &ALL_COMBAT_UNITS);
-    if !ready_units.is_empty() || !local_ready_units.is_empty() {
+    let rifle_raid_policy = is_rifle_raid_policy(attack_policy);
+    let rifle_raid_units = if rifle_raid_policy {
+        select_rifle_raid_units(observation)
+    } else {
+        Vec::new()
+    };
+    if !ready_units.is_empty() || !local_ready_units.is_empty() || !rifle_raid_units.is_empty() {
         let mut handled_local_defense = false;
         if let Some(target) = local_defense_target(observation) {
             if let Some(units) = actions::attack_units(
@@ -545,7 +553,40 @@ where
             }
         }
 
-        if !handled_local_defense && !ready_units.is_empty() {
+        let mut handled_raid_target = false;
+        if !handled_local_defense && rifle_raid_policy && !rifle_raid_units.is_empty() {
+            if let Some(enemy_base) = facts.nearest_public_enemy_base {
+                if let Some(target) = rifle_raid_unit_target(observation, &rifle_raid_units)
+                    .or_else(|| {
+                        rifle_raid_building_fallback_target(
+                            observation,
+                            &rifle_raid_units,
+                            enemy_base,
+                        )
+                    })
+                {
+                    if let Some(units) =
+                        actions::attack_units(&mut actions, rifle_raid_units.clone(), target)
+                    {
+                        intents.push(AiIntent::Attack { units });
+                        handled_raid_target = true;
+                    }
+                } else {
+                    let continuing_units = active_rifle_raid_units(observation, &rifle_raid_units);
+                    if !continuing_units.is_empty() {
+                        let (x, y) = rifle_raid_move_target(observation, enemy_base);
+                        if let Some(units) =
+                            actions::move_units(&mut actions, continuing_units, x, y)
+                        {
+                            intents.push(AiIntent::Move { units });
+                            handled_raid_target = true;
+                        }
+                    }
+                }
+            }
+        }
+
+        if !handled_local_defense && !handled_raid_target && !ready_units.is_empty() {
             if let Some(enemy_base) = facts.nearest_public_enemy_base {
                 let required_unit_ready = attack_policy
                     .required_unit
@@ -562,12 +603,18 @@ where
                     && ready_units.len() >= attack_size
                     && memory.attack_due_for(profile, attack_policy, observation.tick)
                 {
-                    if let Some(units) = actions::attack_move_units(
-                        &mut actions,
-                        ready_units,
-                        enemy_base.x,
-                        enemy_base.y,
-                    ) {
+                    let attack_units = if rifle_raid_policy {
+                        let (x, y) = rifle_raid_move_target(observation, enemy_base);
+                        actions::move_units(&mut actions, ready_units, x, y)
+                    } else {
+                        actions::attack_move_units(
+                            &mut actions,
+                            ready_units,
+                            enemy_base.x,
+                            enemy_base.y,
+                        )
+                    };
+                    if let Some(units) = attack_units {
                         memory.note_attack_for(profile, attack_policy, observation.tick);
                         intents.push(AiIntent::Attack { units });
                     }
@@ -2005,6 +2052,133 @@ fn occupied_resource_nodes(observation: &AiObservation) -> BTreeSet<u32> {
         .filter(|entity| entity.kind == EntityKind::Worker)
         .filter_map(|worker| worker.latched_node)
         .collect()
+}
+
+fn is_rifle_raid_policy(attack: AttackPolicy) -> bool {
+    matches!(attack.unit_kinds, [EntityKind::Rifleman]) && attack.required_unit.is_none()
+}
+
+fn select_rifle_raid_units(observation: &AiObservation) -> Vec<u32> {
+    let mut units: Vec<u32> = observation
+        .owned
+        .iter()
+        .filter(|entity| entity.kind == EntityKind::Rifleman && entity.is_complete)
+        .filter(|entity| {
+            entity.free_for_combat
+                || matches!(entity.state, AiEntityState::Move | AiEntityState::Attack)
+        })
+        .map(|entity| entity.id)
+        .collect();
+    units.sort_unstable();
+    units
+}
+
+fn active_rifle_raid_units(observation: &AiObservation, raid_units: &[u32]) -> Vec<u32> {
+    let raid_ids: BTreeSet<u32> = raid_units.iter().copied().collect();
+    let mut units: Vec<u32> = observation
+        .owned
+        .iter()
+        .filter(|entity| raid_ids.contains(&entity.id))
+        .filter(|entity| matches!(entity.state, AiEntityState::Move | AiEntityState::Attack))
+        .map(|entity| entity.id)
+        .collect();
+    units.sort_unstable();
+    units
+}
+
+fn rifle_raid_unit_target(observation: &AiObservation, raid_units: &[u32]) -> Option<u32> {
+    let center = group_center(observation, raid_units)?;
+    observation
+        .visible_enemies
+        .iter()
+        .filter(|enemy| enemy.kind.is_unit())
+        .map(|enemy| {
+            (
+                enemy.id,
+                rifle_raid_unit_priority(enemy.kind),
+                dist2(center.0, center.1, enemy.x, enemy.y),
+            )
+        })
+        .min_by(|left, right| {
+            left.1
+                .cmp(&right.1)
+                .then_with(|| left.2.total_cmp(&right.2))
+                .then_with(|| left.0.cmp(&right.0))
+        })
+        .map(|(id, _, _)| id)
+}
+
+fn rifle_raid_unit_priority(kind: EntityKind) -> u8 {
+    match kind {
+        EntityKind::Worker => 0,
+        EntityKind::Rifleman | EntityKind::MachineGunner | EntityKind::AtTeam => 1,
+        EntityKind::Tank => 2,
+        _ => 3,
+    }
+}
+
+fn rifle_raid_building_fallback_target(
+    observation: &AiObservation,
+    raid_units: &[u32],
+    enemy_base: EnemyBaseFact,
+) -> Option<u32> {
+    let raid_ids: BTreeSet<u32> = raid_units.iter().copied().collect();
+    let radius_px = RIFLE_RAID_BASE_RADIUS_TILES * observation.map.tile_size as f32;
+    let radius2 = squared(radius_px);
+    let raider_ready_to_burn_buildings = observation.owned.iter().any(|entity| {
+        raid_ids.contains(&entity.id)
+            && !matches!(entity.state, AiEntityState::Move)
+            && dist2(entity.x, entity.y, enemy_base.x, enemy_base.y) <= radius2
+    });
+    if !raider_ready_to_burn_buildings {
+        return None;
+    }
+
+    let center = group_center(observation, raid_units)?;
+    observation
+        .visible_enemies
+        .iter()
+        .filter(|enemy| enemy.kind.is_building())
+        .map(|enemy| (enemy.id, dist2(center.0, center.1, enemy.x, enemy.y)))
+        .min_by(|left, right| {
+            left.1
+                .total_cmp(&right.1)
+                .then_with(|| left.0.cmp(&right.0))
+        })
+        .map(|(id, _)| id)
+}
+
+fn rifle_raid_move_target(observation: &AiObservation, enemy_base: EnemyBaseFact) -> (f32, f32) {
+    let own_base = tile_center(observation.own_start_tile, observation.map.tile_size);
+    let dx = enemy_base.x - own_base.0;
+    let dy = enemy_base.y - own_base.1;
+    let len = (dx * dx + dy * dy).sqrt();
+    if len <= f32::EPSILON || !len.is_finite() {
+        return (enemy_base.x, enemy_base.y);
+    }
+    let deepen_px = RIFLE_RAID_DEEPEN_TILES * observation.map.tile_size as f32;
+    let max = observation.map.width as f32 * observation.map.tile_size as f32 - 0.01;
+    (
+        (enemy_base.x + dx / len * deepen_px).clamp(0.0, max),
+        (enemy_base.y + dy / len * deepen_px).clamp(0.0, max),
+    )
+}
+
+fn group_center(observation: &AiObservation, unit_ids: &[u32]) -> Option<(f32, f32)> {
+    let ids: BTreeSet<u32> = unit_ids.iter().copied().collect();
+    let mut sum_x = 0.0;
+    let mut sum_y = 0.0;
+    let mut count = 0usize;
+    for entity in observation
+        .owned
+        .iter()
+        .filter(|entity| ids.contains(&entity.id))
+    {
+        sum_x += entity.x;
+        sum_y += entity.y;
+        count += 1;
+    }
+    (count > 0).then(|| (sum_x / count as f32, sum_y / count as f32))
 }
 
 fn local_defense_target(observation: &AiObservation) -> Option<u32> {
@@ -4256,6 +4430,153 @@ mod tests {
                 )
             }),
             "far tanks should keep their outbound attack behavior"
+        );
+    }
+
+    #[test]
+    fn rifle_attack_wave_uses_plain_move_deeper_than_enemy_base() {
+        let mut owned = vec![building(10, EntityKind::IndustrialCenter, Some(0))];
+        owned.extend((0..6).map(|i| combat(30 + i, EntityKind::Rifleman)));
+        let observation = observation(
+            AiEconomy {
+                steel: 0,
+                oil: 0,
+                supply_used: 6,
+                supply_cap: 20,
+            },
+            owned,
+        );
+
+        let decision = decide(
+            &observation,
+            &RIFLE_FLOOD_FULL_SATURATION,
+            &mut AiDecisionMemory::for_profile(&RIFLE_FLOOD_FULL_SATURATION),
+        );
+
+        assert!(
+            !decision
+                .commands
+                .iter()
+                .any(|command| matches!(command, Command::AttackMove { .. })),
+            "pure rifle raids should not use generic attack-move"
+        );
+        let enemy_base = tile_center(enemy_start_tile(&observation), observation.map.tile_size);
+        assert!(decision.commands.iter().any(|command| {
+            matches!(
+                command,
+                Command::Move { units, x, y }
+                    if units.as_slice() == [30, 31, 32, 33, 34, 35]
+                        && *x > enemy_base.0
+                        && *y > enemy_base.1
+            )
+        }));
+    }
+
+    #[test]
+    fn moving_rifle_raid_targets_visible_workers_before_buildings() {
+        let ts = config::TILE_SIZE as f32;
+        let mut raider = combat_at(30, EntityKind::Rifleman, 46.0 * ts, 46.0 * ts);
+        raider.state = AiEntityState::Move;
+        raider.free_for_combat = false;
+        let mut observation = observation(
+            AiEconomy {
+                steel: 0,
+                oil: 0,
+                supply_used: 1,
+                supply_cap: 10,
+            },
+            vec![building(10, EntityKind::IndustrialCenter, Some(0)), raider],
+        );
+        observation
+            .visible_enemies
+            .push(enemy(80, EntityKind::Depot, 45.5 * ts, 45.5 * ts));
+        observation
+            .visible_enemies
+            .push(enemy(90, EntityKind::Worker, 48.5 * ts, 48.5 * ts));
+
+        let decision = decide(
+            &observation,
+            &RIFLE_FLOOD_FAST,
+            &mut AiDecisionMemory::for_profile(&RIFLE_FLOOD_FAST),
+        );
+
+        assert!(decision.commands.iter().any(|command| {
+            matches!(
+                command,
+                Command::Attack { units, target } if units.as_slice() == [30] && *target == 90
+            )
+        }));
+    }
+
+    #[test]
+    fn rifle_raid_attacks_buildings_after_reaching_enemy_base_without_units() {
+        let ts = config::TILE_SIZE as f32;
+        let observation = {
+            let mut observation = observation(
+                AiEconomy {
+                    steel: 0,
+                    oil: 0,
+                    supply_used: 1,
+                    supply_cap: 10,
+                },
+                vec![
+                    building(10, EntityKind::IndustrialCenter, Some(0)),
+                    combat_at(30, EntityKind::Rifleman, 49.0 * ts, 49.0 * ts),
+                ],
+            );
+            observation
+                .visible_enemies
+                .push(enemy(80, EntityKind::Depot, 48.5 * ts, 48.5 * ts));
+            observation
+        };
+
+        let decision = decide(
+            &observation,
+            &RIFLE_FLOOD_FAST,
+            &mut AiDecisionMemory::for_profile(&RIFLE_FLOOD_FAST),
+        );
+
+        assert!(decision.commands.iter().any(|command| {
+            matches!(
+                command,
+                Command::Attack { units, target } if units.as_slice() == [30] && *target == 80
+            )
+        }));
+    }
+
+    #[test]
+    fn moving_rifle_raid_ignores_visible_buildings_until_arrival() {
+        let ts = config::TILE_SIZE as f32;
+        let mut raider = combat_at(30, EntityKind::Rifleman, 46.0 * ts, 46.0 * ts);
+        raider.state = AiEntityState::Move;
+        raider.free_for_combat = false;
+        let mut observation = observation(
+            AiEconomy {
+                steel: 0,
+                oil: 0,
+                supply_used: 1,
+                supply_cap: 10,
+            },
+            vec![building(10, EntityKind::IndustrialCenter, Some(0)), raider],
+        );
+        observation
+            .visible_enemies
+            .push(enemy(80, EntityKind::Depot, 48.5 * ts, 48.5 * ts));
+
+        let decision = decide(
+            &observation,
+            &RIFLE_FLOOD_FAST,
+            &mut AiDecisionMemory::for_profile(&RIFLE_FLOOD_FAST),
+        );
+
+        assert!(
+            !decision.commands.iter().any(|command| {
+                matches!(
+                    command,
+                    Command::Attack { units, target } if units.as_slice() == [30] && *target == 80
+                )
+            }),
+            "moving rifle raids should keep moving past buildings"
         );
     }
 
