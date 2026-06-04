@@ -272,7 +272,7 @@ function fakeAudioContext() {
 // ---------------------------------------------------------------------------
 {
   assert(MINING_IC_RANGE_TILES === 7, "client mirrors the server mining IC range");
-  assert(STATS[KIND.INDUSTRIAL_CENTER].cost.steel === 200, "Industrial Center cost mirrors server");
+  assert(STATS[KIND.INDUSTRIAL_CENTER].cost.steel === 200, "City Centre cost mirrors server");
   assert(
     Array.isArray(STATS[KIND.TANK_FACTORY].requires),
     "Tank Factory should expose all server-side build prerequisites",
@@ -283,7 +283,7 @@ function fakeAudioContext() {
   );
   assert(
     STATS[KIND.TRAINING_CENTRE].requires.includes(KIND.INDUSTRIAL_CENTER),
-    "Training Centre should require an Industrial Center in the command card",
+    "Training Centre should require a City Centre in the command card",
   );
   assert(
     STATS[KIND.TRAINING_CENTRE].requires.includes(KIND.BARRACKS),
@@ -291,7 +291,7 @@ function fakeAudioContext() {
   );
   assert(
     STATS[KIND.TANK_FACTORY].requires.includes(KIND.INDUSTRIAL_CENTER),
-    "Tank Factory should require an Industrial Center in the command card",
+    "Tank Factory should require a City Centre in the command card",
   );
   assert(
     STATS[KIND.TANK_FACTORY].requires.includes(KIND.TRAINING_CENTRE),

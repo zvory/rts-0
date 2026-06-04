@@ -70,7 +70,7 @@ try {
     const s = window.__rts.match.state, es = s.entitiesInterpolated(1).filter((e) => e.owner === s.playerId);
     return { industrialCenter: es.filter((e) => e.kind === "industrial_center").length, w: es.filter((e) => e.kind === "worker").length };
   });
-  ok(own.industrialCenter === 1 && own.w === 4, `client sees own Industrial Center + 4 workers (industrialCenter=${own.industrialCenter}, workers=${own.w})`);
+  ok(own.industrialCenter === 1 && own.w === 4, `client sees own City Centre + 4 workers (industrialCenter=${own.industrialCenter}, workers=${own.w})`);
 
   // Interpolation must be live: GameState exposes recv timestamps so alpha isn't pinned to 1.
   const interp = await page.evaluate(() => {
@@ -165,7 +165,7 @@ try {
     s.setSelection([industrialCenter.id]); window.__rts.match.hud.update();
     return !!document.querySelector('#command-card [data-hotkey="Q"]');
   });
-  ok(trainBtn, "TRAIN CARD: selecting the Industrial Center shows a Worker train button");
+  ok(trainBtn, "TRAIN CARD: selecting the City Centre shows a Worker train button");
 
   await page.click("#settings-button");
   await page.waitForFunction(() => !document.getElementById("settings-menu")?.hidden, { timeout: 2000 });

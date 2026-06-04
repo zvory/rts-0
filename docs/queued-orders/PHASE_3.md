@@ -16,7 +16,7 @@ Goal: support practical worker chains such as "build this, then go back to steel
 - Gather semantics:
   - Gather is terminal infinite once harvesting starts.
   - A queued gather intent validates the node, remaining resources, worker ownership, worker kind,
-    and completed Industrial Center requirement when promoted.
+    and completed City Centre requirement when promoted.
   - If invalid at promotion, silently skip to the next queued order.
 - Stop/replacement:
   - Normal gather/build commands clear existing queued orders.

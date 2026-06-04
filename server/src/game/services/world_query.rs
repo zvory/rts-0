@@ -62,7 +62,7 @@ pub(crate) fn completed_building_kinds(entities: &EntityStore, player: u32) -> V
         .collect()
 }
 
-/// Whether a resource node is mineable by `player` because a completed Industrial Center is close
+/// Whether a resource node is mineable by `player` because a completed City Centre is close
 /// enough to receive attached-mining income from that node.
 pub(crate) fn resource_has_completed_mining_ic(
     entities: &EntityStore,
@@ -99,7 +99,7 @@ fn nearest_completed_mining_ic(
         .min_by(|a, b| a.1.total_cmp(&b.1).then_with(|| a.0.cmp(&b.0)))
 }
 
-/// Town halls (Industrial Centers) owned by `player`, in any construction state.
+/// Town halls (City Centres) owned by `player`, in any construction state.
 /// Reserved for the AI GG/leave predicate (Phase 6.4) and future faction-aware queries.
 #[allow(dead_code)]
 pub(crate) fn town_halls(
@@ -299,7 +299,7 @@ mod tests {
 
     fn store_with_two_players() -> EntityStore {
         let mut s = EntityStore::default();
-        // P1: industrial center (complete), barracks (under construction), worker.
+        // P1: city centre (complete), barracks (under construction), worker.
         s.spawn_building(1, EntityKind::IndustrialCenter, 100.0, 100.0, true)
             .unwrap();
         s.spawn_building(1, EntityKind::Barracks, 200.0, 100.0, false)

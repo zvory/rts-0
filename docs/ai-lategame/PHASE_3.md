@@ -15,27 +15,27 @@ to keep producing them.
 
 The exact timing can still vary. A fast proxy rush may expand later than a macro rifle profile. A
 tank rush may expand after tank tech is stable. But all live profiles should eventually have a path
-to a second Industrial Center.
+to a second City Centre.
 
 ## Current State
 
 `tech_to_tanks` already has an expansion policy:
 
-- target Industrial Centers: 2;
+- target City Centres: 2;
 - prerequisite: completed Tank Factory;
 - trigger: 500 steel or 70 supply;
 - does not block tech path.
 
 `rifle_flood_full_saturation` already has an expansion policy:
 
-- target Industrial Centers: 2;
+- target City Centres: 2;
 - prerequisite: completed Training Centre;
 - trigger: 500 steel or 50 supply;
 - does not block tech path.
 
 `rifle_flood_fast` already has an expansion policy:
 
-- target Industrial Centers: 2;
+- target City Centres: 2;
 - prerequisite: completed Tank Factory;
 - trigger: 500 steel or 70 supply;
 - does not block tech path.
@@ -50,7 +50,7 @@ needed.
 
 Shared expectation:
 
-- eventual target: 2 Industrial Centers;
+- eventual target: 2 City Centres;
 - expansion does not block tank tech for live profiles;
 - expansion should be allowed once the profile has reached a stable tech/economy point;
 - post-expansion worker caps should support sustained tank+rifle production.
@@ -125,7 +125,7 @@ At the end:
 Focused tests should prove:
 
 - every profile in the live profile pool has an expansion policy;
-- every live profile's expansion target is at least 2 Industrial Centers;
+- every live profile's expansion target is at least 2 City Centres;
 - live-profile expansions do not block the tank tech path unless explicitly intended;
 - the shared expansion constants are applied consistently;
 - `tech_to_tanks` still expands after reaching its existing tank-tech gate.
