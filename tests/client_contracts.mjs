@@ -22,7 +22,7 @@ import {
   STATE_CODE,
   decodeServerMessage,
 } from "../client/src/protocol.js";
-import { footprintValidAgainstEntities } from "../client/src/input.js";
+import { Input, footprintValidAgainstEntities } from "../client/src/input.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -408,11 +408,31 @@ function assertHasGetter(obj, name, msgPrefix = "") {
   const other = { id: 8, owner: 1, kind: "worker", x: 80, y: 80 };
   assert(
     footprintValidAgainstEntities([worker], new Set([7]), 1, 1, 2, 2, map) === true,
-    "selected worker should be allowed inside the build footprint",
+    "client_preview_allows_chosen_worker_body_inside_footprint",
   );
   assert(
     footprintValidAgainstEntities([other], new Set([7]), 1, 1, 2, 2, map) === false,
-    "unselected overlapping worker should still block placement",
+    "client_preview_rejects_other_unit_body_inside_footprint",
+  );
+  const tank = { id: 9, owner: 1, kind: KIND.TANK, x: 116, y: 64 };
+  assert(
+    footprintValidAgainstEntities([tank], new Set(), 1, 1, 2, 2, map) === false,
+    "client preview should reject a tank body touching a footprint edge",
+  );
+
+  const input = Object.create(Input.prototype);
+  input.state = {
+    entitiesInterpolated: () => [worker, other],
+  };
+  input._selectedWorkerIds = () => [7, 8];
+  assert(
+    input._footprintValid(1, 1, 2, 2, map) === false,
+    "preview should not ignore every selected worker",
+  );
+  input.state.entitiesInterpolated = () => [worker];
+  assert(
+    input._footprintValid(1, 1, 2, 2, map) === true,
+    "preview should ignore the same first selected worker used for cmd.build",
   );
 }
 

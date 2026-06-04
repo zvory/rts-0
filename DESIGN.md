@@ -694,6 +694,14 @@ The server treats every client as potentially hostile. Limits live next to the c
   deduped and capped before per-unit work, so a repeated/huge id list can't trigger an A* storm.
 - **Bounds-checked placement** (`services/occupancy.rs` `footprint_tiles`): tile math uses `checked_add` and
   out-of-range build coords are rejected — the tick loop never panics on adversarial input.
+- **Body-aware construction placement**: `services::standability::building_site_clear` is the
+  final scaffold policy. A building footprint rectangle must be in-bounds, passable, clear of
+  existing building rectangles/resource bodies, and clear of every living unit circle. Build
+  command intent uses the paired build-intent predicate, which ignores only the chosen builder's
+  own body so a worker can be ordered to build over its current position and walk out first.
+  `construction_system` repeats the strict final policy at arrival before creating the scaffold.
+  The client placement ghost mirrors the intent policy for the first selected worker, but remains
+  advisory; the server is authoritative.
 - **Idle timeout + heartbeat**: the server drops connections idle for `IDLE_TIMEOUT = 40s`
   (`main.rs`); the client pings every 15s (`main.js`). This evicts half-open/stuck clients so a
   silent player can't wedge a shared room, and frees the room slot.
