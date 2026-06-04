@@ -24,8 +24,26 @@ pub struct PathRequest {
     pub goal: (i32, i32),
     /// Unit radius in tiles for clearance. `0` means point-sized (current behavior).
     pub radius_tiles: u32,
+    /// Optional route-shaping cost model. Keep normal for interaction paths where exact tile
+    /// progression matters more than visual smoothness.
+    pub route_shape: RouteShape,
     /// Max A* nodes to expand. `None` uses the service default.
     pub budget: Option<usize>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum RouteShape {
+    Normal,
+    PreferFewerTurns,
+}
+
+impl RouteShape {
+    fn turn_penalty(self) -> u32 {
+        match self {
+            RouteShape::Normal => 0,
+            RouteShape::PreferFewerTurns => 3,
+        }
+    }
 }
 
 /// Passability oracle that layers terrain + occupancy.
@@ -70,7 +88,7 @@ impl Passability for TerrainPassability<'_> {
     }
 }
 
-type CacheKey = (EntityKind, (i32, i32), (i32, i32), u32);
+type CacheKey = (EntityKind, (i32, i32), (i32, i32), u32, RouteShape);
 
 struct CacheEntry {
     tile_path: Vec<(i32, i32)>,
@@ -134,13 +152,14 @@ impl PathingService {
         }
 
         let budget = req.budget.unwrap_or(self.default_budget);
-        let tile_path = pathfinding::find_path_with_budget(
+        let tile_path = pathfinding::find_path_with_budget_and_turn_cost(
             &pass,
             req.start.0,
             req.start.1,
             req.goal.0,
             req.goal.1,
             budget,
+            req.route_shape.turn_penalty(),
         );
 
         if !tile_path.is_empty() {
@@ -149,6 +168,7 @@ impl PathingService {
                 req.start,
                 req.goal,
                 req.radius_tiles,
+                req.route_shape,
                 tile_path.clone(),
             );
         }
@@ -160,7 +180,13 @@ impl PathingService {
         req: &PathRequest,
         pass: &P,
     ) -> Option<Vec<(i32, i32)>> {
-        let key: CacheKey = (req.kind, req.start, req.goal, req.radius_tiles);
+        let key: CacheKey = (
+            req.kind,
+            req.start,
+            req.goal,
+            req.radius_tiles,
+            req.route_shape,
+        );
         let entry = self.cache.get_mut(&key)?;
         for &(tx, ty) in &entry.tile_path {
             if !pass.passable(tx, ty) {
@@ -177,6 +203,7 @@ impl PathingService {
         start: (i32, i32),
         goal: (i32, i32),
         radius: u32,
+        route_shape: RouteShape,
         tile_path: Vec<(i32, i32)>,
     ) {
         if self.cache.len() >= self.cache_cap {
@@ -190,7 +217,7 @@ impl PathingService {
             }
         }
         self.cache.insert(
-            (kind, start, goal, radius),
+            (kind, start, goal, radius, route_shape),
             CacheEntry {
                 tile_path,
                 last_used: self.tick,
@@ -255,8 +282,10 @@ impl PathingService {
         start: (i32, i32),
         goal: (i32, i32),
         radius: u32,
+        route_shape: RouteShape,
     ) -> bool {
-        self.cache.contains_key(&(kind, start, goal, radius))
+        self.cache
+            .contains_key(&(kind, start, goal, radius, route_shape))
     }
 }
 
@@ -323,11 +352,39 @@ mod tests {
             start,
             goal,
             radius_tiles,
+            route_shape: RouteShape::Normal,
             budget: None,
         };
         let tile_path = service.request_tile_path(map, &occ, req.clone());
         let world_path = service.request(map, &occ, req);
         (tile_path, world_path)
+    }
+
+    fn request_route_shape_tile_path(
+        map: &Map,
+        kind: EntityKind,
+        start: (i32, i32),
+        goal: (i32, i32),
+        route_shape: RouteShape,
+    ) -> Vec<(i32, i32)> {
+        let entities = EntityStore::new();
+        let occ = Occupancy::build(map, &entities);
+        let mut service = PathingService::new(8_192, 256);
+        let radius_tiles = config::unit_stats(kind)
+            .map(|stats| stats.radius_tiles())
+            .unwrap_or(0);
+        service.request_tile_path(
+            map,
+            &occ,
+            PathRequest {
+                kind,
+                start,
+                goal,
+                radius_tiles,
+                route_shape,
+                budget: None,
+            },
+        )
     }
 
     fn raw_world_path(
@@ -375,6 +432,47 @@ mod tests {
         (to - from + std::f32::consts::PI).rem_euclid(std::f32::consts::TAU) - std::f32::consts::PI
     }
 
+    fn tile_turn_count(start: (i32, i32), path: &[(i32, i32)]) -> usize {
+        let mut points = Vec::with_capacity(path.len() + 1);
+        points.push(start);
+        points.extend_from_slice(path);
+        points
+            .windows(3)
+            .filter(|triple| {
+                let a = (
+                    (triple[1].0 - triple[0].0).signum(),
+                    (triple[1].1 - triple[0].1).signum(),
+                );
+                let b = (
+                    (triple[2].0 - triple[1].0).signum(),
+                    (triple[2].1 - triple[1].1).signum(),
+                );
+                a != b
+            })
+            .count()
+    }
+
+    fn tile_move_cost(start: (i32, i32), path: &[(i32, i32)]) -> u32 {
+        let mut cost = 0;
+        let mut prev = start;
+        for &next in path {
+            let dx = (next.0 - prev.0).abs();
+            let dy = (next.1 - prev.1).abs();
+            cost += if dx != 0 && dy != 0 { 14 } else { 10 };
+            prev = next;
+        }
+        cost
+    }
+
+    fn assert_tile_path_passable(map: &Map, path: &[(i32, i32)]) {
+        for &(tx, ty) in path {
+            assert!(
+                map.is_passable(tx, ty),
+                "tile path should not cross impassable terrain, got blocked tile ({tx}, {ty}) in {path:?}"
+            );
+        }
+    }
+
     #[test]
     fn path_cache_eviction_is_deterministic_across_instances() {
         // Use a small empty map so most path requests are valid and cached.
@@ -397,6 +495,7 @@ mod tests {
                 start: *start,
                 goal: *goal,
                 radius_tiles: 0,
+                route_shape: RouteShape::Normal,
                 budget: None,
             };
             a.request(&map, &occ, req.clone());
@@ -413,6 +512,7 @@ mod tests {
             start: (1, 1),
             goal: (5, 5),
             radius_tiles: 0,
+            route_shape: RouteShape::Normal,
             budget: None,
         };
         a.request(&map, &occ, req4.clone());
@@ -424,13 +524,25 @@ mod tests {
         // Both instances should have evicted the same key: the one with the
         // smallest (start, goal, radius) tuple.
         let evicted = ((1, 1), (2, 2), 0u32);
-        assert!(!a.cache_contains(EntityKind::Worker, evicted.0, evicted.1, evicted.2));
-        assert!(!b.cache_contains(EntityKind::Worker, evicted.0, evicted.1, evicted.2));
+        assert!(!a.cache_contains(
+            EntityKind::Worker,
+            evicted.0,
+            evicted.1,
+            evicted.2,
+            RouteShape::Normal
+        ));
+        assert!(!b.cache_contains(
+            EntityKind::Worker,
+            evicted.0,
+            evicted.1,
+            evicted.2,
+            RouteShape::Normal
+        ));
 
         // And both should still contain the other three.
         for (start, goal) in &[((1, 1), (3, 3)), ((2, 2), (4, 4)), ((1, 1), (5, 5))] {
-            assert!(a.cache_contains(EntityKind::Worker, *start, *goal, 0));
-            assert!(b.cache_contains(EntityKind::Worker, *start, *goal, 0));
+            assert!(a.cache_contains(EntityKind::Worker, *start, *goal, 0, RouteShape::Normal));
+            assert!(b.cache_contains(EntityKind::Worker, *start, *goal, 0, RouteShape::Normal));
         }
     }
 
@@ -452,12 +564,13 @@ mod tests {
                 start,
                 goal,
                 radius_tiles: 0,
+                route_shape: RouteShape::Normal,
                 budget: Some(0),
             },
         );
         assert!(failed.is_empty());
         assert_eq!(service.cache_len(), 0);
-        assert!(!service.cache_contains(EntityKind::Worker, start, goal, 0));
+        assert!(!service.cache_contains(EntityKind::Worker, start, goal, 0, RouteShape::Normal));
 
         let found = service.request(
             &map,
@@ -467,11 +580,243 @@ mod tests {
                 start,
                 goal,
                 radius_tiles: 0,
+                route_shape: RouteShape::Normal,
                 budget: None,
             },
         );
         assert!(!found.is_empty());
-        assert!(service.cache_contains(EntityKind::Worker, start, goal, 0));
+        assert!(service.cache_contains(EntityKind::Worker, start, goal, 0, RouteShape::Normal));
+    }
+
+    #[test]
+    fn tank_turn_cost_prefers_fewer_semi_open_route_turns_than_normal_pathing() {
+        let mut map = flat_test_map(24);
+        for (tx, ty) in [
+            (6, 6),
+            (6, 11),
+            (6, 15),
+            (6, 19),
+            (7, 4),
+            (7, 6),
+            (7, 17),
+            (8, 5),
+            (8, 14),
+            (8, 15),
+            (8, 16),
+            (9, 4),
+            (9, 8),
+            (9, 12),
+            (9, 16),
+            (10, 11),
+            (10, 12),
+            (10, 14),
+            (11, 14),
+            (11, 15),
+            (12, 4),
+            (12, 8),
+            (12, 10),
+            (13, 13),
+            (13, 14),
+            (13, 16),
+            (14, 4),
+            (14, 8),
+            (14, 10),
+            (14, 16),
+            (14, 17),
+            (15, 5),
+            (15, 6),
+            (15, 10),
+            (15, 14),
+            (15, 15),
+            (16, 4),
+            (16, 6),
+            (16, 9),
+            (16, 10),
+            (16, 12),
+            (16, 14),
+            (17, 4),
+            (17, 14),
+            (17, 16),
+            (17, 18),
+        ] {
+            let index = map.index(tx, ty);
+            map.terrain[index] = terrain::ROCK;
+        }
+        let start = (3, 12);
+        let goal = (20, 12);
+
+        let normal =
+            request_route_shape_tile_path(&map, EntityKind::Tank, start, goal, RouteShape::Normal);
+        let shaped = request_route_shape_tile_path(
+            &map,
+            EntityKind::Tank,
+            start,
+            goal,
+            RouteShape::PreferFewerTurns,
+        );
+
+        assert_eq!(normal.last().copied(), Some(goal));
+        assert_eq!(shaped.last().copied(), Some(goal));
+        assert_eq!(
+            tile_move_cost(start, &shaped),
+            tile_move_cost(start, &normal),
+            "turn cost should prefer an equally short semi-open route, not a longer detour"
+        );
+        assert!(
+            tile_turn_count(start, &shaped) < tile_turn_count(start, &normal),
+            "turn-shaped tank route should reduce heading changes, normal={normal:?} shaped={shaped:?}"
+        );
+    }
+
+    #[test]
+    fn tank_turn_cost_still_finds_route_around_obstacle() {
+        let map = map_with_rock_rect(24, 7, 6, 10, 8);
+        let start = (4, 7);
+        let goal = (13, 7);
+
+        let shaped = request_route_shape_tile_path(
+            &map,
+            EntityKind::Tank,
+            start,
+            goal,
+            RouteShape::PreferFewerTurns,
+        );
+
+        assert_eq!(shaped.last().copied(), Some(goal));
+        assert_tile_path_passable(&map, &shaped);
+    }
+
+    #[test]
+    fn tank_turn_cost_keeps_required_bend() {
+        let map = map_with_rock_rect(24, 7, 6, 10, 8);
+        let start = (4, 7);
+        let goal = (13, 7);
+
+        let shaped = request_route_shape_tile_path(
+            &map,
+            EntityKind::Tank,
+            start,
+            goal,
+            RouteShape::PreferFewerTurns,
+        );
+
+        assert!(
+            tile_turn_count(start, &shaped) >= 2,
+            "route around a rectangular blocker should keep the necessary bends, got {shaped:?}"
+        );
+        assert!(
+            shaped
+                .iter()
+                .any(|&(_, y)| y < 6 || y > 8),
+            "route must leave the blocked row band instead of pretending the direct path is legal, got {shaped:?}"
+        );
+    }
+
+    #[test]
+    fn tank_turn_cost_requests_are_deterministic() {
+        let map = map_with_rock_rect(32, 10, 8, 14, 12);
+        let start = (5, 10);
+        let goal = (22, 14);
+        let first = request_route_shape_tile_path(
+            &map,
+            EntityKind::Tank,
+            start,
+            goal,
+            RouteShape::PreferFewerTurns,
+        );
+
+        for _ in 0..5 {
+            let next = request_route_shape_tile_path(
+                &map,
+                EntityKind::Tank,
+                start,
+                goal,
+                RouteShape::PreferFewerTurns,
+            );
+            assert_eq!(next, first);
+        }
+    }
+
+    #[test]
+    fn route_shape_is_part_of_path_cache_key() {
+        let map = flat_test_map(40);
+        let entities = EntityStore::new();
+        let occ = Occupancy::build(&map, &entities);
+        let start = (4, 4);
+        let goal = (28, 17);
+        let mut service = PathingService::new(8_192, 256);
+
+        for route_shape in [RouteShape::Normal, RouteShape::PreferFewerTurns] {
+            let path = service.request_tile_path(
+                &map,
+                &occ,
+                PathRequest {
+                    kind: EntityKind::Tank,
+                    start,
+                    goal,
+                    radius_tiles: 0,
+                    route_shape,
+                    budget: None,
+                },
+            );
+            assert!(!path.is_empty());
+        }
+
+        assert_eq!(service.cache_len(), 2);
+        assert!(service.cache_contains(EntityKind::Tank, start, goal, 0, RouteShape::Normal));
+        assert!(service.cache_contains(
+            EntityKind::Tank,
+            start,
+            goal,
+            0,
+            RouteShape::PreferFewerTurns
+        ));
+    }
+
+    #[test]
+    fn tank_turn_cost_respects_expansion_budget() {
+        let map = flat_test_map(40);
+        let entities = EntityStore::new();
+        let occ = Occupancy::build(&map, &entities);
+        let start = (4, 4);
+        let goal = (28, 17);
+        let mut service = PathingService::new(8_192, 256);
+
+        let bounded = service.request_tile_path(
+            &map,
+            &occ,
+            PathRequest {
+                kind: EntityKind::Tank,
+                start,
+                goal,
+                radius_tiles: 0,
+                route_shape: RouteShape::PreferFewerTurns,
+                budget: Some(0),
+            },
+        );
+        assert!(bounded.is_empty());
+        assert_eq!(service.cache_len(), 0);
+
+        let unbounded = service.request_tile_path(
+            &map,
+            &occ,
+            PathRequest {
+                kind: EntityKind::Tank,
+                start,
+                goal,
+                radius_tiles: 0,
+                route_shape: RouteShape::PreferFewerTurns,
+                budget: None,
+            },
+        );
+        assert_eq!(unbounded.last().copied(), Some(goal));
+        assert!(service.cache_contains(
+            EntityKind::Tank,
+            start,
+            goal,
+            0,
+            RouteShape::PreferFewerTurns
+        ));
     }
 
     #[test]
@@ -750,6 +1095,7 @@ mod tests {
                 start: (1, 3),
                 goal: (6, 3),
                 radius_tiles,
+                route_shape: RouteShape::Normal,
                 budget: None,
             },
         );
