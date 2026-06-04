@@ -5,16 +5,21 @@
 
 use crate::config;
 use crate::game::entity::{Order, NEUTRAL};
+use crate::game::services::geometry::{
+    building_rect_for_entity, circle_intersects_rect, unit_body,
+};
 use crate::game::services::movement::is_collision_anchored;
-use crate::game::services::occupancy::building_footprint;
+use crate::game::services::occupancy::{building_footprint, Occupancy};
+use crate::game::services::standability;
 use crate::game::Game;
 use crate::rules;
 
 /// Maximum residual overlap (world px) tolerated between two non-anchored mobile units after
 /// a tick. The iterative resolver converges to within numerical noise on flat ground; this
-/// slack also absorbs the rare case of a unit cornered against impassable terrain where the
-/// resolver's push lands on a blocked tile and has to be skipped.
-const OVERLAP_TOLERANCE_PX: f32 = 7.0;
+/// slack also absorbs units pinned against static terrain or building body clearance where the
+/// resolver's only separating pushes are statically illegal and have to be skipped. Building-body
+/// overlap has its own zero-tolerance invariant below.
+const OVERLAP_TOLERANCE_PX: f32 = 8.0;
 
 impl Game {
     /// Assert that the current world state satisfies all simulation invariants.
@@ -119,7 +124,54 @@ impl Game {
         }
 
         // ------------------------------------------------------------------
-        // 5. Resource-node miner reservations are valid or ignored
+        // 5. Non-ghost unit bodies never intersect static blockers.
+        // ------------------------------------------------------------------
+        let building_rects: Vec<_> = self
+            .entities
+            .iter()
+            .filter_map(|e| {
+                if e.is_building() {
+                    building_rect_for_entity(&self.map, e).map(|rect| (e.id, e.kind, rect))
+                } else {
+                    None
+                }
+            })
+            .collect();
+        for e in self.entities.iter().filter(|e| e.is_unit()) {
+            if is_collision_anchored(e) {
+                continue;
+            }
+            if let Some(body) = unit_body(e.kind, e.pos_x, e.pos_y) {
+                for &(building_id, building_kind, rect) in &building_rects {
+                    assert!(
+                        !circle_intersects_rect(body, rect),
+                        "invariant: unit {} ({:?}) body intersects building {} ({:?}) footprint",
+                        e.id,
+                        e.kind,
+                        building_id,
+                        building_kind
+                    );
+                }
+            }
+        }
+
+        let occ = Occupancy::build(&self.map, &self.entities);
+        for e in self.entities.iter().filter(|e| e.is_unit()) {
+            if is_collision_anchored(e) {
+                continue;
+            }
+            assert!(
+                standability::unit_static_standable(&self.map, &occ, e.kind, e.pos_x, e.pos_y),
+                "invariant: unit {} ({:?}) body is not static-standable at ({:.2}, {:.2})",
+                e.id,
+                e.kind,
+                e.pos_x,
+                e.pos_y
+            );
+        }
+
+        // ------------------------------------------------------------------
+        // 6. Resource-node miner reservations are valid or ignored
         // ------------------------------------------------------------------
         for e in self.entities.iter() {
             if !e.is_node() {
@@ -137,7 +189,7 @@ impl Game {
         }
 
         // ------------------------------------------------------------------
-        // 6. Orders do not point at invalid required targets
+        // 7. Orders do not point at invalid required targets
         //    (transition windows where a target just died are allowed because
         //     death_system cleans them up on the same tick).
         // ------------------------------------------------------------------
@@ -187,7 +239,7 @@ impl Game {
         }
 
         // ------------------------------------------------------------------
-        // 7. Fog grids exist for all players and never for neutral owner
+        // 8. Fog grids exist for all players and never for neutral owner
         // ------------------------------------------------------------------
         for &pid in &player_ids {
             assert!(
@@ -202,7 +254,7 @@ impl Game {
         );
 
         // ------------------------------------------------------------------
-        // 8b. Mobile units do not stack on top of each other (PLAN §4.3).
+        // 9. Mobile units do not stack on top of each other (PLAN §4.3).
         //     Harvesting workers are anchored to their resource node and excluded — they
         //     intentionally cannot be pushed by collision. All other mobile-unit pairs must
         //     stay at sum-of-radii apart (within `OVERLAP_TOLERANCE_PX` of floating-point and
@@ -232,7 +284,7 @@ impl Game {
         }
 
         // ------------------------------------------------------------------
-        // 8. Snapshots never expose hidden enemy ids through entities or targets
+        // 10. Snapshots never expose hidden enemy ids through entities or targets
         // ------------------------------------------------------------------
         for &pid in &player_ids {
             let snap = self.snapshot_for(pid);
@@ -269,6 +321,9 @@ impl Game {
 #[cfg(test)]
 mod tests {
     use crate::config;
+    use crate::game::entity::EntityKind;
+    use crate::game::services::geometry::building_rect_for_footprint;
+    use crate::game::services::occupancy::footprint_center;
     use crate::game::{Game, PlayerInit};
     use crate::protocol::kinds;
 
@@ -313,6 +368,32 @@ mod tests {
             },
         ];
         let game = Game::new(&players, 0x1234_5678);
+        game.assert_invariants();
+    }
+
+    #[test]
+    #[should_panic(expected = "body intersects building")]
+    fn unit_body_vs_building_invariant_catches_manual_bad_state() {
+        let players = [PlayerInit {
+            id: 1,
+            name: "Solo".into(),
+            color: "#fff".into(),
+            is_ai: false,
+        }];
+        let mut game = Game::new(&players, 0x1234_5678);
+        for tile in &mut game.map.terrain {
+            *tile = crate::protocol::terrain::GRASS;
+        }
+
+        let (bx, by) = footprint_center(&game.map, EntityKind::Depot, 10, 10);
+        game.entities
+            .spawn_building(99, EntityKind::Depot, bx, by, true)
+            .expect("building spawn");
+        let rect = building_rect_for_footprint(EntityKind::Depot, 10, 10).expect("depot rect");
+        game.entities
+            .spawn_unit(99, EntityKind::Tank, rect.max_x + 19.0, rect.min_y + 32.0)
+            .expect("tank spawn");
+
         game.assert_invariants();
     }
 
