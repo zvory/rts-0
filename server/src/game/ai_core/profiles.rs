@@ -194,7 +194,7 @@ pub(crate) struct ResourcePolicy {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct TankResourcePolicy {
     pub(crate) max_oil_workers: usize,
-    pub(crate) oil_workers_per_tank_factory: usize,
+    pub(crate) oil_workers_per_factory: usize,
     pub(crate) deficit_response_workers: usize,
 }
 
@@ -213,7 +213,7 @@ const FULL_TECH_PATH: [EntityKind; 1] = [EntityKind::Barracks];
 const TANK_TECH_PATH: [EntityKind; 3] = [
     EntityKind::Barracks,
     EntityKind::TrainingCentre,
-    EntityKind::TankFactory,
+    EntityKind::Factory,
 ];
 const SUPPORT_TECH_PATH: [EntityKind; 2] = [EntityKind::Barracks, EntityKind::TrainingCentre];
 
@@ -267,7 +267,7 @@ pub(crate) static RIFLE_FLOOD_FAST: AiProfile = AiProfile {
     },
     expansion: Some(ExpansionPolicy {
         target_industrial_centers: 2,
-        required_complete_building: EntityKind::TankFactory,
+        required_complete_building: EntityKind::Factory,
         defensive_unit: EntityKind::Rifleman,
         defensive_unit_count: 0,
         pre_expansion_steel_worker_cap: 12,
@@ -480,7 +480,7 @@ pub(crate) static TECH_TO_TANKS: AiProfile = AiProfile {
     },
     expansion: Some(ExpansionPolicy {
         target_industrial_centers: 2,
-        required_complete_building: EntityKind::TankFactory,
+        required_complete_building: EntityKind::Factory,
         defensive_unit: EntityKind::Tank,
         defensive_unit_count: 0,
         pre_expansion_steel_worker_cap: 12,
@@ -634,7 +634,7 @@ mod tests {
     }
 
     #[test]
-    fn tech_to_tanks_has_oil_workers_and_tank_factory_path() {
+    fn tech_to_tanks_has_oil_workers_and_factory_path() {
         assert_eq!(TECH_TO_TANKS.workers.extra_oil_workers, 3);
         assert_eq!(TECH_TO_TANKS.resources.oil_after_steel_workers, 8);
         assert_eq!(TECH_TO_TANKS.resources.tank_adaptive, None);
@@ -643,7 +643,7 @@ mod tests {
             &[
                 EntityKind::Barracks,
                 EntityKind::TrainingCentre,
-                EntityKind::TankFactory
+                EntityKind::Factory
             ]
         );
         assert_eq!(
@@ -682,7 +682,7 @@ mod tests {
             &[
                 EntityKind::Barracks,
                 EntityKind::TrainingCentre,
-                EntityKind::TankFactory
+                EntityKind::Factory
             ]
         );
         assert_eq!(
@@ -730,7 +730,7 @@ mod tests {
             &[
                 EntityKind::Barracks,
                 EntityKind::TrainingCentre,
-                EntityKind::TankFactory
+                EntityKind::Factory
             ]
         );
         assert_eq!(transition.production.unit_priorities, &[EntityKind::Tank]);

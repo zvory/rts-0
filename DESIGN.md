@@ -178,7 +178,7 @@ Compact numeric codes:
 
 | Vocabulary | Codes |
 |------------|-------|
-| `kind` | 1 `worker`, 2 `rifleman`, 3 `machine_gunner`, 4 `at_team`, 5 `tank`, 6 `industrial_center`, 7 `depot`, 8 `barracks`, 9 `training_centre`, 10 `tank_factory`, 11 `steel`, 12 `oil` |
+| `kind` | 1 `worker`, 2 `rifleman`, 3 `machine_gunner`, 4 `at_team`, 5 `tank`, 6 `industrial_center`, 7 `depot`, 8 `barracks`, 9 `training_centre`, 10 `factory`, 11 `steel`, 12 `oil` |
 | `state` | 1 `idle`, 2 `move`, 3 `attack`, 4 `gather`, 5 `build`, 6 `train`, 7 `construct`, 8 `dead` |
 | `setupState` | 1 `packed`, 2 `setting_up`, 3 `deployed`, 4 `tearing_down` |
 | `notice.severity` | 1 `info`, 2 `warn`, 3 `alert` |
@@ -198,7 +198,7 @@ watch rooms receive all resource updates).
 {
   id: u32,
   owner: u32,                    // 0 = neutral (resources), else player id
-  kind: string,                  // EntityKind: "worker","rifleman","machine_gunner","at_team","tank","industrial_center","depot","barracks","training_centre","tank_factory"
+  kind: string,                  // EntityKind: "worker","rifleman","machine_gunner","at_team","tank","industrial_center","depot","barracks","training_centre","factory"
   x: f32, y: f32,                // world px (center)
   hp: u32, maxHp: u32,
   state: string,                 // "idle","move","attack","gather","build","train","construct","dead"
@@ -749,7 +749,7 @@ Building stats (hp, sight, cost, footprint tiles wxh, buildTicks, extra):
 | depot                      | 220 | 4     | 100 | 2x2  | 180       | +8 supply |
 | barracks                   | 320 | 6     | 150 | 3x2  | 200       | trains rifleman, machine_gunner, at_team; requires a City Centre |
 | training_centre   | 300 | 6     | 100 steel + 50 oil | 3x2  | 220       | unlocks machine_gunner and at_team training at barracks; requires a City Centre and Barracks |
-| tank_factory               | 360 | 6     | 200 steel + 100 oil | 3x3  | 240       | trains tank; requires a City Centre and Training Centre |
+| factory                    | 360 | 6     | 200 steel + 100 oil | 3x3  | 240       | trains tank; requires a City Centre and Training Centre |
 
 Win: a player is **eliminated** when they own zero buildings (units alone do not keep them
 alive). Last player standing wins; a 1-player match never ends (sandbox/exploration mode). In a
@@ -973,10 +973,10 @@ Riflemen as the fallback until support tech is ready.
 `rifle_flood_full_saturation` saturates the observed main-base steel line before assigning oil
 workers, so the oil timing follows the map's current steel patch count instead of a hardcoded worker
 number. At 50 supply it independently pivots into the tank tech path and becomes eligible to expand
-off a completed Training Centre instead of waiting for a finished Tank Factory; expansion site
+off a completed Training Centre instead of waiting for a finished Factory; expansion site
 selection prefers oil coverage before extra steel output.
 `tech_to_tanks` is a steel-first fast-tech profile: it keeps worker production active while saving
-for the tank-factory step, delays oil workers until at least eight workers are already mining steel,
+for the factory step, delays oil workers until at least eight workers are already mining steel,
 uses ready combat units to clear visible threats in its home resource line before attacking out,
 and treats a single completed tank as a valid minimum attack wave.
 All profiles share a defensive panic mode. A visible enemy near the AI's base, home resource line,
@@ -996,7 +996,7 @@ enemies. Once that expansion IC is planned, it builds Barracks and Training Cent
 oil, produces Machine Gunners and AT teams toward a one-for-one support mix, and keeps those
 support units staged in a short line on the enemy-facing side of its main-base steel cluster
 instead of launching outbound attack waves.
-After 50 supply used, it switches to a Tank Factory tech path, stops Machine Gunner / AT team
+After 50 supply used, it switches to a Factory tech path, stops Machine Gunner / AT team
 production, trains tanks, and launches outbound tank groups only once at least three tanks are
 ready. After the expansion IC is complete, its worker resource assignment is locally bounded so
 main-base workers do not walk to expansion patches, and expansion workers do not walk back to

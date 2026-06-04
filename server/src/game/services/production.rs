@@ -278,9 +278,9 @@ mod tests {
     }
 
     fn spawn_factory(map: &Map, entities: &mut EntityStore, tile_x: u32, tile_y: u32) -> u32 {
-        let (x, y) = footprint_center(map, EntityKind::TankFactory, tile_x, tile_y);
+        let (x, y) = footprint_center(map, EntityKind::Factory, tile_x, tile_y);
         let id = entities
-            .spawn_building(1, EntityKind::TankFactory, x, y, true)
+            .spawn_building(1, EntityKind::Factory, x, y, true)
             .expect("factory should spawn");
         entities
             .get_mut(id)

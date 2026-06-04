@@ -266,7 +266,7 @@ export class HUD {
    *  - anything else → empty.
    *
    * Buttons are disabled when unaffordable (vs `state.resources`) or when tech
-   * requirements are unmet (e.g. tank factory requires completed prerequisites).
+   * requirements are unmet (e.g. factory requires completed prerequisites).
    */
   _renderCommandCard() {
     const card = this.elCommand;
