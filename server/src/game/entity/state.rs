@@ -91,6 +91,8 @@ pub struct CombatState {
     pub weapon_facing: f32,
     /// Target weapon/barrel facing in radians. Useful for projection/debugging and future arcs.
     pub desired_weapon_facing: f32,
+    /// Fixed center of a manually emplaced AT gun's field of fire.
+    pub emplacement_facing: Option<f32>,
 }
 
 impl Default for CombatState {
@@ -101,6 +103,7 @@ impl Default for CombatState {
             setup: WeaponSetup::Packed,
             weapon_facing: 0.0,
             desired_weapon_facing: 0.0,
+            emplacement_facing: None,
         }
     }
 }

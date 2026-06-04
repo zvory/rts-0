@@ -366,6 +366,8 @@ fn command_stats_by_player(commands: &[CommandLogEntry]) -> BTreeMap<u32, Comman
                 player.first_attack_command_tick.get_or_insert(entry.tick);
             }
             WireCommand::Move { .. }
+            | WireCommand::SetupAtGuns { .. }
+            | WireCommand::TearDownAtGuns { .. }
             | WireCommand::Gather { .. }
             | WireCommand::Build { .. }
             | WireCommand::Train { .. }
