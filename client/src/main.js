@@ -20,7 +20,8 @@ import { HUD } from "./hud.js";
 import { Minimap } from "./minimap.js";
 import { Lobby } from "./lobby.js";
 import { Audio, SOUND_MANIFEST, noticeSoundId } from "./audio.js";
-import { S, EVENT, KIND, SETUP, STATE } from "./protocol.js";
+import { machineGunnerHasAudibleTarget, machineGunSoundKey } from "./combat_audio.js";
+import { S, EVENT, KIND } from "./protocol.js";
 import { SNAPSHOT_MS, INTERP_DELAY_MS } from "./config.js";
 
 /** How long (ms) a #toast notice stays on screen before fading out. */
@@ -54,20 +55,6 @@ const COMBAT_SOUNDS = Object.freeze({
     priority: 2.5,
   },
 });
-
-function machineGunSoundKey(id) {
-  return `combat:machine_gunner:${id}`;
-}
-
-function isAudiblyFiringMachineGunner(e) {
-  return !!(
-    e &&
-    e.kind === KIND.MACHINE_GUNNER &&
-    e.state === STATE.ATTACK &&
-    e.setupState === SETUP.DEPLOYED &&
-    typeof e.targetId === "number"
-  );
-}
 
 /**
  * Derive the WebSocket endpoint from the current page location, so the client
@@ -706,7 +693,7 @@ class Match {
   stopInactiveMachineGunSounds() {
     if (!this.audio || this.activeMachineGunSoundKeys.size === 0) return;
     for (const [id, key] of this.activeMachineGunSoundKeys) {
-      if (isAudiblyFiringMachineGunner(this.state.entityById(id))) continue;
+      if (machineGunnerHasAudibleTarget(this.state.entityById(id))) continue;
       this.audio.stopByKey(key);
       this.activeMachineGunSoundKeys.delete(id);
     }
