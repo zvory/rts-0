@@ -590,7 +590,7 @@ fn spread_goals(
     let mut taken: Vec<(u32, u32)> = Vec::new();
 
     for unit in units {
-        if let Some(tile) = find_unique_tile_near(map, occ, unit.kind, anchor, &taken) {
+        if let Some(tile) = find_unique_tile_near(map, occ, unit, anchor, &taken) {
             taken.push(tile);
             out.push(map.tile_center(tile.0, tile.1));
         } else {
@@ -639,7 +639,7 @@ fn formation_goals(
             (goal.1 + offset.1 * formation_scale).clamp(0.0, max),
         );
         let anchor = map.tile_of(desired.0, desired.1);
-        if let Some(tile) = find_unique_tile_near(map, occ, unit.kind, anchor, &taken) {
+        if let Some(tile) = find_unique_tile_near(map, occ, unit, anchor, &taken) {
             taken.push(tile);
             out.push(map.tile_center(tile.0, tile.1));
         } else {
@@ -671,12 +671,12 @@ fn clamp_offset(dx: f32, dy: f32, max_len: f32) -> (f32, f32) {
 fn find_unique_tile_near(
     map: &Map,
     occ: &Occupancy,
-    kind: EntityKind,
+    unit: &FormationUnit,
     anchor: (u32, u32),
     taken: &[(u32, u32)],
 ) -> Option<(u32, u32)> {
     // Try the anchor first.
-    if is_free_goal(map, occ, kind, anchor, taken) {
+    if is_free_goal(map, occ, unit, anchor, taken) {
         return Some(anchor);
     }
 
@@ -692,7 +692,7 @@ fn find_unique_tile_near(
                     continue;
                 }
                 let t = (tx as u32, ty as u32);
-                if is_free_goal(map, occ, kind, t, taken) {
+                if is_free_goal(map, occ, unit, t, taken) {
                     return Some(t);
                 }
             }
@@ -705,7 +705,7 @@ fn find_unique_tile_near(
 fn is_free_goal(
     map: &Map,
     occ: &Occupancy,
-    kind: EntityKind,
+    unit: &FormationUnit,
     tile: (u32, u32),
     taken: &[(u32, u32)],
 ) -> bool {
@@ -719,7 +719,22 @@ fn is_free_goal(
         return false;
     }
     let center = map.tile_center(tile.0, tile.1);
-    standability::unit_static_standable(map, occ, kind, center.0, center.1)
+    let facing = formation_goal_facing(unit, center);
+    standability::unit_static_standable_with_facing(map, occ, unit.kind, center.0, center.1, facing)
+}
+
+fn formation_goal_facing(unit: &FormationUnit, center: (f32, f32)) -> f32 {
+    if unit.kind != EntityKind::Tank {
+        return 0.0;
+    }
+    let dx = center.0 - unit.pos.0;
+    let dy = center.1 - unit.pos.1;
+    let dist2 = dx * dx + dy * dy;
+    if !dist2.is_finite() || dist2 <= 1.0e-4 {
+        0.0
+    } else {
+        dy.atan2(dx)
+    }
 }
 
 /// Pick a walk target outside a build footprint.
@@ -989,7 +1004,7 @@ mod tests {
     }
 
     #[test]
-    fn formation_goal_accepts_v1_tank_tile_center_near_building() {
+    fn formation_goal_accepts_side_on_tank_tile_center_near_building() {
         let mut map = Map::generate(1, 0x1234_5678);
         for tile in &mut map.terrain {
             *tile = crate::protocol::terrain::GRASS;
@@ -1000,7 +1015,7 @@ mod tests {
             .spawn_building(1, EntityKind::Depot, bx, by, true)
             .expect("depot should spawn");
         let occ = Occupancy::build(&map, &entities);
-        let units = vec![formation_unit_kind(1, EntityKind::Tank, &map, (6, 10))];
+        let units = vec![formation_unit_kind(1, EntityKind::Tank, &map, (12, 6))];
         let adjacent_tile_goal = map.tile_center(12, 10);
 
         let goals = formation_goals(&map, &occ, &units, adjacent_tile_goal);
@@ -1009,10 +1024,18 @@ mod tests {
         assert_eq!(
             map.tile_of(goal.0, goal.1),
             (12, 10),
-            "v1 tank radius should allow adjacent tile-center formation slots"
+            "side-on tank hull should allow adjacent tile-center formation slots"
         );
+        let facing = formation_goal_facing(&units[0], goal);
         assert!(
-            standability::unit_static_standable(&map, &occ, EntityKind::Tank, goal.0, goal.1),
+            standability::unit_static_standable_with_facing(
+                &map,
+                &occ,
+                EntityKind::Tank,
+                goal.0,
+                goal.1,
+                facing,
+            ),
             "assigned formation goal must be body-standable"
         );
     }

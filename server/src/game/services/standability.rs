@@ -4,7 +4,8 @@ use crate::game::map::Map;
 use crate::game::pathfinding::Passability;
 use crate::game::services::geometry::{
     building_rect_for_entity, building_rect_for_footprint, circle_intersects_rect, rects_intersect,
-    tile_rect, unit_body, CircleBody,
+    tile_rect, unit_bodies_intersect, unit_body, unit_body_for_entity, unit_body_intersects_rect,
+    unit_body_with_facing, CircleBody, UnitBody,
 };
 use crate::game::services::occupancy::Occupancy;
 
@@ -15,23 +16,34 @@ pub(crate) fn unit_static_standable(
     x: f32,
     y: f32,
 ) -> bool {
-    let Some(body) = unit_body(kind, x, y) else {
+    unit_static_standable_with_facing(map, occ, kind, x, y, 0.0)
+}
+
+pub(crate) fn unit_static_standable_with_facing(
+    map: &Map,
+    occ: &Occupancy,
+    kind: EntityKind,
+    x: f32,
+    y: f32,
+    facing: f32,
+) -> bool {
+    let Some(body) = unit_body_with_facing(kind, x, y, facing) else {
         return false;
     };
-    if !circle_inside_world(map, body) {
+    if !unit_body_inside_world(map, body) {
         return false;
     }
 
-    for (tx, ty) in circle_tile_range(body) {
+    for (tx, ty) in body_tile_range(body) {
         if !map.in_bounds(tx, ty) {
             return false;
         }
 
         let tile = tile_rect(tx, ty);
-        if !map.is_passable(tx, ty) && circle_intersects_rect(body, tile) {
+        if !map.is_passable(tx, ty) && unit_body_intersects_rect(body, tile) {
             return false;
         }
-        if !occ.passable(tx, ty) && circle_intersects_rect(body, tile) {
+        if !occ.passable(tx, ty) && unit_body_intersects_rect(body, tile) {
             return false;
         }
     }
@@ -46,8 +58,9 @@ pub(crate) fn unit_static_segment_standable(
     from: (f32, f32),
     to: (f32, f32),
 ) -> bool {
-    if !unit_static_standable(map, occ, kind, from.0, from.1)
-        || !unit_static_standable(map, occ, kind, to.0, to.1)
+    let facing = segment_body_facing(kind, from, to);
+    if !unit_static_standable_with_facing(map, occ, kind, from.0, from.1, facing)
+        || !unit_static_standable_with_facing(map, occ, kind, to.0, to.1, facing)
     {
         return false;
     }
@@ -62,7 +75,7 @@ pub(crate) fn unit_static_segment_standable(
         let t = i as f32 / steps as f32;
         let x = from.0 + dx * t;
         let y = from.1 + dy * t;
-        if !unit_static_standable(map, occ, kind, x, y) {
+        if !unit_static_standable_with_facing(map, occ, kind, x, y, facing) {
             return false;
         }
     }
@@ -88,7 +101,7 @@ pub(crate) fn unit_spawn_standable(
     entities.iter().all(|e| {
         e.hp == 0
             || !e.is_unit()
-            || unit_entity_body(e).is_none_or(|existing| !circles_intersect(body, existing))
+            || unit_body_for_entity(e).is_none_or(|existing| !unit_bodies_intersect(body, existing))
     })
 }
 
@@ -143,7 +156,8 @@ fn building_site_clear_with_ignored_unit(
             return !circle_intersects_rect(entity_circle_body(e), rect);
         }
         if e.is_unit() {
-            return unit_entity_body(e).is_none_or(|body| !circle_intersects_rect(body, rect));
+            return unit_body_for_entity(e)
+                .is_none_or(|body| !unit_body_intersects_rect(body, rect));
         }
         true
     })
@@ -182,27 +196,22 @@ fn footprint_in_bounds_and_passable(
     true
 }
 
-fn circle_inside_world(map: &Map, body: CircleBody) -> bool {
+fn unit_body_inside_world(map: &Map, body: UnitBody) -> bool {
     let max = map.world_size_px();
-    body.x - body.radius >= 0.0
-        && body.y - body.radius >= 0.0
-        && body.x + body.radius <= max
-        && body.y + body.radius <= max
+    let aabb = body.aabb();
+    aabb.min_x >= 0.0 && aabb.min_y >= 0.0 && aabb.max_x <= max && aabb.max_y <= max
 }
 
-fn circle_tile_range(body: CircleBody) -> impl Iterator<Item = (i32, i32)> {
+fn body_tile_range(body: UnitBody) -> impl Iterator<Item = (i32, i32)> {
     let ts = config::TILE_SIZE as f32;
     let eps = 0.001;
-    let min_tx = ((body.x - body.radius - eps) / ts).floor() as i32;
-    let min_ty = ((body.y - body.radius - eps) / ts).floor() as i32;
-    let max_tx = ((body.x + body.radius + eps) / ts).ceil() as i32 - 1;
-    let max_ty = ((body.y + body.radius + eps) / ts).ceil() as i32 - 1;
+    let aabb = body.aabb();
+    let min_tx = ((aabb.min_x - eps) / ts).floor() as i32;
+    let min_ty = ((aabb.min_y - eps) / ts).floor() as i32;
+    let max_tx = ((aabb.max_x + eps) / ts).ceil() as i32 - 1;
+    let max_ty = ((aabb.max_y + eps) / ts).ceil() as i32 - 1;
 
     (min_ty..=max_ty).flat_map(move |ty| (min_tx..=max_tx).map(move |tx| (tx, ty)))
-}
-
-fn unit_entity_body(e: &Entity) -> Option<CircleBody> {
-    unit_body(e.kind, e.pos_x, e.pos_y)
 }
 
 fn entity_circle_body(e: &Entity) -> CircleBody {
@@ -213,11 +222,18 @@ fn entity_circle_body(e: &Entity) -> CircleBody {
     }
 }
 
-fn circles_intersect(a: CircleBody, b: CircleBody) -> bool {
-    let dx = a.x - b.x;
-    let dy = a.y - b.y;
-    let r = a.radius + b.radius;
-    dx * dx + dy * dy <= r * r
+fn segment_body_facing(kind: EntityKind, from: (f32, f32), to: (f32, f32)) -> f32 {
+    if kind != EntityKind::Tank {
+        return 0.0;
+    }
+    let dx = to.0 - from.0;
+    let dy = to.1 - from.1;
+    let dist2 = dx * dx + dy * dy;
+    if !dist2.is_finite() || dist2 <= 1.0e-4 {
+        0.0
+    } else {
+        dy.atan2(dx)
+    }
 }
 
 #[cfg(test)]

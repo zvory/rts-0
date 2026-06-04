@@ -1073,7 +1073,7 @@ mod tests {
     }
 
     #[test]
-    fn tank_pathing_uses_tile_center_corridors_for_v1_radius() {
+    fn tank_pathing_uses_oriented_hull_in_two_tile_corridor() {
         let map = two_tile_wide_horizontal_corridor();
         let entities = EntityStore::new();
         let occ = Occupancy::build(&map, &entities);
@@ -1087,13 +1087,15 @@ mod tests {
             "v1 tanks must stay point-sized for coarse A* so they can use two-tile corridors"
         );
 
+        let start = (2, 3);
+        let goal = (5, 3);
         let waypoints = service.request(
             &map,
             &occ,
             PathRequest {
                 kind: EntityKind::Tank,
-                start: (1, 3),
-                goal: (6, 3),
+                start,
+                goal,
                 radius_tiles,
                 route_shape: RouteShape::Normal,
                 budget: None,
@@ -1104,11 +1106,12 @@ mod tests {
             !waypoints.is_empty(),
             "tank should find a coarse tile path through a two-tile-wide corridor"
         );
-        for (x, y) in waypoints {
-            assert!(
-                standability::unit_static_standable(&map, &occ, EntityKind::Tank, x, y),
-                "tank waypoint ({x:.1}, {y:.1}) must be body-legal"
-            );
-        }
+        assert_reverse_segments_standable(
+            &map,
+            &occ,
+            EntityKind::Tank,
+            map.tile_center(start.0 as u32, start.1 as u32),
+            &waypoints,
+        );
     }
 }
