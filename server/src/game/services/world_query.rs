@@ -262,7 +262,15 @@ fn nearest_matching_enemy_in_range(
         let dy = entity.pos_y - py;
         let d2 = dx * dx + dy * dy;
         let r2 = effective_radius * effective_radius;
-        if d2 <= r2 && best.map(|(_, best_d2)| d2 < best_d2).unwrap_or(true) {
+        if d2 <= r2
+            && best
+                .map(|(best_id, best_d2)| {
+                    d2.total_cmp(&best_d2)
+                        .then_with(|| id.cmp(&best_id))
+                        .is_lt()
+                })
+                .unwrap_or(true)
+        {
             best = Some((id, d2));
         }
     }
@@ -332,6 +340,21 @@ mod tests {
         // ... but not their own worker (self) or their own building.
         assert!(!is_enemy_targetable(p1_worker, 1, p1_worker.id));
         assert!(!is_enemy_targetable(p1_ic, 1, p1_worker.id));
+    }
+
+    #[test]
+    fn nearest_enemy_breaks_equal_distance_ties_by_id() {
+        let mut s = EntityStore::default();
+        let attacker = s.spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0).unwrap();
+        let lower_id = s.spawn_unit(2, EntityKind::Rifleman, 120.0, 100.0).unwrap();
+        let higher_id = s.spawn_unit(2, EntityKind::Rifleman, 80.0, 100.0).unwrap();
+        assert!(lower_id < higher_id);
+        let spatial = SpatialIndex::build(&s, 10);
+
+        assert_eq!(
+            nearest_enemy_in_range(&s, &spatial, attacker, 1, 100.0, 100.0, 50.0),
+            Some(lower_id)
+        );
     }
 
     #[test]
