@@ -1319,4 +1319,42 @@ mod tests {
         );
         assert_eq!(still_waiting, 7, "7 units should still be awaiting path");
     }
+
+    #[test]
+    fn request_path_snaps_final_waypoint_to_exact_goal() {
+        let map = Map::generate(1, 0x1234_5678);
+        let mut entities = EntityStore::new();
+        let start = map.tile_center(10, 10);
+        let unit = entities
+            .spawn_unit(1, EntityKind::Rifleman, start.0, start.1)
+            .expect("unit should spawn");
+        let goal_tile_center = map.tile_center(20, 13);
+        let exact_goal = (goal_tile_center.0 + 7.25, goal_tile_center.1 - 5.5);
+        let occ = Occupancy::build(&map, &entities);
+
+        let mut pathing = PathingService::new(8_192, 256);
+        pathing.advance_tick(1);
+        let mut coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, 1);
+
+        assert!(
+            coordinator.request_path(&mut entities, unit, exact_goal),
+            "fixture path should be found"
+        );
+        let unit = entities.get(unit).expect("unit should still exist");
+        let path = &unit
+            .movement
+            .as_ref()
+            .expect("unit should have movement")
+            .path;
+        assert!(
+            path.len() > 1,
+            "fixture should produce an intermediate route plus final exact goal"
+        );
+        assert_eq!(
+            path.first().copied(),
+            Some(exact_goal),
+            "paths are reverse-ordered, so index 0 must remain the exact requested final goal"
+        );
+        assert_eq!(unit.path_goal(), Some(exact_goal));
+    }
 }
