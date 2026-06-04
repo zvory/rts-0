@@ -102,11 +102,9 @@ mod tests {
     use std::collections::HashMap;
 
     use super::*;
-    use crate::config;
     use crate::game::entity::{EntityKind, Order};
     use crate::game::fog::Fog;
     use crate::game::map::Map;
-    use crate::game::services::occupancy::building_footprint;
     use crate::protocol::terrain;
     use rand::SeedableRng;
 
@@ -135,7 +133,7 @@ mod tests {
     }
 
     #[test]
-    fn collision_uses_occupancy_rebuilt_after_construction() {
+    fn construction_rejects_unit_body_before_collision_cleanup() {
         let map = flat_map(24);
         let mut entities = EntityStore::new();
         let mut players = vec![player_state(1)];
@@ -151,7 +149,7 @@ mod tests {
             .expect("worker should exist")
             .set_order(Order::build(EntityKind::Depot, 10, 10));
 
-        let pinned = entities
+        let blocker = entities
             .spawn_unit(1, EntityKind::Rifleman, 386.0, 336.0)
             .expect("rifleman kind should be valid");
         entities
@@ -171,18 +169,26 @@ mod tests {
             1,
         );
 
-        let depot = entities
-            .iter()
-            .find(|e| e.kind == EntityKind::Depot)
-            .expect("arrived worker should spawn the depot");
-        let depot_footprint = building_footprint(&map, depot);
-        let pinned = entities.get(pinned).expect("unit should survive collision");
-        let pinned_tile = map.tile_of(pinned.pos_x, pinned.pos_y);
-
         assert!(
-            !depot_footprint.contains(&pinned_tile),
-            "collision resolution must not push a unit into a building footprint spawned earlier in the same tick"
+            entities.iter().all(|e| e.kind != EntityKind::Depot),
+            "construction should reject the scaffold before collision cleanup when a unit body intersects the footprint"
         );
-        assert_eq!(config::TILE_SIZE, 32, "test coordinates assume 32px tiles");
+        assert!(
+            matches!(
+                entities.get(worker).expect("worker should survive").order(),
+                Order::Idle
+            ),
+            "blocked construction should clear the worker order"
+        );
+        assert!(
+            entities.get(blocker).is_some(),
+            "blocking unit should survive the rejected construction"
+        );
+        assert!(
+            events
+                .get(&1)
+                .is_some_and(|events| matches!(events.as_slice(), [Event::Notice { msg }] if msg == "Cannot build there")),
+            "rejected construction should notify the owner"
+        );
     }
 }
