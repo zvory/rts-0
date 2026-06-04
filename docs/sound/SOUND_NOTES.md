@@ -27,6 +27,7 @@ Files that failed any of these were deleted immediately.
 | units_tank_engine_idle_03.mp3 | Excellent. Clean, long, authentic idle. Primary tank idle. Pair with _running (565597) from same source. | https://freesound.org/people/C-V/sounds/565598/ |
 | combat_tank_cannon_06.mp3 | Acceptable. Not top quality — extracted from US Army video, some compression artifacts — but usable as primary until something better is found. | https://freesound.org/people/qubodup/sounds/161343/ |
 | combat_tank_cannon_09.mp3 | Backup only. Authentic 1958 Nagra field recording of a Finnish 76mm KT cannon (caliber close to Panzer IV 75mm KwK). Good character but recording age is audible. Contains multiple shots; trim individual shots as needed. CC-BY 4.0 — credit YleArkisto / yle.fi. | https://freesound.org/people/YleArkisto/sounds/332935/ |
+| buildings/buildings_construction_start_01.mp3 | Primary — all construction. Trimmed to 1.9s. Shovel into grass+dirt. Original retained as _full.mp3. | https://freesound.org/people/dr19/sounds/353907/ |
 
 ## Rejections and Criteria
 
@@ -74,14 +75,42 @@ Files that failed any of these were deleted immediately.
 
 **combat_tank_cannon_04.mp3** — Rejected. Heavy background noise.
 
+**buildings_construction_start_04.mp3** — Rejected. Heavy background noise. Deleted.
+
+**buildings_construction_start_05.mp3** — Rejected. Heavy background noise. Deleted.
+
+**buildings_construction_start_06.mp3** — Rejected. Deleted.
+
 **combat_tank_cannon_05.mp3** — Rejected. Heavy background noise.
 
 **units_tank_engine_idle_01.mp3** — Rejected. Too much turbine noise.
 
 **units_tank_engine_idle_04.mp3** — Rejected. Decent but outclassed by _03.
 
+## Ambient — Deferred
+
+Ambient sound cut from scope. Too much work to get right (wind level, forest layers, looping). Revisit later if needed.
+
+Samples reviewed:
+- ambient_field_wind_01 (felix.blume 146436 CC0): too windy, mic distortion. Backup if ambient is ever revived.
+- ambient_field_wind_02 (fran_marenco 853991 CC0): too windy. Deleted.
+- ambient_field_wind_03 (silencyo 81793 CC0): acceptable — would need volume reduction and layered forest sounds. Not pursued.
+- ambient_field_wind_04–06: not reviewed.
+
+## Under Review — Buildings
+
+| File | Source | License | Original format | Notes |
+|------|--------|---------|-----------------|-------|
+| buildings/buildings_construction_start_01.mp3 | https://freesound.org/people/dr19/sounds/353907/ | CC0 | — | Trimmed to 1.9s (4.9–6.8s of original). Shovel into grass+dirt, thud + tearing texture. Primary — use for all construction. Original retained as buildings_construction_start_01_full.mp3. |
+| buildings/buildings_construction_start_02.mp3 | https://freesound.org/people/ernstBWP/sounds/568846/ | CC0 | — | 20.5s. Shoveling very dry dirt, Zoom H5. Trim to single scoop. |
+| buildings/buildings_construction_start_03.mp3 | https://freesound.org/people/Glen_Dorner/sounds/654114/ | CC-BY 4.0 | — | 13.5s. Shovel hitting dirt, metal scrape + soil impact, ZOOM H6, no processing. Trim to single hit. |
+
 ## Gaps (still needed)
 
 - Grass infantry footstep pack: need clean, light steps on grass, 6–10 variations
 - Tank engine running (moving): download https://freesound.org/people/C-V/sounds/565597/ to match idle_03
 - Sources unknown for most new keepers — track down before ship
+
+## Out of scope — first pass
+
+- **Explosions**: explicitly deferred. No explosion SFX for v1. Death events for vehicles will play nothing or a generic hit sound; revisit after first pass ships.
