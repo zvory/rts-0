@@ -10,6 +10,12 @@ import { RESOURCE_AMOUNTS } from "./config.js";
 import { KIND, PASSABLE, isResource } from "./protocol.js";
 
 const TWO_PI = Math.PI * 2;
+const WEAPON_RECOIL_MS = Object.freeze({
+  [KIND.RIFLEMAN]: 420,
+  [KIND.MACHINE_GUNNER]: 160,
+  [KIND.AT_TEAM]: 820,
+  [KIND.TANK]: 650,
+});
 
 function normalizeAngle(a) {
   let out = (a + Math.PI) % TWO_PI;
@@ -187,13 +193,18 @@ export class GameState {
   /**
    * Recoil progress for an entity that fired recently. Returns 0 when idle.
    * @param {number} id
+   * @param {string=} kind
    * @param {number} now
    * @returns {number}
    */
-  weaponRecoil(id, now) {
+  weaponRecoil(id, kind, now) {
+    if (typeof now !== "number") {
+      now = kind;
+      kind = undefined;
+    }
     const startedAt = this.weaponRecoilById.get(id);
     if (typeof startedAt !== "number") return 0;
-    const ttlMs = 190;
+    const ttlMs = WEAPON_RECOIL_MS[kind] || 300;
     const age = now - startedAt;
     if (age < 0) return 1;
     if (age > ttlMs) {
@@ -201,7 +212,7 @@ export class GameState {
       return 0;
     }
     const t = age / ttlMs;
-    return Math.sin((1 - t) * Math.PI * 0.5);
+    return recoilCurve(t);
   }
 
   /**
@@ -478,4 +489,13 @@ export class GameState {
     if (terrain == null) return false;
     return !!PASSABLE[terrain];
   }
+}
+
+function recoilCurve(t) {
+  const progress = t < 0 ? 0 : t > 1 ? 1 : t;
+  if (progress < 0.18) {
+    return 1 - progress * 0.12;
+  }
+  const settle = (progress - 0.18) / 0.82;
+  return Math.cos(settle * Math.PI * 0.5) * 0.88;
 }
