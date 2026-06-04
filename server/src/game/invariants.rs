@@ -4,9 +4,10 @@
 //! panic-on-failure so broken assumptions surface immediately during development.
 
 use crate::config;
-use crate::game::entity::{Order, NEUTRAL};
+use crate::game::entity::{Entity, EntityKind, Order, NEUTRAL};
+use crate::game::map::Map;
 use crate::game::services::geometry::{
-    building_rect_for_entity, circle_intersects_rect, unit_body, CircleBody,
+    building_rect_for_entity, circle_intersects_rect, unit_body, CircleBody, RectBody,
 };
 use crate::game::services::movement::is_collision_anchored;
 use crate::game::services::occupancy::{building_footprint, Occupancy};
@@ -56,29 +57,25 @@ impl Game {
         for e in self.entities.iter() {
             assert!(
                 e.pos_x.is_finite() && e.pos_y.is_finite(),
-                "invariant: entity {} has non-finite position ({}, {})",
-                e.id,
-                e.pos_x,
-                e.pos_y
+                "invariant: tick {} entity has non-finite position; {}",
+                self.tick,
+                entity_context(&self.map, e)
             );
             assert!(
                 e.pos_x >= 0.0 && e.pos_x < world_max && e.pos_y >= 0.0 && e.pos_y < world_max,
-                "invariant: entity {} position ({}, {}) out of world bounds [0, {})",
-                e.id,
-                e.pos_x,
-                e.pos_y,
-                world_max
+                "invariant: tick {} entity position out of world bounds [0, {:.2}); {}",
+                self.tick,
+                world_max,
+                entity_context(&self.map, e)
             );
             if e.is_unit() {
                 let body = unit_body(e.kind, e.pos_x, e.pos_y);
                 assert!(
                     body.is_some(),
-                    "invariant: unit {} ({:?}) has invalid body at ({}, {}) with radius {}",
-                    e.id,
-                    e.kind,
-                    e.pos_x,
-                    e.pos_y,
-                    e.radius()
+                    "invariant: tick {} unit has invalid body with radius {:.2}; {}",
+                    self.tick,
+                    e.radius(),
+                    entity_context(&self.map, e)
                 );
             }
         }
@@ -118,20 +115,29 @@ impl Game {
         // ------------------------------------------------------------------
         // 4. Buildings never overlap
         // ------------------------------------------------------------------
-        let mut occupied: Vec<(u32, u32)> = Vec::new();
+        let mut occupied: Vec<(u32, EntityKind, (u32, u32))> = Vec::new();
         for e in self.entities.iter() {
             if !e.is_building() {
                 continue;
             }
             let footprint = building_footprint(&self.map, e);
             for tile in &footprint {
+                let previous = occupied
+                    .iter()
+                    .find(|(_, _, occupied_tile)| occupied_tile == tile);
                 assert!(
-                    !occupied.contains(tile),
-                    "invariant: building {} footprint overlaps another building at tile {:?}",
-                    e.id,
-                    tile
+                    previous.is_none(),
+                    "invariant: tick {} building footprint overlaps another building at tile {:?} {}; building={}; other={}; footprint={:?}",
+                    self.tick,
+                    tile,
+                    tile_location_context(&self.map, *tile),
+                    entity_context(&self.map, e),
+                    previous
+                        .map(|(id, kind, _)| format!("id={} kind={}", id, kind))
+                        .unwrap_or_else(|| "unknown".to_string()),
+                    footprint
                 );
-                occupied.push(*tile);
+                occupied.push((e.id, e.kind, *tile));
             }
         }
 
@@ -155,11 +161,13 @@ impl Game {
             for &(building_id, building_kind, rect) in &building_rects {
                 assert!(
                     !circle_intersects_rect(body, rect),
-                    "invariant: resource node {} ({:?}) body overlaps building {} ({:?}) footprint",
-                    node.id,
-                    node.kind,
+                    "invariant: tick {} resource node body overlaps building footprint; node={}; building=id={} kind={} {}; collision={}",
+                    self.tick,
+                    entity_context(&self.map, node),
                     building_id,
-                    building_kind
+                    building_kind,
+                    rect_context(&self.map, rect),
+                    circle_rect_collision_context(&self.map, body, rect)
                 );
             }
         }
@@ -175,11 +183,13 @@ impl Game {
                 for &(building_id, building_kind, rect) in &building_rects {
                     assert!(
                         !circle_intersects_rect(body, rect),
-                        "invariant: unit {} ({:?}) body intersects building {} ({:?}) footprint",
-                        e.id,
-                        e.kind,
+                        "invariant: tick {} unit body intersects building footprint; unit={}; building=id={} kind={} {}; collision={}",
+                        self.tick,
+                        entity_context(&self.map, e),
                         building_id,
-                        building_kind
+                        building_kind,
+                        rect_context(&self.map, rect),
+                        circle_rect_collision_context(&self.map, body, rect)
                     );
                 }
             }
@@ -192,11 +202,9 @@ impl Game {
             }
             assert!(
                 standability::unit_static_standable(&self.map, &occ, e.kind, e.pos_x, e.pos_y),
-                "invariant: unit {} ({:?}) body is not static-standable at ({:.2}, {:.2})",
-                e.id,
-                e.kind,
-                e.pos_x,
-                e.pos_y
+                "invariant: tick {} unit body is not static-standable; {}",
+                self.tick,
+                entity_context(&self.map, e)
             );
         }
 
@@ -306,9 +314,14 @@ impl Game {
                 let min_d = a.radius() + b.radius();
                 assert!(
                     dist + OVERLAP_TOLERANCE_PX >= min_d,
-                    "invariant: units {} ({:?}) and {} ({:?}) overlap by {:.2}px (min sep {:.1}, dist {:.2})",
-                    a.id, a.kind, b.id, b.kind,
-                    min_d - dist, min_d, dist
+                    "invariant: tick {} units overlap by {:.2}px (min sep {:.1}, dist {:.2}); a={}; b={}; midpoint={}",
+                    self.tick,
+                    min_d - dist,
+                    min_d,
+                    dist,
+                    entity_context(&self.map, a),
+                    entity_context(&self.map, b),
+                    location_context(&self.map, (a.pos_x + b.pos_x) * 0.5, (a.pos_y + b.pos_y) * 0.5)
                 );
             }
         }
@@ -325,11 +338,11 @@ impl Game {
                 // Enemy entity: must be on a visible tile.
                 assert!(
                     self.fog.is_visible_world(pid, v.x, v.y),
-                    "invariant: snapshot for player {} exposes hidden enemy entity {} at ({}, {})",
+                    "invariant: tick {} snapshot for player {} exposes hidden enemy entity {} at {}",
+                    self.tick,
                     pid,
                     v.id,
-                    v.x,
-                    v.y
+                    location_context(&self.map, v.x, v.y)
                 );
                 // If a target_id is exposed, the target must be visible too.
                 if let Some(tid) = v.target_id {
@@ -338,8 +351,11 @@ impl Game {
                             v.owner == pid || self.fog.is_visible_world(pid, t.pos_x, t.pos_y);
                         assert!(
                             visible,
-                            "invariant: snapshot for player {} exposes hidden target_id {} (target pos {}, {})",
-                            pid, tid, t.pos_x, t.pos_y
+                            "invariant: tick {} snapshot for player {} exposes hidden target_id {}; target={}",
+                            self.tick,
+                            pid,
+                            tid,
+                            entity_context(&self.map, t)
                         );
                     }
                 }
@@ -348,14 +364,122 @@ impl Game {
     }
 }
 
+fn entity_context(map: &Map, e: &Entity) -> String {
+    format!(
+        "id={} kind={} owner={} hp={}/{} state={} pos={} radius={:.2} order={:?} target_id={:?} anchored={}",
+        e.id,
+        e.kind,
+        e.owner,
+        e.hp,
+        e.max_hp,
+        e.state_str(),
+        location_context(map, e.pos_x, e.pos_y),
+        e.radius(),
+        e.order(),
+        e.target_id(),
+        is_collision_anchored(e)
+    )
+}
+
+fn location_context(map: &Map, x: f32, y: f32) -> String {
+    if !x.is_finite() || !y.is_finite() {
+        return format!(
+            "world=({x}, {y}) tile=(n/a) region=n/a map={}x{} tiles",
+            map.size, map.size
+        );
+    }
+
+    let (tile_x, tile_y) = map.tile_of(x, y);
+    format!(
+        "world=({:.2}, {:.2}) tile=({}, {}) region={} map={}x{} tiles/{:.0}px",
+        x,
+        y,
+        tile_x,
+        tile_y,
+        map_region(map, x, y),
+        map.size,
+        map.size,
+        map.world_size_px()
+    )
+}
+
+fn tile_location_context(map: &Map, tile: (u32, u32)) -> String {
+    let max_tile = map.size.saturating_sub(1);
+    let (x, y) = map.tile_center(tile.0.min(max_tile), tile.1.min(max_tile));
+    format!("center={}", location_context(map, x, y))
+}
+
+fn rect_context(map: &Map, rect: RectBody) -> String {
+    let center_x = (rect.min_x + rect.max_x) * 0.5;
+    let center_y = (rect.min_y + rect.max_y) * 0.5;
+    format!(
+        "rect=[{:.2},{:.2}]-[{:.2},{:.2}] center={}",
+        rect.min_x,
+        rect.min_y,
+        rect.max_x,
+        rect.max_y,
+        location_context(map, center_x, center_y)
+    )
+}
+
+fn circle_rect_collision_context(map: &Map, circle: CircleBody, rect: RectBody) -> String {
+    let nearest_x = circle.x.clamp(rect.min_x, rect.max_x);
+    let nearest_y = circle.y.clamp(rect.min_y, rect.max_y);
+    let dx = circle.x - nearest_x;
+    let dy = circle.y - nearest_y;
+    let distance = (dx * dx + dy * dy).sqrt();
+    let overlap = circle.radius - distance;
+    format!(
+        "circle_center={} circle_radius={:.2} nearest_rect_point={} overlap_depth={:.2}px",
+        location_context(map, circle.x, circle.y),
+        circle.radius,
+        location_context(map, nearest_x, nearest_y),
+        overlap.max(0.0)
+    )
+}
+
+fn map_region(map: &Map, x: f32, y: f32) -> String {
+    let world_size = map.world_size_px();
+    if world_size <= 0.0 {
+        return "unknown".to_string();
+    }
+
+    let horizontal = third_label(x / world_size, "left", "middle", "right");
+    let vertical = third_label(y / world_size, "top", "middle", "bottom");
+    if horizontal == "middle" && vertical == "middle" {
+        "middle".to_string()
+    } else {
+        format!("{vertical} {horizontal}")
+    }
+}
+
+fn third_label(
+    value: f32,
+    low: &'static str,
+    mid: &'static str,
+    high: &'static str,
+) -> &'static str {
+    if value < 1.0 / 3.0 {
+        low
+    } else if value < 2.0 / 3.0 {
+        mid
+    } else {
+        high
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    use std::panic::{catch_unwind, AssertUnwindSafe};
+
+    use super::location_context;
     use crate::config;
     use crate::game::entity::EntityKind;
+    use crate::game::map::Map;
     use crate::game::services::geometry::building_rect_for_footprint;
     use crate::game::services::occupancy::footprint_center;
     use crate::game::{Game, PlayerInit};
-    use crate::protocol::kinds;
+    use crate::protocol::{kinds, terrain};
 
     /// Steel patch placement must stay within IC distance bounds for any STEEL_PATCHES_PER_BASE.
     /// Regression: doubling patches to 24 caused rows 2/3 to exceed IC_RESOURCE_MAX_DIST_TILES.
@@ -402,7 +526,6 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "body intersects building")]
     fn unit_body_vs_building_invariant_catches_manual_bad_state() {
         let players = [PlayerInit {
             id: 1,
@@ -424,11 +547,18 @@ mod tests {
             .spawn_unit(99, EntityKind::Tank, rect.max_x + 19.0, rect.min_y + 32.0)
             .expect("tank spawn");
 
-        game.assert_invariants();
+        let message = invariant_panic_message(&game);
+        assert!(message.contains("unit body intersects building footprint"));
+        assert!(message.contains("tick 0"));
+        assert!(message.contains("unit=id="));
+        assert!(message.contains("building=id="));
+        assert!(message.contains("world=("));
+        assert!(message.contains("tile=("));
+        assert!(message.contains("region="));
+        assert!(message.contains("overlap_depth="));
     }
 
     #[test]
-    #[should_panic(expected = "resource node")]
     fn resource_body_vs_building_invariant_catches_manual_bad_state() {
         let players = [PlayerInit {
             id: 1,
@@ -454,7 +584,31 @@ mod tests {
             )
             .expect("resource spawn");
 
-        game.assert_invariants();
+        let message = invariant_panic_message(&game);
+        assert!(message.contains("resource node body overlaps building footprint"));
+        assert!(message.contains("node=id="));
+        assert!(message.contains("building=id="));
+        assert!(message.contains("world=("));
+        assert!(message.contains("tile=("));
+        assert!(message.contains("region="));
+        assert!(message.contains("overlap_depth="));
+    }
+
+    #[test]
+    fn location_context_describes_human_map_region() {
+        let map = Map {
+            size: 30,
+            terrain: vec![terrain::GRASS; 30 * 30],
+            starts: vec![],
+            expansion_sites: vec![],
+        };
+        let ts = config::TILE_SIZE as f32;
+
+        let context = location_context(&map, 15.25 * ts, 25.5 * ts);
+
+        assert!(context.contains("world=("));
+        assert!(context.contains("tile=(15, 25)"));
+        assert!(context.contains("region=bottom middle"));
     }
 
     /// After many ticks the invariants must still hold.
@@ -530,5 +684,17 @@ mod tests {
             game.tick();
         }
         game.assert_invariants();
+    }
+
+    fn invariant_panic_message(game: &Game) -> String {
+        let payload = catch_unwind(AssertUnwindSafe(|| game.assert_invariants()))
+            .expect_err("expected invariant panic");
+        if let Some(message) = payload.downcast_ref::<String>() {
+            return message.clone();
+        }
+        if let Some(message) = payload.downcast_ref::<&'static str>() {
+            return message.to_string();
+        }
+        "non-string panic payload".to_string()
     }
 }
