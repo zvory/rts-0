@@ -85,6 +85,8 @@ export class GameState {
 
     /** @type {Array<{from:number,to:number,createdAt:number}>} */
     this.muzzleFlashes = [];
+    /** @type {Map<number, number>} attacker id -> latest shot receive time. */
+    this.weaponRecoilById = new Map();
   }
 
   /** Maximum number of entities the local selection may contain. */
@@ -146,6 +148,9 @@ export class GameState {
     this._curRecvTime = now;
     this._curById = new Map();
     for (const e of entities) this._curById.set(e.id, e);
+    for (const id of this.weaponRecoilById.keys()) {
+      if (!this._curById.has(id)) this.weaponRecoilById.delete(id);
+    }
 
     this.resources = {
       steel: msg.steel | 0,
@@ -160,6 +165,7 @@ export class GameState {
     for (const ev of this.events) {
       if (ev && ev.e === "attack" && typeof ev.from === "number" && typeof ev.to === "number") {
         this.muzzleFlashes.push({ from: ev.from, to: ev.to, createdAt: now });
+        this.weaponRecoilById.set(ev.from, now);
       }
     }
     if (this.muzzleFlashes.length > 256) {
@@ -176,6 +182,26 @@ export class GameState {
     const ttlMs = 240;
     this.muzzleFlashes = this.muzzleFlashes.filter((f) => now - f.createdAt <= ttlMs);
     return this.muzzleFlashes;
+  }
+
+  /**
+   * Recoil progress for an entity that fired recently. Returns 0 when idle.
+   * @param {number} id
+   * @param {number} now
+   * @returns {number}
+   */
+  weaponRecoil(id, now) {
+    const startedAt = this.weaponRecoilById.get(id);
+    if (typeof startedAt !== "number") return 0;
+    const ttlMs = 190;
+    const age = now - startedAt;
+    if (age < 0) return 1;
+    if (age > ttlMs) {
+      this.weaponRecoilById.delete(id);
+      return 0;
+    }
+    const t = age / ttlMs;
+    return Math.sin((1 - t) * Math.PI * 0.5);
   }
 
   /**
