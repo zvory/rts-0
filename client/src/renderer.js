@@ -73,7 +73,9 @@ export class Renderer {
       height: canvasParent.clientHeight || window.innerHeight,
     });
     PIXI.settings.SCALE_MODE = PIXI.SCALE_MODES.NEAREST;
-    this.app.renderer.roundPixels = true;
+    // Keep interpolated entity positions fractional. Nearest scaling preserves
+    // the low-res look without snapping smooth server-snapshot interpolation.
+    this.app.renderer.roundPixels = false;
     this.app.view.style.imageRendering = "pixelated";
     canvasParent.appendChild(this.app.view);
 

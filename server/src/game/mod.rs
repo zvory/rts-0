@@ -165,6 +165,7 @@ impl Game {
         Self::new_inner(players, true, steel, oil, seed)
     }
 
+    #[cfg(test)]
     pub(crate) fn new_for_replay(players: &[PlayerInit], seed: u32) -> Game {
         Self::new_without_ai_controllers(players, seed)
     }
@@ -520,15 +521,13 @@ impl Game {
     /// Reconstruct the `PlayerInit` list this game was created from, so a crash/invariant
     /// failure can persist a replayable artifact.
     pub fn player_inits(&self) -> Vec<PlayerInit> {
-        let ai_ids: std::collections::HashSet<u32> =
-            self.ai.iter().map(|a| a.player_id()).collect();
         self.players
             .iter()
             .map(|p| PlayerInit {
                 id: p.id,
                 name: p.name.clone(),
                 color: p.color.clone(),
-                is_ai: ai_ids.contains(&p.id),
+                is_ai: p.is_ai,
             })
             .collect()
     }
@@ -1166,6 +1165,12 @@ mod tests {
                 .iter()
                 .any(|player| player.id == 1 && player.is_ai),
             "replays must preserve AI identity for deterministic simulation rules"
+        );
+        assert!(
+            game.player_inits()
+                .iter()
+                .any(|player| player.id == 1 && player.is_ai),
+            "replay artifacts must serialize the original AI identity"
         );
     }
 

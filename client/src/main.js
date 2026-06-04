@@ -20,7 +20,7 @@ import { HUD } from "./hud.js";
 import { Minimap } from "./minimap.js";
 import { Lobby } from "./lobby.js";
 import { Audio, SOUND_MANIFEST, noticeSoundId } from "./audio.js";
-import { S, EVENT } from "./protocol.js";
+import { S, EVENT, KIND } from "./protocol.js";
 import { SNAPSHOT_MS, INTERP_DELAY_MS } from "./config.js";
 
 /** How long (ms) a #toast notice stays on screen before fading out. */
@@ -31,6 +31,25 @@ const TOAST_MS = 2600;
  * so we ping well inside that window to keep a healthy connection alive.
  */
 const HEARTBEAT_MS = 15000;
+
+const COMBAT_SOUNDS = Object.freeze({
+  [KIND.TANK]: {
+    ids: ["combat_tank_01", "combat_tank_06"],
+    priority: 4,
+  },
+  [KIND.RIFLEMAN]: {
+    ids: ["combat_rifle_02", "combat_rifle_03"],
+    priority: 2,
+  },
+  [KIND.AT_TEAM]: {
+    ids: ["combat_rifle_02", "combat_rifle_03"],
+    priority: 4,
+  },
+  [KIND.MACHINE_GUNNER]: {
+    ids: ["combat_mg_burst_02", "combat_mg_burst_03"],
+    priority: 2.5,
+  },
+});
 
 /**
  * Derive the WebSocket endpoint from the current page location, so the client
@@ -399,6 +418,7 @@ class Match {
     this.toast = toast;
     this.devWatch = devWatch;
     this.audio = audio;
+    this.missingCombatSoundKinds = new Set();
     this.replaySpeedHandler = null;
     this.giveUpSent = false;
 
@@ -434,7 +454,10 @@ class Match {
     this.rafId = undefined;
 
     // --- Listeners (bound so they can be removed on destroy). ---
-    this.onSnapshot = (m) => this.state.applySnapshot(m);
+    this.onSnapshot = (m) => {
+      this.state.applySnapshot(m);
+      this.handleSnapshotEvents(m.events || []);
+    };
     this.onResize = this.handleResize.bind(this);
     this.onMenuKeyDown = this.handleMenuKeyDown.bind(this);
     this.onSettingsClick = this.toggleSettingsMenu.bind(this);
@@ -609,12 +632,10 @@ class Match {
   }
 
   /**
-   * Surface this snapshot's `notice` events as toasts and (phase 1) play a
-   * matching alert sound. Sound id is chosen by keyword from the notice text;
-   * any unmatched notice falls back to the generic notice sound.
+   * Surface one snapshot's transient events exactly once. Notices become toasts
+   * and alerts; combat/death events drive spatial sounds.
    */
-  drainNotices() {
-    const events = this.state.events;
+  handleSnapshotEvents(events) {
     if (!events || !events.length) return;
     for (const ev of events) {
       if (ev && ev.e === EVENT.NOTICE && ev.msg) {
@@ -622,8 +643,37 @@ class Match {
         if (this.audio) {
           this.audio.play(noticeSoundId(ev.msg), { category: "alert", priority: 3 });
         }
+      } else if (ev && ev.e === EVENT.ATTACK) {
+        this.playAttackSound(ev);
       }
     }
+  }
+
+  playAttackSound(ev) {
+    if (!this.audio) return;
+    const from = typeof ev.from === "number" ? this.state.entityById(ev.from) : null;
+    const to = typeof ev.to === "number" ? this.state.entityById(ev.to) : null;
+    const pos = from || to;
+    if (!pos || typeof pos.x !== "number" || typeof pos.y !== "number") return;
+
+    const kind = from?.kind || KIND.RIFLEMAN;
+    let spec = COMBAT_SOUNDS[kind];
+    if (!spec) {
+      spec = COMBAT_SOUNDS[KIND.RIFLEMAN];
+      if (!this.missingCombatSoundKinds.has(kind)) {
+        this.missingCombatSoundKinds.add(kind);
+        console.warn(`audio: missing combat sound mapping for ${kind}, using rifle`);
+      }
+    }
+    const id = this.audio.pickVariant(spec.ids);
+    if (!id) return;
+    const category = from && from.owner === this.state.playerId ? "combat_self" : "combat_other";
+    this.audio.play(id, {
+      x: pos.x,
+      y: pos.y,
+      category,
+      priority: spec.priority,
+    });
   }
 
   /**
@@ -640,14 +690,20 @@ class Match {
     const alpha = this.computeAlpha();
 
     this.camera.update(dt, this.input);
+    if (this.audio) {
+      this.audio.setListener(
+        this.camera.x + this.camera.viewW / (2 * this.camera.zoom),
+        this.camera.y + this.camera.viewH / (2 * this.camera.zoom),
+        this.camera.zoom,
+        this.camera.viewW,
+      );
+    }
     this.input.update(dt);
     this.fog.update(this.ownEntities(), this.state.map.tileSize);
 
     this.renderer.render(this.state, this.camera, this.fog, alpha);
     this.hud.update();
     this.minimap.render();
-
-    this.drainNotices();
 
     this.rafId = requestAnimationFrame(this.tickFn);
   }

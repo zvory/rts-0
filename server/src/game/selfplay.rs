@@ -1893,8 +1893,15 @@ fn replay_outcome_for(
     game: &Game,
     players: &[PlayerInit],
 ) -> Result<ReplayOutcome, SelfPlayFailure> {
-    replay_commands(players, game.command_log(), game.tick_count(), game.seed())
-        .map_err(|e| SelfPlayFailure::new(format!("replay failed: {e}")))
+    replay_commands(
+        players,
+        game.command_log(),
+        game.tick_count(),
+        game.seed(),
+        game.starting_steel(),
+        game.starting_oil(),
+    )
+    .map_err(|e| SelfPlayFailure::new(format!("replay failed: {e}")))
 }
 
 fn finalize_self_play_success(
