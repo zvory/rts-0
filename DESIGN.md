@@ -721,7 +721,7 @@ Unit stats (hp, dmg, range[tiles], cooldown[ticks], speed[px/tick], sight[tiles]
 | rifleman        | 45  | 5   | 4     | 8  | 1.6   | 8     | 50  | 0   | 1   | 300 (~10s) |
 | machine_gunner  | 55  | 4   | 5     | 3  | 1.28  | 8     | 75  | 25  | 2   | 400 (~13s) |
 | at_team         | 45  | 48  | 5     | 48 | 1.28  | 8     | 75  | 25  | 2   | 440 (~15s) |
-| tank            | 390 | 60  | 3     | 36 | 2.0   | 7     | 200 | 100 | 6   | 500 (~17s) |
+| tank            | 390 | 60  | 5     | 36 | 2.0   | 7     | 200 | 100 | 6   | 500 (~17s) |
 
 Building stats (hp, sight, cost, footprint tiles wxh, buildTicks, extra):
 
