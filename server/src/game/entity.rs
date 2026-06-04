@@ -28,6 +28,7 @@ pub enum EntityKind {
     Rifleman,
     MachineGunner,
     AtTeam,
+    ScoutCar,
     Tank,
     IndustrialCenter,
     Depot,
@@ -40,11 +41,12 @@ pub enum EntityKind {
 
 impl EntityKind {
     #[cfg(test)]
-    pub const ALL: [EntityKind; 12] = [
+    pub const ALL: [EntityKind; 13] = [
         EntityKind::Worker,
         EntityKind::Rifleman,
         EntityKind::MachineGunner,
         EntityKind::AtTeam,
+        EntityKind::ScoutCar,
         EntityKind::Tank,
         EntityKind::IndustrialCenter,
         EntityKind::Depot,
@@ -74,6 +76,7 @@ impl EntityKind {
             EntityKind::Rifleman => kinds::RIFLEMAN,
             EntityKind::MachineGunner => kinds::MACHINE_GUNNER,
             EntityKind::AtTeam => kinds::AT_TEAM,
+            EntityKind::ScoutCar => kinds::SCOUT_CAR,
             EntityKind::Tank => kinds::TANK,
             EntityKind::IndustrialCenter => kinds::INDUSTRIAL_CENTER,
             EntityKind::Depot => kinds::DEPOT,
@@ -95,6 +98,7 @@ impl std::str::FromStr for EntityKind {
             kinds::RIFLEMAN => Ok(EntityKind::Rifleman),
             kinds::MACHINE_GUNNER => Ok(EntityKind::MachineGunner),
             kinds::AT_TEAM => Ok(EntityKind::AtTeam),
+            kinds::SCOUT_CAR => Ok(EntityKind::ScoutCar),
             kinds::TANK => Ok(EntityKind::Tank),
             kinds::INDUSTRIAL_CENTER => Ok(EntityKind::IndustrialCenter),
             kinds::DEPOT => Ok(EntityKind::Depot),
@@ -112,6 +116,16 @@ impl std::fmt::Display for EntityKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(self.to_protocol_str())
     }
+}
+
+pub(crate) fn uses_tank_movement_semantics(kind: EntityKind) -> bool {
+    // Scout cars temporarily borrow the tank hull/pathing movement model. Replace this
+    // with truck/wheeled movement semantics once that vehicle model exists.
+    matches!(kind, EntityKind::Tank | EntityKind::ScoutCar)
+}
+
+pub(crate) fn fires_while_moving(kind: EntityKind) -> bool {
+    matches!(kind, EntityKind::Tank | EntityKind::ScoutCar)
 }
 
 // ---------------------------------------------------------------------------

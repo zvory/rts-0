@@ -92,6 +92,9 @@ pub const SUPPLY_CAP_MAX: u32 = 200;
 pub const TANK_BODY_LENGTH_PX: f32 = 42.0;
 pub const TANK_BODY_WIDTH_PX: f32 = 24.0;
 pub const TANK_BODY_CLEARANCE_PX: f32 = 1.5;
+pub const SCOUT_CAR_BODY_LENGTH_PX: f32 = 34.0;
+pub const SCOUT_CAR_BODY_WIDTH_PX: f32 = 18.0;
+pub const SCOUT_CAR_BODY_CLEARANCE_PX: f32 = 1.0;
 
 // --- Stats ------------------------------------------------------------------
 

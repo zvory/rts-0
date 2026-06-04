@@ -1,5 +1,5 @@
 use crate::config;
-use crate::game::entity::{Entity, EntityKind};
+use crate::game::entity::{uses_tank_movement_semantics, Entity, EntityKind};
 use crate::game::map::Map;
 use crate::game::services::occupancy::building_footprint;
 
@@ -116,10 +116,10 @@ pub(crate) fn unit_body_with_facing(
         return None;
     }
 
-    if kind == EntityKind::Tank {
-        let clearance = config::TANK_BODY_CLEARANCE_PX;
-        let half_len = config::TANK_BODY_LENGTH_PX * 0.5 + clearance;
-        let half_width = config::TANK_BODY_WIDTH_PX * 0.5 + clearance;
+    if uses_tank_movement_semantics(kind) {
+        let (length, width, clearance) = vehicle_body_dimensions(kind);
+        let half_len = length * 0.5 + clearance;
+        let half_width = width * 0.5 + clearance;
         if !facing.is_finite()
             || !half_len.is_finite()
             || !half_width.is_finite()
@@ -142,6 +142,21 @@ pub(crate) fn unit_body_with_facing(
         y,
         radius: stats.radius,
     }))
+}
+
+fn vehicle_body_dimensions(kind: EntityKind) -> (f32, f32, f32) {
+    match kind {
+        EntityKind::ScoutCar => (
+            config::SCOUT_CAR_BODY_LENGTH_PX,
+            config::SCOUT_CAR_BODY_WIDTH_PX,
+            config::SCOUT_CAR_BODY_CLEARANCE_PX,
+        ),
+        _ => (
+            config::TANK_BODY_LENGTH_PX,
+            config::TANK_BODY_WIDTH_PX,
+            config::TANK_BODY_CLEARANCE_PX,
+        ),
+    }
 }
 
 pub(crate) fn building_rect_for_footprint(

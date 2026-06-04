@@ -3,7 +3,7 @@
 //! This module owns what a player is allowed to see. It does not mutate the world; future
 //! last-known-position or partial-reveal rules should grow here.
 
-use crate::game::entity::{Entity, GatherPhase, Order};
+use crate::game::entity::{fires_while_moving, Entity, GatherPhase, Order};
 use crate::game::fog::Fog;
 use crate::protocol::EntityView;
 
@@ -65,7 +65,7 @@ pub fn project_entity(
         view.oil_used = Some(oil_used);
     }
     let active_combat_target = matches!(entity.order(), Order::Attack(_) | Order::AttackMove(_))
-        || (entity.kind == crate::game::entity::EntityKind::Tank && entity.target_id().is_some())
+        || (fires_while_moving(entity.kind) && entity.target_id().is_some())
         || (entity.is_building() && entity.can_attack());
     let target_visible = if let Some(target_id) = entity.target_id() {
         target
@@ -79,8 +79,7 @@ pub fn project_entity(
     } else {
         false
     };
-    let weapon_facing_useful =
-        entity.kind == crate::game::entity::EntityKind::Tank || active_combat_target;
+    let weapon_facing_useful = fires_while_moving(entity.kind) || active_combat_target;
     if weapon_facing_useful {
         if let Some(weapon_facing) = entity.weapon_facing() {
             let weapon_facing_is_safe = entity.owner == viewer

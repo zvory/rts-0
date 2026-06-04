@@ -90,7 +90,10 @@ mod tests {
                 EntityKind::AtTeam
             ]
         );
-        assert_eq!(trainable_units(EntityKind::Factory), &[EntityKind::Tank]);
+        assert_eq!(
+            trainable_units(EntityKind::Factory),
+            &[EntityKind::ScoutCar, EntityKind::Tank]
+        );
 
         assert!(train_requirement_met(EntityKind::Rifleman, &[]));
         assert!(!train_requirement_met(EntityKind::MachineGunner, &[]));
@@ -133,9 +136,11 @@ mod tests {
         ));
 
         assert_eq!(cost(EntityKind::Worker), (50, 0));
+        assert_eq!(cost(EntityKind::ScoutCar), (125, 75));
         assert_eq!(cost(EntityKind::Tank), (200, 150));
         assert_eq!(cost(EntityKind::IndustrialCenter), (200, 0));
         assert_eq!(cost(EntityKind::Depot), (100, 0));
+        assert_eq!(supply_cost(EntityKind::ScoutCar), 3);
         assert_eq!(supply_cost(EntityKind::Tank), 6);
         assert_eq!(supply_cost(EntityKind::Depot), 0);
         assert_eq!(

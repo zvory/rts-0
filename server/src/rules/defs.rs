@@ -59,7 +59,7 @@ const BARRACKS_UNITS: &[EntityKind] = &[
     EntityKind::MachineGunner,
     EntityKind::AtTeam,
 ];
-const TANK_ONLY: &[EntityKind] = &[EntityKind::Tank];
+const FACTORY_UNITS: &[EntityKind] = &[EntityKind::ScoutCar, EntityKind::Tank];
 const INDUSTRIAL_CENTER_REQUIRED: &[EntityKind] = &[EntityKind::IndustrialCenter];
 const INDUSTRIAL_CENTER_AND_BARRACKS_REQUIRED: &[EntityKind] =
     &[EntityKind::IndustrialCenter, EntityKind::Barracks];
@@ -172,6 +172,27 @@ pub const UNITS: &[UnitDef] = &[
         trained_at: Some(EntityKind::Factory),
         train_requires: &[],
     },
+    UnitDef {
+        kind: EntityKind::ScoutCar,
+        stats: config::UnitStats {
+            hp: 150,
+            dmg: 4,
+            range_tiles: 5,
+            cooldown: 6,
+            speed: 2.35,
+            sight_tiles: 10,
+            cost_steel: 125,
+            cost_oil: 75,
+            supply: 3,
+            build_ticks: 480,
+            radius: 12.0,
+        },
+        armor_class: ArmorClass::Small,
+        weapon: WeaponClass::SmallArms,
+        target_priority: TargetPriority::Default,
+        trained_at: Some(EntityKind::Factory),
+        train_requires: &[],
+    },
 ];
 
 pub const BUILDINGS: &[BuildingDef] = &[
@@ -272,7 +293,7 @@ pub const BUILDINGS: &[BuildingDef] = &[
         },
         armor_class: ArmorClass::Armored,
         weapon: WeaponClass::None,
-        trains: TANK_ONLY,
+        trains: FACTORY_UNITS,
         build_requires: FACTORY_REQUIRED,
     },
 ];

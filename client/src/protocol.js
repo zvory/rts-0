@@ -50,6 +50,7 @@ export const KIND = Object.freeze({
   RIFLEMAN: "rifleman",
   MACHINE_GUNNER: "machine_gunner",
   AT_TEAM: "at_team",
+  SCOUT_CAR: "scout_car",
   TANK: "tank",
   INDUSTRIAL_CENTER: "industrial_center",
   DEPOT: "depot",
@@ -64,6 +65,7 @@ export const UNIT_KINDS = Object.freeze([
   KIND.RIFLEMAN,
   KIND.MACHINE_GUNNER,
   KIND.AT_TEAM,
+  KIND.SCOUT_CAR,
   KIND.TANK,
 ]);
 export const BUILDING_KINDS = Object.freeze([
@@ -121,6 +123,7 @@ export const KIND_CODE = Object.freeze({
   [KIND.MACHINE_GUNNER]: 3,
   [KIND.AT_TEAM]: 4,
   [KIND.TANK]: 5,
+  [KIND.SCOUT_CAR]: 13,
   [KIND.INDUSTRIAL_CENTER]: 6,
   [KIND.DEPOT]: 7,
   [KIND.BARRACKS]: 8,

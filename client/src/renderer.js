@@ -443,7 +443,7 @@ export class Renderer {
     // Shadow on its own layer (under all units).
     const sh = this._slot("unitShadows", e.id);
     sh.position.set(e.x + tankKick.x, e.y + tankKick.y);
-    this._shadow(sh, 0, 0, e.kind === KIND.TANK ? tankBodyVisual(stat).shadowRadius : r);
+    this._shadow(sh, 0, 0, isVehicleBodyKind(e.kind) ? tankBodyVisual(stat).shadowRadius : r);
 
     // Body on the unit layer.
     const g = this._slot("units", e.id);
@@ -459,6 +459,12 @@ export class Renderer {
       } else {
         drawInfantryMachineGun(g, r, facing, weaponFacing, this._machineGunnerSetupVisual(e), recoil);
       }
+    } else if (e.kind === KIND.SCOUT_CAR) {
+      // Scout cars currently use the tank-like vehicle movement model server-side.
+      // Replace with truck/wheeled movement semantics once that model exists.
+      const body = tankBodyVisual(STATS[e.kind]);
+      const motion = this._tankMotionVisual(e, facing, state, body);
+      drawScoutCar(g, body, tint, facing, weaponFacing, motion, recoil);
     } else if (e.kind === KIND.TANK) {
       // Hull follows movement facing; turret/barrel follow weapon facing.
       const body = tankBodyVisual(STATS[e.kind]);
@@ -507,6 +513,7 @@ export class Renderer {
       e.kind !== KIND.RIFLEMAN &&
       e.kind !== KIND.MACHINE_GUNNER &&
       e.kind !== KIND.AT_TEAM &&
+      e.kind !== KIND.SCOUT_CAR &&
       e.kind !== KIND.TANK
     ) {
       const fp = polar(facing, r + 3);
@@ -726,7 +733,7 @@ export class Renderer {
       const h = (stat.footH || 2) * ts;
       return { rx: w * 0.6, ry: h * 0.42, cy: 0 };
     }
-    if (e.kind === KIND.TANK) {
+    if (isVehicleBodyKind(e.kind)) {
       const body = tankBodyVisual(stat);
       return { rx: body.halfLen + 4, ry: body.halfWidth + 5, cy: 2 };
     }
@@ -751,7 +758,7 @@ export class Renderer {
       halfW = Math.min(w * 0.45, 28);
       topY = e.y - h / 2 - 8;
     } else {
-      if (e.kind === KIND.TANK) {
+      if (isVehicleBodyKind(e.kind)) {
         const body = tankBodyVisual(stat);
         halfW = body.halfLen * 0.8;
         topY = e.y - body.shadowRadius - 8;
@@ -1054,7 +1061,7 @@ export class Renderer {
       const baseR = muzzleFlashRadius(attacker.kind);
       if (baseR <= 0) continue;
 
-      const facing = attacker.kind === KIND.TANK && typeof attacker.weaponFacing === "number"
+      const facing = isVehicleBodyKind(attacker.kind) && typeof attacker.weaponFacing === "number"
         ? attacker.weaponFacing
         : typeof attacker.facing === "number"
         ? attacker.facing
@@ -1254,6 +1261,7 @@ export class Renderer {
 function muzzleFlashRadius(kind) {
   if (kind === KIND.TANK) return 18;
   if (kind === KIND.AT_TEAM) return 11;
+  if (kind === KIND.SCOUT_CAR) return 9;
   if (kind === KIND.MACHINE_GUNNER) return 9;
   if (kind === KIND.RIFLEMAN) return 7;
   return 0;
@@ -1361,6 +1369,23 @@ function drawRotatedRect(g, cx, cy, w, h, a) {
   drawRotatedRectOffset(g, cx, cy, w, h, a, ZERO_OFFSET);
 }
 
+function drawFreeRotatedRect(g, cx, cy, w, h, a) {
+  const hw = w / 2;
+  const hh = h / 2;
+  const corners = [
+    [-hw, -hh],
+    [hw, -hh],
+    [hw, hh],
+    [-hw, hh],
+  ];
+  const polygon = [];
+  for (const [x, y] of corners) {
+    const p = rotatePoint(x, y, a);
+    polygon.push(cx + p.x, cy + p.y);
+  }
+  g.drawPolygon(polygon);
+}
+
 function drawRotatedRectOffset(g, cx, cy, w, h, a, offset) {
   const hw = w / 2;
   const hh = h / 2;
@@ -1389,6 +1414,10 @@ function tankBodyVisual(stat = {}) {
     clearance,
     shadowRadius: Math.hypot(halfLen + clearance, halfWidth + clearance),
   };
+}
+
+function isVehicleBodyKind(kind) {
+  return kind === KIND.TANK || kind === KIND.SCOUT_CAR;
 }
 
 function drawTankTracks(g, body, facing, motion) {
@@ -1466,6 +1495,73 @@ function drawTankFuelCue(g, body, facing, motion) {
     g.moveTo(p3.x, p3.y);
     g.lineTo(p4.x, p4.y);
   }
+}
+
+function drawScoutCar(g, body, tint, facing, weaponFacing, motion, recoil) {
+  const wheelR = 3.2;
+  const wheelX = body.halfLen * 0.58;
+  const wheelY = body.halfWidth + 2.2;
+  const wheelAlpha = lerp(0.72, 0.98, motion.activity);
+
+  g.beginFill(0x15120f, wheelAlpha);
+  for (const x of [-wheelX, wheelX]) {
+    for (const y of [-wheelY, wheelY]) {
+      drawRotatedRect(g, x, y, wheelR * 2.2, wheelR * 1.5, facing);
+    }
+  }
+  g.endFill();
+
+  g.beginFill(tint);
+  g.drawPolygon(rotatedPolygon([
+    -body.halfLen + 2, -body.halfWidth + 3,
+    body.halfLen - 4, -body.halfWidth + 3,
+    body.halfLen, -body.halfWidth + 6,
+    body.halfLen, body.halfWidth - 6,
+    body.halfLen - 4, body.halfWidth - 3,
+    -body.halfLen + 2, body.halfWidth - 3,
+    -body.halfLen - 1, body.halfWidth - 6,
+    -body.halfLen - 1, -body.halfWidth + 6,
+  ], facing));
+  g.endFill();
+
+  g.beginFill(0x1a1712, 0.22);
+  drawRotatedRect(g, body.halfLen * 0.08, 0, body.halfLen * 1.05, body.halfWidth * 0.9, facing);
+  g.endFill();
+
+  g.beginFill(lightenColor(tint, 0.14), 0.95);
+  drawRotatedRect(g, body.halfLen * 0.45, 0, body.halfLen * 0.48, body.halfWidth * 1.12, facing);
+  g.endFill();
+
+  const gunner = rotatePoint(-body.halfLen * 0.45, 0, facing);
+  g.beginFill(lightenColor(tint, 0.22), 0.98);
+  g.drawCircle(gunner.x, gunner.y, 4.2);
+  g.endFill();
+
+  const a = weaponFacing;
+  const kick = recoilVector(a, recoil);
+  const stock = offsetPoint({
+    x: gunner.x + Math.cos(a + Math.PI) * 3.8,
+    y: gunner.y + Math.sin(a + Math.PI) * 3.8,
+  }, kick);
+  const muzzle = offsetPoint({
+    x: gunner.x + Math.cos(a) * (body.halfLen * 0.75),
+    y: gunner.y + Math.sin(a) * (body.halfLen * 0.75),
+  }, kick);
+  g.lineStyle(3, 0x17130f, 0.98);
+  g.moveTo(stock.x, stock.y);
+  g.lineTo(muzzle.x, muzzle.y);
+  g.beginFill(0x32291f, 0.98);
+  const receiver = offsetPoint({
+    x: gunner.x + Math.cos(a) * 5,
+    y: gunner.y + Math.sin(a) * 5,
+  }, kick);
+  drawFreeRotatedRect(g, receiver.x, receiver.y, 7, 4, a);
+  g.endFill();
+
+  const nose = polar(facing, body.halfLen - 2);
+  g.lineStyle(2, 0xd8d0b0, 0.72);
+  g.moveTo(nose.x - Math.cos(facing) * 4, nose.y - Math.sin(facing) * 4);
+  g.lineTo(nose.x, nose.y);
 }
 
 function drawRotatedRectOutline(g, cx, cy, w, h, a) {

@@ -27,6 +27,7 @@ pub mod kinds {
     pub const RIFLEMAN: &str = "rifleman";
     pub const MACHINE_GUNNER: &str = "machine_gunner";
     pub const AT_TEAM: &str = "at_team";
+    pub const SCOUT_CAR: &str = "scout_car";
     pub const TANK: &str = "tank";
     pub const INDUSTRIAL_CENTER: &str = "industrial_center";
     pub const DEPOT: &str = "depot";
@@ -652,6 +653,7 @@ fn kind_code(kind: &str) -> u8 {
         kinds::MACHINE_GUNNER => 3,
         kinds::AT_TEAM => 4,
         kinds::TANK => 5,
+        kinds::SCOUT_CAR => 13,
         kinds::INDUSTRIAL_CENTER => 6,
         kinds::DEPOT => 7,
         kinds::BARRACKS => 8,
