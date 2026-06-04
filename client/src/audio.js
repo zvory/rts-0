@@ -150,6 +150,7 @@ export class Audio {
    * @param {number} [opts.priority] higher wins eviction (default 1)
    * @param {string} [opts.category] one of CATEGORIES (default "ui")
    * @param {number} [opts.pitchVariance] override default jitter (0 to disable)
+   * @param {number} [opts.gain] linear gain multiplier applied before the category bus
    * @returns {boolean} true if scheduled, false if dropped
    */
   play(id, opts) {
@@ -185,8 +186,11 @@ export class Audio {
       src.playbackRate.value = 1 + (this.rng() * 2 - 1) * variance;
     }
     const bus = this.gains[category] || this.master;
+    const gainValue = typeof opts.gain === "number" ? Math.max(0, opts.gain) : 1;
 
     const trail = [];
+    const gainNode = this.ctx.createGain();
+    gainNode.gain.value = gainValue;
     if (spatial) {
       const panner = this.ctx.createStereoPanner();
       panner.pan.value = spatial.pan;
@@ -198,10 +202,13 @@ export class Audio {
       src.connect(panner);
       panner.connect(lp);
       lp.connect(distGain);
-      distGain.connect(bus);
-      trail.push(panner, lp, distGain);
+      distGain.connect(gainNode);
+      gainNode.connect(bus);
+      trail.push(panner, lp, distGain, gainNode);
     } else {
-      src.connect(bus);
+      src.connect(gainNode);
+      gainNode.connect(bus);
+      trail.push(gainNode);
     }
     try {
       src.start();
