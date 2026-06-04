@@ -948,7 +948,7 @@ enemies. Once that expansion IC is planned, it builds Barracks and Training Cent
 oil, produces Machine Gunners and AT teams toward a one-for-one support mix, and keeps those
 support units staged in a short line on the enemy-facing side of its main-base steel cluster
 instead of launching outbound attack waves.
-After 100 supply used, it switches to a Tank Factory tech path, stops Machine Gunner / AT team
+After 50 supply used, it switches to a Tank Factory tech path, stops Machine Gunner / AT team
 production, trains tanks, and launches outbound tank groups only once at least three tanks are
 ready. After the expansion IC is complete, its worker resource assignment is locally bounded so
 main-base workers do not walk to expansion patches, and expansion workers do not walk back to
