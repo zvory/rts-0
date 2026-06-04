@@ -1345,6 +1345,66 @@ fn expansion_site_selection_prefers_oil_over_steel_only_output() {
 }
 
 #[test]
+fn expansion_site_selection_filters_resource_range_before_placeable() {
+    let map_size = 96;
+    let ts = config::TILE_SIZE as f32;
+    let mut observation = observation(
+        AiEconomy {
+            steel: 500,
+            oil: 500,
+            supply_used: 70,
+            supply_cap: 80,
+        },
+        vec![building(10, EntityKind::CityCentre, Some(0))],
+    );
+    observation.map.width = map_size;
+    observation.map.height = map_size;
+    observation.own_start_tile = (8, 8);
+    observation.players = vec![
+        AiPlayerSummary {
+            id: 1,
+            start_tile: observation.own_start_tile,
+            is_ai: true,
+            is_alive: true,
+        },
+        AiPlayerSummary {
+            id: 2,
+            start_tile: (88, 88),
+            is_ai: false,
+            is_alive: true,
+        },
+    ];
+    observation.resources = vec![resource(300, EntityKind::Steel, 40.5 * ts, 40.5 * ts)];
+
+    let expansion = RIFLE_FLOOD_FULL_SATURATION.expansion.unwrap();
+    let full_search_window = (expansion.search_radius_tiles * 2 + 1).pow(2) as usize;
+    let mut placeable_calls = 0usize;
+    let site = expansion_city_centre_site(
+        &observation,
+        expansion,
+        EntityKind::CityCentre,
+        &mut |_, _, _| {
+            placeable_calls += 1;
+            true
+        },
+    )
+    .expect("single-patch expansion site should be found");
+
+    assert_eq!(
+        expansion_resource_counts_for_site(&observation, site),
+        (1, 0)
+    );
+    assert!(
+        placeable_calls > 0,
+        "resource-qualified candidates should still be checked for placement"
+    );
+    assert!(
+        placeable_calls < full_search_window,
+        "resource range filtering should avoid checking all {full_search_window} search tiles for placement; checked {placeable_calls}"
+    );
+}
+
+#[test]
 fn steel_expansion_tanks_prefers_safer_natural_when_distances_are_similar() {
     let map_size = 96;
     let ts = config::TILE_SIZE as f32;

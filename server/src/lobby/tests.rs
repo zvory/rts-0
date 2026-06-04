@@ -4,7 +4,7 @@ use super::connection::SnapshotSendStatus;
 use super::room_task::{DevSelfPlayConfig, RoomMode, RoomTask};
 use super::snapshots::compact_snapshot_for_wire;
 use super::*;
-use crate::protocol::{EntityView, Event, ResourceDelta};
+use crate::protocol::{kinds, EntityView, Event, ResourceDelta};
 
 fn join_test_player(task: &mut RoomTask, player_id: u32) {
     let (msg_tx, _writer) = ConnectionSink::new();

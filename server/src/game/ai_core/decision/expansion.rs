@@ -130,7 +130,6 @@ where
                 if tx > observation.map.width.saturating_sub(stats.foot_w)
                     || ty > observation.map.height.saturating_sub(stats.foot_h)
                     || !seen.insert((tx, ty))
-                    || !placeable(kind, tx, ty)
                 {
                     continue;
                 }
@@ -142,6 +141,9 @@ where
                 if candidate.steel_in_range < required_steel
                     || candidate.oil_in_range < required_oil
                 {
+                    continue;
+                }
+                if !placeable(kind, tx, ty) {
                     continue;
                 }
                 if expansion_site_candidate_better(candidate, best) {
