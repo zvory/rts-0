@@ -1,3 +1,10 @@
+//! Unit movement service.
+//!
+//! This module owns per-tick waypoint advancement and collision cleanup for mobile entities.
+//! Path requests are prepared by `move_coordinator`, but landing legality, vehicle steering,
+//! weapon setup restrictions, and final overlap resolution live here so the tick pipeline has a
+//! single movement phase.
+
 use std::collections::HashMap;
 
 use crate::game::entity::EntityStore;

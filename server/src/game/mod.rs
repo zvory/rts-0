@@ -8,23 +8,23 @@
 //! separately via [`Game::snapshot_for`], fog-filtered so a player only ever sees neutral /
 //! enemy entities on tiles they currently see.
 
-pub mod ai;
+mod ai;
 pub(crate) mod ai_core;
 pub(crate) mod ai_shared;
-pub mod command;
+pub(crate) mod command;
 mod commands;
-pub mod entity;
-pub mod fog;
+pub(crate) mod entity;
+pub(crate) mod fog;
 mod invariants;
-pub mod map;
-pub mod pathfinding;
-pub mod replay;
+pub(crate) mod map;
+mod pathfinding;
+mod replay;
 mod scoring;
-pub mod selfplay;
+pub(crate) mod selfplay;
 pub(crate) mod services;
 mod setup;
 mod snapshot;
-pub mod systems;
+mod systems;
 
 use std::collections::HashMap;
 

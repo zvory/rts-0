@@ -3,9 +3,9 @@ import { Camera } from "./camera.js";
 import { machineGunnerHasAudibleTarget, machineGunSoundKey } from "./combat_audio.js";
 import { Fog } from "./fog.js";
 import { HUD } from "./hud.js";
-import { Input } from "./input.js";
+import { Input } from "./input/index.js";
 import { Minimap } from "./minimap.js";
-import { Renderer } from "./renderer.js";
+import { Renderer } from "./renderer/index.js";
 import { GameState } from "./state.js";
 import { INTERP_DELAY_MS, SNAPSHOT_MS } from "./config.js";
 import { EVENT, KIND, NOTICE_SEVERITY, S } from "./protocol.js";
@@ -473,4 +473,3 @@ export class Match {
     }
   }
 }
-
