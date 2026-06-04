@@ -109,10 +109,10 @@ pub(crate) fn footprint_center(
 pub(crate) fn footprint_placeable(
     map: &Map,
     entities: &EntityStore,
-    _spatial: &SpatialIndex,
+    spatial: &SpatialIndex,
     building: EntityKind,
     tile_x: u32,
     tile_y: u32,
 ) -> bool {
-    standability::building_site_clear(map, entities, building, tile_x, tile_y)
+    standability::building_site_clear_spatial(map, entities, spatial, building, tile_x, tile_y)
 }

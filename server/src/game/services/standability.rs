@@ -5,9 +5,12 @@ use crate::game::pathfinding::Passability;
 use crate::game::services::geometry::{
     building_rect_for_entity, building_rect_for_footprint, circle_intersects_rect, rects_intersect,
     tile_rect, unit_bodies_intersect, unit_body, unit_body_for_entity, unit_body_intersects_rect,
-    unit_body_with_facing, CircleBody, UnitBody,
+    unit_body_with_facing, CircleBody, RectBody, UnitBody,
 };
 use crate::game::services::occupancy::Occupancy;
+use crate::game::services::spatial::SpatialIndex;
+
+const BUILD_SITE_SPATIAL_PADDING_TILES: i32 = 8;
 
 pub(crate) fn unit_static_standable(
     map: &Map,
@@ -105,6 +108,7 @@ pub(crate) fn unit_spawn_standable(
     })
 }
 
+#[allow(dead_code)]
 pub(crate) fn building_site_clear(
     map: &Map,
     entities: &EntityStore,
@@ -113,6 +117,41 @@ pub(crate) fn building_site_clear(
     tile_y: u32,
 ) -> bool {
     building_site_clear_with_ignored_unit(map, entities, building, tile_x, tile_y, None)
+}
+
+pub(crate) fn building_site_clear_spatial(
+    map: &Map,
+    entities: &EntityStore,
+    spatial: &SpatialIndex,
+    building: EntityKind,
+    tile_x: u32,
+    tile_y: u32,
+) -> bool {
+    let Some(rect) = building_rect_for_footprint(building, tile_x, tile_y) else {
+        return false;
+    };
+    if !footprint_in_bounds_and_passable(map, building, tile_x, tile_y) {
+        return false;
+    }
+    let Some(stats) = config::building_stats(building) else {
+        return false;
+    };
+    let min_tx = tile_x as i32 - BUILD_SITE_SPATIAL_PADDING_TILES;
+    let min_ty = tile_y as i32 - BUILD_SITE_SPATIAL_PADDING_TILES;
+    let max_tx = tile_x
+        .saturating_add(stats.foot_w)
+        .saturating_add(BUILD_SITE_SPATIAL_PADDING_TILES as u32) as i32;
+    let max_ty = tile_y
+        .saturating_add(stats.foot_h)
+        .saturating_add(BUILD_SITE_SPATIAL_PADDING_TILES as u32) as i32;
+
+    spatial
+        .ids_in_rect(min_tx, min_ty, max_tx, max_ty)
+        .all(|id| {
+            entities
+                .get(id)
+                .is_none_or(|e| entity_clear_of_building_rect(map, e, rect, None))
+        })
 }
 
 pub(crate) fn building_site_clear_for_build_intent(
@@ -141,26 +180,33 @@ fn building_site_clear_with_ignored_unit(
         return false;
     }
 
-    entities.iter().all(|e| {
-        if e.hp == 0 {
-            return true;
-        }
-        if e.is_unit() && ignored_unit == Some(e.id) {
-            return true;
-        }
-        if e.is_building() {
-            return building_rect_for_entity(map, e)
-                .is_none_or(|other| !rects_intersect(rect, other));
-        }
-        if e.is_node() {
-            return !circle_intersects_rect(entity_circle_body(e), rect);
-        }
-        if e.is_unit() {
-            return unit_body_for_entity(e)
-                .is_none_or(|body| !unit_body_intersects_rect(body, rect));
-        }
-        true
-    })
+    entities
+        .iter()
+        .all(|e| entity_clear_of_building_rect(map, e, rect, ignored_unit))
+}
+
+fn entity_clear_of_building_rect(
+    map: &Map,
+    e: &Entity,
+    rect: RectBody,
+    ignored_unit: Option<u32>,
+) -> bool {
+    if e.hp == 0 {
+        return true;
+    }
+    if e.is_unit() && ignored_unit == Some(e.id) {
+        return true;
+    }
+    if e.is_building() {
+        return building_rect_for_entity(map, e).is_none_or(|other| !rects_intersect(rect, other));
+    }
+    if e.is_node() {
+        return !circle_intersects_rect(entity_circle_body(e), rect);
+    }
+    if e.is_unit() {
+        return unit_body_for_entity(e).is_none_or(|body| !unit_body_intersects_rect(body, rect));
+    }
+    true
 }
 
 fn footprint_in_bounds_and_passable(
@@ -451,6 +497,51 @@ mod tests {
             4,
             4,
         ));
+    }
+
+    #[test]
+    fn spatial_building_site_clear_matches_full_scan_for_blockers() {
+        let map = flat_map(12);
+        let mut cases = Vec::new();
+
+        let mut blocked_by_building = EntityStore::new();
+        let (bx, by) = footprint_center(&map, EntityKind::Depot, 4, 4);
+        blocked_by_building
+            .spawn_building(1, EntityKind::Depot, bx, by, true)
+            .expect("depot should spawn");
+        cases.push(blocked_by_building);
+
+        let mut blocked_by_unit = EntityStore::new();
+        let rect = building_rect_for_footprint(EntityKind::Depot, 4, 4).expect("depot rect");
+        let radius = config::unit_stats(EntityKind::Tank)
+            .expect("tank stats")
+            .radius;
+        blocked_by_unit
+            .spawn_unit(
+                1,
+                EntityKind::Tank,
+                rect.max_x + radius - 1.0,
+                rect.min_y + 32.0,
+            )
+            .expect("tank should spawn");
+        cases.push(blocked_by_unit);
+
+        let mut blocked_by_resource = EntityStore::new();
+        let (nx, ny) = map.tile_center(4, 4);
+        blocked_by_resource
+            .spawn_node(EntityKind::Steel, nx, ny)
+            .expect("steel node should spawn");
+        cases.push(blocked_by_resource);
+
+        cases.push(EntityStore::new());
+
+        for entities in cases {
+            let spatial = SpatialIndex::build(&entities, map.size);
+            assert_eq!(
+                building_site_clear_spatial(&map, &entities, &spatial, EntityKind::Depot, 4, 4),
+                building_site_clear(&map, &entities, EntityKind::Depot, 4, 4)
+            );
+        }
     }
 
     #[test]
