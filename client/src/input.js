@@ -63,7 +63,7 @@ function entityIntersectsRect(e, minX, minY, maxX, maxY, tileSize) {
     halfH = ((stat.footH ? stat.footH : 1) * tileSize) / 2;
     return e.x + halfW > minX && e.x - halfW < maxX && e.y + halfH > minY && e.y - halfH < maxY;
   } else {
-    if (e.kind === KIND.TANK) return orientedTankIntersectsRect(e, minX, minY, maxX, maxY, 0);
+    if (isVehicleBodyKind(e.kind)) return orientedVehicleIntersectsRect(e, minX, minY, maxX, maxY, 0);
     const radius = stat.size ? stat.size : 0;
     const nearestX = Math.min(Math.max(e.x, minX), maxX);
     const nearestY = Math.min(Math.max(e.y, minY), maxY);
@@ -633,7 +633,7 @@ export class Input {
 
   /**
    * Pick the entity at a world point. Infantry/resources are tested against a
-   * circular render radius, tanks against their oriented hull, and buildings
+   * circular render radius, vehicles against their oriented hull, and buildings
    * against their footprint box.
    * When `ownPreferred`, a hit on an own entity wins over an overlapping foreign one,
    * and among equals the closest center is chosen. Forgiving by design (small pad).
@@ -675,7 +675,7 @@ export class Input {
         wy <= e.y + halfH + HIT_PAD_PX
       );
     }
-    if (e.kind === KIND.TANK) return pointHitsOrientedTank(e, wx, wy, HIT_PAD_PX);
+    if (isVehicleBodyKind(e.kind)) return pointHitsOrientedVehicle(e, wx, wy, HIT_PAD_PX);
     const radius = (stat && stat.size ? stat.size : DEFAULT_HIT_RADIUS) + HIT_PAD_PX;
     return Math.hypot(wx - e.x, wy - e.y) <= radius;
   }
@@ -913,8 +913,8 @@ const DEFAULT_TILE_SIZE = 32;
 // Wheel zoom multiplier per notch.
 const ZOOM_STEP = 0.12;
 
-function pointHitsOrientedTank(e, wx, wy, pad) {
-  const body = tankBody(e, pad);
+function pointHitsOrientedVehicle(e, wx, wy, pad) {
+  const body = vehicleBody(e, pad);
   if (!body) return false;
   const dx = wx - e.x;
   const dy = wy - e.y;
@@ -925,13 +925,13 @@ function pointHitsOrientedTank(e, wx, wy, pad) {
   return Math.abs(forward) <= body.halfLen && Math.abs(side) <= body.halfWidth;
 }
 
-function orientedTankIntersectsRect(e, minX, minY, maxX, maxY, pad) {
-  const body = tankBody(e, pad);
+function orientedVehicleIntersectsRect(e, minX, minY, maxX, maxY, pad) {
+  const body = vehicleBody(e, pad);
   if (!body) return false;
   return orientedBoxIntersectsRect(body, minX, minY, maxX, maxY);
 }
 
-function tankBody(e, pad) {
+function vehicleBody(e, pad) {
   const stat = STATS[e.kind];
   const body = (stat && stat.body) || TANK_BODY;
   const facing = typeof e.facing === "number" && Number.isFinite(e.facing) ? e.facing : 0;
@@ -943,6 +943,10 @@ function tankBody(e, pad) {
     halfWidth: body.width * 0.5 + (body.clearance || 0) + pad,
     facing,
   };
+}
+
+function isVehicleBodyKind(kind) {
+  return kind === KIND.TANK || kind === KIND.SCOUT_CAR;
 }
 
 function orientedBoxIntersectsRect(body, minX, minY, maxX, maxY) {

@@ -28,29 +28,33 @@ pub enum EntityKind {
     Rifleman,
     MachineGunner,
     AtTeam,
+    ScoutCar,
     Tank,
     CityCentre,
     Depot,
     Barracks,
     TrainingCentre,
     Factory,
+    Steelworks,
     Steel,
     Oil,
 }
 
 impl EntityKind {
     #[cfg(test)]
-    pub const ALL: [EntityKind; 12] = [
+    pub const ALL: [EntityKind; 14] = [
         EntityKind::Worker,
         EntityKind::Rifleman,
         EntityKind::MachineGunner,
         EntityKind::AtTeam,
+        EntityKind::ScoutCar,
         EntityKind::Tank,
         EntityKind::CityCentre,
         EntityKind::Depot,
         EntityKind::Barracks,
         EntityKind::TrainingCentre,
         EntityKind::Factory,
+        EntityKind::Steelworks,
         EntityKind::Steel,
         EntityKind::Oil,
     ];
@@ -74,12 +78,14 @@ impl EntityKind {
             EntityKind::Rifleman => kinds::RIFLEMAN,
             EntityKind::MachineGunner => kinds::MACHINE_GUNNER,
             EntityKind::AtTeam => kinds::AT_TEAM,
+            EntityKind::ScoutCar => kinds::SCOUT_CAR,
             EntityKind::Tank => kinds::TANK,
             EntityKind::CityCentre => kinds::CITY_CENTRE,
             EntityKind::Depot => kinds::DEPOT,
             EntityKind::Barracks => kinds::BARRACKS,
             EntityKind::TrainingCentre => kinds::TRAINING_CENTRE,
             EntityKind::Factory => kinds::FACTORY,
+            EntityKind::Steelworks => kinds::STEELWORKS,
             EntityKind::Steel => kinds::STEEL,
             EntityKind::Oil => kinds::OIL,
         }
@@ -95,12 +101,14 @@ impl std::str::FromStr for EntityKind {
             kinds::RIFLEMAN => Ok(EntityKind::Rifleman),
             kinds::MACHINE_GUNNER => Ok(EntityKind::MachineGunner),
             kinds::AT_TEAM => Ok(EntityKind::AtTeam),
+            kinds::SCOUT_CAR => Ok(EntityKind::ScoutCar),
             kinds::TANK => Ok(EntityKind::Tank),
             kinds::CITY_CENTRE => Ok(EntityKind::CityCentre),
             kinds::DEPOT => Ok(EntityKind::Depot),
             kinds::BARRACKS => Ok(EntityKind::Barracks),
             kinds::TRAINING_CENTRE => Ok(EntityKind::TrainingCentre),
             kinds::FACTORY => Ok(EntityKind::Factory),
+            kinds::STEELWORKS => Ok(EntityKind::Steelworks),
             kinds::STEEL => Ok(EntityKind::Steel),
             kinds::OIL => Ok(EntityKind::Oil),
             _ => Err(()),
@@ -112,6 +120,16 @@ impl std::fmt::Display for EntityKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(self.to_protocol_str())
     }
+}
+
+pub(crate) fn uses_tank_movement_semantics(kind: EntityKind) -> bool {
+    // Scout cars temporarily borrow the tank hull/pathing movement model. Replace this
+    // with truck/wheeled movement semantics once that vehicle model exists.
+    matches!(kind, EntityKind::Tank | EntityKind::ScoutCar)
+}
+
+pub(crate) fn fires_while_moving(kind: EntityKind) -> bool {
+    matches!(kind, EntityKind::Tank | EntityKind::ScoutCar)
 }
 
 // ---------------------------------------------------------------------------
@@ -1379,6 +1397,10 @@ mod tests {
                 EntityKind::Factory,
                 groups(false, false, true, false, false, false),
             ),
+            (
+                EntityKind::Steelworks,
+                groups(false, false, false, false, false, false),
+            ),
         ];
 
         for (kind, expected) in cases {
@@ -1396,6 +1418,7 @@ mod tests {
             EntityKind::Barracks,
             EntityKind::TrainingCentre,
             EntityKind::Factory,
+            EntityKind::Steelworks,
         ];
 
         for kind in kinds {

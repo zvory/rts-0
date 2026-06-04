@@ -1,7 +1,9 @@
 use std::collections::HashMap;
 
 use crate::config;
-use crate::game::entity::{AttackPhase, Entity, EntityKind, EntityStore, Order, WeaponSetup};
+use crate::game::entity::{
+    fires_while_moving, AttackPhase, Entity, EntityKind, EntityStore, Order, WeaponSetup,
+};
 use crate::game::fog::Fog;
 use crate::game::map::Map;
 use crate::game::services::dist2;
@@ -121,8 +123,8 @@ pub(crate) fn combat_system(
                     e.set_target_id(None);
                     begin_idle_machine_gunner_setup(e);
                 }
-                if e.kind == EntityKind::Tank {
-                    relax_tank_weapon_toward_body(e);
+                if fires_while_moving(e.kind) {
+                    relax_vehicle_weapon_toward_body(e);
                 }
             }
             if matches!(mode, CombatMode::Aggressive) {
@@ -162,17 +164,17 @@ pub(crate) fn combat_system(
             // In range: aim, stop, deploy if needed, and fire if off cooldown.
             let mut weapon_aligned = true;
             if let Some(e) = entities.get_mut(id) {
-                if e.kind == EntityKind::Tank {
-                    weapon_aligned = rotate_tank_weapon_for_combat(e, target_angle);
+                if fires_while_moving(e.kind) {
+                    weapon_aligned = rotate_vehicle_weapon_for_combat(e, target_angle);
                 } else if target_angle.is_finite() {
                     e.set_facing(target_angle);
                     mirror_weapon_to_body(e, target_angle);
                 }
                 e.set_target_id(Some(tid));
                 e.mark_attack_phase(AttackPhase::Firing);
-                // Most units hold position while firing. Tanks have independent turret facing,
-                // so they can keep driving along their current path while the weapon tracks.
-                if e.kind != EntityKind::Tank {
+                // Most units hold position while firing. Vehicle weapons can track independently,
+                // so those units keep driving along their current path while the weapon tracks.
+                if !fires_while_moving(e.kind) {
                     e.clear_path();
                 }
             }
@@ -202,8 +204,8 @@ pub(crate) fn combat_system(
                 .map(|e| chase_path_needs_refresh(e, chase_goal))
                 .unwrap_or(false);
             if let Some(e) = entities.get_mut(id) {
-                if e.kind == EntityKind::Tank {
-                    rotate_tank_weapon_for_combat(e, target_angle);
+                if fires_while_moving(e.kind) {
+                    rotate_vehicle_weapon_for_combat(e, target_angle);
                 } else if target_angle.is_finite() {
                     mirror_weapon_to_body(e, e.facing());
                 }
@@ -231,7 +233,7 @@ fn chase_goal_for_target(
 ) -> (f32, f32) {
     let is_out_of_range_tank = entities
         .get(attacker_id)
-        .map(|e| e.kind == EntityKind::Tank && dist > range_px)
+        .map(|e| fires_while_moving(e.kind) && dist > range_px)
         .unwrap_or(false);
     if !is_out_of_range_tank {
         return target_pos;
@@ -276,7 +278,7 @@ fn chase_path_needs_refresh(e: &Entity, chase_goal: (f32, f32)) -> bool {
     if e.path_is_empty() {
         return true;
     }
-    if e.kind != EntityKind::Tank {
+    if !fires_while_moving(e.kind) {
         return false;
     }
     e.path_goal()
@@ -287,7 +289,7 @@ fn chase_path_needs_refresh(e: &Entity, chase_goal: (f32, f32)) -> bool {
         .unwrap_or(true)
 }
 
-fn rotate_tank_weapon_for_combat(e: &mut Entity, target_angle: f32) -> bool {
+fn rotate_vehicle_weapon_for_combat(e: &mut Entity, target_angle: f32) -> bool {
     if !target_angle.is_finite() {
         return false;
     }
@@ -303,7 +305,7 @@ fn rotate_tank_weapon_for_combat(e: &mut Entity, target_angle: f32) -> bool {
     angle_delta(rotated, target_angle).abs() <= TANK_TURRET_FIRE_TOLERANCE_RAD
 }
 
-fn relax_tank_weapon_toward_body(e: &mut Entity) {
+fn relax_vehicle_weapon_toward_body(e: &mut Entity) {
     let body = e.facing();
     if !body.is_finite() {
         return;
@@ -409,7 +411,7 @@ fn combat_mode(e: &Entity) -> CombatMode {
     match e.order() {
         Order::Attack(_) => CombatMode::Ordered,
         Order::AttackMove(_) => CombatMode::Aggressive,
-        Order::Move(_) if e.kind == EntityKind::Tank => CombatMode::Opportunistic,
+        Order::Move(_) if fires_while_moving(e.kind) => CombatMode::Opportunistic,
         Order::Idle if e.is_building() => CombatMode::Aggressive,
         Order::Idle if e.is_unit() && e.kind != EntityKind::Worker => CombatMode::Aggressive,
         _ => CombatMode::Passive,

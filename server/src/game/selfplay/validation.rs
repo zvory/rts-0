@@ -89,6 +89,7 @@ fn known_kind(kind: &str) -> bool {
             | kinds::BARRACKS
             | kinds::TRAINING_CENTRE
             | kinds::FACTORY
+            | kinds::STEELWORKS
             | kinds::STEEL
             | kinds::OIL
     )

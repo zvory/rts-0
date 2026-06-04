@@ -59,11 +59,12 @@ const BARRACKS_UNITS: &[EntityKind] = &[
     EntityKind::MachineGunner,
     EntityKind::AtTeam,
 ];
-const TANK_ONLY: &[EntityKind] = &[EntityKind::Tank];
+const FACTORY_UNITS: &[EntityKind] = &[EntityKind::ScoutCar, EntityKind::Tank];
 const CITY_CENTRE_REQUIRED: &[EntityKind] = &[EntityKind::CityCentre];
 const CITY_CENTRE_AND_BARRACKS_REQUIRED: &[EntityKind] =
     &[EntityKind::CityCentre, EntityKind::Barracks];
 const TRAINING_CENTRE_REQUIRED: &[EntityKind] = &[EntityKind::TrainingCentre];
+const STEELWORKS_REQUIRED: &[EntityKind] = &[EntityKind::Steelworks];
 const FACTORY_REQUIRED: &[EntityKind] = &[EntityKind::CityCentre, EntityKind::TrainingCentre];
 
 pub const UNITS: &[UnitDef] = &[
@@ -170,6 +171,27 @@ pub const UNITS: &[UnitDef] = &[
         weapon: WeaponClass::AntiTank,
         target_priority: TargetPriority::Default,
         trained_at: Some(EntityKind::Factory),
+        train_requires: STEELWORKS_REQUIRED,
+    },
+    UnitDef {
+        kind: EntityKind::ScoutCar,
+        stats: config::UnitStats {
+            hp: 150,
+            dmg: 4,
+            range_tiles: 5,
+            cooldown: 6,
+            speed: 2.35,
+            sight_tiles: 10,
+            cost_steel: 125,
+            cost_oil: 75,
+            supply: 3,
+            build_ticks: 480,
+            radius: 12.0,
+        },
+        armor_class: ArmorClass::Small,
+        weapon: WeaponClass::SmallArms,
+        target_priority: TargetPriority::Default,
+        trained_at: Some(EntityKind::Factory),
         train_requires: &[],
     },
 ];
@@ -272,7 +294,27 @@ pub const BUILDINGS: &[BuildingDef] = &[
         },
         armor_class: ArmorClass::Armored,
         weapon: WeaponClass::None,
-        trains: TANK_ONLY,
+        trains: FACTORY_UNITS,
+        build_requires: FACTORY_REQUIRED,
+    },
+    BuildingDef {
+        kind: EntityKind::Steelworks,
+        stats: config::BuildingStats {
+            hp: 300,
+            sight_tiles: 6,
+            cost_steel: 125,
+            cost_oil: 125,
+            foot_w: 2,
+            foot_h: 2,
+            build_ticks: 220,
+            provides_supply: 0,
+            dmg: 0,
+            range_tiles: 0,
+            cooldown: 0,
+        },
+        armor_class: ArmorClass::Armored,
+        weapon: WeaponClass::None,
+        trains: &[],
         build_requires: FACTORY_REQUIRED,
     },
 ];

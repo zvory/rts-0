@@ -50,10 +50,11 @@ const DEFENSIVE_PANIC_SUPPORT_MIX_UNITS: [EntityKind; 3] = [
     EntityKind::MachineGunner,
     EntityKind::Rifleman,
 ];
-const ALL_COMBAT_UNITS: [EntityKind; 4] = [
+const ALL_COMBAT_UNITS: [EntityKind; 5] = [
     EntityKind::Rifleman,
     EntityKind::MachineGunner,
     EntityKind::AtTeam,
+    EntityKind::ScoutCar,
     EntityKind::Tank,
 ];
 
@@ -2008,6 +2009,8 @@ fn next_tank_resource_goal(facts: &AiFacts, profile: &AiProfile) -> Option<Resou
         EntityKind::TrainingCentre
     } else if facts.complete_building_count(EntityKind::Factory) == 0 {
         EntityKind::Factory
+    } else if facts.complete_building_count(EntityKind::Steelworks) == 0 {
+        EntityKind::Steelworks
     } else {
         EntityKind::Tank
     };
@@ -3208,7 +3211,7 @@ mod tests {
     }
 
     #[test]
-    fn tech_to_tanks_delays_oil_until_steel_floor_and_builds_factory() {
+    fn tech_to_tanks_delays_oil_until_steel_floor_and_builds_tank_tech() {
         let mut owned = vec![
             building(10, EntityKind::CityCentre, Some(0)),
             building(11, EntityKind::Barracks, Some(0)),
@@ -3234,11 +3237,14 @@ mod tests {
         assert!(decision.intents.contains(&AiIntent::Build {
             kind: EntityKind::Factory
         }));
+        assert!(decision.intents.contains(&AiIntent::Build {
+            kind: EntityKind::Steelworks
+        }));
         assert!(
             decision.intents.contains(&AiIntent::Train {
                 kind: EntityKind::Worker
             }),
-            "tech_to_tanks should keep worker production alive while saving for the factory"
+            "tech_to_tanks should keep worker production alive while saving for tank tech"
         );
         assert!(
             !decision.intents.contains(&AiIntent::Train {
@@ -3263,12 +3269,12 @@ mod tests {
             building(12, EntityKind::TrainingCentre, None),
         ];
         steel_floor_owned.extend((0..8).map(|i| steel_worker(20 + i, 100 + i)));
-        steel_floor_owned.extend((0..2).map(|i| worker(40 + i, AiEntityState::Idle)));
+        steel_floor_owned.extend((0..3).map(|i| worker(40 + i, AiEntityState::Idle)));
         let steel_floor_observation = observation(
             AiEconomy {
                 steel: 1_000,
                 oil: 1_000,
-                supply_used: 10,
+                supply_used: 11,
                 supply_cap: 20,
             },
             steel_floor_owned,
@@ -4237,6 +4243,7 @@ mod tests {
                 building(12, EntityKind::Barracks, Some(0)),
                 building(13, EntityKind::TrainingCentre, None),
                 building(14, EntityKind::Factory, Some(0)),
+                building(15, EntityKind::Steelworks, None),
             ],
         ));
 
@@ -4347,6 +4354,7 @@ mod tests {
                 building(11, EntityKind::Barracks, Some(0)),
                 building(12, EntityKind::TrainingCentre, None),
                 building(13, EntityKind::Factory, Some(0)),
+                building(14, EntityKind::Steelworks, None),
                 worker(20, AiEntityState::Gather),
                 worker(21, AiEntityState::Gather),
                 worker(22, AiEntityState::Gather),
