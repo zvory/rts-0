@@ -861,7 +861,12 @@ impl RoomTask {
                     .first()
                     .map(|p| p.id)
                     .ok_or_else(|| format!("replay artifact {artifact_name:?} has no players"))?;
-                let game = Game::new_for_replay(&players, driver.seed());
+                let game = Game::new_for_replay_with_starting_resources(
+                    &players,
+                    driver.starting_steel(),
+                    driver.starting_oil(),
+                    driver.seed(),
+                );
                 Ok((game, DevDriver::Replay(driver), view_player_id))
             }
         }
@@ -1198,6 +1203,8 @@ fn dump_crash_replay(room: &str, game: &Game, reason: &str) {
         replay_commands: game.command_log().to_vec(),
         players: game.player_inits(),
         seed: game.seed(),
+        starting_steel: game.starting_steel(),
+        starting_oil: game.starting_oil(),
     };
     let json = match serde_json::to_string_pretty(&artifact) {
         Ok(s) => s,

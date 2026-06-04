@@ -136,6 +136,11 @@ pub struct Game {
     /// Match seed retained for replay metadata/API compatibility. The current hardcoded map
     /// ignores it until lobby map selection or randomized maps are reintroduced.
     seed: u32,
+    /// Starting steel granted to each player at match start. Retained so replay artifacts can
+    /// faithfully recreate "start with more money" matches.
+    starting_steel: u32,
+    /// Starting oil granted to each player at match start. See [`Game::starting_steel`].
+    starting_oil: u32,
     pub(crate) rng: SmallRng,
 }
 
@@ -164,6 +169,18 @@ impl Game {
         Self::new_without_ai_controllers(players, seed)
     }
 
+    /// Like [`Game::new_for_replay`] but with explicit starting resources. Used when replaying a
+    /// match that was originally created in quickstart ("start with more money") mode so the
+    /// initial player economy matches the live recording.
+    pub(crate) fn new_for_replay_with_starting_resources(
+        players: &[PlayerInit],
+        steel: u32,
+        oil: u32,
+        seed: u32,
+    ) -> Game {
+        Self::new_inner(players, false, steel, oil, seed)
+    }
+
     /// Create a match that preserves player identity flags but does not attach live
     /// [`AiController`]s. Used by command-log replay and scripted self-play, where commands come
     /// from an external driver.
@@ -179,6 +196,14 @@ impl Game {
 
     pub(crate) fn seed(&self) -> u32 {
         self.seed
+    }
+
+    pub(crate) fn starting_steel(&self) -> u32 {
+        self.starting_steel
+    }
+
+    pub(crate) fn starting_oil(&self) -> u32 {
+        self.starting_oil
     }
 
     fn new_inner(players: &[PlayerInit], enable_ai: bool, steel: u32, oil: u32, seed: u32) -> Game {
@@ -235,6 +260,8 @@ impl Game {
             spatial,
             pathing,
             seed,
+            starting_steel: steel,
+            starting_oil: oil,
             rng,
         };
         // Initialize supply accounting and fog so the very first snapshot is correct.
