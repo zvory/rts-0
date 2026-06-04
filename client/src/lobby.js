@@ -29,6 +29,8 @@ export class Lobby {
     this.elName = rootEl.querySelector("#lobby-name");
     this.elRoom = rootEl.querySelector("#lobby-room");
     this.btnJoin = rootEl.querySelector("#lobby-join");
+    this.chkSpectator = rootEl.querySelector("#lobby-spectator");
+    this.chkSpectatorInput = this.chkSpectator?.querySelector("input[type='checkbox']") || null;
     this.roomBlock = rootEl.querySelector(".lobby-room");
     this.elPlayers = rootEl.querySelector("#lobby-players");
     this.btnReady = rootEl.querySelector("#lobby-ready");
@@ -41,6 +43,7 @@ export class Lobby {
     // Local lobby state.
     this._joined = false;
     this._ready = false;
+    this._spectator = false;
     this._hostId = null;
     this._canStart = false;
     this._quickstart = false;
@@ -103,10 +106,20 @@ export class Lobby {
 
     // Ready: toggle local ready and tell the server.
     this.btnReady.addEventListener("click", () => {
+      if (this._spectator) return;
       this._ready = !this._ready;
       this.net.ready(this._ready);
       this._reflectReadyButton();
     });
+
+    if (this.chkSpectatorInput) {
+      this.chkSpectatorInput.addEventListener("change", () => {
+        this._spectator = !!this.chkSpectatorInput.checked;
+        this._ready = false;
+        this._reflectReadyButton();
+        if (this._joined) this.net.setSpectator(this._spectator);
+      });
+    }
 
     // Start: host-only; the server ignores it from non-hosts but we also gate the UI.
     this.btnStart.addEventListener("click", () => {
@@ -132,9 +145,11 @@ export class Lobby {
   _join() {
     const name = (this.elName && this.elName.value.trim()) || "Commander";
     const room = (this.elRoom && this.elRoom.value.trim()) || "main";
+    const spectator = !!this.chkSpectatorInput?.checked;
     this._persistName(name);
-    this.net.join(name, room);
+    this.net.join(name, room, spectator);
     this._joined = true;
+    this._spectator = spectator;
     if (this.roomBlock) this.roomBlock.hidden = false;
     this.setStatus(`Joining "${room}"…`);
     this._reflectReadyButton();
@@ -176,14 +191,20 @@ export class Lobby {
     if (this.roomBlock) this.roomBlock.hidden = false;
 
     const players = m.players || [];
-    this._playerCount = players.length;
+    this._playerCount = players.filter((p) => !p.isSpectator).length;
     this._renderPlayers(players);
     this._reflectStartButton();
     this._reflectAddAiButton();
     this._reflectQuickstart();
 
-    const count = players.length;
-    this.setStatus(`Room "${m.room}" — ${count} player${count === 1 ? "" : "s"}.`);
+    const participantCount = this._playerCount;
+    const spectatorCount = players.filter((p) => p.isSpectator).length;
+    const specText = spectatorCount > 0
+      ? `, ${spectatorCount} spectator${spectatorCount === 1 ? "" : "s"}`
+      : "";
+    this.setStatus(
+      `Room "${m.room}" — ${participantCount} player${participantCount === 1 ? "" : "s"}${specText}.`,
+    );
   }
 
   /** Rebuild the player list: color swatch, name, (host) tag, ready check. */
@@ -221,6 +242,13 @@ export class Lobby {
         bot.textContent = "AI";
         tags.appendChild(bot);
       }
+      if (p.isSpectator) {
+        li.classList.add("is-spectator");
+        const spec = document.createElement("span");
+        spec.className = "tag spectator";
+        spec.textContent = "Spectator";
+        tags.appendChild(spec);
+      }
 
       li.appendChild(swatch);
       li.appendChild(name);
@@ -244,6 +272,11 @@ export class Lobby {
           ready.textContent = "✓ Ready";
           li.appendChild(ready);
         }
+      } else if (p.isSpectator) {
+        const ready = document.createElement("span");
+        ready.className = "player-ready spectator";
+        ready.textContent = "Observing";
+        li.appendChild(ready);
       } else {
         const ready = document.createElement("span");
         ready.className = "player-ready" + (p.ready ? " ready" : "");
@@ -256,6 +289,8 @@ export class Lobby {
       // Keep our own ready toggle in sync with the authoritative server state.
       if (p.id === myId) {
         this._ready = !!p.ready;
+        this._spectator = !!p.isSpectator;
+        if (this.chkSpectatorInput) this.chkSpectatorInput.checked = this._spectator;
         this._reflectReadyButton();
       }
     }
@@ -293,6 +328,8 @@ export class Lobby {
   _reflectReadyButton() {
     if (!this.btnReady) return;
     this.btnReady.textContent = this._ready ? "Unready" : "Ready";
+    if (this._spectator) this.btnReady.textContent = "Observing";
+    this.btnReady.disabled = this._spectator;
     this.btnReady.classList.toggle("active", this._ready);
     this.btnReady.setAttribute("aria-pressed", this._ready ? "true" : "false");
   }

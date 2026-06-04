@@ -397,7 +397,11 @@ async fn handle_client_message(
     current_room: &mut Option<lobby::RoomHandle>,
 ) {
     match msg {
-        ClientMessage::Join { name, room } => {
+        ClientMessage::Join {
+            name,
+            room,
+            spectator,
+        } => {
             // Re-joining a different room is not supported; the first join wins. Subsequent
             // joins from the same connection are ignored to keep room membership unambiguous.
             if current_room.is_some() {
@@ -421,6 +425,7 @@ async fn handle_client_message(
                 .send(RoomEvent::Join {
                     player_id,
                     name,
+                    spectator,
                     msg_tx: conn_tx.clone(),
                     ack: ack_tx,
                 })
@@ -475,6 +480,17 @@ async fn handle_client_message(
                 player_id,
                 current_room,
                 RoomEvent::SetQuickstart { player_id, enabled },
+            )
+            .await;
+        }
+        ClientMessage::SetSpectator { spectator } => {
+            send_room_event(
+                player_id,
+                current_room,
+                RoomEvent::SetSpectator {
+                    player_id,
+                    spectator,
+                },
             )
             .await;
         }

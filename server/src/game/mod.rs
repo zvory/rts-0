@@ -363,6 +363,7 @@ impl Game {
             .collect();
         StartPayload {
             player_id: 0,
+            spectator: false,
             tick: self.tick,
             map,
             players,

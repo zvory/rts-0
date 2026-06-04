@@ -438,11 +438,13 @@ export class Input {
 
     const entities = this.state.entitiesInterpolated(1);
     const me = this.state.playerId;
+    const spectator = !!this.state.spectator;
 
     const units = [];
     const buildings = [];
     for (const e of entities) {
-      if (e.owner !== me) continue;
+      if (!spectator && e.owner !== me) continue;
+      if (spectator && e.owner === 0) continue;
       if (!this._entityIntersectsRect(e, minX, minY, maxX, maxY)) continue;
       if (isUnit(e.kind)) units.push(e.id);
       else if (isBuilding(e.kind)) buildings.push(e.id);

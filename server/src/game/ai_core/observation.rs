@@ -433,6 +433,7 @@ mod tests {
     fn start_payload() -> StartPayload {
         StartPayload {
             player_id: 1,
+            spectator: false,
             tick: 0,
             map: MapInfo {
                 width: 64,
