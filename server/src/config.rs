@@ -37,7 +37,7 @@ pub const STATIC_BLOCKED_REPATH_TICKS: u16 = TICK_HZ as u16;
 /// units contesting the same tile center cannot both lock onto it simultaneously.
 pub const ARRIVE_RADIUS_INTERMEDIATE_PX: f32 = TILE_SIZE as f32 * 0.5; // 16 px
 
-/// Machine-gunner setup/teardown time. One second at the simulation tick rate.
+/// Support-weapon setup/teardown time. One second at the simulation tick rate.
 pub const MACHINE_GUNNER_SETUP_TICKS: u16 = TICK_HZ as u16;
 
 /// Experimental: tanks burn this much oil per world pixel of movement. Calibrated so a tank

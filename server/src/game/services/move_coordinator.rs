@@ -117,7 +117,7 @@ impl<'a> MoveCoordinator<'a> {
             e.set_path_goal(Some(*g));
             e.mark_move_phase(MovePhase::AwaitingPath);
             e.reset_gather_state();
-            begin_machine_gunner_teardown(e);
+            begin_deployed_weapon_teardown(e);
             let (px, py) = (e.pos_x, e.pos_y);
             e.reset_stuck(px, py);
         }
@@ -138,10 +138,10 @@ impl<'a> MoveCoordinator<'a> {
             e.set_path(Vec::new());
             e.set_path_goal(Some((tx, ty)));
             e.reset_gather_state();
-            // An explicit attack order is not necessarily a move command for a deployed MG:
+            // An explicit attack order is not necessarily a move command for a deployed weapon:
             // it may be able to slew and fire immediately. Combat requests a chase path only
             // if the target is actually out of range, after teardown if needed.
-            request_initial_path = e.kind != EntityKind::MachineGunner;
+            request_initial_path = !requires_weapon_setup(e.kind);
             let (px, py) = (e.pos_x, e.pos_y);
             e.reset_stuck(px, py);
         }
@@ -558,8 +558,8 @@ fn build_staging_goal_in_range(
     dx * dx + dy * dy <= interact_range_for_kind(kind).powi(2)
 }
 
-fn begin_machine_gunner_teardown(e: &mut crate::game::entity::Entity) {
-    if e.kind != EntityKind::MachineGunner {
+fn begin_deployed_weapon_teardown(e: &mut crate::game::entity::Entity) {
+    if !requires_weapon_setup(e.kind) {
         return;
     }
     if !matches!(e.weapon_setup(), WeaponSetup::Packed) {
@@ -567,6 +567,10 @@ fn begin_machine_gunner_teardown(e: &mut crate::game::entity::Entity) {
             ticks: config::MACHINE_GUNNER_SETUP_TICKS,
         });
     }
+}
+
+fn requires_weapon_setup(kind: EntityKind) -> bool {
+    matches!(kind, EntityKind::MachineGunner | EntityKind::AtTeam)
 }
 
 // ---------------------------------------------------------------------------
