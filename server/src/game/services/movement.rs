@@ -707,10 +707,11 @@ pub(crate) fn resolve_collisions(
             // Broad-phase: collect candidate neighbor ids using the (possibly stale) spatial
             // index plus a one-tile slack so small intra-tick drift never hides an overlap.
             let search_r = ar + MAX_UNIT_RADIUS_PX + COLLISION_SEARCH_SLACK_PX;
-            let candidates: Vec<u32> = spatial
+            let mut candidates: Vec<u32> = spatial
                 .ids_in_circle_bbox(ax_idx, ay_idx, search_r)
                 .filter(|&b| b > a)
                 .collect();
+            candidates.sort_unstable();
 
             for b in candidates {
                 let (br, b_kind, b_profile, bx, by) = match entities.get(b) {

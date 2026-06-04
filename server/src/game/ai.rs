@@ -67,10 +67,6 @@ impl AiController {
         }
     }
 
-    pub(crate) fn player_id(&self) -> u32 {
-        self.player
-    }
-
     fn profile(&self) -> &'static AiProfile {
         profile_by_id(self.profile_id).unwrap_or(&RIFLE_FLOOD_FULL_SATURATION)
     }
@@ -213,7 +209,7 @@ mod tests {
     fn live_controller_uses_default_profile_id() {
         let ai = AiController::new(2);
 
-        assert_eq!(ai.player_id(), 2);
+        assert_eq!(ai.player, 2);
         assert_eq!(ai.profile_id, RIFLE_FLOOD_FULL_SATURATION_ID);
     }
 

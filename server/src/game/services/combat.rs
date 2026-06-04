@@ -704,7 +704,7 @@ fn apply_overpenetration(
         hits.push((id, target.pos_x, target.pos_y, along, target.radius()));
     }
 
-    hits.sort_by(|a, b| a.3.partial_cmp(&b.3).unwrap_or(std::cmp::Ordering::Equal));
+    hits.sort_by(|a, b| a.3.total_cmp(&b.3).then_with(|| a.0.cmp(&b.0)));
     for (id, tx, ty, _, _) in hits {
         let attacker_kind = entities.get(attacker).map(|e| e.kind);
         let effective_dmg = entities
