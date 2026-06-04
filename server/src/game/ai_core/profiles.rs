@@ -210,10 +210,11 @@ const SUPPORT_WEAPONS_AND_RIFLE: [EntityKind; 3] = [
 
 const FAST_TECH_PATH: [EntityKind; 1] = [EntityKind::Barracks];
 const FULL_TECH_PATH: [EntityKind; 1] = [EntityKind::Barracks];
-const TANK_TECH_PATH: [EntityKind; 3] = [
+const TANK_TECH_PATH: [EntityKind; 4] = [
     EntityKind::Barracks,
     EntityKind::TrainingCentre,
     EntityKind::Factory,
+    EntityKind::Steelworks,
 ];
 const SUPPORT_TECH_PATH: [EntityKind; 2] = [EntityKind::Barracks, EntityKind::TrainingCentre];
 
@@ -643,7 +644,8 @@ mod tests {
             &[
                 EntityKind::Barracks,
                 EntityKind::TrainingCentre,
-                EntityKind::Factory
+                EntityKind::Factory,
+                EntityKind::Steelworks
             ]
         );
         assert_eq!(
@@ -682,7 +684,8 @@ mod tests {
             &[
                 EntityKind::Barracks,
                 EntityKind::TrainingCentre,
-                EntityKind::Factory
+                EntityKind::Factory,
+                EntityKind::Steelworks
             ]
         );
         assert_eq!(
@@ -730,7 +733,8 @@ mod tests {
             &[
                 EntityKind::Barracks,
                 EntityKind::TrainingCentre,
-                EntityKind::Factory
+                EntityKind::Factory,
+                EntityKind::Steelworks
             ]
         );
         assert_eq!(transition.production.unit_priorities, &[EntityKind::Tank]);
