@@ -449,6 +449,26 @@ pub(crate) fn attack_move_units(
     Some(units)
 }
 
+pub(crate) fn move_units(
+    ctx: &mut AiActionContext<'_>,
+    units: impl IntoIterator<Item = u32>,
+    x: f32,
+    y: f32,
+) -> Option<Vec<u32>> {
+    let mut units: Vec<u32> = units.into_iter().collect();
+    units.sort_unstable();
+    units.dedup();
+    if units.is_empty() {
+        return None;
+    }
+    ctx.emit_command(Command::Move {
+        units: units.clone(),
+        x,
+        y,
+    });
+    Some(units)
+}
+
 pub(crate) fn attack_units(
     ctx: &mut AiActionContext<'_>,
     units: impl IntoIterator<Item = u32>,
@@ -1034,6 +1054,31 @@ mod tests {
         assert!(matches!(
             ctx.into_commands().as_slice(),
             [Command::AttackMove { units, x: 10.0, y: 20.0 }]
+                if units == &vec![3, 4, 5]
+        ));
+    }
+
+    #[test]
+    fn move_command_unit_order_is_deterministic() {
+        let observation = observation(
+            AiEconomy {
+                steel: 0,
+                oil: 0,
+                supply_used: 0,
+                supply_cap: 10,
+            },
+            Vec::new(),
+            Vec::new(),
+        );
+        let facts = facts_from_observation(&observation);
+        let mut ctx = context_from_facts(&facts, &observation);
+
+        let units = move_units(&mut ctx, [5, 3, 4, 3], 10.0, 20.0);
+
+        assert_eq!(units, Some(vec![3, 4, 5]));
+        assert!(matches!(
+            ctx.into_commands().as_slice(),
+            [Command::Move { units, x: 10.0, y: 20.0 }]
                 if units == &vec![3, 4, 5]
         ));
     }

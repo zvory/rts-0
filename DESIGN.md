@@ -941,8 +941,13 @@ target stays at least 18 tiles from the enemy start, prefers map-edge footprints
 direct own-base-to-enemy-base scouting line. If the worker was already committed when the barracks
 becomes affordable, the AI places the barracks near that worker's current position rather than
 waiting for the ideal edge point; if it can afford the barracks immediately, it uses the hidden
-edge target as the build site. It trains only one extra home worker and attack-moves riflemen as
-individual pressure units instead of waiting for escalating waves.
+edge target as the build site. It trains only one extra home worker and sends riflemen as
+individual pressure units instead of waiting for escalating waves. Pure rifle attack profiles use
+AI-only raid movement: launched riflemen receive plain `Move` orders to a point deeper than the
+public enemy start tile, so they ignore buildings encountered on the way, while the AI reissues
+direct `Attack` commands against visible enemy units with workers first. If no enemy units are
+visible and raiders have reached the enemy-base area, they fall back to attacking visible buildings
+so a unitless opponent can still be finished.
 `rifle_flood_full_saturation` saturates the observed main-base steel line before assigning oil
 workers, so the oil timing follows the map's current steel patch count instead of a hardcoded worker
 number. At 50 supply it independently pivots into the tank tech path and becomes eligible to expand
