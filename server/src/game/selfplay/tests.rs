@@ -1119,6 +1119,7 @@ fn run_scripted_ticks(
 fn pending_tracker_start_payload() -> StartPayload {
     StartPayload {
         player_id: 1,
+        spectator: false,
         tick: 0,
         map: MapInfo {
             width: 96,

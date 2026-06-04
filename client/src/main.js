@@ -107,6 +107,7 @@ const dom = {
   giveUpConfirm: document.getElementById("give-up-confirm"),
   giveUpCancel: document.getElementById("give-up-cancel"),
   giveUpConfirmButton: document.getElementById("give-up-confirm-button"),
+  commandCard: document.getElementById("command-card"),
   devBanner: document.getElementById("dev-banner"),
   replaySpeed: document.getElementById("replay-speed"),
 };
@@ -185,7 +186,7 @@ class App {
     const name = "Spectator";
     if (this.lobby?.elName) this.lobby.elName.value = name;
     if (this.lobby?.elRoom) this.lobby.elRoom.value = this.devWatch.room;
-    this.net.join(name, this.devWatch.room);
+    this.net.join(name, this.devWatch.room, true);
     if (this.lobby?.roomBlock) this.lobby.roomBlock.hidden = true;
     this.lobby.setStatus("Starting local self-play watch…");
   }
@@ -440,7 +441,7 @@ class Match {
     this.camera = new Camera();
     this.renderer = new Renderer(dom.viewport);
     this.fog = new Fog(this.state.map.width, this.state.map.height, this.state.map.terrain);
-    this.fog.setRevealAll(!!this.devWatch?.noFog);
+    this.fog.setRevealAll(!!this.devWatch?.noFog || this.state.spectator);
     this.hud = new HUD(dom.gameScreen, this.state, this.net);
     this.minimap = new Minimap(dom.minimap, this.state, this.camera, this.fog, this.net);
     this.input = new Input(
@@ -510,6 +511,13 @@ class Match {
       };
       dom.replaySpeed.addEventListener("click", this.replaySpeedHandler);
     }
+    this.applySpectatorUi();
+  }
+
+  applySpectatorUi() {
+    const spectator = !!this.state?.spectator;
+    if (dom.giveUpOpen) dom.giveUpOpen.hidden = spectator;
+    if (dom.commandCard) dom.commandCard.hidden = spectator;
   }
 
   handleMenuKeyDown(ev) {
@@ -541,6 +549,7 @@ class Match {
   }
 
   openGiveUpConfirm() {
+    if (this.state?.spectator) return;
     if (!dom.giveUpConfirm || this.giveUpSent) return;
     this.closeSettingsMenu();
     dom.giveUpConfirm.hidden = false;
@@ -562,6 +571,7 @@ class Match {
   }
 
   requestGiveUp() {
+    if (this.state?.spectator) return;
     if (this.giveUpSent) return;
     this.giveUpSent = true;
     if (dom.giveUpConfirmButton) {
@@ -824,6 +834,8 @@ class Match {
       dom.replaySpeed.removeEventListener("click", this.replaySpeedHandler);
       dom.replaySpeed.hidden = true;
     }
+    if (dom.giveUpOpen) dom.giveUpOpen.hidden = false;
+    if (dom.commandCard) dom.commandCard.hidden = false;
     // Let modules release DOM/WebGL resources if they own any.
     for (const m of [this.input, this.minimap, this.hud, this.renderer, this.fog]) {
       if (m && typeof m.destroy === "function") {

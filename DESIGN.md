@@ -30,6 +30,9 @@ update this file in the same change.
 - Every tick the server produces a **per-player snapshot**, applying **fog of war**:
   a player only receives neutral/enemy entities standing on tiles that player can
   currently see. This makes the fog cheat-proof (hidden enemies are never sent).
+- Lobby-time spectators are connected humans who are not seated in the simulation. They receive
+  full-world no-fog snapshots, all player resource rows, and no controllable units/buildings.
+  Spectators must join or switch roles before the match starts; mid-match joins are rejected.
 - The **client** renders snapshots, interpolating entity positions between them for
   smoothness, and computes the **fog overlay** locally from its own units'/buildings'
   sight radii plus static terrain occlusion (the server already withholds anything it
@@ -62,12 +65,13 @@ short but readable. Coordinates are **world pixels** (floats) unless a field nam
 
 | `t`        | Fields | Meaning |
 |------------|--------|---------|
-| `join`     | `name: string`, `room?: string` | Join (or create) a room. `room` defaults to `"main"`. |
+| `join`     | `name: string`, `room?: string`, `spectator?: bool` | Join (or create) a room. `room` defaults to `"main"`. If `spectator` is true, join as a lobby-time observer instead of a match participant. |
 | `ready`    | `ready: bool` | Toggle ready state in the lobby. |
 | `start`    | — | Host asks to start the match (only honored from the room host). |
 | `addAi`    | — | Host adds a computer opponent to the room (lobby phase only, host-only). |
 | `removeAi` | `id: u32` | Host removes a previously-added AI opponent by id (lobby phase only, host-only). |
 | `setQuickstart` | `enabled: bool` | Host toggles "Start with more money mode" for the next match in this room. |
+| `setSpectator` | `spectator: bool` | Switch between active player and spectator role while still in the lobby. Ignored after the match starts; switching to active player is ignored if the active seats are full. |
 | `command`  | `cmd: Command` | Issue a gameplay command (see below). Ignored unless in-game. |
 | `giveUp`   | — | Give up the active match. The server eliminates that player and sends their score screen. |
 | `ping`     | `ts: number` | Latency probe; server replies with `pong`. |
@@ -103,9 +107,10 @@ illegal placements, or unaffordable actions (fail silently or emit a `notice` ev
 | `pong`     | `ts: number` (echo of the ping ts) |
 | `error`    | `msg: string` |
 
-`LobbyPlayer`: `{ id: u32, name: string, ready: bool, color: string, isAi: bool }`. `isAi` is
+`LobbyPlayer`: `{ id: u32, name: string, ready: bool, color: string, isAi: bool, isSpectator: bool }`. `isAi` is
 true for computer opponents (always shown ready; the client renders an "AI" tag and a host-only
-remove control instead of a ready toggle).
+remove control instead of a ready toggle). `isSpectator` is true for human observers; they do not
+consume active map starts, block readiness, or count toward win/loss.
 
 `PlayerScore`: `{ id: u32, name: string, color: string, unitScore: u32, structureScore: u32,
 unitsKilled: u32, unitsLost: u32, buildingsKilled: u32, buildingsLost: u32 }`. `scores` is a
@@ -119,6 +124,7 @@ Sent once when the match begins. Carries everything static for the whole match.
 {
   t: "start",
   playerId: u32,                 // your id (repeat of welcome for convenience)
+  spectator: bool,               // true when this connection is observing only
   tick: u32,                     // starting tick (usually 0)
   map: {
     width: u32, height: u32,     // in tiles
@@ -129,12 +135,14 @@ Sent once when the match begins. Carries everything static for the whole match.
     // render them on the minimap before fog-of-war reveals them.
     resources: [ { id: u32, kind: "steel"|"oil", x: f32, y: f32 } ]
   },
-  players: [ { id, name, color, startTileX, startTileY } ],
+  players: [ { id, name, color, startTileX, startTileY } ], // active match players only
 }
 ```
 Units/buildings arrive via snapshots (so they obey fog), including
 the player's own starting City Centre + workers. When the lobby's `setQuickstart` toggle is
 enabled, every player starts with 99,999 steel and 99,999 oil instead of the default opening resources.
+Spectator start payloads keep the spectator connection's `playerId`, set `spectator: true`, and
+list only active match players in `players`.
 
 ### 2.4 `snapshot` payload (per-player, fog-filtered)
 `Snapshot` remains the semantic shape used by server game code and by client modules after
@@ -148,7 +156,7 @@ transport decode:
   entities: Entity[],            // your non-resource entities (always) + enemy on visible tiles
   resourceDeltas?: ResourceDelta[], // visible resource remaining updates; omitted when empty
   events: Event[],               // transient things to surface (see 2.5)
-  playerResources?: {id, steel, oil, supplyUsed, supplyCap}[]  // all players; replay/no-fog mode only
+  playerResources?: {id, steel, oil, supplyUsed, supplyCap}[]  // all players; replay/spectator no-fog mode only
 }
 ```
 
@@ -170,7 +178,7 @@ Older object-shaped JSON snapshots remain decodable by the client for fallback/d
   ],
   "r": [[id, remaining]],         // omitted when empty
   "ev": [EventRecord],            // omitted when empty
-  "pr": [[id, steel, oil, supplyUsed, supplyCap]]  // omitted in normal play; present in no-fog/replay
+  "pr": [[id, steel, oil, supplyUsed, supplyCap]]  // omitted in normal play; present in spectator/no-fog/replay
 }
 ```
 
@@ -349,10 +357,13 @@ them at the top of `tick()` — see §8.
 - One tokio task per **room** owns its `Game` and runs the tick loop (`tokio::time::interval`).
 - Each **connection** is a task with an `mpsc::Sender<ServerMessage>` to push to its socket.
 - Connection→room communication uses an `mpsc` channel of internal `RoomEvent`
-  (`Join`, `Leave`, `Ready`, `StartRequest`, `AddAi`, `RemoveAi`, `Command`, `GiveUp`). The room task is the
+  (`Join`, `Leave`, `Ready`, `StartRequest`, `AddAi`, `RemoveAi`, `SetSpectator`, `Command`, `GiveUp`). The room task is the
   single writer of game state — no locks around `Game`.
 - The room task, each tick: drain commands → `game.tick()` → for each connected player
   `game.snapshot_for(pid)` → send. Lobby phase: broadcast `lobby` on changes.
+- Normal rooms reject all mid-match joins. Spectators are lobby members only: they receive
+  `StartPayload.spectator = true` and live `game.snapshot_full_for(0)` snapshots, but are not
+  included in `PlayerInit`, command routing, elimination, or match-player counts.
 - Dev self-play watch rooms are a special-case room mode inside the same task model: they own a
   normal `Game`, feed it scripted commands from `game::selfplay`, and send watchers
   `game.snapshot_full_for(view_pid)` instead of fog-filtered snapshots. Replay rooms advance at
@@ -580,7 +591,7 @@ export class Minimap {
 export class Lobby {
   constructor(rootEl, net)
   show(), hide()
-  // renders player list + ready/start; calls net.join/ready/start.
+  // renders player list + ready/start/spectator role; calls net.join/ready/start/setSpectator.
   onGameStart(cb)                        // main.js subscribes to transition to game screen
 }
 ```
@@ -591,6 +602,8 @@ export class Lobby {
 `audio.setListener`, `input.update`, `fog.update`, `renderer.render`, `hud.update`,
 `minimap.render`); on each snapshot it applies state and triggers transient event audio exactly
 once; on `gameOver` show the victory/defeat overlay with the frozen score table.
+For spectator starts, `main.js` reveals all fog, hides the command card and give-up action, and
+keeps the ordinary renderer/minimap/HUD pointed at full-world snapshots with `playerResources`.
 
 ### 4.2 Rendering & look (PixiJS, procedural art — neutral PS1 field-command style)
 - Layers (back→front): terrain → resource nodes → building shadows → buildings → unit
@@ -1020,6 +1033,8 @@ main-base workers do not walk to expansion patches, and expansion workers do not
 main-base patches.
 The live lobby AI uses this shared core through `AiController`, which only owns live identity,
 profile id, cadence, and persistent decision memory. Profiles are still not client-selectable.
+
+Spectators never count toward win/elimination and receive a neutral final scoreboard result.
 
 **Win/elimination.** AI players count as match players: a 1-human + N-AI match is a real match
 (it resolves to a winner), while a lone human with no AI remains a never-ending sandbox. They have

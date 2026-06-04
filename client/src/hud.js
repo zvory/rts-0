@@ -276,6 +276,13 @@ export class HUD {
   _renderCommandCard() {
     const card = this.elCommand;
     if (!card) return;
+    if (this.state.spectator) {
+      if (this._cardSig !== "spectator") {
+        card.innerHTML = "";
+        this._cardSig = "spectator";
+      }
+      return;
+    }
 
     const sel = this.state.selectedEntities() || [];
     const primary = this._commandSubject(sel);

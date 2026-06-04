@@ -58,11 +58,14 @@ pub mod states {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(tag = "t", rename_all = "camelCase")]
 pub enum ClientMessage {
-    /// Join (or create) a room. `room` defaults to "main" when absent.
+    /// Join (or create) a room. `room` defaults to "main" when absent. Spectators must join
+    /// before the match starts; they observe only and are not seated in the simulation.
     Join {
         name: String,
         #[serde(default)]
         room: Option<String>,
+        #[serde(default)]
+        spectator: bool,
     },
     /// Toggle ready state in the lobby.
     Ready { ready: bool },
@@ -74,6 +77,8 @@ pub enum ClientMessage {
     RemoveAi { id: u32 },
     /// Host toggles the lobby's quickstart starting-resource mode.
     SetQuickstart { enabled: bool },
+    /// Switch between player and spectator role while still in the lobby.
+    SetSpectator { spectator: bool },
     /// Issue a gameplay command (ignored unless in-game).
     Command { cmd: Command },
     /// Give up the current match, removing this player's army and showing the score screen.
@@ -182,12 +187,16 @@ pub struct LobbyPlayer {
     /// True for computer opponents (no socket). The client uses this to label the row and show a
     /// host-only "remove" control instead of a ready indicator.
     pub is_ai: bool,
+    /// True for human observers. Spectators do not count toward match starts or win conditions.
+    pub is_spectator: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct StartPayload {
     pub player_id: u32,
+    #[serde(default)]
+    pub spectator: bool,
     pub tick: u32,
     pub map: MapInfo,
     pub players: Vec<PlayerStart>,

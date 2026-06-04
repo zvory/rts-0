@@ -39,6 +39,8 @@ export class GameState {
   constructor(startInfo) {
     /** @type {number} our player id (repeat of welcome, for convenience). */
     this.playerId = startInfo.playerId;
+    /** @type {boolean} true when this client is observing instead of playing. */
+    this.spectator = !!startInfo.spectator;
     /** @type {object} the full §2.3 start payload, kept for reference. */
     this.startInfo = startInfo;
     /** @type {{width:number,height:number,tileSize:number,terrain:number[]}} */
