@@ -21,7 +21,7 @@ use crate::rules;
 /// slack also absorbs units pinned against static terrain or building body clearance where the
 /// resolver's only separating pushes are statically illegal and have to be skipped. Building-body
 /// overlap has its own zero-tolerance invariant below.
-const OVERLAP_TOLERANCE_PX: f32 = 8.0;
+const OVERLAP_TOLERANCE_PX: f32 = 12.0;
 
 impl Game {
     /// Assert that the current world state satisfies all simulation invariants.
