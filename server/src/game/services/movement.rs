@@ -31,7 +31,7 @@ const COLLISION_PASSES: usize = 6;
 const COLLISION_EPS_PX: f32 = 0.001;
 
 pub(crate) const TANK_BODY_TURN_RATE_RAD_PER_TICK: f32 = 0.035;
-const TANK_BODY_LOOKAHEAD_PX: f32 = config::TILE_SIZE as f32 * 2.0;
+const TANK_BODY_LOOKAHEAD_PX: f32 = config::TILE_SIZE as f32 * 5.0;
 const TANK_CRAWL_ANGLE_RAD: f32 = 0.55;
 const TANK_PIVOT_ANGLE_RAD: f32 = 1.25;
 
@@ -99,7 +99,7 @@ pub(crate) fn movement_system(
         let mut static_blocked_this_tick = false;
         if is_tank {
             if let Some(e) = entities.get(id) {
-                if let Some((desired_x, desired_y)) = tank_desired_path_point(e, x, y) {
+                if let Some((desired_x, desired_y)) = tank_desired_path_point(map, occ, e, x, y) {
                     let desired = (desired_y - y).atan2(desired_x - x);
                     if desired.is_finite() {
                         let rotated =
@@ -417,8 +417,11 @@ pub(crate) fn angle_delta(from: f32, to: f32) -> f32 {
 }
 
 pub(crate) fn rotate_toward(current: f32, desired: f32, max_delta: f32) -> f32 {
-    if !current.is_finite() || !desired.is_finite() || !max_delta.is_finite() {
+    if !desired.is_finite() || !max_delta.is_finite() {
         return current;
+    }
+    if !current.is_finite() {
+        return desired;
     }
     let delta = angle_delta(current, desired);
     if delta.abs() <= max_delta {
@@ -443,18 +446,49 @@ pub(crate) fn tank_speed_scale(abs_angle_error: f32) -> f32 {
     }
 }
 
-fn tank_desired_path_point(e: &Entity, x: f32, y: f32) -> Option<(f32, f32)> {
+fn tank_desired_path_point(
+    map: &Map,
+    occ: &Occupancy,
+    e: &Entity,
+    x: f32,
+    y: f32,
+) -> Option<(f32, f32)> {
     let path = &e.movement.as_ref()?.path;
     let next = path.last().copied()?;
-    path.iter()
-        .rev()
-        .copied()
-        .find(|(px, py)| {
-            let dx = *px - x;
-            let dy = *py - y;
-            (dx * dx + dy * dy).sqrt() >= TANK_BODY_LOOKAHEAD_PX
-        })
-        .or(Some(next))
+    let from = (x, y);
+    let mut farthest_reachable = None;
+
+    for waypoint in path.iter().rev().copied() {
+        if !standability::unit_static_segment_standable(map, occ, EntityKind::Tank, from, waypoint)
+        {
+            break;
+        }
+        farthest_reachable = Some(waypoint);
+
+        if let Some(point) = point_at_distance(from, waypoint, TANK_BODY_LOOKAHEAD_PX) {
+            return Some(point);
+        }
+    }
+
+    farthest_reachable.or(Some(next))
+}
+
+fn point_at_distance(from: (f32, f32), to: (f32, f32), distance: f32) -> Option<(f32, f32)> {
+    if !distance.is_finite() || distance <= 0.0 {
+        return None;
+    }
+    let dx = to.0 - from.0;
+    let dy = to.1 - from.1;
+    let segment_len = (dx * dx + dy * dy).sqrt();
+    if !segment_len.is_finite() || segment_len < distance {
+        return None;
+    }
+    if segment_len <= 1.0e-4 {
+        return Some(to);
+    }
+
+    let t = distance / segment_len;
+    Some((from.0 + dx * t, from.1 + dy * t))
 }
 
 fn steering_path_dir(e: &Entity, x: f32, y: f32, fallback: (f32, f32)) -> (f32, f32) {
@@ -1496,6 +1530,107 @@ mod tests {
         assert_eq!(players[0].oil, 10 - oil_used.floor() as u32);
     }
 
+    #[test]
+    fn tank_route_lookahead_uses_long_open_segment() {
+        let map = flat_map(1);
+        let mut entities = EntityStore::new();
+        let (sx, sy) = map.tile_center(20, 20);
+        let tank = entities
+            .spawn_unit(1, EntityKind::Tank, sx, sy)
+            .expect("tank should spawn");
+
+        set_path_direct(
+            &mut entities,
+            tank,
+            vec![
+                (sx + config::TILE_SIZE as f32, sy),
+                (sx + config::TILE_SIZE as f32 * 2.0, sy),
+                (sx + config::TILE_SIZE as f32 * 3.0, sy),
+                (sx + config::TILE_SIZE as f32 * 4.0, sy),
+                (sx + config::TILE_SIZE as f32 * 8.0, sy),
+            ],
+        );
+
+        let occ = Occupancy::build(&map, &entities);
+        let e = entities.get(tank).expect("tank should exist");
+        let desired =
+            tank_desired_path_point(&map, &occ, e, sx, sy).expect("tank should have route intent");
+
+        assert!(
+            (desired.0 - (sx + TANK_BODY_LOOKAHEAD_PX)).abs() <= 0.001,
+            "open route intent should use the long tank lookahead, got x {:.2} from start {:.2}",
+            desired.0,
+            sx
+        );
+        assert!(
+            (desired.1 - sy).abs() <= 0.001,
+            "open route intent should stay on the route segment, got y {:.2}",
+            desired.1
+        );
+    }
+
+    #[test]
+    fn tank_route_lookahead_stops_before_blocked_corner() {
+        let map = flat_map(1);
+        let mut entities = EntityStore::new();
+        let (bx, by) = footprint_center(&map, EntityKind::Depot, 10, 10);
+        entities
+            .spawn_building(1, EntityKind::Depot, bx, by, true)
+            .expect("depot spawn");
+        let rect = building_rect_for_footprint(EntityKind::Depot, 10, 10).expect("depot rect");
+        let tank_radius = config::unit_stats(EntityKind::Tank)
+            .expect("tank stats")
+            .radius;
+
+        let start = (
+            rect.min_x - tank_radius - 8.0,
+            rect.max_y + tank_radius + 8.0,
+        );
+        let corner = (rect.max_x + tank_radius + 8.0, start.1);
+        let after_corner = (corner.0, rect.min_y - tank_radius - 8.0);
+        let tank = entities
+            .spawn_unit(1, EntityKind::Tank, start.0, start.1)
+            .expect("tank spawn");
+        set_path_direct(&mut entities, tank, vec![corner, after_corner]);
+
+        let occ = Occupancy::build(&map, &entities);
+        assert!(
+            standability::unit_static_segment_standable(
+                &map,
+                &occ,
+                EntityKind::Tank,
+                start,
+                corner
+            ),
+            "fixture requires a legal current route segment"
+        );
+        assert!(
+            !standability::unit_static_segment_standable(
+                &map,
+                &occ,
+                EntityKind::Tank,
+                start,
+                after_corner
+            ),
+            "fixture requires the direct look-through-corner segment to be blocked"
+        );
+
+        let e = entities.get(tank).expect("tank should exist");
+        let desired =
+            tank_desired_path_point(&map, &occ, e, start.0, start.1).expect("route intent");
+
+        assert!(
+            (desired.1 - start.1).abs() <= 0.001,
+            "tank intent should stay on the legal segment before the corner, got {:?}",
+            desired
+        );
+        assert!(
+            desired.0 > start.0 && desired.0 <= corner.0,
+            "tank intent should advance along the current segment only, got {:?}",
+            desired
+        );
+    }
+
     /// Set a path directly on a unit. Path is stored reversed (last element = next waypoint).
     /// `waypoints` should be in visit order: [first_to_visit, ..., final_goal].
     fn set_path_direct(entities: &mut EntityStore, id: u32, waypoints: Vec<(f32, f32)>) {
@@ -1972,6 +2107,30 @@ mod tests {
             e.facing().abs() > 0.0 && e.facing().abs() <= TANK_BODY_TURN_RATE_RAD_PER_TICK + 0.0001,
             "tank should still rotate while paused, facing {:.4}",
             e.facing()
+        );
+    }
+
+    #[test]
+    fn tank_facing_remains_finite_after_movement() {
+        let map = flat_map(1);
+        let mut entities = EntityStore::new();
+        let (sx, sy) = map.tile_center(20, 20);
+        let tank = entities
+            .spawn_unit(1, EntityKind::Tank, sx, sy)
+            .expect("tank should spawn");
+        if let Some(e) = entities.get_mut(tank) {
+            e.set_facing(f32::NAN);
+        }
+        set_path_direct(&mut entities, tank, vec![(sx + 200.0, sy)]);
+
+        let occ = Occupancy::build(&map, &entities);
+        let spatial = SpatialIndex::build(&entities, map.size);
+        movement_system(&map, &mut entities, &mut [], &occ, &spatial, 0);
+
+        let facing = entities.get(tank).expect("tank should exist").facing();
+        assert!(
+            facing.is_finite(),
+            "tank movement should recover a finite hull facing, got {facing:?}"
         );
     }
 

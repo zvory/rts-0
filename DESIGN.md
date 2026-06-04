@@ -252,7 +252,7 @@ src/
     command.rs   # SimCommand domain commands + protocol translation helpers
     map.rs       # Map: handcrafted terrain asset loading, passability, base-site validation
     entity.rs    # Entity, EntityKind, EntityStore (slotmap-style Vec + free list)
-    pathfinding.rs # A* over the tile grid (impassable = terrain + building footprints)
+    pathfinding.rs # A* over the tile grid, with optional turn-cost route shaping for tanks
     fog.rs       # per-player visibility grid (visible / explored)
     systems.rs   # orchestrator: runs services in order each tick
     services/    # per-tick internal services: commands, move_coordinator, movement (incl. unit collision), combat, economy, production, construction, death, occupancy, supply, pathing, geometry, standability, line_of_sight
@@ -560,7 +560,8 @@ victory/defeat overlay with the frozen score table.
   Distinct silhouette per kind (engineer: compact block; rifleman / machine gunner / AT team:
   shared infantry body with oversized role weapons; tank: chunky flat-shaded armor). Riflemen
   carry a rifle, AT teams carry a large panzerfaust-style launcher, and machine gunners carry
-  an MG across the body while packed that extends forward with bracing during setup/deployment.
+  an MG42-style long machine gun across the body while packed that extends forward with bracing
+  during setup/deployment.
 - Buildings: footprint-sized blocky field structures with neutral geometry and plain
   two-letter stencils; under construction → translucent with a progress bar; production →
   small progress arc.
@@ -761,13 +762,17 @@ The server treats every client as potentially hostile. Limits live next to the c
   Stone blocks target acquisition, primary fire, and overpenetration.
 - **Tank body and weapon facing**: the snapshot `facing` field is the tank hull/body angle. Tanks
   rotate that body angle at a bounded rate on movement paths; badly misaligned tanks pivot in
-  place instead of sliding sideways at full speed. The snapshot `weaponFacing` field is the
-  independent turret/barrel angle. Tank combat rotates the turret toward the target at a bounded
-  rate and fires only once the turret is within tolerance; the hull does not need to face the
-  target. Tanks do not clear their movement path when they fire, so they can continue driving while
-  the turret tracks and shoots on both `Move` and `AttackMove` orders. A tank on plain `Move` only
-  opportunistically fires at enemies already in range; it does not chase out-of-range enemies.
-  Projection omits enemy `weaponFacing` when it would reveal a hidden target direction.
+  place instead of sliding sideways at full speed. Tank hull movement intent uses a long route
+  lookahead, but the desired facing point is bounded to the current statically legal route segment
+  unless a farther waypoint is also reachable by `standability::unit_static_segment_standable` from
+  the tank's current position; local steering and collision displacement do not become hull intent.
+  The snapshot `weaponFacing` field is the independent turret/barrel angle. Tank combat rotates the
+  turret toward the target at a bounded rate and fires only once the turret is within tolerance; the
+  hull does not need to face the target. Tanks do not clear their movement path when they fire, so
+  they can continue driving while the turret tracks and shoots on both `Move` and `AttackMove`
+  orders. A tank on plain `Move` only opportunistically fires at enemies already in range; it does
+  not chase out-of-range enemies. Projection omits enemy `weaponFacing` when it would reveal a
+  hidden target direction.
 - **Tank movement oil burn**: tanks consume oil based on distance actually moved, using
   `TANK_OIL_COST_PER_PX`. Fractional movement cost accumulates per tank until whole oil units are
   deducted from the owner's stockpile. The tank also tracks lifetime movement oil as `oilUsed` for
@@ -795,9 +800,12 @@ The server treats every client as potentially hostile. Limits live next to the c
   unit `AwaitingPath`. The existing path coordinator then recomputes under current occupancy within
   the normal per-tick A* budget. This covers buildings constructed after a long path was assigned
   without periodically repathing every moving unit.
-- **Tank path simplification**: player-issued tank `Move` / `AttackMove` path requests still use
-  tile A* for reachability, then snap the reverse-ordered final waypoint to the exact command goal
-  and simplify the waypoint list by dropping intermediate tile centers only when
+- **Tank path simplification**: player-issued tank `Move` / `AttackMove` path requests use tile A*
+  with a small direction-change penalty so equivalent-cost routes prefer fewer bends. Path cache
+  keys include the route-shaping mode so tank turn-cost paths do not share cached routes with normal
+  interaction pathing. The returned route is still used for reachability, then snaps the
+  reverse-ordered final waypoint to the exact command goal and simplifies the waypoint list by
+  dropping intermediate tile centers only when
   `standability::unit_static_segment_standable` proves the unit body can travel the straight segment
   without clipping terrain or building occupancy. The simplifier preserves the exact final command
   goal, never adds waypoints, and falls back to the original next waypoint whenever segment legality
