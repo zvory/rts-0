@@ -386,11 +386,10 @@ export class Renderer {
       g.beginFill(tint);
       g.drawPolygon(rotatedPolygon([
         -r * 1.05, -r * 0.75,
-        r * 0.85, -r * 0.75,
-        r * 1.18, -r * 0.32,
-        r * 1.2, 0,
-        r * 1.12, r * 0.56,
-        r * 0.72, r * 0.82,
+        r * 0.9, -r * 0.75,
+        r * 1.16, -r * 0.5,
+        r * 1.16, r * 0.54,
+        r * 0.9, r * 0.82,
         -r * 0.95, r * 0.82,
         -r * 1.18, r * 0.35,
         -r * 1.18, -r * 0.38,
@@ -406,25 +405,12 @@ export class Renderer {
       drawRotatedRect(g, -r * 0.04, 0, r * 1.05, r * 0.74, facing);
       g.endFill();
 
-      g.beginFill(lightenColor(tint, 0.08), 0.95);
-      g.drawPolygon(rotatedPolygon([
-        r * 0.28, -r * 0.44,
-        r * 0.9, -r * 0.32,
-        r * 1.06, 0,
-        r * 0.9, r * 0.34,
-        r * 0.28, r * 0.48,
-      ], facing));
+      g.beginFill(lightenColor(tint, 0.06), 0.95);
+      drawRotatedRect(g, r * 0.86, 0, r * 0.42, r * 1.02, facing);
       g.endFill();
 
-      g.beginFill(0x1a1712, 0.18);
-      g.drawPolygon(rotatedPolygon([
-        r * 0.72, -r * 0.32,
-        r * 1.02, -r * 0.18,
-        r * 1.06, 0,
-        r * 1.0, r * 0.18,
-        r * 0.72, r * 0.32,
-        r * 0.8, 0,
-      ], facing));
+      g.beginFill(0x1a1712, 0.22);
+      drawRotatedRect(g, r * 1.03, 0, r * 0.18, r * 0.92, facing);
       g.endFill();
 
       const barrel = polar(weaponFacing, r * 1.55);
