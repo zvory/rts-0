@@ -446,6 +446,7 @@ mod tests {
         };
         let start = StartPayload {
             player_id: 1,
+            spectator: false,
             tick: 0,
             map: MapInfo {
                 width: map.size,

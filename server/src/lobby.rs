@@ -192,6 +192,7 @@ pub enum RoomEvent {
     Join {
         player_id: u32,
         name: String,
+        spectator: bool,
         msg_tx: ConnectionSink,
         ack: tokio::sync::oneshot::Sender<bool>,
     },
@@ -207,6 +208,8 @@ pub enum RoomEvent {
     RemoveAi { player_id: u32, target: u32 },
     /// The host toggled the lobby's start-with-more-money mode.
     SetQuickstart { player_id: u32, enabled: bool },
+    /// A connected human switched between active player and spectator role in the lobby.
+    SetSpectator { player_id: u32, spectator: bool },
     /// A gameplay command (ignored unless the room is in-game and the sender is in the room).
     Command { player_id: u32, cmd: SimCommand },
     /// A connected player intentionally gave up the active match.
@@ -271,6 +274,7 @@ struct RoomPlayer {
     name: String,
     color: String,
     ready: bool,
+    spectator: bool,
     msg_tx: ConnectionSink,
 }
 
@@ -406,9 +410,10 @@ impl RoomTask {
             RoomEvent::Join {
                 player_id,
                 name,
+                spectator,
                 msg_tx,
                 ack,
-            } => self.on_join(player_id, name, msg_tx, ack),
+            } => self.on_join(player_id, name, spectator, msg_tx, ack),
             RoomEvent::Leave { player_id } => self.on_leave(player_id),
             RoomEvent::Ready { player_id, ready } => self.on_ready(player_id, ready),
             RoomEvent::StartRequest { player_id } => self.on_start_request(player_id),
@@ -417,6 +422,10 @@ impl RoomTask {
             RoomEvent::SetQuickstart { player_id, enabled } => {
                 self.on_set_quickstart(player_id, enabled)
             }
+            RoomEvent::SetSpectator {
+                player_id,
+                spectator,
+            } => self.on_set_spectator(player_id, spectator),
             RoomEvent::Command { player_id, cmd } => self.on_command(player_id, cmd),
             RoomEvent::GiveUp { player_id } => self.on_give_up(player_id),
             RoomEvent::SetReplaySpeed { speed } => self.on_set_replay_speed(speed),
@@ -428,6 +437,7 @@ impl RoomTask {
         &mut self,
         player_id: u32,
         name: String,
+        spectator: bool,
         msg_tx: ConnectionSink,
         ack: tokio::sync::oneshot::Sender<bool>,
     ) {
@@ -456,7 +466,11 @@ impl RoomTask {
             let _ = ack.send(false);
             return;
         }
-        let color = self.next_human_color();
+        let color = if spectator {
+            "#6f8fa8".to_string()
+        } else {
+            self.next_human_color()
+        };
         self.order.push(player_id);
         self.players.insert(
             player_id,
@@ -464,32 +478,27 @@ impl RoomTask {
                 name,
                 color,
                 ready: false,
+                spectator,
                 msg_tx,
             },
         );
-        if self.host_id.is_none() {
-            self.host_id = Some(player_id);
-        }
+        self.reassign_host_if_needed();
         debug!(room = %self.room, player_id, "joined");
         // The player is now in the room; tell the connection it may mark itself joined.
         let _ = ack.send(true);
-        // A player joining mid-match just sits in the (still in-game) room until it resolves;
-        // they receive snapshots immediately. They are not added to the live `Game`.
         if matches!(self.phase, Phase::Lobby) {
             self.broadcast_lobby();
         }
     }
 
     fn on_leave(&mut self, player_id: u32) {
-        if self.players.remove(&player_id).is_none() {
+        let Some(removed) = self.players.remove(&player_id) else {
             return;
-        }
+        };
+        let was_spectator = removed.spectator;
         self.order.retain(|&id| id != player_id);
         self.outcome_sent.remove(&player_id);
-        if self.host_id == Some(player_id) {
-            // Reassign the host to the next remaining player in join order.
-            self.host_id = self.order.first().copied();
-        }
+        self.reassign_host_if_needed();
         debug!(room = %self.room, player_id, "left");
 
         // If the room emptied out, fully reset it to a clean lobby so its name is never stuck
@@ -513,7 +522,9 @@ impl RoomTask {
             Phase::Lobby => self.broadcast_lobby(),
             Phase::InGame(game) => {
                 // Remove their army so the match can still resolve to a winner.
-                game.eliminate(player_id);
+                if !was_spectator {
+                    game.eliminate(player_id);
+                }
             }
         }
     }
@@ -524,6 +535,9 @@ impl RoomTask {
         }
         if let Phase::Lobby = self.phase {
             if let Some(player) = self.players.get_mut(&player_id) {
+                if player.spectator {
+                    return;
+                }
                 player.ready = ready;
                 self.broadcast_lobby();
             }
@@ -600,9 +614,66 @@ impl RoomTask {
         }
     }
 
+    fn on_set_spectator(&mut self, player_id: u32, spectator: bool) {
+        if matches!(self.mode, RoomMode::DevSelfPlay(_)) {
+            return;
+        }
+        if !matches!(self.phase, Phase::Lobby) {
+            return;
+        }
+        let current = self.players.get(&player_id).map(|p| p.spectator);
+        if current == Some(spectator) || current.is_none() {
+            return;
+        }
+        if spectator {
+            if let Some(player) = self.players.get_mut(&player_id) {
+                player.spectator = true;
+                player.ready = false;
+                player.color = "#6f8fa8".to_string();
+            }
+        } else {
+            if self.total_player_count() >= MAX_PLAYERS {
+                debug!(room = %self.room, player_id, "ignoring player role switch; room full");
+                return;
+            }
+            let color = self.next_human_color();
+            if let Some(player) = self.players.get_mut(&player_id) {
+                player.spectator = false;
+                player.ready = false;
+                player.color = color;
+            }
+        }
+        self.broadcast_lobby();
+    }
+
     /// Total seated players: connected humans plus AI opponents.
     fn total_player_count(&self) -> usize {
-        self.order.len() + self.ai_players.len()
+        self.active_human_count() + self.ai_players.len()
+    }
+
+    fn active_human_count(&self) -> usize {
+        self.order
+            .iter()
+            .filter(|id| self.players.get(id).map(|p| !p.spectator).unwrap_or(false))
+            .count()
+    }
+
+    fn active_human_ids(&self) -> impl Iterator<Item = u32> + '_ {
+        self.order
+            .iter()
+            .copied()
+            .filter(|id| self.players.get(id).map(|p| !p.spectator).unwrap_or(false))
+    }
+
+    fn reassign_host_if_needed(&mut self) {
+        if self
+            .host_id
+            .and_then(|id| self.players.get(&id).map(|_| id))
+            .is_some()
+        {
+            return;
+        }
+        self.host_id = self.order.first().copied();
     }
 
     /// Pick the first palette color not currently held by a human player. Join order alone is
@@ -612,7 +683,7 @@ impl RoomTask {
             .iter()
             .copied()
             .find(|color| !self.players.values().any(|p| p.color == *color))
-            .unwrap_or(PLAYER_PALETTE[self.order.len() % PLAYER_PALETTE.len()])
+            .unwrap_or(PLAYER_PALETTE[self.active_human_count() % PLAYER_PALETTE.len()])
             .to_string()
     }
 
@@ -631,7 +702,12 @@ impl RoomTask {
         // Commands are ignored unless in-game and the sender is actually in this room. The
         // simulation itself validates ownership/affordability when it applies the command.
         if let Phase::InGame(game) = &mut self.phase {
-            if self.players.contains_key(&player_id) && !self.outcome_sent.contains(&player_id) {
+            let active_player = self
+                .players
+                .get(&player_id)
+                .map(|p| !p.spectator)
+                .unwrap_or(false);
+            if active_player && !self.outcome_sent.contains(&player_id) {
                 game.enqueue(player_id, cmd);
             }
         }
@@ -641,7 +717,12 @@ impl RoomTask {
         if matches!(self.mode, RoomMode::DevSelfPlay(_)) {
             return;
         }
-        if !self.players.contains_key(&player_id) || self.outcome_sent.contains(&player_id) {
+        let active_player = self
+            .players
+            .get(&player_id)
+            .map(|p| !p.spectator)
+            .unwrap_or(false);
+        if !active_player || self.outcome_sent.contains(&player_id) {
             return;
         }
 
@@ -710,6 +791,7 @@ impl RoomTask {
                 name,
                 color: "#6f8fa8".to_string(),
                 ready: true,
+                spectator: true,
                 msg_tx,
             },
         );
@@ -721,9 +803,15 @@ impl RoomTask {
         }
     }
 
-    /// A match may start with at least one player present and every player marked ready.
+    /// A match may start with at least one active participant and every active human ready.
+    /// Spectators can host and watch from the lobby, but they do not block readiness.
     fn can_start(&self) -> bool {
-        !self.players.is_empty() && self.players.values().all(|p| p.ready)
+        self.total_player_count() > 0
+            && self
+                .players
+                .values()
+                .filter(|p| !p.spectator)
+                .all(|p| p.ready)
     }
 
     /// Build and broadcast the current `lobby` message to everyone in the room.
@@ -740,6 +828,7 @@ impl RoomTask {
                     ready: p.ready,
                     color: p.color.clone(),
                     is_ai: false,
+                    is_spectator: p.spectator,
                 })
             })
             .collect();
@@ -750,6 +839,7 @@ impl RoomTask {
                 ready: true,
                 color: Self::ai_color(seat),
                 is_ai: true,
+                is_spectator: false,
             });
         }
         let msg = ServerMessage::Lobby {
@@ -766,11 +856,10 @@ impl RoomTask {
     /// own `start` payload. Only called from `on_start_request` once preconditions hold.
     fn start_match(&mut self) {
         let mut inits: Vec<PlayerInit> = self
-            .order
-            .iter()
+            .active_human_ids()
             .filter_map(|id| {
-                self.players.get(id).map(|p| PlayerInit {
-                    id: *id,
+                self.players.get(&id).map(|p| PlayerInit {
+                    id,
                     name: p.name.clone(),
                     color: p.color.clone(),
                     is_ai: false,
@@ -813,6 +902,7 @@ impl RoomTask {
             if let Some(player) = self.players.get(&id) {
                 let per_player = StartPayload {
                     player_id: id,
+                    spectator: player.spectator,
                     ..payload.clone()
                 };
                 send_or_log(
@@ -890,6 +980,7 @@ impl RoomTask {
         };
         let per_player = StartPayload {
             player_id: self.dev_view_player_id.unwrap_or(watcher_id),
+            spectator: true,
             ..game.start_payload()
         };
         send_or_log(
@@ -945,8 +1036,10 @@ impl RoomTask {
                 return;
             }
         };
+        let full_vision_events = union_events(per_player_events.values());
 
-        // Fan out a fog-filtered snapshot to every connected player, merging in their events.
+        // Fan out fog-filtered snapshots to active players and full-world snapshots to lobby-time
+        // spectators, merging in the events each recipient is allowed to observe.
         let recipients: Vec<u32> = self.order.clone();
         for id in &recipients {
             if self.outcome_sent.contains(id) {
@@ -955,8 +1048,14 @@ impl RoomTask {
             let Some(player) = self.players.get(id) else {
                 continue;
             };
-            let mut snapshot = game.snapshot_for(*id);
-            if let Some(mut events) = per_player_events.remove(id) {
+            let mut snapshot = if player.spectator {
+                game.snapshot_full_for(0)
+            } else {
+                game.snapshot_for(*id)
+            };
+            if player.spectator {
+                snapshot.events.extend(full_vision_events.clone());
+            } else if let Some(mut events) = per_player_events.remove(id) {
                 snapshot.events.append(&mut events);
             }
             compact_snapshot_for_wire(&mut snapshot);
@@ -1118,7 +1217,11 @@ impl RoomTask {
             .order
             .iter()
             .copied()
-            .filter(|id| !alive.contains(id) && !self.outcome_sent.contains(id))
+            .filter(|id| {
+                self.players.get(id).map(|p| !p.spectator).unwrap_or(false)
+                    && !alive.contains(id)
+                    && !self.outcome_sent.contains(id)
+            })
             .collect();
         if recipients.is_empty() {
             return;
@@ -1153,10 +1256,14 @@ impl RoomTask {
             let Some(player) = self.players.get(id) else {
                 continue;
             };
-            let you = match winner_id {
-                Some(w) if w == *id => "won",
-                Some(_) => "lost",
-                None => "draw",
+            let you = if player.spectator {
+                "draw"
+            } else {
+                match winner_id {
+                    Some(w) if w == *id => "won",
+                    Some(_) => "lost",
+                    None => "draw",
+                }
             }
             .to_string();
             send_or_log(
@@ -1247,6 +1354,18 @@ fn compact_snapshot_for_wire(snapshot: &mut Snapshot) {
     snapshot
         .entities
         .retain(|entity| entity.kind != kinds::STEEL && entity.kind != kinds::OIL);
+}
+
+fn union_events<'a>(event_sets: impl Iterator<Item = &'a Vec<Event>>) -> Vec<Event> {
+    let mut events = Vec::new();
+    for set in event_sets {
+        for event in set {
+            if !events.contains(event) {
+                events.push(event.clone());
+            }
+        }
+    }
+    events
 }
 
 fn room_mode_for(room: &str) -> RoomMode {
@@ -1382,7 +1501,7 @@ mod tests {
     fn join_test_player(task: &mut RoomTask, player_id: u32) {
         let (msg_tx, _writer) = ConnectionSink::new();
         let (ack, _ack_rx) = tokio::sync::oneshot::channel();
-        task.on_join(player_id, format!("Player {player_id}"), msg_tx, ack);
+        task.on_join(player_id, format!("Player {player_id}"), false, msg_tx, ack);
     }
 
     fn test_snapshot(tick: u32, resource_deltas: Vec<ResourceDelta>) -> Snapshot {

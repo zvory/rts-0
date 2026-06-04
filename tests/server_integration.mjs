@@ -58,10 +58,15 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   await B.waitFor((m) => m.t === "welcome", 3000, "B welcome");
   B.send({ t: "join", name: "Bravo", room: ROOM });
 
-  const lob = await A.waitFor((m) => m.t === "lobby" && m.players.length === 2, 3000, "A lobby(2)");
-  ok(lob.players.length === 2, `lobby shows 2 players: ${lob.players.map((p) => p.name).join(", ")}`);
+  const C = new Client("C"); await C.open();
+  await C.waitFor((m) => m.t === "welcome", 3000, "C welcome");
+  C.send({ t: "join", name: "Observer", room: ROOM, spectator: true });
+
+  const lob = await A.waitFor((m) => m.t === "lobby" && m.players.length === 3, 3000, "A lobby(3)");
+  ok(lob.players.length === 3, `lobby shows 2 players and 1 spectator: ${lob.players.map((p) => p.name).join(", ")}`);
   ok(lob.hostId === A.playerId, `host is A (${lob.hostId})`);
   ok(lob.players.every((p) => /^#/.test(p.color)), `players have hex colors: ${lob.players.map((p) => p.color).join(",")}`);
+  ok(lob.players.find((p) => p.id === C.playerId)?.isSpectator === true, "lobby marks C as spectator");
 
   A.send({ t: "ready", ready: true });
   B.send({ t: "ready", ready: true });
@@ -71,10 +76,13 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
   const startA = await A.waitFor((m) => m.t === "start", 3000, "A start");
   const startB = await B.waitFor((m) => m.t === "start", 3000, "B start");
+  const startC = await C.waitFor((m) => m.t === "start", 3000, "C start");
   ok(startA.map.terrain.length === startA.map.width * startA.map.height,
      `start map ${startA.map.width}x${startA.map.height}, terrain len=${startA.map.terrain.length}`);
   ok(startA.players.length === 2, `start lists 2 players`);
   ok(startA.playerId === A.playerId && startB.playerId === B.playerId, `each start carries own playerId`);
+  ok(startC.playerId === C.playerId && startC.spectator === true, `spectator start carries observer id and flag`);
+  ok(startC.players.length === 2 && !startC.players.some((p) => p.id === C.playerId), "spectator is not seated in start players");
   const a = startA.players.find((p) => p.id === A.playerId);
   const b = startA.players.find((p) => p.id === B.playerId);
   ok(a && b && (a.startTileX !== b.startTileX || a.startTileY !== b.startTileY),
@@ -95,6 +103,18 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   ok(steelNodes.length > 0 && typeof steelNodes[0].id === "number", `start lists neutral steel nodes (${steelNodes.length})`);
   ok(!snap.entities.some((e) => e.kind === "steel" || e.kind === "oil"), "snapshot omits static resource entities");
   ok(!snap.entities.some((e) => e.owner === B.playerId), `FOG: A cannot see B at start`);
+
+  const specSnap = await C.waitFor(
+    (m) => m.t === "snapshot" && m.entities.some((e) => e.owner === A.playerId) && m.entities.some((e) => e.owner === B.playerId),
+    3000,
+    "C full-vision snapshot",
+  );
+  ok(specSnap.steel === 0 && specSnap.oil === 0 && specSnap.supplyUsed === 0 && specSnap.supplyCap === 0,
+     `SPECTATOR: observer has no personal economy (${specSnap.steel}/${specSnap.oil}/${specSnap.supplyUsed}/${specSnap.supplyCap})`);
+  ok(Array.isArray(specSnap.playerResources) && specSnap.playerResources.length === 2,
+     `SPECTATOR: observer sees all player resources (${specSnap.playerResources?.length})`);
+  ok(!specSnap.entities.some((e) => e.owner === C.playerId),
+     "SPECTATOR: observer owns no entities");
 
   A.send({ t: "command", cmd: { c: "gather", units: workers.map((w) => w.id), node: steelNodes[0].id } });
   let sawLatch = false, peak = snap.steel;
@@ -124,7 +144,9 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const overB = await B.waitFor((m) => m.t === "gameOver", 4000, "B gameOver after giveUp");
   ok(overB.you === "lost", `GIVE UP: B sees defeat after giving up (you=${overB.you})`);
   const over = await A.waitFor((m) => m.t === "gameOver", 4000, "A gameOver");
+  const overC = await C.waitFor((m) => m.t === "gameOver", 4000, "C gameOver");
   ok(over.you === "won", `WIN: A wins after B gives up (you=${over.you})`);
+  ok(overC.you === "draw" && overC.winnerId === A.playerId, `SPECTATOR: observer sees neutral result with winner (${overC.you}/${overC.winnerId})`);
   ok(Array.isArray(over.scores) && over.scores.length === 2, `SCORE: gameOver lists both players (${over.scores?.length})`);
   const aScore = over.scores?.find((s) => s.id === A.playerId);
   const bScore = over.scores?.find((s) => s.id === B.playerId);
@@ -132,6 +154,8 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   ok(bScore && bScore.unitsLost >= 4 && bScore.buildingsLost >= 1, `SCORE: surrendered B losses recorded (${bScore?.unitsLost}/${bScore?.buildingsLost})`);
 
   A.ws.close();
+  B.ws.close();
+  C.ws.close();
   await sleep(200);
   if (failures > 0) console.log(`\n${failures} FAILURE(S) ❌`);
   process.exit(failures === 0 ? 0 : 1);

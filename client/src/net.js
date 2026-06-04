@@ -101,9 +101,10 @@ export class Net {
    * Join (or create) a room.
    * @param {string} name display name
    * @param {string} [room] room id; defaults to "main" via the builder.
+   * @param {boolean} [spectator=false] join as an observer instead of a player.
    */
-  join(name, room) {
-    this._send(msg.join(name, room));
+  join(name, room, spectator = false) {
+    this._send(msg.join(name, room, spectator));
   }
 
   /**
@@ -135,6 +136,14 @@ export class Net {
   /** Toggle the lobby's start-with-more-money mode (host-only; ignored otherwise). */
   setQuickstart(enabled) {
     this._send(msg.setQuickstart(enabled));
+  }
+
+  /**
+   * Switch between player and spectator role while still in the lobby.
+   * @param {boolean} spectator
+   */
+  setSpectator(spectator) {
+    this._send(msg.setSpectator(spectator));
   }
 
   /**
