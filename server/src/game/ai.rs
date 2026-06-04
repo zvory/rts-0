@@ -26,7 +26,6 @@ use crate::game::services::spatial::SpatialIndex;
 use crate::game::systems;
 use crate::game::PlayerState;
 use rand::Rng;
-use std::collections::BTreeSet;
 
 /// Re-plan cadence in ticks. The AI "thinks" this often (about 3 times/second at 30 Hz);
 /// decisions are staggered per player so several AIs do not all think on the same tick.
@@ -115,7 +114,6 @@ impl AiController {
             return;
         };
 
-        let building_margin = building_margin_tiles(context.map, context.entities);
         let profile = self.profile();
         let decision = decide_profile(
             &observation,
@@ -125,13 +123,13 @@ impl AiController {
                 min_radius: 2,
                 max_radius: ai_shared::DEFAULT_BUILD_SEARCH_MAX_RADIUS,
                 prefer_away_from_center: false,
+                prefer_toward_center: false,
             },
             |building, tile_x, tile_y| {
                 live_building_placeable(
                     context.map,
                     context.entities,
                     context.spatial,
-                    &building_margin,
                     building,
                     tile_x,
                     tile_y,
@@ -153,7 +151,6 @@ fn live_building_placeable(
     map: &Map,
     entities: &EntityStore,
     spatial: &SpatialIndex,
-    building_margin: &BTreeSet<(u32, u32)>,
     building: EntityKind,
     tile_x: u32,
     tile_y: u32,
@@ -161,41 +158,25 @@ fn live_building_placeable(
     if !systems::footprint_placeable(map, entities, spatial, building, tile_x, tile_y) {
         return false;
     }
-    let Some(stats) = config::building_stats(building) else {
-        return false;
-    };
-    for dy in 0..stats.foot_h {
-        for dx in 0..stats.foot_w {
-            let Some(x) = tile_x.checked_add(dx) else {
-                return false;
-            };
-            let Some(y) = tile_y.checked_add(dy) else {
-                return false;
-            };
-            if building_margin.contains(&(x, y)) {
-                return false;
-            }
+    for entity in entities.iter().filter(|entity| entity.is_building()) {
+        let (cx, cy) = map.tile_of(entity.pos_x, entity.pos_y);
+        let Some(stats) = config::building_stats(entity.kind) else {
+            return false;
+        };
+        let existing_tile_x = cx.saturating_sub(stats.foot_w / 2);
+        let existing_tile_y = cy.saturating_sub(stats.foot_h / 2);
+        if !ai_shared::footprints_respect_clearance(
+            building,
+            tile_x,
+            tile_y,
+            entity.kind,
+            existing_tile_x,
+            existing_tile_y,
+        ) {
+            return false;
         }
     }
     true
-}
-
-fn building_margin_tiles(map: &Map, entities: &EntityStore) -> BTreeSet<(u32, u32)> {
-    let mut margin = BTreeSet::new();
-    for entity in entities.iter().filter(|entity| entity.is_building()) {
-        for (tile_x, tile_y) in crate::game::services::occupancy::building_footprint(map, entity) {
-            for dy in -1i32..=1 {
-                for dx in -1i32..=1 {
-                    let nx = tile_x as i32 + dx;
-                    let ny = tile_y as i32 + dy;
-                    if nx >= 0 && ny >= 0 && nx < map.size as i32 && ny < map.size as i32 {
-                        margin.insert((nx as u32, ny as u32));
-                    }
-                }
-            }
-        }
-    }
-    margin
 }
 
 #[cfg(test)]
