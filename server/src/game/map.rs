@@ -25,7 +25,7 @@ type BasePair = (Tile, Tile);
 /// Radius around a player start site (even index) that must remain passable.
 pub const BASE_PROTECTION_RADIUS_TILES: i32 = 7;
 /// Radius around a natural expansion site (odd index) that must remain passable.
-/// Smaller than the start radius because naturals have no IC or worker ring.
+/// Smaller than the start radius because naturals have no City Centre or worker ring.
 pub const EXPANSION_PROTECTION_RADIUS_TILES: i32 = 4;
 
 /// The terrain grid plus the selected start and expansion tiles.

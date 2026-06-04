@@ -558,7 +558,7 @@ export class Renderer {
     // Player-tinted roof/yard slabs, all neutral geometry.
     g.lineStyle(0);
     g.beginFill(tint, bodyAlpha * 0.82);
-    if (e.kind === KIND.INDUSTRIAL_CENTER) {
+    if (e.kind === KIND.CITY_CENTRE) {
       g.drawRect(x0 + w * 0.12, y0 + h * 0.18, w * 0.62, h * 0.52);
       g.drawRect(x0 + w * 0.68, y0 + h * 0.1, w * 0.16, h * 0.32);
       g.beginFill(0x1a1712, bodyAlpha * 0.7);
@@ -634,7 +634,7 @@ export class Renderer {
     g.alpha = alpha;
 
     if (e.kind === KIND.OIL) {
-      // Fuel drums: industrial but faction-neutral.
+      // Fuel drums: utilitarian but faction-neutral.
       // White outline improves contrast against dark ground and fog.
       g.lineStyle(2.5, 0xffffff, 0.95);
       g.drawRect(-r * 0.78, -r * 0.58, r * 0.52, r * 1.09);
@@ -1008,20 +1008,20 @@ export class Renderer {
     }
   }
 
-  /** Draw the resource hover's nearest-IC mining link. @private */
+  /** Draw the resource hover's nearest City Centre mining link. @private */
   _drawResourceMiningPreview(state) {
     if (!state || !state.resourceMiningPreview) return;
     const g = this._feedbackGfx;
     const p = state.resourceMiningPreview;
-    const icStat = STATS[KIND.INDUSTRIAL_CENTER] || {};
+    const ccStat = STATS[KIND.CITY_CENTRE] || {};
     const ts = (this._map && this._map.tileSize) || 32;
-    const icEndpoint = rectEdgePointTowardCenter(
+    const ccEndpoint = rectEdgePointTowardCenter(
       p.resourceX,
       p.resourceY,
-      p.icX,
-      p.icY,
-      ((icStat.footW || 3) * ts) / 2,
-      ((icStat.footH || 3) * ts) / 2,
+      p.ccX,
+      p.ccY,
+      ((ccStat.footW || 3) * ts) / 2,
+      ((ccStat.footH || 3) * ts) / 2,
     );
 
     if (p.inRange) {
@@ -1033,7 +1033,7 @@ export class Renderer {
     }
 
     g.lineStyle(2.5, 0xd64d45, 0.9);
-    dashedLine(g, p.resourceX, p.resourceY, icEndpoint.x, icEndpoint.y, 14, 9);
+    dashedLine(g, p.resourceX, p.resourceY, ccEndpoint.x, ccEndpoint.y, 14, 9);
   }
 
   /**

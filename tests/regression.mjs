@@ -57,7 +57,7 @@ async function soloStart(room) {
     const room = "reg-build-" + Math.floor(performance.now());
     const { c, snap } = await soloStart(room);
     const worker = snap.entities.find((e) => e.owner === c.playerId && e.kind === "worker");
-    c.send({ t: "command", cmd: { c: "build", worker: worker.id, building: "industrial_center", tileX: 4294967295, tileY: 0 } });
+    c.send({ t: "command", cmd: { c: "build", worker: worker.id, building: "city_centre", tileX: 4294967295, tileY: 0 } });
     const tickBefore = c.lastSnapshot.tick;
     await sleep(1500);
     const alive = c.lastSnapshot && c.lastSnapshot.tick > tickBefore;

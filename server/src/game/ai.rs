@@ -346,16 +346,10 @@ mod tests {
         let ai_base = map.tile_center(ai_start.0, ai_start.1);
         let enemy_base = map.tile_center(enemy_start.0, enemy_start.1);
         entities
-            .spawn_building(2, EntityKind::IndustrialCenter, ai_base.0, ai_base.1, true)
+            .spawn_building(2, EntityKind::CityCentre, ai_base.0, ai_base.1, true)
             .unwrap();
         entities
-            .spawn_building(
-                1,
-                EntityKind::IndustrialCenter,
-                enemy_base.0,
-                enemy_base.1,
-                true,
-            )
+            .spawn_building(1, EntityKind::CityCentre, enemy_base.0, enemy_base.1, true)
             .unwrap();
         for i in 0..RIFLE_FLOOD_FULL_SATURATION.attack.first_attack_size {
             entities

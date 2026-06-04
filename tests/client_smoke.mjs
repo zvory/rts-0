@@ -68,9 +68,9 @@ try {
 
   const own = await page.evaluate(() => {
     const s = window.__rts.match.state, es = s.entitiesInterpolated(1).filter((e) => e.owner === s.playerId);
-    return { industrialCenter: es.filter((e) => e.kind === "industrial_center").length, w: es.filter((e) => e.kind === "worker").length };
+    return { cityCentre: es.filter((e) => e.kind === "city_centre").length, w: es.filter((e) => e.kind === "worker").length };
   });
-  ok(own.industrialCenter === 1 && own.w === 4, `client sees own City Centre + 4 workers (industrialCenter=${own.industrialCenter}, workers=${own.w})`);
+  ok(own.cityCentre === 1 && own.w === 4, `client sees own City Centre + 4 workers (cityCentre=${own.cityCentre}, workers=${own.w})`);
 
   // Interpolation must be live: GameState exposes recv timestamps so alpha isn't pinned to 1.
   const interp = await page.evaluate(() => {
@@ -160,9 +160,9 @@ try {
   ok(depot, "BUILD: placing a Supply Depot created an own depot entity (server round-trip)");
 
   const trainBtn = await page.evaluate(() => {
-    const s = window.__rts.match.state, industrialCenter = s.entitiesInterpolated(1).find((e) => e.owner === s.playerId && e.kind === "industrial_center");
-    if (!industrialCenter) return false;
-    s.setSelection([industrialCenter.id]); window.__rts.match.hud.update();
+    const s = window.__rts.match.state, cityCentre = s.entitiesInterpolated(1).find((e) => e.owner === s.playerId && e.kind === "city_centre");
+    if (!cityCentre) return false;
+    s.setSelection([cityCentre.id]); window.__rts.match.hud.update();
     return !!document.querySelector('#command-card [data-hotkey="Q"]');
   });
   ok(trainBtn, "TRAIN CARD: selecting the City Centre shows a Worker train button");
@@ -189,8 +189,8 @@ try {
 
   const beforePan = await page.evaluate(() => {
     const s = window.__rts.match.state;
-    const industrialCenter = s.entitiesInterpolated(1).find((e) => e.owner === s.playerId && e.kind === "industrial_center");
-    if (industrialCenter) s.setSelection([industrialCenter.id]);
+    const cityCentre = s.entitiesInterpolated(1).find((e) => e.owner === s.playerId && e.kind === "city_centre");
+    if (cityCentre) s.setSelection([cityCentre.id]);
     return {
       x: window.__rts.match.camera.x,
       y: window.__rts.match.camera.y,

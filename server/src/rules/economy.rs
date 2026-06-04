@@ -79,7 +79,7 @@ mod tests {
     #[test]
     fn ww2_production_chain_matches_design() {
         assert_eq!(
-            trainable_units(EntityKind::IndustrialCenter),
+            trainable_units(EntityKind::CityCentre),
             &[EntityKind::Worker]
         );
         assert_eq!(
@@ -110,7 +110,7 @@ mod tests {
         assert!(!build_requirement_met(EntityKind::TrainingCentre, &[]));
         assert!(!build_requirement_met(
             EntityKind::TrainingCentre,
-            &[EntityKind::IndustrialCenter]
+            &[EntityKind::CityCentre]
         ));
         assert!(!build_requirement_met(
             EntityKind::TrainingCentre,
@@ -118,13 +118,13 @@ mod tests {
         ));
         assert!(build_requirement_met(
             EntityKind::TrainingCentre,
-            &[EntityKind::IndustrialCenter, EntityKind::Barracks]
+            &[EntityKind::CityCentre, EntityKind::Barracks]
         ));
 
         assert!(!build_requirement_met(EntityKind::Factory, &[]));
         assert!(!build_requirement_met(
             EntityKind::Factory,
-            &[EntityKind::IndustrialCenter]
+            &[EntityKind::CityCentre]
         ));
         assert!(!build_requirement_met(
             EntityKind::Factory,
@@ -132,13 +132,13 @@ mod tests {
         ));
         assert!(build_requirement_met(
             EntityKind::Factory,
-            &[EntityKind::IndustrialCenter, EntityKind::TrainingCentre]
+            &[EntityKind::CityCentre, EntityKind::TrainingCentre]
         ));
 
         assert_eq!(cost(EntityKind::Worker), (50, 0));
         assert_eq!(cost(EntityKind::ScoutCar), (125, 75));
         assert_eq!(cost(EntityKind::Tank), (200, 150));
-        assert_eq!(cost(EntityKind::IndustrialCenter), (200, 0));
+        assert_eq!(cost(EntityKind::CityCentre), (200, 0));
         assert_eq!(cost(EntityKind::Depot), (100, 0));
         assert_eq!(supply_cost(EntityKind::ScoutCar), 3);
         assert_eq!(supply_cost(EntityKind::Tank), 6);

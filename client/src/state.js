@@ -87,7 +87,7 @@ export class GameState {
     this.commandTarget = null;
     /** @type {Array<{kind:string,x:number,y:number,createdAt:number}>} */
     this.commandFeedback = [];
-    /** @type {null | {resourceId:number, resourceX:number, resourceY:number, icId:number, icX:number, icY:number, inRange:boolean}} */
+    /** @type {null | {resourceId:number, resourceX:number, resourceY:number, ccId:number, ccX:number, ccY:number, inRange:boolean}} */
     this.resourceMiningPreview = null;
 
     /** @type {Array<{from:number,to:number,createdAt:number}>} */
@@ -441,8 +441,8 @@ export class GameState {
   }
 
   /**
-   * Set or clear the hovered resource-to-Industrial-Center mining preview.
-   * @param {null | {resourceId:number, resourceX:number, resourceY:number, icId:number, icX:number, icY:number, inRange:boolean}} preview
+   * Set or clear the hovered resource-to-City-Centre mining preview.
+   * @param {null | {resourceId:number, resourceX:number, resourceY:number, ccId:number, ccX:number, ccY:number, inRange:boolean}} preview
    */
   updateResourceMiningPreview(preview) {
     this.resourceMiningPreview = preview;

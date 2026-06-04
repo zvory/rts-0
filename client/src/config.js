@@ -53,7 +53,7 @@ export const SCOUT_CAR_BODY = Object.freeze({
 });
 
 // Workers can mine a resource only when a completed City Centre is within this many tiles.
-export const MINING_IC_RANGE_TILES = 7.0;
+export const MINING_CC_RANGE_TILES = 7.0;
 
 // Player colors (server assigns from a matching palette; used as a fallback for blips).
 export const PLAYER_PALETTE = Object.freeze([
@@ -78,18 +78,18 @@ export const STATS = Object.freeze({
   [KIND.TANK]: { label: "Tank", icon: "TK", size: 15, sight: 7, body: TANK_BODY,
     rangeTiles: 3, cost: { steel: 200, oil: 150 }, supply: 6, buildTicks: 750 },
 
-  [KIND.INDUSTRIAL_CENTER]: { label: "City Centre", icon: "CC", footW: 3, footH: 3, sight: 9,
+  [KIND.CITY_CENTRE]: { label: "City Centre", icon: "CC", footW: 3, footH: 3, sight: 9,
     cost: { steel: 200, oil: 0 }, buildTicks: 400, trains: [KIND.WORKER] },
   [KIND.DEPOT]: { label: "Supply Depot", icon: "SD", footW: 2, footH: 2, sight: 4,
     cost: { steel: 100, oil: 0 }, buildTicks: 180, trains: [] },
   [KIND.BARRACKS]: { label: "Barracks", icon: "BK", footW: 3, footH: 2, sight: 6,
-    cost: { steel: 150, oil: 0 }, buildTicks: 200, trains: [KIND.RIFLEMAN, KIND.MACHINE_GUNNER, KIND.AT_TEAM], requires: KIND.INDUSTRIAL_CENTER },
+    cost: { steel: 150, oil: 0 }, buildTicks: 200, trains: [KIND.RIFLEMAN, KIND.MACHINE_GUNNER, KIND.AT_TEAM], requires: KIND.CITY_CENTRE },
   [KIND.TRAINING_CENTRE]: { label: "Training Centre", icon: "TC", footW: 3, footH: 2, sight: 6,
     cost: { steel: 100, oil: 50 }, buildTicks: 220, trains: [],
-    requires: [KIND.INDUSTRIAL_CENTER, KIND.BARRACKS] },
+    requires: [KIND.CITY_CENTRE, KIND.BARRACKS] },
   [KIND.FACTORY]: { label: "Factory", icon: "FY", footW: 3, footH: 3, sight: 6,
     cost: { steel: 200, oil: 100 }, buildTicks: 240, trains: [KIND.SCOUT_CAR, KIND.TANK],
-    requires: [KIND.INDUSTRIAL_CENTER, KIND.TRAINING_CENTRE] },
+    requires: [KIND.CITY_CENTRE, KIND.TRAINING_CENTRE] },
 
   [KIND.STEEL]: { label: "Steel", size: 22 },
   [KIND.OIL]: { label: "Oil", size: 14 },
@@ -106,7 +106,7 @@ export const RESOURCE_AMOUNTS = Object.freeze({
 
 // What a worker can build (command card when a worker is selected).
 export const WORKER_BUILDABLE = Object.freeze([
-  KIND.INDUSTRIAL_CENTER,
+  KIND.CITY_CENTRE,
   KIND.DEPOT,
   KIND.BARRACKS,
   KIND.TRAINING_CENTRE,
