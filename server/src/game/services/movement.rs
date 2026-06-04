@@ -33,7 +33,6 @@ pub(crate) const TANK_BODY_TURN_RATE_RAD_PER_TICK: f32 = 0.035;
 const TANK_BODY_LOOKAHEAD_PX: f32 = config::TILE_SIZE as f32 * 2.0;
 const TANK_CRAWL_ANGLE_RAD: f32 = 0.55;
 const TANK_PIVOT_ANGLE_RAD: f32 = 1.25;
-pub(crate) const TANK_BODY_FIRE_TOLERANCE_RAD: f32 = 0.30;
 
 const STEERING_RADIUS_PX: f32 = config::TILE_SIZE as f32 * 2.5;
 const STEERING_STRENGTH: f32 = 0.65;

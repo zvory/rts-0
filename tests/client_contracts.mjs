@@ -83,6 +83,7 @@ function assertHasGetter(obj, name, msgPrefix = "") {
         40,
         STATE_CODE[STATE.GATHER],
         1.5,
+        1.75,
         null,
         null,
         null,
@@ -100,6 +101,7 @@ function assertHasGetter(obj, name, msgPrefix = "") {
         55,
         STATE_CODE[STATE.ATTACK],
         null,
+        0.3,
         null,
         null,
         null,
@@ -117,6 +119,7 @@ function assertHasGetter(obj, name, msgPrefix = "") {
         450,
         500,
         STATE_CODE[STATE.TRAIN],
+        null,
         null,
         KIND_CODE[KIND.WORKER],
         0.25,
@@ -138,6 +141,7 @@ function assertHasGetter(obj, name, msgPrefix = "") {
   assert(decoded.entities.length === 3, "compact entities decode");
   assert(decoded.entities[0].kind === KIND.WORKER, "entity kind code decodes");
   assert(decoded.entities[0].state === STATE.GATHER, "entity state code decodes");
+  assert(decoded.entities[0].weaponFacing === 1.75, "entity optional weaponFacing decodes");
   assert(decoded.entities[0].latchedNode === 200, "entity optional latchedNode decodes");
   assert(decoded.entities[1].setupState === SETUP.DEPLOYED, "entity setupState code decodes");
   assert(decoded.entities[2].prodKind === KIND.WORKER, "entity prodKind code decodes");
@@ -338,6 +342,7 @@ function assertHasGetter(obj, name, msgPrefix = "") {
         maxHp: 100,
         state: "move",
         facing: (170 * Math.PI) / 180,
+        weaponFacing: (170 * Math.PI) / 180,
       },
       { id: 13, owner: 1, kind: "worker", x: 0, y: 0, hp: 40, maxHp: 40, state: "idle", facing: 0.5 },
       { id: 14, owner: 1, kind: "worker", x: 0, y: 0, hp: 40, maxHp: 40, state: "idle" },
@@ -362,6 +367,7 @@ function assertHasGetter(obj, name, msgPrefix = "") {
         maxHp: 100,
         state: "move",
         facing: (-170 * Math.PI) / 180,
+        weaponFacing: (-170 * Math.PI) / 180,
       },
       { id: 12, owner: 1, kind: "worker", x: 5, y: 5, hp: 40, maxHp: 40, state: "idle", facing: 1.25 },
       { id: 13, owner: 1, kind: "worker", x: 0, y: 0, hp: 40, maxHp: 40, state: "idle" },
@@ -383,6 +389,12 @@ function assertHasGetter(obj, name, msgPrefix = "") {
     Math.PI,
     0.001,
     "facing interpolation uses the short path across angle wrap",
+  );
+  assertApprox(
+    Math.abs(wrapTurn.weaponFacing),
+    Math.PI,
+    0.001,
+    "weaponFacing interpolation uses the short path across angle wrap",
   );
   assertApprox(newFacing.facing, 1.25, 0.001, "missing prior entity keeps current facing");
   assert(!("facing" in missingCurrentFacing), "missing current facing does not add a field");
