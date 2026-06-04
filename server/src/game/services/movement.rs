@@ -885,6 +885,22 @@ mod tests {
         map
     }
 
+    fn two_tile_wide_horizontal_corridor_map() -> Map {
+        let size = 40;
+        let mut terrain = vec![crate::protocol::terrain::ROCK; size * size];
+        for y in 10..=11 {
+            for x in 2..=36 {
+                terrain[y * size + x] = crate::protocol::terrain::GRASS;
+            }
+        }
+        Map {
+            size: size as u32,
+            terrain,
+            starts: vec![],
+            expansion_sites: vec![],
+        }
+    }
+
     /// Two riflemen spawned right on top of each other are pushed apart to non-overlap by
     /// a single tick of `resolve_collisions`.
     #[test]
@@ -1263,6 +1279,52 @@ mod tests {
                 dist_from_start
             );
         }
+    }
+
+    #[test]
+    fn tank_moves_through_long_two_tile_wide_corridor() {
+        let map = two_tile_wide_horizontal_corridor_map();
+        let mut entities = EntityStore::new();
+        let start = map.tile_center(2, 10);
+        let goal = map.tile_center(36, 10);
+        let tank = entities
+            .spawn_unit(1, EntityKind::Tank, start.0, start.1)
+            .expect("tank should spawn in corridor");
+        let mut pathing = PathingService::new(8_192, 256);
+
+        for tick in 1u32..=900 {
+            pathing.advance_tick(tick);
+            let occ = Occupancy::build(&map, &entities);
+            let mut coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, tick);
+            if tick == 1 {
+                coordinator.order_group_move(&mut entities, 1, &[tank], goal, false);
+            }
+            coordinator.process_awaiting_paths(&mut entities);
+            let spatial = SpatialIndex::build(&entities, map.size);
+            movement_system(&map, &mut entities, &occ, &spatial, tick);
+            let spatial = SpatialIndex::build(&entities, map.size);
+            resolve_collisions(&mut entities, &spatial, &map, &occ);
+
+            let e = entities.get(tank).expect("tank should still exist");
+            assert!(
+                standability::unit_static_standable(&map, &occ, EntityKind::Tank, e.pos_x, e.pos_y),
+                "tank body became illegal at tick {tick}: ({:.1}, {:.1})",
+                e.pos_x,
+                e.pos_y
+            );
+        }
+
+        let e = entities.get(tank).expect("tank should still exist");
+        let dx = e.pos_x - goal.0;
+        let dy = e.pos_y - goal.1;
+        let dist_to_goal = (dx * dx + dy * dy).sqrt();
+        assert!(
+            dist_to_goal <= config::TILE_SIZE as f32,
+            "tank did not traverse the long 2-tile corridor; ended {:.1}px from goal at ({:.1}, {:.1})",
+            dist_to_goal,
+            e.pos_x,
+            e.pos_y
+        );
     }
 
     /// Set a path directly on a unit. Path is stored reversed (last element = next waypoint).
