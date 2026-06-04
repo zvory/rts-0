@@ -242,7 +242,7 @@ mod tests {
             (EntityKind::AtTeam, false, true, true),
             (EntityKind::ScoutCar, false, false, false),
             (EntityKind::Tank, true, true, false),
-            (EntityKind::IndustrialCenter, true, false, false),
+            (EntityKind::CityCentre, true, false, false),
             (EntityKind::Depot, true, false, false),
             (EntityKind::Barracks, true, false, false),
             (EntityKind::TrainingCentre, true, false, false),

@@ -290,7 +290,7 @@ impl Game {
             };
             spawn_player_start(&mut entities, &map, &mut ps, start);
             // The starting City Centre contributes supply immediately.
-            ps.supply_cap = config::INDUSTRIAL_CENTER_SUPPLY.min(config::SUPPLY_CAP_MAX);
+            ps.supply_cap = config::CITY_CENTRE_SUPPLY.min(config::SUPPLY_CAP_MAX);
             player_states.push(ps);
         }
 
@@ -657,11 +657,11 @@ fn spawn_base_resources(entities: &mut EntityStore, map: &Map, tile: (u32, u32))
         let py = block_cy + off_x * perp_y + off_y * base_angle.sin();
         let dist_tiles = ((px - hx).powi(2) + (py - hy).powi(2)).sqrt() / ts;
         debug_assert!(
-            (config::IC_RESOURCE_MIN_DIST_TILES..=config::IC_RESOURCE_MAX_DIST_TILES)
+            (config::CC_RESOURCE_MIN_DIST_TILES..=config::CC_RESOURCE_MAX_DIST_TILES)
                 .contains(&dist_tiles),
-            "steel patch {i} at {dist_tiles:.2} tiles from IC is out of [{:.1}, {:.1}] bounds",
-            config::IC_RESOURCE_MIN_DIST_TILES,
-            config::IC_RESOURCE_MAX_DIST_TILES
+            "steel patch {i} at {dist_tiles:.2} tiles from City Centre is out of [{:.1}, {:.1}] bounds",
+            config::CC_RESOURCE_MIN_DIST_TILES,
+            config::CC_RESOURCE_MAX_DIST_TILES
         );
         entities.spawn_node(EntityKind::Steel, px, py);
     }
@@ -682,11 +682,11 @@ fn spawn_base_resources(entities: &mut EntityStore, map: &Map, tile: (u32, u32))
         let py = oil_cy + off_x * oil_perp_y + off_y * oil_angle.sin();
         let dist_tiles = ((px - hx).powi(2) + (py - hy).powi(2)).sqrt() / ts;
         debug_assert!(
-            (config::IC_RESOURCE_MIN_DIST_TILES..=config::IC_RESOURCE_MAX_DIST_TILES)
+            (config::CC_RESOURCE_MIN_DIST_TILES..=config::CC_RESOURCE_MAX_DIST_TILES)
                 .contains(&dist_tiles),
-            "oil patch {i} at {dist_tiles:.2} tiles from IC is out of [{:.1}, {:.1}] bounds",
-            config::IC_RESOURCE_MIN_DIST_TILES,
-            config::IC_RESOURCE_MAX_DIST_TILES
+            "oil patch {i} at {dist_tiles:.2} tiles from City Centre is out of [{:.1}, {:.1}] bounds",
+            config::CC_RESOURCE_MIN_DIST_TILES,
+            config::CC_RESOURCE_MAX_DIST_TILES
         );
         entities.spawn_node(EntityKind::Oil, px, py);
     }
@@ -703,10 +703,10 @@ fn spawn_player_start(
     let (hx, hy) = map.tile_center(stx, sty);
 
     if entities
-        .spawn_building(player.id, EntityKind::IndustrialCenter, hx, hy, true)
+        .spawn_building(player.id, EntityKind::CityCentre, hx, hy, true)
         .is_some()
     {
-        player.record_entity_created(EntityKind::IndustrialCenter);
+        player.record_entity_created(EntityKind::CityCentre);
     }
 
     let ts = config::TILE_SIZE as f32;
@@ -1029,7 +1029,7 @@ mod tests {
         );
         assert_eq!(
             human.structure_score,
-            entity_score_value(EntityKind::IndustrialCenter)
+            entity_score_value(EntityKind::CityCentre)
         );
         assert_eq!(human.units_killed, 0);
         assert_eq!(human.units_lost, 0);
@@ -1050,7 +1050,7 @@ mod tests {
         let victim_building = game
             .entities
             .iter()
-            .find(|e| e.owner == 2 && e.kind == EntityKind::IndustrialCenter)
+            .find(|e| e.owner == 2 && e.kind == EntityKind::CityCentre)
             .map(|e| e.id)
             .expect("victim building should exist");
         for id in [victim_unit, victim_building] {
@@ -1197,7 +1197,7 @@ mod tests {
             }
 
             if max_workers >= target_workers
-                && ai_supply_cap > config::INDUSTRIAL_CENTER_SUPPLY
+                && ai_supply_cap > config::CITY_CENTRE_SUPPLY
                 && max_pending_depot_builders <= 1
                 && gathering_workers_after_depot > 0
                 && ever_had_barracks
@@ -1219,9 +1219,9 @@ mod tests {
             target_workers
         );
         assert!(
-            ai_supply_cap > config::INDUSTRIAL_CENTER_SUPPLY,
+            ai_supply_cap > config::CITY_CENTRE_SUPPLY,
             "AI should build a depot to raise supply above the City Centre's {} (saw {ai_supply_cap})",
-            config::INDUSTRIAL_CENTER_SUPPLY
+            config::CITY_CENTRE_SUPPLY
         );
         assert!(
             max_pending_depot_builders <= 1,
@@ -1385,7 +1385,7 @@ mod tests {
     }
 
     #[test]
-    fn gather_command_ignores_nodes_without_nearby_completed_ic() {
+    fn gather_command_ignores_nodes_without_nearby_completed_cc() {
         let players = [PlayerInit {
             id: 1,
             name: "Solo".into(),
@@ -1399,18 +1399,18 @@ mod tests {
             .find(|e| e.owner == 1 && e.kind == EntityKind::Worker)
             .map(|e| e.id)
             .expect("starting worker");
-        let ic = game
+        let cc = game
             .entities
             .iter()
-            .find(|e| e.owner == 1 && e.kind == EntityKind::IndustrialCenter)
-            .expect("starting IC");
+            .find(|e| e.owner == 1 && e.kind == EntityKind::CityCentre)
+            .expect("starting City Centre");
         let world = game.map.world_size_px();
-        let far_x = if ic.pos_x < world * 0.5 {
+        let far_x = if cc.pos_x < world * 0.5 {
             world - config::TILE_SIZE as f32 * 0.5
         } else {
             config::TILE_SIZE as f32 * 0.5
         };
-        let far_y = if ic.pos_y < world * 0.5 {
+        let far_y = if cc.pos_y < world * 0.5 {
             world - config::TILE_SIZE as f32 * 0.5
         } else {
             config::TILE_SIZE as f32 * 0.5
@@ -1432,12 +1432,12 @@ mod tests {
         let worker_order = game.entities.get(worker).expect("worker survives").order();
         assert!(
             !matches!(worker_order, Order::Gather(_)),
-            "worker should ignore gather commands for patches outside IC mining range"
+            "worker should ignore gather commands for patches outside City Centre mining range"
         );
     }
 
     #[test]
-    fn active_mining_stops_when_nearby_ic_is_removed() {
+    fn active_mining_stops_when_nearby_cc_is_removed() {
         let players = [PlayerInit {
             id: 1,
             name: "Solo".into(),
@@ -1487,16 +1487,16 @@ mod tests {
         assert_eq!(
             game.entities.get(worker).and_then(|e| e.gather_phase()),
             Some(GatherPhase::Harvesting),
-            "worker should reach and latch the starting patch before the IC is removed"
+            "worker should reach and latch the starting patch before the City Centre is removed"
         );
 
-        let ic = game
+        let cc = game
             .entities
             .iter()
-            .find(|e| e.owner == 1 && e.kind == EntityKind::IndustrialCenter)
+            .find(|e| e.owner == 1 && e.kind == EntityKind::CityCentre)
             .map(|e| e.id)
-            .expect("starting IC");
-        game.entities.remove(ic);
+            .expect("starting City Centre");
+        game.entities.remove(cc);
         let steel_before = game.players.iter().find(|p| p.id == 1).unwrap().steel;
 
         for _ in 0..(config::HARVEST_TICKS + 5) {
@@ -1506,14 +1506,14 @@ mod tests {
         let steel_after = game.players.iter().find(|p| p.id == 1).unwrap().steel;
         assert_eq!(
             steel_after, steel_before,
-            "mining should not continue without an IC"
+            "mining should not continue without a City Centre"
         );
         assert!(
             !matches!(
                 game.entities.get(worker).map(|e| e.order()),
                 Some(Order::Gather(_))
             ),
-            "worker should go idle when its mining IC disappears"
+            "worker should go idle when its mining City Centre disappears"
         );
     }
 
@@ -1626,10 +1626,10 @@ mod tests {
 
             let mut all_player_dists: Vec<Vec<(EntityKind, f32)>> = Vec::new();
             for p in &game.players {
-                let ic = game
+                let cc = game
                     .entities
                     .iter()
-                    .find(|e| e.owner == p.id && e.kind == EntityKind::IndustrialCenter)
+                    .find(|e| e.owner == p.id && e.kind == EntityKind::CityCentre)
                     .expect("City Centre exists for every player");
 
                 let mut dists = Vec::new();
@@ -1637,23 +1637,23 @@ mod tests {
                     if e.owner != 0 || (!e.is_node()) {
                         continue;
                     }
-                    let d_x = e.pos_x - ic.pos_x;
-                    let d_y = e.pos_y - ic.pos_y;
+                    let d_x = e.pos_x - cc.pos_x;
+                    let d_y = e.pos_y - cc.pos_y;
                     let dist_tiles = (d_x * d_x + d_y * d_y).sqrt() / config::TILE_SIZE as f32;
 
                     // Only consider nodes that belong to this player's start cluster.
-                    if dist_tiles <= config::IC_RESOURCE_MAX_DIST_TILES + 1.0 {
+                    if dist_tiles <= config::CC_RESOURCE_MAX_DIST_TILES + 1.0 {
                         dists.push((e.kind, dist_tiles));
                         assert!(
-                            dist_tiles >= config::IC_RESOURCE_MIN_DIST_TILES,
-                            "player {} has a {:?} node too close ({:.2} tiles) to their IC",
+                            dist_tiles >= config::CC_RESOURCE_MIN_DIST_TILES,
+                            "player {} has a {:?} node too close ({:.2} tiles) to their City Centre",
                             p.id,
                             e.kind,
                             dist_tiles
                         );
                         assert!(
-                            dist_tiles <= config::IC_RESOURCE_MAX_DIST_TILES,
-                            "player {} has a {:?} node too far ({:.2} tiles) from their IC",
+                            dist_tiles <= config::CC_RESOURCE_MAX_DIST_TILES,
+                            "player {} has a {:?} node too far ({:.2} tiles) from their City Centre",
                             p.id,
                             e.kind,
                             dist_tiles

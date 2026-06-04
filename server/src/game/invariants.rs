@@ -513,8 +513,8 @@ mod tests {
     use crate::game::{Game, PlayerInit};
     use crate::protocol::{kinds, terrain};
 
-    /// Steel patch placement must stay within IC distance bounds for any STEEL_PATCHES_PER_BASE.
-    /// Regression: doubling patches to 24 caused rows 2/3 to exceed IC_RESOURCE_MAX_DIST_TILES.
+    /// Steel patch placement must stay within City Centre distance bounds for any STEEL_PATCHES_PER_BASE.
+    /// Regression: doubling patches to 24 caused rows 2/3 to exceed CC_RESOURCE_MAX_DIST_TILES.
     #[test]
     fn steel_patch_grid_fits_within_distance_bounds() {
         // Game::new triggers spawn_player_base which debug_asserts every patch is in bounds.

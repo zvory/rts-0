@@ -1824,7 +1824,7 @@ impl PlayerMilestones {
             out.push("oil-worker".to_string());
         }
         if goal.require_depot_supply
-            && (!self.depot_started || self.max_supply_cap <= config::INDUSTRIAL_CENTER_SUPPLY)
+            && (!self.depot_started || self.max_supply_cap <= config::CITY_CENTRE_SUPPLY)
         {
             out.push("depot-supply".to_string());
         }
@@ -2120,7 +2120,7 @@ fn known_kind(kind: &str) -> bool {
             | kinds::MACHINE_GUNNER
             | kinds::AT_TEAM
             | kinds::TANK
-            | kinds::INDUSTRIAL_CENTER
+            | kinds::CITY_CENTRE
             | kinds::DEPOT
             | kinds::BARRACKS
             | kinds::TRAINING_CENTRE
@@ -2410,7 +2410,7 @@ fn rifle_flood_fast_goal() -> PlayerMilestoneGoal {
         ..PlayerMilestoneGoal::default()
     }
     .with_min_workers(config::STARTING_WORKERS + 1)
-    .with_min_supply_cap(config::INDUSTRIAL_CENTER_SUPPLY + config::DEPOT_SUPPLY)
+    .with_min_supply_cap(config::CITY_CENTRE_SUPPLY + config::DEPOT_SUPPLY)
     .with_min_units(kinds::RIFLEMAN, 1)
     .with_min_attack_command_units(1)
 }
@@ -2423,7 +2423,7 @@ fn rifle_flood_full_saturation_goal() -> PlayerMilestoneGoal {
         ..PlayerMilestoneGoal::default()
     }
     .with_min_workers(12)
-    .with_min_supply_cap(config::INDUSTRIAL_CENTER_SUPPLY + config::DEPOT_SUPPLY)
+    .with_min_supply_cap(config::CITY_CENTRE_SUPPLY + config::DEPOT_SUPPLY)
     .with_min_units(kinds::RIFLEMAN, 6)
     .with_min_attack_command_units(6)
 }
@@ -2436,7 +2436,7 @@ fn rifle_flood_full_saturation_under_proxy_pressure_goal() -> PlayerMilestoneGoa
         ..PlayerMilestoneGoal::default()
     }
     .with_min_workers(config::STARTING_WORKERS + 4)
-    .with_min_supply_cap(config::INDUSTRIAL_CENTER_SUPPLY + config::DEPOT_SUPPLY)
+    .with_min_supply_cap(config::CITY_CENTRE_SUPPLY + config::DEPOT_SUPPLY)
     .with_min_units(kinds::RIFLEMAN, 1)
     .with_min_attack_command_units(1)
 }
@@ -2452,7 +2452,7 @@ fn tech_to_tanks_goal() -> PlayerMilestoneGoal {
         ..PlayerMilestoneGoal::default()
     }
     .with_min_workers(8)
-    .with_min_supply_cap(config::INDUSTRIAL_CENTER_SUPPLY + config::DEPOT_SUPPLY)
+    .with_min_supply_cap(config::CITY_CENTRE_SUPPLY + config::DEPOT_SUPPLY)
     .with_min_buildings(kinds::TRAINING_CENTRE, 1)
     .with_min_buildings(kinds::FACTORY, 1)
     .with_min_units(kinds::TANK, 1)
@@ -2468,7 +2468,7 @@ fn tech_to_tanks_under_pressure_goal() -> PlayerMilestoneGoal {
         ..PlayerMilestoneGoal::default()
     }
     .with_min_workers(8)
-    .with_min_supply_cap(config::INDUSTRIAL_CENTER_SUPPLY + config::DEPOT_SUPPLY)
+    .with_min_supply_cap(config::CITY_CENTRE_SUPPLY + config::DEPOT_SUPPLY)
     .with_min_buildings(kinds::TRAINING_CENTRE, 1)
     .with_min_buildings(kinds::FACTORY, 1)
     .allowing_elimination_before_milestones()
@@ -3110,7 +3110,7 @@ fn pending_build_tracker_keeps_moving_worker_past_stale_window() {
         10,
         &[Command::Build {
             worker: 2,
-            building: EntityKind::IndustrialCenter,
+            building: EntityKind::CityCentre,
             tile_x: 48,
             tile_y: 70,
         }],
@@ -3135,7 +3135,7 @@ fn pending_build_tracker_expires_stuck_worker() {
         10,
         &[Command::Build {
             worker: 2,
-            building: EntityKind::IndustrialCenter,
+            building: EntityKind::CityCentre,
             tile_x: 48,
             tile_y: 70,
         }],
@@ -3148,7 +3148,7 @@ fn pending_build_tracker_expires_stuck_worker() {
     tracker.observe(pending_tracker_view(stale_tick, &start, &stale_snapshot));
 
     assert!(tracker.intents().is_empty());
-    assert!(tracker.failed(EntityKind::IndustrialCenter, 48, 70));
+    assert!(tracker.failed(EntityKind::CityCentre, 48, 70));
 }
 
 /// Two fresh games with the same scripted players must evolve identically tick-for-tick.

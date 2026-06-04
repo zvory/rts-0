@@ -382,8 +382,8 @@ mod tests {
             10.5 * config::TILE_SIZE as f32,
             20.5 * config::TILE_SIZE as f32,
         );
-        let in_range = (config::IC_RESOURCE_MAX_DIST_TILES - 0.25) * config::TILE_SIZE as f32;
-        let out_of_range = (config::IC_RESOURCE_MAX_DIST_TILES + 2.0) * config::TILE_SIZE as f32;
+        let in_range = (config::CC_RESOURCE_MAX_DIST_TILES - 0.25) * config::TILE_SIZE as f32;
+        let out_of_range = (config::CC_RESOURCE_MAX_DIST_TILES + 2.0) * config::TILE_SIZE as f32;
         let snapshot = Snapshot {
             tick: 0,
             steel: 0,

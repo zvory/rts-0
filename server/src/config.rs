@@ -64,16 +64,16 @@ pub const OIL_PATCHES_PER_BASE: u32 = 3;
 
 /// Minimum distance (in tiles) from a City Centre's center to any starting resource node.
 /// Prevents resources from spawning inside or too close to the building footprint.
-pub const IC_RESOURCE_MIN_DIST_TILES: f32 = 3.5;
+pub const CC_RESOURCE_MIN_DIST_TILES: f32 = 3.5;
 
 /// Maximum distance (in tiles) from a City Centre's center to any starting resource node.
 /// Ensures no player is advantaged by resources being too far away.
-pub const IC_RESOURCE_MAX_DIST_TILES: f32 = 7.0;
+pub const CC_RESOURCE_MAX_DIST_TILES: f32 = 7.0;
 
 /// Maximum distance (in tiles) from a completed City Centre's center to a resource node for
 /// workers to mine that node. Matches the starting resource layout bound so every main patch is
 /// usable from the starting City Centre.
-pub const MINING_IC_RANGE_TILES: f32 = IC_RESOURCE_MAX_DIST_TILES;
+pub const MINING_CC_RANGE_TILES: f32 = CC_RESOURCE_MAX_DIST_TILES;
 
 /// Distance (in tiles) from the City Centre to the center of the steel patch block.
 pub const STEEL_BLOCK_DIST_TILES: f32 = 5.0;
@@ -82,7 +82,7 @@ pub const STEEL_BLOCK_DIST_TILES: f32 = 5.0;
 pub const OIL_DIST_TILES: f32 = 6.0;
 
 // --- Supply -----------------------------------------------------------------
-pub const INDUSTRIAL_CENTER_SUPPLY: u32 = 10;
+pub const CITY_CENTRE_SUPPLY: u32 = 10;
 pub const DEPOT_SUPPLY: u32 = 8;
 pub const SUPPLY_CAP_MAX: u32 = 200;
 
