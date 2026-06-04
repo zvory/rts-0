@@ -1762,6 +1762,7 @@ where
     if counts.incomplete + counts.intended >= profile.buildings.max_pending_per_kind {
         return None;
     }
+    let build_search = build_search_for_kind(build_search, kind);
     let empty = BTreeSet::new();
     actions::try_build(
         actions,
@@ -1776,6 +1777,17 @@ where
             placeable: |tx, ty| placeable(kind, tx, ty),
         },
     )
+}
+
+fn build_search_for_kind(
+    mut build_search: ai_shared::BuildSearch,
+    kind: EntityKind,
+) -> ai_shared::BuildSearch {
+    if kind == EntityKind::TankFactory {
+        build_search.prefer_away_from_center = false;
+        build_search.prefer_toward_center = true;
+    }
+    build_search
 }
 
 fn desired_oil_workers(
@@ -2404,6 +2416,7 @@ mod tests {
                 min_radius: 0,
                 max_radius: 0,
                 prefer_away_from_center: false,
+                prefer_toward_center: false,
             },
             |_, tx, ty| tx < width && ty < height,
         )
@@ -3169,6 +3182,7 @@ mod tests {
                 min_radius: 0,
                 max_radius: 0,
                 prefer_away_from_center: false,
+                prefer_toward_center: false,
             },
             |_, tx, ty| tx < map_size && ty < map_size,
         );
