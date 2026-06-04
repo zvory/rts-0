@@ -397,9 +397,9 @@ spatial indexes across later mutations.
 `services::line_of_sight` owns static terrain raycasts used by fog and combat. Stone/rock tiles
 block vision and ranged attacks. Fog may reveal the blocking stone tile itself, but not tiles
 behind it. Combat auto-acquisition only considers enemies with a clear line; explicit attack
-orders may chase toward a blocked target but cannot fire until the shot is clear. Overpenetration
-also stops at static LOS blockers. Future forest visibility/cover rules should extend the terrain
-rules and this service instead of adding ad hoc checks to fog or combat.
+orders may chase toward a terrain-blocked target but cannot fire until the shot is clear. Future
+forest visibility/cover rules should extend the terrain rules and this service instead of adding
+ad hoc checks to fog or combat.
 
 `services::geometry` owns shared body primitives: infantry unit bodies are circles centered on
 `(x, y)` with the configured unit radius, tanks use an oriented vehicle hull derived from their
