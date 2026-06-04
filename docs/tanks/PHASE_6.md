@@ -38,6 +38,33 @@ This phase makes the work shippable. It confirms the game still works end to end
 contract, and records the gameplay impact so future changes do not accidentally undo the new tank
 model.
 
+## Implementation Audit
+
+- `DESIGN.md` now records the implemented tank hull dimensions, standability contract, collision
+  behavior, route-following lookahead, reverse/pivot thresholds, traffic braking, oil burn, and the
+  current balance table.
+- `server/src/config.rs` and `client/src/config.js` already mirror the tank body values:
+  `42px` length, `24px` width, and `1.5px` clearance. No config code change was needed for Phase 6.
+- The current tank locomotion model has bounded hull turn and per-tick throttle scaling, but no
+  persistent velocity or acceleration state. Alignment, traffic, and zero-oil checks are the
+  implemented braking mechanisms.
+
+## Patch Notes
+
+- Tanks now use a documented oriented hull footprint for movement legality, selection affordances,
+  placement previews, and collision instead of relying on a circular approximation.
+- Tank hulls turn at a bounded rate, pivot in place when badly misaligned, reverse only for nearby
+  behind-the-hull goals, and slow down for sharp alignment errors or frontal traffic.
+- Tanks keep moving while their turret tracks and fires; plain move orders only opportunistically
+  shoot enemies already in range, while attack-move can chase to a standoff firing point.
+- Tank movement oil burn remains distance-based: crossing one full 96-tile map width costs about
+  10 oil, and tanks stop advancing while their owner has zero oil.
+- Current tank balance is unchanged in Phase 6: 390 hp, 60 damage, 3-tile range, 72-tick cooldown,
+  2.0 px/tick speed, 7-tile sight, 200 steel plus 150 oil, 6 supply, and 750-tick build time.
+- Strategic impact to watch in playtests: body-aware collision and slower turning make unsupported
+  tanks less able to slide through congested bases or tight corners, while open lanes remain their
+  intended strength.
+
 ## Expected Code Touches
 
 - `DESIGN.md`
@@ -56,4 +83,3 @@ movement assumptions.
 - `DESIGN.md` matches the implemented behavior.
 - Patch notes explain the player-facing movement and balance impact.
 - The remaining risks are explicit and assigned to follow-up work.
-
