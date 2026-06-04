@@ -619,7 +619,6 @@ export const SOUND_MANIFEST = Object.freeze([
   { id: "notice_out_of_range", url: "/assets/sound/alert/alert_out_of_range_01.mp3",  category: "alert" },
   { id: "build_confirm",       url: "/assets/sound/buildings/buildings_construction_start_01.mp3", category: "ui" },
   { id: "combat_tank_01",      url: "/assets/sound/combat/combat_tank_cannon_01.mp3", category: "combat_other" },
-  { id: "combat_tank_06",      url: "/assets/sound/combat/combat_tank_cannon_06.mp3", category: "combat_other" },
   { id: "combat_rifle_02",     url: "/assets/sound/combat/combat_kar98k_02.mp3", category: "combat_other" },
   { id: "combat_rifle_03",     url: "/assets/sound/combat/combat_kar98k_03.mp3", category: "combat_other" },
   { id: "combat_mg_burst_02",  url: "/assets/sound/combat/combat_mg42_burst_02.mp3", category: "combat_other" },
