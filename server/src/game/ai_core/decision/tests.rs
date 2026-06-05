@@ -450,7 +450,7 @@ fn fast_flood_sends_proxy_worker_before_barracks_is_affordable() {
         .commands
         .iter()
         .find_map(|command| match command {
-            Command::Move { units, x, y } if units.as_slice() == [20] => Some((*x, *y)),
+            Command::Move { units, x, y, .. } if units.as_slice() == [20] => Some((*x, *y)),
             _ => None,
         })
         .expect("proxy worker should receive a move command");
@@ -536,6 +536,7 @@ fn fast_flood_initial_affordable_proxy_uses_hidden_edge_target() {
                 building,
                 tile_x,
                 tile_y,
+                ..
             } if *building == EntityKind::Barracks => Some((*worker, (*tile_x, *tile_y))),
             _ => None,
         })
@@ -588,6 +589,7 @@ fn fast_flood_builds_proxy_barracks_with_reserved_worker_once_affordable() {
                 building,
                 tile_x,
                 tile_y,
+                ..
             } if *building == EntityKind::Barracks => Some((*worker, (*tile_x, *tile_y))),
             _ => None,
         })
@@ -1782,7 +1784,7 @@ fn steel_expansion_tanks_sends_expansion_workers_to_expansion_steel() {
         decision.commands.iter().any(|command| {
             matches!(
                 command,
-                Command::Gather { units, node }
+                Command::Gather { units, node, .. }
                     if units.as_slice() == [90] && (300..318).contains(node)
             )
         }),
@@ -1821,7 +1823,7 @@ fn steel_expansion_tanks_stages_support_weapons_on_enemy_facing_main_steel_line(
         .commands
         .iter()
         .filter_map(|command| match command {
-            Command::AttackMove { units, x, y } if units.len() == 1 => Some((units[0], *x, *y)),
+            Command::AttackMove { units, x, y, .. } if units.len() == 1 => Some((units[0], *x, *y)),
             _ => None,
         })
         .collect();
@@ -2335,7 +2337,7 @@ fn visible_home_threat_preempts_outbound_tank_attack() {
     assert!(decision.commands.iter().any(|command| {
         matches!(
             command,
-            Command::Attack { units, target } if *target == 90 && units == &[30]
+            Command::Attack { units, target, .. } if *target == 90 && units == &[30]
         )
     }));
     assert!(
@@ -2379,7 +2381,7 @@ fn far_tank_is_not_recalled_for_home_threat() {
         !decision.commands.iter().any(|command| {
             matches!(
                 command,
-                Command::Attack { units, target } if *target == 90 && units == &[30]
+                Command::Attack { units, target, .. } if *target == 90 && units == &[30]
             )
         }),
         "far outbound tanks should not be pulled back by local defense"
@@ -2461,7 +2463,7 @@ fn full_saturation_rifle_wave_targets_visible_enemy_army() {
     assert!(decision.commands.iter().any(|command| {
         matches!(
             command,
-            Command::Attack { units, target }
+            Command::Attack { units, target, .. }
                 if units.as_slice() == [30, 31, 32, 33, 34, 35] && *target == 90
         )
     }));
@@ -2498,7 +2500,7 @@ fn moving_rifle_raid_targets_visible_workers_before_buildings() {
     assert!(decision.commands.iter().any(|command| {
         matches!(
             command,
-            Command::Attack { units, target } if units.as_slice() == [30] && *target == 90
+            Command::Attack { units, target, .. } if units.as_slice() == [30] && *target == 90
         )
     }));
 }
@@ -2531,7 +2533,7 @@ fn moving_rifle_raid_targets_visible_scout_car() {
     assert!(decision.commands.iter().any(|command| {
         matches!(
             command,
-            Command::Attack { units, target } if units.as_slice() == [30] && *target == 90
+            Command::Attack { units, target, .. } if units.as_slice() == [30] && *target == 90
         )
     }));
 }
@@ -2571,13 +2573,13 @@ fn local_defense_does_not_block_moving_raid_from_targeting_scout_car() {
     assert!(decision.commands.iter().any(|command| {
         matches!(
             command,
-            Command::Attack { units, target } if units.as_slice() == [20] && *target == 80
+            Command::Attack { units, target, .. } if units.as_slice() == [20] && *target == 80
         )
     }));
     assert!(decision.commands.iter().any(|command| {
         matches!(
             command,
-            Command::Attack { units, target } if units.as_slice() == [30] && *target == 90
+            Command::Attack { units, target, .. } if units.as_slice() == [30] && *target == 90
         )
     }));
 }
@@ -2620,7 +2622,7 @@ fn rifle_raid_attacks_buildings_after_reaching_enemy_main_steel_line_without_uni
     assert!(decision.commands.iter().any(|command| {
         matches!(
             command,
-            Command::Attack { units, target } if units.as_slice() == [30] && *target == 80
+            Command::Attack { units, target, .. } if units.as_slice() == [30] && *target == 80
         )
     }));
 }
@@ -2658,7 +2660,7 @@ fn rifle_raid_ignores_buildings_near_enemy_start_before_reaching_main_steel_line
         !decision.commands.iter().any(|command| {
             matches!(
                 command,
-                Command::Attack { units, target } if units.as_slice() == [30] && *target == 80
+                Command::Attack { units, target, .. } if units.as_slice() == [30] && *target == 80
             )
         }),
         "rifle raids should not switch to buildings until they reach the enemy main steel line"
@@ -2694,7 +2696,7 @@ fn moving_rifle_raid_ignores_visible_buildings_until_arrival() {
         !decision.commands.iter().any(|command| {
             matches!(
                 command,
-                Command::Attack { units, target } if units.as_slice() == [30] && *target == 80
+                Command::Attack { units, target, .. } if units.as_slice() == [30] && *target == 80
             )
         }),
         "moving rifle raids should keep moving past buildings"
@@ -2723,7 +2725,7 @@ fn idle_midfield_rifle_raid_resumes_after_cleared_fight() {
     assert!(decision.commands.iter().any(|command| {
         matches!(
             command,
-            Command::Move { units, x, y }
+            Command::Move { units, x, y, .. }
                 if units.as_slice() == [30] && *x > enemy_base.0 && *y > enemy_base.1
         )
     }));

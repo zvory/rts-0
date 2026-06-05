@@ -116,6 +116,7 @@ impl PendingBuildTracker {
                 building,
                 tile_x,
                 tile_y,
+                ..
             } = command
             else {
                 continue;

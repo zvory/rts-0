@@ -49,7 +49,14 @@ pub(crate) fn production_system(
             let Some((sx, sy)) = coordinator.find_spawn_point(entities, id, unit, rally) else {
                 continue;
             };
+            let spawn_facing = rally
+                .and_then(|rally| coordinator.rally_spawn_facing(entities, unit, (sx, sy), rally));
             if let Some(spawned) = entities.spawn_unit(owner, unit, sx, sy) {
+                if let Some(facing) = spawn_facing {
+                    if let Some(e) = entities.get_mut(spawned) {
+                        e.set_facing(facing);
+                    }
+                }
                 if let Some(b) = entities.get_mut(id) {
                     if let Some(queue) = b.prod_queue_mut() {
                         if !queue.is_empty() {
@@ -222,6 +229,10 @@ mod tests {
             factory_x
         );
         let spawned = entities.get(tank.0).expect("spawned tank");
+        assert_angle_close(
+            spawned.facing(),
+            (rally.1 - spawned.pos_y).atan2(rally.0 - spawned.pos_x),
+        );
         assert!(
             matches!(spawned.order(), Order::Move(_)),
             "spawned unit should receive a move order to the rally point"
@@ -231,6 +242,41 @@ mod tests {
         assert!(
             dist <= crate::config::TILE_SIZE as f32 * 4.0,
             "rally move goal should be near the rally point, was {dist} px away"
+        );
+    }
+
+    #[test]
+    fn rally_spawn_facing_falls_back_when_oriented_body_would_clip() {
+        let map = flat_map(16);
+        let mut entities = EntityStore::new();
+        spawn_factory(&map, &mut entities, 4, 4);
+        let spawn = map.tile_center(5, 3);
+        let rally = map.tile_center(5, 10);
+        let desired_facing = (rally.1 - spawn.1).atan2(rally.0 - spawn.0);
+        let occ = Occupancy::build(&map, &entities);
+        let mut pathing = PathingService::new(8_192, 256);
+        pathing.advance_tick(1);
+        let coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, 1);
+
+        assert!(
+            standability::unit_static_standable(&map, &occ, EntityKind::Tank, spawn.0, spawn.1),
+            "test setup needs a legal default-facing tank spawn"
+        );
+        assert!(
+            !standability::unit_static_standable_with_facing(
+                &map,
+                &occ,
+                EntityKind::Tank,
+                spawn.0,
+                spawn.1,
+                desired_facing,
+            ),
+            "test setup needs the rally-facing hull to clip the factory"
+        );
+        assert_eq!(
+            coordinator.rally_spawn_facing(&entities, EntityKind::Tank, spawn, rally),
+            None,
+            "rally-facing preference should be skipped when the rotated hull is illegal"
         );
     }
 
@@ -293,6 +339,15 @@ mod tests {
                 total: 1,
             });
         id
+    }
+
+    fn assert_angle_close(actual: f32, expected: f32) {
+        let delta = (actual - expected + std::f32::consts::PI).rem_euclid(std::f32::consts::TAU)
+            - std::f32::consts::PI;
+        assert!(
+            delta.abs() <= 0.001,
+            "expected angle {actual:.4} to be close to {expected:.4}"
+        );
     }
 
     fn tick_production(map: &Map, entities: &mut EntityStore, players: &mut [PlayerState]) {

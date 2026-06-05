@@ -264,6 +264,11 @@ function fakeAudioContext() {
       JSON.stringify({ c: "tearDownAtGuns", units: [3, 4] }),
     "tearDownAtGuns command builder emits the wire shape",
   );
+  assert(
+    JSON.stringify(cmd.move([1], 100, 200, true)) ===
+      JSON.stringify({ c: "move", units: [1], x: 100, y: 200, queued: true }),
+    "queued move command builder emits the queued flag only when requested",
+  );
   assert(AT_GUN_DEPLOYED_RANGE_TILES === 12, "client mirrors deployed AT gun range");
   assertApprox(
     AT_GUN_FIELD_OF_FIRE_RAD,

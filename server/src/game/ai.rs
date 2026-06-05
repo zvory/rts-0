@@ -195,6 +195,7 @@ fn emit_worker_retreat_commands(
                 units: vec![entity.id],
                 x: target_x,
                 y: target_y,
+                queued: false,
             },
         ));
     }
@@ -393,7 +394,7 @@ mod tests {
             *player_id == 2
                 && matches!(
                     command,
-                    Command::AttackMove { units, x, y }
+                    Command::AttackMove { units, x, y, .. }
                         if units.len() == RIFLE_FLOOD_FULL_SATURATION.attack.first_attack_size
                             && (*x - enemy_base.0).abs() <= f32::EPSILON
                             && (*y - enemy_base.1).abs() <= f32::EPSILON

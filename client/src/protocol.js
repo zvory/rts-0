@@ -440,16 +440,26 @@ export const msg = Object.freeze({
 });
 
 // --- Command builders (the `cmd` payload) ---
+function withQueued(command, queued) {
+  if (queued) command.queued = true;
+  return command;
+}
+
 export const cmd = Object.freeze({
-  move: (units, x, y) => ({ c: CMD.MOVE, units, x, y }),
-  attackMove: (units, x, y) => ({ c: CMD.ATTACK_MOVE, units, x, y }),
-  attack: (units, target) => ({ c: CMD.ATTACK, units, target }),
+  move: (units, x, y, queued = false) => withQueued({ c: CMD.MOVE, units, x, y }, queued),
+  attackMove: (units, x, y, queued = false) =>
+    withQueued({ c: CMD.ATTACK_MOVE, units, x, y }, queued),
+  attack: (units, target, queued = false) =>
+    withQueued({ c: CMD.ATTACK, units, target }, queued),
   setupAtGuns: (units, x, y) => ({ c: CMD.SETUP_AT_GUNS, units, x, y }),
   tearDownAtGuns: (units) => ({ c: CMD.TEAR_DOWN_AT_GUNS, units }),
-  gather: (units, node) => ({ c: CMD.GATHER, units, node }),
-  build: (worker, building, tileX, tileY) => ({ c: CMD.BUILD, worker, building, tileX, tileY }),
+  gather: (units, node, queued = false) =>
+    withQueued({ c: CMD.GATHER, units, node }, queued),
+  build: (worker, building, tileX, tileY, queued = false) =>
+    withQueued({ c: CMD.BUILD, worker, building, tileX, tileY }, queued),
   train: (building, unit) => ({ c: CMD.TRAIN, building, unit }),
   cancel: (building) => ({ c: CMD.CANCEL, building }),
   stop: (units) => ({ c: CMD.STOP, units }),
-  setRally: (building, x, y) => ({ c: CMD.SET_RALLY, building, x, y }),
+  setRally: (building, x, y, queued = false) =>
+    withQueued({ c: CMD.SET_RALLY, building, x, y }, queued),
 });

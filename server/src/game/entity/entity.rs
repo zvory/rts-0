@@ -6,8 +6,8 @@ use crate::rules;
 use super::EntityStateGroups;
 use super::{
     AttackPhase, BuildPhase, CombatState, ConstructionState, EntityKind, GatherPhase, MovePhase,
-    MovementState, Order, ProdItem, ProductionState, ResourceNodeState, WeaponSetup, WorkerState,
-    NEUTRAL,
+    MovementState, Order, OrderIntent, PointIntent, ProdItem, ProductionState, ResourceNodeState,
+    WeaponSetup, WorkerState, MAX_QUEUED_ORDERS, MAX_RALLY_STAGES, NEUTRAL,
 };
 
 /// A single simulation entity: unit, building, or resource node.
@@ -162,6 +162,41 @@ impl Entity {
     pub fn set_order(&mut self, order: Order) {
         if let Some(m) = self.movement.as_mut() {
             m.order = order;
+        }
+    }
+
+    #[allow(dead_code)]
+    pub fn queued_orders(&self) -> &[OrderIntent] {
+        self.movement
+            .as_ref()
+            .map(|m| m.queued_orders.as_slice())
+            .unwrap_or(&[])
+    }
+
+    pub fn clear_queued_orders(&mut self) {
+        if let Some(m) = self.movement.as_mut() {
+            m.queued_orders.clear();
+        }
+    }
+
+    pub fn append_queued_order(&mut self, intent: OrderIntent) -> bool {
+        let Some(m) = self.movement.as_mut() else {
+            return false;
+        };
+        if m.queued_orders.len() >= MAX_QUEUED_ORDERS {
+            return false;
+        }
+        m.queued_orders.push(intent);
+        true
+    }
+
+    #[allow(dead_code)]
+    pub fn pop_queued_order(&mut self) -> Option<OrderIntent> {
+        let m = self.movement.as_mut()?;
+        if m.queued_orders.is_empty() {
+            None
+        } else {
+            Some(m.queued_orders.remove(0))
         }
     }
 
@@ -478,6 +513,31 @@ impl Entity {
         }
     }
 
+    #[allow(dead_code)]
+    pub fn rally_stages(&self) -> &[PointIntent] {
+        self.production
+            .as_ref()
+            .map(|p| p.rally_queue.as_slice())
+            .unwrap_or(&[])
+    }
+
+    pub fn clear_rally_stages(&mut self) {
+        if let Some(p) = self.production.as_mut() {
+            p.rally_queue.clear();
+        }
+    }
+
+    pub fn append_rally_stage(&mut self, stage: PointIntent) -> bool {
+        let Some(p) = self.production.as_mut() else {
+            return false;
+        };
+        if p.rally_queue.len() >= MAX_RALLY_STAGES {
+            return false;
+        }
+        p.rally_queue.push(stage);
+        true
+    }
+
     pub fn under_construction(&self) -> bool {
         self.construction.is_some()
     }
@@ -607,6 +667,7 @@ impl Entity {
     pub fn clear_orders(&mut self) {
         if let Some(m) = self.movement.as_mut() {
             m.order = Order::Idle;
+            m.queued_orders.clear();
             m.path.clear();
         }
         self.set_target_id(None);

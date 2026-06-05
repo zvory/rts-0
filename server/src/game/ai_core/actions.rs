@@ -230,6 +230,7 @@ pub(crate) fn try_build_at(
         building,
         tile_x,
         tile_y,
+        queued: false,
     });
     Some(BuildAction {
         worker,
@@ -407,6 +408,7 @@ pub(crate) fn assign_workers_to_resource(
         ctx.emit_command(Command::Gather {
             units: vec![worker.id],
             node,
+            queued: false,
         });
         assignments.push(ResourceAssignment {
             worker: worker.id,
@@ -445,6 +447,7 @@ pub(crate) fn attack_move_units(
         units: units.clone(),
         x,
         y,
+        queued: false,
     });
     Some(units)
 }
@@ -465,6 +468,7 @@ pub(crate) fn move_units(
         units: units.clone(),
         x,
         y,
+        queued: false,
     });
     Some(units)
 }
@@ -483,6 +487,7 @@ pub(crate) fn attack_units(
     ctx.emit_command(Command::Attack {
         units: units.clone(),
         target,
+        queued: false,
     });
     Some(units)
 }
@@ -745,7 +750,7 @@ mod tests {
         assert_eq!(ctx.budget().steel, 0);
         assert!(matches!(
             ctx.into_commands().as_slice(),
-            [Command::Build { worker: 10, building, tile_x: 8, tile_y: 8 }]
+            [Command::Build { worker: 10, building, tile_x: 8, tile_y: 8, .. }]
                 if *building == EntityKind::Depot
         ));
     }
@@ -1090,7 +1095,7 @@ mod tests {
         assert_eq!(units, Some(vec![3, 4, 5]));
         assert!(matches!(
             ctx.into_commands().as_slice(),
-            [Command::AttackMove { units, x: 10.0, y: 20.0 }]
+            [Command::AttackMove { units, x: 10.0, y: 20.0, .. }]
                 if units == &vec![3, 4, 5]
         ));
     }
@@ -1115,7 +1120,7 @@ mod tests {
         assert_eq!(units, Some(vec![3, 4, 5]));
         assert!(matches!(
             ctx.into_commands().as_slice(),
-            [Command::Move { units, x: 10.0, y: 20.0 }]
+            [Command::Move { units, x: 10.0, y: 20.0, .. }]
                 if units == &vec![3, 4, 5]
         ));
     }
@@ -1140,7 +1145,7 @@ mod tests {
         assert_eq!(units, Some(vec![6, 8]));
         assert!(matches!(
             ctx.into_commands().as_slice(),
-            [Command::AttackMove { units, x: 64.0, y: 0.0 }]
+            [Command::AttackMove { units, x: 64.0, y: 0.0, .. }]
                 if units == &vec![6, 8]
         ));
     }

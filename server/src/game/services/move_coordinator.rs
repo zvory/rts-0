@@ -19,7 +19,10 @@ use crate::game::entity::{
 };
 use crate::game::map::Map;
 use crate::game::pathfinding::{self, Passability};
-use crate::game::services::geometry::{building_rect_for_entity, unit_body, RectBody, UnitBody};
+use crate::game::services::geometry::{
+    building_rect_for_entity, unit_bodies_intersect, unit_body, unit_body_for_entity,
+    unit_body_with_facing, RectBody, UnitBody,
+};
 use crate::game::services::interact_range_for_kind;
 use crate::game::services::occupancy::{
     building_footprint, footprint_center, footprint_tiles, Occupancy,
@@ -345,6 +348,47 @@ impl<'a> MoveCoordinator<'a> {
         }
 
         fallback.map(|(_, point)| point)
+    }
+
+    /// Prefer spawning oriented vehicles already facing the rally, but only if that body
+    /// orientation is legal at the chosen spawn point.
+    pub fn rally_spawn_facing(
+        &self,
+        entities: &EntityStore,
+        spawned_kind: EntityKind,
+        spawn: (f32, f32),
+        rally: (f32, f32),
+    ) -> Option<f32> {
+        if !uses_oriented_vehicle_body(spawned_kind) {
+            return None;
+        }
+
+        let dx = rally.0 - spawn.0;
+        let dy = rally.1 - spawn.1;
+        let facing = dy.atan2(dx);
+        if !facing.is_finite()
+            || !standability::unit_static_standable_with_facing(
+                self.map,
+                self.occ,
+                spawned_kind,
+                spawn.0,
+                spawn.1,
+                facing,
+            )
+        {
+            return None;
+        }
+
+        let body = unit_body_with_facing(spawned_kind, spawn.0, spawn.1, facing)?;
+        entities
+            .iter()
+            .all(|e| {
+                e.hp == 0
+                    || !e.is_unit()
+                    || unit_body_for_entity(e)
+                        .is_none_or(|existing| !unit_bodies_intersect(body, existing))
+            })
+            .then_some(facing)
     }
 
     // -------------------------------------------------------------------

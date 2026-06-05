@@ -217,6 +217,7 @@ fn tank_move_command_preserves_exact_goal_and_repeats_deterministically() {
             units: vec![tank],
             x: goal.0,
             y: goal.1,
+            queued: false,
         },
     );
     live.tick();
@@ -230,6 +231,7 @@ fn tank_move_command_preserves_exact_goal_and_repeats_deterministically() {
                 units: vec![tank],
                 x: goal.0,
                 y: goal.1,
+                queued: false,
             },
         }]
     );
@@ -255,6 +257,7 @@ fn tank_move_command_preserves_exact_goal_and_repeats_deterministically() {
                 units: vec![tank_a],
                 x: goal_a.0,
                 y: goal_a.1,
+                queued: false,
             },
         );
     }
@@ -777,6 +780,7 @@ fn gather_command_ignores_nodes_without_nearby_completed_cc() {
         Command::Gather {
             units: vec![worker],
             node: far_node,
+            queued: false,
         },
     );
     game.tick();
@@ -837,6 +841,7 @@ fn gather_command_to_occupied_patch_is_ignored() {
         Command::Gather {
             units: vec![ordered],
             node,
+            queued: false,
         },
     );
     game.tick();
@@ -892,6 +897,7 @@ fn worker_already_touching_resource_body_starts_harvesting() {
         Command::Gather {
             units: vec![worker],
             node,
+            queued: false,
         },
     );
     game.tick();
@@ -940,6 +946,7 @@ fn active_mining_stops_when_nearby_cc_is_removed() {
         Command::Gather {
             units: vec![worker],
             node,
+            queued: false,
         },
     );
     for _ in 0..600 {

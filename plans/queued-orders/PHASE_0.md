@@ -1,5 +1,7 @@
 # Phase 0 - Contract and Queue Foundation
 
+Status: Done.
+
 Goal: introduce the internal queue model and protocol contract without exposing queued orders to
 players yet.
 
@@ -46,4 +48,3 @@ small helper so later phases can add order kinds without changing every call sit
 - No player-visible queued behavior is required in this phase.
 - Existing non-queued commands behave exactly as before.
 - `cargo test` in `server/` should pass.
-

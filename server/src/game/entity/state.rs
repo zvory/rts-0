@@ -1,4 +1,4 @@
-use super::{EntityKind, Order};
+use super::{EntityKind, Order, OrderIntent, PointIntent};
 
 /// A queued production order on a building.
 #[derive(Debug, Clone)]
@@ -28,6 +28,8 @@ pub struct MovementState {
     pub facing: f32,
     /// Current high-level order / AI state.
     pub order: Order,
+    /// Future order intents appended by queued commands. These are inert until promoted.
+    pub queued_orders: Vec<OrderIntent>,
     /// Tile-center waypoints remaining to walk through (world pixels), in reverse order so
     /// the next waypoint is the last element (cheap `pop`). Empty when not moving.
     pub path: Vec<(f32, f32)>,
@@ -68,6 +70,7 @@ impl Default for MovementState {
         MovementState {
             facing: 0.0,
             order: Order::Idle,
+            queued_orders: Vec::new(),
             path: Vec::new(),
             last_repath_tick: 0,
             path_goal: None,
@@ -144,6 +147,9 @@ pub struct ProductionState {
     /// order to this point and the producer prefers the spawn exit closest to it. `None` = units
     /// spawn and idle next to the building (legacy behavior).
     pub rally_point: Option<(f32, f32)>,
+    /// Future rally stages. Phase 0 stores the shape only; production still consumes
+    /// `rally_point` until multi-stage rallies are exposed.
+    pub rally_queue: Vec<PointIntent>,
 }
 
 /// Construction progress state. Present only while a building is under construction.
