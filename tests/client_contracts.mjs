@@ -162,6 +162,12 @@ function fakeAudioContext() {
         null,
         200,
         9,
+        null,
+        null,
+        null,
+        null,
+        null,
+        [[128, 160], [192, 224, true]],
       ],
       [
         2,
@@ -216,9 +222,19 @@ function fakeAudioContext() {
   assert(decoded.entities[0].state === STATE.GATHER, "entity state code decodes");
   assert(decoded.entities[0].weaponFacing === 1.75, "entity optional weaponFacing decodes");
   assert(decoded.entities[0].latchedNode === 200, "entity optional latchedNode decodes");
+  assert(decoded.entities[0].queuedMarkers.length === 2, "entity queued markers decode");
+  assert(
+    decoded.entities[0].queuedMarkers[0].attackMove === false &&
+      decoded.entities[0].queuedMarkers[1].attackMove === true,
+    "queued marker attack-move flavor decodes",
+  );
   assert(decoded.entities[1].setupState === SETUP.DEPLOYED, "entity setupState code decodes");
   assert(decoded.entities[2].prodKind === KIND.WORKER, "entity prodKind code decodes");
   assert(decoded.entities[2].prodProgress === 0.25, "entity prodProgress decodes");
+  assert(
+    decoded.entities[2].queuedMarkers === undefined,
+    "compact snapshot tolerates missing queued marker fields",
+  );
   assert(decoded.resourceDeltas[0].remaining === 1498, "resource deltas decode");
   assert(decoded.events[0].e === EVENT.ATTACK && decoded.events[0].to === 7, "attack event decodes");
   assert(decoded.events[1].kind === KIND.STEEL, "death event kind decodes");
@@ -250,6 +266,39 @@ function fakeAudioContext() {
         e: new Array(20001),
       }),
     "compact snapshot enforces entity count bounds",
+  );
+  assertThrows(
+    () =>
+      decodeServerMessage({
+        t: "snapshot",
+        v: COMPACT_SNAPSHOT_VERSION,
+        s: [1, 0, 0, 0, 0],
+        e: [[
+          1,
+          1,
+          KIND_CODE[KIND.WORKER],
+          0,
+          0,
+          1,
+          1,
+          STATE_CODE[STATE.IDLE],
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          new Array(9),
+        ]],
+      }),
+    "compact snapshot enforces queued marker bounds",
   );
 }
 

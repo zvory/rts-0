@@ -177,6 +177,7 @@ const NOTICE_SEVERITY_BY_CODE = Object.freeze({
 const MAX_COMPACT_ENTITIES = 20000;
 const MAX_COMPACT_RESOURCE_DELTAS = 20000;
 const MAX_COMPACT_EVENTS = 5000;
+const MAX_COMPACT_QUEUED_MARKERS = 8;
 
 /**
  * Expand server messages into the semantic shapes the rest of the client expects.
@@ -231,7 +232,7 @@ function decodeCompactPlayerResource(record, index) {
 }
 
 function decodeCompactEntity(record, index) {
-  const fields = readArray(record, `entity ${index}`, 21);
+  const fields = readArray(record, `entity ${index}`, 22);
   if (fields.length < 8) throw new Error(`entity ${index} is too short`);
   const entity = {
     id: readU32(fields[0], "entity.id"),
@@ -257,6 +258,7 @@ function decodeCompactEntity(record, index) {
   assignRally(entity, fields, 18);
   assignOptional(entity, "oilUsed", fields, 19, readNumber);
   assignOptional(entity, "setupFacing", fields, 20, readNumber);
+  assignQueuedMarkers(entity, fields, 21);
   return entity;
 }
 
@@ -266,6 +268,25 @@ function assignRally(target, fields, index) {
   const pair = readArray(fields[index], "entity.rally", 2);
   if (pair.length !== 2) throw new Error("entity.rally must have two elements");
   target.rally = [readNumber(pair[0], "entity.rally.x"), readNumber(pair[1], "entity.rally.y")];
+}
+
+/** Decode owner-only queued point markers into `entity.queuedMarkers`. */
+function assignQueuedMarkers(target, fields, index) {
+  if (index >= fields.length || fields[index] == null) return;
+  const markers = readArray(fields[index], "entity.queuedMarkers", MAX_COMPACT_QUEUED_MARKERS);
+  target.queuedMarkers = markers.map((record, markerIndex) => {
+    const marker = readArray(record, `entity.queuedMarkers.${markerIndex}`, 3);
+    if (marker.length !== 2 && marker.length !== 3) {
+      throw new Error(`entity.queuedMarkers.${markerIndex} field count mismatch`);
+    }
+    return {
+      x: readNumber(marker[0], `entity.queuedMarkers.${markerIndex}.x`),
+      y: readNumber(marker[1], `entity.queuedMarkers.${markerIndex}.y`),
+      attackMove: marker.length > 2
+        ? readBool(marker[2], `entity.queuedMarkers.${markerIndex}.attackMove`)
+        : false,
+    };
+  });
 }
 
 function decodeCompactResourceDelta(record, index) {
@@ -398,6 +419,11 @@ function readU32(value, name) {
     throw new Error(`${name} must be a u32`);
   }
   return number;
+}
+
+function readBool(value, name) {
+  if (typeof value !== "boolean") throw new Error(`${name} must be a boolean`);
+  return value;
 }
 
 function readCode(value, table, name) {
