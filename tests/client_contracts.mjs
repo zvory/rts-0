@@ -17,7 +17,10 @@ import {
 } from "../client/src/config.js";
 import { HUD, formatTankOilUsed, playerHasCompletedKind } from "../client/src/hud.js";
 import { Audio } from "../client/src/audio.js";
-import { machineGunnerHasAudibleTarget } from "../client/src/combat_audio.js";
+import {
+  attackKindHasCombatSound,
+  machineGunnerHasAudibleTarget,
+} from "../client/src/combat_audio.js";
 import {
   COMPACT_SNAPSHOT_VERSION,
   EVENT,
@@ -1056,6 +1059,11 @@ function fakeAudioContext() {
     }),
     "non-MG targets do not hold the MG combat loop",
   );
+  assert(
+    !attackKindHasCombatSound(KIND.WORKER),
+    "worker attacks are silent instead of falling back to rifle shots",
+  );
+  assert(attackKindHasCombatSound(KIND.RIFLEMAN), "rifleman attacks still play combat sounds");
 }
 
 console.log("✅ client_contracts.mjs: all contract assertions passed");

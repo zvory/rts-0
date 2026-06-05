@@ -11,3 +11,7 @@ export function machineGunnerHasAudibleTarget(e) {
     typeof e.targetId === "number"
   );
 }
+
+export function attackKindHasCombatSound(kind) {
+  return kind !== KIND.WORKER;
+}
