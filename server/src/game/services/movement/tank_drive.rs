@@ -171,10 +171,18 @@ pub(super) fn vehicle_traffic_adjustment(
 
 fn vehicle_body_half_width_with_clearance(kind: EntityKind) -> f32 {
     match kind {
+        EntityKind::AtTeam => config::AT_GUN_BODY_WIDTH_PX * 0.5 + config::AT_GUN_BODY_CLEARANCE_PX,
         EntityKind::ScoutCar => {
             config::SCOUT_CAR_BODY_WIDTH_PX * 0.5 + config::SCOUT_CAR_BODY_CLEARANCE_PX
         }
         _ => config::TANK_BODY_WIDTH_PX * 0.5 + config::TANK_BODY_CLEARANCE_PX,
+    }
+}
+
+pub(super) fn vehicle_body_turn_rate(kind: EntityKind) -> f32 {
+    match kind {
+        EntityKind::AtTeam => AT_GUN_BODY_TURN_RATE_RAD_PER_TICK,
+        _ => TANK_BODY_TURN_RATE_RAD_PER_TICK,
     }
 }
 

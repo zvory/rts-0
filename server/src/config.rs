@@ -124,6 +124,9 @@ pub const SUPPLY_CAP_MAX: u32 = 200;
 pub const TANK_BODY_LENGTH_PX: f32 = 50.4;
 pub const TANK_BODY_WIDTH_PX: f32 = 28.8;
 pub const TANK_BODY_CLEARANCE_PX: f32 = 1.5;
+pub const AT_GUN_BODY_LENGTH_PX: f32 = 42.0;
+pub const AT_GUN_BODY_WIDTH_PX: f32 = 24.0;
+pub const AT_GUN_BODY_CLEARANCE_PX: f32 = 1.0;
 pub const SCOUT_CAR_BODY_LENGTH_PX: f32 = 40.8;
 pub const SCOUT_CAR_BODY_WIDTH_PX: f32 = 21.6;
 pub const SCOUT_CAR_BODY_CLEARANCE_PX: f32 = 1.0;
@@ -153,10 +156,13 @@ impl UnitStats {
     }
 }
 
-/// Tile clearance radius for coarse A* by kind. Vehicles stay point-sized here because static
-/// segment legality is checked with their oriented hulls.
+/// Tile clearance radius for coarse A* by kind. Oriented bodies stay point-sized here because
+/// static segment legality is checked with their hulls.
 pub fn unit_radius_tiles(kind: EntityKind) -> u32 {
-    if matches!(kind, EntityKind::ScoutCar | EntityKind::Tank) {
+    if matches!(
+        kind,
+        EntityKind::AtTeam | EntityKind::ScoutCar | EntityKind::Tank
+    ) {
         return 0;
     }
     unit_stats(kind)

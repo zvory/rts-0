@@ -135,7 +135,7 @@ export function vehicleBody(e, pad) {
 }
 
 export function isVehicleBodyKind(kind) {
-  return kind === KIND.TANK || kind === KIND.SCOUT_CAR;
+  return kind === KIND.AT_TEAM || kind === KIND.TANK || kind === KIND.SCOUT_CAR;
 }
 
 export function orientedBoxIntersectsRect(body, minX, minY, maxX, maxY) {

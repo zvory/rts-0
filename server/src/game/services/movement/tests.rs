@@ -420,6 +420,10 @@ fn tank_body_half_width() -> f32 {
     config::TANK_BODY_WIDTH_PX * 0.5 + config::TANK_BODY_CLEARANCE_PX
 }
 
+fn at_gun_body_half_len() -> f32 {
+    config::AT_GUN_BODY_LENGTH_PX * 0.5 + config::AT_GUN_BODY_CLEARANCE_PX
+}
+
 fn scout_car_body_half_width() -> f32 {
     config::SCOUT_CAR_BODY_WIDTH_PX * 0.5 + config::SCOUT_CAR_BODY_CLEARANCE_PX
 }
@@ -668,6 +672,52 @@ fn tank_infantry_overlap_resolves_from_oriented_hull() {
     assert!(
         rifleman_after.0 > rifleman_before.0,
         "soft infantry should absorb the tank-front overlap"
+    );
+}
+
+#[test]
+fn at_gun_infantry_overlap_resolves_from_oriented_body() {
+    let map = flat_map(1);
+    let mut entities = EntityStore::new();
+    let (cx, cy) = map.tile_center(20, 20);
+    let at_gun = entities
+        .spawn_unit(1, EntityKind::AtTeam, cx, cy)
+        .expect("AT gun spawn");
+    if let Some(e) = entities.get_mut(at_gun) {
+        e.set_facing(0.0);
+    }
+    let rifle_radius = config::unit_stats(EntityKind::Rifleman)
+        .expect("rifleman stats")
+        .radius;
+    let rifleman = entities
+        .spawn_unit(
+            2,
+            EntityKind::Rifleman,
+            cx + at_gun_body_half_len() + rifle_radius - 4.0,
+            cy,
+        )
+        .expect("rifleman spawn");
+    mark_moving(&mut entities, rifleman, (cx + 128.0, cy));
+    let at_gun_before = pos(&entities, at_gun);
+    let rifleman_before = pos(&entities, rifleman);
+
+    let occ = Occupancy::build(&map, &entities);
+    let spatial = SpatialIndex::build(&entities, map.size);
+    resolve_collisions(&mut entities, &spatial, &map, &occ);
+
+    let at_gun_after = pos(&entities, at_gun);
+    let rifleman_after = pos(&entities, rifleman);
+    assert!(
+        body_overlap_depth(&entities, at_gun, rifleman) <= COLLISION_EPS_PX,
+        "oriented AT gun body and infantry circle should separate"
+    );
+    assert!(
+        (at_gun_after.1 - at_gun_before.1).abs() <= 0.001,
+        "front collision should not sidestep the AT gun sideways"
+    );
+    assert!(
+        rifleman_after.0 > rifleman_before.0,
+        "soft infantry should absorb the AT gun-front overlap"
     );
 }
 
@@ -3529,6 +3579,36 @@ fn tank_body_facing_turns_gradually_along_path() {
     assert!(
         facing > 0.0 && facing <= TANK_BODY_TURN_RATE_RAD_PER_TICK + 0.0001,
         "tank body should turn by at most the turn-rate constant, got {facing:.4}"
+    );
+}
+
+#[test]
+fn at_gun_body_uses_tank_drive_turning_along_path() {
+    let map = flat_map(1);
+    let mut entities = EntityStore::new();
+    let (sx, sy) = map.tile_center(20, 20);
+    let (_, gy) = map.tile_center(20, 26);
+    let at_gun = entities
+        .spawn_unit(1, EntityKind::AtTeam, sx, sy)
+        .expect("AT gun should spawn");
+    if let Some(e) = entities.get_mut(at_gun) {
+        e.set_facing(0.0);
+    }
+    set_path_direct(&mut entities, at_gun, vec![(sx, gy)]);
+
+    let occ = Occupancy::build(&map, &entities);
+    let spatial = SpatialIndex::build(&entities, map.size);
+    movement_system(&map, &mut entities, &mut [], &occ, &spatial, 0);
+
+    let e = entities.get(at_gun).expect("AT gun should exist");
+    assert!(
+        e.facing() > 0.0 && e.facing() <= AT_GUN_BODY_TURN_RATE_RAD_PER_TICK + 0.0001,
+        "AT gun body should turn by at most the support-weapon turn-rate constant, got {:.4}",
+        e.facing()
+    );
+    assert!(
+        moved_distance((sx, sy), (e.pos_x, e.pos_y)) < 0.01,
+        "AT gun should pivot before driving when the target is far off its facing"
     );
 }
 

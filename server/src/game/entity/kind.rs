@@ -106,11 +106,14 @@ impl std::fmt::Display for EntityKind {
 }
 
 pub(crate) fn uses_oriented_vehicle_body(kind: EntityKind) -> bool {
-    matches!(kind, EntityKind::Tank | EntityKind::ScoutCar)
+    matches!(
+        kind,
+        EntityKind::AtTeam | EntityKind::ScoutCar | EntityKind::Tank
+    )
 }
 
 pub(crate) fn uses_tank_movement_semantics(kind: EntityKind) -> bool {
-    matches!(kind, EntityKind::Tank)
+    matches!(kind, EntityKind::AtTeam | EntityKind::Tank)
 }
 
 pub(crate) fn uses_car_movement_semantics(kind: EntityKind) -> bool {
