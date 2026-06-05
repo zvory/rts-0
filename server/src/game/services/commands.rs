@@ -102,9 +102,12 @@ pub(crate) fn apply_commands(
                     e.set_facing(facing);
                     e.set_weapon_facing(facing);
                     e.set_desired_weapon_facing(facing);
-                    e.set_weapon_setup(WeaponSetup::SettingUp {
-                        ticks: config::MACHINE_GUNNER_SETUP_TICKS,
-                    });
+                    let ticks = if matches!(e.weapon_setup(), WeaponSetup::Packed) {
+                        config::AT_TEAM_SETUP_TICKS
+                    } else {
+                        config::AT_TEAM_SETUP_TICKS.saturating_mul(2)
+                    };
+                    e.set_weapon_setup(WeaponSetup::SettingUp { ticks });
                     e.reset_gather_state();
                     let (px, py) = (e.pos_x, e.pos_y);
                     e.reset_stuck(px, py);
@@ -128,7 +131,7 @@ pub(crate) fn apply_commands(
                         e.clear_orders();
                         e.set_path_goal(None);
                         e.set_weapon_setup(WeaponSetup::TearingDown {
-                            ticks: config::MACHINE_GUNNER_SETUP_TICKS,
+                            ticks: config::AT_TEAM_SETUP_TICKS,
                         });
                     }
                 }

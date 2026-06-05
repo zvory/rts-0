@@ -114,7 +114,7 @@ pub(super) fn deployed_weapon_ready_to_fire(entities: &mut EntityStore, id: u32)
         WeaponSetup::Deployed => true,
         WeaponSetup::Packed => {
             e.set_weapon_setup(WeaponSetup::SettingUp {
-                ticks: config::MACHINE_GUNNER_SETUP_TICKS,
+                ticks: setup_ticks_for(e.kind),
             });
             false
         }
@@ -133,11 +133,18 @@ pub(super) fn deployed_weapon_ready_to_move(entities: &mut EntityStore, id: u32)
         WeaponSetup::Packed => true,
         WeaponSetup::Deployed | WeaponSetup::SettingUp { .. } => {
             e.set_weapon_setup(WeaponSetup::TearingDown {
-                ticks: config::MACHINE_GUNNER_SETUP_TICKS,
+                ticks: setup_ticks_for(e.kind),
             });
             false
         }
         WeaponSetup::TearingDown { .. } => false,
+    }
+}
+
+pub(super) fn setup_ticks_for(kind: EntityKind) -> u16 {
+    match kind {
+        EntityKind::AtTeam => config::AT_TEAM_SETUP_TICKS,
+        _ => config::MACHINE_GUNNER_SETUP_TICKS,
     }
 }
 

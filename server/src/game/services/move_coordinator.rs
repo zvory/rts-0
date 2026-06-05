@@ -558,9 +558,11 @@ fn begin_deployed_weapon_teardown(e: &mut crate::game::entity::Entity) {
         return;
     }
     if !matches!(e.weapon_setup(), WeaponSetup::Packed) {
-        e.set_weapon_setup(WeaponSetup::TearingDown {
-            ticks: config::MACHINE_GUNNER_SETUP_TICKS,
-        });
+        let ticks = match e.kind {
+            EntityKind::AtTeam => config::AT_TEAM_SETUP_TICKS,
+            _ => config::MACHINE_GUNNER_SETUP_TICKS,
+        };
+        e.set_weapon_setup(WeaponSetup::TearingDown { ticks });
     }
 }
 
