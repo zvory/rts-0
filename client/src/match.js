@@ -104,13 +104,20 @@ export class Match {
     this.onGiveUpOpen = this.openGiveUpConfirm.bind(this);
     this.onGiveUpCancel = this.closeGiveUpConfirm.bind(this);
     this.onGiveUpConfirm = this.requestGiveUp.bind(this);
+    this.onPointerLockToggle = this.togglePointerLock.bind(this);
+    this.onPointerLockChange = this.handlePointerLockChange.bind(this);
+    this.onPointerLockError = this.handlePointerLockError.bind(this);
+    this.input.onPointerLockChange = this.onPointerLockChange;
+    this.input.onPointerLockError = this.onPointerLockError;
     this.net.on(S.SNAPSHOT, this.onSnapshot);
     window.addEventListener("resize", this.onResize);
     window.addEventListener("keydown", this.onMenuKeyDown, true);
     dom.settingsButton?.addEventListener("click", this.onSettingsClick);
+    dom.pointerLockToggle?.addEventListener("click", this.onPointerLockToggle);
     dom.giveUpOpen?.addEventListener("click", this.onGiveUpOpen);
     dom.giveUpCancel?.addEventListener("click", this.onGiveUpCancel);
     dom.giveUpConfirmButton?.addEventListener("click", this.onGiveUpConfirm);
+    this.syncPointerLockUi();
 
     this.rafId = requestAnimationFrame(this.tickFn);
 
@@ -163,6 +170,7 @@ export class Match {
   toggleSettingsMenu() {
     if (!dom.settingsMenu || this.giveUpSent) return;
     if (dom.giveUpConfirm && !dom.giveUpConfirm.hidden) this.closeGiveUpConfirm();
+    this.syncPointerLockUi();
     dom.settingsMenu.hidden = !dom.settingsMenu.hidden;
     dom.settingsButton?.setAttribute("aria-expanded", String(!dom.settingsMenu.hidden));
   }
@@ -204,6 +212,42 @@ export class Match {
       dom.giveUpConfirmButton.textContent = "Giving up...";
     }
     this.net.giveUp();
+  }
+
+  togglePointerLock() {
+    if (!this.input?.pointerLockSupported()) {
+      this.toast("Cursor lock is not supported by this browser.");
+      this.syncPointerLockUi();
+      return;
+    }
+    if (!this.input.pointerLocked) this.closeSettingsMenu();
+    void this.input.togglePointerLock();
+  }
+
+  handlePointerLockChange(locked) {
+    if (locked) {
+      this.closeSettingsMenu();
+      this.toast("Cursor locked. Press Esc to unlock.");
+    }
+    this.syncPointerLockUi();
+  }
+
+  handlePointerLockError() {
+    this.toast("Cursor lock was blocked. Click the game view and try again.");
+    this.syncPointerLockUi();
+  }
+
+  syncPointerLockUi() {
+    const btn = dom.pointerLockToggle;
+    if (!btn || !this.input) return;
+    const supported = this.input.pointerLockSupported();
+    const locked = this.input.pointerLocked;
+    btn.disabled = !supported;
+    btn.setAttribute("aria-checked", String(locked));
+    btn.textContent = locked ? "Cursor locked (Esc)" : "Lock cursor pan";
+    btn.title = supported
+      ? "Trap the cursor in the game view for multi-monitor edge panning."
+      : "Cursor lock is not supported by this browser.";
   }
 
   /** Compute world/viewport sizes and push them into the camera. */
@@ -457,6 +501,7 @@ export class Match {
     window.removeEventListener("resize", this.onResize);
     window.removeEventListener("keydown", this.onMenuKeyDown, true);
     dom.settingsButton?.removeEventListener("click", this.onSettingsClick);
+    dom.pointerLockToggle?.removeEventListener("click", this.onPointerLockToggle);
     dom.giveUpOpen?.removeEventListener("click", this.onGiveUpOpen);
     dom.giveUpCancel?.removeEventListener("click", this.onGiveUpCancel);
     dom.giveUpConfirmButton?.removeEventListener("click", this.onGiveUpConfirm);
