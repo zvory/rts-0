@@ -9,6 +9,7 @@ const CIRCLE_COLLISION_EPS_PX: f32 = 0.001;
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub(crate) enum UnitBody {
     Circle(CircleBody),
+    OrientedCapsule(OrientedCapsuleBody),
     OrientedBox(OrientedBoxBody),
 }
 
@@ -25,6 +26,15 @@ pub(crate) struct OrientedBoxBody {
     pub y: f32,
     pub half_len: f32,
     pub half_width: f32,
+    pub facing: f32,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(crate) struct OrientedCapsuleBody {
+    pub x: f32,
+    pub y: f32,
+    pub half_segment: f32,
+    pub radius: f32,
     pub facing: f32,
 }
 
@@ -56,6 +66,7 @@ impl UnitBody {
     pub(crate) fn bounding_radius(self) -> f32 {
         match self {
             UnitBody::Circle(body) => body.radius,
+            UnitBody::OrientedCapsule(body) => body.half_segment + body.radius,
             UnitBody::OrientedBox(body) => {
                 (body.half_len * body.half_len + body.half_width * body.half_width).sqrt()
             }
@@ -70,6 +81,15 @@ impl UnitBody {
                 max_x: body.x + body.radius,
                 max_y: body.y + body.radius,
             },
+            UnitBody::OrientedCapsule(body) => {
+                let (fx, fy) = body.forward_axis();
+                BodyAabb {
+                    min_x: body.x - fx.abs() * body.half_segment - body.radius,
+                    min_y: body.y - fy.abs() * body.half_segment - body.radius,
+                    max_x: body.x + fx.abs() * body.half_segment + body.radius,
+                    max_y: body.y + fy.abs() * body.half_segment + body.radius,
+                }
+            }
             UnitBody::OrientedBox(body) => {
                 let (fx, fy) = body.forward_axis();
                 let (sx, sy) = body.side_axis();
@@ -97,6 +117,31 @@ impl OrientedBoxBody {
     }
 }
 
+impl OrientedCapsuleBody {
+    fn forward_axis(self) -> (f32, f32) {
+        (self.facing.cos(), self.facing.sin())
+    }
+
+    fn side_axis(self) -> (f32, f32) {
+        let (fx, fy) = self.forward_axis();
+        (-fy, fx)
+    }
+
+    fn endpoints(self) -> ((f32, f32), (f32, f32)) {
+        let (fx, fy) = self.forward_axis();
+        (
+            (
+                self.x - fx * self.half_segment,
+                self.y - fy * self.half_segment,
+            ),
+            (
+                self.x + fx * self.half_segment,
+                self.y + fy * self.half_segment,
+            ),
+        )
+    }
+}
+
 pub(crate) fn unit_body(kind: EntityKind, x: f32, y: f32) -> Option<UnitBody> {
     unit_body_with_facing(kind, x, y, DEFAULT_FACING_RAD)
 }
@@ -114,6 +159,27 @@ pub(crate) fn unit_body_with_facing(
     let stats = config::unit_stats(kind)?;
     if !x.is_finite() || !y.is_finite() || !stats.radius.is_finite() || stats.radius <= 0.0 {
         return None;
+    }
+
+    if kind == EntityKind::ScoutCar {
+        let (length, width, clearance) = vehicle_body_dimensions(kind);
+        let radius = width * 0.5 + clearance;
+        let half_segment = (length * 0.5 - width * 0.5).max(0.0);
+        if !facing.is_finite()
+            || !half_segment.is_finite()
+            || !radius.is_finite()
+            || half_segment < 0.0
+            || radius <= 0.0
+        {
+            return None;
+        }
+        return Some(UnitBody::OrientedCapsule(OrientedCapsuleBody {
+            x,
+            y,
+            half_segment,
+            radius,
+            facing,
+        }));
     }
 
     if uses_oriented_vehicle_body(kind) {
@@ -229,6 +295,7 @@ pub(crate) fn unit_body_intersects_rect(body: UnitBody, rect: RectBody) -> bool 
     }
     match body {
         UnitBody::Circle(circle) => circle_intersects_rect(circle, rect),
+        UnitBody::OrientedCapsule(capsule) => capsule_intersects_rect(capsule, rect),
         UnitBody::OrientedBox(oriented) => oriented_box_intersects_rect(oriented, rect),
     }
 }
@@ -239,9 +306,18 @@ pub(crate) fn unit_bodies_intersect(a: UnitBody, b: UnitBody) -> bool {
     }
     match (a, b) {
         (UnitBody::Circle(a), UnitBody::Circle(b)) => circles_intersect(a, b),
+        (UnitBody::Circle(circle), UnitBody::OrientedCapsule(capsule))
+        | (UnitBody::OrientedCapsule(capsule), UnitBody::Circle(circle)) => {
+            circle_intersects_capsule(circle, capsule)
+        }
         (UnitBody::Circle(circle), UnitBody::OrientedBox(box_body))
         | (UnitBody::OrientedBox(box_body), UnitBody::Circle(circle)) => {
             circle_intersects_oriented_box(circle, box_body)
+        }
+        (UnitBody::OrientedCapsule(a), UnitBody::OrientedCapsule(b)) => capsules_intersect(a, b),
+        (UnitBody::OrientedCapsule(capsule), UnitBody::OrientedBox(box_body))
+        | (UnitBody::OrientedBox(box_body), UnitBody::OrientedCapsule(capsule)) => {
+            capsule_intersects_oriented_box(capsule, box_body)
         }
         (UnitBody::OrientedBox(a), UnitBody::OrientedBox(b)) => oriented_boxes_intersect(a, b),
     }
@@ -254,11 +330,34 @@ pub(crate) fn unit_body_overlap(a: UnitBody, b: UnitBody) -> Option<BodyOverlap>
 
     let overlap = match (a, b) {
         (UnitBody::Circle(a), UnitBody::Circle(b)) => circle_circle_overlap(a, b),
+        (UnitBody::Circle(circle), UnitBody::OrientedCapsule(capsule)) => {
+            capsule_circle_overlap(capsule, circle).map(|overlap| BodyOverlap {
+                normal_x: -overlap.normal_x,
+                normal_y: -overlap.normal_y,
+                depth: overlap.depth,
+            })
+        }
         (UnitBody::Circle(circle), UnitBody::OrientedBox(box_body)) => {
             circle_oriented_box_overlap(circle, box_body)
         }
+        (UnitBody::OrientedCapsule(capsule), UnitBody::Circle(circle)) => {
+            capsule_circle_overlap(capsule, circle)
+        }
+        (UnitBody::OrientedCapsule(a), UnitBody::OrientedCapsule(b)) => {
+            capsule_capsule_overlap(a, b)
+        }
+        (UnitBody::OrientedCapsule(capsule), UnitBody::OrientedBox(box_body)) => {
+            capsule_oriented_box_overlap(capsule, box_body)
+        }
         (UnitBody::OrientedBox(box_body), UnitBody::Circle(circle)) => {
             circle_oriented_box_overlap(circle, box_body).map(|overlap| BodyOverlap {
+                normal_x: -overlap.normal_x,
+                normal_y: -overlap.normal_y,
+                depth: overlap.depth,
+            })
+        }
+        (UnitBody::OrientedBox(box_body), UnitBody::OrientedCapsule(capsule)) => {
+            capsule_oriented_box_overlap(capsule, box_body).map(|overlap| BodyOverlap {
                 normal_x: -overlap.normal_x,
                 normal_y: -overlap.normal_y,
                 depth: overlap.depth,
@@ -299,6 +398,7 @@ pub(crate) fn segment_intersects_unit_body(
     }
     match body {
         UnitBody::Circle(circle) => segment_intersects_circle(start, end, circle),
+        UnitBody::OrientedCapsule(body) => segment_intersects_capsule(start, end, body),
         UnitBody::OrientedBox(body) => segment_intersects_oriented_box(start, end, body),
     }
 }
@@ -349,6 +449,17 @@ fn oriented_box_intersects_rect(body: OrientedBoxBody, rect: RectBody) -> bool {
     })
 }
 
+fn capsule_intersects_rect(body: OrientedCapsuleBody, rect: RectBody) -> bool {
+    let (start, end) = body.endpoints();
+    segment_rect_distance_sq(start, end, rect) <= body.radius * body.radius
+}
+
+fn circle_intersects_capsule(circle: CircleBody, body: OrientedCapsuleBody) -> bool {
+    let (start, end) = body.endpoints();
+    let r = circle.radius + body.radius;
+    point_segment_distance_sq((circle.x, circle.y), start, end) <= r * r
+}
+
 fn circle_intersects_oriented_box(circle: CircleBody, body: OrientedBoxBody) -> bool {
     let (fx, fy) = body.forward_axis();
     let (sx, sy) = body.side_axis();
@@ -361,6 +472,30 @@ fn circle_intersects_oriented_box(circle: CircleBody, body: OrientedBoxBody) -> 
     let px = circle.x - closest_x;
     let py = circle.y - closest_y;
     px * px + py * py <= circle.radius * circle.radius
+}
+
+fn capsule_intersects_oriented_box(capsule: OrientedCapsuleBody, body: OrientedBoxBody) -> bool {
+    let (fx, fy) = body.forward_axis();
+    let (sx, sy) = body.side_axis();
+    let (start, end) = capsule.endpoints();
+    let local_start = (
+        (start.0 - body.x) * fx + (start.1 - body.y) * fy,
+        (start.0 - body.x) * sx + (start.1 - body.y) * sy,
+    );
+    let local_end = (
+        (end.0 - body.x) * fx + (end.1 - body.y) * fy,
+        (end.0 - body.x) * sx + (end.1 - body.y) * sy,
+    );
+    segment_rect_distance_sq(
+        local_start,
+        local_end,
+        RectBody {
+            min_x: -body.half_len,
+            min_y: -body.half_width,
+            max_x: body.half_len,
+            max_y: body.half_width,
+        },
+    ) <= capsule.radius * capsule.radius
 }
 
 fn oriented_boxes_intersect(a: OrientedBoxBody, b: OrientedBoxBody) -> bool {
@@ -382,6 +517,16 @@ fn oriented_boxes_intersect(a: OrientedBoxBody, b: OrientedBoxBody) -> bool {
     })
 }
 
+fn capsules_intersect(a: OrientedCapsuleBody, b: OrientedCapsuleBody) -> bool {
+    let (a_start, a_end) = a.endpoints();
+    let (b_start, b_end) = b.endpoints();
+    let (a_closest, b_closest) = closest_points_between_segments(a_start, a_end, b_start, b_end);
+    let dx = a_closest.0 - b_closest.0;
+    let dy = a_closest.1 - b_closest.1;
+    let r = a.radius + b.radius;
+    dx * dx + dy * dy <= r * r
+}
+
 fn circle_circle_overlap(a: CircleBody, b: CircleBody) -> Option<BodyOverlap> {
     let dx = b.x - a.x;
     let dy = b.y - a.y;
@@ -399,6 +544,32 @@ fn circle_circle_overlap(a: CircleBody, b: CircleBody) -> Option<BodyOverlap> {
         });
     }
 
+    let d = d2.sqrt();
+    Some(BodyOverlap {
+        normal_x: dx / d,
+        normal_y: dy / d,
+        depth: min_d - d,
+    })
+}
+
+fn capsule_circle_overlap(capsule: OrientedCapsuleBody, circle: CircleBody) -> Option<BodyOverlap> {
+    let (start, end) = capsule.endpoints();
+    let closest = closest_point_on_segment((circle.x, circle.y), start, end);
+    let dx = circle.x - closest.0;
+    let dy = circle.y - closest.1;
+    let min_d = capsule.radius + circle.radius;
+    let d2 = dx * dx + dy * dy;
+    if d2 + CIRCLE_COLLISION_EPS_PX >= min_d * min_d {
+        return None;
+    }
+    if d2 <= 1.0e-4 {
+        let fallback = capsule_center_normal(capsule, (circle.x, circle.y));
+        return Some(BodyOverlap {
+            normal_x: fallback.0,
+            normal_y: fallback.1,
+            depth: min_d,
+        });
+    }
     let d = d2.sqrt();
     Some(BodyOverlap {
         normal_x: dx / d,
@@ -451,6 +622,77 @@ fn circle_oriented_box_overlap(circle: CircleBody, body: OrientedBoxBody) -> Opt
             depth: y_depth,
         })
     }
+}
+
+fn capsule_capsule_overlap(a: OrientedCapsuleBody, b: OrientedCapsuleBody) -> Option<BodyOverlap> {
+    let (a_start, a_end) = a.endpoints();
+    let (b_start, b_end) = b.endpoints();
+    let (a_closest, b_closest) = closest_points_between_segments(a_start, a_end, b_start, b_end);
+    let dx = b_closest.0 - a_closest.0;
+    let dy = b_closest.1 - a_closest.1;
+    let min_d = a.radius + b.radius;
+    let d2 = dx * dx + dy * dy;
+    if d2 + CIRCLE_COLLISION_EPS_PX >= min_d * min_d {
+        return None;
+    }
+    if d2 <= 1.0e-4 {
+        let fallback = center_normal((a.x, a.y), (b.x, b.y)).unwrap_or_else(|| a.side_axis());
+        return Some(BodyOverlap {
+            normal_x: fallback.0,
+            normal_y: fallback.1,
+            depth: min_d,
+        });
+    }
+    let d = d2.sqrt();
+    Some(BodyOverlap {
+        normal_x: dx / d,
+        normal_y: dy / d,
+        depth: min_d - d,
+    })
+}
+
+fn capsule_oriented_box_overlap(
+    capsule: OrientedCapsuleBody,
+    body: OrientedBoxBody,
+) -> Option<BodyOverlap> {
+    let (bfx, bfy) = body.forward_axis();
+    let (bsx, bsy) = body.side_axis();
+    let (start, end) = capsule.endpoints();
+    let corners = oriented_box_corners(body);
+    let mut axes = [(0.0, 0.0); 6];
+    let mut axis_count = 2;
+    axes[0] = (bfx, bfy);
+    axes[1] = (bsx, bsy);
+    for corner in corners {
+        let closest = closest_point_on_segment(corner, start, end);
+        if let Some(axis) = normalized((corner.0 - closest.0, corner.1 - closest.1)) {
+            axes[axis_count] = axis;
+            axis_count += 1;
+        }
+    }
+
+    let mut best_axis = (1.0, 0.0);
+    let mut best_depth = f32::INFINITY;
+    for axis in axes.into_iter().take(axis_count) {
+        let (capsule_min, capsule_max) = project_capsule(capsule, axis);
+        let (box_min, box_max) = project_oriented_box(body, axis);
+        let depth = capsule_max.min(box_max) - capsule_min.max(box_min);
+        if depth <= 0.0 {
+            return None;
+        }
+        if depth < best_depth {
+            let center_delta = (body.x - capsule.x) * axis.0 + (body.y - capsule.y) * axis.1;
+            let sign = if center_delta >= 0.0 { 1.0 } else { -1.0 };
+            best_axis = (axis.0 * sign, axis.1 * sign);
+            best_depth = depth;
+        }
+    }
+
+    Some(BodyOverlap {
+        normal_x: best_axis.0,
+        normal_y: best_axis.1,
+        depth: best_depth,
+    })
 }
 
 fn oriented_box_overlap(a: OrientedBoxBody, b: OrientedBoxBody) -> Option<BodyOverlap> {
@@ -524,6 +766,55 @@ fn segment_intersects_circle(
         .min_by(|a, b| a.total_cmp(b))
 }
 
+fn segment_intersects_capsule(
+    start: (f32, f32),
+    end: (f32, f32),
+    body: OrientedCapsuleBody,
+) -> Option<f32> {
+    let (fx, fy) = body.forward_axis();
+    let (sx, sy) = body.side_axis();
+    let local_start = (
+        (start.0 - body.x) * fx + (start.1 - body.y) * fy,
+        (start.0 - body.x) * sx + (start.1 - body.y) * sy,
+    );
+    let local_end = (
+        (end.0 - body.x) * fx + (end.1 - body.y) * fy,
+        (end.0 - body.x) * sx + (end.1 - body.y) * sy,
+    );
+
+    let mut best: Option<f32> = None;
+    if body.half_segment > 0.0 {
+        best = segment_intersection_min(
+            best,
+            segment_intersects_rect(
+                local_start,
+                local_end,
+                RectBody {
+                    min_x: -body.half_segment,
+                    min_y: -body.radius,
+                    max_x: body.half_segment,
+                    max_y: body.radius,
+                },
+            ),
+        );
+    }
+    for cap_x in [-body.half_segment, body.half_segment] {
+        best = segment_intersection_min(
+            best,
+            segment_intersects_circle(
+                local_start,
+                local_end,
+                CircleBody {
+                    x: cap_x,
+                    y: 0.0,
+                    radius: body.radius,
+                },
+            ),
+        );
+    }
+    best
+}
+
 fn segment_intersects_oriented_box(
     start: (f32, f32),
     end: (f32, f32),
@@ -551,6 +842,15 @@ fn segment_intersects_oriented_box(
     )
 }
 
+fn segment_intersection_min(current: Option<f32>, candidate: Option<f32>) -> Option<f32> {
+    match (current, candidate) {
+        (Some(a), Some(b)) => Some(a.min(b)),
+        (Some(a), None) => Some(a),
+        (None, Some(b)) => Some(b),
+        (None, None) => None,
+    }
+}
+
 fn clip_segment_axis(
     origin: f32,
     delta: f32,
@@ -573,6 +873,162 @@ fn clip_segment_axis(
     *t_min <= *t_max
 }
 
+fn segment_rect_distance_sq(start: (f32, f32), end: (f32, f32), rect: RectBody) -> f32 {
+    if segment_intersects_rect(start, end, rect).is_some() {
+        return 0.0;
+    }
+
+    let mut best = point_rect_distance_sq(start, rect).min(point_rect_distance_sq(end, rect));
+    let corners = [
+        (rect.min_x, rect.min_y),
+        (rect.max_x, rect.min_y),
+        (rect.max_x, rect.max_y),
+        (rect.min_x, rect.max_y),
+    ];
+    for i in 0..4 {
+        let edge_start = corners[i];
+        let edge_end = corners[(i + 1) % 4];
+        let (a, b) = closest_points_between_segments(start, end, edge_start, edge_end);
+        let dx = a.0 - b.0;
+        let dy = a.1 - b.1;
+        best = best.min(dx * dx + dy * dy);
+    }
+    best
+}
+
+fn point_rect_distance_sq(point: (f32, f32), rect: RectBody) -> f32 {
+    let x = point.0.clamp(rect.min_x, rect.max_x);
+    let y = point.1.clamp(rect.min_y, rect.max_y);
+    let dx = point.0 - x;
+    let dy = point.1 - y;
+    dx * dx + dy * dy
+}
+
+fn point_segment_distance_sq(point: (f32, f32), start: (f32, f32), end: (f32, f32)) -> f32 {
+    let closest = closest_point_on_segment(point, start, end);
+    let dx = point.0 - closest.0;
+    let dy = point.1 - closest.1;
+    dx * dx + dy * dy
+}
+
+fn closest_point_on_segment(point: (f32, f32), start: (f32, f32), end: (f32, f32)) -> (f32, f32) {
+    let dx = end.0 - start.0;
+    let dy = end.1 - start.1;
+    let len_sq = dx * dx + dy * dy;
+    if len_sq <= f32::EPSILON {
+        return start;
+    }
+    let t = (((point.0 - start.0) * dx + (point.1 - start.1) * dy) / len_sq).clamp(0.0, 1.0);
+    (start.0 + dx * t, start.1 + dy * t)
+}
+
+fn closest_points_between_segments(
+    p1: (f32, f32),
+    q1: (f32, f32),
+    p2: (f32, f32),
+    q2: (f32, f32),
+) -> ((f32, f32), (f32, f32)) {
+    let d1 = (q1.0 - p1.0, q1.1 - p1.1);
+    let d2 = (q2.0 - p2.0, q2.1 - p2.1);
+    let r = (p1.0 - p2.0, p1.1 - p2.1);
+    let a = dot(d1, d1);
+    let e = dot(d2, d2);
+    let f = dot(d2, r);
+
+    let (s, t) = if a <= f32::EPSILON && e <= f32::EPSILON {
+        (0.0, 0.0)
+    } else if a <= f32::EPSILON {
+        (0.0, (f / e).clamp(0.0, 1.0))
+    } else {
+        let c = dot(d1, r);
+        if e <= f32::EPSILON {
+            ((-c / a).clamp(0.0, 1.0), 0.0)
+        } else {
+            let b = dot(d1, d2);
+            let denom = a * e - b * b;
+            let mut s = if denom.abs() > f32::EPSILON {
+                ((b * f - c * e) / denom).clamp(0.0, 1.0)
+            } else {
+                0.0
+            };
+            let mut t = (b * s + f) / e;
+            if t < 0.0 {
+                t = 0.0;
+                s = (-c / a).clamp(0.0, 1.0);
+            } else if t > 1.0 {
+                t = 1.0;
+                s = ((b - c) / a).clamp(0.0, 1.0);
+            }
+            (s, t)
+        }
+    };
+
+    (
+        (p1.0 + d1.0 * s, p1.1 + d1.1 * s),
+        (p2.0 + d2.0 * t, p2.1 + d2.1 * t),
+    )
+}
+
+fn oriented_box_corners(body: OrientedBoxBody) -> [(f32, f32); 4] {
+    let (fx, fy) = body.forward_axis();
+    let (sx, sy) = body.side_axis();
+    [
+        (
+            body.x - fx * body.half_len - sx * body.half_width,
+            body.y - fy * body.half_len - sy * body.half_width,
+        ),
+        (
+            body.x + fx * body.half_len - sx * body.half_width,
+            body.y + fy * body.half_len - sy * body.half_width,
+        ),
+        (
+            body.x + fx * body.half_len + sx * body.half_width,
+            body.y + fy * body.half_len + sy * body.half_width,
+        ),
+        (
+            body.x - fx * body.half_len + sx * body.half_width,
+            body.y - fy * body.half_len + sy * body.half_width,
+        ),
+    ]
+}
+
+fn project_capsule(body: OrientedCapsuleBody, axis: (f32, f32)) -> (f32, f32) {
+    let (start, end) = body.endpoints();
+    let a = dot(start, axis);
+    let b = dot(end, axis);
+    (a.min(b) - body.radius, a.max(b) + body.radius)
+}
+
+fn project_oriented_box(body: OrientedBoxBody, axis: (f32, f32)) -> (f32, f32) {
+    let (fx, fy) = body.forward_axis();
+    let (sx, sy) = body.side_axis();
+    let center = body.x * axis.0 + body.y * axis.1;
+    let extent =
+        body.half_len * dot_abs(axis, (fx, fy)) + body.half_width * dot_abs(axis, (sx, sy));
+    (center - extent, center + extent)
+}
+
+fn capsule_center_normal(capsule: OrientedCapsuleBody, other_center: (f32, f32)) -> (f32, f32) {
+    center_normal((capsule.x, capsule.y), other_center).unwrap_or_else(|| capsule.forward_axis())
+}
+
+fn center_normal(from: (f32, f32), to: (f32, f32)) -> Option<(f32, f32)> {
+    normalized((to.0 - from.0, to.1 - from.1))
+}
+
+fn normalized(v: (f32, f32)) -> Option<(f32, f32)> {
+    let len_sq = v.0 * v.0 + v.1 * v.1;
+    if len_sq <= 1.0e-4 {
+        return None;
+    }
+    let len = len_sq.sqrt();
+    Some((v.0 / len, v.1 / len))
+}
+
+fn dot(a: (f32, f32), b: (f32, f32)) -> f32 {
+    a.0 * b.0 + a.1 * b.1
+}
+
 fn dot_abs(a: (f32, f32), b: (f32, f32)) -> f32 {
     (a.0 * b.0 + a.1 * b.1).abs()
 }
@@ -580,6 +1036,7 @@ fn dot_abs(a: (f32, f32), b: (f32, f32)) -> f32 {
 fn valid_unit_body(body: UnitBody) -> bool {
     match body {
         UnitBody::Circle(circle) => valid_circle(circle),
+        UnitBody::OrientedCapsule(body) => valid_oriented_capsule(body),
         UnitBody::OrientedBox(body) => valid_oriented_box(body),
     }
 }
@@ -599,6 +1056,16 @@ fn valid_oriented_box(body: OrientedBoxBody) -> bool {
         && body.facing.is_finite()
         && body.half_len >= 0.0
         && body.half_width >= 0.0
+}
+
+fn valid_oriented_capsule(body: OrientedCapsuleBody) -> bool {
+    body.x.is_finite()
+        && body.y.is_finite()
+        && body.half_segment.is_finite()
+        && body.radius.is_finite()
+        && body.facing.is_finite()
+        && body.half_segment >= 0.0
+        && body.radius >= 0.0
 }
 
 fn valid_rect(rect: RectBody) -> bool {
@@ -683,6 +1150,134 @@ mod tests {
 
         assert!(!unit_body_intersects_rect(legal, rect));
         assert!(unit_body_intersects_rect(illegal, rect));
+    }
+
+    #[test]
+    fn scout_car_body_uses_capsule_aabb() {
+        let body =
+            unit_body_with_facing(EntityKind::ScoutCar, 100.0, 120.0, 0.0).expect("scout car body");
+        let UnitBody::OrientedCapsule(capsule) = body else {
+            panic!("scout car should use capsule body");
+        };
+
+        let expected_radius =
+            config::SCOUT_CAR_BODY_WIDTH_PX * 0.5 + config::SCOUT_CAR_BODY_CLEARANCE_PX;
+        let expected_half_segment =
+            config::SCOUT_CAR_BODY_LENGTH_PX * 0.5 - config::SCOUT_CAR_BODY_WIDTH_PX * 0.5;
+        assert!((capsule.radius - expected_radius).abs() <= 0.001);
+        assert!((capsule.half_segment - expected_half_segment).abs() <= 0.001);
+
+        let aabb = body.aabb();
+        let expected_half_len = expected_half_segment + expected_radius;
+        assert!((aabb.min_x - (100.0 - expected_half_len)).abs() <= 0.001);
+        assert!((aabb.max_x - (100.0 + expected_half_len)).abs() <= 0.001);
+        assert!((aabb.min_y - (120.0 - expected_radius)).abs() <= 0.001);
+        assert!((aabb.max_y - (120.0 + expected_radius)).abs() <= 0.001);
+    }
+
+    #[test]
+    fn scout_car_capsule_rejects_building_intersection() {
+        let rect = building_rect_for_footprint(EntityKind::Depot, 4, 4).expect("depot rect");
+        let radius = config::SCOUT_CAR_BODY_WIDTH_PX * 0.5 + config::SCOUT_CAR_BODY_CLEARANCE_PX;
+        let half_segment =
+            config::SCOUT_CAR_BODY_LENGTH_PX * 0.5 - config::SCOUT_CAR_BODY_WIDTH_PX * 0.5;
+        let legal = unit_body_with_facing(
+            EntityKind::ScoutCar,
+            rect.min_x - half_segment - radius - 0.1,
+            rect.min_y + 32.0,
+            0.0,
+        )
+        .expect("scout car body");
+        let illegal = unit_body_with_facing(
+            EntityKind::ScoutCar,
+            rect.min_x - half_segment - radius + 0.1,
+            rect.min_y + 32.0,
+            0.0,
+        )
+        .expect("scout car body");
+
+        assert!(!unit_body_intersects_rect(legal, rect));
+        assert!(unit_body_intersects_rect(illegal, rect));
+    }
+
+    #[test]
+    fn scout_car_capsule_shaves_former_rectangular_corner() {
+        let rect = building_rect_for_footprint(EntityKind::Depot, 4, 4).expect("depot rect");
+        let radius = config::SCOUT_CAR_BODY_WIDTH_PX * 0.5 + config::SCOUT_CAR_BODY_CLEARANCE_PX;
+        let half_segment =
+            config::SCOUT_CAR_BODY_LENGTH_PX * 0.5 - config::SCOUT_CAR_BODY_WIDTH_PX * 0.5;
+        let cap_corner_gap = radius * 0.72;
+        let x = rect.min_x - cap_corner_gap - half_segment;
+        let y = rect.min_y - cap_corner_gap;
+        let capsule =
+            unit_body_with_facing(EntityKind::ScoutCar, x, y, 0.0).expect("scout car body");
+        let former_box = UnitBody::OrientedBox(OrientedBoxBody {
+            x,
+            y,
+            half_len: config::SCOUT_CAR_BODY_LENGTH_PX * 0.5 + config::SCOUT_CAR_BODY_CLEARANCE_PX,
+            half_width: radius,
+            facing: 0.0,
+        });
+
+        assert!(
+            unit_body_intersects_rect(former_box, rect),
+            "the old rectangular scout car corner should clip the building"
+        );
+        assert!(
+            !unit_body_intersects_rect(capsule, rect),
+            "the rounded capsule corner should clear the building"
+        );
+    }
+
+    #[test]
+    fn capsule_overlaps_circle_and_oriented_box_deterministically() {
+        let capsule = UnitBody::OrientedCapsule(OrientedCapsuleBody {
+            x: 100.0,
+            y: 100.0,
+            half_segment: 10.0,
+            radius: 5.0,
+            facing: 0.0,
+        });
+        let circle = UnitBody::Circle(CircleBody {
+            x: 118.0,
+            y: 100.0,
+            radius: 5.0,
+        });
+        let box_body = UnitBody::OrientedBox(OrientedBoxBody {
+            x: 118.0,
+            y: 100.0,
+            half_len: 5.0,
+            half_width: 5.0,
+            facing: 0.0,
+        });
+
+        let circle_overlap =
+            unit_body_overlap(capsule, circle).expect("capsule should overlap circle");
+        assert!((circle_overlap.normal_x - 1.0).abs() <= 0.001);
+        assert!(circle_overlap.normal_y.abs() <= 0.001);
+        assert!((circle_overlap.depth - 2.0).abs() <= 0.001);
+
+        let box_overlap = unit_body_overlap(capsule, box_body).expect("capsule should overlap box");
+        let repeat =
+            unit_body_overlap(capsule, box_body).expect("capsule should overlap box again");
+        assert_eq!(box_overlap, repeat);
+        assert!(box_overlap.normal_x > 0.0);
+        assert!(box_overlap.depth > 0.0);
+    }
+
+    #[test]
+    fn segment_intersection_uses_scout_car_capsule_body() {
+        let body =
+            unit_body_with_facing(EntityKind::ScoutCar, 50.0, 50.0, 0.0).expect("scout car body");
+
+        assert!(
+            segment_intersects_unit_body((0.0, 50.0), (100.0, 50.0), body).is_some(),
+            "lengthwise segment should hit the capsule"
+        );
+        assert!(
+            segment_intersects_unit_body((0.0, 30.0), (100.0, 30.0), body).is_none(),
+            "segment outside the capsule radius should miss"
+        );
     }
 
     #[test]

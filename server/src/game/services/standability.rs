@@ -412,6 +412,92 @@ mod tests {
     }
 
     #[test]
+    fn scout_car_static_standability_allows_shaved_front_corner_clearance() {
+        let map = flat_map(12);
+        let mut entities = EntityStore::new();
+        let (bx, by) = footprint_center(&map, EntityKind::Depot, 4, 4);
+        entities
+            .spawn_building(1, EntityKind::Depot, bx, by, true)
+            .expect("depot should spawn");
+        let occ = Occupancy::build(&map, &entities);
+        let rect = building_rect_for_footprint(EntityKind::Depot, 4, 4).expect("depot rect");
+        let radius = config::SCOUT_CAR_BODY_WIDTH_PX * 0.5 + config::SCOUT_CAR_BODY_CLEARANCE_PX;
+        let half_segment =
+            config::SCOUT_CAR_BODY_LENGTH_PX * 0.5 - config::SCOUT_CAR_BODY_WIDTH_PX * 0.5;
+        let cap_corner_gap = radius * 0.72;
+
+        assert!(unit_static_standable_with_facing(
+            &map,
+            &occ,
+            EntityKind::ScoutCar,
+            rect.min_x - cap_corner_gap - half_segment,
+            rect.min_y - cap_corner_gap,
+            0.0,
+        ));
+    }
+
+    #[test]
+    fn scout_car_static_standability_allows_shaved_rear_corner_clearance() {
+        let map = flat_map(12);
+        let mut entities = EntityStore::new();
+        let (bx, by) = footprint_center(&map, EntityKind::Depot, 4, 4);
+        entities
+            .spawn_building(1, EntityKind::Depot, bx, by, true)
+            .expect("depot should spawn");
+        let occ = Occupancy::build(&map, &entities);
+        let rect = building_rect_for_footprint(EntityKind::Depot, 4, 4).expect("depot rect");
+        let radius = config::SCOUT_CAR_BODY_WIDTH_PX * 0.5 + config::SCOUT_CAR_BODY_CLEARANCE_PX;
+        let half_segment =
+            config::SCOUT_CAR_BODY_LENGTH_PX * 0.5 - config::SCOUT_CAR_BODY_WIDTH_PX * 0.5;
+        let cap_corner_gap = radius * 0.72;
+
+        assert!(unit_static_standable_with_facing(
+            &map,
+            &occ,
+            EntityKind::ScoutCar,
+            rect.max_x + cap_corner_gap + half_segment,
+            rect.min_y - cap_corner_gap,
+            0.0,
+        ));
+    }
+
+    #[test]
+    fn scout_car_static_standability_still_rejects_building_overlap_and_diagonal_pinch() {
+        let mut pinch_map = flat_map(12);
+        set_tile(&mut pinch_map, 4, 4, crate::protocol::terrain::WATER);
+        set_tile(&mut pinch_map, 5, 5, crate::protocol::terrain::ROCK);
+        let empty = EntityStore::new();
+        let pinch_occ = Occupancy::build(&pinch_map, &empty);
+
+        assert!(!unit_static_standable_with_facing(
+            &pinch_map,
+            &pinch_occ,
+            EntityKind::ScoutCar,
+            5.0 * config::TILE_SIZE as f32,
+            5.0 * config::TILE_SIZE as f32,
+            std::f32::consts::FRAC_PI_4,
+        ));
+
+        let map = flat_map(12);
+        let mut entities = EntityStore::new();
+        let (bx, by) = footprint_center(&map, EntityKind::Depot, 4, 4);
+        entities
+            .spawn_building(1, EntityKind::Depot, bx, by, true)
+            .expect("depot should spawn");
+        let occ = Occupancy::build(&map, &entities);
+        let rect = building_rect_for_footprint(EntityKind::Depot, 4, 4).expect("depot rect");
+
+        assert!(!unit_static_standable_with_facing(
+            &map,
+            &occ,
+            EntityKind::ScoutCar,
+            rect.min_x + 16.0,
+            rect.min_y + 16.0,
+            0.0,
+        ));
+    }
+
+    #[test]
     fn build_intent_ignores_only_the_chosen_builder_body() {
         let map = flat_map(12);
         let mut entities = EntityStore::new();

@@ -5,7 +5,8 @@ use crate::game::map::Map;
 use crate::game::pathfinding::Passability;
 use crate::game::services::geometry::{
     building_rect_for_footprint, tile_rect, unit_body_for_entity, unit_body_intersects_rect,
-    unit_body_overlap, unit_body_with_facing, CircleBody, OrientedBoxBody, UnitBody,
+    unit_body_overlap, unit_body_with_facing, CircleBody, OrientedBoxBody, OrientedCapsuleBody,
+    UnitBody,
 };
 use crate::game::services::move_coordinator::MoveCoordinator;
 use crate::game::services::occupancy::footprint_center;
@@ -439,6 +440,13 @@ fn expanded_body(body: UnitBody, extra_px: f32) -> UnitBody {
             x: body.x,
             y: body.y,
             radius: body.radius + extra_px,
+        }),
+        UnitBody::OrientedCapsule(body) => UnitBody::OrientedCapsule(OrientedCapsuleBody {
+            x: body.x,
+            y: body.y,
+            half_segment: body.half_segment,
+            radius: body.radius + extra_px,
+            facing: body.facing,
         }),
         UnitBody::OrientedBox(body) => UnitBody::OrientedBox(OrientedBoxBody {
             x: body.x,
@@ -1465,14 +1473,15 @@ fn scout_car_phase0_blocked_nose_recovery_is_measurable() {
         "recovery fixture must never accept a clipping pose: {:?}",
         baseline
     );
+    baseline.assert_reference_envelope("blocked_nose_recovery");
     assert!(
-        baseline.static_blocked_step_attempts > 0,
-        "fixture should measure repeated blocked static step attempts: {:?}",
+        baseline.static_blocked_step_attempts == 0,
+        "capsule geometry should clear the former blocked-nose fixture without static step churn: {:?}",
         baseline
     );
     assert!(
-        baseline.reverse_recovery_activations >= 1,
-        "front-blocked scout car should inject reverse recovery: {:?}",
+        baseline.reverse_recovery_activations == 0,
+        "capsule geometry should not need reverse recovery in the former blocked-nose fixture: {:?}",
         baseline
     );
 }
@@ -1527,13 +1536,13 @@ fn scout_car_phase0_traffic_compression_near_factory() {
         baseline
     );
     assert!(
-        baseline.final_error_px > config::TILE_SIZE as f32 * 4.0,
-        "phase-0 traffic fixture should reproduce the current scout-car wedge: {:?}",
+        baseline.final_error_px <= config::TILE_SIZE as f32,
+        "capsule geometry should keep the scout car mobile through traffic compression: {:?}",
         baseline
     );
     assert!(
-        baseline.reverse_recovery_activations > 0,
-        "wedged traffic should trigger measurable reverse recovery attempts: {:?}",
+        baseline.reverse_recovery_activations == 0,
+        "capsule geometry should avoid reverse recovery churn in this traffic fixture: {:?}",
         baseline
     );
     assert!(
@@ -2558,9 +2567,9 @@ fn scout_car_locomotion_suppresses_illegal_rotation_when_blocked() {
         .expect("factory spawn");
 
     // Regression for a live crash: the scout car center is below the factory and legal while
-    // nearly horizontal, but the borrowed tank-body turn model can rotate its long body into
-    // the factory footprint without moving.
-    let start = (784.0, 397.0);
+    // nearly horizontal, but rotation can still swing the authoritative body into the factory
+    // footprint without moving.
+    let start = (710.0, 396.3);
     let initial_facing = 0.05;
     let illegal_next_facing = initial_facing + TANK_BODY_TURN_RATE_RAD_PER_TICK;
     assert!(standability::unit_static_standable_with_facing(
@@ -2595,18 +2604,16 @@ fn scout_car_locomotion_suppresses_illegal_rotation_when_blocked() {
     movement_system(&map, &mut entities, &mut [], &occ, &spatial, 0);
 
     let e = entities.get(scout).expect("scout car should exist");
+    let moved = moved_distance(start, (e.pos_x, e.pos_y));
     assert!(
-        moved_distance(start, (e.pos_x, e.pos_y)) <= 0.01,
-        "front-blocked scout car must not take an illegal body step"
-    );
-    assert!(
-        (e.facing() - initial_facing).abs() <= 0.001,
-        "scout car should not rotate its body into a building footprint while blocked"
+        moved > 0.01 || (e.facing() - initial_facing).abs() <= 0.001,
+        "scout car may rotate only when translation keeps the capsule legal"
     );
     assert!(
         matches!(e.order(), Order::Move(_)) && !e.path_is_empty(),
         "front-blocked scout car should preserve the player's move order for recovery"
     );
+    let occ = Occupancy::build(&map, &entities);
     assert!(standability::unit_static_standable_with_facing(
         &map,
         &occ,
@@ -2655,29 +2662,26 @@ fn run_scout_car_movement_tick(map: &Map, entities: &mut EntityStore, tick: u32)
 }
 
 #[test]
-fn scout_car_front_blocked_by_building_injects_reverse_recovery() {
-    let (map, mut entities, scout, start, goal, initial_facing) = front_blocked_scout_car_fixture();
+fn scout_car_former_front_blocked_fixture_keeps_original_goal() {
+    let (map, mut entities, scout, start, goal, _initial_facing) =
+        front_blocked_scout_car_fixture();
 
     for tick in 0..config::SCOUT_CAR_STUCK_RECOVERY_TRIGGER_TICKS as u32 {
         run_scout_car_movement_tick(&map, &mut entities, tick);
     }
 
     let e = entities.get(scout).expect("scout car should exist");
-    let recovery = e.next_waypoint().expect("recovery waypoint should exist");
-    assert_ne!(
-        recovery, goal,
-        "recovery should be inserted before the original goal"
-    );
     assert_eq!(
-        e.movement.as_ref().map(|m| m.path.len()),
-        Some(2),
-        "reverse recovery should add one bounded waypoint ahead of the original goal"
+        e.next_waypoint(),
+        Some(goal),
+        "capsule geometry should keep the original goal in the former blocked-nose fixture"
     );
     assert!(
-        recovery.0 > start.0 && (recovery.1 - start.1).abs() < config::TILE_SIZE as f32,
-        "recovery should be behind the current hull direction, got {:?} from {:?}",
-        recovery,
-        start
+        e.movement
+            .as_ref()
+            .and_then(|m| m.scout_car_reverse_waypoint)
+            .is_none(),
+        "capsule geometry should not inject reverse recovery for the former blocked-nose fixture"
     );
 
     for tick in config::SCOUT_CAR_STUCK_RECOVERY_TRIGGER_TICKS as u32
@@ -2688,10 +2692,11 @@ fn scout_car_front_blocked_by_building_injects_reverse_recovery() {
 
     let e = entities.get(scout).expect("scout car should exist");
     assert!(
-        e.pos_x > start.0 + 4.0,
-        "front-blocked scout car should back away after recovery, start x {:.2}, got {:.2}",
-        start.0,
-        e.pos_x
+        moved_distance(start, (e.pos_x, e.pos_y)) > 4.0,
+        "scout car should make direct progress without reverse recovery, start {:?}, got ({:.2}, {:.2})",
+        start,
+        e.pos_x,
+        e.pos_y
     );
     let occ = Occupancy::build(&map, &entities);
     assert!(
@@ -2703,7 +2708,7 @@ fn scout_car_front_blocked_by_building_injects_reverse_recovery() {
             e.pos_y,
             e.facing()
         ),
-        "reverse recovery should keep the scout car body legal; initial facing was {initial_facing:.3}"
+        "direct progress should keep the scout car body legal"
     );
 }
 

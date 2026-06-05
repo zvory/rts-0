@@ -437,6 +437,20 @@ fn rect_context(map: &Map, rect: RectBody) -> String {
 fn unit_body_rect_collision_context(map: &Map, body: UnitBody, rect: RectBody) -> String {
     match body {
         UnitBody::Circle(circle) => circle_rect_collision_context(map, circle, rect),
+        UnitBody::OrientedCapsule(capsule) => {
+            let aabb = UnitBody::OrientedCapsule(capsule).aabb();
+            format!(
+                "oriented_capsule_center={} half_segment={:.2} radius={:.2} facing={:.3}rad bounding_aabb=[{:.2},{:.2}]-[{:.2},{:.2}]",
+                location_context(map, capsule.x, capsule.y),
+                capsule.half_segment,
+                capsule.radius,
+                capsule.facing,
+                aabb.min_x,
+                aabb.min_y,
+                aabb.max_x,
+                aabb.max_y
+            )
+        }
         UnitBody::OrientedBox(oriented) => {
             let aabb = UnitBody::OrientedBox(oriented).aabb();
             format!(
