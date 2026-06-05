@@ -72,7 +72,7 @@ export const STATS = Object.freeze({
   [KIND.MACHINE_GUNNER]: { label: "Machine Gunner", icon: "MG", size: 10, sight: 8,
     rangeTiles: 5, cost: { steel: 75, oil: 25 }, supply: 2, buildTicks: 400, requires: KIND.TRAINING_CENTRE },
   [KIND.AT_TEAM]: { label: "AT Gun", icon: "AT", size: 20, sight: 8,
-    rangeTiles: 5, cost: { steel: 75, oil: 25 }, supply: 2, buildTicks: 440, requires: KIND.TRAINING_CENTRE },
+    rangeTiles: 5, cost: { steel: 75, oil: 25 }, supply: 2, buildTicks: 440, requires: KIND.STEELWORKS },
   [KIND.SCOUT_CAR]: { label: "Scout Car", icon: "SC", size: 18, sight: 10, body: SCOUT_CAR_BODY,
     rangeTiles: 5, cost: { steel: 125, oil: 75 }, supply: 3, buildTicks: 480 },
   [KIND.TANK]: { label: "Tank", icon: "TK", size: 15, sight: 7, body: TANK_BODY,
