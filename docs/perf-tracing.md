@@ -29,6 +29,17 @@ Example local run:
 cd server && RUST_LOG=info,server::perf=debug RTS_PERF=spikes cargo run --release
 ```
 
+The Fly production deploy enables the low-noise spike mode in `fly.toml`:
+
+```toml
+RTS_PERF = "spikes"
+RTS_PERF_SLOW_TICK_MS = "40"
+```
+
+That emits one `performance tick summary` log line when a server tick takes at least 40 ms. Phase,
+snapshot, and WebSocket writer detail remains at `debug`, so the production default keeps basic
+slow-tick visibility without logging every tick.
+
 Perf tracing intentionally exits at startup if `RTS_PERF` is enabled in a debug build. Debug builds
 include overflow checks and different optimization behavior, so their timings are not useful for
 production lag diagnosis.

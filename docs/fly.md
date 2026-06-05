@@ -3,6 +3,10 @@
 This app runs as one Rust process that serves the static client and upgrades `/ws` to a WebSocket.
 Fly proxies HTTPS and WSS traffic to the container on port 8080.
 
+`fly.toml` enables basic production performance tracing with `RTS_PERF=spikes` and
+`RTS_PERF_SLOW_TICK_MS=40`. Fly logs will include a `performance tick summary` row only when a
+server tick takes at least 40 ms.
+
 ## First deploy
 
 ```bash

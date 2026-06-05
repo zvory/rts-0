@@ -7,6 +7,8 @@ primary_region = "ewr"
 [env]
   RTS_ADDR = "0.0.0.0:8080"
   RUST_LOG = "info"
+  RTS_PERF = "spikes"
+  RTS_PERF_SLOW_TICK_MS = "40"
 
 [http_service]
   internal_port = 8080
