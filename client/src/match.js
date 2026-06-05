@@ -1,6 +1,10 @@
 import { Audio, noticeSoundId } from "./audio.js";
 import { Camera } from "./camera.js";
-import { machineGunnerHasAudibleTarget, machineGunSoundKey } from "./combat_audio.js";
+import {
+  attackKindHasCombatSound,
+  machineGunnerHasAudibleTarget,
+  machineGunSoundKey,
+} from "./combat_audio.js";
 import { Fog } from "./fog.js";
 import { HUD } from "./hud.js";
 import { Input } from "./input/index.js";
@@ -385,6 +389,7 @@ export class Match {
     if (!pos || typeof pos.x !== "number" || typeof pos.y !== "number") return;
 
     const kind = from?.kind || KIND.RIFLEMAN;
+    if (!attackKindHasCombatSound(kind)) return;
     let spec = COMBAT_SOUNDS[kind];
     if (!spec) {
       spec = COMBAT_SOUNDS[KIND.RIFLEMAN];
