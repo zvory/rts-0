@@ -34,6 +34,7 @@ const WORKER_RETREAT_TILES: f32 = 5.0;
 /// Re-plan cadence in ticks. The AI "thinks" this often (about 3 times/second at 30 Hz);
 /// decisions are staggered per player so several AIs do not all think on the same tick.
 const DECISION_INTERVAL: u32 = 9;
+const BUILDING_CLEARANCE_SPATIAL_PADDING_TILES: i32 = 12;
 
 /// Default live-lobby profile. This preserves the current macro-focused AI behavior better than
 /// the faster pressure profile, while still selecting from the canonical shared profile ids.
@@ -210,7 +211,22 @@ fn live_building_placeable(
     if !systems::footprint_placeable(map, entities, spatial, building, tile_x, tile_y) {
         return false;
     }
-    for entity in entities.iter().filter(|entity| entity.is_building()) {
+    let Some(candidate_stats) = config::building_stats(building) else {
+        return false;
+    };
+    let min_tx = tile_x as i32 - BUILDING_CLEARANCE_SPATIAL_PADDING_TILES;
+    let min_ty = tile_y as i32 - BUILDING_CLEARANCE_SPATIAL_PADDING_TILES;
+    let max_tx = tile_x
+        .saturating_add(candidate_stats.foot_w)
+        .saturating_add(BUILDING_CLEARANCE_SPATIAL_PADDING_TILES as u32) as i32;
+    let max_ty = tile_y
+        .saturating_add(candidate_stats.foot_h)
+        .saturating_add(BUILDING_CLEARANCE_SPATIAL_PADDING_TILES as u32) as i32;
+    for entity in spatial
+        .ids_in_rect(min_tx, min_ty, max_tx, max_ty)
+        .filter_map(|id| entities.get(id))
+        .filter(|entity| entity.is_building())
+    {
         let (cx, cy) = map.tile_of(entity.pos_x, entity.pos_y);
         let Some(stats) = config::building_stats(entity.kind) else {
             return false;

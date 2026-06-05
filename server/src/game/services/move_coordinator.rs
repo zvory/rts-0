@@ -213,12 +213,11 @@ impl<'a> MoveCoordinator<'a> {
     /// order, assigning paths up to the tick budget. Units that can't be serviced this tick
     /// remain `AwaitingPath`; units that fail to get any route are marked `PathFailed`.
     pub fn process_awaiting_paths(&mut self, entities: &mut EntityStore) {
-        let mut waiting: Vec<u32> = entities
+        let waiting: Vec<u32> = entities
             .iter()
             .filter(|e| e.is_unit() && e.move_phase() == Some(MovePhase::AwaitingPath))
             .map(|e| e.id)
             .collect();
-        waiting.sort_unstable();
 
         for id in waiting {
             if self.budget == 0 {
