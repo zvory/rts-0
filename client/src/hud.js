@@ -10,7 +10,12 @@
 
 import { cmd } from "./protocol.js";
 import { KIND, STATE, isBuilding, isUnit } from "./protocol.js";
-import { STATS, WORKER_BUILDABLE, PLAYER_PALETTE } from "./config.js";
+import {
+  PLAYER_PALETTE,
+  RIFLEMAN_CHARGE_COOLDOWN_TICKS,
+  STATS,
+  WORKER_BUILDABLE,
+} from "./config.js";
 
 // Command-card hotkeys follow the keyboard grid (3 columns):
 //   Q W E
@@ -32,6 +37,53 @@ export function formatTankOilUsed(value) {
     ? Math.max(0, value)
     : 0;
   return oilUsed >= 10 ? `${Math.round(oilUsed)}` : oilUsed.toFixed(1);
+}
+
+/**
+ * Group cooldown-left values that are visually close enough to share one clock arm.
+ * @param {number[]} cooldowns ticks left; ready values (<= 0) are ignored
+ * @param {number} totalTicks full cooldown duration in ticks
+ * @param {number} [toleranceTicks] max intra-group spread before splitting
+ * @returns {{count:number,cooldownLeft:number,progress:number,rotationDeg:number}[]}
+ */
+export function groupCooldownClocks(
+  cooldowns,
+  totalTicks,
+  toleranceTicks = Math.max(2, Math.round(totalTicks / 30)),
+) {
+  if (!Array.isArray(cooldowns) || !(totalTicks > 0)) return [];
+
+  const active = cooldowns
+    .filter((value) => typeof value === "number" && Number.isFinite(value) && value > 0)
+    .sort((a, b) => b - a);
+  if (active.length === 0) return [];
+
+  const groups = [];
+  for (const cooldownLeft of active) {
+    const group = groups[groups.length - 1];
+    if (group && Math.abs(group.avgCooldownLeft - cooldownLeft) <= toleranceTicks) {
+      group.sumCooldownLeft += cooldownLeft;
+      group.count += 1;
+      group.avgCooldownLeft = group.sumCooldownLeft / group.count;
+      continue;
+    }
+    groups.push({
+      count: 1,
+      sumCooldownLeft: cooldownLeft,
+      avgCooldownLeft: cooldownLeft,
+    });
+  }
+
+  return groups.map((group) => {
+    const cooldownLeft = Math.max(0, Math.min(totalTicks, group.avgCooldownLeft));
+    const progress = 1 - cooldownLeft / totalTicks;
+    return {
+      count: group.count,
+      cooldownLeft,
+      progress,
+      rotationDeg: progress * 360,
+    };
+  });
 }
 
 /**
@@ -462,6 +514,13 @@ export class HUD {
       .map((e) => e.id);
   }
 
+  _selectedOwnChargeCooldownClocks(sel) {
+    const cooldowns = this._selectedOwnUnits(sel)
+      .filter((e) => e.kind === KIND.RIFLEMAN)
+      .map((e) => e.chargeCooldownLeft || 0);
+    return groupCooldownClocks(cooldowns, RIFLEMAN_CHARGE_COOLDOWN_TICKS);
+  }
+
   /** True when the actionable selected units are workers and no army unit is selected. */
   _workerOnlySelection(sel) {
     const ownUnits = this._selectedOwnUnits(sel);
@@ -476,6 +535,7 @@ export class HUD {
     const atGunIds = ownUnits.filter((e) => e.kind === KIND.AT_TEAM).map((e) => e.id);
     const riflemanIds = this._selectedOwnRiflemanIds(sel);
     const readyChargeRiflemanIds = this._selectedOwnReadyChargeRiflemanIds(sel);
+    const chargeCooldownClocks = this._selectedOwnChargeCooldownClocks(sel);
     const chargeUnlocked =
       riflemanIds.length > 0 && this._playerHasCompleteKind(KIND.TRAINING_CENTRE);
     const chargeReadyCount = readyChargeRiflemanIds.length;
@@ -486,7 +546,8 @@ export class HUD {
     const sig =
       `units|${unitIds.join(".")}|target:${this.state.commandTarget || ""}|` +
       `|at:${atGunIds.join(".")}|` +
-      `|rifle:${riflemanIds.join(".")}|charge:${chargeUnlocked ? 1 : 0}:${chargeReadyCount}|` +
+      `|rifle:${riflemanIds.join(".")}|charge:${chargeUnlocked ? 1 : 0}:${chargeReadyCount}:` +
+      `${chargeCooldownClocks.map((group) => `${group.count}:${Math.round(group.cooldownLeft)}`).join(",")}|` +
       (workerSelected ? "worker-main" : "no-build");
     if (sig === this._cardSig) return;
     this._cardSig = sig;
@@ -596,6 +657,7 @@ export class HUD {
           hotkey: GRID_HOTKEYS[idx++],
           enabled: chargeReadyCount > 0,
           countBadge: showChargeReadyCount ? `${chargeReadyCount}` : "",
+          cooldownClocks: chargeCooldownClocks,
           cls: "",
           onClick: () => {
             this.net.command(cmd.charge(readyChargeRiflemanIds));
@@ -853,6 +915,7 @@ export class HUD {
    * @param {string} [opts.title] tooltip / disabled reason.
    * @param {string} [opts.cls] extra class (e.g. "cancel").
    * @param {string} [opts.countBadge] top-right ready count for partially-available abilities.
+   * @param {{count:number,rotationDeg:number}[]} [opts.cooldownClocks] grouped cooldown clocks.
    * @param {() => void} opts.onClick click handler (skipped when disabled).
    * @returns {HTMLButtonElement}
    */
@@ -874,11 +937,22 @@ export class HUD {
         (opts.cost.oil ? `<span class="c-oil">${opts.cost.oil}</span>` : "") +
         `</span>`
       : "";
+    const cooldownClocks = Array.isArray(opts.cooldownClocks) ? opts.cooldownClocks : [];
+    const cooldownHtml = cooldownClocks.length > 0
+      ? `<span class="cmd-cooldowns" aria-hidden="true">` +
+          `<span class="cmd-cd-clock">` +
+            cooldownClocks.map((group) =>
+              `<span class="cmd-cd-arm" style="--cooldown-rotation:${group.rotationDeg.toFixed(1)}deg"></span>`
+            ).join("") +
+          `</span>` +
+        `</span>`
+      : "";
 
     btn.innerHTML =
       `<span class="cmd-icon">${opts.icon || ""}</span>` +
       `<span class="cmd-label">${opts.label || ""}</span>` +
       (opts.hotkey ? `<span class="cmd-hotkey">${opts.hotkey}</span>` : "") +
+      cooldownHtml +
       (opts.countBadge ? `<span class="cmd-ready-count">${opts.countBadge}</span>` : "") +
       costHtml;
 

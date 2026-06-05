@@ -1026,6 +1026,34 @@ input[type="text"]:focus {
   border: 1px solid var(--panel-edge);
   border-radius: 999px;
 }
+.cmd-btn .cmd-cooldowns {
+  position: absolute;
+  top: 5px;
+  right: 23px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+.cmd-btn .cmd-cd-clock {
+  position: relative;
+  flex: 0 0 auto;
+  width: 10px;
+  height: 10px;
+  border: 1px solid var(--panel-edge);
+  border-radius: 999px;
+  background: rgba(17, 17, 15, 0.92);
+}
+.cmd-btn .cmd-cd-arm {
+  position: absolute;
+  left: 50%;
+  top: 1px;
+  width: 1px;
+  height: 4px;
+  background: var(--accent);
+  box-shadow: 0 0 0 1px rgba(17, 17, 15, 0.18);
+  transform-origin: 50% 100%;
+  transform: translateX(-50%) rotate(var(--cooldown-rotation, 0deg));
+}
 /* Cost badge, bottom edge. Steel / oil costs colored to match the world. */
 .cmd-btn .cmd-cost {
   position: absolute;

@@ -61,6 +61,7 @@ export const SCOUT_CAR_BODY = Object.freeze({
 export const MINING_CC_RANGE_TILES = 7.0;
 export const AT_GUN_DEPLOYED_RANGE_TILES = 12;
 export const AT_GUN_FIELD_OF_FIRE_RAD = Math.PI / 4;
+export const RIFLEMAN_CHARGE_COOLDOWN_TICKS = 150;
 
 // Player colors (server assigns from a matching palette; used as a fallback for blips).
 export const PLAYER_PALETTE = Object.freeze([
