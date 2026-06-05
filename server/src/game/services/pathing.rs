@@ -344,9 +344,7 @@ mod tests {
         let entities = EntityStore::new();
         let occ = Occupancy::build(map, &entities);
         let mut service = PathingService::new(8_192, 256);
-        let radius_tiles = config::unit_stats(kind)
-            .map(|stats| stats.radius_tiles())
-            .unwrap_or(0);
+        let radius_tiles = config::unit_radius_tiles(kind);
         let req = PathRequest {
             kind,
             start,
@@ -370,9 +368,7 @@ mod tests {
         let entities = EntityStore::new();
         let occ = Occupancy::build(map, &entities);
         let mut service = PathingService::new(8_192, 256);
-        let radius_tiles = config::unit_stats(kind)
-            .map(|stats| stats.radius_tiles())
-            .unwrap_or(0);
+        let radius_tiles = config::unit_radius_tiles(kind);
         service.request_tile_path(
             map,
             &occ,
@@ -1078,9 +1074,7 @@ mod tests {
         let entities = EntityStore::new();
         let occ = Occupancy::build(&map, &entities);
         let mut service = PathingService::new(1_000, 16);
-        let radius_tiles = config::unit_stats(EntityKind::Tank)
-            .expect("tank stats")
-            .radius_tiles();
+        let radius_tiles = config::unit_radius_tiles(EntityKind::Tank);
 
         assert_eq!(
             radius_tiles, 0,

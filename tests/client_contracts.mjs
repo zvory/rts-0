@@ -304,8 +304,8 @@ function fakeAudioContext() {
   assert(STATS[KIND.SCOUT_CAR].cost.steel === 125, "Scout Car steel cost mirrors server");
   assert(STATS[KIND.SCOUT_CAR].cost.oil === 75, "Scout Car oil cost mirrors server");
   assert(STATS[KIND.SCOUT_CAR].sight === 10, "Scout Car has the largest mobile sight radius");
-  assert(STATS[KIND.SCOUT_CAR].body.length === 51, "Scout Car client body length mirrors server");
-  assert(STATS[KIND.SCOUT_CAR].body.width === 27, "Scout Car client body width mirrors server");
+  assert(STATS[KIND.SCOUT_CAR].body.length === 40.8, "Scout Car client body length mirrors server");
+  assert(STATS[KIND.SCOUT_CAR].body.width === 21.6, "Scout Car client body width mirrors server");
   assert(KIND_CODE[KIND.SCOUT_CAR] === 14, "Scout Car compact kind code should follow Steelworks");
   assert(
     STATS[KIND.STEELWORKS].footW === 2 && STATS[KIND.STEELWORKS].footH === 2,
@@ -607,8 +607,8 @@ function fakeAudioContext() {
     footprintValidAgainstEntities([tank], new Set(), 1, 1, 2, 2, map) === false,
     "client preview should reject a tank body touching a footprint edge",
   );
-  assert(STATS[KIND.TANK].body.length === 42, "tank client body length mirrors server");
-  assert(STATS[KIND.TANK].body.width === 24, "tank client body width mirrors server");
+  assert(STATS[KIND.TANK].body.length === 50.4, "tank client body length mirrors server");
+  assert(STATS[KIND.TANK].body.width === 28.8, "tank client body width mirrors server");
 
   const input = Object.create(Input.prototype);
   input.state = {
@@ -627,11 +627,11 @@ function fakeAudioContext() {
 
   const clickableTank = { id: 10, owner: 1, kind: KIND.TANK, x: 0, y: 0, facing: 0 };
   assert(
-    input._worldPointHitsEntity(clickableTank, 21, 0, 32) === true,
+    input._worldPointHitsEntity(clickableTank, 25.2, 0, 32) === true,
     "tank hit testing should reach the long hull axis",
   );
   assert(
-    input._worldPointHitsEntity(clickableTank, 0, 18, 32) === false,
+    input._worldPointHitsEntity(clickableTank, 0, 20, 32) === false,
     "tank hit testing should not use a stale circular side radius",
   );
 }

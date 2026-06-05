@@ -358,9 +358,7 @@ impl<'a> MoveCoordinator<'a> {
             None => return false,
         };
         let (gx, gy) = self.map.tile_of(goal.0, goal.1);
-        let radius_tiles = config::unit_stats(kind)
-            .map(|s| s.radius_tiles())
-            .unwrap_or(0);
+        let radius_tiles = config::unit_radius_tiles(kind);
         let req = PathRequest {
             kind,
             start: (sx as i32, sy as i32),
@@ -493,9 +491,7 @@ impl<'a> MoveCoordinator<'a> {
             _ => return None,
         };
         let (gx, gy) = self.map.tile_of(goal.0, goal.1);
-        let radius_tiles = config::unit_stats(unit_kind)
-            .map(|s| s.radius_tiles())
-            .unwrap_or(0);
+        let radius_tiles = config::unit_radius_tiles(unit_kind);
         let req = PathRequest {
             kind: unit_kind,
             start: (sx as i32, sy as i32),
