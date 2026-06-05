@@ -183,9 +183,14 @@ try {
   const afterGameplayEscape = await page.evaluate(() => ({
     menuHidden: document.getElementById("settings-menu")?.hidden,
     selected: window.__rts.match.state.selection.size,
+    commandCardHidden: document.getElementById("command-card")?.hidden,
+    commandSlots: document.querySelectorAll("#command-card .cmd-empty").length,
+    commandButtons: document.querySelectorAll("#command-card button").length,
   }));
   ok(afterGameplayEscape.menuHidden && afterGameplayEscape.selected === 0,
      `ESCAPE: gameplay cancel clears selection without opening settings (hidden=${afterGameplayEscape.menuHidden}, selected=${afterGameplayEscape.selected})`);
+  ok(!afterGameplayEscape.commandCardHidden && afterGameplayEscape.commandSlots === 9 && afterGameplayEscape.commandButtons === 0,
+     `COMMAND CARD: empty selection keeps an inert 3x3 card (hidden=${afterGameplayEscape.commandCardHidden}, slots=${afterGameplayEscape.commandSlots}, buttons=${afterGameplayEscape.commandButtons})`);
 
   const beforePan = await page.evaluate(() => {
     const s = window.__rts.match.state;
