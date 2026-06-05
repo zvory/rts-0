@@ -13,9 +13,15 @@ import {
   AT_GUN_DEPLOYED_RANGE_TILES,
   AT_GUN_FIELD_OF_FIRE_RAD,
   MINING_CC_RANGE_TILES,
+  RIFLEMAN_CHARGE_COOLDOWN_TICKS,
   STATS,
 } from "../client/src/config.js";
-import { HUD, formatTankOilUsed, playerHasCompletedKind } from "../client/src/hud.js";
+import {
+  HUD,
+  formatTankOilUsed,
+  groupCooldownClocks,
+  playerHasCompletedKind,
+} from "../client/src/hud.js";
 import { Audio, noticeSoundId } from "../client/src/audio.js";
 import {
   attackKindHasCombatSound,
@@ -422,6 +428,10 @@ function fakeAudioContext() {
     "Steelworks should require Training Centre tech in the command card",
   );
   assert(
+    RIFLEMAN_CHARGE_COOLDOWN_TICKS === 150,
+    "client mirrors the server rifleman charge cooldown duration",
+  );
+  assert(
     STATS[KIND.AT_TEAM].requires === KIND.STEELWORKS,
     "AT Gun training should require a completed Steelworks in the command card",
   );
@@ -459,6 +469,13 @@ function fakeAudioContext() {
   assert(formatTankOilUsed(10.4) === "10", "tank oil panel rounds whole values above ten oil");
   assert(formatTankOilUsed(-2) === "0.0", "tank oil panel clamps negative values");
   assert(formatTankOilUsed(Number.NaN) === "0.0", "tank oil panel tolerates missing oilUsed");
+  const groupedNearlySameCooldowns = groupCooldownClocks([150, 149, 146], RIFLEMAN_CHARGE_COOLDOWN_TICKS);
+  assert(groupedNearlySameCooldowns.length === 1, "nearby rifleman cooldowns share one clock arm");
+  assert(groupedNearlySameCooldowns[0].count === 3, "clock grouping keeps the grouped unit count");
+  const groupedDistinctCooldowns = groupCooldownClocks([150, 120, 60], RIFLEMAN_CHARGE_COOLDOWN_TICKS);
+  assert(groupedDistinctCooldowns.length === 3, "visibly different rifleman cooldowns get separate clock arms");
+  const groupedIgnoringReady = groupCooldownClocks([0, 0, 30, 31], RIFLEMAN_CHARGE_COOLDOWN_TICKS);
+  assert(groupedIgnoringReady.length === 1 && groupedIgnoringReady[0].count === 2, "ready riflemen do not create cooldown clocks");
 
   const trained = [];
   let selectedProductionBuildings = [
