@@ -866,7 +866,7 @@ mod tests {
         assert!(trained.is_empty());
         assert!(ctx.into_commands().is_empty());
 
-        let with_tech = observation(
+        let with_training_centre = observation(
             AiEconomy {
                 steel: 500,
                 oil: 200,
@@ -880,8 +880,45 @@ mod tests {
             ],
             Vec::new(),
         );
-        let facts = AiFacts::from_observation(&with_tech);
-        let mut ctx = AiActionContext::new(&facts, budget_from_observation(&with_tech));
+        let facts = AiFacts::from_observation(&with_training_centre);
+        let mut ctx = AiActionContext::new(&facts, budget_from_observation(&with_training_centre));
+
+        let trained = train_units(
+            &mut ctx,
+            TrainUnitsRequest {
+                buildings: facts.production_buildings(EntityKind::Barracks),
+                unit_priorities: &[EntityKind::MachineGunner, EntityKind::AtTeam],
+                completed_building_kinds: facts.complete_building_kinds(),
+                max_queue_depth: 1,
+                save_for_tech: false,
+                current_counts: &[],
+                max_counts: &[],
+                balance_unit_priorities: true,
+            },
+        );
+
+        assert_eq!(
+            trained.iter().map(|action| action.unit).collect::<Vec<_>>(),
+            vec![EntityKind::MachineGunner, EntityKind::MachineGunner]
+        );
+
+        let with_steelworks = observation(
+            AiEconomy {
+                steel: 500,
+                oil: 200,
+                supply_used: 0,
+                supply_cap: 20,
+            },
+            vec![
+                production_building(20, EntityKind::Barracks, 0),
+                production_building(21, EntityKind::Barracks, 0),
+                complete_building(30, EntityKind::TrainingCentre),
+                complete_building(31, EntityKind::Steelworks),
+            ],
+            Vec::new(),
+        );
+        let facts = AiFacts::from_observation(&with_steelworks);
+        let mut ctx = AiActionContext::new(&facts, budget_from_observation(&with_steelworks));
 
         let trained = train_units(
             &mut ctx,

@@ -793,10 +793,11 @@ struct DefensivePanicPlan {
 }
 
 fn defensive_panic_plan(response: DefensivePanicResponse, facts: &AiFacts) -> DefensivePanicPlan {
-    let support_tech_ready = facts.complete_building_count(EntityKind::TrainingCentre) > 0;
+    let machine_gunner_tech_ready = facts.complete_building_count(EntityKind::TrainingCentre) > 0;
+    let at_tech_ready = facts.complete_building_count(EntityKind::Steelworks) > 0;
     match response {
         DefensivePanicResponse::Riflemen => defensive_panic_rifle_plan(),
-        DefensivePanicResponse::MachineGunners if support_tech_ready => DefensivePanicPlan {
+        DefensivePanicResponse::MachineGunners if machine_gunner_tech_ready => DefensivePanicPlan {
             required_tech_path: &DEFENSIVE_PANIC_RIFLE_TECH_PATH,
             production: ProductionPolicy {
                 queue_depth: 3,
@@ -806,7 +807,7 @@ fn defensive_panic_plan(response: DefensivePanicResponse, facts: &AiFacts) -> De
             },
             oil_workers: DEFENSIVE_PANIC_OIL_WORKERS,
         },
-        DefensivePanicResponse::AtTeams if support_tech_ready => DefensivePanicPlan {
+        DefensivePanicResponse::AtTeams if at_tech_ready => DefensivePanicPlan {
             required_tech_path: &DEFENSIVE_PANIC_RIFLE_TECH_PATH,
             production: ProductionPolicy {
                 queue_depth: 3,
@@ -816,7 +817,7 @@ fn defensive_panic_plan(response: DefensivePanicResponse, facts: &AiFacts) -> De
             },
             oil_workers: DEFENSIVE_PANIC_OIL_WORKERS,
         },
-        DefensivePanicResponse::SupportMix if support_tech_ready => DefensivePanicPlan {
+        DefensivePanicResponse::SupportMix if machine_gunner_tech_ready => DefensivePanicPlan {
             required_tech_path: &DEFENSIVE_PANIC_RIFLE_TECH_PATH,
             production: ProductionPolicy {
                 queue_depth: 3,
@@ -3925,6 +3926,42 @@ mod tests {
     }
 
     #[test]
+    fn steel_expansion_tanks_builds_steelworks_before_training_at_teams() {
+        let observation = with_expansion_resources(observation(
+            AiEconomy {
+                steel: 500,
+                oil: 200,
+                supply_used: 10,
+                supply_cap: 40,
+            },
+            vec![
+                building(10, EntityKind::CityCentre, Some(0)),
+                building(11, EntityKind::CityCentre, Some(0)),
+                building(12, EntityKind::Barracks, Some(0)),
+                building(13, EntityKind::Barracks, Some(0)),
+                building(14, EntityKind::TrainingCentre, None),
+                worker(60, AiEntityState::Idle),
+            ],
+        ));
+
+        let decision = decide(
+            &observation,
+            &STEEL_EXPANSION_TANKS,
+            &mut AiDecisionMemory::for_profile(&STEEL_EXPANSION_TANKS),
+        );
+
+        assert!(decision.intents.contains(&AiIntent::Build {
+            kind: EntityKind::Steelworks
+        }));
+        assert!(decision.intents.contains(&AiIntent::Train {
+            kind: EntityKind::MachineGunner
+        }));
+        assert!(!decision.intents.contains(&AiIntent::Train {
+            kind: EntityKind::AtTeam
+        }));
+    }
+
+    #[test]
     fn steel_expansion_tanks_balances_machine_gunner_and_at_team_training() {
         let observation = with_expansion_resources(observation(
             AiEconomy {
@@ -3939,6 +3976,7 @@ mod tests {
                 building(12, EntityKind::Barracks, Some(0)),
                 building(13, EntityKind::Barracks, Some(0)),
                 building(14, EntityKind::TrainingCentre, None),
+                building(15, EntityKind::Steelworks, None),
                 worker(60, AiEntityState::Idle),
             ],
         ));
@@ -3972,6 +4010,7 @@ mod tests {
                 building_training(12, EntityKind::Barracks, EntityKind::MachineGunner),
                 building(13, EntityKind::Barracks, Some(0)),
                 building(15, EntityKind::TrainingCentre, None),
+                building(16, EntityKind::Steelworks, None),
             ],
         ));
 
@@ -4391,6 +4430,7 @@ mod tests {
                 building(11, EntityKind::Barracks, Some(0)),
                 building(12, EntityKind::TrainingCentre, None),
                 building(13, EntityKind::Factory, Some(0)),
+                building(14, EntityKind::Steelworks, None),
                 worker(20, AiEntityState::Gather),
                 worker(21, AiEntityState::Gather),
                 worker(22, AiEntityState::Gather),
@@ -4433,6 +4473,7 @@ mod tests {
                 building(11, EntityKind::Barracks, Some(0)),
                 building(12, EntityKind::TrainingCentre, None),
                 building(13, EntityKind::Factory, Some(0)),
+                building(14, EntityKind::Steelworks, None),
                 worker(20, AiEntityState::Gather),
                 worker(21, AiEntityState::Gather),
                 worker(22, AiEntityState::Gather),

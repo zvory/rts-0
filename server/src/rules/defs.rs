@@ -150,7 +150,7 @@ pub const UNITS: &[UnitDef] = &[
         weapon: WeaponClass::AntiTank,
         target_priority: TargetPriority::PrefersArmored,
         trained_at: Some(EntityKind::Barracks),
-        train_requires: TRAINING_CENTRE_REQUIRED,
+        train_requires: STEELWORKS_REQUIRED,
     },
     UnitDef {
         kind: EntityKind::Tank,
