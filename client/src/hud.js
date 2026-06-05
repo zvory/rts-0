@@ -288,10 +288,7 @@ export class HUD {
     const primary = this._commandSubject(sel);
 
     if (!primary) {
-      if (this._cardSig !== "empty") {
-        card.innerHTML = "";
-        this._cardSig = "empty";
-      }
+      this._renderEmptyCard(card);
       return;
     }
 
@@ -300,6 +297,17 @@ export class HUD {
     } else {
       this._renderTrainCard(card, primary);
     }
+  }
+
+  /** Render a stable, inert command-card grid when no actionable selection exists. */
+  _renderEmptyCard(card) {
+    if (this._cardSig === "empty") return;
+    this._cardSig = "empty";
+
+    const frag = document.createDocumentFragment();
+    this._padCard(frag, 0);
+    card.innerHTML = "";
+    card.appendChild(frag);
   }
 
   /**
