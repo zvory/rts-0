@@ -47,7 +47,9 @@ pub(crate) fn apply_commands(
                 let valid: Vec<u32> = dedupe_cap_units(units)
                     .into_iter()
                     .filter(|id| {
-                        owns_unit(entities, player, *id) && !is_constructing(entities, *id)
+                        owns_unit(entities, player, *id)
+                            && !is_constructing(entities, *id)
+                            && can_accept_move_order(entities, *id)
                     })
                     .collect();
                 clear_queued_orders(entities, &valid);
@@ -66,7 +68,9 @@ pub(crate) fn apply_commands(
                 let valid: Vec<u32> = dedupe_cap_units(units)
                     .into_iter()
                     .filter(|id| {
-                        owns_unit(entities, player, *id) && !is_constructing(entities, *id)
+                        owns_unit(entities, player, *id)
+                            && !is_constructing(entities, *id)
+                            && can_accept_move_order(entities, *id)
                     })
                     .collect();
                 clear_queued_orders(entities, &valid);
@@ -351,6 +355,14 @@ fn is_constructing(entities: &EntityStore, id: u32) -> bool {
     matches!(
         entities.get(id),
         Some(e) if matches!(e.build_phase(), Some(BuildPhase::Constructing { .. }))
+    )
+}
+
+fn can_accept_move_order(entities: &EntityStore, id: u32) -> bool {
+    matches!(
+        entities.get(id),
+        Some(e)
+            if e.kind != EntityKind::AtTeam || matches!(e.weapon_setup(), WeaponSetup::Packed)
     )
 }
 
@@ -1091,6 +1103,117 @@ mod tests {
         assert_eq!(
             entities.get(packed).unwrap().weapon_setup(),
             WeaponSetup::Packed
+        );
+    }
+
+    #[test]
+    fn move_order_ignores_deployed_at_guns_without_tearing_down_or_rotating() {
+        let map = flat_map(24);
+        let mut entities = EntityStore::new();
+        let deployed = entities
+            .spawn_unit(1, EntityKind::AtTeam, 100.0, 100.0)
+            .expect("at gun should spawn");
+        let packed = entities
+            .spawn_unit(1, EntityKind::AtTeam, 130.0, 100.0)
+            .expect("at gun should spawn");
+        {
+            let at = entities.get_mut(deployed).unwrap();
+            at.set_weapon_setup(WeaponSetup::Deployed);
+            at.set_emplacement_facing(Some(0.25));
+            at.set_facing(0.25);
+            at.set_weapon_facing(0.25);
+        }
+
+        apply(
+            &map,
+            &mut entities,
+            vec![(
+                1,
+                SimCommand::Move {
+                    units: vec![deployed, packed],
+                    x: 220.0,
+                    y: 100.0,
+                    queued: false,
+                },
+            )],
+        );
+
+        let deployed = entities.get(deployed).expect("at gun should exist");
+        assert_eq!(
+            deployed.weapon_setup(),
+            WeaponSetup::Deployed,
+            "move should not implicitly tear down deployed AT guns"
+        );
+        assert_eq!(
+            deployed.facing(),
+            0.25,
+            "ignored move should not rotate deployed AT guns"
+        );
+        assert!(
+            matches!(deployed.order(), Order::Idle),
+            "ignored move should not replace the deployed AT gun order"
+        );
+        assert_eq!(
+            deployed.path_goal(),
+            None,
+            "ignored move should not queue a movement path"
+        );
+
+        let packed = entities.get(packed).expect("packed at gun should exist");
+        assert!(
+            matches!(packed.order(), Order::Move(_)),
+            "packed AT guns should still accept move orders"
+        );
+    }
+
+    #[test]
+    fn attack_move_order_ignores_deployed_at_guns_without_tearing_down_or_rotating() {
+        let map = flat_map(24);
+        let mut entities = EntityStore::new();
+        let deployed = entities
+            .spawn_unit(1, EntityKind::AtTeam, 100.0, 100.0)
+            .expect("at gun should spawn");
+        {
+            let at = entities.get_mut(deployed).unwrap();
+            at.set_weapon_setup(WeaponSetup::Deployed);
+            at.set_emplacement_facing(Some(-0.5));
+            at.set_facing(-0.5);
+            at.set_weapon_facing(-0.5);
+        }
+
+        apply(
+            &map,
+            &mut entities,
+            vec![(
+                1,
+                SimCommand::AttackMove {
+                    units: vec![deployed],
+                    x: 220.0,
+                    y: 100.0,
+                    queued: false,
+                },
+            )],
+        );
+
+        let deployed = entities.get(deployed).expect("at gun should exist");
+        assert_eq!(
+            deployed.weapon_setup(),
+            WeaponSetup::Deployed,
+            "attack-move should not implicitly tear down deployed AT guns"
+        );
+        assert_eq!(
+            deployed.facing(),
+            -0.5,
+            "ignored attack-move should not rotate deployed AT guns"
+        );
+        assert!(
+            matches!(deployed.order(), Order::Idle),
+            "ignored attack-move should not replace the deployed AT gun order"
+        );
+        assert_eq!(
+            deployed.path_goal(),
+            None,
+            "ignored attack-move should not queue a movement path"
         );
     }
 
