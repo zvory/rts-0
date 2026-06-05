@@ -150,7 +150,7 @@ mod tests {
         ));
 
         assert_eq!(cost(EntityKind::Worker), (50, 0));
-        assert_eq!(cost(EntityKind::ScoutCar), (125, 75));
+        assert_eq!(cost(EntityKind::ScoutCar), (125, 50));
         assert_eq!(cost(EntityKind::Tank), (200, 150));
         assert_eq!(cost(EntityKind::CityCentre), (200, 0));
         assert_eq!(cost(EntityKind::Depot), (100, 0));
