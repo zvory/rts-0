@@ -444,14 +444,21 @@ src/
   net.js          # Net: WebSocket wrapper, typed send helpers, event emitter
   state.js        # GameState: holds prev+current snapshot, selection, camera, placement
   camera.js       # Camera: pan/zoom, world<->screen transforms, edge/keyboard scroll
-  renderer.js     # Renderer: PixiJS app + layers; render(state, camera, alpha)
+  renderer.js     # Renderer facade re-export
+  renderer/       # Pixi app facade plus layers, terrain, entities, units, buildings,
+                  # resources, fog overlay, feedback, and renderer-local palette helpers
   fog.js          # Fog overlay: accumulate explored, compute visible from own entities
-  input.js        # Input: mouse/keyboard -> selection box, issue commands, build placement
+  input.js        # Input facade re-export
+  input/          # lifecycle facade plus selection, commands, placement, camera controls
   audio.js        # Audio: Web Audio context, buses, one-shots, spatialization
   hud.js          # HUD: resources/supply bar, selected panel, command card (build/train)
   minimap.js      # Minimap: draw terrain+entities+viewport; click to move camera/command
   lobby.js        # Lobby screen: name entry, player list, ready/start buttons
-  main.js         # Bootstrap & wiring: screens (lobby<->game), net hookup, render loop
+  main.js         # Entry point: starts App
+  app.js          # Lobby/app shell lifecycle and persistent Net/Audio ownership
+  match.js        # Match lifecycle, module dependency wiring, render loop, transient events
+  alerts.js       # Notice/toast alert ids and viewport alert behavior constants
+  bootstrap.js    # DOM lookup, ws/dev-watch config, startup helpers
 ```
 
 ### 4.1 Module export contracts
@@ -600,13 +607,14 @@ export class Lobby {
 }
 ```
 
-`main.js` wires it all: create `Net` and `Audio`, derive ws url from `window.location`, show
-`Lobby`; on `start` message build `GameState`, `Camera`, `Renderer`, `Fog`, `HUD`, `Minimap`,
-`Input`, start the rAF loop (compute `alpha` from snapshot timing, `camera.update`,
+`main.js` starts `App`; `app.js` owns the persistent `Net` and `Audio`, derives the ws url from
+`window.location`, and shows `Lobby`; on `start` it creates `Match`. `match.js` builds
+`GameState`, `Camera`, `Renderer`, `Fog`, `HUD`, `Minimap`, `Input`, starts the rAF loop
+(compute `alpha` from snapshot timing, `camera.update`,
 `audio.setListener`, `input.update`, `fog.update`, `renderer.render`, `hud.update`,
 `minimap.render`); on each snapshot it applies state and triggers transient event audio exactly
 once; on `gameOver` show the victory/defeat overlay with the frozen score table.
-For spectator starts, `main.js` reveals all fog, hides the command card and give-up action, and
+For spectator starts, `match.js` reveals all fog, hides the command card and give-up action, and
 keeps the ordinary renderer/minimap/HUD pointed at full-world snapshots with `playerResources`.
 
 ### 4.2 Rendering & look (PixiJS, procedural art — neutral PS1 field-command style)
