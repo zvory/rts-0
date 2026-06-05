@@ -25,7 +25,7 @@ const TANK_TRAFFIC_TURN_BIAS_RAD: f32 = 0.28;
 pub(super) const SCOUT_CAR_MIN_TURN_RADIUS_PX: f32 = config::TILE_SIZE as f32 * 1.5;
 pub(super) const SCOUT_CAR_ROUTE_LOOKAHEAD_PX: f32 = config::TILE_SIZE as f32 * 3.0;
 
-pub(super) fn tank_oil_starves_movement(
+pub(super) fn vehicle_oil_starves_movement(
     entities: &mut EntityStore,
     players: &[PlayerState],
     events: &mut HashMap<u32, Vec<Event>>,
