@@ -188,15 +188,7 @@ impl PathingService {
         );
 
         if !tile_path.is_empty() {
-            self.cache_insert(
-                req.kind,
-                req.start,
-                req.goal,
-                req.radius_tiles,
-                req.route_shape,
-                occupancy.static_fingerprint(),
-                tile_path.clone(),
-            );
+            self.cache_insert(&req, occupancy.static_fingerprint(), tile_path.clone());
         }
         tile_path
     }
@@ -228,11 +220,7 @@ impl PathingService {
     #[allow(clippy::too_many_arguments)]
     fn cache_insert(
         &mut self,
-        kind: EntityKind,
-        start: (i32, i32),
-        goal: (i32, i32),
-        radius: u32,
-        route_shape: RouteShape,
+        req: &PathRequest,
         static_fingerprint: u64,
         tile_path: Vec<(i32, i32)>,
     ) {
@@ -247,7 +235,14 @@ impl PathingService {
             }
         }
         self.cache.insert(
-            (kind, start, goal, radius, route_shape, static_fingerprint),
+            (
+                req.kind,
+                req.start,
+                req.goal,
+                req.radius_tiles,
+                req.route_shape,
+                static_fingerprint,
+            ),
             CacheEntry {
                 tile_path,
                 last_used: self.tick,

@@ -2173,6 +2173,12 @@ fn infantry_heavy_home_threat_prefers_machine_gunners_before_tanks() {
     observation
         .visible_enemies
         .push(enemy(90, EntityKind::Rifleman, 10.5 * ts, 10.5 * ts));
+    observation
+        .visible_enemies
+        .push(enemy(91, EntityKind::Rifleman, 10.5 * ts, 11.5 * ts));
+    observation
+        .visible_enemies
+        .push(enemy(92, EntityKind::Rifleman, 11.5 * ts, 10.5 * ts));
 
     let decision = decide(
         &observation,
@@ -2188,6 +2194,38 @@ fn infantry_heavy_home_threat_prefers_machine_gunners_before_tanks() {
     }));
     assert!(!decision.intents.contains(&AiIntent::Train {
         kind: EntityKind::Worker
+    }));
+}
+
+#[test]
+fn lone_rifle_near_base_does_not_trigger_defensive_panic() {
+    let ts = config::TILE_SIZE as f32;
+    let mut observation = observation(
+        AiEconomy {
+            steel: 1_000,
+            oil: 1_000,
+            supply_used: 8,
+            supply_cap: 30,
+        },
+        vec![
+            building(10, EntityKind::CityCentre, Some(0)),
+            building(11, EntityKind::Barracks, Some(0)),
+            worker(20, AiEntityState::Gather),
+            worker(21, AiEntityState::Gather),
+        ],
+    );
+    observation
+        .visible_enemies
+        .push(enemy(90, EntityKind::Rifleman, 10.5 * ts, 10.5 * ts));
+
+    let decision = decide(
+        &observation,
+        &TECH_TO_TANKS,
+        &mut AiDecisionMemory::for_profile(&TECH_TO_TANKS),
+    );
+
+    assert!(decision.intents.contains(&AiIntent::Build {
+        kind: EntityKind::TrainingCentre
     }));
 }
 
@@ -2254,6 +2292,9 @@ fn sustained_support_panic_falls_back_to_riflemen_without_training_centre() {
     observation
         .visible_enemies
         .push(enemy(90, EntityKind::Rifleman, 10.5 * ts, 10.5 * ts));
+    observation
+        .visible_enemies
+        .push(enemy(91, EntityKind::Rifleman, 10.5 * ts, 11.5 * ts));
     let mut memory = AiDecisionMemory::for_profile(&TECH_TO_TANKS);
 
     let first_decision = decide(&observation, &TECH_TO_TANKS, &mut memory);
