@@ -3,7 +3,7 @@
 //! This module owns what a player is allowed to see. It does not mutate the world; future
 //! last-known-position or partial-reveal rules should grow here.
 
-use crate::game::entity::{fires_while_moving, Entity, GatherPhase, Order};
+use crate::game::entity::{fires_while_moving, Entity, EntityKind, GatherPhase, Order};
 use crate::game::fog::Fog;
 use crate::protocol::EntityView;
 
@@ -92,11 +92,11 @@ pub fn project_entity(
             }
         }
     }
-    if matches!(
-        entity.kind,
-        crate::game::entity::EntityKind::MachineGunner | crate::game::entity::EntityKind::AtTeam
-    ) {
+    if matches!(entity.kind, EntityKind::MachineGunner | EntityKind::AtTeam) {
         view.setup_state = Some(entity.weapon_setup().to_protocol_str().to_string());
+    }
+    if entity.kind == EntityKind::AtTeam && entity.owner == viewer {
+        view.setup_facing = entity.emplacement_facing();
     }
 
     if entity.is_building() && !entity.prod_queue().is_empty() {

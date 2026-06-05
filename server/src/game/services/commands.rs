@@ -2,9 +2,10 @@ use std::collections::{HashMap, HashSet};
 
 use crate::config;
 use crate::game::command::SimCommand;
-use crate::game::entity::{BuildPhase, EntityKind, EntityStore, ProdItem};
+use crate::game::entity::{BuildPhase, EntityKind, EntityStore, ProdItem, WeaponSetup};
 use crate::game::map::Map;
 use crate::game::services::move_coordinator::MoveCoordinator;
+use crate::game::services::movement::angle_delta;
 use crate::game::services::spatial::SpatialIndex;
 use crate::game::services::standability;
 use crate::game::services::world_query;
@@ -64,7 +65,69 @@ pub(crate) fn apply_commands(
                     if !target_ok {
                         continue;
                     }
+                    if deployed_at_gun_target_outside_arc(entities, id, target) {
+                        continue;
+                    }
                     coordinator.order_attack(entities, id, target);
+                }
+            }
+            SimCommand::SetupAtGuns { units, x, y } => {
+                if !x.is_finite() || !y.is_finite() {
+                    continue;
+                }
+                for id in dedupe_cap_units(units) {
+                    if !owns_unit(entities, player, id) || is_constructing(entities, id) {
+                        continue;
+                    }
+                    let Some(e) = entities.get_mut(id) else {
+                        continue;
+                    };
+                    if e.kind != EntityKind::AtTeam {
+                        continue;
+                    }
+                    let facing = (y - e.pos_y).atan2(x - e.pos_x);
+                    if !facing.is_finite() {
+                        continue;
+                    }
+                    entities.release_miner(id);
+                    let Some(e) = entities.get_mut(id) else {
+                        continue;
+                    };
+                    e.clear_orders();
+                    e.set_path_goal(None);
+                    e.set_emplacement_facing(Some(facing));
+                    e.set_facing(facing);
+                    e.set_weapon_facing(facing);
+                    e.set_desired_weapon_facing(facing);
+                    e.set_weapon_setup(WeaponSetup::SettingUp {
+                        ticks: config::MACHINE_GUNNER_SETUP_TICKS,
+                    });
+                    e.reset_gather_state();
+                    let (px, py) = (e.pos_x, e.pos_y);
+                    e.reset_stuck(px, py);
+                }
+            }
+            SimCommand::TearDownAtGuns { units } => {
+                for id in dedupe_cap_units(units) {
+                    if !owns_unit(entities, player, id) || is_constructing(entities, id) {
+                        continue;
+                    }
+                    let Some(e) = entities.get_mut(id) else {
+                        continue;
+                    };
+                    if e.kind != EntityKind::AtTeam {
+                        continue;
+                    }
+                    if matches!(
+                        e.weapon_setup(),
+                        WeaponSetup::SettingUp { .. } | WeaponSetup::Deployed
+                    ) {
+                        e.clear_orders();
+                        e.set_path_goal(None);
+                        e.set_weapon_setup(WeaponSetup::TearingDown {
+                            ticks: config::MACHINE_GUNNER_SETUP_TICKS,
+                        });
+                    }
                 }
             }
             SimCommand::Gather { units, node } => {
@@ -170,6 +233,32 @@ fn is_constructing(entities: &EntityStore, id: u32) -> bool {
         entities.get(id),
         Some(e) if matches!(e.build_phase(), Some(BuildPhase::Constructing { .. }))
     )
+}
+
+fn deployed_at_gun_target_outside_arc(entities: &EntityStore, id: u32, target: u32) -> bool {
+    let Some(attacker) = entities.get(id) else {
+        return false;
+    };
+    if attacker.kind != EntityKind::AtTeam
+        || !matches!(attacker.weapon_setup(), WeaponSetup::Deployed)
+    {
+        return false;
+    }
+    let Some(center) = attacker
+        .emplacement_facing()
+        .or_else(|| attacker.weapon_facing())
+        .filter(|facing| facing.is_finite())
+    else {
+        return false;
+    };
+    let Some(target) = entities.get(target) else {
+        return false;
+    };
+    let target_angle = (target.pos_y - attacker.pos_y).atan2(target.pos_x - attacker.pos_x);
+    if !target_angle.is_finite() {
+        return true;
+    }
+    angle_delta(center, target_angle).abs() > config::AT_GUN_FIELD_OF_FIRE_RAD * 0.5
 }
 
 /// Issue a build order under the "reserve on arrival" model. Validates intent, emits
@@ -369,7 +458,7 @@ pub(crate) fn notice(events: &mut HashMap<u32, Vec<Event>>, player: u32, msg: &s
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::game::entity::{EntityKind, EntityStore, Order};
+    use crate::game::entity::{EntityKind, EntityStore, Order, WeaponSetup};
     use crate::game::map::Map;
     use crate::game::services::move_coordinator::MoveCoordinator;
     use crate::game::services::occupancy::{footprint_center, footprint_tiles, Occupancy};
@@ -589,6 +678,146 @@ mod tests {
             entities.get(barracks).unwrap().rally_point(),
             Some((max, 0.0)),
             "rally point should be clamped into the map bounds"
+        );
+    }
+
+    #[test]
+    fn setup_at_guns_filters_mixed_selection_and_records_facing() {
+        let map = flat_map(24);
+        let mut entities = EntityStore::new();
+        let at = entities
+            .spawn_unit(1, EntityKind::AtTeam, 100.0, 100.0)
+            .expect("at gun should spawn");
+        let rifle = entities
+            .spawn_unit(1, EntityKind::Rifleman, 120.0, 100.0)
+            .expect("rifleman should spawn");
+        let enemy_at = entities
+            .spawn_unit(2, EntityKind::AtTeam, 140.0, 100.0)
+            .expect("enemy at gun should spawn");
+
+        apply(
+            &map,
+            &mut entities,
+            vec![(
+                1,
+                SimCommand::SetupAtGuns {
+                    units: vec![at, rifle, enemy_at, at],
+                    x: 100.0,
+                    y: 140.0,
+                },
+            )],
+        );
+
+        let at = entities.get(at).expect("at gun should exist");
+        assert!(matches!(at.weapon_setup(), WeaponSetup::SettingUp { .. }));
+        assert!(
+            (at.emplacement_facing().unwrap_or_default() - std::f32::consts::FRAC_PI_2).abs()
+                < 0.001,
+            "setup command should store a finite facing toward the target point"
+        );
+        assert_eq!(
+            entities
+                .get(rifle)
+                .expect("rifleman should exist")
+                .weapon_setup(),
+            WeaponSetup::Packed,
+            "non-AT units in the selected list are ignored"
+        );
+        assert_eq!(
+            entities
+                .get(enemy_at)
+                .expect("enemy at gun should exist")
+                .weapon_setup(),
+            WeaponSetup::Packed,
+            "enemy AT guns are ignored"
+        );
+    }
+
+    #[test]
+    fn teardown_at_guns_only_affects_setting_up_or_deployed_at_guns() {
+        let map = flat_map(24);
+        let mut entities = EntityStore::new();
+        let deployed = entities
+            .spawn_unit(1, EntityKind::AtTeam, 100.0, 100.0)
+            .expect("at gun should spawn");
+        let packed = entities
+            .spawn_unit(1, EntityKind::AtTeam, 130.0, 100.0)
+            .expect("at gun should spawn");
+        entities
+            .get_mut(deployed)
+            .unwrap()
+            .set_weapon_setup(WeaponSetup::Deployed);
+
+        apply(
+            &map,
+            &mut entities,
+            vec![(
+                1,
+                SimCommand::TearDownAtGuns {
+                    units: vec![deployed, packed],
+                },
+            )],
+        );
+
+        assert!(matches!(
+            entities.get(deployed).unwrap().weapon_setup(),
+            WeaponSetup::TearingDown { .. }
+        ));
+        assert_eq!(
+            entities.get(packed).unwrap().weapon_setup(),
+            WeaponSetup::Packed
+        );
+    }
+
+    #[test]
+    fn deployed_at_gun_rejects_explicit_attack_outside_field_of_fire() {
+        let map = flat_map(24);
+        let mut entities = EntityStore::new();
+        let at = entities
+            .spawn_unit(1, EntityKind::AtTeam, 100.0, 100.0)
+            .expect("at gun should spawn");
+        let front_target = entities
+            .spawn_unit(2, EntityKind::Tank, 220.0, 100.0)
+            .expect("target should spawn");
+        let side_target = entities
+            .spawn_unit(2, EntityKind::Tank, 100.0, 220.0)
+            .expect("target should spawn");
+        {
+            let at = entities.get_mut(at).unwrap();
+            at.set_weapon_setup(WeaponSetup::Deployed);
+            at.set_emplacement_facing(Some(0.0));
+        }
+
+        apply(
+            &map,
+            &mut entities,
+            vec![(
+                1,
+                SimCommand::Attack {
+                    units: vec![at],
+                    target: side_target,
+                },
+            )],
+        );
+        assert!(
+            !matches!(entities.get(at).unwrap().order(), Order::Attack(_)),
+            "out-of-arc attack should be ignored for the deployed AT gun"
+        );
+
+        apply(
+            &map,
+            &mut entities,
+            vec![(
+                1,
+                SimCommand::Attack {
+                    units: vec![at],
+                    target: front_target,
+                },
+            )],
+        );
+        assert!(
+            matches!(entities.get(at).unwrap().order(), Order::Attack(_)),
+            "in-arc attack should still be accepted"
         );
     }
 
