@@ -1,5 +1,5 @@
 use super::*;
-use crate::game::entity::{BuildPhase, EntityKind, EntityStore, Order, WeaponSetup};
+use crate::game::entity::{BuildPhase, EntityKind, EntityStore, MovePhase, Order, WeaponSetup};
 use crate::game::fog::Fog;
 use crate::game::services::move_coordinator::MoveCoordinator;
 use crate::game::services::movement::movement_system;
@@ -373,6 +373,31 @@ fn attack_move_resumes_original_destination_after_target_is_gone() {
             .expect("attacker should exist")
             .path_goal(),
         Some((300.0, 300.0))
+    );
+}
+
+#[test]
+fn attack_move_resumes_after_firing_cleared_path_before_arrival() {
+    let mut entities = EntityStore::new();
+    let attacker_id = entities
+        .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
+        .expect("attacker should spawn");
+    if let Some(attacker) = entities.get_mut(attacker_id) {
+        attacker.set_order(Order::attack_move_to(300.0, 100.0));
+        attacker.set_path_goal(Some((300.0, 100.0)));
+        attacker.set_path(Vec::new());
+        attacker.mark_move_phase(MovePhase::Moving);
+    }
+
+    let map = open_map(16);
+    run_combat_tick_on_map(&mut entities, &[player_state(1, false)], &map);
+
+    let attacker = entities.get(attacker_id).expect("attacker should exist");
+    assert_eq!(attacker.path_goal(), Some((300.0, 100.0)));
+    assert_eq!(attacker.move_phase(), Some(MovePhase::Moving));
+    assert!(
+        !attacker.path_is_empty(),
+        "attack-move should resume toward its original destination after firing cleared its path"
     );
 }
 

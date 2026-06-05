@@ -746,6 +746,34 @@ function fakeAudioContext() {
     "worker right-click should prioritize an overlapped resource patch over the worker body",
   );
 
+  const moveUnit = { id: 40, owner: 1, kind: KIND.RIFLEMAN, x: 120, y: 120 };
+  input.state = {
+    playerId: 1,
+    map: { tileSize: 32 },
+    entitiesInterpolated: () => [moveUnit],
+    selectedEntities: () => [moveUnit],
+    addCommandFeedback() {},
+  };
+  input.net = { sent: [], command(command) { this.sent.push(command); } };
+  input._onRightClick({ x: 180, y: 180 }, { shiftKey: true });
+  assert(
+    input.net.sent.length === 1 &&
+      input.net.sent[0].c === "move" &&
+      input.net.sent[0].queued === true,
+    "Shift terrain right-click should send queued move",
+  );
+
+  const enemyUnit = { id: 41, owner: 2, kind: KIND.RIFLEMAN, x: 180, y: 180 };
+  input.state.entitiesInterpolated = () => [moveUnit, enemyUnit];
+  input.net.sent = [];
+  input._onRightClick({ x: 180, y: 180 }, { shiftKey: true });
+  assert(
+    input.net.sent.length === 1 &&
+      input.net.sent[0].c === "attack" &&
+      input.net.sent[0].queued === undefined,
+    "Shift right-click on enemies should remain replacement attack behavior in phase 1",
+  );
+
   input.dom = { clientWidth: 800, clientHeight: 600 };
   input.camera = { screenToWorld: (x, y) => ({ x, y }) };
   const deployedAtGun = {
@@ -927,6 +955,29 @@ function fakeAudioContext() {
   });
   assert(sentCommands.length === 1, "a second click without another A press should not issue attack-move");
   assert(selectionClicks.length === 1, "a second click without another A press should be normal selection");
+
+  targetedInput.state.commandTarget = "move";
+  targetedInput._onLeftDown({ x: 260, y: 260 }, { shiftKey: true });
+  let lastSent = sentCommands[sentCommands.length - 1];
+  assert(lastSent.c === "move", "move targeting should issue a move command");
+  assert(lastSent.queued === true, "Shift move targeting should queue movement");
+
+  targetedInput.state.commandTarget = "attack";
+  targetedInput._entityAtWorld = () => null;
+  targetedInput._onLeftDown({ x: 280, y: 280 }, { shiftKey: true });
+  lastSent = sentCommands[sentCommands.length - 1];
+  assert(lastSent.c === "attackMove", "attack targeting terrain should attack-move");
+  assert(lastSent.queued === true, "Shift attack-move targeting should queue attack-move");
+
+  targetedInput.state.commandTarget = "attack";
+  targetedInput._entityAtWorld = () => ({ id: 99, owner: 2, kind: KIND.RIFLEMAN, x: 300, y: 300 });
+  targetedInput._onLeftDown({ x: 300, y: 300 }, { shiftKey: true });
+  lastSent = sentCommands[sentCommands.length - 1];
+  assert(lastSent.c === "attack", "attack targeting an enemy should issue attack");
+  assert(
+    lastSent.queued === undefined,
+    "Shift enemy attack targeting should remain replacement behavior in phase 1",
+  );
 }
 
 // ---------------------------------------------------------------------------
