@@ -134,6 +134,7 @@ pub(super) fn resolve_target(
     )
 }
 
+#[allow(clippy::too_many_arguments)]
 fn retained_firing_target_for_shoot_while_moving_unit(
     entities: &EntityStore,
     los: &LineOfSight<'_>,
