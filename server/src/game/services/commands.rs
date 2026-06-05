@@ -53,6 +53,7 @@ pub(crate) fn apply_commands(
                     })
                     .collect();
                 clear_queued_orders(entities, &valid);
+                clear_staged_at_gun_setup(entities, &valid);
                 coordinator.order_group_move(entities, player, &valid, (x, y), false);
             }
             SimCommand::AttackMove {
@@ -74,6 +75,7 @@ pub(crate) fn apply_commands(
                     })
                     .collect();
                 clear_queued_orders(entities, &valid);
+                clear_staged_at_gun_setup(entities, &valid);
                 coordinator.order_group_move(entities, player, &valid, (x, y), true);
             }
             SimCommand::Attack {
@@ -110,6 +112,7 @@ pub(crate) fn apply_commands(
                     if let Some(e) = entities.get_mut(id) {
                         e.clear_queued_orders();
                     }
+                    clear_staged_at_gun_setup(entities, &[id]);
                     coordinator.order_attack(entities, id, target);
                 }
             }
@@ -139,12 +142,7 @@ pub(crate) fn apply_commands(
                     e.set_path_goal(None);
                     if matches!(e.weapon_setup(), WeaponSetup::Packed) {
                         e.set_emplacement_facing(Some(facing));
-                        e.set_facing(facing);
-                        e.set_weapon_facing(facing);
                         e.set_desired_weapon_facing(facing);
-                        e.set_weapon_setup(WeaponSetup::SettingUp {
-                            ticks: config::AT_TEAM_SETUP_TICKS,
-                        });
                     } else {
                         e.set_pending_redeploy_facing(Some(facing));
                         e.set_weapon_setup(WeaponSetup::TearingDownToRedeploy {
@@ -176,6 +174,9 @@ pub(crate) fn apply_commands(
                         e.set_weapon_setup(WeaponSetup::TearingDown {
                             ticks: config::AT_TEAM_SETUP_TICKS,
                         });
+                    } else if matches!(e.weapon_setup(), WeaponSetup::Packed) {
+                        e.set_emplacement_facing(None);
+                        e.set_pending_redeploy_facing(None);
                     }
                 }
             }
@@ -385,6 +386,18 @@ fn can_accept_move_order(entities: &EntityStore, id: u32) -> bool {
         Some(e)
             if e.kind != EntityKind::AtTeam || matches!(e.weapon_setup(), WeaponSetup::Packed)
     )
+}
+
+fn clear_staged_at_gun_setup(entities: &mut EntityStore, ids: &[u32]) {
+    for id in ids {
+        let Some(e) = entities.get_mut(*id) else {
+            continue;
+        };
+        if e.kind == EntityKind::AtTeam && matches!(e.weapon_setup(), WeaponSetup::Packed) {
+            e.set_emplacement_facing(None);
+            e.set_pending_redeploy_facing(None);
+        }
+    }
 }
 
 fn player_has_completed_training_centre(entities: &EntityStore, player: u32) -> bool {
@@ -1199,11 +1212,15 @@ mod tests {
         );
 
         let at = entities.get(at).expect("at gun should exist");
-        assert!(matches!(at.weapon_setup(), WeaponSetup::SettingUp { .. }));
+        assert_eq!(at.weapon_setup(), WeaponSetup::Packed);
         assert!(
             (at.emplacement_facing().unwrap_or_default() - std::f32::consts::FRAC_PI_2).abs()
                 < 0.001,
             "setup command should store a finite facing toward the target point"
+        );
+        assert!(
+            at.facing().abs() < 0.001,
+            "setup command should not snap the AT gun body to the target facing"
         );
         assert_eq!(
             entities
@@ -1237,6 +1254,10 @@ mod tests {
             .get_mut(deployed)
             .unwrap()
             .set_weapon_setup(WeaponSetup::Deployed);
+        entities
+            .get_mut(packed)
+            .unwrap()
+            .set_emplacement_facing(Some(1.0));
 
         apply(
             &map,
@@ -1256,6 +1277,11 @@ mod tests {
         assert_eq!(
             entities.get(packed).unwrap().weapon_setup(),
             WeaponSetup::Packed
+        );
+        assert_eq!(
+            entities.get(packed).unwrap().emplacement_facing(),
+            None,
+            "teardown should cancel a packed AT gun's staged setup facing"
         );
     }
 

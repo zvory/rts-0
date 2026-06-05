@@ -2,6 +2,7 @@ use super::*;
 use crate::game::entity::{BuildPhase, EntityKind, EntityStore, MovePhase, Order, WeaponSetup};
 use crate::game::fog::Fog;
 use crate::game::services::move_coordinator::MoveCoordinator;
+use crate::game::services::movement::angle_delta;
 use crate::game::services::movement::movement_system;
 use crate::game::services::occupancy::Occupancy;
 use crate::game::services::pathing::PathingService;
@@ -1203,6 +1204,58 @@ fn at_team_redeploy_rotates_during_teardown_and_setup() {
         (at.facing() - target).abs() <= AT_GUN_TURN_RATE_RAD_PER_TICK + 0.001,
         "AT gun should finish redeploy facing the requested direction, got {:.4}",
         at.facing()
+    );
+}
+
+#[test]
+fn packed_at_team_rotates_before_setup_animation_begins() {
+    let mut entities = EntityStore::new();
+    let at_id = entities
+        .spawn_unit(1, EntityKind::AtTeam, 100.0, 100.0)
+        .expect("at team should spawn");
+    let target = std::f32::consts::FRAC_PI_2;
+    if let Some(at) = entities.get_mut(at_id) {
+        at.set_weapon_setup(WeaponSetup::Packed);
+        at.set_emplacement_facing(Some(target));
+        at.set_desired_weapon_facing(target);
+        at.set_facing(0.0);
+        at.set_weapon_facing(0.0);
+    }
+
+    run_combat_tick(&mut entities);
+
+    let at = entities.get(at_id).expect("at should exist");
+    assert_eq!(
+        at.weapon_setup(),
+        WeaponSetup::Packed,
+        "AT gun should stay packed until it has rotated into setup tolerance"
+    );
+    assert!(
+        at.facing() > 0.0 && at.facing() <= AT_GUN_TURN_RATE_RAD_PER_TICK + 0.001,
+        "AT gun should begin rotating while still packed, got {:.4}",
+        at.facing()
+    );
+
+    let mut saw_setting_up = false;
+    for _ in 0..200 {
+        run_combat_tick(&mut entities);
+        let at = entities.get(at_id).expect("at should exist");
+        if matches!(
+            at.weapon_setup(),
+            WeaponSetup::SettingUp { .. } | WeaponSetup::Deployed
+        ) {
+            saw_setting_up = true;
+            assert!(
+                angle_delta(at.facing(), target).abs() <= AT_GUN_FIRE_TOLERANCE_RAD + 0.001,
+                "setup animation should begin only after the AT gun is aligned, got {:.4}",
+                at.facing()
+            );
+            break;
+        }
+    }
+    assert!(
+        saw_setting_up,
+        "AT gun should eventually start setup once it rotates into tolerance"
     );
 }
 
