@@ -871,8 +871,8 @@ fn packed_at_team_fires_with_shorter_range_and_reduced_damage() {
 
     assert_eq!(
         entities.get(tank_id).expect("enemy should exist").hp,
-        enemy_hp - 36,
-        "packed AT gun should deal 75% of its deployed 48 damage"
+        enemy_hp - 47,
+        "packed AT gun should deal 75% of its deployed 62 damage"
     );
 }
 
