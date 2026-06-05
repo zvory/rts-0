@@ -15,7 +15,8 @@
 
 use crate::config;
 use crate::game::entity::{
-    uses_oriented_vehicle_body, EntityKind, EntityStore, MovePhase, Order, WeaponSetup,
+    uses_car_movement_semantics, uses_oriented_vehicle_body, EntityKind, EntityStore, MovePhase,
+    Order, WeaponSetup,
 };
 use crate::game::map::Map;
 use crate::game::pathfinding::{self, Passability};
@@ -28,7 +29,8 @@ use crate::game::services::occupancy::{
     building_footprint, footprint_center, footprint_tiles, Occupancy,
 };
 use crate::game::services::pathing::{
-    simplify_reverse_waypoints, PathRequest, PathingService, RouteShape,
+    simplify_reverse_waypoints, simplify_reverse_waypoints_with_limit, PathRequest, PathingService,
+    RouteShape,
 };
 use crate::game::services::standability;
 
@@ -46,6 +48,7 @@ const FORMATION_NEAR_DISTANCE_PX: f32 = config::TILE_SIZE as f32 * 4.0;
 const FORMATION_FAR_DISTANCE_PX: f32 = config::TILE_SIZE as f32 * 18.0;
 const FORMATION_MAX_OFFSET_PX: f32 = config::TILE_SIZE as f32 * 10.0;
 const SPAWN_PREFERRED_GAP_UNIT_FRACTION: f32 = 0.10;
+const SCOUT_CAR_ROUTE_SIMPLIFY_MAX_SEGMENT_PX: f32 = config::TILE_SIZE as f32 * 3.0;
 
 /// The movement/pathing coordinator for one tick.
 pub struct MoveCoordinator<'a> {
@@ -413,16 +416,19 @@ impl<'a> MoveCoordinator<'a> {
         };
         let (gx, gy) = self.map.tile_of(goal.0, goal.1);
         let radius_tiles = config::unit_radius_tiles(kind);
+        let route_shape = if smooth_static_segments && uses_car_movement_semantics(kind) {
+            RouteShape::ScoutCarClearance
+        } else if smooth_static_segments && uses_oriented_vehicle_body(kind) {
+            RouteShape::PreferFewerTurns
+        } else {
+            RouteShape::Normal
+        };
         let req = PathRequest {
             kind,
             start: (sx as i32, sy as i32),
             goal: (gx as i32, gy as i32),
             radius_tiles,
-            route_shape: if smooth_static_segments && uses_oriented_vehicle_body(kind) {
-                RouteShape::PreferFewerTurns
-            } else {
-                RouteShape::Normal
-            },
+            route_shape,
             budget: None,
         };
         let mut waypoints = self.pathing.request(self.map, self.occ, req);
@@ -430,9 +436,18 @@ impl<'a> MoveCoordinator<'a> {
         // Snap the final waypoint to the exact requested goal for precise arrival.
         if !waypoints.is_empty() {
             waypoints[0] = goal;
-            if smooth_static_segments && uses_oriented_vehicle_body(kind) {
+            if route_shape == RouteShape::PreferFewerTurns {
                 waypoints =
                     simplify_reverse_waypoints(self.map, self.occ, kind, start_pos, waypoints);
+            } else if route_shape == RouteShape::ScoutCarClearance {
+                waypoints = simplify_reverse_waypoints_with_limit(
+                    self.map,
+                    self.occ,
+                    kind,
+                    start_pos,
+                    waypoints,
+                    SCOUT_CAR_ROUTE_SIMPLIFY_MAX_SEGMENT_PX,
+                );
             }
         }
 
@@ -1590,6 +1605,42 @@ mod tests {
             "paths are reverse-ordered, so index 0 must remain the exact requested final goal"
         );
         assert_eq!(unit.path_goal(), Some(exact_goal));
+    }
+
+    #[test]
+    fn smooth_scout_car_path_uses_clearance_route_shape() {
+        let map = Map {
+            size: 40,
+            terrain: vec![crate::protocol::terrain::GRASS; 40 * 40],
+            starts: vec![],
+            expansion_sites: vec![],
+        };
+        let mut entities = EntityStore::new();
+        let start = map.tile_center(10, 10);
+        let unit = entities
+            .spawn_unit(1, EntityKind::ScoutCar, start.0, start.1)
+            .expect("scout car should spawn");
+        let goal_tile = (24, 18);
+        let goal = map.tile_center(goal_tile.0, goal_tile.1);
+        let occ = Occupancy::build(&map, &entities);
+
+        let mut pathing = PathingService::new(8_192, 256);
+        pathing.advance_tick(1);
+        {
+            let mut coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, 1);
+            assert!(
+                coordinator.request_path(&mut entities, unit, goal, true),
+                "fixture path should be found"
+            );
+        }
+
+        assert!(pathing.cache_contains(
+            EntityKind::ScoutCar,
+            (10, 10),
+            (goal_tile.0 as i32, goal_tile.1 as i32),
+            config::unit_radius_tiles(EntityKind::ScoutCar),
+            RouteShape::ScoutCarClearance
+        ));
     }
 
     #[test]

@@ -16,6 +16,10 @@ use crate::rules::terrain::{self, TerrainKind};
 const SCOUT_CAR_HARD_CLEARANCE_TILES: u16 = 1;
 const SCOUT_CAR_PREFERRED_CLEARANCE_TILES: u16 = 3;
 const SCOUT_CAR_CLEARANCE_COST_SCALE: u32 = 2;
+const SCOUT_CAR_ROUTE_TURN_PENALTY: u32 = 5;
+const SCOUT_CAR_ADJACENT_BLOCKER_COST: u32 = 2;
+const SCOUT_CAR_CORNER_GRAZE_COST: u32 = 18;
+const SCOUT_CAR_DIAGONAL_BLOCKER_COST: u32 = 3;
 
 /// Parameters for a single path query.
 #[derive(Clone)]
@@ -39,6 +43,7 @@ pub struct PathRequest {
 pub enum RouteShape {
     Normal,
     PreferFewerTurns,
+    ScoutCarClearance,
 }
 
 impl RouteShape {
@@ -46,6 +51,7 @@ impl RouteShape {
         match self {
             RouteShape::Normal => 0,
             RouteShape::PreferFewerTurns => 3,
+            RouteShape::ScoutCarClearance => SCOUT_CAR_ROUTE_TURN_PENALTY,
         }
     }
 }
@@ -56,6 +62,7 @@ struct TerrainPassability<'a> {
     occupancy: &'a Occupancy<'a>,
     kind: EntityKind,
     radius_tiles: u32,
+    route_shape: RouteShape,
     /// When true, reject tiles pinched between two diagonally-opposite blocked corners.
     /// Used for oriented vehicle bodies so A* avoids 1-tile gaps that the rotating hull
     /// cannot legally thread (see DESIGN.md pathing notes).
@@ -105,10 +112,41 @@ impl Passability for TerrainPassability<'_> {
     }
 
     fn movement_cost(&self, tx: i32, ty: i32) -> u32 {
-        if !uses_car_movement_semantics(self.kind) {
+        if self.route_shape != RouteShape::ScoutCarClearance
+            || !uses_car_movement_semantics(self.kind)
+        {
             return 0;
         }
         scout_car_clearance_cost(self.occupancy.clearance_at_tile(tx, ty))
+            .saturating_add(self.scout_car_corner_cost(tx, ty))
+    }
+}
+
+impl TerrainPassability<'_> {
+    fn scout_car_corner_cost(&self, tx: i32, ty: i32) -> u32 {
+        let n = !self.tile_passable(tx, ty - 1);
+        let e = !self.tile_passable(tx + 1, ty);
+        let s = !self.tile_passable(tx, ty + 1);
+        let w = !self.tile_passable(tx - 1, ty);
+        let nw = !self.tile_passable(tx - 1, ty - 1);
+        let ne = !self.tile_passable(tx + 1, ty - 1);
+        let se = !self.tile_passable(tx + 1, ty + 1);
+        let sw = !self.tile_passable(tx - 1, ty + 1);
+
+        let adjacent_blockers = [n, e, s, w].into_iter().filter(|blocked| *blocked).count() as u32;
+        let diagonal_blockers = [nw, ne, se, sw]
+            .into_iter()
+            .filter(|blocked| *blocked)
+            .count() as u32;
+        let grazes_corner = (w || e) && (s || n);
+
+        adjacent_blockers * SCOUT_CAR_ADJACENT_BLOCKER_COST
+            + diagonal_blockers * SCOUT_CAR_DIAGONAL_BLOCKER_COST
+            + if grazes_corner {
+                SCOUT_CAR_CORNER_GRAZE_COST
+            } else {
+                0
+            }
     }
 }
 
@@ -169,6 +207,7 @@ impl PathingService {
             occupancy,
             kind: req.kind,
             radius_tiles: req.radius_tiles,
+            route_shape: req.route_shape,
             avoid_diagonal_pinch: uses_oriented_vehicle_body(req.kind),
         };
 
@@ -267,6 +306,17 @@ pub(crate) fn simplify_reverse_waypoints(
     start: (f32, f32),
     waypoints: Vec<(f32, f32)>,
 ) -> Vec<(f32, f32)> {
+    simplify_reverse_waypoints_with_limit(map, occupancy, kind, start, waypoints, f32::INFINITY)
+}
+
+pub(crate) fn simplify_reverse_waypoints_with_limit(
+    map: &Map,
+    occupancy: &Occupancy,
+    kind: EntityKind,
+    start: (f32, f32),
+    waypoints: Vec<(f32, f32)>,
+    max_segment_px: f32,
+) -> Vec<(f32, f32)> {
     if waypoints.len() <= 1 {
         return waypoints;
     }
@@ -279,6 +329,9 @@ pub(crate) fn simplify_reverse_waypoints(
     while next_index < forward.len() {
         let mut farthest_legal = None;
         for candidate_index in (next_index..forward.len()).rev() {
+            if distance_between(from, forward[candidate_index]) > max_segment_px {
+                continue;
+            }
             if standability::unit_static_segment_standable(
                 map,
                 occupancy,
@@ -300,6 +353,12 @@ pub(crate) fn simplify_reverse_waypoints(
 
     simplified.reverse();
     simplified
+}
+
+fn distance_between(a: (f32, f32), b: (f32, f32)) -> f32 {
+    let dx = b.0 - a.0;
+    let dy = b.1 - a.1;
+    (dx * dx + dy * dy).sqrt()
 }
 
 #[cfg(test)]
@@ -427,6 +486,16 @@ mod tests {
                 budget: None,
             },
         )
+    }
+
+    fn min_tile_clearance(occ: &Occupancy, tile_path: &[(i32, i32)]) -> u16 {
+        let interior_len = tile_path.len().saturating_sub(1);
+        tile_path
+            .iter()
+            .take(interior_len)
+            .map(|&(tx, ty)| occ.clearance_at_tile(tx, ty))
+            .min()
+            .unwrap_or(0)
     }
 
     fn raw_world_path(
@@ -798,7 +867,11 @@ mod tests {
         let goal = (28, 17);
         let mut service = PathingService::new(8_192, 256);
 
-        for route_shape in [RouteShape::Normal, RouteShape::PreferFewerTurns] {
+        for route_shape in [
+            RouteShape::Normal,
+            RouteShape::PreferFewerTurns,
+            RouteShape::ScoutCarClearance,
+        ] {
             let path = service.request_tile_path(
                 &map,
                 &occ,
@@ -814,7 +887,7 @@ mod tests {
             assert!(!path.is_empty());
         }
 
-        assert_eq!(service.cache_len(), 2);
+        assert_eq!(service.cache_len(), 3);
         assert!(service.cache_contains(EntityKind::Tank, start, goal, 0, RouteShape::Normal));
         assert!(service.cache_contains(
             EntityKind::Tank,
@@ -822,6 +895,56 @@ mod tests {
             goal,
             0,
             RouteShape::PreferFewerTurns
+        ));
+        assert!(service.cache_contains(
+            EntityKind::Tank,
+            start,
+            goal,
+            0,
+            RouteShape::ScoutCarClearance
+        ));
+    }
+
+    #[test]
+    fn scout_car_clearance_route_shape_is_part_of_path_cache_key() {
+        let map = flat_test_map(40);
+        let entities = EntityStore::new();
+        let occ = Occupancy::build(&map, &entities);
+        let start = (4, 4);
+        let goal = (28, 17);
+        let radius_tiles = config::unit_radius_tiles(EntityKind::ScoutCar);
+        let mut service = PathingService::new(8_192, 256);
+
+        for route_shape in [RouteShape::Normal, RouteShape::ScoutCarClearance] {
+            let path = service.request_tile_path(
+                &map,
+                &occ,
+                PathRequest {
+                    kind: EntityKind::ScoutCar,
+                    start,
+                    goal,
+                    radius_tiles,
+                    route_shape,
+                    budget: None,
+                },
+            );
+            assert!(!path.is_empty());
+        }
+
+        assert_eq!(service.cache_len(), 2);
+        assert!(service.cache_contains(
+            EntityKind::ScoutCar,
+            start,
+            goal,
+            radius_tiles,
+            RouteShape::Normal
+        ));
+        assert!(service.cache_contains(
+            EntityKind::ScoutCar,
+            start,
+            goal,
+            radius_tiles,
+            RouteShape::ScoutCarClearance
         ));
     }
 
@@ -1215,7 +1338,7 @@ mod tests {
         let start = (1, 4);
         let goal = (14, 4);
 
-        let tile_path = service.request_tile_path(
+        let normal = service.request_tile_path(
             &map,
             &occ,
             PathRequest {
@@ -1227,11 +1350,28 @@ mod tests {
                 budget: None,
             },
         );
+        let shaped = service.request_tile_path(
+            &map,
+            &occ,
+            PathRequest {
+                kind: EntityKind::ScoutCar,
+                start,
+                goal,
+                radius_tiles: config::unit_radius_tiles(EntityKind::ScoutCar),
+                route_shape: RouteShape::ScoutCarClearance,
+                budget: None,
+            },
+        );
 
-        assert_eq!(tile_path.last().copied(), Some(goal));
+        assert_eq!(normal.last().copied(), Some(goal));
+        assert_eq!(shaped.last().copied(), Some(goal));
         assert!(
-            tile_path.iter().any(|&(_, ty)| ty >= 6),
-            "scout car route should move away from the wall shelf when open space is available, got {tile_path:?}"
+            min_tile_clearance(&occ, &shaped) > min_tile_clearance(&occ, &normal),
+            "scout car clearance route should improve minimum clearance, normal={normal:?} shaped={shaped:?}"
+        );
+        assert!(
+            shaped.iter().any(|&(_, ty)| ty >= 6),
+            "scout car route should move away from the wall shelf when open space is available, got {shaped:?}"
         );
     }
 
@@ -1252,12 +1392,43 @@ mod tests {
                 start,
                 goal,
                 radius_tiles: config::unit_radius_tiles(EntityKind::ScoutCar),
-                route_shape: RouteShape::Normal,
+                route_shape: RouteShape::ScoutCarClearance,
                 budget: None,
             },
         );
 
         assert_eq!(tile_path.last().copied(), Some(goal));
+    }
+
+    #[test]
+    fn scout_car_clearance_route_avoids_corner_graze_tiles_when_alternatives_exist() {
+        let map = map_with_rock_rect(24, 9, 8, 11, 10);
+        let entities = EntityStore::new();
+        let occ = Occupancy::build(&map, &entities);
+        let mut service = PathingService::new(8_192, 16);
+        let start = (5, 11);
+        let goal = (15, 7);
+
+        let shaped = service.request_tile_path(
+            &map,
+            &occ,
+            PathRequest {
+                kind: EntityKind::ScoutCar,
+                start,
+                goal,
+                radius_tiles: config::unit_radius_tiles(EntityKind::ScoutCar),
+                route_shape: RouteShape::ScoutCarClearance,
+                budget: None,
+            },
+        );
+
+        assert_eq!(shaped.last().copied(), Some(goal));
+        for corner_graze in [(8, 11), (12, 7)] {
+            assert!(
+                !shaped.contains(&corner_graze),
+                "scout car clearance route should avoid corner-graze tile {corner_graze:?} when a wider route exists, got {shaped:?}"
+            );
+        }
     }
 
     fn diagonal_pinch_map() -> Map {
