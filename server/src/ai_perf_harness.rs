@@ -13,7 +13,7 @@ mod rules;
 #[path = "lobby/snapshots.rs"]
 mod snapshots;
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::process;
 use std::time::{Duration, Instant};
 
@@ -27,6 +27,7 @@ const DEFAULT_TICKS: u32 = 20_000;
 const DEFAULT_PERF_MODE: &str = "sample";
 const DEFAULT_SAMPLE_EVERY: u32 = 300;
 const ROOM_NAME: &str = "ai-perf-harness";
+const TOP_WORST_TICKS: usize = 10;
 
 #[derive(Debug)]
 struct CliConfig {
@@ -50,6 +51,179 @@ struct HarnessSummary {
     attack_events: usize,
     death_events: usize,
     final_counts: perf::EntityCounts,
+    perf_report: PerfReport,
+}
+
+#[derive(Debug, Default)]
+struct PerfReport {
+    ticks: MetricSeries,
+    phases: BTreeMap<&'static str, MetricSeries>,
+    snapshot_build: MetricSeries,
+    snapshot_compact: MetricSeries,
+    snapshot_serialize: MetricSeries,
+    snapshot_total: MetricSeries,
+    snapshot_entities: CountSeries,
+    snapshot_resource_deltas: CountSeries,
+    snapshot_events: CountSeries,
+    worst_ticks: Vec<WorstTick>,
+}
+
+#[derive(Debug)]
+struct WorstTick {
+    tick: u32,
+    total: Duration,
+    slowest_phase: &'static str,
+    slowest_phase_duration: Duration,
+    entities: usize,
+    units: usize,
+    buildings: usize,
+    resources: usize,
+}
+
+#[derive(Debug, Default)]
+struct MetricSeries {
+    samples: Vec<Duration>,
+}
+
+#[derive(Debug, Default)]
+struct CountSeries {
+    samples: Vec<usize>,
+}
+
+impl PerfReport {
+    fn record_snapshot_serialize(&mut self, duration: Duration) {
+        self.snapshot_serialize.record(duration);
+    }
+
+    fn record_total_only_tick(&mut self, tick: u32, total: Duration, counts: perf::EntityCounts) {
+        self.ticks.record(total);
+        self.record_worst_tick(WorstTick {
+            tick,
+            total,
+            slowest_phase: "none",
+            slowest_phase_duration: Duration::ZERO,
+            entities: counts.entities,
+            units: counts.units,
+            buildings: counts.buildings,
+            resources: counts.resources,
+        });
+    }
+
+    fn record_tick(
+        &mut self,
+        tick: u32,
+        total: Duration,
+        counts: perf::EntityCounts,
+        perf_tick: &perf::TickPerf,
+    ) {
+        self.ticks.record(total);
+
+        let mut slowest_phase = "none";
+        let mut slowest_phase_duration = Duration::ZERO;
+        for (phase, duration) in perf_tick.phase_records() {
+            self.phases.entry(phase).or_default().record(duration);
+            if !matches!(phase, "game_tick" | "snapshot_fanout" | "outcome_checks")
+                && duration > slowest_phase_duration
+            {
+                slowest_phase = phase;
+                slowest_phase_duration = duration;
+            }
+        }
+
+        for snapshot in perf_tick.snapshot_records() {
+            self.snapshot_build.record(snapshot.snapshot);
+            self.snapshot_compact.record(snapshot.compact);
+            self.snapshot_total.record(snapshot.total);
+            self.snapshot_entities.record(snapshot.entities);
+            self.snapshot_resource_deltas
+                .record(snapshot.resource_deltas);
+            self.snapshot_events.record(snapshot.events);
+        }
+
+        self.record_worst_tick(WorstTick {
+            tick,
+            total,
+            slowest_phase,
+            slowest_phase_duration,
+            entities: counts.entities,
+            units: counts.units,
+            buildings: counts.buildings,
+            resources: counts.resources,
+        });
+    }
+
+    fn record_worst_tick(&mut self, tick: WorstTick) {
+        self.worst_ticks.push(tick);
+        self.worst_ticks
+            .sort_unstable_by(|a, b| b.total.cmp(&a.total).then_with(|| a.tick.cmp(&b.tick)));
+        self.worst_ticks.truncate(TOP_WORST_TICKS);
+    }
+}
+
+impl MetricSeries {
+    fn record(&mut self, duration: Duration) {
+        self.samples.push(duration);
+    }
+
+    fn len(&self) -> usize {
+        self.samples.len()
+    }
+
+    fn is_empty(&self) -> bool {
+        self.samples.is_empty()
+    }
+
+    fn total(&self) -> Duration {
+        self.samples.iter().copied().sum()
+    }
+
+    fn max(&self) -> Duration {
+        self.samples.iter().copied().max().unwrap_or(Duration::ZERO)
+    }
+
+    fn avg(&self) -> Duration {
+        if self.samples.is_empty() {
+            Duration::ZERO
+        } else {
+            duration_div(self.total(), self.samples.len() as u32)
+        }
+    }
+
+    fn percentile(&self, numerator: usize, denominator: usize) -> Duration {
+        if self.samples.is_empty() || denominator == 0 {
+            return Duration::ZERO;
+        }
+        let mut sorted = self.samples.clone();
+        sorted.sort_unstable();
+        let rank = (sorted.len() * numerator).div_ceil(denominator);
+        let index = rank.saturating_sub(1).min(sorted.len() - 1);
+        sorted[index]
+    }
+
+    fn count_at_least(&self, threshold: Duration) -> usize {
+        self.samples
+            .iter()
+            .filter(|&&duration| duration >= threshold)
+            .count()
+    }
+}
+
+impl CountSeries {
+    fn record(&mut self, count: usize) {
+        self.samples.push(count);
+    }
+
+    fn max(&self) -> usize {
+        self.samples.iter().copied().max().unwrap_or(0)
+    }
+
+    fn avg(&self) -> usize {
+        if self.samples.is_empty() {
+            0
+        } else {
+            self.samples.iter().sum::<usize>() / self.samples.len()
+        }
+    }
 }
 
 fn main() {
@@ -100,6 +274,7 @@ fn run_harness(config: CliConfig) -> Result<HarnessSummary, String> {
     let mut serialized_snapshots = 0u64;
     let mut attack_events = 0usize;
     let mut death_events = 0usize;
+    let mut perf_report = PerfReport::default();
 
     while game.tick_count() < config.ticks {
         let alive = game.alive_players();
@@ -156,6 +331,7 @@ fn run_harness(config: CliConfig) -> Result<HarnessSummary, String> {
             let serialize_duration = serialize_start.elapsed();
             snapshot_bytes = snapshot_bytes.saturating_add(payload.len() as u64);
             serialized_snapshots = serialized_snapshots.saturating_add(1);
+            perf_report.record_snapshot_serialize(serialize_duration);
             perf::log_writer_message(
                 player.id,
                 "snapshot",
@@ -183,18 +359,23 @@ fn run_harness(config: CliConfig) -> Result<HarnessSummary, String> {
 
         let outcome_start = Instant::now();
         let alive = game.alive_players();
+        let total = tick_start.elapsed();
+        let counts = game.perf_entity_counts();
         if let Some(perf_tick) = perf_tick.as_mut() {
             perf_tick.record_phase("outcome_checks", outcome_start.elapsed());
+            perf_report.record_tick(game.current_tick(), total, counts, perf_tick);
             perf_tick.finish(perf::TickContext {
                 room: ROOM_NAME,
                 tick: game.current_tick(),
                 scheduler_lag: Duration::ZERO,
-                total: tick_start.elapsed(),
+                total,
                 players: players.len(),
                 spectators: 0,
                 ai_players: players.len(),
-                counts: game.perf_entity_counts(),
+                counts,
             });
+        } else {
+            perf_report.record_total_only_tick(game.current_tick(), total, counts);
         }
         if alive.len() <= 1 {
             break;
@@ -214,6 +395,7 @@ fn run_harness(config: CliConfig) -> Result<HarnessSummary, String> {
         attack_events,
         death_events,
         final_counts: game.perf_entity_counts(),
+        perf_report,
     })
 }
 
@@ -363,6 +545,189 @@ fn print_summary(summary: &HarnessSummary) {
         summary.final_counts.buildings,
         summary.final_counts.resources
     );
+    print_perf_report(&summary.perf_report);
+}
+
+fn print_perf_report(report: &PerfReport) {
+    if report.ticks.is_empty() {
+        return;
+    }
+
+    let config = perf::PerfConfig::global();
+    println!();
+    println!("Perf aggregate report");
+    println!(
+        "tick_total: samples={} total_ms={} avg_us={} p95_us={} p99_us={} max_us={} slow_ticks>={}ms={}",
+        report.ticks.len(),
+        report.ticks.total().as_millis(),
+        report.ticks.avg().as_micros(),
+        report.ticks.percentile(95, 100).as_micros(),
+        report.ticks.percentile(99, 100).as_micros(),
+        report.ticks.max().as_micros(),
+        config.slow_tick().as_millis(),
+        report.ticks.count_at_least(config.slow_tick())
+    );
+
+    print_phase_table(
+        "top-level phases by total",
+        phase_rows(report, |phase| {
+            matches!(phase, "game_tick" | "snapshot_fanout" | "outcome_checks")
+        }),
+        report.ticks.total(),
+        config.slow_phase(),
+    );
+    print_phase_table(
+        "simulation phases by total",
+        phase_rows(report, |phase| {
+            !matches!(phase, "game_tick" | "snapshot_fanout" | "outcome_checks")
+        }),
+        report.ticks.total(),
+        config.slow_phase(),
+    );
+    print_snapshot_report(report, config.slow_snapshot());
+    print_worst_ticks(report);
+}
+
+fn phase_rows(
+    report: &PerfReport,
+    keep: impl Fn(&'static str) -> bool,
+) -> Vec<(&'static str, &MetricSeries)> {
+    let mut rows: Vec<_> = report
+        .phases
+        .iter()
+        .filter(|(phase, _)| keep(phase))
+        .map(|(&phase, metrics)| (phase, metrics))
+        .collect();
+    rows.sort_unstable_by(|a, b| {
+        b.1.total()
+            .cmp(&a.1.total())
+            .then_with(|| b.1.max().cmp(&a.1.max()))
+            .then_with(|| a.0.cmp(b.0))
+    });
+    rows
+}
+
+fn print_phase_table(
+    title: &str,
+    rows: Vec<(&'static str, &MetricSeries)>,
+    tick_total: Duration,
+    spike_threshold: Duration,
+) {
+    if rows.is_empty() {
+        return;
+    }
+    println!();
+    println!("{title}");
+    println!(
+        "{:<24} {:>8} {:>10} {:>7} {:>9} {:>9} {:>9} {:>9} {:>9}",
+        "phase", "samples", "total_ms", "share", "avg_us", "p95_us", "p99_us", "max_us", "spikes"
+    );
+    for (phase, metrics) in rows {
+        println!(
+            "{:<24} {:>8} {:>10} {:>6.1}% {:>9} {:>9} {:>9} {:>9} {:>9}",
+            phase,
+            metrics.len(),
+            metrics.total().as_millis(),
+            percent_of(metrics.total(), tick_total),
+            metrics.avg().as_micros(),
+            metrics.percentile(95, 100).as_micros(),
+            metrics.percentile(99, 100).as_micros(),
+            metrics.max().as_micros(),
+            metrics.count_at_least(spike_threshold)
+        );
+    }
+}
+
+fn print_snapshot_report(report: &PerfReport, spike_threshold: Duration) {
+    if report.snapshot_total.is_empty() && report.snapshot_serialize.is_empty() {
+        return;
+    }
+
+    println!();
+    println!("snapshot detail");
+    println!(
+        "{:<24} {:>8} {:>10} {:>9} {:>9} {:>9} {:>9} {:>9}",
+        "part", "samples", "total_ms", "avg_us", "p95_us", "p99_us", "max_us", "spikes"
+    );
+    for (name, metrics) in [
+        ("snapshot_build", &report.snapshot_build),
+        ("snapshot_compact", &report.snapshot_compact),
+        ("snapshot_build_compact", &report.snapshot_total),
+        ("snapshot_serialize", &report.snapshot_serialize),
+    ] {
+        if metrics.is_empty() {
+            continue;
+        }
+        println!(
+            "{:<24} {:>8} {:>10} {:>9} {:>9} {:>9} {:>9} {:>9}",
+            name,
+            metrics.len(),
+            metrics.total().as_millis(),
+            metrics.avg().as_micros(),
+            metrics.percentile(95, 100).as_micros(),
+            metrics.percentile(99, 100).as_micros(),
+            metrics.max().as_micros(),
+            metrics.count_at_least(spike_threshold)
+        );
+    }
+    println!(
+        "snapshot_payload_shape: avg_entities={} max_entities={} avg_resource_deltas={} max_resource_deltas={} avg_events={} max_events={}",
+        report.snapshot_entities.avg(),
+        report.snapshot_entities.max(),
+        report.snapshot_resource_deltas.avg(),
+        report.snapshot_resource_deltas.max(),
+        report.snapshot_events.avg(),
+        report.snapshot_events.max()
+    );
+}
+
+fn print_worst_ticks(report: &PerfReport) {
+    if report.worst_ticks.is_empty() {
+        return;
+    }
+
+    println!();
+    println!("worst ticks");
+    println!(
+        "{:>8} {:>10} {:<24} {:>12} {:>9} {:>7} {:>10} {:>10}",
+        "tick",
+        "total_us",
+        "slowest_phase",
+        "phase_us",
+        "entities",
+        "units",
+        "buildings",
+        "resources"
+    );
+    for tick in &report.worst_ticks {
+        println!(
+            "{:>8} {:>10} {:<24} {:>12} {:>9} {:>7} {:>10} {:>10}",
+            tick.tick,
+            tick.total.as_micros(),
+            tick.slowest_phase,
+            tick.slowest_phase_duration.as_micros(),
+            tick.entities,
+            tick.units,
+            tick.buildings,
+            tick.resources
+        );
+    }
+}
+
+fn percent_of(part: Duration, whole: Duration) -> f64 {
+    if whole.is_zero() {
+        0.0
+    } else {
+        part.as_secs_f64() * 100.0 / whole.as_secs_f64()
+    }
+}
+
+fn duration_div(duration: Duration, divisor: u32) -> Duration {
+    if divisor == 0 {
+        Duration::ZERO
+    } else {
+        duration / divisor
+    }
 }
 
 fn winner_text(alive_players: &[u32]) -> String {
