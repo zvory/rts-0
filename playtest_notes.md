@@ -1,4 +1,9 @@
 - contorl groups
+- left click bug stille xists
+- you are under attack plays when supply blocked
+- make scout car much quieter
+- make scout car turn radius smaller
+
 - make it so that AT guns are revealed by shooting, and there's an obvious visual animatino 
 - imposisble to get units through the side entrances
 - shift queueing of movements
