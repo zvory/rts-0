@@ -7,6 +7,7 @@ import {
   RESOURCE_AMOUNTS,
   AT_GUN_DEPLOYED_RANGE_TILES,
   AT_GUN_FIELD_OF_FIRE_RAD,
+  MINING_CC_RANGE_TILES,
   isProducerBuilding,
 } from "../config.js";
 import { KIND, SETUP, STATE, isBuilding, isResource } from "../protocol.js";
@@ -74,6 +75,27 @@ export function _drawPlacement(state, fog) {
   for (let j = 1; j < (stat.footH || 2); j++) {
     g.moveTo(x0, y0 + j * ts);
     g.lineTo(x0 + w, y0 + j * ts);
+  }
+
+  if (p.building !== KIND.CITY_CENTRE) return;
+
+  const cx = x0 + w / 2;
+  const cy = y0 + h / 2;
+  const rangePx = MINING_CC_RANGE_TILES * ts;
+  const rangeSq = rangePx * rangePx;
+  const resourceColor = 0x4aa3ff;
+  for (const node of state.map?.resources || []) {
+    if (!node || !isResource(node.kind) || node.remaining === 0) continue;
+    const dx = node.x - cx;
+    const dy = node.y - cy;
+    if (dx * dx + dy * dy > rangeSq + 0.001) continue;
+
+    const resourceStat = STATS[node.kind] || {};
+    const radius = Math.max(13, (resourceStat.size || 12) + 7);
+    g.lineStyle(4, resourceColor, 0.95);
+    g.beginFill(resourceColor, 0.12);
+    g.drawCircle(node.x, node.y, radius);
+    g.endFill();
   }
 }
 
