@@ -1010,6 +1010,22 @@ input[type="text"]:focus {
   border-right: 1px solid var(--panel-edge);
   border-bottom: 1px solid var(--panel-edge);
 }
+.cmd-btn .cmd-ready-count {
+  position: absolute;
+  top: 3px;
+  right: 4px;
+  min-width: 14px;
+  padding: 0 3px;
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--ink);
+  background: rgba(17, 17, 15, 0.82);
+  border: 1px solid var(--panel-edge);
+  border-radius: 999px;
+}
 /* Cost badge, bottom edge. Steel / oil costs colored to match the world. */
 .cmd-btn .cmd-cost {
   position: absolute;

@@ -385,6 +385,10 @@ pub struct EntityView {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub active_marker: Option<QueuedOrderMarker>,
 
+    // Owner-only ability cooldown state for HUD affordances.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub charge_cooldown_left: Option<u16>,
+
     // True when this entity is visible only through lingering death vision. It is real-time
     // visual intel, but not actionable for selection or attack commands.
     #[serde(default, skip_serializing_if = "is_false")]
@@ -428,6 +432,7 @@ impl EntityView {
             oil_used: None,
             queued_markers: Vec::new(),
             active_marker: None,
+            charge_cooldown_left: None,
             vision_only: false,
         }
     }
@@ -507,7 +512,7 @@ impl NoticeSeverity {
 ///
 /// [`Snapshot`] remains the semantic source of truth for game code. This format is only a
 /// transport-side optimization for `ServerMessage::Snapshot`.
-pub const COMPACT_SNAPSHOT_VERSION: u8 = 3;
+pub const COMPACT_SNAPSHOT_VERSION: u8 = 4;
 
 /// Serialize one semantic snapshot as a compact JSON text frame payload.
 pub fn serialize_compact_snapshot(snapshot: &Snapshot) -> serde_json::Result<String> {
@@ -632,8 +637,11 @@ impl Serialize for CompactEntity<'_> {
         if entity.active_marker.is_some() {
             len = 23;
         }
-        if entity.vision_only {
+        if entity.charge_cooldown_left.is_some() {
             len = 24;
+        }
+        if entity.vision_only {
+            len = 25;
         }
 
         let mut seq = serializer.serialize_seq(Some(len))?;
@@ -701,6 +709,9 @@ impl Serialize for CompactEntity<'_> {
             }
         }
         if len > 23 {
+            seq.serialize_element(&entity.charge_cooldown_left)?;
+        }
+        if len > 24 {
             seq.serialize_element(&entity.vision_only)?;
         }
         seq.end()
@@ -923,6 +934,7 @@ mod tests {
             y: 112.0,
             attack_move: false,
         });
+        worker.charge_cooldown_left = Some(87);
         worker.vision_only = true;
 
         let mut gunner = EntityView::new(
@@ -1028,7 +1040,8 @@ mod tests {
             serde_json::json!([[128.0, 160.0], [192.0, 224.0, true]])
         );
         assert_eq!(value["e"][0][22], serde_json::json!([96.0, 112.0]));
-        assert_eq!(value["e"][0][23], serde_json::json!(true));
+        assert_eq!(value["e"][0][23], serde_json::json!(87));
+        assert_eq!(value["e"][0][24], serde_json::json!(true));
         // Rally point rides in slot 18 of the producing building's record.
         assert_eq!(value["e"][2][18], serde_json::json!([256.0, 512.0]));
         assert_eq!(value["r"], serde_json::json!([[200, 1498]]));

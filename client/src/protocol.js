@@ -121,7 +121,7 @@ export const NOTICE_SEVERITY = Object.freeze({
 });
 
 // --- Compact snapshot wire schema (must match protocol.rs) ---
-export const COMPACT_SNAPSHOT_VERSION = 3;
+export const COMPACT_SNAPSHOT_VERSION = 4;
 
 export const KIND_CODE = Object.freeze({
   [KIND.WORKER]: 1,
@@ -233,7 +233,7 @@ function decodeCompactPlayerResource(record, index) {
 }
 
 function decodeCompactEntity(record, index) {
-  const fields = readArray(record, `entity ${index}`, 24);
+  const fields = readArray(record, `entity ${index}`, 25);
   if (fields.length < 8) throw new Error(`entity ${index} is too short`);
   const entity = {
     id: readU32(fields[0], "entity.id"),
@@ -261,7 +261,8 @@ function decodeCompactEntity(record, index) {
   assignOptional(entity, "setupFacing", fields, 20, readNumber);
   assignQueuedMarkers(entity, fields, 21);
   assignPointMarker(entity, "activeMarker", fields, 22);
-  assignOptional(entity, "visionOnly", fields, 23, readBool);
+  assignOptional(entity, "chargeCooldownLeft", fields, 23, readU32);
+  assignOptional(entity, "visionOnly", fields, 24, readBool);
   return entity;
 }
 

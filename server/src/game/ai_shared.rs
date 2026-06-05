@@ -415,6 +415,7 @@ mod tests {
                     oil_used: None,
                     queued_markers: Vec::new(),
                     active_marker: None,
+                    charge_cooldown_left: None,
                     vision_only: false,
                 },
                 EntityView {
@@ -441,6 +442,7 @@ mod tests {
                     oil_used: None,
                     queued_markers: Vec::new(),
                     active_marker: None,
+                    charge_cooldown_left: None,
                     vision_only: false,
                 },
                 EntityView {
@@ -467,6 +469,7 @@ mod tests {
                     oil_used: None,
                     queued_markers: Vec::new(),
                     active_marker: None,
+                    charge_cooldown_left: None,
                     vision_only: false,
                 },
                 EntityView {
@@ -493,6 +496,7 @@ mod tests {
                     oil_used: None,
                     queued_markers: Vec::new(),
                     active_marker: None,
+                    charge_cooldown_left: None,
                     vision_only: false,
                 },
                 EntityView {
@@ -519,6 +523,7 @@ mod tests {
                     oil_used: None,
                     queued_markers: Vec::new(),
                     active_marker: None,
+                    charge_cooldown_left: None,
                     vision_only: false,
                 },
             ],

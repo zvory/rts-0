@@ -456,6 +456,12 @@ export class HUD {
       .map((e) => e.id);
   }
 
+  _selectedOwnReadyChargeRiflemanIds(sel) {
+    return this._selectedOwnUnits(sel)
+      .filter((e) => e.kind === KIND.RIFLEMAN && (e.chargeCooldownLeft || 0) === 0)
+      .map((e) => e.id);
+  }
+
   /** True when the actionable selected units are workers and no army unit is selected. */
   _workerOnlySelection(sel) {
     const ownUnits = this._selectedOwnUnits(sel);
@@ -469,15 +475,18 @@ export class HUD {
     const unitIds = ownUnits.map((e) => e.id);
     const atGunIds = ownUnits.filter((e) => e.kind === KIND.AT_TEAM).map((e) => e.id);
     const riflemanIds = this._selectedOwnRiflemanIds(sel);
+    const readyChargeRiflemanIds = this._selectedOwnReadyChargeRiflemanIds(sel);
     const chargeUnlocked =
       riflemanIds.length > 0 && this._playerHasCompleteKind(KIND.TRAINING_CENTRE);
+    const chargeReadyCount = readyChargeRiflemanIds.length;
+    const showChargeReadyCount = chargeUnlocked && chargeReadyCount < riflemanIds.length;
     const hasArmyUnit = ownUnits.some((e) => e.kind !== KIND.WORKER);
     const workerSelected = !hasArmyUnit && ownUnits.some((e) => e.kind === KIND.WORKER);
 
     const sig =
       `units|${unitIds.join(".")}|target:${this.state.commandTarget || ""}|` +
       `|at:${atGunIds.join(".")}|` +
-      `|rifle:${riflemanIds.join(".")}|charge:${chargeUnlocked ? 1 : 0}|` +
+      `|rifle:${riflemanIds.join(".")}|charge:${chargeUnlocked ? 1 : 0}:${chargeReadyCount}|` +
       (workerSelected ? "worker-main" : "no-build");
     if (sig === this._cardSig) return;
     this._cardSig = sig;
@@ -585,10 +594,11 @@ export class HUD {
           label: "Charge",
           title: "Riflemen sprint briefly at double movement speed",
           hotkey: GRID_HOTKEYS[idx++],
-          enabled: true,
+          enabled: chargeReadyCount > 0,
+          countBadge: showChargeReadyCount ? `${chargeReadyCount}` : "",
           cls: "",
           onClick: () => {
-            this.net.command(cmd.charge(riflemanIds));
+            this.net.command(cmd.charge(readyChargeRiflemanIds));
             this.state.endCommandTarget();
           },
         }));
@@ -842,6 +852,7 @@ export class HUD {
    * @param {boolean} opts.enabled whether the action is currently available.
    * @param {string} [opts.title] tooltip / disabled reason.
    * @param {string} [opts.cls] extra class (e.g. "cancel").
+   * @param {string} [opts.countBadge] top-right ready count for partially-available abilities.
    * @param {() => void} opts.onClick click handler (skipped when disabled).
    * @returns {HTMLButtonElement}
    */
@@ -868,6 +879,7 @@ export class HUD {
       `<span class="cmd-icon">${opts.icon || ""}</span>` +
       `<span class="cmd-label">${opts.label || ""}</span>` +
       (opts.hotkey ? `<span class="cmd-hotkey">${opts.hotkey}</span>` : "") +
+      (opts.countBadge ? `<span class="cmd-ready-count">${opts.countBadge}</span>` : "") +
       costHtml;
 
     if (opts.enabled && typeof opts.onClick === "function") {

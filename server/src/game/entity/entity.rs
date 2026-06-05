@@ -373,6 +373,13 @@ impl Entity {
         self.movement.as_ref().map(|m| m.charge_ticks).unwrap_or(0)
     }
 
+    pub fn charge_cooldown_ticks(&self) -> u16 {
+        self.movement
+            .as_ref()
+            .map(|m| m.charge_cooldown_ticks)
+            .unwrap_or(0)
+    }
+
     pub fn start_charge(&mut self, ticks: u16) {
         if self.kind == EntityKind::Rifleman {
             if let Some(m) = self.movement.as_mut() {
@@ -381,9 +388,23 @@ impl Entity {
         }
     }
 
+    pub fn start_charge_cooldown(&mut self, ticks: u16) {
+        if self.kind == EntityKind::Rifleman {
+            if let Some(m) = self.movement.as_mut() {
+                m.charge_cooldown_ticks = ticks;
+            }
+        }
+    }
+
     pub fn tick_charge(&mut self) {
         if let Some(m) = self.movement.as_mut() {
             m.charge_ticks = m.charge_ticks.saturating_sub(1);
+        }
+    }
+
+    pub fn tick_charge_cooldown(&mut self) {
+        if let Some(m) = self.movement.as_mut() {
+            m.charge_cooldown_ticks = m.charge_cooldown_ticks.saturating_sub(1);
         }
     }
 
