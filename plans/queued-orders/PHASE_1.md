@@ -1,5 +1,7 @@
 # Phase 1 - Queued Move and Attack-Move
 
+Status: Done.
+
 Goal: make Shift-clicked movement paths work for selected units.
 
 ## Scope
