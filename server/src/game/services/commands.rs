@@ -452,7 +452,11 @@ fn order_build(
     };
     let (cost_steel, cost_oil) = rules::economy::cost(building);
     if ps.steel < cost_steel || ps.oil < cost_oil {
-        notice(events, player, "Not enough resources");
+        notice(
+            events,
+            player,
+            rules::economy::resource_shortage_notice(ps.steel, ps.oil, cost_steel, cost_oil),
+        );
         return;
     }
 
@@ -500,7 +504,11 @@ fn order_train(
     let (cost_steel, cost_oil) = rules::economy::cost(unit);
     let supply = rules::economy::supply_cost(unit);
     if ps.steel < cost_steel || ps.oil < cost_oil {
-        notice(events, player, "Not enough resources");
+        notice(
+            events,
+            player,
+            rules::economy::resource_shortage_notice(ps.steel, ps.oil, cost_steel, cost_oil),
+        );
         return;
     }
     if ps.supply_used + supply > ps.supply_cap {
@@ -1304,27 +1312,96 @@ mod tests {
         assert_eq!(rifle.path_goal(), None);
     }
 
+    #[test]
+    fn train_resource_shortages_emit_specific_notices() {
+        let map = flat_map(24);
+
+        let mut oil_missing_entities = EntityStore::new();
+        let (fx, fy) = footprint_center(&map, EntityKind::Factory, 6, 6);
+        let factory = oil_missing_entities
+            .spawn_building(1, EntityKind::Factory, fx, fy, true)
+            .expect("factory should spawn");
+        let mut oil_missing_players = vec![player_state(1), player_state(2)];
+        oil_missing_players[0].oil = 0;
+        let oil_missing_events = apply_with_players(
+            &map,
+            &mut oil_missing_entities,
+            &mut oil_missing_players,
+            vec![(
+                1,
+                SimCommand::Train {
+                    building: factory,
+                    unit: EntityKind::ScoutCar,
+                },
+            )],
+        );
+        assert!(
+            matches!(
+                oil_missing_events.get(&1).and_then(|events| events.first()),
+                Some(Event::Notice { msg, .. }) if msg == "Not enough oil"
+            ),
+            "oil-gated units should emit the oil voice-line notice"
+        );
+
+        let mut steel_missing_entities = EntityStore::new();
+        let (cx, cy) = footprint_center(&map, EntityKind::CityCentre, 6, 6);
+        let city_centre = steel_missing_entities
+            .spawn_building(1, EntityKind::CityCentre, cx, cy, true)
+            .expect("city centre should spawn");
+        let mut steel_missing_players = vec![player_state(1), player_state(2)];
+        steel_missing_players[0].steel = 0;
+        let steel_missing_events = apply_with_players(
+            &map,
+            &mut steel_missing_entities,
+            &mut steel_missing_players,
+            vec![(
+                1,
+                SimCommand::Train {
+                    building: city_centre,
+                    unit: EntityKind::Worker,
+                },
+            )],
+        );
+        assert!(
+            matches!(
+                steel_missing_events.get(&1).and_then(|events| events.first()),
+                Some(Event::Notice { msg, .. }) if msg == "Not enough steel"
+            ),
+            "steel-only units should emit the steel voice-line notice"
+        );
+    }
+
     /// Run `apply_commands` with throwaway derived state for command-validation tests.
     fn apply(map: &Map, entities: &mut EntityStore, pending: Vec<(u32, SimCommand)>) {
+        let mut players = vec![player_state(1), player_state(2)];
+        let _ = apply_with_players(map, entities, &mut players, pending);
+    }
+
+    fn apply_with_players(
+        map: &Map,
+        entities: &mut EntityStore,
+        players: &mut [PlayerState],
+        pending: Vec<(u32, SimCommand)>,
+    ) -> HashMap<u32, Vec<Event>> {
         let spatial = SpatialIndex::build(entities, map.size);
         let occ = Occupancy::build(map, entities);
         let mut pathing = PathingService::new(1024, 32);
         pathing.advance_tick(1);
         let mut coordinator = MoveCoordinator::new(&mut pathing, map, &occ, 1);
-        let mut players = vec![player_state(1), player_state(2)];
         let mut fog = Fog::new(map.size);
         fog.recompute(&[1, 2], entities, map);
         let mut events = HashMap::new();
         apply_commands(
             map,
             entities,
-            &mut players,
+            players,
             &spatial,
             &mut coordinator,
             &fog,
             pending,
             &mut events,
         );
+        events
     }
 
     fn flat_map(size: u32) -> Map {

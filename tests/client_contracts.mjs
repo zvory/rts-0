@@ -16,7 +16,7 @@ import {
   STATS,
 } from "../client/src/config.js";
 import { HUD, formatTankOilUsed, playerHasCompletedKind } from "../client/src/hud.js";
-import { Audio } from "../client/src/audio.js";
+import { Audio, noticeSoundId } from "../client/src/audio.js";
 import {
   attackKindHasCombatSound,
   machineGunnerHasAudibleTarget,
@@ -77,6 +77,16 @@ function assertHasGetter(obj, name, msgPrefix = "") {
     `${msgPrefix || "Object"} missing getter "${name}"`,
   );
 }
+
+assert(noticeSoundId("alert:under_attack") === "notice_under_attack", "under-attack notice has dedicated sound id");
+assert(noticeSoundId("Not enough supply") === "notice_supply", "supply notice routes to supply voice line");
+assert(noticeSoundId("Build more depots") === "notice_supply", "depot notice routes to supply voice line");
+assert(noticeSoundId("Not enough steel") === "notice_steel", "steel notice routes to steel voice line");
+assert(noticeSoundId("Not enough oil") === "notice_oil", "oil notice routes to oil voice line");
+assert(noticeSoundId("Cannot build there") === "notice_cannot_build", "cannot-build notice routes to cannot-build voice line");
+assert(noticeSoundId("Requirement not met") === null, "generic invalid notices stay silent");
+assert(noticeSoundId("Unknown unit") === null, "unknown-unit notices stay silent");
+assert(noticeSoundId("Not enough resources") === null, "generic resource notices stay silent");
 
 function fakeAudioParam(value = 1) {
   return {
@@ -1133,10 +1143,10 @@ function fakeAudioContext() {
   assert(audio.voices.every((v) => v.category === "alert"), "Audio priority eviction keeps highest-priority voices");
 
   audio.voices.slice().forEach((v) => v.node.stop());
-  audio.buffers.set("notice_generic", { duration: 0.5 });
+  audio.buffers.set("notice_under_attack", { duration: 0.5 });
   now = 10_000;
   assert(
-    audio.play("notice_generic", {
+    audio.play("notice_under_attack", {
       category: "alert",
       alertId: "under_attack",
       alertX: 100,
@@ -1145,7 +1155,7 @@ function fakeAudioContext() {
     "first under-attack alert plays",
   );
   assert(
-    !audio.play("notice_generic", {
+    !audio.play("notice_under_attack", {
       category: "alert",
       alertId: "under_attack",
       alertX: 120,
@@ -1154,7 +1164,7 @@ function fakeAudioContext() {
     "under-attack alert dedups within the same spatial bucket",
   );
   assert(
-    audio.play("notice_generic", {
+    audio.play("notice_under_attack", {
       category: "alert",
       alertId: "under_attack",
       alertX: 2000,

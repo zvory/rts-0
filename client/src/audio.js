@@ -493,7 +493,7 @@ export class Audio {
 
   _dedupKey(id, category, opts, spatial) {
     if (typeof opts.dedupKey === "string" && opts.dedupKey) return `${id}:${opts.dedupKey}`;
-    if (id === "notice_generic" && opts.alertId === "under_attack") {
+    if (id === "notice_under_attack" && opts.alertId === "under_attack") {
       const x = Number(opts.alertX);
       const y = Number(opts.alertY);
       if (isFinite(x) && isFinite(y)) {
@@ -511,7 +511,7 @@ export class Audio {
 
   _cooldownMs(id, category, opts, buf) {
     if (typeof opts.cooldownMs === "number" && opts.cooldownMs >= 0) return opts.cooldownMs;
-    if (id === "notice_generic" && opts.alertId === "under_attack") {
+    if (id === "notice_under_attack" && opts.alertId === "under_attack") {
       return UNDER_ATTACK_COOLDOWN_MS;
     }
     if (SPOKEN_CATEGORIES.has(category)) {
@@ -656,7 +656,7 @@ export class Audio {
  * IDs are stable seams referenced by main.js, input/index.js, and renderer/index.js.
  */
 export const SOUND_MANIFEST = Object.freeze([
-  { id: "notice_generic",      url: "/assets/sound/alert/alert_under_attack_01.mp3",  category: "alert" },
+  { id: "notice_under_attack", url: "/assets/sound/alert/alert_under_attack_01.mp3",  category: "alert" },
   { id: "notice_supply",       url: "/assets/sound/alert/alert_supply_low_01.mp3",    category: "alert" },
   { id: "notice_steel",        url: "/assets/sound/alert/alert_steel_low_01.mp3",     category: "alert" },
   { id: "notice_oil",          url: "/assets/sound/alert/alert_oil_low_01.mp3",       category: "alert" },
@@ -673,12 +673,12 @@ export const SOUND_MANIFEST = Object.freeze([
 ]);
 
 /**
- * Pick a notice sound id from a server `Notice` message text. Simple keyword
- * routing — sufficient until phase 4 adds richer alert categorization.
+ * Pick a notice sound id from a server `Notice` message text, or null when
+ * there is no matching voice line.
  */
 export function noticeSoundId(msg) {
   const m = (msg || "").toLowerCase();
-  if (m.includes("under_attack") || m.includes("under attack")) return "notice_generic";
+  if (m.includes("under_attack") || m.includes("under attack")) return "notice_under_attack";
   if (m.includes("supply") || m.includes("depot")) return "notice_supply";
   if (m.includes("steel")) return "notice_steel";
   if (m.includes("oil")) return "notice_oil";
@@ -686,5 +686,5 @@ export function noticeSoundId(msg) {
     return "notice_cannot_build";
   }
   if (m.includes("out of range") || m.includes("too far")) return "notice_out_of_range";
-  return "notice_generic";
+  return null;
 }
