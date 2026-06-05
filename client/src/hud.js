@@ -1,6 +1,6 @@
 // HUD — the DOM overlay for the game screen: resource/supply bar, the selected-units
-// panel, and the context-sensitive command card (build buttons for workers, train
-// buttons for production buildings). See DESIGN.md §4.1 (HUD) and §5 for balance.
+// panel, and the context-sensitive command card (unit actions, worker build submenu,
+// train buttons for production buildings). See DESIGN.md §4.1 (HUD) and §5 for balance.
 //
 // The HUD is plain DOM (not Pixi). It is rebuilt cheaply each frame from `state`; the
 // only stateful trick is reusing command-card buttons between frames so that holding a
@@ -365,7 +365,8 @@ export class HUD {
   /**
    * Render the context command card based on the current selection:
    *  - selected own units → action buttons for move / attack / stop.
-   *  - a selected WORKER → action buttons plus build buttons for WORKER_BUILDABLE.
+   *  - a selected WORKER → unit action buttons plus a build-menu button.
+   *  - worker build submenu → build buttons for WORKER_BUILDABLE plus a return button.
    *  - selected production buildings (have `STATS[kind].trains`) → train
    *    buttons for the primary producer's trainable units. Successive train clicks
    *    are distributed round-robin across the selected compatible producers. A
@@ -395,7 +396,9 @@ export class HUD {
       return;
     }
 
-    if (this._selectedOwnUnits(sel).length > 0) {
+    if (this.state.commandCardMode === "workerBuild" && this._workerOnlySelection(sel)) {
+      this._renderBuildCard(card);
+    } else if (this._selectedOwnUnits(sel).length > 0) {
       this._renderUnitCard(card, sel);
     } else {
       this._renderTrainCard(card, primary);
@@ -450,6 +453,12 @@ export class HUD {
     return sel.filter((e) => this._isOwn(e) && isUnit(e.kind));
   }
 
+  /** True when the actionable selected units are workers and no army unit is selected. */
+  _workerOnlySelection(sel) {
+    const ownUnits = this._selectedOwnUnits(sel);
+    return ownUnits.length > 0 && ownUnits.every((e) => e.kind === KIND.WORKER);
+  }
+
   // --- Unit card (units selected) ------------------------------------------
 
   _renderUnitCard(card, sel) {
@@ -458,14 +467,11 @@ export class HUD {
     const atGunIds = ownUnits.filter((e) => e.kind === KIND.AT_TEAM).map((e) => e.id);
     const hasArmyUnit = ownUnits.some((e) => e.kind !== KIND.WORKER);
     const workerSelected = !hasArmyUnit && ownUnits.some((e) => e.kind === KIND.WORKER);
-    const res = this.state.resources || { steel: 0, oil: 0 };
 
     const sig =
       `units|${unitIds.join(".")}|target:${this.state.commandTarget || ""}|` +
       `|at:${atGunIds.join(".")}|` +
-      (workerSelected
-        ? WORKER_BUILDABLE.map((k) => `${k}:${this._canBuild(k, res) ? 1 : 0}`).join(",")
-        : "no-build");
+      (workerSelected ? "worker-main" : "no-build");
     if (sig === this._cardSig) return;
     this._cardSig = sig;
 
@@ -473,40 +479,55 @@ export class HUD {
     let idx = 0;
 
     if (workerSelected) {
-      // Workers: compact layout — Move/Attack/Hold at Q/W/E, build buttons fill A+.
-      const actionButtons = [
-        {
-          icon: "MV",
-          label: "Move",
-          title: "Move to a target point",
-          active: this.state.commandTarget === "move",
-          onClick: () => this.state.beginCommandTarget("move"),
-        },
-        {
-          icon: "AT",
-          label: "Attack",
-          title: "Attack a target or attack-move to a point",
-          active: this.state.commandTarget === "attack",
-          onClick: () => this.state.beginCommandTarget("attack"),
-        },
-        {
-          icon: "HD",
-          label: "Hold",
-          title: "Hold position / stop selected units",
-          onClick: () => {
-            this.net.command(cmd.stop(unitIds));
-            this.state.endCommandTarget();
-          },
-        },
-      ];
-      for (const action of actionButtons) {
-        frag.appendChild(this._cmdButton({
-          ...action,
-          hotkey: GRID_HOTKEYS[idx++],
-          enabled: unitIds.length > 0,
-          cls: action.active ? "active" : "",
-        }));
+      // Workers mirror the standard unit layout: Q=Move, A=Attack, S=Hold.
+      frag.appendChild(this._cmdButton({
+        icon: "MV",
+        label: "Move",
+        title: "Move to a target point",
+        hotkey: GRID_HOTKEYS[0],
+        enabled: unitIds.length > 0,
+        cls: this.state.commandTarget === "move" ? "active" : "",
+        onClick: () => this.state.beginCommandTarget("move"),
+      }));
+      for (let i = 0; i < 2; i++) {
+        const el = document.createElement("div");
+        el.className = "cmd-empty";
+        frag.appendChild(el);
       }
+      frag.appendChild(this._cmdButton({
+        icon: "AT",
+        label: "Attack",
+        title: "Attack a target or attack-move to a point",
+        hotkey: GRID_HOTKEYS[3],
+        enabled: unitIds.length > 0,
+        cls: this.state.commandTarget === "attack" ? "active" : "",
+        onClick: () => this.state.beginCommandTarget("attack"),
+      }));
+      frag.appendChild(this._cmdButton({
+        icon: "HD",
+        label: "Hold",
+        title: "Hold position / stop selected units",
+        hotkey: GRID_HOTKEYS[4],
+        enabled: unitIds.length > 0,
+        cls: "",
+        onClick: () => {
+          this.net.command(cmd.stop(unitIds));
+          this.state.endCommandTarget();
+        },
+      }));
+      const empty = document.createElement("div");
+      empty.className = "cmd-empty";
+      frag.appendChild(empty);
+      idx = 6;
+      frag.appendChild(this._cmdButton({
+        icon: "BLD",
+        label: "Build",
+        title: "Open worker build menu",
+        hotkey: GRID_HOTKEYS[idx++],
+        enabled: unitIds.length > 0,
+        cls: "",
+        onClick: () => this.state.openWorkerBuildMenu(),
+      }));
     } else {
       // Non-worker units: Q=Move, W/E=empty, A=Attack, S=Hold.
       frag.appendChild(this._cmdButton({
@@ -574,27 +595,6 @@ export class HUD {
       }
     }
 
-    if (workerSelected) {
-      for (const kind of WORKER_BUILDABLE) {
-        const st = STATS[kind];
-        if (!st) continue;
-        const enabled = this._canBuild(kind, res);
-        const reason = this._buildDisabledReason(kind, res);
-        frag.appendChild(this._cmdButton({
-          icon: st.icon,
-          label: st.label,
-          hotkey: GRID_HOTKEYS[idx++],
-          cost: st.cost,
-          enabled,
-          title: reason,
-          onClick: () => {
-            this.state.endCommandTarget();
-            this.state.beginPlacement(kind);
-          },
-        }));
-      }
-    }
-
     this._padCard(frag, idx);
     card.innerHTML = "";
     card.appendChild(frag);
@@ -630,7 +630,15 @@ export class HUD {
       });
       frag.appendChild(btn);
     }
-    this._padCard(frag, idx);
+    this._padCard(frag, idx, 8);
+    frag.appendChild(this._cmdButton({
+      icon: "RTN",
+      label: "Worker",
+      hotkey: GRID_HOTKEYS[8],
+      enabled: true,
+      title: "Return to worker commands",
+      onClick: () => this.state.closeCommandCardMenu(),
+    }));
     card.innerHTML = "";
     card.appendChild(frag);
   }
