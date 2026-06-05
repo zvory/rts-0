@@ -553,6 +553,12 @@ fn resolve_target(
         return None;
     }
 
+    if let Some(target) = retained_firing_target_for_shoot_while_moving_unit(
+        entities, los, self_id, owner, px, py, acquire_px,
+    ) {
+        return Some(target);
+    }
+
     // AT teams prefer tanks over all other targets; fall back to nearest enemy if no tank
     // is in range.
     let prefers_armored = entities
@@ -586,6 +592,41 @@ fn resolve_target(
         acquire_px,
         |target| los.clear_between_world_points((px, py), (target.pos_x, target.pos_y)),
     )
+}
+
+fn retained_firing_target_for_shoot_while_moving_unit(
+    entities: &EntityStore,
+    los: &LineOfSight<'_>,
+    self_id: u32,
+    owner: u32,
+    px: f32,
+    py: f32,
+    acquire_px: f32,
+) -> Option<u32> {
+    let attacker = entities.get(self_id)?;
+    if !fires_while_moving(attacker.kind) {
+        return None;
+    }
+    let target_id = attacker.target_id()?;
+    let target = entities.get(target_id)?;
+    if !world_query::is_enemy_targetable(target, owner, self_id) {
+        return None;
+    }
+    let concealment =
+        crate::rules::terrain::concealment_modifier(target.kind, TerrainKind::Open).max(0.0);
+    let effective_acquire_px = acquire_px * concealment;
+    if !effective_acquire_px.is_finite() {
+        return None;
+    }
+    let dx = target.pos_x - px;
+    let dy = target.pos_y - py;
+    if dx * dx + dy * dy > effective_acquire_px * effective_acquire_px {
+        return None;
+    }
+    if !los.clear_between_world_points((px, py), (target.pos_x, target.pos_y)) {
+        return None;
+    }
+    Some(target_id)
 }
 
 /// Apply `dmg` to `victim` from `attacker`, emitting an `Attack` event for every fired shot.
@@ -1397,6 +1438,95 @@ mod tests {
         assert_eq!(tank.target_id(), None);
         assert_eq!(tank.path_goal(), Some((300.0, 100.0)));
         assert_eq!(tank.next_waypoint(), Some((300.0, 100.0)));
+    }
+
+    #[test]
+    fn shoot_while_moving_units_keep_existing_valid_target() {
+        for kind in [EntityKind::Tank, EntityKind::ScoutCar] {
+            let mut entities = EntityStore::new();
+            let attacker_id = entities
+                .spawn_unit(1, kind, 100.0, 100.0)
+                .expect("attacker should spawn");
+            let retained_target_id = entities
+                .spawn_unit(2, EntityKind::Worker, 150.0, 100.0)
+                .expect("retained target should spawn");
+            entities
+                .spawn_unit(2, EntityKind::Worker, 120.0, 130.0)
+                .expect("closer target should spawn");
+            if let Some(attacker) = entities.get_mut(attacker_id) {
+                attacker.set_order(Order::move_to(300.0, 100.0));
+                attacker.set_target_id(Some(retained_target_id));
+            }
+
+            let map = open_map(8);
+            let los = LineOfSight::new(&map);
+            let spatial = SpatialIndex::build(&entities, map.size);
+            let attacker = entities
+                .get(attacker_id)
+                .expect("attacker should still exist");
+
+            let target = resolve_target(
+                &entities,
+                &spatial,
+                &los,
+                attacker_id,
+                attacker.owner,
+                attacker.pos_x,
+                attacker.pos_y,
+                192.0,
+                combat_mode(attacker),
+            );
+
+            assert_eq!(
+                target,
+                Some(retained_target_id),
+                "{kind} should stay focused"
+            );
+        }
+    }
+
+    #[test]
+    fn shoot_while_moving_units_reacquire_when_existing_target_is_dead() {
+        for kind in [EntityKind::Tank, EntityKind::ScoutCar] {
+            let mut entities = EntityStore::new();
+            let attacker_id = entities
+                .spawn_unit(1, kind, 100.0, 100.0)
+                .expect("attacker should spawn");
+            let dead_target_id = entities
+                .spawn_unit(2, EntityKind::Worker, 150.0, 100.0)
+                .expect("dead target should spawn");
+            let new_target_id = entities
+                .spawn_unit(2, EntityKind::Worker, 120.0, 130.0)
+                .expect("new target should spawn");
+            if let Some(dead_target) = entities.get_mut(dead_target_id) {
+                dead_target.hp = 0;
+            }
+            if let Some(attacker) = entities.get_mut(attacker_id) {
+                attacker.set_order(Order::move_to(300.0, 100.0));
+                attacker.set_target_id(Some(dead_target_id));
+            }
+
+            let map = open_map(8);
+            let los = LineOfSight::new(&map);
+            let spatial = SpatialIndex::build(&entities, map.size);
+            let attacker = entities
+                .get(attacker_id)
+                .expect("attacker should still exist");
+
+            let target = resolve_target(
+                &entities,
+                &spatial,
+                &los,
+                attacker_id,
+                attacker.owner,
+                attacker.pos_x,
+                attacker.pos_y,
+                192.0,
+                combat_mode(attacker),
+            );
+
+            assert_eq!(target, Some(new_target_id), "{kind} should reacquire");
+        }
     }
 
     #[test]
