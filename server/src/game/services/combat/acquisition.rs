@@ -1,4 +1,5 @@
 use crate::game::entity::{fires_while_moving, Entity, EntityKind, EntityStore, Order};
+use crate::game::fog::Fog;
 use crate::game::services::line_of_sight::LineOfSight;
 use crate::game::services::spatial::SpatialIndex;
 use crate::game::services::world_query;
@@ -35,6 +36,7 @@ pub(super) fn resolve_target(
     entities: &EntityStore,
     spatial: &SpatialIndex,
     los: &LineOfSight<'_>,
+    fog: &Fog,
     self_id: u32,
     owner: u32,
     px: f32,
@@ -46,7 +48,14 @@ pub(super) fn resolve_target(
     if mode == CombatMode::Ordered {
         if let Some(e) = entities.get(self_id) {
             if let Some(target) = e.order().attack_target() {
-                if entities.get(target).map(|t| t.hp > 0).unwrap_or(false) {
+                if entities
+                    .get(target)
+                    .map(|t| {
+                        world_query::is_enemy_targetable(t, owner, self_id)
+                            && target_visible_to_owner(fog, owner, t)
+                    })
+                    .unwrap_or(false)
+                {
                     return Some(target);
                 }
             }
@@ -59,7 +68,7 @@ pub(super) fn resolve_target(
     }
 
     if let Some(target) = retained_firing_target_for_shoot_while_moving_unit(
-        entities, los, self_id, owner, px, py, acquire_px,
+        entities, los, fog, self_id, owner, px, py, acquire_px,
     ) {
         return Some(target);
     }
@@ -79,7 +88,10 @@ pub(super) fn resolve_target(
             px,
             py,
             acquire_px,
-            |target| los.clear_between_world_points((px, py), (target.pos_x, target.pos_y)),
+            |target| {
+                target_visible_to_owner(fog, owner, target)
+                    && los.clear_between_world_points((px, py), (target.pos_x, target.pos_y))
+            },
         ) {
             return Some(id);
         }
@@ -96,7 +108,10 @@ pub(super) fn resolve_target(
             px,
             py,
             acquire_px,
-            |target| los.clear_between_world_points((px, py), (target.pos_x, target.pos_y)),
+            |target| {
+                target_visible_to_owner(fog, owner, target)
+                    && los.clear_between_world_points((px, py), (target.pos_x, target.pos_y))
+            },
         ) {
             return Some(id);
         }
@@ -112,13 +127,17 @@ pub(super) fn resolve_target(
         px,
         py,
         acquire_px,
-        |target| los.clear_between_world_points((px, py), (target.pos_x, target.pos_y)),
+        |target| {
+            target_visible_to_owner(fog, owner, target)
+                && los.clear_between_world_points((px, py), (target.pos_x, target.pos_y))
+        },
     )
 }
 
 fn retained_firing_target_for_shoot_while_moving_unit(
     entities: &EntityStore,
     los: &LineOfSight<'_>,
+    fog: &Fog,
     self_id: u32,
     owner: u32,
     px: f32,
@@ -132,6 +151,9 @@ fn retained_firing_target_for_shoot_while_moving_unit(
     let target_id = attacker.target_id()?;
     let target = entities.get(target_id)?;
     if !world_query::is_enemy_targetable(target, owner, self_id) {
+        return None;
+    }
+    if !target_visible_to_owner(fog, owner, target) {
         return None;
     }
     let concealment =
@@ -149,4 +171,8 @@ fn retained_firing_target_for_shoot_while_moving_unit(
         return None;
     }
     Some(target_id)
+}
+
+fn target_visible_to_owner(fog: &Fog, owner: u32, target: &Entity) -> bool {
+    fog.is_visible_world(owner, target.pos_x, target.pos_y)
 }
