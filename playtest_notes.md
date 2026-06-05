@@ -18,6 +18,9 @@
 
 ----
 
+
+tanks are getting stuck on corners because they're not giving themselves enough clearance in their pathfindign
+
 AT guns should move like tanks, they have two wheels.their current point movement semantics look very bad.
 
 queued orders don't render correctly. the first order workers as before, butt hen holding shift and then right clicking somewhere else draw a line from the unit to the new waypoint, even though the worker needs to finish goint ot the first waypoint first
