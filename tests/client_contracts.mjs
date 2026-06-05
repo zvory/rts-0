@@ -713,6 +713,11 @@ function fakeAudioContext() {
       .join(",") === "23",
     "selecting packed AT guns should not include set-up AT guns",
   );
+  assert(
+    input._closestOwnUnitKindInViewport(KIND.AT_TEAM, deployedAtGun.x, deployedAtGun.y).join(",") ===
+      "21,23,22",
+    "kind-only AT selection helper calls should keep legacy all-AT behavior",
+  );
 }
 
 // ---------------------------------------------------------------------------
