@@ -15,8 +15,7 @@ use crate::config;
 use crate::game::ai_core::decision::{decide_profile, AiDecisionMemory};
 use crate::game::ai_core::observation::AiObservation;
 use crate::game::ai_core::profiles::{
-    profile_by_id, AiProfile, RIFLE_FLOOD_FAST_ID, RIFLE_FLOOD_FULL_SATURATION,
-    RIFLE_FLOOD_FULL_SATURATION_ID, TECH_TO_TANKS_ID,
+    profile_by_id, AiProfile, RIFLE_FLOOD_FULL_SATURATION, RIFLE_FLOOD_FULL_SATURATION_ID,
 };
 use crate::game::ai_shared;
 use crate::game::command::SimCommand;
@@ -42,11 +41,7 @@ pub(crate) const DEFAULT_LIVE_PROFILE_ID: &str = RIFLE_FLOOD_FULL_SATURATION_ID;
 
 /// Profiles available to ordinary lobby AI opponents. The names map to player-facing behaviors:
 /// tank rush, proxy rush, and the previous rifle saturation strategy.
-const LIVE_PROFILE_IDS: [&str; 3] = [
-    TECH_TO_TANKS_ID,
-    RIFLE_FLOOD_FAST_ID,
-    RIFLE_FLOOD_FULL_SATURATION_ID,
-];
+const LIVE_PROFILE_IDS: [&str; 1] = [RIFLE_FLOOD_FULL_SATURATION_ID];
 
 pub(crate) fn random_live_profile_id(rng: &mut impl Rng) -> &'static str {
     LIVE_PROFILE_IDS[rng.gen_range(0..LIVE_PROFILE_IDS.len())]
@@ -273,15 +268,8 @@ mod tests {
     }
 
     #[test]
-    fn live_profile_pool_has_requested_strategies() {
-        assert_eq!(
-            LIVE_PROFILE_IDS,
-            [
-                TECH_TO_TANKS_ID,
-                RIFLE_FLOOD_FAST_ID,
-                RIFLE_FLOOD_FULL_SATURATION_ID
-            ]
-        );
+    fn live_profile_pool_has_only_rifle_flood_full_saturation() {
+        assert_eq!(LIVE_PROFILE_IDS, [RIFLE_FLOOD_FULL_SATURATION_ID]);
     }
 
     #[test]
