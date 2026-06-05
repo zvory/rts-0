@@ -28,6 +28,7 @@ const CATEGORY_SET = new Set(CATEGORIES);
 /** Per-category default volumes when no localStorage value is present. */
 const DEFAULT_MASTER = 0.7;
 const DEFAULT_AMBIENT = 0.4;
+const DEFAULT_COMBAT = 0.5;
 const DEFAULT_OTHER = 1.0;
 
 /** Maximum concurrent voices. Beyond this, eviction kicks in. */
@@ -149,7 +150,12 @@ export class Audio {
 
     this.volume = { master: lsRead("audio.master", DEFAULT_MASTER) };
     for (const c of CATEGORIES) {
-      const fallback = c === "ambient" ? DEFAULT_AMBIENT : DEFAULT_OTHER;
+      const fallback =
+        c === "ambient"
+          ? DEFAULT_AMBIENT
+          : c === "combat_self" || c === "combat_other"
+            ? DEFAULT_COMBAT
+            : DEFAULT_OTHER;
       this.volume[c] = lsRead(`audio.cat.${c}`, fallback);
     }
 
