@@ -6,6 +6,8 @@ use crate::game::services::world_query;
 use crate::rules::combat as combat_rules;
 use crate::rules::terrain::TerrainKind;
 
+use super::weapons::can_fire_while_moving;
+
 /// How a combatant chooses targets.
 #[derive(Copy, Clone, PartialEq)]
 pub(super) enum CombatMode {
@@ -146,7 +148,7 @@ fn retained_firing_target_for_shoot_while_moving_unit(
     acquire_px: f32,
 ) -> Option<u32> {
     let attacker = entities.get(self_id)?;
-    if !fires_while_moving(attacker.kind) {
+    if !can_fire_while_moving(attacker) {
         return None;
     }
     let target_id = attacker.target_id()?;

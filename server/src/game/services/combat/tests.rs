@@ -138,6 +138,7 @@ fn apply_test_damage(
         vx,
         vy,
         range_px,
+        0.0,
         10,
     );
 }
@@ -655,7 +656,7 @@ fn tank_chase_refreshes_stale_standoff_goal() {
 }
 
 #[test]
-fn non_tank_attack_move_still_holds_position_while_firing() {
+fn rifleman_attack_move_keeps_path_while_firing() {
     let mut entities = EntityStore::new();
     let rifleman_id = entities
         .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
@@ -674,8 +675,41 @@ fn non_tank_attack_move_still_holds_position_while_firing() {
     let rifleman = entities.get(rifleman_id).expect("rifleman should exist");
     assert_eq!(rifleman.target_id(), Some(enemy_id));
     assert!(
-        rifleman.path_is_empty(),
-        "non-tank units should still stop while firing"
+        !rifleman.path_is_empty(),
+        "charging riflemen should keep their movement path while firing"
+    );
+}
+
+#[test]
+fn charging_rifleman_miss_still_emits_attack_event() {
+    let mut entities = EntityStore::new();
+    let rifleman_id = entities
+        .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
+        .expect("rifleman should spawn");
+    let enemy_id = entities
+        .spawn_unit(2, EntityKind::Rifleman, 120.0, 100.0)
+        .expect("enemy should spawn");
+    if let Some(rifleman) = entities.get_mut(rifleman_id) {
+        rifleman.set_order(Order::attack_move_to(300.0, 100.0));
+        rifleman.set_path(vec![(300.0, 100.0)]);
+        rifleman.set_path_goal(Some((300.0, 100.0)));
+    }
+    let enemy_hp = entities.get(enemy_id).expect("enemy should exist").hp;
+
+    let events = run_combat_tick(&mut entities);
+
+    assert_eq!(
+        entities.get(enemy_id).expect("enemy should exist").hp,
+        enemy_hp,
+        "seeded charge shot should miss"
+    );
+    assert!(
+        events
+            .get(&1)
+            .expect("attacker owner events should exist")
+            .iter()
+            .any(|event| matches!(event, Event::Attack { from, to, .. } if *from == rifleman_id && *to == enemy_id)),
+        "missed charge shots should still emit attack feedback"
     );
 }
 
