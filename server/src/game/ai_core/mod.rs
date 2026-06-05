@@ -1,8 +1,8 @@
-//! Shared AI world model and derived facts.
+//! Shared AI world model, profiles, and decisions.
 //!
-//! The live AI and self-play harness observe the game through different surfaces. This module is
-//! the narrow compatibility layer that turns both surfaces into stable, deterministic summaries
-//! before later phases synthesize commands.
+//! The live AI and self-play harness observe the game through different surfaces, then translate
+//! those observations into the same deterministic facts, profile policies, action helpers, and
+//! command decisions.
 
 pub(crate) mod actions;
 pub(crate) mod decision;

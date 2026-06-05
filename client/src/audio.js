@@ -611,7 +611,7 @@ export class Audio {
 
 /**
  * Phase-1 sound manifest. URLs are served by the Rust process from `client/assets`.
- * IDs are stable seams referenced by main.js, input.js, and (later phases) renderer.js.
+ * IDs are stable seams referenced by main.js, input/index.js, and renderer/index.js.
  */
 export const SOUND_MANIFEST = Object.freeze([
   { id: "notice_generic",      url: "/assets/sound/alert/alert_under_attack_01.mp3",  category: "alert" },
