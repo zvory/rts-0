@@ -447,7 +447,7 @@ src/
   config.js       # PINNED — render/UI constants: colors, sizes, costs, sight (mirror balance)
   net.js          # Net: WebSocket wrapper, typed send helpers, event emitter
   state.js        # GameState: holds prev+current snapshot, selection, camera, placement
-  camera.js       # Camera: pan/zoom, world<->screen transforms, edge/keyboard scroll
+  camera.js       # Camera: pan/zoom, world<->screen transforms, edge/keyboard/pointer-lock scroll
   renderer/       # Pixi app facade plus layers, terrain, entities, units, buildings,
                   # resources, fog overlay, feedback, and renderer-local palette helpers
   fog.js          # Fog overlay: accumulate explored, compute visible from own entities
@@ -518,7 +518,7 @@ export class GameState {
 ```js
 export class Camera {
   x, y, zoom                             // world coords of viewport top-left, zoom factor
-  update(dt, input)                      // apply pan (keys/edge) & clamp to map bounds
+  update(dt, input)                      // apply pan (keys/edge/virtual pointer-lock cursor) & clamp
   worldToScreen(wx, wy) -> {x,y}
   screenToWorld(sx, sy) -> {x,y}
   centerOn(wx, wy)
@@ -555,6 +555,8 @@ export class Fog {
 export class Input {
   constructor(domElement, camera, state, net, renderer, fog, audio?)
   // installs listeners; translates gestures into selection + protocol commands.
+  // optional pointer-lock mode traps the browser cursor and drives a visible
+  // virtual cursor for edge pan on multi-monitor setups.
   update(dt)                             // continuous handling (edge scroll handled by camera)
   // emits nothing to return; mutates state.selection / state.placement and calls net.command
 }

@@ -17,6 +17,8 @@
 //   - Arrow-key pan state is OWNED here and exposed via `this.keys` so the camera can
 //     read it in Camera.update(dt, input) — see the `keys` field documentation below.
 //   - Middle-drag or Space+left-drag pans the camera without using build hotkeys.
+//   - Optional pointer-lock mode traps the browser cursor and drives a visible
+//     virtual cursor so multi-monitor players can still edge-pan and click.
 //
 // All world hit-testing goes through camera.screenToWorld. Entities are hit-tested
 // against the interpolated positions from state so clicks line up with what is drawn.
@@ -110,6 +112,12 @@ export class Input {
     // Active direct camera pan, in screen pixels, or null when not panning.
     // { x, y, button } where button is the pointer button that started the pan.
     this._panDrag = null;
+    // Browser pointer-lock state. While locked, `this.mouse` is a viewport-local
+    // virtual cursor updated from movementX/movementY and drawn above the canvas.
+    this.pointerLocked = false;
+    this._pointerLockCursor = null;
+    this.onPointerLockChange = null;
+    this.onPointerLockError = null;
 
     // Bound handlers retained so destroy() can remove the exact references.
     this._onMouseDown = this._handleMouseDown.bind(this);
@@ -121,8 +129,11 @@ export class Input {
     this._onKeyDown = this._handleKeyDown.bind(this);
     this._onKeyUp = this._handleKeyUp.bind(this);
     this._onBlur = this._handleBlur.bind(this);
+    this._onPointerLockChange = this._handlePointerLockChange.bind(this);
+    this._onPointerLockError = this._handlePointerLockError.bind(this);
 
     this._install();
+    this._installPointerLockCursor();
   }
 
   // --- Lifecycle ----------------------------------------------------------
@@ -139,10 +150,13 @@ export class Input {
     window.addEventListener("keydown", this._onKeyDown);
     window.addEventListener("keyup", this._onKeyUp);
     window.addEventListener("blur", this._onBlur);
+    document.addEventListener("pointerlockchange", this._onPointerLockChange);
+    document.addEventListener("pointerlockerror", this._onPointerLockError);
   }
 
   /** Remove all installed listeners (e.g. on game teardown / screen change). */
   destroy() {
+    this.exitPointerLock();
     const el = this.dom;
     el.removeEventListener("mousedown", this._onMouseDown);
     window.removeEventListener("mousemove", this._onMouseMove);
@@ -153,6 +167,12 @@ export class Input {
     window.removeEventListener("keydown", this._onKeyDown);
     window.removeEventListener("keyup", this._onKeyUp);
     window.removeEventListener("blur", this._onBlur);
+    document.removeEventListener("pointerlockchange", this._onPointerLockChange);
+    document.removeEventListener("pointerlockerror", this._onPointerLockError);
+    if (this._pointerLockCursor) {
+      this._pointerLockCursor.remove();
+      this._pointerLockCursor = null;
+    }
   }
 
   /**
@@ -186,6 +206,12 @@ export class Input {
     return { x: ev.clientX - r.left, y: ev.clientY - r.top };
   }
 
+  /** Cursor position for gameplay: real browser cursor, or virtual cursor while locked. */
+  _eventScreenPos(ev) {
+    if (this.pointerLocked) return this.mouse || this._viewportCenter();
+    return this._screenPos(ev);
+  }
+
   /** True when a viewport-local point is inside the viewport bounds. */
   _insideViewport(p) {
     return p.x >= 0 && p.y >= 0 && p.x <= this.dom.clientWidth && p.y <= this.dom.clientHeight;
@@ -194,6 +220,104 @@ export class Input {
   /** Update the camera-facing mouse position from a viewport-local point. */
   _trackMouse(p) {
     this.mouse = this._insideViewport(p) ? p : null;
+  }
+
+  _viewportCenter() {
+    return { x: this.dom.clientWidth / 2, y: this.dom.clientHeight / 2 };
+  }
+
+  _clampViewportPoint(p) {
+    return {
+      x: Math.max(0, Math.min(this.dom.clientWidth, p.x)),
+      y: Math.max(0, Math.min(this.dom.clientHeight, p.y)),
+    };
+  }
+
+  _installPointerLockCursor() {
+    const cursor = document.createElement("div");
+    cursor.className = "pointer-lock-cursor";
+    cursor.hidden = true;
+    this.dom.appendChild(cursor);
+    this._pointerLockCursor = cursor;
+  }
+
+  _setPointerLockCursor(p) {
+    if (!this._pointerLockCursor) return;
+    this._pointerLockCursor.style.transform = `translate(${p.x}px, ${p.y}px)`;
+  }
+
+  _moveLockedCursor(ev) {
+    const base = this.mouse || this._viewportCenter();
+    const p = this._clampViewportPoint({
+      x: base.x + (Number.isFinite(ev.movementX) ? ev.movementX : 0),
+      y: base.y + (Number.isFinite(ev.movementY) ? ev.movementY : 0),
+    });
+    this.mouse = p;
+    this._setPointerLockCursor(p);
+    return p;
+  }
+
+  pointerLockSupported() {
+    return typeof this.dom.requestPointerLock === "function" &&
+      typeof document.exitPointerLock === "function";
+  }
+
+  requestPointerLock() {
+    if (this.pointerLocked) return Promise.resolve(true);
+    if (!this.pointerLockSupported()) {
+      if (this.onPointerLockError) this.onPointerLockError(new Error("Pointer Lock API is unavailable."));
+      return Promise.resolve(false);
+    }
+    const p = this.mouse || this._viewportCenter();
+    this.mouse = this._clampViewportPoint(p);
+    this._setPointerLockCursor(this.mouse);
+    try {
+      const result = this.dom.requestPointerLock();
+      if (result && typeof result.then === "function") {
+        return result.then(() => true).catch((err) => {
+          if (this.onPointerLockError) this.onPointerLockError(err);
+          return false;
+        });
+      }
+      return Promise.resolve(true);
+    } catch (err) {
+      if (this.onPointerLockError) this.onPointerLockError(err);
+      return Promise.resolve(false);
+    }
+  }
+
+  exitPointerLock() {
+    if (document.pointerLockElement === this.dom && typeof document.exitPointerLock === "function") {
+      document.exitPointerLock();
+    }
+  }
+
+  togglePointerLock() {
+    return this.pointerLocked ? (this.exitPointerLock(), Promise.resolve(false)) : this.requestPointerLock();
+  }
+
+  _handlePointerLockChange() {
+    const locked = document.pointerLockElement === this.dom;
+    this.pointerLocked = locked;
+    this.dom.classList.toggle("pointer-locked", locked);
+    if (this._pointerLockCursor) this._pointerLockCursor.hidden = !locked;
+    if (locked) {
+      this.mouse = this._clampViewportPoint(this.mouse || this._viewportCenter());
+      this._setPointerLockCursor(this.mouse);
+    } else {
+      this.mouse = null;
+      this._panDrag = null;
+      if (this._drag) {
+        this._drag = null;
+        this._dragging = false;
+        this.renderer.drawSelectionBox(null);
+      }
+    }
+    if (this.onPointerLockChange) this.onPointerLockChange(locked);
+  }
+
+  _handlePointerLockError(ev) {
+    if (this.onPointerLockError) this.onPointerLockError(ev);
   }
 
   /** World point under the current screen cursor, clamped to map bounds. */
@@ -212,8 +336,8 @@ export class Input {
   // --- Mouse: press / move / release --------------------------------------
 
   _handleMouseDown(ev) {
-    const p = this._screenPos(ev);
-    this._trackMouse(p);
+    const p = this._eventScreenPos(ev);
+    if (!this.pointerLocked) this._trackMouse(p);
     if (ev.button === 1 || (ev.button === 0 && this._spacePan)) {
       this._startPanDrag(p, ev.button);
       ev.preventDefault();
@@ -226,8 +350,8 @@ export class Input {
   }
 
   _handleMouseMove(ev) {
-    const p = this._screenPos(ev);
-    this._trackMouse(p);
+    const p = this.pointerLocked ? this._moveLockedCursor(ev) : this._screenPos(ev);
+    if (!this.pointerLocked) this._trackMouse(p);
 
     if (this._panDrag) {
       this.camera.panByScreenDelta(p.x - this._panDrag.x, p.y - this._panDrag.y);
@@ -261,8 +385,8 @@ export class Input {
       return;
     }
     if (ev.button !== 0) return;
-    const p = this._screenPos(ev);
-    this._trackMouse(p);
+    const p = this._eventScreenPos(ev);
+    if (!this.pointerLocked) this._trackMouse(p);
     if (!this._drag) return;
 
     const wasDragging = this._dragging;
@@ -288,8 +412,8 @@ export class Input {
   _handleContextMenu(ev) {
     // Always suppress the native menu over the viewport; treat as a right-click.
     ev.preventDefault();
-    const p = this._screenPos(ev);
-    this._trackMouse(p);
+    const p = this._eventScreenPos(ev);
+    if (!this.pointerLocked) this._trackMouse(p);
     this._onRightClick(p);
   }
 

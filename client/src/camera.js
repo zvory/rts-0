@@ -6,7 +6,8 @@
 //
 // Panning comes from three sources:
 //   - keyboard arrows, applied in `update(dt, input)`,
-//   - screen-edge scrolling (cursor within `CAMERA.edgeScrollPx` of a viewport edge),
+//   - screen-edge scrolling (real cursor, or the pointer-lock virtual cursor,
+//     within `CAMERA.edgeScrollPx` of a viewport edge),
 //   - direct drag panning through `panByScreenDelta`,
 // and the result is always clamped so the visible rectangle stays inside the map.
 //
@@ -59,7 +60,8 @@ export class Camera {
    * @param {object} [input] read-only view of current input state
    * @param {{up:boolean,down:boolean,left:boolean,right:boolean}} [input.keys] pan flags
    *   owned by Input (arrow keys feed these; reset on blur)
-   * @param {{x:number,y:number}|null} [input.mouse] cursor position in screen px, or null if outside
+   * @param {{x:number,y:number}|null} [input.mouse] cursor position in screen px, or null if outside.
+   *   While pointer lock is active this is Input's clamped virtual cursor.
    */
   update(dt, input) {
     if (!input) return;

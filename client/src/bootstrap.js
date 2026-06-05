@@ -37,6 +37,7 @@ export const dom = {
   gameOverButton: document.getElementById("game-over-button"),
   settingsButton: document.getElementById("settings-button"),
   settingsMenu: document.getElementById("settings-menu"),
+  pointerLockToggle: document.getElementById("pointer-lock-toggle"),
   giveUpOpen: document.getElementById("give-up-open"),
   giveUpConfirm: document.getElementById("give-up-confirm"),
   giveUpCancel: document.getElementById("give-up-cancel"),
@@ -131,5 +132,4 @@ export function buildAudioSettings(audio, menuEl) {
 
   menuEl.insertBefore(wrap, menuEl.firstChild);
 }
-
 
