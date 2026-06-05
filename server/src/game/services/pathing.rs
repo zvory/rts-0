@@ -225,6 +225,7 @@ impl PathingService {
         Some(entry.tile_path.clone())
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn cache_insert(
         &mut self,
         kind: EntityKind,

@@ -33,10 +33,11 @@ use acquisition::{combat_mode, resolve_target, CombatMode};
 use chase::{chase_goal_for_target, chase_path_needs_refresh};
 use damage::apply_damage;
 use weapons::{
-    at_gun_can_chase, begin_idle_deployed_weapon_setup, deployed_weapon_ready_to_fire,
-    deployed_weapon_ready_to_move, effective_attack_profile, mirror_weapon_to_body,
-    relax_vehicle_weapon_toward_body, rotate_at_gun_for_combat, rotate_vehicle_weapon_for_combat,
-    tick_deployed_weapon_setup, uses_stationary_weapon_aggro,
+    at_gun_can_chase, begin_idle_deployed_weapon_setup, can_fire_while_moving,
+    deployed_weapon_ready_to_fire, deployed_weapon_ready_to_move, effective_attack_profile,
+    mirror_weapon_to_body, moving_fire_miss_chance, relax_vehicle_weapon_toward_body,
+    rotate_at_gun_for_combat, rotate_vehicle_weapon_for_combat, tick_deployed_weapon_setup,
+    uses_stationary_weapon_aggro,
 };
 
 /// Extra slack (px) added to attack range checks so units don't dance at the exact boundary.
@@ -197,8 +198,8 @@ pub(crate) fn combat_system(
                 e.set_target_id(Some(tid));
                 e.mark_attack_phase(AttackPhase::Firing);
                 // Most units hold position while firing. Vehicle weapons can track independently,
-                // so those units keep driving along their current path while the weapon tracks.
-                if !fires_while_moving(e.kind) {
+                // and charging riflemen accept lower accuracy to keep advancing.
+                if !can_fire_while_moving(e) {
                     e.clear_path();
                 }
             }
@@ -210,8 +211,24 @@ pub(crate) fn combat_system(
             }
             let ready = matches!(entities.get(id), Some(e) if e.attack_cd() == 0);
             if ready {
+                let extra_miss_chance =
+                    entities.get(id).map(moving_fire_miss_chance).unwrap_or(0.0);
                 apply_damage(
-                    map, entities, events, fog, rng, id, tid, dmg, owner, px, py, tx, ty, range_px,
+                    map,
+                    entities,
+                    events,
+                    fog,
+                    rng,
+                    id,
+                    tid,
+                    dmg,
+                    owner,
+                    px,
+                    py,
+                    tx,
+                    ty,
+                    range_px,
+                    extra_miss_chance,
                     tick,
                 );
                 if let Some(e) = entities.get_mut(id) {

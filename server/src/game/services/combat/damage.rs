@@ -36,6 +36,7 @@ pub(super) fn apply_damage(
     vx: f32,
     vy: f32,
     range_px: f32,
+    extra_miss_chance: f32,
     tick: u32,
 ) {
     if entities.get(victim).map(|e| e.is_node()).unwrap_or(false) {
@@ -69,7 +70,7 @@ pub(super) fn apply_damage(
 
     // Roll for miss before computing damage.
     if let (Some(ak), Some(vk)) = (attacker_kind, victim_kind) {
-        let mc = combat_rules::miss_chance(ak, vk);
+        let mc = combat_rules::miss_chance(ak, vk).max(extra_miss_chance);
         if mc > 0.0 && rng.gen::<f32>() < mc {
             return;
         }

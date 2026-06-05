@@ -751,8 +751,9 @@ Intended progression:
 The current implementation uses the themed unit/building names below. Combat is handled by the
 shared attack model plus the support-weapon setup/teardown state, tank turret aim gates, and
 tank hull-facing damage modifiers for anti-tank hits against tank victims. Tanks keep their active
-movement path while firing on either `Move` or `AttackMove` orders; other mobile combat units still
-hold position once a target is in weapon range. Scout cars also fire while moving using an
+movement path while firing on either `Move` or `AttackMove` orders; riflemen keep advancing while
+firing on `AttackMove` and roll a 50% miss chance for those moving charge shots; other mobile
+combat units still hold position once a target is in weapon range. Scout cars also fire while moving using an
 independent rear machine-gun facing. They are unarmored light vehicles and do not receive
 armored damage reduction, but AT guns do not roll their infantry miss chance against them.
 Plain `Move` tanks and scout cars only fire at enemies already in
@@ -909,6 +910,10 @@ The server treats every client as potentially hostile. Limits live next to the c
   falling back to nearest-target acquisition, so drive-by fire tends to finish one enemy instead of
   spreading damage across every passing unit. Projection omits enemy `weaponFacing` when it would
   reveal a hidden target direction.
+- **Rifleman charge fire**: riflemen on `AttackMove` keep their active movement path while firing
+  at enemies in range instead of stopping to shoot. Those moving charge shots roll a 50% miss
+  chance after attack feedback is emitted, so audio/tracers still play but missed shots deal no
+  damage or under-attack alert.
 - **Scout car movement and weapon facing**: scout cars are light unarmored vehicles with a
   rear-mounted machine gun (higher damage, same range and cooldown as machine gunners). They use the
   same oriented-body/pathing/collision model as tanks, including standoff firing and firing while
