@@ -488,7 +488,7 @@ input[type="text"]:focus {
    sub-panels opt back in via pointer-events:auto. */
 #hud,
 #minimap-wrap,
-#selected-panel,
+#selection-area,
 #game-menu,
 #command-card,
 #toast {
@@ -723,12 +723,89 @@ input[type="text"]:focus {
 }
 
 /* --- Bottom-center selected panel --- */
-#selected-panel {
+#selection-area {
   left: 50%;
   bottom: 12px;
   transform: translateX(-50%);
+  width: clamp(280px, 36vw, 520px);
+  max-width: calc(100vw - 24px);
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+#control-group-tabs {
+  display: grid;
+  grid-template-columns: repeat(10, minmax(0, 1fr));
+  gap: 4px;
+  min-height: 24px;
+  margin: 0 4px -1px;
+  pointer-events: none;
+}
+#control-group-tabs.empty {
+  min-height: 0;
+  margin-top: 0;
+  margin-bottom: 0;
+}
+.control-group-slot {
+  min-width: 0;
+  display: flex;
+  justify-content: center;
+  align-items: end;
+}
+.control-group-tab {
+  position: relative;
+  width: 100%;
+  min-height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 3px 4px 3px 12px;
+  border: 1px solid var(--panel-edge);
+  border-bottom-color: rgba(39, 37, 31, 0.94);
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  background: rgba(52, 48, 36, 0.96);
+  color: var(--ink);
+  box-shadow: var(--shadow), inset 0 1px 0 rgba(255, 255, 255, 0.07);
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  user-select: none;
+}
+.control-group-tab.selected {
+  background: rgba(26, 25, 21, 0.98);
+  border-color: #4b4435;
+  border-bottom-color: rgba(26, 25, 21, 0.98);
+  color: #fff5ea;
+}
+.control-group-key {
+  position: absolute;
+  top: 3px;
+  left: 4px;
+  color: var(--ink-faint);
+  font-size: 9px;
+  font-weight: 700;
+}
+.control-group-kind {
+  min-width: 0;
+  flex: 0 1 auto;
+  overflow: hidden;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 800;
+}
+.control-group-count {
+  color: var(--ink-dim);
+  flex: 0 0 auto;
+  font-weight: 700;
+  text-align: right;
+}
+#selected-panel {
   min-width: 280px;
-  max-width: 46vw;
+  width: 100%;
   min-height: 92px;
   padding: 10px 14px;
   border-radius: var(--radius);
@@ -741,6 +818,7 @@ input[type="text"]:focus {
 #selected-panel.empty {
   opacity: 0;
   pointer-events: none;
+  display: none;
 }
 #selected-panel .sel-name,
 #selected-panel .sel-title {
