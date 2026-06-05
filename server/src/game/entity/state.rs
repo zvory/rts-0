@@ -128,11 +128,17 @@ impl Default for CombatState {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WeaponSetup {
     Packed,
-    SettingUp { ticks: u16 },
+    SettingUp {
+        ticks: u16,
+    },
     Deployed,
-    TearingDown { ticks: u16 },
+    TearingDown {
+        ticks: u16,
+    },
     /// Tearing down in order to re-deploy at a new facing. Sent as "tearing_down" on the wire.
-    TearingDownToRedeploy { ticks: u16 },
+    TearingDownToRedeploy {
+        ticks: u16,
+    },
 }
 
 impl WeaponSetup {
