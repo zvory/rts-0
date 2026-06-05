@@ -130,6 +130,9 @@ pub enum Command {
     TearDownAtGuns {
         units: Vec<u32>,
     },
+    Charge {
+        units: Vec<u32>,
+    },
     Gather {
         units: Vec<u32>,
         node: u32,

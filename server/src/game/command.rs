@@ -34,6 +34,9 @@ pub enum SimCommand {
     TearDownAtGuns {
         units: Vec<u32>,
     },
+    Charge {
+        units: Vec<u32>,
+    },
     Gather {
         units: Vec<u32>,
         node: u32,
@@ -120,6 +123,7 @@ impl SimCommand {
                 SimCommand::SetupAtGuns { units, x, y }
             }
             protocol::Command::TearDownAtGuns { units } => SimCommand::TearDownAtGuns { units },
+            protocol::Command::Charge { units } => SimCommand::Charge { units },
             protocol::Command::Gather {
                 units,
                 node,
@@ -208,6 +212,9 @@ impl SimCommand {
                 y: *y,
             },
             SimCommand::TearDownAtGuns { units } => protocol::Command::TearDownAtGuns {
+                units: units.clone(),
+            },
+            SimCommand::Charge { units } => protocol::Command::Charge {
                 units: units.clone(),
             },
             SimCommand::Gather {

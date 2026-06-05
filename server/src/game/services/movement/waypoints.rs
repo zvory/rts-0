@@ -57,7 +57,9 @@ pub(super) fn advance_moving_units(
             {
                 continue;
             }
-            let speed = config::unit_stats(e.kind).map(|s| s.speed).unwrap_or(0.0);
+            let speed = config::unit_stats(e.kind)
+                .map(|s| s.speed * e.movement_speed_multiplier())
+                .unwrap_or(0.0);
             (
                 e.kind,
                 speed,

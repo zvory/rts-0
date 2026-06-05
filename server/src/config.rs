@@ -71,6 +71,12 @@ pub const SCOUT_CAR_OIL_COST_PER_PX: f32 = 5.0 / (96.0 * TILE_SIZE as f32);
 /// Ticks a moving oil-starved vehicle waits before checking fuel again.
 pub const TANK_OIL_STARVED_PAUSE_TICKS: u16 = TICK_HZ as u16;
 
+/// Rifleman Charge lasts long enough for a charged rifleman to cover about two current tank
+/// lengths. Keep this duration hard-coded so future tank body tuning does not silently retune it.
+pub const RIFLEMAN_CHARGE_TICKS: u16 = 32;
+/// Rifleman movement multiplier while Charge is active.
+pub const RIFLEMAN_CHARGE_SPEED_MULTIPLIER: f32 = 2.0;
+
 // --- Economy ----------------------------------------------------------------
 pub const STARTING_STEEL: u32 = 75;
 pub const STARTING_OIL: u32 = 0;

@@ -63,6 +63,8 @@ pub struct MovementState {
     pub oil_debt: f32,
     /// Ticks remaining before an oil-starved vehicle may try to advance again.
     pub oil_starved_pause_ticks: u16,
+    /// Ticks remaining for Rifleman Charge. Used only by riflemen.
+    pub charge_ticks: u16,
 }
 
 impl Default for MovementState {
@@ -83,6 +85,7 @@ impl Default for MovementState {
             lifetime_oil_used: 0.0,
             oil_debt: 0.0,
             oil_starved_pause_ticks: 0,
+            charge_ticks: 0,
         }
     }
 }
