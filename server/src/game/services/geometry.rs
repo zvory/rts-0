@@ -1,5 +1,5 @@
 use crate::config;
-use crate::game::entity::{uses_tank_movement_semantics, Entity, EntityKind};
+use crate::game::entity::{uses_oriented_vehicle_body, Entity, EntityKind};
 use crate::game::map::Map;
 use crate::game::services::occupancy::building_footprint;
 
@@ -116,7 +116,7 @@ pub(crate) fn unit_body_with_facing(
         return None;
     }
 
-    if uses_tank_movement_semantics(kind) {
+    if uses_oriented_vehicle_body(kind) {
         let (length, width, clearance) = vehicle_body_dimensions(kind);
         let half_len = length * 0.5 + clearance;
         let half_width = width * 0.5 + clearance;

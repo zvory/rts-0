@@ -854,10 +854,15 @@ The server treats every client as potentially hostile. Limits live next to the c
   not chase out-of-range enemies. Projection omits enemy `weaponFacing` when it would reveal a
   hidden target direction.
 - **Scout car movement and weapon facing**: scout cars are light unarmored vehicles with a
-  rear-mounted machine gun (same damage, range, and cooldown as machine gunners). They currently
-  borrow the tank oriented-body/pathing/facing movement model, including standoff firing and
-  firing while moving, but do not use tank armor or tank damage reduction. This is temporary:
-  replace the borrowed tank movement with truck/wheeled movement semantics when that model exists.
+  rear-mounted machine gun (same damage, range, and cooldown as machine gunners). They use the
+  same oriented-body/pathing/collision model as tanks, including standoff firing and firing while
+  moving, but they use simplified car locomotion instead of tank pivot locomotion. A scout car's
+  yaw is capped by movement budget over a minimum turn radius, so it can steer while translating
+  but cannot rotate in place when blocked or badly misaligned. Nearby behind goals are handled by
+  reversing; farther behind goals make the scout car drive through a broad turn. This is still a
+  path-following approximation, not tire or Ackermann steering physics; replace it with proper
+  truck/wheeled movement semantics when that model exists. Scout cars do not use tank armor or
+  tank damage reduction.
 - **Tank movement oil burn**: tanks consume oil based on distance actually moved, using
   `TANK_OIL_COST_PER_PX`. Fractional movement cost accumulates per tank until whole oil units are
   deducted from the owner's stockpile. The tank also tracks lifetime movement oil as `oilUsed` for
