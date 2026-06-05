@@ -615,6 +615,59 @@ function fakeAudioContext() {
   const sel = state.selectedEntities();
   assert(sel.length === 1 && sel[0].id === 1, "selectedEntities drops stale ids");
 
+  // Control groups are local-only, own controllable entities only, and capped like selection.
+  const cgState = new GameState({ ...start, map: { ...start.map, resources: [] } });
+  const ownControllables = Array.from({ length: 14 }, (_, i) => ({
+    id: 100 + i,
+    owner: 1,
+    kind: i === 12 ? KIND.BARRACKS : KIND.WORKER,
+    x: i * 10,
+    y: 0,
+    hp: 40,
+    maxHp: 40,
+    state: "idle",
+  }));
+  cgState.applySnapshot({
+    tick: 0,
+    steel: 0,
+    oil: 0,
+    supplyUsed: 0,
+    supplyCap: 20,
+    entities: [
+      ...ownControllables,
+      { id: 160, owner: 2, kind: KIND.WORKER, x: 0, y: 20, hp: 40, maxHp: 40, state: "idle" },
+      { id: 161, owner: 0, kind: KIND.STEEL, x: 0, y: 40, remaining: 100 },
+    ],
+    events: [],
+  });
+  assert(Array.isArray(cgState.controlGroups) && cgState.controlGroups.length === 10, "GameState has ten control groups");
+  assertHasMethod(cgState, "setControlGroup", "GameState");
+  assertHasMethod(cgState, "addToControlGroup", "GameState");
+  assertHasMethod(cgState, "selectControlGroup", "GameState");
+  assertHasMethod(cgState, "controlGroupEntities", "GameState");
+  cgState.setControlGroup(0, [100, 160, 101, 161, 112, 113, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111]);
+  assert(
+    cgState.controlGroups[0].join(",") === "100,101,112,113,102,103,104,105,106,107,108,109",
+    "control groups store own units/buildings only in selection order up to 12",
+  );
+  cgState.addToControlGroup(0, [110, 111, 112, 113]);
+  assert(cgState.controlGroups[0].length === 12, "adding to a full control group ignores overflow");
+  cgState.setControlGroup(1, [100, 101]);
+  cgState.addToControlGroup(1, [101, 102, 103]);
+  assert(cgState.controlGroups[1].join(",") === "100,101,102,103", "adding to a control group dedupes existing ids");
+  cgState.selectControlGroup(1);
+  assert(Array.from(cgState.selection).join(",") === "100,101,102,103", "selectControlGroup recalls live group ids");
+  cgState.applySnapshot({
+    tick: 1,
+    steel: 0,
+    oil: 0,
+    supplyUsed: 0,
+    supplyCap: 20,
+    entities: ownControllables.filter((e) => e.id !== 101),
+    events: [{ e: "death", id: 101, x: 10, y: 0, kind: KIND.WORKER }],
+  });
+  assert(cgState.controlGroups[1].join(",") === "100,102,103", "dead entities disappear from control groups");
+
   // Placement is local-only
   state.beginPlacement("barracks");
   assert(state.placement !== null, "placement started");
@@ -740,6 +793,72 @@ function fakeAudioContext() {
       "21,23,22",
     "kind-only AT selection helper calls should keep legacy all-AT behavior",
   );
+
+  assert(input._controlGroupSlotFromKey({ code: "Digit1" }) === 0, "Digit1 maps to control group slot 0");
+  assert(input._controlGroupSlotFromKey({ code: "Digit0" }) === 9, "Digit0 maps to control group slot 9");
+  assert(input._controlGroupSlotFromKey({ code: "Numpad5" }) === 4, "Numpad5 maps to control group slot 4");
+  assert(input._controlGroupSlotFromKey({ code: "KeyQ" }) === null, "non-number keys do not map to control groups");
+
+  const hotkeyCalls = [];
+  const hotkeyInput = Object.create(Input.prototype);
+  hotkeyInput.state = {
+    spectator: false,
+    selection: new Set([1, 2]),
+    setControlGroup(slot, ids) {
+      hotkeyCalls.push({ type: "set", slot, ids: Array.from(ids) });
+      return Array.from(ids);
+    },
+    addToControlGroup(slot, ids) {
+      hotkeyCalls.push({ type: "add", slot, ids: Array.from(ids) });
+      return Array.from(ids);
+    },
+    selectControlGroup(slot) {
+      hotkeyCalls.push({ type: "select", slot });
+      return [1, 2];
+    },
+  };
+  hotkeyInput._lastControlGroupTap = null;
+  hotkeyInput._jumpToControlGroupCluster = (slot) => hotkeyCalls.push({ type: "jump", slot });
+  const keyEvent = (code, mods = {}) => ({
+    code,
+    altKey: !!mods.altKey,
+    ctrlKey: !!mods.ctrlKey,
+    metaKey: !!mods.metaKey,
+    shiftKey: !!mods.shiftKey,
+    preventDefault() { this.prevented = true; },
+    stopPropagation() { this.stopped = true; },
+  });
+  const saveEvent = keyEvent("Digit2", { altKey: true });
+  assert(hotkeyInput._handleControlGroupHotkey(saveEvent) === true, "Alt+number saves a control group");
+  assert(saveEvent.prevented && saveEvent.stopped, "handled control-group hotkeys prevent browser handling");
+  const addEvent = keyEvent("Digit2", { shiftKey: true });
+  assert(hotkeyInput._handleControlGroupHotkey(addEvent) === true, "Shift+number adds to a control group");
+  hotkeyInput._handleControlGroupHotkey(keyEvent("Digit2"));
+  hotkeyInput._handleControlGroupHotkey(keyEvent("Digit2"));
+  assert(
+    hotkeyCalls.map((c) => c.type).join(",") === "set,add,select,select,jump",
+    "plain number recalls, and double-tap recalls then jumps",
+  );
+
+  const clusterInput = Object.create(Input.prototype);
+  let centered = null;
+  clusterInput.camera = {
+    viewW: 100,
+    viewH: 100,
+    zoom: 1,
+    x: 0,
+    y: 0,
+    centerOn(x, y) { centered = { x, y }; },
+  };
+  clusterInput.state = {
+    controlGroupEntities: () => [
+      { id: 1, x: 0, y: 0 },
+      { id: 2, x: 20, y: 0 },
+      { id: 3, x: 500, y: 500 },
+    ],
+  };
+  assert(clusterInput._jumpToControlGroupCluster(0) === true, "control-group double-tap jumps to a cluster");
+  assert(centered.x < 100 && centered.y < 100, "control-group jump chooses the dense cluster, not the all-entity centroid");
 
   const ownBuilding = {
     id: 31,

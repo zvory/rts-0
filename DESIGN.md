@@ -509,6 +509,10 @@ export class GameState {
   setSelection(ids), addToSelection(ids), clearSelection()
   selectedEntities()                     // resolved entity objects from current snapshot
   entityById(id)
+  // control groups (client-only):
+  controlGroups                          // ten Array<entityId> slots; slot 9 maps to key 0
+  setControlGroup(slot, ids), addToControlGroup(slot, ids)
+  selectControlGroup(slot), controlGroupEntities(slot)
   // build placement (client-only):
   placement                              // null | { building, valid, tileX, tileY }
   beginPlacement(buildingKind), updatePlacement(tileX,tileY,valid), endPlacement()
@@ -559,6 +563,8 @@ export class Fog {
 export class Input {
   constructor(domElement, camera, state, net, renderer, fog, audio?)
   // installs listeners; translates gestures into selection + protocol commands.
+  // number keys recall control groups; double-tap jumps the camera to the largest
+  // local cluster. Alt/Ctrl/Cmd+number replaces a group, Shift+number adds to it.
   // optional pointer-lock mode traps the browser cursor and drives a visible
   // virtual cursor for edge pan on multi-monitor setups.
   update(dt)                             // continuous handling (edge scroll handled by camera)
