@@ -1533,13 +1533,22 @@ function drawScoutCar(g, body, tint, facing, weaponFacing, motion, recoil) {
   const sideAlpha = lerp(0.62, 0.88, motion.activity);
 
   // Single blocky truck hull with enclosed side running gear; nothing protrudes past the body.
+  const noseShoulderX = body.halfLen * 0.4;
+  const noseHalfWidth = body.halfWidth * 0.62;
   g.beginFill(tint);
-  drawRotatedRect(g, 0, 0, body.halfLen * 2, body.halfWidth * 2, facing);
+  g.drawPolygon(rotatedPolygon([
+    -body.halfLen, -body.halfWidth,
+    noseShoulderX, -body.halfWidth,
+    body.halfLen, -noseHalfWidth,
+    body.halfLen, noseHalfWidth,
+    noseShoulderX, body.halfWidth,
+    -body.halfLen, body.halfWidth,
+  ], facing));
   g.endFill();
 
   g.beginFill(0x15120f, sideAlpha);
-  drawRotatedRect(g, -body.halfLen * 0.02, -body.halfWidth * 0.78, body.halfLen * 1.72, body.halfWidth * 0.22, facing);
-  drawRotatedRect(g, -body.halfLen * 0.02, body.halfWidth * 0.78, body.halfLen * 1.72, body.halfWidth * 0.22, facing);
+  drawRotatedRect(g, -body.halfLen * 0.08, -body.halfWidth * 0.78, body.halfLen * 1.58, body.halfWidth * 0.22, facing);
+  drawRotatedRect(g, -body.halfLen * 0.08, body.halfWidth * 0.78, body.halfLen * 1.58, body.halfWidth * 0.22, facing);
   g.endFill();
 
   g.beginFill(lightenColor(tint, 0.08), 0.96);
@@ -1547,11 +1556,18 @@ function drawScoutCar(g, body, tint, facing, weaponFacing, motion, recoil) {
   g.endFill();
 
   g.beginFill(lightenColor(tint, 0.14), 0.95);
-  drawRotatedRect(g, body.halfLen * 0.36, 0, body.halfLen * 0.58, body.halfWidth * 1.42, facing);
+  g.drawPolygon(rotatedPolygon([
+    body.halfLen * 0.1, -body.halfWidth * 0.68,
+    body.halfLen * 0.58, -body.halfWidth * 0.56,
+    body.halfLen * 0.9, -body.halfWidth * 0.4,
+    body.halfLen * 0.9, body.halfWidth * 0.4,
+    body.halfLen * 0.58, body.halfWidth * 0.56,
+    body.halfLen * 0.1, body.halfWidth * 0.68,
+  ], facing));
   g.endFill();
 
   g.beginFill(0x211b14, 0.82);
-  drawRotatedRect(g, body.halfLen * 0.68, 0, body.halfLen * 0.22, body.halfWidth * 1.2, facing);
+  drawRotatedRect(g, body.halfLen * 0.68, 0, body.halfLen * 0.2, body.halfWidth * 0.88, facing);
   drawRotatedRect(g, body.halfLen * 0.24, -body.halfWidth * 0.36, body.halfLen * 0.18, body.halfWidth * 0.34, facing);
   drawRotatedRect(g, body.halfLen * 0.24, body.halfWidth * 0.36, body.halfLen * 0.18, body.halfWidth * 0.34, facing);
   g.endFill();
