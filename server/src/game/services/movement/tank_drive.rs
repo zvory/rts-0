@@ -22,7 +22,7 @@ const TANK_CRAWL_ANGLE_RAD: f32 = 0.55;
 const TANK_PIVOT_ANGLE_RAD: f32 = 1.25;
 const TANK_TRAFFIC_LOOKAHEAD_PX: f32 = config::TILE_SIZE as f32 * 2.0;
 const TANK_TRAFFIC_TURN_BIAS_RAD: f32 = 0.28;
-pub(super) const SCOUT_CAR_MIN_TURN_RADIUS_PX: f32 = config::TILE_SIZE as f32 * 3.0;
+pub(super) const SCOUT_CAR_MIN_TURN_RADIUS_PX: f32 = config::TILE_SIZE as f32 * 1.5;
 
 pub(super) fn tank_oil_starves_movement(
     entities: &mut EntityStore,

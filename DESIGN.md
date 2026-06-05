@@ -869,9 +869,10 @@ The server treats every client as potentially hostile. Limits live next to the c
   rear-mounted machine gun (same damage, range, and cooldown as machine gunners). They use the
   same oriented-body/pathing/collision model as tanks, including standoff firing and firing while
   moving, but they use simplified car locomotion instead of tank pivot locomotion. A scout car's
-  yaw is capped by movement budget over a minimum turn radius, so it can steer while translating
-  but cannot rotate in place when blocked or badly misaligned. Nearby behind goals are handled by
-  reversing; farther behind goals make the scout car drive through a broad turn. This is still a
+  yaw is capped by movement budget over a 1.5-tile minimum turn radius, so it can steer
+  while translating but cannot rotate in place when blocked or badly misaligned. Nearby
+  behind goals are handled by reversing; farther behind goals make the scout car drive
+  through a broad turn. This is still a
   path-following approximation, not tire or Ackermann steering physics; replace it with proper
   truck/wheeled movement semantics when that model exists. Scout cars do not use tank armor or
   tank damage reduction.
