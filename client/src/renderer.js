@@ -1752,7 +1752,8 @@ function drawAtGun(g, r, tint, facing, weaponFacing, setup, recoil) {
   const a = angleLerp(facing, weaponFacing, smoothstep01(deploy));
   const barrelKick = recoilVector(a, recoil);
   const carriageKick = recoilVector(a, recoil * 0.12);
-  const wheelRadius = r * 0.36;
+  const tireLength = r * 0.68;
+  const tireWidth = r * 0.34;
   const wheelY = r * 0.42;
   const axleX = -r * 0.16;
   const trailRear = lerp(-r * 0.45, -r * 1.55, deploy);
@@ -1769,18 +1770,8 @@ function drawAtGun(g, r, tint, facing, weaponFacing, setup, recoil) {
 
   const leftWheel = rotatePoint(axleX, -wheelY, a);
   const rightWheel = rotatePoint(axleX, wheelY, a);
-  g.lineStyle(2.5, 0x17130f, 0.98);
-  g.beginFill(0x26221b, 0.98);
-  g.drawCircle(leftWheel.x + carriageKick.x, leftWheel.y + carriageKick.y, wheelRadius);
-  g.drawCircle(rightWheel.x + carriageKick.x, rightWheel.y + carriageKick.y, wheelRadius);
-  g.endFill();
-  g.beginFill(0xd8d0b0, 0.72);
-  g.drawCircle(leftWheel.x + carriageKick.x, leftWheel.y + carriageKick.y, wheelRadius * 0.38);
-  g.drawCircle(rightWheel.x + carriageKick.x, rightWheel.y + carriageKick.y, wheelRadius * 0.38);
-  g.endFill();
-  g.lineStyle(1.6, 0xd8d0b0, 0.62);
-  g.drawCircle(leftWheel.x + carriageKick.x, leftWheel.y + carriageKick.y, wheelRadius * 0.82);
-  g.drawCircle(rightWheel.x + carriageKick.x, rightWheel.y + carriageKick.y, wheelRadius * 0.82);
+  drawGunTire(g, leftWheel.x + carriageKick.x, leftWheel.y + carriageKick.y, tireLength, tireWidth, a);
+  drawGunTire(g, rightWheel.x + carriageKick.x, rightWheel.y + carriageKick.y, tireLength, tireWidth, a);
 
   const shield = rotatePoint(r * 0.12, 0, a);
   g.beginFill(tint, 0.96);
@@ -1836,6 +1827,56 @@ function drawAtGun(g, r, tint, facing, weaponFacing, setup, recoil) {
   g.beginFill(0x3d3528, 0.98);
   drawRotatedRectOffset(g, breechX - r * 0.1, 0, r * 0.52, r * 0.42, a, barrelKick);
   g.endFill();
+}
+
+function drawGunTire(g, cx, cy, length, width, a) {
+  g.lineStyle(2.4, 0x17130f, 0.98);
+  g.beginFill(0x26221b, 0.98);
+  g.drawPolygon(orientedCapsulePolygon(cx, cy, length, width, a));
+  g.endFill();
+
+  g.lineStyle(1.5, 0xd8d0b0, 0.5);
+  const treadOffset = width * 0.32;
+  const treadInset = length * 0.26;
+  const sideTreadLength = length - treadInset * 2;
+  drawRotatedLine(g, cx, cy, -sideTreadLength / 2, -treadOffset, sideTreadLength / 2, -treadOffset, a);
+  drawRotatedLine(g, cx, cy, -sideTreadLength / 2, treadOffset, sideTreadLength / 2, treadOffset, a);
+
+  g.lineStyle(1.2, 0x4a4031, 0.9);
+  for (let i = -1; i <= 1; i += 1) {
+    const x = i * length * 0.2;
+    drawRotatedLine(g, cx, cy, x, -width * 0.42, x, width * 0.42, a);
+  }
+
+  g.lineStyle(1.4, 0x17130f, 0.9);
+  g.beginFill(0xd8d0b0, 0.76);
+  g.drawCircle(cx, cy, width * 0.32);
+  g.endFill();
+}
+
+function orientedCapsulePolygon(cx, cy, length, width, a) {
+  const radius = width / 2;
+  const halfStraight = Math.max(0, length / 2 - radius);
+  const points = [];
+  const steps = 8;
+  for (let i = 0; i <= steps; i += 1) {
+    const t = -Math.PI / 2 + (Math.PI * i) / steps;
+    const p = rotatePoint(halfStraight + Math.cos(t) * radius, Math.sin(t) * radius, a);
+    points.push(cx + p.x, cy + p.y);
+  }
+  for (let i = 0; i <= steps; i += 1) {
+    const t = Math.PI / 2 + (Math.PI * i) / steps;
+    const p = rotatePoint(-halfStraight + Math.cos(t) * radius, Math.sin(t) * radius, a);
+    points.push(cx + p.x, cy + p.y);
+  }
+  return points;
+}
+
+function drawRotatedLine(g, cx, cy, x1, y1, x2, y2, a) {
+  const p1 = rotatePoint(x1, y1, a);
+  const p2 = rotatePoint(x2, y2, a);
+  g.moveTo(cx + p1.x, cy + p1.y);
+  g.lineTo(cx + p2.x, cy + p2.y);
 }
 
 function angleLerp(a, b, t) {
