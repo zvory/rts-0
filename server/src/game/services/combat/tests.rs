@@ -315,7 +315,7 @@ fn visible_damage_emits_positioned_under_attack_alert_to_victim_owner() {
     assert!(
             victim_events
                 .iter()
-                .any(|event| matches!(event, Event::Attack { from, to } if *from == attacker_id && *to == victim_id)),
+                .any(|event| matches!(event, Event::Attack { from, to, .. } if *from == attacker_id && *to == victim_id)),
             "victim owner should receive the visible attack event"
         );
     assert!(
@@ -897,11 +897,29 @@ fn deployed_at_team_fires_at_long_range() {
         .set_facing(std::f32::consts::PI);
     let enemy_hp = entities.get(tank_id).expect("enemy should exist").hp;
 
-    run_combat_tick(&mut entities);
+    let events = run_combat_tick(&mut entities);
 
     assert!(
         entities.get(tank_id).expect("enemy should exist").hp < enemy_hp,
         "deployed AT team should fire at range 7"
+    );
+    assert!(
+        events.get(&2).is_some_and(|events| events.iter().any(|event| {
+            matches!(
+                event,
+                Event::Attack {
+                    from,
+                    to,
+                    reveal: Some(reveal),
+                    to_pos: Some(to_pos),
+                } if *from == at_id
+                    && *to == tank_id
+                    && reveal.kind == EntityKind::AtTeam.to_protocol_str()
+                    && reveal.setup_state.as_deref() == Some(WeaponSetup::Deployed.to_protocol_str())
+                    && *to_pos == [310.0, 100.0]
+            )
+        })),
+        "AT attack event should carry shooter reveal and target position for visual feedback"
     );
 }
 
@@ -1348,7 +1366,7 @@ fn missed_primary_shot_still_emits_attack_event() {
                 .get(&1)
                 .expect("attacker owner events should exist")
                 .iter()
-                .any(|event| matches!(event, Event::Attack { from, to } if *from == attacker && *to == victim)),
+                .any(|event| matches!(event, Event::Attack { from, to, .. } if *from == attacker && *to == victim)),
             "missed shots should still emit attack feedback for gun audio"
         );
     assert!(
@@ -1528,7 +1546,7 @@ fn tank_between_attacker_and_target_blocks_the_shot() {
                 .get(&1)
                 .expect("attacker owner events should exist")
                 .iter()
-                .any(|event| matches!(event, Event::Attack { from, to } if *from == attacker && *to == blocker)),
+                .any(|event| matches!(event, Event::Attack { from, to, .. } if *from == attacker && *to == blocker)),
             "attack event should point at the blocking tank"
         );
 }

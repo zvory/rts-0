@@ -7,9 +7,10 @@
 // server never sees them directly (only the resulting commands).
 
 import { RESOURCE_AMOUNTS } from "./config.js";
-import { KIND, PASSABLE, isResource } from "./protocol.js";
+import { KIND, PASSABLE, SETUP, STATE, isResource } from "./protocol.js";
 
 const TWO_PI = Math.PI * 2;
+const AT_GUN_SHOT_REVEAL_MS = 1500;
 const WEAPON_RECOIL_MS = Object.freeze({
   [KIND.RIFLEMAN]: 420,
   [KIND.MACHINE_GUNNER]: 160,
@@ -98,6 +99,8 @@ export class GameState {
     this.muzzleFlashes = [];
     /** @type {Map<number, number>} attacker id -> latest shot receive time. */
     this.weaponRecoilById = new Map();
+    /** @type {Map<number, object>} attacker id -> temporary AT-gun fog reveal entity. */
+    this.shotRevealsById = new Map();
   }
 
   /** Maximum number of entities the local selection may contain. */
@@ -150,10 +153,15 @@ export class GameState {
     this._prevRecvTime = this._curRecvTime;
     this._prevById = this._curById;
 
+    const events = msg.events || [];
     this._applyResourceDeltas(msg.resourceDeltas || []);
-    this._applyResourceDeaths(msg.events || []);
+    this._applyResourceDeaths(events);
     const wireEntities = (msg.entities || []).filter((e) => !isResource(e.kind));
-    const entities = wireEntities.concat(this._resourceEntityViews());
+    this._applyAttackReveals(events, now);
+    const visibleIds = new Set(wireEntities.map((e) => e.id));
+    const entities = wireEntities
+      .concat(this._resourceEntityViews())
+      .concat(this._shotRevealEntityViews(now, visibleIds));
 
     this._cur = { ...msg, entities };
     this._curRecvTime = now;
@@ -170,12 +178,15 @@ export class GameState {
       supplyCap: msg.supplyCap | 0,
     };
     this.playerResources = msg.playerResources || [];
-    this.events = msg.events || [];
+    this.events = events;
     this._pruneSelection();
 
     for (const ev of this.events) {
       if (ev && ev.e === "attack" && typeof ev.from === "number" && typeof ev.to === "number") {
-        this.muzzleFlashes.push({ from: ev.from, to: ev.to, createdAt: now });
+        const targetPos = Array.isArray(ev.toPos) && ev.toPos.length === 2
+          ? { x: ev.toPos[0], y: ev.toPos[1] }
+          : null;
+        this.muzzleFlashes.push({ from: ev.from, to: ev.to, targetPos, createdAt: now });
         this.weaponRecoilById.set(ev.from, now);
       }
     }
@@ -297,6 +308,57 @@ export class GameState {
     }
   }
 
+  _applyAttackReveals(events, now) {
+    for (const ev of events) {
+      if (!ev || ev.e !== "attack" || typeof ev.from !== "number") continue;
+      const reveal = this._normalizeAttackReveal(ev, now);
+      if (!reveal) continue;
+      this.shotRevealsById.set(ev.from, reveal);
+    }
+  }
+
+  _normalizeAttackReveal(ev, now) {
+    const r = ev.reveal;
+    if (!r || r.kind !== KIND.AT_TEAM) return null;
+    if (!Number.isFinite(r.x) || !Number.isFinite(r.y)) return null;
+    const targetPos = Array.isArray(ev.toPos) && ev.toPos.length === 2
+      ? { x: ev.toPos[0], y: ev.toPos[1] }
+      : null;
+    const targetAngle = targetPos && Number.isFinite(targetPos.x) && Number.isFinite(targetPos.y)
+      ? Math.atan2(targetPos.y - r.y, targetPos.x - r.x)
+      : null;
+    const facing = Number.isFinite(r.facing) ? r.facing : (targetAngle ?? 0);
+    const weaponFacing = Number.isFinite(r.weaponFacing) ? r.weaponFacing : facing;
+    return {
+      id: ev.from,
+      owner: typeof r.owner === "number" ? r.owner : 0,
+      kind: KIND.AT_TEAM,
+      x: r.x,
+      y: r.y,
+      hp: 1,
+      maxHp: 1,
+      state: STATE.ATTACK,
+      facing,
+      weaponFacing,
+      setupState: r.setupState || SETUP.DEPLOYED,
+      shotReveal: true,
+      shotRevealCreatedAt: now,
+      shotRevealExpiresAt: now + AT_GUN_SHOT_REVEAL_MS,
+    };
+  }
+
+  _shotRevealEntityViews(now, visibleIds) {
+    const out = [];
+    for (const [id, reveal] of this.shotRevealsById) {
+      if (visibleIds.has(id) || now > reveal.shotRevealExpiresAt) {
+        this.shotRevealsById.delete(id);
+        continue;
+      }
+      out.push({ ...reveal });
+    }
+    return out;
+  }
+
   _resourceEntityViews() {
     return (this.map.resources || []).map((node) => ({ ...node }));
   }
@@ -313,7 +375,7 @@ export class GameState {
     const out = [];
     for (const id of this.selection) {
       const e = this._curById.get(id);
-      if (e) out.push(e);
+      if (e && !e.shotReveal) out.push(e);
     }
     return out;
   }
@@ -364,7 +426,8 @@ export class GameState {
     let changed = false;
     const live = new Set();
     for (const id of this.selection) {
-      if (this._curById.has(id)) {
+      const entity = this._curById.get(id);
+      if (entity && !entity.shotReveal) {
         live.add(id);
       } else {
         changed = true;

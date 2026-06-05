@@ -12,7 +12,8 @@ use rand::rngs::SmallRng;
 use rand::Rng;
 
 use super::events::{
-    emit_attack_event, push_under_attack_notice, push_under_attack_notices_for_visible_attack,
+    attack_reveal_for, emit_attack_event, push_under_attack_notice,
+    push_under_attack_notices_for_visible_attack,
 };
 use super::projection::{resolve_shot_victim, shot_blocker_intersection};
 use super::RANGE_SLACK;
@@ -48,6 +49,7 @@ pub(super) fn apply_damage(
         .get(shot_victim)
         .map(|e| (e.pos_x, e.pos_y))
         .unwrap_or((vx, vy));
+    let reveal = attack_reveal_for(entities.get(attacker));
     let attacker_kind = entities.get(attacker).map(|e| e.kind);
     let victim_kind = entities.get(shot_victim).map(|e| e.kind);
     let victim_facing = entities.get(shot_victim).map(|e| e.facing());
@@ -62,6 +64,7 @@ pub(super) fn apply_damage(
         ay,
         shot_victim_pos.0,
         shot_victim_pos.1,
+        reveal.clone(),
     );
 
     // Roll for miss before computing damage.
@@ -248,6 +251,7 @@ fn apply_overpenetration(
                 v.record_damage_from((ax, ay), tick);
             }
         }
+        let reveal = attack_reveal_for(entities.get(attacker));
         for pid in &player_ids {
             if !projection_rules::attack_event_visible_to(*pid, ax, ay, tx, ty, attacker_owner, fog)
             {
@@ -256,6 +260,8 @@ fn apply_overpenetration(
             events.entry(*pid).or_default().push(Event::Attack {
                 from: attacker,
                 to: id,
+                reveal: reveal.clone(),
+                to_pos: Some([tx, ty]),
             });
             push_under_attack_notice(events, *pid, victim_owner, attacker_owner, tx, ty);
         }
