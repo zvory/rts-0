@@ -128,14 +128,19 @@ export class Match {
 
     this.rafId = requestAnimationFrame(this.tickFn);
 
-    // Show replay speed controls only when watching a replay.
-    const isReplay = this.devWatch?.room?.includes("__dev_selfplay__replay:");
-    if (isReplay && dom.replaySpeed) {
+    // Show speed controls for replay and scenario dev-watch rooms.
+    const isReplay = this.devWatch?.kind === "replay";
+    const isScenario = this.devWatch?.kind === "scenario";
+    if ((isReplay || isScenario) && dom.replaySpeed) {
       dom.replaySpeed.hidden = false;
+      for (const btn of dom.replaySpeed.querySelectorAll(".seek-btn")) {
+        btn.hidden = isScenario;
+      }
       this.replaySpeedHandler = (e) => {
         const btn = e.target.closest(".spd-btn");
         if (!btn) return;
         if (btn.dataset.seekBack !== undefined) {
+          if (!isReplay) return;
           const ticksBack = parseInt(btn.dataset.seekBack, 10);
           if (!isFinite(ticksBack) || ticksBack <= 0) return;
           this.net.seekReplay(ticksBack);
@@ -519,6 +524,7 @@ export class Match {
     if (dom.replaySpeed && this.replaySpeedHandler) {
       dom.replaySpeed.removeEventListener("click", this.replaySpeedHandler);
       dom.replaySpeed.hidden = true;
+      for (const btn of dom.replaySpeed.querySelectorAll(".seek-btn")) btn.hidden = false;
     }
     if (dom.giveUpOpen) dom.giveUpOpen.hidden = false;
     if (dom.commandCard) dom.commandCard.hidden = false;

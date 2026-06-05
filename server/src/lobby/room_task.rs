@@ -33,6 +33,7 @@ enum Phase {
 pub(super) enum RoomMode {
     Normal,
     DevSelfPlay(DevSelfPlayConfig),
+    DevScenario(DevScenarioConfig),
 }
 
 #[derive(Clone)]
@@ -41,9 +42,46 @@ pub(super) enum DevSelfPlayConfig {
     Replay { artifact: String },
 }
 
+#[derive(Clone)]
+pub(super) struct DevScenarioConfig {
+    pub(super) id: DevScenarioId,
+    pub(super) cars: usize,
+}
+
+#[derive(Clone)]
+pub(super) enum DevScenarioId {
+    ScoutCarSnakingCorridor,
+}
+
 enum DevDriver {
     Live(LiveSelfPlay),
     Replay(ReplayDriver),
+    Scenario(DevScenarioDriver),
+}
+
+struct DevScenarioDriver {
+    player_id: u32,
+    units: Vec<u32>,
+    goal: (f32, f32),
+    issued: bool,
+}
+
+impl DevScenarioDriver {
+    fn enqueue_for_tick(&mut self, game: &mut Game) {
+        if self.issued {
+            return;
+        }
+        self.issued = true;
+        game.enqueue(
+            self.player_id,
+            SimCommand::Move {
+                units: self.units.clone(),
+                x: self.goal.0,
+                y: self.goal.1,
+                queued: false,
+            },
+        );
+    }
 }
 
 /// All state owned by a single room task. Lives entirely on that task — never shared.
@@ -141,6 +179,13 @@ impl RoomTask {
         base.div_f32(self.replay_speed)
     }
 
+    fn is_dev_watch(&self) -> bool {
+        matches!(
+            self.mode,
+            RoomMode::DevSelfPlay(_) | RoomMode::DevScenario(_)
+        )
+    }
+
     // -- Event handling ------------------------------------------------------
 
     fn handle_event(&mut self, event: RoomEvent) {
@@ -179,7 +224,7 @@ impl RoomTask {
         msg_tx: ConnectionSink,
         ack: tokio::sync::oneshot::Sender<bool>,
     ) {
-        if matches!(self.mode, RoomMode::DevSelfPlay(_)) {
+        if self.is_dev_watch() {
             self.on_join_dev_selfplay(player_id, name, msg_tx, ack);
             return;
         }
@@ -268,7 +313,7 @@ impl RoomTask {
     }
 
     fn on_ready(&mut self, player_id: u32, ready: bool) {
-        if matches!(self.mode, RoomMode::DevSelfPlay(_)) {
+        if self.is_dev_watch() {
             return;
         }
         if let Phase::Lobby = self.phase {
@@ -283,7 +328,7 @@ impl RoomTask {
     }
 
     fn on_start_request(&mut self, player_id: u32) {
-        if matches!(self.mode, RoomMode::DevSelfPlay(_)) {
+        if self.is_dev_watch() {
             return;
         }
         if !matches!(self.phase, Phase::Lobby) {
@@ -303,7 +348,7 @@ impl RoomTask {
     /// Host-only: seat a computer opponent. Ignored outside the lobby, from non-hosts, or once
     /// the room is full (humans + AI == [`MAX_PLAYERS`]).
     fn on_add_ai(&mut self, player_id: u32) {
-        if matches!(self.mode, RoomMode::DevSelfPlay(_)) {
+        if self.is_dev_watch() {
             return;
         }
         if !matches!(self.phase, Phase::Lobby) || self.host_id != Some(player_id) {
@@ -323,7 +368,7 @@ impl RoomTask {
     /// Host-only: remove a previously-added AI opponent by id. Ignored outside the lobby, from
     /// non-hosts, or for an unknown id.
     fn on_remove_ai(&mut self, player_id: u32, target: u32) {
-        if matches!(self.mode, RoomMode::DevSelfPlay(_)) {
+        if self.is_dev_watch() {
             return;
         }
         if !matches!(self.phase, Phase::Lobby) || self.host_id != Some(player_id) {
@@ -339,7 +384,7 @@ impl RoomTask {
 
     /// Host-only: toggle the lobby's boosted opening resources.
     fn on_set_quickstart(&mut self, player_id: u32, enabled: bool) {
-        if matches!(self.mode, RoomMode::DevSelfPlay(_)) {
+        if self.is_dev_watch() {
             return;
         }
         if !matches!(self.phase, Phase::Lobby) || self.host_id != Some(player_id) {
@@ -353,7 +398,7 @@ impl RoomTask {
     }
 
     fn on_set_spectator(&mut self, player_id: u32, spectator: bool) {
-        if matches!(self.mode, RoomMode::DevSelfPlay(_)) {
+        if self.is_dev_watch() {
             return;
         }
         if !matches!(self.phase, Phase::Lobby) {
@@ -440,7 +485,7 @@ impl RoomTask {
     }
 
     fn on_command(&mut self, player_id: u32, cmd: SimCommand) {
-        if matches!(self.mode, RoomMode::DevSelfPlay(_)) {
+        if self.is_dev_watch() {
             return;
         }
         // Commands are ignored unless in-game and the sender is actually in this room. The
@@ -458,7 +503,7 @@ impl RoomTask {
     }
 
     fn on_give_up(&mut self, player_id: u32) {
-        if matches!(self.mode, RoomMode::DevSelfPlay(_)) {
+        if self.is_dev_watch() {
             return;
         }
         let active_player = self
@@ -666,7 +711,7 @@ impl RoomTask {
         let (game, driver, view_player_id) = match self.build_dev_session() {
             Ok(session) => session,
             Err(err) => {
-                warn!(room = %self.room, error = %err, "dev self-play bootstrap failed");
+                warn!(room = %self.room, error = %err, "dev session bootstrap failed");
                 self.send_dev_error(&err);
                 return;
             }
@@ -679,12 +724,12 @@ impl RoomTask {
         for player_id in recipients {
             self.send_dev_start_to(player_id);
         }
-        info!(room = %self.room, "dev self-play session started");
+        info!(room = %self.room, "dev session started");
     }
 
     fn build_dev_session(&self) -> Result<(Game, DevDriver, u32), String> {
         match &self.mode {
-            RoomMode::Normal => Err("room is not configured for dev self-play".to_string()),
+            RoomMode::Normal => Err("room is not configured for a dev session".to_string()),
             RoomMode::DevSelfPlay(DevSelfPlayConfig::Live) => {
                 let driver = LiveSelfPlay::default_match();
                 let players = driver.players().to_vec();
@@ -712,6 +757,19 @@ impl RoomTask {
                 );
                 Ok((game, DevDriver::Replay(driver), view_player_id))
             }
+            RoomMode::DevScenario(config) => match config.id {
+                DevScenarioId::ScoutCarSnakingCorridor => {
+                    let setup =
+                        Game::new_scout_car_snaking_corridor_scenario(config.cars, match_seed())?;
+                    let driver = DevScenarioDriver {
+                        player_id: setup.player_id,
+                        units: setup.units,
+                        goal: setup.goal,
+                        issued: false,
+                    };
+                    Ok((setup.game, DevDriver::Scenario(driver), setup.player_id))
+                }
+            },
         }
     }
 
@@ -752,7 +810,7 @@ impl RoomTask {
     /// One simulation step. No-op in the `Lobby` phase (the ticker keeps running so a room is
     /// always live and ready to start).
     fn on_tick(&mut self, scheduled: TokioInstant) {
-        if matches!(self.mode, RoomMode::DevSelfPlay(_)) {
+        if self.is_dev_watch() {
             self.on_tick_dev_selfplay(scheduled);
             return;
         }
@@ -887,6 +945,7 @@ impl RoomTask {
         crate::perf::timed(perf.as_mut(), "dev_driver_enqueue", || match &mut driver {
             DevDriver::Live(scripted) => scripted.enqueue_for_tick(&mut game),
             DevDriver::Replay(replay) => replay.enqueue_for_tick(&mut game),
+            DevDriver::Scenario(scenario) => scenario.enqueue_for_tick(&mut game),
         });
         let game_tick_start = StdInstant::now();
         let tick_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
@@ -917,7 +976,7 @@ impl RoomTask {
             };
             let snapshot_start = StdInstant::now();
             let mut snapshot = game.snapshot_full_for(view_player_id);
-            if let Some(mut events) = per_player_events.remove(&id) {
+            if let Some(mut events) = per_player_events.remove(&view_player_id) {
                 snapshot.events.append(&mut events);
             }
             let snapshot_duration = snapshot_start.elapsed();
@@ -953,8 +1012,9 @@ impl RoomTask {
         }
 
         let outcome_start = StdInstant::now();
+        let scenario_keeps_running = matches!(self.mode, RoomMode::DevScenario(_));
         let alive = game.alive_players();
-        if alive.len() <= 1 {
+        if !scenario_keeps_running && alive.len() <= 1 {
             if let Some(perf) = perf.as_mut() {
                 perf.record_phase("outcome_checks", outcome_start.elapsed());
             }
@@ -977,7 +1037,7 @@ impl RoomTask {
     pub(super) fn on_set_replay_speed(&mut self, speed: f32) {
         if !matches!(
             self.mode,
-            RoomMode::DevSelfPlay(DevSelfPlayConfig::Replay { .. })
+            RoomMode::DevSelfPlay(DevSelfPlayConfig::Replay { .. }) | RoomMode::DevScenario(_)
         ) {
             return;
         }
@@ -1016,6 +1076,7 @@ impl RoomTask {
             match &mut driver {
                 DevDriver::Live(scripted) => scripted.enqueue_for_tick(&mut game),
                 DevDriver::Replay(replay) => replay.enqueue_for_tick(&mut game),
+                DevDriver::Scenario(scenario) => scenario.enqueue_for_tick(&mut game),
             }
             let tick_result =
                 std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| game.tick()));
