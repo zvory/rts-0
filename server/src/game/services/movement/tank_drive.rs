@@ -23,6 +23,7 @@ const TANK_PIVOT_ANGLE_RAD: f32 = 1.25;
 const TANK_TRAFFIC_LOOKAHEAD_PX: f32 = config::TILE_SIZE as f32 * 2.0;
 const TANK_TRAFFIC_TURN_BIAS_RAD: f32 = 0.28;
 pub(super) const SCOUT_CAR_MIN_TURN_RADIUS_PX: f32 = config::TILE_SIZE as f32 * 1.5;
+pub(super) const SCOUT_CAR_ROUTE_LOOKAHEAD_PX: f32 = config::TILE_SIZE as f32 * 3.0;
 
 pub(super) fn tank_oil_starves_movement(
     entities: &mut EntityStore,
@@ -221,7 +222,7 @@ pub(super) fn scout_car_drive_intent(
     x: f32,
     y: f32,
 ) -> Option<ScoutCarDriveIntent> {
-    let (desired_x, desired_y) = tank_desired_path_point(map, occ, e, x, y)?;
+    let (desired_x, desired_y) = scout_car_desired_path_point(map, occ, e, x, y)?;
     let dx = desired_x - x;
     let dy = desired_y - y;
     let dist = (dx * dx + dy * dy).sqrt();
@@ -309,10 +310,89 @@ pub(super) fn step_can_reach_waypoint(
     along >= -ARRIVE_EPS && lateral <= ARRIVE_EPS
 }
 
+pub(super) fn along_track_error(delta: (f32, f32), segment_dir: (f32, f32)) -> f32 {
+    delta.0 * segment_dir.0 + delta.1 * segment_dir.1
+}
+
+pub(super) fn lateral_error(delta: (f32, f32), segment_dir: (f32, f32)) -> f32 {
+    (delta.0 * segment_dir.1 - delta.1 * segment_dir.0).abs()
+}
+
 pub(super) fn distance_between(from: (f32, f32), to: (f32, f32)) -> f32 {
     let dx = to.0 - from.0;
     let dy = to.1 - from.1;
     (dx * dx + dy * dy).sqrt()
+}
+
+pub(super) fn scout_car_final_goal_tolerance() -> f32 {
+    config::SCOUT_CAR_FINAL_GOAL_TOLERANCE_PX
+}
+
+pub(super) fn scout_car_accepts_waypoint(
+    map: &Map,
+    occ: &Occupancy,
+    e: &Entity,
+    current: (f32, f32),
+    waypoint: (f32, f32),
+    next_waypoint: Option<(f32, f32)>,
+) -> bool {
+    if distance_between(current, waypoint) <= config::SCOUT_CAR_WAYPOINT_ACCEPTANCE_RADIUS_PX {
+        return true;
+    }
+
+    let Some(next_waypoint) = next_waypoint else {
+        return false;
+    };
+    let Some(route_dir) = unit_direction(waypoint, next_waypoint) else {
+        return false;
+    };
+    let from_waypoint_to_current = (current.0 - waypoint.0, current.1 - waypoint.1);
+    if along_track_error(from_waypoint_to_current, route_dir) > 0.0 {
+        return true;
+    }
+
+    static_standability::unit_static_standable_with_facing(
+        map,
+        occ,
+        e.kind,
+        current.0,
+        current.1,
+        e.facing(),
+    ) && static_standability::unit_static_segment_standable(
+        map,
+        occ,
+        e.kind,
+        current,
+        next_waypoint,
+    )
+}
+
+pub(super) fn scout_car_desired_path_point(
+    map: &Map,
+    occ: &Occupancy,
+    e: &Entity,
+    x: f32,
+    y: f32,
+) -> Option<(f32, f32)> {
+    let path = &e.movement.as_ref()?.path;
+    let current = (x, y);
+    let mut next_index = path.len().checked_sub(1)?;
+
+    while next_index > 0 {
+        let waypoint = path[next_index];
+        let next_waypoint = path[next_index - 1];
+        if !scout_car_accepts_waypoint(map, occ, e, current, waypoint, Some(next_waypoint)) {
+            break;
+        }
+        next_index -= 1;
+    }
+
+    let target = path[next_index];
+    if !static_standability::unit_static_segment_standable(map, occ, e.kind, current, target) {
+        return Some(target);
+    }
+
+    point_at_distance(current, target, SCOUT_CAR_ROUTE_LOOKAHEAD_PX).or(Some(target))
 }
 
 pub(super) fn tank_desired_path_point(
@@ -339,6 +419,16 @@ pub(super) fn tank_desired_path_point(
     }
 
     farthest_reachable.or(Some(next))
+}
+
+fn unit_direction(from: (f32, f32), to: (f32, f32)) -> Option<(f32, f32)> {
+    let dx = to.0 - from.0;
+    let dy = to.1 - from.1;
+    let len = (dx * dx + dy * dy).sqrt();
+    if !len.is_finite() || len <= 1.0e-4 {
+        return None;
+    }
+    Some((dx / len, dy / len))
 }
 
 fn point_at_distance(from: (f32, f32), to: (f32, f32), distance: f32) -> Option<(f32, f32)> {

@@ -15,8 +15,9 @@ use crate::protocol::NoticeSeverity;
 
 use super::collision::COLLISION_EPS_PX;
 use super::tank_drive::{
-    tank_desired_path_point, AT_GUN_BODY_TURN_RATE_RAD_PER_TICK, SCOUT_CAR_MIN_TURN_RADIUS_PX,
-    TANK_BODY_LOOKAHEAD_PX, TANK_REVERSE_GOAL_DISTANCE_PX,
+    scout_car_desired_path_point, tank_desired_path_point, AT_GUN_BODY_TURN_RATE_RAD_PER_TICK,
+    SCOUT_CAR_MIN_TURN_RADIUS_PX, SCOUT_CAR_ROUTE_LOOKAHEAD_PX, TANK_BODY_LOOKAHEAD_PX,
+    TANK_REVERSE_GOAL_DISTANCE_PX,
 };
 
 /// Distance (px) between two entity centers.
@@ -239,6 +240,10 @@ fn tank_body_half_len() -> f32 {
 
 fn tank_body_half_width() -> f32 {
     config::TANK_BODY_WIDTH_PX * 0.5 + config::TANK_BODY_CLEARANCE_PX
+}
+
+fn scout_car_body_half_width() -> f32 {
+    config::SCOUT_CAR_BODY_WIDTH_PX * 0.5 + config::SCOUT_CAR_BODY_CLEARANCE_PX
 }
 
 fn tank_standable_at_entity_facing(
@@ -1282,6 +1287,117 @@ fn tank_route_lookahead_stops_before_blocked_corner() {
     );
 }
 
+#[test]
+fn scout_car_route_lookahead_skips_lateral_waypoint_when_next_segment_reachable() {
+    let map = flat_map(1);
+    let mut entities = EntityStore::new();
+    let (sx, sy) = map.tile_center(20, 20);
+    let lateral_offset = config::SCOUT_CAR_WAYPOINT_ACCEPTANCE_RADIUS_PX + 10.0;
+    let start = (sx, sy + lateral_offset);
+    let intermediate = (sx + config::TILE_SIZE as f32, sy);
+    let goal = (sx + config::TILE_SIZE as f32 * 8.0, sy);
+    let scout = entities
+        .spawn_unit(1, EntityKind::ScoutCar, start.0, start.1)
+        .expect("scout car should spawn");
+    if let Some(e) = entities.get_mut(scout) {
+        e.set_facing(0.0);
+        e.set_order(Order::move_to(goal.0, goal.1));
+    }
+    set_path_direct(&mut entities, scout, vec![intermediate, goal]);
+
+    let occ = Occupancy::build(&map, &entities);
+    let e = entities.get(scout).expect("scout car should exist");
+    let desired = scout_car_desired_path_point(&map, &occ, e, start.0, start.1)
+        .expect("scout car should have route intent");
+    assert!(
+        moved_distance(start, desired) >= SCOUT_CAR_ROUTE_LOOKAHEAD_PX - 0.001,
+        "lookahead should aim past the lateral waypoint along the reachable route, got {:?}",
+        desired
+    );
+    assert_ne!(
+        desired, intermediate,
+        "scout car should not chase the lateral intermediate waypoint center"
+    );
+
+    let spatial = SpatialIndex::build(&entities, map.size);
+    movement_system(&map, &mut entities, &mut [], &occ, &spatial, 0);
+
+    let e = entities.get(scout).expect("scout car should exist");
+    assert_eq!(
+        e.movement.as_ref().map(|m| m.path.len()),
+        Some(1),
+        "statically reachable next segment should consume the lateral intermediate waypoint"
+    );
+    assert_eq!(e.next_waypoint(), Some(goal));
+    assert!(
+        e.pos_x > start.0,
+        "scout car should drive down the reachable route after consuming the waypoint"
+    );
+}
+
+#[test]
+fn scout_car_route_lookahead_stops_before_blocked_corner() {
+    let map = flat_map(1);
+    let mut entities = EntityStore::new();
+    let (bx, by) = footprint_center(&map, EntityKind::Depot, 10, 10);
+    entities
+        .spawn_building(1, EntityKind::Depot, bx, by, true)
+        .expect("depot spawn");
+    let rect = building_rect_for_footprint(EntityKind::Depot, 10, 10).expect("depot rect");
+    let clearance = scout_car_body_half_width() + 8.0;
+
+    let start = (
+        rect.min_x - config::TILE_SIZE as f32 * 2.0,
+        rect.max_y + clearance,
+    );
+    let corner = (rect.max_x + config::TILE_SIZE as f32 * 2.0, start.1);
+    let after_corner = (corner.0, rect.min_y - clearance);
+    let scout = entities
+        .spawn_unit(1, EntityKind::ScoutCar, start.0, start.1)
+        .expect("scout car spawn");
+    if let Some(e) = entities.get_mut(scout) {
+        e.set_facing(0.0);
+    }
+    set_path_direct(&mut entities, scout, vec![corner, after_corner]);
+
+    let occ = Occupancy::build(&map, &entities);
+    assert!(
+        standability::unit_static_segment_standable(
+            &map,
+            &occ,
+            EntityKind::ScoutCar,
+            start,
+            corner
+        ),
+        "fixture requires a legal current route segment"
+    );
+    assert!(
+        !standability::unit_static_segment_standable(
+            &map,
+            &occ,
+            EntityKind::ScoutCar,
+            start,
+            after_corner
+        ),
+        "fixture requires the direct look-through-corner segment to be blocked"
+    );
+
+    let e = entities.get(scout).expect("scout car should exist");
+    let desired =
+        scout_car_desired_path_point(&map, &occ, e, start.0, start.1).expect("route intent");
+
+    assert!(
+        (desired.1 - start.1).abs() <= 0.001,
+        "scout car intent should stay on the legal segment before the corner, got {:?}",
+        desired
+    );
+    assert!(
+        desired.0 > start.0 && desired.0 <= corner.0,
+        "scout car intent should advance along the current segment only, got {:?}",
+        desired
+    );
+}
+
 /// Set a path directly on a unit. Path is stored reversed (last element = next waypoint).
 /// `waypoints` should be in visit order: [first_to_visit, ..., final_goal].
 fn set_path_direct(entities: &mut EntityStore, id: u32, waypoints: Vec<(f32, f32)>) {
@@ -2024,6 +2140,34 @@ fn scout_car_lateral_final_goal_settles_inside_final_tolerance() {
     assert!(
         moved_distance((e.pos_x, e.pos_y), goal) <= config::SCOUT_CAR_FINAL_GOAL_TOLERANCE_PX,
         "settled scout car should remain inside final tolerance"
+    );
+}
+
+#[test]
+fn scout_car_attack_move_lateral_final_goal_keeps_attack_move_order() {
+    let map = flat_map(1);
+    let mut entities = EntityStore::new();
+    let (sx, sy) = map.tile_center(20, 20);
+    let goal = (sx, sy + config::SCOUT_CAR_FINAL_GOAL_TOLERANCE_PX - 2.0);
+    let scout = entities
+        .spawn_unit(1, EntityKind::ScoutCar, sx, sy)
+        .expect("scout car should spawn");
+    if let Some(e) = entities.get_mut(scout) {
+        e.set_facing(0.0);
+        e.set_order(Order::attack_move_to(goal.0, goal.1));
+    }
+    set_path_direct(&mut entities, scout, vec![goal]);
+
+    let occ = Occupancy::build(&map, &entities);
+    let spatial = SpatialIndex::build(&entities, map.size);
+    movement_system(&map, &mut entities, &mut [], &occ, &spatial, 0);
+
+    let e = entities.get(scout).expect("scout car should exist");
+    assert!(e.path_is_empty(), "attack-move scout car should settle");
+    assert_eq!(e.move_phase(), Some(MovePhase::Arrived));
+    assert!(
+        matches!(e.order(), Order::AttackMove(_)),
+        "attack-move arrival should keep combat movement semantics"
     );
 }
 
