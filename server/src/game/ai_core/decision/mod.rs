@@ -51,13 +51,16 @@ use self::production::{
 };
 use self::proxy::{should_use_proxy_barracks, try_proxy_barracks};
 use self::raids::{
-    is_rifle_raid_policy, rifle_raid_building_fallback_target, rifle_raid_move_target,
-    rifle_raid_unit_target, rifle_raid_units_to_resume, select_rifle_raid_units,
+    group_center, is_rifle_raid_policy, rifle_raid_building_fallback_target,
+    rifle_raid_move_target, rifle_raid_unit_target, rifle_raid_units_to_resume,
+    select_rifle_raid_units,
 };
 use self::resources::{
     desired_oil_workers, max_worker_resource_assignment_distance_px, occupied_resource_nodes,
     resource_worker_counts, target_steel_workers_for_profile,
 };
+
+const OUTBOUND_WAVE_VISIBLE_TARGET_RADIUS_TILES: f32 = 14.0;
 
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct AiDecision {
@@ -333,11 +336,30 @@ where
         });
     }
 
+    if save_for_expansion
+        && try_build_expansion_city_centre(
+            observation,
+            &facts,
+            &mut actions,
+            &builder_pools,
+            profile,
+            recovery_active,
+            &mut placeable,
+        )
+        .is_some()
+    {
+        intents.push(AiIntent::Build {
+            kind: EntityKind::CityCentre,
+        });
+    }
+    let save_for_unplanned_expansion =
+        save_for_expansion && planned_in_intents(&intents, EntityKind::CityCentre) == 0;
+
     for kind in required_tech_path {
         if proxy_barracks_active && *kind == EntityKind::Barracks {
             continue;
         }
-        if expansion_blocks_tech_path {
+        if expansion_blocks_tech_path || save_for_unplanned_expansion {
             continue;
         }
         if facts.building_count(*kind) + planned_in_intents(&intents, *kind) > 0 {
@@ -388,6 +410,7 @@ where
             < target_barracks
         && !(proxy_barracks_active && facts.building_count(EntityKind::Barracks) == 0)
         && !expansion_blocks_tech_path
+        && !save_for_unplanned_expansion
         && planned_in_intents(&intents, EntityKind::Barracks) == 0
         && try_build_kind(
             observation,
@@ -406,23 +429,6 @@ where
         });
     }
 
-    if save_for_expansion
-        && try_build_expansion_city_centre(
-            observation,
-            &facts,
-            &mut actions,
-            &builder_pools,
-            profile,
-            recovery_active,
-            &mut placeable,
-        )
-        .is_some()
-    {
-        intents.push(AiIntent::Build {
-            kind: EntityKind::CityCentre,
-        });
-    }
-
     let desired_oil_workers = if let Some(plan) = panic_plan {
         plan.oil_workers
     } else {
@@ -437,7 +443,7 @@ where
     let target_workers = target_steel_workers.saturating_add(desired_oil_workers);
     let save_for_first_tech_unit = should_save_for_first_tech_unit(&facts, production_policy);
     let save_worker_training_for_tech = defensive_panic.active
-        || save_for_expansion
+        || save_for_unplanned_expansion
         || save_for_first_tech_unit
         || (save_for_required_tech_building && facts.worker_count >= target_workers);
     for trained in actions::train_units(
@@ -466,9 +472,10 @@ where
         let key_tech_unit = production_policy
             .save_for_first_tech_unit
             .unwrap_or(EntityKind::Worker);
-        let save_for_tech =
-            (save_for_expansion || save_for_first_tech_unit || save_for_required_tech_building)
-                && !rules::economy::trainable_units(building_kind).contains(&key_tech_unit);
+        let save_for_tech = (save_for_unplanned_expansion
+            || save_for_first_tech_unit
+            || save_for_required_tech_building)
+            && !rules::economy::trainable_units(building_kind).contains(&key_tech_unit);
         for trained in actions::train_units(
             &mut actions,
             TrainUnitsRequest {
@@ -645,6 +652,10 @@ where
                     let attack_units = if rifle_raid_policy {
                         let (x, y) = rifle_raid_move_target(observation, enemy_base);
                         actions::move_units(&mut actions, ready_units, x, y)
+                    } else if let Some(target) =
+                        visible_combat_target_for_wave(observation, &ready_units)
+                    {
+                        actions::attack_units(&mut actions, ready_units, target)
                     } else {
                         actions::attack_move_units(
                             &mut actions,
@@ -698,6 +709,41 @@ fn planned_in_intents(intents: &[AiIntent], kind: EntityKind) -> usize {
         .iter()
         .filter(|intent| matches!(intent, AiIntent::Build { kind: built } if *built == kind))
         .count()
+}
+
+fn visible_combat_target_for_wave(observation: &AiObservation, unit_ids: &[u32]) -> Option<u32> {
+    let center = group_center(observation, unit_ids)?;
+    let max_distance = OUTBOUND_WAVE_VISIBLE_TARGET_RADIUS_TILES * observation.map.tile_size as f32;
+    let max_distance2 = max_distance * max_distance;
+    observation
+        .visible_enemies
+        .iter()
+        .filter(|enemy| enemy.kind.is_unit() && enemy.kind != EntityKind::Worker)
+        .map(|enemy| {
+            let distance2 = geometry::dist2(center.0, center.1, enemy.x, enemy.y);
+            (
+                enemy.id,
+                outbound_wave_target_priority(enemy.kind),
+                distance2,
+            )
+        })
+        .filter(|(_, _, distance2)| *distance2 <= max_distance2)
+        .min_by(|left, right| {
+            left.1
+                .cmp(&right.1)
+                .then_with(|| left.2.total_cmp(&right.2))
+                .then_with(|| left.0.cmp(&right.0))
+        })
+        .map(|(id, _, _)| id)
+}
+
+fn outbound_wave_target_priority(kind: EntityKind) -> u8 {
+    match kind {
+        EntityKind::Tank => 0,
+        EntityKind::MachineGunner | EntityKind::AtTeam => 1,
+        EntityKind::Rifleman | EntityKind::ScoutCar => 2,
+        _ => 3,
+    }
 }
 
 #[cfg(test)]
