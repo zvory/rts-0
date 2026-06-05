@@ -1167,8 +1167,15 @@ mod tests {
             },
         );
 
-        assert!(!tile_path.is_empty(), "tank should still reach the goal around the pinch");
-        assert_eq!(tile_path.last().copied(), Some(goal), "tank path must terminate at the goal");
+        assert!(
+            !tile_path.is_empty(),
+            "tank should still reach the goal around the pinch"
+        );
+        assert_eq!(
+            tile_path.last().copied(),
+            Some(goal),
+            "tank path must terminate at the goal"
+        );
         assert!(
             !tile_path.contains(&(3, 3)),
             "tank A* must skip the diagonal-pinch tile (3, 3), got {tile_path:?}"

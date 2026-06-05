@@ -389,7 +389,7 @@ pub(crate) static RIFLE_FLOOD_FULL_SATURATION: AiProfile = AiProfile {
         balance_unit_priorities: false,
     },
     attack: AttackPolicy {
-        first_attack_size: 6,
+        first_attack_size: 3,
         wave_growth: 2,
         regroup_reset_ticks: 480,
         reissue_cadence_ticks: 120,
@@ -621,6 +621,7 @@ mod tests {
     fn fast_flood_attacks_with_smaller_waves_than_full_saturation() {
         assert_eq!(RIFLE_FLOOD_FAST.attack.first_attack_size, 1);
         assert_eq!(RIFLE_FLOOD_FAST.attack.wave_growth, 0);
+        assert_eq!(RIFLE_FLOOD_FULL_SATURATION.attack.first_attack_size, 3);
         assert!(
             RIFLE_FLOOD_FAST.production.queue_depth
                 < RIFLE_FLOOD_FULL_SATURATION.production.queue_depth
