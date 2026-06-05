@@ -1118,6 +1118,63 @@ mod tests {
         );
     }
 
+    #[test]
+    fn live_ai_rifle_raid_attacks_visible_scout_car() {
+        let players = human_vs_ai_players();
+        let mut game = Game::new_for_replay(&players, 0xCAFE_BABE);
+        for tile in &mut game.map.terrain {
+            *tile = crate::protocol::terrain::GRASS;
+        }
+        for id in game.entities.ids() {
+            game.entities.remove(id);
+        }
+        game.ai
+            .push(ai::AiController::with_profile_id(2, RIFLE_FLOOD_FAST_ID));
+
+        let ai_base = game.map.tile_center(42, 42);
+        game.entities
+            .spawn_building(2, EntityKind::CityCentre, ai_base.0, ai_base.1, true)
+            .expect("AI city centre should spawn");
+        let human_base = game.map.tile_center(8, 8);
+        game.entities
+            .spawn_building(1, EntityKind::CityCentre, human_base.0, human_base.1, true)
+            .expect("human city centre should spawn");
+
+        let raider_pos = game.map.tile_center(24, 24);
+        let raider = game
+            .entities
+            .spawn_unit(2, EntityKind::Rifleman, raider_pos.0, raider_pos.1)
+            .expect("AI rifleman should spawn");
+        let scout_pos = game.map.tile_center(27, 24);
+        let scout_car = game
+            .entities
+            .spawn_unit(1, EntityKind::ScoutCar, scout_pos.0, scout_pos.1)
+            .expect("human scout car should spawn");
+        if let Some(e) = game.entities.get_mut(raider) {
+            e.set_order(Order::move_to(human_base.0, human_base.1));
+        }
+
+        systems::recompute_supply(&mut game.players, &game.entities);
+        game.spatial = services::spatial::SpatialIndex::build(&game.entities, game.map.size);
+        let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
+        game.fog.recompute(&ids, &game.entities, &game.map);
+
+        while (game.tick_count().wrapping_add(1).wrapping_add(2)) % 9 != 0 {
+            game.tick();
+        }
+        game.tick();
+
+        let raider = game
+            .entities
+            .get(raider)
+            .expect("raider should remain alive");
+        assert_eq!(
+            raider.order().attack_target(),
+            Some(scout_car),
+            "visible scout car should interrupt the AI rifle raid move"
+        );
+    }
+
     /// Drive a passive human vs. one AI and confirm the deterministic default AI actually plays:
     /// it grows its economy, expands supply, builds a barracks, produces riflemen, and marches
     /// them into the human base to deal damage. This exercises the full command path the AI shares

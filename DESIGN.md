@@ -991,13 +991,15 @@ edge target as the build site. It trains only one extra home worker and sends ri
 individual pressure units instead of waiting for escalating waves. Pure rifle attack profiles use
 AI-only raid movement: launched riflemen receive plain `Move` orders to a point deeper than the
 public enemy start tile, so they ignore buildings encountered on the way, while the AI reissues
-direct `Attack` commands against visible enemy units with workers first. If no enemy units are
-visible and raiders have reached within 4 tiles of the center of the enemy main-base steel line,
-they fall back to attacking visible buildings so a unitless opponent can still be finished. Once
-the first completed Barracks has had enough time to produce seven Riflemen, using the current
-Rifleman training time from shared unit stats, the profile stops treating the rush as a pure
-all-in: it resumes worker production toward main steel saturation, starts oil workers after a
-steel floor, adds a home
+direct `Attack` commands against visible enemy units with workers first. Local home-defense
+responses reserve only the defenders assigned to that threat; unrelated moving raiders keep
+reacting to visible units on their own route, including scout cars, instead of continuing past
+them. If no enemy units are visible and raiders have reached within 4 tiles of the center of the
+enemy main-base steel line, they fall back to attacking visible buildings so a unitless opponent
+can still be finished. Once the first completed Barracks has had enough time to produce seven
+Riflemen, using the current Rifleman training time from shared unit stats, the profile stops
+treating the rush as a pure all-in: it resumes worker production toward main steel saturation,
+starts oil workers after a steel floor, adds a home
 Barracks, builds a Training Centre, and switches production toward Machine Gunners / AT teams with
 Riflemen as the fallback until support tech is ready.
 `rifle_flood_full_saturation` saturates the observed main-base steel line before assigning oil
