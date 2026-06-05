@@ -15,6 +15,7 @@ use crate::game::PlayerState;
 use crate::protocol::Event;
 
 mod collision;
+mod scout_car;
 mod standability;
 mod steering;
 mod tank_drive;

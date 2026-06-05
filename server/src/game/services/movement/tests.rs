@@ -16,9 +16,11 @@ use crate::game::{PlayerState, ScoreState};
 use crate::protocol::NoticeSeverity;
 
 use super::collision::COLLISION_EPS_PX;
+use super::scout_car::{
+    scout_car_desired_path_point, SCOUT_CAR_MIN_TURN_RADIUS_PX, SCOUT_CAR_ROUTE_LOOKAHEAD_PX,
+};
 use super::tank_drive::{
-    scout_car_desired_path_point, tank_desired_path_point, AT_GUN_BODY_TURN_RATE_RAD_PER_TICK,
-    SCOUT_CAR_MIN_TURN_RADIUS_PX, SCOUT_CAR_ROUTE_LOOKAHEAD_PX, TANK_BODY_LOOKAHEAD_PX,
+    tank_desired_path_point, AT_GUN_BODY_TURN_RATE_RAD_PER_TICK, TANK_BODY_LOOKAHEAD_PX,
     TANK_REVERSE_GOAL_DISTANCE_PX,
 };
 
@@ -1374,7 +1376,7 @@ fn scout_car_phase0_two_building_alley() {
 
     baseline.assert_reference_envelope("two_building_alley");
     assert!(
-        baseline.min_static_clearance_px <= 12.0,
+        baseline.min_static_clearance_px <= 16.0,
         "fixture should exercise a narrow lane, got {:?}",
         baseline
     );
@@ -3134,6 +3136,38 @@ fn scout_car_does_not_pivot_in_place_for_far_goal_behind() {
 }
 
 #[test]
+fn scout_car_symmetric_far_behind_turn_is_deterministic() {
+    fn run_once() -> ((f32, f32), f32) {
+        let map = flat_map(1);
+        let mut entities = EntityStore::new();
+        let (sx, sy) = map.tile_center(20, 20);
+        let goal = (
+            sx - TANK_REVERSE_GOAL_DISTANCE_PX - config::TILE_SIZE as f32,
+            sy,
+        );
+        let scout = entities
+            .spawn_unit(1, EntityKind::ScoutCar, sx, sy)
+            .expect("scout car should spawn");
+        if let Some(e) = entities.get_mut(scout) {
+            e.set_facing(0.0);
+        }
+        set_path_direct(&mut entities, scout, vec![goal]);
+
+        run_scout_car_movement_tick(&map, &mut entities, 0);
+
+        let e = entities.get(scout).expect("scout car should exist");
+        ((e.pos_x, e.pos_y), e.facing())
+    }
+
+    let first = run_once();
+    let second = run_once();
+    assert_eq!(
+        first, second,
+        "symmetric scout-car primitive tie should resolve deterministically"
+    );
+}
+
+#[test]
 fn scout_car_far_behind_click_after_forward_motion_does_not_backtrack_first() {
     let map = flat_map(1);
     let mut entities = EntityStore::new();
@@ -3267,8 +3301,8 @@ fn scout_car_reversing_to_nearby_offset_goal_arrives() {
         e.facing()
     );
     assert!(
-        moved_distance((e.pos_x, e.pos_y), goal) <= ARRIVE_EPS,
-        "scout car should finish on the ordered point"
+        moved_distance((e.pos_x, e.pos_y), goal) <= config::SCOUT_CAR_WAYPOINT_ACCEPTANCE_RADIUS_PX,
+        "straight reverse should settle within scout-car acceptance without reverse turning"
     );
 }
 

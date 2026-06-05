@@ -13,15 +13,14 @@ use crate::game::services::standability as static_standability;
 use crate::game::PlayerState;
 use crate::protocol::Event;
 
+use super::scout_car::{plan_scout_car_motion, scout_car_accepts_waypoint};
 use super::standability::{
     footing_profile, requires_weapon_setup, unit_static_standable, FootingProfile,
 };
 use super::steering::{inject_sidestep, steered_candidate, steering_path_dir};
 use super::tank_drive::{
-    along_track_error, angle_delta, distance_between, lateral_error, normalize_angle,
-    rotate_toward, scout_car_accepts_waypoint, scout_car_drive_intent,
-    scout_car_final_goal_tolerance, scout_car_turn_delta_for_budget, step_can_reach_waypoint,
-    tank_drive_intent, tank_speed_scale, vehicle_oil_starves_movement, vehicle_traffic_adjustment,
+    angle_delta, distance_between, normalize_angle, rotate_toward, tank_drive_intent,
+    tank_speed_scale, vehicle_oil_starves_movement, vehicle_traffic_adjustment,
     AT_GUN_BODY_TURN_RATE_RAD_PER_TICK, TANK_BODY_TURN_RATE_RAD_PER_TICK,
 };
 use super::{ARRIVE_EPS, MAX_UNIT_BOUNDING_RADIUS_PX};
@@ -95,7 +94,6 @@ pub(super) fn advance_moving_units(
         let mut new_facing = None;
         let original_facing = entities.get(id).map(|e| e.facing()).unwrap_or(0.0);
         let mut body_facing = original_facing;
-        let mut vehicle_step_dir = None;
         let mut scout_car_reverse_waypoint = None;
         let mut static_blocked_this_tick = false;
         if is_tank {
@@ -122,31 +120,38 @@ pub(super) fn advance_moving_units(
                 }
             }
         } else if is_car {
-            if let Some(e) = entities.get(id) {
-                if let Some(mut intent) = scout_car_drive_intent(map, occ, e, x, y) {
-                    let traffic =
-                        vehicle_traffic_adjustment(entities, spatial, id, kind, x, y, e.facing());
-                    budget *= traffic.throttle_scale;
-                    intent.desired_facing =
-                        normalize_angle(intent.desired_facing + traffic.turn_bias);
-                    if intent.desired_facing.is_finite() {
-                        let max_delta = scout_car_turn_delta_for_budget(budget);
-                        let rotated = rotate_toward(e.facing(), intent.desired_facing, max_delta);
-                        if rotated.is_finite() {
-                            new_facing = Some(rotated);
-                            body_facing = rotated;
-                            vehicle_step_dir = Some((
-                                rotated.cos() * intent.travel_sign,
-                                rotated.sin() * intent.travel_sign,
-                            ));
-                            scout_car_reverse_waypoint = intent.reverse_waypoint;
+            if let Some(snapshot) = entities.get(id).cloned() {
+                if let Some(plan) = plan_scout_car_motion(
+                    map,
+                    occ,
+                    entities,
+                    spatial,
+                    id,
+                    &snapshot,
+                    (x, y),
+                    budget,
+                ) {
+                    x = plan.pos.0;
+                    y = plan.pos.1;
+                    static_blocked_this_tick = plan.static_blocked;
+                    scout_car_reverse_waypoint = plan.reverse_waypoint;
+                    if let Some(facing) = plan.facing {
+                        new_facing = Some(facing);
+                        body_facing = facing;
+                    }
+                    if plan.pop_waypoints > 0 {
+                        if let Some(e) = entities.get_mut(id) {
+                            for _ in 0..plan.pop_waypoints {
+                                e.pop_waypoint();
+                                e.mark_move_phase(MovePhase::Moving);
+                            }
                         }
                     }
                 }
             }
         }
         // Consume waypoints (stored reversed, next = last element) within this tick's budget.
-        loop {
+        while !is_car {
             let (next, path_len, next_next) = {
                 let Some(e) = entities.get(id) else { break };
                 let path_len = e.movement.as_ref().map(|m| m.path.len()).unwrap_or(0);
@@ -189,8 +194,7 @@ pub(super) fn advance_moving_units(
                     continue;
                 }
             } else {
-                // Final waypoint: require exact arrival, except scout cars may settle when the
-                // remaining error is small and mostly lateral to their feasible travel direction.
+                // Final waypoint: require exact arrival.
                 if dist <= ARRIVE_EPS {
                     if let Some(e) = entities.get_mut(id) {
                         e.pop_waypoint();
@@ -198,21 +202,6 @@ pub(super) fn advance_moving_units(
                     }
                     x = wx;
                     y = wy;
-                    continue;
-                }
-                let scout_car_tolerant_arrival = is_car
-                    && dist <= scout_car_final_goal_tolerance()
-                    && unit_static_standable(occ, map, kind, x, y, body_facing)
-                    && vehicle_step_dir.is_some_and(|dir| {
-                        let along = along_track_error((dx, dy), dir);
-                        let lateral = lateral_error((dx, dy), dir);
-                        lateral > along.abs() && lateral > ARRIVE_EPS
-                    });
-                if scout_car_tolerant_arrival {
-                    if let Some(e) = entities.get_mut(id) {
-                        e.pop_waypoint();
-                        e.mark_move_phase(MovePhase::Moving);
-                    }
                     continue;
                 }
             }
@@ -232,8 +221,6 @@ pub(super) fn advance_moving_units(
             }
             let can_reach_waypoint = if is_car {
                 path_len == 1 && dist <= budget
-                    || vehicle_step_dir
-                        .is_some_and(|dir| step_can_reach_waypoint((dx, dy), dir, budget))
             } else {
                 dist <= budget
             };
@@ -253,7 +240,7 @@ pub(super) fn advance_moving_units(
             } else {
                 // Partial step toward the waypoint.
                 let path_dir = (dx / dist, dy / dist);
-                let step_dir = vehicle_step_dir.unwrap_or(path_dir);
+                let step_dir = path_dir;
                 let direct_nx = x + step_dir.0 * budget;
                 let direct_ny = y + step_dir.1 * budget;
                 let steered = if can_local_steer {
