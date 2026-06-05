@@ -924,7 +924,12 @@ The server treats every client as potentially hostile. Limits live next to the c
   bounded maneuver latched to the immediate waypoint: nearby final waypoints and injected recovery
   waypoints can be reached by backing up, but route lookahead alone cannot put the car into reverse.
   Farther behind goals make the scout car drive through a broad forward turn instead of
-  backtracking. Scout cars follow the route corridor rather than exact intermediate
+  backtracking. Scout-car movement orders use a dedicated clearance-aware route shape: coarse A*
+  still works on tiles, but scout cars add static-clearance, turn, adjacent-blocker, and corner-graze
+  costs so open alternatives are preferred before local movement gets close to walls. The clearance
+  cost is finite, so intended narrow passages remain traversable; exact interaction paths such as
+  chase, gather, and build staging keep tile-guided `Normal` routing. Scout cars follow the route
+  corridor rather than exact intermediate
   waypoint centers: an intermediate waypoint is consumed inside
   `SCOUT_CAR_WAYPOINT_ACCEPTANCE_RADIUS_PX` (0.75 tiles), after the car has passed the waypoint
   along the next route segment, or when the next route segment is statically reachable from the
