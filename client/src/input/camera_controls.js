@@ -43,6 +43,7 @@ export function _handleKeyDown(ev) {
   }
 
   if (ev.repeat) return;
+  if (this._handleControlGroupHotkey(ev)) return;
   if (this._activateCommandHotkey(ev)) return;
 
   switch (ev.code) {
