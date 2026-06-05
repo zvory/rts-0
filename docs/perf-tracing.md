@@ -29,6 +29,17 @@ Example local run:
 cd server && RUST_LOG=info,server::perf=debug RTS_PERF=spikes cargo run --release
 ```
 
+Four-AI local harness:
+
+```bash
+scripts/ai-perf-harness.sh --ticks 20000
+```
+
+The harness runs four AI players in one local match, enables sample perf tracing by default, and
+exercises simulation, per-player snapshot fanout, snapshot compaction, and compact JSON
+serialization without requiring browser clients. Override the usual `RTS_PERF*` and `RUST_LOG`
+environment variables when you need a different trace shape, or pass `--perf full` for every tick.
+
 The Fly production deploy enables the low-noise spike mode in `fly.toml`:
 
 ```toml

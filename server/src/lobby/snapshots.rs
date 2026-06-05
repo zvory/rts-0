@@ -1,4 +1,4 @@
-use super::*;
+use crate::protocol::{kinds, Event, ResourceDelta, Snapshot};
 
 /// Keep static resource positions in the start payload and send only compact visible remaining
 /// updates in snapshots. Internal `Game::snapshot_for` still includes resource entities for
