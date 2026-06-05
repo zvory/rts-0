@@ -517,6 +517,8 @@ export class GameState {
   setControlGroup(slot, ids), addToControlGroup(slot, ids)
   selectControlGroup(slot), controlGroupEntities(slot)
   // build placement (client-only):
+  commandCardMode                       // null | "workerBuild"
+  openWorkerBuildMenu(), closeCommandCardMenu()
   placement                              // null | { building, valid, tileX, tileY }
   beginPlacement(buildingKind), updatePlacement(tileX,tileY,valid), endPlacement()
   // resource hover preview (client-only):

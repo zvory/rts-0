@@ -218,6 +218,9 @@ export function _issueStop() {
 }
 
 export function _cancel() {
+  if (typeof this.state.closeCommandCardMenu === "function" && this.state.closeCommandCardMenu()) {
+    return;
+  }
   if (this.state.placement) {
     this.state.endPlacement();
     return;

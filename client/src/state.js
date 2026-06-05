@@ -3,7 +3,7 @@
 //
 // It holds the two most recent server snapshots (for interpolation), the
 // latest resources/events, the local selection set, and the local build
-// placement preview. Selection and placement are client-only concepts; the
+// placement preview. Selection, command-card menus, and placement are client-only concepts; the
 // server never sees them directly (only the resulting commands).
 
 import { RESOURCE_AMOUNTS } from "./config.js";
@@ -86,6 +86,10 @@ export class GameState {
     // --- build placement preview (client-only) ---
     /** @type {null | {building:string, tileX:number, tileY:number, valid:boolean}} */
     this.placement = null;
+
+    // --- command card submenu (client-only) ---
+    /** @type {null | "workerBuild"} */
+    this.commandCardMode = null;
 
     // --- command targeting / feedback (client-only) ---
     /** @type {null | "move" | "attack" | "setupAtGuns"} */
@@ -393,6 +397,7 @@ export class GameState {
       this.selection.add(id);
       if (this.selection.size >= GameState.MAX_SELECTION_SIZE) break;
     }
+    this.closeCommandCardMenu();
   }
 
   /**
@@ -405,6 +410,7 @@ export class GameState {
       if (this.selection.size >= GameState.MAX_SELECTION_SIZE) break;
       this.selection.add(id);
     }
+    this.closeCommandCardMenu();
   }
 
   /**
@@ -416,11 +422,13 @@ export class GameState {
     for (const id of ids) {
       this.selection.delete(id);
     }
+    this.closeCommandCardMenu();
   }
 
   /** Clear the selection. */
   clearSelection() {
     this.selection.clear();
+    this.closeCommandCardMenu();
   }
 
   /** Drop selected ids that are no longer present in the latest snapshot. */
@@ -551,6 +559,24 @@ export class GameState {
 
   // --- build placement (client-only) -------------------------------------
 
+  /** Open the worker build command-card submenu. */
+  openWorkerBuildMenu() {
+    this.placement = null;
+    this.commandTarget = null;
+    this.atGunSetupPreview = null;
+    this.commandCardMode = "workerBuild";
+  }
+
+  /**
+   * Close any command-card submenu.
+   * @returns {boolean} true if a submenu was open.
+   */
+  closeCommandCardMenu() {
+    const hadMenu = this.commandCardMode != null;
+    this.commandCardMode = null;
+    return hadMenu;
+  }
+
   /**
    * Start previewing placement of a building. Position/validity are filled in
    * by updatePlacement as the cursor moves.
@@ -558,6 +584,7 @@ export class GameState {
    */
   beginPlacement(buildingKind) {
     this.commandTarget = null;
+    this.closeCommandCardMenu();
     this.placement = { building: buildingKind, tileX: 0, tileY: 0, valid: false };
   }
 
@@ -588,6 +615,7 @@ export class GameState {
    */
   beginCommandTarget(kind) {
     this.placement = null;
+    this.closeCommandCardMenu();
     this.commandTarget = kind;
     if (kind !== "setupAtGuns") this.atGunSetupPreview = null;
   }

@@ -477,6 +477,9 @@ function fakeAudioContext() {
   assertHasMethod(state, "clearSelection", "GameState");
   assertHasMethod(state, "selectedEntities", "GameState");
   assertHasMethod(state, "entityById", "GameState");
+  assert(state.commandCardMode === null, "GameState.commandCardMode initially null");
+  assertHasMethod(state, "openWorkerBuildMenu", "GameState");
+  assertHasMethod(state, "closeCommandCardMenu", "GameState");
   assert(state.placement === null, "GameState.placement initially null");
   assertHasMethod(state, "beginPlacement", "GameState");
   assertHasMethod(state, "updatePlacement", "GameState");
@@ -619,6 +622,21 @@ function fakeAudioContext() {
   state.setSelection([1, 999]);
   const sel = state.selectedEntities();
   assert(sel.length === 1 && sel[0].id === 1, "selectedEntities drops stale ids");
+
+  // Command-card submenu is local-only and is closed by mode-changing actions.
+  state.openWorkerBuildMenu();
+  assert(state.commandCardMode === "workerBuild", "worker build submenu opens");
+  assert(state.closeCommandCardMenu() === true, "closeCommandCardMenu reports an open submenu");
+  assert(state.closeCommandCardMenu() === false, "closeCommandCardMenu reports when no submenu was open");
+  state.openWorkerBuildMenu();
+  state.beginCommandTarget("attack");
+  assert(state.commandCardMode === null, "command targeting closes the worker build submenu");
+  state.openWorkerBuildMenu();
+  state.beginPlacement(KIND.DEPOT);
+  assert(state.commandCardMode === null, "build placement closes the worker build submenu");
+  state.openWorkerBuildMenu();
+  state.setSelection([1]);
+  assert(state.commandCardMode === null, "selection replacement closes the worker build submenu");
 
   // Control groups are local-only, own controllable entities only, and capped like selection.
   const cgState = new GameState({ ...start, map: { ...start.map, resources: [] } });
@@ -844,6 +862,24 @@ function fakeAudioContext() {
     hotkeyCalls.map((c) => c.type).join(",") === "set,add,select,select,jump",
     "plain number recalls, and double-tap recalls then jumps",
   );
+
+  const menuCancelInput = Object.create(Input.prototype);
+  let menuClosed = 0;
+  let selectionCleared = 0;
+  menuCancelInput.state = {
+    placement: null,
+    commandTarget: null,
+    closeCommandCardMenu() {
+      menuClosed += 1;
+      return true;
+    },
+    clearSelection() {
+      selectionCleared += 1;
+    },
+  };
+  menuCancelInput._cancel();
+  assert(menuClosed === 1, "Esc closes the worker build submenu first");
+  assert(selectionCleared === 0, "Esc returning to worker commands does not clear selection");
 
   const clusterInput = Object.create(Input.prototype);
   let centered = null;
