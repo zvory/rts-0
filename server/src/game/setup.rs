@@ -96,13 +96,14 @@ impl Game {
         let mut entities = EntityStore::new();
         let scouts = spawn_snaking_corridor_scout_cars(&mut entities, car_count, start)?;
         let player_id = 1;
+        let starting_oil = 10_000;
         let player = PlayerState {
             id: player_id,
             name: "Scenario".to_string(),
             color: "#4878c8".to_string(),
             start_tile,
             steel: 0,
-            oil: 10_000,
+            oil: starting_oil,
             supply_used: 0,
             supply_cap: 0,
             is_ai: false,
@@ -126,7 +127,7 @@ impl Game {
             lingering_sight: Vec::new(),
             seed,
             starting_steel: 0,
-            starting_oil: 0,
+            starting_oil,
             rng,
         };
         let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();

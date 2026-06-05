@@ -49,7 +49,6 @@ const FORMATION_FAR_DISTANCE_PX: f32 = config::TILE_SIZE as f32 * 18.0;
 const FORMATION_MAX_OFFSET_PX: f32 = config::TILE_SIZE as f32 * 10.0;
 const SPAWN_PREFERRED_GAP_UNIT_FRACTION: f32 = 0.10;
 const SCOUT_CAR_ROUTE_SIMPLIFY_MAX_SEGMENT_PX: f32 = config::TILE_SIZE as f32 * 3.0;
-
 /// The movement/pathing coordinator for one tick.
 pub struct MoveCoordinator<'a> {
     pathing: &'a mut PathingService,
@@ -431,11 +430,42 @@ impl<'a> MoveCoordinator<'a> {
             route_shape,
             budget: None,
         };
-        let mut waypoints = self.pathing.request(self.map, self.occ, req);
+        let goal_tile = (gx as i32, gy as i32);
+        let mut tile_path = self
+            .pathing
+            .request_tile_path(self.map, self.occ, req.clone());
+        let mut reached_goal_tile = tile_path.last().copied() == Some(goal_tile);
+        if route_shape == RouteShape::ScoutCarClearance && !reached_goal_tile {
+            let fallback = self.pathing.request_tile_path(
+                self.map,
+                self.occ,
+                PathRequest {
+                    route_shape: RouteShape::PreferFewerTurns,
+                    ..req
+                },
+            );
+            if fallback.last().copied() == Some(goal_tile) {
+                if let Some(join_tile) = tile_path.last().copied() {
+                    if let Some(join_index) = fallback.iter().position(|&tile| tile == join_tile) {
+                        let mut joined = tile_path;
+                        joined.extend_from_slice(&fallback[join_index + 1..]);
+                        tile_path = joined;
+                    } else {
+                        tile_path = fallback;
+                    }
+                } else {
+                    tile_path = fallback;
+                }
+                reached_goal_tile = true;
+            }
+        }
+        let mut waypoints = pathfinding::to_world_waypoints(&tile_path);
 
         // Snap the final waypoint to the exact requested goal for precise arrival.
         if !waypoints.is_empty() {
-            waypoints[0] = goal;
+            if reached_goal_tile {
+                waypoints[0] = goal;
+            }
             if route_shape == RouteShape::PreferFewerTurns {
                 waypoints =
                     simplify_reverse_waypoints(self.map, self.occ, kind, start_pos, waypoints);
