@@ -43,6 +43,7 @@ import { _drawResource } from "./resources.js";
 import { buildStaticMap } from "./terrain.js";
 import {
   _deployedWeaponSetupVisual,
+  _drawShotRevealUnit,
   _drawUnit,
   _sweepSetupVisuals,
   _sweepTankMotion,
@@ -109,6 +110,8 @@ export class Renderer {
       units: new Map(),
       selectionRings: new Map(),
       hpBars: new Map(),
+      shotRevealShadows: new Map(),
+      shotReveals: new Map(),
     };
     // Ids touched this frame, per pool, so we can hide stale entries afterwards.
     this._seen = {};
@@ -158,6 +161,8 @@ export class Renderer {
     for (const key of Object.keys(this._seen)) this._seen[key].clear();
 
     const entities = state.entitiesInterpolated(alpha) || [];
+    const regularEntities = entities.filter((e) => !e.shotReveal);
+    const shotReveals = entities.filter((e) => e.shotReveal);
     const selection = state.selection || new Set();
     const colorByOwner = this._ownerColors(state);
     const liveIds = new Set();
@@ -165,26 +170,30 @@ export class Renderer {
     // Nodes currently being mined: any worker latched to them. Used by
     // _drawResource to overlay an X marker.
     this._miningNodes = new Set();
-    for (const e of entities) {
+    for (const e of regularEntities) {
       if (e.latchedNode) this._miningNodes.add(e.latchedNode);
     }
 
     // Two passes so silhouettes layer correctly: resources + buildings first
     // (footprints sit under units), then units. Selection rings / hp bars are
     // their own layers and are filled inline.
-    for (const e of entities) {
+    for (const e of regularEntities) {
       liveIds.add(e.id);
       if (isResource(e.kind)) this._drawResource(e, fog);
       else if (isBuilding(e.kind)) this._drawBuilding(e, colorByOwner, state);
     }
-    for (const e of entities) {
+    for (const e of regularEntities) {
       liveIds.add(e.id);
       if (isUnit(e.kind)) this._drawUnit(e, colorByOwner, state);
     }
     // Selection rings + HP bars after shapes are placed so they read on top.
-    for (const e of entities) {
+    for (const e of regularEntities) {
       liveIds.add(e.id);
       this._drawSelectionAndHp(e, selection, state);
+    }
+    for (const e of shotReveals) {
+      liveIds.add(e.id);
+      this._drawShotRevealUnit(e, colorByOwner, state);
     }
 
     // Hide pooled objects whose id was not touched this frame.
@@ -251,6 +260,11 @@ export class Renderer {
   /**
    * Low-poly PS1 silhouettes tinted by owner. The shapes are intentionally neutral:
    * no national insignia, flags, stars, crosses, eagles, or historical unit badges.
+   * @private
+   */
+  /**
+   * Draw a short-lived AT-gun reveal on layers above fog. These entities are visual-only and
+   * non-interactive; normal visibility still comes from the authoritative fog-filtered snapshot.
    * @private
    */
   /**
@@ -399,6 +413,7 @@ Object.assign(Renderer.prototype, {
   _sweepTankMotion,
   _tankMotionVisual,
   _drawUnit,
+  _drawShotRevealUnit,
   _drawBuilding,
   _drawResource,
   _drawSelectionAndHp,
