@@ -22,6 +22,7 @@ import {
 import { dom, isTextEntry } from "./bootstrap.js";
 
 const KAR98K_GAIN = 0.25;
+const MG_BURST_GAIN = 0.7;
 
 const COMBAT_SOUNDS = Object.freeze({
   [KIND.TANK]: {
@@ -32,6 +33,7 @@ const COMBAT_SOUNDS = Object.freeze({
   [KIND.SCOUT_CAR]: {
     ids: ["combat_mg_burst_02", "combat_mg_burst_03"],
     priority: 2.5,
+    gain: MG_BURST_GAIN,
   },
   [KIND.RIFLEMAN]: {
     ids: ["combat_rifle_02", "combat_rifle_03"],
@@ -46,6 +48,7 @@ const COMBAT_SOUNDS = Object.freeze({
   [KIND.MACHINE_GUNNER]: {
     ids: ["combat_mg_burst_02", "combat_mg_burst_03"],
     priority: 2.5,
+    gain: MG_BURST_GAIN,
   },
 });
 
