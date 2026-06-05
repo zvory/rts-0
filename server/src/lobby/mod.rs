@@ -62,6 +62,7 @@ const PLAYER_RELIABLE_CHANNEL_CAP: usize = 64;
 /// allowed to grow without limit; in practice the room drains this every tick.
 const ROOM_EVENT_CHANNEL_CAP: usize = 1024;
 const DEV_SELFPLAY_ROOM_PREFIX: &str = "__dev_selfplay__";
+const DEV_SCENARIO_ROOM_PREFIX: &str = "__dev_scenario__:";
 const MATCH_SEED_ENV: &str = "RTS_MATCH_SEED";
 
 /// Monotonic source of globally-unique player ids (ids are never reused within a process run).
@@ -105,7 +106,7 @@ pub enum RoomEvent {
     Command { player_id: u32, cmd: SimCommand },
     /// A connected player intentionally gave up the active match.
     GiveUp { player_id: u32 },
-    /// Set replay playback speed multiplier (replay rooms only; ignored elsewhere).
+    /// Set dev playback speed multiplier (replay/scenario rooms only; ignored elsewhere).
     SetReplaySpeed { speed: f32 },
     /// Rewind a replay by `ticks_back` simulation ticks (replay rooms only; clamped to start).
     SeekReplay { ticks_back: u32 },

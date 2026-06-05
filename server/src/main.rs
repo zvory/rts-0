@@ -21,6 +21,7 @@ use std::time::{Duration, Instant};
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use axum::extract::{Query, State};
 use axum::http::header;
+use axum::http::StatusCode;
 use axum::response::{IntoResponse, Redirect};
 use axum::routing::get;
 use axum::Router;
@@ -82,6 +83,7 @@ async fn main() {
         .route("/version", get(version_handler))
         .route("/ws", get(ws_handler))
         .route("/dev/selfplay", get(dev_selfplay_handler))
+        .route("/dev/scenario", get(dev_scenario_handler))
         .nest_service("/maps", ServeDir::new(maps_dir))
         .fallback_service(static_service)
         .with_state(state);
@@ -145,6 +147,24 @@ async fn dev_selfplay_handler(
         target.push_str(replay);
     }
     Redirect::temporary(&target)
+}
+
+async fn dev_scenario_handler(
+    Query(params): Query<std::collections::HashMap<String, String>>,
+) -> impl IntoResponse {
+    let id = params.get("id").map(|s| s.trim()).unwrap_or("");
+    let cars = params.get("cars").map(|s| s.trim()).unwrap_or("");
+    if id != "scout_car_snaking_corridor" || !matches!(cars, "1" | "4") {
+        return (
+            StatusCode::BAD_REQUEST,
+            "supported dev scenario: /dev/scenario?id=scout_car_snaking_corridor&cars=1 or cars=4",
+        )
+            .into_response();
+    }
+    Redirect::temporary(&format!(
+        "/?watchScenario=1&id=scout_car_snaking_corridor&cars={cars}"
+    ))
+    .into_response()
 }
 
 /// Return the short git commit SHA that identifies this build.

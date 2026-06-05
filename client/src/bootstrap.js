@@ -8,15 +8,27 @@ export function wsUrl() {
 export function devWatchConfig() {
   const params = new URLSearchParams(window.location.search);
   const replay = (params.get("replay") || "").trim();
-  if (window.location.pathname !== "/dev/selfplay" && !params.has("watchSelfplay")) {
-    return null;
+  if (window.location.pathname === "/dev/scenario" || params.has("watchScenario")) {
+    const id = (params.get("id") || "").trim();
+    const cars = (params.get("cars") || "").trim();
+    if (id !== "scout_car_snaking_corridor" || (cars !== "1" && cars !== "4")) {
+      return null;
+    }
+    return {
+      room: `__dev_scenario__:scout_car_snaking_corridor:cars=${cars}`,
+      noFog: true,
+      kind: "scenario",
+      banner: `local dev scenario no fog scout_car_snaking_corridor cars=${cars}`,
+    };
   }
+  if (window.location.pathname !== "/dev/selfplay" && !params.has("watchSelfplay")) return null;
   const room = replay
     ? `__dev_selfplay__replay:${replay}`
     : "__dev_selfplay__live";
   return {
     room,
     noFog: true,
+    kind: replay ? "replay" : "selfplay",
     banner: replay ? `local dev  self-play replay  no fog  ${replay}` : "local dev  self-play  no fog",
   };
 }
@@ -132,4 +144,3 @@ export function buildAudioSettings(audio, menuEl) {
 
   menuEl.insertBefore(wrap, menuEl.firstChild);
 }
-

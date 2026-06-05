@@ -100,7 +100,8 @@ export class App {
     if (this.lobby?.elRoom) this.lobby.elRoom.value = this.devWatch.room;
     this.net.join(name, this.devWatch.room, true);
     if (this.lobby?.roomBlock) this.lobby.roomBlock.hidden = true;
-    this.lobby.setStatus("Starting local self-play watch…");
+    const label = this.devWatch.kind === "scenario" ? "scenario" : "self-play watch";
+    this.lobby.setStatus(`Starting local ${label}...`);
   }
 
   /**

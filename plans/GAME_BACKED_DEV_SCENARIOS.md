@@ -27,7 +27,7 @@ exercise internals below the `Game` seam and cannot be honestly represented by a
 
 ## Phase Index
 
-1. [Phase 1: Minimal Pathfinding Viewer](game-backed-dev-scenarios/phase-1-minimal-pathfinding-viewer.md)
+1. [Phase 1: Minimal Pathfinding Viewer](game-backed-dev-scenarios/phase-1-minimal-pathfinding-viewer.md) - done
 2. [Phase 2: Scenario Setup API](game-backed-dev-scenarios/phase-2-scenario-setup-api.md)
 3. [Phase 3: Scenario Framework](game-backed-dev-scenarios/phase-3-scenario-framework.md)
 4. [Phase 4: Debug Overlays and Artifacts](game-backed-dev-scenarios/phase-4-debug-overlays-and-artifacts.md)

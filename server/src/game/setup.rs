@@ -123,6 +123,64 @@ impl Game {
         )
     }
 
+    pub(crate) fn new_scout_car_snaking_corridor_scenario(
+        car_count: usize,
+        seed: u32,
+    ) -> Result<DevScenarioSetup, String> {
+        if !matches!(car_count, 1 | 4) {
+            return Err(format!("unsupported scout-car count {car_count}"));
+        }
+
+        let (map, start_tile, start, goal) = scout_car_snaking_corridor_map();
+        let mut entities = EntityStore::new();
+        let scouts = spawn_snaking_corridor_scout_cars(&mut entities, car_count, start)?;
+        let player_id = 1;
+        let starting_oil = 10_000;
+        let player = PlayerState {
+            id: player_id,
+            name: "Scenario".to_string(),
+            color: "#4878c8".to_string(),
+            start_tile,
+            steel: 0,
+            oil: starting_oil,
+            supply_used: 0,
+            supply_cap: 0,
+            is_ai: false,
+            score: ScoreState::default(),
+        };
+
+        let spatial = services::spatial::SpatialIndex::build(&entities, map.size);
+        let pathing = services::pathing::PathingService::new(8_192, 256);
+        let rng = SmallRng::seed_from_u64(seed as u64);
+        let mut game = Game {
+            map,
+            entities,
+            fog: Fog::new(96),
+            players: vec![player],
+            ai: Vec::new(),
+            pending: Vec::new(),
+            command_log: Vec::new(),
+            tick: 0,
+            spatial,
+            pathing,
+            lingering_sight: Vec::new(),
+            seed,
+            starting_steel: 0,
+            starting_oil,
+            rng,
+        };
+        let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
+        game.fog = Fog::new(game.map.size);
+        game.fog.recompute(&ids, &game.entities, &game.map);
+
+        Ok(DevScenarioSetup {
+            game,
+            player_id,
+            units: scouts,
+            goal,
+        })
+    }
+
     pub(crate) fn seed(&self) -> u32 {
         self.seed
     }
@@ -262,6 +320,116 @@ impl Game {
             players,
         }
     }
+}
+
+pub(crate) struct DevScenarioSetup {
+    pub(crate) game: Game,
+    pub(crate) player_id: u32,
+    pub(crate) units: Vec<u32>,
+    pub(crate) goal: (f32, f32),
+}
+
+fn flat_dev_map(player_count: usize) -> Map {
+    let mut map = Map::generate(player_count, 0xC0FF_EE01);
+    for terrain in &mut map.terrain {
+        *terrain = crate::protocol::terrain::GRASS;
+    }
+    map.expansion_sites.clear();
+    map
+}
+
+fn block_rect_tiles(map: &mut Map, min_x: u32, min_y: u32, max_x: u32, max_y: u32) {
+    for ty in min_y..=max_y {
+        for tx in min_x..=max_x {
+            let idx = map.index(tx, ty);
+            map.terrain[idx] = crate::protocol::terrain::ROCK;
+        }
+    }
+}
+
+fn carve_rect_tiles(map: &mut Map, min_x: u32, min_y: u32, max_x: u32, max_y: u32) {
+    for ty in min_y..=max_y {
+        for tx in min_x..=max_x {
+            let idx = map.index(tx, ty);
+            map.terrain[idx] = crate::protocol::terrain::GRASS;
+        }
+    }
+}
+
+fn carve_horizontal_corridor(map: &mut Map, min_x: u32, max_x: u32, center_y: u32) {
+    carve_rect_tiles(map, min_x, center_y - 1, max_x, center_y + 1);
+}
+
+fn carve_vertical_corridor(map: &mut Map, center_x: u32, min_y: u32, max_y: u32) {
+    carve_rect_tiles(map, center_x - 1, min_y, center_x + 1, max_y);
+}
+
+fn scout_car_snaking_corridor_map() -> (Map, (u32, u32), (f32, f32), (f32, f32)) {
+    let mut map = flat_dev_map(1);
+    let stone_min_y = 15u32;
+    let stone_max_y = 75u32;
+    let exit_x = 36u32;
+    let first_left_x = 26u32;
+    let right_x = 56u32;
+    let lower_lane_y = 68u32;
+    let middle_lane_y = 64u32;
+    let upper_lane_y = 60u32;
+
+    let stone_max_x = map.size - 1;
+    block_rect_tiles(&mut map, 0, stone_min_y, stone_max_x, stone_max_y);
+
+    carve_vertical_corridor(&mut map, exit_x, lower_lane_y, stone_max_y);
+    carve_horizontal_corridor(&mut map, first_left_x, exit_x, lower_lane_y);
+    carve_vertical_corridor(&mut map, first_left_x, middle_lane_y, lower_lane_y);
+    carve_horizontal_corridor(&mut map, first_left_x, right_x, middle_lane_y);
+    carve_vertical_corridor(&mut map, right_x, upper_lane_y, middle_lane_y);
+    carve_horizontal_corridor(&mut map, exit_x, right_x, upper_lane_y);
+    carve_vertical_corridor(&mut map, exit_x, stone_min_y, upper_lane_y);
+
+    let ts = config::TILE_SIZE as f32;
+    let start_tile = (exit_x, stone_max_y + 5);
+    let start = map.tile_center(start_tile.0, start_tile.1);
+    let exit = map.tile_center(exit_x, stone_min_y - 1);
+    let goal = (exit.0 + ts * 10.0, exit.1 - ts * 10.0);
+    if let Some(slot) = map.starts.get_mut(0) {
+        *slot = start_tile;
+    }
+
+    (map, start_tile, start, goal)
+}
+
+fn spawn_snaking_corridor_scout_cars(
+    entities: &mut EntityStore,
+    car_count: usize,
+    start: (f32, f32),
+) -> Result<Vec<u32>, String> {
+    let north = -std::f32::consts::FRAC_PI_2;
+    let positions: Vec<(f32, f32)> = match car_count {
+        1 => vec![start],
+        4 => {
+            let x_spacing = config::SCOUT_CAR_BODY_WIDTH_PX * 1.5;
+            let y_spacing = config::SCOUT_CAR_BODY_LENGTH_PX * 1.5;
+            vec![
+                (start.0 - x_spacing * 0.5, start.1 - y_spacing * 0.5),
+                (start.0 + x_spacing * 0.5, start.1 - y_spacing * 0.5),
+                (start.0 - x_spacing * 0.5, start.1 + y_spacing * 0.5),
+                (start.0 + x_spacing * 0.5, start.1 + y_spacing * 0.5),
+            ]
+        }
+        _ => return Err(format!("unsupported scout-car count {car_count}")),
+    };
+
+    let mut scouts = Vec::with_capacity(positions.len());
+    for (x, y) in positions {
+        let scout = entities
+            .spawn_unit(1, EntityKind::ScoutCar, x, y)
+            .ok_or_else(|| "failed to spawn scout car".to_string())?;
+        if let Some(e) = entities.get_mut(scout) {
+            e.set_facing(north);
+        }
+        scouts.push(scout);
+    }
+    Ok(scouts)
 }
 
 /// Spawn a player's full starting layout: a free, fully-built City Centre on the start tile, a ring of

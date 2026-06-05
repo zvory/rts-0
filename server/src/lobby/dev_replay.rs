@@ -1,4 +1,4 @@
-use super::room_task::{DevSelfPlayConfig, RoomMode};
+use super::room_task::{DevScenarioConfig, DevScenarioId, DevSelfPlayConfig, RoomMode};
 use super::*;
 
 pub(super) fn room_mode_for(room: &str) -> RoomMode {
@@ -9,6 +9,20 @@ pub(super) fn room_mode_for(room: &str) -> RoomMode {
         return RoomMode::DevSelfPlay(DevSelfPlayConfig::Replay {
             artifact: artifact.to_string(),
         });
+    }
+    if let Some(raw) = room.strip_prefix(DEV_SCENARIO_ROOM_PREFIX) {
+        if let Some((id, cars)) = raw.split_once(":cars=") {
+            if id == "scout_car_snaking_corridor" {
+                if let Ok(cars) = cars.parse::<usize>() {
+                    if matches!(cars, 1 | 4) {
+                        return RoomMode::DevScenario(DevScenarioConfig {
+                            id: DevScenarioId::ScoutCarSnakingCorridor,
+                            cars,
+                        });
+                    }
+                }
+            }
+        }
     }
     RoomMode::Normal
 }
