@@ -6,12 +6,16 @@
 
 use std::collections::HashMap;
 
-use crate::game::entity::{uses_oriented_vehicle_body, EntityKind};
+use crate::game::entity::{uses_car_movement_semantics, uses_oriented_vehicle_body, EntityKind};
 use crate::game::map::Map;
 use crate::game::pathfinding::{self, Passability};
 use crate::game::services::occupancy::Occupancy;
 use crate::game::services::standability;
 use crate::rules::terrain::{self, TerrainKind};
+
+const SCOUT_CAR_HARD_CLEARANCE_TILES: u16 = 1;
+const SCOUT_CAR_PREFERRED_CLEARANCE_TILES: u16 = 3;
+const SCOUT_CAR_CLEARANCE_COST_SCALE: u32 = 2;
 
 /// Parameters for a single path query.
 #[derive(Clone)]
@@ -99,9 +103,16 @@ impl Passability for TerrainPassability<'_> {
         }
         true
     }
+
+    fn movement_cost(&self, tx: i32, ty: i32) -> u32 {
+        if !uses_car_movement_semantics(self.kind) {
+            return 0;
+        }
+        scout_car_clearance_cost(self.occupancy.clearance_at_tile(tx, ty))
+    }
 }
 
-type CacheKey = (EntityKind, (i32, i32), (i32, i32), u32, RouteShape);
+type CacheKey = (EntityKind, (i32, i32), (i32, i32), u32, RouteShape, u64);
 
 struct CacheEntry {
     tile_path: Vec<(i32, i32)>,
@@ -161,7 +172,7 @@ impl PathingService {
             avoid_diagonal_pinch: uses_oriented_vehicle_body(req.kind),
         };
 
-        if let Some(tile_path) = self.cache_lookup(&req, &pass) {
+        if let Some(tile_path) = self.cache_lookup(&req, &pass, occupancy.static_fingerprint()) {
             return tile_path;
         }
 
@@ -183,6 +194,7 @@ impl PathingService {
                 req.goal,
                 req.radius_tiles,
                 req.route_shape,
+                occupancy.static_fingerprint(),
                 tile_path.clone(),
             );
         }
@@ -193,6 +205,7 @@ impl PathingService {
         &mut self,
         req: &PathRequest,
         pass: &P,
+        static_fingerprint: u64,
     ) -> Option<Vec<(i32, i32)>> {
         let key: CacheKey = (
             req.kind,
@@ -200,6 +213,7 @@ impl PathingService {
             req.goal,
             req.radius_tiles,
             req.route_shape,
+            static_fingerprint,
         );
         let entry = self.cache.get_mut(&key)?;
         for &(tx, ty) in &entry.tile_path {
@@ -218,6 +232,7 @@ impl PathingService {
         goal: (i32, i32),
         radius: u32,
         route_shape: RouteShape,
+        static_fingerprint: u64,
         tile_path: Vec<(i32, i32)>,
     ) {
         if self.cache.len() >= self.cache_cap {
@@ -231,13 +246,21 @@ impl PathingService {
             }
         }
         self.cache.insert(
-            (kind, start, goal, radius, route_shape),
+            (kind, start, goal, radius, route_shape, static_fingerprint),
             CacheEntry {
                 tile_path,
                 last_used: self.tick,
             },
         );
     }
+}
+
+pub(crate) fn scout_car_clearance_cost(clearance_tiles: u16) -> u32 {
+    if clearance_tiles < SCOUT_CAR_HARD_CLEARANCE_TILES {
+        return u32::MAX / 4;
+    }
+    let deficit = SCOUT_CAR_PREFERRED_CLEARANCE_TILES.saturating_sub(clearance_tiles) as u32;
+    deficit * deficit * SCOUT_CAR_CLEARANCE_COST_SCALE
 }
 
 /// Simplify reverse-ordered world waypoints by dropping intermediate tile centers when the unit
@@ -298,8 +321,13 @@ impl PathingService {
         radius: u32,
         route_shape: RouteShape,
     ) -> bool {
-        self.cache
-            .contains_key(&(kind, start, goal, radius, route_shape))
+        self.cache.keys().any(|key| {
+            key.0 == kind
+                && key.1 == start
+                && key.2 == goal
+                && key.3 == radius
+                && key.4 == route_shape
+        })
     }
 }
 
@@ -347,6 +375,15 @@ mod tests {
             starts: vec![],
             expansion_sites: vec![],
         }
+    }
+
+    fn clearance_choice_map() -> Map {
+        let mut map = flat_test_map(16);
+        for tx in 2..=13 {
+            let idx = map.index(tx, 3);
+            map.terrain[idx] = terrain::ROCK;
+        }
+        map
     }
 
     fn request_fixture_path(
@@ -481,6 +518,16 @@ mod tests {
                 "tile path should not cross impassable terrain, got blocked tile ({tx}, {ty}) in {path:?}"
             );
         }
+    }
+
+    #[test]
+    fn scout_car_clearance_cost_tapers_below_preferred_clearance() {
+        assert_eq!(
+            scout_car_clearance_cost(SCOUT_CAR_PREFERRED_CLEARANCE_TILES),
+            0
+        );
+        assert!(scout_car_clearance_cost(3) < scout_car_clearance_cost(2));
+        assert!(scout_car_clearance_cost(2) < scout_car_clearance_cost(1));
     }
 
     #[test]
@@ -781,6 +828,47 @@ mod tests {
             0,
             RouteShape::PreferFewerTurns
         ));
+    }
+
+    #[test]
+    fn static_fingerprint_is_part_of_path_cache_key() {
+        let map = flat_test_map(16);
+        let mut entities = EntityStore::new();
+        let empty_occ = Occupancy::build(&map, &entities);
+        let start = (1, 5);
+        let goal = (13, 5);
+        let mut service = PathingService::new(8_192, 256);
+        let req = PathRequest {
+            kind: EntityKind::ScoutCar,
+            start,
+            goal,
+            radius_tiles: config::unit_radius_tiles(EntityKind::ScoutCar),
+            route_shape: RouteShape::Normal,
+            budget: None,
+        };
+
+        let before = service.request_tile_path(&map, &empty_occ, req.clone());
+        assert_eq!(before.last().copied(), Some(goal));
+        assert_eq!(service.cache_len(), 1);
+
+        let (bx, by) =
+            crate::game::services::occupancy::footprint_center(&map, EntityKind::Depot, 5, 3);
+        entities
+            .spawn_building(1, EntityKind::Depot, bx, by, true)
+            .expect("depot should spawn");
+        let blocked_occ = Occupancy::build(&map, &entities);
+        assert_ne!(
+            empty_occ.static_fingerprint(),
+            blocked_occ.static_fingerprint()
+        );
+
+        let after = service.request_tile_path(&map, &blocked_occ, req);
+        assert_eq!(after.last().copied(), Some(goal));
+        assert_eq!(
+            service.cache_len(),
+            2,
+            "same request should cache separately when static clearance changes"
+        );
     }
 
     #[test]
@@ -1121,6 +1209,60 @@ mod tests {
             map.tile_center(start.0 as u32, start.1 as u32),
             &waypoints,
         );
+    }
+
+    #[test]
+    fn scout_car_pathing_prefers_clearance_in_wide_space() {
+        let map = clearance_choice_map();
+        let entities = EntityStore::new();
+        let occ = Occupancy::build(&map, &entities);
+        let mut service = PathingService::new(8_192, 16);
+        let start = (1, 4);
+        let goal = (14, 4);
+
+        let tile_path = service.request_tile_path(
+            &map,
+            &occ,
+            PathRequest {
+                kind: EntityKind::ScoutCar,
+                start,
+                goal,
+                radius_tiles: config::unit_radius_tiles(EntityKind::ScoutCar),
+                route_shape: RouteShape::Normal,
+                budget: None,
+            },
+        );
+
+        assert_eq!(tile_path.last().copied(), Some(goal));
+        assert!(
+            tile_path.iter().any(|&(_, ty)| ty >= 6),
+            "scout car route should move away from the wall shelf when open space is available, got {tile_path:?}"
+        );
+    }
+
+    #[test]
+    fn scout_car_clearance_cost_keeps_narrow_passage_traversable() {
+        let map = two_tile_wide_horizontal_corridor();
+        let entities = EntityStore::new();
+        let occ = Occupancy::build(&map, &entities);
+        let mut service = PathingService::new(8_192, 16);
+        let start = (2, 3);
+        let goal = (5, 3);
+
+        let tile_path = service.request_tile_path(
+            &map,
+            &occ,
+            PathRequest {
+                kind: EntityKind::ScoutCar,
+                start,
+                goal,
+                radius_tiles: config::unit_radius_tiles(EntityKind::ScoutCar),
+                route_shape: RouteShape::Normal,
+                budget: None,
+            },
+        );
+
+        assert_eq!(tile_path.last().copied(), Some(goal));
     }
 
     fn diagonal_pinch_map() -> Map {
