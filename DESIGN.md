@@ -982,11 +982,11 @@ The server treats every client as potentially hostile. Limits live next to the c
   produce constant one-tick stuttering. Turret/combat behavior still runs through the combat system
   while movement is paused.
 - **Rifleman Charge**: after completing a Training Centre, selected riflemen gain a `charge`
-  command on the command card's `Z` slot. The command sets `RIFLEMAN_CHARGE_TICKS` (32 ticks) on
+  command on the command card's `Z` slot. The command sets `RIFLEMAN_CHARGE_TICKS` (64 ticks) on
   owned riflemen only; while active, movement uses `RIFLEMAN_CHARGE_SPEED_MULTIPLIER` (2x) and the
   timer decays every simulation tick, even while idle. Charged riflemen can fire while moving, with
   the charge-fire miss chance described above. The duration is intentionally hard-coded from the
-  current "two tank lengths" feel and does not reference tank body constants.
+  current "four tank lengths" feel and does not reference tank body constants.
 - **Tank armor facing**: tank and AT-team attacks against tank victims use the victim tank's hull
   `facing` and the attacker's position. Front hits (`<=45°` from the hull direction) deal normal
   damage, side hits (`>45°` and `<=135°`) deal `1.25x`, and rear hits (`>135°`) deal `1.75x`.
