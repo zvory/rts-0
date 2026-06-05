@@ -814,12 +814,6 @@ input[type="text"]:focus {
   flex-direction: column;
   gap: 6px;
 }
-/* When nothing is selected, keep it out of the way. hud.js can toggle .empty. */
-#selected-panel.empty {
-  opacity: 0;
-  pointer-events: none;
-  display: none;
-}
 #selected-panel .sel-name,
 #selected-panel .sel-title {
   font-weight: 700;
