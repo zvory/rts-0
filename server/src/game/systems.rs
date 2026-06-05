@@ -109,73 +109,99 @@ pub(crate) fn run_tick(
     pending: Vec<(u32, SimCommand)>,
     events: &mut HashMap<u32, Vec<Event>>,
     tick: u32,
+    mut perf: Option<&mut crate::perf::TickPerf>,
 ) -> SpatialIndex {
-    let pre_command = PreCommandDerivedState::rebuild(map, entities);
-    let mut coordinator = services::move_coordinator::MoveCoordinator::new(
-        pathing,
-        map,
-        &pre_command.occupancy,
-        tick,
-    );
+    let pre_command = crate::perf::timed(perf.as_deref_mut(), "pre_command_derived", || {
+        PreCommandDerivedState::rebuild(map, entities)
+    });
+    let mut coordinator = crate::perf::timed(perf.as_deref_mut(), "move_coordinator_new", || {
+        services::move_coordinator::MoveCoordinator::new(pathing, map, &pre_command.occupancy, tick)
+    });
 
-    services::commands::apply_commands(
-        map,
-        entities,
-        players,
-        &pre_command.spatial,
-        &mut coordinator,
-        fog,
-        pending,
-        events,
-    );
-    coordinator.process_awaiting_paths(entities);
-    services::movement::movement_system_with_events(
-        map,
-        entities,
-        players,
-        &pre_command.occupancy,
-        &pre_command.spatial,
-        tick,
-        events,
-    );
+    crate::perf::timed(perf.as_deref_mut(), "apply_commands", || {
+        services::commands::apply_commands(
+            map,
+            entities,
+            players,
+            &pre_command.spatial,
+            &mut coordinator,
+            fog,
+            pending,
+            events,
+        );
+    });
+    crate::perf::timed(perf.as_deref_mut(), "awaiting_paths", || {
+        coordinator.process_awaiting_paths(entities);
+    });
+    crate::perf::timed(perf.as_deref_mut(), "movement", || {
+        services::movement::movement_system_with_events(
+            map,
+            entities,
+            players,
+            &pre_command.occupancy,
+            &pre_command.spatial,
+            tick,
+            events,
+        );
+    });
 
-    let post_movement = PostMovementDerivedState::rebuild(map, entities);
+    let post_movement = crate::perf::timed(perf.as_deref_mut(), "post_movement_derived", || {
+        PostMovementDerivedState::rebuild(map, entities)
+    });
 
-    services::combat::combat_system(
-        map,
-        entities,
-        players,
-        &post_movement.occupancy,
-        &post_movement.spatial,
-        &mut coordinator,
-        fog,
-        rng,
-        events,
-        tick,
-    );
-    services::economy::gather_system(
-        map,
-        entities,
-        players,
-        &post_movement.occupancy,
-        &post_movement.spatial,
-        &mut coordinator,
-    );
-    services::production::production_system(map, entities, players, &mut coordinator, events);
-    services::construction::construction_system(map, entities, players, events);
-    services::death::death_system(entities, fog, players, events);
+    crate::perf::timed(perf.as_deref_mut(), "combat", || {
+        services::combat::combat_system(
+            map,
+            entities,
+            players,
+            &post_movement.occupancy,
+            &post_movement.spatial,
+            &mut coordinator,
+            fog,
+            rng,
+            events,
+            tick,
+        );
+    });
+    crate::perf::timed(perf.as_deref_mut(), "economy", || {
+        services::economy::gather_system(
+            map,
+            entities,
+            players,
+            &post_movement.occupancy,
+            &post_movement.spatial,
+            &mut coordinator,
+        );
+    });
+    crate::perf::timed(perf.as_deref_mut(), "production", || {
+        services::production::production_system(map, entities, players, &mut coordinator, events);
+    });
+    crate::perf::timed(perf.as_deref_mut(), "construction", || {
+        services::construction::construction_system(map, entities, players, events);
+    });
+    crate::perf::timed(perf.as_deref_mut(), "death", || {
+        services::death::death_system(entities, fog, players, events);
+    });
 
-    let pre_collision = PreCollisionDerivedState::rebuild(map, entities);
-    services::movement::resolve_collisions(
-        entities,
-        &pre_collision.spatial,
-        map,
-        &pre_collision.occupancy,
-    );
+    let pre_collision = crate::perf::timed(perf.as_deref_mut(), "pre_collision_derived", || {
+        PreCollisionDerivedState::rebuild(map, entities)
+    });
+    crate::perf::timed(perf.as_deref_mut(), "collision", || {
+        services::movement::resolve_collisions(
+            entities,
+            &pre_collision.spatial,
+            map,
+            &pre_collision.occupancy,
+        );
+    });
 
-    services::supply::recompute_supply(players, entities);
+    crate::perf::timed(perf.as_deref_mut(), "supply", || {
+        services::supply::recompute_supply(players, entities);
+    });
 
-    FinalDerivedState::rebuild(map, entities).spatial
+    crate::perf::timed(perf, "final_derived", || {
+        FinalDerivedState::rebuild(map, entities).spatial
+    })
 }
 
 // Re-exports for callers outside the services layer so the public surface of `systems` stays
@@ -253,6 +279,7 @@ mod tests {
             Vec::new(),
             &mut events,
             1,
+            None,
         );
 
         assert!(

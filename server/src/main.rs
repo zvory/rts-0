@@ -11,11 +11,12 @@
 mod config;
 mod game;
 mod lobby;
+mod perf;
 mod protocol;
 mod rules;
 
 use std::net::SocketAddr;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use axum::extract::{Query, State};
@@ -59,6 +60,7 @@ async fn main() {
             EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")),
         )
         .init();
+    perf::PerfConfig::global().enforce_release_build_for_server();
 
     let version = git_version();
     let client_dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../client");
@@ -365,16 +367,43 @@ async fn send_server_message(
     sink: &mut futures_util::stream::SplitSink<WebSocket, Message>,
     msg: ServerMessage,
 ) -> bool {
+    let message_kind = match &msg {
+        ServerMessage::Snapshot(_) => "snapshot",
+        ServerMessage::Lobby { .. } => "lobby",
+        ServerMessage::Welcome { .. } => "welcome",
+        ServerMessage::Start(_) => "start",
+        ServerMessage::Error { .. } => "error",
+        ServerMessage::GameOver { .. } => "game_over",
+        ServerMessage::Pong { .. } => "pong",
+    };
+    let serialize_start = Instant::now();
     let encoded = match msg {
         ServerMessage::Snapshot(snapshot) => serialize_compact_snapshot(&snapshot),
         reliable => serde_json::to_string(&reliable),
     };
+    let serialize_duration = serialize_start.elapsed();
     match encoded {
         Ok(json) => {
+            let bytes = json.len();
+            let send_start = Instant::now();
             if sink.send(Message::Text(json.into())).await.is_err() {
                 // Socket gone; stop writing. The reader side will emit Leave.
+                crate::perf::log_writer_message(
+                    player_id,
+                    message_kind,
+                    serialize_duration,
+                    send_start.elapsed(),
+                    bytes,
+                );
                 return false;
             }
+            crate::perf::log_writer_message(
+                player_id,
+                message_kind,
+                serialize_duration,
+                send_start.elapsed(),
+                bytes,
+            );
         }
         Err(err) => {
             // Should never happen for our own types, but never let it kill the task.
