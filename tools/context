@@ -1,0 +1,276 @@
+#!/usr/bin/env bash
+# tools/context <topic> — print a task-scoped reading list so an agent does not
+# have to explore the repo from scratch. Prevents token-burn on irrelevant files.
+#
+# Topics: client-input renderer balance protocol ai tests
+set -euo pipefail
+
+TOPIC="${1:-}"
+
+usage() {
+  cat <<'EOF'
+usage: tools/context <topic>
+
+topics:
+  client-input   input handling, selection, command issue, lobby UI wiring
+  renderer       PixiJS render, camera, minimap, fog draw, HUD visuals
+  balance        costs, supply, sight, unit/building stats, economy tuning
+  protocol       wire messages, snapshot shape, server<->client mirror
+  ai             AI opponent: observation, decision, actions, profiles
+  tests          node integration suites, regression, self-play harness
+EOF
+  exit 2
+}
+
+[[ -z "$TOPIC" || "$TOPIC" == "-h" || "$TOPIC" == "--help" ]] && usage
+
+section() { printf '\n%s\n' "$1"; }
+
+case "$TOPIC" in
+
+client-input)
+cat <<'EOF'
+Context: client-input
+
+Read:
+- docs/context/client-ui.md
+- client/src/input.js
+- client/src/lobby.js
+- client/src/hud.js              (only the parts touched by input)
+- client/src/main.js             (DI wiring of input -> net/state)
+- client/src/net.js              (command send shape)
+- client/src/protocol.js         (command tags only)
+
+Do not start by reading:
+- client/src/renderer.js
+- client/src/fog.js
+- client/src/minimap.js
+- client/src/audio.js
+- client/src/combat_audio.js
+- server/src/game/**             (server sim is not the seam for input bugs)
+
+Run:
+- cd server && cargo run
+- (then) cd tests && node client_smoke.mjs
+
+Invariants:
+- Modules receive collaborators via DI from main.js; do NOT cross-import.
+- Any module owning DOM/window listeners must implement destroy().
+- Coordinates on the wire are world pixels; tile fields end in `Tile`.
+- Commands are validated server-side: unit lists deduped + capped
+  (MAX_UNITS_PER_COMMAND). Do not rely on client-side limits.
+
+Grep for:
+- "addEventListener" "pointerdown" "keydown" in client/src/
+- "sendCommand" "CommandTag" in client/src/
+- "destroy()" in client/src/
+EOF
+;;
+
+renderer)
+cat <<'EOF'
+Context: renderer
+
+Read:
+- docs/context/client-ui.md
+- client/src/renderer.js
+- client/src/camera.js
+- client/src/minimap.js
+- client/src/fog.js
+- client/src/hud.js               (visual bits only)
+- client/src/state.js             (what renderer consumes)
+- client/src/config.js            (sizes, colors, sight)
+
+Do not start by reading:
+- client/src/input.js
+- client/src/lobby.js
+- client/src/net.js
+- client/src/protocol.js          (unless adding a new rendered field)
+- server/src/**                   (rendering does not cross the wire)
+
+Run:
+- cd server && cargo run
+- cd tests && node client_smoke.mjs
+
+Invariants:
+- PixiJS is the global PIXI (v7). Do NOT `import` it.
+- Renderer/minimap/fog must implement destroy() — Match.destroy() relies on it
+  to release GPU resources between rematches.
+- Fog filtering is authoritative on the server. The client must NOT render
+  anything not present in the snapshot.
+- World pixels everywhere; tile-named fields only where the name ends in `Tile`.
+
+Grep for:
+- "PIXI." "Container" "Graphics" "Sprite" in client/src/
+- "destroy()" in client/src/renderer.js client/src/minimap.js client/src/fog.js
+EOF
+;;
+
+balance)
+cat <<'EOF'
+Context: balance
+
+Read:
+- docs/context/balance.md
+- server/src/config.rs            (AUTHORITATIVE)
+- client/src/config.js            (UI/render/fog mirror subset)
+- server/src/rules/economy.rs
+- server/src/rules/combat.rs
+- server/src/rules/defs.rs
+- DESIGN.md §5 Balance definitions & constants
+
+Do not start by reading:
+- client/src/renderer.js
+- client/src/hud.js
+- client/src/input.js
+- server/src/main.rs
+- server/src/lobby.rs
+- server/src/game/systems.rs
+
+Run:
+- cd server && cargo test scripted_self_play
+- cd server && cargo run --bin ai_matchup -- rush tech
+- tests/run-all.sh --no-client
+
+Invariants:
+- MIRROR: any value visible to the client (cost, supply, sight, size) must be
+  changed in BOTH config.rs and config.js in the same commit.
+- Server-only tuning (damage curves, internal timers) stays in config.rs.
+- Collect patch-note bullets as you work: changed stats, economy, combat
+  behavior, UI affordances, expected strategic impact. Factual only.
+
+Grep for:
+- "COST" "SUPPLY" "SIGHT" "RANGE" "HP" in server/src/config.rs
+- the same constants in client/src/config.js to verify mirror
+EOF
+;;
+
+protocol)
+cat <<'EOF'
+Context: protocol
+
+Read:
+- docs/context/protocol.md
+- server/src/protocol.rs          (AUTHORITATIVE wire definitions)
+- client/src/protocol.js          (must mirror tags + field names + shape)
+- server/src/game/fog.rs          (per-player filtering)
+- server/src/lobby.rs             (snapshot send path)
+- client/src/net.js               (decode path)
+- DESIGN.md §2 Wire protocol
+
+Do not start by reading:
+- client/src/renderer.js
+- client/src/hud.js
+- server/src/rules/**
+- server/src/game/services/**
+
+Run:
+- node tests/server_integration.mjs
+- node tests/regression.mjs
+- cd tests && node client_contracts.mjs
+
+Invariants:
+- Every tag, field name, and shape in protocol.rs <-> protocol.js MUST match.
+  Change both together (and DESIGN.md §2).
+- Fog: never send a player an entity or position they cannot see. target_id
+  tracers and death/positional events are gated on visibility/ownership.
+- Untrusted client: WebSocket frames are size-limited; command unit lists are
+  deduped + capped (MAX_UNITS_PER_COMMAND); placement coords are checked_*.
+
+Grep for:
+- "enum.*Tag" "Serialize" "Deserialize" in server/src/protocol.rs
+- "case '" tag strings in client/src/protocol.js
+- "MAX_UNITS_PER_COMMAND" "checked_" in server/src/
+EOF
+;;
+
+ai)
+cat <<'EOF'
+Context: ai
+
+Read:
+- docs/context/server-sim.md
+- server/src/game/ai.rs
+- server/src/game/ai_shared.rs
+- server/src/game/ai_core/mod.rs
+- server/src/game/ai_core/observation.rs
+- server/src/game/ai_core/decision/      (open the dir, read what is touched)
+- server/src/game/ai_core/actions.rs
+- server/src/game/ai_core/profiles.rs
+- server/src/game/ai_core/facts.rs
+- server/src/ai_matchup.rs                (driver/CLI)
+- server/src/ai_balance_matrix.rs
+
+Do not start by reading:
+- client/src/**                  (AI runs entirely server-side)
+- server/src/protocol.rs         (unless wiring a new lobby control)
+- server/src/game/services/**    (services are the same for human and AI)
+- server/src/game/selfplay/**    (separate harness; only if changing replays)
+
+Run:
+- cd server && cargo test ai
+- cd server && cargo run --bin ai_matchup -- rush tech
+- node tests/ai_integration.mjs
+
+Invariants:
+- AI issues commands via the same Game public API as human clients — do not
+  reach into internal state from ai_core.
+- Game::tick() is panic-free. AI code on the tick path must not unwrap/expect
+  or do unchecked arithmetic on derived values.
+- AI sees the world via the same fog-filtered observation surface the wire
+  uses; do not bypass fog for AI decisions.
+
+Grep for:
+- "fn decide" "fn observe" "Profile" in server/src/game/ai_core/
+- "ai_matchup" in server/src/
+EOF
+;;
+
+tests)
+cat <<'EOF'
+Context: tests
+
+Read:
+- docs/context/testing.md
+- tests/README.md
+- tests/run-all.sh
+- tests/server_integration.mjs
+- tests/regression.mjs
+- tests/ai_integration.mjs
+- tests/client_contracts.mjs
+- tests/client_smoke.mjs
+- server/src/game/selfplay/         (scripted self-play harness)
+
+Do not start by reading:
+- client/src/renderer.js
+- client/src/hud.js
+- server/src/rules/**               (unless the failing test names a rule)
+- server/src/game/services/**       (unless the failing test names a service)
+
+Run:
+- tests/run-all.sh                  # canonical "is the build green?"
+- tests/run-all.sh --no-client      # skip headless Chrome
+- cd server && cargo test           # scripted self-play, in-process, no server
+- node tests/server_integration.mjs # requires a running server on the test port
+
+Invariants:
+- Node tests need a RUNNING server on the test runner's private port. They are
+  NOT cargo test.
+- Debug builds have overflow checks ON; hardening regression tests depend on
+  that — do NOT switch the test server to --release.
+- If a self-play test fails and the cause is not obvious, open the replay in a
+  browser:
+    open "http://localhost:<port>/dev/selfplay?replay=<artifact_name>"
+  Do NOT sink time into speculative debugging first.
+
+Grep for:
+- "describe" "test(" "assert" in tests/
+- "RTS_MATCH_SEED" "PORT" in tests/
+EOF
+;;
+
+*)
+  echo "unknown topic: $TOPIC" >&2
+  usage
+;;
+esac
