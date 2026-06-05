@@ -84,7 +84,7 @@ fn gather_to_node(
             if can_mine {
                 e.mark_gather_phase(GatherPhase::Harvesting);
             } else {
-                e.mark_gather_phase(GatherPhase::ToNode);
+                e.clear_orders();
             }
         }
         if can_mine && !entities.claim_miner(node, id) {

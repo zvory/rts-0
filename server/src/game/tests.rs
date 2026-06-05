@@ -789,7 +789,7 @@ fn gather_command_ignores_nodes_without_nearby_completed_cc() {
 }
 
 #[test]
-fn gather_command_to_occupied_patch_still_orders_worker_without_mining() {
+fn gather_command_to_occupied_patch_is_ignored() {
     let players = [PlayerInit {
         id: 1,
         name: "Solo".into(),
@@ -843,13 +843,8 @@ fn gather_command_to_occupied_patch_still_orders_worker_without_mining() {
 
     let ordered_worker = game.entities.get(ordered).expect("worker survives");
     assert!(
-        matches!(ordered_worker.order(), Order::Gather(_)),
-        "occupied patches should still accept gather orders so workers can approach the patch"
-    );
-    assert_eq!(
-        ordered_worker.gather_phase(),
-        Some(GatherPhase::ToNode),
-        "only the current node holder can enter Harvesting"
+        !matches!(ordered_worker.order(), Order::Gather(_)),
+        "occupied patches should reject gather orders so extra workers do not move onto them"
     );
     assert_eq!(
         game.entities.node_slot_holder(node),
