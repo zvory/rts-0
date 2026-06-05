@@ -151,6 +151,9 @@ pub(crate) fn apply_commands(
                     if !world_query::resource_has_completed_mining_cc(entities, player, node) {
                         continue;
                     }
+                    if matches!(entities.node_slot_holder(node), Some(holder) if holder != id) {
+                        continue;
+                    }
                     coordinator.order_gather(entities, id, node);
                 }
             }
