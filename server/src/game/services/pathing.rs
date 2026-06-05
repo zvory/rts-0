@@ -6,7 +6,7 @@
 
 use std::collections::HashMap;
 
-use crate::game::entity::EntityKind;
+use crate::game::entity::{uses_oriented_vehicle_body, EntityKind};
 use crate::game::map::Map;
 use crate::game::pathfinding::{self, Passability};
 use crate::game::services::occupancy::Occupancy;
@@ -52,6 +52,10 @@ struct TerrainPassability<'a> {
     occupancy: &'a Occupancy<'a>,
     kind: EntityKind,
     radius_tiles: u32,
+    /// When true, reject tiles pinched between two diagonally-opposite blocked corners.
+    /// Used for oriented vehicle bodies so A* avoids 1-tile gaps that the rotating hull
+    /// cannot legally thread (see DESIGN.md pathing notes).
+    avoid_diagonal_pinch: bool,
 }
 
 impl TerrainPassability<'_> {
@@ -82,6 +86,15 @@ impl Passability for TerrainPassability<'_> {
                 if !self.tile_passable(tx + dx, ty + dy) {
                     return false;
                 }
+            }
+        }
+        if self.avoid_diagonal_pinch {
+            let nw = !self.tile_passable(tx - 1, ty - 1);
+            let ne = !self.tile_passable(tx + 1, ty - 1);
+            let sw = !self.tile_passable(tx - 1, ty + 1);
+            let se = !self.tile_passable(tx + 1, ty + 1);
+            if (nw && se) || (ne && sw) {
+                return false;
             }
         }
         true
@@ -145,6 +158,7 @@ impl PathingService {
             occupancy,
             kind: req.kind,
             radius_tiles: req.radius_tiles,
+            avoid_diagonal_pinch: uses_oriented_vehicle_body(req.kind),
         };
 
         if let Some(tile_path) = self.cache_lookup(&req, &pass) {
@@ -1106,6 +1120,88 @@ mod tests {
             EntityKind::Tank,
             map.tile_center(start.0 as u32, start.1 as u32),
             &waypoints,
+        );
+    }
+
+    fn diagonal_pinch_map() -> Map {
+        // Two 3x3 rock footprints arranged as in the tank-pinch bug:
+        //   A at tiles (0..=2, 0..=2), B at tiles (4..=6, 3..=5).
+        // The gap column is x = 3; tile (3, 3) sits between diagonally-opposite blocked corners
+        // (2, 2) and (4, 4).
+        let mut map = flat_test_map(16);
+        for ty in 0..=2 {
+            for tx in 0..=2 {
+                let idx = map.index(tx, ty);
+                map.terrain[idx] = terrain::ROCK;
+            }
+        }
+        for ty in 3..=5 {
+            for tx in 4..=6 {
+                let idx = map.index(tx, ty);
+                map.terrain[idx] = terrain::ROCK;
+            }
+        }
+        map
+    }
+
+    #[test]
+    fn tank_pathing_avoids_diagonal_pinch_between_offset_buildings() {
+        let map = diagonal_pinch_map();
+        let entities = EntityStore::new();
+        let occ = Occupancy::build(&map, &entities);
+        let mut service = PathingService::new(8_192, 16);
+        let radius_tiles = config::unit_radius_tiles(EntityKind::Tank);
+
+        let start = (0, 5);
+        let goal = (6, 0);
+        let tile_path = service.request_tile_path(
+            &map,
+            &occ,
+            PathRequest {
+                kind: EntityKind::Tank,
+                start,
+                goal,
+                radius_tiles,
+                route_shape: RouteShape::Normal,
+                budget: None,
+            },
+        );
+
+        assert!(!tile_path.is_empty(), "tank should still reach the goal around the pinch");
+        assert_eq!(tile_path.last().copied(), Some(goal), "tank path must terminate at the goal");
+        assert!(
+            !tile_path.contains(&(3, 3)),
+            "tank A* must skip the diagonal-pinch tile (3, 3), got {tile_path:?}"
+        );
+    }
+
+    #[test]
+    fn infantry_pathing_ignores_diagonal_pinch_rule() {
+        let map = diagonal_pinch_map();
+        let entities = EntityStore::new();
+        let occ = Occupancy::build(&map, &entities);
+        let mut service = PathingService::new(8_192, 16);
+        let radius_tiles = config::unit_radius_tiles(EntityKind::Rifleman);
+
+        let start = (0, 5);
+        let goal = (6, 0);
+        let tile_path = service.request_tile_path(
+            &map,
+            &occ,
+            PathRequest {
+                kind: EntityKind::Rifleman,
+                start,
+                goal,
+                radius_tiles,
+                route_shape: RouteShape::Normal,
+                budget: None,
+            },
+        );
+
+        assert!(!tile_path.is_empty(), "infantry path should be found");
+        assert!(
+            tile_path.contains(&(3, 3)),
+            "infantry must remain free to thread the diagonal pinch, got {tile_path:?}"
         );
     }
 }
