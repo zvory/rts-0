@@ -21,7 +21,7 @@ use super::tank_drive::{
     along_track_error, angle_delta, distance_between, lateral_error, normalize_angle,
     rotate_toward, scout_car_accepts_waypoint, scout_car_drive_intent,
     scout_car_final_goal_tolerance, scout_car_turn_delta_for_budget, step_can_reach_waypoint,
-    tank_drive_intent, tank_oil_starves_movement, tank_speed_scale, vehicle_traffic_adjustment,
+    tank_drive_intent, tank_speed_scale, vehicle_oil_starves_movement, vehicle_traffic_adjustment,
     AT_GUN_BODY_TURN_RATE_RAD_PER_TICK, TANK_BODY_TURN_RATE_RAD_PER_TICK,
 };
 use super::{ARRIVE_EPS, MAX_UNIT_BOUNDING_RADIUS_PX};
@@ -75,9 +75,16 @@ pub(super) fn advance_moving_units(
         let uses_vehicle_movement = uses_oriented_vehicle_body(kind);
         let is_tank = uses_tank_movement_semantics(kind);
         let is_car = uses_car_movement_semantics(kind);
-        // Experimental tank fuel rule: an oil-starved tank pauses before retrying so sparse
+        let vehicle_oil_cost_per_px = match kind {
+            EntityKind::Tank => Some(config::TANK_OIL_COST_PER_PX),
+            EntityKind::ScoutCar => Some(config::SCOUT_CAR_OIL_COST_PER_PX),
+            _ => None,
+        };
+        // Experimental vehicle fuel rule: an oil-starved vehicle pauses before retrying so sparse
         // oil income does not make it lurch forward on isolated ticks.
-        if is_tank && tank_oil_starves_movement(entities, players, events, id) {
+        if vehicle_oil_cost_per_px.is_some()
+            && vehicle_oil_starves_movement(entities, players, events, id)
+        {
             continue;
         }
         let orig_x = x;
@@ -498,8 +505,8 @@ pub(super) fn advance_moving_units(
             }
         }
 
-        // Experimental tank fuel: charge oil for the distance actually moved this tick.
-        if is_tank {
+        // Experimental vehicle fuel: charge oil for the distance actually moved this tick.
+        if let Some(oil_cost_per_px) = vehicle_oil_cost_per_px {
             let (final_x, final_y, owner) = match entities.get(id) {
                 Some(e) => (e.pos_x, e.pos_y, e.owner),
                 None => continue,
@@ -508,7 +515,7 @@ pub(super) fn advance_moving_units(
             let dy = final_y - orig_y;
             let dist = (dx * dx + dy * dy).sqrt();
             if dist > 0.0 {
-                let cost = dist * config::TANK_OIL_COST_PER_PX;
+                let cost = dist * oil_cost_per_px;
                 if let Some(e) = entities.get_mut(id) {
                     if let Some(m) = e.movement.as_mut() {
                         m.lifetime_oil_used += cost;
