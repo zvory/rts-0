@@ -261,7 +261,7 @@ function fakeAudioContext() {
       JSON.stringify({ c: "tearDownAtGuns", units: [3, 4] }),
     "tearDownAtGuns command builder emits the wire shape",
   );
-  assert(AT_GUN_DEPLOYED_RANGE_TILES === 10, "client mirrors deployed AT gun range");
+  assert(AT_GUN_DEPLOYED_RANGE_TILES === 12, "client mirrors deployed AT gun range");
   assertApprox(
     AT_GUN_FIELD_OF_FIRE_RAD,
     Math.PI / 4,
@@ -328,7 +328,7 @@ function fakeAudioContext() {
     "Factory should put Scout Car in the leftmost train slot",
   );
   assert(STATS[KIND.SCOUT_CAR].cost.steel === 125, "Scout Car steel cost mirrors server");
-  assert(STATS[KIND.SCOUT_CAR].cost.oil === 75, "Scout Car oil cost mirrors server");
+  assert(STATS[KIND.SCOUT_CAR].cost.oil === 50, "Scout Car oil cost mirrors server");
   assert(STATS[KIND.SCOUT_CAR].sight === 10, "Scout Car has the largest mobile sight radius");
   assert(STATS[KIND.SCOUT_CAR].body.length === 40.8, "Scout Car client body length mirrors server");
   assert(STATS[KIND.SCOUT_CAR].body.width === 21.6, "Scout Car client body width mirrors server");
