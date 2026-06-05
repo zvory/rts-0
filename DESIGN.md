@@ -999,7 +999,9 @@ public enemy start tile, so they ignore buildings encountered on the way, while 
 direct `Attack` commands against visible enemy units with workers first. Local home-defense
 responses reserve only the defenders assigned to that threat; unrelated moving raiders keep
 reacting to visible units on their own route, including scout cars, instead of continuing past
-them. If no enemy units are visible and raiders have reached within 4 tiles of the center of the
+them. After a direct raid fight is cleared, raiders already away from home immediately resume the
+deeper raid move instead of waiting for the next outbound wave cadence. If no enemy units are
+visible and raiders have reached within 4 tiles of the center of the
 enemy main-base steel line, they fall back to attacking visible buildings so a unitless opponent
 can still be finished. Once the first completed Barracks has had enough time to produce seven
 Riflemen, using the current Rifleman training time from shared unit stats, the profile stops
