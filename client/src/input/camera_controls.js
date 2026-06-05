@@ -7,6 +7,12 @@ export function _handleKeyDown(ev) {
   // Never hijack typing in inputs (lobby name field, etc.).
   if (isTextEntry(ev.target)) return;
 
+  if (ev.code === "Escape" && this.pointerLocked) {
+    this.exitPointerLock();
+    ev.preventDefault();
+    return;
+  }
+
   switch (ev.code) {
     case "ArrowUp":
       this.keys.up = true;
@@ -81,6 +87,7 @@ export function _handleKeyUp(ev) {
 }
 
 export function _handleBlur() {
+  if (this.pointerLocked) this.exitPointerLock();
   this.keys.up = this.keys.down = this.keys.left = this.keys.right = false;
   this.mouse = null;
   this._spacePan = false;

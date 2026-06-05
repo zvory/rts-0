@@ -26,7 +26,7 @@
         Game:   #game-screen, #viewport (Pixi canvas mounts here),
                 #hud, #res-steel, #res-oil, #res-supply,
                 #minimap (canvas), #selected-panel, #command-card,
-                #game-menu, #settings-button, #settings-menu,
+                #game-menu, #settings-button, #settings-menu, #pointer-lock-toggle,
                 #give-up-open, #give-up-confirm, #give-up-cancel, #give-up-confirm-button,
                 #game-over, #game-over-text, #game-over-scores, #game-over-button
         App:    #toast
@@ -100,6 +100,7 @@
         <div id="game-menu">
           <button id="settings-button" type="button" aria-label="Settings" title="Settings">⚙</button>
           <div id="settings-menu" class="hud-panel" role="menu" hidden>
+            <button id="pointer-lock-toggle" type="button" role="menuitemcheckbox" aria-checked="false">Lock cursor pan</button>
             <button id="give-up-open" type="button" role="menuitem">Give up</button>
           </div>
         </div>
