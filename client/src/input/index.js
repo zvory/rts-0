@@ -307,27 +307,14 @@ export class Input {
     }
     // Command-card targeting: the next left-click issues the armed command.
     if (this.state.commandTarget) {
-      if (this._commandTargetClickStartsSelection(p)) {
-        this.state.endCommandTarget();
-      } else {
-        this._issueTargetedCommand(p);
-        this.state.endCommandTarget();
-        return;
-      }
+      this._issueTargetedCommand(p);
+      this.state.endCommandTarget();
+      return;
     }
     // Otherwise begin a (possible) selection drag from this anchor.
     this._drag = { x0: p.x, y0: p.y, x1: p.x, y1: p.y };
     this._dragging = false;
     void ev;
-  }
-
-  _commandTargetClickStartsSelection(p) {
-    if (this.state.commandTarget !== "move" && this.state.commandTarget !== "attack") {
-      return false;
-    }
-    const world = this._worldAt(p.x, p.y);
-    const hit = this._entityAtWorld(world.x, world.y, /*ownPreferred=*/ true);
-    return !!hit && hit.owner === this.state.playerId;
   }
 
   _startPanDrag(p, button) {

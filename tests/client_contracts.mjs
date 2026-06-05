@@ -748,25 +748,34 @@ function fakeAudioContext() {
   const targetedInput = Object.create(Input.prototype);
   const sentCommands = [];
   const selectionClicks = [];
+  const feedback = [];
   targetedInput.state = {
     placement: null,
     commandTarget: "attack",
     playerId: 1,
+    addCommandFeedback(kind, x, y) {
+      feedback.push({ kind, x, y });
+    },
     endCommandTarget() {
       this.commandTarget = null;
     },
   };
   targetedInput.renderer = { drawSelectionBox() {} };
+  targetedInput.net = { command: (command) => sentCommands.push(command) };
   targetedInput._worldAt = (x, y) => ({ x, y });
   targetedInput._entityAtWorld = () => ownBuilding;
-  targetedInput._issueTargetedCommand = () => sentCommands.push("attackMove");
+  targetedInput._selectedOwnUnitIds = () => [7];
   targetedInput._commitClickSelection = (p) => selectionClicks.push(p);
   targetedInput._screenPos = (ev) => ({ x: ev.clientX, y: ev.clientY });
   targetedInput._trackMouse = () => {};
   targetedInput._onLeftDown({ x: 200, y: 200 }, {});
-  assert(targetedInput.state.commandTarget === null, "own click while attack targeting clears target mode");
-  assert(sentCommands.length === 0, "own click while attack targeting should not issue attack-move");
-  assert(targetedInput._drag !== null, "own click while attack targeting should fall through to selection");
+  assert(targetedInput.state.commandTarget === null, "attack targeting clears after one click");
+  assert(sentCommands.length === 1, "own click while attack targeting should issue one command");
+  assert(sentCommands[0].c === "attackMove", "own click while attack targeting should attack-move");
+  assert(sentCommands[0].units.join(",") === "7", "attack-move should use selected own units");
+  assert(sentCommands[0].x === 200 && sentCommands[0].y === 200, "attack-move should go to the clicked own position");
+  assert(feedback.length === 1 && feedback[0].kind === "attack", "own attack-move click should show attack feedback");
+  assert(targetedInput._drag == null, "attack targeting should not fall through to selection on the same click");
   targetedInput._handleMouseUp({
     button: 0,
     clientX: 200,
@@ -775,14 +784,22 @@ function fakeAudioContext() {
     ctrlKey: false,
     metaKey: false,
   });
-  assert(selectionClicks.length === 1, "own click while attack targeting should select on mouse-up");
+  assert(selectionClicks.length === 0, "attack targeting click should not also select on mouse-up");
 
-  targetedInput.state.commandTarget = "attack";
+  targetedInput.state.commandTarget = null;
   targetedInput._drag = null;
   targetedInput._entityAtWorld = () => null;
   targetedInput._onLeftDown({ x: 240, y: 240 }, {});
-  assert(sentCommands.length === 1, "ground click while attack targeting still issues attack-move");
-  assert(targetedInput.state.commandTarget === null, "ground click while attack targeting clears target mode");
+  targetedInput._handleMouseUp({
+    button: 0,
+    clientX: 240,
+    clientY: 240,
+    shiftKey: false,
+    ctrlKey: false,
+    metaKey: false,
+  });
+  assert(sentCommands.length === 1, "a second click without another A press should not issue attack-move");
+  assert(selectionClicks.length === 1, "a second click without another A press should be normal selection");
 }
 
 // ---------------------------------------------------------------------------
