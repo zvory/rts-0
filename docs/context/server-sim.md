@@ -1,0 +1,34 @@
+# Capsule: server simulation
+
+Use when changing tick logic, services, rules, AI, or the `Game` core.
+
+## Read first in `DESIGN.md`
+- §1 High-level architecture (tick & networking model)
+- §3 Rust server — modules & the `Game` core API
+- §3.1 `game::Game` public API (the seam — keep stable)
+- §3.2 Concurrency model (room task is sole owner; no locks)
+- §3.3 Rules layer (`rules/`)
+- §8 AI opponents (`game/ai.rs`)
+- §9 Self-play harness (only if touching scripted tests)
+
+## Code map
+- `server/src/game/mod.rs` — public `Game` API
+- `server/src/game/systems.rs` — thin tick orchestrator
+- `server/src/game/services/` — small pure helpers, called in order by `systems.rs`
+- `server/src/game/rules/` — declarative rules
+- `server/src/game/ai.rs` — AI opponents
+- `server/src/lobby.rs`, `server/src/main.rs` — only touch sim via `game::Game`
+
+## Invariants
+- `Game::tick()` is **panic-free**: no `unwrap`/`expect`/unchecked indexing; stale ids = no-op;
+  `checked_*` for anything derived from client input. A panic kills the room task.
+- The room task is the single owner of its `Game`. No locks.
+- `lobby.rs`/`main.rs` only call the public `Game` API. Don't reach into internals.
+
+## Don't break
+- The `Game` API signatures (§3.1). If you must change one, update `DESIGN.md §3.1` and all callers
+  in the same commit.
+
+## Cross-capsule triggers
+- Touching message construction → also read [protocol.md](protocol.md).
+- Touching unit/building numbers → also read [balance.md](balance.md).
