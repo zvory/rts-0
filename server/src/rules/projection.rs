@@ -129,6 +129,12 @@ pub fn project_entity(
             view.rally = Some([rx, ry]);
         }
         view.queued_markers = queued_order_markers(entity);
+        if entity.kind == EntityKind::Rifleman {
+            let charge_cooldown_left = entity.charge_cooldown_ticks();
+            if charge_cooldown_left > 0 {
+                view.charge_cooldown_left = Some(charge_cooldown_left);
+            }
+        }
     }
 
     if let Some(progress) = entity.build_progress_fraction() {
@@ -354,5 +360,35 @@ mod tests {
         let enemy_view = project_entity(2, unit, &fog, Some(&fog), false, None)
             .expect("full view should include unit");
         assert!(enemy_view.queued_markers.is_empty());
+    }
+
+    #[test]
+    fn charge_cooldown_is_owner_only() {
+        let mut entities = EntityStore::new();
+        let rifle_id = entities
+            .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
+            .expect("rifleman should spawn");
+        entities
+            .get_mut(rifle_id)
+            .expect("rifleman should exist")
+            .start_charge_cooldown(42);
+
+        let map = Map {
+            size: 64,
+            terrain: vec![terrain::GRASS; 64 * 64],
+            starts: vec![(1, 1), (40, 40)],
+            expansion_sites: Vec::new(),
+        };
+        let mut fog = Fog::new(map.size);
+        fog.recompute(&[1, 2], &entities, &map);
+        let rifle = entities.get(rifle_id).expect("rifleman should exist");
+
+        let owner_view = project_entity(1, rifle, &fog, Some(&fog), true, None)
+            .expect("owner should see own rifleman");
+        assert_eq!(owner_view.charge_cooldown_left, Some(42));
+
+        let enemy_view = project_entity(2, rifle, &fog, Some(&fog), false, None)
+            .expect("full view should include rifleman");
+        assert_eq!(enemy_view.charge_cooldown_left, None);
     }
 }

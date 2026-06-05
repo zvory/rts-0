@@ -65,6 +65,8 @@ pub struct MovementState {
     pub oil_starved_pause_ticks: u16,
     /// Ticks remaining for Rifleman Charge. Used only by riflemen.
     pub charge_ticks: u16,
+    /// Ticks remaining until Rifleman Charge may be used again. Used only by riflemen.
+    pub charge_cooldown_ticks: u16,
 }
 
 impl Default for MovementState {
@@ -86,6 +88,7 @@ impl Default for MovementState {
             oil_debt: 0.0,
             oil_starved_pause_ticks: 0,
             charge_ticks: 0,
+            charge_cooldown_ticks: 0,
         }
     }
 }

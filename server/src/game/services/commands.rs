@@ -190,8 +190,9 @@ pub(crate) fn apply_commands(
                     let Some(e) = entities.get_mut(id) else {
                         continue;
                     };
-                    if e.kind == EntityKind::Rifleman {
+                    if e.kind == EntityKind::Rifleman && e.charge_cooldown_ticks() == 0 {
                         e.start_charge(config::RIFLEMAN_CHARGE_TICKS);
+                        e.start_charge_cooldown(config::RIFLEMAN_CHARGE_COOLDOWN_TICKS);
                     }
                 }
             }
@@ -1002,6 +1003,10 @@ mod tests {
             config::RIFLEMAN_CHARGE_TICKS
         );
         assert_eq!(
+            entities.get(rifle).unwrap().charge_cooldown_ticks(),
+            config::RIFLEMAN_CHARGE_COOLDOWN_TICKS
+        );
+        assert_eq!(
             entities.get(worker).unwrap().charge_ticks(),
             0,
             "non-riflemen in the selected list are ignored"
@@ -1010,6 +1015,59 @@ mod tests {
             entities.get(enemy_rifle).unwrap().charge_ticks(),
             0,
             "enemy riflemen are ignored"
+        );
+    }
+
+    #[test]
+    fn charge_respects_cooldown_before_allowing_reuse() {
+        let map = flat_map(24);
+        let mut entities = EntityStore::new();
+        let rifle = entities
+            .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
+            .expect("rifleman should spawn");
+        let (tx, ty) = footprint_center(&map, EntityKind::TrainingCentre, 6, 6);
+        entities
+            .spawn_building(1, EntityKind::TrainingCentre, tx, ty, true)
+            .expect("training centre should spawn");
+
+        apply(
+            &map,
+            &mut entities,
+            vec![(1, SimCommand::Charge { units: vec![rifle] })],
+        );
+        let first_charge_ticks = entities.get(rifle).unwrap().charge_ticks();
+        let first_cooldown_ticks = entities.get(rifle).unwrap().charge_cooldown_ticks();
+
+        apply(
+            &map,
+            &mut entities,
+            vec![(1, SimCommand::Charge { units: vec![rifle] })],
+        );
+        assert_eq!(
+            entities.get(rifle).unwrap().charge_ticks(),
+            first_charge_ticks,
+            "cooldown should block immediate charge reuse"
+        );
+        assert_eq!(
+            entities.get(rifle).unwrap().charge_cooldown_ticks(),
+            first_cooldown_ticks,
+            "retrying during cooldown must not refresh the cooldown"
+        );
+
+        for _ in 0..config::RIFLEMAN_CHARGE_COOLDOWN_TICKS {
+            entities.get_mut(rifle).unwrap().tick_charge_cooldown();
+        }
+        entities.get_mut(rifle).unwrap().tick_charge();
+
+        apply(
+            &map,
+            &mut entities,
+            vec![(1, SimCommand::Charge { units: vec![rifle] })],
+        );
+        assert_eq!(
+            entities.get(rifle).unwrap().charge_ticks(),
+            config::RIFLEMAN_CHARGE_TICKS,
+            "charge should become available again after cooldown expiry"
         );
     }
 

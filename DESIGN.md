@@ -171,21 +171,21 @@ transport decode:
 }
 ```
 
-Live WebSocket snapshot frames are sent as compact JSON text, version 2. `client/src/net.js`
+Live WebSocket snapshot frames are sent as compact JSON text, version 3. `client/src/net.js`
 decodes this transport shape back into the semantic object above before dispatching `S.SNAPSHOT`.
 Older object-shaped JSON snapshots remain decodable by the client for fallback/dev use.
 
 ```
 {
   "t": "snapshot",
-  "v": 2,
+  "v": 3,
   "s": [tick, steel, oil, supplyUsed, supplyCap],
   "e": [
     [
       id, owner, kind, x, y, hp, maxHp, state,
       facing?, weaponFacing?, prodKind?, prodProgress?, prodQueue?,
       buildProgress?, latchedNode?, targetId?, setupState?, remaining?, rally?, oilUsed?,
-      setupFacing?, queuedMarkers?, visionOnly?
+      setupFacing?, queuedMarkers?, chargeCooldownLeft?, visionOnly?
     ]
   ],
   "r": [[id, remaining]],         // omitted when empty
@@ -248,6 +248,7 @@ watch rooms receive all resource updates).
   queuedMarkers?: [              // future queued move/attack-move points; ONLY ever sent to the owner
     { x: f32, y: f32, attackMove?: bool }
   ],
+  chargeCooldownLeft?: u16,      // rifleman only: owner-visible remaining Charge cooldown in ticks
   visionOnly?: bool,             // true = visible only through one-second death vision; visual intel only
 }
 ```
