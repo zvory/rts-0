@@ -853,9 +853,12 @@ The server treats every client as potentially hostile. Limits live next to the c
   A tank reverses toward a nearby goal within 3 tiles when that goal is more than 90 degrees behind
   the hull; farther behind goals make it pivot first. Alignment error at or below `0.55` radians
   keeps full drive speed, error at or above `1.25` radians pivots with no translation, and values
-  between those thresholds linearly reduce throttle. Frontal traffic within 2 tiles can reduce
-  throttle and add a bounded `0.28` radian turn bias toward open space, but does not inject a
-  perpendicular sidestep waypoint.
+  between those thresholds linearly reduce throttle. If a proposed tank rotation is blocked by
+  static terrain or a building while the current hull orientation remains legal, the tank probes one
+  speed-step forward and backward along its current hull axis and takes the candidate that makes the
+  rotated hull legal, preferring the candidate nearer the active route point. Frontal traffic within
+  2 tiles can reduce throttle and add a bounded `0.28` radian turn bias toward open space, but does
+  not inject a perpendicular sidestep waypoint.
   The snapshot `weaponFacing` field is the independent turret/barrel angle. Tank combat rotates the
   turret toward the target at a bounded rate and fires only once the turret is within tolerance; the
   hull does not need to face the target. Tanks do not clear their movement path when they fire, so
