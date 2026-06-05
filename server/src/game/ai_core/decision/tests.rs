@@ -936,7 +936,7 @@ fn full_saturation_pivots_to_tank_tech_but_waits_for_full_steel_before_oil() {
         false,
         target_steel_workers,
     );
-    assert_eq!(desired_oil, 3);
+    assert_eq!(desired_oil, 6);
 }
 
 #[test]

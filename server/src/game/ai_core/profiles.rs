@@ -362,7 +362,7 @@ pub(crate) static RIFLE_FLOOD_FULL_SATURATION: AiProfile = AiProfile {
     workers: WorkerPolicy {
         steel_saturation_fraction: Ratio::new(1, 1),
         steel_worker_cap: None,
-        extra_oil_workers: 3,
+        extra_oil_workers: 6,
         pressure_worker_cap: None,
         pressure_until_complete: None,
     },
@@ -408,10 +408,10 @@ pub(crate) static RIFLE_FLOOD_FULL_SATURATION: AiProfile = AiProfile {
         defensive_unit: EntityKind::Rifleman,
         defensive_unit_count: 0,
         pre_expansion_steel_worker_cap: usize::MAX,
-        post_expansion_steel_worker_cap: Some(28),
+        post_expansion_steel_worker_cap: Some(36),
         search_radius_tiles: 6,
-        trigger_steel: 500,
-        trigger_supply_used: 50,
+        trigger_steel: 300,
+        trigger_supply_used: 30,
         blocks_tech_path: false,
     }),
     recovery_transition: None,
@@ -669,7 +669,7 @@ mod tests {
         let expansion = RIFLE_FLOOD_FULL_SATURATION.expansion.unwrap();
         let transition = RIFLE_FLOOD_FULL_SATURATION.tech_transition.unwrap();
 
-        assert_eq!(RIFLE_FLOOD_FULL_SATURATION.workers.extra_oil_workers, 3);
+        assert_eq!(RIFLE_FLOOD_FULL_SATURATION.workers.extra_oil_workers, 6);
         assert_eq!(
             RIFLE_FLOOD_FULL_SATURATION
                 .resources
@@ -686,7 +686,7 @@ mod tests {
             EntityKind::TrainingCentre
         );
         assert_eq!(expansion.pre_expansion_steel_worker_cap, usize::MAX);
-        assert_eq!(expansion.trigger_supply_used, 50);
+        assert_eq!(expansion.trigger_supply_used, 30);
         assert_eq!(transition.supply_used_threshold, 50);
         assert_eq!(
             transition.required_tech_path,
