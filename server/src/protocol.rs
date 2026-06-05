@@ -311,6 +311,17 @@ pub struct ResourceDelta {
     pub remaining: u32,
 }
 
+/// Owner-only visual marker for a future queued point order. This deliberately carries only a
+/// world point and order flavor, never target ids.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct QueuedOrderMarker {
+    pub x: f32,
+    pub y: f32,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub attack_move: bool,
+}
+
 /// One entity as seen by one player. Optional fields are omitted when not applicable.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
@@ -365,6 +376,10 @@ pub struct EntityView {
     // Tanks: lifetime oil burned by movement, in resource units.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub oil_used: Option<f32>,
+
+    // Mobile units: future queued move/attack-move stages. Only ever sent to the owner.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub queued_markers: Vec<QueuedOrderMarker>,
 }
 
 impl EntityView {
@@ -402,6 +417,7 @@ impl EntityView {
             setup_facing: None,
             rally: None,
             oil_used: None,
+            queued_markers: Vec::new(),
         }
     }
 }
@@ -599,6 +615,9 @@ impl Serialize for CompactEntity<'_> {
         if entity.setup_facing.is_some() {
             len = 21;
         }
+        if !entity.queued_markers.is_empty() {
+            len = 22;
+        }
 
         let mut seq = serializer.serialize_seq(Some(len))?;
         seq.serialize_element(&entity.id)?;
@@ -647,6 +666,34 @@ impl Serialize for CompactEntity<'_> {
         }
         if len > 20 {
             seq.serialize_element(&entity.setup_facing)?;
+        }
+        if len > 21 {
+            seq.serialize_element(
+                &entity
+                    .queued_markers
+                    .iter()
+                    .map(CompactQueuedMarker)
+                    .collect::<Vec<_>>(),
+            )?;
+        }
+        seq.end()
+    }
+}
+
+struct CompactQueuedMarker<'a>(&'a QueuedOrderMarker);
+
+impl Serialize for CompactQueuedMarker<'_> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let marker = self.0;
+        let len = if marker.attack_move { 3 } else { 2 };
+        let mut seq = serializer.serialize_seq(Some(len))?;
+        seq.serialize_element(&marker.x)?;
+        seq.serialize_element(&marker.y)?;
+        if len > 2 {
+            seq.serialize_element(&marker.attack_move)?;
         }
         seq.end()
     }
@@ -832,6 +879,18 @@ mod tests {
         worker.weapon_facing = Some(1.75);
         worker.latched_node = Some(200);
         worker.target_id = Some(9);
+        worker.queued_markers = vec![
+            QueuedOrderMarker {
+                x: 128.0,
+                y: 160.0,
+                attack_move: false,
+            },
+            QueuedOrderMarker {
+                x: 192.0,
+                y: 224.0,
+                attack_move: true,
+            },
+        ];
 
         let mut gunner = EntityView::new(
             2,
@@ -931,6 +990,10 @@ mod tests {
         assert_eq!(value["e"][0][9], serde_json::json!(1.75));
         assert_eq!(value["e"][0][14], serde_json::json!(200));
         assert_eq!(value["e"][0][15], serde_json::json!(9));
+        assert_eq!(
+            value["e"][0][21],
+            serde_json::json!([[128.0, 160.0], [192.0, 224.0, true]])
+        );
         // Rally point rides in slot 18 of the producing building's record.
         assert_eq!(value["e"][2][18], serde_json::json!([256.0, 512.0]));
         assert_eq!(value["r"], serde_json::json!([[200, 1498]]));

@@ -181,7 +181,7 @@ Older object-shaped JSON snapshots remain decodable by the client for fallback/d
       id, owner, kind, x, y, hp, maxHp, state,
       facing?, weaponFacing?, prodKind?, prodProgress?, prodQueue?,
       buildProgress?, latchedNode?, targetId?, setupState?, remaining?, rally?, oilUsed?,
-      setupFacing?
+      setupFacing?, queuedMarkers?
     ]
   ],
   "r": [[id, remaining]],         // omitted when empty
@@ -203,6 +203,8 @@ Compact numeric codes:
 Compact entity records are positional arrays. Optional fields keep the semantic order above and
 trailing missing optional fields are omitted; interior missing optional fields are encoded as
 `null`. The `rally` slot is itself a two-element `[x, y]` array (or `null`).
+The `queuedMarkers` slot is an owner-only array capped at 8 entries; each entry is
+`[x, y]` for a queued move stage or `[x, y, true]` for a queued attack-move stage.
 
 `ResourceDelta`: `{ id: u32, remaining: u32 }`. Resource node positions/kinds are static and come
 from `start.map.resources`; clients keep last-known `remaining` locally. The server sends
@@ -235,7 +237,10 @@ watch rooms receive all resource updates).
   rally?: [f32, f32],            // rally point (world px); ONLY ever sent to the owner
   // tanks:
   oilUsed?: f32,                 // lifetime oil burned by movement, in resource units
-  setupFacing?: f32              // at_team only: owner-visible deployed arc center; appended after oilUsed in compact snapshots
+  setupFacing?: f32,             // at_team only: owner-visible deployed arc center; appended after oilUsed in compact snapshots
+  queuedMarkers?: [              // future queued move/attack-move points; ONLY ever sent to the owner
+    { x: f32, y: f32, attackMove?: bool }
+  ]
 }
 ```
 

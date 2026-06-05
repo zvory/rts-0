@@ -3,9 +3,11 @@
 //! This module owns what a player is allowed to see. It does not mutate the world; future
 //! last-known-position or partial-reveal rules should grow here.
 
-use crate::game::entity::{fires_while_moving, Entity, EntityKind, GatherPhase, Order};
+use crate::game::entity::{
+    fires_while_moving, Entity, EntityKind, GatherPhase, Order, OrderIntent,
+};
 use crate::game::fog::Fog;
-use crate::protocol::EntityView;
+use crate::protocol::{EntityView, QueuedOrderMarker};
 
 pub fn entity_visible_to(viewer: u32, entity: &Entity, fog: &Fog) -> bool {
     entity.owner == viewer
@@ -118,6 +120,7 @@ pub fn project_entity(
         if let Some((rx, ry)) = entity.rally_point() {
             view.rally = Some([rx, ry]);
         }
+        view.queued_markers = queued_order_markers(entity);
     }
 
     if let Some(progress) = entity.build_progress_fraction() {
@@ -150,10 +153,38 @@ pub fn project_entity(
     Some(view)
 }
 
+fn queued_order_markers(entity: &Entity) -> Vec<QueuedOrderMarker> {
+    entity
+        .queued_orders()
+        .iter()
+        .filter_map(|intent| match intent {
+            OrderIntent::Move(point) if point.x.is_finite() && point.y.is_finite() => {
+                Some(QueuedOrderMarker {
+                    x: point.x,
+                    y: point.y,
+                    attack_move: false,
+                })
+            }
+            OrderIntent::AttackMove(point) if point.x.is_finite() && point.y.is_finite() => {
+                Some(QueuedOrderMarker {
+                    x: point.x,
+                    y: point.y,
+                    attack_move: true,
+                })
+            }
+            OrderIntent::Move(_)
+            | OrderIntent::AttackMove(_)
+            | OrderIntent::Attack(_)
+            | OrderIntent::Gather(_)
+            | OrderIntent::Build(_) => None,
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::game::entity::{EntityKind, EntityStore, Order};
+    use crate::game::entity::{EntityKind, EntityStore, Order, OrderIntent};
     use crate::game::map::Map;
     use crate::protocol::terrain;
 
@@ -259,5 +290,60 @@ mod tests {
 
         let view = project_entity(1, tank, &fog, true, None).expect("tank should be visible");
         assert_eq!(view.oil_used, Some(3.25));
+    }
+
+    #[test]
+    fn queued_markers_are_owner_only_points() {
+        let mut entities = EntityStore::new();
+        let unit_id = entities
+            .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
+            .expect("rifleman should spawn");
+        let hidden_enemy = entities
+            .spawn_unit(2, EntityKind::Rifleman, 700.0, 700.0)
+            .expect("enemy should spawn");
+        let hidden_node = entities
+            .spawn_node(EntityKind::Steel, 720.0, 720.0)
+            .expect("node should spawn");
+        {
+            let unit = entities.get_mut(unit_id).expect("unit should exist");
+            unit.append_queued_order(OrderIntent::move_to(140.0, 160.0));
+            unit.append_queued_order(OrderIntent::attack(hidden_enemy));
+            unit.append_queued_order(OrderIntent::gather(hidden_node));
+            unit.append_queued_order(OrderIntent::attack_move_to(180.0, 200.0));
+        }
+
+        let map = Map {
+            size: 64,
+            terrain: vec![terrain::GRASS; 64 * 64],
+            starts: vec![(1, 1), (40, 40)],
+            expansion_sites: Vec::new(),
+        };
+        let mut fog = Fog::new(map.size);
+        fog.recompute(&[1, 2], &entities, &map);
+        let unit = entities.get(unit_id).expect("unit should exist");
+
+        let owner_view =
+            project_entity(1, unit, &fog, true, None).expect("owner should see own unit");
+        assert_eq!(owner_view.queued_markers.len(), 2);
+        assert_eq!(
+            owner_view.queued_markers[0],
+            QueuedOrderMarker {
+                x: 140.0,
+                y: 160.0,
+                attack_move: false,
+            }
+        );
+        assert_eq!(
+            owner_view.queued_markers[1],
+            QueuedOrderMarker {
+                x: 180.0,
+                y: 200.0,
+                attack_move: true,
+            }
+        );
+
+        let enemy_view =
+            project_entity(2, unit, &fog, false, None).expect("full view should include unit");
+        assert!(enemy_view.queued_markers.is_empty());
     }
 }

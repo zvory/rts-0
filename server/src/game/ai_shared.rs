@@ -413,6 +413,7 @@ mod tests {
                     setup_facing: None,
                     rally: None,
                     oil_used: None,
+                    queued_markers: Vec::new(),
                 },
                 EntityView {
                     id: 2,
@@ -436,6 +437,7 @@ mod tests {
                     setup_facing: None,
                     rally: None,
                     oil_used: None,
+                    queued_markers: Vec::new(),
                 },
                 EntityView {
                     id: 3,
@@ -459,6 +461,7 @@ mod tests {
                     setup_facing: None,
                     rally: None,
                     oil_used: None,
+                    queued_markers: Vec::new(),
                 },
                 EntityView {
                     id: 4,
@@ -482,6 +485,7 @@ mod tests {
                     setup_facing: None,
                     rally: None,
                     oil_used: None,
+                    queued_markers: Vec::new(),
                 },
                 EntityView {
                     id: 5,
@@ -505,6 +509,7 @@ mod tests {
                     setup_facing: None,
                     rally: None,
                     oil_used: None,
+                    queued_markers: Vec::new(),
                 },
             ],
             resource_deltas: Vec::new(),
