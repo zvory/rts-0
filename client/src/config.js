@@ -39,12 +39,17 @@ export const COLORS = Object.freeze({
 export const FOG_EXPLORED_ALPHA = 0.55;
 export const FOG_UNEXPLORED_ALPHA = 0.86;
 
-// Mirrors server/src/config.rs TANK_BODY_* values. Server collision is authoritative;
-// the client uses these only for tank art, selection, and advisory placement previews.
+// Mirrors server/src/config.rs *_BODY_* values. Server collision is authoritative;
+// the client uses these only for art, selection, and advisory placement previews.
 export const TANK_BODY = Object.freeze({
   length: 50.4,
   width: 28.8,
   clearance: 1.5,
+});
+export const AT_GUN_BODY = Object.freeze({
+  length: 42.0,
+  width: 24.0,
+  clearance: 1.0,
 });
 export const SCOUT_CAR_BODY = Object.freeze({
   length: 40.8,
@@ -73,7 +78,7 @@ export const STATS = Object.freeze({
     rangeTiles: 4, cost: { steel: 50, oil: 0 }, supply: 1, buildTicks: 300 },
   [KIND.MACHINE_GUNNER]: { label: "Machine Gunner", icon: "MG", size: 10, sight: 8,
     rangeTiles: 6, cost: { steel: 75, oil: 10 }, supply: 2, buildTicks: 400, requires: KIND.TRAINING_CENTRE },
-  [KIND.AT_TEAM]: { label: "AT Gun", icon: "AT", size: 20, sight: 6,
+  [KIND.AT_TEAM]: { label: "AT Gun", icon: "AT", size: 20, sight: 6, body: AT_GUN_BODY,
     rangeTiles: AT_GUN_DEPLOYED_RANGE_TILES, cost: { steel: 75, oil: 25 }, supply: 3, buildTicks: 440, requires: KIND.STEELWORKS },
   [KIND.SCOUT_CAR]: { label: "Scout Car", icon: "SC", size: 14.4, sight: 10, body: SCOUT_CAR_BODY,
     rangeTiles: 5, cost: { steel: 125, oil: 50 }, supply: 3, buildTicks: 480 },

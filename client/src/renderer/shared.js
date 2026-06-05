@@ -164,7 +164,7 @@ export function tankBodyVisual(stat = {}) {
 }
 
 export function isVehicleBodyKind(kind) {
-  return kind === KIND.TANK || kind === KIND.SCOUT_CAR;
+  return kind === KIND.AT_TEAM || kind === KIND.TANK || kind === KIND.SCOUT_CAR;
 }
 
 export function drawTankTracks(g, body, facing, motion) {

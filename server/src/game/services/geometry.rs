@@ -212,6 +212,11 @@ pub(crate) fn unit_body_with_facing(
 
 fn vehicle_body_dimensions(kind: EntityKind) -> (f32, f32, f32) {
     match kind {
+        EntityKind::AtTeam => (
+            config::AT_GUN_BODY_LENGTH_PX,
+            config::AT_GUN_BODY_WIDTH_PX,
+            config::AT_GUN_BODY_CLEARANCE_PX,
+        ),
         EntityKind::ScoutCar => (
             config::SCOUT_CAR_BODY_LENGTH_PX,
             config::SCOUT_CAR_BODY_WIDTH_PX,

@@ -20,8 +20,8 @@ use super::standability::{
 use super::steering::{inject_sidestep, steered_candidate, steering_path_dir};
 use super::tank_drive::{
     angle_delta, distance_between, normalize_angle, rotate_toward, tank_drive_intent,
-    tank_speed_scale, vehicle_oil_starves_movement, vehicle_traffic_adjustment,
-    AT_GUN_BODY_TURN_RATE_RAD_PER_TICK, TANK_BODY_TURN_RATE_RAD_PER_TICK,
+    tank_speed_scale, vehicle_body_turn_rate, vehicle_oil_starves_movement,
+    vehicle_traffic_adjustment,
 };
 use super::{ARRIVE_EPS, MAX_UNIT_BOUNDING_RADIUS_PX};
 
@@ -109,7 +109,7 @@ pub(super) fn advance_moving_units(
                         let rotated = rotate_toward(
                             e.facing(),
                             intent.desired_facing,
-                            TANK_BODY_TURN_RATE_RAD_PER_TICK,
+                            vehicle_body_turn_rate(kind),
                         );
                         if rotated.is_finite() {
                             let error = angle_delta(rotated, intent.desired_facing).abs();
@@ -212,14 +212,7 @@ pub(super) fn advance_moving_units(
                 if !uses_vehicle_movement {
                     let facing = dy.atan2(dx);
                     if facing.is_finite() {
-                        if kind == EntityKind::AtTeam {
-                            let current = entities.get(id).map(|e| e.facing()).unwrap_or(0.0);
-                            let rotated =
-                                rotate_toward(current, facing, AT_GUN_BODY_TURN_RATE_RAD_PER_TICK);
-                            new_facing = Some(if rotated.is_finite() { rotated } else { facing });
-                        } else {
-                            new_facing = Some(facing);
-                        }
+                        new_facing = Some(facing);
                     }
                 }
                 let can_reach_waypoint = if is_car {

@@ -787,6 +787,8 @@ function fakeAudioContext() {
   );
   assert(STATS[KIND.TANK].body.length === 50.4, "tank client body length mirrors server");
   assert(STATS[KIND.TANK].body.width === 28.8, "tank client body width mirrors server");
+  assert(STATS[KIND.AT_TEAM].body.length === 42.0, "AT gun client body length mirrors server");
+  assert(STATS[KIND.AT_TEAM].body.width === 24.0, "AT gun client body width mirrors server");
 
   const input = Object.create(Input.prototype);
   input.state = {
@@ -811,6 +813,15 @@ function fakeAudioContext() {
   assert(
     input._worldPointHitsEntity(clickableTank, 0, 20, 32) === false,
     "tank hit testing should not use a stale circular side radius",
+  );
+  const clickableAtGun = { id: 11, owner: 1, kind: KIND.AT_TEAM, x: 0, y: 0, facing: 0 };
+  assert(
+    input._worldPointHitsEntity(clickableAtGun, 22, 0, 32) === true,
+    "AT gun hit testing should reach the wheeled body axis",
+  );
+  assert(
+    input._worldPointHitsEntity(clickableAtGun, 0, 18, 32) === false,
+    "AT gun hit testing should not use the old circular radius",
   );
 
   const overlappingWorker = { id: 30, owner: 1, kind: KIND.WORKER, x: 100, y: 100 };
