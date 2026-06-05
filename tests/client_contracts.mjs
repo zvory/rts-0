@@ -665,6 +665,54 @@ function fakeAudioContext() {
     input._worldPointHitsEntity(clickableTank, 0, 20, 32) === false,
     "tank hit testing should not use a stale circular side radius",
   );
+
+  input.dom = { clientWidth: 800, clientHeight: 600 };
+  input.camera = { screenToWorld: (x, y) => ({ x, y }) };
+  const deployedAtGun = {
+    id: 21,
+    owner: 1,
+    kind: KIND.AT_TEAM,
+    x: 100,
+    y: 100,
+    setupState: SETUP.DEPLOYED,
+  };
+  const otherDeployedAtGun = {
+    id: 22,
+    owner: 1,
+    kind: KIND.AT_TEAM,
+    x: 120,
+    y: 100,
+    setupState: SETUP.DEPLOYED,
+  };
+  const packedAtGun = {
+    id: 23,
+    owner: 1,
+    kind: KIND.AT_TEAM,
+    x: 110,
+    y: 100,
+    setupState: SETUP.PACKED,
+  };
+  input.state = {
+    playerId: 1,
+    entitiesInterpolated: () => [deployedAtGun, otherDeployedAtGun, packedAtGun],
+  };
+  assert(
+    input
+      ._closestOwnUnitKindInViewport(
+        KIND.AT_TEAM,
+        deployedAtGun.x,
+        deployedAtGun.y,
+        deployedAtGun,
+      )
+      .join(",") === "21,22",
+    "selecting set-up AT guns should not include packed AT guns",
+  );
+  assert(
+    input
+      ._closestOwnUnitKindInViewport(KIND.AT_TEAM, packedAtGun.x, packedAtGun.y, packedAtGun)
+      .join(",") === "23",
+    "selecting packed AT guns should not include set-up AT guns",
+  );
 }
 
 // ---------------------------------------------------------------------------

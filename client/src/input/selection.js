@@ -1,6 +1,6 @@
-import { cmd, PASSABLE, isUnit, isBuilding, isResource, KIND } from "../protocol.js";
-import { MINING_CC_RANGE_TILES, STATS, TANK_BODY, isProducerBuilding } from "../config.js";
-import { DEFAULT_HIT_RADIUS, DEFAULT_TILE_SIZE, HIT_PAD_PX, OWN_HIT_BONUS, ZOOM_STEP } from "./constants.js";
+import { isUnit, isBuilding, KIND, SETUP } from "../protocol.js";
+import { STATS } from "../config.js";
+import { DEFAULT_HIT_RADIUS, DEFAULT_TILE_SIZE, HIT_PAD_PX, OWN_HIT_BONUS } from "./constants.js";
 import { entityIntersectsRect, isVehicleBodyKind, pointHitsOrientedVehicle } from "./placement.js";
 
 export function _commitClickSelection(p, additive, ctrl) {
@@ -11,7 +11,7 @@ export function _commitClickSelection(p, additive, ctrl) {
     return;
   }
   if (ctrl && isUnit(hit.kind) && hit.owner === this.state.playerId) {
-    const ids = this._closestOwnUnitKindInViewport(hit.kind, hit.x, hit.y);
+    const ids = this._closestOwnUnitKindInViewport(hit.kind, hit.x, hit.y, hit);
     if (additive) this.state.addToSelection(ids);
     else this.state.setSelection(ids);
     return;
@@ -54,7 +54,13 @@ export function _ownBuildingsOfKindInViewport(kind) {
     .map((e) => e.id);
 }
 
-export function _closestOwnUnitKindInViewport(kind, anchorX, anchorY) {
+export function _unitSelectionGroup(e) {
+  if (!e) return "";
+  if (e.kind !== KIND.AT_TEAM) return e.kind;
+  return `${e.kind}:${e.setupState || SETUP.PACKED}`;
+}
+
+export function _closestOwnUnitKindInViewport(kind, anchorX, anchorY, anchor = null) {
   const el = this.dom;
   const w = el.clientWidth;
   const h = el.clientHeight;
@@ -65,12 +71,13 @@ export function _closestOwnUnitKindInViewport(kind, anchorX, anchorY) {
   const minY = Math.min(topLeft.y, botRight.y);
   const maxY = Math.max(topLeft.y, botRight.y);
   const me = this.state.playerId;
+  const anchorGroup = anchor ? _unitSelectionGroup(anchor) : kind;
   return this.state
     .entitiesInterpolated(1)
     .filter(
       (e) =>
         e.owner === me &&
-        e.kind === kind &&
+        _unitSelectionGroup(e) === anchorGroup &&
         e.x >= minX && e.x <= maxX &&
         e.y >= minY && e.y <= maxY,
     )
