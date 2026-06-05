@@ -59,8 +59,8 @@ export const AT_GUN_FIELD_OF_FIRE_RAD = Math.PI / 4;
 
 // Player colors (server assigns from a matching palette; used as a fallback for blips).
 export const PLAYER_PALETTE = Object.freeze([
-  "#4878c8", "#c84848", "#30a090", "#8040c8",
-  "#c83880", "#c87830", "#409840", "#c8b030",
+  "#cc1111", "#1133bb", "#33aaee", "#dd1188",
+  "#117733", "#eeeeee", "#222222", "#8822cc",
 ]);
 
 // Per-kind UI / render info. `size` is the render radius (units) or half-extent hint.
