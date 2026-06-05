@@ -19,15 +19,22 @@
 ----
 
 
-tanks are getting stuck on corners because they're not giving themselves enough clearance in their pathfindign
+tanks are getting stuck on corners because they're not giving themselves enough clearance in their pathfindign. i think we implemented something like this for scoutcars, so maybe something can be re-used or copied
+
+
+---
 
 AT guns should move like tanks, they have two wheels.their current point movement semantics look very bad.
 
-queued orders don't render correctly. the first order workers as before, butt hen holding shift and then right clicking somewhere else draw a line from the unit to the new waypoint, even though the worker needs to finish goint ot the first waypoint first
+---
 
-in addition, holding and right clikgin will work once, but on the second time, it again draws a line from the unit to the second waypoint.  further waypoints beyond this do work correctly
+queued orders don't render correctly. the first order works as before, but then holding shift and then right clicking somewhere else draw a line from the unit to the new waypoint, even though the worker keeps walking towards the initial waypoint 
 
-add a ten second cooldown to the charge ability, that's visible by the charge meter having a like a clock like circle that fills up when the charge is available again. umm, idk what to do when only some units have charge on cooldown, or on different times. i guess if any unit has an ability available, it should display as available, with a tiny number in the top left of the button with how many can charge. this is how cooldowns should work for all abiliites in the future. so it
+in general, the active waypoint doesn't get displayed, only the one after the active one. 
+
+---
+
+add a ten second cooldown to the charge ability, that's visible by the button having a like a clock like circle that fills up when the charge is available again. if any unit has an ability available, it should display as available, with a tiny number in the top left of the button with how many can charge. this is how cooldowns should work for all abiliites in the future. so it
 would be good to make this like, systematized.
 
 
