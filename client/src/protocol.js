@@ -283,12 +283,23 @@ function decodeCompactEvent(record, index) {
   const eventKind = readCode(fields[0], EVENT_BY_CODE, "event.kind");
   switch (eventKind) {
     case EVENT.ATTACK:
-      requireLength(fields, 3, `attack event ${index}`);
-      return {
+      if (fields.length !== 3 && fields.length !== 4 && fields.length !== 5) {
+        throw new Error(`attack event ${index} field count mismatch`);
+      }
+      {
+        const ev = {
         e: EVENT.ATTACK,
         from: readU32(fields[1], "event.from"),
         to: readU32(fields[2], "event.to"),
-      };
+        };
+        if (fields.length > 3 && fields[3] != null) {
+          ev.reveal = decodeCompactAttackReveal(fields[3], index);
+        }
+        if (fields.length > 4 && fields[4] != null) {
+          ev.toPos = decodeCompactPoint(fields[4], "event.toPos");
+        }
+        return ev;
+      }
     case EVENT.DEATH:
       requireLength(fields, 5, `death event ${index}`);
       return {
@@ -314,6 +325,27 @@ function decodeCompactEvent(record, index) {
     default:
       throw new Error(`unknown compact event kind ${eventKind}`);
   }
+}
+
+function decodeCompactAttackReveal(record, index) {
+  const fields = readArray(record, `attack reveal ${index}`, 7);
+  if (fields.length < 4) throw new Error(`attack reveal ${index} is too short`);
+  const reveal = {
+    owner: readU32(fields[0], "attackReveal.owner"),
+    kind: readCode(fields[1], KIND_BY_CODE, "attackReveal.kind"),
+    x: readNumber(fields[2], "attackReveal.x"),
+    y: readNumber(fields[3], "attackReveal.y"),
+  };
+  assignOptional(reveal, "facing", fields, 4, readNumber);
+  assignOptional(reveal, "weaponFacing", fields, 5, readNumber);
+  assignOptionalCode(reveal, "setupState", fields, 6, SETUP_BY_CODE);
+  return reveal;
+}
+
+function decodeCompactPoint(record, label) {
+  const pair = readArray(record, label, 2);
+  if (pair.length !== 2) throw new Error(`${label} must have two elements`);
+  return [readNumber(pair[0], `${label}.x`), readNumber(pair[1], `${label}.y`)];
 }
 
 function decodeCompactNotice(fields, index) {
