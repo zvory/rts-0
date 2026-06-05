@@ -221,7 +221,6 @@ impl PathingService {
     }
 
     /// Request a path. Returns world-pixel waypoints in reverse order (next waypoint = pop).
-    #[cfg(test)]
     pub fn request(
         &mut self,
         map: &Map,
@@ -252,7 +251,7 @@ impl PathingService {
         }
 
         let budget = req.budget.unwrap_or(self.default_budget);
-        let mut tile_path = pathfinding::find_path_with_budget_and_turn_cost(
+        let tile_path = pathfinding::find_path_with_budget_and_turn_cost(
             &pass,
             req.start.0,
             req.start.1,
@@ -261,9 +260,6 @@ impl PathingService {
             budget,
             req.route_shape.turn_penalty(),
         );
-        if req.route_shape == RouteShape::ScoutCarClearance {
-            tile_path = orthogonalize_diagonal_corner_runs(&tile_path, &pass);
-        }
 
         if !tile_path.is_empty() {
             self.cache_insert(&req, occupancy.static_fingerprint(), tile_path.clone());
@@ -329,118 +325,6 @@ impl PathingService {
     }
 }
 
-fn orthogonalize_diagonal_corner_runs<P: Passability>(
-    tile_path: &[(i32, i32)],
-    pass: &P,
-) -> Vec<(i32, i32)> {
-    if tile_path.len() < 2 {
-        return tile_path.to_vec();
-    }
-
-    let mut out = Vec::with_capacity(tile_path.len());
-    out.push(tile_path[0]);
-    let mut i = 0usize;
-    while i + 1 < tile_path.len() {
-        let start = tile_path[i];
-        let next = tile_path[i + 1];
-        let dx = (next.0 - start.0).signum();
-        let dy = (next.1 - start.1).signum();
-        if dx == 0 || dy == 0 {
-            out.push(next);
-            i += 1;
-            continue;
-        }
-
-        let mut j = i + 1;
-        while j + 1 < tile_path.len() {
-            let step = (
-                tile_path[j + 1].0 - tile_path[j].0,
-                tile_path[j + 1].1 - tile_path[j].1,
-            );
-            if step.0.signum() != dx
-                || step.1.signum() != dy
-                || step.0.abs() != 1
-                || step.1.abs() != 1
-            {
-                break;
-            }
-            j += 1;
-        }
-
-        let end = tile_path[j];
-        let horizontal_first = diagonal_run_prefers_horizontal_first(tile_path, i, j);
-        let expanded = expand_diagonal_run_orthogonally(start, end, horizontal_first);
-        if expanded.iter().all(|&(tx, ty)| pass.passable(tx, ty)) {
-            out.extend_from_slice(&expanded);
-        } else {
-            out.extend_from_slice(&tile_path[i + 1..=j]);
-        }
-        i = j;
-    }
-    out
-}
-
-fn diagonal_run_prefers_horizontal_first(
-    tile_path: &[(i32, i32)],
-    start: usize,
-    end: usize,
-) -> bool {
-    if start > 0 {
-        let prev = (
-            tile_path[start].0 - tile_path[start - 1].0,
-            tile_path[start].1 - tile_path[start - 1].1,
-        );
-        if prev.0 != 0 && prev.1 == 0 {
-            return true;
-        }
-        if prev.0 == 0 && prev.1 != 0 {
-            return false;
-        }
-    }
-    if end + 1 < tile_path.len() {
-        let next = (
-            tile_path[end + 1].0 - tile_path[end].0,
-            tile_path[end + 1].1 - tile_path[end].1,
-        );
-        if next.0 == 0 && next.1 != 0 {
-            return true;
-        }
-        if next.0 != 0 && next.1 == 0 {
-            return false;
-        }
-    }
-    true
-}
-
-fn expand_diagonal_run_orthogonally(
-    start: (i32, i32),
-    end: (i32, i32),
-    horizontal_first: bool,
-) -> Vec<(i32, i32)> {
-    let mut expanded = Vec::new();
-    let mut current = start;
-    if horizontal_first {
-        while current.0 != end.0 {
-            current.0 += (end.0 - current.0).signum();
-            expanded.push(current);
-        }
-        while current.1 != end.1 {
-            current.1 += (end.1 - current.1).signum();
-            expanded.push(current);
-        }
-    } else {
-        while current.1 != end.1 {
-            current.1 += (end.1 - current.1).signum();
-            expanded.push(current);
-        }
-        while current.0 != end.0 {
-            current.0 += (end.0 - current.0).signum();
-            expanded.push(current);
-        }
-    }
-    expanded
-}
-
 #[cfg(test)]
 fn scout_car_clearance_cost(clearance_tiles: u16) -> u32 {
     clearance_cost(
@@ -499,11 +383,6 @@ pub(crate) fn simplify_reverse_waypoints_with_limit(
             if distance_between(from, forward[candidate_index]) > max_segment_px {
                 continue;
             }
-            if uses_car_movement_semantics(kind)
-                && crosses_axis_aligned_corner(&forward, next_index, candidate_index)
-            {
-                continue;
-            }
             if standability::unit_static_segment_standable(
                 map,
                 occupancy,
@@ -525,32 +404,6 @@ pub(crate) fn simplify_reverse_waypoints_with_limit(
 
     simplified.reverse();
     simplified
-}
-
-fn crosses_axis_aligned_corner(
-    forward_waypoints: &[(f32, f32)],
-    next_index: usize,
-    candidate_index: usize,
-) -> bool {
-    if candidate_index <= next_index + 1 {
-        return false;
-    }
-    for corner_index in (next_index + 1)..candidate_index {
-        let prev = forward_waypoints[corner_index - 1];
-        let corner = forward_waypoints[corner_index];
-        let next = forward_waypoints[corner_index + 1];
-        let incoming = (corner.0 - prev.0, corner.1 - prev.1);
-        let outgoing = (next.0 - corner.0, next.1 - corner.1);
-        let incoming_horizontal = incoming.0.abs() > 0.001 && incoming.1.abs() <= 0.001;
-        let incoming_vertical = incoming.1.abs() > 0.001 && incoming.0.abs() <= 0.001;
-        let outgoing_horizontal = outgoing.0.abs() > 0.001 && outgoing.1.abs() <= 0.001;
-        let outgoing_vertical = outgoing.1.abs() > 0.001 && outgoing.0.abs() <= 0.001;
-        if (incoming_horizontal && outgoing_vertical) || (incoming_vertical && outgoing_horizontal)
-        {
-            return true;
-        }
-    }
-    false
 }
 
 fn distance_between(a: (f32, f32), b: (f32, f32)) -> f32 {

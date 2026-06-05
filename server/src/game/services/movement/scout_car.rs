@@ -23,7 +23,6 @@ const SCOUT_CAR_SWEEP_SAMPLE_STEP_PX: f32 = config::TILE_SIZE as f32 * 0.125;
 const SCOUT_CAR_CLEARANCE_SCORE_MAX_PX: f32 = config::TILE_SIZE as f32 * 0.5;
 const SCOUT_CAR_SCORE_EPS: f32 = 1.0e-4;
 const SCOUT_CAR_REVERSE_MIN_BEHIND_ANGLE_RAD: f32 = std::f32::consts::FRAC_PI_2;
-const SCOUT_CAR_WAYPOINT_SKIP_MIN_DOT: f32 = 0.985;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(super) struct ScoutCarMotionPlan {
@@ -180,21 +179,7 @@ pub(super) fn scout_car_accepts_waypoint(
     waypoint: (f32, f32),
     next_waypoint: Option<(f32, f32)>,
 ) -> bool {
-    let waypoint_distance = distance_between(current, waypoint);
-    if waypoint_distance <= config::SCOUT_CAR_WAYPOINT_ACCEPTANCE_RADIUS_PX {
-        if let Some(next_waypoint) = next_waypoint {
-            if let (Some(approach_dir), Some(route_dir)) = (
-                unit_direction(current, waypoint),
-                unit_direction(waypoint, next_waypoint),
-            ) {
-                let dot = approach_dir.0 * route_dir.0 + approach_dir.1 * route_dir.1;
-                if dot < SCOUT_CAR_WAYPOINT_SKIP_MIN_DOT
-                    && waypoint_distance > config::ARRIVE_RADIUS_INTERMEDIATE_PX
-                {
-                    return false;
-                }
-            }
-        }
+    if distance_between(current, waypoint) <= config::SCOUT_CAR_WAYPOINT_ACCEPTANCE_RADIUS_PX {
         return true;
     }
 
@@ -216,13 +201,6 @@ pub(super) fn scout_car_accepts_waypoint(
     let Some(route_dir) = unit_direction(waypoint, next_waypoint) else {
         return false;
     };
-    let Some(approach_dir) = unit_direction(current, waypoint) else {
-        return false;
-    };
-    if approach_dir.0 * route_dir.0 + approach_dir.1 * route_dir.1 < SCOUT_CAR_WAYPOINT_SKIP_MIN_DOT
-    {
-        return false;
-    }
     let from_waypoint_to_current = (current.0 - waypoint.0, current.1 - waypoint.1);
     if along_track_error(from_waypoint_to_current, route_dir) > 0.0 {
         return static_standability::unit_static_standable_with_facing(
