@@ -811,7 +811,7 @@ Unit stats (hp, dmg, range[tiles], cooldown[ticks], speed[px/tick], sight[tiles]
 |-----------------|-----|-----|-------|----|-------|-------|-----|-----|-----|-----------|
 | worker          | 40  | 4   | 1     | 24 | 1.6   | 7     | 50  | 0   | 1   | 360 (~12s) |
 | rifleman        | 45  | 5   | 4     | 16 | 1.6   | 8     | 50  | 0   | 1   | 300 (~10s) |
-| machine_gunner  | 55  | 4   | 5     | 6  | 1.28  | 8     | 75  | 25  | 2   | 400 (~13s) |
+| machine_gunner  | 55  | 4   | 6     | 6  | 1.28  | 8     | 75  | 10  | 2   | 400 (~13s) |
 | at_team         | 45  | 62 deployed / 47 packed | 12 deployed / 5 packed | 72 | 1.152 | 6     | 75  | 25  | 3   | 440 (~15s); requires Steelworks |
 | scout_car       | 150 | 6   | 5     | 6  | 2.35  | 10    | 125 | 50  | 3   | 480 (~16s) |
 | tank            | 390 | 60  | 5     | 72 | 2.0   | 6     | 200 | 150 | 6   | 750 (~25s); requires Steelworks |
@@ -1112,16 +1112,17 @@ selection prefers oil coverage before extra steel output.
 for the factory step, delays oil workers until at least eight workers are already mining steel,
 uses ready combat units to clear visible threats in its home resource line before attacking out,
 and treats a single completed tank as a valid minimum attack wave.
-All profiles share a defensive panic mode. A visible enemy near the AI's base, home resource line,
-or workers temporarily suspends expansion, worker training, and non-defensive tech spending. While
-panicking, the AI classifies the visible local threat by weapon DPS: tank-dominated pressure (75%+
-of visible local DPS) prioritizes AT teams, infantry-dominated pressure prioritizes Machine
-Gunners, mixed pressure asks for a support mix, and no-DPS pressure falls back to Riflemen. Support
-panic only uses already-completed support tech: Machine Gunners need a Training Centre and AT teams
-need a Steelworks. It may pull workers onto oil for those support counters; if the relevant support
-tech is absent, Barracks production falls back to Riflemen and panic mode does not create tech
-buildings. If the pressure persists through the panic window, the AI asks for
-an additional Barracks before resuming its normal profile once the threat has cleared.
+All profiles share a defensive panic mode. Visible enemy units near the AI's base, home resource
+line, or workers temporarily suspend expansion, worker training, and non-defensive tech spending
+only when their steel+oil value is at least 75% of the AI's own local unit value. While panicking,
+the AI classifies the visible local threat by weapon DPS: tank-dominated pressure (75%+ of visible
+local DPS) prioritizes AT teams, infantry-dominated pressure prioritizes Machine Gunners, mixed
+pressure asks for a support mix, and no-DPS pressure falls back to Riflemen. Support panic only uses
+already-completed support tech: Machine Gunners need a Training Centre and AT teams need a
+Steelworks. It may pull workers onto oil for those support counters; if the relevant support tech
+is absent, Barracks production falls back to Riflemen and panic mode does not create tech buildings.
+If the pressure persists through the panic window, the AI asks for an additional Barracks before
+resuming its normal profile once the threat has cleared.
 `steel_expansion_tanks` is a defensive economic support profile: it saves for a second City
 Centre near a neutral steel expansion before building any non-Depot tech structure. Valid
 expansion sites must cover the full local resource line, then are ranked by own distance divided
