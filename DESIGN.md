@@ -761,9 +761,12 @@ authoritative `rules::defs` records.
 - AT guns use `AT_GUN_PACKED_RANGE_TILES = 5`, `AT_GUN_DEPLOYED_RANGE_TILES = 12`,
   `AT_GUN_PACKED_DAMAGE_MULTIPLIER = 0.75`, and
   `AT_GUN_FIELD_OF_FIRE_RAD = PI / 4` (45 degrees total).
-- `TANK_OIL_COST_PER_PX = 10 / (96 * TILE_SIZE)`: tank movement still uses the original
+- `TANK_OIL_COST_PER_PX = 20 / (96 * TILE_SIZE)`: tank movement still uses the original
   96-tile calibration, so driving the wider 126-tile map costs proportionally more oil than
-  before. Tanks cannot advance while their owner has zero oil.
+  before.
+- `SCOUT_CAR_OIL_COST_PER_PX = 5 / (96 * TILE_SIZE)`: scout cars burn oil for movement at
+  half the previous tank movement rate. Tanks and scout cars cannot advance while their owner has
+  zero oil.
 - Map: `TILE_SIZE = 32` px. The live map is the hardcoded handcrafted asset at
   `server/assets/maps/default-handcrafted.json` (126×126 today), served for tooling at
   `/maps/default-handcrafted.json`. The current asset is the original 96×96 handcrafted map
@@ -935,13 +938,14 @@ The server treats every client as potentially hostile. Limits live next to the c
   This is still a path-following approximation, not tire or Ackermann steering physics; replace it
   with proper truck/wheeled movement semantics when that model exists.
   Scout cars do not use tank armor or tank damage reduction.
-- **Tank movement oil burn**: tanks consume oil based on distance actually moved, using
-  `TANK_OIL_COST_PER_PX`. Fractional movement cost accumulates per tank until whole oil units are
-  deducted from the owner's stockpile. The tank also tracks lifetime movement oil as `oilUsed` for
-  the client selected-entity panel. If the owner has zero oil at the start of a movement tick, that
-  tank does not advance and waits `TANK_OIL_STARVED_PAUSE_TICKS` (one second) before retrying, so
-  sparse oil income does not produce constant one-tick stuttering. Turret/combat behavior still
-  runs through the combat system while movement is paused.
+- **Vehicle movement oil burn**: tanks and scout cars consume oil based on distance actually moved,
+  using `TANK_OIL_COST_PER_PX` and `SCOUT_CAR_OIL_COST_PER_PX` respectively. Fractional movement
+  cost accumulates per vehicle until whole oil units are deducted from the owner's stockpile. Tanks
+  also track lifetime movement oil as `oilUsed` for the client selected-entity panel. If the owner
+  has zero oil at the start of a movement tick, that vehicle does not advance and waits
+  `TANK_OIL_STARVED_PAUSE_TICKS` (one second) before retrying, so sparse oil income does not
+  produce constant one-tick stuttering. Turret/combat behavior still runs through the combat system
+  while movement is paused.
 - **Tank armor facing**: tank and AT-team attacks against tank victims use the victim tank's hull
   `facing` and the attacker's position. Front hits (`<=45°` from the hull direction) deal normal
   damage, side hits (`>45°` and `<=135°`) deal `1.25x`, and rear hits (`>135°`) deal `1.75x`.

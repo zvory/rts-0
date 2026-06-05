@@ -55,13 +55,13 @@ pub struct MovementState {
     /// Consecutive ticks where the next path step was blocked by terrain/building occupancy.
     /// Once this reaches the debounce threshold, movement queues a fresh path to `path_goal`.
     pub static_blocked_ticks: u16,
-    /// Experimental: total oil this tank has burnt over its lifetime (fractional units).
-    /// Used for the on-unit fuel readout; zero for non-tank units.
+    /// Experimental: total movement oil this vehicle has burnt over its lifetime (fractional units).
+    /// Only tanks expose this through the selected-entity fuel readout today.
     pub lifetime_oil_used: f32,
     /// Experimental: sub-1 oil consumed since the last whole-oil deduction from the player's
-    /// stockpile. Used by the tank-fuel charge to round fractional cost up into integer oil.
+    /// stockpile. Used by vehicle-fuel charging to round fractional cost up into integer oil.
     pub oil_debt: f32,
-    /// Ticks remaining before an oil-starved tank may try to advance again. Used only by tanks.
+    /// Ticks remaining before an oil-starved vehicle may try to advance again.
     pub oil_starved_pause_ticks: u16,
 }
 

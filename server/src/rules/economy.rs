@@ -56,6 +56,23 @@ pub fn cost(kind: EntityKind) -> (u32, u32) {
     }
 }
 
+/// Human-readable notice for a resource shortage. Oil is reported first because
+/// mixed steel/oil units are usually blocked by oil in practice.
+pub(crate) fn resource_shortage_notice(
+    steel: u32,
+    oil: u32,
+    cost_steel: u32,
+    cost_oil: u32,
+) -> &'static str {
+    if oil < cost_oil {
+        "Not enough oil"
+    } else if steel < cost_steel {
+        "Not enough steel"
+    } else {
+        "Not enough resources"
+    }
+}
+
 /// Supply consumed by a unit kind. Returns 0 for non-units.
 pub fn supply_cost(kind: EntityKind) -> u32 {
     defs::unit_def(kind).map(|d| d.stats.supply).unwrap_or(0)
@@ -164,5 +181,21 @@ mod tests {
             crate::config::DEPOT_SUPPLY
         );
         assert_eq!(supply_provided(EntityKind::Tank), 0);
+    }
+
+    #[test]
+    fn resource_shortage_notice_prefers_specific_voice_lines() {
+        assert_eq!(resource_shortage_notice(25, 100, 50, 0), "Not enough steel");
+        assert_eq!(resource_shortage_notice(100, 5, 50, 25), "Not enough oil");
+        assert_eq!(
+            resource_shortage_notice(0, 0, 50, 25),
+            "Not enough oil",
+            "oil should win when both resources are missing"
+        );
+        assert_eq!(
+            resource_shortage_notice(50, 25, 50, 25),
+            "Not enough resources",
+            "fallback should only be used when there is no shortage"
+        );
     }
 }

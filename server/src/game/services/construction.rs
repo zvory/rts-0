@@ -58,11 +58,18 @@ pub(crate) fn construction_system(
             continue;
         }
         let (cost_steel, cost_oil) = rules::economy::cost(kind);
-        let affordable = players
-            .iter()
-            .find(|p| p.id == owner)
-            .map(|p| p.steel >= cost_steel && p.oil >= cost_oil)
-            .unwrap_or(false);
+        let resource_notice = match players.iter().find(|p| p.id == owner) {
+            Some(p) => {
+                if p.steel >= cost_steel && p.oil >= cost_oil {
+                    None
+                } else {
+                    Some(rules::economy::resource_shortage_notice(
+                        p.steel, p.oil, cost_steel, cost_oil,
+                    ))
+                }
+            }
+            None => Some("Not enough resources"),
+        };
 
         if !placeable {
             events.entry(owner).or_default().push(Event::Notice {
@@ -76,9 +83,9 @@ pub(crate) fn construction_system(
             }
             continue;
         }
-        if !affordable {
+        if let Some(msg) = resource_notice {
             events.entry(owner).or_default().push(Event::Notice {
-                msg: "Not enough resources".to_string(),
+                msg: msg.to_string(),
                 x: None,
                 y: None,
                 severity: NoticeSeverity::Info,

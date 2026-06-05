@@ -1590,6 +1590,35 @@ fn tank_with_zero_oil_does_not_move() {
 }
 
 #[test]
+fn scout_car_with_zero_oil_does_not_move() {
+    let map = flat_map(1);
+    let mut entities = EntityStore::new();
+    let (sx, sy) = map.tile_center(20, 20);
+    let scout_car = entities
+        .spawn_unit(1, EntityKind::ScoutCar, sx, sy)
+        .expect("scout car should spawn");
+    set_path_direct(&mut entities, scout_car, vec![(sx + 128.0, sy)]);
+    if let Some(e) = entities.get_mut(scout_car) {
+        e.set_order(Order::move_to(sx + 128.0, sy));
+        e.set_facing(0.0);
+    }
+    let mut players = vec![player_with_oil(1, 0)];
+
+    let occ = Occupancy::build(&map, &entities);
+    let spatial = SpatialIndex::build(&entities, map.size);
+    movement_system(&map, &mut entities, &mut players, &occ, &spatial, 0);
+
+    assert_eq!(pos(&entities, scout_car), (sx, sy));
+    assert_eq!(
+        entities
+            .get(scout_car)
+            .and_then(|e| e.movement.as_ref())
+            .map(|m| m.oil_starved_pause_ticks),
+        Some(config::TANK_OIL_STARVED_PAUSE_TICKS - 1)
+    );
+}
+
+#[test]
 fn tank_oil_starvation_pauses_before_retrying() {
     let map = flat_map(1);
     let mut entities = EntityStore::new();
@@ -1731,6 +1760,51 @@ fn moving_tank_accrues_lifetime_oil_and_charges_player_stockpile() {
         .and_then(|e| e.lifetime_oil_used())
         .expect("tank should report oil used");
     let expected = total_moved * config::TANK_OIL_COST_PER_PX;
+    assert!(
+        (oil_used - expected).abs() <= 0.001,
+        "expected oil used {expected:.4}, got {oil_used:.4}"
+    );
+    assert!(
+        oil_used >= 1.0,
+        "test should move far enough to burn at least one oil, got {oil_used:.4}"
+    );
+    assert_eq!(players[0].oil, 10 - oil_used.floor() as u32);
+}
+
+#[test]
+fn moving_scout_car_accrues_lifetime_oil_and_charges_player_stockpile() {
+    let map = flat_map(1);
+    let mut entities = EntityStore::new();
+    let (sx, sy) = map.tile_center(20, 20);
+    let scout_car = entities
+        .spawn_unit(1, EntityKind::ScoutCar, sx, sy)
+        .expect("scout car should spawn");
+    set_path_direct(&mut entities, scout_car, vec![(sx + 720.0, sy)]);
+    if let Some(e) = entities.get_mut(scout_car) {
+        e.set_order(Order::move_to(sx + 720.0, sy));
+        e.set_facing(0.0);
+    }
+    let mut players = vec![player_with_oil(1, 10)];
+
+    let mut total_moved = 0.0;
+    for tick in 0..400u32 {
+        let before = pos(&entities, scout_car);
+        let occ = Occupancy::build(&map, &entities);
+        let spatial = SpatialIndex::build(&entities, map.size);
+        movement_system(&map, &mut entities, &mut players, &occ, &spatial, tick);
+        let after = pos(&entities, scout_car);
+        total_moved += moved_distance(before, after);
+        if total_moved >= 620.0 {
+            break;
+        }
+    }
+
+    let oil_used = entities
+        .get(scout_car)
+        .and_then(|e| e.movement.as_ref())
+        .map(|m| m.lifetime_oil_used)
+        .expect("scout car should have movement state");
+    let expected = total_moved * config::SCOUT_CAR_OIL_COST_PER_PX;
     assert!(
         (oil_used - expected).abs() <= 0.001,
         "expected oil used {expected:.4}, got {oil_used:.4}"
