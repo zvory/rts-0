@@ -48,6 +48,15 @@ pub(crate) fn construction_system(
             None => continue,
         };
 
+        if let Some(site) = resumable_site_for_build_intent(map, entities, owner, kind, tx, ty) {
+            if let Some(w) = entities.get_mut(worker) {
+                w.clear_path();
+                w.set_target_id(Some(site));
+                w.mark_build_phase(BuildPhase::Constructing { site });
+            }
+            continue;
+        }
+
         // Re-validate placement against the live entity set.
         let placeable =
             standability::building_site_clear_for_build_intent(map, entities, kind, tx, ty, worker);
@@ -170,6 +179,25 @@ pub(crate) fn construction_system(
             }
         }
     }
+}
+
+pub(crate) fn resumable_site_for_build_intent(
+    map: &Map,
+    entities: &EntityStore,
+    owner: u32,
+    kind: EntityKind,
+    tile_x: u32,
+    tile_y: u32,
+) -> Option<u32> {
+    let (cx, cy) = footprint_center(map, kind, tile_x, tile_y);
+    entities.iter().find_map(|entity| {
+        (entity.owner == owner
+            && entity.kind == kind
+            && entity.under_construction()
+            && (entity.pos_x - cx).abs() <= 0.01
+            && (entity.pos_y - cy).abs() <= 0.01)
+            .then_some(entity.id)
+    })
 }
 
 /// Ensure a worker that just finished construction is in a body-standable position before
@@ -372,6 +400,61 @@ mod tests {
         assert!(
             dx + dy > ts * 0.25,
             "worker should have moved to escape the overlap"
+        );
+    }
+
+    #[test]
+    fn arrival_to_existing_scaffold_resumes_without_spawning_or_repaying() {
+        let map = flat_map(16);
+        let mut entities = EntityStore::new();
+        let (sx, sy) = footprint_center(&map, EntityKind::Depot, 4, 4);
+        let site = entities
+            .spawn_building(1, EntityKind::Depot, sx, sy, false)
+            .expect("scaffold should spawn");
+        let worker = entities
+            .spawn_unit(1, EntityKind::Worker, sx, sy)
+            .expect("worker should spawn");
+        entities
+            .get_mut(worker)
+            .expect("worker should exist")
+            .set_order(Order::build(EntityKind::Depot, 4, 4));
+
+        let mut players = vec![player_state(1)];
+        let starting_steel = players[0].steel;
+        let starting_oil = players[0].oil;
+        let mut events = HashMap::new();
+
+        construction_system(&map, &mut entities, &mut players, &mut events);
+
+        let owned_depots: Vec<_> = entities
+            .iter()
+            .filter(|entity| entity.owner == 1 && entity.kind == EntityKind::Depot)
+            .map(|entity| entity.id)
+            .collect();
+        assert_eq!(
+            owned_depots,
+            vec![site],
+            "resuming should reuse the existing scaffold instead of spawning another building"
+        );
+        assert_eq!(
+            players[0].steel, starting_steel,
+            "resuming an existing scaffold must not charge steel again"
+        );
+        assert_eq!(
+            players[0].oil, starting_oil,
+            "resuming an existing scaffold must not charge oil again"
+        );
+        assert_eq!(
+            entities
+                .get(worker)
+                .expect("worker should survive")
+                .build_phase(),
+            Some(BuildPhase::Constructing { site }),
+            "worker should latch onto the existing scaffold"
+        );
+        assert!(
+            events.get(&1).is_none_or(Vec::is_empty),
+            "resume should not emit a failure notice"
         );
     }
 

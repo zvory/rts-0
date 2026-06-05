@@ -7,6 +7,7 @@ use crate::game::entity::{
 };
 use crate::game::fog::Fog;
 use crate::game::map::Map;
+use crate::game::services::construction::resumable_site_for_build_intent;
 use crate::game::services::move_coordinator::MoveCoordinator;
 use crate::game::services::movement::angle_delta;
 use crate::game::services::spatial::SpatialIndex;
@@ -477,9 +478,13 @@ fn order_build(
     }
 
     // Feedback only; construction repeats a stricter final-placement check at arrival.
-    if !standability::building_site_clear_for_build_intent(
-        map, entities, building, tile_x, tile_y, worker,
-    ) {
+    let can_resume_existing =
+        resumable_site_for_build_intent(map, entities, player, building, tile_x, tile_y).is_some();
+    if !can_resume_existing
+        && !standability::building_site_clear_for_build_intent(
+            map, entities, building, tile_x, tile_y, worker,
+        )
+    {
         notice(events, player, "Cannot build there");
         return;
     }
@@ -777,6 +782,75 @@ mod tests {
         assert!(
             events.get(&1).is_none_or(Vec::is_empty),
             "ignored build command should not emit a failure notice"
+        );
+    }
+
+    #[test]
+    fn build_order_accepts_resuming_owned_scaffold() {
+        let map = flat_map(16);
+        let mut entities = EntityStore::new();
+        let (site_x, site_y) = footprint_center(&map, EntityKind::Depot, 4, 4);
+        let worker = entities
+            .spawn_unit(1, EntityKind::Worker, 64.0, 64.0)
+            .expect("worker should spawn");
+        let scaffold = entities
+            .spawn_building(1, EntityKind::Depot, site_x, site_y, false)
+            .expect("scaffold should spawn");
+        let spatial = SpatialIndex::build(&entities, map.size);
+        let occ = Occupancy::build(&map, &entities);
+        let mut pathing = PathingService::new(1024, 32);
+        pathing.advance_tick(1);
+        let mut coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, 1);
+        let mut players = vec![player_state(1)];
+        let mut fog = Fog::new(map.size);
+        fog.recompute(&[1], &entities, &map);
+        let mut events = HashMap::new();
+
+        apply_commands(
+            &map,
+            &mut entities,
+            &mut players,
+            &spatial,
+            &mut coordinator,
+            &fog,
+            vec![(
+                1,
+                SimCommand::Build {
+                    worker,
+                    building: EntityKind::Depot,
+                    tile_x: 4,
+                    tile_y: 4,
+                    queued: false,
+                },
+            )],
+            &mut events,
+        );
+
+        let worker = entities.get(worker).expect("worker should remain alive");
+        assert!(
+            matches!(worker.order(), Order::Build(_)),
+            "worker should accept the resume order"
+        );
+        assert_eq!(
+            worker.order().build_intent_tile(),
+            Some((EntityKind::Depot, 4, 4)),
+            "resume order should keep the scaffold footprint intent"
+        );
+        assert_ne!(
+            worker.path_goal(),
+            None,
+            "resume order should still path the worker to the scaffold"
+        );
+        assert!(
+            entities
+                .get(scaffold)
+                .expect("scaffold should survive")
+                .under_construction(),
+            "existing scaffold should remain available for resume"
+        );
+        assert!(
+            events.get(&1).is_none_or(Vec::is_empty),
+            "resume order should not emit a placement failure notice"
         );
     }
 

@@ -43,6 +43,16 @@ export function _onRightClick(p, ev = {}) {
   }
 
   const target = this._entityAtWorld(world.x, world.y, /*ownPreferred=*/ false);
+  if (target && target.owner === me && _isOwnIncompleteBuilding(target)) {
+    const resume = _resumeConstructionIntent(target, this.state.map);
+    if (resume && workers.length > 0) {
+      for (const worker of workers) {
+        this.net.command(cmd.build(worker, resume.building, resume.tileX, resume.tileY));
+      }
+      this.state.addCommandFeedback("move", target.x, target.y);
+      return;
+    }
+  }
   if (target && target.owner !== me && target.owner !== 0 && !isResource(target.kind)) {
     // Enemy entity -> attack.
     this.net.command(cmd.attack(ownUnits, target.id));
@@ -122,6 +132,25 @@ export function _selectedOwnAtGunIds() {
     .selectedEntities()
     .filter((e) => e.owner === me && e.kind === KIND.AT_TEAM)
     .map((e) => e.id);
+}
+
+function _isOwnIncompleteBuilding(target) {
+  return (
+    isBuilding(target.kind) &&
+    typeof target.buildProgress === "number" &&
+    target.buildProgress < 1
+  );
+}
+
+function _resumeConstructionIntent(target, map) {
+  if (!map) return null;
+  const stat = STATS[target.kind];
+  if (!stat?.footW || !stat?.footH) return null;
+  const tileSize = map.tileSize || DEFAULT_TILE_SIZE;
+  const tileX = Math.round(target.x / tileSize - stat.footW * 0.5);
+  const tileY = Math.round(target.y / tileSize - stat.footH * 0.5);
+  if (!Number.isFinite(tileX) || !Number.isFinite(tileY)) return null;
+  return { building: target.kind, tileX, tileY };
 }
 
 export function _refreshAtGunSetupPreview() {
