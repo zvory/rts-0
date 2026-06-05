@@ -666,6 +666,25 @@ function fakeAudioContext() {
     "tank hit testing should not use a stale circular side radius",
   );
 
+  const overlappingWorker = { id: 30, owner: 1, kind: KIND.WORKER, x: 100, y: 100 };
+  const overlappingSteel = { id: 31, owner: 0, kind: KIND.STEEL, x: 104, y: 100, remaining: 1500 };
+  input.state = {
+    playerId: 1,
+    map: { tileSize: 32 },
+    entitiesInterpolated: () => [overlappingWorker, overlappingSteel],
+    selectedEntities: () => [overlappingWorker],
+    addCommandFeedback() {},
+  };
+  input.net = { sent: [], command(command) { this.sent.push(command); } };
+  input._worldAt = (x, y) => ({ x, y });
+  input._onRightClick({ x: 100, y: 100 });
+  assert(
+    input.net.sent.length === 1 &&
+      input.net.sent[0].c === "gather" &&
+      input.net.sent[0].node === overlappingSteel.id,
+    "worker right-click should prioritize an overlapped resource patch over the worker body",
+  );
+
   input.dom = { clientWidth: 800, clientHeight: 600 };
   input.camera = { screenToWorld: (x, y) => ({ x, y }) };
   const deployedAtGun = {
