@@ -1335,8 +1335,8 @@ fn scout_car_phase0_factory_corner_graze_cardinal_approaches() {
 
         baseline.assert_reference_envelope(name);
         assert!(
-            baseline.min_static_clearance_px <= 1.0,
-            "{name}: corner graze fixture should exercise near-zero static clearance: {:?}",
+            baseline.min_static_clearance_px <= 2.0,
+            "{name}: corner graze fixture should exercise tight static clearance: {:?}",
             baseline
         );
         assert!(

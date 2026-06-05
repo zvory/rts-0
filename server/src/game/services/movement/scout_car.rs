@@ -16,7 +16,8 @@ use super::tank_drive::{
 };
 use super::{ARRIVE_EPS, MAX_UNIT_BOUNDING_RADIUS_PX, STEERING_MAX_NEIGHBORS};
 
-pub(super) const SCOUT_CAR_MIN_TURN_RADIUS_PX: f32 = config::TILE_SIZE as f32 * 1.5;
+// Gives the scout car roughly a 1.7-body-length outer swept turning circle.
+pub(super) const SCOUT_CAR_MIN_TURN_RADIUS_PX: f32 = 22.9;
 pub(super) const SCOUT_CAR_ROUTE_LOOKAHEAD_PX: f32 = config::TILE_SIZE as f32 * 3.0;
 const SCOUT_CAR_SWEEP_SAMPLE_STEP_PX: f32 = config::TILE_SIZE as f32 * 0.125;
 const SCOUT_CAR_CLEARANCE_SCORE_MAX_PX: f32 = config::TILE_SIZE as f32 * 0.5;
@@ -59,6 +60,7 @@ struct Candidate {
     min_static_clearance_px: f32,
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(super) fn plan_scout_car_motion(
     map: &Map,
     occ: &Occupancy,
@@ -201,7 +203,20 @@ pub(super) fn scout_car_accepts_waypoint(
     };
     let from_waypoint_to_current = (current.0 - waypoint.0, current.1 - waypoint.1);
     if along_track_error(from_waypoint_to_current, route_dir) > 0.0 {
-        return true;
+        return static_standability::unit_static_standable_with_facing(
+            map,
+            occ,
+            e.kind,
+            current.0,
+            current.1,
+            e.facing(),
+        ) && static_standability::unit_static_segment_standable(
+            map,
+            occ,
+            e.kind,
+            current,
+            next_waypoint,
+        );
     }
 
     static_standability::unit_static_standable_with_facing(
@@ -498,6 +513,7 @@ fn sample_primitive(
     ))
 }
 
+#[allow(clippy::too_many_arguments)]
 fn score_candidate(
     entities: &EntityStore,
     spatial: &SpatialIndex,

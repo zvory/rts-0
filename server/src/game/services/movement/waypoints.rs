@@ -151,146 +151,148 @@ pub(super) fn advance_moving_units(
             }
         }
         // Consume waypoints (stored reversed, next = last element) within this tick's budget.
-        while !is_car {
-            let (next, path_len, next_next) = {
-                let Some(e) = entities.get(id) else { break };
-                let path_len = e.movement.as_ref().map(|m| m.path.len()).unwrap_or(0);
-                // next_next: the waypoint after the current one (path is reversed, so index len-2).
-                let next_next = e.movement.as_ref().and_then(|m| {
-                    if m.path.len() >= 2 {
-                        m.path.get(m.path.len() - 2).copied()
-                    } else {
-                        None
-                    }
-                });
-                (e.next_waypoint(), path_len, next_next)
-            };
-            let Some((wx, wy)) = next else { break };
-            let dx = wx - x;
-            let dy = wy - y;
-            let dist = (dx * dx + dy * dy).sqrt();
-
-            if path_len > 1 {
-                // Intermediate waypoint: pop on radius hit or geometric pass-by.
-                let accepts_waypoint = if is_car {
-                    entities.get(id).is_some_and(|e| {
-                        scout_car_accepts_waypoint(map, occ, e, (x, y), (wx, wy), next_next)
-                    })
-                } else {
-                    let radius_hit = dist <= config::ARRIVE_RADIUS_INTERMEDIATE_PX;
-                    let passed = next_next.is_some_and(|(nnx, nny)| {
-                        // Positive projection of (pos - waypoint) onto (next_next - waypoint) means
-                        // the unit is on the far side of the waypoint relative to where it came from.
-                        (x - wx) * (nnx - wx) + (y - wy) * (nny - wy) > 0.0
+        if !is_car {
+            loop {
+                let (next, path_len, next_next) = {
+                    let Some(e) = entities.get(id) else { break };
+                    let path_len = e.movement.as_ref().map(|m| m.path.len()).unwrap_or(0);
+                    // next_next: the waypoint after the current one (path is reversed, so index len-2).
+                    let next_next = e.movement.as_ref().and_then(|m| {
+                        if m.path.len() >= 2 {
+                            m.path.get(m.path.len() - 2).copied()
+                        } else {
+                            None
+                        }
                     });
-                    radius_hit || passed
+                    (e.next_waypoint(), path_len, next_next)
                 };
-                if accepts_waypoint {
-                    if let Some(e) = entities.get_mut(id) {
-                        e.pop_waypoint();
-                        e.mark_move_phase(MovePhase::Moving);
+                let Some((wx, wy)) = next else { break };
+                let dx = wx - x;
+                let dy = wy - y;
+                let dist = (dx * dx + dy * dy).sqrt();
+
+                if path_len > 1 {
+                    // Intermediate waypoint: pop on radius hit or geometric pass-by.
+                    let accepts_waypoint = if is_car {
+                        entities.get(id).is_some_and(|e| {
+                            scout_car_accepts_waypoint(map, occ, e, (x, y), (wx, wy), next_next)
+                        })
+                    } else {
+                        let radius_hit = dist <= config::ARRIVE_RADIUS_INTERMEDIATE_PX;
+                        let passed = next_next.is_some_and(|(nnx, nny)| {
+                            // Positive projection of (pos - waypoint) onto (next_next - waypoint) means
+                            // the unit is on the far side of the waypoint relative to where it came from.
+                            (x - wx) * (nnx - wx) + (y - wy) * (nny - wy) > 0.0
+                        });
+                        radius_hit || passed
+                    };
+                    if accepts_waypoint {
+                        if let Some(e) = entities.get_mut(id) {
+                            e.pop_waypoint();
+                            e.mark_move_phase(MovePhase::Moving);
+                        }
+                        // No position snap — steer toward the new next waypoint from current position.
+                        continue;
                     }
-                    // No position snap — steer toward the new next waypoint from current position.
-                    continue;
+                } else {
+                    // Final waypoint: require exact arrival.
+                    if dist <= ARRIVE_EPS {
+                        if let Some(e) = entities.get_mut(id) {
+                            e.pop_waypoint();
+                            e.mark_move_phase(MovePhase::Moving);
+                        }
+                        x = wx;
+                        y = wy;
+                        continue;
+                    }
                 }
-            } else {
-                // Final waypoint: require exact arrival.
-                if dist <= ARRIVE_EPS {
-                    if let Some(e) = entities.get_mut(id) {
-                        e.pop_waypoint();
-                        e.mark_move_phase(MovePhase::Moving);
+
+                if !uses_vehicle_movement {
+                    let facing = dy.atan2(dx);
+                    if facing.is_finite() {
+                        if kind == EntityKind::AtTeam {
+                            let current = entities.get(id).map(|e| e.facing()).unwrap_or(0.0);
+                            let rotated =
+                                rotate_toward(current, facing, AT_GUN_BODY_TURN_RATE_RAD_PER_TICK);
+                            new_facing = Some(if rotated.is_finite() { rotated } else { facing });
+                        } else {
+                            new_facing = Some(facing);
+                        }
+                    }
+                }
+                let can_reach_waypoint = if is_car {
+                    path_len == 1 && dist <= budget
+                } else {
+                    dist <= budget
+                };
+                if can_reach_waypoint {
+                    // We can reach this waypoint this tick.
+                    if !unit_static_standable(occ, map, kind, wx, wy, body_facing) {
+                        static_blocked_this_tick = true;
+                        break;
                     }
                     x = wx;
                     y = wy;
-                    continue;
-                }
-            }
-
-            if !uses_vehicle_movement {
-                let facing = dy.atan2(dx);
-                if facing.is_finite() {
-                    if kind == EntityKind::AtTeam {
-                        let current = entities.get(id).map(|e| e.facing()).unwrap_or(0.0);
-                        let rotated =
-                            rotate_toward(current, facing, AT_GUN_BODY_TURN_RATE_RAD_PER_TICK);
-                        new_facing = Some(if rotated.is_finite() { rotated } else { facing });
-                    } else {
-                        new_facing = Some(facing);
+                    budget -= dist;
+                    if let Some(e) = entities.get_mut(id) {
+                        e.pop_waypoint();
+                        e.mark_move_phase(MovePhase::Moving);
                     }
-                }
-            }
-            let can_reach_waypoint = if is_car {
-                path_len == 1 && dist <= budget
-            } else {
-                dist <= budget
-            };
-            if can_reach_waypoint {
-                // We can reach this waypoint this tick.
-                if !unit_static_standable(occ, map, kind, wx, wy, body_facing) {
-                    static_blocked_this_tick = true;
-                    break;
-                }
-                x = wx;
-                y = wy;
-                budget -= dist;
-                if let Some(e) = entities.get_mut(id) {
-                    e.pop_waypoint();
-                    e.mark_move_phase(MovePhase::Moving);
-                }
-            } else {
-                // Partial step toward the waypoint.
-                let path_dir = (dx / dist, dy / dist);
-                let step_dir = path_dir;
-                let direct_nx = x + step_dir.0 * budget;
-                let direct_ny = y + step_dir.1 * budget;
-                let steered = if can_local_steer {
-                    let steering_path_dir = entities
-                        .get(id)
-                        .map(|e| steering_path_dir(e, x, y, path_dir))
-                        .unwrap_or(path_dir);
-                    steered_candidate(
-                        entities,
-                        spatial,
-                        occ,
-                        map,
-                        id,
-                        kind,
-                        x,
-                        y,
-                        steering_path_dir,
-                        budget,
-                    )
                 } else {
-                    None
-                };
-                let (nx, ny) = if let Some((sx, sy)) = steered {
-                    (sx, sy)
-                } else {
-                    (direct_nx, direct_ny)
-                };
-                // Clamp landing to a body-legal static position.
-                if unit_static_standable(occ, map, kind, nx, ny, body_facing) {
-                    x = nx;
-                    y = ny;
-                } else {
-                    // Wall-slide: try each axis independently so a unit pressed against a
-                    // building edge can slide along it rather than freezing. Guard each axis
-                    // against zero movement (dy=0 ⟹ y-only slide is a no-op that would
-                    // spuriously suppress static_blocked). Only mark static-blocked when
-                    // neither axis makes progress.
-                    let slide_x = dx.abs() > 1e-4
-                        && unit_static_standable(occ, map, kind, nx, y, body_facing);
-                    let slide_y = dy.abs() > 1e-4
-                        && unit_static_standable(occ, map, kind, x, ny, body_facing);
-                    if slide_x {
+                    // Partial step toward the waypoint.
+                    let path_dir = (dx / dist, dy / dist);
+                    let step_dir = path_dir;
+                    let direct_nx = x + step_dir.0 * budget;
+                    let direct_ny = y + step_dir.1 * budget;
+                    let steered = if can_local_steer {
+                        let steering_path_dir = entities
+                            .get(id)
+                            .map(|e| steering_path_dir(e, x, y, path_dir))
+                            .unwrap_or(path_dir);
+                        steered_candidate(
+                            entities,
+                            spatial,
+                            occ,
+                            map,
+                            id,
+                            kind,
+                            x,
+                            y,
+                            steering_path_dir,
+                            budget,
+                        )
+                    } else {
+                        None
+                    };
+                    let (nx, ny) = if let Some((sx, sy)) = steered {
+                        (sx, sy)
+                    } else {
+                        (direct_nx, direct_ny)
+                    };
+                    // Clamp landing to a body-legal static position.
+                    if unit_static_standable(occ, map, kind, nx, ny, body_facing) {
                         x = nx;
-                    } else if slide_y {
                         y = ny;
                     } else {
-                        static_blocked_this_tick = true;
+                        // Wall-slide: try each axis independently so a unit pressed against a
+                        // building edge can slide along it rather than freezing. Guard each axis
+                        // against zero movement (dy=0 ⟹ y-only slide is a no-op that would
+                        // spuriously suppress static_blocked). Only mark static-blocked when
+                        // neither axis makes progress.
+                        let slide_x = dx.abs() > 1e-4
+                            && unit_static_standable(occ, map, kind, nx, y, body_facing);
+                        let slide_y = dy.abs() > 1e-4
+                            && unit_static_standable(occ, map, kind, x, ny, body_facing);
+                        if slide_x {
+                            x = nx;
+                        } else if slide_y {
+                            y = ny;
+                        } else {
+                            static_blocked_this_tick = true;
+                        }
                     }
+                    break;
                 }
-                break;
             }
         }
 
