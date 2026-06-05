@@ -33,7 +33,7 @@ import {
   cmd,
   decodeServerMessage,
 } from "../client/src/protocol.js";
-import { Input, footprintValidAgainstEntities } from "../client/src/input.js";
+import { Input, footprintValidAgainstEntities } from "../client/src/input/index.js";
 
 // ---------------------------------------------------------------------------
 // Helpers

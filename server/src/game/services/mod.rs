@@ -1,3 +1,11 @@
+//! Tick services used by [`crate::game::systems`].
+//!
+//! Services own simulation mutations below the public [`crate::game::Game`] seam: command
+//! application, movement, combat, economy, production, construction, death cleanup, and the
+//! derived spatial/occupancy/geometry queries those phases share. The tick orchestrator wires
+//! these services together; individual services should stay focused on one phase or one reusable
+//! query surface.
+
 pub mod combat;
 pub mod commands;
 pub mod construction;

@@ -33,3 +33,57 @@ the new component layout is easier to maintain.
 - Documentation matches the resulting architecture.
 - The cleanup does not change gameplay except where a separate, explicit follow-up change says so.
 
+## Final Audit - 2026-06-04
+
+Phase 8 removed the temporary client facade re-export files:
+
+- `client/src/renderer.js`
+- `client/src/input.js`
+
+Runtime imports now point at the owning module roots, `renderer/index.js` and `input/index.js`.
+`DESIGN.md` and the context capsules were updated to match the extracted server/client layout.
+No protocol, balance, or gameplay contracts changed.
+
+Module-level ownership docs were added to important server roots that now own behavior:
+
+- `server/src/game/services/mod.rs`
+- `server/src/game/services/movement/mod.rs`
+- `server/src/game/services/combat/mod.rs`
+- `server/src/game/ai_core/mod.rs`
+
+### Current Hotspot Line Counts
+
+Measured with `wc -l` after Phase 8 edits:
+
+| Path | Lines | Public items |
+| --- | ---: | ---: |
+| `server/src/game/ai_core/decision/` | 5,424 | 121 |
+| `server/src/game/services/movement/` | 4,950 | 43 |
+| `server/src/game/selfplay/` | 3,633 | 74 |
+| `server/src/game/services/combat/` | 2,517 | 30 |
+| `client/src/renderer/` | 2,409 | N/A |
+| `server/src/lobby/` | 1,770 | 30 |
+| `server/src/game/entity/` | 1,692 | 139 |
+| `server/src/game/services/move_coordinator.rs` | 1,446 | 11 |
+| `server/src/game/services/pathing.rs` | 1,214 | 10 |
+| `server/src/game/ai_core/actions.rs` | 1,147 | 37 |
+| `client/src/input/` | 1,110 | N/A |
+| `server/src/game/services/commands.rs` | 867 | 2 |
+| `server/src/game/mod.rs` | 270 | 18 |
+
+The largest individual files after cleanup are test-heavy modules:
+
+| File | Lines |
+| --- | ---: |
+| `server/src/game/services/movement/tests.rs` | 3,158 |
+| `server/src/game/ai_core/decision/tests.rs` | 2,758 |
+| `server/src/game/selfplay/tests.rs` | 1,543 |
+| `server/src/game/services/combat/tests.rs` | 1,461 |
+
+### Verification Scope
+
+Required verification for this phase:
+
+- `cd server && cargo test`
+- `node tests/client_contracts.mjs`
+- Client smoke test, because the client module import paths changed.
