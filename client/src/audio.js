@@ -1,4 +1,4 @@
-// Audio — client-side sound engine. See docs/sound/PHASE_1.md and PHASE_2.md.
+// Audio — client-side sound engine. See docs/sound/ASSETS.md and docs/sound/SOUND_NOTES.md.
 //
 // Owns one AudioContext (lazily created on first user gesture, per browser policy),
 // a category gain bus, a buffer cache keyed by sound id, and a capped voice pool.
