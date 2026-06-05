@@ -59,6 +59,7 @@ export class HUD {
 
     // Selected-units panel + command card containers.
     this.elSelected = rootEl.querySelector("#selected-panel");
+    this.elControlGroups = rootEl.querySelector("#control-group-tabs");
     this.elCommand = rootEl.querySelector("#command-card");
 
     // Signature of the last-rendered command card so we only rebuild its buttons when
@@ -68,6 +69,8 @@ export class HUD {
     this._trainRoundRobin = new Map();
     // Signature for the resource bar to avoid unnecessary DOM rebuilds.
     this._resSig = null;
+    // Signature for the inert control-group tabs.
+    this._controlGroupSig = null;
   }
 
   /**
@@ -76,6 +79,7 @@ export class HUD {
    */
   update() {
     this._renderResources();
+    this._renderControlGroupTabs();
     this._renderSelectedPanel();
     this._renderCommandCard();
   }
@@ -86,11 +90,16 @@ export class HUD {
       this.elSelected.innerHTML = "";
       this.elSelected.classList.add("empty");
     }
+    if (this.elControlGroups) {
+      this.elControlGroups.innerHTML = "";
+      this.elControlGroups.classList.add("empty");
+    }
     if (this.elCommand) this.elCommand.innerHTML = "";
     if (this.elSupply) this.elSupply.classList.remove("supply-capped");
     this._cardSig = null;
     this._trainRoundRobin.clear();
     this._resSig = null;
+    this._controlGroupSig = null;
   }
 
   // --- Resource / supply bar -------------------------------------------------
@@ -167,6 +176,100 @@ export class HUD {
   }
 
   // --- Selected-units panel --------------------------------------------------
+
+  /** Render fixed-position, non-clickable tabs for occupied local control groups. */
+  _renderControlGroupTabs() {
+    const tabs = this.elControlGroups;
+    if (!tabs) return;
+
+    const groups = this._controlGroupSummaries();
+    const sig = groups.map((g) =>
+      g ? `${g.key}:${g.count}:${g.icon}:${g.selected ? 1 : 0}` : "-",
+    ).join("|");
+    if (sig === this._controlGroupSig) return;
+    this._controlGroupSig = sig;
+
+    const any = groups.some(Boolean);
+    tabs.classList.toggle("empty", !any);
+
+    const frag = document.createDocumentFragment();
+    for (const group of groups) {
+      const slot = document.createElement("div");
+      slot.className = "control-group-slot";
+      if (group) {
+        const tab = document.createElement("div");
+        tab.className = "control-group-tab" + (group.selected ? " selected" : "");
+        tab.setAttribute(
+          "aria-label",
+          `Control group ${group.key}: ${group.count} ${group.label}`,
+        );
+        tab.innerHTML =
+          `<span class="control-group-key">${group.key}</span>` +
+          `<span class="control-group-kind">${group.icon}</span>` +
+          `<span class="control-group-count">${group.count}</span>`;
+        slot.appendChild(tab);
+      }
+      frag.appendChild(slot);
+    }
+
+    tabs.innerHTML = "";
+    tabs.appendChild(frag);
+  }
+
+  _controlGroupSummaries() {
+    const selected = typeof this.state.selectedEntities === "function"
+      ? this.state.selectedEntities()
+      : [];
+    const selectedIds = new Set(selected.map((e) => e.id));
+    const selectedCount = selectedIds.size;
+    const out = [];
+    const groups = this.state.controlGroups || [];
+    for (let slot = 0; slot < groups.length; slot++) {
+      const entities = typeof this.state.controlGroupEntities === "function"
+        ? this.state.controlGroupEntities(slot)
+        : [];
+      if (!entities || entities.length === 0) {
+        out.push(null);
+        continue;
+      }
+      const dominant = this._dominantControlGroupKind(entities);
+      const st = STATS[dominant.kind] || {};
+      out.push({
+        key: slot === 9 ? "0" : String(slot + 1),
+        count: entities.length,
+        icon: st.icon || dominant.kind,
+        label: st.label || dominant.kind,
+        selected: this._controlGroupMatchesSelection(entities, selectedIds, selectedCount),
+      });
+    }
+    return out;
+  }
+
+  _dominantControlGroupKind(entities) {
+    const counts = new Map();
+    let best = { kind: entities[0].kind, count: 0, first: 0 };
+    for (let i = 0; i < entities.length; i++) {
+      const kind = entities[i].kind;
+      const entry = counts.get(kind) || { kind, count: 0, first: i };
+      entry.count += 1;
+      counts.set(kind, entry);
+      if (
+        entry.count > best.count ||
+        (entry.count === best.count && entry.first < best.first)
+      ) {
+        best = entry;
+      }
+    }
+    return best;
+  }
+
+  _controlGroupMatchesSelection(entities, selectedIds, selectedCount) {
+    if (selectedCount === 0 || entities.length !== selectedCount) return false;
+    for (const e of entities) {
+      if (!selectedIds.has(e.id)) return false;
+    }
+    return true;
+  }
 
   /**
    * Render the selection summary: for a single entity show its name + HP; for a

@@ -25,7 +25,8 @@
                 #lobby-start, #lobby-status
         Game:   #game-screen, #viewport (Pixi canvas mounts here),
                 #hud, #res-steel, #res-oil, #res-supply,
-                #minimap (canvas), #selected-panel, #command-card,
+                #minimap (canvas), #selection-area, #control-group-tabs,
+                #selected-panel, #command-card,
                 #game-menu, #settings-button, #settings-menu, #pointer-lock-toggle,
                 #give-up-open, #give-up-confirm, #give-up-cancel, #give-up-confirm-button,
                 #game-over, #game-over-text, #game-over-scores, #game-over-button
@@ -94,7 +95,10 @@
         </div>
 
         <!-- Bottom-center selection info -->
-        <div id="selected-panel"></div>
+        <div id="selection-area">
+          <div id="control-group-tabs" aria-label="Control groups"></div>
+          <div id="selected-panel"></div>
+        </div>
 
         <!-- Above-card settings menu -->
         <div id="game-menu">
