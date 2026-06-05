@@ -628,7 +628,7 @@ impl RoomTask {
         };
         let seed = match_seed();
         let game = if self.quickstart {
-            Game::new_with_starting_resources_and_random_ai_profiles(
+            Game::new_with_debug_starting_loadout_and_random_ai_profiles(
                 &inits,
                 starting_steel,
                 starting_oil,

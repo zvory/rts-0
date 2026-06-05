@@ -307,7 +307,7 @@ export class Lobby {
     this.btnAddAi.disabled = this._playerCount >= MAX_PLAYERS;
   }
 
-  /** Show the start-with-more-money toggle only to the host and keep it synced. */
+  /** Show the debug mode toggle only to the host and keep it synced. */
   _reflectQuickstart() {
     if (!this.chkQuickstart) return;
     const isHost = this.net.playerId != null && this.net.playerId === this._hostId;

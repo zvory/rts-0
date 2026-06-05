@@ -118,7 +118,7 @@ pub struct Game {
     /// ignores it until lobby map selection or randomized maps are reintroduced.
     seed: u32,
     /// Starting steel granted to each player at match start. Retained so replay artifacts can
-    /// faithfully recreate "start with more money" matches.
+    /// faithfully recreate debug-mode economy.
     starting_steel: u32,
     /// Starting oil granted to each player at match start. See [`Game::starting_steel`].
     starting_oil: u32,

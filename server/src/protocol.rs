@@ -79,7 +79,7 @@ pub enum ClientMessage {
     AddAi,
     /// Host removes a previously-added AI opponent by its player id (lobby phase only).
     RemoveAi { id: u32 },
-    /// Host toggles the lobby's quickstart starting-resource mode.
+    /// Host toggles the lobby's debug mode.
     SetQuickstart { enabled: bool },
     /// Switch between player and spectator role while still in the lobby.
     SetSpectator { spectator: bool },

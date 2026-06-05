@@ -10,6 +10,7 @@ impl Game {
             config::STARTING_OIL,
             seed,
             AiProfileSelection::Default,
+            StartingLoadout::Standard,
         )
     }
 
@@ -22,6 +23,7 @@ impl Game {
             config::STARTING_OIL,
             seed,
             AiProfileSelection::Random,
+            StartingLoadout::Standard,
         )
     }
 
@@ -33,17 +35,52 @@ impl Game {
         oil: u32,
         seed: u32,
     ) -> Game {
-        Self::new_inner(players, true, steel, oil, seed, AiProfileSelection::Default)
+        Self::new_inner(
+            players,
+            true,
+            steel,
+            oil,
+            seed,
+            AiProfileSelection::Default,
+            StartingLoadout::Standard,
+        )
     }
 
     /// Create a live lobby match with explicit starting resources and randomized AI strategies.
+    #[allow(dead_code)]
     pub fn new_with_starting_resources_and_random_ai_profiles(
         players: &[PlayerInit],
         steel: u32,
         oil: u32,
         seed: u32,
     ) -> Game {
-        Self::new_inner(players, true, steel, oil, seed, AiProfileSelection::Random)
+        Self::new_inner(
+            players,
+            true,
+            steel,
+            oil,
+            seed,
+            AiProfileSelection::Random,
+            StartingLoadout::Standard,
+        )
+    }
+
+    /// Create a debug lobby match with boosted resources and a prebuilt human-only loadout.
+    pub fn new_with_debug_starting_loadout_and_random_ai_profiles(
+        players: &[PlayerInit],
+        steel: u32,
+        oil: u32,
+        seed: u32,
+    ) -> Game {
+        Self::new_inner(
+            players,
+            true,
+            steel,
+            oil,
+            seed,
+            AiProfileSelection::Random,
+            StartingLoadout::DebugHuman,
+        )
     }
 
     #[cfg(test)]
@@ -52,8 +89,8 @@ impl Game {
     }
 
     /// Like [`Game::new_for_replay`] but with explicit starting resources. Used when replaying a
-    /// match that was originally created in quickstart ("start with more money") mode so the
-    /// initial player economy matches the live recording.
+    /// match that was originally created in debug mode so the initial player economy matches the
+    /// live recording.
     pub(crate) fn new_for_replay_with_starting_resources(
         players: &[PlayerInit],
         steel: u32,
@@ -67,6 +104,7 @@ impl Game {
             oil,
             seed,
             AiProfileSelection::Default,
+            StartingLoadout::Standard,
         )
     }
 
@@ -81,6 +119,7 @@ impl Game {
             config::STARTING_OIL,
             seed,
             AiProfileSelection::Default,
+            StartingLoadout::Standard,
         )
     }
 
@@ -108,6 +147,7 @@ impl Game {
         oil: u32,
         seed: u32,
         ai_profile_selection: AiProfileSelection,
+        starting_loadout: StartingLoadout,
     ) -> Game {
         let map = Map::generate(players.len(), seed);
         let fog = Fog::new(map.size);
@@ -138,6 +178,9 @@ impl Game {
                 score: ScoreState::default(),
             };
             spawn_player_start(&mut entities, &map, &mut ps, start);
+            if starting_loadout == StartingLoadout::DebugHuman && !p.is_ai {
+                spawn_debug_human_start(&mut entities, &map, &mut ps, start);
+            }
             // The starting City Centre contributes supply immediately.
             ps.supply_cap = config::CITY_CENTRE_SUPPLY.min(config::SUPPLY_CAP_MAX);
             player_states.push(ps);
@@ -323,4 +366,148 @@ fn spawn_player_start(
     }
 
     spawn_base_resources(entities, map, start);
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum StartingLoadout {
+    Standard,
+    DebugHuman,
+}
+
+/// Spawn the debug-mode extras for a human player. Default starts already include four workers,
+/// so this adds one more worker plus five of every combat unit for a final five of each unit kind.
+fn spawn_debug_human_start(
+    entities: &mut EntityStore,
+    map: &Map,
+    player: &mut PlayerState,
+    start: (u32, u32),
+) {
+    const DEBUG_BUILDINGS: &[(EntityKind, f32, f32)] = &[
+        (EntityKind::Depot, -8.0, 7.0),
+        (EntityKind::Depot, -4.0, 7.0),
+        (EntityKind::Depot, 0.0, 7.0),
+        (EntityKind::Depot, 4.0, 7.0),
+        (EntityKind::Depot, 8.0, 7.0),
+        (EntityKind::TrainingCentre, -7.0, 12.0),
+        (EntityKind::Barracks, -1.5, 12.0),
+        (EntityKind::Barracks, 4.0, 12.0),
+        (EntityKind::Steelworks, 9.0, 12.0),
+        (EntityKind::Factory, -4.0, 17.0),
+        (EntityKind::Factory, 4.0, 17.0),
+    ];
+    const DEBUG_UNITS: &[(EntityKind, u32)] = &[
+        (EntityKind::Worker, 1),
+        (EntityKind::Rifleman, 5),
+        (EntityKind::MachineGunner, 5),
+        (EntityKind::AtTeam, 5),
+        (EntityKind::ScoutCar, 5),
+        (EntityKind::Tank, 5),
+    ];
+
+    for &(kind, side_tiles, back_tiles) in DEBUG_BUILDINGS {
+        let (x, y) = debug_offset_world(map, start, side_tiles, back_tiles);
+        if entities
+            .spawn_building(player.id, kind, x, y, true)
+            .is_some()
+        {
+            player.record_entity_created(kind);
+        }
+    }
+
+    let mut slot = 0u32;
+    for &(kind, count) in DEBUG_UNITS {
+        for _ in 0..count {
+            let row = slot / 6;
+            let col = slot % 6;
+            let side_tiles = if col < 3 {
+                -16.0 + col as f32 * 3.0
+            } else {
+                10.0 + (col - 3) as f32 * 3.0
+            };
+            let back_tiles = -2.0 + row as f32 * 2.0;
+            let (x, y) = debug_offset_world(map, start, side_tiles, back_tiles);
+            if entities.spawn_unit(player.id, kind, x, y).is_some() {
+                player.record_entity_created(kind);
+            }
+            slot += 1;
+        }
+    }
+}
+
+fn debug_offset_world(
+    map: &Map,
+    start: (u32, u32),
+    side_tiles: f32,
+    back_tiles: f32,
+) -> (f32, f32) {
+    let (hx, hy) = map.tile_center(start.0, start.1);
+    let mid = map.size / 2;
+    let back_x = if start.0 < mid { -1.0 } else { 1.0 };
+    let back_y = if start.1 < mid { -1.0 } else { 1.0 };
+    let side_x = -back_y;
+    let side_y = back_x;
+    let ts = config::TILE_SIZE as f32;
+    (
+        hx + (side_x * side_tiles + back_x * back_tiles) * ts,
+        hy + (side_y * side_tiles + back_y * back_tiles) * ts,
+    )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn owned_kind_count(game: &Game, owner: u32, kind: EntityKind) -> usize {
+        game.entities
+            .iter()
+            .filter(|e| e.owner == owner && e.kind == kind)
+            .count()
+    }
+
+    #[test]
+    fn debug_starting_loadout_applies_to_humans_only() {
+        let players = [
+            PlayerInit {
+                id: 1,
+                name: "Human".to_string(),
+                color: "#cc1111".to_string(),
+                is_ai: false,
+            },
+            PlayerInit {
+                id: 2,
+                name: "AI".to_string(),
+                color: "#1133bb".to_string(),
+                is_ai: true,
+            },
+        ];
+        let game = Game::new_with_debug_starting_loadout_and_random_ai_profiles(
+            &players,
+            config::QUICKSTART_STEEL,
+            config::QUICKSTART_OIL,
+            1,
+        );
+
+        assert_eq!(owned_kind_count(&game, 1, EntityKind::Depot), 5);
+        assert_eq!(owned_kind_count(&game, 1, EntityKind::Steelworks), 1);
+        assert_eq!(owned_kind_count(&game, 1, EntityKind::TrainingCentre), 1);
+        assert_eq!(owned_kind_count(&game, 1, EntityKind::Barracks), 2);
+        assert_eq!(owned_kind_count(&game, 1, EntityKind::Factory), 2);
+        for kind in [
+            EntityKind::Worker,
+            EntityKind::Rifleman,
+            EntityKind::MachineGunner,
+            EntityKind::AtTeam,
+            EntityKind::ScoutCar,
+            EntityKind::Tank,
+        ] {
+            assert_eq!(owned_kind_count(&game, 1, kind), 5, "{kind}");
+        }
+
+        assert_eq!(owned_kind_count(&game, 2, EntityKind::Depot), 0);
+        assert_eq!(owned_kind_count(&game, 2, EntityKind::Barracks), 0);
+        assert_eq!(
+            owned_kind_count(&game, 2, EntityKind::Worker),
+            config::STARTING_WORKERS as usize
+        );
+    }
 }

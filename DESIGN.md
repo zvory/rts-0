@@ -73,7 +73,7 @@ short but readable. Coordinates are **world pixels** (floats) unless a field nam
 | `start`    | — | Host asks to start the match (only honored from the room host). |
 | `addAi`    | — | Host adds a computer opponent to the room (lobby phase only, host-only). |
 | `removeAi` | `id: u32` | Host removes a previously-added AI opponent by id (lobby phase only, host-only). |
-| `setQuickstart` | `enabled: bool` | Host toggles "Start with more money mode" for the next match in this room. |
+| `setQuickstart` | `enabled: bool` | Host toggles "Debug mode" for the next match in this room. |
 | `setSpectator` | `spectator: bool` | Switch between active player and spectator role while still in the lobby. Ignored after the match starts; switching to active player is ignored if the active seats are full. |
 | `command`  | `cmd: Command` | Issue a gameplay command (see below). Ignored unless in-game. |
 | `giveUp`   | — | Give up the active match. The server eliminates that player and sends their score screen. |
@@ -149,7 +149,9 @@ Sent once when the match begins. Carries everything static for the whole match.
 ```
 Units/buildings arrive via snapshots (so they obey fog), including
 the player's own starting City Centre + workers. When the lobby's `setQuickstart` toggle is
-enabled, every player starts with 99,999 steel and 99,999 oil instead of the default opening resources.
+enabled, every player starts with 99,999 steel and 99,999 oil instead of the default opening
+resources, and each human player also starts with five supply depots, one Steelworks, one Training
+Centre, two Barracks, two Factories, and five of each unit kind.
 Spectator start payloads keep the spectator connection's `playerId`, set `spectator: true`, and
 list only active match players in `players`.
 
@@ -1071,8 +1073,9 @@ The server treats every client as potentially hostile. Limits live next to the c
 
 Computer opponents are **opt-in**: a room has none unless the host adds them from the lobby
 (`addAi` / `removeAi`, host-only, lobby phase only). The lobby also has a host-only
-`setQuickstart` toggle labeled "Start with more money mode", which causes the next match to begin
-with 99,999 steel and 99,999 oil for every player. They are capped with humans at
+`setQuickstart` toggle labeled "Debug mode", which causes the next match to begin
+with 99,999 steel and 99,999 oil for every player plus a prebuilt human-only army/base loadout.
+They are capped with humans at
 `MAX_PLAYERS = 4` (the hardcoded map has enough ordered `baseSites` for four starts plus neutral
 expansions). AI players are seated after the humans in the lobby player list; their colors come
 from the tail of `PLAYER_PALETTE` so they never collide with human colors. They persist across rematches and are cleared only when the room
@@ -1211,8 +1214,8 @@ coverage. These scripts are kept isolated from the canonical profile list.
 
 **Artifacts.** On failure, the test writes `target/selfplay-failures/<test>-<pid>-<time>/`
 with:
-- `replay.json`: start payload, player specs, per-player starting steel/oil (so quickstart
-  "start with more money" matches replay with the same economy they were recorded with),
+- `replay.json`: start payload, player specs, per-player starting steel/oil (so debug mode
+  matches replay with the same economy they were recorded with),
   script decision log, authoritative tick-stamped command log, event log, milestone state,
   and sampled snapshot summaries.
 - `summary.log`: short human-readable failure summary and missing milestones.
