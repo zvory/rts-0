@@ -25,6 +25,10 @@ After `movement.rs` is split, evaluate `move_coordinator.rs` for a follow-up spl
 - `move_coordinator/staging.rs`: current/build staging goals and material goal refresh.
 - `move_coordinator/path_assignment.rs`: path creation and entity path mutation.
 
+Implementation note: `move_coordinator.rs` was left as the follow-up boundary for this phase. The
+movement split did not require coordinator internals to become public, and the request/formations/
+staging/path-assignment seams above remain the right next decomposition cut.
+
 ## Design Notes
 
 Keep `movement_system` as the only system entry point called by `systems.rs`. Extraction should not
@@ -45,4 +49,3 @@ calculations during mechanical moves.
 - `movement_system` is short enough to show the tick flow.
 - Tank drive, steering, collision, and waypoint behavior are independently testable.
 - `move_coordinator.rs` has a clear follow-up boundary or has been split under the same principles.
-
