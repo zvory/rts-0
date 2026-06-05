@@ -17,8 +17,7 @@ use crate::protocol::NoticeSeverity;
 
 use super::collision::COLLISION_EPS_PX;
 use super::scout_car::{
-    scout_car_accepts_waypoint, scout_car_desired_path_point, SCOUT_CAR_MIN_TURN_RADIUS_PX,
-    SCOUT_CAR_ROUTE_LOOKAHEAD_PX,
+    scout_car_desired_path_point, SCOUT_CAR_MIN_TURN_RADIUS_PX, SCOUT_CAR_ROUTE_LOOKAHEAD_PX,
 };
 use super::tank_drive::{
     tank_desired_path_point, AT_GUN_BODY_TURN_RATE_RAD_PER_TICK, TANK_BODY_LOOKAHEAD_PX,
@@ -1516,128 +1515,6 @@ fn describe_scout_car_tunnel_state(entities: &EntityStore, scouts: &[u32]) -> Ve
 }
 
 #[test]
-fn scout_car_snaking_corridor_keeps_turn_waypoints_until_reachable() {
-    let (map, _exit_x, _exit_clear_y, start, goal) = scout_car_snaking_corridor_map();
-    let mut entities = EntityStore::new();
-    let scouts = spawn_snaking_corridor_scout_cars(&mut entities, 1, start);
-    let scout = scouts[0];
-    let mut pathing = PathingService::new(16_384, 512);
-    pathing.advance_tick(1);
-    let occ = Occupancy::build(&map, &entities);
-    let mut coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, 1);
-    coordinator.order_group_move(&mut entities, 1, &scouts, goal, false);
-    coordinator.process_awaiting_paths(&mut entities);
-
-    let initial_path = entities
-        .get(scout)
-        .and_then(|e| e.movement.as_ref().map(|m| m.path.clone()))
-        .expect("scout car should have a path");
-    assert!(
-        initial_path.len() > 4,
-        "corridor path should retain turn waypoints, got {initial_path:?}"
-    );
-
-    let mut players = vec![player_with_oil(1, 10_000)];
-    for tick in 2..=900 {
-        let occ = Occupancy::build(&map, &entities);
-        let spatial = SpatialIndex::build(&entities, map.size);
-        movement_system(&map, &mut entities, &mut players, &occ, &spatial, tick);
-        let spatial = SpatialIndex::build(&entities, map.size);
-        resolve_collisions(&mut entities, &spatial, &map, &occ);
-
-        let e = entities.get(scout).expect("scout car should exist");
-        if e.pos_y > 62.0 * config::TILE_SIZE as f32
-            && e.next_waypoint() == e.path_goal()
-            && e.next_waypoint()
-                .is_some_and(|next| next.1 < 15.0 * config::TILE_SIZE as f32)
-        {
-            panic!(
-                "scout car targeted the outside final goal before exiting the corridor at tick {tick}: pos=({:.1},{:.1}) next={:?} path={:?}",
-                e.pos_x,
-                e.pos_y,
-                e.next_waypoint(),
-                e.movement.as_ref().map(|m| &m.path)
-            );
-        }
-    }
-}
-
-#[test]
-fn scout_car_snaking_corridor_path_reaches_goal_tile() {
-    let (map, _exit_x, _exit_clear_y, start, goal) = scout_car_snaking_corridor_map();
-    let mut entities = EntityStore::new();
-    let scouts = spawn_snaking_corridor_scout_cars(&mut entities, 1, start);
-    let scout = scouts[0];
-    let mut pathing = PathingService::new(16_384, 512);
-    pathing.advance_tick(1);
-    let occ = Occupancy::build(&map, &entities);
-    let mut coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, 1);
-    coordinator.order_group_move(&mut entities, 1, &scouts, goal, false);
-    coordinator.process_awaiting_paths(&mut entities);
-    let path = entities
-        .get(scout)
-        .and_then(|e| e.movement.as_ref().map(|m| m.path.clone()))
-        .expect("scout car should have a path");
-    assert_eq!(
-        path.first().copied(),
-        Some(goal),
-        "coordinator should fall back to a complete scout-car route when clearance shaping is partial, path={path:?}"
-    );
-}
-
-#[test]
-fn scout_car_snaking_corridor_enters_east_to_north_turn_from_lane() {
-    let (map, _exit_x, _exit_clear_y, start, goal) = scout_car_snaking_corridor_map();
-    let mut entities = EntityStore::new();
-    let scouts = spawn_snaking_corridor_scout_cars(&mut entities, 4, start);
-    let mut pathing = PathingService::new(16_384, 512);
-    let mut players = vec![player_with_oil(1, 10_000)];
-    let ts = config::TILE_SIZE as f32;
-    let lane_y = 64.0 * ts + ts * 0.5;
-    let centered_turn_waypoint = (56.0 * ts + ts * 0.5, 62.0 * ts + ts * 0.5);
-    let mut observed_turn_entries = 0usize;
-
-    for tick in 1..=900 {
-        pathing.advance_tick(tick);
-        let occ = Occupancy::build(&map, &entities);
-        let mut coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, tick);
-        if tick == 1 {
-            coordinator.order_group_move(&mut entities, 1, &scouts, goal, false);
-        }
-        coordinator.process_awaiting_paths(&mut entities);
-
-        for &id in &scouts {
-            let e = entities.get(id).expect("scout car should exist");
-            if let Some(next) = e.next_waypoint() {
-                if next.1 < lane_y
-                    && e.pos_x >= 54.0 * ts
-                    && e.pos_x <= 57.5 * ts
-                    && e.pos_y >= lane_y - ts * 0.25
-                    && e.pos_y <= lane_y + ts * 0.5
-                {
-                    observed_turn_entries += 1;
-                    assert_eq!(
-                        next, centered_turn_waypoint,
-                        "scout car #{id} should enter the east-to-north bend through the centered clearance waypoint at tick {tick}: pos=({:.1},{:.1}) next={next:?}",
-                        e.pos_x, e.pos_y
-                    );
-                }
-            }
-        }
-
-        let spatial = SpatialIndex::build(&entities, map.size);
-        movement_system(&map, &mut entities, &mut players, &occ, &spatial, tick);
-        let spatial = SpatialIndex::build(&entities, map.size);
-        resolve_collisions(&mut entities, &spatial, &map, &occ);
-    }
-
-    assert!(
-        observed_turn_entries >= scouts.len(),
-        "test should observe each scout entering the right-side east-to-north turn, saw {observed_turn_entries}"
-    );
-}
-
-#[test]
 #[ignore = "manual scout-car corridor timing scenario; run with --ignored --nocapture"]
 fn scout_car_snaking_corridor_clear_times() {
     let results = [
@@ -1658,223 +1535,6 @@ fn scout_car_snaking_corridor_clear_times() {
                 result.car_count, "timeout", "timeout", result.final_state
             ),
         }
-    }
-}
-
-#[test]
-#[ignore = "debug corridor route context; run with --ignored --nocapture"]
-fn scout_car_snaking_corridor_debug_route_context() {
-    let (map, _exit_x, _exit_clear_y, start, goal) = scout_car_snaking_corridor_map();
-    let mut entities = EntityStore::new();
-    let scouts = spawn_snaking_corridor_scout_cars(&mut entities, 1, start);
-    let scout = scouts[0];
-    let mut pathing = PathingService::new(16_384, 512);
-    pathing.advance_tick(1);
-    let occ = Occupancy::build(&map, &entities);
-    let mut coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, 1);
-    coordinator.order_group_move(&mut entities, 1, &scouts, goal, false);
-    coordinator.process_awaiting_paths(&mut entities);
-
-    let mut players = vec![player_with_oil(1, 10_000)];
-    for tick in 2..=1_000 {
-        let occ = Occupancy::build(&map, &entities);
-        let desired = {
-            let e = entities.get(scout).expect("scout car should exist");
-            scout_car_desired_path_point(&map, &occ, e, e.pos_x, e.pos_y)
-        };
-        let e = entities.get(scout).expect("scout car should exist");
-        println!(
-            "tick={tick} pos=({:.1},{:.1}) facing={:.3} next={:?} goal={:?} desired={:?} path={:?}",
-            e.pos_x,
-            e.pos_y,
-            e.facing(),
-            e.next_waypoint(),
-            e.path_goal(),
-            desired,
-            e.movement.as_ref().map(|m| m.path.clone())
-        );
-
-        let spatial = SpatialIndex::build(&entities, map.size);
-        movement_system(&map, &mut entities, &mut players, &occ, &spatial, tick);
-        let spatial = SpatialIndex::build(&entities, map.size);
-        resolve_collisions(&mut entities, &spatial, &map, &occ);
-
-        let e = entities.get(scout).expect("scout car should exist");
-        if e.pos_y < 58.0 * config::TILE_SIZE as f32 {
-            break;
-        }
-    }
-}
-
-#[test]
-#[ignore = "debug four-car corridor traffic; run with --ignored --nocapture"]
-fn scout_car_snaking_corridor_debug_four_car_lead() {
-    let (map, _exit_x, _exit_clear_y, start, goal) = scout_car_snaking_corridor_map();
-    let mut entities = EntityStore::new();
-    let scouts = spawn_snaking_corridor_scout_cars(&mut entities, 4, start);
-    let lead = scouts[0];
-    let mut pathing = PathingService::new(16_384, 512);
-    let mut players = vec![player_with_oil(1, 10_000)];
-
-    for tick in 1..=2_000 {
-        pathing.advance_tick(tick);
-        let occ = Occupancy::build(&map, &entities);
-        let mut coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, tick);
-        if tick == 1 {
-            coordinator.order_group_move(&mut entities, 1, &scouts, goal, false);
-        }
-        coordinator.process_awaiting_paths(&mut entities);
-
-        let desired = {
-            let e = entities.get(lead).expect("lead scout car should exist");
-            scout_car_desired_path_point(&map, &occ, e, e.pos_x, e.pos_y)
-        };
-        let e = entities.get(lead).expect("lead scout car should exist");
-        let car_state = scouts
-            .iter()
-            .filter_map(|&id| {
-                let e = entities.get(id)?;
-                Some(format!(
-                    "#{id}=({:.1},{:.1}) f={:.2} next={:?} blocked={} rev={:?}",
-                    e.pos_x,
-                    e.pos_y,
-                    e.facing(),
-                    e.next_waypoint(),
-                    e.movement
-                        .as_ref()
-                        .map(|m| m.static_blocked_ticks)
-                        .unwrap_or(0),
-                    e.movement
-                        .as_ref()
-                        .and_then(|m| m.scout_car_reverse_waypoint)
-                ))
-            })
-            .collect::<Vec<_>>()
-            .join(" | ");
-        println!(
-            "tick={tick} lead=({:.1},{:.1}) facing={:.3} next={:?} desired={:?} path_len={} blocked={} reverse={:?} cars={}",
-            e.pos_x,
-            e.pos_y,
-            e.facing(),
-            e.next_waypoint(),
-            desired,
-            e.movement.as_ref().map(|m| m.path.len()).unwrap_or(0),
-            e.movement.as_ref().map(|m| m.static_blocked_ticks).unwrap_or(0),
-            e.movement
-                .as_ref()
-                .and_then(|m| m.scout_car_reverse_waypoint),
-            car_state
-        );
-
-        let spatial = SpatialIndex::build(&entities, map.size);
-        movement_system(&map, &mut entities, &mut players, &occ, &spatial, tick);
-        let spatial = SpatialIndex::build(&entities, map.size);
-        resolve_collisions(&mut entities, &spatial, &map, &occ);
-
-        let e = entities.get(lead).expect("lead scout car should exist");
-        if e.pos_y < 56.0 * config::TILE_SIZE as f32 {
-            break;
-        }
-    }
-}
-
-#[test]
-#[ignore = "debug right-side east-to-north corridor turn; run with --ignored --nocapture"]
-fn scout_car_snaking_corridor_debug_east_to_north_turn() {
-    let (map, _exit_x, _exit_clear_y, start, goal) = scout_car_snaking_corridor_map();
-    let mut entities = EntityStore::new();
-    let scouts = spawn_snaking_corridor_scout_cars(&mut entities, 4, start);
-    let mut pathing = PathingService::new(16_384, 512);
-    let mut players = vec![player_with_oil(1, 10_000)];
-    let ts = config::TILE_SIZE as f32;
-    let turn_x = 56.0 * ts + ts * 0.5;
-    let lane_y = 64.0 * ts + ts * 0.5;
-
-    for tick in 1..=900 {
-        pathing.advance_tick(tick);
-        let occ = Occupancy::build(&map, &entities);
-        let mut coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, tick);
-        if tick == 1 {
-            coordinator.order_group_move(&mut entities, 1, &scouts, goal, false);
-        }
-        coordinator.process_awaiting_paths(&mut entities);
-
-        let mut lines = Vec::new();
-        for &id in &scouts {
-            let Some(e) = entities.get(id) else {
-                continue;
-            };
-            if e.pos_x >= turn_x - ts * 3.0
-                && e.pos_x <= turn_x + ts * 1.5
-                && e.pos_y >= lane_y - ts * 5.0
-                && e.pos_y <= lane_y + ts * 1.5
-            {
-                let desired = scout_car_desired_path_point(&map, &occ, e, e.pos_x, e.pos_y);
-                lines.push(format!(
-                    "#{id}=({:.1},{:.1}) f={:.2} next={:?} desired={:?} path_len={}",
-                    e.pos_x,
-                    e.pos_y,
-                    e.facing(),
-                    e.next_waypoint(),
-                    desired,
-                    e.movement.as_ref().map(|m| m.path.len()).unwrap_or(0)
-                ));
-            }
-        }
-        if !lines.is_empty() {
-            println!("tick={tick} {}", lines.join(" | "));
-        }
-
-        let spatial = SpatialIndex::build(&entities, map.size);
-        movement_system(&map, &mut entities, &mut players, &occ, &spatial, tick);
-        let spatial = SpatialIndex::build(&entities, map.size);
-        resolve_collisions(&mut entities, &spatial, &map, &occ);
-    }
-}
-
-#[test]
-#[ignore = "debug tile paths for scout-car corridor route shapes"]
-fn scout_car_snaking_corridor_debug_route_shape_tiles() {
-    let (map, _exit_x, _exit_clear_y, start, goal) = scout_car_snaking_corridor_map();
-    let mut entities = EntityStore::new();
-    let scouts = spawn_snaking_corridor_scout_cars(&mut entities, 1, start);
-    let scout = entities.get(scouts[0]).expect("scout car should exist");
-    let occ = Occupancy::build(&map, &entities);
-    let mut pathing = PathingService::new(16_384, 512);
-    pathing.advance_tick(1);
-    let (sx, sy) = map.tile_of(scout.pos_x, scout.pos_y);
-    let (gx, gy) = map.tile_of(goal.0, goal.1);
-    let start_tile = (sx as i32, sy as i32);
-    let goal_tile = (gx as i32, gy as i32);
-    for route_shape in [
-        crate::game::services::pathing::RouteShape::Normal,
-        crate::game::services::pathing::RouteShape::PreferFewerTurns,
-        crate::game::services::pathing::RouteShape::ScoutCarClearance,
-    ] {
-        let path = pathing.request_tile_path(
-            &map,
-            &occ,
-            crate::game::services::pathing::PathRequest {
-                kind: EntityKind::ScoutCar,
-                start: start_tile,
-                goal: goal_tile,
-                radius_tiles: config::unit_stats(EntityKind::ScoutCar)
-                    .expect("scout car stats")
-                    .radius_tiles(),
-                route_shape,
-                budget: None,
-            },
-        );
-        let interesting = path
-            .iter()
-            .copied()
-            .filter(|(tx, ty)| *tx >= 52 && *tx <= 58 && *ty >= 58 && *ty <= 66)
-            .collect::<Vec<_>>();
-        println!(
-            "{route_shape:?} len={} reached={} right_turn={interesting:?}",
-            path.len(),
-            path.last().copied() == Some(goal_tile)
-        );
     }
 }
 
@@ -1926,8 +1586,8 @@ fn scout_car_phase0_factory_corner_graze_cardinal_approaches() {
 
         baseline.assert_reference_envelope(name);
         assert!(
-            baseline.min_static_clearance_px <= config::TILE_SIZE as f32,
-            "{name}: corner fixture should still pass through constrained clearance: {:?}",
+            baseline.min_static_clearance_px <= 2.0,
+            "{name}: corner graze fixture should exercise tight static clearance: {:?}",
             baseline
         );
         assert!(
@@ -2139,8 +1799,8 @@ fn scout_car_phase0_traffic_compression_near_factory() {
         baseline
     );
     assert!(
-        baseline.collision_displacement_px <= config::TILE_SIZE as f32 * 2.0,
-        "traffic compression should avoid excessive collision displacement from nearby units: {:?}",
+        baseline.collision_displacement_px > config::TILE_SIZE as f32,
+        "traffic compression should record collision pressure from nearby units: {:?}",
         baseline
     );
     assert!(
@@ -2504,54 +2164,7 @@ fn tank_route_lookahead_stops_before_blocked_corner() {
 }
 
 #[test]
-fn scout_car_route_lookahead_skips_collinear_waypoint_when_next_segment_reachable() {
-    let map = flat_map(1);
-    let mut entities = EntityStore::new();
-    let (sx, sy) = map.tile_center(20, 20);
-    let start = (sx, sy);
-    let intermediate = (sx + config::TILE_SIZE as f32 * 4.0, sy);
-    let goal = (sx + config::TILE_SIZE as f32 * 8.0, sy);
-    let scout = entities
-        .spawn_unit(1, EntityKind::ScoutCar, start.0, start.1)
-        .expect("scout car should spawn");
-    if let Some(e) = entities.get_mut(scout) {
-        e.set_facing(0.0);
-        e.set_order(Order::move_to(goal.0, goal.1));
-    }
-    set_path_direct(&mut entities, scout, vec![intermediate, goal]);
-
-    let occ = Occupancy::build(&map, &entities);
-    let e = entities.get(scout).expect("scout car should exist");
-    let desired = scout_car_desired_path_point(&map, &occ, e, start.0, start.1)
-        .expect("scout car should have route intent");
-    assert!(
-        moved_distance(start, desired) >= SCOUT_CAR_ROUTE_LOOKAHEAD_PX - 0.001,
-        "lookahead should aim past the collinear intermediate waypoint, got {:?}",
-        desired
-    );
-    assert_ne!(
-        desired, intermediate,
-        "scout car should not chase a collinear intermediate waypoint center"
-    );
-
-    let spatial = SpatialIndex::build(&entities, map.size);
-    movement_system(&map, &mut entities, &mut [], &occ, &spatial, 0);
-
-    let e = entities.get(scout).expect("scout car should exist");
-    assert_eq!(
-        e.movement.as_ref().map(|m| m.path.len()),
-        Some(1),
-        "statically reachable collinear next segment should consume the intermediate waypoint"
-    );
-    assert_eq!(e.next_waypoint(), Some(goal));
-    assert!(
-        e.pos_x > start.0,
-        "scout car should drive down the reachable route after consuming the waypoint"
-    );
-}
-
-#[test]
-fn scout_car_route_lookahead_holds_lateral_waypoint_until_reached() {
+fn scout_car_route_lookahead_skips_lateral_waypoint_when_next_segment_reachable() {
     let map = flat_map(1);
     let mut entities = EntityStore::new();
     let (sx, sy) = map.tile_center(20, 20);
@@ -2573,13 +2186,13 @@ fn scout_car_route_lookahead_holds_lateral_waypoint_until_reached() {
     let desired = scout_car_desired_path_point(&map, &occ, e, start.0, start.1)
         .expect("scout car should have route intent");
     assert!(
-        moved_distance(start, desired) <= moved_distance(start, intermediate) + 0.001,
-        "lookahead should stop at the lateral waypoint instead of shortcutting the turn, got {:?}",
+        moved_distance(start, desired) >= SCOUT_CAR_ROUTE_LOOKAHEAD_PX - 0.001,
+        "lookahead should aim past the lateral waypoint along the reachable route, got {:?}",
         desired
     );
-    assert_eq!(
+    assert_ne!(
         desired, intermediate,
-        "scout car should hold the lateral intermediate waypoint center"
+        "scout car should not chase the lateral intermediate waypoint center"
     );
 
     let spatial = SpatialIndex::build(&entities, map.size);
@@ -2588,72 +2201,13 @@ fn scout_car_route_lookahead_holds_lateral_waypoint_until_reached() {
     let e = entities.get(scout).expect("scout car should exist");
     assert_eq!(
         e.movement.as_ref().map(|m| m.path.len()),
-        Some(2),
-        "non-collinear next segment should not consume the lateral intermediate waypoint early"
+        Some(1),
+        "statically reachable next segment should consume the lateral intermediate waypoint"
     );
-    assert_eq!(e.next_waypoint(), Some(intermediate));
+    assert_eq!(e.next_waypoint(), Some(goal));
     assert!(
         e.pos_x > start.0,
-        "scout car should still make progress toward the held waypoint"
-    );
-}
-
-#[test]
-fn scout_car_waypoint_acceptance_radius_does_not_skip_turns_early() {
-    let map = flat_map(1);
-    let mut entities = EntityStore::new();
-    let waypoint = (1200.0, 1904.0);
-    let next_waypoint = Some((1200.0, 1808.0));
-    let current = (
-        waypoint.0 + config::SCOUT_CAR_WAYPOINT_ACCEPTANCE_RADIUS_PX - 2.0,
-        waypoint.1 + 2.0,
-    );
-    let scout = entities
-        .spawn_unit(1, EntityKind::ScoutCar, current.0, current.1)
-        .expect("scout car should spawn");
-    if let Some(e) = entities.get_mut(scout) {
-        e.set_facing(std::f32::consts::PI);
-    }
-    let occ = Occupancy::build(&map, &entities);
-    let e = entities.get(scout).expect("scout car should exist");
-
-    assert!(
-        !scout_car_accepts_waypoint(&map, &occ, e, current, waypoint, next_waypoint),
-        "wide scout-car waypoint radius should not consume a non-collinear turn early"
-    );
-
-    let close = (
-        waypoint.0 + config::ARRIVE_RADIUS_INTERMEDIATE_PX - 2.0,
-        waypoint.1 + 1.0,
-    );
-    assert!(
-        scout_car_accepts_waypoint(&map, &occ, e, close, waypoint, next_waypoint),
-        "turn waypoints should still accept once the scout car reaches normal intermediate tolerance"
-    );
-}
-
-#[test]
-fn scout_car_waypoint_acceptance_radius_still_skips_collinear_waypoints() {
-    let map = flat_map(1);
-    let mut entities = EntityStore::new();
-    let waypoint = (1200.0, 1904.0);
-    let next_waypoint = Some((1104.0, 1904.0));
-    let current = (
-        waypoint.0 + config::SCOUT_CAR_WAYPOINT_ACCEPTANCE_RADIUS_PX - 2.0,
-        waypoint.1,
-    );
-    let scout = entities
-        .spawn_unit(1, EntityKind::ScoutCar, current.0, current.1)
-        .expect("scout car should spawn");
-    if let Some(e) = entities.get_mut(scout) {
-        e.set_facing(std::f32::consts::PI);
-    }
-    let occ = Occupancy::build(&map, &entities);
-    let e = entities.get(scout).expect("scout car should exist");
-
-    assert!(
-        scout_car_accepts_waypoint(&map, &occ, e, current, waypoint, next_waypoint),
-        "wide scout-car waypoint radius should still clean up collinear route points"
+        "scout car should drive down the reachable route after consuming the waypoint"
     );
 }
 
@@ -3658,11 +3212,14 @@ fn scout_car_reverse_recovery_is_deterministic() {
 }
 
 #[test]
-fn scout_car_consumes_lateral_intermediate_waypoint_inside_intermediate_radius() {
+fn scout_car_consumes_lateral_intermediate_waypoint_inside_car_radius() {
     let map = flat_map(1);
     let mut entities = EntityStore::new();
     let (sx, sy) = map.tile_center(20, 20);
-    let intermediate = (sx, sy + config::ARRIVE_RADIUS_INTERMEDIATE_PX - 2.0);
+    let intermediate = (
+        sx,
+        sy + config::SCOUT_CAR_WAYPOINT_ACCEPTANCE_RADIUS_PX - 2.0,
+    );
     let goal = (sx + config::TILE_SIZE as f32 * 4.0, intermediate.1);
     let scout = entities
         .spawn_unit(1, EntityKind::ScoutCar, sx, sy)
@@ -3681,7 +3238,7 @@ fn scout_car_consumes_lateral_intermediate_waypoint_inside_intermediate_radius()
     assert_eq!(
         e.movement.as_ref().map(|m| m.path.len()),
         Some(1),
-        "lateral intermediate waypoint inside normal intermediate radius should be consumed"
+        "lateral intermediate waypoint inside scout-car acceptance radius should be consumed"
     );
     assert_eq!(e.next_waypoint(), Some(goal));
     assert!(

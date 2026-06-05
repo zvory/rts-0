@@ -1,7 +1,5 @@
 # Phase 1: Minimal Pathfinding Viewer
 
-Status: done
-
 ## Objective
 
 Build the smallest game-backed viewer that makes the scout-car snaking corridor bug visible in the
