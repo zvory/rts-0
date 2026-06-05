@@ -373,6 +373,55 @@ fn queued_move_commands_follow_waypoints_in_order() {
 }
 
 #[test]
+fn normal_move_then_queued_move_snapshot_shows_active_and_future_waypoints() {
+    let (mut game, unit, first, second, _) = queued_move_fixture();
+
+    game.enqueue(
+        1,
+        Command::Move {
+            units: vec![unit],
+            x: first.0,
+            y: first.1,
+            queued: false,
+        },
+    );
+    game.tick();
+    game.enqueue(
+        1,
+        Command::Move {
+            units: vec![unit],
+            x: second.0,
+            y: second.1,
+            queued: true,
+        },
+    );
+    game.tick();
+
+    let view = game
+        .snapshot_for(1)
+        .entities
+        .into_iter()
+        .find(|entity| entity.id == unit)
+        .expect("selected unit should be visible to owner");
+    assert_eq!(
+        view.active_marker,
+        Some(crate::protocol::QueuedOrderMarker {
+            x: first.0,
+            y: first.1,
+            attack_move: false,
+        })
+    );
+    assert_eq!(
+        view.queued_markers,
+        vec![crate::protocol::QueuedOrderMarker {
+            x: second.0,
+            y: second.1,
+            attack_move: false,
+        }]
+    );
+}
+
+#[test]
 fn replacement_move_and_stop_clear_queued_movement() {
     let (mut game, unit, first, second, replacement) = queued_move_fixture();
 

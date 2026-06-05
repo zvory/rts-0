@@ -414,6 +414,7 @@ mod tests {
                     rally: None,
                     oil_used: None,
                     queued_markers: Vec::new(),
+                    active_marker: None,
                     vision_only: false,
                 },
                 EntityView {
@@ -439,6 +440,7 @@ mod tests {
                     rally: None,
                     oil_used: None,
                     queued_markers: Vec::new(),
+                    active_marker: None,
                     vision_only: false,
                 },
                 EntityView {
@@ -464,6 +466,7 @@ mod tests {
                     rally: None,
                     oil_used: None,
                     queued_markers: Vec::new(),
+                    active_marker: None,
                     vision_only: false,
                 },
                 EntityView {
@@ -489,6 +492,7 @@ mod tests {
                     rally: None,
                     oil_used: None,
                     queued_markers: Vec::new(),
+                    active_marker: None,
                     vision_only: false,
                 },
                 EntityView {
@@ -514,6 +518,7 @@ mod tests {
                     rally: None,
                     oil_used: None,
                     queued_markers: Vec::new(),
+                    active_marker: None,
                     vision_only: false,
                 },
             ],

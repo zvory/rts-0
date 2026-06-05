@@ -121,7 +121,7 @@ export const NOTICE_SEVERITY = Object.freeze({
 });
 
 // --- Compact snapshot wire schema (must match protocol.rs) ---
-export const COMPACT_SNAPSHOT_VERSION = 2;
+export const COMPACT_SNAPSHOT_VERSION = 3;
 
 export const KIND_CODE = Object.freeze({
   [KIND.WORKER]: 1,
@@ -233,7 +233,7 @@ function decodeCompactPlayerResource(record, index) {
 }
 
 function decodeCompactEntity(record, index) {
-  const fields = readArray(record, `entity ${index}`, 23);
+  const fields = readArray(record, `entity ${index}`, 24);
   if (fields.length < 8) throw new Error(`entity ${index} is too short`);
   const entity = {
     id: readU32(fields[0], "entity.id"),
@@ -260,7 +260,8 @@ function decodeCompactEntity(record, index) {
   assignOptional(entity, "oilUsed", fields, 19, readNumber);
   assignOptional(entity, "setupFacing", fields, 20, readNumber);
   assignQueuedMarkers(entity, fields, 21);
-  assignOptional(entity, "visionOnly", fields, 22, readBool);
+  assignPointMarker(entity, "activeMarker", fields, 22);
+  assignOptional(entity, "visionOnly", fields, 23, readBool);
   return entity;
 }
 
@@ -276,19 +277,27 @@ function assignRally(target, fields, index) {
 function assignQueuedMarkers(target, fields, index) {
   if (index >= fields.length || fields[index] == null) return;
   const markers = readArray(fields[index], "entity.queuedMarkers", MAX_COMPACT_QUEUED_MARKERS);
-  target.queuedMarkers = markers.map((record, markerIndex) => {
-    const marker = readArray(record, `entity.queuedMarkers.${markerIndex}`, 3);
-    if (marker.length !== 2 && marker.length !== 3) {
-      throw new Error(`entity.queuedMarkers.${markerIndex} field count mismatch`);
-    }
-    return {
-      x: readNumber(marker[0], `entity.queuedMarkers.${markerIndex}.x`),
-      y: readNumber(marker[1], `entity.queuedMarkers.${markerIndex}.y`),
-      attackMove: marker.length > 2
-        ? readBool(marker[2], `entity.queuedMarkers.${markerIndex}.attackMove`)
-        : false,
-    };
-  });
+  target.queuedMarkers = markers.map((record, markerIndex) =>
+    readPointMarker(record, `entity.queuedMarkers.${markerIndex}`),
+  );
+}
+
+/** Decode a single optional owner-only point marker. */
+function assignPointMarker(target, property, fields, index) {
+  if (index >= fields.length || fields[index] == null) return;
+  target[property] = readPointMarker(fields[index], `entity.${property}`);
+}
+
+function readPointMarker(record, label) {
+  const marker = readArray(record, label, 3);
+  if (marker.length !== 2 && marker.length !== 3) {
+    throw new Error(`${label} field count mismatch`);
+  }
+  return {
+    x: readNumber(marker[0], `${label}.x`),
+    y: readNumber(marker[1], `${label}.y`),
+    attackMove: marker.length > 2 ? readBool(marker[2], `${label}.attackMove`) : false,
+  };
 }
 
 function decodeCompactResourceDelta(record, index) {

@@ -128,6 +128,7 @@ pub fn project_entity(
         if let Some((rx, ry)) = entity.rally_point() {
             view.rally = Some([rx, ry]);
         }
+        view.active_marker = active_order_marker(entity);
         view.queued_markers = queued_order_markers(entity);
     }
 
@@ -159,6 +160,19 @@ pub fn project_entity(
     }
 
     Some(view)
+}
+
+fn active_order_marker(entity: &Entity) -> Option<QueuedOrderMarker> {
+    let attack_move = match entity.order() {
+        Order::Move(_) => false,
+        Order::AttackMove(_) => true,
+        Order::Idle | Order::Attack(_) | Order::Gather(_) | Order::Build(_) => return None,
+    };
+    let (x, y) = entity.path_goal().or_else(|| entity.move_intent())?;
+    if !x.is_finite() || !y.is_finite() {
+        return None;
+    }
+    Some(QueuedOrderMarker { x, y, attack_move })
 }
 
 fn queued_order_markers(entity: &Entity) -> Vec<QueuedOrderMarker> {
@@ -315,6 +329,7 @@ mod tests {
             .expect("node should spawn");
         {
             let unit = entities.get_mut(unit_id).expect("unit should exist");
+            unit.set_order(Order::attack_move_to(120.0, 130.0));
             unit.append_queued_order(OrderIntent::move_to(140.0, 160.0));
             unit.append_queued_order(OrderIntent::attack(hidden_enemy));
             unit.append_queued_order(OrderIntent::gather(hidden_node));
@@ -333,6 +348,14 @@ mod tests {
 
         let owner_view = project_entity(1, unit, &fog, Some(&fog), true, None)
             .expect("owner should see own unit");
+        assert_eq!(
+            owner_view.active_marker,
+            Some(QueuedOrderMarker {
+                x: 120.0,
+                y: 130.0,
+                attack_move: true,
+            })
+        );
         assert_eq!(owner_view.queued_markers.len(), 2);
         assert_eq!(
             owner_view.queued_markers[0],
@@ -353,6 +376,7 @@ mod tests {
 
         let enemy_view = project_entity(2, unit, &fog, Some(&fog), false, None)
             .expect("full view should include unit");
+        assert_eq!(enemy_view.active_marker, None);
         assert!(enemy_view.queued_markers.is_empty());
     }
 }

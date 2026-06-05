@@ -149,16 +149,22 @@ export function _drawQueuedOrderMarkers(state) {
 
   for (const e of state.selectedEntities()) {
     if (e.owner !== state.playerId || !isUnit(e.kind)) continue;
-    const markers = Array.isArray(e.queuedMarkers)
+    const activeMarker = Number.isFinite(e.activeMarker?.x) && Number.isFinite(e.activeMarker?.y)
+      ? e.activeMarker
+      : null;
+    const queuedMarkers = Array.isArray(e.queuedMarkers)
       ? e.queuedMarkers.filter((m) => Number.isFinite(m?.x) && Number.isFinite(m?.y))
       : [];
+    const markers = activeMarker ? [activeMarker, ...queuedMarkers] : queuedMarkers;
     if (markers.length === 0) continue;
 
     let fromX = e.x;
     let fromY = e.y;
-    for (const marker of markers) {
+    for (let i = 0; i < markers.length; i += 1) {
+      const marker = markers[i];
       const color = marker.attackMove ? attackColor : moveColor;
-      g.lineStyle(2, color, 0.48);
+      const alpha = i === 0 && activeMarker ? 0.68 : 0.48;
+      g.lineStyle(2, color, alpha);
       if (marker.attackMove) {
         dashedLine(g, fromX, fromY, marker.x, marker.y, 12, 8);
       } else {
