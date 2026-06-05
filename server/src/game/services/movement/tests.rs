@@ -1833,6 +1833,49 @@ fn scout_car_does_not_pivot_in_place_for_far_goal_behind() {
 }
 
 #[test]
+fn scout_car_reversing_to_nearby_offset_goal_arrives() {
+    let map = flat_map(1);
+    let mut entities = EntityStore::new();
+    let (sx, sy) = map.tile_center(20, 20);
+    let goal = (sx - config::TILE_SIZE as f32 * 2.0, sy + 20.0);
+    let scout = entities
+        .spawn_unit(1, EntityKind::ScoutCar, sx, sy)
+        .expect("scout car should spawn");
+    if let Some(e) = entities.get_mut(scout) {
+        e.set_facing(0.0);
+        e.set_order(Order::move_to(goal.0, goal.1));
+    }
+    set_path_direct(&mut entities, scout, vec![goal]);
+
+    for tick in 0..120 {
+        let occ = Occupancy::build(&map, &entities);
+        let spatial = SpatialIndex::build(&entities, map.size);
+        movement_system(&map, &mut entities, &mut [], &occ, &spatial, tick);
+        if entities
+            .get(scout)
+            .is_some_and(|e| e.path_is_empty() && matches!(e.order(), Order::Idle))
+        {
+            break;
+        }
+    }
+
+    let e = entities.get(scout).expect("scout car should exist");
+    assert!(
+        e.path_is_empty() && matches!(e.order(), Order::Idle),
+        "reverse steering should settle at the final waypoint instead of jiggling near it; pos=({:.2},{:.2}) goal=({:.2},{:.2}) facing={:.3}",
+        e.pos_x,
+        e.pos_y,
+        goal.0,
+        goal.1,
+        e.facing()
+    );
+    assert!(
+        moved_distance((e.pos_x, e.pos_y), goal) <= ARRIVE_EPS,
+        "scout car should finish on the ordered point"
+    );
+}
+
+#[test]
 fn tank_body_facing_turns_gradually_along_path() {
     let map = flat_map(1);
     let mut entities = EntityStore::new();
