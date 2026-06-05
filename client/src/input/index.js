@@ -13,6 +13,8 @@
 //     state.updatePlacement, confirm with a valid left-click, cancel with right/Esc.
 //   - Keyboard: command-card grid hotkeys (QWE/ASD/ZXC) activate buttons directly;
 //     Esc cancels placement/targeting; S also falls back to stop when no card button is active.
+//     Number keys recall control groups; double-tap jumps to the densest visible
+//     cluster. Alt/Ctrl/Cmd+number replaces a group, and Shift+number adds to it.
 //   - Mouse wheel = camera zoom toward the cursor.
 //   - Arrow-key pan state is OWNED here and exposed via `this.keys` so the camera can
 //     read it in Camera.update(dt, input) — see the `keys` field documentation below.
@@ -46,6 +48,11 @@ import {
   _refreshPlacement,
   footprintValidAgainstEntities,
 } from "./placement.js";
+import {
+  _controlGroupSlotFromKey,
+  _handleControlGroupHotkey,
+  _jumpToControlGroupCluster,
+} from "./control_groups.js";
 import {
   _closestIdsToPoint,
   _closestOwnUnitKindInViewport,
@@ -107,6 +114,8 @@ export class Input {
     this._dragging = false;
     // Last completed single click: { x, y, t } in screen pixels + timestamp ms.
     this._lastClick = null;
+    // Last recalled control-group slot for number-key double-tap camera jumps.
+    this._lastControlGroupTap = null;
     // Space held: left-drag pans instead of selecting/placing.
     this._spacePan = false;
     // Active direct camera pan, in screen pixels, or null when not panning.
@@ -514,6 +523,7 @@ export class Input {
 
   /** Window blur: release all pan keys so the camera doesn't drift while away. */
   /** Esc cancel: drop placement first, then targeting, then selection. */
+  /** Number-key control groups: save/add/recall, with recall double-tap camera jump. */
   // --- Mouse wheel: zoom toward cursor ------------------------------------
 
 }
@@ -540,6 +550,9 @@ Object.assign(Input.prototype, {
   _refreshPlacement,
   _footprintValid,
   _confirmPlacement,
+  _controlGroupSlotFromKey,
+  _handleControlGroupHotkey,
+  _jumpToControlGroupCluster,
   _handleKeyDown,
   _handleKeyUp,
   _handleBlur,

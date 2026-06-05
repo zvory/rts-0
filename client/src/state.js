@@ -7,7 +7,7 @@
 // server never sees them directly (only the resulting commands).
 
 import { RESOURCE_AMOUNTS } from "./config.js";
-import { KIND, PASSABLE, isResource } from "./protocol.js";
+import { KIND, PASSABLE, isBuilding, isResource, isUnit } from "./protocol.js";
 
 const TWO_PI = Math.PI * 2;
 const WEAPON_RECOIL_MS = Object.freeze({
@@ -79,6 +79,8 @@ export class GameState {
     // --- selection (client-only) ---
     /** @type {Set<number>} */
     this.selection = new Set();
+    /** @type {Array<Array<number>>} ten local control groups, slot 9 is key 0. */
+    this.controlGroups = Array.from({ length: 10 }, () => []);
 
     // --- build placement preview (client-only) ---
     /** @type {null | {building:string, tileX:number, tileY:number, valid:boolean}} */
@@ -172,6 +174,7 @@ export class GameState {
     this.playerResources = msg.playerResources || [];
     this.events = msg.events || [];
     this._pruneSelection();
+    this._pruneControlGroups();
 
     for (const ev of this.events) {
       if (ev && ev.e === "attack" && typeof ev.from === "number" && typeof ev.to === "number") {
@@ -371,6 +374,116 @@ export class GameState {
       }
     }
     if (changed) this.selection = live;
+  }
+
+  /**
+   * Replace a control group with currently-live own units/buildings.
+   * @param {number} slot 0-based control-group slot; slot 9 maps to key 0.
+   * @param {Iterable<number>} ids selected ids to store.
+   * @returns {Array<number>} stored ids.
+   */
+  setControlGroup(slot, ids) {
+    if (!this._validControlGroupSlot(slot)) return [];
+    const next = this._ownControllableIds(ids, GameState.MAX_SELECTION_SIZE);
+    this.controlGroups[slot] = next;
+    return next.slice();
+  }
+
+  /**
+   * Add currently-live own units/buildings to a control group, ignoring overflow.
+   * @param {number} slot 0-based control-group slot; slot 9 maps to key 0.
+   * @param {Iterable<number>} ids selected ids to add.
+   * @returns {Array<number>} stored ids after the add.
+   */
+  addToControlGroup(slot, ids) {
+    if (!this._validControlGroupSlot(slot)) return [];
+    const merged = this.controlGroups[slot] ? this.controlGroups[slot].slice() : [];
+    const seen = new Set(merged);
+    const additions = this._ownControllableIds(ids, GameState.MAX_SELECTION_SIZE);
+    for (const id of additions) {
+      if (merged.length >= GameState.MAX_SELECTION_SIZE) break;
+      if (seen.has(id)) continue;
+      merged.push(id);
+      seen.add(id);
+    }
+    this.controlGroups[slot] = merged;
+    return merged.slice();
+  }
+
+  /**
+   * Resolve a control group to live entities, pruning dead/stale ids first.
+   * @param {number} slot 0-based control-group slot; slot 9 maps to key 0.
+   * @returns {Array<object>}
+   */
+  controlGroupEntities(slot) {
+    if (!this._validControlGroupSlot(slot)) return [];
+    this._pruneControlGroup(slot);
+    const out = [];
+    for (const id of this.controlGroups[slot]) {
+      const e = this._curById.get(id);
+      if (e) out.push(e);
+    }
+    return out;
+  }
+
+  /**
+   * Select a control group if it has live members.
+   * @param {number} slot 0-based control-group slot; slot 9 maps to key 0.
+   * @returns {Array<number>} selected ids.
+   */
+  selectControlGroup(slot) {
+    if (!this._validControlGroupSlot(slot)) return [];
+    this._pruneControlGroup(slot);
+    const ids = this.controlGroups[slot] || [];
+    if (ids.length > 0) this.setSelection(ids);
+    return ids.slice();
+  }
+
+  _validControlGroupSlot(slot) {
+    return Number.isInteger(slot) && slot >= 0 && slot < this.controlGroups.length;
+  }
+
+  _ownControllableIds(ids, limit) {
+    const out = [];
+    const seen = new Set();
+    for (const id of ids || []) {
+      if (out.length >= limit) break;
+      if (seen.has(id)) continue;
+      const e = this._curById.get(id);
+      if (!e || e.owner !== this.playerId) continue;
+      if (!isUnit(e.kind) && !isBuilding(e.kind)) continue;
+      out.push(id);
+      seen.add(id);
+    }
+    return out;
+  }
+
+  _pruneControlGroups() {
+    for (let i = 0; i < this.controlGroups.length; i++) this._pruneControlGroup(i);
+  }
+
+  _pruneControlGroup(slot) {
+    const group = this.controlGroups[slot];
+    if (!group || group.length === 0) return;
+    const live = [];
+    let changed = false;
+    const seen = new Set();
+    for (const id of group) {
+      const e = this._curById.get(id);
+      if (
+        e &&
+        e.owner === this.playerId &&
+        (isUnit(e.kind) || isBuilding(e.kind)) &&
+        !seen.has(id) &&
+        live.length < GameState.MAX_SELECTION_SIZE
+      ) {
+        live.push(id);
+        seen.add(id);
+      } else {
+        changed = true;
+      }
+    }
+    if (changed) this.controlGroups[slot] = live;
   }
 
   // --- build placement (client-only) -------------------------------------
