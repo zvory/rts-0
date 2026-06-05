@@ -871,8 +871,8 @@ fn packed_at_team_fires_with_shorter_range_and_reduced_damage() {
 
     assert_eq!(
         entities.get(tank_id).expect("enemy should exist").hp,
-        enemy_hp - 47,
-        "packed AT gun should deal 75% of its deployed 62 damage"
+        enemy_hp - 45,
+        "packed AT gun should deal 75% of its deployed 60 damage"
     );
 }
 
@@ -1263,8 +1263,8 @@ fn tank_front_and_rear_hits_take_different_damage() {
     let front_hp = tank_hp_after_at_hit((140.0, 100.0));
     let rear_hp = tank_hp_after_at_hit((60.0, 100.0));
 
-    assert_eq!(front_hp, 342);
-    assert_eq!(rear_hp, 306);
+    assert_eq!(front_hp, 244);
+    assert_eq!(rear_hp, 208);
     assert!(
         front_hp > rear_hp,
         "rear AT hits should deal more damage than front hits"
