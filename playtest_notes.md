@@ -1,8 +1,5 @@
 - contorl groups
 - left click bug stille xists
-- you are under attack plays when supply blocked
-- make scout car much quieter
-- make scout car turn radius smaller
 
 - make it so that AT guns are revealed by shooting, and there's an obvious visual animatino 
 - imposisble to get units through the side entrances
@@ -20,21 +17,5 @@
 
 
 tanks are getting stuck on corners because they're not giving themselves enough clearance in their pathfindign. i think we implemented something like this for scoutcars, so maybe something can be re-used or copied
-
-
----
-
-AT guns should move like tanks, they have two wheels.their current point movement semantics look very bad.
-
----
-
-queued orders don't render correctly. the first order works as before, but then holding shift and then right clicking somewhere else draw a line from the unit to the new waypoint, even though the worker keeps walking towards the initial waypoint 
-
-in general, the active waypoint doesn't get displayed, only the one after the active one. 
-
----
-
-add a ten second cooldown to the charge ability, that's visible by the button having a like a clock like circle that fills up when the charge is available again. if any unit has an ability available, it should display as available, with a tiny number in the top left of the button with how many can charge. this is how cooldowns should work for all abiliites in the future. so it
-would be good to make this like, systematized.
 
 
