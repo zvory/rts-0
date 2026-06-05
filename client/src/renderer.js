@@ -22,6 +22,8 @@ import {
   TANK_BODY,
   PLAYER_PALETTE,
   RESOURCE_AMOUNTS,
+  AT_GUN_DEPLOYED_RANGE_TILES,
+  AT_GUN_FIELD_OF_FIRE_RAD,
   isProducerBuilding,
 } from "./config.js";
 import {
@@ -260,6 +262,7 @@ export class Renderer {
     // Overlays.
     this._drawFog(fog);
     this._drawCommandFeedback(state);
+    this._drawAtGunSetupPreview(state);
     this._drawRallyPoints(state);
     this._drawResourceMiningPreview(state);
     this._drawMuzzleFlashes(state);
@@ -972,6 +975,32 @@ export class Renderer {
         g.lineTo(f.x - r * 0.72, f.y);
         g.lineTo(f.x, f.y - r);
       }
+    }
+  }
+
+  /** Draw AT gun setup and selected deployed field-of-fire wedges. @private */
+  _drawAtGunSetupPreview(state) {
+    if (!state || typeof state.selectedEntities !== "function") return;
+    const g = this._feedbackGfx;
+    const tileSize = (this._map && this._map.tileSize) || 32;
+    const radius = AT_GUN_DEPLOYED_RANGE_TILES * tileSize;
+    const color = 0x4aa3ff;
+
+    for (const e of state.selectedEntities()) {
+      if (e.owner !== state.playerId || e.kind !== KIND.AT_TEAM) continue;
+      if (e.setupState !== SETUP.DEPLOYED) continue;
+      const facing = finiteNumber(e.setupFacing) ? e.setupFacing : finiteNumber(e.facing) ? e.facing : null;
+      if (facing == null) continue;
+      drawFacingWedge(g, e.x, e.y, radius, facing, AT_GUN_FIELD_OF_FIRE_RAD, color, 0.08, 0.26);
+    }
+
+    const preview = state.atGunSetupPreview;
+    if (!preview || !Array.isArray(preview.guns)) return;
+    for (const e of preview.guns) {
+      if (!finiteNumber(e.x) || !finiteNumber(e.y)) continue;
+      const facing = Math.atan2(preview.mouseY - e.y, preview.mouseX - e.x);
+      if (!Number.isFinite(facing)) continue;
+      drawFacingWedge(g, e.x, e.y, radius, facing, AT_GUN_FIELD_OF_FIRE_RAD, color, 0.16, 0.58);
     }
   }
 
@@ -1877,6 +1906,26 @@ function drawRotatedLine(g, cx, cy, x1, y1, x2, y2, a) {
   const p2 = rotatePoint(x2, y2, a);
   g.moveTo(cx + p1.x, cy + p1.y);
   g.lineTo(cx + p2.x, cy + p2.y);
+}
+
+function drawFacingWedge(g, x, y, radius, facing, width, color, fillAlpha, lineAlpha) {
+  const half = width / 2;
+  const start = facing - half;
+  const end = facing + half;
+  const sx = x + Math.cos(start) * radius;
+  const sy = y + Math.sin(start) * radius;
+
+  g.lineStyle(1.5, color, lineAlpha);
+  g.beginFill(color, fillAlpha);
+  g.moveTo(x, y);
+  g.lineTo(sx, sy);
+  g.arc(x, y, radius, start, end);
+  g.lineTo(x, y);
+  g.endFill();
+}
+
+function finiteNumber(value) {
+  return typeof value === "number" && Number.isFinite(value);
 }
 
 function angleLerp(a, b, t) {

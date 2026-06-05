@@ -33,6 +33,8 @@ export const CMD = Object.freeze({
   MOVE: "move",
   ATTACK_MOVE: "attackMove",
   ATTACK: "attack",
+  SETUP_AT_GUNS: "setupAtGuns",
+  TEAR_DOWN_AT_GUNS: "tearDownAtGuns",
   GATHER: "gather",
   BUILD: "build",
   TRAIN: "train",
@@ -229,7 +231,7 @@ function decodeCompactPlayerResource(record, index) {
 }
 
 function decodeCompactEntity(record, index) {
-  const fields = readArray(record, `entity ${index}`, 20);
+  const fields = readArray(record, `entity ${index}`, 21);
   if (fields.length < 8) throw new Error(`entity ${index} is too short`);
   const entity = {
     id: readU32(fields[0], "entity.id"),
@@ -254,6 +256,7 @@ function decodeCompactEntity(record, index) {
   assignOptional(entity, "remaining", fields, 17, readU32);
   assignRally(entity, fields, 18);
   assignOptional(entity, "oilUsed", fields, 19, readNumber);
+  assignOptional(entity, "setupFacing", fields, 20, readNumber);
   return entity;
 }
 
@@ -409,6 +412,8 @@ export const cmd = Object.freeze({
   move: (units, x, y) => ({ c: CMD.MOVE, units, x, y }),
   attackMove: (units, x, y) => ({ c: CMD.ATTACK_MOVE, units, x, y }),
   attack: (units, target) => ({ c: CMD.ATTACK, units, target }),
+  setupAtGuns: (units, x, y) => ({ c: CMD.SETUP_AT_GUNS, units, x, y }),
+  tearDownAtGuns: (units) => ({ c: CMD.TEAR_DOWN_AT_GUNS, units }),
   gather: (units, node) => ({ c: CMD.GATHER, units, node }),
   build: (worker, building, tileX, tileY) => ({ c: CMD.BUILD, worker, building, tileX, tileY }),
   train: (building, unit) => ({ c: CMD.TRAIN, building, unit }),

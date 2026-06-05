@@ -112,6 +112,14 @@ pub enum Command {
         units: Vec<u32>,
         target: u32,
     },
+    SetupAtGuns {
+        units: Vec<u32>,
+        x: f32,
+        y: f32,
+    },
+    TearDownAtGuns {
+        units: Vec<u32>,
+    },
     Gather {
         units: Vec<u32>,
         node: u32,
@@ -328,6 +336,8 @@ pub struct EntityView {
     pub target_id: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub setup_state: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub setup_facing: Option<f32>,
 
     // Unit-producing buildings: rally point [x, y] in world px. Only ever sent to the owner.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -370,6 +380,7 @@ impl EntityView {
             remaining: None,
             target_id: None,
             setup_state: None,
+            setup_facing: None,
             rally: None,
             oil_used: None,
         }
@@ -545,6 +556,9 @@ impl Serialize for CompactEntity<'_> {
         if entity.oil_used.is_some() {
             len = 20;
         }
+        if entity.setup_facing.is_some() {
+            len = 21;
+        }
 
         let mut seq = serializer.serialize_seq(Some(len))?;
         seq.serialize_element(&entity.id)?;
@@ -590,6 +604,9 @@ impl Serialize for CompactEntity<'_> {
         }
         if len > 19 {
             seq.serialize_element(&entity.oil_used)?;
+        }
+        if len > 20 {
+            seq.serialize_element(&entity.setup_facing)?;
         }
         seq.end()
     }

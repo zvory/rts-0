@@ -877,6 +877,12 @@ mod tests {
         if e.kind == EntityKind::MachineGunner {
             v.setup_state = Some(e.weapon_setup().to_protocol_str().to_string());
         }
+        if e.kind == EntityKind::AtTeam {
+            v.setup_state = Some(e.weapon_setup().to_protocol_str().to_string());
+            if e.owner == viewer {
+                v.setup_facing = e.emplacement_facing();
+            }
+        }
         if e.is_building() && !e.prod_queue().is_empty() {
             if let Some(front) = e.prod_queue().first() {
                 v.prod_kind = Some(front.unit.to_protocol_str().to_string());

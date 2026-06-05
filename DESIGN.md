@@ -85,6 +85,8 @@ short but readable. Coordinates are **world pixels** (floats) unless a field nam
 | `move`       | `units: u32[]`, `x: f32`, `y: f32` | Move selected units to a world point. Infantry ignore enemies until they arrive or receive another order; tanks and scout cars keep driving and fire at in-range enemies without chasing. |
 | `attackMove` | `units: u32[]`, `x: f32`, `y: f32` | Move while attacking enemies encountered; this is the aggressive movement order. |
 | `attack`     | `units: u32[]`, `target: u32` | Attack a specific entity. |
+| `setupAtGuns` | `units: u32[]`, `x: f32`, `y: f32` | Manually emplace owned AT guns toward a world point. The server filters the unit list to owned, completed AT guns, clears movement/target state, records the setup facing, and enters `setting_up`. Other selected units are ignored. |
+| `tearDownAtGuns` | `units: u32[]` | Pack up owned AT guns that are `setting_up` or `deployed`. Other selected units are ignored. |
 | `gather`     | `units: u32[]`, `node: u32` | Send workers to harvest a resource node. |
 | `build`      | `worker: u32`, `building: string`, `tileX: u32`, `tileY: u32` | Worker constructs a building at a tile. The server first walks the worker to a nearby point outside the requested footprint, then starts construction once it is in range. `building` ∈ building kinds. |
 | `train`      | `building: u32`, `unit: string` | Queue a unit at a production building. |
@@ -173,7 +175,8 @@ Older object-shaped JSON snapshots remain decodable by the client for fallback/d
     [
       id, owner, kind, x, y, hp, maxHp, state,
       facing?, weaponFacing?, prodKind?, prodProgress?, prodQueue?,
-      buildProgress?, latchedNode?, targetId?, setupState?, remaining?, rally?, oilUsed?
+      buildProgress?, latchedNode?, targetId?, setupState?, remaining?, rally?, oilUsed?,
+      setupFacing?
     ]
   ],
   "r": [[id, remaining]],         // omitted when empty
@@ -226,7 +229,8 @@ watch rooms receive all resource updates).
   // unit-producing buildings:
   rally?: [f32, f32],            // rally point (world px); ONLY ever sent to the owner
   // tanks:
-  oilUsed?: f32                  // lifetime oil burned by movement, in resource units
+  oilUsed?: f32,                 // lifetime oil burned by movement, in resource units
+  setupFacing?: f32              // at_team only: owner-visible deployed arc center; appended after oilUsed in compact snapshots
 }
 ```
 
@@ -682,9 +686,10 @@ Core unit roles:
 - **Tank** is the machine-gun breaker and open-ground power unit: immune to rifle and
   machine-gun small-arms fire, strong against static defenses and exposed infantry, but
   vulnerable to other tanks and anti-tank infantry.
-- **Anti-tank gun team** is the ambush counter to tanks: dangerous from the side,
-  rear, or at close range, especially when operating from forests, but weak or inefficient
-  against regular infantry.
+- **Anti-tank gun team** is the ambush counter to tanks: it can fight while packed at short
+  range with reduced damage, or manually set up into a longer-ranged fixed field of fire.
+  Deployed guns are dangerous from the side or rear, but weak or inefficient against regular
+  infantry and cannot fire outside their emplacement arc.
 
 Terrain rules:
 - **Open ground** favors machine guns and tanks.
@@ -720,7 +725,10 @@ below are the human-readable form of the
 authoritative `rules::defs` records.
 
 - `TICK_HZ = 30`, `SNAPSHOT_EVERY_N_TICKS = 1`.
-- `MACHINE_GUNNER_SETUP_TICKS = 30` (~1s setup or teardown for machine gunners and AT teams).
+- `MACHINE_GUNNER_SETUP_TICKS = 30` (~1s setup or teardown for support weapons).
+- AT guns use `AT_GUN_PACKED_RANGE_TILES = 4`, `AT_GUN_DEPLOYED_RANGE_TILES = 7`,
+  `AT_GUN_PACKED_DAMAGE_MULTIPLIER = 0.75`, and
+  `AT_GUN_FIELD_OF_FIRE_RAD = PI / 6` (30 degrees total).
 - `TANK_OIL_COST_PER_PX = 10 / (96 * TILE_SIZE)`: a tank driving one full 96-tile map width
   burns approximately 10 oil. Tanks cannot advance while their owner has zero oil.
 - Map: `TILE_SIZE = 32` px. The live map is the hardcoded handcrafted asset at
@@ -761,7 +769,7 @@ Unit stats (hp, dmg, range[tiles], cooldown[ticks], speed[px/tick], sight[tiles]
 | worker          | 40  | 4   | 1     | 24 | 1.6   | 7     | 50  | 0   | 1   | 360 (~12s) |
 | rifleman        | 45  | 5   | 4     | 16 | 1.6   | 8     | 50  | 0   | 1   | 300 (~10s) |
 | machine_gunner  | 55  | 4   | 5     | 6  | 1.28  | 8     | 75  | 25  | 2   | 400 (~13s) |
-| at_team         | 45  | 48  | 5     | 72 | 1.152 | 6     | 75  | 25  | 3   | 440 (~15s); requires Steelworks |
+| at_team         | 45  | 48 deployed / 36 packed | 7 deployed / 4 packed | 72 | 1.152 | 6     | 75  | 25  | 3   | 440 (~15s); requires Steelworks |
 | scout_car       | 150 | 4   | 5     | 6  | 2.35  | 10    | 125 | 75  | 3   | 480 (~16s) |
 | tank            | 390 | 60  | 5     | 72 | 2.0   | 6     | 200 | 150 | 6   | 750 (~25s); requires Steelworks |
 
