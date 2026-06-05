@@ -51,6 +51,7 @@ import {
   _commitClickSelection,
   _entityAtWorld,
   _entityIntersectsRect,
+  _resourceAtWorld,
   _ownBuildingsOfKindInViewport,
   _worldPointHitsEntity,
 } from "./selection.js";
@@ -409,6 +410,7 @@ Object.assign(Input.prototype, {
   _refreshResourceMiningPreview,
   _nearestOwnCompletedCityCentre,
   _entityAtWorld,
+  _resourceAtWorld,
   _worldPointHitsEntity,
   _entityIntersectsRect,
   _refreshPlacement,

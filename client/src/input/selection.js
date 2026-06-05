@@ -1,4 +1,4 @@
-import { isUnit, isBuilding, KIND, SETUP } from "../protocol.js";
+import { isUnit, isBuilding, isResource, KIND, SETUP } from "../protocol.js";
 import { STATS } from "../config.js";
 import { DEFAULT_HIT_RADIUS, DEFAULT_TILE_SIZE, HIT_PAD_PX, OWN_HIT_BONUS } from "./constants.js";
 import { entityIntersectsRect, isVehicleBodyKind, pointHitsOrientedVehicle } from "./placement.js";
@@ -154,6 +154,24 @@ export function _entityAtWorld(wx, wy, ownPreferred) {
     const score = dist - ownBonus;
     if (score < bestScore) {
       bestScore = score;
+      best = e;
+    }
+  }
+  return best;
+}
+
+export function _resourceAtWorld(wx, wy) {
+  const entities = this.state.entitiesInterpolated(1);
+  const tileSize = this.state.map ? this.state.map.tileSize : DEFAULT_TILE_SIZE;
+
+  let best = null;
+  let bestDist = Infinity;
+  for (const e of entities) {
+    if (!isResource(e.kind) || e.remaining === 0) continue;
+    if (!this._worldPointHitsEntity(e, wx, wy, tileSize)) continue;
+    const dist = Math.hypot(wx - e.x, wy - e.y);
+    if (dist < bestDist || (dist === bestDist && e.id < best.id)) {
+      bestDist = dist;
       best = e;
     }
   }

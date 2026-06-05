@@ -18,8 +18,6 @@ pub(crate) fn gather_system(
     _spatial: &SpatialIndex,
     coordinator: &mut MoveCoordinator<'_>,
 ) {
-    let interact = config::TILE_SIZE as f32 * 0.1;
-
     for id in entities.ids() {
         let node = match entities.get(id) {
             Some(e) if e.hp > 0 && e.kind == EntityKind::Worker => match e.order().gather_node() {
@@ -35,7 +33,7 @@ pub(crate) fn gather_system(
             .unwrap_or(GatherPhase::ToNode);
         match phase {
             GatherPhase::ToNode | GatherPhase::ToHome => {
-                gather_to_node(map, entities, occ, coordinator, id, node, interact)
+                gather_to_node(map, entities, occ, coordinator, id, node)
             }
             GatherPhase::Harvesting => gather_harvesting(entities, players, id, node),
         }
@@ -49,7 +47,6 @@ fn gather_to_node(
     coordinator: &mut MoveCoordinator<'_>,
     id: u32,
     node: u32,
-    interact: f32,
 ) {
     let node_pos = match entities.get(node) {
         Some(n) if n.is_node() && n.remaining().unwrap_or(0) > 0 => (n.pos_x, n.pos_y),
@@ -72,6 +69,13 @@ fn gather_to_node(
         return;
     }
 
+    let interact = match (entities.get(id), entities.get(node)) {
+        (Some(worker), Some(node)) => {
+            worker.radius() + node.radius() + config::TILE_SIZE as f32 * 0.1
+        }
+        _ => return,
+    };
+
     if dist2(wx, wy, node_pos.0, node_pos.1).sqrt() <= interact {
         let can_mine = !matches!(entities.node_slot_holder(node), Some(m) if m != id);
         if let Some(e) = entities.get_mut(id) {
@@ -80,7 +84,7 @@ fn gather_to_node(
             if can_mine {
                 e.mark_gather_phase(GatherPhase::Harvesting);
             } else {
-                e.clear_orders();
+                e.mark_gather_phase(GatherPhase::ToNode);
             }
         }
         if can_mine && !entities.claim_miner(node, id) {

@@ -789,6 +789,126 @@ fn gather_command_ignores_nodes_without_nearby_completed_cc() {
 }
 
 #[test]
+fn gather_command_to_occupied_patch_still_orders_worker_without_mining() {
+    let players = [PlayerInit {
+        id: 1,
+        name: "Solo".into(),
+        color: "#fff".into(),
+        is_ai: false,
+    }];
+    let mut game = Game::new_for_replay(&players, 0x1234_5678);
+    let mut workers: Vec<u32> = game
+        .entities
+        .iter()
+        .filter(|e| e.owner == 1 && e.kind == EntityKind::Worker)
+        .map(|e| e.id)
+        .collect();
+    workers.sort_unstable();
+    let holder = workers[0];
+    let ordered = workers[1];
+    let node = game
+        .entities
+        .iter()
+        .find(|e| e.is_node())
+        .map(|e| e.id)
+        .expect("starting resource node");
+    let (node_x, node_y) = game
+        .entities
+        .get(node)
+        .map(|e| (e.pos_x, e.pos_y))
+        .expect("node position");
+
+    {
+        let holder_entity = game.entities.get_mut(holder).expect("holder worker");
+        holder_entity.pos_x = node_x;
+        holder_entity.pos_y = node_y;
+        holder_entity.set_order(Order::gather(node));
+        holder_entity.mark_gather_phase(GatherPhase::Harvesting);
+    }
+    assert!(game.entities.claim_miner(node, holder));
+    {
+        let ordered_entity = game.entities.get_mut(ordered).expect("ordered worker");
+        ordered_entity.pos_x = node_x + 4.0;
+        ordered_entity.pos_y = node_y;
+    }
+
+    game.enqueue(
+        1,
+        Command::Gather {
+            units: vec![ordered],
+            node,
+        },
+    );
+    game.tick();
+
+    let ordered_worker = game.entities.get(ordered).expect("worker survives");
+    assert!(
+        matches!(ordered_worker.order(), Order::Gather(_)),
+        "occupied patches should still accept gather orders so workers can approach the patch"
+    );
+    assert_eq!(
+        ordered_worker.gather_phase(),
+        Some(GatherPhase::ToNode),
+        "only the current node holder can enter Harvesting"
+    );
+    assert_eq!(
+        game.entities.node_slot_holder(node),
+        Some(holder),
+        "the original worker should remain the single active miner"
+    );
+}
+
+#[test]
+fn worker_already_touching_resource_body_starts_harvesting() {
+    let players = [PlayerInit {
+        id: 1,
+        name: "Solo".into(),
+        color: "#fff".into(),
+        is_ai: false,
+    }];
+    let mut game = Game::new_for_replay(&players, 0x1234_5678);
+    let worker = game
+        .entities
+        .iter()
+        .find(|e| e.owner == 1 && e.kind == EntityKind::Worker)
+        .map(|e| e.id)
+        .expect("starting worker");
+    let node = game
+        .entities
+        .iter()
+        .find(|e| e.is_node())
+        .map(|e| e.id)
+        .expect("starting resource node");
+    let (node_x, node_y) = game
+        .entities
+        .get(node)
+        .map(|e| (e.pos_x, e.pos_y))
+        .expect("node position");
+    let worker_radius = game.entities.get(worker).expect("worker").radius();
+    let node_radius = game.entities.get(node).expect("node").radius();
+    {
+        let worker_entity = game.entities.get_mut(worker).expect("worker");
+        worker_entity.pos_x = node_x + worker_radius + node_radius - 1.0;
+        worker_entity.pos_y = node_y;
+    }
+
+    game.enqueue(
+        1,
+        Command::Gather {
+            units: vec![worker],
+            node,
+        },
+    );
+    game.tick();
+
+    assert_eq!(
+        game.entities.get(worker).and_then(|e| e.gather_phase()),
+        Some(GatherPhase::Harvesting),
+        "worker already touching the resource body should not need to reach the exact node center"
+    );
+}
+
+#[test]
 fn active_mining_stops_when_nearby_cc_is_removed() {
     let players = [PlayerInit {
         id: 1,
