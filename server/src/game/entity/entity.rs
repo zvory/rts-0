@@ -190,6 +190,7 @@ impl Entity {
             m.stuck_ticks = 0;
             m.last_progress_pos = (pos_x, pos_y);
             m.sidestep_cooldown = 0;
+            m.scout_car_recovery_cooldown = 0;
             m.static_blocked_ticks = 0;
         }
     }

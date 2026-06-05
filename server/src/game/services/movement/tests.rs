@@ -2077,6 +2077,213 @@ fn scout_car_locomotion_suppresses_illegal_rotation_when_blocked() {
     ));
 }
 
+fn front_blocked_scout_car_fixture() -> (Map, EntityStore, u32, (f32, f32), (f32, f32), f32) {
+    let map = flat_map(1);
+    let mut entities = EntityStore::new();
+    let (bx, by) = footprint_center(&map, EntityKind::Factory, 22, 9);
+    entities
+        .spawn_building(1, EntityKind::Factory, bx, by, true)
+        .expect("factory spawn");
+    let rect = building_rect_for_footprint(EntityKind::Factory, 22, 9).expect("factory rect");
+
+    let start = (
+        rect.max_x + config::SCOUT_CAR_BODY_LENGTH_PX * 0.5 + 1.5,
+        (rect.min_y + rect.max_y) * 0.5,
+    );
+    let initial_facing = std::f32::consts::PI;
+    let goal = (
+        rect.min_x - config::TILE_SIZE as f32 * 2.0,
+        rect.max_y + config::TILE_SIZE as f32 * 3.0,
+    );
+    let scout = entities
+        .spawn_unit(1, EntityKind::ScoutCar, start.0, start.1)
+        .expect("scout car spawn");
+    if let Some(e) = entities.get_mut(scout) {
+        e.set_facing(initial_facing);
+        e.set_order(Order::move_to(goal.0, goal.1));
+        e.reset_stuck(start.0, start.1);
+    }
+    set_path_direct(&mut entities, scout, vec![goal]);
+
+    (map, entities, scout, start, goal, initial_facing)
+}
+
+fn run_scout_car_movement_tick(map: &Map, entities: &mut EntityStore, tick: u32) {
+    let occ = Occupancy::build(map, entities);
+    let spatial = SpatialIndex::build(entities, map.size);
+    movement_system(map, entities, &mut [], &occ, &spatial, tick);
+}
+
+#[test]
+fn scout_car_front_blocked_by_building_injects_reverse_recovery() {
+    let (map, mut entities, scout, start, goal, initial_facing) = front_blocked_scout_car_fixture();
+
+    for tick in 0..config::SCOUT_CAR_STUCK_RECOVERY_TRIGGER_TICKS as u32 {
+        run_scout_car_movement_tick(&map, &mut entities, tick);
+    }
+
+    let e = entities.get(scout).expect("scout car should exist");
+    let recovery = e.next_waypoint().expect("recovery waypoint should exist");
+    assert_ne!(
+        recovery, goal,
+        "recovery should be inserted before the original goal"
+    );
+    assert_eq!(
+        e.movement.as_ref().map(|m| m.path.len()),
+        Some(2),
+        "reverse recovery should add one bounded waypoint ahead of the original goal"
+    );
+    assert!(
+        recovery.0 > start.0 && (recovery.1 - start.1).abs() < config::TILE_SIZE as f32,
+        "recovery should be behind the current hull direction, got {:?} from {:?}",
+        recovery,
+        start
+    );
+
+    for tick in config::SCOUT_CAR_STUCK_RECOVERY_TRIGGER_TICKS as u32
+        ..config::SCOUT_CAR_STUCK_RECOVERY_TRIGGER_TICKS as u32 + 20
+    {
+        run_scout_car_movement_tick(&map, &mut entities, tick);
+    }
+
+    let e = entities.get(scout).expect("scout car should exist");
+    assert!(
+        e.pos_x > start.0 + 4.0,
+        "front-blocked scout car should back away after recovery, start x {:.2}, got {:.2}",
+        start.0,
+        e.pos_x
+    );
+    let occ = Occupancy::build(&map, &entities);
+    assert!(
+        standability::unit_static_standable_with_facing(
+            &map,
+            &occ,
+            EntityKind::ScoutCar,
+            e.pos_x,
+            e.pos_y,
+            e.facing()
+        ),
+        "reverse recovery should keep the scout car body legal; initial facing was {initial_facing:.3}"
+    );
+}
+
+#[test]
+fn scout_car_traffic_throttle_can_trigger_reverse_recovery() {
+    let map = flat_map(1);
+    let mut entities = EntityStore::new();
+    let (sx, sy) = map.tile_center(20, 20);
+    let goal = (sx + config::TILE_SIZE as f32 * 8.0, sy);
+    let scout = entities
+        .spawn_unit(1, EntityKind::ScoutCar, sx, sy)
+        .expect("scout car spawn");
+    let blocker = entities
+        .spawn_unit(2, EntityKind::Tank, sx + 1.0, sy)
+        .expect("traffic blocker spawn");
+    if let Some(e) = entities.get_mut(scout) {
+        e.set_facing(0.0);
+        e.set_order(Order::move_to(goal.0, goal.1));
+        e.reset_stuck(sx, sy);
+    }
+    if let Some(e) = entities.get_mut(blocker) {
+        e.set_facing(0.0);
+        e.pos_x = sx + 0.0001;
+    }
+    set_path_direct(&mut entities, scout, vec![goal]);
+    if let Some(e) = entities.get_mut(scout) {
+        if let Some(m) = e.movement.as_mut() {
+            m.stuck_ticks = config::SCOUT_CAR_STUCK_RECOVERY_TRIGGER_TICKS - 1;
+            m.last_progress_pos = (sx, sy);
+        }
+    }
+
+    run_scout_car_movement_tick(&map, &mut entities, 0);
+
+    let e = entities.get(scout).expect("scout car should exist");
+    assert_eq!(
+        e.movement.as_ref().map(|m| m.path.len()),
+        Some(2),
+        "slow frontal traffic should eventually inject a reverse recovery waypoint"
+    );
+    assert!(
+        e.next_waypoint().is_some_and(|wp| wp.0 < sx),
+        "traffic recovery waypoint should be behind the scout car"
+    );
+}
+
+#[test]
+fn scout_car_recovery_cooldown_bounds_duplicate_waypoints() {
+    let (map, mut entities, scout, _, _, _) = front_blocked_scout_car_fixture();
+    let mut max_path_len = 0usize;
+
+    for tick in 0..config::SCOUT_CAR_RECOVERY_COOLDOWN_TICKS as u32 {
+        run_scout_car_movement_tick(&map, &mut entities, tick);
+        let path_len = entities
+            .get(scout)
+            .and_then(|e| e.movement.as_ref())
+            .map(|m| m.path.len())
+            .unwrap_or(0);
+        max_path_len = max_path_len.max(path_len);
+    }
+
+    assert!(
+        max_path_len <= 2,
+        "recovery should not stack duplicate waypoints; max path len was {max_path_len}"
+    );
+}
+
+#[test]
+fn scout_car_resumes_original_path_after_reverse_recovery() {
+    let (map, mut entities, scout, start, goal, _) = front_blocked_scout_car_fixture();
+
+    for tick in 0..180 {
+        run_scout_car_movement_tick(&map, &mut entities, tick);
+        if entities
+            .get(scout)
+            .is_some_and(|e| e.path_is_empty() && matches!(e.order(), Order::Idle))
+        {
+            break;
+        }
+    }
+
+    let e = entities.get(scout).expect("scout car should exist");
+    assert!(
+        moved_distance((e.pos_x, e.pos_y), goal) < moved_distance(start, goal),
+        "after reversing out, scout car should resume toward the original goal; pos=({:.2},{:.2})",
+        e.pos_x,
+        e.pos_y
+    );
+    assert!(
+        e.path_is_empty() || e.path_goal() == Some(goal),
+        "recovery should preserve the original path goal"
+    );
+}
+
+#[test]
+fn scout_car_reverse_recovery_is_deterministic() {
+    fn run_once() -> ((f32, f32), f32, Vec<(f32, f32)>) {
+        let (map, mut entities, scout, _, _, _) = front_blocked_scout_car_fixture();
+        for tick in 0..90 {
+            run_scout_car_movement_tick(&map, &mut entities, tick);
+        }
+        let e = entities.get(scout).expect("scout car should exist");
+        (
+            (e.pos_x, e.pos_y),
+            e.facing(),
+            e.movement
+                .as_ref()
+                .map(|m| m.path.clone())
+                .unwrap_or_default(),
+        )
+    }
+
+    let a = run_once();
+    let b = run_once();
+    assert_eq!(
+        a, b,
+        "same recovery fixture should produce identical path state"
+    );
+}
+
 #[test]
 fn scout_car_consumes_lateral_intermediate_waypoint_inside_car_radius() {
     let map = flat_map(1);
