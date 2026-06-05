@@ -84,6 +84,17 @@ pub(crate) struct SnapshotRecord {
     pub(crate) events: usize,
 }
 
+#[allow(dead_code)]
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct SnapshotPerfSample {
+    pub(crate) snapshot: Duration,
+    pub(crate) compact: Duration,
+    pub(crate) total: Duration,
+    pub(crate) entities: usize,
+    pub(crate) resource_deltas: usize,
+    pub(crate) events: usize,
+}
+
 #[derive(Clone, Copy, Debug)]
 pub(crate) enum SnapshotEnqueue {
     Stored,
@@ -122,6 +133,21 @@ impl PerfConfig {
 
     pub(crate) fn enabled(&self) -> bool {
         self.mode != PerfMode::Off
+    }
+
+    #[allow(dead_code)]
+    pub(crate) fn slow_tick(&self) -> Duration {
+        self.slow_tick
+    }
+
+    #[allow(dead_code)]
+    pub(crate) fn slow_phase(&self) -> Duration {
+        self.slow_phase
+    }
+
+    #[allow(dead_code)]
+    pub(crate) fn slow_snapshot(&self) -> Duration {
+        self.slow_snapshot
     }
 
     pub(crate) fn enforce_release_build_for_server(&self) {
@@ -204,6 +230,25 @@ impl TickPerf {
             SnapshotEnqueue::Replaced => self.snapshot_replaced += 1,
             SnapshotEnqueue::Closed => self.snapshot_closed += 1,
         }
+    }
+
+    #[allow(dead_code)]
+    pub(crate) fn phase_records(&self) -> impl Iterator<Item = (&'static str, Duration)> + '_ {
+        self.phases
+            .iter()
+            .map(|phase| (phase.phase, phase.duration))
+    }
+
+    #[allow(dead_code)]
+    pub(crate) fn snapshot_records(&self) -> impl Iterator<Item = SnapshotPerfSample> + '_ {
+        self.snapshots.iter().map(|snapshot| SnapshotPerfSample {
+            snapshot: snapshot.snapshot,
+            compact: snapshot.compact,
+            total: snapshot.snapshot + snapshot.compact,
+            entities: snapshot.entities,
+            resource_deltas: snapshot.resource_deltas,
+            events: snapshot.events,
+        })
     }
 
     pub(crate) fn finish(&self, context: TickContext<'_>) {
