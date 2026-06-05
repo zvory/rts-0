@@ -102,6 +102,8 @@ export class Input {
     this._drag = null;
     // Whether the current left press has moved far enough to count as a box drag.
     this._dragging = false;
+    // Last completed single click: { x, y, t } in screen pixels + timestamp ms.
+    this._lastClick = null;
     // Space held: left-drag pans instead of selecting/placing.
     this._spacePan = false;
     // Active direct camera pan, in screen pixels, or null when not panning.
@@ -269,9 +271,16 @@ export class Input {
     this.renderer.drawSelectionBox(null);
 
     if (wasDragging) {
+      this._lastClick = null;
       this._commitBoxSelection(drag, ev.shiftKey);
     } else {
-      this._commitClickSelection(p, ev.shiftKey, ev.ctrlKey || ev.metaKey);
+      const now = performance.now();
+      const last = this._lastClick;
+      const isDouble = last &&
+        (now - last.t) < 300 &&
+        Math.hypot(p.x - last.x, p.y - last.y) < 5;
+      this._lastClick = isDouble ? null : { x: p.x, y: p.y, t: now };
+      this._commitClickSelection(p, ev.shiftKey, (ev.ctrlKey || ev.metaKey) || isDouble);
     }
   }
 
