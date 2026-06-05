@@ -72,6 +72,7 @@ export function _slot(poolName, id) {
   }
   this._seen[poolName].add(id);
   g.visible = true;
+  g.alpha = 1;
   g.clear();
   return g;
 }

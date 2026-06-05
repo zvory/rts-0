@@ -105,6 +105,7 @@ export function _commitBoxSelection(drag, additive) {
   const units = [];
   const buildings = [];
   for (const e of entities) {
+    if (e.shotReveal) continue;
     if (!spectator && e.owner !== me) continue;
     if (spectator && e.owner === 0) continue;
     if (!this._entityIntersectsRect(e, minX, minY, maxX, maxY)) continue;
@@ -145,6 +146,7 @@ export function _entityAtWorld(wx, wy, ownPreferred) {
   let best = null;
   let bestScore = Infinity; // lower is better (distance, with ownership tiebreak)
   for (const e of entities) {
+    if (e.shotReveal) continue;
     if (!this._worldPointHitsEntity(e, wx, wy, tileSize)) continue;
     const dx = wx - e.x;
     const dy = wy - e.y;
@@ -167,6 +169,7 @@ export function _resourceAtWorld(wx, wy) {
   let best = null;
   let bestDist = Infinity;
   for (const e of entities) {
+    if (e.shotReveal) continue;
     if (!isResource(e.kind) || e.remaining === 0) continue;
     if (!this._worldPointHitsEntity(e, wx, wy, tileSize)) continue;
     const dist = Math.hypot(wx - e.x, wy - e.y);

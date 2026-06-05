@@ -387,6 +387,23 @@ impl EntityView {
     }
 }
 
+/// Minimal shooter view attached to selected attack events so the client can show a short-lived
+/// fog reveal without adding a normal fog-visible snapshot entity.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct AttackReveal {
+    pub owner: u32,
+    pub kind: String,
+    pub x: f32,
+    pub y: f32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub facing: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub weapon_facing: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub setup_state: Option<String>,
+}
+
 /// Transient, single-snapshot visual feedback. Clients must not rely on delivery.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "e", rename_all = "camelCase", rename_all_fields = "camelCase")]
@@ -394,6 +411,10 @@ pub enum Event {
     Attack {
         from: u32,
         to: u32,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        reveal: Option<AttackReveal>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        to_pos: Option<[f32; 2]>,
     },
     Death {
         id: u32,
@@ -620,11 +641,29 @@ impl Serialize for CompactEvent<'_> {
         S: Serializer,
     {
         match self.0 {
-            Event::Attack { from, to } => {
-                let mut seq = serializer.serialize_seq(Some(3))?;
+            Event::Attack {
+                from,
+                to,
+                reveal,
+                to_pos,
+            } => {
+                let len = if to_pos.is_some() {
+                    5
+                } else if reveal.is_some() {
+                    4
+                } else {
+                    3
+                };
+                let mut seq = serializer.serialize_seq(Some(len))?;
                 seq.serialize_element(&1u8)?;
                 seq.serialize_element(from)?;
                 seq.serialize_element(to)?;
+                if len > 3 {
+                    seq.serialize_element(&reveal.as_ref().map(CompactAttackReveal))?;
+                }
+                if len > 4 {
+                    seq.serialize_element(to_pos)?;
+                }
                 seq.end()
             }
             Event::Death { id, x, y, kind } => {
@@ -670,6 +709,45 @@ impl Serialize for CompactEvent<'_> {
                 seq.end()
             }
         }
+    }
+}
+
+struct CompactAttackReveal<'a>(&'a AttackReveal);
+
+impl Serialize for CompactAttackReveal<'_> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let reveal = self.0;
+        let setup_state = reveal.setup_state.as_deref().map(setup_state_code);
+
+        let mut len = 4;
+        if reveal.facing.is_some() {
+            len = 5;
+        }
+        if reveal.weapon_facing.is_some() {
+            len = 6;
+        }
+        if setup_state.is_some() {
+            len = 7;
+        }
+
+        let mut seq = serializer.serialize_seq(Some(len))?;
+        seq.serialize_element(&reveal.owner)?;
+        seq.serialize_element(&kind_code(&reveal.kind))?;
+        seq.serialize_element(&reveal.x)?;
+        seq.serialize_element(&reveal.y)?;
+        if len > 4 {
+            seq.serialize_element(&reveal.facing)?;
+        }
+        if len > 5 {
+            seq.serialize_element(&reveal.weapon_facing)?;
+        }
+        if len > 6 {
+            seq.serialize_element(&setup_state)?;
+        }
+        seq.end()
     }
 }
 
@@ -777,7 +855,20 @@ mod tests {
                 remaining: 1498,
             }],
             events: vec![
-                Event::Attack { from: 1, to: 7 },
+                Event::Attack {
+                    from: 1,
+                    to: 7,
+                    reveal: Some(AttackReveal {
+                        owner: 1,
+                        kind: kinds::AT_TEAM.to_string(),
+                        x: 12.0,
+                        y: 24.0,
+                        facing: Some(0.5),
+                        weapon_facing: Some(0.75),
+                        setup_state: Some("deployed".to_string()),
+                    }),
+                    to_pos: Some([48.0, 96.0]),
+                },
                 Event::Death {
                     id: 200,
                     x: 64.0,
@@ -825,6 +916,11 @@ mod tests {
         assert_eq!(value["e"][2][18], serde_json::json!([256.0, 512.0]));
         assert_eq!(value["r"], serde_json::json!([[200, 1498]]));
         assert_eq!(value["ev"].as_array().unwrap().len(), 4);
+        assert_eq!(
+            value["ev"][0][3],
+            serde_json::json!([1, 4, 12.0, 24.0, 0.5, 0.75, 3])
+        );
+        assert_eq!(value["ev"][0][4], serde_json::json!([48.0, 96.0]));
     }
 
     #[test]
