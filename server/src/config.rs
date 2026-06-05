@@ -37,6 +37,21 @@ pub const STATIC_BLOCKED_REPATH_TICKS: u16 = TICK_HZ as u16;
 /// units contesting the same tile center cannot both lock onto it simultaneously.
 pub const ARRIVE_RADIUS_INTERMEDIATE_PX: f32 = TILE_SIZE as f32 * 0.5; // 16 px
 
+/// Scout cars follow route corridors instead of exact intermediate tile centers. This larger
+/// acceptance radius lets the nonholonomic body consume a waypoint it has come alongside.
+pub const SCOUT_CAR_WAYPOINT_ACCEPTANCE_RADIUS_PX: f32 = TILE_SIZE as f32 * 0.75; // 24 px
+/// Final move tolerance for scout cars when exact arrival would require lateral motion.
+pub const SCOUT_CAR_FINAL_GOAL_TOLERANCE_PX: f32 = TILE_SIZE as f32 * 0.375; // 12 px
+/// Scout-car-specific no-progress threshold reserved for reverse recovery behavior.
+#[allow(dead_code)]
+pub const SCOUT_CAR_STUCK_RECOVERY_TRIGGER_TICKS: u16 = STUCK_ARRIVAL_TICKS;
+/// Distance for a scout-car reverse recovery waypoint once recovery behavior is active.
+#[allow(dead_code)]
+pub const SCOUT_CAR_REVERSE_RECOVERY_DISTANCE_PX: f32 = TILE_SIZE as f32 * 2.0;
+/// Cooldown after a scout-car recovery attempt so recovery waypoints stay bounded.
+#[allow(dead_code)]
+pub const SCOUT_CAR_RECOVERY_COOLDOWN_TICKS: u16 = TICK_HZ as u16;
+
 /// Support-weapon setup/teardown time. One second at the simulation tick rate.
 pub const MACHINE_GUNNER_SETUP_TICKS: u16 = TICK_HZ as u16;
 /// Packed AT guns stay mobile and fight only at short range.

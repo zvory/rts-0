@@ -872,10 +872,22 @@ The server treats every client as potentially hostile. Limits live next to the c
   yaw is capped by movement budget over a 1.5-tile minimum turn radius, so it can steer
   while translating but cannot rotate in place when blocked or badly misaligned. Nearby
   behind goals are handled by reversing; farther behind goals make the scout car drive
-  through a broad turn. This is still a
-  path-following approximation, not tire or Ackermann steering physics; replace it with proper
-  truck/wheeled movement semantics when that model exists. Scout cars do not use tank armor or
-  tank damage reduction.
+  through a broad turn. Scout cars follow the route corridor rather than exact intermediate
+  waypoint centers: an intermediate waypoint is consumed inside
+  `SCOUT_CAR_WAYPOINT_ACCEPTANCE_RADIUS_PX` (0.75 tiles) so a car that comes alongside the route can
+  continue to the next segment instead of oscillating around a point it cannot laterally reach. A
+  final move waypoint can settle inside `SCOUT_CAR_FINAL_GOAL_TOLERANCE_PX` (0.375 tiles) only when
+  the remaining error is small and mostly lateral to the car's feasible travel direction; ordinary
+  exact arrival still snaps to the ordered point when the car can actually reach it. Scout-car
+  movement must never accept a rotated or translated oriented body that is statically illegal
+  against terrain or building occupancy, and blocked cars preserve the player's movement order so
+  bounded recovery behavior can continue from the same command. Recovery constants live alongside
+  movement constants (`SCOUT_CAR_STUCK_RECOVERY_TRIGGER_TICKS`,
+  `SCOUT_CAR_REVERSE_RECOVERY_DISTANCE_PX`, `SCOUT_CAR_RECOVERY_COOLDOWN_TICKS`) and are reserved
+  for deterministic reverse-recovery injection; recovery must not add network fields or make normal
+  movement rotate in place. This is still a path-following approximation, not tire or Ackermann
+  steering physics; replace it with proper truck/wheeled movement semantics when that model exists.
+  Scout cars do not use tank armor or tank damage reduction.
 - **Tank movement oil burn**: tanks consume oil based on distance actually moved, using
   `TANK_OIL_COST_PER_PX`. Fractional movement cost accumulates per tank until whole oil units are
   deducted from the owner's stockpile. The tank also tracks lifetime movement oil as `oilUsed` for
