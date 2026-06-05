@@ -88,7 +88,6 @@ export class HUD {
   destroy() {
     if (this.elSelected) {
       this.elSelected.innerHTML = "";
-      this.elSelected.classList.add("empty");
     }
     if (this.elControlGroups) {
       this.elControlGroups.innerHTML = "";
@@ -283,10 +282,8 @@ export class HUD {
     const sel = this.state.selectedEntities();
     if (!sel || sel.length === 0) {
       panel.innerHTML = "";
-      panel.classList.add("empty");
       return;
     }
-    panel.classList.remove("empty");
 
     if (sel.length === 1) {
       panel.innerHTML = "";
