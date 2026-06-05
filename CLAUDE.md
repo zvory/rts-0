@@ -1,9 +1,15 @@
 # CLAUDE.md
 
-Guidance for working in this repo. **Read `DESIGN.md` first** — it is the source of truth for the
-architecture, the JSON wire protocol, every module's contract, the `Game` API seam, the balance
-table, and the hardening limits (§7). Keep `DESIGN.md` updated in the same change whenever you
-alter a contract.
+Guidance for working in this repo. **Read only the relevant context capsule first** —
+`docs/context/` has small, task-scoped capsules (server-sim, client-ui, protocol, balance,
+testing, deployment) that point into the parts of `DESIGN.md` and the code you actually need.
+See [docs/context/README.md](docs/context/README.md) for the capsule index.
+
+**Read `DESIGN.md` in full only when you are changing a cross-file contract** — the wire
+protocol (server ⇄ client), the `Game` API seam, the balance mirror, fog rules, or the
+hardening surface. `DESIGN.md` is still the source of truth; capsules are pointers, not copies.
+Keep `DESIGN.md` updated in the same change whenever you alter a contract, and refresh the
+capsule's section list if structure shifts.
 
 A server-authoritative Bewegungskrieg server (`server/`, axum + tokio) runs the one authoritative
 simulation and also serves the **HTML/CSS/JS + PixiJS** client (`client/`). Clients send commands;
