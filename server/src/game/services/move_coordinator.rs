@@ -539,7 +539,7 @@ fn unit_body_rect_gap(body: UnitBody, rect: RectBody) -> f32 {
             let dy = circle.y - nearest_y;
             ((dx * dx + dy * dy).sqrt() - circle.radius).max(0.0)
         }
-        UnitBody::OrientedBox(_) => {
+        UnitBody::OrientedCapsule(_) | UnitBody::OrientedBox(_) => {
             let aabb = body.aabb();
             let dx = if aabb.max_x < rect.min_x {
                 rect.min_x - aabb.max_x
