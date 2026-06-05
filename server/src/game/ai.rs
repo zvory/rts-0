@@ -8,7 +8,8 @@
 //!
 //! The live controller may read authoritative own/resource state to build its observation, but
 //! enemy entities are filtered through the player's fog grid. Shared strategy code attacks public
-//! enemy start tiles for outbound waves and only targets visible enemy entities for local defense.
+//! enemy start tiles for outbound waves, and can redirect waves or local defense onto visible
+//! enemy entities.
 
 use crate::config;
 use crate::game::ai_core::decision::{decide_profile, AiDecisionMemory};
@@ -388,10 +389,10 @@ mod tests {
             *player_id == 2
                 && matches!(
                     command,
-                    Command::Move { units, x, y }
+                    Command::AttackMove { units, x, y }
                         if units.len() == RIFLE_FLOOD_FULL_SATURATION.attack.first_attack_size
-                            && *x > enemy_base.0
-                            && *y > enemy_base.1
+                            && (*x - enemy_base.0).abs() <= f32::EPSILON
+                            && (*y - enemy_base.1).abs() <= f32::EPSILON
                 )
         }));
     }

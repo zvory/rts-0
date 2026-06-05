@@ -1950,6 +1950,107 @@ fn steel_expansion_tanks_attacks_with_three_or_more_tanks_after_transition() {
 }
 
 #[test]
+fn full_saturation_prioritizes_second_city_centre_at_fifty_supply() {
+    let observation = with_expansion_resources(observation(
+        AiEconomy {
+            steel: 200,
+            oil: 150,
+            supply_used: 50,
+            supply_cap: 100,
+        },
+        vec![
+            building(10, EntityKind::CityCentre, Some(0)),
+            building(11, EntityKind::Barracks, Some(0)),
+            building(12, EntityKind::TrainingCentre, None),
+            worker(60, AiEntityState::Idle),
+        ],
+    ));
+
+    let decision = decide(
+        &observation,
+        &RIFLE_FLOOD_FULL_SATURATION,
+        &mut AiDecisionMemory::for_profile(&RIFLE_FLOOD_FULL_SATURATION),
+    );
+
+    assert!(decision.intents.contains(&AiIntent::Build {
+        kind: EntityKind::CityCentre
+    }));
+    assert!(
+        !decision.intents.contains(&AiIntent::Build {
+            kind: EntityKind::Factory
+        }),
+        "the first 50-supply macro spend should not let Factory preempt the expansion"
+    );
+}
+
+#[test]
+fn full_saturation_builds_factory_after_expansion_is_planned() {
+    let mut observation = with_expansion_resources(observation(
+        AiEconomy {
+            steel: 400,
+            oil: 150,
+            supply_used: 50,
+            supply_cap: 100,
+        },
+        vec![
+            building(10, EntityKind::CityCentre, Some(0)),
+            building(11, EntityKind::Barracks, Some(0)),
+            building(12, EntityKind::TrainingCentre, None),
+            worker(60, AiEntityState::Idle),
+        ],
+    ));
+    observation
+        .pending_builds
+        .push(AiBuildIntent::to_site(60, EntityKind::CityCentre, 20, 30));
+
+    let decision = decide(
+        &observation,
+        &RIFLE_FLOOD_FULL_SATURATION,
+        &mut AiDecisionMemory::for_profile(&RIFLE_FLOOD_FULL_SATURATION),
+    );
+
+    assert!(decision.intents.contains(&AiIntent::Build {
+        kind: EntityKind::Factory
+    }));
+    assert!(!decision.intents.contains(&AiIntent::Build {
+        kind: EntityKind::CityCentre
+    }));
+}
+
+#[test]
+fn full_saturation_trains_tanks_after_tech_transition_completes() {
+    let observation = with_expansion_resources(observation(
+        AiEconomy {
+            steel: 200,
+            oil: 150,
+            supply_used: 50,
+            supply_cap: 100,
+        },
+        vec![
+            building(10, EntityKind::CityCentre, Some(0)),
+            building(11, EntityKind::CityCentre, Some(0)),
+            building(12, EntityKind::Barracks, Some(0)),
+            building(13, EntityKind::TrainingCentre, None),
+            building(14, EntityKind::Factory, Some(0)),
+            building(15, EntityKind::Steelworks, None),
+        ],
+    ));
+
+    let decision = decide(
+        &observation,
+        &RIFLE_FLOOD_FULL_SATURATION,
+        &mut AiDecisionMemory::for_profile(&RIFLE_FLOOD_FULL_SATURATION),
+    );
+
+    assert!(decision.intents.contains(&AiIntent::Train {
+        kind: EntityKind::Tank
+    }));
+    assert!(!decision.intents.contains(&AiIntent::Train {
+        kind: EntityKind::Rifleman
+    }));
+}
+
+#[test]
 fn tech_to_tanks_trains_tank_before_spending_barracks_budget() {
     let observation = observation(
         AiEconomy {
@@ -2235,7 +2336,7 @@ fn far_tank_is_not_recalled_for_home_threat() {
 }
 
 #[test]
-fn rifle_attack_wave_uses_plain_move_deeper_than_enemy_base() {
+fn full_saturation_rifle_wave_uses_attack_move_to_enemy_base() {
     let mut owned = vec![building(10, EntityKind::CityCentre, Some(0))];
     owned.extend((0..6).map(|i| combat(30 + i, EntityKind::Rifleman)));
     let observation = observation(
@@ -2255,20 +2356,53 @@ fn rifle_attack_wave_uses_plain_move_deeper_than_enemy_base() {
     );
 
     assert!(
-        !decision
-            .commands
-            .iter()
-            .any(|command| matches!(command, Command::AttackMove { .. })),
-        "pure rifle raids should not use generic attack-move"
+        decision.commands.iter().any(|command| matches!(
+            command,
+            Command::AttackMove { units, .. } if units.as_slice() == [30, 31, 32, 33, 34, 35]
+        )),
+        "macro rifle waves should attack-move instead of moving past enemy armies"
     );
-    let enemy_base = tile_center(enemy_start_tile(&observation), observation.map.tile_size);
+}
+
+#[test]
+fn full_saturation_rifle_wave_targets_visible_enemy_army() {
+    let ts = config::TILE_SIZE as f32;
+    let mut owned = vec![building(10, EntityKind::CityCentre, Some(0))];
+    owned.extend((0..6).map(|i| {
+        combat_at(
+            30 + i,
+            EntityKind::Rifleman,
+            (26.0 + i as f32 * 0.2) * ts,
+            28.0 * ts,
+        )
+    }));
+    let mut observation = observation(
+        AiEconomy {
+            steel: 0,
+            oil: 0,
+            supply_used: 6,
+            supply_cap: 20,
+        },
+        owned,
+    );
+    observation
+        .visible_enemies
+        .push(enemy(80, EntityKind::Worker, 30.5 * ts, 30.5 * ts));
+    observation
+        .visible_enemies
+        .push(enemy(90, EntityKind::Rifleman, 28.5 * ts, 28.5 * ts));
+
+    let decision = decide(
+        &observation,
+        &RIFLE_FLOOD_FULL_SATURATION,
+        &mut AiDecisionMemory::for_profile(&RIFLE_FLOOD_FULL_SATURATION),
+    );
+
     assert!(decision.commands.iter().any(|command| {
         matches!(
             command,
-            Command::Move { units, x, y }
-                if units.as_slice() == [30, 31, 32, 33, 34, 35]
-                    && *x > enemy_base.0
-                    && *y > enemy_base.1
+            Command::Attack { units, target }
+                if units.as_slice() == [30, 31, 32, 33, 34, 35] && *target == 90
         )
     }));
 }
