@@ -15,6 +15,12 @@ path = "src/ai_matchup.rs"
 test = false
 bench = false
 
+[[bin]]
+name = "ai-balance-matrix"
+path = "src/ai_balance_matrix.rs"
+test = false
+bench = false
+
 [dependencies]
 tokio = { version = "1", features = ["full"] }
 axum = { version = "0.8", features = ["ws"] }
