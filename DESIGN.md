@@ -727,8 +727,9 @@ shared attack model plus the support-weapon setup/teardown state, tank turret ai
 tank hull-facing damage modifiers for anti-tank hits against tank victims. Tanks keep their active
 movement path while firing on either `Move` or `AttackMove` orders; other mobile combat units still
 hold position once a target is in weapon range. Scout cars also fire while moving using an
-independent rear machine-gun facing, but they are unarmored small targets and do not receive
-armored damage reduction. Plain `Move` tanks and scout cars only fire at enemies already in
+independent rear machine-gun facing. They are unarmored light vehicles and do not receive
+armored damage reduction, but AT guns do not roll their infantry miss chance against them.
+Plain `Move` tanks and scout cars only fire at enemies already in
 weapon range, while `AttackMove` tanks and scout cars can chase acquired targets. When they chase an acquired
 target from outside weapon range, they path to a standoff point inside firing range instead of the
 target center. Forest-specific rules are future work. The unit, building, and resource-node tables

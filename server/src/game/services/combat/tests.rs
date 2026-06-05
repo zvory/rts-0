@@ -1364,6 +1364,41 @@ fn missed_primary_shot_still_emits_attack_event() {
 }
 
 #[test]
+fn at_team_seeded_shot_hits_scout_car_without_miss_roll() {
+    let mut entities = EntityStore::new();
+    let attacker = entities
+        .spawn_unit(1, EntityKind::AtTeam, 100.0, 100.0)
+        .expect("attacker should spawn");
+    let victim = entities
+        .spawn_unit(2, EntityKind::ScoutCar, 140.0, 100.0)
+        .expect("victim should spawn");
+    let victim_hp = entities.get(victim).expect("victim should exist").hp;
+    let mut events: HashMap<u32, Vec<Event>> = HashMap::new();
+    events.insert(1, Vec::new());
+    events.insert(2, Vec::new());
+
+    apply_test_damage(
+        &mut entities,
+        &mut events,
+        attacker,
+        victim,
+        48,
+        1,
+        100.0,
+        100.0,
+        140.0,
+        100.0,
+        128.0,
+    );
+
+    assert_eq!(
+        entities.get(victim).expect("victim should exist").hp,
+        victim_hp.saturating_sub(48),
+        "seeded AT shot should not miss the scout car target"
+    );
+}
+
+#[test]
 fn shots_do_not_continue_into_resource_nodes() {
     let mut entities = EntityStore::new();
     let attacker = entities
