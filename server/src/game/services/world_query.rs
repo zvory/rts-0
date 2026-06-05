@@ -303,14 +303,6 @@ fn nearest_matching_enemy_in_range(
     best.map(|(id, _)| id)
 }
 
-/// Whichever worker currently holds `node`'s single harvest slot, if any. A reservation is
-/// only honored when the worker is alive, still gathering this exact node, and in the
-/// `Harvesting` phase — stale ids are ignored so commands can race for a freed slot without
-/// being blocked by a dead/cancelled holder.
-pub(crate) fn node_holder(entities: &EntityStore, node: u32) -> Option<u32> {
-    entities.node_slot_holder(node)
-}
-
 // --- Cheap predicates re-exported for convenience ---------------------------
 
 /// Whether `player` owns a *unit* with this id (buildings and nodes excluded).

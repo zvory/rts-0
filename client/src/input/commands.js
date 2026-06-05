@@ -31,10 +31,18 @@ export function _onRightClick(p) {
     return;
   }
 
-  const world = this._worldAt(p.x, p.y);
-  const target = this._entityAtWorld(world.x, world.y, /*ownPreferred=*/ false);
   const me = this.state.playerId;
+  const world = this._worldAt(p.x, p.y);
+  const workers = this._selectedWorkerIds();
+  if (workers.length > 0) {
+    const resource = this._resourceAtWorld(world.x, world.y);
+    if (resource && resource.remaining !== 0) {
+      this.net.command(cmd.gather(workers, resource.id));
+      return;
+    }
+  }
 
+  const target = this._entityAtWorld(world.x, world.y, /*ownPreferred=*/ false);
   if (target && target.owner !== me && target.owner !== 0 && !isResource(target.kind)) {
     // Enemy entity -> attack.
     this.net.command(cmd.attack(ownUnits, target.id));
@@ -43,7 +51,6 @@ export function _onRightClick(p) {
   }
   if (target && isResource(target.kind) && target.remaining !== 0) {
     // Resource node -> gather, but only with the workers in the selection.
-    const workers = this._selectedWorkerIds();
     if (workers.length > 0) {
       this.net.command(cmd.gather(workers, target.id));
       return;
