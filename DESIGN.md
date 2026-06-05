@@ -879,9 +879,11 @@ The server treats every client as potentially hostile. Limits live next to the c
   same oriented-body/pathing/collision model as tanks, including standoff firing and firing while
   moving, but they use simplified car locomotion instead of tank pivot locomotion. A scout car's
   yaw is capped by movement budget over a 1.5-tile minimum turn radius, so it can steer
-  while translating but cannot rotate in place when blocked or badly misaligned. Nearby
-  behind goals are handled by reversing; farther behind goals make the scout car drive
-  through a broad turn. Scout cars follow the route corridor rather than exact intermediate
+  while translating but cannot rotate in place when blocked or badly misaligned. Reverse is a
+  bounded maneuver latched to the immediate waypoint: nearby final waypoints and injected recovery
+  waypoints can be reached by backing up, but route lookahead alone cannot put the car into reverse.
+  Farther behind goals make the scout car drive through a broad forward turn instead of
+  backtracking. Scout cars follow the route corridor rather than exact intermediate
   waypoint centers: an intermediate waypoint is consumed inside
   `SCOUT_CAR_WAYPOINT_ACCEPTANCE_RADIUS_PX` (0.75 tiles), after the car has passed the waypoint
   along the next route segment, or when the next route segment is statically reachable from the
