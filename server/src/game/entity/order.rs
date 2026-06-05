@@ -1,5 +1,11 @@
 use super::EntityKind;
 
+/// Maximum number of queued command intents stored on one mobile unit.
+pub const MAX_QUEUED_ORDERS: usize = 8;
+
+/// Maximum number of queued rally stages stored on one production building.
+pub const MAX_RALLY_STAGES: usize = 2;
+
 /// The high-level order a unit/building is currently executing.
 ///
 /// Orders drive the per-tick systems. Buildings only ever sit in [`Order::Idle`]; their
@@ -88,6 +94,43 @@ impl Order {
             Order::Gather(order) => Some(order.execution.phase),
             _ => None,
         }
+    }
+}
+
+/// Lightweight future order intent. Unlike [`Order`], this stores no execution phase, path,
+/// progress, or target latch state.
+#[derive(Debug, Clone, PartialEq)]
+pub enum OrderIntent {
+    Move(PointIntent),
+    AttackMove(PointIntent),
+    Attack(TargetIntent),
+    Gather(GatherIntent),
+    Build(BuildIntent),
+}
+
+impl OrderIntent {
+    pub fn move_to(x: f32, y: f32) -> Self {
+        OrderIntent::Move(PointIntent { x, y })
+    }
+
+    pub fn attack_move_to(x: f32, y: f32) -> Self {
+        OrderIntent::AttackMove(PointIntent { x, y })
+    }
+
+    pub fn attack(target: u32) -> Self {
+        OrderIntent::Attack(TargetIntent { target })
+    }
+
+    pub fn gather(node: u32) -> Self {
+        OrderIntent::Gather(GatherIntent { node })
+    }
+
+    pub fn build(kind: EntityKind, tile_x: u32, tile_y: u32) -> Self {
+        OrderIntent::Build(BuildIntent {
+            kind,
+            tile_x,
+            tile_y,
+        })
     }
 }
 

@@ -2,7 +2,9 @@ use std::collections::{HashMap, HashSet};
 
 use crate::config;
 use crate::game::command::SimCommand;
-use crate::game::entity::{BuildPhase, EntityKind, EntityStore, ProdItem, WeaponSetup};
+use crate::game::entity::{
+    BuildPhase, EntityKind, EntityStore, OrderIntent, PointIntent, ProdItem, WeaponSetup,
+};
 use crate::game::fog::Fog;
 use crate::game::map::Map;
 use crate::game::services::move_coordinator::MoveCoordinator;
@@ -32,25 +34,49 @@ pub(crate) fn apply_commands(
 ) {
     for (player, cmd) in pending {
         match cmd {
-            SimCommand::Move { units, x, y } => {
+            SimCommand::Move {
+                units,
+                x,
+                y,
+                queued,
+            } => {
+                if queued {
+                    append_queued_point_order(entities, player, units, x, y, false);
+                    continue;
+                }
                 let valid: Vec<u32> = dedupe_cap_units(units)
                     .into_iter()
                     .filter(|id| {
                         owns_unit(entities, player, *id) && !is_constructing(entities, *id)
                     })
                     .collect();
+                clear_queued_orders(entities, &valid);
                 coordinator.order_group_move(entities, player, &valid, (x, y), false);
             }
-            SimCommand::AttackMove { units, x, y } => {
+            SimCommand::AttackMove {
+                units,
+                x,
+                y,
+                queued,
+            } => {
+                if queued {
+                    append_queued_point_order(entities, player, units, x, y, true);
+                    continue;
+                }
                 let valid: Vec<u32> = dedupe_cap_units(units)
                     .into_iter()
                     .filter(|id| {
                         owns_unit(entities, player, *id) && !is_constructing(entities, *id)
                     })
                     .collect();
+                clear_queued_orders(entities, &valid);
                 coordinator.order_group_move(entities, player, &valid, (x, y), true);
             }
-            SimCommand::Attack { units, target } => {
+            SimCommand::Attack {
+                units,
+                target,
+                queued,
+            } => {
                 for id in dedupe_cap_units(units) {
                     if let Some(e) = entities.get(id) {
                         if !e.is_unit() || e.owner != player {
@@ -70,6 +96,15 @@ pub(crate) fn apply_commands(
                     }
                     if deployed_at_gun_target_outside_arc(entities, id, target) {
                         continue;
+                    }
+                    if queued {
+                        if let Some(e) = entities.get_mut(id) {
+                            e.append_queued_order(OrderIntent::attack(target));
+                        }
+                        continue;
+                    }
+                    if let Some(e) = entities.get_mut(id) {
+                        e.clear_queued_orders();
                     }
                     coordinator.order_attack(entities, id, target);
                 }
@@ -136,7 +171,11 @@ pub(crate) fn apply_commands(
                     }
                 }
             }
-            SimCommand::Gather { units, node } => {
+            SimCommand::Gather {
+                units,
+                node,
+                queued,
+            } => {
                 for id in dedupe_cap_units(units) {
                     if !owns_unit(entities, player, id) {
                         continue;
@@ -157,6 +196,15 @@ pub(crate) fn apply_commands(
                     if matches!(entities.node_slot_holder(node), Some(holder) if holder != id) {
                         continue;
                     }
+                    if queued {
+                        if let Some(e) = entities.get_mut(id) {
+                            e.append_queued_order(OrderIntent::gather(node));
+                        }
+                        continue;
+                    }
+                    if let Some(e) = entities.get_mut(id) {
+                        e.clear_queued_orders();
+                    }
                     coordinator.order_gather(entities, id, node);
                 }
             }
@@ -165,7 +213,12 @@ pub(crate) fn apply_commands(
                 building,
                 tile_x,
                 tile_y,
+                queued,
             } => {
+                if queued {
+                    append_queued_build_order(entities, player, worker, building, tile_x, tile_y);
+                    continue;
+                }
                 order_build(
                     map,
                     entities,
@@ -199,8 +252,13 @@ pub(crate) fn apply_commands(
                     }
                 }
             }
-            SimCommand::SetRally { building, x, y } => {
-                order_set_rally(map, entities, player, building, x, y);
+            SimCommand::SetRally {
+                building,
+                x,
+                y,
+                queued,
+            } => {
+                order_set_rally(map, entities, player, building, x, y, queued);
             }
             SimCommand::Rejected { reason } => {
                 notice(events, player, reason.notice_message());
@@ -229,6 +287,62 @@ fn dedupe_cap_units(units: Vec<u32>) -> Vec<u32> {
 /// [`world_query::owns_unit`] to keep call sites in this module terse.
 fn owns_unit(entities: &EntityStore, player: u32, id: u32) -> bool {
     world_query::owns_unit(entities, player, id)
+}
+
+fn clear_queued_orders(entities: &mut EntityStore, ids: &[u32]) {
+    for id in ids {
+        if let Some(e) = entities.get_mut(*id) {
+            e.clear_queued_orders();
+        }
+    }
+}
+
+fn append_queued_point_order(
+    entities: &mut EntityStore,
+    player: u32,
+    units: Vec<u32>,
+    x: f32,
+    y: f32,
+    attack_move: bool,
+) {
+    if !x.is_finite() || !y.is_finite() {
+        return;
+    }
+    let intent = if attack_move {
+        OrderIntent::attack_move_to(x, y)
+    } else {
+        OrderIntent::move_to(x, y)
+    };
+    for id in dedupe_cap_units(units) {
+        if !owns_unit(entities, player, id) || is_constructing(entities, id) {
+            continue;
+        }
+        if let Some(e) = entities.get_mut(id) {
+            e.append_queued_order(intent.clone());
+        }
+    }
+}
+
+fn append_queued_build_order(
+    entities: &mut EntityStore,
+    player: u32,
+    worker: u32,
+    building: EntityKind,
+    tile_x: u32,
+    tile_y: u32,
+) {
+    if !owns_unit(entities, player, worker) {
+        return;
+    }
+    if is_constructing(entities, worker) {
+        return;
+    }
+    if !matches!(entities.get(worker), Some(e) if e.kind == EntityKind::Worker) {
+        return;
+    }
+    if let Some(e) = entities.get_mut(worker) {
+        e.append_queued_order(OrderIntent::build(building, tile_x, tile_y));
+    }
 }
 
 /// True if this unit is a worker that has already begun laying concrete — it cannot
@@ -333,6 +447,8 @@ fn order_build(
     let built = coordinator.order_build(entities, worker, building, tile_x, tile_y);
     if !built {
         notice(events, player, "Cannot build there");
+    } else if let Some(e) = entities.get_mut(worker) {
+        e.clear_queued_orders();
     }
 }
 
@@ -404,6 +520,7 @@ fn order_set_rally(
     building: u32,
     x: f32,
     y: f32,
+    queued: bool,
 ) {
     let ok = matches!(entities.get(building), Some(b)
         if b.owner == player && b.is_building() && !b.under_construction()
@@ -417,7 +534,15 @@ fn order_set_rally(
     let max = (map.world_size_px() - 1.0).max(0.0);
     let rally = (x.clamp(0.0, max), y.clamp(0.0, max));
     if let Some(b) = entities.get_mut(building) {
-        b.set_rally_point(Some(rally));
+        if queued {
+            b.append_rally_stage(PointIntent {
+                x: rally.0,
+                y: rally.1,
+            });
+        } else {
+            b.clear_rally_stages();
+            b.set_rally_point(Some(rally));
+        }
     }
 }
 
@@ -463,7 +588,7 @@ pub(crate) fn notice(events: &mut HashMap<u32, Vec<Event>>, player: u32, msg: &s
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::game::entity::{EntityKind, EntityStore, Order, WeaponSetup};
+    use crate::game::entity::{EntityKind, EntityStore, Order, OrderIntent, WeaponSetup};
     use crate::game::map::Map;
     use crate::game::services::move_coordinator::MoveCoordinator;
     use crate::game::services::occupancy::{footprint_center, footprint_tiles, Occupancy};
@@ -504,6 +629,7 @@ mod tests {
                     building: EntityKind::Depot,
                     tile_x: 4,
                     tile_y: 4,
+                    queued: false,
                 },
             )],
             &mut events,
@@ -568,6 +694,7 @@ mod tests {
                     building: EntityKind::Barracks,
                     tile_x: 8,
                     tile_y: 8,
+                    queued: false,
                 },
             )],
             &mut events,
@@ -622,6 +749,7 @@ mod tests {
                         building: barracks,
                         x: 100.0,
                         y: 200.0,
+                        queued: false,
                     },
                 ),
                 // Depot trains nothing -> rejected.
@@ -631,6 +759,7 @@ mod tests {
                         building: depot,
                         x: 50.0,
                         y: 50.0,
+                        queued: false,
                     },
                 ),
                 // Not the owner -> rejected.
@@ -640,6 +769,7 @@ mod tests {
                         building: enemy_barracks,
                         x: 10.0,
                         y: 10.0,
+                        queued: false,
                     },
                 ),
             ],
@@ -680,6 +810,7 @@ mod tests {
                     building: barracks,
                     x: 1.0e9,
                     y: -50.0,
+                    queued: false,
                 },
             )],
         );
@@ -690,6 +821,189 @@ mod tests {
             Some((max, 0.0)),
             "rally point should be clamped into the map bounds"
         );
+    }
+
+    #[test]
+    fn queued_move_appends_until_cap_and_normal_move_clears_queue() {
+        let map = flat_map(24);
+        let mut entities = EntityStore::new();
+        let unit = entities
+            .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
+            .expect("rifleman should spawn");
+
+        let queued_moves = (0..10)
+            .map(|i| {
+                (
+                    1,
+                    SimCommand::Move {
+                        units: vec![unit],
+                        x: 120.0 + i as f32,
+                        y: 140.0,
+                        queued: true,
+                    },
+                )
+            })
+            .collect();
+        apply(&map, &mut entities, queued_moves);
+
+        let entity = entities.get(unit).expect("unit should exist");
+        assert_eq!(
+            entity.queued_orders().len(),
+            8,
+            "unit queue should enforce the phase-0 cap"
+        );
+        assert!(
+            matches!(entity.order(), Order::Idle),
+            "queued command should not interrupt the active order in phase 0"
+        );
+
+        apply(
+            &map,
+            &mut entities,
+            vec![(
+                1,
+                SimCommand::Move {
+                    units: vec![unit],
+                    x: 200.0,
+                    y: 220.0,
+                    queued: false,
+                },
+            )],
+        );
+
+        let entity = entities.get(unit).expect("unit should exist");
+        assert!(
+            entity.queued_orders().is_empty(),
+            "replacement move should clear queued intents"
+        );
+        assert!(
+            matches!(entity.order(), Order::Move(_)),
+            "replacement move should still issue the active order"
+        );
+    }
+
+    #[test]
+    fn stop_clears_active_order_and_queued_orders() {
+        let map = flat_map(24);
+        let mut entities = EntityStore::new();
+        let unit = entities
+            .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
+            .expect("rifleman should spawn");
+        {
+            let entity = entities.get_mut(unit).expect("unit should exist");
+            entity.set_order(Order::move_to(300.0, 300.0));
+            entity.append_queued_order(OrderIntent::move_to(400.0, 400.0));
+        }
+
+        apply(
+            &map,
+            &mut entities,
+            vec![(1, SimCommand::Stop { units: vec![unit] })],
+        );
+
+        let entity = entities.get(unit).expect("unit should exist");
+        assert!(matches!(entity.order(), Order::Idle));
+        assert!(entity.queued_orders().is_empty());
+    }
+
+    #[test]
+    fn queued_move_ignores_stale_ids_and_invalid_coordinates() {
+        let map = flat_map(24);
+        let mut entities = EntityStore::new();
+        let unit = entities
+            .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
+            .expect("rifleman should spawn");
+
+        apply(
+            &map,
+            &mut entities,
+            vec![(
+                1,
+                SimCommand::Move {
+                    units: vec![unit, 99_999],
+                    x: f32::NAN,
+                    y: 140.0,
+                    queued: true,
+                },
+            )],
+        );
+
+        assert!(
+            entities
+                .get(unit)
+                .expect("unit should exist")
+                .queued_orders()
+                .is_empty(),
+            "invalid queued point should be ignored without appending or panicking"
+        );
+    }
+
+    #[test]
+    fn queued_rally_stages_are_capped_and_normal_rally_replaces() {
+        let map = flat_map(24);
+        let mut entities = EntityStore::new();
+        let (bx, by) = footprint_center(&map, EntityKind::Barracks, 6, 6);
+        let barracks = entities
+            .spawn_building(1, EntityKind::Barracks, bx, by, true)
+            .expect("barracks should spawn");
+
+        apply(
+            &map,
+            &mut entities,
+            vec![
+                (
+                    1,
+                    SimCommand::SetRally {
+                        building: barracks,
+                        x: 100.0,
+                        y: 100.0,
+                        queued: true,
+                    },
+                ),
+                (
+                    1,
+                    SimCommand::SetRally {
+                        building: barracks,
+                        x: 200.0,
+                        y: 200.0,
+                        queued: true,
+                    },
+                ),
+                (
+                    1,
+                    SimCommand::SetRally {
+                        building: barracks,
+                        x: 300.0,
+                        y: 300.0,
+                        queued: true,
+                    },
+                ),
+            ],
+        );
+
+        assert_eq!(
+            entities.get(barracks).unwrap().rally_stages().len(),
+            2,
+            "building rally stages should enforce the phase-0 cap"
+        );
+
+        apply(
+            &map,
+            &mut entities,
+            vec![(
+                1,
+                SimCommand::SetRally {
+                    building: barracks,
+                    x: 400.0,
+                    y: 400.0,
+                    queued: false,
+                },
+            )],
+        );
+
+        let barracks = entities.get(barracks).expect("barracks should exist");
+        assert!(barracks.rally_stages().is_empty());
+        assert_eq!(barracks.rally_point(), Some((400.0, 400.0)));
     }
 
     #[test]
@@ -807,6 +1121,7 @@ mod tests {
                 SimCommand::Attack {
                     units: vec![at],
                     target: side_target,
+                    queued: false,
                 },
             )],
         );
@@ -823,6 +1138,7 @@ mod tests {
                 SimCommand::Attack {
                     units: vec![at],
                     target: front_target,
+                    queued: false,
                 },
             )],
         );
@@ -851,6 +1167,7 @@ mod tests {
                 SimCommand::Attack {
                     units: vec![rifle],
                     target: hidden_target,
+                    queued: false,
                 },
             )],
         );

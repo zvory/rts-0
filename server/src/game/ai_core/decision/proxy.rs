@@ -78,6 +78,7 @@ where
         units: vec![worker],
         x,
         y,
+        queued: false,
     });
     Some(AiIntent::Move {
         units: vec![worker],

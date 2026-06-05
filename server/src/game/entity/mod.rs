@@ -28,7 +28,7 @@ pub(crate) use kind::{
 pub use order::{
     AttackExecution, AttackOrder, AttackPhase, BuildExecution, BuildIntent, BuildOrder, BuildPhase,
     GatherExecution, GatherIntent, GatherOrder, GatherPhase, MoveExecution, MoveOrder, MovePhase,
-    Order, PointIntent, TargetIntent,
+    Order, OrderIntent, PointIntent, TargetIntent, MAX_QUEUED_ORDERS, MAX_RALLY_STAGES,
 };
 #[cfg(test)]
 pub use state::EntityStateGroups;

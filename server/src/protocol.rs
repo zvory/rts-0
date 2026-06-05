@@ -9,6 +9,10 @@
 use serde::ser::{SerializeSeq, Serializer};
 use serde::{Deserialize, Serialize};
 
+fn is_false(value: &bool) -> bool {
+    !*value
+}
+
 // ---------------------------------------------------------------------------
 // Shared string vocabularies (kept as constants so the simulation never sprays
 // magic strings; the JS mirror has the same values).
@@ -102,15 +106,21 @@ pub enum Command {
         units: Vec<u32>,
         x: f32,
         y: f32,
+        #[serde(default, skip_serializing_if = "is_false")]
+        queued: bool,
     },
     AttackMove {
         units: Vec<u32>,
         x: f32,
         y: f32,
+        #[serde(default, skip_serializing_if = "is_false")]
+        queued: bool,
     },
     Attack {
         units: Vec<u32>,
         target: u32,
+        #[serde(default, skip_serializing_if = "is_false")]
+        queued: bool,
     },
     SetupAtGuns {
         units: Vec<u32>,
@@ -123,12 +133,16 @@ pub enum Command {
     Gather {
         units: Vec<u32>,
         node: u32,
+        #[serde(default, skip_serializing_if = "is_false")]
+        queued: bool,
     },
     Build {
         worker: u32,
         building: String,
         tile_x: u32,
         tile_y: u32,
+        #[serde(default, skip_serializing_if = "is_false")]
+        queued: bool,
     },
     Train {
         building: u32,
@@ -146,6 +160,8 @@ pub enum Command {
         building: u32,
         x: f32,
         y: f32,
+        #[serde(default, skip_serializing_if = "is_false")]
+        queued: bool,
     },
 }
 
