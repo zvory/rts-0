@@ -77,7 +77,7 @@ export function _closestOwnUnitKindInViewport(kind, anchorX, anchorY, anchor = n
     .filter(
       (e) =>
         e.owner === me &&
-        _unitSelectionGroup(e) === anchorGroup &&
+        (anchor ? _unitSelectionGroup(e) === anchorGroup : e.kind === kind) &&
         e.x >= minX && e.x <= maxX &&
         e.y >= minY && e.y <= maxY,
     )
