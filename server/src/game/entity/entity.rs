@@ -443,6 +443,10 @@ impl Entity {
         }
     }
 
+    pub fn pending_redeploy_facing(&self) -> Option<f32> {
+        self.combat.as_ref().and_then(|c| c.pending_redeploy_facing)
+    }
+
     pub fn attack_cd(&self) -> u32 {
         self.combat.as_ref().map(|c| c.attack_cd).unwrap_or(0)
     }

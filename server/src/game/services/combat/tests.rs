@@ -1167,6 +1167,46 @@ fn deployed_at_team_clamps_to_field_edge_and_does_not_fire_outside_arc() {
 }
 
 #[test]
+fn at_team_redeploy_rotates_during_teardown_and_setup() {
+    let mut entities = EntityStore::new();
+    let at_id = entities
+        .spawn_unit(1, EntityKind::AtTeam, 100.0, 100.0)
+        .expect("at team should spawn");
+    let target = std::f32::consts::FRAC_PI_2;
+    if let Some(at) = entities.get_mut(at_id) {
+        at.set_emplacement_facing(Some(0.0));
+        at.set_pending_redeploy_facing(Some(target));
+        at.set_facing(0.0);
+        at.set_weapon_facing(0.0);
+        at.set_weapon_setup(WeaponSetup::TearingDownToRedeploy {
+            ticks: config::AT_TEAM_SETUP_TICKS,
+        });
+    }
+
+    run_combat_tick(&mut entities);
+
+    let facing_after_one_tick = entities.get(at_id).expect("at should exist").facing();
+    assert!(
+        facing_after_one_tick > 0.0
+            && facing_after_one_tick <= AT_GUN_TURN_RATE_RAD_PER_TICK + 0.001,
+        "AT gun should start rotating toward its redeploy facing immediately, got {:.4}",
+        facing_after_one_tick
+    );
+
+    for _ in 0..(config::AT_TEAM_SETUP_TICKS as usize * 2) {
+        run_combat_tick(&mut entities);
+    }
+
+    let at = entities.get(at_id).expect("at should exist");
+    assert_eq!(at.weapon_setup(), WeaponSetup::Deployed);
+    assert!(
+        (at.facing() - target).abs() <= AT_GUN_TURN_RATE_RAD_PER_TICK + 0.001,
+        "AT gun should finish redeploy facing the requested direction, got {:.4}",
+        at.facing()
+    );
+}
+
+#[test]
 fn deployed_machine_gunner_can_fire_immediately() {
     let mut entities = EntityStore::new();
     let mg_id = entities

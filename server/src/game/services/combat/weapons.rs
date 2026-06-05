@@ -80,6 +80,7 @@ pub(super) fn tick_deployed_weapon_setup(e: &mut Entity) {
     if !requires_weapon_setup(e.kind) {
         return;
     }
+    rotate_at_gun_toward_setup_facing(e);
     e.tick_weapon_setup();
 }
 
@@ -230,4 +231,25 @@ fn at_gun_field_center(e: &Entity) -> Option<f32> {
     e.emplacement_facing()
         .or_else(|| e.weapon_facing())
         .filter(|facing| facing.is_finite())
+}
+
+fn rotate_at_gun_toward_setup_facing(e: &mut Entity) {
+    if e.kind != EntityKind::AtTeam {
+        return;
+    }
+    let target = match e.weapon_setup() {
+        WeaponSetup::SettingUp { .. } => e.emplacement_facing(),
+        WeaponSetup::TearingDownToRedeploy { .. } => e.pending_redeploy_facing(),
+        _ => None,
+    };
+    let Some(target) = target.filter(|facing| facing.is_finite()) else {
+        return;
+    };
+    e.set_desired_weapon_facing(target);
+    let current = e.facing();
+    let rotated = rotate_toward(current, target, AT_GUN_TURN_RATE_RAD_PER_TICK);
+    if rotated.is_finite() {
+        e.set_facing(rotated);
+        e.set_weapon_facing(rotated);
+    }
 }
