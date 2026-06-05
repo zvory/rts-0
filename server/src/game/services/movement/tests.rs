@@ -1703,6 +1703,119 @@ fn tank_body_locomotion_suppresses_illegal_rotation_when_blocked() {
 }
 
 #[test]
+fn tank_body_locomotion_backs_out_when_rotation_corner_is_blocked() {
+    let map = flat_map(1);
+    let mut entities = EntityStore::new();
+    let (bx, by) = footprint_center(&map, EntityKind::Depot, 10, 10);
+    entities
+        .spawn_building(1, EntityKind::Depot, bx, by, true)
+        .expect("building spawn");
+    let rect = building_rect_for_footprint(EntityKind::Depot, 10, 10).expect("depot rect");
+
+    let initial_facing = 0.0;
+    let next_facing = TANK_BODY_TURN_RATE_RAD_PER_TICK;
+    let speed = config::unit_stats(EntityKind::Tank)
+        .expect("tank stats")
+        .speed;
+    let occ = Occupancy::build(&map, &entities);
+    let mut start = None;
+    for ix in 0..80 {
+        for iy in 0..80 {
+            let x = rect.min_x - tank_body_half_len() - 4.0 + ix as f32 * 0.25;
+            let y = rect.min_y - tank_body_half_width() - 4.0 + iy as f32 * 0.25;
+            let original_legal = standability::unit_static_standable_with_facing(
+                &map,
+                &occ,
+                EntityKind::Tank,
+                x,
+                y,
+                initial_facing,
+            );
+            let rotated_legal = standability::unit_static_standable_with_facing(
+                &map,
+                &occ,
+                EntityKind::Tank,
+                x,
+                y,
+                next_facing,
+            );
+            let reverse_rotated_legal = standability::unit_static_standable_with_facing(
+                &map,
+                &occ,
+                EntityKind::Tank,
+                x - speed,
+                y,
+                next_facing,
+            );
+            let forward_rotated_legal = standability::unit_static_standable_with_facing(
+                &map,
+                &occ,
+                EntityKind::Tank,
+                x + speed,
+                y,
+                next_facing,
+            );
+            if original_legal && !rotated_legal && reverse_rotated_legal && !forward_rotated_legal {
+                start = Some((x, y));
+                break;
+            }
+        }
+        if start.is_some() {
+            break;
+        }
+    }
+    let start = start.expect("fixture should find a front-corner rotation blockage");
+    let goal = (
+        start.0 + config::TILE_SIZE as f32 * 4.0,
+        start.1 + config::TILE_SIZE as f32 * 4.0,
+    );
+    let tank = entities
+        .spawn_unit(1, EntityKind::Tank, start.0, start.1)
+        .expect("tank spawn");
+    if let Some(e) = entities.get_mut(tank) {
+        e.set_facing(initial_facing);
+    }
+    set_path_direct(&mut entities, tank, vec![goal]);
+
+    assert!(standability::unit_static_standable_with_facing(
+        &map,
+        &occ,
+        EntityKind::Tank,
+        start.0,
+        start.1,
+        initial_facing
+    ));
+    assert!(
+        !standability::unit_static_standable_with_facing(
+            &map,
+            &occ,
+            EntityKind::Tank,
+            start.0,
+            start.1,
+            next_facing
+        ),
+        "fixture requires the first tank rotation to clip the building corner"
+    );
+
+    let spatial = SpatialIndex::build(&entities, map.size);
+    movement_system(&map, &mut entities, &mut [], &occ, &spatial, 0);
+
+    let e = entities.get(tank).expect("tank should exist");
+    assert!(
+        e.pos_x < start.0 - 1.0,
+        "front-corner rotation blockage should make the tank back out along its hull, start x {:.2}, got {:.2}",
+        start.0,
+        e.pos_x
+    );
+    assert!(
+        e.facing() > initial_facing && e.facing() <= next_facing + 0.0001,
+        "tank should keep the legal unjammed rotation, facing {:.4}",
+        e.facing()
+    );
+    assert!(tank_standable_at_entity_facing(&map, &occ, &entities, tank));
+}
+
+#[test]
 fn scout_car_locomotion_suppresses_illegal_rotation_when_blocked() {
     let map = flat_map(1);
     let mut entities = EntityStore::new();
