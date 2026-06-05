@@ -66,7 +66,7 @@ export class Match {
     this.camera = new Camera();
     this.renderer = new Renderer(dom.viewport);
     this.fog = new Fog(this.state.map.width, this.state.map.height, this.state.map.terrain);
-    this.fog.setRevealAll(!!this.devWatch?.noFog || this.state.spectator);
+    this.fog.setRevealAll(!!this.devWatch?.noFog);
     this.hud = new HUD(dom.gameScreen, this.state, this.net);
     this.minimap = new Minimap(dom.minimap, this.state, this.camera, this.fog, this.net);
     this.input = new Input(
@@ -420,12 +420,17 @@ export class Match {
   }
 
   /**
-   * This player's own units & buildings, used to drive the local fog overlay.
+   * Entities used to drive the local fog overlay.
+   * Spectators receive the server-filtered union of all players' visible entities, so every
+   * non-resource entity in their snapshot contributes to the local overlay.
    * Resource nodes (owner 0) never grant vision.
    * @returns {object[]}
    */
   ownEntities() {
     const all = this.state.entitiesInterpolated(1);
+    if (this.state.spectator) {
+      return all.filter((e) => e.owner !== 0);
+    }
     const me = this.state.playerId;
     return all.filter((e) => e.owner === me);
   }

@@ -269,7 +269,7 @@ pub struct Snapshot {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub resource_deltas: Vec<ResourceDelta>,
     pub events: Vec<Event>,
-    /// Per-player resources for all players. Populated only in no-fog (replay/spectator) mode.
+    /// Per-player resources for all players. Populated only in spectator/replay modes.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub player_resources: Vec<PlayerResourceSnapshot>,
 }
