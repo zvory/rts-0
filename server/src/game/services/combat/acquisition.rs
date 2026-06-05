@@ -1,4 +1,4 @@
-use crate::game::entity::{fires_while_moving, Entity, EntityKind, EntityStore, Order};
+use crate::game::entity::{Entity, EntityKind, EntityStore, Order};
 use crate::game::fog::Fog;
 use crate::game::services::line_of_sight::LineOfSight;
 use crate::game::services::spatial::SpatialIndex;
@@ -25,7 +25,7 @@ pub(super) fn combat_mode(e: &Entity) -> CombatMode {
     match e.order() {
         Order::Attack(_) => CombatMode::Ordered,
         Order::AttackMove(_) => CombatMode::Aggressive,
-        Order::Move(_) if fires_while_moving(e.kind) => CombatMode::Opportunistic,
+        Order::Move(_) if can_fire_while_moving(e) => CombatMode::Opportunistic,
         Order::Idle if e.is_building() => CombatMode::Aggressive,
         Order::Idle if e.is_unit() && e.kind != EntityKind::Worker => CombatMode::Aggressive,
         _ => CombatMode::Passive,

@@ -159,14 +159,11 @@ pub(super) fn uses_stationary_weapon_aggro(e: &Entity) -> bool {
 
 pub(super) fn can_fire_while_moving(e: &Entity) -> bool {
     crate::game::entity::fires_while_moving(e.kind)
-        || (e.kind == EntityKind::Rifleman && matches!(e.order(), Order::AttackMove(_)))
+        || (e.kind == EntityKind::Rifleman && e.charge_ticks() > 0)
 }
 
 pub(super) fn moving_fire_miss_chance(e: &Entity) -> f32 {
-    if e.kind == EntityKind::Rifleman
-        && matches!(e.order(), Order::AttackMove(_))
-        && !e.path_is_empty()
-    {
+    if e.kind == EntityKind::Rifleman && e.charge_ticks() > 0 && !e.path_is_empty() {
         combat_rules::RIFLEMAN_CHARGE_MISS_CHANCE
     } else {
         0.0

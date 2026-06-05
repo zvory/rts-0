@@ -656,7 +656,7 @@ fn tank_chase_refreshes_stale_standoff_goal() {
 }
 
 #[test]
-fn rifleman_attack_move_keeps_path_while_firing() {
+fn rifleman_attack_move_without_charge_holds_position_while_firing() {
     let mut entities = EntityStore::new();
     let rifleman_id = entities
         .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
@@ -675,8 +675,34 @@ fn rifleman_attack_move_keeps_path_while_firing() {
     let rifleman = entities.get(rifleman_id).expect("rifleman should exist");
     assert_eq!(rifleman.target_id(), Some(enemy_id));
     assert!(
+        rifleman.path_is_empty(),
+        "non-charged riflemen should still stop while firing"
+    );
+}
+
+#[test]
+fn charged_rifleman_move_order_keeps_path_while_firing() {
+    let mut entities = EntityStore::new();
+    let rifleman_id = entities
+        .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
+        .expect("rifleman should spawn");
+    let enemy_id = entities
+        .spawn_unit(2, EntityKind::Rifleman, 120.0, 100.0)
+        .expect("enemy should spawn");
+    if let Some(rifleman) = entities.get_mut(rifleman_id) {
+        rifleman.set_order(Order::move_to(300.0, 100.0));
+        rifleman.set_path(vec![(300.0, 100.0)]);
+        rifleman.set_path_goal(Some((300.0, 100.0)));
+        rifleman.start_charge(config::RIFLEMAN_CHARGE_TICKS);
+    }
+
+    run_combat_tick(&mut entities);
+
+    let rifleman = entities.get(rifleman_id).expect("rifleman should exist");
+    assert_eq!(rifleman.target_id(), Some(enemy_id));
+    assert!(
         !rifleman.path_is_empty(),
-        "charging riflemen should keep their movement path while firing"
+        "charged riflemen should keep their movement path while firing"
     );
 }
 
@@ -690,9 +716,10 @@ fn charging_rifleman_miss_still_emits_attack_event() {
         .spawn_unit(2, EntityKind::Rifleman, 120.0, 100.0)
         .expect("enemy should spawn");
     if let Some(rifleman) = entities.get_mut(rifleman_id) {
-        rifleman.set_order(Order::attack_move_to(300.0, 100.0));
+        rifleman.set_order(Order::move_to(300.0, 100.0));
         rifleman.set_path(vec![(300.0, 100.0)]);
         rifleman.set_path_goal(Some((300.0, 100.0)));
+        rifleman.start_charge(config::RIFLEMAN_CHARGE_TICKS);
     }
     let enemy_hp = entities.get(enemy_id).expect("enemy should exist").hp;
 
@@ -710,6 +737,29 @@ fn charging_rifleman_miss_still_emits_attack_event() {
             .iter()
             .any(|event| matches!(event, Event::Attack { from, to, .. } if *from == rifleman_id && *to == enemy_id)),
         "missed charge shots should still emit attack feedback"
+    );
+}
+
+#[test]
+fn stationary_charged_rifleman_does_not_take_miss_penalty() {
+    let mut entities = EntityStore::new();
+    let rifleman_id = entities
+        .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
+        .expect("rifleman should spawn");
+    let enemy_id = entities
+        .spawn_unit(2, EntityKind::Rifleman, 120.0, 100.0)
+        .expect("enemy should spawn");
+    if let Some(rifleman) = entities.get_mut(rifleman_id) {
+        rifleman.start_charge(config::RIFLEMAN_CHARGE_TICKS);
+    }
+    let enemy_hp = entities.get(enemy_id).expect("enemy should exist").hp;
+
+    run_combat_tick(&mut entities);
+
+    assert_eq!(
+        entities.get(enemy_id).expect("enemy should exist").hp,
+        enemy_hp.saturating_sub(5),
+        "stationary charged riflemen should fire with normal accuracy"
     );
 }
 
