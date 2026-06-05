@@ -761,9 +761,9 @@ Unit stats (hp, dmg, range[tiles], cooldown[ticks], speed[px/tick], sight[tiles]
 | worker          | 40  | 4   | 1     | 24 | 1.6   | 7     | 50  | 0   | 1   | 360 (~12s) |
 | rifleman        | 45  | 5   | 4     | 16 | 1.6   | 8     | 50  | 0   | 1   | 300 (~10s) |
 | machine_gunner  | 55  | 4   | 5     | 6  | 1.28  | 8     | 75  | 25  | 2   | 400 (~13s) |
-| at_team         | 45  | 48  | 5     | 72 | 1.152 | 8     | 75  | 25  | 3   | 440 (~15s); requires Steelworks |
+| at_team         | 45  | 48  | 5     | 72 | 1.152 | 6     | 75  | 25  | 3   | 440 (~15s); requires Steelworks |
 | scout_car       | 150 | 4   | 5     | 6  | 2.35  | 10    | 125 | 75  | 3   | 480 (~16s) |
-| tank            | 390 | 60  | 5     | 72 | 2.0   | 7     | 200 | 150 | 6   | 750 (~25s); requires Steelworks |
+| tank            | 390 | 60  | 5     | 72 | 2.0   | 6     | 200 | 150 | 6   | 750 (~25s); requires Steelworks |
 
 Building stats (hp, sight, cost, footprint tiles wxh, buildTicks, extra):
 
