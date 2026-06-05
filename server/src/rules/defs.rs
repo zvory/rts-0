@@ -135,7 +135,7 @@ pub const UNITS: &[UnitDef] = &[
         kind: EntityKind::AtTeam,
         stats: config::UnitStats {
             hp: 45,
-            dmg: 48,
+            dmg: 62,
             range_tiles: 5,
             cooldown: 72,
             speed: 1.152,
