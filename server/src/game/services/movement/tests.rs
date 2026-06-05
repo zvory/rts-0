@@ -1750,8 +1750,16 @@ fn scout_car_locomotion_suppresses_illegal_rotation_when_blocked() {
 
     let e = entities.get(scout).expect("scout car should exist");
     assert!(
+        moved_distance(start, (e.pos_x, e.pos_y)) <= 0.01,
+        "front-blocked scout car must not take an illegal body step"
+    );
+    assert!(
         (e.facing() - initial_facing).abs() <= 0.001,
         "scout car should not rotate its body into a building footprint while blocked"
+    );
+    assert!(
+        matches!(e.order(), Order::Move(_)) && !e.path_is_empty(),
+        "front-blocked scout car should preserve the player's move order for recovery"
     );
     assert!(standability::unit_static_standable_with_facing(
         &map,
@@ -1761,6 +1769,72 @@ fn scout_car_locomotion_suppresses_illegal_rotation_when_blocked() {
         e.pos_y,
         e.facing()
     ));
+}
+
+#[test]
+fn scout_car_consumes_lateral_intermediate_waypoint_inside_car_radius() {
+    let map = flat_map(1);
+    let mut entities = EntityStore::new();
+    let (sx, sy) = map.tile_center(20, 20);
+    let intermediate = (
+        sx,
+        sy + config::SCOUT_CAR_WAYPOINT_ACCEPTANCE_RADIUS_PX - 2.0,
+    );
+    let goal = (sx + config::TILE_SIZE as f32 * 4.0, intermediate.1);
+    let scout = entities
+        .spawn_unit(1, EntityKind::ScoutCar, sx, sy)
+        .expect("scout car should spawn");
+    if let Some(e) = entities.get_mut(scout) {
+        e.set_facing(0.0);
+        e.set_order(Order::move_to(goal.0, goal.1));
+    }
+    set_path_direct(&mut entities, scout, vec![intermediate, goal]);
+
+    let occ = Occupancy::build(&map, &entities);
+    let spatial = SpatialIndex::build(&entities, map.size);
+    movement_system(&map, &mut entities, &mut [], &occ, &spatial, 0);
+
+    let e = entities.get(scout).expect("scout car should exist");
+    assert_eq!(
+        e.movement.as_ref().map(|m| m.path.len()),
+        Some(1),
+        "lateral intermediate waypoint inside scout-car acceptance radius should be consumed"
+    );
+    assert_eq!(e.next_waypoint(), Some(goal));
+    assert!(
+        e.pos_x > sx,
+        "after consuming the lateral waypoint, scout car should continue down the route corridor"
+    );
+}
+
+#[test]
+fn scout_car_lateral_final_goal_settles_inside_final_tolerance() {
+    let map = flat_map(1);
+    let mut entities = EntityStore::new();
+    let (sx, sy) = map.tile_center(20, 20);
+    let goal = (sx, sy + config::SCOUT_CAR_FINAL_GOAL_TOLERANCE_PX - 2.0);
+    let scout = entities
+        .spawn_unit(1, EntityKind::ScoutCar, sx, sy)
+        .expect("scout car should spawn");
+    if let Some(e) = entities.get_mut(scout) {
+        e.set_facing(0.0);
+        e.set_order(Order::move_to(goal.0, goal.1));
+    }
+    set_path_direct(&mut entities, scout, vec![goal]);
+
+    let occ = Occupancy::build(&map, &entities);
+    let spatial = SpatialIndex::build(&entities, map.size);
+    movement_system(&map, &mut entities, &mut [], &occ, &spatial, 0);
+
+    let e = entities.get(scout).expect("scout car should exist");
+    assert!(
+        e.path_is_empty() && matches!(e.order(), Order::Idle),
+        "lateral final goal inside scout-car tolerance should settle without oscillation"
+    );
+    assert!(
+        moved_distance((e.pos_x, e.pos_y), goal) <= config::SCOUT_CAR_FINAL_GOAL_TOLERANCE_PX,
+        "settled scout car should remain inside final tolerance"
+    );
 }
 
 #[test]
