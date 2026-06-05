@@ -2081,7 +2081,7 @@ fn full_saturation_builds_factory_after_expansion_is_planned() {
 fn full_saturation_trains_tanks_after_tech_transition_completes() {
     let observation = with_expansion_resources(observation(
         AiEconomy {
-            steel: 200,
+            steel: 300,
             oil: 150,
             supply_used: 50,
             supply_cap: 100,
@@ -2114,7 +2114,7 @@ fn full_saturation_trains_tanks_after_tech_transition_completes() {
 fn tech_to_tanks_trains_tank_before_spending_barracks_budget() {
     let observation = observation(
         AiEconomy {
-            steel: 200,
+            steel: 300,
             oil: 150,
             supply_used: 4,
             supply_cap: 20,

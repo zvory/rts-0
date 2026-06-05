@@ -135,7 +135,7 @@ pub const UNITS: &[UnitDef] = &[
         kind: EntityKind::AtTeam,
         stats: config::UnitStats {
             hp: 45,
-            dmg: 62,
+            dmg: 60,
             range_tiles: 5,
             cooldown: 72,
             speed: 1.152,
@@ -155,13 +155,13 @@ pub const UNITS: &[UnitDef] = &[
     UnitDef {
         kind: EntityKind::Tank,
         stats: config::UnitStats {
-            hp: 390,
+            hp: 292,
             dmg: 60,
             range_tiles: 5,
             cooldown: 72,
             speed: 2.0,
             sight_tiles: 6,
-            cost_steel: 200,
+            cost_steel: 300,
             cost_oil: 150,
             supply: 6,
             build_ticks: 750,
