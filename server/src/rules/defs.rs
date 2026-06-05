@@ -177,7 +177,7 @@ pub const UNITS: &[UnitDef] = &[
         kind: EntityKind::ScoutCar,
         stats: config::UnitStats {
             hp: 150,
-            dmg: 4,
+            dmg: 6,
             range_tiles: 5,
             cooldown: 6,
             speed: 2.35,

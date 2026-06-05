@@ -786,7 +786,7 @@ Unit stats (hp, dmg, range[tiles], cooldown[ticks], speed[px/tick], sight[tiles]
 | rifleman        | 45  | 5   | 4     | 16 | 1.6   | 8     | 50  | 0   | 1   | 300 (~10s) |
 | machine_gunner  | 55  | 4   | 5     | 6  | 1.28  | 8     | 75  | 25  | 2   | 400 (~13s) |
 | at_team         | 45  | 62 deployed / 47 packed | 12 deployed / 5 packed | 72 | 1.152 | 6     | 75  | 25  | 3   | 440 (~15s); requires Steelworks |
-| scout_car       | 150 | 4   | 5     | 6  | 2.35  | 10    | 125 | 50  | 3   | 480 (~16s) |
+| scout_car       | 150 | 6   | 5     | 6  | 2.35  | 10    | 125 | 50  | 3   | 480 (~16s) |
 | tank            | 390 | 60  | 5     | 72 | 2.0   | 6     | 200 | 150 | 6   | 750 (~25s); requires Steelworks |
 
 Building stats (hp, sight, cost, footprint tiles wxh, buildTicks, extra):
@@ -883,7 +883,7 @@ The server treats every client as potentially hostile. Limits live next to the c
   spreading damage across every passing unit. Projection omits enemy `weaponFacing` when it would
   reveal a hidden target direction.
 - **Scout car movement and weapon facing**: scout cars are light unarmored vehicles with a
-  rear-mounted machine gun (same damage, range, and cooldown as machine gunners). They use the
+  rear-mounted machine gun (higher damage, same range and cooldown as machine gunners). They use the
   same oriented-body/pathing/collision model as tanks, including standoff firing and firing while
   moving, but they use simplified car locomotion instead of tank pivot locomotion. A scout car's
   yaw is capped by movement budget over a 1.5-tile minimum turn radius, so it can steer
