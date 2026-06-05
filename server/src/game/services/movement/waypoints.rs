@@ -17,9 +17,10 @@ use super::standability::{
 };
 use super::steering::{inject_sidestep, steered_candidate, steering_path_dir};
 use super::tank_drive::{
-    angle_delta, distance_between, normalize_angle, rotate_toward, scout_car_drive_intent,
-    scout_car_turn_delta_for_budget, step_can_reach_waypoint, tank_drive_intent,
-    tank_oil_starves_movement, tank_speed_scale, vehicle_traffic_adjustment,
+    along_track_error, angle_delta, distance_between, lateral_error, normalize_angle,
+    rotate_toward, scout_car_accepts_waypoint, scout_car_drive_intent,
+    scout_car_final_goal_tolerance, scout_car_turn_delta_for_budget, step_can_reach_waypoint,
+    tank_drive_intent, tank_oil_starves_movement, tank_speed_scale, vehicle_traffic_adjustment,
     AT_GUN_BODY_TURN_RATE_RAD_PER_TICK, TANK_BODY_TURN_RATE_RAD_PER_TICK,
 };
 use super::{ARRIVE_EPS, MAX_UNIT_BOUNDING_RADIUS_PX};
@@ -151,18 +152,20 @@ pub(super) fn advance_moving_units(
 
             if path_len > 1 {
                 // Intermediate waypoint: pop on radius hit or geometric pass-by.
-                let acceptance_radius = if is_car {
-                    config::SCOUT_CAR_WAYPOINT_ACCEPTANCE_RADIUS_PX
+                let accepts_waypoint = if is_car {
+                    entities.get(id).is_some_and(|e| {
+                        scout_car_accepts_waypoint(map, occ, e, (x, y), (wx, wy), next_next)
+                    })
                 } else {
-                    config::ARRIVE_RADIUS_INTERMEDIATE_PX
+                    let radius_hit = dist <= config::ARRIVE_RADIUS_INTERMEDIATE_PX;
+                    let passed = next_next.is_some_and(|(nnx, nny)| {
+                        // Positive projection of (pos - waypoint) onto (next_next - waypoint) means
+                        // the unit is on the far side of the waypoint relative to where it came from.
+                        (x - wx) * (nnx - wx) + (y - wy) * (nny - wy) > 0.0
+                    });
+                    radius_hit || passed
                 };
-                let radius_hit = dist <= acceptance_radius;
-                let passed = next_next.is_some_and(|(nnx, nny)| {
-                    // Positive projection of (pos - waypoint) onto (next_next - waypoint) means the
-                    // unit is on the far side of the waypoint relative to where it came from.
-                    (x - wx) * (nnx - wx) + (y - wy) * (nny - wy) > 0.0
-                });
-                if radius_hit || passed {
+                if accepts_waypoint {
                     if let Some(e) = entities.get_mut(id) {
                         e.pop_waypoint();
                         e.mark_move_phase(MovePhase::Moving);
@@ -183,10 +186,11 @@ pub(super) fn advance_moving_units(
                     continue;
                 }
                 let scout_car_tolerant_arrival = is_car
-                    && dist <= config::SCOUT_CAR_FINAL_GOAL_TOLERANCE_PX
+                    && dist <= scout_car_final_goal_tolerance()
+                    && unit_static_standable(occ, map, kind, x, y, body_facing)
                     && vehicle_step_dir.is_some_and(|dir| {
-                        let along = dx * dir.0 + dy * dir.1;
-                        let lateral = (dx * dir.1 - dy * dir.0).abs();
+                        let along = along_track_error((dx, dy), dir);
+                        let lateral = lateral_error((dx, dy), dir);
                         lateral > along.abs() && lateral > ARRIVE_EPS
                     });
                 if scout_car_tolerant_arrival {
