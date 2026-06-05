@@ -261,10 +261,10 @@ function fakeAudioContext() {
       JSON.stringify({ c: "tearDownAtGuns", units: [3, 4] }),
     "tearDownAtGuns command builder emits the wire shape",
   );
-  assert(AT_GUN_DEPLOYED_RANGE_TILES === 7, "client mirrors deployed AT gun range");
+  assert(AT_GUN_DEPLOYED_RANGE_TILES === 10, "client mirrors deployed AT gun range");
   assertApprox(
     AT_GUN_FIELD_OF_FIRE_RAD,
-    Math.PI / 6,
+    Math.PI / 4,
     0.000001,
     "client mirrors AT gun field of fire",
   );

@@ -9,7 +9,10 @@ Use when changing rendering, input, HUD, lobby UI, or any module under `client/s
 - §4.2 Rendering & look (PixiJS, procedural art)
 
 ## Code map
-- `client/src/main.js` — wires modules; owns dependency injection
+- `client/src/main.js` — entry point; starts `App`
+- `client/src/app.js` / `client/src/match.js` — app shell and match dependency injection
+- `client/src/renderer/` and `client/src/input/` — decomposed renderer/input collaborators,
+  re-exported by `renderer.js` and `input.js`
 - `client/src/protocol.js` — wire mirror (treat as read-only unless touching protocol)
 - `client/src/config.js` — UI/render/fog subset of balance
 - One small class per file under `client/src/`
