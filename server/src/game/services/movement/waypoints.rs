@@ -87,6 +87,7 @@ pub(super) fn advance_moving_units(
         let original_facing = entities.get(id).map(|e| e.facing()).unwrap_or(0.0);
         let mut body_facing = original_facing;
         let mut vehicle_step_dir = None;
+        let mut scout_car_reverse_waypoint = None;
         let mut static_blocked_this_tick = false;
         if is_tank {
             if let Some(e) = entities.get(id) {
@@ -129,6 +130,7 @@ pub(super) fn advance_moving_units(
                                 rotated.cos() * intent.travel_sign,
                                 rotated.sin() * intent.travel_sign,
                             ));
+                            scout_car_reverse_waypoint = intent.reverse_waypoint;
                         }
                     }
                 }
@@ -379,6 +381,15 @@ pub(super) fn advance_moving_units(
             if let Some(f) = new_facing {
                 e.set_facing(f);
             }
+            if is_car {
+                let active_reverse_waypoint = scout_car_reverse_waypoint.filter(|wp| {
+                    e.next_waypoint()
+                        .is_some_and(|next| distance_between(next, *wp) <= ARRIVE_EPS)
+                });
+                if let Some(m) = e.movement.as_mut() {
+                    m.scout_car_reverse_waypoint = active_reverse_waypoint;
+                }
+            }
             // A plain Move with an empty path has arrived → go idle so normal auto-acquire
             // resumes after the destination is reached.
             if e.path_is_empty() {
@@ -571,6 +582,7 @@ fn inject_scout_car_reverse_recovery(e: &mut Entity, map: &Map, occ: &Occupancy)
                 m.stuck_ticks = 0;
                 m.last_progress_pos = (e.pos_x, e.pos_y);
                 m.static_blocked_ticks = 0;
+                m.scout_car_reverse_waypoint = Some(candidate);
                 m.scout_car_recovery_cooldown = config::SCOUT_CAR_RECOVERY_COOLDOWN_TICKS;
             }
             return;
