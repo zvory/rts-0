@@ -423,7 +423,7 @@ export class Input {
     ev.preventDefault();
     const p = this._eventScreenPos(ev);
     if (!this.pointerLocked) this._trackMouse(p);
-    this._onRightClick(p);
+    this._onRightClick(p, ev);
   }
 
   _handleAuxClick(ev) {
@@ -440,7 +440,7 @@ export class Input {
     }
     // Command-card targeting: the next left-click issues the armed command.
     if (this.state.commandTarget) {
-      this._issueTargetedCommand(p);
+      this._issueTargetedCommand(p, ev);
       this.state.endCommandTarget();
       return;
     }

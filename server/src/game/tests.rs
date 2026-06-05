@@ -207,6 +207,45 @@ fn flat_tank_move_fixture() -> (Game, u32, (f32, f32)) {
     (game, tank, goal)
 }
 
+fn queued_move_fixture() -> (Game, u32, (f32, f32), (f32, f32), (f32, f32)) {
+    let players = [PlayerInit {
+        id: 1,
+        name: "Solo".into(),
+        color: "#fff".into(),
+        is_ai: false,
+    }];
+    let mut game = Game::new_for_replay(&players, 0x5150_0001);
+    for tile in &mut game.map.terrain {
+        *tile = crate::protocol::terrain::GRASS;
+    }
+    for id in game.entities.ids() {
+        game.entities.remove(id);
+    }
+
+    let start = game.map.tile_center(8, 8);
+    let first = game.map.tile_center(10, 8);
+    let second = game.map.tile_center(12, 8);
+    let replacement = game.map.tile_center(8, 10);
+    let unit = game
+        .entities
+        .spawn_unit(1, EntityKind::Rifleman, start.0, start.1)
+        .expect("rifleman should spawn");
+    systems::recompute_supply(&mut game.players, &game.entities);
+    game.spatial = services::spatial::SpatialIndex::build(&game.entities, game.map.size);
+    let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
+    game.fog.recompute(&ids, &game.entities, &game.map);
+    game.assert_invariants();
+
+    (game, unit, first, second, replacement)
+}
+
+fn entity_distance_to(game: &Game, id: u32, point: (f32, f32)) -> f32 {
+    let entity = game.entities.get(id).expect("entity should exist");
+    let dx = entity.pos_x - point.0;
+    let dy = entity.pos_y - point.1;
+    (dx * dx + dy * dy).sqrt()
+}
+
 #[test]
 fn tank_move_command_preserves_exact_goal_and_repeats_deterministically() {
     let (mut live, tank, goal) = flat_tank_move_fixture();
@@ -279,6 +318,98 @@ fn tank_move_command_preserves_exact_goal_and_repeats_deterministically() {
         b.movement.as_ref().map(|movement| movement.path.clone())
     );
     assert_eq!(repeat_a.command_log(), repeat_b.command_log());
+}
+
+#[test]
+fn queued_move_commands_follow_waypoints_in_order() {
+    let (mut game, unit, first, second, _) = queued_move_fixture();
+
+    game.enqueue(
+        1,
+        Command::Move {
+            units: vec![unit],
+            x: first.0,
+            y: first.1,
+            queued: true,
+        },
+    );
+    game.enqueue(
+        1,
+        Command::Move {
+            units: vec![unit],
+            x: second.0,
+            y: second.1,
+            queued: true,
+        },
+    );
+    game.tick();
+
+    let entity = game.entities.get(unit).expect("unit should exist");
+    assert_eq!(
+        entity.move_intent(),
+        Some(first),
+        "idle unit should immediately promote the first queued move"
+    );
+    assert_eq!(entity.queued_orders().len(), 1);
+
+    for _ in 0..120 {
+        game.tick();
+    }
+
+    let entity = game.entities.get(unit).expect("unit should exist");
+    assert!(
+        entity_distance_to(&game, unit, second) <= 3.0,
+        "unit should end at the second queued waypoint"
+    );
+    assert!(entity.queued_orders().is_empty());
+    assert!(matches!(entity.order(), Order::Idle));
+    assert_eq!(game.command_log().len(), 2);
+    assert!(game.command_log().iter().all(|entry| {
+        matches!(
+            &entry.command,
+            crate::protocol::Command::Move { queued: true, .. }
+        )
+    }));
+}
+
+#[test]
+fn replacement_move_and_stop_clear_queued_movement() {
+    let (mut game, unit, first, second, replacement) = queued_move_fixture();
+
+    for goal in [first, second] {
+        game.enqueue(
+            1,
+            Command::Move {
+                units: vec![unit],
+                x: goal.0,
+                y: goal.1,
+                queued: true,
+            },
+        );
+    }
+    game.tick();
+    game.enqueue(
+        1,
+        Command::Move {
+            units: vec![unit],
+            x: replacement.0,
+            y: replacement.1,
+            queued: false,
+        },
+    );
+    game.tick();
+
+    let entity = game.entities.get(unit).expect("unit should exist");
+    assert_eq!(entity.move_intent(), Some(replacement));
+    assert!(entity.queued_orders().is_empty());
+
+    game.enqueue(1, Command::Stop { units: vec![unit] });
+    game.tick();
+
+    let entity = game.entities.get(unit).expect("unit should exist");
+    assert!(matches!(entity.order(), Order::Idle));
+    assert!(entity.queued_orders().is_empty());
+    assert!(entity.path_is_empty());
 }
 
 #[test]

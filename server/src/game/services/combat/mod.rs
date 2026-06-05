@@ -149,10 +149,14 @@ pub(crate) fn combat_system(
                 if let Some(goal) = entities.get(id).and_then(|e| e.move_intent()) {
                     let needs_resume = entities
                         .get(id)
-                        .and_then(|e| e.path_goal())
-                        .map(|path_goal| {
-                            (path_goal.0 - goal.0).abs() > f32::EPSILON
-                                || (path_goal.1 - goal.1).abs() > f32::EPSILON
+                        .map(|e| {
+                            let stale_goal = e.path_goal().is_none_or(|path_goal| {
+                                (path_goal.0 - goal.0).abs() > f32::EPSILON
+                                    || (path_goal.1 - goal.1).abs() > f32::EPSILON
+                            });
+                            let interrupted_before_arrival = e.path_is_empty()
+                                && e.move_phase() != Some(crate::game::entity::MovePhase::Arrived);
+                            stale_goal || interrupted_before_arrival
                         })
                         .unwrap_or(true);
                     if needs_resume {
