@@ -1966,6 +1966,61 @@ fn set_path_direct(entities: &mut EntityStore, id: u32, waypoints: Vec<(f32, f32
 }
 
 #[test]
+fn rifleman_charge_doubles_movement_for_hard_coded_duration() {
+    let map = flat_map(1);
+    let mut entities = EntityStore::new();
+    let (sx, sy) = map.tile_center(20, 20);
+    let goal = (sx + 500.0, sy);
+    let rifleman = entities
+        .spawn_unit(1, EntityKind::Rifleman, sx, sy)
+        .expect("rifleman should spawn");
+    if let Some(e) = entities.get_mut(rifleman) {
+        e.set_order(Order::move_to(goal.0, goal.1));
+        e.start_charge(config::RIFLEMAN_CHARGE_TICKS);
+    }
+    set_path_direct(&mut entities, rifleman, vec![goal]);
+
+    let occ = crate::game::services::occupancy::Occupancy::build(&map, &entities);
+    let spatial = SpatialIndex::build(&entities, map.size);
+    let mut players = vec![player_with_oil(1, 0)];
+    let base_speed = config::unit_stats(EntityKind::Rifleman)
+        .expect("rifleman stats")
+        .speed;
+
+    let before = pos(&entities, rifleman);
+    movement_system(&map, &mut entities, &mut players, &occ, &spatial, 0);
+    let charged_step = moved_distance(before, pos(&entities, rifleman));
+    assert!(
+        (charged_step - base_speed * config::RIFLEMAN_CHARGE_SPEED_MULTIPLIER).abs() < 0.01,
+        "charged rifleman should move at 2x speed, moved {charged_step:.3}px"
+    );
+    assert_eq!(
+        entities.get(rifleman).unwrap().charge_ticks(),
+        config::RIFLEMAN_CHARGE_TICKS - 1
+    );
+
+    for tick in 1..config::RIFLEMAN_CHARGE_TICKS as u32 {
+        movement_system(&map, &mut entities, &mut players, &occ, &spatial, tick);
+    }
+    assert_eq!(entities.get(rifleman).unwrap().charge_ticks(), 0);
+
+    let before_normal = pos(&entities, rifleman);
+    movement_system(
+        &map,
+        &mut entities,
+        &mut players,
+        &occ,
+        &spatial,
+        config::RIFLEMAN_CHARGE_TICKS as u32,
+    );
+    let normal_step = moved_distance(before_normal, pos(&entities, rifleman));
+    assert!(
+        (normal_step - base_speed).abs() < 0.01,
+        "expired charge should return to normal speed, moved {normal_step:.3}px"
+    );
+}
+
+#[test]
 fn moving_unit_steers_around_braced_unit_when_space_exists() {
     let map = flat_map(1);
     let mut entities = EntityStore::new();

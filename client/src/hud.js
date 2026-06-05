@@ -453,6 +453,12 @@ export class HUD {
     return sel.filter((e) => this._isOwn(e) && isUnit(e.kind));
   }
 
+  _selectedOwnRiflemanIds(sel) {
+    return this._selectedOwnUnits(sel)
+      .filter((e) => e.kind === KIND.RIFLEMAN)
+      .map((e) => e.id);
+  }
+
   /** True when the actionable selected units are workers and no army unit is selected. */
   _workerOnlySelection(sel) {
     const ownUnits = this._selectedOwnUnits(sel);
@@ -465,12 +471,16 @@ export class HUD {
     const ownUnits = this._selectedOwnUnits(sel);
     const unitIds = ownUnits.map((e) => e.id);
     const atGunIds = ownUnits.filter((e) => e.kind === KIND.AT_TEAM).map((e) => e.id);
+    const riflemanIds = this._selectedOwnRiflemanIds(sel);
+    const chargeUnlocked =
+      riflemanIds.length > 0 && this._playerHasCompleteKind(KIND.TRAINING_CENTRE);
     const hasArmyUnit = ownUnits.some((e) => e.kind !== KIND.WORKER);
     const workerSelected = !hasArmyUnit && ownUnits.some((e) => e.kind === KIND.WORKER);
 
     const sig =
       `units|${unitIds.join(".")}|target:${this.state.commandTarget || ""}|` +
       `|at:${atGunIds.join(".")}|` +
+      `|rifle:${riflemanIds.join(".")}|charge:${chargeUnlocked ? 1 : 0}|` +
       (workerSelected ? "worker-main" : "no-build");
     if (sig === this._cardSig) return;
     this._cardSig = sig;
@@ -566,13 +576,29 @@ export class HUD {
         },
       }));
       idx = 5;
-      if (atGunIds.length > 0) {
+      if (chargeUnlocked || atGunIds.length > 0) {
         const empty = document.createElement("div");
         empty.className = "cmd-empty";
         frag.appendChild(empty);
         idx = 6;
+      }
+      if (chargeUnlocked) {
         frag.appendChild(this._cmdButton({
-          icon: "Z",
+          icon: "CHG",
+          label: "Charge",
+          title: "Riflemen sprint briefly at double movement speed",
+          hotkey: GRID_HOTKEYS[idx++],
+          enabled: true,
+          cls: "",
+          onClick: () => {
+            this.net.command(cmd.charge(riflemanIds));
+            this.state.endCommandTarget();
+          },
+        }));
+      }
+      if (atGunIds.length > 0) {
+        frag.appendChild(this._cmdButton({
+          icon: "SET",
           label: "Set Up",
           title: "Set up selected AT guns toward a target point",
           hotkey: GRID_HOTKEYS[idx++],
@@ -581,7 +607,7 @@ export class HUD {
           onClick: () => this.state.beginCommandTarget("setupAtGuns"),
         }));
         frag.appendChild(this._cmdButton({
-          icon: "X",
+          icon: "TD",
           label: "Tear Down",
           title: "Pack up selected AT guns",
           hotkey: GRID_HOTKEYS[idx++],

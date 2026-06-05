@@ -175,6 +175,22 @@ pub(crate) fn apply_commands(
                     }
                 }
             }
+            SimCommand::Charge { units } => {
+                if !player_has_completed_training_centre(entities, player) {
+                    continue;
+                }
+                for id in dedupe_cap_units(units) {
+                    if !owns_unit(entities, player, id) || is_constructing(entities, id) {
+                        continue;
+                    }
+                    let Some(e) = entities.get_mut(id) else {
+                        continue;
+                    };
+                    if e.kind == EntityKind::Rifleman {
+                        e.start_charge(config::RIFLEMAN_CHARGE_TICKS);
+                    }
+                }
+            }
             SimCommand::Gather {
                 units,
                 node,
@@ -364,6 +380,10 @@ fn can_accept_move_order(entities: &EntityStore, id: u32) -> bool {
         Some(e)
             if e.kind != EntityKind::AtTeam || matches!(e.weapon_setup(), WeaponSetup::Packed)
     )
+}
+
+fn player_has_completed_training_centre(entities: &EntityStore, player: u32) -> bool {
+    world_query::completed_building_kinds(entities, player).contains(&EntityKind::TrainingCentre)
 }
 
 fn deployed_at_gun_target_outside_arc(entities: &EntityStore, id: u32, target: u32) -> bool {
@@ -916,6 +936,69 @@ mod tests {
         let entity = entities.get(unit).expect("unit should exist");
         assert!(matches!(entity.order(), Order::Idle));
         assert!(entity.queued_orders().is_empty());
+    }
+
+    #[test]
+    fn charge_requires_training_centre_and_filters_to_owned_riflemen() {
+        let map = flat_map(24);
+        let mut entities = EntityStore::new();
+        let rifle = entities
+            .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
+            .expect("rifleman should spawn");
+        let worker = entities
+            .spawn_unit(1, EntityKind::Worker, 120.0, 100.0)
+            .expect("worker should spawn");
+        let enemy_rifle = entities
+            .spawn_unit(2, EntityKind::Rifleman, 140.0, 100.0)
+            .expect("enemy rifleman should spawn");
+
+        apply(
+            &map,
+            &mut entities,
+            vec![(
+                1,
+                SimCommand::Charge {
+                    units: vec![rifle, worker, enemy_rifle, rifle],
+                },
+            )],
+        );
+
+        assert_eq!(
+            entities.get(rifle).unwrap().charge_ticks(),
+            0,
+            "charge should be locked before Training Centre is complete"
+        );
+
+        let (tx, ty) = footprint_center(&map, EntityKind::TrainingCentre, 6, 6);
+        entities
+            .spawn_building(1, EntityKind::TrainingCentre, tx, ty, true)
+            .expect("training centre should spawn");
+
+        apply(
+            &map,
+            &mut entities,
+            vec![(
+                1,
+                SimCommand::Charge {
+                    units: vec![rifle, worker, enemy_rifle, rifle],
+                },
+            )],
+        );
+
+        assert_eq!(
+            entities.get(rifle).unwrap().charge_ticks(),
+            config::RIFLEMAN_CHARGE_TICKS
+        );
+        assert_eq!(
+            entities.get(worker).unwrap().charge_ticks(),
+            0,
+            "non-riflemen in the selected list are ignored"
+        );
+        assert_eq!(
+            entities.get(enemy_rifle).unwrap().charge_ticks(),
+            0,
+            "enemy riflemen are ignored"
+        );
     }
 
     #[test]

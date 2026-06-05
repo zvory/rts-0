@@ -88,6 +88,7 @@ short but readable. Coordinates are **world pixels** (floats) unless a field nam
 | `attack`     | `units: u32[]`, `target: u32`, `queued?: bool` | Attack a specific entity. When `queued` is true, store future attack intent instead of replacing the active order. |
 | `setupAtGuns` | `units: u32[]`, `x: f32`, `y: f32` | Manually emplace owned AT guns toward a world point. The server filters the unit list to owned, completed AT guns, clears movement/target state, records the setup facing, and enters `setting_up`. Other selected units are ignored. |
 | `tearDownAtGuns` | `units: u32[]` | Pack up owned AT guns that are `setting_up` or `deployed`. Other selected units are ignored. |
+| `charge`     | `units: u32[]` | Activate Rifleman Charge on owned riflemen. Requires at least one completed Training Centre. The server filters the unit list to owned, completed riflemen and sets a short sprint timer; other selected units are ignored. |
 | `gather`     | `units: u32[]`, `node: u32`, `queued?: bool` | Send workers to harvest a resource node. When `queued` is true, store future gather intent instead of replacing the active order. |
 | `build`      | `worker: u32`, `building: string`, `tileX: u32`, `tileY: u32`, `queued?: bool` | Worker constructs a building at a tile. The server first walks the worker to a nearby point outside the requested footprint, then starts construction once it is in range. `building` ∈ building kinds. When `queued` is true, store future build intent instead of replacing the active order. |
 | `train`      | `building: u32`, `unit: string` | Queue a unit at a production building. |
@@ -942,6 +943,11 @@ The server treats every client as potentially hostile. Limits live next to the c
   tank does not advance and waits `TANK_OIL_STARVED_PAUSE_TICKS` (one second) before retrying, so
   sparse oil income does not produce constant one-tick stuttering. Turret/combat behavior still
   runs through the combat system while movement is paused.
+- **Rifleman Charge**: after completing a Training Centre, selected riflemen gain a `charge`
+  command on the command card's `Z` slot. The command sets `RIFLEMAN_CHARGE_TICKS` (32 ticks) on
+  owned riflemen only; while active, movement uses `RIFLEMAN_CHARGE_SPEED_MULTIPLIER` (2x) and the
+  timer decays every simulation tick, even while idle. The duration is intentionally hard-coded
+  from the current "two tank lengths" feel and does not reference tank body constants.
 - **Tank armor facing**: tank and AT-team attacks against tank victims use the victim tank's hull
   `facing` and the attacker's position. Front hits (`<=45°` from the hull direction) deal normal
   damage, side hits (`>45°` and `<=135°`) deal `1.25x`, and rear hits (`>135°`) deal `1.75x`.

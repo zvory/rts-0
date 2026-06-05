@@ -73,4 +73,9 @@ pub(crate) fn movement_system_with_events(
     events: &mut HashMap<u32, Vec<Event>>,
 ) {
     waypoints::advance_moving_units(map, entities, players, occ, spatial, tick, events);
+    for id in entities.ids() {
+        if let Some(e) = entities.get_mut(id) {
+            e.tick_charge();
+        }
+    }
 }

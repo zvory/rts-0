@@ -35,6 +35,7 @@ export const CMD = Object.freeze({
   ATTACK: "attack",
   SETUP_AT_GUNS: "setupAtGuns",
   TEAR_DOWN_AT_GUNS: "tearDownAtGuns",
+  CHARGE: "charge",
   GATHER: "gather",
   BUILD: "build",
   TRAIN: "train",
@@ -453,6 +454,7 @@ export const cmd = Object.freeze({
     withQueued({ c: CMD.ATTACK, units, target }, queued),
   setupAtGuns: (units, x, y) => ({ c: CMD.SETUP_AT_GUNS, units, x, y }),
   tearDownAtGuns: (units) => ({ c: CMD.TEAR_DOWN_AT_GUNS, units }),
+  charge: (units) => ({ c: CMD.CHARGE, units }),
   gather: (units, node, queued = false) =>
     withQueued({ c: CMD.GATHER, units, node }, queued),
   build: (worker, building, tileX, tileY, queued = false) =>
