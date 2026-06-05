@@ -546,12 +546,9 @@ impl Entity {
                     if ticks == 0 {
                         if let Some(facing) = c.pending_redeploy_facing.take() {
                             c.emplacement_facing = Some(facing);
-                            c.weapon_facing = facing;
                             c.desired_weapon_facing = facing;
                         }
-                        WeaponSetup::SettingUp {
-                            ticks: crate::config::AT_TEAM_SETUP_TICKS,
-                        }
+                        WeaponSetup::Packed
                     } else {
                         WeaponSetup::TearingDownToRedeploy { ticks }
                     }

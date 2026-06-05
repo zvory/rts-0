@@ -81,6 +81,7 @@ pub(super) fn tick_deployed_weapon_setup(e: &mut Entity) {
         return;
     }
     rotate_at_gun_toward_setup_facing(e);
+    maybe_begin_at_gun_setup_after_alignment(e);
     e.tick_weapon_setup();
 }
 
@@ -238,6 +239,7 @@ fn rotate_at_gun_toward_setup_facing(e: &mut Entity) {
         return;
     }
     let target = match e.weapon_setup() {
+        WeaponSetup::Packed => e.emplacement_facing(),
         WeaponSetup::SettingUp { .. } => e.emplacement_facing(),
         WeaponSetup::TearingDownToRedeploy { .. } => e.pending_redeploy_facing(),
         _ => None,
@@ -251,5 +253,26 @@ fn rotate_at_gun_toward_setup_facing(e: &mut Entity) {
     if rotated.is_finite() {
         e.set_facing(rotated);
         e.set_weapon_facing(rotated);
+    }
+}
+
+fn maybe_begin_at_gun_setup_after_alignment(e: &mut Entity) {
+    if e.kind != EntityKind::AtTeam || !matches!(e.weapon_setup(), WeaponSetup::Packed) {
+        return;
+    }
+    if !e.path_is_empty() || !matches!(e.order(), Order::Idle) {
+        return;
+    }
+    let Some(target) = e.emplacement_facing().filter(|facing| facing.is_finite()) else {
+        return;
+    };
+    let current = e
+        .weapon_facing()
+        .filter(|facing| facing.is_finite())
+        .unwrap_or_else(|| e.facing());
+    if angle_delta(current, target).abs() <= AT_GUN_FIRE_TOLERANCE_RAD {
+        e.set_weapon_setup(WeaponSetup::SettingUp {
+            ticks: config::AT_TEAM_SETUP_TICKS,
+        });
     }
 }
