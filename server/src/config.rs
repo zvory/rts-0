@@ -51,6 +51,8 @@ pub const SCOUT_CAR_RECOVERY_COOLDOWN_TICKS: u16 = TICK_HZ as u16;
 
 /// Support-weapon setup/teardown time. One second at the simulation tick rate.
 pub const MACHINE_GUNNER_SETUP_TICKS: u16 = TICK_HZ as u16;
+/// AT-team setup/teardown time. 1.5 seconds at the simulation tick rate.
+pub const AT_TEAM_SETUP_TICKS: u16 = (TICK_HZ as u16) * 3 / 2;
 /// Packed AT guns stay mobile and fight only at short range.
 pub const AT_GUN_PACKED_RANGE_TILES: u32 = 5;
 /// Manually deployed AT guns trade mobility for long-range ambush coverage.
