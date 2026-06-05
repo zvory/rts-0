@@ -59,7 +59,7 @@ export function _onRightClick(p, ev = {}) {
   }
   // Default -> move to the world point.
   this.net.command(cmd.move(ownUnits, world.x, world.y, !!ev.shiftKey));
-  this.state.addCommandFeedback("move", world.x, world.y);
+  this.state.addCommandFeedback("move", world.x, world.y, !!ev.shiftKey);
 }
 
 export function _issueTargetedCommand(p, ev = {}) {
@@ -76,7 +76,7 @@ export function _issueTargetedCommand(p, ev = {}) {
   }
   if (this.state.commandTarget === "move") {
     this.net.command(cmd.move(ownUnits, world.x, world.y, !!ev.shiftKey));
-    this.state.addCommandFeedback("move", world.x, world.y);
+    this.state.addCommandFeedback("move", world.x, world.y, !!ev.shiftKey);
     return;
   }
 
@@ -89,7 +89,7 @@ export function _issueTargetedCommand(p, ev = {}) {
   }
 
   this.net.command(cmd.attackMove(ownUnits, world.x, world.y, !!ev.shiftKey));
-  this.state.addCommandFeedback("attack", world.x, world.y);
+  this.state.addCommandFeedback("attack", world.x, world.y, !!ev.shiftKey);
 }
 
 export function _selectedOwnUnitIds() {

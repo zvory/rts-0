@@ -10,7 +10,7 @@ import {
   MINING_CC_RANGE_TILES,
   isProducerBuilding,
 } from "../config.js";
-import { KIND, SETUP, STATE, isBuilding, isResource } from "../protocol.js";
+import { KIND, SETUP, STATE, isBuilding, isResource, isUnit } from "../protocol.js";
 import {
   DEPLOYED_WEAPON_ANIM_MS,
   SWEEP_EVICT_FRAMES,
@@ -127,6 +127,49 @@ export function _drawCommandFeedback(state) {
       g.lineTo(f.x - r * 0.72, f.y);
       g.lineTo(f.x, f.y - r);
     }
+    if (f.append) {
+      g.lineStyle(1.5, color, alpha * 0.85);
+      drawDashedCircle(g, f.x, f.y, r + 7, 10);
+      const sx = f.x + r * 0.7;
+      const sy = f.y - r * 0.7;
+      g.lineStyle(2, color, alpha);
+      g.moveTo(sx - 4, sy);
+      g.lineTo(sx + 4, sy);
+      g.moveTo(sx, sy - 4);
+      g.lineTo(sx, sy + 4);
+    }
+  }
+}
+
+export function _drawQueuedOrderMarkers(state) {
+  if (!state || typeof state.selectedEntities !== "function") return;
+  const g = this._feedbackGfx;
+  const moveColor = COLORS.selectOwn;
+  const attackColor = COLORS.selectEnemy;
+
+  for (const e of state.selectedEntities()) {
+    if (e.owner !== state.playerId || !isUnit(e.kind)) continue;
+    const markers = Array.isArray(e.queuedMarkers)
+      ? e.queuedMarkers.filter((m) => Number.isFinite(m?.x) && Number.isFinite(m?.y))
+      : [];
+    if (markers.length === 0) continue;
+
+    let fromX = e.x;
+    let fromY = e.y;
+    for (const marker of markers) {
+      const color = marker.attackMove ? attackColor : moveColor;
+      g.lineStyle(2, color, 0.48);
+      if (marker.attackMove) {
+        dashedLine(g, fromX, fromY, marker.x, marker.y, 12, 8);
+      } else {
+        g.moveTo(fromX, fromY);
+        g.lineTo(marker.x, marker.y);
+      }
+
+      drawQueuedPointMarker(g, marker.x, marker.y, color, !!marker.attackMove);
+      fromX = marker.x;
+      fromY = marker.y;
+    }
   }
 }
 
@@ -182,6 +225,37 @@ export function _drawRallyPoints(state) {
     g.beginFill(color, 0.85);
     g.drawCircle(rx, ry, 3);
     g.endFill();
+  }
+}
+
+function drawQueuedPointMarker(g, x, y, color, attackMove) {
+  if (attackMove) {
+    g.lineStyle(2.5, color, 0.95);
+    g.drawCircle(x, y, 7);
+    g.moveTo(x - 6, y - 6);
+    g.lineTo(x + 6, y + 6);
+    g.moveTo(x + 6, y - 6);
+    g.lineTo(x - 6, y + 6);
+    return;
+  }
+
+  g.lineStyle(2.5, color, 0.95);
+  g.beginFill(color, 0.18);
+  g.drawPolygon([x, y - 8, x + 8, y, x, y + 8, x - 8, y]);
+  g.endFill();
+  g.lineStyle(0);
+  g.beginFill(color, 0.9);
+  g.drawCircle(x, y, 2.5);
+  g.endFill();
+}
+
+function drawDashedCircle(g, x, y, radius, segments) {
+  const count = Math.max(6, segments | 0);
+  for (let i = 0; i < count; i += 2) {
+    const a0 = (i / count) * Math.PI * 2;
+    const a1 = ((i + 1) / count) * Math.PI * 2;
+    g.moveTo(x + Math.cos(a0) * radius, y + Math.sin(a0) * radius);
+    g.lineTo(x + Math.cos(a1) * radius, y + Math.sin(a1) * radius);
   }
 }
 

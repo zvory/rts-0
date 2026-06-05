@@ -94,7 +94,7 @@ export class GameState {
     // --- command targeting / feedback (client-only) ---
     /** @type {null | "move" | "attack" | "setupAtGuns"} */
     this.commandTarget = null;
-    /** @type {Array<{kind:string,x:number,y:number,createdAt:number}>} */
+    /** @type {Array<{kind:string,x:number,y:number,append:boolean,createdAt:number}>} */
     this.commandFeedback = [];
     /** @type {null | {resourceId:number, resourceX:number, resourceY:number, ccId:number, ccX:number, ccY:number, inRange:boolean}} */
     this.resourceMiningPreview = null;
@@ -631,9 +631,10 @@ export class GameState {
    * @param {"move"|"attack"} kind
    * @param {number} x
    * @param {number} y
+   * @param {boolean=} append
    */
-  addCommandFeedback(kind, x, y) {
-    this.commandFeedback.push({ kind, x, y, createdAt: performance.now() });
+  addCommandFeedback(kind, x, y, append = false) {
+    this.commandFeedback.push({ kind, x, y, append: !!append, createdAt: performance.now() });
     if (this.commandFeedback.length > 12) {
       this.commandFeedback.splice(0, this.commandFeedback.length - 12);
     }
@@ -642,7 +643,7 @@ export class GameState {
   /**
    * Return live command feedback markers, pruning expired ones.
    * @param {number} now
-   * @returns {Array<{kind:string,x:number,y:number,createdAt:number}>}
+   * @returns {Array<{kind:string,x:number,y:number,append:boolean,createdAt:number}>}
    */
   liveCommandFeedback(now) {
     const ttlMs = 650;
