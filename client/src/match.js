@@ -476,7 +476,7 @@ export class Match {
    * @returns {object[]}
    */
   ownEntities() {
-    const all = this.state.entitiesInterpolated(1);
+    const all = this.state.entitiesInterpolated(1).filter((e) => !e.shotReveal);
     if (this.state.spectator) {
       return all.filter((e) => e.owner !== 0);
     }

@@ -11,8 +11,6 @@ export const LAYERS = [
   "selectionRings",
   "hpBars",
   "fog",
-  "shotRevealShadows",
-  "shotReveals",
   "feedback",
   "placement",
 ];
