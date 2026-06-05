@@ -4,7 +4,8 @@ use crate::game::entity::{EntityKind, EntityStore, GatherPhase, MovePhase, Order
 use crate::game::map::Map;
 use crate::game::pathfinding::Passability;
 use crate::game::services::geometry::{
-    building_rect_for_footprint, unit_body_for_entity, unit_body_overlap,
+    building_rect_for_footprint, tile_rect, unit_body_for_entity, unit_body_intersects_rect,
+    unit_body_overlap, unit_body_with_facing, CircleBody, OrientedBoxBody, UnitBody,
 };
 use crate::game::services::move_coordinator::MoveCoordinator;
 use crate::game::services::occupancy::footprint_center;
@@ -98,6 +99,55 @@ struct TankMovementBaseline {
     oil_burned: f32,
 }
 
+#[derive(Debug, Clone, Copy)]
+struct ScoutCarMovementBaseline {
+    travel_ticks: u32,
+    path_length_px: f32,
+    final_error_px: f32,
+    min_static_clearance_px: f32,
+    static_blocked_step_attempts: u32,
+    reverse_recovery_activations: u32,
+    repath_count: u32,
+    max_consecutive_no_progress_ticks: u32,
+    accepted_static_illegal_pose: bool,
+    collision_displacement_px: f32,
+}
+
+impl ScoutCarMovementBaseline {
+    fn assert_reference_envelope(&self, name: &str) {
+        assert!(
+            self.travel_ticks > 0,
+            "{name}: fixture never advanced: {:?}",
+            self
+        );
+        assert!(
+            self.path_length_px > 16.0,
+            "{name}: path_length_px should prove the fixture moved: {:?}",
+            self
+        );
+        assert!(
+            self.final_error_px <= config::TILE_SIZE as f32 * 1.5,
+            "{name}: scout car ended too far from goal: {:?}",
+            self
+        );
+        assert!(
+            self.min_static_clearance_px.is_finite() && self.min_static_clearance_px >= 0.0,
+            "{name}: accepted pose clipped static terrain/buildings: {:?}",
+            self
+        );
+        assert!(
+            !self.accepted_static_illegal_pose,
+            "{name}: movement accepted a statically illegal scout-car pose: {:?}",
+            self
+        );
+        assert!(
+            self.max_consecutive_no_progress_ticks < 120,
+            "{name}: scout car spent too long making no progress: {:?}",
+            self
+        );
+    }
+}
+
 impl TankMovementBaseline {
     fn assert_reference_envelope(&self, name: &str) {
         assert!(
@@ -126,6 +176,131 @@ impl TankMovementBaseline {
             self
         );
     }
+}
+
+fn measure_scout_car_fixture(
+    name: &str,
+    map: &Map,
+    entities: &mut EntityStore,
+    scout: u32,
+    goal: (f32, f32),
+    max_ticks: u32,
+    order_via_coordinator: bool,
+) -> ScoutCarMovementBaseline {
+    let mut pathing = PathingService::new(8_192, 256);
+    let start = pos(entities, scout);
+    let mut last = start;
+    let mut path_length_px = 0.0;
+    let mut static_blocked_step_attempts = 0;
+    let mut reverse_recovery_activations = 0;
+    let mut repath_count = 0;
+    let mut was_awaiting_path = false;
+    let mut consecutive_no_progress = 0;
+    let mut max_consecutive_no_progress_ticks = 0;
+    let mut accepted_static_illegal_pose = false;
+    let mut min_static_clearance_px = f32::INFINITY;
+    let mut collision_displacement_px = 0.0;
+    let mut travel_ticks = max_ticks;
+
+    if !order_via_coordinator {
+        set_path_direct(entities, scout, vec![goal]);
+        if let Some(e) = entities.get_mut(scout) {
+            e.set_order(Order::move_to(goal.0, goal.1));
+            e.reset_stuck(start.0, start.1);
+        }
+    }
+
+    for tick in 1..=max_ticks {
+        pathing.advance_tick(tick);
+        let occ = Occupancy::build(map, entities);
+        let mut coordinator = MoveCoordinator::new(&mut pathing, map, &occ, tick);
+        if tick == 1 && order_via_coordinator {
+            coordinator.order_group_move(entities, 1, &[scout], goal, false);
+        }
+        coordinator.process_awaiting_paths(entities);
+
+        let before = pos(entities, scout);
+        let before_static_blocked = entities
+            .get(scout)
+            .and_then(|e| e.movement.as_ref())
+            .map(|m| m.static_blocked_ticks)
+            .unwrap_or(0);
+        let before_reverse = entities
+            .get(scout)
+            .and_then(|e| e.movement.as_ref())
+            .and_then(|m| m.scout_car_reverse_waypoint);
+
+        let spatial = SpatialIndex::build(entities, map.size);
+        movement_system(map, entities, &mut [], &occ, &spatial, tick);
+        let after_movement = pos(entities, scout);
+        let spatial = SpatialIndex::build(entities, map.size);
+        resolve_collisions(entities, &spatial, map, &occ);
+        let after_collision = pos(entities, scout);
+
+        path_length_px += moved_distance(last, after_collision);
+        collision_displacement_px += moved_distance(after_movement, after_collision);
+        let moved_this_tick = moved_distance(before, after_collision);
+        last = after_collision;
+
+        let e = entities.get(scout).expect("scout car should still exist");
+        let after_static_blocked = e
+            .movement
+            .as_ref()
+            .map(|m| m.static_blocked_ticks)
+            .unwrap_or(0);
+        if after_static_blocked > before_static_blocked {
+            static_blocked_step_attempts += 1;
+        }
+        let after_reverse = e
+            .movement
+            .as_ref()
+            .and_then(|m| m.scout_car_reverse_waypoint);
+        if before_reverse.is_none() && after_reverse.is_some() {
+            reverse_recovery_activations += 1;
+        }
+
+        let awaiting_path = e.move_phase() == Some(MovePhase::AwaitingPath);
+        if awaiting_path && !was_awaiting_path {
+            repath_count += 1;
+        }
+        was_awaiting_path = awaiting_path;
+
+        if moved_this_tick < config::STUCK_EPS_PX && !e.path_is_empty() {
+            consecutive_no_progress += 1;
+            max_consecutive_no_progress_ticks =
+                max_consecutive_no_progress_ticks.max(consecutive_no_progress);
+        } else {
+            consecutive_no_progress = 0;
+        }
+
+        let clearance = scout_car_static_clearance_px(map, &occ, (e.pos_x, e.pos_y), e.facing());
+        if clearance < 0.0 {
+            accepted_static_illegal_pose = true;
+        } else {
+            min_static_clearance_px = min_static_clearance_px.min(clearance);
+        }
+
+        if e.path_is_empty() {
+            travel_ticks = tick;
+            break;
+        }
+    }
+
+    let final_error_px = moved_distance(pos(entities, scout), goal);
+    let baseline = ScoutCarMovementBaseline {
+        travel_ticks,
+        path_length_px,
+        final_error_px,
+        min_static_clearance_px,
+        static_blocked_step_attempts,
+        reverse_recovery_activations,
+        repath_count,
+        max_consecutive_no_progress_ticks,
+        accepted_static_illegal_pose,
+        collision_displacement_px,
+    };
+    println!("SCOUT_CAR_PHASE0_BASELINE {name}: {baseline:?}");
+    baseline
 }
 
 fn measure_tank_fixture(
@@ -244,6 +419,74 @@ fn tank_body_half_width() -> f32 {
 
 fn scout_car_body_half_width() -> f32 {
     config::SCOUT_CAR_BODY_WIDTH_PX * 0.5 + config::SCOUT_CAR_BODY_CLEARANCE_PX
+}
+
+fn body_tile_range_for_test(body: UnitBody) -> impl Iterator<Item = (i32, i32)> {
+    let ts = config::TILE_SIZE as f32;
+    let eps = 0.001;
+    let aabb = body.aabb();
+    let min_tx = ((aabb.min_x - eps) / ts).floor() as i32;
+    let min_ty = ((aabb.min_y - eps) / ts).floor() as i32;
+    let max_tx = ((aabb.max_x + eps) / ts).ceil() as i32 - 1;
+    let max_ty = ((aabb.max_y + eps) / ts).ceil() as i32 - 1;
+
+    (min_ty..=max_ty).flat_map(move |ty| (min_tx..=max_tx).map(move |tx| (tx, ty)))
+}
+
+fn expanded_body(body: UnitBody, extra_px: f32) -> UnitBody {
+    match body {
+        UnitBody::Circle(body) => UnitBody::Circle(CircleBody {
+            x: body.x,
+            y: body.y,
+            radius: body.radius + extra_px,
+        }),
+        UnitBody::OrientedBox(body) => UnitBody::OrientedBox(OrientedBoxBody {
+            x: body.x,
+            y: body.y,
+            half_len: body.half_len + extra_px,
+            half_width: body.half_width + extra_px,
+            facing: body.facing,
+        }),
+    }
+}
+
+fn body_hits_static_blocker(map: &Map, occ: &Occupancy, body: UnitBody) -> bool {
+    let aabb = body.aabb();
+    let world_size = map.world_size_px();
+    if aabb.min_x < 0.0 || aabb.min_y < 0.0 || aabb.max_x > world_size || aabb.max_y > world_size {
+        return true;
+    }
+
+    for (tx, ty) in body_tile_range_for_test(body) {
+        if !map.in_bounds(tx, ty) {
+            return true;
+        }
+        if (!map.is_passable(tx, ty) || !occ.passable(tx, ty))
+            && unit_body_intersects_rect(body, tile_rect(tx, ty))
+        {
+            return true;
+        }
+    }
+    false
+}
+
+fn scout_car_static_clearance_px(map: &Map, occ: &Occupancy, pos: (f32, f32), facing: f32) -> f32 {
+    let Some(body) = unit_body_with_facing(EntityKind::ScoutCar, pos.0, pos.1, facing) else {
+        return -1.0;
+    };
+    if body_hits_static_blocker(map, occ, body) {
+        return -1.0;
+    }
+
+    let mut clearance = 0.0;
+    while clearance <= config::TILE_SIZE as f32 * 2.0 {
+        let expanded = expanded_body(body, clearance + 1.0);
+        if body_hits_static_blocker(map, occ, expanded) {
+            return clearance;
+        }
+        clearance += 1.0;
+    }
+    clearance
 }
 
 fn tank_standable_at_entity_facing(
@@ -1004,6 +1247,303 @@ fn tank_phase0_baseline_traffic_cluster() {
     assert!(
         baseline.collision_displacement_px <= 0.01,
         "phase-4 tank traffic should avoid collision shoving the tank sideways: {:?}",
+        baseline
+    );
+}
+
+fn spawn_ordered_scout_car(
+    entities: &mut EntityStore,
+    start: (f32, f32),
+    goal: (f32, f32),
+    facing: f32,
+) -> u32 {
+    let scout = entities
+        .spawn_unit(1, EntityKind::ScoutCar, start.0, start.1)
+        .expect("scout car should spawn");
+    if let Some(e) = entities.get_mut(scout) {
+        e.set_facing(facing);
+        e.set_order(Order::move_to(goal.0, goal.1));
+        e.reset_stuck(start.0, start.1);
+    }
+    scout
+}
+
+fn block_rect_tiles(map: &mut Map, min_x: u32, min_y: u32, max_x: u32, max_y: u32) {
+    for ty in min_y..=max_y {
+        for tx in min_x..=max_x {
+            let idx = map.index(tx, ty);
+            map.terrain[idx] = crate::protocol::terrain::ROCK;
+        }
+    }
+}
+
+#[test]
+fn scout_car_phase0_factory_corner_graze_cardinal_approaches() {
+    let ts = config::TILE_SIZE as f32;
+    let clearance = scout_car_body_half_width() + 8.0;
+
+    for name in [
+        "west_to_north",
+        "north_to_east",
+        "east_to_south",
+        "south_to_west",
+    ] {
+        let map = flat_map(1);
+        let mut entities = EntityStore::new();
+        let (bx, by) = footprint_center(&map, EntityKind::Factory, 20, 20);
+        entities
+            .spawn_building(2, EntityKind::Factory, bx, by, true)
+            .expect("factory should spawn");
+        let rect = building_rect_for_footprint(EntityKind::Factory, 20, 20).expect("factory rect");
+        let (start, goal, facing) = match name {
+            "west_to_north" => (
+                (rect.min_x - ts * 4.0, rect.max_y + clearance),
+                (rect.max_x + clearance, rect.min_y - ts * 4.0),
+                0.0,
+            ),
+            "north_to_east" => (
+                (rect.min_x - clearance, rect.min_y - ts * 4.0),
+                (rect.max_x + ts * 4.0, rect.max_y + clearance),
+                std::f32::consts::FRAC_PI_2,
+            ),
+            "east_to_south" => (
+                (rect.max_x + ts * 4.0, rect.min_y - clearance),
+                (rect.min_x - clearance, rect.max_y + ts * 4.0),
+                std::f32::consts::PI,
+            ),
+            "south_to_west" => (
+                (rect.max_x + clearance, rect.max_y + ts * 4.0),
+                (rect.min_x - ts * 4.0, rect.min_y - clearance),
+                -std::f32::consts::FRAC_PI_2,
+            ),
+            _ => unreachable!("case list is exhaustive"),
+        };
+        let scout = spawn_ordered_scout_car(&mut entities, start, goal, facing);
+
+        let baseline =
+            measure_scout_car_fixture(name, &map, &mut entities, scout, goal, 1_200, true);
+
+        baseline.assert_reference_envelope(name);
+        assert!(
+            baseline.min_static_clearance_px <= 1.0,
+            "{name}: corner graze fixture should exercise near-zero static clearance: {:?}",
+            baseline
+        );
+        assert!(
+            baseline.static_blocked_step_attempts <= 45,
+            "{name}: corner graze repeatedly aimed into static blockers: {:?}",
+            baseline
+        );
+    }
+}
+
+#[test]
+fn scout_car_phase0_two_building_alley() {
+    let map = flat_map(1);
+    let mut entities = EntityStore::new();
+    for tile_y in [16, 20] {
+        let (bx, by) = footprint_center(&map, EntityKind::Depot, 18, tile_y);
+        entities
+            .spawn_building(2, EntityKind::Depot, bx, by, true)
+            .expect("depot should spawn");
+    }
+    let lower = building_rect_for_footprint(EntityKind::Depot, 18, 16).expect("lower depot rect");
+    let upper = building_rect_for_footprint(EntityKind::Depot, 18, 20).expect("upper depot rect");
+    let lane_y = (lower.max_y + upper.min_y) * 0.5;
+    let start = (lower.min_x - config::TILE_SIZE as f32 * 5.0, lane_y);
+    let goal = (lower.max_x + config::TILE_SIZE as f32 * 5.0, lane_y);
+    let scout = spawn_ordered_scout_car(&mut entities, start, goal, 0.0);
+
+    let baseline = measure_scout_car_fixture(
+        "two_building_alley",
+        &map,
+        &mut entities,
+        scout,
+        goal,
+        900,
+        true,
+    );
+
+    baseline.assert_reference_envelope("two_building_alley");
+    assert!(
+        baseline.min_static_clearance_px <= 12.0,
+        "fixture should exercise a narrow lane, got {:?}",
+        baseline
+    );
+    assert!(
+        baseline.static_blocked_step_attempts <= 10,
+        "scout car should not repeatedly hit alley corners: {:?}",
+        baseline
+    );
+}
+
+#[test]
+fn scout_car_phase0_diagonal_pinch_avoids_one_tile_gap() {
+    let mut map = flat_map(1);
+    block_rect_tiles(&mut map, 10, 10, 12, 12);
+    block_rect_tiles(&mut map, 14, 13, 16, 15);
+    let mut entities = EntityStore::new();
+    let start = map.tile_center(9, 15);
+    let goal = map.tile_center(18, 10);
+    let scout = spawn_ordered_scout_car(&mut entities, start, goal, -std::f32::consts::FRAC_PI_4);
+
+    let baseline = measure_scout_car_fixture(
+        "diagonal_pinch",
+        &map,
+        &mut entities,
+        scout,
+        goal,
+        1_200,
+        true,
+    );
+
+    baseline.assert_reference_envelope("diagonal_pinch");
+    assert!(
+        baseline.min_static_clearance_px >= 0.0,
+        "diagonal pinch route must never accept a clipping pose: {:?}",
+        baseline
+    );
+    assert!(
+        baseline.max_consecutive_no_progress_ticks < 90,
+        "diagonal pinch should not wedge the scout car: {:?}",
+        baseline
+    );
+}
+
+#[test]
+fn scout_car_phase0_wall_parallel_lane_does_not_ram_wall() {
+    let mut map = flat_map(1);
+    for tx in 8..=30 {
+        let idx = map.index(tx, 16);
+        map.terrain[idx] = crate::protocol::terrain::ROCK;
+    }
+    let mut entities = EntityStore::new();
+    let start = map.tile_center(8, 17);
+    let goal = map.tile_center(30, 17);
+    let scout = spawn_ordered_scout_car(&mut entities, start, goal, 0.0);
+
+    let baseline = measure_scout_car_fixture(
+        "wall_parallel_lane",
+        &map,
+        &mut entities,
+        scout,
+        goal,
+        900,
+        true,
+    );
+
+    baseline.assert_reference_envelope("wall_parallel_lane");
+    assert_eq!(
+        baseline.reverse_recovery_activations, 0,
+        "parallel wall lane should not need reverse recovery: {:?}",
+        baseline
+    );
+    assert!(
+        baseline.static_blocked_step_attempts <= 5,
+        "wall-parallel route should not repeatedly aim into the wall: {:?}",
+        baseline
+    );
+}
+
+#[test]
+fn scout_car_phase0_blocked_nose_recovery_is_measurable() {
+    let (map, mut entities, scout, _start, goal, _initial_facing) =
+        front_blocked_scout_car_fixture();
+
+    let baseline = measure_scout_car_fixture(
+        "blocked_nose_recovery",
+        &map,
+        &mut entities,
+        scout,
+        goal,
+        180,
+        false,
+    );
+
+    assert!(
+        !baseline.accepted_static_illegal_pose,
+        "recovery fixture must never accept a clipping pose: {:?}",
+        baseline
+    );
+    assert!(
+        baseline.static_blocked_step_attempts > 0,
+        "fixture should measure repeated blocked static step attempts: {:?}",
+        baseline
+    );
+    assert!(
+        baseline.reverse_recovery_activations >= 1,
+        "front-blocked scout car should inject reverse recovery: {:?}",
+        baseline
+    );
+}
+
+#[test]
+fn scout_car_phase0_traffic_compression_near_factory() {
+    let map = flat_map(1);
+    let mut entities = EntityStore::new();
+    let (bx, by) = footprint_center(&map, EntityKind::Factory, 20, 18);
+    entities
+        .spawn_building(2, EntityKind::Factory, bx, by, true)
+        .expect("factory should spawn");
+    let rect = building_rect_for_footprint(EntityKind::Factory, 20, 18).expect("factory rect");
+    let lane_y = rect.max_y + scout_car_body_half_width() + 12.0;
+    let start = (rect.min_x - config::TILE_SIZE as f32 * 5.0, lane_y);
+    let goal = (rect.max_x + config::TILE_SIZE as f32 * 5.0, lane_y);
+    let scout = spawn_ordered_scout_car(&mut entities, start, goal, 0.0);
+
+    for (dx, dy, kind) in [
+        (-54.0, -12.0, EntityKind::Rifleman),
+        (-28.0, 18.0, EntityKind::Rifleman),
+        (18.0, -14.0, EntityKind::MachineGunner),
+        (54.0, 16.0, EntityKind::Rifleman),
+        (86.0, 0.0, EntityKind::Tank),
+    ] {
+        let id = entities
+            .spawn_unit(2, kind, rect.min_x + dx, lane_y + dy)
+            .expect("traffic unit should spawn");
+        if let Some(e) = entities.get_mut(id) {
+            e.set_facing(0.0);
+        }
+    }
+
+    let baseline = measure_scout_car_fixture(
+        "traffic_compression",
+        &map,
+        &mut entities,
+        scout,
+        goal,
+        1_200,
+        true,
+    );
+
+    assert!(
+        !baseline.accepted_static_illegal_pose,
+        "traffic compression must not accept static clipping even when wedged: {:?}",
+        baseline
+    );
+    assert!(
+        baseline.path_length_px > moved_distance(start, goal),
+        "traffic compression should show churn around the factory lane: {:?}",
+        baseline
+    );
+    assert!(
+        baseline.final_error_px > config::TILE_SIZE as f32 * 4.0,
+        "phase-0 traffic fixture should reproduce the current scout-car wedge: {:?}",
+        baseline
+    );
+    assert!(
+        baseline.reverse_recovery_activations > 0,
+        "wedged traffic should trigger measurable reverse recovery attempts: {:?}",
+        baseline
+    );
+    assert!(
+        baseline.collision_displacement_px > config::TILE_SIZE as f32,
+        "traffic compression should record collision pressure from nearby units: {:?}",
+        baseline
+    );
+    assert!(
+        baseline.repath_count <= 4,
+        "traffic fixture should distinguish clean progress from repeated repaths: {:?}",
         baseline
     );
 }
