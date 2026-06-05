@@ -46,7 +46,7 @@ const MATERIAL_GOAL_DELTA_PX: f32 = config::TILE_SIZE as f32;
 
 const FORMATION_NEAR_DISTANCE_PX: f32 = config::TILE_SIZE as f32 * 4.0;
 const FORMATION_FAR_DISTANCE_PX: f32 = config::TILE_SIZE as f32 * 18.0;
-const FORMATION_MAX_OFFSET_PX: f32 = config::TILE_SIZE as f32 * 10.0;
+const FORMATION_MAX_OFFSET_PX: f32 = config::TILE_SIZE as f32 * 4.0;
 const SPAWN_PREFERRED_GAP_UNIT_FRACTION: f32 = 0.10;
 const SCOUT_CAR_ROUTE_SIMPLIFY_MAX_SEGMENT_PX: f32 = config::TILE_SIZE as f32 * 3.0;
 /// The movement/pathing coordinator for one tick.
@@ -1092,6 +1092,28 @@ mod tests {
             (-2.0 * ts, 2.0 * ts),
             (2.0 * ts, 2.0 * ts),
         ];
+        for (goal, expected_offset) in goals.iter().zip(expected) {
+            let actual = offset_from(*goal, click);
+            assert_close(actual.0, expected_offset.0);
+            assert_close(actual.1, expected_offset.1);
+        }
+    }
+
+    #[test]
+    fn far_scattered_group_move_caps_preserved_offsets() {
+        let map = flat_map(80);
+        let entities = EntityStore::new();
+        let occ = Occupancy::build(&map, &entities);
+        let units = vec![
+            formation_unit(1, &map, (5, 20)),
+            formation_unit(2, &map, (45, 20)),
+        ];
+        let click = map.tile_center(60, 50);
+
+        let goals = formation_goals(&map, &occ, &units, click);
+
+        let ts = config::TILE_SIZE as f32;
+        let expected = [(-4.0 * ts, 0.0), (4.0 * ts, 0.0)];
         for (goal, expected_offset) in goals.iter().zip(expected) {
             let actual = offset_from(*goal, click);
             assert_close(actual.0, expected_offset.0);
