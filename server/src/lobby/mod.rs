@@ -31,7 +31,7 @@ use crate::game::command::SimCommand;
 use crate::game::selfplay::{is_safe_artifact_name, LiveSelfPlay, ReplayArtifact, ReplayDriver};
 use crate::game::{Game, PlayerInit};
 use crate::protocol::{
-    kinds, Event, LobbyPlayer, PlayerScore, ResourceDelta, ServerMessage, Snapshot, StartPayload,
+    Event, LobbyPlayer, PlayerScore, ResourceDelta, ServerMessage, Snapshot, StartPayload,
 };
 
 mod connection;
