@@ -584,37 +584,58 @@ where
     };
     if !ready_units.is_empty() || !local_ready_units.is_empty() || !rifle_raid_units.is_empty() {
         let mut handled_local_defense = false;
+        let mut local_defense_assigned = BTreeSet::new();
+        let mut local_defense_targets = BTreeSet::new();
         if let Some(target) = local_defense_target(observation) {
             if let Some(units) = actions::attack_units(
                 &mut actions,
                 local_defense_units(observation, &local_ready_units),
                 target,
             ) {
+                local_defense_assigned.extend(units.iter().copied());
+                let geometry = LocalDefenseGeometry::from_observation(observation);
+                local_defense_targets.extend(
+                    observation
+                        .visible_enemies
+                        .iter()
+                        .filter(|enemy| geometry.contains(enemy))
+                        .map(|enemy| enemy.id),
+                );
                 intents.push(AiIntent::Attack { units });
                 handled_local_defense = true;
             }
         }
 
         let mut handled_raid_target = false;
-        if !handled_local_defense && rifle_raid_policy && !rifle_raid_units.is_empty() {
+        let raid_units_available: Vec<u32> = rifle_raid_units
+            .iter()
+            .copied()
+            .filter(|id| !local_defense_assigned.contains(id))
+            .collect();
+        if rifle_raid_policy && !raid_units_available.is_empty() {
             if let Some(enemy_base) = facts.nearest_public_enemy_base {
-                if let Some(target) = rifle_raid_unit_target(observation, &rifle_raid_units)
-                    .or_else(|| {
-                        rifle_raid_building_fallback_target(
-                            observation,
-                            &rifle_raid_units,
-                            enemy_base,
-                        )
-                    })
-                {
+                if let Some(target) = rifle_raid_unit_target(
+                    observation,
+                    &raid_units_available,
+                    &local_defense_targets,
+                )
+                .or_else(|| {
+                    rifle_raid_building_fallback_target(
+                        observation,
+                        &raid_units_available,
+                        &local_defense_targets,
+                        enemy_base,
+                    )
+                }) {
                     if let Some(units) =
-                        actions::attack_units(&mut actions, rifle_raid_units.clone(), target)
+                        actions::attack_units(&mut actions, raid_units_available.clone(), target)
                     {
                         intents.push(AiIntent::Attack { units });
                         handled_raid_target = true;
                     }
                 } else {
-                    let continuing_units = active_rifle_raid_units(observation, &rifle_raid_units);
+                    let continuing_units =
+                        active_rifle_raid_units(observation, &raid_units_available);
                     if !continuing_units.is_empty() {
                         let (x, y) = rifle_raid_move_target(observation, enemy_base);
                         if let Some(units) =
@@ -2185,11 +2206,16 @@ fn active_rifle_raid_units(observation: &AiObservation, raid_units: &[u32]) -> V
     units
 }
 
-fn rifle_raid_unit_target(observation: &AiObservation, raid_units: &[u32]) -> Option<u32> {
+fn rifle_raid_unit_target(
+    observation: &AiObservation,
+    raid_units: &[u32],
+    excluded_targets: &BTreeSet<u32>,
+) -> Option<u32> {
     let center = group_center(observation, raid_units)?;
     observation
         .visible_enemies
         .iter()
+        .filter(|enemy| !excluded_targets.contains(&enemy.id))
         .filter(|enemy| enemy.kind.is_unit())
         .map(|enemy| {
             (
@@ -2219,6 +2245,7 @@ fn rifle_raid_unit_priority(kind: EntityKind) -> u8 {
 fn rifle_raid_building_fallback_target(
     observation: &AiObservation,
     raid_units: &[u32],
+    excluded_targets: &BTreeSet<u32>,
     enemy_base: EnemyBaseFact,
 ) -> Option<u32> {
     let raid_ids: BTreeSet<u32> = raid_units.iter().copied().collect();
@@ -2239,6 +2266,7 @@ fn rifle_raid_building_fallback_target(
     observation
         .visible_enemies
         .iter()
+        .filter(|enemy| !excluded_targets.contains(&enemy.id))
         .filter(|enemy| enemy.kind.is_building())
         .map(|enemy| (enemy.id, dist2(center.0, center.1, enemy.x, enemy.y)))
         .min_by(|left, right| {
@@ -4731,6 +4759,85 @@ mod tests {
             &mut AiDecisionMemory::for_profile(&RIFLE_FLOOD_FAST),
         );
 
+        assert!(decision.commands.iter().any(|command| {
+            matches!(
+                command,
+                Command::Attack { units, target } if units.as_slice() == [30] && *target == 90
+            )
+        }));
+    }
+
+    #[test]
+    fn moving_rifle_raid_targets_visible_scout_car() {
+        let ts = config::TILE_SIZE as f32;
+        let mut raider = combat_at(30, EntityKind::Rifleman, 46.0 * ts, 46.0 * ts);
+        raider.state = AiEntityState::Move;
+        raider.free_for_combat = false;
+        let mut observation = observation(
+            AiEconomy {
+                steel: 0,
+                oil: 0,
+                supply_used: 1,
+                supply_cap: 10,
+            },
+            vec![building(10, EntityKind::CityCentre, Some(0)), raider],
+        );
+        observation
+            .visible_enemies
+            .push(enemy(90, EntityKind::ScoutCar, 48.5 * ts, 48.5 * ts));
+
+        let decision = decide(
+            &observation,
+            &RIFLE_FLOOD_FAST,
+            &mut AiDecisionMemory::for_profile(&RIFLE_FLOOD_FAST),
+        );
+
+        assert!(decision.commands.iter().any(|command| {
+            matches!(
+                command,
+                Command::Attack { units, target } if units.as_slice() == [30] && *target == 90
+            )
+        }));
+    }
+
+    #[test]
+    fn local_defense_does_not_block_moving_raid_from_targeting_scout_car() {
+        let ts = config::TILE_SIZE as f32;
+        let mut raider = combat_at(30, EntityKind::Rifleman, 46.0 * ts, 46.0 * ts);
+        raider.state = AiEntityState::Move;
+        raider.free_for_combat = false;
+        let mut observation = observation(
+            AiEconomy {
+                steel: 0,
+                oil: 0,
+                supply_used: 2,
+                supply_cap: 10,
+            },
+            vec![
+                building(10, EntityKind::CityCentre, Some(0)),
+                combat_at(20, EntityKind::Rifleman, 8.5 * ts, 8.5 * ts),
+                raider,
+            ],
+        );
+        observation
+            .visible_enemies
+            .push(enemy(80, EntityKind::Worker, 9.5 * ts, 9.5 * ts));
+        observation
+            .visible_enemies
+            .push(enemy(90, EntityKind::ScoutCar, 48.5 * ts, 48.5 * ts));
+
+        let decision = decide(
+            &observation,
+            &RIFLE_FLOOD_FAST,
+            &mut AiDecisionMemory::for_profile(&RIFLE_FLOOD_FAST),
+        );
+
+        assert!(decision.commands.iter().any(|command| {
+            matches!(
+                command,
+                Command::Attack { units, target } if units.as_slice() == [20] && *target == 80
+            )
+        }));
         assert!(decision.commands.iter().any(|command| {
             matches!(
                 command,
