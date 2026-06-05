@@ -403,6 +403,12 @@ impl RoomTask {
             .filter(|id| self.players.get(id).map(|p| !p.spectator).unwrap_or(false))
     }
 
+    fn spectator_visible_player_ids(&self) -> Vec<u32> {
+        let mut ids: Vec<u32> = self.active_human_ids().collect();
+        ids.extend(self.ai_players.iter().map(|ai| ai.id));
+        ids
+    }
+
     fn reassign_host_if_needed(&mut self) {
         if self
             .host_id
@@ -788,10 +794,11 @@ impl RoomTask {
             union_events(per_player_events.values())
         });
 
-        // Fan out fog-filtered snapshots to active players and full-world snapshots to lobby-time
+        // Fan out fog-filtered snapshots to active players and union-fog snapshots to lobby-time
         // spectators, merging in the events each recipient is allowed to observe.
         let fanout_start = StdInstant::now();
         let recipients: Vec<u32> = self.order.clone();
+        let spectator_visible_players = self.spectator_visible_player_ids();
         for id in &recipients {
             if self.outcome_sent.contains(id) {
                 continue;
@@ -801,7 +808,7 @@ impl RoomTask {
             };
             let snapshot_start = StdInstant::now();
             let mut snapshot = if player.spectator {
-                game.snapshot_full_for(0)
+                game.snapshot_for_spectator(&spectator_visible_players)
             } else {
                 game.snapshot_for(*id)
             };

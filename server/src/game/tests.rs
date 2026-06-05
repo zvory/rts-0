@@ -383,6 +383,40 @@ fn phase4_projection_matches_legacy_snapshot_entities() {
 }
 
 #[test]
+fn spectator_snapshot_uses_union_fog_not_full_world() {
+    let players = human_vs_ai_players();
+    let mut game = Game::new(&players, 0xCAFE_BABE);
+    let active_players = [1, 2];
+    game.fog
+        .recompute(&active_players, &game.entities, &game.map);
+
+    let hidden_pos = (0..game.map.size)
+        .flat_map(|ty| (0..game.map.size).map(move |tx| (tx, ty)))
+        .find_map(|(tx, ty)| {
+            let (x, y) = game.map.tile_center(tx, ty);
+            let hidden_from_all = active_players
+                .iter()
+                .all(|player| !game.fog.is_visible_world(*player, x, y));
+            hidden_from_all.then_some((x, y))
+        })
+        .expect("map should contain a tile outside both players' opening fog");
+    let hidden = game
+        .entities
+        .spawn_unit(99, EntityKind::Rifleman, hidden_pos.0, hidden_pos.1)
+        .expect("hidden unit should spawn");
+    game.spatial = services::spatial::SpatialIndex::build(&game.entities, game.map.size);
+    game.fog
+        .recompute(&active_players, &game.entities, &game.map);
+
+    let snapshot = game.snapshot_for_spectator(&active_players);
+
+    assert!(snapshot.entities.iter().any(|e| e.owner == 1));
+    assert!(snapshot.entities.iter().any(|e| e.owner == 2));
+    assert!(!snapshot.entities.iter().any(|e| e.id == hidden));
+    assert_eq!(snapshot.player_resources.len(), 2);
+}
+
+#[test]
 fn live_ai_rifle_raid_attacks_visible_scout_car() {
     let players = human_vs_ai_players();
     let mut game = Game::new_for_replay(&players, 0xCAFE_BABE);

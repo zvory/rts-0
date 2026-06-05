@@ -73,6 +73,24 @@ impl Fog {
         }
     }
 
+    /// Build a temporary fog view where `viewer` can see every tile visible to any of `players`.
+    pub fn union_for(&self, viewer: u32, players: &[u32]) -> Self {
+        let cells = (self.size * self.size) as usize;
+        let mut union = vec![false; cells];
+        for player in players {
+            let Some(grid) = self.grids.get(player) else {
+                continue;
+            };
+            for (dst, src) in union.iter_mut().zip(grid.iter()) {
+                *dst = *dst || *src;
+            }
+        }
+
+        let mut fog = Fog::new(self.size);
+        fog.grids.insert(viewer, union);
+        fog
+    }
+
     /// Whether a grid has been allocated for `player`.
     pub fn has_grid(&self, player: u32) -> bool {
         self.grids.contains_key(&player)

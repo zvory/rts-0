@@ -1,19 +1,35 @@
 use super::*;
 
 impl Game {
+    const SPECTATOR_VIEWER_ID: u32 = 0;
+
     /// Build the fog-filtered snapshot for one player at the current tick. Includes ALL of the
     /// player's own entities plus neutral/enemy entities whose tile is currently visible.
     pub fn snapshot_for(&self, player: u32) -> Snapshot {
-        self.snapshot_for_mode(player, true)
+        self.snapshot_for_mode(player, &self.fog, true, false)
     }
 
     /// Build a full-world snapshot for a viewer. Used only by dev watch flows where fog is
     /// intentionally disabled; normal gameplay must keep using [`snapshot_for`].
     pub fn snapshot_full_for(&self, player: u32) -> Snapshot {
-        self.snapshot_for_mode(player, false)
+        self.snapshot_for_mode(player, &self.fog, false, true)
     }
 
-    fn snapshot_for_mode(&self, player: u32, fogged: bool) -> Snapshot {
+    /// Build a spectator snapshot from the union of all active players' current fog.
+    pub fn snapshot_for_spectator(&self, visible_players: &[u32]) -> Snapshot {
+        let fog = self
+            .fog
+            .union_for(Self::SPECTATOR_VIEWER_ID, visible_players);
+        self.snapshot_for_mode(Self::SPECTATOR_VIEWER_ID, &fog, true, true)
+    }
+
+    fn snapshot_for_mode(
+        &self,
+        player: u32,
+        fog: &Fog,
+        fogged: bool,
+        include_player_resources: bool,
+    ) -> Snapshot {
         let ps = self.player(player);
         let (steel, oil, supply_used, supply_cap) = match ps {
             Some(p) => (p.steel, p.oil, p.supply_used, p.supply_cap),
@@ -29,7 +45,7 @@ impl Game {
                 None => continue,
             };
             let target = e.target_id().and_then(|target| self.entities.get(target));
-            if e.is_node() && (!fogged || self.fog.is_visible_world(player, e.pos_x, e.pos_y)) {
+            if e.is_node() && (!fogged || fog.is_visible_world(player, e.pos_x, e.pos_y)) {
                 if let Some(remaining) = e.remaining() {
                     resource_deltas.push(ResourceDelta {
                         id: e.id,
@@ -37,7 +53,7 @@ impl Game {
                     });
                 }
             }
-            if let Some(view) = projection::project_entity(player, e, &self.fog, fogged, target) {
+            if let Some(view) = projection::project_entity(player, e, fog, fogged, target) {
                 entities.push(view);
             }
         }
@@ -45,7 +61,7 @@ impl Game {
         entities.sort_by_key(|v| v.id);
         resource_deltas.sort_by_key(|d| d.id);
 
-        let player_resources = if !fogged {
+        let player_resources = if include_player_resources {
             self.players
                 .iter()
                 .map(|p| PlayerResourceSnapshot {
