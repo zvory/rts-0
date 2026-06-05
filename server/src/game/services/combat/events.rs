@@ -1,8 +1,25 @@
 use std::collections::HashMap;
 
+use crate::game::entity::{Entity, EntityKind};
 use crate::game::fog::Fog;
-use crate::protocol::{Event, NoticeSeverity};
+use crate::protocol::{AttackReveal, Event, NoticeSeverity};
 use crate::rules::projection;
+
+pub(super) fn attack_reveal_for(attacker: Option<&Entity>) -> Option<AttackReveal> {
+    let attacker = attacker?;
+    if attacker.kind != EntityKind::AtTeam {
+        return None;
+    }
+    Some(AttackReveal {
+        owner: attacker.owner,
+        kind: attacker.kind.to_protocol_str().to_string(),
+        x: attacker.pos_x,
+        y: attacker.pos_y,
+        facing: Some(attacker.facing()),
+        weapon_facing: attacker.weapon_facing(),
+        setup_state: Some(attacker.weapon_setup().to_protocol_str().to_string()),
+    })
+}
 
 #[allow(clippy::too_many_arguments)]
 pub(super) fn emit_attack_event(
@@ -15,6 +32,7 @@ pub(super) fn emit_attack_event(
     ay: f32,
     vx: f32,
     vy: f32,
+    reveal: Option<AttackReveal>,
 ) {
     let player_ids: Vec<u32> = events.keys().copied().collect();
     for pid in player_ids {
@@ -24,6 +42,8 @@ pub(super) fn emit_attack_event(
         events.entry(pid).or_default().push(Event::Attack {
             from: attacker,
             to: victim,
+            reveal: reveal.clone(),
+            to_pos: Some([vx, vy]),
         });
     }
 }

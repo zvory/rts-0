@@ -221,3 +221,34 @@ export function _drawUnit(e, colorByOwner, state) {
     g.lineTo(fp.x, fp.y);
   }
 }
+
+export function _drawShotRevealUnit(e, colorByOwner, state) {
+  if (e.kind !== KIND.AT_TEAM) return;
+  const stat = STATS[e.kind] || {};
+  const r = stat.size || 9;
+  const tint = this._tintFor(e.owner, colorByOwner);
+  const facing = typeof e.facing === "number" ? e.facing : 0;
+  const weaponFacing = typeof e.weaponFacing === "number" ? e.weaponFacing : facing;
+  const now = performance.now();
+  const recoilProgress = typeof state.weaponRecoil === "function"
+    ? state.weaponRecoil(e.id, e.kind, now)
+    : 0;
+  const recoil = weaponRecoilOffset(e.kind, recoilProgress);
+  const age = Math.max(0, now - (e.shotRevealCreatedAt || now));
+  const ttl = Math.max(1, (e.shotRevealExpiresAt || now + 1) - (e.shotRevealCreatedAt || now));
+  const t = clamp01(age / ttl);
+  const alpha = 0.72 * (1 - smoothstep01(Math.max(0, t - 0.62) / 0.38));
+
+  const sh = this._slot("shotRevealShadows", e.id);
+  sh.position.set(e.x, e.y);
+  sh.alpha = alpha * 0.62;
+  this._shadow(sh, 0, 0, r + 6);
+
+  const g = this._slot("shotReveals", e.id);
+  g.position.set(e.x, e.y);
+  g.alpha = alpha;
+  g.lineStyle(2, 0xffe066, 0.92);
+  g.drawCircle(0, r * 0.15, r + 8 + Math.sin(t * Math.PI) * 5);
+  g.lineStyle(2, 0x1a1712, 0.95);
+  drawAtGun(g, r, tint, facing, weaponFacing, { prongFactor: 1, barrel: true }, recoil);
+}

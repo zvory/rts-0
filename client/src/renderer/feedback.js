@@ -223,6 +223,7 @@ export function _drawMuzzleFlashes(state) {
     const attacker = state.entityById(f.from);
     if (!attacker) continue;
     const target = state.entityById(f.to);
+    const targetPos = target || f.targetPos;
 
     const age = now - f.createdAt;
     const t = clamp01(age / 240);
@@ -235,37 +236,40 @@ export function _drawMuzzleFlashes(state) {
       ? attacker.weaponFacing
       : typeof attacker.facing === "number"
       ? attacker.facing
-      : target
-      ? Math.atan2(target.y - attacker.y, target.x - attacker.x)
+      : targetPos
+      ? Math.atan2(targetPos.y - attacker.y, targetPos.x - attacker.x)
       : 0;
     const stat = STATS[attacker.kind] || {};
     const reach = isBuilding(attacker.kind)
       ? Math.max(stat.footW || 2, stat.footH || 2) * ((this._map && this._map.tileSize) || 32) * 0.5
+      : attacker.kind === KIND.AT_TEAM
+        ? (stat.size || 9) * 1.9
       : (stat.size || 9) * 1.1;
     const mx = attacker.x + Math.cos(facing) * reach;
     const my = attacker.y + Math.sin(facing) * reach;
 
-    if (target) {
-      const dx = target.x - mx;
-      const dy = target.y - my;
+    if (targetPos) {
+      const dx = targetPos.x - mx;
+      const dy = targetPos.y - my;
       const shotLen = Math.hypot(dx, dy);
       // Mirror the server overpenetration band: a round that hits a tank stops dead (no tail),
       // and AT teams punch twice as deep as everyone else.
       const tileSize = (this._map && this._map.tileSize) || 32;
-      const penFactor = target.kind === KIND.TANK ? 0 : attacker.kind === KIND.AT_TEAM ? 0.5 : 0.25;
+      const penFactor = target?.kind === KIND.TANK ? 0 : attacker.kind === KIND.AT_TEAM ? 0.5 : 0.25;
       const tailLen = (stat.rangeTiles || 0) * tileSize * penFactor;
+      const tracerWidth = attacker.kind === KIND.AT_TEAM ? 2.5 : 1.5;
 
-      g.lineStyle(1.5, 0xffe066, 0.9 * fade);
+      g.lineStyle(tracerWidth, 0xffe066, 0.92 * fade);
       g.moveTo(mx, my);
-      g.lineTo(target.x, target.y);
+      g.lineTo(targetPos.x, targetPos.y);
 
       if (shotLen > 0.001 && tailLen > 0) {
         const ux = dx / shotLen;
         const uy = dy / shotLen;
-        const ex = target.x + ux * tailLen;
-        const ey = target.y + uy * tailLen;
-        g.lineStyle(1.0, 0xffd84a, 0.42 * fade);
-        g.moveTo(target.x, target.y);
+        const ex = targetPos.x + ux * tailLen;
+        const ey = targetPos.y + uy * tailLen;
+        g.lineStyle(attacker.kind === KIND.AT_TEAM ? 1.4 : 1.0, 0xffd84a, 0.46 * fade);
+        g.moveTo(targetPos.x, targetPos.y);
         g.lineTo(ex, ey);
       }
     }
