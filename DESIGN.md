@@ -171,21 +171,21 @@ transport decode:
 }
 ```
 
-Live WebSocket snapshot frames are sent as compact JSON text, version 4. `client/src/net.js`
+Live WebSocket snapshot frames are sent as compact JSON text, version 5. `client/src/net.js`
 decodes this transport shape back into the semantic object above before dispatching `S.SNAPSHOT`.
 Older object-shaped JSON snapshots remain decodable by the client for fallback/dev use.
 
 ```
 {
   "t": "snapshot",
-  "v": 4,
+  "v": 5,
   "s": [tick, steel, oil, supplyUsed, supplyCap],
   "e": [
     [
       id, owner, kind, x, y, hp, maxHp, state,
       facing?, weaponFacing?, prodKind?, prodProgress?, prodQueue?,
       buildProgress?, latchedNode?, targetId?, setupState?, remaining?, rally?, oilUsed?,
-      setupFacing?, queuedMarkers?, activeMarker?, chargeCooldownLeft?, visionOnly?
+      setupFacing?, queuedMarkers?, activeMarker?, chargeCooldownLeft?, visionOnly?, debugPath?
     ]
   ],
   "r": [[id, remaining]],         // omitted when empty
@@ -214,6 +214,12 @@ move/attack-move destination, letting clients draw the active leg before future 
 `visionOnly` is true only for non-owned units/buildings visible through lingering death vision;
 clients render them below the fog overlay and must not select or issue targeted commands against
 them.
+`debugPath` is present only in debug server builds, only for the owner, and only while the unit has
+remaining movement waypoints. It carries `{ waypoints, goal, lastRepathTick, stuckTicks,
+staticBlockedTicks, totalWaypoints }`, where `waypoints` are remaining `{x, y}` world-pixel path
+points in traversal order and `waypoints[0]` is the current movement target. The compact slot
+encodes this as `[waypoints, goal, lastRepathTick, stuckTicks, staticBlockedTicks, totalWaypoints]`,
+with points encoded as `[x, y]`; `waypoints` is capped at 128 entries for transport.
 
 `ResourceDelta`: `{ id: u32, remaining: u32 }`. Resource node positions/kinds are static and come
 from `start.map.resources`; clients keep last-known `remaining` locally. The server sends
@@ -250,9 +256,17 @@ watch rooms receive all resource updates).
   queuedMarkers?: [              // future queued move/attack-move points; ONLY ever sent to the owner
     { x: f32, y: f32, attackMove?: bool }
   ],
-  chargeCooldownLeft?: u16,      // rifleman only: owner-visible remaining Charge cooldown in ticks
   activeMarker?: { x: f32, y: f32, attackMove?: bool }, // active move/attack-move destination; ONLY ever sent to the owner
+  chargeCooldownLeft?: u16,      // rifleman only: owner-visible remaining Charge cooldown in ticks
   visionOnly?: bool,             // true = visible only through one-second death vision; visual intel only
+  debugPath?: {                  // debug builds only; remaining movement path; ONLY ever sent to the owner
+    waypoints: { x: f32, y: f32 }[],
+    goal?: { x: f32, y: f32 },
+    lastRepathTick: u32,
+    stuckTicks: u16,
+    staticBlockedTicks: u16,
+    totalWaypoints: u16
+  },
 }
 ```
 

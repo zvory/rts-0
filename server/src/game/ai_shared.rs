@@ -417,6 +417,8 @@ mod tests {
                     active_marker: None,
                     charge_cooldown_left: None,
                     vision_only: false,
+                    #[cfg(debug_assertions)]
+                    debug_path: None,
                 },
                 EntityView {
                     id: 2,
@@ -444,6 +446,8 @@ mod tests {
                     active_marker: None,
                     charge_cooldown_left: None,
                     vision_only: false,
+                    #[cfg(debug_assertions)]
+                    debug_path: None,
                 },
                 EntityView {
                     id: 3,
@@ -471,6 +475,8 @@ mod tests {
                     active_marker: None,
                     charge_cooldown_left: None,
                     vision_only: false,
+                    #[cfg(debug_assertions)]
+                    debug_path: None,
                 },
                 EntityView {
                     id: 4,
@@ -498,6 +504,8 @@ mod tests {
                     active_marker: None,
                     charge_cooldown_left: None,
                     vision_only: false,
+                    #[cfg(debug_assertions)]
+                    debug_path: None,
                 },
                 EntityView {
                     id: 5,
@@ -525,6 +533,8 @@ mod tests {
                     active_marker: None,
                     charge_cooldown_left: None,
                     vision_only: false,
+                    #[cfg(debug_assertions)]
+                    debug_path: None,
                 },
             ],
             resource_deltas: Vec::new(),

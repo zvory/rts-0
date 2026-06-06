@@ -7,7 +7,12 @@ use crate::game::entity::{
     fires_while_moving, Entity, EntityKind, GatherPhase, Order, OrderIntent,
 };
 use crate::game::fog::Fog;
+#[cfg(debug_assertions)]
+use crate::protocol::{DebugPathPoint, DebugPathView};
 use crate::protocol::{EntityView, QueuedOrderMarker};
+
+#[cfg(debug_assertions)]
+const MAX_DEBUG_PATH_WAYPOINTS: usize = 128;
 
 pub fn entity_visible_to(viewer: u32, entity: &Entity, fog: &Fog) -> bool {
     entity.owner == viewer
@@ -130,6 +135,10 @@ pub fn project_entity(
         }
         view.active_marker = active_order_marker(entity);
         view.queued_markers = queued_order_markers(entity);
+        #[cfg(debug_assertions)]
+        {
+            view.debug_path = debug_path_view(entity);
+        }
         if entity.kind == EntityKind::Rifleman {
             let charge_cooldown_left = entity.charge_cooldown_ticks();
             if charge_cooldown_left > 0 {
@@ -207,6 +216,40 @@ fn queued_order_markers(entity: &Entity) -> Vec<QueuedOrderMarker> {
             | OrderIntent::Build(_) => None,
         })
         .collect()
+}
+
+#[cfg(debug_assertions)]
+fn debug_path_view(entity: &Entity) -> Option<DebugPathView> {
+    let movement = entity.movement.as_ref()?;
+    if movement.path.is_empty() {
+        return None;
+    }
+
+    let waypoints = movement
+        .path
+        .iter()
+        .rev()
+        .take(MAX_DEBUG_PATH_WAYPOINTS)
+        .filter_map(|&(x, y)| debug_path_point(x, y))
+        .collect::<Vec<_>>();
+    if waypoints.is_empty() {
+        return None;
+    }
+
+    let goal = movement.path_goal.and_then(|(x, y)| debug_path_point(x, y));
+    Some(DebugPathView {
+        waypoints,
+        goal,
+        last_repath_tick: movement.last_repath_tick,
+        stuck_ticks: movement.stuck_ticks,
+        static_blocked_ticks: movement.static_blocked_ticks,
+        total_waypoints: movement.path.len().min(u16::MAX as usize) as u16,
+    })
+}
+
+#[cfg(debug_assertions)]
+fn debug_path_point(x: f32, y: f32) -> Option<DebugPathPoint> {
+    (x.is_finite() && y.is_finite()).then_some(DebugPathPoint { x, y })
 }
 
 #[cfg(test)]
@@ -384,6 +427,58 @@ mod tests {
             .expect("full view should include unit");
         assert_eq!(enemy_view.active_marker, None);
         assert!(enemy_view.queued_markers.is_empty());
+    }
+
+    #[test]
+    fn debug_path_is_owner_only_and_in_movement_order() {
+        let mut entities = EntityStore::new();
+        let unit_id = entities
+            .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
+            .expect("rifleman should spawn");
+        {
+            let unit = entities.get_mut(unit_id).expect("unit should exist");
+            unit.set_order(Order::move_to(300.0, 300.0));
+            unit.set_path(vec![(300.0, 300.0), (200.0, 200.0), (120.0, 120.0)]);
+            unit.set_path_goal(Some((300.0, 300.0)));
+            unit.set_last_repath_tick(7);
+            if let Some(movement) = unit.movement.as_mut() {
+                movement.stuck_ticks = 2;
+                movement.static_blocked_ticks = 3;
+            }
+        }
+
+        let map = Map {
+            size: 64,
+            terrain: vec![terrain::GRASS; 64 * 64],
+            starts: vec![(1, 1), (40, 40)],
+            expansion_sites: Vec::new(),
+        };
+        let mut fog = Fog::new(map.size);
+        fog.recompute(&[1, 2], &entities, &map);
+        let unit = entities.get(unit_id).expect("unit should exist");
+
+        let owner_view = project_entity(1, unit, &fog, Some(&fog), true, None)
+            .expect("owner should see own unit");
+        let debug_path = owner_view
+            .debug_path
+            .expect("moving own unit should expose debug path in debug builds");
+        assert_eq!(
+            debug_path.waypoints,
+            vec![
+                DebugPathPoint { x: 120.0, y: 120.0 },
+                DebugPathPoint { x: 200.0, y: 200.0 },
+                DebugPathPoint { x: 300.0, y: 300.0 },
+            ]
+        );
+        assert_eq!(debug_path.goal, Some(DebugPathPoint { x: 300.0, y: 300.0 }));
+        assert_eq!(debug_path.last_repath_tick, 7);
+        assert_eq!(debug_path.stuck_ticks, 2);
+        assert_eq!(debug_path.static_blocked_ticks, 3);
+        assert_eq!(debug_path.total_waypoints, 3);
+
+        let enemy_view = project_entity(2, unit, &fog, Some(&fog), false, None)
+            .expect("full view should include unit");
+        assert_eq!(enemy_view.debug_path, None);
     }
 
     #[test]

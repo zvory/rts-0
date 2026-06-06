@@ -121,7 +121,7 @@ export const NOTICE_SEVERITY = Object.freeze({
 });
 
 // --- Compact snapshot wire schema (must match protocol.rs) ---
-export const COMPACT_SNAPSHOT_VERSION = 4;
+export const COMPACT_SNAPSHOT_VERSION = 5;
 
 export const KIND_CODE = Object.freeze({
   [KIND.WORKER]: 1,
@@ -179,6 +179,7 @@ const MAX_COMPACT_ENTITIES = 20000;
 const MAX_COMPACT_RESOURCE_DELTAS = 20000;
 const MAX_COMPACT_EVENTS = 5000;
 const MAX_COMPACT_QUEUED_MARKERS = 8;
+const MAX_COMPACT_DEBUG_WAYPOINTS = 128;
 
 /**
  * Expand server messages into the semantic shapes the rest of the client expects.
@@ -233,7 +234,7 @@ function decodeCompactPlayerResource(record, index) {
 }
 
 function decodeCompactEntity(record, index) {
-  const fields = readArray(record, `entity ${index}`, 25);
+  const fields = readArray(record, `entity ${index}`, 26);
   if (fields.length < 8) throw new Error(`entity ${index} is too short`);
   const entity = {
     id: readU32(fields[0], "entity.id"),
@@ -263,6 +264,7 @@ function decodeCompactEntity(record, index) {
   assignPointMarker(entity, "activeMarker", fields, 22);
   assignOptional(entity, "chargeCooldownLeft", fields, 23, readU32);
   assignOptional(entity, "visionOnly", fields, 24, readBool);
+  assignDebugPath(entity, fields, 25);
   return entity;
 }
 
@@ -299,6 +301,28 @@ function readPointMarker(record, label) {
     y: readNumber(marker[1], `${label}.y`),
     attackMove: marker.length > 2 ? readBool(marker[2], `${label}.attackMove`) : false,
   };
+}
+
+/** Decode debug-build owner-only path diagnostics. */
+function assignDebugPath(target, fields, index) {
+  if (index >= fields.length || fields[index] == null) return;
+  const record = readArray(fields[index], "entity.debugPath", 6);
+  if (record.length !== 6) throw new Error("entity.debugPath field count mismatch");
+  target.debugPath = {
+    waypoints: readArray(record[0], "entity.debugPath.waypoints", MAX_COMPACT_DEBUG_WAYPOINTS).map(
+      (point, pointIndex) => decodeCompactDebugPoint(point, `entity.debugPath.waypoints.${pointIndex}`),
+    ),
+    goal: record[1] == null ? null : decodeCompactDebugPoint(record[1], "entity.debugPath.goal"),
+    lastRepathTick: readU32(record[2], "entity.debugPath.lastRepathTick"),
+    stuckTicks: readU32(record[3], "entity.debugPath.stuckTicks"),
+    staticBlockedTicks: readU32(record[4], "entity.debugPath.staticBlockedTicks"),
+    totalWaypoints: readU32(record[5], "entity.debugPath.totalWaypoints"),
+  };
+}
+
+function decodeCompactDebugPoint(record, label) {
+  const [x, y] = decodeCompactPoint(record, label);
+  return { x, y };
 }
 
 function decodeCompactResourceDelta(record, index) {
