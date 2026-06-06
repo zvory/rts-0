@@ -60,7 +60,7 @@ pub const AT_GUN_DEPLOYED_RANGE_TILES: u32 = 12;
 /// Packed AT gun damage as a fraction of deployed damage.
 pub const AT_GUN_PACKED_DAMAGE_MULTIPLIER: f32 = 0.75;
 /// Total deployed AT gun field of fire in radians.
-pub const AT_GUN_FIELD_OF_FIRE_RAD: f32 = std::f32::consts::PI / 4.0;
+pub const AT_GUN_FIELD_OF_FIRE_RAD: f32 = 40.0_f32 * std::f32::consts::PI / 180.0;
 
 /// Experimental: tanks burn this much oil per world pixel of movement. Calibrated against the
 /// original 96-tile map span (3072 px), where a full-width drive burns ~20 oil. Larger maps keep
