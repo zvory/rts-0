@@ -1463,6 +1463,104 @@ fn spawn_snaking_corridor_units(
         .collect()
 }
 
+fn scout_car_wall_chokepoint_map(
+    unit: EntityKind,
+    unit_count: usize,
+) -> (Map, f32, Vec<(f32, f32)>, (f32, f32)) {
+    let mut map = flat_map(1);
+    let center_x = map.size / 2;
+    let wall_y = map.size - 18;
+    let gap_left_x = center_x - 1;
+    let gap_right_x = center_x;
+    let max_tile = map.size - 1;
+
+    block_rect_tiles(&mut map, 0, wall_y, max_tile, wall_y);
+    carve_rect_tiles(&mut map, gap_left_x, wall_y, gap_right_x, wall_y);
+
+    let ts = config::TILE_SIZE as f32;
+    let center_world_x = gap_right_x as f32 * ts;
+    let start_y = (wall_y as f32 + 10.5) * ts;
+    let spacing = match unit {
+        EntityKind::AtTeam => config::AT_GUN_BODY_WIDTH_PX + config::AT_GUN_BODY_CLEARANCE_PX * 4.0,
+        EntityKind::ScoutCar => {
+            config::SCOUT_CAR_BODY_WIDTH_PX + config::SCOUT_CAR_BODY_CLEARANCE_PX * 4.0
+        }
+        EntityKind::Tank => config::TANK_BODY_WIDTH_PX + config::TANK_BODY_CLEARANCE_PX * 4.0,
+        _ => panic!("wall chokepoint only supports vehicles"),
+    };
+    let center_index = (unit_count.saturating_sub(1)) as f32 * 0.5;
+    let starts = (0..unit_count)
+        .map(|i| {
+            let offset = (i as f32 - center_index) * spacing;
+            (center_world_x + offset, start_y)
+        })
+        .collect();
+    let goal_y = (wall_y as f32 + 0.5) * ts - ts * 10.0;
+    let goal = (center_world_x, goal_y);
+    let exit_clear_y = wall_y as f32 * ts;
+
+    (map, exit_clear_y, starts, goal)
+}
+
+fn spawn_wall_chokepoint_units(
+    entities: &mut EntityStore,
+    unit: EntityKind,
+    starts: Vec<(f32, f32)>,
+) -> Vec<u32> {
+    let north = -std::f32::consts::FRAC_PI_2;
+    starts
+        .into_iter()
+        .map(|(x, y)| {
+            let spawned = entities
+                .spawn_unit(1, unit, x, y)
+                .expect("unit should spawn");
+            if let Some(e) = entities.get_mut(spawned) {
+                e.set_facing(north);
+            }
+            spawned
+        })
+        .collect()
+}
+
+fn wall_chokepoint_units_clear_exit(
+    entities: &EntityStore,
+    unit: EntityKind,
+    units: &[u32],
+    exit_clear_y: f32,
+) -> bool {
+    let radius = config::unit_stats(unit).expect("unit stats").radius;
+    units.iter().all(|&id| {
+        entities
+            .get(id)
+            .is_some_and(|e| e.pos_y + radius < exit_clear_y)
+    })
+}
+
+fn describe_units(entities: &EntityStore, units: &[u32]) -> Vec<String> {
+    units
+        .iter()
+        .filter_map(|&id| {
+            let e = entities.get(id)?;
+            let movement = e.movement.as_ref();
+            Some(format!(
+                "#{id}: pos=({:.1},{:.1}) facing={:.3} phase={:?} path_len={} next={:?} goal={:?} stuck={} blocked={} recovery_cd={}",
+                e.pos_x,
+                e.pos_y,
+                e.facing(),
+                e.move_phase(),
+                movement.map(|m| m.path.len()).unwrap_or(0),
+                e.next_waypoint(),
+                e.path_goal(),
+                movement.map(|m| m.stuck_ticks).unwrap_or(0),
+                movement.map(|m| m.static_blocked_ticks).unwrap_or(0),
+                movement
+                    .map(|m| m.scout_car_recovery_cooldown)
+                    .unwrap_or(0),
+            ))
+        })
+        .collect()
+}
+
 fn snaking_corridor_spawn_spacing(unit: EntityKind) -> (f32, f32) {
     match unit {
         EntityKind::AtTeam => (
@@ -1817,6 +1915,62 @@ fn snaking_corridor_vehicle_slot_clear_times_regression() {
             result.final_state
         );
     }
+}
+
+#[test]
+fn scout_car_wall_chokepoint_five_clear_without_parallel_nose_wedge() {
+    let unit = EntityKind::ScoutCar;
+    let unit_count = 5;
+    let (map, exit_clear_y, starts, goal) = scout_car_wall_chokepoint_map(unit, unit_count);
+    let mut entities = EntityStore::new();
+    let units = spawn_wall_chokepoint_units(&mut entities, unit, starts);
+    let mut pathing = PathingService::new(65_536, 512);
+    let max_ticks = 3_000u32;
+    let mut max_no_progress = 0u16;
+
+    for tick in 1..=max_ticks {
+        pathing.advance_tick(tick);
+        let occ = Occupancy::build(&map, &entities);
+        let mut coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, tick);
+        if tick == 1 {
+            coordinator.order_group_move(&mut entities, 1, &units, goal, false);
+        }
+        coordinator.process_awaiting_paths(&mut entities);
+
+        let spatial = SpatialIndex::build(&entities, map.size);
+        movement_system(&map, &mut entities, &mut [], &occ, &spatial, tick);
+        let spatial = SpatialIndex::build(&entities, map.size);
+        resolve_collisions(&mut entities, &spatial, &map, &occ);
+
+        for id in &units {
+            if let Some(stuck) = entities
+                .get(*id)
+                .and_then(|e| e.movement.as_ref())
+                .map(|m| m.stuck_ticks)
+            {
+                max_no_progress = max_no_progress.max(stuck);
+            }
+        }
+
+        if wall_chokepoint_units_clear_exit(&entities, unit, &units, exit_clear_y) {
+            assert!(
+                tick <= 300,
+                "five scout cars should clear the chokepoint promptly; tick={tick}, state={:?}",
+                describe_units(&entities, &units)
+            );
+            assert!(
+                max_no_progress < config::SCOUT_CAR_STUCK_RECOVERY_TRIGGER_TICKS,
+                "scout cars should not need stuck recovery in the open approach; max_no_progress={max_no_progress}, state={:?}",
+                describe_units(&entities, &units)
+            );
+            return;
+        }
+    }
+
+    panic!(
+        "five scout cars failed to clear wall chokepoint within {max_ticks} ticks; state={:?}",
+        describe_units(&entities, &units)
+    );
 }
 
 #[test]
