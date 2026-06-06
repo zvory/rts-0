@@ -1355,12 +1355,24 @@ fn carve_vertical_corridor(map: &mut Map, center_x: u32, min_y: u32, max_y: u32)
 }
 
 #[derive(Debug, Clone)]
-struct ScoutCarTunnelTiming {
-    car_count: usize,
+struct SnakingCorridorTiming {
+    unit: EntityKind,
+    unit_count: usize,
     clear_ticks: Option<u32>,
     clear_seconds: Option<f32>,
     final_state: Vec<String>,
 }
+
+const SNAKING_CORRIDOR_REGRESSION_BASELINES: &[(EntityKind, usize, u32)] = &[
+    (EntityKind::Worker, 1, 2_303),
+    (EntityKind::Worker, 4, 2_340),
+    (EntityKind::Rifleman, 1, 2_303),
+    (EntityKind::Rifleman, 4, 2_340),
+    (EntityKind::MachineGunner, 1, 2_890),
+    (EntityKind::MachineGunner, 4, 2_940),
+    (EntityKind::ScoutCar, 1, 1_577),
+    (EntityKind::ScoutCar, 4, 1_654),
+];
 
 fn scout_car_snaking_corridor_map() -> (Map, u32, f32, (f32, f32), (f32, f32)) {
     let mut map = flat_map(1);
@@ -1393,17 +1405,17 @@ fn scout_car_snaking_corridor_map() -> (Map, u32, f32, (f32, f32), (f32, f32)) {
     (map, exit_x, exit_clear_y, start, goal)
 }
 
-fn spawn_snaking_corridor_scout_cars(
+fn spawn_snaking_corridor_units(
     entities: &mut EntityStore,
-    car_count: usize,
+    unit: EntityKind,
+    unit_count: usize,
     start: (f32, f32),
 ) -> Vec<u32> {
     let north = -std::f32::consts::FRAC_PI_2;
-    let positions: Vec<(f32, f32)> = match car_count {
+    let (x_spacing, y_spacing) = snaking_corridor_spawn_spacing(unit);
+    let positions: Vec<(f32, f32)> = match unit_count {
         1 => vec![start],
         4 => {
-            let x_spacing = config::SCOUT_CAR_BODY_WIDTH_PX * 1.5;
-            let y_spacing = config::SCOUT_CAR_BODY_LENGTH_PX * 1.5;
             vec![
                 (start.0 - x_spacing * 0.5, start.1 - y_spacing * 0.5),
                 (start.0 + x_spacing * 0.5, start.1 - y_spacing * 0.5),
@@ -1411,45 +1423,73 @@ fn spawn_snaking_corridor_scout_cars(
                 (start.0 + x_spacing * 0.5, start.1 + y_spacing * 0.5),
             ]
         }
-        _ => panic!("unsupported scout car count {car_count}"),
+        _ => panic!("unsupported snaking corridor unit count {unit_count}"),
     };
 
     positions
         .into_iter()
         .map(|(x, y)| {
-            let scout = entities
-                .spawn_unit(1, EntityKind::ScoutCar, x, y)
-                .expect("scout car should spawn");
-            if let Some(e) = entities.get_mut(scout) {
+            let spawned = entities
+                .spawn_unit(1, unit, x, y)
+                .expect("unit should spawn");
+            if let Some(e) = entities.get_mut(spawned) {
                 e.set_facing(north);
             }
-            scout
+            spawned
         })
         .collect()
 }
 
-fn scout_cars_clear_tunnel_exit(entities: &EntityStore, scouts: &[u32], exit_clear_y: f32) -> bool {
-    let radius = config::unit_stats(EntityKind::ScoutCar)
-        .expect("scout car stats")
-        .radius;
-    scouts.iter().all(|&id| {
+fn snaking_corridor_spawn_spacing(unit: EntityKind) -> (f32, f32) {
+    match unit {
+        EntityKind::AtTeam => (
+            config::AT_GUN_BODY_WIDTH_PX * 1.5,
+            config::AT_GUN_BODY_LENGTH_PX * 1.5,
+        ),
+        EntityKind::ScoutCar => (
+            config::SCOUT_CAR_BODY_WIDTH_PX * 1.5,
+            config::SCOUT_CAR_BODY_LENGTH_PX * 1.5,
+        ),
+        EntityKind::Tank => (
+            config::TANK_BODY_WIDTH_PX * 1.5,
+            config::TANK_BODY_LENGTH_PX * 1.5,
+        ),
+        _ => {
+            let radius = config::unit_stats(unit).expect("unit stats").radius;
+            let spacing = radius * 3.0;
+            (spacing, spacing)
+        }
+    }
+}
+
+fn units_clear_tunnel_exit(
+    entities: &EntityStore,
+    unit: EntityKind,
+    units: &[u32],
+    exit_clear_y: f32,
+) -> bool {
+    let radius = config::unit_stats(unit).expect("unit stats").radius;
+    units.iter().all(|&id| {
         entities
             .get(id)
             .is_some_and(|e| e.pos_y + radius < exit_clear_y)
     })
 }
 
-fn measure_snaking_corridor_clear_time(car_count: usize) -> ScoutCarTunnelTiming {
+fn measure_snaking_corridor_clear_time(
+    unit: EntityKind,
+    unit_count: usize,
+) -> SnakingCorridorTiming {
     let (map, exit_x, exit_clear_y, start, goal) = scout_car_snaking_corridor_map();
     let mut entities = EntityStore::new();
-    let scouts = spawn_snaking_corridor_scout_cars(&mut entities, car_count, start);
+    let units = spawn_snaking_corridor_units(&mut entities, unit, unit_count, start);
     let occ = Occupancy::build(&map, &entities);
-    for &scout in &scouts {
-        let e = entities.get(scout).expect("scout car should exist");
+    for &spawned in &units {
+        let e = entities.get(spawned).expect("unit should exist");
         assert!(standability::unit_static_standable_with_facing(
             &map,
             &occ,
-            EntityKind::ScoutCar,
+            unit,
             e.pos_x,
             e.pos_y,
             e.facing()
@@ -1458,7 +1498,7 @@ fn measure_snaking_corridor_clear_time(car_count: usize) -> ScoutCarTunnelTiming
     assert_eq!(
         map.tile_of(start.0, start.1).0,
         exit_x,
-        "scout cars should start vertically aligned with the tunnel exit"
+        "units should start vertically aligned with the tunnel exit"
     );
 
     let mut pathing = PathingService::new(65_536, 512);
@@ -1468,7 +1508,7 @@ fn measure_snaking_corridor_clear_time(car_count: usize) -> ScoutCarTunnelTiming
         let occ = Occupancy::build(&map, &entities);
         let mut coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, tick);
         if tick == 1 {
-            coordinator.order_group_move(&mut entities, 1, &scouts, goal, false);
+            coordinator.order_group_move(&mut entities, 1, &units, goal, false);
         }
         coordinator.process_awaiting_paths(&mut entities);
 
@@ -1477,26 +1517,28 @@ fn measure_snaking_corridor_clear_time(car_count: usize) -> ScoutCarTunnelTiming
         let spatial = SpatialIndex::build(&entities, map.size);
         resolve_collisions(&mut entities, &spatial, &map, &occ);
 
-        if scout_cars_clear_tunnel_exit(&entities, &scouts, exit_clear_y) {
-            return ScoutCarTunnelTiming {
-                car_count,
+        if units_clear_tunnel_exit(&entities, unit, &units, exit_clear_y) {
+            return SnakingCorridorTiming {
+                unit,
+                unit_count,
                 clear_ticks: Some(tick),
                 clear_seconds: Some(tick as f32 / config::TICK_HZ as f32),
-                final_state: describe_scout_car_tunnel_state(&entities, &scouts),
+                final_state: describe_snaking_corridor_state(&entities, &units),
             };
         }
     }
 
-    ScoutCarTunnelTiming {
-        car_count,
+    SnakingCorridorTiming {
+        unit,
+        unit_count,
         clear_ticks: None,
         clear_seconds: None,
-        final_state: describe_scout_car_tunnel_state(&entities, &scouts),
+        final_state: describe_snaking_corridor_state(&entities, &units),
     }
 }
 
-fn describe_scout_car_tunnel_state(entities: &EntityStore, scouts: &[u32]) -> Vec<String> {
-    scouts
+fn describe_snaking_corridor_state(entities: &EntityStore, units: &[u32]) -> Vec<String> {
+    units
         .iter()
         .filter_map(|&id| {
             let e = entities.get(id)?;
@@ -1517,22 +1559,22 @@ fn describe_scout_car_tunnel_state(entities: &EntityStore, scouts: &[u32]) -> Ve
 #[test]
 fn scout_car_snaking_corridor_clear_times() {
     let results = [
-        measure_snaking_corridor_clear_time(1),
-        measure_snaking_corridor_clear_time(4),
+        measure_snaking_corridor_clear_time(EntityKind::ScoutCar, 1),
+        measure_snaking_corridor_clear_time(EntityKind::ScoutCar, 4),
     ];
     let baselines = [(1usize, 1_577u32), (4usize, 1_654u32)];
 
     println!("SCOUT_CAR_SNAKING_CORRIDOR_CLEAR_TIMES");
-    println!("cars | clear_ticks | clear_seconds | final_state");
+    println!("count | clear_ticks | clear_seconds | final_state");
     for result in &results {
         match (result.clear_ticks, result.clear_seconds) {
             (Some(ticks), Some(seconds)) => println!(
-                "{:>4} | {:>11} | {:>13.2} | {:?}",
-                result.car_count, ticks, seconds, result.final_state
+                "{:>5} | {:>11} | {:>13.2} | {:?}",
+                result.unit_count, ticks, seconds, result.final_state
             ),
             _ => println!(
-                "{:>4} | {:>11} | {:>13} | {:?}",
-                result.car_count, "timeout", "timeout", result.final_state
+                "{:>5} | {:>11} | {:>13} | {:?}",
+                result.unit_count, "timeout", "timeout", result.final_state
             ),
         }
     }
@@ -1540,22 +1582,117 @@ fn scout_car_snaking_corridor_clear_times() {
     for result in &results {
         let baseline = baselines
             .iter()
-            .find_map(|(cars, ticks)| (*cars == result.car_count).then_some(*ticks))
-            .expect("baseline should exist for each supported scout-car scenario");
+            .find_map(|(count, ticks)| (*count == result.unit_count).then_some(*ticks))
+            .expect("baseline should exist for each scout-car scenario");
         let clear_ticks = result.clear_ticks.unwrap_or_else(|| {
             panic!(
-                "scout-car snaking corridor cars={} timed out; final_state={:?}",
-                result.car_count, result.final_state
+                "scout-car snaking corridor count={} timed out; final_state={:?}",
+                result.unit_count, result.final_state
             )
         });
         assert!(
             clear_ticks.saturating_mul(10) <= baseline.saturating_mul(11),
-            "scout-car snaking corridor cars={} regressed: {} ticks vs baseline {} (>10% slower); final_state={:?}",
-            result.car_count,
+            "scout-car snaking corridor count={} regressed: {} ticks vs baseline {} (>10% slower); final_state={:?}",
+            result.unit_count,
             clear_ticks,
             baseline,
             result.final_state
         );
+    }
+}
+
+#[test]
+fn snaking_corridor_completed_unit_clear_times_regression() {
+    let scenarios = [
+        (EntityKind::Worker, 1usize),
+        (EntityKind::Worker, 4usize),
+        (EntityKind::Rifleman, 1usize),
+        (EntityKind::Rifleman, 4usize),
+        (EntityKind::MachineGunner, 1usize),
+        (EntityKind::MachineGunner, 4usize),
+        (EntityKind::ScoutCar, 1usize),
+        (EntityKind::ScoutCar, 4usize),
+    ];
+    let results: Vec<_> = scenarios
+        .into_iter()
+        .map(|(unit, count)| measure_snaking_corridor_clear_time(unit, count))
+        .collect();
+
+    println!("SNAKING_CORRIDOR_COMPLETED_UNIT_CLEAR_TIMES");
+    println!("unit | count | clear_ticks | clear_seconds | final_state");
+    for result in &results {
+        match (result.clear_ticks, result.clear_seconds) {
+            (Some(ticks), Some(seconds)) => println!(
+                "{:>14} | {:>5} | {:>11} | {:>13.2} | {:?}",
+                result.unit, result.unit_count, ticks, seconds, result.final_state
+            ),
+            _ => println!(
+                "{:>14} | {:>5} | {:>11} | {:>13} | {:?}",
+                result.unit, result.unit_count, "timeout", "timeout", result.final_state
+            ),
+        }
+    }
+
+    for result in &results {
+        let baseline = SNAKING_CORRIDOR_REGRESSION_BASELINES
+            .iter()
+            .find_map(|(unit, count, ticks)| {
+                (*unit == result.unit && *count == result.unit_count).then_some(*ticks)
+            })
+            .expect("baseline should exist for each completed snaking-corridor scenario");
+        let clear_ticks = result.clear_ticks.unwrap_or_else(|| {
+            panic!(
+                "snaking corridor unit={} count={} timed out; final_state={:?}",
+                result.unit, result.unit_count, result.final_state
+            )
+        });
+        assert!(
+            clear_ticks.saturating_mul(10) <= baseline.saturating_mul(11),
+            "snaking corridor unit={} count={} regressed: {} ticks vs baseline {} (>10% slower); final_state={:?}",
+            result.unit,
+            result.unit_count,
+            clear_ticks,
+            baseline,
+            result.final_state
+        );
+    }
+}
+
+#[test]
+#[ignore = "manual timing sweep across all unit types; prints timings and allows timeouts"]
+fn snaking_corridor_clear_times_all_units() {
+    let scenarios = [
+        (EntityKind::Worker, 1usize),
+        (EntityKind::Worker, 4usize),
+        (EntityKind::Rifleman, 1usize),
+        (EntityKind::Rifleman, 4usize),
+        (EntityKind::MachineGunner, 1usize),
+        (EntityKind::MachineGunner, 4usize),
+        (EntityKind::AtTeam, 1usize),
+        (EntityKind::AtTeam, 4usize),
+        (EntityKind::ScoutCar, 1usize),
+        (EntityKind::ScoutCar, 4usize),
+        (EntityKind::Tank, 1usize),
+        (EntityKind::Tank, 4usize),
+    ];
+    let results: Vec<_> = scenarios
+        .into_iter()
+        .map(|(unit, count)| measure_snaking_corridor_clear_time(unit, count))
+        .collect();
+
+    println!("SNAKING_CORRIDOR_CLEAR_TIMES");
+    println!("unit | count | clear_ticks | clear_seconds | final_state");
+    for result in &results {
+        match (result.clear_ticks, result.clear_seconds) {
+            (Some(ticks), Some(seconds)) => println!(
+                "{:>14} | {:>5} | {:>11} | {:>13.2} | {:?}",
+                result.unit, result.unit_count, ticks, seconds, result.final_state
+            ),
+            _ => println!(
+                "{:>14} | {:>5} | {:>11} | {:>13} | {:?}",
+                result.unit, result.unit_count, "timeout", "timeout", result.final_state
+            ),
+        }
     }
 }
 

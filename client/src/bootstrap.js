@@ -10,15 +10,28 @@ export function devWatchConfig() {
   const replay = (params.get("replay") || "").trim();
   if (window.location.pathname === "/dev/scenario" || params.has("watchScenario")) {
     const id = (params.get("id") || "").trim();
-    const cars = (params.get("cars") || "").trim();
-    if (id !== "scout_car_snaking_corridor" || (cars !== "1" && cars !== "4")) {
+    const unit = (params.get("unit") || "").trim();
+    const count = (params.get("count") || "").trim();
+    const supportedUnits = new Set([
+      "worker",
+      "rifleman",
+      "machine_gunner",
+      "at_team",
+      "scout_car",
+      "tank",
+    ]);
+    if (
+      id !== "scout_car_snaking_corridor" ||
+      !supportedUnits.has(unit) ||
+      (count !== "1" && count !== "4")
+    ) {
       return null;
     }
     return {
-      room: `__dev_scenario__:scout_car_snaking_corridor:cars=${cars}`,
+      room: `__dev_scenario__:scout_car_snaking_corridor:unit=${unit}:count=${count}`,
       noFog: true,
       kind: "scenario",
-      banner: `local dev scenario no fog scout_car_snaking_corridor cars=${cars}`,
+      banner: `local dev scenario no fog scout_car_snaking_corridor unit=${unit} count=${count}`,
     };
   }
   if (window.location.pathname !== "/dev/selfplay" && !params.has("watchSelfplay")) return null;

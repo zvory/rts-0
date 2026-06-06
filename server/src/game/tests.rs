@@ -476,7 +476,7 @@ fn lobby_debug_mode_snapshot_shows_runtime_movement_debug_path() {
 
 #[test]
 fn dev_scenario_snapshot_shows_runtime_movement_debug_path() {
-    let setup = Game::new_scout_car_snaking_corridor_scenario(1, 0x5150_0002)
+    let setup = Game::new_snaking_corridor_scenario(EntityKind::ScoutCar, 1, 0x5150_0002)
         .expect("scenario setup should succeed");
     let mut game = setup.game;
     let unit = setup.units[0];
