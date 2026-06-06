@@ -353,10 +353,14 @@ mod tests {
         let html = dev_scenario_index_html();
         assert!(html.contains("Scout Car Snaking Corridor"));
         assert!(html.contains("Direct Reverse Order"));
+        assert!(html.contains("Scout Car Wall Chokepoint"));
         assert!(html.contains("<table class=\"scenario-table\">"));
         assert!(html.contains("/dev/scenarios?id=scout_car_snaking_corridor&unit=worker&count=1"));
         assert!(html.contains("/dev/scenarios?id=scout_car_snaking_corridor&unit=tank&count=4"));
         assert!(html.contains("/dev/scenarios?id=direct_reverse_order&unit=tank&count=1"));
+        assert!(
+            html.contains("/dev/scenarios?id=scout_car_wall_chokepoint&unit=scout_car&count=15")
+        );
     }
 }
 

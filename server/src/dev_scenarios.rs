@@ -96,7 +96,35 @@ const DIRECT_REVERSE_ORDER_LAUNCHES: [DevScenarioLaunch; 3] = [
     },
 ];
 
-const DEV_SCENARIOS: [DevScenarioSpec; 2] = [
+const SCOUT_CAR_WALL_CHOKEPOINT_LAUNCHES: [DevScenarioLaunch; 5] = [
+    DevScenarioLaunch {
+        id: "scout_car_wall_chokepoint",
+        unit: EntityKind::ScoutCar,
+        count: 3,
+    },
+    DevScenarioLaunch {
+        id: "scout_car_wall_chokepoint",
+        unit: EntityKind::ScoutCar,
+        count: 5,
+    },
+    DevScenarioLaunch {
+        id: "scout_car_wall_chokepoint",
+        unit: EntityKind::ScoutCar,
+        count: 6,
+    },
+    DevScenarioLaunch {
+        id: "scout_car_wall_chokepoint",
+        unit: EntityKind::ScoutCar,
+        count: 10,
+    },
+    DevScenarioLaunch {
+        id: "scout_car_wall_chokepoint",
+        unit: EntityKind::ScoutCar,
+        count: 15,
+    },
+];
+
+const DEV_SCENARIOS: [DevScenarioSpec; 3] = [
     DevScenarioSpec {
         id: "scout_car_snaking_corridor",
         title: "Scout Car Snaking Corridor",
@@ -109,6 +137,12 @@ const DEV_SCENARIOS: [DevScenarioSpec; 2] = [
         description:
             "Single vehicle faces east, then receives a move order 15 tiles directly behind it.",
         launches: &DIRECT_REVERSE_ORDER_LAUNCHES,
+    },
+    DevScenarioSpec {
+        id: "scout_car_wall_chokepoint",
+        title: "Scout Car Wall Chokepoint",
+        description: "Scout cars start beside each other below a stone wall gap and move north through the choke.",
+        launches: &SCOUT_CAR_WALL_CHOKEPOINT_LAUNCHES,
     },
 ];
 
@@ -181,6 +215,14 @@ mod tests {
                 count: 1,
             })
         );
+        assert_eq!(
+            parse_dev_scenario_room("scout_car_wall_chokepoint:unit=scout_car:count=15"),
+            Some(DevScenarioLaunch {
+                id: "scout_car_wall_chokepoint",
+                unit: EntityKind::ScoutCar,
+                count: 15,
+            })
+        );
     }
 
     #[test]
@@ -199,6 +241,14 @@ mod tests {
         );
         assert_eq!(
             parse_dev_scenario_launch("direct_reverse_order", "tank", "4"),
+            None
+        );
+        assert_eq!(
+            parse_dev_scenario_launch("scout_car_wall_chokepoint", "tank", "3"),
+            None
+        );
+        assert_eq!(
+            parse_dev_scenario_launch("scout_car_wall_chokepoint", "scout_car", "4"),
             None
         );
         assert_eq!(parse_dev_scenario_launch("unknown", "worker", "1"), None);

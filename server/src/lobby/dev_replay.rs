@@ -17,6 +17,7 @@ pub(super) fn room_mode_for(room: &str) -> RoomMode {
                 id: match launch.id {
                     "scout_car_snaking_corridor" => DevScenarioId::ScoutCarSnakingCorridor,
                     "direct_reverse_order" => DevScenarioId::DirectReverseOrder,
+                    "scout_car_wall_chokepoint" => DevScenarioId::ScoutCarWallChokepoint,
                     _ => return RoomMode::Normal,
                 },
                 unit: launch.unit,

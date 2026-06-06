@@ -26,7 +26,10 @@ export function devWatchConfig() {
         (count === "1" || count === "4")) ||
       (id === "direct_reverse_order" &&
         ["at_team", "scout_car", "tank"].includes(unit) &&
-        count === "1");
+        count === "1") ||
+      (id === "scout_car_wall_chokepoint" &&
+        unit === "scout_car" &&
+        ["3", "5", "6", "10", "15"].includes(count));
     if (!supportedScenario) {
       return null;
     }
