@@ -15,7 +15,14 @@ import { Lobby } from "./lobby.js";
 import { Audio, SOUND_MANIFEST } from "./audio.js";
 import { S } from "./protocol.js";
 import { TOAST_MS } from "./alerts.js";
-import { buildAudioSettings, devWatchConfig, dom, formatScore, wsUrl } from "./bootstrap.js";
+import {
+  buildAudioSettings,
+  devWatchConfig,
+  diagnostics,
+  dom,
+  formatScore,
+  wsUrl,
+} from "./bootstrap.js";
 import { Match } from "./match.js";
 import { StatusBadge } from "./status_badge.js";
 
@@ -33,7 +40,7 @@ const HEARTBEAT_MS = 15000;
 export class App {
   constructor() {
     /** @type {Net} persistent connection across lobby + matches. */
-    this.net = new Net(wsUrl());
+    this.net = new Net(wsUrl(), diagnostics);
     this.devWatch = devWatchConfig();
     /**
      * Audio engine. Long-lived across matches: the AudioContext is unlocked
@@ -149,6 +156,13 @@ export class App {
    * @param {object} payload §2.3 start payload
    */
   onStart(payload) {
+    diagnostics.mark("app.onStart.begin", {
+      map: payload?.map ? `${payload.map.width}x${payload.map.height}` : undefined,
+      terrain: payload?.map?.terrain?.length,
+      resources: payload?.map?.resources?.length,
+      players: payload?.players?.length,
+      spectator: payload?.spectator,
+    });
     // If a previous match somehow lingers, tear it down first.
     if (this.match) this.match.destroy();
 
@@ -165,7 +179,9 @@ export class App {
       this.devWatch,
       this.audio,
       this.statusBadge,
+      diagnostics,
     );
+    diagnostics.mark("app.onStart.end");
   }
 
   /**

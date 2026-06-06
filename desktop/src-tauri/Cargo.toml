@@ -8,6 +8,10 @@ repository = ""
 edition = "2021"
 rust-version = "1.77.2"
 
+[features]
+default = []
+desktop-debug-tools = ["tauri/devtools"]
+
 [build-dependencies]
 tauri-build = { version = "2.6.2", features = [] }
 

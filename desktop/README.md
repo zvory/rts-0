@@ -23,6 +23,12 @@ Run the shell:
 cargo tauri dev
 ```
 
+Run the shell with desktop debugging enabled:
+
+```bash
+../scripts/run-desktop-debug.sh
+```
+
 Build the unsigned macOS bundle:
 
 ```bash
@@ -36,5 +42,13 @@ paths:
 ./scripts/build-desktop.sh
 ```
 
+Build a debuggable internal bundle:
+
+```bash
+./scripts/build-desktop-debug.sh
+```
+
 The macOS `.app` and `.dmg` are written under
 `src-tauri/target/release/bundle/`.
+
+See `../docs/desktop-debugging.md` for Web Inspector, URL override, and client timing marks.

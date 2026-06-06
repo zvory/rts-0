@@ -62,12 +62,13 @@ export class Match {
    * @param {object} payload §2.3 start payload
    * @param {(msg: string) => void} toast surface a notice in the App's toast
    */
-  constructor(net, payload, toast, devWatch, audio, statusBadge) {
+  constructor(net, payload, toast, devWatch, audio, statusBadge, diagnostics = null) {
     this.net = net;
     this.toast = toast;
     this.devWatch = devWatch;
     this.audio = audio;
     this.statusBadge = statusBadge;
+    this.diagnostics = diagnostics;
     this.missingCombatSoundKinds = new Set();
     this.activeMachineGunSoundKeys = new Map();
     this.replaySpeedHandler = null;
@@ -91,30 +92,41 @@ export class Match {
     };
 
     // --- Build the module graph from the static start payload (DESIGN.md §4.1). ---
-    this.state = new GameState(payload);
+    this.state = this._timeInit("match.state", () => new GameState(payload));
     this.state.showAllDebugPathOverlays = this.devWatch?.kind === "scenario";
-    this.camera = new Camera();
-    this.renderer = new Renderer(dom.viewport);
-    this.fog = new Fog(this.state.map.width, this.state.map.height, this.state.map.terrain);
+    this.camera = this._timeInit("match.camera", () => new Camera());
+    this.renderer = this._timeInit("match.renderer", () => new Renderer(dom.viewport));
+    this.fog = this._timeInit(
+      "match.fog",
+      () => new Fog(this.state.map.width, this.state.map.height, this.state.map.terrain),
+    );
     this.fog.setRevealAll(!!this.devWatch?.noFog);
-    this.hud = new HUD(dom.gameScreen, this.state, this.net);
-    this.minimap = new Minimap(dom.minimap, this.state, this.camera, this.fog, this.net);
-    this.input = new Input(
-      dom.viewport,
-      this.camera,
-      this.state,
-      this.net,
-      this.renderer,
-      this.fog,
-      this.audio,
+    this.hud = this._timeInit("match.hud", () => new HUD(dom.gameScreen, this.state, this.net));
+    this.minimap = this._timeInit(
+      "match.minimap",
+      () => new Minimap(dom.minimap, this.state, this.camera, this.fog, this.net),
+    );
+    this.input = this._timeInit(
+      "match.input",
+      () => new Input(
+        dom.viewport,
+        this.camera,
+        this.state,
+        this.net,
+        this.renderer,
+        this.fog,
+        this.audio,
+      ),
     );
 
     // Draw the static terrain once into the renderer's cached layer.
-    this.renderer.buildStaticMap(this.state.map);
+    this._timeInit("match.staticMap", () => this.renderer.buildStaticMap(this.state.map));
 
     // Size the camera to the map and the current viewport, then center on home.
-    this.applyBounds();
-    this.centerOnHome();
+    this._timeInit("match.bounds", () => {
+      this.applyBounds();
+      this.centerOnHome();
+    });
 
     // --- Render loop state. ---
     this.running = true;
@@ -185,6 +197,10 @@ export class Match {
       dom.replaySpeed.addEventListener("click", this.replaySpeedHandler);
     }
     this.applySpectatorUi();
+  }
+
+  _timeInit(label, fn) {
+    return this.diagnostics?.time(label, undefined, fn) ?? fn();
   }
 
   startMatchPings() {
