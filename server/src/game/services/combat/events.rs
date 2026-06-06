@@ -7,9 +7,14 @@ use crate::rules::projection;
 
 pub(super) fn attack_reveal_for(attacker: Option<&Entity>) -> Option<AttackReveal> {
     let attacker = attacker?;
-    if attacker.kind != EntityKind::AtTeam {
+    if !attacker.is_unit() {
         return None;
     }
+    let setup_state = matches!(
+        attacker.kind,
+        EntityKind::MachineGunner | EntityKind::AtTeam
+    )
+    .then(|| attacker.weapon_setup().to_protocol_str().to_string());
     Some(AttackReveal {
         owner: attacker.owner,
         kind: attacker.kind.to_protocol_str().to_string(),
@@ -17,7 +22,7 @@ pub(super) fn attack_reveal_for(attacker: Option<&Entity>) -> Option<AttackRevea
         y: attacker.pos_y,
         facing: Some(attacker.facing()),
         weapon_facing: attacker.weapon_facing(),
-        setup_state: Some(attacker.weapon_setup().to_protocol_str().to_string()),
+        setup_state,
     })
 }
 

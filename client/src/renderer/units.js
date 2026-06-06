@@ -123,7 +123,9 @@ export function _tankMotionVisual(e, facing, state, body) {
   return { leftPhase, rightPhase, leftDir, rightDir, activity, lowOil, oilStarved };
 }
 
-export function _drawUnit(e, colorByOwner, state) {
+export function _drawUnit(e, colorByOwner, state, pools = {}) {
+  const shadowPool = pools.shadow || "unitShadows";
+  const unitPool = pools.unit || "units";
   const stat = STATS[e.kind] || {};
   const r = stat.size || 9;
   const tint = this._tintFor(e.owner, colorByOwner);
@@ -140,12 +142,12 @@ export function _drawUnit(e, colorByOwner, state) {
       : ZERO_OFFSET;
 
   // Shadow on its own layer (under all units).
-  const sh = this._slot("unitShadows", e.id);
+  const sh = this._slot(shadowPool, e.id);
   sh.position.set(e.x + heavyKick.x, e.y + heavyKick.y);
   this._shadow(sh, 0, 0, isVehicleBodyKind(e.kind) ? tankBodyVisual(stat).shadowRadius : r);
 
   // Body on the unit layer.
-  const g = this._slot("units", e.id);
+  const g = this._slot(unitPool, e.id);
   g.position.set(e.x + heavyKick.x, e.y + heavyKick.y);
   g.lineStyle(2, 0x1a1712, 0.95);
 
@@ -223,30 +225,17 @@ export function _drawUnit(e, colorByOwner, state) {
 }
 
 export function _drawShotRevealUnit(e, colorByOwner, state) {
-  if (e.kind !== KIND.AT_TEAM) return;
-  const stat = STATS[e.kind] || {};
-  const r = stat.size || 9;
-  const tint = this._tintFor(e.owner, colorByOwner);
-  const facing = typeof e.facing === "number" ? e.facing : 0;
-  const weaponFacing = typeof e.weaponFacing === "number" ? e.weaponFacing : facing;
   const now = performance.now();
-  const recoilProgress = typeof state.weaponRecoil === "function"
-    ? state.weaponRecoil(e.id, e.kind, now)
-    : 0;
-  const recoil = weaponRecoilOffset(e.kind, recoilProgress);
   const age = Math.max(0, now - (e.shotRevealCreatedAt || now));
   const ttl = Math.max(1, (e.shotRevealExpiresAt || now + 1) - (e.shotRevealCreatedAt || now));
   const t = clamp01(age / ttl);
-  const alpha = 0.72 * (1 - smoothstep01(Math.max(0, t - 0.62) / 0.38));
-
-  const sh = this._slot("unitShadows", e.id);
-  sh.position.set(e.x, e.y);
-  sh.alpha = alpha;
-  this._shadow(sh, 0, 0, r + 6);
-
-  const g = this._slot("units", e.id);
-  g.position.set(e.x, e.y);
-  g.alpha = alpha;
-  g.lineStyle(2, 0x1a1712, 0.95);
-  drawAtGun(g, r, tint, facing, weaponFacing, { prongFactor: 1, barrel: true }, recoil);
+  const alpha = 0.82 * (1 - smoothstep01(Math.max(0, t - 0.62) / 0.38));
+  this._drawUnit(e, colorByOwner, state, {
+    shadow: "shotRevealShadows",
+    unit: "shotReveals",
+  });
+  const sh = this._pools.shotRevealShadows.get(e.id);
+  const g = this._pools.shotReveals.get(e.id);
+  if (sh) sh.alpha = alpha * 0.9;
+  if (g) g.alpha = alpha;
 }

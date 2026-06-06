@@ -291,7 +291,7 @@ watch rooms receive all resource updates).
 Notices default to `severity: "info"` with no position. `alert:`-prefixed notice ids are
 gameplay alerts: the client plays alert audio and pings the minimap at `(x, y)` when present,
 or pulses the minimap border when absent. `alert:under_attack` is emitted at the damaged unit's
-position after normal fog/visibility filtering. AT-gun attack events include `reveal` so a gun
+position after normal fog/visibility filtering. Unit attack events include `reveal` so a shooter
 that fires from fog can be rendered briefly as a semi-transparent, non-interactive silhouette above
 the fog overlay; `toPos` lets tracers draw even when the hit target is no longer in the snapshot.
 Events are best-effort visual flavor; the client must not depend on receiving them.
@@ -681,7 +681,7 @@ with `playerResources`.
 
 ### 4.2 Rendering & look (PixiJS, procedural art — neutral PS1 field-command style)
 - Layers (back→front): terrain → resource nodes → building shadows → buildings → unit
-  shadows → units → selection rings → health bars → fog overlay → shot-revealed AT guns →
+  shadows → units → selection rings → health bars → fog overlay → shot-revealed units →
   command/hover feedback → placement ghost →
   selection drag-box → (HUD is DOM, not Pixi).
 - Units: low-detail hard-edged silhouettes tinted by player color, with a dark drop shadow,
@@ -692,7 +692,7 @@ with `playerResources`.
   Riflemen carry a rifle, AT teams field a wheeled anti-tank gun with a long recoiling barrel,
   carriage, two wheels, and animated deployment bracing, and machine gunners carry an MG42-style
   long machine gun across the body while packed that extends forward with bracing during
-  setup/deployment. AT guns that fire from outside current vision are shown briefly above the fog
+  setup/deployment. Units that fire from outside current vision are shown briefly above the fog
   as semi-transparent silhouettes with the same recoil animation and a yellow tracer to the hit
   point.
   Entities marked `visionOnly` by the server are drawn on the ordinary building/unit layers below
@@ -717,8 +717,8 @@ with `playerResources`.
   click targeting.
 - Terrain: muted grass/field/mud, rock, and water tiles with deterministic coarse dithering
   so movement is readable and the map has a PlayStation 1-era low-resolution texture feel.
-- Fog: unexplored = 86% dark overlay so terrain remains faintly readable; explored-but-not-visible =
-  55% dark overlay; visible = clear. Use a single overlay sprite/graphics updated from `fog`
+- Fog: unexplored = 80% dark overlay so terrain remains faintly readable; explored-but-not-visible =
+  48% dark overlay; visible = clear. Use a single overlay sprite/graphics updated from `fog`
   grids; soften edges if cheap.
 - Selection: green for own, red tint for enemy, yellow for neutral. Drag-box translucent green.
 - Keep a cohesive muted palette; define colors in `config.js`.

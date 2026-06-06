@@ -36,8 +36,8 @@ export const COLORS = Object.freeze({
   fogUnexplored: 0x11110f,
   fogExplored: 0x000000, // drawn at fogExploredAlpha
 });
-export const FOG_EXPLORED_ALPHA = 0.55;
-export const FOG_UNEXPLORED_ALPHA = 0.86;
+export const FOG_EXPLORED_ALPHA = 0.48;
+export const FOG_UNEXPLORED_ALPHA = 0.8;
 
 // Mirrors server/src/config.rs *_BODY_* values. Server collision is authoritative;
 // the client uses these only for art, selection, and advisory placement previews.
