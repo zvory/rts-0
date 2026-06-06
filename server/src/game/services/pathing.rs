@@ -6,7 +6,7 @@
 
 use std::collections::HashMap;
 
-use crate::game::entity::{uses_oriented_vehicle_body, EntityKind};
+use crate::game::entity::{uses_oriented_vehicle_body, uses_tank_movement_semantics, EntityKind};
 use crate::game::map::Map;
 use crate::game::pathfinding::{self, Passability};
 use crate::game::services::occupancy::Occupancy;
@@ -194,7 +194,21 @@ impl PathingService {
         occupancy: &Occupancy,
         req: PathRequest,
     ) -> Vec<(f32, f32)> {
+        let start = req.start;
+        let kind = req.kind;
         let tile_path = self.request_tile_path(map, occupancy, req);
+        if uses_tank_movement_semantics(kind) {
+            let pass = TerrainPassability {
+                map,
+                occupancy,
+                kind,
+                radius_tiles: 0,
+                route_shape: RouteShape::ScoutCarClearance,
+                avoid_diagonal_pinch: true,
+            };
+            let tile_path = expand_vehicle_diagonal_steps_to_l_waypoints(start, &tile_path, &pass);
+            return pathfinding::to_world_waypoints(&tile_path);
+        }
         pathfinding::to_world_waypoints(&tile_path)
     }
 
@@ -289,6 +303,59 @@ impl PathingService {
                 last_used: self.tick,
             },
         );
+    }
+}
+
+fn expand_vehicle_diagonal_steps_to_l_waypoints<P: Passability>(
+    start: (i32, i32),
+    tile_path: &[(i32, i32)],
+    pass: &P,
+) -> Vec<(i32, i32)> {
+    let mut expanded = Vec::with_capacity(tile_path.len() * 2);
+    let mut prev = start;
+
+    for &next in tile_path {
+        let dx = next.0 - prev.0;
+        let dy = next.1 - prev.1;
+        if dx.abs() == 1 && dy.abs() == 1 {
+            if let Some(elbow) = choose_vehicle_l_elbow(prev, next, pass) {
+                if expanded.last().copied() != Some(elbow) {
+                    expanded.push(elbow);
+                }
+            }
+        }
+        if expanded.last().copied() != Some(next) {
+            expanded.push(next);
+        }
+        prev = next;
+    }
+
+    expanded
+}
+
+fn choose_vehicle_l_elbow<P: Passability>(
+    prev: (i32, i32),
+    next: (i32, i32),
+    pass: &P,
+) -> Option<(i32, i32)> {
+    let horizontal_first = (next.0, prev.1);
+    let vertical_first = (prev.0, next.1);
+    let horizontal_ok = pass.passable(horizontal_first.0, horizontal_first.1);
+    let vertical_ok = pass.passable(vertical_first.0, vertical_first.1);
+
+    match (horizontal_ok, vertical_ok) {
+        (true, true) => {
+            let horizontal_cost = pass.movement_cost(horizontal_first.0, horizontal_first.1);
+            let vertical_cost = pass.movement_cost(vertical_first.0, vertical_first.1);
+            if horizontal_cost <= vertical_cost {
+                Some(horizontal_first)
+            } else {
+                Some(vertical_first)
+            }
+        }
+        (true, false) => Some(horizontal_first),
+        (false, true) => Some(vertical_first),
+        (false, false) => None,
     }
 }
 
@@ -537,6 +604,42 @@ mod tests {
                 angle_delta(a, b).abs() > threshold_rad
             })
             .count()
+    }
+
+    fn diagonal_tile_steps(start: (i32, i32), tile_path: &[(i32, i32)]) -> usize {
+        let mut prev = start;
+        let mut diagonals = 0usize;
+        for &next in tile_path {
+            let dx = (next.0 - prev.0).abs();
+            let dy = (next.1 - prev.1).abs();
+            if dx == 1 && dy == 1 {
+                diagonals += 1;
+            }
+            prev = next;
+        }
+        diagonals
+    }
+
+    fn assert_no_diagonal_world_steps(
+        map: &Map,
+        start: (i32, i32),
+        reverse_waypoints: &[(f32, f32)],
+    ) {
+        let ts = config::TILE_SIZE as f32;
+        let mut points: Vec<_> = std::iter::once(map.tile_center(start.0 as u32, start.1 as u32))
+            .chain(reverse_waypoints.iter().rev().copied())
+            .collect();
+        points.dedup();
+        for step in points.windows(2) {
+            let dx = (step[1].0 - step[0].0).abs();
+            let dy = (step[1].1 - step[0].1).abs();
+            assert!(
+                dx <= f32::EPSILON || dy <= f32::EPSILON || dx != ts || dy != ts,
+                "vehicle world path must not retain a direct diagonal tile-center step: {:?} -> {:?}",
+                step[0],
+                step[1]
+            );
+        }
     }
 
     fn segment_angle(from: (f32, f32), to: (f32, f32)) -> f32 {
@@ -1207,45 +1310,44 @@ mod tests {
     }
 
     #[test]
-    fn raw_open_tank_route_keeps_every_tile_center_waypoint() {
+    fn tank_style_vehicle_routes_expand_diagonal_steps_to_l_waypoints() {
         let map = flat_test_map(40);
         let start = (4, 4);
         let goal = (28, 17);
-        let (tile_path, world_path) = request_fixture_path(&map, EntityKind::Tank, start, goal);
-
-        assert_eq!(
-            tile_path.len(),
-            world_path.len(),
-            "raw world waypoint count should mirror original tile path length"
-        );
-        assert!(
-            tile_path.len() >= 20,
-            "long open tank route should expose many tile-center waypoints before smoothing, got {}",
-            tile_path.len()
-        );
-
-        let forward_world: Vec<_> =
-            std::iter::once(map.tile_center(start.0 as u32, start.1 as u32))
-                .chain(world_path.iter().rev().copied())
-                .collect();
-        let heading_changes = heading_changes_above(&forward_world, 10.0_f32.to_radians());
-        assert!(
-            heading_changes >= 1,
-            "mixed diagonal/cardinal tile route should contain heading changes above 10 degrees"
-        );
-
         let entities = EntityStore::new();
         let occ = Occupancy::build(&map, &entities);
-        assert!(
-            standability::unit_static_segment_standable(
+
+        for kind in [EntityKind::Tank, EntityKind::AtTeam] {
+            let (tile_path, world_path) = request_fixture_path(&map, kind, start, goal);
+            let diagonal_steps = diagonal_tile_steps(start, &tile_path);
+            assert!(
+                diagonal_steps > 0,
+                "fixture should include raw diagonal A* steps for {kind:?}; got {tile_path:?}"
+            );
+            assert_eq!(
+                world_path.len(),
+                tile_path.len() + diagonal_steps,
+                "tank-style vehicles should insert one L elbow per raw diagonal step"
+            );
+            assert_no_diagonal_world_steps(&map, start, &world_path);
+            assert_reverse_segments_standable(
                 &map,
                 &occ,
-                EntityKind::Tank,
+                kind,
                 map.tile_center(start.0 as u32, start.1 as u32),
-                world_path[0],
-            ),
-            "fixture should contain a legal straight segment from start to the final waypoint"
-        );
+                &world_path,
+            );
+
+            let forward_world: Vec<_> =
+                std::iter::once(map.tile_center(start.0 as u32, start.1 as u32))
+                    .chain(world_path.iter().rev().copied())
+                    .collect();
+            let heading_changes = heading_changes_above(&forward_world, 10.0_f32.to_radians());
+            assert!(
+                heading_changes >= diagonal_steps,
+                "L-expanded route should visibly preserve corner turns for {kind:?}"
+            );
+        }
     }
 
     #[test]
