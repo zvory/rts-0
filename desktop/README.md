@@ -1,7 +1,7 @@
 # Bewegungskrieg Desktop
 
-Phase 0 Tauri shell for the native desktop client. It intentionally loads only
-`dist/index.html`; game client integration starts in a later phase.
+Phase 1 Tauri shell for the native desktop client. It opens the live
+Bewegungskrieg server directly inside the desktop webview.
 
 ## Toolchain
 
@@ -27,6 +27,13 @@ Build the unsigned macOS bundle:
 
 ```bash
 cargo tauri build
+```
+
+Or use the helper from the repo root, which builds and prints the exact output
+paths:
+
+```bash
+./scripts/build-desktop.sh
 ```
 
 The macOS `.app` and `.dmg` are written under
