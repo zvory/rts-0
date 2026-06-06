@@ -4,6 +4,7 @@ use super::crash_replay::{dump_crash_replay, panic_reason};
 use super::dev_replay::{load_replay_artifact, match_seed};
 use super::snapshots::{compact_snapshot_for_wire, union_events};
 use super::*;
+use crate::protocol::SnapshotNetStatus;
 use std::time::Instant as StdInstant;
 use tokio::time::Instant as TokioInstant;
 
@@ -14,6 +15,7 @@ pub(super) struct RoomPlayer {
     ready: bool,
     spectator: bool,
     msg_tx: ConnectionSink,
+    head_of_line_count: u32,
 }
 
 /// A computer opponent seated in a room. Has an id (for the lobby list / removal) and a name, but
@@ -109,6 +111,7 @@ pub(super) struct RoomTask {
     dev_view_player_id: Option<u32>,
     /// Replay speed multiplier; 1.0 = real-time, 2.0 = 2× faster, etc.
     replay_speed: f32,
+    slow_tick_count: u32,
 }
 
 impl RoomTask {
@@ -131,6 +134,7 @@ impl RoomTask {
             dev_driver: None,
             dev_view_player_id: None,
             replay_speed,
+            slow_tick_count: 0,
         }
     }
 
@@ -263,6 +267,7 @@ impl RoomTask {
                 ready: false,
                 spectator,
                 msg_tx,
+                head_of_line_count: 0,
             },
         );
         self.reassign_host_if_needed();
@@ -582,6 +587,7 @@ impl RoomTask {
                 ready: true,
                 spectator: true,
                 msg_tx,
+                head_of_line_count: 0,
             },
         );
         let _ = ack.send(true);
@@ -644,6 +650,7 @@ impl RoomTask {
     /// Transition from `Lobby` to `InGame`: create the simulation and send each player their
     /// own `start` payload. Only called from `on_start_request` once preconditions hold.
     fn start_match(&mut self) {
+        self.reset_match_net_status();
         let mut inits: Vec<PlayerInit> = self
             .active_human_ids()
             .filter_map(|id| {
@@ -708,6 +715,7 @@ impl RoomTask {
     }
 
     fn start_dev_session(&mut self) {
+        self.reset_match_net_status();
         let (game, driver, view_player_id) = match self.build_dev_session() {
             Ok(session) => session,
             Err(err) => {
@@ -854,6 +862,8 @@ impl RoomTask {
 
         // Fan out fog-filtered snapshots to active players and union-fog snapshots to lobby-time
         // spectators, merging in the events each recipient is allowed to observe.
+        let tick_budget = self.current_tick_interval();
+        let mut slow_tick_counted = false;
         let fanout_start = StdInstant::now();
         let recipients: Vec<u32> = self.order.clone();
         let spectator_visible_players = self.spectator_visible_player_ids();
@@ -879,6 +889,14 @@ impl RoomTask {
             let entity_count = snapshot.entities.len();
             let resource_delta_count = snapshot.resource_deltas.len();
             let event_count = snapshot.events.len();
+            let tick_elapsed = tick_start.elapsed();
+            let slow_tick = scheduler_lag >= tick_budget || tick_elapsed >= tick_budget;
+            if slow_tick && !slow_tick_counted {
+                self.slow_tick_count = self.slow_tick_count.saturating_add(1);
+                slow_tick_counted = true;
+            }
+            snapshot.net_status =
+                self.snapshot_net_status(player, scheduler_lag, tick_elapsed, slow_tick);
             let compact_start = StdInstant::now();
             compact_snapshot_for_wire(&mut snapshot);
             let compact_duration = compact_start.elapsed();
@@ -899,6 +917,11 @@ impl RoomTask {
                 &player.msg_tx,
                 ServerMessage::Snapshot(snapshot),
             );
+            if matches!(enqueue_status, Some(SnapshotSendStatus::Replaced)) {
+                if let Some(player) = self.players.get_mut(id) {
+                    player.head_of_line_count = player.head_of_line_count.saturating_add(1);
+                }
+            }
             if let (Some(perf), Some(status)) = (perf.as_mut(), enqueue_status) {
                 perf.record_enqueue(snapshot_enqueue_status(status));
             }
@@ -967,6 +990,8 @@ impl RoomTask {
             }
         };
 
+        let tick_budget = self.current_tick_interval();
+        let mut slow_tick_counted = false;
         let fanout_start = StdInstant::now();
         let recipients = self.order.clone();
         let view_player_id = self.dev_view_player_id.unwrap_or(0);
@@ -983,6 +1008,14 @@ impl RoomTask {
             let entity_count = snapshot.entities.len();
             let resource_delta_count = snapshot.resource_deltas.len();
             let event_count = snapshot.events.len();
+            let tick_elapsed = tick_start.elapsed();
+            let slow_tick = scheduler_lag >= tick_budget || tick_elapsed >= tick_budget;
+            if slow_tick && !slow_tick_counted {
+                self.slow_tick_count = self.slow_tick_count.saturating_add(1);
+                slow_tick_counted = true;
+            }
+            snapshot.net_status =
+                self.snapshot_net_status(player, scheduler_lag, tick_elapsed, slow_tick);
             let compact_start = StdInstant::now();
             compact_snapshot_for_wire(&mut snapshot);
             let compact_duration = compact_start.elapsed();
@@ -1003,6 +1036,11 @@ impl RoomTask {
                 &player.msg_tx,
                 ServerMessage::Snapshot(snapshot),
             );
+            if matches!(enqueue_status, Some(SnapshotSendStatus::Replaced)) {
+                if let Some(player) = self.players.get_mut(&id) {
+                    player.head_of_line_count = player.head_of_line_count.saturating_add(1);
+                }
+            }
             if let (Some(perf), Some(status)) = (perf.as_mut(), enqueue_status) {
                 perf.record_enqueue(snapshot_enqueue_status(status));
             }
@@ -1218,6 +1256,33 @@ impl RoomTask {
             }
         }
     }
+
+    fn reset_match_net_status(&mut self) {
+        self.slow_tick_count = 0;
+        for player in self.players.values_mut() {
+            player.head_of_line_count = 0;
+        }
+    }
+
+    fn snapshot_net_status(
+        &self,
+        player: &RoomPlayer,
+        scheduler_lag: Duration,
+        tick_elapsed: Duration,
+        slow_tick: bool,
+    ) -> SnapshotNetStatus {
+        let head_of_line = player.msg_tx.has_pending_snapshot();
+        SnapshotNetStatus {
+            server_lag_ms: saturating_duration_ms_u16(scheduler_lag),
+            tick_ms: saturating_duration_ms_u16(tick_elapsed),
+            slow_tick,
+            slow_tick_count: self.slow_tick_count,
+            head_of_line,
+            head_of_line_count: player
+                .head_of_line_count
+                .saturating_add(u32::from(head_of_line)),
+        }
+    }
 }
 
 fn snapshot_enqueue_status(status: SnapshotSendStatus) -> crate::perf::SnapshotEnqueue {
@@ -1226,4 +1291,8 @@ fn snapshot_enqueue_status(status: SnapshotSendStatus) -> crate::perf::SnapshotE
         SnapshotSendStatus::Replaced => crate::perf::SnapshotEnqueue::Replaced,
         SnapshotSendStatus::Closed => crate::perf::SnapshotEnqueue::Closed,
     }
+}
+
+fn saturating_duration_ms_u16(duration: Duration) -> u16 {
+    duration.as_millis().min(u16::MAX as u128) as u16
 }

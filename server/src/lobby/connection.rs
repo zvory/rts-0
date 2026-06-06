@@ -88,6 +88,10 @@ impl ConnectionSink {
             SnapshotSendStatus::Stored
         }
     }
+
+    pub(crate) fn has_pending_snapshot(&self) -> bool {
+        self.snapshots.has_pending()
+    }
 }
 
 impl LatestSnapshotSlot {
@@ -100,6 +104,10 @@ impl LatestSnapshotSlot {
 
     pub(crate) fn take(&self) -> Option<Snapshot> {
         self.lock_pending().take()
+    }
+
+    fn has_pending(&self) -> bool {
+        self.lock_pending().is_some()
     }
 
     pub(crate) async fn notified(&self) {

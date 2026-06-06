@@ -291,6 +291,22 @@ pub struct Snapshot {
     /// Per-player resources for all players. Populated only in spectator/replay modes.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub player_resources: Vec<PlayerResourceSnapshot>,
+    /// Per-recipient server/network diagnostics for the current match.
+    pub net_status: SnapshotNetStatus,
+}
+
+/// Server-side transport and scheduling health attached to every snapshot.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct SnapshotNetStatus {
+    pub server_lag_ms: u16,
+    pub tick_ms: u16,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub slow_tick: bool,
+    pub slow_tick_count: u32,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub head_of_line: bool,
+    pub head_of_line_count: u32,
 }
 
 /// Resources for one player, included in no-fog snapshots so replay viewers see all players.
@@ -602,7 +618,28 @@ impl Serialize for CompactSnapshot<'_> {
                     .collect::<Vec<_>>(),
             )?;
         }
+        map.serialize_entry("n", &CompactNetStatus(&snapshot.net_status))?;
         map.end()
+    }
+}
+
+struct CompactNetStatus<'a>(&'a SnapshotNetStatus);
+
+impl Serialize for CompactNetStatus<'_> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let status = self.0;
+        let flags = u8::from(status.slow_tick) | (u8::from(status.head_of_line) << 1);
+        [
+            status.server_lag_ms as u32,
+            status.tick_ms as u32,
+            flags as u32,
+            status.slow_tick_count,
+            status.head_of_line_count,
+        ]
+        .serialize(serializer)
     }
 }
 
@@ -1067,6 +1104,14 @@ mod tests {
                 },
             ],
             player_resources: Vec::new(),
+            net_status: SnapshotNetStatus {
+                server_lag_ms: 4,
+                tick_ms: 17,
+                slow_tick: false,
+                slow_tick_count: 2,
+                head_of_line: true,
+                head_of_line_count: 3,
+            },
         }
     }
 
@@ -1103,6 +1148,7 @@ mod tests {
         assert_eq!(value["e"][2][18], serde_json::json!([256.0, 512.0]));
         assert_eq!(value["r"], serde_json::json!([[200, 1498]]));
         assert_eq!(value["ev"].as_array().unwrap().len(), 4);
+        assert_eq!(value["n"], serde_json::json!([4, 17, 2, 2, 3]));
         assert_eq!(
             value["ev"][0][3],
             serde_json::json!([1, 4, 12.0, 24.0, 0.5, 0.75, 3])
@@ -1131,6 +1177,7 @@ mod tests {
             resource_deltas: Vec::new(),
             events: Vec::new(),
             player_resources: Vec::new(),
+            net_status: SnapshotNetStatus::default(),
         };
 
         let compact = serialize_compact_snapshot(&snapshot).unwrap();

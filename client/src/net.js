@@ -26,6 +26,8 @@ export class Net {
     this._playerId = null;
     /** Most recently measured round-trip latency in ms (null until first pong). */
     this.latency = null;
+    /** performance.now() stamp of the latest pong-derived latency sample. */
+    this.latencyUpdatedAt = 0;
     /** performance.now() stamp of the last ping(), used to compute latency. */
     this._lastPingSent = null;
   }
@@ -226,6 +228,7 @@ export class Net {
         } else if (this._lastPingSent != null) {
           this.latency = performance.now() - this._lastPingSent;
         }
+        this.latencyUpdatedAt = performance.now();
         break;
       default:
         break;

@@ -17,6 +17,7 @@ import { S } from "./protocol.js";
 import { TOAST_MS } from "./alerts.js";
 import { buildAudioSettings, devWatchConfig, dom, formatScore, wsUrl } from "./bootstrap.js";
 import { Match } from "./match.js";
+import { StatusBadge } from "./status_badge.js";
 
 /**
  * App-level heartbeat interval (ms). The server drops connections idle for 40s,
@@ -43,6 +44,7 @@ export class App {
     this.audio = new Audio();
     void this.audio.preload(SOUND_MANIFEST);
     if (dom.settingsMenu) buildAudioSettings(this.audio, dom.settingsMenu);
+    this.statusBadge = new StatusBadge(dom.version);
     /** @type {Lobby} */
     this.lobby = new Lobby(dom.lobbyScreen, this.net);
     /** @type {Match|null} the currently running match, if any. */
@@ -161,6 +163,7 @@ export class App {
       (msg) => this.showToast(msg),
       this.devWatch,
       this.audio,
+      this.statusBadge,
     );
   }
 
@@ -264,6 +267,7 @@ export class App {
       this.match.destroy();
       this.match = null;
     }
+    this.statusBadge.clearMatchMetrics();
     dom.gameOver.hidden = true;
     this.clearScoreboard();
     dom.gameScreen.hidden = true;
@@ -300,14 +304,13 @@ export class App {
 
   /** Fetch and display the build version in the shared top-left badge. */
   async loadVersion() {
-    if (!dom.version) return;
     try {
       const res = await fetch("/version", { cache: "no-store" });
       if (!res.ok) throw new Error(`version request failed: ${res.status}`);
       const text = await res.text();
-      dom.version.textContent = text.trim() || "unknown";
+      this.statusBadge.setVersion(text.trim() || "unknown");
     } catch {
-      dom.version.textContent = "unknown";
+      this.statusBadge.setVersion("unknown");
     }
   }
 }

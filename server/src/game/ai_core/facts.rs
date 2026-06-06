@@ -443,6 +443,7 @@ mod tests {
             resource_deltas: Vec::new(),
             events: Vec::new(),
             player_resources: Vec::new(),
+            net_status: crate::protocol::SnapshotNetStatus::default(),
         };
         let start = StartPayload {
             player_id: 1,

@@ -75,13 +75,48 @@ body {
   top: 8px;
   left: 10px;
   z-index: 30;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 180px;
+  padding: 6px 8px;
+  border: 1px solid rgba(91, 83, 65, 0.7);
+  background: rgba(17, 17, 15, 0.78);
   color: var(--ink-faint);
   font-family: var(--mono);
   font-size: 11px;
-  line-height: 1;
-  letter-spacing: 0.08em;
+  line-height: 1.2;
+  letter-spacing: 0;
   pointer-events: none;
   user-select: none;
+}
+
+.status-badge-build,
+.status-badge-metrics,
+.status-badge-issues {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.status-badge-build {
+  color: var(--ink);
+}
+
+.status-badge-metric,
+.status-badge-issue,
+.status-badge-issue-ok {
+  color: var(--ink-faint);
+}
+
+.status-badge-metric.is-active,
+.status-badge-issue.is-active {
+  color: var(--bad);
+}
+
+.status-badge-issue-ok {
+  color: var(--good);
 }
 
 #dev-banner {
