@@ -122,6 +122,9 @@ pub struct Game {
     starting_steel: u32,
     /// Starting oil granted to each player at match start. See [`Game::starting_steel`].
     starting_oil: u32,
+    /// True for lobby "Debug mode" matches; enables owner-only movement path diagnostics in
+    /// snapshots even when the server binary is built in release mode.
+    debug_path_overlays: bool,
     pub(crate) rng: SmallRng,
 }
 

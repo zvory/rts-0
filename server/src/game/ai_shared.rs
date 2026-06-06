@@ -417,7 +417,6 @@ mod tests {
                     active_marker: None,
                     charge_cooldown_left: None,
                     vision_only: false,
-                    #[cfg(debug_assertions)]
                     debug_path: None,
                 },
                 EntityView {
@@ -446,7 +445,6 @@ mod tests {
                     active_marker: None,
                     charge_cooldown_left: None,
                     vision_only: false,
-                    #[cfg(debug_assertions)]
                     debug_path: None,
                 },
                 EntityView {
@@ -475,7 +473,6 @@ mod tests {
                     active_marker: None,
                     charge_cooldown_left: None,
                     vision_only: false,
-                    #[cfg(debug_assertions)]
                     debug_path: None,
                 },
                 EntityView {
@@ -504,7 +501,6 @@ mod tests {
                     active_marker: None,
                     charge_cooldown_left: None,
                     vision_only: false,
-                    #[cfg(debug_assertions)]
                     debug_path: None,
                 },
                 EntityView {
@@ -533,7 +529,6 @@ mod tests {
                     active_marker: None,
                     charge_cooldown_left: None,
                     vision_only: false,
-                    #[cfg(debug_assertions)]
                     debug_path: None,
                 },
             ],
