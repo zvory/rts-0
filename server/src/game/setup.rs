@@ -1,4 +1,5 @@
 use super::*;
+use crate::game::entity::WeaponSetup;
 
 impl Game {
     #[allow(dead_code)]
@@ -358,7 +359,7 @@ impl Game {
         let mut entities = EntityStore::new();
         let mut ai_profile_rng = SmallRng::seed_from_u64((seed as u64) ^ 0xA17E_5EED);
 
-        let mut player_states = Vec::with_capacity(players.len());
+        let mut player_states = Vec::with_capacity(players.len() + 1);
         let mut ai = Vec::new();
         for (i, p) in players.iter().enumerate() {
             let start = map.starts.get(i).copied().unwrap_or((0, 0));
@@ -388,6 +389,10 @@ impl Game {
             // The starting City Centre contributes supply immediately.
             ps.supply_cap = config::CITY_CENTRE_SUPPLY.min(config::SUPPLY_CAP_MAX);
             player_states.push(ps);
+        }
+
+        if starting_loadout == StartingLoadout::DebugHuman {
+            spawn_debug_inert_enemy_at_guns(&mut entities, &map, &mut player_states, players);
         }
 
         // Always spawn resources on the neutral expansion sites. Claimed sites get a full start;
@@ -831,6 +836,75 @@ fn spawn_debug_human_start(
     }
 }
 
+const DEBUG_INERT_ENEMY_ID: u32 = 900_001;
+const DEBUG_INERT_AT_GUN_COUNT: usize = 5;
+const DEBUG_INERT_AT_GUN_SPACING_TILES: f32 = 4.0;
+
+/// Add a static enemy AT-gun battery to debug starts without creating an AI controller/profile.
+fn spawn_debug_inert_enemy_at_guns(
+    entities: &mut EntityStore,
+    map: &Map,
+    players: &mut Vec<PlayerState>,
+    inits: &[PlayerInit],
+) {
+    if inits.iter().any(|p| p.id == DEBUG_INERT_ENEMY_ID) || inits.iter().all(|p| p.is_ai) {
+        return;
+    }
+
+    let Some((human_index, _)) = inits.iter().enumerate().find(|(_, p)| !p.is_ai) else {
+        return;
+    };
+    let Some(&human_start) = map.starts.get(human_index) else {
+        return;
+    };
+
+    let max_tile = map.size.saturating_sub(1);
+    let battery_tile = (
+        max_tile.saturating_sub(human_start.0.min(max_tile)),
+        max_tile.saturating_sub(human_start.1.min(max_tile)),
+    );
+    let battery_center = map.tile_center(battery_tile.0, battery_tile.1);
+    let map_center = map.world_size_px() * 0.5;
+    let to_center = (map_center - battery_center.0, map_center - battery_center.1);
+    let center_facing = to_center.1.atan2(to_center.0);
+    if !center_facing.is_finite() {
+        return;
+    }
+
+    let side = (-center_facing.sin(), center_facing.cos());
+    let ts = config::TILE_SIZE as f32;
+    let center_index = (DEBUG_INERT_AT_GUN_COUNT.saturating_sub(1)) as f32 * 0.5;
+    for i in 0..DEBUG_INERT_AT_GUN_COUNT {
+        let offset = (i as f32 - center_index) * DEBUG_INERT_AT_GUN_SPACING_TILES * ts;
+        let x = battery_center.0 + side.0 * offset;
+        let y = battery_center.1 + side.1 * offset;
+        let facing = (map_center - y).atan2(map_center - x);
+        let Some(id) = entities.spawn_unit(DEBUG_INERT_ENEMY_ID, EntityKind::AtTeam, x, y) else {
+            continue;
+        };
+        if let Some(e) = entities.get_mut(id) {
+            e.set_facing(facing);
+            e.set_weapon_facing(facing);
+            e.set_desired_weapon_facing(facing);
+            e.set_emplacement_facing(Some(facing));
+            e.set_weapon_setup(WeaponSetup::Deployed);
+        }
+    }
+
+    players.push(PlayerState {
+        id: DEBUG_INERT_ENEMY_ID,
+        name: "Inert AT Battery".to_string(),
+        color: "#8d2f2f".to_string(),
+        start_tile: battery_tile,
+        steel: 0,
+        oil: 0,
+        supply_used: 0,
+        supply_cap: 0,
+        is_ai: true,
+        score: ScoreState::default(),
+    });
+}
+
 fn debug_offset_world(
     map: &Map,
     start: (u32, u32),
@@ -934,5 +1008,64 @@ mod tests {
             owned_kind_count(&game, 2, EntityKind::Worker),
             config::STARTING_WORKERS as usize
         );
+    }
+
+    #[test]
+    fn debug_starting_loadout_adds_inert_enemy_at_gun_battery_without_profile() {
+        let players = [PlayerInit {
+            id: 1,
+            name: "Human".to_string(),
+            color: "#cc1111".to_string(),
+            is_ai: false,
+        }];
+        let game = Game::new_with_debug_starting_loadout_and_random_ai_profiles(
+            &players,
+            config::QUICKSTART_STEEL,
+            config::QUICKSTART_OIL,
+            1,
+        );
+        game.assert_invariants();
+
+        assert!(
+            game.ai_profile_ids().is_empty(),
+            "inert debug battery must not attach an AI profile"
+        );
+        let battery_player = game
+            .players
+            .iter()
+            .find(|p| p.id == DEBUG_INERT_ENEMY_ID)
+            .expect("debug battery should be represented as an AI player");
+        assert!(battery_player.is_ai);
+
+        let human_start = game.players.iter().find(|p| p.id == 1).unwrap().start_tile;
+        let max_tile = game.map.size - 1;
+        assert_eq!(
+            battery_player.start_tile,
+            (max_tile - human_start.0, max_tile - human_start.1)
+        );
+
+        let map_center = game.map.world_size_px() * 0.5;
+        let guns: Vec<_> = game
+            .entities
+            .iter()
+            .filter(|e| e.owner == DEBUG_INERT_ENEMY_ID && e.kind == EntityKind::AtTeam)
+            .collect();
+        assert_eq!(guns.len(), DEBUG_INERT_AT_GUN_COUNT);
+        for gun in guns {
+            let facing_to_center = (map_center - gun.pos_y).atan2(map_center - gun.pos_x);
+            assert_eq!(gun.weapon_setup(), WeaponSetup::Deployed);
+            assert!(
+                (gun.emplacement_facing().unwrap_or(f32::NAN) - facing_to_center).abs() <= 0.001,
+                "gun emplacement should point toward map center"
+            );
+            assert!(
+                (gun.weapon_facing().unwrap_or(f32::NAN) - facing_to_center).abs() <= 0.001,
+                "gun barrel should point toward map center"
+            );
+            assert!(
+                (gun.facing() - facing_to_center).abs() <= 0.001,
+                "gun should face map center"
+            );
+        }
     }
 }
