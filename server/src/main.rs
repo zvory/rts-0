@@ -9,6 +9,7 @@
 //! the per-room task in `lobby`. This file never touches a `Game` directly.
 
 mod config;
+mod dev_scenarios;
 mod game;
 mod lobby;
 mod perf;
@@ -22,7 +23,7 @@ use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use axum::extract::{Query, State};
 use axum::http::header;
 use axum::http::StatusCode;
-use axum::response::{IntoResponse, Redirect};
+use axum::response::{Html, IntoResponse, Redirect};
 use axum::routing::get;
 use axum::Router;
 use futures_util::{SinkExt, StreamExt};
@@ -34,6 +35,7 @@ use tracing_subscriber::EnvFilter;
 use crate::game::command::SimCommand;
 use crate::lobby::{Lobby, RoomEvent};
 use crate::protocol::{serialize_compact_snapshot, ClientMessage, ServerMessage};
+use dev_scenarios::{all_dev_scenarios, parse_dev_scenario_launch};
 
 /// Default room name used when a client's `join` omits `room`.
 const DEFAULT_ROOM: &str = "main";
@@ -154,17 +156,73 @@ async fn dev_scenario_handler(
 ) -> impl IntoResponse {
     let id = params.get("id").map(|s| s.trim()).unwrap_or("");
     let cars = params.get("cars").map(|s| s.trim()).unwrap_or("");
-    if id != "scout_car_snaking_corridor" || !matches!(cars, "1" | "4") {
-        return (
-            StatusCode::BAD_REQUEST,
-            "supported dev scenario: /dev/scenario?id=scout_car_snaking_corridor&cars=1 or cars=4",
-        )
-            .into_response();
+    if id.is_empty() && cars.is_empty() {
+        return Html(dev_scenario_index_html()).into_response();
     }
-    Redirect::temporary(&format!(
-        "/?watchScenario=1&id=scout_car_snaking_corridor&cars={cars}"
-    ))
-    .into_response()
+    if let Some(launch) = parse_dev_scenario_launch(id, cars) {
+        return Redirect::temporary(&format!(
+            "/?watchScenario=1&id={}&cars={}",
+            launch.id, launch.cars
+        ))
+        .into_response();
+    }
+    (
+        StatusCode::BAD_REQUEST,
+        "supported dev scenario urls are listed at /dev/scenario",
+    )
+        .into_response()
+}
+
+fn dev_scenario_index_html() -> String {
+    let mut items = String::new();
+    for scenario in all_dev_scenarios() {
+        let mut links = String::new();
+        for launch in scenario.launches {
+            links.push_str(&format!(
+                "<a class=\"scenario-link\" href=\"/dev/scenario?id={}&cars={}\">Open cars={}</a>",
+                launch.id, launch.cars, launch.cars
+            ));
+        }
+        items.push_str(&format!(
+            "<section class=\"scenario-card\">\
+                <h2>{}</h2>\
+                <p>{}</p>\
+                <div class=\"scenario-links\">{}</div>\
+             </section>",
+            scenario.title, scenario.description, links
+        ));
+    }
+
+    format!(
+        "<!DOCTYPE html>\
+        <html lang=\"en\">\
+          <head>\
+            <meta charset=\"UTF-8\" />\
+            <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />\
+            <title>Dev Scenarios</title>\
+            <link rel=\"stylesheet\" href=\"/styles.css\" />\
+            <style>\
+              body {{ min-height: 100vh; margin: 0; background: #171d24; color: #e6edf3; font: 16px/1.5 Georgia, serif; }}\
+              .scenario-page {{ max-width: 880px; margin: 0 auto; padding: 48px 20px 64px; }}\
+              .scenario-page h1 {{ margin: 0 0 8px; font-size: clamp(2rem, 6vw, 3.5rem); }}\
+              .scenario-page p {{ margin: 0; color: #b7c4d2; }}\
+              .scenario-grid {{ display: grid; gap: 18px; margin-top: 28px; }}\
+              .scenario-card {{ border: 1px solid rgba(230, 237, 243, 0.14); border-radius: 18px; padding: 20px 22px; background: linear-gradient(180deg, rgba(72, 120, 200, 0.18), rgba(23, 29, 36, 0.92)); box-shadow: 0 18px 44px rgba(0, 0, 0, 0.28); }}\
+              .scenario-card h2 {{ margin: 0 0 8px; font-size: 1.35rem; }}\
+              .scenario-links {{ display: flex; flex-wrap: wrap; gap: 12px; margin-top: 16px; }}\
+              .scenario-link {{ display: inline-flex; align-items: center; justify-content: center; min-width: 148px; padding: 10px 14px; border-radius: 999px; text-decoration: none; color: #10151b; background: #d6e7ff; font-weight: 700; }}\
+              .scenario-link:hover {{ background: #f2f7ff; }}\
+            </style>\
+          </head>\
+          <body>\
+            <main class=\"scenario-page\">\
+              <h1>Dev Scenarios</h1>\
+              <p>Available local scenario launches. Pick one to open the live no-fog watcher.</p>\
+              <div class=\"scenario-grid\">{items}</div>\
+            </main>\
+          </body>\
+        </html>"
+    )
 }
 
 /// Return the short git commit SHA that identifies this build.
@@ -224,6 +282,19 @@ fn build_versioned_index(client_dir: &str, version: &str) -> String {
     // Also version the top-level entry point and stylesheet so they bypass the cache too.
     html.replace("./src/main.js\"", &format!("./src/main.js?v={version}\""))
         .replace("./styles.css\"", &format!("./styles.css?v={version}\""))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn scenario_index_lists_supported_launches() {
+        let html = dev_scenario_index_html();
+        assert!(html.contains("Scout Car Snaking Corridor"));
+        assert!(html.contains("/dev/scenario?id=scout_car_snaking_corridor&cars=1"));
+        assert!(html.contains("/dev/scenario?id=scout_car_snaking_corridor&cars=4"));
+    }
 }
 
 /// Drive one client connection end to end.
