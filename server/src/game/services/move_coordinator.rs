@@ -49,7 +49,8 @@ const FORMATION_FAR_DISTANCE_PX: f32 = config::TILE_SIZE as f32 * 18.0;
 const FORMATION_MAX_OFFSET_PX: f32 = config::TILE_SIZE as f32 * 4.0;
 const SPAWN_PREFERRED_GAP_UNIT_FRACTION: f32 = 0.10;
 const SCOUT_CAR_ROUTE_SIMPLIFY_MAX_SEGMENT_PX: f32 = config::TILE_SIZE as f32 * 3.0;
-
+const TANK_CLEARANCE_ROUTE_SIMPLIFY_TRIGGER_TILES: u16 = 3;
+const TANK_CLEARANCE_ROUTE_SIMPLIFY_MAX_SEGMENT_PX: f32 = config::TILE_SIZE as f32 * 3.0;
 /// The movement/pathing coordinator for one tick.
 pub struct MoveCoordinator<'a> {
     pathing: &'a mut PathingService,
@@ -437,15 +438,29 @@ impl<'a> MoveCoordinator<'a> {
             route_shape,
             budget: None,
         };
-        let mut waypoints = self.pathing.request(self.map, self.occ, req);
+        let tile_path = self.pathing.request_tile_path(self.map, self.occ, req);
+        let tank_clearance_route_near_static = route_shape == RouteShape::TankClearance
+            && tile_path.iter().any(|&(tx, ty)| {
+                self.occ.clearance_at_tile(tx, ty) <= TANK_CLEARANCE_ROUTE_SIMPLIFY_TRIGGER_TILES
+            });
+        let mut waypoints = pathfinding::to_world_waypoints(&tile_path);
 
         // Snap the final waypoint to the exact requested goal for precise arrival.
         if !waypoints.is_empty() {
             waypoints[0] = goal;
-            if matches!(
-                route_shape,
-                RouteShape::PreferFewerTurns | RouteShape::TankClearance
-            ) {
+            if route_shape == RouteShape::TankClearance && tank_clearance_route_near_static {
+                waypoints = simplify_reverse_waypoints_with_limit(
+                    self.map,
+                    self.occ,
+                    kind,
+                    start_pos,
+                    waypoints,
+                    TANK_CLEARANCE_ROUTE_SIMPLIFY_MAX_SEGMENT_PX,
+                );
+            } else if route_shape == RouteShape::TankClearance {
+                waypoints =
+                    simplify_reverse_waypoints(self.map, self.occ, kind, start_pos, waypoints);
+            } else if route_shape == RouteShape::PreferFewerTurns {
                 waypoints =
                     simplify_reverse_waypoints(self.map, self.occ, kind, start_pos, waypoints);
             } else if route_shape == RouteShape::ScoutCarClearance {
