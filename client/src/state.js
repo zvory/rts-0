@@ -382,7 +382,7 @@ export class GameState {
     const out = [];
     for (const id of this.selection) {
       const e = this._curById.get(id);
-      if (e && !e.shotReveal) out.push(e);
+      if (e && !e.shotReveal && !e.visionOnly) out.push(e);
     }
     return out;
   }
@@ -438,7 +438,7 @@ export class GameState {
     const live = new Set();
     for (const id of this.selection) {
       const entity = this._curById.get(id);
-      if (entity && !entity.shotReveal) {
+      if (entity && !entity.shotReveal && !entity.visionOnly) {
         live.add(id);
       } else {
         changed = true;

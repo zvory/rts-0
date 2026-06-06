@@ -288,6 +288,7 @@ impl AiObservation {
             .entities
             .iter()
             .filter(|e| e.owner != NEUTRAL && e.owner != player_id)
+            .filter(|e| !e.vision_only)
             .filter_map(AiEntitySummary::from_entity_view)
             .filter(|e| e.kind.is_unit() || e.kind.is_building())
             .collect();

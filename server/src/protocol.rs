@@ -380,6 +380,11 @@ pub struct EntityView {
     // Mobile units: future queued move/attack-move stages. Only ever sent to the owner.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub queued_markers: Vec<QueuedOrderMarker>,
+
+    // True when this entity is visible only through lingering death vision. It is real-time
+    // visual intel, but not actionable for selection or attack commands.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub vision_only: bool,
 }
 
 impl EntityView {
@@ -418,6 +423,7 @@ impl EntityView {
             rally: None,
             oil_used: None,
             queued_markers: Vec::new(),
+            vision_only: false,
         }
     }
 }
@@ -496,7 +502,7 @@ impl NoticeSeverity {
 ///
 /// [`Snapshot`] remains the semantic source of truth for game code. This format is only a
 /// transport-side optimization for `ServerMessage::Snapshot`.
-pub const COMPACT_SNAPSHOT_VERSION: u8 = 1;
+pub const COMPACT_SNAPSHOT_VERSION: u8 = 2;
 
 /// Serialize one semantic snapshot as a compact JSON text frame payload.
 pub fn serialize_compact_snapshot(snapshot: &Snapshot) -> serde_json::Result<String> {
@@ -618,6 +624,9 @@ impl Serialize for CompactEntity<'_> {
         if !entity.queued_markers.is_empty() {
             len = 22;
         }
+        if entity.vision_only {
+            len = 23;
+        }
 
         let mut seq = serializer.serialize_seq(Some(len))?;
         seq.serialize_element(&entity.id)?;
@@ -675,6 +684,9 @@ impl Serialize for CompactEntity<'_> {
                     .map(CompactQueuedMarker)
                     .collect::<Vec<_>>(),
             )?;
+        }
+        if len > 22 {
+            seq.serialize_element(&entity.vision_only)?;
         }
         seq.end()
     }
@@ -891,6 +903,7 @@ mod tests {
                 attack_move: true,
             },
         ];
+        worker.vision_only = true;
 
         let mut gunner = EntityView::new(
             2,
@@ -994,6 +1007,7 @@ mod tests {
             value["e"][0][21],
             serde_json::json!([[128.0, 160.0], [192.0, 224.0, true]])
         );
+        assert_eq!(value["e"][0][22], serde_json::json!(true));
         // Rally point rides in slot 18 of the producing building's record.
         assert_eq!(value["e"][2][18], serde_json::json!([256.0, 512.0]));
         assert_eq!(value["r"], serde_json::json!([[200, 1498]]));

@@ -347,15 +347,28 @@ impl Game {
                 if v.owner == pid || v.owner == NEUTRAL {
                     continue;
                 }
-                // Enemy entity: must be on a visible tile.
-                assert!(
-                    self.fog.is_visible_world(pid, v.x, v.y),
-                    "invariant: tick {} snapshot for player {} exposes hidden enemy entity {} at {}",
-                    self.tick,
-                    pid,
-                    v.id,
-                    location_context(&self.map, v.x, v.y)
-                );
+                let live_visible = self.fog.is_visible_world(pid, v.x, v.y);
+                // Enemy entities must either be live-visible or explicitly marked as
+                // visual-only lingering death intel.
+                if v.vision_only {
+                    assert!(
+                        !live_visible,
+                        "invariant: tick {} snapshot for player {} marks live-visible enemy entity {} as vision-only at {}",
+                        self.tick,
+                        pid,
+                        v.id,
+                        location_context(&self.map, v.x, v.y)
+                    );
+                } else {
+                    assert!(
+                        live_visible,
+                        "invariant: tick {} snapshot for player {} exposes hidden enemy entity {} at {}",
+                        self.tick,
+                        pid,
+                        v.id,
+                        location_context(&self.map, v.x, v.y)
+                    );
+                }
                 // If a target_id is exposed, the target must be visible too.
                 if let Some(tid) = v.target_id {
                     if let Some(t) = self.entities.get(tid) {

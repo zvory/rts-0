@@ -460,11 +460,15 @@ fn scores_record_kills_and_losses_on_death() {
 
     let mut events: HashMap<u32, Vec<Event>> =
         game.players.iter().map(|p| (p.id, Vec::new())).collect();
+    let mut lingering_sight = Vec::new();
+    let tick = game.tick_count();
     services::death::death_system(
         &mut game.entities,
         &game.fog,
         &mut game.players,
+        &mut lingering_sight,
         &mut events,
+        tick,
     );
 
     let scores = game.scores();
@@ -548,6 +552,116 @@ fn spectator_snapshot_uses_union_fog_not_full_world() {
     assert!(snapshot.entities.iter().any(|e| e.owner == 2));
     assert!(!snapshot.entities.iter().any(|e| e.id == hidden));
     assert_eq!(snapshot.player_resources.len(), 2);
+}
+
+#[test]
+fn death_vision_lingers_for_one_second_as_visual_only_intel() {
+    let players = [
+        PlayerInit {
+            id: 1,
+            name: "One".into(),
+            color: "#fff".into(),
+            is_ai: false,
+        },
+        PlayerInit {
+            id: 2,
+            name: "Two".into(),
+            color: "#000".into(),
+            is_ai: false,
+        },
+    ];
+    let mut game = Game::new_for_replay(&players, 0xD3AD_5151);
+    for tile in &mut game.map.terrain {
+        *tile = crate::protocol::terrain::GRASS;
+    }
+    for id in game.entities.ids() {
+        game.entities.remove(id);
+    }
+
+    let rifle_pos = game.map.tile_center(2, 2);
+    let rifle = game
+        .entities
+        .spawn_unit(1, EntityKind::Rifleman, rifle_pos.0, rifle_pos.1)
+        .expect("rifleman should spawn");
+    let spotter_pos = game.map.tile_center(20, 20);
+    let spotter = game
+        .entities
+        .spawn_unit(1, EntityKind::Worker, spotter_pos.0, spotter_pos.1)
+        .expect("spotter should spawn");
+    let enemy_pos = game.map.tile_center(22, 20);
+    let enemy = game
+        .entities
+        .spawn_unit(2, EntityKind::Rifleman, enemy_pos.0, enemy_pos.1)
+        .expect("enemy should spawn");
+    systems::recompute_supply(&mut game.players, &game.entities);
+    game.spatial = services::spatial::SpatialIndex::build(&game.entities, game.map.size);
+    let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
+    game.fog.recompute(&ids, &game.entities, &game.map);
+    assert!(game.fog.is_visible_world(1, enemy_pos.0, enemy_pos.1));
+
+    game.entities
+        .get_mut(spotter)
+        .expect("spotter should exist")
+        .hp = 0;
+    game.tick();
+
+    assert!(!game.entities.contains(spotter));
+    assert!(
+        !game.fog.is_visible_world(1, enemy_pos.0, enemy_pos.1),
+        "live fog should no longer see through the dead spotter"
+    );
+    let first_linger = game
+        .snapshot_for(1)
+        .entities
+        .into_iter()
+        .find(|e| e.id == enemy)
+        .expect("enemy should remain visible through lingering death vision");
+    assert!(first_linger.vision_only);
+
+    let enemy_goal = game.map.tile_center(24, 20);
+    game.enqueue(
+        1,
+        Command::Attack {
+            units: vec![rifle],
+            target: enemy,
+            queued: false,
+        },
+    );
+    game.enqueue(
+        2,
+        Command::Move {
+            units: vec![enemy],
+            x: enemy_goal.0,
+            y: enemy_goal.1,
+            queued: false,
+        },
+    );
+    game.tick();
+
+    let rifle_entity = game.entities.get(rifle).expect("rifle should remain alive");
+    assert_eq!(
+        rifle_entity.order().attack_target(),
+        None,
+        "vision-only enemies should not be accepted as direct attack targets"
+    );
+    let moved_enemy = game.entities.get(enemy).expect("enemy should remain alive");
+    let moving_linger = game
+        .snapshot_for(1)
+        .entities
+        .into_iter()
+        .find(|e| e.id == enemy)
+        .expect("moving enemy should still be visible during lingering death vision");
+    assert!(moving_linger.vision_only);
+    assert!((moving_linger.x - moved_enemy.pos_x).abs() < 0.001);
+    assert!((moving_linger.y - moved_enemy.pos_y).abs() < 0.001);
+
+    while game.tick_count() <= config::TICK_HZ {
+        game.tick();
+    }
+    assert!(
+        game.snapshot_for(1).entities.iter().all(|e| e.id != enemy),
+        "lingering death vision should expire after one second"
+    );
 }
 
 #[test]

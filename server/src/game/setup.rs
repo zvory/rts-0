@@ -166,6 +166,7 @@ impl Game {
             tick: 0,
             spatial,
             pathing,
+            lingering_sight: Vec::new(),
             seed,
             starting_steel: steel,
             starting_oil: oil,

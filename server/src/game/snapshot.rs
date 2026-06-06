@@ -6,27 +6,59 @@ impl Game {
     /// Build the fog-filtered snapshot for one player at the current tick. Includes ALL of the
     /// player's own entities plus neutral/enemy entities whose tile is currently visible.
     pub fn snapshot_for(&self, player: u32) -> Snapshot {
-        self.snapshot_for_mode(player, &self.fog, true, false)
+        if self.lingering_sight.is_empty() {
+            return self.snapshot_for_mode(player, &self.fog, Some(&self.fog), true, false);
+        }
+        let snapshot_fog = self.snapshot_fog();
+        self.snapshot_for_mode(player, &snapshot_fog, Some(&self.fog), true, false)
     }
 
     /// Build a full-world snapshot for a viewer. Used only by dev watch flows where fog is
     /// intentionally disabled; normal gameplay must keep using [`snapshot_for`].
     pub fn snapshot_full_for(&self, player: u32) -> Snapshot {
-        self.snapshot_for_mode(player, &self.fog, false, true)
+        self.snapshot_for_mode(player, &self.fog, None, false, true)
     }
 
     /// Build a spectator snapshot from the union of all active players' current fog.
     pub fn snapshot_for_spectator(&self, visible_players: &[u32]) -> Snapshot {
-        let fog = self
+        let actionable_fog = self
             .fog
             .union_for(Self::SPECTATOR_VIEWER_ID, visible_players);
-        self.snapshot_for_mode(Self::SPECTATOR_VIEWER_ID, &fog, true, true)
+        if self.lingering_sight.is_empty() {
+            return self.snapshot_for_mode(
+                Self::SPECTATOR_VIEWER_ID,
+                &actionable_fog,
+                Some(&actionable_fog),
+                true,
+                true,
+            );
+        }
+        let snapshot_fog = self
+            .snapshot_fog()
+            .union_for(Self::SPECTATOR_VIEWER_ID, visible_players);
+        self.snapshot_for_mode(
+            Self::SPECTATOR_VIEWER_ID,
+            &snapshot_fog,
+            Some(&actionable_fog),
+            true,
+            true,
+        )
+    }
+
+    fn snapshot_fog(&self) -> Fog {
+        if self.lingering_sight.is_empty() {
+            return self.fog.clone();
+        }
+        let mut fog = self.fog.clone();
+        fog.stamp_lingering_sources(&self.lingering_sight, &self.map);
+        fog
     }
 
     fn snapshot_for_mode(
         &self,
         player: u32,
         fog: &Fog,
+        actionable_fog: Option<&Fog>,
         fogged: bool,
         include_player_resources: bool,
     ) -> Snapshot {
@@ -53,7 +85,9 @@ impl Game {
                     });
                 }
             }
-            if let Some(view) = projection::project_entity(player, e, fog, fogged, target) {
+            if let Some(view) =
+                projection::project_entity(player, e, fog, actionable_fog, fogged, target)
+            {
                 entities.push(view);
             }
         }

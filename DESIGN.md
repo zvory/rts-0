@@ -29,7 +29,9 @@ update this file in the same change.
   state directly.
 - Every tick the server produces a **per-player snapshot**, applying **fog of war**:
   a player only receives neutral/enemy entities standing on tiles that player can
-  currently see. This makes the fog cheat-proof (hidden enemies are never sent).
+  currently see, plus visual-only entities inside the one-second lingering sight left behind
+  when that player's unit/building dies. This makes the fog cheat-proof (hidden enemies are never
+  sent outside live or explicit lingering death vision).
 - Lobby-time spectators are connected humans who are not seated in the simulation. They receive
   snapshots filtered to the union of all active players' current fog, all player resource rows,
   and no controllable units/buildings.
@@ -160,28 +162,28 @@ transport decode:
   tick: u32,
   steel: u32, oil: u32,       // your resources
   supplyUsed: u32, supplyCap: u32,
-  entities: Entity[],            // your non-resource entities (always) + enemy on visible tiles
+  entities: Entity[],            // your non-resource entities (always) + enemies on live/death-vision-visible tiles
   resourceDeltas?: ResourceDelta[], // visible resource remaining updates; omitted when empty
   events: Event[],               // transient things to surface (see 2.5)
   playerResources?: {id, steel, oil, supplyUsed, supplyCap}[]  // all players; spectator/replay mode only
 }
 ```
 
-Live WebSocket snapshot frames are sent as compact JSON text, version 1. `client/src/net.js`
+Live WebSocket snapshot frames are sent as compact JSON text, version 2. `client/src/net.js`
 decodes this transport shape back into the semantic object above before dispatching `S.SNAPSHOT`.
 Older object-shaped JSON snapshots remain decodable by the client for fallback/dev use.
 
 ```
 {
   "t": "snapshot",
-  "v": 1,
+  "v": 2,
   "s": [tick, steel, oil, supplyUsed, supplyCap],
   "e": [
     [
       id, owner, kind, x, y, hp, maxHp, state,
       facing?, weaponFacing?, prodKind?, prodProgress?, prodQueue?,
       buildProgress?, latchedNode?, targetId?, setupState?, remaining?, rally?, oilUsed?,
-      setupFacing?, queuedMarkers?
+      setupFacing?, queuedMarkers?, visionOnly?
     ]
   ],
   "r": [[id, remaining]],         // omitted when empty
@@ -205,6 +207,9 @@ trailing missing optional fields are omitted; interior missing optional fields a
 `null`. The `rally` slot is itself a two-element `[x, y]` array (or `null`).
 The `queuedMarkers` slot is an owner-only array capped at 8 entries; each entry is
 `[x, y]` for a queued move stage or `[x, y, true]` for a queued attack-move stage.
+`visionOnly` is true only for non-owned units/buildings visible through lingering death vision;
+clients render them below the fog overlay and must not select or issue targeted commands against
+them.
 
 `ResourceDelta`: `{ id: u32, remaining: u32 }`. Resource node positions/kinds are static and come
 from `start.map.resources`; clients keep last-known `remaining` locally. The server sends
@@ -240,7 +245,8 @@ watch rooms receive all resource updates).
   setupFacing?: f32,             // at_team only: owner-visible deployed arc center; appended after oilUsed in compact snapshots
   queuedMarkers?: [              // future queued move/attack-move points; ONLY ever sent to the owner
     { x: f32, y: f32, attackMove?: bool }
-  ]
+  ],
+  visionOnly?: bool,             // true = visible only through one-second death vision; visual intel only
 }
 ```
 
@@ -286,7 +292,7 @@ src/
     map.rs       # Map: handcrafted terrain asset loading, passability, base-site validation
     entity/      # Entity, EntityKind, Order state machines, grouped state, and EntityStore
     pathfinding.rs # A* over the tile grid, with optional turn-cost route shaping for tanks
-    fog.rs       # per-player visibility grid (visible / explored)
+    fog.rs       # per-player live visibility grid plus snapshot-only lingering death sight sources
     systems.rs   # orchestrator: runs services in order each tick
     services/    # per-tick services: commands, move_coordinator, movement (incl. unit collision), combat, economy, production, construction, death, occupancy, supply, pathing, geometry, standability, line_of_sight
     ai.rs        # optional computer opponents: one AiController per AI player (see §8)
@@ -409,9 +415,8 @@ centralized instead of scattered through services.
 - `rules::terrain` — `TerrainKind` plus movement, cover, concealment, and static line-of-sight
   opacity modifiers. It is intentionally small today (`Open` returns current defaults; raw stone
   terrain blocks LOS) so the forest/road/hill feature has one rules file to grow in.
-- `rules::projection` — fog-gated `EntityView` construction and event visibility predicates.
-  It is intentionally a seam for future last-known-position memory or partial unit-type reveal;
-  it does not add wire fields today.
+- `rules::projection` — fog-gated `EntityView` construction, `visionOnly` marking for lingering
+  death sight, and event visibility predicates.
 
 Services in `game/services/` orchestrate tick logic and call into `rules::*` for classification.
 Rules functions have no imports from `services/`; classification and formula rules read
@@ -568,6 +573,8 @@ export class Fog {
   visibleGrid, exploredGrid              // Uint8Array length w*h
 }
 ```
+`match.js` must exclude `visionOnly` and shot-reveal entities from `ownEntities` before calling
+`fog.update`; those views are rendered as intel, not as local fog sources.
 
 `input/index.js`
 ```js
@@ -659,6 +666,9 @@ with `playerResources`.
   setup/deployment. AT guns that fire from outside current vision are shown briefly above the fog
   as semi-transparent silhouettes with the same recoil animation and a yellow tracer to the hit
   point.
+  Entities marked `visionOnly` by the server are drawn on the ordinary building/unit layers below
+  the fog overlay, excluded from local fog-source computation and hit-testing, and treated as
+  visual intel only.
 - Buildings: footprint-sized blocky field structures with neutral geometry and plain
   two-letter stencils; under construction → translucent with a progress bar; production →
   small progress arc.
@@ -872,8 +882,10 @@ The server treats every client as potentially hostile. Limits live next to the c
   on an accept, so a rejected mid-match join doesn't wedge the socket.
 - **Fog is authoritative**: `snapshot_for` and per-recipient event delivery go through
   `rules::projection`, which gates entity views, `target_id` tracers, and death/attack events on
-  visibility — hidden enemies are never sent. Visibility is terrain-aware: stone blocks sight
-  beyond itself on both the server fog grid and the client cosmetic fog overlay.
+  visibility. Hidden enemies are never sent except inside explicit one-second lingering death
+  vision, where entity views are marked `visionOnly` and remain non-actionable. Visibility is
+  terrain-aware: stone blocks sight beyond itself on both the server fog grid and the client
+  cosmetic fog overlay.
 - **Shot blocking and overpenetration**: ranged attacks first resolve against the first enemy tank
   body or building footprint intersecting the line from attacker to intended target. That blocker
   takes the shot damage and the intended target behind it is unharmed. Shots that hit ordinary

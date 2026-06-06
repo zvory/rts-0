@@ -178,6 +178,7 @@ function fakeAudioContext() {
         null,
         null,
         [[128, 160], [192, 224, true]],
+        true,
       ],
       [
         2,
@@ -233,6 +234,7 @@ function fakeAudioContext() {
   assert(decoded.entities[0].weaponFacing === 1.75, "entity optional weaponFacing decodes");
   assert(decoded.entities[0].latchedNode === 200, "entity optional latchedNode decodes");
   assert(decoded.entities[0].queuedMarkers.length === 2, "entity queued markers decode");
+  assert(decoded.entities[0].visionOnly === true, "entity visionOnly flag decodes");
   assert(
     decoded.entities[0].queuedMarkers[0].attackMove === false &&
       decoded.entities[0].queuedMarkers[1].attackMove === true,

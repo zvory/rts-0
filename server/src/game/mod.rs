@@ -39,7 +39,7 @@ use serde::{Deserialize, Serialize};
 
 use ai::{AiController, AiThinkContext};
 use entity::{EntityKind, EntityStore};
-use fog::Fog;
+use fog::{Fog, LingeringSightSource};
 use map::Map;
 use rand::rngs::SmallRng;
 use rand::SeedableRng;
@@ -112,6 +112,8 @@ pub struct Game {
     spatial: services::spatial::SpatialIndex,
     /// Persistent pathfinding service with an LRU cache for verified paths.
     pathing: services::pathing::PathingService,
+    /// One-second death-vision sources used only when building fog-filtered snapshots.
+    lingering_sight: Vec<LingeringSightSource>,
     /// Match seed retained for replay metadata/API compatibility. The current hardcoded map
     /// ignores it until lobby map selection or randomized maps are reintroduced.
     seed: u32,
@@ -188,13 +190,17 @@ impl Game {
             &self.fog,
             &mut self.pathing,
             &mut self.rng,
+            &mut self.lingering_sight,
             pending,
             &mut events,
             self.tick,
             perf.as_deref_mut(),
         );
 
-        // Fog last, from the post-systems world state.
+        // Live fog last, from the post-systems world state. Lingering death vision is layered
+        // only when snapshots are projected so it cannot validate commands or combat targeting.
+        self.lingering_sight
+            .retain(|source| source.is_active_at(self.tick));
         let ids: Vec<u32> = self.players.iter().map(|p| p.id).collect();
         crate::perf::timed(perf.as_deref_mut(), "fog_recompute", || {
             self.fog.recompute(&ids, &self.entities, &self.map);
@@ -276,6 +282,8 @@ impl Game {
             p.supply_used = 0;
             p.supply_cap = 0;
         }
+        self.lingering_sight
+            .retain(|source| source.owner() != player);
         // Recompute fog so the now-entity-less player's visibility goes dark immediately;
         // otherwise a stale grid would keep leaking neutral/enemy entities into their snapshots.
         let ids: Vec<u32> = self.players.iter().map(|p| p.id).collect();

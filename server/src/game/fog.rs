@@ -17,9 +17,49 @@ use crate::game::entity::{Entity, EntityStore};
 use crate::game::map::Map;
 use crate::game::services::line_of_sight::LineOfSight;
 
+/// Temporary sight left behind by an owned unit/building after it dies. This is used only by
+/// snapshot projection; command validation and combat still use live fog.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct LingeringSightSource {
+    owner: u32,
+    x: f32,
+    y: f32,
+    sight_tiles: u32,
+    expires_at_tick: u32,
+}
+
+impl LingeringSightSource {
+    pub(crate) fn new(
+        owner: u32,
+        x: f32,
+        y: f32,
+        sight_tiles: u32,
+        expires_at_tick: u32,
+    ) -> Option<Self> {
+        if owner == 0 || sight_tiles == 0 || !x.is_finite() || !y.is_finite() {
+            return None;
+        }
+        Some(Self {
+            owner,
+            x,
+            y,
+            sight_tiles,
+            expires_at_tick,
+        })
+    }
+
+    pub(crate) fn is_active_at(self, tick: u32) -> bool {
+        self.expires_at_tick > tick
+    }
+
+    pub(crate) fn owner(self) -> u32 {
+        self.owner
+    }
+}
+
 /// Visible-tile grids, one per player. Recomputed every tick from scratch (cheap at our map
 /// sizes) so it always reflects current entity positions and never leaks stale visibility.
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub struct Fog {
     size: u32,
     /// player id -> row-major visibility grid (`true` = visible this tick).
@@ -59,6 +99,18 @@ impl Fog {
                 continue;
             };
             stamp_sight(grid, size, e, &los);
+        }
+    }
+
+    /// Add temporary death-vision sight sources to already-recomputed grids.
+    pub(crate) fn stamp_lingering_sources(&mut self, sources: &[LingeringSightSource], map: &Map) {
+        let size = self.size;
+        let los = LineOfSight::new(map);
+        for source in sources {
+            let Some(grid) = self.grids.get_mut(&source.owner) else {
+                continue;
+            };
+            stamp_sight_at(grid, size, source.x, source.y, source.sight_tiles, &los);
         }
     }
 
@@ -113,13 +165,24 @@ impl Fog {
 
 /// Mark every tile within an entity's sight radius (a filled circle in tile space) as visible.
 fn stamp_sight(grid: &mut [bool], size: u32, e: &Entity, los: &LineOfSight<'_>) {
-    let r = e.sight_tiles() as i32;
+    stamp_sight_at(grid, size, e.pos_x, e.pos_y, e.sight_tiles(), los);
+}
+
+fn stamp_sight_at(
+    grid: &mut [bool],
+    size: u32,
+    x: f32,
+    y: f32,
+    sight_tiles: u32,
+    los: &LineOfSight<'_>,
+) {
+    let r = sight_tiles as i32;
     if r <= 0 {
         return;
     }
     let ts = config::TILE_SIZE as f32;
-    let cx = (e.pos_x / ts).floor() as i32;
-    let cy = (e.pos_y / ts).floor() as i32;
+    let cx = (x / ts).floor() as i32;
+    let cy = (y / ts).floor() as i32;
     let r2 = r * r;
     for dy in -r..=r {
         for dx in -r..=r {
@@ -131,7 +194,7 @@ fn stamp_sight(grid: &mut [bool], size: u32, e: &Entity, los: &LineOfSight<'_>) 
             if tx < 0 || ty < 0 || tx as u32 >= size || ty as u32 >= size {
                 continue;
             }
-            if !los.tile_visible_from_world((e.pos_x, e.pos_y), (tx as u32, ty as u32)) {
+            if !los.tile_visible_from_world((x, y), (tx as u32, ty as u32)) {
                 continue;
             }
             grid[(ty as u32 * size + tx as u32) as usize] = true;

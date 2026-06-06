@@ -42,6 +42,7 @@ pub fn project_entity(
     viewer: u32,
     entity: &Entity,
     fog: &Fog,
+    actionable_fog: Option<&Fog>,
     fogged: bool,
     target: Option<&Entity>,
 ) -> Option<EntityView> {
@@ -59,6 +60,12 @@ pub fn project_entity(
         entity.max_hp,
         entity.state_str(),
     );
+    let actionable_fog = actionable_fog.unwrap_or(fog);
+    let vision_only = fogged
+        && entity.owner != viewer
+        && !entity.is_node()
+        && !entity_visible_to(viewer, entity, actionable_fog);
+    view.vision_only = vision_only;
 
     if entity.is_unit() {
         view.facing = Some(entity.facing());
@@ -75,7 +82,8 @@ pub fn project_entity(
             .map(|target| {
                 entity.owner == viewer
                     || !fogged
-                    || fog.is_visible_world(viewer, target.pos_x, target.pos_y)
+                    || (!vision_only
+                        && actionable_fog.is_visible_world(viewer, target.pos_x, target.pos_y))
             })
             .unwrap_or(false)
     } else {
@@ -219,12 +227,12 @@ mod tests {
             .get(hidden_target_id)
             .expect("hidden target should exist");
 
-        let enemy_view = project_entity(1, tank, &fog, true, Some(hidden_target))
+        let enemy_view = project_entity(1, tank, &fog, Some(&fog), true, Some(hidden_target))
             .expect("viewer should see nearby tank");
         assert_eq!(enemy_view.target_id, None);
         assert_eq!(enemy_view.weapon_facing, None);
 
-        let owner_view = project_entity(2, tank, &fog, true, Some(hidden_target))
+        let owner_view = project_entity(2, tank, &fog, Some(&fog), true, Some(hidden_target))
             .expect("owner should see own tank");
         assert_eq!(owner_view.target_id, Some(hidden_target_id));
         assert_eq!(owner_view.weapon_facing, Some(1.2));
@@ -259,8 +267,8 @@ mod tests {
         let tank = entities.get(tank_id).expect("tank should exist");
         let target = entities.get(target_id).expect("target should exist");
 
-        let viewer_view =
-            project_entity(1, tank, &fog, true, Some(target)).expect("viewer should see tank");
+        let viewer_view = project_entity(1, tank, &fog, Some(&fog), true, Some(target))
+            .expect("viewer should see tank");
 
         assert_eq!(viewer_view.target_id, Some(target_id));
         assert_eq!(viewer_view.weapon_facing, Some(0.0));
@@ -288,7 +296,8 @@ mod tests {
         fog.recompute(&[1], &entities, &map);
         let tank = entities.get(tank_id).expect("tank should exist");
 
-        let view = project_entity(1, tank, &fog, true, None).expect("tank should be visible");
+        let view =
+            project_entity(1, tank, &fog, Some(&fog), true, None).expect("tank should be visible");
         assert_eq!(view.oil_used, Some(3.25));
     }
 
@@ -322,8 +331,8 @@ mod tests {
         fog.recompute(&[1, 2], &entities, &map);
         let unit = entities.get(unit_id).expect("unit should exist");
 
-        let owner_view =
-            project_entity(1, unit, &fog, true, None).expect("owner should see own unit");
+        let owner_view = project_entity(1, unit, &fog, Some(&fog), true, None)
+            .expect("owner should see own unit");
         assert_eq!(owner_view.queued_markers.len(), 2);
         assert_eq!(
             owner_view.queued_markers[0],
@@ -342,8 +351,8 @@ mod tests {
             }
         );
 
-        let enemy_view =
-            project_entity(2, unit, &fog, false, None).expect("full view should include unit");
+        let enemy_view = project_entity(2, unit, &fog, Some(&fog), false, None)
+            .expect("full view should include unit");
         assert!(enemy_view.queued_markers.is_empty());
     }
 }
