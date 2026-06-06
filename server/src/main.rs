@@ -86,6 +86,7 @@ async fn main() {
         .route("/ws", get(ws_handler))
         .route("/dev/selfplay", get(dev_selfplay_handler))
         .route("/dev/scenario", get(dev_scenario_handler))
+        .route("/dev/scenarios", get(dev_scenario_handler))
         .nest_service("/maps", ServeDir::new(maps_dir))
         .fallback_service(static_service)
         .with_state(state);
@@ -169,7 +170,7 @@ async fn dev_scenario_handler(
     }
     (
         StatusCode::BAD_REQUEST,
-        "supported dev scenario urls are listed at /dev/scenario",
+        "supported dev scenario urls are listed at /dev/scenarios",
     )
         .into_response()
 }
@@ -177,24 +178,70 @@ async fn dev_scenario_handler(
 fn dev_scenario_index_html() -> String {
     let mut items = String::new();
     for scenario in all_dev_scenarios() {
-        let mut links = String::new();
+        let mut counts = Vec::new();
+        let mut units = Vec::new();
         for launch in scenario.launches {
-            links.push_str(&format!(
-                "<a class=\"scenario-link\" href=\"/dev/scenario?id={}&unit={}&count={}\">Open {} x{}</a>",
-                launch.id,
-                launch.unit,
-                launch.count,
-                dev_scenario_unit_label(launch.unit),
-                launch.count
+            if !counts.contains(&launch.count) {
+                counts.push(launch.count);
+            }
+            if !units.contains(&launch.unit) {
+                units.push(launch.unit);
+            }
+        }
+        counts.sort_unstable();
+
+        let mut header_cells = String::new();
+        for count in &counts {
+            header_cells.push_str(&format!("<th scope=\"col\">x{count}</th>"));
+        }
+
+        let mut rows = String::new();
+        for unit in units {
+            let mut cells = String::new();
+            for count in &counts {
+                if scenario
+                    .launches
+                    .iter()
+                    .any(|candidate| candidate.unit == unit && candidate.count == *count)
+                {
+                    cells.push_str(&format!(
+                        "<td><a class=\"scenario-link\" href=\"/dev/scenarios?id={}&unit={}&count={}\">Open</a></td>",
+                        scenario.id,
+                        unit,
+                        count
+                    ));
+                } else {
+                    cells.push_str("<td class=\"scenario-missing\">-</td>");
+                }
+            }
+            rows.push_str(&format!(
+                "<tr>\
+                    <th scope=\"row\">{}</th>\
+                    {}\
+                 </tr>",
+                dev_scenario_unit_label(unit),
+                cells
             ));
         }
+
         items.push_str(&format!(
-            "<section class=\"scenario-card\">\
-                <h2>{}</h2>\
-                <p>{}</p>\
-                <div class=\"scenario-links\">{}</div>\
+            "<section class=\"scenario-panel\">\
+                <div class=\"scenario-copy\">\
+                  <h2>{}</h2>\
+                  <p><code>{}</code></p>\
+                  <p>{}</p>\
+                </div>\
+                <table class=\"scenario-table\">\
+                  <thead>\
+                    <tr>\
+                      <th scope=\"col\">Unit</th>\
+                      {}\
+                    </tr>\
+                  </thead>\
+                  <tbody>{}</tbody>\
+                </table>\
              </section>",
-            scenario.title, scenario.description, links
+            scenario.title, scenario.id, scenario.description, header_cells, rows
         ));
     }
 
@@ -207,16 +254,24 @@ fn dev_scenario_index_html() -> String {
             <title>Dev Scenarios</title>\
             <link rel=\"stylesheet\" href=\"/styles.css\" />\
             <style>\
-              body {{ min-height: 100vh; margin: 0; background: #171d24; color: #e6edf3; font: 16px/1.5 Georgia, serif; }}\
-              .scenario-page {{ max-width: 880px; margin: 0 auto; padding: 48px 20px 64px; }}\
-              .scenario-page h1 {{ margin: 0 0 8px; font-size: clamp(2rem, 6vw, 3.5rem); }}\
-              .scenario-page p {{ margin: 0; color: #b7c4d2; }}\
-              .scenario-grid {{ display: grid; gap: 18px; margin-top: 28px; }}\
-              .scenario-card {{ border: 1px solid rgba(230, 237, 243, 0.14); border-radius: 18px; padding: 20px 22px; background: linear-gradient(180deg, rgba(72, 120, 200, 0.18), rgba(23, 29, 36, 0.92)); box-shadow: 0 18px 44px rgba(0, 0, 0, 0.28); }}\
-              .scenario-card h2 {{ margin: 0 0 8px; font-size: 1.35rem; }}\
-              .scenario-links {{ display: flex; flex-wrap: wrap; gap: 12px; margin-top: 16px; }}\
-              .scenario-link {{ display: inline-flex; align-items: center; justify-content: center; min-width: 148px; padding: 10px 14px; border-radius: 999px; text-decoration: none; color: #10151b; background: #d6e7ff; font-weight: 700; }}\
-              .scenario-link:hover {{ background: #f2f7ff; }}\
+              body {{ min-height: 100vh; height: auto; overflow: auto; background: var(--void); color: var(--ink); font-family: var(--font); image-rendering: auto; }}\
+              .scenario-page {{ width: min(960px, 100%); margin: 0 auto; padding: 32px 20px 48px; }}\
+              .scenario-page h1 {{ margin: 0 0 6px; color: var(--accent); font-size: 28px; line-height: 1.1; letter-spacing: 0.08em; text-transform: uppercase; text-shadow: 2px 2px 0 #191710; }}\
+              .scenario-page > p {{ margin: 0; color: var(--ink-dim); }}\
+              .scenario-grid {{ display: grid; gap: 14px; margin-top: 22px; }}\
+              .scenario-panel {{ display: grid; grid-template-columns: minmax(220px, 0.8fr) minmax(0, 1.2fr); gap: 18px; align-items: start; border: 1px solid var(--panel-edge); border-radius: var(--radius); background: rgba(39, 37, 31, 0.98); box-shadow: var(--shadow), inset 0 1px 0 rgba(255, 255, 255, 0.08); padding: 18px; }}\
+              .scenario-copy h2 {{ margin: 0 0 8px; font-size: 16px; letter-spacing: 0.04em; text-transform: uppercase; }}\
+              .scenario-copy p {{ margin: 0 0 8px; color: var(--ink-dim); }}\
+              .scenario-copy code {{ color: var(--ink-faint); font-family: var(--mono); font-size: 12px; }}\
+              .scenario-table {{ width: 100%; border-collapse: collapse; border: 1px solid rgba(91, 83, 65, 0.7); background: rgba(17, 17, 15, 0.34); }}\
+              .scenario-table th, .scenario-table td {{ padding: 9px 10px; border-bottom: 1px solid rgba(91, 83, 65, 0.45); text-align: left; }}\
+              .scenario-table thead th {{ color: var(--ink-dim); font-family: var(--mono); font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }}\
+              .scenario-table tbody th {{ color: var(--ink); font-weight: 600; }}\
+              .scenario-table tbody tr:last-child th, .scenario-table tbody tr:last-child td {{ border-bottom: 0; }}\
+              .scenario-link {{ display: inline-flex; align-items: center; justify-content: center; min-width: 56px; padding: 6px 10px; border: 1px solid var(--panel-edge); border-radius: var(--radius-sm); background: var(--panel); color: var(--ink); font-weight: 600; text-decoration: none; }}\
+              .scenario-link:hover {{ border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--panel-glow); }}\
+              .scenario-missing {{ color: var(--ink-faint); font-family: var(--mono); }}\
+              @media (max-width: 720px) {{ .scenario-panel {{ grid-template-columns: 1fr; }} .scenario-page {{ padding: 24px 12px 36px; }} .scenario-table th, .scenario-table td {{ padding: 8px; }} }}\
             </style>\
           </head>\
           <body>\
@@ -297,8 +352,9 @@ mod tests {
     fn scenario_index_lists_supported_launches() {
         let html = dev_scenario_index_html();
         assert!(html.contains("Scout Car Snaking Corridor"));
-        assert!(html.contains("/dev/scenario?id=scout_car_snaking_corridor&unit=worker&count=1"));
-        assert!(html.contains("/dev/scenario?id=scout_car_snaking_corridor&unit=tank&count=4"));
+        assert!(html.contains("<table class=\"scenario-table\">"));
+        assert!(html.contains("/dev/scenarios?id=scout_car_snaking_corridor&unit=worker&count=1"));
+        assert!(html.contains("/dev/scenarios?id=scout_car_snaking_corridor&unit=tank&count=4"));
     }
 }
 
