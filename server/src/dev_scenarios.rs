@@ -1,7 +1,10 @@
+use crate::game::entity::EntityKind;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct DevScenarioLaunch {
     pub(crate) id: &'static str,
-    pub(crate) cars: usize,
+    pub(crate) unit: EntityKind,
+    pub(crate) count: usize,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -12,14 +15,66 @@ pub(crate) struct DevScenarioSpec {
     pub(crate) launches: &'static [DevScenarioLaunch],
 }
 
-const SCOUT_CAR_SNAKING_CORRIDOR_LAUNCHES: [DevScenarioLaunch; 2] = [
+const SCOUT_CAR_SNAKING_CORRIDOR_LAUNCHES: [DevScenarioLaunch; 12] = [
     DevScenarioLaunch {
         id: "scout_car_snaking_corridor",
-        cars: 1,
+        unit: EntityKind::Worker,
+        count: 1,
     },
     DevScenarioLaunch {
         id: "scout_car_snaking_corridor",
-        cars: 4,
+        unit: EntityKind::Worker,
+        count: 4,
+    },
+    DevScenarioLaunch {
+        id: "scout_car_snaking_corridor",
+        unit: EntityKind::Rifleman,
+        count: 1,
+    },
+    DevScenarioLaunch {
+        id: "scout_car_snaking_corridor",
+        unit: EntityKind::Rifleman,
+        count: 4,
+    },
+    DevScenarioLaunch {
+        id: "scout_car_snaking_corridor",
+        unit: EntityKind::MachineGunner,
+        count: 1,
+    },
+    DevScenarioLaunch {
+        id: "scout_car_snaking_corridor",
+        unit: EntityKind::MachineGunner,
+        count: 4,
+    },
+    DevScenarioLaunch {
+        id: "scout_car_snaking_corridor",
+        unit: EntityKind::AtTeam,
+        count: 1,
+    },
+    DevScenarioLaunch {
+        id: "scout_car_snaking_corridor",
+        unit: EntityKind::AtTeam,
+        count: 4,
+    },
+    DevScenarioLaunch {
+        id: "scout_car_snaking_corridor",
+        unit: EntityKind::ScoutCar,
+        count: 1,
+    },
+    DevScenarioLaunch {
+        id: "scout_car_snaking_corridor",
+        unit: EntityKind::ScoutCar,
+        count: 4,
+    },
+    DevScenarioLaunch {
+        id: "scout_car_snaking_corridor",
+        unit: EntityKind::Tank,
+        count: 1,
+    },
+    DevScenarioLaunch {
+        id: "scout_car_snaking_corridor",
+        unit: EntityKind::Tank,
+        count: 4,
     },
 ];
 
@@ -34,18 +89,39 @@ pub(crate) fn all_dev_scenarios() -> &'static [DevScenarioSpec] {
     &DEV_SCENARIOS
 }
 
-pub(crate) fn parse_dev_scenario_launch(id: &str, cars: &str) -> Option<DevScenarioLaunch> {
-    let cars = cars.parse::<usize>().ok()?;
+pub(crate) fn parse_dev_scenario_launch(
+    id: &str,
+    unit: &str,
+    count: &str,
+) -> Option<DevScenarioLaunch> {
+    let unit = unit.parse::<EntityKind>().ok()?;
+    if !unit.is_unit() {
+        return None;
+    }
+    let count = count.parse::<usize>().ok()?;
     all_dev_scenarios()
         .iter()
         .flat_map(|scenario| scenario.launches.iter())
         .copied()
-        .find(|launch| launch.id == id && launch.cars == cars)
+        .find(|launch| launch.id == id && launch.unit == unit && launch.count == count)
 }
 
 pub(crate) fn parse_dev_scenario_room(raw: &str) -> Option<DevScenarioLaunch> {
-    let (id, cars) = raw.split_once(":cars=")?;
-    parse_dev_scenario_launch(id, cars)
+    let (id, rest) = raw.split_once(":unit=")?;
+    let (unit, count) = rest.split_once(":count=")?;
+    parse_dev_scenario_launch(id, unit, count)
+}
+
+pub(crate) fn dev_scenario_unit_label(unit: EntityKind) -> &'static str {
+    match unit {
+        EntityKind::Worker => "worker",
+        EntityKind::Rifleman => "rifleman",
+        EntityKind::MachineGunner => "machine gunner",
+        EntityKind::AtTeam => "AT gun",
+        EntityKind::ScoutCar => "scout car",
+        EntityKind::Tank => "tank",
+        _ => "unit",
+    }
 }
 
 #[cfg(test)]
@@ -55,17 +131,19 @@ mod tests {
     #[test]
     fn parses_supported_launches() {
         assert_eq!(
-            parse_dev_scenario_launch("scout_car_snaking_corridor", "1"),
+            parse_dev_scenario_launch("scout_car_snaking_corridor", "worker", "1"),
             Some(DevScenarioLaunch {
                 id: "scout_car_snaking_corridor",
-                cars: 1,
+                unit: EntityKind::Worker,
+                count: 1,
             })
         );
         assert_eq!(
-            parse_dev_scenario_room("scout_car_snaking_corridor:cars=4"),
+            parse_dev_scenario_room("scout_car_snaking_corridor:unit=tank:count=4"),
             Some(DevScenarioLaunch {
                 id: "scout_car_snaking_corridor",
-                cars: 4,
+                unit: EntityKind::Tank,
+                count: 4,
             })
         );
     }
@@ -73,10 +151,14 @@ mod tests {
     #[test]
     fn rejects_unknown_launches() {
         assert_eq!(
-            parse_dev_scenario_launch("scout_car_snaking_corridor", "2"),
+            parse_dev_scenario_launch("scout_car_snaking_corridor", "tank", "2"),
             None
         );
-        assert_eq!(parse_dev_scenario_launch("unknown", "1"), None);
+        assert_eq!(
+            parse_dev_scenario_launch("scout_car_snaking_corridor", "city_centre", "1"),
+            None
+        );
+        assert_eq!(parse_dev_scenario_launch("unknown", "worker", "1"), None);
         assert_eq!(parse_dev_scenario_room("scout_car_snaking_corridor"), None);
     }
 }

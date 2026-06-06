@@ -4,6 +4,7 @@ use super::crash_replay::{dump_crash_replay, panic_reason};
 use super::dev_replay::{load_replay_artifact, match_seed};
 use super::snapshots::{compact_snapshot_for_wire, union_events};
 use super::*;
+use crate::game::entity::EntityKind;
 use crate::protocol::SnapshotNetStatus;
 use std::time::Instant as StdInstant;
 use tokio::time::Instant as TokioInstant;
@@ -47,7 +48,8 @@ pub(super) enum DevSelfPlayConfig {
 #[derive(Clone)]
 pub(super) struct DevScenarioConfig {
     pub(super) id: DevScenarioId,
-    pub(super) cars: usize,
+    pub(super) unit: EntityKind,
+    pub(super) count: usize,
 }
 
 #[derive(Clone)]
@@ -767,8 +769,11 @@ impl RoomTask {
             }
             RoomMode::DevScenario(config) => match config.id {
                 DevScenarioId::ScoutCarSnakingCorridor => {
-                    let setup =
-                        Game::new_scout_car_snaking_corridor_scenario(config.cars, match_seed())?;
+                    let setup = Game::new_snaking_corridor_scenario(
+                        config.unit,
+                        config.count,
+                        match_seed(),
+                    )?;
                     let driver = DevScenarioDriver {
                         player_id: setup.player_id,
                         units: setup.units,

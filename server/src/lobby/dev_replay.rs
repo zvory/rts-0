@@ -18,7 +18,8 @@ pub(super) fn room_mode_for(room: &str) -> RoomMode {
                     "scout_car_snaking_corridor" => DevScenarioId::ScoutCarSnakingCorridor,
                     _ => return RoomMode::Normal,
                 },
-                cars: launch.cars,
+                unit: launch.unit,
+                count: launch.count,
             });
         }
     }

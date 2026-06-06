@@ -123,17 +123,23 @@ impl Game {
         )
     }
 
-    pub(crate) fn new_scout_car_snaking_corridor_scenario(
-        car_count: usize,
+    pub(crate) fn new_snaking_corridor_scenario(
+        unit: EntityKind,
+        unit_count: usize,
         seed: u32,
     ) -> Result<DevScenarioSetup, String> {
-        if !matches!(car_count, 1 | 4) {
-            return Err(format!("unsupported scout-car count {car_count}"));
+        if !unit.is_unit() {
+            return Err(format!("unsupported snaking-corridor unit {unit}"));
+        }
+        if !matches!(unit_count, 1 | 4) {
+            return Err(format!(
+                "unsupported snaking-corridor unit count {unit_count}"
+            ));
         }
 
         let (map, start_tile, start, goal) = scout_car_snaking_corridor_map();
         let mut entities = EntityStore::new();
-        let scouts = spawn_snaking_corridor_scout_cars(&mut entities, car_count, start)?;
+        let units = spawn_snaking_corridor_units(&mut entities, unit, unit_count, start)?;
         let player_id = 1;
         let player = PlayerState {
             id: player_id,
@@ -176,7 +182,7 @@ impl Game {
         Ok(DevScenarioSetup {
             game,
             player_id,
-            units: scouts,
+            units,
             goal,
         })
     }
@@ -401,17 +407,17 @@ fn scout_car_snaking_corridor_map() -> ScoutCarCorridorLayout {
     (map, start_tile, start, goal)
 }
 
-fn spawn_snaking_corridor_scout_cars(
+fn spawn_snaking_corridor_units(
     entities: &mut EntityStore,
-    car_count: usize,
+    unit: EntityKind,
+    unit_count: usize,
     start: (f32, f32),
 ) -> Result<Vec<u32>, String> {
     let north = -std::f32::consts::FRAC_PI_2;
-    let positions: Vec<(f32, f32)> = match car_count {
+    let (x_spacing, y_spacing) = snaking_corridor_spawn_spacing(unit)?;
+    let positions: Vec<(f32, f32)> = match unit_count {
         1 => vec![start],
         4 => {
-            let x_spacing = config::SCOUT_CAR_BODY_WIDTH_PX * 1.5;
-            let y_spacing = config::SCOUT_CAR_BODY_LENGTH_PX * 1.5;
             vec![
                 (start.0 - x_spacing * 0.5, start.1 - y_spacing * 0.5),
                 (start.0 + x_spacing * 0.5, start.1 - y_spacing * 0.5),
@@ -419,20 +425,48 @@ fn spawn_snaking_corridor_scout_cars(
                 (start.0 + x_spacing * 0.5, start.1 + y_spacing * 0.5),
             ]
         }
-        _ => return Err(format!("unsupported scout-car count {car_count}")),
+        _ => {
+            return Err(format!(
+                "unsupported snaking-corridor unit count {unit_count}"
+            ))
+        }
     };
 
-    let mut scouts = Vec::with_capacity(positions.len());
+    let mut units = Vec::with_capacity(positions.len());
     for (x, y) in positions {
-        let scout = entities
-            .spawn_unit(1, EntityKind::ScoutCar, x, y)
-            .ok_or_else(|| "failed to spawn scout car".to_string())?;
-        if let Some(e) = entities.get_mut(scout) {
+        let spawned = entities
+            .spawn_unit(1, unit, x, y)
+            .ok_or_else(|| format!("failed to spawn {unit}"))?;
+        if let Some(e) = entities.get_mut(spawned) {
             e.set_facing(north);
         }
-        scouts.push(scout);
+        units.push(spawned);
     }
-    Ok(scouts)
+    Ok(units)
+}
+
+fn snaking_corridor_spawn_spacing(unit: EntityKind) -> Result<(f32, f32), String> {
+    match unit {
+        EntityKind::AtTeam => Ok((
+            config::AT_GUN_BODY_WIDTH_PX * 1.5,
+            config::AT_GUN_BODY_LENGTH_PX * 1.5,
+        )),
+        EntityKind::ScoutCar => Ok((
+            config::SCOUT_CAR_BODY_WIDTH_PX * 1.5,
+            config::SCOUT_CAR_BODY_LENGTH_PX * 1.5,
+        )),
+        EntityKind::Tank => Ok((
+            config::TANK_BODY_WIDTH_PX * 1.5,
+            config::TANK_BODY_LENGTH_PX * 1.5,
+        )),
+        _ => {
+            let radius = config::unit_stats(unit)
+                .ok_or_else(|| format!("missing stats for snaking-corridor unit {unit}"))?
+                .radius;
+            let spacing = radius * 3.0;
+            Ok((spacing, spacing))
+        }
+    }
 }
 
 /// Spawn a player's full starting layout: a free, fully-built City Centre on the start tile, a ring of

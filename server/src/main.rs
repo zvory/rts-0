@@ -35,7 +35,7 @@ use tracing_subscriber::EnvFilter;
 use crate::game::command::SimCommand;
 use crate::lobby::{Lobby, RoomEvent};
 use crate::protocol::{serialize_compact_snapshot, ClientMessage, ServerMessage};
-use dev_scenarios::{all_dev_scenarios, parse_dev_scenario_launch};
+use dev_scenarios::{all_dev_scenarios, dev_scenario_unit_label, parse_dev_scenario_launch};
 
 /// Default room name used when a client's `join` omits `room`.
 const DEFAULT_ROOM: &str = "main";
@@ -155,14 +155,15 @@ async fn dev_scenario_handler(
     Query(params): Query<std::collections::HashMap<String, String>>,
 ) -> impl IntoResponse {
     let id = params.get("id").map(|s| s.trim()).unwrap_or("");
-    let cars = params.get("cars").map(|s| s.trim()).unwrap_or("");
-    if id.is_empty() && cars.is_empty() {
+    let unit = params.get("unit").map(|s| s.trim()).unwrap_or("");
+    let count = params.get("count").map(|s| s.trim()).unwrap_or("");
+    if id.is_empty() && unit.is_empty() && count.is_empty() {
         return Html(dev_scenario_index_html()).into_response();
     }
-    if let Some(launch) = parse_dev_scenario_launch(id, cars) {
+    if let Some(launch) = parse_dev_scenario_launch(id, unit, count) {
         return Redirect::temporary(&format!(
-            "/?watchScenario=1&id={}&cars={}",
-            launch.id, launch.cars
+            "/?watchScenario=1&id={}&unit={}&count={}",
+            launch.id, launch.unit, launch.count
         ))
         .into_response();
     }
@@ -179,8 +180,12 @@ fn dev_scenario_index_html() -> String {
         let mut links = String::new();
         for launch in scenario.launches {
             links.push_str(&format!(
-                "<a class=\"scenario-link\" href=\"/dev/scenario?id={}&cars={}\">Open cars={}</a>",
-                launch.id, launch.cars, launch.cars
+                "<a class=\"scenario-link\" href=\"/dev/scenario?id={}&unit={}&count={}\">Open {} x{}</a>",
+                launch.id,
+                launch.unit,
+                launch.count,
+                dev_scenario_unit_label(launch.unit),
+                launch.count
             ));
         }
         items.push_str(&format!(
@@ -292,8 +297,8 @@ mod tests {
     fn scenario_index_lists_supported_launches() {
         let html = dev_scenario_index_html();
         assert!(html.contains("Scout Car Snaking Corridor"));
-        assert!(html.contains("/dev/scenario?id=scout_car_snaking_corridor&cars=1"));
-        assert!(html.contains("/dev/scenario?id=scout_car_snaking_corridor&cars=4"));
+        assert!(html.contains("/dev/scenario?id=scout_car_snaking_corridor&unit=worker&count=1"));
+        assert!(html.contains("/dev/scenario?id=scout_car_snaking_corridor&unit=tank&count=4"));
     }
 }
 
