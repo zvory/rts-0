@@ -112,7 +112,7 @@ pub struct Game {
     spatial: services::spatial::SpatialIndex,
     /// Persistent pathfinding service with an LRU cache for verified paths.
     pathing: services::pathing::PathingService,
-    /// One-second death-vision sources used only when building fog-filtered snapshots.
+    /// Five-second death-vision sources used only when building fog-filtered snapshots.
     lingering_sight: Vec<LingeringSightSource>,
     /// Match seed retained for replay metadata/API compatibility. The current hardcoded map
     /// ignores it until lobby map selection or randomized maps are reintroduced.

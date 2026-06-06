@@ -44,7 +44,7 @@ pub(crate) fn death_system(
             dead.x,
             dead.y,
             dead.sight_tiles,
-            tick.saturating_add(config::TICK_HZ),
+            tick.saturating_add(config::TICK_HZ * 5),
         ) {
             lingering_sight.push(source);
         }

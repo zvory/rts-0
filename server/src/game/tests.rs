@@ -771,7 +771,7 @@ fn spectator_snapshot_uses_union_fog_not_full_world() {
 }
 
 #[test]
-fn death_vision_lingers_for_one_second_as_visual_only_intel() {
+fn death_vision_lingers_for_five_seconds_as_visual_only_intel() {
     let players = [
         PlayerInit {
             id: 1,
@@ -871,12 +871,12 @@ fn death_vision_lingers_for_one_second_as_visual_only_intel() {
     assert!((moving_linger.x - moved_enemy.pos_x).abs() < 0.001);
     assert!((moving_linger.y - moved_enemy.pos_y).abs() < 0.001);
 
-    while game.tick_count() <= config::TICK_HZ {
+    while game.tick_count() <= config::TICK_HZ * 5 {
         game.tick();
     }
     assert!(
         game.snapshot_for(1).entities.iter().all(|e| e.id != enemy),
-        "lingering death vision should expire after one second"
+        "lingering death vision should expire after five seconds"
     );
 }
 
