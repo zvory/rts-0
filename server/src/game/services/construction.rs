@@ -62,7 +62,7 @@ pub(crate) fn construction_system(
             standability::building_site_clear_for_build_intent(map, entities, kind, tx, ty, worker);
         if config::building_stats(kind).is_none() {
             if let Some(w) = entities.get_mut(worker) {
-                w.clear_orders();
+                w.clear_active_order();
             }
             continue;
         }
@@ -88,7 +88,7 @@ pub(crate) fn construction_system(
                 severity: NoticeSeverity::Info,
             });
             if let Some(w) = entities.get_mut(worker) {
-                w.clear_orders();
+                w.clear_active_order();
             }
             continue;
         }
@@ -100,7 +100,7 @@ pub(crate) fn construction_system(
                 severity: NoticeSeverity::Info,
             });
             if let Some(w) = entities.get_mut(worker) {
-                w.clear_orders();
+                w.clear_active_order();
             }
             continue;
         }
@@ -147,7 +147,7 @@ pub(crate) fn construction_system(
                 Some(b) if b.hp > 0 && b.under_construction() => b,
                 _ => {
                     if let Some(w) = entities.get_mut(worker) {
-                        w.clear_orders();
+                        w.clear_active_order();
                     }
                     continue;
                 }
@@ -175,7 +175,7 @@ pub(crate) fn construction_system(
             });
             defensively_eject_worker_from_static_overlap(map, entities, worker);
             if let Some(w) = entities.get_mut(worker) {
-                w.clear_orders();
+                w.clear_active_order();
             }
         }
     }
@@ -255,7 +255,7 @@ fn defensively_eject_worker_from_static_overlap(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::game::entity::{EntityStore, Order};
+    use crate::game::entity::{EntityStore, Order, OrderIntent};
     use crate::game::services::geometry::building_rect_for_footprint;
     use crate::game::services::occupancy::footprint_center;
     use crate::game::ScoreState;
@@ -455,6 +455,86 @@ mod tests {
         assert!(
             events.get(&1).is_none_or(Vec::is_empty),
             "resume should not emit a failure notice"
+        );
+    }
+
+    #[test]
+    fn build_completion_preserves_queued_orders_for_handoff() {
+        let map = flat_map(16);
+        let mut entities = EntityStore::new();
+        let (sx, sy) = footprint_center(&map, EntityKind::Depot, 4, 4);
+        let site = entities
+            .spawn_building(1, EntityKind::Depot, sx, sy, false)
+            .expect("scaffold should spawn");
+        // Drive the scaffold to one tick away from completion.
+        if let Some(b) = entities.get_mut(site) {
+            if let Some(c) = b.construction.as_mut() {
+                c.progress = c.total.saturating_sub(1);
+            }
+        }
+        let worker = entities
+            .spawn_unit(1, EntityKind::Worker, sx, sy)
+            .expect("worker should spawn");
+        let handoff = (sx + 96.0, sy);
+        {
+            let w = entities.get_mut(worker).expect("worker should exist");
+            w.set_order(Order::build(EntityKind::Depot, 4, 4));
+            w.mark_build_phase(BuildPhase::Constructing { site });
+            w.set_target_id(Some(site));
+            w.append_queued_order(OrderIntent::move_to(handoff.0, handoff.1));
+        }
+        let mut players = vec![player_state(1)];
+        let mut events = HashMap::new();
+
+        construction_system(&map, &mut entities, &mut players, &mut events);
+
+        let w = entities.get(worker).expect("worker should survive");
+        assert!(
+            matches!(w.order(), Order::Idle),
+            "completed build should drop the active order to idle"
+        );
+        assert_eq!(
+            w.queued_orders().len(),
+            1,
+            "build completion must leave queued handoff orders intact for promotion"
+        );
+    }
+
+    #[test]
+    fn build_site_destruction_clears_active_order_but_preserves_queue() {
+        let map = flat_map(16);
+        let mut entities = EntityStore::new();
+        let (sx, sy) = footprint_center(&map, EntityKind::Depot, 4, 4);
+        let site = entities
+            .spawn_building(1, EntityKind::Depot, sx, sy, false)
+            .expect("scaffold should spawn");
+        let worker = entities
+            .spawn_unit(1, EntityKind::Worker, sx, sy)
+            .expect("worker should spawn");
+        let handoff = (sx + 96.0, sy);
+        {
+            let w = entities.get_mut(worker).expect("worker should exist");
+            w.set_order(Order::build(EntityKind::Depot, 4, 4));
+            w.mark_build_phase(BuildPhase::Constructing { site });
+            w.set_target_id(Some(site));
+            w.append_queued_order(OrderIntent::move_to(handoff.0, handoff.1));
+        }
+        // Simulate the scaffold being destroyed mid-construction.
+        entities.remove(site);
+        let mut players = vec![player_state(1)];
+        let mut events = HashMap::new();
+
+        construction_system(&map, &mut entities, &mut players, &mut events);
+
+        let w = entities.get(worker).expect("worker should survive");
+        assert!(
+            matches!(w.order(), Order::Idle),
+            "lost scaffold should drop the worker's active order"
+        );
+        assert_eq!(
+            w.queued_orders().len(),
+            1,
+            "queued handoff orders must persist after a scaffold is destroyed"
         );
     }
 

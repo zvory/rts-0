@@ -16,6 +16,7 @@ export function _onRightClick(p, ev = {}) {
   }
 
   const ownUnits = this._selectedOwnUnitIds();
+  const queued = !!ev.shiftKey;
   if (ownUnits.length === 0) {
     // No units selected: a buildings-only selection sets a rally point on any
     // unit-producing buildings in it. Units in the selection take priority, so a
@@ -24,9 +25,9 @@ export function _onRightClick(p, ev = {}) {
     if (producers.length > 0) {
       const world = this._worldAt(p.x, p.y);
       for (const building of producers) {
-        this.net.command(cmd.setRally(building, world.x, world.y));
+        this.net.command(cmd.setRally(building, world.x, world.y, queued));
       }
-      this.state.addCommandFeedback("move", world.x, world.y);
+      this.state.addCommandFeedback("move", world.x, world.y, queued);
     }
     return;
   }
@@ -37,7 +38,8 @@ export function _onRightClick(p, ev = {}) {
   if (workers.length > 0) {
     const resource = this._resourceAtWorld(world.x, world.y);
     if (resource && resource.remaining !== 0) {
-      this.net.command(cmd.gather(workers, resource.id));
+      this.net.command(cmd.gather(workers, resource.id, queued));
+      this.state.addCommandFeedback("move", world.x, world.y, queued);
       return;
     }
   }
@@ -47,29 +49,30 @@ export function _onRightClick(p, ev = {}) {
     const resume = _resumeConstructionIntent(target, this.state.map);
     if (resume && workers.length > 0) {
       for (const worker of workers) {
-        this.net.command(cmd.build(worker, resume.building, resume.tileX, resume.tileY));
+        this.net.command(cmd.build(worker, resume.building, resume.tileX, resume.tileY, queued));
       }
-      this.state.addCommandFeedback("move", target.x, target.y);
+      this.state.addCommandFeedback("move", target.x, target.y, queued);
       return;
     }
   }
   if (target && target.owner !== me && target.owner !== 0 && !isResource(target.kind)) {
     // Enemy entity -> attack.
-    this.net.command(cmd.attack(ownUnits, target.id));
-    this.state.addCommandFeedback("attack", target.x, target.y);
+    this.net.command(cmd.attack(ownUnits, target.id, queued));
+    this.state.addCommandFeedback("attack", target.x, target.y, queued);
     return;
   }
   if (target && isResource(target.kind) && target.remaining !== 0) {
     // Resource node -> gather, but only with the workers in the selection.
     if (workers.length > 0) {
-      this.net.command(cmd.gather(workers, target.id));
+      this.net.command(cmd.gather(workers, target.id, queued));
+      this.state.addCommandFeedback("move", world.x, world.y, queued);
       return;
     }
     // Selection has no workers: fall through to a move onto the node's position.
   }
   // Default -> move to the world point.
-  this.net.command(cmd.move(ownUnits, world.x, world.y, !!ev.shiftKey));
-  this.state.addCommandFeedback("move", world.x, world.y, !!ev.shiftKey);
+  this.net.command(cmd.move(ownUnits, world.x, world.y, queued));
+  this.state.addCommandFeedback("move", world.x, world.y, queued);
 }
 
 export function _issueTargetedCommand(p, ev = {}) {

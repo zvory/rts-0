@@ -82,9 +82,12 @@ fn gather_to_node(
             e.clear_path();
             e.set_facing((node_pos.1 - wy).atan2(node_pos.0 - wx));
             if can_mine {
+                // Gather is terminal once harvesting begins: drop any later queued
+                // handoff orders so the worker stays on the node.
+                e.clear_queued_orders();
                 e.mark_gather_phase(GatherPhase::Harvesting);
             } else {
-                e.clear_orders();
+                e.clear_active_order();
             }
         }
         if can_mine && !entities.claim_miner(node, id) {
@@ -118,7 +121,7 @@ fn gather_harvesting(entities: &mut EntityStore, players: &mut [PlayerState], id
     match entities.node_slot_holder(node) {
         Some(m) if m != id => {
             if let Some(e) = entities.get_mut(id) {
-                e.clear_orders();
+                e.clear_active_order();
             }
             return;
         }
@@ -181,6 +184,96 @@ fn gather_harvesting(entities: &mut EntityStore, players: &mut [PlayerState], id
 fn idle_gatherer(entities: &mut EntityStore, id: u32) {
     entities.release_miner(id);
     if let Some(e) = entities.get_mut(id) {
-        e.clear_orders();
+        e.clear_active_order();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::game::entity::{EntityKind, EntityStore, GatherPhase, Order, OrderIntent};
+    use crate::game::map::Map;
+    use crate::game::services::move_coordinator::MoveCoordinator;
+    use crate::game::services::occupancy::{footprint_center, Occupancy};
+    use crate::game::services::pathing::PathingService;
+    use crate::game::services::spatial::SpatialIndex;
+    use crate::game::ScoreState;
+    use crate::protocol::terrain;
+
+    fn flat_map(size: u32) -> Map {
+        Map {
+            size,
+            terrain: vec![terrain::GRASS; (size * size) as usize],
+            starts: vec![(4, 4)],
+            expansion_sites: Vec::new(),
+        }
+    }
+
+    fn player_state(id: u32) -> PlayerState {
+        PlayerState {
+            id,
+            name: format!("Player {id}"),
+            color: "#fff".to_string(),
+            start_tile: (0, 0),
+            steel: 0,
+            oil: 0,
+            supply_used: 0,
+            supply_cap: 20,
+            is_ai: false,
+            score: ScoreState::default(),
+        }
+    }
+
+    #[test]
+    fn entering_harvesting_clears_pending_queued_orders() {
+        let map = flat_map(24);
+        let mut entities = EntityStore::new();
+        let (ccx, ccy) = footprint_center(&map, EntityKind::CityCentre, 4, 4);
+        entities
+            .spawn_building(1, EntityKind::CityCentre, ccx, ccy, true)
+            .expect("city centre should spawn");
+        let node = entities
+            .spawn_node(EntityKind::Steel, ccx + 48.0, ccy)
+            .expect("steel node should spawn");
+        let (nx, ny) = entities
+            .get(node)
+            .map(|n| (n.pos_x, n.pos_y))
+            .expect("node pos");
+        let worker = entities
+            .spawn_unit(1, EntityKind::Worker, nx, ny)
+            .expect("worker should spawn");
+        {
+            let w = entities.get_mut(worker).expect("worker should exist");
+            w.set_order(Order::gather(node));
+            w.set_target_id(Some(node));
+            w.append_queued_order(OrderIntent::move_to(nx + 96.0, ny));
+        }
+
+        let occ = Occupancy::build(&map, &entities);
+        let spatial = SpatialIndex::build(&entities, map.size);
+        let mut pathing = PathingService::new(1024, 32);
+        pathing.advance_tick(1);
+        let mut coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, 1);
+        let mut players = vec![player_state(1)];
+
+        gather_system(
+            &map,
+            &mut entities,
+            &mut players,
+            &occ,
+            &spatial,
+            &mut coordinator,
+        );
+
+        let w = entities.get(worker).expect("worker should exist");
+        assert_eq!(
+            w.gather_phase(),
+            Some(GatherPhase::Harvesting),
+            "worker in interact range should transition to harvesting"
+        );
+        assert!(
+            w.queued_orders().is_empty(),
+            "harvesting transition is terminal; queued handoff orders should be dropped"
+        );
     }
 }

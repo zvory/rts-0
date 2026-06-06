@@ -435,7 +435,7 @@ export class Input {
   _onLeftDown(p, ev) {
     // Build placement: a valid left-click confirms the build with a selected worker.
     if (this.state.placement) {
-      this._confirmPlacement();
+      this._confirmPlacement(ev);
       return;
     }
     // Command-card targeting: the next left-click issues the armed command.

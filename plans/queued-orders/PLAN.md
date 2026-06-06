@@ -56,7 +56,7 @@ Queued orders should be stored as intent, not execution state.
 - [x] [Phase 0 - Contract and queue foundation](PHASE_0.md)
 - [x] [Phase 1 - Queued move and attack-move](PHASE_1.md)
 - [x] [Phase 2 - Basic queued order markers](PHASE_2.md)
-- [Phase 3 - Queued worker build and gather handoff](PHASE_3.md)
+- [x] [Phase 3 - Queued worker build and gather handoff](PHASE_3.md)
 - [Phase 4 - Mixed attack and movement queues](PHASE_4.md)
 - [Phase 5 - Multi-stage rallies](PHASE_5.md)
 - [Phase 6 - Hardening, replay, and documentation audit](PHASE_6.md)
