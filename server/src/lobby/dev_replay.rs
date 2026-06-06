@@ -16,6 +16,7 @@ pub(super) fn room_mode_for(room: &str) -> RoomMode {
             return RoomMode::DevScenario(DevScenarioConfig {
                 id: match launch.id {
                     "scout_car_snaking_corridor" => DevScenarioId::ScoutCarSnakingCorridor,
+                    "scout_car_wall_chokepoint" => DevScenarioId::ScoutCarWallChokepoint,
                     _ => return RoomMode::Normal,
                 },
                 unit: launch.unit,

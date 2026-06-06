@@ -187,6 +187,66 @@ impl Game {
         })
     }
 
+    pub(crate) fn new_scout_car_wall_chokepoint_scenario(
+        unit_count: usize,
+        seed: u32,
+    ) -> Result<DevScenarioSetup, String> {
+        if !matches!(unit_count, 3 | 5 | 6 | 10 | 15) {
+            return Err(format!(
+                "unsupported wall-chokepoint scout car count {unit_count}"
+            ));
+        }
+
+        let (map, start_tile, starts, goal) = scout_car_wall_chokepoint_map(unit_count);
+        let mut entities = EntityStore::new();
+        let units = spawn_wall_chokepoint_scout_cars(&mut entities, starts)?;
+        let player_id = 1;
+        let player = PlayerState {
+            id: player_id,
+            name: "Scenario".to_string(),
+            color: "#4878c8".to_string(),
+            start_tile,
+            steel: 0,
+            oil: 10_000,
+            supply_used: 0,
+            supply_cap: 0,
+            is_ai: false,
+            score: ScoreState::default(),
+        };
+
+        let spatial = services::spatial::SpatialIndex::build(&entities, map.size);
+        let pathing = services::pathing::PathingService::new(65_536, 256);
+        let rng = SmallRng::seed_from_u64(seed as u64);
+        let mut game = Game {
+            map,
+            entities,
+            fog: Fog::new(96),
+            players: vec![player],
+            ai: Vec::new(),
+            pending: Vec::new(),
+            command_log: Vec::new(),
+            tick: 0,
+            spatial,
+            pathing,
+            lingering_sight: Vec::new(),
+            seed,
+            starting_steel: 0,
+            starting_oil: 0,
+            debug_path_overlays: true,
+            rng,
+        };
+        let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
+        game.fog = Fog::new(game.map.size);
+        game.fog.recompute(&ids, &game.entities, &game.map);
+
+        Ok(DevScenarioSetup {
+            game,
+            player_id,
+            units,
+            goal,
+        })
+    }
+
     pub(crate) fn seed(&self) -> u32 {
         self.seed
     }
@@ -407,6 +467,40 @@ fn scout_car_snaking_corridor_map() -> ScoutCarCorridorLayout {
     (map, start_tile, start, goal)
 }
 
+fn scout_car_wall_chokepoint_map(
+    unit_count: usize,
+) -> (Map, (u32, u32), Vec<(f32, f32)>, (f32, f32)) {
+    let mut map = flat_dev_map(1);
+    let center_x = map.size / 2;
+    let wall_y = map.size - 18;
+    let start_tile = (center_x, wall_y + 10);
+    let gap_left_x = center_x - 1;
+    let gap_right_x = center_x;
+    let max_tile = map.size - 1;
+
+    block_rect_tiles(&mut map, 0, wall_y, max_tile, wall_y);
+    carve_rect_tiles(&mut map, gap_left_x, wall_y, gap_right_x, wall_y);
+
+    let ts = config::TILE_SIZE as f32;
+    let center_world_x = gap_right_x as f32 * ts;
+    let start_y = (start_tile.1 as f32 + 0.5) * ts;
+    let spacing = config::SCOUT_CAR_BODY_WIDTH_PX + config::SCOUT_CAR_BODY_CLEARANCE_PX * 4.0;
+    let center_index = (unit_count.saturating_sub(1)) as f32 * 0.5;
+    let starts = (0..unit_count)
+        .map(|i| {
+            let offset = (i as f32 - center_index) * spacing;
+            (center_world_x + offset, start_y)
+        })
+        .collect();
+    let goal_y = (wall_y as f32 + 0.5) * ts - ts * 10.0;
+    let goal = (center_world_x, goal_y);
+    if let Some(slot) = map.starts.get_mut(0) {
+        *slot = start_tile;
+    }
+
+    (map, start_tile, starts, goal)
+}
+
 fn spawn_snaking_corridor_units(
     entities: &mut EntityStore,
     unit: EntityKind,
@@ -437,6 +531,24 @@ fn spawn_snaking_corridor_units(
         let spawned = entities
             .spawn_unit(1, unit, x, y)
             .ok_or_else(|| format!("failed to spawn {unit}"))?;
+        if let Some(e) = entities.get_mut(spawned) {
+            e.set_facing(north);
+        }
+        units.push(spawned);
+    }
+    Ok(units)
+}
+
+fn spawn_wall_chokepoint_scout_cars(
+    entities: &mut EntityStore,
+    starts: Vec<(f32, f32)>,
+) -> Result<Vec<u32>, String> {
+    let north = -std::f32::consts::FRAC_PI_2;
+    let mut units = Vec::with_capacity(starts.len());
+    for (x, y) in starts {
+        let spawned = entities
+            .spawn_unit(1, EntityKind::ScoutCar, x, y)
+            .ok_or_else(|| "failed to spawn scout car".to_string())?;
         if let Some(e) = entities.get_mut(spawned) {
             e.set_facing(north);
         }

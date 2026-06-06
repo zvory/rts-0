@@ -5,7 +5,7 @@ use super::*;
 use crate::game::ai_core::profiles::{RIFLE_FLOOD_FAST_ID, RIFLE_FLOOD_FULL_SATURATION_ID};
 use crate::game::command::SimCommand as Command;
 use crate::game::entity::{Entity, EntityKind, GatherPhase, Order};
-use crate::protocol::{kinds, EntityView};
+use crate::protocol::{kinds, terrain, EntityView};
 
 fn human_vs_ai_players() -> [PlayerInit; 2] {
     [
@@ -508,6 +508,66 @@ fn dev_scenario_snapshot_shows_runtime_movement_debug_path() {
         view.debug_path.is_some(),
         "dev scenario snapshots should include movement debug paths"
     );
+}
+
+#[test]
+fn wall_chokepoint_dev_scenario_matches_authored_layout() {
+    let setup = Game::new_scout_car_wall_chokepoint_scenario(15, 0x5150_0003)
+        .expect("scenario setup should succeed");
+    let mut game = setup.game;
+
+    assert_eq!(setup.units.len(), 15);
+    let wall_y = game.map.size - 18;
+    let gap_left_x = game.map.size / 2 - 1;
+    let gap_right_x = game.map.size / 2;
+    assert_eq!(
+        game.map.terrain[game.map.index(gap_left_x, wall_y)],
+        terrain::GRASS
+    );
+    assert_eq!(
+        game.map.terrain[game.map.index(gap_right_x, wall_y)],
+        terrain::GRASS
+    );
+    assert_eq!(
+        game.map.terrain[game.map.index(gap_left_x - 1, wall_y)],
+        terrain::ROCK
+    );
+    assert_eq!(
+        game.map.terrain[game.map.index(gap_right_x + 1, wall_y)],
+        terrain::ROCK
+    );
+
+    let start_y = (wall_y + 10) as f32 * config::TILE_SIZE as f32 + config::TILE_SIZE as f32 * 0.5;
+    let north = -std::f32::consts::FRAC_PI_2;
+    for unit in &setup.units {
+        let entity = game.entities.get(*unit).expect("scenario unit exists");
+        assert_eq!(entity.kind, EntityKind::ScoutCar);
+        assert!((entity.pos_y - start_y).abs() < 0.1);
+        assert!((entity.facing() - north).abs() < 0.001);
+    }
+
+    game.enqueue(
+        setup.player_id,
+        Command::Move {
+            units: setup.units.clone(),
+            x: setup.goal.0,
+            y: setup.goal.1,
+            queued: false,
+        },
+    );
+    game.tick();
+    for unit in setup.units {
+        let view = game
+            .snapshot_for(setup.player_id)
+            .entities
+            .into_iter()
+            .find(|entity| entity.id == unit)
+            .expect("scenario scout car should be visible to owner");
+        assert!(
+            view.debug_path.is_some(),
+            "wall chokepoint scenario should issue movement debug paths"
+        );
+    }
 }
 
 #[test]

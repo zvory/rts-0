@@ -78,12 +78,48 @@ const SCOUT_CAR_SNAKING_CORRIDOR_LAUNCHES: [DevScenarioLaunch; 12] = [
     },
 ];
 
-const DEV_SCENARIOS: [DevScenarioSpec; 1] = [DevScenarioSpec {
-    id: "scout_car_snaking_corridor",
-    title: "Scout Car Snaking Corridor",
-    description: "Movement/pathing debug run through a narrow authored corridor.",
-    launches: &SCOUT_CAR_SNAKING_CORRIDOR_LAUNCHES,
-}];
+const SCOUT_CAR_WALL_CHOKEPOINT_LAUNCHES: [DevScenarioLaunch; 5] = [
+    DevScenarioLaunch {
+        id: "scout_car_wall_chokepoint",
+        unit: EntityKind::ScoutCar,
+        count: 3,
+    },
+    DevScenarioLaunch {
+        id: "scout_car_wall_chokepoint",
+        unit: EntityKind::ScoutCar,
+        count: 5,
+    },
+    DevScenarioLaunch {
+        id: "scout_car_wall_chokepoint",
+        unit: EntityKind::ScoutCar,
+        count: 6,
+    },
+    DevScenarioLaunch {
+        id: "scout_car_wall_chokepoint",
+        unit: EntityKind::ScoutCar,
+        count: 10,
+    },
+    DevScenarioLaunch {
+        id: "scout_car_wall_chokepoint",
+        unit: EntityKind::ScoutCar,
+        count: 15,
+    },
+];
+
+const DEV_SCENARIOS: [DevScenarioSpec; 2] = [
+    DevScenarioSpec {
+        id: "scout_car_snaking_corridor",
+        title: "Scout Car Snaking Corridor",
+        description: "Movement/pathing debug run through a narrow authored corridor.",
+        launches: &SCOUT_CAR_SNAKING_CORRIDOR_LAUNCHES,
+    },
+    DevScenarioSpec {
+        id: "scout_car_wall_chokepoint",
+        title: "Scout Car Wall Chokepoint",
+        description: "Scout cars start beside each other below a stone wall gap and move north through the choke.",
+        launches: &SCOUT_CAR_WALL_CHOKEPOINT_LAUNCHES,
+    },
+];
 
 pub(crate) fn all_dev_scenarios() -> &'static [DevScenarioSpec] {
     &DEV_SCENARIOS
@@ -144,6 +180,14 @@ mod tests {
                 id: "scout_car_snaking_corridor",
                 unit: EntityKind::Tank,
                 count: 4,
+            })
+        );
+        assert_eq!(
+            parse_dev_scenario_room("scout_car_wall_chokepoint:unit=scout_car:count=15"),
+            Some(DevScenarioLaunch {
+                id: "scout_car_wall_chokepoint",
+                unit: EntityKind::ScoutCar,
+                count: 15,
             })
         );
     }

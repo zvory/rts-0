@@ -20,18 +20,21 @@ export function devWatchConfig() {
       "scout_car",
       "tank",
     ]);
-    if (
-      id !== "scout_car_snaking_corridor" ||
-      !supportedUnits.has(unit) ||
-      (count !== "1" && count !== "4")
-    ) {
+    const supportedScenario =
+      (id === "scout_car_snaking_corridor" &&
+        supportedUnits.has(unit) &&
+        (count === "1" || count === "4")) ||
+      (id === "scout_car_wall_chokepoint" &&
+        unit === "scout_car" &&
+        ["3", "5", "6", "10", "15"].includes(count));
+    if (!supportedScenario) {
       return null;
     }
     return {
-      room: `__dev_scenario__:scout_car_snaking_corridor:unit=${unit}:count=${count}`,
+      room: `__dev_scenario__:${id}:unit=${unit}:count=${count}`,
       noFog: true,
       kind: "scenario",
-      banner: `local dev scenario no fog scout_car_snaking_corridor unit=${unit} count=${count}`,
+      banner: `local dev scenario no fog ${id} unit=${unit} count=${count}`,
     };
   }
   if (window.location.pathname !== "/dev/selfplay" && !params.has("watchSelfplay")) return null;
