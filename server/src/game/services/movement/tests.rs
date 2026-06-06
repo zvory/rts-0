@@ -1371,6 +1371,13 @@ struct SnakingCorridorUnitTiming {
     final_state: Vec<String>,
 }
 
+#[derive(Debug, Clone)]
+struct WallChokepointTiming {
+    unit: EntityKind,
+    unit_count: usize,
+    clear_ticks: Vec<Option<u32>>,
+}
+
 const SNAKING_CORRIDOR_REGRESSION_BASELINES: &[(EntityKind, usize, u32)] = &[
     (EntityKind::Worker, 1, 2_303),
     (EntityKind::Worker, 4, 2_340),
@@ -1396,6 +1403,9 @@ const SNAKING_CORRIDOR_VEHICLE_SLOT_BASELINES: &[(EntityKind, usize, u32)] = &[
     (EntityKind::AtTeam, 2, 3_368),
     (EntityKind::AtTeam, 3, 3_448),
 ];
+
+const WALL_CHOKEPOINT_MAX_TICKS: u32 = 3_000;
+const WALL_CHOKEPOINT_AVERAGE_SCORE_BASELINE: u32 = 1_080;
 
 fn scout_car_snaking_corridor_map() -> (Map, u32, f32, (f32, f32), (f32, f32)) {
     let mut map = flat_map(1);
@@ -1536,6 +1546,62 @@ fn wall_chokepoint_units_clear_exit(
     })
 }
 
+fn measure_wall_chokepoint_clear_times(
+    unit: EntityKind,
+    unit_count: usize,
+) -> WallChokepointTiming {
+    let (map, exit_clear_y, starts, goal) = scout_car_wall_chokepoint_map(unit, unit_count);
+    let mut entities = EntityStore::new();
+    let units = spawn_wall_chokepoint_units(&mut entities, unit, starts);
+    let mut clear_ticks = vec![None; units.len()];
+    let mut pathing = PathingService::new(65_536, 512);
+
+    for tick in 1..=WALL_CHOKEPOINT_MAX_TICKS {
+        pathing.advance_tick(tick);
+        let occ = Occupancy::build(&map, &entities);
+        let mut coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, tick);
+        if tick == 1 {
+            coordinator.order_group_move(&mut entities, 1, &units, goal, false);
+        }
+        coordinator.process_awaiting_paths(&mut entities);
+
+        let spatial = SpatialIndex::build(&entities, map.size);
+        movement_system(&map, &mut entities, &mut [], &occ, &spatial, tick);
+        let spatial = SpatialIndex::build(&entities, map.size);
+        resolve_collisions(&mut entities, &spatial, &map, &occ);
+
+        for (slot, id) in units.iter().copied().enumerate() {
+            if clear_ticks[slot].is_none()
+                && unit_clears_wall_chokepoint_exit(&entities, unit, id, exit_clear_y)
+            {
+                clear_ticks[slot] = Some(tick);
+            }
+        }
+
+        if clear_ticks.iter().all(Option::is_some) {
+            break;
+        }
+    }
+
+    WallChokepointTiming {
+        unit,
+        unit_count,
+        clear_ticks,
+    }
+}
+
+fn unit_clears_wall_chokepoint_exit(
+    entities: &EntityStore,
+    unit: EntityKind,
+    id: u32,
+    exit_clear_y: f32,
+) -> bool {
+    let radius = config::unit_stats(unit).expect("unit stats").radius;
+    entities
+        .get(id)
+        .is_some_and(|e| e.pos_y + radius < exit_clear_y)
+}
+
 fn describe_units(entities: &EntityStore, units: &[u32]) -> Vec<String> {
     units
         .iter()
@@ -1557,6 +1623,29 @@ fn describe_units(entities: &EntityStore, units: &[u32]) -> Vec<String> {
                     .map(|m| m.scout_car_recovery_cooldown)
                     .unwrap_or(0),
             ))
+        })
+        .collect()
+}
+
+fn wall_chokepoint_timing_summary(results: &[WallChokepointTiming]) -> Vec<String> {
+    results
+        .iter()
+        .map(|result| {
+            let clear_ticks: Vec<String> = result
+                .clear_ticks
+                .iter()
+                .map(|ticks| {
+                    ticks
+                        .map(|ticks| ticks.to_string())
+                        .unwrap_or_else(|| "timeout".to_string())
+                })
+                .collect();
+            format!(
+                "{} count={}: [{}]",
+                result.unit,
+                result.unit_count,
+                clear_ticks.join(", ")
+            )
         })
         .collect()
 }
@@ -1970,6 +2059,73 @@ fn scout_car_wall_chokepoint_five_clear_without_parallel_nose_wedge() {
     panic!(
         "five scout cars failed to clear wall chokepoint within {max_ticks} ticks; state={:?}",
         describe_units(&entities, &units)
+    );
+}
+
+#[test]
+fn wall_chokepoint_average_clear_time_regression() {
+    let scenarios = [
+        (EntityKind::AtTeam, 3usize),
+        (EntityKind::AtTeam, 5usize),
+        (EntityKind::AtTeam, 6usize),
+        (EntityKind::AtTeam, 10usize),
+        (EntityKind::AtTeam, 15usize),
+        (EntityKind::ScoutCar, 3usize),
+        (EntityKind::ScoutCar, 5usize),
+        (EntityKind::ScoutCar, 6usize),
+        (EntityKind::ScoutCar, 10usize),
+        (EntityKind::ScoutCar, 15usize),
+        (EntityKind::Tank, 3usize),
+        (EntityKind::Tank, 5usize),
+        (EntityKind::Tank, 6usize),
+        (EntityKind::Tank, 10usize),
+        (EntityKind::Tank, 15usize),
+    ];
+    let results: Vec<_> = scenarios
+        .into_iter()
+        .map(|(unit, count)| measure_wall_chokepoint_clear_times(unit, count))
+        .collect();
+
+    let mut total_score = 0u64;
+    let mut total_slots = 0u64;
+
+    println!("WALL_CHOKEPOINT_CLEAR_TIMES");
+    println!("unit | count | clear_ticks | score_ticks");
+    for result in &results {
+        let mut clear_tick_cells = Vec::with_capacity(result.clear_ticks.len());
+        let mut score_cells = Vec::with_capacity(result.clear_ticks.len());
+        for (slot, clear_ticks) in result.clear_ticks.iter().enumerate() {
+            let score = clear_ticks.unwrap_or(WALL_CHOKEPOINT_MAX_TICKS);
+            total_score = total_score.saturating_add(score as u64);
+            total_slots = total_slots.saturating_add(1);
+            clear_tick_cells.push(format!(
+                "{slot}:{}",
+                clear_ticks
+                    .map(|ticks| ticks.to_string())
+                    .unwrap_or_else(|| "timeout".to_string())
+            ));
+            score_cells.push(format!("{slot}:{score}"));
+        }
+        println!(
+            "{:>14} | {:>5} | {:>11} | {:>11}",
+            result.unit,
+            result.unit_count,
+            clear_tick_cells.join(","),
+            score_cells.join(",")
+        );
+    }
+
+    let average_score = (total_score / total_slots) as u32;
+    println!(
+        "WALL_CHOKEPOINT_AVERAGE_SCORE average_score={} baseline={} max_ticks={}",
+        average_score, WALL_CHOKEPOINT_AVERAGE_SCORE_BASELINE, WALL_CHOKEPOINT_MAX_TICKS
+    );
+    assert!(
+        average_score.saturating_mul(10) <= WALL_CHOKEPOINT_AVERAGE_SCORE_BASELINE.saturating_mul(11),
+        "wall chokepoint average score regressed: {} ticks vs baseline {} (>10% slower); results={:?}",
+        average_score,
+        WALL_CHOKEPOINT_AVERAGE_SCORE_BASELINE,
+        wall_chokepoint_timing_summary(&results)
     );
 }
 
