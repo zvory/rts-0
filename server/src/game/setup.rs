@@ -187,6 +187,86 @@ impl Game {
         })
     }
 
+    pub(crate) fn new_direct_reverse_order_scenario(
+        unit: EntityKind,
+        unit_count: usize,
+        seed: u32,
+    ) -> Result<DevScenarioSetup, String> {
+        if !matches!(
+            unit,
+            EntityKind::AtTeam | EntityKind::ScoutCar | EntityKind::Tank
+        ) {
+            return Err(format!("unsupported direct-reverse-order unit {unit}"));
+        }
+        if unit_count != 1 {
+            return Err(format!(
+                "unsupported direct-reverse-order unit count {unit_count}"
+            ));
+        }
+
+        let mut map = flat_dev_map(1);
+        let start_tile = (48, 48);
+        let start = map.tile_center(start_tile.0, start_tile.1);
+        let goal = (start.0 - config::TILE_SIZE as f32 * 15.0, start.1);
+        if let Some(slot) = map.starts.get_mut(0) {
+            *slot = start_tile;
+        }
+
+        let mut entities = EntityStore::new();
+        let unit_id = entities
+            .spawn_unit(1, unit, start.0, start.1)
+            .ok_or_else(|| format!("failed to spawn {unit}"))?;
+        if let Some(e) = entities.get_mut(unit_id) {
+            e.set_facing(0.0);
+        }
+
+        let player_id = 1;
+        let player = PlayerState {
+            id: player_id,
+            name: "Scenario".to_string(),
+            color: "#4878c8".to_string(),
+            start_tile,
+            steel: 0,
+            oil: 10_000,
+            supply_used: 0,
+            supply_cap: 0,
+            is_ai: false,
+            score: ScoreState::default(),
+        };
+
+        let spatial = services::spatial::SpatialIndex::build(&entities, map.size);
+        let pathing = services::pathing::PathingService::new(65_536, 256);
+        let rng = SmallRng::seed_from_u64(seed as u64);
+        let mut game = Game {
+            map,
+            entities,
+            fog: Fog::new(96),
+            players: vec![player],
+            ai: Vec::new(),
+            pending: Vec::new(),
+            command_log: Vec::new(),
+            tick: 0,
+            spatial,
+            pathing,
+            lingering_sight: Vec::new(),
+            seed,
+            starting_steel: 0,
+            starting_oil: 0,
+            debug_path_overlays: true,
+            rng,
+        };
+        let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
+        game.fog = Fog::new(game.map.size);
+        game.fog.recompute(&ids, &game.entities, &game.map);
+
+        Ok(DevScenarioSetup {
+            game,
+            player_id,
+            units: vec![unit_id],
+            goal,
+        })
+    }
+
     pub(crate) fn seed(&self) -> u32 {
         self.seed
     }
@@ -667,6 +747,34 @@ mod tests {
             .iter()
             .filter(|e| e.owner == owner && e.kind == kind)
             .count()
+    }
+
+    #[test]
+    fn direct_reverse_order_scenario_faces_unit_east_and_orders_goal_behind() {
+        for unit in [EntityKind::AtTeam, EntityKind::ScoutCar, EntityKind::Tank] {
+            let setup = Game::new_direct_reverse_order_scenario(unit, 1, 0x5150_0003)
+                .expect("scenario setup should succeed");
+            let unit_id = *setup.units.first().expect("scenario should spawn one unit");
+            let entity = setup
+                .game
+                .entities
+                .get(unit_id)
+                .expect("scenario unit should exist");
+            let goal_delta_x = entity.pos_x - setup.goal.0;
+            assert!(
+                (goal_delta_x - config::TILE_SIZE as f32 * 15.0).abs() <= 0.001,
+                "{unit} should receive a goal 15 tiles behind, delta {goal_delta_x:.2}"
+            );
+            assert!(
+                (entity.pos_y - setup.goal.1).abs() <= 0.001,
+                "{unit} goal should be directly behind on the same y axis"
+            );
+            assert!(
+                entity.facing().abs() <= 0.001,
+                "{unit} should begin facing east, facing {:.4}",
+                entity.facing()
+            );
+        }
     }
 
     #[test]

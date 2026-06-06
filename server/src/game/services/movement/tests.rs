@@ -4083,6 +4083,38 @@ fn tank_still_pivots_for_far_goal_behind() {
 }
 
 #[test]
+fn tank_does_not_reverse_for_behind_intermediate_waypoint() {
+    let map = flat_map(1);
+    let mut entities = EntityStore::new();
+    let (sx, sy) = map.tile_center(20, 20);
+    let behind = (sx - config::TILE_SIZE as f32, sy);
+    let goal = (sx + config::TILE_SIZE as f32 * 8.0, sy);
+    let tank = entities
+        .spawn_unit(1, EntityKind::Tank, sx, sy)
+        .expect("tank should spawn");
+    if let Some(e) = entities.get_mut(tank) {
+        e.set_facing(0.0);
+    }
+    set_path_direct(&mut entities, tank, vec![behind, goal]);
+
+    let occ = Occupancy::build(&map, &entities);
+    let spatial = SpatialIndex::build(&entities, map.size);
+    movement_system(&map, &mut entities, &mut [], &occ, &spatial, 0);
+
+    let e = entities.get(tank).expect("tank should exist");
+    let moved = moved_distance((sx, sy), (e.pos_x, e.pos_y));
+    assert!(
+        moved <= 0.01,
+        "behind intermediate waypoint should make the tank pivot before moving, moved {moved:.4}px"
+    );
+    assert!(
+        e.facing().abs() > 0.0 && e.facing().abs() <= TANK_BODY_TURN_RATE_RAD_PER_TICK + 0.0001,
+        "tank should rotate toward the behind waypoint instead of staying in reverse-facing gear, facing {:.4}",
+        e.facing()
+    );
+}
+
+#[test]
 fn tank_reverse_correction_uses_short_angle_across_wrap() {
     let map = flat_map(1);
     let mut entities = EntityStore::new();

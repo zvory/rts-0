@@ -202,7 +202,8 @@ pub(super) fn tank_drive_intent(
     }
 
     let forward_desired = dy.atan2(dx);
-    if dist <= TANK_REVERSE_GOAL_DISTANCE_PX
+    if tank_desired_point_is_final_waypoint(e, (desired_x, desired_y))
+        && dist <= TANK_REVERSE_GOAL_DISTANCE_PX
         && angle_delta(e.facing(), forward_desired).abs() > TANK_REVERSE_MIN_BEHIND_ANGLE_RAD
     {
         return Some(TankDriveIntent {
@@ -269,4 +270,11 @@ pub(super) fn tank_desired_path_point(
     y: f32,
 ) -> Option<(f32, f32)> {
     vehicle_desired_path_point(map, occ, e, x, y)
+}
+
+fn tank_desired_point_is_final_waypoint(e: &Entity, desired: (f32, f32)) -> bool {
+    let Some(path) = e.movement.as_ref().map(|m| m.path.as_slice()) else {
+        return false;
+    };
+    path.len() == 1 && distance_between(path[0], desired) <= 1.0e-3
 }

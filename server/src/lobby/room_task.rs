@@ -55,6 +55,7 @@ pub(super) struct DevScenarioConfig {
 #[derive(Clone)]
 pub(super) enum DevScenarioId {
     ScoutCarSnakingCorridor,
+    DirectReverseOrder,
 }
 
 enum DevDriver {
@@ -770,6 +771,20 @@ impl RoomTask {
             RoomMode::DevScenario(config) => match config.id {
                 DevScenarioId::ScoutCarSnakingCorridor => {
                     let setup = Game::new_snaking_corridor_scenario(
+                        config.unit,
+                        config.count,
+                        match_seed(),
+                    )?;
+                    let driver = DevScenarioDriver {
+                        player_id: setup.player_id,
+                        units: setup.units,
+                        goal: setup.goal,
+                        issued: false,
+                    };
+                    Ok((setup.game, DevDriver::Scenario(driver), setup.player_id))
+                }
+                DevScenarioId::DirectReverseOrder => {
+                    let setup = Game::new_direct_reverse_order_scenario(
                         config.unit,
                         config.count,
                         match_seed(),
