@@ -16,8 +16,9 @@ export class Net {
   /**
    * @param {string} url WebSocket url (derived from window.location in main.js).
    */
-  constructor(url) {
+  constructor(url, diagnostics = null) {
     this.url = url;
+    this.diagnostics = diagnostics;
     /** @type {WebSocket|null} */
     this.ws = null;
     /** @type {Map<string, Set<Function>>} type -> handlers */
@@ -45,11 +46,13 @@ export class Net {
   connect() {
     return new Promise((resolve, reject) => {
       let settled = false;
+      this.diagnostics?.mark("ws.connect.start", { url: this.url });
       const ws = new WebSocket(this.url);
       this.ws = ws;
 
       ws.addEventListener("open", () => {
         settled = true;
+        this.diagnostics?.mark("ws.open");
         this._emit("open");
         resolve();
       });
@@ -59,11 +62,13 @@ export class Net {
         // connect() promise. Errors after open are surfaced via "close".
         if (!settled) {
           settled = true;
+          this.diagnostics?.mark("ws.error.before_open");
           reject(new Error("WebSocket connection failed"));
         }
       });
 
       ws.addEventListener("close", () => {
+        this.diagnostics?.mark("ws.close");
         this._emit("close");
       });
 
@@ -206,7 +211,9 @@ export class Net {
    */
   _send(obj) {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return false;
-    this.ws.send(JSON.stringify(obj));
+    const json = JSON.stringify(obj);
+    this.diagnostics?.mark(`client.send.${obj?.t || "unknown"}`, { bytes: json.length });
+    this.ws.send(json);
     return true;
   }
 
@@ -224,6 +231,9 @@ export class Net {
       return;
     }
     if (!m || typeof m.t !== "string") return;
+    this.diagnostics?.mark(`server.recv.${m.t}`, {
+      bytes: typeof ev.data === "string" ? ev.data.length : undefined,
+    });
 
     switch (m.t) {
       case S.WELCOME:

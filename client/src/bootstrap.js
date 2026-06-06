@@ -3,6 +3,60 @@ export function wsUrl() {
   return `${scheme}://${window.location.host}/ws`;
 }
 
+function diagnosticsEnabled() {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    if (params.has("rtsDebug")) return params.get("rtsDebug") !== "0";
+    return window.localStorage.getItem("rts.debug") === "1";
+  } catch {
+    return false;
+  }
+}
+
+function summarizeDetail(detail) {
+  if (!detail || typeof detail !== "object") return detail;
+  const out = {};
+  for (const [key, value] of Object.entries(detail)) {
+    if (Array.isArray(value)) out[key] = `array(${value.length})`;
+    else if (value && typeof value === "object") out[key] = "{...}";
+    else out[key] = value;
+  }
+  return out;
+}
+
+export const diagnostics = {
+  enabled: diagnosticsEnabled(),
+  marks: [],
+
+  mark(label, detail) {
+    if (!this.enabled) return;
+    const at = performance.now();
+    const entry = { at, label, detail: summarizeDetail(detail) };
+    this.marks.push(entry);
+    if (this.marks.length > 500) this.marks.splice(0, this.marks.length - 500);
+    try {
+      performance.mark(`rts:${label}`);
+    } catch {
+      // Some WebViews reject dynamic mark names; console output still has the data.
+    }
+    console.debug(`[rts-debug] ${at.toFixed(1)} ${label}`, entry.detail || "");
+  },
+
+  time(label, detail, fn) {
+    if (!this.enabled) return fn();
+    const start = performance.now();
+    this.mark(`${label}:start`, detail);
+    try {
+      return fn();
+    } finally {
+      const durationMs = performance.now() - start;
+      this.mark(`${label}:end`, { ...detail, durationMs: Number(durationMs.toFixed(1)) });
+    }
+  },
+};
+
+if (typeof window !== "undefined") window.__rtsDebug = diagnostics;
+
 
 
 export function devWatchConfig() {
