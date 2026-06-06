@@ -107,6 +107,8 @@ pub struct CombatState {
     pub desired_weapon_facing: f32,
     /// Fixed center of a manually emplaced AT gun's field of fire.
     pub emplacement_facing: Option<f32>,
+    /// Pending facing to apply when a TearingDownToRedeploy phase completes.
+    pub pending_redeploy_facing: Option<f32>,
 }
 
 impl Default for CombatState {
@@ -118,6 +120,7 @@ impl Default for CombatState {
             weapon_facing: 0.0,
             desired_weapon_facing: 0.0,
             emplacement_facing: None,
+            pending_redeploy_facing: None,
         }
     }
 }
@@ -128,6 +131,8 @@ pub enum WeaponSetup {
     SettingUp { ticks: u16 },
     Deployed,
     TearingDown { ticks: u16 },
+    /// Tearing down in order to re-deploy at a new facing. Sent as "tearing_down" on the wire.
+    TearingDownToRedeploy { ticks: u16 },
 }
 
 impl WeaponSetup {
@@ -136,7 +141,9 @@ impl WeaponSetup {
             WeaponSetup::Packed => "packed",
             WeaponSetup::SettingUp { .. } => "setting_up",
             WeaponSetup::Deployed => "deployed",
-            WeaponSetup::TearingDown { .. } => "tearing_down",
+            WeaponSetup::TearingDown { .. } | WeaponSetup::TearingDownToRedeploy { .. } => {
+                "tearing_down"
+            }
         }
     }
 }
