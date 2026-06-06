@@ -1520,6 +1520,7 @@ fn scout_car_snaking_corridor_clear_times() {
         measure_snaking_corridor_clear_time(1),
         measure_snaking_corridor_clear_time(4),
     ];
+    let baselines = [(1usize, 1_577u32), (4usize, 1_654u32)];
 
     println!("SCOUT_CAR_SNAKING_CORRIDOR_CLEAR_TIMES");
     println!("cars | clear_ticks | clear_seconds | final_state");
@@ -1534,6 +1535,27 @@ fn scout_car_snaking_corridor_clear_times() {
                 result.car_count, "timeout", "timeout", result.final_state
             ),
         }
+    }
+
+    for result in &results {
+        let baseline = baselines
+            .iter()
+            .find_map(|(cars, ticks)| (*cars == result.car_count).then_some(*ticks))
+            .expect("baseline should exist for each supported scout-car scenario");
+        let clear_ticks = result.clear_ticks.unwrap_or_else(|| {
+            panic!(
+                "scout-car snaking corridor cars={} timed out; final_state={:?}",
+                result.car_count, result.final_state
+            )
+        });
+        assert!(
+            clear_ticks.saturating_mul(10) <= baseline.saturating_mul(11),
+            "scout-car snaking corridor cars={} regressed: {} ticks vs baseline {} (>10% slower); final_state={:?}",
+            result.car_count,
+            clear_ticks,
+            baseline,
+            result.final_state
+        );
     }
 }
 
