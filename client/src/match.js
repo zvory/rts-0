@@ -23,6 +23,10 @@ import { dom, isTextEntry } from "./bootstrap.js";
 
 const KAR98K_GAIN = 0.25;
 const MG_BURST_GAIN = 0.7;
+const MATCH_PING_MS = 2000;
+const LATENCY_ISSUE_MS = 180;
+const JITTER_ISSUE_MS = 20;
+const JITTER_WINDOW = 8;
 
 const COMBAT_SOUNDS = Object.freeze({
   [KIND.TANK]: {
@@ -58,15 +62,33 @@ export class Match {
    * @param {object} payload §2.3 start payload
    * @param {(msg: string) => void} toast surface a notice in the App's toast
    */
-  constructor(net, payload, toast, devWatch, audio) {
+  constructor(net, payload, toast, devWatch, audio, statusBadge) {
     this.net = net;
     this.toast = toast;
     this.devWatch = devWatch;
     this.audio = audio;
+    this.statusBadge = statusBadge;
     this.missingCombatSoundKinds = new Set();
     this.activeMachineGunSoundKeys = new Map();
     this.replaySpeedHandler = null;
     this.giveUpSent = false;
+    this.matchPingTimer = undefined;
+    this.lastLatencySampleAt = 0;
+    this.snapshotJitterDeltas = [];
+    this.lastSnapshotArrivedAt = null;
+    this.lastServerNetStatus = null;
+    this.health = {
+      latencyMs: null,
+      serverTickMs: null,
+      serverLagMs: null,
+      jitterMs: null,
+      issues: {
+        latency: { active: false, count: 0 },
+        slowTick: { active: false, count: 0 },
+        headOfLine: { active: false, count: 0 },
+        jitter: { active: false, count: 0 },
+      },
+    };
 
     // --- Build the module graph from the static start payload (DESIGN.md §4.1). ---
     this.state = new GameState(payload);
@@ -101,7 +123,11 @@ export class Match {
 
     // --- Listeners (bound so they can be removed on destroy). ---
     this.onSnapshot = (m) => {
+      const now = performance.now();
+      this.noteSnapshotArrival(now);
       this.state.applySnapshot(m);
+      this.lastServerNetStatus = m?.netStatus || null;
+      this.applyServerNetStatus();
       this.stopInactiveMachineGunSounds();
       this.handleSnapshotEvents(m.events || []);
     };
@@ -127,6 +153,8 @@ export class Match {
     this.syncPointerLockUi();
 
     this.rafId = requestAnimationFrame(this.tickFn);
+    this.startMatchPings();
+    this.publishStatusBadge();
 
     // Show speed controls for replay and scenario dev-watch rooms.
     const isReplay = this.devWatch?.kind === "replay";
@@ -156,6 +184,68 @@ export class Match {
       dom.replaySpeed.addEventListener("click", this.replaySpeedHandler);
     }
     this.applySpectatorUi();
+  }
+
+  startMatchPings() {
+    this.stopMatchPings();
+    this.net.ping();
+    this.matchPingTimer = window.setInterval(() => this.net.ping(), MATCH_PING_MS);
+  }
+
+  stopMatchPings() {
+    if (this.matchPingTimer !== undefined) {
+      clearInterval(this.matchPingTimer);
+      this.matchPingTimer = undefined;
+    }
+  }
+
+  noteSnapshotArrival(now) {
+    if (!document.hidden && this.lastSnapshotArrivedAt != null) {
+      const delta = Math.abs((now - this.lastSnapshotArrivedAt) - SNAPSHOT_MS);
+      this.snapshotJitterDeltas.push(delta);
+      if (this.snapshotJitterDeltas.length > JITTER_WINDOW) {
+        this.snapshotJitterDeltas.splice(0, this.snapshotJitterDeltas.length - JITTER_WINDOW);
+      }
+      this.health.jitterMs = Math.max(...this.snapshotJitterDeltas, 0);
+      const jitterActive = delta >= JITTER_ISSUE_MS;
+      this.health.issues.jitter.active = jitterActive;
+      if (jitterActive) {
+        this.health.issues.jitter.count += 1;
+      }
+    }
+    this.lastSnapshotArrivedAt = now;
+  }
+
+  applyServerNetStatus() {
+    const status = this.lastServerNetStatus;
+    if (!status) return;
+    this.health.serverTickMs = status.tickMs;
+    this.health.serverLagMs = status.serverLagMs;
+    this.health.issues.slowTick.active = !!status.slowTick;
+    this.health.issues.slowTick.count = status.slowTickCount || 0;
+    this.health.issues.headOfLine.active = !!status.headOfLine;
+    this.health.issues.headOfLine.count = status.headOfLineCount || 0;
+  }
+
+  refreshLatencyHealth() {
+    if (this.net.latencyUpdatedAt === this.lastLatencySampleAt) return;
+    this.lastLatencySampleAt = this.net.latencyUpdatedAt;
+    this.health.latencyMs = this.net.latency;
+    const latencyActive = Number.isFinite(this.net.latency) && this.net.latency >= LATENCY_ISSUE_MS;
+    this.health.issues.latency.active = latencyActive;
+    if (latencyActive) {
+      this.health.issues.latency.count += 1;
+    }
+  }
+
+  publishStatusBadge() {
+    this.statusBadge?.setMatchMetrics({
+      latencyMs: this.health.latencyMs,
+      serverTickMs: this.health.serverTickMs,
+      serverLagMs: this.health.serverLagMs,
+      jitterMs: this.health.jitterMs,
+      issues: this.health.issues,
+    });
   }
 
   applySpectatorUi() {
@@ -455,6 +545,7 @@ export class Match {
 
     const dt = (now - this.lastFrame) / 1000; // seconds since last frame
     this.lastFrame = now;
+    this.refreshLatencyHealth();
 
     const alpha = this.computeAlpha();
 
@@ -473,6 +564,7 @@ export class Match {
     this.renderer.render(this.state, this.camera, this.fog, alpha);
     this.hud.update();
     this.minimap.render();
+    this.publishStatusBadge();
 
     this.rafId = requestAnimationFrame(this.tickFn);
   }
@@ -512,6 +604,7 @@ export class Match {
    */
   destroy() {
     this.stop();
+    this.stopMatchPings();
     this.stopAllMachineGunSounds();
     this.net.off(S.SNAPSHOT, this.onSnapshot);
     window.removeEventListener("resize", this.onResize);

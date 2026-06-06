@@ -121,7 +121,7 @@ export const NOTICE_SEVERITY = Object.freeze({
 });
 
 // --- Compact snapshot wire schema (must match protocol.rs) ---
-export const COMPACT_SNAPSHOT_VERSION = 4;
+export const COMPACT_SNAPSHOT_VERSION = 5;
 
 export const KIND_CODE = Object.freeze({
   [KIND.WORKER]: 1,
@@ -217,6 +217,21 @@ function decodeCompactSnapshot(raw) {
     playerResources: readOptionalArray(raw.pr, "playerResources", 32).map(
       decodeCompactPlayerResource,
     ),
+    netStatus: decodeCompactNetStatus(raw.n),
+  };
+}
+
+function decodeCompactNetStatus(record) {
+  const fields = readArray(record, "netStatus", 5);
+  if (fields.length !== 5) throw new Error("netStatus field count mismatch");
+  const flags = readU32(fields[2], "netStatus.flags");
+  return {
+    serverLagMs: readU32(fields[0], "netStatus.serverLagMs"),
+    tickMs: readU32(fields[1], "netStatus.tickMs"),
+    slowTick: !!(flags & 1),
+    slowTickCount: readU32(fields[3], "netStatus.slowTickCount"),
+    headOfLine: !!(flags & 2),
+    headOfLineCount: readU32(fields[4], "netStatus.headOfLineCount"),
   };
 }
 

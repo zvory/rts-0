@@ -32,6 +32,7 @@ fn test_snapshot(tick: u32, resource_deltas: Vec<ResourceDelta>) -> Snapshot {
         resource_deltas,
         events: Vec::new(),
         player_resources: Vec::new(),
+        net_status: crate::protocol::SnapshotNetStatus::default(),
     }
 }
 
@@ -202,6 +203,7 @@ fn wire_compaction_removes_resource_entities_but_keeps_deltas() {
             severity: crate::protocol::NoticeSeverity::Info,
         }],
         player_resources: Vec::new(),
+        net_status: crate::protocol::SnapshotNetStatus::default(),
     };
 
     compact_snapshot_for_wire(&mut snapshot);
@@ -239,6 +241,7 @@ fn wire_compaction_converts_visible_resource_death_to_zero_delta() {
             kind: kinds::STEEL.to_string(),
         }],
         player_resources: Vec::new(),
+        net_status: crate::protocol::SnapshotNetStatus::default(),
     };
 
     compact_snapshot_for_wire(&mut snapshot);

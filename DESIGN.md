@@ -167,18 +167,26 @@ transport decode:
   entities: Entity[],            // your non-resource entities (always) + enemies on live/death-vision-visible tiles
   resourceDeltas?: ResourceDelta[], // visible resource remaining updates; omitted when empty
   events: Event[],               // transient things to surface (see 2.5)
-  playerResources?: {id, steel, oil, supplyUsed, supplyCap}[]  // all players; spectator/replay mode only
+  playerResources?: {id, steel, oil, supplyUsed, supplyCap}[], // all players; spectator/replay mode only
+  netStatus: {                // per-recipient server-side health for the current match
+    serverLagMs: u16,         // how late this room started the tick vs its scheduled time
+    tickMs: u16,              // elapsed room-tick work so far when this snapshot was built
+    slowTick: bool,           // true when the room was at/over its tick budget this tick
+    slowTickCount: u32,       // number of slow-tick incidents so far this match
+    headOfLine: bool,         // true when an older unsent snapshot was still pending for this client
+    headOfLineCount: u32      // number of pending-snapshot replacements so far this match
+  }
 }
 ```
 
-Live WebSocket snapshot frames are sent as compact JSON text, version 4. `client/src/net.js`
+Live WebSocket snapshot frames are sent as compact JSON text, version 5. `client/src/net.js`
 decodes this transport shape back into the semantic object above before dispatching `S.SNAPSHOT`.
 Older object-shaped JSON snapshots remain decodable by the client for fallback/dev use.
 
 ```
 {
   "t": "snapshot",
-  "v": 4,
+  "v": 5,
   "s": [tick, steel, oil, supplyUsed, supplyCap],
   "e": [
     [
@@ -190,7 +198,8 @@ Older object-shaped JSON snapshots remain decodable by the client for fallback/d
   ],
   "r": [[id, remaining]],         // omitted when empty
   "ev": [EventRecord],            // omitted when empty
-  "pr": [[id, steel, oil, supplyUsed, supplyCap]]  // omitted in normal play; present in spectator/replay
+  "pr": [[id, steel, oil, supplyUsed, supplyCap]], // omitted in normal play; present in spectator/replay
+  "n": [serverLagMs, tickMs, flags, slowTickCount, headOfLineCount]
 }
 ```
 
@@ -213,7 +222,7 @@ The `activeMarker` slot uses the same point-marker shape for the owner-only curr
 move/attack-move destination, letting clients draw the active leg before future queued stages.
 `visionOnly` is true only for non-owned units/buildings visible through lingering death vision;
 clients render them below the fog overlay and must not select or issue targeted commands against
-them.
+them. In `n.flags`, bit 0 = `slowTick` and bit 1 = `headOfLine`.
 
 `ResourceDelta`: `{ id: u32, remaining: u32 }`. Resource node positions/kinds are static and come
 from `start.map.resources`; clients keep last-known `remaining` locally. The server sends
