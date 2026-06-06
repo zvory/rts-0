@@ -45,7 +45,7 @@ for arg in "$@"; do
   esac
 done
 
-echo "running all tests silently, will take a while, patience"
+echo "running all tests silently, can take up to five minutes, patience"
 
 if ! command -v node >/dev/null 2>&1; then
   echo "node not found on PATH — the API suites need Node >= 22 (built-in WebSocket)." >&2
