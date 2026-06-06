@@ -798,6 +798,7 @@ enum StartingLoadout {
 
 /// Spawn the debug-mode extras for a human player. Default starts already include four workers,
 /// so this adds one more worker plus five of every combat unit for a final five of each unit kind.
+/// It also seeds a side-corner stash of extra depots for fast supply-cap testing.
 fn spawn_debug_human_start(
     entities: &mut EntityStore,
     map: &Map,
@@ -817,6 +818,8 @@ fn spawn_debug_human_start(
         (EntityKind::Factory, -4.0, 17.0),
         (EntityKind::Factory, 4.0, 17.0),
     ];
+    const DEBUG_CORNER_DEPOT_COLUMNS: u32 = 5;
+    const DEBUG_CORNER_DEPOT_ROWS: u32 = 2;
     const DEBUG_UNITS: &[(EntityKind, u32)] = &[
         (EntityKind::Worker, 1),
         (EntityKind::Rifleman, 5),
@@ -833,6 +836,18 @@ fn spawn_debug_human_start(
             .is_some()
         {
             player.record_entity_created(kind);
+        }
+    }
+
+    for row in 0..DEBUG_CORNER_DEPOT_ROWS {
+        for col in 0..DEBUG_CORNER_DEPOT_COLUMNS {
+            let (x, y) = debug_side_corner_world(map, start, col, row);
+            if entities
+                .spawn_building(player.id, EntityKind::Depot, x, y, true)
+                .is_some()
+            {
+                player.record_entity_created(EntityKind::Depot);
+            }
         }
     }
 
@@ -965,6 +980,25 @@ fn debug_offset_world(
     )
 }
 
+fn debug_side_corner_world(map: &Map, start: (u32, u32), col: u32, row: u32) -> (f32, f32) {
+    const CORNER_INSET_TILES: u32 = 4;
+    const CORNER_SPACING_TILES: u32 = 4;
+
+    let max_tile = map.size.saturating_sub(1);
+    let mid = map.size / 2;
+    let x_tile = if start.0 < mid {
+        CORNER_INSET_TILES + col * CORNER_SPACING_TILES
+    } else {
+        max_tile.saturating_sub(CORNER_INSET_TILES + col * CORNER_SPACING_TILES)
+    };
+    let y_tile = if start.1 < mid {
+        max_tile.saturating_sub(CORNER_INSET_TILES + row * CORNER_SPACING_TILES)
+    } else {
+        CORNER_INSET_TILES + row * CORNER_SPACING_TILES
+    };
+    map.tile_center(x_tile.min(max_tile), y_tile.min(max_tile))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1027,7 +1061,7 @@ mod tests {
             1,
         );
 
-        assert_eq!(owned_kind_count(&game, 1, EntityKind::Depot), 5);
+        assert_eq!(owned_kind_count(&game, 1, EntityKind::Depot), 15);
         assert_eq!(owned_kind_count(&game, 1, EntityKind::Steelworks), 1);
         assert_eq!(owned_kind_count(&game, 1, EntityKind::TrainingCentre), 1);
         assert_eq!(owned_kind_count(&game, 1, EntityKind::Barracks), 2);
