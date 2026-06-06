@@ -282,6 +282,7 @@
       <div class="actions">
         <button id="load-file" type="button">Load</button>
         <button id="save-file" type="button">Save JSON</button>
+        <button id="save-as-file" type="button">Save As</button>
         <button id="reset-map" type="button">Reload Default</button>
         <input id="file-input" class="file-input" type="file" accept="application/json,.json" />
       </div>
@@ -734,6 +735,41 @@
         URL.revokeObjectURL(link.href);
       }
 
+      async function saveMapAs() {
+        const errors = validationErrors();
+        if (errors.length) {
+          setStatus(errors[0], true);
+          return;
+        }
+        const suggested = map.name || "handcrafted-map";
+        const raw = window.prompt("Save map as (lowercase letters, digits, hyphens):", suggested);
+        if (raw === null) return;
+        const name = raw.trim().toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
+        if (!name) {
+          setStatus("invalid name", true);
+          return;
+        }
+        const payload = { name, terrain: map.terrain, baseSites: map.baseSites };
+        try {
+          setStatus("saving…");
+          const resp = await fetch("/maps/save", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name, payload }),
+          });
+          if (!resp.ok) {
+            const msg = await resp.text();
+            setStatus(`save failed: ${msg}`, true);
+            return;
+          }
+          map.name = name;
+          refresh();
+          setStatus(`saved as ${name}.json`);
+        } catch (err) {
+          setStatus(`save error: ${err.message}`, true);
+        }
+      }
+
       document.getElementById("tools").addEventListener("click", (event) => {
         const button = event.target.closest("[data-tool]");
         if (!button) return;
@@ -803,6 +839,7 @@
         }
       });
       document.getElementById("save-file").addEventListener("click", saveMap);
+      document.getElementById("save-as-file").addEventListener("click", saveMapAs);
       document.getElementById("reset-map").addEventListener("click", loadDefault);
       document.getElementById("resize-map").addEventListener("click", () => {
         resizeMap(Number(sizeInput.value));
