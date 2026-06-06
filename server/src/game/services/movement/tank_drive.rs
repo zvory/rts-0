@@ -130,10 +130,10 @@ pub(super) fn vehicle_traffic_adjustment(
             continue;
         }
         let lateral = dx * side.0 + dy * side.1;
-        let neighbor_radius = unit_body_for_entity(neighbor)
-            .map(|body| body.bounding_radius())
+        let neighbor_half_width = traffic_body_half_width(kind, neighbor.kind)
+            .or_else(|| unit_body_for_entity(neighbor).map(|body| body.bounding_radius()))
             .unwrap_or_else(|| neighbor.radius());
-        if lateral.abs() > vehicle_half_width + neighbor_radius {
+        if lateral.abs() > vehicle_half_width + neighbor_half_width {
             continue;
         }
 
@@ -177,6 +177,11 @@ fn vehicle_body_half_width_with_clearance(kind: EntityKind) -> f32 {
         }
         _ => config::TANK_BODY_WIDTH_PX * 0.5 + config::TANK_BODY_CLEARANCE_PX,
     }
+}
+
+fn traffic_body_half_width(ego_kind: EntityKind, neighbor_kind: EntityKind) -> Option<f32> {
+    (ego_kind == EntityKind::ScoutCar && uses_oriented_vehicle_body(neighbor_kind))
+        .then(|| vehicle_body_half_width_with_clearance(neighbor_kind))
 }
 
 pub(super) fn vehicle_body_turn_rate(kind: EntityKind) -> f32 {
