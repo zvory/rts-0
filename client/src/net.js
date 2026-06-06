@@ -188,6 +188,14 @@ export class Net {
     this._send(msg.seekReplay(ticksBack));
   }
 
+  /**
+   * Host selects a map by name (lobby phase only).
+   * @param {string} map map display name
+   */
+  selectMap(map) {
+    this._send(msg.selectMap(map));
+  }
+
   // --- internals ----------------------------------------------------------
 
   /**

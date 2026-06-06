@@ -16,6 +16,7 @@ impl Game {
     }
 
     /// Create a live lobby match where each AI picks one strategy from the live profile pool.
+    #[allow(dead_code)]
     pub fn new_with_random_ai_profiles(players: &[PlayerInit], seed: u32) -> Game {
         Self::new_inner(
             players,
@@ -67,6 +68,7 @@ impl Game {
     }
 
     /// Create a debug lobby match with boosted resources and a prebuilt human-only loadout.
+    #[allow(dead_code)]
     pub fn new_with_debug_starting_loadout_and_random_ai_profiles(
         players: &[PlayerInit],
         steel: u32,
@@ -81,6 +83,45 @@ impl Game {
             seed,
             AiProfileSelection::Random,
             StartingLoadout::DebugHuman,
+        )
+    }
+
+    /// Like [`Game::new_with_random_ai_profiles`] but uses a pre-loaded [`Map`].
+    pub fn new_with_random_ai_profiles_and_map(
+        players: &[PlayerInit],
+        seed: u32,
+        map: Map,
+    ) -> Game {
+        Self::new_inner_with_map(
+            players,
+            true,
+            config::STARTING_STEEL,
+            config::STARTING_OIL,
+            seed,
+            AiProfileSelection::Random,
+            StartingLoadout::Standard,
+            Some(map),
+        )
+    }
+
+    /// Like [`Game::new_with_debug_starting_loadout_and_random_ai_profiles`] but uses a
+    /// pre-loaded [`Map`].
+    pub fn new_with_debug_starting_loadout_and_random_ai_profiles_and_map(
+        players: &[PlayerInit],
+        steel: u32,
+        oil: u32,
+        seed: u32,
+        map: Map,
+    ) -> Game {
+        Self::new_inner_with_map(
+            players,
+            true,
+            steel,
+            oil,
+            seed,
+            AiProfileSelection::Random,
+            StartingLoadout::DebugHuman,
+            Some(map),
         )
     }
 
@@ -361,7 +402,29 @@ impl Game {
         ai_profile_selection: AiProfileSelection,
         starting_loadout: StartingLoadout,
     ) -> Game {
-        let map = Map::generate(players.len(), seed);
+        Self::new_inner_with_map(
+            players,
+            enable_ai,
+            steel,
+            oil,
+            seed,
+            ai_profile_selection,
+            starting_loadout,
+            None,
+        )
+    }
+
+    fn new_inner_with_map(
+        players: &[PlayerInit],
+        enable_ai: bool,
+        steel: u32,
+        oil: u32,
+        seed: u32,
+        ai_profile_selection: AiProfileSelection,
+        starting_loadout: StartingLoadout,
+        map_override: Option<Map>,
+    ) -> Game {
+        let map = map_override.unwrap_or_else(|| Map::generate(players.len(), seed));
         let fog = Fog::new(map.size);
         let mut entities = EntityStore::new();
         let mut ai_profile_rng = SmallRng::seed_from_u64((seed as u64) ^ 0xA17E_5EED);

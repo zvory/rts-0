@@ -5,6 +5,7 @@ use super::dev_replay::{load_replay_artifact, match_seed};
 use super::snapshots::{compact_snapshot_for_wire, union_events};
 use super::*;
 use crate::game::entity::EntityKind;
+use crate::game::map::Map;
 use crate::protocol::SnapshotNetStatus;
 use std::time::Instant as StdInstant;
 use tokio::time::Instant as TokioInstant;
@@ -102,6 +103,8 @@ pub(super) struct RoomTask {
     ai_players: Vec<AiSlot>,
     /// Lobby toggle: start matches with boosted opening resources.
     quickstart: bool,
+    /// Name of the map the host has selected (display name from JSON `name` field).
+    selected_map: String,
     /// Current host (first joiner; reassigned to the next in `order` when the host leaves).
     host_id: Option<u32>,
     phase: Phase,
@@ -131,6 +134,7 @@ impl RoomTask {
             players: HashMap::new(),
             ai_players: Vec::new(),
             quickstart: false,
+            selected_map: "default-handcrafted".to_string(),
             host_id: None,
             phase: Phase::Lobby,
             match_player_count: 0,
@@ -221,6 +225,7 @@ impl RoomTask {
             RoomEvent::GiveUp { player_id } => self.on_give_up(player_id),
             RoomEvent::SetReplaySpeed { speed } => self.on_set_replay_speed(speed),
             RoomEvent::SeekReplay { ticks_back } => self.on_seek_replay(ticks_back),
+            RoomEvent::SelectMap { player_id, map } => self.on_select_map(player_id, map),
         }
     }
 
@@ -402,6 +407,21 @@ impl RoomTask {
         if self.quickstart != enabled {
             self.quickstart = enabled;
             debug!(room = %self.room, enabled, "quickstart toggled");
+            self.broadcast_lobby();
+        }
+    }
+
+    /// Host-only: select a map by name. Ignored outside the lobby or from non-hosts.
+    fn on_select_map(&mut self, player_id: u32, map: String) {
+        if self.is_dev_watch() {
+            return;
+        }
+        if !matches!(self.phase, Phase::Lobby) || self.host_id != Some(player_id) {
+            return;
+        }
+        if self.selected_map != map {
+            self.selected_map = map;
+            debug!(room = %self.room, map = %self.selected_map, "map selected");
             self.broadcast_lobby();
         }
     }
@@ -647,6 +667,8 @@ impl RoomTask {
             players,
             can_start: self.can_start(),
             quickstart: self.quickstart,
+            map: self.selected_map.clone(),
+            maps: Map::list_available(),
         };
         self.broadcast(&msg);
     }
@@ -683,15 +705,37 @@ impl RoomTask {
             (config::STARTING_STEEL, config::STARTING_OIL)
         };
         let seed = match_seed();
+
+        // Load the selected map from disk. On failure, send an error to the host and abort.
+        let map = match Map::load(&self.selected_map, inits.len(), seed) {
+            Ok(m) => m,
+            Err(err) => {
+                let msg = format!("Cannot load map \"{}\": {err}", self.selected_map);
+                warn!(room = %self.room, error = %err, "map load failed at start");
+                if let Some(host_id) = self.host_id {
+                    if let Some(player) = self.players.get(&host_id) {
+                        send_or_log(
+                            &self.room,
+                            host_id,
+                            &player.msg_tx,
+                            ServerMessage::Error { msg },
+                        );
+                    }
+                }
+                return;
+            }
+        };
+
         let game = if self.quickstart {
-            Game::new_with_debug_starting_loadout_and_random_ai_profiles(
+            Game::new_with_debug_starting_loadout_and_random_ai_profiles_and_map(
                 &inits,
                 starting_steel,
                 starting_oil,
                 seed,
+                map,
             )
         } else {
-            Game::new_with_random_ai_profiles(&inits, seed)
+            Game::new_with_random_ai_profiles_and_map(&inits, seed, map)
         };
         let payload = game.start_payload();
         self.match_player_count = inits.len();

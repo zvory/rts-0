@@ -716,6 +716,14 @@ async fn handle_client_message(
             )
             .await;
         }
+        ClientMessage::SelectMap { map } => {
+            send_room_event(
+                player_id,
+                current_room,
+                RoomEvent::SelectMap { player_id, map },
+            )
+            .await;
+        }
     }
 }
 
