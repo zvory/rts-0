@@ -2,10 +2,16 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
   "description": "enables the default permissions",
+  "remote": {
+    "urls": ["https://rts-0-zvorygin.fly.dev/*"]
+  },
+  "local": false,
   "windows": [
     "main"
   ],
   "permissions": [
-    "core:default"
+    "core:default",
+    "allow-cursor-grab",
+    "allow-cursor-visible"
   ]
 }
