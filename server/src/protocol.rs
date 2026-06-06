@@ -96,6 +96,8 @@ pub enum ClientMessage {
         #[serde(rename = "ticksBack")]
         ticks_back: u32,
     },
+    /// Host selects a map by name (lobby phase only; ignored from non-hosts).
+    SelectMap { map: String },
 }
 
 /// A gameplay command. Validated when applied, not when received.
@@ -184,6 +186,10 @@ pub enum ServerMessage {
         players: Vec<LobbyPlayer>,
         can_start: bool,
         quickstart: bool,
+        /// Currently selected map name.
+        map: String,
+        /// All available map names (populated from disk at broadcast time).
+        maps: Vec<String>,
     },
     /// Match start (flattened: carries StartPayload's fields alongside `"t":"start"`).
     Start(StartPayload),

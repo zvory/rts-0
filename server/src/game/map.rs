@@ -9,6 +9,7 @@
 //! not baked into the map.
 
 use std::collections::HashSet;
+use std::path::Path;
 
 use crate::config;
 use crate::protocol::terrain;
@@ -18,6 +19,7 @@ use rand::SeedableRng;
 use serde::Deserialize;
 
 const DEFAULT_MAP_JSON: &str = include_str!("../../assets/maps/default-handcrafted.json");
+const MAPS_DIR: &str = "assets/maps";
 
 type Tile = (u32, u32);
 type BasePair = (Tile, Tile);
@@ -49,6 +51,76 @@ impl Map {
     pub fn generate(player_count: usize, seed: u32) -> Map {
         Self::from_authored_json(player_count, DEFAULT_MAP_JSON, seed)
             .unwrap_or_else(|err| panic!("invalid hardcoded map asset: {err}"))
+    }
+
+    /// Return the display names of all maps in `assets/maps/`. The name is read from the JSON
+    /// `name` field; the filename stem is used as a fallback. Errors (unreadable directory or
+    /// files) are silently skipped so a bad asset file can't crash the lobby.
+    pub fn list_available() -> Vec<String> {
+        let dir = Path::new(MAPS_DIR);
+        let mut names: Vec<String> = Vec::new();
+        let Ok(entries) = std::fs::read_dir(dir) else {
+            return names;
+        };
+        let mut paths: Vec<_> = entries
+            .filter_map(|e| e.ok())
+            .filter(|e| e.path().extension().and_then(|s| s.to_str()) == Some("json"))
+            .map(|e| e.path())
+            .collect();
+        paths.sort();
+        for path in paths {
+            let stem = path
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or("")
+                .to_string();
+            let name = std::fs::read_to_string(&path)
+                .ok()
+                .and_then(|json| {
+                    serde_json::from_str::<serde_json::Value>(&json)
+                        .ok()
+                        .and_then(|v| v.get("name").and_then(|n| n.as_str()).map(str::to_string))
+                })
+                .unwrap_or(stem);
+            if !name.is_empty() {
+                names.push(name);
+            }
+        }
+        names
+    }
+
+    /// Load a map by display name (the `name` field in the JSON) for `player_count` players.
+    /// Returns an error string if the map cannot be found, read, or parsed.
+    pub fn load(map_name: &str, player_count: usize, seed: u32) -> Result<Map, String> {
+        // First try to match by `name` field, then by filename stem.
+        let dir = Path::new(MAPS_DIR);
+        let Ok(entries) = std::fs::read_dir(dir) else {
+            return Err(format!("cannot read maps directory: {MAPS_DIR}"));
+        };
+        let mut paths: Vec<_> = entries
+            .filter_map(|e| e.ok())
+            .filter(|e| e.path().extension().and_then(|s| s.to_str()) == Some("json"))
+            .map(|e| e.path())
+            .collect();
+        paths.sort();
+
+        for path in paths {
+            let stem = path
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or("")
+                .to_string();
+            let json = std::fs::read_to_string(&path)
+                .map_err(|e| format!("cannot read {}: {e}", path.display()))?;
+            let json_name = serde_json::from_str::<serde_json::Value>(&json)
+                .ok()
+                .and_then(|v| v.get("name").and_then(|n| n.as_str()).map(str::to_string));
+            let matches = json_name.as_deref() == Some(map_name) || stem == map_name;
+            if matches {
+                return Self::from_authored_json(player_count, &json, seed);
+            }
+        }
+        Err(format!("map not found: {map_name:?}"))
     }
 
     fn from_authored_json(player_count: usize, json: &str, seed: u32) -> Result<Map, String> {

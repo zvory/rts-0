@@ -119,6 +119,72 @@ body {
   color: var(--good);
 }
 
+#dev-links {
+  position: absolute;
+  top: 52px;
+  left: 10px;
+  z-index: 31;
+  min-width: 180px;
+  padding: 4px 8px;
+  border: 1px solid rgba(91, 83, 65, 0.7);
+  background: rgba(17, 17, 15, 0.88);
+  color: var(--ink-faint);
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.4;
+  pointer-events: auto;
+  user-select: none;
+}
+
+#dev-links summary {
+  cursor: pointer;
+  color: var(--ink);
+  list-style: none;
+  outline: none;
+}
+
+#dev-links summary::before {
+  content: "▶ ";
+  font-size: 9px;
+}
+
+#dev-links[open] summary::before {
+  content: "▼ ";
+}
+
+#dev-links ul {
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+#dev-links li {
+  padding: 1px 0;
+}
+
+#dev-links a {
+  color: var(--ink-faint);
+  text-decoration: none;
+}
+
+#dev-links a:hover {
+  color: var(--ink);
+  text-decoration: underline;
+}
+
+.dev-links-section {
+  margin-top: 4px;
+  font-size: 10px;
+  color: rgba(160, 148, 120, 0.6);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.dev-links-note {
+  color: rgba(160, 148, 120, 0.5);
+  font-size: 10px;
+}
+
 #dev-banner {
   position: absolute;
   top: 8px;

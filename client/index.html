@@ -34,6 +34,18 @@
     -->
     <div id="app">
       <div id="version" aria-label="game version"></div>
+      <details id="dev-links">
+        <summary>Dev links</summary>
+        <ul>
+          <li><a href="/" target="_blank">/</a></li>
+          <li><a href="/version" target="_blank">/version</a></li>
+          <li><a href="/ws" target="_blank">/ws</a> <span class="dev-links-note">WebSocket</span></li>
+          <li><a href="/dev/selfplay" target="_blank">/dev/selfplay</a></li>
+          <li><a href="/dev/scenarios" target="_blank">/dev/scenarios</a></li>
+          <li><a href="/maps/" target="_blank">/maps/</a></li>
+          <li><a href="/map-editor.html" target="_blank">Map editor</a></li>
+        </ul>
+      </details>
       <div id="dev-banner" hidden></div>
 
       <!-- ============================ LOBBY ============================ -->
@@ -62,6 +74,11 @@
           <div class="lobby-room" hidden>
             <h2>Players</h2>
             <ul id="lobby-players" class="player-list"></ul>
+            <div class="lobby-map-row">
+              <label id="lobby-map-label" for="lobby-map">Map</label>
+              <select id="lobby-map" disabled></select>
+              <span id="lobby-map-display" hidden></span>
+            </div>
             <div class="lobby-actions">
               <button id="lobby-ready" class="btn">Ready</button>
               <button id="lobby-add-ai" class="btn host-only" hidden>+ Add AI</button>

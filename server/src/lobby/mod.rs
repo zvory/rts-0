@@ -110,6 +110,8 @@ pub enum RoomEvent {
     SetReplaySpeed { speed: f32 },
     /// Rewind a replay by `ticks_back` simulation ticks (replay rooms only; clamped to start).
     SeekReplay { ticks_back: u32 },
+    /// Host selects a map by name (lobby phase only; honored only from the host).
+    SelectMap { player_id: u32, map: String },
 }
 
 /// Handle the lobby keeps for each live room: just the channel into its task.

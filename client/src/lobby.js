@@ -39,6 +39,8 @@ export class Lobby {
     this.chkQuickstartInput = this.chkQuickstart?.querySelector("input[type='checkbox']") || null;
     this.btnStart = rootEl.querySelector("#lobby-start");
     this.elStatus = rootEl.querySelector("#lobby-status");
+    this.selMap = rootEl.querySelector("#lobby-map");
+    this.elMapDisplay = rootEl.querySelector("#lobby-map-display");
 
     // Local lobby state.
     this._joined = false;
@@ -47,6 +49,8 @@ export class Lobby {
     this._hostId = null;
     this._canStart = false;
     this._quickstart = false;
+    this._selectedMap = "";
+    this._availableMaps = [];
     /** Total seated players (humans + AI) from the latest lobby message. */
     this._playerCount = 0;
     /** @type {Array<() => void>} subscribers for the server `start` message. */
@@ -140,6 +144,15 @@ export class Lobby {
         this.net.addAi();
       });
     }
+
+    // Map selector: host-only. Non-hosts see the selected map as a label.
+    if (this.selMap) {
+      this.selMap.addEventListener("change", () => {
+        const isHost = this.net.playerId != null && this.net.playerId === this._hostId;
+        if (!isHost || this.selMap.disabled) return;
+        this.net.selectMap(this.selMap.value);
+      });
+    }
   }
 
   _join() {
@@ -185,6 +198,8 @@ export class Lobby {
     this._hostId = m.hostId;
     this._canStart = !!m.canStart;
     this._quickstart = !!m.quickstart;
+    this._selectedMap = m.map || "";
+    this._availableMaps = Array.isArray(m.maps) ? m.maps : [];
 
     // Once a lobby arrives we are definitively joined; make sure the room block shows.
     this._joined = true;
@@ -196,6 +211,7 @@ export class Lobby {
     this._reflectStartButton();
     this._reflectAddAiButton();
     this._reflectQuickstart();
+    this._reflectMap();
 
     const participantCount = this._playerCount;
     const spectatorCount = players.filter((p) => p.isSpectator).length;
@@ -314,6 +330,34 @@ export class Lobby {
     this.chkQuickstart.hidden = !isHost;
     this.chkQuickstart.disabled = !isHost;
     this.chkQuickstartInput.checked = !!this._quickstart;
+  }
+
+  /** Render the map selector (host) or map name label (non-host). */
+  _reflectMap() {
+    const isHost = this.net.playerId != null && this.net.playerId === this._hostId;
+    if (this.selMap) {
+      // Rebuild the option list only when the available maps have changed.
+      const currentOptions = Array.from(this.selMap.options).map((o) => o.value);
+      const mapsChanged =
+        currentOptions.length !== this._availableMaps.length ||
+        currentOptions.some((v, i) => v !== this._availableMaps[i]);
+      if (mapsChanged) {
+        this.selMap.innerHTML = "";
+        for (const name of this._availableMaps) {
+          const opt = document.createElement("option");
+          opt.value = name;
+          opt.textContent = name;
+          this.selMap.appendChild(opt);
+        }
+      }
+      this.selMap.value = this._selectedMap;
+      this.selMap.disabled = !isHost;
+      this.selMap.hidden = !isHost;
+    }
+    if (this.elMapDisplay) {
+      this.elMapDisplay.textContent = `Map: ${this._selectedMap}`;
+      this.elMapDisplay.hidden = isHost;
+    }
   }
 
   /** Enable Start only for the host and only when the server says the match can start. */
