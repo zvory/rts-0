@@ -6,7 +6,7 @@
 
 use std::collections::HashMap;
 
-use crate::game::entity::{uses_car_movement_semantics, uses_oriented_vehicle_body, EntityKind};
+use crate::game::entity::{uses_oriented_vehicle_body, EntityKind};
 use crate::game::map::Map;
 use crate::game::pathfinding::{self, Passability};
 use crate::game::services::occupancy::Occupancy;
@@ -42,6 +42,7 @@ pub struct PathRequest {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum RouteShape {
     Normal,
+    #[cfg(test)]
     PreferFewerTurns,
     ScoutCarClearance,
 }
@@ -50,6 +51,7 @@ impl RouteShape {
     fn turn_penalty(self) -> u32 {
         match self {
             RouteShape::Normal => 0,
+            #[cfg(test)]
             RouteShape::PreferFewerTurns => 3,
             RouteShape::ScoutCarClearance => SCOUT_CAR_ROUTE_TURN_PENALTY,
         }
@@ -113,7 +115,7 @@ impl Passability for TerrainPassability<'_> {
 
     fn movement_cost(&self, tx: i32, ty: i32) -> u32 {
         if self.route_shape != RouteShape::ScoutCarClearance
-            || !uses_car_movement_semantics(self.kind)
+            || !uses_oriented_vehicle_body(self.kind)
         {
             return 0;
         }
@@ -300,7 +302,8 @@ pub(crate) fn scout_car_clearance_cost(clearance_tiles: u16) -> u32 {
 
 /// Simplify reverse-ordered world waypoints by dropping intermediate tile centers when the unit
 /// body can travel straight to a later waypoint without clipping static terrain or buildings.
-pub(crate) fn simplify_reverse_waypoints(
+#[cfg(test)]
+fn simplify_reverse_waypoints(
     map: &Map,
     occupancy: &Occupancy,
     kind: EntityKind,
@@ -1331,7 +1334,7 @@ mod tests {
     }
 
     #[test]
-    fn scout_car_pathing_prefers_clearance_in_wide_space() {
+    fn vehicle_clearance_pathing_prefers_clearance_in_wide_space() {
         let map = clearance_choice_map();
         let entities = EntityStore::new();
         let occ = Occupancy::build(&map, &entities);
@@ -1339,41 +1342,43 @@ mod tests {
         let start = (1, 4);
         let goal = (14, 4);
 
-        let normal = service.request_tile_path(
-            &map,
-            &occ,
-            PathRequest {
-                kind: EntityKind::ScoutCar,
-                start,
-                goal,
-                radius_tiles: config::unit_radius_tiles(EntityKind::ScoutCar),
-                route_shape: RouteShape::Normal,
-                budget: None,
-            },
-        );
-        let shaped = service.request_tile_path(
-            &map,
-            &occ,
-            PathRequest {
-                kind: EntityKind::ScoutCar,
-                start,
-                goal,
-                radius_tiles: config::unit_radius_tiles(EntityKind::ScoutCar),
-                route_shape: RouteShape::ScoutCarClearance,
-                budget: None,
-            },
-        );
+        for kind in [EntityKind::ScoutCar, EntityKind::Tank, EntityKind::AtTeam] {
+            let normal = service.request_tile_path(
+                &map,
+                &occ,
+                PathRequest {
+                    kind,
+                    start,
+                    goal,
+                    radius_tiles: config::unit_radius_tiles(kind),
+                    route_shape: RouteShape::Normal,
+                    budget: None,
+                },
+            );
+            let shaped = service.request_tile_path(
+                &map,
+                &occ,
+                PathRequest {
+                    kind,
+                    start,
+                    goal,
+                    radius_tiles: config::unit_radius_tiles(kind),
+                    route_shape: RouteShape::ScoutCarClearance,
+                    budget: None,
+                },
+            );
 
-        assert_eq!(normal.last().copied(), Some(goal));
-        assert_eq!(shaped.last().copied(), Some(goal));
-        assert!(
-            min_tile_clearance(&occ, &shaped) > min_tile_clearance(&occ, &normal),
-            "scout car clearance route should improve minimum clearance, normal={normal:?} shaped={shaped:?}"
-        );
-        assert!(
-            shaped.iter().any(|&(_, ty)| ty >= 6),
-            "scout car route should move away from the wall shelf when open space is available, got {shaped:?}"
-        );
+            assert_eq!(normal.last().copied(), Some(goal));
+            assert_eq!(shaped.last().copied(), Some(goal));
+            assert!(
+                min_tile_clearance(&occ, &shaped) > min_tile_clearance(&occ, &normal),
+                "{kind:?} clearance route should improve minimum clearance, normal={normal:?} shaped={shaped:?}"
+            );
+            assert!(
+                shaped.iter().any(|&(_, ty)| ty >= 6),
+                "{kind:?} route should move away from the wall shelf when open space is available, got {shaped:?}"
+            );
+        }
     }
 
     #[test]

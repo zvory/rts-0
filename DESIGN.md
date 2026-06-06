@@ -1034,18 +1034,17 @@ The server treats every client as potentially hostile. Limits live next to the c
   unit `AwaitingPath`. The existing path coordinator then recomputes under current occupancy within
   the normal per-tick A* budget. This covers buildings constructed after a long path was assigned
   without periodically repathing every moving unit.
-- **Tank path simplification**: player-issued tank `Move` / `AttackMove` path requests use tile A*
-  with a small direction-change penalty so equivalent-cost routes prefer fewer bends. Path cache
-  keys include the route-shaping mode so tank turn-cost paths do not share cached routes with normal
-  interaction pathing. The returned route is still used for reachability, then snaps the
-  reverse-ordered final waypoint to the exact command goal and simplifies the waypoint list by
-  dropping intermediate tile centers only when
-  `standability::unit_static_segment_standable` proves the unit body can travel the straight segment
-  without clipping terrain or building occupancy. The simplifier preserves the exact final command
-  goal, never adds waypoints, and falls back to the original next waypoint whenever segment legality
-  cannot be proven. Non-tank movement and interaction paths for attack chasing, gathering, and build
-  staging remain unsmoothed so combat, mining, construction range checks, and infantry/worker
-  traffic stay controlled by their existing logic.
+- **Vehicle clearance pathing**: player-issued scout-car, tank, and AT-team `Move` / `AttackMove`
+  path requests use the scout-car clearance-aware tile A* route shape. The route shape adds finite
+  static-clearance, turn, adjacent-blocker, and corner-graze costs so open alternatives are
+  preferred before local movement gets close to walls. Path cache keys include the route-shaping
+  mode so clearance-shaped movement paths do not share cached routes with normal interaction
+  pathing. The returned route is still used for reachability, then snaps the reverse-ordered final
+  waypoint to the exact command goal and only simplifies straight segments up to the scout-car
+  lookahead window, preserving intermediate route guidance through obstacle fields. Interaction
+  paths for attack chasing, gathering, and build staging remain tile-guided `Normal` routing so
+  combat, mining, construction range checks, and infantry/worker traffic stay controlled by their
+  existing logic.
 - **Vehicle diagonal-pinch avoidance**: A* passability for oriented-vehicle bodies (tanks, scout
   cars) rejects tiles wedged between two diagonally-opposite blocked corners — i.e. (NW blocked AND
   SE blocked) OR (NE blocked AND SW blocked). The rotating hull cannot legally thread such 1-tile
