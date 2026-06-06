@@ -1,5 +1,6 @@
 use super::room_task::{DevScenarioConfig, DevScenarioId, DevSelfPlayConfig, RoomMode};
 use super::*;
+use crate::dev_scenarios::parse_dev_scenario_room;
 
 pub(super) fn room_mode_for(room: &str) -> RoomMode {
     if room == format!("{DEV_SELFPLAY_ROOM_PREFIX}live") {
@@ -11,17 +12,14 @@ pub(super) fn room_mode_for(room: &str) -> RoomMode {
         });
     }
     if let Some(raw) = room.strip_prefix(DEV_SCENARIO_ROOM_PREFIX) {
-        if let Some((id, cars)) = raw.split_once(":cars=") {
-            if id == "scout_car_snaking_corridor" {
-                if let Ok(cars) = cars.parse::<usize>() {
-                    if matches!(cars, 1 | 4) {
-                        return RoomMode::DevScenario(DevScenarioConfig {
-                            id: DevScenarioId::ScoutCarSnakingCorridor,
-                            cars,
-                        });
-                    }
-                }
-            }
+        if let Some(launch) = parse_dev_scenario_room(raw) {
+            return RoomMode::DevScenario(DevScenarioConfig {
+                id: match launch.id {
+                    "scout_car_snaking_corridor" => DevScenarioId::ScoutCarSnakingCorridor,
+                    _ => return RoomMode::Normal,
+                },
+                cars: launch.cars,
+            });
         }
     }
     RoomMode::Normal
