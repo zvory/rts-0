@@ -1405,7 +1405,23 @@ const SNAKING_CORRIDOR_VEHICLE_SLOT_BASELINES: &[(EntityKind, usize, u32)] = &[
 ];
 
 const WALL_CHOKEPOINT_MAX_TICKS: u32 = 3_000;
-const WALL_CHOKEPOINT_AVERAGE_SCORE_BASELINE: u32 = 1_080;
+const WALL_CHOKEPOINT_SCORE_BASELINES: &[(EntityKind, usize, u32)] = &[
+    (EntityKind::AtTeam, 3, 846),
+    (EntityKind::AtTeam, 5, 421),
+    (EntityKind::AtTeam, 6, 2_556),
+    (EntityKind::AtTeam, 10, 810),
+    (EntityKind::AtTeam, 15, 1_351),
+    (EntityKind::ScoutCar, 3, 156),
+    (EntityKind::ScoutCar, 5, 176),
+    (EntityKind::ScoutCar, 6, 175),
+    (EntityKind::ScoutCar, 10, 203),
+    (EntityKind::ScoutCar, 15, 234),
+    (EntityKind::Tank, 3, 3_000),
+    (EntityKind::Tank, 5, 1_920),
+    (EntityKind::Tank, 6, 1_271),
+    (EntityKind::Tank, 10, 1_935),
+    (EntityKind::Tank, 15, 1_635),
+];
 
 fn scout_car_snaking_corridor_map() -> (Map, u32, f32, (f32, f32), (f32, f32)) {
     let mut map = flat_map(1);
@@ -1648,6 +1664,22 @@ fn wall_chokepoint_timing_summary(results: &[WallChokepointTiming]) -> Vec<Strin
             )
         })
         .collect()
+}
+
+fn wall_chokepoint_case_score(result: &WallChokepointTiming) -> u32 {
+    let total_score = result.clear_ticks.iter().fold(0u64, |total, clear_ticks| {
+        total.saturating_add(clear_ticks.unwrap_or(WALL_CHOKEPOINT_MAX_TICKS) as u64)
+    });
+    (total_score / result.clear_ticks.len() as u64) as u32
+}
+
+fn wall_chokepoint_score_baseline(unit: EntityKind, unit_count: usize) -> u32 {
+    WALL_CHOKEPOINT_SCORE_BASELINES
+        .iter()
+        .find_map(|(baseline_unit, baseline_count, score)| {
+            (*baseline_unit == unit && *baseline_count == unit_count).then_some(*score)
+        })
+        .expect("baseline should exist for each wall chokepoint scenario")
 }
 
 fn snaking_corridor_spawn_spacing(unit: EntityKind) -> (f32, f32) {
@@ -2063,41 +2095,19 @@ fn scout_car_wall_chokepoint_five_clear_without_parallel_nose_wedge() {
 }
 
 #[test]
-fn wall_chokepoint_average_clear_time_regression() {
-    let scenarios = [
-        (EntityKind::AtTeam, 3usize),
-        (EntityKind::AtTeam, 5usize),
-        (EntityKind::AtTeam, 6usize),
-        (EntityKind::AtTeam, 10usize),
-        (EntityKind::AtTeam, 15usize),
-        (EntityKind::ScoutCar, 3usize),
-        (EntityKind::ScoutCar, 5usize),
-        (EntityKind::ScoutCar, 6usize),
-        (EntityKind::ScoutCar, 10usize),
-        (EntityKind::ScoutCar, 15usize),
-        (EntityKind::Tank, 3usize),
-        (EntityKind::Tank, 5usize),
-        (EntityKind::Tank, 6usize),
-        (EntityKind::Tank, 10usize),
-        (EntityKind::Tank, 15usize),
-    ];
-    let results: Vec<_> = scenarios
-        .into_iter()
-        .map(|(unit, count)| measure_wall_chokepoint_clear_times(unit, count))
+fn wall_chokepoint_case_clear_time_regression() {
+    let results: Vec<_> = WALL_CHOKEPOINT_SCORE_BASELINES
+        .iter()
+        .map(|&(unit, count, _)| measure_wall_chokepoint_clear_times(unit, count))
         .collect();
 
-    let mut total_score = 0u64;
-    let mut total_slots = 0u64;
-
     println!("WALL_CHOKEPOINT_CLEAR_TIMES");
-    println!("unit | count | clear_ticks | score_ticks");
+    println!("unit | count | clear_ticks | score_ticks | case_score | baseline");
     for result in &results {
         let mut clear_tick_cells = Vec::with_capacity(result.clear_ticks.len());
         let mut score_cells = Vec::with_capacity(result.clear_ticks.len());
         for (slot, clear_ticks) in result.clear_ticks.iter().enumerate() {
             let score = clear_ticks.unwrap_or(WALL_CHOKEPOINT_MAX_TICKS);
-            total_score = total_score.saturating_add(score as u64);
-            total_slots = total_slots.saturating_add(1);
             clear_tick_cells.push(format!(
                 "{slot}:{}",
                 clear_ticks
@@ -2106,27 +2116,28 @@ fn wall_chokepoint_average_clear_time_regression() {
             ));
             score_cells.push(format!("{slot}:{score}"));
         }
+        let case_score = wall_chokepoint_case_score(result);
+        let baseline = wall_chokepoint_score_baseline(result.unit, result.unit_count);
         println!(
-            "{:>14} | {:>5} | {:>11} | {:>11}",
+            "{:>14} | {:>5} | {:>11} | {:>11} | {:>10} | {:>8}",
             result.unit,
             result.unit_count,
             clear_tick_cells.join(","),
-            score_cells.join(",")
+            score_cells.join(","),
+            case_score,
+            baseline
+        );
+
+        assert!(
+            case_score.saturating_mul(10) <= baseline.saturating_mul(11),
+            "wall chokepoint unit={} count={} regressed: {} ticks vs baseline {} (>10% slower); results={:?}",
+            result.unit,
+            result.unit_count,
+            case_score,
+            baseline,
+            wall_chokepoint_timing_summary(&results)
         );
     }
-
-    let average_score = (total_score / total_slots) as u32;
-    println!(
-        "WALL_CHOKEPOINT_AVERAGE_SCORE average_score={} baseline={} max_ticks={}",
-        average_score, WALL_CHOKEPOINT_AVERAGE_SCORE_BASELINE, WALL_CHOKEPOINT_MAX_TICKS
-    );
-    assert!(
-        average_score.saturating_mul(10) <= WALL_CHOKEPOINT_AVERAGE_SCORE_BASELINE.saturating_mul(11),
-        "wall chokepoint average score regressed: {} ticks vs baseline {} (>10% slower); results={:?}",
-        average_score,
-        WALL_CHOKEPOINT_AVERAGE_SCORE_BASELINE,
-        wall_chokepoint_timing_summary(&results)
-    );
 }
 
 #[test]
