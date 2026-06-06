@@ -1,8 +1,8 @@
 //! The tile map: terrain grid, authored map loading, and passability. See `DESIGN.md` §3 (`map.rs`).
 //!
-//! The live game currently uses one deterministic handcrafted map embedded in the server binary.
-//! The map file defines terrain and ordered base sites; the simulation still derives player
-//! starts, expansion sites, starting buildings, workers, and resource clusters from those sites.
+//! The live game loads authored maps from the server asset bundle. Map files define terrain and
+//! ordered base sites; the simulation still derives player starts, expansion sites, starting
+//! buildings, workers, and resource clusters from those sites.
 //!
 //! Terrain passability here is purely about *terrain* — building footprints are tracked
 //! dynamically by the simulation (a separate occupancy grid in `systems`/`pathfinding`),
@@ -19,7 +19,7 @@ use rand::SeedableRng;
 use serde::Deserialize;
 
 const DEFAULT_MAP_JSON: &str = include_str!("../../assets/maps/default-handcrafted.json");
-const MAPS_DIR: &str = "assets/maps";
+const MAPS_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/assets/maps");
 
 type Tile = (u32, u32);
 type BasePair = (Tile, Tile);
@@ -516,6 +516,18 @@ mod tests {
                 assert!(map.is_passable(expansion.0 as i32, expansion.1 as i32));
             }
         }
+    }
+
+    #[test]
+    fn bundled_map_catalog_loads_available_maps_by_name() {
+        let available = Map::list_available();
+        assert!(available.contains(&"default-handcrafted".to_string()));
+        assert!(available.contains(&"no-terrain".to_string()));
+
+        let map = Map::load("default-handcrafted", 2, 0x1234_5678)
+            .expect("default handcrafted map should load from bundled assets");
+        assert_eq!(map.size, 126);
+        assert_eq!(map.starts.len(), 2);
     }
 
     #[test]
