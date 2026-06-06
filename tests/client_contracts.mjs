@@ -185,7 +185,9 @@ function fakeAudioContext() {
         null,
         [[128, 160], [192, 224, true]],
         [96, 112],
+        null,
         true,
+        [[[112, 128], [144, 160]], [192, 224], 12, 2, 1, 2],
       ],
       [
         2,
@@ -248,6 +250,16 @@ function fakeAudioContext() {
     "entity active marker decodes",
   );
   assert(decoded.entities[0].visionOnly === true, "entity visionOnly flag decodes");
+  assert(
+    decoded.entities[0].debugPath.waypoints[0].x === 112 &&
+      decoded.entities[0].debugPath.waypoints[1].y === 160 &&
+      decoded.entities[0].debugPath.goal.x === 192 &&
+      decoded.entities[0].debugPath.lastRepathTick === 12 &&
+      decoded.entities[0].debugPath.stuckTicks === 2 &&
+      decoded.entities[0].debugPath.staticBlockedTicks === 1 &&
+      decoded.entities[0].debugPath.totalWaypoints === 2,
+    "entity debug path decodes",
+  );
   assert(
     decoded.entities[0].queuedMarkers[0].attackMove === false &&
       decoded.entities[0].queuedMarkers[1].attackMove === true,

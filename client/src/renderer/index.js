@@ -31,6 +31,7 @@ import {
 import {
   _drawAtGunSetupPreview,
   _drawCommandFeedback,
+  _drawDebugPathOverlay,
   _drawMuzzleFlashes,
   _drawPlacement,
   _drawQueuedOrderMarkers,
@@ -207,6 +208,7 @@ export class Renderer {
     this._drawCommandFeedback(state);
     this._drawAtGunSetupPreview(state);
     this._drawQueuedOrderMarkers(state);
+    this._drawDebugPathOverlay(state);
     this._drawRallyPoints(state);
     this._drawResourceMiningPreview(state);
     this._drawMuzzleFlashes(state);
@@ -430,6 +432,7 @@ Object.assign(Renderer.prototype, {
   _drawCommandFeedback,
   _drawAtGunSetupPreview,
   _drawQueuedOrderMarkers,
+  _drawDebugPathOverlay,
   _drawRallyPoints,
   _drawResourceMiningPreview,
   _drawMuzzleFlashes,

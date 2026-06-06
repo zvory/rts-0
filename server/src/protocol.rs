@@ -322,6 +322,29 @@ pub struct QueuedOrderMarker {
     pub attack_move: bool,
 }
 
+#[cfg(debug_assertions)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct DebugPathPoint {
+    pub x: f32,
+    pub y: f32,
+}
+
+#[cfg(debug_assertions)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct DebugPathView {
+    /// Remaining movement waypoints in traversal order. The first entry is the currently targeted
+    /// waypoint; long paths are truncated for transport.
+    pub waypoints: Vec<DebugPathPoint>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub goal: Option<DebugPathPoint>,
+    pub last_repath_tick: u32,
+    pub stuck_ticks: u16,
+    pub static_blocked_ticks: u16,
+    pub total_waypoints: u16,
+}
+
 /// One entity as seen by one player. Optional fields are omitted when not applicable.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
@@ -393,6 +416,11 @@ pub struct EntityView {
     // visual intel, but not actionable for selection or attack commands.
     #[serde(default, skip_serializing_if = "is_false")]
     pub vision_only: bool,
+
+    // Debug builds only: owner-only movement path diagnostics for selected-unit overlays.
+    #[cfg(debug_assertions)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub debug_path: Option<DebugPathView>,
 }
 
 impl EntityView {
@@ -434,6 +462,8 @@ impl EntityView {
             active_marker: None,
             charge_cooldown_left: None,
             vision_only: false,
+            #[cfg(debug_assertions)]
+            debug_path: None,
         }
     }
 }
@@ -512,7 +542,7 @@ impl NoticeSeverity {
 ///
 /// [`Snapshot`] remains the semantic source of truth for game code. This format is only a
 /// transport-side optimization for `ServerMessage::Snapshot`.
-pub const COMPACT_SNAPSHOT_VERSION: u8 = 4;
+pub const COMPACT_SNAPSHOT_VERSION: u8 = 5;
 
 /// Serialize one semantic snapshot as a compact JSON text frame payload.
 pub fn serialize_compact_snapshot(snapshot: &Snapshot) -> serde_json::Result<String> {
@@ -643,6 +673,10 @@ impl Serialize for CompactEntity<'_> {
         if entity.vision_only {
             len = 25;
         }
+        #[cfg(debug_assertions)]
+        if entity.debug_path.is_some() {
+            len = 26;
+        }
 
         let mut seq = serializer.serialize_seq(Some(len))?;
         seq.serialize_element(&entity.id)?;
@@ -714,6 +748,10 @@ impl Serialize for CompactEntity<'_> {
         if len > 24 {
             seq.serialize_element(&entity.vision_only)?;
         }
+        #[cfg(debug_assertions)]
+        if len > 25 {
+            seq.serialize_element(&entity.debug_path.as_ref().map(CompactDebugPath))?;
+        }
         seq.end()
     }
 }
@@ -733,6 +771,33 @@ impl Serialize for CompactQueuedMarker<'_> {
         if len > 2 {
             seq.serialize_element(&marker.attack_move)?;
         }
+        seq.end()
+    }
+}
+
+#[cfg(debug_assertions)]
+struct CompactDebugPath<'a>(&'a DebugPathView);
+
+#[cfg(debug_assertions)]
+impl Serialize for CompactDebugPath<'_> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let path = self.0;
+        let mut seq = serializer.serialize_seq(Some(6))?;
+        seq.serialize_element(
+            &path
+                .waypoints
+                .iter()
+                .map(|p| [p.x, p.y])
+                .collect::<Vec<_>>(),
+        )?;
+        seq.serialize_element(&path.goal.map(|p| [p.x, p.y]))?;
+        seq.serialize_element(&path.last_repath_tick)?;
+        seq.serialize_element(&path.stuck_ticks)?;
+        seq.serialize_element(&path.static_blocked_ticks)?;
+        seq.serialize_element(&path.total_waypoints)?;
         seq.end()
     }
 }

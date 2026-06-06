@@ -179,6 +179,56 @@ export function _drawQueuedOrderMarkers(state) {
   }
 }
 
+export function _drawDebugPathOverlay(state) {
+  if (!state || typeof state.selectedEntities !== "function") return;
+  const g = this._feedbackGfx;
+  const pathColor = 0x33d6ff;
+  const currentColor = 0xffe066;
+  const goalColor = 0xff8a4c;
+
+  for (const e of state.selectedEntities()) {
+    if (e.owner !== state.playerId || !isUnit(e.kind) || e.state !== STATE.MOVE) continue;
+    const debugPath = e.debugPath;
+    const waypoints = Array.isArray(debugPath?.waypoints)
+      ? debugPath.waypoints.filter((p) => finiteNumber(p?.x) && finiteNumber(p?.y))
+      : [];
+    if (waypoints.length === 0) continue;
+
+    const current = waypoints[0];
+    g.lineStyle(3, currentColor, 0.9);
+    dashedLine(g, e.x, e.y, current.x, current.y, 10, 6);
+
+    if (waypoints.length > 1) {
+      g.lineStyle(2, pathColor, 0.72);
+      g.moveTo(current.x, current.y);
+      for (let i = 1; i < waypoints.length; i += 1) {
+        g.lineTo(waypoints[i].x, waypoints[i].y);
+      }
+    }
+
+    for (let i = 0; i < waypoints.length; i += 1) {
+      const p = waypoints[i];
+      if (i === 0) {
+        drawDebugCurrentWaypoint(g, p.x, p.y, currentColor);
+      } else {
+        drawDebugWaypoint(g, p.x, p.y, pathColor, i);
+      }
+    }
+
+    const goal = debugPath?.goal;
+    if (finiteNumber(goal?.x) && finiteNumber(goal?.y)) {
+      const last = waypoints[waypoints.length - 1];
+      const goalMatchesPathEnd = Math.hypot(goal.x - last.x, goal.y - last.y) < 0.5;
+      drawDebugGoal(g, goal.x, goal.y, goalColor, goalMatchesPathEnd ? 0.35 : 0.9);
+    }
+
+    if (Number.isFinite(debugPath?.totalWaypoints) && debugPath.totalWaypoints > waypoints.length) {
+      const last = waypoints[waypoints.length - 1];
+      drawDebugTruncatedTail(g, last.x, last.y, pathColor);
+    }
+  }
+}
+
 export function _drawAtGunSetupPreview(state) {
   if (!state || typeof state.selectedEntities !== "function") return;
   const g = this._feedbackGfx;
@@ -253,6 +303,43 @@ function drawQueuedPointMarker(g, x, y, color, attackMove) {
   g.beginFill(color, 0.9);
   g.drawCircle(x, y, 2.5);
   g.endFill();
+}
+
+function drawDebugCurrentWaypoint(g, x, y, color) {
+  g.lineStyle(3, color, 0.98);
+  g.beginFill(color, 0.18);
+  g.drawCircle(x, y, 10);
+  g.endFill();
+  g.lineStyle(1.5, color, 0.9);
+  g.drawCircle(x, y, 15);
+  g.moveTo(x - 13, y);
+  g.lineTo(x + 13, y);
+  g.moveTo(x, y - 13);
+  g.lineTo(x, y + 13);
+}
+
+function drawDebugWaypoint(g, x, y, color, index) {
+  const radius = index % 2 === 0 ? 5.5 : 4.5;
+  g.lineStyle(2, color, 0.85);
+  g.beginFill(color, 0.14);
+  g.drawCircle(x, y, radius);
+  g.endFill();
+}
+
+function drawDebugGoal(g, x, y, color, alpha) {
+  g.lineStyle(2.5, color, alpha);
+  g.drawRect(x - 8, y - 8, 16, 16);
+  g.moveTo(x - 11, y);
+  g.lineTo(x + 11, y);
+  g.moveTo(x, y - 11);
+  g.lineTo(x, y + 11);
+}
+
+function drawDebugTruncatedTail(g, x, y, color) {
+  g.lineStyle(2, color, 0.72);
+  g.moveTo(x + 10, y - 6);
+  g.lineTo(x + 16, y);
+  g.lineTo(x + 10, y + 6);
 }
 
 function drawDashedCircle(g, x, y, radius, segments) {
