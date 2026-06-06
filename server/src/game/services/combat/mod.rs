@@ -32,6 +32,7 @@ mod tests;
 use acquisition::{combat_mode, resolve_target, CombatMode};
 use chase::{chase_goal_for_target, chase_path_needs_refresh};
 use damage::apply_damage;
+use projection::friendly_hard_blocker_between;
 use weapons::{
     at_gun_can_chase, begin_idle_deployed_weapon_setup, can_fire_while_moving,
     deployed_weapon_ready_to_fire, deployed_weapon_ready_to_move, effective_attack_profile,
@@ -130,7 +131,7 @@ pub(crate) fn combat_system(
 
         // Resolve / acquire a target id based on the current order semantics.
         let target = resolve_target(
-            entities, spatial, &los, fog, id, owner, px, py, acquire_px, mode,
+            map, entities, spatial, &los, fog, id, owner, px, py, acquire_px, mode,
         );
         let Some(tid) = target else {
             // No target: clear stale combat target id for opportunistic-combat orders.
@@ -181,7 +182,27 @@ pub(crate) fn combat_system(
         }
         let dist = dist2(px, py, tx, ty).sqrt();
         let target_angle = (ty - py).atan2(tx - px);
-        let clear_shot = los.clear_between_world_points((px, py), (tx, ty));
+        let terrain_clear = los.clear_between_world_points((px, py), (tx, ty));
+        let friendly_blocked = terrain_clear
+            && friendly_hard_blocker_between(map, entities, id, owner, (px, py), (tx, ty));
+        let clear_shot = terrain_clear && !friendly_blocked;
+
+        if friendly_blocked && matches!(mode, CombatMode::Ordered) {
+            if let Some(e) = entities.get_mut(id) {
+                if fires_while_moving(e.kind) {
+                    rotate_vehicle_weapon_for_combat(e, target_angle);
+                } else if e.kind == EntityKind::AtTeam {
+                    rotate_at_gun_for_combat(e, target_angle);
+                } else if target_angle.is_finite() {
+                    e.set_facing(target_angle);
+                    mirror_weapon_to_body(e, target_angle);
+                }
+                e.set_target_id(Some(tid));
+                e.mark_attack_phase(AttackPhase::Firing);
+                e.clear_path();
+            }
+            continue;
+        }
 
         if dist <= range_px && clear_shot {
             // In range: aim, stop, deploy if needed, and fire if off cooldown.
