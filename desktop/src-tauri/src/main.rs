@@ -39,7 +39,6 @@ fn maybe_open_devtools(_window: &WebviewWindow) {}
 fn main() {
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![cursor_grab, cursor_visible])
-        .enable_macos_default_menu(false)
         .setup(|app| {
             let server_url = desktop_url()?;
             let main_window = app.get_webview_window("main").ok_or_else(|| {
