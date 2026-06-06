@@ -16,6 +16,7 @@ pub(super) fn room_mode_for(room: &str) -> RoomMode {
             return RoomMode::DevScenario(DevScenarioConfig {
                 id: match launch.id {
                     "scout_car_snaking_corridor" => DevScenarioId::ScoutCarSnakingCorridor,
+                    "direct_reverse_order" => DevScenarioId::DirectReverseOrder,
                     _ => return RoomMode::Normal,
                 },
                 unit: launch.unit,

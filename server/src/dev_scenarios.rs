@@ -78,12 +78,39 @@ const SCOUT_CAR_SNAKING_CORRIDOR_LAUNCHES: [DevScenarioLaunch; 12] = [
     },
 ];
 
-const DEV_SCENARIOS: [DevScenarioSpec; 1] = [DevScenarioSpec {
-    id: "scout_car_snaking_corridor",
-    title: "Scout Car Snaking Corridor",
-    description: "Movement/pathing debug run through a narrow authored corridor.",
-    launches: &SCOUT_CAR_SNAKING_CORRIDOR_LAUNCHES,
-}];
+const DIRECT_REVERSE_ORDER_LAUNCHES: [DevScenarioLaunch; 3] = [
+    DevScenarioLaunch {
+        id: "direct_reverse_order",
+        unit: EntityKind::AtTeam,
+        count: 1,
+    },
+    DevScenarioLaunch {
+        id: "direct_reverse_order",
+        unit: EntityKind::ScoutCar,
+        count: 1,
+    },
+    DevScenarioLaunch {
+        id: "direct_reverse_order",
+        unit: EntityKind::Tank,
+        count: 1,
+    },
+];
+
+const DEV_SCENARIOS: [DevScenarioSpec; 2] = [
+    DevScenarioSpec {
+        id: "scout_car_snaking_corridor",
+        title: "Scout Car Snaking Corridor",
+        description: "Movement/pathing debug run through a narrow authored corridor.",
+        launches: &SCOUT_CAR_SNAKING_CORRIDOR_LAUNCHES,
+    },
+    DevScenarioSpec {
+        id: "direct_reverse_order",
+        title: "Direct Reverse Order",
+        description:
+            "Single vehicle faces east, then receives a move order 15 tiles directly behind it.",
+        launches: &DIRECT_REVERSE_ORDER_LAUNCHES,
+    },
+];
 
 pub(crate) fn all_dev_scenarios() -> &'static [DevScenarioSpec] {
     &DEV_SCENARIOS
@@ -146,6 +173,14 @@ mod tests {
                 count: 4,
             })
         );
+        assert_eq!(
+            parse_dev_scenario_room("direct_reverse_order:unit=at_team:count=1"),
+            Some(DevScenarioLaunch {
+                id: "direct_reverse_order",
+                unit: EntityKind::AtTeam,
+                count: 1,
+            })
+        );
     }
 
     #[test]
@@ -156,6 +191,14 @@ mod tests {
         );
         assert_eq!(
             parse_dev_scenario_launch("scout_car_snaking_corridor", "city_centre", "1"),
+            None
+        );
+        assert_eq!(
+            parse_dev_scenario_launch("direct_reverse_order", "worker", "1"),
+            None
+        );
+        assert_eq!(
+            parse_dev_scenario_launch("direct_reverse_order", "tank", "4"),
             None
         );
         assert_eq!(parse_dev_scenario_launch("unknown", "worker", "1"), None);
