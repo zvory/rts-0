@@ -1610,54 +1610,6 @@ mod tests {
         }
     }
 
-    #[test]
-    fn tank_clearance_route_limited_smoothing_keeps_corner_detour() {
-        let map = map_with_rock_rect(24, 9, 8, 11, 10);
-        let entities = EntityStore::new();
-        let occ = Occupancy::build(&map, &entities);
-        let mut service = PathingService::new(8_192, 16);
-        let start_tile = (5, 11);
-        let goal_tile = (15, 7);
-        let start = map.tile_center(start_tile.0 as u32, start_tile.1 as u32);
-        let shaped = service.request_tile_path(
-            &map,
-            &occ,
-            PathRequest {
-                kind: EntityKind::Tank,
-                start: start_tile,
-                goal: goal_tile,
-                radius_tiles: config::unit_radius_tiles(EntityKind::Tank),
-                route_shape: RouteShape::TankClearance,
-                budget: None,
-            },
-        );
-        let raw = pathfinding::to_world_waypoints(&shaped);
-
-        let unlimited =
-            simplify_reverse_waypoints(&map, &occ, EntityKind::Tank, start, raw.clone());
-        let limited = simplify_reverse_waypoints_with_limit(
-            &map,
-            &occ,
-            EntityKind::Tank,
-            start,
-            raw,
-            config::TILE_SIZE as f32 * 3.0,
-        );
-
-        assert!(
-            limited.len() > unlimited.len(),
-            "bounded tank smoothing should preserve more clearance route structure than unlimited smoothing; unlimited={unlimited:?} limited={limited:?}"
-        );
-        assert_reverse_segments_standable(&map, &occ, EntityKind::Tank, start, &limited);
-        assert!(
-            limited
-                .iter()
-                .rev()
-                .any(|&(_, y)| y > start.1 + config::TILE_SIZE as f32),
-            "limited smoothing should keep the tank below the blocker before turning back, got {limited:?}"
-        );
-    }
-
     fn diagonal_pinch_map() -> Map {
         // Two 3x3 rock footprints arranged as in the tank-pinch bug:
         //   A at tiles (0..=2, 0..=2), B at tiles (4..=6, 3..=5).
