@@ -24,8 +24,10 @@ use axum::extract::{Query, State};
 use axum::http::header;
 use axum::http::StatusCode;
 use axum::response::{Html, IntoResponse, Redirect};
-use axum::routing::get;
+use axum::routing::{get, post};
+use axum::Json;
 use axum::Router;
+use serde::Deserialize;
 use futures_util::{SinkExt, StreamExt};
 use tokio::sync::mpsc;
 use tower_http::services::{ServeDir, ServeFile};
@@ -53,6 +55,7 @@ struct AppState {
     /// `index.html` with `?v=<COMMIT_HASH>` appended to all JS/CSS asset URLs, computed once at
     /// startup so cache-busting survives browser caches without a hard refresh.
     index_html: String,
+    maps_dir: String,
 }
 
 #[tokio::main]
@@ -68,13 +71,13 @@ async fn main() {
     let version = git_version();
     let client_dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../client");
     let index_html = build_versioned_index(client_dir, &version);
+    let maps_dir = concat!(env!("CARGO_MANIFEST_DIR"), "/assets/maps").to_string();
     let state = AppState {
         lobby: Lobby::new(),
         index_html,
         version,
+        maps_dir: maps_dir.clone(),
     };
-
-    let maps_dir = concat!(env!("CARGO_MANIFEST_DIR"), "/assets/maps");
     // Static files for everything except `/ws`; unknown paths fall back to `index.html` so the
     // single-page client loads regardless of the requested path.
     let static_service =
@@ -87,6 +90,7 @@ async fn main() {
         .route("/dev/selfplay", get(dev_selfplay_handler))
         .route("/dev/scenario", get(dev_scenario_handler))
         .route("/dev/scenarios", get(dev_scenario_handler))
+        .route("/maps/save", post(map_save_handler))
         .nest_service("/maps", ServeDir::new(maps_dir))
         .fallback_service(static_service)
         .with_state(state);
@@ -742,4 +746,51 @@ fn sanitize_name(name: String) -> String {
     } else {
         cleaned
     }
+}
+
+#[derive(Deserialize)]
+struct MapSaveRequest {
+    name: String,
+    payload: serde_json::Value,
+}
+
+/// POST /maps/save — write a map JSON file directly into the server's assets/maps directory.
+/// Only accepts filenames matching `[a-z0-9-]+` to prevent path traversal.
+async fn map_save_handler(
+    State(state): State<AppState>,
+    Json(req): Json<MapSaveRequest>,
+) -> impl IntoResponse {
+    let name = req.name.trim().to_string();
+    if name.is_empty()
+        || name.len() > 64
+        || !name.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+    {
+        return (
+            StatusCode::BAD_REQUEST,
+            "name must be 1-64 lowercase alphanumeric or hyphen characters",
+        )
+            .into_response();
+    }
+
+    let filename = format!("{name}.json");
+    let path = std::path::Path::new(&state.maps_dir).join(&filename);
+
+    let json_bytes = match serde_json::to_vec_pretty(&req.payload) {
+        Ok(mut b) => {
+            b.push(b'\n');
+            b
+        }
+        Err(e) => {
+            warn!(%e, "map save: payload serialization failed");
+            return (StatusCode::BAD_REQUEST, "invalid payload").into_response();
+        }
+    };
+
+    if let Err(e) = tokio::fs::write(&path, &json_bytes).await {
+        warn!(%e, ?path, "map save: write failed");
+        return (StatusCode::INTERNAL_SERVER_ERROR, "write failed").into_response();
+    }
+
+    info!(?path, "map saved");
+    (StatusCode::OK, filename).into_response()
 }
