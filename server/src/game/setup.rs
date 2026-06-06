@@ -859,8 +859,12 @@ fn spawn_debug_human_start(
 const DEBUG_INERT_ENEMY_ID: u32 = 900_001;
 const DEBUG_INERT_AT_GUN_COUNT: usize = 5;
 const DEBUG_INERT_AT_GUN_SPACING_TILES: f32 = 4.0;
+const DEBUG_INERT_RIFLEMAN_SCREEN_COUNT: usize = 12;
+const DEBUG_INERT_RIFLEMAN_SCREEN_SPACING_TILES: f32 = 2.0;
+const DEBUG_INERT_RIFLEMAN_SCREEN_FRONT_TILES: f32 = 5.0;
 
-/// Add a static enemy AT-gun battery to debug starts without creating an AI controller/profile.
+/// Add a static enemy AT-gun battery and rifle screen to debug starts without creating an AI
+/// controller/profile.
 fn spawn_debug_inert_enemy_at_guns(
     entities: &mut EntityStore,
     map: &Map,
@@ -892,6 +896,7 @@ fn spawn_debug_inert_enemy_at_guns(
     }
 
     let side = (-center_facing.sin(), center_facing.cos());
+    let forward = (center_facing.cos(), center_facing.sin());
     let ts = config::TILE_SIZE as f32;
     let center_index = (DEBUG_INERT_AT_GUN_COUNT.saturating_sub(1)) as f32 * 0.5;
     for i in 0..DEBUG_INERT_AT_GUN_COUNT {
@@ -908,6 +913,22 @@ fn spawn_debug_inert_enemy_at_guns(
             e.set_desired_weapon_facing(facing);
             e.set_emplacement_facing(Some(facing));
             e.set_weapon_setup(WeaponSetup::Deployed);
+        }
+    }
+
+    let screen_center = (
+        battery_center.0 + forward.0 * DEBUG_INERT_RIFLEMAN_SCREEN_FRONT_TILES * ts,
+        battery_center.1 + forward.1 * DEBUG_INERT_RIFLEMAN_SCREEN_FRONT_TILES * ts,
+    );
+    let center_index = (DEBUG_INERT_RIFLEMAN_SCREEN_COUNT.saturating_sub(1)) as f32 * 0.5;
+    for i in 0..DEBUG_INERT_RIFLEMAN_SCREEN_COUNT {
+        let offset = (i as f32 - center_index) * DEBUG_INERT_RIFLEMAN_SCREEN_SPACING_TILES * ts;
+        let x = screen_center.0 + side.0 * offset;
+        let y = screen_center.1 + side.1 * offset;
+        if let Some(id) = entities.spawn_unit(DEBUG_INERT_ENEMY_ID, EntityKind::Rifleman, x, y) {
+            if let Some(e) = entities.get_mut(id) {
+                e.set_facing(center_facing);
+            }
         }
     }
 
@@ -1065,6 +1086,13 @@ mod tests {
         );
 
         let map_center = game.map.world_size_px() * 0.5;
+        let battery_center = game
+            .map
+            .tile_center(battery_player.start_tile.0, battery_player.start_tile.1);
+        let center_facing = (map_center - battery_center.1).atan2(map_center - battery_center.0);
+        let forward = (center_facing.cos(), center_facing.sin());
+        let side = (-center_facing.sin(), center_facing.cos());
+        let ts = config::TILE_SIZE as f32;
         let guns: Vec<_> = game
             .entities
             .iter()
@@ -1085,6 +1113,39 @@ mod tests {
             assert!(
                 (gun.facing() - facing_to_center).abs() <= 0.001,
                 "gun should face map center"
+            );
+        }
+
+        let mut rifle_offsets: Vec<_> = game
+            .entities
+            .iter()
+            .filter(|e| e.owner == DEBUG_INERT_ENEMY_ID && e.kind == EntityKind::Rifleman)
+            .map(|e| {
+                let dx = e.pos_x - battery_center.0;
+                let dy = e.pos_y - battery_center.1;
+                let front_tiles = (dx * forward.0 + dy * forward.1) / ts;
+                let side_tiles = (dx * side.0 + dy * side.1) / ts;
+                (front_tiles, side_tiles, e.facing())
+            })
+            .collect();
+        assert_eq!(rifle_offsets.len(), DEBUG_INERT_RIFLEMAN_SCREEN_COUNT);
+        rifle_offsets.sort_by(|a, b| a.1.total_cmp(&b.1));
+
+        let center_index = (DEBUG_INERT_RIFLEMAN_SCREEN_COUNT.saturating_sub(1)) as f32 * 0.5;
+        for (i, (front_tiles, side_tiles, facing)) in rifle_offsets.into_iter().enumerate() {
+            let expected_side =
+                (i as f32 - center_index) * DEBUG_INERT_RIFLEMAN_SCREEN_SPACING_TILES;
+            assert!(
+                (front_tiles - DEBUG_INERT_RIFLEMAN_SCREEN_FRONT_TILES).abs() <= 0.001,
+                "rifleman screen should stand five tiles in front of the AT guns"
+            );
+            assert!(
+                (side_tiles - expected_side).abs() <= 0.001,
+                "rifleman screen should form an evenly spaced line"
+            );
+            assert!(
+                (facing - center_facing).abs() <= 0.001,
+                "rifleman screen should face map center"
             );
         }
     }
