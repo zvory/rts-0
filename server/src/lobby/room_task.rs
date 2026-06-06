@@ -799,8 +799,11 @@ impl RoomTask {
                     Ok((setup.game, DevDriver::Scenario(driver), setup.player_id))
                 }
                 DevScenarioId::ScoutCarWallChokepoint => {
-                    let setup =
-                        Game::new_scout_car_wall_chokepoint_scenario(config.count, match_seed())?;
+                    let setup = Game::new_scout_car_wall_chokepoint_scenario(
+                        config.unit,
+                        config.count,
+                        match_seed(),
+                    )?;
                     let driver = DevScenarioDriver {
                         player_id: setup.player_id,
                         units: setup.units,

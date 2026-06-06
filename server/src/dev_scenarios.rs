@@ -96,7 +96,32 @@ const DIRECT_REVERSE_ORDER_LAUNCHES: [DevScenarioLaunch; 3] = [
     },
 ];
 
-const SCOUT_CAR_WALL_CHOKEPOINT_LAUNCHES: [DevScenarioLaunch; 5] = [
+const WALL_CHOKEPOINT_VEHICLE_LAUNCHES: [DevScenarioLaunch; 15] = [
+    DevScenarioLaunch {
+        id: "scout_car_wall_chokepoint",
+        unit: EntityKind::AtTeam,
+        count: 3,
+    },
+    DevScenarioLaunch {
+        id: "scout_car_wall_chokepoint",
+        unit: EntityKind::AtTeam,
+        count: 5,
+    },
+    DevScenarioLaunch {
+        id: "scout_car_wall_chokepoint",
+        unit: EntityKind::AtTeam,
+        count: 6,
+    },
+    DevScenarioLaunch {
+        id: "scout_car_wall_chokepoint",
+        unit: EntityKind::AtTeam,
+        count: 10,
+    },
+    DevScenarioLaunch {
+        id: "scout_car_wall_chokepoint",
+        unit: EntityKind::AtTeam,
+        count: 15,
+    },
     DevScenarioLaunch {
         id: "scout_car_wall_chokepoint",
         unit: EntityKind::ScoutCar,
@@ -122,6 +147,31 @@ const SCOUT_CAR_WALL_CHOKEPOINT_LAUNCHES: [DevScenarioLaunch; 5] = [
         unit: EntityKind::ScoutCar,
         count: 15,
     },
+    DevScenarioLaunch {
+        id: "scout_car_wall_chokepoint",
+        unit: EntityKind::Tank,
+        count: 3,
+    },
+    DevScenarioLaunch {
+        id: "scout_car_wall_chokepoint",
+        unit: EntityKind::Tank,
+        count: 5,
+    },
+    DevScenarioLaunch {
+        id: "scout_car_wall_chokepoint",
+        unit: EntityKind::Tank,
+        count: 6,
+    },
+    DevScenarioLaunch {
+        id: "scout_car_wall_chokepoint",
+        unit: EntityKind::Tank,
+        count: 10,
+    },
+    DevScenarioLaunch {
+        id: "scout_car_wall_chokepoint",
+        unit: EntityKind::Tank,
+        count: 15,
+    },
 ];
 
 const DEV_SCENARIOS: [DevScenarioSpec; 3] = [
@@ -140,9 +190,9 @@ const DEV_SCENARIOS: [DevScenarioSpec; 3] = [
     },
     DevScenarioSpec {
         id: "scout_car_wall_chokepoint",
-        title: "Scout Car Wall Chokepoint",
-        description: "Scout cars start beside each other below a stone wall gap and move north through the choke.",
-        launches: &SCOUT_CAR_WALL_CHOKEPOINT_LAUNCHES,
+        title: "Vehicle Wall Chokepoint",
+        description: "Vehicles start beside each other below a stone wall gap and move north through the choke.",
+        launches: &WALL_CHOKEPOINT_VEHICLE_LAUNCHES,
     },
 ];
 
@@ -216,10 +266,26 @@ mod tests {
             })
         );
         assert_eq!(
+            parse_dev_scenario_room("scout_car_wall_chokepoint:unit=at_team:count=15"),
+            Some(DevScenarioLaunch {
+                id: "scout_car_wall_chokepoint",
+                unit: EntityKind::AtTeam,
+                count: 15,
+            })
+        );
+        assert_eq!(
             parse_dev_scenario_room("scout_car_wall_chokepoint:unit=scout_car:count=15"),
             Some(DevScenarioLaunch {
                 id: "scout_car_wall_chokepoint",
                 unit: EntityKind::ScoutCar,
+                count: 15,
+            })
+        );
+        assert_eq!(
+            parse_dev_scenario_room("scout_car_wall_chokepoint:unit=tank:count=15"),
+            Some(DevScenarioLaunch {
+                id: "scout_car_wall_chokepoint",
+                unit: EntityKind::Tank,
                 count: 15,
             })
         );
@@ -244,7 +310,7 @@ mod tests {
             None
         );
         assert_eq!(
-            parse_dev_scenario_launch("scout_car_wall_chokepoint", "tank", "3"),
+            parse_dev_scenario_launch("scout_car_wall_chokepoint", "worker", "3"),
             None
         );
         assert_eq!(
