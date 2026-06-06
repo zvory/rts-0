@@ -1287,6 +1287,207 @@ fn block_rect_tiles(map: &mut Map, min_x: u32, min_y: u32, max_x: u32, max_y: u3
     }
 }
 
+fn carve_rect_tiles(map: &mut Map, min_x: u32, min_y: u32, max_x: u32, max_y: u32) {
+    for ty in min_y..=max_y {
+        for tx in min_x..=max_x {
+            let idx = map.index(tx, ty);
+            map.terrain[idx] = crate::protocol::terrain::GRASS;
+        }
+    }
+}
+
+fn carve_horizontal_corridor(map: &mut Map, min_x: u32, max_x: u32, center_y: u32) {
+    carve_rect_tiles(map, min_x, center_y - 1, max_x, center_y + 1);
+}
+
+fn carve_vertical_corridor(map: &mut Map, center_x: u32, min_y: u32, max_y: u32) {
+    carve_rect_tiles(map, center_x - 1, min_y, center_x + 1, max_y);
+}
+
+#[derive(Debug, Clone)]
+struct ScoutCarTunnelTiming {
+    car_count: usize,
+    clear_ticks: Option<u32>,
+    clear_seconds: Option<f32>,
+    final_state: Vec<String>,
+}
+
+fn scout_car_snaking_corridor_map() -> (Map, u32, f32, (f32, f32), (f32, f32)) {
+    let mut map = flat_map(1);
+    let stone_min_y = 15u32;
+    let stone_max_y = 75u32;
+    let exit_x = 36u32;
+    let first_left_x = 26u32;
+    let right_x = 56u32;
+    let lower_lane_y = 68u32;
+    let middle_lane_y = 64u32;
+    let upper_lane_y = 60u32;
+
+    let stone_max_x = map.size - 1;
+    block_rect_tiles(&mut map, 0, stone_min_y, stone_max_x, stone_max_y);
+
+    carve_vertical_corridor(&mut map, exit_x, lower_lane_y, stone_max_y);
+    carve_horizontal_corridor(&mut map, first_left_x, exit_x, lower_lane_y);
+    carve_vertical_corridor(&mut map, first_left_x, middle_lane_y, lower_lane_y);
+    carve_horizontal_corridor(&mut map, first_left_x, right_x, middle_lane_y);
+    carve_vertical_corridor(&mut map, right_x, upper_lane_y, middle_lane_y);
+    carve_horizontal_corridor(&mut map, exit_x, right_x, upper_lane_y);
+    carve_vertical_corridor(&mut map, exit_x, stone_min_y, upper_lane_y);
+
+    let ts = config::TILE_SIZE as f32;
+    let start = map.tile_center(exit_x, stone_max_y + 5);
+    let exit = map.tile_center(exit_x, stone_min_y - 1);
+    let goal = (exit.0 + ts * 10.0, exit.1 - ts * 10.0);
+    let exit_clear_y = stone_min_y as f32 * ts;
+
+    (map, exit_x, exit_clear_y, start, goal)
+}
+
+fn spawn_snaking_corridor_scout_cars(
+    entities: &mut EntityStore,
+    car_count: usize,
+    start: (f32, f32),
+) -> Vec<u32> {
+    let north = -std::f32::consts::FRAC_PI_2;
+    let positions: Vec<(f32, f32)> = match car_count {
+        1 => vec![start],
+        4 => {
+            let x_spacing = config::SCOUT_CAR_BODY_WIDTH_PX * 1.5;
+            let y_spacing = config::SCOUT_CAR_BODY_LENGTH_PX * 1.5;
+            vec![
+                (start.0 - x_spacing * 0.5, start.1 - y_spacing * 0.5),
+                (start.0 + x_spacing * 0.5, start.1 - y_spacing * 0.5),
+                (start.0 - x_spacing * 0.5, start.1 + y_spacing * 0.5),
+                (start.0 + x_spacing * 0.5, start.1 + y_spacing * 0.5),
+            ]
+        }
+        _ => panic!("unsupported scout car count {car_count}"),
+    };
+
+    positions
+        .into_iter()
+        .map(|(x, y)| {
+            let scout = entities
+                .spawn_unit(1, EntityKind::ScoutCar, x, y)
+                .expect("scout car should spawn");
+            if let Some(e) = entities.get_mut(scout) {
+                e.set_facing(north);
+            }
+            scout
+        })
+        .collect()
+}
+
+fn scout_cars_clear_tunnel_exit(entities: &EntityStore, scouts: &[u32], exit_clear_y: f32) -> bool {
+    let radius = config::unit_stats(EntityKind::ScoutCar)
+        .expect("scout car stats")
+        .radius;
+    scouts.iter().all(|&id| {
+        entities
+            .get(id)
+            .is_some_and(|e| e.pos_y + radius < exit_clear_y)
+    })
+}
+
+fn measure_snaking_corridor_clear_time(car_count: usize) -> ScoutCarTunnelTiming {
+    let (map, exit_x, exit_clear_y, start, goal) = scout_car_snaking_corridor_map();
+    let mut entities = EntityStore::new();
+    let scouts = spawn_snaking_corridor_scout_cars(&mut entities, car_count, start);
+    let occ = Occupancy::build(&map, &entities);
+    for &scout in &scouts {
+        let e = entities.get(scout).expect("scout car should exist");
+        assert!(standability::unit_static_standable_with_facing(
+            &map,
+            &occ,
+            EntityKind::ScoutCar,
+            e.pos_x,
+            e.pos_y,
+            e.facing()
+        ));
+    }
+    assert_eq!(
+        map.tile_of(start.0, start.1).0,
+        exit_x,
+        "scout cars should start vertically aligned with the tunnel exit"
+    );
+
+    let mut pathing = PathingService::new(16_384, 512);
+    let max_ticks = 12_000u32;
+    for tick in 1..=max_ticks {
+        pathing.advance_tick(tick);
+        let occ = Occupancy::build(&map, &entities);
+        let mut coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, tick);
+        if tick == 1 {
+            coordinator.order_group_move(&mut entities, 1, &scouts, goal, false);
+        }
+        coordinator.process_awaiting_paths(&mut entities);
+
+        let spatial = SpatialIndex::build(&entities, map.size);
+        movement_system(&map, &mut entities, &mut [], &occ, &spatial, tick);
+        let spatial = SpatialIndex::build(&entities, map.size);
+        resolve_collisions(&mut entities, &spatial, &map, &occ);
+
+        if scout_cars_clear_tunnel_exit(&entities, &scouts, exit_clear_y) {
+            return ScoutCarTunnelTiming {
+                car_count,
+                clear_ticks: Some(tick),
+                clear_seconds: Some(tick as f32 / config::TICK_HZ as f32),
+                final_state: describe_scout_car_tunnel_state(&entities, &scouts),
+            };
+        }
+    }
+
+    ScoutCarTunnelTiming {
+        car_count,
+        clear_ticks: None,
+        clear_seconds: None,
+        final_state: describe_scout_car_tunnel_state(&entities, &scouts),
+    }
+}
+
+fn describe_scout_car_tunnel_state(entities: &EntityStore, scouts: &[u32]) -> Vec<String> {
+    scouts
+        .iter()
+        .filter_map(|&id| {
+            let e = entities.get(id)?;
+            Some(format!(
+                "#{id}: pos=({:.1},{:.1}) facing={:.3} phase={:?} path_len={} next={:?} goal={:?}",
+                e.pos_x,
+                e.pos_y,
+                e.facing(),
+                e.move_phase(),
+                e.movement.as_ref().map(|m| m.path.len()).unwrap_or(0),
+                e.next_waypoint(),
+                e.path_goal(),
+            ))
+        })
+        .collect()
+}
+
+#[test]
+#[ignore = "manual scout-car corridor timing scenario; run with --ignored --nocapture"]
+fn scout_car_snaking_corridor_clear_times() {
+    let results = [
+        measure_snaking_corridor_clear_time(1),
+        measure_snaking_corridor_clear_time(4),
+    ];
+
+    println!("SCOUT_CAR_SNAKING_CORRIDOR_CLEAR_TIMES");
+    println!("cars | clear_ticks | clear_seconds | final_state");
+    for result in &results {
+        match (result.clear_ticks, result.clear_seconds) {
+            (Some(ticks), Some(seconds)) => println!(
+                "{:>4} | {:>11} | {:>13.2} | {:?}",
+                result.car_count, ticks, seconds, result.final_state
+            ),
+            _ => println!(
+                "{:>4} | {:>11} | {:>13} | {:?}",
+                result.car_count, "timeout", "timeout", result.final_state
+            ),
+        }
+    }
+}
+
 #[test]
 fn scout_car_phase0_factory_corner_graze_cardinal_approaches() {
     let ts = config::TILE_SIZE as f32;
