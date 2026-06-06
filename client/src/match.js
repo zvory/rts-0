@@ -92,6 +92,7 @@ export class Match {
 
     // --- Build the module graph from the static start payload (DESIGN.md §4.1). ---
     this.state = new GameState(payload);
+    this.state.showAllDebugPathOverlays = this.devWatch?.kind === "scenario";
     this.camera = new Camera();
     this.renderer = new Renderer(dom.viewport);
     this.fog = new Fog(this.state.map.width, this.state.map.height, this.state.map.terrain);

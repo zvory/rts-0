@@ -179,14 +179,17 @@ export function _drawQueuedOrderMarkers(state) {
   }
 }
 
-export function _drawDebugPathOverlay(state) {
+export function _drawDebugPathOverlay(state, entities = null) {
   if (!state || typeof state.selectedEntities !== "function") return;
   const g = this._feedbackGfx;
   const pathColor = 0x33d6ff;
   const currentColor = 0xffe066;
   const goalColor = 0xff8a4c;
+  const candidates = state.showAllDebugPathOverlays && Array.isArray(entities)
+    ? entities
+    : state.selectedEntities();
 
-  for (const e of state.selectedEntities()) {
+  for (const e of candidates) {
     if (e.owner !== state.playerId || !isUnit(e.kind) || e.state !== STATE.MOVE) continue;
     const debugPath = e.debugPath;
     const waypoints = Array.isArray(debugPath?.waypoints)

@@ -208,7 +208,7 @@ export class Renderer {
     this._drawCommandFeedback(state);
     this._drawAtGunSetupPreview(state);
     this._drawQueuedOrderMarkers(state);
-    this._drawDebugPathOverlay(state);
+    this._drawDebugPathOverlay(state, regularEntities);
     this._drawRallyPoints(state);
     this._drawResourceMiningPreview(state);
     this._drawMuzzleFlashes(state);
