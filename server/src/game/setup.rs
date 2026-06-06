@@ -268,18 +268,25 @@ impl Game {
     }
 
     pub(crate) fn new_scout_car_wall_chokepoint_scenario(
+        unit: EntityKind,
         unit_count: usize,
         seed: u32,
     ) -> Result<DevScenarioSetup, String> {
+        if !matches!(
+            unit,
+            EntityKind::AtTeam | EntityKind::ScoutCar | EntityKind::Tank
+        ) {
+            return Err(format!("unsupported wall-chokepoint unit {unit}"));
+        }
         if !matches!(unit_count, 3 | 5 | 6 | 10 | 15) {
             return Err(format!(
-                "unsupported wall-chokepoint scout car count {unit_count}"
+                "unsupported wall-chokepoint unit count {unit_count}"
             ));
         }
 
-        let (map, start_tile, starts, goal) = scout_car_wall_chokepoint_map(unit_count);
+        let (map, start_tile, starts, goal) = scout_car_wall_chokepoint_map(unit, unit_count);
         let mut entities = EntityStore::new();
-        let units = spawn_wall_chokepoint_scout_cars(&mut entities, starts)?;
+        let units = spawn_wall_chokepoint_units(&mut entities, unit, starts)?;
         let player_id = 1;
         let player = PlayerState {
             id: player_id,
@@ -548,6 +555,7 @@ fn scout_car_snaking_corridor_map() -> ScoutCarCorridorLayout {
 }
 
 fn scout_car_wall_chokepoint_map(
+    unit: EntityKind,
     unit_count: usize,
 ) -> (Map, (u32, u32), Vec<(f32, f32)>, (f32, f32)) {
     let mut map = flat_dev_map(1);
@@ -564,7 +572,7 @@ fn scout_car_wall_chokepoint_map(
     let ts = config::TILE_SIZE as f32;
     let center_world_x = gap_right_x as f32 * ts;
     let start_y = (start_tile.1 as f32 + 0.5) * ts;
-    let spacing = config::SCOUT_CAR_BODY_WIDTH_PX + config::SCOUT_CAR_BODY_CLEARANCE_PX * 4.0;
+    let spacing = wall_chokepoint_spawn_spacing(unit);
     let center_index = (unit_count.saturating_sub(1)) as f32 * 0.5;
     let starts = (0..unit_count)
         .map(|i| {
@@ -619,22 +627,34 @@ fn spawn_snaking_corridor_units(
     Ok(units)
 }
 
-fn spawn_wall_chokepoint_scout_cars(
+fn spawn_wall_chokepoint_units(
     entities: &mut EntityStore,
+    unit: EntityKind,
     starts: Vec<(f32, f32)>,
 ) -> Result<Vec<u32>, String> {
     let north = -std::f32::consts::FRAC_PI_2;
     let mut units = Vec::with_capacity(starts.len());
     for (x, y) in starts {
         let spawned = entities
-            .spawn_unit(1, EntityKind::ScoutCar, x, y)
-            .ok_or_else(|| "failed to spawn scout car".to_string())?;
+            .spawn_unit(1, unit, x, y)
+            .ok_or_else(|| format!("failed to spawn {unit}"))?;
         if let Some(e) = entities.get_mut(spawned) {
             e.set_facing(north);
         }
         units.push(spawned);
     }
     Ok(units)
+}
+
+fn wall_chokepoint_spawn_spacing(unit: EntityKind) -> f32 {
+    match unit {
+        EntityKind::AtTeam => config::AT_GUN_BODY_WIDTH_PX + config::AT_GUN_BODY_CLEARANCE_PX * 4.0,
+        EntityKind::ScoutCar => {
+            config::SCOUT_CAR_BODY_WIDTH_PX + config::SCOUT_CAR_BODY_CLEARANCE_PX * 4.0
+        }
+        EntityKind::Tank => config::TANK_BODY_WIDTH_PX + config::TANK_BODY_CLEARANCE_PX * 4.0,
+        _ => unreachable!("wall chokepoint only supports vehicles"),
+    }
 }
 
 fn snaking_corridor_spawn_spacing(unit: EntityKind) -> Result<(f32, f32), String> {

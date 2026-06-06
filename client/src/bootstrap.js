@@ -28,7 +28,7 @@ export function devWatchConfig() {
         ["at_team", "scout_car", "tank"].includes(unit) &&
         count === "1") ||
       (id === "scout_car_wall_chokepoint" &&
-        unit === "scout_car" &&
+        ["at_team", "scout_car", "tank"].includes(unit) &&
         ["3", "5", "6", "10", "15"].includes(count));
     if (!supportedScenario) {
       return null;

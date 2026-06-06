@@ -512,7 +512,7 @@ fn dev_scenario_snapshot_shows_runtime_movement_debug_path() {
 
 #[test]
 fn wall_chokepoint_dev_scenario_matches_authored_layout() {
-    let setup = Game::new_scout_car_wall_chokepoint_scenario(15, 0x5150_0003)
+    let setup = Game::new_scout_car_wall_chokepoint_scenario(EntityKind::ScoutCar, 15, 0x5150_0003)
         .expect("scenario setup should succeed");
     let mut game = setup.game;
 
@@ -567,6 +567,24 @@ fn wall_chokepoint_dev_scenario_matches_authored_layout() {
             view.debug_path.is_some(),
             "wall chokepoint scenario should issue movement debug paths"
         );
+    }
+}
+
+#[test]
+fn wall_chokepoint_dev_scenario_supports_all_vehicles() {
+    for unit in [EntityKind::AtTeam, EntityKind::ScoutCar, EntityKind::Tank] {
+        let setup = Game::new_scout_car_wall_chokepoint_scenario(unit, 5, 0x5150_0004)
+            .expect("scenario setup should succeed");
+
+        assert_eq!(setup.units.len(), 5);
+        for unit_id in setup.units {
+            let entity = setup
+                .game
+                .entities
+                .get(unit_id)
+                .expect("scenario unit exists");
+            assert_eq!(entity.kind, unit);
+        }
     }
 }
 
