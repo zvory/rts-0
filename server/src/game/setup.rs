@@ -149,7 +149,7 @@ impl Game {
         };
 
         let spatial = services::spatial::SpatialIndex::build(&entities, map.size);
-        let pathing = services::pathing::PathingService::new(8_192, 256);
+        let pathing = services::pathing::PathingService::new(65_536, 256);
         let rng = SmallRng::seed_from_u64(seed as u64);
         let mut game = Game {
             map,
@@ -254,7 +254,7 @@ impl Game {
         }
 
         let spatial = services::spatial::SpatialIndex::build(&entities, map.size);
-        let pathing = services::pathing::PathingService::new(8_192, 256);
+        let pathing = services::pathing::PathingService::new(65_536, 256);
         let rng = SmallRng::seed_from_u64(seed as u64);
         let mut game = Game {
             map,

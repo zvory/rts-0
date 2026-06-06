@@ -1461,7 +1461,7 @@ fn measure_snaking_corridor_clear_time(car_count: usize) -> ScoutCarTunnelTiming
         "scout cars should start vertically aligned with the tunnel exit"
     );
 
-    let mut pathing = PathingService::new(16_384, 512);
+    let mut pathing = PathingService::new(65_536, 512);
     let max_ticks = 12_000u32;
     for tick in 1..=max_ticks {
         pathing.advance_tick(tick);
@@ -1515,7 +1515,6 @@ fn describe_scout_car_tunnel_state(entities: &EntityStore, scouts: &[u32]) -> Ve
 }
 
 #[test]
-#[ignore = "manual scout-car corridor timing scenario; run with --ignored --nocapture"]
 fn scout_car_snaking_corridor_clear_times() {
     let results = [
         measure_snaking_corridor_clear_time(1),
