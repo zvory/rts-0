@@ -1363,6 +1363,14 @@ struct SnakingCorridorTiming {
     final_state: Vec<String>,
 }
 
+#[derive(Debug, Clone)]
+struct SnakingCorridorUnitTiming {
+    unit: EntityKind,
+    unit_count: usize,
+    clear_ticks: Vec<Option<u32>>,
+    final_state: Vec<String>,
+}
+
 const SNAKING_CORRIDOR_REGRESSION_BASELINES: &[(EntityKind, usize, u32)] = &[
     (EntityKind::Worker, 1, 2_303),
     (EntityKind::Worker, 4, 2_340),
@@ -1372,6 +1380,16 @@ const SNAKING_CORRIDOR_REGRESSION_BASELINES: &[(EntityKind, usize, u32)] = &[
     (EntityKind::MachineGunner, 4, 2_940),
     (EntityKind::ScoutCar, 1, 1_577),
     (EntityKind::ScoutCar, 4, 1_654),
+];
+
+const SNAKING_CORRIDOR_VEHICLE_SLOT_BASELINES: &[(EntityKind, usize, u32)] = &[
+    (EntityKind::Tank, 0, 1_922),
+    (EntityKind::Tank, 1, 1_981),
+    (EntityKind::Tank, 2, 2_035),
+    (EntityKind::AtTeam, 0, 3_281),
+    (EntityKind::AtTeam, 1, 3_364),
+    (EntityKind::AtTeam, 2, 3_439),
+    (EntityKind::AtTeam, 3, 3_517),
 ];
 
 fn scout_car_snaking_corridor_map() -> (Map, u32, f32, (f32, f32), (f32, f32)) {
@@ -1474,6 +1492,85 @@ fn units_clear_tunnel_exit(
             .get(id)
             .is_some_and(|e| e.pos_y + radius < exit_clear_y)
     })
+}
+
+fn unit_clears_tunnel_exit(
+    entities: &EntityStore,
+    unit: EntityKind,
+    id: u32,
+    exit_clear_y: f32,
+) -> bool {
+    let radius = config::unit_stats(unit).expect("unit stats").radius;
+    entities
+        .get(id)
+        .is_some_and(|e| e.pos_y + radius < exit_clear_y)
+}
+
+fn measure_snaking_corridor_unit_clear_times(
+    unit: EntityKind,
+    unit_count: usize,
+    required_slots: &[usize],
+) -> SnakingCorridorUnitTiming {
+    let (map, exit_x, exit_clear_y, start, goal) = scout_car_snaking_corridor_map();
+    let mut entities = EntityStore::new();
+    let units = spawn_snaking_corridor_units(&mut entities, unit, unit_count, start);
+    let occ = Occupancy::build(&map, &entities);
+    for &spawned in &units {
+        let e = entities.get(spawned).expect("unit should exist");
+        assert!(standability::unit_static_standable_with_facing(
+            &map,
+            &occ,
+            unit,
+            e.pos_x,
+            e.pos_y,
+            e.facing()
+        ));
+    }
+    assert_eq!(
+        map.tile_of(start.0, start.1).0,
+        exit_x,
+        "units should start vertically aligned with the tunnel exit"
+    );
+
+    let mut clear_ticks = vec![None; units.len()];
+    let mut pathing = PathingService::new(65_536, 512);
+    let max_ticks = 12_000u32;
+    for tick in 1..=max_ticks {
+        pathing.advance_tick(tick);
+        let occ = Occupancy::build(&map, &entities);
+        let mut coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, tick);
+        if tick == 1 {
+            coordinator.order_group_move(&mut entities, 1, &units, goal, false);
+        }
+        coordinator.process_awaiting_paths(&mut entities);
+
+        let spatial = SpatialIndex::build(&entities, map.size);
+        movement_system(&map, &mut entities, &mut [], &occ, &spatial, tick);
+        let spatial = SpatialIndex::build(&entities, map.size);
+        resolve_collisions(&mut entities, &spatial, &map, &occ);
+
+        for (slot, id) in units.iter().copied().enumerate() {
+            if clear_ticks[slot].is_none()
+                && unit_clears_tunnel_exit(&entities, unit, id, exit_clear_y)
+            {
+                clear_ticks[slot] = Some(tick);
+            }
+        }
+
+        if required_slots
+            .iter()
+            .all(|&slot| clear_ticks.get(slot).is_some_and(Option::is_some))
+        {
+            break;
+        }
+    }
+
+    SnakingCorridorUnitTiming {
+        unit,
+        unit_count,
+        clear_ticks,
+        final_state: describe_snaking_corridor_state(&entities, &units),
+    }
 }
 
 fn measure_snaking_corridor_clear_time(
@@ -1651,6 +1748,61 @@ fn snaking_corridor_completed_unit_clear_times_regression() {
             "snaking corridor unit={} count={} regressed: {} ticks vs baseline {} (>10% slower); final_state={:?}",
             result.unit,
             result.unit_count,
+            clear_ticks,
+            baseline,
+            result.final_state
+        );
+    }
+}
+
+#[test]
+fn snaking_corridor_vehicle_slot_clear_times_regression() {
+    let results = [
+        measure_snaking_corridor_unit_clear_times(EntityKind::Tank, 4, &[0, 1, 2]),
+        measure_snaking_corridor_unit_clear_times(EntityKind::AtTeam, 4, &[0, 1, 2, 3]),
+    ];
+
+    println!("SNAKING_CORRIDOR_VEHICLE_SLOT_CLEAR_TIMES");
+    println!("unit | count | slot | clear_ticks | final_state");
+    for &(unit, slot, _) in SNAKING_CORRIDOR_VEHICLE_SLOT_BASELINES {
+        let result = results
+            .iter()
+            .find(|result| result.unit == unit)
+            .expect("result should exist for each vehicle unit kind");
+        let clear_ticks = result.clear_ticks.get(slot).copied().flatten();
+        println!(
+            "{:>14} | {:>5} | {:>4} | {:>11} | {:?}",
+            result.unit,
+            result.unit_count,
+            slot,
+            clear_ticks
+                .map(|ticks| ticks.to_string())
+                .unwrap_or_else(|| "timeout".to_string()),
+            result.final_state
+        );
+    }
+
+    for &(unit, slot, baseline) in SNAKING_CORRIDOR_VEHICLE_SLOT_BASELINES {
+        let result = results
+            .iter()
+            .find(|result| result.unit == unit)
+            .expect("result should exist for each vehicle unit kind");
+        let clear_ticks = result
+            .clear_ticks
+            .get(slot)
+            .copied()
+            .flatten()
+            .unwrap_or_else(|| {
+                panic!(
+                    "snaking corridor unit={} slot={} timed out; final_state={:?}",
+                    unit, slot, result.final_state
+                )
+            });
+        assert!(
+            clear_ticks.saturating_mul(10) <= baseline.saturating_mul(11),
+            "snaking corridor unit={} slot={} regressed: {} ticks vs baseline {} (>10% slower); final_state={:?}",
+            unit,
+            slot,
             clear_ticks,
             baseline,
             result.final_state

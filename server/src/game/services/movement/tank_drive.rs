@@ -6,10 +6,10 @@ use crate::game::map::Map;
 use crate::game::services::geometry::unit_body_for_entity;
 use crate::game::services::occupancy::Occupancy;
 use crate::game::services::spatial::SpatialIndex;
-use crate::game::services::standability as static_standability;
 use crate::game::PlayerState;
 use crate::protocol::{Event, NoticeSeverity};
 
+use super::scout_car::vehicle_desired_path_point;
 use super::standability::{footing_profile, footing_resistance, FootingProfile};
 use super::{MAX_UNIT_BOUNDING_RADIUS_PX, STEERING_MAX_NEIGHBORS};
 
@@ -268,39 +268,5 @@ pub(super) fn tank_desired_path_point(
     x: f32,
     y: f32,
 ) -> Option<(f32, f32)> {
-    let path = &e.movement.as_ref()?.path;
-    let next = path.last().copied()?;
-    let from = (x, y);
-    let mut farthest_reachable = None;
-
-    for waypoint in path.iter().rev().copied() {
-        if !static_standability::unit_static_segment_standable(map, occ, e.kind, from, waypoint) {
-            break;
-        }
-        farthest_reachable = Some(waypoint);
-
-        if let Some(point) = point_at_distance(from, waypoint, TANK_BODY_LOOKAHEAD_PX) {
-            return Some(point);
-        }
-    }
-
-    farthest_reachable.or(Some(next))
-}
-
-fn point_at_distance(from: (f32, f32), to: (f32, f32), distance: f32) -> Option<(f32, f32)> {
-    if !distance.is_finite() || distance <= 0.0 {
-        return None;
-    }
-    let dx = to.0 - from.0;
-    let dy = to.1 - from.1;
-    let segment_len = (dx * dx + dy * dy).sqrt();
-    if !segment_len.is_finite() || segment_len < distance {
-        return None;
-    }
-    if segment_len <= 1.0e-4 {
-        return Some(to);
-    }
-
-    let t = distance / segment_len;
-    Some((from.0 + dx * t, from.1 + dy * t))
+    vehicle_desired_path_point(map, occ, e, x, y)
 }

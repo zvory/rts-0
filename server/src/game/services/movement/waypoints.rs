@@ -13,7 +13,7 @@ use crate::game::services::standability as static_standability;
 use crate::game::PlayerState;
 use crate::protocol::Event;
 
-use super::scout_car::{plan_scout_car_motion, scout_car_accepts_waypoint};
+use super::scout_car::{plan_scout_car_motion, vehicle_accepts_waypoint};
 use super::standability::{
     footing_profile, requires_weapon_setup, unit_static_standable, FootingProfile,
 };
@@ -174,10 +174,11 @@ pub(super) fn advance_moving_units(
                 let dist = (dx * dx + dy * dy).sqrt();
 
                 if path_len > 1 {
-                    // Intermediate waypoint: pop on radius hit or geometric pass-by.
-                    let accepts_waypoint = if is_car {
+                    // Intermediate waypoint: vehicles require the swept-body route check; other
+                    // units keep the radius/pass-by path-following rule.
+                    let accepts_waypoint = if uses_vehicle_movement {
                         entities.get(id).is_some_and(|e| {
-                            scout_car_accepts_waypoint(map, occ, e, (x, y), (wx, wy), next_next)
+                            vehicle_accepts_waypoint(map, occ, e, (x, y), (wx, wy), next_next)
                         })
                     } else {
                         let radius_hit = dist <= config::ARRIVE_RADIUS_INTERMEDIATE_PX;
