@@ -75,6 +75,7 @@ export const dom = {
   giveUpConfirmButton: document.getElementById("give-up-confirm-button"),
   commandCard: document.getElementById("command-card"),
   devBanner: document.getElementById("dev-banner"),
+  devLinks: document.getElementById("dev-links"),
   replaySpeed: document.getElementById("replay-speed"),
 };
 

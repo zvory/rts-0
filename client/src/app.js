@@ -153,6 +153,7 @@ export class App {
     if (this.match) this.match.destroy();
 
     dom.lobbyScreen.hidden = true;
+    if (dom.devLinks) dom.devLinks.hidden = true;
     dom.gameScreen.hidden = false;
     dom.gameOver.hidden = true;
     this.clearScoreboard();
@@ -272,6 +273,7 @@ export class App {
     this.clearScoreboard();
     dom.gameScreen.hidden = true;
     dom.lobbyScreen.hidden = false;
+    if (dom.devLinks) dom.devLinks.hidden = false;
     this.lobby.show();
   }
 
