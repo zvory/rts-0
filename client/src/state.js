@@ -7,10 +7,10 @@
 // server never sees them directly (only the resulting commands).
 
 import { RESOURCE_AMOUNTS } from "./config.js";
-import { KIND, PASSABLE, SETUP, STATE, isBuilding, isResource, isUnit } from "./protocol.js";
+import { KIND, PASSABLE, STATE, isBuilding, isResource, isUnit } from "./protocol.js";
 
 const TWO_PI = Math.PI * 2;
-const AT_GUN_SHOT_REVEAL_MS = 1500;
+const SHOT_REVEAL_MS = 1500;
 const WEAPON_RECOIL_MS = Object.freeze({
   [KIND.RIFLEMAN]: 420,
   [KIND.MACHINE_GUNNER]: 160,
@@ -107,7 +107,7 @@ export class GameState {
     this.muzzleFlashes = [];
     /** @type {Map<number, number>} attacker id -> latest shot receive time. */
     this.weaponRecoilById = new Map();
-    /** @type {Map<number, object>} attacker id -> temporary AT-gun fog reveal entity. */
+    /** @type {Map<number, object>} attacker id -> temporary fog reveal entity. */
     this.shotRevealsById = new Map();
   }
 
@@ -328,7 +328,7 @@ export class GameState {
 
   _normalizeAttackReveal(ev, now) {
     const r = ev.reveal;
-    if (!r || r.kind !== KIND.AT_TEAM) return null;
+    if (!r || !isUnit(r.kind)) return null;
     if (!Number.isFinite(r.x) || !Number.isFinite(r.y)) return null;
     const targetPos = Array.isArray(ev.toPos) && ev.toPos.length === 2
       ? { x: ev.toPos[0], y: ev.toPos[1] }
@@ -341,7 +341,7 @@ export class GameState {
     return {
       id: ev.from,
       owner: typeof r.owner === "number" ? r.owner : 0,
-      kind: KIND.AT_TEAM,
+      kind: r.kind,
       x: r.x,
       y: r.y,
       hp: 1,
@@ -349,10 +349,10 @@ export class GameState {
       state: STATE.ATTACK,
       facing,
       weaponFacing,
-      setupState: r.setupState || SETUP.DEPLOYED,
+      setupState: r.setupState,
       shotReveal: true,
       shotRevealCreatedAt: now,
-      shotRevealExpiresAt: now + AT_GUN_SHOT_REVEAL_MS,
+      shotRevealExpiresAt: now + SHOT_REVEAL_MS,
     };
   }
 

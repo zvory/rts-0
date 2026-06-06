@@ -5,7 +5,7 @@
 // for the drag selection box. Layers are drawn back-to-front in this order:
 //
 //   terrain → resources → building-shadows → buildings → unit-shadows → units
-//   → selection-rings → hp-bars → fog → feedback → placement-ghost → drag-box
+//   → selection-rings → hp-bars → fog → shot-reveals → feedback → placement-ghost → drag-box
 //
 // Terrain is drawn once into a cached RenderTexture (it never changes mid-match).
 // Everything else is redrawn each frame, but per-entity Graphics are pooled and
@@ -112,6 +112,8 @@ export class Renderer {
       units: new Map(),
       selectionRings: new Map(),
       hpBars: new Map(),
+      shotRevealShadows: new Map(),
+      shotReveals: new Map(),
     };
     // Ids touched this frame, per pool, so we can hide stale entries afterwards.
     this._seen = {};
@@ -191,13 +193,10 @@ export class Renderer {
       liveIds.add(e.id);
       this._drawSelectionAndHp(e, selection, state);
     }
-    // AT-gun shot reveals are visual-only ghosts, but they live on the normal
-    // unit layers so the fog overlay dims them like any other unit in fog.
     for (const e of shotReveals) {
       liveIds.add(e.id);
       this._drawShotRevealUnit(e, colorByOwner, state);
     }
-
     // Hide pooled objects whose id was not touched this frame.
     this._sweep();
     this._sweepSetupVisuals(liveIds);
@@ -267,7 +266,7 @@ export class Renderer {
    * @private
    */
   /**
-   * Draw a short-lived AT-gun reveal on layers above fog. These entities are visual-only and
+   * Draw a short-lived shot reveal on layers above fog. These entities are visual-only and
    * non-interactive; normal visibility still comes from the authoritative fog-filtered snapshot.
    * @private
    */
