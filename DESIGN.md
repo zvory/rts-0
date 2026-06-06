@@ -29,7 +29,9 @@ update this file in the same change.
   state directly.
 - Every tick the server produces a **per-player snapshot**, applying **fog of war**:
   a player only receives neutral/enemy entities standing on tiles that player can
-  currently see. This makes the fog cheat-proof (hidden enemies are never sent).
+  currently see, plus visual-only entities inside the one-second lingering sight left behind
+  when that player's unit/building dies. This makes the fog cheat-proof (hidden enemies are never
+  sent outside live or explicit lingering death vision).
 - Lobby-time spectators are connected humans who are not seated in the simulation. They receive
   snapshots filtered to the union of all active players' current fog, all player resource rows,
   and no controllable units/buildings.
@@ -83,20 +85,24 @@ short but readable. Coordinates are **world pixels** (floats) unless a field nam
 
 | `c`          | Fields | Meaning |
 |--------------|--------|---------|
-| `move`       | `units: u32[]`, `x: f32`, `y: f32` | Move selected units to a world point. Infantry ignore enemies until they arrive or receive another order; tanks and scout cars keep driving and fire at in-range enemies without chasing. |
-| `attackMove` | `units: u32[]`, `x: f32`, `y: f32` | Move while attacking enemies encountered; this is the aggressive movement order. |
-| `attack`     | `units: u32[]`, `target: u32` | Attack a specific entity. |
+| `move`       | `units: u32[]`, `x: f32`, `y: f32`, `queued?: bool` | Move selected units to a world point. Infantry ignore enemies until they arrive or receive another order; tanks and scout cars keep driving and fire at in-range enemies without chasing. When `queued` is true, store future movement intent instead of replacing the active order. |
+| `attackMove` | `units: u32[]`, `x: f32`, `y: f32`, `queued?: bool` | Move while attacking enemies encountered; this is the aggressive movement order. When `queued` is true, store future attack-move intent instead of replacing the active order. |
+| `attack`     | `units: u32[]`, `target: u32`, `queued?: bool` | Attack a specific entity. When `queued` is true, store future attack intent instead of replacing the active order. |
 | `setupAtGuns` | `units: u32[]`, `x: f32`, `y: f32` | Manually emplace owned AT guns toward a world point. The server filters the unit list to owned, completed AT guns, clears movement/target state, records the setup facing, and enters `setting_up`. Other selected units are ignored. |
 | `tearDownAtGuns` | `units: u32[]` | Pack up owned AT guns that are `setting_up` or `deployed`. Other selected units are ignored. |
-| `gather`     | `units: u32[]`, `node: u32` | Send workers to harvest a resource node. |
-| `build`      | `worker: u32`, `building: string`, `tileX: u32`, `tileY: u32` | Worker constructs a building at a tile. The server first walks the worker to a nearby point outside the requested footprint, then starts construction once it is in range. `building` ∈ building kinds. |
+| `charge`     | `units: u32[]` | Activate Rifleman Charge on owned riflemen. Requires at least one completed Training Centre. The server filters the unit list to owned, completed riflemen and sets a short sprint timer; other selected units are ignored. |
+| `gather`     | `units: u32[]`, `node: u32`, `queued?: bool` | Send workers to harvest a resource node. When `queued` is true, store future gather intent instead of replacing the active order. |
+| `build`      | `worker: u32`, `building: string`, `tileX: u32`, `tileY: u32`, `queued?: bool` | Worker constructs a building at a tile. The server first walks the worker to a nearby point outside the requested footprint, then starts construction once it is in range. `building` ∈ building kinds. When `queued` is true, store future build intent instead of replacing the active order. |
 | `train`      | `building: u32`, `unit: string` | Queue a unit at a production building. |
 | `cancel`     | `building: u32` | Cancel the front of a building's production queue. |
 | `stop`       | `units: u32[]` | Clear orders, hold position. |
-| `setRally`   | `building: u32`, `x: f32`, `y: f32` | Set a unit-producing building's rally point. Freshly produced units receive a plain `move` order to the point and the building prefers the spawn exit nearest it. Ignored for buildings the player doesn't own, non-producers (depot, training centre), or buildings still under construction. The point is clamped into map bounds. |
+| `setRally`   | `building: u32`, `x: f32`, `y: f32`, `queued?: bool` | Set a unit-producing building's rally point. Freshly produced units receive a plain `move` order to the point and the building prefers the spawn exit nearest it. Ignored for buildings the player doesn't own, non-producers (depot, training centre), or buildings still under construction. The point is clamped into map bounds. When `queued` is true, store a future rally stage instead of replacing the active rally point. |
 
 Servers MUST ignore commands referencing entities the player does not own, unknown ids,
 illegal placements, or unaffordable actions (fail silently or emit a `notice` event).
+For appendable commands, omitted `queued` is equivalent to `false`. Unit order queues are capped at
+8 intents per unit, and building rally stage queues are capped at 2 stages per building. Queued
+intents are lightweight future intent only; active `Order` remains the per-tick execution state.
 
 ### 2.2 Server → Client (`ServerMessage`)
 
@@ -156,28 +162,28 @@ transport decode:
   tick: u32,
   steel: u32, oil: u32,       // your resources
   supplyUsed: u32, supplyCap: u32,
-  entities: Entity[],            // your non-resource entities (always) + enemy on visible tiles
+  entities: Entity[],            // your non-resource entities (always) + enemies on live/death-vision-visible tiles
   resourceDeltas?: ResourceDelta[], // visible resource remaining updates; omitted when empty
   events: Event[],               // transient things to surface (see 2.5)
   playerResources?: {id, steel, oil, supplyUsed, supplyCap}[]  // all players; spectator/replay mode only
 }
 ```
 
-Live WebSocket snapshot frames are sent as compact JSON text, version 1. `client/src/net.js`
+Live WebSocket snapshot frames are sent as compact JSON text, version 2. `client/src/net.js`
 decodes this transport shape back into the semantic object above before dispatching `S.SNAPSHOT`.
 Older object-shaped JSON snapshots remain decodable by the client for fallback/dev use.
 
 ```
 {
   "t": "snapshot",
-  "v": 1,
+  "v": 2,
   "s": [tick, steel, oil, supplyUsed, supplyCap],
   "e": [
     [
       id, owner, kind, x, y, hp, maxHp, state,
       facing?, weaponFacing?, prodKind?, prodProgress?, prodQueue?,
       buildProgress?, latchedNode?, targetId?, setupState?, remaining?, rally?, oilUsed?,
-      setupFacing?
+      setupFacing?, queuedMarkers?, visionOnly?
     ]
   ],
   "r": [[id, remaining]],         // omitted when empty
@@ -199,6 +205,11 @@ Compact numeric codes:
 Compact entity records are positional arrays. Optional fields keep the semantic order above and
 trailing missing optional fields are omitted; interior missing optional fields are encoded as
 `null`. The `rally` slot is itself a two-element `[x, y]` array (or `null`).
+The `queuedMarkers` slot is an owner-only array capped at 8 entries; each entry is
+`[x, y]` for a queued move stage or `[x, y, true]` for a queued attack-move stage.
+`visionOnly` is true only for non-owned units/buildings visible through lingering death vision;
+clients render them below the fog overlay and must not select or issue targeted commands against
+them.
 
 `ResourceDelta`: `{ id: u32, remaining: u32 }`. Resource node positions/kinds are static and come
 from `start.map.resources`; clients keep last-known `remaining` locally. The server sends
@@ -231,7 +242,11 @@ watch rooms receive all resource updates).
   rally?: [f32, f32],            // rally point (world px); ONLY ever sent to the owner
   // tanks:
   oilUsed?: f32,                 // lifetime oil burned by movement, in resource units
-  setupFacing?: f32              // at_team only: owner-visible deployed arc center; appended after oilUsed in compact snapshots
+  setupFacing?: f32,             // at_team only: owner-visible deployed arc center; appended after oilUsed in compact snapshots
+  queuedMarkers?: [              // future queued move/attack-move points; ONLY ever sent to the owner
+    { x: f32, y: f32, attackMove?: bool }
+  ],
+  visionOnly?: bool,             // true = visible only through one-second death vision; visual intel only
 }
 ```
 
@@ -277,7 +292,7 @@ src/
     map.rs       # Map: handcrafted terrain asset loading, passability, base-site validation
     entity/      # Entity, EntityKind, Order state machines, grouped state, and EntityStore
     pathfinding.rs # A* over the tile grid, with optional turn-cost route shaping for tanks
-    fog.rs       # per-player visibility grid (visible / explored)
+    fog.rs       # per-player live visibility grid plus snapshot-only lingering death sight sources
     systems.rs   # orchestrator: runs services in order each tick
     services/    # per-tick services: commands, move_coordinator, movement (incl. unit collision), combat, economy, production, construction, death, occupancy, supply, pathing, geometry, standability, line_of_sight
     ai.rs        # optional computer opponents: one AiController per AI player (see §8)
@@ -400,9 +415,8 @@ centralized instead of scattered through services.
 - `rules::terrain` — `TerrainKind` plus movement, cover, concealment, and static line-of-sight
   opacity modifiers. It is intentionally small today (`Open` returns current defaults; raw stone
   terrain blocks LOS) so the forest/road/hill feature has one rules file to grow in.
-- `rules::projection` — fog-gated `EntityView` construction and event visibility predicates.
-  It is intentionally a seam for future last-known-position memory or partial unit-type reveal;
-  it does not add wire fields today.
+- `rules::projection` — fog-gated `EntityView` construction, `visionOnly` marking for lingering
+  death sight, and event visibility predicates.
 
 Services in `game/services/` orchestrate tick logic and call into `rules::*` for classification.
 Rules functions have no imports from `services/`; classification and formula rules read
@@ -514,6 +528,8 @@ export class GameState {
   setControlGroup(slot, ids), addToControlGroup(slot, ids)
   selectControlGroup(slot), controlGroupEntities(slot)
   // build placement (client-only):
+  commandCardMode                       // null | "workerBuild"
+  openWorkerBuildMenu(), closeCommandCardMenu()
   placement                              // null | { building, valid, tileX, tileY }
   beginPlacement(buildingKind), updatePlacement(tileX,tileY,valid), endPlacement()
   // resource hover preview (client-only):
@@ -557,6 +573,8 @@ export class Fog {
   visibleGrid, exploredGrid              // Uint8Array length w*h
 }
 ```
+`match.js` must exclude `visionOnly` and shot-reveal entities from `ownEntities` before calling
+`fog.update`; those views are rendered as intel, not as local fog sources.
 
 `input/index.js`
 ```js
@@ -648,6 +666,9 @@ with `playerResources`.
   setup/deployment. AT guns that fire from outside current vision are shown briefly above the fog
   as semi-transparent silhouettes with the same recoil animation and a yellow tracer to the hit
   point.
+  Entities marked `visionOnly` by the server are drawn on the ordinary building/unit layers below
+  the fog overlay, excluded from local fog-source computation and hit-testing, and treated as
+  visual intel only.
 - Buildings: footprint-sized blocky field structures with neutral geometry and plain
   two-letter stencils; under construction → translucent with a progress bar; production →
   small progress arc.
@@ -740,8 +761,9 @@ Intended progression:
 The current implementation uses the themed unit/building names below. Combat is handled by the
 shared attack model plus the support-weapon setup/teardown state, tank turret aim gates, and
 tank hull-facing damage modifiers for anti-tank hits against tank victims. Tanks keep their active
-movement path while firing on either `Move` or `AttackMove` orders; other mobile combat units still
-hold position once a target is in weapon range. Scout cars also fire while moving using an
+movement path while firing on either `Move` or `AttackMove` orders; charged riflemen keep advancing
+while firing and roll a 50% miss chance for those moving charge shots; other mobile combat units
+still hold position once a target is in weapon range. Scout cars also fire while moving using an
 independent rear machine-gun facing. They are unarmored light vehicles and do not receive
 armored damage reduction, but AT guns do not roll their infantry miss chance against them.
 Plain `Move` tanks and scout cars only fire at enemies already in
@@ -756,9 +778,12 @@ authoritative `rules::defs` records.
 - AT guns use `AT_GUN_PACKED_RANGE_TILES = 5`, `AT_GUN_DEPLOYED_RANGE_TILES = 12`,
   `AT_GUN_PACKED_DAMAGE_MULTIPLIER = 0.75`, and
   `AT_GUN_FIELD_OF_FIRE_RAD = PI / 4` (45 degrees total).
-- `TANK_OIL_COST_PER_PX = 10 / (96 * TILE_SIZE)`: tank movement still uses the original
+- `TANK_OIL_COST_PER_PX = 20 / (96 * TILE_SIZE)`: tank movement still uses the original
   96-tile calibration, so driving the wider 126-tile map costs proportionally more oil than
-  before. Tanks cannot advance while their owner has zero oil.
+  before.
+- `SCOUT_CAR_OIL_COST_PER_PX = 5 / (96 * TILE_SIZE)`: scout cars burn oil for movement at
+  half the previous tank movement rate. Tanks and scout cars cannot advance while their owner has
+  zero oil.
 - Map: `TILE_SIZE = 32` px. The live map is the hardcoded handcrafted asset at
   `server/assets/maps/default-handcrafted.json` (126×126 today), served for tooling at
   `/maps/default-handcrafted.json`. The current asset is the original 96×96 handcrafted map
@@ -797,7 +822,7 @@ Unit stats (hp, dmg, range[tiles], cooldown[ticks], speed[px/tick], sight[tiles]
 |-----------------|-----|-----|-------|----|-------|-------|-----|-----|-----|-----------|
 | worker          | 40  | 4   | 1     | 24 | 1.6   | 7     | 50  | 0   | 1   | 360 (~12s) |
 | rifleman        | 45  | 5   | 4     | 16 | 1.6   | 8     | 50  | 0   | 1   | 300 (~10s) |
-| machine_gunner  | 55  | 4   | 5     | 6  | 1.28  | 8     | 75  | 25  | 2   | 400 (~13s) |
+| machine_gunner  | 55  | 4   | 6     | 6  | 1.28  | 8     | 75  | 10  | 2   | 400 (~13s) |
 | at_team         | 45  | 62 deployed / 47 packed | 12 deployed / 5 packed | 72 | 1.152 | 6     | 75  | 25  | 3   | 440 (~15s); requires Steelworks |
 | scout_car       | 150 | 6   | 5     | 6  | 2.35  | 10    | 125 | 50  | 3   | 480 (~16s) |
 | tank            | 390 | 60  | 5     | 72 | 2.0   | 6     | 200 | 150 | 6   | 750 (~25s); requires Steelworks |
@@ -857,8 +882,10 @@ The server treats every client as potentially hostile. Limits live next to the c
   on an accept, so a rejected mid-match join doesn't wedge the socket.
 - **Fog is authoritative**: `snapshot_for` and per-recipient event delivery go through
   `rules::projection`, which gates entity views, `target_id` tracers, and death/attack events on
-  visibility — hidden enemies are never sent. Visibility is terrain-aware: stone blocks sight
-  beyond itself on both the server fog grid and the client cosmetic fog overlay.
+  visibility. Hidden enemies are never sent except inside explicit one-second lingering death
+  vision, where entity views are marked `visionOnly` and remain non-actionable. Visibility is
+  terrain-aware: stone blocks sight beyond itself on both the server fog grid and the client
+  cosmetic fog overlay.
 - **Shot blocking and overpenetration**: ranged attacks first resolve against the first enemy tank
   body or building footprint intersecting the line from attacker to intended target. That blocker
   takes the shot damage and the intended target behind it is unharmed. Shots that hit ordinary
@@ -895,6 +922,11 @@ The server treats every client as potentially hostile. Limits live next to the c
   falling back to nearest-target acquisition, so drive-by fire tends to finish one enemy instead of
   spreading damage across every passing unit. Projection omits enemy `weaponFacing` when it would
   reveal a hidden target direction.
+- **Rifleman charge fire**: riflemen with active Charge keep their movement path while firing at
+  enemies in range instead of stopping to shoot. While on a plain `Move`, charged riflemen only fire
+  opportunistically at enemies already in range and do not chase. Moving charge shots roll a 50%
+  miss chance after attack feedback is emitted, so audio/tracers still play but missed shots deal
+  no damage or under-attack alert.
 - **Scout car movement and weapon facing**: scout cars are light unarmored vehicles with a
   rear-mounted machine gun (higher damage, same range and cooldown as machine gunners). They use the
   same oriented-body/pathing/collision model as tanks, including standoff firing and firing while
@@ -904,7 +936,12 @@ The server treats every client as potentially hostile. Limits live next to the c
   bounded maneuver latched to the immediate waypoint: nearby final waypoints and injected recovery
   waypoints can be reached by backing up, but route lookahead alone cannot put the car into reverse.
   Farther behind goals make the scout car drive through a broad forward turn instead of
-  backtracking. Scout cars follow the route corridor rather than exact intermediate
+  backtracking. Scout-car movement orders use a dedicated clearance-aware route shape: coarse A*
+  still works on tiles, but scout cars add static-clearance, turn, adjacent-blocker, and corner-graze
+  costs so open alternatives are preferred before local movement gets close to walls. The clearance
+  cost is finite, so intended narrow passages remain traversable; exact interaction paths such as
+  chase, gather, and build staging keep tile-guided `Normal` routing. Scout cars follow the route
+  corridor rather than exact intermediate
   waypoint centers: an intermediate waypoint is consumed inside
   `SCOUT_CAR_WAYPOINT_ACCEPTANCE_RADIUS_PX` (0.75 tiles), after the car has passed the waypoint
   along the next route segment, or when the next route segment is statically reachable from the
@@ -930,13 +967,20 @@ The server treats every client as potentially hostile. Limits live next to the c
   This is still a path-following approximation, not tire or Ackermann steering physics; replace it
   with proper truck/wheeled movement semantics when that model exists.
   Scout cars do not use tank armor or tank damage reduction.
-- **Tank movement oil burn**: tanks consume oil based on distance actually moved, using
-  `TANK_OIL_COST_PER_PX`. Fractional movement cost accumulates per tank until whole oil units are
-  deducted from the owner's stockpile. The tank also tracks lifetime movement oil as `oilUsed` for
-  the client selected-entity panel. If the owner has zero oil at the start of a movement tick, that
-  tank does not advance and waits `TANK_OIL_STARVED_PAUSE_TICKS` (one second) before retrying, so
-  sparse oil income does not produce constant one-tick stuttering. Turret/combat behavior still
-  runs through the combat system while movement is paused.
+- **Vehicle movement oil burn**: tanks and scout cars consume oil based on distance actually moved,
+  using `TANK_OIL_COST_PER_PX` and `SCOUT_CAR_OIL_COST_PER_PX` respectively. Fractional movement
+  cost accumulates per vehicle until whole oil units are deducted from the owner's stockpile. Tanks
+  also track lifetime movement oil as `oilUsed` for the client selected-entity panel. If the owner
+  has zero oil at the start of a movement tick, that vehicle does not advance and waits
+  `TANK_OIL_STARVED_PAUSE_TICKS` (one second) before retrying, so sparse oil income does not
+  produce constant one-tick stuttering. Turret/combat behavior still runs through the combat system
+  while movement is paused.
+- **Rifleman Charge**: after completing a Training Centre, selected riflemen gain a `charge`
+  command on the command card's `Z` slot. The command sets `RIFLEMAN_CHARGE_TICKS` (32 ticks) on
+  owned riflemen only; while active, movement uses `RIFLEMAN_CHARGE_SPEED_MULTIPLIER` (2x) and the
+  timer decays every simulation tick, even while idle. Charged riflemen can fire while moving, with
+  the charge-fire miss chance described above. The duration is intentionally hard-coded from the
+  current "two tank lengths" feel and does not reference tank body constants.
 - **Tank armor facing**: tank and AT-team attacks against tank victims use the victim tank's hull
   `facing` and the attacker's position. Front hits (`<=45°` from the hull direction) deal normal
   damage, side hits (`>45°` and `<=135°`) deal `1.25x`, and rear hits (`>135°`) deal `1.75x`.
@@ -1092,16 +1136,17 @@ selection prefers oil coverage before extra steel output.
 for the factory step, delays oil workers until at least eight workers are already mining steel,
 uses ready combat units to clear visible threats in its home resource line before attacking out,
 and treats a single completed tank as a valid minimum attack wave.
-All profiles share a defensive panic mode. A visible enemy near the AI's base, home resource line,
-or workers temporarily suspends expansion, worker training, and non-defensive tech spending. While
-panicking, the AI classifies the visible local threat by weapon DPS: tank-dominated pressure (75%+
-of visible local DPS) prioritizes AT teams, infantry-dominated pressure prioritizes Machine
-Gunners, mixed pressure asks for a support mix, and no-DPS pressure falls back to Riflemen. Support
-panic only uses already-completed support tech: Machine Gunners need a Training Centre and AT teams
-need a Steelworks. It may pull workers onto oil for those support counters; if the relevant support
-tech is absent, Barracks production falls back to Riflemen and panic mode does not create tech
-buildings. If the pressure persists through the panic window, the AI asks for
-an additional Barracks before resuming its normal profile once the threat has cleared.
+All profiles share a defensive panic mode. Visible enemy units near the AI's base, home resource
+line, or workers temporarily suspend expansion, worker training, and non-defensive tech spending
+only when their steel+oil value is at least 75% of the AI's own local unit value. While panicking,
+the AI classifies the visible local threat by weapon DPS: tank-dominated pressure (75%+ of visible
+local DPS) prioritizes AT teams, infantry-dominated pressure prioritizes Machine Gunners, mixed
+pressure asks for a support mix, and no-DPS pressure falls back to Riflemen. Support panic only uses
+already-completed support tech: Machine Gunners need a Training Centre and AT teams need a
+Steelworks. It may pull workers onto oil for those support counters; if the relevant support tech
+is absent, Barracks production falls back to Riflemen and panic mode does not create tech buildings.
+If the pressure persists through the panic window, the AI asks for an additional Barracks before
+resuming its normal profile once the threat has cleared.
 `steel_expansion_tanks` is a defensive economic support profile: it saves for a second City
 Centre near a neutral steel expansion before building any non-Depot tech structure. Valid
 expansion sites must cover the full local resource line, then are ranked by own distance divided

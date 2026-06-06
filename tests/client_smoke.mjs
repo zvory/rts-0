@@ -103,14 +103,20 @@ try {
     return { workers: workers.length, nodes: steel.length, assigned: n };
   });
   ok(gather.assigned > 0, `assigned workers to steel before building (workers=${gather.workers}, nodes=${gather.nodes})`);
+  await page.evaluate(() => document.activeElement?.blur());
+  await page.keyboard.press("z");
+  await sleep(150);
+  ok(
+    await page.evaluate(() => window.__rts.match.state.commandCardMode === "workerBuild"),
+    "worker build hotkey opened the build submenu",
+  );
   await page.waitForFunction(() => {
-    const btn = document.querySelector('#command-card button[data-hotkey="S"]');
+    const btn = document.querySelector('#command-card button[data-hotkey="W"]');
     return btn && !btn.disabled && /Supply Depot/.test(btn.textContent || "");
   }, { timeout: 30000 });
   ok(true, "Depot build button became affordable after mining");
 
-  await page.evaluate(() => document.activeElement?.blur());
-  await page.keyboard.press("s");
+  await page.keyboard.press("w");
   await sleep(150);
   ok(await page.evaluate(() => window.__rts.match.state.placement?.building) === "depot", "build hotkey entered placement mode");
 
@@ -183,9 +189,14 @@ try {
   const afterGameplayEscape = await page.evaluate(() => ({
     menuHidden: document.getElementById("settings-menu")?.hidden,
     selected: window.__rts.match.state.selection.size,
+    commandCardHidden: document.getElementById("command-card")?.hidden,
+    commandSlots: document.querySelectorAll("#command-card .cmd-empty").length,
+    commandButtons: document.querySelectorAll("#command-card button").length,
   }));
   ok(afterGameplayEscape.menuHidden && afterGameplayEscape.selected === 0,
      `ESCAPE: gameplay cancel clears selection without opening settings (hidden=${afterGameplayEscape.menuHidden}, selected=${afterGameplayEscape.selected})`);
+  ok(!afterGameplayEscape.commandCardHidden && afterGameplayEscape.commandSlots === 9 && afterGameplayEscape.commandButtons === 0,
+     `COMMAND CARD: empty selection keeps an inert 3x3 card (hidden=${afterGameplayEscape.commandCardHidden}, slots=${afterGameplayEscape.commandSlots}, buttons=${afterGameplayEscape.commandButtons})`);
 
   const beforePan = await page.evaluate(() => {
     const s = window.__rts.match.state;

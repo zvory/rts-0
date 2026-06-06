@@ -1197,6 +1197,7 @@ fn pending_build_tracker_keeps_moving_worker_past_stale_window() {
             building: EntityKind::CityCentre,
             tile_x: 48,
             tile_y: 70,
+            queued: false,
         }],
     );
 
@@ -1222,6 +1223,7 @@ fn pending_build_tracker_expires_stuck_worker() {
             building: EntityKind::CityCentre,
             tile_x: 48,
             tile_y: 70,
+            queued: false,
         }],
     );
 

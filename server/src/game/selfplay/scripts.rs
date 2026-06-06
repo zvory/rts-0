@@ -143,6 +143,7 @@ pub(super) fn is_combat_command(command: &Command, combat_intent_units: &BTreeSe
         Command::Move { units, .. } => units.iter().any(|id| combat_intent_units.contains(id)),
         Command::SetupAtGuns { .. }
         | Command::TearDownAtGuns { .. }
+        | Command::Charge { .. }
         | Command::Gather { .. }
         | Command::Build { .. }
         | Command::Train { .. }
@@ -196,9 +197,12 @@ impl ProfileBackedScript {
         let mut filtered = Vec::new();
         for command in commands {
             match command {
-                Command::AttackMove { units, x, y }
-                    if units.iter().any(|id| staging.contains(id)) =>
-                {
+                Command::AttackMove {
+                    units,
+                    x,
+                    y,
+                    queued,
+                } if units.iter().any(|id| staging.contains(id)) => {
                     let fresh: Vec<u32> = units
                         .into_iter()
                         .filter(|id| !self.staged_units.contains(id))
@@ -206,7 +210,12 @@ impl ProfileBackedScript {
                         .collect();
                     self.staged_units.extend(fresh.iter().copied());
                     if !fresh.is_empty() {
-                        filtered.push(Command::AttackMove { units: fresh, x, y });
+                        filtered.push(Command::AttackMove {
+                            units: fresh,
+                            x,
+                            y,
+                            queued,
+                        });
                     }
                 }
                 other => filtered.push(other),

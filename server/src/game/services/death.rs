@@ -1,7 +1,8 @@
 use std::collections::HashMap;
 
+use crate::config;
 use crate::game::entity::{EntityKind, EntityStore, Order};
-use crate::game::fog::Fog;
+use crate::game::fog::{Fog, LingeringSightSource};
 use crate::game::PlayerState;
 use crate::protocol::Event;
 use crate::rules::projection;
@@ -16,39 +17,49 @@ pub(crate) fn death_system(
     entities: &mut EntityStore,
     fog: &Fog,
     players: &mut [PlayerState],
+    lingering_sight: &mut Vec<LingeringSightSource>,
     events: &mut HashMap<u32, Vec<Event>>,
+    tick: u32,
 ) {
-    let dead: Vec<(u32, u32, f32, f32, EntityKind, Option<u32>)> = entities
+    let dead: Vec<DeadEntity> = entities
         .iter()
         .filter(|e| e.is_targetable() && e.hp == 0)
-        .map(|e| {
-            (
-                e.id,
-                e.owner,
-                e.pos_x,
-                e.pos_y,
-                e.kind,
-                e.last_damage_owner(),
-            )
+        .map(|e| DeadEntity {
+            id: e.id,
+            owner: e.owner,
+            x: e.pos_x,
+            y: e.pos_y,
+            sight_tiles: e.sight_tiles(),
+            kind: e.kind,
+            killer: e.last_damage_owner(),
         })
         .collect();
 
-    for (id, owner, x, y, kind, killer) in dead {
-        entities.release_miner(id);
-        entities.remove(id);
-        record_score_death(players, owner, kind, killer);
+    for dead in dead {
+        entities.release_miner(dead.id);
+        entities.remove(dead.id);
+        record_score_death(players, dead.owner, dead.kind, dead.killer);
+        if let Some(source) = LingeringSightSource::new(
+            dead.owner,
+            dead.x,
+            dead.y,
+            dead.sight_tiles,
+            tick.saturating_add(config::TICK_HZ),
+        ) {
+            lingering_sight.push(source);
+        }
         // Deliver the death only to players who owned the entity or could see where it died,
         // so a death poof never reveals an entity hidden in a player's fog.
         let pids: Vec<u32> = events.keys().copied().collect();
         for pid in pids {
-            if !projection::event_visible_to(pid, x, y, owner, fog) {
+            if !projection::event_visible_to(pid, dead.x, dead.y, dead.owner, fog) {
                 continue;
             }
             events.entry(pid).or_default().push(Event::Death {
-                id,
-                x,
-                y,
-                kind: kind.to_protocol_str().to_string(),
+                id: dead.id,
+                x: dead.x,
+                y: dead.y,
+                kind: dead.kind.to_protocol_str().to_string(),
             });
         }
     }
@@ -105,6 +116,16 @@ pub(crate) fn death_system(
             }
         }
     }
+}
+
+struct DeadEntity {
+    id: u32,
+    owner: u32,
+    x: f32,
+    y: f32,
+    sight_tiles: u32,
+    kind: EntityKind,
+    killer: Option<u32>,
 }
 
 fn record_score_death(

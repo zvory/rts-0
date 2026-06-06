@@ -1,6 +1,6 @@
 // HUD — the DOM overlay for the game screen: resource/supply bar, the selected-units
-// panel, and the context-sensitive command card (build buttons for workers, train
-// buttons for production buildings). See DESIGN.md §4.1 (HUD) and §5 for balance.
+// panel, and the context-sensitive command card (unit actions, worker build submenu,
+// train buttons for production buildings). See DESIGN.md §4.1 (HUD) and §5 for balance.
 //
 // The HUD is plain DOM (not Pixi). It is rebuilt cheaply each frame from `state`; the
 // only stateful trick is reusing command-card buttons between frames so that holding a
@@ -59,6 +59,7 @@ export class HUD {
 
     // Selected-units panel + command card containers.
     this.elSelected = rootEl.querySelector("#selected-panel");
+    this.elControlGroups = rootEl.querySelector("#control-group-tabs");
     this.elCommand = rootEl.querySelector("#command-card");
 
     // Signature of the last-rendered command card so we only rebuild its buttons when
@@ -68,6 +69,8 @@ export class HUD {
     this._trainRoundRobin = new Map();
     // Signature for the resource bar to avoid unnecessary DOM rebuilds.
     this._resSig = null;
+    // Signature for the inert control-group tabs.
+    this._controlGroupSig = null;
   }
 
   /**
@@ -76,6 +79,7 @@ export class HUD {
    */
   update() {
     this._renderResources();
+    this._renderControlGroupTabs();
     this._renderSelectedPanel();
     this._renderCommandCard();
   }
@@ -86,11 +90,16 @@ export class HUD {
       this.elSelected.innerHTML = "";
       this.elSelected.classList.add("empty");
     }
+    if (this.elControlGroups) {
+      this.elControlGroups.innerHTML = "";
+      this.elControlGroups.classList.add("empty");
+    }
     if (this.elCommand) this.elCommand.innerHTML = "";
     if (this.elSupply) this.elSupply.classList.remove("supply-capped");
     this._cardSig = null;
     this._trainRoundRobin.clear();
     this._resSig = null;
+    this._controlGroupSig = null;
   }
 
   // --- Resource / supply bar -------------------------------------------------
@@ -167,6 +176,100 @@ export class HUD {
   }
 
   // --- Selected-units panel --------------------------------------------------
+
+  /** Render fixed-position, non-clickable tabs for occupied local control groups. */
+  _renderControlGroupTabs() {
+    const tabs = this.elControlGroups;
+    if (!tabs) return;
+
+    const groups = this._controlGroupSummaries();
+    const sig = groups.map((g) =>
+      g ? `${g.key}:${g.count}:${g.icon}:${g.selected ? 1 : 0}` : "-",
+    ).join("|");
+    if (sig === this._controlGroupSig) return;
+    this._controlGroupSig = sig;
+
+    const any = groups.some(Boolean);
+    tabs.classList.toggle("empty", !any);
+
+    const frag = document.createDocumentFragment();
+    for (const group of groups) {
+      const slot = document.createElement("div");
+      slot.className = "control-group-slot";
+      if (group) {
+        const tab = document.createElement("div");
+        tab.className = "control-group-tab" + (group.selected ? " selected" : "");
+        tab.setAttribute(
+          "aria-label",
+          `Control group ${group.key}: ${group.count} ${group.label}`,
+        );
+        tab.innerHTML =
+          `<span class="control-group-key">${group.key}</span>` +
+          `<span class="control-group-kind">${group.icon}</span>` +
+          `<span class="control-group-count">${group.count}</span>`;
+        slot.appendChild(tab);
+      }
+      frag.appendChild(slot);
+    }
+
+    tabs.innerHTML = "";
+    tabs.appendChild(frag);
+  }
+
+  _controlGroupSummaries() {
+    const selected = typeof this.state.selectedEntities === "function"
+      ? this.state.selectedEntities()
+      : [];
+    const selectedIds = new Set(selected.map((e) => e.id));
+    const selectedCount = selectedIds.size;
+    const out = [];
+    const groups = this.state.controlGroups || [];
+    for (let slot = 0; slot < groups.length; slot++) {
+      const entities = typeof this.state.controlGroupEntities === "function"
+        ? this.state.controlGroupEntities(slot)
+        : [];
+      if (!entities || entities.length === 0) {
+        out.push(null);
+        continue;
+      }
+      const dominant = this._dominantControlGroupKind(entities);
+      const st = STATS[dominant.kind] || {};
+      out.push({
+        key: slot === 9 ? "0" : String(slot + 1),
+        count: entities.length,
+        icon: st.icon || dominant.kind,
+        label: st.label || dominant.kind,
+        selected: this._controlGroupMatchesSelection(entities, selectedIds, selectedCount),
+      });
+    }
+    return out;
+  }
+
+  _dominantControlGroupKind(entities) {
+    const counts = new Map();
+    let best = { kind: entities[0].kind, count: 0, first: 0 };
+    for (let i = 0; i < entities.length; i++) {
+      const kind = entities[i].kind;
+      const entry = counts.get(kind) || { kind, count: 0, first: i };
+      entry.count += 1;
+      counts.set(kind, entry);
+      if (
+        entry.count > best.count ||
+        (entry.count === best.count && entry.first < best.first)
+      ) {
+        best = entry;
+      }
+    }
+    return best;
+  }
+
+  _controlGroupMatchesSelection(entities, selectedIds, selectedCount) {
+    if (selectedCount === 0 || entities.length !== selectedCount) return false;
+    for (const e of entities) {
+      if (!selectedIds.has(e.id)) return false;
+    }
+    return true;
+  }
 
   /**
    * Render the selection summary: for a single entity show its name + HP; for a
@@ -262,7 +365,8 @@ export class HUD {
   /**
    * Render the context command card based on the current selection:
    *  - selected own units → action buttons for move / attack / stop.
-   *  - a selected WORKER → action buttons plus build buttons for WORKER_BUILDABLE.
+   *  - a selected WORKER → unit action buttons plus a build-menu button.
+   *  - worker build submenu → build buttons for WORKER_BUILDABLE plus a return button.
    *  - selected production buildings (have `STATS[kind].trains`) → train
    *    buttons for the primary producer's trainable units. Successive train clicks
    *    are distributed round-robin across the selected compatible producers. A
@@ -288,18 +392,28 @@ export class HUD {
     const primary = this._commandSubject(sel);
 
     if (!primary) {
-      if (this._cardSig !== "empty") {
-        card.innerHTML = "";
-        this._cardSig = "empty";
-      }
+      this._renderEmptyCard(card);
       return;
     }
 
-    if (this._selectedOwnUnits(sel).length > 0) {
+    if (this.state.commandCardMode === "workerBuild" && this._workerOnlySelection(sel)) {
+      this._renderBuildCard(card);
+    } else if (this._selectedOwnUnits(sel).length > 0) {
       this._renderUnitCard(card, sel);
     } else {
       this._renderTrainCard(card, primary);
     }
+  }
+
+  /** Render a stable, inert command-card grid when no actionable selection exists. */
+  _renderEmptyCard(card) {
+    if (this._cardSig === "empty") return;
+    this._cardSig = "empty";
+
+    const frag = document.createDocumentFragment();
+    this._padCard(frag, 0);
+    card.innerHTML = "";
+    card.appendChild(frag);
   }
 
   /**
@@ -339,22 +453,35 @@ export class HUD {
     return sel.filter((e) => this._isOwn(e) && isUnit(e.kind));
   }
 
+  _selectedOwnRiflemanIds(sel) {
+    return this._selectedOwnUnits(sel)
+      .filter((e) => e.kind === KIND.RIFLEMAN)
+      .map((e) => e.id);
+  }
+
+  /** True when the actionable selected units are workers and no army unit is selected. */
+  _workerOnlySelection(sel) {
+    const ownUnits = this._selectedOwnUnits(sel);
+    return ownUnits.length > 0 && ownUnits.every((e) => e.kind === KIND.WORKER);
+  }
+
   // --- Unit card (units selected) ------------------------------------------
 
   _renderUnitCard(card, sel) {
     const ownUnits = this._selectedOwnUnits(sel);
     const unitIds = ownUnits.map((e) => e.id);
     const atGunIds = ownUnits.filter((e) => e.kind === KIND.AT_TEAM).map((e) => e.id);
+    const riflemanIds = this._selectedOwnRiflemanIds(sel);
+    const chargeUnlocked =
+      riflemanIds.length > 0 && this._playerHasCompleteKind(KIND.TRAINING_CENTRE);
     const hasArmyUnit = ownUnits.some((e) => e.kind !== KIND.WORKER);
     const workerSelected = !hasArmyUnit && ownUnits.some((e) => e.kind === KIND.WORKER);
-    const res = this.state.resources || { steel: 0, oil: 0 };
 
     const sig =
       `units|${unitIds.join(".")}|target:${this.state.commandTarget || ""}|` +
       `|at:${atGunIds.join(".")}|` +
-      (workerSelected
-        ? WORKER_BUILDABLE.map((k) => `${k}:${this._canBuild(k, res) ? 1 : 0}`).join(",")
-        : "no-build");
+      `|rifle:${riflemanIds.join(".")}|charge:${chargeUnlocked ? 1 : 0}|` +
+      (workerSelected ? "worker-main" : "no-build");
     if (sig === this._cardSig) return;
     this._cardSig = sig;
 
@@ -362,40 +489,55 @@ export class HUD {
     let idx = 0;
 
     if (workerSelected) {
-      // Workers: compact layout — Move/Attack/Hold at Q/W/E, build buttons fill A+.
-      const actionButtons = [
-        {
-          icon: "MV",
-          label: "Move",
-          title: "Move to a target point",
-          active: this.state.commandTarget === "move",
-          onClick: () => this.state.beginCommandTarget("move"),
-        },
-        {
-          icon: "AT",
-          label: "Attack",
-          title: "Attack a target or attack-move to a point",
-          active: this.state.commandTarget === "attack",
-          onClick: () => this.state.beginCommandTarget("attack"),
-        },
-        {
-          icon: "HD",
-          label: "Hold",
-          title: "Hold position / stop selected units",
-          onClick: () => {
-            this.net.command(cmd.stop(unitIds));
-            this.state.endCommandTarget();
-          },
-        },
-      ];
-      for (const action of actionButtons) {
-        frag.appendChild(this._cmdButton({
-          ...action,
-          hotkey: GRID_HOTKEYS[idx++],
-          enabled: unitIds.length > 0,
-          cls: action.active ? "active" : "",
-        }));
+      // Workers mirror the standard unit layout: Q=Move, A=Attack, S=Hold.
+      frag.appendChild(this._cmdButton({
+        icon: "MV",
+        label: "Move",
+        title: "Move to a target point",
+        hotkey: GRID_HOTKEYS[0],
+        enabled: unitIds.length > 0,
+        cls: this.state.commandTarget === "move" ? "active" : "",
+        onClick: () => this.state.beginCommandTarget("move"),
+      }));
+      for (let i = 0; i < 2; i++) {
+        const el = document.createElement("div");
+        el.className = "cmd-empty";
+        frag.appendChild(el);
       }
+      frag.appendChild(this._cmdButton({
+        icon: "AT",
+        label: "Attack",
+        title: "Attack a target or attack-move to a point",
+        hotkey: GRID_HOTKEYS[3],
+        enabled: unitIds.length > 0,
+        cls: this.state.commandTarget === "attack" ? "active" : "",
+        onClick: () => this.state.beginCommandTarget("attack"),
+      }));
+      frag.appendChild(this._cmdButton({
+        icon: "HD",
+        label: "Hold",
+        title: "Hold position / stop selected units",
+        hotkey: GRID_HOTKEYS[4],
+        enabled: unitIds.length > 0,
+        cls: "",
+        onClick: () => {
+          this.net.command(cmd.stop(unitIds));
+          this.state.endCommandTarget();
+        },
+      }));
+      const empty = document.createElement("div");
+      empty.className = "cmd-empty";
+      frag.appendChild(empty);
+      idx = 6;
+      frag.appendChild(this._cmdButton({
+        icon: "BLD",
+        label: "Build",
+        title: "Open worker build menu",
+        hotkey: GRID_HOTKEYS[idx++],
+        enabled: unitIds.length > 0,
+        cls: "",
+        onClick: () => this.state.openWorkerBuildMenu(),
+      }));
     } else {
       // Non-worker units: Q=Move, W/E=empty, A=Attack, S=Hold.
       frag.appendChild(this._cmdButton({
@@ -434,13 +576,29 @@ export class HUD {
         },
       }));
       idx = 5;
-      if (atGunIds.length > 0) {
+      if (chargeUnlocked || atGunIds.length > 0) {
         const empty = document.createElement("div");
         empty.className = "cmd-empty";
         frag.appendChild(empty);
         idx = 6;
+      }
+      if (chargeUnlocked) {
         frag.appendChild(this._cmdButton({
-          icon: "Z",
+          icon: "CHG",
+          label: "Charge",
+          title: "Riflemen sprint briefly at double movement speed",
+          hotkey: GRID_HOTKEYS[idx++],
+          enabled: true,
+          cls: "",
+          onClick: () => {
+            this.net.command(cmd.charge(riflemanIds));
+            this.state.endCommandTarget();
+          },
+        }));
+      }
+      if (atGunIds.length > 0) {
+        frag.appendChild(this._cmdButton({
+          icon: "SET",
           label: "Set Up",
           title: "Set up selected AT guns toward a target point",
           hotkey: GRID_HOTKEYS[idx++],
@@ -449,7 +607,7 @@ export class HUD {
           onClick: () => this.state.beginCommandTarget("setupAtGuns"),
         }));
         frag.appendChild(this._cmdButton({
-          icon: "X",
+          icon: "TD",
           label: "Tear Down",
           title: "Pack up selected AT guns",
           hotkey: GRID_HOTKEYS[idx++],
@@ -458,27 +616,6 @@ export class HUD {
           onClick: () => {
             this.net.command(cmd.tearDownAtGuns(atGunIds));
             this.state.endCommandTarget();
-          },
-        }));
-      }
-    }
-
-    if (workerSelected) {
-      for (const kind of WORKER_BUILDABLE) {
-        const st = STATS[kind];
-        if (!st) continue;
-        const enabled = this._canBuild(kind, res);
-        const reason = this._buildDisabledReason(kind, res);
-        frag.appendChild(this._cmdButton({
-          icon: st.icon,
-          label: st.label,
-          hotkey: GRID_HOTKEYS[idx++],
-          cost: st.cost,
-          enabled,
-          title: reason,
-          onClick: () => {
-            this.state.endCommandTarget();
-            this.state.beginPlacement(kind);
           },
         }));
       }
@@ -519,7 +656,15 @@ export class HUD {
       });
       frag.appendChild(btn);
     }
-    this._padCard(frag, idx);
+    this._padCard(frag, idx, 8);
+    frag.appendChild(this._cmdButton({
+      icon: "RTN",
+      label: "Worker",
+      hotkey: GRID_HOTKEYS[8],
+      enabled: true,
+      title: "Return to worker commands",
+      onClick: () => this.state.closeCommandCardMenu(),
+    }));
     card.innerHTML = "";
     card.appendChild(frag);
   }

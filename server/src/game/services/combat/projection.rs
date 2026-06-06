@@ -41,6 +41,25 @@ pub(super) fn resolve_shot_victim(
     Some(best.0)
 }
 
+pub(super) fn friendly_hard_blocker_between(
+    map: &Map,
+    entities: &EntityStore,
+    attacker: u32,
+    attacker_owner: u32,
+    start: (f32, f32),
+    end: (f32, f32),
+) -> bool {
+    if !start.0.is_finite() || !start.1.is_finite() || !end.0.is_finite() || !end.1.is_finite() {
+        return true;
+    }
+    entities.iter().any(|candidate| {
+        candidate.id != attacker
+            && candidate.owner == attacker_owner
+            && candidate.hp > 0
+            && shot_blocker_intersection(map, candidate, start, end).is_some()
+    })
+}
+
 pub(super) fn shot_blocker_intersection(
     map: &Map,
     entity: &Entity,

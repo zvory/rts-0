@@ -25,6 +25,7 @@ export function footprintValidAgainstEntities(
   const maxX = (tileX + footW) * ts;
   const maxY = (tileY + footH) * ts;
   for (const e of entities) {
+    if (e.shotReveal || e.visionOnly) continue;
     if (allowedOverlapIds?.has(e.id)) continue;
     if (entityIntersectsRect(e, minX, minY, maxX, maxY, ts)) return false;
   }

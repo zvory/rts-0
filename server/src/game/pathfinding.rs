@@ -20,6 +20,12 @@ use crate::config;
 pub trait Passability {
     /// Whether a unit may stand on / traverse this tile.
     fn passable(&self, tx: i32, ty: i32) -> bool;
+
+    /// Additional deterministic cost for entering this tile. Defaults to zero so callers that
+    /// only need pass/fail behavior keep legacy path scoring.
+    fn movement_cost(&self, _tx: i32, _ty: i32) -> u32 {
+        0
+    }
 }
 
 /// A* node in the open set, ordered by `f = g + h` (min-heap via `Reverse`-style `Ord`).
@@ -183,7 +189,11 @@ pub fn find_path_with_budget_and_turn_cost<P: Passability>(
                 NO_INCOMING_DIR
             };
             let next_key = (nx, ny, next_dir);
-            let tentative = cur.g + cost + turn_cost;
+            let tentative = cur
+                .g
+                .saturating_add(cost)
+                .saturating_add(turn_cost)
+                .saturating_add(pass.movement_cost(nx, ny));
             let better = match g_score.get(&next_key) {
                 Some(&existing) => tentative < existing,
                 None => true,

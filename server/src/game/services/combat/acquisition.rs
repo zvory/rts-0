@@ -1,10 +1,14 @@
-use crate::game::entity::{fires_while_moving, Entity, EntityKind, EntityStore, Order};
+use crate::game::entity::{Entity, EntityKind, EntityStore, Order};
 use crate::game::fog::Fog;
+use crate::game::map::Map;
 use crate::game::services::line_of_sight::LineOfSight;
 use crate::game::services::spatial::SpatialIndex;
 use crate::game::services::world_query;
 use crate::rules::combat as combat_rules;
 use crate::rules::terrain::TerrainKind;
+
+use super::projection::friendly_hard_blocker_between;
+use super::weapons::can_fire_while_moving;
 
 /// How a combatant chooses targets.
 #[derive(Copy, Clone, PartialEq)]
@@ -23,7 +27,7 @@ pub(super) fn combat_mode(e: &Entity) -> CombatMode {
     match e.order() {
         Order::Attack(_) => CombatMode::Ordered,
         Order::AttackMove(_) => CombatMode::Aggressive,
-        Order::Move(_) if fires_while_moving(e.kind) => CombatMode::Opportunistic,
+        Order::Move(_) if can_fire_while_moving(e) => CombatMode::Opportunistic,
         Order::Idle if e.is_building() => CombatMode::Aggressive,
         Order::Idle if e.is_unit() && e.kind != EntityKind::Worker => CombatMode::Aggressive,
         _ => CombatMode::Passive,
@@ -33,6 +37,7 @@ pub(super) fn combat_mode(e: &Entity) -> CombatMode {
 /// Resolve which entity an attacker should engage this tick.
 #[allow(clippy::too_many_arguments)]
 pub(super) fn resolve_target(
+    map: &Map,
     entities: &EntityStore,
     spatial: &SpatialIndex,
     los: &LineOfSight<'_>,
@@ -68,7 +73,7 @@ pub(super) fn resolve_target(
     }
 
     if let Some(target) = retained_firing_target_for_shoot_while_moving_unit(
-        entities, los, fog, self_id, owner, px, py, acquire_px,
+        map, entities, los, fog, self_id, owner, px, py, acquire_px,
     ) {
         return Some(target);
     }
@@ -89,8 +94,7 @@ pub(super) fn resolve_target(
             py,
             acquire_px,
             |target| {
-                target_visible_to_owner(fog, owner, target)
-                    && los.clear_between_world_points((px, py), (target.pos_x, target.pos_y))
+                target_currently_fireable(map, entities, los, fog, self_id, owner, px, py, target)
             },
         ) {
             return Some(id);
@@ -109,8 +113,7 @@ pub(super) fn resolve_target(
             py,
             acquire_px,
             |target| {
-                target_visible_to_owner(fog, owner, target)
-                    && los.clear_between_world_points((px, py), (target.pos_x, target.pos_y))
+                target_currently_fireable(map, entities, los, fog, self_id, owner, px, py, target)
             },
         ) {
             return Some(id);
@@ -127,15 +130,13 @@ pub(super) fn resolve_target(
         px,
         py,
         acquire_px,
-        |target| {
-            target_visible_to_owner(fog, owner, target)
-                && los.clear_between_world_points((px, py), (target.pos_x, target.pos_y))
-        },
+        |target| target_currently_fireable(map, entities, los, fog, self_id, owner, px, py, target),
     )
 }
 
 #[allow(clippy::too_many_arguments)]
 fn retained_firing_target_for_shoot_while_moving_unit(
+    map: &Map,
     entities: &EntityStore,
     los: &LineOfSight<'_>,
     fog: &Fog,
@@ -146,15 +147,12 @@ fn retained_firing_target_for_shoot_while_moving_unit(
     acquire_px: f32,
 ) -> Option<u32> {
     let attacker = entities.get(self_id)?;
-    if !fires_while_moving(attacker.kind) {
+    if !can_fire_while_moving(attacker) {
         return None;
     }
     let target_id = attacker.target_id()?;
     let target = entities.get(target_id)?;
     if !world_query::is_enemy_targetable(target, owner, self_id) {
-        return None;
-    }
-    if !target_visible_to_owner(fog, owner, target) {
         return None;
     }
     let concealment =
@@ -168,10 +166,34 @@ fn retained_firing_target_for_shoot_while_moving_unit(
     if dx * dx + dy * dy > effective_acquire_px * effective_acquire_px {
         return None;
     }
-    if !los.clear_between_world_points((px, py), (target.pos_x, target.pos_y)) {
+    if !target_currently_fireable(map, entities, los, fog, self_id, owner, px, py, target) {
         return None;
     }
     Some(target_id)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn target_currently_fireable(
+    map: &Map,
+    entities: &EntityStore,
+    los: &LineOfSight<'_>,
+    fog: &Fog,
+    self_id: u32,
+    owner: u32,
+    px: f32,
+    py: f32,
+    target: &Entity,
+) -> bool {
+    target_visible_to_owner(fog, owner, target)
+        && los.clear_between_world_points((px, py), (target.pos_x, target.pos_y))
+        && !friendly_hard_blocker_between(
+            map,
+            entities,
+            self_id,
+            owner,
+            (px, py),
+            (target.pos_x, target.pos_y),
+        )
 }
 
 fn target_visible_to_owner(fog: &Fog, owner: u32, target: &Entity) -> bool {

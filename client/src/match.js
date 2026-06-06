@@ -371,7 +371,8 @@ export class Match {
       opts.alertX = ev.x;
       opts.alertY = ev.y;
     }
-    this.audio.play(noticeSoundId(ev.msg), opts);
+    const soundId = noticeSoundId(ev.msg);
+    if (soundId) this.audio.play(soundId, opts);
   }
 
   pointInViewport(x, y, marginPx = 0) {
@@ -479,7 +480,9 @@ export class Match {
    * @returns {object[]}
    */
   ownEntities() {
-    const all = this.state.entitiesInterpolated(1).filter((e) => !e.shotReveal);
+    const all = this.state
+      .entitiesInterpolated(1)
+      .filter((e) => !e.shotReveal && !e.visionOnly);
     if (this.state.spectator) {
       return all.filter((e) => e.owner !== 0);
     }

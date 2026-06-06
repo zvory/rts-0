@@ -36,6 +36,8 @@ has length and facing, but its rounded ends reduce snagging.
 - Capsule vs circle and capsule vs oriented box overlap resolve deterministically.
 - Scout car can stand in positions where the former rectangular corner would clip but the capsule
   is clear.
+- Scout car can stand side-by-side with a building or wall in poses where the old rear rectangular
+  corner would overlap but the capsule's rounded side/end is clear.
 - Scout car still cannot pass through one-tile diagonal pinches or building footprints.
 
 ## Non-Goals
@@ -48,4 +50,5 @@ has length and facing, but its rounded ends reduce snagging.
 
 - Scout-car static legality uses the capsule body everywhere the server currently uses the oriented
   vehicle body.
-- Tests prove the capsule is less corner-snaggy without permitting wall/building overlap.
+- Tests prove the capsule is less corner-snaggy, including wall-adjacent side-by-side poses, without
+  permitting wall/building overlap.

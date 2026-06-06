@@ -15,6 +15,8 @@ blocked, a conservative wall response can prevent hard wedging.
 
 - Sample the capsule along each candidate primitive at fixed deterministic intervals.
 - Reject candidates if any sampled pose is statically illegal.
+- Treat a wall-adjacent turn-away as legal only when every sampled capsule pose remains clear; the
+  capsule shape may save the old rectangular rear corner, but it must not hide real swept overlap.
 - Keep sample count tied to body length/speed so faster movement does not skip collision.
 - Prefer exact analytical checks only if they stay simple; robust sampling is acceptable for v1.
 
@@ -41,6 +43,8 @@ This approximates "frictionless walls" without turning walls into normal navigat
 
 - Arc around a building corner samples intermediate poses and rejects corner clipping.
 - Legal tangent fallback along a wall is accepted when it reduces overlap risk.
+- Side-by-side building contact can resolve into a legal tangent/outward turn-away instead of
+  reverse-recovery loops, while rejecting any sampled rear-end overlap.
 - Fallback does not move through a building corner.
 - A scout car touching no blocker does not use wall response.
 - Repeated wall-response ticks remain bounded and eventually trigger repath/recovery if no route is

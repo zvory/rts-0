@@ -20,7 +20,7 @@ use std::collections::HashMap;
 
 use crate::game::command::SimCommand;
 use crate::game::entity::EntityStore;
-use crate::game::fog::Fog;
+use crate::game::fog::{Fog, LingeringSightSource};
 use crate::game::map::Map;
 use crate::game::services;
 use crate::game::services::occupancy::Occupancy;
@@ -106,6 +106,7 @@ pub(crate) fn run_tick(
     fog: &Fog,
     pathing: &mut PathingService,
     rng: &mut SmallRng,
+    lingering_sight: &mut Vec<LingeringSightSource>,
     pending: Vec<(u32, SimCommand)>,
     events: &mut HashMap<u32, Vec<Event>>,
     tick: u32,
@@ -144,6 +145,12 @@ pub(crate) fn run_tick(
             events,
         );
     });
+    crate::perf::timed(perf.as_deref_mut(), "promote_queued_orders", || {
+        services::order_queue::promote_ready_orders(entities, &mut coordinator);
+    });
+    crate::perf::timed(perf.as_deref_mut(), "promoted_awaiting_paths", || {
+        coordinator.process_awaiting_paths(entities);
+    });
 
     let post_movement = crate::perf::timed(perf.as_deref_mut(), "post_movement_derived", || {
         PostMovementDerivedState::rebuild(map, entities)
@@ -180,7 +187,7 @@ pub(crate) fn run_tick(
         services::construction::construction_system(map, entities, players, events);
     });
     crate::perf::timed(perf.as_deref_mut(), "death", || {
-        services::death::death_system(entities, fog, players, events);
+        services::death::death_system(entities, fog, players, lingering_sight, events, tick);
     });
 
     let pre_collision = crate::perf::timed(perf.as_deref_mut(), "pre_collision_derived", || {
@@ -252,6 +259,7 @@ mod tests {
         let fog = Fog::new(map.size);
         let mut pathing = PathingService::new(1024, 16);
         let mut events: HashMap<u32, Vec<Event>> = HashMap::new();
+        let mut lingering_sight = Vec::new();
 
         let worker = entities
             .spawn_unit(1, EntityKind::Worker, 400.0, 390.0)
@@ -276,6 +284,7 @@ mod tests {
             &fog,
             &mut pathing,
             &mut SmallRng::seed_from_u64(0),
+            &mut lingering_sight,
             Vec::new(),
             &mut events,
             1,

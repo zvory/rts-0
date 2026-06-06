@@ -63,12 +63,19 @@ pub const AT_GUN_PACKED_DAMAGE_MULTIPLIER: f32 = 0.75;
 pub const AT_GUN_FIELD_OF_FIRE_RAD: f32 = std::f32::consts::PI / 4.0;
 
 /// Experimental: tanks burn this much oil per world pixel of movement. Calibrated against the
-/// original 96-tile map span (3072 px), where a full-width drive burned ~10 oil. Larger maps keep
-/// the same per-pixel rate, so longer crossings cost proportionally more. When a player has zero
-/// oil their tanks pause movement before retrying.
-pub const TANK_OIL_COST_PER_PX: f32 = 10.0 / (96.0 * TILE_SIZE as f32);
-/// Ticks a moving tank waits after an oil-starved movement attempt before checking fuel again.
+/// original 96-tile map span (3072 px), where a full-width drive burns ~20 oil. Larger maps keep
+/// the same per-pixel rate, so longer crossings cost proportionally more.
+pub const TANK_OIL_COST_PER_PX: f32 = 20.0 / (96.0 * TILE_SIZE as f32);
+/// Scout cars burn half of the previous tank oil rate, or ~5 oil over the original 96-tile span.
+pub const SCOUT_CAR_OIL_COST_PER_PX: f32 = 5.0 / (96.0 * TILE_SIZE as f32);
+/// Ticks a moving oil-starved vehicle waits before checking fuel again.
 pub const TANK_OIL_STARVED_PAUSE_TICKS: u16 = TICK_HZ as u16;
+
+/// Rifleman Charge lasts long enough for a charged rifleman to cover about two current tank
+/// lengths. Keep this duration hard-coded so future tank body tuning does not silently retune it.
+pub const RIFLEMAN_CHARGE_TICKS: u16 = 32;
+/// Rifleman movement multiplier while Charge is active.
+pub const RIFLEMAN_CHARGE_SPEED_MULTIPLIER: f32 = 2.0;
 
 // --- Economy ----------------------------------------------------------------
 pub const STARTING_STEEL: u32 = 75;

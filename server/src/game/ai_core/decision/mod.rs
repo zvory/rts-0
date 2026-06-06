@@ -265,9 +265,7 @@ where
     let mut actions = AiActionContext::new(&facts, budget);
     let mut intents = Vec::new();
 
-    let local_threat_response = local_defense_target(observation)
-        .is_some()
-        .then(|| defensive_panic_response(observation));
+    let local_threat_response = defensive_panic_response(observation);
     let defensive_panic = memory.defensive_panic(local_threat_response, observation.tick);
     let panic_plan = defensive_panic
         .active

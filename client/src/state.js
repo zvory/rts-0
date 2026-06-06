@@ -3,7 +3,7 @@
 //
 // It holds the two most recent server snapshots (for interpolation), the
 // latest resources/events, the local selection set, and the local build
-// placement preview. Selection and placement are client-only concepts; the
+// placement preview. Selection, command-card menus, and placement are client-only concepts; the
 // server never sees them directly (only the resulting commands).
 
 import { RESOURCE_AMOUNTS } from "./config.js";
@@ -87,10 +87,14 @@ export class GameState {
     /** @type {null | {building:string, tileX:number, tileY:number, valid:boolean}} */
     this.placement = null;
 
+    // --- command card submenu (client-only) ---
+    /** @type {null | "workerBuild"} */
+    this.commandCardMode = null;
+
     // --- command targeting / feedback (client-only) ---
     /** @type {null | "move" | "attack" | "setupAtGuns"} */
     this.commandTarget = null;
-    /** @type {Array<{kind:string,x:number,y:number,createdAt:number}>} */
+    /** @type {Array<{kind:string,x:number,y:number,append:boolean,createdAt:number}>} */
     this.commandFeedback = [];
     /** @type {null | {resourceId:number, resourceX:number, resourceY:number, ccId:number, ccX:number, ccY:number, inRange:boolean}} */
     this.resourceMiningPreview = null;
@@ -378,7 +382,7 @@ export class GameState {
     const out = [];
     for (const id of this.selection) {
       const e = this._curById.get(id);
-      if (e && !e.shotReveal) out.push(e);
+      if (e && !e.shotReveal && !e.visionOnly) out.push(e);
     }
     return out;
   }
@@ -393,6 +397,7 @@ export class GameState {
       this.selection.add(id);
       if (this.selection.size >= GameState.MAX_SELECTION_SIZE) break;
     }
+    this.closeCommandCardMenu();
   }
 
   /**
@@ -405,6 +410,7 @@ export class GameState {
       if (this.selection.size >= GameState.MAX_SELECTION_SIZE) break;
       this.selection.add(id);
     }
+    this.closeCommandCardMenu();
   }
 
   /**
@@ -416,11 +422,13 @@ export class GameState {
     for (const id of ids) {
       this.selection.delete(id);
     }
+    this.closeCommandCardMenu();
   }
 
   /** Clear the selection. */
   clearSelection() {
     this.selection.clear();
+    this.closeCommandCardMenu();
   }
 
   /** Drop selected ids that are no longer present in the latest snapshot. */
@@ -430,7 +438,7 @@ export class GameState {
     const live = new Set();
     for (const id of this.selection) {
       const entity = this._curById.get(id);
-      if (entity && !entity.shotReveal) {
+      if (entity && !entity.shotReveal && !entity.visionOnly) {
         live.add(id);
       } else {
         changed = true;
@@ -551,6 +559,24 @@ export class GameState {
 
   // --- build placement (client-only) -------------------------------------
 
+  /** Open the worker build command-card submenu. */
+  openWorkerBuildMenu() {
+    this.placement = null;
+    this.commandTarget = null;
+    this.atGunSetupPreview = null;
+    this.commandCardMode = "workerBuild";
+  }
+
+  /**
+   * Close any command-card submenu.
+   * @returns {boolean} true if a submenu was open.
+   */
+  closeCommandCardMenu() {
+    const hadMenu = this.commandCardMode != null;
+    this.commandCardMode = null;
+    return hadMenu;
+  }
+
   /**
    * Start previewing placement of a building. Position/validity are filled in
    * by updatePlacement as the cursor moves.
@@ -558,6 +584,7 @@ export class GameState {
    */
   beginPlacement(buildingKind) {
     this.commandTarget = null;
+    this.closeCommandCardMenu();
     this.placement = { building: buildingKind, tileX: 0, tileY: 0, valid: false };
   }
 
@@ -588,6 +615,7 @@ export class GameState {
    */
   beginCommandTarget(kind) {
     this.placement = null;
+    this.closeCommandCardMenu();
     this.commandTarget = kind;
     if (kind !== "setupAtGuns") this.atGunSetupPreview = null;
   }
@@ -603,9 +631,10 @@ export class GameState {
    * @param {"move"|"attack"} kind
    * @param {number} x
    * @param {number} y
+   * @param {boolean=} append
    */
-  addCommandFeedback(kind, x, y) {
-    this.commandFeedback.push({ kind, x, y, createdAt: performance.now() });
+  addCommandFeedback(kind, x, y, append = false) {
+    this.commandFeedback.push({ kind, x, y, append: !!append, createdAt: performance.now() });
     if (this.commandFeedback.length > 12) {
       this.commandFeedback.splice(0, this.commandFeedback.length - 12);
     }
@@ -614,7 +643,7 @@ export class GameState {
   /**
    * Return live command feedback markers, pruning expired ones.
    * @param {number} now
-   * @returns {Array<{kind:string,x:number,y:number,createdAt:number}>}
+   * @returns {Array<{kind:string,x:number,y:number,append:boolean,createdAt:number}>}
    */
   liveCommandFeedback(now) {
     const ttlMs = 650;

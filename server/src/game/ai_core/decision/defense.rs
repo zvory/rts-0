@@ -19,6 +19,10 @@ pub(super) const DEFENSIVE_PANIC_SUSTAINED_BARRACKS: usize = 2;
 
 pub(super) const DEFENSIVE_PANIC_DPS_DOMINANCE: f32 = 0.75;
 
+pub(super) const DEFENSIVE_PANIC_ENEMY_VALUE_NUMERATOR: u32 = 3;
+
+pub(super) const DEFENSIVE_PANIC_ENEMY_VALUE_DENOMINATOR: u32 = 4;
+
 pub(super) const DEFENSIVE_PANIC_OIL_WORKERS: usize = 2;
 
 pub(super) const DEFENSIVE_PANIC_RIFLE_TECH_PATH: [EntityKind; 1] = [EntityKind::Barracks];
@@ -133,8 +137,21 @@ pub(super) fn defensive_panic_rifle_plan() -> DefensivePanicPlan {
     }
 }
 
-pub(super) fn defensive_panic_response(observation: &AiObservation) -> DefensivePanicResponse {
+pub(super) fn defensive_panic_response(
+    observation: &AiObservation,
+) -> Option<DefensivePanicResponse> {
     let geometry = LocalDefenseGeometry::from_observation(observation);
+    let enemy_value = local_enemy_unit_value(observation, &geometry);
+    if enemy_value == 0 {
+        return None;
+    }
+    let own_value = local_owned_unit_value(observation, &geometry);
+    if enemy_value.saturating_mul(DEFENSIVE_PANIC_ENEMY_VALUE_DENOMINATOR)
+        < own_value.saturating_mul(DEFENSIVE_PANIC_ENEMY_VALUE_NUMERATOR)
+    {
+        return None;
+    }
+
     let mut local_scores = DefensiveThreatScores::default();
     let mut visible_scores = DefensiveThreatScores::default();
 
@@ -149,12 +166,39 @@ pub(super) fn defensive_panic_response(observation: &AiObservation) -> Defensive
         }
     }
 
-    if local_scores.non_empty() {
-        local_scores
-    } else {
-        visible_scores
-    }
-    .response()
+    Some(
+        if local_scores.non_empty() {
+            local_scores
+        } else {
+            visible_scores
+        }
+        .response(),
+    )
+}
+
+fn local_enemy_unit_value(observation: &AiObservation, geometry: &LocalDefenseGeometry) -> u32 {
+    observation
+        .visible_enemies
+        .iter()
+        .filter(|enemy| enemy.kind.is_unit())
+        .filter(|enemy| geometry.contains(enemy))
+        .map(|enemy| unit_value(enemy.kind))
+        .sum()
+}
+
+fn local_owned_unit_value(observation: &AiObservation, geometry: &LocalDefenseGeometry) -> u32 {
+    observation
+        .owned
+        .iter()
+        .filter(|entity| entity.kind.is_unit())
+        .filter(|entity| geometry.contains(entity))
+        .map(|entity| unit_value(entity.kind))
+        .sum()
+}
+
+fn unit_value(kind: EntityKind) -> u32 {
+    let (steel, oil) = rules::economy::cost(kind);
+    steel.saturating_add(oil)
 }
 
 #[derive(Clone, Copy, Debug, Default)]

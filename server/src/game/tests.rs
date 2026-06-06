@@ -207,6 +207,45 @@ fn flat_tank_move_fixture() -> (Game, u32, (f32, f32)) {
     (game, tank, goal)
 }
 
+fn queued_move_fixture() -> (Game, u32, (f32, f32), (f32, f32), (f32, f32)) {
+    let players = [PlayerInit {
+        id: 1,
+        name: "Solo".into(),
+        color: "#fff".into(),
+        is_ai: false,
+    }];
+    let mut game = Game::new_for_replay(&players, 0x5150_0001);
+    for tile in &mut game.map.terrain {
+        *tile = crate::protocol::terrain::GRASS;
+    }
+    for id in game.entities.ids() {
+        game.entities.remove(id);
+    }
+
+    let start = game.map.tile_center(8, 8);
+    let first = game.map.tile_center(10, 8);
+    let second = game.map.tile_center(12, 8);
+    let replacement = game.map.tile_center(8, 10);
+    let unit = game
+        .entities
+        .spawn_unit(1, EntityKind::Rifleman, start.0, start.1)
+        .expect("rifleman should spawn");
+    systems::recompute_supply(&mut game.players, &game.entities);
+    game.spatial = services::spatial::SpatialIndex::build(&game.entities, game.map.size);
+    let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
+    game.fog.recompute(&ids, &game.entities, &game.map);
+    game.assert_invariants();
+
+    (game, unit, first, second, replacement)
+}
+
+fn entity_distance_to(game: &Game, id: u32, point: (f32, f32)) -> f32 {
+    let entity = game.entities.get(id).expect("entity should exist");
+    let dx = entity.pos_x - point.0;
+    let dy = entity.pos_y - point.1;
+    (dx * dx + dy * dy).sqrt()
+}
+
 #[test]
 fn tank_move_command_preserves_exact_goal_and_repeats_deterministically() {
     let (mut live, tank, goal) = flat_tank_move_fixture();
@@ -217,6 +256,7 @@ fn tank_move_command_preserves_exact_goal_and_repeats_deterministically() {
             units: vec![tank],
             x: goal.0,
             y: goal.1,
+            queued: false,
         },
     );
     live.tick();
@@ -230,6 +270,7 @@ fn tank_move_command_preserves_exact_goal_and_repeats_deterministically() {
                 units: vec![tank],
                 x: goal.0,
                 y: goal.1,
+                queued: false,
             },
         }]
     );
@@ -255,6 +296,7 @@ fn tank_move_command_preserves_exact_goal_and_repeats_deterministically() {
                 units: vec![tank_a],
                 x: goal_a.0,
                 y: goal_a.1,
+                queued: false,
             },
         );
     }
@@ -276,6 +318,98 @@ fn tank_move_command_preserves_exact_goal_and_repeats_deterministically() {
         b.movement.as_ref().map(|movement| movement.path.clone())
     );
     assert_eq!(repeat_a.command_log(), repeat_b.command_log());
+}
+
+#[test]
+fn queued_move_commands_follow_waypoints_in_order() {
+    let (mut game, unit, first, second, _) = queued_move_fixture();
+
+    game.enqueue(
+        1,
+        Command::Move {
+            units: vec![unit],
+            x: first.0,
+            y: first.1,
+            queued: true,
+        },
+    );
+    game.enqueue(
+        1,
+        Command::Move {
+            units: vec![unit],
+            x: second.0,
+            y: second.1,
+            queued: true,
+        },
+    );
+    game.tick();
+
+    let entity = game.entities.get(unit).expect("unit should exist");
+    assert_eq!(
+        entity.move_intent(),
+        Some(first),
+        "idle unit should immediately promote the first queued move"
+    );
+    assert_eq!(entity.queued_orders().len(), 1);
+
+    for _ in 0..120 {
+        game.tick();
+    }
+
+    let entity = game.entities.get(unit).expect("unit should exist");
+    assert!(
+        entity_distance_to(&game, unit, second) <= 3.0,
+        "unit should end at the second queued waypoint"
+    );
+    assert!(entity.queued_orders().is_empty());
+    assert!(matches!(entity.order(), Order::Idle));
+    assert_eq!(game.command_log().len(), 2);
+    assert!(game.command_log().iter().all(|entry| {
+        matches!(
+            &entry.command,
+            crate::protocol::Command::Move { queued: true, .. }
+        )
+    }));
+}
+
+#[test]
+fn replacement_move_and_stop_clear_queued_movement() {
+    let (mut game, unit, first, second, replacement) = queued_move_fixture();
+
+    for goal in [first, second] {
+        game.enqueue(
+            1,
+            Command::Move {
+                units: vec![unit],
+                x: goal.0,
+                y: goal.1,
+                queued: true,
+            },
+        );
+    }
+    game.tick();
+    game.enqueue(
+        1,
+        Command::Move {
+            units: vec![unit],
+            x: replacement.0,
+            y: replacement.1,
+            queued: false,
+        },
+    );
+    game.tick();
+
+    let entity = game.entities.get(unit).expect("unit should exist");
+    assert_eq!(entity.move_intent(), Some(replacement));
+    assert!(entity.queued_orders().is_empty());
+
+    game.enqueue(1, Command::Stop { units: vec![unit] });
+    game.tick();
+
+    let entity = game.entities.get(unit).expect("unit should exist");
+    assert!(matches!(entity.order(), Order::Idle));
+    assert!(entity.queued_orders().is_empty());
+    assert!(entity.path_is_empty());
 }
 
 #[test]
@@ -326,11 +460,15 @@ fn scores_record_kills_and_losses_on_death() {
 
     let mut events: HashMap<u32, Vec<Event>> =
         game.players.iter().map(|p| (p.id, Vec::new())).collect();
+    let mut lingering_sight = Vec::new();
+    let tick = game.tick_count();
     services::death::death_system(
         &mut game.entities,
         &game.fog,
         &mut game.players,
+        &mut lingering_sight,
         &mut events,
+        tick,
     );
 
     let scores = game.scores();
@@ -414,6 +552,116 @@ fn spectator_snapshot_uses_union_fog_not_full_world() {
     assert!(snapshot.entities.iter().any(|e| e.owner == 2));
     assert!(!snapshot.entities.iter().any(|e| e.id == hidden));
     assert_eq!(snapshot.player_resources.len(), 2);
+}
+
+#[test]
+fn death_vision_lingers_for_one_second_as_visual_only_intel() {
+    let players = [
+        PlayerInit {
+            id: 1,
+            name: "One".into(),
+            color: "#fff".into(),
+            is_ai: false,
+        },
+        PlayerInit {
+            id: 2,
+            name: "Two".into(),
+            color: "#000".into(),
+            is_ai: false,
+        },
+    ];
+    let mut game = Game::new_for_replay(&players, 0xD3AD_5151);
+    for tile in &mut game.map.terrain {
+        *tile = crate::protocol::terrain::GRASS;
+    }
+    for id in game.entities.ids() {
+        game.entities.remove(id);
+    }
+
+    let rifle_pos = game.map.tile_center(2, 2);
+    let rifle = game
+        .entities
+        .spawn_unit(1, EntityKind::Rifleman, rifle_pos.0, rifle_pos.1)
+        .expect("rifleman should spawn");
+    let spotter_pos = game.map.tile_center(20, 20);
+    let spotter = game
+        .entities
+        .spawn_unit(1, EntityKind::Worker, spotter_pos.0, spotter_pos.1)
+        .expect("spotter should spawn");
+    let enemy_pos = game.map.tile_center(22, 20);
+    let enemy = game
+        .entities
+        .spawn_unit(2, EntityKind::Rifleman, enemy_pos.0, enemy_pos.1)
+        .expect("enemy should spawn");
+    systems::recompute_supply(&mut game.players, &game.entities);
+    game.spatial = services::spatial::SpatialIndex::build(&game.entities, game.map.size);
+    let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
+    game.fog.recompute(&ids, &game.entities, &game.map);
+    assert!(game.fog.is_visible_world(1, enemy_pos.0, enemy_pos.1));
+
+    game.entities
+        .get_mut(spotter)
+        .expect("spotter should exist")
+        .hp = 0;
+    game.tick();
+
+    assert!(!game.entities.contains(spotter));
+    assert!(
+        !game.fog.is_visible_world(1, enemy_pos.0, enemy_pos.1),
+        "live fog should no longer see through the dead spotter"
+    );
+    let first_linger = game
+        .snapshot_for(1)
+        .entities
+        .into_iter()
+        .find(|e| e.id == enemy)
+        .expect("enemy should remain visible through lingering death vision");
+    assert!(first_linger.vision_only);
+
+    let enemy_goal = game.map.tile_center(24, 20);
+    game.enqueue(
+        1,
+        Command::Attack {
+            units: vec![rifle],
+            target: enemy,
+            queued: false,
+        },
+    );
+    game.enqueue(
+        2,
+        Command::Move {
+            units: vec![enemy],
+            x: enemy_goal.0,
+            y: enemy_goal.1,
+            queued: false,
+        },
+    );
+    game.tick();
+
+    let rifle_entity = game.entities.get(rifle).expect("rifle should remain alive");
+    assert_eq!(
+        rifle_entity.order().attack_target(),
+        None,
+        "vision-only enemies should not be accepted as direct attack targets"
+    );
+    let moved_enemy = game.entities.get(enemy).expect("enemy should remain alive");
+    let moving_linger = game
+        .snapshot_for(1)
+        .entities
+        .into_iter()
+        .find(|e| e.id == enemy)
+        .expect("moving enemy should still be visible during lingering death vision");
+    assert!(moving_linger.vision_only);
+    assert!((moving_linger.x - moved_enemy.pos_x).abs() < 0.001);
+    assert!((moving_linger.y - moved_enemy.pos_y).abs() < 0.001);
+
+    while game.tick_count() <= config::TICK_HZ {
+        game.tick();
+    }
+    assert!(
+        game.snapshot_for(1).entities.iter().all(|e| e.id != enemy),
+        "lingering death vision should expire after one second"
+    );
 }
 
 #[test]
@@ -777,6 +1025,7 @@ fn gather_command_ignores_nodes_without_nearby_completed_cc() {
         Command::Gather {
             units: vec![worker],
             node: far_node,
+            queued: false,
         },
     );
     game.tick();
@@ -837,6 +1086,7 @@ fn gather_command_to_occupied_patch_is_ignored() {
         Command::Gather {
             units: vec![ordered],
             node,
+            queued: false,
         },
     );
     game.tick();
@@ -892,6 +1142,7 @@ fn worker_already_touching_resource_body_starts_harvesting() {
         Command::Gather {
             units: vec![worker],
             node,
+            queued: false,
         },
     );
     game.tick();
@@ -940,6 +1191,7 @@ fn active_mining_stops_when_nearby_cc_is_removed() {
         Command::Gather {
             units: vec![worker],
             node,
+            queued: false,
         },
     );
     for _ in 0..600 {

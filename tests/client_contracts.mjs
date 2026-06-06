@@ -16,7 +16,7 @@ import {
   STATS,
 } from "../client/src/config.js";
 import { HUD, formatTankOilUsed, playerHasCompletedKind } from "../client/src/hud.js";
-import { Audio } from "../client/src/audio.js";
+import { Audio, noticeSoundId } from "../client/src/audio.js";
 import {
   attackKindHasCombatSound,
   machineGunnerHasAudibleTarget,
@@ -77,6 +77,16 @@ function assertHasGetter(obj, name, msgPrefix = "") {
     `${msgPrefix || "Object"} missing getter "${name}"`,
   );
 }
+
+assert(noticeSoundId("alert:under_attack") === "notice_under_attack", "under-attack notice has dedicated sound id");
+assert(noticeSoundId("Not enough supply") === "notice_supply", "supply notice routes to supply voice line");
+assert(noticeSoundId("Build more depots") === "notice_supply", "depot notice routes to supply voice line");
+assert(noticeSoundId("Not enough steel") === "notice_steel", "steel notice routes to steel voice line");
+assert(noticeSoundId("Not enough oil") === "notice_oil", "oil notice routes to oil voice line");
+assert(noticeSoundId("Cannot build there") === "notice_cannot_build", "cannot-build notice routes to cannot-build voice line");
+assert(noticeSoundId("Requirement not met") === null, "generic invalid notices stay silent");
+assert(noticeSoundId("Unknown unit") === null, "unknown-unit notices stay silent");
+assert(noticeSoundId("Not enough resources") === null, "generic resource notices stay silent");
 
 function fakeAudioParam(value = 1) {
   return {
@@ -162,6 +172,13 @@ function fakeAudioContext() {
         null,
         200,
         9,
+        null,
+        null,
+        null,
+        null,
+        null,
+        [[128, 160], [192, 224, true]],
+        true,
       ],
       [
         2,
@@ -216,9 +233,20 @@ function fakeAudioContext() {
   assert(decoded.entities[0].state === STATE.GATHER, "entity state code decodes");
   assert(decoded.entities[0].weaponFacing === 1.75, "entity optional weaponFacing decodes");
   assert(decoded.entities[0].latchedNode === 200, "entity optional latchedNode decodes");
+  assert(decoded.entities[0].queuedMarkers.length === 2, "entity queued markers decode");
+  assert(decoded.entities[0].visionOnly === true, "entity visionOnly flag decodes");
+  assert(
+    decoded.entities[0].queuedMarkers[0].attackMove === false &&
+      decoded.entities[0].queuedMarkers[1].attackMove === true,
+    "queued marker attack-move flavor decodes",
+  );
   assert(decoded.entities[1].setupState === SETUP.DEPLOYED, "entity setupState code decodes");
   assert(decoded.entities[2].prodKind === KIND.WORKER, "entity prodKind code decodes");
   assert(decoded.entities[2].prodProgress === 0.25, "entity prodProgress decodes");
+  assert(
+    decoded.entities[2].queuedMarkers === undefined,
+    "compact snapshot tolerates missing queued marker fields",
+  );
   assert(decoded.resourceDeltas[0].remaining === 1498, "resource deltas decode");
   assert(decoded.events[0].e === EVENT.ATTACK && decoded.events[0].to === 7, "attack event decodes");
   assert(decoded.events[1].kind === KIND.STEEL, "death event kind decodes");
@@ -251,6 +279,39 @@ function fakeAudioContext() {
       }),
     "compact snapshot enforces entity count bounds",
   );
+  assertThrows(
+    () =>
+      decodeServerMessage({
+        t: "snapshot",
+        v: COMPACT_SNAPSHOT_VERSION,
+        s: [1, 0, 0, 0, 0],
+        e: [[
+          1,
+          1,
+          KIND_CODE[KIND.WORKER],
+          0,
+          0,
+          1,
+          1,
+          STATE_CODE[STATE.IDLE],
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          new Array(9),
+        ]],
+      }),
+    "compact snapshot enforces queued marker bounds",
+  );
 }
 
 {
@@ -263,6 +324,11 @@ function fakeAudioContext() {
     JSON.stringify(cmd.tearDownAtGuns([3, 4])) ===
       JSON.stringify({ c: "tearDownAtGuns", units: [3, 4] }),
     "tearDownAtGuns command builder emits the wire shape",
+  );
+  assert(
+    JSON.stringify(cmd.move([1], 100, 200, true)) ===
+      JSON.stringify({ c: "move", units: [1], x: 100, y: 200, queued: true }),
+    "queued move command builder emits the queued flag only when requested",
   );
   assert(AT_GUN_DEPLOYED_RANGE_TILES === 12, "client mirrors deployed AT gun range");
   assertApprox(
@@ -472,6 +538,9 @@ function fakeAudioContext() {
   assertHasMethod(state, "clearSelection", "GameState");
   assertHasMethod(state, "selectedEntities", "GameState");
   assertHasMethod(state, "entityById", "GameState");
+  assert(state.commandCardMode === null, "GameState.commandCardMode initially null");
+  assertHasMethod(state, "openWorkerBuildMenu", "GameState");
+  assertHasMethod(state, "closeCommandCardMenu", "GameState");
   assert(state.placement === null, "GameState.placement initially null");
   assertHasMethod(state, "beginPlacement", "GameState");
   assertHasMethod(state, "updatePlacement", "GameState");
@@ -615,6 +684,21 @@ function fakeAudioContext() {
   const sel = state.selectedEntities();
   assert(sel.length === 1 && sel[0].id === 1, "selectedEntities drops stale ids");
 
+  // Command-card submenu is local-only and is closed by mode-changing actions.
+  state.openWorkerBuildMenu();
+  assert(state.commandCardMode === "workerBuild", "worker build submenu opens");
+  assert(state.closeCommandCardMenu() === true, "closeCommandCardMenu reports an open submenu");
+  assert(state.closeCommandCardMenu() === false, "closeCommandCardMenu reports when no submenu was open");
+  state.openWorkerBuildMenu();
+  state.beginCommandTarget("attack");
+  assert(state.commandCardMode === null, "command targeting closes the worker build submenu");
+  state.openWorkerBuildMenu();
+  state.beginPlacement(KIND.DEPOT);
+  assert(state.commandCardMode === null, "build placement closes the worker build submenu");
+  state.openWorkerBuildMenu();
+  state.setSelection([1]);
+  assert(state.commandCardMode === null, "selection replacement closes the worker build submenu");
+
   // Control groups are local-only, own controllable entities only, and capped like selection.
   const cgState = new GameState({ ...start, map: { ...start.map, resources: [] } });
   const ownControllables = Array.from({ length: 14 }, (_, i) => ({
@@ -741,6 +825,34 @@ function fakeAudioContext() {
     "worker right-click should prioritize an overlapped resource patch over the worker body",
   );
 
+  const moveUnit = { id: 40, owner: 1, kind: KIND.RIFLEMAN, x: 120, y: 120 };
+  input.state = {
+    playerId: 1,
+    map: { tileSize: 32 },
+    entitiesInterpolated: () => [moveUnit],
+    selectedEntities: () => [moveUnit],
+    addCommandFeedback() {},
+  };
+  input.net = { sent: [], command(command) { this.sent.push(command); } };
+  input._onRightClick({ x: 180, y: 180 }, { shiftKey: true });
+  assert(
+    input.net.sent.length === 1 &&
+      input.net.sent[0].c === "move" &&
+      input.net.sent[0].queued === true,
+    "Shift terrain right-click should send queued move",
+  );
+
+  const enemyUnit = { id: 41, owner: 2, kind: KIND.RIFLEMAN, x: 180, y: 180 };
+  input.state.entitiesInterpolated = () => [moveUnit, enemyUnit];
+  input.net.sent = [];
+  input._onRightClick({ x: 180, y: 180 }, { shiftKey: true });
+  assert(
+    input.net.sent.length === 1 &&
+      input.net.sent[0].c === "attack" &&
+      input.net.sent[0].queued === undefined,
+    "Shift right-click on enemies should remain replacement attack behavior in phase 1",
+  );
+
   input.dom = { clientWidth: 800, clientHeight: 600 };
   input.camera = { screenToWorld: (x, y) => ({ x, y }) };
   const deployedAtGun = {
@@ -840,6 +952,24 @@ function fakeAudioContext() {
     "plain number recalls, and double-tap recalls then jumps",
   );
 
+  const menuCancelInput = Object.create(Input.prototype);
+  let menuClosed = 0;
+  let selectionCleared = 0;
+  menuCancelInput.state = {
+    placement: null,
+    commandTarget: null,
+    closeCommandCardMenu() {
+      menuClosed += 1;
+      return true;
+    },
+    clearSelection() {
+      selectionCleared += 1;
+    },
+  };
+  menuCancelInput._cancel();
+  assert(menuClosed === 1, "Esc closes the worker build submenu first");
+  assert(selectionCleared === 0, "Esc returning to worker commands does not clear selection");
+
   const clusterInput = Object.create(Input.prototype);
   let centered = null;
   clusterInput.camera = {
@@ -922,6 +1052,29 @@ function fakeAudioContext() {
   });
   assert(sentCommands.length === 1, "a second click without another A press should not issue attack-move");
   assert(selectionClicks.length === 1, "a second click without another A press should be normal selection");
+
+  targetedInput.state.commandTarget = "move";
+  targetedInput._onLeftDown({ x: 260, y: 260 }, { shiftKey: true });
+  let lastSent = sentCommands[sentCommands.length - 1];
+  assert(lastSent.c === "move", "move targeting should issue a move command");
+  assert(lastSent.queued === true, "Shift move targeting should queue movement");
+
+  targetedInput.state.commandTarget = "attack";
+  targetedInput._entityAtWorld = () => null;
+  targetedInput._onLeftDown({ x: 280, y: 280 }, { shiftKey: true });
+  lastSent = sentCommands[sentCommands.length - 1];
+  assert(lastSent.c === "attackMove", "attack targeting terrain should attack-move");
+  assert(lastSent.queued === true, "Shift attack-move targeting should queue attack-move");
+
+  targetedInput.state.commandTarget = "attack";
+  targetedInput._entityAtWorld = () => ({ id: 99, owner: 2, kind: KIND.RIFLEMAN, x: 300, y: 300 });
+  targetedInput._onLeftDown({ x: 300, y: 300 }, { shiftKey: true });
+  lastSent = sentCommands[sentCommands.length - 1];
+  assert(lastSent.c === "attack", "attack targeting an enemy should issue attack");
+  assert(
+    lastSent.queued === undefined,
+    "Shift enemy attack targeting should remain replacement behavior in phase 1",
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -1092,10 +1245,10 @@ function fakeAudioContext() {
   assert(audio.voices.every((v) => v.category === "alert"), "Audio priority eviction keeps highest-priority voices");
 
   audio.voices.slice().forEach((v) => v.node.stop());
-  audio.buffers.set("notice_generic", { duration: 0.5 });
+  audio.buffers.set("notice_under_attack", { duration: 0.5 });
   now = 10_000;
   assert(
-    audio.play("notice_generic", {
+    audio.play("notice_under_attack", {
       category: "alert",
       alertId: "under_attack",
       alertX: 100,
@@ -1104,7 +1257,7 @@ function fakeAudioContext() {
     "first under-attack alert plays",
   );
   assert(
-    !audio.play("notice_generic", {
+    !audio.play("notice_under_attack", {
       category: "alert",
       alertId: "under_attack",
       alertX: 120,
@@ -1113,7 +1266,7 @@ function fakeAudioContext() {
     "under-attack alert dedups within the same spatial bucket",
   );
   assert(
-    audio.play("notice_generic", {
+    audio.play("notice_under_attack", {
       category: "alert",
       alertId: "under_attack",
       alertX: 2000,

@@ -7,8 +7,8 @@ use crate::config;
 use crate::game::entity::{Entity, EntityKind, Order, NEUTRAL};
 use crate::game::map::Map;
 use crate::game::services::geometry::{
-    building_rect_for_entity, circle_intersects_rect, unit_body_for_entity,
-    unit_body_intersects_rect, unit_body_overlap, CircleBody, RectBody, UnitBody,
+    building_rect_for_entity, circle_intersects_rect, segment_intersects_rect,
+    unit_body_for_entity, unit_body_overlap, CircleBody, RectBody, UnitBody,
 };
 use crate::game::services::movement::is_collision_anchored;
 use crate::game::services::occupancy::{building_footprint, Occupancy};
@@ -19,9 +19,13 @@ use crate::rules;
 /// Maximum residual overlap (world px) tolerated between two non-anchored mobile units after
 /// a tick. The iterative resolver converges to within numerical noise on flat ground; this
 /// slack also absorbs units pinned against static terrain or building body clearance where the
-/// resolver's only separating pushes are statically illegal and have to be skipped. Building-body
-/// overlap has its own zero-tolerance invariant below.
+/// resolver's only separating pushes are statically illegal and have to be skipped. Static
+/// unit-vs-building contact has its own much smaller tolerance below.
 const OVERLAP_TOLERANCE_PX: f32 = 12.0;
+/// Maximum static body penetration tolerated by invariants. Movement/standability still use the
+/// stricter geometry predicates; this only avoids failing self-play on exact tangent contact after
+/// floating-point rotation.
+const STATIC_BODY_OVERLAP_TOLERANCE_PX: f32 = 0.01;
 
 impl Game {
     /// Assert that the current world state satisfies all simulation invariants.
@@ -181,8 +185,9 @@ impl Game {
             }
             if let Some(body) = unit_body_for_entity(e) {
                 for &(building_id, building_kind, rect) in &building_rects {
+                    let overlap_depth = unit_body_rect_overlap_depth(body, rect);
                     assert!(
-                        !unit_body_intersects_rect(body, rect),
+                        overlap_depth <= STATIC_BODY_OVERLAP_TOLERANCE_PX,
                         "invariant: tick {} unit body intersects building footprint; unit={}; building=id={} kind={} {}; collision={}",
                         self.tick,
                         entity_context(&self.map, e),
@@ -347,15 +352,28 @@ impl Game {
                 if v.owner == pid || v.owner == NEUTRAL {
                     continue;
                 }
-                // Enemy entity: must be on a visible tile.
-                assert!(
-                    self.fog.is_visible_world(pid, v.x, v.y),
-                    "invariant: tick {} snapshot for player {} exposes hidden enemy entity {} at {}",
-                    self.tick,
-                    pid,
-                    v.id,
-                    location_context(&self.map, v.x, v.y)
-                );
+                let live_visible = self.fog.is_visible_world(pid, v.x, v.y);
+                // Enemy entities must either be live-visible or explicitly marked as
+                // visual-only lingering death intel.
+                if v.vision_only {
+                    assert!(
+                        !live_visible,
+                        "invariant: tick {} snapshot for player {} marks live-visible enemy entity {} as vision-only at {}",
+                        self.tick,
+                        pid,
+                        v.id,
+                        location_context(&self.map, v.x, v.y)
+                    );
+                } else {
+                    assert!(
+                        live_visible,
+                        "invariant: tick {} snapshot for player {} exposes hidden enemy entity {} at {}",
+                        self.tick,
+                        pid,
+                        v.id,
+                        location_context(&self.map, v.x, v.y)
+                    );
+                }
                 // If a target_id is exposed, the target must be visible too.
                 if let Some(tid) = v.target_id {
                     if let Some(t) = self.entities.get(tid) {
@@ -437,10 +455,25 @@ fn rect_context(map: &Map, rect: RectBody) -> String {
 fn unit_body_rect_collision_context(map: &Map, body: UnitBody, rect: RectBody) -> String {
     match body {
         UnitBody::Circle(circle) => circle_rect_collision_context(map, circle, rect),
+        UnitBody::OrientedCapsule(capsule) => {
+            let aabb = UnitBody::OrientedCapsule(capsule).aabb();
+            format!(
+                "oriented_capsule_center={} half_segment={:.2} radius={:.2} facing={:.3}rad bounding_aabb=[{:.2},{:.2}]-[{:.2},{:.2}] overlap_depth={:.4}px",
+                location_context(map, capsule.x, capsule.y),
+                capsule.half_segment,
+                capsule.radius,
+                capsule.facing,
+                aabb.min_x,
+                aabb.min_y,
+                aabb.max_x,
+                aabb.max_y,
+                unit_body_rect_overlap_depth(body, rect)
+            )
+        }
         UnitBody::OrientedBox(oriented) => {
             let aabb = UnitBody::OrientedBox(oriented).aabb();
             format!(
-                "oriented_box_center={} half_len={:.2} half_width={:.2} facing={:.3}rad bounding_aabb=[{:.2},{:.2}]-[{:.2},{:.2}]",
+                "oriented_box_center={} half_len={:.2} half_width={:.2} facing={:.3}rad bounding_aabb=[{:.2},{:.2}]-[{:.2},{:.2}] overlap_depth={:.4}px",
                 location_context(map, oriented.x, oriented.y),
                 oriented.half_len,
                 oriented.half_width,
@@ -448,10 +481,137 @@ fn unit_body_rect_collision_context(map: &Map, body: UnitBody, rect: RectBody) -
                 aabb.min_x,
                 aabb.min_y,
                 aabb.max_x,
-                aabb.max_y
+                aabb.max_y,
+                unit_body_rect_overlap_depth(body, rect)
             )
         }
     }
+}
+
+fn unit_body_rect_overlap_depth(body: UnitBody, rect: RectBody) -> f32 {
+    match body {
+        UnitBody::Circle(circle) => circle_rect_overlap_depth(circle, rect),
+        UnitBody::OrientedCapsule(capsule) => {
+            let (start, end) =
+                capsule_endpoints(capsule.x, capsule.y, capsule.half_segment, capsule.facing);
+            (capsule.radius - segment_rect_distance_sq(start, end, rect).sqrt()).max(0.0)
+        }
+        UnitBody::OrientedBox(oriented) => oriented_box_rect_overlap_depth(oriented, rect),
+    }
+}
+
+fn circle_rect_overlap_depth(circle: CircleBody, rect: RectBody) -> f32 {
+    let nearest_x = circle.x.clamp(rect.min_x, rect.max_x);
+    let nearest_y = circle.y.clamp(rect.min_y, rect.max_y);
+    let dx = circle.x - nearest_x;
+    let dy = circle.y - nearest_y;
+    (circle.radius - (dx * dx + dy * dy).sqrt()).max(0.0)
+}
+
+fn oriented_box_rect_overlap_depth(
+    body: crate::game::services::geometry::OrientedBoxBody,
+    rect: RectBody,
+) -> f32 {
+    let rect_center = (
+        (rect.min_x + rect.max_x) * 0.5,
+        (rect.min_y + rect.max_y) * 0.5,
+    );
+    let rect_half = (
+        (rect.max_x - rect.min_x) * 0.5,
+        (rect.max_y - rect.min_y) * 0.5,
+    );
+    let forward = (body.facing.cos(), body.facing.sin());
+    let side = (-forward.1, forward.0);
+    let delta = (rect_center.0 - body.x, rect_center.1 - body.y);
+    let axes = [forward, side, (1.0, 0.0), (0.0, 1.0)];
+    let mut best_depth = f32::INFINITY;
+
+    for axis in axes {
+        let center_dist = (delta.0 * axis.0 + delta.1 * axis.1).abs();
+        let body_extent =
+            body.half_len * dot_abs(axis, forward) + body.half_width * dot_abs(axis, side);
+        let rect_extent = rect_half.0 * axis.0.abs() + rect_half.1 * axis.1.abs();
+        let depth = body_extent + rect_extent - center_dist;
+        if depth <= 0.0 {
+            return 0.0;
+        }
+        best_depth = best_depth.min(depth);
+    }
+
+    best_depth
+}
+
+fn segment_rect_distance_sq(start: (f32, f32), end: (f32, f32), rect: RectBody) -> f32 {
+    if segment_intersects_rect(start, end, rect).is_some() {
+        return 0.0;
+    }
+
+    let corners = [
+        (rect.min_x, rect.min_y),
+        (rect.max_x, rect.min_y),
+        (rect.max_x, rect.max_y),
+        (rect.min_x, rect.max_y),
+    ];
+    let edges = [
+        (corners[0], corners[1]),
+        (corners[1], corners[2]),
+        (corners[2], corners[3]),
+        (corners[3], corners[0]),
+    ];
+
+    let mut best = point_rect_distance_sq(start, rect).min(point_rect_distance_sq(end, rect));
+    for &(a, b) in &edges {
+        best = best.min(segment_segment_distance_sq(start, end, a, b));
+    }
+    best
+}
+
+fn point_rect_distance_sq(point: (f32, f32), rect: RectBody) -> f32 {
+    let nearest_x = point.0.clamp(rect.min_x, rect.max_x);
+    let nearest_y = point.1.clamp(rect.min_y, rect.max_y);
+    let dx = point.0 - nearest_x;
+    let dy = point.1 - nearest_y;
+    dx * dx + dy * dy
+}
+
+fn segment_segment_distance_sq(
+    a0: (f32, f32),
+    a1: (f32, f32),
+    b0: (f32, f32),
+    b1: (f32, f32),
+) -> f32 {
+    point_segment_distance_sq(a0, b0, b1)
+        .min(point_segment_distance_sq(a1, b0, b1))
+        .min(point_segment_distance_sq(b0, a0, a1))
+        .min(point_segment_distance_sq(b1, a0, a1))
+}
+
+fn point_segment_distance_sq(point: (f32, f32), start: (f32, f32), end: (f32, f32)) -> f32 {
+    let dx = end.0 - start.0;
+    let dy = end.1 - start.1;
+    let len_sq = dx * dx + dy * dy;
+    if len_sq <= f32::EPSILON {
+        let px = point.0 - start.0;
+        let py = point.1 - start.1;
+        return px * px + py * py;
+    }
+    let t = (((point.0 - start.0) * dx + (point.1 - start.1) * dy) / len_sq).clamp(0.0, 1.0);
+    let closest = (start.0 + dx * t, start.1 + dy * t);
+    let px = point.0 - closest.0;
+    let py = point.1 - closest.1;
+    px * px + py * py
+}
+
+fn capsule_endpoints(x: f32, y: f32, half_segment: f32, facing: f32) -> ((f32, f32), (f32, f32)) {
+    let forward = (facing.cos(), facing.sin());
+    (
+        (x - forward.0 * half_segment, y - forward.1 * half_segment),
+        (x + forward.0 * half_segment, y + forward.1 * half_segment),
+    )
+}
+
+fn dot_abs(a: (f32, f32), b: (f32, f32)) -> f32 {
+    (a.0 * b.0 + a.1 * b.1).abs()
 }
 
 fn circle_rect_collision_context(map: &Map, circle: CircleBody, rect: RectBody) -> String {
@@ -504,11 +664,11 @@ fn third_label(
 mod tests {
     use std::panic::{catch_unwind, AssertUnwindSafe};
 
-    use super::location_context;
+    use super::{location_context, unit_body_rect_overlap_depth, STATIC_BODY_OVERLAP_TOLERANCE_PX};
     use crate::config;
     use crate::game::entity::EntityKind;
     use crate::game::map::Map;
-    use crate::game::services::geometry::building_rect_for_footprint;
+    use crate::game::services::geometry::{building_rect_for_footprint, unit_body_with_facing};
     use crate::game::services::occupancy::footprint_center;
     use crate::game::{Game, PlayerInit};
     use crate::protocol::{kinds, terrain};
@@ -599,6 +759,36 @@ mod tests {
         assert!(message.contains("half_len="));
         assert!(message.contains("half_width="));
         assert!(message.contains("facing="));
+    }
+
+    #[test]
+    fn unit_building_invariant_tolerates_tangent_contact_only() {
+        let rect = building_rect_for_footprint(EntityKind::Depot, 10, 10).expect("depot rect");
+        let tank_stats = config::unit_stats(EntityKind::Tank).expect("tank stats");
+        let tangent_x =
+            rect.max_x + config::TANK_BODY_LENGTH_PX * 0.5 + config::TANK_BODY_CLEARANCE_PX;
+        let tangent = unit_body_with_facing(
+            EntityKind::Tank,
+            tangent_x,
+            rect.min_y + config::TILE_SIZE as f32,
+            0.0,
+        )
+        .expect("tank body");
+        assert!(unit_body_rect_overlap_depth(tangent, rect) <= STATIC_BODY_OVERLAP_TOLERANCE_PX);
+
+        let meaningful_overlap = unit_body_with_facing(
+            EntityKind::Tank,
+            tangent_x - STATIC_BODY_OVERLAP_TOLERANCE_PX * 2.0,
+            rect.min_y + config::TILE_SIZE as f32,
+            0.0,
+        )
+        .expect("tank body");
+        assert!(
+            unit_body_rect_overlap_depth(meaningful_overlap, rect)
+                > STATIC_BODY_OVERLAP_TOLERANCE_PX,
+            "overlap should exceed invariant tolerance; tank radius is {}",
+            tank_stats.radius
+        );
     }
 
     #[test]

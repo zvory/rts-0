@@ -35,6 +35,7 @@ export const CMD = Object.freeze({
   ATTACK: "attack",
   SETUP_AT_GUNS: "setupAtGuns",
   TEAR_DOWN_AT_GUNS: "tearDownAtGuns",
+  CHARGE: "charge",
   GATHER: "gather",
   BUILD: "build",
   TRAIN: "train",
@@ -120,7 +121,7 @@ export const NOTICE_SEVERITY = Object.freeze({
 });
 
 // --- Compact snapshot wire schema (must match protocol.rs) ---
-export const COMPACT_SNAPSHOT_VERSION = 1;
+export const COMPACT_SNAPSHOT_VERSION = 2;
 
 export const KIND_CODE = Object.freeze({
   [KIND.WORKER]: 1,
@@ -177,6 +178,7 @@ const NOTICE_SEVERITY_BY_CODE = Object.freeze({
 const MAX_COMPACT_ENTITIES = 20000;
 const MAX_COMPACT_RESOURCE_DELTAS = 20000;
 const MAX_COMPACT_EVENTS = 5000;
+const MAX_COMPACT_QUEUED_MARKERS = 8;
 
 /**
  * Expand server messages into the semantic shapes the rest of the client expects.
@@ -231,7 +233,7 @@ function decodeCompactPlayerResource(record, index) {
 }
 
 function decodeCompactEntity(record, index) {
-  const fields = readArray(record, `entity ${index}`, 21);
+  const fields = readArray(record, `entity ${index}`, 23);
   if (fields.length < 8) throw new Error(`entity ${index} is too short`);
   const entity = {
     id: readU32(fields[0], "entity.id"),
@@ -257,6 +259,8 @@ function decodeCompactEntity(record, index) {
   assignRally(entity, fields, 18);
   assignOptional(entity, "oilUsed", fields, 19, readNumber);
   assignOptional(entity, "setupFacing", fields, 20, readNumber);
+  assignQueuedMarkers(entity, fields, 21);
+  assignOptional(entity, "visionOnly", fields, 22, readBool);
   return entity;
 }
 
@@ -266,6 +270,25 @@ function assignRally(target, fields, index) {
   const pair = readArray(fields[index], "entity.rally", 2);
   if (pair.length !== 2) throw new Error("entity.rally must have two elements");
   target.rally = [readNumber(pair[0], "entity.rally.x"), readNumber(pair[1], "entity.rally.y")];
+}
+
+/** Decode owner-only queued point markers into `entity.queuedMarkers`. */
+function assignQueuedMarkers(target, fields, index) {
+  if (index >= fields.length || fields[index] == null) return;
+  const markers = readArray(fields[index], "entity.queuedMarkers", MAX_COMPACT_QUEUED_MARKERS);
+  target.queuedMarkers = markers.map((record, markerIndex) => {
+    const marker = readArray(record, `entity.queuedMarkers.${markerIndex}`, 3);
+    if (marker.length !== 2 && marker.length !== 3) {
+      throw new Error(`entity.queuedMarkers.${markerIndex} field count mismatch`);
+    }
+    return {
+      x: readNumber(marker[0], `entity.queuedMarkers.${markerIndex}.x`),
+      y: readNumber(marker[1], `entity.queuedMarkers.${markerIndex}.y`),
+      attackMove: marker.length > 2
+        ? readBool(marker[2], `entity.queuedMarkers.${markerIndex}.attackMove`)
+        : false,
+    };
+  });
 }
 
 function decodeCompactResourceDelta(record, index) {
@@ -400,6 +423,11 @@ function readU32(value, name) {
   return number;
 }
 
+function readBool(value, name) {
+  if (typeof value !== "boolean") throw new Error(`${name} must be a boolean`);
+  return value;
+}
+
 function readCode(value, table, name) {
   const code = readU32(value, name);
   if (!Object.prototype.hasOwnProperty.call(table, code)) {
@@ -440,16 +468,27 @@ export const msg = Object.freeze({
 });
 
 // --- Command builders (the `cmd` payload) ---
+function withQueued(command, queued) {
+  if (queued) command.queued = true;
+  return command;
+}
+
 export const cmd = Object.freeze({
-  move: (units, x, y) => ({ c: CMD.MOVE, units, x, y }),
-  attackMove: (units, x, y) => ({ c: CMD.ATTACK_MOVE, units, x, y }),
-  attack: (units, target) => ({ c: CMD.ATTACK, units, target }),
+  move: (units, x, y, queued = false) => withQueued({ c: CMD.MOVE, units, x, y }, queued),
+  attackMove: (units, x, y, queued = false) =>
+    withQueued({ c: CMD.ATTACK_MOVE, units, x, y }, queued),
+  attack: (units, target, queued = false) =>
+    withQueued({ c: CMD.ATTACK, units, target }, queued),
   setupAtGuns: (units, x, y) => ({ c: CMD.SETUP_AT_GUNS, units, x, y }),
   tearDownAtGuns: (units) => ({ c: CMD.TEAR_DOWN_AT_GUNS, units }),
-  gather: (units, node) => ({ c: CMD.GATHER, units, node }),
-  build: (worker, building, tileX, tileY) => ({ c: CMD.BUILD, worker, building, tileX, tileY }),
+  charge: (units) => ({ c: CMD.CHARGE, units }),
+  gather: (units, node, queued = false) =>
+    withQueued({ c: CMD.GATHER, units, node }, queued),
+  build: (worker, building, tileX, tileY, queued = false) =>
+    withQueued({ c: CMD.BUILD, worker, building, tileX, tileY }, queued),
   train: (building, unit) => ({ c: CMD.TRAIN, building, unit }),
   cancel: (building) => ({ c: CMD.CANCEL, building }),
   stop: (units) => ({ c: CMD.STOP, units }),
-  setRally: (building, x, y) => ({ c: CMD.SET_RALLY, building, x, y }),
+  setRally: (building, x, y, queued = false) =>
+    withQueued({ c: CMD.SET_RALLY, building, x, y }, queued),
 });

@@ -13,6 +13,7 @@ Run and keep fixtures for:
 - two-tile lanes;
 - diagonal pinches;
 - wall-parallel movement;
+- side-by-side building adjacency followed by a turn-away command;
 - near-goal reverse;
 - far-behind retarget;
 - mixed army movement;
@@ -51,6 +52,8 @@ Update:
 - Scout cars do not clip terrain or building occupancy in invariant checks.
 - Scout cars traverse intended tight spaces without repeated reverse-recovery loops.
 - Scout cars avoid wall-hugging in open alternatives.
+- Scout cars legally side-by-side with buildings can turn away without the old rectangular
+  rear-corner clipping behavior and without accepting any swept capsule overlap.
 - Scout cars preserve their identity: fast, light, wheeled, no tank pivot, no sideways infantry
   sliding.
 

@@ -1,5 +1,5 @@
 use super::*;
-use crate::game::entity::{BuildPhase, EntityKind, EntityStore, Order, WeaponSetup};
+use crate::game::entity::{BuildPhase, EntityKind, EntityStore, MovePhase, Order, WeaponSetup};
 use crate::game::fog::Fog;
 use crate::game::services::move_coordinator::MoveCoordinator;
 use crate::game::services::movement::movement_system;
@@ -138,6 +138,7 @@ fn apply_test_damage(
         vx,
         vy,
         range_px,
+        0.0,
         10,
     );
 }
@@ -152,6 +153,7 @@ fn idle_army_units_auto_acquire_targets() {
     let attacker = entities.get(self_id).expect("attacker should exist");
 
     let target = resolve_target(
+        &map,
         &entities,
         &spatial,
         &los,
@@ -178,6 +180,7 @@ fn move_orders_ignore_nearby_enemies() {
     attacker.set_order(Order::move_to(300.0, 300.0));
 
     let target = resolve_target(
+        &map,
         &entities,
         &spatial,
         &los,
@@ -204,6 +207,7 @@ fn attack_move_keeps_auto_acquisition() {
     attacker.set_order(Order::attack_move_to(300.0, 300.0));
 
     let target = resolve_target(
+        &map,
         &entities,
         &spatial,
         &los,
@@ -241,6 +245,7 @@ fn stone_blocks_attack_move_auto_acquisition() {
     let attacker = entities.get(self_id).expect("attacker should exist");
 
     let target = resolve_target(
+        &map,
         &entities,
         &spatial,
         &los,
@@ -377,6 +382,31 @@ fn attack_move_resumes_original_destination_after_target_is_gone() {
 }
 
 #[test]
+fn attack_move_resumes_after_firing_cleared_path_before_arrival() {
+    let mut entities = EntityStore::new();
+    let attacker_id = entities
+        .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
+        .expect("attacker should spawn");
+    if let Some(attacker) = entities.get_mut(attacker_id) {
+        attacker.set_order(Order::attack_move_to(300.0, 100.0));
+        attacker.set_path_goal(Some((300.0, 100.0)));
+        attacker.set_path(Vec::new());
+        attacker.mark_move_phase(MovePhase::Moving);
+    }
+
+    let map = open_map(16);
+    run_combat_tick_on_map(&mut entities, &[player_state(1, false)], &map);
+
+    let attacker = entities.get(attacker_id).expect("attacker should exist");
+    assert_eq!(attacker.path_goal(), Some((300.0, 100.0)));
+    assert_eq!(attacker.move_phase(), Some(MovePhase::Moving));
+    assert!(
+        !attacker.path_is_empty(),
+        "attack-move should resume toward its original destination after firing cleared its path"
+    );
+}
+
+#[test]
 fn tank_keeps_moving_path_while_firing() {
     let mut entities = EntityStore::new();
     let tank_id = entities
@@ -486,6 +516,7 @@ fn shoot_while_moving_units_keep_existing_valid_target() {
             .expect("attacker should still exist");
 
         let target = resolve_target(
+            &map,
             &entities,
             &spatial,
             &los,
@@ -536,6 +567,7 @@ fn shoot_while_moving_units_reacquire_when_existing_target_is_dead() {
             .expect("attacker should still exist");
 
         let target = resolve_target(
+            &map,
             &entities,
             &spatial,
             &los,
@@ -630,7 +662,7 @@ fn tank_chase_refreshes_stale_standoff_goal() {
 }
 
 #[test]
-fn non_tank_attack_move_still_holds_position_while_firing() {
+fn rifleman_attack_move_without_charge_holds_position_while_firing() {
     let mut entities = EntityStore::new();
     let rifleman_id = entities
         .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
@@ -650,7 +682,90 @@ fn non_tank_attack_move_still_holds_position_while_firing() {
     assert_eq!(rifleman.target_id(), Some(enemy_id));
     assert!(
         rifleman.path_is_empty(),
-        "non-tank units should still stop while firing"
+        "non-charged riflemen should still stop while firing"
+    );
+}
+
+#[test]
+fn charged_rifleman_move_order_keeps_path_while_firing() {
+    let mut entities = EntityStore::new();
+    let rifleman_id = entities
+        .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
+        .expect("rifleman should spawn");
+    let enemy_id = entities
+        .spawn_unit(2, EntityKind::Rifleman, 120.0, 100.0)
+        .expect("enemy should spawn");
+    if let Some(rifleman) = entities.get_mut(rifleman_id) {
+        rifleman.set_order(Order::move_to(300.0, 100.0));
+        rifleman.set_path(vec![(300.0, 100.0)]);
+        rifleman.set_path_goal(Some((300.0, 100.0)));
+        rifleman.start_charge(config::RIFLEMAN_CHARGE_TICKS);
+    }
+
+    run_combat_tick(&mut entities);
+
+    let rifleman = entities.get(rifleman_id).expect("rifleman should exist");
+    assert_eq!(rifleman.target_id(), Some(enemy_id));
+    assert!(
+        !rifleman.path_is_empty(),
+        "charged riflemen should keep their movement path while firing"
+    );
+}
+
+#[test]
+fn charging_rifleman_miss_still_emits_attack_event() {
+    let mut entities = EntityStore::new();
+    let rifleman_id = entities
+        .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
+        .expect("rifleman should spawn");
+    let enemy_id = entities
+        .spawn_unit(2, EntityKind::Rifleman, 120.0, 100.0)
+        .expect("enemy should spawn");
+    if let Some(rifleman) = entities.get_mut(rifleman_id) {
+        rifleman.set_order(Order::move_to(300.0, 100.0));
+        rifleman.set_path(vec![(300.0, 100.0)]);
+        rifleman.set_path_goal(Some((300.0, 100.0)));
+        rifleman.start_charge(config::RIFLEMAN_CHARGE_TICKS);
+    }
+    let enemy_hp = entities.get(enemy_id).expect("enemy should exist").hp;
+
+    let events = run_combat_tick(&mut entities);
+
+    assert_eq!(
+        entities.get(enemy_id).expect("enemy should exist").hp,
+        enemy_hp,
+        "seeded charge shot should miss"
+    );
+    assert!(
+        events
+            .get(&1)
+            .expect("attacker owner events should exist")
+            .iter()
+            .any(|event| matches!(event, Event::Attack { from, to, .. } if *from == rifleman_id && *to == enemy_id)),
+        "missed charge shots should still emit attack feedback"
+    );
+}
+
+#[test]
+fn stationary_charged_rifleman_does_not_take_miss_penalty() {
+    let mut entities = EntityStore::new();
+    let rifleman_id = entities
+        .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
+        .expect("rifleman should spawn");
+    let enemy_id = entities
+        .spawn_unit(2, EntityKind::Rifleman, 120.0, 100.0)
+        .expect("enemy should spawn");
+    if let Some(rifleman) = entities.get_mut(rifleman_id) {
+        rifleman.start_charge(config::RIFLEMAN_CHARGE_TICKS);
+    }
+    let enemy_hp = entities.get(enemy_id).expect("enemy should exist").hp;
+
+    run_combat_tick(&mut entities);
+
+    assert_eq!(
+        entities.get(enemy_id).expect("enemy should exist").hp,
+        enemy_hp.saturating_sub(5),
+        "stationary charged riflemen should fire with normal accuracy"
     );
 }
 
@@ -670,6 +785,7 @@ fn idle_workers_do_not_auto_acquire_targets() {
     let worker = entities.get(worker_id).expect("worker should exist");
 
     let target = resolve_target(
+        &map,
         &entities,
         &spatial,
         &los,
@@ -1592,4 +1708,190 @@ fn building_between_attacker_and_target_blocks_the_shot() {
         entities.get(blocker).expect("blocker should exist").hp < blocker_hp_before,
         "blocking building should take the shot damage"
     );
+}
+
+#[test]
+fn friendly_building_between_attacker_and_target_prevents_firing() {
+    let mut entities = EntityStore::new();
+    let attacker = entities
+        .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
+        .expect("attacker should spawn");
+    let blocker = entities
+        .spawn_building(1, EntityKind::Depot, 160.0, 100.0, true)
+        .expect("friendly blocker should spawn");
+    let intended = entities
+        .spawn_unit(2, EntityKind::Worker, 230.0, 100.0)
+        .expect("intended target should spawn");
+    entities
+        .get_mut(attacker)
+        .expect("attacker should exist")
+        .set_order(Order::attack(intended));
+    let blocker_hp_before = entities.get(blocker).expect("blocker should exist").hp;
+    let intended_hp_before = entities.get(intended).expect("intended should exist").hp;
+    let map = open_map(12);
+
+    let events = run_combat_tick_on_map(
+        &mut entities,
+        &[player_state(1, false), player_state(2, false)],
+        &map,
+    );
+
+    let attacker_entity = entities.get(attacker).expect("attacker should exist");
+    assert_eq!(attacker_entity.target_id(), Some(intended));
+    assert_eq!(
+        attacker_entity.attack_cd(),
+        0,
+        "blocked shots must not reset cooldown"
+    );
+    assert_eq!(
+        entities.get(blocker).expect("blocker should exist").hp,
+        blocker_hp_before,
+        "friendly buildings must not take blocked-shot damage"
+    );
+    assert_eq!(
+        entities.get(intended).expect("intended should exist").hp,
+        intended_hp_before,
+        "targets behind friendly buildings should not be damaged"
+    );
+    assert!(
+        events
+            .values()
+            .flatten()
+            .all(|event| !matches!(event, Event::Attack { .. })),
+        "blocked friendly-cover shots should not emit attack events"
+    );
+}
+
+#[test]
+fn friendly_tank_between_attacker_and_target_prevents_firing() {
+    let mut entities = EntityStore::new();
+    let attacker = entities
+        .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
+        .expect("attacker should spawn");
+    let blocker = entities
+        .spawn_unit(1, EntityKind::Tank, 140.0, 100.0)
+        .expect("friendly blocker should spawn");
+    let intended = entities
+        .spawn_unit(2, EntityKind::Worker, 190.0, 100.0)
+        .expect("intended target should spawn");
+    if let Some(attacker_entity) = entities.get_mut(attacker) {
+        attacker_entity.set_order(Order::attack(intended));
+    }
+    if let Some(blocker_entity) = entities.get_mut(blocker) {
+        blocker_entity.set_attack_cd(99);
+    }
+    let blocker_hp_before = entities.get(blocker).expect("blocker should exist").hp;
+    let intended_hp_before = entities.get(intended).expect("intended should exist").hp;
+    let map = open_map(12);
+
+    let events = run_combat_tick_on_map(
+        &mut entities,
+        &[player_state(1, false), player_state(2, false)],
+        &map,
+    );
+
+    let attacker_entity = entities.get(attacker).expect("attacker should exist");
+    assert_eq!(attacker_entity.target_id(), Some(intended));
+    assert_eq!(
+        attacker_entity.attack_cd(),
+        0,
+        "blocked shots must not reset cooldown"
+    );
+    assert_eq!(
+        entities.get(blocker).expect("blocker should exist").hp,
+        blocker_hp_before,
+        "friendly tanks must not take blocked-shot damage"
+    );
+    assert_eq!(
+        entities.get(intended).expect("intended should exist").hp,
+        intended_hp_before,
+        "targets behind friendly tanks should not be damaged"
+    );
+    assert!(
+        events
+            .values()
+            .flatten()
+            .all(|event| !matches!(event, Event::Attack { from, .. } if *from == attacker)),
+        "the blocked attacker should not emit attack events"
+    );
+}
+
+#[test]
+fn friendly_non_tank_units_do_not_block_firing() {
+    let mut entities = EntityStore::new();
+    let attacker = entities
+        .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
+        .expect("attacker should spawn");
+    let blocker = entities
+        .spawn_unit(1, EntityKind::Worker, 140.0, 100.0)
+        .expect("friendly worker should spawn");
+    let intended = entities
+        .spawn_unit(2, EntityKind::Worker, 190.0, 100.0)
+        .expect("intended target should spawn");
+    entities
+        .get_mut(attacker)
+        .expect("attacker should exist")
+        .set_order(Order::attack(intended));
+    let blocker_hp_before = entities.get(blocker).expect("blocker should exist").hp;
+    let intended_hp_before = entities.get(intended).expect("intended should exist").hp;
+    let map = open_map(12);
+
+    run_combat_tick_on_map(
+        &mut entities,
+        &[player_state(1, false), player_state(2, false)],
+        &map,
+    );
+
+    assert_eq!(
+        entities.get(blocker).expect("blocker should exist").hp,
+        blocker_hp_before,
+        "friendly soft units must not take damage"
+    );
+    assert!(
+        entities.get(intended).expect("intended should exist").hp < intended_hp_before,
+        "friendly soft units should not block the shot"
+    );
+}
+
+#[test]
+fn attack_move_prefers_clear_target_over_target_behind_friendly_tank() {
+    let mut entities = EntityStore::new();
+    let attacker = entities
+        .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
+        .expect("attacker should spawn");
+    entities
+        .spawn_unit(1, EntityKind::Tank, 135.0, 100.0)
+        .expect("friendly blocker should spawn");
+    let blocked_target = entities
+        .spawn_unit(2, EntityKind::Worker, 170.0, 100.0)
+        .expect("blocked target should spawn");
+    let clear_target = entities
+        .spawn_unit(2, EntityKind::Worker, 100.0, 180.0)
+        .expect("clear target should spawn");
+    entities
+        .get_mut(attacker)
+        .expect("attacker should exist")
+        .set_order(Order::attack_move_to(220.0, 100.0));
+    let map = open_map(12);
+    let los = LineOfSight::new(&map);
+    let spatial = SpatialIndex::build(&entities, map.size);
+    let fog = visible_fog(&map, &entities);
+    let attacker_entity = entities.get(attacker).expect("attacker should exist");
+
+    let target = resolve_target(
+        &map,
+        &entities,
+        &spatial,
+        &los,
+        &fog,
+        attacker,
+        attacker_entity.owner,
+        attacker_entity.pos_x,
+        attacker_entity.pos_y,
+        128.0,
+        combat_mode(attacker_entity),
+    );
+
+    assert_eq!(target, Some(clear_target));
+    assert_ne!(target, Some(blocked_target));
 }

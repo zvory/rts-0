@@ -3,7 +3,7 @@ import { MINING_CC_RANGE_TILES, STATS, TANK_BODY, isProducerBuilding } from "../
 import { DEFAULT_HIT_RADIUS, DEFAULT_TILE_SIZE, HIT_PAD_PX, OWN_HIT_BONUS, ZOOM_STEP } from "./constants.js";
 import { commandHotkeyFromEvent } from "./placement.js";
 
-export function _onRightClick(p) {
+export function _onRightClick(p, ev = {}) {
   // During placement, right-click cancels.
   if (this.state.placement) {
     this.state.endPlacement();
@@ -58,11 +58,11 @@ export function _onRightClick(p) {
     // Selection has no workers: fall through to a move onto the node's position.
   }
   // Default -> move to the world point.
-  this.net.command(cmd.move(ownUnits, world.x, world.y));
-  this.state.addCommandFeedback("move", world.x, world.y);
+  this.net.command(cmd.move(ownUnits, world.x, world.y, !!ev.shiftKey));
+  this.state.addCommandFeedback("move", world.x, world.y, !!ev.shiftKey);
 }
 
-export function _issueTargetedCommand(p) {
+export function _issueTargetedCommand(p, ev = {}) {
   const ownUnits = this._selectedOwnUnitIds();
   if (ownUnits.length === 0) return;
   const world = this._worldAt(p.x, p.y);
@@ -75,8 +75,8 @@ export function _issueTargetedCommand(p) {
     return;
   }
   if (this.state.commandTarget === "move") {
-    this.net.command(cmd.move(ownUnits, world.x, world.y));
-    this.state.addCommandFeedback("move", world.x, world.y);
+    this.net.command(cmd.move(ownUnits, world.x, world.y, !!ev.shiftKey));
+    this.state.addCommandFeedback("move", world.x, world.y, !!ev.shiftKey);
     return;
   }
 
@@ -88,8 +88,8 @@ export function _issueTargetedCommand(p) {
     return;
   }
 
-  this.net.command(cmd.attackMove(ownUnits, world.x, world.y));
-  this.state.addCommandFeedback("attack", world.x, world.y);
+  this.net.command(cmd.attackMove(ownUnits, world.x, world.y, !!ev.shiftKey));
+  this.state.addCommandFeedback("attack", world.x, world.y, !!ev.shiftKey);
 }
 
 export function _selectedOwnUnitIds() {
@@ -218,6 +218,9 @@ export function _issueStop() {
 }
 
 export function _cancel() {
+  if (typeof this.state.closeCommandCardMenu === "function" && this.state.closeCommandCardMenu()) {
+    return;
+  }
   if (this.state.placement) {
     this.state.endPlacement();
     return;
