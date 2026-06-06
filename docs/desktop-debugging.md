@@ -43,8 +43,9 @@ localStorage.setItem("rts.debug", "1");
 location.reload();
 ```
 
-The client then writes `[rts-debug]` console rows and keeps the latest entries in
-`window.__rtsDebug.marks`.
+The client then writes `[rts-debug]` console rows and keeps the latest lifecycle entries in
+`window.__rtsDebug.marks`. High-volume heartbeat and snapshot traffic is counted in
+`window.__rtsDebug.counts` instead of being appended to the timeline.
 
 Useful rows for lobby-to-match problems:
 
@@ -55,14 +56,23 @@ Useful rows for lobby-to-match problems:
   phases. Large durations here mean the WebView main thread is busy after the server already
   answered.
 
-Quick summary snippet:
+Quick summary:
 
 ```js
-console.table(__rtsDebug.marks.map((m) => ({
-  at: m.at.toFixed(1),
-  label: m.label,
-  detail: JSON.stringify(m.detail || {}),
-})));
+__rtsDebug.summary();
+```
+
+Filter the timeline:
+
+```js
+__rtsDebug.table(/start|match\./);
+```
+
+Inspect high-volume counters:
+
+```js
+__rtsDebug.counts;
+__rtsDebug.last["server.recv.snapshot"];
 ```
 
 ## Triage Pattern

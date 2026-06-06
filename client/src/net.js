@@ -212,7 +212,9 @@ export class Net {
   _send(obj) {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return false;
     const json = JSON.stringify(obj);
-    this.diagnostics?.mark(`client.send.${obj?.t || "unknown"}`, { bytes: json.length });
+    const label = `client.send.${obj?.t || "unknown"}`;
+    if (obj?.t === "ping") this.diagnostics?.count(label, { bytes: json.length });
+    else this.diagnostics?.mark(label, { bytes: json.length });
     this.ws.send(json);
     return true;
   }
@@ -231,9 +233,10 @@ export class Net {
       return;
     }
     if (!m || typeof m.t !== "string") return;
-    this.diagnostics?.mark(`server.recv.${m.t}`, {
-      bytes: typeof ev.data === "string" ? ev.data.length : undefined,
-    });
+    const detail = { bytes: typeof ev.data === "string" ? ev.data.length : undefined };
+    const label = `server.recv.${m.t}`;
+    if (m.t === S.SNAPSHOT || m.t === S.PONG) this.diagnostics?.count(label, detail);
+    else this.diagnostics?.mark(label, detail);
 
     switch (m.t) {
       case S.WELCOME:

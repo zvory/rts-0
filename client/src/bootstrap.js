@@ -27,19 +27,33 @@ function summarizeDetail(detail) {
 export const diagnostics = {
   enabled: diagnosticsEnabled(),
   marks: [],
+  counts: {},
+  last: {},
 
-  mark(label, detail) {
+  mark(label, detail, options = {}) {
     if (!this.enabled) return;
+    const shouldStore = options.store !== false;
+    const shouldLog = options.log !== false;
     const at = performance.now();
     const entry = { at, label, detail: summarizeDetail(detail) };
-    this.marks.push(entry);
-    if (this.marks.length > 500) this.marks.splice(0, this.marks.length - 500);
-    try {
-      performance.mark(`rts:${label}`);
-    } catch {
-      // Some WebViews reject dynamic mark names; console output still has the data.
+    if (shouldStore) {
+      this.marks.push(entry);
+      if (this.marks.length > 500) this.marks.splice(0, this.marks.length - 500);
+      try {
+        performance.mark(`rts:${label}`);
+      } catch {
+        // Some WebViews reject dynamic mark names; console output still has the data.
+      }
     }
-    console.debug(`[rts-debug] ${at.toFixed(1)} ${label}`, entry.detail || "");
+    this.last[label] = entry;
+    if (shouldLog) console.debug(`[rts-debug] ${at.toFixed(1)} ${label}`, entry.detail || "");
+    return entry;
+  },
+
+  count(label, detail) {
+    if (!this.enabled) return;
+    this.counts[label] = (this.counts[label] || 0) + 1;
+    return this.mark(label, detail, { store: false, log: false });
   },
 
   time(label, detail, fn) {
@@ -52,6 +66,34 @@ export const diagnostics = {
       const durationMs = performance.now() - start;
       this.mark(`${label}:end`, { ...detail, durationMs: Number(durationMs.toFixed(1)) });
     }
+  },
+
+  events(filter) {
+    if (!filter) return this.marks.slice();
+    if (typeof filter === "function") return this.marks.filter(filter);
+    const pattern = filter instanceof RegExp ? filter : new RegExp(String(filter));
+    return this.marks.filter((m) => pattern.test(m.label));
+  },
+
+  rows(filter) {
+    return this.events(filter).map((m) => ({
+      at: Number(m.at.toFixed(1)),
+      label: m.label,
+      detail: JSON.stringify(m.detail || {}),
+    }));
+  },
+
+  table(filter) {
+    const rows = this.rows(filter);
+    console.table(rows);
+    return rows;
+  },
+
+  summary() {
+    const rows = this.rows((m) => !m.label.startsWith("server.recv.snapshot"));
+    console.table(rows);
+    console.table(Object.entries(this.counts).map(([label, count]) => ({ label, count })));
+    return { marks: rows, counts: { ...this.counts }, last: { ...this.last } };
   },
 };
 
