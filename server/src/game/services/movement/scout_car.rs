@@ -12,7 +12,7 @@ use crate::game::services::standability as static_standability;
 
 use super::tank_drive::{
     angle_delta, distance_between, normalize_angle, vehicle_traffic_adjustment,
-    TANK_REVERSE_GOAL_DISTANCE_PX,
+    TANK_BODY_LOOKAHEAD_PX, TANK_REVERSE_GOAL_DISTANCE_PX,
 };
 use super::{ARRIVE_EPS, MAX_UNIT_BOUNDING_RADIUS_PX, STEERING_MAX_NEIGHBORS};
 
@@ -85,7 +85,7 @@ pub(super) fn plan_scout_car_motion(
             pop_waypoints: 1,
         });
     }
-    let route = scout_car_route_context(map, occ, e, current)?;
+    let route = vehicle_route_context(map, occ, e, current)?;
     if route.pre_pop_count >= e.movement.as_ref()?.path.len() {
         return Some(ScoutCarMotionPlan {
             pos: current,
@@ -171,7 +171,7 @@ pub(super) fn scout_car_final_goal_tolerance() -> f32 {
     config::SCOUT_CAR_FINAL_GOAL_TOLERANCE_PX
 }
 
-pub(super) fn scout_car_accepts_waypoint(
+pub(super) fn vehicle_accepts_waypoint(
     map: &Map,
     occ: &Occupancy,
     e: &Entity,
@@ -243,7 +243,17 @@ pub(super) fn scout_car_desired_path_point(
     x: f32,
     y: f32,
 ) -> Option<(f32, f32)> {
-    scout_car_route_context(map, occ, e, (x, y)).map(|route| route.lookahead)
+    vehicle_route_context(map, occ, e, (x, y)).map(|route| route.lookahead)
+}
+
+pub(super) fn vehicle_desired_path_point(
+    map: &Map,
+    occ: &Occupancy,
+    e: &Entity,
+    x: f32,
+    y: f32,
+) -> Option<(f32, f32)> {
+    vehicle_route_context(map, occ, e, (x, y)).map(|route| route.lookahead)
 }
 
 pub(super) fn along_track_error(delta: (f32, f32), segment_dir: (f32, f32)) -> f32 {
@@ -254,7 +264,7 @@ pub(super) fn lateral_error(delta: (f32, f32), segment_dir: (f32, f32)) -> f32 {
     (delta.0 * segment_dir.1 - delta.1 * segment_dir.0).abs()
 }
 
-fn scout_car_route_context(
+fn vehicle_route_context(
     map: &Map,
     occ: &Occupancy,
     e: &Entity,
@@ -266,7 +276,7 @@ fn scout_car_route_context(
     while next_index > 0 {
         let waypoint = path[next_index];
         let next_waypoint = path[next_index - 1];
-        if !scout_car_accepts_waypoint(map, occ, e, current, waypoint, Some(next_waypoint)) {
+        if !vehicle_accepts_waypoint(map, occ, e, current, waypoint, Some(next_waypoint)) {
             break;
         }
         next_index -= 1;
@@ -282,7 +292,7 @@ fn scout_car_route_context(
         if !static_standability::unit_static_segment_standable(map, occ, e.kind, current, target) {
             target
         } else {
-            point_at_distance(current, target, SCOUT_CAR_ROUTE_LOOKAHEAD_PX).unwrap_or(target)
+            point_at_distance(current, target, vehicle_route_lookahead_px(e.kind)).unwrap_or(target)
         };
     let route_dir = unit_direction(current, lookahead)
         .or_else(|| unit_direction(current, target))
@@ -294,8 +304,19 @@ fn scout_car_route_context(
         lookahead,
         route_dir,
         final_goal,
-        reverse_waypoint: scout_car_reverse_waypoint(e, current.0, current.1),
+        reverse_waypoint: if e.kind == EntityKind::ScoutCar {
+            scout_car_reverse_waypoint(e, current.0, current.1)
+        } else {
+            None
+        },
     })
+}
+
+fn vehicle_route_lookahead_px(kind: EntityKind) -> f32 {
+    match kind {
+        EntityKind::Tank | EntityKind::AtTeam => TANK_BODY_LOOKAHEAD_PX,
+        _ => SCOUT_CAR_ROUTE_LOOKAHEAD_PX,
+    }
 }
 
 fn scout_car_primitives(reverse_only: bool) -> Vec<Primitive> {
@@ -665,7 +686,7 @@ fn scout_car_post_motion_waypoint_pops(
     while idx > 0 {
         let waypoint = path[idx];
         let next_waypoint = path[idx - 1];
-        if !scout_car_accepts_waypoint(map, occ, e, pos, waypoint, Some(next_waypoint)) {
+        if !vehicle_accepts_waypoint(map, occ, e, pos, waypoint, Some(next_waypoint)) {
             break;
         }
         pops += 1;

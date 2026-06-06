@@ -926,13 +926,14 @@ The server treats every client as potentially hostile. Limits live next to the c
   movement paths; badly misaligned tanks pivot in place instead of sliding sideways at full speed.
   The current locomotion model is stateless per tick: it does not store velocity or acceleration,
   but it does brake by scaling the tick movement budget for hull misalignment, frontal traffic, and
-  oil starvation. Tank hull movement intent uses a 5-tile route lookahead, but the desired facing
-  point is bounded to the current statically legal route segment unless a farther waypoint is also
-  reachable by `standability::unit_static_segment_standable` from the tank's current position;
-  local steering and collision displacement do not become hull intent. Static terrain/building
-  legality uses the oriented `50.4px` by `28.8px` hull plus `1.5px` clearance rather than the
-  conservative circular radius, so a lengthwise tank still fits through a 2-tile-wide straight
-  corridor while front/rear and side clearance near blockers match the hull shape.
+  oil starvation. Tank hull movement intent uses the shared oriented-vehicle route lookahead:
+  intermediate waypoints can be skipped only when the vehicle's swept static body can legally reach
+  the next route segment from the current position. Tanks use a 5-tile lookahead on that legal
+  route segment; local steering and collision displacement do not become hull intent. Static
+  terrain/building legality uses the oriented `50.4px` by `28.8px` hull plus `1.5px` clearance
+  rather than the conservative circular radius, so a lengthwise tank still fits through a
+  2-tile-wide straight corridor while front/rear and side clearance near blockers match the hull
+  shape.
   A tank reverses toward a nearby goal within 3 tiles when that goal is more than 90 degrees behind
   the hull; farther behind goals make it pivot first. Alignment error at or below `0.55` radians
   keeps full drive speed, error at or above `1.25` radians pivots with no translation, and values
@@ -965,19 +966,22 @@ The server treats every client as potentially hostile. Limits live next to the c
   bounded maneuver latched to the immediate waypoint: nearby final waypoints and injected recovery
   waypoints can be reached by backing up, but route lookahead alone cannot put the car into reverse.
   Farther behind goals make the scout car drive through a broad forward turn instead of
-  backtracking. Scout-car movement orders use a dedicated clearance-aware route shape: coarse A*
-  still works on tiles, but scout cars add static-clearance, turn, adjacent-blocker, and corner-graze
-  costs so open alternatives are preferred before local movement gets close to walls. The clearance
+  backtracking. Scout cars, tanks, and AT teams use the same clearance-aware player-move route
+  shape: coarse A* still works on tiles, but vehicles add static-clearance, turn,
+  adjacent-blocker, and corner-graze costs so open alternatives are preferred before local movement
+  gets close to walls. The clearance
   cost is finite, so intended narrow passages remain traversable; exact interaction paths such as
-  chase, gather, and build staging keep tile-guided `Normal` routing. Scout cars follow the route
-  corridor rather than exact intermediate
-  waypoint centers: an intermediate waypoint is consumed inside
+  chase, gather, and build staging keep tile-guided `Normal` routing. Oriented vehicles follow the
+  route corridor rather than exact intermediate waypoint centers: an intermediate waypoint is
+  consumed inside
   `SCOUT_CAR_WAYPOINT_ACCEPTANCE_RADIUS_PX` (0.75 tiles), after the car has passed the waypoint
-  along the next route segment, or when the next route segment is statically reachable from the
-  car's current legal body position. Scout-car drive intent uses a 3-tile lookahead on the current
-  statically legal route segment, so a car that comes alongside the route can continue to a drivable
-  point ahead instead of oscillating around a point it cannot laterally reach; the lookahead never
-  skips through terrain or building occupancy that fails oriented-body segment legality. A final
+  along the next route segment, or when the next route segment is statically reachable by the
+  vehicle's swept oriented body from its current legal body position. Scout-car drive intent uses a
+  3-tile lookahead on the current statically legal route segment, so a car that comes alongside the
+  route can continue to a drivable point ahead instead of oscillating around a point it cannot
+  laterally reach; tanks and AT teams use a 5-tile lookahead with tank-style pivot locomotion. The
+  lookahead never skips through terrain or building occupancy that fails oriented-body segment
+  legality. A final
   move waypoint can settle inside `SCOUT_CAR_FINAL_GOAL_TOLERANCE_PX` (0.375 tiles) only when the
   remaining error is small and mostly lateral to the car's feasible travel direction; ordinary exact
   arrival still snaps to the ordered point when the car can actually reach it. Scout-car movement
@@ -1035,7 +1039,7 @@ The server treats every client as potentially hostile. Limits live next to the c
   the normal per-tick A* budget. This covers buildings constructed after a long path was assigned
   without periodically repathing every moving unit.
 - **Vehicle clearance pathing**: player-issued scout-car, tank, and AT-team `Move` / `AttackMove`
-  path requests use the scout-car clearance-aware tile A* route shape. The route shape adds finite
+  path requests use the shared clearance-aware tile A* route shape. The route shape adds finite
   static-clearance, turn, adjacent-blocker, and corner-graze costs so open alternatives are
   preferred before local movement gets close to walls. Path cache keys include the route-shaping
   mode so clearance-shaped movement paths do not share cached routes with normal interaction
@@ -1046,9 +1050,9 @@ The server treats every client as potentially hostile. Limits live next to the c
   combat, mining, construction range checks, and infantry/worker traffic stay controlled by their
   existing logic.
 - **Vehicle diagonal-pinch avoidance**: A* passability for oriented-vehicle bodies (tanks, scout
-  cars) rejects tiles wedged between two diagonally-opposite blocked corners — i.e. (NW blocked AND
-  SE blocked) OR (NE blocked AND SW blocked). The rotating hull cannot legally thread such 1-tile
-  gaps at any intermediate heading, so routing through them used to deadlock at the
+  cars, AT teams) rejects tiles wedged between two diagonally-opposite blocked corners — i.e. (NW
+  blocked AND SE blocked) OR (NE blocked AND SW blocked). The rotating hull cannot legally thread
+  such 1-tile gaps at any intermediate heading, so routing through them used to deadlock at the
   static-blocked-repath threshold. Infantry pathing is unaffected; legitimate 2-tile-wide corridors
   always leave at least one diagonal of each pair open and remain traversable.
 - **Formation goal legality**: group move goals keep the existing distance-sensitive formation
