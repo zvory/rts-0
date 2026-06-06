@@ -2933,7 +2933,7 @@ fn set_path_direct(entities: &mut EntityStore, id: u32, waypoints: Vec<(f32, f32
 }
 
 #[test]
-fn rifleman_charge_boosts_movement_for_hard_coded_duration() {
+fn rifleman_charge_doubles_movement_for_hard_coded_duration() {
     let map = flat_map(1);
     let mut entities = EntityStore::new();
     let (sx, sy) = map.tile_center(20, 20);
@@ -2959,7 +2959,7 @@ fn rifleman_charge_boosts_movement_for_hard_coded_duration() {
     let charged_step = moved_distance(before, pos(&entities, rifleman));
     assert!(
         (charged_step - base_speed * config::RIFLEMAN_CHARGE_SPEED_MULTIPLIER).abs() < 0.01,
-        "charged rifleman should move at the configured charge speed, moved {charged_step:.3}px"
+        "charged rifleman should move at 2x speed, moved {charged_step:.3}px"
     );
     assert_eq!(
         entities.get(rifleman).unwrap().charge_ticks(),
