@@ -126,6 +126,24 @@ impl SelfPlayRunner {
             }
             let alive = self.game.alive_players();
             if alive.len() < self.player_specs.len() {
+                // Game flips alive_players() the tick the last building dies; the snapshot
+                // we just observed may still show owned buildings, so PlayerMilestones
+                // hasn't set `eliminated` yet. Backfill it here so goals that opt into
+                // `.allowing_elimination_before_milestones()` can accept the outcome.
+                for spec in &self.player_specs {
+                    if !alive.contains(&spec.id) {
+                        if let Some(player) = self.milestones.players.get_mut(&spec.id) {
+                            player.eliminated = true;
+                        }
+                    }
+                }
+                if self.milestones.complete() {
+                    return Ok(SelfPlayReport {
+                        ticks: tick,
+                        commands: self.commands.len(),
+                        replay_commands: self.replay_commands_len,
+                    });
+                }
                 return Err(SelfPlayFailure::new(format!(
                     "self-play ended by elimination before all milestones: alive={alive:?}; missing={}",
                     self.milestones.missing_summary()

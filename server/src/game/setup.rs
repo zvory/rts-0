@@ -363,7 +363,9 @@ fn carve_vertical_corridor(map: &mut Map, center_x: u32, min_y: u32, max_y: u32)
     carve_rect_tiles(map, center_x - 1, min_y, center_x + 1, max_y);
 }
 
-fn scout_car_snaking_corridor_map() -> (Map, (u32, u32), (f32, f32), (f32, f32)) {
+type ScoutCarCorridorLayout = (Map, (u32, u32), (f32, f32), (f32, f32));
+
+fn scout_car_snaking_corridor_map() -> ScoutCarCorridorLayout {
     let mut map = flat_dev_map(1);
     let stone_min_y = 15u32;
     let stone_max_y = 75u32;
