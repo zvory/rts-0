@@ -80,6 +80,8 @@ export class GameState {
     // --- selection (client-only) ---
     /** @type {Set<number>} */
     this.selection = new Set();
+    /** @type {boolean} true for dev viewers that should show all server debug paths. */
+    this.showAllDebugPathOverlays = false;
     /** @type {Array<Array<number>>} ten local control groups, slot 9 is key 0. */
     this.controlGroups = Array.from({ length: 10 }, () => []);
 

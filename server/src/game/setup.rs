@@ -166,7 +166,7 @@ impl Game {
             seed,
             starting_steel: 0,
             starting_oil: 0,
-            debug_path_overlays: false,
+            debug_path_overlays: true,
             rng,
         };
         let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();

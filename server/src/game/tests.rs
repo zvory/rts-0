@@ -475,6 +475,35 @@ fn lobby_debug_mode_snapshot_shows_runtime_movement_debug_path() {
 }
 
 #[test]
+fn dev_scenario_snapshot_shows_runtime_movement_debug_path() {
+    let setup = Game::new_scout_car_snaking_corridor_scenario(1, 0x5150_0002)
+        .expect("scenario setup should succeed");
+    let mut game = setup.game;
+    let unit = setup.units[0];
+    game.enqueue(
+        setup.player_id,
+        Command::Move {
+            units: vec![unit],
+            x: setup.goal.0,
+            y: setup.goal.1,
+            queued: false,
+        },
+    );
+    game.tick();
+
+    let view = game
+        .snapshot_for(setup.player_id)
+        .entities
+        .into_iter()
+        .find(|entity| entity.id == unit)
+        .expect("scenario unit should be visible to owner");
+    assert!(
+        view.debug_path.is_some(),
+        "dev scenario snapshots should include movement debug paths"
+    );
+}
+
+#[test]
 fn replacement_move_and_stop_clear_queued_movement() {
     let (mut game, unit, first, second, replacement) = queued_move_fixture();
 
