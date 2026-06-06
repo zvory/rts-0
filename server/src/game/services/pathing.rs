@@ -20,12 +20,6 @@ const SCOUT_CAR_ROUTE_TURN_PENALTY: u32 = 5;
 const SCOUT_CAR_ADJACENT_BLOCKER_COST: u32 = 2;
 const SCOUT_CAR_CORNER_GRAZE_COST: u32 = 18;
 const SCOUT_CAR_DIAGONAL_BLOCKER_COST: u32 = 3;
-const TANK_PREFERRED_CLEARANCE_TILES: u16 = 3;
-const TANK_CLEARANCE_COST_SCALE: u32 = 3;
-const TANK_ROUTE_TURN_PENALTY: u32 = 5;
-const TANK_ADJACENT_BLOCKER_COST: u32 = 3;
-const TANK_CORNER_GRAZE_COST: u32 = 24;
-const TANK_DIAGONAL_BLOCKER_COST: u32 = 4;
 
 /// Parameters for a single path query.
 #[derive(Clone)]
@@ -50,7 +44,6 @@ pub enum RouteShape {
     Normal,
     PreferFewerTurns,
     ScoutCarClearance,
-    TankClearance,
 }
 
 impl RouteShape {
@@ -59,7 +52,6 @@ impl RouteShape {
             RouteShape::Normal => 0,
             RouteShape::PreferFewerTurns => 3,
             RouteShape::ScoutCarClearance => SCOUT_CAR_ROUTE_TURN_PENALTY,
-            RouteShape::TankClearance => TANK_ROUTE_TURN_PENALTY,
         }
     }
 }
@@ -120,49 +112,18 @@ impl Passability for TerrainPassability<'_> {
     }
 
     fn movement_cost(&self, tx: i32, ty: i32) -> u32 {
-        match self.route_shape {
-            RouteShape::ScoutCarClearance if uses_car_movement_semantics(self.kind) => {
-                clearance_cost(
-                    self.occupancy.clearance_at_tile(tx, ty),
-                    SCOUT_CAR_HARD_CLEARANCE_TILES,
-                    SCOUT_CAR_PREFERRED_CLEARANCE_TILES,
-                    SCOUT_CAR_CLEARANCE_COST_SCALE,
-                )
-                .saturating_add(self.corner_cost(
-                    tx,
-                    ty,
-                    SCOUT_CAR_ADJACENT_BLOCKER_COST,
-                    SCOUT_CAR_DIAGONAL_BLOCKER_COST,
-                    SCOUT_CAR_CORNER_GRAZE_COST,
-                ))
-            }
-            RouteShape::TankClearance if self.kind == EntityKind::Tank => clearance_cost(
-                self.occupancy.clearance_at_tile(tx, ty),
-                SCOUT_CAR_HARD_CLEARANCE_TILES,
-                TANK_PREFERRED_CLEARANCE_TILES,
-                TANK_CLEARANCE_COST_SCALE,
-            )
-            .saturating_add(self.corner_cost(
-                tx,
-                ty,
-                TANK_ADJACENT_BLOCKER_COST,
-                TANK_DIAGONAL_BLOCKER_COST,
-                TANK_CORNER_GRAZE_COST,
-            )),
-            _ => 0,
+        if self.route_shape != RouteShape::ScoutCarClearance
+            || !uses_car_movement_semantics(self.kind)
+        {
+            return 0;
         }
+        scout_car_clearance_cost(self.occupancy.clearance_at_tile(tx, ty))
+            .saturating_add(self.scout_car_corner_cost(tx, ty))
     }
 }
 
 impl TerrainPassability<'_> {
-    fn corner_cost(
-        &self,
-        tx: i32,
-        ty: i32,
-        adjacent_blocker_cost: u32,
-        diagonal_blocker_cost: u32,
-        corner_graze_cost: u32,
-    ) -> u32 {
+    fn scout_car_corner_cost(&self, tx: i32, ty: i32) -> u32 {
         let n = !self.tile_passable(tx, ty - 1);
         let e = !self.tile_passable(tx + 1, ty);
         let s = !self.tile_passable(tx, ty + 1);
@@ -179,9 +140,13 @@ impl TerrainPassability<'_> {
             .count() as u32;
         let grazes_corner = (w || e) && (s || n);
 
-        adjacent_blockers * adjacent_blocker_cost
-            + diagonal_blockers * diagonal_blocker_cost
-            + if grazes_corner { corner_graze_cost } else { 0 }
+        adjacent_blockers * SCOUT_CAR_ADJACENT_BLOCKER_COST
+            + diagonal_blockers * SCOUT_CAR_DIAGONAL_BLOCKER_COST
+            + if grazes_corner {
+                SCOUT_CAR_CORNER_GRAZE_COST
+            } else {
+                0
+            }
     }
 }
 
@@ -325,27 +290,12 @@ impl PathingService {
     }
 }
 
-#[cfg(test)]
-fn scout_car_clearance_cost(clearance_tiles: u16) -> u32 {
-    clearance_cost(
-        clearance_tiles,
-        SCOUT_CAR_HARD_CLEARANCE_TILES,
-        SCOUT_CAR_PREFERRED_CLEARANCE_TILES,
-        SCOUT_CAR_CLEARANCE_COST_SCALE,
-    )
-}
-
-fn clearance_cost(
-    clearance_tiles: u16,
-    hard_clearance_tiles: u16,
-    preferred_clearance_tiles: u16,
-    cost_scale: u32,
-) -> u32 {
-    if clearance_tiles < hard_clearance_tiles {
+pub(crate) fn scout_car_clearance_cost(clearance_tiles: u16) -> u32 {
+    if clearance_tiles < SCOUT_CAR_HARD_CLEARANCE_TILES {
         return u32::MAX / 4;
     }
-    let deficit = preferred_clearance_tiles.saturating_sub(clearance_tiles) as u32;
-    deficit * deficit * cost_scale
+    let deficit = SCOUT_CAR_PREFERRED_CLEARANCE_TILES.saturating_sub(clearance_tiles) as u32;
+    deficit * deficit * SCOUT_CAR_CLEARANCE_COST_SCALE
 }
 
 /// Simplify reverse-ordered world waypoints by dropping intermediate tile centers when the unit
@@ -922,7 +872,6 @@ mod tests {
             RouteShape::Normal,
             RouteShape::PreferFewerTurns,
             RouteShape::ScoutCarClearance,
-            RouteShape::TankClearance,
         ] {
             let path = service.request_tile_path(
                 &map,
@@ -939,7 +888,7 @@ mod tests {
             assert!(!path.is_empty());
         }
 
-        assert_eq!(service.cache_len(), 4);
+        assert_eq!(service.cache_len(), 3);
         assert!(service.cache_contains(EntityKind::Tank, start, goal, 0, RouteShape::Normal));
         assert!(service.cache_contains(
             EntityKind::Tank,
@@ -954,56 +903,6 @@ mod tests {
             goal,
             0,
             RouteShape::ScoutCarClearance
-        ));
-        assert!(service.cache_contains(
-            EntityKind::Tank,
-            start,
-            goal,
-            0,
-            RouteShape::TankClearance
-        ));
-    }
-
-    #[test]
-    fn tank_clearance_route_shape_is_part_of_path_cache_key() {
-        let map = flat_test_map(40);
-        let entities = EntityStore::new();
-        let occ = Occupancy::build(&map, &entities);
-        let start = (4, 4);
-        let goal = (28, 17);
-        let radius_tiles = config::unit_radius_tiles(EntityKind::Tank);
-        let mut service = PathingService::new(8_192, 256);
-
-        for route_shape in [RouteShape::Normal, RouteShape::TankClearance] {
-            let path = service.request_tile_path(
-                &map,
-                &occ,
-                PathRequest {
-                    kind: EntityKind::Tank,
-                    start,
-                    goal,
-                    radius_tiles,
-                    route_shape,
-                    budget: None,
-                },
-            );
-            assert!(!path.is_empty());
-        }
-
-        assert_eq!(service.cache_len(), 2);
-        assert!(service.cache_contains(
-            EntityKind::Tank,
-            start,
-            goal,
-            radius_tiles,
-            RouteShape::Normal
-        ));
-        assert!(service.cache_contains(
-            EntityKind::Tank,
-            start,
-            goal,
-            radius_tiles,
-            RouteShape::TankClearance
         ));
     }
 
@@ -1478,52 +1377,6 @@ mod tests {
     }
 
     #[test]
-    fn tank_pathing_prefers_clearance_in_wide_space() {
-        let map = clearance_choice_map();
-        let entities = EntityStore::new();
-        let occ = Occupancy::build(&map, &entities);
-        let mut service = PathingService::new(8_192, 16);
-        let start = (1, 4);
-        let goal = (14, 4);
-
-        let normal = service.request_tile_path(
-            &map,
-            &occ,
-            PathRequest {
-                kind: EntityKind::Tank,
-                start,
-                goal,
-                radius_tiles: config::unit_radius_tiles(EntityKind::Tank),
-                route_shape: RouteShape::Normal,
-                budget: None,
-            },
-        );
-        let shaped = service.request_tile_path(
-            &map,
-            &occ,
-            PathRequest {
-                kind: EntityKind::Tank,
-                start,
-                goal,
-                radius_tiles: config::unit_radius_tiles(EntityKind::Tank),
-                route_shape: RouteShape::TankClearance,
-                budget: None,
-            },
-        );
-
-        assert_eq!(normal.last().copied(), Some(goal));
-        assert_eq!(shaped.last().copied(), Some(goal));
-        assert!(
-            min_tile_clearance(&occ, &shaped) > min_tile_clearance(&occ, &normal),
-            "tank clearance route should improve minimum clearance, normal={normal:?} shaped={shaped:?}"
-        );
-        assert!(
-            shaped.iter().any(|&(_, ty)| ty >= 6),
-            "tank route should move away from the wall shelf when open space is available, got {shaped:?}"
-        );
-    }
-
-    #[test]
     fn scout_car_clearance_cost_keeps_narrow_passage_traversable() {
         let map = two_tile_wide_horizontal_corridor();
         let entities = EntityStore::new();
@@ -1575,37 +1428,6 @@ mod tests {
             assert!(
                 !shaped.contains(&corner_graze),
                 "scout car clearance route should avoid corner-graze tile {corner_graze:?} when a wider route exists, got {shaped:?}"
-            );
-        }
-    }
-
-    #[test]
-    fn tank_clearance_route_avoids_corner_graze_tiles_when_alternatives_exist() {
-        let map = map_with_rock_rect(24, 9, 8, 11, 10);
-        let entities = EntityStore::new();
-        let occ = Occupancy::build(&map, &entities);
-        let mut service = PathingService::new(8_192, 16);
-        let start = (5, 11);
-        let goal = (15, 7);
-
-        let shaped = service.request_tile_path(
-            &map,
-            &occ,
-            PathRequest {
-                kind: EntityKind::Tank,
-                start,
-                goal,
-                radius_tiles: config::unit_radius_tiles(EntityKind::Tank),
-                route_shape: RouteShape::TankClearance,
-                budget: None,
-            },
-        );
-
-        assert_eq!(shaped.last().copied(), Some(goal));
-        for corner_graze in [(8, 11), (12, 7)] {
-            assert!(
-                !shaped.contains(&corner_graze),
-                "tank clearance route should avoid corner-graze tile {corner_graze:?} when a wider route exists, got {shaped:?}"
             );
         }
     }

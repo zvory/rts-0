@@ -416,16 +416,10 @@ impl<'a> MoveCoordinator<'a> {
         };
         let (gx, gy) = self.map.tile_of(goal.0, goal.1);
         let radius_tiles = config::unit_radius_tiles(kind);
-        let route_shape = if smooth_static_segments {
-            if uses_car_movement_semantics(kind) {
-                RouteShape::ScoutCarClearance
-            } else if kind == EntityKind::Tank {
-                RouteShape::TankClearance
-            } else if uses_oriented_vehicle_body(kind) {
-                RouteShape::PreferFewerTurns
-            } else {
-                RouteShape::Normal
-            }
+        let route_shape = if smooth_static_segments && uses_car_movement_semantics(kind) {
+            RouteShape::ScoutCarClearance
+        } else if smooth_static_segments && uses_oriented_vehicle_body(kind) {
+            RouteShape::PreferFewerTurns
         } else {
             RouteShape::Normal
         };
@@ -442,10 +436,7 @@ impl<'a> MoveCoordinator<'a> {
         // Snap the final waypoint to the exact requested goal for precise arrival.
         if !waypoints.is_empty() {
             waypoints[0] = goal;
-            if matches!(
-                route_shape,
-                RouteShape::PreferFewerTurns | RouteShape::TankClearance
-            ) {
+            if route_shape == RouteShape::PreferFewerTurns {
                 waypoints =
                     simplify_reverse_waypoints(self.map, self.occ, kind, start_pos, waypoints);
             } else if route_shape == RouteShape::ScoutCarClearance {
