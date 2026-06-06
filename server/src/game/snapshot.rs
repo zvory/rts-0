@@ -85,9 +85,15 @@ impl Game {
                     });
                 }
             }
-            if let Some(view) =
-                projection::project_entity(player, e, fog, actionable_fog, fogged, target)
-            {
+            if let Some(view) = projection::project_entity(
+                player,
+                e,
+                fog,
+                actionable_fog,
+                fogged,
+                target,
+                self.debug_path_overlays,
+            ) {
                 entities.push(view);
             }
         }

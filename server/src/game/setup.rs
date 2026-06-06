@@ -166,6 +166,7 @@ impl Game {
             seed,
             starting_steel: 0,
             starting_oil: 0,
+            debug_path_overlays: false,
             rng,
         };
         let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
@@ -270,6 +271,7 @@ impl Game {
             seed,
             starting_steel: steel,
             starting_oil: oil,
+            debug_path_overlays: starting_loadout == StartingLoadout::DebugHuman,
             rng,
         };
         // Initialize supply accounting and fog so the very first snapshot is correct.

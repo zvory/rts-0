@@ -214,8 +214,8 @@ move/attack-move destination, letting clients draw the active leg before future 
 `visionOnly` is true only for non-owned units/buildings visible through lingering death vision;
 clients render them below the fog overlay and must not select or issue targeted commands against
 them.
-`debugPath` is present only in debug server builds, only for the owner, and only while the unit has
-remaining movement waypoints. It carries `{ waypoints, goal, lastRepathTick, stuckTicks,
+`debugPath` is present only in lobby Debug mode matches, only for the owner, and only while the unit
+has remaining movement waypoints. It carries `{ waypoints, goal, lastRepathTick, stuckTicks,
 staticBlockedTicks, totalWaypoints }`, where `waypoints` are remaining `{x, y}` world-pixel path
 points in traversal order and `waypoints[0]` is the current movement target. The compact slot
 encodes this as `[waypoints, goal, lastRepathTick, stuckTicks, staticBlockedTicks, totalWaypoints]`,
@@ -259,7 +259,7 @@ watch rooms receive all resource updates).
   activeMarker?: { x: f32, y: f32, attackMove?: bool }, // active move/attack-move destination; ONLY ever sent to the owner
   chargeCooldownLeft?: u16,      // rifleman only: owner-visible remaining Charge cooldown in ticks
   visionOnly?: bool,             // true = visible only through one-second death vision; visual intel only
-  debugPath?: {                  // debug builds only; remaining movement path; ONLY ever sent to the owner
+  debugPath?: {                  // lobby Debug mode only; remaining movement path; ONLY ever sent to the owner
     waypoints: { x: f32, y: f32 }[],
     goal?: { x: f32, y: f32 },
     lastRepathTick: u32,

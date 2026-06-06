@@ -303,7 +303,7 @@ function readPointMarker(record, label) {
   };
 }
 
-/** Decode debug-build owner-only path diagnostics. */
+/** Decode lobby-debug-mode owner-only path diagnostics. */
 function assignDebugPath(target, fields, index) {
   if (index >= fields.length || fields[index] == null) return;
   const record = readArray(fields[index], "entity.debugPath", 6);

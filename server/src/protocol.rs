@@ -322,7 +322,6 @@ pub struct QueuedOrderMarker {
     pub attack_move: bool,
 }
 
-#[cfg(debug_assertions)]
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct DebugPathPoint {
@@ -330,7 +329,6 @@ pub struct DebugPathPoint {
     pub y: f32,
 }
 
-#[cfg(debug_assertions)]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct DebugPathView {
@@ -417,8 +415,7 @@ pub struct EntityView {
     #[serde(default, skip_serializing_if = "is_false")]
     pub vision_only: bool,
 
-    // Debug builds only: owner-only movement path diagnostics for selected-unit overlays.
-    #[cfg(debug_assertions)]
+    // Runtime debug-mode only: owner-only movement path diagnostics for selected-unit overlays.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub debug_path: Option<DebugPathView>,
 }
@@ -462,7 +459,6 @@ impl EntityView {
             active_marker: None,
             charge_cooldown_left: None,
             vision_only: false,
-            #[cfg(debug_assertions)]
             debug_path: None,
         }
     }
@@ -673,7 +669,6 @@ impl Serialize for CompactEntity<'_> {
         if entity.vision_only {
             len = 25;
         }
-        #[cfg(debug_assertions)]
         if entity.debug_path.is_some() {
             len = 26;
         }
@@ -748,7 +743,6 @@ impl Serialize for CompactEntity<'_> {
         if len > 24 {
             seq.serialize_element(&entity.vision_only)?;
         }
-        #[cfg(debug_assertions)]
         if len > 25 {
             seq.serialize_element(&entity.debug_path.as_ref().map(CompactDebugPath))?;
         }
@@ -775,10 +769,8 @@ impl Serialize for CompactQueuedMarker<'_> {
     }
 }
 
-#[cfg(debug_assertions)]
 struct CompactDebugPath<'a>(&'a DebugPathView);
 
-#[cfg(debug_assertions)]
 impl Serialize for CompactDebugPath<'_> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where

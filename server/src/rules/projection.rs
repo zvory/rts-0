@@ -7,11 +7,9 @@ use crate::game::entity::{
     fires_while_moving, Entity, EntityKind, GatherPhase, Order, OrderIntent,
 };
 use crate::game::fog::Fog;
-#[cfg(debug_assertions)]
 use crate::protocol::{DebugPathPoint, DebugPathView};
 use crate::protocol::{EntityView, QueuedOrderMarker};
 
-#[cfg(debug_assertions)]
 const MAX_DEBUG_PATH_WAYPOINTS: usize = 128;
 
 pub fn entity_visible_to(viewer: u32, entity: &Entity, fog: &Fog) -> bool {
@@ -50,6 +48,7 @@ pub fn project_entity(
     actionable_fog: Option<&Fog>,
     fogged: bool,
     target: Option<&Entity>,
+    include_debug_path: bool,
 ) -> Option<EntityView> {
     if fogged && !entity_visible_to(viewer, entity, fog) {
         return None;
@@ -135,8 +134,7 @@ pub fn project_entity(
         }
         view.active_marker = active_order_marker(entity);
         view.queued_markers = queued_order_markers(entity);
-        #[cfg(debug_assertions)]
-        {
+        if include_debug_path {
             view.debug_path = debug_path_view(entity);
         }
         if entity.kind == EntityKind::Rifleman {
@@ -218,7 +216,6 @@ fn queued_order_markers(entity: &Entity) -> Vec<QueuedOrderMarker> {
         .collect()
 }
 
-#[cfg(debug_assertions)]
 fn debug_path_view(entity: &Entity) -> Option<DebugPathView> {
     let movement = entity.movement.as_ref()?;
     if movement.path.is_empty() {
@@ -247,7 +244,6 @@ fn debug_path_view(entity: &Entity) -> Option<DebugPathView> {
     })
 }
 
-#[cfg(debug_assertions)]
 fn debug_path_point(x: f32, y: f32) -> Option<DebugPathPoint> {
     (x.is_finite() && y.is_finite()).then_some(DebugPathPoint { x, y })
 }
@@ -290,13 +286,15 @@ mod tests {
             .get(hidden_target_id)
             .expect("hidden target should exist");
 
-        let enemy_view = project_entity(1, tank, &fog, Some(&fog), true, Some(hidden_target))
-            .expect("viewer should see nearby tank");
+        let enemy_view =
+            project_entity(1, tank, &fog, Some(&fog), true, Some(hidden_target), false)
+                .expect("viewer should see nearby tank");
         assert_eq!(enemy_view.target_id, None);
         assert_eq!(enemy_view.weapon_facing, None);
 
-        let owner_view = project_entity(2, tank, &fog, Some(&fog), true, Some(hidden_target))
-            .expect("owner should see own tank");
+        let owner_view =
+            project_entity(2, tank, &fog, Some(&fog), true, Some(hidden_target), false)
+                .expect("owner should see own tank");
         assert_eq!(owner_view.target_id, Some(hidden_target_id));
         assert_eq!(owner_view.weapon_facing, Some(1.2));
     }
@@ -330,7 +328,7 @@ mod tests {
         let tank = entities.get(tank_id).expect("tank should exist");
         let target = entities.get(target_id).expect("target should exist");
 
-        let viewer_view = project_entity(1, tank, &fog, Some(&fog), true, Some(target))
+        let viewer_view = project_entity(1, tank, &fog, Some(&fog), true, Some(target), false)
             .expect("viewer should see tank");
 
         assert_eq!(viewer_view.target_id, Some(target_id));
@@ -359,8 +357,8 @@ mod tests {
         fog.recompute(&[1], &entities, &map);
         let tank = entities.get(tank_id).expect("tank should exist");
 
-        let view =
-            project_entity(1, tank, &fog, Some(&fog), true, None).expect("tank should be visible");
+        let view = project_entity(1, tank, &fog, Some(&fog), true, None, false)
+            .expect("tank should be visible");
         assert_eq!(view.oil_used, Some(3.25));
     }
 
@@ -395,7 +393,7 @@ mod tests {
         fog.recompute(&[1, 2], &entities, &map);
         let unit = entities.get(unit_id).expect("unit should exist");
 
-        let owner_view = project_entity(1, unit, &fog, Some(&fog), true, None)
+        let owner_view = project_entity(1, unit, &fog, Some(&fog), true, None, false)
             .expect("owner should see own unit");
         assert_eq!(
             owner_view.active_marker,
@@ -423,14 +421,14 @@ mod tests {
             }
         );
 
-        let enemy_view = project_entity(2, unit, &fog, Some(&fog), false, None)
+        let enemy_view = project_entity(2, unit, &fog, Some(&fog), false, None, false)
             .expect("full view should include unit");
         assert_eq!(enemy_view.active_marker, None);
         assert!(enemy_view.queued_markers.is_empty());
     }
 
     #[test]
-    fn debug_path_is_owner_only_and_in_movement_order() {
+    fn debug_path_is_runtime_debug_mode_owner_only_and_in_movement_order() {
         let mut entities = EntityStore::new();
         let unit_id = entities
             .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
@@ -457,11 +455,15 @@ mod tests {
         fog.recompute(&[1, 2], &entities, &map);
         let unit = entities.get(unit_id).expect("unit should exist");
 
-        let owner_view = project_entity(1, unit, &fog, Some(&fog), true, None)
+        let standard_owner_view = project_entity(1, unit, &fog, Some(&fog), true, None, false)
+            .expect("owner should see own unit");
+        assert_eq!(standard_owner_view.debug_path, None);
+
+        let owner_view = project_entity(1, unit, &fog, Some(&fog), true, None, true)
             .expect("owner should see own unit");
         let debug_path = owner_view
             .debug_path
-            .expect("moving own unit should expose debug path in debug builds");
+            .expect("moving own unit should expose debug path when runtime debug mode is enabled");
         assert_eq!(
             debug_path.waypoints,
             vec![
@@ -476,7 +478,7 @@ mod tests {
         assert_eq!(debug_path.static_blocked_ticks, 3);
         assert_eq!(debug_path.total_waypoints, 3);
 
-        let enemy_view = project_entity(2, unit, &fog, Some(&fog), false, None)
+        let enemy_view = project_entity(2, unit, &fog, Some(&fog), false, None, true)
             .expect("full view should include unit");
         assert_eq!(enemy_view.debug_path, None);
     }
@@ -502,11 +504,11 @@ mod tests {
         fog.recompute(&[1, 2], &entities, &map);
         let rifle = entities.get(rifle_id).expect("rifleman should exist");
 
-        let owner_view = project_entity(1, rifle, &fog, Some(&fog), true, None)
+        let owner_view = project_entity(1, rifle, &fog, Some(&fog), true, None, false)
             .expect("owner should see own rifleman");
         assert_eq!(owner_view.charge_cooldown_left, Some(42));
 
-        let enemy_view = project_entity(2, rifle, &fog, Some(&fog), false, None)
+        let enemy_view = project_entity(2, rifle, &fog, Some(&fog), false, None, false)
             .expect("full view should include rifleman");
         assert_eq!(enemy_view.charge_cooldown_left, None);
     }

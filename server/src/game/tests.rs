@@ -208,13 +208,28 @@ fn flat_tank_move_fixture() -> (Game, u32, (f32, f32)) {
 }
 
 fn queued_move_fixture() -> (Game, u32, (f32, f32), (f32, f32), (f32, f32)) {
+    queued_move_fixture_with_lobby_debug(false)
+}
+
+fn queued_move_fixture_with_lobby_debug(
+    lobby_debug: bool,
+) -> (Game, u32, (f32, f32), (f32, f32), (f32, f32)) {
     let players = [PlayerInit {
         id: 1,
         name: "Solo".into(),
         color: "#fff".into(),
         is_ai: false,
     }];
-    let mut game = Game::new_for_replay(&players, 0x5150_0001);
+    let mut game = if lobby_debug {
+        Game::new_with_debug_starting_loadout_and_random_ai_profiles(
+            &players,
+            crate::config::QUICKSTART_STEEL,
+            crate::config::QUICKSTART_OIL,
+            0x5150_0001,
+        )
+    } else {
+        Game::new_for_replay(&players, 0x5150_0001)
+    };
     for tile in &mut game.map.terrain {
         *tile = crate::protocol::terrain::GRASS;
     }
@@ -419,6 +434,44 @@ fn normal_move_then_queued_move_snapshot_shows_active_and_future_waypoints() {
             attack_move: false,
         }]
     );
+}
+
+#[test]
+fn lobby_debug_mode_snapshot_shows_runtime_movement_debug_path() {
+    for (lobby_debug, expected_debug_path) in [(false, false), (true, true)] {
+        let (mut game, unit, first, _, _) = queued_move_fixture_with_lobby_debug(lobby_debug);
+
+        game.enqueue(
+            1,
+            Command::Move {
+                units: vec![unit],
+                x: first.0,
+                y: first.1,
+                queued: false,
+            },
+        );
+        game.tick();
+
+        let view = game
+            .snapshot_for(1)
+            .entities
+            .into_iter()
+            .find(|entity| entity.id == unit)
+            .expect("selected unit should be visible to owner");
+        assert_eq!(
+            view.debug_path.is_some(),
+            expected_debug_path,
+            "debug path visibility should follow lobby Debug mode"
+        );
+        if let Some(debug_path) = view.debug_path {
+            assert_eq!(
+                debug_path.waypoints.first().map(|point| (point.x, point.y)),
+                game.entities
+                    .get(unit)
+                    .and_then(|entity| entity.next_waypoint())
+            );
+        }
+    }
 }
 
 #[test]
