@@ -9,15 +9,20 @@
   "app": {
     "windows": [
       {
-        "title": "Bewegungskrieg",
-        "width": 800,
-        "height": 600,
+        "label": "main",
+        "title": "Bewegungskrieg!",
+        "url": "index.html",
+        "width": 1600,
+        "height": 900,
+        "minWidth": 1024,
+        "minHeight": 640,
         "resizable": true,
-        "fullscreen": false
+        "fullscreen": false,
+        "decorations": true
       }
     ],
     "security": {
-      "csp": null
+      "csp": "default-src 'self' https://rts-0-zvorygin.fly.dev; connect-src 'self' https://rts-0-zvorygin.fly.dev wss://rts-0-zvorygin.fly.dev; script-src 'self' https://rts-0-zvorygin.fly.dev https://cdn.jsdelivr.net 'unsafe-inline'; style-src 'self' https://rts-0-zvorygin.fly.dev 'unsafe-inline'; img-src 'self' https://rts-0-zvorygin.fly.dev data:; media-src 'self' https://rts-0-zvorygin.fly.dev; font-src 'self' https://rts-0-zvorygin.fly.dev data:;"
     }
   },
   "bundle": {
