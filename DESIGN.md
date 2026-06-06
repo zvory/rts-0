@@ -969,7 +969,11 @@ The server treats every client as potentially hostile. Limits live next to the c
   backtracking. Scout cars, tanks, and AT teams use the same clearance-aware player-move route
   shape: coarse A* still works on tiles, but vehicles add static-clearance, turn,
   adjacent-blocker, and corner-graze costs so open alternatives are preferred before local movement
-  gets close to walls. The clearance
+  gets close to walls. Tank-style pivot vehicles (tanks and AT teams) expand each diagonal A* tile
+  step into an L-shaped pair of orthogonal tile-center waypoints, choosing the lower-clearance-cost
+  elbow when both elbows are passable. This makes pivoting vehicles clear corners before retargeting
+  the next leg instead of stopping near an inside corner and immediately rotating toward a diagonal
+  segment. The clearance
   cost is finite, so intended narrow passages remain traversable; exact interaction paths such as
   chase, gather, and build staging keep tile-guided `Normal` routing. Oriented vehicles follow the
   route corridor rather than exact intermediate waypoint centers: an intermediate waypoint is
@@ -1044,11 +1048,11 @@ The server treats every client as potentially hostile. Limits live next to the c
   preferred before local movement gets close to walls. Path cache keys include the route-shaping
   mode so clearance-shaped movement paths do not share cached routes with normal interaction
   pathing. The returned route is still used for reachability, then snaps the reverse-ordered final
-  waypoint to the exact command goal and only simplifies straight segments up to the scout-car
-  lookahead window, preserving intermediate route guidance through obstacle fields. Interaction
-  paths for attack chasing, gathering, and build staging remain tile-guided `Normal` routing so
-  combat, mining, construction range checks, and infantry/worker traffic stay controlled by their
-  existing logic.
+  waypoint to the exact command goal. Scout cars simplify straight segments up to their route
+  lookahead window; tanks and AT teams keep their L-expanded tile-center route so corner-clearing
+  waypoints are not collapsed back into diagonal shortcuts. Interaction paths for attack chasing,
+  gathering, and build staging remain tile-guided `Normal` routing so combat, mining, construction
+  range checks, and infantry/worker traffic stay controlled by their existing logic.
 - **Vehicle diagonal-pinch avoidance**: A* passability for oriented-vehicle bodies (tanks, scout
   cars, AT teams) rejects tiles wedged between two diagonally-opposite blocked corners — i.e. (NW
   blocked AND SE blocked) OR (NE blocked AND SW blocked). The rotating hull cannot legally thread

@@ -1378,18 +1378,23 @@ const SNAKING_CORRIDOR_REGRESSION_BASELINES: &[(EntityKind, usize, u32)] = &[
     (EntityKind::Rifleman, 4, 2_340),
     (EntityKind::MachineGunner, 1, 2_890),
     (EntityKind::MachineGunner, 4, 2_940),
+    (EntityKind::AtTeam, 1, 3_235),
+    (EntityKind::AtTeam, 4, 3_448),
     (EntityKind::ScoutCar, 1, 1_577),
     (EntityKind::ScoutCar, 4, 1_654),
+    (EntityKind::Tank, 1, 1_957),
+    (EntityKind::Tank, 4, 2_070),
 ];
 
 const SNAKING_CORRIDOR_VEHICLE_SLOT_BASELINES: &[(EntityKind, usize, u32)] = &[
-    (EntityKind::Tank, 0, 1_922),
-    (EntityKind::Tank, 1, 1_981),
-    (EntityKind::Tank, 2, 2_035),
-    (EntityKind::AtTeam, 0, 3_281),
-    (EntityKind::AtTeam, 1, 3_364),
-    (EntityKind::AtTeam, 2, 3_439),
-    (EntityKind::AtTeam, 3, 3_517),
+    (EntityKind::Tank, 0, 1_902),
+    (EntityKind::Tank, 1, 1_951),
+    (EntityKind::Tank, 2, 2_007),
+    (EntityKind::Tank, 3, 2_070),
+    (EntityKind::AtTeam, 0, 3_207),
+    (EntityKind::AtTeam, 1, 3_290),
+    (EntityKind::AtTeam, 2, 3_368),
+    (EntityKind::AtTeam, 3, 3_448),
 ];
 
 fn scout_car_snaking_corridor_map() -> (Map, u32, f32, (f32, f32), (f32, f32)) {
@@ -1707,8 +1712,12 @@ fn snaking_corridor_completed_unit_clear_times_regression() {
         (EntityKind::Rifleman, 4usize),
         (EntityKind::MachineGunner, 1usize),
         (EntityKind::MachineGunner, 4usize),
+        (EntityKind::AtTeam, 1usize),
+        (EntityKind::AtTeam, 4usize),
         (EntityKind::ScoutCar, 1usize),
         (EntityKind::ScoutCar, 4usize),
+        (EntityKind::Tank, 1usize),
+        (EntityKind::Tank, 4usize),
     ];
     let results: Vec<_> = scenarios
         .into_iter()
@@ -1758,7 +1767,7 @@ fn snaking_corridor_completed_unit_clear_times_regression() {
 #[test]
 fn snaking_corridor_vehicle_slot_clear_times_regression() {
     let results = [
-        measure_snaking_corridor_unit_clear_times(EntityKind::Tank, 4, &[0, 1, 2]),
+        measure_snaking_corridor_unit_clear_times(EntityKind::Tank, 4, &[0, 1, 2, 3]),
         measure_snaking_corridor_unit_clear_times(EntityKind::AtTeam, 4, &[0, 1, 2, 3]),
     ];
 

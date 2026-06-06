@@ -15,7 +15,8 @@
 
 use crate::config;
 use crate::game::entity::{
-    uses_oriented_vehicle_body, EntityKind, EntityStore, MovePhase, Order, WeaponSetup,
+    uses_oriented_vehicle_body, uses_tank_movement_semantics, EntityKind, EntityStore, MovePhase,
+    Order, WeaponSetup,
 };
 use crate::game::map::Map;
 use crate::game::pathfinding::{self, Passability};
@@ -432,7 +433,7 @@ impl<'a> MoveCoordinator<'a> {
         // Snap the final waypoint to the exact requested goal for precise arrival.
         if !waypoints.is_empty() {
             waypoints[0] = goal;
-            if route_shape == RouteShape::ScoutCarClearance {
+            if route_shape == RouteShape::ScoutCarClearance && !uses_tank_movement_semantics(kind) {
                 waypoints = simplify_reverse_waypoints_with_limit(
                     self.map,
                     self.occ,
