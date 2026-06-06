@@ -51,7 +51,9 @@ pub(super) fn advance_moving_units(
             if requires_weapon_setup(e.kind)
                 && matches!(
                     e.weapon_setup(),
-                    WeaponSetup::SettingUp { .. } | WeaponSetup::TearingDown { .. }
+                    WeaponSetup::SettingUp { .. }
+                        | WeaponSetup::TearingDown { .. }
+                        | WeaponSetup::TearingDownToRedeploy { .. }
                 )
             {
                 continue;

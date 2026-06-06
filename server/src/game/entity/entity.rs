@@ -437,6 +437,12 @@ impl Entity {
         }
     }
 
+    pub fn set_pending_redeploy_facing(&mut self, facing: Option<f32>) {
+        if let Some(c) = self.combat.as_mut() {
+            c.pending_redeploy_facing = facing.filter(|f| f.is_finite()).map(normalize_angle);
+        }
+    }
+
     pub fn attack_cd(&self) -> u32 {
         self.combat.as_ref().map(|c| c.attack_cd).unwrap_or(0)
     }
@@ -508,6 +514,21 @@ impl Entity {
                         WeaponSetup::Packed
                     } else {
                         WeaponSetup::TearingDown { ticks }
+                    }
+                }
+                WeaponSetup::TearingDownToRedeploy { ticks } => {
+                    let ticks = ticks.saturating_sub(1);
+                    if ticks == 0 {
+                        if let Some(facing) = c.pending_redeploy_facing.take() {
+                            c.emplacement_facing = Some(facing);
+                            c.weapon_facing = facing;
+                            c.desired_weapon_facing = facing;
+                        }
+                        WeaponSetup::SettingUp {
+                            ticks: crate::config::AT_TEAM_SETUP_TICKS,
+                        }
+                    } else {
+                        WeaponSetup::TearingDownToRedeploy { ticks }
                     }
                 }
                 setup => setup,

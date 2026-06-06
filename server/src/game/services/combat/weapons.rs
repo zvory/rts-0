@@ -118,7 +118,9 @@ pub(super) fn deployed_weapon_ready_to_fire(entities: &mut EntityStore, id: u32)
             });
             false
         }
-        WeaponSetup::SettingUp { .. } | WeaponSetup::TearingDown { .. } => false,
+        WeaponSetup::SettingUp { .. }
+        | WeaponSetup::TearingDown { .. }
+        | WeaponSetup::TearingDownToRedeploy { .. } => false,
     }
 }
 
@@ -137,7 +139,7 @@ pub(super) fn deployed_weapon_ready_to_move(entities: &mut EntityStore, id: u32)
             });
             false
         }
-        WeaponSetup::TearingDown { .. } => false,
+        WeaponSetup::TearingDown { .. } | WeaponSetup::TearingDownToRedeploy { .. } => false,
     }
 }
 
@@ -188,7 +190,9 @@ pub(super) fn effective_attack_profile(e: &Entity) -> combat_rules::AttackProfil
         WeaponSetup::Deployed => {
             profile.range_tiles = config::AT_GUN_DEPLOYED_RANGE_TILES;
         }
-        WeaponSetup::SettingUp { .. } | WeaponSetup::TearingDown { .. } => {
+        WeaponSetup::SettingUp { .. }
+        | WeaponSetup::TearingDown { .. }
+        | WeaponSetup::TearingDownToRedeploy { .. } => {
             profile.range_tiles = config::AT_GUN_PACKED_RANGE_TILES;
             profile.dmg = 0;
         }
