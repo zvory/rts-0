@@ -85,7 +85,7 @@ export function _footprintValid(tileX, tileY, footW, footH, map) {
   );
 }
 
-export function _confirmPlacement() {
+export function _confirmPlacement(ev = {}) {
   const place = this.state.placement;
   if (!place || !place.valid) return;
   const workers = this._selectedWorkerIds();
@@ -95,8 +95,12 @@ export function _confirmPlacement() {
     return;
   }
   const worker = workers[0];
-  this.net.command(cmd.build(worker, place.building, place.tileX, place.tileY));
+  const queued = !!ev.shiftKey;
+  this.net.command(cmd.build(worker, place.building, place.tileX, place.tileY, queued));
   if (this.audio) this.audio.play("build_confirm", { category: "ui", priority: 2 });
+  // Shift-confirm keeps placement mode active so the player can chain
+  // several queued buildings without rearming the command card.
+  if (queued) return;
   this.state.endPlacement();
 }
 

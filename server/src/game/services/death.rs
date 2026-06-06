@@ -112,7 +112,7 @@ pub(crate) fn death_system(
         };
         if stale {
             if let Some(e) = entities.get_mut(id) {
-                e.clear_orders();
+                e.clear_active_order();
             }
         }
     }

@@ -741,6 +741,18 @@ impl Entity {
         }
         self.set_target_id(None);
     }
+
+    /// Reset only the active order (idle + clear path + drop target latch). Leaves any
+    /// queued order intents intact so the order_queue promotion pass can advance to the
+    /// next one. Used by build/gather completion and failure paths that hand the worker
+    /// off to its next queued order.
+    pub fn clear_active_order(&mut self) {
+        if let Some(m) = self.movement.as_mut() {
+            m.order = Order::Idle;
+            m.path.clear();
+        }
+        self.set_target_id(None);
+    }
 }
 
 fn normalize_angle(angle: f32) -> f32 {
