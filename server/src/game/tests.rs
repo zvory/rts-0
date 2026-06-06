@@ -291,13 +291,20 @@ fn tank_move_command_preserves_exact_goal_and_repeats_deterministically() {
     );
     let moved_tank = live.entities.get(tank).expect("tank should exist");
     assert_eq!(moved_tank.path_goal(), Some(goal));
+    let path = moved_tank
+        .movement
+        .as_ref()
+        .expect("tank should have movement")
+        .path
+        .as_slice();
     assert_eq!(
-        moved_tank
-            .movement
-            .as_ref()
-            .map(|movement| movement.path.as_slice()),
-        Some(&[goal][..]),
-        "flat tank move should smooth to the exact command goal only"
+        path.first().copied(),
+        Some(goal),
+        "reverse-ordered tank path should preserve the exact command goal"
+    );
+    assert!(
+        path.len() > 1,
+        "tank movement should keep clearance-shaped intermediate waypoints"
     );
 
     let (mut repeat_a, tank_a, goal_a) = flat_tank_move_fixture();
