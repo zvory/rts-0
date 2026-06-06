@@ -54,6 +54,12 @@ import {
   _jumpToControlGroupCluster,
 } from "./control_groups.js";
 import {
+  cursorLockSupported,
+  enterCursorLock,
+  exitCursorLock,
+  nativeCursorSupported,
+} from "./native_cursor.js";
+import {
   _closestIdsToPoint,
   _closestOwnUnitKindInViewport,
   _commitBoxSelection,
@@ -121,9 +127,10 @@ export class Input {
     // Active direct camera pan, in screen pixels, or null when not panning.
     // { x, y, button } where button is the pointer button that started the pan.
     this._panDrag = null;
-    // Browser pointer-lock state. While locked, `this.mouse` is a viewport-local
-    // virtual cursor updated from movementX/movementY and drawn above the canvas.
+    // Cursor-lock state. While locked, `this.mouse` is a viewport-local virtual
+    // cursor updated from movementX/movementY and drawn above the canvas.
     this.pointerLocked = false;
+    this._cursorLockMode = null;
     this._pointerLockCursor = null;
     this.onPointerLockChange = null;
     this.onPointerLockError = null;
@@ -267,8 +274,22 @@ export class Input {
   }
 
   pointerLockSupported() {
+    return cursorLockSupported(this._browserPointerLockSupported());
+  }
+
+  nativeCursorSupported() {
+    return nativeCursorSupported();
+  }
+
+  _browserPointerLockSupported() {
     return typeof this.dom.requestPointerLock === "function" &&
       typeof document.exitPointerLock === "function";
+  }
+
+  _prepareCursorLock() {
+    const p = this.mouse || this._viewportCenter();
+    this.mouse = this._clampViewportPoint(p);
+    this._setPointerLockCursor(this.mouse);
   }
 
   requestPointerLock() {
@@ -277,9 +298,21 @@ export class Input {
       if (this.onPointerLockError) this.onPointerLockError(new Error("Pointer Lock API is unavailable."));
       return Promise.resolve(false);
     }
-    const p = this.mouse || this._viewportCenter();
-    this.mouse = this._clampViewportPoint(p);
-    this._setPointerLockCursor(this.mouse);
+    this._prepareCursorLock();
+    return enterCursorLock(() => this._requestBrowserPointerLock()).then((mode) => {
+      if (mode === "native") this._setCursorLockState(true, mode);
+      return !!mode;
+    }).catch((err) => {
+      if (this.onPointerLockError) this.onPointerLockError(err);
+      return false;
+    });
+  }
+
+  _requestBrowserPointerLock() {
+    if (!this._browserPointerLockSupported()) {
+      if (this.onPointerLockError) this.onPointerLockError(new Error("Pointer Lock API is unavailable."));
+      return Promise.resolve(false);
+    }
     try {
       const result = this.dom.requestPointerLock();
       if (result && typeof result.then === "function") {
@@ -296,6 +329,14 @@ export class Input {
   }
 
   exitPointerLock() {
+    const mode = this._cursorLockMode;
+    if (mode === "native") this._setCursorLockState(false, null);
+    void exitCursorLock(mode, () => this._exitBrowserPointerLock()).catch((err) => {
+      if (this.onPointerLockError) this.onPointerLockError(err);
+    });
+  }
+
+  _exitBrowserPointerLock() {
     if (document.pointerLockElement === this.dom && typeof document.exitPointerLock === "function") {
       document.exitPointerLock();
     }
@@ -307,7 +348,12 @@ export class Input {
 
   _handlePointerLockChange() {
     const locked = document.pointerLockElement === this.dom;
+    this._setCursorLockState(locked, locked ? "browser" : null);
+  }
+
+  _setCursorLockState(locked, mode) {
     this.pointerLocked = locked;
+    this._cursorLockMode = locked ? mode : null;
     this.dom.classList.toggle("pointer-locked", locked);
     if (this._pointerLockCursor) this._pointerLockCursor.hidden = !locked;
     if (locked) {
