@@ -333,15 +333,14 @@ pub struct ResourceDelta {
     pub remaining: u32,
 }
 
-/// Owner-only visual marker for a future queued point order. This deliberately carries only a
-/// world point and order flavor, never target ids.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
+/// Owner-only visual stage for a selected unit's current + queued order plan. Stages carry only
+/// safe world points and order flavor, never target ids.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
-pub struct QueuedOrderMarker {
+pub struct OrderPlanMarker {
+    pub kind: String,
     pub x: f32,
     pub y: f32,
-    #[serde(default, skip_serializing_if = "is_false")]
-    pub attack_move: bool,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
@@ -420,14 +419,9 @@ pub struct EntityView {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub oil_used: Option<f32>,
 
-    // Mobile units: future queued move/attack-move stages. Only ever sent to the owner.
+    // Mobile units: current + future queued order stages. Only ever sent to the owner.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub queued_markers: Vec<QueuedOrderMarker>,
-
-    // Mobile units: current move/attack-move destination or active build footprint center. Only
-    // ever sent to the owner.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub active_marker: Option<QueuedOrderMarker>,
+    pub order_plan: Vec<OrderPlanMarker>,
 
     // Owner-only ability cooldown state for HUD affordances.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -478,8 +472,7 @@ impl EntityView {
             setup_facing: None,
             rally: None,
             oil_used: None,
-            queued_markers: Vec::new(),
-            active_marker: None,
+            order_plan: Vec::new(),
             charge_cooldown_left: None,
             vision_only: false,
             debug_path: None,
@@ -561,7 +554,7 @@ impl NoticeSeverity {
 ///
 /// [`Snapshot`] remains the semantic source of truth for game code. This format is only a
 /// transport-side optimization for `ServerMessage::Snapshot`.
-pub const COMPACT_SNAPSHOT_VERSION: u8 = 5;
+pub const COMPACT_SNAPSHOT_VERSION: u8 = 6;
 
 /// Serialize one semantic snapshot as a compact JSON text frame payload.
 pub fn serialize_compact_snapshot(snapshot: &Snapshot) -> serde_json::Result<String> {
@@ -701,20 +694,17 @@ impl Serialize for CompactEntity<'_> {
         if entity.setup_facing.is_some() {
             len = 21;
         }
-        if !entity.queued_markers.is_empty() {
+        if !entity.order_plan.is_empty() {
             len = 22;
         }
-        if entity.active_marker.is_some() {
+        if entity.charge_cooldown_left.is_some() {
             len = 23;
         }
-        if entity.charge_cooldown_left.is_some() {
+        if entity.vision_only {
             len = 24;
         }
-        if entity.vision_only {
-            len = 25;
-        }
         if entity.debug_path.is_some() {
-            len = 26;
+            len = 25;
         }
 
         let mut seq = serializer.serialize_seq(Some(len))?;
@@ -768,47 +758,37 @@ impl Serialize for CompactEntity<'_> {
         if len > 21 {
             seq.serialize_element(
                 &entity
-                    .queued_markers
+                    .order_plan
                     .iter()
-                    .map(CompactQueuedMarker)
+                    .map(CompactOrderPlanMarker)
                     .collect::<Vec<_>>(),
             )?;
         }
         if len > 22 {
-            if let Some(marker) = &entity.active_marker {
-                seq.serialize_element(&CompactQueuedMarker(marker))?;
-            } else {
-                seq.serialize_element(&Option::<u8>::None)?;
-            }
-        }
-        if len > 23 {
             seq.serialize_element(&entity.charge_cooldown_left)?;
         }
-        if len > 24 {
+        if len > 23 {
             seq.serialize_element(&entity.vision_only)?;
         }
-        if len > 25 {
+        if len > 24 {
             seq.serialize_element(&entity.debug_path.as_ref().map(CompactDebugPath))?;
         }
         seq.end()
     }
 }
 
-struct CompactQueuedMarker<'a>(&'a QueuedOrderMarker);
+struct CompactOrderPlanMarker<'a>(&'a OrderPlanMarker);
 
-impl Serialize for CompactQueuedMarker<'_> {
+impl Serialize for CompactOrderPlanMarker<'_> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
         let marker = self.0;
-        let len = if marker.attack_move { 3 } else { 2 };
-        let mut seq = serializer.serialize_seq(Some(len))?;
+        let mut seq = serializer.serialize_seq(Some(3))?;
+        seq.serialize_element(&order_stage_code(&marker.kind))?;
         seq.serialize_element(&marker.x)?;
         seq.serialize_element(&marker.y)?;
-        if len > 2 {
-            seq.serialize_element(&marker.attack_move)?;
-        }
         seq.end()
     }
 }
@@ -1000,6 +980,17 @@ fn setup_state_code(setup_state: &str) -> u8 {
     }
 }
 
+fn order_stage_code(kind: &str) -> u8 {
+    match kind {
+        "move" => 1,
+        "attackMove" => 2,
+        "attack" => 3,
+        "gather" => 4,
+        "build" => 5,
+        _ => 255,
+    }
+}
+
 fn notice_severity_code(severity: NoticeSeverity) -> u8 {
     match severity {
         NoticeSeverity::Info => 1,
@@ -1018,23 +1009,23 @@ mod tests {
         worker.weapon_facing = Some(1.75);
         worker.latched_node = Some(200);
         worker.target_id = Some(9);
-        worker.queued_markers = vec![
-            QueuedOrderMarker {
+        worker.order_plan = vec![
+            OrderPlanMarker {
+                kind: "move".to_string(),
+                x: 96.0,
+                y: 112.0,
+            },
+            OrderPlanMarker {
+                kind: "move".to_string(),
                 x: 128.0,
                 y: 160.0,
-                attack_move: false,
             },
-            QueuedOrderMarker {
+            OrderPlanMarker {
+                kind: "attackMove".to_string(),
                 x: 192.0,
                 y: 224.0,
-                attack_move: true,
             },
         ];
-        worker.active_marker = Some(QueuedOrderMarker {
-            x: 96.0,
-            y: 112.0,
-            attack_move: false,
-        });
         worker.charge_cooldown_left = Some(87);
         worker.vision_only = true;
 
@@ -1146,11 +1137,10 @@ mod tests {
         assert_eq!(value["e"][0][15], serde_json::json!(9));
         assert_eq!(
             value["e"][0][21],
-            serde_json::json!([[128.0, 160.0], [192.0, 224.0, true]])
+            serde_json::json!([[1, 96.0, 112.0], [1, 128.0, 160.0], [2, 192.0, 224.0]])
         );
-        assert_eq!(value["e"][0][22], serde_json::json!([96.0, 112.0]));
-        assert_eq!(value["e"][0][23], serde_json::json!(87));
-        assert_eq!(value["e"][0][24], serde_json::json!(true));
+        assert_eq!(value["e"][0][22], serde_json::json!(87));
+        assert_eq!(value["e"][0][23], serde_json::json!(true));
         // Rally point rides in slot 18 of the producing building's record.
         assert_eq!(value["e"][2][18], serde_json::json!([256.0, 512.0]));
         assert_eq!(value["r"], serde_json::json!([[200, 1498]]));
