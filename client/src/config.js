@@ -128,6 +128,7 @@ export const ABILITIES = Object.freeze({
     ability: ABILITY.SMOKE,
     label: "Smoke",
     icon: "SMK",
+    hotkey: "D",
     title: "Target a smoke grenade location",
     carriers: Object.freeze([KIND.SCOUT_CAR]),
     targetMode: "worldPoint",

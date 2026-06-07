@@ -8,6 +8,7 @@ export const LAYERS = [
   "buildings",
   "unitShadows",
   "units",
+  "smokes",
   "selectionRings",
   "hpBars",
   "fog",

@@ -638,8 +638,9 @@ export class HUD {
         onClick: () => this.state.openWorkerBuildMenu(),
       }));
     } else {
-      // Non-worker units: Q=Move, W/E=empty, A=Attack, S=Hold.
-      frag.appendChild(this._cmdButton({
+      // Non-worker units: Q=Move, W/E=empty, A=Attack, S=Hold; abilities/AT slot in D/Z/X/C.
+      const slots = new Array(9).fill(null);
+      slots[0] = this._cmdButton({
         icon: "MV",
         label: "Move",
         title: "Move to a target point",
@@ -647,13 +648,8 @@ export class HUD {
         enabled: unitIds.length > 0,
         cls: this.state.commandTarget === "move" ? "active" : "",
         onClick: () => this.state.beginCommandTarget("move"),
-      }));
-      for (let i = 0; i < 2; i++) {
-        const el = document.createElement("div");
-        el.className = "cmd-empty";
-        frag.appendChild(el);
-      }
-      frag.appendChild(this._cmdButton({
+      });
+      slots[3] = this._cmdButton({
         icon: "AT",
         label: "Attack",
         title: "Attack a target or attack-move to a point",
@@ -661,8 +657,8 @@ export class HUD {
         enabled: unitIds.length > 0,
         cls: this.state.commandTarget === "attack" ? "active" : "",
         onClick: () => this.state.beginCommandTarget("attack"),
-      }));
-      frag.appendChild(this._cmdButton({
+      });
+      slots[4] = this._cmdButton({
         icon: "HD",
         label: "Hold",
         title: "Hold position / stop selected units",
@@ -673,24 +669,30 @@ export class HUD {
           this.net.command(cmd.stop(unitIds));
           this.state.endCommandTarget();
         },
-      }));
-      idx = 5;
-      if (abilityAffordances.some((affordance) => affordance.unlocked) || atGunIds.length > 0) {
-        const empty = document.createElement("div");
-        empty.className = "cmd-empty";
-        frag.appendChild(empty);
-        idx = 6;
-      }
+      });
+
+      let sequentialSlot = 6;
+      const claimSlot = (preferred) => {
+        if (preferred != null && preferred >= 0 && preferred < 9 && slots[preferred] == null) {
+          return preferred;
+        }
+        while (sequentialSlot < 9 && slots[sequentialSlot] != null) sequentialSlot++;
+        return sequentialSlot < 9 ? sequentialSlot++ : -1;
+      };
+
       for (const affordance of abilityAffordances) {
         if (!affordance.unlocked) continue;
         const definition = affordance.definition;
         const readyCount = affordance.readyIds.length;
         const showReadyCount = readyCount < affordance.carrierIds.length;
-        frag.appendChild(this._cmdButton({
+        const preferred = definition.hotkey ? GRID_HOTKEYS.indexOf(definition.hotkey) : -1;
+        const slot = claimSlot(preferred);
+        if (slot < 0) continue;
+        slots[slot] = this._cmdButton({
           icon: definition.icon,
           label: definition.label,
           title: this._abilityDisabledReason(affordance),
-          hotkey: GRID_HOTKEYS[idx++],
+          hotkey: GRID_HOTKEYS[slot],
           enabled: readyCount > 0 && affordance.affordable,
           countBadge: showReadyCount ? `${readyCount}` : "",
           cooldownClocks: affordance.cooldownClocks,
@@ -704,31 +706,51 @@ export class HUD {
               this.state.endCommandTarget();
             }
           },
-        }));
+        });
       }
+
       if (atGunIds.length > 0) {
-        frag.appendChild(this._cmdButton({
-          icon: "SET",
-          label: "Set Up",
-          title: "Set up selected AT guns toward a target point",
-          hotkey: GRID_HOTKEYS[idx++],
-          enabled: true,
-          cls: this.state.commandTarget === "setupAtGuns" ? "active" : "",
-          onClick: () => this.state.beginCommandTarget("setupAtGuns"),
-        }));
-        frag.appendChild(this._cmdButton({
-          icon: "TD",
-          label: "Tear Down",
-          title: "Pack up selected AT guns",
-          hotkey: GRID_HOTKEYS[idx++],
-          enabled: true,
-          cls: "",
-          onClick: () => {
-            this.net.command(cmd.tearDownAtGuns(atGunIds));
-            this.state.endCommandTarget();
-          },
-        }));
+        const setupSlot = claimSlot(null);
+        if (setupSlot >= 0) {
+          slots[setupSlot] = this._cmdButton({
+            icon: "SET",
+            label: "Set Up",
+            title: "Set up selected AT guns toward a target point",
+            hotkey: GRID_HOTKEYS[setupSlot],
+            enabled: true,
+            cls: this.state.commandTarget === "setupAtGuns" ? "active" : "",
+            onClick: () => this.state.beginCommandTarget("setupAtGuns"),
+          });
+        }
+        const tearDownSlot = claimSlot(null);
+        if (tearDownSlot >= 0) {
+          slots[tearDownSlot] = this._cmdButton({
+            icon: "TD",
+            label: "Tear Down",
+            title: "Pack up selected AT guns",
+            hotkey: GRID_HOTKEYS[tearDownSlot],
+            enabled: true,
+            cls: "",
+            onClick: () => {
+              this.net.command(cmd.tearDownAtGuns(atGunIds));
+              this.state.endCommandTarget();
+            },
+          });
+        }
       }
+
+      for (let i = 0; i < 9; i++) {
+        if (slots[i]) {
+          frag.appendChild(slots[i]);
+        } else {
+          const el = document.createElement("div");
+          el.className = "cmd-empty";
+          frag.appendChild(el);
+        }
+      }
+      card.innerHTML = "";
+      card.appendChild(frag);
+      return;
     }
 
     this._padCard(frag, idx);

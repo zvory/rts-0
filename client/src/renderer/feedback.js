@@ -255,6 +255,70 @@ export function _drawAtGunSetupPreview(state) {
   }
 }
 
+export function _drawAbilityTargetPreview(state) {
+  const preview = state?.abilityTargetPreview;
+  if (!preview || !Array.isArray(preview.carriers)) return;
+  const g = this._feedbackGfx;
+  const rangeColor = 0x6fa3ff;
+
+  for (const carrier of preview.carriers) {
+    if (!finiteNumber(carrier.x) || !finiteNumber(carrier.y)) continue;
+    g.lineStyle(1.5, rangeColor, 0.85);
+    dashedCircle(g, carrier.x, carrier.y, preview.rangePx, 64);
+  }
+
+  const cursorColor = preview.hoverInRange ? COLORS.selectOwn : COLORS.selectNeutral;
+  const radiusPx = preview.radiusPx || 24;
+  g.lineStyle(2, cursorColor, 0.95);
+  g.beginFill(cursorColor, 0.18);
+  g.drawCircle(preview.mouseX, preview.mouseY, radiusPx);
+  g.endFill();
+  g.lineStyle(2, cursorColor, 0.85);
+  g.moveTo(preview.mouseX - radiusPx * 0.45, preview.mouseY);
+  g.lineTo(preview.mouseX + radiusPx * 0.45, preview.mouseY);
+  g.moveTo(preview.mouseX, preview.mouseY - radiusPx * 0.45);
+  g.lineTo(preview.mouseX, preview.mouseY + radiusPx * 0.45);
+}
+
+function dashedCircle(g, cx, cy, radius, segments) {
+  if (!(radius > 0)) return;
+  const count = Math.max(12, segments | 0);
+  for (let i = 0; i < count; i += 2) {
+    const a0 = (i / count) * Math.PI * 2;
+    const a1 = ((i + 1) / count) * Math.PI * 2;
+    g.moveTo(cx + Math.cos(a0) * radius, cy + Math.sin(a0) * radius);
+    g.lineTo(cx + Math.cos(a1) * radius, cy + Math.sin(a1) * radius);
+  }
+}
+
+export function _drawSmokes(state) {
+  const smokes = state?.smokes;
+  if (!Array.isArray(smokes) || smokes.length === 0) return;
+  const g = this._smokeGfx;
+  if (!g) return;
+  const ts = (this._map && this._map.tileSize) || 32;
+  for (const smoke of smokes) {
+    if (!finiteNumber(smoke.x) || !finiteNumber(smoke.y)) continue;
+    const r = Math.max(8, (smoke.radiusTiles || 0) * ts);
+    // Layered translucent billows: a darker core plus a softer halo.
+    g.lineStyle(0);
+    g.beginFill(0x1a1a1c, 0.55);
+    g.drawCircle(smoke.x, smoke.y, r * 0.95);
+    g.endFill();
+    g.beginFill(0x3a3a3e, 0.45);
+    g.drawCircle(smoke.x - r * 0.25, smoke.y - r * 0.15, r * 0.72);
+    g.drawCircle(smoke.x + r * 0.3, smoke.y + r * 0.05, r * 0.6);
+    g.drawCircle(smoke.x - r * 0.05, smoke.y + r * 0.3, r * 0.55);
+    g.endFill();
+    g.beginFill(0x9b9b9d, 0.32);
+    g.drawCircle(smoke.x + r * 0.12, smoke.y - r * 0.3, r * 0.42);
+    g.drawCircle(smoke.x - r * 0.35, smoke.y + r * 0.18, r * 0.34);
+    g.endFill();
+    g.lineStyle(1, 0x0a0a0a, 0.45);
+    g.drawCircle(smoke.x, smoke.y, r);
+  }
+}
+
 export function _drawRallyPoints(state) {
   if (!state || typeof state.selectedEntities !== "function") return;
   const g = this._feedbackGfx;
