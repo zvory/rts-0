@@ -480,7 +480,7 @@ impl PlayerMilestones {
             Command::Move { .. }
             | Command::SetupAtGuns { .. }
             | Command::TearDownAtGuns { .. }
-            | Command::Charge { .. }
+            | Command::UseAbility { .. }
             | Command::Gather { .. }
             | Command::Build { .. }
             | Command::Train { .. }

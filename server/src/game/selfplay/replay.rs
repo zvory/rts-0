@@ -376,6 +376,7 @@ fn command_stats_by_player(commands: &[CommandLogEntry]) -> BTreeMap<u32, Comman
             | WireCommand::SetupAtGuns { .. }
             | WireCommand::TearDownAtGuns { .. }
             | WireCommand::Charge { .. }
+            | WireCommand::UseAbility { .. }
             | WireCommand::Gather { .. }
             | WireCommand::Build { .. }
             | WireCommand::Train { .. }

@@ -4,6 +4,7 @@
 //! networking/replay boundary. Simulation services consume `SimCommand` so they can work with
 //! typed entity kinds instead of JSON-facing strings.
 
+use crate::game::ability::AbilityKind;
 use crate::game::entity::EntityKind;
 use crate::protocol;
 
@@ -34,8 +35,12 @@ pub enum SimCommand {
     TearDownAtGuns {
         units: Vec<u32>,
     },
-    Charge {
+    UseAbility {
+        ability: AbilityKind,
         units: Vec<u32>,
+        x: Option<f32>,
+        y: Option<f32>,
+        queued: bool,
     },
     Gather {
         units: Vec<u32>,
@@ -72,15 +77,17 @@ pub enum SimCommand {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CommandRejection {
-    UnknownBuilding,
-    UnknownUnit,
+    Building,
+    Unit,
+    Ability,
 }
 
 impl CommandRejection {
     pub(crate) fn notice_message(self) -> &'static str {
         match self {
-            CommandRejection::UnknownBuilding => "Unknown building",
-            CommandRejection::UnknownUnit => "Unknown unit",
+            CommandRejection::Building => "Unknown building",
+            CommandRejection::Unit => "Unknown unit",
+            CommandRejection::Ability => "Unknown ability",
         }
     }
 }
@@ -123,7 +130,31 @@ impl SimCommand {
                 SimCommand::SetupAtGuns { units, x, y }
             }
             protocol::Command::TearDownAtGuns { units } => SimCommand::TearDownAtGuns { units },
-            protocol::Command::Charge { units } => SimCommand::Charge { units },
+            protocol::Command::Charge { units } => SimCommand::UseAbility {
+                ability: AbilityKind::Charge,
+                units,
+                x: None,
+                y: None,
+                queued: false,
+            },
+            protocol::Command::UseAbility {
+                ability,
+                units,
+                x,
+                y,
+                queued,
+            } => match ability.parse::<AbilityKind>() {
+                Ok(ability) => SimCommand::UseAbility {
+                    ability,
+                    units,
+                    x,
+                    y,
+                    queued,
+                },
+                Err(_) => SimCommand::Rejected {
+                    reason: CommandRejection::Ability,
+                },
+            },
             protocol::Command::Gather {
                 units,
                 node,
@@ -148,13 +179,13 @@ impl SimCommand {
                     queued,
                 },
                 _ => SimCommand::Rejected {
-                    reason: CommandRejection::UnknownBuilding,
+                    reason: CommandRejection::Building,
                 },
             },
             protocol::Command::Train { building, unit } => match unit.parse::<EntityKind>() {
                 Ok(unit) if unit.is_unit() => SimCommand::Train { building, unit },
                 _ => SimCommand::Rejected {
-                    reason: CommandRejection::UnknownUnit,
+                    reason: CommandRejection::Unit,
                 },
             },
             protocol::Command::Cancel { building } => SimCommand::Cancel { building },
@@ -214,8 +245,18 @@ impl SimCommand {
             SimCommand::TearDownAtGuns { units } => protocol::Command::TearDownAtGuns {
                 units: units.clone(),
             },
-            SimCommand::Charge { units } => protocol::Command::Charge {
+            SimCommand::UseAbility {
+                ability,
+                units,
+                x,
+                y,
+                queued,
+            } => protocol::Command::UseAbility {
+                ability: ability.to_protocol_str().to_string(),
                 units: units.clone(),
+                x: *x,
+                y: *y,
+                queued: *queued,
             },
             SimCommand::Gather {
                 units,
@@ -339,7 +380,7 @@ mod tests {
         assert_eq!(
             SimCommand::from_protocol(command),
             SimCommand::Rejected {
-                reason: CommandRejection::UnknownUnit,
+                reason: CommandRejection::Unit,
             }
         );
     }
@@ -372,6 +413,32 @@ mod tests {
         assert_eq!(
             SimCommand::from_protocol(teardown.clone()).to_protocol(),
             Some(teardown)
+        );
+    }
+
+    #[test]
+    fn protocol_use_ability_command_round_trips() {
+        let command = protocol::Command::UseAbility {
+            ability: protocol::abilities::SMOKE.to_string(),
+            units: vec![10, 11],
+            x: Some(320.0),
+            y: Some(384.0),
+            queued: true,
+        };
+
+        assert_eq!(
+            SimCommand::from_protocol(command.clone()),
+            SimCommand::UseAbility {
+                ability: AbilityKind::Smoke,
+                units: vec![10, 11],
+                x: Some(320.0),
+                y: Some(384.0),
+                queued: true,
+            }
+        );
+        assert_eq!(
+            SimCommand::from_protocol(command.clone()).to_protocol(),
+            Some(command)
         );
     }
 }

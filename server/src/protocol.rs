@@ -55,6 +55,12 @@ pub mod states {
     pub const DEAD: &str = "dead";
 }
 
+/// Ability ids used by generic ability commands and owner-only cooldown projection.
+pub mod abilities {
+    pub const CHARGE: &str = "charge";
+    pub const SMOKE: &str = "smoke";
+}
+
 // ---------------------------------------------------------------------------
 // Client -> Server
 // ---------------------------------------------------------------------------
@@ -134,6 +140,16 @@ pub enum Command {
     },
     Charge {
         units: Vec<u32>,
+    },
+    UseAbility {
+        ability: String,
+        units: Vec<u32>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        x: Option<f32>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        y: Option<f32>,
+        #[serde(default, skip_serializing_if = "is_false")]
+        queued: bool,
     },
     Gather {
         units: Vec<u32>,
@@ -364,6 +380,13 @@ pub struct DebugPathView {
     pub total_waypoints: u16,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct AbilityCooldownView {
+    pub ability: String,
+    pub cooldown_left: u16,
+}
+
 /// One entity as seen by one player. Optional fields are omitted when not applicable.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
@@ -426,6 +449,8 @@ pub struct EntityView {
     // Owner-only ability cooldown state for HUD affordances.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub charge_cooldown_left: Option<u16>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub abilities: Vec<AbilityCooldownView>,
 
     // True when this entity is visible only through lingering death vision. It is real-time
     // visual intel, but not actionable for selection or attack commands.
@@ -474,6 +499,7 @@ impl EntityView {
             oil_used: None,
             order_plan: Vec::new(),
             charge_cooldown_left: None,
+            abilities: Vec::new(),
             vision_only: false,
             debug_path: None,
         }
@@ -554,7 +580,7 @@ impl NoticeSeverity {
 ///
 /// [`Snapshot`] remains the semantic source of truth for game code. This format is only a
 /// transport-side optimization for `ServerMessage::Snapshot`.
-pub const COMPACT_SNAPSHOT_VERSION: u8 = 6;
+pub const COMPACT_SNAPSHOT_VERSION: u8 = 7;
 
 /// Serialize one semantic snapshot as a compact JSON text frame payload.
 pub fn serialize_compact_snapshot(snapshot: &Snapshot) -> serde_json::Result<String> {
@@ -700,11 +726,14 @@ impl Serialize for CompactEntity<'_> {
         if entity.charge_cooldown_left.is_some() {
             len = 23;
         }
-        if entity.vision_only {
+        if !entity.abilities.is_empty() {
             len = 24;
         }
-        if entity.debug_path.is_some() {
+        if entity.vision_only {
             len = 25;
+        }
+        if entity.debug_path.is_some() {
+            len = 26;
         }
 
         let mut seq = serializer.serialize_seq(Some(len))?;
@@ -768,11 +797,35 @@ impl Serialize for CompactEntity<'_> {
             seq.serialize_element(&entity.charge_cooldown_left)?;
         }
         if len > 23 {
-            seq.serialize_element(&entity.vision_only)?;
+            seq.serialize_element(
+                &entity
+                    .abilities
+                    .iter()
+                    .map(CompactAbilityCooldown)
+                    .collect::<Vec<_>>(),
+            )?;
         }
         if len > 24 {
+            seq.serialize_element(&entity.vision_only)?;
+        }
+        if len > 25 {
             seq.serialize_element(&entity.debug_path.as_ref().map(CompactDebugPath))?;
         }
+        seq.end()
+    }
+}
+
+struct CompactAbilityCooldown<'a>(&'a AbilityCooldownView);
+
+impl Serialize for CompactAbilityCooldown<'_> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let ability = self.0;
+        let mut seq = serializer.serialize_seq(Some(2))?;
+        seq.serialize_element(&ability_code(&ability.ability))?;
+        seq.serialize_element(&ability.cooldown_left)?;
         seq.end()
     }
 }
@@ -991,6 +1044,14 @@ fn order_stage_code(kind: &str) -> u8 {
     }
 }
 
+fn ability_code(ability: &str) -> u8 {
+    match ability {
+        abilities::CHARGE => 1,
+        abilities::SMOKE => 2,
+        _ => 255,
+    }
+}
+
 fn notice_severity_code(severity: NoticeSeverity) -> u8 {
     match severity {
         NoticeSeverity::Info => 1,
@@ -1027,6 +1088,10 @@ mod tests {
             },
         ];
         worker.charge_cooldown_left = Some(87);
+        worker.abilities = vec![AbilityCooldownView {
+            ability: abilities::CHARGE.to_string(),
+            cooldown_left: 87,
+        }];
         worker.vision_only = true;
 
         let mut gunner = EntityView::new(
@@ -1140,7 +1205,8 @@ mod tests {
             serde_json::json!([[1, 96.0, 112.0], [1, 128.0, 160.0], [2, 192.0, 224.0]])
         );
         assert_eq!(value["e"][0][22], serde_json::json!(87));
-        assert_eq!(value["e"][0][23], serde_json::json!(true));
+        assert_eq!(value["e"][0][23], serde_json::json!([[1, 87]]));
+        assert_eq!(value["e"][0][24], serde_json::json!(true));
         // Rally point rides in slot 18 of the producing building's record.
         assert_eq!(value["e"][2][18], serde_json::json!([256.0, 512.0]));
         assert_eq!(value["r"], serde_json::json!([[200, 1498]]));

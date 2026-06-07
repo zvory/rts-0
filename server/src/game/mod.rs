@@ -8,6 +8,7 @@
 //! separately via [`Game::snapshot_for`], fog-filtered so a player only ever sees neutral /
 //! enemy entities on tiles they currently see.
 
+pub(crate) mod ability;
 mod ai;
 pub(crate) mod ai_core;
 pub(crate) mod ai_shared;

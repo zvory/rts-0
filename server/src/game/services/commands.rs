@@ -1,6 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::config;
+use crate::game::ability::{self, AbilityKind, AbilityTargetMode};
 use crate::game::command::SimCommand;
 use crate::game::entity::{
     BuildPhase, EntityKind, EntityStore, OrderIntent, PointIntent, ProdItem, WeaponSetup,
@@ -184,22 +185,25 @@ pub(crate) fn apply_commands(
                     }
                 }
             }
-            SimCommand::Charge { units } => {
-                if !player_has_completed_training_centre(entities, player) {
-                    continue;
-                }
-                for id in dedupe_cap_units(units) {
-                    if !owns_unit(entities, player, id) || is_constructing(entities, id) {
-                        continue;
-                    }
-                    let Some(e) = entities.get_mut(id) else {
-                        continue;
-                    };
-                    if e.kind == EntityKind::Rifleman && e.charge_cooldown_ticks() == 0 {
-                        e.start_charge(config::RIFLEMAN_CHARGE_TICKS);
-                        e.start_charge_cooldown(config::RIFLEMAN_CHARGE_COOLDOWN_TICKS);
-                    }
-                }
+            SimCommand::UseAbility {
+                ability,
+                units,
+                x,
+                y,
+                queued,
+            } => {
+                use_ability(
+                    entities,
+                    players,
+                    player,
+                    AbilityUse {
+                        ability,
+                        units,
+                        x,
+                        y,
+                        queued,
+                    },
+                );
             }
             SimCommand::Gather {
                 units,
@@ -313,6 +317,76 @@ fn dedupe_cap_units(units: Vec<u32>) -> Vec<u32> {
     out
 }
 
+struct AbilityUse {
+    ability: AbilityKind,
+    x: Option<f32>,
+    y: Option<f32>,
+    units: Vec<u32>,
+    queued: bool,
+}
+
+fn use_ability(
+    entities: &mut EntityStore,
+    players: &mut [PlayerState],
+    player: u32,
+    request: AbilityUse,
+) {
+    let ability = request.ability;
+    let definition = ability::definition(ability);
+    if request.queued && !definition.may_queue {
+        return;
+    }
+    match definition.target_mode {
+        AbilityTargetMode::SelfTarget => {}
+        AbilityTargetMode::WorldPoint => {
+            let Some(x) = request.x else {
+                return;
+            };
+            let Some(y) = request.y else {
+                return;
+            };
+            if !x.is_finite() || !y.is_finite() {
+                return;
+            }
+        }
+    }
+    if let Some(required) = definition.tech_requirement {
+        if !player_has_completed_kind(entities, player, required) {
+            return;
+        }
+    }
+    if definition.cost.steel > 0 || definition.cost.oil > 0 {
+        let Some(p) = players.iter().find(|p| p.id == player) else {
+            return;
+        };
+        if p.steel < definition.cost.steel || p.oil < definition.cost.oil {
+            return;
+        }
+    }
+
+    for id in dedupe_cap_units(request.units) {
+        if !owns_unit(entities, player, id) || is_constructing(entities, id) {
+            continue;
+        }
+        let Some(e) = entities.get_mut(id) else {
+            continue;
+        };
+        if !ability::carried_by(ability, e.kind) || e.ability_cooldown_ticks(ability) > 0 {
+            continue;
+        }
+        match ability {
+            AbilityKind::Charge => {
+                e.start_charge(config::RIFLEMAN_CHARGE_TICKS);
+                e.start_ability_cooldown(ability, definition.cooldown_ticks);
+            }
+            AbilityKind::Smoke => {
+                // Phase 1 intentionally validates the generic command shell without launching
+                // smoke gameplay. Phase 3 will spend resources, start cooldown, and spawn smoke.
+            }
+        }
+    }
+}
+
 /// Whether `player` owns a *unit* with this id. Local re-export of
 /// [`world_query::owns_unit`] to keep call sites in this module terse.
 fn owns_unit(entities: &EntityStore, player: u32, id: u32) -> bool {
@@ -401,8 +475,8 @@ fn clear_staged_at_gun_setup(entities: &mut EntityStore, ids: &[u32]) {
     }
 }
 
-fn player_has_completed_training_centre(entities: &EntityStore, player: u32) -> bool {
-    world_query::completed_building_kinds(entities, player).contains(&EntityKind::TrainingCentre)
+fn player_has_completed_kind(entities: &EntityStore, player: u32, kind: EntityKind) -> bool {
+    world_query::completed_building_kinds(entities, player).contains(&kind)
 }
 
 fn deployed_at_gun_target_outside_arc(entities: &EntityStore, id: u32, target: u32) -> bool {
@@ -1057,8 +1131,12 @@ mod tests {
             &mut entities,
             vec![(
                 1,
-                SimCommand::Charge {
+                SimCommand::UseAbility {
+                    ability: AbilityKind::Charge,
                     units: vec![rifle, worker, enemy_rifle, rifle],
+                    x: None,
+                    y: None,
+                    queued: false,
                 },
             )],
         );
@@ -1079,8 +1157,12 @@ mod tests {
             &mut entities,
             vec![(
                 1,
-                SimCommand::Charge {
+                SimCommand::UseAbility {
+                    ability: AbilityKind::Charge,
                     units: vec![rifle, worker, enemy_rifle, rifle],
+                    x: None,
+                    y: None,
+                    queued: false,
                 },
             )],
         );
@@ -1120,7 +1202,16 @@ mod tests {
         apply(
             &map,
             &mut entities,
-            vec![(1, SimCommand::Charge { units: vec![rifle] })],
+            vec![(
+                1,
+                SimCommand::UseAbility {
+                    ability: AbilityKind::Charge,
+                    units: vec![rifle],
+                    x: None,
+                    y: None,
+                    queued: false,
+                },
+            )],
         );
         let first_charge_ticks = entities.get(rifle).unwrap().charge_ticks();
         let first_cooldown_ticks = entities.get(rifle).unwrap().charge_cooldown_ticks();
@@ -1128,7 +1219,16 @@ mod tests {
         apply(
             &map,
             &mut entities,
-            vec![(1, SimCommand::Charge { units: vec![rifle] })],
+            vec![(
+                1,
+                SimCommand::UseAbility {
+                    ability: AbilityKind::Charge,
+                    units: vec![rifle],
+                    x: None,
+                    y: None,
+                    queued: false,
+                },
+            )],
         );
         assert_eq!(
             entities.get(rifle).unwrap().charge_ticks(),
@@ -1142,14 +1242,23 @@ mod tests {
         );
 
         for _ in 0..config::RIFLEMAN_CHARGE_COOLDOWN_TICKS {
-            entities.get_mut(rifle).unwrap().tick_charge_cooldown();
+            entities.get_mut(rifle).unwrap().tick_ability_cooldowns();
         }
         entities.get_mut(rifle).unwrap().tick_charge();
 
         apply(
             &map,
             &mut entities,
-            vec![(1, SimCommand::Charge { units: vec![rifle] })],
+            vec![(
+                1,
+                SimCommand::UseAbility {
+                    ability: AbilityKind::Charge,
+                    units: vec![rifle],
+                    x: None,
+                    y: None,
+                    queued: false,
+                },
+            )],
         );
         assert_eq!(
             entities.get(rifle).unwrap().charge_ticks(),

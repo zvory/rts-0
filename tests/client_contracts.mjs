@@ -29,6 +29,8 @@ import {
 } from "../client/src/combat_audio.js";
 import {
   COMPACT_SNAPSHOT_VERSION,
+  ABILITY,
+  ABILITY_CODE,
   EVENT,
   EVENT_CODE,
   KIND,
@@ -431,7 +433,8 @@ function fakeAudioContext() {
         null,
         null,
         [[ORDER_STAGE_CODE[ORDER_STAGE.MOVE], 96, 112], [ORDER_STAGE_CODE[ORDER_STAGE.MOVE], 128, 160], [ORDER_STAGE_CODE[ORDER_STAGE.ATTACK_MOVE], 192, 224]],
-        null,
+        87,
+        [[ABILITY_CODE[ABILITY.CHARGE], 87]],
         true,
         [[[112, 128], [144, 160]], [192, 224], 12, 2, 1, 2],
       ],
@@ -489,6 +492,12 @@ function fakeAudioContext() {
   assert(decoded.entities[0].weaponFacing === 1.75, "entity optional weaponFacing decodes");
   assert(decoded.entities[0].latchedNode === 200, "entity optional latchedNode decodes");
   assert(decoded.entities[0].orderPlan.length === 3, "entity order plan decodes");
+  assert(decoded.entities[0].chargeCooldownLeft === 87, "legacy charge cooldown decodes");
+  assert(
+    decoded.entities[0].abilities[0].ability === ABILITY.CHARGE &&
+      decoded.entities[0].abilities[0].cooldownLeft === 87,
+    "entity ability cooldowns decode",
+  );
   assert(
     decoded.entities[0].orderPlan[0].kind === ORDER_STAGE.MOVE &&
       decoded.entities[0].orderPlan[0].x === 96 &&
@@ -525,6 +534,17 @@ function fakeAudioContext() {
   assert(decoded.events[3].severity === NOTICE_SEVERITY.INFO, "legacy notice defaults to info");
   assert(decoded.events[4].severity === NOTICE_SEVERITY.ALERT, "notice severity decodes");
   assert(decoded.events[4].x === 512 && decoded.events[4].y === 768, "notice position decodes");
+
+  const abilityCommand = cmd.useAbility(ABILITY.SMOKE, [7, 8], 320, 384, true);
+  assert(
+    abilityCommand.c === "useAbility" &&
+      abilityCommand.ability === ABILITY.SMOKE &&
+      abilityCommand.units.length === 2 &&
+      abilityCommand.x === 320 &&
+      abilityCommand.y === 384 &&
+      abilityCommand.queued === true,
+    "useAbility command builder emits targeted ability wire shape",
+  );
 
   assertThrows(
     () => decodeServerMessage({ t: "snapshot", v: COMPACT_SNAPSHOT_VERSION, s: [1], e: [] }),

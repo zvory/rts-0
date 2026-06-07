@@ -9,11 +9,11 @@
 // effects go through `net.command(...)` or `state.beginPlacement(...)` — the HUD never
 // mutates game state directly.
 
-import { cmd } from "./protocol.js";
+import { ABILITY, cmd } from "./protocol.js";
 import { KIND, STATE, isBuilding, isUnit } from "./protocol.js";
 import {
+  ABILITIES,
   PLAYER_PALETTE,
-  RIFLEMAN_CHARGE_COOLDOWN_TICKS,
   STATS,
   WORKER_BUILDABLE,
 } from "./config.js";
@@ -503,23 +503,57 @@ export class HUD {
     return sel.filter((e) => this._isOwn(e) && isUnit(e.kind));
   }
 
-  _selectedOwnRiflemanIds(sel) {
-    return this._selectedOwnUnits(sel)
-      .filter((e) => e.kind === KIND.RIFLEMAN)
-      .map((e) => e.id);
+  _abilityCooldownLeft(entity, ability) {
+    const projected = Array.isArray(entity.abilities)
+      ? entity.abilities.find((entry) => entry.ability === ability)
+      : null;
+    if (projected && typeof projected.cooldownLeft === "number") return projected.cooldownLeft;
+    if (ability === ABILITY.CHARGE) return entity.chargeCooldownLeft || 0;
+    return 0;
   }
 
-  _selectedOwnReadyChargeRiflemanIds(sel) {
-    return this._selectedOwnUnits(sel)
-      .filter((e) => e.kind === KIND.RIFLEMAN && (e.chargeCooldownLeft || 0) === 0)
-      .map((e) => e.id);
+  _selectedAbilityAffordances(sel) {
+    const ownUnits = this._selectedOwnUnits(sel);
+    const res = this.state.resources || { steel: 0, oil: 0 };
+    return Object.values(ABILITIES)
+      .map((definition) => {
+        const carriers = ownUnits.filter((e) => definition.carriers.includes(e.kind));
+        if (carriers.length === 0) return null;
+        const unlocked = this._abilityUnlocked(definition);
+        const affordable = this._affordable(definition.cost, res);
+        const readyUnits = carriers.filter(
+          (e) => this._abilityCooldownLeft(e, definition.ability) === 0,
+        );
+        const cooldowns = carriers.map((e) =>
+          this._abilityCooldownLeft(e, definition.ability),
+        );
+        return {
+          definition,
+          unlocked,
+          affordable,
+          carrierIds: carriers.map((e) => e.id),
+          readyIds: readyUnits.map((e) => e.id),
+          cooldownClocks: groupCooldownClocks(cooldowns, definition.cooldownTicks),
+        };
+      })
+      .filter(Boolean);
   }
 
-  _selectedOwnChargeCooldownClocks(sel) {
-    const cooldowns = this._selectedOwnUnits(sel)
-      .filter((e) => e.kind === KIND.RIFLEMAN)
-      .map((e) => e.chargeCooldownLeft || 0);
-    return groupCooldownClocks(cooldowns, RIFLEMAN_CHARGE_COOLDOWN_TICKS);
+  _abilityUnlocked(definition) {
+    const requirements = this._requirementsOf(definition);
+    return requirements.every((req) => this._playerHasCompleteKind(req));
+  }
+
+  _abilityTargetActive(ability) {
+    return this.state.commandTarget?.kind === "ability" &&
+      this.state.commandTarget.ability === ability;
+  }
+
+  _commandTargetSig() {
+    const target = this.state.commandTarget;
+    if (!target) return "";
+    if (typeof target === "string") return target;
+    return `${target.kind || ""}:${target.ability || ""}`;
   }
 
   /** True when the actionable selected units are workers and no army unit is selected. */
@@ -534,21 +568,18 @@ export class HUD {
     const ownUnits = this._selectedOwnUnits(sel);
     const unitIds = ownUnits.map((e) => e.id);
     const atGunIds = ownUnits.filter((e) => e.kind === KIND.AT_TEAM).map((e) => e.id);
-    const riflemanIds = this._selectedOwnRiflemanIds(sel);
-    const readyChargeRiflemanIds = this._selectedOwnReadyChargeRiflemanIds(sel);
-    const chargeCooldownClocks = this._selectedOwnChargeCooldownClocks(sel);
-    const chargeUnlocked =
-      riflemanIds.length > 0 && this._playerHasCompleteKind(KIND.TRAINING_CENTRE);
-    const chargeReadyCount = readyChargeRiflemanIds.length;
-    const showChargeReadyCount = chargeUnlocked && chargeReadyCount < riflemanIds.length;
+    const abilityAffordances = this._selectedAbilityAffordances(sel);
     const hasArmyUnit = ownUnits.some((e) => e.kind !== KIND.WORKER);
     const workerSelected = !hasArmyUnit && ownUnits.some((e) => e.kind === KIND.WORKER);
 
     const sig =
-      `units|${unitIds.join(".")}|target:${this.state.commandTarget || ""}|` +
+      `units|${unitIds.join(".")}|target:${this._commandTargetSig()}|` +
       `|at:${atGunIds.join(".")}|` +
-      `|rifle:${riflemanIds.join(".")}|charge:${chargeUnlocked ? 1 : 0}:${chargeReadyCount}:` +
-      `${chargeCooldownClocks.map((group) => `${group.count}:${Math.round(group.cooldownLeft)}`).join(",")}|` +
+      `|abilities:${abilityAffordances.map((affordance) =>
+        `${affordance.definition.ability}:${affordance.unlocked ? 1 : 0}:${affordance.affordable ? 1 : 0}:` +
+        `${affordance.readyIds.join(".")}:` +
+        `${affordance.cooldownClocks.map((group) => `${group.count}:${Math.round(group.cooldownLeft)}`).join(",")}`,
+      ).join("|")}|` +
       (workerSelected ? "worker-main" : "no-build");
     if (sig === this._cardSig) return;
     this._cardSig = sig;
@@ -644,25 +675,34 @@ export class HUD {
         },
       }));
       idx = 5;
-      if (chargeUnlocked || atGunIds.length > 0) {
+      if (abilityAffordances.some((affordance) => affordance.unlocked) || atGunIds.length > 0) {
         const empty = document.createElement("div");
         empty.className = "cmd-empty";
         frag.appendChild(empty);
         idx = 6;
       }
-      if (chargeUnlocked) {
+      for (const affordance of abilityAffordances) {
+        if (!affordance.unlocked) continue;
+        const definition = affordance.definition;
+        const readyCount = affordance.readyIds.length;
+        const showReadyCount = readyCount < affordance.carrierIds.length;
         frag.appendChild(this._cmdButton({
-          icon: "CHG",
-          label: "Charge",
-          title: "Riflemen sprint briefly at double movement speed",
+          icon: definition.icon,
+          label: definition.label,
+          title: this._abilityDisabledReason(affordance),
           hotkey: GRID_HOTKEYS[idx++],
-          enabled: chargeReadyCount > 0,
-          countBadge: showChargeReadyCount ? `${chargeReadyCount}` : "",
-          cooldownClocks: chargeCooldownClocks,
-          cls: "",
+          enabled: readyCount > 0 && affordance.affordable,
+          countBadge: showReadyCount ? `${readyCount}` : "",
+          cooldownClocks: affordance.cooldownClocks,
+          cost: definition.cost,
+          cls: this._abilityTargetActive(definition.ability) ? "active" : "",
           onClick: () => {
-            this.net.command(cmd.charge(readyChargeRiflemanIds));
-            this.state.endCommandTarget();
+            if (definition.targetMode === "worldPoint") {
+              this.state.beginCommandTarget({ kind: "ability", ability: definition.ability });
+            } else {
+              this.net.command(cmd.useAbility(definition.ability, affordance.readyIds));
+              this.state.endCommandTarget();
+            }
           },
         }));
       }
@@ -880,6 +920,20 @@ export class HUD {
     }
     if (!this._affordable(st.cost, res)) return "Not enough resources";
     return "";
+  }
+
+  _abilityDisabledReason(affordance) {
+    if (!affordance.unlocked) {
+      const missing = this._requirementsOf(affordance.definition)
+        .find((req) => !this._playerHasCompleteKind(req));
+      if (missing) {
+        const reqLabel = (STATS[missing] && STATS[missing].label) || missing;
+        return `Requires ${reqLabel}`;
+      }
+    }
+    if (!affordance.affordable) return "Not enough resources";
+    if (affordance.readyIds.length === 0) return "On cooldown";
+    return affordance.definition.title || "";
   }
 
   /** True if the player owns at least one completed entity of `kind`. */

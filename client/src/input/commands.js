@@ -87,6 +87,19 @@ export function _issueTargetedCommand(p, ev = {}) {
     }
     return;
   }
+  if (this.state.commandTarget?.kind === "ability") {
+    this.net.command(
+      cmd.useAbility(
+        this.state.commandTarget.ability,
+        ownUnits,
+        world.x,
+        world.y,
+        !!ev.shiftKey,
+      ),
+    );
+    this.state.addCommandFeedback("attack", world.x, world.y, !!ev.shiftKey);
+    return;
+  }
   if (this.state.commandTarget === "move") {
     this.net.command(cmd.move(ownUnits, world.x, world.y, !!ev.shiftKey));
     this.state.addCommandFeedback("move", world.x, world.y, !!ev.shiftKey);

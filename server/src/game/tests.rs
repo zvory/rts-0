@@ -5,7 +5,7 @@ use super::*;
 use crate::game::ai_core::profiles::{RIFLE_FLOOD_FAST_ID, RIFLE_FLOOD_FULL_SATURATION_ID};
 use crate::game::command::SimCommand as Command;
 use crate::game::entity::{Entity, EntityKind, GatherPhase, Order};
-use crate::protocol::{kinds, terrain, EntityView, OrderPlanMarker};
+use crate::protocol::{kinds, terrain, AbilityCooldownView, EntityView, OrderPlanMarker};
 
 fn human_vs_ai_players() -> [PlayerInit; 2] {
     [
@@ -175,6 +175,14 @@ fn legacy_view_of(game: &Game, e: &Entity, viewer: u32, fogged: bool) -> EntityV
         }
     }
     if e.owner == viewer {
+        for kind in [ability::AbilityKind::Charge, ability::AbilityKind::Smoke] {
+            if ability::carried_by(kind, e.kind) {
+                v.abilities.push(AbilityCooldownView {
+                    ability: kind.to_protocol_str().to_string(),
+                    cooldown_left: e.ability_cooldown_ticks(kind),
+                });
+            }
+        }
         if let Order::Attack(order) = e.order() {
             if let Some(target) = game.entities.get(order.intent.target) {
                 if target_visible {

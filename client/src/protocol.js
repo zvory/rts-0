@@ -37,6 +37,7 @@ export const CMD = Object.freeze({
   SETUP_AT_GUNS: "setupAtGuns",
   TEAR_DOWN_AT_GUNS: "tearDownAtGuns",
   CHARGE: "charge",
+  USE_ABILITY: "useAbility",
   GATHER: "gather",
   BUILD: "build",
   TRAIN: "train",
@@ -121,8 +122,13 @@ export const NOTICE_SEVERITY = Object.freeze({
   ALERT: "alert",
 });
 
+export const ABILITY = Object.freeze({
+  CHARGE: "charge",
+  SMOKE: "smoke",
+});
+
 // --- Compact snapshot wire schema (must match protocol.rs) ---
-export const COMPACT_SNAPSHOT_VERSION = 6;
+export const COMPACT_SNAPSHOT_VERSION = 7;
 
 export const KIND_CODE = Object.freeze({
   [KIND.WORKER]: 1,
@@ -182,11 +188,17 @@ export const ORDER_STAGE_CODE = Object.freeze({
   [ORDER_STAGE.BUILD]: 5,
 });
 
+export const ABILITY_CODE = Object.freeze({
+  [ABILITY.CHARGE]: 1,
+  [ABILITY.SMOKE]: 2,
+});
+
 const KIND_BY_CODE = Object.freeze(reverseCodes(KIND_CODE));
 const STATE_BY_CODE = Object.freeze(reverseCodes(STATE_CODE));
 const SETUP_BY_CODE = Object.freeze(reverseCodes(SETUP_CODE));
 const EVENT_BY_CODE = Object.freeze(reverseCodes(EVENT_CODE));
 const ORDER_STAGE_BY_CODE = Object.freeze(reverseCodes(ORDER_STAGE_CODE));
+const ABILITY_BY_CODE = Object.freeze(reverseCodes(ABILITY_CODE));
 const NOTICE_SEVERITY_BY_CODE = Object.freeze({
   1: NOTICE_SEVERITY.INFO,
   2: NOTICE_SEVERITY.WARN,
@@ -197,6 +209,7 @@ const MAX_COMPACT_ENTITIES = 20000;
 const MAX_COMPACT_RESOURCE_DELTAS = 20000;
 const MAX_COMPACT_EVENTS = 5000;
 const MAX_COMPACT_ORDER_PLAN = 9;
+const MAX_COMPACT_ABILITIES = 8;
 const MAX_COMPACT_DEBUG_WAYPOINTS = 128;
 
 /**
@@ -267,7 +280,7 @@ function decodeCompactPlayerResource(record, index) {
 }
 
 function decodeCompactEntity(record, index) {
-  const fields = readArray(record, `entity ${index}`, 25);
+  const fields = readArray(record, `entity ${index}`, 26);
   if (fields.length < 8) throw new Error(`entity ${index} is too short`);
   const entity = {
     id: readU32(fields[0], "entity.id"),
@@ -295,8 +308,9 @@ function decodeCompactEntity(record, index) {
   assignOptional(entity, "setupFacing", fields, 20, readNumber);
   assignOrderPlan(entity, fields, 21);
   assignOptional(entity, "chargeCooldownLeft", fields, 22, readU32);
-  assignOptional(entity, "visionOnly", fields, 23, readBool);
-  assignDebugPath(entity, fields, 24);
+  assignAbilities(entity, fields, 23);
+  assignOptional(entity, "visionOnly", fields, 24, readBool);
+  assignDebugPath(entity, fields, 25);
   return entity;
 }
 
@@ -326,6 +340,24 @@ function readOrderPlanMarker(record, label) {
     kind: readCode(marker[0], ORDER_STAGE_BY_CODE, `${label}.kind`),
     x: readNumber(marker[1], `${label}.x`),
     y: readNumber(marker[2], `${label}.y`),
+  };
+}
+
+/** Decode owner-only ability cooldown affordances into `entity.abilities`. */
+function assignAbilities(target, fields, index) {
+  if (index >= fields.length || fields[index] == null) return;
+  const cooldowns = readArray(fields[index], "entity.abilities", MAX_COMPACT_ABILITIES);
+  target.abilities = cooldowns.map((record, abilityIndex) =>
+    readAbilityCooldown(record, `entity.abilities.${abilityIndex}`),
+  );
+}
+
+function readAbilityCooldown(record, label) {
+  const fields = readArray(record, label, 2);
+  if (fields.length !== 2) throw new Error(`${label} field count mismatch`);
+  return {
+    ability: readCode(fields[0], ABILITY_BY_CODE, `${label}.ability`),
+    cooldownLeft: readU32(fields[1], `${label}.cooldownLeft`),
   };
 }
 
@@ -543,6 +575,12 @@ export const cmd = Object.freeze({
   setupAtGuns: (units, x, y) => ({ c: CMD.SETUP_AT_GUNS, units, x, y }),
   tearDownAtGuns: (units) => ({ c: CMD.TEAR_DOWN_AT_GUNS, units }),
   charge: (units) => ({ c: CMD.CHARGE, units }),
+  useAbility: (ability, units, x = null, y = null, queued = false) => {
+    const command = { c: CMD.USE_ABILITY, ability, units };
+    if (x != null) command.x = x;
+    if (y != null) command.y = y;
+    return withQueued(command, queued);
+  },
   gather: (units, node, queued = false) =>
     withQueued({ c: CMD.GATHER, units, node }, queued),
   build: (worker, building, tileX, tileY, queued = false) =>

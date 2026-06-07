@@ -83,6 +83,10 @@ authoritative `rules::defs` records.
 - `SCOUT_CAR_OIL_COST_PER_PX = 5 / (96 * TILE_SIZE)`: scout cars burn oil for movement at
   half the previous tank movement rate. Tanks and scout cars cannot advance while their owner has
   zero oil.
+- Ability shell metadata: Rifleman Charge has a 5s reuse delay and remains unlocked by a completed
+  Training Centre. Scout Car Smoke is exposed as a Factory-unlocked, world-point ability with
+  range 6 tiles, 10 oil listed cost, and a 20s listed cooldown; Phase 1 validates and carries the
+  command/cooldown model only and does not spawn LOS-blocking smoke yet.
 - Map: `TILE_SIZE = 32` px. The live map is the hardcoded handcrafted asset at
   `server/assets/maps/default-handcrafted.json` (126×126 today), served for tooling at
   `/maps/default-handcrafted.json`. The current asset is the original 96×96 handcrafted map

@@ -143,7 +143,7 @@ pub(super) fn is_combat_command(command: &Command, combat_intent_units: &BTreeSe
         Command::Move { units, .. } => units.iter().any(|id| combat_intent_units.contains(id)),
         Command::SetupAtGuns { .. }
         | Command::TearDownAtGuns { .. }
-        | Command::Charge { .. }
+        | Command::UseAbility { .. }
         | Command::Gather { .. }
         | Command::Build { .. }
         | Command::Train { .. }

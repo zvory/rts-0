@@ -31,7 +31,8 @@ short but readable. Coordinates are **world pixels** (floats) unless a field nam
 | `attack`     | `units: u32[]`, `target: u32`, `queued?: bool` | Attack a specific entity. When `queued` is true, store future attack intent instead of replacing the active order. |
 | `setupAtGuns` | `units: u32[]`, `x: f32`, `y: f32` | Manually emplace owned AT guns toward a world point. The server filters the unit list to owned, completed AT guns, clears movement/target state, records the setup facing, and enters `setting_up`. Other selected units are ignored. |
 | `tearDownAtGuns` | `units: u32[]` | Pack up owned AT guns that are `setting_up` or `deployed`. Other selected units are ignored. |
-| `charge`     | `units: u32[]` | Activate Rifleman Charge on owned riflemen. Requires at least one completed Training Centre. The server filters the unit list to owned, completed riflemen and sets a short sprint timer; other selected units are ignored. |
+| `charge`     | `units: u32[]` | Legacy Rifleman Charge activation. Preserved for old clients/replays, but translated to the generic Charge ability internally. |
+| `useAbility` | `ability: "charge"|"smoke"`, `units: u32[]`, `x?: f32`, `y?: f32`, `queued?: bool` | Generic ability command. `charge` is self-targeted and ignores `x/y`; `smoke` targets a world point. Phase 1 validates and records Smoke commands but does not apply smoke LOS gameplay yet. |
 | `gather`     | `units: u32[]`, `node: u32`, `queued?: bool` | Send workers to harvest a resource node. When `queued` is true, store future gather intent instead of replacing the active order. |
 | `build`      | `worker: u32`, `building: string`, `tileX: u32`, `tileY: u32`, `queued?: bool` | Worker constructs a building at a tile. The server first walks the worker to a nearby point outside the requested footprint, then starts construction once it is in range. `building` ∈ building kinds. When `queued` is true, store future build intent instead of replacing the active order. |
 | `train`      | `building: u32`, `unit: string` | Queue a unit at a production building. |
@@ -120,21 +121,21 @@ transport decode:
 }
 ```
 
-Live WebSocket snapshot frames are sent as compact JSON text, version 6. `client/src/net.js`
+Live WebSocket snapshot frames are sent as compact JSON text, version 7. `client/src/net.js`
 decodes this transport shape back into the semantic object above before dispatching `S.SNAPSHOT`.
 Older object-shaped JSON snapshots remain decodable by the client for fallback/dev use.
 
 ```
 {
   "t": "snapshot",
-  "v": 6,
+  "v": 7,
   "s": [tick, steel, oil, supplyUsed, supplyCap],
   "e": [
     [
       id, owner, kind, x, y, hp, maxHp, state,
       facing?, weaponFacing?, prodKind?, prodProgress?, prodQueue?,
       buildProgress?, latchedNode?, targetId?, setupState?, remaining?, rally?, oilUsed?,
-      setupFacing?, orderPlan?, chargeCooldownLeft?, visionOnly?, debugPath?
+      setupFacing?, orderPlan?, chargeCooldownLeft?, abilities?, visionOnly?, debugPath?
     ]
   ],
   "r": [[id, remaining]],         // omitted when empty
@@ -162,6 +163,8 @@ stage first, followed by queued stages in execution order. Each compact stage is
 where `kind` is 1 `move`, 2 `attackMove`, 3 `attack`, 4 `gather`, or 5 `build`. Stages carry safe
 world points only, never target ids; hidden attack target stages may be omitted rather than leaking
 enemy positions through fog.
+The `abilities` slot is owner-only and capped at 8 entries. Each compact ability cooldown is
+`[ability, cooldownLeft]`, where `ability` is 1 `charge` or 2 `smoke`.
 `visionOnly` is true only for non-owned units/buildings visible through lingering death vision;
 clients render them below the fog overlay and must not select or issue targeted commands against
 them. In `n.flags`, bit 0 = `slowTick` and bit 1 = `headOfLine`.
@@ -207,7 +210,10 @@ watch rooms receive all resource updates).
   orderPlan?: [                  // current + queued order stages; ONLY ever sent to the owner
     { kind: "move"|"attackMove"|"attack"|"gather"|"build", x: f32, y: f32 }
   ],
-  chargeCooldownLeft?: u16,      // rifleman only: owner-visible remaining Charge cooldown in ticks
+  chargeCooldownLeft?: u16,      // legacy rifleman-only owner-visible remaining Charge cooldown
+  abilities?: [                  // owner-only ability affordance/cooldown data
+    { ability: "charge"|"smoke", cooldownLeft: u16 }
+  ],
   visionOnly?: bool,             // true = visible only through one-second death vision; visual intel only
   debugPath?: {                  // lobby Debug mode only; remaining movement path; ONLY ever sent to the owner
     waypoints: { x: f32, y: f32 }[],

@@ -77,7 +77,7 @@ pub(crate) fn movement_system_with_events(
     for id in entities.ids() {
         if let Some(e) = entities.get_mut(id) {
             e.tick_charge();
-            e.tick_charge_cooldown();
+            e.tick_ability_cooldowns();
         }
     }
 }

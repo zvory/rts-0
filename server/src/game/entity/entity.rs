@@ -1,4 +1,7 @@
+use std::collections::BTreeMap;
+
 use crate::config;
+use crate::game::ability::AbilityKind;
 use crate::protocol::states;
 use crate::rules;
 
@@ -44,6 +47,7 @@ pub struct Entity {
     pub construction: Option<ConstructionState>,
     pub worker: Option<WorkerState>,
     pub resource_node: Option<ResourceNodeState>,
+    pub ability_cooldowns: BTreeMap<AbilityKind, u16>,
 }
 
 impl Entity {
@@ -70,6 +74,7 @@ impl Entity {
             construction: None,
             worker: (kind == EntityKind::Worker).then(WorkerState::default),
             resource_node: None,
+            ability_cooldowns: BTreeMap::new(),
         })
     }
 
@@ -109,6 +114,7 @@ impl Entity {
             }),
             worker: None,
             resource_node: None,
+            ability_cooldowns: BTreeMap::new(),
         })
     }
 
@@ -137,6 +143,7 @@ impl Entity {
                 remaining: amount,
                 miner: None,
             }),
+            ability_cooldowns: BTreeMap::new(),
         })
     }
 
@@ -404,10 +411,7 @@ impl Entity {
     }
 
     pub fn charge_cooldown_ticks(&self) -> u16 {
-        self.movement
-            .as_ref()
-            .map(|m| m.charge_cooldown_ticks)
-            .unwrap_or(0)
+        self.ability_cooldown_ticks(AbilityKind::Charge)
     }
 
     pub fn start_charge(&mut self, ticks: u16) {
@@ -418,24 +422,29 @@ impl Entity {
         }
     }
 
-    pub fn start_charge_cooldown(&mut self, ticks: u16) {
-        if self.kind == EntityKind::Rifleman {
-            if let Some(m) = self.movement.as_mut() {
-                m.charge_cooldown_ticks = ticks;
-            }
-        }
-    }
-
     pub fn tick_charge(&mut self) {
         if let Some(m) = self.movement.as_mut() {
             m.charge_ticks = m.charge_ticks.saturating_sub(1);
         }
     }
 
-    pub fn tick_charge_cooldown(&mut self) {
-        if let Some(m) = self.movement.as_mut() {
-            m.charge_cooldown_ticks = m.charge_cooldown_ticks.saturating_sub(1);
+    pub fn ability_cooldown_ticks(&self, ability: AbilityKind) -> u16 {
+        self.ability_cooldowns.get(&ability).copied().unwrap_or(0)
+    }
+
+    pub fn start_ability_cooldown(&mut self, ability: AbilityKind, ticks: u16) {
+        if ticks == 0 {
+            self.ability_cooldowns.remove(&ability);
+        } else {
+            self.ability_cooldowns.insert(ability, ticks);
         }
+    }
+
+    pub fn tick_ability_cooldowns(&mut self) {
+        self.ability_cooldowns.retain(|_, ticks| {
+            *ticks = ticks.saturating_sub(1);
+            *ticks > 0
+        });
     }
 
     pub fn movement_speed_multiplier(&self) -> f32 {

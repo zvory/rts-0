@@ -4,11 +4,12 @@
 //! last-known-position or partial-reveal rules should grow here.
 
 use crate::config;
+use crate::game::ability;
 use crate::game::entity::{
     fires_while_moving, Entity, EntityKind, EntityStore, GatherPhase, Order, OrderIntent,
 };
 use crate::game::fog::Fog;
-use crate::protocol::{DebugPathPoint, DebugPathView};
+use crate::protocol::{AbilityCooldownView, DebugPathPoint, DebugPathView};
 use crate::protocol::{EntityView, OrderPlanMarker};
 
 const MAX_DEBUG_PATH_WAYPOINTS: usize = 128;
@@ -147,6 +148,28 @@ pub fn project_entity(
             let charge_cooldown_left = entity.charge_cooldown_ticks();
             if charge_cooldown_left > 0 {
                 view.charge_cooldown_left = Some(charge_cooldown_left);
+            }
+        }
+        view.abilities = entity
+            .ability_cooldowns
+            .iter()
+            .filter(|(_, cooldown_left)| **cooldown_left > 0)
+            .map(|(kind, cooldown_left)| AbilityCooldownView {
+                ability: kind.to_protocol_str().to_string(),
+                cooldown_left: *cooldown_left,
+            })
+            .collect();
+        for kind in [ability::AbilityKind::Charge, ability::AbilityKind::Smoke] {
+            if ability::carried_by(kind, entity.kind)
+                && !view
+                    .abilities
+                    .iter()
+                    .any(|cooldown| cooldown.ability == kind.to_protocol_str())
+            {
+                view.abilities.push(AbilityCooldownView {
+                    ability: kind.to_protocol_str().to_string(),
+                    cooldown_left: 0,
+                });
             }
         }
     }
@@ -621,7 +644,7 @@ mod tests {
         entities
             .get_mut(rifle_id)
             .expect("rifleman should exist")
-            .start_charge_cooldown(42);
+            .start_ability_cooldown(ability::AbilityKind::Charge, 42);
 
         let map = Map {
             size: 64,

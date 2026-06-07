@@ -615,7 +615,7 @@ export class GameState {
 
   /**
    * Arm a one-click command target mode from the HUD.
-   * @param {"move"|"attack"|"setupAtGuns"} kind
+   * @param {"move"|"attack"|"setupAtGuns"|{kind:"ability",ability:string}} kind
    */
   beginCommandTarget(kind) {
     this.placement = null;

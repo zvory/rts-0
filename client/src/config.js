@@ -2,7 +2,7 @@
 // Gameplay is authoritative on the server; these values drive UI labels, the command
 // card, fog sight radii, and rendering. Keep costs/supply/sight in sync with the server.
 
-import { KIND } from "./protocol.js";
+import { ABILITY, KIND } from "./protocol.js";
 
 // Timing (for snapshot interpolation). Must match server TICK_HZ / SNAPSHOT_EVERY_N_TICKS.
 export const TICK_HZ = 30;
@@ -62,6 +62,9 @@ export const MINING_CC_RANGE_TILES = 7.0;
 export const AT_GUN_DEPLOYED_RANGE_TILES = 12;
 export const AT_GUN_FIELD_OF_FIRE_RAD = Math.PI / 4;
 export const RIFLEMAN_CHARGE_COOLDOWN_TICKS = 150;
+export const SMOKE_ABILITY_RANGE_TILES = 6;
+export const SMOKE_ABILITY_COOLDOWN_TICKS = 600;
+export const SMOKE_ABILITY_COST = Object.freeze({ steel: 0, oil: 10 });
 
 // Player colors (server assigns from a matching palette; used as a fallback for blips).
 export const PLAYER_PALETTE = Object.freeze([
@@ -104,6 +107,34 @@ export const STATS = Object.freeze({
 
   [KIND.STEEL]: { label: "Steel", size: 22 },
   [KIND.OIL]: { label: "Oil", size: 14 },
+});
+
+export const ABILITIES = Object.freeze({
+  [ABILITY.CHARGE]: Object.freeze({
+    ability: ABILITY.CHARGE,
+    label: "Charge",
+    icon: "CHG",
+    title: "Riflemen sprint briefly at double movement speed",
+    carriers: Object.freeze([KIND.RIFLEMAN]),
+    targetMode: "self",
+    cooldownTicks: RIFLEMAN_CHARGE_COOLDOWN_TICKS,
+    cost: Object.freeze({ steel: 0, oil: 0 }),
+    requires: KIND.TRAINING_CENTRE,
+    queued: false,
+  }),
+  [ABILITY.SMOKE]: Object.freeze({
+    ability: ABILITY.SMOKE,
+    label: "Smoke",
+    icon: "SMK",
+    title: "Target a smoke grenade location",
+    carriers: Object.freeze([KIND.SCOUT_CAR]),
+    targetMode: "worldPoint",
+    rangeTiles: SMOKE_ABILITY_RANGE_TILES,
+    cooldownTicks: SMOKE_ABILITY_COOLDOWN_TICKS,
+    cost: SMOKE_ABILITY_COST,
+    requires: KIND.FACTORY,
+    queued: false,
+  }),
 });
 
 // A building that trains units — the only buildings that accept a rally point.
