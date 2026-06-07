@@ -7,11 +7,31 @@ export function _controlGroupSlotFromKey(ev) {
   return n === 0 ? 9 : n - 1;
 }
 
+export function _controlGroupIsWindowsPlatform() {
+  const nav = globalThis.navigator;
+  const platform = `${nav?.userAgentData?.platform || nav?.platform || ""}`;
+  if (/Windows/i.test(platform)) return true;
+  return /\bWindows\b|\bWin(?:32|64|CE)\b/i.test(`${nav?.userAgent || ""}`);
+}
+
+export function _controlGroupSaveModifierActive(ev, runtime = {}) {
+  const isWindows = runtime.isWindows ?? _controlGroupIsWindowsPlatform();
+  const isDesktop = !!runtime.isDesktop;
+  if (isWindows) {
+    return isDesktop
+      ? ev.ctrlKey && !ev.altKey && !ev.metaKey
+      : ev.altKey && !ev.ctrlKey && !ev.metaKey;
+  }
+  return ev.altKey || ev.ctrlKey || ev.metaKey;
+}
+
 export function _handleControlGroupHotkey(ev) {
   const slot = this._controlGroupSlotFromKey(ev);
   if (slot == null || this.state.spectator) return false;
 
-  const save = (ev.altKey || ev.ctrlKey || ev.metaKey) && !ev.shiftKey;
+  const save = _controlGroupSaveModifierActive(ev, {
+    isDesktop: typeof this.desktopRuntime === "function" && this.desktopRuntime(),
+  }) && !ev.shiftKey;
   const add = ev.shiftKey && !ev.altKey && !ev.ctrlKey && !ev.metaKey;
   const recall = !ev.altKey && !ev.ctrlKey && !ev.metaKey && !ev.shiftKey;
   if (!save && !add && !recall) return false;
