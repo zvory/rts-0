@@ -35,6 +35,7 @@ import {
   _issueTargetedCommand,
   _nearestOwnCompletedCityCentre,
   _onRightClick,
+  _refreshAbilityTargetPreview,
   _refreshAtGunSetupPreview,
   _refreshResourceMiningPreview,
   _selectedOwnAtGunIds,
@@ -227,9 +228,17 @@ export class Input {
     }
     if (this.state.commandTarget === "setupAtGuns") {
       this.state.updateResourceMiningPreview(null);
+      this.state.updateAbilityTargetPreview(null);
       this._refreshAtGunSetupPreview();
       return;
     }
+    if (this.state.commandTarget?.kind === "ability") {
+      this.state.updateResourceMiningPreview(null);
+      this.state.updateAtGunSetupPreview(null);
+      this._refreshAbilityTargetPreview();
+      return;
+    }
+    this.state.updateAbilityTargetPreview(null);
     this.state.updateAtGunSetupPreview(null);
     this._refreshResourceMiningPreview();
   }
@@ -847,6 +856,7 @@ Object.assign(Input.prototype, {
   _selectedWorkerIds,
   _selectedOwnAtGunIds,
   _refreshAtGunSetupPreview,
+  _refreshAbilityTargetPreview,
   _refreshResourceMiningPreview,
   _nearestOwnCompletedCityCentre,
   _entityAtWorld,

@@ -1,5 +1,5 @@
 import { cmd, PASSABLE, isUnit, isBuilding, isResource, KIND } from "../protocol.js";
-import { MINING_CC_RANGE_TILES, STATS, TANK_BODY, isProducerBuilding } from "../config.js";
+import { ABILITIES, MINING_CC_RANGE_TILES, STATS, TANK_BODY, isProducerBuilding } from "../config.js";
 import { DEFAULT_HIT_RADIUS, DEFAULT_TILE_SIZE, HIT_PAD_PX, OWN_HIT_BONUS, ZOOM_STEP } from "./constants.js";
 import { commandHotkeyFromEvent } from "./placement.js";
 
@@ -88,15 +88,17 @@ export function _issueTargetedCommand(p, ev = {}) {
     return;
   }
   if (this.state.commandTarget?.kind === "ability") {
-    this.net.command(
-      cmd.useAbility(
-        this.state.commandTarget.ability,
-        ownUnits,
-        world.x,
-        world.y,
-        !!ev.shiftKey,
-      ),
-    );
+    const ability = this.state.commandTarget.ability;
+    const definition = ABILITIES[ability];
+    const carriers = definition?.carriers;
+    const units = Array.isArray(carriers)
+      ? this.state
+          .selectedEntities()
+          .filter((e) => e.owner === this.state.playerId && carriers.includes(e.kind))
+          .map((e) => e.id)
+      : ownUnits;
+    if (units.length === 0) return;
+    this.net.command(cmd.useAbility(ability, units, world.x, world.y, !!ev.shiftKey));
     this.state.addCommandFeedback("attack", world.x, world.y, !!ev.shiftKey);
     return;
   }
@@ -167,6 +169,46 @@ function _resumeConstructionIntent(target, map) {
   const tileY = Math.round(target.y / tileSize - stat.footH * 0.5);
   if (!Number.isFinite(tileX) || !Number.isFinite(tileY)) return null;
   return { building: target.kind, tileX, tileY };
+}
+
+export function _refreshAbilityTargetPreview() {
+  const target = this.state.commandTarget;
+  if (!target || target.kind !== "ability" || !this.mouse) {
+    this.state.updateAbilityTargetPreview(null);
+    return;
+  }
+  const definition = ABILITIES[target.ability];
+  if (!definition || !Array.isArray(definition.carriers) || !definition.rangeTiles) {
+    this.state.updateAbilityTargetPreview(null);
+    return;
+  }
+  const me = this.state.playerId;
+  const carriers = this.state
+    .selectedEntities()
+    .filter((e) => e.owner === me && definition.carriers.includes(e.kind));
+  if (carriers.length === 0) {
+    this.state.updateAbilityTargetPreview(null);
+    return;
+  }
+  const tileSize = this.state.map?.tileSize || 32;
+  const rangePx = definition.rangeTiles * tileSize;
+  const world = this._worldAt(this.mouse.x, this.mouse.y);
+  let hoverInRange = false;
+  for (const c of carriers) {
+    if (Math.hypot(world.x - c.x, world.y - c.y) <= rangePx) {
+      hoverInRange = true;
+      break;
+    }
+  }
+  this.state.updateAbilityTargetPreview({
+    ability: target.ability,
+    mouseX: world.x,
+    mouseY: world.y,
+    carriers,
+    rangePx,
+    radiusPx: (definition.radiusTiles || 0) * tileSize,
+    hoverInRange,
+  });
 }
 
 export function _refreshAtGunSetupPreview() {

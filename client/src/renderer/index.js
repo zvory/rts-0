@@ -29,6 +29,7 @@ import {
   _tintFor,
 } from "./entities.js";
 import {
+  _drawAbilityTargetPreview,
   _drawAtGunSetupPreview,
   _drawCommandFeedback,
   _drawDebugPathOverlay,
@@ -37,6 +38,7 @@ import {
   _drawPlacement,
   _drawRallyPoints,
   _drawResourceMiningPreview,
+  _drawSmokes,
   drawSelectionBox,
 } from "./feedback.js";
 import { _drawFog, _fogLevel } from "./fog.js";
@@ -95,6 +97,8 @@ export class Renderer {
     this.layers.fog.addChild(this._fogGfx);
     this._feedbackGfx = new PIXI.Graphics();
     this.layers.feedback.addChild(this._feedbackGfx);
+    this._smokeGfx = new PIXI.Graphics();
+    this.layers.smokes.addChild(this._smokeGfx);
     this._placementGfx = new PIXI.Graphics();
     this.layers.placement.addChild(this._placementGfx);
 
@@ -203,8 +207,11 @@ export class Renderer {
     this._sweepTankMotion(liveIds);
 
     // Overlays.
+    this._smokeGfx.clear();
+    this._drawSmokes(state);
     this._drawFog(fog);
     this._drawCommandFeedback(state);
+    this._drawAbilityTargetPreview(state);
     this._drawAtGunSetupPreview(state);
     this._drawOrderPlan(state);
     this._drawDebugPathOverlay(state, regularEntities);
@@ -389,6 +396,7 @@ export class Renderer {
     // Long-lived single Graphics.
     this._fogGfx.destroy();
     this._feedbackGfx.destroy();
+    this._smokeGfx.destroy();
     this._placementGfx.destroy();
     this._dragGfx.destroy();
 
@@ -429,6 +437,8 @@ Object.assign(Renderer.prototype, {
   _fogLevel,
   _drawPlacement,
   _drawCommandFeedback,
+  _drawAbilityTargetPreview,
+  _drawSmokes,
   _drawAtGunSetupPreview,
   _drawOrderPlan,
   _drawDebugPathOverlay,

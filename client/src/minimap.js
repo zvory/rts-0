@@ -9,6 +9,7 @@
 
 import { cmd } from "./protocol.js";
 import { TERRAIN, isResource, isUnit } from "./protocol.js";
+import { ABILITIES } from "./config.js";
 
 const isImpassableTerrainCode = (code) => code === TERRAIN.ROCK || code === TERRAIN.WATER;
 import { COLORS, FOG_EXPLORED_ALPHA, FOG_UNEXPLORED_ALPHA } from "./config.js";
@@ -466,6 +467,20 @@ export class Minimap {
     if (unitIds.length === 0) return;
     if (this.state.commandTarget === "attack") {
       this.net.command(cmd.attackMove(unitIds, wx, wy, queued));
+      this.state.addCommandFeedback("attack", wx, wy, queued);
+      return;
+    }
+    if (this.state.commandTarget?.kind === "ability") {
+      const ability = this.state.commandTarget.ability;
+      const definition = ABILITIES[ability];
+      const carriers = definition?.carriers;
+      const abilityUnits = Array.isArray(carriers)
+        ? sel
+            .filter((e) => e.owner === this.state.playerId && carriers.includes(e.kind))
+            .map((e) => e.id)
+        : unitIds;
+      if (abilityUnits.length === 0) return;
+      this.net.command(cmd.useAbility(ability, abilityUnits, wx, wy, queued));
       this.state.addCommandFeedback("attack", wx, wy, queued);
       return;
     }

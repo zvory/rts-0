@@ -104,6 +104,10 @@ export class GameState {
     this.resourceMiningPreview = null;
     /** @type {null | {mouseX:number, mouseY:number, guns:Array<object>}} */
     this.atGunSetupPreview = null;
+    /** @type {null | {ability:string, mouseX:number, mouseY:number, carriers:Array<object>, rangePx:number, hoverInRange:boolean}} */
+    this.abilityTargetPreview = null;
+    /** @type {Array<{id:number,x:number,y:number,radiusTiles:number,expiresIn:number}>} */
+    this.smokes = [];
 
     /** @type {Array<{from:number,to:number,createdAt:number}>} */
     this.muzzleFlashes = [];
@@ -188,6 +192,7 @@ export class GameState {
       supplyCap: msg.supplyCap | 0,
     };
     this.playerResources = msg.playerResources || [];
+    this.smokes = Array.isArray(msg.smokes) ? msg.smokes : [];
     this.events = events;
     this._pruneSelection();
     this._pruneControlGroups();
@@ -622,12 +627,16 @@ export class GameState {
     this.closeCommandCardMenu();
     this.commandTarget = kind;
     if (kind !== "setupAtGuns") this.atGunSetupPreview = null;
+    if (!(kind && typeof kind === "object" && kind.kind === "ability")) {
+      this.abilityTargetPreview = null;
+    }
   }
 
   /** Clear any armed command target mode. */
   endCommandTarget() {
     this.commandTarget = null;
     this.atGunSetupPreview = null;
+    this.abilityTargetPreview = null;
   }
 
   /**
@@ -669,6 +678,14 @@ export class GameState {
    */
   updateAtGunSetupPreview(preview) {
     this.atGunSetupPreview = preview;
+  }
+
+  /**
+   * Set or clear the armed-ability targeting preview (range circles + hover validity).
+   * @param {null | {ability:string, mouseX:number, mouseY:number, carriers:Array<object>, rangePx:number, hoverInRange:boolean}} preview
+   */
+  updateAbilityTargetPreview(preview) {
+    this.abilityTargetPreview = preview;
   }
 
   // --- map helpers --------------------------------------------------------
