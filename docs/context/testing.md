@@ -10,6 +10,7 @@ Use when writing or debugging tests, or before claiming a change is done.
 - `node tests/server_integration.mjs` — dep-free, full server pipeline
 - `node tests/regression.mjs` — dep-free, hardening/DoS/robustness guards
 - `node tests/ai_integration.mjs` — dep-free, AI opponent lobby flow
+- `node tests/minimap_input_contracts.mjs` — dep-free minimap/router pointer-lock input contracts
 - `cd tests && npm install && node client_smoke.mjs` — headless-Chrome client smoke
 - `cd server && cargo test` — simulation behavior + scripted self-play (no running server needed)
 
