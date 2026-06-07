@@ -257,6 +257,15 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
 }
 
 {
+  const viewport = { requestPointerLock() {} };
+  const canvas = { requestPointerLock() {} };
+  const canvasInput = Object.create(Input.prototype);
+  canvasInput.dom = viewport;
+  canvasInput.renderer = { app: { view: canvas } };
+  assert(canvasInput._pointerLockTarget() === canvas, "Pointer Lock prefers the Pixi canvas target");
+}
+
+{
   let focused = false;
   let windowFocused = false;
   const priorWindow = globalThis.window;

@@ -166,6 +166,10 @@ export class Input {
   _install() {
     const el = this.dom;
     if (!el.hasAttribute("tabindex")) el.tabIndex = -1;
+    const lockTarget = this._pointerLockTarget();
+    if (lockTarget !== el && typeof lockTarget.hasAttribute === "function" && !lockTarget.hasAttribute("tabindex")) {
+      lockTarget.tabIndex = -1;
+    }
     el.addEventListener("mousedown", this._onMouseDown);
     // Move/up on window so a drag that leaves the viewport still tracks & releases.
     window.addEventListener("mousemove", this._onMouseMove);
@@ -331,9 +335,15 @@ export class Input {
     return this._browserRequestPointerLock() !== null && this._browserExitPointerLockFn() !== null;
   }
 
+  _pointerLockTarget() {
+    const view = this.renderer?.app?.view;
+    return view && typeof view.requestPointerLock === "function" ? view : this.dom;
+  }
+
   _browserRequestPointerLock() {
-    const fn = this.dom.requestPointerLock || this.dom.webkitRequestPointerLock;
-    return typeof fn === "function" ? fn.bind(this.dom) : null;
+    const target = this._pointerLockTarget();
+    const fn = target.requestPointerLock || target.webkitRequestPointerLock;
+    return typeof fn === "function" ? fn.bind(target) : null;
   }
 
   _browserExitPointerLockFn() {
@@ -345,13 +355,29 @@ export class Input {
     return document.pointerLockElement || document.webkitPointerLockElement || null;
   }
 
+  _elementDebugSummary(el) {
+    if (!el) return null;
+    return {
+      tag: el.tagName,
+      id: el.id || null,
+      className: el.className || null,
+      requestPointerLock: typeof el.requestPointerLock,
+      webkitRequestPointerLock: typeof el.webkitRequestPointerLock,
+    };
+  }
+
   pointerLockDebugSnapshot() {
+    const target = this._pointerLockTarget();
     return {
       desktopRuntime: this.desktopRuntime(),
       pointerLocked: this.pointerLocked,
-      pointerLockElementMatches: this._browserPointerLockElement() === this.dom,
-      requestPointerLock: typeof this.dom.requestPointerLock,
-      webkitRequestPointerLock: typeof this.dom.webkitRequestPointerLock,
+      pointerLockElementMatches: this._browserPointerLockElement() === target,
+      pointerLockElementIsViewport: this._browserPointerLockElement() === this.dom,
+      pointerLockElementIsTarget: this._browserPointerLockElement() === target,
+      viewport: this._elementDebugSummary(this.dom),
+      lockTarget: this._elementDebugSummary(target),
+      requestPointerLock: typeof target.requestPointerLock,
+      webkitRequestPointerLock: typeof target.webkitRequestPointerLock,
       exitPointerLock: typeof document.exitPointerLock,
       webkitExitPointerLock: typeof document.webkitExitPointerLock,
       hasPointerLockElement: "pointerLockElement" in document,
@@ -381,6 +407,8 @@ export class Input {
 
   _focusPointerLockTarget() {
     const before = this._focusDebugState();
+    const target = this._pointerLockTarget();
+    if (typeof target.hasAttribute === "function" && !target.hasAttribute("tabindex")) target.tabIndex = -1;
     if (typeof globalThis.window?.focus === "function") {
       try {
         globalThis.window.focus();
@@ -388,15 +416,15 @@ export class Input {
         // Some embedded webviews expose focus but reject it; the element focus below is still useful.
       }
     }
-    if (typeof this.dom.focus !== "function") {
+    if (typeof target.focus !== "function") {
       this._lastPointerLockFocusAttempt = { before, after: this._focusDebugState(), elementFocusCalled: false };
       return;
     }
     const elementFocusCalled = true;
     try {
-      this.dom.focus({ preventScroll: true });
+      target.focus({ preventScroll: true });
     } catch {
-      this.dom.focus();
+      target.focus();
     }
     this._lastPointerLockFocusAttempt = { before, after: this._focusDebugState(), elementFocusCalled };
   }
@@ -475,10 +503,10 @@ export class Input {
         resolve(locked);
       };
       const timer = window.setTimeout(() => {
-        finish("timeout", this._browserPointerLockElement() === this.dom, null);
+        finish("timeout", this._browserPointerLockElement() === this._pointerLockTarget(), null);
       }, POINTER_LOCK_RESULT_TIMEOUT_MS);
       pointerLockPromise.then(
-        () => finish("resolved", this._browserPointerLockElement() === this.dom, null),
+        () => finish("resolved", this._browserPointerLockElement() === this._pointerLockTarget(), null),
         (err) => finish("rejected", false, err),
       );
     });
@@ -490,7 +518,7 @@ export class Input {
       ...this._lastPointerLockRequest,
       outcome,
       after: this._focusDebugState(),
-      pointerLockElementMatches: this._browserPointerLockElement() === this.dom,
+      pointerLockElementMatches: this._browserPointerLockElement() === this._pointerLockTarget(),
       error: err ? this._pointerLockErrorSummary(err) : null,
     };
   }
@@ -508,7 +536,7 @@ export class Input {
   }
 
   _waitForBrowserPointerLockResult() {
-    if (this._browserPointerLockElement() === this.dom) return Promise.resolve(true);
+    if (this._browserPointerLockElement() === this._pointerLockTarget()) return Promise.resolve(true);
     return new Promise((resolve) => {
       let done = false;
       const finish = (locked) => {
@@ -521,9 +549,9 @@ export class Input {
         document.removeEventListener("webkitpointerlockerror", onError);
         resolve(locked);
       };
-      const onChange = () => finish(this._browserPointerLockElement() === this.dom);
+      const onChange = () => finish(this._browserPointerLockElement() === this._pointerLockTarget());
       const onError = () => finish(false);
-      const timer = window.setTimeout(() => finish(this._browserPointerLockElement() === this.dom), 350);
+      const timer = window.setTimeout(() => finish(this._browserPointerLockElement() === this._pointerLockTarget()), 350);
       document.addEventListener("pointerlockchange", onChange);
       document.addEventListener("pointerlockerror", onError);
       document.addEventListener("webkitpointerlockchange", onChange);
@@ -539,7 +567,7 @@ export class Input {
   }
 
   _exitBrowserPointerLock() {
-    if (this._browserPointerLockElement() === this.dom) {
+    if (this._browserPointerLockElement() === this._pointerLockTarget()) {
       const exitPointerLock = this._browserExitPointerLockFn();
       if (exitPointerLock) exitPointerLock();
     }
@@ -550,7 +578,7 @@ export class Input {
   }
 
   _handlePointerLockChange() {
-    const locked = this._browserPointerLockElement() === this.dom;
+    const locked = this._browserPointerLockElement() === this._pointerLockTarget();
     this._setCursorLockState(locked, locked ? "browser" : null);
   }
 
