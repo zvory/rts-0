@@ -87,8 +87,9 @@ export class Input {
    * @param {import("../renderer/index.js").Renderer} renderer for drawSelectionBox
    * @param {import("../fog.js").Fog} fog kept for parity / future hit-test filtering
    * @param {import("../audio.js").Audio} [audio] optional audio engine for local cues
+   * @param {import("./router.js").MatchInputRouter} [inputRouter] optional UI input router
    */
-  constructor(domElement, camera, state, net, renderer, fog, audio) {
+  constructor(domElement, camera, state, net, renderer, fog, audio, inputRouter = null) {
     this.dom = domElement;
     this.camera = camera;
     this.state = state;
@@ -96,6 +97,7 @@ export class Input {
     this.renderer = renderer;
     this.fog = fog;
     this.audio = audio || null;
+    this.inputRouter = inputRouter;
 
     /**
      * Continuous pan-key state, read by Camera.update(dt, input). Booleans for the
@@ -133,6 +135,7 @@ export class Input {
     this.pointerLocked = false;
     this._cursorLockMode = null;
     this._pointerLockCursor = null;
+    this._suppressNextContextMenu = false;
     this.onPointerLockChange = null;
     this.onPointerLockError = null;
 
@@ -274,6 +277,38 @@ export class Input {
     return p;
   }
 
+  _routedPointerEvent(ev, p, source) {
+    const rect = this.dom.getBoundingClientRect();
+    return {
+      viewportX: p.x,
+      viewportY: p.y,
+      clientX: rect.left + p.x,
+      clientY: rect.top + p.y,
+      button: Number.isFinite(p.button) ? p.button : ev.button,
+      shiftKey: ev.shiftKey,
+      ctrlKey: ev.ctrlKey,
+      metaKey: ev.metaKey,
+      altKey: ev.altKey,
+      source,
+      originalEvent: ev,
+    };
+  }
+
+  _routeLockedPointerDown(ev, p) {
+    if (!this.pointerLocked || !this.inputRouter) return false;
+    return this.inputRouter.pointerDown(this._routedPointerEvent(ev, p, "locked"));
+  }
+
+  _routeLockedPointerMove(ev, p) {
+    if (!this.pointerLocked || !this.inputRouter) return false;
+    return this.inputRouter.pointerMove(this._routedPointerEvent(ev, p, "locked"));
+  }
+
+  _routeLockedPointerUp(ev, p) {
+    if (!this.pointerLocked || !this.inputRouter) return false;
+    return this.inputRouter.pointerUp(this._routedPointerEvent(ev, p, "locked"));
+  }
+
   pointerLockSupported() {
     return cursorLockSupported(this._browserPointerLockSupported());
   }
@@ -398,6 +433,16 @@ export class Input {
   _handleMouseDown(ev) {
     const p = this._eventScreenPos(ev);
     if (!this.pointerLocked) this._trackMouse(p);
+    if (this.pointerLocked && ev.button === 2) {
+      this._suppressNextContextMenu = true;
+      if (!this._routeLockedPointerDown(ev, { ...p, button: 2 })) this._onRightClick(p, ev);
+      ev.preventDefault();
+      return;
+    }
+    if (ev.button !== 2 && this._routeLockedPointerDown(ev, p)) {
+      ev.preventDefault();
+      return;
+    }
     if (ev.button === 1 || (ev.button === 0 && this._spacePan)) {
       this._startPanDrag(p, ev.button);
       ev.preventDefault();
@@ -412,6 +457,10 @@ export class Input {
   _handleMouseMove(ev) {
     const p = this.pointerLocked ? this._moveLockedCursor(ev) : this._screenPos(ev);
     if (!this.pointerLocked) this._trackMouse(p);
+    if (this._routeLockedPointerMove(ev, p)) {
+      ev.preventDefault();
+      return;
+    }
 
     if (this._panDrag) {
       this.camera.panByScreenDelta(p.x - this._panDrag.x, p.y - this._panDrag.y);
@@ -447,6 +496,10 @@ export class Input {
     if (ev.button !== 0) return;
     const p = this._eventScreenPos(ev);
     if (!this.pointerLocked) this._trackMouse(p);
+    if (this._routeLockedPointerUp(ev, p)) {
+      ev.preventDefault();
+      return;
+    }
     if (!this._drag) return;
 
     const wasDragging = this._dragging;
@@ -472,8 +525,13 @@ export class Input {
   _handleContextMenu(ev) {
     // Always suppress the native menu over the viewport; treat as a right-click.
     ev.preventDefault();
+    if (this._suppressNextContextMenu) {
+      this._suppressNextContextMenu = false;
+      return;
+    }
     const p = this._eventScreenPos(ev);
     if (!this.pointerLocked) this._trackMouse(p);
+    if (this._routeLockedPointerDown(ev, { ...p, button: 2 })) return;
     this._onRightClick(p, ev);
   }
 

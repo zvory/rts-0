@@ -16,7 +16,7 @@ src/
   renderer/       # Pixi app facade plus layers, terrain, entities, units, buildings,
                   # resources, fog overlay, feedback, and renderer-local palette helpers
   fog.js          # Fog overlay: accumulate explored, compute visible from own entities
-  input/          # lifecycle facade plus selection, commands, placement, camera controls
+  input/          # lifecycle facade plus selection, commands, placement, camera controls, UI input routing
   audio.js        # Audio: Web Audio context, buses, one-shots, spatialization
   hud.js          # HUD: resources/supply bar, selected panel, command card (build/train)
   minimap.js      # Minimap: draw terrain+entities+viewport; click to move camera/command
@@ -126,7 +126,7 @@ export class Fog {
 `input/index.js`
 ```js
 export class Input {
-  constructor(domElement, camera, state, net, renderer, fog, audio?)
+  constructor(domElement, camera, state, net, renderer, fog, audio?, inputRouter?)
   // installs listeners; translates gestures into selection + protocol commands.
   // number keys recall control groups; double-tap jumps the camera to the largest
   // local cluster. Alt/Ctrl/Cmd+number replaces a group, Shift+number adds to it.
@@ -136,6 +136,21 @@ export class Input {
   // emits nothing to return; mutates state.selection / state.placement and calls net.command
 }
 ```
+
+`input/router.js`
+```js
+export class MatchInputRouter {
+  constructor(viewportEl)
+  registerZone(zone)                     // zone: {priority?, contains(ev), pointerDown?, pointerMove?, pointerUp?}
+                                         // returns unregister()
+  pointerDown(ev) -> boolean             // routes to highest-priority matching zone
+  pointerMove(ev) -> boolean             // captured zone receives moves until release
+  pointerUp(ev) -> boolean               // releases capture after the originating source handles up
+}
+```
+Router events carry `viewportX`/`viewportY` plus `clientX`/`clientY`; pointer-lock input and DOM
+input use the same zone contract so HUD interactions can work while the browser routes mouse events
+to the locked viewport.
 
 `audio.js`
 ```js
@@ -170,8 +185,9 @@ multi-building selection spreads queued units across its producers.
 `minimap.js`
 ```js
 export class Minimap {
-  constructor(canvasEl, state, camera, fog, net)
+  constructor(canvasEl, state, camera, fog, net, inputRouter?)
   render()                               // draw terrain + fog + entity blips + viewport rect
+  inputZone()                            // router zone for locked/unlocked minimap interaction
   // click/drag -> camera.centerOn or issue move command (right-click)
 }
 ```
@@ -188,7 +204,7 @@ export class Lobby {
 
 `main.js` starts `App`; `app.js` owns the persistent `Net` and `Audio`, derives the ws url from
 `window.location`, and shows `Lobby`; on `start` it creates `Match`. `match.js` builds
-`GameState`, `Camera`, `Renderer`, `Fog`, `HUD`, `Minimap`, `Input`, starts the rAF loop
+`GameState`, `Camera`, `Renderer`, `Fog`, `HUD`, `MatchInputRouter`, `Minimap`, `Input`, starts the rAF loop
 (compute `alpha` from snapshot timing, `camera.update`,
 `audio.setListener`, `input.update`, `fog.update`, `renderer.render`, `hud.update`,
 `minimap.render`); on each snapshot it applies state and triggers transient event audio exactly
@@ -245,4 +261,3 @@ with `playerResources`.
   specific insignia.
 
 ---
-

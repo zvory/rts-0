@@ -48,13 +48,15 @@ export class Minimap {
    * @param {import("./fog.js").Fog} fog the local fog overlay grids.
    * @param {import("./net.js").Net} net network seam for right-click move orders.
    */
-  constructor(canvasEl, state, camera, fog, net) {
+  constructor(canvasEl, state, camera, fog, net, inputRouter = null) {
     this.canvas = canvasEl;
     this.ctx = canvasEl.getContext("2d");
     this.state = state;
     this.camera = camera;
     this.fog = fog;
     this.net = net;
+    this.inputRouter = inputRouter;
+    this._unregisterInputZone = null;
 
     this.size = canvasEl.width; // assumed square (220 per index.html)
 
@@ -325,6 +327,9 @@ export class Minimap {
   /** Install pointer/context listeners for recenter (left) and commands (right). */
   _installInput() {
     const c = this.canvas;
+    if (this.inputRouter) {
+      this._unregisterInputZone = this.inputRouter.registerZone(this.inputZone());
+    }
     // Suppress the browser context menu so right-click can mean "move here".
     c.addEventListener("contextmenu", this._onContextMenu);
     c.addEventListener("mousedown", this._onCanvasMouseDown);
@@ -339,43 +344,110 @@ export class Minimap {
    */
   destroy() {
     const c = this.canvas;
+    if (this._unregisterInputZone) {
+      this._unregisterInputZone();
+      this._unregisterInputZone = null;
+    }
     c.removeEventListener("contextmenu", this._onContextMenu);
     c.removeEventListener("mousedown", this._onCanvasMouseDown);
     window.removeEventListener("mousemove", this._onWinMouseMove);
     window.removeEventListener("mouseup", this._onWinMouseUp);
   }
 
+  inputZone() {
+    return {
+      priority: 100,
+      contains: (ev) => this._containsClientPoint(ev.clientX, ev.clientY),
+      pointerDown: (ev) => this._handlePointerDown(ev),
+      pointerMove: (ev) => this._handlePointerMove(ev),
+      pointerUp: () => this._handlePointerUp(),
+    };
+  }
+
+  _routerEvent(ev, source) {
+    return {
+      clientX: ev.clientX,
+      clientY: ev.clientY,
+      button: ev.button,
+      shiftKey: ev.shiftKey,
+      ctrlKey: ev.ctrlKey,
+      metaKey: ev.metaKey,
+      altKey: ev.altKey,
+      source,
+      originalEvent: ev,
+    };
+  }
+
+  _containsClientPoint(clientX, clientY) {
+    const rect = this.canvas.getBoundingClientRect();
+    return clientX >= rect.left && clientX <= rect.right && clientY >= rect.top && clientY <= rect.bottom;
+  }
+
   _handleCanvasMouseDown(ev) {
+    if (this.inputRouter) {
+      if (this.inputRouter.pointerDown(this._routerEvent(ev, "dom"))) {
+        ev.preventDefault();
+        return;
+      }
+    }
+    this._handlePointerDown(this._routerEvent(ev, "dom"));
+  }
+
+  _handlePointerDown(ev) {
     if (!this._ensureTransform()) return;
     const cp = this._eventToCanvas(ev);
     const w = this._canvasToWorld(cp.x, cp.y);
     if (ev.button === 2) {
       // Right-click: issue a context-sensitive order for the currently selected own units.
-      ev.preventDefault();
+      ev.originalEvent?.preventDefault();
       this._issueOrder(w.x, w.y);
+      return true;
     } else if (ev.button === 0) {
-      ev.preventDefault();
+      ev.originalEvent?.preventDefault();
       // Left-click while a command target is armed: issue the command instead of panning.
       if (this.state.commandTarget) {
         this._issueOrder(w.x, w.y);
         this.state.endCommandTarget();
-        return;
+        return true;
       }
       // Default: recenter the camera (and start a drag).
       this._dragging = true;
       this.camera.centerOn(w.x, w.y);
+      return true;
     }
+    return false;
   }
 
   _handleWinMouseMove(ev) {
+    if (this.inputRouter) {
+      if (this.inputRouter.pointerMove(this._routerEvent(ev, "dom"))) {
+        ev.preventDefault();
+        return;
+      }
+    }
+    this._handlePointerMove(this._routerEvent(ev, "dom"));
+  }
+
+  _handlePointerMove(ev) {
     if (!this._dragging) return;
     const cp = this._eventToCanvas(ev);
     const w = this._canvasToWorld(cp.x, cp.y);
     this.camera.centerOn(w.x, w.y);
+    ev.originalEvent?.preventDefault();
+    return true;
   }
 
   _handleWinMouseUp() {
+    if (this.inputRouter) {
+      this.inputRouter.pointerUp({ button: 0, source: "dom" });
+      return;
+    }
+    this._handlePointerUp();
+  }
+
+  _handlePointerUp() {
     this._dragging = false;
+    return true;
   }
 
   /** Issue the minimap's current command to the world point for any selected own units. */
