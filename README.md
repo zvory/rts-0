@@ -96,6 +96,32 @@ WebSocket/API suites, and runs the headless client smoke test when Chrome is ava
 
 For focused test runs, see [tests/README.md](tests/README.md).
 
+## Main-Branch Test Gate
+
+Anything landing on `main` must pass the canonical local CI command:
+
+```bash
+./tests/run-all.sh
+```
+
+Install the tracked Git hooks in each checkout:
+
+```bash
+./scripts/install-hooks.sh
+```
+
+The hooks run `./tests/run-all.sh` before direct commits to `main` and before non-fast-forward
+merge commits into `main`. Feature-branch commits stay fast, but merging them into `main` should
+use a merge commit so the gate can run:
+
+```bash
+git merge --no-ff <branch>
+```
+
+Git does not distribute active local hook configuration through clones, so GitHub Actions also runs
+`./tests/run-all.sh` on pushes and pull requests targeting `main`. To require this for everyone on
+other machines, protect `main` in GitHub and require the `./tests/run-all.sh` status check.
+
 ## Deploy
 
 The app is configured for Fly.io through [fly.toml](fly.toml):
