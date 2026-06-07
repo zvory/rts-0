@@ -143,6 +143,10 @@ export class Audio {
     this.rng = mulberry32(0xb7e15163);
     /** Manifest entries queued before the context was unlocked. */
     this._queuedManifests = [];
+    /** @type {Set<() => void>} listeners notified when the context starts running. */
+    this._unlockListeners = new Set();
+    /** Whether queued manifests have already been handed to the decoder. */
+    this._decodedQueued = false;
     /** Listener pose in world pixels + reference distance (1 screen-width at current zoom). */
     this.listener = { x: 0, y: 0, refDist: DEFAULT_REF_DIST };
     /** Number of active alert voices currently forcing lower-priority buses down. */
@@ -161,7 +165,14 @@ export class Audio {
 
     this._gesture = this._gesture.bind(this);
     this._visibility = this._visibility.bind(this);
-    this._gestureEvents = ["pointerdown", "keydown", "touchstart"];
+    this._gestureEvents = [
+      "pointerdown",
+      "pointerup",
+      "click",
+      "mousedown",
+      "touchstart",
+      "keydown",
+    ];
     for (const ev of this._gestureEvents) {
       window.addEventListener(ev, this._gesture, true);
     }
@@ -176,11 +187,55 @@ export class Audio {
    */
   preload(manifest) {
     if (!Array.isArray(manifest) || manifest.length === 0) return Promise.resolve();
-    if (!this.ctx) {
+    if (!this.isUnlocked()) {
       this._queuedManifests.push(manifest);
       return Promise.resolve();
     }
     return this._decodeManifest(manifest);
+  }
+
+  /**
+   * Attempt to unlock audio from a user gesture. Browser policy decides whether
+   * the call succeeds; callers should invoke this only from real interaction
+   * handlers so the gesture token is still live.
+   * @param {Event} [ev]
+   * @returns {Promise<boolean>} true once the context is running
+   */
+  async unlockFromGesture(ev) {
+    if (ev && ev.isTrusted === false) return false;
+    const ctx = this._ensureContext();
+    if (!ctx) return false;
+    if (ctx.state === "running") {
+      this._markUnlocked();
+      return true;
+    }
+    if (typeof ctx.resume === "function") {
+      try {
+        await ctx.resume();
+      } catch {
+        return false;
+      }
+    }
+    if (ctx.state === "running") {
+      this._markUnlocked();
+      return true;
+    }
+    return false;
+  }
+
+  isUnlocked() {
+    return !!this.ctx && this.ctx.state === "running";
+  }
+
+  /**
+   * Subscribe to unlock state changes.
+   * @param {() => void} fn
+   * @returns {() => void}
+   */
+  onUnlockChange(fn) {
+    if (typeof fn !== "function") return () => {};
+    this._unlockListeners.add(fn);
+    return () => this._unlockListeners.delete(fn);
   }
 
   /**
@@ -199,7 +254,7 @@ export class Audio {
    * @returns {boolean} true if scheduled, false if dropped
    */
   play(id, opts) {
-    if (!this.ctx) return false;
+    if (!this.isUnlocked()) return false;
     const buf = this.buffers.get(id);
     if (!buf) return false;
     opts = opts || {};
@@ -419,6 +474,9 @@ export class Audio {
     this.buffers.clear();
     this.pending.clear();
     this.lastPlay.clear();
+    this._unlockListeners.clear();
+    this._queuedManifests = [];
+    this._decodedQueued = false;
     if (this.ctx) {
       try {
         this.ctx.close();
@@ -434,15 +492,19 @@ export class Audio {
 
   // --- Internals ------------------------------------------------------------
 
-  _gesture() {
-    if (this.ctx) return;
+  _gesture(ev) {
+    void this.unlockFromGesture(ev);
+  }
+
+  _ensureContext() {
+    if (this.ctx) return this.ctx;
     const Ctor = window.AudioContext || window.webkitAudioContext;
-    if (!Ctor) return;
+    if (!Ctor) return null;
     let ctx;
     try {
       ctx = new Ctor();
     } catch {
-      return;
+      return null;
     }
     this.ctx = ctx;
     this.master = ctx.createGain();
@@ -454,13 +516,26 @@ export class Audio {
       g.connect(this.master);
       this.gains[c] = g;
     }
+    return ctx;
+  }
+
+  _markUnlocked() {
     for (const ev of this._gestureEvents) {
       window.removeEventListener(ev, this._gesture, true);
     }
+    if (this._decodedQueued) return;
+    this._decodedQueued = true;
     const queued = this._queuedManifests;
     this._queuedManifests = [];
     for (const m of queued) {
       void this._decodeManifest(m);
+    }
+    for (const fn of [...this._unlockListeners]) {
+      try {
+        fn();
+      } catch {
+        /* listeners are UI niceties; never break audio startup */
+      }
     }
   }
 

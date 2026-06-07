@@ -689,6 +689,26 @@ input[type="text"]:focus {
   padding-bottom: 6px;
   border-bottom: 1px solid rgba(255, 245, 234, 0.12);
 }
+.audio-unlock-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 8px;
+  padding: 4px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.audio-unlock-row[hidden] {
+  display: none;
+}
+#settings-menu .audio-unlock-row button {
+  width: auto;
+  min-height: 28px;
+  padding: 5px 8px;
+  border-color: rgba(210, 138, 112, 0.55);
+  background: rgba(210, 138, 112, 0.12);
+  white-space: nowrap;
+}
 .audio-slider {
   display: flex;
   align-items: center;

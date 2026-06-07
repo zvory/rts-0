@@ -156,6 +156,10 @@ to the locked viewport.
 ```js
 export class Audio {
   preload(manifest): Promise<void>        // decode sounds once the AudioContext is unlocked
+  unlockFromGesture(ev?) -> Promise<boolean>
+                                          // create/resume AudioContext from a user gesture
+  isUnlocked() -> boolean                 // true when the AudioContext is running
+  onUnlockChange(fn) -> unsubscribe       // notify settings UI after first successful unlock
   play(id, {x?, y?, priority?, category?, pitchVariance?, gain?})
                                            // x/y present -> StereoPanner + lowpass + distance gain
   playUI(id, opts)                        // non-spatial ui category convenience

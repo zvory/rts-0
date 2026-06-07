@@ -218,6 +218,35 @@ export function buildAudioSettings(audio, menuEl) {
   const wrap = document.createElement("div");
   wrap.className = "audio-settings";
 
+  const unlockRow = document.createElement("div");
+  unlockRow.className = "audio-unlock-row";
+  unlockRow.setAttribute("role", "status");
+
+  const unlockText = document.createElement("span");
+  unlockText.textContent = "Audio waiting for input";
+
+  const unlockButton = document.createElement("button");
+  unlockButton.type = "button";
+  unlockButton.textContent = "Start audio";
+  unlockButton.addEventListener("click", async (ev) => {
+    unlockButton.disabled = true;
+    unlockButton.textContent = "Starting...";
+    await audio.unlockFromGesture(ev);
+    updateUnlockRow();
+  });
+
+  function updateUnlockRow() {
+    const unlocked = audio.isUnlocked();
+    unlockRow.hidden = unlocked;
+    unlockButton.disabled = false;
+    unlockButton.textContent = unlocked ? "Audio on" : "Start audio";
+  }
+
+  unlockRow.append(unlockText, unlockButton);
+  wrap.appendChild(unlockRow);
+  audio.onUnlockChange(updateUnlockRow);
+  updateUnlockRow();
+
   const rows = [
     {
       label: "Master",
