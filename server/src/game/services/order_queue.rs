@@ -6,6 +6,9 @@ use crate::game::entity::{
 };
 use crate::game::fog::Fog;
 use crate::game::map::Map;
+use crate::game::services::ability_orders::{
+    active_ability_order_ready, launch_world_ability, order_or_launch_world_ability,
+};
 use crate::game::services::construction::resumable_site_for_build_intent;
 use crate::game::services::dist2;
 use crate::game::services::line_of_sight::LineOfSight;
@@ -13,7 +16,9 @@ use crate::game::services::move_coordinator::MoveCoordinator;
 use crate::game::services::movement::angle_delta;
 use crate::game::services::standability;
 use crate::game::services::world_query;
+use crate::game::smoke::SmokeCloudStore;
 use crate::game::PlayerState;
+use crate::protocol::Event;
 use crate::rules;
 
 const ATTACK_UNREACHABLE_PROMOTION_CHECKS: u16 = 3;
@@ -49,21 +54,38 @@ impl PointPromotionKey {
 /// group move per destination point; gather/build are issued directly per worker.
 enum PromotedIntent {
     PointMove(PointPromotionKey),
-    Attack { target: u32 },
-    Gather { node: u32 },
-    Build { kind: EntityKind, tx: u32, ty: u32 },
+    Attack {
+        target: u32,
+    },
+    Gather {
+        node: u32,
+    },
+    Build {
+        kind: EntityKind,
+        tx: u32,
+        ty: u32,
+    },
+    Ability {
+        ability: crate::game::ability::AbilityKind,
+        x: f32,
+        y: f32,
+    },
 }
 
 /// Promote completed orders into the next queued intent.
 ///
 /// Move/AttackMove intents are batched by destination so co-arriving units share a formation,
 /// while Attack, Gather, and Build intents are issued directly per unit.
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn promote_ready_orders(
     map: &Map,
     entities: &mut EntityStore,
-    players: &[PlayerState],
+    players: &mut [PlayerState],
     fog: &Fog,
     coordinator: &mut MoveCoordinator<'_>,
+    smokes: &mut SmokeCloudStore,
+    events: &mut std::collections::HashMap<u32, Vec<Event>>,
+    tick: u32,
 ) {
     let ready: Vec<u32> = entities
         .iter()
@@ -76,7 +98,29 @@ pub(crate) fn promote_ready_orders(
 
     let mut groups: BTreeMap<PointPromotionKey, Vec<u32>> = BTreeMap::new();
     for id in ready {
-        clear_completed_active_order(entities, id);
+        if let Some((_ability, _x, _y, MovePhase::PathFailed)) = entities
+            .get(id)
+            .and_then(|e| active_ability_order_ready(&e.order()))
+        {
+            clear_completed_active_order(entities, id);
+        } else if let Some((ability, x, y, MovePhase::Arrived)) = entities
+            .get(id)
+            .and_then(|e| active_ability_order_ready(&e.order()))
+        {
+            let owner = match entities.get(id) {
+                Some(e) => e.owner,
+                None => continue,
+            };
+            let launched = launch_world_ability(
+                map, entities, players, smokes, events, owner, id, ability, x, y, tick, true,
+            );
+            if !launched {
+                clear_completed_active_order(entities, id);
+            }
+        } else {
+            clear_completed_active_order(entities, id);
+        }
+
         let Some(promoted) = pop_next_valid_intent(map, entities, players, fog, id) else {
             continue;
         };
@@ -93,6 +137,26 @@ pub(crate) fn promote_ready_orders(
             PromotedIntent::Build { kind, tx, ty } => {
                 coordinator.order_build(entities, id, kind, tx, ty);
             }
+            PromotedIntent::Ability { ability, x, y } => {
+                let Some(owner) = entities.get(id).map(|e| e.owner) else {
+                    continue;
+                };
+                order_or_launch_world_ability(
+                    map,
+                    entities,
+                    players,
+                    coordinator,
+                    smokes,
+                    events,
+                    owner,
+                    id,
+                    ability,
+                    x,
+                    y,
+                    tick,
+                    true,
+                );
+            }
         }
     }
 
@@ -102,20 +166,28 @@ pub(crate) fn promote_ready_orders(
 }
 
 fn ready_for_next_order(map: &Map, entities: &EntityStore, fog: &Fog, e: &Entity) -> bool {
-    if !e.is_unit() || e.queued_orders().is_empty() {
+    if !e.is_unit() {
         return false;
     }
     match e.order() {
-        Order::Idle => e.path_is_empty(),
+        Order::Idle => !e.queued_orders().is_empty() && e.path_is_empty(),
         Order::Move(_) | Order::AttackMove(_) => {
-            e.path_is_empty()
+            !e.queued_orders().is_empty()
+                && e.path_is_empty()
                 && matches!(
                     e.move_phase(),
                     Some(MovePhase::Arrived | MovePhase::PathFailed)
                 )
         }
-        Order::Attack(order) => attack_order_complete(map, entities, fog, e, order.intent.target),
+        Order::Attack(order) => {
+            !e.queued_orders().is_empty()
+                && attack_order_complete(map, entities, fog, e, order.intent.target)
+        }
         Order::Gather(_) | Order::Build(_) => false,
+        Order::Ability(_) => matches!(
+            e.move_phase(),
+            Some(MovePhase::Arrived | MovePhase::PathFailed)
+        ),
     }
 }
 
@@ -176,9 +248,51 @@ fn pop_next_valid_intent(
                     });
                 }
             }
+            OrderIntent::Ability(ability) => {
+                if ability_intent_valid(
+                    map,
+                    entities,
+                    players,
+                    owner,
+                    id,
+                    ability.ability,
+                    (ability.x, ability.y),
+                ) {
+                    return Some(PromotedIntent::Ability {
+                        ability: ability.ability,
+                        x: ability.x,
+                        y: ability.y,
+                    });
+                }
+            }
         }
     }
     None
+}
+
+fn ability_intent_valid(
+    map: &Map,
+    entities: &EntityStore,
+    players: &[PlayerState],
+    owner: u32,
+    caster: u32,
+    ability: crate::game::ability::AbilityKind,
+    target: (f32, f32),
+) -> bool {
+    let (x, y) = target;
+    if SmokeCloudStore::clamp_point_to_map(map, x, y).is_none() {
+        return false;
+    }
+    if !crate::game::services::ability_orders::caster_can_attempt(entities, owner, caster, ability)
+        || !crate::game::services::ability_orders::tech_requirement_met(entities, owner, ability)
+    {
+        return false;
+    }
+    let definition = crate::game::ability::definition(ability);
+    let Some(ps) = players.iter().find(|p| p.id == owner) else {
+        return false;
+    };
+    ps.steel >= definition.cost.steel && ps.oil >= definition.cost.oil
 }
 
 fn attack_intent_valid(
@@ -377,6 +491,21 @@ mod tests {
     }
 
     fn promote_with_players(map: &Map, entities: &mut EntityStore, players: &[PlayerState]) {
+        let mut players: Vec<PlayerState> = players
+            .iter()
+            .map(|p| PlayerState {
+                id: p.id,
+                name: p.name.clone(),
+                color: p.color.clone(),
+                start_tile: p.start_tile,
+                steel: p.steel,
+                oil: p.oil,
+                supply_used: p.supply_used,
+                supply_cap: p.supply_cap,
+                is_ai: p.is_ai,
+                score: p.score.clone(),
+            })
+            .collect();
         let occ = Occupancy::build(map, entities);
         let mut pathing = PathingService::new(1024, 32);
         pathing.advance_tick(1);
@@ -384,7 +513,18 @@ mod tests {
         let mut fog = Fog::new(map.size);
         let player_ids: Vec<u32> = players.iter().map(|p| p.id).collect();
         fog.recompute(&player_ids, entities, map);
-        promote_ready_orders(map, entities, players, &fog, &mut coordinator);
+        let mut smokes = SmokeCloudStore::new();
+        let mut events = std::collections::HashMap::new();
+        promote_ready_orders(
+            map,
+            entities,
+            &mut players,
+            &fog,
+            &mut coordinator,
+            &mut smokes,
+            &mut events,
+            1,
+        );
     }
 
     #[test]

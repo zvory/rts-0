@@ -26,9 +26,10 @@ pub(crate) use kind::{
 };
 #[allow(unused_imports)]
 pub use order::{
-    AttackExecution, AttackOrder, AttackPhase, BuildExecution, BuildIntent, BuildOrder, BuildPhase,
-    GatherExecution, GatherIntent, GatherOrder, GatherPhase, MoveExecution, MoveOrder, MovePhase,
-    Order, OrderIntent, PointIntent, TargetIntent, MAX_QUEUED_ORDERS,
+    AbilityExecution, AbilityIntent, AbilityOrder, AttackExecution, AttackOrder, AttackPhase,
+    BuildExecution, BuildIntent, BuildOrder, BuildPhase, GatherExecution, GatherIntent,
+    GatherOrder, GatherPhase, MoveExecution, MoveOrder, MovePhase, Order, OrderIntent, PointIntent,
+    TargetIntent, MAX_QUEUED_ORDERS,
 };
 #[cfg(test)]
 pub use state::EntityStateGroups;
