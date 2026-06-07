@@ -130,7 +130,14 @@ fn pop_next_valid_intent(
             }
             OrderIntent::Build(build) => {
                 if build_intent_valid(
-                    map, entities, players, owner, id, build.kind, build.tile_x, build.tile_y,
+                    map,
+                    entities,
+                    players,
+                    owner,
+                    id,
+                    build.kind,
+                    build.tile_x,
+                    build.tile_y,
                 ) {
                     return Some(PromotedIntent::Build {
                         kind: build.kind,
@@ -193,8 +200,8 @@ fn build_intent_valid(
     if tile_x >= map.size || tile_y >= map.size {
         return false;
     }
-    let can_resume = resumable_site_for_build_intent(map, entities, owner, kind, tile_x, tile_y)
-        .is_some();
+    let can_resume =
+        resumable_site_for_build_intent(map, entities, owner, kind, tile_x, tile_y).is_some();
     if !can_resume
         && !standability::building_site_clear_for_build_intent(
             map, entities, kind, tile_x, tile_y, worker,

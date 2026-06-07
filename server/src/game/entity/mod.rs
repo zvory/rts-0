@@ -22,7 +22,7 @@ pub use entity::Entity;
 pub use kind::EntityKind;
 pub(crate) use kind::{
     fires_while_moving, uses_car_movement_semantics, uses_oriented_vehicle_body,
-    uses_tank_movement_semantics,
+    uses_pivot_vehicle_movement,
 };
 #[allow(unused_imports)]
 pub use order::{

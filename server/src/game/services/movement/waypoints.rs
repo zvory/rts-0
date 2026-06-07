@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::config;
 use crate::game::entity::{
-    uses_car_movement_semantics, uses_oriented_vehicle_body, uses_tank_movement_semantics, Entity,
+    uses_car_movement_semantics, uses_oriented_vehicle_body, uses_pivot_vehicle_movement, Entity,
     EntityKind, EntityStore, MovePhase, Order, WeaponSetup,
 };
 use crate::game::map::Map;
@@ -13,16 +13,16 @@ use crate::game::services::standability as static_standability;
 use crate::game::PlayerState;
 use crate::protocol::Event;
 
+use super::pivot_drive::{
+    angle_delta, distance_between, normalize_angle, pivot_drive_intent, pivot_drive_speed_scale,
+    rotate_toward, vehicle_body_turn_rate, vehicle_oil_starves_movement,
+    vehicle_traffic_adjustment,
+};
 use super::scout_car::{plan_scout_car_motion, vehicle_accepts_waypoint};
 use super::standability::{
     footing_profile, requires_weapon_setup, unit_static_standable, FootingProfile,
 };
 use super::steering::{inject_sidestep, steered_candidate, steering_path_dir};
-use super::tank_drive::{
-    angle_delta, distance_between, normalize_angle, rotate_toward, tank_drive_intent,
-    tank_speed_scale, vehicle_body_turn_rate, vehicle_oil_starves_movement,
-    vehicle_traffic_adjustment,
-};
 use super::{ARRIVE_EPS, MAX_UNIT_BOUNDING_RADIUS_PX};
 
 const TANK_ROTATION_UNJAM_EPS: f32 = 1.0e-4;
@@ -76,7 +76,7 @@ pub(super) fn advance_moving_units(
         }
 
         let uses_vehicle_movement = uses_oriented_vehicle_body(kind);
-        let is_tank = uses_tank_movement_semantics(kind);
+        let is_pivot_vehicle = uses_pivot_vehicle_movement(kind);
         let is_car = uses_car_movement_semantics(kind);
         let vehicle_oil_cost_per_px = match kind {
             EntityKind::Tank => Some(config::TANK_OIL_COST_PER_PX),
@@ -98,9 +98,9 @@ pub(super) fn advance_moving_units(
         let mut body_facing = original_facing;
         let mut scout_car_reverse_waypoint = None;
         let mut static_blocked_this_tick = false;
-        if is_tank {
+        if is_pivot_vehicle {
             if let Some(e) = entities.get(id) {
-                if let Some(mut intent) = tank_drive_intent(map, occ, e, x, y) {
+                if let Some(mut intent) = pivot_drive_intent(map, occ, e, x, y) {
                     let traffic =
                         vehicle_traffic_adjustment(entities, spatial, id, kind, x, y, e.facing());
                     intent.desired_facing =
@@ -113,7 +113,7 @@ pub(super) fn advance_moving_units(
                         );
                         if rotated.is_finite() {
                             let error = angle_delta(rotated, intent.desired_facing).abs();
-                            budget *= tank_speed_scale(error);
+                            budget *= pivot_drive_speed_scale(error);
                             budget *= traffic.throttle_scale;
                             new_facing = Some(rotated);
                             body_facing = rotated;
@@ -306,12 +306,12 @@ pub(super) fn advance_moving_units(
                         let route_target = entities
                             .get(id)
                             .and_then(|e| e.next_waypoint().or_else(|| e.path_goal()));
-                        if is_tank {
-                            if let Some((ux, uy)) = tank_rotation_unjam_candidate(
+                        if is_pivot_vehicle {
+                            if let Some((ux, uy)) = pivot_vehicle_rotation_unjam_candidate(
                                 occ,
                                 map,
                                 kind,
-                                TankRotationUnjamProbe {
+                                PivotVehicleRotationUnjamProbe {
                                     pos: (x, y),
                                     original_facing,
                                     blocked_facing: facing,
@@ -561,7 +561,7 @@ fn inject_scout_car_reverse_recovery(e: &mut Entity, map: &Map, occ: &Occupancy)
     }
 
     let min_distance = (config::SCOUT_CAR_BODY_LENGTH_PX
-        + config::SCOUT_CAR_WAYPOINT_ACCEPTANCE_RADIUS_PX)
+        + config::VEHICLE_WAYPOINT_ACCEPTANCE_RADIUS_PX)
         .min(config::SCOUT_CAR_REVERSE_RECOVERY_DISTANCE_PX);
     let max_distance = config::SCOUT_CAR_REVERSE_RECOVERY_DISTANCE_PX.max(min_distance);
     let mut distance = min_distance;
@@ -618,7 +618,7 @@ fn recovery_candidate_is_legal(
 }
 
 #[derive(Clone, Copy)]
-struct TankRotationUnjamProbe {
+struct PivotVehicleRotationUnjamProbe {
     pos: (f32, f32),
     original_facing: f32,
     blocked_facing: f32,
@@ -626,11 +626,11 @@ struct TankRotationUnjamProbe {
     route_target: Option<(f32, f32)>,
 }
 
-fn tank_rotation_unjam_candidate(
+fn pivot_vehicle_rotation_unjam_candidate(
     occ: &Occupancy,
     map: &Map,
     kind: EntityKind,
-    probe: TankRotationUnjamProbe,
+    probe: PivotVehicleRotationUnjamProbe,
 ) -> Option<(f32, f32)> {
     if !probe.original_facing.is_finite()
         || !probe.blocked_facing.is_finite()

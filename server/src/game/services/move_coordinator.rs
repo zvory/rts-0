@@ -15,7 +15,7 @@
 
 use crate::config;
 use crate::game::entity::{
-    uses_oriented_vehicle_body, uses_tank_movement_semantics, EntityKind, EntityStore, MovePhase,
+    uses_oriented_vehicle_body, uses_pivot_vehicle_movement, EntityKind, EntityStore, MovePhase,
     Order, WeaponSetup,
 };
 use crate::game::map::Map;
@@ -416,7 +416,7 @@ impl<'a> MoveCoordinator<'a> {
         let (gx, gy) = self.map.tile_of(goal.0, goal.1);
         let radius_tiles = config::unit_radius_tiles(kind);
         let route_shape = if smooth_static_segments && uses_oriented_vehicle_body(kind) {
-            RouteShape::ScoutCarClearance
+            RouteShape::VehicleClearance
         } else {
             RouteShape::Normal
         };
@@ -433,7 +433,7 @@ impl<'a> MoveCoordinator<'a> {
         // Snap the final waypoint to the exact requested goal for precise arrival.
         if !waypoints.is_empty() {
             waypoints[0] = goal;
-            if route_shape == RouteShape::ScoutCarClearance && !uses_tank_movement_semantics(kind) {
+            if route_shape == RouteShape::VehicleClearance && !uses_pivot_vehicle_movement(kind) {
                 waypoints = simplify_reverse_waypoints_with_limit(
                     self.map,
                     self.occ,
@@ -1657,7 +1657,7 @@ mod tests {
                     (10, 10),
                     (goal_tile.0 as i32, goal_tile.1 as i32),
                     config::unit_radius_tiles(kind),
-                    RouteShape::ScoutCarClearance
+                    RouteShape::VehicleClearance
                 ),
                 "{kind:?} movement path should use the clearance-aware vehicle route shape"
             );

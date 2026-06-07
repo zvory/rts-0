@@ -15,13 +15,13 @@ use super::{MAX_UNIT_BOUNDING_RADIUS_PX, STEERING_MAX_NEIGHBORS};
 
 pub(crate) const TANK_BODY_TURN_RATE_RAD_PER_TICK: f32 = 0.035;
 pub(super) const AT_GUN_BODY_TURN_RATE_RAD_PER_TICK: f32 = 0.035;
-pub(super) const TANK_BODY_LOOKAHEAD_PX: f32 = config::TILE_SIZE as f32 * 5.0;
-pub(super) const TANK_REVERSE_GOAL_DISTANCE_PX: f32 = config::TILE_SIZE as f32 * 3.0;
-const TANK_REVERSE_MIN_BEHIND_ANGLE_RAD: f32 = std::f32::consts::FRAC_PI_2;
-const TANK_CRAWL_ANGLE_RAD: f32 = 0.55;
-const TANK_PIVOT_ANGLE_RAD: f32 = 1.25;
-const TANK_TRAFFIC_LOOKAHEAD_PX: f32 = config::TILE_SIZE as f32 * 2.0;
-const TANK_TRAFFIC_TURN_BIAS_RAD: f32 = 0.28;
+pub(super) const PIVOT_VEHICLE_LOOKAHEAD_PX: f32 = config::TILE_SIZE as f32 * 5.0;
+pub(super) const VEHICLE_REVERSE_GOAL_DISTANCE_PX: f32 = config::TILE_SIZE as f32 * 3.0;
+const PIVOT_VEHICLE_REVERSE_MIN_BEHIND_ANGLE_RAD: f32 = std::f32::consts::FRAC_PI_2;
+const PIVOT_VEHICLE_CRAWL_ANGLE_RAD: f32 = 0.55;
+const PIVOT_VEHICLE_PIVOT_ANGLE_RAD: f32 = 1.25;
+const VEHICLE_TRAFFIC_LOOKAHEAD_PX: f32 = config::TILE_SIZE as f32 * 2.0;
+const VEHICLE_TRAFFIC_TURN_BIAS_RAD: f32 = 0.28;
 
 pub(super) fn vehicle_oil_starves_movement(
     entities: &mut EntityStore,
@@ -71,12 +71,12 @@ pub(super) fn vehicle_oil_starves_movement(
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub(super) struct TankDriveIntent {
+pub(super) struct PivotDriveIntent {
     pub(super) desired_facing: f32,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub(super) struct TankTrafficAdjustment {
+pub(super) struct PivotTrafficAdjustment {
     pub(super) throttle_scale: f32,
     pub(super) turn_bias: f32,
 }
@@ -89,9 +89,9 @@ pub(super) fn vehicle_traffic_adjustment(
     x: f32,
     y: f32,
     facing: f32,
-) -> TankTrafficAdjustment {
+) -> PivotTrafficAdjustment {
     if !facing.is_finite() {
-        return TankTrafficAdjustment {
+        return PivotTrafficAdjustment {
             throttle_scale: 1.0,
             turn_bias: 0.0,
         };
@@ -100,7 +100,7 @@ pub(super) fn vehicle_traffic_adjustment(
     let forward = (facing.cos(), facing.sin());
     let side = (-forward.1, forward.0);
     let vehicle_half_width = vehicle_body_half_width_with_clearance(kind);
-    let query_radius = TANK_TRAFFIC_LOOKAHEAD_PX + MAX_UNIT_BOUNDING_RADIUS_PX;
+    let query_radius = VEHICLE_TRAFFIC_LOOKAHEAD_PX + MAX_UNIT_BOUNDING_RADIUS_PX;
     let mut throttle_scale = 1.0_f32;
     let mut side_pressure = 0.0_f32;
 
@@ -126,7 +126,7 @@ pub(super) fn vehicle_traffic_adjustment(
         let dx = neighbor.pos_x - x;
         let dy = neighbor.pos_y - y;
         let ahead = dx * forward.0 + dy * forward.1;
-        if ahead <= 0.0 || ahead > TANK_TRAFFIC_LOOKAHEAD_PX {
+        if ahead <= 0.0 || ahead > VEHICLE_TRAFFIC_LOOKAHEAD_PX {
             continue;
         }
         let lateral = dx * side.0 + dy * side.1;
@@ -137,7 +137,7 @@ pub(super) fn vehicle_traffic_adjustment(
             continue;
         }
 
-        let closeness = 1.0 - (ahead / TANK_TRAFFIC_LOOKAHEAD_PX).clamp(0.0, 1.0);
+        let closeness = 1.0 - (ahead / VEHICLE_TRAFFIC_LOOKAHEAD_PX).clamp(0.0, 1.0);
         let resistance = footing_resistance(profile);
         if uses_oriented_vehicle_body(neighbor.kind) || profile == FootingProfile::Braced {
             throttle_scale = throttle_scale.min((1.0 - closeness * 0.95).clamp(0.0, 1.0));
@@ -160,10 +160,10 @@ pub(super) fn vehicle_traffic_adjustment(
     let turn_bias = if side_pressure.abs() <= 1.0e-4 {
         0.0
     } else {
-        side_pressure.signum() * TANK_TRAFFIC_TURN_BIAS_RAD
+        side_pressure.signum() * VEHICLE_TRAFFIC_TURN_BIAS_RAD
     };
 
-    TankTrafficAdjustment {
+    PivotTrafficAdjustment {
         throttle_scale,
         turn_bias,
     }
@@ -191,14 +191,14 @@ pub(super) fn vehicle_body_turn_rate(kind: EntityKind) -> f32 {
     }
 }
 
-pub(super) fn tank_drive_intent(
+pub(super) fn pivot_drive_intent(
     map: &Map,
     occ: &Occupancy,
     e: &Entity,
     x: f32,
     y: f32,
-) -> Option<TankDriveIntent> {
-    let (desired_x, desired_y) = tank_desired_path_point(map, occ, e, x, y)?;
+) -> Option<PivotDriveIntent> {
+    let (desired_x, desired_y) = pivot_drive_desired_path_point(map, occ, e, x, y)?;
     let dx = desired_x - x;
     let dy = desired_y - y;
     let dist = (dx * dx + dy * dy).sqrt();
@@ -207,16 +207,17 @@ pub(super) fn tank_drive_intent(
     }
 
     let forward_desired = dy.atan2(dx);
-    if tank_desired_point_is_final_waypoint(e, (desired_x, desired_y))
-        && dist <= TANK_REVERSE_GOAL_DISTANCE_PX
-        && angle_delta(e.facing(), forward_desired).abs() > TANK_REVERSE_MIN_BEHIND_ANGLE_RAD
+    if pivot_drive_desired_point_is_final_waypoint(e, (desired_x, desired_y))
+        && dist <= VEHICLE_REVERSE_GOAL_DISTANCE_PX
+        && angle_delta(e.facing(), forward_desired).abs()
+            > PIVOT_VEHICLE_REVERSE_MIN_BEHIND_ANGLE_RAD
     {
-        return Some(TankDriveIntent {
+        return Some(PivotDriveIntent {
             desired_facing: normalize_angle(forward_desired + std::f32::consts::PI),
         });
     }
 
-    Some(TankDriveIntent {
+    Some(PivotDriveIntent {
         desired_facing: forward_desired,
     })
 }
@@ -246,17 +247,17 @@ pub(crate) fn rotate_toward(current: f32, desired: f32, max_delta: f32) -> f32 {
     }
 }
 
-pub(super) fn tank_speed_scale(abs_angle_error: f32) -> f32 {
+pub(super) fn pivot_drive_speed_scale(abs_angle_error: f32) -> f32 {
     if !abs_angle_error.is_finite() {
         return 0.0;
     }
-    if abs_angle_error <= TANK_CRAWL_ANGLE_RAD {
+    if abs_angle_error <= PIVOT_VEHICLE_CRAWL_ANGLE_RAD {
         1.0
-    } else if abs_angle_error >= TANK_PIVOT_ANGLE_RAD {
+    } else if abs_angle_error >= PIVOT_VEHICLE_PIVOT_ANGLE_RAD {
         0.0
     } else {
-        let t = (abs_angle_error - TANK_CRAWL_ANGLE_RAD)
-            / (TANK_PIVOT_ANGLE_RAD - TANK_CRAWL_ANGLE_RAD);
+        let t = (abs_angle_error - PIVOT_VEHICLE_CRAWL_ANGLE_RAD)
+            / (PIVOT_VEHICLE_PIVOT_ANGLE_RAD - PIVOT_VEHICLE_CRAWL_ANGLE_RAD);
         1.0 - t
     }
 }
@@ -267,7 +268,7 @@ pub(super) fn distance_between(from: (f32, f32), to: (f32, f32)) -> f32 {
     (dx * dx + dy * dy).sqrt()
 }
 
-pub(super) fn tank_desired_path_point(
+pub(super) fn pivot_drive_desired_path_point(
     map: &Map,
     occ: &Occupancy,
     e: &Entity,
@@ -277,7 +278,7 @@ pub(super) fn tank_desired_path_point(
     vehicle_desired_path_point(map, occ, e, x, y)
 }
 
-fn tank_desired_point_is_final_waypoint(e: &Entity, desired: (f32, f32)) -> bool {
+fn pivot_drive_desired_point_is_final_waypoint(e: &Entity, desired: (f32, f32)) -> bool {
     let Some(path) = e.movement.as_ref().map(|m| m.path.as_slice()) else {
         return false;
     };

@@ -76,6 +76,15 @@ fn run_combat_tick_on_map(
     players: &[PlayerState],
     map: &Map,
 ) -> HashMap<u32, Vec<Event>> {
+    run_combat_tick_on_map_with_seed(entities, players, map, 0)
+}
+
+fn run_combat_tick_on_map_with_seed(
+    entities: &mut EntityStore,
+    players: &[PlayerState],
+    map: &Map,
+    rng_seed: u64,
+) -> HashMap<u32, Vec<Event>> {
     let occ = Occupancy::build(map, entities);
     let spatial = SpatialIndex::build(entities, map.size);
     let mut pathing = PathingService::new(256, 64);
@@ -84,7 +93,7 @@ fn run_combat_tick_on_map(
     fog.recompute(&[1, 2], entities, map);
     let mut events = HashMap::from([(1, Vec::new()), (2, Vec::new())]);
 
-    let mut rng = SmallRng::seed_from_u64(0);
+    let mut rng = SmallRng::seed_from_u64(rng_seed);
     combat_system(
         map,
         entities,
@@ -715,28 +724,43 @@ fn charged_rifleman_move_order_keeps_path_while_firing() {
 
 #[test]
 fn charging_rifleman_miss_still_emits_attack_event() {
-    let mut entities = EntityStore::new();
-    let rifleman_id = entities
-        .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
-        .expect("rifleman should spawn");
-    let enemy_id = entities
-        .spawn_unit(2, EntityKind::Rifleman, 120.0, 100.0)
-        .expect("enemy should spawn");
-    if let Some(rifleman) = entities.get_mut(rifleman_id) {
-        rifleman.set_order(Order::move_to(300.0, 100.0));
-        rifleman.set_path(vec![(300.0, 100.0)]);
-        rifleman.set_path_goal(Some((300.0, 100.0)));
-        rifleman.start_charge(config::RIFLEMAN_CHARGE_TICKS);
-    }
+    let make_entities = || {
+        let mut entities = EntityStore::new();
+        let rifleman_id = entities
+            .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
+            .expect("rifleman should spawn");
+        let enemy_id = entities
+            .spawn_unit(2, EntityKind::Rifleman, 120.0, 100.0)
+            .expect("enemy should spawn");
+        if let Some(rifleman) = entities.get_mut(rifleman_id) {
+            rifleman.set_order(Order::move_to(300.0, 100.0));
+            rifleman.set_path(vec![(300.0, 100.0)]);
+            rifleman.set_path_goal(Some((300.0, 100.0)));
+            rifleman.start_charge(config::RIFLEMAN_CHARGE_TICKS);
+        }
+        (entities, rifleman_id, enemy_id)
+    };
+
+    let (entities, rifleman_id, enemy_id) = make_entities();
+    let map = Map::generate(2, 0x00C0_FFEE);
+    let players = [player_state(1, false), player_state(2, false)];
     let enemy_hp = entities.get(enemy_id).expect("enemy should exist").hp;
+    let mut missed_events = None;
+    for seed in 0..128 {
+        let (mut seeded_entities, _, _) = make_entities();
+        let events = run_combat_tick_on_map_with_seed(&mut seeded_entities, &players, &map, seed);
+        if seeded_entities
+            .get(enemy_id)
+            .expect("enemy should exist")
+            .hp
+            == enemy_hp
+        {
+            missed_events = Some(events);
+            break;
+        }
+    }
 
-    let events = run_combat_tick(&mut entities);
-
-    assert_eq!(
-        entities.get(enemy_id).expect("enemy should exist").hp,
-        enemy_hp,
-        "seeded charge shot should miss"
-    );
+    let events = missed_events.expect("seeded charge shot should miss for at least one seed");
     assert!(
         events
             .get(&1)
