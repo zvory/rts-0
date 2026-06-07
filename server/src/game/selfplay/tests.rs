@@ -1366,6 +1366,10 @@ fn real_ai_vs_real_ai() {
     let mut seen_riflemen: BTreeMap<u32, BTreeSet<u32>> = BTreeMap::new();
     let mut attack_events: BTreeMap<u32, usize> = BTreeMap::new();
     let mut death_events: BTreeMap<u32, usize> = BTreeMap::new();
+    let mut barracks_build_cmds: BTreeMap<u32, usize> = BTreeMap::new();
+    let mut rifleman_train_cmds: BTreeMap<u32, usize> = BTreeMap::new();
+    let mut attack_move_cmds: BTreeMap<u32, usize> = BTreeMap::new();
+    let mut command_log_cursor = 0usize;
     let panic_reason = |payload: &Box<dyn std::any::Any + Send>| -> String {
         if let Some(s) = payload.downcast_ref::<&'static str>() {
             s.to_string()
@@ -1457,23 +1461,44 @@ fn real_ai_vs_real_ai() {
                     .and_modify(|max| *max = (*max).max(riflemen_alive))
                     .or_insert(riflemen_alive);
             }
-        }
 
-        let mut barracks_build_cmds: BTreeMap<u32, usize> = BTreeMap::new();
-        let mut rifleman_train_cmds: BTreeMap<u32, usize> = BTreeMap::new();
-        let mut attack_move_cmds: BTreeMap<u32, usize> = BTreeMap::new();
-        for entry in game.command_log() {
-            match &entry.command {
-                WireCommand::Build { building, .. } if building == kinds::BARRACKS => {
-                    *barracks_build_cmds.entry(entry.player_id).or_default() += 1;
+            let command_log = game.command_log();
+            for entry in &command_log[command_log_cursor..] {
+                match &entry.command {
+                    WireCommand::Build { building, .. } if building == kinds::BARRACKS => {
+                        *barracks_build_cmds.entry(entry.player_id).or_default() += 1;
+                    }
+                    WireCommand::Train { unit, .. } if unit == kinds::RIFLEMAN => {
+                        *rifleman_train_cmds.entry(entry.player_id).or_default() += 1;
+                    }
+                    WireCommand::AttackMove { .. } => {
+                        *attack_move_cmds.entry(entry.player_id).or_default() += 1;
+                    }
+                    _ => {}
                 }
-                WireCommand::Train { unit, .. } if unit == kinds::RIFLEMAN => {
-                    *rifleman_train_cmds.entry(entry.player_id).or_default() += 1;
-                }
-                WireCommand::AttackMove { .. } => {
-                    *attack_move_cmds.entry(entry.player_id).or_default() += 1;
-                }
-                _ => {}
+            }
+            command_log_cursor = command_log.len();
+
+            if players.iter().all(|player| {
+                max_barracks_alive
+                    .get(&player.id)
+                    .copied()
+                    .unwrap_or_default()
+                    >= MIN_PEAK_BARRACKS_ALIVE
+                    && rifleman_train_cmds
+                        .get(&player.id)
+                        .copied()
+                        .unwrap_or_default()
+                        >= MIN_RIFLEMAN_TRAIN_COMMANDS
+                    && attack_move_cmds
+                        .get(&player.id)
+                        .copied()
+                        .unwrap_or_default()
+                        >= MIN_ATTACK_MOVE_COMMANDS
+                    && attack_events.get(&player.id).copied().unwrap_or_default()
+                        >= MIN_ATTACK_EVENTS
+            }) {
+                break;
             }
         }
 
