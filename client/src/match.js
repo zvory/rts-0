@@ -8,6 +8,7 @@ import {
 import { Fog } from "./fog.js";
 import { HUD } from "./hud.js";
 import { Input } from "./input/index.js";
+import { shouldRequestPointerLock } from "./input/cursor_lock.js";
 import { MatchInputRouter } from "./input/router.js";
 import { Minimap } from "./minimap.js";
 import { Renderer } from "./renderer/index.js";
@@ -181,7 +182,7 @@ export class Match {
     this.rafId = requestAnimationFrame(this.tickFn);
     this.startMatchPings();
     this.publishStatusBadge();
-    this.requestAutomaticPointerLock();
+    this.requestAutomaticPointerLock({ requireGesture: false });
 
     // Show speed controls for replay and scenario dev-watch rooms.
     const isReplay = this.devWatch?.kind === "replay";
@@ -301,20 +302,21 @@ export class Match {
   }
 
   handleWindowFocus() {
-    this.requestAutomaticPointerLock();
+    this.requestAutomaticPointerLock({ requireGesture: false });
   }
 
   handleVisibilityChange() {
-    if (!document.hidden) this.requestAutomaticPointerLock();
+    if (!document.hidden) this.requestAutomaticPointerLock({ requireGesture: false });
   }
 
   handlePointerLockGesture(ev) {
     if (ev.code === "Escape" || isTextEntry(ev.target)) return;
-    this.requestAutomaticPointerLock();
+    this.requestAutomaticPointerLock({ requireGesture: true });
   }
 
-  requestAutomaticPointerLock() {
+  requestAutomaticPointerLock({ requireGesture = false } = {}) {
     if (!this.input || this.input.pointerLocked || !this.input.pointerLockSupported()) return;
+    if (!shouldRequestPointerLock({ desktopRuntime: this.input.desktopRuntime(), requireGesture })) return;
     this.autoPointerLockUntil = performance.now() + AUTO_POINTER_LOCK_SUPPRESS_MS;
     void this.input.requestPointerLock().finally(() => {
       window.setTimeout(() => {

@@ -49,6 +49,7 @@ import {
   desktopRuntime,
   enterCursorLock,
   exitCursorLock,
+  shouldRequestPointerLock,
 } from "../client/src/input/cursor_lock.js";
 import { MatchInputRouter } from "../client/src/input/router.js";
 
@@ -253,6 +254,21 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
   assert(webkitExitCalled, "WebKit-prefixed Pointer Lock exit is called");
   globalThis.document = priorDocument;
   resetTauriGlobals();
+}
+
+{
+  assert(
+    !shouldRequestPointerLock({ desktopRuntime: true, requireGesture: false }),
+    "desktop Pointer Lock skips non-gesture automatic requests",
+  );
+  assert(
+    shouldRequestPointerLock({ desktopRuntime: true, requireGesture: true }),
+    "desktop Pointer Lock runs from user gesture requests",
+  );
+  assert(
+    shouldRequestPointerLock({ desktopRuntime: false, requireGesture: false }),
+    "browser Pointer Lock keeps non-gesture automatic attempts",
+  );
 }
 
 function fakeAudioParam(value = 1) {
