@@ -172,6 +172,7 @@ fn gather_intent_valid(entities: &EntityStore, owner: u32, worker: u32, node: u3
     true
 }
 
+#[allow(clippy::too_many_arguments)]
 fn build_intent_valid(
     map: &Map,
     entities: &EntityStore,
