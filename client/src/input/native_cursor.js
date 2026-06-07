@@ -1,7 +1,7 @@
 const CURSOR_LOCK_NATIVE = "native";
 const CURSOR_LOCK_BROWSER = "browser";
 
-function isTauriRuntime() {
+export function desktopRuntime() {
   return !!globalThis.__TAURI_INTERNALS__ || !!globalThis.__TAURI__?.core;
 }
 
@@ -11,30 +11,15 @@ function tauriInvoke() {
 }
 
 export function nativeCursorSupported() {
-  return isTauriRuntime() && !!tauriInvoke();
+  return false;
 }
 
 export function cursorLockSupported(browserPointerLockSupported) {
-  return nativeCursorSupported() || browserPointerLockSupported;
+  return browserPointerLockSupported;
 }
 
 export async function enterCursorLock(enterBrowserPointerLock, cursor = null) {
-  const invoke = tauriInvoke();
-  if (isTauriRuntime() && invoke) {
-    await invoke("cursor_grab", {
-      grab: true,
-      x: Number.isFinite(cursor?.x) ? cursor.x : null,
-      y: Number.isFinite(cursor?.y) ? cursor.y : null,
-    });
-    try {
-      await invoke("cursor_visible", { visible: false });
-    } catch (err) {
-      await invoke("cursor_grab", { grab: false, x: null, y: null }).catch(() => {});
-      throw err;
-    }
-    return CURSOR_LOCK_NATIVE;
-  }
-
+  void cursor;
   const browserLocked = await enterBrowserPointerLock();
   return browserLocked ? CURSOR_LOCK_BROWSER : null;
 }

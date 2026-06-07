@@ -27,6 +27,7 @@ const MATCH_PING_MS = 2000;
 const LATENCY_ISSUE_MS = 180;
 const JITTER_ISSUE_MS = 20;
 const JITTER_WINDOW = 8;
+const AUTO_POINTER_LOCK_SUPPRESS_MS = 1200;
 
 const COMBAT_SOUNDS = Object.freeze({
   [KIND.TANK]: {
@@ -78,6 +79,7 @@ export class Match {
     this.snapshotJitterDeltas = [];
     this.lastSnapshotArrivedAt = null;
     this.lastServerNetStatus = null;
+    this.autoPointerLockUntil = 0;
     this.health = {
       latencyMs: null,
       serverTickMs: null,
@@ -146,6 +148,9 @@ export class Match {
     };
     this.onResize = this.handleResize.bind(this);
     this.onMenuKeyDown = this.handleMenuKeyDown.bind(this);
+    this.onWindowFocus = this.handleWindowFocus.bind(this);
+    this.onVisibilityChange = this.handleVisibilityChange.bind(this);
+    this.onPointerLockGesture = this.handlePointerLockGesture.bind(this);
     this.onSettingsClick = this.toggleSettingsMenu.bind(this);
     this.onGiveUpOpen = this.openGiveUpConfirm.bind(this);
     this.onGiveUpCancel = this.closeGiveUpConfirm.bind(this);
@@ -157,7 +162,11 @@ export class Match {
     this.input.onPointerLockError = this.onPointerLockError;
     this.net.on(S.SNAPSHOT, this.onSnapshot);
     window.addEventListener("resize", this.onResize);
+    window.addEventListener("focus", this.onWindowFocus);
     window.addEventListener("keydown", this.onMenuKeyDown, true);
+    window.addEventListener("keydown", this.onPointerLockGesture, true);
+    window.addEventListener("mousedown", this.onPointerLockGesture, true);
+    document.addEventListener("visibilitychange", this.onVisibilityChange);
     dom.settingsButton?.addEventListener("click", this.onSettingsClick);
     dom.pointerLockToggle?.addEventListener("click", this.onPointerLockToggle);
     dom.giveUpOpen?.addEventListener("click", this.onGiveUpOpen);
@@ -168,6 +177,7 @@ export class Match {
     this.rafId = requestAnimationFrame(this.tickFn);
     this.startMatchPings();
     this.publishStatusBadge();
+    this.requestAutomaticPointerLock();
 
     // Show speed controls for replay and scenario dev-watch rooms.
     const isReplay = this.devWatch?.kind === "replay";
@@ -286,6 +296,33 @@ export class Match {
     }
   }
 
+  handleWindowFocus() {
+    this.requestAutomaticPointerLock();
+  }
+
+  handleVisibilityChange() {
+    if (!document.hidden) this.requestAutomaticPointerLock();
+  }
+
+  handlePointerLockGesture(ev) {
+    if (ev.code === "Escape" || isTextEntry(ev.target)) return;
+    this.requestAutomaticPointerLock();
+  }
+
+  requestAutomaticPointerLock() {
+    if (!this.input || this.input.pointerLocked || !this.input.pointerLockSupported()) return;
+    this.autoPointerLockUntil = performance.now() + AUTO_POINTER_LOCK_SUPPRESS_MS;
+    void this.input.requestPointerLock().finally(() => {
+      window.setTimeout(() => {
+        if (performance.now() >= this.autoPointerLockUntil) this.autoPointerLockUntil = 0;
+      }, AUTO_POINTER_LOCK_SUPPRESS_MS);
+    });
+  }
+
+  automaticPointerLockActive() {
+    return performance.now() <= this.autoPointerLockUntil;
+  }
+
   toggleSettingsMenu() {
     if (!dom.settingsMenu || this.giveUpSent) return;
     if (dom.giveUpConfirm && !dom.giveUpConfirm.hidden) this.closeGiveUpConfirm();
@@ -339,6 +376,7 @@ export class Match {
       this.syncPointerLockUi();
       return;
     }
+    this.autoPointerLockUntil = 0;
     if (!this.input.pointerLocked) this.closeSettingsMenu();
     void this.input.togglePointerLock();
   }
@@ -346,12 +384,13 @@ export class Match {
   handlePointerLockChange(locked) {
     if (locked) {
       this.closeSettingsMenu();
-      this.toast("Cursor locked. Press Esc to unlock.");
+      if (!this.automaticPointerLockActive()) this.toast("Cursor locked. Press Esc to unlock.");
     }
     this.syncPointerLockUi();
   }
 
   handlePointerLockError() {
+    if (this.automaticPointerLockActive()) return;
     this.toast("Cursor lock was blocked. Click the game view and try again.");
     this.syncPointerLockUi();
   }
@@ -359,6 +398,11 @@ export class Match {
   syncPointerLockUi() {
     const btn = dom.pointerLockToggle;
     if (!btn || !this.input) return;
+    if (this.input.desktopRuntime()) {
+      btn.hidden = true;
+      return;
+    }
+    btn.hidden = false;
     const supported = this.input.pointerLockSupported();
     const locked = this.input.pointerLocked;
     btn.disabled = !supported;
@@ -625,7 +669,11 @@ export class Match {
     this.stopAllMachineGunSounds();
     this.net.off(S.SNAPSHOT, this.onSnapshot);
     window.removeEventListener("resize", this.onResize);
+    window.removeEventListener("focus", this.onWindowFocus);
     window.removeEventListener("keydown", this.onMenuKeyDown, true);
+    window.removeEventListener("keydown", this.onPointerLockGesture, true);
+    window.removeEventListener("mousedown", this.onPointerLockGesture, true);
+    document.removeEventListener("visibilitychange", this.onVisibilityChange);
     dom.settingsButton?.removeEventListener("click", this.onSettingsClick);
     dom.pointerLockToggle?.removeEventListener("click", this.onPointerLockToggle);
     dom.giveUpOpen?.removeEventListener("click", this.onGiveUpOpen);
