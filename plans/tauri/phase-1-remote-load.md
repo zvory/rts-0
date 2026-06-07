@@ -92,4 +92,4 @@ font-src 'self' https://rts-0-zvorygin.fly.dev data:;
 
 ## Out of scope
 
-Native cursor handling. Native fullscreen. Windows builds. Vendoring Pixi.
+Native fullscreen. Windows builds. Vendoring Pixi.

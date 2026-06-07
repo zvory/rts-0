@@ -34,7 +34,7 @@ from a single hardcoded URL.
 
 - [Phase 0 — Scaffold and macOS smoke build](phase-0-scaffold.md)
 - [Phase 1 — Point at the live server](phase-1-remote-load.md)
-- [Phase 2 — Native cursor confine / hide](phase-2-native-cursor.md)
+- [Phase 2 — Aggressive browser Pointer Lock](phase-2-pointer-lock.md)
 - [Phase 3 — Native fullscreen](phase-3-native-fullscreen.md) (skipped)
 - [Phase 4 — Audio gesture prompt](phase-4-audio-gesture.md)
 - [Phase 5 — GitHub Actions Windows build](phase-5-windows-ci.md)

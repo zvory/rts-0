@@ -10,8 +10,6 @@
     "main"
   ],
   "permissions": [
-    "core:default",
-    "allow-cursor-grab",
-    "allow-cursor-visible"
+    "core:default"
   ]
 }

@@ -59,8 +59,7 @@ import {
   desktopRuntime,
   enterCursorLock,
   exitCursorLock,
-  nativeCursorSupported,
-} from "./native_cursor.js";
+} from "./cursor_lock.js";
 import {
   _closestIdsToPoint,
   _closestOwnUnitKindInViewport,
@@ -173,6 +172,8 @@ export class Input {
     window.addEventListener("blur", this._onBlur);
     document.addEventListener("pointerlockchange", this._onPointerLockChange);
     document.addEventListener("pointerlockerror", this._onPointerLockError);
+    document.addEventListener("webkitpointerlockchange", this._onPointerLockChange);
+    document.addEventListener("webkitpointerlockerror", this._onPointerLockError);
   }
 
   /** Remove all installed listeners (e.g. on game teardown / screen change). */
@@ -190,6 +191,8 @@ export class Input {
     window.removeEventListener("blur", this._onBlur);
     document.removeEventListener("pointerlockchange", this._onPointerLockChange);
     document.removeEventListener("pointerlockerror", this._onPointerLockError);
+    document.removeEventListener("webkitpointerlockchange", this._onPointerLockChange);
+    document.removeEventListener("webkitpointerlockerror", this._onPointerLockError);
     if (this._pointerLockCursor) {
       this._pointerLockCursor.remove();
       this._pointerLockCursor = null;
@@ -314,17 +317,26 @@ export class Input {
     return cursorLockSupported(this._browserPointerLockSupported());
   }
 
-  nativeCursorSupported() {
-    return nativeCursorSupported();
-  }
-
   desktopRuntime() {
     return desktopRuntime();
   }
 
   _browserPointerLockSupported() {
-    return typeof this.dom.requestPointerLock === "function" &&
-      typeof document.exitPointerLock === "function";
+    return this._browserRequestPointerLock() !== null && this._browserExitPointerLockFn() !== null;
+  }
+
+  _browserRequestPointerLock() {
+    const fn = this.dom.requestPointerLock || this.dom.webkitRequestPointerLock;
+    return typeof fn === "function" ? fn.bind(this.dom) : null;
+  }
+
+  _browserExitPointerLockFn() {
+    const fn = document.exitPointerLock || document.webkitExitPointerLock;
+    return typeof fn === "function" ? fn.bind(document) : null;
+  }
+
+  _browserPointerLockElement() {
+    return document.pointerLockElement || document.webkitPointerLockElement || null;
   }
 
   _prepareCursorLock() {
@@ -355,7 +367,12 @@ export class Input {
       return Promise.resolve(false);
     }
     try {
-      const result = this.dom.requestPointerLock();
+      const requestPointerLock = this._browserRequestPointerLock();
+      if (!requestPointerLock) {
+        if (this.onPointerLockError) this.onPointerLockError(new Error("Pointer Lock API is unavailable."));
+        return Promise.resolve(false);
+      }
+      const result = requestPointerLock();
       if (result && typeof result.then === "function") {
         return result.then(() => true).catch((err) => {
           if (this.onPointerLockError) this.onPointerLockError(err);
@@ -378,8 +395,9 @@ export class Input {
   }
 
   _exitBrowserPointerLock() {
-    if (document.pointerLockElement === this.dom && typeof document.exitPointerLock === "function") {
-      document.exitPointerLock();
+    if (this._browserPointerLockElement() === this.dom) {
+      const exitPointerLock = this._browserExitPointerLockFn();
+      if (exitPointerLock) exitPointerLock();
     }
   }
 
@@ -388,7 +406,7 @@ export class Input {
   }
 
   _handlePointerLockChange() {
-    const locked = document.pointerLockElement === this.dom;
+    const locked = this._browserPointerLockElement() === this.dom;
     this._setCursorLockState(locked, locked ? "browser" : null);
   }
 
