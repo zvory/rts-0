@@ -160,6 +160,20 @@ after production/construction/death mutations; and final state for snapshot inte
 Systems should consume the derived-state object for their phase instead of carrying occupancy or
 spatial indexes across later mutations.
 
+Queued unit orders are future intents stored on mobile units, capped at 8 intents per unit.
+The command service dedupes and caps unit-id lists before appending, rejects non-finite queued
+points, and validates target/resource ownership enough to avoid storing obviously stale attack or
+gather intents. Promotion is centralized in `services::order_queue`: idle units, arrived/path-failed
+move orders, and completed/invalid explicit attacks pop the next valid intent; move and attack-move
+promotions are batched by owner/destination through deterministic `BTreeMap` ordering, while
+attack, gather, and build promotions are issued per unit. Invalid queued build/gather/attack
+intents are skipped at promotion time rather than retried forever. Active gather and build orders
+remain terminal until their own systems mark them complete or clear them.
+
+Production buildings intentionally keep a single rally point. `setRally` replaces that point even
+when an older client sends `queued: true`; newly produced units receive only the current rally point
+as a plain move order.
+
 `services::line_of_sight` owns static terrain raycasts used by fog and combat. Stone/rock tiles
 block vision and ranged attacks. Fog may reveal the blocking stone tile itself, but not tiles
 behind it. Combat auto-acquisition only considers enemies with a clear line; explicit attack
