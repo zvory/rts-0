@@ -34,17 +34,8 @@ SERVER_DIR="$REPO_ROOT/server"
 # server/target cache so parallel worktrees share dependencies and server artifacts; callers can
 # still override this with CARGO_TARGET_DIR.
 if [ -z "${CARGO_TARGET_DIR:-}" ]; then
-  GIT_COMMON_DIR="$(git -C "$REPO_ROOT" rev-parse --path-format=absolute --git-common-dir 2>/dev/null || true)"
-  if [ -n "$GIT_COMMON_DIR" ] && [ -d "$GIT_COMMON_DIR" ]; then
-    PRIMARY_REPO_ROOT="$(cd "$GIT_COMMON_DIR/.." && pwd)"
-    if [ -f "$PRIMARY_REPO_ROOT/server/Cargo.toml" ]; then
-      export CARGO_TARGET_DIR="$PRIMARY_REPO_ROOT/server/target"
-    else
-      export CARGO_TARGET_DIR="$SERVER_DIR/target"
-    fi
-  else
-    export CARGO_TARGET_DIR="$SERVER_DIR/target"
-  fi
+  CARGO_TARGET_DIR="$("$REPO_ROOT/scripts/cargo-shared-target.sh" --print-target-dir)"
+  export CARGO_TARGET_DIR
 else
   export CARGO_TARGET_DIR
 fi
