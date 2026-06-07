@@ -15,6 +15,9 @@ Use when writing or debugging tests, or before claiming a change is done.
 - `cd server && cargo test` — simulation behavior + scripted self-play (no running server needed)
 
 ## Invariants
+- Repo-level Cargo config uses `/tmp/rts-cargo-target/rts-0-server` as the shared target dir, so
+  plain Cargo commands in worktrees reuse dependency builds. Override with `CARGO_TARGET_DIR` if a
+  task needs an isolated cache.
 - Node tests need a **running** server on the test runner's private port. They are not
   `cargo test`. Start the server first.
 - After any change, run all relevant Node suites + `cargo test` and confirm green. The commit

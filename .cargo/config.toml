@@ -1,0 +1,8 @@
+[build]
+# Keep normal `cargo build/test/clippy` commands fast in git worktrees.
+#
+# Without this, each `/tmp/rts-worktrees/<branch>/server` checkout writes to its
+# own `server/target` and recompiles dependencies from scratch. Cargo safely
+# serializes concurrent writers with its target-dir locks, and callers can still
+# override this with `CARGO_TARGET_DIR=/path/to/target`.
+target-dir = "/tmp/rts-cargo-target/rts-0-server"

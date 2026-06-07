@@ -22,9 +22,12 @@ CHROME=/path/to/chrome tests/run-all.sh
 ```
 
 The client smoke test self-skips (not a failure) when `puppeteer-core` or a Chrome binary is
-missing. By default, worktrees use the primary checkout's `server/target` as the Cargo target
-directory so dependency builds are reused instead of compiled from scratch in every worktree.
-For one-off Cargo commands in a worktree, use the same wrapper:
+missing. By default, repo-level Cargo config sends every checkout and worktree to the shared
+target directory at `/tmp/rts-cargo-target/rts-0-server`, so plain `cargo build`, `cargo test`,
+and `cargo clippy` reuse dependency builds instead of compiling from scratch in every worktree.
+Override with `CARGO_TARGET_DIR=/path/to/target` when you need an isolated cache.
+
+For scripts that need to print the shared target dir or for explicit wrapper usage:
 
 ```bash
 scripts/cargo-shared-target.sh test --manifest-path server/Cargo.toml self_play -- --nocapture
@@ -59,9 +62,10 @@ drive `Game` through `enqueue`/`tick`/`snapshot_for`, exercising gathering, oil,
 Depot/Barracks/Factory construction, Rifleman/Tank training, rush pressure, and combat.
 Successful runs replay the authoritative tick-stamped command log through a fresh game and compare
 the replayed event stream and final snapshots against the live run. On failure it writes replay
-artifacts under `server/target/selfplay-failures/`. To save a successful run too, set
+artifacts under the Cargo target dir's `selfplay-failures/` directory. To save a successful run too, set
 `RTS_SELFPLAY_SAVE_REPLAY` to either `1` for an auto-generated artifact name or to an explicit safe
-artifact name; successful runs are then written under `server/target/selfplay-artifacts/<name>/`.
+artifact name; successful runs are then written under the target dir's
+`selfplay-artifacts/<name>/`.
 When you open a replay artifact in the browser, use the server instance that produced it, or
 start a fresh one on its own port before loading `/dev/selfplay?replay=<artifact_name>`.
 
