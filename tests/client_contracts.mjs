@@ -258,6 +258,13 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
 
 {
   let focused = false;
+  let windowFocused = false;
+  const priorWindow = globalThis.window;
+  globalThis.window = {
+    focus() {
+      windowFocused = true;
+    },
+  };
   const focusInput = Object.create(Input.prototype);
   focusInput.dom = {
     clientWidth: 100,
@@ -269,7 +276,10 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
   focusInput.mouse = null;
   focusInput._setPointerLockCursor = () => {};
   focusInput._prepareCursorLock();
+  assert(windowFocused, "Pointer Lock preparation asks the window to focus before requesting lock");
   assert(focused, "Pointer Lock preparation focuses the viewport before requesting lock");
+  if (priorWindow === undefined) delete globalThis.window;
+  else globalThis.window = priorWindow;
 }
 
 {

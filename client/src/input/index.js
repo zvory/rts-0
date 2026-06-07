@@ -137,6 +137,7 @@ export class Input {
     this._pointerLockCursor = null;
     this._suppressNextContextMenu = false;
     this._pointerLockAttempt = 0;
+    this._lastPointerLockFocusAttempt = null;
     this.onPointerLockChange = null;
     this.onPointerLockError = null;
 
@@ -361,6 +362,7 @@ export class Input {
           }
         : null,
       attempts: this._pointerLockAttempt,
+      lastFocusAttempt: this._lastPointerLockFocusAttempt,
       location: globalThis.location?.href || null,
       userAgent: navigator.userAgent,
     };
@@ -374,12 +376,39 @@ export class Input {
   }
 
   _focusPointerLockTarget() {
-    if (typeof this.dom.focus !== "function") return;
+    const before = this._focusDebugState();
+    if (typeof globalThis.window?.focus === "function") {
+      try {
+        globalThis.window.focus();
+      } catch {
+        // Some embedded webviews expose focus but reject it; the element focus below is still useful.
+      }
+    }
+    if (typeof this.dom.focus !== "function") {
+      this._lastPointerLockFocusAttempt = { before, after: this._focusDebugState(), elementFocusCalled: false };
+      return;
+    }
+    const elementFocusCalled = true;
     try {
       this.dom.focus({ preventScroll: true });
     } catch {
       this.dom.focus();
     }
+    this._lastPointerLockFocusAttempt = { before, after: this._focusDebugState(), elementFocusCalled };
+  }
+
+  _focusDebugState() {
+    const doc = globalThis.document;
+    return {
+      documentHasFocus: typeof doc?.hasFocus === "function" ? doc.hasFocus() : null,
+      activeElement: doc?.activeElement
+        ? {
+            tag: doc.activeElement.tagName,
+            id: doc.activeElement.id || null,
+            className: doc.activeElement.className || null,
+          }
+        : null,
+    };
   }
 
   requestPointerLock() {
