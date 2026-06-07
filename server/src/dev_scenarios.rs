@@ -1,18 +1,18 @@
 use crate::game::entity::EntityKind;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) struct DevScenarioLaunch {
-    pub(crate) id: &'static str,
-    pub(crate) unit: EntityKind,
-    pub(crate) count: usize,
+pub struct DevScenarioLaunch {
+    pub id: &'static str,
+    pub unit: EntityKind,
+    pub count: usize,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) struct DevScenarioSpec {
-    pub(crate) id: &'static str,
-    pub(crate) title: &'static str,
-    pub(crate) description: &'static str,
-    pub(crate) launches: &'static [DevScenarioLaunch],
+pub struct DevScenarioSpec {
+    pub id: &'static str,
+    pub title: &'static str,
+    pub description: &'static str,
+    pub launches: &'static [DevScenarioLaunch],
 }
 
 const SCOUT_CAR_SNAKING_CORRIDOR_LAUNCHES: [DevScenarioLaunch; 12] = [
@@ -196,15 +196,11 @@ const DEV_SCENARIOS: [DevScenarioSpec; 3] = [
     },
 ];
 
-pub(crate) fn all_dev_scenarios() -> &'static [DevScenarioSpec] {
+pub fn all_dev_scenarios() -> &'static [DevScenarioSpec] {
     &DEV_SCENARIOS
 }
 
-pub(crate) fn parse_dev_scenario_launch(
-    id: &str,
-    unit: &str,
-    count: &str,
-) -> Option<DevScenarioLaunch> {
+pub fn parse_dev_scenario_launch(id: &str, unit: &str, count: &str) -> Option<DevScenarioLaunch> {
     let unit = unit.parse::<EntityKind>().ok()?;
     if !unit.is_unit() {
         return None;
@@ -217,13 +213,13 @@ pub(crate) fn parse_dev_scenario_launch(
         .find(|launch| launch.id == id && launch.unit == unit && launch.count == count)
 }
 
-pub(crate) fn parse_dev_scenario_room(raw: &str) -> Option<DevScenarioLaunch> {
+pub fn parse_dev_scenario_room(raw: &str) -> Option<DevScenarioLaunch> {
     let (id, rest) = raw.split_once(":unit=")?;
     let (unit, count) = rest.split_once(":count=")?;
     parse_dev_scenario_launch(id, unit, count)
 }
 
-pub(crate) fn dev_scenario_unit_label(unit: EntityKind) -> &'static str {
+pub fn dev_scenario_unit_label(unit: EntityKind) -> &'static str {
     match unit {
         EntityKind::Worker => "worker",
         EntityKind::Rifleman => "rifleman",

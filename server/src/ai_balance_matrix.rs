@@ -5,20 +5,14 @@
 //! tick-cap draws.
 #![allow(dead_code)]
 
-mod config;
-mod game;
-mod perf;
-mod protocol;
-mod rules;
-
 use std::path::PathBuf;
 use std::process;
 
-use game::selfplay::{
+use rayon::prelude::*;
+use rts_server::game::selfplay::{
     available_profile_ids, canonical_profile_id, run_profile_matchup_result, ProfileMatchupOptions,
     ProfileMatchupResult,
 };
-use rayon::prelude::*;
 
 const DEFAULT_SEEDS: u32 = 5;
 const DEFAULT_TICKS: u32 = 20_000;

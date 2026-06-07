@@ -16,11 +16,11 @@ impl std::fmt::Debug for ConnectionSink {
 }
 
 pub struct ConnectionWriter {
-    pub(crate) reliable_rx: mpsc::Receiver<ServerMessage>,
-    pub(crate) snapshots: Arc<LatestSnapshotSlot>,
+    pub reliable_rx: mpsc::Receiver<ServerMessage>,
+    pub snapshots: Arc<LatestSnapshotSlot>,
 }
 
-pub(crate) struct LatestSnapshotSlot {
+pub struct LatestSnapshotSlot {
     pending: StdMutex<Option<Snapshot>>,
     notify: Notify,
 }
@@ -102,7 +102,7 @@ impl LatestSnapshotSlot {
         }
     }
 
-    pub(crate) fn take(&self) -> Option<Snapshot> {
+    pub fn take(&self) -> Option<Snapshot> {
         self.lock_pending().take()
     }
 
@@ -110,7 +110,7 @@ impl LatestSnapshotSlot {
         self.lock_pending().is_some()
     }
 
-    pub(crate) async fn notified(&self) {
+    pub async fn notified(&self) {
         self.notify.notified().await;
     }
 }

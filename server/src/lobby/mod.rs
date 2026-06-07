@@ -43,6 +43,7 @@ mod snapshots;
 pub use connection::{ConnectionSink, ConnectionWriter};
 use dev_replay::room_mode_for;
 use room_task::RoomTask;
+pub use snapshots::compact_snapshot_for_wire;
 
 /// Player colors, assigned from the head of the palette. MUST match `client/src/config.js`
 /// `PLAYER_PALETTE`.

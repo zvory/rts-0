@@ -110,65 +110,65 @@ impl ReplayDriver {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct ProfileMatchupOptions {
-    pub(crate) profile_a: String,
-    pub(crate) profile_b: String,
-    pub(crate) seed: u32,
-    pub(crate) max_ticks: u32,
-    pub(crate) verify_replay: bool,
-    pub(crate) save_replay_name: Option<String>,
-    pub(crate) replay_dir: Option<PathBuf>,
+pub struct ProfileMatchupOptions {
+    pub profile_a: String,
+    pub profile_b: String,
+    pub seed: u32,
+    pub max_ticks: u32,
+    pub verify_replay: bool,
+    pub save_replay_name: Option<String>,
+    pub replay_dir: Option<PathBuf>,
 }
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct ProfileMatchupResult {
-    pub(crate) profile_a: String,
-    pub(crate) profile_b: String,
-    pub(crate) seed: u32,
-    pub(crate) max_ticks: u32,
-    pub(crate) ticks: u32,
-    pub(crate) completed_by_elimination: bool,
-    pub(crate) winner: Option<ProfileMatchupWinner>,
-    pub(crate) players: Vec<ProfileMatchupPlayerResult>,
-    pub(crate) first_damage_tick: Option<u32>,
-    pub(crate) attack_events: usize,
-    pub(crate) death_events: usize,
-    pub(crate) event_count: usize,
-    pub(crate) replay_verified: bool,
-    pub(crate) replay_artifact: Option<String>,
+pub struct ProfileMatchupResult {
+    pub profile_a: String,
+    pub profile_b: String,
+    pub seed: u32,
+    pub max_ticks: u32,
+    pub ticks: u32,
+    pub completed_by_elimination: bool,
+    pub winner: Option<ProfileMatchupWinner>,
+    pub players: Vec<ProfileMatchupPlayerResult>,
+    pub first_damage_tick: Option<u32>,
+    pub attack_events: usize,
+    pub death_events: usize,
+    pub event_count: usize,
+    pub replay_verified: bool,
+    pub replay_artifact: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct ProfileMatchupWinner {
-    pub(crate) player_id: u32,
-    pub(crate) profile: String,
+pub struct ProfileMatchupWinner {
+    pub player_id: u32,
+    pub profile: String,
 }
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct ProfileMatchupPlayerResult {
-    pub(crate) player_id: u32,
-    pub(crate) profile: String,
-    pub(crate) alive: bool,
-    pub(crate) army_value: u32,
-    pub(crate) building_value: u32,
-    pub(crate) command_count: usize,
-    pub(crate) attack_command_count: usize,
-    pub(crate) first_attack_command_tick: Option<u32>,
-    pub(crate) first_tank_tick: Option<u32>,
-    pub(crate) final_counts: BTreeMap<String, u32>,
+pub struct ProfileMatchupPlayerResult {
+    pub player_id: u32,
+    pub profile: String,
+    pub alive: bool,
+    pub army_value: u32,
+    pub building_value: u32,
+    pub command_count: usize,
+    pub attack_command_count: usize,
+    pub first_attack_command_tick: Option<u32>,
+    pub first_tank_tick: Option<u32>,
+    pub final_counts: BTreeMap<String, u32>,
 }
 
-pub(crate) fn available_profile_ids() -> Vec<&'static str> {
+pub fn available_profile_ids() -> Vec<&'static str> {
     required_profiles()
         .into_iter()
         .map(|profile| profile.id)
         .collect()
 }
 
-pub(crate) fn canonical_profile_id(input: &str) -> Option<&'static str> {
+pub fn canonical_profile_id(input: &str) -> Option<&'static str> {
     match input {
         "rush" | "fast" => Some("rifle_flood_fast"),
         "saturation" | "full" | "macro" => Some(RIFLE_FLOOD_FULL_SATURATION_ID),
@@ -178,7 +178,7 @@ pub(crate) fn canonical_profile_id(input: &str) -> Option<&'static str> {
     }
 }
 
-pub(crate) fn run_profile_matchup_result(
+pub fn run_profile_matchup_result(
     options: ProfileMatchupOptions,
 ) -> Result<ProfileMatchupResult, String> {
     let profile_a = profile_by_id(&options.profile_a)

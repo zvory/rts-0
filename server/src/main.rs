@@ -9,14 +9,6 @@
 //! The simulation itself lives behind the `game` module's public API and is driven entirely by
 //! the per-room task in `lobby`. This file never touches a `Game` directly.
 
-mod config;
-mod dev_scenarios;
-mod game;
-mod lobby;
-mod perf;
-mod protocol;
-mod rules;
-
 use std::net::SocketAddr;
 use std::time::{Duration, Instant};
 
@@ -35,10 +27,13 @@ use tower_http::services::{ServeDir, ServeFile};
 use tracing::{debug, info, warn};
 use tracing_subscriber::EnvFilter;
 
-use crate::game::command::SimCommand;
-use crate::lobby::{Lobby, RoomEvent};
-use crate::protocol::{serialize_compact_snapshot, ClientMessage, ServerMessage};
-use dev_scenarios::{all_dev_scenarios, dev_scenario_unit_label, parse_dev_scenario_launch};
+use rts_server::dev_scenarios::{
+    all_dev_scenarios, dev_scenario_unit_label, parse_dev_scenario_launch,
+};
+use rts_server::game::SimCommand;
+use rts_server::lobby::{self, Lobby, RoomEvent};
+use rts_server::perf;
+use rts_server::protocol::{serialize_compact_snapshot, ClientMessage, ServerMessage};
 
 /// Default room name used when a client's `join` omits `room`.
 const DEFAULT_ROOM: &str = "main";
@@ -590,7 +585,7 @@ async fn send_server_message(
             let send_start = Instant::now();
             if sink.send(Message::Text(json.into())).await.is_err() {
                 // Socket gone; stop writing. The reader side will emit Leave.
-                crate::perf::log_writer_message(
+                perf::log_writer_message(
                     player_id,
                     message_kind,
                     serialize_duration,
@@ -599,7 +594,7 @@ async fn send_server_message(
                 );
                 return false;
             }
-            crate::perf::log_writer_message(
+            perf::log_writer_message(
                 player_id,
                 message_kind,
                 serialize_duration,

@@ -17,7 +17,7 @@ enum PerfMode {
 }
 
 #[derive(Clone, Copy, Debug)]
-pub(crate) struct PerfConfig {
+pub struct PerfConfig {
     mode: PerfMode,
     slow_tick: Duration,
     slow_phase: Duration,
@@ -28,11 +28,11 @@ pub(crate) struct PerfConfig {
 }
 
 #[derive(Clone, Copy, Debug, Default)]
-pub(crate) struct EntityCounts {
-    pub(crate) entities: usize,
-    pub(crate) units: usize,
-    pub(crate) buildings: usize,
-    pub(crate) resources: usize,
+pub struct EntityCounts {
+    pub entities: usize,
+    pub units: usize,
+    pub buildings: usize,
+    pub resources: usize,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -53,7 +53,7 @@ struct SnapshotTiming {
 }
 
 #[derive(Debug)]
-pub(crate) struct TickPerf {
+pub struct TickPerf {
     phases: Vec<PhaseTiming>,
     snapshots: Vec<SnapshotTiming>,
     snapshot_stored: u32,
@@ -62,41 +62,41 @@ pub(crate) struct TickPerf {
 }
 
 #[derive(Clone, Copy, Debug)]
-pub(crate) struct TickContext<'a> {
-    pub(crate) room: &'a str,
-    pub(crate) tick: u32,
-    pub(crate) scheduler_lag: Duration,
-    pub(crate) total: Duration,
-    pub(crate) players: usize,
-    pub(crate) spectators: usize,
-    pub(crate) ai_players: usize,
-    pub(crate) counts: EntityCounts,
+pub struct TickContext<'a> {
+    pub room: &'a str,
+    pub tick: u32,
+    pub scheduler_lag: Duration,
+    pub total: Duration,
+    pub players: usize,
+    pub spectators: usize,
+    pub ai_players: usize,
+    pub counts: EntityCounts,
 }
 
 #[derive(Clone, Copy, Debug)]
-pub(crate) struct SnapshotRecord {
-    pub(crate) player_id: u32,
-    pub(crate) spectator: bool,
-    pub(crate) snapshot: Duration,
-    pub(crate) compact: Duration,
-    pub(crate) entities: usize,
-    pub(crate) resource_deltas: usize,
-    pub(crate) events: usize,
+pub struct SnapshotRecord {
+    pub player_id: u32,
+    pub spectator: bool,
+    pub snapshot: Duration,
+    pub compact: Duration,
+    pub entities: usize,
+    pub resource_deltas: usize,
+    pub events: usize,
 }
 
 #[allow(dead_code)]
 #[derive(Clone, Copy, Debug)]
-pub(crate) struct SnapshotPerfSample {
-    pub(crate) snapshot: Duration,
-    pub(crate) compact: Duration,
-    pub(crate) total: Duration,
-    pub(crate) entities: usize,
-    pub(crate) resource_deltas: usize,
-    pub(crate) events: usize,
+pub struct SnapshotPerfSample {
+    pub snapshot: Duration,
+    pub compact: Duration,
+    pub total: Duration,
+    pub entities: usize,
+    pub resource_deltas: usize,
+    pub events: usize,
 }
 
 #[derive(Clone, Copy, Debug)]
-pub(crate) enum SnapshotEnqueue {
+pub enum SnapshotEnqueue {
     Stored,
     Replaced,
     Closed,
@@ -126,31 +126,31 @@ impl PerfConfig {
         }
     }
 
-    pub(crate) fn global() -> &'static Self {
+    pub fn global() -> &'static Self {
         static CONFIG: OnceLock<PerfConfig> = OnceLock::new();
         CONFIG.get_or_init(PerfConfig::from_env)
     }
 
-    pub(crate) fn enabled(&self) -> bool {
+    pub fn enabled(&self) -> bool {
         self.mode != PerfMode::Off
     }
 
     #[allow(dead_code)]
-    pub(crate) fn slow_tick(&self) -> Duration {
+    pub fn slow_tick(&self) -> Duration {
         self.slow_tick
     }
 
     #[allow(dead_code)]
-    pub(crate) fn slow_phase(&self) -> Duration {
+    pub fn slow_phase(&self) -> Duration {
         self.slow_phase
     }
 
     #[allow(dead_code)]
-    pub(crate) fn slow_snapshot(&self) -> Duration {
+    pub fn slow_snapshot(&self) -> Duration {
         self.slow_snapshot
     }
 
-    pub(crate) fn enforce_release_build_for_server(&self) {
+    pub fn enforce_release_build_for_server(&self) {
         #[cfg(debug_assertions)]
         if self.enabled() {
             tracing::error!(
@@ -194,7 +194,7 @@ impl PerfConfig {
 }
 
 impl TickPerf {
-    pub(crate) fn maybe_new() -> Option<Self> {
+    pub fn maybe_new() -> Option<Self> {
         if PerfConfig::global().enabled() {
             Some(TickPerf {
                 phases: Vec::with_capacity(16),
@@ -208,11 +208,11 @@ impl TickPerf {
         }
     }
 
-    pub(crate) fn record_phase(&mut self, phase: &'static str, duration: Duration) {
+    pub fn record_phase(&mut self, phase: &'static str, duration: Duration) {
         self.phases.push(PhaseTiming { phase, duration });
     }
 
-    pub(crate) fn record_snapshot(&mut self, record: SnapshotRecord) {
+    pub fn record_snapshot(&mut self, record: SnapshotRecord) {
         self.snapshots.push(SnapshotTiming {
             player_id: record.player_id,
             spectator: record.spectator,
@@ -224,7 +224,7 @@ impl TickPerf {
         });
     }
 
-    pub(crate) fn record_enqueue(&mut self, status: SnapshotEnqueue) {
+    pub fn record_enqueue(&mut self, status: SnapshotEnqueue) {
         match status {
             SnapshotEnqueue::Stored => self.snapshot_stored += 1,
             SnapshotEnqueue::Replaced => self.snapshot_replaced += 1,
@@ -233,14 +233,14 @@ impl TickPerf {
     }
 
     #[allow(dead_code)]
-    pub(crate) fn phase_records(&self) -> impl Iterator<Item = (&'static str, Duration)> + '_ {
+    pub fn phase_records(&self) -> impl Iterator<Item = (&'static str, Duration)> + '_ {
         self.phases
             .iter()
             .map(|phase| (phase.phase, phase.duration))
     }
 
     #[allow(dead_code)]
-    pub(crate) fn snapshot_records(&self) -> impl Iterator<Item = SnapshotPerfSample> + '_ {
+    pub fn snapshot_records(&self) -> impl Iterator<Item = SnapshotPerfSample> + '_ {
         self.snapshots.iter().map(|snapshot| SnapshotPerfSample {
             snapshot: snapshot.snapshot,
             compact: snapshot.compact,
@@ -251,7 +251,7 @@ impl TickPerf {
         })
     }
 
-    pub(crate) fn finish(&self, context: TickContext<'_>) {
+    pub fn finish(&self, context: TickContext<'_>) {
         let config = PerfConfig::global();
         if !config.enabled() {
             return;
@@ -345,7 +345,7 @@ impl TickPerf {
     }
 }
 
-pub(crate) fn log_writer_message(
+pub fn log_writer_message(
     player_id: u32,
     message_kind: &'static str,
     serialize: Duration,

@@ -4,16 +4,10 @@
 //! elimination or a fixed tick cap and prints the result.
 #![allow(dead_code)]
 
-mod config;
-mod game;
-mod perf;
-mod protocol;
-mod rules;
-
 use std::path::PathBuf;
 use std::process;
 
-use game::selfplay::{
+use rts_server::game::selfplay::{
     available_profile_ids, canonical_profile_id, run_profile_matchup_result, ProfileMatchupOptions,
     ProfileMatchupResult,
 };

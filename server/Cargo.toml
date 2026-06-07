@@ -5,6 +5,10 @@ edition = "2021"
 description = "Authoritative server for Bewegungskrieg, a simple real-time strategy game"
 default-run = "rts-server"
 
+[workspace]
+members = ["."]
+resolver = "2"
+
 [[bin]]
 name = "rts-server"
 path = "src/main.rs"

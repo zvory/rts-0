@@ -21,7 +21,7 @@ pub(crate) mod map;
 mod pathfinding;
 mod replay;
 mod scoring;
-pub(crate) mod selfplay;
+pub mod selfplay;
 pub(crate) mod services;
 mod setup;
 pub(crate) mod smoke;
@@ -31,7 +31,6 @@ mod systems;
 use std::collections::HashMap;
 
 use crate::config;
-use crate::game::command::SimCommand;
 use crate::protocol::{
     Event, MapInfo, PlayerResourceSnapshot, PlayerScore, PlayerStart, ResourceDelta, ResourceNode,
     Snapshot, StartPayload,
@@ -47,6 +46,8 @@ use rand::rngs::SmallRng;
 use rand::SeedableRng;
 use replay::CommandLogEntry;
 use smoke::SmokeCloudStore;
+
+pub use crate::game::command::SimCommand;
 
 #[cfg(test)]
 pub(crate) const FULL_AI_TESTS_ENV: &str = "RTS_FULL_AI_TESTS";
@@ -174,7 +175,7 @@ impl Game {
         self.tick_inner(None)
     }
 
-    pub(crate) fn tick_with_perf(
+    pub fn tick_with_perf(
         &mut self,
         perf: Option<&mut crate::perf::TickPerf>,
     ) -> Vec<(u32, Vec<Event>)> {
@@ -261,11 +262,11 @@ impl Game {
         out
     }
 
-    pub(crate) fn current_tick(&self) -> u32 {
+    pub fn current_tick(&self) -> u32 {
         self.tick
     }
 
-    pub(crate) fn perf_entity_counts(&self) -> crate::perf::EntityCounts {
+    pub fn perf_entity_counts(&self) -> crate::perf::EntityCounts {
         let mut counts = crate::perf::EntityCounts::default();
         for entity in self.entities.iter() {
             counts.entities += 1;

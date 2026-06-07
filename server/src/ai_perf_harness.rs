@@ -5,21 +5,14 @@
 //! summaries include simulation and fanout work without requiring browser clients.
 #![allow(dead_code)]
 
-mod config;
-mod game;
-mod perf;
-mod protocol;
-mod rules;
-#[path = "lobby/snapshots.rs"]
-mod snapshots;
-
 use std::collections::{BTreeMap, HashMap};
 use std::process;
 use std::time::{Duration, Instant};
 
-use game::{Game, PlayerInit};
-use protocol::{serialize_compact_snapshot, Event};
-use snapshots::compact_snapshot_for_wire;
+use rts_server::game::{Game, PlayerInit};
+use rts_server::lobby::compact_snapshot_for_wire;
+use rts_server::perf;
+use rts_server::protocol::{serialize_compact_snapshot, Event};
 use tracing_subscriber::EnvFilter;
 
 const DEFAULT_SEED: u32 = 0;

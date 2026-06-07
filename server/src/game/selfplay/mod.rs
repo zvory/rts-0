@@ -21,9 +21,13 @@ mod tests;
 pub(crate) use live::LiveSelfPlay;
 #[allow(unused_imports)]
 pub(crate) use replay::{
-    assert_replay_matches_live, available_profile_ids, canonical_profile_id, is_safe_artifact_name,
-    run_profile_matchup_result, ProfileMatchupOptions, ProfileMatchupPlayerResult,
-    ProfileMatchupResult, ProfileMatchupWinner, ReplayArtifact, ReplayDriver, SelfPlayFailure,
+    assert_replay_matches_live, is_safe_artifact_name, ReplayArtifact, ReplayDriver,
+    SelfPlayFailure,
+};
+#[allow(unused_imports)]
+pub use replay::{
+    available_profile_ids, canonical_profile_id, run_profile_matchup_result, ProfileMatchupOptions,
+    ProfileMatchupPlayerResult, ProfileMatchupResult, ProfileMatchupWinner,
 };
 
 const MAX_TICKS: u32 = 9_600;
