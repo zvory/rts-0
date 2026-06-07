@@ -74,6 +74,8 @@ import {
 
 export { footprintValidAgainstEntities };
 
+const POINTER_LOCK_RESULT_TIMEOUT_MS = 700;
+
 /**
  * Translates raw DOM pointer/keyboard gestures on the viewport into selection
  * mutations (on `state`) and protocol commands (via `net.command`).
@@ -138,6 +140,7 @@ export class Input {
     this._suppressNextContextMenu = false;
     this._pointerLockAttempt = 0;
     this._lastPointerLockFocusAttempt = null;
+    this._lastPointerLockRequest = null;
     this.onPointerLockChange = null;
     this.onPointerLockError = null;
 
@@ -363,6 +366,7 @@ export class Input {
         : null,
       attempts: this._pointerLockAttempt,
       lastFocusAttempt: this._lastPointerLockFocusAttempt,
+      lastRequest: this._lastPointerLockRequest,
       location: globalThis.location?.href || null,
       userAgent: navigator.userAgent,
     };
@@ -442,15 +446,65 @@ export class Input {
         return false;
       }
       const result = requestPointerLock();
+      this._lastPointerLockRequest = {
+        attempt: this._pointerLockAttempt,
+        at: new Date().toISOString(),
+        returnedPromise: !!(result && typeof result.then === "function"),
+        before: this._focusDebugState(),
+        outcome: "pending",
+      };
       if (result && typeof result.then === "function") {
-        await result;
-        return true;
+        return await this._waitForPointerLockPromise(result);
       }
       return await this._waitForBrowserPointerLockResult();
     } catch (err) {
+      this._finishPointerLockRequest("exception", err);
       if (this.onPointerLockError) this.onPointerLockError(err);
       return false;
     }
+  }
+
+  _waitForPointerLockPromise(pointerLockPromise) {
+    return new Promise((resolve) => {
+      let done = false;
+      const finish = (outcome, locked, err = null) => {
+        if (done) return;
+        done = true;
+        clearTimeout(timer);
+        this._finishPointerLockRequest(outcome, err);
+        resolve(locked);
+      };
+      const timer = window.setTimeout(() => {
+        finish("timeout", this._browserPointerLockElement() === this.dom, null);
+      }, POINTER_LOCK_RESULT_TIMEOUT_MS);
+      pointerLockPromise.then(
+        () => finish("resolved", this._browserPointerLockElement() === this.dom, null),
+        (err) => finish("rejected", false, err),
+      );
+    });
+  }
+
+  _finishPointerLockRequest(outcome, err = null) {
+    if (!this._lastPointerLockRequest) return;
+    this._lastPointerLockRequest = {
+      ...this._lastPointerLockRequest,
+      outcome,
+      after: this._focusDebugState(),
+      pointerLockElementMatches: this._browserPointerLockElement() === this.dom,
+      error: err ? this._pointerLockErrorSummary(err) : null,
+    };
+  }
+
+  _pointerLockErrorSummary(err) {
+    if (err instanceof Error) return { name: err.name, message: err.message };
+    if (err && typeof err === "object") {
+      return {
+        type: err.type || null,
+        name: err.name || null,
+        message: err.message || null,
+      };
+    }
+    return err == null ? null : { message: String(err) };
   }
 
   _waitForBrowserPointerLockResult() {
