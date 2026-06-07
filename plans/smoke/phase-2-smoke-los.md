@@ -45,7 +45,8 @@ Implement the special cases explicitly:
 ## Done
 
 - A deployed smoke cloud blocks fog and combat LOS.
-- A tank behind smoke is not fired on by an AT gun unless another clear, non-smoke LOS path exists.
+- Units do not fire through smoke unless another clear, non-smoke LOS path exists; AT gun to tank is
+  the core regression case.
 - Enemy units inside smoke are withheld from normal player snapshots.
 - Friendly units inside smoke remain in owner snapshots but do not expand visible fog.
 - Smoke expiration restores normal LOS.
@@ -53,5 +54,5 @@ Implement the special cases explicitly:
 ## Verification
 
 - `cd server && cargo test`
-- Add focused fog and combat unit tests around AT gun vs tank, units inside smoke, and overlapping
-  expiration.
+- Add focused fog and combat unit tests around generic firing LOS, AT gun vs tank, units inside
+  smoke, and overlapping expiration.
