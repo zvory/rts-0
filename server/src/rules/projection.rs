@@ -9,6 +9,7 @@ use crate::game::entity::{
     fires_while_moving, Entity, EntityKind, EntityStore, GatherPhase, Order, OrderIntent,
 };
 use crate::game::fog::Fog;
+use crate::game::smoke::SmokeCloudStore;
 use crate::protocol::{AbilityCooldownView, DebugPathPoint, DebugPathView};
 use crate::protocol::{EntityView, OrderPlanMarker};
 
@@ -17,6 +18,7 @@ const MAX_DEBUG_PATH_WAYPOINTS: usize = 128;
 pub struct EntityProjectionContext<'a> {
     pub fog: &'a Fog,
     pub actionable_fog: Option<&'a Fog>,
+    pub smokes: Option<&'a SmokeCloudStore>,
     pub fogged: bool,
     pub entities: &'a EntityStore,
     pub target: Option<&'a Entity>,
@@ -29,6 +31,21 @@ pub fn entity_visible_to(viewer: u32, entity: &Entity, fog: &Fog) -> bool {
         || fog.is_visible_world(viewer, entity.pos_x, entity.pos_y)
 }
 
+pub fn entity_visible_to_with_smoke(
+    viewer: u32,
+    entity: &Entity,
+    fog: &Fog,
+    smokes: &SmokeCloudStore,
+) -> bool {
+    if entity.owner != viewer
+        && !entity.is_node()
+        && smokes.point_inside(entity.pos_x, entity.pos_y)
+    {
+        return false;
+    }
+    entity_visible_to(viewer, entity, fog)
+}
+
 pub fn event_visible_to(
     viewer: u32,
     event_origin_x: f32,
@@ -37,6 +54,20 @@ pub fn event_visible_to(
     fog: &Fog,
 ) -> bool {
     viewer == attacker_owner || fog.is_visible_world(viewer, event_origin_x, event_origin_y)
+}
+
+pub fn event_visible_to_with_smoke(
+    viewer: u32,
+    event_origin_x: f32,
+    event_origin_y: f32,
+    attacker_owner: u32,
+    fog: &Fog,
+    smokes: &SmokeCloudStore,
+) -> bool {
+    if viewer != attacker_owner && smokes.point_inside(event_origin_x, event_origin_y) {
+        return false;
+    }
+    event_visible_to(viewer, event_origin_x, event_origin_y, attacker_owner, fog)
 }
 
 pub fn attack_event_visible_to(
@@ -52,12 +83,37 @@ pub fn attack_event_visible_to(
         || fog.is_visible_world(viewer, target_x, target_y)
 }
 
+#[allow(clippy::too_many_arguments)]
+#[allow(dead_code)]
+pub fn attack_event_visible_to_with_smoke(
+    viewer: u32,
+    attacker_x: f32,
+    attacker_y: f32,
+    target_x: f32,
+    target_y: f32,
+    attacker_owner: u32,
+    fog: &Fog,
+    smokes: &SmokeCloudStore,
+) -> bool {
+    if viewer != attacker_owner && smokes.point_inside(attacker_x, attacker_y) {
+        return false;
+    }
+    event_visible_to_with_smoke(viewer, attacker_x, attacker_y, attacker_owner, fog, smokes)
+        || (!smokes.point_inside(target_x, target_y)
+            && fog.is_visible_world(viewer, target_x, target_y))
+}
+
 pub fn project_entity(
     viewer: u32,
     entity: &Entity,
     context: EntityProjectionContext<'_>,
 ) -> Option<EntityView> {
-    if context.fogged && !entity_visible_to(viewer, entity, context.fog) {
+    if context.fogged
+        && !context
+            .smokes
+            .map(|smokes| entity_visible_to_with_smoke(viewer, entity, context.fog, smokes))
+            .unwrap_or_else(|| entity_visible_to(viewer, entity, context.fog))
+    {
         return None;
     }
 
@@ -75,7 +131,10 @@ pub fn project_entity(
     let vision_only = context.fogged
         && entity.owner != viewer
         && !entity.is_node()
-        && !entity_visible_to(viewer, entity, actionable_fog);
+        && !context
+            .smokes
+            .map(|smokes| entity_visible_to_with_smoke(viewer, entity, actionable_fog, smokes))
+            .unwrap_or_else(|| entity_visible_to(viewer, entity, actionable_fog));
     view.vision_only = vision_only;
 
     if entity.is_unit() {
@@ -95,7 +154,11 @@ pub fn project_entity(
                 entity.owner == viewer
                     || !context.fogged
                     || (!vision_only
-                        && actionable_fog.is_visible_world(viewer, target.pos_x, target.pos_y))
+                        && actionable_fog.is_visible_world(viewer, target.pos_x, target.pos_y)
+                        && !context
+                            .smokes
+                            .map(|smokes| smokes.point_inside(target.pos_x, target.pos_y))
+                            .unwrap_or(false))
             })
             .unwrap_or(false)
     } else {
@@ -140,7 +203,13 @@ pub fn project_entity(
         if let Some((rx, ry)) = entity.rally_point() {
             view.rally = Some([rx, ry]);
         }
-        view.order_plan = order_plan(entity, context.entities, viewer, actionable_fog);
+        view.order_plan = order_plan(
+            entity,
+            context.entities,
+            viewer,
+            actionable_fog,
+            context.smokes,
+        );
         if context.include_debug_path {
             view.debug_path = debug_path_view(entity);
         }
@@ -209,16 +278,17 @@ fn order_plan(
     entities: &EntityStore,
     viewer: u32,
     fog: &Fog,
+    smokes: Option<&SmokeCloudStore>,
 ) -> Vec<OrderPlanMarker> {
     let mut plan = Vec::new();
-    if let Some(marker) = active_order_plan_marker(entity, entities, viewer, fog) {
+    if let Some(marker) = active_order_plan_marker(entity, entities, viewer, fog, smokes) {
         plan.push(marker);
     }
     plan.extend(
         entity
             .queued_orders()
             .iter()
-            .filter_map(|intent| intent_plan_marker(intent, entities, viewer, fog)),
+            .filter_map(|intent| intent_plan_marker(intent, entities, viewer, fog, smokes)),
     );
     plan
 }
@@ -228,6 +298,7 @@ fn active_order_plan_marker(
     entities: &EntityStore,
     viewer: u32,
     fog: &Fog,
+    smokes: Option<&SmokeCloudStore>,
 ) -> Option<OrderPlanMarker> {
     match entity.order() {
         Order::Move(_) => {
@@ -238,7 +309,9 @@ fn active_order_plan_marker(
             let (x, y) = entity.path_goal().or_else(|| entity.move_intent())?;
             point_marker("attackMove", x, y)
         }
-        Order::Attack(order) => target_marker("attack", order.intent.target, entities, viewer, fog),
+        Order::Attack(order) => {
+            target_marker("attack", order.intent.target, entities, viewer, fog, smokes)
+        }
         Order::Gather(order) => entity_point_marker("gather", order.intent.node, entities),
         Order::Build(order) => {
             build_marker(order.intent.kind, order.intent.tile_x, order.intent.tile_y)
@@ -252,12 +325,13 @@ fn intent_plan_marker(
     entities: &EntityStore,
     viewer: u32,
     fog: &Fog,
+    smokes: Option<&SmokeCloudStore>,
 ) -> Option<OrderPlanMarker> {
     match intent {
         OrderIntent::Move(point) => point_marker("move", point.x, point.y),
         OrderIntent::AttackMove(point) => point_marker("attackMove", point.x, point.y),
         OrderIntent::Attack(attack) => {
-            target_marker("attack", attack.target, entities, viewer, fog)
+            target_marker("attack", attack.target, entities, viewer, fog, smokes)
         }
         OrderIntent::Gather(gather) => entity_point_marker("gather", gather.node, entities),
         OrderIntent::Build(build) => build_marker(build.kind, build.tile_x, build.tile_y),
@@ -270,9 +344,14 @@ fn target_marker(
     entities: &EntityStore,
     viewer: u32,
     fog: &Fog,
+    smokes: Option<&SmokeCloudStore>,
 ) -> Option<OrderPlanMarker> {
     let target = entities.get(target)?;
-    fog.is_visible_world(viewer, target.pos_x, target.pos_y)
+    let visible = fog.is_visible_world(viewer, target.pos_x, target.pos_y)
+        && !smokes
+            .map(|smokes| smokes.point_inside(target.pos_x, target.pos_y))
+            .unwrap_or(false);
+    visible
         .then(|| point_marker(kind, target.pos_x, target.pos_y))
         .flatten()
 }
@@ -355,6 +434,7 @@ mod tests {
             EntityProjectionContext {
                 fog,
                 actionable_fog: Some(fog),
+                smokes: None,
                 fogged,
                 entities,
                 target,

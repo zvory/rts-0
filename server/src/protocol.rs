@@ -309,12 +309,24 @@ pub struct Snapshot {
     pub entities: Vec<EntityView>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub resource_deltas: Vec<ResourceDelta>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub smokes: Vec<SmokeCloudView>,
     pub events: Vec<Event>,
     /// Per-player resources for all players. Populated only in spectator/replay modes.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub player_resources: Vec<PlayerResourceSnapshot>,
     /// Per-recipient server/network diagnostics for the current match.
     pub net_status: SnapshotNetStatus,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct SmokeCloudView {
+    pub id: u32,
+    pub x: f32,
+    pub y: f32,
+    pub radius_tiles: f32,
+    pub expires_in: u16,
 }
 
 /// Server-side transport and scheduling health attached to every snapshot.
@@ -580,7 +592,7 @@ impl NoticeSeverity {
 ///
 /// [`Snapshot`] remains the semantic source of truth for game code. This format is only a
 /// transport-side optimization for `ServerMessage::Snapshot`.
-pub const COMPACT_SNAPSHOT_VERSION: u8 = 7;
+pub const COMPACT_SNAPSHOT_VERSION: u8 = 8;
 
 /// Serialize one semantic snapshot as a compact JSON text frame payload.
 pub fn serialize_compact_snapshot(snapshot: &Snapshot) -> serde_json::Result<String> {
@@ -628,6 +640,16 @@ impl Serialize for CompactSnapshot<'_> {
                     .collect::<Vec<_>>(),
             )?;
         }
+        if !snapshot.smokes.is_empty() {
+            map.serialize_entry(
+                "sm",
+                &snapshot
+                    .smokes
+                    .iter()
+                    .map(CompactSmokeCloud)
+                    .collect::<Vec<_>>(),
+            )?;
+        }
         if !snapshot.events.is_empty() {
             map.serialize_entry(
                 "ev",
@@ -646,6 +668,24 @@ impl Serialize for CompactSnapshot<'_> {
         }
         map.serialize_entry("n", &CompactNetStatus(&snapshot.net_status))?;
         map.end()
+    }
+}
+
+struct CompactSmokeCloud<'a>(&'a SmokeCloudView);
+
+impl Serialize for CompactSmokeCloud<'_> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let smoke = self.0;
+        let mut seq = serializer.serialize_seq(Some(5))?;
+        seq.serialize_element(&smoke.id)?;
+        seq.serialize_element(&smoke.x)?;
+        seq.serialize_element(&smoke.y)?;
+        seq.serialize_element(&smoke.radius_tiles)?;
+        seq.serialize_element(&smoke.expires_in)?;
+        seq.end()
     }
 }
 
@@ -1134,6 +1174,13 @@ mod tests {
                 id: 200,
                 remaining: 1498,
             }],
+            smokes: vec![SmokeCloudView {
+                id: 50,
+                x: 320.0,
+                y: 352.0,
+                radius_tiles: 2.0,
+                expires_in: 120,
+            }],
             events: vec![
                 Event::Attack {
                     from: 1,
@@ -1210,6 +1257,10 @@ mod tests {
         // Rally point rides in slot 18 of the producing building's record.
         assert_eq!(value["e"][2][18], serde_json::json!([256.0, 512.0]));
         assert_eq!(value["r"], serde_json::json!([[200, 1498]]));
+        assert_eq!(
+            value["sm"],
+            serde_json::json!([[50, 320.0, 352.0, 2.0, 120]])
+        );
         assert_eq!(value["ev"].as_array().unwrap().len(), 4);
         assert_eq!(value["n"], serde_json::json!([4, 17, 2, 2, 3]));
         assert_eq!(
@@ -1238,6 +1289,7 @@ mod tests {
                 states::IDLE,
             )],
             resource_deltas: Vec::new(),
+            smokes: Vec::new(),
             events: Vec::new(),
             player_resources: Vec::new(),
             net_status: SnapshotNetStatus::default(),

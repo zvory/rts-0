@@ -15,6 +15,7 @@ use crate::game::services::line_of_sight::LineOfSight;
 use crate::game::services::move_coordinator::MoveCoordinator;
 use crate::game::services::occupancy::Occupancy;
 use crate::game::services::spatial::SpatialIndex;
+use crate::game::smoke::SmokeCloudStore;
 use crate::game::PlayerState;
 use crate::protocol::Event;
 use rand::rngs::SmallRng;
@@ -62,11 +63,12 @@ pub(crate) fn combat_system(
     spatial: &SpatialIndex,
     coordinator: &mut MoveCoordinator<'_>,
     fog: &Fog,
+    smokes: &SmokeCloudStore,
     rng: &mut SmallRng,
     events: &mut HashMap<u32, Vec<Event>>,
     tick: u32,
 ) {
-    let los = LineOfSight::new(map);
+    let los = LineOfSight::with_smoke(map, smokes);
     // Tick down cooldowns first.
     for id in entities.ids() {
         if let Some(e) = entities.get_mut(id) {
@@ -131,7 +133,7 @@ pub(crate) fn combat_system(
 
         // Resolve / acquire a target id based on the current order semantics.
         let target = resolve_target(
-            map, entities, spatial, &los, fog, id, owner, px, py, acquire_px, mode,
+            map, entities, spatial, &los, fog, smokes, id, owner, px, py, acquire_px, mode,
         );
         let Some(tid) = target else {
             // No target: clear stale combat target id for opportunistic-combat orders.
@@ -239,6 +241,7 @@ pub(crate) fn combat_system(
                     entities,
                     events,
                     fog,
+                    smokes,
                     rng,
                     id,
                     tid,

@@ -4,6 +4,7 @@ use crate::game::map::Map;
 use crate::game::services::line_of_sight::LineOfSight;
 use crate::game::services::spatial::SpatialIndex;
 use crate::game::services::world_query;
+use crate::game::smoke::SmokeCloudStore;
 use crate::rules::combat as combat_rules;
 use crate::rules::terrain::TerrainKind;
 
@@ -42,6 +43,7 @@ pub(super) fn resolve_target(
     spatial: &SpatialIndex,
     los: &LineOfSight<'_>,
     fog: &Fog,
+    smokes: &SmokeCloudStore,
     self_id: u32,
     owner: u32,
     px: f32,
@@ -49,6 +51,9 @@ pub(super) fn resolve_target(
     acquire_px: f32,
     mode: CombatMode,
 ) -> Option<u32> {
+    if smokes.point_inside(px, py) {
+        return None;
+    }
     // Ordered attackers keep their explicit target if it still exists.
     if mode == CombatMode::Ordered {
         if let Some(e) = entities.get(self_id) {
@@ -57,7 +62,7 @@ pub(super) fn resolve_target(
                     .get(target)
                     .map(|t| {
                         world_query::is_enemy_targetable(t, owner, self_id)
-                            && target_visible_to_owner(fog, owner, t)
+                            && target_visible_to_owner(fog, smokes, owner, t)
                     })
                     .unwrap_or(false)
                 {
@@ -73,7 +78,7 @@ pub(super) fn resolve_target(
     }
 
     if let Some(target) = retained_firing_target_for_shoot_while_moving_unit(
-        map, entities, los, fog, self_id, owner, px, py, acquire_px,
+        map, entities, los, fog, smokes, self_id, owner, px, py, acquire_px,
     ) {
         return Some(target);
     }
@@ -94,7 +99,9 @@ pub(super) fn resolve_target(
             py,
             acquire_px,
             |target| {
-                target_currently_fireable(map, entities, los, fog, self_id, owner, px, py, target)
+                target_currently_fireable(
+                    map, entities, los, fog, smokes, self_id, owner, px, py, target,
+                )
             },
         ) {
             return Some(id);
@@ -113,7 +120,9 @@ pub(super) fn resolve_target(
             py,
             acquire_px,
             |target| {
-                target_currently_fireable(map, entities, los, fog, self_id, owner, px, py, target)
+                target_currently_fireable(
+                    map, entities, los, fog, smokes, self_id, owner, px, py, target,
+                )
             },
         ) {
             return Some(id);
@@ -130,7 +139,11 @@ pub(super) fn resolve_target(
         px,
         py,
         acquire_px,
-        |target| target_currently_fireable(map, entities, los, fog, self_id, owner, px, py, target),
+        |target| {
+            target_currently_fireable(
+                map, entities, los, fog, smokes, self_id, owner, px, py, target,
+            )
+        },
     )
 }
 
@@ -140,6 +153,7 @@ fn retained_firing_target_for_shoot_while_moving_unit(
     entities: &EntityStore,
     los: &LineOfSight<'_>,
     fog: &Fog,
+    smokes: &SmokeCloudStore,
     self_id: u32,
     owner: u32,
     px: f32,
@@ -166,7 +180,9 @@ fn retained_firing_target_for_shoot_while_moving_unit(
     if dx * dx + dy * dy > effective_acquire_px * effective_acquire_px {
         return None;
     }
-    if !target_currently_fireable(map, entities, los, fog, self_id, owner, px, py, target) {
+    if !target_currently_fireable(
+        map, entities, los, fog, smokes, self_id, owner, px, py, target,
+    ) {
         return None;
     }
     Some(target_id)
@@ -178,13 +194,16 @@ fn target_currently_fireable(
     entities: &EntityStore,
     los: &LineOfSight<'_>,
     fog: &Fog,
+    smokes: &SmokeCloudStore,
     self_id: u32,
     owner: u32,
     px: f32,
     py: f32,
     target: &Entity,
 ) -> bool {
-    target_visible_to_owner(fog, owner, target)
+    !smokes.point_inside(px, py)
+        && !smokes.point_inside(target.pos_x, target.pos_y)
+        && target_visible_to_owner(fog, smokes, owner, target)
         && los.clear_between_world_points((px, py), (target.pos_x, target.pos_y))
         && !friendly_hard_blocker_between(
             map,
@@ -196,6 +215,12 @@ fn target_currently_fireable(
         )
 }
 
-fn target_visible_to_owner(fog: &Fog, owner: u32, target: &Entity) -> bool {
+fn target_visible_to_owner(
+    fog: &Fog,
+    smokes: &SmokeCloudStore,
+    owner: u32,
+    target: &Entity,
+) -> bool {
     fog.is_visible_world(owner, target.pos_x, target.pos_y)
+        && !smokes.point_inside(target.pos_x, target.pos_y)
 }

@@ -7,6 +7,7 @@ use crate::game::services::movement::movement_system;
 use crate::game::services::occupancy::Occupancy;
 use crate::game::services::pathing::PathingService;
 use crate::game::services::spatial::SpatialIndex;
+use crate::game::smoke::SmokeCloudStore;
 use crate::game::ScoreState;
 use crate::protocol::{terrain, NoticeSeverity};
 use crate::rules::combat as combat_rules;
@@ -85,12 +86,23 @@ fn run_combat_tick_on_map_with_seed(
     map: &Map,
     rng_seed: u64,
 ) -> HashMap<u32, Vec<Event>> {
+    let smokes = SmokeCloudStore::new();
+    run_combat_tick_on_map_with_seed_and_smokes(entities, players, map, rng_seed, &smokes)
+}
+
+fn run_combat_tick_on_map_with_seed_and_smokes(
+    entities: &mut EntityStore,
+    players: &[PlayerState],
+    map: &Map,
+    rng_seed: u64,
+    smokes: &SmokeCloudStore,
+) -> HashMap<u32, Vec<Event>> {
     let occ = Occupancy::build(map, entities);
     let spatial = SpatialIndex::build(entities, map.size);
     let mut pathing = PathingService::new(256, 64);
     let mut coordinator = MoveCoordinator::new(&mut pathing, map, &occ, 10);
     let mut fog = Fog::new(map.size);
-    fog.recompute(&[1, 2], entities, map);
+    fog.recompute_with_smoke(&[1, 2], entities, map, smokes);
     let mut events = HashMap::from([(1, Vec::new()), (2, Vec::new())]);
 
     let mut rng = SmallRng::seed_from_u64(rng_seed);
@@ -102,6 +114,7 @@ fn run_combat_tick_on_map_with_seed(
         &spatial,
         &mut coordinator,
         &fog,
+        smokes,
         &mut rng,
         &mut events,
         10,
@@ -132,12 +145,14 @@ fn apply_test_damage(
 ) {
     let map = Map::generate(2, 0x00C0_FFEE);
     let fog = Fog::new(map.size);
+    let smokes = SmokeCloudStore::new();
     let mut rng = SmallRng::seed_from_u64(0);
     apply_damage(
         &map,
         entities,
         events,
         &fog,
+        &smokes,
         &mut rng,
         attacker,
         victim,
@@ -160,6 +175,7 @@ fn idle_army_units_auto_acquire_targets() {
     let los = LineOfSight::new(&map);
     let spatial = SpatialIndex::build(&entities, map.size);
     let fog = visible_fog(&map, &entities);
+    let smokes = SmokeCloudStore::new();
     let attacker = entities.get(self_id).expect("attacker should exist");
 
     let target = resolve_target(
@@ -168,6 +184,7 @@ fn idle_army_units_auto_acquire_targets() {
         &spatial,
         &los,
         &fog,
+        &smokes,
         self_id,
         attacker.owner,
         attacker.pos_x,
@@ -186,6 +203,7 @@ fn move_orders_ignore_nearby_enemies() {
     let los = LineOfSight::new(&map);
     let spatial = SpatialIndex::build(&entities, map.size);
     let fog = visible_fog(&map, &entities);
+    let smokes = SmokeCloudStore::new();
     let attacker = entities.get_mut(self_id).expect("attacker should exist");
     attacker.set_order(Order::move_to(300.0, 300.0));
 
@@ -195,6 +213,7 @@ fn move_orders_ignore_nearby_enemies() {
         &spatial,
         &los,
         &fog,
+        &smokes,
         self_id,
         1,
         100.0,
@@ -213,6 +232,7 @@ fn attack_move_keeps_auto_acquisition() {
     let los = LineOfSight::new(&map);
     let spatial = SpatialIndex::build(&entities, map.size);
     let fog = visible_fog(&map, &entities);
+    let smokes = SmokeCloudStore::new();
     let attacker = entities.get_mut(self_id).expect("attacker should exist");
     attacker.set_order(Order::attack_move_to(300.0, 300.0));
 
@@ -222,6 +242,7 @@ fn attack_move_keeps_auto_acquisition() {
         &spatial,
         &los,
         &fog,
+        &smokes,
         self_id,
         1,
         100.0,
@@ -248,6 +269,7 @@ fn stone_blocks_attack_move_auto_acquisition() {
     let los = LineOfSight::new(&map);
     let spatial = SpatialIndex::build(&entities, map.size);
     let fog = visible_fog(&map, &entities);
+    let smokes = SmokeCloudStore::new();
     entities
         .get_mut(self_id)
         .expect("attacker should exist")
@@ -260,6 +282,7 @@ fn stone_blocks_attack_move_auto_acquisition() {
         &spatial,
         &los,
         &fog,
+        &smokes,
         self_id,
         attacker.owner,
         attacker.pos_x,
@@ -283,10 +306,10 @@ fn stone_blocks_explicit_attack_damage_until_shot_is_clear() {
     let enemy_id = entities
         .spawn_unit(2, EntityKind::Rifleman, enemy_pos.0, enemy_pos.1)
         .expect("enemy should spawn");
-    entities
-        .get_mut(attacker_id)
-        .expect("attacker should exist")
-        .set_order(Order::attack(enemy_id));
+    if let Some(attacker) = entities.get_mut(attacker_id) {
+        attacker.set_weapon_setup(WeaponSetup::Deployed);
+        attacker.set_order(Order::attack(enemy_id));
+    }
     let before_hp = entities.get(enemy_id).expect("enemy should exist").hp;
 
     let events = run_combat_tick_on_map(
@@ -305,6 +328,133 @@ fn stone_blocks_explicit_attack_damage_until_shot_is_clear() {
             .flatten()
             .all(|event| !matches!(event, Event::Attack { .. })),
         "blocked shots should not emit attack tracers"
+    );
+}
+
+#[test]
+fn smoke_blocks_attack_move_auto_acquisition() {
+    let map = open_map(12);
+    let mut entities = EntityStore::new();
+    let attacker_pos = map.tile_center(2, 4);
+    let enemy_pos = map.tile_center(6, 4);
+    let smoke_pos = map.tile_center(4, 4);
+    let self_id = entities
+        .spawn_unit(1, EntityKind::Rifleman, attacker_pos.0, attacker_pos.1)
+        .expect("attacker should spawn");
+    entities
+        .spawn_unit(2, EntityKind::Rifleman, enemy_pos.0, enemy_pos.1)
+        .expect("enemy should spawn");
+    let mut smokes = SmokeCloudStore::new();
+    smokes
+        .spawn(smoke_pos.0, smoke_pos.1, 1.0, 100, 0)
+        .expect("smoke should spawn");
+    let los = LineOfSight::with_smoke(&map, &smokes);
+    let spatial = SpatialIndex::build(&entities, map.size);
+    let mut fog = Fog::new(map.size);
+    fog.recompute_with_smoke(&[1, 2], &entities, &map, &smokes);
+    entities
+        .get_mut(self_id)
+        .expect("attacker should exist")
+        .set_order(Order::attack_move_to(300.0, 300.0));
+    let attacker = entities.get(self_id).expect("attacker should exist");
+
+    let target = resolve_target(
+        &map,
+        &entities,
+        &spatial,
+        &los,
+        &fog,
+        &smokes,
+        self_id,
+        attacker.owner,
+        attacker.pos_x,
+        attacker.pos_y,
+        256.0,
+        combat_mode(attacker),
+    );
+
+    assert_eq!(target, None);
+}
+
+#[test]
+fn smoke_blocks_explicit_attack_damage_until_shot_is_clear() {
+    let map = open_map(16);
+    let mut entities = EntityStore::new();
+    let attacker_pos = map.tile_center(2, 4);
+    let enemy_pos = map.tile_center(8, 4);
+    let smoke_pos = map.tile_center(5, 4);
+    let attacker_id = entities
+        .spawn_unit(1, EntityKind::AtTeam, attacker_pos.0, attacker_pos.1)
+        .expect("attacker should spawn");
+    let enemy_id = entities
+        .spawn_unit(2, EntityKind::Tank, enemy_pos.0, enemy_pos.1)
+        .expect("enemy should spawn");
+    entities
+        .get_mut(attacker_id)
+        .expect("attacker should exist")
+        .set_order(Order::attack(enemy_id));
+    let mut smokes = SmokeCloudStore::new();
+    smokes
+        .spawn(smoke_pos.0, smoke_pos.1, 1.0, 100, 0)
+        .expect("smoke should spawn");
+    let before_hp = entities.get(enemy_id).expect("enemy should exist").hp;
+
+    let events = run_combat_tick_on_map_with_seed_and_smokes(
+        &mut entities,
+        &[player_state(1, false), player_state(2, false)],
+        &map,
+        0,
+        &smokes,
+    );
+
+    assert_eq!(
+        entities.get(enemy_id).expect("enemy should exist").hp,
+        before_hp
+    );
+    assert!(
+        events
+            .values()
+            .flatten()
+            .all(|event| !matches!(event, Event::Attack { .. })),
+        "smoke-blocked AT gun shots should not emit attack tracers"
+    );
+}
+
+#[test]
+fn units_inside_smoke_drop_retained_targets() {
+    let map = open_map(12);
+    let mut entities = EntityStore::new();
+    let attacker_pos = map.tile_center(4, 4);
+    let enemy_pos = map.tile_center(5, 4);
+    let attacker_id = entities
+        .spawn_unit(1, EntityKind::Tank, attacker_pos.0, attacker_pos.1)
+        .expect("attacker should spawn");
+    let enemy_id = entities
+        .spawn_unit(2, EntityKind::Worker, enemy_pos.0, enemy_pos.1)
+        .expect("enemy should spawn");
+    if let Some(attacker) = entities.get_mut(attacker_id) {
+        attacker.set_order(Order::move_to(300.0, 100.0));
+        attacker.set_target_id(Some(enemy_id));
+    }
+    let mut smokes = SmokeCloudStore::new();
+    smokes
+        .spawn(attacker_pos.0, attacker_pos.1, 1.0, 100, 0)
+        .expect("smoke should spawn");
+
+    run_combat_tick_on_map_with_seed_and_smokes(
+        &mut entities,
+        &[player_state(1, false), player_state(2, false)],
+        &map,
+        0,
+        &smokes,
+    );
+
+    assert_eq!(
+        entities
+            .get(attacker_id)
+            .expect("attacker should exist")
+            .target_id(),
+        None
     );
 }
 
@@ -367,6 +517,7 @@ fn attack_move_resumes_original_destination_after_target_is_gone() {
     let mut coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, 0);
     let mut fog = Fog::new(map.size);
     fog.recompute(&[1], &entities, &map);
+    let smokes = SmokeCloudStore::new();
     let mut events = HashMap::from([(1, Vec::new())]);
 
     let mut rng = SmallRng::seed_from_u64(0);
@@ -378,6 +529,7 @@ fn attack_move_resumes_original_destination_after_target_is_gone() {
         &spatial,
         &mut coordinator,
         &fog,
+        &smokes,
         &mut rng,
         &mut events,
         10,
@@ -521,6 +673,7 @@ fn shoot_while_moving_units_keep_existing_valid_target() {
         let los = LineOfSight::new(&map);
         let spatial = SpatialIndex::build(&entities, map.size);
         let fog = visible_fog(&map, &entities);
+        let smokes = SmokeCloudStore::new();
         let attacker = entities
             .get(attacker_id)
             .expect("attacker should still exist");
@@ -531,6 +684,7 @@ fn shoot_while_moving_units_keep_existing_valid_target() {
             &spatial,
             &los,
             &fog,
+            &smokes,
             attacker_id,
             attacker.owner,
             attacker.pos_x,
@@ -572,6 +726,7 @@ fn shoot_while_moving_units_reacquire_when_existing_target_is_dead() {
         let los = LineOfSight::new(&map);
         let spatial = SpatialIndex::build(&entities, map.size);
         let fog = visible_fog(&map, &entities);
+        let smokes = SmokeCloudStore::new();
         let attacker = entities
             .get(attacker_id)
             .expect("attacker should still exist");
@@ -582,6 +737,7 @@ fn shoot_while_moving_units_reacquire_when_existing_target_is_dead() {
             &spatial,
             &los,
             &fog,
+            &smokes,
             attacker_id,
             attacker.owner,
             attacker.pos_x,
@@ -807,6 +963,7 @@ fn idle_workers_do_not_auto_acquire_targets() {
     let los = LineOfSight::new(&map);
     let spatial = SpatialIndex::build(&entities, map.size);
     let fog = visible_fog(&map, &entities);
+    let smokes = SmokeCloudStore::new();
     let worker = entities.get(worker_id).expect("worker should exist");
 
     let target = resolve_target(
@@ -815,6 +972,7 @@ fn idle_workers_do_not_auto_acquire_targets() {
         &spatial,
         &los,
         &fog,
+        &smokes,
         worker_id,
         worker.owner,
         worker.pos_x,
@@ -1993,6 +2151,7 @@ fn attack_move_prefers_clear_target_over_target_behind_friendly_tank() {
     let los = LineOfSight::new(&map);
     let spatial = SpatialIndex::build(&entities, map.size);
     let fog = visible_fog(&map, &entities);
+    let smokes = SmokeCloudStore::new();
     let attacker_entity = entities.get(attacker).expect("attacker should exist");
 
     let target = resolve_target(
@@ -2001,6 +2160,7 @@ fn attack_move_prefers_clear_target_over_target_behind_friendly_tank() {
         &spatial,
         &los,
         &fog,
+        &smokes,
         attacker,
         attacker_entity.owner,
         attacker_entity.pos_x,

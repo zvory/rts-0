@@ -32,7 +32,7 @@ short but readable. Coordinates are **world pixels** (floats) unless a field nam
 | `setupAtGuns` | `units: u32[]`, `x: f32`, `y: f32` | Manually emplace owned AT guns toward a world point. The server filters the unit list to owned, completed AT guns, clears movement/target state, records the setup facing, and enters `setting_up`. Other selected units are ignored. |
 | `tearDownAtGuns` | `units: u32[]` | Pack up owned AT guns that are `setting_up` or `deployed`. Other selected units are ignored. |
 | `charge`     | `units: u32[]` | Legacy Rifleman Charge activation. Preserved for old clients/replays, but translated to the generic Charge ability internally. |
-| `useAbility` | `ability: "charge"|"smoke"`, `units: u32[]`, `x?: f32`, `y?: f32`, `queued?: bool` | Generic ability command. `charge` is self-targeted and ignores `x/y`; `smoke` targets a world point. Phase 1 validates and records Smoke commands but does not apply smoke LOS gameplay yet. |
+| `useAbility` | `ability: "charge"|"smoke"`, `units: u32[]`, `x?: f32`, `y?: f32`, `queued?: bool` | Generic ability command. `charge` is self-targeted and ignores `x/y`; `smoke` targets a world point. Smoke command execution is phased separately from the authoritative smoke world-state/LOS model. |
 | `gather`     | `units: u32[]`, `node: u32`, `queued?: bool` | Send workers to harvest a resource node. When `queued` is true, store future gather intent instead of replacing the active order. |
 | `build`      | `worker: u32`, `building: string`, `tileX: u32`, `tileY: u32`, `queued?: bool` | Worker constructs a building at a tile. The server first walks the worker to a nearby point outside the requested footprint, then starts construction once it is in range. `building` ∈ building kinds. When `queued` is true, store future build intent instead of replacing the active order. |
 | `train`      | `building: u32`, `unit: string` | Queue a unit at a production building. |
@@ -110,6 +110,7 @@ transport decode:
   supplyUsed: u32, supplyCap: u32,
   entities: Entity[],            // your non-resource entities (always) + enemies on live/death-vision-visible tiles
   resourceDeltas?: ResourceDelta[], // visible resource remaining updates; omitted when empty
+  smokes?: SmokeCloud[],         // active smoke clouds visible to this recipient; omitted when empty
   events: Event[],               // transient things to surface (see 2.5)
   playerResources?: {id, steel, oil, supplyUsed, supplyCap}[], // all players; spectator/replay mode only
   netStatus: {                // per-recipient server-side health for the current match
@@ -123,14 +124,14 @@ transport decode:
 }
 ```
 
-Live WebSocket snapshot frames are sent as compact JSON text, version 7. `client/src/net.js`
+Live WebSocket snapshot frames are sent as compact JSON text, version 8. `client/src/net.js`
 decodes this transport shape back into the semantic object above before dispatching `S.SNAPSHOT`.
 Older object-shaped JSON snapshots remain decodable by the client for fallback/dev use.
 
 ```
 {
   "t": "snapshot",
-  "v": 7,
+  "v": 8,
   "s": [tick, steel, oil, supplyUsed, supplyCap],
   "e": [
     [
@@ -141,6 +142,7 @@ Older object-shaped JSON snapshots remain decodable by the client for fallback/d
     ]
   ],
   "r": [[id, remaining]],         // omitted when empty
+  "sm": [[id, x, y, radiusTiles, expiresIn]], // omitted when empty
   "ev": [EventRecord],            // omitted when empty
   "pr": [[id, steel, oil, supplyUsed, supplyCap]], // omitted in normal play; present in spectator/replay
   "n": [serverLagMs, tickMs, flags, slowTickCount, headOfLineCount]
@@ -182,6 +184,12 @@ with points encoded as `[x, y]`; `waypoints` is capped at 128 entries for transp
 from `start.map.resources`; clients keep last-known `remaining` locally. The server sends
 `remaining` updates only for resource nodes currently visible to that recipient (dev full-world
 watch rooms receive all resource updates).
+
+`SmokeCloud`: `{ id: u32, x: f32, y: f32, radiusTiles: f32, expiresIn: u16 }`. Smoke clouds are
+neutral world effects, not entities. Normal player snapshots include only clouds that have at least
+one currently visible tile after smoke-suppressed fog is recomputed; spectator/dev full-world
+snapshots may include all active clouds. Smoke-covered enemy units/buildings, target ids, death
+events, and positioned notices remain fog-gated and are withheld when smoke hides the position.
 
 `Entity` (lean; omit fields that don't apply):
 ```

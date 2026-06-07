@@ -30,6 +30,7 @@ fn test_snapshot(tick: u32, resource_deltas: Vec<ResourceDelta>) -> Snapshot {
             "idle",
         )],
         resource_deltas,
+        smokes: Vec::new(),
         events: Vec::new(),
         player_resources: Vec::new(),
         net_status: crate::protocol::SnapshotNetStatus::default(),
@@ -196,6 +197,7 @@ fn wire_compaction_removes_resource_entities_but_keeps_deltas() {
             id: 2,
             remaining: 1498,
         }],
+        smokes: Vec::new(),
         events: vec![Event::Notice {
             msg: "hello".to_string(),
             x: None,
@@ -233,6 +235,7 @@ fn wire_compaction_converts_visible_resource_death_to_zero_delta() {
             40,
             "idle",
         )],
+        smokes: Vec::new(),
         resource_deltas: Vec::new(),
         events: vec![Event::Death {
             id: 200,

@@ -50,7 +50,7 @@ impl Game {
             return self.fog.clone();
         }
         let mut fog = self.fog.clone();
-        fog.stamp_lingering_sources(&self.lingering_sight, &self.map);
+        fog.stamp_lingering_sources_with_smoke(&self.lingering_sight, &self.map, &self.smokes);
         fog
     }
 
@@ -91,6 +91,7 @@ impl Game {
                 projection::EntityProjectionContext {
                     fog,
                     actionable_fog,
+                    smokes: Some(&self.smokes),
                     fogged,
                     entities: &self.entities,
                     target,
@@ -103,6 +104,31 @@ impl Game {
         // Deterministic order (stable for tests / replays).
         entities.sort_by_key(|v| v.id);
         resource_deltas.sort_by_key(|d| d.id);
+        let mut smokes = if fogged && !include_player_resources {
+            self.smokes
+                .iter()
+                .filter(|cloud| self.smokes.visible_to_player(cloud, player, fog))
+                .map(|cloud| crate::protocol::SmokeCloudView {
+                    id: cloud.id,
+                    x: cloud.x,
+                    y: cloud.y,
+                    radius_tiles: cloud.radius_tiles,
+                    expires_in: cloud.expires_in(self.tick),
+                })
+                .collect::<Vec<_>>()
+        } else {
+            self.smokes
+                .iter()
+                .map(|cloud| crate::protocol::SmokeCloudView {
+                    id: cloud.id,
+                    x: cloud.x,
+                    y: cloud.y,
+                    radius_tiles: cloud.radius_tiles,
+                    expires_in: cloud.expires_in(self.tick),
+                })
+                .collect::<Vec<_>>()
+        };
+        smokes.sort_by_key(|smoke| smoke.id);
 
         let player_resources = if include_player_resources {
             self.players
@@ -127,6 +153,7 @@ impl Game {
             supply_cap,
             entities,
             resource_deltas,
+            smokes,
             // Events are delivered via the `tick()` return value, not the snapshot.
             events: Vec::new(),
             player_resources,
