@@ -2,11 +2,11 @@ const CURSOR_LOCK_NATIVE = "native";
 const CURSOR_LOCK_BROWSER = "browser";
 
 function isTauriRuntime() {
-  return !!window.__TAURI_INTERNALS__;
+  return !!globalThis.__TAURI_INTERNALS__ || !!globalThis.__TAURI__?.core;
 }
 
 function tauriInvoke() {
-  const invoke = window.__TAURI__?.core?.invoke;
+  const invoke = globalThis.__TAURI__?.core?.invoke || globalThis.__TAURI_INTERNALS__?.invoke;
   return typeof invoke === "function" ? invoke : null;
 }
 
@@ -18,14 +18,18 @@ export function cursorLockSupported(browserPointerLockSupported) {
   return nativeCursorSupported() || browserPointerLockSupported;
 }
 
-export async function enterCursorLock(enterBrowserPointerLock) {
+export async function enterCursorLock(enterBrowserPointerLock, cursor = null) {
   const invoke = tauriInvoke();
   if (isTauriRuntime() && invoke) {
-    await invoke("cursor_grab", { grab: true });
+    await invoke("cursor_grab", {
+      grab: true,
+      x: Number.isFinite(cursor?.x) ? cursor.x : null,
+      y: Number.isFinite(cursor?.y) ? cursor.y : null,
+    });
     try {
       await invoke("cursor_visible", { visible: false });
     } catch (err) {
-      await invoke("cursor_grab", { grab: false }).catch(() => {});
+      await invoke("cursor_grab", { grab: false, x: null, y: null }).catch(() => {});
       throw err;
     }
     return CURSOR_LOCK_NATIVE;

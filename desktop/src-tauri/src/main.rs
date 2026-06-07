@@ -3,14 +3,23 @@
 
 use std::{env, io};
 
-use tauri::{Manager, Url, WebviewWindow, Window, WindowEvent};
+use tauri::{LogicalPosition, Manager, Url, WebviewWindow, Window, WindowEvent};
 
 const SERVER_URL: &str = "https://rts-0-zvorygin.fly.dev/";
 const DESKTOP_URL_ENV: &str = "RTS_DESKTOP_URL";
 const OPEN_DEVTOOLS_ENV: &str = "RTS_TAURI_OPEN_DEVTOOLS";
 
 #[tauri::command]
-fn cursor_grab(window: Window, grab: bool) -> Result<(), String> {
+fn cursor_grab(window: Window, grab: bool, x: Option<f64>, y: Option<f64>) -> Result<(), String> {
+    if grab {
+        if let (Some(x), Some(y)) = (x, y) {
+            if x.is_finite() && y.is_finite() {
+                window
+                    .set_cursor_position(LogicalPosition::new(x, y))
+                    .map_err(|err| err.to_string())?;
+            }
+        }
+    }
     window.set_cursor_grab(grab).map_err(|err| err.to_string())
 }
 

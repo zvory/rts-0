@@ -299,7 +299,7 @@ export class Input {
       return Promise.resolve(false);
     }
     this._prepareCursorLock();
-    return enterCursorLock(() => this._requestBrowserPointerLock()).then((mode) => {
+    return enterCursorLock(() => this._requestBrowserPointerLock(), this.mouse).then((mode) => {
       if (mode === "native") this._setCursorLockState(true, mode);
       return !!mode;
     }).catch((err) => {
