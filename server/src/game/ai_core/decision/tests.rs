@@ -986,6 +986,50 @@ fn full_saturation_oil_timing_tracks_observed_steel_patch_count() {
 }
 
 #[test]
+fn full_saturation_assigns_oil_before_steel_saturation_when_expansion_complete() {
+    let ts = config::TILE_SIZE as f32;
+    let mut owned = vec![
+        building_at(10, EntityKind::CityCentre, Some(0), 8.5 * ts, 8.5 * ts),
+        building_at(11, EntityKind::CityCentre, Some(0), 23.5 * ts, 36.5 * ts),
+        building(12, EntityKind::Barracks, Some(0)),
+        building(13, EntityKind::TrainingCentre, Some(0)),
+    ];
+    // 15 steel workers — below target saturation of 36 (18 main + 18 expansion)
+    owned.extend((0..15).map(|i| steel_worker(20 + i, 100 + i)));
+    owned.push(worker(300, AiEntityState::Idle));
+    let observation = with_expansion_resources(observation(
+        AiEconomy {
+            steel: 500,
+            oil: 0,
+            supply_used: 35,
+            supply_cap: 80,
+        },
+        owned,
+    ));
+    let facts = AiFacts::from_observation(&observation);
+    let target_steel_workers = target_steel_workers_for_profile(
+        &observation,
+        &facts,
+        &RIFLE_FLOOD_FULL_SATURATION,
+        false,
+        RIFLE_FLOOD_FULL_SATURATION
+            .workers
+            .target_steel_workers(facts.target_steel_workers, usize::MAX),
+    );
+    let desired_oil = desired_oil_workers(
+        &observation,
+        &facts,
+        &RIFLE_FLOOD_FULL_SATURATION,
+        false,
+        target_steel_workers,
+    );
+    assert!(
+        desired_oil > 0,
+        "full saturation should want oil workers at expansion even before steel saturation; target_steel={target_steel_workers}, desired_oil={desired_oil}"
+    );
+}
+
+#[test]
 fn full_saturation_can_expand_while_teching_to_tanks() {
     let mut owned = vec![
         building(10, EntityKind::CityCentre, Some(0)),
