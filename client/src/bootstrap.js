@@ -89,6 +89,22 @@ export const diagnostics = {
     return rows;
   },
 
+  text(filter) {
+    return this.rows(filter)
+      .map((row) => `${row.at}\t${row.label}\t${row.detail}`)
+      .join("\n");
+  },
+
+  copy(filter) {
+    const text = this.text(filter);
+    if (navigator.clipboard?.writeText) {
+      void navigator.clipboard.writeText(text);
+      return text;
+    }
+    console.log(text);
+    return text;
+  },
+
   summary() {
     const rows = this.rows((m) => !m.label.startsWith("server.recv.snapshot"));
     console.table(rows);
