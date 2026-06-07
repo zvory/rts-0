@@ -1072,33 +1072,34 @@ fn scripted_self_play_mine_only_steel_fairness() {
         Box::new(MineOnlyScript::new(2)),
     ];
 
-    for tick in 0..TWO_MINUTES_TICKS {
-        let snapshots: BTreeMap<u32, Snapshot> = players
-            .iter()
-            .map(|p| (p.id, game.snapshot_for(p.id)))
-            .collect();
+    let snapshots: BTreeMap<u32, Snapshot> = players
+        .iter()
+        .map(|p| (p.id, game.snapshot_for(p.id)))
+        .collect();
+    let mut commands = Vec::new();
+    for script in &mut scripts {
+        let pid = script.player_id();
+        let Some(snapshot) = snapshots.get(&pid) else {
+            continue;
+        };
+        let view = PlayerView {
+            player_id: pid,
+            tick: 0,
+            start: &start,
+            snapshot,
+        };
+        commands.extend(
+            script
+                .commands(view)
+                .into_iter()
+                .map(|command| (pid, command)),
+        );
+    }
+    for (player_id, command) in commands {
+        game.enqueue(player_id, command);
+    }
 
-        let mut commands = Vec::new();
-        for script in &mut scripts {
-            let pid = script.player_id();
-            let Some(snapshot) = snapshots.get(&pid) else {
-                continue;
-            };
-            let view = PlayerView {
-                player_id: pid,
-                tick,
-                start: &start,
-                snapshot,
-            };
-            for command in script.commands(view) {
-                commands.push((pid, command));
-            }
-        }
-
-        for (player_id, command) in commands {
-            game.enqueue(player_id, command);
-        }
-
+    for _ in 0..TWO_MINUTES_TICKS {
         game.tick();
     }
 
@@ -1117,28 +1118,39 @@ fn scripted_self_play_mine_only_steel_fairness() {
     );
 }
 
-/// Run a scripted match for a fixed number of ticks and return the final game state plus
-/// the per-tick snapshots for every player.
+/// Run a scripted match pair for a fixed number of ticks and assert both games expose identical
+/// per-player snapshots before each tick.
 #[cfg(test)]
-fn run_scripted_ticks(
+fn assert_scripted_runs_identical_for_ticks(
     players: &[PlayerInit],
-    scripts: &mut [Box<dyn ScriptedPlayer>],
+    scripts_a: &mut [Box<dyn ScriptedPlayer>],
+    scripts_b: &mut [Box<dyn ScriptedPlayer>],
     start: &StartPayload,
-    game: &mut Game,
+    game_a: &mut Game,
+    game_b: &mut Game,
     ticks: u32,
-) -> Vec<BTreeMap<u32, Snapshot>> {
-    let mut history = Vec::with_capacity(ticks as usize);
+) {
     for tick in 0..ticks {
-        let snapshots: BTreeMap<u32, Snapshot> = players
+        let snapshots_a: BTreeMap<u32, Snapshot> = players
             .iter()
-            .map(|p| (p.id, game.snapshot_for(p.id)))
+            .map(|p| (p.id, game_a.snapshot_for(p.id)))
             .collect();
-        history.push(snapshots.clone());
+        let snapshots_b: BTreeMap<u32, Snapshot> = players
+            .iter()
+            .map(|p| (p.id, game_b.snapshot_for(p.id)))
+            .collect();
+        for p in players {
+            assert_eq!(
+                snapshots_a[&p.id], snapshots_b[&p.id],
+                "tick {tick}: player {} snapshots diverged between two fresh runs",
+                p.id
+            );
+        }
 
-        let mut commands = Vec::new();
-        for script in scripts.iter_mut() {
+        let mut commands_a = Vec::new();
+        for script in scripts_a.iter_mut() {
             let pid = script.player_id();
-            let Some(snapshot) = snapshots.get(&pid) else {
+            let Some(snapshot) = snapshots_a.get(&pid) else {
                 continue;
             };
             let view = PlayerView {
@@ -1147,18 +1159,43 @@ fn run_scripted_ticks(
                 start,
                 snapshot,
             };
-            for command in script.commands(view) {
-                commands.push((pid, command));
-            }
+            commands_a.extend(
+                script
+                    .commands(view)
+                    .into_iter()
+                    .map(|command| (pid, command)),
+            );
+        }
+        let mut commands_b = Vec::new();
+        for script in scripts_b.iter_mut() {
+            let pid = script.player_id();
+            let Some(snapshot) = snapshots_b.get(&pid) else {
+                continue;
+            };
+            let view = PlayerView {
+                player_id: pid,
+                tick,
+                start,
+                snapshot,
+            };
+            commands_b.extend(
+                script
+                    .commands(view)
+                    .into_iter()
+                    .map(|command| (pid, command)),
+            );
         }
 
-        for (player_id, command) in commands {
-            game.enqueue(player_id, command);
+        for (player_id, command) in commands_a {
+            game_a.enqueue(player_id, command);
+        }
+        for (player_id, command) in commands_b {
+            game_b.enqueue(player_id, command);
         }
 
-        game.tick();
+        game_a.tick();
+        game_b.tick();
     }
-    history
 }
 
 #[cfg(test)]
@@ -1300,24 +1337,21 @@ fn identical_scripted_runs_are_identical() {
         Box::new(MineOnlyScript::new(1)),
         Box::new(MineOnlyScript::new(2)),
     ];
-    let history_a = run_scripted_ticks(&players, &mut scripts_a, &start, &mut game_a, TICKS);
-
     let mut game_b = Game::new(&players, 0x1234_5678);
     let mut scripts_b: Vec<Box<dyn ScriptedPlayer>> = vec![
         Box::new(MineOnlyScript::new(1)),
         Box::new(MineOnlyScript::new(2)),
     ];
-    let history_b = run_scripted_ticks(&players, &mut scripts_b, &start, &mut game_b, TICKS);
 
-    for (tick, (snaps_a, snaps_b)) in history_a.iter().zip(&history_b).enumerate() {
-        for p in &players {
-            assert_eq!(
-                snaps_a[&p.id], snaps_b[&p.id],
-                "tick {tick}: player {} snapshots diverged between two fresh runs",
-                p.id
-            );
-        }
-    }
+    assert_scripted_runs_identical_for_ticks(
+        &players,
+        &mut scripts_a,
+        &mut scripts_b,
+        &start,
+        &mut game_a,
+        &mut game_b,
+        TICKS,
+    );
 
     // Command logs must also be identical.
     assert_eq!(
