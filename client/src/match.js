@@ -8,6 +8,7 @@ import {
 import { Fog } from "./fog.js";
 import { HUD } from "./hud.js";
 import { Input } from "./input/index.js";
+import { MatchInputRouter } from "./input/router.js";
 import { Minimap } from "./minimap.js";
 import { Renderer } from "./renderer/index.js";
 import { GameState } from "./state.js";
@@ -104,9 +105,10 @@ export class Match {
     );
     this.fog.setRevealAll(!!this.devWatch?.noFog);
     this.hud = this._timeInit("match.hud", () => new HUD(dom.gameScreen, this.state, this.net));
+    this.inputRouter = this._timeInit("match.inputRouter", () => new MatchInputRouter(dom.viewport));
     this.minimap = this._timeInit(
       "match.minimap",
-      () => new Minimap(dom.minimap, this.state, this.camera, this.fog, this.net),
+      () => new Minimap(dom.minimap, this.state, this.camera, this.fog, this.net, this.inputRouter),
     );
     this.input = this._timeInit(
       "match.input",
@@ -118,6 +120,7 @@ export class Match {
         this.renderer,
         this.fog,
         this.audio,
+        this.inputRouter,
       ),
     );
 

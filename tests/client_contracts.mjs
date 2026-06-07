@@ -50,6 +50,7 @@ import {
   exitCursorLock,
   nativeCursorSupported,
 } from "../client/src/input/native_cursor.js";
+import { MatchInputRouter } from "../client/src/input/router.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -105,6 +106,59 @@ assert(noticeSoundId("Cannot build there") === "notice_cannot_build", "cannot-bu
 assert(noticeSoundId("Requirement not met") === null, "generic invalid notices stay silent");
 assert(noticeSoundId("Unknown unit") === null, "unknown-unit notices stay silent");
 assert(noticeSoundId("Not enough resources") === null, "generic resource notices stay silent");
+
+// ---------------------------------------------------------------------------
+// Match input router
+// ---------------------------------------------------------------------------
+{
+  const viewport = {
+    getBoundingClientRect() {
+      return { left: 10, top: 20, right: 810, bottom: 620, width: 800, height: 600 };
+    },
+  };
+  const router = new MatchInputRouter(viewport);
+  const calls = [];
+  const lowZone = {
+    priority: 1,
+    contains: () => true,
+    pointerDown: () => {
+      calls.push("lowDown");
+      return true;
+    },
+  };
+  const highZone = {
+    priority: 10,
+    contains: (ev) => ev.clientX >= 100 && ev.clientX <= 200,
+    pointerDown: (ev) => {
+      calls.push(["highDown", ev.viewportX, ev.viewportY]);
+      return true;
+    },
+    pointerMove: (ev) => {
+      calls.push(["highMove", ev.clientX, ev.clientY]);
+      return true;
+    },
+    pointerUp: () => {
+      calls.push("highUp");
+      return true;
+    },
+  };
+  router.registerZone(lowZone);
+  const unregisterHigh = router.registerZone(highZone);
+
+  assert(router.pointerDown({ clientX: 150, clientY: 70, button: 0, source: "locked" }), "router consumes highest matching zone");
+  assert(calls[0][0] === "highDown", "higher priority matching zone receives pointerDown first");
+  assert(calls[0][1] === 140 && calls[0][2] === 50, "router computes viewport-local coords");
+  assert(!router.pointerMove({ clientX: 500, clientY: 500, source: "dom" }), "capture ignores different event source");
+  assert(router.pointerMove({ clientX: 500, clientY: 500, source: "locked" }), "captured zone receives pointerMove outside bounds");
+  assert(calls[1][0] === "highMove", "pointerDown capture is retained for moves");
+  assert(!router.pointerUp({ clientX: 500, clientY: 500, source: "dom" }), "capture is not released by a different source");
+  assert(router.pointerUp({ clientX: 500, clientY: 500, source: "locked" }), "captured zone receives pointerUp");
+  assert(calls[2] === "highUp", "pointerUp releases the captured zone");
+
+  unregisterHigh();
+  assert(router.pointerDown({ clientX: 150, clientY: 70, button: 0 }), "router falls back after unregister");
+  assert(calls.at(-1) === "lowDown", "unregistered zone no longer receives events");
+}
 
 // ---------------------------------------------------------------------------
 // Pointer lock bridge
@@ -209,6 +263,7 @@ function fakeAudioContext() {
     t: "snapshot",
     v: COMPACT_SNAPSHOT_VERSION,
     s: [42, 100, 25, 3, 10],
+    n: [0, 0, 0, 0, 0],
     e: [
       [
         1,
