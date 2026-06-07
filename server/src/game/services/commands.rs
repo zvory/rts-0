@@ -49,9 +49,7 @@ pub(crate) fn apply_commands(
                 let valid: Vec<u32> = dedupe_cap_units(units)
                     .into_iter()
                     .filter(|id| {
-                        owns_unit(entities, player, *id)
-                            && !is_constructing(entities, *id)
-                            && can_accept_move_order(entities, *id)
+                        owns_unit(entities, player, *id) && !is_constructing(entities, *id)
                     })
                     .collect();
                 clear_queued_orders(entities, &valid);
@@ -71,9 +69,7 @@ pub(crate) fn apply_commands(
                 let valid: Vec<u32> = dedupe_cap_units(units)
                     .into_iter()
                     .filter(|id| {
-                        owns_unit(entities, player, *id)
-                            && !is_constructing(entities, *id)
-                            && can_accept_move_order(entities, *id)
+                        owns_unit(entities, player, *id) && !is_constructing(entities, *id)
                     })
                     .collect();
                 clear_queued_orders(entities, &valid);
@@ -455,20 +451,12 @@ fn is_constructing(entities: &EntityStore, id: u32) -> bool {
     )
 }
 
-fn can_accept_move_order(entities: &EntityStore, id: u32) -> bool {
-    matches!(
-        entities.get(id),
-        Some(e)
-            if e.kind != EntityKind::AtTeam || matches!(e.weapon_setup(), WeaponSetup::Packed)
-    )
-}
-
 fn clear_staged_at_gun_setup(entities: &mut EntityStore, ids: &[u32]) {
     for id in ids {
         let Some(e) = entities.get_mut(*id) else {
             continue;
         };
-        if e.kind == EntityKind::AtTeam && matches!(e.weapon_setup(), WeaponSetup::Packed) {
+        if e.kind == EntityKind::AtTeam {
             e.set_emplacement_facing(None);
             e.set_pending_redeploy_facing(None);
         }
@@ -1615,7 +1603,7 @@ mod tests {
     }
 
     #[test]
-    fn move_order_ignores_deployed_at_guns_without_tearing_down_or_rotating() {
+    fn move_order_tears_down_deployed_at_guns_before_moving() {
         let map = flat_map(24);
         let mut entities = EntityStore::new();
         let deployed = entities
@@ -1647,25 +1635,25 @@ mod tests {
         );
 
         let deployed = entities.get(deployed).expect("at gun should exist");
-        assert_eq!(
+        assert!(matches!(
             deployed.weapon_setup(),
-            WeaponSetup::Deployed,
-            "move should not implicitly tear down deployed AT guns"
-        );
+            WeaponSetup::TearingDown { .. }
+        ));
         assert_eq!(
             deployed.facing(),
             0.25,
-            "ignored move should not rotate deployed AT guns"
+            "move order should not instantly rotate a deployed AT gun before it moves"
         );
         assert!(
-            matches!(deployed.order(), Order::Idle),
-            "ignored move should not replace the deployed AT gun order"
+            matches!(deployed.order(), Order::Move(_)),
+            "move should replace the deployed AT gun order"
         );
-        assert_eq!(
-            deployed.path_goal(),
-            None,
-            "ignored move should not queue a movement path"
+        assert!(
+            deployed.path_goal().is_some(),
+            "move should preserve the movement destination while the AT gun tears down"
         );
+        assert_eq!(deployed.emplacement_facing(), None);
+        assert_eq!(deployed.pending_redeploy_facing(), None);
 
         let packed = entities.get(packed).expect("packed at gun should exist");
         assert!(
@@ -1675,7 +1663,7 @@ mod tests {
     }
 
     #[test]
-    fn attack_move_order_ignores_deployed_at_guns_without_tearing_down_or_rotating() {
+    fn attack_move_order_tears_down_deployed_at_guns_before_moving() {
         let map = flat_map(24);
         let mut entities = EntityStore::new();
         let deployed = entities
@@ -1704,25 +1692,25 @@ mod tests {
         );
 
         let deployed = entities.get(deployed).expect("at gun should exist");
-        assert_eq!(
+        assert!(matches!(
             deployed.weapon_setup(),
-            WeaponSetup::Deployed,
-            "attack-move should not implicitly tear down deployed AT guns"
-        );
+            WeaponSetup::TearingDown { .. }
+        ));
         assert_eq!(
             deployed.facing(),
             -0.5,
-            "ignored attack-move should not rotate deployed AT guns"
+            "attack-move should not instantly rotate a deployed AT gun before it moves"
         );
         assert!(
-            matches!(deployed.order(), Order::Idle),
-            "ignored attack-move should not replace the deployed AT gun order"
+            matches!(deployed.order(), Order::AttackMove(_)),
+            "attack-move should replace the deployed AT gun order"
         );
-        assert_eq!(
-            deployed.path_goal(),
-            None,
-            "ignored attack-move should not queue a movement path"
+        assert!(
+            deployed.path_goal().is_some(),
+            "attack-move should preserve the movement destination while the AT gun tears down"
         );
+        assert_eq!(deployed.emplacement_facing(), None);
+        assert_eq!(deployed.pending_redeploy_facing(), None);
     }
 
     #[test]
