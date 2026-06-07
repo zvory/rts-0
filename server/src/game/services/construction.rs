@@ -171,7 +171,7 @@ pub(crate) fn construction_system(
                 .unwrap_or((0, EntityKind::Worker));
             events.entry(owner).or_default().push(Event::Build {
                 id: site,
-                kind: kind.to_protocol_str().to_string(),
+                kind: crate::protocol::kind_to_wire(kind).to_string(),
             });
             defensively_eject_worker_from_static_overlap(map, entities, worker);
             if let Some(w) = entities.get_mut(worker) {

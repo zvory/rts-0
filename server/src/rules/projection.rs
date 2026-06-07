@@ -10,6 +10,7 @@ use crate::game::entity::{
 };
 use crate::game::fog::Fog;
 use crate::game::smoke::SmokeCloudStore;
+use crate::protocol;
 use crate::protocol::{AbilityCooldownView, DebugPathPoint, DebugPathView};
 use crate::protocol::{EntityView, OrderPlanMarker};
 
@@ -120,7 +121,7 @@ pub fn project_entity(
     let mut view = EntityView::new(
         entity.id,
         entity.owner,
-        entity.kind.to_protocol_str(),
+        protocol::kind_to_wire(entity.kind),
         entity.pos_x,
         entity.pos_y,
         entity.hp,
@@ -186,7 +187,7 @@ pub fn project_entity(
 
     if entity.is_building() && !entity.prod_queue().is_empty() {
         if let Some(front) = entity.prod_queue().first() {
-            view.prod_kind = Some(front.unit.to_protocol_str().to_string());
+            view.prod_kind = Some(protocol::kind_to_wire(front.unit).to_string());
             view.prod_progress = Some(if front.total == 0 {
                 0.0
             } else {

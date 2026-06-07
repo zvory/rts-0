@@ -394,7 +394,7 @@ mod tests {
                 EntityView {
                     id: 1,
                     owner: 0,
-                    kind: EntityKind::Steel.to_protocol_str().to_string(),
+                    kind: crate::protocol::kind_to_wire(EntityKind::Steel).to_string(),
                     x: hx + in_range,
                     y: hy,
                     hp: 1,
@@ -422,7 +422,7 @@ mod tests {
                 EntityView {
                     id: 2,
                     owner: 0,
-                    kind: EntityKind::Steel.to_protocol_str().to_string(),
+                    kind: crate::protocol::kind_to_wire(EntityKind::Steel).to_string(),
                     x: hx - in_range,
                     y: hy,
                     hp: 1,
@@ -450,7 +450,7 @@ mod tests {
                 EntityView {
                     id: 3,
                     owner: 0,
-                    kind: EntityKind::Oil.to_protocol_str().to_string(),
+                    kind: crate::protocol::kind_to_wire(EntityKind::Oil).to_string(),
                     x: hx,
                     y: hy + in_range,
                     hp: 1,
@@ -478,7 +478,7 @@ mod tests {
                 EntityView {
                     id: 4,
                     owner: 0,
-                    kind: EntityKind::Steel.to_protocol_str().to_string(),
+                    kind: crate::protocol::kind_to_wire(EntityKind::Steel).to_string(),
                     x: hx,
                     y: hy + out_of_range,
                     hp: 1,
@@ -506,7 +506,7 @@ mod tests {
                 EntityView {
                     id: 5,
                     owner: 0,
-                    kind: EntityKind::Steel.to_protocol_str().to_string(),
+                    kind: crate::protocol::kind_to_wire(EntityKind::Steel).to_string(),
                     x: hx,
                     y: hy - in_range,
                     hp: 1,

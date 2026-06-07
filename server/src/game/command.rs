@@ -275,14 +275,14 @@ impl SimCommand {
                 queued,
             } => protocol::Command::Build {
                 worker: *worker,
-                building: building.to_protocol_str().to_string(),
+                building: protocol::kind_to_wire(*building).to_string(),
                 tile_x: *tile_x,
                 tile_y: *tile_y,
                 queued: *queued,
             },
             SimCommand::Train { building, unit } => protocol::Command::Train {
                 building: *building,
-                unit: unit.to_protocol_str().to_string(),
+                unit: protocol::kind_to_wire(*unit).to_string(),
             },
             SimCommand::Cancel { building } => protocol::Command::Cancel {
                 building: *building,

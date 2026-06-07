@@ -3,8 +3,11 @@
 //! Today all passable terrain is open ground. Forests, roads, hills, and their combat/movement
 //! effects intentionally land here later instead of being spread through services.
 
-use crate::game::entity::EntityKind;
-use crate::protocol::terrain as wire_terrain;
+use crate::EntityKind;
+
+pub const MAP_TERRAIN_GRASS: u8 = 0;
+pub const MAP_TERRAIN_ROCK: u8 = 1;
+pub const MAP_TERRAIN_WATER: u8 = 2;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TerrainKind {
@@ -17,8 +20,8 @@ pub enum TerrainKind {
 impl TerrainKind {
     pub fn from_map_code(code: u8) -> Option<Self> {
         match code {
-            wire_terrain::GRASS => Some(TerrainKind::Open),
-            wire_terrain::ROCK | wire_terrain::WATER => None,
+            MAP_TERRAIN_GRASS => Some(TerrainKind::Open),
+            MAP_TERRAIN_ROCK | MAP_TERRAIN_WATER => None,
             _ => None,
         }
     }
@@ -41,30 +44,27 @@ pub fn concealment_modifier(_kind: EntityKind, _terrain: TerrainKind) -> f32 {
 /// Whether this raw map terrain code blocks line-of-sight for fog and ranged attacks.
 /// Stone blocks today; forests can grow into this seam later with partial visibility rules.
 pub fn blocks_line_of_sight(code: u8) -> bool {
-    code == wire_terrain::ROCK
+    code == MAP_TERRAIN_ROCK
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::game::entity::EntityKind;
-    use crate::protocol::terrain as wire_terrain;
-
     #[test]
     fn current_map_codes_only_project_grass_to_open_terrain() {
         assert_eq!(
-            TerrainKind::from_map_code(wire_terrain::GRASS),
+            TerrainKind::from_map_code(MAP_TERRAIN_GRASS),
             Some(TerrainKind::Open)
         );
-        assert_eq!(TerrainKind::from_map_code(wire_terrain::ROCK), None);
-        assert_eq!(TerrainKind::from_map_code(wire_terrain::WATER), None);
+        assert_eq!(TerrainKind::from_map_code(MAP_TERRAIN_ROCK), None);
+        assert_eq!(TerrainKind::from_map_code(MAP_TERRAIN_WATER), None);
     }
 
     #[test]
     fn stone_blocks_line_of_sight_but_water_does_not() {
-        assert!(!blocks_line_of_sight(wire_terrain::GRASS));
-        assert!(blocks_line_of_sight(wire_terrain::ROCK));
-        assert!(!blocks_line_of_sight(wire_terrain::WATER));
+        assert!(!blocks_line_of_sight(MAP_TERRAIN_GRASS));
+        assert!(blocks_line_of_sight(MAP_TERRAIN_ROCK));
+        assert!(!blocks_line_of_sight(MAP_TERRAIN_WATER));
     }
 
     #[test]

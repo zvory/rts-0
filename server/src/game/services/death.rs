@@ -63,7 +63,7 @@ pub(crate) fn death_system(
                 id: dead.id,
                 x: dead.x,
                 y: dead.y,
-                kind: dead.kind.to_protocol_str().to_string(),
+                kind: crate::protocol::kind_to_wire(dead.kind).to_string(),
             });
         }
     }
@@ -86,7 +86,7 @@ pub(crate) fn death_system(
                 id,
                 x,
                 y,
-                kind: kind.to_protocol_str().to_string(),
+                kind: crate::protocol::kind_to_wire(kind).to_string(),
             });
         }
         entities.remove(id);

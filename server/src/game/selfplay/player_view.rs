@@ -13,7 +13,7 @@ pub(super) fn kind_of(e: &EntityView) -> Option<EntityKind> {
 
 /// Convenience: check whether an `EntityView` has a given internal kind.
 pub(super) fn is_kind(e: &EntityView, kind: EntityKind) -> bool {
-    e.kind == kind.to_protocol_str()
+    e.kind == crate::protocol::kind_to_wire(kind)
 }
 
 #[derive(Clone, Copy)]

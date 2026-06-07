@@ -1,8 +1,8 @@
 //! Pure combat rules: classification predicates and damage formula.
 
-use crate::game::entity::EntityKind;
-use crate::rules::defs::{self, ArmorClass, TargetPriority, WeaponClass};
-use crate::rules::terrain::{self, TerrainKind};
+use crate::defs::{self, ArmorClass, TargetPriority, WeaponClass};
+use crate::terrain::{self, TerrainKind};
+use crate::EntityKind;
 
 const FRONT_ARC_RAD: f32 = std::f32::consts::FRAC_PI_4;
 const SIDE_ARC_RAD: f32 = std::f32::consts::PI * 3.0 / 4.0;

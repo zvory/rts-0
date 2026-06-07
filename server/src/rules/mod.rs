@@ -1,10 +1,9 @@
-//! Classification, formula, and projection rules. See `docs/design/server-sim.md`.
+//! Compatibility surface for extracted rules plus sim-owned projection.
 //!
-//! Functions here never mutate state. Services in `game/services/` orchestrate; rules classify,
-//! calculate, or project views.
+//! Pure domain, balance, terrain, economy, and combat rules live in `rts-rules`. Projection still
+//! lives here because it reads sim entities, fog, smoke, and constructs protocol DTOs.
 
-pub mod combat;
-pub mod defs;
-pub mod economy;
 pub mod projection;
-pub mod terrain;
+
+#[allow(unused_imports)]
+pub use rts_rules::{combat, defs, economy, terrain};

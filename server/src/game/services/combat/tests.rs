@@ -1213,7 +1213,7 @@ fn deployed_at_team_fires_at_long_range() {
                     to_pos: Some(to_pos),
                 } if *from == at_id
                     && *to == tank_id
-                    && reveal.kind == EntityKind::AtTeam.to_protocol_str()
+                    && reveal.kind == crate::protocol::kind_to_wire(EntityKind::AtTeam)
                     && reveal.setup_state.as_deref() == Some(WeaponSetup::Deployed.to_protocol_str())
                     && *to_pos == [310.0, 100.0]
             )

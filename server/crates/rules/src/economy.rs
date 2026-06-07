@@ -2,8 +2,8 @@
 //!
 //! `rules::defs` owns kind-specific data; this module answers allowed/cost/supply questions.
 
-use crate::game::entity::EntityKind;
-use crate::rules::defs;
+use crate::defs;
+use crate::EntityKind;
 
 /// Which units a given building can train.
 pub fn trainable_units(building_kind: EntityKind) -> &'static [EntityKind] {
@@ -58,7 +58,7 @@ pub fn cost(kind: EntityKind) -> (u32, u32) {
 
 /// Human-readable notice for a resource shortage. Oil is reported first because
 /// mixed steel/oil units are usually blocked by oil in practice.
-pub(crate) fn resource_shortage_notice(
+pub fn resource_shortage_notice(
     steel: u32,
     oil: u32,
     cost_steel: u32,
@@ -178,7 +178,7 @@ mod tests {
         assert_eq!(supply_cost(EntityKind::Depot), 0);
         assert_eq!(
             supply_provided(EntityKind::Depot),
-            crate::config::DEPOT_SUPPLY
+            crate::balance::DEPOT_SUPPLY
         );
         assert_eq!(supply_provided(EntityKind::Tank), 0);
     }

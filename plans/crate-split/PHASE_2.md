@@ -1,6 +1,6 @@
 # Phase 2 - Domain, Rules, and Balance Extraction
 
-Status: Planned.
+Status: Done.
 
 Goal: create a rules/balance crate that owns gameplay vocabulary and formula data without importing
 simulation state.
@@ -37,6 +37,23 @@ Projection is the riskiest part. It owns fog-gated entity view construction toda
 gameplay-critical and wire-facing. Move it in small steps and keep fog leak tests close to the
 change.
 
+## Implementation Notes
+
+- Added `server/crates/rules` as `rts-rules`.
+- Moved `EntityKind`, kind classification helpers, unit/building/node stats and definitions,
+  terrain vocabulary/formulas, combat formulas, economy rules, and simulation/balance constants
+  into `rts-rules`.
+- Reduced `server/src/config.rs` and `server/src/rules/mod.rs` to compatibility shims for existing
+  server call sites.
+- Kept `rules::projection` in the server crate because it still reads `Entity`, `EntityStore`,
+  fog/smoke state, and builds protocol DTOs. Pure visibility extraction can happen later once a
+  trait/primitives boundary is introduced.
+- Replaced `EntityKind -> protocol string` inherent conversion with explicit server-side
+  `protocol::kind_to_wire` / `protocol::kind_from_wire` adapters. The domain type no longer imports
+  protocol constants.
+- Added adapter tests for kind wire round-trips and terrain code parity between `rts-rules` and
+  `rts-protocol`.
+
 ## Tests
 
 - Unit tests for kind parsing/format adapters.
@@ -52,4 +69,3 @@ change.
 - `EntityKind` no longer imports protocol constants.
 - `config.rs` is either gone, reduced to a compatibility shim, or clearly owned by the rules crate.
 - Fog-filtered snapshots and events remain behaviorally unchanged.
-

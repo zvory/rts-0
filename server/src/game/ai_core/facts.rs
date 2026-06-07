@@ -429,7 +429,7 @@ mod tests {
                     let mut view = EntityView::new(
                         r.id,
                         0,
-                        r.kind.to_protocol_str(),
+                        crate::protocol::kind_to_wire(r.kind),
                         r.x,
                         r.y,
                         1,

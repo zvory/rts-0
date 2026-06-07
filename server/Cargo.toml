@@ -6,7 +6,7 @@ description = "Authoritative server for Bewegungskrieg, a simple real-time strat
 default-run = "rts-server"
 
 [workspace]
-members = [".", "crates/contract", "crates/protocol"]
+members = [".", "crates/contract", "crates/protocol", "crates/rules"]
 resolver = "2"
 
 [[bin]]
@@ -34,6 +34,7 @@ bench = false
 [dependencies]
 rts-contract = { path = "crates/contract" }
 rts-protocol = { path = "crates/protocol" }
+rts-rules = { path = "crates/rules" }
 tokio = { version = "1", features = ["full"] }
 axum = { version = "0.8", features = ["ws"] }
 tower-http = { version = "0.6", features = ["fs", "trace"] }

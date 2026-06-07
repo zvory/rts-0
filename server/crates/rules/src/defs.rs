@@ -4,8 +4,8 @@
 //! rule classification for a new unit such as a hypothetical `Halftrack` should require
 //! appending one `UnitDef` here instead of adding category matches across rules modules.
 
-use crate::config;
-use crate::game::entity::EntityKind;
+use crate::balance;
+use crate::EntityKind;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ArmorClass {
@@ -29,7 +29,7 @@ pub enum TargetPriority {
 #[derive(Debug, Clone, Copy)]
 pub struct UnitDef {
     pub kind: EntityKind,
-    pub stats: config::UnitStats,
+    pub stats: balance::UnitStats,
     pub armor_class: ArmorClass,
     pub weapon: WeaponClass,
     pub target_priority: TargetPriority,
@@ -40,7 +40,7 @@ pub struct UnitDef {
 #[derive(Debug, Clone, Copy)]
 pub struct BuildingDef {
     pub kind: EntityKind,
-    pub stats: config::BuildingStats,
+    pub stats: balance::BuildingStats,
     pub armor_class: ArmorClass,
     pub weapon: WeaponClass,
     pub trains: &'static [EntityKind],
@@ -70,7 +70,7 @@ const FACTORY_REQUIRED: &[EntityKind] = &[EntityKind::CityCentre, EntityKind::Tr
 pub const UNITS: &[UnitDef] = &[
     UnitDef {
         kind: EntityKind::Worker,
-        stats: config::UnitStats {
+        stats: balance::UnitStats {
             hp: 40,
             dmg: 4,
             range_tiles: 1,
@@ -91,7 +91,7 @@ pub const UNITS: &[UnitDef] = &[
     },
     UnitDef {
         kind: EntityKind::Rifleman,
-        stats: config::UnitStats {
+        stats: balance::UnitStats {
             hp: 45,
             dmg: 5,
             range_tiles: 4,
@@ -112,7 +112,7 @@ pub const UNITS: &[UnitDef] = &[
     },
     UnitDef {
         kind: EntityKind::MachineGunner,
-        stats: config::UnitStats {
+        stats: balance::UnitStats {
             hp: 55,
             dmg: 4,
             range_tiles: 6,
@@ -133,7 +133,7 @@ pub const UNITS: &[UnitDef] = &[
     },
     UnitDef {
         kind: EntityKind::AtTeam,
-        stats: config::UnitStats {
+        stats: balance::UnitStats {
             hp: 45,
             dmg: 60,
             range_tiles: 5,
@@ -154,7 +154,7 @@ pub const UNITS: &[UnitDef] = &[
     },
     UnitDef {
         kind: EntityKind::Tank,
-        stats: config::UnitStats {
+        stats: balance::UnitStats {
             hp: 292,
             dmg: 60,
             range_tiles: 5,
@@ -175,7 +175,7 @@ pub const UNITS: &[UnitDef] = &[
     },
     UnitDef {
         kind: EntityKind::ScoutCar,
-        stats: config::UnitStats {
+        stats: balance::UnitStats {
             hp: 150,
             dmg: 6,
             range_tiles: 5,
@@ -199,7 +199,7 @@ pub const UNITS: &[UnitDef] = &[
 pub const BUILDINGS: &[BuildingDef] = &[
     BuildingDef {
         kind: EntityKind::CityCentre,
-        stats: config::BuildingStats {
+        stats: balance::BuildingStats {
             hp: 600,
             sight_tiles: 9,
             cost_steel: 200,
@@ -207,7 +207,7 @@ pub const BUILDINGS: &[BuildingDef] = &[
             foot_w: 3,
             foot_h: 3,
             build_ticks: 400,
-            provides_supply: config::CITY_CENTRE_SUPPLY,
+            provides_supply: balance::CITY_CENTRE_SUPPLY,
             dmg: 0,
             range_tiles: 0,
             cooldown: 0,
@@ -219,7 +219,7 @@ pub const BUILDINGS: &[BuildingDef] = &[
     },
     BuildingDef {
         kind: EntityKind::Depot,
-        stats: config::BuildingStats {
+        stats: balance::BuildingStats {
             hp: 220,
             sight_tiles: 4,
             cost_steel: 100,
@@ -227,7 +227,7 @@ pub const BUILDINGS: &[BuildingDef] = &[
             foot_w: 2,
             foot_h: 2,
             build_ticks: 300,
-            provides_supply: config::DEPOT_SUPPLY,
+            provides_supply: balance::DEPOT_SUPPLY,
             dmg: 0,
             range_tiles: 0,
             cooldown: 0,
@@ -239,7 +239,7 @@ pub const BUILDINGS: &[BuildingDef] = &[
     },
     BuildingDef {
         kind: EntityKind::Barracks,
-        stats: config::BuildingStats {
+        stats: balance::BuildingStats {
             hp: 320,
             sight_tiles: 6,
             cost_steel: 150,
@@ -259,7 +259,7 @@ pub const BUILDINGS: &[BuildingDef] = &[
     },
     BuildingDef {
         kind: EntityKind::TrainingCentre,
-        stats: config::BuildingStats {
+        stats: balance::BuildingStats {
             hp: 300,
             sight_tiles: 6,
             cost_steel: 100,
@@ -279,7 +279,7 @@ pub const BUILDINGS: &[BuildingDef] = &[
     },
     BuildingDef {
         kind: EntityKind::Factory,
-        stats: config::BuildingStats {
+        stats: balance::BuildingStats {
             hp: 360,
             sight_tiles: 6,
             cost_steel: 200,
@@ -299,7 +299,7 @@ pub const BUILDINGS: &[BuildingDef] = &[
     },
     BuildingDef {
         kind: EntityKind::Steelworks,
-        stats: config::BuildingStats {
+        stats: balance::BuildingStats {
             hp: 300,
             sight_tiles: 6,
             cost_steel: 125,
@@ -322,11 +322,11 @@ pub const BUILDINGS: &[BuildingDef] = &[
 pub const NODES: &[NodeDef] = &[
     NodeDef {
         kind: EntityKind::Steel,
-        amount: config::STEEL_PATCH_AMOUNT,
+        amount: balance::STEEL_PATCH_AMOUNT,
     },
     NodeDef {
         kind: EntityKind::Oil,
-        amount: config::OIL_GEYSER_AMOUNT,
+        amount: balance::OIL_GEYSER_AMOUNT,
     },
 ];
 

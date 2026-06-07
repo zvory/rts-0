@@ -635,6 +635,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "rts-rules"
+version = "0.1.0"
+
+[[package]]
 name = "rts-server"
 version = "0.1.0"
 dependencies = [
@@ -644,6 +648,7 @@ dependencies = [
  "rayon",
  "rts-contract",
  "rts-protocol",
+ "rts-rules",
  "serde",
  "serde_json",
  "tokio",

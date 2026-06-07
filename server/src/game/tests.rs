@@ -92,7 +92,7 @@ fn legacy_view_of(game: &Game, e: &Entity, viewer: u32, fogged: bool) -> EntityV
     let mut v = EntityView::new(
         e.id,
         e.owner,
-        e.kind.to_protocol_str(),
+        crate::protocol::kind_to_wire(e.kind),
         e.pos_x,
         e.pos_y,
         e.hp,
@@ -143,7 +143,7 @@ fn legacy_view_of(game: &Game, e: &Entity, viewer: u32, fogged: bool) -> EntityV
     }
     if e.is_building() && !e.prod_queue().is_empty() {
         if let Some(front) = e.prod_queue().first() {
-            v.prod_kind = Some(front.unit.to_protocol_str().to_string());
+            v.prod_kind = Some(crate::protocol::kind_to_wire(front.unit).to_string());
             v.prod_progress = Some(if front.total == 0 {
                 0.0
             } else {
@@ -2123,7 +2123,8 @@ fn spawn_resource_distances_are_fair_and_symmetric() {
             }
             // Sort for deterministic comparison.
             dists.sort_by(|a, b| {
-                let kind_ord = a.0.to_protocol_str().cmp(b.0.to_protocol_str());
+                let kind_ord =
+                    crate::protocol::kind_to_wire(a.0).cmp(crate::protocol::kind_to_wire(b.0));
                 if kind_ord != std::cmp::Ordering::Equal {
                     return kind_ord;
                 }

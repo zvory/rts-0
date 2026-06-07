@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::game::entity::{Entity, EntityKind};
 use crate::game::fog::Fog;
-use crate::protocol::{AttackReveal, Event, NoticeSeverity};
+use crate::protocol::{self, AttackReveal, Event, NoticeSeverity};
 use crate::rules::projection;
 
 pub(super) fn attack_reveal_for(attacker: Option<&Entity>) -> Option<AttackReveal> {
@@ -17,7 +17,7 @@ pub(super) fn attack_reveal_for(attacker: Option<&Entity>) -> Option<AttackRevea
     .then(|| attacker.weapon_setup().to_protocol_str().to_string());
     Some(AttackReveal {
         owner: attacker.owner,
-        kind: attacker.kind.to_protocol_str().to_string(),
+        kind: protocol::kind_to_wire(attacker.kind).to_string(),
         x: attacker.pos_x,
         y: attacker.pos_y,
         facing: Some(attacker.facing()),

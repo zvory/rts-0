@@ -520,7 +520,7 @@ impl Game {
             .filter(|e| e.kind.is_node())
             .map(|e| ResourceNode {
                 id: e.id,
-                kind: e.kind.to_protocol_str().to_string(),
+                kind: crate::protocol::kind_to_wire(e.kind).to_string(),
                 x: e.pos_x,
                 y: e.pos_y,
             })

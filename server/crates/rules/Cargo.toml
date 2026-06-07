@@ -1,0 +1,7 @@
+[package]
+name = "rts-rules"
+version = "0.1.0"
+edition = "2021"
+description = "Gameplay domain vocabulary, balance data, and pure rules for Bewegungskrieg"
+
+[dependencies]

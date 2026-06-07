@@ -1,0 +1,146 @@
+//! Simulation constants and compatibility stats helpers.
+
+use crate::defs;
+use crate::EntityKind;
+
+// --- Timing -----------------------------------------------------------------
+pub const TICK_HZ: u32 = 30;
+pub const TICK_MS: u64 = 1000 / TICK_HZ as u64;
+
+// --- Map --------------------------------------------------------------------
+pub const TILE_SIZE: u32 = 32;
+
+// --- Tolerant arrival -------------------------------------------------------
+pub const STUCK_EPS_PX: f32 = 2.0;
+pub const STUCK_ARRIVAL_TICKS: u16 = 15;
+pub const TOLERANT_ARRIVAL_RADIUS_PX: f32 = 2.0 * TILE_SIZE as f32;
+
+// --- Sidestep (mid-path unstick) --------------------------------------------
+pub const SIDESTEP_TRIGGER_TICKS: u16 = 15;
+pub const SIDESTEP_DISTANCE_PX: f32 = TILE_SIZE as f32;
+pub const SIDESTEP_COOLDOWN_TICKS: u16 = 30;
+pub const STATIC_BLOCKED_REPATH_TICKS: u16 = TICK_HZ as u16;
+
+pub const ARRIVE_RADIUS_INTERMEDIATE_PX: f32 = TILE_SIZE as f32 * 0.5;
+pub const VEHICLE_WAYPOINT_ACCEPTANCE_RADIUS_PX: f32 = TILE_SIZE as f32 * 0.75;
+pub const SCOUT_CAR_FINAL_GOAL_TOLERANCE_PX: f32 = TILE_SIZE as f32 * 0.375;
+pub const SCOUT_CAR_STUCK_RECOVERY_TRIGGER_TICKS: u16 = STUCK_ARRIVAL_TICKS;
+pub const SCOUT_CAR_REVERSE_RECOVERY_DISTANCE_PX: f32 = TILE_SIZE as f32 * 2.0;
+pub const SCOUT_CAR_RECOVERY_COOLDOWN_TICKS: u16 = TICK_HZ as u16;
+
+pub const MACHINE_GUNNER_SETUP_TICKS: u16 = TICK_HZ as u16;
+pub const AT_TEAM_SETUP_TICKS: u16 = (TICK_HZ as u16) * 3 / 2;
+pub const AT_GUN_PACKED_RANGE_TILES: u32 = 5;
+pub const AT_GUN_DEPLOYED_RANGE_TILES: u32 = 12;
+pub const AT_GUN_PACKED_DAMAGE_MULTIPLIER: f32 = 0.75;
+pub const AT_GUN_FIELD_OF_FIRE_RAD: f32 = 40.0_f32 * std::f32::consts::PI / 180.0;
+
+pub const TANK_OIL_COST_PER_PX: f32 = 20.0 / (96.0 * TILE_SIZE as f32);
+pub const SCOUT_CAR_OIL_COST_PER_PX: f32 = 5.0 / (96.0 * TILE_SIZE as f32);
+pub const TANK_OIL_STARVED_PAUSE_TICKS: u16 = TICK_HZ as u16;
+
+pub const RIFLEMAN_CHARGE_TICKS: u16 = 64;
+pub const RIFLEMAN_CHARGE_COOLDOWN_TICKS: u16 = (TICK_HZ as u16) * 5;
+pub const RIFLEMAN_CHARGE_SPEED_MULTIPLIER: f32 = 2.0;
+
+pub const SMOKE_ABILITY_RANGE_TILES: u32 = 9;
+pub const SMOKE_CLOUD_RADIUS_TILES: f32 = 2.0;
+pub const SMOKE_CLOUD_DURATION_TICKS: u32 = TICK_HZ * 5;
+pub const SMOKE_ABILITY_COOLDOWN_TICKS: u16 = (TICK_HZ as u16) * 20;
+pub const SMOKE_ABILITY_COST_STEEL: u32 = 25;
+pub const SMOKE_ABILITY_COST_OIL: u32 = 25;
+
+// --- Economy ----------------------------------------------------------------
+pub const STARTING_STEEL: u32 = 75;
+pub const STARTING_OIL: u32 = 0;
+pub const STARTING_WORKERS: u32 = 4;
+pub const QUICKSTART_STEEL: u32 = 99_999;
+pub const QUICKSTART_OIL: u32 = 99_999;
+
+pub const STEEL_LOAD: u32 = 2;
+pub const OIL_LOAD: u32 = 2;
+pub const HARVEST_TICKS: u32 = 40;
+pub const STEEL_PATCH_AMOUNT: u32 = 1500;
+pub const OIL_GEYSER_AMOUNT: u32 = 5000;
+pub const STEEL_PATCHES_PER_BASE: u32 = 18;
+pub const OIL_PATCHES_PER_BASE: u32 = 3;
+
+pub const CC_RESOURCE_MIN_DIST_TILES: f32 = 3.5;
+pub const CC_RESOURCE_MAX_DIST_TILES: f32 = 7.0;
+pub const MINING_CC_RANGE_TILES: f32 = CC_RESOURCE_MAX_DIST_TILES;
+pub const STEEL_BLOCK_DIST_TILES: f32 = 5.0;
+pub const OIL_DIST_TILES: f32 = 6.0;
+
+// --- Supply -----------------------------------------------------------------
+pub const CITY_CENTRE_SUPPLY: u32 = 10;
+pub const DEPOT_SUPPLY: u32 = 8;
+pub const SUPPLY_CAP_MAX: u32 = 200;
+
+// --- Vehicle bodies ----------------------------------------------------------
+pub const TANK_BODY_LENGTH_PX: f32 = 50.4;
+pub const TANK_BODY_WIDTH_PX: f32 = 28.8;
+pub const TANK_BODY_CLEARANCE_PX: f32 = 1.5;
+pub const AT_GUN_BODY_LENGTH_PX: f32 = 42.0;
+pub const AT_GUN_BODY_WIDTH_PX: f32 = 24.0;
+pub const AT_GUN_BODY_CLEARANCE_PX: f32 = 1.0;
+pub const SCOUT_CAR_BODY_LENGTH_PX: f32 = 40.8;
+pub const SCOUT_CAR_BODY_WIDTH_PX: f32 = 21.6;
+pub const SCOUT_CAR_BODY_CLEARANCE_PX: f32 = 1.0;
+
+// --- Stats ------------------------------------------------------------------
+
+#[derive(Debug, Clone, Copy)]
+pub struct UnitStats {
+    pub hp: u32,
+    pub dmg: u32,
+    pub range_tiles: u32,
+    pub cooldown: u32,
+    pub speed: f32,
+    pub sight_tiles: u32,
+    pub cost_steel: u32,
+    pub cost_oil: u32,
+    pub supply: u32,
+    pub build_ticks: u32,
+    pub radius: f32,
+}
+
+impl UnitStats {
+    pub fn radius_tiles(&self) -> u32 {
+        (self.radius / TILE_SIZE as f32).round() as u32
+    }
+}
+
+pub fn unit_radius_tiles(kind: EntityKind) -> u32 {
+    if matches!(
+        kind,
+        EntityKind::AtTeam | EntityKind::ScoutCar | EntityKind::Tank
+    ) {
+        return 0;
+    }
+    unit_stats(kind)
+        .map(|stats| stats.radius_tiles())
+        .unwrap_or(0)
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct BuildingStats {
+    pub hp: u32,
+    pub sight_tiles: u32,
+    pub cost_steel: u32,
+    pub cost_oil: u32,
+    pub foot_w: u32,
+    pub foot_h: u32,
+    pub build_ticks: u32,
+    pub provides_supply: u32,
+    pub dmg: u32,
+    pub range_tiles: u32,
+    pub cooldown: u32,
+}
+
+pub fn unit_stats(kind: EntityKind) -> Option<UnitStats> {
+    defs::unit_def(kind).map(|d| d.stats)
+}
+
+pub fn building_stats(kind: EntityKind) -> Option<BuildingStats> {
+    defs::building_def(kind).map(|d| d.stats)
+}

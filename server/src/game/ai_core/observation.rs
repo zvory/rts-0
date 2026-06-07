@@ -471,7 +471,7 @@ mod tests {
             EntityView::new(
                 30,
                 0,
-                EntityKind::Steel.to_protocol_str(),
+                crate::protocol::kind_to_wire(EntityKind::Steel),
                 64.0,
                 64.0,
                 1,
@@ -481,7 +481,7 @@ mod tests {
             EntityView::new(
                 20,
                 2,
-                EntityKind::Rifleman.to_protocol_str(),
+                crate::protocol::kind_to_wire(EntityKind::Rifleman),
                 96.0,
                 96.0,
                 1,
@@ -491,7 +491,7 @@ mod tests {
             EntityView::new(
                 10,
                 1,
-                EntityKind::Worker.to_protocol_str(),
+                crate::protocol::kind_to_wire(EntityKind::Worker),
                 32.0,
                 32.0,
                 1,
@@ -544,7 +544,7 @@ mod tests {
         let staged = EntityView::new(
             10,
             1,
-            EntityKind::Rifleman.to_protocol_str(),
+            crate::protocol::kind_to_wire(EntityKind::Rifleman),
             32.0,
             32.0,
             1,
@@ -554,7 +554,7 @@ mod tests {
         let attack_moving = EntityView::new(
             12,
             1,
-            EntityKind::Tank.to_protocol_str(),
+            crate::protocol::kind_to_wire(EntityKind::Tank),
             96.0,
             32.0,
             1,
@@ -564,7 +564,7 @@ mod tests {
         let mut engaged = EntityView::new(
             11,
             1,
-            EntityKind::Rifleman.to_protocol_str(),
+            crate::protocol::kind_to_wire(EntityKind::Rifleman),
             64.0,
             32.0,
             1,
