@@ -943,6 +943,10 @@ fn live_ai_rifle_raid_attacks_visible_scout_car() {
 /// with human clients.
 #[test]
 fn ai_builds_economy_and_attacks() {
+    if skip_unless_full_ai("ai_builds_economy_and_attacks") {
+        return;
+    }
+
     let players = human_vs_ai_players();
     let mut game = Game::new(&players, 0x1234_5678);
 

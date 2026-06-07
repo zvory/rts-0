@@ -19,16 +19,22 @@ snapshots. Replay and live play use the same typed command application path, so 
 the recorded command artifact and the deterministic simulation ordering. Entity iteration and A*
 tie-breaking must remain stable; avoid hash-order-dependent simulation behavior.
 
-**Profile-backed coverage.** The main scripted self-play test spawns two non-AI players, gives each
-the shared `tech_to_tanks` AI profile through the self-play adapter, and runs the match headlessly
-under `cargo test`. The profile gathers steel and oil, constructs supply and tech structures,
-trains Riflemen and Tanks, and launches mixed attack-move waves at public enemy start tiles. The
-self-play adapter owns harness-only state such as pending build intents, failed build spots, and
-staging/attack guards needed to interpret fog-filtered snapshots without duplicating profile
-strategy logic. The harness checks per-tick invariants
-for invalid resources, supply overflow, malformed entity snapshots, out-of-bounds positions, and
-non-finite progress values. It also enforces progress deadlines so a stuck economy/tech/combat loop
-fails as a deadlock instead of timing out silently.
+**Fast/full AI split.** Plain `cargo test` keeps the self-play harness in the default gate, but only
+runs the fast scripted coverage. Long profile-backed and real-AI self-play tests return early unless
+`RTS_FULL_AI_TESTS=1` is set; `tests/run-all.sh --full-ai` enables that mode for the local gate.
+`RTS_SELFPLAY_FULL=1` remains accepted as an alias for manual self-play runs. Use full AI coverage
+when touching AI strategy, profile-backed self-play, replay determinism, or balance behavior that
+depends on long matches.
+
+**Profile-backed coverage.** The long profile-backed tests spawn AI-profile players through the
+self-play adapter and run matches headlessly under `RTS_FULL_AI_TESTS=1 cargo test`. The profiles
+gather steel and oil, construct supply and tech structures, train Riflemen and Tanks, and launch
+attack-move waves at public enemy start tiles. The self-play adapter owns harness-only state such as
+pending build intents, failed build spots, and staging/attack guards needed to interpret
+fog-filtered snapshots without duplicating profile strategy logic. The harness checks per-tick
+invariants for invalid resources, supply overflow, malformed entity snapshots, out-of-bounds
+positions, and non-finite progress values. It also enforces progress deadlines so a stuck
+economy/tech/combat loop fails as a deadlock instead of timing out silently.
 
 Special harness scripts remain where they cover behavior that is not a normal AI strategy profile:
 `WorkerRushScript` is an all-in worker-pull scenario, and `MineOnlyScript` is passive mining/fairness
@@ -60,5 +66,6 @@ cargo run --bin ai-matchup -- saturation tech --seed 7 --ticks 20000 --json
 cargo run --bin ai-matchup -- --list-profiles
 ```
 
-Keep invariant-style milestone coverage in `cargo test`; use the CLI for balance exploration,
-seed sweeps, and strategy result sampling.
+Keep fast invariant-style milestone coverage in `cargo test`; use `RTS_FULL_AI_TESTS=1 cargo test`
+for the long regression gate and the CLI for balance exploration, seed sweeps, and strategy result
+sampling.

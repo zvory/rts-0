@@ -847,6 +847,10 @@ mod tests {
     /// After many ticks the invariants must still hold.
     #[test]
     fn invariants_hold_after_ai_match() {
+        if crate::game::skip_unless_full_ai("invariants_hold_after_ai_match") {
+            return;
+        }
+
         let players = [
             PlayerInit {
                 id: 1,

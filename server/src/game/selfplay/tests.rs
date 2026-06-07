@@ -705,6 +705,10 @@ fn assert_full_saturation_pressure_and_tech_response(milestones: &Milestones) {
 
 #[test]
 fn profile_matchup_rifle_flood_fast_vs_full_saturation() {
+    if crate::game::skip_unless_full_ai("profile_matchup_rifle_flood_fast_vs_full_saturation") {
+        return;
+    }
+
     run_profile_matchup(MatchupConfig {
         artifact_name: "profile_matchup_rifle_flood_fast_vs_full_saturation",
         seed: 0x1234_5678,
@@ -732,6 +736,10 @@ fn profile_matchup_rifle_flood_fast_vs_full_saturation() {
 
 #[test]
 fn profile_matchup_rifle_flood_fast_vs_tech_to_tanks() {
+    if crate::game::skip_unless_full_ai("profile_matchup_rifle_flood_fast_vs_tech_to_tanks") {
+        return;
+    }
+
     let factory_build_ticks = config::building_stats(EntityKind::Factory)
         .expect("factory stats should exist")
         .build_ticks;
@@ -765,6 +773,12 @@ fn profile_matchup_rifle_flood_fast_vs_tech_to_tanks() {
 
 #[test]
 fn profile_matchup_rifle_flood_full_saturation_vs_tech_to_tanks() {
+    if crate::game::skip_unless_full_ai(
+        "profile_matchup_rifle_flood_full_saturation_vs_tech_to_tanks",
+    ) {
+        return;
+    }
+
     run_profile_matchup(MatchupConfig {
         artifact_name: "profile_matchup_rifle_flood_full_saturation_vs_tech_to_tanks",
         seed: 0,
@@ -919,6 +933,10 @@ fn final_unit_counts(game: &Game, players: &[PlayerInit]) -> BTreeMap<u32, BTree
 
 #[test]
 fn profile_backed_self_play_exercises_tech_to_tanks() {
+    if crate::game::skip_unless_full_ai("profile_backed_self_play_exercises_tech_to_tanks") {
+        return;
+    }
+
     let players = vec![
         PlayerInit {
             id: 1,
@@ -1315,6 +1333,10 @@ fn identical_scripted_runs_are_identical() {
 #[test]
 fn real_ai_vs_real_ai() {
     use std::collections::{BTreeMap, BTreeSet};
+
+    if crate::game::skip_unless_full_ai("real_ai_vs_real_ai") {
+        return;
+    }
 
     const MIN_PEAK_BARRACKS_ALIVE: usize = 3;
     const MIN_RIFLEMAN_TRAIN_COMMANDS: usize = 25;

@@ -4,7 +4,7 @@
 #
 # What it runs, in order:
 #   1. Rust formatting              (cargo fmt --check)
-#   2. Rust scripted tests          (cargo test — deterministic, in-process, no server)
+#   2. Rust fast scripted tests     (cargo test — deterministic, in-process, no server)
 #   3. Rust lint                    (cargo clippy)
 #   4. Node API suites              (server_integration, regression, ai_integration)
 #   5. Headless client smoke        (client_smoke — only if puppeteer-core + Chrome are present)
@@ -14,7 +14,8 @@
 # runner owns that server process and tears it down on exit.
 #
 # Usage:
-#   tests/run-all.sh                 # everything (silent unless failing)
+#   tests/run-all.sh                 # fast gate (silent unless failing)
+#   tests/run-all.sh --full-ai       # also run long AI self-play/simulation coverage
 #   tests/run-all.sh -v              # verbose: print headers and passes
 #   tests/run-all.sh --no-rust       # skip Rust fmt/test/lint
 #   tests/run-all.sh --no-client     # skip the headless-browser smoke test
@@ -45,20 +46,26 @@ SERVER_BIN="$CARGO_TARGET_DIR/debug/rts-server"
 PORT="${PORT:-}"
 RUN_RUST=1
 RUN_CLIENT=1
+RUN_FULL_AI=0
 VERBOSE=0
 for arg in "$@"; do
   case "$arg" in
     --no-rust)   RUN_RUST=0 ;;
     --no-client) RUN_CLIENT=0 ;;
+    --full-ai|--full-selfplay) RUN_FULL_AI=1 ;;
     --port) echo "use --port=N or PORT=N" >&2; exit 2 ;;
     --port=*) PORT="${arg#*=}" ;;
     -v|--verbose) VERBOSE=1 ;;
-    -h|--help) sed -n '2,27p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help) sed -n '2,28p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "unknown arg: $arg" >&2; exit 2 ;;
   esac
 done
 
-echo "running all tests silently, can take up to five minutes, patience"
+if [ "$RUN_FULL_AI" = "1" ]; then
+  echo "running all tests, including full AI coverage, silently; this can take several minutes"
+else
+  echo "running fast test gate silently"
+fi
 
 if ! command -v node >/dev/null 2>&1; then
   echo "node not found on PATH — the API suites need Node >= 22 (built-in WebSocket)." >&2
@@ -240,14 +247,21 @@ run_rust_suites_bg() {
   if [ "$RUN_RUST" = "1" ]; then
     run_suite_bg "Rust format (cargo fmt --check)" \
       cargo fmt --manifest-path "$SERVER_DIR/Cargo.toml" --check
-    run_suite_bg "Rust scripted tests (cargo test)" \
-      cargo test --manifest-path "$SERVER_DIR/Cargo.toml"
+    if [ "$RUN_FULL_AI" = "1" ]; then
+      run_suite_bg "Rust full AI-enabled tests (RTS_FULL_AI_TESTS=1 cargo test)" \
+        env RTS_FULL_AI_TESTS=1 cargo test --manifest-path "$SERVER_DIR/Cargo.toml"
+    else
+      run_suite_bg "Rust fast scripted tests (cargo test)" \
+        cargo test --manifest-path "$SERVER_DIR/Cargo.toml"
+      SKIPPED+=("Rust full AI coverage (--full-ai not set)")
+    fi
     run_suite_bg "Rust lint (cargo clippy)" \
       cargo clippy --manifest-path "$SERVER_DIR/Cargo.toml" -- -D warnings
   else
     SKIPPED+=("Rust format (--no-rust)")
-    SKIPPED+=("Rust scripted tests (--no-rust)")
+    SKIPPED+=("Rust fast scripted tests (--no-rust)")
     SKIPPED+=("Rust lint (--no-rust)")
+    SKIPPED+=("Rust full AI coverage (--no-rust)")
   fi
 }
 
