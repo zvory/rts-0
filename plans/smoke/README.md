@@ -1,12 +1,14 @@
 # Smoke Ability Plan
 
-This plan adds a reusable targeted-ability system, then uses it to give scout cars a Smoke
+This plan adds a reusable ability system, then uses its targeted branch to give scout cars a Smoke
 ability. Smoke is intended as an offensive tool: a player spends steel and oil to block line of
 sight long enough for tanks and infantry to close on AT guns and other ranged threats.
 
-The implementation should not hard-code the ability model around scout cars. Scout cars are the
-first carrier. Later phases should be able to move Smoke to infantry, add other targeted abilities,
-or give different units different ability sets without rewriting command routing, HUD targeting, or
+The implementation should not hard-code the ability model around scout cars. Rifleman Charge is
+already a self-activated cooldown ability and must share the same ability definition/cooldown
+vocabulary where practical. Scout cars are the first world-point targeted carrier. Later phases
+should be able to move Smoke to infantry, add other targeted or self-target abilities, or give
+different units different ability sets without rewriting command routing, HUD targeting, or
 cooldown projection.
 
 ## Confirmed Rules
@@ -44,11 +46,13 @@ cooldown projection.
 
 Add a generic ability layer rather than a `ScoutCarSmoke` special case.
 
-- `AbilityKind` is the domain identity, starting with `Smoke`.
+- `AbilityKind` is the domain identity, covering existing `Charge` and new `Smoke`.
 - Ability definitions own reusable data: carrier kinds, range, radius/effect parameters, cooldown,
   cost, tech requirement, target mode, and queue behavior.
-- Client commands send ability intent: selected unit ids, ability kind, target point, and queued
-  flag.
+- Ability definitions distinguish self-activated abilities such as Charge from world-point targeted
+  abilities such as Smoke.
+- Client commands for targeted abilities send ability intent: selected unit ids, ability kind,
+  target point, and queued flag.
 - The server validates and resolves the actual caster. The client never chooses the authoritative
   caster.
 - Active/queued orders store ability intent and execution state separately, mirroring existing
