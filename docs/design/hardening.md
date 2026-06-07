@@ -4,6 +4,10 @@ The server treats every client as potentially hostile. Limits live next to the c
   frames are rejected and the connection closed before they reach serde.
 - **Command unit cap** (`services/commands.rs` `MAX_UNITS_PER_COMMAND = 256`): unit-list commands are
   deduped and capped before per-unit work, so a repeated/huge id list can't trigger an A* storm.
+- **Queued order caps** (`entity/order.rs` `MAX_QUEUED_ORDERS = 8`): each mobile unit stores at most
+  eight future intents. Queued command application still runs the unit-list dedupe/cap first, and
+  queued promotion drains invalid stale intents instead of retrying them forever. Production
+  rallies are not queued; `setRally` always replaces the single active rally point.
 - **Bounds-checked placement** (`services/occupancy.rs` `footprint_tiles`): tile math uses `checked_add` and
   out-of-range build coords are rejected — the tick loop never panics on adversarial input.
 - **Body-aware construction placement**: `services::standability::building_site_clear` is the

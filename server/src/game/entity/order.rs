@@ -3,9 +3,6 @@ use super::EntityKind;
 /// Maximum number of queued command intents stored on one mobile unit.
 pub const MAX_QUEUED_ORDERS: usize = 8;
 
-/// Maximum number of queued rally stages stored on one production building.
-pub const MAX_RALLY_STAGES: usize = 2;
-
 /// The high-level order a unit/building is currently executing.
 ///
 /// Orders drive the per-tick systems. Buildings only ever sit in [`Order::Idle`]; their

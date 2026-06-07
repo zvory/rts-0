@@ -166,8 +166,8 @@ pub struct ProductionState {
     /// order to this point and the producer prefers the spawn exit closest to it. `None` = units
     /// spawn and idle next to the building (legacy behavior).
     pub rally_point: Option<(f32, f32)>,
-    /// Future rally stages. Phase 0 stores the shape only; production still consumes
-    /// `rally_point` until multi-stage rallies are exposed.
+    /// Reserved for old replay compatibility. Production consumes only `rally_point`; live rally
+    /// commands clear this list and replace the single active rally point.
     pub rally_queue: Vec<PointIntent>,
 }
 

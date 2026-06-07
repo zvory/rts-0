@@ -569,6 +569,37 @@ mod tests {
     }
 
     #[test]
+    fn queued_build_with_huge_tiles_is_drained_without_panic() {
+        let map = flat_map(32);
+        let mut entities = EntityStore::new();
+        let (cc_x, cc_y) = footprint_center(&map, EntityKind::CityCentre, 4, 4);
+        entities
+            .spawn_building(1, EntityKind::CityCentre, cc_x, cc_y, true)
+            .expect("city centre should spawn");
+        let worker = entities
+            .spawn_unit(1, EntityKind::Worker, cc_x + 96.0, cc_y)
+            .expect("worker should spawn");
+        {
+            let w = entities.get_mut(worker).expect("worker should exist");
+            for _ in 0..MAX_QUEUED_ORDERS {
+                w.append_queued_order(OrderIntent::build(EntityKind::Depot, u32::MAX, u32::MAX));
+            }
+        }
+
+        promote(&map, &mut entities);
+
+        let entity = entities.get(worker).expect("worker should exist");
+        assert!(
+            matches!(entity.order(), Order::Idle),
+            "invalid queued build intents should not promote to an active order"
+        );
+        assert!(
+            entity.queued_orders().is_empty(),
+            "promotion should drain bounded invalid intents instead of retrying forever"
+        );
+    }
+
+    #[test]
     fn idle_combat_unit_promotes_queued_attack() {
         let map = flat_map(24);
         let mut entities = EntityStore::new();

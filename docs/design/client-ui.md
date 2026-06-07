@@ -137,6 +137,10 @@ export class Input {
   // emits nothing to return; mutates state.selection / state.placement and calls net.command
 }
 ```
+Shift-right-click appends queued orders only for selected units: move, attack-move, attack,
+gather, build/resume, and placement build commands set `queued: true` and rely on the server
+snapshot's owner-only `orderPlan` for accepted markers. Production-building-only right-clicks set
+the building's single rally point; Shift does not create rally stages.
 
 `input/router.js`
 ```js
