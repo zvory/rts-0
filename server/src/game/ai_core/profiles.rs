@@ -102,6 +102,7 @@ pub(crate) struct ExpansionPolicy {
     pub(crate) trigger_steel: u32,
     pub(crate) trigger_supply_used: u32,
     pub(crate) blocks_tech_path: bool,
+    pub(crate) oil_before_steel_in_expansion: bool,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -281,6 +282,7 @@ pub(crate) static RIFLE_FLOOD_FAST: AiProfile = AiProfile {
         trigger_steel: 500,
         trigger_supply_used: 70,
         blocks_tech_path: false,
+        oil_before_steel_in_expansion: false,
     }),
     recovery_transition: Some(RecoveryTransitionPolicy {
         completed_building: EntityKind::Barracks,
@@ -332,6 +334,7 @@ pub(crate) static RIFLE_FLOOD_FAST: AiProfile = AiProfile {
             trigger_steel: 500,
             trigger_supply_used: 50,
             blocks_tech_path: false,
+            oil_before_steel_in_expansion: false,
         }),
     }),
     tech_transition: Some(TechTransitionPolicy {
@@ -413,6 +416,7 @@ pub(crate) static RIFLE_FLOOD_FULL_SATURATION: AiProfile = AiProfile {
         trigger_steel: 300,
         trigger_supply_used: 30,
         blocks_tech_path: false,
+        oil_before_steel_in_expansion: true,
     }),
     recovery_transition: None,
     tech_transition: Some(TechTransitionPolicy {
@@ -494,6 +498,7 @@ pub(crate) static TECH_TO_TANKS: AiProfile = AiProfile {
         trigger_steel: 500,
         trigger_supply_used: 70,
         blocks_tech_path: false,
+        oil_before_steel_in_expansion: false,
     }),
     recovery_transition: None,
     tech_transition: None,
@@ -555,6 +560,7 @@ pub(crate) static STEEL_EXPANSION_TANKS: AiProfile = AiProfile {
         trigger_steel: 0,
         trigger_supply_used: 0,
         blocks_tech_path: true,
+        oil_before_steel_in_expansion: false,
     }),
     recovery_transition: None,
     tech_transition: Some(TechTransitionPolicy {

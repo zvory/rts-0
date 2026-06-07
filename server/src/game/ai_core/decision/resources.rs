@@ -87,7 +87,13 @@ pub(super) fn desired_oil_workers(
         .get(&EntityKind::Steel)
         .copied()
         .unwrap_or(0);
-    let oil_steel_floor = if resource_policy.oil_after_full_steel_saturation {
+    let expansion_oil_first = active_expansion(observation, profile, recovery_active)
+        .filter(|e| e.oil_before_steel_in_expansion)
+        .map(|e| facts.complete_building_count(EntityKind::CityCentre) >= e.target_city_centres)
+        .unwrap_or(false);
+    let oil_steel_floor = if expansion_oil_first {
+        0
+    } else if resource_policy.oil_after_full_steel_saturation {
         target_steel_workers
     } else {
         target_steel_workers.min(resource_policy.oil_after_steel_workers)
