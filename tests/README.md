@@ -16,12 +16,16 @@ open for direct pushes.
 tests/run-all.sh                 # cargo fmt --check + cargo test + clippy + 3 API suites + client smoke
 tests/run-all.sh --no-rust       # skip Rust fmt/test/lint
 tests/run-all.sh --no-client     # skip the headless-browser smoke test
+tests/run-all.sh -v              # print suite timings and pass/fail lines
 PORT=8090 tests/run-all.sh       # use a different port
+CARGO_TARGET_DIR=/tmp/rts-target tests/run-all.sh  # override the shared Cargo target cache
 CHROME=/path/to/chrome tests/run-all.sh
 ```
 
 The client smoke test self-skips (not a failure) when `puppeteer-core` or a Chrome binary is
-missing. Everything below documents the individual suites the runner orchestrates.
+missing. By default, worktrees use the primary checkout's `server/target` as the Cargo target
+directory so dependency builds are reused instead of compiled from scratch in every worktree.
+Everything below documents the individual suites the runner orchestrates.
 
 ---
 

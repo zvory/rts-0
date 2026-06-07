@@ -20,6 +20,7 @@
 #   tests/run-all.sh --no-client     # skip the headless-browser smoke test
 #   PORT=8090 tests/run-all.sh       # use a different port
 #   RTS_MATCH_SEED=123 tests/run-all.sh  # use a different deterministic map seed
+#   CARGO_TARGET_DIR=/path/to/target tests/run-all.sh  # override the shared Cargo cache
 #   CHROME=/path/to/chrome tests/run-all.sh
 set -uo pipefail
 
@@ -27,6 +28,27 @@ set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 SERVER_DIR="$REPO_ROOT/server"
+
+# Cargo normally writes build artifacts under each worktree's server/target directory. That makes
+# every fresh worktree compile dependencies from scratch. Default to the primary checkout's
+# server/target cache so parallel worktrees share dependencies and server artifacts; callers can
+# still override this with CARGO_TARGET_DIR.
+if [ -z "${CARGO_TARGET_DIR:-}" ]; then
+  GIT_COMMON_DIR="$(git -C "$REPO_ROOT" rev-parse --path-format=absolute --git-common-dir 2>/dev/null || true)"
+  if [ -n "$GIT_COMMON_DIR" ] && [ -d "$GIT_COMMON_DIR" ]; then
+    PRIMARY_REPO_ROOT="$(cd "$GIT_COMMON_DIR/.." && pwd)"
+    if [ -f "$PRIMARY_REPO_ROOT/server/Cargo.toml" ]; then
+      export CARGO_TARGET_DIR="$PRIMARY_REPO_ROOT/server/target"
+    else
+      export CARGO_TARGET_DIR="$SERVER_DIR/target"
+    fi
+  else
+    export CARGO_TARGET_DIR="$SERVER_DIR/target"
+  fi
+else
+  export CARGO_TARGET_DIR
+fi
+SERVER_BIN="$CARGO_TARGET_DIR/debug/rts-server"
 
 # --- Options --------------------------------------------------------------------------------
 PORT="${PORT:-}"
@@ -72,10 +94,13 @@ else BOLD=""; RED=""; GRN=""; YEL=""; RST=""; fi
 hdr()  { [ "$VERBOSE" = "1" ] && printf '\n%s== %s ==%s\n' "$BOLD" "$1" "$RST"; }
 info() { [ "$VERBOSE" = "1" ] && printf '%s\n' "$1"; }
 warn() { printf '%s! %s%s\n' "$YEL" "$1" "$RST"; }
+elapsed_since() { printf '%ss' "$((SECONDS - $1))"; }
 
 if [ "$NODE_MAJOR" -lt 22 ]; then
   warn "Node $NODE_MAJOR detected; the API suites need >= 22 for the global WebSocket. Continuing anyway."
 fi
+
+info "Cargo target dir: $CARGO_TARGET_DIR"
 
 FAILED=()   # human-readable names of suites that failed
 SKIPPED=()  # suites we deliberately did not run
@@ -84,16 +109,17 @@ SKIPPED=()  # suites we deliberately did not run
 run_suite() {
   local name="$1"; shift
   local logf
+  local start=$SECONDS
   logf="$(mktemp -t rts-suite.XXXXXX)"
   [ "$VERBOSE" = "1" ] && hdr "$name"
   if "$@" >"$logf" 2>&1; then
     rm -f "$logf"
     if [ "$VERBOSE" = "1" ]; then
-      info "${GRN}PASS${RST} $name"
+      info "${GRN}PASS${RST} $name ($(elapsed_since "$start"))"
     fi
   else
     local rc=$?
-    warn "FAIL $name (exit $rc)"
+    warn "FAIL $name (exit $rc, $(elapsed_since "$start"))"
     cat "$logf"
     rm -f "$logf"
     FAILED+=("$name")
@@ -122,25 +148,27 @@ trap cleanup EXIT INT TERM
 boot_server() {
   [ "$VERBOSE" = "1" ] && hdr "Build server (debug)"
   local build_log
+  local build_start=$SECONDS
   build_log="$(mktemp -t rts-build.XXXXXX)"
   if ! cargo build --manifest-path "$SERVER_DIR/Cargo.toml" >"$build_log" 2>&1; then
-    warn "server build failed"
+    warn "server build failed ($(elapsed_since "$build_start"))"
     cat "$build_log"
     rm -f "$build_log"
     FAILED+=("server build")
     return 1
   fi
+  info "${GRN}PASS${RST} server build ($(elapsed_since "$build_start"))"
   rm -f "$build_log"
-  local bin="$SERVER_DIR/target/debug/rts-server"
-  if [ ! -x "$bin" ]; then
-    warn "server binary not found at $bin"
+  if [ ! -x "$SERVER_BIN" ]; then
+    warn "server binary not found at $SERVER_BIN"
     FAILED+=("server build")
     return 1
   fi
 
   [ "$VERBOSE" = "1" ] && hdr "Boot server on :$PORT"
+  local boot_start=$SECONDS
   SERVER_LOG="$(mktemp -t rts-server-log.XXXXXX)"
-  RTS_ADDR="127.0.0.1:${PORT}" "$bin" >"$SERVER_LOG" 2>&1 &
+  RTS_ADDR="127.0.0.1:${PORT}" "$SERVER_BIN" >"$SERVER_LOG" 2>&1 &
   SERVER_PID=$!
   STARTED_SERVER=1
 
@@ -160,7 +188,7 @@ boot_server() {
     sleep 0.3
   done
   if [ "$VERBOSE" = "1" ]; then
-    info "server healthy (pid $SERVER_PID) at $HEALTH_URL"
+    info "server healthy (pid $SERVER_PID) at $HEALTH_URL ($(elapsed_since "$boot_start"))"
   fi
 }
 
@@ -178,12 +206,14 @@ run_suite_bg() {
   resultf="$(mktemp -t rts-result.XXXXXX)"
   [ "$VERBOSE" = "1" ] && hdr "$name (bg)"
   (
+    start=$SECONDS
     if "$@" >"$logf" 2>&1; then
       echo ok >"$resultf"
     else
       echo fail >"$resultf"
     fi
     echo "$logf" >>"$resultf"   # second line = log path
+    echo "$((SECONDS - start))" >>"$resultf" # third line = elapsed seconds
   ) &
   BG_PIDS+=($!)
   BG_NAMES+=("$name")
@@ -196,15 +226,17 @@ collect_bg_results() {
     wait "${BG_PIDS[$i]}" 2>/dev/null || true
     local resultf="${BG_RESULT_FILES[$i]}"
     local name="${BG_NAMES[$i]}"
-    local status logf
+    local status logf elapsed
     status="$(head -1 "$resultf" 2>/dev/null)"
     logf="$(sed -n '2p' "$resultf" 2>/dev/null)"
+    elapsed="$(sed -n '3p' "$resultf" 2>/dev/null)"
+    [ -n "$elapsed" ] || elapsed=0
     if [ "$status" = "ok" ]; then
       [ -n "$logf" ] && rm -f "$logf"
       rm -f "$resultf"
-      [ "$VERBOSE" = "1" ] && info "${GRN}PASS${RST} $name"
+      [ "$VERBOSE" = "1" ] && info "${GRN}PASS${RST} $name (${elapsed}s)"
     else
-      warn "FAIL $name"
+      warn "FAIL $name (${elapsed}s)"
       [ -n "$logf" ] && { cat "$logf"; rm -f "$logf"; }
       rm -f "$resultf"
       FAILED+=("$name")
