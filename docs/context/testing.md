@@ -22,6 +22,8 @@ Use when writing or debugging tests, or before claiming a change is done.
   task needs an isolated cache.
 - Node tests need a **running** server on the test runner's private port. They are not
   `cargo test`. Start the server first.
+- `tests/run-all.sh` boots its private server with `RTS_TEST_TICK_MS=5` by default so live-server
+  suites advance simulated time quickly without changing normal `cargo run` pacing.
 - After any change, run all relevant Node suites + `cargo test` and confirm green. Use
   `RTS_FULL_AI_TESTS=1 cargo test` when touching AI strategy, profile-backed self-play, replay
   determinism, or balance behavior that depends on long AI matches. The commit hook silently runs

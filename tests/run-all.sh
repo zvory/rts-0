@@ -12,6 +12,8 @@
 # The server is built in debug (overflow checks ON — the hardening regression tests rely on a
 # bad Build coord being caught, not silently wrapped) and booted on a private free port. The
 # runner owns that server process and tears it down on exit.
+# The private test server runs with a 5ms tick interval so live-server tests wait on simulated
+# game progress instead of real-time 30 Hz wall clock. Normal `cargo run` remains 30 Hz.
 #
 # Usage:
 #   tests/run-all.sh                 # fast gate (silent unless failing)
@@ -166,7 +168,7 @@ boot_server() {
   [ "$VERBOSE" = "1" ] && hdr "Boot server on :$PORT"
   local boot_start=$SECONDS
   SERVER_LOG="$(mktemp -t rts-server-log.XXXXXX)"
-  RTS_ADDR="127.0.0.1:${PORT}" "$SERVER_BIN" >"$SERVER_LOG" 2>&1 &
+  RTS_ADDR="127.0.0.1:${PORT}" RTS_TEST_TICK_MS="${RTS_TEST_TICK_MS:-5}" "$SERVER_BIN" >"$SERVER_LOG" 2>&1 &
   SERVER_PID=$!
   STARTED_SERVER=1
 

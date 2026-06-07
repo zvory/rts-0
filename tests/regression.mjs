@@ -22,6 +22,13 @@ class Client {
     };
   }
   open() { return new Promise((res, rej) => { this.ws.onopen = () => res(); this.ws.onerror = (e) => rej(e); }); }
+  closed(t = 3000) {
+    if (this.ws.readyState === WebSocket.CLOSED) return Promise.resolve();
+    return new Promise((resolve) => {
+      const to = setTimeout(resolve, t);
+      this.ws.onclose = () => { clearTimeout(to); resolve(); };
+    });
+  }
   send(o) { this.ws.send(JSON.stringify(o)); }
   waitFor(test, t = 5000, label = "msg") {
     const hit = this.msgs.find(test); if (hit) return Promise.resolve(hit);
@@ -59,7 +66,7 @@ async function soloStart(room) {
     const worker = snap.entities.find((e) => e.owner === c.playerId && e.kind === "worker");
     c.send({ t: "command", cmd: { c: "build", worker: worker.id, building: "city_centre", tileX: 4294967295, tileY: 0 } });
     const tickBefore = c.lastSnapshot.tick;
-    await sleep(1500);
+    await c.waitFor((m) => m.t === "snapshot" && m.tick > tickBefore, 3000, "post-overflow snapshot");
     const alive = c.lastSnapshot && c.lastSnapshot.tick > tickBefore;
     ok(alive, `OVERFLOW BUILD: room still ticking after huge tile coords (tick ${tickBefore} -> ${c.lastSnapshot?.tick})`);
     c.ws.close();
@@ -75,7 +82,7 @@ async function soloStart(room) {
     const tickBefore = c.lastSnapshot.tick;
     const t0 = performance.now();
     c.send({ t: "command", cmd: { c: "move", units, x: 1500, y: 1500 } });
-    await sleep(2000);
+    await c.waitFor((m) => m.t === "snapshot" && m.tick > tickBefore + 5, 3000, "post-dedupe snapshots");
     const dt = performance.now() - t0;
     ok(c.lastSnapshot && c.lastSnapshot.tick > tickBefore + 5,
        `DOS GUARD (dedupe): room kept ticking after 20k-id move (tick ${tickBefore} -> ${c.lastSnapshot?.tick} in ${Math.round(dt)}ms)`);
@@ -89,7 +96,7 @@ async function soloStart(room) {
     const worker = snap.entities.find((e) => e.owner === c.playerId && e.kind === "worker");
     const huge = new Array(500000).fill(worker.id); // ~1MB JSON, exceeds the WS frame cap
     c.send({ t: "command", cmd: { c: "move", units: huge, x: 10, y: 10 } });
-    await sleep(800);
+    await c.closed(800);
     // Server must still be healthy: a brand-new connection still gets a welcome.
     const probe = new Client();
     await probe.open();
@@ -182,13 +189,19 @@ async function soloStart(room) {
       left.send({ t: "command", cmd: { c: "attackMove", units: leftWorkers, x: targetX, y: targetY } });
       right.send({ t: "command", cmd: { c: "attackMove", units: rightWorkers, x: targetX, y: targetY } });
 
-      let combatSeen = false;
-      const deadline = performance.now() + 45000;
-      while (performance.now() < deadline && !combatSeen) {
-        await sleep(1000);
-        combatSeen = [left, right].some((c) =>
-          c.msgs.some((m) => m.t === "snapshot" && (m.events || []).some((ev) => ev.e === "attack" || ev.e === "death")),
-        );
+      const hasCombatEvent = (m) => m.t === "snapshot" && (m.events || []).some((ev) => ev.e === "attack" || ev.e === "death");
+      let combatMsg = null;
+      try {
+        combatMsg = await Promise.any([
+          left.waitFor(hasCombatEvent, 45000, "left hidden combat event"),
+          right.waitFor(hasCombatEvent, 45000, "right hidden combat event"),
+        ]);
+      } catch {
+        // Keep the assertion below as the single failure report.
+      }
+      const combatSeen = !!combatMsg;
+      if (combatMsg) {
+        await observer.waitFor((m) => m.t === "snapshot" && m.tick >= combatMsg.tick, 2000, "observer matching combat tick").catch(() => {});
       }
 
       ok(combatSeen, "FOG EVENTS: hidden pair produced combat events for involved players");
@@ -205,7 +218,7 @@ async function soloStart(room) {
     }
   }
 
-  await sleep(200);
+  await sleep(50);
   if (failures > 0) console.log(`\nREGRESSION: ${failures} FAILURE(S) ❌`);
   process.exit(failures === 0 ? 0 : 1);
 })().catch((e) => { console.log("TEST ERROR:", e.message); process.exit(2); });

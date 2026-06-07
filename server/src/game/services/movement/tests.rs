@@ -14,6 +14,7 @@ use crate::game::services::pathing::PathingService;
 use crate::game::services::standability;
 use crate::game::{PlayerState, ScoreState};
 use crate::protocol::NoticeSeverity;
+use rayon::prelude::*;
 
 use super::collision::COLLISION_EPS_PX;
 use super::pivot_drive::{
@@ -1939,8 +1940,8 @@ fn snaking_corridor_completed_unit_clear_times_regression() {
         (EntityKind::Tank, 4usize),
     ];
     let results: Vec<_> = scenarios
-        .into_iter()
-        .map(|(unit, count)| measure_snaking_corridor_clear_time(unit, count))
+        .par_iter()
+        .map(|&(unit, count)| measure_snaking_corridor_clear_time(unit, count))
         .collect();
 
     println!("SNAKING_CORRIDOR_COMPLETED_UNIT_CLEAR_TIMES");
@@ -1985,10 +1986,11 @@ fn snaking_corridor_completed_unit_clear_times_regression() {
 
 #[test]
 fn snaking_corridor_vehicle_slot_clear_times_regression() {
-    let results = [
-        measure_snaking_corridor_unit_clear_times(EntityKind::Tank, 4, &[0, 1, 2, 3]),
-        measure_snaking_corridor_unit_clear_times(EntityKind::AtTeam, 4, &[0, 1, 2, 3]),
-    ];
+    let scenarios = [(EntityKind::Tank, 4usize), (EntityKind::AtTeam, 4usize)];
+    let results: Vec<_> = scenarios
+        .par_iter()
+        .map(|&(unit, count)| measure_snaking_corridor_unit_clear_times(unit, count, &[0, 1, 2, 3]))
+        .collect();
 
     println!("SNAKING_CORRIDOR_VEHICLE_SLOT_CLEAR_TIMES");
     println!("unit | count | slot | clear_ticks | final_state");
@@ -2097,7 +2099,7 @@ fn scout_car_wall_chokepoint_five_clear_without_parallel_nose_wedge() {
 #[test]
 fn wall_chokepoint_case_clear_time_regression() {
     let results: Vec<_> = WALL_CHOKEPOINT_SCORE_BASELINES
-        .iter()
+        .par_iter()
         .map(|&(unit, count, _)| measure_wall_chokepoint_clear_times(unit, count))
         .collect();
 
