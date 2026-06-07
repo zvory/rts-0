@@ -316,6 +316,11 @@ fn active_order_plan_marker(
         Order::Build(order) => {
             build_marker(order.intent.kind, order.intent.tile_x, order.intent.tile_y)
         }
+        Order::Ability(order) => point_marker(
+            order.intent.ability.to_protocol_str(),
+            order.intent.x,
+            order.intent.y,
+        ),
         Order::Idle => None,
     }
 }
@@ -335,6 +340,9 @@ fn intent_plan_marker(
         }
         OrderIntent::Gather(gather) => entity_point_marker("gather", gather.node, entities),
         OrderIntent::Build(build) => build_marker(build.kind, build.tile_x, build.tile_y),
+        OrderIntent::Ability(ability) => {
+            point_marker(ability.ability.to_protocol_str(), ability.x, ability.y)
+        }
     }
 }
 

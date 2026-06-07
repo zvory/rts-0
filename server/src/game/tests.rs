@@ -327,6 +327,42 @@ fn queued_move_fixture() -> (Game, u32, (f32, f32), (f32, f32), (f32, f32)) {
     queued_move_fixture_with_lobby_debug(false)
 }
 
+fn smoke_command_fixture() -> (Game, u32, (f32, f32), (f32, f32)) {
+    let players = [PlayerInit {
+        id: 1,
+        name: "Solo".into(),
+        color: "#fff".into(),
+        is_ai: false,
+    }];
+    let mut game = Game::new_for_replay_with_starting_resources(&players, 500, 500, 0x5150_0303);
+    for tile in &mut game.map.terrain {
+        *tile = crate::protocol::terrain::GRASS;
+    }
+    for id in game.entities.ids() {
+        game.entities.remove(id);
+    }
+
+    let scout_pos = game.map.tile_center(8, 8);
+    let target = game.map.tile_center(20, 8);
+    let second_target = game.map.tile_center(21, 10);
+    let scout = game
+        .entities
+        .spawn_unit(1, EntityKind::ScoutCar, scout_pos.0, scout_pos.1)
+        .expect("scout car should spawn");
+    let (sx, sy) = services::occupancy::footprint_center(&game.map, EntityKind::Steelworks, 4, 4);
+    game.entities
+        .spawn_building(1, EntityKind::Steelworks, sx, sy, true)
+        .expect("steelworks should spawn");
+    systems::recompute_supply(&mut game.players, &game.entities);
+    game.spatial = services::spatial::SpatialIndex::build(&game.entities, game.map.size);
+    let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
+    game.fog
+        .recompute_with_smoke(&ids, &game.entities, &game.map, &game.smokes);
+    game.assert_invariants();
+
+    (game, scout, target, second_target)
+}
+
 fn queued_move_fixture_with_lobby_debug(
     lobby_debug: bool,
 ) -> (Game, u32, (f32, f32), (f32, f32), (f32, f32)) {
@@ -593,6 +629,130 @@ fn queued_move_commands_follow_waypoints_in_order() {
             crate::protocol::Command::Move { queued: true, .. }
         )
     }));
+}
+
+#[test]
+fn out_of_range_smoke_moves_into_range_launches_then_idles() {
+    let (mut game, scout, target, _) = smoke_command_fixture();
+
+    game.enqueue(
+        1,
+        Command::UseAbility {
+            ability: ability::AbilityKind::Smoke,
+            units: vec![scout],
+            x: Some(target.0),
+            y: Some(target.1),
+            queued: false,
+        },
+    );
+    game.tick();
+
+    assert!(
+        matches!(game.entities.get(scout).unwrap().order(), Order::Ability(_)),
+        "out-of-range Smoke should become an active ability movement order"
+    );
+
+    for _ in 0..240 {
+        if game.smokes.iter().count() > 0 {
+            break;
+        }
+        game.tick();
+    }
+
+    let scout_entity = game.entities.get(scout).expect("scout should exist");
+    assert_eq!(
+        game.smokes.iter().count(),
+        1,
+        "Smoke cloud should spawn once the scout car reaches launch range"
+    );
+    assert!(matches!(scout_entity.order(), Order::Idle));
+    assert_eq!(
+        scout_entity.ability_cooldown_ticks(ability::AbilityKind::Smoke),
+        config::SMOKE_ABILITY_COOLDOWN_TICKS
+    );
+    assert_eq!(game.players[0].steel, 475);
+    assert_eq!(game.players[0].oil, 475);
+}
+
+#[test]
+fn queued_out_of_range_smoke_command_log_replays_deterministically() {
+    let (mut live, scout, first_target, second_target) = smoke_command_fixture();
+
+    live.enqueue(
+        1,
+        Command::UseAbility {
+            ability: ability::AbilityKind::Smoke,
+            units: vec![scout],
+            x: Some(first_target.0),
+            y: Some(first_target.1),
+            queued: true,
+        },
+    );
+    live.enqueue(
+        1,
+        Command::UseAbility {
+            ability: ability::AbilityKind::Smoke,
+            units: vec![scout],
+            x: Some(second_target.0),
+            y: Some(second_target.1),
+            queued: true,
+        },
+    );
+
+    let mut live_events = Vec::new();
+    for tick in 1..=180 {
+        for (player_id, events) in live.tick() {
+            for event in events {
+                live_events.push(super::replay::EventLogEntry {
+                    tick,
+                    player_id,
+                    event,
+                });
+            }
+        }
+    }
+
+    assert!(
+        live.command_log().iter().any(|entry| matches!(
+            entry.command,
+            crate::protocol::Command::UseAbility {
+                ref ability,
+                queued: true,
+                ..
+            } if ability == crate::protocol::abilities::SMOKE
+        )),
+        "command log should preserve queued Smoke intent"
+    );
+
+    let mut replay = smoke_command_fixture().0;
+    let command_log = live.command_log().to_vec();
+    let mut next_command = 0usize;
+    let mut replay_events = Vec::new();
+    for tick in 1..=live.tick_count() {
+        while let Some(entry) = command_log.get(next_command) {
+            if entry.tick != tick {
+                break;
+            }
+            replay.enqueue(
+                entry.player_id,
+                Command::from_protocol(entry.command.clone()),
+            );
+            next_command += 1;
+        }
+        for (player_id, events) in replay.tick() {
+            for event in events {
+                replay_events.push(super::replay::EventLogEntry {
+                    tick,
+                    player_id,
+                    event,
+                });
+            }
+        }
+    }
+
+    assert_eq!(next_command, command_log.len());
+    assert_eq!(live_events, replay_events);
+    assert_eq!(live.snapshot_for(1), replay.snapshot_for(1));
 }
 
 #[test]

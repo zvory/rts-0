@@ -81,7 +81,7 @@ pub fn definition(kind: AbilityKind) -> AbilityDefinition {
                 oil: config::SMOKE_ABILITY_COST_OIL,
             },
             tech_requirement: Some(EntityKind::Steelworks),
-            may_queue: false,
+            may_queue: true,
         },
     }
 }

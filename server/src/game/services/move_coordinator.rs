@@ -14,6 +14,7 @@
 //! - spawn-point search around buildings.
 
 use crate::config;
+use crate::game::ability::AbilityKind;
 use crate::game::entity::{
     uses_oriented_vehicle_body, uses_pivot_vehicle_movement, EntityKind, EntityStore, MovePhase,
     Order, WeaponSetup,
@@ -176,6 +177,30 @@ impl<'a> MoveCoordinator<'a> {
             e.reset_stuck(px, py);
         }
         self.request_path(entities, id, (nx, ny), false);
+    }
+
+    /// Issue a world-targeted ability order and walk the caster to the launch staging point.
+    pub fn order_ability(
+        &mut self,
+        entities: &mut EntityStore,
+        id: u32,
+        ability: AbilityKind,
+        target: (f32, f32),
+        staging: (f32, f32),
+    ) {
+        entities.release_miner(id);
+        if let Some(e) = entities.get_mut(id) {
+            e.set_order(Order::ability(
+                ability, target.0, target.1, staging.0, staging.1,
+            ));
+            e.set_target_id(None);
+            e.set_path(Vec::new());
+            e.set_path_goal(Some(staging));
+            e.reset_gather_state();
+            let (px, py) = (e.pos_x, e.pos_y);
+            e.reset_stuck(px, py);
+        }
+        self.request_path(entities, id, staging, true);
     }
 
     /// Issue a build order: record the placement intent on the worker and walk it to an outside
@@ -450,7 +475,10 @@ impl<'a> MoveCoordinator<'a> {
             e.set_path(waypoints);
             e.set_last_repath_tick(self.tick);
             e.set_path_goal(Some(goal));
-            if matches!(e.order(), Order::Move(_) | Order::AttackMove(_)) {
+            if matches!(
+                e.order(),
+                Order::Move(_) | Order::AttackMove(_) | Order::Ability(_)
+            ) {
                 e.mark_move_phase(if path_ok {
                     MovePhase::Moving
                 } else {

@@ -108,7 +108,7 @@ pub(crate) fn run_tick(
     pathing: &mut PathingService,
     rng: &mut SmallRng,
     lingering_sight: &mut Vec<LingeringSightSource>,
-    smokes: &SmokeCloudStore,
+    smokes: &mut SmokeCloudStore,
     pending: Vec<(u32, SimCommand)>,
     events: &mut HashMap<u32, Vec<Event>>,
     tick: u32,
@@ -132,6 +132,7 @@ pub(crate) fn run_tick(
             smokes,
             pending,
             events,
+            tick,
         );
     });
     crate::perf::timed(perf.as_deref_mut(), "awaiting_paths", || {
@@ -149,7 +150,16 @@ pub(crate) fn run_tick(
         );
     });
     crate::perf::timed(perf.as_deref_mut(), "promote_queued_orders", || {
-        services::order_queue::promote_ready_orders(map, entities, players, fog, &mut coordinator);
+        services::order_queue::promote_ready_orders(
+            map,
+            entities,
+            players,
+            fog,
+            &mut coordinator,
+            smokes,
+            events,
+            tick,
+        );
     });
     crate::perf::timed(perf.as_deref_mut(), "promoted_awaiting_paths", || {
         coordinator.process_awaiting_paths(entities);
@@ -272,7 +282,7 @@ mod tests {
         let mut pathing = PathingService::new(1024, 16);
         let mut events: HashMap<u32, Vec<Event>> = HashMap::new();
         let mut lingering_sight = Vec::new();
-        let smokes = SmokeCloudStore::new();
+        let mut smokes = SmokeCloudStore::new();
 
         let worker = entities
             .spawn_unit(1, EntityKind::Worker, 400.0, 390.0)
@@ -298,7 +308,7 @@ mod tests {
             &mut pathing,
             &mut SmallRng::seed_from_u64(0),
             &mut lingering_sight,
-            &smokes,
+            &mut smokes,
             Vec::new(),
             &mut events,
             1,

@@ -8,7 +8,11 @@ use crate::game::entity::{
 };
 use crate::game::fog::Fog;
 use crate::game::map::Map;
+use crate::game::services::ability_orders::{
+    self, caster_can_attempt, order_or_launch_world_ability, tech_requirement_met,
+};
 use crate::game::services::construction::resumable_site_for_build_intent;
+use crate::game::services::dist2;
 use crate::game::services::move_coordinator::MoveCoordinator;
 use crate::game::services::movement::angle_delta;
 use crate::game::services::spatial::SpatialIndex;
@@ -32,9 +36,10 @@ pub(crate) fn apply_commands(
     spatial: &SpatialIndex,
     coordinator: &mut MoveCoordinator<'_>,
     fog: &Fog,
-    smokes: &SmokeCloudStore,
+    smokes: &mut SmokeCloudStore,
     pending: Vec<(u32, SimCommand)>,
     events: &mut HashMap<u32, Vec<Event>>,
+    tick: u32,
 ) {
     for (player, cmd) in pending {
         match cmd {
@@ -192,8 +197,12 @@ pub(crate) fn apply_commands(
                 queued,
             } => {
                 use_ability(
+                    map,
                     entities,
                     players,
+                    coordinator,
+                    smokes,
+                    events,
                     player,
                     AbilityUse {
                         ability,
@@ -202,6 +211,7 @@ pub(crate) fn apply_commands(
                         y,
                         queued,
                     },
+                    tick,
                 );
             }
             SimCommand::Gather {
@@ -324,11 +334,17 @@ struct AbilityUse {
     queued: bool,
 }
 
+#[allow(clippy::too_many_arguments)]
 fn use_ability(
+    map: &Map,
     entities: &mut EntityStore,
     players: &mut [PlayerState],
+    coordinator: &mut MoveCoordinator<'_>,
+    smokes: &mut SmokeCloudStore,
+    events: &mut HashMap<u32, Vec<Event>>,
     player: u32,
     request: AbilityUse,
+    tick: u32,
 ) {
     let ability = request.ability;
     let definition = ability::definition(ability);
@@ -349,41 +365,102 @@ fn use_ability(
             }
         }
     }
-    if let Some(required) = definition.tech_requirement {
-        if !player_has_completed_kind(entities, player, required) {
-            return;
-        }
-    }
-    if definition.cost.steel > 0 || definition.cost.oil > 0 {
-        let Some(p) = players.iter().find(|p| p.id == player) else {
-            return;
-        };
-        if p.steel < definition.cost.steel || p.oil < definition.cost.oil {
-            return;
-        }
-    }
-
-    for id in dedupe_cap_units(request.units) {
-        if !owns_unit(entities, player, id) || is_constructing(entities, id) {
-            continue;
-        }
-        let Some(e) = entities.get_mut(id) else {
-            continue;
-        };
-        if !ability::carried_by(ability, e.kind) || e.ability_cooldown_ticks(ability) > 0 {
-            continue;
-        }
-        match ability {
-            AbilityKind::Charge => {
+    match ability {
+        AbilityKind::Charge => {
+            if !tech_requirement_met(entities, player, ability) {
+                return;
+            }
+            for id in dedupe_cap_units(request.units) {
+                if !caster_can_attempt(entities, player, id, ability) {
+                    continue;
+                }
+                let Some(e) = entities.get_mut(id) else {
+                    continue;
+                };
                 e.start_charge(config::RIFLEMAN_CHARGE_TICKS);
                 e.start_ability_cooldown(ability, definition.cooldown_ticks);
             }
-            AbilityKind::Smoke => {
-                // Phase 1 intentionally validates the generic command shell without launching
-                // smoke gameplay. Phase 3 will spend resources, start cooldown, and spawn smoke.
+        }
+        AbilityKind::Smoke => {
+            let Some(x) = request.x else {
+                return;
+            };
+            let Some(y) = request.y else {
+                return;
+            };
+            let Some((x, y)) = SmokeCloudStore::clamp_point_to_map(map, x, y) else {
+                return;
+            };
+            if !tech_requirement_met(entities, player, ability) {
+                return;
             }
+            let eligible: Vec<u32> = dedupe_cap_units(request.units)
+                .into_iter()
+                .filter(|id| caster_can_attempt(entities, player, *id, ability))
+                .collect();
+            if eligible.is_empty() {
+                return;
+            }
+            if request.queued {
+                let intent = OrderIntent::ability(ability, x, y);
+                for id in eligible {
+                    if let Some(e) = entities.get_mut(id) {
+                        e.append_queued_order(intent.clone());
+                    }
+                }
+                return;
+            }
+
+            let Some(caster) = choose_smoke_caster(map, entities, ability, &eligible, x, y) else {
+                return;
+            };
+            if let Some(e) = entities.get_mut(caster) {
+                e.clear_queued_orders();
+            }
+            order_or_launch_world_ability(
+                map,
+                entities,
+                players,
+                coordinator,
+                smokes,
+                events,
+                player,
+                caster,
+                ability,
+                x,
+                y,
+                tick,
+                true,
+            );
         }
     }
+}
+
+fn choose_smoke_caster(
+    map: &Map,
+    entities: &EntityStore,
+    ability: AbilityKind,
+    eligible: &[u32],
+    x: f32,
+    y: f32,
+) -> Option<u32> {
+    let mut furthest_in_range: Option<(u32, f32)> = None;
+    let mut closest: Option<(u32, f32)> = None;
+    for id in eligible {
+        let Some(e) = entities.get(*id) else {
+            continue;
+        };
+        let d2 = dist2(e.pos_x, e.pos_y, x, y);
+        if closest.is_none_or(|(_, best)| d2 < best) {
+            closest = Some((*id, d2));
+        }
+        if ability_orders::caster_in_range(map, entities, *id, ability, x, y)
+            && furthest_in_range.is_none_or(|(_, best)| d2 > best)
+        {
+            furthest_in_range = Some((*id, d2));
+        }
+    }
+    furthest_in_range.or(closest).map(|(id, _)| id)
 }
 
 /// Whether `player` owns a *unit* with this id. Local re-export of
@@ -464,10 +541,6 @@ fn clear_staged_at_gun_setup(entities: &mut EntityStore, ids: &[u32]) {
             e.set_pending_redeploy_facing(None);
         }
     }
-}
-
-fn player_has_completed_kind(entities: &EntityStore, player: u32, kind: EntityKind) -> bool {
-    world_query::completed_building_kinds(entities, player).contains(&kind)
 }
 
 fn deployed_at_gun_target_outside_arc(entities: &EntityStore, id: u32, target: u32) -> bool {
@@ -734,7 +807,7 @@ mod tests {
         let mut players = vec![player_state(1)];
         let mut fog = Fog::new(map.size);
         fog.recompute(&[1], &entities, &map);
-        let smokes = SmokeCloudStore::new();
+        let mut smokes = SmokeCloudStore::new();
         let mut events = HashMap::new();
 
         apply_commands(
@@ -744,7 +817,7 @@ mod tests {
             &spatial,
             &mut coordinator,
             &fog,
-            &smokes,
+            &mut smokes,
             vec![(
                 1,
                 SimCommand::Build {
@@ -756,6 +829,7 @@ mod tests {
                 },
             )],
             &mut events,
+            1,
         );
 
         let worker = entities.get(worker).expect("worker should remain alive");
@@ -801,7 +875,7 @@ mod tests {
         let mut players = vec![player_state(1)];
         let mut fog = Fog::new(map.size);
         fog.recompute(&[1], &entities, &map);
-        let smokes = SmokeCloudStore::new();
+        let mut smokes = SmokeCloudStore::new();
         let mut events = HashMap::new();
 
         apply_commands(
@@ -811,7 +885,7 @@ mod tests {
             &spatial,
             &mut coordinator,
             &fog,
-            &smokes,
+            &mut smokes,
             vec![(
                 1,
                 SimCommand::Build {
@@ -823,6 +897,7 @@ mod tests {
                 },
             )],
             &mut events,
+            1,
         );
 
         let worker = entities.get(worker).expect("worker should remain alive");
@@ -866,7 +941,7 @@ mod tests {
         let mut players = vec![player_state(1)];
         let mut fog = Fog::new(map.size);
         fog.recompute(&[1], &entities, &map);
-        let smokes = SmokeCloudStore::new();
+        let mut smokes = SmokeCloudStore::new();
         let mut events = HashMap::new();
 
         apply_commands(
@@ -876,7 +951,7 @@ mod tests {
             &spatial,
             &mut coordinator,
             &fog,
-            &smokes,
+            &mut smokes,
             vec![(
                 1,
                 SimCommand::Build {
@@ -888,6 +963,7 @@ mod tests {
                 },
             )],
             &mut events,
+            1,
         );
 
         let worker = entities.get(worker).expect("worker should remain alive");
@@ -1255,6 +1331,158 @@ mod tests {
             config::RIFLEMAN_CHARGE_TICKS,
             "charge should become available again after cooldown expiry"
         );
+    }
+
+    #[test]
+    fn in_range_smoke_launches_from_furthest_selected_carrier() {
+        let map = flat_map(32);
+        let mut entities = EntityStore::new();
+        let target = map.tile_center(12, 8);
+        let near = entities
+            .spawn_unit(1, EntityKind::ScoutCar, target.0 - 96.0, target.1)
+            .expect("near scout car should spawn");
+        let far = entities
+            .spawn_unit(1, EntityKind::ScoutCar, target.0 - 192.0, target.1)
+            .expect("far scout car should spawn");
+        let (sx, sy) = footprint_center(&map, EntityKind::Steelworks, 4, 4);
+        entities
+            .spawn_building(1, EntityKind::Steelworks, sx, sy, true)
+            .expect("steelworks should spawn");
+        let mut players = vec![player_state(1), player_state(2)];
+        let mut smokes = SmokeCloudStore::new();
+        let events = apply_with_players_and_smokes(
+            &map,
+            &mut entities,
+            &mut players,
+            &mut smokes,
+            vec![(
+                1,
+                SimCommand::UseAbility {
+                    ability: AbilityKind::Smoke,
+                    units: vec![near, far],
+                    x: Some(target.0),
+                    y: Some(target.1),
+                    queued: false,
+                },
+            )],
+        );
+
+        assert_eq!(smokes.iter().count(), 1);
+        assert_eq!(players[0].steel, 975);
+        assert_eq!(players[0].oil, 975);
+        assert_eq!(
+            entities
+                .get(far)
+                .unwrap()
+                .ability_cooldown_ticks(AbilityKind::Smoke),
+            config::SMOKE_ABILITY_COOLDOWN_TICKS,
+            "furthest in-range selected carrier should launch"
+        );
+        assert_eq!(
+            entities
+                .get(near)
+                .unwrap()
+                .ability_cooldown_ticks(AbilityKind::Smoke),
+            0
+        );
+        assert!(matches!(entities.get(far).unwrap().order(), Order::Idle));
+        assert!(events.get(&1).is_none_or(Vec::is_empty));
+    }
+
+    #[test]
+    fn queued_smoke_appends_to_eligible_carriers_until_cap() {
+        let map = flat_map(32);
+        let mut entities = EntityStore::new();
+        let target = map.tile_center(12, 8);
+        let scout = entities
+            .spawn_unit(1, EntityKind::ScoutCar, target.0 - 96.0, target.1)
+            .expect("scout car should spawn");
+        let rifle = entities
+            .spawn_unit(1, EntityKind::Rifleman, target.0 - 64.0, target.1)
+            .expect("rifleman should spawn");
+        let (sx, sy) = footprint_center(&map, EntityKind::Steelworks, 4, 4);
+        entities
+            .spawn_building(1, EntityKind::Steelworks, sx, sy, true)
+            .expect("steelworks should spawn");
+
+        apply(
+            &map,
+            &mut entities,
+            (0..10)
+                .map(|_| {
+                    (
+                        1,
+                        SimCommand::UseAbility {
+                            ability: AbilityKind::Smoke,
+                            units: vec![scout, rifle],
+                            x: Some(target.0),
+                            y: Some(target.1),
+                            queued: true,
+                        },
+                    )
+                })
+                .collect(),
+        );
+
+        assert_eq!(entities.get(scout).unwrap().queued_orders().len(), 8);
+        assert!(entities
+            .get(scout)
+            .unwrap()
+            .queued_orders()
+            .iter()
+            .all(|intent| matches!(intent, OrderIntent::Ability(_))));
+        assert!(
+            entities.get(rifle).unwrap().queued_orders().is_empty(),
+            "non-carriers should not receive queued Smoke intents"
+        );
+
+        apply(
+            &map,
+            &mut entities,
+            vec![(1, SimCommand::Stop { units: vec![scout] })],
+        );
+        assert!(entities.get(scout).unwrap().queued_orders().is_empty());
+    }
+
+    #[test]
+    fn smoke_resource_shortage_prefers_oil_notice_at_launch() {
+        let map = flat_map(32);
+        let mut entities = EntityStore::new();
+        let target = map.tile_center(12, 8);
+        let scout = entities
+            .spawn_unit(1, EntityKind::ScoutCar, target.0 - 96.0, target.1)
+            .expect("scout car should spawn");
+        let (sx, sy) = footprint_center(&map, EntityKind::Steelworks, 4, 4);
+        entities
+            .spawn_building(1, EntityKind::Steelworks, sx, sy, true)
+            .expect("steelworks should spawn");
+        let mut players = vec![player_state(1), player_state(2)];
+        players[0].steel = 0;
+        players[0].oil = 0;
+        let mut smokes = SmokeCloudStore::new();
+
+        let events = apply_with_players_and_smokes(
+            &map,
+            &mut entities,
+            &mut players,
+            &mut smokes,
+            vec![(
+                1,
+                SimCommand::UseAbility {
+                    ability: AbilityKind::Smoke,
+                    units: vec![scout],
+                    x: Some(target.0),
+                    y: Some(target.1),
+                    queued: false,
+                },
+            )],
+        );
+
+        assert_eq!(smokes.iter().count(), 0);
+        assert!(matches!(
+            events.get(&1).and_then(|events| events.first()),
+            Some(Event::Notice { msg, .. }) if msg == "Not enough oil"
+        ));
     }
 
     #[test]
@@ -1880,6 +2108,17 @@ mod tests {
         players: &mut [PlayerState],
         pending: Vec<(u32, SimCommand)>,
     ) -> HashMap<u32, Vec<Event>> {
+        let mut smokes = SmokeCloudStore::new();
+        apply_with_players_and_smokes(map, entities, players, &mut smokes, pending)
+    }
+
+    fn apply_with_players_and_smokes(
+        map: &Map,
+        entities: &mut EntityStore,
+        players: &mut [PlayerState],
+        smokes: &mut SmokeCloudStore,
+        pending: Vec<(u32, SimCommand)>,
+    ) -> HashMap<u32, Vec<Event>> {
         let spatial = SpatialIndex::build(entities, map.size);
         let occ = Occupancy::build(map, entities);
         let mut pathing = PathingService::new(1024, 32);
@@ -1887,7 +2126,6 @@ mod tests {
         let mut coordinator = MoveCoordinator::new(&mut pathing, map, &occ, 1);
         let mut fog = Fog::new(map.size);
         fog.recompute(&[1, 2], entities, map);
-        let smokes = SmokeCloudStore::new();
         let mut events = HashMap::new();
         apply_commands(
             map,
@@ -1896,9 +2134,10 @@ mod tests {
             &spatial,
             &mut coordinator,
             &fog,
-            &smokes,
+            smokes,
             pending,
             &mut events,
+            1,
         );
         events
     }

@@ -231,7 +231,7 @@ impl Game {
             &mut self.pathing,
             &mut self.rng,
             &mut self.lingering_sight,
-            &self.smokes,
+            &mut self.smokes,
             pending,
             &mut events,
             self.tick,

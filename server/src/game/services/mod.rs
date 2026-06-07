@@ -6,6 +6,7 @@
 //! these services together; individual services should stay focused on one phase or one reusable
 //! query surface.
 
+pub mod ability_orders;
 pub mod combat;
 pub mod commands;
 pub mod construction;

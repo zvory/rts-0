@@ -1,3 +1,5 @@
+use crate::game::ability::AbilityKind;
+
 use super::EntityKind;
 
 /// Maximum number of queued command intents stored on one mobile unit.
@@ -26,6 +28,8 @@ pub enum Order {
     /// not exist until the worker arrives, re-validates placement/affordability, and pays
     /// the cost; until then the order carries only the intent (kind + top-left tile).
     Build(BuildOrder),
+    /// Move into range of a world-targeted ability, then execute it at the target point.
+    Ability(AbilityOrder),
 }
 
 impl Order {
@@ -47,6 +51,10 @@ impl Order {
 
     pub fn build(kind: EntityKind, tile_x: u32, tile_y: u32) -> Self {
         Order::Build(BuildOrder::new(kind, tile_x, tile_y))
+    }
+
+    pub fn ability(ability: AbilityKind, x: f32, y: f32, staging_x: f32, staging_y: f32) -> Self {
+        Order::Ability(AbilityOrder::new(ability, x, y, staging_x, staging_y))
     }
 
     pub fn attack_target(&self) -> Option<u32> {
@@ -103,6 +111,7 @@ pub enum OrderIntent {
     Attack(TargetIntent),
     Gather(GatherIntent),
     Build(BuildIntent),
+    Ability(AbilityIntent),
 }
 
 impl OrderIntent {
@@ -129,10 +138,21 @@ impl OrderIntent {
             tile_y,
         })
     }
+
+    pub fn ability(ability: AbilityKind, x: f32, y: f32) -> Self {
+        OrderIntent::Ability(AbilityIntent { ability, x, y })
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct PointIntent {
+    pub x: f32,
+    pub y: f32,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct AbilityIntent {
+    pub ability: AbilityKind,
     pub x: f32,
     pub y: f32,
 }
@@ -274,6 +294,33 @@ pub enum BuildPhase {
     /// Worker has arrived, the building has been spawned in CONSTRUCT state, and
     /// construction is progressing. `site` is the building entity id.
     Constructing { site: u32 },
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct AbilityOrder {
+    pub intent: AbilityIntent,
+    pub execution: AbilityExecution,
+}
+
+impl AbilityOrder {
+    fn new(ability: AbilityKind, x: f32, y: f32, staging_x: f32, staging_y: f32) -> Self {
+        AbilityOrder {
+            intent: AbilityIntent { ability, x, y },
+            execution: AbilityExecution {
+                phase: MovePhase::AwaitingPath,
+                staging: PointIntent {
+                    x: staging_x,
+                    y: staging_y,
+                },
+            },
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct AbilityExecution {
+    pub phase: MovePhase,
+    pub staging: PointIntent,
 }
 
 /// The phase a gathering worker is in. Kept inside [`GatherOrder`] so the order's intent

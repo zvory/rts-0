@@ -213,6 +213,9 @@ impl Entity {
                 Order::Move(order) | Order::AttackMove(order) => {
                     order.execution.phase = phase;
                 }
+                Order::Ability(order) => {
+                    order.execution.phase = phase;
+                }
                 _ => {}
             }
         }
@@ -221,6 +224,7 @@ impl Entity {
     pub fn move_phase(&self) -> Option<MovePhase> {
         self.movement.as_ref().and_then(|m| match &m.order {
             Order::Move(order) | Order::AttackMove(order) => Some(order.execution.phase),
+            Order::Ability(order) => Some(order.execution.phase),
             _ => None,
         })
     }
@@ -756,6 +760,7 @@ impl Entity {
             Order::Attack(_) => states::ATTACK,
             Order::Gather(_) => states::GATHER,
             Order::Build(_) => states::BUILD,
+            Order::Ability(_) => states::MOVE,
         }
     }
 

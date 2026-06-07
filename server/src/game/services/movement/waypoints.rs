@@ -415,7 +415,10 @@ pub(super) fn advance_moving_units(
                     .map(|m| m.static_blocked_ticks)
                     .unwrap_or(0);
                 if static_blocked_ticks >= config::STATIC_BLOCKED_REPATH_TICKS
-                    && matches!(e.order(), Order::Move(_) | Order::AttackMove(_))
+                    && matches!(
+                        e.order(),
+                        Order::Move(_) | Order::AttackMove(_) | Order::Ability(_)
+                    )
                 {
                     e.set_path(Vec::new());
                     e.mark_move_phase(MovePhase::AwaitingPath);
@@ -462,7 +465,10 @@ pub(super) fn advance_moving_units(
                 }
                 if is_car
                     && stuck_ticks >= config::SCOUT_CAR_STUCK_RECOVERY_TRIGGER_TICKS
-                    && matches!(e.order(), Order::Move(_) | Order::AttackMove(_))
+                    && matches!(
+                        e.order(),
+                        Order::Move(_) | Order::AttackMove(_) | Order::Ability(_)
+                    )
                 {
                     inject_scout_car_reverse_recovery(e, map, occ);
                 }
