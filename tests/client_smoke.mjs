@@ -13,7 +13,12 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-const URL = process.env.RTS_URL || "http://127.0.0.1:8081/";
+const BASE_URL = process.env.RTS_URL || "http://127.0.0.1:8081/";
+const TEST_URL = (() => {
+  const url = new URL(BASE_URL);
+  url.searchParams.set("rtsNoAutoPointerLock", "1");
+  return url.href;
+})();
 const CHROME = process.env.CHROME ||
   "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const consoleErrors = [];
@@ -37,7 +42,7 @@ try {
   page.on("pageerror", (e) => pageErrors.push(e.message));
   page.on("requestfailed", (r) => { if (!r.url().includes("favicon")) consoleErrors.push("requestfailed: " + r.url()); });
 
-  await page.goto(URL, { waitUntil: "networkidle2", timeout: 15000 });
+  await page.goto(TEST_URL, { waitUntil: "networkidle2", timeout: 15000 });
   await page.waitForSelector("#lobby-screen", { visible: true, timeout: 5000 });
   ok(true, "lobby screen visible on load");
   ok(await page.evaluate(() => !!window.PIXI), `PixiJS loaded (v${await page.evaluate(() => window.PIXI?.VERSION)})`);
