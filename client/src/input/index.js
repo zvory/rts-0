@@ -76,6 +76,7 @@ import {
 export { footprintValidAgainstEntities };
 
 const POINTER_LOCK_RESULT_TIMEOUT_MS = 700;
+const POINTER_LOCK_RAW_INPUT_OPTIONS = Object.freeze({ unadjustedMovement: true });
 
 /**
  * Translates raw DOM pointer/keyboard gestures on the viewport into selection
@@ -140,10 +141,12 @@ export class Input {
     this.pointerLocked = false;
     this._cursorLockMode = null;
     this._pointerLockCursor = null;
+    this._pendingPointerLockCursor = null;
     this._suppressNextContextMenu = false;
     this._pointerLockAttempt = 0;
     this._lastPointerLockFocusAttempt = null;
     this._lastPointerLockRequest = null;
+    this._lastPointerLockRawInputFallback = null;
     this.onPointerLockChange = null;
     this.onPointerLockError = null;
 
@@ -220,6 +223,7 @@ export class Input {
    */
   update(dt) {
     void dt;
+    this._flushPointerLockCursor();
     if (this.state.placement) {
       this.state.updateResourceMiningPreview(null);
       this.state.updateAtGunSetupPreview(null);
@@ -288,14 +292,28 @@ export class Input {
 
   _setPointerLockCursor(p) {
     if (!this._pointerLockCursor) return;
-    this._pointerLockCursor.style.transform = `translate(${p.x}px, ${p.y}px)`;
+    this._pendingPointerLockCursor = { x: p.x, y: p.y };
   }
 
-  _moveLockedCursor(ev) {
+  _flushPointerLockCursor() {
+    if (!this._pointerLockCursor || !this._pendingPointerLockCursor) return;
+    const p = this._pendingPointerLockCursor;
+    this._pointerLockCursor.style.transform = `translate(${p.x}px, ${p.y}px)`;
+    this._pendingPointerLockCursor = null;
+  }
+
+  _lockedMovementDelta(ev) {
+    return {
+      x: Number.isFinite(ev.movementX) ? ev.movementX : 0,
+      y: Number.isFinite(ev.movementY) ? ev.movementY : 0,
+    };
+  }
+
+  _moveLockedCursor(delta) {
     const base = this.mouse || this._viewportCenter();
     const p = this._clampViewportPoint({
-      x: base.x + (Number.isFinite(ev.movementX) ? ev.movementX : 0),
-      y: base.y + (Number.isFinite(ev.movementY) ? ev.movementY : 0),
+      x: base.x + delta.x,
+      y: base.y + delta.y,
     });
     this.mouse = p;
     this._setPointerLockCursor(p);
@@ -404,6 +422,7 @@ export class Input {
       attempts: this._pointerLockAttempt,
       lastFocusAttempt: this._lastPointerLockFocusAttempt,
       lastRequest: this._lastPointerLockRequest,
+      lastRawInputFallback: this._lastPointerLockRawInputFallback,
       location: globalThis.location?.href || null,
       userAgent: navigator.userAgent,
     };
@@ -484,23 +503,49 @@ export class Input {
         if (this.onPointerLockError) this.onPointerLockError(new Error("Pointer Lock API is unavailable."));
         return false;
       }
-      const result = requestPointerLock();
-      this._lastPointerLockRequest = {
-        attempt: this._pointerLockAttempt,
-        at: new Date().toISOString(),
-        returnedPromise: !!(result && typeof result.then === "function"),
-        before: this._focusDebugState(),
-        outcome: "pending",
-      };
-      if (result && typeof result.then === "function") {
-        return await this._waitForPointerLockPromise(result);
-      }
-      return await this._waitForBrowserPointerLockResult();
+      const rawLocked = await this._requestBrowserPointerLockWithOptions(
+        requestPointerLock,
+        POINTER_LOCK_RAW_INPUT_OPTIONS,
+        true,
+      );
+      if (rawLocked || this._browserPointerLockElement() === this._pointerLockTarget()) return true;
+      this._lastPointerLockRawInputFallback = this._lastPointerLockRequest;
+      return await this._requestBrowserPointerLockWithOptions(requestPointerLock, undefined, false);
     } catch (err) {
       this._finishPointerLockRequest("exception", err);
       if (this.onPointerLockError) this.onPointerLockError(err);
       return false;
     }
+  }
+
+  async _requestBrowserPointerLockWithOptions(requestPointerLock, options, rawInputRequested) {
+    let result;
+    try {
+      result = options === undefined ? requestPointerLock() : requestPointerLock(options);
+    } catch (err) {
+      this._lastPointerLockRequest = {
+        attempt: this._pointerLockAttempt,
+        at: new Date().toISOString(),
+        rawInputRequested,
+        returnedPromise: false,
+        before: this._focusDebugState(),
+        outcome: "pending",
+      };
+      this._finishPointerLockRequest("exception", err);
+      return false;
+    }
+    this._lastPointerLockRequest = {
+      attempt: this._pointerLockAttempt,
+      at: new Date().toISOString(),
+      rawInputRequested,
+      returnedPromise: !!(result && typeof result.then === "function"),
+      before: this._focusDebugState(),
+      outcome: "pending",
+    };
+    if (result && typeof result.then === "function") {
+      return await this._waitForPointerLockPromise(result);
+    }
+    return await this._waitForBrowserPointerLockResult();
   }
 
   _waitForPointerLockPromise(pointerLockPromise) {
@@ -657,8 +702,15 @@ export class Input {
   }
 
   _handleMouseMove(ev) {
-    const p = this.pointerLocked ? this._moveLockedCursor(ev) : this._screenPos(ev);
-    if (!this.pointerLocked) this._trackMouse(p);
+    let p;
+    if (this.pointerLocked) {
+      const delta = this._lockedMovementDelta(ev);
+      if (delta.x === 0 && delta.y === 0 && !this._panDrag && !this._drag) return;
+      p = this._moveLockedCursor(delta);
+    } else {
+      p = this._screenPos(ev);
+      this._trackMouse(p);
+    }
     if (this._routeLockedPointerMove(ev, p)) {
       ev.preventDefault();
       return;
@@ -669,7 +721,6 @@ export class Input {
       this._panDrag.x = p.x;
       this._panDrag.y = p.y;
       ev.preventDefault();
-      if (this.state.placement) this._refreshPlacement();
       return;
     }
 
@@ -685,8 +736,8 @@ export class Input {
       }
     }
 
-    if (this.state.placement) this._refreshPlacement();
-    else this._refreshResourceMiningPreview();
+    // Hover/placement/ability previews are refreshed once per animation frame
+    // in update(); pointer-lock mousemove can arrive much faster than that.
   }
 
   _handleMouseUp(ev) {
