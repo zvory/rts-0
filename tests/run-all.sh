@@ -29,10 +29,10 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 SERVER_DIR="$REPO_ROOT/server"
 
-# Cargo normally writes build artifacts under each worktree's server/target directory. That makes
-# every fresh worktree compile dependencies from scratch. Default to the primary checkout's
-# server/target cache so parallel worktrees share dependencies and server artifacts; callers can
-# still override this with CARGO_TARGET_DIR.
+# Cargo normally writes build artifacts under each worktree's server/target directory. Repo-level
+# `.cargo/config.toml` points normal Cargo commands at a shared cache so fresh worktrees do not
+# compile dependencies from scratch. Resolve the same default here so this script can find the
+# server binary deterministically; callers can still override it with CARGO_TARGET_DIR.
 if [ -z "${CARGO_TARGET_DIR:-}" ]; then
   CARGO_TARGET_DIR="$("$REPO_ROOT/scripts/cargo-shared-target.sh" --print-target-dir)"
   export CARGO_TARGET_DIR
