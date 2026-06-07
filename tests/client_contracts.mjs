@@ -328,6 +328,104 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
 }
 
 {
+  let locked = false;
+  const requests = [];
+  const target = {};
+  const rawFallbackInput = Object.create(Input.prototype);
+  rawFallbackInput._pointerLockAttempt = 4;
+  rawFallbackInput._browserPointerLockSupported = () => true;
+  rawFallbackInput._browserPointerLockElement = () => locked ? target : null;
+  rawFallbackInput._pointerLockTarget = () => target;
+  rawFallbackInput._focusDebugState = () => ({ documentHasFocus: true, activeElement: null });
+  rawFallbackInput._browserRequestPointerLock = () => (options) => {
+    requests.push(options);
+    if (options?.unadjustedMovement) return Promise.reject(new Error("raw input unavailable"));
+    locked = true;
+    return Promise.resolve();
+  };
+  rawFallbackInput._waitForPointerLockPromise = async (promise) => {
+    try {
+      await promise;
+      rawFallbackInput._finishPointerLockRequest("resolved");
+      return rawFallbackInput._browserPointerLockElement() === target;
+    } catch (err) {
+      rawFallbackInput._finishPointerLockRequest("rejected", err);
+      return false;
+    }
+  };
+  assert(await rawFallbackInput._requestBrowserPointerLock(), "Pointer Lock falls back after raw input rejection");
+  assert(requests.length === 2, "Pointer Lock tries raw input before plain fallback");
+  assert(requests[0]?.unadjustedMovement === true, "first Pointer Lock request asks for unadjusted movement");
+  assert(requests[1] === undefined, "second Pointer Lock request is the plain fallback");
+  assert(rawFallbackInput._lastPointerLockRequest.rawInputRequested === false, "fallback request records plain Pointer Lock");
+}
+
+{
+  const rawSuccessRequests = [];
+  const target = {};
+  const rawSuccessInput = Object.create(Input.prototype);
+  rawSuccessInput._pointerLockAttempt = 5;
+  rawSuccessInput._browserPointerLockSupported = () => true;
+  rawSuccessInput._browserPointerLockElement = () => target;
+  rawSuccessInput._pointerLockTarget = () => target;
+  rawSuccessInput._focusDebugState = () => ({ documentHasFocus: true, activeElement: null });
+  rawSuccessInput._browserRequestPointerLock = () => (options) => {
+    rawSuccessRequests.push(options);
+    return Promise.resolve();
+  };
+  rawSuccessInput._waitForPointerLockPromise = async (promise) => {
+    await promise;
+    rawSuccessInput._finishPointerLockRequest("resolved");
+    return true;
+  };
+  assert(await rawSuccessInput._requestBrowserPointerLock(), "Pointer Lock succeeds with raw input");
+  assert(rawSuccessRequests.length === 1, "raw Pointer Lock success does not make a fallback request");
+  assert(rawSuccessInput._lastPointerLockRequest.rawInputRequested === true, "raw request is recorded for diagnostics");
+}
+
+{
+  const quietMoveInput = Object.create(Input.prototype);
+  let routedMoves = 0;
+  let previewRefreshes = 0;
+  quietMoveInput.pointerLocked = true;
+  quietMoveInput._panDrag = null;
+  quietMoveInput._drag = null;
+  quietMoveInput._lockedMovementDelta = () => ({ x: 0, y: 0 });
+  quietMoveInput._routeLockedPointerMove = () => {
+    routedMoves += 1;
+    return false;
+  };
+  quietMoveInput._refreshResourceMiningPreview = () => {
+    previewRefreshes += 1;
+  };
+  quietMoveInput._handleMouseMove({});
+  assert(routedMoves === 0 && previewRefreshes === 0, "zero-delta locked mousemove does no hover work");
+}
+
+{
+  let previewRefreshes = 0;
+  const painted = { style: {} };
+  const lockedMoveInput = Object.create(Input.prototype);
+  lockedMoveInput.pointerLocked = true;
+  lockedMoveInput.mouse = { x: 10, y: 20 };
+  lockedMoveInput.dom = { clientWidth: 100, clientHeight: 100 };
+  lockedMoveInput._panDrag = null;
+  lockedMoveInput._drag = null;
+  lockedMoveInput._pointerLockCursor = painted;
+  lockedMoveInput._pendingPointerLockCursor = null;
+  lockedMoveInput._routeLockedPointerMove = () => false;
+  lockedMoveInput._refreshResourceMiningPreview = () => {
+    previewRefreshes += 1;
+  };
+  lockedMoveInput._handleMouseMove({ movementX: 3, movementY: -4 });
+  assert(lockedMoveInput.mouse.x === 13 && lockedMoveInput.mouse.y === 16, "locked mousemove updates virtual cursor state");
+  assert(previewRefreshes === 0, "nonzero locked mousemove defers hover work to frame update");
+  assert(painted.style.transform === undefined, "locked mousemove defers virtual cursor paint");
+  lockedMoveInput._flushPointerLockCursor();
+  assert(painted.style.transform === "translate(13px, 16px)", "virtual cursor paint flushes once per frame");
+}
+
+{
   assert(
     !shouldRequestPointerLock({ desktopRuntime: true, requireGesture: false }),
     "desktop Pointer Lock skips non-gesture automatic requests",
