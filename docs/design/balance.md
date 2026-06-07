@@ -131,11 +131,11 @@ Building stats (hp, sight, cost, footprint tiles wxh, buildTicks, extra):
 | kind                       | hp  | sight | cost | foot | buildTicks | notes |
 |----------------------------|-----|-------|-----|------|-----------|-------|
 | city_centre          | 600 | 9     | 200 | 3x3  | 400       | trains worker; +10 supply; players start with one free |
-| depot                      | 220 | 4     | 100 | 2x2  | 180       | +8 supply |
+| depot                      | 220 | 4     | 100 | 2x2  | 300       | +8 supply |
 | barracks                   | 320 | 6     | 150 | 3x2  | 200       | trains rifleman, machine_gunner, at_team; requires a City Centre |
-| training_centre   | 300 | 6     | 100 steel + 50 oil | 3x2  | 220       | unlocks machine_gunner training at barracks; requires a City Centre and Barracks |
-| factory                    | 360 | 6     | 200 steel + 100 oil | 3x3  | 240       | trains scout_car, tank; requires a City Centre and Training Centre |
-| steelworks                 | 300 | 6     | 125 steel + 125 oil | 2x2  | 220       | unlocks at_team training at barracks and tank training; requires a City Centre and Training Centre |
+| training_centre   | 300 | 6     | 100 steel + 50 oil | 3x2  | 280       | unlocks machine_gunner training at barracks; requires a City Centre and Barracks |
+| factory                    | 360 | 6     | 200 steel + 100 oil | 3x3  | 330       | trains scout_car, tank; requires a City Centre and Training Centre |
+| steelworks                 | 300 | 6     | 125 steel + 125 oil | 2x2  | 310       | unlocks at_team training at barracks and tank training; requires a City Centre and Training Centre |
 
 Win: a player is **eliminated** when they own zero buildings (units alone do not keep them
 alive). Last player standing wins; a 1-player match never ends (sandbox/exploration mode). In a
