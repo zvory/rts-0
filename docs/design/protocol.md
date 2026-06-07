@@ -38,13 +38,15 @@ short but readable. Coordinates are **world pixels** (floats) unless a field nam
 | `train`      | `building: u32`, `unit: string` | Queue a unit at a production building. |
 | `cancel`     | `building: u32` | Cancel the front of a building's production queue. |
 | `stop`       | `units: u32[]` | Clear orders, hold position. |
-| `setRally`   | `building: u32`, `x: f32`, `y: f32`, `queued?: bool` | Set a unit-producing building's rally point. Freshly produced units receive a plain `move` order to the point and the building prefers the spawn exit nearest it. Ignored for buildings the player doesn't own, non-producers (depot, training centre), or buildings still under construction. The point is clamped into map bounds. When `queued` is true, store a future rally stage instead of replacing the active rally point. |
+| `setRally`   | `building: u32`, `x: f32`, `y: f32`, `queued?: bool` | Set a unit-producing building's single rally point. Freshly produced units receive a plain `move` order to the point and the building prefers the spawn exit nearest it. Ignored for buildings the player doesn't own, non-producers (depot, training centre), or buildings still under construction. The point is clamped into map bounds. `queued` is accepted for wire compatibility but does not append rally stages; rally edits always replace the single active point. |
 
 Servers MUST ignore commands referencing entities the player does not own, unknown ids,
 illegal placements, or unaffordable actions (fail silently or emit a `notice` event).
-For appendable commands, omitted `queued` is equivalent to `false`. Unit order queues are capped at
-8 intents per unit, and building rally stage queues are capped at 2 stages per building. Queued
-intents are lightweight future intent only; active `Order` remains the per-tick execution state.
+For appendable unit commands, omitted `queued` is equivalent to `false`. Unit order queues are
+capped at 8 intents per unit. Queued intents are lightweight future intent only; active `Order`
+remains the per-tick execution state. Non-queued unit orders replace the active order and clear
+future unit intents; `stop` clears both active and queued unit orders.
+Production buildings intentionally have one rally point, not a rally queue.
 
 ### 2.2 Server → Client (`ServerMessage`)
 
@@ -159,10 +161,11 @@ Compact entity records are positional arrays. Optional fields keep the semantic 
 trailing missing optional fields are omitted; interior missing optional fields are encoded as
 `null`. The `rally` slot is itself a two-element `[x, y]` array (or `null`).
 The `orderPlan` slot is an owner-only array capped at 9 entries. It contains the current active
-stage first, followed by queued stages in execution order. Each compact stage is `[kind, x, y]`,
-where `kind` is 1 `move`, 2 `attackMove`, 3 `attack`, 4 `gather`, or 5 `build`. Stages carry safe
-world points only, never target ids; hidden attack target stages may be omitted rather than leaking
-enemy positions through fog.
+stage first, followed by queued unit stages in execution order. Each compact stage is
+`[kind, x, y]`, where `kind` is 1 `move`, 2 `attackMove`, 3 `attack`, 4 `gather`, or 5 `build`.
+Stages carry safe world points only, never target ids; hidden attack target stages may be omitted
+rather than leaking enemy positions through fog. Production building rally points are exposed
+separately through `rally` and are not part of `orderPlan`.
 The `abilities` slot is owner-only and capped at 8 entries. Each compact ability cooldown is
 `[ability, cooldownLeft]`, where `ability` is 1 `charge` or 2 `smoke`.
 `visionOnly` is true only for non-owned units/buildings visible through lingering death vision;

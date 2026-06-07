@@ -275,6 +275,91 @@ fn queued_move_fixture_with_lobby_debug(
     (game, unit, first, second, replacement)
 }
 
+struct MixedQueuedFixture {
+    game: Game,
+    worker_builder: u32,
+    worker_gatherer: u32,
+    rifleman: u32,
+    enemy: u32,
+    node: u32,
+    move_goal: (f32, f32),
+    attack_move_goal: (f32, f32),
+}
+
+fn mixed_queued_fixture() -> MixedQueuedFixture {
+    let players = [
+        PlayerInit {
+            id: 1,
+            name: "Alpha".into(),
+            color: "#fff".into(),
+            is_ai: false,
+        },
+        PlayerInit {
+            id: 2,
+            name: "Bravo".into(),
+            color: "#000".into(),
+            is_ai: false,
+        },
+    ];
+    let mut game =
+        Game::new_for_replay_with_starting_resources(&players, 5_000, 5_000, 0x5150_0601);
+    for tile in &mut game.map.terrain {
+        *tile = crate::protocol::terrain::GRASS;
+    }
+    for id in game.entities.ids() {
+        game.entities.remove(id);
+    }
+
+    let (cc_x, cc_y) =
+        services::occupancy::footprint_center(&game.map, EntityKind::CityCentre, 4, 4);
+    game.entities
+        .spawn_building(1, EntityKind::CityCentre, cc_x, cc_y, true)
+        .expect("player city centre should spawn");
+    let (enemy_cc_x, enemy_cc_y) =
+        services::occupancy::footprint_center(&game.map, EntityKind::CityCentre, 24, 4);
+    game.entities
+        .spawn_building(2, EntityKind::CityCentre, enemy_cc_x, enemy_cc_y, true)
+        .expect("enemy city centre should spawn");
+
+    let node = game
+        .entities
+        .spawn_node(EntityKind::Steel, cc_x + 96.0, cc_y)
+        .expect("resource node should spawn");
+    let worker_builder = game
+        .entities
+        .spawn_unit(1, EntityKind::Worker, cc_x + 96.0, cc_y + 32.0)
+        .expect("builder should spawn");
+    let worker_gatherer = game
+        .entities
+        .spawn_unit(1, EntityKind::Worker, cc_x, cc_y + 96.0)
+        .expect("gatherer should spawn");
+    let rifleman = game
+        .entities
+        .spawn_unit(1, EntityKind::Rifleman, cc_x + 96.0, cc_y + 160.0)
+        .expect("rifleman should spawn");
+    let enemy = game
+        .entities
+        .spawn_unit(2, EntityKind::Rifleman, cc_x + 224.0, cc_y + 160.0)
+        .expect("enemy should spawn");
+
+    systems::recompute_supply(&mut game.players, &game.entities);
+    game.spatial = services::spatial::SpatialIndex::build(&game.entities, game.map.size);
+    let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
+    game.fog.recompute(&ids, &game.entities, &game.map);
+    game.assert_invariants();
+
+    MixedQueuedFixture {
+        game,
+        worker_builder,
+        worker_gatherer,
+        rifleman,
+        enemy,
+        node,
+        move_goal: (cc_x + 128.0, cc_y + 160.0),
+        attack_move_goal: (cc_x + 192.0, cc_y + 160.0),
+    }
+}
+
 fn entity_distance_to(game: &Game, id: u32, point: (f32, f32)) -> f32 {
     let entity = game.entities.get(id).expect("entity should exist");
     let dx = entity.pos_x - point.0;
@@ -413,6 +498,117 @@ fn queued_move_commands_follow_waypoints_in_order() {
             crate::protocol::Command::Move { queued: true, .. }
         )
     }));
+}
+
+#[test]
+fn mixed_queued_command_log_replays_deterministically() {
+    let MixedQueuedFixture {
+        mut game,
+        worker_builder,
+        worker_gatherer,
+        rifleman,
+        enemy,
+        node,
+        move_goal,
+        attack_move_goal,
+    } = mixed_queued_fixture();
+
+    game.enqueue(
+        1,
+        Command::Move {
+            units: vec![rifleman],
+            x: move_goal.0,
+            y: move_goal.1,
+            queued: true,
+        },
+    );
+    game.enqueue(
+        1,
+        Command::AttackMove {
+            units: vec![rifleman],
+            x: attack_move_goal.0,
+            y: attack_move_goal.1,
+            queued: true,
+        },
+    );
+    game.enqueue(
+        1,
+        Command::Attack {
+            units: vec![rifleman],
+            target: enemy,
+            queued: true,
+        },
+    );
+    game.enqueue(
+        1,
+        Command::Gather {
+            units: vec![worker_gatherer],
+            node,
+            queued: true,
+        },
+    );
+    game.enqueue(
+        1,
+        Command::Build {
+            worker: worker_builder,
+            building: EntityKind::Depot,
+            tile_x: 12,
+            tile_y: 12,
+            queued: true,
+        },
+    );
+
+    let mut live_events = Vec::new();
+    for tick in 1..=180 {
+        for (player_id, events) in game.tick() {
+            for event in events {
+                live_events.push(super::replay::EventLogEntry {
+                    tick,
+                    player_id,
+                    event,
+                });
+            }
+        }
+    }
+
+    let command_log = game.command_log().to_vec();
+    assert!(
+        command_log.iter().any(|entry| matches!(
+            entry.command,
+            crate::protocol::Command::Attack { queued: true, .. }
+        )),
+        "command log should preserve queued mixed attack intent"
+    );
+
+    let mut replay = mixed_queued_fixture().game;
+    let mut next_command = 0usize;
+    let mut replay_events = Vec::new();
+    for tick in 1..=game.tick_count() {
+        while let Some(entry) = command_log.get(next_command) {
+            if entry.tick != tick {
+                break;
+            }
+            replay.enqueue(
+                entry.player_id,
+                Command::from_protocol(entry.command.clone()),
+            );
+            next_command += 1;
+        }
+        for (player_id, events) in replay.tick() {
+            for event in events {
+                replay_events.push(super::replay::EventLogEntry {
+                    tick,
+                    player_id,
+                    event,
+                });
+            }
+        }
+    }
+
+    assert_eq!(next_command, command_log.len());
+    assert_eq!(live_events, replay_events);
+    assert_eq!(game.snapshot_for(1), replay.snapshot_for(1));
+    assert_eq!(game.snapshot_for(2), replay.snapshot_for(2));
 }
 
 #[test]

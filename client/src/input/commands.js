@@ -25,9 +25,9 @@ export function _onRightClick(p, ev = {}) {
     if (producers.length > 0) {
       const world = this._worldAt(p.x, p.y);
       for (const building of producers) {
-        this.net.command(cmd.setRally(building, world.x, world.y, queued));
+        this.net.command(cmd.setRally(building, world.x, world.y, false));
       }
-      this.state.addCommandFeedback("move", world.x, world.y, queued);
+      this.state.addCommandFeedback("move", world.x, world.y, false);
     }
     return;
   }

@@ -4,7 +4,7 @@ use crate::config;
 use crate::game::ability::{self, AbilityKind, AbilityTargetMode};
 use crate::game::command::SimCommand;
 use crate::game::entity::{
-    BuildPhase, EntityKind, EntityStore, OrderIntent, PointIntent, ProdItem, WeaponSetup,
+    BuildPhase, EntityKind, EntityStore, OrderIntent, ProdItem, WeaponSetup,
 };
 use crate::game::fog::Fog;
 use crate::game::map::Map;
@@ -657,7 +657,7 @@ fn order_set_rally(
     building: u32,
     x: f32,
     y: f32,
-    queued: bool,
+    _queued: bool,
 ) {
     let ok = matches!(entities.get(building), Some(b)
         if b.owner == player && b.is_building() && !b.under_construction()
@@ -671,15 +671,8 @@ fn order_set_rally(
     let max = (map.world_size_px() - 1.0).max(0.0);
     let rally = (x.clamp(0.0, max), y.clamp(0.0, max));
     if let Some(b) = entities.get_mut(building) {
-        if queued {
-            b.append_rally_stage(PointIntent {
-                x: rally.0,
-                y: rally.1,
-            });
-        } else {
-            b.clear_rally_stages();
-            b.set_rally_point(Some(rally));
-        }
+        b.clear_rally_stages();
+        b.set_rally_point(Some(rally));
     }
 }
 
@@ -1300,7 +1293,159 @@ mod tests {
     }
 
     #[test]
-    fn queued_rally_stages_are_capped_and_normal_rally_replaces() {
+    fn oversized_queued_unit_lists_are_deduped_and_capped_before_appending() {
+        let map = flat_map(24);
+        let mut entities = EntityStore::new();
+        let owned = entities
+            .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
+            .expect("owned unit should spawn");
+        let enemy = entities
+            .spawn_unit(2, EntityKind::Rifleman, 130.0, 100.0)
+            .expect("enemy unit should spawn");
+        let mut units = vec![owned; 20_000];
+        units.extend([99_999, enemy, owned]);
+
+        apply(
+            &map,
+            &mut entities,
+            vec![(
+                1,
+                SimCommand::Move {
+                    units,
+                    x: 180.0,
+                    y: 180.0,
+                    queued: true,
+                },
+            )],
+        );
+
+        assert_eq!(
+            entities
+                .get(owned)
+                .expect("owned unit should exist")
+                .queued_orders()
+                .len(),
+            1,
+            "repeated ids, stale ids, and enemy ids should not multiply queued state"
+        );
+        assert!(
+            entities
+                .get(enemy)
+                .expect("enemy unit should exist")
+                .queued_orders()
+                .is_empty(),
+            "enemy ids in a hostile queued command must be ignored"
+        );
+    }
+
+    #[test]
+    fn queued_attack_and_gather_reject_dead_or_depleted_targets_before_appending() {
+        let map = flat_map(24);
+        let mut entities = EntityStore::new();
+        let (cc_x, cc_y) = footprint_center(&map, EntityKind::CityCentre, 4, 4);
+        entities
+            .spawn_building(1, EntityKind::CityCentre, cc_x, cc_y, true)
+            .expect("city centre should spawn");
+        let worker = entities
+            .spawn_unit(1, EntityKind::Worker, cc_x + 16.0, cc_y)
+            .expect("worker should spawn");
+        let rifle = entities
+            .spawn_unit(1, EntityKind::Rifleman, cc_x + 32.0, cc_y)
+            .expect("rifleman should spawn");
+        let target = entities
+            .spawn_unit(2, EntityKind::Rifleman, cc_x + 96.0, cc_y)
+            .expect("target should spawn");
+        let node = entities
+            .spawn_node(EntityKind::Steel, cc_x + 64.0, cc_y)
+            .expect("node should spawn");
+        entities.get_mut(target).expect("target should exist").hp = 0;
+        if let Some(resource) = entities
+            .get_mut(node)
+            .expect("node should exist")
+            .resource_node
+            .as_mut()
+        {
+            resource.remaining = 0;
+        }
+
+        apply(
+            &map,
+            &mut entities,
+            vec![
+                (
+                    1,
+                    SimCommand::Attack {
+                        units: vec![rifle],
+                        target,
+                        queued: true,
+                    },
+                ),
+                (
+                    1,
+                    SimCommand::Gather {
+                        units: vec![worker],
+                        node,
+                        queued: true,
+                    },
+                ),
+            ],
+        );
+
+        assert!(
+            entities
+                .get(rifle)
+                .expect("rifleman should exist")
+                .queued_orders()
+                .is_empty(),
+            "dead attack targets should not create queued attack intents"
+        );
+        assert!(
+            entities
+                .get(worker)
+                .expect("worker should exist")
+                .queued_orders()
+                .is_empty(),
+            "depleted resources should not create queued gather intents"
+        );
+    }
+
+    #[test]
+    fn repeated_invalid_queued_builds_stay_bounded() {
+        let map = flat_map(24);
+        let mut entities = EntityStore::new();
+        let worker = entities
+            .spawn_unit(1, EntityKind::Worker, 100.0, 100.0)
+            .expect("worker should spawn");
+        let pending = (0..32)
+            .map(|_| {
+                (
+                    1,
+                    SimCommand::Build {
+                        worker,
+                        building: EntityKind::Depot,
+                        tile_x: u32::MAX,
+                        tile_y: u32::MAX,
+                        queued: true,
+                    },
+                )
+            })
+            .collect();
+
+        apply(&map, &mut entities, pending);
+
+        assert_eq!(
+            entities
+                .get(worker)
+                .expect("worker should exist")
+                .queued_orders()
+                .len(),
+            8,
+            "queued build intents should enforce the per-unit queue cap even when invalid"
+        );
+    }
+
+    #[test]
+    fn queued_rally_replaces_the_single_rally_point() {
         let map = flat_map(24);
         let mut entities = EntityStore::new();
         let (bx, by) = footprint_center(&map, EntityKind::Barracks, 6, 6);
@@ -1343,10 +1488,11 @@ mod tests {
         );
 
         assert_eq!(
-            entities.get(barracks).unwrap().rally_stages().len(),
-            2,
-            "building rally stages should enforce the phase-0 cap"
+            entities.get(barracks).unwrap().rally_point(),
+            Some((300.0, 300.0)),
+            "queued rally commands should still replace the one active rally point"
         );
+        assert!(entities.get(barracks).unwrap().rally_stages().is_empty());
 
         apply(
             &map,

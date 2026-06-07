@@ -10,7 +10,7 @@ use super::EntityStateGroups;
 use super::{
     AttackPhase, BuildPhase, CombatState, ConstructionState, EntityKind, GatherPhase, MovePhase,
     MovementState, Order, OrderIntent, PointIntent, ProdItem, ProductionState, ResourceNodeState,
-    WeaponSetup, WorkerState, MAX_QUEUED_ORDERS, MAX_RALLY_STAGES, NEUTRAL,
+    WeaponSetup, WorkerState, MAX_QUEUED_ORDERS, NEUTRAL,
 };
 
 /// A single simulation entity: unit, building, or resource node.
@@ -633,17 +633,6 @@ impl Entity {
         if let Some(p) = self.production.as_mut() {
             p.rally_queue.clear();
         }
-    }
-
-    pub fn append_rally_stage(&mut self, stage: PointIntent) -> bool {
-        let Some(p) = self.production.as_mut() else {
-            return false;
-        };
-        if p.rally_queue.len() >= MAX_RALLY_STAGES {
-            return false;
-        }
-        p.rally_queue.push(stage);
-        true
     }
 
     pub fn under_construction(&self) -> bool {
