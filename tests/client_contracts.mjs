@@ -49,8 +49,7 @@ import {
   desktopRuntime,
   enterCursorLock,
   exitCursorLock,
-  nativeCursorSupported,
-} from "../client/src/input/native_cursor.js";
+} from "../client/src/input/cursor_lock.js";
 import { MatchInputRouter } from "../client/src/input/router.js";
 
 // ---------------------------------------------------------------------------
@@ -207,7 +206,6 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
 // ---------------------------------------------------------------------------
 {
   resetTauriGlobals();
-  assert(!nativeCursorSupported(), "native cursor bridge is disabled outside Tauri");
   assert(cursorLockSupported(true), "browser pointer lock keeps cursor lock available outside Tauri");
 
   const invocations = [];
@@ -217,7 +215,6 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
     },
   };
   assert(desktopRuntime(), "Tauri globals still mark the desktop runtime");
-  assert(!nativeCursorSupported(), "desktop runtime does not enable native cursor lock");
   assert(cursorLockSupported(true), "desktop runtime still uses browser pointer lock support");
   let browserFallbackCalled = 0;
   const mode = await enterCursorLock(
@@ -229,13 +226,32 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
   );
   assert(mode === "browser", "Tauri runtime still selects browser Pointer Lock");
   assert(browserFallbackCalled === 1, "browser Pointer Lock fallback is invoked in Tauri");
-  assert(invocations.length === 0, "cursor lock does not call native Tauri cursor IPC");
+  assert(invocations.length === 0, "cursor lock does not call Tauri cursor IPC");
 
   let browserExitCalled = false;
   await exitCursorLock("native", () => {
     browserExitCalled = true;
   });
-  assert(!browserExitCalled, "legacy native mode still exits through native IPC if already active");
+  assert(browserExitCalled, "legacy native mode falls back to browser Pointer Lock exit");
+
+  const priorDocument = globalThis.document;
+  const prefixedDom = {
+    webkitRequestPointerLock() {},
+  };
+  let webkitExitCalled = false;
+  globalThis.document = {
+    webkitPointerLockElement: prefixedDom,
+    webkitExitPointerLock() {
+      webkitExitCalled = true;
+    },
+  };
+  const prefixedInput = Object.create(Input.prototype);
+  prefixedInput.dom = prefixedDom;
+  assert(prefixedInput._browserPointerLockSupported(), "WebKit-prefixed Pointer Lock is supported");
+  assert(prefixedInput._browserPointerLockElement() === prefixedDom, "WebKit-prefixed lock element is detected");
+  prefixedInput._exitBrowserPointerLock();
+  assert(webkitExitCalled, "WebKit-prefixed Pointer Lock exit is called");
+  globalThis.document = priorDocument;
   resetTauriGlobals();
 }
 
@@ -279,6 +295,7 @@ function fakeGain() {
 
 function fakeAudioContext() {
   return {
+    state: "running",
     currentTime: 0,
     createBufferSource() { return new FakeBufferSource(); },
     createStereoPanner() {
@@ -1042,8 +1059,8 @@ function fakeAudioContext() {
   assert(
     input.net.sent.length === 1 &&
       input.net.sent[0].c === "attack" &&
-      input.net.sent[0].queued === undefined,
-    "Shift right-click on enemies should remain replacement attack behavior in phase 1",
+      input.net.sent[0].queued === true,
+    "Shift right-click on enemies should send queued attack",
   );
 
   input.dom = { clientWidth: 800, clientHeight: 600 };
@@ -1427,11 +1444,13 @@ function fakeAudioContext() {
 
   for (let i = 0; i < 200; i++) audio.buffers.set(`pool_${i}`, { duration: 0.1 });
   for (let i = 0; i < 120; i++) {
-    assert(audio.play(`pool_${i}`, { category: "ambient" }), "ambient voice should enqueue");
+    audio.play(`pool_${i}`, { category: "ambient" });
+    assert(audio.voices.length <= 48, "ambient voice pool stays capped");
     now += 1;
   }
   for (let i = 120; i < 200; i++) {
-    assert(audio.play(`pool_${i}`, { category: "alert" }), "alert voice should enqueue or evict");
+    audio.play(`pool_${i}`, { category: "alert" });
+    assert(audio.voices.length <= 48, "alert voice pool stays capped");
     now += 1;
   }
   assert(audio.voices.length <= 48, "Audio voice pool stays capped");
