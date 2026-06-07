@@ -1,5 +1,19 @@
 # Phase 3 — Native fullscreen
 
+Status: skipped.
+
+Pointer lock now covers the important desktop-client input problem. Native
+fullscreen is not required for early playtesting: the game is a readable RTS UI,
+not a cinematic presentation, and normal resizable windows are sufficient. Avoid
+adding a second native window-control surface unless playtesters report a concrete
+need.
+
+The original implementation plan below is retained as historical context only.
+If this phase is revived later, treat it as optional polish rather than a blocker
+for Windows CI or release packaging.
+
+## Historical plan
+
 Add a fullscreen toggle that calls Tauri's `Window::set_fullscreen` instead of
 `document.documentElement.requestFullscreen()`. Same fallback pattern as Phase 2:
 in a normal browser, fall through to the Fullscreen Web API.

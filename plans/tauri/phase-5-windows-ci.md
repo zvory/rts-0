@@ -45,8 +45,8 @@ command.
    an artifact.
 2. Download the `.exe`, run on a Windows machine, dismiss SmartScreen, confirm
    the app opens into the live lobby and plays a match.
-3. Confirm cursor lock and fullscreen behave on Windows the same way they did
-   on macOS in Phase 2/3.
+3. Confirm pointer lock behaves on Windows the same way it did on macOS in
+   Phase 2.
 
 ## Exit criteria
 

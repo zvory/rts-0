@@ -8,8 +8,7 @@ from a single hardcoded URL.
 ## Goals
 
 - Native desktop launch that opens the live client.
-- Native cursor confinement / hide (not the browser Pointer Lock API).
-- Native fullscreen toggle.
+- Reliable pointer-lock cursor pan in the desktop shell.
 - Reproducible Windows build out of GitHub Actions.
 - Unsigned everything; document the macOS quarantine and Windows SmartScreen workarounds.
 
@@ -19,6 +18,8 @@ from a single hardcoded URL.
 - Offline play. The app requires network at launch.
 - Bundling the client. The webview loads it from the server.
 - Shipping the map editor or any `/dev/*` route in the native shell.
+- Native fullscreen. Pointer lock covers the important RTS input problem, and
+  fullscreen is optional polish for a non-cinematic playtest client.
 
 ## Constraints assumed
 
@@ -34,7 +35,7 @@ from a single hardcoded URL.
 - [Phase 0 — Scaffold and macOS smoke build](phase-0-scaffold.md)
 - [Phase 1 — Point at the live server](phase-1-remote-load.md)
 - [Phase 2 — Native cursor confine / hide](phase-2-native-cursor.md)
-- [Phase 3 — Native fullscreen](phase-3-native-fullscreen.md)
+- [Phase 3 — Native fullscreen](phase-3-native-fullscreen.md) (skipped)
 - [Phase 4 — Audio gesture prompt](phase-4-audio-gesture.md)
 - [Phase 5 — GitHub Actions Windows build](phase-5-windows-ci.md)
 - [Phase 6 — Vendor PixiJS](phase-6-vendor-pixi.md)
@@ -43,7 +44,7 @@ from a single hardcoded URL.
 
 A playtester downloads a `.dmg` or `.exe` from a GitHub Release, dismisses the OS
 "unidentified developer" dialog once with a documented one-liner, launches the app,
-and is in the lobby on the live server within ten seconds. Cursor confine and
-fullscreen work without the browser's Pointer Lock prompt. The shell never needs to
-be rebuilt for ordinary client changes — only for shell-level changes (server URL,
-window flags, native API surface).
+and is in the lobby on the live server within ten seconds. Pointer-lock cursor
+pan works without introducing extra native window controls. The shell never needs
+to be rebuilt for ordinary client changes — only for shell-level changes (server
+URL, window flags, native API surface).

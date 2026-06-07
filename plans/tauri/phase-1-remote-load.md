@@ -2,8 +2,9 @@
 
 Replace the placeholder page with a navigation to the live fly.io server. After
 this phase the desktop app is a usable (if rough) playtest client. Mouse lock and
-fullscreen still go through the existing browser-API paths from `match.js`; the
-native versions land in Phase 2 and Phase 3.
+fullscreen still go through the existing browser-API paths from `match.js`.
+Pointer lock is addressed in Phase 2; native fullscreen is no longer required
+for the playtest shell.
 
 ## The one constant
 
@@ -74,7 +75,8 @@ font-src 'self' https://rts-0-zvorygin.fly.dev data:;
 - A full match (1-player sandbox is enough) plays without errors in the webview
   console.
 - Existing browser-API pointer lock and `requestFullscreen` from `match.js` still
-  work as they did in Safari — these are placeholders to be replaced in Phase 2/3.
+  work as they did in Safari. Pointer lock is the only required desktop input
+  improvement; fullscreen may remain browser-managed or unused.
 
 ## Risks
 

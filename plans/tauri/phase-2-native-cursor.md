@@ -99,8 +99,8 @@ else gets added in this phase — keep the IPC surface minimal.
 ## Risks
 
 - Tauri's `set_cursor_grab` on macOS historically required the window to be the
-  key window. Verify after fullscreen transitions (Phase 3) that grab survives
-  the transition or is re-applied on the appropriate event.
+  key window. Since native fullscreen is skipped, keep verification focused on
+  normal window focus changes such as Cmd-Tab and Mission Control.
 - The existing `_pointerLockCursor` synthetic cursor in `input/index.js:181-255`
   was drawn because the OS cursor was hidden by Pointer Lock at the lock origin.
   With native hide it may still be useful (gives the player a visible aim point);
