@@ -1,4 +1,4 @@
-//! Grid pathfinding. See `DESIGN.md` §3 (`pathfinding.rs`).
+//! Grid pathfinding. See `docs/design/server-sim.md` (`pathfinding.rs`).
 //!
 //! An 8-direction A* over the tile grid. A tile is blocked when its terrain is impassable
 //! (ROCK / WATER) or when a building footprint occupies it. Units do NOT block each other —

@@ -2,8 +2,8 @@
 
 Use when changing server bind/config, the build pipeline, or the input-hardening surface.
 
-## Read first in `DESIGN.md`
-- §7 Hardening (input is untrusted) — full section
+## Read first
+- [docs/design/hardening.md](../design/hardening.md) — full hardening section
 
 ## Run / build
 ```bash

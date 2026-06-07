@@ -10,7 +10,8 @@ AI rollout order, and AI-specific handoff tasks.
 
 - Work phases in order unless a later phase explicitly says it is parallel-safe.
 - Keep each implementation branch scoped to one phase or one subtask inside a phase.
-- Read `DESIGN.md` before implementation; update it in the same change if a public contract changes.
+- Read the relevant `docs/context/` capsule before implementation; update the matching
+  `docs/design/` file in the same change if a public contract changes.
 - Keep live AI, self-play, replay, and human players on the ordinary `Command` path.
 - Prefer deterministic, inspectable heuristics over opaque planning/search frameworks.
 - Do not add a second AI roadmap. Update this index and the relevant detailed phase file instead.

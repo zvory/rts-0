@@ -1,4 +1,4 @@
-// Camera — the player's view into the world. See DESIGN.md §4.1 / §4.2.
+// Camera — the player's view into the world. See docs/design/client-ui.md §4.1 / §4.2.
 //
 // The camera holds the world-space coordinate of the viewport's top-left corner
 // (`x`, `y`) and a `zoom` factor. World units are pixels at zoom 1; on screen a

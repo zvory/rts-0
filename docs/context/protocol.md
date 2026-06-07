@@ -2,8 +2,8 @@
 
 Use when adding, removing, or changing any field on a client↔server message, snapshot, or event.
 
-## Read first in `DESIGN.md`
-- §2 Wire protocol (JSON over WebSocket) — full section
+## Read first
+- [docs/design/protocol.md](../design/protocol.md) — full wire protocol
   - §2.1 `ClientMessage`
   - §2.2 `ServerMessage`
   - §2.3 `start` payload
@@ -15,13 +15,15 @@ Use when adding, removing, or changing any field on a client↔server message, s
 - `client/src/protocol.js` — mirror; must agree on every tag, field name, and shape
 
 ## Invariants
-- **Mirror.** Every protocol change touches both files **and** `DESIGN.md §2` in the same commit.
+- **Mirror.** Every protocol change touches both files **and**
+  [docs/design/protocol.md](../design/protocol.md) in the same commit.
 - **Fog is authoritative.** Anything sent per-player (entity views, `target_id` tracers, death/
   positional events) must be gated on visibility/ownership. Never send a player an entity or
-  position they can't see. See `DESIGN.md §2.4` and §7.
+  position they can't see. See [docs/design/protocol.md](../design/protocol.md) §2.4 and
+  [docs/design/hardening.md](../design/hardening.md).
 - **Clients are untrusted.** Validate and bound everything inbound: dedupe + cap unit lists
   (`MAX_UNITS_PER_COMMAND`), size-limit frames, range/overflow-check placement coords. See
-  [deployment.md](deployment.md) and `DESIGN.md §7`.
+  [deployment.md](deployment.md) and [docs/design/hardening.md](../design/hardening.md).
 
 ## Cross-capsule triggers
 - Adding a snapshot field consumed by rendering → [client-ui.md](client-ui.md).

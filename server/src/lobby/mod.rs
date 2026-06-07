@@ -1,4 +1,4 @@
-//! Lobby & room orchestration. See `DESIGN.md` §3.2.
+//! Lobby & room orchestration. See `docs/design/server-sim.md` §3.2.
 //!
 //! Concurrency model: there is exactly **one tokio task per room** and that task is the
 //! sole owner/writer of its [`Game`]. There are no locks around the simulation. Everything

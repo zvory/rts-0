@@ -2,14 +2,14 @@
 
 Use when changing tick logic, services, rules, AI, or the `Game` core.
 
-## Read first in `DESIGN.md`
-- §1 High-level architecture (tick & networking model)
-- §3 Rust server — modules & the `Game` core API
+## Read first
+- [docs/design/architecture.md](../design/architecture.md) — tick & networking model
+- [docs/design/server-sim.md](../design/server-sim.md) — Rust server, `Game` core API
 - §3.1 `game::Game` public API (the seam — keep stable)
 - §3.2 Concurrency model (room task is sole owner; no locks)
 - §3.3 Rules layer (`rules/`)
-- §8 AI opponents (`game/ai.rs`)
-- §9 Self-play harness (only if touching scripted tests)
+- [docs/design/ai.md](../design/ai.md) — AI opponents (`game/ai.rs`)
+- [docs/design/testing.md](../design/testing.md) — self-play harness (only if touching scripted tests)
 
 ## Code map
 - `server/src/game/mod.rs` — public `Game` API
@@ -26,8 +26,8 @@ Use when changing tick logic, services, rules, AI, or the `Game` core.
 - `lobby/`/`main.rs` only call the public `Game` API. Don't reach into internals.
 
 ## Don't break
-- The `Game` API signatures (§3.1). If you must change one, update `DESIGN.md §3.1` and all callers
-  in the same commit.
+- The `Game` API signatures (§3.1). If you must change one, update
+  [docs/design/server-sim.md](../design/server-sim.md) and all callers in the same commit.
 
 ## Cross-capsule triggers
 - Touching message construction → also read [protocol.md](protocol.md).

@@ -1,5 +1,5 @@
 // Input — mouse/keyboard -> selection, protocol commands, and build placement.
-// See DESIGN.md §4.1 (export contract) and the gameplay rules below.
+// See docs/design/client-ui.md §4.1 (export contract) and the gameplay rules below.
 //
 // Responsibilities:
 //   - Left-click / left-drag selection box (own units preferred; buildings as a
@@ -100,7 +100,7 @@ export class Input {
      * Continuous pan-key state, read by Camera.update(dt, input). Booleans for the
      * four cardinal directions; the camera maps these to a pan velocity. Arrow keys
      * feed the flags. This is the shared input-state object the
-     * design refers to (DESIGN.md §4.1 camera/input seam).
+     * design refers to (docs/design/client-ui.md §4.1 camera/input seam).
      * @type {{up:boolean,down:boolean,left:boolean,right:boolean}}
      */
     this.keys = { up: false, down: false, left: false, right: false };

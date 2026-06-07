@@ -67,7 +67,7 @@ struct TerrainPassability<'a> {
     route_shape: RouteShape,
     /// When true, reject tiles pinched between two diagonally-opposite blocked corners.
     /// Used for oriented vehicle bodies so A* avoids 1-tile gaps that the rotating hull
-    /// cannot legally thread (see DESIGN.md pathing notes).
+    /// cannot legally thread (see docs/design/server-sim.md pathing notes).
     avoid_diagonal_pinch: bool,
 }
 

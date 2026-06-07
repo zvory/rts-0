@@ -81,7 +81,7 @@ Score screen:
 
 ## Files to Touch
 
-- `DESIGN.md`
+- `docs/design/*.md`
 - `client/src/state.js`
 - `client/src/input.js`
 - `client/src/hud.js`

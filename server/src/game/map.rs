@@ -1,4 +1,5 @@
-//! The tile map: terrain grid, authored map loading, and passability. See `DESIGN.md` §3 (`map.rs`).
+//! The tile map: terrain grid, authored map loading, and passability. See
+//! `docs/design/server-sim.md` (`map.rs`).
 //!
 //! The live game loads authored maps from the server asset bundle. Map files define terrain and
 //! ordered base sites; the simulation still derives player starts, expansion sites, starting

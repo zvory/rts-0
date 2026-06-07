@@ -91,7 +91,7 @@ export class Match {
       },
     };
 
-    // --- Build the module graph from the static start payload (DESIGN.md §4.1). ---
+    // --- Build the module graph from the static start payload (docs/design/client-ui.md §4.1). ---
     this.state = this._timeInit("match.state", () => new GameState(payload));
     this.state.showAllDebugPathOverlays = this.devWatch?.kind === "scenario";
     this.camera = this._timeInit("match.camera", () => new Camera());
@@ -554,7 +554,7 @@ export class Match {
 
   /**
    * One animation frame: advance time-based systems, then render.
-   * Order matches DESIGN.md §4.1 main.js loop description.
+   * Order matches docs/design/client-ui.md §4.1 main.js loop description.
    * @param {number} now high-res timestamp from rAF
    */
   frame(now) {

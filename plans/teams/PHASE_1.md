@@ -80,7 +80,7 @@ Keep the lobby utilitarian. This is an operational pre-match screen, not a landi
 
 ## Files to Touch
 
-- `DESIGN.md`
+- `docs/design/*.md`
 - `server/src/protocol.rs`
 - `server/src/lobby.rs`
 - `client/src/protocol.js`

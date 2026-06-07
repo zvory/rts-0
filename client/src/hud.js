@@ -1,6 +1,7 @@
 // HUD — the DOM overlay for the game screen: resource/supply bar, the selected-units
 // panel, and the context-sensitive command card (unit actions, worker build submenu,
-// train buttons for production buildings). See DESIGN.md §4.1 (HUD) and §5 for balance.
+// train buttons for production buildings). See docs/design/client-ui.md §4.1 (HUD) and
+// docs/design/balance.md for balance.
 //
 // The HUD is plain DOM (not Pixi). It is rebuilt cheaply each frame from `state`; the
 // only stateful trick is reusing command-card buttons between frames so that holding a

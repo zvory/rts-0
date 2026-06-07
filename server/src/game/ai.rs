@@ -1,4 +1,4 @@
-//! Live gameplay AI adapter. See `DESIGN.md` section 8.
+//! Live gameplay AI adapter. See `docs/design/ai.md`.
 //!
 //! An [`AiController`] drives one AI-owned player. It is invoked from
 //! [`crate::game::Game::tick`] every tick, before queued commands are applied, and it pushes

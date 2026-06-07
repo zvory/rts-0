@@ -2,8 +2,8 @@
 
 Use when tuning costs, supply, sight, sizes, unit/building stats, or any number a player feels.
 
-## Read first in `DESIGN.md`
-- §5 Balance definitions & constants
+## Read first
+- [docs/design/balance.md](../design/balance.md) — balance definitions & constants
   - §5.1 Target theme and MVP combat loop
   - §5.2 Current implementation constants
 

@@ -80,7 +80,7 @@ Do not aggregate team scores in this phase.
 
 ## Files to Touch
 
-- `DESIGN.md`
+- `docs/design/*.md`
 - `server/src/game/teams.rs`
 - `server/src/game/mod.rs`
 - `server/src/game/services/commands.rs`

@@ -1,4 +1,4 @@
-// Renderer — PixiJS scene graph + per-frame drawing. See DESIGN.md §4.1 / §4.2.
+// Renderer — PixiJS scene graph + per-frame drawing. See docs/design/client-ui.md §4.1 / §4.2.
 //
 // Owns a single PIXI.Application whose stage holds one `world` container that is
 // positioned/scaled from the Camera each frame, plus a screen-space overlay layer

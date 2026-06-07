@@ -1,6 +1,7 @@
 // Lobby — the pre-match screen (`#lobby-screen`): name/room entry, the player list, and
 // ready/start controls. Talks to the server through `net` (join/ready/start) and renders
-// `lobby` server messages. See DESIGN.md §4.1 (Lobby) and §2.2 (`lobby` payload).
+// `lobby` server messages. See docs/design/client-ui.md §4.1 (Lobby) and
+// docs/design/protocol.md §2.2 (`lobby` payload).
 //
 // Screen transitions are NOT this module's job: it only toggles its own visibility via
 // show()/hide(). main.js owns the lobby↔game switch and subscribes via `onGameStart(cb)`

@@ -1,4 +1,4 @@
-// Bootstrap & wiring. See DESIGN.md §4.1 (module contracts) and §4.
+// Bootstrap & wiring. See docs/design/client-ui.md §4.1 (module contracts) and §4.
 //
 // This is the only place that knows about *all* the modules. It owns:
 //   - the WebSocket lifecycle (via Net),
@@ -6,7 +6,7 @@
 //   - constructing the in-game modules from the `start` payload, and
 //   - the requestAnimationFrame render loop (with snapshot interpolation).
 //
-// Everything below codes strictly against the export signatures in DESIGN.md §4.1;
+// Everything below codes strictly against the export signatures in docs/design/client-ui.md §4.1;
 // the modules themselves are owned by other files. Keep this layer thin: it should
 // orchestrate, not implement game logic.
 

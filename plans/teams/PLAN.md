@@ -77,7 +77,7 @@ advertise the shapes above.
 ## Non-Negotiable Invariants
 
 1. Protocol mirrors stay in sync: `server/src/protocol.rs`, `client/src/protocol.js`, and
-   `DESIGN.md` must be changed together for every wire field.
+   `docs/design/protocol.md` must be changed together for every wire field.
 2. Player economies stay isolated. No team resource pool, no shared tech, no shared supply, no
    allied worker building, and no allied production commands.
 3. Allies are not enemies. Raw `attack` commands, auto-acquisition, overpenetration, target tracers,
@@ -98,4 +98,4 @@ Implement one phase at a time. Do not skip Phase 0: adding team behavior without
 contract will scatter owner comparisons through the codebase and make later fixes fragile.
 
 Each phase should leave the repo in a working state. Where a phase changes behavior, add the tests in
-that same phase. If a phase updates `DESIGN.md`, update it in the same commit as the code.
+that same phase. If a phase updates `docs/design/*.md`, update it in the same commit as the code.

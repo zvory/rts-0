@@ -1,4 +1,4 @@
-//! Per-tick simulation systems orchestrator. See `DESIGN.md` §3.
+//! Per-tick simulation systems orchestrator. See `docs/design/server-sim.md`.
 //!
 //! [`run_tick`] delegates to the internal services through explicit derived-state boundaries:
 //!   1. rebuild pre-command occupancy/spatial indexes

@@ -59,7 +59,7 @@ same team relationships.
 
 ## Files to Touch
 
-- `DESIGN.md`
+- `docs/design/*.md`
 - `server/src/game/ai.rs`
 - `server/src/game/ai_core/observation.rs`
 - `server/src/game/ai_core/facts.rs`

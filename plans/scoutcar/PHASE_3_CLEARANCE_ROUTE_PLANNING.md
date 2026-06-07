@@ -38,7 +38,7 @@ low-clearance, similar in spirit to Voronoi-style clearance fields used in vehic
 - `server/src/game/services/pathing.rs`
 - `server/src/game/services/move_coordinator.rs`
 - `server/src/game/services/movement/tests.rs`
-- `DESIGN.md` after behavior is implemented
+- `docs/design/server-sim.md` after behavior is implemented
 
 ## Tests
 

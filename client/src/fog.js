@@ -1,4 +1,5 @@
-// Fog of war — client-side visibility overlay. See DESIGN.md §1, §4.1, §4.2.
+// Fog of war — client-side visibility overlay. See docs/design/architecture.md and
+// docs/design/client-ui.md §4.1, §4.2.
 //
 // The server already withholds enemy/neutral entities the player cannot see, so
 // this overlay is purely cosmetic: it makes the map look correctly fogged. Two

@@ -1,0 +1,248 @@
+## 4. JS client — modules & exported APIs
+
+`client/` (ES modules, no bundler; `index.html` imports `src/main.js` as a module).
+PixiJS is loaded globally from CDN as `PIXI`.
+
+```
+index.html        # PINNED — CDN + #app + module entry + screens markup
+map-editor.html   # standalone handcrafted-map editor; loads/saves server map JSON
+styles.css        # HUD, lobby, menus, command card
+src/
+  protocol.js     # PINNED — message tag constants + builder helpers (mirror of §2)
+  config.js       # PINNED — render/UI constants: colors, sizes, costs, sight (mirror balance)
+  net.js          # Net: WebSocket wrapper, typed send helpers, event emitter
+  state.js        # GameState: holds prev+current snapshot, selection, camera, placement
+  camera.js       # Camera: pan/zoom, world<->screen transforms, edge/keyboard/pointer-lock scroll
+  renderer/       # Pixi app facade plus layers, terrain, entities, units, buildings,
+                  # resources, fog overlay, feedback, and renderer-local palette helpers
+  fog.js          # Fog overlay: accumulate explored, compute visible from own entities
+  input/          # lifecycle facade plus selection, commands, placement, camera controls
+  audio.js        # Audio: Web Audio context, buses, one-shots, spatialization
+  hud.js          # HUD: resources/supply bar, selected panel, command card (build/train)
+  minimap.js      # Minimap: draw terrain+entities+viewport; click to move camera/command
+  lobby.js        # Lobby screen: name entry, player list, ready/start buttons
+  main.js         # Entry point: starts App
+  app.js          # Lobby/app shell lifecycle and persistent Net/Audio ownership
+  match.js        # Match lifecycle, module dependency wiring, render loop, transient events
+  alerts.js       # Notice/toast alert ids and viewport alert behavior constants
+  bootstrap.js    # DOM lookup, ws/dev-watch config, startup helpers
+```
+
+### 4.1 Module export contracts
+
+`net.js`
+```js
+export class Net {
+  constructor(url)                       // ws url; auto-derived from location in main.js
+  connect(): Promise<void>
+  on(type, handler)                      // type ∈ ServerMessage tags + "open"/"close"
+  off(type, handler)
+  join(name, room)
+  ready(isReady)
+  start()
+  addAi()
+  removeAi(id)
+  setQuickstart(enabled)
+  command(cmd)                           // cmd built via protocol.js builders
+  ping()
+  setReplaySpeed(speed)                  // dev replay rooms only
+  seekReplay(ticksBack)                  // dev replay rooms only; pass huge N for full reset
+  get playerId()
+}
+```
+
+`state.js`
+```js
+export class GameState {
+  playerId
+  startInfo                              // §2.3 payload
+  map                                    // {width,height,tileSize,terrain}
+  players                                // [{id,name,color,startTileX,startTileY}]
+  // snapshot buffering for interpolation:
+  applySnapshot(msg)                     // pushes msg, keeps prev+current, stamps recvTime
+  entitiesInterpolated(alpha)            // -> entities with lerped x,y,facing,weaponFacing
+  get prevRecvTime() / get currRecvTime()// recv timestamps of the two buffered snapshots
+                                         //   (null until two exist); main.js derives interp alpha
+  resources                             // {steel,oil,supplyUsed,supplyCap} (latest)
+  events                                 // latest snapshot's events
+  // selection (client-only):
+  selection                              // Set<entityId>
+  setSelection(ids), addToSelection(ids), clearSelection()
+  selectedEntities()                     // resolved entity objects from current snapshot
+  entityById(id)
+  // control groups (client-only):
+  controlGroups                          // ten Array<entityId> slots; slot 9 maps to key 0
+  setControlGroup(slot, ids), addToControlGroup(slot, ids)
+  selectControlGroup(slot), controlGroupEntities(slot)
+  // build placement (client-only):
+  commandCardMode                       // null | "workerBuild"
+  openWorkerBuildMenu(), closeCommandCardMenu()
+  placement                              // null | { building, valid, tileX, tileY }
+  beginPlacement(buildingKind), updatePlacement(tileX,tileY,valid), endPlacement()
+  // resource hover preview (client-only):
+  resourceMiningPreview                  // null | {resourceId, resourceX, resourceY, ccId, ccX, ccY, inRange}
+  updateResourceMiningPreview(preview)
+}
+```
+
+`camera.js`
+```js
+export class Camera {
+  x, y, zoom                             // world coords of viewport top-left, zoom factor
+  update(dt, input)                      // apply pan (keys/edge/virtual pointer-lock cursor) & clamp
+  worldToScreen(wx, wy) -> {x,y}
+  screenToWorld(sx, sy) -> {x,y}
+  centerOn(wx, wy)
+  setBounds(worldW, worldH, viewW, viewH)
+}
+```
+
+`renderer/index.js`
+```js
+export class Renderer {
+  constructor(canvasParent)              // creates PIXI.Application, layers
+  resize(w,h)
+  buildStaticMap(map)                    // draw terrain once into a cached layer
+  render(state, camera, fog, alpha)      // per-frame; draws entities, fog, selection, placement
+  app                                    // the PIXI.Application (for ticker/stage if needed)
+  // exposes screen->world hit info if helpful; selection box drawing lives here too:
+  drawSelectionBox(rectOrNull)
+}
+```
+
+`fog.js`
+```js
+export class Fog {
+  constructor(mapWidth, mapHeight)
+  update(ownEntities, tileSize)          // mark visible tiles this frame; accumulate explored
+  isVisible(tileX,tileY), isExplored(tileX,tileY)
+  // renderer reads the grids to draw the black/dim overlay
+  visibleGrid, exploredGrid              // Uint8Array length w*h
+}
+```
+`match.js` must exclude `visionOnly` and shot-reveal entities from `ownEntities` before calling
+`fog.update`; those views are rendered as intel, not as local fog sources.
+
+`input/index.js`
+```js
+export class Input {
+  constructor(domElement, camera, state, net, renderer, fog, audio?)
+  // installs listeners; translates gestures into selection + protocol commands.
+  // number keys recall control groups; double-tap jumps the camera to the largest
+  // local cluster. Alt/Ctrl/Cmd+number replaces a group, Shift+number adds to it.
+  // optional pointer-lock mode traps the browser cursor and drives a visible
+  // virtual cursor for edge pan on multi-monitor setups.
+  update(dt)                             // continuous handling (edge scroll handled by camera)
+  // emits nothing to return; mutates state.selection / state.placement and calls net.command
+}
+```
+
+`audio.js`
+```js
+export class Audio {
+  preload(manifest): Promise<void>        // decode sounds once the AudioContext is unlocked
+  play(id, {x?, y?, priority?, category?, pitchVariance?, gain?})
+                                           // x/y present -> StereoPanner + lowpass + distance gain
+  playUI(id, opts)                        // non-spatial ui category convenience
+  stopByKey(key) -> number                // stop tagged active voices, for sustained/abortable cues
+  setListener(x, y, zoom, viewW?)          // camera center in world px; derives screen-width refDist
+  pickVariant(ids) -> id|null             // seeded RNG variant choice
+  setMasterVolume(v), getMasterVolume()
+  setCategoryVolume(cat, v), getCategoryVolume(cat)
+  destroy()
+}
+export const SOUND_MANIFEST
+export function noticeSoundId(msg)
+```
+
+`hud.js`
+```js
+export class HUD {
+  constructor(rootEl, state, net)
+  update()                               // refresh resources/supply, selected panel, command card
+  // command card buttons call net.command(...) or state.beginPlacement(...)
+}
+```
+The train command card is driven by the first selected production building type, but train clicks
+are issued to the selected completed compatible production buildings in round-robin order so a
+multi-building selection spreads queued units across its producers.
+
+`minimap.js`
+```js
+export class Minimap {
+  constructor(canvasEl, state, camera, fog, net)
+  render()                               // draw terrain + fog + entity blips + viewport rect
+  // click/drag -> camera.centerOn or issue move command (right-click)
+}
+```
+
+`lobby.js`
+```js
+export class Lobby {
+  constructor(rootEl, net)
+  show(), hide()
+  // renders player list + ready/start/spectator role; calls net.join/ready/start/setSpectator.
+  onGameStart(cb)                        // main.js subscribes to transition to game screen
+}
+```
+
+`main.js` starts `App`; `app.js` owns the persistent `Net` and `Audio`, derives the ws url from
+`window.location`, and shows `Lobby`; on `start` it creates `Match`. `match.js` builds
+`GameState`, `Camera`, `Renderer`, `Fog`, `HUD`, `Minimap`, `Input`, starts the rAF loop
+(compute `alpha` from snapshot timing, `camera.update`,
+`audio.setListener`, `input.update`, `fog.update`, `renderer.render`, `hud.update`,
+`minimap.render`); on each snapshot it applies state and triggers transient event audio exactly
+once; on `gameOver` show the victory/defeat overlay with the frozen score table.
+For spectator starts, `match.js` hides the command card and give-up action, computes local fog from
+the server-filtered union snapshot, and keeps the ordinary renderer/minimap/HUD pointed at snapshots
+with `playerResources`.
+
+### 4.2 Rendering & look (PixiJS, procedural art — neutral PS1 field-command style)
+- Layers (back→front): terrain → resource nodes → building shadows → buildings → unit
+  shadows → units → selection rings → health bars → fog overlay → shot-revealed units →
+  command/hover feedback → placement ghost →
+  selection drag-box → (HUD is DOM, not Pixi).
+- Units: low-detail hard-edged silhouettes tinted by player color, with a dark drop shadow,
+  dark outline, HP bar above when damaged/selected, and glowing selection ring when selected.
+  Distinct silhouette per kind (engineer: compact block; rifleman / machine gunner: shared
+  infantry body with oversized role weapons; AT team: wheeled gun; scout car: boxy WW2-style truck
+  silhouette with enclosed wheels and a rear-top machine-gunner; tank: chunky flat-shaded armor).
+  Riflemen carry a rifle, AT teams field a wheeled anti-tank gun with a long recoiling barrel,
+  carriage, two wheels, and animated deployment bracing, and machine gunners carry an MG42-style
+  long machine gun across the body while packed that extends forward with bracing during
+  setup/deployment. Units that fire from outside current vision are shown briefly above the fog
+  as semi-transparent silhouettes with the same recoil animation and a yellow tracer to the hit
+  point.
+  Entities marked `visionOnly` by the server are drawn on the ordinary building/unit layers below
+  the fog overlay, excluded from local fog-source computation and hit-testing, and treated as
+  visual intel only.
+- Buildings: footprint-sized blocky field structures with neutral geometry and plain
+  two-letter stencils; under construction → translucent with a progress bar; production →
+  small progress arc.
+- Resource nodes: steel = tan supply crates; oil = olive fuel drums; show last-known remaining
+  from `resourceDeltas` via size/opacity. When a worker is selected and the cursor hovers a
+  resource, draw a blue circle on the resource when the nearest completed own City Centre
+  is inside mining range; draw a red/dashed line to the City Centre when too far.
+- Tanks: render the hull from mirrored client `TANK_BODY` constants (`50.4px` length, `28.8px` width,
+  `1.5px` clearance) so the visible body, selection ring, click target, and advisory build
+  preview match the server's oriented vehicle body. Track tread offsets advance from actual
+  interpolated movement and hull turn deltas: both tracks forward/backward for drive/reverse and
+  opposite track motion for pivot turns. Own tanks show a small amber/red fuel cue when oil is low
+  or movement is oil-starved; the selected-entity panel also exposes lifetime movement `oilUsed`
+  as `Oil Used:` when exactly one tank is selected.
+- Scout cars render from mirrored client `SCOUT_CAR_BODY` constants (`40.8px` length, `21.6px` width,
+  `1px` clearance), matching the authoritative oriented vehicle body used for collision and
+  click targeting.
+- Terrain: muted grass/field/mud, rock, and water tiles with deterministic coarse dithering
+  so movement is readable and the map has a PlayStation 1-era low-resolution texture feel.
+- Fog: unexplored = 80% dark overlay so terrain remains faintly readable; explored-but-not-visible =
+  48% dark overlay; visible = clear. Use a single overlay sprite/graphics updated from `fog`
+  grids; soften edges if cheap.
+- Selection: green for own, red tint for enemy, yellow for neutral. Drag-box translucent green.
+- Keep a cohesive muted palette; define colors in `config.js`.
+- Art must stay faction-agnostic: no Soviet, German, Nazi, imperial, national, or unit-branch
+  iconography. Avoid flags, stars, crosses, eagles, skulls, sickles, hammers, and historically
+  specific insignia.
+
+---
+
