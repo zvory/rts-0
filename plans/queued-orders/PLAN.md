@@ -46,7 +46,7 @@ Queued orders should be stored as intent, not execution state.
 - `Move`: advance when the unit reaches the destination or tolerant arrival marks it arrived.
 - `AttackMove`: advance only when the movement destination is reached. Enemy engagements along the
   way do not consume the queued order.
-- `Attack`: later phase. Advance when the target dies, becomes invalid, or the order is judged
+- `Attack`: advance when the target dies, becomes invalid, or the order is judged
   unreachable by explicit failure rules.
 - `Gather`: terminal infinite. Do not auto-promote later queued orders after harvesting starts.
 - `Build`: later phase. Advance after construction completes or after the build intent fails.
@@ -57,7 +57,7 @@ Queued orders should be stored as intent, not execution state.
 - [x] [Phase 1 - Queued move and attack-move](PHASE_1.md)
 - [x] [Phase 2 - Basic queued order markers](PHASE_2.md)
 - [x] [Phase 3 - Queued worker build and gather handoff](PHASE_3.md)
-- [Phase 4 - Mixed attack and movement queues](PHASE_4.md)
+- [x] [Phase 4 - Mixed attack and movement queues](PHASE_4.md)
 - [Phase 5 - Multi-stage rallies](PHASE_5.md)
 - [Phase 6 - Hardening, replay, and documentation audit](PHASE_6.md)
 

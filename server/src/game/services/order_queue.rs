@@ -4,13 +4,20 @@ use crate::config;
 use crate::game::entity::{
     BuildPhase, Entity, EntityKind, EntityStore, MovePhase, Order, OrderIntent, MAX_QUEUED_ORDERS,
 };
+use crate::game::fog::Fog;
 use crate::game::map::Map;
 use crate::game::services::construction::resumable_site_for_build_intent;
+use crate::game::services::dist2;
+use crate::game::services::line_of_sight::LineOfSight;
 use crate::game::services::move_coordinator::MoveCoordinator;
+use crate::game::services::movement::angle_delta;
 use crate::game::services::standability;
 use crate::game::services::world_query;
 use crate::game::PlayerState;
 use crate::rules;
+
+const ATTACK_UNREACHABLE_PROMOTION_CHECKS: u16 = 3;
+const ATTACK_RANGE_SLACK_PX: f32 = 4.0;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 struct PointPromotionKey {
@@ -42,6 +49,7 @@ impl PointPromotionKey {
 /// group move per destination point; gather/build are issued directly per worker.
 enum PromotedIntent {
     PointMove(PointPromotionKey),
+    Attack { target: u32 },
     Gather { node: u32 },
     Build { kind: EntityKind, tx: u32, ty: u32 },
 }
@@ -49,17 +57,17 @@ enum PromotedIntent {
 /// Promote completed orders into the next queued intent.
 ///
 /// Move/AttackMove intents are batched by destination so co-arriving units share a formation,
-/// while Gather and Build intents are issued one worker at a time. Queued Attack intents are
-/// still skipped silently in Phase 3 (Phase 4 will validate and promote them).
+/// while Attack, Gather, and Build intents are issued directly per unit.
 pub(crate) fn promote_ready_orders(
     map: &Map,
     entities: &mut EntityStore,
     players: &[PlayerState],
+    fog: &Fog,
     coordinator: &mut MoveCoordinator<'_>,
 ) {
     let ready: Vec<u32> = entities
         .iter()
-        .filter(|e| ready_for_next_order(e))
+        .filter(|e| ready_for_next_order(map, entities, fog, e))
         .map(|e| e.id)
         .collect();
     if ready.is_empty() {
@@ -68,12 +76,16 @@ pub(crate) fn promote_ready_orders(
 
     let mut groups: BTreeMap<PointPromotionKey, Vec<u32>> = BTreeMap::new();
     for id in ready {
-        let Some(promoted) = pop_next_valid_intent(map, entities, players, id) else {
+        clear_completed_active_order(entities, id);
+        let Some(promoted) = pop_next_valid_intent(map, entities, players, fog, id) else {
             continue;
         };
         match promoted {
             PromotedIntent::PointMove(key) => {
                 groups.entry(key).or_default().push(id);
+            }
+            PromotedIntent::Attack { target } => {
+                coordinator.order_attack(entities, id, target);
             }
             PromotedIntent::Gather { node } => {
                 coordinator.order_gather(entities, id, node);
@@ -89,17 +101,27 @@ pub(crate) fn promote_ready_orders(
     }
 }
 
-fn ready_for_next_order(e: &Entity) -> bool {
-    if !e.is_unit() || e.queued_orders().is_empty() || !e.path_is_empty() {
+fn ready_for_next_order(map: &Map, entities: &EntityStore, fog: &Fog, e: &Entity) -> bool {
+    if !e.is_unit() || e.queued_orders().is_empty() {
         return false;
     }
     match e.order() {
-        Order::Idle => true,
-        Order::Move(_) | Order::AttackMove(_) => matches!(
-            e.move_phase(),
-            Some(MovePhase::Arrived | MovePhase::PathFailed)
-        ),
-        Order::Attack(_) | Order::Gather(_) | Order::Build(_) => false,
+        Order::Idle => e.path_is_empty(),
+        Order::Move(_) | Order::AttackMove(_) => {
+            e.path_is_empty()
+                && matches!(
+                    e.move_phase(),
+                    Some(MovePhase::Arrived | MovePhase::PathFailed)
+                )
+        }
+        Order::Attack(order) => attack_order_complete(map, entities, fog, e, order.intent.target),
+        Order::Gather(_) | Order::Build(_) => false,
+    }
+}
+
+fn clear_completed_active_order(entities: &mut EntityStore, id: u32) {
+    if let Some(e) = entities.get_mut(id) {
+        e.clear_active_order();
     }
 }
 
@@ -107,6 +129,7 @@ fn pop_next_valid_intent(
     map: &Map,
     entities: &mut EntityStore,
     players: &[PlayerState],
+    fog: &Fog,
     id: u32,
 ) -> Option<PromotedIntent> {
     let owner = entities.get(id)?.owner;
@@ -146,11 +169,102 @@ fn pop_next_valid_intent(
                     });
                 }
             }
-            // Attack queueing arrives in Phase 4; silently drop until then.
-            OrderIntent::Attack(_) => continue,
+            OrderIntent::Attack(attack) => {
+                if attack_intent_valid(entities, fog, owner, id, attack.target) {
+                    return Some(PromotedIntent::Attack {
+                        target: attack.target,
+                    });
+                }
+            }
         }
     }
     None
+}
+
+fn attack_intent_valid(
+    entities: &EntityStore,
+    fog: &Fog,
+    owner: u32,
+    attacker: u32,
+    target: u32,
+) -> bool {
+    let Some(unit) = entities.get(attacker) else {
+        return false;
+    };
+    if unit.owner != owner || !unit.is_unit() || !unit.can_attack() {
+        return false;
+    }
+    if deployed_at_gun_target_outside_arc(entities, attacker, target) {
+        return false;
+    }
+    matches!(entities.get(target),
+        Some(t) if world_query::is_enemy_targetable(t, owner, attacker)
+            && fog.is_visible_world(owner, t.pos_x, t.pos_y))
+}
+
+fn attack_order_complete(
+    map: &Map,
+    entities: &EntityStore,
+    fog: &Fog,
+    attacker: &Entity,
+    target: u32,
+) -> bool {
+    if !attack_intent_valid(entities, fog, attacker.owner, attacker.id, target) {
+        return true;
+    }
+    attacker.attack_unreachable_checks() >= ATTACK_UNREACHABLE_PROMOTION_CHECKS
+        && !attack_can_fire_now(map, entities, attacker, target)
+}
+
+fn attack_can_fire_now(map: &Map, entities: &EntityStore, attacker: &Entity, target: u32) -> bool {
+    let Some(target) = entities.get(target) else {
+        return false;
+    };
+    let Some(stats) = config::unit_stats(attacker.kind) else {
+        return false;
+    };
+    if stats.dmg == 0 {
+        return false;
+    }
+    let range_px = stats.range_tiles as f32 * config::TILE_SIZE as f32
+        + attacker.radius()
+        + ATTACK_RANGE_SLACK_PX;
+    if dist2(attacker.pos_x, attacker.pos_y, target.pos_x, target.pos_y) > range_px * range_px {
+        return false;
+    }
+    LineOfSight::new(map).clear_between_world_points(
+        (attacker.pos_x, attacker.pos_y),
+        (target.pos_x, target.pos_y),
+    )
+}
+
+fn deployed_at_gun_target_outside_arc(entities: &EntityStore, id: u32, target: u32) -> bool {
+    let Some(attacker) = entities.get(id) else {
+        return false;
+    };
+    if attacker.kind != EntityKind::AtTeam
+        || !matches!(
+            attacker.weapon_setup(),
+            crate::game::entity::WeaponSetup::Deployed
+        )
+    {
+        return false;
+    }
+    let Some(center) = attacker
+        .emplacement_facing()
+        .or_else(|| attacker.weapon_facing())
+        .filter(|facing| facing.is_finite())
+    else {
+        return false;
+    };
+    let Some(target) = entities.get(target) else {
+        return false;
+    };
+    let target_angle = (target.pos_y - attacker.pos_y).atan2(target.pos_x - attacker.pos_x);
+    if !target_angle.is_finite() {
+        return true;
+    }
+    angle_delta(center, target_angle).abs() > config::AT_GUN_FIELD_OF_FIRE_RAD * 0.5
 }
 
 fn gather_intent_valid(entities: &EntityStore, owner: u32, worker: u32, node: u32) -> bool {
@@ -225,6 +339,7 @@ fn build_intent_valid(
 mod tests {
     use super::*;
     use crate::game::entity::{EntityKind, EntityStore, MovePhase, Order, OrderIntent};
+    use crate::game::fog::Fog;
     use crate::game::map::Map;
     use crate::game::services::move_coordinator::MoveCoordinator;
     use crate::game::services::occupancy::{footprint_center, Occupancy};
@@ -266,7 +381,10 @@ mod tests {
         let mut pathing = PathingService::new(1024, 32);
         pathing.advance_tick(1);
         let mut coordinator = MoveCoordinator::new(&mut pathing, map, &occ, 1);
-        promote_ready_orders(map, entities, players, &mut coordinator);
+        let mut fog = Fog::new(map.size);
+        let player_ids: Vec<u32> = players.iter().map(|p| p.id).collect();
+        fog.recompute(&player_ids, entities, map);
+        promote_ready_orders(map, entities, players, &fog, &mut coordinator);
     }
 
     #[test]
@@ -448,5 +566,189 @@ mod tests {
             "unaffordable build should be skipped and the next move intent should promote"
         );
         assert!(entity.queued_orders().is_empty());
+    }
+
+    #[test]
+    fn idle_combat_unit_promotes_queued_attack() {
+        let map = flat_map(24);
+        let mut entities = EntityStore::new();
+        let attacker = entities
+            .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
+            .expect("rifleman should spawn");
+        let target = entities
+            .spawn_unit(2, EntityKind::Rifleman, 160.0, 100.0)
+            .expect("target should spawn");
+        entities
+            .get_mut(attacker)
+            .expect("attacker should exist")
+            .append_queued_order(OrderIntent::attack(target));
+        let players = vec![player_state(1), player_state(2)];
+
+        promote_with_players(&map, &mut entities, &players);
+
+        let entity = entities.get(attacker).expect("attacker should exist");
+        assert!(matches!(entity.order(), Order::Attack(_)));
+        assert_eq!(entity.order().attack_target(), Some(target));
+        assert_eq!(entity.target_id(), Some(target));
+        assert!(entity.queued_orders().is_empty());
+    }
+
+    #[test]
+    fn unit_executes_move_attack_then_move_queue() {
+        let map = flat_map(32);
+        let mut entities = EntityStore::new();
+        let attacker = entities
+            .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
+            .expect("rifleman should spawn");
+        let target = entities
+            .spawn_unit(2, EntityKind::Rifleman, 160.0, 100.0)
+            .expect("target should spawn");
+        {
+            let unit = entities.get_mut(attacker).expect("attacker should exist");
+            unit.set_order(Order::move_to(120.0, 100.0));
+            unit.mark_move_phase(MovePhase::Arrived);
+            unit.append_queued_order(OrderIntent::attack(target));
+            unit.append_queued_order(OrderIntent::move_to(220.0, 100.0));
+        }
+        let players = vec![player_state(1), player_state(2)];
+
+        promote_with_players(&map, &mut entities, &players);
+        {
+            let unit = entities.get(attacker).expect("attacker should exist");
+            assert!(matches!(unit.order(), Order::Attack(_)));
+            assert_eq!(unit.queued_orders().len(), 1);
+        }
+        entities.get_mut(target).expect("target should exist").hp = 0;
+
+        promote_with_players(&map, &mut entities, &players);
+
+        let unit = entities.get(attacker).expect("attacker should exist");
+        assert!(matches!(unit.order(), Order::Move(_)));
+        assert_eq!(unit.move_phase(), Some(MovePhase::AwaitingPath));
+        assert!(unit.queued_orders().is_empty());
+    }
+
+    #[test]
+    fn queued_attack_skips_when_target_is_dead_before_promotion() {
+        let map = flat_map(24);
+        let mut entities = EntityStore::new();
+        let attacker = entities
+            .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
+            .expect("rifleman should spawn");
+        let target = entities
+            .spawn_unit(2, EntityKind::Rifleman, 160.0, 100.0)
+            .expect("target should spawn");
+        let fallback = (220.0, 100.0);
+        {
+            let target = entities.get_mut(target).expect("target should exist");
+            target.hp = 0;
+        }
+        {
+            let unit = entities.get_mut(attacker).expect("attacker should exist");
+            unit.append_queued_order(OrderIntent::attack(target));
+            unit.append_queued_order(OrderIntent::move_to(fallback.0, fallback.1));
+        }
+        let players = vec![player_state(1), player_state(2)];
+
+        promote_with_players(&map, &mut entities, &players);
+
+        let unit = entities.get(attacker).expect("attacker should exist");
+        assert!(
+            matches!(unit.order(), Order::Move(_)),
+            "dead attack target should be skipped and next move promoted"
+        );
+        assert!(unit.queued_orders().is_empty());
+    }
+
+    #[test]
+    fn queued_attack_skips_when_target_is_not_targetable() {
+        let map = flat_map(24);
+        let mut entities = EntityStore::new();
+        let attacker = entities
+            .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
+            .expect("rifleman should spawn");
+        let node = entities
+            .spawn_node(EntityKind::Steel, 160.0, 100.0)
+            .expect("node should spawn");
+        {
+            let unit = entities.get_mut(attacker).expect("attacker should exist");
+            unit.append_queued_order(OrderIntent::attack(node));
+            unit.append_queued_order(OrderIntent::attack_move_to(220.0, 100.0));
+        }
+        let players = vec![player_state(1), player_state(2)];
+
+        promote_with_players(&map, &mut entities, &players);
+
+        let unit = entities.get(attacker).expect("attacker should exist");
+        assert!(
+            matches!(unit.order(), Order::AttackMove(_)),
+            "non-targetable attack target should be skipped and next attack-move promoted"
+        );
+        assert!(unit.queued_orders().is_empty());
+    }
+
+    #[test]
+    fn completed_attack_promotes_following_attack_move_destination() {
+        let map = flat_map(24);
+        let mut entities = EntityStore::new();
+        let attacker = entities
+            .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
+            .expect("rifleman should spawn");
+        let target = entities
+            .spawn_unit(2, EntityKind::Rifleman, 160.0, 100.0)
+            .expect("target should spawn");
+        {
+            let unit = entities.get_mut(attacker).expect("attacker should exist");
+            unit.set_order(Order::attack(target));
+            unit.set_target_id(Some(target));
+            unit.append_queued_order(OrderIntent::attack_move_to(240.0, 100.0));
+        }
+        entities.get_mut(target).expect("target should exist").hp = 0;
+        let players = vec![player_state(1), player_state(2)];
+
+        promote_with_players(&map, &mut entities, &players);
+
+        let unit = entities.get(attacker).expect("attacker should exist");
+        assert!(matches!(unit.order(), Order::AttackMove(_)));
+        assert_eq!(unit.move_phase(), Some(MovePhase::AwaitingPath));
+        let intent = unit
+            .move_intent()
+            .expect("attack-move promotion should keep a destination");
+        assert!(
+            (intent.0 - 240.0).abs() <= config::TILE_SIZE as f32
+                && (intent.1 - 100.0).abs() <= config::TILE_SIZE as f32,
+            "formation-adjusted attack-move intent should stay near the queued destination, got {intent:?}"
+        );
+    }
+
+    #[test]
+    fn unreachable_attack_promotes_next_queued_order() {
+        let map = flat_map(32);
+        let mut entities = EntityStore::new();
+        let attacker = entities
+            .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
+            .expect("rifleman should spawn");
+        let target = entities
+            .spawn_unit(2, EntityKind::Rifleman, 700.0, 100.0)
+            .expect("target should spawn");
+        {
+            let unit = entities.get_mut(attacker).expect("attacker should exist");
+            unit.set_order(Order::attack(target));
+            unit.set_target_id(Some(target));
+            for _ in 0..ATTACK_UNREACHABLE_PROMOTION_CHECKS {
+                unit.increment_attack_unreachable_checks();
+            }
+            unit.append_queued_order(OrderIntent::move_to(220.0, 100.0));
+        }
+        let players = vec![player_state(1), player_state(2)];
+
+        promote_with_players(&map, &mut entities, &players);
+
+        let unit = entities.get(attacker).expect("attacker should exist");
+        assert!(
+            matches!(unit.order(), Order::Move(_)),
+            "bounded unreachable attack should not stall the queued move forever"
+        );
+        assert!(unit.queued_orders().is_empty());
     }
 }

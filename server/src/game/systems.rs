@@ -146,7 +146,7 @@ pub(crate) fn run_tick(
         );
     });
     crate::perf::timed(perf.as_deref_mut(), "promote_queued_orders", || {
-        services::order_queue::promote_ready_orders(map, entities, players, &mut coordinator);
+        services::order_queue::promote_ready_orders(map, entities, players, fog, &mut coordinator);
     });
     crate::perf::timed(perf.as_deref_mut(), "promoted_awaiting_paths", || {
         coordinator.process_awaiting_paths(entities);
