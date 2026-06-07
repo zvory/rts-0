@@ -1,5 +1,11 @@
 # Phase 2 — Native cursor confine / hide
 
+Status note: completed in spirit, but not by shipping the native cursor path below.
+We implemented and tested the Tauri native cursor grab/hide bridge, then found it
+produced a laggy synthetic cursor path on macOS WKWebView. The shipped solution is
+aggressive browser Pointer Lock in both desktop and browser builds, so this phase
+is considered done and the design below is retained as historical context only.
+
 Replace the browser Pointer Lock API path in `client/src/input/` with calls into a
 Tauri-provided IPC command. The browser path stays as a fallback when the app is
 opened in a normal browser (so non-Tauri playtest via the URL still works).
