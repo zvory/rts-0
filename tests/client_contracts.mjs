@@ -43,6 +43,12 @@ import {
   decodeServerMessage,
 } from "../client/src/protocol.js";
 import { Input, footprintValidAgainstEntities } from "../client/src/input/index.js";
+import {
+  cursorLockSupported,
+  enterCursorLock,
+  exitCursorLock,
+  nativeCursorSupported,
+} from "../client/src/input/native_cursor.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -84,6 +90,11 @@ function assertHasGetter(obj, name, msgPrefix = "") {
   );
 }
 
+function resetTauriGlobals() {
+  delete globalThis.__TAURI__;
+  delete globalThis.__TAURI_INTERNALS__;
+}
+
 assert(noticeSoundId("alert:under_attack") === "notice_under_attack", "under-attack notice has dedicated sound id");
 assert(noticeSoundId("Not enough supply") === "notice_supply", "supply notice routes to supply voice line");
 assert(noticeSoundId("Build more depots") === "notice_supply", "depot notice routes to supply voice line");
@@ -93,6 +104,56 @@ assert(noticeSoundId("Cannot build there") === "notice_cannot_build", "cannot-bu
 assert(noticeSoundId("Requirement not met") === null, "generic invalid notices stay silent");
 assert(noticeSoundId("Unknown unit") === null, "unknown-unit notices stay silent");
 assert(noticeSoundId("Not enough resources") === null, "generic resource notices stay silent");
+
+// ---------------------------------------------------------------------------
+// Native cursor lock bridge
+// ---------------------------------------------------------------------------
+{
+  resetTauriGlobals();
+  assert(!nativeCursorSupported(), "native cursor bridge is disabled without Tauri IPC");
+  assert(cursorLockSupported(true), "browser pointer lock keeps cursor lock available outside Tauri");
+
+  const invocations = [];
+  globalThis.__TAURI_INTERNALS__ = {
+    invoke: async (cmdName, args) => {
+      invocations.push([cmdName, args]);
+    },
+  };
+  let browserFallbackCalled = false;
+  const mode = await enterCursorLock(
+    async () => {
+      browserFallbackCalled = true;
+      return true;
+    },
+    { x: 42, y: 64 },
+  );
+  assert(mode === "native", "Tauri internals invoke selects native cursor lock");
+  assert(!browserFallbackCalled, "native cursor lock does not invoke browser pointer lock fallback");
+  assert(invocations.length === 2, "native cursor lock grabs and hides the cursor");
+  assert(
+    invocations[0][0] === "cursor_grab" &&
+      invocations[0][1].grab === true &&
+      invocations[0][1].x === 42 &&
+      invocations[0][1].y === 64,
+    "native cursor lock passes the current viewport cursor point",
+  );
+  assert(
+    invocations[1][0] === "cursor_visible" && invocations[1][1].visible === false,
+    "native cursor lock hides the OS cursor",
+  );
+
+  await exitCursorLock("native", () => {
+    throw new Error("browser exit fallback should not run for native cursor lock");
+  });
+  assert(
+    invocations.at(-2)[0] === "cursor_grab" &&
+      invocations.at(-2)[1].grab === false &&
+      invocations.at(-1)[0] === "cursor_visible" &&
+      invocations.at(-1)[1].visible === true,
+    "native cursor unlock releases grab and restores cursor visibility",
+  );
+  resetTauriGlobals();
+}
 
 function fakeAudioParam(value = 1) {
   return {
