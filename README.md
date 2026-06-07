@@ -96,9 +96,9 @@ WebSocket/API suites, and runs the headless client smoke test when Chrome is ava
 
 For focused test runs, see [tests/README.md](tests/README.md).
 
-## Main-Branch Test Gate
+## Local Commit Test Gate
 
-Anything landing on `main` must pass the canonical local CI command:
+Every local commit must pass the canonical local CI command:
 
 ```bash
 ./tests/run-all.sh
@@ -110,9 +110,9 @@ Install the tracked Git hooks in each checkout:
 ./scripts/install-hooks.sh
 ```
 
-The hooks run `./tests/run-all.sh` before direct commits to `main` and before non-fast-forward
-merge commits into `main`. Feature-branch commits stay fast, but merging them into `main` should
-use a merge commit so the gate can run:
+The hooks run `./tests/run-all.sh` before every local commit and before every non-fast-forward
+merge commit. Fast-forward merges do not create commits, so they do not run commit hooks. When
+merging feature branches into `main`, use a merge commit so the gate can run:
 
 ```bash
 git merge --no-ff <branch>
