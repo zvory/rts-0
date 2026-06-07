@@ -81,6 +81,7 @@ export class Match {
     this.lastSnapshotArrivedAt = null;
     this.lastServerNetStatus = null;
     this.autoPointerLockUntil = 0;
+    this.pointerLockDiagnosticShown = false;
     this.health = {
       latencyMs: null,
       serverTickMs: null,
@@ -392,19 +393,42 @@ export class Match {
     this.syncPointerLockUi();
   }
 
-  handlePointerLockError() {
+  handlePointerLockError(err) {
+    this.recordPointerLockDiagnostic(err);
     if (this.automaticPointerLockActive()) return;
     this.toast("Cursor lock was blocked. Click the game view and try again.");
     this.syncPointerLockUi();
   }
 
+  recordPointerLockDiagnostic(err = null) {
+    if (!this.input?.desktopRuntime() || this.pointerLockDiagnosticShown) return;
+    this.pointerLockDiagnosticShown = true;
+    const snapshot = {
+      at: new Date().toISOString(),
+      error: this.pointerLockErrorSummary(err),
+      support: this.input.pointerLockDebugSnapshot(),
+    };
+    if (typeof window !== "undefined") window.__rtsPointerLockDebug = snapshot;
+    console.warn("[RTS_POINTER_LOCK_DESKTOP]", snapshot);
+    this.toast("Desktop cursor lock failed. Inspect window.__rtsPointerLockDebug.");
+  }
+
+  pointerLockErrorSummary(err) {
+    if (!err) return null;
+    if (err instanceof Error) return { name: err.name, message: err.message };
+    if (typeof err === "object") {
+      return {
+        type: err.type || null,
+        name: err.name || null,
+        message: err.message || null,
+      };
+    }
+    return { message: String(err) };
+  }
+
   syncPointerLockUi() {
     const btn = dom.pointerLockToggle;
     if (!btn || !this.input) return;
-    if (this.input.desktopRuntime()) {
-      btn.hidden = true;
-      return;
-    }
     btn.hidden = false;
     const supported = this.input.pointerLockSupported();
     const locked = this.input.pointerLocked;

@@ -229,10 +229,10 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
   assert(invocations.length === 0, "cursor lock does not call Tauri cursor IPC");
 
   let browserExitCalled = false;
-  await exitCursorLock("native", () => {
+  await exitCursorLock("browser", () => {
     browserExitCalled = true;
   });
-  assert(browserExitCalled, "legacy native mode falls back to browser Pointer Lock exit");
+  assert(browserExitCalled, "cursor lock exits through browser Pointer Lock");
 
   const priorDocument = globalThis.document;
   const prefixedDom = {

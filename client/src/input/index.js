@@ -136,6 +136,7 @@ export class Input {
     this._cursorLockMode = null;
     this._pointerLockCursor = null;
     this._suppressNextContextMenu = false;
+    this._pointerLockAttempt = 0;
     this.onPointerLockChange = null;
     this.onPointerLockError = null;
 
@@ -339,6 +340,23 @@ export class Input {
     return document.pointerLockElement || document.webkitPointerLockElement || null;
   }
 
+  pointerLockDebugSnapshot() {
+    return {
+      desktopRuntime: this.desktopRuntime(),
+      pointerLocked: this.pointerLocked,
+      pointerLockElementMatches: this._browserPointerLockElement() === this.dom,
+      requestPointerLock: typeof this.dom.requestPointerLock,
+      webkitRequestPointerLock: typeof this.dom.webkitRequestPointerLock,
+      exitPointerLock: typeof document.exitPointerLock,
+      webkitExitPointerLock: typeof document.webkitExitPointerLock,
+      hasPointerLockElement: "pointerLockElement" in document,
+      hasWebkitPointerLockElement: "webkitPointerLockElement" in document,
+      attempts: this._pointerLockAttempt,
+      location: globalThis.location?.href || null,
+      userAgent: navigator.userAgent,
+    };
+  }
+
   _prepareCursorLock() {
     const p = this.mouse || this._viewportCenter();
     this.mouse = this._clampViewportPoint(p);
@@ -347,13 +365,16 @@ export class Input {
 
   requestPointerLock() {
     if (this.pointerLocked) return Promise.resolve(true);
+    this._pointerLockAttempt += 1;
     if (!this.pointerLockSupported()) {
       if (this.onPointerLockError) this.onPointerLockError(new Error("Pointer Lock API is unavailable."));
       return Promise.resolve(false);
     }
     this._prepareCursorLock();
     return enterCursorLock(() => this._requestBrowserPointerLock(), this.mouse).then((mode) => {
-      if (mode === "native") this._setCursorLockState(true, mode);
+      if (!mode && this.onPointerLockError) {
+        this.onPointerLockError(new Error("Pointer Lock request finished without locking the viewport."));
+      }
       return !!mode;
     }).catch((err) => {
       if (this.onPointerLockError) this.onPointerLockError(err);
@@ -361,34 +382,55 @@ export class Input {
     });
   }
 
-  _requestBrowserPointerLock() {
+  async _requestBrowserPointerLock() {
     if (!this._browserPointerLockSupported()) {
       if (this.onPointerLockError) this.onPointerLockError(new Error("Pointer Lock API is unavailable."));
-      return Promise.resolve(false);
+      return false;
     }
     try {
       const requestPointerLock = this._browserRequestPointerLock();
       if (!requestPointerLock) {
         if (this.onPointerLockError) this.onPointerLockError(new Error("Pointer Lock API is unavailable."));
-        return Promise.resolve(false);
+        return false;
       }
       const result = requestPointerLock();
       if (result && typeof result.then === "function") {
-        return result.then(() => true).catch((err) => {
-          if (this.onPointerLockError) this.onPointerLockError(err);
-          return false;
-        });
+        await result;
+        return true;
       }
-      return Promise.resolve(true);
+      return await this._waitForBrowserPointerLockResult();
     } catch (err) {
       if (this.onPointerLockError) this.onPointerLockError(err);
-      return Promise.resolve(false);
+      return false;
     }
+  }
+
+  _waitForBrowserPointerLockResult() {
+    if (this._browserPointerLockElement() === this.dom) return Promise.resolve(true);
+    return new Promise((resolve) => {
+      let done = false;
+      const finish = (locked) => {
+        if (done) return;
+        done = true;
+        clearTimeout(timer);
+        document.removeEventListener("pointerlockchange", onChange);
+        document.removeEventListener("pointerlockerror", onError);
+        document.removeEventListener("webkitpointerlockchange", onChange);
+        document.removeEventListener("webkitpointerlockerror", onError);
+        resolve(locked);
+      };
+      const onChange = () => finish(this._browserPointerLockElement() === this.dom);
+      const onError = () => finish(false);
+      const timer = window.setTimeout(() => finish(this._browserPointerLockElement() === this.dom), 350);
+      document.addEventListener("pointerlockchange", onChange);
+      document.addEventListener("pointerlockerror", onError);
+      document.addEventListener("webkitpointerlockchange", onChange);
+      document.addEventListener("webkitpointerlockerror", onError);
+    });
   }
 
   exitPointerLock() {
     const mode = this._cursorLockMode;
-    if (mode === "native") this._setCursorLockState(false, null);
     void exitCursorLock(mode, () => this._exitBrowserPointerLock()).catch((err) => {
       if (this.onPointerLockError) this.onPointerLockError(err);
     });
