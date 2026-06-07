@@ -5,7 +5,7 @@ use super::*;
 use crate::game::ai_core::profiles::{RIFLE_FLOOD_FAST_ID, RIFLE_FLOOD_FULL_SATURATION_ID};
 use crate::game::command::SimCommand as Command;
 use crate::game::entity::{Entity, EntityKind, GatherPhase, Order};
-use crate::protocol::{kinds, terrain, EntityView};
+use crate::protocol::{kinds, terrain, EntityView, OrderPlanMarker};
 
 fn human_vs_ai_players() -> [PlayerInit; 2] {
     [
@@ -170,6 +170,19 @@ fn legacy_view_of(game: &Game, e: &Entity, viewer: u32, fogged: bool) -> EntityV
             if game.entities.get(t).is_some() {
                 if target_visible {
                     v.target_id = Some(t);
+                }
+            }
+        }
+    }
+    if e.owner == viewer {
+        if let Order::Attack(order) = e.order() {
+            if let Some(target) = game.entities.get(order.intent.target) {
+                if target_visible {
+                    v.order_plan.push(OrderPlanMarker {
+                        kind: "attack".to_string(),
+                        x: target.pos_x,
+                        y: target.pos_y,
+                    });
                 }
             }
         }
@@ -426,20 +439,19 @@ fn normal_move_then_queued_move_snapshot_shows_active_and_future_waypoints() {
         .find(|entity| entity.id == unit)
         .expect("selected unit should be visible to owner");
     assert_eq!(
-        view.active_marker,
-        Some(crate::protocol::QueuedOrderMarker {
-            x: first.0,
-            y: first.1,
-            attack_move: false,
-        })
-    );
-    assert_eq!(
-        view.queued_markers,
-        vec![crate::protocol::QueuedOrderMarker {
-            x: second.0,
-            y: second.1,
-            attack_move: false,
-        }]
+        view.order_plan,
+        vec![
+            crate::protocol::OrderPlanMarker {
+                kind: "move".to_string(),
+                x: first.0,
+                y: first.1,
+            },
+            crate::protocol::OrderPlanMarker {
+                kind: "move".to_string(),
+                x: second.0,
+                y: second.1,
+            },
+        ]
     );
 }
 

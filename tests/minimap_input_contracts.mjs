@@ -71,6 +71,7 @@ function minimapHarness({ selected = [], commandTarget = null } = {}) {
   const state = {
     playerId: 1,
     commandTarget,
+    attackTargetKeyHeld: false,
     map: {
       width: 242,
       height: 242,
@@ -135,13 +136,14 @@ function lockedEvent(clientX, clientY, button = 0, extra = {}) {
   h.minimap.destroy();
 }
 
-// Right-click on minimap with a selected unit issues a move order through the locked path.
+// Shift-right-click on minimap with a selected unit issues a queued move order through the locked path.
 {
   const selected = [{ id: 7, owner: 1, kind: KIND.RIFLEMAN }];
   const h = minimapHarness({ selected });
-  assert(h.router.pointerDown(lockedEvent(180, 280, 2)), "locked minimap right-click is consumed");
+  assert(h.router.pointerDown(lockedEvent(180, 280, 2, { shiftKey: true })), "locked minimap right-click is consumed");
   assert(h.net.sent.length === 1, "minimap right-click sends one command");
   assert(h.net.sent[0].c === "move", "minimap right-click sends move");
+  assert(h.net.sent[0].queued === true, "shift minimap right-click queues move");
   assert(h.net.sent[0].units.length === 1 && h.net.sent[0].units[0] === 7, "move uses selected unit");
   assertApprox(h.net.sent[0].x, 80, 0.001, "move command minimap x");
   assertApprox(h.net.sent[0].y, 80, 0.001, "move command minimap y");
@@ -160,11 +162,26 @@ function lockedEvent(clientX, clientY, button = 0, extra = {}) {
 {
   const selected = [{ id: 9, owner: 1, kind: KIND.RIFLEMAN }];
   const h = minimapHarness({ selected, commandTarget: "attack" });
-  assert(h.router.pointerDown(lockedEvent(150, 250, 0)), "attack-move minimap left-click is consumed");
+  assert(h.router.pointerDown(lockedEvent(150, 250, 0, { shiftKey: true })), "attack-move minimap left-click is consumed");
   assert(h.net.sent.length === 1, "attack-move minimap click sends one command");
   assert(h.net.sent[0].c === "attackMove", "attack command-target sends attack-move");
+  assert(h.net.sent[0].queued === true, "shift minimap attack target queues attack-move");
   assert(h.state.commandTarget === null, "attack command-target exits after minimap click");
   assert(h.endedTargets.length === 1 && h.endedTargets[0] === "attack", "endCommandTarget is called");
+  h.minimap.destroy();
+}
+
+// Shift command-target clicks on the minimap stay armed while the attack hotkey is held.
+{
+  const selected = [{ id: 9, owner: 1, kind: KIND.RIFLEMAN }];
+  const h = minimapHarness({ selected, commandTarget: "attack" });
+  h.state.attackTargetKeyHeld = true;
+  assert(h.router.pointerDown(lockedEvent(150, 250, 0, { shiftKey: true })), "first held-A minimap attack click is consumed");
+  assert(h.router.pointerDown(lockedEvent(160, 260, 0, { shiftKey: true })), "second held-A minimap attack click is consumed");
+  assert(h.net.sent.length === 2, "held-A minimap targeting sends multiple commands");
+  assert(h.net.sent.every((command) => command.c === "attackMove" && command.queued === true), "held-A minimap targeting queues attack-move commands");
+  assert(h.state.commandTarget === "attack", "held-A minimap targeting stays armed after queued clicks");
+  assert(h.endedTargets.length === 0, "held-A minimap targeting does not end while queueing");
   h.minimap.destroy();
 }
 

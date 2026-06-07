@@ -400,14 +400,17 @@ export class Minimap {
     if (ev.button === 2) {
       // Right-click: issue a context-sensitive order for the currently selected own units.
       ev.originalEvent?.preventDefault();
-      this._issueOrder(w.x, w.y);
+      this._issueOrder(w.x, w.y, !!ev.shiftKey);
       return true;
     } else if (ev.button === 0) {
       ev.originalEvent?.preventDefault();
       // Left-click while a command target is armed: issue the command instead of panning.
       if (this.state.commandTarget) {
-        this._issueOrder(w.x, w.y);
-        this.state.endCommandTarget();
+        const target = this.state.commandTarget;
+        this._issueOrder(w.x, w.y, !!ev.shiftKey);
+        if (!(target === "attack" && ev.shiftKey && this.state.attackTargetKeyHeld)) {
+          this.state.endCommandTarget();
+        }
         return true;
       }
       // Default: recenter the camera (and start a drag).
@@ -451,7 +454,7 @@ export class Minimap {
   }
 
   /** Issue the minimap's current command to the world point for any selected own units. */
-  _issueOrder(wx, wy) {
+  _issueOrder(wx, wy, queued = false) {
     const sel = this.state.selectedEntities() || [];
     const unitIds = [];
     for (const e of sel) {
@@ -462,11 +465,11 @@ export class Minimap {
     }
     if (unitIds.length === 0) return;
     if (this.state.commandTarget === "attack") {
-      this.net.command(cmd.attackMove(unitIds, wx, wy));
-      this.state.addCommandFeedback("attack", wx, wy);
+      this.net.command(cmd.attackMove(unitIds, wx, wy, queued));
+      this.state.addCommandFeedback("attack", wx, wy, queued);
       return;
     }
-    this.net.command(cmd.move(unitIds, wx, wy));
-    this.state.addCommandFeedback("move", wx, wy);
+    this.net.command(cmd.move(unitIds, wx, wy, queued));
+    this.state.addCommandFeedback("move", wx, wy, queued);
   }
 }

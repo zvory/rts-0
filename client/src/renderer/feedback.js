@@ -10,7 +10,7 @@ import {
   MINING_CC_RANGE_TILES,
   isProducerBuilding,
 } from "../config.js";
-import { KIND, SETUP, STATE, isBuilding, isResource, isUnit } from "../protocol.js";
+import { KIND, ORDER_STAGE, SETUP, STATE, isBuilding, isResource, isUnit } from "../protocol.js";
 import {
   DEPLOYED_WEAPON_ANIM_MS,
   SWEEP_EVICT_FRAMES,
@@ -141,7 +141,7 @@ export function _drawCommandFeedback(state) {
   }
 }
 
-export function _drawQueuedOrderMarkers(state) {
+export function _drawOrderPlan(state) {
   if (!state || typeof state.selectedEntities !== "function") return;
   const g = this._feedbackGfx;
   const moveColor = COLORS.selectOwn;
@@ -149,30 +149,28 @@ export function _drawQueuedOrderMarkers(state) {
 
   for (const e of state.selectedEntities()) {
     if (e.owner !== state.playerId || !isUnit(e.kind)) continue;
-    const activeMarker = Number.isFinite(e.activeMarker?.x) && Number.isFinite(e.activeMarker?.y)
-      ? e.activeMarker
-      : null;
-    const queuedMarkers = Array.isArray(e.queuedMarkers)
-      ? e.queuedMarkers.filter((m) => Number.isFinite(m?.x) && Number.isFinite(m?.y))
+    const markers = Array.isArray(e.orderPlan)
+      ? e.orderPlan.filter((m) => Number.isFinite(m?.x) && Number.isFinite(m?.y))
       : [];
-    const markers = activeMarker ? [activeMarker, ...queuedMarkers] : queuedMarkers;
     if (markers.length === 0) continue;
 
     let fromX = e.x;
     let fromY = e.y;
     for (let i = 0; i < markers.length; i += 1) {
       const marker = markers[i];
-      const color = marker.attackMove ? attackColor : moveColor;
-      const alpha = i === 0 && activeMarker ? 0.68 : 0.48;
+      const hostile = marker.kind === ORDER_STAGE.ATTACK || marker.kind === ORDER_STAGE.ATTACK_MOVE;
+      const attackMove = marker.kind === ORDER_STAGE.ATTACK_MOVE;
+      const color = hostile ? attackColor : moveColor;
+      const alpha = i === 0 ? 0.68 : 0.48;
       g.lineStyle(2, color, alpha);
-      if (marker.attackMove) {
+      if (attackMove) {
         dashedLine(g, fromX, fromY, marker.x, marker.y, 12, 8);
       } else {
         g.moveTo(fromX, fromY);
         g.lineTo(marker.x, marker.y);
       }
 
-      drawQueuedPointMarker(g, marker.x, marker.y, color, !!marker.attackMove);
+      drawQueuedPointMarker(g, marker.x, marker.y, color, hostile);
       fromX = marker.x;
       fromY = marker.y;
     }

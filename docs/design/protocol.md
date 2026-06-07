@@ -120,21 +120,21 @@ transport decode:
 }
 ```
 
-Live WebSocket snapshot frames are sent as compact JSON text, version 5. `client/src/net.js`
+Live WebSocket snapshot frames are sent as compact JSON text, version 6. `client/src/net.js`
 decodes this transport shape back into the semantic object above before dispatching `S.SNAPSHOT`.
 Older object-shaped JSON snapshots remain decodable by the client for fallback/dev use.
 
 ```
 {
   "t": "snapshot",
-  "v": 5,
+  "v": 6,
   "s": [tick, steel, oil, supplyUsed, supplyCap],
   "e": [
     [
       id, owner, kind, x, y, hp, maxHp, state,
       facing?, weaponFacing?, prodKind?, prodProgress?, prodQueue?,
       buildProgress?, latchedNode?, targetId?, setupState?, remaining?, rally?, oilUsed?,
-      setupFacing?, queuedMarkers?, activeMarker?, chargeCooldownLeft?, visionOnly?, debugPath?
+      setupFacing?, orderPlan?, chargeCooldownLeft?, visionOnly?, debugPath?
     ]
   ],
   "r": [[id, remaining]],         // omitted when empty
@@ -157,11 +157,11 @@ Compact numeric codes:
 Compact entity records are positional arrays. Optional fields keep the semantic order above and
 trailing missing optional fields are omitted; interior missing optional fields are encoded as
 `null`. The `rally` slot is itself a two-element `[x, y]` array (or `null`).
-The `queuedMarkers` slot is an owner-only array capped at 8 entries; each entry is
-`[x, y]` for a queued move stage or `[x, y, true]` for a queued attack-move stage.
-The `activeMarker` slot uses the same point-marker shape for the owner-only current
-move/attack-move destination or active build footprint center, letting clients draw the active leg
-before future queued stages.
+The `orderPlan` slot is an owner-only array capped at 9 entries. It contains the current active
+stage first, followed by queued stages in execution order. Each compact stage is `[kind, x, y]`,
+where `kind` is 1 `move`, 2 `attackMove`, 3 `attack`, 4 `gather`, or 5 `build`. Stages carry safe
+world points only, never target ids; hidden attack target stages may be omitted rather than leaking
+enemy positions through fog.
 `visionOnly` is true only for non-owned units/buildings visible through lingering death vision;
 clients render them below the fog overlay and must not select or issue targeted commands against
 them. In `n.flags`, bit 0 = `slowTick` and bit 1 = `headOfLine`.
@@ -204,10 +204,9 @@ watch rooms receive all resource updates).
   // tanks:
   oilUsed?: f32,                 // lifetime oil burned by movement, in resource units
   setupFacing?: f32,             // at_team only: owner-visible deployed arc center; appended after oilUsed in compact snapshots
-  queuedMarkers?: [              // future queued move/attack-move points; ONLY ever sent to the owner
-    { x: f32, y: f32, attackMove?: bool }
+  orderPlan?: [                  // current + queued order stages; ONLY ever sent to the owner
+    { kind: "move"|"attackMove"|"attack"|"gather"|"build", x: f32, y: f32 }
   ],
-  activeMarker?: { x: f32, y: f32, attackMove?: bool }, // active move/attack-move destination or build footprint center; ONLY ever sent to the owner
   chargeCooldownLeft?: u16,      // rifleman only: owner-visible remaining Charge cooldown in ticks
   visionOnly?: bool,             // true = visible only through one-second death vision; visual intel only
   debugPath?: {                  // lobby Debug mode only; remaining movement path; ONLY ever sent to the owner

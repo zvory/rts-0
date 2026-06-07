@@ -33,8 +33,8 @@ import {
   _drawCommandFeedback,
   _drawDebugPathOverlay,
   _drawMuzzleFlashes,
+  _drawOrderPlan,
   _drawPlacement,
-  _drawQueuedOrderMarkers,
   _drawRallyPoints,
   _drawResourceMiningPreview,
   drawSelectionBox,
@@ -206,7 +206,7 @@ export class Renderer {
     this._drawFog(fog);
     this._drawCommandFeedback(state);
     this._drawAtGunSetupPreview(state);
-    this._drawQueuedOrderMarkers(state);
+    this._drawOrderPlan(state);
     this._drawDebugPathOverlay(state, regularEntities);
     this._drawRallyPoints(state);
     this._drawResourceMiningPreview(state);
@@ -329,7 +329,7 @@ export class Renderer {
    */
   /** Draw short-lived local markers for issued move / attack commands. @private */
   /** Draw AT gun setup and selected deployed field-of-fire wedges. @private */
-  /** Draw selected own units' server-accepted queued move / attack-move stages. @private */
+  /** Draw selected own units' server-accepted active + queued order plan. @private */
   /**
    * Draw rally-point markers for selected own unit-producing buildings: a faint line from the
    * building to the rally point and a small flag at the point. Appends to the feedback graphics,
@@ -430,7 +430,7 @@ Object.assign(Renderer.prototype, {
   _drawPlacement,
   _drawCommandFeedback,
   _drawAtGunSetupPreview,
-  _drawQueuedOrderMarkers,
+  _drawOrderPlan,
   _drawDebugPathOverlay,
   _drawRallyPoints,
   _drawResourceMiningPreview,

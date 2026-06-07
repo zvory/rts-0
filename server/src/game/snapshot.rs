@@ -88,11 +88,14 @@ impl Game {
             if let Some(view) = projection::project_entity(
                 player,
                 e,
-                fog,
-                actionable_fog,
-                fogged,
-                target,
-                self.debug_path_overlays,
+                projection::EntityProjectionContext {
+                    fog,
+                    actionable_fog,
+                    fogged,
+                    entities: &self.entities,
+                    target,
+                    include_debug_path: self.debug_path_overlays,
+                },
             ) {
                 entities.push(view);
             }

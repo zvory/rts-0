@@ -34,6 +34,8 @@ import {
   KIND,
   KIND_CODE,
   NOTICE_SEVERITY,
+  ORDER_STAGE,
+  ORDER_STAGE_CODE,
   SETUP,
   SETUP_CODE,
   STATE,
@@ -428,8 +430,7 @@ function fakeAudioContext() {
         null,
         null,
         null,
-        [[128, 160], [192, 224, true]],
-        [96, 112],
+        [[ORDER_STAGE_CODE[ORDER_STAGE.MOVE], 96, 112], [ORDER_STAGE_CODE[ORDER_STAGE.MOVE], 128, 160], [ORDER_STAGE_CODE[ORDER_STAGE.ATTACK_MOVE], 192, 224]],
         null,
         true,
         [[[112, 128], [144, 160]], [192, 224], 12, 2, 1, 2],
@@ -487,12 +488,12 @@ function fakeAudioContext() {
   assert(decoded.entities[0].state === STATE.GATHER, "entity state code decodes");
   assert(decoded.entities[0].weaponFacing === 1.75, "entity optional weaponFacing decodes");
   assert(decoded.entities[0].latchedNode === 200, "entity optional latchedNode decodes");
-  assert(decoded.entities[0].queuedMarkers.length === 2, "entity queued markers decode");
+  assert(decoded.entities[0].orderPlan.length === 3, "entity order plan decodes");
   assert(
-    decoded.entities[0].activeMarker.x === 96 &&
-      decoded.entities[0].activeMarker.y === 112 &&
-      decoded.entities[0].activeMarker.attackMove === false,
-    "entity active marker decodes",
+    decoded.entities[0].orderPlan[0].kind === ORDER_STAGE.MOVE &&
+      decoded.entities[0].orderPlan[0].x === 96 &&
+      decoded.entities[0].orderPlan[0].y === 112,
+    "entity active order stage decodes",
   );
   assert(decoded.entities[0].visionOnly === true, "entity visionOnly flag decodes");
   assert(
@@ -506,16 +507,16 @@ function fakeAudioContext() {
     "entity debug path decodes",
   );
   assert(
-    decoded.entities[0].queuedMarkers[0].attackMove === false &&
-      decoded.entities[0].queuedMarkers[1].attackMove === true,
-    "queued marker attack-move flavor decodes",
+    decoded.entities[0].orderPlan[1].kind === ORDER_STAGE.MOVE &&
+      decoded.entities[0].orderPlan[2].kind === ORDER_STAGE.ATTACK_MOVE,
+    "order plan stage flavor decodes",
   );
   assert(decoded.entities[1].setupState === SETUP.DEPLOYED, "entity setupState code decodes");
   assert(decoded.entities[2].prodKind === KIND.WORKER, "entity prodKind code decodes");
   assert(decoded.entities[2].prodProgress === 0.25, "entity prodProgress decodes");
   assert(
-    decoded.entities[2].queuedMarkers === undefined,
-    "compact snapshot tolerates missing queued marker fields",
+    decoded.entities[2].orderPlan === undefined,
+    "compact snapshot tolerates missing order plan fields",
   );
   assert(decoded.resourceDeltas[0].remaining === 1498, "resource deltas decode");
   assert(decoded.events[0].e === EVENT.ATTACK && decoded.events[0].to === 7, "attack event decodes");
@@ -577,10 +578,10 @@ function fakeAudioContext() {
           null,
           null,
           null,
-          new Array(9),
+          new Array(10),
         ]],
       }),
-    "compact snapshot enforces queued marker bounds",
+    "compact snapshot enforces order plan bounds",
   );
 }
 
@@ -1296,6 +1297,7 @@ function fakeAudioContext() {
   targetedInput.state = {
     placement: null,
     commandTarget: "attack",
+    attackTargetKeyHeld: false,
     playerId: 1,
     addCommandFeedback(kind, x, y) {
       feedback.push({ kind, x, y });
@@ -1364,9 +1366,39 @@ function fakeAudioContext() {
   lastSent = sentCommands[sentCommands.length - 1];
   assert(lastSent.c === "attack", "attack targeting an enemy should issue attack");
   assert(
-    lastSent.queued === undefined,
-    "Shift enemy attack targeting should remain replacement behavior in phase 1",
+    lastSent.queued === true,
+    "Shift enemy attack targeting should queue attack",
   );
+
+  targetedInput.state.commandTarget = "attack";
+  targetedInput.state.attackTargetKeyHeld = true;
+  targetedInput._attackTargetKeyHeld = true;
+  targetedInput._entityAtWorld = () => null;
+  targetedInput._onLeftDown({ x: 320, y: 320 }, { shiftKey: true });
+  assert(
+    targetedInput.state.commandTarget === "attack",
+    "Shift attack targeting should stay armed while A is held",
+  );
+  targetedInput._onLeftDown({ x: 340, y: 340 }, { shiftKey: true });
+  assert(
+    sentCommands.at(-2).c === "attackMove" &&
+      sentCommands.at(-2).queued === true &&
+      sentCommands.at(-1).c === "attackMove" &&
+      sentCommands.at(-1).queued === true,
+    "held A plus Shift should queue multiple attack-move orders",
+  );
+  targetedInput._onLeftDown({ x: 360, y: 360 }, { shiftKey: false });
+  assert(
+    targetedInput.state.commandTarget === null,
+    "attack targeting clears after an unqueued click even while A is held",
+  );
+
+  targetedInput.state.commandTarget = "attack";
+  targetedInput.state.attackTargetKeyHeld = true;
+  targetedInput._attackTargetKeyHeld = true;
+  targetedInput._handleKeyUp({ code: "KeyA", preventDefault() {} });
+  assert(targetedInput.state.attackTargetKeyHeld === false, "A keyup clears attack key-held state");
+  assert(targetedInput.state.commandTarget === null, "A keyup exits sticky attack targeting");
 }
 
 // ---------------------------------------------------------------------------

@@ -96,8 +96,8 @@ export function _issueTargetedCommand(p, ev = {}) {
   const target = this._entityAtWorld(world.x, world.y, /*ownPreferred=*/ false);
   const me = this.state.playerId;
   if (target && target.owner !== me && target.owner !== 0 && !isResource(target.kind)) {
-    this.net.command(cmd.attack(ownUnits, target.id));
-    this.state.addCommandFeedback("attack", target.x, target.y);
+    this.net.command(cmd.attack(ownUnits, target.id, !!ev.shiftKey));
+    this.state.addCommandFeedback("attack", target.x, target.y, !!ev.shiftKey);
     return;
   }
 

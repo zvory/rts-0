@@ -5,13 +5,22 @@
 
 use crate::config;
 use crate::game::entity::{
-    fires_while_moving, Entity, EntityKind, GatherPhase, Order, OrderIntent,
+    fires_while_moving, Entity, EntityKind, EntityStore, GatherPhase, Order, OrderIntent,
 };
 use crate::game::fog::Fog;
 use crate::protocol::{DebugPathPoint, DebugPathView};
-use crate::protocol::{EntityView, QueuedOrderMarker};
+use crate::protocol::{EntityView, OrderPlanMarker};
 
 const MAX_DEBUG_PATH_WAYPOINTS: usize = 128;
+
+pub struct EntityProjectionContext<'a> {
+    pub fog: &'a Fog,
+    pub actionable_fog: Option<&'a Fog>,
+    pub fogged: bool,
+    pub entities: &'a EntityStore,
+    pub target: Option<&'a Entity>,
+    pub include_debug_path: bool,
+}
 
 pub fn entity_visible_to(viewer: u32, entity: &Entity, fog: &Fog) -> bool {
     entity.owner == viewer
@@ -45,13 +54,9 @@ pub fn attack_event_visible_to(
 pub fn project_entity(
     viewer: u32,
     entity: &Entity,
-    fog: &Fog,
-    actionable_fog: Option<&Fog>,
-    fogged: bool,
-    target: Option<&Entity>,
-    include_debug_path: bool,
+    context: EntityProjectionContext<'_>,
 ) -> Option<EntityView> {
-    if fogged && !entity_visible_to(viewer, entity, fog) {
+    if context.fogged && !entity_visible_to(viewer, entity, context.fog) {
         return None;
     }
 
@@ -65,8 +70,8 @@ pub fn project_entity(
         entity.max_hp,
         entity.state_str(),
     );
-    let actionable_fog = actionable_fog.unwrap_or(fog);
-    let vision_only = fogged
+    let actionable_fog = context.actionable_fog.unwrap_or(context.fog);
+    let vision_only = context.fogged
         && entity.owner != viewer
         && !entity.is_node()
         && !entity_visible_to(viewer, entity, actionable_fog);
@@ -82,11 +87,12 @@ pub fn project_entity(
         || (fires_while_moving(entity.kind) && entity.target_id().is_some())
         || (entity.is_building() && entity.can_attack());
     let target_visible = if let Some(target_id) = entity.target_id() {
-        target
+        context
+            .target
             .filter(|target| target.id == target_id)
             .map(|target| {
                 entity.owner == viewer
-                    || !fogged
+                    || !context.fogged
                     || (!vision_only
                         && actionable_fog.is_visible_world(viewer, target.pos_x, target.pos_y))
             })
@@ -98,7 +104,7 @@ pub fn project_entity(
     if weapon_facing_useful {
         if let Some(weapon_facing) = entity.weapon_facing() {
             let weapon_facing_is_safe = entity.owner == viewer
-                || !fogged
+                || !context.fogged
                 || entity.target_id().is_none()
                 || !active_combat_target
                 || target_visible;
@@ -133,9 +139,8 @@ pub fn project_entity(
         if let Some((rx, ry)) = entity.rally_point() {
             view.rally = Some([rx, ry]);
         }
-        view.active_marker = active_order_marker(entity);
-        view.queued_markers = queued_order_markers(entity);
-        if include_debug_path {
+        view.order_plan = order_plan(entity, context.entities, viewer, actionable_fog);
+        if context.include_debug_path {
             view.debug_path = debug_path_view(entity);
         }
         if entity.kind == EntityKind::Rifleman {
@@ -165,7 +170,7 @@ pub fn project_entity(
 
     if let Some(target_id) = entity.target_id() {
         if active_combat_target {
-            if let Some(target) = target {
+            if let Some(target) = context.target {
                 if target.id == target_id && target_visible {
                     view.target_id = Some(target_id);
                 }
@@ -176,59 +181,101 @@ pub fn project_entity(
     Some(view)
 }
 
-fn active_order_marker(entity: &Entity) -> Option<QueuedOrderMarker> {
-    let attack_move = match entity.order() {
-        Order::Move(_) => false,
-        Order::AttackMove(_) => true,
-        Order::Build(order) => {
-            let stats = config::building_stats(order.intent.kind)?;
-            let tile_size = config::TILE_SIZE as f32;
-            let x = order.intent.tile_x as f32 * tile_size + stats.foot_w as f32 * tile_size * 0.5;
-            let y = order.intent.tile_y as f32 * tile_size + stats.foot_h as f32 * tile_size * 0.5;
-            if !x.is_finite() || !y.is_finite() {
-                return None;
-            }
-            return Some(QueuedOrderMarker {
-                x,
-                y,
-                attack_move: false,
-            });
+fn order_plan(
+    entity: &Entity,
+    entities: &EntityStore,
+    viewer: u32,
+    fog: &Fog,
+) -> Vec<OrderPlanMarker> {
+    let mut plan = Vec::new();
+    if let Some(marker) = active_order_plan_marker(entity, entities, viewer, fog) {
+        plan.push(marker);
+    }
+    plan.extend(
+        entity
+            .queued_orders()
+            .iter()
+            .filter_map(|intent| intent_plan_marker(intent, entities, viewer, fog)),
+    );
+    plan
+}
+
+fn active_order_plan_marker(
+    entity: &Entity,
+    entities: &EntityStore,
+    viewer: u32,
+    fog: &Fog,
+) -> Option<OrderPlanMarker> {
+    match entity.order() {
+        Order::Move(_) => {
+            let (x, y) = entity.path_goal().or_else(|| entity.move_intent())?;
+            point_marker("move", x, y)
         }
-        Order::Idle | Order::Attack(_) | Order::Gather(_) => return None,
-    };
-    let (x, y) = entity.path_goal().or_else(|| entity.move_intent())?;
+        Order::AttackMove(_) => {
+            let (x, y) = entity.path_goal().or_else(|| entity.move_intent())?;
+            point_marker("attackMove", x, y)
+        }
+        Order::Attack(order) => target_marker("attack", order.intent.target, entities, viewer, fog),
+        Order::Gather(order) => entity_point_marker("gather", order.intent.node, entities),
+        Order::Build(order) => {
+            build_marker(order.intent.kind, order.intent.tile_x, order.intent.tile_y)
+        }
+        Order::Idle => None,
+    }
+}
+
+fn intent_plan_marker(
+    intent: &OrderIntent,
+    entities: &EntityStore,
+    viewer: u32,
+    fog: &Fog,
+) -> Option<OrderPlanMarker> {
+    match intent {
+        OrderIntent::Move(point) => point_marker("move", point.x, point.y),
+        OrderIntent::AttackMove(point) => point_marker("attackMove", point.x, point.y),
+        OrderIntent::Attack(attack) => {
+            target_marker("attack", attack.target, entities, viewer, fog)
+        }
+        OrderIntent::Gather(gather) => entity_point_marker("gather", gather.node, entities),
+        OrderIntent::Build(build) => build_marker(build.kind, build.tile_x, build.tile_y),
+    }
+}
+
+fn target_marker(
+    kind: &str,
+    target: u32,
+    entities: &EntityStore,
+    viewer: u32,
+    fog: &Fog,
+) -> Option<OrderPlanMarker> {
+    let target = entities.get(target)?;
+    fog.is_visible_world(viewer, target.pos_x, target.pos_y)
+        .then(|| point_marker(kind, target.pos_x, target.pos_y))
+        .flatten()
+}
+
+fn entity_point_marker(kind: &str, id: u32, entities: &EntityStore) -> Option<OrderPlanMarker> {
+    let entity = entities.get(id)?;
+    point_marker(kind, entity.pos_x, entity.pos_y)
+}
+
+fn build_marker(kind: EntityKind, tile_x: u32, tile_y: u32) -> Option<OrderPlanMarker> {
+    let stats = config::building_stats(kind)?;
+    let tile_size = config::TILE_SIZE as f32;
+    let x = tile_x as f32 * tile_size + stats.foot_w as f32 * tile_size * 0.5;
+    let y = tile_y as f32 * tile_size + stats.foot_h as f32 * tile_size * 0.5;
+    point_marker("build", x, y)
+}
+
+fn point_marker(kind: &str, x: f32, y: f32) -> Option<OrderPlanMarker> {
     if !x.is_finite() || !y.is_finite() {
         return None;
     }
-    Some(QueuedOrderMarker { x, y, attack_move })
-}
-
-fn queued_order_markers(entity: &Entity) -> Vec<QueuedOrderMarker> {
-    entity
-        .queued_orders()
-        .iter()
-        .filter_map(|intent| match intent {
-            OrderIntent::Move(point) if point.x.is_finite() && point.y.is_finite() => {
-                Some(QueuedOrderMarker {
-                    x: point.x,
-                    y: point.y,
-                    attack_move: false,
-                })
-            }
-            OrderIntent::AttackMove(point) if point.x.is_finite() && point.y.is_finite() => {
-                Some(QueuedOrderMarker {
-                    x: point.x,
-                    y: point.y,
-                    attack_move: true,
-                })
-            }
-            OrderIntent::Move(_)
-            | OrderIntent::AttackMove(_)
-            | OrderIntent::Attack(_)
-            | OrderIntent::Gather(_)
-            | OrderIntent::Build(_) => None,
-        })
-        .collect()
+    Some(OrderPlanMarker {
+        kind: kind.to_string(),
+        x,
+        y,
+    })
 }
 
 fn debug_path_view(entity: &Entity) -> Option<DebugPathView> {
@@ -270,6 +317,29 @@ mod tests {
     use crate::game::map::Map;
     use crate::protocol::terrain;
 
+    fn project_for_test(
+        viewer: u32,
+        entity: &Entity,
+        fog: &Fog,
+        fogged: bool,
+        entities: &EntityStore,
+        target: Option<&Entity>,
+        include_debug_path: bool,
+    ) -> Option<EntityView> {
+        project_entity(
+            viewer,
+            entity,
+            EntityProjectionContext {
+                fog,
+                actionable_fog: Some(fog),
+                fogged,
+                entities,
+                target,
+                include_debug_path,
+            },
+        )
+    }
+
     #[test]
     fn weapon_facing_is_omitted_when_target_direction_is_hidden() {
         let mut entities = EntityStore::new();
@@ -302,13 +372,13 @@ mod tests {
             .expect("hidden target should exist");
 
         let enemy_view =
-            project_entity(1, tank, &fog, Some(&fog), true, Some(hidden_target), false)
+            project_for_test(1, tank, &fog, true, &entities, Some(hidden_target), false)
                 .expect("viewer should see nearby tank");
         assert_eq!(enemy_view.target_id, None);
         assert_eq!(enemy_view.weapon_facing, None);
 
         let owner_view =
-            project_entity(2, tank, &fog, Some(&fog), true, Some(hidden_target), false)
+            project_for_test(2, tank, &fog, true, &entities, Some(hidden_target), false)
                 .expect("owner should see own tank");
         assert_eq!(owner_view.target_id, Some(hidden_target_id));
         assert_eq!(owner_view.weapon_facing, Some(1.2));
@@ -343,7 +413,7 @@ mod tests {
         let tank = entities.get(tank_id).expect("tank should exist");
         let target = entities.get(target_id).expect("target should exist");
 
-        let viewer_view = project_entity(1, tank, &fog, Some(&fog), true, Some(target), false)
+        let viewer_view = project_for_test(1, tank, &fog, true, &entities, Some(target), false)
             .expect("viewer should see tank");
 
         assert_eq!(viewer_view.target_id, Some(target_id));
@@ -372,13 +442,13 @@ mod tests {
         fog.recompute(&[1], &entities, &map);
         let tank = entities.get(tank_id).expect("tank should exist");
 
-        let view = project_entity(1, tank, &fog, Some(&fog), true, None, false)
+        let view = project_for_test(1, tank, &fog, true, &entities, None, false)
             .expect("tank should be visible");
         assert_eq!(view.oil_used, Some(3.25));
     }
 
     #[test]
-    fn queued_markers_are_owner_only_points() {
+    fn order_plan_is_owner_only_and_projects_safe_stages() {
         let mut entities = EntityStore::new();
         let unit_id = entities
             .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
@@ -408,38 +478,37 @@ mod tests {
         fog.recompute(&[1, 2], &entities, &map);
         let unit = entities.get(unit_id).expect("unit should exist");
 
-        let owner_view = project_entity(1, unit, &fog, Some(&fog), true, None, false)
+        let owner_view = project_for_test(1, unit, &fog, true, &entities, None, false)
             .expect("owner should see own unit");
         assert_eq!(
-            owner_view.active_marker,
-            Some(QueuedOrderMarker {
-                x: 120.0,
-                y: 130.0,
-                attack_move: true,
-            })
-        );
-        assert_eq!(owner_view.queued_markers.len(), 2);
-        assert_eq!(
-            owner_view.queued_markers[0],
-            QueuedOrderMarker {
-                x: 140.0,
-                y: 160.0,
-                attack_move: false,
-            }
-        );
-        assert_eq!(
-            owner_view.queued_markers[1],
-            QueuedOrderMarker {
-                x: 180.0,
-                y: 200.0,
-                attack_move: true,
-            }
+            owner_view.order_plan,
+            vec![
+                OrderPlanMarker {
+                    kind: "attackMove".to_string(),
+                    x: 120.0,
+                    y: 130.0,
+                },
+                OrderPlanMarker {
+                    kind: "move".to_string(),
+                    x: 140.0,
+                    y: 160.0,
+                },
+                OrderPlanMarker {
+                    kind: "gather".to_string(),
+                    x: 720.0,
+                    y: 720.0,
+                },
+                OrderPlanMarker {
+                    kind: "attackMove".to_string(),
+                    x: 180.0,
+                    y: 200.0,
+                },
+            ]
         );
 
-        let enemy_view = project_entity(2, unit, &fog, Some(&fog), false, None, false)
+        let enemy_view = project_for_test(2, unit, &fog, false, &entities, None, false)
             .expect("full view should include unit");
-        assert_eq!(enemy_view.active_marker, None);
-        assert!(enemy_view.queued_markers.is_empty());
+        assert!(enemy_view.order_plan.is_empty());
     }
 
     #[test]
@@ -464,29 +533,27 @@ mod tests {
         fog.recompute(&[1, 2], &entities, &map);
         let worker = entities.get(worker_id).expect("worker should exist");
 
-        let owner_view = project_entity(1, worker, &fog, Some(&fog), true, None, false)
+        let owner_view = project_for_test(1, worker, &fog, true, &entities, None, false)
             .expect("owner should see own worker");
         assert_eq!(
-            owner_view.active_marker,
-            Some(QueuedOrderMarker {
-                x: 160.0,
-                y: 192.0,
-                attack_move: false,
-            })
-        );
-        assert_eq!(
-            owner_view.queued_markers,
-            vec![QueuedOrderMarker {
-                x: 320.0,
-                y: 352.0,
-                attack_move: false,
-            }]
+            owner_view.order_plan,
+            vec![
+                OrderPlanMarker {
+                    kind: "build".to_string(),
+                    x: 160.0,
+                    y: 192.0,
+                },
+                OrderPlanMarker {
+                    kind: "move".to_string(),
+                    x: 320.0,
+                    y: 352.0,
+                },
+            ]
         );
 
-        let enemy_view = project_entity(2, worker, &fog, Some(&fog), false, None, false)
+        let enemy_view = project_for_test(2, worker, &fog, false, &entities, None, false)
             .expect("full view should include worker");
-        assert_eq!(enemy_view.active_marker, None);
-        assert!(enemy_view.queued_markers.is_empty());
+        assert!(enemy_view.order_plan.is_empty());
     }
 
     #[test]
@@ -517,11 +584,11 @@ mod tests {
         fog.recompute(&[1, 2], &entities, &map);
         let unit = entities.get(unit_id).expect("unit should exist");
 
-        let standard_owner_view = project_entity(1, unit, &fog, Some(&fog), true, None, false)
+        let standard_owner_view = project_for_test(1, unit, &fog, true, &entities, None, false)
             .expect("owner should see own unit");
         assert_eq!(standard_owner_view.debug_path, None);
 
-        let owner_view = project_entity(1, unit, &fog, Some(&fog), true, None, true)
+        let owner_view = project_for_test(1, unit, &fog, true, &entities, None, true)
             .expect("owner should see own unit");
         let debug_path = owner_view
             .debug_path
@@ -540,7 +607,7 @@ mod tests {
         assert_eq!(debug_path.static_blocked_ticks, 3);
         assert_eq!(debug_path.total_waypoints, 3);
 
-        let enemy_view = project_entity(2, unit, &fog, Some(&fog), false, None, true)
+        let enemy_view = project_for_test(2, unit, &fog, false, &entities, None, true)
             .expect("full view should include unit");
         assert_eq!(enemy_view.debug_path, None);
     }
@@ -566,11 +633,11 @@ mod tests {
         fog.recompute(&[1, 2], &entities, &map);
         let rifle = entities.get(rifle_id).expect("rifleman should exist");
 
-        let owner_view = project_entity(1, rifle, &fog, Some(&fog), true, None, false)
+        let owner_view = project_for_test(1, rifle, &fog, true, &entities, None, false)
             .expect("owner should see own rifleman");
         assert_eq!(owner_view.charge_cooldown_left, Some(42));
 
-        let enemy_view = project_entity(2, rifle, &fog, Some(&fog), false, None, false)
+        let enemy_view = project_for_test(2, rifle, &fog, false, &entities, None, false)
             .expect("full view should include rifleman");
         assert_eq!(enemy_view.charge_cooldown_left, None);
     }
