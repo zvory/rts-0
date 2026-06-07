@@ -301,7 +301,7 @@ fn git_version() -> String {
 }
 
 /// Read `index.html`, inject a versioned import map for all `/src/*.js` modules, and append
-/// `?v=<version>` to the top-level `<script src>` and `<link href>` tags.
+/// `?v=<version>` to the top-level cacheable app asset URLs.
 ///
 /// The import map causes the browser to rewrite every `import "./foo.js"` inside ES modules to
 /// `./foo.js?v=<version>`, so sub-modules (hud.js, net.js, …) are cache-busted alongside
@@ -343,9 +343,13 @@ fn build_versioned_index(client_dir: &str, version: &str) -> String {
         &format!("{import_map}<script type=\"module\""),
     );
 
-    // Also version the top-level entry point and stylesheet so they bypass the cache too.
+    // Also version the top-level entry point, stylesheet, and web manifest.
     html.replace("./src/main.js\"", &format!("./src/main.js?v={version}\""))
         .replace("./styles.css\"", &format!("./styles.css?v={version}\""))
+        .replace(
+            "/manifest.webmanifest\"",
+            &format!("/manifest.webmanifest?v={version}\""),
+        )
 }
 
 fn collect_js_modules(dir: &std::path::Path, prefix: &std::path::Path, out: &mut Vec<String>) {
@@ -400,6 +404,7 @@ mod tests {
         );
         assert!(html.contains("./src/main.js?v=test-version\""));
         assert!(html.contains("./styles.css?v=test-version\""));
+        assert!(html.contains("/manifest.webmanifest?v=test-version\""));
     }
 }
 
