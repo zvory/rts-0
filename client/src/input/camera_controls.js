@@ -43,12 +43,26 @@ export function _handleKeyDown(ev) {
   }
 
   if (ev.repeat) return;
+  if (ev.code === "KeyA") {
+    this._attackTargetKeyHeld = true;
+    this.state.attackTargetKeyHeld = true;
+  }
   if (this._handleControlGroupHotkey(ev)) return;
-  if (this._activateCommandHotkey(ev)) return;
+  if (this._activateCommandHotkey(ev)) {
+    if (ev.code === "KeyA" && this.state.commandTarget !== "attack") {
+      this._attackTargetKeyHeld = false;
+      this.state.attackTargetKeyHeld = false;
+    }
+    return;
+  }
 
   switch (ev.code) {
     case "KeyA":
       this._enterAttackMove();
+      if (this.state.commandTarget !== "attack") {
+        this._attackTargetKeyHeld = false;
+        this.state.attackTargetKeyHeld = false;
+      }
       ev.preventDefault();
       return;
     case "KeyS":
@@ -82,6 +96,12 @@ export function _handleKeyUp(ev) {
       this._spacePan = false;
       ev.preventDefault();
       return;
+    case "KeyA":
+      this._attackTargetKeyHeld = false;
+      this.state.attackTargetKeyHeld = false;
+      if (this.state.commandTarget === "attack") this.state.endCommandTarget();
+      ev.preventDefault();
+      return;
     default:
       return;
   }
@@ -92,6 +112,8 @@ export function _handleBlur() {
   this.keys.up = this.keys.down = this.keys.left = this.keys.right = false;
   this.mouse = null;
   this._spacePan = false;
+  this._attackTargetKeyHeld = false;
+  this.state.attackTargetKeyHeld = false;
   this._panDrag = null;
   if (this._drag) {
     this._drag = null;

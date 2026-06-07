@@ -406,8 +406,11 @@ export class Minimap {
       ev.originalEvent?.preventDefault();
       // Left-click while a command target is armed: issue the command instead of panning.
       if (this.state.commandTarget) {
+        const target = this.state.commandTarget;
         this._issueOrder(w.x, w.y, !!ev.shiftKey);
-        this.state.endCommandTarget();
+        if (!(target === "attack" && ev.shiftKey && this.state.attackTargetKeyHeld)) {
+          this.state.endCommandTarget();
+        }
         return true;
       }
       // Default: recenter the camera (and start a drag).

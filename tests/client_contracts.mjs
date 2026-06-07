@@ -1297,6 +1297,7 @@ function fakeAudioContext() {
   targetedInput.state = {
     placement: null,
     commandTarget: "attack",
+    attackTargetKeyHeld: false,
     playerId: 1,
     addCommandFeedback(kind, x, y) {
       feedback.push({ kind, x, y });
@@ -1368,6 +1369,36 @@ function fakeAudioContext() {
     lastSent.queued === true,
     "Shift enemy attack targeting should queue attack",
   );
+
+  targetedInput.state.commandTarget = "attack";
+  targetedInput.state.attackTargetKeyHeld = true;
+  targetedInput._attackTargetKeyHeld = true;
+  targetedInput._entityAtWorld = () => null;
+  targetedInput._onLeftDown({ x: 320, y: 320 }, { shiftKey: true });
+  assert(
+    targetedInput.state.commandTarget === "attack",
+    "Shift attack targeting should stay armed while A is held",
+  );
+  targetedInput._onLeftDown({ x: 340, y: 340 }, { shiftKey: true });
+  assert(
+    sentCommands.at(-2).c === "attackMove" &&
+      sentCommands.at(-2).queued === true &&
+      sentCommands.at(-1).c === "attackMove" &&
+      sentCommands.at(-1).queued === true,
+    "held A plus Shift should queue multiple attack-move orders",
+  );
+  targetedInput._onLeftDown({ x: 360, y: 360 }, { shiftKey: false });
+  assert(
+    targetedInput.state.commandTarget === null,
+    "attack targeting clears after an unqueued click even while A is held",
+  );
+
+  targetedInput.state.commandTarget = "attack";
+  targetedInput.state.attackTargetKeyHeld = true;
+  targetedInput._attackTargetKeyHeld = true;
+  targetedInput._handleKeyUp({ code: "KeyA", preventDefault() {} });
+  assert(targetedInput.state.attackTargetKeyHeld === false, "A keyup clears attack key-held state");
+  assert(targetedInput.state.commandTarget === null, "A keyup exits sticky attack targeting");
 }
 
 // ---------------------------------------------------------------------------

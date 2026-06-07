@@ -96,6 +96,8 @@ export class GameState {
     // --- command targeting / feedback (client-only) ---
     /** @type {null | "move" | "attack" | "setupAtGuns"} */
     this.commandTarget = null;
+    /** @type {boolean} true while the attack command hotkey is physically held. */
+    this.attackTargetKeyHeld = false;
     /** @type {Array<{kind:string,x:number,y:number,append:boolean,createdAt:number}>} */
     this.commandFeedback = [];
     /** @type {null | {resourceId:number, resourceX:number, resourceY:number, ccId:number, ccX:number, ccY:number, inRange:boolean}} */
