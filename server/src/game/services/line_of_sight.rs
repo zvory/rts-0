@@ -5,22 +5,31 @@
 
 use crate::config;
 use crate::game::map::Map;
+use crate::game::smoke::SmokeCloudStore;
 use crate::rules::terrain;
 
 #[derive(Clone, Copy)]
 pub(crate) struct LineOfSight<'a> {
     map: &'a Map,
+    smokes: Option<&'a SmokeCloudStore>,
 }
 
 impl<'a> LineOfSight<'a> {
     pub(crate) fn new(map: &'a Map) -> Self {
-        LineOfSight { map }
+        LineOfSight { map, smokes: None }
+    }
+
+    pub(crate) fn with_smoke(map: &'a Map, smokes: &'a SmokeCloudStore) -> Self {
+        LineOfSight {
+            map,
+            smokes: Some(smokes),
+        }
     }
 
     /// True when no opaque terrain lies on the segment between two world-pixel points.
     /// The origin tile is ignored; the target tile is treated as blocking if it is opaque.
     pub(crate) fn clear_between_world_points(&self, from: (f32, f32), to: (f32, f32)) -> bool {
-        self.raycast_clear(from, to, false)
+        self.raycast_clear(from, to, false, false)
     }
 
     /// True when `tile` is visible from a world-pixel origin. The target tile itself may be
@@ -29,10 +38,16 @@ impl<'a> LineOfSight<'a> {
         if tile.0 >= self.map.size || tile.1 >= self.map.size {
             return false;
         }
-        self.raycast_clear(from, self.map.tile_center(tile.0, tile.1), true)
+        self.raycast_clear(from, self.map.tile_center(tile.0, tile.1), true, true)
     }
 
-    fn raycast_clear(&self, from: (f32, f32), to: (f32, f32), allow_opaque_target: bool) -> bool {
+    fn raycast_clear(
+        &self,
+        from: (f32, f32),
+        to: (f32, f32),
+        allow_opaque_target: bool,
+        allow_dynamic_target: bool,
+    ) -> bool {
         let (from_x, from_y) = from;
         let (to_x, to_y) = to;
         if !from_x.is_finite() || !from_y.is_finite() || !to_x.is_finite() || !to_y.is_finite() {
@@ -45,6 +60,16 @@ impl<'a> LineOfSight<'a> {
         if from_x >= world_size || from_y >= world_size || to_x >= world_size || to_y >= world_size
         {
             return false;
+        }
+        if let Some(smokes) = self.smokes {
+            let blocked = if allow_dynamic_target {
+                smokes.segment_blocked_allowing_target_cloud(from, to)
+            } else {
+                smokes.segment_blocked(from, to)
+            };
+            if blocked {
+                return false;
+            }
         }
 
         let ts = config::TILE_SIZE as f32;

@@ -4,6 +4,7 @@ use crate::game::entity::{EntityKind, EntityStore};
 use crate::game::fog::Fog;
 use crate::game::map::Map;
 use crate::game::services::line_of_sight::LineOfSight;
+use crate::game::smoke::SmokeCloudStore;
 use crate::protocol::Event;
 use crate::rules::combat as combat_rules;
 use crate::rules::projection as projection_rules;
@@ -26,6 +27,7 @@ pub(super) fn apply_damage(
     entities: &mut EntityStore,
     events: &mut HashMap<u32, Vec<Event>>,
     fog: &Fog,
+    smokes: &SmokeCloudStore,
     rng: &mut SmallRng,
     attacker: u32,
     victim: u32,
@@ -107,6 +109,7 @@ pub(super) fn apply_damage(
             entities,
             events,
             fog,
+            smokes,
             attacker,
             shot_victim,
             effective_dmg,
@@ -137,6 +140,7 @@ fn apply_overpenetration(
     entities: &mut EntityStore,
     events: &mut HashMap<u32, Vec<Event>>,
     fog: &Fog,
+    smokes: &SmokeCloudStore,
     attacker: u32,
     primary_victim: u32,
     primary_dmg: u32,
@@ -181,7 +185,7 @@ fn apply_overpenetration(
 
     let player_ids: Vec<u32> = events.keys().copied().collect();
     let mut hits: Vec<(u32, f32, f32, f32)> = Vec::new();
-    let los = LineOfSight::new(map);
+    let los = LineOfSight::with_smoke(map, smokes);
     for id in entities.ids() {
         if id == attacker || id == primary_victim {
             continue;

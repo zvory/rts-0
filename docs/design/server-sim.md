@@ -174,12 +174,18 @@ Production buildings intentionally keep a single rally point. `setRally` replace
 when an older client sends `queued: true`; newly produced units receive only the current rally point
 as a plain move order.
 
-`services::line_of_sight` owns static terrain raycasts used by fog and combat. Stone/rock tiles
-block vision and ranged attacks. Fog may reveal the blocking stone tile itself, but not tiles
-behind it. Combat auto-acquisition only considers enemies with a clear line; explicit attack
-orders may chase toward a terrain-blocked target but cannot fire until the shot is clear. Future
-forest visibility/cover rules should extend the terrain rules and this service instead of adding
-ad hoc checks to fog or combat.
+`game::smoke::SmokeCloudStore` owns active neutral smoke clouds as world effects, not entities:
+clouds have stable ids, center points, radius, spawn tick, and expiry tick, and they do not
+participate in pathing, collision, scoring, supply, or target queries. `services::line_of_sight`
+owns terrain raycasts used by fog and combat and can be constructed with the active smoke store as
+a dynamic blocker input. Stone/rock tiles block vision and ranged attacks. Fog may reveal the
+blocking stone tile itself and the visible edge of a smoke cloud, but not tiles behind blockers.
+Units inside smoke do not stamp vision; friendly units inside smoke remain owner-visible through
+projection, while enemy units inside smoke are withheld and cannot be targeted. Combat
+auto-acquisition and firing both use the smoke-aware LOS query; explicit attack orders may chase
+toward terrain- or smoke-blocked targets but cannot fire until the shot is clear. Future forest
+visibility/cover rules should extend the terrain rules and this service instead of adding ad hoc
+checks to fog or combat.
 
 `services::geometry` owns shared body primitives: infantry unit bodies are circles centered on
 `(x, y)` with the configured unit radius, tanks use an oriented vehicle hull derived from their

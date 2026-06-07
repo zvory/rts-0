@@ -14,6 +14,7 @@ use crate::game::services::movement::angle_delta;
 use crate::game::services::spatial::SpatialIndex;
 use crate::game::services::standability;
 use crate::game::services::world_query;
+use crate::game::smoke::SmokeCloudStore;
 use crate::game::PlayerState;
 use crate::protocol::{Event, NoticeSeverity};
 use crate::rules;
@@ -31,6 +32,7 @@ pub(crate) fn apply_commands(
     spatial: &SpatialIndex,
     coordinator: &mut MoveCoordinator<'_>,
     fog: &Fog,
+    smokes: &SmokeCloudStore,
     pending: Vec<(u32, SimCommand)>,
     events: &mut HashMap<u32, Vec<Event>>,
 ) {
@@ -94,7 +96,8 @@ pub(crate) fn apply_commands(
                     }
                     let target_ok = matches!(entities.get(target),
                         Some(t) if world_query::is_enemy_targetable(t, player, id)
-                            && fog.is_visible_world(player, t.pos_x, t.pos_y));
+                            && fog.is_visible_world(player, t.pos_x, t.pos_y)
+                            && !smokes.point_inside(t.pos_x, t.pos_y));
                     if !target_ok {
                         continue;
                     }
@@ -731,6 +734,7 @@ mod tests {
         let mut players = vec![player_state(1)];
         let mut fog = Fog::new(map.size);
         fog.recompute(&[1], &entities, &map);
+        let smokes = SmokeCloudStore::new();
         let mut events = HashMap::new();
 
         apply_commands(
@@ -740,6 +744,7 @@ mod tests {
             &spatial,
             &mut coordinator,
             &fog,
+            &smokes,
             vec![(
                 1,
                 SimCommand::Build {
@@ -796,6 +801,7 @@ mod tests {
         let mut players = vec![player_state(1)];
         let mut fog = Fog::new(map.size);
         fog.recompute(&[1], &entities, &map);
+        let smokes = SmokeCloudStore::new();
         let mut events = HashMap::new();
 
         apply_commands(
@@ -805,6 +811,7 @@ mod tests {
             &spatial,
             &mut coordinator,
             &fog,
+            &smokes,
             vec![(
                 1,
                 SimCommand::Build {
@@ -859,6 +866,7 @@ mod tests {
         let mut players = vec![player_state(1)];
         let mut fog = Fog::new(map.size);
         fog.recompute(&[1], &entities, &map);
+        let smokes = SmokeCloudStore::new();
         let mut events = HashMap::new();
 
         apply_commands(
@@ -868,6 +876,7 @@ mod tests {
             &spatial,
             &mut coordinator,
             &fog,
+            &smokes,
             vec![(
                 1,
                 SimCommand::Build {
@@ -1878,6 +1887,7 @@ mod tests {
         let mut coordinator = MoveCoordinator::new(&mut pathing, map, &occ, 1);
         let mut fog = Fog::new(map.size);
         fog.recompute(&[1, 2], entities, map);
+        let smokes = SmokeCloudStore::new();
         let mut events = HashMap::new();
         apply_commands(
             map,
@@ -1886,6 +1896,7 @@ mod tests {
             &spatial,
             &mut coordinator,
             &fog,
+            &smokes,
             pending,
             &mut events,
         );

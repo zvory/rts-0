@@ -475,6 +475,7 @@ function fakeAudioContext() {
       ],
     ],
     r: [[200, 1498]],
+    sm: [[50, 320, 352, 2, 120]],
     ev: [
       [EVENT_CODE[EVENT.ATTACK], 1, 7],
       [EVENT_CODE[EVENT.DEATH], 200, 64, 96, KIND_CODE[KIND.STEEL]],
@@ -528,6 +529,12 @@ function fakeAudioContext() {
     "compact snapshot tolerates missing order plan fields",
   );
   assert(decoded.resourceDeltas[0].remaining === 1498, "resource deltas decode");
+  assert(
+    decoded.smokes[0].id === 50 &&
+      decoded.smokes[0].radiusTiles === 2 &&
+      decoded.smokes[0].expiresIn === 120,
+    "smoke clouds decode",
+  );
   assert(decoded.events[0].e === EVENT.ATTACK && decoded.events[0].to === 7, "attack event decodes");
   assert(decoded.events[1].kind === KIND.STEEL, "death event kind decodes");
   assert(decoded.events[3].msg === "Not enough steel", "notice event decodes");

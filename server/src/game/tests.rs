@@ -228,6 +228,101 @@ fn flat_tank_move_fixture() -> (Game, u32, (f32, f32)) {
     (game, tank, goal)
 }
 
+fn smoke_projection_fixture() -> (Game, u32, u32, u32, (f32, f32)) {
+    let players = [
+        PlayerInit {
+            id: 1,
+            name: "One".into(),
+            color: "#fff".into(),
+            is_ai: false,
+        },
+        PlayerInit {
+            id: 2,
+            name: "Two".into(),
+            color: "#000".into(),
+            is_ai: false,
+        },
+    ];
+    let mut game = Game::new_for_replay(&players, 0x5EED_5000);
+    for tile in &mut game.map.terrain {
+        *tile = crate::protocol::terrain::GRASS;
+    }
+    for id in game.entities.ids() {
+        game.entities.remove(id);
+    }
+    let observer_pos = game.map.tile_center(4, 4);
+    let smoke_pos = game.map.tile_center(7, 4);
+    let friendly_pos = game.map.tile_center(8, 4);
+    let observer = game
+        .entities
+        .spawn_unit(1, EntityKind::Worker, observer_pos.0, observer_pos.1)
+        .expect("observer should spawn");
+    let friendly = game
+        .entities
+        .spawn_unit(1, EntityKind::Rifleman, friendly_pos.0, friendly_pos.1)
+        .expect("friendly should spawn");
+    let enemy = game
+        .entities
+        .spawn_unit(2, EntityKind::Rifleman, smoke_pos.0, smoke_pos.1)
+        .expect("enemy should spawn");
+    systems::recompute_supply(&mut game.players, &game.entities);
+    game.spatial = services::spatial::SpatialIndex::build(&game.entities, game.map.size);
+    game.smokes
+        .spawn(
+            smoke_pos.0,
+            smoke_pos.1,
+            config::SMOKE_CLOUD_RADIUS_TILES,
+            config::SMOKE_CLOUD_DURATION_TICKS,
+            game.tick,
+        )
+        .expect("smoke should spawn");
+    let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
+    game.fog
+        .recompute_with_smoke(&ids, &game.entities, &game.map, &game.smokes);
+    (game, observer, friendly, enemy, smoke_pos)
+}
+
+#[test]
+fn snapshot_projects_visible_smoke_but_hides_enemy_inside_it() {
+    let (game, _observer, _friendly, enemy, _smoke_pos) = smoke_projection_fixture();
+
+    let snapshot = game.snapshot_for(1);
+
+    assert_eq!(snapshot.smokes.len(), 1);
+    assert!(
+        snapshot.entities.iter().all(|entity| entity.id != enemy),
+        "enemy inside smoke should be withheld from the opposing player snapshot"
+    );
+}
+
+#[test]
+fn snapshot_keeps_friendly_unit_inside_smoke_visible_to_owner() {
+    let (game, _observer, friendly, _enemy, _smoke_pos) = smoke_projection_fixture();
+
+    let snapshot = game.snapshot_for(1);
+
+    assert!(
+        snapshot.entities.iter().any(|entity| entity.id == friendly),
+        "friendly unit inside smoke should remain owner-visible"
+    );
+}
+
+#[test]
+fn smoke_expiration_restores_fog_projection() {
+    let (mut game, _observer, _friendly, enemy, _smoke_pos) = smoke_projection_fixture();
+
+    for _ in 0..=config::SMOKE_CLOUD_DURATION_TICKS {
+        game.tick();
+    }
+    let snapshot = game.snapshot_for(1);
+
+    assert!(snapshot.smokes.is_empty());
+    assert!(
+        snapshot.entities.iter().any(|entity| entity.id == enemy),
+        "enemy should become visible again once smoke expires"
+    );
+}
+
 fn queued_move_fixture() -> (Game, u32, (f32, f32), (f32, f32), (f32, f32)) {
     queued_move_fixture_with_lobby_debug(false)
 }
@@ -897,6 +992,7 @@ fn scores_record_kills_and_losses_on_death() {
     services::death::death_system(
         &mut game.entities,
         &game.fog,
+        &game.smokes,
         &mut game.players,
         &mut lingering_sight,
         &mut events,

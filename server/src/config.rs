@@ -79,14 +79,20 @@ pub const RIFLEMAN_CHARGE_COOLDOWN_TICKS: u16 = (TICK_HZ as u16) * 5;
 /// Rifleman movement multiplier while Charge is active.
 pub const RIFLEMAN_CHARGE_SPEED_MULTIPLIER: f32 = 2.0;
 
-/// Smoke grenade target range for scout cars. Phase 1 exposes command plumbing only.
-pub const SMOKE_ABILITY_RANGE_TILES: u32 = 6;
-/// Smoke grenade reuse delay from launch time. Phase 1 does not launch gameplay smoke yet.
+/// Smoke grenade target range for scout cars.
+pub const SMOKE_ABILITY_RANGE_TILES: u32 = 9;
+/// Smoke grenade effect radius.
+#[allow(dead_code)]
+pub const SMOKE_CLOUD_RADIUS_TILES: f32 = 2.0;
+/// Smoke grenade active duration.
+#[allow(dead_code)]
+pub const SMOKE_CLOUD_DURATION_TICKS: u32 = TICK_HZ * 5;
+/// Smoke grenade reuse delay from launch time.
 pub const SMOKE_ABILITY_COOLDOWN_TICKS: u16 = (TICK_HZ as u16) * 20;
-/// Smoke grenade steel cost. Phase 1 exposes metadata only; spending lands with execution.
-pub const SMOKE_ABILITY_COST_STEEL: u32 = 0;
-/// Smoke grenade oil cost. Phase 1 exposes metadata only; spending lands with execution.
-pub const SMOKE_ABILITY_COST_OIL: u32 = 10;
+/// Smoke grenade steel cost. Spending lands when command execution launches the cloud.
+pub const SMOKE_ABILITY_COST_STEEL: u32 = 25;
+/// Smoke grenade oil cost. Spending lands when command execution launches the cloud.
+pub const SMOKE_ABILITY_COST_OIL: u32 = 25;
 
 // --- Economy ----------------------------------------------------------------
 pub const STARTING_STEEL: u32 = 75;

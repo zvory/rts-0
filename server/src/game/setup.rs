@@ -211,6 +211,7 @@ impl Game {
             spatial,
             pathing,
             lingering_sight: Vec::new(),
+            smokes: SmokeCloudStore::new(),
             seed,
             starting_steel: 0,
             starting_oil: 0,
@@ -219,7 +220,8 @@ impl Game {
         };
         let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
         game.fog = Fog::new(game.map.size);
-        game.fog.recompute(&ids, &game.entities, &game.map);
+        game.fog
+            .recompute_with_smoke(&ids, &game.entities, &game.map, &game.smokes);
 
         Ok(DevScenarioSetup {
             game,
@@ -291,6 +293,7 @@ impl Game {
             spatial,
             pathing,
             lingering_sight: Vec::new(),
+            smokes: SmokeCloudStore::new(),
             seed,
             starting_steel: 0,
             starting_oil: 0,
@@ -299,7 +302,8 @@ impl Game {
         };
         let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
         game.fog = Fog::new(game.map.size);
-        game.fog.recompute(&ids, &game.entities, &game.map);
+        game.fog
+            .recompute_with_smoke(&ids, &game.entities, &game.map, &game.smokes);
 
         Ok(DevScenarioSetup {
             game,
@@ -358,6 +362,7 @@ impl Game {
             spatial,
             pathing,
             lingering_sight: Vec::new(),
+            smokes: SmokeCloudStore::new(),
             seed,
             starting_steel: 0,
             starting_oil: 0,
@@ -366,7 +371,8 @@ impl Game {
         };
         let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
         game.fog = Fog::new(game.map.size);
-        game.fog.recompute(&ids, &game.entities, &game.map);
+        game.fog
+            .recompute_with_smoke(&ids, &game.entities, &game.map, &game.smokes);
 
         Ok(DevScenarioSetup {
             game,
@@ -490,6 +496,7 @@ impl Game {
             spatial,
             pathing,
             lingering_sight: Vec::new(),
+            smokes: SmokeCloudStore::new(),
             seed,
             starting_steel: steel,
             starting_oil: oil,
@@ -499,7 +506,8 @@ impl Game {
         // Initialize supply accounting and fog so the very first snapshot is correct.
         systems::recompute_supply(&mut game.players, &game.entities);
         let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
-        game.fog.recompute(&ids, &game.entities, &game.map);
+        game.fog
+            .recompute_with_smoke(&ids, &game.entities, &game.map, &game.smokes);
         game
     }
 

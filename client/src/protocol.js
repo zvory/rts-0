@@ -128,7 +128,7 @@ export const ABILITY = Object.freeze({
 });
 
 // --- Compact snapshot wire schema (must match protocol.rs) ---
-export const COMPACT_SNAPSHOT_VERSION = 7;
+export const COMPACT_SNAPSHOT_VERSION = 8;
 
 export const KIND_CODE = Object.freeze({
   [KIND.WORKER]: 1,
@@ -207,6 +207,7 @@ const NOTICE_SEVERITY_BY_CODE = Object.freeze({
 
 const MAX_COMPACT_ENTITIES = 20000;
 const MAX_COMPACT_RESOURCE_DELTAS = 20000;
+const MAX_COMPACT_SMOKES = 1024;
 const MAX_COMPACT_EVENTS = 5000;
 const MAX_COMPACT_ORDER_PLAN = 9;
 const MAX_COMPACT_ABILITIES = 8;
@@ -245,11 +246,24 @@ function decodeCompactSnapshot(raw) {
       "resourceDeltas",
       MAX_COMPACT_RESOURCE_DELTAS,
     ).map(decodeCompactResourceDelta),
+    smokes: readOptionalArray(raw.sm, "smokes", MAX_COMPACT_SMOKES).map(decodeCompactSmoke),
     events: readOptionalArray(raw.ev, "events", MAX_COMPACT_EVENTS).map(decodeCompactEvent),
     playerResources: readOptionalArray(raw.pr, "playerResources", 32).map(
       decodeCompactPlayerResource,
     ),
     netStatus: decodeCompactNetStatus(raw.n),
+  };
+}
+
+function decodeCompactSmoke(record, index) {
+  const fields = readArray(record, `smoke ${index}`, 5);
+  if (fields.length !== 5) throw new Error(`smoke ${index} field count mismatch`);
+  return {
+    id: readU32(fields[0], "smoke.id"),
+    x: readNumber(fields[1], "smoke.x"),
+    y: readNumber(fields[2], "smoke.y"),
+    radiusTiles: readNumber(fields[3], "smoke.radiusTiles"),
+    expiresIn: readU32(fields[4], "smoke.expiresIn"),
   };
 }
 

@@ -16,6 +16,7 @@ use crate::config;
 use crate::game::entity::{Entity, EntityStore};
 use crate::game::map::Map;
 use crate::game::services::line_of_sight::LineOfSight;
+use crate::game::smoke::SmokeCloudStore;
 
 /// Temporary sight left behind by an owned unit/building after it dies. This is used only by
 /// snapshot projection; command validation and combat still use live fog.
@@ -76,7 +77,28 @@ impl Fog {
 
     /// Recompute visibility for all `players` from the union of their entities' sight circles.
     /// Players with no entities get an all-dark grid.
+    #[allow(dead_code)]
     pub fn recompute(&mut self, players: &[u32], store: &EntityStore, map: &Map) {
+        self.recompute_inner(players, store, map, None);
+    }
+
+    pub(crate) fn recompute_with_smoke(
+        &mut self,
+        players: &[u32],
+        store: &EntityStore,
+        map: &Map,
+        smokes: &SmokeCloudStore,
+    ) {
+        self.recompute_inner(players, store, map, Some(smokes));
+    }
+
+    fn recompute_inner(
+        &mut self,
+        players: &[u32],
+        store: &EntityStore,
+        map: &Map,
+        smokes: Option<&SmokeCloudStore>,
+    ) {
         let size = self.size;
         let cells = (self.size * self.size) as usize;
         // Reset / allocate a grid per player.
@@ -89,10 +111,19 @@ impl Fog {
             }
         }
 
-        let los = LineOfSight::new(map);
+        let los = match smokes {
+            Some(smokes) => LineOfSight::with_smoke(map, smokes),
+            None => LineOfSight::new(map),
+        };
         for e in store.iter() {
             if e.owner == 0 {
                 continue; // neutral resource nodes do not grant a player vision
+            }
+            if smokes
+                .map(|smokes| smokes.point_inside(e.pos_x, e.pos_y))
+                .unwrap_or(false)
+            {
+                continue;
             }
             // Only stamp sight for players we are tracking this tick.
             let Some(grid) = self.grids.get_mut(&e.owner) else {
@@ -103,10 +134,38 @@ impl Fog {
     }
 
     /// Add temporary death-vision sight sources to already-recomputed grids.
+    #[allow(dead_code)]
     pub(crate) fn stamp_lingering_sources(&mut self, sources: &[LingeringSightSource], map: &Map) {
+        self.stamp_lingering_sources_inner(sources, map, None);
+    }
+
+    pub(crate) fn stamp_lingering_sources_with_smoke(
+        &mut self,
+        sources: &[LingeringSightSource],
+        map: &Map,
+        smokes: &SmokeCloudStore,
+    ) {
+        self.stamp_lingering_sources_inner(sources, map, Some(smokes));
+    }
+
+    fn stamp_lingering_sources_inner(
+        &mut self,
+        sources: &[LingeringSightSource],
+        map: &Map,
+        smokes: Option<&SmokeCloudStore>,
+    ) {
         let size = self.size;
-        let los = LineOfSight::new(map);
+        let los = match smokes {
+            Some(smokes) => LineOfSight::with_smoke(map, smokes),
+            None => LineOfSight::new(map),
+        };
         for source in sources {
+            if smokes
+                .map(|smokes| smokes.point_inside(source.x, source.y))
+                .unwrap_or(false)
+            {
+                continue;
+            }
             let Some(grid) = self.grids.get_mut(&source.owner) else {
                 continue;
             };
@@ -234,5 +293,46 @@ mod tests {
 
         assert!(fog.is_visible(1, 3, 2));
         assert!(!fog.is_visible(1, 4, 2));
+    }
+
+    #[test]
+    fn smoke_blocks_authoritative_fog_behind_it_but_reveals_cloud_edge() {
+        let map = map_with_rock_at((7, 7));
+        let mut entities = EntityStore::new();
+        let origin = map.tile_center(1, 2);
+        entities
+            .spawn_unit(1, EntityKind::Worker, origin.0, origin.1)
+            .expect("worker should spawn");
+        let mut smokes = SmokeCloudStore::new();
+        let smoke = map.tile_center(3, 2);
+        smokes
+            .spawn(smoke.0, smoke.1, 1.0, 100, 0)
+            .expect("smoke should spawn");
+        let mut fog = Fog::new(map.size);
+
+        fog.recompute_with_smoke(&[1], &entities, &map, &smokes);
+
+        assert!(fog.is_visible(1, 3, 2));
+        assert!(!fog.is_visible(1, 5, 2));
+    }
+
+    #[test]
+    fn unit_inside_smoke_does_not_stamp_vision() {
+        let map = map_with_rock_at((7, 7));
+        let mut entities = EntityStore::new();
+        let origin = map.tile_center(2, 2);
+        entities
+            .spawn_unit(1, EntityKind::Worker, origin.0, origin.1)
+            .expect("worker should spawn");
+        let mut smokes = SmokeCloudStore::new();
+        smokes
+            .spawn(origin.0, origin.1, 1.0, 100, 0)
+            .expect("smoke should spawn");
+        let mut fog = Fog::new(map.size);
+
+        fog.recompute_with_smoke(&[1], &entities, &map, &smokes);
+
+        assert!(!fog.is_visible(1, 2, 2));
+        assert!(!fog.is_visible(1, 3, 2));
     }
 }

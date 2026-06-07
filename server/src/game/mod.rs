@@ -24,6 +24,7 @@ mod scoring;
 pub(crate) mod selfplay;
 pub(crate) mod services;
 mod setup;
+pub(crate) mod smoke;
 mod snapshot;
 mod systems;
 
@@ -45,6 +46,7 @@ use map::Map;
 use rand::rngs::SmallRng;
 use rand::SeedableRng;
 use replay::CommandLogEntry;
+use smoke::SmokeCloudStore;
 
 #[cfg(test)]
 pub(crate) const FULL_AI_TESTS_ENV: &str = "RTS_FULL_AI_TESTS";
@@ -146,6 +148,8 @@ pub struct Game {
     pathing: services::pathing::PathingService,
     /// Five-second death-vision sources used only when building fog-filtered snapshots.
     lingering_sight: Vec<LingeringSightSource>,
+    /// Neutral smoke clouds that block authoritative fog and combat LOS without being entities.
+    smokes: SmokeCloudStore,
     /// Match seed retained for replay metadata/API compatibility. The current hardcoded map
     /// ignores it until lobby map selection or randomized maps are reintroduced.
     seed: u32,
@@ -183,6 +187,7 @@ impl Game {
     ) -> Vec<(u32, Vec<Event>)> {
         self.tick = self.tick.wrapping_add(1);
         self.pathing.advance_tick(self.tick);
+        self.smokes.retain_active(self.tick);
 
         // Per-player event buckets, accumulated by the systems below.
         let mut events: HashMap<u32, Vec<Event>> = HashMap::new();
@@ -226,6 +231,7 @@ impl Game {
             &mut self.pathing,
             &mut self.rng,
             &mut self.lingering_sight,
+            &self.smokes,
             pending,
             &mut events,
             self.tick,
@@ -238,7 +244,8 @@ impl Game {
             .retain(|source| source.is_active_at(self.tick));
         let ids: Vec<u32> = self.players.iter().map(|p| p.id).collect();
         crate::perf::timed(perf.as_deref_mut(), "fog_recompute", || {
-            self.fog.recompute(&ids, &self.entities, &self.map);
+            self.fog
+                .recompute_with_smoke(&ids, &self.entities, &self.map, &self.smokes);
         });
 
         // In debug builds, assert that the world state is internally consistent.
@@ -322,11 +329,29 @@ impl Game {
         // Recompute fog so the now-entity-less player's visibility goes dark immediately;
         // otherwise a stale grid would keep leaking neutral/enemy entities into their snapshots.
         let ids: Vec<u32> = self.players.iter().map(|p| p.id).collect();
-        self.fog.recompute(&ids, &self.entities, &self.map);
+        self.fog
+            .recompute_with_smoke(&ids, &self.entities, &self.map, &self.smokes);
     }
 
     pub fn tick_count(&self) -> u32 {
         self.tick
+    }
+
+    #[allow(dead_code)]
+    #[cfg(any(test, debug_assertions))]
+    pub(crate) fn spawn_smoke_cloud_for_test(&mut self, x: f32, y: f32) -> Option<u32> {
+        let (x, y) = SmokeCloudStore::clamp_point_to_map(&self.map, x, y)?;
+        let id = self.smokes.spawn(
+            x,
+            y,
+            config::SMOKE_CLOUD_RADIUS_TILES,
+            config::SMOKE_CLOUD_DURATION_TICKS,
+            self.tick,
+        )?;
+        let ids: Vec<u32> = self.players.iter().map(|p| p.id).collect();
+        self.fog
+            .recompute_with_smoke(&ids, &self.entities, &self.map, &self.smokes);
+        Some(id)
     }
 
     /// Authoritative commands applied so far, in exact application order.

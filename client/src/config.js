@@ -62,9 +62,11 @@ export const MINING_CC_RANGE_TILES = 7.0;
 export const AT_GUN_DEPLOYED_RANGE_TILES = 12;
 export const AT_GUN_FIELD_OF_FIRE_RAD = Math.PI / 4;
 export const RIFLEMAN_CHARGE_COOLDOWN_TICKS = 150;
-export const SMOKE_ABILITY_RANGE_TILES = 6;
+export const SMOKE_ABILITY_RANGE_TILES = 9;
+export const SMOKE_CLOUD_RADIUS_TILES = 2;
+export const SMOKE_CLOUD_DURATION_TICKS = TICK_HZ * 5;
 export const SMOKE_ABILITY_COOLDOWN_TICKS = 600;
-export const SMOKE_ABILITY_COST = Object.freeze({ steel: 0, oil: 10 });
+export const SMOKE_ABILITY_COST = Object.freeze({ steel: 25, oil: 25 });
 
 // Player colors (server assigns from a matching palette; used as a fallback for blips).
 export const PLAYER_PALETTE = Object.freeze([
@@ -132,7 +134,9 @@ export const ABILITIES = Object.freeze({
     rangeTiles: SMOKE_ABILITY_RANGE_TILES,
     cooldownTicks: SMOKE_ABILITY_COOLDOWN_TICKS,
     cost: SMOKE_ABILITY_COST,
-    requires: KIND.FACTORY,
+    radiusTiles: SMOKE_CLOUD_RADIUS_TILES,
+    durationTicks: SMOKE_CLOUD_DURATION_TICKS,
+    requires: KIND.STEELWORKS,
     queued: false,
   }),
 });

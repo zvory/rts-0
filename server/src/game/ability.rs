@@ -80,7 +80,7 @@ pub fn definition(kind: AbilityKind) -> AbilityDefinition {
                 steel: config::SMOKE_ABILITY_COST_STEEL,
                 oil: config::SMOKE_ABILITY_COST_OIL,
             },
-            tech_requirement: Some(EntityKind::Factory),
+            tech_requirement: Some(EntityKind::Steelworks),
             may_queue: false,
         },
     }

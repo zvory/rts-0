@@ -26,6 +26,7 @@ use crate::game::services;
 use crate::game::services::occupancy::Occupancy;
 use crate::game::services::pathing::PathingService;
 use crate::game::services::spatial::SpatialIndex;
+use crate::game::smoke::SmokeCloudStore;
 use crate::game::PlayerState;
 use crate::protocol::Event;
 use rand::rngs::SmallRng;
@@ -107,6 +108,7 @@ pub(crate) fn run_tick(
     pathing: &mut PathingService,
     rng: &mut SmallRng,
     lingering_sight: &mut Vec<LingeringSightSource>,
+    smokes: &SmokeCloudStore,
     pending: Vec<(u32, SimCommand)>,
     events: &mut HashMap<u32, Vec<Event>>,
     tick: u32,
@@ -127,6 +129,7 @@ pub(crate) fn run_tick(
             &pre_command.spatial,
             &mut coordinator,
             fog,
+            smokes,
             pending,
             events,
         );
@@ -165,6 +168,7 @@ pub(crate) fn run_tick(
             &post_movement.spatial,
             &mut coordinator,
             fog,
+            smokes,
             rng,
             events,
             tick,
@@ -187,7 +191,15 @@ pub(crate) fn run_tick(
         services::construction::construction_system(map, entities, players, events);
     });
     crate::perf::timed(perf.as_deref_mut(), "death", || {
-        services::death::death_system(entities, fog, players, lingering_sight, events, tick);
+        services::death::death_system(
+            entities,
+            fog,
+            smokes,
+            players,
+            lingering_sight,
+            events,
+            tick,
+        );
     });
 
     let pre_collision = crate::perf::timed(perf.as_deref_mut(), "pre_collision_derived", || {
@@ -260,6 +272,7 @@ mod tests {
         let mut pathing = PathingService::new(1024, 16);
         let mut events: HashMap<u32, Vec<Event>> = HashMap::new();
         let mut lingering_sight = Vec::new();
+        let smokes = SmokeCloudStore::new();
 
         let worker = entities
             .spawn_unit(1, EntityKind::Worker, 400.0, 390.0)
@@ -285,6 +298,7 @@ mod tests {
             &mut pathing,
             &mut SmallRng::seed_from_u64(0),
             &mut lingering_sight,
+            &smokes,
             Vec::new(),
             &mut events,
             1,
