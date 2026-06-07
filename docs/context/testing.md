@@ -12,13 +12,17 @@ Use when writing or debugging tests, or before claiming a change is done.
 - `node tests/ai_integration.mjs` — dep-free, AI opponent lobby flow
 - `node tests/minimap_input_contracts.mjs` — dep-free minimap/router pointer-lock input contracts
 - `cd tests && npm install && node client_smoke.mjs` — headless-Chrome client smoke
-- `cd server && cargo test` — simulation behavior + scripted self-play (no running server needed)
+- `cd server && cargo test` — simulation behavior + fast scripted self-play (no running server needed)
+- `cd server && RTS_FULL_AI_TESTS=1 cargo test` — includes long AI self-play/simulation coverage
+- `tests/run-all.sh --full-ai` — local gate plus long AI self-play/simulation coverage
 
 ## Invariants
 - Node tests need a **running** server on the test runner's private port. They are not
   `cargo test`. Start the server first.
-- After any change, run all relevant Node suites + `cargo test` and confirm green. The commit
-  hook silently runs tests; don't rely on it as your only check.
+- After any change, run all relevant Node suites + `cargo test` and confirm green. Use
+  `RTS_FULL_AI_TESTS=1 cargo test` when touching AI strategy, profile-backed self-play, replay
+  determinism, or balance behavior that depends on long AI matches. The commit hook silently runs
+  the fast gate; don't rely on it as your only check.
 
 ## Self-play failure protocol
 If a self-play test fails and the cause is not immediately obvious, **do not** speculate-debug.

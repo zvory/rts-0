@@ -3,8 +3,9 @@
 ## Run everything (one command)
 
 `run-all.sh` builds the server in debug (overflow checks **on**, which the hardening regression
-tests rely on), boots it, polls `GET /` until healthy, runs Rust formatting/lint/scripted tests
-and all the live-server suites, tears the server down, and exits non-zero if **any** suite fails.
+tests rely on), boots it, polls `GET /` until healthy, runs Rust formatting/lint/fast scripted
+tests and all the live-server suites, tears the server down, and exits non-zero if **any** suite
+fails.
 If a server is already answering on the port it is reused and left running.
 
 This command is the required local gate for every commit. Run `./scripts/install-hooks.sh` once per
@@ -12,7 +13,8 @@ checkout to install the tracked hooks locally. GitHub Actions also runs this com
 `main` as a shared signal, but `main` is intentionally left open for direct pushes.
 
 ```bash
-tests/run-all.sh                 # cargo fmt --check + cargo test + clippy + 3 API suites + client smoke
+tests/run-all.sh                 # fast gate: cargo fmt --check + cargo test + clippy + 3 API suites + client smoke
+tests/run-all.sh --full-ai       # fast gate plus long AI self-play/simulation coverage
 tests/run-all.sh --no-rust       # skip Rust fmt/test/lint
 tests/run-all.sh --no-client     # skip the headless-browser smoke test
 tests/run-all.sh -v              # print suite timings and pass/fail lines
@@ -54,12 +56,15 @@ node tests/server_integration.mjs
 
 ## Headless simulation self-play
 
-Runs inside the Rust test suite with no live server. The tests create scripted API clients that
-drive `Game` through `enqueue`/`tick`/`snapshot_for`, exercising gathering, oil,
-Depot/Barracks/Factory construction, Rifleman/Tank training, rush pressure, and combat.
-Successful runs replay the authoritative tick-stamped command log through a fresh game and compare
-the replayed event stream and final snapshots against the live run. On failure it writes replay
-artifacts under `server/target/selfplay-failures/`. To save a successful run too, set
+Runs inside the Rust test suite with no live server. Plain `cargo test` runs the fast scripted
+self-play coverage. Long profile-backed matchups, long AI simulation checks, and the full real-AI
+match are gated behind `RTS_FULL_AI_TESTS=1` because they dominate wall-clock time.
+The tests create scripted API clients that drive `Game` through `enqueue`/`tick`/`snapshot_for`,
+exercising gathering, oil, Depot/Barracks/Factory construction, Rifleman/Tank training, rush
+pressure, and combat. Successful runs replay the authoritative tick-stamped command log through a
+fresh game and compare the replayed event stream and final snapshots against the live run. On
+failure it writes replay artifacts under `server/target/selfplay-failures/`. To save a successful
+run too, set
 `RTS_SELFPLAY_SAVE_REPLAY` to either `1` for an auto-generated artifact name or to an explicit safe
 artifact name; successful runs are then written under `server/target/selfplay-artifacts/<name>/`.
 When you open a replay artifact in the browser, use the server instance that produced it, or
@@ -68,6 +73,8 @@ start a fresh one on its own port before loading `/dev/selfplay?replay=<artifact
 ```bash
 RTS_SELFPLAY_SAVE_REPLAY=manual_worker_rush_latest \
   cargo test scripted_self_play_worker_rush_vs_economy
+
+RTS_FULL_AI_TESTS=1 cargo test
 ```
 
 For manual profile-vs-profile balance checks, use the fixed-horizon matchup CLI. It runs one

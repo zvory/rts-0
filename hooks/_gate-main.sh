@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Shared "local CI" gate.
 #
-# Runs the full suite (tests/run-all.sh) before every local commit and before
+# Runs the fast local gate (tests/run-all.sh) before every local commit and before
 # every local merge commit.
 #
 # Why this and not pre-push: the project keeps direct pushes to main unblocked.
@@ -23,5 +23,5 @@ hook="${1:-hook}"
 repo_root="$(git rev-parse --show-toplevel)"
 cd "$repo_root"
 
-echo "$hook: running local CI (tests/run-all.sh)…"
+echo "$hook: running fast local CI (tests/run-all.sh)…"
 exec ./tests/run-all.sh
