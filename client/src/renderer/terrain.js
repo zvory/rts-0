@@ -6,6 +6,8 @@ import {
   terrainOverlayColor,
 } from "./shared.js";
 
+const TERRAIN_TEXTURE_DOWNSAMPLE = 8;
+
 function colorCss(color, alpha = 1) {
   const r = (color >> 16) & 0xff;
   const g = (color >> 8) & 0xff;
@@ -16,7 +18,7 @@ function colorCss(color, alpha = 1) {
 function fillImpassableEdge(ctx, map, tx, ty, code, ts) {
   if (!isImpassableTerrain(code)) return;
 
-  const edge = Math.max(3, Math.floor(ts * 0.16));
+  const edge = Math.max(1, Math.floor(ts * 0.16));
   const color = code === 2 ? 0x0c2028 : 0x24231f;
   const x = tx * ts;
   const y = ty * ts;
@@ -30,9 +32,10 @@ function fillImpassableEdge(ctx, map, tx, ty, code, ts) {
 export function buildStaticMap(map) {
   this._map = { width: map.width, height: map.height, tileSize: map.tileSize, terrain: map.terrain };
   const ts = map.tileSize;
+  const textureTileSize = Math.max(1, Math.round(ts / TERRAIN_TEXTURE_DOWNSAMPLE));
   const canvas = document.createElement("canvas");
-  canvas.width = map.width * ts;
-  canvas.height = map.height * ts;
+  canvas.width = map.width * textureTileSize;
+  canvas.height = map.height * textureTileSize;
   const ctx = canvas.getContext("2d", { alpha: false });
   if (!ctx) return;
   ctx.imageSmoothingEnabled = false;
@@ -40,16 +43,16 @@ export function buildStaticMap(map) {
   for (let ty = 0; ty < map.height; ty++) {
     for (let tx = 0; tx < map.width; tx++) {
       const code = map.terrain[ty * map.width + tx];
-      const x = tx * ts;
-      const y = ty * ts;
+      const x = tx * textureTileSize;
+      const y = ty * textureTileSize;
       const color = terrainColor(code, tx, ty);
       ctx.fillStyle = colorCss(color);
-      ctx.fillRect(x, y, ts, ts);
+      ctx.fillRect(x, y, textureTileSize, textureTileSize);
 
       // Coarse texture blocks keep the ground readable while selling the
       // low-resolution PS1 look. No symbols or national markings are used.
-      const blocks = ts >= 32 ? 4 : 2;
-      const block = ts / blocks;
+      const blocks = textureTileSize >= 4 ? 4 : 2;
+      const block = textureTileSize / blocks;
       for (let by = 0; by < blocks; by++) {
         for (let bx = 0; bx < blocks; bx++) {
           const n = hash2(tx * 17 + bx, ty * 17 + by);
@@ -60,7 +63,7 @@ export function buildStaticMap(map) {
         }
       }
 
-      fillImpassableEdge(ctx, map, tx, ty, code, ts);
+      fillImpassableEdge(ctx, map, tx, ty, code, textureTileSize);
     }
   }
 
@@ -71,5 +74,7 @@ export function buildStaticMap(map) {
   }
   const tex = PIXI.Texture.from(canvas, { scaleMode: PIXI.SCALE_MODES.NEAREST });
   this._terrainSprite = new PIXI.Sprite(tex);
+  const scale = ts / textureTileSize;
+  this._terrainSprite.scale.set(scale);
   layer.addChild(this._terrainSprite);
 }
