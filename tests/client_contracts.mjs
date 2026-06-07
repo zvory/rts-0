@@ -257,6 +257,22 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
 }
 
 {
+  let focused = false;
+  const focusInput = Object.create(Input.prototype);
+  focusInput.dom = {
+    clientWidth: 100,
+    clientHeight: 80,
+    focus(opts) {
+      focused = !!opts?.preventScroll;
+    },
+  };
+  focusInput.mouse = null;
+  focusInput._setPointerLockCursor = () => {};
+  focusInput._prepareCursorLock();
+  assert(focused, "Pointer Lock preparation focuses the viewport before requesting lock");
+}
+
+{
   assert(
     !shouldRequestPointerLock({ desktopRuntime: true, requireGesture: false }),
     "desktop Pointer Lock skips non-gesture automatic requests",

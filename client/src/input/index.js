@@ -161,6 +161,7 @@ export class Input {
 
   _install() {
     const el = this.dom;
+    if (!el.hasAttribute("tabindex")) el.tabIndex = -1;
     el.addEventListener("mousedown", this._onMouseDown);
     // Move/up on window so a drag that leaves the viewport still tracks & releases.
     window.addEventListener("mousemove", this._onMouseMove);
@@ -351,6 +352,14 @@ export class Input {
       webkitExitPointerLock: typeof document.webkitExitPointerLock,
       hasPointerLockElement: "pointerLockElement" in document,
       hasWebkitPointerLockElement: "webkitPointerLockElement" in document,
+      documentHasFocus: typeof document.hasFocus === "function" ? document.hasFocus() : null,
+      activeElement: document.activeElement
+        ? {
+            tag: document.activeElement.tagName,
+            id: document.activeElement.id || null,
+            className: document.activeElement.className || null,
+          }
+        : null,
       attempts: this._pointerLockAttempt,
       location: globalThis.location?.href || null,
       userAgent: navigator.userAgent,
@@ -358,9 +367,19 @@ export class Input {
   }
 
   _prepareCursorLock() {
+    this._focusPointerLockTarget();
     const p = this.mouse || this._viewportCenter();
     this.mouse = this._clampViewportPoint(p);
     this._setPointerLockCursor(this.mouse);
+  }
+
+  _focusPointerLockTarget() {
+    if (typeof this.dom.focus !== "function") return;
+    try {
+      this.dom.focus({ preventScroll: true });
+    } catch {
+      this.dom.focus();
+    }
   }
 
   requestPointerLock() {

@@ -170,7 +170,7 @@ export class Match {
     window.addEventListener("focus", this.onWindowFocus);
     window.addEventListener("keydown", this.onMenuKeyDown, true);
     window.addEventListener("keydown", this.onPointerLockGesture, true);
-    window.addEventListener("mousedown", this.onPointerLockGesture, true);
+    window.addEventListener("click", this.onPointerLockGesture, true);
     document.addEventListener("visibilitychange", this.onVisibilityChange);
     dom.settingsButton?.addEventListener("click", this.onSettingsClick);
     dom.pointerLockToggle?.addEventListener("click", this.onPointerLockToggle);
@@ -311,6 +311,7 @@ export class Match {
 
   handlePointerLockGesture(ev) {
     if (ev.code === "Escape" || isTextEntry(ev.target)) return;
+    if (ev.type === "click" && !dom.viewport?.contains(ev.target)) return;
     this.requestAutomaticPointerLock({ requireGesture: true });
   }
 
@@ -701,7 +702,7 @@ export class Match {
     window.removeEventListener("focus", this.onWindowFocus);
     window.removeEventListener("keydown", this.onMenuKeyDown, true);
     window.removeEventListener("keydown", this.onPointerLockGesture, true);
-    window.removeEventListener("mousedown", this.onPointerLockGesture, true);
+    window.removeEventListener("click", this.onPointerLockGesture, true);
     document.removeEventListener("visibilitychange", this.onVisibilityChange);
     dom.settingsButton?.removeEventListener("click", this.onSettingsClick);
     dom.pointerLockToggle?.removeEventListener("click", this.onPointerLockToggle);
