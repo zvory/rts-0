@@ -23,7 +23,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self' https://rts-0-zvorygin.fly.dev; connect-src 'self' https://rts-0-zvorygin.fly.dev wss://rts-0-zvorygin.fly.dev; script-src 'self' https://rts-0-zvorygin.fly.dev https://cdn.jsdelivr.net 'unsafe-inline'; style-src 'self' https://rts-0-zvorygin.fly.dev 'unsafe-inline'; img-src 'self' https://rts-0-zvorygin.fly.dev data:; media-src 'self' https://rts-0-zvorygin.fly.dev; font-src 'self' https://rts-0-zvorygin.fly.dev data:;"
+      "csp": "default-src 'self' https://bewegungskrieg.net; connect-src 'self' https://bewegungskrieg.net wss://bewegungskrieg.net; script-src 'self' https://bewegungskrieg.net https://cdn.jsdelivr.net 'unsafe-inline'; style-src 'self' https://bewegungskrieg.net 'unsafe-inline'; img-src 'self' https://bewegungskrieg.net data:; media-src 'self' https://bewegungskrieg.net; font-src 'self' https://bewegungskrieg.net data:;"
     }
   },
   "bundle": {
