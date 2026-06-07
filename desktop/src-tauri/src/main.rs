@@ -5,7 +5,7 @@ use std::{env, io};
 
 use tauri::{Manager, Url, WebviewWindow};
 
-const SERVER_URL: &str = "https://rts-0-zvorygin.fly.dev/";
+const SERVER_URL: &str = "https://bewegungskrieg.net/";
 const DESKTOP_URL_ENV: &str = "RTS_DESKTOP_URL";
 const OPEN_DEVTOOLS_ENV: &str = "RTS_TAURI_OPEN_DEVTOOLS";
 

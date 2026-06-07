@@ -3,7 +3,7 @@
   "identifier": "default",
   "description": "enables the default permissions",
   "remote": {
-    "urls": ["https://rts-0-zvorygin.fly.dev/*"]
+    "urls": ["https://bewegungskrieg.net/*"]
   },
   "local": false,
   "windows": [
