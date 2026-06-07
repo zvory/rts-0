@@ -424,7 +424,8 @@ pub struct EntityView {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub queued_markers: Vec<QueuedOrderMarker>,
 
-    // Mobile units: current move/attack-move destination. Only ever sent to the owner.
+    // Mobile units: current move/attack-move destination or active build footprint center. Only
+    // ever sent to the owner.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub active_marker: Option<QueuedOrderMarker>,
 

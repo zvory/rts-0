@@ -160,7 +160,8 @@ trailing missing optional fields are omitted; interior missing optional fields a
 The `queuedMarkers` slot is an owner-only array capped at 8 entries; each entry is
 `[x, y]` for a queued move stage or `[x, y, true]` for a queued attack-move stage.
 The `activeMarker` slot uses the same point-marker shape for the owner-only current
-move/attack-move destination, letting clients draw the active leg before future queued stages.
+move/attack-move destination or active build footprint center, letting clients draw the active leg
+before future queued stages.
 `visionOnly` is true only for non-owned units/buildings visible through lingering death vision;
 clients render them below the fog overlay and must not select or issue targeted commands against
 them. In `n.flags`, bit 0 = `slowTick` and bit 1 = `headOfLine`.
@@ -206,7 +207,7 @@ watch rooms receive all resource updates).
   queuedMarkers?: [              // future queued move/attack-move points; ONLY ever sent to the owner
     { x: f32, y: f32, attackMove?: bool }
   ],
-  activeMarker?: { x: f32, y: f32, attackMove?: bool }, // active move/attack-move destination; ONLY ever sent to the owner
+  activeMarker?: { x: f32, y: f32, attackMove?: bool }, // active move/attack-move destination or build footprint center; ONLY ever sent to the owner
   chargeCooldownLeft?: u16,      // rifleman only: owner-visible remaining Charge cooldown in ticks
   visionOnly?: bool,             // true = visible only through one-second death vision; visual intel only
   debugPath?: {                  // lobby Debug mode only; remaining movement path; ONLY ever sent to the owner
@@ -238,4 +239,3 @@ the fog overlay; `toPos` lets tracers draw even when the hit target is no longer
 Events are best-effort visual flavor; the client must not depend on receiving them.
 
 ---
-
