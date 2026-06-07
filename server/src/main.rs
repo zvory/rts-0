@@ -27,8 +27,8 @@ use axum::response::{Html, IntoResponse, Redirect};
 use axum::routing::{get, post};
 use axum::Json;
 use axum::Router;
-use serde::Deserialize;
 use futures_util::{SinkExt, StreamExt};
+use serde::Deserialize;
 use tokio::sync::mpsc;
 use tower_http::services::{ServeDir, ServeFile};
 use tracing::{debug, info, warn};
@@ -315,23 +315,22 @@ fn build_versioned_index(client_dir: &str, version: &str) -> String {
     // Collect every .js file under client/src/ to populate the import map.
     let src_dir = format!("{client_dir}/src");
     let mut entries = String::new();
-    if let Ok(read_dir) = std::fs::read_dir(&src_dir) {
-        let mut names: Vec<String> = read_dir
-            .flatten()
-            .filter(|e| e.path().extension().map(|x| x == "js").unwrap_or(false))
-            .filter_map(|e| e.file_name().into_string().ok())
-            .collect();
-        names.sort();
-        for name in names {
-            entries.push_str(&format!(
-                "    \"/src/{name}\": \"/src/{name}?v={version}\",\n"
-            ));
-        }
-        // Remove the trailing comma from the last entry so the JSON is valid.
-        if entries.ends_with(",\n") {
-            entries.truncate(entries.len() - 2);
-            entries.push('\n');
-        }
+    let mut names = Vec::new();
+    collect_js_modules(
+        std::path::Path::new(&src_dir),
+        std::path::Path::new(""),
+        &mut names,
+    );
+    names.sort();
+    for name in names {
+        entries.push_str(&format!(
+            "    \"/src/{name}\": \"/src/{name}?v={version}\",\n"
+        ));
+    }
+    // Remove the trailing comma from the last entry so the JSON is valid.
+    if entries.ends_with(",\n") {
+        entries.truncate(entries.len() - 2);
+        entries.push('\n');
     }
     let import_map = format!(
         "<script type=\"importmap\">\n{{\n  \"imports\": {{\n{entries}  }}\n}}\n</script>\n  "
@@ -346,6 +345,24 @@ fn build_versioned_index(client_dir: &str, version: &str) -> String {
     // Also version the top-level entry point and stylesheet so they bypass the cache too.
     html.replace("./src/main.js\"", &format!("./src/main.js?v={version}\""))
         .replace("./styles.css\"", &format!("./styles.css?v={version}\""))
+}
+
+fn collect_js_modules(dir: &std::path::Path, prefix: &std::path::Path, out: &mut Vec<String>) {
+    let Ok(read_dir) = std::fs::read_dir(dir) else {
+        return;
+    };
+    for entry in read_dir.flatten() {
+        let path = entry.path();
+        let name = entry.file_name();
+        let next_prefix = prefix.join(name);
+        if path.is_dir() {
+            collect_js_modules(&path, &next_prefix, out);
+        } else if path.extension().is_some_and(|ext| ext == "js") {
+            if let Some(name) = next_prefix.to_str() {
+                out.push(name.replace('\\', "/"));
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -367,6 +384,21 @@ mod tests {
         );
         assert!(html.contains("/dev/scenarios?id=scout_car_wall_chokepoint&unit=tank&count=15"));
         assert!(html.contains("/dev/scenarios?id=scout_car_wall_chokepoint&unit=at_team&count=15"));
+    }
+
+    #[test]
+    fn versioned_index_cache_busts_nested_js_modules() {
+        let client_dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../client");
+        let html = build_versioned_index(client_dir, "test-version");
+        assert!(html.contains("\"/src/main.js\": \"/src/main.js?v=test-version\""));
+        assert!(
+            html.contains(
+                "\"/src/renderer/terrain.js\": \"/src/renderer/terrain.js?v=test-version\""
+            ),
+            "nested ES modules must be versioned so desktop webviews do not run stale renderer code"
+        );
+        assert!(html.contains("./src/main.js?v=test-version\""));
+        assert!(html.contains("./styles.css?v=test-version\""));
     }
 }
 
@@ -771,7 +803,9 @@ async fn map_save_handler(
     let name = req.name.trim().to_string();
     if name.is_empty()
         || name.len() > 64
-        || !name.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+        || !name
+            .chars()
+            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
     {
         return (
             StatusCode::BAD_REQUEST,
