@@ -15,10 +15,10 @@ use crate::game::PlayerState;
 use crate::protocol::Event;
 
 mod collision;
+mod pivot_drive;
 mod scout_car;
 mod standability;
 mod steering;
-mod tank_drive;
 mod waypoints;
 
 #[cfg(test)]
@@ -33,10 +33,10 @@ pub(super) const MAX_UNIT_BOUNDING_RADIUS_PX: f32 = 32.0;
 pub(super) const STEERING_MAX_NEIGHBORS: usize = 16;
 
 pub(crate) use collision::resolve_collisions;
-pub(crate) use standability::is_collision_anchored;
 #[cfg(test)]
-use tank_drive::TANK_BODY_TURN_RATE_RAD_PER_TICK;
-pub(crate) use tank_drive::{angle_delta, rotate_toward};
+use pivot_drive::TANK_BODY_TURN_RATE_RAD_PER_TICK;
+pub(crate) use pivot_drive::{angle_delta, rotate_toward};
+pub(crate) use standability::is_collision_anchored;
 
 /// Advance every moving unit along its waypoint path at its speed. Clamps the final landing
 /// tile to passable terrain (soft overlap with other units is allowed, so we don't resolve

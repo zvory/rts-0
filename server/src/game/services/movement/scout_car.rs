@@ -10,9 +10,9 @@ use crate::game::services::occupancy::Occupancy;
 use crate::game::services::spatial::SpatialIndex;
 use crate::game::services::standability as static_standability;
 
-use super::tank_drive::{
+use super::pivot_drive::{
     angle_delta, distance_between, normalize_angle, vehicle_traffic_adjustment,
-    TANK_BODY_LOOKAHEAD_PX, TANK_REVERSE_GOAL_DISTANCE_PX,
+    PIVOT_VEHICLE_LOOKAHEAD_PX, VEHICLE_REVERSE_GOAL_DISTANCE_PX,
 };
 use super::{ARRIVE_EPS, MAX_UNIT_BOUNDING_RADIUS_PX, STEERING_MAX_NEIGHBORS};
 
@@ -179,7 +179,7 @@ pub(super) fn vehicle_accepts_waypoint(
     waypoint: (f32, f32),
     next_waypoint: Option<(f32, f32)>,
 ) -> bool {
-    if distance_between(current, waypoint) <= config::SCOUT_CAR_WAYPOINT_ACCEPTANCE_RADIUS_PX {
+    if distance_between(current, waypoint) <= config::VEHICLE_WAYPOINT_ACCEPTANCE_RADIUS_PX {
         return true;
     }
 
@@ -314,7 +314,7 @@ fn vehicle_route_context(
 
 fn vehicle_route_lookahead_px(kind: EntityKind) -> f32 {
     match kind {
-        EntityKind::Tank | EntityKind::AtTeam => TANK_BODY_LOOKAHEAD_PX,
+        EntityKind::Tank | EntityKind::AtTeam => PIVOT_VEHICLE_LOOKAHEAD_PX,
         _ => SCOUT_CAR_ROUTE_LOOKAHEAD_PX,
     }
 }
@@ -726,7 +726,7 @@ fn scout_car_post_motion_waypoint_pops(
             }
         } else {
             let pass_by_tolerance = if candidate.primitive.travel_sign < 0.0 {
-                config::SCOUT_CAR_WAYPOINT_ACCEPTANCE_RADIUS_PX
+                config::VEHICLE_WAYPOINT_ACCEPTANCE_RADIUS_PX
             } else {
                 scout_car_final_goal_tolerance()
             };
@@ -770,7 +770,7 @@ fn scout_car_reverse_waypoint(e: &Entity, x: f32, y: f32) -> Option<(f32, f32)> 
     }
 
     let is_final_waypoint = movement.path.len() == 1;
-    if is_final_waypoint && dist <= TANK_REVERSE_GOAL_DISTANCE_PX {
+    if is_final_waypoint && dist <= VEHICLE_REVERSE_GOAL_DISTANCE_PX {
         return Some(next);
     }
 

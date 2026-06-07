@@ -175,8 +175,10 @@ build-site blocking. `services::standability` owns reusable legality predicates 
 building sites. Production spawn exits, construction/build intent, movement landing, steering
 candidates, collision push targets, and formation goal selection all use this shared standability
 layer for static/body legality. Swept segment checks sample the same body shape along a straight
-segment, and broad-phase queries use each body's conservative bounding radius. These helpers are
-pure and do not change the wire protocol or client contract.
+segment, and broad-phase queries use each body's conservative bounding radius. Movement separates
+oriented vehicle body legality from drive behavior: tanks and AT guns use pivot-drive locomotion
+that can rotate in place before advancing, while scout cars use car-drive path following where hull
+facing changes through translation/curvature. These helpers are pure and do not change the wire
+protocol or client contract.
 
 ---
-

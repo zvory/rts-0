@@ -6,20 +6,20 @@
 
 use std::collections::HashMap;
 
-use crate::game::entity::{uses_oriented_vehicle_body, uses_tank_movement_semantics, EntityKind};
+use crate::game::entity::{uses_oriented_vehicle_body, uses_pivot_vehicle_movement, EntityKind};
 use crate::game::map::Map;
 use crate::game::pathfinding::{self, Passability};
 use crate::game::services::occupancy::Occupancy;
 use crate::game::services::standability;
 use crate::rules::terrain::{self, TerrainKind};
 
-const SCOUT_CAR_HARD_CLEARANCE_TILES: u16 = 1;
-const SCOUT_CAR_PREFERRED_CLEARANCE_TILES: u16 = 3;
-const SCOUT_CAR_CLEARANCE_COST_SCALE: u32 = 2;
-const SCOUT_CAR_ROUTE_TURN_PENALTY: u32 = 5;
-const SCOUT_CAR_ADJACENT_BLOCKER_COST: u32 = 2;
-const SCOUT_CAR_CORNER_GRAZE_COST: u32 = 18;
-const SCOUT_CAR_DIAGONAL_BLOCKER_COST: u32 = 3;
+const VEHICLE_HARD_CLEARANCE_TILES: u16 = 1;
+const VEHICLE_PREFERRED_CLEARANCE_TILES: u16 = 3;
+const VEHICLE_CLEARANCE_COST_SCALE: u32 = 2;
+const VEHICLE_ROUTE_TURN_PENALTY: u32 = 5;
+const VEHICLE_ADJACENT_BLOCKER_COST: u32 = 2;
+const VEHICLE_CORNER_GRAZE_COST: u32 = 18;
+const VEHICLE_DIAGONAL_BLOCKER_COST: u32 = 3;
 
 /// Parameters for a single path query.
 #[derive(Clone)]
@@ -44,7 +44,7 @@ pub enum RouteShape {
     Normal,
     #[cfg(test)]
     PreferFewerTurns,
-    ScoutCarClearance,
+    VehicleClearance,
 }
 
 impl RouteShape {
@@ -53,7 +53,7 @@ impl RouteShape {
             RouteShape::Normal => 0,
             #[cfg(test)]
             RouteShape::PreferFewerTurns => 3,
-            RouteShape::ScoutCarClearance => SCOUT_CAR_ROUTE_TURN_PENALTY,
+            RouteShape::VehicleClearance => VEHICLE_ROUTE_TURN_PENALTY,
         }
     }
 }
@@ -114,18 +114,18 @@ impl Passability for TerrainPassability<'_> {
     }
 
     fn movement_cost(&self, tx: i32, ty: i32) -> u32 {
-        if self.route_shape != RouteShape::ScoutCarClearance
+        if self.route_shape != RouteShape::VehicleClearance
             || !uses_oriented_vehicle_body(self.kind)
         {
             return 0;
         }
-        scout_car_clearance_cost(self.occupancy.clearance_at_tile(tx, ty))
-            .saturating_add(self.scout_car_corner_cost(tx, ty))
+        vehicle_clearance_cost(self.occupancy.clearance_at_tile(tx, ty))
+            .saturating_add(self.vehicle_corner_cost(tx, ty))
     }
 }
 
 impl TerrainPassability<'_> {
-    fn scout_car_corner_cost(&self, tx: i32, ty: i32) -> u32 {
+    fn vehicle_corner_cost(&self, tx: i32, ty: i32) -> u32 {
         let n = !self.tile_passable(tx, ty - 1);
         let e = !self.tile_passable(tx + 1, ty);
         let s = !self.tile_passable(tx, ty + 1);
@@ -142,10 +142,10 @@ impl TerrainPassability<'_> {
             .count() as u32;
         let grazes_corner = (w || e) && (s || n);
 
-        adjacent_blockers * SCOUT_CAR_ADJACENT_BLOCKER_COST
-            + diagonal_blockers * SCOUT_CAR_DIAGONAL_BLOCKER_COST
+        adjacent_blockers * VEHICLE_ADJACENT_BLOCKER_COST
+            + diagonal_blockers * VEHICLE_DIAGONAL_BLOCKER_COST
             + if grazes_corner {
-                SCOUT_CAR_CORNER_GRAZE_COST
+                VEHICLE_CORNER_GRAZE_COST
             } else {
                 0
             }
@@ -197,13 +197,13 @@ impl PathingService {
         let start = req.start;
         let kind = req.kind;
         let tile_path = self.request_tile_path(map, occupancy, req);
-        if uses_tank_movement_semantics(kind) {
+        if uses_pivot_vehicle_movement(kind) {
             let pass = TerrainPassability {
                 map,
                 occupancy,
                 kind,
                 radius_tiles: 0,
-                route_shape: RouteShape::ScoutCarClearance,
+                route_shape: RouteShape::VehicleClearance,
                 avoid_diagonal_pinch: true,
             };
             let tile_path = expand_vehicle_diagonal_steps_to_l_waypoints(start, &tile_path, &pass);
@@ -359,12 +359,12 @@ fn choose_vehicle_l_elbow<P: Passability>(
     }
 }
 
-pub(crate) fn scout_car_clearance_cost(clearance_tiles: u16) -> u32 {
-    if clearance_tiles < SCOUT_CAR_HARD_CLEARANCE_TILES {
+pub(crate) fn vehicle_clearance_cost(clearance_tiles: u16) -> u32 {
+    if clearance_tiles < VEHICLE_HARD_CLEARANCE_TILES {
         return u32::MAX / 4;
     }
-    let deficit = SCOUT_CAR_PREFERRED_CLEARANCE_TILES.saturating_sub(clearance_tiles) as u32;
-    deficit * deficit * SCOUT_CAR_CLEARANCE_COST_SCALE
+    let deficit = VEHICLE_PREFERRED_CLEARANCE_TILES.saturating_sub(clearance_tiles) as u32;
+    deficit * deficit * VEHICLE_CLEARANCE_COST_SCALE
 }
 
 /// Simplify reverse-ordered world waypoints by dropping intermediate tile centers when the unit
@@ -692,13 +692,10 @@ mod tests {
     }
 
     #[test]
-    fn scout_car_clearance_cost_tapers_below_preferred_clearance() {
-        assert_eq!(
-            scout_car_clearance_cost(SCOUT_CAR_PREFERRED_CLEARANCE_TILES),
-            0
-        );
-        assert!(scout_car_clearance_cost(3) < scout_car_clearance_cost(2));
-        assert!(scout_car_clearance_cost(2) < scout_car_clearance_cost(1));
+    fn vehicle_clearance_cost_tapers_below_preferred_clearance() {
+        assert_eq!(vehicle_clearance_cost(VEHICLE_PREFERRED_CLEARANCE_TILES), 0);
+        assert!(vehicle_clearance_cost(3) < vehicle_clearance_cost(2));
+        assert!(vehicle_clearance_cost(2) < vehicle_clearance_cost(1));
     }
 
     #[test]
@@ -817,7 +814,7 @@ mod tests {
     }
 
     #[test]
-    fn tank_turn_cost_prefers_fewer_semi_open_route_turns_than_normal_pathing() {
+    fn pivot_vehicle_turn_cost_prefers_fewer_semi_open_route_turns_than_normal_pathing() {
         let mut map = flat_test_map(24);
         for (tx, ty) in [
             (6, 6),
@@ -892,12 +889,12 @@ mod tests {
         );
         assert!(
             tile_turn_count(start, &shaped) < tile_turn_count(start, &normal),
-            "turn-shaped tank route should reduce heading changes, normal={normal:?} shaped={shaped:?}"
+            "turn-shaped pivot vehicle route should reduce heading changes, normal={normal:?} shaped={shaped:?}"
         );
     }
 
     #[test]
-    fn tank_turn_cost_still_finds_route_around_obstacle() {
+    fn pivot_vehicle_turn_cost_still_finds_route_around_obstacle() {
         let map = map_with_rock_rect(24, 7, 6, 10, 8);
         let start = (4, 7);
         let goal = (13, 7);
@@ -915,7 +912,7 @@ mod tests {
     }
 
     #[test]
-    fn tank_turn_cost_keeps_required_bend() {
+    fn pivot_vehicle_turn_cost_keeps_required_bend() {
         let map = map_with_rock_rect(24, 7, 6, 10, 8);
         let start = (4, 7);
         let goal = (13, 7);
@@ -941,7 +938,7 @@ mod tests {
     }
 
     #[test]
-    fn tank_turn_cost_requests_are_deterministic() {
+    fn pivot_vehicle_turn_cost_requests_are_deterministic() {
         let map = map_with_rock_rect(32, 10, 8, 14, 12);
         let start = (5, 10);
         let goal = (22, 14);
@@ -977,7 +974,7 @@ mod tests {
         for route_shape in [
             RouteShape::Normal,
             RouteShape::PreferFewerTurns,
-            RouteShape::ScoutCarClearance,
+            RouteShape::VehicleClearance,
         ] {
             let path = service.request_tile_path(
                 &map,
@@ -1008,12 +1005,12 @@ mod tests {
             start,
             goal,
             0,
-            RouteShape::ScoutCarClearance
+            RouteShape::VehicleClearance
         ));
     }
 
     #[test]
-    fn scout_car_clearance_route_shape_is_part_of_path_cache_key() {
+    fn vehicle_clearance_route_shape_is_part_of_path_cache_key() {
         let map = flat_test_map(40);
         let entities = EntityStore::new();
         let occ = Occupancy::build(&map, &entities);
@@ -1022,7 +1019,7 @@ mod tests {
         let radius_tiles = config::unit_radius_tiles(EntityKind::ScoutCar);
         let mut service = PathingService::new(8_192, 256);
 
-        for route_shape in [RouteShape::Normal, RouteShape::ScoutCarClearance] {
+        for route_shape in [RouteShape::Normal, RouteShape::VehicleClearance] {
             let path = service.request_tile_path(
                 &map,
                 &occ,
@@ -1051,7 +1048,7 @@ mod tests {
             start,
             goal,
             radius_tiles,
-            RouteShape::ScoutCarClearance
+            RouteShape::VehicleClearance
         ));
     }
 
@@ -1097,7 +1094,7 @@ mod tests {
     }
 
     #[test]
-    fn tank_turn_cost_respects_expansion_budget() {
+    fn pivot_vehicle_turn_cost_respects_expansion_budget() {
         let map = flat_test_map(40);
         let entities = EntityStore::new();
         let occ = Occupancy::build(&map, &entities);
@@ -1327,7 +1324,7 @@ mod tests {
             assert_eq!(
                 world_path.len(),
                 tile_path.len() + diagonal_steps,
-                "tank-style vehicles should insert one L elbow per raw diagonal step"
+                "pivot-drive vehicles should insert one L elbow per raw diagonal step"
             );
             assert_no_diagonal_world_steps(&map, start, &world_path);
             assert_reverse_segments_standable(
@@ -1465,7 +1462,7 @@ mod tests {
                     start,
                     goal,
                     radius_tiles: config::unit_radius_tiles(kind),
-                    route_shape: RouteShape::ScoutCarClearance,
+                    route_shape: RouteShape::VehicleClearance,
                     budget: None,
                 },
             );
@@ -1484,7 +1481,7 @@ mod tests {
     }
 
     #[test]
-    fn scout_car_clearance_cost_keeps_narrow_passage_traversable() {
+    fn vehicle_clearance_cost_keeps_narrow_passage_traversable() {
         let map = two_tile_wide_horizontal_corridor();
         let entities = EntityStore::new();
         let occ = Occupancy::build(&map, &entities);
@@ -1500,7 +1497,7 @@ mod tests {
                 start,
                 goal,
                 radius_tiles: config::unit_radius_tiles(EntityKind::ScoutCar),
-                route_shape: RouteShape::ScoutCarClearance,
+                route_shape: RouteShape::VehicleClearance,
                 budget: None,
             },
         );
@@ -1509,7 +1506,7 @@ mod tests {
     }
 
     #[test]
-    fn scout_car_clearance_route_avoids_corner_graze_tiles_when_alternatives_exist() {
+    fn vehicle_clearance_route_avoids_corner_graze_tiles_when_alternatives_exist() {
         let map = map_with_rock_rect(24, 9, 8, 11, 10);
         let entities = EntityStore::new();
         let occ = Occupancy::build(&map, &entities);
@@ -1525,7 +1522,7 @@ mod tests {
                 start,
                 goal,
                 radius_tiles: config::unit_radius_tiles(EntityKind::ScoutCar),
-                route_shape: RouteShape::ScoutCarClearance,
+                route_shape: RouteShape::VehicleClearance,
                 budget: None,
             },
         );
@@ -1534,7 +1531,7 @@ mod tests {
         for corner_graze in [(8, 11), (12, 7)] {
             assert!(
                 !shaped.contains(&corner_graze),
-                "scout car clearance route should avoid corner-graze tile {corner_graze:?} when a wider route exists, got {shaped:?}"
+                "vehicle clearance route should avoid corner-graze tile {corner_graze:?} when a wider route exists, got {shaped:?}"
             );
         }
     }

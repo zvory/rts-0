@@ -112,7 +112,7 @@ pub(crate) fn uses_oriented_vehicle_body(kind: EntityKind) -> bool {
     )
 }
 
-pub(crate) fn uses_tank_movement_semantics(kind: EntityKind) -> bool {
+pub(crate) fn uses_pivot_vehicle_movement(kind: EntityKind) -> bool {
     matches!(kind, EntityKind::AtTeam | EntityKind::Tank)
 }
 

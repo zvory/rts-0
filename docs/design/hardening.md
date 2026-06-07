@@ -90,12 +90,12 @@ The server treats every client as potentially hostile. Limits live next to the c
   chase, gather, and build staging keep tile-guided `Normal` routing. Oriented vehicles follow the
   route corridor rather than exact intermediate waypoint centers: an intermediate waypoint is
   consumed inside
-  `SCOUT_CAR_WAYPOINT_ACCEPTANCE_RADIUS_PX` (0.75 tiles), after the car has passed the waypoint
+  `VEHICLE_WAYPOINT_ACCEPTANCE_RADIUS_PX` (0.75 tiles), after the vehicle has passed the waypoint
   along the next route segment, or when the next route segment is statically reachable by the
   vehicle's swept oriented body from its current legal body position. Scout-car drive intent uses a
   3-tile lookahead on the current statically legal route segment, so a car that comes alongside the
   route can continue to a drivable point ahead instead of oscillating around a point it cannot
-  laterally reach; tanks and AT teams use a 5-tile lookahead with tank-style pivot locomotion. The
+  laterally reach; tanks and AT teams use a 5-tile lookahead with pivot-drive locomotion. The
   lookahead never skips through terrain or building occupancy that fails oriented-body segment
   legality. A final
   move waypoint can settle inside `SCOUT_CAR_FINAL_GOAL_TOLERANCE_PX` (0.375 tiles) only when the
@@ -176,7 +176,7 @@ The server treats every client as potentially hostile. Limits live next to the c
   `standability::unit_static_standable`. This prevents large units from being assigned a center tile
   whose body would clip terrain or a building footprint; dynamic unit traffic is still handled by
   steering and collision after movement.
-- **Local steering**: before taking a partial path step for a plain `Move` order, non-tank movement
+- **Local steering**: before taking a partial path step for a plain `Move` order, non-vehicle movement
   computes a short-range separation proposal away from nearby firm/braced/heavy mobile units.
   Neighbor ids are sorted and capped so replay behavior stays deterministic, and separation uses the
   same footing profiles as hard collision so braced/heavy units exert stronger local pressure than
@@ -214,4 +214,3 @@ The server treats every client as potentially hostile. Limits live next to the c
   scaffolds are accepted.
 
 ---
-

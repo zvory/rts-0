@@ -16,12 +16,12 @@ use crate::game::{PlayerState, ScoreState};
 use crate::protocol::NoticeSeverity;
 
 use super::collision::COLLISION_EPS_PX;
+use super::pivot_drive::{
+    pivot_drive_desired_path_point, AT_GUN_BODY_TURN_RATE_RAD_PER_TICK, PIVOT_VEHICLE_LOOKAHEAD_PX,
+    VEHICLE_REVERSE_GOAL_DISTANCE_PX,
+};
 use super::scout_car::{
     scout_car_desired_path_point, SCOUT_CAR_MIN_TURN_RADIUS_PX, SCOUT_CAR_ROUTE_LOOKAHEAD_PX,
-};
-use super::tank_drive::{
-    tank_desired_path_point, AT_GUN_BODY_TURN_RATE_RAD_PER_TICK, TANK_BODY_LOOKAHEAD_PX,
-    TANK_REVERSE_GOAL_DISTANCE_PX,
 };
 
 /// Distance (px) between two entity centers.
@@ -2732,11 +2732,11 @@ fn tank_route_lookahead_uses_long_open_segment() {
 
     let occ = Occupancy::build(&map, &entities);
     let e = entities.get(tank).expect("tank should exist");
-    let desired =
-        tank_desired_path_point(&map, &occ, e, sx, sy).expect("tank should have route intent");
+    let desired = pivot_drive_desired_path_point(&map, &occ, e, sx, sy)
+        .expect("tank should have route intent");
 
     assert!(
-        (desired.0 - (sx + TANK_BODY_LOOKAHEAD_PX)).abs() <= 0.001,
+        (desired.0 - (sx + PIVOT_VEHICLE_LOOKAHEAD_PX)).abs() <= 0.001,
         "open route intent should use the long tank lookahead, got x {:.2} from start {:.2}",
         desired.0,
         sx
@@ -2789,7 +2789,8 @@ fn tank_route_lookahead_stops_before_blocked_corner() {
     );
 
     let e = entities.get(tank).expect("tank should exist");
-    let desired = tank_desired_path_point(&map, &occ, e, start.0, start.1).expect("route intent");
+    let desired =
+        pivot_drive_desired_path_point(&map, &occ, e, start.0, start.1).expect("route intent");
 
     assert!(
         (desired.1 - start.1).abs() <= 0.001,
@@ -2808,7 +2809,7 @@ fn scout_car_route_lookahead_skips_lateral_waypoint_when_next_segment_reachable(
     let map = flat_map(1);
     let mut entities = EntityStore::new();
     let (sx, sy) = map.tile_center(20, 20);
-    let lateral_offset = config::SCOUT_CAR_WAYPOINT_ACCEPTANCE_RADIUS_PX + 10.0;
+    let lateral_offset = config::VEHICLE_WAYPOINT_ACCEPTANCE_RADIUS_PX + 10.0;
     let start = (sx, sy + lateral_offset);
     let intermediate = (sx + config::TILE_SIZE as f32, sy);
     let goal = (sx + config::TILE_SIZE as f32 * 8.0, sy);
@@ -3856,10 +3857,7 @@ fn scout_car_consumes_lateral_intermediate_waypoint_inside_car_radius() {
     let map = flat_map(1);
     let mut entities = EntityStore::new();
     let (sx, sy) = map.tile_center(20, 20);
-    let intermediate = (
-        sx,
-        sy + config::SCOUT_CAR_WAYPOINT_ACCEPTANCE_RADIUS_PX - 2.0,
-    );
+    let intermediate = (sx, sy + config::VEHICLE_WAYPOINT_ACCEPTANCE_RADIUS_PX - 2.0);
     let goal = (sx + config::TILE_SIZE as f32 * 4.0, intermediate.1);
     let scout = entities
         .spawn_unit(1, EntityKind::ScoutCar, sx, sy)
@@ -3987,7 +3985,7 @@ fn scout_car_does_not_pivot_in_place_for_far_goal_behind() {
     let mut entities = EntityStore::new();
     let (sx, sy) = map.tile_center(20, 20);
     let goal = (
-        sx - TANK_REVERSE_GOAL_DISTANCE_PX - config::TILE_SIZE as f32,
+        sx - VEHICLE_REVERSE_GOAL_DISTANCE_PX - config::TILE_SIZE as f32,
         sy,
     );
     let scout = entities
@@ -4033,7 +4031,7 @@ fn scout_car_symmetric_far_behind_turn_is_deterministic() {
         let mut entities = EntityStore::new();
         let (sx, sy) = map.tile_center(20, 20);
         let goal = (
-            sx - TANK_REVERSE_GOAL_DISTANCE_PX - config::TILE_SIZE as f32,
+            sx - VEHICLE_REVERSE_GOAL_DISTANCE_PX - config::TILE_SIZE as f32,
             sy,
         );
         let scout = entities
@@ -4192,7 +4190,7 @@ fn scout_car_reversing_to_nearby_offset_goal_arrives() {
         e.facing()
     );
     assert!(
-        moved_distance((e.pos_x, e.pos_y), goal) <= config::SCOUT_CAR_WAYPOINT_ACCEPTANCE_RADIUS_PX,
+        moved_distance((e.pos_x, e.pos_y), goal) <= config::VEHICLE_WAYPOINT_ACCEPTANCE_RADIUS_PX,
         "straight reverse should settle within scout-car acceptance without reverse turning"
     );
 }
@@ -4223,7 +4221,7 @@ fn tank_body_facing_turns_gradually_along_path() {
 }
 
 #[test]
-fn at_gun_body_uses_tank_drive_turning_along_path() {
+fn at_gun_body_uses_pivot_drive_turning_along_path() {
     let map = flat_map(1);
     let mut entities = EntityStore::new();
     let (sx, sy) = map.tile_center(20, 20);
@@ -4375,7 +4373,7 @@ fn tank_still_pivots_for_far_goal_behind() {
     let mut entities = EntityStore::new();
     let (sx, sy) = map.tile_center(20, 20);
     let goal = (
-        sx - TANK_REVERSE_GOAL_DISTANCE_PX - config::TILE_SIZE as f32,
+        sx - VEHICLE_REVERSE_GOAL_DISTANCE_PX - config::TILE_SIZE as f32,
         sy,
     );
     let tank = entities

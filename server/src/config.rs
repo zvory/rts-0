@@ -37,9 +37,9 @@ pub const STATIC_BLOCKED_REPATH_TICKS: u16 = TICK_HZ as u16;
 /// units contesting the same tile center cannot both lock onto it simultaneously.
 pub const ARRIVE_RADIUS_INTERMEDIATE_PX: f32 = TILE_SIZE as f32 * 0.5; // 16 px
 
-/// Scout cars follow route corridors instead of exact intermediate tile centers. This larger
-/// acceptance radius lets the nonholonomic body consume a waypoint it has come alongside.
-pub const SCOUT_CAR_WAYPOINT_ACCEPTANCE_RADIUS_PX: f32 = TILE_SIZE as f32 * 0.75; // 24 px
+/// Oriented vehicles follow route corridors instead of exact intermediate tile centers. This
+/// larger acceptance radius lets vehicle bodies consume a waypoint they have come alongside.
+pub const VEHICLE_WAYPOINT_ACCEPTANCE_RADIUS_PX: f32 = TILE_SIZE as f32 * 0.75; // 24 px
 /// Final move tolerance for scout cars when exact arrival would require lateral motion.
 pub const SCOUT_CAR_FINAL_GOAL_TOLERANCE_PX: f32 = TILE_SIZE as f32 * 0.375; // 12 px
 /// Scout-car-specific no-progress threshold reserved for reverse recovery behavior.
