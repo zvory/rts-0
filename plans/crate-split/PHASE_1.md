@@ -1,6 +1,6 @@
 # Phase 1 - Contract and Protocol Extraction
 
-Status: Planned.
+Status: Done.
 
 Goal: make protocol and semantic message contracts importable without access to simulation internals.
 
@@ -17,7 +17,9 @@ Goal: make protocol and semantic message contracts importable without access to 
   - `SnapshotNetStatus`
   - `PlayerResourceSnapshot`
   - `ResourceDelta`
+  - `SmokeCloudView`
   - `EntityView`
+  - `AbilityCooldownView`
   - `OrderPlanMarker`
   - `DebugPathPoint`
   - `DebugPathView`
@@ -33,6 +35,16 @@ Goal: make protocol and semantic message contracts importable without access to 
 - Keep protocol crate dependencies limited to `serde`, `serde_json`, and the contract crate.
 - Update all server imports to use the new crates or temporary re-exports.
 - Preserve `client/src/protocol.js` behavior exactly.
+
+## Implementation Notes
+
+- `server/crates/contract` now owns the semantic DTOs used by snapshots, starts, score screens,
+  resource deltas, smoke visibility, ability cooldown projection, and events.
+- `server/crates/protocol` now owns WebSocket envelopes, gameplay wire commands, string/code
+  vocabularies, and compact snapshot serialization.
+- `server/src/protocol.rs` remains as a compatibility re-export so existing server, sim, lobby, and
+  tool call sites keep compiling while later phases move imports to narrower crates.
+- The Rust wire shape is unchanged; `client/src/protocol.js` did not need edits.
 
 ## Design Notes
 
@@ -57,4 +69,3 @@ codes, but the domain vocabulary belongs in rules/domain in Phase 2.
 - The Rust protocol shape and JS mirror remain unchanged at the wire level.
 - Sim call sites that build snapshots/events compile through contract types or deliberate
   re-exports.
-

@@ -1,0 +1,8 @@
+[package]
+name = "rts-contract"
+version = "0.1.0"
+edition = "2021"
+description = "Semantic DTO contracts shared across Bewegungskrieg server crates"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
