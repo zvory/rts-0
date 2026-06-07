@@ -64,7 +64,7 @@ Server simulation tests:
 - Completed Steelworks is required.
 - Smoke supports Shift queue and promotes deterministically.
 - Overlapping smoke clouds block LOS independently and expire independently.
-- Smoke blocks AT-gun LOS to a tank across the cloud.
+- Smoke blocks shooting LOS for all units across the cloud; AT gun to tank is the core use case.
 - Enemy units inside smoke are not visible and cannot be targeted.
 - Friendly units inside smoke remain visible to their owner/allies but provide no vision.
 - Units inside smoke do not acquire or retain targets.
