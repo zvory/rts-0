@@ -25,6 +25,12 @@ CHROME=/path/to/chrome tests/run-all.sh
 The client smoke test self-skips (not a failure) when `puppeteer-core` or a Chrome binary is
 missing. By default, worktrees use the primary checkout's `server/target` as the Cargo target
 directory so dependency builds are reused instead of compiled from scratch in every worktree.
+For one-off Cargo commands in a worktree, use the same wrapper:
+
+```bash
+scripts/cargo-shared-target.sh test --manifest-path server/Cargo.toml self_play -- --nocapture
+```
+
 Everything below documents the individual suites the runner orchestrates.
 
 ---
