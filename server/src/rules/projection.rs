@@ -3,6 +3,7 @@
 //! This module owns what a player is allowed to see. It does not mutate the world; future
 //! last-known-position or partial-reveal rules should grow here.
 
+use crate::config;
 use crate::game::entity::{
     fires_while_moving, Entity, EntityKind, GatherPhase, Order, OrderIntent,
 };
@@ -179,7 +180,21 @@ fn active_order_marker(entity: &Entity) -> Option<QueuedOrderMarker> {
     let attack_move = match entity.order() {
         Order::Move(_) => false,
         Order::AttackMove(_) => true,
-        Order::Idle | Order::Attack(_) | Order::Gather(_) | Order::Build(_) => return None,
+        Order::Build(order) => {
+            let stats = config::building_stats(order.intent.kind)?;
+            let tile_size = config::TILE_SIZE as f32;
+            let x = order.intent.tile_x as f32 * tile_size + stats.foot_w as f32 * tile_size * 0.5;
+            let y = order.intent.tile_y as f32 * tile_size + stats.foot_h as f32 * tile_size * 0.5;
+            if !x.is_finite() || !y.is_finite() {
+                return None;
+            }
+            return Some(QueuedOrderMarker {
+                x,
+                y,
+                attack_move: false,
+            });
+        }
+        Order::Idle | Order::Attack(_) | Order::Gather(_) => return None,
     };
     let (x, y) = entity.path_goal().or_else(|| entity.move_intent())?;
     if !x.is_finite() || !y.is_finite() {
@@ -423,6 +438,53 @@ mod tests {
 
         let enemy_view = project_entity(2, unit, &fog, Some(&fog), false, None, false)
             .expect("full view should include unit");
+        assert_eq!(enemy_view.active_marker, None);
+        assert!(enemy_view.queued_markers.is_empty());
+    }
+
+    #[test]
+    fn active_build_marker_uses_building_footprint_center() {
+        let mut entities = EntityStore::new();
+        let worker_id = entities
+            .spawn_unit(1, EntityKind::Worker, 100.0, 100.0)
+            .expect("worker should spawn");
+        {
+            let worker = entities.get_mut(worker_id).expect("worker should exist");
+            worker.set_order(Order::build(EntityKind::Depot, 4, 5));
+            worker.append_queued_order(OrderIntent::move_to(320.0, 352.0));
+        }
+
+        let map = Map {
+            size: 64,
+            terrain: vec![terrain::GRASS; 64 * 64],
+            starts: vec![(1, 1), (40, 40)],
+            expansion_sites: Vec::new(),
+        };
+        let mut fog = Fog::new(map.size);
+        fog.recompute(&[1, 2], &entities, &map);
+        let worker = entities.get(worker_id).expect("worker should exist");
+
+        let owner_view = project_entity(1, worker, &fog, Some(&fog), true, None, false)
+            .expect("owner should see own worker");
+        assert_eq!(
+            owner_view.active_marker,
+            Some(QueuedOrderMarker {
+                x: 160.0,
+                y: 192.0,
+                attack_move: false,
+            })
+        );
+        assert_eq!(
+            owner_view.queued_markers,
+            vec![QueuedOrderMarker {
+                x: 320.0,
+                y: 352.0,
+                attack_move: false,
+            }]
+        );
+
+        let enemy_view = project_entity(2, worker, &fog, Some(&fog), false, None, false)
+            .expect("full view should include worker");
         assert_eq!(enemy_view.active_marker, None);
         assert!(enemy_view.queued_markers.is_empty());
     }
