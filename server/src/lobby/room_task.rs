@@ -187,7 +187,8 @@ impl RoomTask {
     }
 
     pub(super) fn current_tick_interval(&self) -> Duration {
-        let base = Duration::from_millis(config::TICK_MS);
+        let base =
+            test_tick_interval_override().unwrap_or_else(|| Duration::from_millis(config::TICK_MS));
         base.div_f32(self.replay_speed)
     }
 
@@ -1361,6 +1362,21 @@ impl RoomTask {
                 .head_of_line_count
                 .saturating_add(u32::from(head_of_line)),
         }
+    }
+}
+
+fn test_tick_interval_override() -> Option<Duration> {
+    #[cfg(test)]
+    {
+        None
+    }
+    #[cfg(not(test))]
+    {
+        std::env::var("RTS_TEST_TICK_MS")
+            .ok()
+            .and_then(|value| value.parse::<u64>().ok())
+            .filter(|&millis| millis > 0)
+            .map(Duration::from_millis)
     }
 }
 

@@ -5,7 +5,8 @@
 `run-all.sh` builds the server in debug (overflow checks **on**, which the hardening regression
 tests rely on), boots it, polls `GET /` until healthy, runs Rust formatting/lint/fast scripted
 tests and all the live-server suites, tears the server down, and exits non-zero if **any** suite
-fails.
+fails. The private server runs with `RTS_TEST_TICK_MS=5` by default, so live-server tests wait on
+simulated progress instead of real-time 30 Hz wall clock; normal `cargo run` remains 30 Hz.
 If a server is already answering on the port it is reused and left running.
 
 This command is the required local gate for every commit. Run `./scripts/install-hooks.sh` once per
