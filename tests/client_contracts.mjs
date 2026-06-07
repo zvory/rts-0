@@ -43,6 +43,7 @@ import {
   decodeServerMessage,
 } from "../client/src/protocol.js";
 import { Input, footprintValidAgainstEntities } from "../client/src/input/index.js";
+import { _controlGroupSaveModifierActive } from "../client/src/input/control_groups.js";
 import {
   cursorLockSupported,
   desktopRuntime,
@@ -106,6 +107,47 @@ assert(noticeSoundId("Cannot build there") === "notice_cannot_build", "cannot-bu
 assert(noticeSoundId("Requirement not met") === null, "generic invalid notices stay silent");
 assert(noticeSoundId("Unknown unit") === null, "unknown-unit notices stay silent");
 assert(noticeSoundId("Not enough resources") === null, "generic resource notices stay silent");
+
+// ---------------------------------------------------------------------------
+// Control groups
+// ---------------------------------------------------------------------------
+{
+  const ev = (mods) => ({
+    altKey: false,
+    ctrlKey: false,
+    metaKey: false,
+    shiftKey: false,
+    ...mods,
+  });
+
+  assert(
+    _controlGroupSaveModifierActive(ev({ altKey: true }), { isWindows: true, isDesktop: false }),
+    "Windows browser control-group save uses Alt+number",
+  );
+  assert(
+    !_controlGroupSaveModifierActive(ev({ ctrlKey: true }), { isWindows: true, isDesktop: false }),
+    "Windows browser control-group save does not use Ctrl+number",
+  );
+  assert(
+    _controlGroupSaveModifierActive(ev({ ctrlKey: true }), { isWindows: true, isDesktop: true }),
+    "Windows desktop control-group save uses Ctrl+number",
+  );
+  assert(
+    !_controlGroupSaveModifierActive(ev({ altKey: true }), { isWindows: true, isDesktop: true }),
+    "Windows desktop control-group save does not use Alt+number",
+  );
+  assert(
+    _controlGroupSaveModifierActive(ev({ metaKey: true }), { isWindows: false, isDesktop: false }),
+    "non-Windows control-group save keeps the existing modifier set",
+  );
+  assert(
+    !_controlGroupSaveModifierActive(
+      ev({ altKey: true, ctrlKey: true }),
+      { isWindows: true, isDesktop: false },
+    ),
+    "Windows browser control-group save requires a clean Alt modifier",
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Match input router
