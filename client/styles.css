@@ -189,11 +189,6 @@ body {
   letter-spacing: 0.05em;
 }
 
-.dev-links-note {
-  color: rgba(160, 148, 120, 0.5);
-  font-size: 10px;
-}
-
 #dev-banner {
   position: absolute;
   top: 8px;
