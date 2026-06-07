@@ -8,6 +8,10 @@ export function cursorLockSupported(browserPointerLockSupported) {
   return browserPointerLockSupported;
 }
 
+export function shouldRequestPointerLock({ desktopRuntime: isDesktop, requireGesture }) {
+  return !isDesktop || !!requireGesture;
+}
+
 export async function enterCursorLock(enterBrowserPointerLock, cursor = null) {
   void cursor;
   const browserLocked = await enterBrowserPointerLock();
