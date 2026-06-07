@@ -283,6 +283,37 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
 }
 
 {
+  const priorWindow = globalThis.window;
+  const priorDocument = globalThis.document;
+  let timeoutCallback = null;
+  globalThis.window = {
+    setTimeout(fn) {
+      timeoutCallback = fn;
+      return 1;
+    },
+  };
+  globalThis.document = {
+    hasFocus() { return true; },
+    activeElement: { tagName: "DIV", id: "viewport", className: "" },
+  };
+  const pendingInput = Object.create(Input.prototype);
+  pendingInput.dom = {};
+  pendingInput._pointerLockAttempt = 3;
+  pendingInput._lastPointerLockRequest = { attempt: 3, outcome: "pending" };
+  pendingInput._focusDebugState = () => ({ documentHasFocus: true, activeElement: null });
+  pendingInput._browserPointerLockElement = () => null;
+  const pending = pendingInput._waitForPointerLockPromise(new Promise(() => {}));
+  assert(typeof timeoutCallback === "function", "promise Pointer Lock requests install a timeout");
+  timeoutCallback();
+  assert((await pending) === false, "pending Pointer Lock promise resolves false on timeout");
+  assert(pendingInput._lastPointerLockRequest.outcome === "timeout", "pending Pointer Lock timeout is recorded");
+  if (priorWindow === undefined) delete globalThis.window;
+  else globalThis.window = priorWindow;
+  if (priorDocument === undefined) delete globalThis.document;
+  else globalThis.document = priorDocument;
+}
+
+{
   assert(
     !shouldRequestPointerLock({ desktopRuntime: true, requireGesture: false }),
     "desktop Pointer Lock skips non-gesture automatic requests",
