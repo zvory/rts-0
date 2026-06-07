@@ -456,6 +456,12 @@ impl<'a> MoveCoordinator<'a> {
                 } else {
                     MovePhase::PathFailed
                 });
+            } else if matches!(e.order(), Order::Attack(_)) {
+                if path_ok {
+                    e.reset_attack_unreachable_checks();
+                } else {
+                    e.increment_attack_unreachable_checks();
+                }
             }
         }
         self.budget = self.budget.saturating_sub(1);

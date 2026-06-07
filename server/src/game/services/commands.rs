@@ -105,6 +105,9 @@ pub(crate) fn apply_commands(
                         continue;
                     }
                     if queued {
+                        if !matches!(entities.get(id), Some(e) if e.can_attack()) {
+                            continue;
+                        }
                         if let Some(e) = entities.get_mut(id) {
                             e.append_queued_order(OrderIntent::attack(target));
                         }

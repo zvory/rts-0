@@ -414,6 +414,7 @@ impl Game {
         )
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn new_inner_with_map(
         players: &[PlayerInit],
         enable_ai: bool,
@@ -622,6 +623,7 @@ fn scout_car_snaking_corridor_map() -> ScoutCarCorridorLayout {
     (map, start_tile, start, goal)
 }
 
+#[allow(clippy::type_complexity)]
 fn scout_car_wall_chokepoint_map(
     unit: EntityKind,
     unit_count: usize,
