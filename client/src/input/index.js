@@ -55,6 +55,7 @@ import {
 } from "./control_groups.js";
 import {
   cursorLockSupported,
+  desktopRuntime,
   enterCursorLock,
   exitCursorLock,
   nativeCursorSupported,
@@ -279,6 +280,10 @@ export class Input {
 
   nativeCursorSupported() {
     return nativeCursorSupported();
+  }
+
+  desktopRuntime() {
+    return desktopRuntime();
   }
 
   _browserPointerLockSupported() {

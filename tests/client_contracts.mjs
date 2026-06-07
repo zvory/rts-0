@@ -45,6 +45,7 @@ import {
 import { Input, footprintValidAgainstEntities } from "../client/src/input/index.js";
 import {
   cursorLockSupported,
+  desktopRuntime,
   enterCursorLock,
   exitCursorLock,
   nativeCursorSupported,
@@ -106,11 +107,11 @@ assert(noticeSoundId("Unknown unit") === null, "unknown-unit notices stay silent
 assert(noticeSoundId("Not enough resources") === null, "generic resource notices stay silent");
 
 // ---------------------------------------------------------------------------
-// Native cursor lock bridge
+// Pointer lock bridge
 // ---------------------------------------------------------------------------
 {
   resetTauriGlobals();
-  assert(!nativeCursorSupported(), "native cursor bridge is disabled without Tauri IPC");
+  assert(!nativeCursorSupported(), "native cursor bridge is disabled outside Tauri");
   assert(cursorLockSupported(true), "browser pointer lock keeps cursor lock available outside Tauri");
 
   const invocations = [];
@@ -119,39 +120,26 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
       invocations.push([cmdName, args]);
     },
   };
-  let browserFallbackCalled = false;
+  assert(desktopRuntime(), "Tauri globals still mark the desktop runtime");
+  assert(!nativeCursorSupported(), "desktop runtime does not enable native cursor lock");
+  assert(cursorLockSupported(true), "desktop runtime still uses browser pointer lock support");
+  let browserFallbackCalled = 0;
   const mode = await enterCursorLock(
     async () => {
-      browserFallbackCalled = true;
+      browserFallbackCalled += 1;
       return true;
     },
     { x: 42, y: 64 },
   );
-  assert(mode === "native", "Tauri internals invoke selects native cursor lock");
-  assert(!browserFallbackCalled, "native cursor lock does not invoke browser pointer lock fallback");
-  assert(invocations.length === 2, "native cursor lock grabs and hides the cursor");
-  assert(
-    invocations[0][0] === "cursor_grab" &&
-      invocations[0][1].grab === true &&
-      invocations[0][1].x === 42 &&
-      invocations[0][1].y === 64,
-    "native cursor lock passes the current viewport cursor point",
-  );
-  assert(
-    invocations[1][0] === "cursor_visible" && invocations[1][1].visible === false,
-    "native cursor lock hides the OS cursor",
-  );
+  assert(mode === "browser", "Tauri runtime still selects browser Pointer Lock");
+  assert(browserFallbackCalled === 1, "browser Pointer Lock fallback is invoked in Tauri");
+  assert(invocations.length === 0, "cursor lock does not call native Tauri cursor IPC");
 
+  let browserExitCalled = false;
   await exitCursorLock("native", () => {
-    throw new Error("browser exit fallback should not run for native cursor lock");
+    browserExitCalled = true;
   });
-  assert(
-    invocations.at(-2)[0] === "cursor_grab" &&
-      invocations.at(-2)[1].grab === false &&
-      invocations.at(-1)[0] === "cursor_visible" &&
-      invocations.at(-1)[1].visible === true,
-    "native cursor unlock releases grab and restores cursor visibility",
-  );
+  assert(!browserExitCalled, "legacy native mode still exits through native IPC if already active");
   resetTauriGlobals();
 }
 
