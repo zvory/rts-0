@@ -53,13 +53,16 @@ The macOS `.app` and `.dmg` are written under
 
 See `../docs/desktop-debugging.md` for Web Inspector, URL override, and client timing marks.
 
-## Windows CI
+## Release CI
 
-GitHub Actions builds an unsigned Windows NSIS `.exe` on pushes to `main` that
-touch `desktop/**`, on manual workflow dispatches, and when a GitHub Release is
-published. The workflow uses `tauri-cli 2.11.2`, builds only the NSIS target, and
-uploads the installer as a workflow artifact. On release events, it also attaches
-the installer to the published release.
+GitHub Actions builds unsigned desktop bundles when a GitHub Release is
+published, and on manual workflow dispatches for packaging checks. The workflow
+uses `tauri-cli 2.11.2` and uploads the build outputs as workflow artifacts.
+On release events, it also attaches them to the published release:
+
+- macOS `.dmg`
+- macOS `.app.zip` containing the `.app` bundle
+- Windows NSIS `.exe`
 
 The Windows installer embeds the WebView2 bootstrapper so older Windows 10
 machines can install the runtime if it is missing. First-time testers may need
@@ -70,6 +73,5 @@ Release flow:
 
 1. Bump `version` in `src-tauri/tauri.conf.json`.
 2. Tag `desktop-v0.X.Y`.
-3. Publish a GitHub Release from the tag; CI attaches the `.exe`.
-4. Build the macOS `.dmg` locally with `cargo tauri build` and upload it to the
-   same release manually.
+3. Publish a GitHub Release from the tag; CI attaches the `.dmg`, `.app.zip`,
+   and `.exe`.
