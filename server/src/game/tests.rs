@@ -323,6 +323,58 @@ fn smoke_expiration_restores_fog_projection() {
     );
 }
 
+#[test]
+fn smoke_queued_order_skipped_when_caster_dies() {
+    let (mut game, scout, target, _) = smoke_command_fixture();
+    use crate::game::ability::AbilityKind;
+    use crate::game::command::SimCommand;
+    // Queue a smoke command (unit already at range per fixture)
+    game.enqueue(
+        1,
+        SimCommand::UseAbility {
+            ability: AbilityKind::Smoke,
+            units: vec![scout],
+            x: Some(target.0),
+            y: Some(target.1),
+            queued: true,
+        },
+    );
+    // Kill the scout car
+    if let Some(e) = game.entities.get_mut(scout) {
+        e.hp = 0;
+    }
+    // Tick — death system runs, then order queue promotion
+    game.tick();
+    assert_eq!(
+        game.smokes.iter().count(),
+        0,
+        "dead scout car should not launch queued smoke"
+    );
+}
+
+#[test]
+fn smoke_nonfinite_target_coordinates_are_rejected() {
+    let (mut game, scout, _target, _) = smoke_command_fixture();
+    use crate::game::ability::AbilityKind;
+    use crate::game::command::SimCommand;
+    game.enqueue(
+        1,
+        SimCommand::UseAbility {
+            ability: AbilityKind::Smoke,
+            units: vec![scout],
+            x: Some(f32::NAN),
+            y: Some(f32::INFINITY),
+            queued: false,
+        },
+    );
+    game.tick();
+    assert_eq!(
+        game.smokes.iter().count(),
+        0,
+        "non-finite coordinates should be rejected"
+    );
+}
+
 fn queued_move_fixture() -> (Game, u32, (f32, f32), (f32, f32), (f32, f32)) {
     queued_move_fixture_with_lobby_debug(false)
 }

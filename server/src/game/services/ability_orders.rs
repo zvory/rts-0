@@ -4,7 +4,7 @@ use crate::config;
 use crate::game::ability::{self, AbilityKind, AbilityTargetMode};
 use crate::game::entity::{EntityStore, MovePhase, Order};
 use crate::game::map::Map;
-use crate::game::services::commands::notice;
+use crate::game::services::commands::{notice, notice_positioned};
 use crate::game::services::dist2;
 use crate::game::services::move_coordinator::MoveCoordinator;
 use crate::game::services::world_query;
@@ -135,6 +135,14 @@ pub(crate) fn launch_world_ability(
                 config::SMOKE_CLOUD_RADIUS_TILES,
                 config::SMOKE_CLOUD_DURATION_TICKS,
                 tick,
+            );
+            notice_positioned(
+                events,
+                player,
+                "Smoke",
+                crate::protocol::NoticeSeverity::Info,
+                x,
+                y,
             );
             true
         }

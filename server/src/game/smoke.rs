@@ -2,6 +2,8 @@ use crate::config;
 use crate::game::fog::Fog;
 use crate::game::map::Map;
 
+pub(crate) const MAX_ACTIVE_SMOKE_CLOUDS: usize = 256;
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub(crate) struct SmokeCloud {
     pub(crate) id: u32,
@@ -67,6 +69,9 @@ impl SmokeCloudStore {
         tick: u32,
     ) -> Option<u32> {
         if !x.is_finite() || !y.is_finite() || !radius_tiles.is_finite() || radius_tiles <= 0.0 {
+            return None;
+        }
+        if self.clouds.len() >= MAX_ACTIVE_SMOKE_CLOUDS {
             return None;
         }
         let id = self.next_id;
@@ -168,6 +173,15 @@ fn segment_intersects_cloud(start: (f32, f32), end: (f32, f32), cloud: SmokeClou
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn spawn_returns_none_when_cap_exceeded() {
+        let mut store = SmokeCloudStore::new();
+        for _ in 0..MAX_ACTIVE_SMOKE_CLOUDS {
+            assert!(store.spawn(64.0, 64.0, 1.0, 150, 1).is_some());
+        }
+        assert!(store.spawn(64.0, 64.0, 1.0, 150, 1).is_none());
+    }
 
     #[test]
     fn segment_intersection_detects_smoke_disc() {

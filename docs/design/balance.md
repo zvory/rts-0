@@ -84,11 +84,17 @@ authoritative `rules::defs` records.
   half the previous tank movement rate. Tanks and scout cars cannot advance while their owner has
   zero oil.
 - Ability shell metadata: Rifleman Charge has a 5s reuse delay and remains unlocked by a completed
-  Training Centre. Scout Car Smoke is a Steelworks-unlocked, world-point ability with 9-tile
-  target range, 25 steel + 25 oil listed cost, 20s listed cooldown, 2-tile smoke radius, and 5s
-  smoke duration. Active smoke is neutral world state: it blocks authoritative fog/combat LOS,
-  prevents units inside smoke from contributing vision, hides enemies inside smoke, and does not
-  participate in pathing, collision, scoring, supply, or targeting as an entity.
+  Training Centre.
+- **Scout Car Smoke** (hotkey `D`): Scout cars gain a targeted smoke-grenade ability once the
+  owner has a completed Steelworks. Costs 25 steel + 25 oil per use. Target range: 9 tiles from
+  the caster. Cloud radius: 2 tiles. Cloud duration: 5 seconds. Cooldown: 20 seconds per caster.
+  Expected role: an offensive tool for closing on long-range defenses; push a scout car forward,
+  place smoke between the advance and the AT gun / machine-gun nest, then move mobile units through
+  the resulting dead zone. Active smoke is neutral world state: it blocks authoritative fog and
+  combat LOS, prevents units inside smoke from contributing vision, hides enemies inside smoke, and
+  does not participate in pathing, collision, scoring, supply, or targeting as an entity.
+  Cooldown duration (20s) exceeds cloud duration (5s), so each scout car has at most one active
+  cloud at a time.
 - Map: `TILE_SIZE = 32` px. The live map is the hardcoded handcrafted asset at
   `server/assets/maps/default-handcrafted.json` (126×126 today), served for tooling at
   `/maps/default-handcrafted.json`. The current asset is the original 96×96 handcrafted map

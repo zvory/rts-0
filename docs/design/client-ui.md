@@ -222,6 +222,40 @@ For spectator starts, `match.js` hides the command card and give-up action, comp
 the server-filtered union snapshot, and keeps the ordinary renderer/minimap/HUD pointed at snapshots
 with `playerResources`.
 
+### 4.1a Targeted ability mode (Smoke)
+
+`input/commands.js` exposes `_onAbilityTarget` and `_refreshAbilityTargetPreview` for world-point
+abilities. When the HUD command card calls `state.commandTarget = { kind: "ability", ability }`,
+the input module enters targeted cursor mode:
+- Pointer moves call `_refreshAbilityTargetPreview`: compute which selected units are eligible
+  carriers (`ABILITIES[ability].carriers`), test whether any carrier is within range of the cursor,
+  update `state.abilityTargetPreview` for the renderer.
+- Left-click: build a `useAbility` command with the ability name, filtered carrier ids, world
+  coords, and the `queued` flag (from Shift). Clear cursor mode; exit ability targeting.
+- Right-click / Escape: cancel cursor mode, `state.commandTarget = null`.
+- Minimap right-click also fires an ability command if in targeted mode.
+
+`state.js` holds `commandTarget` (null or `{ kind, ability }`) and `abilityTargetPreview`
+(null or `{ ability, x, y, rangeCenters, inRange }`). `commandTarget` is a transient UI state;
+`abilityTargetPreview` is rebuilt every mouse move from the cursor world position and the current
+selection.
+
+Range preview rendering (`renderer/feedback.js`, `_drawAbilityTargetPreview`):
+- While in targeted ability mode, draws a dotted range ring (radius = `rangeTiles × tileSize`) around
+  each eligible carrier.
+- At the cursor position, draws the cloud radius preview (2-tile circle) colored green when in
+  range of at least one carrier, grey when out of range.
+
+Smoke rendering (`renderer/feedback.js`, `_drawSmokes`; layer `smokes` between `selectionRings`
+and unit layer):
+- Each frame, iterates `state.smokes` (the latest snapshot's fog-filtered cloud list).
+- Each cloud is rendered as layered translucent grey/white circles (overlapping offset blobs) with
+  a dark semi-transparent core so the cloud reads as a LOS blocker without obscuring own unit
+  selection rings or HP bars above the fog overlay.
+- Non-finite coordinates are skipped.
+- The render layer is cleared each frame so expired clouds vanish automatically when they drop from
+  the next snapshot.
+
 ### 4.2 Rendering & look (PixiJS, procedural art — neutral PS1 field-command style)
 - Layers (back→front): terrain → resource nodes → building shadows → buildings → unit
   shadows → units → selection rings → health bars → fog overlay → shot-revealed units →

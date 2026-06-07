@@ -779,6 +779,23 @@ pub(crate) fn notice(events: &mut HashMap<u32, Vec<Event>>, player: u32, msg: &s
     });
 }
 
+/// Push a positioned `Notice` event to a player, anchored at world coordinates `(x, y)`.
+pub(crate) fn notice_positioned(
+    events: &mut HashMap<u32, Vec<Event>>,
+    player: u32,
+    msg: &str,
+    severity: crate::protocol::NoticeSeverity,
+    x: f32,
+    y: f32,
+) {
+    events.entry(player).or_default().push(Event::Notice {
+        msg: msg.to_string(),
+        x: Some(x),
+        y: Some(y),
+        severity,
+    });
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1386,7 +1403,18 @@ mod tests {
             0
         );
         assert!(matches!(entities.get(far).unwrap().order(), Order::Idle));
-        assert!(events.get(&1).is_none_or(Vec::is_empty));
+        // A positioned info notice is emitted on successful smoke launch; no warn/alert events.
+        let player_events = events.get(&1).map(Vec::as_slice).unwrap_or(&[]);
+        assert!(
+            player_events.iter().all(|ev| matches!(
+                ev,
+                Event::Notice {
+                    severity: crate::protocol::NoticeSeverity::Info,
+                    ..
+                }
+            )),
+            "smoke launch should emit at most info-level notices, got: {player_events:?}"
+        );
     }
 
     #[test]

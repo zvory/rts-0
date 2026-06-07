@@ -147,6 +147,32 @@ centralized instead of scattered through services.
 - `rules::projection` — fog-gated `EntityView` construction, `visionOnly` marking for lingering
   death sight, and event visibility predicates.
 
+### 3.4 Ability system (`game/ability.rs`, `game/services/ability_orders.rs`)
+
+`game/ability.rs` defines `AbilityKind` (currently `Charge` and `Smoke`), `AbilityDefinition`,
+`AbilityTargetMode` (`SelfTarget` or `WorldPoint`), `ResourceCost`, and the compile-time
+definition table accessed via `ability::definition(kind)`. Ability definitions include the carrier
+entity kinds, target mode, optional tile range, cooldown in ticks, resource cost, tech requirement,
+and whether the ability may be queued. Adding a new ability means adding an `AbilityKind` variant
+and a `definition` match arm; no other files need to change for the definition itself.
+
+`services::ability_orders` owns the tick-path execution helpers:
+- `order_or_launch_world_ability` — for `WorldPoint` abilities: if the caster is in range, launch
+  immediately; otherwise compute a staging point inside range and issue an `Order::Ability`
+  movement order via `MoveCoordinator`.
+- `launch_world_ability` — deducts resources, sets the caster's cooldown, clears the active order,
+  and executes the effect (currently: spawns a smoke cloud). Guards: caster exists + alive + owner
+  + not under construction + correct kind + not on cooldown + tech present + in range + affordable.
+  All guards are checked without panicking; missing/stale casters are no-ops.
+- `caster_can_attempt`, `tech_requirement_met`, `caster_in_range` — pure predicates used by both
+  command validation and order-queue promotion.
+
+Active `Order::Ability` movement orders run through `services::order_queue::promote_ready_orders`:
+when the caster arrives (phase `Arrived`), `launch_world_ability` is called; when pathing fails
+(phase `PathFailed`), the order is cleared silently. Stale queued ability intents (caster dead,
+cooldown active, tech gone, target point off-map) are skipped at promotion time via
+`ability_intent_valid`.
+
 Services in `game/services/` orchestrate tick logic and call into `rules::*` for classification.
 Rules functions have no imports from `services/`; classification and formula rules read
 kind-specific data from `rules::defs`. `config.rs` holds scalar constants and compatibility
