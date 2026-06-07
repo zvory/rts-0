@@ -122,7 +122,7 @@ export const NOTICE_SEVERITY = Object.freeze({
 });
 
 // --- Compact snapshot wire schema (must match protocol.rs) ---
-export const COMPACT_SNAPSHOT_VERSION = 5;
+export const COMPACT_SNAPSHOT_VERSION = 6;
 
 export const KIND_CODE = Object.freeze({
   [KIND.WORKER]: 1,
@@ -166,10 +166,27 @@ export const EVENT_CODE = Object.freeze({
   [EVENT.NOTICE]: 4,
 });
 
+export const ORDER_STAGE = Object.freeze({
+  MOVE: "move",
+  ATTACK_MOVE: "attackMove",
+  ATTACK: "attack",
+  GATHER: "gather",
+  BUILD: "build",
+});
+
+export const ORDER_STAGE_CODE = Object.freeze({
+  [ORDER_STAGE.MOVE]: 1,
+  [ORDER_STAGE.ATTACK_MOVE]: 2,
+  [ORDER_STAGE.ATTACK]: 3,
+  [ORDER_STAGE.GATHER]: 4,
+  [ORDER_STAGE.BUILD]: 5,
+});
+
 const KIND_BY_CODE = Object.freeze(reverseCodes(KIND_CODE));
 const STATE_BY_CODE = Object.freeze(reverseCodes(STATE_CODE));
 const SETUP_BY_CODE = Object.freeze(reverseCodes(SETUP_CODE));
 const EVENT_BY_CODE = Object.freeze(reverseCodes(EVENT_CODE));
+const ORDER_STAGE_BY_CODE = Object.freeze(reverseCodes(ORDER_STAGE_CODE));
 const NOTICE_SEVERITY_BY_CODE = Object.freeze({
   1: NOTICE_SEVERITY.INFO,
   2: NOTICE_SEVERITY.WARN,
@@ -179,7 +196,7 @@ const NOTICE_SEVERITY_BY_CODE = Object.freeze({
 const MAX_COMPACT_ENTITIES = 20000;
 const MAX_COMPACT_RESOURCE_DELTAS = 20000;
 const MAX_COMPACT_EVENTS = 5000;
-const MAX_COMPACT_QUEUED_MARKERS = 8;
+const MAX_COMPACT_ORDER_PLAN = 9;
 const MAX_COMPACT_DEBUG_WAYPOINTS = 128;
 
 /**
@@ -250,7 +267,7 @@ function decodeCompactPlayerResource(record, index) {
 }
 
 function decodeCompactEntity(record, index) {
-  const fields = readArray(record, `entity ${index}`, 26);
+  const fields = readArray(record, `entity ${index}`, 25);
   if (fields.length < 8) throw new Error(`entity ${index} is too short`);
   const entity = {
     id: readU32(fields[0], "entity.id"),
@@ -276,11 +293,10 @@ function decodeCompactEntity(record, index) {
   assignRally(entity, fields, 18);
   assignOptional(entity, "oilUsed", fields, 19, readNumber);
   assignOptional(entity, "setupFacing", fields, 20, readNumber);
-  assignQueuedMarkers(entity, fields, 21);
-  assignPointMarker(entity, "activeMarker", fields, 22);
-  assignOptional(entity, "chargeCooldownLeft", fields, 23, readU32);
-  assignOptional(entity, "visionOnly", fields, 24, readBool);
-  assignDebugPath(entity, fields, 25);
+  assignOrderPlan(entity, fields, 21);
+  assignOptional(entity, "chargeCooldownLeft", fields, 22, readU32);
+  assignOptional(entity, "visionOnly", fields, 23, readBool);
+  assignDebugPath(entity, fields, 24);
   return entity;
 }
 
@@ -292,30 +308,24 @@ function assignRally(target, fields, index) {
   target.rally = [readNumber(pair[0], "entity.rally.x"), readNumber(pair[1], "entity.rally.y")];
 }
 
-/** Decode owner-only queued point markers into `entity.queuedMarkers`. */
-function assignQueuedMarkers(target, fields, index) {
+/** Decode owner-only current + queued order stages into `entity.orderPlan`. */
+function assignOrderPlan(target, fields, index) {
   if (index >= fields.length || fields[index] == null) return;
-  const markers = readArray(fields[index], "entity.queuedMarkers", MAX_COMPACT_QUEUED_MARKERS);
-  target.queuedMarkers = markers.map((record, markerIndex) =>
-    readPointMarker(record, `entity.queuedMarkers.${markerIndex}`),
+  const markers = readArray(fields[index], "entity.orderPlan", MAX_COMPACT_ORDER_PLAN);
+  target.orderPlan = markers.map((record, markerIndex) =>
+    readOrderPlanMarker(record, `entity.orderPlan.${markerIndex}`),
   );
 }
 
-/** Decode a single optional owner-only point marker. */
-function assignPointMarker(target, property, fields, index) {
-  if (index >= fields.length || fields[index] == null) return;
-  target[property] = readPointMarker(fields[index], `entity.${property}`);
-}
-
-function readPointMarker(record, label) {
+function readOrderPlanMarker(record, label) {
   const marker = readArray(record, label, 3);
-  if (marker.length !== 2 && marker.length !== 3) {
+  if (marker.length !== 3) {
     throw new Error(`${label} field count mismatch`);
   }
   return {
-    x: readNumber(marker[0], `${label}.x`),
-    y: readNumber(marker[1], `${label}.y`),
-    attackMove: marker.length > 2 ? readBool(marker[2], `${label}.attackMove`) : false,
+    kind: readCode(marker[0], ORDER_STAGE_BY_CODE, `${label}.kind`),
+    x: readNumber(marker[1], `${label}.x`),
+    y: readNumber(marker[2], `${label}.y`),
   };
 }
 

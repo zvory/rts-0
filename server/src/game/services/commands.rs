@@ -210,9 +210,6 @@ pub(crate) fn apply_commands(
                     if !owns_unit(entities, player, id) {
                         continue;
                     }
-                    if is_constructing(entities, id) {
-                        continue;
-                    }
                     let is_worker =
                         matches!(entities.get(id), Some(e) if e.kind == EntityKind::Worker);
                     let node_ok = matches!(entities.get(node), Some(n)
@@ -230,6 +227,9 @@ pub(crate) fn apply_commands(
                         if let Some(e) = entities.get_mut(id) {
                             e.append_queued_order(OrderIntent::gather(node));
                         }
+                        continue;
+                    }
+                    if is_constructing(entities, id) {
                         continue;
                     }
                     if let Some(e) = entities.get_mut(id) {
@@ -344,7 +344,7 @@ fn append_queued_point_order(
         OrderIntent::move_to(x, y)
     };
     for id in dedupe_cap_units(units) {
-        if !owns_unit(entities, player, id) || is_constructing(entities, id) {
+        if !owns_unit(entities, player, id) {
             continue;
         }
         if let Some(e) = entities.get_mut(id) {
@@ -362,9 +362,6 @@ fn append_queued_build_order(
     tile_y: u32,
 ) {
     if !owns_unit(entities, player, worker) {
-        return;
-    }
-    if is_constructing(entities, worker) {
         return;
     }
     if !matches!(entities.get(worker), Some(e) if e.kind == EntityKind::Worker) {
