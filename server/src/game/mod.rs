@@ -1,4 +1,4 @@
-//! The authoritative game simulation. See `DESIGN.md` §3.1 for the public API contract.
+//! The authoritative game simulation. See `docs/design/server-sim.md` for the public API contract.
 //!
 //! [`Game`] is the single seam between the simulation and the networking/lobby layer. The
 //! networking layer calls ONLY the methods in §3.1; everything else here is private detail.
@@ -131,7 +131,7 @@ pub struct Game {
 impl Game {
     /// Advance the simulation by one tick and return per-player transient events.
     ///
-    /// Ordered per `DESIGN.md` §3: drain+apply commands → movement → combat → gather →
+    /// Ordered per `docs/design/server-sim.md`: drain+apply commands → movement → combat → gather →
     /// production+spawn → construction → deaths → recompute supply → recompute fog. The whole
     /// method is panic-free: every entity lookup is fallible and stale ids are ignored.
     pub fn tick(&mut self) -> Vec<(u32, Vec<Event>)> {

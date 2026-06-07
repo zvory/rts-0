@@ -61,7 +61,7 @@ For the current map:
 
 ## Files to Touch
 
-- `DESIGN.md`
+- `docs/design/*.md`
 - `server/src/game/map.rs`
 - `server/src/game/mod.rs`
 - `server/src/game/selfplay.rs` if fixtures need explicit FFA teams

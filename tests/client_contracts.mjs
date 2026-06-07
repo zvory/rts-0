@@ -1,6 +1,6 @@
 // tests/client_contracts.mjs
 // Lightweight dependency-free checks that the client modules export the expected
-// constructors and pure methods documented in DESIGN.md §4.1.
+// constructors and pure methods documented in docs/design/client-ui.md §4.1.
 //
 // This does NOT spin up a browser or a server. Modules that require DOM / Pixi
 // (Renderer, Input, HUD, Minimap, Lobby) are not instantiated here.

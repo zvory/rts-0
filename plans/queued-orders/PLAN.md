@@ -5,7 +5,7 @@ server-authoritative. The first goal is reliable queued movement and basic visua
 chaining, mixed combat orders, and richer rally behavior come later once the core queue machinery is
 proven.
 
-Current command queuing in `DESIGN.md` only means WebSocket commands are drained at the start of the
+Current command queuing in `docs/design/architecture.md` only means WebSocket commands are drained at the start of the
 next tick. It is not a per-unit order queue. Today each mobile entity owns exactly one active
 `Order`, and each ordinary command replaces that order immediately.
 
@@ -66,7 +66,7 @@ Queued orders should be stored as intent, not execution state.
 1. Server authority stays intact. Clients send intent only; the server owns active orders, queued
    orders, validation, movement, combat, economy, and production.
 2. Protocol mirrors stay synchronized. Any wire change updates `server/src/protocol.rs`,
-   `client/src/protocol.js`, and `DESIGN.md` in the same implementation change.
+   `client/src/protocol.js`, and `docs/design/protocol.md` in the same implementation change.
 3. `Game::tick()` stays panic-free. Queue promotion must tolerate stale ids, dead entities,
    depleted resources, invalid coordinates, and non-finite client input.
 4. Queue sizes are hard capped. A malicious client must not be able to allocate unbounded queued

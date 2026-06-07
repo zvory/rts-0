@@ -117,7 +117,7 @@ Read:
 - server/src/rules/economy.rs
 - server/src/rules/combat.rs
 - server/src/rules/defs.rs
-- DESIGN.md §5 Balance definitions & constants
+- docs/design/balance.md           (balance definitions & constants)
 
 Do not start by reading:
 - client/src/renderer.js
@@ -156,7 +156,7 @@ Read:
 - server/src/game/fog.rs          (per-player filtering)
 - server/src/lobby.rs             (snapshot send path)
 - client/src/net.js               (decode path)
-- DESIGN.md §2 Wire protocol
+- docs/design/protocol.md         (wire protocol)
 
 Do not start by reading:
 - client/src/renderer.js
@@ -171,7 +171,7 @@ Run:
 
 Invariants:
 - Every tag, field name, and shape in protocol.rs <-> protocol.js MUST match.
-  Change both together (and DESIGN.md §2).
+  Change both together (and docs/design/protocol.md).
 - Fog: never send a player an entity or position they cannot see. target_id
   tracers and death/positional events are gated on visibility/ownership.
 - Untrusted client: WebSocket frames are size-limited; command unit lists are

@@ -16,7 +16,7 @@ shell, browser players, dev pages — shares.
 3. Same swap in `client/map-editor.html` and any `/dev/*` page that pulls Pixi.
 4. Drop `https://cdn.jsdelivr.net` from the CSP `script-src` in
    `desktop/src-tauri/tauri.conf.json`.
-5. Drop the `cdn.jsdelivr.net` line from `DESIGN.md` if it's mentioned there as a
+5. Drop the `cdn.jsdelivr.net` line from `docs/design/client-ui.md` if it's mentioned there as a
    contract, and from `CLAUDE.md` if relevant.
 
 ## Verification

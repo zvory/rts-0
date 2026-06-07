@@ -1,4 +1,5 @@
-//! Bewegungskrieg server entry point. See `DESIGN.md` §1, §3.
+//! Bewegungskrieg server entry point. See `docs/design/architecture.md` and
+//! `docs/design/server-sim.md`.
 //!
 //! Responsibilities of this binary:
 //! - Serve the static JS/HTML client (so `cargo run` + open a browser is the whole dev loop).
@@ -404,7 +405,7 @@ mod tests {
 
 /// Drive one client connection end to end.
 ///
-/// Layout (see `DESIGN.md` §3.2):
+/// Layout (see `docs/design/server-sim.md` §3.2):
 /// - Split the socket into a sink (writer) and a stream (reader).
 /// - Spawn a dedicated **writer task** that drains reliable messages and latest-only snapshots
 ///   to the sink. The room sends through the matching connection sink via [`RoomEvent::Join`],

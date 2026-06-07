@@ -77,7 +77,7 @@ explored history as soon as allied entities appear in snapshots.
 
 ## Files to Touch
 
-- `DESIGN.md`
+- `docs/design/*.md`
 - `server/src/game/fog.rs`
 - `server/src/game/mod.rs`
 - `server/src/rules/projection.rs`

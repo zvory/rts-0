@@ -10,8 +10,9 @@ The game is server-authoritative: a Rust server owns the simulation, serves the 
 client, and streams fog-filtered snapshots over WebSocket. The client is plain HTML/CSS/JS with
 PixiJS loaded from a CDN, so there is no JavaScript build step.
 
-For architecture, protocol, balance, hardening rules, and module contracts, read
-[DESIGN.md](DESIGN.md). This README is only the quickstart.
+For architecture, protocol, balance, hardening rules, and module contracts, start with
+[DESIGN.md](DESIGN.md), then follow the relevant `docs/design/` link. This README is only the
+quickstart.
 
 ## Play Locally
 
@@ -74,7 +75,7 @@ Useful entry points:
 - `server/` contains the Rust server and authoritative simulation.
 - `client/` contains the static browser client served by the Rust process.
 - `tests/` contains live-server integration and browser smoke tests.
-- [DESIGN.md](DESIGN.md) is the source of truth for contracts and architecture.
+- [DESIGN.md](DESIGN.md) indexes the source-of-truth contract docs under `docs/design/`.
 - [tests/README.md](tests/README.md) explains the test suites in detail.
 
 Common commands:

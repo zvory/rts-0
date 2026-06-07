@@ -13,7 +13,8 @@ Goal: close edge cases after all queued order types are implemented.
     ids, dead targets, depleted resources, and destroyed construction sites.
   - Confirm queue caps bound memory and per-tick promotion work.
 - Documentation:
-  - Update `DESIGN.md` wire protocol tables and `Game`/order contracts.
+  - Update `docs/design/protocol.md` wire protocol tables and
+    `docs/design/server-sim.md` `Game`/order contracts.
   - Document completion semantics for every queued order kind.
   - Update client interaction notes for Shift-click behavior and queued markers.
 - UX polish:
@@ -34,4 +35,3 @@ Goal: close edge cases after all queued order types are implemented.
 - Replays remain deterministic.
 - Invalid queued input cannot panic `Game::tick()` or grow unbounded state.
 - Player-facing behavior is covered in patch notes for the implementation PRs or commits.
-

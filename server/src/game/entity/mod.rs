@@ -1,4 +1,4 @@
-//! Entities and their storage. See `DESIGN.md` §3 (`entity`).
+//! Entities and their storage. See `docs/design/server-sim.md` (`entity`).
 //!
 //! An [`Entity`] is the single mutable record for any unit, building, or resource node
 //! in the simulation. The simulation services (`services/`) read and mutate these records

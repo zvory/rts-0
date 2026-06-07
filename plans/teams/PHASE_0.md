@@ -74,7 +74,7 @@ payloads.
 
 ## Files to Touch
 
-- `DESIGN.md`
+- `docs/design/*.md`
 - `server/src/protocol.rs`
 - `client/src/protocol.js`
 - `server/src/game/mod.rs`

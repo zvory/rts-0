@@ -41,7 +41,7 @@ the scoring or swept legality rather than increasing recovery frequency.
 
 Update:
 
-- `DESIGN.md` scout-car movement section;
+- `docs/design/server-sim.md` scout-car movement section;
 - `docs/context/server-sim.md` if section pointers shift;
 - client config comments if authoritative body metadata changes;
 - final patch-note bullets for player-facing movement impact.

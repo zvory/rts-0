@@ -2,9 +2,9 @@
 
 Use when changing rendering, input, HUD, lobby UI, or any module under `client/src/`.
 
-## Read first in `DESIGN.md`
-- §1 High-level architecture (just the client paragraph)
-- §4 JS client — modules & exported APIs
+## Read first
+- [docs/design/architecture.md](../design/architecture.md) — just the client paragraph
+- [docs/design/client-ui.md](../design/client-ui.md) — JS client modules & exported APIs
 - §4.1 Module export contracts
 - §4.2 Rendering & look (PixiJS, procedural art)
 

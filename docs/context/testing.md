@@ -2,8 +2,9 @@
 
 Use when writing or debugging tests, or before claiming a change is done.
 
-## Read first in `DESIGN.md`
-- §9 API-driven self-play test harness (only if touching scripted self-play)
+## Read first
+- [docs/design/testing.md](../design/testing.md) — API-driven self-play test harness
+  (only if touching scripted self-play)
 
 ## Suites
 - `node tests/server_integration.mjs` — dep-free, full server pipeline

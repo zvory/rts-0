@@ -1,5 +1,5 @@
 // Net — WebSocket wrapper with a tiny event emitter and typed send helpers.
-// See DESIGN.md §4.1. All wire shapes come from protocol.js builders so the
+// See docs/design/client-ui.md §4.1. All wire shapes come from protocol.js builders so the
 // client and server stay in lockstep; this module owns no game logic.
 
 import { S, decodeServerMessage, msg, cmd as cmdBuilders } from "./protocol.js";

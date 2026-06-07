@@ -1,5 +1,5 @@
 // GameState — the single client-side model the renderer, HUD, minimap and
-// input all read from. See DESIGN.md §4.1.
+// input all read from. See docs/design/client-ui.md §4.1.
 //
 // It holds the two most recent server snapshots (for interpolation), the
 // latest resources/events, the local selection set, and the local build

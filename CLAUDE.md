@@ -2,14 +2,14 @@
 
 Guidance for working in this repo. **Read only the relevant context capsule first** —
 `docs/context/` has small, task-scoped capsules (server-sim, client-ui, protocol, balance,
-testing, deployment) that point into the parts of `DESIGN.md` and the code you actually need.
+testing, deployment) that point into the relevant `docs/design/` file and code you actually need.
 See [docs/context/README.md](docs/context/README.md) for the capsule index.
 
-**Read `DESIGN.md` in full only when you are changing a cross-file contract** — the wire
-protocol (server ⇄ client), the `Game` API seam, the balance mirror, fog rules, or the
-hardening surface. `DESIGN.md` is still the source of truth; capsules are pointers, not copies.
-Keep `DESIGN.md` updated in the same change whenever you alter a contract, and refresh the
-capsule's section list if structure shifts.
+**Read only the relevant design file when you are changing a cross-file contract** — the wire
+protocol (server ⇄ client), the `Game` API seam, the balance mirror, fog rules, or the hardening
+surface. `docs/design/*.md` are the source of truth by contract area; capsules are pointers, not
+copies. Keep the relevant design file updated in the same change whenever you alter a contract, and
+refresh the capsule's section list if structure shifts.
 
 A server-authoritative Bewegungskrieg server (`server/`, axum + tokio) runs the one authoritative
 simulation and also serves the **HTML/CSS/JS + PixiJS** client (`client/`). Clients send commands;
@@ -102,12 +102,12 @@ There is **no JS build step** (plain ES modules + PixiJS from CDN). The client i
 ## Invariants — do not break these
 
 - **Wire protocol is mirrored.** `server/src/protocol.rs` ⇄ `client/src/protocol.js` must agree on
-  every tag, field name, and shape. Change both together (and `DESIGN.md §2`).
+  every tag, field name, and shape. Change both together (and `docs/design/protocol.md`).
 - **Balance is mirrored.** `server/src/config.rs` is authoritative; `client/src/config.js` mirrors
   the UI/render/fog subset (costs, supply, sight, sizes). Change both together.
 - **The `Game` API is the seam.** `lobby.rs`/`main.rs` touch the simulation only through the public
-  API in `game/mod.rs` (documented in `DESIGN.md §3.1`). Keep the signatures stable; if you must
-  change one, update the doc and all callers.
+  API in `game/mod.rs` (documented in `docs/design/server-sim.md`). Keep the signatures stable; if
+  you must change one, update the doc and all callers.
 - **`Game::tick()` must be panic-free.** No `unwrap()`/`expect()`/unchecked indexing on the tick
   path; treat stale ids as no-ops. Use checked arithmetic on anything derived from client input
   (a panic kills the whole room task).
@@ -116,7 +116,7 @@ There is **no JS build step** (plain ES modules + PixiJS from CDN). The client i
   entity or position they can't see.
 - **Clients are untrusted.** Validate and bound everything from the wire: command unit lists are
   deduped + capped (`MAX_UNITS_PER_COMMAND`), WebSocket frames are size-limited, placement coords
-  are range/overflow-checked. See `DESIGN.md §7`.
+  are range/overflow-checked. See `docs/design/hardening.md`.
 
 ## Conventions
 
@@ -124,8 +124,9 @@ There is **no JS build step** (plain ES modules + PixiJS from CDN). The client i
   `game/services/`. `systems.rs` is the thin orchestrator that calls services in order. The room
   task is the single owner of its `Game` — no locks around it. Don't panic on the network or tick
   paths; handle errors and keep the room alive.
-- **JS:** ES2020 modules, no framework, one small class per file (see `DESIGN.md §4`). Modules
-  receive their collaborators via **dependency injection** from `main.js`; they do **not**
+- **JS:** ES2020 modules, no framework, one small class per file (see
+  `docs/design/client-ui.md`). Modules receive their collaborators via **dependency injection**
+  from `main.js`; they do **not**
   cross-import each other (only `protocol.js`/`config.js`). PixiJS is the global `PIXI` (v7) — do
   not `import` it.
 - **Client teardown:** any module that holds DOM/window listeners or GPU resources must implement

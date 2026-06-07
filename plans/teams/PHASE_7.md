@@ -52,7 +52,7 @@ failures, where the project instructions require macOS `open`.
 
 ## Documentation Audit
 
-Update `DESIGN.md` in the same implementation changes that alter contracts.
+Update the relevant `docs/design/` file in the same implementation changes that alter contracts.
 
 Sections that must mention teams:
 
@@ -87,5 +87,5 @@ verification wrapper.
 - FFA remains the default and still works.
 - Team victory, shared vision, allied inspection, and per-player score rows all work together.
 - Malicious clients cannot attack allies or mutate teams without host authority.
-- `DESIGN.md` accurately describes the final implementation.
+- `docs/design/*.md` accurately describe the final implementation.
 - No implementation depends on a fixed number of teams or fixed team sizes.

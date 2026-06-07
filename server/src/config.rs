@@ -1,4 +1,4 @@
-//! Simulation constants and compatibility stats helpers. See `DESIGN.md` §5.
+//! Simulation constants and compatibility stats helpers. See `docs/design/balance.md`.
 //!
 //! Kind-specific balance lives in `rules::defs`. `client/src/config.js` mirrors the subset
 //! the UI / rendering / fog overlay needs (costs, supply, sight, sizes, colors). Keep both

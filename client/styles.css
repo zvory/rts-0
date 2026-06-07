@@ -1,7 +1,7 @@
 /*
  * Bewegungskrieg client styles — muted low-resolution field-command palette.
  *
- * Goals (DESIGN.md §4.2): clean, modern, lightweight. No CSS frameworks.
+ * Goals (docs/design/client-ui.md §4.2): clean, modern, lightweight. No CSS frameworks.
  * The DOM is the pinned markup in index.html; PixiJS owns #viewport's canvas.
  * HUD pieces are absolutely-positioned overlays; they only capture pointer
  * events where interaction is needed so the canvas stays draggable underneath.

@@ -16,7 +16,7 @@ sub-plan so this file stays readable.
 - With two agents, Agent A should own the current server/simulation phase. Agent B may take only
   tasks explicitly marked `parallel-safe`.
 - Do not edit the same module from two worktrees at the same time.
-- Shared contracts require extra care: `DESIGN.md`, `server/src/protocol.rs`,
+- Shared contracts require extra care: `docs/design/*.md`, `server/src/protocol.rs`,
   `client/src/protocol.js`, `server/src/config.rs`, `client/src/config.js`, command handling,
   fog/snapshot code, and pathing/movement code.
 - Branches must start with `zvorygin/`.

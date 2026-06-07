@@ -1,4 +1,4 @@
-// Wire protocol — JavaScript mirror of `server/src/protocol.rs`. See DESIGN.md §2.
+// Wire protocol — JavaScript mirror of `server/src/protocol.rs`. See docs/design/protocol.md.
 // Change both files together. Builders construct the exact JSON the server expects.
 
 // --- Server -> Client message tags (the `t` field) ---

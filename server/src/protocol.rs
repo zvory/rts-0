@@ -1,4 +1,4 @@
-//! Wire protocol (JSON over WebSocket). See `DESIGN.md` §2.
+//! Wire protocol (JSON over WebSocket). See `docs/design/protocol.md`.
 //!
 //! This file is the authoritative Rust side of the contract. `client/src/protocol.js`
 //! is its JavaScript mirror — change both together.

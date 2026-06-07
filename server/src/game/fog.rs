@@ -1,4 +1,4 @@
-//! Per-player fog of war. See `DESIGN.md` §3 (`fog.rs`).
+//! Per-player fog of war. See `docs/design/server-sim.md` (`fog.rs`).
 //!
 //! The server is authoritative about visibility: each tick we recompute, for every player, a
 //! boolean grid of which tiles that player can currently see. A tile is visible if it falls
@@ -7,7 +7,7 @@
 //! neutral/enemy entities standing on non-visible tiles, making the fog cheat-proof.
 //!
 //! Note the server only needs *currently visible* — the client maintains the "explored but
-//! not currently visible" dimming locally (see `DESIGN.md` §4). So this module tracks only
+//! not currently visible" dimming locally (see `docs/design/client-ui.md`). So this module tracks only
 //! the per-tick visible set.
 
 use std::collections::HashMap;

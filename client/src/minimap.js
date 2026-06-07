@@ -1,7 +1,7 @@
 // Minimap — the bottom-left overview canvas (`#minimap`, 220×220). Draws the terrain,
 // the fog overlay, entity blips colored by owner, and the current camera viewport
 // rectangle. Left-click/drag recenters the camera; right-click issues a context-sensitive
-// order for the current own-unit selection. See DESIGN.md §4.1 (Minimap) and §4.2 (look).
+// order for the current own-unit selection. See docs/design/client-ui.md §4.1 (Minimap) and §4.2 (look).
 //
 // The minimap is a plain 2D canvas (not Pixi). World↔canvas conversion is a uniform
 // scale derived from the map's pixel size and the (square) canvas size, letterboxed so
