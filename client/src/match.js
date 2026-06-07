@@ -30,6 +30,8 @@ const LATENCY_ISSUE_MS = 180;
 const JITTER_ISSUE_MS = 20;
 const JITTER_WINDOW = 8;
 const AUTO_POINTER_LOCK_SUPPRESS_MS = 1200;
+const DESKTOP_POINTER_LOCK_RETRY_ATTEMPTS = 4;
+const DESKTOP_POINTER_LOCK_RETRY_DELAY_MS = 120;
 
 const COMBAT_SOUNDS = Object.freeze({
   [KIND.TANK]: {
@@ -83,6 +85,8 @@ export class Match {
     this.lastServerNetStatus = null;
     this.autoPointerLockUntil = 0;
     this.pointerLockDiagnosticShown = false;
+    this.pointerLockRetryToken = 0;
+    this.pointerLockRetry = null;
     this.health = {
       latencyMs: null,
       serverTickMs: null,
@@ -317,13 +321,55 @@ export class Match {
 
   requestAutomaticPointerLock({ requireGesture = false } = {}) {
     if (!this.input || this.input.pointerLocked || !this.input.pointerLockSupported()) return;
-    if (!shouldRequestPointerLock({ desktopRuntime: this.input.desktopRuntime(), requireGesture })) return;
+    const isDesktop = this.input.desktopRuntime();
+    if (!shouldRequestPointerLock({ desktopRuntime: isDesktop, requireGesture })) return;
     this.autoPointerLockUntil = performance.now() + AUTO_POINTER_LOCK_SUPPRESS_MS;
-    void this.input.requestPointerLock().finally(() => {
-      window.setTimeout(() => {
-        if (performance.now() >= this.autoPointerLockUntil) this.autoPointerLockUntil = 0;
-      }, AUTO_POINTER_LOCK_SUPPRESS_MS);
-    });
+    const maxAttempts = isDesktop && requireGesture ? DESKTOP_POINTER_LOCK_RETRY_ATTEMPTS : 1;
+    this.pointerLockRetryToken += 1;
+    void this.runPointerLockRetryBurst(this.pointerLockRetryToken, maxAttempts);
+  }
+
+  async runPointerLockRetryBurst(token, maxAttempts) {
+    this.pointerLockRetry = {
+      startedAt: new Date().toISOString(),
+      attempts: 0,
+      maxAttempts,
+      lastResult: null,
+      stopped: null,
+    };
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      if (token !== this.pointerLockRetryToken || !this.running) {
+        this.pointerLockRetry.stopped = "superseded";
+        break;
+      }
+      if (!this.input || this.input.pointerLocked || !this.input.pointerLockSupported()) {
+        this.pointerLockRetry.stopped = "unavailable";
+        break;
+      }
+      if (this.input.desktopRuntime() && typeof document.hasFocus === "function" && !document.hasFocus()) {
+        this.pointerLockRetry.stopped = "document-not-focused";
+        break;
+      }
+
+      this.pointerLockRetry.attempts = attempt;
+      const locked = await this.input.requestPointerLock();
+      this.pointerLockRetry.lastResult = locked ? "locked" : "not-locked";
+      if (locked || this.input.pointerLocked) {
+        this.pointerLockRetry.stopped = "locked";
+        break;
+      }
+      if (attempt < maxAttempts) await this.waitPointerLockRetryDelay();
+    }
+
+    if (!this.pointerLockRetry.stopped) this.pointerLockRetry.stopped = "exhausted";
+    window.setTimeout(() => {
+      if (performance.now() >= this.autoPointerLockUntil) this.autoPointerLockUntil = 0;
+    }, AUTO_POINTER_LOCK_SUPPRESS_MS);
+  }
+
+  waitPointerLockRetryDelay() {
+    return new Promise((resolve) => window.setTimeout(resolve, DESKTOP_POINTER_LOCK_RETRY_DELAY_MS));
   }
 
   automaticPointerLockActive() {
@@ -404,14 +450,16 @@ export class Match {
   }
 
   recordPointerLockDiagnostic(err = null) {
-    if (!this.input?.desktopRuntime() || this.pointerLockDiagnosticShown) return;
-    this.pointerLockDiagnosticShown = true;
+    if (!this.input?.desktopRuntime()) return;
     const snapshot = {
       at: new Date().toISOString(),
       error: this.pointerLockErrorSummary(err),
+      retry: this.pointerLockRetry,
       support: this.input.pointerLockDebugSnapshot(),
     };
     if (typeof window !== "undefined") window.__rtsPointerLockDebug = snapshot;
+    if (this.pointerLockDiagnosticShown) return;
+    this.pointerLockDiagnosticShown = true;
     console.warn("[RTS_POINTER_LOCK_DESKTOP]", snapshot);
     this.toast("Desktop cursor lock failed. Inspect window.__rtsPointerLockDebug.");
   }
@@ -697,6 +745,7 @@ export class Match {
     this.stop();
     this.stopMatchPings();
     this.stopAllMachineGunSounds();
+    this.pointerLockRetryToken += 1;
     this.net.off(S.SNAPSHOT, this.onSnapshot);
     window.removeEventListener("resize", this.onResize);
     window.removeEventListener("focus", this.onWindowFocus);
