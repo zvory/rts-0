@@ -118,9 +118,9 @@ use a merge commit so the gate can run:
 git merge --no-ff <branch>
 ```
 
-Git does not distribute active local hook configuration through clones, so GitHub Actions also runs
-`./tests/run-all.sh` on pushes and pull requests targeting `main`. To require this for everyone on
-other machines, protect `main` in GitHub and require the `./tests/run-all.sh` status check.
+Git does not distribute active local hook configuration through clones. Each checkout needs to run
+the installer once. GitHub Actions also runs `./tests/run-all.sh` after pushes to `main` as a
+shared signal, but `main` is intentionally left open for direct pushes.
 
 ## Deploy
 

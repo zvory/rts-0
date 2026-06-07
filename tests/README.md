@@ -7,10 +7,10 @@ tests rely on), boots it, polls `GET /` until healthy, runs Rust formatting/lint
 and all the live-server suites, tears the server down, and exits non-zero if **any** suite fails.
 If a server is already answering on the port it is reused and left running.
 
-This command is the required gate for anything landing on `main`. Run
-`./scripts/install-hooks.sh` once per checkout to install the tracked hooks locally. For enforcement
-across other machines and clones, the GitHub Actions workflow named `Main test gate` runs this same
-command and should be required by branch protection on `main`.
+This command is the required local gate for anything landing on `main`. Run
+`./scripts/install-hooks.sh` once per checkout to install the tracked hooks locally. GitHub Actions
+also runs this command after pushes to `main` as a shared signal, but `main` is intentionally left
+open for direct pushes.
 
 ```bash
 tests/run-all.sh                 # cargo fmt --check + cargo test + clippy + 3 API suites + client smoke
