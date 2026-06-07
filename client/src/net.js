@@ -210,9 +210,15 @@ export class Net {
    * @returns {boolean}
    */
   _send(obj) {
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return false;
     const json = JSON.stringify(obj);
     const label = `client.send.${obj?.t || "unknown"}`;
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+      this.diagnostics?.mark(`${label}.blocked`, {
+        readyState: this.ws?.readyState ?? null,
+        bytes: json.length,
+      });
+      return false;
+    }
     if (obj?.t === "ping") this.diagnostics?.count(label, { bytes: json.length });
     else this.diagnostics?.mark(label, { bytes: json.length });
     this.ws.send(json);

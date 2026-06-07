@@ -1,47 +1,50 @@
 import {
-  angleDelta,
-  clamp01,
-  dashedLine,
-  drawAtGun,
-  drawFacingWedge,
-  drawImpassableEdge,
-  drawInfantryBase,
-  drawInfantryMachineGun,
-  drawInfantryRifle,
-  drawRotatedRect,
-  drawScoutCar,
-  drawTankFuelCue,
-  drawTankHull,
-  drawTankTracks,
-  finiteNumber,
   hash2,
-  hexToInt,
   isImpassableAt,
-  isVehicleBodyKind,
-  muzzleFlashRadius,
-  normRect,
-  polar,
-  recoilVector,
-  rectEdgePointTowardCenter,
-  smoothstep01,
-  tankBodyVisual,
+  isImpassableTerrain,
   terrainColor,
   terrainOverlayColor,
-  weaponRecoilOffset,
 } from "./shared.js";
+
+function colorCss(color, alpha = 1) {
+  const r = (color >> 16) & 0xff;
+  const g = (color >> 8) & 0xff;
+  const b = color & 0xff;
+  return alpha >= 1 ? `rgb(${r},${g},${b})` : `rgba(${r},${g},${b},${alpha})`;
+}
+
+function fillImpassableEdge(ctx, map, tx, ty, code, ts) {
+  if (!isImpassableTerrain(code)) return;
+
+  const edge = Math.max(3, Math.floor(ts * 0.16));
+  const color = code === 2 ? 0x0c2028 : 0x24231f;
+  const x = tx * ts;
+  const y = ty * ts;
+  ctx.fillStyle = colorCss(color, 0.72);
+  if (!isImpassableAt(map, tx, ty - 1)) ctx.fillRect(x, y, ts, edge);
+  if (!isImpassableAt(map, tx, ty + 1)) ctx.fillRect(x, y + ts - edge, ts, edge);
+  if (!isImpassableAt(map, tx - 1, ty)) ctx.fillRect(x, y, edge, ts);
+  if (!isImpassableAt(map, tx + 1, ty)) ctx.fillRect(x + ts - edge, y, edge, ts);
+}
 
 export function buildStaticMap(map) {
   this._map = { width: map.width, height: map.height, tileSize: map.tileSize, terrain: map.terrain };
   const ts = map.tileSize;
+  const canvas = document.createElement("canvas");
+  canvas.width = map.width * ts;
+  canvas.height = map.height * ts;
+  const ctx = canvas.getContext("2d", { alpha: false });
+  if (!ctx) return;
+  ctx.imageSmoothingEnabled = false;
 
-  const g = new PIXI.Graphics();
   for (let ty = 0; ty < map.height; ty++) {
     for (let tx = 0; tx < map.width; tx++) {
       const code = map.terrain[ty * map.width + tx];
-      let color = terrainColor(code, tx, ty);
-      g.beginFill(color);
-      g.drawRect(tx * ts, ty * ts, ts, ts);
-      g.endFill();
+      const x = tx * ts;
+      const y = ty * ts;
+      const color = terrainColor(code, tx, ty);
+      ctx.fillStyle = colorCss(color);
+      ctx.fillRect(x, y, ts, ts);
 
       // Coarse texture blocks keep the ground readable while selling the
       // low-resolution PS1 look. No symbols or national markings are used.
@@ -52,29 +55,21 @@ export function buildStaticMap(map) {
           const n = hash2(tx * 17 + bx, ty * 17 + by);
           if (n < 0.42) continue;
           const overlay = terrainOverlayColor(code, n);
-          g.beginFill(overlay, code === 2 ? 0.22 : 0.16);
-          g.drawRect(tx * ts + bx * block, ty * ts + by * block, Math.ceil(block), Math.ceil(block));
-          g.endFill();
+          ctx.fillStyle = colorCss(overlay, code === 2 ? 0.22 : 0.16);
+          ctx.fillRect(x + bx * block, y + by * block, Math.ceil(block), Math.ceil(block));
         }
       }
 
-      drawImpassableEdge(g, map, tx, ty, code, ts);
+      fillImpassableEdge(ctx, map, tx, ty, code, ts);
     }
   }
-
-  // Rasterize to a texture so the (potentially huge) terrain is a single sprite.
-  const tex = this.app.renderer.generateTexture(g, {
-    region: new PIXI.Rectangle(0, 0, map.width * ts, map.height * ts),
-    scaleMode: PIXI.SCALE_MODES.NEAREST,
-  });
-  g.destroy();
 
   const layer = this.layers.terrain;
   if (this._terrainSprite) {
     this._terrainSprite.destroy(true);
     layer.removeChildren();
   }
+  const tex = PIXI.Texture.from(canvas, { scaleMode: PIXI.SCALE_MODES.NEAREST });
   this._terrainSprite = new PIXI.Sprite(tex);
   layer.addChild(this._terrainSprite);
-
 }
