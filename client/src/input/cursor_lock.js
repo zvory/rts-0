@@ -22,6 +22,14 @@ export function shouldRequestPointerLock({ desktopRuntime: isDesktop, requireGes
   return !isDesktop || !!requireGesture;
 }
 
+export function automaticPointerLockDisabledForTests() {
+  try {
+    return new URLSearchParams(globalThis.location?.search || "").has("rtsNoAutoPointerLock");
+  } catch {
+    return false;
+  }
+}
+
 export async function enterCursorLock(enterBrowserPointerLock, cursor = null) {
   void cursor;
   const browserLocked = await enterBrowserPointerLock();

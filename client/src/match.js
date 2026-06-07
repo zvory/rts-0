@@ -8,7 +8,7 @@ import {
 import { Fog } from "./fog.js";
 import { HUD } from "./hud.js";
 import { Input } from "./input/index.js";
-import { shouldRequestPointerLock } from "./input/cursor_lock.js";
+import { automaticPointerLockDisabledForTests, shouldRequestPointerLock } from "./input/cursor_lock.js";
 import { MatchInputRouter } from "./input/router.js";
 import { Minimap } from "./minimap.js";
 import { Renderer } from "./renderer/index.js";
@@ -321,6 +321,7 @@ export class Match {
 
   requestAutomaticPointerLock({ requireGesture = false } = {}) {
     if (!this.input || this.input.pointerLocked || !this.input.pointerLockSupported()) return;
+    if (automaticPointerLockDisabledForTests()) return;
     const isDesktop = this.input.desktopRuntime();
     if (!shouldRequestPointerLock({ desktopRuntime: isDesktop, requireGesture })) return;
     this.autoPointerLockUntil = performance.now() + AUTO_POINTER_LOCK_SUPPRESS_MS;

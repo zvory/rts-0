@@ -49,6 +49,7 @@ import {
 import { Input, footprintValidAgainstEntities } from "../client/src/input/index.js";
 import { _controlGroupSaveModifierActive } from "../client/src/input/control_groups.js";
 import {
+  automaticPointerLockDisabledForTests,
   cursorLockSupported,
   desktopRuntime,
   enterCursorLock,
@@ -339,6 +340,13 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
     shouldRequestPointerLock({ desktopRuntime: false, requireGesture: false }),
     "browser Pointer Lock keeps non-gesture automatic attempts",
   );
+  const priorLocation = globalThis.location;
+  globalThis.location = { search: "?rtsNoAutoPointerLock=1" };
+  assert(automaticPointerLockDisabledForTests(), "test URL flag disables automatic Pointer Lock requests");
+  globalThis.location = { search: "" };
+  assert(!automaticPointerLockDisabledForTests(), "automatic Pointer Lock is enabled by default");
+  if (priorLocation === undefined) delete globalThis.location;
+  else globalThis.location = priorLocation;
 }
 
 function fakeAudioParam(value = 1) {
