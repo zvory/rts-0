@@ -81,6 +81,8 @@ async fn main() {
 
     let app = Router::new()
         .route("/", get(index_handler))
+        .route("/beta", get(beta_redirect_handler))
+        .route("/beta/", get(beta_redirect_handler))
         .route("/version", get(version_handler))
         .route("/ws", get(ws_handler))
         .route("/dev/selfplay", get(dev_selfplay_handler))
@@ -139,6 +141,13 @@ async fn index_handler(State(state): State<AppState>) -> impl IntoResponse {
 /// Return the short git commit SHA that identifies this build.
 async fn version_handler(State(state): State<AppState>) -> String {
     state.version
+}
+
+async fn beta_redirect_handler() -> impl IntoResponse {
+    (
+        StatusCode::MOVED_PERMANENTLY,
+        [(header::LOCATION, "https://rts-0-zvorygin-beta.fly.dev/")],
+    )
 }
 
 async fn dev_selfplay_handler(
