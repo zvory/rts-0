@@ -80,6 +80,10 @@ pub struct Snapshot {
     pub resource_deltas: Vec<ResourceDelta>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub smokes: Vec<SmokeCloudView>,
+    /// Row-major current visibility grid for this recipient, one byte per map tile.
+    /// Populated only for fog-filtered snapshots; clients keep explored history locally.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub visible_tiles: Vec<u8>,
     pub events: Vec<Event>,
     /// Per-player resources for all players. Populated only in spectator/replay modes.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]

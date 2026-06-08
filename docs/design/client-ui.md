@@ -114,14 +114,16 @@ export class Renderer {
 ```js
 export class Fog {
   constructor(mapWidth, mapHeight)
-  update(ownEntities, tileSize)          // mark visible tiles this frame; accumulate explored
+  update(ownEntities, tileSize, serverVisibleTiles?) // copy server visibility when provided; accumulate explored
   isVisible(tileX,tileY), isExplored(tileX,tileY)
   // renderer reads the grids to draw the black/dim overlay
   visibleGrid, exploredGrid              // Uint8Array length w*h
 }
 ```
 `match.js` must exclude `visionOnly` and shot-reveal entities from `ownEntities` before calling
-`fog.update`; those views are rendered as intel, not as local fog sources.
+`fog.update`; those views are rendered as intel, not as local fog sources. Normal match snapshots
+provide `visibleTiles`, so the overlay follows server-authoritative fog including smoke blockers;
+local stamping remains a fallback for older/dev object snapshots.
 
 `input/index.js`
 ```js

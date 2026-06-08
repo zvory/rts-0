@@ -731,7 +731,7 @@ export class Match {
       );
     }
     this.input.update(dt);
-    this.fog.update(this.ownEntities(), this.state.map.tileSize);
+    this.fog.update(this.ownEntities(), this.state.map.tileSize, this.state.visibleTiles);
 
     this.renderer.render(this.state, this.camera, this.fog, alpha);
     this.hud.update();

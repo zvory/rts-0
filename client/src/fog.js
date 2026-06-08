@@ -46,11 +46,20 @@ export class Fog {
    *
    * @param {Array<{kind:string,x:number,y:number}>} ownEntities entities owned by this player (world px centers)
    * @param {number} tileSize world px per tile
+   * @param {ArrayLike<number>|null} serverVisibleTiles server-authoritative current visibility
    */
-  update(ownEntities, tileSize) {
+  update(ownEntities, tileSize, serverVisibleTiles = null) {
     if (this.revealAll) {
       this.visibleGrid.fill(1);
       this.exploredGrid.fill(1);
+      return;
+    }
+    if (serverVisibleTiles && serverVisibleTiles.length === this.visibleGrid.length) {
+      for (let i = 0; i < this.visibleGrid.length; i++) {
+        const visible = serverVisibleTiles[i] ? 1 : 0;
+        this.visibleGrid[i] = visible;
+        if (visible) this.exploredGrid[i] = 1;
+      }
       return;
     }
     this.visibleGrid.fill(0);

@@ -111,6 +111,7 @@ transport decode:
   entities: Entity[],            // your non-resource entities (always) + enemies on live/death-vision-visible tiles
   resourceDeltas?: ResourceDelta[], // visible resource remaining updates; omitted when empty
   smokes?: SmokeCloud[],         // active smoke clouds visible to this recipient; omitted when empty
+  visibleTiles?: u8[],           // row-major current server visibility; 1 = visible, 0 = fogged
   events: Event[],               // transient things to surface (see 2.5)
   playerResources?: {id, steel, oil, supplyUsed, supplyCap}[], // all players; spectator/replay mode only
   netStatus: {                // per-recipient server-side health for the current match
@@ -124,14 +125,14 @@ transport decode:
 }
 ```
 
-Live WebSocket snapshot frames are sent as compact JSON text, version 8. `client/src/net.js`
+Live WebSocket snapshot frames are sent as compact JSON text, version 9. `client/src/net.js`
 decodes this transport shape back into the semantic object above before dispatching `S.SNAPSHOT`.
 Older object-shaped JSON snapshots remain decodable by the client for fallback/dev use.
 
 ```
 {
   "t": "snapshot",
-  "v": 8,
+  "v": 9,
   "s": [tick, steel, oil, supplyUsed, supplyCap],
   "e": [
     [
@@ -143,6 +144,7 @@ Older object-shaped JSON snapshots remain decodable by the client for fallback/d
   ],
   "r": [[id, remaining]],         // omitted when empty
   "sm": [[id, x, y, radiusTiles, expiresIn]], // omitted when empty
+  "fg": [firstValue, runLen, ...], // RLE visibleTiles; omitted when empty/no-fog
   "ev": [EventRecord],            // omitted when empty
   "pr": [[id, steel, oil, supplyUsed, supplyCap]], // omitted in normal play; present in spectator/replay
   "n": [serverLagMs, tickMs, flags, slowTickCount, headOfLineCount]

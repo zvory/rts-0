@@ -108,6 +108,8 @@ export class GameState {
     this.abilityTargetPreview = null;
     /** @type {Array<{id:number,x:number,y:number,radiusTiles:number,expiresIn:number}>} */
     this.smokes = [];
+    /** @type {number[]|Uint8Array} row-major current server-authoritative visibility. */
+    this.visibleTiles = [];
 
     /** @type {Array<{from:number,to:number,createdAt:number}>} */
     this.muzzleFlashes = [];
@@ -193,6 +195,9 @@ export class GameState {
     };
     this.playerResources = msg.playerResources || [];
     this.smokes = Array.isArray(msg.smokes) ? msg.smokes : [];
+    this.visibleTiles = Array.isArray(msg.visibleTiles) || msg.visibleTiles instanceof Uint8Array
+      ? msg.visibleTiles
+      : [];
     this.events = events;
     this._pruneSelection();
     this._pruneControlGroups();

@@ -1241,6 +1241,7 @@ fn pending_tracker_snapshot(tick: u32, worker_x: f32, worker_y: f32) -> Snapshot
         )],
         resource_deltas: Vec::new(),
         smokes: Vec::new(),
+        visible_tiles: Vec::new(),
         events: Vec::new(),
         player_resources: Vec::new(),
         net_status: crate::protocol::SnapshotNetStatus::default(),

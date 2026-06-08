@@ -128,7 +128,7 @@ export const ABILITY = Object.freeze({
 });
 
 // --- Compact snapshot wire schema (must match protocol.rs) ---
-export const COMPACT_SNAPSHOT_VERSION = 8;
+export const COMPACT_SNAPSHOT_VERSION = 9;
 
 export const KIND_CODE = Object.freeze({
   [KIND.WORKER]: 1,
@@ -214,6 +214,7 @@ const MAX_COMPACT_EVENTS = 5000;
 const MAX_COMPACT_ORDER_PLAN = 9;
 const MAX_COMPACT_ABILITIES = 8;
 const MAX_COMPACT_DEBUG_WAYPOINTS = 128;
+const MAX_COMPACT_VISIBLE_TILES = 65536;
 
 /**
  * Expand server messages into the semantic shapes the rest of the client expects.
@@ -249,12 +250,32 @@ function decodeCompactSnapshot(raw) {
       MAX_COMPACT_RESOURCE_DELTAS,
     ).map(decodeCompactResourceDelta),
     smokes: readOptionalArray(raw.sm, "smokes", MAX_COMPACT_SMOKES).map(decodeCompactSmoke),
+    visibleTiles: decodeVisibilityRuns(raw.fg),
     events: readOptionalArray(raw.ev, "events", MAX_COMPACT_EVENTS).map(decodeCompactEvent),
     playerResources: readOptionalArray(raw.pr, "playerResources", 32).map(
       decodeCompactPlayerResource,
     ),
     netStatus: decodeCompactNetStatus(raw.n),
   };
+}
+
+function decodeVisibilityRuns(record) {
+  if (record == null) return [];
+  const runs = readArray(record, "visibleTiles", MAX_COMPACT_VISIBLE_TILES + 1);
+  if (runs.length < 2) throw new Error("visibleTiles run data must include a value and length");
+  let value = readU32(runs[0], "visibleTiles.first");
+  if (value !== 0 && value !== 1) throw new Error("visibleTiles.first must be 0 or 1");
+  const out = [];
+  for (let i = 1; i < runs.length; i++) {
+    const len = readU32(runs[i], `visibleTiles.run.${i}`);
+    if (len === 0) throw new Error("visibleTiles run length must be positive");
+    if (out.length + len > MAX_COMPACT_VISIBLE_TILES) {
+      throw new Error("visibleTiles exceeds compact bounds");
+    }
+    for (let j = 0; j < len; j++) out.push(value);
+    value = value === 1 ? 0 : 1;
+  }
+  return out;
 }
 
 function decodeCompactSmoke(record, index) {

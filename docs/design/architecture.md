@@ -24,9 +24,9 @@
   and no controllable units/buildings.
   Spectators must join or switch roles before the match starts; mid-match joins are rejected.
 - The **client** renders snapshots, interpolating entity positions between them for
-  smoothness, and computes the **fog overlay** locally from its own units'/buildings'
-  sight radii plus static terrain occlusion (the server already withholds anything it
-  shouldn't see, so the local overlay only needs to look right — it is not a security boundary).
+  smoothness, and draws the **fog overlay** from the server-provided current visibility grid
+  while keeping explored history locally. Local sight stamping exists only as a fallback for
+  older/dev object snapshots; the server remains the fog authority.
 - Local development also exposes a dev-only watch entry at `/dev/selfplay` that auto-runs
   scripted self-play and streams **full-world** snapshots (no fog) to the ordinary match
   renderer. This path is isolated from normal lobby play and is only for debugging.
@@ -43,4 +43,3 @@
   most recent snapshots using wall-clock time.
 
 ---
-

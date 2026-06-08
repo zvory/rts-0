@@ -254,7 +254,7 @@ pub struct LobbyPlayer {
 ///
 /// [`Snapshot`] remains the semantic source of truth for game code. This format is only a
 /// transport-side optimization for `ServerMessage::Snapshot`.
-pub const COMPACT_SNAPSHOT_VERSION: u8 = 8;
+pub const COMPACT_SNAPSHOT_VERSION: u8 = 9;
 
 /// Serialize one semantic snapshot as a compact JSON text frame payload.
 pub fn serialize_compact_snapshot(snapshot: &Snapshot) -> serde_json::Result<String> {
@@ -312,6 +312,9 @@ impl Serialize for CompactSnapshot<'_> {
                     .collect::<Vec<_>>(),
             )?;
         }
+        if !snapshot.visible_tiles.is_empty() {
+            map.serialize_entry("fg", &encode_visibility_runs(&snapshot.visible_tiles))?;
+        }
         if !snapshot.events.is_empty() {
             map.serialize_entry(
                 "ev",
@@ -331,6 +334,27 @@ impl Serialize for CompactSnapshot<'_> {
         map.serialize_entry("n", &CompactNetStatus(&snapshot.net_status))?;
         map.end()
     }
+}
+
+fn encode_visibility_runs(visible_tiles: &[u8]) -> Vec<u32> {
+    let Some((&first, rest)) = visible_tiles.split_first() else {
+        return Vec::new();
+    };
+    let mut runs = vec![u32::from(first != 0)];
+    let mut current = first != 0;
+    let mut len: u32 = 1;
+    for &tile in rest {
+        let value = tile != 0;
+        if value == current && len < u32::MAX {
+            len += 1;
+        } else {
+            runs.push(len);
+            current = value;
+            len = 1;
+        }
+    }
+    runs.push(len);
+    runs
 }
 
 struct CompactSmokeCloud<'a>(&'a SmokeCloudView);
@@ -844,6 +868,7 @@ mod tests {
                 radius_tiles: 2.0,
                 expires_in: 120,
             }],
+            visible_tiles: vec![1, 1, 0, 0, 0, 1],
             events: vec![
                 Event::Attack {
                     from: 1,
@@ -924,6 +949,7 @@ mod tests {
             value["sm"],
             serde_json::json!([[50, 320.0, 352.0, 2.0, 120]])
         );
+        assert_eq!(value["fg"], serde_json::json!([1, 2, 3, 1]));
         assert_eq!(value["ev"].as_array().unwrap().len(), 4);
         assert_eq!(value["n"], serde_json::json!([4, 17, 2, 2, 3]));
         assert_eq!(
@@ -953,6 +979,7 @@ mod tests {
             )],
             resource_deltas: Vec::new(),
             smokes: Vec::new(),
+            visible_tiles: Vec::new(),
             events: Vec::new(),
             player_resources: Vec::new(),
             net_status: SnapshotNetStatus::default(),

@@ -154,6 +154,11 @@ impl Game {
             entities,
             resource_deltas,
             smokes,
+            visible_tiles: if fogged {
+                fog.visible_tiles_for(player)
+            } else {
+                Vec::new()
+            },
             // Events are delivered via the `tick()` return value, not the snapshot.
             events: Vec::new(),
             player_resources,
