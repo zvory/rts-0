@@ -60,6 +60,9 @@ or:
 Run one machine only. Game rooms live in server memory, so multiple machines can split players
 between different lobbies.
 
+Beta deploys set the machine size to `shared-cpu-4x@1024MB`, matching the mainline app. If you
+override the app name for a different beta app, `./deploy.sh beta` still applies that VM size.
+
 ## Stop spending after game night
 
 ```bash

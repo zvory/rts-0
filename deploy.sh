@@ -81,9 +81,11 @@ done
 case "$channel" in
   mainline|main|production|prod|release)
     app="$MAINLINE_APP"
+    vm_flags=()
     ;;
   beta)
     app="$BETA_APP"
+    vm_flags=(--vm-size shared-cpu-4x --vm-memory 1024)
     ;;
   *)
     echo "error: unknown channel: $channel" >&2
@@ -125,6 +127,7 @@ flyctl deploy \
   --app "$app" \
   --config "$deploy_dir/fly.toml" \
   --build-arg "COMMIT_HASH=$short_commit" \
+  "${vm_flags[@]}" \
   --ha=false \
   --now \
   "$deploy_dir"
