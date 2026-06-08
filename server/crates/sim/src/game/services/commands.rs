@@ -10,8 +10,8 @@ use crate::game::entity::{
 use crate::game::fog::Fog;
 use crate::game::map::Map;
 use crate::game::services::ability_orders::{
-    self, caster_can_attempt, launch_self_ability, order_or_launch_world_ability,
-    tech_requirement_met,
+    self, caster_can_attempt, launch_self_ability, launch_world_ability,
+    order_or_launch_world_ability, tech_requirement_met,
 };
 use crate::game::services::construction::resumable_site_for_build_intent;
 use crate::game::services::dist2;
@@ -69,8 +69,9 @@ pub(crate) fn apply_commands(
                     smokes,
                     events,
                     player,
-                    &planner_facts(entities, player, &units, false),
+                    &planner_facts(entities, player, &units, false, None),
                     &request,
+                    tick,
                 );
             }
             SimCommand::AttackMove {
@@ -96,8 +97,9 @@ pub(crate) fn apply_commands(
                     smokes,
                     events,
                     player,
-                    &planner_facts(entities, player, &units, false),
+                    &planner_facts(entities, player, &units, false, None),
                     &request,
+                    tick,
                 );
             }
             SimCommand::Attack {
@@ -125,8 +127,9 @@ pub(crate) fn apply_commands(
                     smokes,
                     events,
                     player,
-                    &planner_facts(entities, player, &units, false),
+                    &planner_facts(entities, player, &units, false, None),
                     &request,
+                    tick,
                 );
             }
             SimCommand::SetupAtGuns {
@@ -135,28 +138,28 @@ pub(crate) fn apply_commands(
                 y,
                 queued,
             } => {
-                if !x.is_finite() || !y.is_finite() {
-                    continue;
-                }
-                for id in dedupe_cap_units(units) {
-                    if !owns_unit(entities, player, id) || is_constructing(entities, id) {
-                        continue;
-                    }
-                    if !matches!(entities.get(id), Some(e) if e.kind == EntityKind::AtTeam) {
-                        continue;
-                    }
-                    if queued {
-                        append_queued_or_notice(
-                            entities,
-                            events,
-                            player,
-                            id,
-                            OrderIntent::setup_at_guns(x, y),
-                        );
-                        continue;
-                    }
-                    execute_at_gun_setup(entities, id, x, y);
-                }
+                let request = planner::OrderRequest {
+                    units: units.clone(),
+                    mode: issue_mode(queued),
+                    order: planner::RequestedOrder::SetupAtGuns {
+                        face_toward: planner::Point::new(x, y),
+                    },
+                };
+                let facts = planner_facts(entities, player, &units, false, None);
+                apply_planned_unit_order(
+                    map,
+                    entities,
+                    players,
+                    spatial,
+                    coordinator,
+                    fog,
+                    smokes,
+                    events,
+                    player,
+                    &facts,
+                    &request,
+                    tick,
+                );
             }
             SimCommand::TearDownAtGuns { units } => {
                 for id in dedupe_cap_units(units) {
@@ -195,7 +198,9 @@ pub(crate) fn apply_commands(
                     map,
                     entities,
                     players,
+                    spatial,
                     coordinator,
+                    fog,
                     smokes,
                     events,
                     player,
@@ -230,8 +235,9 @@ pub(crate) fn apply_commands(
                     smokes,
                     events,
                     player,
-                    &planner_facts(entities, player, &units, false),
+                    &planner_facts(entities, player, &units, false, None),
                     &request,
+                    tick,
                 );
             }
             SimCommand::Build {
@@ -261,8 +267,9 @@ pub(crate) fn apply_commands(
                     smokes,
                     events,
                     player,
-                    &planner_facts(entities, player, &[worker], !queued),
+                    &planner_facts(entities, player, &[worker], !queued, None),
                     &request,
+                    tick,
                 );
             }
             SimCommand::Train { building, unit } => {
@@ -335,6 +342,7 @@ fn planner_facts(
     player: u32,
     units: &[u32],
     build_notice_compat: bool,
+    ability: Option<AbilityFactInput>,
 ) -> Vec<planner::UnitFacts> {
     dedupe_cap_units(units.to_vec())
         .into_iter()
@@ -356,24 +364,54 @@ fn planner_facts(
             facts.can_gather = e.kind == EntityKind::Worker;
             facts.can_build = e.kind == EntityKind::Worker || build_notice_compat;
             facts.can_setup_at_gun = e.kind == EntityKind::AtTeam;
+            if let Some(ability) = ability {
+                if ability_orders::caster_can_attempt(entities, player, id, ability.kind)
+                    && ability.tech_ready
+                {
+                    facts.abilities.push(planner::AbilityFacts {
+                        ability: ability.id,
+                        ready_at_issue: true,
+                        can_execute_without_interrupt: ability.target.is_some_and(|(x, y)| {
+                            ability_orders::caster_in_range(
+                                ability.map,
+                                entities,
+                                id,
+                                ability.kind,
+                                x,
+                                y,
+                            )
+                        }),
+                    });
+                }
+            }
             Some(facts)
         })
         .collect()
+}
+
+#[derive(Clone, Copy)]
+struct AbilityFactInput<'a> {
+    kind: AbilityKind,
+    id: planner::AbilityId,
+    tech_ready: bool,
+    target: Option<(f32, f32)>,
+    map: &'a Map,
 }
 
 #[allow(clippy::too_many_arguments)]
 fn apply_planned_unit_order(
     map: &Map,
     entities: &mut EntityStore,
-    players: &[PlayerState],
+    players: &mut [PlayerState],
     spatial: &SpatialIndex,
     coordinator: &mut MoveCoordinator<'_>,
     fog: &Fog,
-    smokes: &SmokeCloudStore,
+    smokes: &mut SmokeCloudStore,
     events: &mut HashMap<u32, Vec<Event>>,
     player: u32,
     facts: &[planner::UnitFacts],
     request: &planner::OrderRequest,
+    tick: u32,
 ) {
     let output = planner::plan_order(planner_config(), facts, request);
     let mut move_units = Vec::new();
@@ -438,9 +476,43 @@ fn apply_planned_unit_order(
                         events,
                     );
                 }
-                planner::OrderIntent::SetupAtGuns { .. }
-                | planner::OrderIntent::WorldAbility { .. }
-                | planner::OrderIntent::SelfAbility { .. } => {}
+                planner::OrderIntent::SetupAtGuns { face_toward } => {
+                    if immediate_unit_can_replace(entities, player, unit) {
+                        execute_at_gun_setup(entities, unit, face_toward.x, face_toward.y);
+                    }
+                }
+                planner::OrderIntent::WorldAbility { ability, target } => {
+                    let Some(ability) = ability_from_planner(ability) else {
+                        continue;
+                    };
+                    if !immediate_unit_can_replace(entities, player, unit) {
+                        continue;
+                    }
+                    if let Some(e) = entities.get_mut(unit) {
+                        e.clear_queued_orders();
+                    }
+                    clear_staged_at_gun_setup(entities, &[unit]);
+                    order_or_launch_world_ability(
+                        map,
+                        entities,
+                        players,
+                        coordinator,
+                        smokes,
+                        events,
+                        player,
+                        unit,
+                        ability,
+                        target.x,
+                        target.y,
+                        tick,
+                        true,
+                    );
+                }
+                planner::OrderIntent::SelfAbility { ability } => {
+                    if let Some(ability) = ability_from_planner(ability) {
+                        launch_self_ability(entities, player, unit, ability);
+                    }
+                }
             },
             planner::PlannedAction::AppendQueued { unit, intent } => {
                 if let Some(intent) = entity_order_intent_from_planner(intent) {
@@ -465,7 +537,38 @@ fn apply_planned_unit_order(
                     }
                 }
             }
-            planner::PlannedAction::ExecuteAbilityNow { .. } => {}
+            planner::PlannedAction::ExecuteAbilityNow {
+                unit,
+                ability,
+                target,
+                preserve_orders,
+            } => {
+                let Some(ability) = ability_from_planner(ability) else {
+                    continue;
+                };
+                match target {
+                    planner::AbilityTarget::SelfTarget => {
+                        launch_self_ability(entities, player, unit, ability);
+                    }
+                    planner::AbilityTarget::WorldPoint(point) => {
+                        launch_world_ability(
+                            map,
+                            entities,
+                            players,
+                            smokes,
+                            events,
+                            player,
+                            unit,
+                            ability,
+                            point.x,
+                            point.y,
+                            tick,
+                            preserve_orders,
+                            true,
+                        );
+                    }
+                }
+            }
         }
     }
 
@@ -549,7 +652,12 @@ fn entity_order_intent_from_planner(intent: planner::OrderIntent) -> Option<Orde
         }
         planner::OrderIntent::WorldAbility { ability, target } => ability_from_planner(ability)
             .map(|ability| OrderIntent::ability(ability, target.x, target.y)),
-        planner::OrderIntent::SelfAbility { .. } | planner::OrderIntent::SetupAtGuns { .. } => None,
+        planner::OrderIntent::SelfAbility { ability } => {
+            ability_from_planner(ability).map(OrderIntent::self_ability)
+        }
+        planner::OrderIntent::SetupAtGuns { face_toward } => {
+            Some(OrderIntent::setup_at_guns(face_toward.x, face_toward.y))
+        }
     }
 }
 
@@ -562,6 +670,13 @@ fn build_kind_code(kind: EntityKind) -> planner::BuildKind {
 
 fn build_kind_from_code(code: planner::BuildKind) -> Option<EntityKind> {
     EntityKind::ALL.get(code as usize).copied()
+}
+
+fn ability_to_planner(ability: AbilityKind) -> planner::AbilityId {
+    match ability {
+        AbilityKind::Charge => planner::AbilityId(0),
+        AbilityKind::Smoke => planner::AbilityId(1),
+    }
 }
 
 fn ability_from_planner(ability: planner::AbilityId) -> Option<AbilityKind> {
@@ -585,7 +700,9 @@ fn use_ability(
     map: &Map,
     entities: &mut EntityStore,
     players: &mut [PlayerState],
+    spatial: &SpatialIndex,
     coordinator: &mut MoveCoordinator<'_>,
+    fog: &Fog,
     smokes: &mut SmokeCloudStore,
     events: &mut HashMap<u32, Vec<Event>>,
     player: u32,
@@ -597,43 +714,12 @@ fn use_ability(
     if request.queued && !definition.may_queue {
         return;
     }
-    match definition.target_mode {
-        AbilityTargetMode::SelfTarget => {}
+    let planner_id = ability_to_planner(ability);
+    let tech_ready = tech_requirement_met(entities, player, ability);
+
+    let (target, target_point) = match definition.target_mode {
+        AbilityTargetMode::SelfTarget => (planner::AbilityTarget::SelfTarget, None),
         AbilityTargetMode::WorldPoint => {
-            let Some(x) = request.x else {
-                return;
-            };
-            let Some(y) = request.y else {
-                return;
-            };
-            if !x.is_finite() || !y.is_finite() {
-                return;
-            }
-        }
-    }
-    match ability {
-        AbilityKind::Charge => {
-            if !tech_requirement_met(entities, player, ability) {
-                return;
-            }
-            for id in dedupe_cap_units(request.units) {
-                if !caster_can_attempt(entities, player, id, ability) {
-                    continue;
-                }
-                if request.queued {
-                    append_queued_or_notice(
-                        entities,
-                        events,
-                        player,
-                        id,
-                        OrderIntent::self_ability(ability),
-                    );
-                    continue;
-                }
-                launch_self_ability(entities, player, id, ability);
-            }
-        }
-        AbilityKind::Smoke => {
             let Some(x) = request.x else {
                 return;
             };
@@ -643,86 +729,65 @@ fn use_ability(
             let Some((x, y)) = SmokeCloudStore::clamp_point_to_map(map, x, y) else {
                 return;
             };
-            if !tech_requirement_met(entities, player, ability) {
-                return;
-            }
-            let eligible: Vec<u32> = dedupe_cap_units(request.units)
+            (
+                planner::AbilityTarget::WorldPoint(planner::Point::new(x, y)),
+                Some((x, y)),
+            )
+        }
+    };
+
+    let units = if !request.queued {
+        if let Some((x, y)) = target_point {
+            let eligible: Vec<u32> = dedupe_cap_units(request.units.clone())
                 .into_iter()
                 .filter(|id| caster_can_attempt(entities, player, *id, ability))
                 .collect();
-            if eligible.is_empty() {
-                return;
+            match choose_smoke_caster(map, entities, ability, &eligible, x, y) {
+                Some(caster) => vec![caster],
+                None => request.units.clone(),
             }
-            if request.queued {
-                if let Some(caster) = choose_queued_smoke_caster(entities, &eligible) {
-                    append_queued_or_notice(
-                        entities,
-                        events,
-                        player,
-                        caster,
-                        OrderIntent::ability(ability, x, y),
-                    );
-                } else {
-                    for id in eligible {
-                        notice(events, player, queue_full_notice(id));
-                    }
-                }
-                return;
-            }
-
-            let Some(caster) = choose_smoke_caster(map, entities, ability, &eligible, x, y) else {
-                return;
-            };
-            if let Some(e) = entities.get_mut(caster) {
-                e.clear_queued_orders();
-            }
-            order_or_launch_world_ability(
-                map,
-                entities,
-                players,
-                coordinator,
-                smokes,
-                events,
-                player,
-                caster,
-                ability,
-                x,
-                y,
-                tick,
-                true,
-            );
+        } else {
+            request.units.clone()
         }
-    }
-}
+    } else {
+        request.units.clone()
+    };
 
-fn choose_queued_smoke_caster(entities: &EntityStore, eligible: &[u32]) -> Option<u32> {
-    eligible
-        .iter()
-        .copied()
-        .filter_map(|id| entities.get(id).map(|e| (id, e.queued_orders().len())))
-        .filter(|(_, len)| *len < crate::game::entity::MAX_QUEUED_ORDERS)
-        .min_by_key(|(_, len)| *len)
-        .map(|(id, _)| id)
-}
-
-fn append_queued_or_notice(
-    entities: &mut EntityStore,
-    events: &mut HashMap<u32, Vec<Event>>,
-    player: u32,
-    unit: u32,
-    intent: OrderIntent,
-) -> bool {
-    let appended = entities
-        .get_mut(unit)
-        .is_some_and(|e| e.append_queued_order(intent));
-    if !appended {
-        notice(events, player, queue_full_notice(unit));
-    }
-    appended
-}
-
-fn queue_full_notice(_unit: u32) -> &'static str {
-    "Order queue full"
+    let facts = planner_facts(
+        entities,
+        player,
+        &units,
+        false,
+        Some(AbilityFactInput {
+            kind: ability,
+            id: planner_id,
+            tech_ready,
+            target: target_point,
+            map,
+        }),
+    );
+    let order = planner::OrderRequest {
+        units,
+        mode: issue_mode(request.queued),
+        order: planner::RequestedOrder::UseAbility {
+            ability: planner_id,
+            target,
+        },
+    };
+    apply_planned_unit_order(
+        map,
+        entities,
+        players,
+        spatial,
+        coordinator,
+        fog,
+        smokes,
+        events,
+        player,
+        &facts,
+        &order,
+        tick,
+    );
 }
 
 fn execute_at_gun_setup(entities: &mut EntityStore, id: u32, x: f32, y: f32) -> bool {
@@ -1967,6 +2032,81 @@ mod tests {
                 }
             )),
             "smoke launch should emit at most info-level notices, got: {player_events:?}"
+        );
+    }
+
+    #[test]
+    fn in_range_smoke_preserves_active_move_and_future_queue() {
+        let map = flat_map(32);
+        let mut entities = EntityStore::new();
+        let target = map.tile_center(12, 8);
+        let scout = entities
+            .spawn_unit(1, EntityKind::ScoutCar, target.0 - 96.0, target.1)
+            .expect("scout car should spawn");
+        let (sx, sy) = footprint_center(&map, EntityKind::Steelworks, 4, 4);
+        entities
+            .spawn_building(1, EntityKind::Steelworks, sx, sy, true)
+            .expect("steelworks should spawn");
+
+        apply(
+            &map,
+            &mut entities,
+            vec![
+                (
+                    1,
+                    SimCommand::Move {
+                        units: vec![scout],
+                        x: 640.0,
+                        y: 320.0,
+                        queued: false,
+                    },
+                ),
+                (
+                    1,
+                    SimCommand::Move {
+                        units: vec![scout],
+                        x: 704.0,
+                        y: 384.0,
+                        queued: true,
+                    },
+                ),
+            ],
+        );
+        let before_queue = entities.get(scout).unwrap().queued_orders().to_vec();
+        assert!(matches!(
+            entities.get(scout).unwrap().order(),
+            Order::Move(_)
+        ));
+
+        let mut players = vec![player_state(1), player_state(2)];
+        let mut smokes = SmokeCloudStore::new();
+        apply_with_players_and_smokes(
+            &map,
+            &mut entities,
+            &mut players,
+            &mut smokes,
+            vec![(
+                1,
+                SimCommand::UseAbility {
+                    ability: AbilityKind::Smoke,
+                    units: vec![scout],
+                    x: Some(target.0),
+                    y: Some(target.1),
+                    queued: false,
+                },
+            )],
+        );
+
+        let scout_entity = entities.get(scout).expect("scout should remain alive");
+        assert_eq!(smokes.iter().count(), 1);
+        assert!(
+            matches!(scout_entity.order(), Order::Move(_)),
+            "reactive in-range smoke should not interrupt the active move"
+        );
+        assert_eq!(
+            scout_entity.queued_orders(),
+            before_queue.as_slice(),
+            "reactive in-range smoke should preserve queued future orders"
         );
     }
 

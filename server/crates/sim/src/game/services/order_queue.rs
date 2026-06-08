@@ -120,7 +120,7 @@ pub(crate) fn promote_ready_orders(
                 None => continue,
             };
             let launched = launch_world_ability(
-                map, entities, players, smokes, events, owner, id, ability, x, y, tick, true,
+                map, entities, players, smokes, events, owner, id, ability, x, y, tick, false, true,
             );
             if !launched {
                 clear_completed_active_order(entities, id);

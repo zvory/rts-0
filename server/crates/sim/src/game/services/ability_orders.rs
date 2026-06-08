@@ -58,6 +58,7 @@ pub(crate) fn order_or_launch_world_ability(
             x,
             y,
             tick,
+            false,
             emit_resource_notice,
         ) {
             return AbilityOrderResult::Launched;
@@ -85,6 +86,7 @@ pub(crate) fn launch_world_ability(
     x: f32,
     y: f32,
     tick: u32,
+    preserve_active_order: bool,
     emit_resource_notice: bool,
 ) -> bool {
     let Some((x, y)) = SmokeCloudStore::clamp_point_to_map(map, x, y) else {
@@ -131,7 +133,9 @@ pub(crate) fn launch_world_ability(
             ps.steel = ps.steel.saturating_sub(definition.cost.steel);
             ps.oil = ps.oil.saturating_sub(definition.cost.oil);
             e.start_ability_cooldown(ability, definition.cooldown_ticks);
-            e.clear_active_order();
+            if !preserve_active_order {
+                e.clear_active_order();
+            }
             smokes.spawn(
                 x,
                 y,
