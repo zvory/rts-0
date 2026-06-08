@@ -32,6 +32,7 @@ const JITTER_WINDOW = 8;
 const AUTO_POINTER_LOCK_SUPPRESS_MS = 1200;
 const DESKTOP_POINTER_LOCK_RETRY_ATTEMPTS = 4;
 const DESKTOP_POINTER_LOCK_RETRY_DELAY_MS = 120;
+const RAW_POINTER_LOCK_RETRY_COOLDOWN_MS = 1000;
 
 const COMBAT_SOUNDS = Object.freeze({
   [KIND.TANK]: {
@@ -84,6 +85,7 @@ export class Match {
     this.lastSnapshotArrivedAt = null;
     this.lastServerNetStatus = null;
     this.autoPointerLockUntil = 0;
+    this.lastRawPointerLockRetryAt = 0;
     this.pointerLockDiagnosticShown = false;
     this.pointerLockRetryToken = 0;
     this.pointerLockRetry = null;
@@ -320,21 +322,37 @@ export class Match {
   }
 
   requestAutomaticPointerLock({ requireGesture = false } = {}) {
-    if (!this.input || this.input.pointerLocked || !this.input.pointerLockSupported()) return;
+    if (!this.input || !this.input.pointerLockSupported()) return;
     if (automaticPointerLockDisabledForTests()) return;
     const isDesktop = this.input.desktopRuntime();
     if (!shouldRequestPointerLock({ desktopRuntime: isDesktop, requireGesture })) return;
+    const forceRawRetry = this.shouldRetryPointerLockRawInput(requireGesture);
+    if (this.input.pointerLocked && !forceRawRetry) return;
+    if (forceRawRetry && !this.noteRawPointerLockRetryAllowed()) return;
     this.autoPointerLockUntil = performance.now() + AUTO_POINTER_LOCK_SUPPRESS_MS;
-    const maxAttempts = isDesktop && requireGesture ? DESKTOP_POINTER_LOCK_RETRY_ATTEMPTS : 1;
+    const maxAttempts = forceRawRetry ? 1 : (isDesktop && requireGesture ? DESKTOP_POINTER_LOCK_RETRY_ATTEMPTS : 1);
     this.pointerLockRetryToken += 1;
-    void this.runPointerLockRetryBurst(this.pointerLockRetryToken, maxAttempts);
+    void this.runPointerLockRetryBurst(this.pointerLockRetryToken, maxAttempts, { forceRawRetry });
   }
 
-  async runPointerLockRetryBurst(token, maxAttempts) {
+  shouldRetryPointerLockRawInput(requireGesture) {
+    return !!requireGesture && !!this.input?.pointerLockRawInputDegraded?.();
+  }
+
+  noteRawPointerLockRetryAllowed() {
+    const now = performance.now();
+    if (now - this.lastRawPointerLockRetryAt < RAW_POINTER_LOCK_RETRY_COOLDOWN_MS) return false;
+    this.lastRawPointerLockRetryAt = now;
+    return true;
+  }
+
+  async runPointerLockRetryBurst(token, maxAttempts, opts = {}) {
+    const forceRawRetry = !!opts.forceRawRetry;
     this.pointerLockRetry = {
       startedAt: new Date().toISOString(),
       attempts: 0,
       maxAttempts,
+      forceRawRetry,
       lastResult: null,
       stopped: null,
     };
@@ -344,9 +362,21 @@ export class Match {
         this.pointerLockRetry.stopped = "superseded";
         break;
       }
-      if (!this.input || this.input.pointerLocked || !this.input.pointerLockSupported()) {
+      if (!this.input || !this.input.pointerLockSupported()) {
         this.pointerLockRetry.stopped = "unavailable";
         break;
+      }
+      if (this.input.pointerLocked) {
+        if (!forceRawRetry || !this.input.pointerLockRawInputDegraded?.()) {
+          this.pointerLockRetry.stopped = "already-locked";
+          break;
+        }
+        await this.input.exitPointerLock();
+        await this.waitPointerLockRetryDelay();
+        if (this.input.pointerLocked) {
+          this.pointerLockRetry.stopped = "unlock-pending";
+          break;
+        }
       }
       if (this.input.desktopRuntime() && typeof document.hasFocus === "function" && !document.hasFocus()) {
         this.pointerLockRetry.stopped = "document-not-focused";
@@ -357,7 +387,9 @@ export class Match {
       const locked = await this.input.requestPointerLock();
       this.pointerLockRetry.lastResult = locked ? "locked" : "not-locked";
       if (locked || this.input.pointerLocked) {
-        this.pointerLockRetry.stopped = "locked";
+        this.pointerLockRetry.stopped = this.input.pointerLockRawInputDegraded?.()
+          ? "locked-with-plain-fallback"
+          : "locked";
         break;
       }
       if (attempt < maxAttempts) await this.waitPointerLockRetryDelay();
