@@ -288,7 +288,20 @@ export function _activateCommandHotkey(ev) {
     if ((btn.dataset.hotkey || "").toUpperCase() !== key) continue;
     if (ev.repeat && btn.dataset.repeatable !== "true") return false;
     ev.preventDefault();
-    if (!btn.disabled) btn.click();
+    if (!btn.disabled) {
+      if (typeof MouseEvent === "function" && typeof btn.dispatchEvent === "function") {
+        btn.dispatchEvent(new MouseEvent("click", {
+          bubbles: true,
+          cancelable: true,
+          altKey: !!ev.altKey,
+          ctrlKey: !!ev.ctrlKey,
+          metaKey: !!ev.metaKey,
+          shiftKey: !!ev.shiftKey,
+        }));
+      } else {
+        btn.click();
+      }
+    }
     return {
       handled: true,
       armed: this.state?.lastCommandTargetArm || null,

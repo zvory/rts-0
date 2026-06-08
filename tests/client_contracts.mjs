@@ -1105,6 +1105,7 @@ function fakeAudioContext() {
   );
 
   const priorDocument = globalThis.document;
+  const priorMouseEvent = globalThis.MouseEvent;
   const renderedButtons = [];
   function fakeElement(tagName) {
     const listeners = new Map();
@@ -1123,8 +1124,13 @@ function fakeAudioContext() {
       addEventListener(type, listener) {
         listeners.set(type, listener);
       },
+      dispatchEvent(ev) {
+        listeners.get(ev.type)?.(ev);
+        return true;
+      },
       click(ev = {}) {
         listeners.get("click")?.({
+          type: "click",
           preventDefault() {},
           shiftKey: !!ev.shiftKey,
         });
@@ -1147,6 +1153,18 @@ function fakeAudioContext() {
         if (tagName === "button") renderedButtons.push(el);
         return el;
       },
+    };
+    globalThis.MouseEvent = class {
+      constructor(type, init = {}) {
+        this.type = type;
+        this.altKey = !!init.altKey;
+        this.ctrlKey = !!init.ctrlKey;
+        this.metaKey = !!init.metaKey;
+        this.shiftKey = !!init.shiftKey;
+        this.bubbles = !!init.bubbles;
+        this.cancelable = !!init.cancelable;
+      }
+      preventDefault() {}
     };
 
     const sent = [];
@@ -1181,9 +1199,39 @@ function fakeAudioContext() {
         sent[0].queued === true,
       "Shift-clicking Charge should send a queued self ability command",
     );
+
+    globalThis.document.getElementById = (id) => {
+      assert(id === "command-card", "Charge hotkey should query the command card");
+      return {
+        querySelectorAll(selector) {
+          assert(selector === "button[data-hotkey]", "Charge hotkey should query hotkey buttons");
+          return [chargeButton];
+        },
+      };
+    };
+    const input = Object.create(Input.prototype);
+    input.state = chargeHud.state;
+    const hotkeyEv = {
+      code: "KeyZ",
+      shiftKey: true,
+      repeat: false,
+      preventDefault() {},
+    };
+    const hotkeyResult = input._activateCommandHotkey(hotkeyEv);
+    assert(hotkeyResult?.handled === true, "Shift+Charge hotkey should activate the command-card button");
+    assert(
+      sent.length === 2 &&
+        sent[1].c === "useAbility" &&
+        sent[1].ability === ABILITY.CHARGE &&
+        sent[1].units.join(",") === "77" &&
+        sent[1].queued === true,
+      "Shift+Charge hotkey should send a queued self ability command",
+    );
   } finally {
     if (priorDocument === undefined) delete globalThis.document;
     else globalThis.document = priorDocument;
+    if (priorMouseEvent === undefined) delete globalThis.MouseEvent;
+    else globalThis.MouseEvent = priorMouseEvent;
   }
 }
 
