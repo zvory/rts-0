@@ -197,7 +197,7 @@ fn local_owned_unit_value(observation: &AiObservation, geometry: &LocalDefenseGe
 }
 
 fn unit_value(kind: EntityKind) -> u32 {
-    let (steel, oil) = rules::economy::cost(kind);
+    let (steel, oil) = rts_rules::economy::cost(kind);
     steel.saturating_add(oil)
 }
 
@@ -239,7 +239,7 @@ pub(super) fn defensive_threat_dps(enemy: &AiEntitySummary) -> f32 {
     if !enemy.kind.is_unit() {
         return 0.0;
     }
-    let profile = rules::combat::attack_profile(enemy.kind);
+    let profile = rts_rules::combat::attack_profile(enemy.kind);
     if profile.dmg == 0 || profile.cooldown == 0 {
         return 0.0;
     }

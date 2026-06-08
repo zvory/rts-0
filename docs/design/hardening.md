@@ -140,11 +140,11 @@ The server treats every client as potentially hostile. Limits live next to the c
   Infantry damage, building damage, non-tank victims, and non-anti-tank attackers ignore armor
   facing.
 - **Worker direct-hit retreat**: combat stamps `last_damage_pos`/`last_damage_tick` on every
-  damaged entity but never mutates orders or paths. AI controllers (`game/ai.rs`) read those fields
-  on the following tick and issue an ordinary `Move` command pointing a few tiles away from the
-  attacker for any own worker that was directly hit. Constructing workers stay latched, and human
-  players receive no automatic retreat — the reflex lives entirely in the AI command stream so
-  replays remain a pure series of player commands.
+  damaged entity but never mutates orders or paths. `Game::worker_retreat_commands_for(player)`
+  projects that private metadata into ordinary AI-owned worker `Move` commands for workers hit on
+  the previous tick. The room task passes those commands through `rts-ai`, then enqueues them via
+  the normal command path. Constructing workers stay latched, and human players receive no
+  automatic retreat.
 - **Tolerant arrival**: a unit on a `Move` or `AttackMove` order in `MovePhase::Moving` that has not
   moved more than `STUCK_EPS_PX` per tick for `STUCK_ARRIVAL_TICKS` consecutive ticks (~0.5 s at
   30 Hz) and is within `TOLERANT_ARRIVAL_RADIUS_PX` (2 tiles) of its `path_goal` is immediately

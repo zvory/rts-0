@@ -6,7 +6,7 @@ description = "Authoritative server for Bewegungskrieg, a simple real-time strat
 default-run = "rts-server"
 
 [workspace]
-members = [".", "crates/contract", "crates/protocol", "crates/rules", "crates/sim"]
+members = [".", "crates/ai", "crates/contract", "crates/protocol", "crates/rules", "crates/sim"]
 resolver = "2"
 
 [[bin]]
@@ -33,6 +33,7 @@ bench = false
 
 [dependencies]
 rts-contract = { path = "crates/contract" }
+rts-ai = { path = "crates/ai" }
 rts-protocol = { path = "crates/protocol" }
 rts-rules = { path = "crates/rules" }
 rts-sim = { path = "crates/sim" }

@@ -233,9 +233,6 @@ pub(crate) fn run_tick(
     })
 }
 
-// Re-exports for callers outside the services layer so the public surface of `systems` stays
-// stable.
-pub(crate) use services::occupancy::footprint_placeable;
 pub(crate) use services::supply::recompute_supply;
 
 #[cfg(test)]

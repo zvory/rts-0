@@ -11,7 +11,8 @@ src/
 crates/
   protocol/      # semantic wire DTOs and compact snapshot transport encoding
   rules/         # pure domain, balance, terrain, economy, and combat rules
-  sim/           # reusable simulation crate; no Tokio/Axum/server transport dependency
+  ai/            # live AI controllers, shared AI strategy core, and self-play harnesses
+  sim/           # reusable simulation crate; no Tokio/Axum/server transport/AI dependency
     src/game/
     mod.rs       # Game struct + public API (the seam below)
     command.rs   # SimCommand domain commands + protocol translation helpers
@@ -21,11 +22,7 @@ crates/
     fog.rs       # per-player live visibility grid plus snapshot-only lingering death sight sources
     systems.rs   # orchestrator: runs services in order each tick
     services/    # per-tick services: commands, move_coordinator, movement (incl. unit collision), combat, economy, production, construction, death, occupancy, supply, pathing, geometry, standability, line_of_sight
-    ai.rs        # optional computer opponents: one AiController per AI player (see §8)
-    ai_core/     # shared AI observation, facts, actions, profiles, and decisions
-    ai_shared.rs # shared AI placement/resource helper functions
     replay.rs    # tick-stamped command log replay harness for determinism checks
-    selfplay/    # test-only API-driven scripted self-play harness (see §9)
     src/rules/projection.rs # fog-gated entity/event projection seam
 ```
 
@@ -45,8 +42,8 @@ impl Game {
     /// paired expansion. For two-player games, the selected starts are kept but the two active
     /// neutral expansions are reselected from the authored expansion pool as the most symmetric
     /// assignment for that start matchup, so adjacent starts both expand in comparable directions.
-    /// AI players use the deterministic default profile; tests and self-play harnesses rely on
-    /// this stable behavior.
+    /// AI players are spawned as normal match participants; external AI orchestration owns any
+    /// controller/profile selection.
     pub fn new(players: &[PlayerInit], seed: u32) -> Game;
 
     /// Create a live lobby match where each AI chooses one strategy from the live profile pool.
@@ -63,6 +60,9 @@ impl Game {
 
     /// Queue a validated-on-apply domain command from `player`. Cheap; real work happens in tick().
     pub fn enqueue(&mut self, player: u32, cmd: SimCommand);
+
+    /// Ordinary retreat commands for AI-owned workers hit on the previous tick.
+    pub fn worker_retreat_commands_for(&self, player: u32) -> Vec<SimCommand>;
 
     /// Advance the simulation by one tick. Returns per-player transient events.
     pub fn tick(&mut self) -> Vec<(u32 /*player*/, Vec<Event>)>;
@@ -103,9 +103,10 @@ serde `Command` from `protocol.rs` so replay JSON stays wire-compatible. `StartP
 `Snapshot`, `Event`, and `PlayerScore` are also serde types from `protocol.rs`.
 
 `PlayerInit.is_ai` marks a computer-controlled player. AI players are full players in every
-respect (they get a start position, City Centre, workers, economy, and count toward win/elimination); the
-only difference is they have no socket. `Game` owns one `AiController` per AI player and drives
-them at the top of `tick()` — see §8.
+respect (they get a start position, City Centre, workers, economy, and count toward
+win/elimination); the only difference is they have no socket. `Game` does not own AI controllers;
+the room task or tool harness asks `rts-ai` controllers for ordinary `SimCommand`s and enqueues
+them through this API before ticking — see §8.
 
 ### 3.2 Concurrency model
 - One tokio task per **room** owns its `Game` and runs the tick loop (`tokio::time::interval`).
@@ -113,13 +114,13 @@ them at the top of `tick()` — see §8.
 - Connection→room communication uses an `mpsc` channel of internal `RoomEvent`
   (`Join`, `Leave`, `Ready`, `StartRequest`, `AddAi`, `RemoveAi`, `SetSpectator`, `Command`, `GiveUp`). The room task is the
   single writer of game state — no locks around `Game`.
-- The room task, each tick: drain commands → `game.tick()` → for each connected player
-  `game.snapshot_for(pid)` → send. Lobby phase: broadcast `lobby` on changes.
+- The room task, each tick: enqueue live AI commands for AI players → `game.tick()` → for each
+  connected player `game.snapshot_for(pid)` → send. Lobby phase: broadcast `lobby` on changes.
 - Normal rooms reject all mid-match joins. Spectators are lobby members only: they receive
   `StartPayload.spectator = true` and live `game.snapshot_for_spectator(active_player_ids)`
   snapshots, but are not included in `PlayerInit`, command routing, elimination, or match-player counts.
 - Dev self-play watch rooms are a special-case room mode inside the same task model: they own a
-  normal `Game`, feed it scripted commands from `game::selfplay`, and send watchers
+  normal `Game`, feed it scripted commands from `rts_ai::selfplay`, and send watchers
   `game.snapshot_full_for(view_pid)` instead of fog-filtered snapshots. Replay rooms advance at
   1.5x the normal room tick rate so artifact playback finishes faster than live self-play.
 

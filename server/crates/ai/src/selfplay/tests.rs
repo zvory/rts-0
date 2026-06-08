@@ -20,15 +20,15 @@ use super::{
     MAX_STALL_TICKS, MAX_TICKS, SAMPLE_EVERY_TICKS, SAVE_REPLAY_ENV, SELFPLAY_ARTIFACT_DIR,
     SELFPLAY_FAILURE_DIR,
 };
-use crate::config;
-use crate::game::ai_core::profiles::{
+use crate::ai_core::profiles::{
     RIFLE_FLOOD_FAST_ID, RIFLE_FLOOD_FULL_SATURATION_ID, TECH_TO_TANKS_ID,
 };
-use crate::game::command::SimCommand as Command;
-use crate::game::entity::EntityKind;
-use crate::game::replay::{CommandLogEntry, EventLogEntry};
-use crate::game::{Game, PlayerInit};
-use crate::protocol::{
+use crate::config;
+use rts_sim::game::command::SimCommand as Command;
+use rts_sim::game::entity::EntityKind;
+use rts_sim::game::replay::{CommandLogEntry, EventLogEntry};
+use rts_sim::game::{Game, PlayerInit};
+use rts_sim::protocol::{
     kinds, states, terrain, Command as WireCommand, EntityView, Event, MapInfo, PlayerStart,
     Snapshot, StartPayload,
 };
@@ -705,7 +705,7 @@ fn assert_full_saturation_pressure_and_tech_response(milestones: &Milestones) {
 
 #[test]
 fn profile_matchup_rifle_flood_fast_vs_full_saturation() {
-    if crate::game::skip_unless_full_ai("profile_matchup_rifle_flood_fast_vs_full_saturation") {
+    if crate::skip_unless_full_ai("profile_matchup_rifle_flood_fast_vs_full_saturation") {
         return;
     }
 
@@ -736,7 +736,7 @@ fn profile_matchup_rifle_flood_fast_vs_full_saturation() {
 
 #[test]
 fn profile_matchup_rifle_flood_fast_vs_tech_to_tanks() {
-    if crate::game::skip_unless_full_ai("profile_matchup_rifle_flood_fast_vs_tech_to_tanks") {
+    if crate::skip_unless_full_ai("profile_matchup_rifle_flood_fast_vs_tech_to_tanks") {
         return;
     }
 
@@ -773,9 +773,7 @@ fn profile_matchup_rifle_flood_fast_vs_tech_to_tanks() {
 
 #[test]
 fn profile_matchup_rifle_flood_full_saturation_vs_tech_to_tanks() {
-    if crate::game::skip_unless_full_ai(
-        "profile_matchup_rifle_flood_full_saturation_vs_tech_to_tanks",
-    ) {
+    if crate::skip_unless_full_ai("profile_matchup_rifle_flood_full_saturation_vs_tech_to_tanks") {
         return;
     }
 
@@ -933,7 +931,7 @@ fn final_unit_counts(game: &Game, players: &[PlayerInit]) -> BTreeMap<u32, BTree
 
 #[test]
 fn profile_backed_self_play_exercises_tech_to_tanks() {
-    if crate::game::skip_unless_full_ai("profile_backed_self_play_exercises_tech_to_tanks") {
+    if crate::skip_unless_full_ai("profile_backed_self_play_exercises_tech_to_tanks") {
         return;
     }
 
@@ -1244,7 +1242,7 @@ fn pending_tracker_snapshot(tick: u32, worker_x: f32, worker_y: f32) -> Snapshot
         visible_tiles: Vec::new(),
         events: Vec::new(),
         player_resources: Vec::new(),
-        net_status: crate::protocol::SnapshotNetStatus::default(),
+        net_status: rts_sim::protocol::SnapshotNetStatus::default(),
     }
 }
 
@@ -1370,7 +1368,7 @@ fn identical_scripted_runs_are_identical() {
 fn real_ai_vs_real_ai() {
     use std::collections::{BTreeMap, BTreeSet};
 
-    if crate::game::skip_unless_full_ai("real_ai_vs_real_ai") {
+    if crate::skip_unless_full_ai("real_ai_vs_real_ai") {
         return;
     }
 

@@ -66,7 +66,7 @@ where
     let expansion = active_expansion(observation, profile, recovery_active)?;
     let kind = EntityKind::CityCentre;
     config::building_stats(kind)?;
-    if !rules::economy::build_requirement_met(kind, facts.complete_building_kinds()) {
+    if !rts_rules::economy::build_requirement_met(kind, facts.complete_building_kinds()) {
         return None;
     }
     if facts.building_count(kind) >= expansion.target_city_centres {

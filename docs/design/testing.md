@@ -1,8 +1,8 @@
 ## 9. API-driven self-play test harness
 
-The automated self-play harness is a **test-only** layer in `game/selfplay/`. It is intentionally
-separate from the gameplay AI in `game/ai.rs`: gameplay AI is a player feature, while self-play is
-a regression harness for exercising the public simulation API.
+The automated self-play harness is a **test-only** layer in `rts_ai::selfplay`. It is intentionally
+separate from the simulation core: gameplay AI is a player feature, while self-play is a
+regression harness for exercising the public simulation API.
 
 **Contract.** Self-play scripts may only drive the game through the `Game` seam in §3.1:
 `start_payload()`, `snapshot_for(player)`, `enqueue(player, SimCommand)`, `tick()`,
@@ -11,8 +11,8 @@ would receive and issue ordinary domain commands. They must not mutate entities,
 private system internals. This keeps the simulation architected for future API clients, replay
 tools, and external test drivers without adding a second privileged control path.
 
-**Command log replay.** `Game` records every command at the authoritative apply tick, after AI
-controllers have emitted their normal commands and before systems apply the pending queue.
+**Command log replay.** `Game` records every command at the authoritative apply tick, after callers
+have enqueued human, scripted, or AI commands and before systems apply the pending queue.
 `game/replay.rs` translates that wire-compatible log into `SimCommand`s, feeds them into a fresh
 `Game` with AI thinking disabled, and compares the resulting event stream and final per-player
 snapshots. Replay and live play use the same typed command application path, so a replay proves both

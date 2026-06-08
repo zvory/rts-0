@@ -1,12 +1,12 @@
 use std::collections::{BTreeMap, BTreeSet};
 
+use crate::ai_core::facts::{AiFacts, ProductionBuildingFact};
+use crate::ai_core::observation::{AiEntityState, AiEntitySummary, AiResourceSummary};
+use crate::ai_shared;
 use crate::config;
-use crate::game::ai_core::facts::{AiFacts, ProductionBuildingFact};
-use crate::game::ai_core::observation::{AiEntityState, AiEntitySummary, AiResourceSummary};
-use crate::game::ai_shared;
-use crate::game::command::SimCommand as Command;
-use crate::game::entity::EntityKind;
-use crate::rules;
+use rts_rules;
+use rts_sim::game::command::SimCommand as Command;
+use rts_sim::game::entity::EntityKind;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct SpendBudget {
@@ -43,8 +43,8 @@ impl SpendBudget {
         if config::unit_stats(kind).is_none() {
             return false;
         }
-        let (steel, oil) = rules::economy::cost(kind);
-        let supply = rules::economy::supply_cost(kind);
+        let (steel, oil) = rts_rules::economy::cost(kind);
+        let supply = rts_rules::economy::supply_cost(kind);
         self.steel >= steel && self.oil >= oil && self.free_supply >= supply
     }
 
@@ -52,8 +52,8 @@ impl SpendBudget {
         if config::unit_stats(kind).is_none() {
             return false;
         }
-        let (steel, oil) = rules::economy::cost(kind);
-        let supply = rules::economy::supply_cost(kind);
+        let (steel, oil) = rts_rules::economy::cost(kind);
+        let supply = rts_rules::economy::supply_cost(kind);
         self.reserve_cost(steel, oil, supply)
     }
 
@@ -61,7 +61,7 @@ impl SpendBudget {
         if config::building_stats(kind).is_none() {
             return false;
         }
-        let (steel, oil) = rules::economy::cost(kind);
+        let (steel, oil) = rts_rules::economy::cost(kind);
         self.steel >= steel && self.oil >= oil
     }
 
@@ -69,7 +69,7 @@ impl SpendBudget {
         if config::building_stats(kind).is_none() {
             return false;
         }
-        let (steel, oil) = rules::economy::cost(kind);
+        let (steel, oil) = rts_rules::economy::cost(kind);
         self.reserve_cost(steel, oil, 0)
     }
 
@@ -280,7 +280,7 @@ pub(crate) fn train_units(
 
         let Some(unit) = train_unit_choice(
             request.unit_priorities,
-            rules::economy::trainable_units(building.kind),
+            rts_rules::economy::trainable_units(building.kind),
             request.completed_building_kinds,
             &current_counts,
             &max_counts,
@@ -322,7 +322,9 @@ fn train_unit_choice(
         .copied()
         .enumerate()
         .filter(|(_, unit)| trainable.contains(unit))
-        .filter(|(_, unit)| rules::economy::train_requirement_met(*unit, completed_building_kinds))
+        .filter(|(_, unit)| {
+            rts_rules::economy::train_requirement_met(*unit, completed_building_kinds)
+        })
         .filter(|(_, unit)| {
             let current = current_counts.get(unit).copied().unwrap_or(0);
             max_counts
@@ -580,9 +582,7 @@ fn point_toward(from: (f32, f32), to: (f32, f32), distance: f32) -> (f32, f32) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::game::ai_core::observation::{
-        AiEconomy, AiMapSummary, AiObservation, AiPlayerSummary,
-    };
+    use crate::ai_core::observation::{AiEconomy, AiMapSummary, AiObservation, AiPlayerSummary};
 
     fn worker(id: u32, x: f32, y: f32, state: AiEntityState) -> AiEntitySummary {
         AiEntitySummary {

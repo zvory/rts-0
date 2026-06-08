@@ -4,9 +4,9 @@ use serde::Serialize;
 
 use super::player_view::{is_complete, kind_of};
 use crate::config;
-use crate::game::command::SimCommand as Command;
-use crate::game::entity::EntityKind;
-use crate::protocol::{states, Event, Snapshot};
+use rts_sim::game::command::SimCommand as Command;
+use rts_sim::game::entity::EntityKind;
+use rts_sim::protocol::{states, Event, Snapshot};
 
 pub(super) struct AttackerInfo {
     pub(super) owner: u32,

@@ -8,7 +8,7 @@ Use when changing tick logic, services, rules, AI, or the `Game` core.
 - §3.1 `game::Game` public API (the seam — keep stable)
 - §3.2 Concurrency model (room task is sole owner; no locks)
 - §3.3 Rules layer (`rules/`)
-- [docs/design/ai.md](../design/ai.md) — AI opponents (`game/ai.rs`)
+- [docs/design/ai.md](../design/ai.md) — AI opponents (`server/crates/ai`)
 - [docs/design/testing.md](../design/testing.md) — self-play harness (only if touching scripted tests)
 
 ## Code map
@@ -16,7 +16,7 @@ Use when changing tick logic, services, rules, AI, or the `Game` core.
 - `server/crates/sim/src/game/systems.rs` — thin tick orchestrator
 - `server/crates/sim/src/game/services/` — small pure helpers, called in order by `systems.rs`
 - `server/crates/rules/src/` plus `server/crates/sim/src/rules/projection.rs` — declarative rules
-- `server/crates/sim/src/game/ai.rs` — AI opponents
+- `server/crates/ai/src/` — AI opponents and self-play harnesses
 - `server/src/lobby/`, `server/src/main.rs` — only touch sim via `game::Game`
 
 ## Invariants

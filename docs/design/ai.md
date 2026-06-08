@@ -1,4 +1,4 @@
-## 8. AI opponents (optional, `game/ai.rs`)
+## 8. AI opponents (optional, `server/crates/ai`)
 
 Computer opponents are **opt-in**: a room has none unless the host adds them from the lobby
 (`addAi` / `removeAi`, host-only, lobby phase only). The lobby also has a host-only
@@ -10,26 +10,27 @@ expansions). AI players are seated after the humans in the lobby player list; th
 from the tail of `PLAYER_PALETTE` so they never collide with human colors. They persist across rematches and are cleared only when the room
 empties of humans.
 
-**Where it runs.** `Game` holds one `AiController` per AI player and drives them at the top of
-`tick()`, *before* commands are applied. Each controller pushes ordinary `SimCommand`s onto the same
-pending queue as translated human client input, so every AI action goes through the identical
-validation / cost / supply / placement path in `services/commands.rs` — the AI has **no special authority**
-over the simulation and can't cheat economy or placement rules. Because the controller is
-server-side (not a network client) it reads authoritative own/resource state directly, but enemy
-entities are filtered through that player's authoritative fog grid. To stay fair, outbound attacks
-target enemy **start tiles**, which are public via the `start` payload; direct attacks only target
-currently visible enemy units/buildings during local defense.
+**Where it runs.** `rts-ai` owns one `AiController` per AI player, while `Game` remains AI-free.
+The room task invokes controllers before `game.tick()`, gives each controller the same
+fog-filtered `snapshot_for(player)` plus the static `start_payload()`, then enqueues emitted
+ordinary `SimCommand`s. Every AI action therefore goes through the identical validation / cost /
+supply / placement path in `services/commands.rs` — the AI has **no special authority** over the
+simulation and can't cheat economy, placement, or fog rules. Outbound attacks target enemy
+**start tiles**, which are public via the `start` payload; direct attacks only target currently
+visible enemy units/buildings during local defense.
+The worker direct-hit retreat reflex is the one extra live input: `Game::worker_retreat_commands_for`
+projects recent own-worker damage metadata into ordinary `Move` commands, and the controller emits
+them alongside profile decisions without reading private sim state.
 
 **Strategy (deliberately "very basic").** Each controller, on a staggered cadence
-(`DECISION_INTERVAL` ticks), builds a constrained live `AiObservation` and delegates RTS decisions
-to `game::ai_core::decision::decide_profile`. Live lobby AIs randomly choose one server-side
-profile at match start, without a lobby protocol or UI change: `tech_to_tanks` (tank rush),
-`rifle_flood_fast` (proxy rush), or `rifle_flood_full_saturation` (the previous rifle saturation
-strategy). Each controller keeps its chosen profile for the whole match. It does not micro, scout,
+(`DECISION_INTERVAL` ticks), builds a constrained snapshot-backed `AiObservation` and delegates RTS
+decisions to `rts_ai::ai_core::decision::decide_profile`. Live lobby AIs randomly choose from the
+server-side live profile pool at match start without a lobby protocol or UI change. Each controller
+keeps its chosen profile for the whole match. It does not micro, scout,
 or choose hidden enemy unit positions. A local per-think budget in the shared action layer prevents
 it from over-committing resources/supply it does not have.
 
-**Shared AI core.** `game::ai_core` has deterministic profile data (`profiles.rs`) and a generic
+**Shared AI core.** `rts_ai::ai_core` has deterministic profile data (`profiles.rs`) and a generic
 ranked decision loop (`decision.rs`) that emits ordinary `SimCommand`s through shared action helpers.
 The first code-defined profiles are `rifle_flood_fast`, `rifle_flood_full_saturation`,
 `tech_to_tanks`, and `steel_expansion_tanks`; they parameterize worker targets, supply buffers,
@@ -104,4 +105,3 @@ because it has no player input path back into the game. The lobby's `match_playe
 **+** AIs.
 
 ---
-

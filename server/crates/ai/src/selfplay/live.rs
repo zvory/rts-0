@@ -1,7 +1,7 @@
 use super::player_view::PlayerView;
 use super::scripts::{ProfileBackedScript, ScriptedPlayer};
-use crate::game::ai_core::profiles::TECH_TO_TANKS_ID;
-use crate::game::{Game, PlayerInit};
+use crate::ai_core::profiles::TECH_TO_TANKS_ID;
+use rts_sim::game::{Game, PlayerInit};
 
 pub struct LiveSelfPlay {
     players: Vec<PlayerInit>,

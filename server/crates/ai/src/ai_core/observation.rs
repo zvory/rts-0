@@ -1,11 +1,8 @@
 use std::collections::BTreeMap;
 
-use crate::game::entity::{BuildPhase, Entity, EntityKind, EntityStore, Order, NEUTRAL};
-use crate::game::fog::Fog;
-use crate::game::map::Map;
-use crate::game::PlayerState;
-use crate::protocol::{states, EntityView, Snapshot, StartPayload};
-use crate::rules;
+use rts_rules;
+use rts_sim::game::entity::{EntityKind, NEUTRAL};
+use rts_sim::protocol::{states, EntityView, Snapshot, StartPayload};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct AiMapSummary {
@@ -125,85 +122,6 @@ pub(crate) struct AiObservation {
 }
 
 impl AiObservation {
-    pub(crate) fn from_live_state(
-        map: &Map,
-        entities: &EntityStore,
-        fog: &Fog,
-        players: &[PlayerState],
-        player_id: u32,
-        tick: u32,
-    ) -> Option<Self> {
-        let me = players.iter().find(|p| p.id == player_id)?;
-        let map_summary = AiMapSummary {
-            width: map.size,
-            height: map.size,
-            tile_size: crate::config::TILE_SIZE,
-        };
-        let economy = AiEconomy {
-            steel: me.steel,
-            oil: me.oil,
-            supply_used: me.supply_used,
-            supply_cap: me.supply_cap,
-        };
-
-        let mut player_summaries: Vec<AiPlayerSummary> = players
-            .iter()
-            .map(|p| AiPlayerSummary {
-                id: p.id,
-                start_tile: p.start_tile,
-                is_ai: p.is_ai,
-                is_alive: entities.player_alive(p.id),
-            })
-            .collect();
-        player_summaries.sort_by_key(|p| p.id);
-
-        let mut owned: Vec<AiEntitySummary> = entities
-            .iter()
-            .filter(|e| e.owner == player_id && (e.is_unit() || e.is_building()))
-            .map(AiEntitySummary::from_live_entity)
-            .collect();
-        owned.sort_by_key(|e| e.id);
-
-        let mut resources: Vec<AiResourceSummary> = entities
-            .iter()
-            .filter(|e| e.owner == NEUTRAL && e.is_node())
-            .filter_map(AiResourceSummary::from_live_entity)
-            .collect();
-        resources.sort_by_key(|r| r.id);
-
-        let mut pending_builds: Vec<AiBuildIntent> = entities
-            .iter()
-            .filter(|e| e.owner == player_id && e.kind == EntityKind::Worker)
-            .filter_map(pending_build_intent_from_live_worker)
-            .collect();
-        pending_builds.sort_unstable();
-        pending_builds.dedup();
-
-        let mut visible_enemies: Vec<AiEntitySummary> = entities
-            .iter()
-            .filter(|e| e.owner != NEUTRAL && e.owner != player_id)
-            .filter(|e| e.is_unit() || e.is_building())
-            .filter(|e| fog.is_visible_world(player_id, e.pos_x, e.pos_y))
-            .map(AiEntitySummary::from_live_entity)
-            .collect();
-        visible_enemies.sort_by_key(|e| e.id);
-
-        Some(Self {
-            player_id,
-            tick,
-            map: map_summary,
-            economy,
-            own_start_tile: me.start_tile,
-            players: player_summaries,
-            owned,
-            resources,
-            // Live AI only receives entities visible through its authoritative fog grid. It can
-            // react to scouted pressure without learning hidden enemy positions.
-            visible_enemies,
-            pending_builds,
-        })
-    }
-
     pub(crate) fn from_selfplay_snapshot(
         start: &StartPayload,
         snapshot: &Snapshot,
@@ -314,23 +232,6 @@ impl AiObservation {
 }
 
 impl AiEntitySummary {
-    fn from_live_entity(entity: &Entity) -> Self {
-        Self {
-            id: entity.id,
-            owner: entity.owner,
-            kind: entity.kind,
-            x: entity.pos_x,
-            y: entity.pos_y,
-            state: AiEntityState::from_protocol_state(entity.state_str()),
-            is_complete: !entity.under_construction(),
-            production_queue_len: production_queue_len(entity.kind, entity.prod_queue().len()),
-            production_kind: entity.prod_queue().first().map(|item| item.unit),
-            latched_node: live_latched_node(entity),
-            target_id: entity.target_id(),
-            free_for_combat: live_free_for_combat(entity),
-        }
-    }
-
     fn from_entity_view(view: &EntityView) -> Option<Self> {
         let kind: EntityKind = view.kind.parse().ok()?;
         let state = AiEntityState::from_protocol_state(&view.state);
@@ -355,16 +256,6 @@ impl AiEntitySummary {
 }
 
 impl AiResourceSummary {
-    fn from_live_entity(entity: &Entity) -> Option<Self> {
-        entity.kind.is_node().then_some(Self {
-            id: entity.id,
-            kind: entity.kind,
-            x: entity.pos_x,
-            y: entity.pos_y,
-            remaining: entity.remaining().unwrap_or(0),
-        })
-    }
-
     fn from_entity_view(view: &EntityView) -> Option<Self> {
         let kind: EntityKind = view.kind.parse().ok()?;
         kind.is_node().then_some(Self {
@@ -378,21 +269,7 @@ impl AiResourceSummary {
 }
 
 fn production_queue_len(kind: EntityKind, queue_len: usize) -> Option<usize> {
-    (!rules::economy::trainable_units(kind).is_empty()).then_some(queue_len)
-}
-
-fn live_latched_node(entity: &Entity) -> Option<u32> {
-    (entity.kind == EntityKind::Worker)
-        .then(|| entity.order().gather_node())
-        .flatten()
-}
-
-fn live_free_for_combat(entity: &Entity) -> bool {
-    match entity.order() {
-        Order::Idle => true,
-        Order::AttackMove(_) => entity.path_is_empty() && entity.target_id().is_none(),
-        _ => false,
-    }
+    (!rts_rules::economy::trainable_units(kind).is_empty()).then_some(queue_len)
 }
 
 fn snapshot_free_for_combat(state: AiEntityState, target_id: Option<u32>) -> bool {
@@ -403,19 +280,10 @@ fn snapshot_free_for_combat(state: AiEntityState, target_id: Option<u32>) -> boo
         )
 }
 
-fn pending_build_intent_from_live_worker(worker: &Entity) -> Option<AiBuildIntent> {
-    if worker.build_phase() != Some(BuildPhase::ToSite) {
-        return None;
-    }
-    let (kind, tile_x, tile_y) = worker.order().build_intent_tile()?;
-    crate::config::building_stats(kind)?;
-    Some(AiBuildIntent::to_site(worker.id, kind, tile_x, tile_y))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::protocol::{terrain, EntityView, MapInfo, PlayerStart};
+    use rts_sim::protocol::{terrain, EntityView, MapInfo, PlayerStart};
 
     fn empty_snapshot(tick: u32) -> Snapshot {
         Snapshot {
@@ -430,7 +298,7 @@ mod tests {
             visible_tiles: Vec::new(),
             events: Vec::new(),
             player_resources: Vec::new(),
-            net_status: crate::protocol::SnapshotNetStatus::default(),
+            net_status: rts_sim::protocol::SnapshotNetStatus::default(),
         }
     }
 
@@ -472,7 +340,7 @@ mod tests {
             EntityView::new(
                 30,
                 0,
-                crate::protocol::kind_to_wire(EntityKind::Steel),
+                rts_sim::protocol::kind_to_wire(EntityKind::Steel),
                 64.0,
                 64.0,
                 1,
@@ -482,7 +350,7 @@ mod tests {
             EntityView::new(
                 20,
                 2,
-                crate::protocol::kind_to_wire(EntityKind::Rifleman),
+                rts_sim::protocol::kind_to_wire(EntityKind::Rifleman),
                 96.0,
                 96.0,
                 1,
@@ -492,7 +360,7 @@ mod tests {
             EntityView::new(
                 10,
                 1,
-                crate::protocol::kind_to_wire(EntityKind::Worker),
+                rts_sim::protocol::kind_to_wire(EntityKind::Worker),
                 32.0,
                 32.0,
                 1,
@@ -545,7 +413,7 @@ mod tests {
         let staged = EntityView::new(
             10,
             1,
-            crate::protocol::kind_to_wire(EntityKind::Rifleman),
+            rts_sim::protocol::kind_to_wire(EntityKind::Rifleman),
             32.0,
             32.0,
             1,
@@ -555,7 +423,7 @@ mod tests {
         let attack_moving = EntityView::new(
             12,
             1,
-            crate::protocol::kind_to_wire(EntityKind::Tank),
+            rts_sim::protocol::kind_to_wire(EntityKind::Tank),
             96.0,
             32.0,
             1,
@@ -565,7 +433,7 @@ mod tests {
         let mut engaged = EntityView::new(
             11,
             1,
-            crate::protocol::kind_to_wire(EntityKind::Rifleman),
+            rts_sim::protocol::kind_to_wire(EntityKind::Rifleman),
             64.0,
             32.0,
             1,
@@ -585,113 +453,5 @@ mod tests {
         assert!(staged.free_for_combat);
         assert!(attack_moving.free_for_combat);
         assert!(!engaged.free_for_combat);
-    }
-
-    #[test]
-    fn live_observation_uses_public_enemy_starts_without_enemy_units() {
-        let map = Map::generate(2, 1234);
-        let mut entities = EntityStore::new();
-        entities
-            .spawn_unit(1, EntityKind::Worker, 32.0, 32.0)
-            .unwrap();
-        entities
-            .spawn_unit(2, EntityKind::Rifleman, 256.0, 256.0)
-            .unwrap();
-        let players = vec![
-            PlayerState {
-                id: 1,
-                name: "Alpha".into(),
-                color: "#111".into(),
-                start_tile: (8, 8),
-                steel: 100,
-                oil: 0,
-                supply_used: 1,
-                supply_cap: 10,
-                is_ai: true,
-                score: crate::game::ScoreState::default(),
-            },
-            PlayerState {
-                id: 2,
-                name: "Bravo".into(),
-                color: "#222".into(),
-                start_tile: (48, 48),
-                steel: 100,
-                oil: 0,
-                supply_used: 1,
-                supply_cap: 10,
-                is_ai: false,
-                score: crate::game::ScoreState::default(),
-            },
-        ];
-        let mut fog = Fog::new(map.size);
-        fog.recompute(&[1, 2], &entities, &map);
-
-        let observation =
-            AiObservation::from_live_state(&map, &entities, &fog, &players, 1, 9).unwrap();
-
-        assert_eq!(
-            observation.players.iter().map(|p| p.id).collect::<Vec<_>>(),
-            vec![1, 2]
-        );
-        assert!(observation.visible_enemies.is_empty());
-        assert_eq!(
-            observation.owned.iter().map(|e| e.id).collect::<Vec<_>>(),
-            vec![1]
-        );
-    }
-
-    #[test]
-    fn live_observation_includes_only_fog_visible_enemies() {
-        let map = Map::generate(2, 1234);
-        let mut entities = EntityStore::new();
-        entities
-            .spawn_unit(1, EntityKind::Worker, 32.0, 32.0)
-            .unwrap();
-        let visible_enemy = entities
-            .spawn_unit(2, EntityKind::Rifleman, 64.0, 32.0)
-            .unwrap();
-        entities
-            .spawn_unit(2, EntityKind::Rifleman, 1_024.0, 1_024.0)
-            .unwrap();
-        let players = vec![
-            PlayerState {
-                id: 1,
-                name: "Alpha".into(),
-                color: "#111".into(),
-                start_tile: (8, 8),
-                steel: 100,
-                oil: 0,
-                supply_used: 1,
-                supply_cap: 10,
-                is_ai: true,
-                score: crate::game::ScoreState::default(),
-            },
-            PlayerState {
-                id: 2,
-                name: "Bravo".into(),
-                color: "#222".into(),
-                start_tile: (48, 48),
-                steel: 100,
-                oil: 0,
-                supply_used: 1,
-                supply_cap: 10,
-                is_ai: false,
-                score: crate::game::ScoreState::default(),
-            },
-        ];
-        let mut fog = Fog::new(map.size);
-        fog.recompute(&[1, 2], &entities, &map);
-
-        let observation =
-            AiObservation::from_live_state(&map, &entities, &fog, &players, 1, 9).unwrap();
-
-        assert_eq!(
-            observation
-                .visible_enemies
-                .iter()
-                .map(|enemy| enemy.id)
-                .collect::<Vec<_>>(),
-            vec![visible_enemy]
-        );
     }
 }

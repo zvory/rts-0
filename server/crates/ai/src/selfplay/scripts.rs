@@ -6,16 +6,16 @@ use super::player_view::{
     PlayerView,
 };
 use super::{ATTACK_REISSUE_TICKS, SELFPLAY_ATTACK_STAGE_SUPPRESSION_TICKS, THINK_INTERVAL};
-use crate::game::ai_core::actions::{self, AiActionContext, ResourceAssignmentPolicy, SpendBudget};
-use crate::game::ai_core::decision::{decide_profile, AiDecisionMemory, AiIntent};
-use crate::game::ai_core::facts::AiFacts;
-use crate::game::ai_core::observation::AiObservation;
-use crate::game::ai_core::profiles::{
+use crate::ai_core::actions::{self, AiActionContext, ResourceAssignmentPolicy, SpendBudget};
+use crate::ai_core::decision::{decide_profile, AiDecisionMemory, AiIntent};
+use crate::ai_core::facts::AiFacts;
+use crate::ai_core::observation::AiObservation;
+use crate::ai_core::profiles::{
     profile_by_id, AiProfile, RIFLE_FLOOD_FULL_SATURATION, RIFLE_FLOOD_FULL_SATURATION_ID,
 };
-use crate::game::ai_shared;
-use crate::game::command::SimCommand as Command;
-use crate::game::entity::EntityKind;
+use crate::ai_shared;
+use rts_sim::game::command::SimCommand as Command;
+use rts_sim::game::entity::EntityKind;
 
 pub(super) trait ScriptedPlayer: Send {
     fn player_id(&self) -> u32;

@@ -1,11 +1,11 @@
 use std::collections::BTreeSet;
 
+use crate::ai_core::facts;
+use crate::ai_core::observation::AiResourceSummary;
 use crate::config;
-use crate::game::ai_core::facts;
-use crate::game::ai_core::observation::AiResourceSummary;
-use crate::game::entity::EntityKind;
-use crate::game::entity::EntityStore;
-use crate::protocol::{MapInfo, Snapshot};
+use rts_sim::game::entity::EntityKind;
+use rts_sim::game::entity::EntityStore;
+use rts_sim::protocol::{MapInfo, Snapshot};
 
 pub(crate) const DEFAULT_BUILD_SEARCH_MIN_RADIUS: i32 = 3;
 pub(crate) const DEFAULT_BUILD_SEARCH_MAX_RADIUS: i32 = 16;
@@ -261,9 +261,8 @@ pub(crate) fn find_build_spot_near_start_with(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::game::ai_core::actions::{ready_attack_wave, SpendBudget};
-    use crate::protocol::{terrain, EntityView, Snapshot};
-    use crate::rules;
+    use crate::ai_core::actions::{ready_attack_wave, SpendBudget};
+    use rts_sim::protocol::{terrain, EntityView, Snapshot};
 
     #[test]
     fn prefers_tiles_away_from_map_center() {
@@ -355,9 +354,9 @@ mod tests {
 
     #[test]
     fn spend_budget_reserves_unit_and_building_costs() {
-        let (tank_steel, tank_oil) = rules::economy::cost(EntityKind::Tank);
-        let tank_supply = rules::economy::supply_cost(EntityKind::Tank);
-        let (depot_steel, _) = rules::economy::cost(EntityKind::Depot);
+        let (tank_steel, tank_oil) = rts_rules::economy::cost(EntityKind::Tank);
+        let tank_supply = rts_rules::economy::supply_cost(EntityKind::Tank);
+        let (depot_steel, _) = rts_rules::economy::cost(EntityKind::Depot);
         let mut budget = SpendBudget::new(tank_steel + depot_steel, tank_oil, 0, tank_supply + 1);
 
         assert!(budget.can_afford_unit(EntityKind::Tank));
@@ -394,7 +393,7 @@ mod tests {
                 EntityView {
                     id: 1,
                     owner: 0,
-                    kind: crate::protocol::kind_to_wire(EntityKind::Steel).to_string(),
+                    kind: rts_sim::protocol::kind_to_wire(EntityKind::Steel).to_string(),
                     x: hx + in_range,
                     y: hy,
                     hp: 1,
@@ -422,7 +421,7 @@ mod tests {
                 EntityView {
                     id: 2,
                     owner: 0,
-                    kind: crate::protocol::kind_to_wire(EntityKind::Steel).to_string(),
+                    kind: rts_sim::protocol::kind_to_wire(EntityKind::Steel).to_string(),
                     x: hx - in_range,
                     y: hy,
                     hp: 1,
@@ -450,7 +449,7 @@ mod tests {
                 EntityView {
                     id: 3,
                     owner: 0,
-                    kind: crate::protocol::kind_to_wire(EntityKind::Oil).to_string(),
+                    kind: rts_sim::protocol::kind_to_wire(EntityKind::Oil).to_string(),
                     x: hx,
                     y: hy + in_range,
                     hp: 1,
@@ -478,7 +477,7 @@ mod tests {
                 EntityView {
                     id: 4,
                     owner: 0,
-                    kind: crate::protocol::kind_to_wire(EntityKind::Steel).to_string(),
+                    kind: rts_sim::protocol::kind_to_wire(EntityKind::Steel).to_string(),
                     x: hx,
                     y: hy + out_of_range,
                     hp: 1,
@@ -506,7 +505,7 @@ mod tests {
                 EntityView {
                     id: 5,
                     owner: 0,
-                    kind: crate::protocol::kind_to_wire(EntityKind::Steel).to_string(),
+                    kind: rts_sim::protocol::kind_to_wire(EntityKind::Steel).to_string(),
                     x: hx,
                     y: hy - in_range,
                     hp: 1,
@@ -537,7 +536,7 @@ mod tests {
             visible_tiles: Vec::new(),
             events: Vec::new(),
             player_resources: Vec::new(),
-            net_status: crate::protocol::SnapshotNetStatus::default(),
+            net_status: rts_sim::protocol::SnapshotNetStatus::default(),
         };
 
         assert_eq!(

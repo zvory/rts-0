@@ -154,7 +154,7 @@ pub(super) fn next_tank_resource_goal(
     } else {
         EntityKind::Tank
     };
-    let (steel, oil) = rules::economy::cost(kind);
+    let (steel, oil) = rts_rules::economy::cost(kind);
     let scale = if kind == EntityKind::Tank {
         facts.complete_building_count(EntityKind::Factory).max(1) as u32
     } else {

@@ -4,8 +4,6 @@ use crate::config;
 use crate::game::entity::{Entity, EntityKind, EntityStore};
 use crate::game::map::Map;
 use crate::game::pathfinding::Passability;
-use crate::game::services::spatial::SpatialIndex;
-use crate::game::services::standability;
 
 const FNV_OFFSET_BASIS: u64 = 0xcbf2_9ce4_8422_2325;
 const FNV_PRIME: u64 = 0x0000_0100_0000_01b3;
@@ -334,18 +332,4 @@ pub(crate) fn footprint_center(
     // map is unused beyond stats here, kept for signature symmetry / future clamping.
     let _ = map;
     (x, y)
-}
-
-/// Whether `building`'s footprint at `(tile_x, tile_y)` is fully in bounds, on passable
-/// terrain, and clear of existing buildings, units, and resource nodes. `(tile_x, tile_y)` is the
-/// footprint's top-left tile. Shared with the AI (`ai.rs`) for picking valid build sites.
-pub(crate) fn footprint_placeable(
-    map: &Map,
-    entities: &EntityStore,
-    spatial: &SpatialIndex,
-    building: EntityKind,
-    tile_x: u32,
-    tile_y: u32,
-) -> bool {
-    standability::building_site_clear_spatial(map, entities, spatial, building, tile_x, tile_y)
 }

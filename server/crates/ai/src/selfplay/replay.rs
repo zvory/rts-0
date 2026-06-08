@@ -8,17 +8,17 @@ use serde::{Deserialize, Serialize};
 use super::player_view::PlayerView;
 use super::scripts::{ProfileBackedScript, ScriptedPlayer};
 use super::SELFPLAY_ARTIFACT_DIR;
-use crate::config;
-use crate::game::ai_core::profiles::{
+use crate::ai_core::profiles::{
     profile_by_id, required_profiles, RIFLE_FLOOD_FULL_SATURATION_ID, STEEL_EXPANSION_TANKS_ID,
     TECH_TO_TANKS_ID,
 };
-use crate::game::command::SimCommand as Command;
-use crate::game::replay::{
+use crate::config;
+use rts_sim::game::command::SimCommand as Command;
+use rts_sim::game::replay::{
     replay_commands, CommandLogEntry, EventLogEntry, PlayerSnapshot, ReplayOutcome,
 };
-use crate::game::{Game, PlayerInit};
-use crate::protocol::{kinds, Command as WireCommand, Event, Snapshot};
+use rts_sim::game::{Game, PlayerInit};
+use rts_sim::protocol::{kinds, Command as WireCommand, Event, Snapshot};
 
 #[derive(Debug)]
 pub struct SelfPlayFailure {
@@ -588,7 +588,7 @@ fn final_material_values(game: &Game, players: &[PlayerInit]) -> BTreeMap<u32, M
         let Ok(kind) = entity.kind.parse() else {
             continue;
         };
-        let (steel, oil) = crate::rules::economy::cost(kind);
+        let (steel, oil) = rts_rules::economy::cost(kind);
         let value = steel.saturating_add(oil);
         let entry = values.entry(entity.owner).or_default();
         if kind.is_unit() {

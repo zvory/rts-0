@@ -1,11 +1,11 @@
 use std::collections::BTreeSet;
 
+use crate::ai_core::observation::{AiBuildIntent, AiObservation};
+use crate::ai_shared;
 use crate::config;
-use crate::game::ai_core::observation::{AiBuildIntent, AiObservation};
-use crate::game::ai_shared;
-use crate::game::entity::EntityKind;
-use crate::protocol::{kinds, terrain, EntityView, MapInfo, Snapshot, StartPayload};
-use crate::rules;
+use rts_rules;
+use rts_sim::game::entity::EntityKind;
+use rts_sim::protocol::{kinds, terrain, EntityView, MapInfo, Snapshot, StartPayload};
 
 pub(super) fn kind_of(e: &EntityView) -> Option<EntityKind> {
     e.kind.parse().ok()
@@ -13,15 +13,15 @@ pub(super) fn kind_of(e: &EntityView) -> Option<EntityKind> {
 
 /// Convenience: check whether an `EntityView` has a given internal kind.
 pub(super) fn is_kind(e: &EntityView, kind: EntityKind) -> bool {
-    e.kind == crate::protocol::kind_to_wire(kind)
+    e.kind == rts_sim::protocol::kind_to_wire(kind)
 }
 
 #[derive(Clone, Copy)]
-pub(super) struct PlayerView<'a> {
-    pub(super) player_id: u32,
-    pub(super) tick: u32,
-    pub(super) start: &'a StartPayload,
-    pub(super) snapshot: &'a Snapshot,
+pub(crate) struct PlayerView<'a> {
+    pub(crate) player_id: u32,
+    pub(crate) tick: u32,
+    pub(crate) start: &'a StartPayload,
+    pub(crate) snapshot: &'a Snapshot,
 }
 
 impl PlayerView<'_> {
@@ -56,7 +56,7 @@ pub(super) fn player_start_world(start: &StartPayload, player_id: u32) -> Option
     Some((tile_x as f32 * ts + ts * 0.5, tile_y as f32 * ts + ts * 0.5))
 }
 
-pub(super) fn occupied_tiles_from_snapshot(
+pub(crate) fn occupied_tiles_from_snapshot(
     map: &MapInfo,
     snapshot: &Snapshot,
 ) -> BTreeSet<(u32, u32)> {
@@ -91,7 +91,7 @@ pub(super) fn occupied_tiles_from_snapshot(
     occupied
 }
 
-pub(super) fn footprint_placeable_from_snapshot(
+pub(crate) fn footprint_placeable_from_snapshot(
     map: &MapInfo,
     snapshot: &Snapshot,
     building: EntityKind,
@@ -151,7 +151,7 @@ pub(super) fn footprint_placeable_from_snapshot(
             }
         }
     }
-    if !rules::economy::trainable_units(building).is_empty() {
+    if !rts_rules::economy::trainable_units(building).is_empty() {
         let spawn_x = tile_x + stats.foot_w / 2;
         let Some(spawn_y) = tile_y.checked_add(stats.foot_h) else {
             return false;

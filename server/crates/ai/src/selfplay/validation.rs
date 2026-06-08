@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use super::replay::SelfPlayFailure;
 use crate::config;
-use crate::protocol::{kinds, MapInfo, Snapshot};
+use rts_sim::protocol::{kinds, MapInfo, Snapshot};
 
 const RESOURCE_SANITY_LIMIT: u32 = 1_000_000;
 

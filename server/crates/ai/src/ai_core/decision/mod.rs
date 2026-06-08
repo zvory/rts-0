@@ -3,23 +3,23 @@
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::config;
-use crate::game::ai_core::actions::{
+use crate::ai_core::actions::{
     self, AiActionContext, BuildPlacementRequest, ResourceAssignmentPolicy, SpendBudget,
     TrainUnitsRequest,
 };
-use crate::game::ai_core::facts::{AiFacts, EnemyBaseFact};
-use crate::game::ai_core::observation::{
+use crate::ai_core::facts::{AiFacts, EnemyBaseFact};
+use crate::ai_core::observation::{
     AiEntityState, AiEntitySummary, AiMapSummary, AiObservation, AiResourceSummary,
 };
-use crate::game::ai_core::profiles::{
+use crate::ai_core::profiles::{
     AiProfile, AttackPolicy, BarracksCurve, ExpansionPolicy, ProductionPolicy, ProxyBarracksPolicy,
     RecoveryTransitionPolicy, ResourcePolicy, TechTransitionPolicy, WorkerPolicy,
 };
-use crate::game::ai_shared;
-use crate::game::command::SimCommand as Command;
-use crate::game::entity::EntityKind;
-use crate::rules;
+use crate::ai_shared;
+use crate::config;
+use rts_rules;
+use rts_sim::game::command::SimCommand as Command;
+use rts_sim::game::entity::EntityKind;
 
 mod defense;
 mod expansion;
@@ -473,7 +473,7 @@ where
         let save_for_tech = (save_for_unplanned_expansion
             || save_for_first_tech_unit
             || save_for_required_tech_building)
-            && !rules::economy::trainable_units(building_kind).contains(&key_tech_unit);
+            && !rts_rules::economy::trainable_units(building_kind).contains(&key_tech_unit);
         for trained in actions::train_units(
             &mut actions,
             TrainUnitsRequest {

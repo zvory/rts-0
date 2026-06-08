@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-use crate::game::entity::EntityKind;
+use rts_sim::game::entity::EntityKind;
 
 pub(crate) const RIFLE_FLOOD_FAST_ID: &str = "rifle_flood_fast";
 pub(crate) const RIFLE_FLOOD_FULL_SATURATION_ID: &str = "rifle_flood_full_saturation";

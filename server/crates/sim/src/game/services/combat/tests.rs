@@ -1010,7 +1010,7 @@ fn direct_hits_record_damage_signal_on_victim() {
     );
     assert!(
         worker.last_damage_tick().is_some(),
-        "victim should record damage tick so AI can react"
+        "victim should record damage tick for diagnostics"
     );
 }
 
@@ -1029,7 +1029,7 @@ fn combat_no_longer_issues_retreat_orders() {
     let worker = entities.get(worker_id).expect("worker should exist");
     assert!(
         matches!(worker.order(), Order::Idle),
-        "combat must not mutate orders; retreat is now an AI command"
+        "combat must not mutate orders"
     );
     assert_eq!(worker.path_goal(), None, "combat must not issue path goals");
 }
@@ -1715,7 +1715,7 @@ fn shots_overpenetrate_past_non_blocking_primary_target() {
     assert_eq!(secondary.hp, 35);
     assert!(
         matches!(secondary.order(), Order::Idle),
-        "overpenetration damage must not trigger worker retreat"
+        "overpenetration damage must not mutate worker orders"
     );
 }
 

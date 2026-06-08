@@ -1,11 +1,11 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use super::player_view::{building_footprint_tiles, is_kind, PlayerView};
+use crate::ai_core::observation::AiBuildIntent;
 use crate::config;
-use crate::game::ai_core::observation::AiBuildIntent;
-use crate::game::command::SimCommand as Command;
-use crate::game::entity::EntityKind;
-use crate::protocol::{states, EntityView};
+use rts_sim::game::command::SimCommand as Command;
+use rts_sim::game::entity::EntityKind;
+use rts_sim::protocol::{states, EntityView};
 
 const FAILED_SPOTS_CAP: usize = 16;
 /// Force a pending build to be treated as failed after this many ticks without worker movement so
@@ -47,13 +47,13 @@ impl PendingBuild {
 }
 
 #[derive(Default)]
-pub(super) struct PendingBuildTracker {
+pub(crate) struct PendingBuildTracker {
     pending: BTreeMap<u32, PendingBuild>,
     failed_spots: HashMap<EntityKind, BTreeSet<(u32, u32)>>,
 }
 
 impl PendingBuildTracker {
-    pub(super) fn observe(&mut self, view: PlayerView<'_>) {
+    pub(crate) fn observe(&mut self, view: PlayerView<'_>) {
         let own: Vec<&EntityView> = view
             .snapshot
             .entities
@@ -100,7 +100,7 @@ impl PendingBuildTracker {
         }
     }
 
-    pub(super) fn intents(&self) -> Vec<AiBuildIntent> {
+    pub(crate) fn intents(&self) -> Vec<AiBuildIntent> {
         self.pending
             .iter()
             .map(|(worker_id, pending)| {
@@ -109,7 +109,7 @@ impl PendingBuildTracker {
             .collect()
     }
 
-    pub(super) fn record_commands(&mut self, tick: u32, commands: &[Command]) {
+    pub(crate) fn record_commands(&mut self, tick: u32, commands: &[Command]) {
         for command in commands {
             let Command::Build {
                 worker,
@@ -138,7 +138,7 @@ impl PendingBuildTracker {
         }
     }
 
-    pub(super) fn failed(&self, kind: EntityKind, tile_x: u32, tile_y: u32) -> bool {
+    pub(crate) fn failed(&self, kind: EntityKind, tile_x: u32, tile_y: u32) -> bool {
         self.failed_spots
             .get(&kind)
             .map(|spots| spots.contains(&(tile_x, tile_y)))

@@ -7,6 +7,9 @@ use super::*;
 use crate::game::entity::EntityKind;
 use crate::game::map::Map;
 use crate::protocol::SnapshotNetStatus;
+use rand::rngs::SmallRng;
+use rand::SeedableRng;
+use rts_ai::{AiController, AiThinkContext};
 use std::time::Instant as StdInstant;
 use tokio::time::Instant as TokioInstant;
 
@@ -25,6 +28,17 @@ pub(super) struct RoomPlayer {
 struct AiSlot {
     id: u32,
     name: String,
+}
+
+fn live_ai_controllers(players: &[PlayerInit], seed: u32) -> Vec<AiController> {
+    let mut rng = SmallRng::seed_from_u64((seed as u64) ^ 0xA17E_5EED);
+    players
+        .iter()
+        .filter(|player| player.is_ai)
+        .map(|player| {
+            AiController::with_profile_id(player.id, rts_ai::random_live_profile_id(&mut rng))
+        })
+        .collect()
 }
 
 /// The room's current mode. `InGame` owns the live simulation outright.
@@ -116,6 +130,7 @@ pub(super) struct RoomTask {
     outcome_sent: HashSet<u32>,
     dev_driver: Option<DevDriver>,
     dev_view_player_id: Option<u32>,
+    ai_controllers: Vec<AiController>,
     /// Replay speed multiplier; 1.0 = real-time, 2.0 = 2× faster, etc.
     replay_speed: f32,
     slow_tick_count: u32,
@@ -141,6 +156,7 @@ impl RoomTask {
             outcome_sent: HashSet::new(),
             dev_driver: None,
             dev_view_player_id: None,
+            ai_controllers: Vec::new(),
             replay_speed,
             slow_tick_count: 0,
         }
@@ -741,6 +757,7 @@ impl RoomTask {
         let payload = game.start_payload();
         self.match_player_count = inits.len();
         self.outcome_sent.clear();
+        self.ai_controllers = live_ai_controllers(&inits, seed);
 
         // Each player gets the shared static payload but stamped with their own id.
         for &id in &self.order {
@@ -777,6 +794,7 @@ impl RoomTask {
         self.match_player_count = 2;
         self.dev_driver = Some(driver);
         self.dev_view_player_id = Some(view_player_id);
+        self.ai_controllers.clear();
         let recipients = self.order.clone();
         for player_id in recipients {
             self.send_dev_start_to(player_id);
@@ -921,6 +939,7 @@ impl RoomTask {
         // failures) writes a replay artifact and resets the room instead of killing the task.
         let game_tick_start = StdInstant::now();
         let tick_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            self.enqueue_live_ai_commands(&mut game, perf.as_mut());
             game.tick_with_perf(perf.as_mut())
         }));
         if let Some(perf) = perf.as_mut() {
@@ -1031,6 +1050,40 @@ impl RoomTask {
 
         self.finish_perf_tick(perf.as_ref(), &game, scheduler_lag, tick_start);
         self.phase = Phase::InGame(game);
+    }
+
+    fn enqueue_live_ai_commands(
+        &mut self,
+        game: &mut Game,
+        perf: Option<&mut crate::perf::TickPerf>,
+    ) {
+        crate::perf::timed(perf, "ai_think", || {
+            if self.ai_controllers.is_empty() {
+                return;
+            }
+            let start = game.start_payload();
+            let mut commands = Vec::new();
+            for controller in &mut self.ai_controllers {
+                let player_id = controller.player_id();
+                if !game.alive_players().contains(&player_id) {
+                    continue;
+                }
+                let snapshot = game.snapshot_for(player_id);
+                commands.extend(
+                    controller
+                        .think(AiThinkContext {
+                            start: &start,
+                            snapshot: &snapshot,
+                            retreat_commands: game.worker_retreat_commands_for(player_id),
+                        })
+                        .into_iter()
+                        .map(|command| (player_id, command)),
+                );
+            }
+            for (player_id, command) in commands {
+                game.enqueue(player_id, command);
+            }
+        });
     }
 
     fn on_tick_dev_selfplay(&mut self, scheduled: TokioInstant) {

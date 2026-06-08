@@ -8,8 +8,8 @@
 
 mod live;
 mod milestones;
-mod pending_build;
-mod player_view;
+pub(crate) mod pending_build;
+pub(crate) mod player_view;
 mod replay;
 mod scripts;
 mod validation;
@@ -35,7 +35,7 @@ const MAX_STALL_TICKS: u32 = 1_800;
 const SAMPLE_EVERY_TICKS: u32 = 30;
 const THINK_INTERVAL: u32 = 6;
 const ATTACK_REISSUE_TICKS: u32 = 120;
-const SELFPLAY_ATTACK_STAGE_SUPPRESSION_TICKS: u32 = 3_600;
+pub(crate) const SELFPLAY_ATTACK_STAGE_SUPPRESSION_TICKS: u32 = 3_600;
 const SELFPLAY_FAILURE_DIR: &str = "selfplay-failures";
 const SELFPLAY_ARTIFACT_DIR: &str = "selfplay-artifacts";
 const SAVE_REPLAY_ENV: &str = "RTS_SELFPLAY_SAVE_REPLAY";

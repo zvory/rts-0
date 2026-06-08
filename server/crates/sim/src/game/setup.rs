@@ -6,25 +6,22 @@ impl Game {
     pub fn new(players: &[PlayerInit], seed: u32) -> Game {
         Self::new_inner(
             players,
-            true,
             config::STARTING_STEEL,
             config::STARTING_OIL,
             seed,
-            AiProfileSelection::Default,
             StartingLoadout::Standard,
         )
     }
 
-    /// Create a live lobby match where each AI picks one strategy from the live profile pool.
+    /// Compatibility constructor retained for callers that still name live AI profile setup.
+    /// AI controllers are owned by the caller, not by `Game`.
     #[allow(dead_code)]
     pub fn new_with_random_ai_profiles(players: &[PlayerInit], seed: u32) -> Game {
         Self::new_inner(
             players,
-            true,
             config::STARTING_STEEL,
             config::STARTING_OIL,
             seed,
-            AiProfileSelection::Random,
             StartingLoadout::Standard,
         )
     }
@@ -37,18 +34,11 @@ impl Game {
         oil: u32,
         seed: u32,
     ) -> Game {
-        Self::new_inner(
-            players,
-            true,
-            steel,
-            oil,
-            seed,
-            AiProfileSelection::Default,
-            StartingLoadout::Standard,
-        )
+        Self::new_inner(players, steel, oil, seed, StartingLoadout::Standard)
     }
 
-    /// Create a live lobby match with explicit starting resources and randomized AI strategies.
+    /// Compatibility constructor retained for callers that still name live AI profile setup.
+    /// AI controllers are owned by the caller, not by `Game`.
     #[allow(dead_code)]
     pub fn new_with_starting_resources_and_random_ai_profiles(
         players: &[PlayerInit],
@@ -56,15 +46,7 @@ impl Game {
         oil: u32,
         seed: u32,
     ) -> Game {
-        Self::new_inner(
-            players,
-            true,
-            steel,
-            oil,
-            seed,
-            AiProfileSelection::Random,
-            StartingLoadout::Standard,
-        )
+        Self::new_inner(players, steel, oil, seed, StartingLoadout::Standard)
     }
 
     /// Create a debug lobby match with boosted resources and a prebuilt human-only loadout.
@@ -75,18 +57,11 @@ impl Game {
         oil: u32,
         seed: u32,
     ) -> Game {
-        Self::new_inner(
-            players,
-            true,
-            steel,
-            oil,
-            seed,
-            AiProfileSelection::Random,
-            StartingLoadout::DebugHuman,
-        )
+        Self::new_inner(players, steel, oil, seed, StartingLoadout::DebugHuman)
     }
 
-    /// Like [`Game::new_with_random_ai_profiles`] but uses a pre-loaded [`Map`].
+    /// Compatibility constructor retained for callers that still name live AI profile setup.
+    /// AI controllers are owned by the caller, not by `Game`.
     pub fn new_with_random_ai_profiles_and_map(
         players: &[PlayerInit],
         seed: u32,
@@ -94,11 +69,9 @@ impl Game {
     ) -> Game {
         Self::new_inner_with_map(
             players,
-            true,
             config::STARTING_STEEL,
             config::STARTING_OIL,
             seed,
-            AiProfileSelection::Random,
             StartingLoadout::Standard,
             Some(map),
         )
@@ -115,11 +88,9 @@ impl Game {
     ) -> Game {
         Self::new_inner_with_map(
             players,
-            true,
             steel,
             oil,
             seed,
-            AiProfileSelection::Random,
             StartingLoadout::DebugHuman,
             Some(map),
         )
@@ -139,28 +110,18 @@ impl Game {
         oil: u32,
         seed: u32,
     ) -> Game {
-        Self::new_inner(
-            players,
-            false,
-            steel,
-            oil,
-            seed,
-            AiProfileSelection::Default,
-            StartingLoadout::Standard,
-        )
+        Self::new_inner(players, steel, oil, seed, StartingLoadout::Standard)
     }
 
     /// Create a match that preserves player identity flags but does not attach live
-    /// [`AiController`]s. Used by command-log replay and scripted self-play, where commands come
-    /// from an external driver.
+    /// controllers. Used by command-log replay and scripted self-play, where commands come from
+    /// an external driver.
     pub fn new_without_ai_controllers(players: &[PlayerInit], seed: u32) -> Game {
         Self::new_inner(
             players,
-            false,
             config::STARTING_STEEL,
             config::STARTING_OIL,
             seed,
-            AiProfileSelection::Default,
             StartingLoadout::Standard,
         )
     }
@@ -204,7 +165,6 @@ impl Game {
             entities,
             fog: Fog::new(96),
             players: vec![player],
-            ai: Vec::new(),
             pending: Vec::new(),
             command_log: Vec::new(),
             tick: 0,
@@ -286,7 +246,6 @@ impl Game {
             entities,
             fog: Fog::new(96),
             players: vec![player],
-            ai: Vec::new(),
             pending: Vec::new(),
             command_log: Vec::new(),
             tick: 0,
@@ -355,7 +314,6 @@ impl Game {
             entities,
             fog: Fog::new(96),
             players: vec![player],
-            ai: Vec::new(),
             pending: Vec::new(),
             command_log: Vec::new(),
             tick: 0,
@@ -394,59 +352,32 @@ impl Game {
         self.starting_oil
     }
 
-    #[cfg(test)]
-    pub(super) fn ai_profile_ids(&self) -> Vec<&'static str> {
-        self.ai.iter().map(AiController::profile_id).collect()
-    }
-
     fn new_inner(
         players: &[PlayerInit],
-        enable_ai: bool,
         steel: u32,
         oil: u32,
         seed: u32,
-        ai_profile_selection: AiProfileSelection,
         starting_loadout: StartingLoadout,
     ) -> Game {
-        Self::new_inner_with_map(
-            players,
-            enable_ai,
-            steel,
-            oil,
-            seed,
-            ai_profile_selection,
-            starting_loadout,
-            None,
-        )
+        Self::new_inner_with_map(players, steel, oil, seed, starting_loadout, None)
     }
 
     #[allow(clippy::too_many_arguments)]
     fn new_inner_with_map(
         players: &[PlayerInit],
-        enable_ai: bool,
         steel: u32,
         oil: u32,
         seed: u32,
-        ai_profile_selection: AiProfileSelection,
         starting_loadout: StartingLoadout,
         map_override: Option<Map>,
     ) -> Game {
         let map = map_override.unwrap_or_else(|| Map::generate(players.len(), seed));
         let fog = Fog::new(map.size);
         let mut entities = EntityStore::new();
-        let mut ai_profile_rng = SmallRng::seed_from_u64((seed as u64) ^ 0xA17E_5EED);
 
         let mut player_states = Vec::with_capacity(players.len() + 1);
-        let mut ai = Vec::new();
         for (i, p) in players.iter().enumerate() {
             let start = map.starts.get(i).copied().unwrap_or((0, 0));
-            if enable_ai && p.is_ai {
-                let profile_id = match ai_profile_selection {
-                    AiProfileSelection::Default => ai::DEFAULT_LIVE_PROFILE_ID,
-                    AiProfileSelection::Random => ai::random_live_profile_id(&mut ai_profile_rng),
-                };
-                ai.push(AiController::with_profile_id(p.id, profile_id));
-            }
             let mut ps = PlayerState {
                 id: p.id,
                 name: p.name.clone(),
@@ -489,7 +420,6 @@ impl Game {
             entities,
             fog,
             players: player_states,
-            ai,
             pending: Vec::new(),
             command_log: Vec::new(),
             tick: 0,
@@ -1174,10 +1104,6 @@ mod tests {
         );
         game.assert_invariants();
 
-        assert!(
-            game.ai_profile_ids().is_empty(),
-            "inert debug battery must not attach an AI profile"
-        );
         let battery_player = game
             .players
             .iter()

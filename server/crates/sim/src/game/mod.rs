@@ -9,9 +9,6 @@
 //! enemy entities on tiles they currently see.
 
 pub(crate) mod ability;
-mod ai;
-pub(crate) mod ai_core;
-pub(crate) mod ai_shared;
 pub mod command;
 mod commands;
 pub mod entity;
@@ -19,9 +16,8 @@ pub(crate) mod fog;
 mod invariants;
 pub mod map;
 mod pathfinding;
-mod replay;
+pub mod replay;
 mod scoring;
-pub mod selfplay;
 pub(crate) mod services;
 mod setup;
 pub(crate) mod smoke;
@@ -38,8 +34,7 @@ use crate::protocol::{
 use crate::rules::{economy as economy_rules, projection};
 use serde::{Deserialize, Serialize};
 
-use ai::{AiController, AiThinkContext};
-use entity::{EntityKind, EntityStore};
+use entity::{BuildPhase, EntityKind, EntityStore};
 use fog::{Fog, LingeringSightSource};
 use map::Map;
 use rand::rngs::SmallRng;
@@ -49,36 +44,7 @@ use smoke::SmokeCloudStore;
 
 pub use crate::game::command::SimCommand;
 
-#[cfg(test)]
-pub(crate) const FULL_AI_TESTS_ENV: &str = "RTS_FULL_AI_TESTS";
-#[cfg(test)]
-pub(crate) const SELFPLAY_FULL_ENV: &str = "RTS_SELFPLAY_FULL";
-
-#[cfg(test)]
-fn env_flag_enabled(name: &str) -> bool {
-    matches!(
-        std::env::var(name)
-            .unwrap_or_default()
-            .to_ascii_lowercase()
-            .as_str(),
-        "1" | "true" | "yes" | "on"
-    )
-}
-
-#[cfg(test)]
-pub(crate) fn full_ai_tests_enabled() -> bool {
-    env_flag_enabled(FULL_AI_TESTS_ENV) || env_flag_enabled(SELFPLAY_FULL_ENV)
-}
-
-#[cfg(test)]
-pub(crate) fn skip_unless_full_ai(test_name: &str) -> bool {
-    if full_ai_tests_enabled() {
-        false
-    } else {
-        eprintln!("skipping {test_name}; set {FULL_AI_TESTS_ENV}=1 to run full AI coverage");
-        true
-    }
-}
+const AI_WORKER_RETREAT_TILES: f32 = 5.0;
 
 /// Lobby-supplied identity for a player joining a match.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -86,8 +52,8 @@ pub struct PlayerInit {
     pub id: u32,
     pub name: String,
     pub color: String,
-    /// When true this player is a computer opponent: it has no socket and is driven by an
-    /// internal [`AiController`] instead of receiving snapshots / sending commands.
+    /// When true this player is a computer opponent: it has no socket and is driven by the
+    /// caller's AI orchestration instead of receiving snapshots / sending commands.
     pub is_ai: bool,
 }
 
@@ -120,21 +86,12 @@ pub(crate) struct ScoreState {
     buildings_lost: u32,
 }
 
-#[derive(Clone, Copy)]
-enum AiProfileSelection {
-    Default,
-    Random,
-}
-
 /// The authoritative match state.
 pub struct Game {
     map: Map,
     entities: EntityStore,
     fog: Fog,
     players: Vec<PlayerState>,
-    /// One controller per AI-owned player. Driven at the top of [`tick`] to enqueue commands;
-    /// empty for an all-human match.
-    ai: Vec<AiController>,
     /// Commands received this tick window, drained at the start of [`tick`]. Each carries the
     /// issuing player so ownership can be validated on apply.
     pending: Vec<(u32, SimCommand)>,
@@ -196,27 +153,7 @@ impl Game {
             events.entry(p.id).or_default();
         }
 
-        // Let each AI player decide its actions first, appending ordinary commands to the same
-        // pending queue a human client feeds. They are validated on apply just like any client
-        // command — the AI gets no special authority over the simulation. Disjoint field borrows
-        // (`self.ai` mutably, the rest shared) keep this lock-free.
-        let pending = crate::perf::timed(perf.as_deref_mut(), "ai_think", || {
-            let mut pending = std::mem::take(&mut self.pending);
-            for controller in self.ai.iter_mut() {
-                controller.think(
-                    AiThinkContext {
-                        map: &self.map,
-                        entities: &self.entities,
-                        fog: &self.fog,
-                        spatial: &self.spatial,
-                        players: &self.players,
-                        tick: self.tick,
-                    },
-                    &mut pending,
-                );
-            }
-            pending
-        });
+        let pending = std::mem::take(&mut self.pending);
         crate::perf::timed(perf.as_deref_mut(), "record_commands", || {
             self.record_commands_for_tick(&pending);
         });
@@ -264,6 +201,48 @@ impl Game {
 
     pub fn current_tick(&self) -> u32 {
         self.tick
+    }
+
+    /// Ordinary retreat commands for AI-owned workers hit on the previous tick.
+    ///
+    /// This exposes the former live-AI direct-hit reflex without letting the AI crate read private
+    /// entity state. Callers still enqueue the returned commands through [`Game::enqueue`], so the
+    /// normal command validation and replay logging path applies.
+    pub fn worker_retreat_commands_for(&self, player: u32) -> Vec<SimCommand> {
+        let last_tick = self.tick.checked_sub(1);
+        let world_max = self.map.world_size_px() - 0.01;
+        let retreat_px = AI_WORKER_RETREAT_TILES * config::TILE_SIZE as f32;
+        let mut commands = Vec::new();
+        for entity in self.entities.iter() {
+            if entity.owner != player || entity.kind != EntityKind::Worker || entity.hp == 0 {
+                continue;
+            }
+            if matches!(entity.build_phase(), Some(BuildPhase::Constructing { .. })) {
+                continue;
+            }
+            if entity.last_damage_tick() != last_tick {
+                continue;
+            }
+            let Some((ax, ay)) = entity.last_damage_pos() else {
+                continue;
+            };
+            let (vx, vy) = (entity.pos_x, entity.pos_y);
+            let dx = vx - ax;
+            let dy = vy - ay;
+            let dist = (dx * dx + dy * dy).sqrt();
+            let (ux, uy) = if dist > f32::EPSILON && dist.is_finite() {
+                (dx / dist, dy / dist)
+            } else {
+                (1.0, 0.0)
+            };
+            commands.push(SimCommand::Move {
+                units: vec![entity.id],
+                x: (vx + ux * retreat_px).clamp(0.0, world_max),
+                y: (vy + uy * retreat_px).clamp(0.0, world_max),
+                queued: false,
+            });
+        }
+        commands
     }
 
     pub fn perf_entity_counts(&self) -> crate::perf::EntityCounts {

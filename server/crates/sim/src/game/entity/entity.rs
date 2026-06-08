@@ -37,7 +37,7 @@ pub struct Entity {
     /// death system removes the entity.
     last_damage_owner: Option<u32>,
     /// Tick on which this entity was most recently damaged by a direct hit, plus the attacker's
-    /// position. Set together by combat; used by the AI controller to issue retreat commands.
+    /// position. Set together by combat for diagnostics and future public observation surfaces.
     last_damage_tick: Option<u32>,
     last_damage_pos: Option<(f32, f32)>,
 

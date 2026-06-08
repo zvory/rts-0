@@ -28,11 +28,11 @@ use tracing::{debug, error, info, warn};
 
 use crate::config;
 use crate::game::command::SimCommand;
-use crate::game::selfplay::{is_safe_artifact_name, LiveSelfPlay, ReplayArtifact, ReplayDriver};
 use crate::game::{Game, PlayerInit};
 use crate::protocol::{
     Event, LobbyPlayer, PlayerScore, ResourceDelta, ServerMessage, Snapshot, StartPayload,
 };
+use rts_ai::selfplay::{is_safe_artifact_name, LiveSelfPlay, ReplayArtifact, ReplayDriver};
 
 mod connection;
 mod crash_replay;

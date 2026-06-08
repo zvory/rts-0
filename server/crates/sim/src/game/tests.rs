@@ -2,7 +2,6 @@ use std::collections::HashMap;
 
 use super::scoring::entity_score_value;
 use super::*;
-use crate::game::ai_core::profiles::{RIFLE_FLOOD_FAST_ID, RIFLE_FLOOD_FULL_SATURATION_ID};
 use crate::game::command::SimCommand as Command;
 use crate::game::entity::{Entity, EntityKind, GatherPhase, Order};
 use crate::protocol::{kinds, terrain, AbilityCooldownView, EntityView, OrderPlanMarker};
@@ -22,50 +21,6 @@ fn human_vs_ai_players() -> [PlayerInit; 2] {
             is_ai: true,
         },
     ]
-}
-
-fn count_ai_pending_depot_builders(game: &Game, player_id: u32) -> usize {
-    game.entities
-        .iter()
-        .filter(|e| e.owner == player_id && e.kind == EntityKind::Worker)
-        .filter(|e| {
-            matches!(
-                e.order().build_intent_tile(),
-                Some((EntityKind::Depot, _, _))
-            )
-        })
-        .count()
-}
-
-fn count_ai_gathering_workers(game: &Game, player_id: u32) -> usize {
-    game.entities
-        .iter()
-        .filter(|e| e.owner == player_id && e.kind == EntityKind::Worker)
-        .filter(|e| matches!(e.order(), Order::Gather(_)))
-        .count()
-}
-
-#[test]
-fn live_ai_profiles_are_selected_from_requested_pool_at_match_start() {
-    let players = human_vs_ai_players();
-
-    for seed in 0..64 {
-        let game = Game::new_with_random_ai_profiles(&players, seed);
-        let profiles = game.ai_profile_ids();
-
-        assert_eq!(profiles.len(), 1);
-        assert_eq!(profiles[0], RIFLE_FLOOD_FULL_SATURATION_ID);
-    }
-}
-
-#[test]
-fn ordinary_game_new_uses_deterministic_ai_profile_for_tests() {
-    let players = human_vs_ai_players();
-
-    for seed in 0..16 {
-        let game = Game::new(&players, seed);
-        assert_eq!(game.ai_profile_ids(), vec![RIFLE_FLOOD_FULL_SATURATION_ID]);
-    }
 }
 
 fn legacy_snapshot_entities(game: &Game, player: u32, fogged: bool) -> Vec<EntityView> {
@@ -1498,289 +1453,9 @@ fn death_vision_lingers_for_five_seconds_as_visual_only_intel() {
     );
 }
 
+/// Adding an AI identity must not perturb a human-only game's construction.
 #[test]
-fn live_ai_rifle_raid_attacks_visible_scout_car() {
-    let players = human_vs_ai_players();
-    let mut game = Game::new_for_replay(&players, 0xCAFE_BABE);
-    for tile in &mut game.map.terrain {
-        *tile = crate::protocol::terrain::GRASS;
-    }
-    for id in game.entities.ids() {
-        game.entities.remove(id);
-    }
-    game.ai
-        .push(ai::AiController::with_profile_id(2, RIFLE_FLOOD_FAST_ID));
-
-    let ai_base = game.map.tile_center(42, 42);
-    game.entities
-        .spawn_building(2, EntityKind::CityCentre, ai_base.0, ai_base.1, true)
-        .expect("AI city centre should spawn");
-    let human_base = game.map.tile_center(8, 8);
-    game.entities
-        .spawn_building(1, EntityKind::CityCentre, human_base.0, human_base.1, true)
-        .expect("human city centre should spawn");
-
-    let raider_pos = game.map.tile_center(24, 24);
-    let raider = game
-        .entities
-        .spawn_unit(2, EntityKind::Rifleman, raider_pos.0, raider_pos.1)
-        .expect("AI rifleman should spawn");
-    let scout_pos = game.map.tile_center(27, 24);
-    let scout_car = game
-        .entities
-        .spawn_unit(1, EntityKind::ScoutCar, scout_pos.0, scout_pos.1)
-        .expect("human scout car should spawn");
-    if let Some(e) = game.entities.get_mut(raider) {
-        e.set_order(Order::move_to(human_base.0, human_base.1));
-    }
-
-    systems::recompute_supply(&mut game.players, &game.entities);
-    game.spatial = services::spatial::SpatialIndex::build(&game.entities, game.map.size);
-    let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
-    game.fog.recompute(&ids, &game.entities, &game.map);
-
-    while (game.tick_count().wrapping_add(1).wrapping_add(2)) % 9 != 0 {
-        game.tick();
-    }
-    game.tick();
-
-    let raider = game
-        .entities
-        .get(raider)
-        .expect("raider should remain alive");
-    assert_eq!(
-        raider.order().attack_target(),
-        Some(scout_car),
-        "visible scout car should interrupt the AI rifle raid move"
-    );
-}
-
-/// Drive a passive human vs. one AI and confirm the deterministic default AI actually plays:
-/// it grows its economy, expands supply, builds a barracks, produces riflemen, and marches
-/// them into the human base to deal damage. This exercises the full command path the AI shares
-/// with human clients.
-#[test]
-fn ai_builds_economy_and_attacks() {
-    if skip_unless_full_ai("ai_builds_economy_and_attacks") {
-        return;
-    }
-
-    let players = human_vs_ai_players();
-    let mut game = Game::new(&players, 0x1234_5678);
-
-    let mut max_workers = 0usize;
-    let mut max_riflemen = 0usize;
-    let mut ever_had_barracks = false;
-    let mut ai_supply_cap = 0u32;
-    let mut human_damaged = false;
-    let mut max_pending_depot_builders = 0usize;
-    let mut depot_completed_tick = None;
-    let mut gathering_workers_after_depot = 0usize;
-    let mut event_log = Vec::new();
-    let target_workers = config::STEEL_PATCHES_PER_BASE as usize;
-
-    // ~200s of simulation. The human issues no commands (passive target).
-    for tick in 1..=6000 {
-        for (player_id, events) in game.tick() {
-            for event in events {
-                if player_id == 2
-                    && matches!(
-                        event,
-                        Event::Build { ref kind, .. } if kind == kinds::DEPOT
-                    )
-                {
-                    depot_completed_tick.get_or_insert(tick);
-                }
-                event_log.push(super::replay::EventLogEntry {
-                    tick,
-                    player_id,
-                    event,
-                });
-            }
-        }
-
-        max_pending_depot_builders =
-            max_pending_depot_builders.max(count_ai_pending_depot_builders(&game, 2));
-        if depot_completed_tick.is_some() {
-            gathering_workers_after_depot =
-                gathering_workers_after_depot.max(count_ai_gathering_workers(&game, 2));
-        }
-
-        let ai = game.snapshot_for(2);
-        ai_supply_cap = ai.supply_cap.max(ai_supply_cap);
-        let workers = ai
-            .entities
-            .iter()
-            .filter(|e| e.owner == 2 && e.kind == kinds::WORKER)
-            .count();
-        let riflemen = ai
-            .entities
-            .iter()
-            .filter(|e| e.owner == 2 && e.kind == kinds::RIFLEMAN)
-            .count();
-        max_workers = max_workers.max(workers);
-        max_riflemen = max_riflemen.max(riflemen);
-        if ai
-            .entities
-            .iter()
-            .any(|e| e.owner == 2 && e.kind == kinds::BARRACKS)
-        {
-            ever_had_barracks = true;
-        }
-
-        // Any human entity below full hp means an AI attack landed.
-        let human = game.snapshot_for(1);
-        if human
-            .entities
-            .iter()
-            .any(|e| e.owner == 1 && e.hp < e.max_hp)
-        {
-            human_damaged = true;
-        }
-
-        if max_workers >= target_workers
-            && ai_supply_cap > config::CITY_CENTRE_SUPPLY
-            && max_pending_depot_builders <= 1
-            && gathering_workers_after_depot > 0
-            && ever_had_barracks
-            && max_riflemen > 0
-            && human_damaged
-        {
-            break;
-        }
-    }
-
-    assert!(
-        max_workers > config::STARTING_WORKERS as usize,
-        "AI should train workers beyond the {} it starts with (saw {max_workers})",
-        config::STARTING_WORKERS
-    );
-    assert!(
-            max_workers >= target_workers,
-            "AI should train enough workers to saturate its starting steel patches (target {}, saw {max_workers})",
-            target_workers
-        );
-    assert!(
-        ai_supply_cap > config::CITY_CENTRE_SUPPLY,
-        "AI should build a depot to raise supply above the City Centre's {} (saw {ai_supply_cap})",
-        config::CITY_CENTRE_SUPPLY
-    );
-    assert!(
-            max_pending_depot_builders <= 1,
-            "AI should never have more than one depot builder pending simultaneously (saw {max_pending_depot_builders})"
-        );
-    assert!(
-        gathering_workers_after_depot > 0,
-        "AI should have workers mining again after the depot completes"
-    );
-    assert!(ever_had_barracks, "AI should build a barracks");
-    assert!(max_riflemen > 0, "AI should produce riflemen");
-    assert!(
-        human_damaged,
-        "AI riflemen should reach and damage the human base"
-    );
-
-    // Replay determinism: the same command log fed into a fresh game must reproduce
-    // the exact events and final snapshots.
-    selfplay::assert_replay_matches_live(&game, &players, &event_log).unwrap_or_else(|failure| {
-        panic!("AI replay determinism failed: {}", failure.reason());
-    });
-}
-
-#[test]
-fn base_ai_tracks_pending_depot_build_order() {
-    let players = human_vs_ai_players();
-    let mut game = Game::new(&players, 0x1234_5678);
-    let mut saw_pending_without_scaffold = false;
-    let mut max_pending_depot_builders = 0usize;
-    let mut gathering_workers_while_pending = 0usize;
-
-    for _ in 0..2000 {
-        game.tick();
-
-        let pending_depot_builders: Vec<_> = game
-            .entities
-            .iter()
-            .filter(|e| e.owner == 2 && e.kind == EntityKind::Worker)
-            .filter(|e| {
-                matches!(
-                    e.order().build_intent_tile(),
-                    Some((EntityKind::Depot, _, _))
-                )
-            })
-            .collect();
-        let scaffold_exists = game
-            .entities
-            .iter()
-            .any(|e| e.owner == 2 && e.kind == EntityKind::Depot && e.under_construction());
-
-        if !pending_depot_builders.is_empty() && !scaffold_exists {
-            saw_pending_without_scaffold = true;
-            max_pending_depot_builders =
-                max_pending_depot_builders.max(pending_depot_builders.len());
-            gathering_workers_while_pending =
-                gathering_workers_while_pending.max(count_ai_gathering_workers(&game, 2));
-        }
-    }
-
-    assert!(
-        saw_pending_without_scaffold,
-        "test should observe the window where a depot order is pending before the scaffold spawns"
-    );
-    assert!(
-            max_pending_depot_builders <= 1,
-            "AI should track pending depot build intents and keep them to one worker (saw {max_pending_depot_builders})"
-        );
-    assert!(
-            gathering_workers_while_pending >= (config::STARTING_WORKERS as usize).saturating_sub(1),
-            "AI should keep nearly all starting workers gathering while one depot order is pending (saw {gathering_workers_while_pending})"
-        );
-}
-
-#[test]
-fn base_ai_reassigns_idle_workers_to_steel() {
-    let players = human_vs_ai_players();
-    let mut game = Game::new(&players, 0x1234_5678);
-
-    // Advance to a point where the AI has active gathering assignments.
-    for _ in 0..30 {
-        game.tick();
-    }
-
-    let idle_worker = game
-        .entities
-        .iter()
-        .find(|e| {
-            e.owner == 2 && e.kind == EntityKind::Worker && matches!(e.order(), Order::Gather(_))
-        })
-        .map(|e| e.id)
-        .expect("AI should have a gathering worker to perturb");
-    game.entities.release_miner(idle_worker);
-    if let Some(worker) = game.entities.get_mut(idle_worker) {
-        worker.clear_orders();
-    }
-
-    let mut reassigned_to = None;
-    for _ in 0..20 {
-        game.tick();
-        if let Some(worker) = game.entities.get(idle_worker) {
-            if let Some(node) = worker.order().gather_node() {
-                reassigned_to = Some(node);
-                break;
-            }
-        }
-    }
-
-    assert!(
-        reassigned_to.is_some(),
-        "AI should send an idle worker back to gather on a later decision tick"
-    );
-}
-
-/// Adding an AI must not perturb a human-only game's construction: an all-human match has no
-/// controllers and behaves exactly as before.
-#[test]
-fn no_ai_controllers_without_ai_players() {
+fn human_only_match_has_no_ai_players() {
     let players = [PlayerInit {
         id: 1,
         name: "Solo".into(),
@@ -1788,10 +1463,7 @@ fn no_ai_controllers_without_ai_players() {
         is_ai: false,
     }];
     let game = Game::new(&players, 0x1234_5678);
-    assert!(
-        game.ai.is_empty(),
-        "a human-only match has no AI controllers"
-    );
+    assert!(game.players.iter().all(|player| !player.is_ai));
 }
 
 #[test]
@@ -1804,10 +1476,6 @@ fn replay_games_preserve_ai_identity_without_controllers() {
     }];
     let game = Game::new_without_ai_controllers(&players, 0x1234_5678);
 
-    assert!(
-        game.ai.is_empty(),
-        "replays should not run live AI controllers"
-    );
     assert!(
         game.players
             .iter()
@@ -2155,12 +1823,17 @@ fn no_commands_one_player_is_deterministic() {
         "a one-player sandbox with no commands should emit no events"
     );
 
-    selfplay::assert_replay_matches_live(&game, &players, &event_log).unwrap_or_else(|failure| {
-        panic!(
-            "one-player no-commands replay determinism failed: {}",
-            failure.reason()
-        );
-    });
+    let replay = super::replay::replay_commands(
+        &players,
+        game.command_log(),
+        game.tick_count(),
+        game.seed(),
+        game.starting_steel(),
+        game.starting_oil(),
+    )
+    .expect("one-player no-commands replay should succeed");
+    assert_eq!(replay.events, event_log);
+    assert_eq!(replay.final_snapshots[0].snapshot, game.snapshot_for(1));
 }
 
 /// Every player must receive the same relative resource layout, and all starting resources

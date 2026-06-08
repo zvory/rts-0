@@ -10,6 +10,7 @@ use crate::game::services::geometry::{
 use crate::game::services::occupancy::Occupancy;
 use crate::game::services::spatial::SpatialIndex;
 
+#[allow(dead_code)]
 const BUILD_SITE_SPATIAL_PADDING_TILES: i32 = 8;
 
 pub(crate) fn unit_static_standable(
@@ -119,6 +120,7 @@ pub(crate) fn building_site_clear(
     building_site_clear_with_ignored_unit(map, entities, building, tile_x, tile_y, None)
 }
 
+#[allow(dead_code)]
 pub(crate) fn building_site_clear_spatial(
     map: &Map,
     entities: &EntityStore,

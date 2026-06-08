@@ -1,11 +1,11 @@
 use std::collections::BTreeMap;
 
-use crate::config;
-use crate::game::ai_core::observation::{
+use crate::ai_core::observation::{
     AiBuildIntentPhase, AiEntityState, AiObservation, AiResourceSummary,
 };
-use crate::game::entity::EntityKind;
-use crate::rules;
+use crate::config;
+use rts_rules;
+use rts_sim::game::entity::EntityKind;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) struct BuildingCounts {
@@ -155,7 +155,7 @@ impl AiFacts {
             .pending_builds
             .iter()
             .filter(|intent| intent.phase == AiBuildIntentPhase::ToSite)
-            .map(|intent| rules::economy::cost(intent.kind).0)
+            .map(|intent| rts_rules::economy::cost(intent.kind).0)
             .fold(0u32, u32::saturating_add);
         let nearest_public_enemy_base = nearest_public_enemy_base(observation);
 
@@ -311,13 +311,10 @@ fn is_combat_unit(kind: EntityKind) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::game::ai_core::observation::{
-        AiEconomy, AiEntitySummary, AiMapSummary, AiPlayerSummary,
+    use crate::ai_core::observation::{
+        AiBuildIntent, AiEconomy, AiEntitySummary, AiMapSummary, AiPlayerSummary,
     };
-    use crate::game::entity::{EntityStore, Order};
-    use crate::game::map::Map;
-    use crate::game::PlayerState;
-    use crate::protocol::{terrain, EntityView, MapInfo, PlayerStart, Snapshot, StartPayload};
+    use rts_sim::protocol::{terrain, EntityView, MapInfo, PlayerStart, Snapshot, StartPayload};
 
     fn base_observation() -> AiObservation {
         AiObservation {
@@ -366,8 +363,7 @@ mod tests {
     }
 
     #[test]
-    fn steel_saturation_from_live_and_snapshot_observations_agree() {
-        let map = Map::generate(2, 1234);
+    fn steel_saturation_from_snapshot_observation_counts_available_main_steel() {
         let (hx, hy) = (
             10.5 * config::TILE_SIZE as f32,
             20.5 * config::TILE_SIZE as f32,
@@ -375,87 +371,35 @@ mod tests {
         let in_range = (config::CC_RESOURCE_MAX_DIST_TILES - 0.25) * config::TILE_SIZE as f32;
         let out_of_range = (config::CC_RESOURCE_MAX_DIST_TILES + 2.0) * config::TILE_SIZE as f32;
 
-        let mut entities = EntityStore::new();
-        entities
-            .spawn_node(EntityKind::Steel, hx + in_range, hy)
-            .unwrap();
-        entities
-            .spawn_node(EntityKind::Steel, hx - in_range, hy)
-            .unwrap();
-        entities
-            .spawn_node(EntityKind::Oil, hx, hy + in_range)
-            .unwrap();
-        entities
-            .spawn_node(EntityKind::Steel, hx, hy + out_of_range)
-            .unwrap();
-        let depleted = entities
-            .spawn_node(EntityKind::Steel, hx, hy - in_range)
-            .unwrap();
-        entities
-            .get_mut(depleted)
-            .unwrap()
-            .resource_node
-            .as_mut()
-            .unwrap()
-            .remaining = 0;
-
-        let players = vec![PlayerState {
-            id: 1,
-            name: "Alpha".into(),
-            color: "#111".into(),
-            start_tile: (10, 20),
-            steel: 0,
-            oil: 0,
-            supply_used: 0,
-            supply_cap: 0,
-            is_ai: true,
-            score: crate::game::ScoreState::default(),
-        }];
-        let mut fog = crate::game::fog::Fog::new(map.size);
-        fog.recompute(&[1], &entities, &map);
-        let live = AiObservation::from_live_state(&map, &entities, &fog, &players, 1, 0).unwrap();
-        let live_facts = AiFacts::from_observation(&live);
-
         let snapshot = Snapshot {
             tick: 0,
             steel: 0,
             oil: 0,
             supply_used: 0,
             supply_cap: 0,
-            entities: live
-                .resources
-                .iter()
-                .map(|r| {
-                    let mut view = EntityView::new(
-                        r.id,
-                        0,
-                        crate::protocol::kind_to_wire(r.kind),
-                        r.x,
-                        r.y,
-                        1,
-                        1,
-                        crate::protocol::states::IDLE,
-                    );
-                    view.remaining = Some(r.remaining);
-                    view
-                })
-                .collect(),
+            entities: vec![
+                resource_view(1, EntityKind::Steel, hx + in_range, hy, 100),
+                resource_view(2, EntityKind::Steel, hx - in_range, hy, 100),
+                resource_view(3, EntityKind::Oil, hx, hy + in_range, 100),
+                resource_view(4, EntityKind::Steel, hx, hy + out_of_range, 100),
+                resource_view(5, EntityKind::Steel, hx, hy - in_range, 0),
+            ],
             resource_deltas: Vec::new(),
             smokes: Vec::new(),
             visible_tiles: Vec::new(),
             events: Vec::new(),
             player_resources: Vec::new(),
-            net_status: crate::protocol::SnapshotNetStatus::default(),
+            net_status: rts_sim::protocol::SnapshotNetStatus::default(),
         };
         let start = StartPayload {
             player_id: 1,
             spectator: false,
             tick: 0,
             map: MapInfo {
-                width: map.size,
-                height: map.size,
+                width: 64,
+                height: 64,
                 tile_size: config::TILE_SIZE,
-                terrain: vec![terrain::GRASS; (map.size * map.size) as usize],
+                terrain: vec![terrain::GRASS; 64 * 64],
                 resources: Vec::new(),
             },
             players: vec![PlayerStart {
@@ -469,41 +413,13 @@ mod tests {
         let selfplay = AiObservation::from_selfplay_snapshot(&start, &snapshot, 1, []).unwrap();
         let selfplay_facts = AiFacts::from_observation(&selfplay);
 
-        assert_eq!(live_facts.target_steel_workers, 2);
-        assert_eq!(
-            selfplay_facts.target_steel_workers,
-            live_facts.target_steel_workers
-        );
+        assert_eq!(selfplay_facts.target_steel_workers, 2);
     }
 
     #[test]
     fn pending_build_intent_counts_once_as_planned_building() {
-        let map = Map::generate(2, 1234);
-        let mut entities = EntityStore::new();
-        let worker = entities
-            .spawn_unit(1, EntityKind::Worker, 32.0, 32.0)
-            .unwrap();
-        entities
-            .get_mut(worker)
-            .unwrap()
-            .set_order(Order::build(EntityKind::Depot, 5, 6));
-        let players = vec![PlayerState {
-            id: 1,
-            name: "Alpha".into(),
-            color: "#111".into(),
-            start_tile: (8, 8),
-            steel: 100,
-            oil: 0,
-            supply_used: 8,
-            supply_cap: 10,
-            is_ai: true,
-            score: crate::game::ScoreState::default(),
-        }];
-
-        let mut fog = crate::game::fog::Fog::new(map.size);
-        fog.recompute(&[1], &entities, &map);
-        let observation =
-            AiObservation::from_live_state(&map, &entities, &fog, &players, 1, 0).unwrap();
+        let mut observation = base_observation();
+        observation.pending_builds = vec![AiBuildIntent::to_site(10, EntityKind::Depot, 5, 6)];
         let facts = AiFacts::from_observation(&observation);
         let counts = facts.building_counts(EntityKind::Depot);
 
@@ -514,8 +430,23 @@ mod tests {
         assert!(facts.depot_in_progress);
         assert_eq!(
             facts.committed_steel,
-            rules::economy::cost(EntityKind::Depot).0
+            rts_rules::economy::cost(EntityKind::Depot).0
         );
+    }
+
+    fn resource_view(id: u32, kind: EntityKind, x: f32, y: f32, remaining: u32) -> EntityView {
+        let mut view = EntityView::new(
+            id,
+            0,
+            rts_sim::protocol::kind_to_wire(kind),
+            x,
+            y,
+            1,
+            1,
+            rts_sim::protocol::states::IDLE,
+        );
+        view.remaining = Some(remaining);
+        view
     }
 
     #[test]

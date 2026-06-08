@@ -7,11 +7,11 @@ use super::geometry::{
 use super::raids::enemy_main_steel_center;
 use super::*;
 
-use crate::game::ai_core::observation::{
+use crate::ai_core::observation::{
     AiBuildIntent, AiEconomy, AiEntityState, AiEntitySummary, AiMapSummary, AiPlayerSummary,
     AiResourceSummary,
 };
-use crate::game::ai_core::profiles::{
+use crate::ai_core::profiles::{
     RIFLE_FLOOD_FAST, RIFLE_FLOOD_FULL_SATURATION, STEEL_EXPANSION_TANKS, TECH_TO_TANKS,
 };
 
@@ -2847,8 +2847,7 @@ fn idle_home_rifle_does_not_resume_raid_before_wave_cadence() {
 
 #[test]
 fn attack_memory_uses_profile_thresholds_and_growth() {
-    let mut owned = Vec::new();
-    owned.push(combat(30, EntityKind::Rifleman));
+    let owned = vec![combat(30, EntityKind::Rifleman)];
     let observation = observation(
         AiEconomy {
             steel: 0,
@@ -2889,7 +2888,7 @@ fn each_required_profile_emits_a_starting_state_command() {
         owned,
     );
 
-    for profile in crate::game::ai_core::profiles::required_profiles() {
+    for profile in crate::ai_core::profiles::required_profiles() {
         let decision = decide(
             &observation,
             profile,

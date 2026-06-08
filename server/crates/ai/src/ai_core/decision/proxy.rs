@@ -21,7 +21,7 @@ where
 {
     let policy = profile.buildings.proxy_barracks?;
     let kind = EntityKind::Barracks;
-    if !rules::economy::build_requirement_met(kind, facts.complete_building_kinds()) {
+    if !rts_rules::economy::build_requirement_met(kind, facts.complete_building_kinds()) {
         return None;
     }
     let counts = facts.building_counts(kind);

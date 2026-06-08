@@ -9,7 +9,7 @@ use std::path::PathBuf;
 use std::process;
 
 use rayon::prelude::*;
-use rts_server::game::selfplay::{
+use rts_server::ai::selfplay::{
     available_profile_ids, canonical_profile_id, run_profile_matchup_result, ProfileMatchupOptions,
     ProfileMatchupResult,
 };

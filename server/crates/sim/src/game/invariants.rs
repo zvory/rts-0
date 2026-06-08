@@ -671,7 +671,7 @@ mod tests {
     use crate::game::services::geometry::{building_rect_for_footprint, unit_body_with_facing};
     use crate::game::services::occupancy::footprint_center;
     use crate::game::{Game, PlayerInit};
-    use crate::protocol::{kinds, terrain};
+    use crate::protocol::terrain;
 
     /// Steel patch placement must stay within City Centre distance bounds for any STEEL_PATCHES_PER_BASE.
     /// Regression: doubling patches to 24 caused rows 2/3 to exceed CC_RESOURCE_MAX_DIST_TILES.
@@ -843,70 +843,6 @@ mod tests {
         assert!(context.contains("tile=(15, 25)"));
         assert!(context.contains("region=bottom middle"));
     }
-
-    /// After many ticks the invariants must still hold.
-    #[test]
-    fn invariants_hold_after_ai_match() {
-        if crate::game::skip_unless_full_ai("invariants_hold_after_ai_match") {
-            return;
-        }
-
-        let players = [
-            PlayerInit {
-                id: 1,
-                name: "A".into(),
-                color: "#fff".into(),
-                is_ai: false,
-            },
-            PlayerInit {
-                id: 2,
-                name: "B".into(),
-                color: "#000".into(),
-                is_ai: true,
-            },
-        ];
-        let mut game = Game::new(&players, 0x1234_5678);
-        let target_workers = config::STEEL_PATCHES_PER_BASE as usize;
-        let mut max_workers = 0usize;
-        let mut max_riflemen = 0usize;
-        let mut human_damaged = false;
-
-        for _ in 0..6000 {
-            game.tick();
-
-            let ai = game.snapshot_for(2);
-            max_workers = max_workers.max(
-                ai.entities
-                    .iter()
-                    .filter(|e| e.owner == 2 && e.kind == kinds::WORKER)
-                    .count(),
-            );
-            max_riflemen = max_riflemen.max(
-                ai.entities
-                    .iter()
-                    .filter(|e| e.owner == 2 && e.kind == kinds::RIFLEMAN)
-                    .count(),
-            );
-
-            let human = game.snapshot_for(1);
-            if human
-                .entities
-                .iter()
-                .any(|e| e.owner == 1 && e.hp < e.max_hp)
-            {
-                human_damaged = true;
-            }
-
-            if max_workers >= target_workers && max_riflemen > 0 && human_damaged {
-                break;
-            }
-        }
-        assert!(max_workers >= target_workers);
-        assert!(max_riflemen > 0);
-        assert!(human_damaged);
-        game.assert_invariants();
-    }
-
     /// A human-only sandbox with no commands must keep invariants across ticks.
     #[test]
     fn invariants_hold_in_no_command_sandbox() {

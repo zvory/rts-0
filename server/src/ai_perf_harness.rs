@@ -9,6 +9,9 @@ use std::collections::{BTreeMap, HashMap};
 use std::process;
 use std::time::{Duration, Instant};
 
+use rand::rngs::SmallRng;
+use rand::SeedableRng;
+use rts_ai::{AiController, AiThinkContext};
 use rts_server::game::{Game, PlayerInit};
 use rts_server::lobby::compact_snapshot_for_wire;
 use rts_server::perf;
@@ -262,6 +265,7 @@ fn run_harness(config: CliConfig) -> Result<HarnessSummary, String> {
 
     let players = four_ai_players();
     let mut game = Game::new_with_random_ai_profiles(&players, config.seed);
+    let mut ai_controllers = live_ai_controllers(&players, config.seed);
     let started = Instant::now();
     let mut snapshot_bytes = 0u64;
     let mut serialized_snapshots = 0u64;
@@ -279,6 +283,7 @@ fn run_harness(config: CliConfig) -> Result<HarnessSummary, String> {
         let mut perf_tick = perf::TickPerf::maybe_new();
         let game_tick_start = Instant::now();
         let tick_events = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            enqueue_live_ai_commands(&mut game, &mut ai_controllers);
             game.tick_with_perf(perf_tick.as_mut())
         }))
         .map_err(|payload| {
@@ -390,6 +395,43 @@ fn run_harness(config: CliConfig) -> Result<HarnessSummary, String> {
         final_counts: game.perf_entity_counts(),
         perf_report,
     })
+}
+
+fn live_ai_controllers(players: &[PlayerInit], seed: u32) -> Vec<AiController> {
+    let mut rng = SmallRng::seed_from_u64((seed as u64) ^ 0xA17E_5EED);
+    players
+        .iter()
+        .filter(|player| player.is_ai)
+        .map(|player| {
+            AiController::with_profile_id(player.id, rts_ai::random_live_profile_id(&mut rng))
+        })
+        .collect()
+}
+
+fn enqueue_live_ai_commands(game: &mut Game, controllers: &mut [AiController]) {
+    let start = game.start_payload();
+    let alive = game.alive_players();
+    let mut commands = Vec::new();
+    for controller in controllers {
+        let player_id = controller.player_id();
+        if !alive.contains(&player_id) {
+            continue;
+        }
+        let snapshot = game.snapshot_for(player_id);
+        commands.extend(
+            controller
+                .think(AiThinkContext {
+                    start: &start,
+                    snapshot: &snapshot,
+                    retreat_commands: game.worker_retreat_commands_for(player_id),
+                })
+                .into_iter()
+                .map(|command| (player_id, command)),
+        );
+    }
+    for (player_id, command) in commands {
+        game.enqueue(player_id, command);
+    }
 }
 
 fn four_ai_players() -> Vec<PlayerInit> {

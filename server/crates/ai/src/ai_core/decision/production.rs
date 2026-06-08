@@ -29,7 +29,7 @@ where
     F: FnMut(EntityKind, u32, u32) -> bool,
 {
     config::building_stats(kind)?;
-    if !rules::economy::build_requirement_met(kind, facts.complete_building_kinds()) {
+    if !rts_rules::economy::build_requirement_met(kind, facts.complete_building_kinds()) {
         return None;
     }
     let counts = facts.building_counts(kind);
@@ -96,21 +96,24 @@ pub(super) fn should_save_for_required_tech_building(
     };
     if facts.building_count(producer) == 0 {
         return required_tech_path.contains(&producer)
-            && rules::economy::build_requirement_met(producer, facts.complete_building_kinds());
+            && rts_rules::economy::build_requirement_met(
+                producer,
+                facts.complete_building_kinds(),
+            );
     }
-    if rules::economy::train_requirement_met(unit, facts.complete_building_kinds()) {
+    if rts_rules::economy::train_requirement_met(unit, facts.complete_building_kinds()) {
         return false;
     }
     required_tech_path.iter().copied().any(|kind| {
         facts.building_count(kind) == 0
-            && rules::economy::build_requirement_met(kind, facts.complete_building_kinds())
+            && rts_rules::economy::build_requirement_met(kind, facts.complete_building_kinds())
     })
 }
 
 pub(super) fn producer_for_unit(unit: EntityKind) -> Option<EntityKind> {
     PRODUCTION_BUILDINGS
         .into_iter()
-        .find(|building| rules::economy::trainable_units(*building).contains(&unit))
+        .find(|building| rts_rules::economy::trainable_units(*building).contains(&unit))
 }
 
 pub(super) fn production_building_order(unit_priorities: &[EntityKind]) -> Vec<EntityKind> {

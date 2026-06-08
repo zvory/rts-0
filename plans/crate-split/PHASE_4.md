@@ -1,6 +1,6 @@
 # Phase 4 - AI and Self-Play Out of the Sim Core
 
-Status: Planned.
+Status: Complete.
 
 Goal: enforce that the simulation does not import AI while preserving live AI behavior and
 self-play coverage.
@@ -52,4 +52,3 @@ rule: own/resource state can be authoritative, enemy state is filtered through t
 - Live AI matches behave the same from the lobby and still resolve.
 - AI commands remain ordinary `SimCommand`s and are recorded/replayed deterministically.
 - Self-play/profile CLIs still work through the new crate boundaries.
-
