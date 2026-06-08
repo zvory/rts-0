@@ -263,7 +263,8 @@ fn dev_scenario_index_html() -> String {
             <title>Dev Scenarios</title>\
             <link rel=\"stylesheet\" href=\"/styles.css\" />\
             <style>\
-              body {{ min-height: 100vh; height: auto; overflow: auto; background: var(--void); color: var(--ink); font-family: var(--font); image-rendering: auto; }}\
+              html, body {{ min-height: 100%; height: auto; overflow-y: auto; overflow-x: hidden; }}\
+              body {{ background: var(--void); color: var(--ink); font-family: var(--font); image-rendering: auto; }}\
               .scenario-page {{ width: min(960px, 100%); margin: 0 auto; padding: 32px 20px 48px; }}\
               .scenario-page h1 {{ margin: 0 0 6px; color: var(--accent); font-size: 28px; line-height: 1.1; letter-spacing: 0.08em; text-transform: uppercase; text-shadow: 2px 2px 0 #191710; }}\
               .scenario-page > p {{ margin: 0; color: var(--ink-dim); }}\
