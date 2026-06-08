@@ -1,4 +1,5 @@
 use crate::config;
+use crate::game::entity::EntityStore;
 use crate::game::fog::Fog;
 use crate::game::map::Map;
 
@@ -123,7 +124,13 @@ impl SmokeCloudStore {
         })
     }
 
-    pub(crate) fn visible_to_player(&self, cloud: &SmokeCloud, player: u32, fog: &Fog) -> bool {
+    pub(crate) fn visible_to_player(
+        &self,
+        cloud: &SmokeCloud,
+        player: u32,
+        fog: &Fog,
+        entities: &EntityStore,
+    ) -> bool {
         let radius_tiles = cloud.radius_tiles.ceil().max(0.0) as i32;
         let ts = config::TILE_SIZE as f32;
         let cx = (cloud.x / ts).floor() as i32;
@@ -145,7 +152,11 @@ impl SmokeCloudStore {
                 }
             }
         }
-        false
+        entities.iter().any(|entity| {
+            entity.owner == player
+                && !entity.is_node()
+                && cloud.contains_point(entity.pos_x, entity.pos_y)
+        })
     }
 
     #[allow(dead_code)]

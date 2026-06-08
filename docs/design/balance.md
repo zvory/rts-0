@@ -93,7 +93,9 @@ authoritative `rules::defs` records.
   place smoke between the advance and the AT gun / machine-gun nest, then move mobile units through
   the resulting dead zone. Active smoke is neutral world state: it blocks authoritative fog and
   combat LOS, prevents units inside smoke from contributing vision, hides enemies inside smoke, and
-  does not participate in pathing, collision, scoring, supply, or targeting as an entity.
+  does not participate in pathing, collision, scoring, supply, or targeting as an entity. Units
+  inside a cloud still receive that cloud in their own snapshot so the obscuring effect remains
+  visible to the player occupying it.
   Cooldown duration (20s) exceeds cloud duration (5s), so each scout car has at most one active
   cloud at a time.
 - Map: `TILE_SIZE = 32` px. The live map is the hardcoded handcrafted asset at

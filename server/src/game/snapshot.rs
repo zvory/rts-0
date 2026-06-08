@@ -107,7 +107,10 @@ impl Game {
         let mut smokes = if fogged && !include_player_resources {
             self.smokes
                 .iter()
-                .filter(|cloud| self.smokes.visible_to_player(cloud, player, fog))
+                .filter(|cloud| {
+                    self.smokes
+                        .visible_to_player(cloud, player, fog, &self.entities)
+                })
                 .map(|cloud| crate::protocol::SmokeCloudView {
                     id: cloud.id,
                     x: cloud.x,

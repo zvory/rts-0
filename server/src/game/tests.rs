@@ -324,6 +324,28 @@ fn snapshot_keeps_friendly_unit_inside_smoke_visible_to_owner() {
 }
 
 #[test]
+fn snapshot_keeps_smoke_visible_to_owner_with_unit_inside() {
+    let (mut game, _observer, friendly, _enemy, smoke_pos) = smoke_projection_fixture();
+
+    if let Some(unit) = game.entities.get_mut(friendly) {
+        unit.pos_x = smoke_pos.0;
+        unit.pos_y = smoke_pos.1;
+    }
+    game.spatial = services::spatial::SpatialIndex::build(&game.entities, game.map.size);
+    let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
+    game.fog
+        .recompute_with_smoke(&ids, &game.entities, &game.map, &game.smokes);
+
+    let snapshot = game.snapshot_for(1);
+
+    assert_eq!(
+        snapshot.smokes.len(),
+        1,
+        "owner should still receive the smoke cloud when their unit is inside it"
+    );
+}
+
+#[test]
 fn smoke_expiration_restores_fog_projection() {
     let (mut game, _observer, _friendly, enemy, _smoke_pos) = smoke_projection_fixture();
 
