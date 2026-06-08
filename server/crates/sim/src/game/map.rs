@@ -10,7 +10,7 @@
 //! not baked into the map.
 
 use std::collections::HashSet;
-use std::path::Path;
+use std::path::PathBuf;
 
 use crate::config;
 use crate::protocol::terrain;
@@ -21,6 +21,7 @@ use serde::Deserialize;
 
 const DEFAULT_MAP_JSON: &str = include_str!("../../../../assets/maps/default-handcrafted.json");
 const MAPS_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../assets/maps");
+const DEFAULT_MAP_NAME: &str = "default-handcrafted";
 
 type Tile = (u32, u32);
 type BasePair = (Tile, Tile);
@@ -58,10 +59,12 @@ impl Map {
     /// `name` field; the filename stem is used as a fallback. Errors (unreadable directory or
     /// files) are silently skipped so a bad asset file can't crash the lobby.
     pub fn list_available() -> Vec<String> {
-        let dir = Path::new(MAPS_DIR);
         let mut names: Vec<String> = Vec::new();
+        let Some(dir) = bundled_maps_dir() else {
+            return vec![DEFAULT_MAP_NAME.to_string()];
+        };
         let Ok(entries) = std::fs::read_dir(dir) else {
-            return names;
+            return vec![DEFAULT_MAP_NAME.to_string()];
         };
         let mut paths: Vec<_> = entries
             .filter_map(|e| e.ok())
@@ -87,6 +90,9 @@ impl Map {
                 names.push(name);
             }
         }
+        if names.is_empty() {
+            names.push(DEFAULT_MAP_NAME.to_string());
+        }
         names
     }
 
@@ -94,32 +100,36 @@ impl Map {
     /// Returns an error string if the map cannot be found, read, or parsed.
     pub fn load(map_name: &str, player_count: usize, seed: u32) -> Result<Map, String> {
         // First try to match by `name` field, then by filename stem.
-        let dir = Path::new(MAPS_DIR);
-        let Ok(entries) = std::fs::read_dir(dir) else {
-            return Err(format!("cannot read maps directory: {MAPS_DIR}"));
-        };
-        let mut paths: Vec<_> = entries
-            .filter_map(|e| e.ok())
-            .filter(|e| e.path().extension().and_then(|s| s.to_str()) == Some("json"))
-            .map(|e| e.path())
-            .collect();
-        paths.sort();
+        if let Some(dir) = bundled_maps_dir() {
+            let Ok(entries) = std::fs::read_dir(&dir) else {
+                return Err(format!("cannot read maps directory: {}", dir.display()));
+            };
+            let mut paths: Vec<_> = entries
+                .filter_map(|e| e.ok())
+                .filter(|e| e.path().extension().and_then(|s| s.to_str()) == Some("json"))
+                .map(|e| e.path())
+                .collect();
+            paths.sort();
 
-        for path in paths {
-            let stem = path
-                .file_stem()
-                .and_then(|s| s.to_str())
-                .unwrap_or("")
-                .to_string();
-            let json = std::fs::read_to_string(&path)
-                .map_err(|e| format!("cannot read {}: {e}", path.display()))?;
-            let json_name = serde_json::from_str::<serde_json::Value>(&json)
-                .ok()
-                .and_then(|v| v.get("name").and_then(|n| n.as_str()).map(str::to_string));
-            let matches = json_name.as_deref() == Some(map_name) || stem == map_name;
-            if matches {
-                return Self::from_authored_json(player_count, &json, seed);
+            for path in paths {
+                let stem = path
+                    .file_stem()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("")
+                    .to_string();
+                let json = std::fs::read_to_string(&path)
+                    .map_err(|e| format!("cannot read {}: {e}", path.display()))?;
+                let json_name = serde_json::from_str::<serde_json::Value>(&json)
+                    .ok()
+                    .and_then(|v| v.get("name").and_then(|n| n.as_str()).map(str::to_string));
+                let matches = json_name.as_deref() == Some(map_name) || stem == map_name;
+                if matches {
+                    return Self::from_authored_json(player_count, &json, seed);
+                }
             }
+        }
+        if map_name == DEFAULT_MAP_NAME {
+            return Self::from_authored_json(player_count, DEFAULT_MAP_JSON, seed);
         }
         Err(format!("map not found: {map_name:?}"))
     }
@@ -226,6 +236,26 @@ impl Map {
     pub fn world_size_px(&self) -> f32 {
         self.size as f32 * config::TILE_SIZE as f32
     }
+}
+
+fn bundled_maps_dir() -> Option<PathBuf> {
+    maps_dir_candidates().into_iter().find(|path| path.is_dir())
+}
+
+fn maps_dir_candidates() -> Vec<PathBuf> {
+    let mut candidates = Vec::new();
+    candidates.push(PathBuf::from(MAPS_DIR));
+    if let Ok(cwd) = std::env::current_dir() {
+        candidates.push(cwd.join("server/assets/maps"));
+        candidates.push(cwd.join("assets/maps"));
+    }
+    if let Ok(exe) = std::env::current_exe() {
+        for ancestor in exe.ancestors() {
+            candidates.push(ancestor.join("server/assets/maps"));
+            candidates.push(ancestor.join("assets/maps"));
+        }
+    }
+    candidates
 }
 
 fn select_symmetric_two_player_expansions(
@@ -522,6 +552,10 @@ mod tests {
     #[test]
     fn bundled_map_catalog_loads_available_maps_by_name() {
         let available = Map::list_available();
+        assert!(
+            !available.is_empty(),
+            "lobby map catalog must expose at least one selectable map"
+        );
         assert!(available.contains(&"default-handcrafted".to_string()));
         assert!(available.contains(&"no-terrain".to_string()));
 
