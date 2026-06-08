@@ -1385,8 +1385,8 @@ mod tests {
         );
 
         assert_eq!(smokes.iter().count(), 1);
-        assert_eq!(players[0].steel, 975);
-        assert_eq!(players[0].oil, 975);
+        assert_eq!(players[0].steel, 1000);
+        assert_eq!(players[0].oil, 1000);
         assert_eq!(
             entities
                 .get(far)
@@ -1473,7 +1473,7 @@ mod tests {
     }
 
     #[test]
-    fn smoke_resource_shortage_prefers_oil_notice_at_launch() {
+    fn smoke_launches_without_resource_cost() {
         let map = flat_map(32);
         let mut entities = EntityStore::new();
         let target = map.tile_center(12, 8);
@@ -1506,11 +1506,20 @@ mod tests {
             )],
         );
 
-        assert_eq!(smokes.iter().count(), 0);
-        assert!(matches!(
-            events.get(&1).and_then(|events| events.first()),
-            Some(Event::Notice { msg, .. }) if msg == "Not enough oil"
-        ));
+        assert_eq!(smokes.iter().count(), 1);
+        assert_eq!(players[0].steel, 0);
+        assert_eq!(players[0].oil, 0);
+        assert!(events.get(&1).is_none_or(|events| {
+            events.iter().all(|ev| {
+                matches!(
+                    ev,
+                    Event::Notice {
+                        severity: crate::protocol::NoticeSeverity::Info,
+                        ..
+                    }
+                )
+            })
+        }));
     }
 
     #[test]

@@ -122,11 +122,14 @@ pub(crate) fn launch_world_ability(
     match ability {
         AbilityKind::Charge => false,
         AbilityKind::Smoke => {
-            ps.steel = ps.steel.saturating_sub(definition.cost.steel);
-            ps.oil = ps.oil.saturating_sub(definition.cost.oil);
             let Some(e) = entities.get_mut(caster) else {
                 return false;
             };
+            if !e.consume_ability_use(ability) {
+                return false;
+            }
+            ps.steel = ps.steel.saturating_sub(definition.cost.steel);
+            ps.oil = ps.oil.saturating_sub(definition.cost.oil);
             e.start_ability_cooldown(ability, definition.cooldown_ticks);
             e.clear_active_order();
             smokes.spawn(
@@ -161,6 +164,7 @@ pub(crate) fn caster_can_attempt(
             && e.is_unit()
             && !e.under_construction()
             && ability::carried_by(ability, e.kind)
+            && e.ability_uses_remaining(ability).unwrap_or(1) > 0
             && e.ability_cooldown_ticks(ability) == 0)
 }
 

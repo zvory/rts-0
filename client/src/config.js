@@ -66,7 +66,8 @@ export const SMOKE_ABILITY_RANGE_TILES = 9;
 export const SMOKE_CLOUD_RADIUS_TILES = 2;
 export const SMOKE_CLOUD_DURATION_TICKS = TICK_HZ * 5;
 export const SMOKE_ABILITY_COOLDOWN_TICKS = 600;
-export const SMOKE_ABILITY_COST = Object.freeze({ steel: 25, oil: 25 });
+export const SCOUT_CAR_SMOKE_USES = 2;
+export const SMOKE_ABILITY_COST = Object.freeze({ steel: 0, oil: 0 });
 
 // Player colors (server assigns from a matching palette; used as a fallback for blips).
 export const PLAYER_PALETTE = Object.freeze([

@@ -47,8 +47,9 @@ pub const SMOKE_ABILITY_RANGE_TILES: u32 = 9;
 pub const SMOKE_CLOUD_RADIUS_TILES: f32 = 2.0;
 pub const SMOKE_CLOUD_DURATION_TICKS: u32 = TICK_HZ * 5;
 pub const SMOKE_ABILITY_COOLDOWN_TICKS: u16 = (TICK_HZ as u16) * 20;
-pub const SMOKE_ABILITY_COST_STEEL: u32 = 25;
-pub const SMOKE_ABILITY_COST_OIL: u32 = 25;
+pub const SCOUT_CAR_SMOKE_USES: u16 = 2;
+pub const SMOKE_ABILITY_COST_STEEL: u32 = 0;
+pub const SMOKE_ABILITY_COST_OIL: u32 = 0;
 
 // --- Economy ----------------------------------------------------------------
 pub const STARTING_STEEL: u32 = 75;

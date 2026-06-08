@@ -512,6 +512,15 @@ export class HUD {
     return 0;
   }
 
+  _abilityRemainingUses(entity, ability) {
+    const projected = Array.isArray(entity.abilities)
+      ? entity.abilities.find((entry) => entry.ability === ability)
+      : null;
+    return projected && typeof projected.remainingUses === "number"
+      ? projected.remainingUses
+      : null;
+  }
+
   _selectedAbilityAffordances(sel) {
     const ownUnits = this._selectedOwnUnits(sel);
     const res = this.state.resources || { steel: 0, oil: 0 };
@@ -521,16 +530,21 @@ export class HUD {
         if (carriers.length === 0) return null;
         const unlocked = this._abilityUnlocked(definition);
         const affordable = this._affordable(definition.cost, res);
-        const readyUnits = carriers.filter(
-          (e) => this._abilityCooldownLeft(e, definition.ability) === 0,
+        const readyUnits = carriers.filter((e) =>
+          this._abilityCooldownLeft(e, definition.ability) === 0 &&
+          this._abilityRemainingUses(e, definition.ability) !== 0
         );
         const cooldowns = carriers.map((e) =>
           this._abilityCooldownLeft(e, definition.ability),
         );
+        const depletedCount = carriers.filter(
+          (e) => this._abilityRemainingUses(e, definition.ability) === 0,
+        ).length;
         return {
           definition,
           unlocked,
           affordable,
+          depletedCount,
           carrierIds: carriers.map((e) => e.id),
           readyIds: readyUnits.map((e) => e.id),
           cooldownClocks: groupCooldownClocks(cooldowns, definition.cooldownTicks),
@@ -577,6 +591,7 @@ export class HUD {
       `|at:${atGunIds.join(".")}|` +
       `|abilities:${abilityAffordances.map((affordance) =>
         `${affordance.definition.ability}:${affordance.unlocked ? 1 : 0}:${affordance.affordable ? 1 : 0}:` +
+        `${affordance.depletedCount}:` +
         `${affordance.readyIds.join(".")}:` +
         `${affordance.cooldownClocks.map((group) => `${group.count}:${Math.round(group.cooldownLeft)}`).join(",")}`,
       ).join("|")}|` +
@@ -954,6 +969,7 @@ export class HUD {
       }
     }
     if (!affordance.affordable) return "Not enough resources";
+    if (affordance.depletedCount === affordance.carrierIds.length) return "Depleted";
     if (affordance.readyIds.length === 0) return "On cooldown";
     return affordance.definition.title || "";
   }

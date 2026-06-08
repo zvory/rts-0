@@ -48,6 +48,7 @@ pub struct Entity {
     pub worker: Option<WorkerState>,
     pub resource_node: Option<ResourceNodeState>,
     pub ability_cooldowns: BTreeMap<AbilityKind, u16>,
+    pub ability_uses_remaining: BTreeMap<AbilityKind, u16>,
 }
 
 impl Entity {
@@ -75,6 +76,7 @@ impl Entity {
             worker: (kind == EntityKind::Worker).then(WorkerState::default),
             resource_node: None,
             ability_cooldowns: BTreeMap::new(),
+            ability_uses_remaining: initial_ability_uses(kind),
         })
     }
 
@@ -115,6 +117,7 @@ impl Entity {
             worker: None,
             resource_node: None,
             ability_cooldowns: BTreeMap::new(),
+            ability_uses_remaining: BTreeMap::new(),
         })
     }
 
@@ -144,6 +147,7 @@ impl Entity {
                 miner: None,
             }),
             ability_cooldowns: BTreeMap::new(),
+            ability_uses_remaining: BTreeMap::new(),
         })
     }
 
@@ -434,6 +438,33 @@ impl Entity {
 
     pub fn ability_cooldown_ticks(&self, ability: AbilityKind) -> u16 {
         self.ability_cooldowns.get(&ability).copied().unwrap_or(0)
+    }
+
+    pub fn ability_uses_remaining(&self, ability: AbilityKind) -> Option<u16> {
+        match (self.kind, ability) {
+            (EntityKind::ScoutCar, AbilityKind::Smoke) => Some(
+                self.ability_uses_remaining
+                    .get(&ability)
+                    .copied()
+                    .unwrap_or(0),
+            ),
+            _ => None,
+        }
+    }
+
+    pub fn consume_ability_use(&mut self, ability: AbilityKind) -> bool {
+        match self.ability_uses_remaining(ability) {
+            Some(0) => false,
+            Some(_) => {
+                if let Some(uses) = self.ability_uses_remaining.get_mut(&ability) {
+                    *uses = uses.saturating_sub(1);
+                    true
+                } else {
+                    false
+                }
+            }
+            None => true,
+        }
     }
 
     pub fn start_ability_cooldown(&mut self, ability: AbilityKind, ticks: u16) {
@@ -786,6 +817,14 @@ impl Entity {
         }
         self.set_target_id(None);
     }
+}
+
+fn initial_ability_uses(kind: EntityKind) -> BTreeMap<AbilityKind, u16> {
+    let mut uses = BTreeMap::new();
+    if kind == EntityKind::ScoutCar {
+        uses.insert(AbilityKind::Smoke, config::SCOUT_CAR_SMOKE_USES);
+    }
+    uses
 }
 
 fn normalize_angle(angle: f32) -> f32 {

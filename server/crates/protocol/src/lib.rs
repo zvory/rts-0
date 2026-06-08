@@ -549,9 +549,17 @@ impl Serialize for CompactAbilityCooldown<'_> {
         S: Serializer,
     {
         let ability = self.0;
-        let mut seq = serializer.serialize_seq(Some(2))?;
+        let len = if ability.remaining_uses.is_some() {
+            3
+        } else {
+            2
+        };
+        let mut seq = serializer.serialize_seq(Some(len))?;
         seq.serialize_element(&ability_code(&ability.ability))?;
         seq.serialize_element(&ability.cooldown_left)?;
+        if ability.remaining_uses.is_some() {
+            seq.serialize_element(&ability.remaining_uses)?;
+        }
         seq.end()
     }
 }
@@ -818,6 +826,7 @@ mod tests {
         worker.abilities = vec![AbilityCooldownView {
             ability: abilities::CHARGE.to_string(),
             cooldown_left: 87,
+            remaining_uses: Some(2),
         }];
         worker.vision_only = true;
 
@@ -940,7 +949,7 @@ mod tests {
             serde_json::json!([[1, 96.0, 112.0], [1, 128.0, 160.0], [6, 192.0, 224.0]])
         );
         assert_eq!(value["e"][0][22], serde_json::json!(87));
-        assert_eq!(value["e"][0][23], serde_json::json!([[1, 87]]));
+        assert_eq!(value["e"][0][23], serde_json::json!([[1, 87, 2]]));
         assert_eq!(value["e"][0][24], serde_json::json!(true));
         // Rally point rides in slot 18 of the producing building's record.
         assert_eq!(value["e"][2][18], serde_json::json!([256.0, 512.0]));

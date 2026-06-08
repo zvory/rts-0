@@ -170,6 +170,8 @@ pub struct DebugPathView {
 pub struct AbilityCooldownView {
     pub ability: String,
     pub cooldown_left: u16,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub remaining_uses: Option<u16>,
 }
 
 /// One entity as seen by one player. Optional fields are omitted when not applicable.

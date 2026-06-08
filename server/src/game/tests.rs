@@ -180,6 +180,7 @@ fn legacy_view_of(game: &Game, e: &Entity, viewer: u32, fogged: bool) -> EntityV
                 v.abilities.push(AbilityCooldownView {
                     ability: kind.to_protocol_str().to_string(),
                     cooldown_left: e.ability_cooldown_ticks(kind),
+                    remaining_uses: e.ability_uses_remaining(kind),
                 });
             }
         }
@@ -387,6 +388,62 @@ fn smoke_nonfinite_target_coordinates_are_rejected() {
         game.smokes.iter().count(),
         0,
         "non-finite coordinates should be rejected"
+    );
+}
+
+#[test]
+fn scout_car_smoke_has_two_free_uses_then_depletes() {
+    let (mut game, scout, _target, _) = smoke_command_fixture();
+    let target = game.map.tile_center(12, 8);
+    game.players[0].steel = 0;
+    game.players[0].oil = 0;
+
+    for expected_remaining in [1, 0] {
+        game.enqueue(
+            1,
+            Command::UseAbility {
+                ability: ability::AbilityKind::Smoke,
+                units: vec![scout],
+                x: Some(target.0),
+                y: Some(target.1),
+                queued: false,
+            },
+        );
+        game.tick();
+
+        let scout_entity = game.entities.get_mut(scout).expect("scout should exist");
+        assert_eq!(
+            scout_entity.ability_uses_remaining(ability::AbilityKind::Smoke),
+            Some(expected_remaining)
+        );
+        scout_entity.start_ability_cooldown(ability::AbilityKind::Smoke, 0);
+    }
+
+    assert_eq!(game.smokes.iter().count(), 2);
+    assert_eq!(game.players[0].steel, 0);
+    assert_eq!(game.players[0].oil, 0);
+
+    game.enqueue(
+        1,
+        Command::UseAbility {
+            ability: ability::AbilityKind::Smoke,
+            units: vec![scout],
+            x: Some(target.0),
+            y: Some(target.1),
+            queued: false,
+        },
+    );
+    game.tick();
+
+    let scout_entity = game.entities.get(scout).expect("scout should exist");
+    assert_eq!(game.smokes.iter().count(), 2);
+    assert_eq!(
+        scout_entity.ability_uses_remaining(ability::AbilityKind::Smoke),
+        Some(0)
+    );
+    assert_eq!(
+        scout_entity.ability_cooldown_ticks(ability::AbilityKind::Smoke),
+        0
     );
 }
 
@@ -737,8 +794,8 @@ fn out_of_range_smoke_moves_into_range_launches_then_idles() {
         scout_entity.ability_cooldown_ticks(ability::AbilityKind::Smoke),
         config::SMOKE_ABILITY_COOLDOWN_TICKS
     );
-    assert_eq!(game.players[0].steel, 475);
-    assert_eq!(game.players[0].oil, 475);
+    assert_eq!(game.players[0].steel, 500);
+    assert_eq!(game.players[0].oil, 500);
 }
 
 #[test]
