@@ -1,5 +1,5 @@
 use crate::config;
-use crate::game::entity::{Entity, EntityKind, EntityStore};
+use crate::game::entity::{uses_oriented_vehicle_body, Entity, EntityKind, EntityStore};
 use crate::game::map::Map;
 use crate::game::pathfinding::Passability;
 use crate::game::services::geometry::{
@@ -171,7 +171,7 @@ pub(super) fn scout_car_final_goal_tolerance() -> f32 {
     config::SCOUT_CAR_FINAL_GOAL_TOLERANCE_PX
 }
 
-pub(super) fn vehicle_accepts_waypoint(
+pub(super) fn route_accepts_waypoint(
     map: &Map,
     occ: &Occupancy,
     e: &Entity,
@@ -184,7 +184,7 @@ pub(super) fn vehicle_accepts_waypoint(
     }
 
     let facing = e.facing();
-    if facing.is_finite() {
+    if uses_oriented_vehicle_body(e.kind) && facing.is_finite() {
         let forward = (facing.cos(), facing.sin());
         let to_waypoint = (waypoint.0 - current.0, waypoint.1 - current.1);
         if forward.0.is_finite()
@@ -276,7 +276,7 @@ fn vehicle_route_context(
     while next_index > 0 {
         let waypoint = path[next_index];
         let next_waypoint = path[next_index - 1];
-        if !vehicle_accepts_waypoint(map, occ, e, current, waypoint, Some(next_waypoint)) {
+        if !route_accepts_waypoint(map, occ, e, current, waypoint, Some(next_waypoint)) {
             break;
         }
         next_index -= 1;
@@ -686,7 +686,7 @@ fn scout_car_post_motion_waypoint_pops(
     while idx > 0 {
         let waypoint = path[idx];
         let next_waypoint = path[idx - 1];
-        if !vehicle_accepts_waypoint(map, occ, e, pos, waypoint, Some(next_waypoint)) {
+        if !route_accepts_waypoint(map, occ, e, pos, waypoint, Some(next_waypoint)) {
             break;
         }
         pops += 1;

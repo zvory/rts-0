@@ -161,6 +161,13 @@ The server treats every client as potentially hostile. Limits live next to the c
   unit `AwaitingPath`. The existing path coordinator then recomputes under current occupancy within
   the normal per-tick A* budget. This covers buildings constructed after a long path was assigned
   without periodically repathing every moving unit.
+- **Route waypoint skipping**: intermediate movement waypoints are path-following hints, not hard
+  stop points, when the unit's own static swept body can legally reach the following route segment
+  from its current position. Infantry and workers use the same standability segment check as
+  vehicles, with their circular bodies, so they can skip reachable dog-leg points instead of
+  oscillating around the waypoint center. Blocked corners still keep the intermediate waypoint until
+  the swept segment is legal. Oriented vehicles additionally keep their facing-specific guard so a
+  waypoint behind the hull, including scout-car reverse recovery, must be physically reached.
 - **Vehicle clearance pathing**: player-issued scout-car, tank, and AT-team `Move` / `AttackMove`
   path requests use the shared clearance-aware tile A* route shape. The route shape adds finite
   static-clearance, turn, adjacent-blocker, and corner-graze costs so open alternatives are

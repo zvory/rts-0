@@ -18,7 +18,7 @@ use super::pivot_drive::{
     rotate_toward, vehicle_body_turn_rate, vehicle_oil_starves_movement,
     vehicle_traffic_adjustment,
 };
-use super::scout_car::{plan_scout_car_motion, vehicle_accepts_waypoint};
+use super::scout_car::{plan_scout_car_motion, route_accepts_waypoint};
 use super::standability::{
     footing_profile, requires_weapon_setup, unit_static_standable, FootingProfile,
 };
@@ -174,13 +174,13 @@ pub(super) fn advance_moving_units(
                 let dist = (dx * dx + dy * dy).sqrt();
 
                 if path_len > 1 {
-                    // Intermediate waypoint: vehicles require the swept-body route check; other
-                    // units keep the radius/pass-by path-following rule.
-                    let accepts_waypoint = if uses_vehicle_movement {
-                        entities.get(id).is_some_and(|e| {
-                            vehicle_accepts_waypoint(map, occ, e, (x, y), (wx, wy), next_next)
-                        })
-                    } else {
+                    // Intermediate waypoint: follow the route corridor when this unit's static
+                    // swept body can reach the next segment. Vehicles also keep their
+                    // facing-specific guard so reverse/recovery waypoints are physically reached.
+                    let route_accepts = entities.get(id).is_some_and(|e| {
+                        route_accepts_waypoint(map, occ, e, (x, y), (wx, wy), next_next)
+                    });
+                    let legacy_infantry_accepts = if !uses_vehicle_movement && !route_accepts {
                         let radius_hit = dist <= config::ARRIVE_RADIUS_INTERMEDIATE_PX;
                         let passed = next_next.is_some_and(|(nnx, nny)| {
                             // Positive projection of (pos - waypoint) onto (next_next - waypoint) means
@@ -188,7 +188,10 @@ pub(super) fn advance_moving_units(
                             (x - wx) * (nnx - wx) + (y - wy) * (nny - wy) > 0.0
                         });
                         radius_hit || passed
+                    } else {
+                        false
                     };
+                    let accepts_waypoint = route_accepts || legacy_infantry_accepts;
                     if accepts_waypoint {
                         if let Some(e) = entities.get_mut(id) {
                             e.pop_waypoint();

@@ -2855,6 +2855,104 @@ fn scout_car_route_lookahead_skips_lateral_waypoint_when_next_segment_reachable(
 }
 
 #[test]
+fn infantry_skips_lateral_waypoint_when_next_segment_reachable() {
+    let map = flat_map(1);
+    let mut entities = EntityStore::new();
+    let (sx, sy) = map.tile_center(20, 20);
+    let lateral_offset = config::VEHICLE_WAYPOINT_ACCEPTANCE_RADIUS_PX + 10.0;
+    let start = (sx, sy + lateral_offset);
+    let intermediate = (sx + config::TILE_SIZE as f32, sy);
+    let goal = (sx + config::TILE_SIZE as f32 * 4.0, sy);
+    let rifleman = entities
+        .spawn_unit(1, EntityKind::Rifleman, start.0, start.1)
+        .expect("rifleman should spawn");
+    if let Some(e) = entities.get_mut(rifleman) {
+        e.set_order(Order::move_to(goal.0, goal.1));
+    }
+    set_path_direct(&mut entities, rifleman, vec![intermediate, goal]);
+
+    let occ = Occupancy::build(&map, &entities);
+    assert!(
+        standability::unit_static_segment_standable(&map, &occ, EntityKind::Rifleman, start, goal),
+        "fixture requires the infantry body to sweep directly to the next route segment"
+    );
+    let spatial = SpatialIndex::build(&entities, map.size);
+    movement_system(&map, &mut entities, &mut [], &occ, &spatial, 0);
+
+    let e = entities.get(rifleman).expect("rifleman should exist");
+    assert_eq!(
+        e.movement.as_ref().map(|m| m.path.len()),
+        Some(1),
+        "reachable intermediate waypoint should be consumed"
+    );
+    assert_eq!(e.next_waypoint(), Some(goal));
+    assert!(
+        e.pos_x > start.0,
+        "rifleman should move along the reachable route after consuming the waypoint"
+    );
+}
+
+#[test]
+fn infantry_route_skip_stops_before_blocked_corner() {
+    let map = flat_map(1);
+    let mut entities = EntityStore::new();
+    let (bx, by) = footprint_center(&map, EntityKind::Depot, 10, 10);
+    entities
+        .spawn_building(1, EntityKind::Depot, bx, by, true)
+        .expect("depot spawn");
+    let rect = building_rect_for_footprint(EntityKind::Depot, 10, 10).expect("depot rect");
+    let infantry_radius = config::unit_stats(EntityKind::Rifleman)
+        .expect("rifleman stats")
+        .radius;
+
+    let start = (
+        rect.min_x - infantry_radius - 8.0,
+        rect.max_y + infantry_radius + 8.0,
+    );
+    let corner = (rect.max_x + infantry_radius + 8.0, start.1);
+    let after_corner = (corner.0, rect.min_y - infantry_radius - 8.0);
+    let rifleman = entities
+        .spawn_unit(1, EntityKind::Rifleman, start.0, start.1)
+        .expect("rifleman spawn");
+    if let Some(e) = entities.get_mut(rifleman) {
+        e.set_order(Order::move_to(after_corner.0, after_corner.1));
+    }
+    set_path_direct(&mut entities, rifleman, vec![corner, after_corner]);
+
+    let occ = Occupancy::build(&map, &entities);
+    assert!(
+        standability::unit_static_segment_standable(
+            &map,
+            &occ,
+            EntityKind::Rifleman,
+            start,
+            corner
+        ),
+        "fixture requires a legal current route segment"
+    );
+    assert!(
+        !standability::unit_static_segment_standable(
+            &map,
+            &occ,
+            EntityKind::Rifleman,
+            start,
+            after_corner
+        ),
+        "fixture requires the direct look-through-corner segment to be blocked"
+    );
+    let spatial = SpatialIndex::build(&entities, map.size);
+    movement_system(&map, &mut entities, &mut [], &occ, &spatial, 0);
+
+    let e = entities.get(rifleman).expect("rifleman should exist");
+    assert_eq!(
+        e.movement.as_ref().map(|m| m.path.len()),
+        Some(2),
+        "blocked look-through-corner segment should keep the intermediate waypoint"
+    );
+    assert_eq!(e.next_waypoint(), Some(corner));
+}
+
+#[test]
 fn scout_car_route_lookahead_stops_before_blocked_corner() {
     let map = flat_map(1);
     let mut entities = EntityStore::new();
