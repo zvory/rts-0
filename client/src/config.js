@@ -124,7 +124,7 @@ export const ABILITIES = Object.freeze({
     cooldownTicks: RIFLEMAN_CHARGE_COOLDOWN_TICKS,
     cost: Object.freeze({ steel: 0, oil: 0 }),
     requires: KIND.TRAINING_CENTRE,
-    queued: false,
+    queued: true,
   }),
   [ABILITY.SMOKE]: Object.freeze({
     ability: ABILITY.SMOKE,

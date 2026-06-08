@@ -15,6 +15,7 @@ import {
   MINING_CC_RANGE_TILES,
   RIFLEMAN_CHARGE_COOLDOWN_TICKS,
   SMOKE_ABILITY_COST,
+  ABILITIES,
   STATS,
 } from "../client/src/config.js";
 import {
@@ -1006,6 +1007,7 @@ function fakeAudioContext() {
     RIFLEMAN_CHARGE_COOLDOWN_TICKS === 150,
     "client mirrors the server rifleman charge cooldown duration",
   );
+  assert(ABILITIES[ABILITY.CHARGE].queued === true, "client marks Rifleman Charge as queueable");
   assert(
     STATS[KIND.AT_TEAM].requires === KIND.STEELWORKS,
     "AT Gun training should require a completed Steelworks in the command card",
@@ -1101,6 +1103,88 @@ function fakeAudioContext() {
     trained.slice(5).map((command) => command.building).join(",") === "21,20,21",
     "selected producing buildings should receive cancel commands reverse round-robin by producer kind",
   );
+
+  const priorDocument = globalThis.document;
+  const renderedButtons = [];
+  function fakeElement(tagName) {
+    const listeners = new Map();
+    return {
+      tagName: tagName.toUpperCase(),
+      children: [],
+      className: "",
+      dataset: {},
+      disabled: false,
+      innerHTML: "",
+      style: {},
+      appendChild(child) {
+        if (child?.nodeType === "fragment") this.children.push(...child.children);
+        else this.children.push(child);
+      },
+      addEventListener(type, listener) {
+        listeners.set(type, listener);
+      },
+      click(ev = {}) {
+        listeners.get("click")?.({
+          preventDefault() {},
+          shiftKey: !!ev.shiftKey,
+        });
+      },
+    };
+  }
+  try {
+    globalThis.document = {
+      createDocumentFragment() {
+        return {
+          nodeType: "fragment",
+          children: [],
+          appendChild(child) {
+            this.children.push(child);
+          },
+        };
+      },
+      createElement(tagName) {
+        const el = fakeElement(tagName);
+        if (tagName === "button") renderedButtons.push(el);
+        return el;
+      },
+    };
+
+    const sent = [];
+    const selectedRifleman = { id: 77, owner: playerId, kind: KIND.RIFLEMAN };
+    const chargeHud = Object.create(HUD.prototype);
+    chargeHud.state = {
+      playerId,
+      resources: { steel: 0, oil: 0 },
+      commandTarget: null,
+      selectedEntities: () => [selectedRifleman],
+      entitiesInterpolated: () => [
+        selectedRifleman,
+        { id: 90, owner: playerId, kind: KIND.TRAINING_CENTRE, buildProgress: null },
+      ],
+      endCommandTarget() {
+        this.commandTarget = null;
+      },
+    };
+    chargeHud.net = { command: (command) => sent.push(command) };
+    chargeHud._cardSig = null;
+
+    const card = fakeElement("div");
+    chargeHud._renderUnitCard(card, [selectedRifleman]);
+    const chargeButton = renderedButtons.find((button) => button.innerHTML.includes("Charge"));
+    assert(chargeButton && !chargeButton.disabled, "Charge command-card button renders enabled");
+    chargeButton.click({ shiftKey: true });
+    assert(
+      sent.length === 1 &&
+        sent[0].c === "useAbility" &&
+        sent[0].ability === ABILITY.CHARGE &&
+        sent[0].units.join(",") === "77" &&
+        sent[0].queued === true,
+      "Shift-clicking Charge should send a queued self ability command",
+    );
+  } finally {
+    if (priorDocument === undefined) delete globalThis.document;
+    else globalThis.document = priorDocument;
+  }
 }
 
 // ---------------------------------------------------------------------------
