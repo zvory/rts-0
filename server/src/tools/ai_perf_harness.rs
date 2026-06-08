@@ -302,7 +302,7 @@ fn run_harness(config: CliConfig) -> Result<HarnessSummary, String> {
                 match event {
                     Event::Attack { .. } => attack_events += 1,
                     Event::Death { .. } => death_events += 1,
-                    Event::Build { .. } | Event::Notice { .. } => {}
+                    _ => {}
                 }
             }
         }

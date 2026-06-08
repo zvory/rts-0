@@ -154,7 +154,7 @@ impl Milestones {
                 self.death_events += 1;
                 true
             }
-            Event::Build { .. } | Event::Notice { .. } => false,
+            _ => false,
         };
         changed || before_damage_tick != self.first_damage_tick
     }

@@ -33,8 +33,29 @@ function packageRoot(pkg) {
 }
 
 function rustFiles(dir) {
-  const out = execFileSync("fd", ["-e", "rs", ".", dir], { encoding: "utf8" });
-  return out.split("\n").filter(Boolean);
+  try {
+    const out = execFileSync("fd", ["-e", "rs", ".", dir], { encoding: "utf8" });
+    return out.split("\n").filter(Boolean);
+  } catch (error) {
+    if (error?.code !== "ENOENT") {
+      throw error;
+    }
+    return rustFilesFallback(dir);
+  }
+}
+
+function rustFilesFallback(dir) {
+  const files = [];
+  for (const entry of readdirSync(dir)) {
+    const fullPath = path.join(dir, entry);
+    const stats = statSync(fullPath);
+    if (stats.isDirectory()) {
+      files.push(...rustFilesFallback(fullPath));
+    } else if (stats.isFile() && fullPath.endsWith(".rs")) {
+      files.push(fullPath);
+    }
+  }
+  return files;
 }
 
 const metadata = cargoMetadata();

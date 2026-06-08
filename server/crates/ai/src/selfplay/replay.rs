@@ -268,7 +268,7 @@ pub fn run_profile_matchup_result(
                     Event::Death { .. } => {
                         death_events += 1;
                     }
-                    Event::Build { .. } | Event::Notice { .. } => {}
+                    _ => {}
                 }
                 event_log.push(EventLogEntry {
                     tick: event_tick,
