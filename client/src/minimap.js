@@ -16,6 +16,7 @@ import { COLORS, FOG_EXPLORED_ALPHA, FOG_UNEXPLORED_ALPHA } from "./config.js";
 
 const PING_MS = 900;
 const BORDER_PULSE_MS = 700;
+const CONTEXT_MENU_EVENT_OPTIONS = { capture: true };
 
 // Convert one of the 0xRRGGBB palette ints into a CSS color string.
 const hex = (n) => "#" + n.toString(16).padStart(6, "0");
@@ -73,7 +74,10 @@ export class Minimap {
     this._borderPulseUntil = 0;
 
     // Bound handlers retained so destroy() can remove the exact references.
-    this._onContextMenu = (ev) => ev.preventDefault();
+    this._onContextMenu = (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+    };
     this._onCanvasMouseDown = this._handleCanvasMouseDown.bind(this);
     this._onWinMouseMove = this._handleWinMouseMove.bind(this);
     this._onWinMouseUp = this._handleWinMouseUp.bind(this);
@@ -332,7 +336,7 @@ export class Minimap {
       this._unregisterInputZone = this.inputRouter.registerZone(this.inputZone());
     }
     // Suppress the browser context menu so right-click can mean "move here".
-    c.addEventListener("contextmenu", this._onContextMenu);
+    c.addEventListener("contextmenu", this._onContextMenu, CONTEXT_MENU_EVENT_OPTIONS);
     c.addEventListener("mousedown", this._onCanvasMouseDown);
     // Move/up on window so a drag that leaves the canvas still tracks & releases.
     window.addEventListener("mousemove", this._onWinMouseMove);
@@ -349,7 +353,7 @@ export class Minimap {
       this._unregisterInputZone();
       this._unregisterInputZone = null;
     }
-    c.removeEventListener("contextmenu", this._onContextMenu);
+    c.removeEventListener("contextmenu", this._onContextMenu, CONTEXT_MENU_EVENT_OPTIONS);
     c.removeEventListener("mousedown", this._onCanvasMouseDown);
     window.removeEventListener("mousemove", this._onWinMouseMove);
     window.removeEventListener("mouseup", this._onWinMouseUp);
@@ -388,6 +392,7 @@ export class Minimap {
     if (this.inputRouter) {
       if (this.inputRouter.pointerDown(this._routerEvent(ev, "dom"))) {
         ev.preventDefault();
+        if (ev.button === 2) ev.stopPropagation();
         return;
       }
     }
@@ -401,6 +406,7 @@ export class Minimap {
     if (ev.button === 2) {
       // Right-click: issue a context-sensitive order for the currently selected own units.
       ev.originalEvent?.preventDefault();
+      ev.originalEvent?.stopPropagation();
       this._issueOrder(w.x, w.y, !!ev.shiftKey);
       return true;
     } else if (ev.button === 0) {

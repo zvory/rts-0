@@ -79,6 +79,8 @@ export { footprintValidAgainstEntities };
 
 const POINTER_LOCK_RESULT_TIMEOUT_MS = 700;
 const POINTER_LOCK_RAW_INPUT_OPTIONS = Object.freeze({ unadjustedMovement: true });
+const CONTEXT_MENU_EVENT_OPTIONS = { capture: true };
+const CONTEXT_MENU_SUPPRESS_MS = 500;
 
 /**
  * Translates raw DOM pointer/keyboard gestures on the viewport into selection
@@ -142,7 +144,7 @@ export class Input {
     this._cursorLockMode = null;
     this._pointerLockCursor = null;
     this._pendingPointerLockCursor = null;
-    this._suppressNextContextMenu = false;
+    this._suppressNextContextMenuUntil = 0;
     this._pointerLockAttempt = 0;
     this._lastPointerLockFocusAttempt = null;
     this._lastPointerLockRequest = null;
@@ -179,7 +181,7 @@ export class Input {
     // Move/up on window so a drag that leaves the viewport still tracks & releases.
     window.addEventListener("mousemove", this._onMouseMove);
     window.addEventListener("mouseup", this._onMouseUp);
-    el.addEventListener("contextmenu", this._onContextMenu);
+    el.addEventListener("contextmenu", this._onContextMenu, CONTEXT_MENU_EVENT_OPTIONS);
     el.addEventListener("auxclick", this._onAuxClick);
     el.addEventListener("wheel", this._onWheel, { passive: false });
     window.addEventListener("keydown", this._onKeyDown);
@@ -198,7 +200,7 @@ export class Input {
     el.removeEventListener("mousedown", this._onMouseDown);
     window.removeEventListener("mousemove", this._onMouseMove);
     window.removeEventListener("mouseup", this._onMouseUp);
-    el.removeEventListener("contextmenu", this._onContextMenu);
+    el.removeEventListener("contextmenu", this._onContextMenu, CONTEXT_MENU_EVENT_OPTIONS);
     el.removeEventListener("auxclick", this._onAuxClick);
     el.removeEventListener("wheel", this._onWheel);
     window.removeEventListener("keydown", this._onKeyDown);
@@ -678,9 +680,19 @@ export class Input {
     const p = this._eventScreenPos(ev);
     if (!this.pointerLocked) this._trackMouse(p);
     if (this.pointerLocked && ev.button === 2) {
-      this._suppressNextContextMenu = true;
+      this._suppressNextContextMenuUntil = performance.now() + CONTEXT_MENU_SUPPRESS_MS;
       if (!this._routeLockedPointerDown(ev, { ...p, button: 2 })) this._onRightClick(p, ev);
       ev.preventDefault();
+      ev.stopPropagation();
+      return;
+    }
+    if (!this.pointerLocked && ev.button === 2 && ev.shiftKey) {
+      // Some browsers/OS combinations show Shift+right-click menus without a
+      // normal contextmenu event, so queue orders on mousedown for that chord.
+      this._suppressNextContextMenuUntil = performance.now() + CONTEXT_MENU_SUPPRESS_MS;
+      if (!this._routeLockedPointerDown(ev, { ...p, button: 2 })) this._onRightClick(p, ev);
+      ev.preventDefault();
+      ev.stopPropagation();
       return;
     }
     if (ev.button !== 2 && this._routeLockedPointerDown(ev, p)) {
@@ -775,8 +787,9 @@ export class Input {
   _handleContextMenu(ev) {
     // Always suppress the native menu over the viewport; treat as a right-click.
     ev.preventDefault();
-    if (this._suppressNextContextMenu) {
-      this._suppressNextContextMenu = false;
+    ev.stopPropagation();
+    if (performance.now() <= this._suppressNextContextMenuUntil) {
+      this._suppressNextContextMenuUntil = 0;
       return;
     }
     const p = this._eventScreenPos(ev);
