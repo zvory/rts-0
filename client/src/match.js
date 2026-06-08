@@ -32,6 +32,7 @@ const JITTER_WINDOW = 8;
 const AUTO_POINTER_LOCK_SUPPRESS_MS = 1200;
 const DESKTOP_POINTER_LOCK_RETRY_ATTEMPTS = 4;
 const DESKTOP_POINTER_LOCK_RETRY_DELAY_MS = 120;
+const POINTER_LOCK_PAN_STORAGE_KEY = "rts.lockCursorPan";
 
 const COMBAT_SOUNDS = Object.freeze({
   [KIND.TANK]: {
@@ -84,6 +85,7 @@ export class Match {
     this.lastSnapshotArrivedAt = null;
     this.lastServerNetStatus = null;
     this.autoPointerLockUntil = 0;
+    this.pointerLockPanEnabled = this.readPointerLockPanEnabled();
     this.pointerLockDiagnosticShown = false;
     this.pointerLockRetryToken = 0;
     this.pointerLockRetry = null;
@@ -325,6 +327,7 @@ export class Match {
   }
 
   requestAutomaticPointerLock({ requireGesture = false } = {}) {
+    if (!this.pointerLockPanEnabled) return;
     if (!this.input || !this.input.pointerLockSupported()) return;
     if (automaticPointerLockDisabledForTests()) return;
     const isDesktop = this.input.desktopRuntime();
@@ -441,8 +444,16 @@ export class Match {
       return;
     }
     this.autoPointerLockUntil = 0;
-    if (!this.input.pointerLocked) this.closeSettingsMenu();
-    void this.input.togglePointerLock();
+    this.pointerLockPanEnabled = !this.pointerLockPanEnabled;
+    this.writePointerLockPanEnabled(this.pointerLockPanEnabled);
+    this.pointerLockRetryToken += 1;
+    if (this.pointerLockPanEnabled) {
+      this.closeSettingsMenu();
+      void this.input.requestPointerLock();
+    } else if (this.input.pointerLocked) {
+      void this.input.exitPointerLock();
+    }
+    this.syncPointerLockUi();
   }
 
   handlePointerLockChange(locked) {
@@ -495,11 +506,30 @@ export class Match {
     const supported = this.input.pointerLockSupported();
     const locked = this.input.pointerLocked;
     btn.disabled = !supported;
-    btn.setAttribute("aria-checked", String(locked));
-    btn.textContent = locked ? "Cursor locked (Esc)" : "Lock cursor pan";
+    btn.setAttribute("aria-checked", String(this.pointerLockPanEnabled));
+    btn.textContent = this.pointerLockPanEnabled
+      ? (locked ? "Lock cursor pan: on (Esc)" : "Lock cursor pan: on")
+      : "Lock cursor pan: off";
     btn.title = supported
-      ? "Trap the cursor in the game view for multi-monitor edge panning."
+      ? "Aggressively trap the cursor in the game view for multi-monitor edge panning."
       : "Cursor lock is not supported by this browser.";
+  }
+
+  readPointerLockPanEnabled() {
+    try {
+      return window.localStorage.getItem(POINTER_LOCK_PAN_STORAGE_KEY) === "1";
+    } catch {
+      return false;
+    }
+  }
+
+  writePointerLockPanEnabled(enabled) {
+    try {
+      if (enabled) window.localStorage.setItem(POINTER_LOCK_PAN_STORAGE_KEY, "1");
+      else window.localStorage.removeItem(POINTER_LOCK_PAN_STORAGE_KEY);
+    } catch {
+      // Private browsing or storage policy failures should only make the setting session-local.
+    }
   }
 
   /** Compute world/viewport sizes and push them into the camera. */

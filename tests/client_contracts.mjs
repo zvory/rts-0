@@ -505,12 +505,32 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
   };
   const { Match } = await import("../client/src/match.js");
 
+  const storageValues = new Map();
+  globalThis.window.localStorage = {
+    getItem(key) {
+      return storageValues.has(key) ? storageValues.get(key) : null;
+    },
+    setItem(key, value) {
+      storageValues.set(key, value);
+    },
+    removeItem(key) {
+      storageValues.delete(key);
+    },
+  };
+  const storagePolicyMatch = Object.create(Match.prototype);
+  assert(!storagePolicyMatch.readPointerLockPanEnabled(), "lock cursor pan defaults off without stored opt-in");
+  storagePolicyMatch.writePointerLockPanEnabled(true);
+  assert(storagePolicyMatch.readPointerLockPanEnabled(), "lock cursor pan opt-in persists");
+  storagePolicyMatch.writePointerLockPanEnabled(false);
+  assert(!storagePolicyMatch.readPointerLockPanEnabled(), "lock cursor pan opt-out clears persisted opt-in");
+
   const lockedPolicyMatch = Object.create(Match.prototype);
   lockedPolicyMatch.input = {
     pointerLocked: true,
     pointerLockSupported: () => true,
     desktopRuntime: () => false,
   };
+  lockedPolicyMatch.pointerLockPanEnabled = true;
   lockedPolicyMatch.pointerLockRetryToken = 0;
   let requestedRetry = null;
   lockedPolicyMatch.runPointerLockRetryBurst = (token, maxAttempts) => {
@@ -520,12 +540,29 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
   lockedPolicyMatch.requestAutomaticPointerLock({ requireGesture: true });
   assert(requestedRetry === null, "automatic Pointer Lock does not churn an already locked raw session");
 
+  const disabledPolicyMatch = Object.create(Match.prototype);
+  disabledPolicyMatch.input = {
+    pointerLocked: false,
+    pointerLockSupported: () => true,
+    desktopRuntime: () => false,
+  };
+  disabledPolicyMatch.pointerLockPanEnabled = false;
+  disabledPolicyMatch.pointerLockRetryToken = 0;
+  requestedRetry = null;
+  disabledPolicyMatch.runPointerLockRetryBurst = (token, maxAttempts) => {
+    requestedRetry = { token, maxAttempts };
+    return Promise.resolve();
+  };
+  disabledPolicyMatch.requestAutomaticPointerLock({ requireGesture: true });
+  assert(requestedRetry === null, "automatic Pointer Lock is gated behind the lock cursor pan setting");
+
   const unlockedPolicyMatch = Object.create(Match.prototype);
   unlockedPolicyMatch.input = {
     pointerLocked: false,
     pointerLockSupported: () => true,
     desktopRuntime: () => true,
   };
+  unlockedPolicyMatch.pointerLockPanEnabled = true;
   unlockedPolicyMatch.autoPointerLockUntil = 0;
   unlockedPolicyMatch.pointerLockRetryToken = 0;
   requestedRetry = null;
