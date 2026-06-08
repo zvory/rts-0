@@ -142,6 +142,7 @@ export class Input {
     this._cursorLockMode = null;
     this._pointerLockCursor = null;
     this._pendingPointerLockCursor = null;
+    this._pointerLockRawInputActive = null;
     this._suppressNextContextMenu = false;
     this._pointerLockAttempt = 0;
     this._lastPointerLockFocusAttempt = null;
@@ -420,6 +421,8 @@ export class Input {
           }
         : null,
       attempts: this._pointerLockAttempt,
+      rawInputActive: this._pointerLockRawInputActive,
+      rawInputDegraded: this.pointerLockRawInputDegraded(),
       lastFocusAttempt: this._lastPointerLockFocusAttempt,
       lastRequest: this._lastPointerLockRequest,
       lastRawInputFallback: this._lastPointerLockRawInputFallback,
@@ -508,9 +511,18 @@ export class Input {
         POINTER_LOCK_RAW_INPUT_OPTIONS,
         true,
       );
-      if (rawLocked || this._browserPointerLockElement() === this._pointerLockTarget()) return true;
+      if (rawLocked || this._browserPointerLockElement() === this._pointerLockTarget()) {
+        this._pointerLockRawInputActive = true;
+        return true;
+      }
       this._lastPointerLockRawInputFallback = this._lastPointerLockRequest;
-      return await this._requestBrowserPointerLockWithOptions(requestPointerLock, undefined, false);
+      const fallbackLocked = await this._requestBrowserPointerLockWithOptions(requestPointerLock, undefined, false);
+      if (fallbackLocked || this._browserPointerLockElement() === this._pointerLockTarget()) {
+        this._pointerLockRawInputActive = false;
+        return true;
+      }
+      this._pointerLockRawInputActive = null;
+      return false;
     } catch (err) {
       this._finishPointerLockRequest("exception", err);
       if (this.onPointerLockError) this.onPointerLockError(err);
@@ -617,8 +629,9 @@ export class Input {
 
   exitPointerLock() {
     const mode = this._cursorLockMode;
-    void exitCursorLock(mode, () => this._exitBrowserPointerLock()).catch((err) => {
+    return exitCursorLock(mode, () => this._exitBrowserPointerLock()).catch((err) => {
       if (this.onPointerLockError) this.onPointerLockError(err);
+      return false;
     });
   }
 
@@ -631,6 +644,10 @@ export class Input {
 
   togglePointerLock() {
     return this.pointerLocked ? (this.exitPointerLock(), Promise.resolve(false)) : this.requestPointerLock();
+  }
+
+  pointerLockRawInputDegraded() {
+    return this.pointerLocked && this._pointerLockRawInputActive === false;
   }
 
   _handlePointerLockChange() {
@@ -647,6 +664,7 @@ export class Input {
       this.mouse = this._clampViewportPoint(this.mouse || this._viewportCenter());
       this._setPointerLockCursor(this.mouse);
     } else {
+      this._pointerLockRawInputActive = null;
       this.mouse = null;
       this._panDrag = null;
       if (this._drag) {

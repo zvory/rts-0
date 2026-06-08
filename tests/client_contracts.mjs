@@ -358,6 +358,8 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
   assert(requests[0]?.unadjustedMovement === true, "first Pointer Lock request asks for unadjusted movement");
   assert(requests[1] === undefined, "second Pointer Lock request is the plain fallback");
   assert(rawFallbackInput._lastPointerLockRequest.rawInputRequested === false, "fallback request records plain Pointer Lock");
+  rawFallbackInput.pointerLocked = true;
+  assert(rawFallbackInput.pointerLockRawInputDegraded(), "plain fallback lock is marked raw-input degraded");
 }
 
 {
@@ -381,6 +383,8 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
   assert(await rawSuccessInput._requestBrowserPointerLock(), "Pointer Lock succeeds with raw input");
   assert(rawSuccessRequests.length === 1, "raw Pointer Lock success does not make a fallback request");
   assert(rawSuccessInput._lastPointerLockRequest.rawInputRequested === true, "raw request is recorded for diagnostics");
+  rawSuccessInput.pointerLocked = true;
+  assert(!rawSuccessInput.pointerLockRawInputDegraded(), "raw Pointer Lock is not marked degraded");
 }
 
 {
@@ -423,6 +427,94 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
   assert(painted.style.transform === undefined, "locked mousemove defers virtual cursor paint");
   lockedMoveInput._flushPointerLockCursor();
   assert(painted.style.transform === "translate(13px, 16px)", "virtual cursor paint flushes once per frame");
+}
+
+{
+  const priorWindow = globalThis.window;
+  const priorDocument = globalThis.document;
+  const fallbackElement = {
+    contains() { return true; },
+    addEventListener() {},
+    removeEventListener() {},
+    setAttribute() {},
+    querySelectorAll() { return []; },
+    hidden: false,
+    disabled: false,
+    textContent: "",
+    title: "",
+  };
+  globalThis.window = {
+    location: { protocol: "http:", host: "localhost", search: "" },
+    localStorage: { getItem() { return null; } },
+    setTimeout(fn) {
+      fn();
+      return 1;
+    },
+  };
+  globalThis.document = {
+    hidden: false,
+    hasFocus() { return true; },
+    getElementById() { return fallbackElement; },
+    createElement() { return { classList: { add() {} }, appendChild() {}, style: {} }; },
+  };
+  const { Match } = await import("../client/src/match.js");
+
+  const policyMatch = Object.create(Match.prototype);
+  policyMatch.input = {
+    pointerLocked: true,
+    pointerLockSupported: () => true,
+    desktopRuntime: () => false,
+    pointerLockRawInputDegraded: () => true,
+  };
+  policyMatch.autoPointerLockUntil = 0;
+  policyMatch.lastRawPointerLockRetryAt = performance.now() - 2000;
+  policyMatch.pointerLockRetryToken = 0;
+  let requestedRetry = null;
+  policyMatch.runPointerLockRetryBurst = (token, maxAttempts, opts) => {
+    requestedRetry = { token, maxAttempts, opts };
+    return Promise.resolve();
+  };
+  policyMatch.requestAutomaticPointerLock({ requireGesture: true });
+  assert(requestedRetry?.opts?.forceRawRetry === true, "gesture reacquire retries degraded raw Pointer Lock");
+  assert(requestedRetry.maxAttempts === 1, "degraded raw retry uses one unlock/relock attempt per gesture");
+
+  requestedRetry = null;
+  policyMatch.requestAutomaticPointerLock({ requireGesture: true });
+  assert(requestedRetry === null, "degraded raw retry is cooldown-limited");
+
+  policyMatch.lastRawPointerLockRetryAt = performance.now() - 2000;
+  policyMatch.input.pointerLockRawInputDegraded = () => false;
+  policyMatch.requestAutomaticPointerLock({ requireGesture: true });
+  assert(requestedRetry === null, "raw Pointer Lock does not churn an already good lock");
+
+  const retryMatch = Object.create(Match.prototype);
+  retryMatch.running = true;
+  retryMatch.input = {
+    pointerLocked: true,
+    _degraded: true,
+    pointerLockSupported: () => true,
+    desktopRuntime: () => false,
+    pointerLockRawInputDegraded() { return this._degraded; },
+    async exitPointerLock() {
+      this.pointerLocked = false;
+    },
+    async requestPointerLock() {
+      this.pointerLocked = true;
+      this._degraded = false;
+      return true;
+    },
+  };
+  retryMatch.autoPointerLockUntil = 0;
+  retryMatch.pointerLockRetryToken = 7;
+  retryMatch.waitPointerLockRetryDelay = async () => {};
+  await retryMatch.runPointerLockRetryBurst(7, 1, { forceRawRetry: true });
+  assert(retryMatch.pointerLockRetry.stopped === "locked", "raw retry unlocks and relocks when fallback was degraded");
+  assert(!retryMatch.input.pointerLockRawInputDegraded(), "raw retry can leave the lock in a non-degraded state");
+
+  if (priorWindow === undefined) delete globalThis.window;
+  else globalThis.window = priorWindow;
+  if (priorDocument === undefined) delete globalThis.document;
+  else globalThis.document = priorDocument;
 }
 
 {
