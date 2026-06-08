@@ -9,13 +9,13 @@ use std::collections::{BTreeMap, HashMap};
 use std::process;
 use std::time::{Duration, Instant};
 
+use crate::game::{Game, PlayerInit};
+use crate::lobby::compact_snapshot_for_wire;
+use crate::perf;
+use crate::protocol::{serialize_compact_snapshot, Event};
 use rand::rngs::SmallRng;
 use rand::SeedableRng;
 use rts_ai::{AiController, AiThinkContext};
-use rts_server::game::{Game, PlayerInit};
-use rts_server::lobby::compact_snapshot_for_wire;
-use rts_server::perf;
-use rts_server::protocol::{serialize_compact_snapshot, Event};
 use tracing_subscriber::EnvFilter;
 
 const DEFAULT_SEED: u32 = 0;
@@ -222,7 +222,7 @@ impl CountSeries {
     }
 }
 
-fn main() {
+pub fn run_from_env() {
     let Some(config) = parse_args_or_exit() else {
         return;
     };

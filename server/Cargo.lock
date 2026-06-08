@@ -623,6 +623,7 @@ name = "rts-ai"
 version = "0.1.0"
 dependencies = [
  "rand 0.8.6",
+ "rayon",
  "rts-contract",
  "rts-protocol",
  "rts-rules",
@@ -658,7 +659,6 @@ dependencies = [
  "axum",
  "futures-util",
  "rand 0.8.6",
- "rayon",
  "rts-ai",
  "rts-contract",
  "rts-protocol",
