@@ -6,6 +6,7 @@ WORKDIR /app
 # at compile time. It stays in the builder layer and is never shipped to runtime.
 COPY .git .git
 COPY server/Cargo.toml server/Cargo.lock server/build.rs ./server/
+COPY server/crates ./server/crates
 COPY server/src ./server/src
 COPY server/assets ./server/assets
 COPY client ./client
