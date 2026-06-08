@@ -123,6 +123,18 @@ export function _tankMotionVisual(e, facing, state, body) {
   return { leftPhase, rightPhase, leftDir, rightDir, activity, lowOil, oilStarved };
 }
 
+function workerIsBusy(e) {
+  return e.kind === KIND.WORKER && (e.latchedNode || e.state === STATE.BUILD);
+}
+
+function drawWorkerBusyIndicator(g, r) {
+  g.lineStyle(2, 0xf2d16b, 0.95);
+  g.moveTo(-r * 0.55, -r * 1.15);
+  g.lineTo(-r * 0.2, -r * 1.45);
+  g.lineTo(r * 0.2, -r * 1.45);
+  g.lineTo(r * 0.55, -r * 1.15);
+}
+
 export function _drawUnit(e, colorByOwner, state, pools = {}) {
   const shadowPool = pools.shadow || "unitShadows";
   const unitPool = pools.unit || "units";
@@ -199,14 +211,7 @@ export function _drawUnit(e, colorByOwner, state, pools = {}) {
       -r * 0.85, -r * 0.25,
     ]);
     g.endFill();
-    // Latched miners get a small clamp marker above the unit.
-    if (e.latchedNode) {
-      g.lineStyle(2, 0xf2d16b, 0.95);
-      g.moveTo(-r * 0.55, -r * 1.15);
-      g.lineTo(-r * 0.2, -r * 1.45);
-      g.lineTo(r * 0.2, -r * 1.45);
-      g.lineTo(r * 0.55, -r * 1.15);
-    }
+    if (workerIsBusy(e)) drawWorkerBusyIndicator(g, r);
   }
 
   // Facing indicator: a short pale tick from center outward.
