@@ -44,8 +44,12 @@ export function _handleKeyDown(ev) {
 
   if (ev.repeat) return;
   if (this._handleControlGroupHotkey(ev)) return;
-  if (this._activateCommandHotkey(ev)) {
-    if (this.state.commandTarget && typeof this.state.holdCommandTarget === "function") {
+  const commandHotkey = this._activateCommandHotkey(ev);
+  if (commandHotkey) {
+    if (commandHotkey.armed?.quickCast) {
+      this._quickCastCommandTarget(ev);
+    }
+    if (ev.shiftKey && this.state.commandTarget && typeof this.state.holdCommandTarget === "function") {
       this.state.holdCommandTarget(this.state.commandTarget, ev.code, ev.shiftKey);
     }
     return;
@@ -53,8 +57,10 @@ export function _handleKeyDown(ev) {
 
   switch (ev.code) {
     case "KeyA":
-      this._enterAttackMove();
-      if (this.state.commandTarget === "attack" && typeof this.state.holdCommandTarget === "function") {
+      if (this._enterAttackMove({ shiftKey: ev.shiftKey })?.quickCast) {
+        this._quickCastCommandTarget(ev);
+      }
+      if (ev.shiftKey && this.state.commandTarget === "attack" && typeof this.state.holdCommandTarget === "function") {
         this.state.holdCommandTarget("attack", "KeyA", ev.shiftKey);
       }
       ev.preventDefault();

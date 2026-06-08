@@ -1731,6 +1731,99 @@ function fakeAudioContext() {
   targetedInput.state.commandComposer.hold("attack", "KeyA");
   targetedInput._handleKeyUp({ code: "KeyA", preventDefault() {} });
   assert(targetedInput.state.commandTarget === null, "A keyup exits sticky attack targeting");
+
+  const originalDocument = globalThis.document;
+  const hotkeyTargetedInput = Object.create(Input.prototype);
+  const hotkeyIssues = [];
+  hotkeyTargetedInput.mouse = { x: 420, y: 260 };
+  hotkeyTargetedInput._handleControlGroupHotkey = () => false;
+  hotkeyTargetedInput._quickCastCommandTarget = (ev) => {
+    hotkeyIssues.push({ shiftKey: !!ev.shiftKey, mouse: hotkeyTargetedInput.mouse });
+    return Input.prototype._quickCastCommandTarget.call(hotkeyTargetedInput, ev);
+  };
+  hotkeyTargetedInput._issueTargetedCommand = (p, ev) => {
+    hotkeyIssues.push({ issuedAt: p, queued: !!ev.shiftKey });
+  };
+  hotkeyTargetedInput.state = {
+    commandTarget: null,
+    commandComposer: new CommandComposer(),
+    lastCommandTargetArm: null,
+    beginCommandTarget(kind, options = {}) {
+      const armed = this.commandComposer.arm(kind, options);
+      this.lastCommandTargetArm = armed;
+      this.commandTarget = this.commandComposer.target;
+      return armed;
+    },
+    endCommandTarget() {
+      this.commandComposer.cancel();
+      this.commandTarget = null;
+      this.lastCommandTargetArm = null;
+    },
+    issueCommandTarget(ev = {}) {
+      const issued = this.commandComposer.issue(ev);
+      this.commandTarget = this.commandComposer.target;
+      return issued;
+    },
+    holdCommandTarget(kind, key, shiftKey = false) {
+      this.commandComposer.hold(kind, key, { shiftKey });
+      this.commandTarget = this.commandComposer.target;
+    },
+    releaseCommandTargetKey(key, shiftKey = false) {
+      this.commandComposer.releaseKey(key, { shiftKey });
+      this.commandTarget = this.commandComposer.target;
+    },
+    releaseCommandTargetShift() {
+      this.commandComposer.releaseShift();
+      this.commandTarget = this.commandComposer.target;
+    },
+  };
+  globalThis.document = {
+    getElementById(id) {
+      assert(id === "command-card", "command hotkeys should query the command card");
+      return {
+        querySelectorAll(selector) {
+          assert(selector === "button[data-hotkey]", "command hotkeys should query hotkey buttons");
+          return [{
+            dataset: { hotkey: "A" },
+            disabled: false,
+            click() {
+              hotkeyTargetedInput.state.beginCommandTarget("attack", { now: 100 + hotkeyIssues.length * 100 });
+            },
+          }];
+        },
+      };
+    },
+  };
+  hotkeyTargetedInput._handleKeyDown(keyEvent("KeyA"));
+  hotkeyTargetedInput._handleKeyUp({ code: "KeyA", shiftKey: false, preventDefault() {} });
+  assert(
+    hotkeyTargetedInput.state.commandTarget === "attack",
+    "plain targeted-order hotkey tap should stay armed after keyup",
+  );
+  hotkeyTargetedInput._handleKeyDown(keyEvent("KeyA"));
+  assert(
+    hotkeyIssues.some((entry) => entry.issuedAt === hotkeyTargetedInput.mouse && entry.queued === false),
+    "second same targeted-order hotkey should quick-cast at the cursor",
+  );
+  assert(
+    hotkeyTargetedInput.state.commandTarget === null,
+    "unqueued quick-cast should consume the armed targeted order",
+  );
+
+  hotkeyTargetedInput._handleKeyDown(keyEvent("KeyA", { shiftKey: true }));
+  hotkeyTargetedInput._handleKeyDown(keyEvent("KeyA", { shiftKey: true }));
+  assert(
+    hotkeyIssues.some((entry) => entry.issuedAt === hotkeyTargetedInput.mouse && entry.queued === true),
+    "Shift double-tap targeted-order hotkey should quick-cast a queued order at the cursor",
+  );
+  assert(
+    hotkeyTargetedInput.state.commandTarget === "attack",
+    "Shift quick-cast should keep the targeted order armed until Shift is released",
+  );
+  hotkeyTargetedInput._handleKeyUp({ code: "KeyA", shiftKey: true, preventDefault() {} });
+  hotkeyTargetedInput._handleKeyUp({ code: "ShiftLeft", preventDefault() {} });
+  assert(hotkeyTargetedInput.state.commandTarget === null, "Shift release clears the queued hotkey target");
+  globalThis.document = originalDocument;
 }
 
 // ---------------------------------------------------------------------------

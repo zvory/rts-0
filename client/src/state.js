@@ -98,6 +98,8 @@ export class GameState {
     /** @type {null | "move" | "attack" | "setupAtGuns"} */
     this.commandTarget = null;
     this.commandComposer = new CommandComposer();
+    /** @type {null | {quickCast:boolean,target:string|object,queued:boolean}} */
+    this.lastCommandTargetArm = null;
     /** @type {Array<{kind:string,x:number,y:number,append:boolean,createdAt:number}>} */
     this.commandFeedback = [];
     /** @type {null | {resourceId:number, resourceX:number, resourceY:number, ccId:number, ccX:number, ccY:number, inRange:boolean}} */
@@ -577,6 +579,7 @@ export class GameState {
   openWorkerBuildMenu() {
     this.placement = null;
     this.commandTarget = null;
+    this.lastCommandTargetArm = null;
     this.atGunSetupPreview = null;
     this.commandCardMode = "workerBuild";
   }
@@ -598,6 +601,7 @@ export class GameState {
    */
   beginPlacement(buildingKind) {
     this.commandTarget = null;
+    this.lastCommandTargetArm = null;
     this.closeCommandCardMenu();
     this.placement = { building: buildingKind, tileX: 0, tileY: 0, valid: false };
   }
@@ -627,16 +631,19 @@ export class GameState {
    * Arm a one-click command target mode from the HUD.
    * @param {"move"|"attack"|"setupAtGuns"|{kind:"ability",ability:string}} kind
    */
-  beginCommandTarget(kind) {
+  beginCommandTarget(kind, options = {}) {
     this.placement = null;
     this.closeCommandCardMenu();
-    this.commandComposer.arm(kind);
+    const armed = this.commandComposer.arm(kind, options);
+    this.lastCommandTargetArm = armed;
     this._syncCommandTargetFromComposer();
+    return armed;
   }
 
   /** Clear any armed command target mode. */
   endCommandTarget() {
     this.commandComposer.cancel();
+    this.lastCommandTargetArm = null;
     this._syncCommandTargetFromComposer();
   }
 

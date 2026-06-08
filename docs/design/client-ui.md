@@ -146,7 +146,10 @@ the building's single rally point; Shift does not create rally stages.
 
 `input/command_composer.js` owns command-target arming lifetime for command-card targets. Input and
 minimap clicks call `GameState.issueCommandTarget`, so held keys, Shift preservation, and repeated
-queued target clicks use one composer path instead of command-specific sticky flags.
+queued target clicks use one composer path instead of command-specific sticky flags. A plain
+targeted-order hotkey tap arms the target after keyup; pressing the same targeted-order hotkey again
+inside the quick-cast window issues it at the current cursor world point. Shift does the same with
+`queued: true` and keeps the target armed until Shift is released.
 
 `input/router.js`
 ```js

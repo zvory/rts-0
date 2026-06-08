@@ -288,15 +288,30 @@ export function _activateCommandHotkey(ev) {
     if ((btn.dataset.hotkey || "").toUpperCase() !== key) continue;
     ev.preventDefault();
     if (!btn.disabled) btn.click();
-    return true;
+    return {
+      handled: true,
+      armed: this.state.lastCommandTargetArm || null,
+    };
   }
   return false;
 }
 
-export function _enterAttackMove() {
+export function _enterAttackMove(options = {}) {
   // Only meaningful when own units are selected; otherwise it's a no-op arming.
   if (this._selectedOwnUnitIds().length === 0) return;
-  this.state.beginCommandTarget("attack");
+  return this.state.beginCommandTarget("attack", options);
+}
+
+export function _quickCastCommandTarget(ev = {}) {
+  if (!this.state.commandTarget || !this.mouse) return false;
+  this._issueTargetedCommand(this.mouse, ev);
+  const issued = typeof this.state.issueCommandTarget === "function"
+    ? this.state.issueCommandTarget(ev)
+    : { keepArmed: false };
+  if (!issued.keepArmed) {
+    this.state.endCommandTarget();
+  }
+  return true;
 }
 
 export function _issueStop() {
