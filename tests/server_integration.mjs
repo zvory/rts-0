@@ -52,7 +52,11 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   await A.waitFor((m) => m.t === "welcome", 3000, "A welcome");
   ok(A.playerId != null, `A got welcome playerId=${A.playerId}`);
   A.send({ t: "join", name: "Alpha", room: ROOM });
-  await A.waitFor((m) => m.t === "lobby", 3000, "A lobby");
+  const initialLobby = await A.waitFor((m) => m.t === "lobby", 3000, "A lobby");
+  ok(Array.isArray(initialLobby.maps) && initialLobby.maps.length >= 1,
+     `lobby exposes at least one selectable map (${initialLobby.maps?.join(",")})`);
+  ok(initialLobby.maps.includes(initialLobby.map),
+     `selected map is present in selectable maps (${initialLobby.map})`);
 
   const B = new Client("B"); await B.open();
   await B.waitFor((m) => m.t === "welcome", 3000, "B welcome");
