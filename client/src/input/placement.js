@@ -42,6 +42,7 @@ export function entityIntersectsRect(e, minX, minY, maxX, maxY, tileSize) {
     halfH = ((stat.footH ? stat.footH : 1) * tileSize) / 2;
     return e.x + halfW > minX && e.x - halfW < maxX && e.y + halfH > minY && e.y - halfH < maxY;
   } else {
+    if (e.kind === KIND.AT_TEAM) return bodyCircleIntersectsRect(e, minX, minY, maxX, maxY, 0);
     if (isVehicleBodyKind(e.kind)) return orientedVehicleIntersectsRect(e, minX, minY, maxX, maxY, 0);
     const radius = stat.size ? stat.size : 0;
     const nearestX = Math.min(Math.max(e.x, minX), maxX);
@@ -124,6 +125,26 @@ export function orientedVehicleIntersectsRect(e, minX, minY, maxX, maxY, pad) {
   return orientedBoxIntersectsRect(body, minX, minY, maxX, maxY);
 }
 
+export function pointHitsBodyCircle(e, wx, wy, pad) {
+  const radius = circularBodyRadius(e) + pad;
+  return Math.hypot(wx - e.x, wy - e.y) <= radius;
+}
+
+export function bodyCircleIntersectsRect(e, minX, minY, maxX, maxY, pad) {
+  const radius = circularBodyRadius(e) + pad;
+  const nearestX = Math.min(Math.max(e.x, minX), maxX);
+  const nearestY = Math.min(Math.max(e.y, minY), maxY);
+  const dx = e.x - nearestX;
+  const dy = e.y - nearestY;
+  return dx * dx + dy * dy <= radius * radius;
+}
+
+export function circularBodyRadius(e) {
+  const body = STATS[e.kind]?.body;
+  if (body) return body.width * 0.5 + (body.clearance || 0);
+  return STATS[e.kind]?.size || 0;
+}
+
 export function vehicleBody(e, pad) {
   const stat = STATS[e.kind];
   const body = (stat && stat.body) || TANK_BODY;
@@ -139,7 +160,7 @@ export function vehicleBody(e, pad) {
 }
 
 export function isVehicleBodyKind(kind) {
-  return kind === KIND.AT_TEAM || kind === KIND.TANK || kind === KIND.SCOUT_CAR;
+  return kind === KIND.TANK || kind === KIND.SCOUT_CAR;
 }
 
 export function orientedBoxIntersectsRect(body, minX, minY, maxX, maxY) {

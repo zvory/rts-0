@@ -1,7 +1,12 @@
 import { isUnit, isBuilding, isResource, KIND, SETUP } from "../protocol.js";
 import { STATS } from "../config.js";
 import { DEFAULT_HIT_RADIUS, DEFAULT_TILE_SIZE, HIT_PAD_PX, OWN_HIT_BONUS } from "./constants.js";
-import { entityIntersectsRect, isVehicleBodyKind, pointHitsOrientedVehicle } from "./placement.js";
+import {
+  entityIntersectsRect,
+  isVehicleBodyKind,
+  pointHitsBodyCircle,
+  pointHitsOrientedVehicle,
+} from "./placement.js";
 
 export function _commitClickSelection(p, additive, ctrl) {
   const world = this._worldAt(p.x, p.y);
@@ -193,6 +198,7 @@ export function _worldPointHitsEntity(e, wx, wy, tileSize) {
       wy <= e.y + halfH + HIT_PAD_PX
     );
   }
+  if (e.kind === KIND.AT_TEAM) return pointHitsBodyCircle(e, wx, wy, HIT_PAD_PX);
   if (isVehicleBodyKind(e.kind)) return pointHitsOrientedVehicle(e, wx, wy, HIT_PAD_PX);
   const radius = (stat && stat.size ? stat.size : DEFAULT_HIT_RADIUS) + HIT_PAD_PX;
   return Math.hypot(wx - e.x, wy - e.y) <= radius;

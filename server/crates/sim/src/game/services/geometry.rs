@@ -161,6 +161,15 @@ pub(crate) fn unit_body_with_facing(
         return None;
     }
 
+    if kind == EntityKind::AtTeam {
+        let (_, width, clearance) = vehicle_body_dimensions(kind);
+        return Some(UnitBody::Circle(CircleBody {
+            x,
+            y,
+            radius: width * 0.5 + clearance,
+        }));
+    }
+
     if kind == EntityKind::ScoutCar {
         let (length, width, clearance) = vehicle_body_dimensions(kind);
         let radius = width * 0.5 + clearance;
