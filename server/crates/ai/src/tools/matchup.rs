@@ -7,7 +7,7 @@
 use std::path::PathBuf;
 use std::process;
 
-use rts_server::ai::selfplay::{
+use crate::selfplay::{
     available_profile_ids, canonical_profile_id, run_profile_matchup_result, ProfileMatchupOptions,
     ProfileMatchupResult,
 };
@@ -32,7 +32,7 @@ struct CliConfig {
     output_format: OutputFormat,
 }
 
-fn main() {
+pub fn run_from_env() {
     let Some(config) = parse_args_or_exit() else {
         return;
     };

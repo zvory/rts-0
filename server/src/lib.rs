@@ -9,6 +9,7 @@ pub mod dev_scenarios;
 pub mod lobby;
 pub mod perf;
 pub mod protocol;
+pub mod tools;
 
 pub use rts_ai as ai;
 pub use rts_sim::game;

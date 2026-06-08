@@ -15,19 +15,19 @@ path = "src/main.rs"
 
 [[bin]]
 name = "ai-matchup"
-path = "src/ai_matchup.rs"
+path = "src/bin/ai_matchup.rs"
 test = false
 bench = false
 
 [[bin]]
 name = "ai-balance-matrix"
-path = "src/ai_balance_matrix.rs"
+path = "src/bin/ai_balance_matrix.rs"
 test = false
 bench = false
 
 [[bin]]
 name = "ai-perf-harness"
-path = "src/ai_perf_harness.rs"
+path = "src/bin/ai_perf_harness.rs"
 test = false
 bench = false
 
@@ -46,7 +46,6 @@ futures-util = { version = "0.3", default-features = false, features = ["sink", 
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 rand = { version = "0.8", features = ["small_rng"] }
-rayon = "1"
 
 [profile.release]
 opt-level = 3

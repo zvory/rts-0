@@ -5,6 +5,7 @@
 
 pub mod ai_core;
 pub mod selfplay;
+pub mod tools;
 
 mod ai_shared;
 mod config {

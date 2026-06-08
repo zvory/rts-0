@@ -8,11 +8,11 @@
 use std::path::PathBuf;
 use std::process;
 
-use rayon::prelude::*;
-use rts_server::ai::selfplay::{
+use crate::selfplay::{
     available_profile_ids, canonical_profile_id, run_profile_matchup_result, ProfileMatchupOptions,
     ProfileMatchupResult,
 };
+use rayon::prelude::*;
 
 const DEFAULT_SEEDS: u32 = 5;
 const DEFAULT_TICKS: u32 = 20_000;
@@ -46,7 +46,7 @@ struct MatchupAggregate {
     buildings_b_total: u64,
 }
 
-fn main() {
+pub fn run_from_env() {
     let Some(config) = parse_args_or_exit() else {
         return;
     };
