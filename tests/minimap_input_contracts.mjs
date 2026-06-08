@@ -2,6 +2,7 @@
 // These cover the pointer-lock virtual-cursor path without launching a browser.
 
 import { MatchInputRouter } from "../client/src/input/router.js";
+import { CommandComposer } from "../client/src/input/command_composer.js";
 import { Minimap } from "../client/src/minimap.js";
 import { KIND } from "../client/src/protocol.js";
 
@@ -71,7 +72,7 @@ function minimapHarness({ selected = [], commandTarget = null } = {}) {
   const state = {
     playerId: 1,
     commandTarget,
-    attackTargetKeyHeld: false,
+    commandComposer: new CommandComposer(),
     map: {
       width: 242,
       height: 242,
@@ -84,7 +85,13 @@ function minimapHarness({ selected = [], commandTarget = null } = {}) {
     },
     endCommandTarget() {
       endedTargets.push(this.commandTarget);
+      this.commandComposer.cancel();
       this.commandTarget = null;
+    },
+    issueCommandTarget(ev = {}) {
+      const issued = this.commandComposer.issue(ev);
+      this.commandTarget = this.commandComposer.target;
+      return issued;
     },
     addCommandFeedback(type, x, y) {
       commands.push({ feedback: type, x, y });
@@ -94,6 +101,7 @@ function minimapHarness({ selected = [], commandTarget = null } = {}) {
     },
     players: [],
   };
+  if (commandTarget) state.commandComposer.arm(commandTarget);
   const camera = {
     centerOn(x, y) {
       centers.push({ x, y });
@@ -162,20 +170,20 @@ function lockedEvent(clientX, clientY, button = 0, extra = {}) {
 {
   const selected = [{ id: 9, owner: 1, kind: KIND.RIFLEMAN }];
   const h = minimapHarness({ selected, commandTarget: "attack" });
-  assert(h.router.pointerDown(lockedEvent(150, 250, 0, { shiftKey: true })), "attack-move minimap left-click is consumed");
+  assert(h.router.pointerDown(lockedEvent(150, 250, 0)), "attack-move minimap left-click is consumed");
   assert(h.net.sent.length === 1, "attack-move minimap click sends one command");
   assert(h.net.sent[0].c === "attackMove", "attack command-target sends attack-move");
-  assert(h.net.sent[0].queued === true, "shift minimap attack target queues attack-move");
+  assert(h.net.sent[0].queued !== true, "plain minimap attack target does not queue attack-move");
   assert(h.state.commandTarget === null, "attack command-target exits after minimap click");
-  assert(h.endedTargets.length === 1 && h.endedTargets[0] === "attack", "endCommandTarget is called");
+  assert(h.endedTargets.length === 1, "endCommandTarget is called");
   h.minimap.destroy();
 }
 
-// Shift command-target clicks on the minimap stay armed while the attack hotkey is held.
+// Shift command-target clicks on the minimap stay armed while the command composer preserves it.
 {
   const selected = [{ id: 9, owner: 1, kind: KIND.RIFLEMAN }];
   const h = minimapHarness({ selected, commandTarget: "attack" });
-  h.state.attackTargetKeyHeld = true;
+  h.state.commandComposer.hold("attack", "KeyA", { shiftKey: true });
   assert(h.router.pointerDown(lockedEvent(150, 250, 0, { shiftKey: true })), "first held-A minimap attack click is consumed");
   assert(h.router.pointerDown(lockedEvent(160, 260, 0, { shiftKey: true })), "second held-A minimap attack click is consumed");
   assert(h.net.sent.length === 2, "held-A minimap targeting sends multiple commands");

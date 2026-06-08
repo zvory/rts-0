@@ -410,7 +410,7 @@ export class Minimap {
         this._issueOrder(w.x, w.y, !!ev.shiftKey);
         const issued = typeof this.state.issueCommandTarget === "function"
           ? this.state.issueCommandTarget(ev)
-          : { keepArmed: ev.shiftKey && this.state.attackTargetKeyHeld };
+          : { keepArmed: false };
         if (!issued.keepArmed) {
           this.state.endCommandTarget();
         }
