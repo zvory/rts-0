@@ -152,6 +152,34 @@ pub(crate) fn launch_world_ability(
     }
 }
 
+pub(crate) fn launch_self_ability(
+    entities: &mut EntityStore,
+    player: u32,
+    caster: u32,
+    ability: AbilityKind,
+) -> bool {
+    if !caster_can_attempt(entities, player, caster, ability)
+        || !tech_requirement_met(entities, player, ability)
+    {
+        return false;
+    }
+    let definition = ability::definition(ability);
+    if definition.target_mode != AbilityTargetMode::SelfTarget {
+        return false;
+    }
+    match ability {
+        AbilityKind::Charge => {
+            let Some(e) = entities.get_mut(caster) else {
+                return false;
+            };
+            e.start_charge(config::RIFLEMAN_CHARGE_TICKS);
+            e.start_ability_cooldown(ability, definition.cooldown_ticks);
+            true
+        }
+        AbilityKind::Smoke => false,
+    }
+}
+
 pub(crate) fn caster_can_attempt(
     entities: &EntityStore,
     player: u32,

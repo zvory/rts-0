@@ -111,7 +111,9 @@ pub enum OrderIntent {
     Attack(TargetIntent),
     Gather(GatherIntent),
     Build(BuildIntent),
-    Ability(AbilityIntent),
+    WorldAbility(AbilityIntent),
+    SelfAbility(SelfAbilityIntent),
+    SetupAtGuns(PointIntent),
 }
 
 impl OrderIntent {
@@ -140,7 +142,15 @@ impl OrderIntent {
     }
 
     pub fn ability(ability: AbilityKind, x: f32, y: f32) -> Self {
-        OrderIntent::Ability(AbilityIntent { ability, x, y })
+        OrderIntent::WorldAbility(AbilityIntent { ability, x, y })
+    }
+
+    pub fn self_ability(ability: AbilityKind) -> Self {
+        OrderIntent::SelfAbility(SelfAbilityIntent { ability })
+    }
+
+    pub fn setup_at_guns(x: f32, y: f32) -> Self {
+        OrderIntent::SetupAtGuns(PointIntent { x, y })
     }
 }
 
@@ -155,6 +165,11 @@ pub struct AbilityIntent {
     pub ability: AbilityKind,
     pub x: f32,
     pub y: f32,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct SelfAbilityIntent {
+    pub ability: AbilityKind,
 }
 
 #[derive(Debug, Clone, PartialEq)]

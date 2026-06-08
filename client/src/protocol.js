@@ -613,7 +613,8 @@ export const cmd = Object.freeze({
     withQueued({ c: CMD.ATTACK_MOVE, units, x, y }, queued),
   attack: (units, target, queued = false) =>
     withQueued({ c: CMD.ATTACK, units, target }, queued),
-  setupAtGuns: (units, x, y) => ({ c: CMD.SETUP_AT_GUNS, units, x, y }),
+  setupAtGuns: (units, x, y, queued = false) =>
+    withQueued({ c: CMD.SETUP_AT_GUNS, units, x, y }, queued),
   tearDownAtGuns: (units) => ({ c: CMD.TEAR_DOWN_AT_GUNS, units }),
   charge: (units) => ({ c: CMD.CHARGE, units }),
   useAbility: (ability, units, x = null, y = null, queued = false) => {

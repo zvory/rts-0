@@ -82,8 +82,9 @@ export function _issueTargetedCommand(p, ev = {}) {
   if (this.state.commandTarget === "setupAtGuns") {
     const atGuns = this._selectedOwnAtGunIds();
     if (atGuns.length > 0) {
-      this.net.command(cmd.setupAtGuns(atGuns, world.x, world.y));
-      this.state.addCommandFeedback("move", world.x, world.y);
+      const queued = !!ev.shiftKey;
+      this.net.command(cmd.setupAtGuns(atGuns, world.x, world.y, queued));
+      this.state.addCommandFeedback("move", world.x, world.y, queued);
     }
     return;
   }
