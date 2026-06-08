@@ -33,6 +33,32 @@
 - The same Rust process serves the static client files, so development is a single
   `cargo run` and then open the printed local URL.
 
+### Workspace crate boundaries
+
+The Rust server workspace is split by dependency direction. Lower crates must not depend on higher
+crates:
+
+```
+rts-server  -> rts-ai, rts-sim, rts-rules, rts-protocol, rts-contract
+rts-ai      -> rts-sim, rts-rules, rts-protocol, rts-contract
+rts-sim     -> rts-rules, rts-protocol, rts-contract
+rts-protocol -> rts-contract
+rts-rules
+rts-contract
+```
+
+`rts-server` is the only crate that may own Axum/Tokio WebSocket/static-file serving and lobby room
+tasks. `rts-sim` owns `Game`, tick systems, deterministic replay, map/fog/entity state, and
+simulation perf accounting without importing server transport. `rts-ai` owns live controllers and
+self-play harnesses and drives the sim only by observing snapshots and enqueueing ordinary
+`SimCommand`s. `rts-rules` owns pure vocabulary, balance data, terrain, economy, and combat
+formulas. `rts-protocol` owns serde wire DTOs and compact snapshot transport. `rts-contract` owns
+shared semantic DTOs that are below the wire and sim layers.
+
+`scripts/check-crate-boundaries.mjs` enforces the implemented Cargo package graph and rejects
+server-only imports in lower crates. Any intentional graph change must update this section, the
+script, and the affected context capsule in the same change.
+
 ### Tick & networking model
 - `TICK_HZ = 30` (~33 ms per simulated tick).
 - The server broadcasts a snapshot every `SNAPSHOT_EVERY_N_TICKS` ticks (default 1 →

@@ -2,8 +2,15 @@
 
 All messages are JSON objects with a `t` field (the discriminator/tag). Field names are
 short but readable. Coordinates are **world pixels** (floats) unless a field name ends in
-`Tile`. The canonical definitions live in `server/src/protocol.rs` (serde) and
-`client/src/protocol.js` (builders + constants). These two files MUST agree.
+`Tile`. The canonical Rust definitions live in `server/crates/protocol/src/lib.rs`; the
+server-shell `server/src/protocol.rs` is an adapter for typed entity-kind conversion and legacy
+imports. The browser mirror lives in `client/src/protocol.js` (builders + constants). Rust and JS
+MUST agree on every tag, field name, and compact transport shape.
+
+`rts-protocol` may depend on `rts-contract` but must not depend on `rts-sim`, `rts-rules`,
+`rts-ai`, or `rts-server`. Domain kind conversion that needs `EntityKind` belongs in an adapter
+layer such as `server/src/protocol.rs` or `server/crates/sim/src/protocol.rs`, not in the wire DTO
+crate.
 
 ### 2.1 Client → Server (`ClientMessage`)
 

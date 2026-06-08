@@ -1,6 +1,6 @@
 # Phase 6 - Test Selection, CI Policy, and Documentation Lock-In
 
-Status: Planned.
+Status: Implemented.
 
 Goal: turn the crate split into enforceable development policy and reliable test-selection rules.
 
@@ -62,3 +62,14 @@ end-to-end tests even if only one package changed.
 - Temporary migration shims are gone or explicitly tracked.
 - Test-selection policy is written down and wired into local/CI scripts where practical.
 
+## Implementation Notes
+
+- Added `scripts/check-crate-boundaries.mjs` to enforce the implemented Cargo package graph and
+  reject server-only imports from lower crates.
+- Added `tests/select-suites.mjs` to document changed-file to suite mapping and verify representative
+  mappings in the local gate.
+- Wired both policy checks into `tests/run-all.sh` and Rust CI.
+- Removed the `server/src/perf.rs` passthrough shim; `rts-server` now re-exports `rts_sim::perf`
+  directly.
+- Left protocol/config adapter shims in place because they still own typed conversion or local
+  compatibility call sites; docs now track them explicitly.
