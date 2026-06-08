@@ -122,14 +122,10 @@ authoritative `rules::defs` records.
   actively harvesting that node, so death / re-order / retarget free it automatically.
 - Starting layout: each base site gets 18 steel patches and 3 oil patches. `baseSites` are stored
   as interleaved pairs: `[start0, expansion0, start1, expansion1, ...]`. The pairs are shuffled
-  by the match seed, and the first N shuffled starts become the active player starts. For one-,
-  three-, and four-player games, each selected start keeps its authored paired neutral expansion.
-  For two-player games, the two neutral expansion sites are selected from the authored expansion
-  pool by scoring each assignment in the players' local start-to-enemy frames; this favors matching
-  forward/lateral offsets and natural distance, avoiding one player receiving a shared middle
-  natural while the other receives a side natural. Sites not selected as an active start or active
-  expansion are unused, giving exactly 2N active bases on the map. Shuffling stops the lobby seat
-  order from pinning the human/AI to the same corner every match.
+  by the match seed, and the first N shuffled starts become the active player starts. Each selected
+  start always keeps its authored paired neutral expansion. Sites not selected as an active start
+  or active expansion are unused, giving exactly 2N active bases on the map. Shuffling stops the
+  lobby seat order from pinning the human/AI to the same corner every match.
 
 Unit stats (hp, dmg, range[tiles], cooldown[ticks], speed[px/tick], sight[tiles], cost, supply, buildTicks):
 
