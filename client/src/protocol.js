@@ -181,6 +181,7 @@ export const ORDER_STAGE = Object.freeze({
   GATHER: "gather",
   BUILD: "build",
   SMOKE: "smoke",
+  SETUP_AT_GUNS: "setupAtGuns",
 });
 
 export const ORDER_STAGE_CODE = Object.freeze({
@@ -190,6 +191,7 @@ export const ORDER_STAGE_CODE = Object.freeze({
   [ORDER_STAGE.GATHER]: 4,
   [ORDER_STAGE.BUILD]: 5,
   [ORDER_STAGE.SMOKE]: 6,
+  [ORDER_STAGE.SETUP_AT_GUNS]: 7,
 });
 
 export const ABILITY_CODE = Object.freeze({
