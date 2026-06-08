@@ -179,6 +179,7 @@ export function _drawOrderPlan(state) {
 
 export function _drawDebugPathOverlay(state, entities = null) {
   if (!state || typeof state.selectedEntities !== "function") return;
+  if (!state.debugPathOverlaysEnabled) return;
   const g = this._feedbackGfx;
   const pathColor = 0x33d6ff;
   const currentColor = 0xffe066;

@@ -306,6 +306,7 @@ mod tests {
         StartPayload {
             player_id: 1,
             spectator: false,
+            debug_mode: false,
             tick: 0,
             map: MapInfo {
                 width: 64,

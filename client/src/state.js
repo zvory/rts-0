@@ -81,6 +81,10 @@ export class GameState {
     // --- selection (client-only) ---
     /** @type {Set<number>} */
     this.selection = new Set();
+    /** @type {boolean} true when the server says movement path diagnostics are available. */
+    this.debugPathOverlaysAvailable = !!startInfo.debugMode;
+    /** @type {boolean} local gear-menu preference for drawing movement path diagnostics. */
+    this.debugPathOverlaysEnabled = !!startInfo.debugMode;
     /** @type {boolean} true for dev viewers that should show all server debug paths. */
     this.showAllDebugPathOverlays = false;
     /** @type {Array<Array<number>>} ten local control groups, slot 9 is key 0. */

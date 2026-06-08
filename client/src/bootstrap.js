@@ -168,6 +168,7 @@ export const dom = {
   settingsButton: document.getElementById("settings-button"),
   settingsMenu: document.getElementById("settings-menu"),
   pointerLockToggle: document.getElementById("pointer-lock-toggle"),
+  debugPathToggle: document.getElementById("debug-path-toggle"),
   giveUpOpen: document.getElementById("give-up-open"),
   giveUpConfirm: document.getElementById("give-up-confirm"),
   giveUpCancel: document.getElementById("give-up-cancel"),
