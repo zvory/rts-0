@@ -1724,6 +1724,15 @@ fn active_mining_stops_when_nearby_cc_is_removed() {
     game.entities.remove(cc);
     let steel_before = game.players.iter().find(|p| p.id == 1).unwrap().steel;
 
+    game.tick();
+    assert!(
+        matches!(
+            game.entities.get(worker).map(|e| e.order()),
+            Some(Order::Move(_))
+        ),
+        "worker should scatter away when its mining City Centre disappears"
+    );
+
     for _ in 0..(config::HARVEST_TICKS + 5) {
         game.tick();
     }
@@ -1738,7 +1747,7 @@ fn active_mining_stops_when_nearby_cc_is_removed() {
             game.entities.get(worker).map(|e| e.order()),
             Some(Order::Gather(_))
         ),
-        "worker should go idle when its mining City Centre disappears"
+        "worker should not resume gathering without City Centre coverage"
     );
 }
 

@@ -111,9 +111,9 @@ authoritative `rules::defs` records.
   directly into the player's economy only if the resource node is within
   `MINING_CC_RANGE_TILES = 7.0` tiles of a completed City Centre owned by that player.
   The range matches `CC_RESOURCE_MAX_DIST_TILES`, so each starting City Centre can mine
-  every patch in its main-base cluster. If no completed City Centre is close enough, workers ignore new
-  gather orders for that patch and active miners go idle. When a patch empties the worker goes
-  idle (no automatic retarget).
+  every patch in its main-base cluster. If no completed City Centre is close enough, workers ignore
+  new gather orders for that patch and active miners scatter roughly one tile away from the patch.
+  When a patch empties the worker goes idle (no automatic retarget).
 - One worker per patch: each node has a single harvest slot (`Entity::miner`). A patch is
   occupied only after the worker reaches `GatherPhase::Harvesting`; right-clicking a patch
   does not reserve it. Extra workers that arrive while the slot is taken go idle. The slot

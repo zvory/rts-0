@@ -35,7 +35,9 @@ pub(crate) fn gather_system(
             GatherPhase::ToNode | GatherPhase::ToHome => {
                 gather_to_node(map, entities, occ, coordinator, id, node)
             }
-            GatherPhase::Harvesting => gather_harvesting(entities, players, id, node),
+            GatherPhase::Harvesting => {
+                gather_harvesting(map, entities, players, coordinator, id, node)
+            }
         }
     }
 }
@@ -98,13 +100,20 @@ fn gather_to_node(
     }
 }
 
-fn gather_harvesting(entities: &mut EntityStore, players: &mut [PlayerState], id: u32, node: u32) {
+fn gather_harvesting(
+    map: &Map,
+    entities: &mut EntityStore,
+    players: &mut [PlayerState],
+    coordinator: &mut MoveCoordinator<'_>,
+    id: u32,
+    node: u32,
+) {
     let owner = match entities.get(id) {
         Some(e) => e.owner,
         None => return,
     };
     if !world_query::resource_has_completed_mining_cc(entities, owner, node) {
-        idle_gatherer(entities, id);
+        scatter_gatherer_from_node(map, entities, coordinator, id, node);
         return;
     }
 
@@ -186,6 +195,40 @@ fn idle_gatherer(entities: &mut EntityStore, id: u32) {
     if let Some(e) = entities.get_mut(id) {
         e.clear_active_order();
     }
+}
+
+fn scatter_gatherer_from_node(
+    map: &Map,
+    entities: &mut EntityStore,
+    coordinator: &mut MoveCoordinator<'_>,
+    id: u32,
+    node: u32,
+) {
+    let Some((owner, wx, wy)) = entities.get(id).map(|e| (e.owner, e.pos_x, e.pos_y)) else {
+        return;
+    };
+    let Some((nx, ny)) = entities.get(node).map(|e| (e.pos_x, e.pos_y)) else {
+        idle_gatherer(entities, id);
+        return;
+    };
+
+    let dx = wx - nx;
+    let dy = wy - ny;
+    let len = (dx * dx + dy * dy).sqrt();
+    let (ux, uy) = if len > 0.001 {
+        (dx / len, dy / len)
+    } else {
+        let angle = (id as f32 * 2.399_963_1).rem_euclid(std::f32::consts::TAU);
+        (angle.cos(), angle.sin())
+    };
+    let step = config::TILE_SIZE as f32;
+    let max = (map.world_size_px() - 1.0).max(0.0);
+    let goal = (
+        (wx + ux * step).clamp(0.0, max),
+        (wy + uy * step).clamp(0.0, max),
+    );
+
+    coordinator.order_group_move(entities, owner, &[id], goal, false);
 }
 
 #[cfg(test)]
