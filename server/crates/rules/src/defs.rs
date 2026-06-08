@@ -220,7 +220,7 @@ pub const BUILDINGS: &[BuildingDef] = &[
     BuildingDef {
         kind: EntityKind::Depot,
         stats: balance::BuildingStats {
-            hp: 220,
+            hp: 110,
             sight_tiles: 4,
             cost_steel: 100,
             cost_oil: 0,
@@ -240,7 +240,7 @@ pub const BUILDINGS: &[BuildingDef] = &[
     BuildingDef {
         kind: EntityKind::Barracks,
         stats: balance::BuildingStats {
-            hp: 320,
+            hp: 165,
             sight_tiles: 6,
             cost_steel: 150,
             cost_oil: 0,
@@ -387,5 +387,17 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn depot_and_barracks_hp_keep_requested_ratio() {
+        let depot_hp = building_def(EntityKind::Depot).expect("depot def").stats.hp;
+        let barracks_hp = building_def(EntityKind::Barracks)
+            .expect("barracks def")
+            .stats
+            .hp;
+
+        assert_eq!(depot_hp, 110);
+        assert_eq!(barracks_hp, depot_hp * 3 / 2);
     }
 }
