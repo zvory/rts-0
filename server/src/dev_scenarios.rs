@@ -174,7 +174,40 @@ const WALL_CHOKEPOINT_VEHICLE_LAUNCHES: [DevScenarioLaunch; 15] = [
     },
 ];
 
-const DEV_SCENARIOS: [DevScenarioSpec; 3] = [
+const VEHICLE_SMALL_BLOCK_BASELINE_LAUNCHES: [DevScenarioLaunch; 6] = [
+    DevScenarioLaunch {
+        id: "vehicle_small_block_baseline",
+        unit: EntityKind::ScoutCar,
+        count: 1,
+    },
+    DevScenarioLaunch {
+        id: "vehicle_small_block_baseline",
+        unit: EntityKind::ScoutCar,
+        count: 3,
+    },
+    DevScenarioLaunch {
+        id: "vehicle_small_block_baseline",
+        unit: EntityKind::ScoutCar,
+        count: 5,
+    },
+    DevScenarioLaunch {
+        id: "vehicle_small_block_baseline",
+        unit: EntityKind::Tank,
+        count: 1,
+    },
+    DevScenarioLaunch {
+        id: "vehicle_small_block_baseline",
+        unit: EntityKind::Tank,
+        count: 3,
+    },
+    DevScenarioLaunch {
+        id: "vehicle_small_block_baseline",
+        unit: EntityKind::Tank,
+        count: 5,
+    },
+];
+
+const DEV_SCENARIOS: [DevScenarioSpec; 4] = [
     DevScenarioSpec {
         id: "scout_car_snaking_corridor",
         title: "Scout Car Snaking Corridor",
@@ -193,6 +226,12 @@ const DEV_SCENARIOS: [DevScenarioSpec; 3] = [
         title: "Vehicle Wall Chokepoint",
         description: "Vehicles start beside each other below a stone wall gap and move north through the choke.",
         launches: &WALL_CHOKEPOINT_VEHICLE_LAUNCHES,
+    },
+    DevScenarioSpec {
+        id: "vehicle_small_block_baseline",
+        title: "Vehicle Small-Unit Block Baseline",
+        description: "Vehicles start almost bumper-to-bumper with a worker one tile north of each vehicle, then all vehicles move 20 tiles north.",
+        launches: &VEHICLE_SMALL_BLOCK_BASELINE_LAUNCHES,
     },
 ];
 
@@ -285,6 +324,22 @@ mod tests {
                 count: 15,
             })
         );
+        assert_eq!(
+            parse_dev_scenario_room("vehicle_small_block_baseline:unit=scout_car:count=5"),
+            Some(DevScenarioLaunch {
+                id: "vehicle_small_block_baseline",
+                unit: EntityKind::ScoutCar,
+                count: 5,
+            })
+        );
+        assert_eq!(
+            parse_dev_scenario_room("vehicle_small_block_baseline:unit=tank:count=5"),
+            Some(DevScenarioLaunch {
+                id: "vehicle_small_block_baseline",
+                unit: EntityKind::Tank,
+                count: 5,
+            })
+        );
     }
 
     #[test]
@@ -311,6 +366,14 @@ mod tests {
         );
         assert_eq!(
             parse_dev_scenario_launch("scout_car_wall_chokepoint", "scout_car", "4"),
+            None
+        );
+        assert_eq!(
+            parse_dev_scenario_launch("vehicle_small_block_baseline", "worker", "1"),
+            None
+        );
+        assert_eq!(
+            parse_dev_scenario_launch("vehicle_small_block_baseline", "tank", "4"),
             None
         );
         assert_eq!(parse_dev_scenario_launch("unknown", "worker", "1"), None);

@@ -72,6 +72,7 @@ pub(super) enum DevScenarioId {
     ScoutCarSnakingCorridor,
     DirectReverseOrder,
     ScoutCarWallChokepoint,
+    VehicleSmallBlockBaseline,
 }
 
 enum DevDriver {
@@ -863,6 +864,20 @@ impl RoomTask {
                 }
                 DevScenarioId::ScoutCarWallChokepoint => {
                     let setup = Game::new_scout_car_wall_chokepoint_scenario(
+                        config.unit,
+                        config.count,
+                        match_seed(),
+                    )?;
+                    let driver = DevScenarioDriver {
+                        player_id: setup.player_id,
+                        units: setup.units,
+                        goal: setup.goal,
+                        issued: false,
+                    };
+                    Ok((setup.game, DevDriver::Scenario(driver), setup.player_id))
+                }
+                DevScenarioId::VehicleSmallBlockBaseline => {
+                    let setup = Game::new_vehicle_small_block_baseline_scenario(
                         config.unit,
                         config.count,
                         match_seed(),

@@ -7,6 +7,14 @@ default-run = "rts-server"
 
 [workspace]
 members = [".", "crates/ai", "crates/contract", "crates/protocol", "crates/rules", "crates/sim"]
+default-members = [
+    ".",
+    "crates/ai",
+    "crates/contract",
+    "crates/protocol",
+    "crates/rules",
+    "crates/sim",
+]
 resolver = "2"
 
 [[bin]]

@@ -340,6 +340,76 @@ impl Game {
         })
     }
 
+    pub fn new_vehicle_small_block_baseline_scenario(
+        vehicle: EntityKind,
+        pair_count: usize,
+        seed: u32,
+    ) -> Result<DevScenarioSetup, String> {
+        if !matches!(vehicle, EntityKind::ScoutCar | EntityKind::Tank) {
+            return Err(format!(
+                "unsupported vehicle-small-block-baseline vehicle {vehicle}"
+            ));
+        }
+        if !matches!(pair_count, 1 | 3 | 5) {
+            return Err(format!(
+                "unsupported vehicle-small-block-baseline pair count {pair_count}"
+            ));
+        }
+
+        let (map, start_tile, vehicle_starts, blocker_starts, goal) =
+            vehicle_small_block_baseline_map(vehicle, pair_count);
+        let mut entities = EntityStore::new();
+        let units =
+            spawn_vehicle_small_block_baseline_units(&mut entities, vehicle, vehicle_starts)?;
+        spawn_vehicle_small_block_baseline_blockers(&mut entities, blocker_starts)?;
+        let player_id = 1;
+        let player = PlayerState {
+            id: player_id,
+            name: "Scenario".to_string(),
+            color: "#4878c8".to_string(),
+            start_tile,
+            steel: 0,
+            oil: 10_000,
+            supply_used: 0,
+            supply_cap: 0,
+            is_ai: false,
+            score: ScoreState::default(),
+        };
+
+        let spatial = services::spatial::SpatialIndex::build(&entities, map.size);
+        let pathing = services::pathing::PathingService::new(65_536, 256);
+        let rng = SmallRng::seed_from_u64(seed as u64);
+        let mut game = Game {
+            map,
+            entities,
+            fog: Fog::new(96),
+            players: vec![player],
+            pending: Vec::new(),
+            command_log: Vec::new(),
+            tick: 0,
+            spatial,
+            pathing,
+            lingering_sight: Vec::new(),
+            smokes: SmokeCloudStore::new(),
+            seed,
+            starting_steel: 0,
+            starting_oil: 0,
+            debug_path_overlays: true,
+            rng,
+        };
+        let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
+        game.fog = Fog::new(game.map.size);
+        game.fog
+            .recompute_with_smoke(&ids, &game.entities, &game.map, &game.smokes);
+
+        Ok(DevScenarioSetup {
+            game,
+            player_id,
+            units,
+            goal,
+        })
+    }
+
     pub fn seed(&self) -> u32 {
         self.seed
     }
@@ -597,6 +667,39 @@ fn scout_car_wall_chokepoint_map(
     (map, start_tile, starts, goal)
 }
 
+#[allow(clippy::type_complexity)]
+fn vehicle_small_block_baseline_map(
+    vehicle: EntityKind,
+    pair_count: usize,
+) -> (
+    Map,
+    (u32, u32),
+    Vec<(f32, f32)>,
+    Vec<(f32, f32)>,
+    (f32, f32),
+) {
+    let mut map = flat_dev_map(1);
+    let center_tile = (map.size / 2, map.size / 2 + 18);
+    let ts = config::TILE_SIZE as f32;
+    let start_y = (center_tile.1 as f32 + 0.5) * ts;
+    let center_x = (center_tile.0 as f32 + 0.5) * ts;
+    let spacing = vehicle_small_block_baseline_vehicle_spacing(vehicle);
+    let center_index = (pair_count.saturating_sub(1)) as f32 * 0.5;
+    let vehicle_starts: Vec<(f32, f32)> = (0..pair_count)
+        .map(|i| {
+            let offset = (i as f32 - center_index) * spacing;
+            (center_x + offset, start_y)
+        })
+        .collect();
+    let blocker_starts = vehicle_starts.iter().map(|(x, y)| (*x, *y - ts)).collect();
+    let goal = (center_x, start_y - ts * 20.0);
+    if let Some(slot) = map.starts.get_mut(0) {
+        *slot = center_tile;
+    }
+
+    (map, center_tile, vehicle_starts, blocker_starts, goal)
+}
+
 fn spawn_snaking_corridor_units(
     entities: &mut EntityStore,
     unit: EntityKind,
@@ -654,6 +757,37 @@ fn spawn_wall_chokepoint_units(
     Ok(units)
 }
 
+fn spawn_vehicle_small_block_baseline_units(
+    entities: &mut EntityStore,
+    vehicle: EntityKind,
+    starts: Vec<(f32, f32)>,
+) -> Result<Vec<u32>, String> {
+    let north = -std::f32::consts::FRAC_PI_2;
+    let mut units = Vec::with_capacity(starts.len());
+    for (x, y) in starts {
+        let spawned = entities
+            .spawn_unit(1, vehicle, x, y)
+            .ok_or_else(|| format!("failed to spawn {vehicle}"))?;
+        if let Some(e) = entities.get_mut(spawned) {
+            e.set_facing(north);
+        }
+        units.push(spawned);
+    }
+    Ok(units)
+}
+
+fn spawn_vehicle_small_block_baseline_blockers(
+    entities: &mut EntityStore,
+    starts: Vec<(f32, f32)>,
+) -> Result<(), String> {
+    for (x, y) in starts {
+        entities
+            .spawn_unit(1, EntityKind::Worker, x, y)
+            .ok_or_else(|| "failed to spawn worker blocker".to_string())?;
+    }
+    Ok(())
+}
+
 fn wall_chokepoint_spawn_spacing(unit: EntityKind) -> f32 {
     match unit {
         EntityKind::AtTeam => config::AT_GUN_BODY_WIDTH_PX + config::AT_GUN_BODY_CLEARANCE_PX * 4.0,
@@ -662,6 +796,14 @@ fn wall_chokepoint_spawn_spacing(unit: EntityKind) -> f32 {
         }
         EntityKind::Tank => config::TANK_BODY_WIDTH_PX + config::TANK_BODY_CLEARANCE_PX * 4.0,
         _ => unreachable!("wall chokepoint only supports vehicles"),
+    }
+}
+
+fn vehicle_small_block_baseline_vehicle_spacing(vehicle: EntityKind) -> f32 {
+    match vehicle {
+        EntityKind::ScoutCar => config::SCOUT_CAR_BODY_WIDTH_PX + 2.0,
+        EntityKind::Tank => config::TANK_BODY_WIDTH_PX + 2.0,
+        _ => unreachable!("vehicle small-block baseline only supports vehicles"),
     }
 }
 
@@ -1040,6 +1182,124 @@ mod tests {
             );
         }
     }
+
+    fn assert_vehicle_small_block_baseline_setup(vehicle: EntityKind, pair_count: usize) {
+        let setup =
+            Game::new_vehicle_small_block_baseline_scenario(vehicle, pair_count, 0x5150_0004)
+                .expect("scenario setup should succeed");
+        assert_eq!(
+            setup.units.len(),
+            pair_count,
+            "{vehicle} scenario should command one vehicle per pair"
+        );
+        assert_eq!(owned_kind_count(&setup.game, 1, vehicle), pair_count);
+        assert_eq!(
+            owned_kind_count(&setup.game, 1, EntityKind::Worker),
+            pair_count,
+            "{vehicle} scenario should spawn one small blocker per vehicle"
+        );
+
+        let north = -std::f32::consts::FRAC_PI_2;
+        let mut vehicle_positions: Vec<(f32, f32)> = setup
+            .units
+            .iter()
+            .map(|id| {
+                let entity = setup
+                    .game
+                    .entities
+                    .get(*id)
+                    .expect("scenario vehicle should exist");
+                assert_eq!(entity.kind, vehicle);
+                assert!(
+                    (entity.facing() - north).abs() <= 0.001,
+                    "{vehicle} should begin facing north, facing {:.4}",
+                    entity.facing()
+                );
+                (entity.pos_x, entity.pos_y)
+            })
+            .collect();
+        vehicle_positions.sort_by(|a, b| a.0.total_cmp(&b.0));
+
+        let mut blocker_positions: Vec<(f32, f32)> = setup
+            .game
+            .entities
+            .iter()
+            .filter(|e| e.owner == 1 && e.kind == EntityKind::Worker)
+            .map(|e| (e.pos_x, e.pos_y))
+            .collect();
+        blocker_positions.sort_by(|a, b| a.0.total_cmp(&b.0));
+
+        let expected_spacing = vehicle_small_block_baseline_vehicle_spacing(vehicle);
+        for pair in vehicle_positions.windows(2) {
+            let gap = pair[1].0 - pair[0].0;
+            assert!(
+                (gap - expected_spacing).abs() <= 0.001,
+                "{vehicle} adjacent vehicle spacing should be {expected_spacing:.2}px, got {gap:.2}px"
+            );
+        }
+        for (vehicle_pos, blocker_pos) in vehicle_positions.iter().zip(blocker_positions.iter()) {
+            assert!(
+                (vehicle_pos.0 - blocker_pos.0).abs() <= 0.001,
+                "{vehicle} blocker should be directly north on the same x"
+            );
+            let north_delta = vehicle_pos.1 - blocker_pos.1;
+            assert!(
+                (north_delta - config::TILE_SIZE as f32).abs() <= 0.001,
+                "{vehicle} blocker should be one tile north, got {north_delta:.2}px"
+            );
+        }
+
+        let center_vehicle = vehicle_positions[pair_count / 2];
+        let goal_delta_y = center_vehicle.1 - setup.goal.1;
+        assert!(
+            (goal_delta_y - config::TILE_SIZE as f32 * 20.0).abs() <= 0.001,
+            "{vehicle} move goal should be 20 tiles north of the formation center, delta {goal_delta_y:.2}"
+        );
+        assert!(
+            (center_vehicle.0 - setup.goal.0).abs() <= 0.001,
+            "{vehicle} move goal should stay on the formation center x axis"
+        );
+    }
+
+    macro_rules! vehicle_small_block_baseline_test {
+        ($name:ident, $vehicle:expr, $pair_count:expr) => {
+            #[test]
+            fn $name() {
+                assert_vehicle_small_block_baseline_setup($vehicle, $pair_count);
+            }
+        };
+    }
+
+    vehicle_small_block_baseline_test!(
+        vehicle_small_block_baseline_scout_car_one_pair,
+        EntityKind::ScoutCar,
+        1
+    );
+    vehicle_small_block_baseline_test!(
+        vehicle_small_block_baseline_scout_car_three_pairs,
+        EntityKind::ScoutCar,
+        3
+    );
+    vehicle_small_block_baseline_test!(
+        vehicle_small_block_baseline_scout_car_five_pairs,
+        EntityKind::ScoutCar,
+        5
+    );
+    vehicle_small_block_baseline_test!(
+        vehicle_small_block_baseline_tank_one_pair,
+        EntityKind::Tank,
+        1
+    );
+    vehicle_small_block_baseline_test!(
+        vehicle_small_block_baseline_tank_three_pairs,
+        EntityKind::Tank,
+        3
+    );
+    vehicle_small_block_baseline_test!(
+        vehicle_small_block_baseline_tank_five_pairs,
+        EntityKind::Tank,
+        5
+    );
 
     #[test]
     fn debug_starting_loadout_applies_to_humans_only() {
