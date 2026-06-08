@@ -199,17 +199,19 @@ export const ABILITY_CODE = Object.freeze({
   [ABILITY.SMOKE]: 2,
 });
 
+export const NOTICE_SEVERITY_CODE = Object.freeze({
+  [NOTICE_SEVERITY.INFO]: 1,
+  [NOTICE_SEVERITY.WARN]: 2,
+  [NOTICE_SEVERITY.ALERT]: 3,
+});
+
 const KIND_BY_CODE = Object.freeze(reverseCodes(KIND_CODE));
 const STATE_BY_CODE = Object.freeze(reverseCodes(STATE_CODE));
 const SETUP_BY_CODE = Object.freeze(reverseCodes(SETUP_CODE));
 const EVENT_BY_CODE = Object.freeze(reverseCodes(EVENT_CODE));
 const ORDER_STAGE_BY_CODE = Object.freeze(reverseCodes(ORDER_STAGE_CODE));
 const ABILITY_BY_CODE = Object.freeze(reverseCodes(ABILITY_CODE));
-const NOTICE_SEVERITY_BY_CODE = Object.freeze({
-  1: NOTICE_SEVERITY.INFO,
-  2: NOTICE_SEVERITY.WARN,
-  3: NOTICE_SEVERITY.ALERT,
-});
+const NOTICE_SEVERITY_BY_CODE = Object.freeze(reverseCodes(NOTICE_SEVERITY_CODE));
 
 const MAX_COMPACT_ENTITIES = 20000;
 const MAX_COMPACT_RESOURCE_DELTAS = 20000;
