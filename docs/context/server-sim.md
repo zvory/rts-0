@@ -12,11 +12,11 @@ Use when changing tick logic, services, rules, AI, or the `Game` core.
 - [docs/design/testing.md](../design/testing.md) — self-play harness (only if touching scripted tests)
 
 ## Code map
-- `server/src/game/mod.rs` — public `Game` API
-- `server/src/game/systems.rs` — thin tick orchestrator
-- `server/src/game/services/` — small pure helpers, called in order by `systems.rs`
-- `server/src/game/rules/` — declarative rules
-- `server/src/game/ai.rs` — AI opponents
+- `server/crates/sim/src/game/mod.rs` — public `Game` API
+- `server/crates/sim/src/game/systems.rs` — thin tick orchestrator
+- `server/crates/sim/src/game/services/` — small pure helpers, called in order by `systems.rs`
+- `server/crates/rules/src/` plus `server/crates/sim/src/rules/projection.rs` — declarative rules
+- `server/crates/sim/src/game/ai.rs` — AI opponents
 - `server/src/lobby/`, `server/src/main.rs` — only touch sim via `game::Game`
 
 ## Invariants

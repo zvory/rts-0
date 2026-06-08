@@ -19,8 +19,8 @@ use rand::seq::SliceRandom;
 use rand::SeedableRng;
 use serde::Deserialize;
 
-const DEFAULT_MAP_JSON: &str = include_str!("../../assets/maps/default-handcrafted.json");
-const MAPS_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/assets/maps");
+const DEFAULT_MAP_JSON: &str = include_str!("../../../../assets/maps/default-handcrafted.json");
+const MAPS_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../assets/maps");
 
 type Tile = (u32, u32);
 type BasePair = (Tile, Tile);

@@ -6,8 +6,8 @@
 
 pub(crate) mod config;
 pub mod dev_scenarios;
-pub mod game;
 pub mod lobby;
 pub mod perf;
 pub mod protocol;
-pub(crate) mod rules;
+
+pub use rts_sim::game;

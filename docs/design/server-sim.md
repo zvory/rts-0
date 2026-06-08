@@ -8,14 +8,11 @@ src/
   protocol.rs    # serde types for §2  (PINNED — provided)
   config.rs      # all balance/sim constants (PINNED — provided)
   lobby/         # Lobby API plus room task, connection writers, snapshots, dev replay, crash replay
-  rules/
-    mod.rs       # rules module boundary
-    defs.rs      # immutable unit/building/node definition tables
-    combat.rs    # weapon/armor predicates and damage formula
-    economy.rs   # tech/production predicates and cost/supply wrappers
-    terrain.rs   # terrain movement/cover/concealment seam (Open only today)
-    projection.rs # fog-gated entity/event projection seam
-  game/
+crates/
+  protocol/      # semantic wire DTOs and compact snapshot transport encoding
+  rules/         # pure domain, balance, terrain, economy, and combat rules
+  sim/           # reusable simulation crate; no Tokio/Axum/server transport dependency
+    src/game/
     mod.rs       # Game struct + public API (the seam below)
     command.rs   # SimCommand domain commands + protocol translation helpers
     map.rs       # Map: handcrafted terrain asset loading, passability, base-site validation
@@ -29,6 +26,7 @@ src/
     ai_shared.rs # shared AI placement/resource helper functions
     replay.rs    # tick-stamped command log replay harness for determinism checks
     selfplay/    # test-only API-driven scripted self-play harness (see §9)
+    src/rules/projection.rs # fog-gated entity/event projection seam
 ```
 
 ### 3.1 `game::Game` public API (seam between `game` and `lobby`/`main`)
@@ -127,10 +125,10 @@ them at the top of `tick()` — see §8.
 
 ### 3.3 Rules layer (`rules/`)
 
-`server/src/rules/` contains classification, formula, terrain, and projection functions. Rules
-never mutate state. Most take `EntityKind` and context primitives; `rules::projection` is the
-explicit exception that reads `Entity` plus `Fog` so snapshot and event visibility policy is
-centralized instead of scattered through services.
+`server/crates/rules/src/` contains classification, formula, terrain, and economy functions with
+no simulation state dependency. `server/crates/sim/src/rules/projection.rs` is the explicit
+state-reading exception: it reads `Entity`, `Fog`, and smoke state so snapshot and event visibility
+policy is centralized instead of scattered through services.
 
 - `rules::defs` — immutable unit/building/node definition tables keyed by `EntityKind`. These
   records are the source of truth for kind-specific stats, armor class, weapon class, target
@@ -173,7 +171,7 @@ when the caster arrives (phase `Arrived`), `launch_world_ability` is called; whe
 cooldown active, tech gone, target point off-map) are skipped at promotion time via
 `ability_intent_valid`.
 
-Services in `game/services/` orchestrate tick logic and call into `rules::*` for classification.
+Services in `server/crates/sim/src/game/services/` orchestrate tick logic and call into `rules::*` for classification.
 Rules functions have no imports from `services/`; classification and formula rules read
 kind-specific data from `rules::defs`. `config.rs` holds scalar constants and compatibility
 wrappers such as `unit_stats(kind)` / `building_stats(kind)`, which return the stats embedded in
