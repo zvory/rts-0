@@ -291,31 +291,96 @@ function dashedCircle(g, cx, cy, radius, segments) {
   }
 }
 
+const SMOKE_RING_BILLOWS = [
+  [-0.54, -0.18, 0.43, 0.74, 0x4d4d50, 0.31],
+  [-0.28, -0.49, 0.39, 0.69, 0x707073, 0.25],
+  [0.18, -0.47, 0.45, 0.8, 0x5c5c60, 0.3],
+  [0.52, -0.16, 0.4, 0.72, 0x848487, 0.22],
+  [0.44, 0.3, 0.46, 0.75, 0x66666a, 0.28],
+  [0.02, 0.52, 0.42, 0.7, 0x77777b, 0.24],
+  [-0.44, 0.34, 0.4, 0.78, 0x555559, 0.29],
+];
+const SMOKE_CORE_BILLOWS = [
+  [-0.2, -0.08, 0.62, 0.64, 0x3f3f43, 0.38],
+  [0.22, 0.04, 0.58, 0.58, 0x6c6c70, 0.3],
+  [-0.02, 0.22, 0.5, 0.52, 0x8b8b8e, 0.22],
+  [0.08, -0.28, 0.46, 0.46, 0xa0a0a2, 0.17],
+];
+
+function smokeHash(seed) {
+  const n = Math.sin(seed * 12.9898) * 43758.5453;
+  return n - Math.floor(n);
+}
+
+function drawSmokeBillow(g, cx, cy, radius, sides, phase, seed, color, alpha) {
+  const points = [];
+  const wobble = Math.sin(phase * 0.0017 + seed * 2.1) * 0.08;
+  const twist = phase * 0.00018 * (smokeHash(seed + 11) > 0.5 ? 1 : -1);
+  for (let i = 0; i < sides; i++) {
+    const t = i / sides;
+    const a = t * Math.PI * 2 + twist;
+    const jitter =
+      0.82 +
+      smokeHash(seed + i * 5.17) * 0.22 +
+      Math.sin(phase * 0.0012 + seed + i * 1.8) * 0.08 +
+      wobble;
+    points.push(cx + Math.cos(a) * radius * jitter, cy + Math.sin(a) * radius * jitter);
+  }
+  g.beginFill(color, alpha);
+  g.drawPolygon(points);
+  g.endFill();
+}
+
 export function _drawSmokes(state) {
   const smokes = state?.smokes;
   if (!Array.isArray(smokes) || smokes.length === 0) return;
   const g = this._smokeGfx;
   if (!g) return;
   const ts = (this._map && this._map.tileSize) || 32;
+  const now = performance.now();
+  g.lineStyle(0, 0x000000, 0);
   for (const smoke of smokes) {
     if (!finiteNumber(smoke.x) || !finiteNumber(smoke.y)) continue;
     const r = Math.max(8, (smoke.radiusTiles || 0) * ts);
-    // Layered translucent billows: a darker core plus a softer halo.
-    g.lineStyle(0);
-    g.beginFill(0x1a1a1c, 0.55);
-    g.drawCircle(smoke.x, smoke.y, r * 0.95);
-    g.endFill();
-    g.beginFill(0x3a3a3e, 0.45);
-    g.drawCircle(smoke.x - r * 0.25, smoke.y - r * 0.15, r * 0.72);
-    g.drawCircle(smoke.x + r * 0.3, smoke.y + r * 0.05, r * 0.6);
-    g.drawCircle(smoke.x - r * 0.05, smoke.y + r * 0.3, r * 0.55);
-    g.endFill();
-    g.beginFill(0x9b9b9d, 0.32);
-    g.drawCircle(smoke.x + r * 0.12, smoke.y - r * 0.3, r * 0.42);
-    g.drawCircle(smoke.x - r * 0.35, smoke.y + r * 0.18, r * 0.34);
-    g.endFill();
-    g.lineStyle(1, 0x0a0a0a, 0.45);
-    g.drawCircle(smoke.x, smoke.y, r);
+    const base = (smoke.id || 1) * 17.31;
+    const phase = now + base * 83;
+
+    // Low-poly overlapping gray billows: readable tactical radius, no hard outline.
+    drawSmokeBillow(g, smoke.x, smoke.y, r * 0.98, 13, phase * 0.72, base, 0x262629, 0.34);
+    for (let i = 0; i < SMOKE_RING_BILLOWS.length; i++) {
+      const [ox, oy, scale, drift, color, alpha] = SMOKE_RING_BILLOWS[i];
+      const seed = base + i * 3.73;
+      const dx = (Math.sin(phase * 0.00035 + seed) * 0.05 + ox) * r;
+      const dy = (Math.cos(phase * 0.00032 + seed * 1.4) * 0.05 + oy) * r;
+      drawSmokeBillow(
+        g,
+        smoke.x + dx,
+        smoke.y + dy,
+        r * scale,
+        7,
+        phase * drift,
+        seed,
+        color,
+        alpha,
+      );
+    }
+    for (let i = 0; i < SMOKE_CORE_BILLOWS.length; i++) {
+      const [ox, oy, scale, drift, color, alpha] = SMOKE_CORE_BILLOWS[i];
+      const seed = base + 41 + i * 4.91;
+      const dx = (Math.sin(phase * 0.00042 + seed) * 0.04 + ox) * r;
+      const dy = (Math.cos(phase * 0.00039 + seed * 1.3) * 0.04 + oy) * r;
+      drawSmokeBillow(
+        g,
+        smoke.x + dx,
+        smoke.y + dy,
+        r * scale,
+        8,
+        phase * drift,
+        seed,
+        color,
+        alpha,
+      );
+    }
   }
 }
 
