@@ -1081,7 +1081,7 @@ fn order_set_rally(
     }
 }
 
-/// Cancel the front item of a building's production queue, refunding its cost + supply.
+/// Cancel the latest item in a building's production queue, refunding its cost + supply.
 fn order_cancel(
     entities: &mut EntityStore,
     players: &mut [PlayerState],
@@ -1094,7 +1094,10 @@ fn order_cancel(
             _ => return,
         };
         match b.prod_queue_mut() {
-            Some(queue) => queue.remove(0).unit,
+            Some(queue) => match queue.pop() {
+                Some(item) => item.unit,
+                None => return,
+            },
             None => return,
         }
     };
@@ -2942,6 +2945,79 @@ mod tests {
                 Some(Event::Notice { msg, .. }) if msg == "Not enough steel"
             ),
             "steel-only units should emit the steel voice-line notice"
+        );
+    }
+
+    #[test]
+    fn cancel_train_removes_latest_queued_unit_without_resetting_active_progress() {
+        let map = flat_map(24);
+        let mut entities = EntityStore::new();
+        let (bx, by) = footprint_center(&map, EntityKind::Barracks, 6, 6);
+        let barracks = entities
+            .spawn_building(1, EntityKind::Barracks, bx, by, true)
+            .expect("barracks should spawn");
+        let (tx, ty) = footprint_center(&map, EntityKind::TrainingCentre, 10, 6);
+        entities
+            .spawn_building(1, EntityKind::TrainingCentre, tx, ty, true)
+            .expect("training centre should spawn");
+        let mut players = vec![player_state(1), player_state(2)];
+
+        apply_with_players(
+            &map,
+            &mut entities,
+            &mut players,
+            vec![(
+                1,
+                SimCommand::Train {
+                    building: barracks,
+                    unit: EntityKind::Rifleman,
+                },
+            )],
+        );
+        entities
+            .get_mut(barracks)
+            .expect("barracks should exist")
+            .prod_queue_mut()
+            .expect("queue")
+            .first_mut()
+            .expect("rifleman should be queued")
+            .progress = 17;
+        apply_with_players(
+            &map,
+            &mut entities,
+            &mut players,
+            vec![(
+                1,
+                SimCommand::Train {
+                    building: barracks,
+                    unit: EntityKind::MachineGunner,
+                },
+            )],
+        );
+        let steel_after_queue = players[0].steel;
+        let oil_after_queue = players[0].oil;
+        let supply_after_queue = players[0].supply_used;
+
+        apply_with_players(
+            &map,
+            &mut entities,
+            &mut players,
+            vec![(1, SimCommand::Cancel { building: barracks })],
+        );
+
+        let queue = entities.get(barracks).expect("barracks").prod_queue();
+        assert_eq!(queue.len(), 1);
+        assert_eq!(queue[0].unit, EntityKind::Rifleman);
+        assert_eq!(
+            queue[0].progress, 17,
+            "canceling queued production should not reset active progress"
+        );
+        let (refunded_steel, refunded_oil) = rules::economy::cost(EntityKind::MachineGunner);
+        assert_eq!(players[0].steel, steel_after_queue + refunded_steel);
+        assert_eq!(players[0].oil, oil_after_queue + refunded_oil);
+        assert_eq!(
+            players[0].supply_used,
+            supply_after_queue - rules::economy::supply_cost(EntityKind::MachineGunner)
         );
     }
 
