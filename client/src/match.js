@@ -9,7 +9,7 @@ import { Fog } from "./fog.js";
 import { HUD } from "./hud.js";
 import { Input } from "./input/index.js";
 import { automaticPointerLockDisabledForTests, shouldRequestPointerLock } from "./input/cursor_lock.js";
-import { MatchInputRouter } from "./input/router.js";
+import { DomClickInputZone, MatchInputRouter } from "./input/router.js";
 import { Minimap } from "./minimap.js";
 import { Renderer } from "./renderer/index.js";
 import { GameState } from "./state.js";
@@ -112,6 +112,11 @@ export class Match {
     this.fog.setRevealAll(!!this.devWatch?.noFog);
     this.hud = this._timeInit("match.hud", () => new HUD(dom.gameScreen, this.state, this.net));
     this.inputRouter = this._timeInit("match.inputRouter", () => new MatchInputRouter(dom.viewport));
+    this.hudInputZone = this._timeInit(
+      "match.hudInputZone",
+      () => new DomClickInputZone([dom.gameMenu, dom.commandCard]),
+    );
+    this.unregisterHudInputZone = this.inputRouter.registerZone(this.hudInputZone);
     this.minimap = this._timeInit(
       "match.minimap",
       () => new Minimap(dom.minimap, this.state, this.camera, this.fog, this.net, this.inputRouter),
@@ -771,6 +776,10 @@ export class Match {
     }
     if (dom.giveUpOpen) dom.giveUpOpen.hidden = false;
     if (dom.commandCard) dom.commandCard.hidden = false;
+    if (this.unregisterHudInputZone) {
+      this.unregisterHudInputZone();
+      this.unregisterHudInputZone = null;
+    }
     // Let modules release DOM/WebGL resources if they own any.
     for (const m of [this.input, this.minimap, this.hud, this.renderer, this.fog]) {
       if (m && typeof m.destroy === "function") {

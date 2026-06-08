@@ -58,7 +58,7 @@ import {
   exitCursorLock,
   shouldRequestPointerLock,
 } from "../client/src/input/cursor_lock.js";
-import { MatchInputRouter } from "../client/src/input/router.js";
+import { DomClickInputZone, MatchInputRouter } from "../client/src/input/router.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -207,6 +207,54 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
   unregisterHigh();
   assert(router.pointerDown({ clientX: 150, clientY: 70, button: 0 }), "router falls back after unregister");
   assert(calls.at(-1) === "lowDown", "unregistered zone no longer receives events");
+}
+
+{
+  const viewport = {
+    getBoundingClientRect() {
+      return { left: 0, top: 0, right: 800, bottom: 600, width: 800, height: 600 };
+    },
+  };
+  const button = {
+    disabled: false,
+    clickCount: 0,
+    click() {
+      this.clickCount += 1;
+    },
+    dispatchEvent(ev) {
+      if (ev.type === "click") this.click();
+      return true;
+    },
+    getAttribute() {
+      return null;
+    },
+    closest() {
+      return this;
+    },
+  };
+  const root = {
+    hidden: false,
+    getBoundingClientRect() {
+      return { left: 600, top: 420, right: 780, bottom: 580, width: 180, height: 160 };
+    },
+    contains(el) {
+      return el === this || el === button;
+    },
+  };
+  const doc = {
+    elementFromPoint(x, y) {
+      return x >= 620 && x <= 700 && y >= 440 && y <= 520 ? button : root;
+    },
+  };
+  const router = new MatchInputRouter(viewport);
+  router.registerZone(new DomClickInputZone(root, { documentRef: doc }));
+
+  assert(router.pointerDown({ clientX: 640, clientY: 460, button: 0, source: "locked" }), "DOM zone consumes locked pointerDown over HUD button");
+  assert(router.pointerUp({ clientX: 640, clientY: 460, button: 0, source: "locked" }), "DOM zone consumes locked pointerUp over HUD button");
+  assert(button.clickCount === 1, "DOM zone forwards locked pointer click to the HUD button");
+  assert(router.pointerDown({ clientX: 760, clientY: 560, button: 0, source: "locked" }), "DOM zone consumes empty HUD panel space");
+  assert(router.pointerUp({ clientX: 760, clientY: 560, button: 0, source: "locked" }), "empty HUD panel click releases capture");
+  assert(button.clickCount === 1, "empty HUD panel space does not click the prior button");
 }
 
 // ---------------------------------------------------------------------------

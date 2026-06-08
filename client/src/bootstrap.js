@@ -178,6 +178,7 @@ export const dom = {
   gameOverText: document.getElementById("game-over-text"),
   gameOverScores: document.getElementById("game-over-scores"),
   gameOverButton: document.getElementById("game-over-button"),
+  gameMenu: document.getElementById("game-menu"),
   settingsButton: document.getElementById("settings-button"),
   settingsMenu: document.getElementById("settings-menu"),
   pointerLockToggle: document.getElementById("pointer-lock-toggle"),
