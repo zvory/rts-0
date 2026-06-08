@@ -47,6 +47,7 @@ const MATERIAL_GOAL_DELTA_PX: f32 = config::TILE_SIZE as f32;
 const FORMATION_NEAR_DISTANCE_PX: f32 = config::TILE_SIZE as f32 * 4.0;
 const FORMATION_FAR_DISTANCE_PX: f32 = config::TILE_SIZE as f32 * 18.0;
 const FORMATION_MAX_OFFSET_PX: f32 = config::TILE_SIZE as f32 * 4.0;
+const AT_TEAM_FORMATION_GAP_TILES: u32 = 1;
 const SPAWN_PREFERRED_GAP_UNIT_FRACTION: f32 = 0.10;
 const SCOUT_CAR_ROUTE_SIMPLIFY_MAX_SEGMENT_PX: f32 = config::TILE_SIZE as f32 * 3.0;
 
@@ -728,11 +729,14 @@ fn spread_goals(
     anchor: (u32, u32),
 ) -> Vec<(f32, f32)> {
     let mut out = Vec::with_capacity(units.len());
-    let mut taken: Vec<(u32, u32)> = Vec::new();
+    let mut assigned: Vec<FormationAssignment> = Vec::new();
 
     for unit in units {
-        if let Some(tile) = find_unique_tile_near(map, occ, unit, anchor, &taken) {
-            taken.push(tile);
+        if let Some(tile) = find_unique_tile_near(map, occ, unit, anchor, &assigned) {
+            assigned.push(FormationAssignment {
+                kind: unit.kind,
+                tile,
+            });
             out.push(map.tile_center(tile.0, tile.1));
         } else {
             out.push(unit.pos);
@@ -767,7 +771,7 @@ fn formation_goals(
     let formation_scale = formation_scale_for_distance(move_distance);
     let max = map.world_size_px() - 1.0;
     let mut out = Vec::with_capacity(units.len());
-    let mut taken: Vec<(u32, u32)> = Vec::new();
+    let mut assigned: Vec<FormationAssignment> = Vec::new();
 
     for unit in units {
         let offset = clamp_offset(
@@ -780,8 +784,11 @@ fn formation_goals(
             (goal.1 + offset.1 * formation_scale).clamp(0.0, max),
         );
         let anchor = map.tile_of(desired.0, desired.1);
-        if let Some(tile) = find_unique_tile_near(map, occ, unit, anchor, &taken) {
-            taken.push(tile);
+        if let Some(tile) = find_unique_tile_near(map, occ, unit, anchor, &assigned) {
+            assigned.push(FormationAssignment {
+                kind: unit.kind,
+                tile,
+            });
             out.push(map.tile_center(tile.0, tile.1));
         } else {
             out.push(unit.pos);
@@ -807,20 +814,39 @@ fn clamp_offset(dx: f32, dy: f32, max_len: f32) -> (f32, f32) {
     (dx * scale, dy * scale)
 }
 
+#[derive(Clone, Copy)]
+struct FormationAssignment {
+    kind: EntityKind,
+    tile: (u32, u32),
+}
+
 /// Search outward from `anchor` in deterministic ring order and return the first body-standable
-/// tile not already in `taken`.
+/// tile not already assigned. Some unit kinds prefer additional spacing and get a strict first
+/// pass before falling back to the ordinary unique-tile rule.
 fn find_unique_tile_near(
     map: &Map,
     occ: &Occupancy,
     unit: &FormationUnit,
     anchor: (u32, u32),
-    taken: &[(u32, u32)],
+    assigned: &[FormationAssignment],
 ) -> Option<(u32, u32)> {
-    // Try the anchor first.
-    if is_free_goal(map, occ, unit, anchor, taken) {
+    if let Some(tile) = find_unique_tile_near_with_spacing(map, occ, unit, anchor, assigned, true) {
+        return Some(tile);
+    }
+    find_unique_tile_near_with_spacing(map, occ, unit, anchor, assigned, false)
+}
+
+fn find_unique_tile_near_with_spacing(
+    map: &Map,
+    occ: &Occupancy,
+    unit: &FormationUnit,
+    anchor: (u32, u32),
+    assigned: &[FormationAssignment],
+    require_preferred_spacing: bool,
+) -> Option<(u32, u32)> {
+    if is_free_goal(map, occ, unit, anchor, assigned, require_preferred_spacing) {
         return Some(anchor);
     }
-
     for r in 1i32..=6 {
         for dy in -r..=r {
             for dx in -r..=r {
@@ -833,7 +859,7 @@ fn find_unique_tile_near(
                     continue;
                 }
                 let t = (tx as u32, ty as u32);
-                if is_free_goal(map, occ, unit, t, taken) {
+                if is_free_goal(map, occ, unit, t, assigned, require_preferred_spacing) {
                     return Some(t);
                 }
             }
@@ -848,7 +874,8 @@ fn is_free_goal(
     occ: &Occupancy,
     unit: &FormationUnit,
     tile: (u32, u32),
-    taken: &[(u32, u32)],
+    assigned: &[FormationAssignment],
+    require_preferred_spacing: bool,
 ) -> bool {
     if !map.is_passable(tile.0 as i32, tile.1 as i32) {
         return false;
@@ -856,12 +883,41 @@ fn is_free_goal(
     if !occ.passable(tile.0 as i32, tile.1 as i32) {
         return false;
     }
-    if taken.contains(&tile) {
+    if assigned.iter().any(|assignment| assignment.tile == tile) {
+        return false;
+    }
+    if require_preferred_spacing && !preferred_goal_spacing_clear(unit, tile, assigned) {
         return false;
     }
     let center = map.tile_center(tile.0, tile.1);
     let facing = formation_goal_facing(unit, center);
     standability::unit_static_standable_with_facing(map, occ, unit.kind, center.0, center.1, facing)
+}
+
+fn preferred_goal_spacing_clear(
+    unit: &FormationUnit,
+    tile: (u32, u32),
+    assigned: &[FormationAssignment],
+) -> bool {
+    let gap_tiles = preferred_gap_tiles(unit.kind);
+    if gap_tiles == 0 {
+        return true;
+    }
+    assigned.iter().all(|assignment| {
+        preferred_gap_tiles(assignment.kind) == 0
+            || tile_chebyshev_distance(tile, assignment.tile) > gap_tiles
+    })
+}
+
+fn preferred_gap_tiles(kind: EntityKind) -> u32 {
+    match kind {
+        EntityKind::AtTeam => AT_TEAM_FORMATION_GAP_TILES,
+        _ => 0,
+    }
+}
+
+fn tile_chebyshev_distance(a: (u32, u32), b: (u32, u32)) -> u32 {
+    a.0.abs_diff(b.0).max(a.1.abs_diff(b.1))
 }
 
 fn formation_goal_facing(unit: &FormationUnit, center: (f32, f32)) -> f32 {
@@ -1152,6 +1208,54 @@ mod tests {
                 "duplicate goal tile {tile:?} for multi-unit formation"
             );
         }
+    }
+
+    #[test]
+    fn at_team_group_move_prefers_one_tile_gap_between_final_goals() {
+        let map = flat_map(40);
+        let entities = EntityStore::new();
+        let occ = Occupancy::build(&map, &entities);
+        let units = vec![
+            formation_unit_kind(1, EntityKind::AtTeam, &map, (10, 10)),
+            formation_unit_kind(2, EntityKind::AtTeam, &map, (11, 10)),
+            formation_unit_kind(3, EntityKind::AtTeam, &map, (10, 11)),
+        ];
+        let click = map.tile_center(20, 20);
+
+        let goals = formation_goals(&map, &occ, &units, click);
+
+        for i in 0..goals.len() {
+            for j in (i + 1)..goals.len() {
+                let a = map.tile_of(goals[i].0, goals[i].1);
+                let b = map.tile_of(goals[j].0, goals[j].1);
+                assert!(
+                    tile_chebyshev_distance(a, b) > AT_TEAM_FORMATION_GAP_TILES,
+                    "AT gun final goals should leave one open tile between them, got {a:?} and {b:?}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn at_team_goal_spacing_is_preferred_but_relaxable() {
+        let map = flat_map(40);
+        let entities = EntityStore::new();
+        let occ = Occupancy::build(&map, &entities);
+        let unit = formation_unit_kind(2, EntityKind::AtTeam, &map, (10, 10));
+        let assigned = vec![FormationAssignment {
+            kind: EntityKind::AtTeam,
+            tile: (20, 20),
+        }];
+        let adjacent = (21, 20);
+
+        assert!(
+            !is_free_goal(&map, &occ, &unit, adjacent, &assigned, true),
+            "preferred spacing should reject adjacent AT gun goals"
+        );
+        assert!(
+            is_free_goal(&map, &occ, &unit, adjacent, &assigned, false),
+            "relaxed fallback should still accept an otherwise legal adjacent AT gun goal"
+        );
     }
 
     #[test]
