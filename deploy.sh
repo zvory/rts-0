@@ -123,11 +123,19 @@ fi
 
 echo "Deploying $short_commit to Fly app '$app' from $deploy_dir"
 
-flyctl deploy \
-  --app "$app" \
-  --config "$deploy_dir/fly.toml" \
-  --build-arg "COMMIT_HASH=$short_commit" \
-  "${vm_flags[@]}" \
-  --ha=false \
-  --now \
-  "$deploy_dir"
+deploy_cmd=(
+  flyctl deploy
+  --app "$app"
+  --config "$deploy_dir/fly.toml"
+  --build-arg "COMMIT_HASH=$short_commit"
+  --ha=false
+  --now
+)
+
+if [[ ${#vm_flags[@]} -gt 0 ]]; then
+  deploy_cmd+=("${vm_flags[@]}")
+fi
+
+deploy_cmd+=("$deploy_dir")
+
+"${deploy_cmd[@]}"
