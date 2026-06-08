@@ -592,6 +592,113 @@ fn mixed_queued_fixture() -> MixedQueuedFixture {
     }
 }
 
+struct PhaseSixIntentFixture {
+    game: Game,
+    scout_a: u32,
+    scout_b: u32,
+    rifleman: u32,
+    at_gun: u32,
+    first_move: (f32, f32),
+    second_move: (f32, f32),
+    smoke_targets: [(f32, f32); 4],
+    charge_goal: (f32, f32),
+    attack_move_goal: (f32, f32),
+    setup_facing: (f32, f32),
+}
+
+fn phase_six_intent_fixture() -> PhaseSixIntentFixture {
+    let players = [
+        PlayerInit {
+            id: 1,
+            name: "Alpha".into(),
+            color: "#fff".into(),
+            is_ai: false,
+        },
+        PlayerInit {
+            id: 2,
+            name: "Bravo".into(),
+            color: "#000".into(),
+            is_ai: false,
+        },
+    ];
+    let mut game =
+        Game::new_for_replay_with_starting_resources(&players, 5_000, 5_000, 0x5150_0602);
+    for tile in &mut game.map.terrain {
+        *tile = crate::protocol::terrain::GRASS;
+    }
+    for id in game.entities.ids() {
+        game.entities.remove(id);
+    }
+
+    let (steelworks_x, steelworks_y) =
+        services::occupancy::footprint_center(&game.map, EntityKind::Steelworks, 4, 4);
+    game.entities
+        .spawn_building(1, EntityKind::Steelworks, steelworks_x, steelworks_y, true)
+        .expect("steelworks should spawn");
+    let (training_x, training_y) =
+        services::occupancy::footprint_center(&game.map, EntityKind::TrainingCentre, 8, 4);
+    game.entities
+        .spawn_building(1, EntityKind::TrainingCentre, training_x, training_y, true)
+        .expect("training centre should spawn");
+    let scout_a_pos = game.map.tile_center(8, 10);
+    let scout_b_pos = game.map.tile_center(8, 12);
+    let scout_a = game
+        .entities
+        .spawn_unit(1, EntityKind::ScoutCar, scout_a_pos.0, scout_a_pos.1)
+        .expect("first scout should spawn");
+    let scout_b = game
+        .entities
+        .spawn_unit(1, EntityKind::ScoutCar, scout_b_pos.0, scout_b_pos.1)
+        .expect("second scout should spawn");
+    let rifle_pos = game.map.tile_center(9, 14);
+    let rifleman = game
+        .entities
+        .spawn_unit(1, EntityKind::Rifleman, rifle_pos.0, rifle_pos.1)
+        .expect("rifleman should spawn");
+    let at_pos = game.map.tile_center(10, 14);
+    let at_gun = game
+        .entities
+        .spawn_unit(1, EntityKind::AtTeam, at_pos.0, at_pos.1)
+        .expect("AT team should spawn");
+    let enemy_pos = game.map.tile_center(18, 14);
+    game.entities
+        .spawn_unit(2, EntityKind::Rifleman, enemy_pos.0, enemy_pos.1)
+        .expect("enemy should spawn");
+
+    systems::recompute_supply(&mut game.players, &game.entities);
+    game.spatial = services::spatial::SpatialIndex::build(&game.entities, game.map.size);
+    let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
+    game.fog
+        .recompute_with_smoke(&ids, &game.entities, &game.map, &game.smokes);
+    game.assert_invariants();
+
+    let first_move = game.map.tile_center(12, 10);
+    let second_move = game.map.tile_center(14, 12);
+    let smoke_targets = [
+        game.map.tile_center(13, 10),
+        game.map.tile_center(13, 12),
+        game.map.tile_center(14, 10),
+        game.map.tile_center(14, 12),
+    ];
+    let charge_goal = game.map.tile_center(12, 14);
+    let attack_move_goal = game.map.tile_center(16, 14);
+    let setup_facing = game.map.tile_center(18, 14);
+
+    PhaseSixIntentFixture {
+        game,
+        scout_a,
+        scout_b,
+        rifleman,
+        at_gun,
+        first_move,
+        second_move,
+        smoke_targets,
+        charge_goal,
+        attack_move_goal,
+        setup_facing,
+    }
+}
+
 fn entity_distance_to(game: &Game, id: u32, point: (f32, f32)) -> f32 {
     let entity = game.entities.get(id).expect("entity should exist");
     let dx = entity.pos_x - point.0;
@@ -937,6 +1044,172 @@ fn mixed_queued_command_log_replays_deterministically() {
     );
 
     let mut replay = mixed_queued_fixture().game;
+    let mut next_command = 0usize;
+    let mut replay_events = Vec::new();
+    for tick in 1..=game.tick_count() {
+        while let Some(entry) = command_log.get(next_command) {
+            if entry.tick != tick {
+                break;
+            }
+            replay.enqueue(
+                entry.player_id,
+                Command::from_protocol(entry.command.clone()),
+            );
+            next_command += 1;
+        }
+        for (player_id, events) in replay.tick() {
+            for event in events {
+                replay_events.push(super::replay::EventLogEntry {
+                    tick,
+                    player_id,
+                    event,
+                });
+            }
+        }
+    }
+
+    assert_eq!(next_command, command_log.len());
+    assert_eq!(live_events, replay_events);
+    assert_eq!(game.snapshot_for(1), replay.snapshot_for(1));
+    assert_eq!(game.snapshot_for(2), replay.snapshot_for(2));
+}
+
+#[test]
+fn phase_six_mixed_intent_command_log_replays_deterministically() {
+    let PhaseSixIntentFixture {
+        mut game,
+        scout_a,
+        scout_b,
+        rifleman,
+        at_gun,
+        first_move,
+        second_move,
+        smoke_targets,
+        charge_goal,
+        attack_move_goal,
+        setup_facing,
+    } = phase_six_intent_fixture();
+
+    game.enqueue(
+        1,
+        Command::Move {
+            units: vec![scout_a, scout_b],
+            x: first_move.0,
+            y: first_move.1,
+            queued: false,
+        },
+    );
+    for target in smoke_targets {
+        game.enqueue(
+            1,
+            Command::UseAbility {
+                ability: ability::AbilityKind::Smoke,
+                units: vec![scout_a, scout_b],
+                x: Some(target.0),
+                y: Some(target.1),
+                queued: true,
+            },
+        );
+    }
+    game.enqueue(
+        1,
+        Command::AttackMove {
+            units: vec![scout_a, scout_b],
+            x: second_move.0,
+            y: second_move.1,
+            queued: true,
+        },
+    );
+    game.enqueue(
+        1,
+        Command::Move {
+            units: vec![rifleman],
+            x: charge_goal.0,
+            y: charge_goal.1,
+            queued: true,
+        },
+    );
+    game.enqueue(
+        1,
+        Command::UseAbility {
+            ability: ability::AbilityKind::Charge,
+            units: vec![rifleman],
+            x: None,
+            y: None,
+            queued: true,
+        },
+    );
+    game.enqueue(
+        1,
+        Command::AttackMove {
+            units: vec![rifleman],
+            x: attack_move_goal.0,
+            y: attack_move_goal.1,
+            queued: true,
+        },
+    );
+    game.enqueue(
+        1,
+        Command::Move {
+            units: vec![at_gun],
+            x: charge_goal.0,
+            y: charge_goal.1,
+            queued: true,
+        },
+    );
+    game.enqueue(
+        1,
+        Command::SetupAtGuns {
+            units: vec![at_gun],
+            x: setup_facing.0,
+            y: setup_facing.1,
+            queued: true,
+        },
+    );
+
+    let mut live_events = Vec::new();
+    for tick in 1..=260 {
+        for (player_id, events) in game.tick() {
+            for event in events {
+                live_events.push(super::replay::EventLogEntry {
+                    tick,
+                    player_id,
+                    event,
+                });
+            }
+        }
+    }
+
+    let command_log = game.command_log().to_vec();
+    assert_eq!(
+        command_log
+            .iter()
+            .filter(|entry| matches!(
+                entry.command,
+                crate::protocol::Command::UseAbility {
+                    ref ability,
+                    queued: true,
+                    ..
+                } if ability == crate::protocol::abilities::SMOKE
+            ))
+            .count(),
+        4,
+        "command log should preserve all queued Smoke intents"
+    );
+    assert!(command_log.iter().any(|entry| matches!(
+        entry.command,
+        crate::protocol::Command::UseAbility {
+            ref ability,
+            queued: true,
+            ..
+        } if ability == crate::protocol::abilities::CHARGE
+    )));
+    assert!(command_log.iter().any(|entry| matches!(
+        entry.command,
+        crate::protocol::Command::SetupAtGuns { queued: true, .. }
+    )));
+
+    let mut replay = phase_six_intent_fixture().game;
     let mut next_command = 0usize;
     let mut replay_events = Vec::new();
     for tick in 1..=game.tick_count() {

@@ -1528,15 +1528,30 @@ function fakeAudioContext() {
   targetedInput.state = {
     placement: null,
     commandTarget: "attack",
-    attackTargetKeyHeld: false,
+    commandComposer: new CommandComposer(),
     playerId: 1,
     addCommandFeedback(kind, x, y) {
       feedback.push({ kind, x, y });
     },
     endCommandTarget() {
+      this.commandComposer.cancel();
       this.commandTarget = null;
     },
+    issueCommandTarget(ev = {}) {
+      const issued = this.commandComposer.issue(ev);
+      this.commandTarget = this.commandComposer.target;
+      return issued;
+    },
+    holdCommandTarget(kind, key, shiftKey = false) {
+      this.commandComposer.hold(kind, key, { shiftKey });
+      this.commandTarget = this.commandComposer.target;
+    },
+    releaseCommandTargetKey(key, shiftKey = false) {
+      this.commandComposer.releaseKey(key, { shiftKey });
+      this.commandTarget = this.commandComposer.target;
+    },
   };
+  targetedInput.state.commandComposer.arm("attack");
   targetedInput.renderer = { drawSelectionBox() {} };
   targetedInput.net = { command: (command) => sentCommands.push(command) };
   targetedInput._worldAt = (x, y) => ({ x, y });
@@ -1579,12 +1594,14 @@ function fakeAudioContext() {
   assert(selectionClicks.length === 1, "a second click without another A press should be normal selection");
 
   targetedInput.state.commandTarget = "move";
+  targetedInput.state.commandComposer.arm("move");
   targetedInput._onLeftDown({ x: 260, y: 260 }, { shiftKey: true });
   let lastSent = sentCommands[sentCommands.length - 1];
   assert(lastSent.c === "move", "move targeting should issue a move command");
   assert(lastSent.queued === true, "Shift move targeting should queue movement");
 
   targetedInput.state.commandTarget = "attack";
+  targetedInput.state.commandComposer.arm("attack");
   targetedInput._entityAtWorld = () => null;
   targetedInput._onLeftDown({ x: 280, y: 280 }, { shiftKey: true });
   lastSent = sentCommands[sentCommands.length - 1];
@@ -1592,6 +1609,7 @@ function fakeAudioContext() {
   assert(lastSent.queued === true, "Shift attack-move targeting should queue attack-move");
 
   targetedInput.state.commandTarget = "attack";
+  targetedInput.state.commandComposer.arm("attack");
   targetedInput._entityAtWorld = () => ({ id: 99, owner: 2, kind: KIND.RIFLEMAN, x: 300, y: 300 });
   targetedInput._onLeftDown({ x: 300, y: 300 }, { shiftKey: true });
   lastSent = sentCommands[sentCommands.length - 1];
@@ -1602,8 +1620,7 @@ function fakeAudioContext() {
   );
 
   targetedInput.state.commandTarget = "attack";
-  targetedInput.state.attackTargetKeyHeld = true;
-  targetedInput._attackTargetKeyHeld = true;
+  targetedInput.state.commandComposer.hold("attack", "KeyA", { shiftKey: true });
   targetedInput._entityAtWorld = () => null;
   targetedInput._onLeftDown({ x: 320, y: 320 }, { shiftKey: true });
   assert(
@@ -1624,11 +1641,10 @@ function fakeAudioContext() {
     "held A keeps attack targeting armed after an unqueued click",
   );
 
+  targetedInput.state.commandComposer.cancel();
   targetedInput.state.commandTarget = "attack";
-  targetedInput.state.attackTargetKeyHeld = true;
-  targetedInput._attackTargetKeyHeld = true;
+  targetedInput.state.commandComposer.hold("attack", "KeyA");
   targetedInput._handleKeyUp({ code: "KeyA", preventDefault() {} });
-  assert(targetedInput.state.attackTargetKeyHeld === false, "A keyup clears attack key-held state");
   assert(targetedInput.state.commandTarget === null, "A keyup exits sticky attack targeting");
 }
 

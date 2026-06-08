@@ -3,8 +3,6 @@
 //! This module intentionally does not mutate the simulation. It answers one question:
 //! given an already-validated command shape plus issue-time facts about the selected
 //! units, which unit-local actions should the authoritative command service apply?
-#![allow(dead_code)]
-
 use std::collections::{HashMap, HashSet};
 
 pub type UnitId = u32;

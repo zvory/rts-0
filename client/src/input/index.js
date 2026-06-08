@@ -131,9 +131,6 @@ export class Input {
     this._lastControlGroupTap = null;
     // Space held: left-drag pans instead of selecting/placing.
     this._spacePan = false;
-    // Physical A-key state mirrored for older tests/minimap state; command
-    // arming lifetime itself is owned by GameState.commandComposer.
-    this._attackTargetKeyHeld = false;
     // Active direct camera pan, in screen pixels, or null when not panning.
     // { x, y, button } where button is the pointer button that started the pan.
     this._panDrag = null;
@@ -803,7 +800,7 @@ export class Input {
       this._issueTargetedCommand(p, ev);
       const issued = typeof this.state.issueCommandTarget === "function"
         ? this.state.issueCommandTarget(ev)
-        : { keepArmed: this._attackTargetKeyHeld || (ev.shiftKey && this.state.attackTargetKeyHeld) };
+        : { keepArmed: false };
       if (!issued.keepArmed) {
         this.state.endCommandTarget();
       }

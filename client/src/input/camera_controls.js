@@ -43,19 +43,10 @@ export function _handleKeyDown(ev) {
   }
 
   if (ev.repeat) return;
-  if (ev.code === "KeyA") {
-    this._attackTargetKeyHeld = true;
-    this.state.attackTargetKeyHeld = true;
-  }
   if (this._handleControlGroupHotkey(ev)) return;
   if (this._activateCommandHotkey(ev)) {
-    if (ev.code === "KeyA" && this.state.commandTarget === "attack") {
-      if (typeof this.state.holdCommandTarget === "function") {
-        this.state.holdCommandTarget("attack", "KeyA", ev.shiftKey);
-      }
-    } else if (ev.code === "KeyA") {
-      this._attackTargetKeyHeld = false;
-      this.state.attackTargetKeyHeld = false;
+    if (this.state.commandTarget && typeof this.state.holdCommandTarget === "function") {
+      this.state.holdCommandTarget(this.state.commandTarget, ev.code, ev.shiftKey);
     }
     return;
   }
@@ -65,9 +56,6 @@ export function _handleKeyDown(ev) {
       this._enterAttackMove();
       if (this.state.commandTarget === "attack" && typeof this.state.holdCommandTarget === "function") {
         this.state.holdCommandTarget("attack", "KeyA", ev.shiftKey);
-      } else {
-        this._attackTargetKeyHeld = false;
-        this.state.attackTargetKeyHeld = false;
       }
       ev.preventDefault();
       return;
@@ -110,8 +98,6 @@ export function _handleKeyUp(ev) {
       ev.preventDefault();
       return;
     case "KeyA":
-      this._attackTargetKeyHeld = false;
-      this.state.attackTargetKeyHeld = false;
       if (typeof this.state.releaseCommandTargetKey === "function") {
         this.state.releaseCommandTargetKey("KeyA", ev.shiftKey);
       } else if (this.state.commandTarget === "attack") {
@@ -120,6 +106,9 @@ export function _handleKeyUp(ev) {
       ev.preventDefault();
       return;
     default:
+      if (this.state.commandTarget && typeof this.state.releaseCommandTargetKey === "function") {
+        this.state.releaseCommandTargetKey(ev.code, ev.shiftKey);
+      }
       return;
   }
 }
@@ -129,8 +118,6 @@ export function _handleBlur() {
   this.keys.up = this.keys.down = this.keys.left = this.keys.right = false;
   this.mouse = null;
   this._spacePan = false;
-  this._attackTargetKeyHeld = false;
-  this.state.attackTargetKeyHeld = false;
   if (typeof this.state.endCommandTarget === "function") this.state.endCommandTarget();
   this._panDrag = null;
   if (this._drag) {

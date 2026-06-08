@@ -144,6 +144,10 @@ gather, build/resume, and placement build commands set `queued: true` and rely o
 snapshot's owner-only `orderPlan` for accepted markers. Production-building-only right-clicks set
 the building's single rally point; Shift does not create rally stages.
 
+`input/command_composer.js` owns command-target arming lifetime for command-card targets. Input and
+minimap clicks call `GameState.issueCommandTarget`, so held keys, Shift preservation, and repeated
+queued target clicks use one composer path instead of command-specific sticky flags.
+
 `input/router.js`
 ```js
 export class MatchInputRouter {
