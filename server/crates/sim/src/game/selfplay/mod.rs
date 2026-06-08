@@ -18,9 +18,9 @@ mod validation;
 mod tests;
 
 #[allow(unused_imports)]
-pub(crate) use live::LiveSelfPlay;
+pub use live::LiveSelfPlay;
 #[allow(unused_imports)]
-pub(crate) use replay::{
+pub use replay::{
     assert_replay_matches_live, is_safe_artifact_name, ReplayArtifact, ReplayDriver,
     SelfPlayFailure,
 };

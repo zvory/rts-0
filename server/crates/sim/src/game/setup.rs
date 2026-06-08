@@ -133,7 +133,7 @@ impl Game {
     /// Like [`Game::new_for_replay`] but with explicit starting resources. Used when replaying a
     /// match that was originally created in debug mode so the initial player economy matches the
     /// live recording.
-    pub(crate) fn new_for_replay_with_starting_resources(
+    pub fn new_for_replay_with_starting_resources(
         players: &[PlayerInit],
         steel: u32,
         oil: u32,
@@ -153,7 +153,7 @@ impl Game {
     /// Create a match that preserves player identity flags but does not attach live
     /// [`AiController`]s. Used by command-log replay and scripted self-play, where commands come
     /// from an external driver.
-    pub(crate) fn new_without_ai_controllers(players: &[PlayerInit], seed: u32) -> Game {
+    pub fn new_without_ai_controllers(players: &[PlayerInit], seed: u32) -> Game {
         Self::new_inner(
             players,
             false,
@@ -165,7 +165,7 @@ impl Game {
         )
     }
 
-    pub(crate) fn new_snaking_corridor_scenario(
+    pub fn new_snaking_corridor_scenario(
         unit: EntityKind,
         unit_count: usize,
         seed: u32,
@@ -231,7 +231,7 @@ impl Game {
         })
     }
 
-    pub(crate) fn new_direct_reverse_order_scenario(
+    pub fn new_direct_reverse_order_scenario(
         unit: EntityKind,
         unit_count: usize,
         seed: u32,
@@ -313,7 +313,7 @@ impl Game {
         })
     }
 
-    pub(crate) fn new_scout_car_wall_chokepoint_scenario(
+    pub fn new_scout_car_wall_chokepoint_scenario(
         unit: EntityKind,
         unit_count: usize,
         seed: u32,
@@ -382,15 +382,15 @@ impl Game {
         })
     }
 
-    pub(crate) fn seed(&self) -> u32 {
+    pub fn seed(&self) -> u32 {
         self.seed
     }
 
-    pub(crate) fn starting_steel(&self) -> u32 {
+    pub fn starting_steel(&self) -> u32 {
         self.starting_steel
     }
 
-    pub(crate) fn starting_oil(&self) -> u32 {
+    pub fn starting_oil(&self) -> u32 {
         self.starting_oil
     }
 
@@ -553,11 +553,11 @@ impl Game {
     }
 }
 
-pub(crate) struct DevScenarioSetup {
-    pub(crate) game: Game,
-    pub(crate) player_id: u32,
-    pub(crate) units: Vec<u32>,
-    pub(crate) goal: (f32, f32),
+pub struct DevScenarioSetup {
+    pub game: Game,
+    pub player_id: u32,
+    pub units: Vec<u32>,
+    pub goal: (f32, f32),
 }
 
 fn flat_dev_map(player_count: usize) -> Map {

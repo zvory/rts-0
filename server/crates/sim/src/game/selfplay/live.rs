@@ -3,13 +3,13 @@ use super::scripts::{ProfileBackedScript, ScriptedPlayer};
 use crate::game::ai_core::profiles::TECH_TO_TANKS_ID;
 use crate::game::{Game, PlayerInit};
 
-pub(crate) struct LiveSelfPlay {
+pub struct LiveSelfPlay {
     players: Vec<PlayerInit>,
     scripts: Vec<Box<dyn ScriptedPlayer>>,
 }
 
 impl LiveSelfPlay {
-    pub(crate) fn default_match() -> Self {
+    pub fn default_match() -> Self {
         let players = vec![
             PlayerInit {
                 id: 1,
@@ -31,11 +31,11 @@ impl LiveSelfPlay {
         Self { players, scripts }
     }
 
-    pub(crate) fn players(&self) -> &[PlayerInit] {
+    pub fn players(&self) -> &[PlayerInit] {
         &self.players
     }
 
-    pub(crate) fn enqueue_for_tick(&mut self, game: &mut Game) {
+    pub fn enqueue_for_tick(&mut self, game: &mut Game) {
         let tick = game.tick_count();
         let start = game.start_payload();
         let mut commands = Vec::new();

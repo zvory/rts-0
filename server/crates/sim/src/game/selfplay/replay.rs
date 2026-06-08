@@ -21,35 +21,35 @@ use crate::game::{Game, PlayerInit};
 use crate::protocol::{kinds, Command as WireCommand, Event, Snapshot};
 
 #[derive(Debug)]
-pub(crate) struct SelfPlayFailure {
-    pub(crate) reason: String,
+pub struct SelfPlayFailure {
+    pub reason: String,
 }
 
 impl SelfPlayFailure {
-    pub(crate) fn new(reason: impl Into<String>) -> Self {
+    pub fn new(reason: impl Into<String>) -> Self {
         SelfPlayFailure {
             reason: reason.into(),
         }
     }
 
-    pub(crate) fn reason(&self) -> &str {
+    pub fn reason(&self) -> &str {
         &self.reason
     }
 }
 
 #[derive(Clone, Serialize, Deserialize)]
-pub(crate) struct ReplayArtifact {
-    pub(crate) replay_commands: Vec<CommandLogEntry>,
-    pub(crate) players: Vec<PlayerInit>,
+pub struct ReplayArtifact {
+    pub replay_commands: Vec<CommandLogEntry>,
+    pub players: Vec<PlayerInit>,
     #[serde(default)]
-    pub(crate) seed: u32,
+    pub seed: u32,
     /// Starting steel each player began the match with. Defaults to [`config::STARTING_STEEL`]
     /// so legacy replays (recorded before quickstart was persisted) still load.
     #[serde(default = "default_starting_steel")]
-    pub(crate) starting_steel: u32,
+    pub starting_steel: u32,
     /// Starting oil each player began the match with. See [`ReplayArtifact::starting_steel`].
     #[serde(default = "default_starting_oil")]
-    pub(crate) starting_oil: u32,
+    pub starting_oil: u32,
 }
 
 fn default_starting_steel() -> u32 {
@@ -60,7 +60,7 @@ fn default_starting_oil() -> u32 {
     config::STARTING_OIL
 }
 
-pub(crate) struct ReplayDriver {
+pub struct ReplayDriver {
     commands: Vec<CommandLogEntry>,
     next: usize,
     seed: u32,
@@ -69,7 +69,7 @@ pub(crate) struct ReplayDriver {
 }
 
 impl ReplayDriver {
-    pub(crate) fn from_artifact(artifact: ReplayArtifact) -> (Vec<PlayerInit>, Self) {
+    pub fn from_artifact(artifact: ReplayArtifact) -> (Vec<PlayerInit>, Self) {
         (
             artifact.players,
             Self {
@@ -82,19 +82,19 @@ impl ReplayDriver {
         )
     }
 
-    pub(crate) fn seed(&self) -> u32 {
+    pub fn seed(&self) -> u32 {
         self.seed
     }
 
-    pub(crate) fn starting_steel(&self) -> u32 {
+    pub fn starting_steel(&self) -> u32 {
         self.starting_steel
     }
 
-    pub(crate) fn starting_oil(&self) -> u32 {
+    pub fn starting_oil(&self) -> u32 {
         self.starting_oil
     }
 
-    pub(crate) fn enqueue_for_tick(&mut self, game: &mut Game) {
+    pub fn enqueue_for_tick(&mut self, game: &mut Game) {
         let next_tick = game.tick_count().saturating_add(1);
         while let Some(entry) = self.commands.get(self.next) {
             if entry.tick != next_tick {
@@ -443,7 +443,7 @@ fn panic_payload_to_string(payload: &Box<dyn std::any::Any + Send>) -> String {
     }
 }
 
-pub(crate) fn is_safe_artifact_name(name: &str) -> bool {
+pub fn is_safe_artifact_name(name: &str) -> bool {
     !name.is_empty()
         && !name.contains('/')
         && !name.contains('\\')
@@ -486,7 +486,7 @@ fn live_outcome_for(
     }
 }
 
-pub(crate) fn assert_replay_matches_live(
+pub fn assert_replay_matches_live(
     game: &Game,
     players: &[PlayerInit],
     events: &[EventLogEntry],
