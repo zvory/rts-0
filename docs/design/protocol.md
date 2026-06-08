@@ -174,7 +174,7 @@ trailing missing optional fields are omitted; interior missing optional fields a
 The `orderPlan` slot is an owner-only array capped at 9 entries. It contains the current active
 stage first, followed by queued unit stages in execution order. Each compact stage is
 `[kind, x, y]`, where `kind` is 1 `move`, 2 `attackMove`, 3 `attack`, 4 `gather`, 5 `build`,
-6 `smoke`, or 7 `setupAtGuns`.
+6 `smoke`, 7 `setupAtGuns`, or 8 `charge`.
 Stages carry safe world points only, never target ids; hidden attack target stages may be omitted
 rather than leaking enemy positions through fog. Production building rally points are exposed
 separately through `rally` and are not part of `orderPlan`.

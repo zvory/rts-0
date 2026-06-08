@@ -710,7 +710,12 @@ function fakeAudioContext() {
         null,
         null,
         null,
-        [[ORDER_STAGE_CODE[ORDER_STAGE.MOVE], 96, 112], [ORDER_STAGE_CODE[ORDER_STAGE.SETUP_AT_GUNS], 128, 160], [ORDER_STAGE_CODE[ORDER_STAGE.SMOKE], 192, 224]],
+        [
+          [ORDER_STAGE_CODE[ORDER_STAGE.MOVE], 96, 112],
+          [ORDER_STAGE_CODE[ORDER_STAGE.SETUP_AT_GUNS], 128, 160],
+          [ORDER_STAGE_CODE[ORDER_STAGE.CHARGE], 176, 208],
+          [ORDER_STAGE_CODE[ORDER_STAGE.SMOKE], 192, 224],
+        ],
         87,
         [[ABILITY_CODE[ABILITY.CHARGE], 87, 2]],
         true,
@@ -771,7 +776,7 @@ function fakeAudioContext() {
   assert(decoded.entities[0].state === STATE.GATHER, "entity state code decodes");
   assert(decoded.entities[0].weaponFacing === 1.75, "entity optional weaponFacing decodes");
   assert(decoded.entities[0].latchedNode === 200, "entity optional latchedNode decodes");
-  assert(decoded.entities[0].orderPlan.length === 3, "entity order plan decodes");
+  assert(decoded.entities[0].orderPlan.length === 4, "entity order plan decodes");
   assert(decoded.entities[0].chargeCooldownLeft === 87, "legacy charge cooldown decodes");
   assert(
     decoded.entities[0].abilities[0].ability === ABILITY.CHARGE &&
@@ -798,7 +803,8 @@ function fakeAudioContext() {
   );
   assert(
     decoded.entities[0].orderPlan[1].kind === ORDER_STAGE.SETUP_AT_GUNS &&
-      decoded.entities[0].orderPlan[2].kind === ORDER_STAGE.SMOKE,
+      decoded.entities[0].orderPlan[2].kind === ORDER_STAGE.CHARGE &&
+      decoded.entities[0].orderPlan[3].kind === ORDER_STAGE.SMOKE,
     "order plan stage flavor decodes",
   );
   assert(
@@ -806,6 +812,12 @@ function fakeAudioContext() {
       decoded.entities[0].orderPlan[1].x === 128 &&
       decoded.entities[0].orderPlan[1].y === 160,
     "queued AT gun setup order stage decodes",
+  );
+  assert(
+    decoded.entities[0].orderPlan[2].kind === ORDER_STAGE.CHARGE &&
+      decoded.entities[0].orderPlan[2].x === 176 &&
+      decoded.entities[0].orderPlan[2].y === 208,
+    "queued Charge order stage decodes",
   );
   assert(decoded.entities[1].setupState === SETUP.DEPLOYED, "entity setupState code decodes");
   assert(decoded.entities[2].prodKind === KIND.WORKER, "entity prodKind code decodes");
