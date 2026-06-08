@@ -56,10 +56,8 @@ impl Game {
     /// Loads the hardcoded handcrafted map, shuffles the authored (start, expansion) pairs by
     /// `seed`, assigns the first N shuffled starts to the N players in lobby order, and spawns
     /// each player's starting City Centre + STARTING_WORKERS workers + nearby steel/oil
-    /// resource clusters. For one-, three-, and four-player games, each start keeps its authored
-    /// paired expansion. For two-player games, the selected starts are kept but the two active
-    /// neutral expansions are reselected from the authored expansion pool as the most symmetric
-    /// assignment for that start matchup, so adjacent starts both expand in comparable directions.
+    /// resource clusters. Each start keeps its authored paired expansion, so map-authored
+    /// main-natural relationships remain stable for every player count.
     /// AI players are spawned as normal match participants; external AI orchestration owns any
     /// controller/profile selection.
     pub fn new(players: &[PlayerInit], seed: u32) -> Game;
