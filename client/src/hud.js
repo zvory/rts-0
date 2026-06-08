@@ -717,11 +717,17 @@ export class HUD {
           cooldownClocks: affordance.cooldownClocks,
           cost: definition.cost,
           cls: this._abilityTargetActive(definition.ability) ? "active" : "",
-          onClick: () => {
+          onClick: (ev) => {
             if (definition.targetMode === "worldPoint") {
               this.state.beginCommandTarget({ kind: "ability", ability: definition.ability });
             } else {
-              this.net.command(cmd.useAbility(definition.ability, affordance.readyIds));
+              this.net.command(cmd.useAbility(
+                definition.ability,
+                affordance.readyIds,
+                null,
+                null,
+                !!ev.shiftKey,
+              ));
               this.state.endCommandTarget();
             }
           },
@@ -1051,7 +1057,7 @@ export class HUD {
    * @param {string} [opts.countBadge] top-right ready count for partially-available abilities.
    * @param {{count:number,rotationDeg:number}[]} [opts.cooldownClocks] grouped cooldown clocks.
    * @param {boolean} [opts.repeatable] whether native keyboard repeat may trigger this button.
-   * @param {() => void} opts.onClick click handler (skipped when disabled).
+   * @param {(ev: MouseEvent) => void} opts.onClick click handler (skipped when disabled).
    * @returns {HTMLButtonElement}
    */
   _cmdButton(opts) {
@@ -1095,7 +1101,7 @@ export class HUD {
     if (opts.enabled && typeof opts.onClick === "function") {
       btn.addEventListener("click", (ev) => {
         ev.preventDefault();
-        opts.onClick();
+        opts.onClick(ev);
       });
     }
     return btn;
