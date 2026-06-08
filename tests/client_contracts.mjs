@@ -538,7 +538,7 @@ function fakeAudioContext() {
         null,
         null,
         null,
-        [[ORDER_STAGE_CODE[ORDER_STAGE.MOVE], 96, 112], [ORDER_STAGE_CODE[ORDER_STAGE.MOVE], 128, 160], [ORDER_STAGE_CODE[ORDER_STAGE.ATTACK_MOVE], 192, 224]],
+        [[ORDER_STAGE_CODE[ORDER_STAGE.MOVE], 96, 112], [ORDER_STAGE_CODE[ORDER_STAGE.MOVE], 128, 160], [ORDER_STAGE_CODE[ORDER_STAGE.SMOKE], 192, 224]],
         87,
         [[ABILITY_CODE[ABILITY.CHARGE], 87]],
         true,
@@ -624,7 +624,7 @@ function fakeAudioContext() {
   );
   assert(
     decoded.entities[0].orderPlan[1].kind === ORDER_STAGE.MOVE &&
-      decoded.entities[0].orderPlan[2].kind === ORDER_STAGE.ATTACK_MOVE,
+      decoded.entities[0].orderPlan[2].kind === ORDER_STAGE.SMOKE,
     "order plan stage flavor decodes",
   );
   assert(decoded.entities[1].setupState === SETUP.DEPLOYED, "entity setupState code decodes");
