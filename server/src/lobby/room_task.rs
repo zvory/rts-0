@@ -65,6 +65,7 @@ pub(super) struct DevScenarioConfig {
     pub(super) id: DevScenarioId,
     pub(super) unit: EntityKind,
     pub(super) count: usize,
+    pub(super) blocker: Option<EntityKind>,
 }
 
 #[derive(Clone)]
@@ -880,6 +881,7 @@ impl RoomTask {
                     let setup = Game::new_vehicle_small_block_baseline_scenario(
                         config.unit,
                         config.count,
+                        config.blocker,
                         match_seed(),
                     )?;
                     let driver = DevScenarioDriver {

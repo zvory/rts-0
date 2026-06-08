@@ -28,7 +28,8 @@ use tracing::{debug, info, warn};
 use tracing_subscriber::EnvFilter;
 
 use rts_server::dev_scenarios::{
-    all_dev_scenarios, dev_scenario_unit_label, parse_dev_scenario_launch,
+    all_dev_scenarios, dev_scenario_blocker_label, dev_scenario_unit_label,
+    parse_dev_scenario_launch,
 };
 use rts_server::game::SimCommand;
 use rts_server::lobby::{self, Lobby, RoomEvent};
@@ -167,15 +168,25 @@ async fn dev_scenario_handler(
     let id = params.get("id").map(|s| s.trim()).unwrap_or("");
     let unit = params.get("unit").map(|s| s.trim()).unwrap_or("");
     let count = params.get("count").map(|s| s.trim()).unwrap_or("");
+    let blocker = params
+        .get("blocker")
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty());
     if id.is_empty() && unit.is_empty() && count.is_empty() {
         return Html(dev_scenario_index_html()).into_response();
     }
-    if let Some(launch) = parse_dev_scenario_launch(id, unit, count) {
-        return Redirect::temporary(&format!(
+    if let Some(launch) = parse_dev_scenario_launch(id, unit, count, blocker) {
+        let mut target = format!(
             "/?watchScenario=1&id={}&unit={}&count={}",
             launch.id, launch.unit, launch.count
-        ))
-        .into_response();
+        );
+        if let Some(blocker) = launch.blocker {
+            target.push_str("&blocker=");
+            target.push_str(blocker.stable_id());
+        } else if launch.id == "vehicle_small_block_baseline" {
+            target.push_str("&blocker=none");
+        }
+        return Redirect::temporary(&target).into_response();
     }
     (
         StatusCode::BAD_REQUEST,
@@ -188,13 +199,14 @@ fn dev_scenario_index_html() -> String {
     let mut items = String::new();
     for scenario in all_dev_scenarios() {
         let mut counts = Vec::new();
-        let mut units = Vec::new();
+        let mut rows_by_variant = Vec::new();
         for launch in scenario.launches {
             if !counts.contains(&launch.count) {
                 counts.push(launch.count);
             }
-            if !units.contains(&launch.unit) {
-                units.push(launch.unit);
+            let variant = (launch.unit, launch.blocker);
+            if !rows_by_variant.contains(&variant) {
+                rows_by_variant.push(variant);
             }
         }
         counts.sort_unstable();
@@ -205,31 +217,47 @@ fn dev_scenario_index_html() -> String {
         }
 
         let mut rows = String::new();
-        for unit in units {
+        for (unit, blocker) in rows_by_variant {
             let mut cells = String::new();
             for count in &counts {
-                if scenario
-                    .launches
-                    .iter()
-                    .any(|candidate| candidate.unit == unit && candidate.count == *count)
-                {
+                if scenario.launches.iter().any(|candidate| {
+                    candidate.unit == unit
+                        && candidate.count == *count
+                        && candidate.blocker == blocker
+                }) {
+                    let blocker_query = match blocker {
+                        Some(kind) => format!("&blocker={}", kind.stable_id()),
+                        None if scenario.id == "vehicle_small_block_baseline" => {
+                            "&blocker=none".to_string()
+                        }
+                        None => String::new(),
+                    };
                     cells.push_str(&format!(
-                        "<td><a class=\"scenario-link\" href=\"/dev/scenarios?id={}&unit={}&count={}\">Open</a></td>",
+                        "<td><a class=\"scenario-link\" href=\"/dev/scenarios?id={}&unit={}&count={}{}\">Open</a></td>",
                         scenario.id,
                         unit,
-                        count
+                        count,
+                        blocker_query
                     ));
                 } else {
                     cells.push_str("<td class=\"scenario-missing\">-</td>");
                 }
             }
+            let row_label = if scenario.id == "vehicle_small_block_baseline" {
+                format!(
+                    "{} / blocker: {}",
+                    dev_scenario_unit_label(unit),
+                    dev_scenario_blocker_label(blocker)
+                )
+            } else {
+                dev_scenario_unit_label(unit).to_string()
+            };
             rows.push_str(&format!(
                 "<tr>\
                     <th scope=\"row\">{}</th>\
                     {}\
                  </tr>",
-                dev_scenario_unit_label(unit),
-                cells
+                row_label, cells
             ));
         }
 
@@ -398,7 +426,15 @@ mod tests {
         assert!(
             html.contains("/dev/scenarios?id=vehicle_small_block_baseline&unit=scout_car&count=5")
         );
-        assert!(html.contains("/dev/scenarios?id=vehicle_small_block_baseline&unit=tank&count=5"));
+        assert!(html.contains(
+            "/dev/scenarios?id=vehicle_small_block_baseline&unit=scout_car&count=5&blocker=none"
+        ));
+        assert!(html.contains(
+            "/dev/scenarios?id=vehicle_small_block_baseline&unit=scout_car&count=5&blocker=machine_gunner"
+        ));
+        assert!(html.contains(
+            "/dev/scenarios?id=vehicle_small_block_baseline&unit=tank&count=5&blocker=at_team"
+        ));
     }
 
     #[test]

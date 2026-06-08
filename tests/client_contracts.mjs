@@ -124,6 +124,17 @@ async function testDevWatchScenarioConfig() {
     );
 
     globalThis.window.location = new URL(
+      "http://localhost/?watchScenario=1&id=vehicle_small_block_baseline&unit=scout_car&count=5&blocker=machine_gunner",
+    );
+    config = devWatchConfig();
+    assert(config, "vehicle_small_block_baseline blocker variant should be recognized");
+    assert(
+      config.room ===
+        "__dev_scenario__:vehicle_small_block_baseline:unit=scout_car:count=5:blocker=machine_gunner",
+      "dev scenario should include blocker variants in the server scenario room",
+    );
+
+    globalThis.window.location = new URL(
       "http://localhost/?watchScenario=1&id=bad/scenario&unit=scout_car&count=5",
     );
     config = devWatchConfig();

@@ -23,6 +23,7 @@ pub(super) fn room_mode_for(room: &str) -> RoomMode {
                 },
                 unit: launch.unit,
                 count: launch.count,
+                blocker: launch.blocker,
             });
         }
     }
