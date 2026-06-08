@@ -273,6 +273,9 @@ run_rust_suites_bg() {
   fi
 }
 
+run_suite_bg "JS protocol contracts" \
+  node "$SCRIPT_DIR/protocol_parity.mjs"
+
 # --- 1. Build server first (both cargo build and cargo test share the target dir and
 #        serialize via cargo's file lock, so we build once, then run both in parallel
 #        — cargo test reuses the already-compiled artifacts and mostly just links+runs).
