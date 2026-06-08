@@ -8,6 +8,9 @@ The server treats every client as potentially hostile. Limits live next to the c
   eight future intents. Queued command application still runs the unit-list dedupe/cap first, and
   queued promotion drains invalid stale intents instead of retrying them forever. Production
   rallies are not queued; `setRally` always replaces the single active rally point.
+  Phase 6 kept this cap at eight because no playtest evidence in the repo justified a larger
+  command buffer; mixed ability/setup replay coverage now guards the current cap and command-log
+  shapes.
 - **Bounds-checked placement** (`services/occupancy.rs` `footprint_tiles`): tile math uses `checked_add` and
   out-of-range build coords are rejected — the tick loop never panics on adversarial input.
 - **Body-aware construction placement**: `services::standability::building_site_clear` is the
