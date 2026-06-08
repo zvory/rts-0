@@ -172,7 +172,9 @@ Stages carry safe world points only, never target ids; hidden attack target stag
 rather than leaking enemy positions through fog. Production building rally points are exposed
 separately through `rally` and are not part of `orderPlan`.
 The `abilities` slot is owner-only and capped at 8 entries. Each compact ability cooldown is
-`[ability, cooldownLeft]`, where `ability` is 1 `charge` or 2 `smoke`.
+`[ability, cooldownLeft, remainingUses?]`, where `ability` is 1 `charge` or 2 `smoke`.
+`remainingUses` is present for finite-use abilities such as Scout Car Smoke; a value of `0`
+means the ability is depleted and cannot be used by that caster.
 `visionOnly` is true only for non-owned units/buildings visible through lingering death vision;
 clients render them below the fog overlay and must not select or issue targeted commands against
 them. In `n.flags`, bit 0 = `slowTick` and bit 1 = `headOfLine`.
@@ -226,7 +228,7 @@ events, and positioned notices remain fog-gated and are withheld when smoke hide
   ],
   chargeCooldownLeft?: u16,      // legacy rifleman-only owner-visible remaining Charge cooldown
   abilities?: [                  // owner-only ability affordance/cooldown data
-    { ability: "charge"|"smoke", cooldownLeft: u16 }
+    { ability: "charge"|"smoke", cooldownLeft: u16, remainingUses?: u16 }
   ],
   visionOnly?: bool,             // true = visible only through one-second death vision; visual intel only
   debugPath?: {                  // lobby Debug mode only; remaining movement path; ONLY ever sent to the owner

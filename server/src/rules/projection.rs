@@ -227,6 +227,7 @@ pub fn project_entity(
             .map(|(kind, cooldown_left)| AbilityCooldownView {
                 ability: kind.to_protocol_str().to_string(),
                 cooldown_left: *cooldown_left,
+                remaining_uses: entity.ability_uses_remaining(*kind),
             })
             .collect();
         for kind in [ability::AbilityKind::Charge, ability::AbilityKind::Smoke] {
@@ -239,6 +240,7 @@ pub fn project_entity(
                 view.abilities.push(AbilityCooldownView {
                     ability: kind.to_protocol_str().to_string(),
                     cooldown_left: 0,
+                    remaining_uses: entity.ability_uses_remaining(kind),
                 });
             }
         }

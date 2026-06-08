@@ -390,12 +390,16 @@ function assignAbilities(target, fields, index) {
 }
 
 function readAbilityCooldown(record, label) {
-  const fields = readArray(record, label, 2);
-  if (fields.length !== 2) throw new Error(`${label} field count mismatch`);
-  return {
+  const fields = readArray(record, label, 3);
+  if (fields.length !== 2 && fields.length !== 3) throw new Error(`${label} field count mismatch`);
+  const ability = {
     ability: readCode(fields[0], ABILITY_BY_CODE, `${label}.ability`),
     cooldownLeft: readU32(fields[1], `${label}.cooldownLeft`),
   };
+  if (fields.length > 2 && fields[2] != null) {
+    ability.remainingUses = readU32(fields[2], `${label}.remainingUses`);
+  }
+  return ability;
 }
 
 /** Decode lobby-debug-mode owner-only path diagnostics. */

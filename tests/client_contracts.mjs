@@ -14,6 +14,7 @@ import {
   AT_GUN_FIELD_OF_FIRE_RAD,
   MINING_CC_RANGE_TILES,
   RIFLEMAN_CHARGE_COOLDOWN_TICKS,
+  SMOKE_ABILITY_COST,
   STATS,
 } from "../client/src/config.js";
 import {
@@ -632,7 +633,7 @@ function fakeAudioContext() {
         null,
         [[ORDER_STAGE_CODE[ORDER_STAGE.MOVE], 96, 112], [ORDER_STAGE_CODE[ORDER_STAGE.MOVE], 128, 160], [ORDER_STAGE_CODE[ORDER_STAGE.SMOKE], 192, 224]],
         87,
-        [[ABILITY_CODE[ABILITY.CHARGE], 87]],
+        [[ABILITY_CODE[ABILITY.CHARGE], 87, 2]],
         true,
         [[[112, 128], [144, 160]], [192, 224], 12, 2, 1, 2],
       ],
@@ -695,7 +696,8 @@ function fakeAudioContext() {
   assert(decoded.entities[0].chargeCooldownLeft === 87, "legacy charge cooldown decodes");
   assert(
     decoded.entities[0].abilities[0].ability === ABILITY.CHARGE &&
-      decoded.entities[0].abilities[0].cooldownLeft === 87,
+      decoded.entities[0].abilities[0].cooldownLeft === 87 &&
+      decoded.entities[0].abilities[0].remainingUses === 2,
     "entity ability cooldowns decode",
   );
   assert(
@@ -900,6 +902,7 @@ function fakeAudioContext() {
   assert(STATS[KIND.SCOUT_CAR].cost.steel === 125, "Scout Car steel cost mirrors server");
   assert(STATS[KIND.SCOUT_CAR].cost.oil === 50, "Scout Car oil cost mirrors server");
   assert(STATS[KIND.SCOUT_CAR].sight === 10, "Scout Car has the largest mobile sight radius");
+  assert(SMOKE_ABILITY_COST.steel === 0 && SMOKE_ABILITY_COST.oil === 0, "Scout Car smoke has no resource cost");
   assert(STATS[KIND.SCOUT_CAR].body.length === 40.8, "Scout Car client body length mirrors server");
   assert(STATS[KIND.SCOUT_CAR].body.width === 21.6, "Scout Car client body width mirrors server");
   assert(KIND_CODE[KIND.SCOUT_CAR] === 14, "Scout Car compact kind code should follow Steelworks");
