@@ -124,18 +124,22 @@ export function devWatchConfig() {
     const id = (params.get("id") || "").trim();
     const unit = (params.get("unit") || "").trim();
     const count = (params.get("count") || "").trim();
+    const blocker = (params.get("blocker") || "").trim();
     if (
       !/^[a-z0-9_]+$/.test(id) ||
       !/^[a-z0-9_]+$/.test(unit) ||
-      !/^[1-9][0-9]*$/.test(count)
+      !/^[1-9][0-9]*$/.test(count) ||
+      (blocker && !/^[a-z0-9_]+$/.test(blocker))
     ) {
       return null;
     }
+    const blockerRoomPart = blocker ? `:blocker=${blocker}` : "";
+    const blockerBannerPart = blocker ? ` blocker=${blocker}` : "";
     return {
-      room: `__dev_scenario__:${id}:unit=${unit}:count=${count}`,
+      room: `__dev_scenario__:${id}:unit=${unit}:count=${count}${blockerRoomPart}`,
       noFog: true,
       kind: "scenario",
-      banner: `local dev scenario no fog ${id} unit=${unit} count=${count}`,
+      banner: `local dev scenario no fog ${id} unit=${unit} count=${count}${blockerBannerPart}`,
     };
   }
   if (window.location.pathname !== "/dev/selfplay" && !params.has("watchSelfplay")) return null;

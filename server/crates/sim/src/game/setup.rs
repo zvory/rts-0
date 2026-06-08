@@ -343,12 +343,26 @@ impl Game {
     pub fn new_vehicle_small_block_baseline_scenario(
         vehicle: EntityKind,
         pair_count: usize,
+        blocker: Option<EntityKind>,
         seed: u32,
     ) -> Result<DevScenarioSetup, String> {
         if !matches!(vehicle, EntityKind::ScoutCar | EntityKind::Tank) {
             return Err(format!(
                 "unsupported vehicle-small-block-baseline vehicle {vehicle}"
             ));
+        }
+        if let Some(blocker) = blocker {
+            if !matches!(
+                blocker,
+                EntityKind::Worker
+                    | EntityKind::Rifleman
+                    | EntityKind::MachineGunner
+                    | EntityKind::AtTeam
+            ) {
+                return Err(format!(
+                    "unsupported vehicle-small-block-baseline blocker {blocker}"
+                ));
+            }
         }
         if !matches!(pair_count, 1 | 3 | 5) {
             return Err(format!(
@@ -361,7 +375,7 @@ impl Game {
         let mut entities = EntityStore::new();
         let units =
             spawn_vehicle_small_block_baseline_units(&mut entities, vehicle, vehicle_starts)?;
-        spawn_vehicle_small_block_baseline_blockers(&mut entities, blocker_starts)?;
+        spawn_vehicle_small_block_baseline_blockers(&mut entities, blocker, blocker_starts)?;
         let player_id = 1;
         let player = PlayerState {
             id: player_id,
@@ -779,12 +793,20 @@ fn spawn_vehicle_small_block_baseline_units(
 
 fn spawn_vehicle_small_block_baseline_blockers(
     entities: &mut EntityStore,
+    blocker: Option<EntityKind>,
     starts: Vec<(f32, f32)>,
 ) -> Result<(), String> {
+    let Some(blocker) = blocker else {
+        return Ok(());
+    };
+    let north = -std::f32::consts::FRAC_PI_2;
     for (x, y) in starts {
-        entities
-            .spawn_unit(1, EntityKind::Worker, x, y)
-            .ok_or_else(|| "failed to spawn worker blocker".to_string())?;
+        let spawned = entities
+            .spawn_unit(1, blocker, x, y)
+            .ok_or_else(|| format!("failed to spawn {blocker} blocker"))?;
+        if let Some(e) = entities.get_mut(spawned) {
+            e.set_facing(north);
+        }
     }
     Ok(())
 }
@@ -1148,12 +1170,111 @@ fn debug_side_corner_world(map: &Map, start: (u32, u32), col: u32, row: u32) -> 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rayon::prelude::*;
 
     fn owned_kind_count(game: &Game, owner: u32, kind: EntityKind) -> usize {
         game.entities
             .iter()
             .filter(|e| e.owner == owner && e.kind == kind)
             .count()
+    }
+
+    #[derive(Debug)]
+    struct VehicleSmallBlockTiming {
+        vehicle: EntityKind,
+        pair_count: usize,
+        blocker: Option<EntityKind>,
+        clear_ticks: Option<u32>,
+        clear_seconds: Option<f32>,
+        final_state: Vec<String>,
+    }
+
+    fn blocker_label(blocker: Option<EntityKind>) -> &'static str {
+        match blocker {
+            None => "none",
+            Some(EntityKind::Worker) => "worker",
+            Some(EntityKind::Rifleman) => "rifleman",
+            Some(EntityKind::MachineGunner) => "machine_gunner",
+            Some(EntityKind::AtTeam) => "at_team",
+            Some(_) => "unsupported",
+        }
+    }
+
+    fn describe_vehicle_small_block_state(game: &Game, units: &[u32]) -> Vec<String> {
+        units
+            .iter()
+            .filter_map(|&id| {
+                let e = game.entities.get(id)?;
+                Some(format!(
+                    "#{id}: pos=({:.1},{:.1}) facing={:.3} phase={:?} path_len={} next={:?} goal={:?}",
+                    e.pos_x,
+                    e.pos_y,
+                    e.facing(),
+                    e.move_phase(),
+                    e.movement.as_ref().map(|m| m.path.len()).unwrap_or(0),
+                    e.next_waypoint(),
+                    e.path_goal(),
+                ))
+            })
+            .collect()
+    }
+
+    fn vehicle_small_block_vehicles_clear(game: &Game, units: &[u32]) -> bool {
+        units.iter().all(|&id| {
+            game.entities
+                .get(id)
+                .is_some_and(|e| e.move_phase().is_none() && e.path_is_empty())
+        })
+    }
+
+    fn measure_vehicle_small_block_clear_time(
+        vehicle: EntityKind,
+        pair_count: usize,
+        blocker: Option<EntityKind>,
+    ) -> VehicleSmallBlockTiming {
+        let setup = Game::new_vehicle_small_block_baseline_scenario(
+            vehicle,
+            pair_count,
+            blocker,
+            0x5150_0004,
+        )
+        .expect("scenario setup should succeed");
+        let mut game = setup.game;
+        let units = setup.units;
+        game.enqueue(
+            setup.player_id,
+            SimCommand::Move {
+                units: units.clone(),
+                x: setup.goal.0,
+                y: setup.goal.1,
+                queued: false,
+            },
+        );
+
+        let max_ticks = 12_000u32;
+        for _ in 0..max_ticks {
+            game.tick();
+            if vehicle_small_block_vehicles_clear(&game, &units) {
+                let ticks = game.tick_count();
+                return VehicleSmallBlockTiming {
+                    vehicle,
+                    pair_count,
+                    blocker,
+                    clear_ticks: Some(ticks),
+                    clear_seconds: Some(ticks as f32 / config::TICK_HZ as f32),
+                    final_state: describe_vehicle_small_block_state(&game, &units),
+                };
+            }
+        }
+
+        VehicleSmallBlockTiming {
+            vehicle,
+            pair_count,
+            blocker,
+            clear_ticks: None,
+            clear_seconds: None,
+            final_state: describe_vehicle_small_block_state(&game, &units),
+        }
     }
 
     #[test]
@@ -1184,21 +1305,37 @@ mod tests {
         }
     }
 
-    fn assert_vehicle_small_block_baseline_setup(vehicle: EntityKind, pair_count: usize) {
-        let setup =
-            Game::new_vehicle_small_block_baseline_scenario(vehicle, pair_count, 0x5150_0004)
-                .expect("scenario setup should succeed");
+    fn assert_vehicle_small_block_baseline_setup(
+        vehicle: EntityKind,
+        pair_count: usize,
+        blocker: Option<EntityKind>,
+    ) {
+        let setup = Game::new_vehicle_small_block_baseline_scenario(
+            vehicle,
+            pair_count,
+            blocker,
+            0x5150_0004,
+        )
+        .expect("scenario setup should succeed");
         assert_eq!(
             setup.units.len(),
             pair_count,
             "{vehicle} scenario should command one vehicle per pair"
         );
         assert_eq!(owned_kind_count(&setup.game, 1, vehicle), pair_count);
-        assert_eq!(
-            owned_kind_count(&setup.game, 1, EntityKind::Worker),
-            pair_count,
-            "{vehicle} scenario should spawn one small blocker per vehicle"
-        );
+        for kind in [
+            EntityKind::Worker,
+            EntityKind::Rifleman,
+            EntityKind::MachineGunner,
+            EntityKind::AtTeam,
+        ] {
+            let expected = (blocker == Some(kind)).then_some(pair_count).unwrap_or(0);
+            assert_eq!(
+                owned_kind_count(&setup.game, 1, kind),
+                expected,
+                "{vehicle} scenario should spawn expected {kind} blockers"
+            );
+        }
 
         let north = -std::f32::consts::FRAC_PI_2;
         let mut vehicle_positions: Vec<(f32, f32)> = setup
@@ -1225,7 +1362,7 @@ mod tests {
             .game
             .entities
             .iter()
-            .filter(|e| e.owner == 1 && e.kind == EntityKind::Worker)
+            .filter(|e| e.owner == 1 && Some(e.kind) == blocker)
             .map(|e| (e.pos_x, e.pos_y))
             .collect();
         blocker_positions.sort_by(|a, b| a.0.total_cmp(&b.0));
@@ -1238,16 +1375,19 @@ mod tests {
                 "{vehicle} adjacent vehicle spacing should be {expected_spacing:.2}px, got {gap:.2}px"
             );
         }
-        for (vehicle_pos, blocker_pos) in vehicle_positions.iter().zip(blocker_positions.iter()) {
-            assert!(
-                (vehicle_pos.0 - blocker_pos.0).abs() <= 0.001,
-                "{vehicle} blocker should be directly north on the same x"
-            );
-            let north_delta = vehicle_pos.1 - blocker_pos.1;
-            assert!(
-                (north_delta - config::TILE_SIZE as f32).abs() <= 0.001,
-                "{vehicle} blocker should be one tile north, got {north_delta:.2}px"
-            );
+        if blocker.is_some() {
+            for (vehicle_pos, blocker_pos) in vehicle_positions.iter().zip(blocker_positions.iter())
+            {
+                assert!(
+                    (vehicle_pos.0 - blocker_pos.0).abs() <= 0.001,
+                    "{vehicle} blocker should be directly north on the same x"
+                );
+                let north_delta = vehicle_pos.1 - blocker_pos.1;
+                assert!(
+                    (north_delta - config::TILE_SIZE as f32).abs() <= 0.001,
+                    "{vehicle} blocker should be one tile north, got {north_delta:.2}px"
+                );
+            }
         }
 
         let center_vehicle = vehicle_positions[pair_count / 2];
@@ -1266,7 +1406,11 @@ mod tests {
         ($name:ident, $vehicle:expr, $pair_count:expr) => {
             #[test]
             fn $name() {
-                assert_vehicle_small_block_baseline_setup($vehicle, $pair_count);
+                assert_vehicle_small_block_baseline_setup(
+                    $vehicle,
+                    $pair_count,
+                    Some(EntityKind::Worker),
+                );
             }
         };
     }
@@ -1301,6 +1445,94 @@ mod tests {
         EntityKind::Tank,
         5
     );
+
+    #[test]
+    fn vehicle_small_block_baseline_supports_blocker_variants() {
+        for blocker in [
+            None,
+            Some(EntityKind::Worker),
+            Some(EntityKind::Rifleman),
+            Some(EntityKind::MachineGunner),
+            Some(EntityKind::AtTeam),
+        ] {
+            assert_vehicle_small_block_baseline_setup(EntityKind::ScoutCar, 3, blocker);
+            assert_vehicle_small_block_baseline_setup(EntityKind::Tank, 3, blocker);
+        }
+    }
+
+    #[test]
+    fn vehicle_small_block_baseline_clear_time_matrix() {
+        let scenarios: Vec<_> = [EntityKind::ScoutCar, EntityKind::Tank]
+            .into_iter()
+            .flat_map(|vehicle| {
+                [1usize, 3, 5].into_iter().flat_map(move |pair_count| {
+                    [
+                        None,
+                        Some(EntityKind::Worker),
+                        Some(EntityKind::Rifleman),
+                        Some(EntityKind::MachineGunner),
+                        Some(EntityKind::AtTeam),
+                    ]
+                    .into_iter()
+                    .map(move |blocker| (vehicle, pair_count, blocker))
+                })
+            })
+            .collect();
+        let mut results: Vec<_> = scenarios
+            .par_iter()
+            .map(|&(vehicle, pair_count, blocker)| {
+                measure_vehicle_small_block_clear_time(vehicle, pair_count, blocker)
+            })
+            .collect();
+        results.sort_by(|a, b| {
+            (
+                a.vehicle.stable_id(),
+                a.pair_count,
+                blocker_label(a.blocker),
+            )
+                .cmp(&(
+                    b.vehicle.stable_id(),
+                    b.pair_count,
+                    blocker_label(b.blocker),
+                ))
+        });
+
+        println!("VEHICLE_SMALL_BLOCK_BASELINE_CLEAR_TIMES");
+        println!("vehicle | count | blocker | clear_ticks | clear_seconds | final_state");
+        for result in &results {
+            match (result.clear_ticks, result.clear_seconds) {
+                (Some(ticks), Some(seconds)) => println!(
+                    "{:>9} | {:>5} | {:>14} | {:>11} | {:>13.2} | {:?}",
+                    result.vehicle,
+                    result.pair_count,
+                    blocker_label(result.blocker),
+                    ticks,
+                    seconds,
+                    result.final_state
+                ),
+                _ => println!(
+                    "{:>9} | {:>5} | {:>14} | {:>11} | {:>13} | {:?}",
+                    result.vehicle,
+                    result.pair_count,
+                    blocker_label(result.blocker),
+                    "timeout",
+                    "timeout",
+                    result.final_state
+                ),
+            }
+        }
+
+        for result in &results {
+            assert!(
+                result.clear_ticks.is_some(),
+                "vehicle-small-block vehicle={} count={} blocker={} timed out; final_state={:?}",
+                result.vehicle,
+                result.pair_count,
+                blocker_label(result.blocker),
+                result.final_state
+            );
+        }
+    }
 
     #[test]
     fn debug_starting_loadout_applies_to_humans_only() {
