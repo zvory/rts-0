@@ -21,7 +21,7 @@ crates/
     pathfinding.rs # A* over the tile grid, with optional turn-cost route shaping for tanks
     fog.rs       # per-player live visibility grid plus snapshot-only lingering death sight sources
     systems.rs   # orchestrator: runs services in order each tick
-    services/    # per-tick services: commands, move_coordinator, movement (incl. unit collision), combat, economy, production, construction, death, occupancy, supply, pathing, geometry, standability, line_of_sight
+    services/    # per-tick services: commands, order_planner, move_coordinator, movement (incl. unit collision), combat, economy, production, construction, death, occupancy, supply, pathing, geometry, standability, line_of_sight
     replay.rs    # tick-stamped command log replay harness for determinism checks
     src/rules/projection.rs # fog-gated entity/event projection seam
 ```
@@ -185,15 +185,86 @@ after production/construction/death mutations; and final state for snapshot inte
 Systems should consume the derived-state object for their phase instead of carrying occupancy or
 spatial indexes across later mutations.
 
-Queued unit orders are future intents stored on mobile units, capped at 8 intents per unit.
-The command service dedupes and caps unit-id lists before appending, rejects non-finite queued
-points, and validates target/resource ownership enough to avoid storing obviously stale attack or
-gather intents. Promotion is centralized in `services::order_queue`: idle units, arrived/path-failed
-move orders, and completed/invalid explicit attacks pop the next valid intent; move and attack-move
-promotions are batched by owner/destination through deterministic `BTreeMap` ordering, while
-attack, gather, and build promotions are issued per unit. Invalid queued build/gather/attack
-intents are skipped at promotion time rather than retried forever. Active gather and build orders
-remain terminal until their own systems mark them complete or clear them.
+### 3.5 Command planning and queued order semantics
+
+The authoritative command model is: clients compose intent; the server validates and plans it.
+Keyboard latching, double-tap quick-cast, Shift lifetime, and cursor previews are client UX. The
+simulation contract begins when a `SimCommand` reaches `services::commands`: the command service
+dedupes and caps unit-id lists, builds issue-time facts for the referenced units/targets, and must
+produce unit-local actions that match the policy below. `services::order_planner` is the pure
+reference implementation of this planning policy. The planner has no `EntityStore`, fog, pathing,
+economy, or cooldown mutation dependency; it accepts plain facts and emits one of three effects:
+
+- `ReplaceActive` — replace this unit's active order and clear future queued intents.
+- `AppendQueued` — append one future intent to this unit's queue.
+- `ExecuteAbilityNow { preserve_orders: true }` — execute an immediate ability without replacing
+  the active order or queued intents.
+
+General rules:
+
+- Commands must be valid at issue time. The server checks ownership, unit capability, target
+  validity/visibility, finite points, ability carrier kind, ability readiness/cooldown/uses, and
+  other command-specific facts before planning. It does not project future movement, future
+  cooldown expiry, future tech, or future affordability.
+- Resource costs are paid at execution time, not queue time. A queued ability or build that becomes
+  unaffordable later is skipped or rejected by the execution/promotion path.
+- Omitted `queued` means immediate. Ordinary immediate unit orders replace active state and clear
+  future intents. `stop` always clears both active and queued unit orders.
+- Queueable commands append future unit-local intents. Unit queues are capped at 8 intents today;
+  a valid append rejected only because the queue is full should emit a player notice.
+- Invalid commands are no-ops except where a notice is explicitly useful. Stale queued stages are
+  skipped at promotion time rather than retried forever.
+- Queue planning is issue-time only. A unit with an ability on cooldown is not eligible for a
+  queued ability intent just because the cooldown might expire before the intent promotes.
+- Later orders still apply to every compatible selected unit. Earlier specialized stages do not
+  remove non-carriers from the plan; for example, a queued smoke applies to one scout car, while the
+  following queued attack-move applies to all selected units that can receive attack-move.
+
+Allocation rules:
+
+- Point orders (`move`, `attackMove`) apply to every selected owned unit that can receive orders.
+- Target/resource/build orders apply to every selected compatible owned unit after the target or
+  placement has passed issue-time validation.
+- Self-targeted abilities, such as Charge, broadcast to every selected ready carrier. Queued Charge
+  is a future self-ability intent for each ready rifleman; immediate Charge executes immediately and
+  preserves existing movement/queue state.
+- World-targeted abilities, such as Smoke, allocate one ready carrier per click. For queued
+  commands the planner chooses an eligible selected carrier with the shortest current queue, which
+  gives round-robin behavior across repeated clicks. If all eligible carriers are full, emit queue
+  full notices; if no carrier is ready at issue time, ignore the click.
+- Immediate world-targeted abilities may be noninterrupting when the ability can fire now without
+  replacing the active order. This is the reactive smoke case: a moving scout car that already has
+  the target in range may launch smoke and continue its previous move and queued plan. If a
+  world-targeted ability cannot execute noninterruptingly, the immediate order may replace the
+  chosen idle caster's active order with an ability movement order.
+- AT-gun setup is a queueable facing intent for selected AT teams only. The stored point means
+  "face toward this world point from wherever the gun is when the setup stage promotes"; mixed
+  selections ignore non-AT units for setup but keep them for later compatible orders.
+
+Examples:
+
+- **Smoke wall then attack.** The player right-clicks selected scout cars to move to a staging
+  point, holds Shift, holds/taps Smoke, and clicks four smoke targets. Each smoke click appends one
+  smoke intent to one ready scout car, rotating across eligible cars by queue length. The player
+  then keeps Shift held, arms Attack, and clicks attack-move points. The smoke carriers execute
+  their smoke stages before the later attack-move; selected non-carriers skip smoke and still
+  receive the attack-move stages.
+- **Waypoint, Charge, attack.** The player queues a move, queues Charge, then queues attack-move.
+  Ready riflemen receive a future self-ability stage between the move and attack-move. Non-riflemen
+  do not receive Charge but still receive the move and attack-move.
+- **Packed AT guns.** The player orders packed AT guns to move, then Shift-arms setup and clicks a
+  facing point. The setup stage promotes after movement and computes facing from the gun's actual
+  arrived position toward the stored world point.
+- **Reactive moving smoke.** A scout car already moving past cover receives an immediate Smoke
+  command for an in-range point. The planner emits a noninterrupting ability execution, so the
+  smoke launches without dropping the car's current move order or queued future orders.
+
+Promotion is centralized in `services::order_queue`: idle units, arrived/path-failed move orders,
+completed or invalid explicit attacks, and completed ability movement orders pop the next valid
+intent. Move and attack-move promotions are batched by owner/destination through deterministic
+`BTreeMap` ordering, while attack, gather, build, setup, and ability promotions are issued per unit.
+Active gather and build orders remain terminal until their own systems mark them complete or clear
+them.
 
 Production buildings intentionally keep a single rally point. `setRally` replaces that point even
 when an older client sends `queued: true`; newly produced units receive only the current rally point
