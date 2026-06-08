@@ -4,7 +4,8 @@ use crate::config;
 use crate::game::ability::{self, AbilityKind, AbilityTargetMode};
 use crate::game::command::SimCommand;
 use crate::game::entity::{
-    BuildPhase, EntityKind, EntityStore, OrderIntent, ProdItem, WeaponSetup,
+    BuildPhase, EntityKind, EntityStore, Order, OrderIntent, ProdItem, WeaponSetup,
+    MAX_QUEUED_ORDERS,
 };
 use crate::game::fog::Fog;
 use crate::game::map::Map;
@@ -15,6 +16,7 @@ use crate::game::services::construction::resumable_site_for_build_intent;
 use crate::game::services::dist2;
 use crate::game::services::move_coordinator::MoveCoordinator;
 use crate::game::services::movement::angle_delta;
+use crate::game::services::order_planner as planner;
 use crate::game::services::spatial::SpatialIndex;
 use crate::game::services::standability;
 use crate::game::services::world_query;
@@ -49,19 +51,26 @@ pub(crate) fn apply_commands(
                 y,
                 queued,
             } => {
-                if queued {
-                    append_queued_point_order(entities, player, units, x, y, false);
-                    continue;
-                }
-                let valid: Vec<u32> = dedupe_cap_units(units)
-                    .into_iter()
-                    .filter(|id| {
-                        owns_unit(entities, player, *id) && !is_constructing(entities, *id)
-                    })
-                    .collect();
-                clear_queued_orders(entities, &valid);
-                clear_staged_at_gun_setup(entities, &valid);
-                coordinator.order_group_move(entities, player, &valid, (x, y), false);
+                let request = planner::OrderRequest {
+                    units: units.clone(),
+                    mode: issue_mode(queued),
+                    order: planner::RequestedOrder::Move {
+                        to: planner::Point::new(x, y),
+                    },
+                };
+                apply_planned_unit_order(
+                    map,
+                    entities,
+                    players,
+                    spatial,
+                    coordinator,
+                    fog,
+                    smokes,
+                    events,
+                    player,
+                    &planner_facts(entities, player, &units, false),
+                    &request,
+                );
             }
             SimCommand::AttackMove {
                 units,
@@ -69,61 +78,55 @@ pub(crate) fn apply_commands(
                 y,
                 queued,
             } => {
-                if queued {
-                    append_queued_point_order(entities, player, units, x, y, true);
-                    continue;
-                }
-                let valid: Vec<u32> = dedupe_cap_units(units)
-                    .into_iter()
-                    .filter(|id| {
-                        owns_unit(entities, player, *id) && !is_constructing(entities, *id)
-                    })
-                    .collect();
-                clear_queued_orders(entities, &valid);
-                clear_staged_at_gun_setup(entities, &valid);
-                coordinator.order_group_move(entities, player, &valid, (x, y), true);
+                let request = planner::OrderRequest {
+                    units: units.clone(),
+                    mode: issue_mode(queued),
+                    order: planner::RequestedOrder::AttackMove {
+                        to: planner::Point::new(x, y),
+                    },
+                };
+                apply_planned_unit_order(
+                    map,
+                    entities,
+                    players,
+                    spatial,
+                    coordinator,
+                    fog,
+                    smokes,
+                    events,
+                    player,
+                    &planner_facts(entities, player, &units, false),
+                    &request,
+                );
             }
             SimCommand::Attack {
                 units,
                 target,
                 queued,
             } => {
-                for id in dedupe_cap_units(units) {
-                    if let Some(e) = entities.get(id) {
-                        if !e.is_unit() || e.owner != player {
-                            continue;
-                        }
-                    } else {
-                        continue;
-                    }
-                    if is_constructing(entities, id) {
-                        continue;
-                    }
-                    let target_ok = matches!(entities.get(target),
-                        Some(t) if world_query::is_enemy_targetable(t, player, id)
-                            && fog.is_visible_world(player, t.pos_x, t.pos_y)
-                            && !smokes.point_inside(t.pos_x, t.pos_y));
-                    if !target_ok {
-                        continue;
-                    }
-                    if deployed_at_gun_target_outside_arc(entities, id, target) {
-                        continue;
-                    }
-                    if queued {
-                        if !matches!(entities.get(id), Some(e) if e.can_attack()) {
-                            continue;
-                        }
-                        if let Some(e) = entities.get_mut(id) {
-                            e.append_queued_order(OrderIntent::attack(target));
-                        }
-                        continue;
-                    }
-                    if let Some(e) = entities.get_mut(id) {
-                        e.clear_queued_orders();
-                    }
-                    clear_staged_at_gun_setup(entities, &[id]);
-                    coordinator.order_attack(entities, id, target);
-                }
+                let target_valid =
+                    attack_target_valid(entities, fog, smokes, player, &units, target);
+                let request = planner::OrderRequest {
+                    units: units.clone(),
+                    mode: issue_mode(queued),
+                    order: planner::RequestedOrder::AttackTarget {
+                        target,
+                        target_valid,
+                    },
+                };
+                apply_planned_unit_order(
+                    map,
+                    entities,
+                    players,
+                    spatial,
+                    coordinator,
+                    fog,
+                    smokes,
+                    events,
+                    player,
+                    &planner_facts(entities, player, &units, false),
+                    &request,
+                );
             }
             SimCommand::SetupAtGuns { units, x, y } => {
                 if !x.is_finite() || !y.is_finite() {
@@ -219,37 +222,25 @@ pub(crate) fn apply_commands(
                 node,
                 queued,
             } => {
-                for id in dedupe_cap_units(units) {
-                    if !owns_unit(entities, player, id) {
-                        continue;
-                    }
-                    let is_worker =
-                        matches!(entities.get(id), Some(e) if e.kind == EntityKind::Worker);
-                    let node_ok = matches!(entities.get(node), Some(n)
-                        if n.is_node() && n.remaining().unwrap_or(0) > 0);
-                    if !is_worker || !node_ok {
-                        continue;
-                    }
-                    if !world_query::resource_has_completed_mining_cc(entities, player, node) {
-                        continue;
-                    }
-                    if matches!(entities.node_slot_holder(node), Some(holder) if holder != id) {
-                        continue;
-                    }
-                    if queued {
-                        if let Some(e) = entities.get_mut(id) {
-                            e.append_queued_order(OrderIntent::gather(node));
-                        }
-                        continue;
-                    }
-                    if is_constructing(entities, id) {
-                        continue;
-                    }
-                    if let Some(e) = entities.get_mut(id) {
-                        e.clear_queued_orders();
-                    }
-                    coordinator.order_gather(entities, id, node);
-                }
+                let node_valid = gather_node_valid(entities, player, node);
+                let request = planner::OrderRequest {
+                    units: units.clone(),
+                    mode: issue_mode(queued),
+                    order: planner::RequestedOrder::Gather { node, node_valid },
+                };
+                apply_planned_unit_order(
+                    map,
+                    entities,
+                    players,
+                    spatial,
+                    coordinator,
+                    fog,
+                    smokes,
+                    events,
+                    player,
+                    &planner_facts(entities, player, &units, false),
+                    &request,
+                );
             }
             SimCommand::Build {
                 worker,
@@ -258,22 +249,28 @@ pub(crate) fn apply_commands(
                 tile_y,
                 queued,
             } => {
-                if queued {
-                    append_queued_build_order(entities, player, worker, building, tile_x, tile_y);
-                    continue;
-                }
-                order_build(
+                let request = planner::OrderRequest {
+                    units: vec![worker],
+                    mode: issue_mode(queued),
+                    order: planner::RequestedOrder::Build {
+                        kind: build_kind_code(building),
+                        tile_x,
+                        tile_y,
+                        placement_valid: true,
+                    },
+                };
+                apply_planned_unit_order(
                     map,
                     entities,
                     players,
                     spatial,
                     coordinator,
-                    player,
-                    worker,
-                    building,
-                    tile_x,
-                    tile_y,
+                    fog,
+                    smokes,
                     events,
+                    player,
+                    &planner_facts(entities, player, &[worker], !queued),
+                    &request,
                 );
             }
             SimCommand::Train { building, unit } => {
@@ -324,6 +321,263 @@ fn dedupe_cap_units(units: Vec<u32>) -> Vec<u32> {
         }
     }
     out
+}
+
+fn issue_mode(queued: bool) -> planner::IssueMode {
+    if queued {
+        planner::IssueMode::Queue
+    } else {
+        planner::IssueMode::Immediate
+    }
+}
+
+fn planner_config() -> planner::PlannerConfig {
+    planner::PlannerConfig {
+        max_units_per_command: MAX_UNITS_PER_COMMAND,
+        max_queue_len: MAX_QUEUED_ORDERS,
+    }
+}
+
+fn planner_facts(
+    entities: &EntityStore,
+    player: u32,
+    units: &[u32],
+    build_notice_compat: bool,
+) -> Vec<planner::UnitFacts> {
+    dedupe_cap_units(units.to_vec())
+        .into_iter()
+        .filter_map(|id| {
+            let e = entities.get(id)?;
+            if !e.is_unit() || e.owner != player {
+                return None;
+            }
+            let mut facts = planner::UnitFacts::new(id);
+            facts.queue_len = e.queued_orders().len();
+            facts.activity = match e.order() {
+                Order::Idle => planner::UnitActivity::Idle,
+                Order::Move(_) | Order::AttackMove(_) | Order::Ability(_) => {
+                    planner::UnitActivity::Moving
+                }
+                _ => planner::UnitActivity::Busy,
+            };
+            facts.can_attack = e.can_attack();
+            facts.can_gather = e.kind == EntityKind::Worker;
+            facts.can_build = e.kind == EntityKind::Worker || build_notice_compat;
+            facts.can_setup_at_gun = e.kind == EntityKind::AtTeam;
+            Some(facts)
+        })
+        .collect()
+}
+
+#[allow(clippy::too_many_arguments)]
+fn apply_planned_unit_order(
+    map: &Map,
+    entities: &mut EntityStore,
+    players: &[PlayerState],
+    spatial: &SpatialIndex,
+    coordinator: &mut MoveCoordinator<'_>,
+    fog: &Fog,
+    smokes: &SmokeCloudStore,
+    events: &mut HashMap<u32, Vec<Event>>,
+    player: u32,
+    facts: &[planner::UnitFacts],
+    request: &planner::OrderRequest,
+) {
+    let output = planner::plan_order(planner_config(), facts, request);
+    let mut move_units = Vec::new();
+    let mut attack_move_units = Vec::new();
+    let mut move_goal = None;
+    let mut attack_move_goal = None;
+
+    for action in output.actions {
+        match action {
+            planner::PlannedAction::ReplaceActive { unit, intent } => match intent {
+                planner::OrderIntent::Move(point) => {
+                    if immediate_unit_can_replace(entities, player, unit) {
+                        move_goal = Some((point.x, point.y));
+                        move_units.push(unit);
+                    }
+                }
+                planner::OrderIntent::AttackMove(point) => {
+                    if immediate_unit_can_replace(entities, player, unit) {
+                        attack_move_goal = Some((point.x, point.y));
+                        attack_move_units.push(unit);
+                    }
+                }
+                planner::OrderIntent::AttackTarget(target) => {
+                    if immediate_unit_can_replace(entities, player, unit)
+                        && attack_unit_can_target(entities, fog, smokes, player, unit, target)
+                        && !deployed_at_gun_target_outside_arc(entities, unit, target)
+                    {
+                        if let Some(e) = entities.get_mut(unit) {
+                            e.clear_queued_orders();
+                        }
+                        clear_staged_at_gun_setup(entities, &[unit]);
+                        coordinator.order_attack(entities, unit, target);
+                    }
+                }
+                planner::OrderIntent::Gather(node) => {
+                    if gather_unit_can_use_node(entities, player, unit, node) {
+                        if let Some(e) = entities.get_mut(unit) {
+                            e.clear_queued_orders();
+                        }
+                        coordinator.order_gather(entities, unit, node);
+                    }
+                }
+                planner::OrderIntent::Build {
+                    kind,
+                    tile_x,
+                    tile_y,
+                } => {
+                    let Some(building) = build_kind_from_code(kind) else {
+                        continue;
+                    };
+                    order_build(
+                        map,
+                        entities,
+                        players,
+                        spatial,
+                        coordinator,
+                        player,
+                        unit,
+                        building,
+                        tile_x,
+                        tile_y,
+                        events,
+                    );
+                }
+                planner::OrderIntent::SetupAtGuns { .. }
+                | planner::OrderIntent::WorldAbility { .. }
+                | planner::OrderIntent::SelfAbility { .. } => {}
+            },
+            planner::PlannedAction::AppendQueued { unit, intent } => {
+                if let Some(intent) = entity_order_intent_from_planner(intent) {
+                    if matches!(intent, OrderIntent::Attack(_))
+                        && !matches!(
+                            intent,
+                            OrderIntent::Attack(attack)
+                                if attack_unit_can_target(
+                                    entities,
+                                    fog,
+                                    smokes,
+                                    player,
+                                    unit,
+                                    attack.target
+                                )
+                        )
+                    {
+                        continue;
+                    }
+                    if let Some(e) = entities.get_mut(unit) {
+                        e.append_queued_order(intent);
+                    }
+                }
+            }
+            planner::PlannedAction::ExecuteAbilityNow { .. } => {}
+        }
+    }
+
+    if let Some(goal) = move_goal {
+        clear_queued_orders(entities, &move_units);
+        clear_staged_at_gun_setup(entities, &move_units);
+        coordinator.order_group_move(entities, player, &move_units, goal, false);
+    }
+    if let Some(goal) = attack_move_goal {
+        clear_queued_orders(entities, &attack_move_units);
+        clear_staged_at_gun_setup(entities, &attack_move_units);
+        coordinator.order_group_move(entities, player, &attack_move_units, goal, true);
+    }
+
+    for planner_notice in output.notices {
+        match planner_notice {
+            planner::PlannerNotice::QueueFull { .. } => {
+                notice(events, player, "Command queue full");
+            }
+        }
+    }
+}
+
+fn immediate_unit_can_replace(entities: &EntityStore, player: u32, unit: u32) -> bool {
+    owns_unit(entities, player, unit) && !is_constructing(entities, unit)
+}
+
+fn attack_target_valid(
+    entities: &EntityStore,
+    fog: &Fog,
+    smokes: &SmokeCloudStore,
+    player: u32,
+    units: &[u32],
+    target: u32,
+) -> bool {
+    dedupe_cap_units(units.to_vec())
+        .into_iter()
+        .any(|unit| attack_unit_can_target(entities, fog, smokes, player, unit, target))
+}
+
+fn attack_unit_can_target(
+    entities: &EntityStore,
+    fog: &Fog,
+    smokes: &SmokeCloudStore,
+    player: u32,
+    unit: u32,
+    target: u32,
+) -> bool {
+    matches!(entities.get(target),
+        Some(t) if world_query::is_enemy_targetable(t, player, unit)
+            && fog.is_visible_world(player, t.pos_x, t.pos_y)
+            && !smokes.point_inside(t.pos_x, t.pos_y))
+}
+
+fn gather_node_valid(entities: &EntityStore, player: u32, node: u32) -> bool {
+    matches!(entities.get(node), Some(n) if n.is_node() && n.remaining().unwrap_or(0) > 0)
+        && world_query::resource_has_completed_mining_cc(entities, player, node)
+}
+
+fn gather_unit_can_use_node(entities: &EntityStore, player: u32, unit: u32, node: u32) -> bool {
+    owns_unit(entities, player, unit)
+        && matches!(entities.get(unit), Some(e) if e.kind == EntityKind::Worker)
+        && gather_node_valid(entities, player, node)
+        && !matches!(entities.node_slot_holder(node), Some(holder) if holder != unit)
+}
+
+fn entity_order_intent_from_planner(intent: planner::OrderIntent) -> Option<OrderIntent> {
+    match intent {
+        planner::OrderIntent::Move(point) => Some(OrderIntent::move_to(point.x, point.y)),
+        planner::OrderIntent::AttackMove(point) => {
+            Some(OrderIntent::attack_move_to(point.x, point.y))
+        }
+        planner::OrderIntent::AttackTarget(target) => Some(OrderIntent::attack(target)),
+        planner::OrderIntent::Gather(node) => Some(OrderIntent::gather(node)),
+        planner::OrderIntent::Build {
+            kind,
+            tile_x,
+            tile_y,
+        } => {
+            build_kind_from_code(kind).map(|building| OrderIntent::build(building, tile_x, tile_y))
+        }
+        planner::OrderIntent::WorldAbility { ability, target } => ability_from_planner(ability)
+            .map(|ability| OrderIntent::ability(ability, target.x, target.y)),
+        planner::OrderIntent::SelfAbility { .. } | planner::OrderIntent::SetupAtGuns { .. } => None,
+    }
+}
+
+fn build_kind_code(kind: EntityKind) -> planner::BuildKind {
+    EntityKind::ALL
+        .iter()
+        .position(|candidate| *candidate == kind)
+        .unwrap_or(usize::MAX) as planner::BuildKind
+}
+
+fn build_kind_from_code(code: planner::BuildKind) -> Option<EntityKind> {
+    EntityKind::ALL.get(code as usize).copied()
+}
+
+fn ability_from_planner(ability: planner::AbilityId) -> Option<AbilityKind> {
+    match ability.0 {
+        0 => Some(AbilityKind::Charge),
+        1 => Some(AbilityKind::Smoke),
+        _ => None,
+    }
 }
 
 struct AbilityUse {
@@ -474,51 +728,6 @@ fn clear_queued_orders(entities: &mut EntityStore, ids: &[u32]) {
         if let Some(e) = entities.get_mut(*id) {
             e.clear_queued_orders();
         }
-    }
-}
-
-fn append_queued_point_order(
-    entities: &mut EntityStore,
-    player: u32,
-    units: Vec<u32>,
-    x: f32,
-    y: f32,
-    attack_move: bool,
-) {
-    if !x.is_finite() || !y.is_finite() {
-        return;
-    }
-    let intent = if attack_move {
-        OrderIntent::attack_move_to(x, y)
-    } else {
-        OrderIntent::move_to(x, y)
-    };
-    for id in dedupe_cap_units(units) {
-        if !owns_unit(entities, player, id) {
-            continue;
-        }
-        if let Some(e) = entities.get_mut(id) {
-            e.append_queued_order(intent.clone());
-        }
-    }
-}
-
-fn append_queued_build_order(
-    entities: &mut EntityStore,
-    player: u32,
-    worker: u32,
-    building: EntityKind,
-    tile_x: u32,
-    tile_y: u32,
-) {
-    if !owns_unit(entities, player, worker) {
-        return;
-    }
-    if !matches!(entities.get(worker), Some(e) if e.kind == EntityKind::Worker) {
-        return;
-    }
-    if let Some(e) = entities.get_mut(worker) {
-        e.append_queued_order(OrderIntent::build(building, tile_x, tile_y));
     }
 }
 
@@ -1169,6 +1378,218 @@ mod tests {
             matches!(entity.order(), Order::Move(_)),
             "replacement move should still issue the active order"
         );
+    }
+
+    #[test]
+    fn planner_backed_existing_command_families_preserve_active_and_queued_state() {
+        let map = flat_map(24);
+        let mut entities = EntityStore::new();
+        let (cc_x, cc_y) = footprint_center(&map, EntityKind::CityCentre, 4, 4);
+        entities
+            .spawn_building(1, EntityKind::CityCentre, cc_x, cc_y, true)
+            .expect("city centre should spawn");
+        let worker = entities
+            .spawn_unit(1, EntityKind::Worker, cc_x + 16.0, cc_y)
+            .expect("worker should spawn");
+        let rifle = entities
+            .spawn_unit(1, EntityKind::Rifleman, cc_x + 48.0, cc_y)
+            .expect("rifleman should spawn");
+        let target = entities
+            .spawn_unit(2, EntityKind::Rifleman, cc_x + 96.0, cc_y)
+            .expect("target should spawn");
+        let node = entities
+            .spawn_node(EntityKind::Steel, cc_x + 64.0, cc_y)
+            .expect("node should spawn");
+
+        entities
+            .get_mut(rifle)
+            .unwrap()
+            .append_queued_order(OrderIntent::move_to(700.0, 700.0));
+        apply(
+            &map,
+            &mut entities,
+            vec![(
+                1,
+                SimCommand::Move {
+                    units: vec![rifle],
+                    x: 180.0,
+                    y: 180.0,
+                    queued: false,
+                },
+            )],
+        );
+        assert!(matches!(
+            entities.get(rifle).unwrap().order(),
+            Order::Move(_)
+        ));
+        assert!(entities.get(rifle).unwrap().queued_orders().is_empty());
+
+        apply(
+            &map,
+            &mut entities,
+            vec![(
+                1,
+                SimCommand::AttackMove {
+                    units: vec![rifle],
+                    x: 220.0,
+                    y: 180.0,
+                    queued: true,
+                },
+            )],
+        );
+        assert!(matches!(
+            entities.get(rifle).unwrap().order(),
+            Order::Move(_)
+        ));
+        assert!(matches!(
+            entities.get(rifle).unwrap().queued_orders().last(),
+            Some(OrderIntent::AttackMove(_))
+        ));
+
+        apply(
+            &map,
+            &mut entities,
+            vec![(
+                1,
+                SimCommand::Attack {
+                    units: vec![rifle],
+                    target,
+                    queued: false,
+                },
+            )],
+        );
+        assert!(matches!(
+            entities.get(rifle).unwrap().order(),
+            Order::Attack(_)
+        ));
+        assert!(entities.get(rifle).unwrap().queued_orders().is_empty());
+
+        apply(
+            &map,
+            &mut entities,
+            vec![(
+                1,
+                SimCommand::Gather {
+                    units: vec![worker],
+                    node,
+                    queued: false,
+                },
+            )],
+        );
+        assert!(matches!(
+            entities.get(worker).unwrap().order(),
+            Order::Gather(_)
+        ));
+
+        apply(
+            &map,
+            &mut entities,
+            vec![(
+                1,
+                SimCommand::Build {
+                    worker,
+                    building: EntityKind::Depot,
+                    tile_x: 10,
+                    tile_y: 10,
+                    queued: true,
+                },
+            )],
+        );
+        assert!(matches!(
+            entities.get(worker).unwrap().queued_orders().last(),
+            Some(OrderIntent::Build(_))
+        ));
+    }
+
+    #[test]
+    fn planner_backed_valid_queued_commands_emit_queue_full_notices() {
+        let map = flat_map(24);
+        let mut entities = EntityStore::new();
+        let (cc_x, cc_y) = footprint_center(&map, EntityKind::CityCentre, 4, 4);
+        entities
+            .spawn_building(1, EntityKind::CityCentre, cc_x, cc_y, true)
+            .expect("city centre should spawn");
+        let mover = entities
+            .spawn_unit(1, EntityKind::Tank, cc_x + 16.0, cc_y)
+            .expect("tank should spawn");
+        let attacker = entities
+            .spawn_unit(1, EntityKind::Rifleman, cc_x + 48.0, cc_y)
+            .expect("rifleman should spawn");
+        let gatherer = entities
+            .spawn_unit(1, EntityKind::Worker, cc_x + 16.0, cc_y + 32.0)
+            .expect("gather worker should spawn");
+        let builder = entities
+            .spawn_unit(1, EntityKind::Worker, cc_x + 48.0, cc_y + 32.0)
+            .expect("build worker should spawn");
+        let target = entities
+            .spawn_unit(2, EntityKind::Rifleman, cc_x + 96.0, cc_y)
+            .expect("target should spawn");
+        let node = entities
+            .spawn_node(EntityKind::Steel, cc_x + 64.0, cc_y + 32.0)
+            .expect("node should spawn");
+
+        for id in [mover, attacker, gatherer, builder] {
+            fill_queue(&mut entities, id);
+        }
+
+        let events = apply_with_players(
+            &map,
+            &mut entities,
+            &mut [player_state(1), player_state(2)],
+            vec![
+                (
+                    1,
+                    SimCommand::Move {
+                        units: vec![mover],
+                        x: 160.0,
+                        y: 160.0,
+                        queued: true,
+                    },
+                ),
+                (
+                    1,
+                    SimCommand::Attack {
+                        units: vec![attacker],
+                        target,
+                        queued: true,
+                    },
+                ),
+                (
+                    1,
+                    SimCommand::Gather {
+                        units: vec![gatherer],
+                        node,
+                        queued: true,
+                    },
+                ),
+                (
+                    1,
+                    SimCommand::Build {
+                        worker: builder,
+                        building: EntityKind::Depot,
+                        tile_x: 10,
+                        tile_y: 10,
+                        queued: true,
+                    },
+                ),
+            ],
+        );
+
+        let notices = events.get(&1).map(Vec::as_slice).unwrap_or(&[]);
+        assert_eq!(
+            notices
+                .iter()
+                .filter(|event| matches!(
+                    event,
+                    Event::Notice { msg, .. } if msg == "Command queue full"
+                ))
+                .count(),
+            4,
+            "each valid queued command that only fails the queue cap should notify"
+        );
+        for id in [mover, attacker, gatherer, builder] {
+            assert_eq!(entities.get(id).unwrap().queued_orders().len(), 8);
+        }
     }
 
     #[test]
@@ -2200,6 +2621,15 @@ mod tests {
             supply_cap: 20,
             is_ai: false,
             score: ScoreState::default(),
+        }
+    }
+
+    fn fill_queue(entities: &mut EntityStore, id: u32) {
+        for _ in 0..MAX_QUEUED_ORDERS {
+            entities
+                .get_mut(id)
+                .expect("unit should exist")
+                .append_queued_order(OrderIntent::move_to(999.0, 999.0));
         }
     }
 }
