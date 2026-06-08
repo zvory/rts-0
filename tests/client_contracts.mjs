@@ -1290,6 +1290,8 @@ function fakeAudioContext() {
   assert(state.atGunSetupPreview === null, "GameState.atGunSetupPreview initially null");
   assertHasMethod(state, "updateResourceMiningPreview", "GameState");
   assert(state.selection instanceof Set, "GameState.selection");
+  assert(state.debugPathOverlaysAvailable === false, "GameState hides waypoint diagnostics by default");
+  assert(state.debugPathOverlaysEnabled === false, "GameState leaves waypoint diagnostics off by default");
   assertHasMethod(state, "setSelection", "GameState");
   assertHasMethod(state, "addToSelection", "GameState");
   assertHasMethod(state, "clearSelection", "GameState");
@@ -1302,6 +1304,17 @@ function fakeAudioContext() {
   assertHasMethod(state, "beginPlacement", "GameState");
   assertHasMethod(state, "updatePlacement", "GameState");
   assertHasMethod(state, "endPlacement", "GameState");
+
+  const debugState = new GameState({
+    ...start,
+    debugMode: true,
+    map: {
+      ...start.map,
+      resources: start.map.resources.map((resource) => ({ ...resource })),
+    },
+  });
+  assert(debugState.debugPathOverlaysAvailable === true, "GameState exposes waypoint diagnostics in debug mode");
+  assert(debugState.debugPathOverlaysEnabled === true, "GameState enables waypoint diagnostics in debug mode");
 
   // Snapshot buffering
   const t0 = performance.now();

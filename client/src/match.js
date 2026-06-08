@@ -104,6 +104,9 @@ export class Match {
 
     // --- Build the module graph from the static start payload (docs/design/client-ui.md §4.1). ---
     this.state = this._timeInit("match.state", () => new GameState(payload));
+    this.state.debugPathOverlaysAvailable =
+      this.state.debugPathOverlaysAvailable || this.devWatch?.kind === "scenario";
+    this.state.debugPathOverlaysEnabled = this.state.debugPathOverlaysAvailable;
     this.state.showAllDebugPathOverlays = this.devWatch?.kind === "scenario";
     this.camera = this._timeInit("match.camera", () => new Camera());
     this.renderer = this._timeInit("match.renderer", () => new Renderer(dom.viewport));
@@ -168,6 +171,7 @@ export class Match {
     this.onVisibilityChange = this.handleVisibilityChange.bind(this);
     this.onPointerLockGesture = this.handlePointerLockGesture.bind(this);
     this.onSettingsClick = this.toggleSettingsMenu.bind(this);
+    this.onDebugPathToggle = this.toggleDebugPathOverlays.bind(this);
     this.onGiveUpOpen = this.openGiveUpConfirm.bind(this);
     this.onGiveUpCancel = this.closeGiveUpConfirm.bind(this);
     this.onGiveUpConfirm = this.requestGiveUp.bind(this);
@@ -184,10 +188,12 @@ export class Match {
     window.addEventListener("click", this.onPointerLockGesture, true);
     document.addEventListener("visibilitychange", this.onVisibilityChange);
     dom.settingsButton?.addEventListener("click", this.onSettingsClick);
+    dom.debugPathToggle?.addEventListener("click", this.onDebugPathToggle);
     dom.pointerLockToggle?.addEventListener("click", this.onPointerLockToggle);
     dom.giveUpOpen?.addEventListener("click", this.onGiveUpOpen);
     dom.giveUpCancel?.addEventListener("click", this.onGiveUpCancel);
     dom.giveUpConfirmButton?.addEventListener("click", this.onGiveUpConfirm);
+    this.syncDebugPathUi();
     this.syncPointerLockUi();
 
     this.rafId = requestAnimationFrame(this.tickFn);
@@ -394,6 +400,7 @@ export class Match {
     if (!dom.settingsMenu || this.giveUpSent) return;
     if (dom.giveUpConfirm && !dom.giveUpConfirm.hidden) this.closeGiveUpConfirm();
     this.syncPointerLockUi();
+    this.syncDebugPathUi();
     dom.settingsMenu.hidden = !dom.settingsMenu.hidden;
     dom.settingsButton?.setAttribute("aria-expanded", String(!dom.settingsMenu.hidden));
   }
@@ -456,6 +463,15 @@ export class Match {
     this.syncPointerLockUi();
   }
 
+  toggleDebugPathOverlays() {
+    if (!this.state?.debugPathOverlaysAvailable) {
+      this.syncDebugPathUi();
+      return;
+    }
+    this.state.debugPathOverlaysEnabled = !this.state.debugPathOverlaysEnabled;
+    this.syncDebugPathUi();
+  }
+
   handlePointerLockChange(locked) {
     if (locked) {
       this.closeSettingsMenu();
@@ -513,6 +529,19 @@ export class Match {
     btn.title = supported
       ? "Aggressively trap the cursor in the game view for multi-monitor edge panning."
       : "Cursor lock is not supported by this browser.";
+  }
+
+  syncDebugPathUi() {
+    const btn = dom.debugPathToggle;
+    if (!btn || !this.state) return;
+    const available = !!this.state.debugPathOverlaysAvailable;
+    btn.hidden = !available;
+    btn.disabled = !available;
+    btn.setAttribute("aria-checked", String(available && this.state.debugPathOverlaysEnabled));
+    btn.textContent = this.state.debugPathOverlaysEnabled
+      ? "Movement waypoints: on"
+      : "Movement waypoints: off";
+    btn.title = "Show the current and queued movement path waypoints.";
   }
 
   readPointerLockPanEnabled() {
@@ -795,6 +824,7 @@ export class Match {
     window.removeEventListener("click", this.onPointerLockGesture, true);
     document.removeEventListener("visibilitychange", this.onVisibilityChange);
     dom.settingsButton?.removeEventListener("click", this.onSettingsClick);
+    dom.debugPathToggle?.removeEventListener("click", this.onDebugPathToggle);
     dom.pointerLockToggle?.removeEventListener("click", this.onPointerLockToggle);
     dom.giveUpOpen?.removeEventListener("click", this.onGiveUpOpen);
     dom.giveUpCancel?.removeEventListener("click", this.onGiveUpCancel);

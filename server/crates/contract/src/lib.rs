@@ -15,6 +15,8 @@ pub struct StartPayload {
     pub player_id: u32,
     #[serde(default)]
     pub spectator: bool,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub debug_mode: bool,
     pub tick: u32,
     pub map: MapInfo,
     pub players: Vec<PlayerStart>,

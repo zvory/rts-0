@@ -1204,6 +1204,7 @@ fn pending_tracker_start_payload() -> StartPayload {
     StartPayload {
         player_id: 1,
         spectator: false,
+        debug_mode: false,
         tick: 0,
         map: MapInfo {
             width: 96,

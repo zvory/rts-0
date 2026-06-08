@@ -546,6 +546,7 @@ impl Game {
         StartPayload {
             player_id: 0,
             spectator: false,
+            debug_mode: self.debug_path_overlays,
             tick: self.tick,
             map,
             players,
