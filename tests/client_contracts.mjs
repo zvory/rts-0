@@ -101,6 +101,43 @@ function assertHasGetter(obj, name, msgPrefix = "") {
   );
 }
 
+async function testDevWatchScenarioConfig() {
+  const priorDocument = globalThis.document;
+  const priorWindow = globalThis.window;
+  globalThis.document = {
+    getElementById: () => null,
+  };
+  globalThis.window = {
+    location: new URL(
+      "http://localhost/?watchScenario=1&id=vehicle_small_block_baseline&unit=scout_car&count=5",
+    ),
+    localStorage: { getItem: () => null },
+  };
+  try {
+    const { devWatchConfig } = await import("../client/src/bootstrap.js");
+    let config = devWatchConfig();
+    assert(config, "vehicle_small_block_baseline dev scenario should be recognized");
+    assert(config.kind === "scenario", "dev scenario should set scenario kind");
+    assert(
+      config.room === "__dev_scenario__:vehicle_small_block_baseline:unit=scout_car:count=5",
+      "dev scenario should auto-join the server scenario room",
+    );
+
+    globalThis.window.location = new URL(
+      "http://localhost/?watchScenario=1&id=bad/scenario&unit=scout_car&count=5",
+    );
+    config = devWatchConfig();
+    assert(config === null, "dev scenario parser should reject unsafe scenario ids");
+  } finally {
+    if (priorDocument === undefined) delete globalThis.document;
+    else globalThis.document = priorDocument;
+    if (priorWindow === undefined) delete globalThis.window;
+    else globalThis.window = priorWindow;
+  }
+}
+
+await testDevWatchScenarioConfig();
+
 function resetTauriGlobals() {
   delete globalThis.__TAURI__;
   delete globalThis.__TAURI_INTERNALS__;

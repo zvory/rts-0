@@ -124,25 +124,11 @@ export function devWatchConfig() {
     const id = (params.get("id") || "").trim();
     const unit = (params.get("unit") || "").trim();
     const count = (params.get("count") || "").trim();
-    const supportedUnits = new Set([
-      "worker",
-      "rifleman",
-      "machine_gunner",
-      "at_team",
-      "scout_car",
-      "tank",
-    ]);
-    const supportedScenario =
-      (id === "scout_car_snaking_corridor" &&
-        supportedUnits.has(unit) &&
-        (count === "1" || count === "4")) ||
-      (id === "direct_reverse_order" &&
-        ["at_team", "scout_car", "tank"].includes(unit) &&
-        count === "1") ||
-      (id === "scout_car_wall_chokepoint" &&
-        ["at_team", "scout_car", "tank"].includes(unit) &&
-        ["3", "5", "6", "10", "15"].includes(count));
-    if (!supportedScenario) {
+    if (
+      !/^[a-z0-9_]+$/.test(id) ||
+      !/^[a-z0-9_]+$/.test(unit) ||
+      !/^[1-9][0-9]*$/.test(count)
+    ) {
       return null;
     }
     return {
