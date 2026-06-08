@@ -114,6 +114,7 @@ export const EVENT = Object.freeze({
   DEATH: "death",
   BUILD: "build",
   NOTICE: "notice",
+  SMOKE_LAUNCH: "smokeLaunch",
 });
 
 export const NOTICE_SEVERITY = Object.freeze({
@@ -170,6 +171,7 @@ export const EVENT_CODE = Object.freeze({
   [EVENT.DEATH]: 2,
   [EVENT.BUILD]: 3,
   [EVENT.NOTICE]: 4,
+  [EVENT.SMOKE_LAUNCH]: 5,
 });
 
 export const ORDER_STAGE = Object.freeze({
@@ -478,6 +480,19 @@ function decodeCompactEvent(record, index) {
       }
       if (typeof fields[1] !== "string") throw new Error(`notice event ${index} msg must be string`);
       return decodeCompactNotice(fields, index);
+    case EVENT.SMOKE_LAUNCH: {
+      requireLength(fields, 4, `smoke launch event ${index}`);
+      const from = decodeCompactPoint(fields[1], "event.smokeLaunch.from");
+      const to = decodeCompactPoint(fields[2], "event.smokeLaunch.to");
+      return {
+        e: EVENT.SMOKE_LAUNCH,
+        fromX: from[0],
+        fromY: from[1],
+        toX: to[0],
+        toY: to[1],
+        delayTicks: readU32(fields[3], "event.smokeLaunch.delayTicks"),
+      };
+    }
     default:
       throw new Error(`unknown compact event kind ${eventKind}`);
   }

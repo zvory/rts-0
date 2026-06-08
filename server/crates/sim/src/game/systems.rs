@@ -135,6 +135,13 @@ pub(crate) fn run_tick(
             tick,
         );
     });
+    crate::perf::timed(
+        perf.as_deref_mut(),
+        "spawn_due_smokes_after_commands",
+        || {
+            smokes.spawn_due(tick);
+        },
+    );
     crate::perf::timed(perf.as_deref_mut(), "awaiting_paths", || {
         coordinator.process_awaiting_paths(entities);
     });
@@ -161,6 +168,13 @@ pub(crate) fn run_tick(
             tick,
         );
     });
+    crate::perf::timed(
+        perf.as_deref_mut(),
+        "spawn_due_smokes_after_promotions",
+        || {
+            smokes.spawn_due(tick);
+        },
+    );
     crate::perf::timed(perf.as_deref_mut(), "promoted_awaiting_paths", || {
         coordinator.process_awaiting_paths(entities);
     });

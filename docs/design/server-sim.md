@@ -178,7 +178,7 @@ and a `definition` match arm; no other files need to change for the definition i
   immediately; otherwise compute a staging point inside range and issue an `Order::Ability`
   movement order via `MoveCoordinator`.
 - `launch_world_ability` — deducts resources, sets the caster's cooldown, clears the active order,
-  and executes the effect (currently: spawns a smoke cloud). Guards: caster exists + alive + owner
+  and executes the effect (currently: schedules a smoke cloud). Guards: caster exists + alive + owner
   + not under construction + correct kind + not on cooldown + tech present + in range + affordable.
   All guards are checked without panicking; missing/stale casters are no-ops.
 - `caster_can_attempt`, `tech_requirement_met`, `caster_in_range` — pure predicates used by both
@@ -290,7 +290,11 @@ as a plain move order.
 
 `game::smoke::SmokeCloudStore` owns active neutral smoke clouds as world effects, not entities:
 clouds have stable ids, center points, radius, spawn tick, and expiry tick, and they do not
-participate in pathing, collision, scoring, supply, or target queries. `services::line_of_sight`
+participate in pathing, collision, scoring, supply, or target queries. Scout-car smoke launch
+schedules a pending cloud rather than spawning it immediately: impact is delayed by up to 3 ticks
+(100 ms) at max range and scales down with launch distance. The server emits a transient
+owner-visible `smokeLaunch` event with caster and target positions for the client canister visual,
+but the projectile itself is not simulated as an entity. `services::line_of_sight`
 owns terrain raycasts used by fog and combat and can be constructed with the active smoke store as
 a dynamic blocker input. Stone/rock tiles block vision and ranged attacks. Fog may reveal the
 blocking stone tile itself and the visible edge of a smoke cloud, but not tiles behind blockers.

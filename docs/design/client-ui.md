@@ -261,6 +261,9 @@ and unit layer):
 - Each cloud is rendered as layered translucent grey/white circles (overlapping offset blobs) with
   a dark semi-transparent core so the cloud reads as a LOS blocker without obscuring own unit
   selection rings or HP bars above the fog overlay.
+- Transient `smokeLaunch` events add a local fast black canister arc from the scout car's launch
+  position to the target point. The canister lifetime uses the server-provided `delayTicks`; the
+  actual smoke still appears only when the authoritative cloud arrives in a later snapshot.
 - Non-finite coordinates are skipped.
 - The render layer is cleared each frame so expired clouds vanish automatically when they drop from
   the next snapshot.

@@ -396,6 +396,9 @@ fn scout_car_smoke_has_two_free_uses_then_depletes() {
         scout_entity.start_ability_cooldown(ability::AbilityKind::Smoke, 0);
     }
 
+    for _ in 0..config::SMOKE_LAUNCH_MAX_DELAY_TICKS {
+        game.tick();
+    }
     assert_eq!(game.smokes.iter().count(), 2);
     assert_eq!(game.players[0].steel, 0);
     assert_eq!(game.players[0].oil, 0);
@@ -877,6 +880,7 @@ fn out_of_range_smoke_moves_into_range_launches_then_idles() {
     assert_eq!(
         scout_entity.ability_cooldown_ticks(ability::AbilityKind::Smoke),
         config::SMOKE_ABILITY_COOLDOWN_TICKS
+            .saturating_sub(config::SMOKE_LAUNCH_MAX_DELAY_TICKS as u16)
     );
     assert_eq!(game.players[0].steel, 500);
     assert_eq!(game.players[0].oil, 500);

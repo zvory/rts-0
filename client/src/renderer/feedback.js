@@ -389,6 +389,43 @@ export function _drawSmokes(state) {
   }
 }
 
+export function _drawSmokeCanisters(state) {
+  const g = this._feedbackGfx;
+  if (!state || typeof state.liveSmokeCanisters !== "function") return;
+  const now = performance.now();
+  const canisters = state.liveSmokeCanisters(now);
+  if (!canisters.length) return;
+
+  for (const c of canisters) {
+    const duration = Math.max(1, c.durationMs || 1);
+    const t = clamp01((now - c.createdAt) / duration);
+    const eased = t * t * (3 - 2 * t);
+    const x = c.fromX + (c.toX - c.fromX) * eased;
+    const y = c.fromY + (c.toY - c.fromY) * eased;
+    const dx = c.toX - c.fromX;
+    const dy = c.toY - c.fromY;
+    const len = Math.hypot(dx, dy);
+    const ux = len > 0.001 ? dx / len : 1;
+    const uy = len > 0.001 ? dy / len : 0;
+    const arc = Math.sin(Math.PI * t) * Math.min(18, Math.max(4, len * 0.04));
+    const px = x - uy * arc;
+    const py = y + ux * arc;
+    const tail = Math.min(28, Math.max(8, len * 0.08));
+    const alpha = 0.95 - t * 0.25;
+
+    g.lineStyle(2, 0x111111, alpha * 0.45);
+    g.moveTo(px - ux * tail, py - uy * tail);
+    g.lineTo(px, py);
+    g.lineStyle(0, 0x000000, 0);
+    g.beginFill(0x050505, alpha);
+    g.drawCircle(px, py, 2.7);
+    g.endFill();
+    g.beginFill(0x2b2b2b, alpha * 0.7);
+    g.drawCircle(px - ux * 1.2 - uy * 0.7, py - uy * 1.2 + ux * 0.7, 1.2);
+    g.endFill();
+  }
+}
+
 export function _drawRallyPoints(state) {
   if (!state || typeof state.selectedEntities !== "function") return;
   const g = this._feedbackGfx;

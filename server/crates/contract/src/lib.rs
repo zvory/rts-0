@@ -320,6 +320,13 @@ pub enum Event {
         id: u32,
         kind: String,
     },
+    SmokeLaunch {
+        from_x: f32,
+        from_y: f32,
+        to_x: f32,
+        to_y: f32,
+        delay_ticks: u32,
+    },
     Notice {
         msg: String,
         #[serde(default, skip_serializing_if = "Option::is_none")]

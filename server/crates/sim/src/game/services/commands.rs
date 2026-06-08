@@ -2002,6 +2002,8 @@ mod tests {
             )],
         );
 
+        assert_eq!(smokes.iter().count(), 0);
+        smokes.spawn_due(1 + config::SMOKE_LAUNCH_MAX_DELAY_TICKS);
         assert_eq!(smokes.iter().count(), 1);
         assert_eq!(players[0].steel, 1000);
         assert_eq!(players[0].oil, 1000);
@@ -2021,15 +2023,29 @@ mod tests {
             0
         );
         assert!(matches!(entities.get(far).unwrap().order(), Order::Idle));
-        // A positioned info notice is emitted on successful smoke launch; no warn/alert events.
+        // Smoke launch emits local canister feedback plus a positioned info notice; no warn/alert events.
         let player_events = events.get(&1).map(Vec::as_slice).unwrap_or(&[]);
+        assert!(player_events.iter().any(|ev| matches!(
+            ev,
+            Event::SmokeLaunch {
+                from_x,
+                from_y,
+                to_x,
+                to_y,
+                delay_ticks,
+            } if (*from_x - (target.0 - 192.0)).abs() < 0.001
+                && (*from_y - target.1).abs() < 0.001
+                && (*to_x - target.0).abs() < 0.001
+                && (*to_y - target.1).abs() < 0.001
+                && *delay_ticks == 2
+        )));
         assert!(
             player_events.iter().all(|ev| matches!(
                 ev,
                 Event::Notice {
                     severity: crate::protocol::NoticeSeverity::Info,
                     ..
-                }
+                } | Event::SmokeLaunch { .. }
             )),
             "smoke launch should emit at most info-level notices, got: {player_events:?}"
         );
@@ -2097,8 +2113,10 @@ mod tests {
             )],
         );
 
-        let scout_entity = entities.get(scout).expect("scout should remain alive");
+        assert_eq!(smokes.iter().count(), 0);
+        smokes.spawn_due(1 + config::SMOKE_LAUNCH_MAX_DELAY_TICKS);
         assert_eq!(smokes.iter().count(), 1);
+        let scout_entity = entities.get(scout).expect("scout should remain alive");
         assert!(
             matches!(scout_entity.order(), Order::Move(_)),
             "reactive in-range smoke should not interrupt the active move"
@@ -2249,6 +2267,8 @@ mod tests {
             )],
         );
 
+        assert_eq!(smokes.iter().count(), 0);
+        smokes.spawn_due(1 + config::SMOKE_LAUNCH_MAX_DELAY_TICKS);
         assert_eq!(smokes.iter().count(), 1);
         assert_eq!(players[0].steel, 0);
         assert_eq!(players[0].oil, 0);
@@ -2259,7 +2279,7 @@ mod tests {
                     Event::Notice {
                         severity: crate::protocol::NoticeSeverity::Info,
                         ..
-                    }
+                    } | Event::SmokeLaunch { .. }
                 )
             })
         }));

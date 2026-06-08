@@ -38,6 +38,7 @@ import {
   _drawPlacement,
   _drawRallyPoints,
   _drawResourceMiningPreview,
+  _drawSmokeCanisters,
   _drawSmokes,
   drawSelectionBox,
 } from "./feedback.js";
@@ -210,6 +211,7 @@ export class Renderer {
     this._smokeGfx.clear();
     this._drawSmokes(state);
     this._drawFog(fog);
+    this._drawSmokeCanisters(state);
     this._drawCommandFeedback(state);
     this._drawAbilityTargetPreview(state);
     this._drawAtGunSetupPreview(state);
@@ -437,6 +439,7 @@ Object.assign(Renderer.prototype, {
   _fogLevel,
   _drawPlacement,
   _drawCommandFeedback,
+  _drawSmokeCanisters,
   _drawAbilityTargetPreview,
   _drawSmokes,
   _drawAtGunSetupPreview,

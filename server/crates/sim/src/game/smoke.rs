@@ -39,11 +39,21 @@ impl SmokeCloud {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(crate) struct PendingSmokeCloud {
+    pub(crate) x: f32,
+    pub(crate) y: f32,
+    pub(crate) radius_tiles: f32,
+    pub(crate) duration_ticks: u32,
+    pub(crate) due_tick: u32,
+}
+
 #[derive(Debug, Clone)]
 pub(crate) struct SmokeCloudStore {
     #[allow(dead_code)]
     next_id: u32,
     clouds: Vec<SmokeCloud>,
+    pending: Vec<PendingSmokeCloud>,
 }
 
 impl Default for SmokeCloudStore {
@@ -57,6 +67,7 @@ impl SmokeCloudStore {
         SmokeCloudStore {
             next_id: 1,
             clouds: Vec::new(),
+            pending: Vec::new(),
         }
     }
 
@@ -86,6 +97,49 @@ impl SmokeCloudStore {
             expires_tick: tick.saturating_add(duration_ticks),
         });
         Some(id)
+    }
+
+    pub(crate) fn schedule(
+        &mut self,
+        x: f32,
+        y: f32,
+        radius_tiles: f32,
+        duration_ticks: u32,
+        due_tick: u32,
+    ) -> bool {
+        if !x.is_finite() || !y.is_finite() || !radius_tiles.is_finite() || radius_tiles <= 0.0 {
+            return false;
+        }
+        if self.clouds.len().saturating_add(self.pending.len()) >= MAX_ACTIVE_SMOKE_CLOUDS {
+            return false;
+        }
+        self.pending.push(PendingSmokeCloud {
+            x,
+            y,
+            radius_tiles,
+            duration_ticks,
+            due_tick,
+        });
+        true
+    }
+
+    pub(crate) fn spawn_due(&mut self, tick: u32) {
+        let mut remaining = Vec::with_capacity(self.pending.len());
+        let pending = std::mem::take(&mut self.pending);
+        for cloud in pending {
+            if cloud.due_tick <= tick {
+                self.spawn(
+                    cloud.x,
+                    cloud.y,
+                    cloud.radius_tiles,
+                    cloud.duration_ticks,
+                    tick,
+                );
+            } else {
+                remaining.push(cloud);
+            }
+        }
+        self.pending = remaining;
     }
 
     pub(crate) fn retain_active(&mut self, tick: u32) {

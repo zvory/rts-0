@@ -110,6 +110,8 @@ export class GameState {
     this.abilityTargetPreview = null;
     /** @type {Array<{id:number,x:number,y:number,radiusTiles:number,expiresIn:number}>} */
     this.smokes = [];
+    /** @type {Array<{fromX:number,fromY:number,toX:number,toY:number,durationMs:number,createdAt:number}>} */
+    this.smokeCanisters = [];
     /** @type {number[]|Uint8Array} row-major current server-authoritative visibility. */
     this.visibleTiles = [];
 
@@ -211,11 +213,48 @@ export class GameState {
           : null;
         this.muzzleFlashes.push({ from: ev.from, to: ev.to, targetPos, createdAt: now });
         this.weaponRecoilById.set(ev.from, now);
+      } else if (ev && ev.e === "smokeLaunch") {
+        this.addSmokeCanister(ev, now);
       }
     }
     if (this.muzzleFlashes.length > 256) {
       this.muzzleFlashes.splice(0, this.muzzleFlashes.length - 256);
     }
+    if (this.smokeCanisters.length > 64) {
+      this.smokeCanisters.splice(0, this.smokeCanisters.length - 64);
+    }
+  }
+
+  addSmokeCanister(ev, now = performance.now()) {
+    if (
+      !Number.isFinite(ev.fromX) ||
+      !Number.isFinite(ev.fromY) ||
+      !Number.isFinite(ev.toX) ||
+      !Number.isFinite(ev.toY)
+    ) {
+      return;
+    }
+    const delayTicks = Number.isFinite(ev.delayTicks) ? Math.max(0, ev.delayTicks) : 0;
+    const durationMs = (delayTicks / 30) * 1000;
+    if (durationMs <= 0) return;
+    this.smokeCanisters.push({
+      fromX: ev.fromX,
+      fromY: ev.fromY,
+      toX: ev.toX,
+      toY: ev.toY,
+      durationMs,
+      createdAt: now,
+    });
+  }
+
+  /**
+   * Return live smoke canister launch visuals, pruning landed ones.
+   * @param {number} now
+   * @returns {Array<{fromX:number,fromY:number,toX:number,toY:number,durationMs:number,createdAt:number}>}
+   */
+  liveSmokeCanisters(now) {
+    this.smokeCanisters = this.smokeCanisters.filter((f) => now - f.createdAt <= f.durationMs);
+    return this.smokeCanisters;
   }
 
   /**

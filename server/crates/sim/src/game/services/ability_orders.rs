@@ -124,6 +124,11 @@ pub(crate) fn launch_world_ability(
     match ability {
         AbilityKind::Charge => false,
         AbilityKind::Smoke => {
+            let Some(caster_pos) = entities.get(caster).map(|e| (e.pos_x, e.pos_y)) else {
+                return false;
+            };
+            let delay_ticks =
+                smoke_launch_delay_ticks(map, caster_pos.0, caster_pos.1, ability, x, y);
             let Some(e) = entities.get_mut(caster) else {
                 return false;
             };
@@ -136,13 +141,20 @@ pub(crate) fn launch_world_ability(
             if !preserve_active_order {
                 e.clear_active_order();
             }
-            smokes.spawn(
+            smokes.schedule(
                 x,
                 y,
                 config::SMOKE_CLOUD_RADIUS_TILES,
                 config::SMOKE_CLOUD_DURATION_TICKS,
-                tick,
+                tick.saturating_add(delay_ticks),
             );
+            events.entry(player).or_default().push(Event::SmokeLaunch {
+                from_x: caster_pos.0,
+                from_y: caster_pos.1,
+                to_x: x,
+                to_y: y,
+                delay_ticks,
+            });
             notice_positioned(
                 events,
                 player,
@@ -182,6 +194,32 @@ pub(crate) fn launch_self_ability(
         }
         AbilityKind::Smoke => false,
     }
+}
+
+fn smoke_launch_delay_ticks(
+    map: &Map,
+    caster_x: f32,
+    caster_y: f32,
+    ability: AbilityKind,
+    x: f32,
+    y: f32,
+) -> u32 {
+    let Some(range_tiles) = ability::definition(ability).range_tiles else {
+        return 0;
+    };
+    if SmokeCloudStore::clamp_point_to_map(map, x, y).is_none() {
+        return 0;
+    }
+    let range_px = range_tiles as f32 * config::TILE_SIZE as f32;
+    if range_px <= f32::EPSILON {
+        return 0;
+    }
+    let distance = dist2(caster_x, caster_y, x, y).sqrt();
+    if !distance.is_finite() || distance <= f32::EPSILON {
+        return 0;
+    }
+    let scaled = (distance / range_px).clamp(0.0, 1.0);
+    ((config::SMOKE_LAUNCH_MAX_DELAY_TICKS as f32) * scaled).ceil() as u32
 }
 
 pub(crate) fn caster_can_attempt(

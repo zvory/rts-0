@@ -242,7 +242,10 @@ impl SelfPlayRunner {
             for event in events {
                 let attacker = match &event {
                     Event::Attack { from, .. } => self.attacker_info(*from),
-                    Event::Death { .. } | Event::Build { .. } | Event::Notice { .. } => None,
+                    Event::Death { .. }
+                    | Event::Build { .. }
+                    | Event::Notice { .. }
+                    | Event::SmokeLaunch { .. } => None,
                 };
                 progressed |= self
                     .milestones

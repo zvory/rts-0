@@ -166,7 +166,7 @@ Compact numeric codes:
 | `state` | 1 `idle`, 2 `move`, 3 `attack`, 4 `gather`, 5 `build`, 6 `train`, 7 `construct`, 8 `dead` |
 | `setupState` | 1 `packed`, 2 `setting_up`, 3 `deployed`, 4 `tearing_down` |
 | `notice.severity` | 1 `info`, 2 `warn`, 3 `alert` |
-| `EventRecord` | `[1, from, to]` attack, `[1, from, to, reveal?, toPos?]` attack with optional shooter reveal and target position, `[2, id, x, y, kind]` death, `[3, id, kind]` build, `[4, msg]` notice, `[4, msg, severity]` position-free notice with severity, `[4, msg, severity, x, y]` positioned notice |
+| `EventRecord` | `[1, from, to]` attack, `[1, from, to, reveal?, toPos?]` attack with optional shooter reveal and target position, `[2, id, x, y, kind]` death, `[3, id, kind]` build, `[4, msg]` notice, `[4, msg, severity]` position-free notice with severity, `[4, msg, severity, x, y]` positioned notice, `[5, [fromX, fromY], [toX, toY], delayTicks]` smoke launch |
 
 Compact entity records are positional arrays. Optional fields keep the semantic order above and
 trailing missing optional fields are omitted; interior missing optional fields are encoded as
@@ -257,6 +257,7 @@ events, and positioned notices remain fog-gated and are withheld when smoke hide
   toPos?: [f32, f32] }                         // for muzzle flashes / tracers
 { e: "death",  id: u32, x: f32, y: f32, kind } // for death poofs
 { e: "build",  id: u32, kind: string }         // building completed
+{ e: "smokeLaunch", fromX: f32, fromY: f32, toX: f32, toY: f32, delayTicks: u32 }
 { e: "notice", msg: string, severity?: "info"|"warn"|"alert", x?: f32, y?: f32 }
 ```
 Notices default to `severity: "info"` with no position. `alert:`-prefixed notice ids are
@@ -265,6 +266,8 @@ or pulses the minimap border when absent. `alert:under_attack` is emitted at the
 position after normal fog/visibility filtering. Unit attack events include `reveal` so a shooter
 that fires from fog can be rendered briefly as a semi-transparent, non-interactive silhouette above
 the fog overlay; `toPos` lets tracers draw even when the hit target is no longer in the snapshot.
+Smoke launch events are owner-visible local feedback for the scout-car canister animation; the
+authoritative smoke cloud appears later in `smokes` after the reported launch delay.
 Events are best-effort visual flavor; the client must not depend on receiving them.
 
 ---

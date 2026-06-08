@@ -88,7 +88,8 @@ authoritative `rules::defs` records.
 - **Scout Car Smoke** (hotkey `D`): Scout cars gain a targeted smoke-grenade ability once the
   owner has a completed Steelworks. Each scout car spawns with 2 smoke uses; once those uses are
   depleted, that car cannot use Smoke again. Smoke has no steel or oil cost. Target range: 9 tiles
-  from the caster. Cloud radius: 2 tiles. Cloud duration: 5 seconds. Cooldown: 20 seconds per caster.
+  from the caster. Launch delay: up to 100 ms at max range, scaling down for closer targets. Cloud
+  radius: 2 tiles. Cloud duration: 5 seconds. Cooldown: 20 seconds per caster.
   Expected role: an offensive tool for closing on long-range defenses; push a scout car forward,
   place smoke between the advance and the AT gun / machine-gun nest, then move mobile units through
   the resulting dead zone. Active smoke is neutral world state: it blocks authoritative fog and
