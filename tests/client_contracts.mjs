@@ -48,6 +48,7 @@ import {
   decodeServerMessage,
 } from "../client/src/protocol.js";
 import { Input, footprintValidAgainstEntities } from "../client/src/input/index.js";
+import { CommandComposer } from "../client/src/input/command_composer.js";
 import { _controlGroupSaveModifierActive } from "../client/src/input/control_groups.js";
 import {
   automaticPointerLockDisabledForTests,
@@ -1199,6 +1200,11 @@ function fakeAudioContext() {
   state.openWorkerBuildMenu();
   state.beginCommandTarget("attack");
   assert(state.commandCardMode === null, "command targeting closes the worker build submenu");
+  assert(state.commandTarget === "attack", "command targeting mirrors the composer target");
+  const queuedIssue = state.issueCommandTarget({ shiftKey: true });
+  assert(queuedIssue.keepArmed && state.commandTarget === "attack", "Shift-issued command remains armed");
+  state.releaseCommandTargetShift();
+  assert(state.commandTarget === null, "Shift release clears a Shift-preserved command target");
   state.openWorkerBuildMenu();
   state.beginPlacement(KIND.DEPOT);
   assert(state.commandCardMode === null, "build placement closes the worker build submenu");
@@ -1614,8 +1620,8 @@ function fakeAudioContext() {
   );
   targetedInput._onLeftDown({ x: 360, y: 360 }, { shiftKey: false });
   assert(
-    targetedInput.state.commandTarget === null,
-    "attack targeting clears after an unqueued click even while A is held",
+    targetedInput.state.commandTarget === "attack",
+    "held A keeps attack targeting armed after an unqueued click",
   );
 
   targetedInput.state.commandTarget = "attack";
@@ -1624,6 +1630,41 @@ function fakeAudioContext() {
   targetedInput._handleKeyUp({ code: "KeyA", preventDefault() {} });
   assert(targetedInput.state.attackTargetKeyHeld === false, "A keyup clears attack key-held state");
   assert(targetedInput.state.commandTarget === null, "A keyup exits sticky attack targeting");
+}
+
+// ---------------------------------------------------------------------------
+// Command composer
+// ---------------------------------------------------------------------------
+{
+  const composer = new CommandComposer();
+  let armed = composer.arm("attack", { now: 100 });
+  assert(!armed.quickCast, "first command tap arms without quick-casting");
+  armed = composer.arm("attack", { now: 220 });
+  assert(armed.quickCast, "second same command tap inside the window requests quick-cast");
+
+  let issued = composer.issue({ shiftKey: true });
+  assert(issued.queued === true && issued.keepArmed === true, "Shift-click queues and preserves a tapped command");
+  issued = composer.issue({ shiftKey: true });
+  assert(issued.keepArmed === true, "Shift-preserved command can issue repeatedly");
+  composer.releaseShift();
+  assert(composer.target === null, "releasing Shift clears a Shift-preserved tapped command");
+
+  composer.arm({ kind: "ability", ability: ABILITY.SMOKE }, { source: "hold", key: "KeyQ" });
+  issued = composer.issue({ shiftKey: false });
+  assert(
+    issued.target.kind === "ability" &&
+      issued.target.ability === ABILITY.SMOKE &&
+      issued.keepArmed === true,
+    "held ability key keeps the target armed after a click",
+  );
+  composer.releaseKey("KeyQ", { shiftKey: true });
+  assert(composer.target?.ability === ABILITY.SMOKE, "Shift preserves the last held ability after key release");
+  composer.releaseShift();
+  assert(composer.target === null, "Shift release clears the preserved held ability");
+
+  composer.arm("move");
+  composer.cancel();
+  assert(composer.target === null, "cancel clears the armed command");
 }
 
 // ---------------------------------------------------------------------------

@@ -407,9 +407,11 @@ export class Minimap {
       ev.originalEvent?.preventDefault();
       // Left-click while a command target is armed: issue the command instead of panning.
       if (this.state.commandTarget) {
-        const target = this.state.commandTarget;
         this._issueOrder(w.x, w.y, !!ev.shiftKey);
-        if (!(target === "attack" && ev.shiftKey && this.state.attackTargetKeyHeld)) {
+        const issued = typeof this.state.issueCommandTarget === "function"
+          ? this.state.issueCommandTarget(ev)
+          : { keepArmed: ev.shiftKey && this.state.attackTargetKeyHeld };
+        if (!issued.keepArmed) {
           this.state.endCommandTarget();
         }
         return true;

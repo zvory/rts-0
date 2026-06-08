@@ -7,6 +7,7 @@
 // server never sees them directly (only the resulting commands).
 
 import { RESOURCE_AMOUNTS } from "./config.js";
+import { CommandComposer } from "./input/command_composer.js";
 import { KIND, PASSABLE, STATE, isBuilding, isResource, isUnit } from "./protocol.js";
 
 const TWO_PI = Math.PI * 2;
@@ -96,6 +97,7 @@ export class GameState {
     // --- command targeting / feedback (client-only) ---
     /** @type {null | "move" | "attack" | "setupAtGuns"} */
     this.commandTarget = null;
+    this.commandComposer = new CommandComposer();
     /** @type {boolean} true while the attack command hotkey is physically held. */
     this.attackTargetKeyHeld = false;
     /** @type {Array<{kind:string,x:number,y:number,append:boolean,createdAt:number}>} */
@@ -630,16 +632,47 @@ export class GameState {
   beginCommandTarget(kind) {
     this.placement = null;
     this.closeCommandCardMenu();
-    this.commandTarget = kind;
-    if (kind !== "setupAtGuns") this.atGunSetupPreview = null;
-    if (!(kind && typeof kind === "object" && kind.kind === "ability")) {
-      this.abilityTargetPreview = null;
-    }
+    this.commandComposer.arm(kind);
+    this._syncCommandTargetFromComposer();
   }
 
   /** Clear any armed command target mode. */
   endCommandTarget() {
-    this.commandTarget = null;
+    this.commandComposer.cancel();
+    this._syncCommandTargetFromComposer();
+  }
+
+  /** Mark a physical key as holding the current command target alive. */
+  holdCommandTarget(kind, key, shiftKey = false) {
+    this.commandComposer.hold(kind, key, { shiftKey });
+    this._syncCommandTargetFromComposer();
+  }
+
+  /**
+   * Record a click issue and return whether the target remains armed.
+   * @param {{shiftKey?: boolean}} ev
+   * @returns {{target:null|string|object,queued:boolean,keepArmed:boolean}}
+   */
+  issueCommandTarget(ev = {}) {
+    const issued = this.commandComposer.issue(ev);
+    this._syncCommandTargetFromComposer();
+    return issued;
+  }
+
+  /** Release a physical command key. */
+  releaseCommandTargetKey(key, shiftKey = false) {
+    this.commandComposer.releaseKey(key, { shiftKey });
+    this._syncCommandTargetFromComposer();
+  }
+
+  /** Release Shift preservation for a tapped command. */
+  releaseCommandTargetShift() {
+    this.commandComposer.releaseShift();
+    this._syncCommandTargetFromComposer();
+  }
+
+  _syncCommandTargetFromComposer() {
+    this.commandTarget = this.commandComposer.target;
     this.atGunSetupPreview = null;
     this.abilityTargetPreview = null;
   }

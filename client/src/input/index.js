@@ -131,7 +131,8 @@ export class Input {
     this._lastControlGroupTap = null;
     // Space held: left-drag pans instead of selecting/placing.
     this._spacePan = false;
-    // Physical A-key state for sticky queued attack targeting while Shift-clicking.
+    // Physical A-key state mirrored for older tests/minimap state; command
+    // arming lifetime itself is owned by GameState.commandComposer.
     this._attackTargetKeyHeld = false;
     // Active direct camera pan, in screen pixels, or null when not panning.
     // { x, y, button } where button is the pointer button that started the pan.
@@ -799,10 +800,11 @@ export class Input {
     }
     // Command-card targeting: the next left-click issues the armed command.
     if (this.state.commandTarget) {
-      const target = this.state.commandTarget;
       this._issueTargetedCommand(p, ev);
-      const attackKeyHeld = this._attackTargetKeyHeld || this.state.attackTargetKeyHeld;
-      if (!(target === "attack" && ev.shiftKey && attackKeyHeld)) {
+      const issued = typeof this.state.issueCommandTarget === "function"
+        ? this.state.issueCommandTarget(ev)
+        : { keepArmed: this._attackTargetKeyHeld || (ev.shiftKey && this.state.attackTargetKeyHeld) };
+      if (!issued.keepArmed) {
         this.state.endCommandTarget();
       }
       return;
