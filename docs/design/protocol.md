@@ -192,7 +192,8 @@ watch rooms receive all resource updates).
 
 `SmokeCloud`: `{ id: u32, x: f32, y: f32, radiusTiles: f32, expiresIn: u16 }`. Smoke clouds are
 neutral world effects, not entities. Normal player snapshots include only clouds that have at least
-one currently visible tile after smoke-suppressed fog is recomputed; spectator/dev full-world
+one currently visible tile after smoke-suppressed fog is recomputed, plus any cloud currently
+containing one of that player's own non-resource entities; spectator/dev full-world
 snapshots may include all active clouds. Smoke-covered enemy units/buildings, target ids, death
 events, and positioned notices remain fog-gated and are withheld when smoke hides the position.
 
