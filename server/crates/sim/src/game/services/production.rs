@@ -299,6 +299,52 @@ mod tests {
         );
     }
 
+    #[test]
+    fn no_rally_at_gun_spawn_uses_rotation_safe_circular_body() {
+        let map = flat_map(32);
+        let mut entities = EntityStore::new();
+        let barracks = spawn_barracks_training(&map, &mut entities, 10, 10, EntityKind::AtTeam);
+        let mut players = vec![player(1)];
+
+        tick_production(&map, &mut entities, &mut players);
+
+        assert!(
+            entities
+                .get(barracks)
+                .expect("barracks")
+                .prod_queue()
+                .is_empty(),
+            "AT gun should spawn when a no-rally barracks exit is available"
+        );
+        let at_gun = entities
+            .iter()
+            .find(|e| e.owner == 1 && e.kind == EntityKind::AtTeam && e.hp > 0)
+            .expect("AT gun should spawn");
+        assert!(
+            matches!(at_gun.order(), Order::Idle),
+            "without a rally point the AT gun should stay idle at its spawn exit"
+        );
+        let occ = Occupancy::build(&map, &entities_without(&entities, at_gun.id));
+        for facing in [
+            0.0,
+            std::f32::consts::FRAC_PI_2,
+            std::f32::consts::PI,
+            std::f32::consts::PI * 1.5,
+        ] {
+            assert!(
+                standability::unit_static_standable_with_facing(
+                    &map,
+                    &occ,
+                    EntityKind::AtTeam,
+                    at_gun.pos_x,
+                    at_gun.pos_y,
+                    facing,
+                ),
+                "AT gun spawn should remain legal at facing {facing:.3}"
+            );
+        }
+    }
+
     fn flat_map(size: u32) -> Map {
         Map {
             size,
@@ -335,6 +381,30 @@ mod tests {
             .expect("queue")
             .push(ProdItem {
                 unit: EntityKind::Tank,
+                progress: 1,
+                total: 1,
+            });
+        id
+    }
+
+    fn spawn_barracks_training(
+        map: &Map,
+        entities: &mut EntityStore,
+        tile_x: u32,
+        tile_y: u32,
+        unit: EntityKind,
+    ) -> u32 {
+        let (x, y) = footprint_center(map, EntityKind::Barracks, tile_x, tile_y);
+        let id = entities
+            .spawn_building(1, EntityKind::Barracks, x, y, true)
+            .expect("barracks should spawn");
+        entities
+            .get_mut(id)
+            .expect("barracks")
+            .prod_queue_mut()
+            .expect("queue")
+            .push(ProdItem {
+                unit,
                 progress: 1,
                 total: 1,
             });

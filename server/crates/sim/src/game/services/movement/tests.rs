@@ -421,8 +421,8 @@ fn tank_body_half_width() -> f32 {
     config::TANK_BODY_WIDTH_PX * 0.5 + config::TANK_BODY_CLEARANCE_PX
 }
 
-fn at_gun_body_half_len() -> f32 {
-    config::AT_GUN_BODY_LENGTH_PX * 0.5 + config::AT_GUN_BODY_CLEARANCE_PX
+fn at_gun_body_radius() -> f32 {
+    config::AT_GUN_BODY_WIDTH_PX * 0.5 + config::AT_GUN_BODY_CLEARANCE_PX
 }
 
 fn scout_car_body_half_width() -> f32 {
@@ -677,7 +677,7 @@ fn tank_infantry_overlap_resolves_from_oriented_hull() {
 }
 
 #[test]
-fn at_gun_infantry_overlap_resolves_from_oriented_body() {
+fn at_gun_infantry_overlap_resolves_from_circular_body() {
     let map = flat_map(1);
     let mut entities = EntityStore::new();
     let (cx, cy) = map.tile_center(20, 20);
@@ -694,10 +694,15 @@ fn at_gun_infantry_overlap_resolves_from_oriented_body() {
         .spawn_unit(
             2,
             EntityKind::Rifleman,
-            cx + at_gun_body_half_len() + rifle_radius - 4.0,
+            cx + at_gun_body_radius() + rifle_radius - 4.0,
             cy,
         )
         .expect("rifleman spawn");
+    assert_eq!(
+        unit_body_with_facing(EntityKind::AtTeam, cx, cy, 0.0),
+        unit_body_with_facing(EntityKind::AtTeam, cx, cy, std::f32::consts::FRAC_PI_2),
+        "AT gun collision body should not change with facing"
+    );
     mark_moving(&mut entities, rifleman, (cx + 128.0, cy));
     let at_gun_before = pos(&entities, at_gun);
     let rifleman_before = pos(&entities, rifleman);
@@ -710,15 +715,15 @@ fn at_gun_infantry_overlap_resolves_from_oriented_body() {
     let rifleman_after = pos(&entities, rifleman);
     assert!(
         body_overlap_depth(&entities, at_gun, rifleman) <= COLLISION_EPS_PX,
-        "oriented AT gun body and infantry circle should separate"
+        "circular AT gun body and infantry circle should separate"
     );
     assert!(
         (at_gun_after.1 - at_gun_before.1).abs() <= 0.001,
-        "front collision should not sidestep the AT gun sideways"
+        "head-on collision should not sidestep the AT gun sideways"
     );
     assert!(
         rifleman_after.0 > rifleman_before.0,
-        "soft infantry should absorb the AT gun-front overlap"
+        "soft infantry should absorb the AT gun overlap"
     );
 }
 
