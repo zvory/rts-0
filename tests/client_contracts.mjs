@@ -332,35 +332,33 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
   let locked = false;
   const requests = [];
   const target = {};
-  const rawFallbackInput = Object.create(Input.prototype);
-  rawFallbackInput._pointerLockAttempt = 4;
-  rawFallbackInput._browserPointerLockSupported = () => true;
-  rawFallbackInput._browserPointerLockElement = () => locked ? target : null;
-  rawFallbackInput._pointerLockTarget = () => target;
-  rawFallbackInput._focusDebugState = () => ({ documentHasFocus: true, activeElement: null });
-  rawFallbackInput._browserRequestPointerLock = () => (options) => {
+  const rawOnlyInput = Object.create(Input.prototype);
+  rawOnlyInput._pointerLockAttempt = 4;
+  rawOnlyInput._browserPointerLockSupported = () => true;
+  rawOnlyInput._browserPointerLockElement = () => locked ? target : null;
+  rawOnlyInput._pointerLockTarget = () => target;
+  rawOnlyInput._focusDebugState = () => ({ documentHasFocus: true, activeElement: null });
+  rawOnlyInput._browserRequestPointerLock = () => (options) => {
     requests.push(options);
     if (options?.unadjustedMovement) return Promise.reject(new Error("raw input unavailable"));
     locked = true;
     return Promise.resolve();
   };
-  rawFallbackInput._waitForPointerLockPromise = async (promise) => {
+  rawOnlyInput._waitForPointerLockPromise = async (promise) => {
     try {
       await promise;
-      rawFallbackInput._finishPointerLockRequest("resolved");
-      return rawFallbackInput._browserPointerLockElement() === target;
+      rawOnlyInput._finishPointerLockRequest("resolved");
+      return rawOnlyInput._browserPointerLockElement() === target;
     } catch (err) {
-      rawFallbackInput._finishPointerLockRequest("rejected", err);
+      rawOnlyInput._finishPointerLockRequest("rejected", err);
       return false;
     }
   };
-  assert(await rawFallbackInput._requestBrowserPointerLock(), "Pointer Lock falls back after raw input rejection");
-  assert(requests.length === 2, "Pointer Lock tries raw input before plain fallback");
+  assert(!(await rawOnlyInput._requestBrowserPointerLock()), "Pointer Lock fails closed after raw input rejection");
+  assert(requests.length === 1, "Pointer Lock does not request plain fallback after raw rejection");
   assert(requests[0]?.unadjustedMovement === true, "first Pointer Lock request asks for unadjusted movement");
-  assert(requests[1] === undefined, "second Pointer Lock request is the plain fallback");
-  assert(rawFallbackInput._lastPointerLockRequest.rawInputRequested === false, "fallback request records plain Pointer Lock");
-  rawFallbackInput.pointerLocked = true;
-  assert(rawFallbackInput.pointerLockRawInputDegraded(), "plain fallback lock is marked raw-input degraded");
+  assert(rawOnlyInput._lastPointerLockRequest.rawInputRequested === true, "raw rejection records the raw request");
+  assert(rawOnlyInput._lastPointerLockRequest.outcome === "rejected", "raw rejection outcome is recorded");
 }
 
 {
@@ -384,8 +382,6 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
   assert(await rawSuccessInput._requestBrowserPointerLock(), "Pointer Lock succeeds with raw input");
   assert(rawSuccessRequests.length === 1, "raw Pointer Lock success does not make a fallback request");
   assert(rawSuccessInput._lastPointerLockRequest.rawInputRequested === true, "raw request is recorded for diagnostics");
-  rawSuccessInput.pointerLocked = true;
-  assert(!rawSuccessInput.pointerLockRawInputDegraded(), "raw Pointer Lock is not marked degraded");
 }
 
 {
@@ -460,57 +456,53 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
   };
   const { Match } = await import("../client/src/match.js");
 
-  const policyMatch = Object.create(Match.prototype);
-  policyMatch.input = {
+  const lockedPolicyMatch = Object.create(Match.prototype);
+  lockedPolicyMatch.input = {
     pointerLocked: true,
     pointerLockSupported: () => true,
     desktopRuntime: () => false,
-    pointerLockRawInputDegraded: () => true,
   };
-  policyMatch.autoPointerLockUntil = 0;
-  policyMatch.lastRawPointerLockRetryAt = performance.now() - 2000;
-  policyMatch.pointerLockRetryToken = 0;
+  lockedPolicyMatch.pointerLockRetryToken = 0;
   let requestedRetry = null;
-  policyMatch.runPointerLockRetryBurst = (token, maxAttempts, opts) => {
-    requestedRetry = { token, maxAttempts, opts };
+  lockedPolicyMatch.runPointerLockRetryBurst = (token, maxAttempts) => {
+    requestedRetry = { token, maxAttempts };
     return Promise.resolve();
   };
-  policyMatch.requestAutomaticPointerLock({ requireGesture: true });
-  assert(requestedRetry?.opts?.forceRawRetry === true, "gesture reacquire retries degraded raw Pointer Lock");
-  assert(requestedRetry.maxAttempts === 1, "degraded raw retry uses one unlock/relock attempt per gesture");
+  lockedPolicyMatch.requestAutomaticPointerLock({ requireGesture: true });
+  assert(requestedRetry === null, "automatic Pointer Lock does not churn an already locked raw session");
 
+  const unlockedPolicyMatch = Object.create(Match.prototype);
+  unlockedPolicyMatch.input = {
+    pointerLocked: false,
+    pointerLockSupported: () => true,
+    desktopRuntime: () => true,
+  };
+  unlockedPolicyMatch.autoPointerLockUntil = 0;
+  unlockedPolicyMatch.pointerLockRetryToken = 0;
   requestedRetry = null;
-  policyMatch.requestAutomaticPointerLock({ requireGesture: true });
-  assert(requestedRetry === null, "degraded raw retry is cooldown-limited");
-
-  policyMatch.lastRawPointerLockRetryAt = performance.now() - 2000;
-  policyMatch.input.pointerLockRawInputDegraded = () => false;
-  policyMatch.requestAutomaticPointerLock({ requireGesture: true });
-  assert(requestedRetry === null, "raw Pointer Lock does not churn an already good lock");
+  unlockedPolicyMatch.runPointerLockRetryBurst = (token, maxAttempts) => {
+    requestedRetry = { token, maxAttempts };
+    return Promise.resolve();
+  };
+  unlockedPolicyMatch.requestAutomaticPointerLock({ requireGesture: true });
+  assert(requestedRetry?.maxAttempts === 4, "desktop gesture aggressively retries raw Pointer Lock while unlocked");
 
   const retryMatch = Object.create(Match.prototype);
   retryMatch.running = true;
   retryMatch.input = {
-    pointerLocked: true,
-    _degraded: true,
+    pointerLocked: false,
     pointerLockSupported: () => true,
     desktopRuntime: () => false,
-    pointerLockRawInputDegraded() { return this._degraded; },
-    async exitPointerLock() {
-      this.pointerLocked = false;
-    },
     async requestPointerLock() {
-      this.pointerLocked = true;
-      this._degraded = false;
-      return true;
+      return false;
     },
   };
   retryMatch.autoPointerLockUntil = 0;
   retryMatch.pointerLockRetryToken = 7;
   retryMatch.waitPointerLockRetryDelay = async () => {};
-  await retryMatch.runPointerLockRetryBurst(7, 1, { forceRawRetry: true });
-  assert(retryMatch.pointerLockRetry.stopped === "locked", "raw retry unlocks and relocks when fallback was degraded");
-  assert(!retryMatch.input.pointerLockRawInputDegraded(), "raw retry can leave the lock in a non-degraded state");
+  await retryMatch.runPointerLockRetryBurst(7, 2);
+  assert(retryMatch.pointerLockRetry.attempts === 2, "raw Pointer Lock retry keeps trying while unlocked");
+  assert(retryMatch.pointerLockRetry.stopped === "exhausted", "raw Pointer Lock retry exhausts without plain fallback");
 
   if (priorWindow === undefined) delete globalThis.window;
   else globalThis.window = priorWindow;
