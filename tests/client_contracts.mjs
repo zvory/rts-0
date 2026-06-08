@@ -709,7 +709,7 @@ function fakeAudioContext() {
         null,
         null,
         null,
-        [[ORDER_STAGE_CODE[ORDER_STAGE.MOVE], 96, 112], [ORDER_STAGE_CODE[ORDER_STAGE.MOVE], 128, 160], [ORDER_STAGE_CODE[ORDER_STAGE.SMOKE], 192, 224]],
+        [[ORDER_STAGE_CODE[ORDER_STAGE.MOVE], 96, 112], [ORDER_STAGE_CODE[ORDER_STAGE.SETUP_AT_GUNS], 128, 160], [ORDER_STAGE_CODE[ORDER_STAGE.SMOKE], 192, 224]],
         87,
         [[ABILITY_CODE[ABILITY.CHARGE], 87, 2]],
         true,
@@ -796,9 +796,15 @@ function fakeAudioContext() {
     "entity debug path decodes",
   );
   assert(
-    decoded.entities[0].orderPlan[1].kind === ORDER_STAGE.MOVE &&
+    decoded.entities[0].orderPlan[1].kind === ORDER_STAGE.SETUP_AT_GUNS &&
       decoded.entities[0].orderPlan[2].kind === ORDER_STAGE.SMOKE,
     "order plan stage flavor decodes",
+  );
+  assert(
+    decoded.entities[0].orderPlan[1].kind === ORDER_STAGE.SETUP_AT_GUNS &&
+      decoded.entities[0].orderPlan[1].x === 128 &&
+      decoded.entities[0].orderPlan[1].y === 160,
+    "queued AT gun setup order stage decodes",
   );
   assert(decoded.entities[1].setupState === SETUP.DEPLOYED, "entity setupState code decodes");
   assert(decoded.entities[2].prodKind === KIND.WORKER, "entity prodKind code decodes");
