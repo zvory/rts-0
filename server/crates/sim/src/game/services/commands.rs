@@ -9,7 +9,8 @@ use crate::game::entity::{
 use crate::game::fog::Fog;
 use crate::game::map::Map;
 use crate::game::services::ability_orders::{
-    self, caster_can_attempt, order_or_launch_world_ability, tech_requirement_met,
+    self, caster_can_attempt, launch_self_ability, order_or_launch_world_ability,
+    tech_requirement_met,
 };
 use crate::game::services::construction::resumable_site_for_build_intent;
 use crate::game::services::dist2;
@@ -125,7 +126,12 @@ pub(crate) fn apply_commands(
                     coordinator.order_attack(entities, id, target);
                 }
             }
-            SimCommand::SetupAtGuns { units, x, y } => {
+            SimCommand::SetupAtGuns {
+                units,
+                x,
+                y,
+                queued,
+            } => {
                 if !x.is_finite() || !y.is_finite() {
                     continue;
                 }
@@ -133,34 +139,20 @@ pub(crate) fn apply_commands(
                     if !owns_unit(entities, player, id) || is_constructing(entities, id) {
                         continue;
                     }
-                    let Some(e) = entities.get_mut(id) else {
-                        continue;
-                    };
-                    if e.kind != EntityKind::AtTeam {
+                    if !matches!(entities.get(id), Some(e) if e.kind == EntityKind::AtTeam) {
                         continue;
                     }
-                    let facing = (y - e.pos_y).atan2(x - e.pos_x);
-                    if !facing.is_finite() {
+                    if queued {
+                        append_queued_or_notice(
+                            entities,
+                            events,
+                            player,
+                            id,
+                            OrderIntent::setup_at_guns(x, y),
+                        );
                         continue;
                     }
-                    entities.release_miner(id);
-                    let Some(e) = entities.get_mut(id) else {
-                        continue;
-                    };
-                    e.clear_orders();
-                    e.set_path_goal(None);
-                    if matches!(e.weapon_setup(), WeaponSetup::Packed) {
-                        e.set_emplacement_facing(Some(facing));
-                        e.set_desired_weapon_facing(facing);
-                    } else {
-                        e.set_pending_redeploy_facing(Some(facing));
-                        e.set_weapon_setup(WeaponSetup::TearingDownToRedeploy {
-                            ticks: config::AT_TEAM_SETUP_TICKS,
-                        });
-                    }
-                    e.reset_gather_state();
-                    let (px, py) = (e.pos_x, e.pos_y);
-                    e.reset_stuck(px, py);
+                    execute_at_gun_setup(entities, id, x, y);
                 }
             }
             SimCommand::TearDownAtGuns { units } => {
@@ -374,11 +366,17 @@ fn use_ability(
                 if !caster_can_attempt(entities, player, id, ability) {
                     continue;
                 }
-                let Some(e) = entities.get_mut(id) else {
+                if request.queued {
+                    append_queued_or_notice(
+                        entities,
+                        events,
+                        player,
+                        id,
+                        OrderIntent::self_ability(ability),
+                    );
                     continue;
-                };
-                e.start_charge(config::RIFLEMAN_CHARGE_TICKS);
-                e.start_ability_cooldown(ability, definition.cooldown_ticks);
+                }
+                launch_self_ability(entities, player, id, ability);
             }
         }
         AbilityKind::Smoke => {
@@ -402,10 +400,17 @@ fn use_ability(
                 return;
             }
             if request.queued {
-                let intent = OrderIntent::ability(ability, x, y);
-                for id in eligible {
-                    if let Some(e) = entities.get_mut(id) {
-                        e.append_queued_order(intent.clone());
+                if let Some(caster) = choose_queued_smoke_caster(entities, &eligible) {
+                    append_queued_or_notice(
+                        entities,
+                        events,
+                        player,
+                        caster,
+                        OrderIntent::ability(ability, x, y),
+                    );
+                } else {
+                    for id in eligible {
+                        notice(events, player, queue_full_notice(id));
                     }
                 }
                 return;
@@ -434,6 +439,68 @@ fn use_ability(
             );
         }
     }
+}
+
+fn choose_queued_smoke_caster(entities: &EntityStore, eligible: &[u32]) -> Option<u32> {
+    eligible
+        .iter()
+        .copied()
+        .filter_map(|id| entities.get(id).map(|e| (id, e.queued_orders().len())))
+        .filter(|(_, len)| *len < crate::game::entity::MAX_QUEUED_ORDERS)
+        .min_by_key(|(_, len)| *len)
+        .map(|(id, _)| id)
+}
+
+fn append_queued_or_notice(
+    entities: &mut EntityStore,
+    events: &mut HashMap<u32, Vec<Event>>,
+    player: u32,
+    unit: u32,
+    intent: OrderIntent,
+) -> bool {
+    let appended = entities
+        .get_mut(unit)
+        .is_some_and(|e| e.append_queued_order(intent));
+    if !appended {
+        notice(events, player, queue_full_notice(unit));
+    }
+    appended
+}
+
+fn queue_full_notice(_unit: u32) -> &'static str {
+    "Order queue full"
+}
+
+fn execute_at_gun_setup(entities: &mut EntityStore, id: u32, x: f32, y: f32) -> bool {
+    let Some(e) = entities.get(id) else {
+        return false;
+    };
+    if e.kind != EntityKind::AtTeam || e.under_construction() || !x.is_finite() || !y.is_finite() {
+        return false;
+    }
+    let facing = (y - e.pos_y).atan2(x - e.pos_x);
+    if !facing.is_finite() {
+        return false;
+    }
+    entities.release_miner(id);
+    let Some(e) = entities.get_mut(id) else {
+        return false;
+    };
+    e.clear_orders();
+    e.set_path_goal(None);
+    if matches!(e.weapon_setup(), WeaponSetup::Packed) {
+        e.set_emplacement_facing(Some(facing));
+        e.set_desired_weapon_facing(facing);
+    } else {
+        e.set_pending_redeploy_facing(Some(facing));
+        e.set_weapon_setup(WeaponSetup::TearingDownToRedeploy {
+            ticks: config::AT_TEAM_SETUP_TICKS,
+        });
+    }
+    e.reset_gather_state();
+    let (px, py) = (e.pos_x, e.pos_y);
+    e.reset_stuck(px, py);
+    true
 }
 
 fn choose_smoke_caster(
@@ -1351,6 +1418,71 @@ mod tests {
     }
 
     #[test]
+    fn queued_charge_appends_to_ready_riflemen_only_and_later_attack_move_hits_selection() {
+        let map = flat_map(24);
+        let mut entities = EntityStore::new();
+        let ready = entities
+            .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
+            .expect("ready rifleman should spawn");
+        let cooldown = entities
+            .spawn_unit(1, EntityKind::Rifleman, 120.0, 100.0)
+            .expect("cooldown rifleman should spawn");
+        let worker = entities
+            .spawn_unit(1, EntityKind::Worker, 140.0, 100.0)
+            .expect("worker should spawn");
+        let (tx, ty) = footprint_center(&map, EntityKind::TrainingCentre, 6, 6);
+        entities
+            .spawn_building(1, EntityKind::TrainingCentre, tx, ty, true)
+            .expect("training centre should spawn");
+        entities
+            .get_mut(cooldown)
+            .unwrap()
+            .start_ability_cooldown(AbilityKind::Charge, 5);
+
+        apply(
+            &map,
+            &mut entities,
+            vec![
+                (
+                    1,
+                    SimCommand::UseAbility {
+                        ability: AbilityKind::Charge,
+                        units: vec![ready, cooldown, worker],
+                        x: None,
+                        y: None,
+                        queued: true,
+                    },
+                ),
+                (
+                    1,
+                    SimCommand::AttackMove {
+                        units: vec![ready, cooldown, worker],
+                        x: 400.0,
+                        y: 100.0,
+                        queued: true,
+                    },
+                ),
+            ],
+        );
+
+        assert!(matches!(
+            entities.get(ready).unwrap().queued_orders()[0],
+            OrderIntent::SelfAbility(_)
+        ));
+        assert_eq!(entities.get(ready).unwrap().queued_orders().len(), 2);
+        assert_eq!(
+            entities.get(cooldown).unwrap().queued_orders().len(),
+            1,
+            "cooldown rifleman should skip Charge but still receive the later attack-move"
+        );
+        assert_eq!(
+            entities.get(worker).unwrap().queued_orders().len(),
+            1,
+            "non-rifleman should skip Charge but still receive the later attack-move"
+        );
+    }
+
+    #[test]
     fn in_range_smoke_launches_from_furthest_selected_carrier() {
         let map = flat_map(32);
         let mut entities = EntityStore::new();
@@ -1458,7 +1590,7 @@ mod tests {
             .unwrap()
             .queued_orders()
             .iter()
-            .all(|intent| matches!(intent, OrderIntent::Ability(_))));
+            .all(|intent| matches!(intent, OrderIntent::WorldAbility(_))));
         assert!(
             entities.get(rifle).unwrap().queued_orders().is_empty(),
             "non-carriers should not receive queued Smoke intents"
@@ -1470,6 +1602,56 @@ mod tests {
             vec![(1, SimCommand::Stop { units: vec![scout] })],
         );
         assert!(entities.get(scout).unwrap().queued_orders().is_empty());
+    }
+
+    #[test]
+    fn queued_smoke_distributes_one_click_per_ready_scout_by_queue_length() {
+        let map = flat_map(32);
+        let mut entities = EntityStore::new();
+        let target = map.tile_center(12, 8);
+        let first = entities
+            .spawn_unit(1, EntityKind::ScoutCar, target.0 - 96.0, target.1)
+            .expect("first scout car should spawn");
+        let second = entities
+            .spawn_unit(1, EntityKind::ScoutCar, target.0 - 128.0, target.1)
+            .expect("second scout car should spawn");
+        let cooling = entities
+            .spawn_unit(1, EntityKind::ScoutCar, target.0 - 160.0, target.1)
+            .expect("cooling scout car should spawn");
+        entities
+            .get_mut(cooling)
+            .unwrap()
+            .start_ability_cooldown(AbilityKind::Smoke, 5);
+        let (sx, sy) = footprint_center(&map, EntityKind::Steelworks, 4, 4);
+        entities
+            .spawn_building(1, EntityKind::Steelworks, sx, sy, true)
+            .expect("steelworks should spawn");
+
+        apply(
+            &map,
+            &mut entities,
+            (0..4)
+                .map(|i| {
+                    (
+                        1,
+                        SimCommand::UseAbility {
+                            ability: AbilityKind::Smoke,
+                            units: vec![first, second, cooling],
+                            x: Some(target.0 + i as f32),
+                            y: Some(target.1),
+                            queued: true,
+                        },
+                    )
+                })
+                .collect(),
+        );
+
+        assert_eq!(entities.get(first).unwrap().queued_orders().len(), 2);
+        assert_eq!(entities.get(second).unwrap().queued_orders().len(), 2);
+        assert!(
+            entities.get(cooling).unwrap().queued_orders().is_empty(),
+            "cooldown scout car should not receive queued smoke at issue time"
+        );
     }
 
     #[test]
@@ -1798,6 +1980,7 @@ mod tests {
                     units: vec![at, rifle, enemy_at, at],
                     x: 100.0,
                     y: 140.0,
+                    queued: false,
                 },
             )],
         );
@@ -1828,6 +2011,54 @@ mod tests {
                 .weapon_setup(),
             WeaponSetup::Packed,
             "enemy AT guns are ignored"
+        );
+    }
+
+    #[test]
+    fn queued_setup_at_guns_filters_to_at_teams_and_preserves_later_attack_move() {
+        let map = flat_map(24);
+        let mut entities = EntityStore::new();
+        let at = entities
+            .spawn_unit(1, EntityKind::AtTeam, 100.0, 100.0)
+            .expect("at gun should spawn");
+        let rifle = entities
+            .spawn_unit(1, EntityKind::Rifleman, 120.0, 100.0)
+            .expect("rifleman should spawn");
+
+        apply(
+            &map,
+            &mut entities,
+            vec![
+                (
+                    1,
+                    SimCommand::SetupAtGuns {
+                        units: vec![at, rifle],
+                        x: 100.0,
+                        y: 140.0,
+                        queued: true,
+                    },
+                ),
+                (
+                    1,
+                    SimCommand::AttackMove {
+                        units: vec![at, rifle],
+                        x: 220.0,
+                        y: 100.0,
+                        queued: true,
+                    },
+                ),
+            ],
+        );
+
+        assert!(matches!(
+            entities.get(at).unwrap().queued_orders()[0],
+            OrderIntent::SetupAtGuns(_)
+        ));
+        assert_eq!(entities.get(at).unwrap().queued_orders().len(), 2);
+        assert_eq!(
+            entities.get(rifle).unwrap().queued_orders().len(),
+            1,
+            "non-AT units skip setup but keep later compatible stages"
         );
     }
 

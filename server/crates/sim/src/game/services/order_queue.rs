@@ -7,7 +7,8 @@ use crate::game::entity::{
 use crate::game::fog::Fog;
 use crate::game::map::Map;
 use crate::game::services::ability_orders::{
-    active_ability_order_ready, launch_world_ability, order_or_launch_world_ability,
+    active_ability_order_ready, launch_self_ability, launch_world_ability,
+    order_or_launch_world_ability,
 };
 use crate::game::services::construction::resumable_site_for_build_intent;
 use crate::game::services::dist2;
@@ -65,8 +66,15 @@ enum PromotedIntent {
         tx: u32,
         ty: u32,
     },
-    Ability {
+    WorldAbility {
         ability: crate::game::ability::AbilityKind,
+        x: f32,
+        y: f32,
+    },
+    SelfAbility {
+        ability: crate::game::ability::AbilityKind,
+    },
+    SetupAtGuns {
         x: f32,
         y: f32,
     },
@@ -137,7 +145,7 @@ pub(crate) fn promote_ready_orders(
             PromotedIntent::Build { kind, tx, ty } => {
                 coordinator.order_build(entities, id, kind, tx, ty);
             }
-            PromotedIntent::Ability { ability, x, y } => {
+            PromotedIntent::WorldAbility { ability, x, y } => {
                 let Some(owner) = entities.get(id).map(|e| e.owner) else {
                     continue;
                 };
@@ -156,6 +164,15 @@ pub(crate) fn promote_ready_orders(
                     tick,
                     true,
                 );
+            }
+            PromotedIntent::SelfAbility { ability } => {
+                let Some(owner) = entities.get(id).map(|e| e.owner) else {
+                    continue;
+                };
+                launch_self_ability(entities, owner, id, ability);
+            }
+            PromotedIntent::SetupAtGuns { x, y } => {
+                execute_at_gun_setup(entities, id, x, y);
             }
         }
     }
@@ -248,8 +265,8 @@ fn pop_next_valid_intent(
                     });
                 }
             }
-            OrderIntent::Ability(ability) => {
-                if ability_intent_valid(
+            OrderIntent::WorldAbility(ability) => {
+                if world_ability_intent_valid(
                     map,
                     entities,
                     players,
@@ -258,10 +275,25 @@ fn pop_next_valid_intent(
                     ability.ability,
                     (ability.x, ability.y),
                 ) {
-                    return Some(PromotedIntent::Ability {
+                    return Some(PromotedIntent::WorldAbility {
                         ability: ability.ability,
                         x: ability.x,
                         y: ability.y,
+                    });
+                }
+            }
+            OrderIntent::SelfAbility(ability) => {
+                if self_ability_intent_valid(entities, owner, id, ability.ability) {
+                    return Some(PromotedIntent::SelfAbility {
+                        ability: ability.ability,
+                    });
+                }
+            }
+            OrderIntent::SetupAtGuns(point) => {
+                if setup_at_gun_intent_valid(entities, id, point.x, point.y) {
+                    return Some(PromotedIntent::SetupAtGuns {
+                        x: point.x,
+                        y: point.y,
                     });
                 }
             }
@@ -270,7 +302,7 @@ fn pop_next_valid_intent(
     None
 }
 
-fn ability_intent_valid(
+fn world_ability_intent_valid(
     map: &Map,
     entities: &EntityStore,
     players: &[PlayerState],
@@ -293,6 +325,58 @@ fn ability_intent_valid(
         return false;
     };
     ps.steel >= definition.cost.steel && ps.oil >= definition.cost.oil
+}
+
+fn self_ability_intent_valid(
+    entities: &EntityStore,
+    owner: u32,
+    caster: u32,
+    ability: crate::game::ability::AbilityKind,
+) -> bool {
+    crate::game::services::ability_orders::caster_can_attempt(entities, owner, caster, ability)
+        && crate::game::services::ability_orders::tech_requirement_met(entities, owner, ability)
+        && crate::game::ability::definition(ability).target_mode
+            == crate::game::ability::AbilityTargetMode::SelfTarget
+}
+
+fn setup_at_gun_intent_valid(entities: &EntityStore, id: u32, x: f32, y: f32) -> bool {
+    let Some(e) = entities.get(id) else {
+        return false;
+    };
+    if e.kind != EntityKind::AtTeam || e.under_construction() || !x.is_finite() || !y.is_finite() {
+        return false;
+    }
+    let facing = (y - e.pos_y).atan2(x - e.pos_x);
+    facing.is_finite()
+}
+
+fn execute_at_gun_setup(entities: &mut EntityStore, id: u32, x: f32, y: f32) -> bool {
+    if !setup_at_gun_intent_valid(entities, id, x, y) {
+        return false;
+    }
+    let Some(e) = entities.get(id) else {
+        return false;
+    };
+    let facing = (y - e.pos_y).atan2(x - e.pos_x);
+    entities.release_miner(id);
+    let Some(e) = entities.get_mut(id) else {
+        return false;
+    };
+    e.clear_active_order();
+    e.set_path_goal(None);
+    if matches!(e.weapon_setup(), crate::game::entity::WeaponSetup::Packed) {
+        e.set_emplacement_facing(Some(facing));
+        e.set_desired_weapon_facing(facing);
+    } else {
+        e.set_pending_redeploy_facing(Some(facing));
+        e.set_weapon_setup(crate::game::entity::WeaponSetup::TearingDownToRedeploy {
+            ticks: config::AT_TEAM_SETUP_TICKS,
+        });
+    }
+    e.reset_gather_state();
+    let (px, py) = (e.pos_x, e.pos_y);
+    e.reset_stuck(px, py);
+    true
 }
 
 fn attack_intent_valid(
@@ -452,7 +536,10 @@ fn build_intent_valid(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::game::entity::{EntityKind, EntityStore, MovePhase, Order, OrderIntent};
+    use crate::game::ability::AbilityKind;
+    use crate::game::entity::{
+        EntityKind, EntityStore, MovePhase, Order, OrderIntent, WeaponSetup,
+    };
     use crate::game::fog::Fog;
     use crate::game::map::Map;
     use crate::game::services::move_coordinator::MoveCoordinator;
@@ -890,6 +977,78 @@ mod tests {
                 && (intent.1 - 100.0).abs() <= config::TILE_SIZE as f32,
             "formation-adjusted attack-move intent should stay near the queued destination, got {intent:?}"
         );
+    }
+
+    #[test]
+    fn queued_charge_promotes_between_move_and_attack_move() {
+        let map = flat_map(32);
+        let mut entities = EntityStore::new();
+        let rifle = entities
+            .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
+            .expect("rifleman should spawn");
+        let (tx, ty) = footprint_center(&map, EntityKind::TrainingCentre, 4, 4);
+        entities
+            .spawn_building(1, EntityKind::TrainingCentre, tx, ty, true)
+            .expect("training centre should spawn");
+        {
+            let unit = entities.get_mut(rifle).expect("rifleman should exist");
+            unit.set_order(Order::move_to(140.0, 100.0));
+            unit.mark_move_phase(MovePhase::Arrived);
+            unit.append_queued_order(OrderIntent::self_ability(AbilityKind::Charge));
+            unit.append_queued_order(OrderIntent::attack_move_to(240.0, 100.0));
+        }
+
+        promote(&map, &mut entities);
+
+        let unit = entities.get(rifle).expect("rifleman should exist");
+        assert_eq!(unit.charge_ticks(), config::RIFLEMAN_CHARGE_TICKS);
+        assert_eq!(
+            unit.ability_cooldown_ticks(AbilityKind::Charge),
+            config::RIFLEMAN_CHARGE_COOLDOWN_TICKS
+        );
+        assert_eq!(unit.queued_orders().len(), 1);
+        assert!(matches!(unit.order(), Order::Idle));
+
+        promote(&map, &mut entities);
+
+        let unit = entities.get(rifle).expect("rifleman should exist");
+        assert!(matches!(unit.order(), Order::AttackMove(_)));
+        assert!(unit.queued_orders().is_empty());
+    }
+
+    #[test]
+    fn queued_at_setup_faces_from_arrived_position_and_keeps_later_attack_move() {
+        let map = flat_map(32);
+        let mut entities = EntityStore::new();
+        let at = entities
+            .spawn_unit(1, EntityKind::AtTeam, 100.0, 100.0)
+            .expect("at gun should spawn");
+        {
+            let unit = entities.get_mut(at).expect("at gun should exist");
+            unit.set_order(Order::move_to(150.0, 100.0));
+            unit.mark_move_phase(MovePhase::Arrived);
+            unit.pos_x = 150.0;
+            unit.pos_y = 100.0;
+            unit.append_queued_order(OrderIntent::setup_at_guns(150.0, 140.0));
+            unit.append_queued_order(OrderIntent::attack_move_to(240.0, 100.0));
+        }
+
+        promote(&map, &mut entities);
+
+        let unit = entities.get(at).expect("at gun should exist");
+        assert_eq!(unit.weapon_setup(), WeaponSetup::Packed);
+        assert!(
+            (unit.emplacement_facing().unwrap_or_default() - std::f32::consts::FRAC_PI_2).abs()
+                < 0.001,
+            "setup facing should be computed from the arrived position"
+        );
+        assert_eq!(unit.queued_orders().len(), 1);
+
+        promote(&map, &mut entities);
+
+        let unit = entities.get(at).expect("at gun should exist");
+        assert!(matches!(unit.order(), Order::AttackMove(_)));
+        assert!(unit.queued_orders().is_empty());
     }
 
     #[test]

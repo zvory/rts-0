@@ -31,6 +31,7 @@ pub enum SimCommand {
         units: Vec<u32>,
         x: f32,
         y: f32,
+        queued: bool,
     },
     TearDownAtGuns {
         units: Vec<u32>,
@@ -126,9 +127,17 @@ impl SimCommand {
                 target,
                 queued,
             },
-            protocol::Command::SetupAtGuns { units, x, y } => {
-                SimCommand::SetupAtGuns { units, x, y }
-            }
+            protocol::Command::SetupAtGuns {
+                units,
+                x,
+                y,
+                queued,
+            } => SimCommand::SetupAtGuns {
+                units,
+                x,
+                y,
+                queued,
+            },
             protocol::Command::TearDownAtGuns { units } => SimCommand::TearDownAtGuns { units },
             protocol::Command::Charge { units } => SimCommand::UseAbility {
                 ability: AbilityKind::Charge,
@@ -237,10 +246,16 @@ impl SimCommand {
                 target: *target,
                 queued: *queued,
             },
-            SimCommand::SetupAtGuns { units, x, y } => protocol::Command::SetupAtGuns {
+            SimCommand::SetupAtGuns {
+                units,
+                x,
+                y,
+                queued,
+            } => protocol::Command::SetupAtGuns {
                 units: units.clone(),
                 x: *x,
                 y: *y,
+                queued: *queued,
             },
             SimCommand::TearDownAtGuns { units } => protocol::Command::TearDownAtGuns {
                 units: units.clone(),
@@ -391,6 +406,7 @@ mod tests {
             units: vec![3, 5],
             x: 100.0,
             y: 200.0,
+            queued: true,
         };
         assert_eq!(
             SimCommand::from_protocol(setup.clone()),
@@ -398,6 +414,7 @@ mod tests {
                 units: vec![3, 5],
                 x: 100.0,
                 y: 200.0,
+                queued: true,
             }
         );
         assert_eq!(

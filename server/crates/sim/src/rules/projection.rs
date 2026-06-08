@@ -287,12 +287,16 @@ fn order_plan(
     if let Some(marker) = active_order_plan_marker(entity, entities, viewer, fog, smokes) {
         plan.push(marker);
     }
-    plan.extend(
-        entity
-            .queued_orders()
-            .iter()
-            .filter_map(|intent| intent_plan_marker(intent, entities, viewer, fog, smokes)),
-    );
+    plan.extend(entity.queued_orders().iter().filter_map(|intent| {
+        intent_plan_marker(
+            intent,
+            (entity.pos_x, entity.pos_y),
+            entities,
+            viewer,
+            fog,
+            smokes,
+        )
+    }));
     plan
 }
 
@@ -330,6 +334,7 @@ fn active_order_plan_marker(
 
 fn intent_plan_marker(
     intent: &OrderIntent,
+    self_position: (f32, f32),
     entities: &EntityStore,
     viewer: u32,
     fog: &Fog,
@@ -343,9 +348,15 @@ fn intent_plan_marker(
         }
         OrderIntent::Gather(gather) => entity_point_marker("gather", gather.node, entities),
         OrderIntent::Build(build) => build_marker(build.kind, build.tile_x, build.tile_y),
-        OrderIntent::Ability(ability) => {
+        OrderIntent::WorldAbility(ability) => {
             point_marker(ability.ability.to_protocol_str(), ability.x, ability.y)
         }
+        OrderIntent::SelfAbility(ability) => point_marker(
+            ability.ability.to_protocol_str(),
+            self_position.0,
+            self_position.1,
+        ),
+        OrderIntent::SetupAtGuns(point) => point_marker("setupAtGuns", point.x, point.y),
     }
 }
 

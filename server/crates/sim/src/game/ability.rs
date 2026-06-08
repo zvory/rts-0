@@ -68,7 +68,7 @@ pub fn definition(kind: AbilityKind) -> AbilityDefinition {
             cooldown_ticks: config::RIFLEMAN_CHARGE_COOLDOWN_TICKS,
             cost: ResourceCost { steel: 0, oil: 0 },
             tech_requirement: Some(EntityKind::TrainingCentre),
-            may_queue: false,
+            may_queue: true,
         },
         AbilityKind::Smoke => AbilityDefinition {
             kind,
