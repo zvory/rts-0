@@ -207,6 +207,13 @@ impl Fog {
         self.grids.contains_key(&player)
     }
 
+    pub(crate) fn visible_tiles_for(&self, player: u32) -> Vec<u8> {
+        self.grids
+            .get(&player)
+            .map(|grid| grid.iter().map(|visible| u8::from(*visible)).collect())
+            .unwrap_or_default()
+    }
+
     /// Whether `player` can currently see the world-pixel point `(x, y)`.
     pub fn is_visible_world(&self, player: u32, x: f32, y: f32) -> bool {
         let ts = config::TILE_SIZE as f32;

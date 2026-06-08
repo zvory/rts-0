@@ -582,6 +582,7 @@ function fakeAudioContext() {
     ],
     r: [[200, 1498]],
     sm: [[50, 320, 352, 2, 120]],
+    fg: [1, 2, 3, 1],
     ev: [
       [EVENT_CODE[EVENT.ATTACK], 1, 7],
       [EVENT_CODE[EVENT.DEATH], 200, 64, 96, KIND_CODE[KIND.STEEL]],
@@ -640,6 +641,10 @@ function fakeAudioContext() {
       decoded.smokes[0].radiusTiles === 2 &&
       decoded.smokes[0].expiresIn === 120,
     "smoke clouds decode",
+  );
+  assert(
+    decoded.visibleTiles.join(",") === "1,1,0,0,0,1",
+    "compact snapshot decodes server visibility grid",
   );
   assert(decoded.events[0].e === EVENT.ATTACK && decoded.events[0].to === 7, "attack event decodes");
   assert(decoded.events[1].kind === KIND.STEEL, "death event kind decodes");

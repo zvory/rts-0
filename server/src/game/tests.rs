@@ -296,6 +296,21 @@ fn snapshot_projects_visible_smoke_but_hides_enemy_inside_it() {
 }
 
 #[test]
+fn snapshot_visibility_grid_fogs_tiles_behind_smoke() {
+    let (game, _observer, _friendly, _enemy, _smoke_pos) = smoke_projection_fixture();
+
+    let snapshot = game.snapshot_for(1);
+    let index = |tx: u32, ty: u32| (ty * game.map.size + tx) as usize;
+
+    assert_eq!(snapshot.visible_tiles[index(7, 4)], 1);
+    assert_eq!(
+        snapshot.visible_tiles[index(11, 4)],
+        0,
+        "tile behind smoke should be fogged in the server-provided visibility grid"
+    );
+}
+
+#[test]
 fn snapshot_keeps_friendly_unit_inside_smoke_visible_to_owner() {
     let (game, _observer, friendly, _enemy, _smoke_pos) = smoke_projection_fixture();
 
