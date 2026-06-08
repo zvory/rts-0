@@ -742,6 +742,7 @@ fn order_stage_code(kind: &str) -> u8 {
         "attack" => 3,
         "gather" => 4,
         "build" => 5,
+        abilities::SMOKE => 6,
         _ => 255,
     }
 }
@@ -784,7 +785,7 @@ mod tests {
                 y: 160.0,
             },
             OrderPlanMarker {
-                kind: "attackMove".to_string(),
+                kind: abilities::SMOKE.to_string(),
                 x: 192.0,
                 y: 224.0,
             },
@@ -911,7 +912,7 @@ mod tests {
         assert_eq!(value["e"][0][15], serde_json::json!(9));
         assert_eq!(
             value["e"][0][21],
-            serde_json::json!([[1, 96.0, 112.0], [1, 128.0, 160.0], [2, 192.0, 224.0]])
+            serde_json::json!([[1, 96.0, 112.0], [1, 128.0, 160.0], [6, 192.0, 224.0]])
         );
         assert_eq!(value["e"][0][22], serde_json::json!(87));
         assert_eq!(value["e"][0][23], serde_json::json!([[1, 87]]));

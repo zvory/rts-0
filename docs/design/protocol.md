@@ -164,7 +164,8 @@ trailing missing optional fields are omitted; interior missing optional fields a
 `null`. The `rally` slot is itself a two-element `[x, y]` array (or `null`).
 The `orderPlan` slot is an owner-only array capped at 9 entries. It contains the current active
 stage first, followed by queued unit stages in execution order. Each compact stage is
-`[kind, x, y]`, where `kind` is 1 `move`, 2 `attackMove`, 3 `attack`, 4 `gather`, or 5 `build`.
+`[kind, x, y]`, where `kind` is 1 `move`, 2 `attackMove`, 3 `attack`, 4 `gather`, 5 `build`,
+or 6 `smoke`.
 Stages carry safe world points only, never target ids; hidden attack target stages may be omitted
 rather than leaking enemy positions through fog. Production building rally points are exposed
 separately through `rally` and are not part of `orderPlan`.
@@ -219,7 +220,7 @@ events, and positioned notices remain fog-gated and are withheld when smoke hide
   oilUsed?: f32,                 // lifetime oil burned by movement, in resource units
   setupFacing?: f32,             // at_team only: owner-visible deployed arc center; appended after oilUsed in compact snapshots
   orderPlan?: [                  // current + queued order stages; ONLY ever sent to the owner
-    { kind: "move"|"attackMove"|"attack"|"gather"|"build", x: f32, y: f32 }
+    { kind: "move"|"attackMove"|"attack"|"gather"|"build"|"smoke", x: f32, y: f32 }
   ],
   chargeCooldownLeft?: u16,      // legacy rifleman-only owner-visible remaining Charge cooldown
   abilities?: [                  // owner-only ability affordance/cooldown data
