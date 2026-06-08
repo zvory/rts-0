@@ -11,7 +11,8 @@ Use when adding, removing, or changing any field on a client↔server message, s
   - §2.5 `Event` (transient, one snapshot only)
 
 ## Code map
-- `server/src/protocol.rs` — authoritative
+- `server/crates/protocol/src/lib.rs` — authoritative Rust wire DTOs and compact transport
+- `server/src/protocol.rs` — server-shell adapter for typed kind conversion and legacy imports
 - `client/src/protocol.js` — mirror; must agree on every tag, field name, and shape
 
 ## Invariants
@@ -24,6 +25,8 @@ Use when adding, removing, or changing any field on a client↔server message, s
 - **Clients are untrusted.** Validate and bound everything inbound: dedupe + cap unit lists
   (`MAX_UNITS_PER_COMMAND`), size-limit frames, range/overflow-check placement coords. See
   [deployment.md](deployment.md) and [docs/design/hardening.md](../design/hardening.md).
+- `rts-protocol` depends only on `rts-contract` among workspace crates. Kind conversion that needs
+  rules/sim vocabulary belongs in adapter modules.
 
 ## Cross-capsule triggers
 - Adding a snapshot field consumed by rendering → [client-ui.md](client-ui.md).

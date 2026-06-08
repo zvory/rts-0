@@ -20,12 +20,14 @@ Use when changing tick logic, services, rules, AI, or the `Game` core.
 - `server/crates/rules/src/` plus `server/crates/sim/src/rules/projection.rs` — declarative rules
 - `server/crates/ai/src/` — AI opponents and self-play harnesses
 - `server/src/lobby/`, `server/src/main.rs` — only touch sim via `game::Game`
+- `scripts/check-crate-boundaries.mjs` — enforces Cargo package dependency direction
 
 ## Invariants
 - `Game::tick()` is **panic-free**: no `unwrap`/`expect`/unchecked indexing; stale ids = no-op;
   `checked_*` for anything derived from client input. A panic kills the room task.
 - The room task is the single owner of its `Game`. No locks.
 - `lobby/`/`main.rs` only call the public `Game` API. Don't reach into internals.
+- `rts-sim` must not depend on `rts-ai`, `rts-server`, Axum, or Tokio room machinery.
 
 ## Don't break
 - The `Game` API signatures (§3.1). If you must change one, update

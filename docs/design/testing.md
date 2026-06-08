@@ -69,3 +69,31 @@ cargo run --bin ai-matchup -- --list-profiles
 Keep fast invariant-style milestone coverage in `cargo test`; use `RTS_FULL_AI_TESTS=1 cargo test`
 for the long regression gate and the CLI for balance exploration, seed sweeps, and strategy result
 sampling.
+
+## 10. Package-aware test selection policy
+
+The full gate is still `tests/run-all.sh`. Narrower local runs are allowed only when the changed
+files map away from the skipped behavior and the crate-boundary check still passes. Use
+`node tests/select-suites.mjs --from=<base-ref>` or pass changed paths directly to see the expected
+suites.
+
+- `rts-contract` or `rts-protocol`: run Rust contract/protocol tests, compact snapshot tests, JS
+  protocol mirror/decode tests, and Node integration when a top-level message or compact shape
+  changed.
+- `rts-rules`: run rules tests plus sim tests that consume stats/formulas. If visible balance
+  values changed, run client config/protocol mirror checks and include factual player-facing patch
+  notes.
+- `rts-sim`: run sim package tests, deterministic replay coverage, and live-server integration for
+  changed behavior that crosses the room/network boundary.
+- `rts-ai`: run AI package tests and `node tests/ai_integration.mjs`. Run
+  `RTS_FULL_AI_TESTS=1 cargo test` or `tests/run-all.sh --full-ai` when strategy profiles,
+  profile-backed self-play, replay determinism, or long-match balance behavior changed.
+- `rts-server`: run server/lobby tests, Node live-server integration/regression suites, and client
+  smoke when connection, snapshot delivery, room lifecycle, or served client behavior changes.
+- `client/`: run JS protocol/client contract checks, minimap/input contracts where relevant, and
+  client smoke. Include Node integration when protocol decode or network behavior changed.
+
+`scripts/check-crate-boundaries.mjs` is part of the gate and fails on forbidden Cargo package
+edges or server-only imports in lower crates. `tests/select-suites.mjs --verify` keeps the changed
+file mapping itself covered by small examples. CI comments document any intentionally skipped suite;
+that skip becomes invalid when the changed-file mapping selects the skipped behavior.

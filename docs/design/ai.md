@@ -22,6 +22,11 @@ The worker direct-hit retreat reflex is the one extra live input: `Game::worker_
 projects recent own-worker damage metadata into ordinary `Move` commands, and the controller emits
 them alongside profile decisions without reading private sim state.
 
+`rts-ai` may import `rts-sim` public API, `rts-rules`, `rts-protocol`, and `rts-contract`. It must
+not import the server shell, lobby internals, Axum/Tokio transport, or private sim modules through
+path tricks. If AI needs more observations, add a public, fog-respecting `Game`/snapshot surface
+instead of reaching into entity stores from the server layer.
+
 **Strategy (deliberately "very basic").** Each controller, on a staggered cadence
 (`DECISION_INTERVAL` ticks), builds a constrained snapshot-backed `AiObservation` and delegates RTS
 decisions to `rts_ai::ai_core::decision::decide_profile`. Live lobby AIs randomly choose from the

@@ -38,5 +38,8 @@ jobs:
         working-directory: tests
         run: npm ci
 
+      # Full local gate: architecture policy, Rust packages, live-server Node suites,
+      # and client smoke. A narrower suite can be used only when tests/select-suites.mjs
+      # maps every changed file away from the skipped behavior.
       - name: Run full local CI suite
         run: ./tests/run-all.sh

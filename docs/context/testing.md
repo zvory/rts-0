@@ -15,6 +15,8 @@ Use when writing or debugging tests, or before claiming a change is done.
 - `cd server && cargo test` — simulation behavior + fast scripted self-play (no running server needed)
 - `cd server && RTS_FULL_AI_TESTS=1 cargo test` — includes long AI self-play/simulation coverage
 - `tests/run-all.sh --full-ai` — local gate plus long AI self-play/simulation coverage
+- `node tests/select-suites.mjs --from=<base-ref>` — list expected suites for changed files
+- `node scripts/check-crate-boundaries.mjs` — enforce crate dependency direction
 
 ## Invariants
 - Repo-level Cargo config uses `/tmp/rts-cargo-target/rts-0-server` as the shared target dir, so
@@ -28,6 +30,8 @@ Use when writing or debugging tests, or before claiming a change is done.
   `RTS_FULL_AI_TESTS=1 cargo test` when touching AI strategy, profile-backed self-play, replay
   determinism, or balance behavior that depends on long AI matches. The commit hook silently runs
   the fast gate; don't rely on it as your only check.
+- A suite can be skipped only when `tests/select-suites.mjs` maps the changed files away from that
+  behavior and `scripts/check-crate-boundaries.mjs` still passes.
 
 ## Self-play failure protocol
 If a self-play test fails and the cause is not immediately obvious, **do not** speculate-debug.

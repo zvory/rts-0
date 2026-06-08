@@ -3,11 +3,12 @@
 # non-zero if anything failed. This is the canonical "is the build green?" command.
 #
 # What it runs, in order:
-#   1. Rust formatting              (cargo fmt --check)
-#   2. Rust fast scripted tests     (cargo test — deterministic, in-process, no server)
-#   3. Rust lint                    (cargo clippy)
-#   4. Node API suites              (server_integration, regression, ai_integration)
-#   5. Headless client smoke        (client_smoke — only if puppeteer-core + Chrome are present)
+#   1. Architecture policy          (crate boundaries + test-selector self-check)
+#   2. Rust formatting              (cargo fmt --check)
+#   3. Rust fast scripted tests     (cargo test — deterministic, in-process, no server)
+#   4. Rust lint                    (cargo clippy)
+#   5. Node API suites              (server_integration, regression, ai_integration)
+#   6. Headless client smoke        (client_smoke — only if puppeteer-core + Chrome are present)
 #
 # The server is built in debug (overflow checks ON — the hardening regression tests rely on a
 # bad Build coord being caught, not silently wrapped) and booted on a private free port. The
@@ -247,6 +248,10 @@ collect_bg_results() {
 
 run_rust_suites_bg() {
   if [ "$RUN_RUST" = "1" ]; then
+    run_suite_bg "Architecture: crate boundaries" \
+      node "$REPO_ROOT/scripts/check-crate-boundaries.mjs"
+    run_suite_bg "Architecture: test selection policy" \
+      node "$SCRIPT_DIR/select-suites.mjs" --verify
     run_suite_bg "Rust format (cargo fmt --check)" \
       cargo fmt --manifest-path "$SERVER_DIR/Cargo.toml" --check
     if [ "$RUN_FULL_AI" = "1" ]; then
@@ -260,6 +265,7 @@ run_rust_suites_bg() {
     run_suite_bg "Rust lint (cargo clippy)" \
       cargo clippy --manifest-path "$SERVER_DIR/Cargo.toml" -- -D warnings
   else
+    SKIPPED+=("Architecture policy checks (--no-rust)")
     SKIPPED+=("Rust format (--no-rust)")
     SKIPPED+=("Rust fast scripted tests (--no-rust)")
     SKIPPED+=("Rust lint (--no-rust)")

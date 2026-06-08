@@ -8,13 +8,14 @@ Use when tuning costs, supply, sight, sizes, unit/building stats, or any number 
   - §5.2 Current implementation constants
 
 ## Code map
-- `server/src/config.rs` — **authoritative**
+- `server/crates/rules/src/balance.rs` — **authoritative**
+- `server/src/config.rs`, `server/crates/sim/src/config.rs` — compatibility shims for local callers
 - `client/src/config.js` — mirrors the UI/render/fog subset (costs, supply, sight, sizes)
 
 ## Invariants
-- **Mirror.** Change both files together when the value is visible to the client (cost, supply,
-  sight, size, anything used by HUD/render/fog). Server-only tuning (damage curves, internal
-  timers) stays in `config.rs`.
+- **Mirror.** Change `server/crates/rules/src/balance.rs` and `client/src/config.js` together when
+  the value is visible to the client (cost, supply, sight, size, anything used by HUD/render/fog).
+  Server-only tuning (damage curves, internal timers) stays in Rust rules/sim code.
 - Patch notes: collect player-facing bullets as you work (changed stats, economy, combat
   behavior, UI affordances, expected strategic impact). Factual, evidence-backed; if uncertain,
   say what changed and what to watch in playtest.

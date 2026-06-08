@@ -10,6 +10,7 @@ Use when changing server bind/config, the build pipeline, or the input-hardening
 cd server && cargo run            # serves client + /ws on RTS_ADDR; open the printed URL
 cd server && cargo run --release  # fast build
 cd server && cargo build && cargo clippy && cargo fmt
+node scripts/check-crate-boundaries.mjs
 ```
 
 No JS build step (plain ES modules + PixiJS from CDN). The client is served from `../client`
@@ -25,6 +26,7 @@ relative to the server crate, so `cargo run` from `server/` is the whole dev loo
   coord can panic in `cargo run` but silently wrap in `--release`). Keep placement math
   `checked_*`.
 - Keep the room task alive: handle errors, don't propagate panics out of message handlers.
+- `rts-server` is the only crate that may own Axum/Tokio WebSocket/static-file serving.
 
 ## Cross-capsule triggers
 - Touching the wire surface → [protocol.md](protocol.md).

@@ -5,10 +5,11 @@ Crate layout (`server/`):
 Cargo.toml
 src/
   main.rs        # tokio runtime, axum router: static files + /ws, room manager task
-  protocol.rs    # serde types for §2  (PINNED — provided)
-  config.rs      # all balance/sim constants (PINNED — provided)
+  protocol.rs    # server-shell protocol adapter shim; serde DTOs live in crates/protocol
+  config.rs      # server-shell balance shim; authoritative values live in crates/rules
   lobby/         # Lobby API plus room task, connection writers, snapshots, dev replay, crash replay
 crates/
+  contract/      # semantic DTOs shared below protocol/sim/server
   protocol/      # semantic wire DTOs and compact snapshot transport encoding
   rules/         # pure domain, balance, terrain, economy, and combat rules
   ai/            # live AI controllers, shared AI strategy core, and self-play harnesses
@@ -25,6 +26,23 @@ crates/
     replay.rs    # tick-stamped command log replay harness for determinism checks
     src/rules/projection.rs # fog-gated entity/event projection seam
 ```
+
+Dependency policy is part of the development contract:
+
+- `rts-server` may depend on every lower crate and is the only package that owns Axum/Tokio room
+  transport.
+- `rts-ai` may depend on `rts-sim`, `rts-rules`, `rts-protocol`, and `rts-contract`; `rts-sim`
+  must not know AI exists.
+- `rts-sim` may depend on `rts-rules`, `rts-protocol`, and `rts-contract`; it must not import
+  lobby, Axum, Tokio room machinery, or `rts-server`.
+- `rts-protocol` may depend only on `rts-contract` among workspace crates.
+- `rts-rules` and `rts-contract` are lower-layer crates and must stay free of server/sim imports.
+
+`scripts/check-crate-boundaries.mjs` checks these edges in `cargo metadata` and scans lower crates
+for server-only imports. `server/src/protocol.rs`, `server/src/config.rs`,
+`server/crates/sim/src/protocol.rs`, `server/crates/sim/src/config.rs`, and
+`server/crates/sim/src/rules/mod.rs` remain intentional adapters while call sites are migrated;
+new code should prefer the owning crate directly when that does not make local code less clear.
 
 ### 3.1 `game::Game` public API (seam between `game` and `lobby`/`main`)
 The `lobby`/networking layer interacts with the simulation ONLY through this surface.
@@ -99,8 +117,8 @@ pub struct CommandLogEntry { pub tick: u32, pub player_id: u32, pub command: Com
 ```
 `SimCommand` is the internal command enum from `game::command`; `ClientMessage::Command` and
 replay artifacts are translated into it at the boundary. `CommandLogEntry.command` remains the
-serde `Command` from `protocol.rs` so replay JSON stays wire-compatible. `StartPayload`,
-`Snapshot`, `Event`, and `PlayerScore` are also serde types from `protocol.rs`.
+serde `Command` from `rts-protocol` so replay JSON stays wire-compatible. `StartPayload`,
+`Snapshot`, `Event`, and `PlayerScore` are also serde types from `rts-protocol`.
 
 `PlayerInit.is_ai` marks a computer-controlled player. AI players are full players in every
 respect (they get a start position, City Centre, workers, economy, and count toward

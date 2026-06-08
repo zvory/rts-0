@@ -35,6 +35,9 @@ jobs:
         run: npm install
         working-directory: tests
 
+      # This job intentionally skips Rust unit/lint suites because rust.yml owns them.
+      # That skip is invalid if protocol, snapshot delivery, lobby, or server-shell behavior
+      # changed without running the package-aware suites from docs/design/testing.md locally.
       - name: Run integration and JS tests
         run: tests/run-all.sh --no-rust
         env:
