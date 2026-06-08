@@ -198,7 +198,10 @@ export class HUD {
 ```
 The train command card is driven by the first selected production building type, but train clicks
 are issued to the selected completed compatible production buildings in round-robin order so a
-multi-building selection spreads queued units across its producers.
+multi-building selection spreads queued units across its producers. Train and production-cancel
+hotkeys honor native keyboard repeat: after the OS repeat delay, repeated `keydown` events activate
+only those repeatable command-card buttons. Cancel walks selected producing buildings in reverse
+round-robin order for the displayed producer type.
 
 `minimap.js`
 ```js

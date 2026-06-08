@@ -286,11 +286,12 @@ export function _activateCommandHotkey(ev) {
   if (!card) return false;
   for (const btn of card.querySelectorAll("button[data-hotkey]")) {
     if ((btn.dataset.hotkey || "").toUpperCase() !== key) continue;
+    if (ev.repeat && btn.dataset.repeatable !== "true") return false;
     ev.preventDefault();
     if (!btn.disabled) btn.click();
     return {
       handled: true,
-      armed: this.state.lastCommandTargetArm || null,
+      armed: this.state?.lastCommandTargetArm || null,
     };
   }
   return false;

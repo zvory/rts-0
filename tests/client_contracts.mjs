@@ -1068,6 +1068,7 @@ function fakeAudioContext() {
     command: (command) => trained.push(command),
   };
   hud._trainRoundRobin = new Map();
+  hud._cancelRoundRobin = new Map();
 
   hud._issueTrain(KIND.RIFLEMAN);
   hud._issueTrain(KIND.MACHINE_GUNNER);
@@ -1086,6 +1087,19 @@ function fakeAudioContext() {
   assert(
     trained[4].building === 21,
     "changing selected producer order should start the new round-robin set at its first building",
+  );
+
+  selectedProductionBuildings = [
+    { id: 20, owner: playerId, kind: KIND.BARRACKS, prodQueue: 1 },
+    { id: 21, owner: playerId, kind: KIND.BARRACKS, prodQueue: 2 },
+    { id: 30, owner: playerId, kind: KIND.FACTORY, prodQueue: 1 },
+  ];
+  hud._issueCancelProduction(KIND.BARRACKS);
+  hud._issueCancelProduction(KIND.BARRACKS);
+  hud._issueCancelProduction(KIND.BARRACKS);
+  assert(
+    trained.slice(5).map((command) => command.building).join(",") === "21,20,21",
+    "selected producing buildings should receive cancel commands reverse round-robin by producer kind",
   );
 }
 
@@ -1552,6 +1566,7 @@ function fakeAudioContext() {
     ctrlKey: !!mods.ctrlKey,
     metaKey: !!mods.metaKey,
     shiftKey: !!mods.shiftKey,
+    repeat: !!mods.repeat,
     preventDefault() { this.prevented = true; },
     stopPropagation() { this.stopped = true; },
   });
@@ -1566,6 +1581,34 @@ function fakeAudioContext() {
     hotkeyCalls.map((c) => c.type).join(",") === "set,add,select,select,jump",
     "plain number recalls, and double-tap recalls then jumps",
   );
+
+  const repeatHotkeyInput = Object.create(Input.prototype);
+  repeatHotkeyInput.keys = {};
+  repeatHotkeyInput.pointerLocked = false;
+  repeatHotkeyInput._handleControlGroupHotkey = () => false;
+  let repeatClicks = 0;
+  let repeatable = true;
+  globalThis.document = {
+    getElementById(id) {
+      assert(id === "command-card", "repeated command hotkeys should query the command card");
+      return {
+        querySelectorAll(selector) {
+          assert(selector === "button[data-hotkey]", "repeated command hotkeys should query hotkey buttons");
+          return [{
+            dataset: { hotkey: "W", repeatable: repeatable ? "true" : "false" },
+            disabled: false,
+            click() {
+              repeatClicks += 1;
+            },
+          }];
+        },
+      };
+    },
+  };
+  repeatHotkeyInput._handleKeyDown(keyEvent("KeyW", { repeat: true }));
+  repeatable = false;
+  repeatHotkeyInput._handleKeyDown(keyEvent("KeyW", { repeat: true }));
+  assert(repeatClicks === 1, "only repeatable command-card buttons respond to native key repeat");
 
   const menuCancelInput = Object.create(Input.prototype);
   let menuClosed = 0;

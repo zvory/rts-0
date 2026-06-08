@@ -42,8 +42,6 @@ export function _handleKeyDown(ev) {
       break;
   }
 
-  if (ev.repeat) return;
-  if (this._handleControlGroupHotkey(ev)) return;
   const commandHotkey = this._activateCommandHotkey(ev);
   if (commandHotkey) {
     if (commandHotkey.armed?.quickCast) {
@@ -54,6 +52,8 @@ export function _handleKeyDown(ev) {
     }
     return;
   }
+  if (ev.repeat) return;
+  if (this._handleControlGroupHotkey(ev)) return;
 
   switch (ev.code) {
     case "KeyA":

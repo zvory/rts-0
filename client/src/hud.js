@@ -120,6 +120,9 @@ export class HUD {
     this._cardSig = null;
     // Next producer index by selected eligible building ids, used to spread train clicks.
     this._trainRoundRobin = new Map();
+    // Next producer index by selected producing building ids, used to undo production
+    // in the opposite order from training when cancel is pressed repeatedly.
+    this._cancelRoundRobin = new Map();
     // Signature for the resource bar to avoid unnecessary DOM rebuilds.
     this._resSig = null;
     // Signature for the inert control-group tabs.
@@ -150,6 +153,7 @@ export class HUD {
     if (this.elSupply) this.elSupply.classList.remove("supply-capped");
     this._cardSig = null;
     this._trainRoundRobin.clear();
+    this._cancelRoundRobin.clear();
     this._resSig = null;
     this._controlGroupSig = null;
   }
@@ -420,8 +424,8 @@ export class HUD {
    *  - selected production buildings (have `STATS[kind].trains`) → train
    *    buttons for the primary producer's trainable units. Successive train clicks
    *    are distributed round-robin across the selected compatible producers. A
-   *    cancel button is shown for the primary producer while producing in the
-   *    bottom-right cell (`C` hotkey).
+   *    cancel button is shown while any selected compatible producer is producing
+   *    in the bottom-right cell (`C` hotkey).
    *  - anything else → empty.
    *
    * Buttons are disabled when unaffordable (vs `state.resources`) or when tech
@@ -842,7 +846,8 @@ export class HUD {
   _renderTrainCard(card, building) {
     const res = this.state.resources || { steel: 0, oil: 0 };
     const trains = this._trainsOf(building.kind);
-    const producing = (building.prodQueue ?? 0) > 0 || building.state === STATE.TRAIN;
+    const producingBuildings = this._selectedProducingBuildingsForKind(building.kind);
+    const producing = producingBuildings.length > 0;
     const cancelSlot = 8;
 
     // Signature includes the building id (so switching buildings rebuilds), each
@@ -854,7 +859,7 @@ export class HUD {
         const producerIds = this._selectedProducerBuildingsForUnit(u).map((e) => e.id).join(".");
         return `${u}:${this._canTrain(u, res) ? 1 : 0}:${producerIds}`;
       }).join(",") +
-      `|cancel:${producing ? 1 : 0}`;
+      `|cancel:${producingBuildings.map((e) => e.id).join(".")}`;
     if (sig === this._cardSig) return;
     this._cardSig = sig;
 
@@ -871,6 +876,7 @@ export class HUD {
         cost: st.cost,
         enabled,
         title: this._trainDisabledReason(unit, res),
+        repeatable: true,
         onClick: () => this._issueTrain(unit),
       });
       frag.appendChild(btn);
@@ -887,7 +893,8 @@ export class HUD {
         enabled: true,
         cls: "cancel",
         title: "Cancel current production",
-        onClick: () => this.net.command(cmd.cancel(building.id)),
+        repeatable: true,
+        onClick: () => this._issueCancelProduction(building.kind),
       });
       frag.appendChild(cancelBtn);
     } else {
@@ -910,6 +917,19 @@ export class HUD {
     );
   }
 
+  /** Selected own completed producers of `kind` that currently have production to cancel. */
+  _selectedProducingBuildingsForKind(kind) {
+    const sel = this.state.selectedEntities() || [];
+    return sel.filter(
+      (e) =>
+        this._isOwn(e) &&
+        e.kind === kind &&
+        isBuilding(e.kind) &&
+        e.buildProgress == null &&
+        ((e.prodQueue ?? 0) > 0 || e.state === STATE.TRAIN),
+    );
+  }
+
   /** Pick the next selected compatible producer for `unit` and advance its cursor. */
   _nextProducerBuildingForUnit(unit) {
     const producers = this._selectedProducerBuildingsForUnit(unit);
@@ -921,11 +941,32 @@ export class HUD {
     return producers[idx];
   }
 
+  /** Pick the next producing building in reverse selection order and advance its cursor. */
+  _previousProducingBuildingForKind(kind) {
+    const producers = this._selectedProducingBuildingsForKind(kind);
+    if (producers.length === 0) return null;
+
+    const key = producers.map((e) => e.id).join(".");
+    let idx = this._cancelRoundRobin.get(key);
+    if (idx == null) idx = producers.length - 1;
+    idx = ((idx % producers.length) + producers.length) % producers.length;
+    const producer = producers[idx];
+    this._cancelRoundRobin.set(key, (idx - 1 + producers.length) % producers.length);
+    return producer;
+  }
+
   /** Queue `unit` at the next selected compatible production building. */
   _issueTrain(unit) {
     const building = this._nextProducerBuildingForUnit(unit);
     if (!building) return;
     this.net.command(cmd.train(building.id, unit));
+  }
+
+  /** Cancel one production item from the next selected producer in reverse order. */
+  _issueCancelProduction(kind) {
+    const building = this._previousProducingBuildingForKind(kind);
+    if (!building) return;
+    this.net.command(cmd.cancel(building.id));
   }
 
   // --- Shared helpers --------------------------------------------------------
@@ -1009,6 +1050,7 @@ export class HUD {
    * @param {string} [opts.cls] extra class (e.g. "cancel").
    * @param {string} [opts.countBadge] top-right ready count for partially-available abilities.
    * @param {{count:number,rotationDeg:number}[]} [opts.cooldownClocks] grouped cooldown clocks.
+   * @param {boolean} [opts.repeatable] whether native keyboard repeat may trigger this button.
    * @param {() => void} opts.onClick click handler (skipped when disabled).
    * @returns {HTMLButtonElement}
    */
@@ -1022,6 +1064,7 @@ export class HUD {
       // Expose the hotkey so Input/keyboard handling and styles.css can find it.
       btn.dataset.hotkey = opts.hotkey;
     }
+    if (opts.repeatable) btn.dataset.repeatable = "true";
 
     const costHtml = opts.cost
       ? `<span class="cmd-cost">` +

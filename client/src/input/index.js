@@ -12,7 +12,8 @@
 //     hovered tile, validate the footprint, drive the renderer ghost via
 //     state.updatePlacement, confirm with a valid left-click, cancel with right/Esc.
 //   - Keyboard: command-card grid hotkeys (QWE/ASD/ZXC) activate buttons directly;
-//     Esc cancels placement/targeting; S also falls back to stop when no card button is active.
+//     production train/cancel buttons honor native key repeat; Esc cancels
+//     placement/targeting; S also falls back to stop when no card button is active.
 //     Number keys recall control groups; double-tap jumps to the densest visible
 //     cluster. Alt/Ctrl/Cmd+number replaces a group, and Shift+number adds to it;
 //     on Windows, browser saves use Alt+number and desktop saves use Ctrl+number.
