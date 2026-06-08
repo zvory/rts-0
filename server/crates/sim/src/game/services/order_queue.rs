@@ -527,7 +527,7 @@ fn build_intent_valid(
         None => return false,
     };
     let (cost_steel, cost_oil) = rules::economy::cost(kind);
-    if ps.steel < cost_steel || ps.oil < cost_oil {
+    if !can_resume && (ps.steel < cost_steel || ps.oil < cost_oil) {
         return false;
     }
     true
@@ -791,6 +791,43 @@ mod tests {
         assert!(
             matches!(entity.order(), Order::Move(_)),
             "unaffordable build should be skipped and the next move intent should promote"
+        );
+        assert!(entity.queued_orders().is_empty());
+    }
+
+    #[test]
+    fn queued_build_promotes_resume_when_player_cannot_afford_original_cost() {
+        let map = flat_map(32);
+        let mut entities = EntityStore::new();
+        let (cc_x, cc_y) = footprint_center(&map, EntityKind::CityCentre, 4, 4);
+        entities
+            .spawn_building(1, EntityKind::CityCentre, cc_x, cc_y, true)
+            .expect("city centre should spawn");
+        let (site_x, site_y) = footprint_center(&map, EntityKind::Depot, 16, 16);
+        entities
+            .spawn_building(1, EntityKind::Depot, site_x, site_y, false)
+            .expect("scaffold should spawn");
+        let worker = entities
+            .spawn_unit(1, EntityKind::Worker, cc_x + 96.0, cc_y)
+            .expect("worker should spawn");
+        entities
+            .get_mut(worker)
+            .expect("worker should exist")
+            .append_queued_order(OrderIntent::build(EntityKind::Depot, 16, 16));
+        let mut players = vec![player_state(1)];
+        players[0].steel = 0;
+        players[0].oil = 0;
+
+        promote_with_players(&map, &mut entities, &players);
+
+        let entity = entities.get(worker).expect("worker should exist");
+        assert!(
+            matches!(entity.order(), Order::Build(_)),
+            "queued resume should promote even when a new depot is unaffordable"
+        );
+        assert_eq!(
+            entity.order().build_intent_tile(),
+            Some((EntityKind::Depot, 16, 16))
         );
         assert!(entity.queued_orders().is_empty());
     }

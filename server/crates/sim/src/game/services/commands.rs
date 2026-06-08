@@ -973,7 +973,7 @@ fn order_build(
         None => return,
     };
     let (cost_steel, cost_oil) = rules::economy::cost(building);
-    if ps.steel < cost_steel || ps.oil < cost_oil {
+    if !can_resume_existing && (ps.steel < cost_steel || ps.oil < cost_oil) {
         notice(
             events,
             player,
@@ -1349,6 +1349,69 @@ mod tests {
         assert!(
             events.get(&1).is_none_or(Vec::is_empty),
             "resume order should not emit a placement failure notice"
+        );
+    }
+
+    #[test]
+    fn build_order_accepts_resuming_owned_scaffold_without_resources() {
+        let map = flat_map(16);
+        let mut entities = EntityStore::new();
+        let (site_x, site_y) = footprint_center(&map, EntityKind::Depot, 4, 4);
+        let worker = entities
+            .spawn_unit(1, EntityKind::Worker, 64.0, 64.0)
+            .expect("worker should spawn");
+        entities
+            .spawn_building(1, EntityKind::Depot, site_x, site_y, false)
+            .expect("scaffold should spawn");
+        let spatial = SpatialIndex::build(&entities, map.size);
+        let occ = Occupancy::build(&map, &entities);
+        let mut pathing = PathingService::new(1024, 32);
+        pathing.advance_tick(1);
+        let mut coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, 1);
+        let mut players = vec![player_state(1)];
+        players[0].steel = 0;
+        players[0].oil = 0;
+        let mut fog = Fog::new(map.size);
+        fog.recompute(&[1], &entities, &map);
+        let mut smokes = SmokeCloudStore::new();
+        let mut events = HashMap::new();
+
+        apply_commands(
+            &map,
+            &mut entities,
+            &mut players,
+            &spatial,
+            &mut coordinator,
+            &fog,
+            &mut smokes,
+            vec![(
+                1,
+                SimCommand::Build {
+                    worker,
+                    building: EntityKind::Depot,
+                    tile_x: 4,
+                    tile_y: 4,
+                    queued: false,
+                },
+            )],
+            &mut events,
+            1,
+        );
+
+        let worker = entities.get(worker).expect("worker should remain alive");
+        assert!(
+            matches!(worker.order(), Order::Build(_)),
+            "worker should accept resume orders even when the original cost is no longer affordable"
+        );
+        assert_eq!(
+            worker.order().build_intent_tile(),
+            Some((EntityKind::Depot, 4, 4))
+        );
+        assert_eq!(players[0].steel, 0, "resume order should not charge steel");
+        assert_eq!(players[0].oil, 0, "resume order should not charge oil");
+        assert!(
+            events.get(&1).is_none_or(Vec::is_empty),
+            "resume order should not emit a resource shortage notice"
         );
     }
 
