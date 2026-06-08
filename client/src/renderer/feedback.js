@@ -321,16 +321,14 @@ function smokeHash(seed) {
 
 function drawSmokeBillow(g, cx, cy, radius, sides, phase, seed, color, alpha) {
   const points = [];
-  const wobble = Math.sin(phase * 0.0017 + seed * 2.1) * 0.08;
   const twist = phase * 0.00018 * (smokeHash(seed + 11) > 0.5 ? 1 : -1);
   for (let i = 0; i < sides; i++) {
     const t = i / sides;
     const a = t * Math.PI * 2 + twist;
     const jitter =
-      0.82 +
-      smokeHash(seed + i * 5.17) * 0.22 +
-      Math.sin(phase * 0.0012 + seed + i * 1.8) * 0.08 +
-      wobble;
+      0.86 +
+      smokeHash(seed + i * 5.17) * 0.18 +
+      Math.sin(phase * 0.0012 + seed + i * 1.8) * 0.025;
     points.push(cx + Math.cos(a) * radius * jitter, cy + Math.sin(a) * radius * jitter);
   }
   g.beginFill(color, alpha);
@@ -357,8 +355,8 @@ export function _drawSmokes(state) {
     for (let i = 0; i < SMOKE_RING_BILLOWS.length; i++) {
       const [ox, oy, scale, drift, color, alpha] = SMOKE_RING_BILLOWS[i];
       const seed = base + i * 3.73;
-      const dx = (Math.sin(phase * 0.00035 + seed) * 0.05 + ox) * r;
-      const dy = (Math.cos(phase * 0.00032 + seed * 1.4) * 0.05 + oy) * r;
+      const dx = (Math.sin(phase * 0.00035 + seed) * 0.025 + ox) * r;
+      const dy = (Math.cos(phase * 0.00032 + seed * 1.4) * 0.025 + oy) * r;
       drawSmokeBillow(
         g,
         smoke.x + dx,
