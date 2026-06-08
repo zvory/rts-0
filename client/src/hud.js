@@ -898,7 +898,7 @@ export class HUD {
         hotkey: GRID_HOTKEYS[cancelSlot],
         enabled: true,
         cls: "cancel",
-        title: "Cancel current production",
+        title: "Cancel latest queued production",
         repeatable: true,
         onClick: () => this._issueCancelProduction(building.kind),
       });

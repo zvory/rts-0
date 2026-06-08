@@ -43,7 +43,7 @@ crate.
 | `gather`     | `units: u32[]`, `node: u32`, `queued?: bool` | Send workers to harvest a resource node. When `queued` is true, store future gather intent instead of replacing the active order. |
 | `build`      | `worker: u32`, `building: string`, `tileX: u32`, `tileY: u32`, `queued?: bool` | Worker constructs a building at a tile. The server first walks the worker to a nearby point outside the requested footprint, then starts construction once it is in range. `building` ∈ building kinds. When `queued` is true, store future build intent instead of replacing the active order. |
 | `train`      | `building: u32`, `unit: string` | Queue a unit at a production building. |
-| `cancel`     | `building: u32` | Cancel the front of a building's production queue. |
+| `cancel`     | `building: u32` | Cancel the latest item in a building's production queue. |
 | `stop`       | `units: u32[]` | Clear orders, hold position. |
 | `setRally`   | `building: u32`, `x: f32`, `y: f32`, `queued?: bool` | Set a unit-producing building's single rally point. Freshly produced units receive a plain `move` order to the point and the building prefers the spawn exit nearest it. Ignored for buildings the player doesn't own, non-producers (depot, training centre), or buildings still under construction. The point is clamped into map bounds. `queued` is accepted for wire compatibility but does not append rally stages; rally edits always replace the single active point. |
 
