@@ -47,6 +47,7 @@ pub struct UnitFacts {
     pub pos: Point,
     pub can_receive_orders: bool,
     pub queue_len: usize,
+    pub active_build: bool,
     pub activity: UnitActivity,
     pub can_attack: bool,
     pub can_gather: bool,
@@ -62,6 +63,7 @@ impl UnitFacts {
             pos: Point::new(0.0, 0.0),
             can_receive_orders: true,
             queue_len: 0,
+            active_build: false,
             activity: UnitActivity::Idle,
             can_attack: false,
             can_gather: false,
@@ -480,8 +482,8 @@ fn choose_queued_build_worker<'a>(
         .copied()
         .filter(|u| u.queue_len < max_queue_len)
         .min_by(|a, b| {
-            a.queue_len
-                .cmp(&b.queue_len)
+            (a.queue_len + usize::from(a.active_build))
+                .cmp(&(b.queue_len + usize::from(b.active_build)))
                 .then_with(|| distance2(a.pos, target).total_cmp(&distance2(b.pos, target)))
                 .then_with(|| a.id.cmp(&b.id))
         })
