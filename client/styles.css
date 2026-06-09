@@ -889,8 +889,8 @@ input[type="text"]:focus {
   flex-direction: column;
   gap: 6px;
   align-items: flex-start;
-  left: 12px;
-  transform: none;
+  left: 50%;
+  transform: translateX(-50%);
   padding: 8px 14px;
 }
 .replay-player-res {
