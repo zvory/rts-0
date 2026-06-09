@@ -1316,6 +1316,16 @@ mod tests {
         final_state: Vec<String>,
     }
 
+    #[derive(Debug)]
+    struct DevScenarioTiming {
+        scenario: &'static str,
+        unit: EntityKind,
+        count: usize,
+        clear_ticks: Option<u32>,
+        clear_seconds: Option<f32>,
+        final_state: Vec<String>,
+    }
+
     fn blocker_label(blocker: Option<EntityKind>) -> &'static str {
         match blocker {
             None => "none",
@@ -1418,6 +1428,77 @@ mod tests {
                 .get(id)
                 .is_some_and(|e| e.move_phase().is_none() && e.path_is_empty())
         })
+    }
+
+    fn dev_scenario_units_clear(game: &Game, units: &[u32]) -> bool {
+        units.iter().all(|&id| {
+            game.entities
+                .get(id)
+                .is_some_and(|e| e.move_phase().is_none() && e.path_is_empty())
+        })
+    }
+
+    fn describe_dev_scenario_state(game: &Game, units: &[u32]) -> Vec<String> {
+        units
+            .iter()
+            .filter_map(|&id| {
+                let e = game.entities.get(id)?;
+                Some(format!(
+                    "#{id}: pos=({:.1},{:.1}) facing={:.3} phase={:?} path_len={} next={:?} goal={:?}",
+                    e.pos_x,
+                    e.pos_y,
+                    e.facing(),
+                    e.move_phase(),
+                    e.movement.as_ref().map(|m| m.path.len()).unwrap_or(0),
+                    e.next_waypoint(),
+                    e.path_goal(),
+                ))
+            })
+            .collect()
+    }
+
+    fn measure_dev_scenario_clear_time(
+        scenario: &'static str,
+        unit: EntityKind,
+        count: usize,
+        setup: DevScenarioSetup,
+    ) -> DevScenarioTiming {
+        let mut game = setup.game;
+        let units = setup.units;
+        game.enqueue(
+            setup.player_id,
+            SimCommand::Move {
+                units: units.clone(),
+                x: setup.goal.0,
+                y: setup.goal.1,
+                queued: false,
+            },
+        );
+
+        let max_ticks = 12_000u32;
+        for _ in 0..max_ticks {
+            game.tick();
+            if dev_scenario_units_clear(&game, &units) {
+                let ticks = game.tick_count();
+                return DevScenarioTiming {
+                    scenario,
+                    unit,
+                    count,
+                    clear_ticks: Some(ticks),
+                    clear_seconds: Some(ticks as f32 / config::TICK_HZ as f32),
+                    final_state: describe_dev_scenario_state(&game, &units),
+                };
+            }
+        }
+
+        DevScenarioTiming {
+            scenario,
+            unit,
+            count,
+            clear_ticks: None,
+            clear_seconds: None,
+            final_state: describe_dev_scenario_state(&game, &units),
+        }
     }
 
     fn measure_vehicle_small_block_clear_time(
@@ -1581,6 +1662,58 @@ mod tests {
                     .expect("scenario setup should succeed");
                 assert_eq!(setup.units.len(), count);
                 assert_eq!(owned_kind_count(&setup.game, 1, unit), count);
+            }
+        }
+    }
+
+    #[test]
+    fn experimental_direct_reverse_and_corner_wall_clear_time_matrix() {
+        let mut results = Vec::new();
+        for unit in [EntityKind::AtTeam, EntityKind::ScoutCar, EntityKind::Tank] {
+            let setup = Game::new_direct_reverse_order_scenario(unit, 1, 0x5150_0007)
+                .expect("scenario setup should succeed");
+            results.push(measure_dev_scenario_clear_time(
+                "direct_reverse_order",
+                unit,
+                1,
+                setup,
+            ));
+        }
+        for unit in [EntityKind::AtTeam, EntityKind::ScoutCar, EntityKind::Tank] {
+            for count in [1usize, 3, 5] {
+                let setup = Game::new_vehicle_corner_wall_scenario(unit, count, 0x5150_0008)
+                    .expect("scenario setup should succeed");
+                results.push(measure_dev_scenario_clear_time(
+                    "vehicle_corner_wall",
+                    unit,
+                    count,
+                    setup,
+                ));
+            }
+        }
+
+        println!("EXPERIMENTAL_DIRECT_REVERSE_AND_CORNER_WALL_CLEAR_TIMES");
+        println!("scenario | unit | count | clear_ticks | clear_seconds | final_state");
+        for result in &results {
+            match (result.clear_ticks, result.clear_seconds) {
+                (Some(ticks), Some(seconds)) => println!(
+                    "{:>24} | {:>14} | {:>5} | {:>11} | {:>13.2} | {:?}",
+                    result.scenario,
+                    result.unit,
+                    result.count,
+                    ticks,
+                    seconds,
+                    result.final_state
+                ),
+                _ => println!(
+                    "{:>24} | {:>14} | {:>5} | {:>11} | {:>13} | {:?}",
+                    result.scenario,
+                    result.unit,
+                    result.count,
+                    "timeout",
+                    "timeout",
+                    result.final_state
+                ),
             }
         }
     }

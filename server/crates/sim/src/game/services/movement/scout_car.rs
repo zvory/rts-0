@@ -1,5 +1,7 @@
 use crate::config;
-use crate::game::entity::{uses_oriented_vehicle_body, Entity, EntityKind, EntityStore};
+use crate::game::entity::{
+    uses_oriented_vehicle_body, uses_pivot_vehicle_movement, Entity, EntityKind, EntityStore,
+};
 use crate::game::map::Map;
 use crate::game::pathfinding::Passability;
 use crate::game::services::geometry::{
@@ -180,6 +182,11 @@ pub(super) fn route_accepts_waypoint(
     next_waypoint: Option<(f32, f32)>,
 ) -> bool {
     if distance_between(current, waypoint) <= config::VEHICLE_WAYPOINT_ACCEPTANCE_RADIUS_PX {
+        if uses_pivot_vehicle_movement(e.kind) {
+            return next_waypoint.is_some_and(|next_waypoint| {
+                route_segment_standable_from_current_hull(map, occ, e, current, next_waypoint)
+            });
+        }
         return true;
     }
 
@@ -203,20 +210,21 @@ pub(super) fn route_accepts_waypoint(
     };
     let from_waypoint_to_current = (current.0 - waypoint.0, current.1 - waypoint.1);
     if along_track_error(from_waypoint_to_current, route_dir) > 0.0 {
-        return static_standability::unit_static_standable_with_facing(
-            map,
-            occ,
-            e.kind,
-            current.0,
-            current.1,
-            e.facing(),
-        ) && static_standability::unit_static_segment_standable(
-            map,
-            occ,
-            e.kind,
-            current,
-            next_waypoint,
-        );
+        return route_segment_standable_for_route_skip(map, occ, e, current, next_waypoint);
+    }
+
+    route_segment_standable_for_route_skip(map, occ, e, current, next_waypoint)
+}
+
+fn route_segment_standable_for_route_skip(
+    map: &Map,
+    occ: &Occupancy,
+    e: &Entity,
+    current: (f32, f32),
+    next_waypoint: (f32, f32),
+) -> bool {
+    if uses_pivot_vehicle_movement(e.kind) {
+        return route_segment_standable_from_current_hull(map, occ, e, current, next_waypoint);
     }
 
     static_standability::unit_static_standable_with_facing(
@@ -233,6 +241,16 @@ pub(super) fn route_accepts_waypoint(
         current,
         next_waypoint,
     )
+}
+
+fn route_segment_standable_from_current_hull(
+    map: &Map,
+    occ: &Occupancy,
+    e: &Entity,
+    current: (f32, f32),
+    next_waypoint: (f32, f32),
+) -> bool {
+    static_swept_segment_legal(map, occ, e.kind, current, next_waypoint, e.facing())
 }
 
 #[cfg(test)]
