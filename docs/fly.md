@@ -69,6 +69,25 @@ before Fly's final stop signal. New matches are rejected while a drain is in pro
 runs `flyctl config validate --strict` before deploying so misplaced Fly config keys fail early
 instead of being silently ignored by the platform.
 
+## Automated beta deploys
+
+GitHub Actions deploys beta automatically after the `Main test gate` workflow succeeds on `main`.
+The workflow checks out the exact commit that passed the gate and runs:
+
+```bash
+./deploy.sh beta <tested-commit>
+```
+
+Set a repository Actions secret named `FLY_BETA_API_TOKEN` before relying on the workflow. Prefer
+an app-scoped Fly deploy token for `rts-0-zvorygin-beta` so the CI secret cannot deploy unrelated
+apps if it leaks.
+
+The beta deploy workflow uses the `beta-deploy` concurrency group with `cancel-in-progress: false`.
+GitHub keeps one deploy running and, by default, only one pending replacement in the same group.
+That coalesces frequent pushes to `main`: an in-flight deploy is allowed to finish its Fly drain,
+and the newest successful pending commit replaces older pending deploys instead of deploying every
+intermediate commit.
+
 ## Match-history secrets (Supabase)
 
 Match history persistence requires `DATABASE_URL`. `RTS_RECORD_MATCHES=1` marks writes as public;
