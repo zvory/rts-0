@@ -6,7 +6,10 @@ export class StatusBadge {
     this.root = rootEl;
     this.version = "unknown";
     this.metrics = null;
+    this.copyResetTimer = undefined;
+    this.onClick = (ev) => this._handleClick(ev);
     this._render();
+    this.root?.addEventListener("click", this.onClick);
   }
 
   setVersion(version) {
@@ -24,6 +27,11 @@ export class StatusBadge {
     this._render();
   }
 
+  destroy() {
+    this.root?.removeEventListener("click", this.onClick);
+    if (this.copyResetTimer) window.clearTimeout(this.copyResetTimer);
+  }
+
   _render() {
     if (!this.root) return;
     const metrics = this.metrics;
@@ -35,20 +43,78 @@ export class StatusBadge {
     ].filter(Boolean) : [];
 
     this.root.innerHTML =
-      `<div class="status-badge-build">${escapeHtml(this.version)}</div>` +
-      (metrics
-        ? `<div class="status-badge-metrics">` +
-            metricSpan("rtt", formatMs(metrics.latencyMs), metrics.issues.latency.active) +
-            metricSpan("tick", formatMs(metrics.serverTickMs), metrics.issues.slowTick.active) +
-            metricSpan("lag", formatMs(metrics.serverLagMs), metrics.issues.slowTick.active) +
-            metricSpan("jit", formatMs(metrics.jitterMs), metrics.issues.jitter.active) +
-          `</div>` +
-          `<div class="status-badge-issues">${
-            issueTokens.length
-              ? issueTokens.join("")
-              : `<span class="status-badge-issue-ok">issues ok</span>`
-          }</div>`
-        : "");
+      `<div class="status-badge-content">` +
+        `<div class="status-badge-build">${escapeHtml(this.version)}</div>` +
+        (metrics
+          ? `<div class="status-badge-metrics">` +
+              metricSpan("rtt", formatMs(metrics.latencyMs), metrics.issues.latency.active) +
+              metricSpan("tick", formatMs(metrics.serverTickMs), metrics.issues.slowTick.active) +
+              metricSpan("lag", formatMs(metrics.serverLagMs), metrics.issues.slowTick.active) +
+              metricSpan("jit", formatMs(metrics.jitterMs), metrics.issues.jitter.active) +
+            `</div>` +
+            `<div class="status-badge-issues">${
+              issueTokens.length
+                ? issueTokens.join("")
+                : `<span class="status-badge-issue-ok">issues ok</span>`
+            }</div>`
+          : "") +
+      `</div>` +
+      `<button class="status-badge-copy" type="button" title="Copy debug info" aria-label="Copy debug info">copy</button>`;
+  }
+
+  async _handleClick(ev) {
+    const button = ev.target?.closest?.(".status-badge-copy");
+    if (!button || !this.root?.contains(button)) return;
+    ev.preventDefault();
+    ev.stopPropagation();
+
+    const text = this._copyText();
+    try {
+      await copyText(text);
+      this._showCopied(button);
+    } catch {
+      this._showCopyFailed(button);
+    }
+  }
+
+  _copyText() {
+    const metrics = this.metrics;
+    const lines = [`build ${this.version || "unknown"}`];
+    if (metrics) {
+      lines.push(
+        [
+          `rtt ${formatMs(metrics.latencyMs)}`,
+          `tick ${formatMs(metrics.serverTickMs)}`,
+          `lag ${formatMs(metrics.serverLagMs)}`,
+          `jit ${formatMs(metrics.jitterMs)}`,
+        ].join("  "),
+      );
+      const issueTexts = [
+        formatIssueText("lat", metrics.issues.latency),
+        formatIssueText("slow", metrics.issues.slowTick),
+        formatIssueText("hol", metrics.issues.headOfLine),
+        formatIssueText("jit", metrics.issues.jitter),
+      ].filter(Boolean);
+      lines.push(issueTexts.length ? issueTexts.join("  ") : "issues ok");
+    }
+    return lines.join("\n");
+  }
+
+  _showCopied(button) {
+    this._setCopyButtonText(button, "copied");
+  }
+
+  _showCopyFailed(button) {
+    this._setCopyButtonText(button, "failed");
+  }
+
+  _setCopyButtonText(button, text) {
+    button.textContent = text;
+    if (this.copyResetTimer) window.clearTimeout(this.copyResetTimer);
+    this.copyResetTimer = window.setTimeout(() => {
+      button.textContent = "copy";
+      this.copyResetTimer = undefined;
+    }, 1200);
   }
 }
 
@@ -61,8 +127,30 @@ function formatIssue(label, issue) {
   return `<span class="status-badge-issue${issue.active ? " is-active" : ""}">${label}${issue.active ? "!" : ""} ${issue.count}</span>`;
 }
 
+function formatIssueText(label, issue) {
+  if (!issue || (!issue.count && !issue.active)) return "";
+  const count = issue?.count || 0;
+  return `${label}${issue?.active ? "!" : ""} ${count}`;
+}
+
 function formatMs(value) {
   return Number.isFinite(value) ? `${Math.max(0, Math.round(value))}ms` : "--";
+}
+
+async function copyText(text) {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+  const area = document.createElement("textarea");
+  area.value = text;
+  area.setAttribute("readonly", "");
+  area.className = "status-badge-copy-fallback";
+  document.body.appendChild(area);
+  area.select();
+  const copied = document.execCommand("copy");
+  area.remove();
+  if (!copied) throw new Error("copy failed");
 }
 
 function escapeHtml(value) {
