@@ -3,7 +3,7 @@ use std::env;
 use std::fs;
 use std::path::PathBuf;
 
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 
 use super::player_view::PlayerView;
 use super::scripts::{ProfileBackedScript, ScriptedPlayer};
@@ -12,10 +12,9 @@ use crate::ai_core::profiles::{
     profile_by_id, required_profiles, RIFLE_FLOOD_FULL_SATURATION_ID, STEEL_EXPANSION_TANKS_ID,
     TECH_TO_TANKS_ID,
 };
-use crate::config;
-use rts_sim::game::command::SimCommand as Command;
 use rts_sim::game::replay::{
-    replay_commands, CommandLogEntry, EventLogEntry, PlayerSnapshot, ReplayOutcome,
+    replay_commands, CommandLogEntry, EventLogEntry, PlayerSnapshot, ReplayArtifactV1,
+    ReplayOutcome,
 };
 use rts_sim::game::{Game, PlayerInit};
 use rts_sim::protocol::{kinds, Command as WireCommand, Event, Snapshot};
@@ -37,76 +36,8 @@ impl SelfPlayFailure {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize)]
-pub struct ReplayArtifact {
-    pub replay_commands: Vec<CommandLogEntry>,
-    pub players: Vec<PlayerInit>,
-    #[serde(default)]
-    pub seed: u32,
-    /// Starting steel each player began the match with. Defaults to [`config::STARTING_STEEL`]
-    /// so legacy replays (recorded before quickstart was persisted) still load.
-    #[serde(default = "default_starting_steel")]
-    pub starting_steel: u32,
-    /// Starting oil each player began the match with. See [`ReplayArtifact::starting_steel`].
-    #[serde(default = "default_starting_oil")]
-    pub starting_oil: u32,
-}
-
-fn default_starting_steel() -> u32 {
-    config::STARTING_STEEL
-}
-
-fn default_starting_oil() -> u32 {
-    config::STARTING_OIL
-}
-
-pub struct ReplayDriver {
-    commands: Vec<CommandLogEntry>,
-    next: usize,
-    seed: u32,
-    starting_steel: u32,
-    starting_oil: u32,
-}
-
-impl ReplayDriver {
-    pub fn from_artifact(artifact: ReplayArtifact) -> (Vec<PlayerInit>, Self) {
-        (
-            artifact.players,
-            Self {
-                commands: artifact.replay_commands,
-                next: 0,
-                seed: artifact.seed,
-                starting_steel: artifact.starting_steel,
-                starting_oil: artifact.starting_oil,
-            },
-        )
-    }
-
-    pub fn seed(&self) -> u32 {
-        self.seed
-    }
-
-    pub fn starting_steel(&self) -> u32 {
-        self.starting_steel
-    }
-
-    pub fn starting_oil(&self) -> u32 {
-        self.starting_oil
-    }
-
-    pub fn enqueue_for_tick(&mut self, game: &mut Game) {
-        let next_tick = game.tick_count().saturating_add(1);
-        while let Some(entry) = self.commands.get(self.next) {
-            if entry.tick != next_tick {
-                break;
-            }
-            game.enqueue(
-                entry.player_id,
-                Command::from_protocol(entry.command.clone()),
-            );
-            self.next += 1;
-        }
-    }
+pub fn server_build_sha() -> &'static str {
+    env!("COMMIT_HASH")
 }
 
 #[derive(Debug, Clone)]
@@ -289,7 +220,7 @@ pub fn run_profile_matchup_result(
 
     let replay_artifact = match &options.save_replay_name {
         Some(name) => Some(
-            write_simple_replay_artifact(name, options.replay_dir.as_ref(), &game, &players)?
+            write_replay_artifact(name, options.replay_dir.as_ref(), &game)?
                 .display()
                 .to_string(),
         ),
@@ -407,11 +338,10 @@ fn observe_first_tank_tick(
     }
 }
 
-fn write_simple_replay_artifact(
+fn write_replay_artifact(
     name: &str,
     replay_dir: Option<&PathBuf>,
     game: &Game,
-    players: &[PlayerInit],
 ) -> Result<PathBuf, String> {
     let dir = replay_dir
         .cloned()
@@ -422,13 +352,7 @@ fn write_simple_replay_artifact(
         })
         .join(name);
     fs::create_dir_all(&dir).map_err(|err| err.to_string())?;
-    let artifact = ReplayArtifact {
-        replay_commands: game.command_log().to_vec(),
-        players: players.to_vec(),
-        seed: game.seed(),
-        starting_steel: game.starting_steel(),
-        starting_oil: game.starting_oil(),
-    };
+    let artifact = ReplayArtifactV1::capture_from_game(game, server_build_sha(), None, game.scores());
     let json = serde_json::to_vec_pretty(&artifact).map_err(|err| err.to_string())?;
     fs::write(dir.join("replay.json"), json).map_err(|err| err.to_string())?;
     Ok(dir)

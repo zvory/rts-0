@@ -147,7 +147,6 @@ pub(super) enum DevScenarioId {
 
 enum DevDriver {
     Live(LiveSelfPlay),
-    Replay(ReplayDriver),
     Scenario(DevScenarioDriver),
 }
 
@@ -298,7 +297,7 @@ impl ReplaySession {
         let metadata = Map::metadata_for_name(&artifact.map_name)
             .map_err(|err| format!("cannot load replay map metadata: {err}"))?;
         artifact
-            .validate_against(&artifact.server_build_sha, &metadata)
+            .validate_against(server_build_sha(), &metadata)
             .map_err(|err| err.to_string())?;
         let map = Map::load(&artifact.map_name, artifact.players.len(), artifact.seed)
             .map_err(|err| format!("cannot load replay map: {err}"))?;
@@ -503,10 +502,6 @@ impl RoomTask {
         match_history_local_only: bool,
         drain: DrainHandle,
     ) -> Self {
-        let replay_speed = match &mode {
-            RoomMode::DevSelfPlay(DevSelfPlayConfig::Replay { .. }) => 1.5,
-            _ => 1.0,
-        };
         RoomTask {
             room,
             mode,
@@ -523,7 +518,7 @@ impl RoomTask {
             dev_driver: None,
             dev_view_player_id: None,
             ai_controllers: Vec::new(),
-            replay_speed,
+            replay_speed: 1.0,
             slow_tick_count: 0,
             db,
             match_history_local_only,
@@ -588,16 +583,16 @@ impl RoomTask {
         }
     }
 
-    fn is_dev_watch(&self) -> bool {
+    fn is_live_dev_watch(&self) -> bool {
         matches!(
             self.mode,
-            RoomMode::DevSelfPlay(_) | RoomMode::DevScenario(_)
+            RoomMode::DevSelfPlay(DevSelfPlayConfig::Live) | RoomMode::DevScenario(_)
         )
     }
 
     fn should_record_match_history(&self) -> bool {
         self.match_human_count >= 2
-            && !self.is_dev_watch()
+            && !self.is_live_dev_watch()
             && !is_automated_match_history_room(&self.room)
             && !match_history_participants_are_automated(&self.match_participants)
     }
@@ -684,11 +679,14 @@ impl RoomTask {
         msg_tx: ConnectionSink,
         ack: tokio::sync::oneshot::Sender<bool>,
     ) {
-        if self.is_dev_watch() {
+        if self.is_live_dev_watch() {
             self.on_join_dev_selfplay(player_id, name, msg_tx, ack);
             return;
         }
-        if matches!(self.mode, RoomMode::Replay { .. }) {
+        if matches!(
+            self.mode,
+            RoomMode::Replay { .. } | RoomMode::DevSelfPlay(DevSelfPlayConfig::Replay { .. })
+        ) {
             self.on_join_replay_room(player_id, name, msg_tx, ack);
             return;
         }
@@ -788,7 +786,7 @@ impl RoomTask {
     }
 
     pub(super) fn on_ready(&mut self, player_id: u32, ready: bool) {
-        if self.is_dev_watch() {
+        if self.is_live_dev_watch() {
             return;
         }
         if let Phase::Lobby = self.phase {
@@ -803,7 +801,7 @@ impl RoomTask {
     }
 
     pub(super) fn on_start_request(&mut self, player_id: u32) {
-        if self.is_dev_watch() {
+        if self.is_live_dev_watch() {
             return;
         }
         if !matches!(self.phase, Phase::Lobby) {
@@ -837,7 +835,7 @@ impl RoomTask {
     /// Host-only: seat a computer opponent. Ignored outside the lobby, from non-hosts, or once
     /// the room is full (humans + AI == [`MAX_PLAYERS`]).
     fn on_add_ai(&mut self, player_id: u32) {
-        if self.is_dev_watch() {
+        if self.is_live_dev_watch() {
             return;
         }
         if !matches!(self.phase, Phase::Lobby) || self.host_id != Some(player_id) {
@@ -857,7 +855,7 @@ impl RoomTask {
     /// Host-only: remove a previously-added AI opponent by id. Ignored outside the lobby, from
     /// non-hosts, or for an unknown id.
     fn on_remove_ai(&mut self, player_id: u32, target: u32) {
-        if self.is_dev_watch() {
+        if self.is_live_dev_watch() {
             return;
         }
         if !matches!(self.phase, Phase::Lobby) || self.host_id != Some(player_id) {
@@ -873,7 +871,7 @@ impl RoomTask {
 
     /// Host-only: toggle the lobby's boosted opening resources.
     fn on_set_quickstart(&mut self, player_id: u32, enabled: bool) {
-        if self.is_dev_watch() {
+        if self.is_live_dev_watch() {
             return;
         }
         if !matches!(self.phase, Phase::Lobby) || self.host_id != Some(player_id) {
@@ -888,7 +886,7 @@ impl RoomTask {
 
     /// Host-only: select a map by name. Ignored outside the lobby or from non-hosts.
     fn on_select_map(&mut self, player_id: u32, map: String) {
-        if self.is_dev_watch() {
+        if self.is_live_dev_watch() {
             return;
         }
         if !matches!(self.phase, Phase::Lobby) || self.host_id != Some(player_id) {
@@ -902,7 +900,7 @@ impl RoomTask {
     }
 
     fn on_set_spectator(&mut self, player_id: u32, spectator: bool) {
-        if self.is_dev_watch() {
+        if self.is_live_dev_watch() {
             return;
         }
         if !matches!(self.phase, Phase::Lobby) {
@@ -989,7 +987,7 @@ impl RoomTask {
     }
 
     fn on_command(&mut self, player_id: u32, cmd: SimCommand) {
-        if self.is_dev_watch() {
+        if self.is_live_dev_watch() {
             return;
         }
         // Commands are ignored unless in-game and the sender is actually in this room. The
@@ -1007,7 +1005,7 @@ impl RoomTask {
     }
 
     fn on_give_up(&mut self, player_id: u32) {
-        if self.is_dev_watch() {
+        if self.is_live_dev_watch() {
             return;
         }
         let active_player = self
@@ -1161,29 +1159,33 @@ impl RoomTask {
                 self.send_replay_start_to(player_id);
                 self.send_replay_state_to(player_id);
             }
-            Phase::Lobby => {
-                let RoomMode::Replay { artifact } = &self.mode else {
-                    return;
-                };
-                match ReplaySession::new(artifact.clone()) {
-                    Ok(session) => self.transition_to_replay_viewer(session),
-                    Err(err) => {
-                        warn!(room = %self.room, error = %err, "persisted replay setup failed");
-                        if let Some(player) = self.players.get(&player_id) {
-                            send_or_log(
-                                &self.room,
-                                player_id,
-                                &player.msg_tx,
-                                ServerMessage::Error {
-                                    msg: "Replay could not be started.".to_string(),
-                                },
-                            );
-                        }
+            Phase::Lobby => match self.replay_session_for_mode() {
+                Ok(session) => self.transition_to_replay_viewer(session),
+                Err(err) => {
+                    warn!(room = %self.room, error = %err, "replay setup failed");
+                    if let Some(player) = self.players.get(&player_id) {
+                        send_or_log(
+                            &self.room,
+                            player_id,
+                            &player.msg_tx,
+                            ServerMessage::Error { msg: err },
+                        );
                     }
                 }
-            }
+            },
             Phase::InGame(_) => {}
         }
+    }
+
+    fn replay_session_for_mode(&self) -> Result<ReplaySession, String> {
+        let artifact = match &self.mode {
+            RoomMode::Replay { artifact } => artifact.clone(),
+            RoomMode::DevSelfPlay(DevSelfPlayConfig::Replay { artifact }) => {
+                load_replay_artifact(artifact)?
+            }
+            _ => return Err("room is not configured for replay playback".to_string()),
+        };
+        ReplaySession::new(artifact)
     }
 
     /// A match may start with at least one active participant and every active human ready.
@@ -1379,6 +1381,9 @@ impl RoomTask {
         match &self.mode {
             RoomMode::Normal => Err("room is not configured for a dev session".to_string()),
             RoomMode::Replay { .. } => Err("room is not configured for a dev session".to_string()),
+            RoomMode::DevSelfPlay(DevSelfPlayConfig::Replay { .. }) => {
+                Err("saved self-play replays use the replay viewer".to_string())
+            }
             RoomMode::DevSelfPlay(DevSelfPlayConfig::Live) => {
                 let driver = LiveSelfPlay::default_match();
                 let players = driver.players().to_vec();
@@ -1389,22 +1394,6 @@ impl RoomTask {
                 let seed = match_seed();
                 let game = Game::new_without_ai_controllers(&players, seed);
                 Ok((game, DevDriver::Live(driver), view_player_id))
-            }
-            RoomMode::DevSelfPlay(DevSelfPlayConfig::Replay { artifact }) => {
-                let artifact_name = artifact.clone();
-                let artifact = load_replay_artifact(artifact)?;
-                let (players, driver) = ReplayDriver::from_artifact(artifact);
-                let view_player_id = players
-                    .first()
-                    .map(|p| p.id)
-                    .ok_or_else(|| format!("replay artifact {artifact_name:?} has no players"))?;
-                let game = Game::new_for_replay_with_starting_resources(
-                    &players,
-                    driver.starting_steel(),
-                    driver.starting_oil(),
-                    driver.seed(),
-                );
-                Ok((game, DevDriver::Replay(driver), view_player_id))
             }
             RoomMode::DevScenario(config) => match config.id {
                 DevScenarioId::ScoutCarSnakingCorridor => {
@@ -1624,7 +1613,7 @@ impl RoomTask {
     /// One simulation step. No-op in the `Lobby` phase (the ticker keeps running so a room is
     /// always live and ready to start).
     fn on_tick(&mut self, scheduled: TokioInstant) {
-        if self.is_dev_watch() {
+        if self.is_live_dev_watch() {
             self.on_tick_dev_selfplay(scheduled);
             return;
         }
@@ -1820,7 +1809,6 @@ impl RoomTask {
         };
         crate::perf::timed(perf.as_mut(), "dev_driver_enqueue", || match &mut driver {
             DevDriver::Live(scripted) => scripted.enqueue_for_tick(&mut game),
-            DevDriver::Replay(replay) => replay.enqueue_for_tick(&mut game),
             DevDriver::Scenario(scenario) => scenario.enqueue_for_tick(&mut game),
         });
         let game_tick_start = StdInstant::now();
@@ -1986,10 +1974,7 @@ impl RoomTask {
             self.broadcast(&ServerMessage::ReplayState(state));
             return;
         }
-        if !matches!(
-            self.mode,
-            RoomMode::DevSelfPlay(DevSelfPlayConfig::Replay { .. }) | RoomMode::DevScenario(_)
-        ) {
+        if !matches!(self.mode, RoomMode::DevScenario(_)) {
             return;
         }
         // Clamp to sensible range matching the UI buttons (0.5× – 8×).
@@ -2017,39 +2002,6 @@ impl RoomTask {
                 return;
             }
             session.set_vision(player_id, vision);
-            return;
-        }
-        if !matches!(
-            self.mode,
-            RoomMode::DevSelfPlay(DevSelfPlayConfig::Replay { .. })
-        ) {
-            return;
-        }
-        if !self.players.contains_key(&player_id) {
-            return;
-        }
-        let valid_ids = self.replay_vision_player_ids();
-        if validate_replay_vision_request(&vision, &valid_ids).is_err() {
-            if let Some(player) = self.players.get(&player_id) {
-                send_or_log(
-                    &self.room,
-                    player_id,
-                    &player.msg_tx,
-                    ServerMessage::Error {
-                        msg: "Invalid replay vision selection".to_string(),
-                    },
-                );
-            }
-        }
-        // Phase 1 defines and validates the per-viewer contract only. Later playback work will
-        // persist this selection and apply it during replay snapshot projection.
-    }
-
-    fn replay_vision_player_ids(&self) -> Vec<u32> {
-        match &self.phase {
-            Phase::InGame(game) => game.player_inits().into_iter().map(|p| p.id).collect(),
-            Phase::Lobby => Vec::new(),
-            Phase::ReplayViewer(session) => session.active_player_ids(),
         }
     }
 
@@ -2093,63 +2045,7 @@ impl RoomTask {
                     self.send_dev_error(&err);
                 }
             }
-            return;
         }
-        if !matches!(
-            self.mode,
-            RoomMode::DevSelfPlay(DevSelfPlayConfig::Replay { .. })
-        ) {
-            return;
-        }
-        let current_tick = match &self.phase {
-            Phase::InGame(game) => game.tick_count(),
-            Phase::Lobby => return,
-            Phase::ReplayViewer(_) => return,
-        };
-        let target_tick = current_tick.saturating_sub(ticks_back);
-
-        let (mut game, mut driver, view_player_id) = match self.build_dev_session() {
-            Ok(session) => session,
-            Err(err) => {
-                warn!(room = %self.room, error = %err, "replay seek rebuild failed");
-                self.send_dev_error(&err);
-                return;
-            }
-        };
-
-        // Fast-forward the fresh game by replaying commands up to `target_tick`.
-        // Snapshots and events from these ticks are discarded — the client gets a fresh Start.
-        for _ in 0..target_tick {
-            match &mut driver {
-                DevDriver::Live(scripted) => scripted.enqueue_for_tick(&mut game),
-                DevDriver::Replay(replay) => replay.enqueue_for_tick(&mut game),
-                DevDriver::Scenario(scenario) => scenario.enqueue_for_tick(&mut game),
-            }
-            let tick_result =
-                std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| game.tick()));
-            if let Err(payload) = tick_result {
-                let reason = panic_reason(&payload);
-                dump_crash_replay(&self.room, &game, &reason);
-                self.phase = Phase::Lobby;
-                self.dev_driver = None;
-                self.dev_view_player_id = None;
-                return;
-            }
-        }
-
-        self.phase = Phase::InGame(Box::new(game));
-        self.dev_driver = Some(driver);
-        self.dev_view_player_id = Some(view_player_id);
-        let recipients = self.order.clone();
-        for player_id in recipients {
-            self.send_dev_start_to(player_id);
-        }
-        info!(
-            room = %self.room,
-            from_tick = current_tick,
-            to_tick = target_tick,
-            "replay seek"
-        );
     }
 
     /// Send a one-time score screen to connected players who have been eliminated while a
@@ -2191,7 +2087,7 @@ impl RoomTask {
     /// Resolve a finished match: tell everyone who won and start post-match replay playback.
     fn end_match(&mut self, winner_id: Option<u32>, scores: Vec<PlayerScore>, game: Option<&Game>) {
         info!(room = %self.room, ?winner_id, "match over");
-        let replay_artifact = game.filter(|_| !self.is_dev_watch()).map(|game| {
+        let replay_artifact = game.filter(|_| !self.is_live_dev_watch()).map(|game| {
             ReplayArtifactV1::capture_from_game(game, server_build_sha(), winner_id, scores.clone())
         });
 
@@ -2329,7 +2225,7 @@ impl RoomTask {
     }
 
     fn mark_match_started_for_drain(&mut self) {
-        if !self.match_tracked_for_drain && !self.is_dev_watch() {
+        if !self.match_tracked_for_drain && !self.is_live_dev_watch() {
             self.match_tracked_for_drain = true;
             self.drain.match_started();
         }
