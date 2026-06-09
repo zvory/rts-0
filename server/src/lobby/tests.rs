@@ -1,7 +1,10 @@
 use std::time::Duration;
 
 use super::connection::SnapshotSendStatus;
-use super::room_task::{DevSelfPlayConfig, RoomMode, RoomTask};
+use super::room_task::{
+    is_automated_match_history_room, match_history_participants_are_automated, DevSelfPlayConfig,
+    RoomMode, RoomTask,
+};
 use super::snapshots::compact_snapshot_for_wire;
 use super::*;
 use crate::protocol::{kinds, EntityView, Event, ResourceDelta};
@@ -185,6 +188,40 @@ fn replay_speed_clamped_and_applied() {
     // 33ms / 2.0 = 16.5ms → rounds to 16ms via div_f32
     assert!(task.current_tick_interval() < Duration::from_millis(17));
     assert!(task.current_tick_interval() > Duration::from_millis(15));
+}
+
+#[test]
+fn automated_match_history_rooms_are_detected() {
+    assert!(is_automated_match_history_room("itest-123"));
+    assert!(is_automated_match_history_room("ai-itest-123"));
+    assert!(is_automated_match_history_room("client-smoke-123"));
+    assert!(is_automated_match_history_room("reg-join-123"));
+    assert!(!is_automated_match_history_room("main"));
+    assert!(!is_automated_match_history_room("ranked-1"));
+}
+
+#[test]
+fn automated_match_history_participants_are_detected() {
+    assert!(match_history_participants_are_automated(&[
+        "smoke".to_string(),
+        "Computer 1".to_string(),
+    ]));
+    assert!(match_history_participants_are_automated(&[
+        "Alpha".to_string(),
+        "Bravo".to_string(),
+    ]));
+    assert!(match_history_participants_are_automated(&[
+        "Player".to_string(),
+        "Computer 2".to_string(),
+    ]));
+    assert!(!match_history_participants_are_automated(&[
+        "Alpha".to_string(),
+        "Charlie".to_string(),
+    ]));
+    assert!(!match_history_participants_are_automated(&[
+        "Player 1".to_string(),
+        "Player 2".to_string(),
+    ]));
 }
 
 #[test]
