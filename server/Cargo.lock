@@ -1272,6 +1272,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "rts-archcheck"
+version = "0.1.0"
+
+[[package]]
 name = "rts-contract"
 version = "0.1.0"
 dependencies = [

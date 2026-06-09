@@ -1,0 +1,12 @@
+[package]
+name = "rts-archcheck"
+version = "0.1.0"
+edition = "2021"
+description = "Architecture checks for RTS simulation internals"
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "check-sim-architecture"
+path = "src/main.rs"
