@@ -68,6 +68,7 @@ empty.
 | `start`    | `Game start payload` (see 2.3). |
 | `snapshot` | `Per-player snapshot` (see 2.4). |
 | `replayState` | `Replay playback state` (see 2.6). |
+| `shutdownWarning` | `deadlineUnixMs: u64`, `secondsRemaining: u64` — deploy/termination drain has started; active matches may continue until the deadline, but new match starts are disabled. |
 | `gameOver` | `winnerId: u32 | null`, `you: "won" | "lost" | "draw"`, `scores: PlayerScore[]` |
 | `pong`     | `ts: number` (echo of the ping ts) |
 | `error`    | `msg: string` |

@@ -531,14 +531,41 @@ impl RoomTask {
                 self.on_set_replay_vision(player_id, vision)
             }
             RoomEvent::SelectMap { player_id, map } => self.on_select_map(player_id, map),
-            RoomEvent::DrainStarted => self.on_drain_started(),
+            RoomEvent::DrainStarted(notice) => self.on_drain_started(notice),
         }
     }
 
-    fn on_drain_started(&mut self) {
+    fn on_drain_started(&mut self, notice: DrainNotice) {
+        self.broadcast_shutdown_warning(notice);
         if matches!(self.phase, Phase::Lobby) {
             self.broadcast_lobby();
         }
+    }
+
+    fn send_current_shutdown_warning_to(&self, player_id: u32) {
+        let Some(notice) = self.drain.notice() else {
+            return;
+        };
+        let Some(player) = self.players.get(&player_id) else {
+            return;
+        };
+        send_or_log(
+            &self.room,
+            player_id,
+            &player.msg_tx,
+            ServerMessage::ShutdownWarning {
+                deadline_unix_ms: notice.deadline_unix_ms,
+                seconds_remaining: notice.seconds_remaining,
+            },
+        );
+    }
+
+    fn broadcast_shutdown_warning(&self, notice: DrainNotice) {
+        let msg = ServerMessage::ShutdownWarning {
+            deadline_unix_ms: notice.deadline_unix_ms,
+            seconds_remaining: notice.seconds_remaining,
+        };
+        self.broadcast(&msg);
     }
 
     pub(super) fn on_join(
@@ -599,6 +626,7 @@ impl RoomTask {
         debug!(room = %self.room, player_id, "joined");
         // The player is now in the room; tell the connection it may mark itself joined.
         let _ = ack.send(true);
+        self.send_current_shutdown_warning_to(player_id);
         if matches!(self.phase, Phase::Lobby) {
             self.broadcast_lobby();
         }
@@ -647,7 +675,7 @@ impl RoomTask {
         }
     }
 
-    fn on_ready(&mut self, player_id: u32, ready: bool) {
+    pub(super) fn on_ready(&mut self, player_id: u32, ready: bool) {
         if self.is_dev_watch() {
             return;
         }
@@ -662,7 +690,7 @@ impl RoomTask {
         }
     }
 
-    fn on_start_request(&mut self, player_id: u32) {
+    pub(super) fn on_start_request(&mut self, player_id: u32) {
         if self.is_dev_watch() {
             return;
         }
