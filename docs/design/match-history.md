@@ -69,10 +69,17 @@ A row is written when **all** of these are true:
 2. `match_human_count >= 2` — at least two human (non-AI) players. Human-vs-AI, AI-only, and
    1-player sandboxes never record.
 3. `is_dev_watch()` is false — dev self-play, scenario, and replay rooms never record.
-4. The server was started with a working DB connection.
+4. The room/participants do not match automated smoke/integration/regression test fingerprints:
+   `itest-*`, `ai-itest-*`, `client-smoke-*`, `reg-*`, `Computer *`, `smoke`, or the
+   `Alpha`/`Bravo` integration pair.
+5. The server was started with a working DB connection.
 
-Anything else (DB failures, dev rooms, missing DB) silently skips the write. The simulation and
-lobby flow are unaffected.
+Anything else (DB failures, dev rooms, test rooms, missing DB) silently skips the write. The
+simulation and lobby flow are unaffected.
+
+Public reads also suppress historical bot/test rows that were written before this eligibility
+filter existed, and migration `20260609000002_suppress_automated_match_history.sql` tags those
+rows `local_only` instead of deleting them.
 
 ## Recording gate (`RTS_RECORD_MATCHES`)
 

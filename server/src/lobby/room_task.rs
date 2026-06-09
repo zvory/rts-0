@@ -30,6 +30,29 @@ struct AiSlot {
     name: String,
 }
 
+const AUTOMATED_MATCH_HISTORY_ROOM_PREFIXES: [&str; 4] =
+    ["itest-", "ai-itest-", "client-smoke-", "reg-"];
+
+pub(super) fn is_automated_match_history_room(room: &str) -> bool {
+    AUTOMATED_MATCH_HISTORY_ROOM_PREFIXES
+        .iter()
+        .any(|prefix| room.starts_with(prefix))
+}
+
+pub(super) fn match_history_participants_are_automated(participants: &[String]) -> bool {
+    let mut has_alpha = false;
+    let mut has_bravo = false;
+    for participant in participants {
+        let name = participant.trim();
+        if name.starts_with("Computer ") || name.eq_ignore_ascii_case("smoke") {
+            return true;
+        }
+        has_alpha |= name == "Alpha";
+        has_bravo |= name == "Bravo";
+    }
+    has_alpha && has_bravo
+}
+
 fn live_ai_controllers(players: &[PlayerInit], seed: u32) -> Vec<AiController> {
     let mut rng = SmallRng::seed_from_u64((seed as u64) ^ 0xA17E_5EED);
     players
@@ -239,6 +262,13 @@ impl RoomTask {
             self.mode,
             RoomMode::DevSelfPlay(_) | RoomMode::DevScenario(_)
         )
+    }
+
+    fn should_record_match_history(&self) -> bool {
+        self.match_human_count >= 2
+            && !self.is_dev_watch()
+            && !is_automated_match_history_room(&self.room)
+            && !match_history_participants_are_automated(&self.match_participants)
     }
 
     // -- Event handling ------------------------------------------------------
@@ -1363,10 +1393,10 @@ impl RoomTask {
     fn end_match(&mut self, winner_id: Option<u32>, scores: Vec<PlayerScore>) {
         info!(room = %self.room, ?winner_id, "match over");
 
-        // Persist match history only for matches with at least 2 human players. Human-vs-AI,
-        // AI-only, 1-player sandboxes, and dev/scenario/replay rooms are all excluded.
+        // Persist match history only for real public matches. Human-vs-AI, AI-only,
+        // 1-player sandboxes, dev/scenario/replay rooms, and automated test rooms are excluded.
         if let (Some(db), Some(started_at)) = (self.db.clone(), self.match_started_at) {
-            if self.match_human_count >= 2 && !self.is_dev_watch() {
+            if self.should_record_match_history() {
                 let ended_at = chrono::Utc::now();
                 let duration_ms = ended_at
                     .signed_duration_since(started_at)

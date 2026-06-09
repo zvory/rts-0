@@ -126,6 +126,18 @@ impl Db {
                    winner_name, outcome, participants, score_screen, local_only
             from matches
             where ($2 or not local_only)
+              and (
+                $2
+                or (
+                  not exists (
+                    select 1
+                    from unnest(participants) as participant(name)
+                    where participant.name like 'Computer %'
+                       or lower(participant.name) = 'smoke'
+                  )
+                  and not (participants @> array['Alpha', 'Bravo']::text[])
+                )
+              )
             order by started_at desc
             limit $1
             "#,

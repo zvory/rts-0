@@ -21,7 +21,8 @@ scope, or the lobby front-page table.
 - **Detached write at `end_match`.** A slow Supabase write must never stall the room. Errors
   log and are dropped.
 - **Recording scope.** Only matches with `match_human_count >= 2` AND not a dev/scenario/replay
-  room get a row. `RTS_RECORD_MATCHES` truthy records public rows; with `DATABASE_URL` set and the
+  or automated test room get a row. Human-vs-AI, smoke, integration, and regression test matches
+  are excluded. `RTS_RECORD_MATCHES` truthy records public rows; with `DATABASE_URL` set and the
   gate off, local `cargo run` records `local_only` rows that only localhost reads can see.
 - **Score-screen schema.** `score_screen` is JSONB holding `Vec<PlayerScore>` from
   `contract::PlayerScore`. Adding fields requires no migration.
