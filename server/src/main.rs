@@ -188,6 +188,10 @@ async fn shutdown_signal(lobby: Lobby) {
         _ = terminate => info!("shutdown requested by SIGTERM"),
     }
 
+    run_deploy_drain(lobby, DEPLOY_DRAIN_TIMEOUT).await;
+}
+
+async fn run_deploy_drain(lobby: Lobby, timeout: Duration) {
     lobby.begin_draining().await;
     let active_matches = lobby.active_match_count();
     if active_matches == 0 {
@@ -198,17 +202,17 @@ async fn shutdown_signal(lobby: Lobby) {
 
     info!(
         active_matches,
-        timeout_secs = DEPLOY_DRAIN_TIMEOUT.as_secs(),
+        timeout_secs = timeout.as_secs(),
         "shutdown drain started; waiting for active matches"
     );
     tokio::select! {
         _ = lobby.wait_for_matches_to_drain() => {
             info!("shutdown drain complete; all matches finished");
         }
-        _ = tokio::time::sleep(DEPLOY_DRAIN_TIMEOUT) => {
+        _ = tokio::time::sleep(timeout) => {
             warn!(
                 active_matches = lobby.active_match_count(),
-                timeout_secs = DEPLOY_DRAIN_TIMEOUT.as_secs(),
+                timeout_secs = timeout.as_secs(),
                 "shutdown drain deadline reached; continuing shutdown"
             );
         }
@@ -539,6 +543,120 @@ fn collect_js_modules(dir: &std::path::Path, prefix: &std::path::Path, out: &mut
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    const TEST_PLAYER_ID: u32 = 42;
+
+    async fn start_one_player_test_match(lobby: &Lobby, room: &str) -> lobby::RoomHandle {
+        let handle = lobby.get_or_create(room).await;
+        let (msg_tx, _writer) = lobby::ConnectionSink::new();
+        let (ack_tx, ack_rx) = tokio::sync::oneshot::channel();
+        handle
+            .event_tx
+            .send(RoomEvent::Join {
+                player_id: TEST_PLAYER_ID,
+                name: "Drain Test".to_string(),
+                spectator: false,
+                msg_tx,
+                ack: ack_tx,
+            })
+            .await
+            .expect("room task should accept join event");
+        assert_eq!(ack_rx.await, Ok(true));
+        handle
+            .event_tx
+            .send(RoomEvent::Ready {
+                player_id: TEST_PLAYER_ID,
+                ready: true,
+            })
+            .await
+            .expect("room task should accept ready event");
+        handle
+            .event_tx
+            .send(RoomEvent::StartRequest {
+                player_id: TEST_PLAYER_ID,
+            })
+            .await
+            .expect("room task should accept start event");
+        wait_for_active_match_count(lobby, 1).await;
+        handle
+    }
+
+    async fn wait_for_active_match_count(lobby: &Lobby, expected: usize) {
+        tokio::time::timeout(Duration::from_secs(1), async {
+            loop {
+                if lobby.active_match_count() == expected {
+                    return;
+                }
+                tokio::time::sleep(Duration::from_millis(5)).await;
+            }
+        })
+        .await
+        .expect("active match count did not settle");
+    }
+
+    #[tokio::test]
+    async fn deploy_drain_waits_for_active_match_to_finish() {
+        let lobby = Lobby::new();
+        let handle = start_one_player_test_match(&lobby, "unit-drain-finish").await;
+        let mut shutdown_rx = lobby.subscribe_connection_shutdown();
+        let drain = tokio::spawn(run_deploy_drain(lobby.clone(), Duration::from_secs(5)));
+
+        tokio::time::sleep(Duration::from_millis(25)).await;
+        assert!(
+            !*shutdown_rx.borrow_and_update(),
+            "connections should stay open while an active match is still draining"
+        );
+
+        handle
+            .event_tx
+            .send(RoomEvent::GiveUp {
+                player_id: TEST_PLAYER_ID,
+            })
+            .await
+            .expect("room task should accept give-up event");
+        tokio::time::timeout(Duration::from_secs(1), drain)
+            .await
+            .expect("deploy drain should complete after the active match ends")
+            .expect("deploy drain task should not panic");
+        assert!(
+            *shutdown_rx.borrow_and_update(),
+            "connections should close after match drain completes"
+        );
+        wait_for_active_match_count(&lobby, 0).await;
+    }
+
+    #[tokio::test]
+    async fn deploy_drain_deadline_closes_connections_with_match_still_active() {
+        let lobby = Lobby::new();
+        let handle = start_one_player_test_match(&lobby, "unit-drain-timeout").await;
+        let mut shutdown_rx = lobby.subscribe_connection_shutdown();
+
+        tokio::time::timeout(
+            Duration::from_secs(1),
+            run_deploy_drain(lobby.clone(), Duration::from_millis(25)),
+        )
+        .await
+        .expect("deploy drain should honor the short deadline");
+
+        assert_eq!(
+            lobby.active_match_count(),
+            1,
+            "the short deadline should not require the match to have ended"
+        );
+        assert!(
+            *shutdown_rx.borrow_and_update(),
+            "connections should close when the drain deadline expires"
+        );
+
+        handle
+            .event_tx
+            .send(RoomEvent::Leave {
+                player_id: TEST_PLAYER_ID,
+            })
+            .await
+            .expect("room task should accept cleanup leave event");
+        wait_for_active_match_count(&lobby, 0).await;
+    }
 
     #[test]
     fn scenario_index_lists_supported_launches() {
