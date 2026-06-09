@@ -57,7 +57,7 @@ function fakeCanvas(rect = { left: 100, top: 200, width: 242, height: 242 }) {
   };
 }
 
-function minimapHarness({ selected = [], commandTarget = null } = {}) {
+function minimapHarness({ selected = [], commandTarget = null, commandsEnabled = true } = {}) {
   installWindowStub();
   const viewport = {
     getBoundingClientRect() {
@@ -113,7 +113,7 @@ function minimapHarness({ selected = [], commandTarget = null } = {}) {
       this.sent.push(command);
     },
   };
-  const minimap = new Minimap(canvas, state, camera, null, net, router);
+  const minimap = new Minimap(canvas, state, camera, null, net, router, { commandsEnabled });
   return { router, canvas, state, camera, net, minimap, centers, commands, endedTargets };
 }
 
@@ -163,6 +163,17 @@ function lockedEvent(clientX, clientY, button = 0, extra = {}) {
   const h = minimapHarness();
   assert(h.router.pointerDown(lockedEvent(180, 280, 2)), "empty-selection minimap right-click is consumed");
   assert(h.net.sent.length === 0, "empty-selection minimap right-click sends no command");
+  h.minimap.destroy();
+}
+
+// Replay minimaps keep camera clicks local and never issue gameplay commands.
+{
+  const selected = [{ id: 7, owner: 1, kind: KIND.RIFLEMAN }];
+  const h = minimapHarness({ selected, commandsEnabled: false });
+  assert(h.router.pointerDown(lockedEvent(180, 280, 2)), "replay minimap right-click is consumed");
+  assert(h.net.sent.length === 0, "replay minimap right-click sends no command");
+  assert(h.router.pointerDown(lockedEvent(221, 321, 0)), "replay minimap left-click still recenters camera");
+  assert(h.centers.length === 1, "replay minimap keeps local camera controls");
   h.minimap.destroy();
 }
 

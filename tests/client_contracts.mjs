@@ -52,6 +52,7 @@ import {
 import { Input, footprintValidAgainstEntities } from "../client/src/input/index.js";
 import { CommandComposer } from "../client/src/input/command_composer.js";
 import { _controlGroupSaveModifierActive } from "../client/src/input/control_groups.js";
+import { ReplayCameraInput } from "../client/src/replay_camera_input.js";
 import {
   automaticPointerLockDisabledForTests,
   cursorLockSupported,
@@ -554,6 +555,122 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
     createElement() { return { classList: { add() {} }, appendChild() {}, style: {} }; },
   };
   const { Match } = await import("../client/src/match.js");
+  const { ReplayViewer } = await import("../client/src/replay_viewer.js");
+  const { dom } = await import("../client/src/bootstrap.js");
+  assert(ReplayViewer.prototype instanceof Match, "ReplayViewer reuses Match rendering lifecycle");
+  assert(!("command" in ReplayCameraInput.prototype), "Replay camera input has no gameplay command API");
+
+  function fakeEl(tag = "div") {
+    const el = {
+      tagName: tag.toUpperCase(),
+      children: [],
+      dataset: {},
+      style: { setProperty(name, value) { this[name] = value; } },
+      hidden: false,
+      textContent: "",
+      className: "",
+      _listeners: new Map(),
+      classList: {
+        add(cls) {
+          if (!el.className.split(/\s+/).includes(cls)) el.className = `${el.className} ${cls}`.trim();
+        },
+        remove(cls) {
+          el.className = el.className.split(/\s+/).filter((c) => c && c !== cls).join(" ");
+        },
+        toggle(cls, force) {
+          const active = force === undefined ? !this.contains(cls) : !!force;
+          if (active) this.add(cls);
+          else this.remove(cls);
+          return active;
+        },
+        contains(cls) {
+          return el.className.split(/\s+/).includes(cls);
+        },
+      },
+      setAttribute(name, value) {
+        this[name] = value;
+      },
+      appendChild(child) {
+        child.parentNode = this;
+        this.children.push(child);
+        return child;
+      },
+      addEventListener(type, handler) {
+        this._listeners.set(type, handler);
+      },
+      remove() {
+        if (!this.parentNode) return;
+        this.parentNode.children = this.parentNode.children.filter((child) => child !== this);
+      },
+      closest(selector) {
+        if (selector.startsWith(".") && this.classList.contains(selector.slice(1))) return this;
+        return this.parentNode?.closest?.(selector) || null;
+      },
+      querySelector(selector) {
+        return this.querySelectorAll(selector)[0] || null;
+      },
+      querySelectorAll(selector) {
+        const out = [];
+        const matches = (node) => {
+          if (selector === ".spd-btn:not(.seek-btn)") {
+            return node.classList?.contains("spd-btn") && !node.classList?.contains("seek-btn");
+          }
+          if (selector.startsWith(".")) return node.classList?.contains(selector.slice(1));
+          return false;
+        };
+        const walk = (node) => {
+          for (const child of node.children || []) {
+            if (matches(child)) out.push(child);
+            walk(child);
+          }
+        };
+        walk(this);
+        return out;
+      },
+    };
+    return el;
+  }
+
+  globalThis.document.createElement = fakeEl;
+  const replayControls = fakeEl("div");
+  const speed2 = fakeEl("button");
+  speed2.className = "spd-btn";
+  speed2.dataset.speed = "2";
+  replayControls.appendChild(speed2);
+  dom.replaySpeed = replayControls;
+  const replayControlsMatch = Object.create(Match.prototype);
+  replayControlsMatch.state = {
+    players: [
+      { id: 1, name: "Alpha", color: "#f00" },
+      { id: 2, name: "Bravo", color: "#0f0" },
+    ],
+  };
+  replayControlsMatch.net = {
+    visions: [],
+    setReplayVision(vision) {
+      this.visions.push(vision);
+    },
+  };
+  replayControlsMatch.replayVisionSelection = new Set();
+  replayControlsMatch.buildReplayVisionControls();
+  replayControlsMatch.setReplaySpeedActive(2);
+  assert(speed2.classList.contains("active"), "replay speed defaults can mark 2x active");
+  const visionButtons = replayControls.querySelectorAll(".vision-btn");
+  assert(visionButtons.length === 3, "replay viewer builds all-player and per-player fog controls");
+  replayControlsMatch.onReplayVisionClick({ target: visionButtons[1], shiftKey: false });
+  assert(
+    replayControlsMatch.net.visions.at(-1).mode === "player" &&
+      replayControlsMatch.net.visions.at(-1).playerId === 1,
+    "single replay fog click sends a per-viewer player vision request",
+  );
+  replayControlsMatch.onReplayVisionClick({ target: visionButtons[2], shiftKey: true });
+  assert(
+    replayControlsMatch.net.visions.at(-1).mode === "players" &&
+      replayControlsMatch.net.visions.at(-1).playerIds.join(",") === "1,2",
+    "shift-click replay fog controls send a selected-players request",
+  );
+  replayControlsMatch.onReplayVisionClick({ target: visionButtons[0], shiftKey: false });
+  assert(replayControlsMatch.net.visions.at(-1).mode === "all", "all replay fog control restores union vision");
 
   const storageValues = new Map();
   globalThis.window.localStorage = {
