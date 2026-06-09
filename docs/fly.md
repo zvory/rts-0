@@ -112,7 +112,9 @@ that the browser is using `localhost`, `127.0.0.1`, or `[::1]` so the TCP peer i
 ## Agent log access
 
 Agents can inspect Fly server logs with a read-only Fly token stored in local `.env`.
-`.env` is gitignored; never commit the actual token.
+`.env` is gitignored; never commit the actual token. The log helper reads this worktree's `.env`
+first, then falls back to the `main` worktree's `.env`, so agents in `/tmp/rts-worktrees/...` can
+use the real checkout's token.
 
 Create or rotate the token from an authenticated Fly session:
 
