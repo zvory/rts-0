@@ -182,11 +182,16 @@ export class Net {
   }
 
   /**
-   * Set replay playback speed (replay rooms only; ignored elsewhere).
+   * Set replay/dev-watch playback speed. Dev-watch accepts 0 as paused.
    * @param {number} speed multiplier, e.g. 0.5, 1, 2, 4, 8
    */
   setReplaySpeed(speed) {
     this._send(msg.setReplaySpeed(speed));
+  }
+
+  /** Advance a paused dev scenario by one authoritative simulation tick. */
+  stepDevTick() {
+    this._send(msg.stepDevTick());
   }
 
   /**

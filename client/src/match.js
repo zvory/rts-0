@@ -226,9 +226,17 @@ export class Match {
       for (const btn of dom.replaySpeed.querySelectorAll(".seek-btn")) {
         btn.hidden = isScenario;
       }
+      for (const btn of dom.replaySpeed.querySelectorAll(".dev-pause-btn, .dev-step-btn")) {
+        btn.hidden = !isScenario;
+      }
       this.replaySpeedHandler = (e) => {
         const btn = e.target.closest(".spd-btn");
         if (!btn) return;
+        if (btn.dataset.stepDevTick !== undefined) {
+          if (!isScenario) return;
+          this.net.stepDevTick();
+          return;
+        }
         if (btn.dataset.seekBack !== undefined) {
           if (!isReplay) return;
           const ticksBack = parseInt(btn.dataset.seekBack, 10);
@@ -239,6 +247,7 @@ export class Match {
         }
         const speed = parseFloat(btn.dataset.speed);
         if (!isFinite(speed)) return;
+        if (speed === 0 && !isScenario) return;
         this.net.setReplaySpeed(speed);
         this.setReplaySpeedActive(speed);
       };
@@ -987,6 +996,9 @@ export class Match {
       dom.replaySpeed.hidden = true;
       this.setReplayConcluded(false);
       for (const btn of dom.replaySpeed.querySelectorAll(".seek-btn")) btn.hidden = false;
+      for (const btn of dom.replaySpeed.querySelectorAll(".dev-pause-btn, .dev-step-btn")) {
+        btn.hidden = true;
+      }
       dom.replaySpeed.classList.remove("replay-viewer-controls");
       dom.replaySpeed.querySelector(".replay-vision-controls")?.remove();
       dom.replaySpeed.querySelector(".replay-tick-status")?.remove();

@@ -1321,6 +1321,14 @@ async fn handle_client_message(
             )
             .await;
         }
+        ClientMessage::StepDevTick => {
+            send_room_event(
+                player_id,
+                current_room,
+                RoomEvent::StepDevTick { player_id },
+            )
+            .await;
+        }
         ClientMessage::SeekReplay { ticks_back } => {
             send_room_event(
                 player_id,

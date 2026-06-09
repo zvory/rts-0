@@ -104,8 +104,10 @@ pub enum ClientMessage {
     ReturnToLobby,
     /// Latency probe.
     Ping { ts: f64 },
-    /// Set replay playback speed multiplier (replay rooms only; ignored elsewhere).
+    /// Set replay/dev-watch playback speed multiplier. Dev watch accepts `0` as paused.
     SetReplaySpeed { speed: f32 },
+    /// Advance a paused dev-watch room by one simulation tick. Ignored outside dev watch.
+    StepDevTick,
     /// Rewind a replay by `ticks_back` simulation ticks (replay rooms only; clamped to start).
     SeekReplay {
         #[serde(rename = "ticksBack")]
