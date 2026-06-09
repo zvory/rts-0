@@ -43,7 +43,11 @@ fn main() {
         .and_then(|o| {
             let text = String::from_utf8_lossy(&o.stdout).trim().to_string();
             let first = text.lines().next().map(str::trim).unwrap_or("").to_string();
-            if first.is_empty() { None } else { Some(first) }
+            if first.is_empty() {
+                None
+            } else {
+                Some(first)
+            }
         });
 
     let version = match tag {
