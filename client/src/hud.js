@@ -818,6 +818,7 @@ export class HUD {
         cost: st.cost,
         enabled,
         title: reason,
+        tooltipHtml: this._kindTooltipHtml(kind),
         onClick: () => this.state.beginPlacement(kind),
       });
       frag.appendChild(btn);
@@ -892,7 +893,7 @@ export class HUD {
         cost: st.cost,
         enabled,
         title: reason,
-        tooltipHtml: this._trainTooltipHtml(unit),
+        tooltipHtml: this._kindTooltipHtml(unit),
         repeatable: true,
         onClick: () => this._issueTrain(unit),
       });
@@ -1032,9 +1033,9 @@ export class HUD {
     return affordance.definition.title || "";
   }
 
-  /** Detailed command-card hover for production menu unit buttons. */
-  _trainTooltipHtml(unit) {
-    const st = STATS[unit];
+  /** Detailed command-card hover for any buildable or trainable kind. */
+  _kindTooltipHtml(kind) {
+    const st = STATS[kind];
     if (!st) return "";
     const cost = st.cost || {};
     const requirements = this._requirementsOf(st);
