@@ -380,6 +380,7 @@ fn command_stats_by_player(commands: &[CommandLogEntry]) -> BTreeMap<u32, Comman
             | WireCommand::Gather { .. }
             | WireCommand::Build { .. }
             | WireCommand::Train { .. }
+            | WireCommand::Research { .. }
             | WireCommand::Cancel { .. }
             | WireCommand::Stop { .. }
             | WireCommand::SetRally { .. } => {}

@@ -559,6 +559,7 @@ mod tests {
             supply_cap: 20,
             is_ai: false,
             score: ScoreState::default(),
+            upgrades: Default::default(),
         }
     }
 }

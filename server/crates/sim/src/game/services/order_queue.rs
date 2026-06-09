@@ -569,6 +569,7 @@ mod tests {
             supply_cap: 20,
             is_ai: false,
             score: ScoreState::default(),
+            upgrades: Default::default(),
         }
     }
 
@@ -591,6 +592,7 @@ mod tests {
                 supply_cap: p.supply_cap,
                 is_ai: p.is_ai,
                 score: p.score.clone(),
+                upgrades: p.upgrades.clone(),
             })
             .collect();
         let occ = Occupancy::build(map, entities);
@@ -1017,7 +1019,7 @@ mod tests {
     }
 
     #[test]
-    fn queued_charge_promotes_between_move_and_attack_move() {
+    fn queued_legacy_charge_skips_to_attack_move() {
         let map = flat_map(32);
         let mut entities = EntityStore::new();
         let rifle = entities
@@ -1034,17 +1036,6 @@ mod tests {
             unit.append_queued_order(OrderIntent::self_ability(AbilityKind::Charge));
             unit.append_queued_order(OrderIntent::attack_move_to(240.0, 100.0));
         }
-
-        promote(&map, &mut entities);
-
-        let unit = entities.get(rifle).expect("rifleman should exist");
-        assert_eq!(unit.charge_ticks(), config::RIFLEMAN_CHARGE_TICKS);
-        assert_eq!(
-            unit.ability_cooldown_ticks(AbilityKind::Charge),
-            config::RIFLEMAN_CHARGE_COOLDOWN_TICKS
-        );
-        assert_eq!(unit.queued_orders().len(), 1);
-        assert!(matches!(unit.order(), Order::Idle));
 
         promote(&map, &mut entities);
 

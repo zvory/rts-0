@@ -4,7 +4,6 @@ import { DEFAULT_HIT_RADIUS, DEFAULT_TILE_SIZE, HIT_PAD_PX, OWN_HIT_BONUS } from
 import {
   entityIntersectsRect,
   isVehicleBodyKind,
-  pointHitsBodyCircle,
   pointHitsOrientedVehicle,
 } from "./placement.js";
 
@@ -198,7 +197,7 @@ export function _worldPointHitsEntity(e, wx, wy, tileSize) {
       wy <= e.y + halfH + HIT_PAD_PX
     );
   }
-  if (e.kind === KIND.AT_TEAM) return pointHitsBodyCircle(e, wx, wy, HIT_PAD_PX);
+  if (e.kind === KIND.AT_TEAM) return pointHitsOrientedVehicle(e, wx, wy, 0);
   if (isVehicleBodyKind(e.kind)) return pointHitsOrientedVehicle(e, wx, wy, HIT_PAD_PX);
   const radius = (stat && stat.size ? stat.size : DEFAULT_HIT_RADIUS) + HIT_PAD_PX;
   return Math.hypot(wx - e.x, wy - e.y) <= radius;

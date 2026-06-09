@@ -182,7 +182,7 @@ policy is centralized instead of scattered through services.
 
 ### 3.4 Ability system (`game/ability.rs`, `game/services/ability_orders.rs`)
 
-`game/ability.rs` defines `AbilityKind` (currently `Charge` and `Smoke`), `AbilityDefinition`,
+`game/ability.rs` defines `AbilityKind` (legacy `Charge` plus active `Smoke`), `AbilityDefinition`,
 `AbilityTargetMode` (`SelfTarget` or `WorldPoint`), `ResourceCost`, and the compile-time
 definition table accessed via `ability::definition(kind)`. Ability definitions include the carrier
 entity kinds, target mode, optional tile range, cooldown in ticks, resource cost, tech requirement,
@@ -259,9 +259,8 @@ Allocation rules:
 - Point orders (`move`, `attackMove`) apply to every selected owned unit that can receive orders.
 - Target/resource/build orders apply to every selected compatible owned unit after the target or
   placement has passed issue-time validation.
-- Self-targeted abilities, such as Charge, broadcast to every selected ready carrier. Queued Charge
-  is a future self-ability intent for each ready rifleman; immediate Charge executes immediately and
-  preserves existing movement/queue state.
+- Legacy Charge has no eligible carriers after the Methamphetamines research conversion. It remains
+  decodable for old command logs but does not create queued or immediate ability work.
 - World-targeted abilities, such as Smoke, allocate one ready carrier per click. For queued
   commands the planner chooses an eligible selected carrier with the shortest current queue, which
   gives round-robin behavior across repeated clicks. If all eligible carriers are full, emit queue
@@ -283,9 +282,8 @@ Examples:
   then keeps Shift held, arms Attack, and clicks attack-move points. The smoke carriers execute
   their smoke stages before the later attack-move; selected non-carriers skip smoke and still
   receive the attack-move stages.
-- **Waypoint, Charge, attack.** The player queues a move, queues Charge, then queues attack-move.
-  Ready riflemen receive a future self-ability stage between the move and attack-move. Non-riflemen
-  do not receive Charge but still receive the move and attack-move.
+- **Legacy Charge in queues.** Old command logs may contain queued Charge stages. Because Charge no
+  longer has eligible carriers, those stages are skipped and later queued orders still promote.
 - **Packed AT guns.** The player orders packed AT guns to move, then Shift-arms setup and clicks a
   facing point. The setup stage promotes after movement and computes facing from the gun's actual
   arrived position toward the stored world point.

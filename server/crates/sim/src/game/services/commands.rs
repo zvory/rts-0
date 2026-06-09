@@ -5,7 +5,7 @@ use crate::game::ability::{self, AbilityKind, AbilityTargetMode};
 use crate::game::command::SimCommand;
 use crate::game::entity::{
     BuildPhase, EntityKind, EntityStore, Order, OrderIntent, ProdItem, RallyIntent, RallyKind,
-    WeaponSetup, MAX_QUEUED_ORDERS,
+    ResearchItem, WeaponSetup, MAX_QUEUED_ORDERS,
 };
 use crate::game::fog::Fog;
 use crate::game::map::Map;
@@ -22,6 +22,7 @@ use crate::game::services::spatial::SpatialIndex;
 use crate::game::services::standability;
 use crate::game::services::world_query;
 use crate::game::smoke::SmokeCloudStore;
+use crate::game::upgrade::{self, UpgradeKind};
 use crate::game::PlayerState;
 use crate::protocol::{Event, NoticeSeverity};
 use crate::rules;
@@ -275,6 +276,9 @@ pub(crate) fn apply_commands(
             }
             SimCommand::Train { building, unit } => {
                 order_train(entities, players, player, building, unit, events);
+            }
+            SimCommand::Research { building, upgrade } => {
+                order_research(entities, players, player, building, upgrade, events);
             }
             SimCommand::Cancel { building } => {
                 order_cancel(entities, players, player, building);
@@ -1054,6 +1058,71 @@ fn order_train(
     }
 }
 
+fn order_research(
+    entities: &mut EntityStore,
+    players: &mut [PlayerState],
+    player: u32,
+    building: u32,
+    upgrade: UpgradeKind,
+    events: &mut HashMap<u32, Vec<Event>>,
+) {
+    let definition = upgrade::definition(upgrade);
+    let ok = matches!(entities.get(building), Some(b)
+        if b.owner == player && b.is_building() && !b.under_construction()
+        && b.kind == definition.researched_at);
+    if !ok {
+        notice(events, player, "Cannot research that here");
+        return;
+    }
+    if players
+        .iter()
+        .find(|p| p.id == player)
+        .is_some_and(|p| p.upgrades.contains(&upgrade))
+    {
+        notice(events, player, "Already researched");
+        return;
+    }
+    if entities.iter().any(|e| {
+        e.owner == player
+            && e.research_queue()
+                .iter()
+                .any(|item| item.upgrade == upgrade)
+    }) {
+        notice(events, player, "Already researching");
+        return;
+    }
+
+    let ps = match players.iter_mut().find(|p| p.id == player) {
+        Some(p) => p,
+        None => return,
+    };
+    if ps.steel < definition.cost_steel || ps.oil < definition.cost_oil {
+        notice(
+            events,
+            player,
+            rules::economy::resource_shortage_notice(
+                ps.steel,
+                ps.oil,
+                definition.cost_steel,
+                definition.cost_oil,
+            ),
+        );
+        return;
+    }
+    ps.steel -= definition.cost_steel;
+    ps.oil -= definition.cost_oil;
+
+    if let Some(b) = entities.get_mut(building) {
+        if let Some(queue) = b.research_queue_mut() {
+            queue.push(ResearchItem {
+                upgrade,
+                progress: 0,
+                total: definition.research_ticks,
+            });
+        }
+    }
+}
+
 /// Set a unit-producing building's rally point. Validates ownership and that the building is a
 /// completed producer; sanitizes/clamps the point to the map. Invalid requests are ignored
 /// silently (consistent with movement commands), so a hostile client cannot wedge the tick loop.
@@ -1094,27 +1163,58 @@ fn order_cancel(
     player: u32,
     building: u32,
 ) {
-    let unit = {
+    enum Cancelled {
+        Unit(EntityKind),
+        Upgrade(UpgradeKind),
+    }
+
+    let cancelled = {
         let b = match entities.get_mut(building) {
-            Some(b) if b.owner == player && b.is_building() && !b.prod_queue().is_empty() => b,
+            Some(b)
+                if b.owner == player
+                    && b.is_building()
+                    && (!b.prod_queue().is_empty() || !b.research_queue().is_empty()) =>
+            {
+                b
+            }
             _ => return,
         };
-        match b.prod_queue_mut() {
-            Some(queue) => match queue.pop() {
-                Some(item) => item.unit,
+        if let Some(queue) = b.research_queue_mut() {
+            if let Some(item) = queue.pop() {
+                Cancelled::Upgrade(item.upgrade)
+            } else if let Some(queue) = b.prod_queue_mut() {
+                match queue.pop() {
+                    Some(item) => Cancelled::Unit(item.unit),
+                    None => return,
+                }
+            } else {
+                return;
+            }
+        } else if let Some(queue) = b.prod_queue_mut() {
+            match queue.pop() {
+                Some(item) => Cancelled::Unit(item.unit),
                 None => return,
-            },
-            None => return,
+            }
+        } else {
+            return;
         }
     };
-    if config::unit_stats(unit).is_some() {
-        if let Some(ps) = players.iter_mut().find(|p| p.id == player) {
-            let (cost_steel, cost_oil) = rules::economy::cost(unit);
-            ps.steel += cost_steel;
-            ps.oil += cost_oil;
-            ps.supply_used = ps
-                .supply_used
-                .saturating_sub(rules::economy::supply_cost(unit));
+    if let Some(ps) = players.iter_mut().find(|p| p.id == player) {
+        match cancelled {
+            Cancelled::Unit(unit) if config::unit_stats(unit).is_some() => {
+                let (cost_steel, cost_oil) = rules::economy::cost(unit);
+                ps.steel += cost_steel;
+                ps.oil += cost_oil;
+                ps.supply_used = ps
+                    .supply_used
+                    .saturating_sub(rules::economy::supply_cost(unit));
+            }
+            Cancelled::Upgrade(upgrade) => {
+                let definition = upgrade::definition(upgrade);
+                ps.steel += definition.cost_steel;
+                ps.oil += definition.cost_oil;
+            }
+            _ => {}
         }
     }
 }
@@ -1825,7 +1925,7 @@ mod tests {
     }
 
     #[test]
-    fn charge_requires_training_centre_and_filters_to_owned_riflemen() {
+    fn legacy_charge_command_is_noop_after_removal() {
         let map = flat_map(24);
         let mut entities = EntityStore::new();
         let rifle = entities
@@ -1881,12 +1981,10 @@ mod tests {
 
         assert_eq!(
             entities.get(rifle).unwrap().charge_ticks(),
-            config::RIFLEMAN_CHARGE_TICKS
+            0,
+            "legacy Charge should no longer activate riflemen"
         );
-        assert_eq!(
-            entities.get(rifle).unwrap().charge_cooldown_ticks(),
-            config::RIFLEMAN_CHARGE_COOLDOWN_TICKS
-        );
+        assert_eq!(entities.get(rifle).unwrap().charge_cooldown_ticks(), 0);
         assert_eq!(
             entities.get(worker).unwrap().charge_ticks(),
             0,
@@ -1900,7 +1998,7 @@ mod tests {
     }
 
     #[test]
-    fn charge_respects_cooldown_before_allowing_reuse() {
+    fn legacy_charge_command_does_not_start_cooldown() {
         let map = flat_map(24);
         let mut entities = EntityStore::new();
         let rifle = entities
@@ -1972,15 +2070,12 @@ mod tests {
                 },
             )],
         );
-        assert_eq!(
-            entities.get(rifle).unwrap().charge_ticks(),
-            config::RIFLEMAN_CHARGE_TICKS,
-            "charge should become available again after cooldown expiry"
-        );
+        assert_eq!(entities.get(rifle).unwrap().charge_ticks(), 0);
+        assert_eq!(entities.get(rifle).unwrap().charge_cooldown_ticks(), 0);
     }
 
     #[test]
-    fn queued_charge_appends_to_ready_riflemen_only_and_later_attack_move_hits_selection() {
+    fn queued_legacy_charge_is_skipped_and_later_attack_move_hits_selection() {
         let map = flat_map(24);
         let mut entities = EntityStore::new();
         let ready = entities
@@ -2027,11 +2122,7 @@ mod tests {
             ],
         );
 
-        assert!(matches!(
-            entities.get(ready).unwrap().queued_orders()[0],
-            OrderIntent::SelfAbility(_)
-        ));
-        assert_eq!(entities.get(ready).unwrap().queued_orders().len(), 2);
+        assert_eq!(entities.get(ready).unwrap().queued_orders().len(), 1);
         assert_eq!(
             entities.get(cooldown).unwrap().queued_orders().len(),
             1,
@@ -3193,6 +3284,7 @@ mod tests {
             supply_cap: 20,
             is_ai: false,
             score: ScoreState::default(),
+            upgrades: Default::default(),
         }
     }
 

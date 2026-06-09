@@ -1,3 +1,5 @@
+use crate::game::upgrade::UpgradeKind;
+
 use super::{EntityKind, Order, OrderIntent, RallyIntent};
 
 /// A queued production order on a building.
@@ -8,6 +10,14 @@ pub struct ProdItem {
     /// Ticks of progress accumulated on this item so far.
     pub progress: u32,
     /// Total ticks required to finish this item.
+    pub total: u32,
+}
+
+/// A queued research order on a tech building.
+#[derive(Debug, Clone)]
+pub struct ResearchItem {
+    pub upgrade: UpgradeKind,
+    pub progress: u32,
     pub total: u32,
 }
 
@@ -159,6 +169,8 @@ impl WeaponSetup {
 pub struct ProductionState {
     /// FIFO production queue (front = item being produced).
     pub queue: Vec<ProdItem>,
+    /// FIFO research queue (front = item being researched).
+    pub research_queue: Vec<ResearchItem>,
     /// Optional first rally stage (world pixels). When set, freshly produced units receive this
     /// order and the producer prefers the spawn exit closest to it.
     pub rally_point: Option<RallyIntent>,

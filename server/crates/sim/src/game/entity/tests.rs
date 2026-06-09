@@ -66,7 +66,7 @@ fn finished_building_kinds_have_exact_state_groups() {
         ),
         (
             EntityKind::TrainingCentre,
-            groups(false, false, false, false, false, false),
+            groups(false, false, true, false, false, false),
         ),
         (
             EntityKind::Factory,

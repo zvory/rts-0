@@ -17,6 +17,7 @@ import {
   SMOKE_ABILITY_COST,
   ABILITIES,
   STATS,
+  UPGRADES,
 } from "../client/src/config.js";
 import {
   HUD,
@@ -45,6 +46,7 @@ import {
   STATE,
   STATE_CODE,
   TERRAIN,
+  UPGRADE,
   cmd,
   decodeServerMessage,
   msg,
@@ -925,6 +927,7 @@ function fakeAudioContext() {
     ],
     r: [[200, 1498]],
     sm: [[50, 320, 352, 2, 120]],
+    u: [1],
     fg: [1, 2, 3, 1],
     ev: [
       [EVENT_CODE[EVENT.ATTACK], 1, 7],
@@ -936,6 +939,7 @@ function fakeAudioContext() {
   });
 
   assert(decoded.t === "snapshot", "compact snapshot keeps the semantic tag");
+  assert(decoded.upgrades[0] === UPGRADE.METHAMPHETAMINES, "compact upgrades decode");
   assert(decoded.tick === 42 && decoded.steel === 100 && decoded.supplyCap === 10, "compact scalars decode");
   assert(decoded.entities.length === 3, "compact entities decode");
   assert(decoded.entities[0].kind === KIND.WORKER, "entity kind code decodes");
@@ -1194,11 +1198,17 @@ function fakeAudioContext() {
     STATS[KIND.STEELWORKS].requires.includes(KIND.TRAINING_CENTRE),
     "Steelworks should require Training Centre tech in the command card",
   );
+  assert(!ABILITIES[ABILITY.CHARGE], "client no longer exposes Rifleman Charge as a command-card ability");
   assert(
-    RIFLEMAN_CHARGE_COOLDOWN_TICKS === 150,
-    "client mirrors the server rifleman charge cooldown duration",
+    STATS[KIND.TRAINING_CENTRE].researches.includes(UPGRADE.METHAMPHETAMINES),
+    "Training Centre should expose Methamphetamines research",
   );
-  assert(ABILITIES[ABILITY.CHARGE].queued === true, "client marks Rifleman Charge as queueable");
+  assert(
+    UPGRADES[UPGRADE.METHAMPHETAMINES].cost.steel === 100 &&
+      UPGRADES[UPGRADE.METHAMPHETAMINES].cost.oil === 100 &&
+      UPGRADES[UPGRADE.METHAMPHETAMINES].researchTicks === 600,
+    "Methamphetamines research cost and time mirror server",
+  );
   assert(
     STATS[KIND.AT_TEAM].requires === KIND.STEELWORKS,
     "AT Gun training should require a completed Steelworks in the command card",
@@ -1359,65 +1369,68 @@ function fakeAudioContext() {
     };
 
     const sent = [];
-    const selectedRifleman = { id: 77, owner: playerId, kind: KIND.RIFLEMAN };
-    const chargeHud = Object.create(HUD.prototype);
-    chargeHud.state = {
+    const selectedTrainingCentre = {
+      id: 77,
+      owner: playerId,
+      kind: KIND.TRAINING_CENTRE,
+      buildProgress: null,
+    };
+    const researchHud = Object.create(HUD.prototype);
+    researchHud.state = {
       playerId,
-      resources: { steel: 0, oil: 0 },
+      resources: { steel: 100, oil: 100 },
+      upgrades: [],
       commandTarget: null,
-      selectedEntities: () => [selectedRifleman],
-      entitiesInterpolated: () => [
-        selectedRifleman,
-        { id: 90, owner: playerId, kind: KIND.TRAINING_CENTRE, buildProgress: null },
-      ],
+      selectedEntities: () => [selectedTrainingCentre],
+      entitiesInterpolated: () => [selectedTrainingCentre],
       endCommandTarget() {
         this.commandTarget = null;
       },
     };
-    chargeHud.net = { command: (command) => sent.push(command) };
-    chargeHud._cardSig = null;
+    researchHud.net = { command: (command) => sent.push(command) };
+    researchHud._cardSig = null;
+    researchHud._resourceIcons = {};
 
     const card = fakeElement("div");
-    chargeHud._renderUnitCard(card, [selectedRifleman]);
-    const chargeButton = renderedButtons.find((button) => button.innerHTML.includes("Charge"));
-    assert(chargeButton && !chargeButton.disabled, "Charge command-card button renders enabled");
-    assert(chargeButton.dataset.hotkey === "C", "Charge command-card button uses C as its hotkey");
-    chargeButton.click({ shiftKey: true });
+    researchHud._renderTrainCard(card, selectedTrainingCentre);
+    const researchButton = renderedButtons.find((button) => button.innerHTML.includes("Methamphetamines"));
+    assert(researchButton && !researchButton.disabled, "Methamphetamines command-card button renders enabled");
+    assert(researchButton.dataset.hotkey === "Q", "Methamphetamines command-card button uses Q as its hotkey");
+    assert(researchButton.innerHTML.includes("Research time"), "Methamphetamines tooltip includes research time");
+    researchButton.click({ shiftKey: true });
     assert(
       sent.length === 1 &&
-        sent[0].c === "useAbility" &&
-        sent[0].ability === ABILITY.CHARGE &&
-        sent[0].units.join(",") === "77" &&
-        sent[0].queued === true,
-      "Shift-clicking Charge should send a queued self ability command",
+        sent[0].c === "research" &&
+        sent[0].building === 77 &&
+        sent[0].upgrade === UPGRADE.METHAMPHETAMINES,
+      "Clicking Methamphetamines should send a research command",
     );
 
     globalThis.document.getElementById = (id) => {
-      assert(id === "command-card", "Charge hotkey should query the command card");
+      assert(id === "command-card", "Methamphetamines hotkey should query the command card");
       return {
         querySelectorAll(selector) {
-          assert(selector === "button[data-hotkey]", "Charge hotkey should query hotkey buttons");
-          return [chargeButton];
+          assert(selector === "button[data-hotkey]", "Methamphetamines hotkey should query hotkey buttons");
+          return [researchButton];
         },
       };
     };
     const input = Object.create(Input.prototype);
-    input.state = chargeHud.state;
+    input.state = researchHud.state;
     const hotkeyEv = {
-      code: "KeyC",
-      shiftKey: true,
+      code: "KeyQ",
+      shiftKey: false,
       repeat: false,
       preventDefault() {},
     };
     const hotkeyResult = input._activateCommandHotkey(hotkeyEv);
-    assert(hotkeyResult?.handled === true, "Shift+Charge hotkey should activate the command-card button");
+    assert(hotkeyResult?.handled === true, "Methamphetamines hotkey should activate the command-card button");
     assert(
       sent.length === 2 &&
-        sent[1].c === "useAbility" &&
-        sent[1].ability === ABILITY.CHARGE &&
-        sent[1].units.join(",") === "77" &&
-        sent[1].queued === true,
-      "Shift+Charge hotkey should send a queued self ability command",
+        sent[1].c === "research" &&
+        sent[1].building === 77 &&
+        sent[1].upgrade === UPGRADE.METHAMPHETAMINES,
+      "Methamphetamines hotkey should send a research command",
     );
 
     renderedButtons.length = 0;

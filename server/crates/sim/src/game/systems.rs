@@ -281,6 +281,7 @@ mod tests {
             supply_cap: 20,
             is_ai: false,
             score: crate::game::ScoreState::default(),
+            upgrades: Default::default(),
         }
     }
 

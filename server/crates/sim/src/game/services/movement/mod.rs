@@ -7,6 +7,7 @@
 
 use std::collections::HashMap;
 
+use crate::game::entity::EntityKind;
 use crate::game::entity::EntityStore;
 use crate::game::map::Map;
 use crate::game::services::occupancy::Occupancy;
@@ -73,6 +74,21 @@ pub(crate) fn movement_system_with_events(
     tick: u32,
     events: &mut HashMap<u32, Vec<Event>>,
 ) {
+    for id in entities.ids() {
+        let has_meth = entities
+            .get(id)
+            .filter(|e| e.kind == EntityKind::Rifleman)
+            .and_then(|e| players.iter().find(|p| p.id == e.owner))
+            .is_some_and(|p| {
+                p.upgrades
+                    .contains(&crate::game::upgrade::UpgradeKind::Methamphetamines)
+            });
+        if has_meth {
+            if let Some(e) = entities.get_mut(id) {
+                e.start_charge(u16::MAX);
+            }
+        }
+    }
     waypoints::advance_moving_units(map, entities, players, occ, spatial, tick, events);
     for id in entities.ids() {
         if let Some(e) = entities.get_mut(id) {

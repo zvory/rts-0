@@ -16,6 +16,7 @@ import {
   PLAYER_PALETTE,
   STATS,
   TICK_HZ,
+  UPGRADES,
   WORKER_BUILDABLE,
 } from "./config.js";
 
@@ -400,7 +401,10 @@ export class HUD {
     const queue = e.prodQueue ?? 0;
     if (queue > 0) {
       const pct = Math.round((e.prodProgress ?? 0) * 100);
-      const kindLabel = (e.prodKind && STATS[e.prodKind] && STATS[e.prodKind].label) || e.prodKind || "";
+      const kindLabel = (e.prodUpgrade && UPGRADES[e.prodUpgrade]?.label) ||
+        (e.prodKind && STATS[e.prodKind] && STATS[e.prodKind].label) ||
+        e.prodKind ||
+        "";
       const queued = queue > 1 ? ` (+${queue - 1})` : "";
       prodHtml =
         `<div class="sel-prod-label">${kindLabel}${queued}</div>` +
@@ -490,7 +494,7 @@ export class HUD {
     for (const e of sel) {
       if (!this._isOwn(e)) continue;
       if (isUnit(e.kind)) return e;
-      if (isBuilding(e.kind) && this._trainsOf(e.kind).length > 0) return e;
+      if (isBuilding(e.kind) && (this._trainsOf(e.kind).length > 0 || this._researchesOf(e.kind).length > 0)) return e;
     }
     return worker;
   }
@@ -503,6 +507,11 @@ export class HUD {
   _trainsOf(kind) {
     const st = STATS[kind];
     return (st && st.trains) || [];
+  }
+
+  _researchesOf(kind) {
+    const st = STATS[kind];
+    return (st && st.researches) || [];
   }
 
   /** Building/unit prerequisite kinds as an array. */
@@ -847,6 +856,7 @@ export class HUD {
   _renderTrainCard(card, building) {
     const res = this.state.resources || { steel: 0, oil: 0 };
     const trains = this._trainsOf(building.kind);
+    const researches = this._researchesOf(building.kind);
     const producingBuildings = this._selectedProducingBuildingsForKind(building.kind);
     const producing = producingBuildings.length > 0;
     const cancelSlot = 8;
@@ -860,6 +870,8 @@ export class HUD {
         const producerIds = this._selectedProducerBuildingsForUnit(u).map((e) => e.id).join(".");
         return `${u}:${this._canTrain(u, res) ? 1 : 0}:${producerIds}`;
       }).join(",") +
+      `|research:` +
+      researches.map((u) => `${u}:${this._canResearch(u, res) ? 1 : 0}`).join(",") +
       `|cancel:${producingBuildings.map((e) => e.id).join(".")}`;
     if (sig === this._cardSig) return;
     this._cardSig = sig;
@@ -882,6 +894,25 @@ export class HUD {
         repeatable: true,
         onClick: () => this._issueTrain(unit),
       });
+      frag.appendChild(btn);
+    }
+    for (const upgrade of researches) {
+      const def = UPGRADES[upgrade];
+      if (!def) continue;
+      const enabled = this._canResearch(upgrade, res);
+      const reason = this._researchDisabledReason(upgrade, res);
+      const btn = this._cmdButton({
+        icon: def.icon,
+        label: def.label,
+        hotkey: def.hotkey || GRID_HOTKEYS[idx],
+        cost: def.cost,
+        enabled,
+        title: reason,
+        tooltipHtml: this._upgradeTooltipHtml(upgrade),
+        repeatable: false,
+        onClick: () => this._issueResearch(upgrade),
+      });
+      idx++;
       frag.appendChild(btn);
     }
 
@@ -972,6 +1003,16 @@ export class HUD {
     this.net.command(cmd.cancel(building.id));
   }
 
+  _issueResearch(upgrade) {
+    const def = UPGRADES[upgrade];
+    if (!def) return;
+    const building = (this.state.selectedEntities() || []).find(
+      (e) => this._isOwn(e) && e.kind === def.researchedAt && e.buildProgress == null,
+    );
+    if (!building) return;
+    this.net.command(cmd.research(building.id, upgrade));
+  }
+
   // --- Shared helpers --------------------------------------------------------
 
   /** True if `cost` ({steel,oil}) is affordable against `res` ({steel,oil}). */
@@ -988,6 +1029,25 @@ export class HUD {
     if (!st) return false;
     if (this._requirementsOf(st).some((req) => !this._playerHasCompleteKind(req))) return false;
     return this._affordable(st.cost, res);
+  }
+
+  _canResearch(upgrade, res) {
+    const def = UPGRADES[upgrade];
+    if (!def) return false;
+    if ((this.state.upgrades || []).includes(upgrade)) return false;
+    if (this._selectedProducingBuildingsForKind(def.researchedAt)
+      .some((e) => e.prodUpgrade === upgrade)) return false;
+    return this._affordable(def.cost, res);
+  }
+
+  _researchDisabledReason(upgrade, res) {
+    const def = UPGRADES[upgrade];
+    if (!def) return "";
+    if ((this.state.upgrades || []).includes(upgrade)) return "Researched";
+    if (this._selectedProducingBuildingsForKind(def.researchedAt)
+      .some((e) => e.prodUpgrade === upgrade)) return "Researching";
+    if (!this._affordable(def.cost, res)) return "Not enough resources";
+    return "";
   }
 
   /** Human-readable disabled reason for a train button tooltip ("" when enabled). */
@@ -1041,6 +1101,23 @@ export class HUD {
       `</span>` +
       `<span class="cmd-tooltip-row"><span>Requires</span><strong>${requirementLabels}</strong></span>` +
       `<span class="cmd-tooltip-row"><span>Build time</span><strong>${buildTime}</strong></span>`
+    );
+  }
+
+  _upgradeTooltipHtml(upgrade) {
+    const def = UPGRADES[upgrade];
+    if (!def) return "";
+    const cost = def.cost || {};
+    const seconds = Math.max(0, (def.researchTicks || 0) / TICK_HZ);
+    const time = Number.isInteger(seconds) ? `${seconds}s` : `${seconds.toFixed(1)}s`;
+    return (
+      `<span class="cmd-tooltip-title">${def.label}</span>` +
+      `<span class="cmd-tooltip-costs">` +
+        `<span class="cmd-tooltip-cost">${this._resourceIcon("steel")}<span>${cost.steel ?? 0}</span></span>` +
+        `<span class="cmd-tooltip-cost">${this._resourceIcon("oil")}<span>${cost.oil ?? 0}</span></span>` +
+      `</span>` +
+      `<span class="cmd-tooltip-desc">${def.description}</span>` +
+      `<span class="cmd-tooltip-row"><span>Research time</span><strong>${time}</strong></span>`
     );
   }
 

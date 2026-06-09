@@ -57,6 +57,7 @@ fn player_state(id: u32, is_ai: bool) -> PlayerState {
         supply_cap: 20,
         is_ai,
         score: ScoreState::default(),
+        upgrades: Default::default(),
     }
 }
 
