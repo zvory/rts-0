@@ -432,6 +432,7 @@ fn planner_facts(
             let mut facts = planner::UnitFacts::new(id);
             facts.pos = planner::Point::new(e.pos_x, e.pos_y);
             facts.queue_len = e.queued_orders().len();
+            facts.active_build = matches!(e.order(), Order::Build(_));
             facts.activity = match e.order() {
                 Order::Idle => planner::UnitActivity::Idle,
                 Order::Move(_) | Order::AttackMove(_) | Order::Ability(_) => {
@@ -2000,6 +2001,51 @@ mod tests {
 
         assert_eq!(entities.get(first).unwrap().queued_orders().len(), 2);
         assert_eq!(entities.get(second).unwrap().queued_orders().len(), 2);
+    }
+
+    #[test]
+    fn queued_build_prefers_idle_worker_over_closer_active_builder() {
+        let map = flat_map(32);
+        let mut entities = EntityStore::new();
+        let (cc_x, cc_y) = footprint_center(&map, EntityKind::CityCentre, 4, 4);
+        entities
+            .spawn_building(1, EntityKind::CityCentre, cc_x, cc_y, true)
+            .expect("city centre should spawn");
+        let west = entities
+            .spawn_unit(1, EntityKind::Worker, 320.0, 512.0)
+            .expect("west worker should spawn");
+        let east = entities
+            .spawn_unit(1, EntityKind::Worker, 640.0, 512.0)
+            .expect("east worker should spawn");
+        entities
+            .get_mut(west)
+            .expect("west worker should exist")
+            .set_order(Order::build(EntityKind::Depot, 8, 16));
+
+        apply(
+            &map,
+            &mut entities,
+            vec![(
+                1,
+                SimCommand::Build {
+                    units: vec![west, east],
+                    building: EntityKind::Depot,
+                    tile_x: 9,
+                    tile_y: 16,
+                    queued: true,
+                },
+            )],
+        );
+
+        assert!(
+            entities.get(west).unwrap().queued_orders().is_empty(),
+            "closer worker already walking to build should not receive the queued build"
+        );
+        assert_eq!(
+            entities.get(east).unwrap().queued_orders(),
+            &[OrderIntent::build(EntityKind::Depot, 9, 16)],
+            "idle worker should receive the next queued build"
+        );
     }
 
     #[test]
