@@ -26,7 +26,8 @@ Core principles:
 4. [Phase 4 - Client Replay Viewer](phase-4-client-viewer.md)
 5. [Phase 5 - Persistence and Match History Entry Points](phase-5-persistence.md)
 6. [Phase 6 - Scrubbing, Overlays, and Hardening](phase-6-analysis-hardening.md)
-7. [Phase 7 - Resume Play From Replay](phase-7-resume-play.md)
+7. [Phase 7 - Legacy Dev Replay Removal](phase-7-legacy-dev-replay-removal.md)
+8. [Phase 8 - Resume Play From Replay](phase-8-resume-play.md)
 
 ## Non-Goals For The First Pass
 

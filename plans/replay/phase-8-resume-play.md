@@ -1,4 +1,4 @@
-# Phase 7 - Resume Play From Replay
+# Phase 8 - Resume Play From Replay
 
 ## Objective
 
@@ -62,4 +62,3 @@ creation and introduces game-design, fairness, and persistence questions.
 
 Players can stop at a mistake, branch the game from that exact moment, and try a different response.
 This turns replay from review into practice.
-
