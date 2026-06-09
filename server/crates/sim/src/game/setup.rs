@@ -1200,6 +1200,72 @@ mod tests {
         }
     }
 
+    const VEHICLE_SMALL_BLOCK_BASELINES: &[(EntityKind, usize, Option<EntityKind>, u32)] = &[
+        (EntityKind::ScoutCar, 1, Some(EntityKind::AtTeam), 280),
+        (
+            EntityKind::ScoutCar,
+            1,
+            Some(EntityKind::MachineGunner),
+            283,
+        ),
+        (EntityKind::ScoutCar, 1, None, 272),
+        (EntityKind::ScoutCar, 1, Some(EntityKind::Rifleman), 272),
+        (EntityKind::ScoutCar, 1, Some(EntityKind::Worker), 272),
+        (EntityKind::ScoutCar, 3, Some(EntityKind::AtTeam), 334),
+        (
+            EntityKind::ScoutCar,
+            3,
+            Some(EntityKind::MachineGunner),
+            338,
+        ),
+        (EntityKind::ScoutCar, 3, None, 298),
+        (EntityKind::ScoutCar, 3, Some(EntityKind::Rifleman), 298),
+        (EntityKind::ScoutCar, 3, Some(EntityKind::Worker), 298),
+        (EntityKind::ScoutCar, 5, Some(EntityKind::AtTeam), 365),
+        (
+            EntityKind::ScoutCar,
+            5,
+            Some(EntityKind::MachineGunner),
+            395,
+        ),
+        (EntityKind::ScoutCar, 5, None, 329),
+        (EntityKind::ScoutCar, 5, Some(EntityKind::Rifleman), 329),
+        (EntityKind::ScoutCar, 5, Some(EntityKind::Worker), 329),
+        (EntityKind::Tank, 1, Some(EntityKind::AtTeam), 327),
+        (EntityKind::Tank, 1, Some(EntityKind::MachineGunner), 326),
+        (EntityKind::Tank, 1, None, 320),
+        (EntityKind::Tank, 1, Some(EntityKind::Rifleman), 320),
+        (EntityKind::Tank, 1, Some(EntityKind::Worker), 320),
+        (EntityKind::Tank, 3, Some(EntityKind::AtTeam), 452),
+        (EntityKind::Tank, 3, Some(EntityKind::MachineGunner), 452),
+        (EntityKind::Tank, 3, None, 447),
+        (EntityKind::Tank, 3, Some(EntityKind::Rifleman), 447),
+        (EntityKind::Tank, 3, Some(EntityKind::Worker), 447),
+        (EntityKind::Tank, 5, Some(EntityKind::AtTeam), 480),
+        (EntityKind::Tank, 5, Some(EntityKind::MachineGunner), 428),
+        (EntityKind::Tank, 5, None, 500),
+        (EntityKind::Tank, 5, Some(EntityKind::Rifleman), 500),
+        (EntityKind::Tank, 5, Some(EntityKind::Worker), 500),
+    ];
+
+    fn vehicle_small_block_baseline(
+        vehicle: EntityKind,
+        pair_count: usize,
+        blocker: Option<EntityKind>,
+    ) -> u32 {
+        VEHICLE_SMALL_BLOCK_BASELINES
+            .iter()
+            .find_map(
+                |(baseline_vehicle, baseline_count, baseline_blocker, ticks)| {
+                    (*baseline_vehicle == vehicle
+                        && *baseline_count == pair_count
+                        && *baseline_blocker == blocker)
+                        .then_some(*ticks)
+                },
+            )
+            .expect("baseline should exist for each vehicle-small-block scenario")
+    }
+
     fn describe_vehicle_small_block_state(game: &Game, units: &[u32]) -> Vec<String> {
         units
             .iter()
@@ -1523,12 +1589,25 @@ mod tests {
         }
 
         for result in &results {
+            let baseline =
+                vehicle_small_block_baseline(result.vehicle, result.pair_count, result.blocker);
+            let clear_ticks = result.clear_ticks.unwrap_or_else(|| {
+                panic!(
+                    "vehicle-small-block vehicle={} count={} blocker={} timed out; final_state={:?}",
+                    result.vehicle,
+                    result.pair_count,
+                    blocker_label(result.blocker),
+                    result.final_state
+                )
+            });
             assert!(
-                result.clear_ticks.is_some(),
-                "vehicle-small-block vehicle={} count={} blocker={} timed out; final_state={:?}",
+                clear_ticks.saturating_mul(10) <= baseline.saturating_mul(11),
+                "vehicle-small-block vehicle={} count={} blocker={} regressed: {} ticks vs baseline {} (>10% slower); final_state={:?}",
                 result.vehicle,
                 result.pair_count,
                 blocker_label(result.blocker),
+                clear_ticks,
+                baseline,
                 result.final_state
             );
         }
