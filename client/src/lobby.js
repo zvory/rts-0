@@ -338,16 +338,17 @@ export class Lobby {
     const isHost = this.net.playerId != null && this.net.playerId === this._hostId;
     if (this.selMap) {
       // Rebuild the option list only when the available maps have changed.
+      // Each entry is {name, description}; name is the stable key, description is display text.
       const currentOptions = Array.from(this.selMap.options).map((o) => o.value);
       const mapsChanged =
         currentOptions.length !== this._availableMaps.length ||
-        currentOptions.some((v, i) => v !== this._availableMaps[i]);
+        currentOptions.some((v, i) => v !== this._availableMaps[i].name);
       if (mapsChanged) {
         this.selMap.innerHTML = "";
-        for (const name of this._availableMaps) {
+        for (const entry of this._availableMaps) {
           const opt = document.createElement("option");
-          opt.value = name;
-          opt.textContent = name;
+          opt.value = entry.name;
+          opt.textContent = entry.description || entry.name;
           this.selMap.appendChild(opt);
         }
       }
@@ -356,7 +357,9 @@ export class Lobby {
       this.selMap.hidden = !isHost;
     }
     if (this.elMapDisplay) {
-      this.elMapDisplay.textContent = `Map: ${this._selectedMap}`;
+      const entry = this._availableMaps.find((e) => e.name === this._selectedMap);
+      const label = entry ? entry.description || entry.name : this._selectedMap;
+      this.elMapDisplay.textContent = `Map: ${label}`;
       this.elMapDisplay.hidden = isHost;
     }
   }

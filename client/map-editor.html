@@ -393,9 +393,14 @@
       const MAX_SIZE = 160;
       const DEFAULT_MAP_URL = "/maps/default-handcrafted.json";
 
+      const MAP_SCHEMA_VERSION = 1;
+
       const fallbackMap = () =>
         normalizeEditorSites({
+          version: MAP_SCHEMA_VERSION,
           name: "blank-handcrafted",
+          description: "",
+          _design: "",
           terrain: Array.from({ length: 126 }, () => ".".repeat(126)),
           baseSites: [
             { x: 10, y: 10 },
@@ -534,7 +539,10 @@
       }
 
       function normalizeMap(raw) {
+        const version = Number.isInteger(raw.version) ? raw.version : MAP_SCHEMA_VERSION;
         const name = String(raw.name || "handcrafted-map");
+        const description = String(raw.description || "");
+        const design = String(raw._design || "");
         const rows = Array.isArray(raw.terrain) ? raw.terrain.map(String) : [];
         if (!rows.length) throw new Error("terrain must contain rows");
         const size = rows[0].length;
@@ -565,7 +573,7 @@
           }
           return { x, y };
         });
-        const normalized = normalizeEditorSites({ ...raw, name, terrain: rows, baseSites: sites });
+        const normalized = normalizeEditorSites({ ...raw, version, name, description, _design: design, terrain: rows, baseSites: sites });
         for (const [collectionName, collection] of [
           ["mainSites", normalized.mainSites],
           ["naturalSites", normalized.naturalSites],
@@ -912,7 +920,10 @@
           return;
         }
         const payload = {
+          version: MAP_SCHEMA_VERSION,
           name: map.name || "handcrafted-map",
+          description: map.description || "",
+          _design: map._design || "",
           terrain: map.terrain,
           baseSites: map.baseSites,
           mainSites: map.mainSites,
@@ -946,7 +957,10 @@
           return;
         }
         const payload = {
+          version: MAP_SCHEMA_VERSION,
           name,
+          description: map.description || "",
+          _design: map._design || "",
           terrain: map.terrain,
           baseSites: map.baseSites,
           mainSites: map.mainSites,

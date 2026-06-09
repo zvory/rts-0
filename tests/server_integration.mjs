@@ -54,8 +54,8 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   A.send({ t: "join", name: "Alpha", room: ROOM });
   const initialLobby = await A.waitFor((m) => m.t === "lobby", 3000, "A lobby");
   ok(Array.isArray(initialLobby.maps) && initialLobby.maps.length >= 1,
-     `lobby exposes at least one selectable map (${initialLobby.maps?.join(",")})`);
-  ok(initialLobby.maps.includes(initialLobby.map),
+     `lobby exposes at least one selectable map (${initialLobby.maps?.map(m=>m.name).join(",")})`);
+  ok(initialLobby.maps.some(m => m.name === initialLobby.map),
      `selected map is present in selectable maps (${initialLobby.map})`);
 
   const B = new Client("B"); await B.open();

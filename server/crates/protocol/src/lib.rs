@@ -198,6 +198,15 @@ pub enum Command {
 // Server -> Client
 // ---------------------------------------------------------------------------
 
+/// A map entry sent to clients in `ServerMessage::Lobby`. `name` is the stable key used for map
+/// selection; `description` is the text shown in the lobby selector.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AvailableMap {
+    pub name: String,
+    pub description: String,
+}
+
 #[derive(Debug, Clone, Serialize)]
 #[serde(tag = "t", rename_all = "camelCase", rename_all_fields = "camelCase")]
 pub enum ServerMessage {
@@ -212,8 +221,8 @@ pub enum ServerMessage {
         quickstart: bool,
         /// Currently selected map name.
         map: String,
-        /// All available map names (populated from disk at broadcast time).
-        maps: Vec<String>,
+        /// All available maps (populated from disk at broadcast time).
+        maps: Vec<AvailableMap>,
     },
     /// Match start (flattened: carries StartPayload's fields alongside `"t":"start"`).
     Start(StartPayload),
