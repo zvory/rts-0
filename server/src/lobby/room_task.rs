@@ -204,7 +204,6 @@ impl ReplaySession {
     const MAX_SPEED: f32 = 8.0;
     const MAX_DURATION_TICKS: u32 = 30 * 60 * 60;
     const MAX_COMMAND_LOG_ENTRIES: usize = 200_000;
-    const MAX_SEEK_REBUILD_TICKS: u32 = 30 * 60 * 10;
     const SEEK_COOLDOWN: Duration = Duration::from_millis(500);
 
     #[allow(dead_code)]
@@ -401,12 +400,6 @@ impl ReplaySession {
             .current_tick()
             .saturating_sub(ticks_back)
             .min(self.duration_ticks);
-        if target_tick > Self::MAX_SEEK_REBUILD_TICKS {
-            return Err(format!(
-                "Replay seek target tick {target_tick} exceeds the current safe rebuild limit of {} ticks.",
-                Self::MAX_SEEK_REBUILD_TICKS
-            ));
-        }
         let from_tick = self.current_tick();
         let seek_start = StdInstant::now();
         self.rebuild_to(target_tick)?;
