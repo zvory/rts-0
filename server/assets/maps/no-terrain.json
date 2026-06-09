@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "name": "no-terrain",
+  "name": "No Terrain",
   "description": "name",
   "_design": "All tiles are grass. Same 4-pair base layout as default-handcrafted. No terrain features \u2014 all unit interaction is unimpeded.",
   "baseSites": [

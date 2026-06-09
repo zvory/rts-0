@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "name": "default-handcrafted",
+  "name": "Default",
   "description": "4-player symmetrical map with a central lake. Standard competitive layout.",
   "_design": "4 base pairs. Each base has a main entrance and two smaller backdoor entrances. Expansions are near the middle of the map and open to attack.",
   "terrain": [

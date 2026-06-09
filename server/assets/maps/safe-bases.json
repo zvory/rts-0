@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "name": "safe-bases",
+  "name": "Safer Expansions",
   "description": "inbase naturals.",
   "_design": "Standard map, except natural expansions are placed near mains.",
   "terrain": [
