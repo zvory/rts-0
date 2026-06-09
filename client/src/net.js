@@ -166,6 +166,11 @@ export class Net {
     this._send(msg.giveUp());
   }
 
+  /** Leave replay playback and ask the room to return to lobby. */
+  returnToLobby() {
+    this._send(msg.returnToLobby());
+  }
+
   /**
    * Send a latency probe stamped with the current high-resolution time. The
    * matching pong is correlated by its echoed `ts` to compute `latency`.

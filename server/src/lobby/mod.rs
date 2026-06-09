@@ -109,6 +109,8 @@ pub enum RoomEvent {
     Command { player_id: u32, cmd: SimCommand },
     /// A connected player intentionally gave up the active match.
     GiveUp { player_id: u32 },
+    /// A replay viewer asked to return the room to the lobby for a rematch.
+    ReturnToLobby { player_id: u32 },
     /// Set replay playback speed multiplier; ignored outside replay/dev watch rooms.
     SetReplaySpeed { player_id: u32, speed: f32 },
     /// Rewind a replay by `ticks_back` simulation ticks (replay rooms only; clamped to start).

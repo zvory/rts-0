@@ -92,6 +92,10 @@ impl ConnectionSink {
     pub(crate) fn has_pending_snapshot(&self) -> bool {
         self.snapshots.has_pending()
     }
+
+    pub(crate) fn clear_pending_snapshot(&self) {
+        self.snapshots.clear();
+    }
 }
 
 impl LatestSnapshotSlot {
@@ -108,6 +112,10 @@ impl LatestSnapshotSlot {
 
     fn has_pending(&self) -> bool {
         self.lock_pending().is_some()
+    }
+
+    fn clear(&self) {
+        self.lock_pending().take();
     }
 
     pub async fn notified(&self) {

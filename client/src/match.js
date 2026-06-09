@@ -202,7 +202,7 @@ export class Match {
     this.requestAutomaticPointerLock({ requireGesture: false });
 
     // Show speed controls for replay and scenario dev-watch rooms.
-    const isReplay = this.devWatch?.kind === "replay";
+    const isReplay = this.devWatch?.kind === "replay" || !!payload?.replay;
     const isScenario = this.devWatch?.kind === "scenario";
     if ((isReplay || isScenario) && dom.replaySpeed) {
       dom.replaySpeed.hidden = false;

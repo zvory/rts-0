@@ -1001,6 +1001,7 @@ function fakeAudioContext() {
   assertHasMethod(net, "ready", "Net");
   assertHasMethod(net, "start", "Net");
   assertHasMethod(net, "giveUp", "Net");
+  assertHasMethod(net, "returnToLobby", "Net");
   assertHasMethod(net, "command", "Net");
   assertHasMethod(net, "ping", "Net");
   assertHasGetter(net, "playerId", "Net");
@@ -1010,6 +1011,7 @@ function fakeAudioContext() {
   assertHasMethod(net, "setQuickstart", "Net");
   assertHasMethod(net, "setReplaySpeed", "Net");
   assertHasMethod(net, "setReplayVision", "Net");
+  assert(msg.returnToLobby().t === "returnToLobby", "return-to-lobby builder tag");
   assert(msg.replayVisionAll().t === "setReplayVision", "replay all-vision builder tag");
   assert(msg.replayVisionAll().vision.mode === "all", "replay all-vision builder payload");
   assert(

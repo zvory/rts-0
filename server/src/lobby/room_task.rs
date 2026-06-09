@@ -519,6 +519,7 @@ impl RoomTask {
             } => self.on_set_spectator(player_id, spectator),
             RoomEvent::Command { player_id, cmd } => self.on_command(player_id, cmd),
             RoomEvent::GiveUp { player_id } => self.on_give_up(player_id),
+            RoomEvent::ReturnToLobby { player_id } => self.on_return_to_lobby(player_id),
             RoomEvent::SetReplaySpeed { player_id, speed } => {
                 self.on_set_replay_speed(player_id, speed)
             }
@@ -896,7 +897,7 @@ impl RoomTask {
         let scores = game.scores();
 
         if self.match_player_count >= 2 && alive.len() <= 1 {
-            self.end_match(alive.first().copied(), scores);
+            self.end_match(alive.first().copied(), scores, Some(&game));
             return;
         }
 
@@ -1456,7 +1457,7 @@ impl RoomTask {
                 let reason = panic_reason(&payload);
                 dump_crash_replay(&self.room, &game, &reason);
                 self.finish_perf_tick(perf.as_ref(), &game, scheduler_lag, tick_start);
-                self.end_match(None, game.scores());
+                self.end_match(None, game.scores(), None);
                 return;
             }
         };
@@ -1542,8 +1543,8 @@ impl RoomTask {
                 perf.record_phase("outcome_checks", outcome_start.elapsed());
             }
             self.finish_perf_tick(perf.as_ref(), &game, scheduler_lag, tick_start);
-            self.end_match(alive.first().copied(), game.scores());
-            // end_match leaves us in the Lobby phase; do not restore the game.
+            self.end_match(alive.first().copied(), game.scores(), Some(&game));
+            // end_match drops the live game and moves to replay or lobby; do not restore it.
             return;
         }
         if self.match_player_count >= 2 {
@@ -1976,9 +1977,17 @@ impl RoomTask {
         }
     }
 
-    /// Resolve a finished match: tell everyone who won and return to the lobby for a rematch.
-    fn end_match(&mut self, winner_id: Option<u32>, scores: Vec<PlayerScore>) {
+    /// Resolve a finished match: tell everyone who won and start post-match replay playback.
+    fn end_match(&mut self, winner_id: Option<u32>, scores: Vec<PlayerScore>, game: Option<&Game>) {
         info!(room = %self.room, ?winner_id, "match over");
+        let replay_artifact = game.filter(|_| !self.is_dev_watch()).map(|game| {
+            ReplayArtifactV1::capture_from_game(
+                game,
+                option_env!("GIT_SHA").unwrap_or("unknown"),
+                winner_id,
+                scores.clone(),
+            )
+        });
 
         // Persist match history only for real public matches. Human-vs-AI, AI-only,
         // 1-player sandboxes, dev/scenario/replay rooms, and automated test rooms are excluded.
@@ -2042,8 +2051,50 @@ impl RoomTask {
             self.outcome_sent.insert(*id);
         }
 
-        // Reset for the next match: drop the game, clear ready flags, and re-advertise the lobby.
         self.mark_match_finished_for_drain();
+        if let Some(artifact) = replay_artifact {
+            match ReplaySession::new(artifact) {
+                Ok(session) => {
+                    self.transition_to_replay_viewer(session);
+                    return;
+                }
+                Err(err) => {
+                    warn!(room = %self.room, error = %err, "post-match replay setup failed");
+                    self.broadcast(&ServerMessage::Error {
+                        msg: "Post-match replay could not be started.".to_string(),
+                    });
+                }
+            }
+        }
+        self.return_to_lobby();
+    }
+
+    fn transition_to_replay_viewer(&mut self, session: ReplaySession) {
+        self.phase = Phase::ReplayViewer(Box::new(session));
+        self.match_player_count = 0;
+        self.match_human_count = 0;
+        self.outcome_sent.clear();
+        for player in self.players.values_mut() {
+            player.ready = false;
+            player.msg_tx.clear_pending_snapshot();
+        }
+        let recipients = self.order.clone();
+        for id in recipients {
+            self.send_replay_start_to(id);
+            self.send_replay_state_to(id);
+        }
+    }
+
+    fn on_return_to_lobby(&mut self, player_id: u32) {
+        if !self.players.contains_key(&player_id) || !matches!(self.phase, Phase::ReplayViewer(_)) {
+            return;
+        }
+        self.return_to_lobby();
+    }
+
+    fn return_to_lobby(&mut self) {
+        // Reset for the next match: drop the game/replay, clear ready flags, and re-advertise
+        // the lobby. AI slots, map selection, and quickstart persist for rematches.
         self.phase = Phase::Lobby;
         self.match_player_count = 0;
         self.match_human_count = 0;
@@ -2186,6 +2237,40 @@ mod tests {
         }
         let artifact = ReplayArtifactV1::capture_from_game(&game, "test-sha", None, game.scores());
         (game, artifact)
+    }
+
+    fn add_test_room_player(task: &mut RoomTask, id: u32, ready: bool) -> ConnectionWriter {
+        let (msg_tx, writer) = ConnectionSink::new();
+        task.order.push(id);
+        task.players.insert(
+            id,
+            RoomPlayer {
+                name: format!("Player {id}"),
+                color: PLAYER_PALETTE[(id as usize - 1) % PLAYER_PALETTE.len()].to_string(),
+                ready,
+                spectator: false,
+                msg_tx,
+                head_of_line_count: 0,
+            },
+        );
+        writer
+    }
+
+    fn replay_transition_test_snapshot(tick: u32) -> Snapshot {
+        Snapshot {
+            tick,
+            steel: 75,
+            oil: 0,
+            supply_used: 1,
+            supply_cap: 10,
+            entities: Vec::new(),
+            resource_deltas: Vec::new(),
+            smokes: Vec::new(),
+            visible_tiles: Vec::new(),
+            events: Vec::new(),
+            player_resources: Vec::new(),
+            net_status: SnapshotNetStatus::default(),
+        }
     }
 
     #[test]
@@ -2363,5 +2448,100 @@ mod tests {
             panic!("replay phase should remain active");
         };
         assert!(replay.game.command_log().is_empty());
+    }
+
+    #[test]
+    fn end_match_transitions_all_connected_players_to_tick_zero_replay() {
+        let players = replay_test_players(2);
+        let (game, _artifact) = replay_test_artifact(&players, 3);
+        let mut task = RoomTask::new(
+            "post-match-replay-test".to_string(),
+            RoomMode::Normal,
+            None,
+            false,
+            DrainHandle::default(),
+        );
+        let mut writer_a = add_test_room_player(&mut task, players[0].id, true);
+        let mut writer_b = add_test_room_player(&mut task, players[1].id, true);
+        task.match_player_count = 2;
+        task.match_human_count = 2;
+        task.outcome_sent.insert(players[1].id);
+
+        task.players
+            .get(&players[0].id)
+            .unwrap()
+            .msg_tx
+            .try_send_snapshot(replay_transition_test_snapshot(99));
+        task.players
+            .get(&players[1].id)
+            .unwrap()
+            .msg_tx
+            .try_send_snapshot(replay_transition_test_snapshot(100));
+
+        task.end_match(Some(players[0].id), game.scores(), Some(&game));
+
+        let Phase::ReplayViewer(session) = &task.phase else {
+            panic!("match should transition into replay viewer");
+        };
+        assert_eq!(session.current_tick(), 0);
+        assert_eq!(session.speed, ReplaySession::DEFAULT_SPEED);
+        assert_eq!(session.vision_player_ids_for(players[0].id), vec![1, 2]);
+        assert!(writer_a.snapshots.take().is_none());
+        assert!(writer_b.snapshots.take().is_none());
+
+        let a_messages: Vec<_> =
+            std::iter::from_fn(|| writer_a.reliable_rx.try_recv().ok()).collect();
+        let b_messages: Vec<_> =
+            std::iter::from_fn(|| writer_b.reliable_rx.try_recv().ok()).collect();
+        assert!(a_messages
+            .iter()
+            .any(|msg| matches!(msg, ServerMessage::GameOver { .. })));
+        assert!(a_messages.iter().any(|msg| {
+            matches!(msg, ServerMessage::Start(payload) if payload.replay.is_some() && payload.tick == 0)
+        }));
+        assert!(a_messages.iter().any(
+            |msg| matches!(msg, ServerMessage::ReplayState(state) if state.current_tick == 0)
+        ));
+        assert!(!b_messages
+            .iter()
+            .any(|msg| matches!(msg, ServerMessage::GameOver { .. })));
+        assert!(b_messages.iter().any(|msg| {
+            matches!(msg, ServerMessage::Start(payload) if payload.replay.is_some() && payload.tick == 0)
+        }));
+        assert!(b_messages.iter().any(
+            |msg| matches!(msg, ServerMessage::ReplayState(state) if state.current_tick == 0)
+        ));
+    }
+
+    #[test]
+    fn replay_viewer_can_return_to_clean_lobby_for_rematch() {
+        let players = replay_test_players(2);
+        let (game, _artifact) = replay_test_artifact(&players, 1);
+        let mut task = RoomTask::new(
+            "post-match-lobby-test".to_string(),
+            RoomMode::Normal,
+            None,
+            false,
+            DrainHandle::default(),
+        );
+        let mut writer_a = add_test_room_player(&mut task, players[0].id, true);
+        let _writer_b = add_test_room_player(&mut task, players[1].id, true);
+        task.match_player_count = 2;
+        task.match_human_count = 2;
+
+        task.end_match(Some(players[0].id), game.scores(), Some(&game));
+        assert!(matches!(task.phase, Phase::ReplayViewer(_)));
+
+        task.on_return_to_lobby(players[0].id);
+
+        assert!(matches!(task.phase, Phase::Lobby));
+        assert_eq!(task.match_player_count, 0);
+        assert_eq!(task.match_human_count, 0);
+        assert!(task.players.values().all(|player| !player.ready));
+        let messages: Vec<_> =
+            std::iter::from_fn(|| writer_a.reliable_rx.try_recv().ok()).collect();
+        assert!(messages
+            .iter()
+            .any(|msg| matches!(msg, ServerMessage::Lobby { can_start, .. } if !can_start)));
     }
 }

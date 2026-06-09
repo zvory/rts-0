@@ -157,6 +157,26 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   ok(aScore && aScore.unitScore >= 200 && aScore.structureScore >= 200, `SCORE: A has unit/structure value (${aScore?.unitScore}/${aScore?.structureScore})`);
   ok(bScore && bScore.unitsLost >= 4 && bScore.buildingsLost >= 1, `SCORE: surrendered B losses recorded (${bScore?.unitsLost}/${bScore?.buildingsLost})`);
 
+  const replayStartA = await A.waitFor((m) => m.t === "start" && m.replay, 4000, "A replay start");
+  const replayStartB = await B.waitFor((m) => m.t === "start" && m.replay, 4000, "B replay start");
+  const replayStartC = await C.waitFor((m) => m.t === "start" && m.replay, 4000, "C replay start");
+  ok(replayStartA.tick === 0 && replayStartB.tick === 0 && replayStartC.tick === 0,
+     `REPLAY: post-match replay starts at tick 0 (${replayStartA.tick}/${replayStartB.tick}/${replayStartC.tick})`);
+  ok(replayStartA.spectator === true && replayStartB.spectator === true && replayStartC.spectator === true,
+     "REPLAY: connected humans become replay spectators");
+  ok(replayStartA.replay.durationTicks > 0,
+     `REPLAY: artifact metadata carries duration (${replayStartA.replay.durationTicks})`);
+  const replayStateA = await A.waitFor((m) => m.t === "replayState" && m.currentTick === 0, 4000, "A replay state");
+  const replayStateB = await B.waitFor((m) => m.t === "replayState" && m.currentTick === 0, 4000, "B replay state");
+  ok(replayStateA.speed === 2 && replayStateB.speed === 2,
+     `REPLAY: playback defaults to 2x (${replayStateA.speed}/${replayStateB.speed})`);
+
+  A.send({ t: "returnToLobby" });
+  const lobbyAfterReplay = await A.waitFor((m) => m.t === "lobby" && m.players.length === 3, 4000, "lobby after replay");
+  ok(lobbyAfterReplay.players.every((p) => p.isSpectator || !p.ready),
+     "REMATCH: returning from replay clears active players' ready flags");
+  ok(lobbyAfterReplay.canStart === false, "REMATCH: lobby cannot immediately restart until players ready again");
+
   A.ws.close();
   B.ws.close();
   C.ws.close();

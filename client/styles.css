@@ -1448,6 +1448,7 @@ input[type="text"]:focus {
   backdrop-filter: none;
 }
 .game-over-box {
+  position: relative;
   text-align: center;
   background: rgba(39, 37, 31, 0.98);
   border: 1px solid var(--panel-edge);
@@ -1457,6 +1458,26 @@ input[type="text"]:focus {
   max-height: calc(100vh - 48px);
   overflow: auto;
   padding: 32px 40px;
+}
+.game-over-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 32px;
+  height: 32px;
+  border: 1px solid rgba(91, 83, 65, 0.8);
+  border-radius: var(--radius-sm);
+  background: rgba(17, 17, 15, 0.72);
+  color: var(--ink-dim);
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+}
+.game-over-close:hover,
+.game-over-close:focus-visible {
+  border-color: var(--accent);
+  color: var(--ink);
+  outline: none;
 }
 #game-over-text {
   margin: 0 0 22px;

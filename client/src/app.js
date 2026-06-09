@@ -71,8 +71,11 @@ export class App {
     this.onError = this.onError.bind(this);
     this.onGameOver = this.onGameOver.bind(this);
     this.onBackToLobby = this.onBackToLobby.bind(this);
+    this.onCloseScorePanel = this.onCloseScorePanel.bind(this);
+    this.onGameOverOverlayClick = this.onGameOverOverlayClick.bind(this);
     this.onOpen = this.onOpen.bind(this);
     this.onClose = this.onClose.bind(this);
+    this.inReplayPlayback = false;
   }
 
   /** Connect, wire global server messages, and show the lobby. */
@@ -83,6 +86,8 @@ export class App {
     this.net.on("open", this.onOpen);
     this.net.on("close", this.onClose);
     dom.gameOverButton.addEventListener("click", this.onBackToLobby);
+    dom.gameOverClose?.addEventListener("click", this.onCloseScorePanel);
+    dom.gameOver.addEventListener("click", this.onGameOverOverlayClick);
 
     void this.loadVersion();
     this.lobby.show();
@@ -167,14 +172,20 @@ export class App {
       players: payload?.players?.length,
       spectator: payload?.spectator,
     });
+    const startsReplay = !!payload?.replay;
+    const preserveScorePanel = startsReplay && !dom.gameOver.hidden;
+
     // If a previous match somehow lingers, tear it down first.
     if (this.match) this.match.destroy();
+    this.inReplayPlayback = startsReplay;
 
     dom.lobbyScreen.hidden = true;
     if (dom.devLinks) dom.devLinks.hidden = true;
     dom.gameScreen.hidden = false;
-    dom.gameOver.hidden = true;
-    this.clearScoreboard();
+    if (!preserveScorePanel) {
+      dom.gameOver.hidden = true;
+      this.clearScoreboard();
+    }
 
     this.match = new Match(
       this.net,
@@ -284,10 +295,12 @@ export class App {
 
   /** "Back to lobby" button: tear down the match and restore the lobby. */
   onBackToLobby() {
+    if (this.inReplayPlayback) this.net.returnToLobby();
     if (this.match) {
       this.match.destroy();
       this.match = null;
     }
+    this.inReplayPlayback = false;
     this.statusBadge.clearMatchMetrics();
     dom.gameOver.hidden = true;
     this.clearScoreboard();
@@ -298,6 +311,14 @@ export class App {
     // A new match row may have just been written server-side; pull the freshest list.
     if (this.matchHistory) this.matchHistory.refresh();
     else this._mountMatchHistory();
+  }
+
+  onCloseScorePanel() {
+    dom.gameOver.hidden = true;
+  }
+
+  onGameOverOverlayClick(ev) {
+    if (ev.target === dom.gameOver) this.onCloseScorePanel();
   }
 
   _mountMatchHistory() {
