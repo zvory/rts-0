@@ -165,6 +165,7 @@ export class Match {
       this.stopInactiveMachineGunSounds();
       this.handleSnapshotEvents(m.events || []);
     };
+    this.onReplayState = (m) => this.applyReplayState(m);
     this.onResize = this.handleResize.bind(this);
     this.onMenuKeyDown = this.handleMenuKeyDown.bind(this);
     this.onWindowFocus = this.handleWindowFocus.bind(this);
@@ -181,6 +182,7 @@ export class Match {
     this.input.onPointerLockChange = this.onPointerLockChange;
     this.input.onPointerLockError = this.onPointerLockError;
     this.net.on(S.SNAPSHOT, this.onSnapshot);
+    this.net.on(S.REPLAY_STATE, this.onReplayState);
     window.addEventListener("resize", this.onResize);
     window.addEventListener("focus", this.onWindowFocus);
     window.addEventListener("keydown", this.onMenuKeyDown, true);
@@ -216,6 +218,7 @@ export class Match {
           if (!isReplay) return;
           const ticksBack = parseInt(btn.dataset.seekBack, 10);
           if (!isFinite(ticksBack) || ticksBack <= 0) return;
+          this.setReplayConcluded(false);
           this.net.seekReplay(ticksBack);
           return;
         }
@@ -806,6 +809,21 @@ export class Match {
     }
   }
 
+  applyReplayState(state) {
+    const ended =
+      state?.ended === true ||
+      (Number.isFinite(state?.currentTick) &&
+        Number.isFinite(state?.durationTicks) &&
+        state.durationTicks > 0 &&
+        state.currentTick >= state.durationTicks);
+    this.setReplayConcluded(ended);
+  }
+
+  setReplayConcluded(concluded) {
+    const status = dom.replaySpeed?.querySelector("#replay-concluded");
+    if (status) status.hidden = !concluded;
+  }
+
   /**
    * Fully dispose of the match: stop the loop, drop listeners, and destroy any
    * module that exposes a destroy()/teardown() hook. After this the App can
@@ -817,6 +835,7 @@ export class Match {
     this.stopAllMachineGunSounds();
     this.pointerLockRetryToken += 1;
     this.net.off(S.SNAPSHOT, this.onSnapshot);
+    this.net.off(S.REPLAY_STATE, this.onReplayState);
     window.removeEventListener("resize", this.onResize);
     window.removeEventListener("focus", this.onWindowFocus);
     window.removeEventListener("keydown", this.onMenuKeyDown, true);
@@ -829,9 +848,12 @@ export class Match {
     dom.giveUpOpen?.removeEventListener("click", this.onGiveUpOpen);
     dom.giveUpCancel?.removeEventListener("click", this.onGiveUpCancel);
     dom.giveUpConfirmButton?.removeEventListener("click", this.onGiveUpConfirm);
-    if (dom.replaySpeed && this.replaySpeedHandler) {
-      dom.replaySpeed.removeEventListener("click", this.replaySpeedHandler);
+    if (dom.replaySpeed) {
+      if (this.replaySpeedHandler) {
+        dom.replaySpeed.removeEventListener("click", this.replaySpeedHandler);
+      }
       dom.replaySpeed.hidden = true;
+      this.setReplayConcluded(false);
       for (const btn of dom.replaySpeed.querySelectorAll(".seek-btn")) btn.hidden = false;
     }
     if (dom.giveUpOpen) dom.giveUpOpen.hidden = false;
