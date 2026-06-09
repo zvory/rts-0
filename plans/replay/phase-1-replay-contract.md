@@ -49,7 +49,8 @@ the replay with a clear incompatibility reason.
 - Unit test validation rejects mismatched build SHA, missing map, wrong map schema, and hash
   mismatch.
 - Unit test replay vision requests reject unknown player ids and empty invalid subsets.
-- Unit test legacy dev replay loading remains unchanged.
+- Later phase 7 coverage verifies legacy dev replay payloads are rejected after unified replay
+  artifacts replace the dev-only loader.
 
 ## Player-Facing Outcome
 

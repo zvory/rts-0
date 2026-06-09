@@ -42,13 +42,13 @@ coverage. These scripts are kept isolated from the canonical profile list.
 
 **Artifacts.** On failure, the test writes `target/selfplay-failures/<test>-<pid>-<time>/`
 with:
-- `replay.json`: start payload, player specs, per-player starting steel/oil (so debug mode
-  matches replay with the same economy they were recorded with),
-  script decision log, authoritative tick-stamped command log, event log, milestone state,
+- `replay.json`: a normal `ReplayArtifactV1` command-log replay artifact, loadable through the
+  same replay runtime as post-match and match-history replays.
+- `diagnostic.json`: self-play-only start payload, script decision log, event log, milestone state,
   and sampled snapshot summaries.
 - `summary.log`: short human-readable failure summary and missing milestones.
 
-The artifact is meant to be enough to reproduce or inspect a failing run without manually
+The replay artifact is meant to be enough to reproduce or inspect a failing run without manually
 playtesting first. By default successful runs do not write artifacts. For manual inspection,
 setting `RTS_SELFPLAY_SAVE_REPLAY=1` writes a successful run to
 `target/selfplay-artifacts/<test>-<pid>-<time>/`; setting `RTS_SELFPLAY_SAVE_REPLAY=<name>` uses

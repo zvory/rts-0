@@ -21,8 +21,7 @@ mod tests;
 pub use live::LiveSelfPlay;
 #[allow(unused_imports)]
 pub use replay::{
-    assert_replay_matches_live, is_safe_artifact_name, ReplayArtifact, ReplayDriver,
-    SelfPlayFailure,
+    assert_replay_matches_live, is_safe_artifact_name, server_build_sha, SelfPlayFailure,
 };
 #[allow(unused_imports)]
 pub use replay::{

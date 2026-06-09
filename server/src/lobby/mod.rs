@@ -36,7 +36,7 @@ use crate::protocol::{
     Event, LobbyPlayer, PlayerScore, ReplayVisionRequest, ResourceDelta, ServerMessage, Snapshot,
     StartPayload,
 };
-use rts_ai::selfplay::{is_safe_artifact_name, LiveSelfPlay, ReplayArtifact, ReplayDriver};
+use rts_ai::selfplay::{is_safe_artifact_name, LiveSelfPlay};
 
 mod connection;
 mod crash_replay;

@@ -11,9 +11,7 @@ use super::milestones::{
 };
 use super::pending_build::{PendingBuildTracker, PENDING_BUILD_STALE_TICKS};
 use super::player_view::{kind_of, PlayerView};
-use super::replay::{
-    assert_replay_matches_live, is_safe_artifact_name, ReplayArtifact, SelfPlayFailure,
-};
+use super::replay::{assert_replay_matches_live, is_safe_artifact_name, SelfPlayFailure};
 use super::scripts::{MineOnlyScript, ProfileBackedScript, ScriptedPlayer, WorkerRushScript};
 use super::validation::validate_snapshot;
 use super::{
@@ -26,7 +24,7 @@ use crate::ai_core::profiles::{
 use crate::config;
 use rts_sim::game::command::SimCommand as Command;
 use rts_sim::game::entity::EntityKind;
-use rts_sim::game::replay::{CommandLogEntry, EventLogEntry};
+use rts_sim::game::replay::{CommandLogEntry, EventLogEntry, ReplayArtifactV1};
 use rts_sim::game::{Game, PlayerInit};
 use rts_sim::protocol::{
     kinds, states, terrain, Command as WireCommand, EntityView, Event, MapInfo, PlayerStart,
@@ -291,8 +289,7 @@ impl SelfPlayRunner {
             std::process::id(),
             now_ms
         ));
-        let artifact = self.artifact_payload(Some(failure.reason.clone()));
-        self.write_artifact_dir(&dir, &artifact)?;
+        self.write_artifact_dir(&dir, Some(failure.reason.clone()))?;
         Ok(dir)
     }
 
@@ -301,13 +298,12 @@ impl SelfPlayRunner {
             return Ok(None);
         };
         let dir = self.artifact_root(SELFPLAY_ARTIFACT_DIR).join(name);
-        let artifact = self.artifact_payload(None);
-        self.write_artifact_dir(&dir, &artifact)?;
+        self.write_artifact_dir(&dir, None)?;
         Ok(Some(dir))
     }
 
-    fn artifact_payload(&self, failure: Option<String>) -> SelfPlayArtifact {
-        SelfPlayArtifact {
+    fn diagnostic_payload(&self, failure: Option<String>) -> SelfPlayDiagnostic {
+        SelfPlayDiagnostic {
             test_name: self.test_name,
             failure,
             start: self.start.clone(),
@@ -328,11 +324,20 @@ impl SelfPlayRunner {
             .join(dir_name)
     }
 
-    fn write_artifact_dir(&self, dir: &Path, artifact: &SelfPlayArtifact) -> Result<(), String> {
+    fn write_artifact_dir(&self, dir: &Path, failure: Option<String>) -> Result<(), String> {
         fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+        let artifact = ReplayArtifactV1::capture_from_game(
+            &self.game,
+            super::server_build_sha(),
+            None,
+            self.game.scores(),
+        );
         let json = serde_json::to_vec_pretty(&artifact).map_err(|e| e.to_string())?;
         fs::write(dir.join("replay.json"), json).map_err(|e| e.to_string())?;
-        fs::write(dir.join("summary.log"), artifact.summary_log()).map_err(|e| e.to_string())?;
+        let diagnostic = self.diagnostic_payload(failure);
+        fs::write(dir.join("summary.log"), diagnostic.summary_log()).map_err(|e| e.to_string())?;
+        let json = serde_json::to_vec_pretty(&diagnostic).map_err(|e| e.to_string())?;
+        fs::write(dir.join("diagnostic.json"), json).map_err(|e| e.to_string())?;
         Ok(())
     }
 }
@@ -405,7 +410,7 @@ struct EventRecord {
 }
 
 #[derive(Serialize)]
-struct SelfPlayArtifact {
+struct SelfPlayDiagnostic {
     test_name: &'static str,
     failure: Option<String>,
     start: StartPayload,
@@ -419,7 +424,7 @@ struct SelfPlayArtifact {
     seed: u32,
 }
 
-impl SelfPlayArtifact {
+impl SelfPlayDiagnostic {
     fn summary_log(&self) -> String {
         let mut out = String::new();
         out.push_str(&format!("test: {}\n", self.test_name));
@@ -881,13 +886,8 @@ fn profile_matchup_rifle_flood_full_saturation_vs_tech_to_tanks_20k_result() {
         );
     });
 
-    let artifact = ReplayArtifact {
-        replay_commands: game.command_log().to_vec(),
-        players: players.clone(),
-        seed: game.seed(),
-        starting_steel: game.starting_steel(),
-        starting_oil: game.starting_oil(),
-    };
+    let artifact =
+        ReplayArtifactV1::capture_from_game(&game, super::server_build_sha(), None, game.scores());
     let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("target")
         .join("selfplay-artifacts")
@@ -1430,13 +1430,12 @@ fn real_ai_vs_real_ai() {
             .join("selfplay-artifacts")
             .join(&artifact_name);
         if std::fs::create_dir_all(&dir).is_ok() {
-            let artifact = ReplayArtifact {
-                replay_commands: game.command_log().to_vec(),
-                players: players.clone(),
-                seed: game.seed(),
-                starting_steel: game.starting_steel(),
-                starting_oil: game.starting_oil(),
-            };
+            let artifact = ReplayArtifactV1::capture_from_game(
+                game,
+                super::server_build_sha(),
+                None,
+                game.scores(),
+            );
             if let Ok(json) = serde_json::to_vec_pretty(&artifact) {
                 let _ = std::fs::write(dir.join("replay.json"), json);
             }
@@ -1628,13 +1627,8 @@ fn real_ai_vs_real_ai() {
     }
 
     // Write a replay artifact so the dev self-play viewer can load it.
-    let artifact = ReplayArtifact {
-        replay_commands: game.command_log().to_vec(),
-        players: players.clone(),
-        seed: game.seed(),
-        starting_steel: game.starting_steel(),
-        starting_oil: game.starting_oil(),
-    };
+    let artifact =
+        ReplayArtifactV1::capture_from_game(&game, super::server_build_sha(), None, game.scores());
     let ts = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default()

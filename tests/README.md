@@ -67,8 +67,8 @@ The tests create scripted API clients that drive `Game` through `enqueue`/`tick`
 exercising gathering, oil, Depot/Barracks/Factory construction, Rifleman/Tank training, rush
 pressure, and combat. Successful runs replay the authoritative tick-stamped command log through a
 fresh game and compare the replayed event stream and final snapshots against the live run. On
-failure it writes replay artifacts under the Cargo target dir's `selfplay-failures/` directory. To
-save a successful run too, set
+failure it writes normal `ReplayArtifactV1` replay artifacts under the Cargo target dir's
+`selfplay-failures/` directory, plus self-play diagnostics beside them. To save a successful run too, set
 `RTS_SELFPLAY_SAVE_REPLAY` to either `1` for an auto-generated artifact name or to an explicit safe
 artifact name; successful runs are then written under the target dir's
 `selfplay-artifacts/<name>/`.

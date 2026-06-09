@@ -164,7 +164,7 @@ fn joining_after_earlier_player_leaves_reuses_open_color() {
 }
 
 #[test]
-fn replay_rooms_default_to_1_5x_speed() {
+fn saved_selfplay_replay_rooms_use_normal_tick_until_replay_viewer_starts() {
     let normal = RoomTask::new("r".to_string(), RoomMode::Normal, None, false, test_drain());
     let live = RoomTask::new(
         "r".to_string(),
@@ -184,12 +184,11 @@ fn replay_rooms_default_to_1_5x_speed() {
     );
     assert_eq!(normal.current_tick_interval(), Duration::from_millis(33));
     assert_eq!(live.current_tick_interval(), Duration::from_millis(33));
-    // 33ms / 1.5 = 22ms
-    assert_eq!(replay.current_tick_interval(), Duration::from_millis(22));
+    assert_eq!(replay.current_tick_interval(), Duration::from_millis(33));
 }
 
 #[test]
-fn replay_speed_clamped_and_applied() {
+fn saved_selfplay_replay_speed_is_ignored_until_replay_viewer_starts() {
     let mut task = RoomTask::new(
         "r".to_string(),
         RoomMode::DevSelfPlay(DevSelfPlayConfig::Replay {
@@ -200,9 +199,7 @@ fn replay_speed_clamped_and_applied() {
         test_drain(),
     );
     task.on_set_replay_speed(1, 2.0);
-    // 33ms / 2.0 = 16.5ms → rounds to 16ms via div_f32
-    assert!(task.current_tick_interval() < Duration::from_millis(17));
-    assert!(task.current_tick_interval() > Duration::from_millis(15));
+    assert_eq!(task.current_tick_interval(), Duration::from_millis(33));
 }
 
 #[test]
