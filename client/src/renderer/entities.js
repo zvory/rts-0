@@ -83,6 +83,24 @@ export function _shadow(g, cx, cy, radius) {
   g.endFill();
 }
 
+export function _vehicleShadow(g, cx, cy, body, facing) {
+  const rx = body.halfLen + body.clearance + 3;
+  const ry = body.halfWidth + body.clearance + 3;
+  const drop = ry * 0.35;
+  const c = Math.cos(facing);
+  const s = Math.sin(facing);
+  const points = [];
+  for (let i = 0; i < 24; i += 1) {
+    const a = (Math.PI * 2 * i) / 24;
+    const x = Math.cos(a) * rx;
+    const y = Math.sin(a) * ry;
+    points.push(cx + x * c - y * s, cy + drop + x * s + y * c);
+  }
+  g.beginFill(COLORS.shadow, 0.28);
+  g.drawPolygon(points);
+  g.endFill();
+}
+
 export function _drawSelectionAndHp(e, selection, state) {
   const selected = selection.has(e.id);
   const damaged = e.maxHp && e.hp < e.maxHp;
