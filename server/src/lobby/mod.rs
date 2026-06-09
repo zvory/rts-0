@@ -27,6 +27,7 @@ use tokio::time::{interval, MissedTickBehavior};
 use tracing::{debug, error, info, warn};
 
 use crate::config;
+use crate::db::Db;
 use crate::game::command::SimCommand;
 use crate::game::{Game, PlayerInit};
 use crate::protocol::{
@@ -125,13 +126,22 @@ pub struct RoomHandle {
 #[derive(Clone)]
 pub struct Lobby {
     rooms: Arc<Mutex<HashMap<String, RoomHandle>>>,
+    db: Option<Arc<Db>>,
 }
 
 impl Lobby {
     pub fn new() -> Self {
         Lobby {
             rooms: Arc::new(Mutex::new(HashMap::new())),
+            db: None,
         }
+    }
+
+    /// Attach a database for match-history persistence. New rooms will inherit it; existing rooms
+    /// (none at construction time) are unaffected.
+    pub fn with_db(mut self, db: Option<Arc<Db>>) -> Self {
+        self.db = db;
+        self
     }
 
     /// Get the handle for `room`, spawning the room task on first use. The `Mutex` here only
@@ -148,8 +158,9 @@ impl Lobby {
 
         let name = room.to_string();
         let mode = room_mode_for(&name);
+        let db = self.db.clone();
         tokio::spawn(async move {
-            let mut task = RoomTask::new(name.clone(), mode);
+            let mut task = RoomTask::new(name.clone(), mode, db);
             task.run(event_rx).await;
             info!(room = %name, "room task exited");
         });

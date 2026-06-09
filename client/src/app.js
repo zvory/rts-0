@@ -24,6 +24,7 @@ import {
   wsUrl,
 } from "./bootstrap.js";
 import { Match } from "./match.js";
+import { MatchHistory } from "./match_history.js";
 import { StatusBadge } from "./status_badge.js";
 
 /**
@@ -54,6 +55,8 @@ export class App {
     this.statusBadge = new StatusBadge(dom.version);
     /** @type {Lobby} */
     this.lobby = new Lobby(dom.lobbyScreen, this.net);
+    /** @type {MatchHistory|null} Lazy-init when the lobby first shows. */
+    this.matchHistory = null;
     /** @type {Match|null} the currently running match, if any. */
     this.match = null;
     /** @type {number|undefined} pending toast hide timer. */
@@ -83,6 +86,7 @@ export class App {
 
     void this.loadVersion();
     this.lobby.show();
+    this._mountMatchHistory();
     this.applyDevBanner();
     try {
       await this.net.connect();
@@ -291,6 +295,16 @@ export class App {
     dom.lobbyScreen.hidden = false;
     if (dom.devLinks) dom.devLinks.hidden = false;
     this.lobby.show();
+    // A new match row may have just been written server-side; pull the freshest list.
+    if (this.matchHistory) this.matchHistory.refresh();
+    else this._mountMatchHistory();
+  }
+
+  _mountMatchHistory() {
+    const host = document.getElementById("match-history-host");
+    if (!host) return;
+    if (this.matchHistory) return;
+    this.matchHistory = new MatchHistory(host);
   }
 
   /**

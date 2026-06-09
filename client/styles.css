@@ -1467,3 +1467,92 @@ input[type="text"]:focus {
     font-size: 12px;
   }
 }
+
+/* ---- Match history (lobby front page) ---------------------------------- */
+.match-history {
+  width: min(960px, 100%);
+  margin: 28px auto 0;
+  padding: 0 16px 32px;
+}
+.match-history-panel {
+  border: 1px solid var(--panel-edge);
+  border-radius: var(--radius);
+  background: rgba(39, 37, 31, 0.98);
+  box-shadow: var(--shadow), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+.match-history-header {
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--panel-edge);
+}
+.match-history-header h2 {
+  margin: 0;
+  color: var(--accent);
+  font-size: 14px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.match-history-table-host {
+  padding: 8px 0;
+}
+.match-history-status {
+  margin: 0;
+  padding: 14px 18px;
+  color: var(--ink-dim);
+  font-family: var(--mono);
+  font-size: 12px;
+}
+.match-history-status.error { color: #d97070; }
+.match-history-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.match-history-table thead th {
+  text-align: left;
+  padding: 8px 14px;
+  color: var(--ink-dim);
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border-bottom: 1px solid rgba(91, 83, 65, 0.5);
+}
+.match-history-row td {
+  padding: 8px 14px;
+  border-bottom: 1px solid rgba(91, 83, 65, 0.25);
+  color: var(--ink);
+}
+.match-history-row { cursor: pointer; }
+.match-history-row:hover td { background: rgba(91, 83, 65, 0.18); }
+.match-history-row:focus { outline: 2px solid var(--accent); outline-offset: -2px; }
+.match-history-detail td {
+  padding: 0 14px 14px;
+  background: rgba(17, 17, 15, 0.4);
+}
+.match-history-score-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  margin-top: 6px;
+}
+.match-history-score-table th, .match-history-score-table td {
+  padding: 5px 10px;
+  border-bottom: 1px solid rgba(91, 83, 65, 0.25);
+  text-align: left;
+  color: var(--ink);
+}
+.match-history-score-table thead th {
+  color: var(--ink-dim);
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.match-history-color {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 6px;
+  border-radius: 2px;
+  vertical-align: middle;
+}

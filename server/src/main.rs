@@ -27,6 +27,9 @@ use tower_http::services::{ServeDir, ServeFile};
 use tracing::{debug, info, warn};
 use tracing_subscriber::EnvFilter;
 
+use std::sync::Arc;
+
+use rts_server::db::Db;
 use rts_server::dev_scenarios::{
     all_dev_scenarios, dev_scenario_blocker_label, dev_scenario_unit_label,
     parse_dev_scenario_launch,
@@ -38,6 +41,17 @@ use rts_server::protocol::{serialize_compact_snapshot, ClientMessage, ServerMess
 
 /// Default room name used when a client's `join` omits `room`.
 const DEFAULT_ROOM: &str = "main";
+
+/// Treat unset/empty/`0`/`false`/`no`/`off` as falsy; anything else is true.
+fn env_truthy(key: &str) -> bool {
+    match std::env::var(key) {
+        Ok(v) => !matches!(
+            v.trim().to_ascii_lowercase().as_str(),
+            "" | "0" | "false" | "no" | "off"
+        ),
+        Err(_) => false,
+    }
+}
 
 /// How long a connection may go without any inbound frame before we evict it. The client sends
 /// app-level pings every ~15s, so a healthy connection never hits this; a silent/half-open socket
@@ -53,6 +67,9 @@ struct AppState {
     /// startup so cache-busting survives browser caches without a hard refresh.
     index_html: String,
     maps_dir: String,
+    /// Optional database for match history. `None` when `DATABASE_URL` is unset or the connect
+    /// failed; the front-page `/api/matches` endpoint returns an empty list in that case.
+    db: Option<Arc<Db>>,
 }
 
 #[tokio::main]
@@ -65,15 +82,31 @@ async fn main() {
         .init();
     perf::PerfConfig::global().enforce_release_build_for_server();
 
+    // Load .env from the repo root if present. Errors (missing file) are non-fatal; production
+    // deployments inject env vars directly.
+    let _ = dotenvy::from_filename(concat!(env!("CARGO_MANIFEST_DIR"), "/../.env"));
+
+    let db = rts_server::db::try_connect_from_env().await;
+
+    // Match-history writes are opt-in so local `cargo run` doesn't pollute the shared DB. Beta /
+    // mainline deploys set `RTS_RECORD_MATCHES=1`. Reads (`/api/matches`) work whenever a DB is
+    // connected, so the front page still shows production history even from a local checkout.
+    let record_matches = env_truthy("RTS_RECORD_MATCHES");
+    let lobby_db = if record_matches { db.clone() } else { None };
+    if db.is_some() && !record_matches {
+        info!("RTS_RECORD_MATCHES unset; match history reads enabled but writes disabled");
+    }
+
     let version = git_version();
     let client_dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../client");
     let index_html = build_versioned_index(client_dir, &version);
     let maps_dir = concat!(env!("CARGO_MANIFEST_DIR"), "/assets/maps").to_string();
     let state = AppState {
-        lobby: Lobby::new(),
+        lobby: Lobby::new().with_db(lobby_db),
         index_html,
         version,
         maps_dir: maps_dir.clone(),
+        db,
     };
     // Static files for everything except `/ws`; unknown paths fall back to `index.html` so the
     // single-page client loads regardless of the requested path.
@@ -90,6 +123,7 @@ async fn main() {
         .route("/dev/scenario", get(dev_scenario_handler))
         .route("/dev/scenarios", get(dev_scenario_handler))
         .route("/maps/save", post(map_save_handler))
+        .route("/api/matches", get(matches_handler))
         .nest_service("/maps", ServeDir::new(maps_dir))
         .fallback_service(static_service)
         .with_state(state);
@@ -142,6 +176,34 @@ async fn index_handler(State(state): State<AppState>) -> impl IntoResponse {
 /// Return the short git commit SHA that identifies this build.
 async fn version_handler(State(state): State<AppState>) -> String {
     state.version
+}
+
+#[derive(Deserialize)]
+struct MatchesQuery {
+    limit: Option<i64>,
+}
+
+/// GET /api/matches?limit=N — most-recent resolved matches in newest-first order.
+/// Returns `[]` (200) when no DB is configured so the client doesn't need to special-case.
+async fn matches_handler(
+    State(state): State<AppState>,
+    Query(params): Query<MatchesQuery>,
+) -> impl IntoResponse {
+    let limit = params.limit.unwrap_or(20);
+    let Some(db) = state.db else {
+        return Json(Vec::<rts_server::db::MatchSummary>::new()).into_response();
+    };
+    match db.recent_matches(limit).await {
+        Ok(rows) => Json(rows).into_response(),
+        Err(err) => {
+            warn!(%err, "match history query failed");
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "match history unavailable",
+            )
+                .into_response()
+        }
+    }
 }
 
 async fn beta_redirect_handler() -> impl IntoResponse {

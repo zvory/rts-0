@@ -63,6 +63,49 @@ between different lobbies.
 Beta deploys set the machine size to `shared-cpu-4x@1024MB`, matching the mainline app. If you
 override the app name for a different beta app, `./deploy.sh beta` still applies that VM size.
 
+## Match-history secrets (Supabase)
+
+Match history persistence is opt-in per environment. Reads require `DATABASE_URL`; writes
+additionally require `RTS_RECORD_MATCHES=1`. Local `cargo run` reads but never writes, so
+local play never pollutes the shared DB.
+
+Set these once per Fly app (replace the URL with the rotated password):
+
+```bash
+flyctl secrets set \
+  DATABASE_URL='postgres://postgres:NEW_PASSWORD@db.umerhlzpdtbxndptnhui.supabase.co:5432/postgres?sslmode=require' \
+  RTS_RECORD_MATCHES=1 \
+  -a rts-0-zvorygin-beta
+
+flyctl secrets set \
+  DATABASE_URL='postgres://postgres:NEW_PASSWORD@db.umerhlzpdtbxndptnhui.supabase.co:5432/postgres?sslmode=require' \
+  RTS_RECORD_MATCHES=1 \
+  -a rts-0-zvorygin
+```
+
+Setting a secret restarts the machines. The first restart runs `sqlx::migrate!` to create the
+`matches` table; subsequent restarts are no-ops because migrations are tracked.
+
+Verify a deploy is recording:
+
+```bash
+curl https://rts-0-zvorygin-beta.fly.dev/api/matches | head -c 500
+flyctl logs -a rts-0-zvorygin-beta | grep -E 'database connected|match recorded|RTS_RECORD_MATCHES'
+```
+
+Expected boot lines on a recording env:
+
+```
+INFO rts_server::db: database connected and migrations applied
+```
+
+(no "match history reads enabled but writes disabled" line; that one only prints when the gate is
+off). Each finished multi-player match logs `match recorded` with map and outcome.
+
+If reads return `[]` after a multi-player match: check `RTS_RECORD_MATCHES` is set and not
+`0`/`false`. See [docs/design/match-history.md](design/match-history.md) for the full gate truth
+table.
+
 ## Stop spending after game night
 
 ```bash

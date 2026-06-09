@@ -136,10 +136,18 @@ pub(super) struct RoomTask {
     /// Replay speed multiplier; 1.0 = real-time, 2.0 = 2× faster, etc.
     replay_speed: f32,
     slow_tick_count: u32,
+    /// Optional persistence sink for resolved matches. `None` disables match-history writes.
+    db: Option<Arc<Db>>,
+    /// Wall-clock start time of the currently-running match. `None` outside `Phase::InGame`.
+    match_started_at: Option<chrono::DateTime<chrono::Utc>>,
+    /// Map name the active match was started on. Empty outside `Phase::InGame`.
+    match_map_name: String,
+    /// Display names of every participant (humans + AI) in seat order, for match-history rows.
+    match_participants: Vec<String>,
 }
 
 impl RoomTask {
-    pub(super) fn new(room: String, mode: RoomMode) -> Self {
+    pub(super) fn new(room: String, mode: RoomMode, db: Option<Arc<Db>>) -> Self {
         let replay_speed = match &mode {
             RoomMode::DevSelfPlay(DevSelfPlayConfig::Replay { .. }) => 1.5,
             _ => 1.0,
@@ -161,6 +169,10 @@ impl RoomTask {
             ai_controllers: Vec::new(),
             replay_speed,
             slow_tick_count: 0,
+            db,
+            match_started_at: None,
+            match_map_name: String::new(),
+            match_participants: Vec::new(),
         }
     }
 
@@ -758,6 +770,9 @@ impl RoomTask {
         };
         let payload = game.start_payload();
         self.match_player_count = inits.len();
+        self.match_started_at = Some(chrono::Utc::now());
+        self.match_map_name = self.selected_map.clone();
+        self.match_participants = inits.iter().map(|p| p.name.clone()).collect();
         self.outcome_sent.clear();
         self.ai_controllers = live_ai_controllers(&inits, seed);
 
@@ -1332,6 +1347,38 @@ impl RoomTask {
     /// Resolve a finished match: tell everyone who won and return to the lobby for a rematch.
     fn end_match(&mut self, winner_id: Option<u32>, scores: Vec<PlayerScore>) {
         info!(room = %self.room, ?winner_id, "match over");
+
+        // Persist match history for real (multi-player) matches only. Dev/scenario/replay rooms
+        // and 1-player sandboxes never enter this branch because either the metadata wasn't set or
+        // the player count is below the threshold.
+        if let (Some(db), Some(started_at)) = (self.db.clone(), self.match_started_at) {
+            if self.match_player_count >= 2 && !self.is_dev_watch() {
+                let ended_at = chrono::Utc::now();
+                let duration_ms = ended_at
+                    .signed_duration_since(started_at)
+                    .num_milliseconds()
+                    .clamp(0, i32::MAX as i64) as i32;
+                let winner_name = winner_id
+                    .and_then(|wid| scores.iter().find(|s| s.id == wid).map(|s| s.name.clone()));
+                let score_json = serde_json::to_value(&scores).unwrap_or(serde_json::Value::Null);
+                let rec = crate::db::MatchRecord {
+                    started_at,
+                    ended_at,
+                    duration_ms,
+                    map_name: self.match_map_name.clone(),
+                    winner_name,
+                    participants: self.match_participants.clone(),
+                    score_screen: score_json,
+                };
+                // Detached: a slow Supabase write must never stall the room transitioning back to
+                // lobby. Errors are logged inside `record_match`.
+                tokio::spawn(async move { db.record_match(rec).await });
+            }
+        }
+        self.match_started_at = None;
+        self.match_map_name.clear();
+        self.match_participants.clear();
+
         let recipients: Vec<u32> = self.order.clone();
         for id in &recipients {
             if self.outcome_sent.contains(id) {
