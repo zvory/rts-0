@@ -1274,6 +1274,10 @@ dependencies = [
 [[package]]
 name = "rts-archcheck"
 version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
 
 [[package]]
 name = "rts-contract"

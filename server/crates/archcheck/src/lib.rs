@@ -3,6 +3,15 @@ use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 
+use serde::{Deserialize, Serialize};
+
+const LINE_GROWTH_BUFFER: usize = 80;
+const TEST_LINE_GROWTH_BUFFER: usize = 250;
+const NEW_FILE_LINE_BUDGET: usize = 500;
+const NEW_TEST_FILE_LINE_BUDGET: usize = 1_500;
+const PUBLIC_EXPORT_GROWTH_BUFFER: usize = 2;
+const NEW_MODULE_PUBLIC_EXPORT_BUDGET: usize = 8;
+
 const PURE_POLICY_FORBIDDEN_IMPORTS: &[&str] = &[
     "EntityStore",
     "PlayerState",
@@ -148,6 +157,7 @@ const ALLOWED_SERVICE_IMPORTS: &[(&str, &[&str])] = &[
 #[derive(Debug, Default)]
 pub struct ArchitectureReport {
     pub failures: Vec<String>,
+    pub ratchet_notes: Vec<String>,
     pub metrics: ArchitectureMetrics,
 }
 
@@ -156,17 +166,18 @@ pub struct ArchitectureMetrics {
     pub line_counts: Vec<LineCount>,
     pub service_edges: Vec<ServiceEdge>,
     pub broad_mutable_signatures: Vec<FunctionSignature>,
+    pub player_state_usages: Vec<PlayerStateUsage>,
     pub public_exports: Vec<PublicExport>,
     pub entity_field_writes: Vec<EntityFieldWrite>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct LineCount {
     pub path: String,
     pub lines: usize,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct ServiceEdge {
     pub source: String,
     pub target: String,
@@ -174,25 +185,50 @@ pub struct ServiceEdge {
     pub line: usize,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FunctionSignature {
     pub path: String,
     pub line: usize,
     pub name: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PlayerStateUsage {
+    pub path: String,
+    pub line: usize,
+    pub code: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PublicExport {
     pub path: String,
     pub line: usize,
     pub item: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EntityFieldWrite {
     pub path: String,
     pub line: usize,
     pub field: String,
+    pub code: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ArchitectureBaseline {
+    pub reason: String,
+    pub line_counts: Vec<LineCount>,
+    pub service_edges: Vec<ServiceEdge>,
+    pub broad_mutable_signatures: Vec<FunctionSignature>,
+    pub player_state_usages: Vec<PlayerStateUsage>,
+    pub entity_field_writes: Vec<EntityFieldWrite>,
+    pub public_export_counts: Vec<PublicExportCount>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PublicExportCount {
+    pub path: String,
+    pub count: usize,
 }
 
 #[derive(Debug, Clone)]
@@ -238,6 +274,44 @@ pub fn check_sim_architecture(game_root: &Path) -> io::Result<ArchitectureReport
     Ok(analyze_source_files(&files))
 }
 
+pub fn check_sim_architecture_with_baseline(
+    game_root: &Path,
+    baseline_path: &Path,
+) -> io::Result<ArchitectureReport> {
+    let mut report = check_sim_architecture(game_root)?;
+    let baseline = read_baseline(baseline_path)?;
+    compare_to_baseline(&baseline, &mut report);
+    Ok(report)
+}
+
+pub fn bless_sim_architecture_baseline(
+    game_root: &Path,
+    baseline_path: &Path,
+    reason: &str,
+) -> io::Result<Vec<String>> {
+    if reason.trim().is_empty() {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "baseline updates require a non-empty reason",
+        ));
+    }
+
+    let report = check_sim_architecture(game_root)?;
+    let previous = read_baseline(baseline_path).ok();
+    let baseline = ArchitectureBaseline::from_metrics(reason.trim(), &report.metrics);
+    let summary = previous
+        .as_ref()
+        .map(|old| baseline_change_summary(old, &baseline))
+        .unwrap_or_else(|| vec!["created baseline".to_string()]);
+    let text = serde_json::to_string_pretty(&baseline)
+        .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
+    if let Some(parent) = baseline_path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    fs::write(baseline_path, format!("{text}\n"))?;
+    Ok(summary)
+}
+
 fn analyze_source_files(files: &[SourceFile]) -> ArchitectureReport {
     let mut report = ArchitectureReport::default();
     let service_modules = service_modules(files);
@@ -265,6 +339,7 @@ fn analyze_source_files(files: &[SourceFile]) -> ArchitectureReport {
         check_pure_policy_imports(file, &use_statements, &service_roles, &mut report);
         check_role_state_boundaries(file, &stripped, &service_roles, &mut report);
         collect_broad_signatures(file, &stripped, &mut report);
+        collect_player_state_usages(file, &stripped, &mut report);
         collect_public_exports(file, &stripped, &mut report);
         collect_entity_field_writes(file, &stripped, &mut report);
     }
@@ -276,6 +351,316 @@ fn analyze_source_files(files: &[SourceFile]) -> ArchitectureReport {
         .sort_by(|a, b| a.path.cmp(&b.path));
     report.metrics.service_edges.sort();
     report
+        .metrics
+        .broad_mutable_signatures
+        .sort_by_key(function_key);
+    report
+        .metrics
+        .player_state_usages
+        .sort_by_key(player_state_usage_key);
+    report
+        .metrics
+        .public_exports
+        .sort_by(|a, b| a.path.cmp(&b.path).then(a.line.cmp(&b.line)));
+    report
+        .metrics
+        .entity_field_writes
+        .sort_by_key(entity_field_write_key);
+    report
+}
+
+impl ArchitectureBaseline {
+    fn from_metrics(reason: &str, metrics: &ArchitectureMetrics) -> Self {
+        Self {
+            reason: reason.to_string(),
+            line_counts: metrics.line_counts.clone(),
+            service_edges: metrics.service_edges.clone(),
+            broad_mutable_signatures: metrics.broad_mutable_signatures.clone(),
+            player_state_usages: metrics.player_state_usages.clone(),
+            entity_field_writes: metrics.entity_field_writes.clone(),
+            public_export_counts: public_export_counts(metrics),
+        }
+    }
+}
+
+fn read_baseline(path: &Path) -> io::Result<ArchitectureBaseline> {
+    let text = fs::read_to_string(path)?;
+    let baseline = serde_json::from_str::<ArchitectureBaseline>(&text)
+        .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
+    if baseline.reason.trim().is_empty() {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            "architecture baseline reason must not be empty",
+        ));
+    }
+    Ok(baseline)
+}
+
+fn compare_to_baseline(baseline: &ArchitectureBaseline, report: &mut ArchitectureReport) {
+    compare_line_counts(baseline, report);
+    compare_service_edges(baseline, report);
+    compare_broad_mutable_signatures(baseline, report);
+    compare_player_state_usages(baseline, report);
+    compare_entity_field_writes(baseline, report);
+    compare_public_export_counts(baseline, report);
+    report.failures.sort();
+    report.ratchet_notes.sort();
+}
+
+fn compare_line_counts(baseline: &ArchitectureBaseline, report: &mut ArchitectureReport) {
+    let baselines = baseline
+        .line_counts
+        .iter()
+        .map(|entry| (entry.path.as_str(), entry.lines))
+        .collect::<BTreeMap<_, _>>();
+
+    for current in &report.metrics.line_counts {
+        match baselines.get(current.path.as_str()).copied() {
+            Some(old_lines) => {
+                let budget = old_lines + line_growth_buffer(&current.path, old_lines);
+                if current.lines > budget {
+                    report.failures.push(format!(
+                        "{}: line count grew to {} lines; baseline is {} with budget {}. Run --bless with a reason if this growth is intentional.",
+                        current.path, current.lines, old_lines, budget
+                    ));
+                } else if current.lines < old_lines {
+                    report.ratchet_notes.push(format!(
+                        "{} shrank from {} to {} lines; --bless would lower the future budget",
+                        current.path, old_lines, current.lines
+                    ));
+                }
+            }
+            None => {
+                let budget = if is_test_path(&current.path) {
+                    NEW_TEST_FILE_LINE_BUDGET
+                } else {
+                    NEW_FILE_LINE_BUDGET
+                };
+                if current.lines > budget {
+                    report.failures.push(format!(
+                        "{}: new file has {} lines, above the unbaselined budget of {}. Run --bless with a reason if this size is intentional.",
+                        current.path, current.lines, budget
+                    ));
+                } else {
+                    report.ratchet_notes.push(format!(
+                        "{} is new with {} lines; --bless would start tracking it",
+                        current.path, current.lines
+                    ));
+                }
+            }
+        }
+    }
+}
+
+fn line_growth_buffer(path: &str, baseline_lines: usize) -> usize {
+    let fixed = if is_test_path(path) {
+        TEST_LINE_GROWTH_BUFFER
+    } else {
+        LINE_GROWTH_BUFFER
+    };
+    fixed.max(baseline_lines / 10)
+}
+
+fn is_test_path(path: &str) -> bool {
+    path.ends_with("tests.rs") || path.contains("/tests/")
+}
+
+fn compare_service_edges(baseline: &ArchitectureBaseline, report: &mut ArchitectureReport) {
+    let old = baseline
+        .service_edges
+        .iter()
+        .map(service_edge_key)
+        .collect::<BTreeSet<_>>();
+    for edge in &report.metrics.service_edges {
+        if !old.contains(&service_edge_key(edge)) {
+            report.failures.push(format!(
+                "{}:{}: new service import {} -> {} exceeds the architecture baseline",
+                edge.path, edge.line, edge.source, edge.target
+            ));
+        }
+    }
+}
+
+fn compare_broad_mutable_signatures(
+    baseline: &ArchitectureBaseline,
+    report: &mut ArchitectureReport,
+) {
+    let old = baseline
+        .broad_mutable_signatures
+        .iter()
+        .map(function_key)
+        .collect::<BTreeSet<_>>();
+    for signature in &report.metrics.broad_mutable_signatures {
+        if !old.contains(&function_key(signature)) {
+            report.failures.push(format!(
+                "{}:{}: new broad mutable world function `{}` exceeds the architecture baseline",
+                signature.path, signature.line, signature.name
+            ));
+        }
+    }
+}
+
+fn compare_player_state_usages(baseline: &ArchitectureBaseline, report: &mut ArchitectureReport) {
+    let old = baseline
+        .player_state_usages
+        .iter()
+        .map(player_state_usage_key)
+        .collect::<BTreeSet<_>>();
+    for usage in &report.metrics.player_state_usages {
+        if !old.contains(&player_state_usage_key(usage)) {
+            report.failures.push(format!(
+                "{}:{}: new direct PlayerState usage exceeds the architecture baseline",
+                usage.path, usage.line
+            ));
+        }
+    }
+}
+
+fn compare_entity_field_writes(baseline: &ArchitectureBaseline, report: &mut ArchitectureReport) {
+    let old = baseline
+        .entity_field_writes
+        .iter()
+        .map(entity_field_write_key)
+        .collect::<BTreeSet<_>>();
+    for write in &report.metrics.entity_field_writes {
+        if !old.contains(&entity_field_write_key(write)) {
+            report.failures.push(format!(
+                "{}:{}: new direct Entity.{} write exceeds the architecture baseline",
+                write.path, write.line, write.field
+            ));
+        }
+    }
+}
+
+fn compare_public_export_counts(baseline: &ArchitectureBaseline, report: &mut ArchitectureReport) {
+    let old = baseline
+        .public_export_counts
+        .iter()
+        .map(|entry| (entry.path.as_str(), entry.count))
+        .collect::<BTreeMap<_, _>>();
+    for current in public_export_counts(&report.metrics) {
+        match old.get(current.path.as_str()).copied() {
+            Some(old_count) => {
+                let budget = old_count + PUBLIC_EXPORT_GROWTH_BUFFER;
+                if current.count > budget {
+                    report.failures.push(format!(
+                        "{}: public exports grew to {}; baseline is {} with budget {}. Run --bless with a reason if this API growth is intentional.",
+                        current.path, current.count, old_count, budget
+                    ));
+                } else if current.count < old_count {
+                    report.ratchet_notes.push(format!(
+                        "{} public exports shrank from {} to {}; --bless would lower the future budget",
+                        current.path, old_count, current.count
+                    ));
+                }
+            }
+            None if current.count > NEW_MODULE_PUBLIC_EXPORT_BUDGET => {
+                report.failures.push(format!(
+                    "{}: new module has {} public exports, above the unbaselined budget of {}",
+                    current.path, current.count, NEW_MODULE_PUBLIC_EXPORT_BUDGET
+                ));
+            }
+            None => {
+                report.ratchet_notes.push(format!(
+                    "{} is new with {} public exports; --bless would start tracking it",
+                    current.path, current.count
+                ));
+            }
+        }
+    }
+}
+
+fn public_export_counts(metrics: &ArchitectureMetrics) -> Vec<PublicExportCount> {
+    let mut counts = BTreeMap::<String, usize>::new();
+    for export in &metrics.public_exports {
+        *counts.entry(export.path.clone()).or_default() += 1;
+    }
+    counts
+        .into_iter()
+        .map(|(path, count)| PublicExportCount { path, count })
+        .collect()
+}
+
+fn baseline_change_summary(
+    previous: &ArchitectureBaseline,
+    current: &ArchitectureBaseline,
+) -> Vec<String> {
+    let mut summary = Vec::new();
+    summarize_count_change(
+        "line-count entries",
+        previous.line_counts.len(),
+        current.line_counts.len(),
+        &mut summary,
+    );
+    summarize_count_change(
+        "service import edges",
+        previous.service_edges.len(),
+        current.service_edges.len(),
+        &mut summary,
+    );
+    summarize_count_change(
+        "broad mutable functions",
+        previous.broad_mutable_signatures.len(),
+        current.broad_mutable_signatures.len(),
+        &mut summary,
+    );
+    summarize_count_change(
+        "PlayerState usage sites",
+        previous.player_state_usages.len(),
+        current.player_state_usages.len(),
+        &mut summary,
+    );
+    summarize_count_change(
+        "Entity field write sites",
+        previous.entity_field_writes.len(),
+        current.entity_field_writes.len(),
+        &mut summary,
+    );
+    summarize_public_export_change(previous, current, &mut summary);
+    if summary.is_empty() {
+        summary.push("baseline values unchanged; reason updated".to_string());
+    }
+    summary
+}
+
+fn summarize_count_change(label: &str, old: usize, new: usize, summary: &mut Vec<String>) {
+    if old != new {
+        summary.push(format!("{label}: {old} -> {new}"));
+    }
+}
+
+fn summarize_public_export_change(
+    previous: &ArchitectureBaseline,
+    current: &ArchitectureBaseline,
+    summary: &mut Vec<String>,
+) {
+    let old_total: usize = previous
+        .public_export_counts
+        .iter()
+        .map(|entry| entry.count)
+        .sum();
+    let new_total: usize = current
+        .public_export_counts
+        .iter()
+        .map(|entry| entry.count)
+        .sum();
+    summarize_count_change("public exports", old_total, new_total, summary);
+}
+
+fn service_edge_key(edge: &ServiceEdge) -> (String, String, String) {
+    (edge.source.clone(), edge.target.clone(), edge.path.clone())
+}
+
+fn function_key(signature: &FunctionSignature) -> (String, String) {
+    (signature.path.clone(), signature.name.clone())
+}
+
+fn player_state_usage_key(usage: &PlayerStateUsage) -> (String, String) {
+    (usage.path.clone(), usage.code.clone())
+}
+
+fn entity_field_write_key(write: &EntityFieldWrite) -> (String, String, String) {
+    (write.path.clone(), write.field.clone(), write.code.clone())
 }
 
 fn rust_files(root: &Path) -> io::Result<Vec<PathBuf>> {
@@ -551,6 +936,22 @@ fn collect_broad_signatures(file: &SourceFile, text: &str, report: &mut Architec
     }
 }
 
+fn collect_player_state_usages(file: &SourceFile, text: &str, report: &mut ArchitectureReport) {
+    for (index, line) in text.lines().enumerate() {
+        let code = code_before_comment(line);
+        if code
+            .split(|ch: char| !(ch == '_' || ch.is_ascii_alphanumeric()))
+            .any(|part| part == "PlayerState")
+        {
+            report.metrics.player_state_usages.push(PlayerStateUsage {
+                path: file.rel_path.clone(),
+                line: index + 1,
+                code: normalized_code(code),
+            });
+        }
+    }
+}
+
 fn collect_public_exports(file: &SourceFile, text: &str, report: &mut ArchitectureReport) {
     for (index, line) in text.lines().enumerate() {
         let trimmed = line.trim_start();
@@ -581,17 +982,26 @@ fn collect_entity_field_writes(file: &SourceFile, text: &str, report: &mut Archi
     }
 
     for (index, line) in text.lines().enumerate() {
-        let code = line.split("//").next().unwrap_or_default();
+        let code = code_before_comment(line);
         for field in ENTITY_FIELDS {
             if contains_field_assignment(code, field) {
                 report.metrics.entity_field_writes.push(EntityFieldWrite {
                     path: file.rel_path.clone(),
                     line: index + 1,
                     field: (*field).to_string(),
+                    code: normalized_code(code),
                 });
             }
         }
     }
+}
+
+fn code_before_comment(line: &str) -> &str {
+    line.split("//").next().unwrap_or_default()
+}
+
+fn normalized_code(line: &str) -> String {
+    line.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
 fn collect_use_statements(text: &str) -> Vec<UseStatement> {
@@ -852,6 +1262,10 @@ mod tests {
         }
     }
 
+    fn baseline(reason: &str, metrics: &ArchitectureMetrics) -> ArchitectureBaseline {
+        ArchitectureBaseline::from_metrics(reason, metrics)
+    }
+
     #[test]
     fn pure_policy_module_importing_entity_store_fails() {
         let report = analyze_source_files(&[source(
@@ -1028,6 +1442,115 @@ mod tests {
                 name: "tick".to_string(),
             }]
         );
+    }
+
+    #[test]
+    fn direct_player_state_usages_are_recorded() {
+        let report = analyze_source_files(&[source(
+            "services/example.rs",
+            "use crate::game::PlayerState;\nfn update(player: &mut PlayerState) {}\n",
+        )]);
+
+        assert_eq!(report.metrics.player_state_usages.len(), 2);
+        assert!(report
+            .metrics
+            .player_state_usages
+            .contains(&PlayerStateUsage {
+                path: "services/example.rs".to_string(),
+                line: 2,
+                code: "fn update(player: &mut PlayerState) {}".to_string(),
+            }));
+    }
+
+    #[test]
+    fn line_growth_has_a_generous_buffer_before_failing() {
+        let original = analyze_source_files(&[source("services/commands.rs", "line\n")]);
+        let baseline = baseline("test baseline", &original.metrics);
+        let mut within_budget =
+            analyze_source_files(&[source("services/commands.rs", &"line\n".repeat(81))]);
+        compare_to_baseline(&baseline, &mut within_budget);
+        assert!(within_budget.failures.is_empty());
+
+        let mut over_budget =
+            analyze_source_files(&[source("services/commands.rs", &"line\n".repeat(82))]);
+        compare_to_baseline(&baseline, &mut over_budget);
+        assert_eq!(over_budget.failures.len(), 1);
+        assert!(over_budget.failures[0].contains("line count grew"));
+    }
+
+    #[test]
+    fn test_files_get_a_larger_line_growth_buffer() {
+        let original = analyze_source_files(&[source("services/tests.rs", "line\n")]);
+        let baseline = baseline("test baseline", &original.metrics);
+        let mut report =
+            analyze_source_files(&[source("services/tests.rs", &"line\n".repeat(251))]);
+
+        compare_to_baseline(&baseline, &mut report);
+
+        assert!(report.failures.is_empty());
+    }
+
+    #[test]
+    fn shrinking_a_file_suggests_lowering_the_future_budget() {
+        let original = analyze_source_files(&[source("services/commands.rs", &"line\n".repeat(5))]);
+        let baseline = baseline("test baseline", &original.metrics);
+        let mut report = analyze_source_files(&[source("services/commands.rs", "line\n")]);
+
+        compare_to_baseline(&baseline, &mut report);
+
+        assert!(report.failures.is_empty());
+        assert_eq!(
+            report.ratchet_notes,
+            vec![
+                "services/commands.rs shrank from 5 to 1 lines; --bless would lower the future budget"
+                    .to_string()
+            ]
+        );
+    }
+
+    #[test]
+    fn new_player_state_usage_exceeds_the_baseline_without_line_number_noise() {
+        let original = analyze_source_files(&[source(
+            "services/commands.rs",
+            "fn update(player: &mut PlayerState) {}\n",
+        )]);
+        let baseline = baseline("test baseline", &original.metrics);
+        let mut same_usage_moved = analyze_source_files(&[source(
+            "services/commands.rs",
+            "\n\nfn update(player: &mut PlayerState) {}\n",
+        )]);
+
+        compare_to_baseline(&baseline, &mut same_usage_moved);
+
+        assert!(same_usage_moved.failures.is_empty());
+
+        let mut new_usage = analyze_source_files(&[source(
+            "services/commands.rs",
+            "fn update(player: &mut PlayerState) {}\nfn reset(player: PlayerState) {}\n",
+        )]);
+        compare_to_baseline(&baseline, &mut new_usage);
+        assert_eq!(new_usage.failures.len(), 1);
+        assert!(new_usage.failures[0].contains("new direct PlayerState usage"));
+    }
+
+    #[test]
+    fn public_exports_have_a_small_growth_buffer() {
+        let original = analyze_source_files(&[source("services/commands.rs", "pub fn a() {}\n")]);
+        let baseline = baseline("test baseline", &original.metrics);
+        let mut within_budget = analyze_source_files(&[source(
+            "services/commands.rs",
+            "pub fn a() {}\npub fn b() {}\npub fn c() {}\n",
+        )]);
+        compare_to_baseline(&baseline, &mut within_budget);
+        assert!(within_budget.failures.is_empty());
+
+        let mut over_budget = analyze_source_files(&[source(
+            "services/commands.rs",
+            "pub fn a() {}\npub fn b() {}\npub fn c() {}\npub fn d() {}\n",
+        )]);
+        compare_to_baseline(&baseline, &mut over_budget);
+        assert_eq!(over_budget.failures.len(), 1);
+        assert!(over_budget.failures[0].contains("public exports grew"));
     }
 
     #[test]

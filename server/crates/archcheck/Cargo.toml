@@ -10,3 +10,7 @@ path = "src/lib.rs"
 [[bin]]
 name = "check-sim-architecture"
 path = "src/main.rs"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
