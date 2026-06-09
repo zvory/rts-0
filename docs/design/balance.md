@@ -61,8 +61,8 @@ The current implementation uses the themed unit/building names below. Combat is 
 shared attack model plus the support-weapon setup/teardown state, tank turret aim gates, and
 tank hull-facing damage modifiers for anti-tank hits against tank victims. Tanks keep their active
 movement path while firing on either `Move` or `AttackMove` orders; riflemen upgraded with
-Methamphetamines are permanently charging, keep advancing while firing, and roll the charge-fire
-miss chance only while moving; other mobile combat units
+Methamphetamines are permanently charging, keep advancing while firing with normal accuracy, and
+move at tank speed; other mobile combat units
 still hold position once a target is in weapon range. Scout cars also fire while moving using an
 independent rear machine-gun facing. They are unarmored light vehicles and do not receive
 armored damage reduction, but AT guns do not roll their infantry miss chance against them.
@@ -86,8 +86,8 @@ authoritative `rules::defs` records.
   zero oil.
 - **Methamphetamines** (Training Centre research): costs 100 steel / 100 oil and takes 600 ticks
   (~20s). Once complete, all current and future riflemen for that player are permanently charging:
-  2x movement speed, fire while moving with moving-shot miss chance, normal accuracy while
-  standing, and 25% faster attacks (16 tick cooldown becomes 12).
+  1.25x movement speed (matching tank speed at 2.0 px/tick), fire while moving without an extra
+  miss chance, and 25% faster attacks (16 tick cooldown becomes 12).
 - **Scout Car Smoke** (hotkey `D`): Scout cars gain a targeted smoke-grenade ability once the
   owner has a completed Steelworks. Each scout car spawns with 2 smoke uses; once those uses are
   depleted, that car cannot use Smoke again. Smoke has no steel or oil cost. Target range: 9 tiles

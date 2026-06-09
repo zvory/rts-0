@@ -93,8 +93,7 @@ The server treats every client as potentially hostile. Limits live next to the c
 - **Rifleman Methamphetamines fire**: upgraded riflemen are permanently charging and keep their
   movement path while firing at enemies in range instead of stopping to shoot. While on a plain
   `Move`, upgraded riflemen only fire opportunistically at enemies already in range and do not
-  chase. Moving charge shots roll a miss chance after attack feedback is emitted, so audio/tracers
-  still play but missed shots deal no damage or under-attack alert.
+  chase. Moving charge shots use normal rifleman accuracy and do not add a movement miss roll.
 - **Scout car movement and weapon facing**: scout cars are light unarmored vehicles with a
   rear-mounted machine gun (higher damage, same range and cooldown as machine gunners). They use the
   same oriented-body/pathing/collision model as tanks, including standoff firing and firing while
@@ -152,8 +151,8 @@ The server treats every client as potentially hostile. Limits live next to the c
   while movement is paused.
 - **Methamphetamines research**: Training Centres can queue one permanent player upgrade costing
   100 steel / 100 oil and taking 600 ticks. Once completed, all current and future owned riflemen
-  use the charging movement/fire model permanently and attack 25% faster. Legacy `charge` commands
-  remain decodable but have no eligible carriers.
+  use the charging movement/fire model permanently, move at tank speed, and attack 25% faster.
+  Legacy `charge` commands remain decodable but have no eligible carriers.
 - **Tank armor facing**: tank and AT-team attacks against tank victims use the victim tank's hull
   `facing` and the attacker's position. Front hits (`<=45°` from the hull direction) deal normal
   damage, side hits (`>45°` and `<=135°`) deal `1.25x`, and rear hits (`>135°`) deal `1.75x`.

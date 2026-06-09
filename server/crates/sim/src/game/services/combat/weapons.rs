@@ -166,12 +166,8 @@ pub(super) fn can_fire_while_moving(e: &Entity) -> bool {
         || (e.kind == EntityKind::Rifleman && e.charge_ticks() > 0)
 }
 
-pub(super) fn moving_fire_miss_chance(e: &Entity) -> f32 {
-    if e.kind == EntityKind::Rifleman && e.charge_ticks() > 0 && !e.path_is_empty() {
-        combat_rules::RIFLEMAN_CHARGE_MISS_CHANCE
-    } else {
-        0.0
-    }
+pub(super) fn moving_fire_miss_chance(_e: &Entity) -> f32 {
+    0.0
 }
 
 pub(super) fn at_gun_can_chase(e: &Entity) -> bool {
