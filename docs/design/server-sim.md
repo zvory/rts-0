@@ -71,6 +71,18 @@ impl Game {
     /// Create a live lobby match with explicit starting steel/oil and random AI strategies.
     pub fn new_with_starting_resources_and_random_ai_profiles(players: &[PlayerInit], steel: u32, oil: u32, seed: u32) -> Game;
 
+    /// Rebuild replay playback with explicit resources, loadout, map, and map metadata.
+    /// Commands are injected by the replay runtime rather than live AI controllers.
+    pub fn new_for_replay_with_map_metadata(
+        players: &[PlayerInit],
+        steel: u32,
+        oil: u32,
+        seed: u32,
+        starting_loadout: ReplayStartingLoadoutMode,
+        map: Map,
+        map_metadata: MapMetadata,
+    ) -> Game;
+
     /// Static info for the `start` message (terrain + player start tiles). Call once.
     pub fn start_payload(&self) -> StartPayload;
 
@@ -128,8 +140,9 @@ them through this API before ticking — see §8.
 - One tokio task per **room** owns its `Game` and runs the tick loop (`tokio::time::interval`).
 - Each **connection** is a task with an `mpsc::Sender<ServerMessage>` to push to its socket.
 - Connection→room communication uses an `mpsc` channel of internal `RoomEvent`
-  (`Join`, `Leave`, `Ready`, `StartRequest`, `AddAi`, `RemoveAi`, `SetSpectator`, `Command`, `GiveUp`). The room task is the
-  single writer of game state — no locks around `Game`.
+  (`Join`, `Leave`, `Ready`, `StartRequest`, `AddAi`, `RemoveAi`, `SetSpectator`, `Command`,
+  `GiveUp`, `SetReplaySpeed`, `SeekReplay`, `SetReplayVision`). The room task is the single writer
+  of game state — no locks around `Game`.
 - The room task, each tick: enqueue live AI commands for AI players → `game.tick()` → for each
   connected player `game.snapshot_for(pid)` → send. Lobby phase: broadcast `lobby` on changes.
 - Normal rooms reject all mid-match joins. Spectators are lobby members only: they receive
@@ -137,8 +150,13 @@ them through this API before ticking — see §8.
   snapshots, but are not included in `PlayerInit`, command routing, elimination, or match-player counts.
 - Dev self-play watch rooms are a special-case room mode inside the same task model: they own a
   normal `Game`, feed it scripted commands from `rts_ai::selfplay`, and send watchers
-  `game.snapshot_full_for(view_pid)` instead of fog-filtered snapshots. Replay rooms advance at
-  1.5x the normal room tick rate so artifact playback finishes faster than live self-play.
+  `game.snapshot_full_for(view_pid)` instead of fog-filtered snapshots. Legacy dev replay rooms
+  advance at 1.5x the normal room tick rate so artifact playback finishes faster than live
+  self-play.
+- Production replay viewer rooms use `Phase::ReplayViewer`, which owns a `ReplaySession`:
+  the immutable `ReplayArtifactV1`, rebuilt `Game`, command cursor, shared playback speed, and
+  per-viewer fog selection. Replay snapshots use `game.snapshot_for_spectator(selected_player_ids)`
+  so viewers see authoritative union-fog or single-player fog, never full-world state.
 
 ### 3.3 Rules layer (`rules/`)
 

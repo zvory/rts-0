@@ -147,6 +147,34 @@ impl Game {
         Self::new_inner(players, steel, oil, seed, StartingLoadout::Standard)
     }
 
+    /// Rebuild a replay from an explicit map and starting loadout. Replay playback owns command
+    /// injection externally, so no live AI controllers are attached.
+    pub fn new_for_replay_with_map_metadata(
+        players: &[PlayerInit],
+        steel: u32,
+        oil: u32,
+        seed: u32,
+        starting_loadout: crate::game::replay::ReplayStartingLoadoutMode,
+        map: Map,
+        map_metadata: MapMetadata,
+    ) -> Game {
+        let starting_loadout = match starting_loadout {
+            crate::game::replay::ReplayStartingLoadoutMode::Standard => StartingLoadout::Standard,
+            crate::game::replay::ReplayStartingLoadoutMode::DebugHuman => {
+                StartingLoadout::DebugHuman
+            }
+        };
+        Self::new_inner_with_map(
+            players,
+            steel,
+            oil,
+            seed,
+            starting_loadout,
+            Some(map),
+            map_metadata,
+        )
+    }
+
     /// Create a match that preserves player identity flags but does not attach live
     /// controllers. Used by command-log replay and scripted self-play, where commands come from
     /// an external driver.
