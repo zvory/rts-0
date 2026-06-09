@@ -248,6 +248,12 @@ pub enum ServerMessage {
     Snapshot(Snapshot),
     /// Shared replay playback cursor/state. Sent reliably outside snapshot cadence.
     ReplayState(ReplayPlaybackState),
+    /// Server shutdown drain has started. Existing matches may continue until the deadline, but
+    /// new match starts are disabled.
+    ShutdownWarning {
+        deadline_unix_ms: u64,
+        seconds_remaining: u64,
+    },
     GameOver {
         winner_id: Option<u32>,
         /// "won" | "lost" | "draw"

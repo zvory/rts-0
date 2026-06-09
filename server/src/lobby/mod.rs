@@ -125,7 +125,7 @@ pub enum RoomEvent {
     SelectMap { player_id: u32, map: String },
     /// Process shutdown has begun. Rooms stay alive, but lobby clients should see that starting
     /// another match is disabled while currently-running matches drain.
-    DrainStarted,
+    DrainStarted(DrainNotice),
 }
 
 #[derive(Clone)]
@@ -133,8 +133,15 @@ pub(super) struct DrainHandle {
     inner: Arc<DrainState>,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct DrainNotice {
+    pub deadline_unix_ms: u64,
+    pub seconds_remaining: u64,
+}
+
 struct DrainState {
     draining: AtomicBool,
+    notice: StdMutex<Option<DrainNotice>>,
     active_matches: AtomicUsize,
     active_matches_tx: watch::Sender<usize>,
     connection_shutdown_tx: watch::Sender<bool>,
@@ -147,6 +154,7 @@ impl Default for DrainHandle {
         Self {
             inner: Arc::new(DrainState {
                 draining: AtomicBool::new(false),
+                notice: StdMutex::new(None),
                 active_matches: AtomicUsize::new(0),
                 active_matches_tx,
                 connection_shutdown_tx,
@@ -156,12 +164,29 @@ impl Default for DrainHandle {
 }
 
 impl DrainHandle {
-    fn begin_draining(&self) {
+    fn begin_draining(&self, timeout: Duration) -> DrainNotice {
+        if let Ok(mut stored) = self.inner.notice.lock() {
+            if let Some(notice) = *stored {
+                self.inner.draining.store(true, Ordering::SeqCst);
+                return notice;
+            }
+            let notice = drain_notice_for(timeout);
+            *stored = Some(notice);
+            self.inner.draining.store(true, Ordering::SeqCst);
+            return notice;
+        }
+
+        let notice = drain_notice_for(timeout);
         self.inner.draining.store(true, Ordering::SeqCst);
+        notice
     }
 
     pub(super) fn is_draining(&self) -> bool {
         self.inner.draining.load(Ordering::SeqCst)
+    }
+
+    pub(super) fn notice(&self) -> Option<DrainNotice> {
+        self.inner.notice.lock().ok().and_then(|stored| *stored)
     }
 
     fn active_matches(&self) -> usize {
@@ -203,6 +228,18 @@ impl DrainHandle {
 
     pub(super) fn subscribe_connection_shutdown(&self) -> watch::Receiver<bool> {
         self.inner.connection_shutdown_tx.subscribe()
+    }
+}
+
+fn drain_notice_for(timeout: Duration) -> DrainNotice {
+    let deadline = SystemTime::now().checked_add(timeout).unwrap_or(UNIX_EPOCH);
+    let deadline_unix_ms = deadline
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_millis().min(u128::from(u64::MAX)) as u64)
+        .unwrap_or(0);
+    DrainNotice {
+        deadline_unix_ms,
+        seconds_remaining: timeout.as_secs(),
     }
 }
 
@@ -255,6 +292,30 @@ impl Lobby {
         if let Some(handle) = rooms.get(room) {
             return handle.clone();
         }
+        self.create_room_locked(room, &mut rooms)
+    }
+
+    /// Resolve a join target. During deploy drain, existing rooms stay joinable but new rooms are
+    /// rejected so fresh lobbies cannot be created while the process is waiting to exit.
+    pub async fn get_or_create_join_target(&self, room: &str) -> Result<RoomHandle, DrainNotice> {
+        let mut rooms = self.rooms.lock().await;
+        if let Some(handle) = rooms.get(room) {
+            return Ok(handle.clone());
+        }
+        if self.drain.is_draining() {
+            return Err(self.drain.notice().unwrap_or(DrainNotice {
+                deadline_unix_ms: 0,
+                seconds_remaining: 0,
+            }));
+        }
+        Ok(self.create_room_locked(room, &mut rooms))
+    }
+
+    fn create_room_locked(
+        &self,
+        room: &str,
+        rooms: &mut HashMap<String, RoomHandle>,
+    ) -> RoomHandle {
         let (event_tx, event_rx) = mpsc::channel(ROOM_EVENT_CHANNEL_CAP);
         let handle = RoomHandle { event_tx };
         rooms.insert(room.to_string(), handle.clone());
@@ -273,14 +334,14 @@ impl Lobby {
         handle
     }
 
-    pub async fn begin_draining(&self) {
-        self.drain.begin_draining();
+    pub async fn begin_draining(&self, timeout: Duration) {
+        let notice = self.drain.begin_draining(timeout);
         let handles: Vec<RoomHandle> = {
             let rooms = self.rooms.lock().await;
             rooms.values().cloned().collect()
         };
         for handle in handles {
-            let _ = handle.event_tx.try_send(RoomEvent::DrainStarted);
+            let _ = handle.event_tx.try_send(RoomEvent::DrainStarted(notice));
         }
     }
 

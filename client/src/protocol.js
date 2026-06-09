@@ -8,6 +8,7 @@ export const S = Object.freeze({
   START: "start",
   SNAPSHOT: "snapshot",
   REPLAY_STATE: "replayState",
+  SHUTDOWN_WARNING: "shutdownWarning",
   GAME_OVER: "gameOver",
   PONG: "pong",
   ERROR: "error",

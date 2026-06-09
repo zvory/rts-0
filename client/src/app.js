@@ -72,6 +72,7 @@ export class App {
     this.onStart = this.onStart.bind(this);
     this.onError = this.onError.bind(this);
     this.onGameOver = this.onGameOver.bind(this);
+    this.onShutdownWarning = this.onShutdownWarning.bind(this);
     this.onBackToLobby = this.onBackToLobby.bind(this);
     this.onCloseScorePanel = this.onCloseScorePanel.bind(this);
     this.onGameOverOverlayClick = this.onGameOverOverlayClick.bind(this);
@@ -85,6 +86,7 @@ export class App {
     this.net.on(S.START, this.onStart);
     this.net.on(S.ERROR, this.onError);
     this.net.on(S.GAME_OVER, this.onGameOver);
+    this.net.on(S.SHUTDOWN_WARNING, this.onShutdownWarning);
     this.net.on("open", this.onOpen);
     this.net.on("close", this.onClose);
     dom.gameOverButton.addEventListener("click", this.onBackToLobby);
@@ -131,6 +133,21 @@ export class App {
    */
   onError(m) {
     this.showToast(m && m.msg ? m.msg : "Server error");
+  }
+
+  /**
+   * Server is draining for deploy. Surface the platform deadline and keep it visible in the
+   * lobby status too, because new match starts are disabled while active matches wind down.
+   * @param {{deadlineUnixMs?: number, secondsRemaining?: number}} m
+   */
+  onShutdownWarning(m) {
+    const seconds = this.shutdownSecondsRemaining(m);
+    const text =
+      seconds > 0
+        ? `Server deploy in ${this.formatDuration(seconds)}. New matches are disabled.`
+        : "Server deploy in progress. New matches are disabled.";
+    this.showToast(text, 8000);
+    if (this.lobby) this.lobby.setStatus(text, true);
   }
 
   /**
@@ -336,14 +353,32 @@ export class App {
    * Re-arming the timer keeps the latest message visible.
    * @param {string} text
    */
-  showToast(text) {
+  showToast(text, timeoutMs = TOAST_MS) {
     if (!text) return;
     dom.toast.textContent = text;
     dom.toast.hidden = false;
     if (this.toastTimer) clearTimeout(this.toastTimer);
     this.toastTimer = window.setTimeout(() => {
       dom.toast.hidden = true;
-    }, TOAST_MS);
+    }, timeoutMs);
+  }
+
+  shutdownSecondsRemaining(m) {
+    const deadline = Number(m?.deadlineUnixMs);
+    if (Number.isFinite(deadline) && deadline > 0) {
+      return Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
+    }
+    const fallback = Number(m?.secondsRemaining);
+    return Number.isFinite(fallback) && fallback > 0 ? Math.ceil(fallback) : 0;
+  }
+
+  formatDuration(seconds) {
+    const total = Math.max(0, Math.ceil(seconds));
+    const minutes = Math.floor(total / 60);
+    const rem = total % 60;
+    if (minutes <= 0) return `${rem}s`;
+    if (rem === 0) return `${minutes}m`;
+    return `${minutes}m ${rem}s`;
   }
 
   /**

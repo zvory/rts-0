@@ -15,6 +15,13 @@ fn join_test_player(task: &mut RoomTask, player_id: u32) {
     task.on_join(player_id, format!("Player {player_id}"), false, msg_tx, ack);
 }
 
+fn join_test_player_with_writer(task: &mut RoomTask, player_id: u32) -> ConnectionWriter {
+    let (msg_tx, writer) = ConnectionSink::new();
+    let (ack, _ack_rx) = tokio::sync::oneshot::channel();
+    task.on_join(player_id, format!("Player {player_id}"), false, msg_tx, ack);
+    writer
+}
+
 fn test_drain() -> DrainHandle {
     DrainHandle::default()
 }
@@ -204,8 +211,11 @@ fn drain_handle_tracks_active_matches() {
     assert!(!drain.is_draining());
     assert_eq!(drain.active_matches(), 0);
 
-    drain.begin_draining();
+    let notice = drain.begin_draining(Duration::from_secs(295));
     assert!(drain.is_draining());
+    assert_eq!(drain.notice(), Some(notice));
+    assert_eq!(notice.seconds_remaining, 295);
+    assert_eq!(drain.begin_draining(Duration::from_secs(5)), notice);
 
     drain.match_started();
     drain.match_started();
@@ -219,6 +229,68 @@ fn drain_handle_tracks_active_matches() {
 
     drain.match_finished();
     assert_eq!(drain.active_matches(), 0);
+}
+
+#[test]
+fn draining_join_sends_warning_and_start_is_blocked() {
+    let drain = DrainHandle::default();
+    let notice = drain.begin_draining(Duration::from_secs(295));
+    let mut task = RoomTask::new(
+        "r".to_string(),
+        RoomMode::Normal,
+        None,
+        false,
+        drain.clone(),
+    );
+    let mut writer = join_test_player_with_writer(&mut task, 1);
+
+    task.on_ready(1, true);
+    task.on_start_request(1);
+
+    let messages: Vec<_> = std::iter::from_fn(|| writer.reliable_rx.try_recv().ok()).collect();
+    assert!(messages.iter().any(|msg| {
+        matches!(
+            msg,
+            ServerMessage::ShutdownWarning {
+                deadline_unix_ms,
+                seconds_remaining,
+            } if *deadline_unix_ms == notice.deadline_unix_ms && *seconds_remaining == 295
+        )
+    }));
+    assert!(messages.iter().any(|msg| matches!(
+        msg,
+        ServerMessage::Lobby {
+            can_start: false,
+            ..
+        }
+    )));
+    assert!(messages
+        .iter()
+        .any(|msg| { matches!(msg, ServerMessage::Error { msg } if msg.contains("draining")) }));
+    assert_eq!(drain.active_matches(), 0);
+}
+
+#[tokio::test]
+async fn draining_rejects_new_rooms_but_keeps_existing_rooms_joinable() {
+    let lobby = Lobby::new();
+    let existing = lobby.get_or_create("existing").await;
+
+    lobby.begin_draining(Duration::from_secs(295)).await;
+
+    let joined_existing = lobby
+        .get_or_create_join_target("existing")
+        .await
+        .expect("existing rooms should remain joinable during drain");
+    assert!(existing.event_tx.same_channel(&joined_existing.event_tx));
+
+    let rejected = lobby.get_or_create_join_target("new-room").await;
+    assert!(matches!(
+        rejected,
+        Err(DrainNotice {
+            seconds_remaining: 295,
+            ..
+        })
+    ));
 }
 
 #[tokio::test]
