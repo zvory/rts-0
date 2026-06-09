@@ -26,7 +26,7 @@ pub const CURRENT_MAP_VERSION: u32 = 1;
 
 const DEFAULT_MAP_JSON: &str = include_str!("../../../../assets/maps/default-handcrafted.json");
 const MAPS_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../assets/maps");
-const DEFAULT_MAP_NAME: &str = "default-handcrafted";
+const DEFAULT_MAP_NAME: &str = "Default";
 
 type Tile = (u32, u32);
 type BasePair = (Tile, Tile);
@@ -440,8 +440,8 @@ mod tests {
             "lobby map catalog must expose at least one selectable map"
         );
         let names: Vec<&str> = available.iter().map(|e| e.name.as_str()).collect();
-        assert!(names.contains(&"default-handcrafted"), "got: {names:?}");
-        assert!(names.contains(&"no-terrain"), "got: {names:?}");
+        assert!(names.contains(&"Default"), "got: {names:?}");
+        assert!(names.contains(&"No Terrain"), "got: {names:?}");
         // Every entry must have a non-empty description.
         for entry in &available {
             assert!(
@@ -451,7 +451,7 @@ mod tests {
             );
         }
 
-        let map = Map::load("default-handcrafted", 2, 0x1234_5678)
+        let map = Map::load("Default", 2, 0x1234_5678)
             .expect("default handcrafted map should load from bundled assets");
         assert_eq!(map.size, 126);
         assert_eq!(map.starts.len(), 2);
