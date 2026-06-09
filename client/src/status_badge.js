@@ -6,6 +6,7 @@ export class StatusBadge {
     this.root = rootEl;
     this.version = "unknown";
     this.metrics = null;
+    this.copyButtonText = "copy";
     this.copyResetTimer = undefined;
     this.onClick = (ev) => this._handleClick(ev);
     this._render();
@@ -59,7 +60,7 @@ export class StatusBadge {
             }</div>`
           : "") +
       `</div>` +
-      `<button class="status-badge-copy" type="button" title="Copy debug info" aria-label="Copy debug info">copy</button>`;
+      `<button class="status-badge-copy" type="button" title="Copy debug info" aria-label="Copy debug info">${this.copyButtonText}</button>`;
   }
 
   async _handleClick(ev) {
@@ -109,10 +110,12 @@ export class StatusBadge {
   }
 
   _setCopyButtonText(button, text) {
+    this.copyButtonText = text;
     button.textContent = text;
     if (this.copyResetTimer) window.clearTimeout(this.copyResetTimer);
     this.copyResetTimer = window.setTimeout(() => {
-      button.textContent = "copy";
+      this.copyButtonText = "copy";
+      this.root?.querySelector(".status-badge-copy")?.replaceChildren("copy");
       this.copyResetTimer = undefined;
     }, 1200);
   }
@@ -139,8 +142,13 @@ function formatMs(value) {
 
 async function copyText(text) {
   if (navigator.clipboard?.writeText) {
-    await navigator.clipboard.writeText(text);
-    return;
+    try {
+      await navigator.clipboard.writeText(text);
+      return;
+    } catch {
+      // Some browser/privacy combinations expose navigator.clipboard but reject
+      // the write; keep the click-gesture fallback path available.
+    }
   }
   const area = document.createElement("textarea");
   area.value = text;
