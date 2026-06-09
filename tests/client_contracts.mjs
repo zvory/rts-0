@@ -1287,6 +1287,41 @@ function fakeAudioContext() {
         sent[1].queued === true,
       "Shift+Charge hotkey should send a queued self ability command",
     );
+
+    renderedButtons.length = 0;
+    sent.length = 0;
+    const selectedAtGun = { id: 88, owner: playerId, kind: KIND.AT_TEAM, setupState: SETUP.DEPLOYED };
+    const atGunHud = Object.create(HUD.prototype);
+    atGunHud.state = {
+      playerId,
+      resources: { steel: 0, oil: 0 },
+      commandTarget: null,
+      selectedEntities: () => [selectedAtGun],
+      entitiesInterpolated: () => [selectedAtGun],
+      beginCommandTarget(kind) {
+        this.commandTarget = kind;
+      },
+      endCommandTarget() {
+        this.commandTarget = null;
+      },
+    };
+    atGunHud.net = { command: (command) => sent.push(command) };
+    atGunHud._cardSig = null;
+
+    const atGunCard = fakeElement("div");
+    atGunHud._renderUnitCard(atGunCard, [selectedAtGun]);
+    const setupButton = renderedButtons.find((button) => button.innerHTML.includes("Set Up"));
+    const tearDownButton = renderedButtons.find((button) => button.innerHTML.includes("Tear Down"));
+    assert(setupButton?.dataset.hotkey, "AT gun Set Up button should keep its command-card hotkey");
+    assert(tearDownButton && !tearDownButton.dataset.hotkey, "AT gun Tear Down button should not expose a hotkey");
+    assert(!tearDownButton.innerHTML.includes("cmd-hotkey"), "AT gun Tear Down button should not render a hotkey hint");
+    tearDownButton.click();
+    assert(
+      sent.length === 1 &&
+        sent[0].c === "tearDownAtGuns" &&
+        sent[0].units.join(",") === "88",
+      "clicking AT gun Tear Down should still send a teardown command",
+    );
   } finally {
     if (priorDocument === undefined) delete globalThis.document;
     else globalThis.document = priorDocument;

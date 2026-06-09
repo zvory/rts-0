@@ -762,7 +762,6 @@ export class HUD {
             icon: "TD",
             label: "Tear Down",
             title: "Pack up selected AT guns",
-            hotkey: GRID_HOTKEYS[tearDownSlot],
             enabled: true,
             cls: "",
             onClick: () => {
