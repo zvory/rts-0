@@ -699,6 +699,7 @@ fn vehicle_small_block_baseline_map(
     let start_y = (center_tile.1 as f32 + 0.5) * ts;
     let center_x = (center_tile.0 as f32 + 0.5) * ts;
     let spacing = vehicle_small_block_baseline_vehicle_spacing(vehicle);
+    let blocker_offset_y = ts * 3.0;
     let center_index = (pair_count.saturating_sub(1)) as f32 * 0.5;
     let vehicle_starts: Vec<(f32, f32)> = (0..pair_count)
         .map(|i| {
@@ -706,7 +707,10 @@ fn vehicle_small_block_baseline_map(
             (center_x + offset, start_y)
         })
         .collect();
-    let blocker_starts = vehicle_starts.iter().map(|(x, y)| (*x, *y - ts)).collect();
+    let blocker_starts = vehicle_starts
+        .iter()
+        .map(|(x, y)| (*x, *y - blocker_offset_y))
+        .collect();
     let goal = (center_x, start_y - ts * 20.0);
     if let Some(slot) = map.starts.get_mut(0) {
         *slot = center_tile;
@@ -1201,48 +1205,48 @@ mod tests {
     }
 
     const VEHICLE_SMALL_BLOCK_BASELINES: &[(EntityKind, usize, Option<EntityKind>, u32)] = &[
-        (EntityKind::ScoutCar, 1, Some(EntityKind::AtTeam), 280),
+        (EntityKind::ScoutCar, 1, Some(EntityKind::AtTeam), 282),
         (
             EntityKind::ScoutCar,
             1,
             Some(EntityKind::MachineGunner),
-            283,
+            288,
         ),
         (EntityKind::ScoutCar, 1, None, 272),
         (EntityKind::ScoutCar, 1, Some(EntityKind::Rifleman), 272),
         (EntityKind::ScoutCar, 1, Some(EntityKind::Worker), 272),
-        (EntityKind::ScoutCar, 3, Some(EntityKind::AtTeam), 334),
+        (EntityKind::ScoutCar, 3, Some(EntityKind::AtTeam), 314),
         (
             EntityKind::ScoutCar,
             3,
             Some(EntityKind::MachineGunner),
-            338,
+            333,
         ),
         (EntityKind::ScoutCar, 3, None, 298),
         (EntityKind::ScoutCar, 3, Some(EntityKind::Rifleman), 298),
         (EntityKind::ScoutCar, 3, Some(EntityKind::Worker), 298),
-        (EntityKind::ScoutCar, 5, Some(EntityKind::AtTeam), 365),
+        (EntityKind::ScoutCar, 5, Some(EntityKind::AtTeam), 359),
         (
             EntityKind::ScoutCar,
             5,
             Some(EntityKind::MachineGunner),
-            395,
+            358,
         ),
         (EntityKind::ScoutCar, 5, None, 329),
         (EntityKind::ScoutCar, 5, Some(EntityKind::Rifleman), 329),
         (EntityKind::ScoutCar, 5, Some(EntityKind::Worker), 329),
         (EntityKind::Tank, 1, Some(EntityKind::AtTeam), 327),
-        (EntityKind::Tank, 1, Some(EntityKind::MachineGunner), 326),
+        (EntityKind::Tank, 1, Some(EntityKind::MachineGunner), 329),
         (EntityKind::Tank, 1, None, 320),
         (EntityKind::Tank, 1, Some(EntityKind::Rifleman), 320),
         (EntityKind::Tank, 1, Some(EntityKind::Worker), 320),
-        (EntityKind::Tank, 3, Some(EntityKind::AtTeam), 452),
-        (EntityKind::Tank, 3, Some(EntityKind::MachineGunner), 452),
+        (EntityKind::Tank, 3, Some(EntityKind::AtTeam), 461),
+        (EntityKind::Tank, 3, Some(EntityKind::MachineGunner), 458),
         (EntityKind::Tank, 3, None, 447),
         (EntityKind::Tank, 3, Some(EntityKind::Rifleman), 447),
         (EntityKind::Tank, 3, Some(EntityKind::Worker), 447),
-        (EntityKind::Tank, 5, Some(EntityKind::AtTeam), 480),
-        (EntityKind::Tank, 5, Some(EntityKind::MachineGunner), 428),
+        (EntityKind::Tank, 5, Some(EntityKind::AtTeam), 513),
+        (EntityKind::Tank, 5, Some(EntityKind::MachineGunner), 508),
         (EntityKind::Tank, 5, None, 500),
         (EntityKind::Tank, 5, Some(EntityKind::Rifleman), 500),
         (EntityKind::Tank, 5, Some(EntityKind::Worker), 500),
@@ -1450,8 +1454,8 @@ mod tests {
                 );
                 let north_delta = vehicle_pos.1 - blocker_pos.1;
                 assert!(
-                    (north_delta - config::TILE_SIZE as f32).abs() <= 0.001,
-                    "{vehicle} blocker should be one tile north, got {north_delta:.2}px"
+                    (north_delta - config::TILE_SIZE as f32 * 3.0).abs() <= 0.001,
+                    "{vehicle} blocker should be three tiles north, got {north_delta:.2}px"
                 );
             }
         }
