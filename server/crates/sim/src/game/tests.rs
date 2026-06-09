@@ -1017,7 +1017,7 @@ fn mixed_queued_command_log_replays_deterministically() {
     game.enqueue(
         1,
         Command::Build {
-            worker: worker_builder,
+            units: vec![worker_builder],
             building: EntityKind::Depot,
             tile_x: 12,
             tile_y: 12,

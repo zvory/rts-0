@@ -48,9 +48,7 @@ export function _onRightClick(p, ev = {}) {
   if (target && target.owner === me && _isOwnIncompleteBuilding(target)) {
     const resume = _resumeConstructionIntent(target, this.state.map);
     if (resume && workers.length > 0) {
-      for (const worker of workers) {
-        this.net.command(cmd.build(worker, resume.building, resume.tileX, resume.tileY, queued));
-      }
+      this.net.command(cmd.build(workers, resume.building, resume.tileX, resume.tileY, queued));
       this.state.addCommandFeedback("move", target.x, target.y, queued);
       return;
     }

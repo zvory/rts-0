@@ -532,12 +532,14 @@ fn fast_flood_initial_affordable_proxy_uses_hidden_edge_target() {
         .iter()
         .filter_map(|command| match command {
             Command::Build {
-                worker,
+                units,
                 building,
                 tile_x,
                 tile_y,
                 ..
-            } if *building == EntityKind::Barracks => Some((*worker, (*tile_x, *tile_y))),
+            } if *building == EntityKind::Barracks => {
+                units.first().copied().map(|worker| (worker, (*tile_x, *tile_y)))
+            }
             _ => None,
         })
         .collect();
@@ -585,12 +587,14 @@ fn fast_flood_builds_proxy_barracks_with_reserved_worker_once_affordable() {
         .iter()
         .filter_map(|command| match command {
             Command::Build {
-                worker,
+                units,
                 building,
                 tile_x,
                 tile_y,
                 ..
-            } if *building == EntityKind::Barracks => Some((*worker, (*tile_x, *tile_y))),
+            } if *building == EntityKind::Barracks => {
+                units.first().copied().map(|worker| (worker, (*tile_x, *tile_y)))
+            }
             _ => None,
         })
         .collect();
@@ -609,8 +613,8 @@ fn fast_flood_builds_proxy_barracks_with_reserved_worker_once_affordable() {
     assert!(decision.commands.iter().any(|command| {
         matches!(
             command,
-            Command::Build { worker, building, .. }
-                if *worker == 20
+            Command::Build { units, building, .. }
+                if units.as_slice() == [20]
                     && *building == EntityKind::Barracks
         )
     }));

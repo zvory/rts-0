@@ -44,6 +44,7 @@ pub enum UnitActivity {
 #[derive(Debug, Clone, PartialEq)]
 pub struct UnitFacts {
     pub id: UnitId,
+    pub pos: Point,
     pub can_receive_orders: bool,
     pub queue_len: usize,
     pub activity: UnitActivity,
@@ -58,6 +59,7 @@ impl UnitFacts {
     pub fn new(id: UnitId) -> Self {
         UnitFacts {
             id,
+            pos: Point::new(0.0, 0.0),
             can_receive_orders: true,
             queue_len: 0,
             activity: UnitActivity::Idle,
@@ -119,6 +121,7 @@ pub enum RequestedOrder {
         kind: BuildKind,
         tile_x: u32,
         tile_y: u32,
+        target: Point,
         placement_valid: bool,
     },
     SetupAtGuns {
@@ -249,18 +252,9 @@ pub fn plan_order(
             kind,
             tile_x,
             tile_y,
+            target,
             placement_valid: true,
-        } => plan_filtered_units(
-            config,
-            request.mode,
-            &ordered_facts,
-            |u| u.can_build,
-            OrderIntent::Build {
-                kind,
-                tile_x,
-                tile_y,
-            },
-        ),
+        } if target.valid() => plan_build(config, request.mode, &ordered_facts, kind, tile_x, tile_y, target),
         RequestedOrder::SetupAtGuns { face_toward } if face_toward.valid() => plan_filtered_units(
             config,
             request.mode,
@@ -318,6 +312,58 @@ fn plan_ability(
         }
         AbilityTarget::WorldPoint(_) => PlannerOutput::default(),
     }
+}
+
+fn plan_build(
+    config: PlannerConfig,
+    mode: IssueMode,
+    units: &[&UnitFacts],
+    kind: BuildKind,
+    tile_x: u32,
+    tile_y: u32,
+    target: Point,
+) -> PlannerOutput {
+    let mut out = PlannerOutput::default();
+    let intent = OrderIntent::Build {
+        kind,
+        tile_x,
+        tile_y,
+    };
+    let builders: Vec<&UnitFacts> = units.iter().copied().filter(|u| u.can_build).collect();
+    if builders.is_empty() {
+        return out;
+    }
+
+    match mode {
+        IssueMode::Immediate => {
+            let idle: Vec<&UnitFacts> = builders
+                .iter()
+                .copied()
+                .filter(|u| matches!(u.activity, UnitActivity::Idle))
+                .collect();
+            let candidates = if idle.is_empty() {
+                builders.as_slice()
+            } else {
+                idle.as_slice()
+            };
+            if let Some(unit) = closest_unit(candidates, target) {
+                out.actions.push(PlannedAction::ReplaceActive {
+                    unit: unit.id,
+                    intent,
+                });
+            }
+        }
+        IssueMode::Queue => {
+            if let Some(unit) = choose_queued_build_worker(&builders, config.max_queue_len, target) {
+                append_or_notice(config, &mut out, unit, intent);
+            } else {
+                for unit in builders {
+                    out.notices.push(PlannerNotice::QueueFull { unit: unit.id });
+                }
+            }
+        }
+    }
+    out
 }
 
 fn plan_self_ability(
@@ -422,6 +468,37 @@ fn choose_queued_world_ability_unit<'a>(
         .copied()
         .filter(|u| u.queue_len < max_queue_len)
         .min_by_key(|u| u.queue_len)
+}
+
+fn choose_queued_build_worker<'a>(
+    units: &'a [&'a UnitFacts],
+    max_queue_len: usize,
+    target: Point,
+) -> Option<&'a UnitFacts> {
+    units
+        .iter()
+        .copied()
+        .filter(|u| u.queue_len < max_queue_len)
+        .min_by(|a, b| {
+            a.queue_len
+                .cmp(&b.queue_len)
+                .then_with(|| distance2(a.pos, target).total_cmp(&distance2(b.pos, target)))
+                .then_with(|| a.id.cmp(&b.id))
+        })
+}
+
+fn closest_unit<'a>(units: &'a [&'a UnitFacts], target: Point) -> Option<&'a UnitFacts> {
+    units.iter().copied().min_by(|a, b| {
+        distance2(a.pos, target)
+            .total_cmp(&distance2(b.pos, target))
+            .then_with(|| a.id.cmp(&b.id))
+    })
+}
+
+fn distance2(a: Point, b: Point) -> f32 {
+    let dx = a.x - b.x;
+    let dy = a.y - b.y;
+    dx * dx + dy * dy
 }
 
 fn append_or_notice(

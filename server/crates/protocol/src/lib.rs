@@ -173,7 +173,7 @@ pub enum Command {
         queued: bool,
     },
     Build {
-        worker: u32,
+        units: Vec<u32>,
         building: String,
         tile_x: u32,
         tile_y: u32,

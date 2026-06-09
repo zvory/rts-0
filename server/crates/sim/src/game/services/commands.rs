@@ -243,19 +243,21 @@ pub(crate) fn apply_commands(
                 );
             }
             SimCommand::Build {
-                worker,
+                units,
                 building,
                 tile_x,
                 tile_y,
                 queued,
             } => {
+                let (target_x, target_y) = build_target_center(building, tile_x, tile_y);
                 let request = planner::OrderRequest {
-                    units: vec![worker],
+                    units: units.clone(),
                     mode: issue_mode(queued),
                     order: planner::RequestedOrder::Build {
                         kind: build_kind_code(building),
                         tile_x,
                         tile_y,
+                        target: planner::Point::new(target_x, target_y),
                         placement_valid: true,
                     },
                 };
@@ -269,7 +271,7 @@ pub(crate) fn apply_commands(
                     smokes,
                     events,
                     player,
-                    &planner_facts(entities, player, &[worker], !queued, None),
+                    &planner_facts(entities, player, &units, false, None),
                     &request,
                     tick,
                 );
@@ -395,6 +397,17 @@ fn issue_mode(queued: bool) -> planner::IssueMode {
     }
 }
 
+fn build_target_center(building: EntityKind, tile_x: u32, tile_y: u32) -> (f32, f32) {
+    let Some(stats) = config::building_stats(building) else {
+        return (0.0, 0.0);
+    };
+    let ts = config::TILE_SIZE as f32;
+    (
+        tile_x as f32 * ts + stats.foot_w as f32 * ts * 0.5,
+        tile_y as f32 * ts + stats.foot_h as f32 * ts * 0.5,
+    )
+}
+
 fn planner_config() -> planner::PlannerConfig {
     planner::PlannerConfig {
         max_units_per_command: MAX_UNITS_PER_COMMAND,
@@ -417,6 +430,7 @@ fn planner_facts(
                 return None;
             }
             let mut facts = planner::UnitFacts::new(id);
+            facts.pos = planner::Point::new(e.pos_x, e.pos_y);
             facts.queue_len = e.queued_orders().len();
             facts.activity = match e.order() {
                 Order::Idle => planner::UnitActivity::Idle,
@@ -1284,7 +1298,7 @@ mod tests {
             vec![(
                 1,
                 SimCommand::Build {
-                    worker,
+                    units: vec![worker],
                     building: EntityKind::Depot,
                     tile_x: 4,
                     tile_y: 4,
@@ -1352,7 +1366,7 @@ mod tests {
             vec![(
                 1,
                 SimCommand::Build {
-                    worker,
+                    units: vec![worker],
                     building: EntityKind::Barracks,
                     tile_x: 8,
                     tile_y: 8,
@@ -1418,7 +1432,7 @@ mod tests {
             vec![(
                 1,
                 SimCommand::Build {
-                    worker,
+                    units: vec![worker],
                     building: EntityKind::Depot,
                     tile_x: 4,
                     tile_y: 4,
@@ -1492,7 +1506,7 @@ mod tests {
             vec![(
                 1,
                 SimCommand::Build {
-                    worker,
+                    units: vec![worker],
                     building: EntityKind::Depot,
                     tile_x: 4,
                     tile_y: 4,
@@ -1791,7 +1805,7 @@ mod tests {
             vec![(
                 1,
                 SimCommand::Build {
-                    worker,
+                    units: vec![worker],
                     building: EntityKind::Depot,
                     tile_x: 10,
                     tile_y: 10,
@@ -1869,7 +1883,7 @@ mod tests {
                 (
                     1,
                     SimCommand::Build {
-                        worker: builder,
+                        units: vec![builder],
                         building: EntityKind::Depot,
                         tile_x: 10,
                         tile_y: 10,
@@ -1894,6 +1908,98 @@ mod tests {
         for id in [mover, attacker, gatherer, builder] {
             assert_eq!(entities.get(id).unwrap().queued_orders().len(), 8);
         }
+    }
+
+    #[test]
+    fn build_with_multiple_selected_workers_uses_idle_closest_worker() {
+        let map = flat_map(32);
+        let mut entities = EntityStore::new();
+        let (cc_x, cc_y) = footprint_center(&map, EntityKind::CityCentre, 4, 4);
+        entities
+            .spawn_building(1, EntityKind::CityCentre, cc_x, cc_y, true)
+            .expect("city centre should spawn");
+        let busy_close = entities
+            .spawn_unit(1, EntityKind::Worker, 555.0, 512.0)
+            .expect("busy worker should spawn");
+        let idle_far = entities
+            .spawn_unit(1, EntityKind::Worker, 100.0, 100.0)
+            .expect("far worker should spawn");
+        let idle_close = entities
+            .spawn_unit(1, EntityKind::Worker, 570.0, 512.0)
+            .expect("close worker should spawn");
+        let node = entities
+            .spawn_node(EntityKind::Steel, 560.0, 560.0)
+            .expect("node should spawn");
+        entities
+            .get_mut(busy_close)
+            .expect("busy worker should exist")
+            .set_order(Order::gather(node));
+
+        apply(
+            &map,
+            &mut entities,
+            vec![(
+                1,
+                SimCommand::Build {
+                    units: vec![busy_close, idle_far, idle_close],
+                    building: EntityKind::Depot,
+                    tile_x: 15,
+                    tile_y: 15,
+                    queued: false,
+                },
+            )],
+        );
+
+        assert!(matches!(
+            entities.get(idle_close).expect("close worker").order(),
+            Order::Build(_)
+        ));
+        assert!(matches!(
+            entities.get(idle_far).expect("far worker").order(),
+            Order::Idle
+        ));
+        assert!(matches!(
+            entities.get(busy_close).expect("busy worker").order(),
+            Order::Gather(_)
+        ));
+    }
+
+    #[test]
+    fn queued_builds_distribute_across_selected_workers_by_queue_length() {
+        let map = flat_map(32);
+        let mut entities = EntityStore::new();
+        let (cc_x, cc_y) = footprint_center(&map, EntityKind::CityCentre, 4, 4);
+        entities
+            .spawn_building(1, EntityKind::CityCentre, cc_x, cc_y, true)
+            .expect("city centre should spawn");
+        let first = entities
+            .spawn_unit(1, EntityKind::Worker, cc_x + 64.0, cc_y)
+            .expect("first worker should spawn");
+        let second = entities
+            .spawn_unit(1, EntityKind::Worker, cc_x + 96.0, cc_y)
+            .expect("second worker should spawn");
+
+        apply(
+            &map,
+            &mut entities,
+            (0..4)
+                .map(|i| {
+                    (
+                        1,
+                        SimCommand::Build {
+                            units: vec![first, second],
+                            building: EntityKind::Depot,
+                            tile_x: 10 + i,
+                            tile_y: 10,
+                            queued: true,
+                        },
+                    )
+                })
+                .collect(),
+        );
+
+        assert_eq!(entities.get(first).unwrap().queued_orders().len(), 2);
+        assert_eq!(entities.get(second).unwrap().queued_orders().len(), 2);
     }
 
     #[test]
@@ -2627,7 +2733,7 @@ mod tests {
                 (
                     1,
                     SimCommand::Build {
-                        worker,
+                        units: vec![worker],
                         building: EntityKind::Depot,
                         tile_x: u32::MAX,
                         tile_y: u32::MAX,

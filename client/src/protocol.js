@@ -693,8 +693,8 @@ export const cmd = Object.freeze({
   },
   gather: (units, node, queued = false) =>
     withQueued({ c: CMD.GATHER, units, node }, queued),
-  build: (worker, building, tileX, tileY, queued = false) =>
-    withQueued({ c: CMD.BUILD, worker, building, tileX, tileY }, queued),
+  build: (units, building, tileX, tileY, queued = false) =>
+    withQueued({ c: CMD.BUILD, units, building, tileX, tileY }, queued),
   train: (building, unit) => ({ c: CMD.TRAIN, building, unit }),
   research: (building, upgrade) => ({ c: CMD.RESEARCH, building, upgrade }),
   cancel: (building) => ({ c: CMD.CANCEL, building }),
