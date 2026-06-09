@@ -9,6 +9,7 @@ COPY server/Cargo.toml server/Cargo.lock server/build.rs ./server/
 COPY server/crates ./server/crates
 COPY server/src ./server/src
 COPY server/assets ./server/assets
+COPY server/migrations ./server/migrations
 COPY client ./client
 
 WORKDIR /app/server
