@@ -12,7 +12,6 @@ const NEW_TEST_FILE_LINE_BUDGET: usize = 1_500;
 const PUBLIC_EXPORT_GROWTH_BUFFER: usize = 2;
 const NEW_MODULE_PUBLIC_EXPORT_BUDGET: usize = 8;
 
-const PURE_POLICY_MODULES: &[&str] = &["services/order_planner.rs"];
 const PURE_POLICY_FORBIDDEN_IMPORTS: &[&str] = &[
     "EntityStore",
     "PlayerState",
@@ -20,6 +19,40 @@ const PURE_POLICY_FORBIDDEN_IMPORTS: &[&str] = &[
     "MoveCoordinator",
     "SmokeCloudStore",
     "Event",
+];
+
+const SERVICE_ROLES: &[(&str, ServiceRole)] = &[
+    ("ability_orders", ServiceRole::MutationHelper),
+    ("combat", ServiceRole::TickSystem),
+    ("commands", ServiceRole::CommandAdapter),
+    ("construction", ServiceRole::TickSystem),
+    ("death", ServiceRole::TickSystem),
+    ("economy", ServiceRole::TickSystem),
+    ("geometry", ServiceRole::QueryIndex),
+    ("line_of_sight", ServiceRole::QueryIndex),
+    ("move_coordinator", ServiceRole::MutationHelper),
+    ("movement", ServiceRole::TickSystem),
+    ("occupancy", ServiceRole::QueryIndex),
+    ("order_planner", ServiceRole::PurePolicy),
+    ("order_queue", ServiceRole::CommandAdapter),
+    ("pathing", ServiceRole::QueryIndex),
+    ("production", ServiceRole::TickSystem),
+    ("spatial", ServiceRole::QueryIndex),
+    ("standability", ServiceRole::QueryIndex),
+    ("supply", ServiceRole::TickSystem),
+    ("world_query", ServiceRole::QueryIndex),
+];
+
+const GRANDFATHERED_BROAD_ADAPTERS: &[&str] = &["commands", "order_queue"];
+
+const ROLE_EDGE_ALLOWLIST: &[(&str, &str)] = &[
+    // Ability execution still reuses command notice constructors. New command families should
+    // prefer facts -> pure plan -> narrow executor instead of adding more adapter back-edges.
+    ("ability_orders", "commands"),
+    // Ability execution may delegate movement/path staging through the coordinator boundary.
+    ("ability_orders", "move_coordinator"),
+    // Combat uses movement's shared facing helpers while combat policy is being split out.
+    ("combat", "movement"),
 ];
 
 const ENTITY_FIELD_WRITE_APPROVED_PREFIXES: &[&str] = &["entity/"];
@@ -210,6 +243,27 @@ struct UseStatement {
     text: String,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ServiceRole {
+    TickSystem,
+    CommandAdapter,
+    PurePolicy,
+    QueryIndex,
+    MutationHelper,
+}
+
+impl ServiceRole {
+    fn label(self) -> &'static str {
+        match self {
+            ServiceRole::TickSystem => "tick system",
+            ServiceRole::CommandAdapter => "command adapter",
+            ServiceRole::PurePolicy => "pure policy",
+            ServiceRole::QueryIndex => "query/index service",
+            ServiceRole::MutationHelper => "mutation helper",
+        }
+    }
+}
+
 pub fn check_sim_architecture(game_root: &Path) -> io::Result<ArchitectureReport> {
     let mut files = Vec::new();
     for path in rust_files(game_root)? {
@@ -262,6 +316,9 @@ fn analyze_source_files(files: &[SourceFile]) -> ArchitectureReport {
     let mut report = ArchitectureReport::default();
     let service_modules = service_modules(files);
     let allowed_service_imports = allowed_service_imports();
+    let service_roles = service_roles();
+
+    check_service_roles(&service_modules, &service_roles, &mut report);
 
     for file in files {
         let stripped = strip_cfg_test_modules(&file.text);
@@ -276,9 +333,11 @@ fn analyze_source_files(files: &[SourceFile]) -> ArchitectureReport {
             &use_statements,
             &service_modules,
             &allowed_service_imports,
+            &service_roles,
             &mut report,
         );
-        check_pure_policy_imports(file, &use_statements, &mut report);
+        check_pure_policy_imports(file, &use_statements, &service_roles, &mut report);
+        check_role_state_boundaries(file, &stripped, &service_roles, &mut report);
         collect_broad_signatures(file, &stripped, &mut report);
         collect_player_state_usages(file, &stripped, &mut report);
         collect_public_exports(file, &stripped, &mut report);
@@ -677,11 +736,30 @@ fn allowed_service_imports() -> BTreeMap<&'static str, BTreeSet<&'static str>> {
         .collect()
 }
 
+fn service_roles() -> BTreeMap<&'static str, ServiceRole> {
+    SERVICE_ROLES.iter().copied().collect()
+}
+
+fn check_service_roles(
+    service_modules: &BTreeSet<String>,
+    roles: &BTreeMap<&str, ServiceRole>,
+    report: &mut ArchitectureReport,
+) {
+    for module in service_modules {
+        if !roles.contains_key(module.as_str()) {
+            report.failures.push(format!(
+                "services/{module}: service module must be classified in SERVICE_ROLES before it can participate in dependency checks"
+            ));
+        }
+    }
+}
+
 fn check_service_imports(
     file: &SourceFile,
     use_statements: &[UseStatement],
     service_modules: &BTreeSet<String>,
     allowed: &BTreeMap<&str, BTreeSet<&str>>,
+    roles: &BTreeMap<&str, ServiceRole>,
     report: &mut ArchitectureReport,
 ) {
     let Some(source) = service_module_for_path(&file.rel_path) else {
@@ -708,6 +786,14 @@ fn check_service_imports(
                     file.rel_path, statement.line
                 ));
             }
+            if let Some(reason) =
+                service_role_edge_rejection(source.as_str(), target.as_str(), roles)
+            {
+                report.failures.push(format!(
+                    "{}:{}: service module {source} must not import services::{target}: {reason}",
+                    file.rel_path, statement.line
+                ));
+            }
         }
     }
 }
@@ -715,9 +801,10 @@ fn check_service_imports(
 fn check_pure_policy_imports(
     file: &SourceFile,
     use_statements: &[UseStatement],
+    roles: &BTreeMap<&str, ServiceRole>,
     report: &mut ArchitectureReport,
 ) {
-    if !PURE_POLICY_MODULES.contains(&file.rel_path.as_str()) {
+    if role_for_file(file, roles) != Some(ServiceRole::PurePolicy) {
         return;
     }
 
@@ -731,6 +818,104 @@ fn check_pure_policy_imports(
             }
         }
     }
+}
+
+fn check_role_state_boundaries(
+    file: &SourceFile,
+    text: &str,
+    roles: &BTreeMap<&str, ServiceRole>,
+    report: &mut ArchitectureReport,
+) {
+    let Some(role) = role_for_file(file, roles) else {
+        return;
+    };
+
+    for signature in collect_function_signatures(text) {
+        let compact = signature.text.split_whitespace().collect::<String>();
+        if role == ServiceRole::PurePolicy && signature_accepts_mutable_world_state(&compact) {
+            report.failures.push(format!(
+                "{}:{}: pure-policy module must not expose mutable world state; use facts-in, decisions-out planning instead",
+                file.rel_path, signature.line
+            ));
+        }
+        if role == ServiceRole::QueryIndex
+            && (compact.contains("&mutEntityStore") || compact.contains("&mut[PlayerState]"))
+        {
+            report.failures.push(format!(
+                "{}:{}: query/index service may read world state but must not accept mutable EntityStore or PlayerState",
+                file.rel_path, signature.line
+            ));
+        }
+    }
+}
+
+fn role_for_file(file: &SourceFile, roles: &BTreeMap<&str, ServiceRole>) -> Option<ServiceRole> {
+    let module = service_module_for_path(&file.rel_path)?;
+    roles.get(module.as_str()).copied()
+}
+
+fn service_role_edge_rejection(
+    source: &str,
+    target: &str,
+    roles: &BTreeMap<&str, ServiceRole>,
+) -> Option<String> {
+    let source_role = roles.get(source).copied()?;
+    let target_role = roles.get(target).copied()?;
+    if GRANDFATHERED_BROAD_ADAPTERS.contains(&source) {
+        return None;
+    }
+    if service_role_edge_allowed(source, target, source_role, target_role) {
+        return None;
+    }
+    Some(format!(
+        "{} -> {} edges are forbidden by the service role matrix; route orchestration through systems.rs or introduce facts/plans plus a narrow executor",
+        source_role.label(),
+        target_role.label()
+    ))
+}
+
+fn signature_accepts_mutable_world_state(compact_signature: &str) -> bool {
+    [
+        "&mutEntityStore",
+        "&mut[PlayerState]",
+        "&mutFog",
+        "&mutMoveCoordinator",
+        "&mutSmokeCloudStore",
+    ]
+    .iter()
+    .any(|needle| compact_signature.contains(needle))
+}
+
+fn service_role_edge_allowed(
+    source: &str,
+    target: &str,
+    source_role: ServiceRole,
+    target_role: ServiceRole,
+) -> bool {
+    if ROLE_EDGE_ALLOWLIST.contains(&(source, target)) {
+        return true;
+    }
+    if source_role == ServiceRole::CommandAdapter
+        && target_role == ServiceRole::CommandAdapter
+        && GRANDFATHERED_BROAD_ADAPTERS.contains(&source)
+    {
+        return true;
+    }
+
+    matches!(
+        (source_role, target_role),
+        (ServiceRole::TickSystem, ServiceRole::PurePolicy)
+            | (ServiceRole::TickSystem, ServiceRole::QueryIndex)
+            | (ServiceRole::TickSystem, ServiceRole::MutationHelper)
+            | (ServiceRole::CommandAdapter, ServiceRole::PurePolicy)
+            | (ServiceRole::CommandAdapter, ServiceRole::QueryIndex)
+            | (ServiceRole::CommandAdapter, ServiceRole::MutationHelper)
+            | (ServiceRole::PurePolicy, ServiceRole::PurePolicy)
+            | (ServiceRole::QueryIndex, ServiceRole::PurePolicy)
+            | (ServiceRole::QueryIndex, ServiceRole::QueryIndex)
+            | (ServiceRole::MutationHelper, ServiceRole::PurePolicy)
+            | (ServiceRole::MutationHelper, ServiceRole::QueryIndex)
+    )
 }
 
 fn collect_broad_signatures(file: &SourceFile, text: &str, report: &mut ArchitectureReport) {
@@ -1129,6 +1314,89 @@ mod tests {
     }
 
     #[test]
+    fn role_allowed_service_import_passes_when_allowlisted() {
+        let report = analyze_source_files(&[
+            source(
+                "services/production.rs",
+                "use crate::game::services::standability;\n",
+            ),
+            source("services/standability.rs", ""),
+        ]);
+
+        assert!(report.failures.is_empty());
+        assert_eq!(
+            report.metrics.service_edges,
+            vec![ServiceEdge {
+                source: "production".to_string(),
+                target: "standability".to_string(),
+                path: "services/production.rs".to_string(),
+                line: 1,
+            }]
+        );
+    }
+
+    #[test]
+    fn edge_forbidden_by_role_matrix_fails_with_reason() {
+        let report = analyze_source_files(&[
+            source(
+                "services/production.rs",
+                "use crate::game::services::combat;\n",
+            ),
+            source("services/combat/mod.rs", ""),
+        ]);
+
+        assert_eq!(
+            report.failures,
+            vec![
+                "services/production.rs:1: service module production must not import services::combat without updating the architecture allowlist".to_string(),
+                "services/production.rs:1: service module production must not import services::combat: tick system -> tick system edges are forbidden by the service role matrix; route orchestration through systems.rs or introduce facts/plans plus a narrow executor".to_string(),
+            ]
+        );
+    }
+
+    #[test]
+    fn new_service_module_must_be_classified() {
+        let report = analyze_source_files(&[source("services/new_policy.rs", "")]);
+
+        assert_eq!(
+            report.failures,
+            vec![
+                "services/new_policy: service module must be classified in SERVICE_ROLES before it can participate in dependency checks".to_string()
+            ]
+        );
+    }
+
+    #[test]
+    fn query_index_module_accepting_mutable_world_state_fails() {
+        let report = analyze_source_files(&[source(
+            "services/world_query.rs",
+            "pub(crate) fn mutate(entities: &mut EntityStore) {}\n",
+        )]);
+
+        assert_eq!(
+            report.failures,
+            vec![
+                "services/world_query.rs:1: query/index service may read world state but must not accept mutable EntityStore or PlayerState".to_string()
+            ]
+        );
+    }
+
+    #[test]
+    fn pure_policy_module_accepting_mutable_inputs_fails() {
+        let report = analyze_source_files(&[source(
+            "services/order_planner.rs",
+            "pub(crate) fn plan(entities: &mut EntityStore) {}\n",
+        )]);
+
+        assert_eq!(
+            report.failures,
+            vec![
+                "services/order_planner.rs:1: pure-policy module must not expose mutable world state; use facts-in, decisions-out planning instead".to_string()
+            ]
+        );
+    }
+
+    #[test]
     fn braced_service_imports_are_parsed() {
         let report = analyze_source_files(&[
             source(
@@ -1196,15 +1464,15 @@ mod tests {
 
     #[test]
     fn line_growth_has_a_generous_buffer_before_failing() {
-        let original = analyze_source_files(&[source("services/example.rs", "line\n")]);
+        let original = analyze_source_files(&[source("services/commands.rs", "line\n")]);
         let baseline = baseline("test baseline", &original.metrics);
         let mut within_budget =
-            analyze_source_files(&[source("services/example.rs", &"line\n".repeat(81))]);
+            analyze_source_files(&[source("services/commands.rs", &"line\n".repeat(81))]);
         compare_to_baseline(&baseline, &mut within_budget);
         assert!(within_budget.failures.is_empty());
 
         let mut over_budget =
-            analyze_source_files(&[source("services/example.rs", &"line\n".repeat(82))]);
+            analyze_source_files(&[source("services/commands.rs", &"line\n".repeat(82))]);
         compare_to_baseline(&baseline, &mut over_budget);
         assert_eq!(over_budget.failures.len(), 1);
         assert!(over_budget.failures[0].contains("line count grew"));
@@ -1224,9 +1492,9 @@ mod tests {
 
     #[test]
     fn shrinking_a_file_suggests_lowering_the_future_budget() {
-        let original = analyze_source_files(&[source("services/example.rs", &"line\n".repeat(5))]);
+        let original = analyze_source_files(&[source("services/commands.rs", &"line\n".repeat(5))]);
         let baseline = baseline("test baseline", &original.metrics);
-        let mut report = analyze_source_files(&[source("services/example.rs", "line\n")]);
+        let mut report = analyze_source_files(&[source("services/commands.rs", "line\n")]);
 
         compare_to_baseline(&baseline, &mut report);
 
@@ -1234,7 +1502,7 @@ mod tests {
         assert_eq!(
             report.ratchet_notes,
             vec![
-                "services/example.rs shrank from 5 to 1 lines; --bless would lower the future budget"
+                "services/commands.rs shrank from 5 to 1 lines; --bless would lower the future budget"
                     .to_string()
             ]
         );
@@ -1243,12 +1511,12 @@ mod tests {
     #[test]
     fn new_player_state_usage_exceeds_the_baseline_without_line_number_noise() {
         let original = analyze_source_files(&[source(
-            "services/example.rs",
+            "services/commands.rs",
             "fn update(player: &mut PlayerState) {}\n",
         )]);
         let baseline = baseline("test baseline", &original.metrics);
         let mut same_usage_moved = analyze_source_files(&[source(
-            "services/example.rs",
+            "services/commands.rs",
             "\n\nfn update(player: &mut PlayerState) {}\n",
         )]);
 
@@ -1257,7 +1525,7 @@ mod tests {
         assert!(same_usage_moved.failures.is_empty());
 
         let mut new_usage = analyze_source_files(&[source(
-            "services/example.rs",
+            "services/commands.rs",
             "fn update(player: &mut PlayerState) {}\nfn reset(player: PlayerState) {}\n",
         )]);
         compare_to_baseline(&baseline, &mut new_usage);
@@ -1267,17 +1535,17 @@ mod tests {
 
     #[test]
     fn public_exports_have_a_small_growth_buffer() {
-        let original = analyze_source_files(&[source("services/example.rs", "pub fn a() {}\n")]);
+        let original = analyze_source_files(&[source("services/commands.rs", "pub fn a() {}\n")]);
         let baseline = baseline("test baseline", &original.metrics);
         let mut within_budget = analyze_source_files(&[source(
-            "services/example.rs",
+            "services/commands.rs",
             "pub fn a() {}\npub fn b() {}\npub fn c() {}\n",
         )]);
         compare_to_baseline(&baseline, &mut within_budget);
         assert!(within_budget.failures.is_empty());
 
         let mut over_budget = analyze_source_files(&[source(
-            "services/example.rs",
+            "services/commands.rs",
             "pub fn a() {}\npub fn b() {}\npub fn c() {}\npub fn d() {}\n",
         )]);
         compare_to_baseline(&baseline, &mut over_budget);
