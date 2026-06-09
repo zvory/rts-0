@@ -109,8 +109,9 @@ pub(crate) fn construction_system(
             Some(p) => p,
             None => continue,
         };
-        ps.steel -= cost_steel;
-        ps.oil -= cost_oil;
+        if !ps.spend_resources(cost_steel, cost_oil) {
+            continue;
+        }
 
         let (cx, cy) = footprint_center(map, kind, tx, ty);
         let site = match entities.spawn_building(owner, kind, cx, cy, false) {
@@ -152,17 +153,7 @@ pub(crate) fn construction_system(
                     continue;
                 }
             };
-            let Some(c) = b.construction.as_mut() else {
-                continue;
-            };
-            c.progress += 1;
-            if c.progress < c.total {
-                false
-            } else {
-                c.progress = c.total;
-                b.construction = None;
-                true
-            }
+            b.advance_construction().unwrap_or(false)
         };
         if completed {
             let (owner, kind) = entities
@@ -468,8 +459,8 @@ mod tests {
             .expect("scaffold should spawn");
         // Drive the scaffold to one tick away from completion.
         if let Some(b) = entities.get_mut(site) {
-            if let Some(c) = b.construction.as_mut() {
-                c.progress = c.total.saturating_sub(1);
+            if let Some(progress) = b.construction.as_ref().map(|c| c.total.saturating_sub(1)) {
+                b.set_construction_progress(progress);
             }
         }
         let worker = entities

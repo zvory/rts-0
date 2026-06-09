@@ -1,0 +1,55 @@
+use super::PlayerState;
+use crate::config;
+use crate::game::entity::EntityKind;
+
+impl PlayerState {
+    pub(crate) fn can_afford(&self, steel: u32, oil: u32) -> bool {
+        self.steel >= steel && self.oil >= oil
+    }
+
+    pub(crate) fn spend_resources(&mut self, steel: u32, oil: u32) -> bool {
+        if !self.can_afford(steel, oil) {
+            return false;
+        }
+        self.steel -= steel;
+        self.oil -= oil;
+        true
+    }
+
+    pub(crate) fn refund_resources(&mut self, steel: u32, oil: u32) {
+        self.steel = self.steel.saturating_add(steel);
+        self.oil = self.oil.saturating_add(oil);
+    }
+
+    pub(crate) fn add_gathered_resources(&mut self, kind: EntityKind, amount: u32) {
+        match kind {
+            EntityKind::Oil => self.oil = self.oil.saturating_add(amount),
+            EntityKind::Steel => self.steel = self.steel.saturating_add(amount),
+            _ => {}
+        }
+    }
+
+    pub(crate) fn reserve_supply(&mut self, supply: u32) -> bool {
+        let Some(next) = self.supply_used.checked_add(supply) else {
+            return false;
+        };
+        if next > self.supply_cap {
+            return false;
+        }
+        self.supply_used = next;
+        true
+    }
+
+    pub(crate) fn release_supply(&mut self, supply: u32) {
+        self.supply_used = self.supply_used.saturating_sub(supply);
+    }
+
+    pub(crate) fn set_supply_counts(&mut self, used: u32, cap: u32) {
+        self.supply_used = used;
+        self.supply_cap = cap.min(config::SUPPLY_CAP_MAX);
+    }
+
+    pub(crate) fn reset_supply(&mut self) {
+        self.set_supply_counts(0, 0);
+    }
+}

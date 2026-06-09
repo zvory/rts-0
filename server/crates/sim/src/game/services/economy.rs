@@ -154,33 +154,24 @@ fn gather_harvesting(
         return;
     }
 
-    let is_oil = node_kind_amount.0 == EntityKind::Oil;
-    let load_cap = if is_oil {
+    let load_cap = if node_kind_amount.0 == EntityKind::Oil {
         config::OIL_LOAD
     } else {
         config::STEEL_LOAD
     };
-    let taken = load_cap.min(node_kind_amount.1);
-    if let Some(n) = entities.get_mut(node) {
-        if let Some(node) = n.resource_node.as_mut() {
-            node.remaining = node.remaining.saturating_sub(taken);
-        }
-    }
+    let taken = entities
+        .get_mut(node)
+        .map(|n| n.harvest_resources(load_cap))
+        .unwrap_or(0);
 
     if taken > 0 {
         if let Some(ps) = players.iter_mut().find(|p| p.id == owner) {
-            if is_oil {
-                ps.oil += taken;
-            } else {
-                ps.steel += taken;
-            }
+            ps.add_gathered_resources(node_kind_amount.0, taken);
         }
     }
 
     if let Some(e) = entities.get_mut(id) {
-        if let Some(w) = e.worker.as_mut() {
-            w.carry = None;
-        }
+        e.clear_worker_carry();
         e.reset_gather_harvest();
         e.clear_path();
     }

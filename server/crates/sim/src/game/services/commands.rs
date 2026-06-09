@@ -285,9 +285,7 @@ pub(crate) fn apply_commands(
                         entities.release_miner(id);
                         if let Some(e) = entities.get_mut(id) {
                             e.clear_orders();
-                            if let Some(w) = e.worker.as_mut() {
-                                w.carry = None;
-                            }
+                            e.clear_worker_carry();
                         }
                     }
                 }
@@ -1035,21 +1033,39 @@ fn order_train(
         );
         return;
     }
-    if ps.supply_used + supply > ps.supply_cap {
+    if ps
+        .supply_used
+        .checked_add(supply)
+        .is_none_or(|used| used > ps.supply_cap)
+    {
         notice(events, player, "Not enough supply");
         return;
     }
-    ps.steel -= cost_steel;
-    ps.oil -= cost_oil;
-    ps.supply_used += supply;
+    if !ps.spend_resources(cost_steel, cost_oil) {
+        notice(
+            events,
+            player,
+            rules::economy::resource_shortage_notice(ps.steel, ps.oil, cost_steel, cost_oil),
+        );
+        return;
+    }
+    if !ps.reserve_supply(supply) {
+        ps.refund_resources(cost_steel, cost_oil);
+        notice(events, player, "Not enough supply");
+        return;
+    }
 
-    if let Some(b) = entities.get_mut(building) {
-        if let Some(queue) = b.prod_queue_mut() {
-            queue.push(ProdItem {
-                unit,
-                progress: 0,
-                total: stats.build_ticks,
-            });
+    let queued = entities.get_mut(building).is_some_and(|b| {
+        b.push_production(ProdItem {
+            unit,
+            progress: 0,
+            total: stats.build_ticks,
+        })
+    });
+    if !queued {
+        if let Some(ps) = players.iter_mut().find(|p| p.id == player) {
+            ps.refund_resources(cost_steel, cost_oil);
+            ps.release_supply(supply);
         }
     }
 }
@@ -1099,22 +1115,16 @@ fn order_cancel(
             Some(b) if b.owner == player && b.is_building() && !b.prod_queue().is_empty() => b,
             _ => return,
         };
-        match b.prod_queue_mut() {
-            Some(queue) => match queue.pop() {
-                Some(item) => item.unit,
-                None => return,
-            },
+        match b.pop_last_production() {
+            Some(item) => item.unit,
             None => return,
         }
     };
     if config::unit_stats(unit).is_some() {
         if let Some(ps) = players.iter_mut().find(|p| p.id == player) {
             let (cost_steel, cost_oil) = rules::economy::cost(unit);
-            ps.steel += cost_steel;
-            ps.oil += cost_oil;
-            ps.supply_used = ps
-                .supply_used
-                .saturating_sub(rules::economy::supply_cost(unit));
+            ps.refund_resources(cost_steel, cost_oil);
+            ps.release_supply(rules::economy::supply_cost(unit));
         }
     }
 }
@@ -3082,11 +3092,7 @@ mod tests {
         entities
             .get_mut(barracks)
             .expect("barracks should exist")
-            .prod_queue_mut()
-            .expect("queue")
-            .first_mut()
-            .expect("rifleman should be queued")
-            .progress = 17;
+            .set_front_production_progress(17);
         apply_with_players(
             &map,
             &mut entities,

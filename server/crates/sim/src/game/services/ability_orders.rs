@@ -135,8 +135,9 @@ pub(crate) fn launch_world_ability(
             if !e.consume_ability_use(ability) {
                 return false;
             }
-            ps.steel = ps.steel.saturating_sub(definition.cost.steel);
-            ps.oil = ps.oil.saturating_sub(definition.cost.oil);
+            if !ps.spend_resources(definition.cost.steel, definition.cost.oil) {
+                return false;
+            }
             e.start_ability_cooldown(ability, definition.cooldown_ticks);
             if !preserve_active_order {
                 e.clear_active_order();

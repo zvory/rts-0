@@ -566,7 +566,7 @@ impl Game {
                 spawn_debug_human_start(&mut entities, &map, &mut ps, start);
             }
             // The starting City Centre contributes supply immediately.
-            ps.supply_cap = config::CITY_CENTRE_SUPPLY.min(config::SUPPLY_CAP_MAX);
+            ps.set_supply_counts(0, config::CITY_CENTRE_SUPPLY);
             player_states.push(ps);
         }
 

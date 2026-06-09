@@ -716,9 +716,7 @@ mod tests {
             .expect("node should spawn");
         // Deplete the node manually so it survives in-store but has nothing to mine.
         if let Some(n) = entities.get_mut(node) {
-            if let Some(resource) = n.resource_node.as_mut() {
-                resource.remaining = 0;
-            }
+            n.harvest_resources(u32::MAX);
         }
         let worker = entities
             .spawn_unit(1, EntityKind::Worker, cx, cy + 16.0)

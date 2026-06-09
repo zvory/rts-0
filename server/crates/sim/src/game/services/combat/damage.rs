@@ -90,16 +90,8 @@ pub(super) fn apply_damage(
         _ => dmg,
     };
     let damaged = if let Some(v) = entities.get_mut(shot_victim) {
-        if v.hp > 0 && effective_dmg > 0 {
-            v.hp = v.hp.saturating_sub(effective_dmg);
-            if v.owner != attacker_owner {
-                v.set_last_damage_owner(Some(attacker_owner));
-                v.record_damage_from((ax, ay), tick);
-            }
-            true
-        } else {
-            false
-        }
+        let attribution = (v.owner != attacker_owner).then_some((attacker_owner, (ax, ay), tick));
+        v.apply_damage(effective_dmg, attribution)
     } else {
         false
     };
@@ -250,11 +242,7 @@ fn apply_overpenetration(
             .map(|e| e.kind == EntityKind::Tank || e.is_building())
             .unwrap_or(false);
         if let Some(v) = entities.get_mut(id) {
-            if v.hp > 0 {
-                v.hp = v.hp.saturating_sub(effective_dmg);
-                v.set_last_damage_owner(Some(attacker_owner));
-                v.record_damage_from((ax, ay), tick);
-            }
+            v.apply_damage(effective_dmg, Some((attacker_owner, (ax, ay), tick)));
         }
         let reveal = attack_reveal_for(entities.get(attacker));
         for pid in &player_ids {

@@ -16,6 +16,7 @@ pub(crate) mod fog;
 mod invariants;
 pub mod map;
 mod pathfinding;
+mod player_state;
 pub mod replay;
 mod scoring;
 pub(crate) mod services;
@@ -306,8 +307,7 @@ impl Game {
             }
         }
         if let Some(p) = self.players.iter_mut().find(|p| p.id == player) {
-            p.supply_used = 0;
-            p.supply_cap = 0;
+            p.reset_supply();
         }
         self.lingering_sight
             .retain(|source| source.owner() != player);

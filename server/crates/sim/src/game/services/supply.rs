@@ -1,4 +1,3 @@
-use crate::config;
 use crate::game::entity::EntityStore;
 use crate::game::PlayerState;
 use crate::rules;
@@ -23,7 +22,6 @@ pub(crate) fn recompute_supply(players: &mut [PlayerState], entities: &EntitySto
                 used += rules::economy::supply_cost(e.kind);
             }
         }
-        ps.supply_cap = cap.min(config::SUPPLY_CAP_MAX);
-        ps.supply_used = used;
+        ps.set_supply_counts(used, cap);
     }
 }

@@ -171,9 +171,7 @@ impl<'a> MoveCoordinator<'a> {
             e.set_target_id(Some(node));
             e.set_path(Vec::new());
             e.set_path_goal(Some((nx, ny)));
-            if let Some(w) = e.worker.as_mut() {
-                w.carry = None;
-            }
+            e.clear_worker_carry();
             let (px, py) = (e.pos_x, e.pos_y);
             e.reset_stuck(px, py);
         }
