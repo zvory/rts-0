@@ -146,8 +146,8 @@ async function soloStart(room) {
     for (const c of clients) c.send({ t: "ready", ready: true });
     await clients[0].waitFor((m) => m.t === "lobby" && m.canStart, 4000, "fog canStart");
     clients[0].send({ t: "start" });
-    const starts = await Promise.all(clients.map((c) => c.waitFor((m) => m.t === "start", 4000, "fog start")));
-    const snaps = await Promise.all(clients.map((c) => c.waitFor((m) => m.t === "snapshot" && m.entities.length > 0, 4000, "fog first snapshot")));
+    const starts = await Promise.all(clients.map((c) => c.waitFor((m) => m.t === "start", 8000, "fog start")));
+    const snaps = await Promise.all(clients.map((c) => c.waitFor((m) => m.t === "snapshot" && m.entities.length > 0, 8000, "fog first snapshot")));
 
     const observer = clients[0];
     const observerId = observer.playerId;

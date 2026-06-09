@@ -348,7 +348,7 @@ export class Lobby {
         for (const entry of this._availableMaps) {
           const opt = document.createElement("option");
           opt.value = entry.name;
-          opt.textContent = entry.description || entry.name;
+          opt.textContent = entry.name;
           this.selMap.appendChild(opt);
         }
       }
@@ -358,7 +358,7 @@ export class Lobby {
     }
     if (this.elMapDisplay) {
       const entry = this._availableMaps.find((e) => e.name === this._selectedMap);
-      const label = entry ? entry.description || entry.name : this._selectedMap;
+      const label = entry ? entry.name : this._selectedMap;
       this.elMapDisplay.textContent = `Map: ${label}`;
       this.elMapDisplay.hidden = isHost;
     }

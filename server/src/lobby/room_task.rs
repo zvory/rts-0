@@ -159,7 +159,7 @@ impl RoomTask {
             players: HashMap::new(),
             ai_players: Vec::new(),
             quickstart: false,
-            selected_map: "default-handcrafted".to_string(),
+            selected_map: "Default".to_string(),
             host_id: None,
             phase: Phase::Lobby,
             match_player_count: 0,
