@@ -183,14 +183,13 @@ impl SimCommand {
             },
             protocol::Command::Build {
                 units,
-                worker,
                 building,
                 tile_x,
                 tile_y,
                 queued,
             } => match building.parse::<EntityKind>() {
                 Ok(building) if building.is_building() => SimCommand::Build {
-                    units: build_units_from_wire(units, worker),
+                    units,
                     building,
                     tile_x,
                     tile_y,
@@ -314,7 +313,6 @@ impl SimCommand {
                 queued,
             } => protocol::Command::Build {
                 units: units.clone(),
-                worker: None,
                 building: protocol::kind_to_wire(*building).to_string(),
                 tile_x: *tile_x,
                 tile_y: *tile_y,
@@ -352,15 +350,6 @@ impl SimCommand {
     }
 }
 
-fn build_units_from_wire(mut units: Vec<u32>, worker: Option<u32>) -> Vec<u32> {
-    if units.is_empty() {
-        if let Some(worker) = worker {
-            units.push(worker);
-        }
-    }
-    units
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -370,7 +359,6 @@ mod tests {
     fn protocol_build_command_translates_kind() {
         let command = protocol::Command::Build {
             units: vec![7],
-            worker: None,
             building: kinds::BARRACKS.to_string(),
             tile_x: 4,
             tile_y: 8,
@@ -390,21 +378,14 @@ mod tests {
     }
 
     #[test]
-    fn legacy_worker_build_command_translates_to_single_unit() {
-        let decoded: protocol::Command = serde_json::from_str(
+    fn protocol_build_command_requires_units() {
+        let decoded = serde_json::from_str::<protocol::Command>(
             r#"{"c":"build","worker":7,"building":"barracks","tileX":4,"tileY":8}"#,
-        )
-        .expect("legacy worker build payload should deserialize");
+        );
 
-        assert_eq!(
-            SimCommand::from_protocol(decoded),
-            SimCommand::Build {
-                units: vec![7],
-                building: EntityKind::Barracks,
-                tile_x: 4,
-                tile_y: 8,
-                queued: false,
-            }
+        assert!(
+            decoded.is_err(),
+            "build commands must use the current units[] payload"
         );
     }
 
