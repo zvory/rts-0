@@ -45,7 +45,7 @@ crate.
 | `train`      | `building: u32`, `unit: string` | Queue a unit at a production building. |
 | `cancel`     | `building: u32` | Cancel the latest item in a building's production queue. |
 | `stop`       | `units: u32[]` | Clear orders, hold position. |
-| `setRally`   | `building: u32`, `x: f32`, `y: f32`, `queued?: bool` | Set a unit-producing building's single rally point. Freshly produced units receive a plain `move` order to the point and the building prefers the spawn exit nearest it. Ignored for buildings the player doesn't own, non-producers (depot, training centre), or buildings still under construction. The point is clamped into map bounds. `queued` is accepted for wire compatibility but does not append rally stages; rally edits always replace the single active point. |
+| `setRally`   | `building: u32`, `x: f32`, `y: f32`, `kind?: "move"|"attackMove"`, `queued?: bool` | Set or append a unit-producing building rally stage. `kind` defaults to `"move"`. Freshly produced units receive the building's rally plan as active + queued move/attack-move orders, and the building prefers the spawn exit nearest the first stage. Ignored for buildings the player doesn't own, non-producers (depot, training centre), or buildings still under construction. Points are clamped into map bounds. When `queued` is true, append until the four-stage building rally cap is reached; otherwise replace the whole rally plan. |
 
 Servers MUST ignore commands referencing entities the player does not own, unknown ids,
 illegal placements, or unaffordable actions (fail silently or emit a `notice` event).
@@ -53,7 +53,9 @@ For appendable unit commands, omitted `queued` is equivalent to `false`. Unit or
 capped at 8 intents per unit. Queued intents are lightweight future intent only; active `Order`
 remains the per-tick execution state. Non-queued unit orders replace the active order and clear
 future unit intents; `stop` clears both active and queued unit orders.
-Production buildings intentionally have one rally point, not a rally queue.
+Production building rally plans are capped at four total stages. A non-queued rally replaces the
+whole plan; a queued rally appends if space remains and establishes the first stage when the plan is
+empty.
 
 ### 2.2 Server → Client (`ServerMessage`)
 
@@ -149,7 +151,8 @@ Older object-shaped JSON snapshots remain decodable by the client for fallback/d
       id, owner, kind, x, y, hp, maxHp, state,
       facing?, weaponFacing?, prodKind?, prodProgress?, prodQueue?,
       buildProgress?, latchedNode?, targetId?, setupState?, remaining?, rally?, oilUsed?,
-      setupFacing?, orderPlan?, chargeCooldownLeft?, abilities?, visionOnly?, debugPath?
+      setupFacing?, orderPlan?, chargeCooldownLeft?, abilities?, visionOnly?, debugPath?,
+      rallyPlan?
     ]
   ],
   "r": [[id, remaining]],         // omitted when empty
@@ -180,7 +183,10 @@ stage first, followed by queued unit stages in execution order. Each compact sta
 6 `smoke`, 7 `setupAtGuns`, or 8 `charge`.
 Stages carry safe world points only, never target ids; hidden attack target stages may be omitted
 rather than leaking enemy positions through fog. Production building rally points are exposed
-separately through `rally` and are not part of `orderPlan`.
+separately through `rally` and `rallyPlan` and are not part of `orderPlan`. `rallyPlan` is appended
+after `debugPath` in compact snapshots to preserve older optional slot positions; it is owner-only,
+capped at four stages, and uses the same `[kind, x, y]` compact stage encoding with `move` and
+`attackMove` stages.
 The `abilities` slot is owner-only and capped at 8 entries. Each compact ability cooldown is
 `[ability, cooldownLeft, remainingUses?]`, where `ability` is 1 `charge` or 2 `smoke`.
 `remainingUses` is present for finite-use abilities such as Scout Car Smoke; a value of `0`
@@ -230,7 +236,10 @@ events, and positioned notices remain fog-gated and are withheld when smoke hide
   targetId?: u32,                // current attack target, for drawing tracers
   setupState?: string,           // machine_gunner/at_team only: "packed","setting_up","deployed","tearing_down"
   // unit-producing buildings:
-  rally?: [f32, f32],            // rally point (world px); ONLY ever sent to the owner
+  rally?: [f32, f32],            // first rally point (world px); ONLY ever sent to the owner
+  rallyPlan?: [                  // building rally stages; ONLY ever sent to the owner
+    { kind: "move"|"attackMove", x: f32, y: f32 }
+  ],
   // tanks:
   oilUsed?: f32,                 // lifetime oil burned by movement, in resource units
   setupFacing?: f32,             // at_team only: owner-visible deployed arc center; appended after oilUsed in compact snapshots

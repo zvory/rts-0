@@ -5,7 +5,7 @@
 //! typed entity kinds instead of JSON-facing strings.
 
 use crate::game::ability::AbilityKind;
-use crate::game::entity::EntityKind;
+use crate::game::entity::{EntityKind, RallyKind};
 use crate::protocol;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -69,6 +69,7 @@ pub enum SimCommand {
         building: u32,
         x: f32,
         y: f32,
+        kind: RallyKind,
         queued: bool,
     },
     Rejected {
@@ -203,12 +204,19 @@ impl SimCommand {
                 building,
                 x,
                 y,
+                kind,
                 queued,
-            } => SimCommand::SetRally {
-                building,
-                x,
-                y,
-                queued,
+            } => match RallyKind::from_protocol_str(kind.as_deref()) {
+                Some(kind) => SimCommand::SetRally {
+                    building,
+                    x,
+                    y,
+                    kind,
+                    queued,
+                },
+                None => SimCommand::Rejected {
+                    reason: CommandRejection::Unit,
+                },
             },
         }
     }
@@ -309,11 +317,13 @@ impl SimCommand {
                 building,
                 x,
                 y,
+                kind,
                 queued,
             } => protocol::Command::SetRally {
                 building: *building,
                 x: *x,
                 y: *y,
+                kind: Some(kind.to_protocol_str().to_string()),
                 queued: *queued,
             },
             SimCommand::Rejected { .. } => return None,

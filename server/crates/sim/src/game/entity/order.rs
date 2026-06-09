@@ -160,6 +160,52 @@ pub struct PointIntent {
     pub y: f32,
 }
 
+/// Future order intent applied to units as they leave a production building.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RallyKind {
+    Move,
+    AttackMove,
+}
+
+impl RallyKind {
+    pub fn from_protocol_str(kind: Option<&str>) -> Option<Self> {
+        match kind.unwrap_or("move") {
+            "move" => Some(RallyKind::Move),
+            "attackMove" => Some(RallyKind::AttackMove),
+            _ => None,
+        }
+    }
+
+    pub fn to_protocol_str(self) -> &'static str {
+        match self {
+            RallyKind::Move => "move",
+            RallyKind::AttackMove => "attackMove",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct RallyIntent {
+    pub kind: RallyKind,
+    pub point: PointIntent,
+}
+
+impl RallyIntent {
+    pub fn new(kind: RallyKind, x: f32, y: f32) -> Self {
+        RallyIntent {
+            kind,
+            point: PointIntent { x, y },
+        }
+    }
+
+    pub fn to_order_intent(self) -> OrderIntent {
+        match self.kind {
+            RallyKind::Move => OrderIntent::Move(self.point),
+            RallyKind::AttackMove => OrderIntent::AttackMove(self.point),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct AbilityIntent {
     pub ability: AbilityKind,

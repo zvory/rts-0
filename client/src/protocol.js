@@ -356,6 +356,7 @@ function decodeCompactEntity(record, index) {
   assignAbilities(entity, fields, 23);
   assignOptional(entity, "visionOnly", fields, 24, readBool);
   assignDebugPath(entity, fields, 25);
+  assignRallyPlan(entity, fields, 26);
   return entity;
 }
 
@@ -373,6 +374,15 @@ function assignOrderPlan(target, fields, index) {
   const markers = readArray(fields[index], "entity.orderPlan", MAX_COMPACT_ORDER_PLAN);
   target.orderPlan = markers.map((record, markerIndex) =>
     readOrderPlanMarker(record, `entity.orderPlan.${markerIndex}`),
+  );
+}
+
+/** Decode owner-only building rally stages into `entity.rallyPlan`. */
+function assignRallyPlan(target, fields, index) {
+  if (index >= fields.length || fields[index] == null) return;
+  const markers = readArray(fields[index], "entity.rallyPlan", 4);
+  target.rallyPlan = markers.map((record, markerIndex) =>
+    readOrderPlanMarker(record, `entity.rallyPlan.${markerIndex}`),
   );
 }
 
@@ -651,6 +661,6 @@ export const cmd = Object.freeze({
   train: (building, unit) => ({ c: CMD.TRAIN, building, unit }),
   cancel: (building) => ({ c: CMD.CANCEL, building }),
   stop: (units) => ({ c: CMD.STOP, units }),
-  setRally: (building, x, y, queued = false) =>
-    withQueued({ c: CMD.SET_RALLY, building, x, y }, queued),
+  setRally: (building, x, y, queued = false, kind = ORDER_STAGE.MOVE) =>
+    withQueued({ c: CMD.SET_RALLY, building, x, y, kind }, queued),
 });

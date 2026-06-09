@@ -142,7 +142,8 @@ export class Input {
 Shift-right-click appends queued orders only for selected units: move, attack-move, attack,
 gather, build/resume, and placement build commands set `queued: true` and rely on the server
 snapshot's owner-only `orderPlan` for accepted markers. Production-building-only right-clicks set
-the building's single rally point; Shift does not create rally stages.
+or append building rally stages and rely on owner-only `rallyPlan` for accepted markers. Attack
+targeting with only production buildings selected creates `attackMove` rally stages.
 
 `input/command_composer.js` owns command-target arming lifetime for command-card targets. Input and
 minimap clicks call `GameState.issueCommandTarget`, so held keys, Shift preservation, and repeated
