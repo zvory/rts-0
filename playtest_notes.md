@@ -11,6 +11,7 @@ ecnomy rework:
  - refineries and mines have the same HP as workers and have no armor
  - 
 
+- map editor hsould allow placement of resources in custom fashion
 
 - when the game is won or lost, it should automatically scrub back to the beginning of the replay, and start playing back at 2x speed. players can close the victory screen to see the replay better. 
 
