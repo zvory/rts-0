@@ -480,6 +480,9 @@ pub(super) struct RoomTask {
     ai_controllers: Vec<AiController>,
     /// Replay speed multiplier; 1.0 = real-time, 2.0 = 2× faster, etc.
     replay_speed: f32,
+    /// Dev-watch pause flag. Kept separate from replay_speed so interval creation never divides
+    /// by zero and resume can restore the previous non-zero multiplier.
+    dev_watch_paused: bool,
     slow_tick_count: u32,
     /// Optional persistence sink for resolved matches. `None` disables match-history writes.
     db: Option<Arc<Db>>,
@@ -524,6 +527,7 @@ impl RoomTask {
             dev_view_player_id: None,
             ai_controllers: Vec::new(),
             replay_speed,
+            dev_watch_paused: false,
             slow_tick_count: 0,
             db,
             match_history_local_only,
@@ -582,6 +586,9 @@ impl RoomTask {
     }
 
     fn current_speed_multiplier(&self) -> f32 {
+        if self.dev_watch_paused {
+            return 1.0;
+        }
         match &self.phase {
             Phase::ReplayViewer(session) => session.speed,
             _ => self.replay_speed,
@@ -631,6 +638,7 @@ impl RoomTask {
             RoomEvent::SetReplaySpeed { player_id, speed } => {
                 self.on_set_replay_speed(player_id, speed)
             }
+            RoomEvent::StepDevTick { player_id } => self.on_step_dev_tick(player_id),
             RoomEvent::SeekReplay {
                 player_id,
                 ticks_back,
@@ -1625,6 +1633,9 @@ impl RoomTask {
     /// always live and ready to start).
     fn on_tick(&mut self, scheduled: TokioInstant) {
         if self.is_dev_watch() {
+            if self.dev_watch_paused {
+                return;
+            }
             self.on_tick_dev_selfplay(scheduled);
             return;
         }
@@ -1992,9 +2003,24 @@ impl RoomTask {
         ) {
             return;
         }
-        // Clamp to sensible range matching the UI buttons (0.5× – 8×).
+        if speed == 0.0 {
+            self.dev_watch_paused = true;
+            return;
+        }
+        self.dev_watch_paused = false;
+        // Clamp to sensible range matching the UI buttons (0.125× – 8×).
         let clamped = speed.clamp(0.125, 8.0);
         self.replay_speed = clamped;
+    }
+
+    fn on_step_dev_tick(&mut self, player_id: u32) {
+        if !self.players.contains_key(&player_id)
+            || !self.dev_watch_paused
+            || !matches!(self.mode, RoomMode::DevScenario(_))
+        {
+            return;
+        }
+        self.on_tick_dev_selfplay(TokioInstant::now());
     }
 
     fn on_set_replay_vision(&mut self, player_id: u32, vision: ReplayVisionRequest) {
@@ -2498,6 +2524,14 @@ mod tests {
         }
     }
 
+    fn in_game_tick(task: &RoomTask) -> u32 {
+        match &task.phase {
+            Phase::InGame(game) => game.tick_count(),
+            Phase::ReplayViewer(session) => session.current_tick(),
+            Phase::Lobby => 0,
+        }
+    }
+
     #[test]
     fn replay_vision_validation_rejects_unknown_and_empty_subsets() {
         let valid = [1, 2, 3];
@@ -2827,6 +2861,49 @@ mod tests {
             panic!("replay phase should remain active");
         };
         assert!(replay.game.command_log().is_empty());
+    }
+
+    #[test]
+    fn paused_dev_scenario_steps_one_tick_at_a_time() {
+        let mut task = RoomTask::new(
+            "dev-scenario-step-test".to_string(),
+            RoomMode::DevScenario(DevScenarioConfig {
+                id: DevScenarioId::VehicleCornerWall,
+                unit: EntityKind::Tank,
+                count: 1,
+                blocker: None,
+            }),
+            None,
+            false,
+            DrainHandle::default(),
+        );
+        let (msg_tx, _writer) = ConnectionSink::new();
+        let (ack, mut ack_rx) = tokio::sync::oneshot::channel();
+        task.on_join(99, "Viewer".to_string(), true, msg_tx, ack);
+
+        assert_eq!(ack_rx.try_recv(), Ok(true));
+        assert_eq!(in_game_tick(&task), 0);
+
+        task.on_set_replay_speed(99, 0.0);
+        task.on_tick(TokioInstant::now());
+        assert_eq!(
+            in_game_tick(&task),
+            0,
+            "scheduled ticks should not advance while paused"
+        );
+
+        task.on_step_dev_tick(99);
+        assert_eq!(in_game_tick(&task), 1);
+        task.on_step_dev_tick(99);
+        assert_eq!(in_game_tick(&task), 2);
+
+        task.on_set_replay_speed(99, 1.0);
+        task.on_tick(TokioInstant::now());
+        assert_eq!(
+            in_game_tick(&task),
+            3,
+            "scheduled ticks should resume after selecting a non-zero speed"
+        );
     }
 
     #[test]

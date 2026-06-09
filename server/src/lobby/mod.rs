@@ -115,8 +115,10 @@ pub enum RoomEvent {
     GiveUp { player_id: u32 },
     /// A replay viewer asked to return the room to the lobby for a rematch.
     ReturnToLobby { player_id: u32 },
-    /// Set replay playback speed multiplier; ignored outside replay/dev watch rooms.
+    /// Set replay/dev-watch playback speed multiplier; ignored outside replay/dev watch rooms.
     SetReplaySpeed { player_id: u32, speed: f32 },
+    /// Advance a paused dev-watch room by one simulation tick.
+    StepDevTick { player_id: u32 },
     /// Rewind a replay by `ticks_back` simulation ticks (replay rooms only; clamped to start).
     SeekReplay { player_id: u32, ticks_back: u32 },
     /// Select replay vision for this viewer only. Ignored outside replay rooms in phase 1.
