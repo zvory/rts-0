@@ -10,7 +10,7 @@ creation and introduces game-design, fairness, and persistence questions.
 
 - A viewer can choose a replay tick and request "resume from here".
 - The server creates a new live match initialized from the replay state at that tick.
-- Each original player can reclaim their seat, or the host can fill seats with AI/open slots.
+- Players can select any seat, all seats must be occupied by players or left idle, no AI resumption.
 - The resumed match is a new match, not a mutation of the original replay.
 - The new match should record its own match history and, eventually, its own replay artifact.
 
@@ -29,7 +29,6 @@ creation and introduces game-design, fairness, and persistence questions.
   - match start wall clock
   - participants
   - human and AI counts
-  - AI controllers for any AI-filled seats
   - net health counters
 - Require compatibility validation before branching from persisted replays.
 - Decide persistence semantics for branched matches. Recommended first pass: mark the match as a
@@ -45,10 +44,10 @@ creation and introduces game-design, fairness, and persistence questions.
 
 ## Hard Questions To Resolve Before Implementation
 
-- Can one player resume alone as a sandbox, or must all original seats be filled?
-- Are resumed matches eligible for public match history?
-- Are players allowed to resume from opponent-only fog perspectives they could not see live?
-- Should ranked/competitive modes ever allow resume-from-replay, or is this only a learning tool?
+- Can one player resume alone as a sandbox, or must all original seats be filled? Answer: all original seats must be filled.
+- Are resumed matches eligible for public match history? Answer: No. 
+- Are players allowed to resume from opponent-only fog perspectives they could not see live? Answer: Yes.
+- Should ranked/competitive modes ever allow resume-from-replay, or is this only a learning tool? Defer, ignore, no need to asnwer now. 
 
 ## Verification
 
