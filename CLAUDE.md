@@ -117,6 +117,10 @@ There is **no JS build step** (plain ES modules + PixiJS from CDN). The client i
 - **Clients are untrusted.** Validate and bound everything from the wire: command unit lists are
   deduped + capped (`MAX_UNITS_PER_COMMAND`), WebSocket frames are size-limited, placement coords
   are range/overflow-checked. See `docs/design/hardening.md`.
+- **Match history is server-only and env-gated.** Only the server writes the `matches` table, and
+  only when `RTS_RECORD_MATCHES` is truthy (so local `cargo run` reads but never writes). Detached
+  write on `end_match` — never block the room task on the DB. See
+  `docs/design/match-history.md`.
 
 ## Conventions
 

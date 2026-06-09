@@ -5,6 +5,7 @@
 //! surface around those packages.
 
 pub(crate) mod config;
+pub mod db;
 pub mod dev_scenarios;
 pub mod lobby;
 pub mod protocol;
