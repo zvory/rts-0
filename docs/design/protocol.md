@@ -26,9 +26,9 @@ crate.
 | `command`  | `cmd: Command` | Issue a gameplay command (see below). Ignored unless in-game. |
 | `giveUp`   | — | Give up the active match. The server eliminates that player and sends their score screen. |
 | `ping`     | `ts: number` | Latency probe; server replies with `pong`. |
-| `setReplaySpeed` | `speed: f32` | Set replay playback speed multiplier in dev replay rooms; ignored elsewhere. |
-| `seekReplay` | `ticksBack: u32` | Rewind a dev replay by N simulation ticks; pass a large value (e.g. `2^31-1`) to reset to tick 0. Ignored outside replay rooms. The room rebuilds the game from the artifact, fast-forwards to `current - N`, and re-sends `start`. |
-| `setReplayVision` | `vision: ReplayVisionRequest` | Select replay fog/vision for this viewer only. Ignored outside replay rooms. Phase 1 validates the request; later replay playback applies it to snapshot projection. |
+| `setReplaySpeed` | `speed: f32` | Set replay playback speed multiplier; ignored outside replay rooms and dev watch playback. The server clamps accepted speeds. |
+| `seekReplay` | `ticksBack: u32` | Rewind a replay by N simulation ticks; pass a large value (e.g. `2^31-1`) to reset to tick 0. Ignored outside replay rooms. The room rebuilds the game from the artifact, fast-forwards to `current - N`, re-sends `start`, and emits `replayState`. |
+| `setReplayVision` | `vision: ReplayVisionRequest` | Select replay fog/vision for this viewer only. Ignored outside replay rooms. The server validates the request and applies it to that viewer's subsequent snapshot projection. |
 
 `Command` (the `cmd` object) — `c` is the command discriminator:
 
@@ -322,6 +322,8 @@ Events are best-effort visual flavor; the client must not depend on receiving th
 { mode: "players", playerIds: u32[] }
 ```
 The server rejects unknown player ids, empty subsets, and duplicate subset ids. Vision selection is
-not shared between viewers unless a later protocol explicitly adds shared-view control.
+not shared between viewers unless a later protocol explicitly adds shared-view control. Replay
+snapshots are spectator-style authoritative fog snapshots from the selected real player ids; the
+default is the union of all replay players.
 
 ---

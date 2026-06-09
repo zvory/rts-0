@@ -184,7 +184,7 @@ fn replay_speed_clamped_and_applied() {
         None,
         false,
     );
-    task.on_set_replay_speed(2.0);
+    task.on_set_replay_speed(1, 2.0);
     // 33ms / 2.0 = 16.5ms → rounds to 16ms via div_f32
     assert!(task.current_tick_interval() < Duration::from_millis(17));
     assert!(task.current_tick_interval() > Duration::from_millis(15));

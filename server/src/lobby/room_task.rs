@@ -6,7 +6,8 @@ use super::snapshots::{compact_snapshot_for_wire, union_events};
 use super::*;
 use crate::game::entity::EntityKind;
 use crate::game::map::Map;
-use crate::protocol::SnapshotNetStatus;
+use crate::game::replay::ReplayArtifactV1;
+use crate::protocol::{ReplayPlaybackState, SnapshotNetStatus};
 use rand::rngs::SmallRng;
 use rand::SeedableRng;
 use rts_ai::{AiController, AiThinkContext};
@@ -106,6 +107,7 @@ fn live_ai_controllers(players: &[PlayerInit], seed: u32) -> Vec<AiController> {
 enum Phase {
     Lobby,
     InGame(Box<Game>),
+    ReplayViewer(Box<ReplaySession>),
 }
 
 #[derive(Clone)]
@@ -148,6 +150,177 @@ struct DevScenarioDriver {
     units: Vec<u32>,
     goal: (f32, f32),
     issued: bool,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum ReplayVisionSelection {
+    All,
+    Players(Vec<u32>),
+}
+
+impl ReplayVisionSelection {
+    fn from_request(request: ReplayVisionRequest) -> Self {
+        match request {
+            ReplayVisionRequest::All => ReplayVisionSelection::All,
+            ReplayVisionRequest::Player { player_id } => {
+                ReplayVisionSelection::Players(vec![player_id])
+            }
+            ReplayVisionRequest::Players { player_ids } => {
+                ReplayVisionSelection::Players(player_ids)
+            }
+        }
+    }
+
+    fn player_ids(&self, all_players: &[u32]) -> Vec<u32> {
+        match self {
+            ReplayVisionSelection::All => all_players.to_vec(),
+            ReplayVisionSelection::Players(ids) => ids.clone(),
+        }
+    }
+}
+
+/// Reusable server-side replay runtime. It owns the artifact and a rebuilt simulation, and the
+/// room task drives it exactly like a live game.
+struct ReplaySession {
+    artifact: ReplayArtifactV1,
+    game: Box<Game>,
+    next_command: usize,
+    duration_ticks: u32,
+    speed: f32,
+    viewer_vision: HashMap<u32, ReplayVisionSelection>,
+    last_controller_id: Option<u32>,
+}
+
+impl ReplaySession {
+    #[allow(dead_code)]
+    const DEFAULT_SPEED: f32 = 2.0;
+    const MIN_SPEED: f32 = 0.125;
+    const MAX_SPEED: f32 = 8.0;
+
+    #[allow(dead_code)]
+    fn new(artifact: ReplayArtifactV1) -> Result<Self, String> {
+        let duration_ticks = artifact.duration_ticks;
+        let game = Box::new(Self::build_game(&artifact)?);
+        Ok(ReplaySession {
+            artifact,
+            game,
+            next_command: 0,
+            duration_ticks,
+            speed: Self::DEFAULT_SPEED,
+            viewer_vision: HashMap::new(),
+            last_controller_id: None,
+        })
+    }
+
+    fn build_game(artifact: &ReplayArtifactV1) -> Result<Game, String> {
+        let metadata = Map::metadata_for_name(&artifact.map_name)
+            .map_err(|err| format!("cannot load replay map metadata: {err}"))?;
+        artifact
+            .validate_against(&artifact.server_build_sha, &metadata)
+            .map_err(|err| err.to_string())?;
+        let map = Map::load(&artifact.map_name, artifact.players.len(), artifact.seed)
+            .map_err(|err| format!("cannot load replay map: {err}"))?;
+        Ok(Game::new_for_replay_with_map_metadata(
+            &artifact.players,
+            artifact.starting_steel,
+            artifact.starting_oil,
+            artifact.seed,
+            artifact.starting_loadout_mode.clone(),
+            map,
+            metadata,
+        ))
+    }
+
+    fn active_player_ids(&self) -> Vec<u32> {
+        self.artifact.players.iter().map(|p| p.id).collect()
+    }
+
+    fn start_payload_for(&self, viewer_id: u32) -> StartPayload {
+        StartPayload {
+            player_id: viewer_id,
+            spectator: true,
+            replay: Some(self.artifact.start_metadata()),
+            ..self.game.start_payload()
+        }
+    }
+
+    fn state(&self) -> ReplayPlaybackState {
+        ReplayPlaybackState {
+            current_tick: self.current_tick(),
+            duration_ticks: self.duration_ticks,
+            speed: self.speed,
+            paused: self.speed == 0.0,
+            ended: self.current_tick() >= self.duration_ticks,
+            controller_id: self.last_controller_id,
+        }
+    }
+
+    fn current_tick(&self) -> u32 {
+        self.game.tick_count()
+    }
+
+    fn set_speed(&mut self, controller_id: u32, speed: f32) {
+        self.speed = speed.clamp(Self::MIN_SPEED, Self::MAX_SPEED);
+        self.last_controller_id = Some(controller_id);
+    }
+
+    fn set_vision(&mut self, viewer_id: u32, vision: ReplayVisionRequest) {
+        self.viewer_vision
+            .insert(viewer_id, ReplayVisionSelection::from_request(vision));
+    }
+
+    fn vision_player_ids_for(&self, viewer_id: u32) -> Vec<u32> {
+        let all_players = self.active_player_ids();
+        self.viewer_vision
+            .get(&viewer_id)
+            .unwrap_or(&ReplayVisionSelection::All)
+            .player_ids(&all_players)
+    }
+
+    fn enqueue_for_current_tick(&mut self) -> Result<(), String> {
+        let tick = self.current_tick().saturating_add(1);
+        while let Some(entry) = self.artifact.command_log.get(self.next_command) {
+            if entry.tick < tick {
+                return Err(format!(
+                    "replay command {} is out of order: tick {} before {}",
+                    self.next_command, entry.tick, tick
+                ));
+            }
+            if entry.tick != tick {
+                break;
+            }
+            self.game.enqueue(
+                entry.player_id,
+                SimCommand::from_protocol(entry.command.clone()),
+            );
+            self.next_command += 1;
+        }
+        Ok(())
+    }
+
+    fn tick(&mut self, perf: Option<&mut crate::perf::TickPerf>) -> HashMap<u32, Vec<Event>> {
+        self.game.tick_with_perf(perf).into_iter().collect()
+    }
+
+    fn seek_back(&mut self, controller_id: u32, ticks_back: u32) -> Result<u32, String> {
+        let target_tick = self
+            .current_tick()
+            .saturating_sub(ticks_back)
+            .min(self.duration_ticks);
+        self.rebuild_to(target_tick)?;
+        self.last_controller_id = Some(controller_id);
+        Ok(target_tick)
+    }
+
+    fn rebuild_to(&mut self, target_tick: u32) -> Result<(), String> {
+        *self.game = Self::build_game(&self.artifact)?;
+        self.next_command = 0;
+        for _ in 0..target_tick {
+            self.enqueue_for_current_tick()?;
+            self.game.tick();
+        }
+        Ok(())
+    }
 }
 
 impl DevScenarioDriver {
@@ -266,9 +439,9 @@ impl RoomTask {
                 maybe_event = event_rx.recv() => {
                     match maybe_event {
                         Some(event) => {
-                            let old_speed = self.replay_speed;
+                            let old_speed = self.current_speed_multiplier();
                             self.handle_event(event);
-                            speed_changed = self.replay_speed != old_speed;
+                            speed_changed = self.current_speed_multiplier() != old_speed;
                         }
                         None => return, // registry dropped; shut the room down.
                     }
@@ -292,7 +465,14 @@ impl RoomTask {
     pub(super) fn current_tick_interval(&self) -> Duration {
         let base =
             test_tick_interval_override().unwrap_or_else(|| Duration::from_millis(config::TICK_MS));
-        base.div_f32(self.replay_speed)
+        base.div_f32(self.current_speed_multiplier())
+    }
+
+    fn current_speed_multiplier(&self) -> f32 {
+        match &self.phase {
+            Phase::ReplayViewer(session) => session.speed,
+            _ => self.replay_speed,
+        }
     }
 
     fn is_dev_watch(&self) -> bool {
@@ -334,8 +514,13 @@ impl RoomTask {
             } => self.on_set_spectator(player_id, spectator),
             RoomEvent::Command { player_id, cmd } => self.on_command(player_id, cmd),
             RoomEvent::GiveUp { player_id } => self.on_give_up(player_id),
-            RoomEvent::SetReplaySpeed { speed } => self.on_set_replay_speed(speed),
-            RoomEvent::SeekReplay { ticks_back } => self.on_seek_replay(ticks_back),
+            RoomEvent::SetReplaySpeed { player_id, speed } => {
+                self.on_set_replay_speed(player_id, speed)
+            }
+            RoomEvent::SeekReplay {
+                player_id,
+                ticks_back,
+            } => self.on_seek_replay(player_id, ticks_back),
             RoomEvent::SetReplayVision { player_id, vision } => {
                 self.on_set_replay_vision(player_id, vision)
             }
@@ -353,6 +538,10 @@ impl RoomTask {
     ) {
         if self.is_dev_watch() {
             self.on_join_dev_selfplay(player_id, name, msg_tx, ack);
+            return;
+        }
+        if matches!(self.phase, Phase::ReplayViewer(_)) {
+            self.on_join_replay_viewer(player_id, name, msg_tx, ack);
             return;
         }
         if self.players.contains_key(&player_id) {
@@ -437,6 +626,9 @@ impl RoomTask {
                 if !was_spectator {
                     game.eliminate(player_id);
                 }
+            }
+            Phase::ReplayViewer(session) => {
+                session.viewer_vision.remove(&player_id);
             }
         }
     }
@@ -665,6 +857,10 @@ impl RoomTask {
                 return;
             }
             Phase::InGame(game) => game,
+            Phase::ReplayViewer(session) => {
+                self.phase = Phase::ReplayViewer(session);
+                return;
+            }
         };
 
         debug!(room = %self.room, player_id, "player gave up");
@@ -736,6 +932,34 @@ impl RoomTask {
         } else {
             self.send_dev_start_to(player_id);
         }
+    }
+
+    fn on_join_replay_viewer(
+        &mut self,
+        player_id: u32,
+        name: String,
+        msg_tx: ConnectionSink,
+        ack: tokio::sync::oneshot::Sender<bool>,
+    ) {
+        if self.players.contains_key(&player_id) {
+            let _ = ack.send(false);
+            return;
+        }
+        self.order.push(player_id);
+        self.players.insert(
+            player_id,
+            RoomPlayer {
+                name,
+                color: "#6f8fa8".to_string(),
+                ready: true,
+                spectator: true,
+                msg_tx,
+                head_of_line_count: 0,
+            },
+        );
+        let _ = ack.send(true);
+        self.send_replay_start_to(player_id);
+        self.send_replay_state_to(player_id);
     }
 
     /// A match may start with at least one active participant and every active human ready.
@@ -1036,6 +1260,111 @@ impl RoomTask {
         );
     }
 
+    fn send_replay_start_to(&self, watcher_id: u32) {
+        let Phase::ReplayViewer(session) = &self.phase else {
+            return;
+        };
+        let Some(player) = self.players.get(&watcher_id) else {
+            return;
+        };
+        send_or_log(
+            &self.room,
+            watcher_id,
+            &player.msg_tx,
+            ServerMessage::Start(session.start_payload_for(watcher_id)),
+        );
+    }
+
+    fn send_replay_state_to(&self, watcher_id: u32) {
+        let Phase::ReplayViewer(session) = &self.phase else {
+            return;
+        };
+        let Some(player) = self.players.get(&watcher_id) else {
+            return;
+        };
+        send_or_log(
+            &self.room,
+            watcher_id,
+            &player.msg_tx,
+            ServerMessage::ReplayState(session.state()),
+        );
+    }
+
+    fn broadcast_replay_state_for(&self, session: &ReplaySession) {
+        let msg = ServerMessage::ReplayState(session.state());
+        self.broadcast(&msg);
+    }
+
+    fn fanout_replay_snapshots(
+        &mut self,
+        session: &ReplaySession,
+        per_player_events: HashMap<u32, Vec<Event>>,
+        scheduler_lag: Duration,
+        tick_start: StdInstant,
+        mut perf: Option<&mut crate::perf::TickPerf>,
+    ) {
+        let tick_budget = self.current_tick_interval();
+        let mut slow_tick_counted = false;
+        let fanout_start = StdInstant::now();
+        let recipients = self.order.clone();
+        for id in recipients {
+            let Some(player) = self.players.get(&id) else {
+                continue;
+            };
+            let visible_players = session.vision_player_ids_for(id);
+            let snapshot_start = StdInstant::now();
+            let mut snapshot = session.game.snapshot_for_spectator(&visible_players);
+            snapshot.events.extend(union_events(
+                visible_players
+                    .iter()
+                    .filter_map(|player_id| per_player_events.get(player_id)),
+            ));
+            let snapshot_duration = snapshot_start.elapsed();
+            let entity_count = snapshot.entities.len();
+            let resource_delta_count = snapshot.resource_deltas.len();
+            let event_count = snapshot.events.len();
+            let tick_elapsed = tick_start.elapsed();
+            let slow_tick = scheduler_lag >= tick_budget || tick_elapsed >= tick_budget;
+            if slow_tick && !slow_tick_counted {
+                self.slow_tick_count = self.slow_tick_count.saturating_add(1);
+                slow_tick_counted = true;
+            }
+            snapshot.net_status =
+                self.snapshot_net_status(player, scheduler_lag, tick_elapsed, slow_tick);
+            let compact_start = StdInstant::now();
+            compact_snapshot_for_wire(&mut snapshot);
+            let compact_duration = compact_start.elapsed();
+            if let Some(perf) = perf.as_mut() {
+                perf.record_snapshot(crate::perf::SnapshotRecord {
+                    player_id: id,
+                    spectator: true,
+                    snapshot: snapshot_duration,
+                    compact: compact_duration,
+                    entities: entity_count,
+                    resource_deltas: resource_delta_count,
+                    events: event_count,
+                });
+            }
+            let enqueue_status = send_or_log(
+                &self.room,
+                id,
+                &player.msg_tx,
+                ServerMessage::Snapshot(snapshot),
+            );
+            if matches!(enqueue_status, Some(SnapshotSendStatus::Replaced)) {
+                if let Some(player) = self.players.get_mut(&id) {
+                    player.head_of_line_count = player.head_of_line_count.saturating_add(1);
+                }
+            }
+            if let (Some(perf), Some(status)) = (perf.as_mut(), enqueue_status) {
+                perf.record_enqueue(snapshot_enqueue_status(status));
+            }
+        }
+        if let Some(perf) = perf.as_mut() {
+            perf.record_phase("snapshot_fanout", fanout_start.elapsed());
+        }
+    }
+
     fn send_dev_error(&self, msg: &str) {
         let payload = ServerMessage::Error {
             msg: msg.to_string(),
@@ -1057,6 +1386,10 @@ impl RoomTask {
             self.on_tick_dev_selfplay(scheduled);
             return;
         }
+        if matches!(self.phase, Phase::ReplayViewer(_)) {
+            self.on_tick_replay_viewer(scheduled);
+            return;
+        }
         // Take ownership of the game for the duration of the tick so we can both mutate it and
         // freely borrow `self` for sending. Restored (or replaced with `Lobby`) before return.
         let mut game = match std::mem::replace(&mut self.phase, Phase::Lobby) {
@@ -1066,6 +1399,10 @@ impl RoomTask {
                 return;
             }
             Phase::InGame(game) => game,
+            Phase::ReplayViewer(session) => {
+                self.phase = Phase::ReplayViewer(session);
+                return;
+            }
         };
         let scheduler_lag = scheduled.elapsed();
         let tick_start = StdInstant::now();
@@ -1227,6 +1564,10 @@ impl RoomTask {
         let mut game = match std::mem::replace(&mut self.phase, Phase::Lobby) {
             Phase::Lobby => return,
             Phase::InGame(game) => game,
+            Phase::ReplayViewer(session) => {
+                self.phase = Phase::ReplayViewer(session);
+                return;
+            }
         };
         let scheduler_lag = scheduled.elapsed();
         let tick_start = StdInstant::now();
@@ -1342,7 +1683,67 @@ impl RoomTask {
         self.phase = Phase::InGame(game);
     }
 
-    pub(super) fn on_set_replay_speed(&mut self, speed: f32) {
+    fn on_tick_replay_viewer(&mut self, scheduled: TokioInstant) {
+        let mut session = match std::mem::replace(&mut self.phase, Phase::Lobby) {
+            Phase::ReplayViewer(session) => session,
+            other => {
+                self.phase = other;
+                return;
+            }
+        };
+        let scheduler_lag = scheduled.elapsed();
+        let tick_start = StdInstant::now();
+        let mut perf = crate::perf::TickPerf::maybe_new();
+
+        if session.current_tick() < session.duration_ticks {
+            if let Err(err) = session.enqueue_for_current_tick() {
+                warn!(room = %self.room, error = %err, "replay command enqueue failed");
+                self.send_dev_error(&err);
+                self.phase = Phase::ReplayViewer(session);
+                return;
+            }
+            let game_tick_start = StdInstant::now();
+            let tick_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                session.tick(perf.as_mut())
+            }));
+            if let Some(perf) = perf.as_mut() {
+                perf.record_phase("game_tick", game_tick_start.elapsed());
+            }
+            let per_player_events = match tick_result {
+                Ok(events) => events,
+                Err(payload) => {
+                    let reason = panic_reason(&payload);
+                    dump_crash_replay(&self.room, &session.game, &reason);
+                    self.send_dev_error("Replay playback failed");
+                    self.phase = Phase::Lobby;
+                    return;
+                }
+            };
+            self.fanout_replay_snapshots(
+                &session,
+                per_player_events,
+                scheduler_lag,
+                tick_start,
+                perf.as_mut(),
+            );
+        } else {
+            self.broadcast_replay_state_for(&session);
+        }
+
+        self.finish_perf_tick(perf.as_ref(), &session.game, scheduler_lag, tick_start);
+        self.phase = Phase::ReplayViewer(session);
+    }
+
+    pub(super) fn on_set_replay_speed(&mut self, player_id: u32, speed: f32) {
+        if let Phase::ReplayViewer(session) = &mut self.phase {
+            if !self.players.contains_key(&player_id) {
+                return;
+            }
+            session.set_speed(player_id, speed);
+            let state = session.state();
+            self.broadcast(&ServerMessage::ReplayState(state));
+            return;
+        }
         if !matches!(
             self.mode,
             RoomMode::DevSelfPlay(DevSelfPlayConfig::Replay { .. }) | RoomMode::DevScenario(_)
@@ -1355,6 +1756,27 @@ impl RoomTask {
     }
 
     fn on_set_replay_vision(&mut self, player_id: u32, vision: ReplayVisionRequest) {
+        if let Phase::ReplayViewer(session) = &mut self.phase {
+            if !self.players.contains_key(&player_id) {
+                return;
+            }
+            let valid_ids = session.active_player_ids();
+            if validate_replay_vision_request(&vision, &valid_ids).is_err() {
+                if let Some(player) = self.players.get(&player_id) {
+                    send_or_log(
+                        &self.room,
+                        player_id,
+                        &player.msg_tx,
+                        ServerMessage::Error {
+                            msg: "Invalid replay vision selection".to_string(),
+                        },
+                    );
+                }
+                return;
+            }
+            session.set_vision(player_id, vision);
+            return;
+        }
         if !matches!(
             self.mode,
             RoomMode::DevSelfPlay(DevSelfPlayConfig::Replay { .. })
@@ -1385,12 +1807,51 @@ impl RoomTask {
         match &self.phase {
             Phase::InGame(game) => game.player_inits().into_iter().map(|p| p.id).collect(),
             Phase::Lobby => Vec::new(),
+            Phase::ReplayViewer(session) => session.active_player_ids(),
         }
     }
 
     /// Rewind a replay by `ticks_back` ticks. Pass `u32::MAX` to reset to the start.
     /// No-op outside replay rooms or when no game is active.
-    fn on_seek_replay(&mut self, ticks_back: u32) {
+    fn on_seek_replay(&mut self, player_id: u32, ticks_back: u32) {
+        if let Phase::ReplayViewer(session) = &mut self.phase {
+            if !self.players.contains_key(&player_id) {
+                return;
+            }
+            let seek_result = session.seek_back(player_id, ticks_back);
+            let starts = if seek_result.is_ok() {
+                self.order
+                    .iter()
+                    .filter_map(|viewer_id| {
+                        self.players.get(viewer_id).map(|player| {
+                            (
+                                *viewer_id,
+                                player.msg_tx.clone(),
+                                session.start_payload_for(*viewer_id),
+                            )
+                        })
+                    })
+                    .collect::<Vec<_>>()
+            } else {
+                Vec::new()
+            };
+            let state = seek_result.as_ref().ok().map(|_| session.state());
+            match seek_result {
+                Ok(_) => {
+                    for (viewer_id, msg_tx, start) in starts {
+                        send_or_log(&self.room, viewer_id, &msg_tx, ServerMessage::Start(start));
+                    }
+                    if let Some(state) = state {
+                        self.broadcast(&ServerMessage::ReplayState(state));
+                    }
+                }
+                Err(err) => {
+                    warn!(room = %self.room, error = %err, "replay seek failed");
+                    self.send_dev_error(&err);
+                }
+            }
+            return;
+        }
         if !matches!(
             self.mode,
             RoomMode::DevSelfPlay(DevSelfPlayConfig::Replay { .. })
@@ -1400,6 +1861,7 @@ impl RoomTask {
         let current_tick = match &self.phase {
             Phase::InGame(game) => game.tick_count(),
             Phase::Lobby => return,
+            Phase::ReplayViewer(_) => return,
         };
         let target_tick = current_tick.saturating_sub(ticks_back);
 
@@ -1653,6 +2115,33 @@ fn saturating_duration_ms_u16(duration: Duration) -> u16 {
 mod tests {
     use super::*;
 
+    fn replay_test_players(count: usize) -> Vec<PlayerInit> {
+        (1..=count as u32)
+            .map(|id| PlayerInit {
+                id,
+                name: format!("Player {id}"),
+                color: PLAYER_PALETTE[(id as usize - 1) % PLAYER_PALETTE.len()].to_string(),
+                is_ai: false,
+            })
+            .collect()
+    }
+
+    fn replay_test_game(players: &[PlayerInit], seed: u32) -> Game {
+        let metadata = Map::metadata_for_name("Default").unwrap();
+        let map = Map::load("Default", players.len(), seed).unwrap();
+        Game::new_with_random_ai_profiles_and_map_metadata(players, seed, map, metadata)
+    }
+
+    fn replay_test_artifact(players: &[PlayerInit], ticks: u32) -> (Game, ReplayArtifactV1) {
+        let seed = 0x5150_2202;
+        let mut game = replay_test_game(players, seed);
+        for _ in 0..ticks {
+            game.tick();
+        }
+        let artifact = ReplayArtifactV1::capture_from_game(&game, "test-sha", None, game.scores());
+        (game, artifact)
+    }
+
     #[test]
     fn replay_vision_validation_rejects_unknown_and_empty_subsets() {
         let valid = [1, 2, 3];
@@ -1695,5 +2184,132 @@ mod tests {
             &valid,
         )
         .is_err());
+    }
+
+    #[test]
+    fn replay_session_reaches_live_final_snapshots() {
+        let players = replay_test_players(2);
+        let (live, artifact) = replay_test_artifact(&players, 5);
+        let mut replay = ReplaySession::new(artifact).unwrap();
+
+        while replay.current_tick() < replay.duration_ticks {
+            replay.enqueue_for_current_tick().unwrap();
+            replay.tick(None);
+        }
+
+        for player in &players {
+            assert_eq!(
+                replay.game.snapshot_for(player.id),
+                live.snapshot_for(player.id)
+            );
+        }
+    }
+
+    #[test]
+    fn replay_viewer_snapshot_hides_resource_outside_union_fog() {
+        let players = replay_test_players(2);
+        let (_live, artifact) = replay_test_artifact(&players, 0);
+        let replay = ReplaySession::new(artifact).unwrap();
+
+        let full = replay.game.snapshot_full_for(players[0].id);
+        let union = replay
+            .game
+            .snapshot_for_spectator(&replay.active_player_ids());
+
+        assert!(
+            full.resource_deltas.len() > union.resource_deltas.len(),
+            "default replay spectator fog should not expose every resource node"
+        );
+    }
+
+    #[test]
+    fn single_player_replay_fog_matches_player_visibility() {
+        let players = replay_test_players(1);
+        let (_live, artifact) = replay_test_artifact(&players, 0);
+        let replay = ReplaySession::new(artifact).unwrap();
+
+        let player = replay.game.snapshot_for(players[0].id);
+        let replay_view = replay.game.snapshot_for_spectator(&[players[0].id]);
+
+        assert_eq!(replay_view.visible_tiles, player.visible_tiles);
+        assert_eq!(
+            replay_view
+                .entities
+                .iter()
+                .map(|entity| entity.id)
+                .collect::<Vec<_>>(),
+            player
+                .entities
+                .iter()
+                .map(|entity| entity.id)
+                .collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    fn replay_vision_selection_is_per_viewer() {
+        let players = replay_test_players(2);
+        let (_live, artifact) = replay_test_artifact(&players, 0);
+        let mut replay = ReplaySession::new(artifact).unwrap();
+
+        replay.set_vision(
+            100,
+            ReplayVisionRequest::Player {
+                player_id: players[0].id,
+            },
+        );
+        replay.set_vision(
+            101,
+            ReplayVisionRequest::Player {
+                player_id: players[1].id,
+            },
+        );
+
+        assert_eq!(replay.vision_player_ids_for(100), vec![players[0].id]);
+        assert_eq!(replay.vision_player_ids_for(101), vec![players[1].id]);
+        assert_eq!(
+            replay.vision_player_ids_for(102),
+            replay.active_player_ids()
+        );
+    }
+
+    #[test]
+    fn replay_speed_and_seek_are_clamped_in_state() {
+        let players = replay_test_players(2);
+        let (_live, artifact) = replay_test_artifact(&players, 4);
+        let mut replay = ReplaySession::new(artifact).unwrap();
+        for _ in 0..3 {
+            replay.enqueue_for_current_tick().unwrap();
+            replay.tick(None);
+        }
+
+        replay.set_speed(42, 99.0);
+        assert_eq!(replay.state().speed, ReplaySession::MAX_SPEED);
+        assert_eq!(replay.state().controller_id, Some(42));
+
+        let target = replay.seek_back(42, u32::MAX).unwrap();
+        assert_eq!(target, 0);
+        assert_eq!(replay.state().current_tick, 0);
+    }
+
+    #[test]
+    fn replay_phase_ignores_gameplay_commands() {
+        let players = replay_test_players(2);
+        let (_live, artifact) = replay_test_artifact(&players, 0);
+        let replay = ReplaySession::new(artifact).unwrap();
+        let mut task = RoomTask::new("replay-test".to_string(), RoomMode::Normal, None, false);
+        task.phase = Phase::ReplayViewer(Box::new(replay));
+
+        task.on_command(
+            players[0].id,
+            SimCommand::Stop {
+                units: vec![1, 2, 3],
+            },
+        );
+
+        let Phase::ReplayViewer(replay) = &task.phase else {
+            panic!("replay phase should remain active");
+        };
+        assert!(replay.game.command_log().is_empty());
     }
 }

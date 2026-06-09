@@ -878,13 +878,21 @@ async fn handle_client_message(
             let _ = conn_tx.try_send_reliable(ServerMessage::Pong { ts });
         }
         ClientMessage::SetReplaySpeed { speed } => {
-            send_room_event(player_id, current_room, RoomEvent::SetReplaySpeed { speed }).await;
+            send_room_event(
+                player_id,
+                current_room,
+                RoomEvent::SetReplaySpeed { player_id, speed },
+            )
+            .await;
         }
         ClientMessage::SeekReplay { ticks_back } => {
             send_room_event(
                 player_id,
                 current_room,
-                RoomEvent::SeekReplay { ticks_back },
+                RoomEvent::SeekReplay {
+                    player_id,
+                    ticks_back,
+                },
             )
             .await;
         }

@@ -109,10 +109,10 @@ pub enum RoomEvent {
     Command { player_id: u32, cmd: SimCommand },
     /// A connected player intentionally gave up the active match.
     GiveUp { player_id: u32 },
-    /// Set dev playback speed multiplier (replay/scenario rooms only; ignored elsewhere).
-    SetReplaySpeed { speed: f32 },
+    /// Set replay playback speed multiplier; ignored outside replay/dev watch rooms.
+    SetReplaySpeed { player_id: u32, speed: f32 },
     /// Rewind a replay by `ticks_back` simulation ticks (replay rooms only; clamped to start).
-    SeekReplay { ticks_back: u32 },
+    SeekReplay { player_id: u32, ticks_back: u32 },
     /// Select replay vision for this viewer only. Ignored outside replay rooms in phase 1.
     SetReplayVision {
         player_id: u32,
