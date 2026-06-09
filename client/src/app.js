@@ -35,8 +35,9 @@ const HEARTBEAT_MS = 15000;
 
 /**
  * The whole application. A single instance is created on load. It can host
- * many sequential matches: a match is torn down on `gameOver` and a fresh one
- * begins on the next `start`, all on the same Net connection.
+ * many sequential matches: a live match can roll straight into post-match replay
+ * playback, then tear down cleanly when the user returns to lobby, all on the
+ * same Net connection.
  */
 export class App {
   constructor() {
