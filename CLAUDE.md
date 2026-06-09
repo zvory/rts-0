@@ -86,6 +86,7 @@ cd server && cargo run            # add --release for the fast build
 
 # Build / lint / format
 cd server && cargo build && cargo clippy && cargo fmt
+cargo run --manifest-path server/Cargo.toml -p rts-archcheck -- check-sim-architecture
 
 # Tests — start the server first, then (from repo root):
 node tests/server_integration.mjs     # dep-free, full server pipeline

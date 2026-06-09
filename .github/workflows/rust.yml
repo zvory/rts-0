@@ -38,6 +38,9 @@ jobs:
       - name: Check crate boundaries
         run: node ../scripts/check-crate-boundaries.mjs
 
+      - name: Check sim architecture
+        run: cargo run -p rts-archcheck -- check-sim-architecture
+
       - name: Check test-selection policy
         run: node ../tests/select-suites.mjs --verify
 
