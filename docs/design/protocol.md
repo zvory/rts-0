@@ -28,7 +28,7 @@ crate.
 | `returnToLobby` | — | Leave post-match replay playback and return the room to a clean lobby for rematch setup. Ignored outside replay rooms. |
 | `ping`     | `ts: number` | Latency probe; server replies with `pong`. |
 | `setReplaySpeed` | `speed: f32` | Set replay playback speed multiplier; ignored outside replay rooms and dev watch playback. The server clamps accepted speeds. |
-| `seekReplay` | `ticksBack: u32` | Rewind a replay by N simulation ticks; pass a large value (e.g. `2^31-1`) to reset to tick 0. Ignored outside replay rooms. The room rebuilds the game from the artifact, fast-forwards to `current - N`, re-sends `start`, and emits `replayState`. |
+| `seekReplay` | `ticksBack: u32` | Rewind a replay by N simulation ticks; pass a large value (e.g. `2^31-1`) to reset to tick 0. Ignored outside replay rooms. The room rate-limits accepted seeks and rejects seek targets that would require more than the bounded safe fast-forward window. Accepted seeks rebuild the game from the artifact, fast-forward to `current - N`, re-send `start`, and emit `replayState`. |
 | `setReplayVision` | `vision: ReplayVisionRequest` | Select replay fog/vision for this viewer only. Ignored outside replay rooms. The server validates the request and applies it to that viewer's subsequent snapshot projection. |
 
 `Command` (the `cmd` object) — `c` is the command discriminator:

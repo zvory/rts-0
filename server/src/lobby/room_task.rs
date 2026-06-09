@@ -194,6 +194,7 @@ struct ReplaySession {
     speed: f32,
     viewer_vision: HashMap<u32, ReplayVisionSelection>,
     last_controller_id: Option<u32>,
+    last_seek_at: Option<StdInstant>,
 }
 
 impl ReplaySession {
@@ -201,11 +202,25 @@ impl ReplaySession {
     const DEFAULT_SPEED: f32 = 2.0;
     const MIN_SPEED: f32 = 0.125;
     const MAX_SPEED: f32 = 8.0;
+    const MAX_DURATION_TICKS: u32 = 30 * 60 * 60;
+    const MAX_COMMAND_LOG_ENTRIES: usize = 200_000;
+    const MAX_SEEK_REBUILD_TICKS: u32 = 30 * 60 * 10;
+    const SEEK_COOLDOWN: Duration = Duration::from_millis(500);
 
     #[allow(dead_code)]
     fn new(artifact: ReplayArtifactV1) -> Result<Self, String> {
+        Self::validate_artifact_limits(&artifact)?;
         let duration_ticks = artifact.duration_ticks;
+        let build_start = StdInstant::now();
         let game = Box::new(Self::build_game(&artifact)?);
+        info!(
+            map = %artifact.map_name,
+            duration_ticks,
+            command_count = artifact.command_log.len(),
+            player_count = artifact.players.len(),
+            build_ms = build_start.elapsed().as_millis(),
+            "replay session built"
+        );
         Ok(ReplaySession {
             artifact,
             game,
@@ -214,7 +229,69 @@ impl ReplaySession {
             speed: Self::DEFAULT_SPEED,
             viewer_vision: HashMap::new(),
             last_controller_id: None,
+            last_seek_at: None,
         })
+    }
+
+    fn validate_artifact_limits(artifact: &ReplayArtifactV1) -> Result<(), String> {
+        if artifact.players.is_empty() {
+            return Err("replay artifact has no players".to_string());
+        }
+        if artifact.players.len() > MAX_PLAYERS {
+            return Err(format!(
+                "replay artifact has {} players; maximum is {MAX_PLAYERS}",
+                artifact.players.len()
+            ));
+        }
+        let mut seen_players = HashSet::new();
+        for player in &artifact.players {
+            if !seen_players.insert(player.id) {
+                return Err(format!(
+                    "replay artifact has duplicate player id {}",
+                    player.id
+                ));
+            }
+        }
+        if artifact.duration_ticks > Self::MAX_DURATION_TICKS {
+            return Err(format!(
+                "replay duration {} exceeds maximum {}",
+                artifact.duration_ticks,
+                Self::MAX_DURATION_TICKS
+            ));
+        }
+        if artifact.command_log.len() > Self::MAX_COMMAND_LOG_ENTRIES {
+            return Err(format!(
+                "replay command log has {} entries; maximum is {}",
+                artifact.command_log.len(),
+                Self::MAX_COMMAND_LOG_ENTRIES
+            ));
+        }
+        let mut previous_tick = 0;
+        for (index, entry) in artifact.command_log.iter().enumerate() {
+            if !seen_players.contains(&entry.player_id) {
+                return Err(format!(
+                    "replay command {index} references unknown player {}",
+                    entry.player_id
+                ));
+            }
+            if entry.tick == 0 {
+                return Err(format!("replay command {index} has invalid tick 0"));
+            }
+            if entry.tick > artifact.duration_ticks {
+                return Err(format!(
+                    "replay command {index} tick {} exceeds duration {}",
+                    entry.tick, artifact.duration_ticks
+                ));
+            }
+            if entry.tick < previous_tick {
+                return Err(format!(
+                    "replay command {index} is out of order: tick {} before {}",
+                    entry.tick, previous_tick
+                ));
+            }
+            previous_tick = entry.tick;
+        }
+        Ok(())
     }
 
     fn build_game(artifact: &ReplayArtifactV1) -> Result<Game, String> {
@@ -307,13 +384,45 @@ impl ReplaySession {
         self.game.tick_with_perf(perf).into_iter().collect()
     }
 
-    fn seek_back(&mut self, controller_id: u32, ticks_back: u32) -> Result<u32, String> {
+    fn seek_back(
+        &mut self,
+        room: &str,
+        viewer_count: usize,
+        controller_id: u32,
+        ticks_back: u32,
+    ) -> Result<u32, String> {
+        if self
+            .last_seek_at
+            .is_some_and(|last_seek| last_seek.elapsed() < Self::SEEK_COOLDOWN)
+        {
+            return Err("Replay seek ignored; wait before seeking again.".to_string());
+        }
         let target_tick = self
             .current_tick()
             .saturating_sub(ticks_back)
             .min(self.duration_ticks);
+        if target_tick > Self::MAX_SEEK_REBUILD_TICKS {
+            return Err(format!(
+                "Replay seek target tick {target_tick} exceeds the current safe rebuild limit of {} ticks.",
+                Self::MAX_SEEK_REBUILD_TICKS
+            ));
+        }
+        let from_tick = self.current_tick();
+        let seek_start = StdInstant::now();
         self.rebuild_to(target_tick)?;
+        self.last_seek_at = Some(StdInstant::now());
         self.last_controller_id = Some(controller_id);
+        info!(
+            room = %room,
+            controller_id,
+            viewer_count,
+            from_tick,
+            to_tick = target_tick,
+            duration_ticks = self.duration_ticks,
+            command_count = self.artifact.command_log.len(),
+            rebuild_ms = seek_start.elapsed().as_millis(),
+            "replay seek rebuilt"
+        );
         Ok(target_tick)
     }
 
@@ -1943,7 +2052,8 @@ impl RoomTask {
             if !self.players.contains_key(&player_id) {
                 return;
             }
-            let seek_result = session.seek_back(player_id, ticks_back);
+            let viewer_count = self.players.len();
+            let seek_result = session.seek_back(&self.room, viewer_count, player_id, ticks_back);
             let starts = if seek_result.is_ok() {
                 self.order
                     .iter()
@@ -2182,6 +2292,11 @@ impl RoomTask {
             self.send_replay_start_to(id);
             self.send_replay_state_to(id);
         }
+        info!(
+            room = %self.room,
+            viewer_count = self.players.len(),
+            "replay viewer active"
+        );
     }
 
     fn on_return_to_lobby(&mut self, player_id: u32) {
@@ -2520,9 +2635,163 @@ mod tests {
         assert_eq!(replay.state().speed, ReplaySession::MAX_SPEED);
         assert_eq!(replay.state().controller_id, Some(42));
 
-        let target = replay.seek_back(42, u32::MAX).unwrap();
+        let target = replay.seek_back("test", 1, 42, u32::MAX).unwrap();
         assert_eq!(target, 0);
         assert_eq!(replay.state().current_tick, 0);
+    }
+
+    #[test]
+    fn replay_seek_frequency_is_bounded() {
+        let players = replay_test_players(2);
+        let (_live, artifact) = replay_test_artifact(&players, 4);
+        let mut replay = ReplaySession::new(artifact).unwrap();
+        for _ in 0..3 {
+            replay.enqueue_for_current_tick().unwrap();
+            replay.tick(None);
+        }
+
+        assert!(replay.seek_back("test", 1, 42, 1).is_ok());
+        let err = replay.seek_back("test", 1, 42, 1).unwrap_err();
+        assert!(
+            err.contains("wait before seeking again"),
+            "unexpected seek reject: {err}"
+        );
+    }
+
+    #[test]
+    fn replay_artifact_limits_reject_malformed_command_logs() {
+        let players = replay_test_players(2);
+        let (_live, mut artifact) = replay_test_artifact(&players, 2);
+        artifact
+            .command_log
+            .push(crate::game::replay::CommandLogEntry {
+                tick: artifact.duration_ticks + 1,
+                player_id: players[0].id,
+                command: crate::protocol::Command::Stop { units: vec![1] },
+            });
+
+        let err = match ReplaySession::new(artifact) {
+            Ok(_) => panic!("malformed replay artifact should be rejected"),
+            Err(err) => err,
+        };
+        assert!(
+            err.contains("exceeds duration"),
+            "unexpected artifact reject: {err}"
+        );
+    }
+
+    #[test]
+    fn replay_artifact_limits_reject_duplicate_players() {
+        let players = replay_test_players(2);
+        let (_live, mut artifact) = replay_test_artifact(&players, 0);
+        artifact.players.push(artifact.players[0].clone());
+
+        let err = match ReplaySession::new(artifact) {
+            Ok(_) => panic!("duplicate-player replay artifact should be rejected"),
+            Err(err) => err,
+        };
+        assert!(
+            err.contains("duplicate player id"),
+            "unexpected artifact reject: {err}"
+        );
+    }
+
+    #[test]
+    fn replay_artifact_limits_reject_oversized_duration() {
+        let players = replay_test_players(2);
+        let (_live, mut artifact) = replay_test_artifact(&players, 0);
+        artifact.duration_ticks = ReplaySession::MAX_DURATION_TICKS + 1;
+
+        let err = match ReplaySession::new(artifact) {
+            Ok(_) => panic!("oversized replay artifact should be rejected"),
+            Err(err) => err,
+        };
+        assert!(
+            err.contains("exceeds maximum"),
+            "unexpected artifact reject: {err}"
+        );
+    }
+
+    #[test]
+    fn replay_room_rejects_rapid_seek_without_resetting_viewers() {
+        let players = replay_test_players(2);
+        let (_live, artifact) = replay_test_artifact(&players, 4);
+        let mut replay = ReplaySession::new(artifact).unwrap();
+        for _ in 0..3 {
+            replay.enqueue_for_current_tick().unwrap();
+            replay.tick(None);
+        }
+        let mut task = RoomTask::new(
+            "replay-seek-rate-test".to_string(),
+            RoomMode::Normal,
+            None,
+            false,
+            DrainHandle::default(),
+        );
+        let mut writer = add_test_room_player(&mut task, 99, true);
+        task.phase = Phase::ReplayViewer(Box::new(replay));
+
+        task.on_seek_replay(99, 1);
+        assert!(std::iter::from_fn(|| writer.reliable_rx.try_recv().ok())
+            .any(|msg| matches!(msg, ServerMessage::ReplayState(_))));
+
+        task.on_seek_replay(99, 1);
+        let messages: Vec<_> = std::iter::from_fn(|| writer.reliable_rx.try_recv().ok()).collect();
+        assert!(messages.iter().any(|msg| {
+            matches!(msg, ServerMessage::Error { msg } if msg.contains("wait before seeking again"))
+        }));
+        assert!(!messages
+            .iter()
+            .any(|msg| matches!(msg, ServerMessage::Start(_))));
+        assert!(matches!(task.phase, Phase::ReplayViewer(_)));
+    }
+
+    #[test]
+    fn rapid_replay_vision_changes_remain_per_viewer() {
+        let players = replay_test_players(2);
+        let (_live, artifact) = replay_test_artifact(&players, 1);
+        let replay = ReplaySession::new(artifact).unwrap();
+        let mut task = RoomTask::new(
+            "replay-vision-stress-test".to_string(),
+            RoomMode::Normal,
+            None,
+            false,
+            DrainHandle::default(),
+        );
+        let writer_a = add_test_room_player(&mut task, 100, true);
+        let writer_b = add_test_room_player(&mut task, 101, true);
+        task.phase = Phase::ReplayViewer(Box::new(replay));
+
+        for _ in 0..8 {
+            task.on_set_replay_vision(
+                100,
+                ReplayVisionRequest::Player {
+                    player_id: players[0].id,
+                },
+            );
+            task.on_set_replay_vision(
+                101,
+                ReplayVisionRequest::Player {
+                    player_id: players[1].id,
+                },
+            );
+        }
+        task.on_tick_replay_viewer(TokioInstant::now());
+
+        let snapshot_a = writer_a.snapshots.take().expect("viewer A snapshot");
+        let snapshot_b = writer_b.snapshots.take().expect("viewer B snapshot");
+        let Phase::ReplayViewer(session) = &task.phase else {
+            panic!("replay phase should remain active");
+        };
+        let expected_a = session.game.snapshot_for_spectator(&[players[0].id]);
+        let expected_b = session.game.snapshot_for_spectator(&[players[1].id]);
+
+        assert_eq!(snapshot_a.visible_tiles, expected_a.visible_tiles);
+        assert_eq!(snapshot_b.visible_tiles, expected_b.visible_tiles);
+        assert_ne!(
+            snapshot_a.visible_tiles, snapshot_b.visible_tiles,
+            "test setup should exercise different fog perspectives"
+        );
     }
 
     #[test]

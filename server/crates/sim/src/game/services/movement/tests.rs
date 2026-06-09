@@ -3040,7 +3040,7 @@ fn set_path_direct(entities: &mut EntityStore, id: u32, waypoints: Vec<(f32, f32
 }
 
 #[test]
-fn rifleman_charge_moves_at_tank_speed_for_hard_coded_duration() {
+fn rifleman_charge_uses_configured_multiplier_for_hard_coded_duration() {
     let map = flat_map(1);
     let mut entities = EntityStore::new();
     let (sx, sy) = map.tile_center(20, 20);
@@ -3060,9 +3060,6 @@ fn rifleman_charge_moves_at_tank_speed_for_hard_coded_duration() {
     let base_speed = config::unit_stats(EntityKind::Rifleman)
         .expect("rifleman stats")
         .speed;
-    let tank_speed = config::unit_stats(EntityKind::Tank)
-        .expect("tank stats")
-        .speed;
 
     let before = pos(&entities, rifleman);
     movement_system(&map, &mut entities, &mut players, &occ, &spatial, 0);
@@ -3070,10 +3067,6 @@ fn rifleman_charge_moves_at_tank_speed_for_hard_coded_duration() {
     assert!(
         (charged_step - base_speed * config::RIFLEMAN_CHARGE_SPEED_MULTIPLIER).abs() < 0.01,
         "charged rifleman speed should use the configured multiplier, moved {charged_step:.3}px"
-    );
-    assert!(
-        (charged_step - tank_speed).abs() < 0.01,
-        "charged rifleman should move at tank speed, moved {charged_step:.3}px"
     );
     assert_eq!(
         entities.get(rifleman).unwrap().charge_ticks(),

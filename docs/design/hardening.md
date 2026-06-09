@@ -30,6 +30,15 @@ The server treats every client as potentially hostile. Limits live next to the c
   silent player can't wedge a shared room, and frees the room slot.
 - **Join ack**: `RoomEvent::Join` carries a `oneshot<bool>`; a connection only marks itself joined
   on an accept, so a rejected mid-match join doesn't wedge the socket.
+- **Replay artifact and seek limits**: production `ReplaySession` construction rejects malformed or
+  oversized artifacts before building a game: empty/duplicate/too-many players, duration over one
+  hour at 30 Hz, more than 200k command-log entries, commands for unknown players, tick 0 commands,
+  out-of-order commands, and commands after the artifact duration. Accepted replay seeks are
+  rate-limited to one every 500 ms per replay room and may only fast-forward through the bounded
+  safe rebuild window of 18k ticks (~10 minutes). Large reset-to-start seeks remain cheap because
+  they rebuild to tick 0. Replay setup and accepted seeks log build/rebuild duration, viewer/player
+  counts, duration, and command counts so long artifacts and expensive controls are visible in
+  server logs.
 - **Deploy drain**: SIGTERM/Ctrl-C starts a server drain instead of immediately shutting down.
   The lobby flips into a draining state, existing room tasks continue ticking active normal
   matches, and new match starts are rejected while lobby clients see `can_start: false`. The

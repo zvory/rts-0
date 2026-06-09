@@ -1725,7 +1725,7 @@ input[type="text"]:focus {
   border-radius: 4px;
   background: rgba(201, 168, 95, 0.14);
   color: var(--accent);
-  font-family: var(--mono);
+  font-family: var(--lobby-font);
   font-size: 11px;
   text-transform: uppercase;
   cursor: pointer;
