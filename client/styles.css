@@ -268,8 +268,10 @@ body {
 /* ============================ LOBBY ============================ */
 #lobby-screen {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
+  gap: 28px;
   font-family: var(--lobby-font);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -281,7 +283,8 @@ body {
     var(--void);
   background-position: 0 0, 8px 8px;
   background-size: 16px 16px;
-  padding: 24px;
+  padding: min(10vh, 72px) 24px 32px;
+  overflow-y: auto;
 }
 
 .lobby-box {
@@ -1471,8 +1474,8 @@ input[type="text"]:focus {
 /* ---- Match history (lobby front page) ---------------------------------- */
 .match-history {
   width: min(960px, 100%);
-  margin: 28px auto 0;
-  padding: 0 16px 32px;
+  margin: 0;
+  padding: 0;
 }
 .match-history-panel {
   border: 1px solid var(--panel-edge);
@@ -1493,6 +1496,7 @@ input[type="text"]:focus {
 }
 .match-history-table-host {
   padding: 8px 0;
+  overflow-x: auto;
 }
 .match-history-status {
   margin: 0;
