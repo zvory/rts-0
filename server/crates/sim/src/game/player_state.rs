@@ -3,6 +3,16 @@ use crate::config;
 use crate::game::entity::EntityKind;
 
 impl PlayerState {
+    pub(crate) fn reset_for_dev_scenario(&mut self, start_tile: (u32, u32)) {
+        self.start_tile = start_tile;
+        self.steel = 0;
+        self.oil = 10_000;
+        self.supply_used = 0;
+        self.supply_cap = 0;
+        self.score = Default::default();
+        self.upgrades.clear();
+    }
+
     pub(crate) fn can_afford(&self, steel: u32, oil: u32) -> bool {
         self.steel >= steel && self.oil >= oil
     }

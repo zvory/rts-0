@@ -206,47 +206,14 @@ impl Game {
         let mut entities = EntityStore::new();
         let units = spawn_snaking_corridor_units(&mut entities, unit, unit_count, start)?;
         let player_id = 1;
-        let player = PlayerState {
-            id: player_id,
-            name: "Scenario".to_string(),
-            color: "#4878c8".to_string(),
-            start_tile,
-            steel: 0,
-            oil: 10_000,
-            supply_used: 0,
-            supply_cap: 0,
-            is_ai: false,
-            score: ScoreState::default(),
-            upgrades: Default::default(),
-        };
-
-        let spatial = services::spatial::SpatialIndex::build(&entities, map.size);
-        let pathing = services::pathing::PathingService::new(65_536, 256);
-        let rng = SmallRng::seed_from_u64(seed as u64);
-        let mut game = Game {
+        let game = build_dev_scenario_game(
             map,
             entities,
-            fog: Fog::new(96),
-            players: vec![player],
-            pending: Vec::new(),
-            command_log: Vec::new(),
-            tick: 0,
-            spatial,
-            pathing,
-            lingering_sight: Vec::new(),
-            smokes: SmokeCloudStore::new(),
+            player_id,
+            start_tile,
             seed,
-            starting_steel: 0,
-            starting_oil: 0,
-            map_metadata: dev_map_metadata("dev:scout_car_snaking_corridor"),
-            debug_path_overlays: true,
-            starting_loadout: StartingLoadout::DebugHuman,
-            rng,
-        };
-        let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
-        game.fog = Fog::new(game.map.size);
-        game.fog
-            .recompute_with_smoke(&ids, &game.entities, &game.map, &game.smokes);
+            "dev:scout_car_snaking_corridor",
+        );
 
         Ok(DevScenarioSetup {
             game,
@@ -290,47 +257,14 @@ impl Game {
         }
 
         let player_id = 1;
-        let player = PlayerState {
-            id: player_id,
-            name: "Scenario".to_string(),
-            color: "#4878c8".to_string(),
-            start_tile,
-            steel: 0,
-            oil: 10_000,
-            supply_used: 0,
-            supply_cap: 0,
-            is_ai: false,
-            score: ScoreState::default(),
-            upgrades: Default::default(),
-        };
-
-        let spatial = services::spatial::SpatialIndex::build(&entities, map.size);
-        let pathing = services::pathing::PathingService::new(65_536, 256);
-        let rng = SmallRng::seed_from_u64(seed as u64);
-        let mut game = Game {
+        let game = build_dev_scenario_game(
             map,
             entities,
-            fog: Fog::new(96),
-            players: vec![player],
-            pending: Vec::new(),
-            command_log: Vec::new(),
-            tick: 0,
-            spatial,
-            pathing,
-            lingering_sight: Vec::new(),
-            smokes: SmokeCloudStore::new(),
+            player_id,
+            start_tile,
             seed,
-            starting_steel: 0,
-            starting_oil: 0,
-            map_metadata: dev_map_metadata("dev:direct_reverse_order"),
-            debug_path_overlays: true,
-            starting_loadout: StartingLoadout::DebugHuman,
-            rng,
-        };
-        let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
-        game.fog = Fog::new(game.map.size);
-        game.fog
-            .recompute_with_smoke(&ids, &game.entities, &game.map, &game.smokes);
+            "dev:direct_reverse_order",
+        );
 
         Ok(DevScenarioSetup {
             game,
@@ -361,47 +295,52 @@ impl Game {
         let mut entities = EntityStore::new();
         let units = spawn_wall_chokepoint_units(&mut entities, unit, starts)?;
         let player_id = 1;
-        let player = PlayerState {
-            id: player_id,
-            name: "Scenario".to_string(),
-            color: "#4878c8".to_string(),
-            start_tile,
-            steel: 0,
-            oil: 10_000,
-            supply_used: 0,
-            supply_cap: 0,
-            is_ai: false,
-            score: ScoreState::default(),
-            upgrades: Default::default(),
-        };
-
-        let spatial = services::spatial::SpatialIndex::build(&entities, map.size);
-        let pathing = services::pathing::PathingService::new(65_536, 256);
-        let rng = SmallRng::seed_from_u64(seed as u64);
-        let mut game = Game {
+        let game = build_dev_scenario_game(
             map,
             entities,
-            fog: Fog::new(96),
-            players: vec![player],
-            pending: Vec::new(),
-            command_log: Vec::new(),
-            tick: 0,
-            spatial,
-            pathing,
-            lingering_sight: Vec::new(),
-            smokes: SmokeCloudStore::new(),
+            player_id,
+            start_tile,
             seed,
-            starting_steel: 0,
-            starting_oil: 0,
-            map_metadata: dev_map_metadata("dev:scout_car_wall_chokepoint"),
-            debug_path_overlays: true,
-            starting_loadout: StartingLoadout::DebugHuman,
-            rng,
-        };
-        let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
-        game.fog = Fog::new(game.map.size);
-        game.fog
-            .recompute_with_smoke(&ids, &game.entities, &game.map, &game.smokes);
+            "dev:scout_car_wall_chokepoint",
+        );
+
+        Ok(DevScenarioSetup {
+            game,
+            player_id,
+            units,
+            goal,
+        })
+    }
+
+    pub fn new_vehicle_corner_wall_scenario(
+        unit: EntityKind,
+        unit_count: usize,
+        seed: u32,
+    ) -> Result<DevScenarioSetup, String> {
+        if !matches!(
+            unit,
+            EntityKind::AtTeam | EntityKind::ScoutCar | EntityKind::Tank
+        ) {
+            return Err(format!("unsupported vehicle-corner-wall unit {unit}"));
+        }
+        if !matches!(unit_count, 1 | 3 | 5) {
+            return Err(format!(
+                "unsupported vehicle-corner-wall unit count {unit_count}"
+            ));
+        }
+
+        let (map, start_tile, starts, goal) = vehicle_corner_wall_map(unit, unit_count);
+        let mut entities = EntityStore::new();
+        let units = spawn_wall_chokepoint_units(&mut entities, unit, starts)?;
+        let player_id = 1;
+        let game = build_dev_scenario_game(
+            map,
+            entities,
+            player_id,
+            start_tile,
+            seed,
+            "dev:vehicle_corner_wall",
+        );
 
         Ok(DevScenarioSetup {
             game,
@@ -448,47 +387,14 @@ impl Game {
             spawn_vehicle_small_block_baseline_units(&mut entities, vehicle, vehicle_starts)?;
         spawn_vehicle_small_block_baseline_blockers(&mut entities, blocker, blocker_starts)?;
         let player_id = 1;
-        let player = PlayerState {
-            id: player_id,
-            name: "Scenario".to_string(),
-            color: "#4878c8".to_string(),
-            start_tile,
-            steel: 0,
-            oil: 10_000,
-            supply_used: 0,
-            supply_cap: 0,
-            is_ai: false,
-            score: ScoreState::default(),
-            upgrades: Default::default(),
-        };
-
-        let spatial = services::spatial::SpatialIndex::build(&entities, map.size);
-        let pathing = services::pathing::PathingService::new(65_536, 256);
-        let rng = SmallRng::seed_from_u64(seed as u64);
-        let mut game = Game {
+        let game = build_dev_scenario_game(
             map,
             entities,
-            fog: Fog::new(96),
-            players: vec![player],
-            pending: Vec::new(),
-            command_log: Vec::new(),
-            tick: 0,
-            spatial,
-            pathing,
-            lingering_sight: Vec::new(),
-            smokes: SmokeCloudStore::new(),
+            player_id,
+            start_tile,
             seed,
-            starting_steel: 0,
-            starting_oil: 0,
-            map_metadata: dev_map_metadata("dev:vehicle_small_block_baseline"),
-            debug_path_overlays: true,
-            starting_loadout: StartingLoadout::DebugHuman,
-            rng,
-        };
-        let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
-        game.fog = Fog::new(game.map.size);
-        game.fog
-            .recompute_with_smoke(&ids, &game.entities, &game.map, &game.smokes);
+            "dev:vehicle_small_block_baseline",
+        );
 
         Ok(DevScenarioSetup {
             game,
@@ -682,6 +588,50 @@ fn dev_map_metadata(name: &str) -> MapMetadata {
     }
 }
 
+fn build_dev_scenario_game(
+    map: Map,
+    entities: EntityStore,
+    player_id: u32,
+    start_tile: (u32, u32),
+    seed: u32,
+    metadata_name: &str,
+) -> Game {
+    let players = [PlayerInit {
+        id: player_id,
+        name: "Scenario".to_string(),
+        color: "#4878c8".to_string(),
+        is_ai: false,
+    }];
+    let spatial = services::spatial::SpatialIndex::build(&entities, map.size);
+    let pathing = services::pathing::PathingService::new(65_536, 256);
+    let rng = SmallRng::seed_from_u64(seed as u64);
+    let mut game = Game::new_without_ai_controllers(&players, seed);
+    game.map = map;
+    game.entities = entities;
+    game.fog = Fog::new(game.map.size);
+    game.pending.clear();
+    game.command_log.clear();
+    game.tick = 0;
+    game.spatial = spatial;
+    game.pathing = pathing;
+    game.lingering_sight.clear();
+    game.smokes = SmokeCloudStore::new();
+    game.starting_steel = 0;
+    game.starting_oil = 0;
+    game.map_metadata = dev_map_metadata(metadata_name);
+    game.debug_path_overlays = true;
+    game.starting_loadout = StartingLoadout::DebugHuman;
+    game.rng = rng;
+    if let Some(player) = game.players.first_mut() {
+        player.reset_for_dev_scenario(start_tile);
+    }
+    let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
+    game.fog = Fog::new(game.map.size);
+    game.fog
+        .recompute_with_smoke(&ids, &game.entities, &game.map, &game.smokes);
+    game
+}
+
 fn flat_dev_map(player_count: usize) -> Map {
     let mut map = Map::generate(player_count, 0xC0FF_EE01);
     for terrain in &mut map.terrain {
@@ -782,6 +732,53 @@ fn scout_car_wall_chokepoint_map(
         .collect();
     let goal_y = (wall_y as f32 + 0.5) * ts - ts * 10.0;
     let goal = (center_world_x, goal_y);
+    if let Some(slot) = map.starts.get_mut(0) {
+        *slot = start_tile;
+    }
+
+    (map, start_tile, starts, goal)
+}
+
+#[allow(clippy::type_complexity)]
+fn vehicle_corner_wall_map(
+    unit: EntityKind,
+    unit_count: usize,
+) -> (Map, (u32, u32), Vec<(f32, f32)>, (f32, f32)) {
+    let mut map = flat_dev_map(1);
+    let center_x = map.size / 2;
+    let wall_left_x = center_x;
+    let wall_right_x = wall_left_x + 2;
+    let wall_top_y = map.size / 2 - 8;
+    let wall_bottom_y = wall_top_y + 16;
+
+    block_rect_tiles(&mut map, wall_left_x, wall_top_y, wall_right_x, wall_bottom_y);
+
+    let ts = config::TILE_SIZE as f32;
+    let lead_x = wall_left_x as f32 * ts - ts;
+    let lead_y = (wall_top_y as f32 + 7.5) * ts;
+    let start_tile = (
+        ((lead_x / ts).floor() as u32).min(map.size - 1),
+        ((lead_y / ts).floor() as u32).min(map.size - 1),
+    );
+    let (side_spacing, rear_spacing) = vehicle_corner_wall_spawn_spacing(unit);
+    let starts: Vec<(f32, f32)> = match unit_count {
+        1 => vec![(lead_x, lead_y)],
+        3 => vec![
+            (lead_x, lead_y),
+            (lead_x, lead_y + rear_spacing),
+            (lead_x - side_spacing, lead_y),
+        ],
+        5 => vec![
+            (lead_x, lead_y),
+            (lead_x, lead_y + rear_spacing),
+            (lead_x, lead_y + rear_spacing * 2.0),
+            (lead_x - side_spacing, lead_y),
+            (lead_x - side_spacing * 2.0, lead_y),
+        ],
+        _ => unreachable!("vehicle corner wall caller validates unit count"),
+    };
+    let wall_right_edge = (wall_right_x + 1) as f32 * ts;
+    let goal = (wall_right_edge + ts * 0.5, lead_y);
     if let Some(slot) = map.starts.get_mut(0) {
         *slot = start_tile;
     }
@@ -930,6 +927,24 @@ fn wall_chokepoint_spawn_spacing(unit: EntityKind) -> f32 {
         }
         EntityKind::Tank => config::TANK_BODY_WIDTH_PX + config::TANK_BODY_CLEARANCE_PX * 4.0,
         _ => unreachable!("wall chokepoint only supports vehicles"),
+    }
+}
+
+fn vehicle_corner_wall_spawn_spacing(unit: EntityKind) -> (f32, f32) {
+    match unit {
+        EntityKind::AtTeam => (
+            config::AT_GUN_BODY_WIDTH_PX + config::AT_GUN_BODY_CLEARANCE_PX * 4.0,
+            config::AT_GUN_BODY_LENGTH_PX + config::AT_GUN_BODY_CLEARANCE_PX * 4.0,
+        ),
+        EntityKind::ScoutCar => (
+            config::SCOUT_CAR_BODY_WIDTH_PX + config::SCOUT_CAR_BODY_CLEARANCE_PX * 4.0,
+            config::SCOUT_CAR_BODY_LENGTH_PX + config::SCOUT_CAR_BODY_CLEARANCE_PX * 4.0,
+        ),
+        EntityKind::Tank => (
+            config::TANK_BODY_WIDTH_PX + config::TANK_BODY_CLEARANCE_PX * 4.0,
+            config::TANK_BODY_LENGTH_PX + config::TANK_BODY_CLEARANCE_PX * 4.0,
+        ),
+        _ => unreachable!("vehicle corner wall only supports vehicles"),
     }
 }
 
@@ -1480,6 +1495,93 @@ mod tests {
                 "{unit} should begin facing east, facing {:.4}",
                 entity.facing()
             );
+        }
+    }
+
+    #[test]
+    fn vehicle_corner_wall_scenario_matches_authored_layout() {
+        let setup = Game::new_vehicle_corner_wall_scenario(EntityKind::Tank, 5, 0x5150_0005)
+            .expect("scenario setup should succeed");
+        assert_eq!(setup.units.len(), 5);
+        assert_eq!(owned_kind_count(&setup.game, 1, EntityKind::Tank), 5);
+
+        let map = &setup.game.map;
+        let wall_left_x = map.size / 2;
+        let wall_right_x = wall_left_x + 2;
+        let wall_top_y = map.size / 2 - 8;
+        let wall_bottom_y = wall_top_y + 16;
+        let wall_tiles = (wall_right_x - wall_left_x + 1) * (wall_bottom_y - wall_top_y + 1);
+        let rock_tiles = map
+            .terrain
+            .iter()
+            .filter(|&&terrain| terrain == crate::protocol::terrain::ROCK)
+            .count();
+        assert_eq!(
+            rock_tiles, wall_tiles as usize,
+            "corner-wall map should be plain except for the stone spur"
+        );
+        for ty in wall_top_y..=wall_bottom_y {
+            for tx in wall_left_x..=wall_right_x {
+                assert_eq!(
+                    map.terrain[map.index(tx, ty)],
+                    crate::protocol::terrain::ROCK,
+                    "wall tile {tx},{ty} should be stone"
+                );
+            }
+        }
+        assert_eq!(
+            map.terrain[map.index(wall_left_x - 1, wall_top_y)],
+            crate::protocol::terrain::GRASS
+        );
+        assert_eq!(
+            map.terrain[map.index(wall_right_x + 1, wall_top_y)],
+            crate::protocol::terrain::GRASS
+        );
+
+        let ts = config::TILE_SIZE as f32;
+        let lead = setup
+            .game
+            .entities
+            .get(setup.units[0])
+            .expect("lead tank should exist");
+        let lead_x = wall_left_x as f32 * ts - ts;
+        let lead_y = (wall_top_y as f32 + 7.5) * ts;
+        assert!((lead.pos_x - lead_x).abs() <= 0.001);
+        assert!((lead.pos_y - lead_y).abs() <= 0.001);
+        assert!((setup.goal.0 - ((wall_right_x + 1) as f32 * ts + ts * 0.5)).abs() <= 0.001);
+        assert!((setup.goal.1 - lead_y).abs() <= 0.001);
+
+        let north = -std::f32::consts::FRAC_PI_2;
+        let (side_spacing, rear_spacing) = vehicle_corner_wall_spawn_spacing(EntityKind::Tank);
+        let expected = [
+            (lead_x, lead_y),
+            (lead_x, lead_y + rear_spacing),
+            (lead_x, lead_y + rear_spacing * 2.0),
+            (lead_x - side_spacing, lead_y),
+            (lead_x - side_spacing * 2.0, lead_y),
+        ];
+        for (unit_id, (expected_x, expected_y)) in setup.units.iter().zip(expected) {
+            let entity = setup
+                .game
+                .entities
+                .get(*unit_id)
+                .expect("scenario tank should exist");
+            assert_eq!(entity.kind, EntityKind::Tank);
+            assert!((entity.pos_x - expected_x).abs() <= 0.001);
+            assert!((entity.pos_y - expected_y).abs() <= 0.001);
+            assert!((entity.facing() - north).abs() <= 0.001);
+        }
+    }
+
+    #[test]
+    fn vehicle_corner_wall_scenario_supports_all_vehicle_counts() {
+        for unit in [EntityKind::AtTeam, EntityKind::ScoutCar, EntityKind::Tank] {
+            for count in [1usize, 3, 5] {
+                let setup = Game::new_vehicle_corner_wall_scenario(unit, count, 0x5150_0006)
+                    .expect("scenario setup should succeed");
+                assert_eq!(setup.units.len(), count);
+                assert_eq!(owned_kind_count(&setup.game, 1, unit), count);
+            }
         }
     }
 

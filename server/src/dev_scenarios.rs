@@ -205,6 +205,63 @@ const WALL_CHOKEPOINT_VEHICLE_LAUNCHES: [DevScenarioLaunch; 15] = [
     },
 ];
 
+const VEHICLE_CORNER_WALL_LAUNCHES: [DevScenarioLaunch; 9] = [
+    DevScenarioLaunch {
+        id: "vehicle_corner_wall",
+        unit: EntityKind::AtTeam,
+        count: 1,
+        blocker: None,
+    },
+    DevScenarioLaunch {
+        id: "vehicle_corner_wall",
+        unit: EntityKind::AtTeam,
+        count: 3,
+        blocker: None,
+    },
+    DevScenarioLaunch {
+        id: "vehicle_corner_wall",
+        unit: EntityKind::AtTeam,
+        count: 5,
+        blocker: None,
+    },
+    DevScenarioLaunch {
+        id: "vehicle_corner_wall",
+        unit: EntityKind::ScoutCar,
+        count: 1,
+        blocker: None,
+    },
+    DevScenarioLaunch {
+        id: "vehicle_corner_wall",
+        unit: EntityKind::ScoutCar,
+        count: 3,
+        blocker: None,
+    },
+    DevScenarioLaunch {
+        id: "vehicle_corner_wall",
+        unit: EntityKind::ScoutCar,
+        count: 5,
+        blocker: None,
+    },
+    DevScenarioLaunch {
+        id: "vehicle_corner_wall",
+        unit: EntityKind::Tank,
+        count: 1,
+        blocker: None,
+    },
+    DevScenarioLaunch {
+        id: "vehicle_corner_wall",
+        unit: EntityKind::Tank,
+        count: 3,
+        blocker: None,
+    },
+    DevScenarioLaunch {
+        id: "vehicle_corner_wall",
+        unit: EntityKind::Tank,
+        count: 5,
+        blocker: None,
+    },
+];
+
 const VEHICLE_SMALL_BLOCK_BASELINE_LAUNCHES: [DevScenarioLaunch; 30] = [
     DevScenarioLaunch {
         id: "vehicle_small_block_baseline",
@@ -388,7 +445,7 @@ const VEHICLE_SMALL_BLOCK_BASELINE_LAUNCHES: [DevScenarioLaunch; 30] = [
     },
 ];
 
-const DEV_SCENARIOS: [DevScenarioSpec; 4] = [
+const DEV_SCENARIOS: [DevScenarioSpec; 5] = [
     DevScenarioSpec {
         id: "scout_car_snaking_corridor",
         title: "Scout Car Snaking Corridor",
@@ -407,6 +464,12 @@ const DEV_SCENARIOS: [DevScenarioSpec; 4] = [
         title: "Vehicle Wall Chokepoint",
         description: "Vehicles start beside each other below a stone wall gap and move north through the choke.",
         launches: &WALL_CHOKEPOINT_VEHICLE_LAUNCHES,
+    },
+    DevScenarioSpec {
+        id: "vehicle_corner_wall",
+        title: "Vehicle Corner Wall",
+        description: "One, three, or five vehicles start in a flipped-L shape half a tile west of a three-tile-wide stone wall spur, then move to the east side to test cornering.",
+        launches: &VEHICLE_CORNER_WALL_LAUNCHES,
     },
     DevScenarioSpec {
         id: "vehicle_small_block_baseline",
@@ -559,6 +622,15 @@ mod tests {
             })
         );
         assert_eq!(
+            parse_dev_scenario_room("vehicle_corner_wall:unit=at_team:count=5"),
+            Some(DevScenarioLaunch {
+                id: "vehicle_corner_wall",
+                unit: EntityKind::AtTeam,
+                count: 5,
+                blocker: None,
+            })
+        );
+        assert_eq!(
             parse_dev_scenario_room("vehicle_small_block_baseline:unit=scout_car:count=5"),
             Some(DevScenarioLaunch {
                 id: "vehicle_small_block_baseline",
@@ -625,6 +697,14 @@ mod tests {
         );
         assert_eq!(
             parse_dev_scenario_launch("scout_car_wall_chokepoint", "scout_car", "4", None),
+            None
+        );
+        assert_eq!(
+            parse_dev_scenario_launch("vehicle_corner_wall", "worker", "1", None),
+            None
+        );
+        assert_eq!(
+            parse_dev_scenario_launch("vehicle_corner_wall", "tank", "4", None),
             None
         );
         assert_eq!(
