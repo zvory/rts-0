@@ -1295,6 +1295,73 @@ input[type="text"]:focus {
 .cmd-btn.unaffordable .cmd-cost {
   color: var(--bad);
 }
+.cmd-btn .cmd-tooltip {
+  position: absolute;
+  right: calc(100% + 10px);
+  bottom: -1px;
+  z-index: 3;
+  width: 218px;
+  display: none;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 11px;
+  color: var(--ink);
+  background: rgba(17, 17, 15, 0.96);
+  border: 1px solid var(--panel-edge);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow);
+  pointer-events: none;
+  text-align: left;
+  font-size: 12px;
+  line-height: 1.25;
+}
+.cmd-btn:hover .cmd-tooltip,
+.cmd-btn:focus-visible .cmd-tooltip {
+  display: flex;
+}
+.cmd-btn .cmd-tooltip-title {
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+.cmd-btn .cmd-tooltip-costs {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.cmd-btn .cmd-tooltip-cost {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 800;
+}
+.cmd-btn .cmd-tooltip .res-icon {
+  font-size: 13px;
+  line-height: 1;
+}
+.cmd-btn .cmd-tooltip .res-icon.steel {
+  color: var(--steel);
+  text-shadow: 1px 1px 0 #191710;
+}
+.cmd-btn .cmd-tooltip .res-icon.oil {
+  color: var(--oil);
+  text-shadow: 1px 1px 0 #5f6848;
+}
+.cmd-btn .cmd-tooltip .res-icon.supply {
+  color: var(--supply);
+}
+.cmd-btn .cmd-tooltip-row {
+  display: grid;
+  grid-template-columns: 74px minmax(0, 1fr);
+  gap: 8px;
+  color: var(--ink-dim);
+}
+.cmd-btn .cmd-tooltip-row strong {
+  color: var(--ink);
+  font-weight: 700;
+}
 
 /* --- Replay speed controls --- */
 #replay-speed {

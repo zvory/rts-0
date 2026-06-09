@@ -15,6 +15,7 @@ import {
   ABILITIES,
   PLAYER_PALETTE,
   STATS,
+  TICK_HZ,
   WORKER_BUILDABLE,
 } from "./config.js";
 
@@ -23,6 +24,11 @@ import {
 //   A S D
 //   Z X C
 const GRID_HOTKEYS = Object.freeze(["Q", "W", "E", "A", "S", "D", "Z", "X", "C"]);
+const RESOURCE_ICON_FALLBACKS = Object.freeze({
+  steel: "▰",
+  oil: "⬤",
+  supply: "▲",
+});
 
 /** True if `playerId` owns at least one completed entity of `kind` in `entities`. */
 export function playerHasCompletedKind(entities, playerId, kind) {
@@ -127,6 +133,9 @@ export class HUD {
     this._resSig = null;
     // Signature for the inert control-group tabs.
     this._controlGroupSig = null;
+    // Cache the initial top-bar resource icon markup so command-card hovers and
+    // replay rows stay in sync with the shared HUD icons.
+    this._resourceIcons = this._readResourceIconHtml();
   }
 
   /**
@@ -176,9 +185,9 @@ export class HUD {
     if (this._resSig && this._resSig.startsWith("multi:")) {
       if (this.elHud) {
         this.elHud.innerHTML =
-          `<div class="res"><span class="res-icon steel">▰</span><span id="res-steel">0</span></div>` +
-          `<div class="res"><span class="res-icon oil">⬤</span><span id="res-oil">0</span></div>` +
-          `<div class="res"><span class="res-icon supply">▲</span><span id="res-supply">0 / 0</span></div>`;
+          `<div class="res">${this._resourceIcon("steel")}<span id="res-steel">0</span></div>` +
+          `<div class="res">${this._resourceIcon("oil")}<span id="res-oil">0</span></div>` +
+          `<div class="res">${this._resourceIcon("supply")}<span id="res-supply">0 / 0</span></div>`;
         this.elSteel = this.elHud.querySelector("#res-steel");
         this.elOil = this.elHud.querySelector("#res-oil");
         this.elSupply = this.elHud.querySelector("#res-supply");
@@ -221,9 +230,9 @@ export class HUD {
       row.className = "res replay-player-res";
       row.innerHTML =
         `<span class="replay-player-dot" style="background:${color}" title="${name}"></span>` +
-        `<span class="res-icon steel">▰</span><span class="replay-res-val">${pr.steel}</span>` +
-        `<span class="res-icon oil">⬤</span><span class="replay-res-val">${pr.oil}</span>` +
-        `<span class="res-icon supply">▲</span>` +
+        `${this._resourceIcon("steel")}<span class="replay-res-val">${pr.steel}</span>` +
+        `${this._resourceIcon("oil")}<span class="replay-res-val">${pr.oil}</span>` +
+        `${this._resourceIcon("supply")}` +
         `<span class="replay-res-val${supplyCapped ? " supply-capped" : ""}">${pr.supplyUsed} / ${pr.supplyCap}</span>`;
       frag.appendChild(row);
     }
@@ -875,13 +884,15 @@ export class HUD {
       const st = STATS[unit];
       if (!st) continue;
       const enabled = this._canTrain(unit, res);
+      const reason = this._trainDisabledReason(unit, res);
       const btn = this._cmdButton({
         icon: st.icon,
         label: st.label,
         hotkey: GRID_HOTKEYS[idx++],
         cost: st.cost,
         enabled,
-        title: this._trainDisabledReason(unit, res),
+        title: reason,
+        tooltipHtml: this._trainTooltipHtml(unit),
         repeatable: true,
         onClick: () => this._issueTrain(unit),
       });
@@ -1021,6 +1032,32 @@ export class HUD {
     return affordance.definition.title || "";
   }
 
+  /** Detailed command-card hover for production menu unit buttons. */
+  _trainTooltipHtml(unit) {
+    const st = STATS[unit];
+    if (!st) return "";
+    const cost = st.cost || {};
+    const requirements = this._requirementsOf(st);
+    const requirementLabels = requirements.length > 0
+      ? requirements.map((req) => (STATS[req] && STATS[req].label) || req).join(", ")
+      : "None";
+    const buildSeconds = Math.max(0, (st.buildTicks || 0) / TICK_HZ);
+    const buildTime = Number.isInteger(buildSeconds)
+      ? `${buildSeconds}s`
+      : `${buildSeconds.toFixed(1)}s`;
+
+    return (
+      `<span class="cmd-tooltip-title">${st.label}</span>` +
+      `<span class="cmd-tooltip-costs">` +
+        `<span class="cmd-tooltip-cost">${this._resourceIcon("steel")}<span>${cost.steel ?? 0}</span></span>` +
+        `<span class="cmd-tooltip-cost">${this._resourceIcon("oil")}<span>${cost.oil ?? 0}</span></span>` +
+        `<span class="cmd-tooltip-cost">${this._resourceIcon("supply")}<span>${st.supply ?? 0}</span></span>` +
+      `</span>` +
+      `<span class="cmd-tooltip-row"><span>Requires</span><strong>${requirementLabels}</strong></span>` +
+      `<span class="cmd-tooltip-row"><span>Build time</span><strong>${buildTime}</strong></span>`
+    );
+  }
+
   /** True if the player owns at least one completed entity of `kind`. */
   _playerHasCompleteKind(kind) {
     // entitiesInterpolated(1) reflects the latest snapshot positions but, more
@@ -1053,6 +1090,7 @@ export class HUD {
    * @param {{steel:number,oil:number}} [opts.cost] cost badge (omitted if absent).
    * @param {boolean} opts.enabled whether the action is currently available.
    * @param {string} [opts.title] tooltip / disabled reason.
+   * @param {string} [opts.tooltipHtml] rich hover content rendered inside the button.
    * @param {string} [opts.cls] extra class (e.g. "cancel").
    * @param {string} [opts.countBadge] top-right ready count for partially-available abilities.
    * @param {{count:number,rotationDeg:number}[]} [opts.cooldownClocks] grouped cooldown clocks.
@@ -1096,7 +1134,8 @@ export class HUD {
       (opts.hotkey ? `<span class="cmd-hotkey">${opts.hotkey}</span>` : "") +
       cooldownHtml +
       (opts.countBadge ? `<span class="cmd-ready-count">${opts.countBadge}</span>` : "") +
-      costHtml;
+      costHtml +
+      (opts.tooltipHtml ? `<span class="cmd-tooltip" role="tooltip">${opts.tooltipHtml}</span>` : "");
 
     if (opts.enabled && typeof opts.onClick === "function") {
       btn.addEventListener("click", (ev) => {
@@ -1105,5 +1144,21 @@ export class HUD {
       });
     }
     return btn;
+  }
+
+  _readResourceIconHtml() {
+    const icons = {};
+    for (const kind of Object.keys(RESOURCE_ICON_FALLBACKS)) {
+      const el = this.elHud?.querySelector(`.res-icon.${kind}`);
+      icons[kind] = el
+        ? el.outerHTML
+        : `<span class="res-icon ${kind}">${RESOURCE_ICON_FALLBACKS[kind]}</span>`;
+    }
+    return icons;
+  }
+
+  _resourceIcon(kind) {
+    return this._resourceIcons[kind] ||
+      `<span class="res-icon ${kind}">${RESOURCE_ICON_FALLBACKS[kind] || ""}</span>`;
   }
 }
