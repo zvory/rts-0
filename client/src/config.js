@@ -142,7 +142,7 @@ export const UPGRADES = Object.freeze({
     hotkey: "Q",
     cost: Object.freeze({ steel: 100, oil: 100 }),
     researchTicks: METHAMPHETAMINES_RESEARCH_TICKS,
-    description: "Increase Attack and Speed, Shoot While Moving",
+    description: "Increase Rifleman Attack and Speed, Shoot While Moving",
     researchedAt: KIND.TRAINING_CENTRE,
   }),
 });
