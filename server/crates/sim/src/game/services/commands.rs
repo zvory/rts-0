@@ -4,8 +4,8 @@ use crate::config;
 use crate::game::ability::{self, AbilityKind, AbilityTargetMode};
 use crate::game::command::SimCommand;
 use crate::game::entity::{
-    BuildPhase, EntityKind, EntityStore, Order, OrderIntent, ProdItem, WeaponSetup,
-    MAX_QUEUED_ORDERS,
+    BuildPhase, EntityKind, EntityStore, Order, OrderIntent, ProdItem, RallyIntent, RallyKind,
+    WeaponSetup, MAX_QUEUED_ORDERS,
 };
 use crate::game::fog::Fog;
 use crate::game::map::Map;
@@ -29,6 +29,7 @@ use crate::rules;
 /// Max unique unit ids honored per multi-unit command. Caps the per-id work a single command can
 /// force, so a repeated/huge id list can't be used to stall the tick loop.
 const MAX_UNITS_PER_COMMAND: usize = 256;
+const MAX_RALLY_STAGES: usize = 4;
 
 /// Drain + apply queued commands (validate ownership / cost / supply / tech / placement).
 #[allow(clippy::too_many_arguments)]
@@ -295,9 +296,10 @@ pub(crate) fn apply_commands(
                 building,
                 x,
                 y,
+                kind,
                 queued,
             } => {
-                order_set_rally(map, entities, player, building, x, y, queued);
+                order_set_rally(map, entities, player, building, (x, y), kind, queued);
             }
             SimCommand::Rejected { reason } => {
                 notice(events, player, reason.notice_message());
@@ -1060,9 +1062,9 @@ fn order_set_rally(
     entities: &mut EntityStore,
     player: u32,
     building: u32,
-    x: f32,
-    y: f32,
-    _queued: bool,
+    point: (f32, f32),
+    kind: RallyKind,
+    queued: bool,
 ) {
     let ok = matches!(entities.get(building), Some(b)
         if b.owner == player && b.is_building() && !b.under_construction()
@@ -1070,14 +1072,18 @@ fn order_set_rally(
     if !ok {
         return;
     }
-    if !x.is_finite() || !y.is_finite() {
+    if !point.0.is_finite() || !point.1.is_finite() {
         return;
     }
     let max = (map.world_size_px() - 1.0).max(0.0);
-    let rally = (x.clamp(0.0, max), y.clamp(0.0, max));
+    let rally = RallyIntent::new(kind, point.0.clamp(0.0, max), point.1.clamp(0.0, max));
     if let Some(b) = entities.get_mut(building) {
-        b.clear_rally_stages();
-        b.set_rally_point(Some(rally));
+        if queued {
+            b.append_rally_stage(rally, MAX_RALLY_STAGES);
+        } else {
+            b.clear_rally_stages();
+            b.set_rally_point(Some(rally));
+        }
     }
 }
 
@@ -1445,6 +1451,7 @@ mod tests {
                         building: barracks,
                         x: 100.0,
                         y: 200.0,
+                        kind: RallyKind::Move,
                         queued: false,
                     },
                 ),
@@ -1455,6 +1462,7 @@ mod tests {
                         building: depot,
                         x: 50.0,
                         y: 50.0,
+                        kind: RallyKind::Move,
                         queued: false,
                     },
                 ),
@@ -1465,6 +1473,7 @@ mod tests {
                         building: enemy_barracks,
                         x: 10.0,
                         y: 10.0,
+                        kind: RallyKind::Move,
                         queued: false,
                     },
                 ),
@@ -1506,6 +1515,7 @@ mod tests {
                     building: barracks,
                     x: 1.0e9,
                     y: -50.0,
+                    kind: RallyKind::Move,
                     queued: false,
                 },
             )],
@@ -2536,7 +2546,7 @@ mod tests {
     }
 
     #[test]
-    fn queued_rally_replaces_the_single_rally_point() {
+    fn queued_rally_appends_until_four_stages_and_normal_rally_clears_queue() {
         let map = flat_map(24);
         let mut entities = EntityStore::new();
         let (bx, by) = footprint_center(&map, EntityKind::Barracks, 6, 6);
@@ -2554,6 +2564,7 @@ mod tests {
                         building: barracks,
                         x: 100.0,
                         y: 100.0,
+                        kind: RallyKind::Move,
                         queued: true,
                     },
                 ),
@@ -2563,6 +2574,7 @@ mod tests {
                         building: barracks,
                         x: 200.0,
                         y: 200.0,
+                        kind: RallyKind::AttackMove,
                         queued: true,
                     },
                 ),
@@ -2572,6 +2584,27 @@ mod tests {
                         building: barracks,
                         x: 300.0,
                         y: 300.0,
+                        kind: RallyKind::Move,
+                        queued: true,
+                    },
+                ),
+                (
+                    1,
+                    SimCommand::SetRally {
+                        building: barracks,
+                        x: 400.0,
+                        y: 400.0,
+                        kind: RallyKind::AttackMove,
+                        queued: true,
+                    },
+                ),
+                (
+                    1,
+                    SimCommand::SetRally {
+                        building: barracks,
+                        x: 500.0,
+                        y: 500.0,
+                        kind: RallyKind::Move,
                         queued: true,
                     },
                 ),
@@ -2580,10 +2613,18 @@ mod tests {
 
         assert_eq!(
             entities.get(barracks).unwrap().rally_point(),
-            Some((300.0, 300.0)),
-            "queued rally commands should still replace the one active rally point"
+            Some((100.0, 100.0)),
+            "first queued rally should establish the active rally point"
         );
-        assert!(entities.get(barracks).unwrap().rally_stages().is_empty());
+        let stages = entities.get(barracks).unwrap().rally_stages();
+        assert_eq!(
+            stages.len(),
+            3,
+            "rally plan should be capped at four total stages"
+        );
+        assert_eq!(stages[0].kind, RallyKind::AttackMove);
+        assert_eq!((stages[0].point.x, stages[0].point.y), (200.0, 200.0));
+        assert_eq!((stages[2].point.x, stages[2].point.y), (400.0, 400.0));
 
         apply(
             &map,
@@ -2592,8 +2633,9 @@ mod tests {
                 1,
                 SimCommand::SetRally {
                     building: barracks,
-                    x: 400.0,
-                    y: 400.0,
+                    x: 600.0,
+                    y: 600.0,
+                    kind: RallyKind::Move,
                     queued: false,
                 },
             )],
@@ -2601,7 +2643,7 @@ mod tests {
 
         let barracks = entities.get(barracks).expect("barracks should exist");
         assert!(barracks.rally_stages().is_empty());
-        assert_eq!(barracks.rally_point(), Some((400.0, 400.0)));
+        assert_eq!(barracks.rally_point(), Some((600.0, 600.0)));
     }
 
     #[test]

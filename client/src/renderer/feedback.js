@@ -434,26 +434,39 @@ export function _drawRallyPoints(state) {
   for (const e of state.selectedEntities()) {
     if (e.owner !== state.playerId) continue;
     if (!isBuilding(e.kind) || !isProducerBuilding(e.kind)) continue;
-    const rally = e.rally;
-    if (!rally) continue;
-    const [rx, ry] = rally;
+    const plan = Array.isArray(e.rallyPlan) && e.rallyPlan.length > 0
+      ? e.rallyPlan
+      : e.rally
+        ? [{ kind: "move", x: e.rally[0], y: e.rally[1] }]
+        : [];
+    if (plan.length === 0) continue;
 
-    // Link from the building to the rally point.
-    g.lineStyle(2, color, 0.5);
-    g.moveTo(e.x, e.y);
-    g.lineTo(rx, ry);
-
-    // Flag: pole + pennant + base dot.
-    g.lineStyle(2.5, color, 0.95);
-    g.moveTo(rx, ry);
-    g.lineTo(rx, ry - 20);
-    g.beginFill(color, 0.9);
-    g.drawPolygon([rx, ry - 20, rx + 13, ry - 16, rx, ry - 11]);
-    g.endFill();
-    g.lineStyle(0);
-    g.beginFill(color, 0.85);
-    g.drawCircle(rx, ry, 3);
-    g.endFill();
+    let fromX = e.x;
+    let fromY = e.y;
+    for (let i = 0; i < plan.length; i += 1) {
+      const stage = plan[i];
+      const attackMove = stage.kind === "attackMove";
+      g.lineStyle(2, color, i === 0 ? 0.55 : 0.35);
+      g.moveTo(fromX, fromY);
+      g.lineTo(stage.x, stage.y);
+      if (i === 0 && !attackMove) {
+        // Flag: pole + pennant + base dot for the active move rally.
+        g.lineStyle(2.5, color, 0.95);
+        g.moveTo(stage.x, stage.y);
+        g.lineTo(stage.x, stage.y - 20);
+        g.beginFill(color, 0.9);
+        g.drawPolygon([stage.x, stage.y - 20, stage.x + 13, stage.y - 16, stage.x, stage.y - 11]);
+        g.endFill();
+        g.lineStyle(0);
+        g.beginFill(color, 0.85);
+        g.drawCircle(stage.x, stage.y, 3);
+        g.endFill();
+      } else {
+        drawQueuedPointMarker(g, stage.x, stage.y, color, attackMove);
+      }
+      fromX = stage.x;
+      fromY = stage.y;
+    }
   }
 }
 

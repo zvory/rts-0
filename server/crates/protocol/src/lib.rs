@@ -183,12 +183,13 @@ pub enum Command {
     Stop {
         units: Vec<u32>,
     },
-    /// Set a unit-producing building's rally point to a world point. Produced units receive a
-    /// move order to it and the building prefers the spawn exit closest to it.
+    /// Set or append a unit-producing building rally stage. `kind` defaults to a plain move stage.
     SetRally {
         building: u32,
         x: f32,
         y: f32,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        kind: Option<String>,
         #[serde(default, skip_serializing_if = "is_false")]
         queued: bool,
     },
@@ -472,6 +473,9 @@ impl Serialize for CompactEntity<'_> {
         if entity.debug_path.is_some() {
             len = 26;
         }
+        if !entity.rally_plan.is_empty() {
+            len = 27;
+        }
 
         let mut seq = serializer.serialize_seq(Some(len))?;
         seq.serialize_element(&entity.id)?;
@@ -547,6 +551,15 @@ impl Serialize for CompactEntity<'_> {
         }
         if len > 25 {
             seq.serialize_element(&entity.debug_path.as_ref().map(CompactDebugPath))?;
+        }
+        if len > 26 {
+            seq.serialize_element(
+                &entity
+                    .rally_plan
+                    .iter()
+                    .map(CompactOrderPlanMarker)
+                    .collect::<Vec<_>>(),
+            )?;
         }
         seq.end()
     }
@@ -890,6 +903,18 @@ mod tests {
         center.prod_queue = Some(2);
         center.build_progress = Some(0.75);
         center.rally = Some([256.0, 512.0]);
+        center.rally_plan = vec![
+            OrderPlanMarker {
+                kind: "move".to_string(),
+                x: 256.0,
+                y: 512.0,
+            },
+            OrderPlanMarker {
+                kind: "attackMove".to_string(),
+                x: 320.0,
+                y: 544.0,
+            },
+        ];
 
         Snapshot {
             tick: 42,
@@ -990,6 +1015,11 @@ mod tests {
         assert_eq!(value["e"][0][24], serde_json::json!(true));
         // Rally point rides in slot 18 of the producing building's record.
         assert_eq!(value["e"][2][18], serde_json::json!([256.0, 512.0]));
+        // Rally plan is appended after the legacy optional slots so earlier compact positions stay stable.
+        assert_eq!(
+            value["e"][2][26],
+            serde_json::json!([[1, 256.0, 512.0], [2, 320.0, 544.0]])
+        );
         assert_eq!(value["r"], serde_json::json!([[200, 1498]]));
         assert_eq!(
             value["sm"],

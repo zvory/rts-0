@@ -1,4 +1,4 @@
-use super::{EntityKind, Order, OrderIntent, PointIntent};
+use super::{EntityKind, Order, OrderIntent, RallyIntent};
 
 /// A queued production order on a building.
 #[derive(Debug, Clone)]
@@ -159,13 +159,11 @@ impl WeaponSetup {
 pub struct ProductionState {
     /// FIFO production queue (front = item being produced).
     pub queue: Vec<ProdItem>,
-    /// Optional rally point (world pixels). When set, freshly produced units receive a move
-    /// order to this point and the producer prefers the spawn exit closest to it. `None` = units
-    /// spawn and idle next to the building (legacy behavior).
-    pub rally_point: Option<(f32, f32)>,
-    /// Reserved for old replay compatibility. Production consumes only `rally_point`; live rally
-    /// commands clear this list and replace the single active rally point.
-    pub rally_queue: Vec<PointIntent>,
+    /// Optional first rally stage (world pixels). When set, freshly produced units receive this
+    /// order and the producer prefers the spawn exit closest to it.
+    pub rally_point: Option<RallyIntent>,
+    /// Additional rally stages applied as queued orders to freshly produced units.
+    pub rally_queue: Vec<RallyIntent>,
 }
 
 /// Construction progress state. Present only while a building is under construction.

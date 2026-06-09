@@ -8,8 +8,8 @@
 // non-square maps stay centered and undistorted.
 
 import { cmd } from "./protocol.js";
-import { TERRAIN, isResource, isUnit } from "./protocol.js";
-import { ABILITIES } from "./config.js";
+import { ORDER_STAGE, TERRAIN, isResource, isUnit } from "./protocol.js";
+import { ABILITIES, isProducerBuilding } from "./config.js";
 
 const isImpassableTerrainCode = (code) => code === TERRAIN.ROCK || code === TERRAIN.WATER;
 import { COLORS, FOG_EXPLORED_ALPHA, FOG_UNEXPLORED_ALPHA } from "./config.js";
@@ -472,7 +472,18 @@ export class Minimap {
         unitIds.push(e.id);
       }
     }
-    if (unitIds.length === 0) return;
+    if (unitIds.length === 0) {
+      const producers = sel
+        .filter((e) => e.owner === this.state.playerId && isProducerBuilding(e.kind))
+        .map((e) => e.id);
+      if (producers.length === 0) return;
+      const kind = this.state.commandTarget === "attack" ? ORDER_STAGE.ATTACK_MOVE : ORDER_STAGE.MOVE;
+      for (const building of producers) {
+        this.net.command(cmd.setRally(building, wx, wy, queued, kind));
+      }
+      this.state.addCommandFeedback(kind === ORDER_STAGE.ATTACK_MOVE ? "attack" : "move", wx, wy, queued);
+      return;
+    }
     if (this.state.commandTarget === "attack") {
       this.net.command(cmd.attackMove(unitIds, wx, wy, queued));
       this.state.addCommandFeedback("attack", wx, wy, queued);

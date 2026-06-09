@@ -29,7 +29,7 @@ pub use order::{
     AbilityExecution, AbilityIntent, AbilityOrder, AttackExecution, AttackOrder, AttackPhase,
     BuildExecution, BuildIntent, BuildOrder, BuildPhase, GatherExecution, GatherIntent,
     GatherOrder, GatherPhase, MoveExecution, MoveOrder, MovePhase, Order, OrderIntent, PointIntent,
-    TargetIntent, MAX_QUEUED_ORDERS,
+    RallyIntent, RallyKind, TargetIntent, MAX_QUEUED_ORDERS,
 };
 #[cfg(test)]
 pub use state::EntityStateGroups;

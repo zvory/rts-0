@@ -282,9 +282,12 @@ intent. Move and attack-move promotions are batched by owner/destination through
 Active gather and build orders remain terminal until their own systems mark them complete or clear
 them.
 
-Production buildings intentionally keep a single rally point. `setRally` replaces that point even
-when an older client sends `queued: true`; newly produced units receive only the current rally point
-as a plain move order.
+Production buildings keep an owner-only rally plan capped at four stages. Non-queued `setRally`
+replaces the whole plan; queued `setRally` appends a `move` or `attackMove` stage if space remains,
+or establishes the first stage when the plan is empty. Newly produced units receive the first rally
+stage as their active order and any later stages as queued unit-local intents, so every trained unit
+follows the same accepted building rally chain. The first stage also drives spawn-exit and vehicle
+facing preference.
 
 `game::smoke::SmokeCloudStore` owns active neutral smoke clouds as world effects, not entities:
 clouds have stable ids, center points, radius, spawn tick, and expiry tick, and they do not

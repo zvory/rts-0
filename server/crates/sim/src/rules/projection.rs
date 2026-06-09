@@ -204,6 +204,15 @@ pub fn project_entity(
         if let Some((rx, ry)) = entity.rally_point() {
             view.rally = Some([rx, ry]);
         }
+        view.rally_plan = entity
+            .rally_plan()
+            .into_iter()
+            .map(|stage| OrderPlanMarker {
+                kind: stage.kind.to_protocol_str().to_string(),
+                x: stage.point.x,
+                y: stage.point.y,
+            })
+            .collect();
         view.order_plan = order_plan(
             entity,
             context.entities,

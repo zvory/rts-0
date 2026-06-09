@@ -43,13 +43,15 @@ pub(crate) fn production_system(
         };
 
         if let Some((owner, unit)) = ready {
-            // Prefer the spawn exit closest to the rally point (if any), so units leave from the
-            // side of the building facing the rally.
-            let rally = entities.get(id).and_then(|b| b.rally_point());
-            let Some((sx, sy)) = coordinator.find_spawn_point(entities, id, unit, rally) else {
+            // Prefer the spawn exit closest to the first rally stage (if any), so units leave from
+            // the side of the building facing the rally plan.
+            let rally_plan = entities.get(id).map(|b| b.rally_plan()).unwrap_or_default();
+            let first_rally = rally_plan.first().map(|r| (r.point.x, r.point.y));
+            let Some((sx, sy)) = coordinator.find_spawn_point(entities, id, unit, first_rally)
+            else {
                 continue;
             };
-            let spawn_facing = rally
+            let spawn_facing = first_rally
                 .and_then(|rally| coordinator.rally_spawn_facing(entities, unit, (sx, sy), rally));
             if let Some(spawned) = entities.spawn_unit(owner, unit, sx, sy) {
                 if let Some(facing) = spawn_facing {
@@ -67,9 +69,20 @@ pub(crate) fn production_system(
                 if let Some(player) = players.iter_mut().find(|p| p.id == owner) {
                     player.record_entity_created(unit);
                 }
-                // Send the new unit toward the rally point with a plain move order.
-                if let Some(rally) = rally {
-                    coordinator.order_group_move(entities, owner, &[spawned], rally, false);
+                // Send the new unit through the building's rally plan.
+                if let Some(first) = rally_plan.first().copied() {
+                    coordinator.order_group_move(
+                        entities,
+                        owner,
+                        &[spawned],
+                        (first.point.x, first.point.y),
+                        matches!(first.kind, crate::game::entity::RallyKind::AttackMove),
+                    );
+                    if let Some(e) = entities.get_mut(spawned) {
+                        for stage in rally_plan.iter().skip(1).copied() {
+                            e.append_queued_order(stage.to_order_intent());
+                        }
+                    }
                 }
             }
         }
@@ -79,7 +92,7 @@ pub(crate) fn production_system(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::game::entity::{EntityKind, Order, ProdItem};
+    use crate::game::entity::{EntityKind, Order, ProdItem, RallyIntent, RallyKind};
     use crate::game::map::Map;
     use crate::game::services::occupancy::{footprint_center, Occupancy};
     use crate::game::services::pathing::PathingService;
@@ -213,7 +226,7 @@ mod tests {
         entities
             .get_mut(factory)
             .expect("factory")
-            .set_rally_point(Some(rally));
+            .set_rally_point(Some(RallyIntent::new(RallyKind::Move, rally.0, rally.1)));
         let mut players = vec![player(1)];
 
         tick_production(&map, &mut entities, &mut players);
@@ -242,6 +255,45 @@ mod tests {
         assert!(
             dist <= crate::config::TILE_SIZE as f32 * 4.0,
             "rally move goal should be near the rally point, was {dist} px away"
+        );
+    }
+
+    #[test]
+    fn queued_attack_move_rally_plan_is_copied_to_spawned_unit() {
+        let map = flat_map(40);
+        let mut entities = EntityStore::new();
+        let factory = spawn_factory(&map, &mut entities, 10, 10);
+        let first = map.tile_center(30, 11);
+        let second = map.tile_center(30, 18);
+        {
+            let building = entities.get_mut(factory).expect("factory");
+            building.set_rally_point(Some(RallyIntent::new(
+                RallyKind::AttackMove,
+                first.0,
+                first.1,
+            )));
+            assert!(building
+                .append_rally_stage(RallyIntent::new(RallyKind::Move, second.0, second.1), 4,));
+        }
+        let mut players = vec![player(1)];
+
+        tick_production(&map, &mut entities, &mut players);
+
+        let tank = tanks_owned_by(&entities, 1)
+            .into_iter()
+            .next()
+            .expect("a tank should spawn");
+        let spawned = entities.get(tank.0).expect("spawned tank");
+        assert!(
+            matches!(spawned.order(), Order::AttackMove(_)),
+            "first attack-move rally stage should become the active spawn order"
+        );
+        assert_eq!(
+            spawned.queued_orders(),
+            &[crate::game::entity::OrderIntent::move_to(
+                second.0, second.1
+            )],
+            "later rally stages should be copied as queued orders"
         );
     }
 

@@ -1,4 +1,4 @@
-import { cmd, PASSABLE, isUnit, isBuilding, isResource, KIND } from "../protocol.js";
+import { cmd, PASSABLE, isUnit, isBuilding, isResource, KIND, ORDER_STAGE } from "../protocol.js";
 import { ABILITIES, MINING_CC_RANGE_TILES, STATS, TANK_BODY, isProducerBuilding } from "../config.js";
 import { DEFAULT_HIT_RADIUS, DEFAULT_TILE_SIZE, HIT_PAD_PX, OWN_HIT_BONUS, ZOOM_STEP } from "./constants.js";
 import { commandHotkeyFromEvent } from "./placement.js";
@@ -25,9 +25,9 @@ export function _onRightClick(p, ev = {}) {
     if (producers.length > 0) {
       const world = this._worldAt(p.x, p.y);
       for (const building of producers) {
-        this.net.command(cmd.setRally(building, world.x, world.y, false));
+        this.net.command(cmd.setRally(building, world.x, world.y, queued, ORDER_STAGE.MOVE));
       }
-      this.state.addCommandFeedback("move", world.x, world.y, false);
+      this.state.addCommandFeedback("move", world.x, world.y, queued);
     }
     return;
   }
@@ -77,8 +77,20 @@ export function _onRightClick(p, ev = {}) {
 
 export function _issueTargetedCommand(p, ev = {}) {
   const ownUnits = this._selectedOwnUnitIds();
-  if (ownUnits.length === 0) return;
+  const producers = ownUnits.length === 0 ? this._selectedProducerBuildingIds() : [];
   const world = this._worldAt(p.x, p.y);
+  if (ownUnits.length === 0) {
+    if (producers.length === 0) return;
+    const queued = !!ev.shiftKey;
+    if (this.state.commandTarget === "move" || this.state.commandTarget === "attack") {
+      const kind = this.state.commandTarget === "attack" ? ORDER_STAGE.ATTACK_MOVE : ORDER_STAGE.MOVE;
+      for (const building of producers) {
+        this.net.command(cmd.setRally(building, world.x, world.y, queued, kind));
+      }
+      this.state.addCommandFeedback(kind === ORDER_STAGE.ATTACK_MOVE ? "attack" : "move", world.x, world.y, queued);
+    }
+    return;
+  }
   if (this.state.commandTarget === "setupAtGuns") {
     const atGuns = this._selectedOwnAtGunIds();
     if (atGuns.length > 0) {
@@ -311,8 +323,8 @@ export function _activateCommandHotkey(ev) {
 }
 
 export function _enterAttackMove(options = {}) {
-  // Only meaningful when own units are selected; otherwise it's a no-op arming.
-  if (this._selectedOwnUnitIds().length === 0) return;
+  // Only meaningful when own units or producer buildings are selected.
+  if (this._selectedOwnUnitIds().length === 0 && this._selectedProducerBuildingIds().length === 0) return;
   return this.state.beginCommandTarget("attack", options);
 }
 
