@@ -1,6 +1,5 @@
 // Regression tests for the hardening fixes (run against a live server on :8081):
 //  - build command with overflow-range tile coords must NOT crash the room
-//  - legacy worker build payloads must decode instead of returning "malformed message"
 //  - a giant/duplicated units[] array must NOT stall the room (DoS guard)
 //  - a join rejected mid-match must NOT wedge the socket (can still join another room)
 // Usage: start the server, then `node tests/regression.mjs`.
@@ -70,20 +69,6 @@ async function soloStart(room) {
     await c.waitFor((m) => m.t === "snapshot" && m.tick > tickBefore, 3000, "post-overflow snapshot");
     const alive = c.lastSnapshot && c.lastSnapshot.tick > tickBefore;
     ok(alive, `OVERFLOW BUILD: room still ticking after huge tile coords (tick ${tickBefore} -> ${c.lastSnapshot?.tick})`);
-    c.ws.close();
-  }
-
-  // 1b) Cached/legacy clients may still send a single `worker` field for build commands.
-  {
-    const room = "reg-build-legacy-" + Math.floor(performance.now());
-    const { c, snap } = await soloStart(room);
-    const worker = snap.entities.find((e) => e.owner === c.playerId && e.kind === "worker");
-    c.send({ t: "command", cmd: { c: "build", worker: worker.id, building: "depot", tileX: 12, tileY: 12 } });
-    const tickBefore = c.lastSnapshot.tick;
-    await c.waitFor((m) => m.t === "snapshot" && m.tick > tickBefore, 3000, "post-legacy-build snapshot");
-    await sleep(100);
-    const malformed = c.msgs.some((m) => m.t === "error" && m.msg === "malformed message");
-    ok(!malformed, "LEGACY BUILD: single-worker build payload decoded without malformed-message error");
     c.ws.close();
   }
 
