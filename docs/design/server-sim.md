@@ -212,6 +212,22 @@ kind-specific data from `rules::defs`. `config.rs` holds scalar constants and co
 wrappers such as `unit_stats(kind)` / `building_stats(kind)`, which return the stats embedded in
 defs.
 
+`server/crates/archcheck` classifies each top-level service module before accepting
+service-to-service imports. The roles are intentionally coarse:
+
+- tick systems are the phases called by `systems.rs`;
+- command adapters translate validated command facts into mutations;
+- pure policy modules accept facts and return decisions without mutable world state;
+- query/index services read derived or immutable world state;
+- mutation helpers perform narrow execution work below a caller-owned phase.
+
+Every service import must be present in the exact import allowlist and must also be legal under the
+role matrix. A role failure explains why the edge is forbidden, usually because orchestration should
+stay in `systems.rs` or because command-family growth should use command input -> issue-time facts
+-> pure plan -> narrow executor. `services::commands` and `services::order_queue` are
+grandfathered broad command adapters: their current allowed imports pass so cleanup can proceed
+gradually, but new service modules must be classified and new edges still need explicit review.
+
 `game::systems::run_tick` owns the tick pipeline and the lifecycle of tick-scoped derived state.
 It rebuilds named phase state at explicit boundaries: pre-command state for command validation,
 pathing, and movement; post-movement state for combat and economy queries; pre-collision state
