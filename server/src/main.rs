@@ -1076,6 +1076,14 @@ async fn handle_client_message(
         ClientMessage::GiveUp => {
             send_room_event(player_id, current_room, RoomEvent::GiveUp { player_id }).await;
         }
+        ClientMessage::ReturnToLobby => {
+            send_room_event(
+                player_id,
+                current_room,
+                RoomEvent::ReturnToLobby { player_id },
+            )
+            .await;
+        }
         ClientMessage::Ping { ts } => {
             // Answer directly so latency probes work regardless of room state.
             let _ = conn_tx.try_send_reliable(ServerMessage::Pong { ts });

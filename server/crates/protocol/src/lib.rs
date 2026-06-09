@@ -100,6 +100,8 @@ pub enum ClientMessage {
     Command { cmd: Command },
     /// Give up the current match, removing this player's army and showing the score screen.
     GiveUp,
+    /// Leave replay playback and return the room to a clean lobby.
+    ReturnToLobby,
     /// Latency probe.
     Ping { ts: f64 },
     /// Set replay playback speed multiplier (replay rooms only; ignored elsewhere).
