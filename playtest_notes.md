@@ -12,6 +12,8 @@ ecnomy rework:
  - 
 
 
+- when the game is won or lost, it should automatically scrub back to the beginning of the replay, and start playing back at 2x speed. players can close the victory screen to see the replay better. 
+
  - beta should deploy automatically from github, but the server should wait until all matches are drained (or twenty minutes) whichever is shorter before killing itself
 
 - tanks should not rotate their turrets back ot the centre, unless they start moving 
