@@ -59,9 +59,9 @@ fn env_truthy(key: &str) -> bool {
 const IDLE_TIMEOUT: Duration = Duration::from_secs(40);
 
 /// On deploy shutdown, keep the process alive long enough for in-progress matches to finish.
-/// Fly's `kill_timeout` is configured to the same duration so the platform's hard stop matches
-/// the app-level drain deadline.
-const DEPLOY_DRAIN_TIMEOUT: Duration = Duration::from_secs(10 * 60);
+/// Fly's shared-CPU `kill_timeout` caps at 300 seconds, so leave a few seconds for axum to stop
+/// accepting connections and exit cleanly before the platform sends its final shutdown signal.
+const DEPLOY_DRAIN_TIMEOUT: Duration = Duration::from_secs(295);
 
 /// Shared application state handed to every request via axum's `State` extractor.
 #[derive(Clone)]

@@ -62,6 +62,12 @@ between different lobbies.
 
 Beta deploys set the machine size to `shared-cpu-4x@1024MB`, matching the mainline app. If you
 override the app name for a different beta app, `./deploy.sh beta` still applies that VM size.
+Deploy shutdown is configured with Fly's top-level `kill_signal = "SIGINT"` and
+`kill_timeout = 300`, the maximum graceful-stop window for shared-CPU Machines. The server drains
+active matches for up to 295 seconds after the deploy signal, then closes connections and exits
+before Fly's final stop signal. New matches are rejected while a drain is in progress. `deploy.sh`
+runs `flyctl config validate --strict` before deploying so misplaced Fly config keys fail early
+instead of being silently ignored by the platform.
 
 ## Match-history secrets (Supabase)
 
