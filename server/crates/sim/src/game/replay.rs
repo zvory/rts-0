@@ -6,9 +6,11 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::{Game, PlayerInit};
+use super::{Game, MapMetadata, PlayerInit, StartingLoadout};
 use crate::game::command::SimCommand;
-use crate::protocol::{Command, Event, Snapshot};
+use crate::protocol::{Command, Event, PlayerScore, ReplayStartMetadata, Snapshot};
+
+pub const REPLAY_ARTIFACT_SCHEMA_VERSION_V1: u32 = 1;
 
 /// One authoritative gameplay command, stamped with the simulation tick that applied it.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -18,6 +20,180 @@ pub struct CommandLogEntry {
     pub player_id: u32,
     pub command: Command,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum ReplayStartingLoadoutMode {
+    Standard,
+    DebugHuman,
+}
+
+impl From<StartingLoadout> for ReplayStartingLoadoutMode {
+    fn from(value: StartingLoadout) -> Self {
+        match value {
+            StartingLoadout::Standard => ReplayStartingLoadoutMode::Standard,
+            StartingLoadout::DebugHuman => ReplayStartingLoadoutMode::DebugHuman,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct ReplayArtifactV1 {
+    pub artifact_schema_version: u32,
+    pub server_build_sha: String,
+    pub map_name: String,
+    pub map_schema_version: u32,
+    pub map_content_hash: String,
+    pub seed: u32,
+    pub starting_steel: u32,
+    pub starting_oil: u32,
+    pub starting_loadout_mode: ReplayStartingLoadoutMode,
+    pub players: Vec<PlayerInit>,
+    pub duration_ticks: u32,
+    pub command_log: Vec<CommandLogEntry>,
+    pub winner_id: Option<u32>,
+    pub final_scores: Vec<PlayerScore>,
+}
+
+impl ReplayArtifactV1 {
+    pub fn capture_from_game(
+        game: &Game,
+        server_build_sha: impl Into<String>,
+        winner_id: Option<u32>,
+        final_scores: Vec<PlayerScore>,
+    ) -> Self {
+        let map = game.map_metadata();
+        ReplayArtifactV1 {
+            artifact_schema_version: REPLAY_ARTIFACT_SCHEMA_VERSION_V1,
+            server_build_sha: server_build_sha.into(),
+            map_name: map.name.clone(),
+            map_schema_version: map.schema_version,
+            map_content_hash: map.content_hash.clone(),
+            seed: game.seed(),
+            starting_steel: game.starting_steel(),
+            starting_oil: game.starting_oil(),
+            starting_loadout_mode: game.starting_loadout().into(),
+            players: game.player_inits(),
+            duration_ticks: game.tick_count(),
+            command_log: game.command_log().to_vec(),
+            winner_id,
+            final_scores,
+        }
+    }
+
+    pub fn start_metadata(&self) -> ReplayStartMetadata {
+        ReplayStartMetadata {
+            artifact_schema_version: self.artifact_schema_version,
+            server_build_sha: self.server_build_sha.clone(),
+            map_name: self.map_name.clone(),
+            map_schema_version: self.map_schema_version,
+            map_content_hash: self.map_content_hash.clone(),
+            seed: self.seed,
+            duration_ticks: self.duration_ticks,
+        }
+    }
+
+    pub fn validate_against(
+        &self,
+        expected_server_build_sha: &str,
+        running_map: &MapMetadata,
+    ) -> Result<(), ReplayValidationError> {
+        if self.artifact_schema_version != REPLAY_ARTIFACT_SCHEMA_VERSION_V1 {
+            return Err(ReplayValidationError::UnsupportedArtifactSchema {
+                found: self.artifact_schema_version,
+                expected: REPLAY_ARTIFACT_SCHEMA_VERSION_V1,
+            });
+        }
+        if self.server_build_sha != expected_server_build_sha {
+            return Err(ReplayValidationError::BuildShaMismatch {
+                artifact: self.server_build_sha.clone(),
+                running: expected_server_build_sha.to_string(),
+            });
+        }
+        if self.map_name != running_map.name {
+            return Err(ReplayValidationError::MapMissing {
+                name: self.map_name.clone(),
+            });
+        }
+        if self.map_schema_version != running_map.schema_version {
+            return Err(ReplayValidationError::MapSchemaMismatch {
+                map_name: self.map_name.clone(),
+                artifact: self.map_schema_version,
+                running: running_map.schema_version,
+            });
+        }
+        if self.map_content_hash != running_map.content_hash {
+            return Err(ReplayValidationError::MapHashMismatch {
+                map_name: self.map_name.clone(),
+                artifact: self.map_content_hash.clone(),
+                running: running_map.content_hash.clone(),
+            });
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ReplayValidationError {
+    UnsupportedArtifactSchema {
+        found: u32,
+        expected: u32,
+    },
+    BuildShaMismatch {
+        artifact: String,
+        running: String,
+    },
+    MapMissing {
+        name: String,
+    },
+    MapSchemaMismatch {
+        map_name: String,
+        artifact: u32,
+        running: u32,
+    },
+    MapHashMismatch {
+        map_name: String,
+        artifact: String,
+        running: String,
+    },
+}
+
+impl std::fmt::Display for ReplayValidationError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ReplayValidationError::UnsupportedArtifactSchema { found, expected } => write!(
+                f,
+                "unsupported replay artifact schema {found}; expected {expected}"
+            ),
+            ReplayValidationError::BuildShaMismatch { artifact, running } => write!(
+                f,
+                "replay was recorded by server build {artifact}; running build is {running}"
+            ),
+            ReplayValidationError::MapMissing { name } => {
+                write!(f, "replay map {name:?} is not available on this server")
+            }
+            ReplayValidationError::MapSchemaMismatch {
+                map_name,
+                artifact,
+                running,
+            } => write!(
+                f,
+                "replay map {map_name:?} schema is {artifact}; running map schema is {running}"
+            ),
+            ReplayValidationError::MapHashMismatch {
+                map_name,
+                artifact,
+                running,
+            } => write!(
+                f,
+                "replay map {map_name:?} hash is {artifact}; running map hash is {running}"
+            ),
+        }
+    }
+}
+
+impl std::error::Error for ReplayValidationError {}
 
 /// One transient event emitted during replay, stamped with the tick that produced it.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -175,5 +351,68 @@ mod tests {
 
         assert_eq!(snapshot.steel, 99_999);
         assert_eq!(snapshot.oil, 88_888);
+    }
+
+    #[test]
+    fn replay_artifact_captures_live_game_contract() {
+        let players = players();
+        let mut game = Game::new_with_starting_resources(&players, 777, 333, 0x1234_5678);
+        game.tick();
+        let scores = game.scores();
+
+        let artifact = ReplayArtifactV1::capture_from_game(&game, "test-sha", Some(1), scores);
+
+        assert_eq!(
+            artifact.artifact_schema_version,
+            REPLAY_ARTIFACT_SCHEMA_VERSION_V1
+        );
+        assert_eq!(artifact.server_build_sha, "test-sha");
+        assert_eq!(artifact.map_name, "Default");
+        assert_eq!(artifact.seed, 0x1234_5678);
+        assert_eq!(artifact.starting_steel, 777);
+        assert_eq!(artifact.starting_oil, 333);
+        assert_eq!(
+            artifact.starting_loadout_mode,
+            ReplayStartingLoadoutMode::Standard
+        );
+        assert_eq!(artifact.players, players);
+        assert_eq!(artifact.duration_ticks, 1);
+        assert_eq!(artifact.winner_id, Some(1));
+        assert!(!artifact.final_scores.is_empty());
+        assert_eq!(artifact.start_metadata().duration_ticks, 1);
+    }
+
+    #[test]
+    fn replay_validation_rejects_incompatible_build_and_map_metadata() {
+        let players = players();
+        let game = Game::new(&players, 0x1234_5678);
+        let artifact = ReplayArtifactV1::capture_from_game(&game, "sha-a", None, game.scores());
+        let map = game.map_metadata().clone();
+
+        assert!(matches!(
+            artifact.validate_against("sha-b", &map),
+            Err(ReplayValidationError::BuildShaMismatch { .. })
+        ));
+
+        let mut missing = map.clone();
+        missing.name = "Other".to_string();
+        assert!(matches!(
+            artifact.validate_against("sha-a", &missing),
+            Err(ReplayValidationError::MapMissing { .. })
+        ));
+
+        let mut wrong_schema = map.clone();
+        wrong_schema.schema_version = wrong_schema.schema_version.saturating_add(1);
+        assert!(matches!(
+            artifact.validate_against("sha-a", &wrong_schema),
+            Err(ReplayValidationError::MapSchemaMismatch { .. })
+        ));
+
+        let mut wrong_hash = map;
+        wrong_hash.content_hash.push_str("-changed");
+        assert!(matches!(
+            artifact.validate_against("sha-a", &wrong_hash),
+            Err(ReplayValidationError::MapHashMismatch { .. })
+        ));
     }
 }

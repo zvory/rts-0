@@ -194,6 +194,14 @@ export class Net {
   }
 
   /**
+   * Select replay vision for this viewer only.
+   * @param {object} vision replay vision payload from protocol.js builders/constants
+   */
+  setReplayVision(vision) {
+    this._send(msg.setReplayVision(vision));
+  }
+
+  /**
    * Host selects a map by name (lobby phase only).
    * @param {string} map map display name
    */

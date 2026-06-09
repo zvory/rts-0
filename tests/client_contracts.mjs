@@ -47,6 +47,7 @@ import {
   TERRAIN,
   cmd,
   decodeServerMessage,
+  msg,
 } from "../client/src/protocol.js";
 import { Input, footprintValidAgainstEntities } from "../client/src/input/index.js";
 import { CommandComposer } from "../client/src/input/command_composer.js";
@@ -1008,6 +1009,17 @@ function fakeAudioContext() {
   assertHasMethod(net, "removeAi", "Net");
   assertHasMethod(net, "setQuickstart", "Net");
   assertHasMethod(net, "setReplaySpeed", "Net");
+  assertHasMethod(net, "setReplayVision", "Net");
+  assert(msg.replayVisionAll().t === "setReplayVision", "replay all-vision builder tag");
+  assert(msg.replayVisionAll().vision.mode === "all", "replay all-vision builder payload");
+  assert(
+    msg.replayVisionPlayer(7).vision.playerId === 7,
+    "replay single-player vision builder payload",
+  );
+  assert(
+    msg.replayVisionPlayers([1, 2]).vision.playerIds.join(",") === "1,2",
+    "replay subset vision builder payload",
+  );
 }
 
 // ---------------------------------------------------------------------------

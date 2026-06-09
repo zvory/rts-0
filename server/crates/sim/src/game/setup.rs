@@ -67,6 +67,20 @@ impl Game {
         seed: u32,
         map: Map,
     ) -> Game {
+        Self::new_with_random_ai_profiles_and_map_metadata(
+            players,
+            seed,
+            map,
+            default_map_metadata(),
+        )
+    }
+
+    pub fn new_with_random_ai_profiles_and_map_metadata(
+        players: &[PlayerInit],
+        seed: u32,
+        map: Map,
+        map_metadata: MapMetadata,
+    ) -> Game {
         Self::new_inner_with_map(
             players,
             config::STARTING_STEEL,
@@ -74,6 +88,7 @@ impl Game {
             seed,
             StartingLoadout::Standard,
             Some(map),
+            map_metadata,
         )
     }
 
@@ -86,6 +101,24 @@ impl Game {
         seed: u32,
         map: Map,
     ) -> Game {
+        Self::new_with_debug_starting_loadout_and_random_ai_profiles_and_map_metadata(
+            players,
+            steel,
+            oil,
+            seed,
+            map,
+            default_map_metadata(),
+        )
+    }
+
+    pub fn new_with_debug_starting_loadout_and_random_ai_profiles_and_map_metadata(
+        players: &[PlayerInit],
+        steel: u32,
+        oil: u32,
+        seed: u32,
+        map: Map,
+        map_metadata: MapMetadata,
+    ) -> Game {
         Self::new_inner_with_map(
             players,
             steel,
@@ -93,6 +126,7 @@ impl Game {
             seed,
             StartingLoadout::DebugHuman,
             Some(map),
+            map_metadata,
         )
     }
 
@@ -175,7 +209,9 @@ impl Game {
             seed,
             starting_steel: 0,
             starting_oil: 0,
+            map_metadata: dev_map_metadata("dev:scout_car_snaking_corridor"),
             debug_path_overlays: true,
+            starting_loadout: StartingLoadout::DebugHuman,
             rng,
         };
         let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
@@ -256,7 +292,9 @@ impl Game {
             seed,
             starting_steel: 0,
             starting_oil: 0,
+            map_metadata: dev_map_metadata("dev:direct_reverse_order"),
             debug_path_overlays: true,
+            starting_loadout: StartingLoadout::DebugHuman,
             rng,
         };
         let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
@@ -324,7 +362,9 @@ impl Game {
             seed,
             starting_steel: 0,
             starting_oil: 0,
+            map_metadata: dev_map_metadata("dev:scout_car_wall_chokepoint"),
             debug_path_overlays: true,
+            starting_loadout: StartingLoadout::DebugHuman,
             rng,
         };
         let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
@@ -408,7 +448,9 @@ impl Game {
             seed,
             starting_steel: 0,
             starting_oil: 0,
+            map_metadata: dev_map_metadata("dev:vehicle_small_block_baseline"),
             debug_path_overlays: true,
+            starting_loadout: StartingLoadout::DebugHuman,
             rng,
         };
         let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
@@ -436,6 +478,14 @@ impl Game {
         self.starting_oil
     }
 
+    pub(crate) fn starting_loadout(&self) -> StartingLoadout {
+        self.starting_loadout
+    }
+
+    pub fn map_metadata(&self) -> &MapMetadata {
+        &self.map_metadata
+    }
+
     fn new_inner(
         players: &[PlayerInit],
         steel: u32,
@@ -443,7 +493,15 @@ impl Game {
         seed: u32,
         starting_loadout: StartingLoadout,
     ) -> Game {
-        Self::new_inner_with_map(players, steel, oil, seed, starting_loadout, None)
+        Self::new_inner_with_map(
+            players,
+            steel,
+            oil,
+            seed,
+            starting_loadout,
+            None,
+            default_map_metadata(),
+        )
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -454,6 +512,7 @@ impl Game {
         seed: u32,
         starting_loadout: StartingLoadout,
         map_override: Option<Map>,
+        map_metadata: MapMetadata,
     ) -> Game {
         let map = map_override.unwrap_or_else(|| Map::generate(players.len(), seed));
         let fog = Fog::new(map.size);
@@ -514,7 +573,9 @@ impl Game {
             seed,
             starting_steel: steel,
             starting_oil: oil,
+            map_metadata,
             debug_path_overlays: starting_loadout == StartingLoadout::DebugHuman,
+            starting_loadout,
             rng,
         };
         // Initialize supply accounting and fog so the very first snapshot is correct.
@@ -561,6 +622,7 @@ impl Game {
             player_id: 0,
             spectator: false,
             debug_mode: self.debug_path_overlays,
+            replay: None,
             tick: self.tick,
             map,
             players,
@@ -573,6 +635,18 @@ pub struct DevScenarioSetup {
     pub player_id: u32,
     pub units: Vec<u32>,
     pub goal: (f32, f32),
+}
+
+fn default_map_metadata() -> MapMetadata {
+    Map::metadata_for_name("Default").unwrap_or_else(|_| dev_map_metadata("Default"))
+}
+
+fn dev_map_metadata(name: &str) -> MapMetadata {
+    MapMetadata {
+        name: name.to_string(),
+        schema_version: crate::game::map::CURRENT_MAP_VERSION,
+        content_hash: "dev-generated".to_string(),
+    }
 }
 
 fn flat_dev_map(player_count: usize) -> Map {
@@ -962,8 +1036,8 @@ fn spawn_player_start(
     spawn_base_resources(entities, map, start);
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum StartingLoadout {
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum StartingLoadout {
     Standard,
     DebugHuman,
 }

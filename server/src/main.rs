@@ -707,6 +707,7 @@ async fn send_server_message(
         ServerMessage::Lobby { .. } => "lobby",
         ServerMessage::Welcome { .. } => "welcome",
         ServerMessage::Start(_) => "start",
+        ServerMessage::ReplayState(_) => "replay_state",
         ServerMessage::Error { .. } => "error",
         ServerMessage::GameOver { .. } => "game_over",
         ServerMessage::Pong { .. } => "pong",
@@ -884,6 +885,14 @@ async fn handle_client_message(
                 player_id,
                 current_room,
                 RoomEvent::SeekReplay { ticks_back },
+            )
+            .await;
+        }
+        ClientMessage::SetReplayVision { vision } => {
+            send_room_event(
+                player_id,
+                current_room,
+                RoomEvent::SetReplayVision { player_id, vision },
             )
             .await;
         }

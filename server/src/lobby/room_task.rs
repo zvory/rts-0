@@ -53,6 +53,44 @@ pub(super) fn match_history_participants_are_automated(participants: &[String]) 
     has_alpha && has_bravo
 }
 
+pub(super) fn validate_replay_vision_request(
+    vision: &ReplayVisionRequest,
+    valid_player_ids: &[u32],
+) -> Result<(), &'static str> {
+    let valid: HashSet<u32> = valid_player_ids.iter().copied().collect();
+    match vision {
+        ReplayVisionRequest::All => {
+            if valid.is_empty() {
+                Err("no replay players")
+            } else {
+                Ok(())
+            }
+        }
+        ReplayVisionRequest::Player { player_id } => {
+            if valid.contains(player_id) {
+                Ok(())
+            } else {
+                Err("unknown replay player")
+            }
+        }
+        ReplayVisionRequest::Players { player_ids } => {
+            if player_ids.is_empty() {
+                return Err("empty replay player subset");
+            }
+            let mut seen = HashSet::new();
+            for player_id in player_ids {
+                if !valid.contains(player_id) {
+                    return Err("unknown replay player");
+                }
+                if !seen.insert(*player_id) {
+                    return Err("duplicate replay player");
+                }
+            }
+            Ok(())
+        }
+    }
+}
+
 fn live_ai_controllers(players: &[PlayerInit], seed: u32) -> Vec<AiController> {
     let mut rng = SmallRng::seed_from_u64((seed as u64) ^ 0xA17E_5EED);
     players
@@ -298,6 +336,9 @@ impl RoomTask {
             RoomEvent::GiveUp { player_id } => self.on_give_up(player_id),
             RoomEvent::SetReplaySpeed { speed } => self.on_set_replay_speed(speed),
             RoomEvent::SeekReplay { ticks_back } => self.on_seek_replay(ticks_back),
+            RoomEvent::SetReplayVision { player_id, vision } => {
+                self.on_set_replay_vision(player_id, vision)
+            }
             RoomEvent::SelectMap { player_id, map } => self.on_select_map(player_id, map),
         }
     }
@@ -782,6 +823,24 @@ impl RoomTask {
         let seed = match_seed();
 
         // Load the selected map from disk. On failure, send an error to the host and abort.
+        let map_metadata = match Map::metadata_for_name(&self.selected_map) {
+            Ok(metadata) => metadata,
+            Err(err) => {
+                let msg = format!("Cannot load map \"{}\": {err}", self.selected_map);
+                warn!(room = %self.room, error = %err, "map metadata load failed at start");
+                if let Some(host_id) = self.host_id {
+                    if let Some(player) = self.players.get(&host_id) {
+                        send_or_log(
+                            &self.room,
+                            host_id,
+                            &player.msg_tx,
+                            ServerMessage::Error { msg },
+                        );
+                    }
+                }
+                return;
+            }
+        };
         let map = match Map::load(&self.selected_map, inits.len(), seed) {
             Ok(m) => m,
             Err(err) => {
@@ -802,15 +861,16 @@ impl RoomTask {
         };
 
         let game = if self.quickstart {
-            Game::new_with_debug_starting_loadout_and_random_ai_profiles_and_map(
+            Game::new_with_debug_starting_loadout_and_random_ai_profiles_and_map_metadata(
                 &inits,
                 starting_steel,
                 starting_oil,
                 seed,
                 map,
+                map_metadata,
             )
         } else {
-            Game::new_with_random_ai_profiles_and_map(&inits, seed, map)
+            Game::new_with_random_ai_profiles_and_map_metadata(&inits, seed, map, map_metadata)
         };
         let payload = game.start_payload();
         self.match_player_count = inits.len();
@@ -1294,6 +1354,40 @@ impl RoomTask {
         self.replay_speed = clamped;
     }
 
+    fn on_set_replay_vision(&mut self, player_id: u32, vision: ReplayVisionRequest) {
+        if !matches!(
+            self.mode,
+            RoomMode::DevSelfPlay(DevSelfPlayConfig::Replay { .. })
+        ) {
+            return;
+        }
+        if !self.players.contains_key(&player_id) {
+            return;
+        }
+        let valid_ids = self.replay_vision_player_ids();
+        if validate_replay_vision_request(&vision, &valid_ids).is_err() {
+            if let Some(player) = self.players.get(&player_id) {
+                send_or_log(
+                    &self.room,
+                    player_id,
+                    &player.msg_tx,
+                    ServerMessage::Error {
+                        msg: "Invalid replay vision selection".to_string(),
+                    },
+                );
+            }
+        }
+        // Phase 1 defines and validates the per-viewer contract only. Later playback work will
+        // persist this selection and apply it during replay snapshot projection.
+    }
+
+    fn replay_vision_player_ids(&self) -> Vec<u32> {
+        match &self.phase {
+            Phase::InGame(game) => game.player_inits().into_iter().map(|p| p.id).collect(),
+            Phase::Lobby => Vec::new(),
+        }
+    }
+
     /// Rewind a replay by `ticks_back` ticks. Pass `u32::MAX` to reset to the start.
     /// No-op outside replay rooms or when no game is active.
     fn on_seek_replay(&mut self, ticks_back: u32) {
@@ -1553,4 +1647,53 @@ fn snapshot_enqueue_status(status: SnapshotSendStatus) -> crate::perf::SnapshotE
 
 fn saturating_duration_ms_u16(duration: Duration) -> u16 {
     duration.as_millis().min(u16::MAX as u128) as u16
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn replay_vision_validation_rejects_unknown_and_empty_subsets() {
+        let valid = [1, 2, 3];
+
+        assert!(validate_replay_vision_request(&ReplayVisionRequest::All, &valid).is_ok());
+        assert!(validate_replay_vision_request(
+            &ReplayVisionRequest::Player { player_id: 2 },
+            &valid,
+        )
+        .is_ok());
+        assert!(validate_replay_vision_request(
+            &ReplayVisionRequest::Players {
+                player_ids: vec![1, 3],
+            },
+            &valid,
+        )
+        .is_ok());
+
+        assert!(validate_replay_vision_request(
+            &ReplayVisionRequest::Player { player_id: 99 },
+            &valid,
+        )
+        .is_err());
+        assert!(validate_replay_vision_request(
+            &ReplayVisionRequest::Players { player_ids: vec![] },
+            &valid,
+        )
+        .is_err());
+        assert!(validate_replay_vision_request(
+            &ReplayVisionRequest::Players {
+                player_ids: vec![1, 99],
+            },
+            &valid,
+        )
+        .is_err());
+        assert!(validate_replay_vision_request(
+            &ReplayVisionRequest::Players {
+                player_ids: vec![1, 1],
+            },
+            &valid,
+        )
+        .is_err());
+    }
 }

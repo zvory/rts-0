@@ -17,7 +17,7 @@ use crate::protocol::terrain;
 use rand::rngs::SmallRng;
 use rand::seq::SliceRandom;
 use rand::SeedableRng;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 pub use rts_protocol::AvailableMap;
 
@@ -27,6 +27,8 @@ pub const CURRENT_MAP_VERSION: u32 = 1;
 const DEFAULT_MAP_JSON: &str = include_str!("../../../../assets/maps/default-handcrafted.json");
 const MAPS_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../assets/maps");
 const DEFAULT_MAP_NAME: &str = "Default";
+const FNV_OFFSET_BASIS: u64 = 0xcbf2_9ce4_8422_2325;
+const FNV_PRIME: u64 = 0x0000_0100_0000_01b3;
 
 type Tile = (u32, u32);
 type BasePair = (Tile, Tile);
@@ -50,13 +52,21 @@ pub struct Map {
     pub expansion_sites: Vec<(u32, u32)>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct MapMetadata {
+    pub name: String,
+    pub schema_version: u32,
+    pub content_hash: String,
+}
+
 impl Map {
     /// Load the deterministic handcrafted map for `player_count` players.
     ///
     /// The `seed` is used to shuffle which authored base pair each player draws, so the
     /// human/AI seating in the lobby does not pin them to the same corner every match.
     pub fn generate(player_count: usize, seed: u32) -> Map {
-        Self::from_authored_json(player_count, DEFAULT_MAP_JSON, seed)
+        Self::from_authored_json_with_name(player_count, DEFAULT_MAP_NAME, DEFAULT_MAP_JSON, seed)
             .unwrap_or_else(|err| panic!("invalid hardcoded map asset: {err}"))
     }
 
@@ -127,6 +137,22 @@ impl Map {
     /// Load a map by display name (the `name` field in the JSON) for `player_count` players.
     /// Returns an error string if the map cannot be found, read, or parsed.
     pub fn load(map_name: &str, player_count: usize, seed: u32) -> Result<Map, String> {
+        let (name, json) = Self::authored_json_for_name(map_name)?;
+        Self::from_authored_json_with_name(player_count, &name, &json, seed)
+    }
+
+    pub fn metadata_for_name(map_name: &str) -> Result<MapMetadata, String> {
+        let (name, json) = Self::authored_json_for_name(map_name)?;
+        let authored: AuthoredMap =
+            serde_json::from_str(&json).map_err(|err| format!("map JSON parse error: {err}"))?;
+        Ok(MapMetadata {
+            name,
+            schema_version: authored.version,
+            content_hash: stable_content_hash(&json),
+        })
+    }
+
+    fn authored_json_for_name(map_name: &str) -> Result<(String, String), String> {
         // First try to match by `name` field, then by filename stem.
         if let Some(dir) = bundled_maps_dir() {
             let Ok(entries) = std::fs::read_dir(&dir) else {
@@ -152,17 +178,27 @@ impl Map {
                     .and_then(|v| v.get("name").and_then(|n| n.as_str()).map(str::to_string));
                 let matches = json_name.as_deref() == Some(map_name) || stem == map_name;
                 if matches {
-                    return Self::from_authored_json(player_count, &json, seed);
+                    return Ok((json_name.unwrap_or(stem), json));
                 }
             }
         }
         if map_name == DEFAULT_MAP_NAME {
-            return Self::from_authored_json(player_count, DEFAULT_MAP_JSON, seed);
+            return Ok((DEFAULT_MAP_NAME.to_string(), DEFAULT_MAP_JSON.to_string()));
         }
         Err(format!("map not found: {map_name:?}"))
     }
 
+    #[cfg(test)]
     fn from_authored_json(player_count: usize, json: &str, seed: u32) -> Result<Map, String> {
+        Self::from_authored_json_with_name(player_count, DEFAULT_MAP_NAME, json, seed)
+    }
+
+    fn from_authored_json_with_name(
+        player_count: usize,
+        _name: &str,
+        json: &str,
+        seed: u32,
+    ) -> Result<Map, String> {
         let authored: AuthoredMap =
             serde_json::from_str(json).map_err(|err| format!("map JSON parse error: {err}"))?;
         if authored.version != CURRENT_MAP_VERSION {
@@ -264,6 +300,14 @@ impl Map {
     pub fn world_size_px(&self) -> f32 {
         self.size as f32 * config::TILE_SIZE as f32
     }
+}
+
+fn stable_content_hash(content: &str) -> String {
+    let mut hash = FNV_OFFSET_BASIS;
+    for byte in content.as_bytes() {
+        hash = (hash ^ u64::from(*byte)).wrapping_mul(FNV_PRIME);
+    }
+    format!("{hash:016x}")
 }
 
 fn bundled_maps_dir() -> Option<PathBuf> {

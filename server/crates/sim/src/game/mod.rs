@@ -37,9 +37,11 @@ use serde::{Deserialize, Serialize};
 use entity::{BuildPhase, EntityKind, EntityStore};
 use fog::{Fog, LingeringSightSource};
 use map::Map;
+pub use map::MapMetadata;
 use rand::rngs::SmallRng;
 use rand::SeedableRng;
 use replay::CommandLogEntry;
+pub(crate) use setup::StartingLoadout;
 use smoke::SmokeCloudStore;
 
 pub use crate::game::command::SimCommand;
@@ -116,9 +118,12 @@ pub struct Game {
     starting_steel: u32,
     /// Starting oil granted to each player at match start. See [`Game::starting_steel`].
     starting_oil: u32,
+    /// Stable authored map identity used by replay artifacts.
+    map_metadata: MapMetadata,
     /// True for lobby "Debug mode" matches; enables owner-only movement path diagnostics in
     /// snapshots even when the server binary is built in release mode.
     debug_path_overlays: bool,
+    starting_loadout: StartingLoadout,
     pub(crate) rng: SmallRng,
 }
 

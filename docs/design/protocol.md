@@ -28,6 +28,7 @@ crate.
 | `ping`     | `ts: number` | Latency probe; server replies with `pong`. |
 | `setReplaySpeed` | `speed: f32` | Set replay playback speed multiplier in dev replay rooms; ignored elsewhere. |
 | `seekReplay` | `ticksBack: u32` | Rewind a dev replay by N simulation ticks; pass a large value (e.g. `2^31-1`) to reset to tick 0. Ignored outside replay rooms. The room rebuilds the game from the artifact, fast-forwards to `current - N`, and re-sends `start`. |
+| `setReplayVision` | `vision: ReplayVisionRequest` | Select replay fog/vision for this viewer only. Ignored outside replay rooms. Phase 1 validates the request; later replay playback applies it to snapshot projection. |
 
 `Command` (the `cmd` object) — `c` is the command discriminator:
 
@@ -65,6 +66,7 @@ empty.
 | `lobby`    | `room: string`, `hostId: u32`, `players: LobbyPlayer[]`, `canStart: bool`, `quickstart: bool` |
 | `start`    | `Game start payload` (see 2.3). |
 | `snapshot` | `Per-player snapshot` (see 2.4). |
+| `replayState` | `Replay playback state` (see 2.6). |
 | `gameOver` | `winnerId: u32 | null`, `you: "won" | "lost" | "draw"`, `scores: PlayerScore[]` |
 | `pong`     | `ts: number` (echo of the ping ts) |
 | `error`    | `msg: string` |
@@ -88,6 +90,15 @@ Sent once when the match begins. Carries everything static for the whole match.
   playerId: u32,                 // your id (repeat of welcome for convenience)
   spectator: bool,               // true when this connection is observing only
   debugMode?: bool,              // true when movement path diagnostics are available
+  replay?: {                     // present for production replay playback
+    artifactSchemaVersion: u32,
+    serverBuildSha: string,
+    mapName: string,
+    mapSchemaVersion: u32,
+    mapContentHash: string,
+    seed: u32,
+    durationTicks: u32
+  },
   tick: u32,                     // starting tick (usually 0)
   map: {
     width: u32, height: u32,     // in tiles
@@ -110,6 +121,13 @@ which lets the client expose local movement-waypoint overlay controls for the ow
 `debugPath` fields in snapshots.
 Spectator start payloads keep the spectator connection's `playerId`, set `spectator: true`, and
 list only active match players in `players`.
+
+Replay start payloads include `replay` metadata so the client can display or cache a
+self-describing playback session. The server validates production replay artifacts before playback:
+artifact schema version, server build SHA, map name, map schema version, and map content hash must
+match the running server/map asset or the replay is rejected with a clear error. Legacy
+`/dev/selfplay?replay=...` artifacts are intentionally not production replay artifacts; they remain
+loadable only through the dev self-play room path.
 
 ### 2.4 `snapshot` payload (per-player, fog-filtered)
 `Snapshot` remains the semantic shape used by server game code and by client modules after
@@ -281,5 +299,29 @@ the fog overlay; `toPos` lets tracers draw even when the hit target is no longer
 Smoke launch events are owner-visible local feedback for the scout-car canister animation; the
 authoritative smoke cloud appears later in `smokes` after the reported launch delay.
 Events are best-effort visual flavor; the client must not depend on receiving them.
+
+### 2.6 Replay playback state and vision
+
+`replayState` is a reliable server message that carries the shared playback cursor/state:
+```
+{
+  t: "replayState",
+  currentTick: u32,
+  durationTicks: u32,
+  speed: f32,
+  paused: bool,
+  ended: bool,
+  controllerId?: u32
+}
+```
+
+`ReplayVisionRequest` selects fog/vision per viewer:
+```
+{ mode: "all" }
+{ mode: "player", playerId: u32 }
+{ mode: "players", playerIds: u32[] }
+```
+The server rejects unknown player ids, empty subsets, and duplicate subset ids. Vision selection is
+not shared between viewers unless a later protocol explicitly adds shared-view control.
 
 ---

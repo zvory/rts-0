@@ -17,9 +17,35 @@ pub struct StartPayload {
     pub spectator: bool,
     #[serde(default, skip_serializing_if = "is_false")]
     pub debug_mode: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub replay: Option<ReplayStartMetadata>,
     pub tick: u32,
     pub map: MapInfo,
     pub players: Vec<PlayerStart>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct ReplayStartMetadata {
+    pub artifact_schema_version: u32,
+    pub server_build_sha: String,
+    pub map_name: String,
+    pub map_schema_version: u32,
+    pub map_content_hash: String,
+    pub seed: u32,
+    pub duration_ticks: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct ReplayPlaybackState {
+    pub current_tick: u32,
+    pub duration_ticks: u32,
+    pub speed: f32,
+    pub paused: bool,
+    pub ended: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub controller_id: Option<u32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
