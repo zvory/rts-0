@@ -217,6 +217,7 @@ impl Game {
             supply_cap: 0,
             is_ai: false,
             score: ScoreState::default(),
+            upgrades: Default::default(),
         };
 
         let spatial = services::spatial::SpatialIndex::build(&entities, map.size);
@@ -300,6 +301,7 @@ impl Game {
             supply_cap: 0,
             is_ai: false,
             score: ScoreState::default(),
+            upgrades: Default::default(),
         };
 
         let spatial = services::spatial::SpatialIndex::build(&entities, map.size);
@@ -370,6 +372,7 @@ impl Game {
             supply_cap: 0,
             is_ai: false,
             score: ScoreState::default(),
+            upgrades: Default::default(),
         };
 
         let spatial = services::spatial::SpatialIndex::build(&entities, map.size);
@@ -456,6 +459,7 @@ impl Game {
             supply_cap: 0,
             is_ai: false,
             score: ScoreState::default(),
+            upgrades: Default::default(),
         };
 
         let spatial = services::spatial::SpatialIndex::build(&entities, map.size);
@@ -560,6 +564,7 @@ impl Game {
                 supply_cap: 0,
                 is_ai: p.is_ai,
                 score: ScoreState::default(),
+                upgrades: Default::default(),
             };
             spawn_player_start(&mut entities, &map, &mut ps, start);
             if starting_loadout == StartingLoadout::DebugHuman && !p.is_ai {
@@ -1232,6 +1237,7 @@ fn spawn_debug_inert_enemy_at_guns(
         supply_cap: 0,
         is_ai: true,
         score: ScoreState::default(),
+        upgrades: Default::default(),
     });
 }
 

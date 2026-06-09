@@ -24,8 +24,9 @@ mod setup;
 pub(crate) mod smoke;
 mod snapshot;
 mod systems;
+pub(crate) mod upgrade;
 
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 
 use crate::config;
 use crate::protocol::{
@@ -75,6 +76,7 @@ pub(crate) struct PlayerState {
     pub(crate) supply_cap: u32,
     pub(crate) is_ai: bool,
     pub(crate) score: ScoreState,
+    pub(crate) upgrades: BTreeSet<upgrade::UpgradeKind>,
 }
 
 /// Per-player score-screen counters. Values are accumulated from authoritative entity lifecycle

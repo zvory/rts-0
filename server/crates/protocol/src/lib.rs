@@ -182,6 +182,10 @@ pub enum Command {
         building: u32,
         unit: String,
     },
+    Research {
+        building: u32,
+        upgrade: String,
+    },
     Cancel {
         building: u32,
     },
@@ -291,7 +295,7 @@ pub struct LobbyPlayer {
 ///
 /// [`Snapshot`] remains the semantic source of truth for game code. This format is only a
 /// transport-side optimization for `ServerMessage::Snapshot`.
-pub const COMPACT_SNAPSHOT_VERSION: u8 = 9;
+pub const COMPACT_SNAPSHOT_VERSION: u8 = 10;
 
 /// Serialize one semantic snapshot as a compact JSON text frame payload.
 pub fn serialize_compact_snapshot(snapshot: &Snapshot) -> serde_json::Result<String> {
@@ -368,6 +372,16 @@ impl Serialize for CompactSnapshot<'_> {
                     .collect::<Vec<_>>(),
             )?;
         }
+        if !snapshot.upgrades.is_empty() {
+            map.serialize_entry(
+                "u",
+                &snapshot
+                    .upgrades
+                    .iter()
+                    .map(|upgrade| upgrade_code(upgrade))
+                    .collect::<Vec<_>>(),
+            )?;
+        }
         map.serialize_entry("n", &CompactNetStatus(&snapshot.net_status))?;
         map.end()
     }
@@ -441,6 +455,7 @@ impl Serialize for CompactEntity<'_> {
     {
         let entity = self.0;
         let prod_kind = entity.prod_kind.as_deref().map(kind_code);
+        let prod_upgrade = entity.prod_upgrade.as_deref().map(upgrade_code);
         let setup_state = entity.setup_state.as_deref().map(setup_state_code);
 
         let mut len = 8;
@@ -500,6 +515,9 @@ impl Serialize for CompactEntity<'_> {
         }
         if !entity.rally_plan.is_empty() {
             len = 27;
+        }
+        if prod_upgrade.is_some() {
+            len = 28;
         }
 
         let mut seq = serializer.serialize_seq(Some(len))?;
@@ -585,6 +603,9 @@ impl Serialize for CompactEntity<'_> {
                     .map(CompactOrderPlanMarker)
                     .collect::<Vec<_>>(),
             )?;
+        }
+        if len > 27 {
+            seq.serialize_element(&prod_upgrade)?;
         }
         seq.end()
     }
@@ -852,6 +873,13 @@ fn ability_code(ability: &str) -> u8 {
     }
 }
 
+fn upgrade_code(upgrade: &str) -> u8 {
+    match upgrade {
+        "methamphetamines" => 1,
+        _ => 255,
+    }
+}
+
 fn notice_severity_code(severity: NoticeSeverity) -> u8 {
     match severity {
         NoticeSeverity::Info => 1,
@@ -992,6 +1020,7 @@ mod tests {
                     severity: NoticeSeverity::Info,
                 },
             ],
+            upgrades: Vec::new(),
             player_resources: Vec::new(),
             net_status: SnapshotNetStatus {
                 server_lag_ms: 4,
@@ -1082,6 +1111,7 @@ mod tests {
             smokes: Vec::new(),
             visible_tiles: Vec::new(),
             events: Vec::new(),
+            upgrades: Vec::new(),
             player_resources: Vec::new(),
             net_status: SnapshotNetStatus::default(),
         };

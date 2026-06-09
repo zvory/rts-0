@@ -2,6 +2,7 @@ use std::collections::BTreeMap;
 
 use crate::config;
 use crate::game::ability::AbilityKind;
+use crate::game::upgrade::UpgradeKind;
 use crate::protocol::states;
 use crate::rules;
 
@@ -9,8 +10,8 @@ use crate::rules;
 use super::EntityStateGroups;
 use super::{
     AttackPhase, BuildPhase, CombatState, ConstructionState, EntityKind, GatherPhase, MovePhase,
-    MovementState, Order, OrderIntent, ProdItem, ProductionState, RallyIntent, ResourceNodeState,
-    WeaponSetup, WorkerState, MAX_QUEUED_ORDERS, NEUTRAL,
+    MovementState, Order, OrderIntent, ProdItem, ProductionState, RallyIntent, ResearchItem,
+    ResourceNodeState, WeaponSetup, WorkerState, MAX_QUEUED_ORDERS, NEUTRAL,
 };
 
 /// A single simulation entity: unit, building, or resource node.
@@ -105,7 +106,9 @@ impl Entity {
             } else {
                 None
             },
-            production: if rules::economy::trainable_units(kind).is_empty() {
+            production: if rules::economy::trainable_units(kind).is_empty()
+                && crate::game::upgrade::researchable_upgrades(kind).is_empty()
+            {
                 None
             } else {
                 Some(ProductionState::default())
@@ -693,6 +696,29 @@ impl Entity {
         true
     }
 
+    pub fn research_queue(&self) -> &[ResearchItem] {
+        self.production
+            .as_ref()
+            .map(|p| p.research_queue.as_slice())
+            .unwrap_or(&[])
+    }
+
+    pub fn research_queue_mut(&mut self) -> Option<&mut Vec<ResearchItem>> {
+        self.production.as_mut().map(|p| &mut p.research_queue)
+    }
+
+    pub fn push_research(&mut self, item: ResearchItem) -> bool {
+        let Some(p) = self.production.as_mut() else {
+            return false;
+        };
+        p.research_queue.push(item);
+        true
+    }
+
+    pub fn pop_last_research(&mut self) -> Option<ResearchItem> {
+        self.production.as_mut()?.research_queue.pop()
+    }
+
     /// Rally point for a unit-producing building, if one has been set.
     pub fn rally_point(&self) -> Option<(f32, f32)> {
         self.production
@@ -886,7 +912,7 @@ impl Entity {
             return states::CONSTRUCT;
         }
         if self.is_building() {
-            if !self.prod_queue().is_empty() {
+            if !self.prod_queue().is_empty() || !self.research_queue().is_empty() {
                 return states::TRAIN;
             }
             return states::IDLE;
@@ -929,6 +955,16 @@ impl Entity {
             m.path.clear();
         }
         self.set_target_id(None);
+    }
+}
+
+impl Entity {
+    pub fn has_upgrade_effect(&self, upgrade: UpgradeKind, player_has_upgrade: bool) -> bool {
+        match upgrade {
+            UpgradeKind::Methamphetamines => {
+                self.kind == EntityKind::Rifleman && player_has_upgrade
+            }
+        }
     }
 }
 

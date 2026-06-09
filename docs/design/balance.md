@@ -60,8 +60,9 @@ Intended progression:
 The current implementation uses the themed unit/building names below. Combat is handled by the
 shared attack model plus the support-weapon setup/teardown state, tank turret aim gates, and
 tank hull-facing damage modifiers for anti-tank hits against tank victims. Tanks keep their active
-movement path while firing on either `Move` or `AttackMove` orders; charged riflemen keep advancing
-while firing and roll a 50% miss chance for those moving charge shots; other mobile combat units
+movement path while firing on either `Move` or `AttackMove` orders; riflemen upgraded with
+Methamphetamines are permanently charging, keep advancing while firing, and roll the charge-fire
+miss chance only while moving; other mobile combat units
 still hold position once a target is in weapon range. Scout cars also fire while moving using an
 independent rear machine-gun facing. They are unarmored light vehicles and do not receive
 armored damage reduction, but AT guns do not roll their infantry miss chance against them.
@@ -83,8 +84,10 @@ authoritative `rules::defs` records.
 - `SCOUT_CAR_OIL_COST_PER_PX = 5 / (96 * TILE_SIZE)`: scout cars burn oil for movement at
   half the previous tank movement rate. Tanks and scout cars cannot advance while their owner has
   zero oil.
-- Ability shell metadata: Rifleman Charge has a 5s reuse delay and remains unlocked by a completed
-  Training Centre.
+- **Methamphetamines** (Training Centre research): costs 100 steel / 100 oil and takes 600 ticks
+  (~20s). Once complete, all current and future riflemen for that player are permanently charging:
+  2x movement speed, fire while moving with moving-shot miss chance, normal accuracy while
+  standing, and 25% faster attacks (16 tick cooldown becomes 12).
 - **Scout Car Smoke** (hotkey `D`): Scout cars gain a targeted smoke-grenade ability once the
   owner has a completed Steelworks. Each scout car spawns with 2 smoke uses; once those uses are
   depleted, that car cannot use Smoke again. Smoke has no steel or oil cost. Target range: 9 tiles
@@ -145,7 +148,7 @@ Building stats (hp, sight, cost, footprint tiles wxh, buildTicks, extra):
 | city_centre          | 600 | 9     | 200 | 3x3  | 400       | trains worker; +10 supply; players start with one free |
 | depot                      | 110 | 4     | 100 | 2x2  | 300       | +8 supply |
 | barracks                   | 165 | 6     | 150 | 3x2  | 200       | trains rifleman, machine_gunner, at_team; requires a City Centre |
-| training_centre   | 300 | 6     | 100 steel + 50 oil | 3x2  | 280       | unlocks machine_gunner training at barracks; requires a City Centre and Barracks |
+| training_centre   | 300 | 6     | 100 steel + 50 oil | 3x2  | 280       | unlocks machine_gunner training at barracks and researches Methamphetamines; requires a City Centre and Barracks |
 | factory                    | 360 | 6     | 200 steel + 100 oil | 3x3  | 330       | trains scout_car, tank; requires a City Centre and Training Centre |
 | steelworks                 | 300 | 6     | 125 steel + 125 oil | 2x2  | 310       | unlocks at_team training at barracks and tank training; requires a City Centre and Training Centre |
 

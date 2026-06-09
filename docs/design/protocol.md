@@ -40,11 +40,12 @@ crate.
 | `attack`     | `units: u32[]`, `target: u32`, `queued?: bool` | Attack a specific entity. When `queued` is true, store future attack intent instead of replacing the active order. |
 | `setupAtGuns` | `units: u32[]`, `x: f32`, `y: f32`, `queued?: bool` | Manually emplace owned AT guns toward a world point. When `queued` is true, append a future setup-facing intent for owned completed AT teams only; the stored point is evaluated from the unit's position when the stage promotes. Immediate setup clears movement/target state, records the setup facing, and enters `setting_up`. Other selected units are ignored. |
 | `tearDownAtGuns` | `units: u32[]` | Pack up owned AT guns that are `setting_up` or `deployed`. Other selected units are ignored. |
-| `charge`     | `units: u32[]` | Legacy Rifleman Charge activation. Preserved for old clients/replays, but translated to the generic Charge ability internally. |
-| `useAbility` | `ability: "charge"|"smoke"`, `units: u32[]`, `x?: f32`, `y?: f32`, `queued?: bool` | Generic ability command. `charge` is self-targeted and ignores `x/y`; `smoke` targets a world point. Smoke command execution is phased separately from the authoritative smoke world-state/LOS model. |
+| `charge`     | `units: u32[]` | Legacy Rifleman Charge activation. Preserved for old clients/replays, but no longer has eligible carriers. |
+| `useAbility` | `ability: "charge"|"smoke"`, `units: u32[]`, `x?: f32`, `y?: f32`, `queued?: bool` | Generic ability command. `charge` is legacy/no-op; `smoke` targets a world point. Smoke command execution is phased separately from the authoritative smoke world-state/LOS model. |
 | `gather`     | `units: u32[]`, `node: u32`, `queued?: bool` | Send workers to harvest a resource node. When `queued` is true, store future gather intent instead of replacing the active order. |
 | `build`      | `worker: u32`, `building: string`, `tileX: u32`, `tileY: u32`, `queued?: bool` | Worker constructs a building at a tile. The server first walks the worker to a nearby point outside the requested footprint, then starts construction once it is in range. `building` ∈ building kinds. When `queued` is true, store future build intent instead of replacing the active order. |
 | `train`      | `building: u32`, `unit: string` | Queue a unit at a production building. |
+| `research`   | `building: u32`, `upgrade: string` | Queue a permanent player upgrade at a tech building. `methamphetamines` researches at the Training Centre. |
 | `cancel`     | `building: u32` | Cancel the latest item in a building's production queue. |
 | `stop`       | `units: u32[]` | Clear orders, hold position. |
 | `setRally`   | `building: u32`, `x: f32`, `y: f32`, `kind?: "move"|"attackMove"`, `queued?: bool` | Set or append a unit-producing building rally stage. `kind` defaults to `"move"`. Freshly produced units receive the building's rally plan as active + queued move/attack-move orders, and the building prefers the spawn exit nearest the first stage. Ignored for buildings the player doesn't own, non-producers (depot, training centre), or buildings still under construction. Points are clamped into map bounds. When `queued` is true, append until the four-stage building rally cap is reached; otherwise replace the whole rally plan. |
@@ -152,6 +153,7 @@ transport decode:
   smokes?: SmokeCloud[],         // active smoke clouds visible to this recipient; omitted when empty
   visibleTiles?: u8[],           // row-major current server visibility; 1 = visible, 0 = fogged
   events: Event[],               // transient things to surface (see 2.5)
+  upgrades?: string[],           // completed permanent upgrades for this recipient
   playerResources?: {id, steel, oil, supplyUsed, supplyCap}[], // all players; spectator/replay mode only
   netStatus: {                // per-recipient server-side health for the current match
     serverLagMs: u16,         // how late this room started the tick vs its scheduled time
@@ -164,7 +166,7 @@ transport decode:
 }
 ```
 
-Live WebSocket snapshot frames are sent as compact JSON text, version 9. `client/src/net.js`
+Live WebSocket snapshot frames are sent as compact JSON text, version 10. `client/src/net.js`
 decodes this transport shape back into the semantic object above before dispatching `S.SNAPSHOT`.
 Older object-shaped JSON snapshots remain decodable by the client for fallback/dev use.
 
@@ -179,7 +181,7 @@ Older object-shaped JSON snapshots remain decodable by the client for fallback/d
       facing?, weaponFacing?, prodKind?, prodProgress?, prodQueue?,
       buildProgress?, latchedNode?, targetId?, setupState?, remaining?, rally?, oilUsed?,
       setupFacing?, orderPlan?, chargeCooldownLeft?, abilities?, visionOnly?, debugPath?,
-      rallyPlan?
+      rallyPlan?, prodUpgrade?
     ]
   ],
   "r": [[id, remaining]],         // omitted when empty
@@ -215,7 +217,7 @@ after `debugPath` in compact snapshots to preserve older optional slot positions
 capped at four stages, and uses the same `[kind, x, y]` compact stage encoding with `move` and
 `attackMove` stages.
 The `abilities` slot is owner-only and capped at 8 entries. Each compact ability cooldown is
-`[ability, cooldownLeft, remainingUses?]`, where `ability` is 1 `charge` or 2 `smoke`.
+`[ability, cooldownLeft, remainingUses?]`, where `ability` is 2 `smoke`; 1 `charge` is legacy.
 `remainingUses` is present for finite-use abilities such as Scout Car Smoke; a value of `0`
 means the ability is depleted and cannot be used by that caster.
 `visionOnly` is true only for non-owned units/buildings visible through lingering death vision;
@@ -253,6 +255,7 @@ events, and positioned notices remain fog-gated and are withheld when smoke hide
   weaponFacing?: f32,            // radians, for independent weapon/barrel orientation (optional)
   // production buildings:
   prodKind?: string,             // unit currently being produced
+  prodUpgrade?: string,          // upgrade currently being researched
   prodProgress?: f32,            // 0..1
   prodQueue?: u32,               // queued count (including the in-progress one)
   // buildings under construction:
@@ -273,9 +276,9 @@ events, and positioned notices remain fog-gated and are withheld when smoke hide
   orderPlan?: [                  // current + queued order stages; ONLY ever sent to the owner
     { kind: "move"|"attackMove"|"attack"|"gather"|"build"|"smoke"|"setupAtGuns", x: f32, y: f32 }
   ],
-  chargeCooldownLeft?: u16,      // legacy rifleman-only owner-visible remaining Charge cooldown
+  chargeCooldownLeft?: u16,      // legacy; no longer projected by current server
   abilities?: [                  // owner-only ability affordance/cooldown data
-    { ability: "charge"|"smoke", cooldownLeft: u16, remainingUses?: u16 }
+    { ability: "smoke", cooldownLeft: u16, remainingUses?: u16 }
   ],
   visionOnly?: bool,             // true = visible only through one-second death vision; visual intel only
   debugPath?: {                  // lobby Debug mode only; remaining movement path; ONLY ever sent to the owner

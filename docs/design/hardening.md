@@ -81,11 +81,11 @@ The server treats every client as potentially hostile. Limits live next to the c
   falling back to nearest-target acquisition, so drive-by fire tends to finish one enemy instead of
   spreading damage across every passing unit. Projection omits enemy `weaponFacing` when it would
   reveal a hidden target direction.
-- **Rifleman charge fire**: riflemen with active Charge keep their movement path while firing at
-  enemies in range instead of stopping to shoot. While on a plain `Move`, charged riflemen only fire
-  opportunistically at enemies already in range and do not chase. Moving charge shots roll a 50%
-  miss chance after attack feedback is emitted, so audio/tracers still play but missed shots deal
-  no damage or under-attack alert.
+- **Rifleman Methamphetamines fire**: upgraded riflemen are permanently charging and keep their
+  movement path while firing at enemies in range instead of stopping to shoot. While on a plain
+  `Move`, upgraded riflemen only fire opportunistically at enemies already in range and do not
+  chase. Moving charge shots roll a miss chance after attack feedback is emitted, so audio/tracers
+  still play but missed shots deal no damage or under-attack alert.
 - **Scout car movement and weapon facing**: scout cars are light unarmored vehicles with a
   rear-mounted machine gun (higher damage, same range and cooldown as machine gunners). They use the
   same oriented-body/pathing/collision model as tanks, including standoff firing and firing while
@@ -141,12 +141,10 @@ The server treats every client as potentially hostile. Limits live next to the c
   `TANK_OIL_STARVED_PAUSE_TICKS` (one second) before retrying, so sparse oil income does not
   produce constant one-tick stuttering. Turret/combat behavior still runs through the combat system
   while movement is paused.
-- **Rifleman Charge**: after completing a Training Centre, selected riflemen gain a `charge`
-  command on the command card's `Z` slot. The command sets `RIFLEMAN_CHARGE_TICKS` (64 ticks) on
-  owned riflemen only; while active, movement uses `RIFLEMAN_CHARGE_SPEED_MULTIPLIER` (2x) and the
-  timer decays every simulation tick, even while idle. Charged riflemen can fire while moving, with
-  the charge-fire miss chance described above. The duration is intentionally hard-coded from the
-  current "four tank lengths" feel and does not reference tank body constants.
+- **Methamphetamines research**: Training Centres can queue one permanent player upgrade costing
+  100 steel / 100 oil and taking 600 ticks. Once completed, all current and future owned riflemen
+  use the charging movement/fire model permanently and attack 25% faster. Legacy `charge` commands
+  remain decodable but have no eligible carriers.
 - **Tank armor facing**: tank and AT-team attacks against tank victims use the victim tank's hull
   `facing` and the attacker's position. Front hits (`<=45°` from the hull direction) deal normal
   damage, side hits (`>45°` and `<=135°`) deal `1.25x`, and rear hits (`>135°`) deal `1.75x`.

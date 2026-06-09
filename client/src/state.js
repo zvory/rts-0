@@ -77,6 +77,8 @@ export class GameState {
     this.playerResources = [];
     /** @type {Array<object>} latest snapshot's transient events. */
     this.events = [];
+    /** @type {string[]} upgrades completed for this player. */
+    this.upgrades = [];
 
     // --- selection (client-only) ---
     /** @type {Set<number>} */
@@ -202,6 +204,7 @@ export class GameState {
       supplyCap: msg.supplyCap | 0,
     };
     this.playerResources = msg.playerResources || [];
+    this.upgrades = Array.isArray(msg.upgrades) ? msg.upgrades : [];
     this.smokes = Array.isArray(msg.smokes) ? msg.smokes : [];
     this.visibleTiles = Array.isArray(msg.visibleTiles) || msg.visibleTiles instanceof Uint8Array
       ? msg.visibleTiles

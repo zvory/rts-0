@@ -15,6 +15,47 @@ pub(crate) fn production_system(
     _events: &mut std::collections::HashMap<u32, Vec<crate::protocol::Event>>,
 ) {
     for id in entities.ids() {
+        let completed_research = {
+            match entities.get_mut(id) {
+                Some(b)
+                    if b.hp > 0
+                        && b.is_building()
+                        && !b.under_construction()
+                        && !b.research_queue().is_empty() =>
+                {
+                    let owner = b.owner;
+                    if let Some(queue) = b.research_queue_mut() {
+                        let front = &mut queue[0];
+                        if front.progress < front.total {
+                            front.progress = front.progress.saturating_add(1);
+                        }
+                        if front.progress >= front.total {
+                            Some((owner, front.upgrade))
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                }
+                _ => None,
+            }
+        };
+
+        if let Some((owner, upgrade)) = completed_research {
+            if let Some(player) = players.iter_mut().find(|p| p.id == owner) {
+                player.upgrades.insert(upgrade);
+            }
+            if let Some(b) = entities.get_mut(id) {
+                if let Some(queue) = b.research_queue_mut() {
+                    if !queue.is_empty() {
+                        queue.remove(0);
+                    }
+                }
+            }
+            continue;
+        }
+
         let ready = {
             let b = match entities.get_mut(id) {
                 Some(b)
@@ -403,6 +444,7 @@ mod tests {
             supply_cap: 0,
             is_ai: false,
             score: ScoreState::default(),
+            upgrades: Default::default(),
         }
     }
 

@@ -2,7 +2,7 @@
 // Gameplay is authoritative on the server; these values drive UI labels, the command
 // card, fog sight radii, and rendering. Keep costs/supply/sight in sync with the server.
 
-import { ABILITY, KIND } from "./protocol.js";
+import { ABILITY, KIND, UPGRADE } from "./protocol.js";
 
 // Timing (for snapshot interpolation). Must match server TICK_HZ / SNAPSHOT_EVERY_N_TICKS.
 export const TICK_HZ = 30;
@@ -69,6 +69,7 @@ export const SMOKE_CLOUD_DURATION_TICKS = TICK_HZ * 5;
 export const SMOKE_ABILITY_COOLDOWN_TICKS = 600;
 export const SCOUT_CAR_SMOKE_USES = 2;
 export const SMOKE_ABILITY_COST = Object.freeze({ steel: 0, oil: 0 });
+export const METHAMPHETAMINES_RESEARCH_TICKS = TICK_HZ * 20;
 
 // Player colors (server assigns from a matching palette; used as a fallback for blips).
 export const PLAYER_PALETTE = Object.freeze([
@@ -101,6 +102,7 @@ export const STATS = Object.freeze({
     cost: { steel: 150, oil: 0 }, buildTicks: 200, trains: [KIND.RIFLEMAN, KIND.MACHINE_GUNNER, KIND.AT_TEAM], requires: KIND.CITY_CENTRE },
   [KIND.TRAINING_CENTRE]: { label: "Training Centre", icon: "TC", footW: 3, footH: 2, sight: 6,
     cost: { steel: 100, oil: 50 }, buildTicks: 280, trains: [],
+    researches: [UPGRADE.METHAMPHETAMINES],
     requires: [KIND.CITY_CENTRE, KIND.BARRACKS] },
   [KIND.FACTORY]: { label: "Factory", icon: "FCT", footW: 3, footH: 3, sight: 6,
     cost: { steel: 200, oil: 100 }, buildTicks: 330, trains: [KIND.SCOUT_CAR, KIND.TANK],
@@ -114,19 +116,6 @@ export const STATS = Object.freeze({
 });
 
 export const ABILITIES = Object.freeze({
-  [ABILITY.CHARGE]: Object.freeze({
-    ability: ABILITY.CHARGE,
-    label: "Charge",
-    icon: "CHG",
-    title: "Riflemen sprint briefly at double movement speed",
-    hotkey: "C",
-    carriers: Object.freeze([KIND.RIFLEMAN]),
-    targetMode: "self",
-    cooldownTicks: RIFLEMAN_CHARGE_COOLDOWN_TICKS,
-    cost: Object.freeze({ steel: 0, oil: 0 }),
-    requires: KIND.TRAINING_CENTRE,
-    queued: true,
-  }),
   [ABILITY.SMOKE]: Object.freeze({
     ability: ABILITY.SMOKE,
     label: "Smoke",
@@ -142,6 +131,19 @@ export const ABILITIES = Object.freeze({
     durationTicks: SMOKE_CLOUD_DURATION_TICKS,
     requires: KIND.STEELWORKS,
     queued: false,
+  }),
+});
+
+export const UPGRADES = Object.freeze({
+  [UPGRADE.METHAMPHETAMINES]: Object.freeze({
+    upgrade: UPGRADE.METHAMPHETAMINES,
+    label: "Methamphetamines",
+    icon: "METH",
+    hotkey: "Q",
+    cost: Object.freeze({ steel: 100, oil: 100 }),
+    researchTicks: METHAMPHETAMINES_RESEARCH_TICKS,
+    description: "Riflemen permanently move and fire while charging; +25% attack speed.",
+    researchedAt: KIND.TRAINING_CENTRE,
   }),
 });
 

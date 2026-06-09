@@ -36,7 +36,7 @@ pub use state::EntityStateGroups;
 #[allow(unused_imports)]
 pub use state::{
     CarryState, CombatState, ConstructionState, MovementState, ProdItem, ProductionState,
-    ResourceNodeState, WeaponSetup, WorkerState,
+    ResearchItem, ResourceNodeState, WeaponSetup, WorkerState,
 };
 pub use store::EntityStore;
 

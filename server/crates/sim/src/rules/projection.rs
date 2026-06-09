@@ -198,6 +198,19 @@ pub fn project_entity(
             view.prod_queue = Some(entity.prod_queue().len() as u32);
         }
     }
+    if entity.is_building() && !entity.research_queue().is_empty() {
+        if let Some(front) = entity.research_queue().first() {
+            view.prod_upgrade = Some(front.upgrade.to_protocol_str().to_string());
+            view.prod_progress = Some(if front.total == 0 {
+                0.0
+            } else {
+                front.progress as f32 / front.total as f32
+            });
+        }
+        if entity.owner == viewer {
+            view.prod_queue = Some(entity.research_queue().len() as u32);
+        }
+    }
 
     // Rally point is a private planning aid: only ever revealed to the owner.
     if entity.owner == viewer {
@@ -223,12 +236,6 @@ pub fn project_entity(
         if context.include_debug_path {
             view.debug_path = debug_path_view(entity);
         }
-        if entity.kind == EntityKind::Rifleman {
-            let charge_cooldown_left = entity.charge_cooldown_ticks();
-            if charge_cooldown_left > 0 {
-                view.charge_cooldown_left = Some(charge_cooldown_left);
-            }
-        }
         view.abilities = entity
             .ability_cooldowns
             .iter()
@@ -239,7 +246,7 @@ pub fn project_entity(
                 remaining_uses: entity.ability_uses_remaining(*kind),
             })
             .collect();
-        for kind in [ability::AbilityKind::Charge, ability::AbilityKind::Smoke] {
+        for kind in [ability::AbilityKind::Smoke] {
             if ability::carried_by(kind, entity.kind)
                 && !view
                     .abilities
@@ -747,7 +754,7 @@ mod tests {
     }
 
     #[test]
-    fn charge_cooldown_is_owner_only() {
+    fn legacy_charge_cooldown_is_not_projected() {
         let mut entities = EntityStore::new();
         let rifle_id = entities
             .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
@@ -769,7 +776,7 @@ mod tests {
 
         let owner_view = project_for_test(1, rifle, &fog, true, &entities, None, false)
             .expect("owner should see own rifleman");
-        assert_eq!(owner_view.charge_cooldown_left, Some(42));
+        assert_eq!(owner_view.charge_cooldown_left, None);
 
         let enemy_view = project_for_test(2, rifle, &fog, false, &entities, None, false)
             .expect("full view should include rifleman");

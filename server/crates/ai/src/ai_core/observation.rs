@@ -297,6 +297,7 @@ mod tests {
             smokes: Vec::new(),
             visible_tiles: Vec::new(),
             events: Vec::new(),
+            upgrades: Vec::new(),
             player_resources: Vec::new(),
             net_status: rts_sim::protocol::SnapshotNetStatus::default(),
         }

@@ -88,6 +88,7 @@ fn player_with_oil(id: u32, oil: u32) -> PlayerState {
         supply_cap: 0,
         is_ai: false,
         score: ScoreState::default(),
+        upgrades: Default::default(),
     }
 }
 

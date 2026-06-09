@@ -6,6 +6,7 @@
 
 use crate::game::ability::AbilityKind;
 use crate::game::entity::{EntityKind, RallyKind};
+use crate::game::upgrade::UpgradeKind;
 use crate::protocol;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -59,6 +60,10 @@ pub enum SimCommand {
         building: u32,
         unit: EntityKind,
     },
+    Research {
+        building: u32,
+        upgrade: UpgradeKind,
+    },
     Cancel {
         building: u32,
     },
@@ -81,6 +86,7 @@ pub enum SimCommand {
 pub enum CommandRejection {
     Building,
     Unit,
+    Upgrade,
     Ability,
 }
 
@@ -89,6 +95,7 @@ impl CommandRejection {
         match self {
             CommandRejection::Building => "Unknown building",
             CommandRejection::Unit => "Unknown unit",
+            CommandRejection::Upgrade => "Unknown upgrade",
             CommandRejection::Ability => "Unknown ability",
         }
     }
@@ -198,6 +205,14 @@ impl SimCommand {
                     reason: CommandRejection::Unit,
                 },
             },
+            protocol::Command::Research { building, upgrade } => {
+                match upgrade.parse::<UpgradeKind>() {
+                    Ok(upgrade) => SimCommand::Research { building, upgrade },
+                    _ => SimCommand::Rejected {
+                        reason: CommandRejection::Upgrade,
+                    },
+                }
+            }
             protocol::Command::Cancel { building } => SimCommand::Cancel { building },
             protocol::Command::Stop { units } => SimCommand::Stop { units },
             protocol::Command::SetRally {
@@ -306,6 +321,10 @@ impl SimCommand {
             SimCommand::Train { building, unit } => protocol::Command::Train {
                 building: *building,
                 unit: protocol::kind_to_wire(*unit).to_string(),
+            },
+            SimCommand::Research { building, upgrade } => protocol::Command::Research {
+                building: *building,
+                upgrade: upgrade.to_protocol_str().to_string(),
             },
             SimCommand::Cancel { building } => protocol::Command::Cancel {
                 building: *building,

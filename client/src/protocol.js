@@ -45,6 +45,7 @@ export const CMD = Object.freeze({
   GATHER: "gather",
   BUILD: "build",
   TRAIN: "train",
+  RESEARCH: "research",
   CANCEL: "cancel",
   STOP: "stop",
   SET_RALLY: "setRally",
@@ -139,7 +140,7 @@ export const REPLAY_VISION = Object.freeze({
 });
 
 // --- Compact snapshot wire schema (must match protocol.rs) ---
-export const COMPACT_SNAPSHOT_VERSION = 9;
+export const COMPACT_SNAPSHOT_VERSION = 10;
 
 export const KIND_CODE = Object.freeze({
   [KIND.WORKER]: 1,
@@ -174,6 +175,14 @@ export const SETUP_CODE = Object.freeze({
   [SETUP.SETTING_UP]: 2,
   [SETUP.DEPLOYED]: 3,
   [SETUP.TEARING_DOWN]: 4,
+});
+
+export const UPGRADE = Object.freeze({
+  METHAMPHETAMINES: "methamphetamines",
+});
+
+export const UPGRADE_CODE = Object.freeze({
+  [UPGRADE.METHAMPHETAMINES]: 1,
 });
 
 export const EVENT_CODE = Object.freeze({
@@ -223,6 +232,7 @@ const SETUP_BY_CODE = Object.freeze(reverseCodes(SETUP_CODE));
 const EVENT_BY_CODE = Object.freeze(reverseCodes(EVENT_CODE));
 const ORDER_STAGE_BY_CODE = Object.freeze(reverseCodes(ORDER_STAGE_CODE));
 const ABILITY_BY_CODE = Object.freeze(reverseCodes(ABILITY_CODE));
+const UPGRADE_BY_CODE = Object.freeze(reverseCodes(UPGRADE_CODE));
 const NOTICE_SEVERITY_BY_CODE = Object.freeze(reverseCodes(NOTICE_SEVERITY_CODE));
 
 const MAX_COMPACT_ENTITIES = 20000;
@@ -272,6 +282,9 @@ function decodeCompactSnapshot(raw) {
     events: readOptionalArray(raw.ev, "events", MAX_COMPACT_EVENTS).map(decodeCompactEvent),
     playerResources: readOptionalArray(raw.pr, "playerResources", 32).map(
       decodeCompactPlayerResource,
+    ),
+    upgrades: readOptionalArray(raw.u, "upgrades", 32).map((code, index) =>
+      readCode(code, UPGRADE_BY_CODE, `upgrade.${index}`),
     ),
     netStatus: decodeCompactNetStatus(raw.n),
   };
@@ -335,7 +348,7 @@ function decodeCompactPlayerResource(record, index) {
 }
 
 function decodeCompactEntity(record, index) {
-  const fields = readArray(record, `entity ${index}`, 26);
+  const fields = readArray(record, `entity ${index}`, 28);
   if (fields.length < 8) throw new Error(`entity ${index} is too short`);
   const entity = {
     id: readU32(fields[0], "entity.id"),
@@ -367,6 +380,7 @@ function decodeCompactEntity(record, index) {
   assignOptional(entity, "visionOnly", fields, 24, readBool);
   assignDebugPath(entity, fields, 25);
   assignRallyPlan(entity, fields, 26);
+  assignOptionalCode(entity, "prodUpgrade", fields, 27, UPGRADE_BY_CODE);
   return entity;
 }
 
@@ -680,6 +694,7 @@ export const cmd = Object.freeze({
   build: (worker, building, tileX, tileY, queued = false) =>
     withQueued({ c: CMD.BUILD, worker, building, tileX, tileY }, queued),
   train: (building, unit) => ({ c: CMD.TRAIN, building, unit }),
+  research: (building, upgrade) => ({ c: CMD.RESEARCH, building, upgrade }),
   cancel: (building) => ({ c: CMD.CANCEL, building }),
   stop: (units) => ({ c: CMD.STOP, units }),
   setRally: (building, x, y, queued = false, kind = ORDER_STAGE.MOVE) =>

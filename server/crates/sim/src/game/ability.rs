@@ -55,7 +55,7 @@ pub struct AbilityDefinition {
     pub may_queue: bool,
 }
 
-const CHARGE_CARRIERS: &[EntityKind] = &[EntityKind::Rifleman];
+const CHARGE_CARRIERS: &[EntityKind] = &[];
 const SMOKE_CARRIERS: &[EntityKind] = &[EntityKind::ScoutCar];
 
 pub fn definition(kind: AbilityKind) -> AbilityDefinition {
@@ -67,8 +67,8 @@ pub fn definition(kind: AbilityKind) -> AbilityDefinition {
             range_tiles: None,
             cooldown_ticks: config::RIFLEMAN_CHARGE_COOLDOWN_TICKS,
             cost: ResourceCost { steel: 0, oil: 0 },
-            tech_requirement: Some(EntityKind::TrainingCentre),
-            may_queue: true,
+            tech_requirement: None,
+            may_queue: false,
         },
         AbilityKind::Smoke => AbilityDefinition {
             kind,

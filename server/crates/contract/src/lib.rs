@@ -113,6 +113,8 @@ pub struct Snapshot {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub visible_tiles: Vec<u8>,
     pub events: Vec<Event>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub upgrades: Vec<String>,
     /// Per-player resources for all players. Populated only in spectator/replay modes.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub player_resources: Vec<PlayerResourceSnapshot>,
@@ -224,6 +226,8 @@ pub struct EntityView {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub prod_kind: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub prod_upgrade: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub prod_progress: Option<f32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub prod_queue: Option<u32>,
@@ -292,6 +296,7 @@ impl EntityView {
             facing: None,
             weapon_facing: None,
             prod_kind: None,
+            prod_upgrade: None,
             prod_progress: None,
             prod_queue: None,
             build_progress: None,

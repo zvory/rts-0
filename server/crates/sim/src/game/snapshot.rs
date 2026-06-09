@@ -164,6 +164,14 @@ impl Game {
             },
             // Events are delivered via the `tick()` return value, not the snapshot.
             events: Vec::new(),
+            upgrades: ps
+                .map(|p| {
+                    p.upgrades
+                        .iter()
+                        .map(|upgrade| upgrade.to_protocol_str().to_string())
+                        .collect()
+                })
+                .unwrap_or_default(),
             player_resources,
             net_status: crate::protocol::SnapshotNetStatus::default(),
         }

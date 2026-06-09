@@ -484,6 +484,7 @@ impl PlayerMilestones {
             | Command::Gather { .. }
             | Command::Build { .. }
             | Command::Train { .. }
+            | Command::Research { .. }
             | Command::Cancel { .. }
             | Command::Stop { .. }
             | Command::SetRally { .. }
