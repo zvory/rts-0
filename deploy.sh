@@ -123,6 +123,11 @@ fi
 
 echo "Deploying $short_commit to Fly app '$app' from $deploy_dir"
 
+flyctl config validate \
+  --app "$app" \
+  --config "$deploy_dir/fly.toml" \
+  --strict
+
 deploy_cmd=(
   flyctl deploy
   --app "$app"
