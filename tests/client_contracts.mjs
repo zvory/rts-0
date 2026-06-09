@@ -1250,6 +1250,7 @@ function fakeAudioContext() {
     chargeHud._renderUnitCard(card, [selectedRifleman]);
     const chargeButton = renderedButtons.find((button) => button.innerHTML.includes("Charge"));
     assert(chargeButton && !chargeButton.disabled, "Charge command-card button renders enabled");
+    assert(chargeButton.dataset.hotkey === "C", "Charge command-card button uses C as its hotkey");
     chargeButton.click({ shiftKey: true });
     assert(
       sent.length === 1 &&
@@ -1272,7 +1273,7 @@ function fakeAudioContext() {
     const input = Object.create(Input.prototype);
     input.state = chargeHud.state;
     const hotkeyEv = {
-      code: "KeyZ",
+      code: "KeyC",
       shiftKey: true,
       repeat: false,
       preventDefault() {},

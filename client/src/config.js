@@ -119,6 +119,7 @@ export const ABILITIES = Object.freeze({
     label: "Charge",
     icon: "CHG",
     title: "Riflemen sprint briefly at double movement speed",
+    hotkey: "C",
     carriers: Object.freeze([KIND.RIFLEMAN]),
     targetMode: "self",
     cooldownTicks: RIFLEMAN_CHARGE_COOLDOWN_TICKS,
