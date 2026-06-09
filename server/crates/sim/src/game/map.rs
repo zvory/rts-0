@@ -19,6 +19,11 @@ use rand::seq::SliceRandom;
 use rand::SeedableRng;
 use serde::Deserialize;
 
+pub use rts_protocol::AvailableMap;
+
+/// The only map schema version this server accepts. Bump when the schema changes incompatibly.
+pub const CURRENT_MAP_VERSION: u32 = 1;
+
 const DEFAULT_MAP_JSON: &str = include_str!("../../../../assets/maps/default-handcrafted.json");
 const MAPS_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../assets/maps");
 const DEFAULT_MAP_NAME: &str = "default-handcrafted";
@@ -55,16 +60,22 @@ impl Map {
             .unwrap_or_else(|err| panic!("invalid hardcoded map asset: {err}"))
     }
 
-    /// Return the display names of all maps in `assets/maps/`. The name is read from the JSON
-    /// `name` field; the filename stem is used as a fallback. Errors (unreadable directory or
-    /// files) are silently skipped so a bad asset file can't crash the lobby.
-    pub fn list_available() -> Vec<String> {
-        let mut names: Vec<String> = Vec::new();
+    /// Return all available maps in `assets/maps/` as `(name, description)` entries. Only maps
+    /// with the current schema version are included; version mismatches are silently skipped.
+    /// Errors (unreadable directory or files) are silently skipped so a bad asset cannot crash the
+    /// lobby.
+    pub fn list_available() -> Vec<AvailableMap> {
         let Some(dir) = bundled_maps_dir() else {
-            return vec![DEFAULT_MAP_NAME.to_string()];
+            return vec![AvailableMap {
+                name: DEFAULT_MAP_NAME.to_string(),
+                description: DEFAULT_MAP_NAME.to_string(),
+            }];
         };
         let Ok(entries) = std::fs::read_dir(dir) else {
-            return vec![DEFAULT_MAP_NAME.to_string()];
+            return vec![AvailableMap {
+                name: DEFAULT_MAP_NAME.to_string(),
+                description: DEFAULT_MAP_NAME.to_string(),
+            }];
         };
         let mut paths: Vec<_> = entries
             .filter_map(|e| e.ok())
@@ -72,28 +83,45 @@ impl Map {
             .map(|e| e.path())
             .collect();
         paths.sort();
+        let mut out: Vec<AvailableMap> = Vec::new();
         for path in paths {
             let stem = path
                 .file_stem()
                 .and_then(|s| s.to_str())
                 .unwrap_or("")
                 .to_string();
-            let name = std::fs::read_to_string(&path)
-                .ok()
-                .and_then(|json| {
-                    serde_json::from_str::<serde_json::Value>(&json)
-                        .ok()
-                        .and_then(|v| v.get("name").and_then(|n| n.as_str()).map(str::to_string))
-                })
-                .unwrap_or(stem);
+            let Some(json) = std::fs::read_to_string(&path).ok() else {
+                continue;
+            };
+            let Ok(v) = serde_json::from_str::<serde_json::Value>(&json) else {
+                continue;
+            };
+            // Skip maps that do not declare the current schema version.
+            let version = v.get("version").and_then(|v| v.as_u64()).unwrap_or(0);
+            if version != CURRENT_MAP_VERSION as u64 {
+                continue;
+            }
+            let name = v
+                .get("name")
+                .and_then(|n| n.as_str())
+                .unwrap_or(&stem)
+                .to_string();
+            let description = v
+                .get("description")
+                .and_then(|d| d.as_str())
+                .unwrap_or(&name)
+                .to_string();
             if !name.is_empty() {
-                names.push(name);
+                out.push(AvailableMap { name, description });
             }
         }
-        if names.is_empty() {
-            names.push(DEFAULT_MAP_NAME.to_string());
+        if out.is_empty() {
+            out.push(AvailableMap {
+                name: DEFAULT_MAP_NAME.to_string(),
+                description: DEFAULT_MAP_NAME.to_string(),
+            });
         }
-        names
+        out
     }
 
     /// Load a map by display name (the `name` field in the JSON) for `player_count` players.
@@ -137,6 +165,12 @@ impl Map {
     fn from_authored_json(player_count: usize, json: &str, seed: u32) -> Result<Map, String> {
         let authored: AuthoredMap =
             serde_json::from_str(json).map_err(|err| format!("map JSON parse error: {err}"))?;
+        if authored.version != CURRENT_MAP_VERSION {
+            return Err(format!(
+                "map schema version {} is not supported; server requires version {CURRENT_MAP_VERSION}",
+                authored.version
+            ));
+        }
         let (size, terrain) = parse_terrain(&authored.terrain)?;
         let base_sites = parse_base_sites(size, &authored.base_sites)?;
 
@@ -255,8 +289,16 @@ fn maps_dir_candidates() -> Vec<PathBuf> {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct AuthoredMap {
+    version: u32,
     #[allow(dead_code)]
     name: String,
+    /// Human-readable text shown in the lobby map selector.
+    #[allow(dead_code)]
+    description: String,
+    /// Private invariants memo used by agents when porting a map to a new schema version.
+    #[allow(dead_code)]
+    #[serde(rename = "_design")]
+    design: String,
     terrain: Vec<String>,
     base_sites: Vec<AuthoredSite>,
 }
@@ -397,8 +439,13 @@ mod tests {
             !available.is_empty(),
             "lobby map catalog must expose at least one selectable map"
         );
-        assert!(available.contains(&"default-handcrafted".to_string()));
-        assert!(available.contains(&"no-terrain".to_string()));
+        let names: Vec<&str> = available.iter().map(|e| e.name.as_str()).collect();
+        assert!(names.contains(&"default-handcrafted"), "got: {names:?}");
+        assert!(names.contains(&"no-terrain"), "got: {names:?}");
+        // Every entry must have a non-empty description.
+        for entry in &available {
+            assert!(!entry.description.is_empty(), "missing description on {}", entry.name);
+        }
 
         let map = Map::load("default-handcrafted", 2, 0x1234_5678)
             .expect("default handcrafted map should load from bundled assets");
@@ -498,11 +545,33 @@ mod tests {
     }
 
     #[test]
+    fn authored_map_rejects_wrong_version() {
+        let err = Map::from_authored_json(
+            1,
+            r#"{
+              "version": 99,
+              "name": "future",
+              "description": "a future map",
+              "_design": "n/a",
+              "terrain": [".."],
+              "baseSites": [{"x": 0, "y": 0}, {"x": 1, "y": 0}]
+            }"#,
+            0,
+        )
+        .expect_err("wrong version should be rejected");
+
+        assert!(err.contains("not supported"), "error was: {err}");
+    }
+
+    #[test]
     fn authored_map_rejects_unknown_terrain_characters() {
         let err = Map::from_authored_json(
             1,
             r#"{
+              "version": 1,
               "name": "bad",
+              "description": "bad map",
+              "_design": "n/a",
               "terrain": ["..", ".x"],
               "baseSites": [{"x": 0, "y": 0}]
             }"#,
@@ -521,7 +590,10 @@ mod tests {
         rows[8].replace_range(8..9, "#");
         let json = format!(
             r#"{{
+              "version": 1,
               "name": "bad-base",
+              "description": "bad base map",
+              "_design": "n/a",
               "terrain": {},
               "baseSites": [{{"x": 8, "y": 8}}, {{"x": 24, "y": 24}}]
             }}"#,

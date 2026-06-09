@@ -1,4 +1,8 @@
 {
+  "version": 1,
+  "name": "no-terrain",
+  "description": "Open flat map with no terrain obstacles. For testing and practice.",
+  "_design": "All tiles are grass. Same 4-pair base layout as default-handcrafted. No terrain features \u2014 all unit interaction is unimpeded. Used primarily for balance testing and AI benchmarking.",
   "baseSites": [
     {
       "x": 25,
@@ -33,7 +37,6 @@
       "y": 62
     }
   ],
-  "name": "no-terrain",
   "terrain": [
     "..............................................................................................................................",
     "..............................................................................................................................",
