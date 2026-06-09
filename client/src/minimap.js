@@ -50,7 +50,7 @@ export class Minimap {
    * @param {import("./fog.js").Fog} fog the local fog overlay grids.
    * @param {import("./net.js").Net} net network seam for right-click move orders.
    */
-  constructor(canvasEl, state, camera, fog, net, inputRouter = null) {
+  constructor(canvasEl, state, camera, fog, net, inputRouter = null, options = {}) {
     this.canvas = canvasEl;
     this.ctx = canvasEl.getContext("2d");
     this.state = state;
@@ -58,6 +58,7 @@ export class Minimap {
     this.fog = fog;
     this.net = net;
     this.inputRouter = inputRouter;
+    this.commandsEnabled = options.commandsEnabled !== false;
     this._unregisterInputZone = null;
 
     this.size = canvasEl.width; // assumed square (220 per index.html)
@@ -407,6 +408,7 @@ export class Minimap {
       // Right-click: issue a context-sensitive order for the currently selected own units.
       ev.originalEvent?.preventDefault();
       ev.originalEvent?.stopPropagation();
+      if (!this.commandsEnabled) return true;
       this._issueOrder(w.x, w.y, !!ev.shiftKey);
       return true;
     } else if (ev.button === 0) {

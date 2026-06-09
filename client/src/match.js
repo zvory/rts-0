@@ -12,9 +12,10 @@ import { automaticPointerLockDisabledForTests, shouldRequestPointerLock } from "
 import { DomClickInputZone, MatchInputRouter } from "./input/router.js";
 import { Minimap } from "./minimap.js";
 import { Renderer } from "./renderer/index.js";
+import { ReplayCameraInput } from "./replay_camera_input.js";
 import { GameState } from "./state.js";
 import { INTERP_DELAY_MS, SNAPSHOT_MS } from "./config.js";
-import { EVENT, KIND, NOTICE_SEVERITY, S } from "./protocol.js";
+import { EVENT, KIND, NOTICE_SEVERITY, REPLAY_VISION, S } from "./protocol.js";
 import {
   UNDER_ATTACK_ID,
   VIEWPORT_ALERT_MARGIN_PX,
@@ -68,16 +69,19 @@ export class Match {
    * @param {object} payload §2.3 start payload
    * @param {(msg: string) => void} toast surface a notice in the App's toast
    */
-  constructor(net, payload, toast, devWatch, audio, statusBadge, diagnostics = null) {
+  constructor(net, payload, toast, devWatch, audio, statusBadge, diagnostics = null, options = {}) {
     this.net = net;
     this.toast = toast;
     this.devWatch = devWatch;
     this.audio = audio;
     this.statusBadge = statusBadge;
     this.diagnostics = diagnostics;
+    this.replayViewer = !!options.replayViewer;
     this.missingCombatSoundKinds = new Set();
     this.activeMachineGunSoundKeys = new Map();
     this.replaySpeedHandler = null;
+    this.replayVisionSelection = new Set();
+    this.replayState = null;
     this.giveUpSent = false;
     this.matchPingTimer = undefined;
     this.lastLatencySampleAt = 0;
@@ -124,20 +128,24 @@ export class Match {
     this.unregisterHudInputZone = this.inputRouter.registerZone(this.hudInputZone);
     this.minimap = this._timeInit(
       "match.minimap",
-      () => new Minimap(dom.minimap, this.state, this.camera, this.fog, this.net, this.inputRouter),
+      () => new Minimap(dom.minimap, this.state, this.camera, this.fog, this.net, this.inputRouter, {
+        commandsEnabled: !this.replayViewer,
+      }),
     );
     this.input = this._timeInit(
       "match.input",
-      () => new Input(
-        dom.viewport,
-        this.camera,
-        this.state,
-        this.net,
-        this.renderer,
-        this.fog,
-        this.audio,
-        this.inputRouter,
-      ),
+      () => this.replayViewer
+        ? new ReplayCameraInput(dom.viewport)
+        : new Input(
+          dom.viewport,
+          this.camera,
+          this.state,
+          this.net,
+          this.renderer,
+          this.fog,
+          this.audio,
+          this.inputRouter,
+        ),
     );
 
     // Draw the static terrain once into the renderer's cached layer.
@@ -179,22 +187,28 @@ export class Match {
     this.onPointerLockToggle = this.togglePointerLock.bind(this);
     this.onPointerLockChange = this.handlePointerLockChange.bind(this);
     this.onPointerLockError = this.handlePointerLockError.bind(this);
-    this.input.onPointerLockChange = this.onPointerLockChange;
-    this.input.onPointerLockError = this.onPointerLockError;
+    if (!this.replayViewer) {
+      this.input.onPointerLockChange = this.onPointerLockChange;
+      this.input.onPointerLockError = this.onPointerLockError;
+    }
     this.net.on(S.SNAPSHOT, this.onSnapshot);
     this.net.on(S.REPLAY_STATE, this.onReplayState);
     window.addEventListener("resize", this.onResize);
     window.addEventListener("focus", this.onWindowFocus);
     window.addEventListener("keydown", this.onMenuKeyDown, true);
-    window.addEventListener("keydown", this.onPointerLockGesture, true);
-    window.addEventListener("click", this.onPointerLockGesture, true);
+    if (!this.replayViewer) {
+      window.addEventListener("keydown", this.onPointerLockGesture, true);
+      window.addEventListener("click", this.onPointerLockGesture, true);
+    }
     document.addEventListener("visibilitychange", this.onVisibilityChange);
     dom.settingsButton?.addEventListener("click", this.onSettingsClick);
     dom.debugPathToggle?.addEventListener("click", this.onDebugPathToggle);
-    dom.pointerLockToggle?.addEventListener("click", this.onPointerLockToggle);
-    dom.giveUpOpen?.addEventListener("click", this.onGiveUpOpen);
-    dom.giveUpCancel?.addEventListener("click", this.onGiveUpCancel);
-    dom.giveUpConfirmButton?.addEventListener("click", this.onGiveUpConfirm);
+    if (!this.replayViewer) {
+      dom.pointerLockToggle?.addEventListener("click", this.onPointerLockToggle);
+      dom.giveUpOpen?.addEventListener("click", this.onGiveUpOpen);
+      dom.giveUpCancel?.addEventListener("click", this.onGiveUpCancel);
+      dom.giveUpConfirmButton?.addEventListener("click", this.onGiveUpConfirm);
+    }
     this.syncDebugPathUi();
     this.syncPointerLockUi();
 
@@ -208,6 +222,7 @@ export class Match {
     const isScenario = this.devWatch?.kind === "scenario";
     if ((isReplay || isScenario) && dom.replaySpeed) {
       dom.replaySpeed.hidden = false;
+      dom.replaySpeed.classList.toggle("replay-viewer-controls", this.replayViewer);
       for (const btn of dom.replaySpeed.querySelectorAll(".seek-btn")) {
         btn.hidden = isScenario;
       }
@@ -225,11 +240,11 @@ export class Match {
         const speed = parseFloat(btn.dataset.speed);
         if (!isFinite(speed)) return;
         this.net.setReplaySpeed(speed);
-        for (const b of dom.replaySpeed.querySelectorAll(".spd-btn:not(.seek-btn)")) {
-          b.classList.toggle("active", b === btn);
-        }
+        this.setReplaySpeedActive(speed);
       };
       dom.replaySpeed.addEventListener("click", this.replaySpeedHandler);
+      this.setReplaySpeedActive(this.replayViewer ? 2 : null);
+      if (this.replayViewer) this.buildReplayVisionControls();
     }
     this.applySpectatorUi();
   }
@@ -301,9 +316,11 @@ export class Match {
   }
 
   applySpectatorUi() {
-    const spectator = !!this.state?.spectator;
+    const spectator = !!this.state?.spectator || this.replayViewer;
     if (dom.giveUpOpen) dom.giveUpOpen.hidden = spectator;
     if (dom.commandCard) dom.commandCard.hidden = spectator;
+    if (dom.giveUpConfirm) dom.giveUpConfirm.hidden = true;
+    if (dom.pointerLockToggle && this.replayViewer) dom.pointerLockToggle.hidden = true;
   }
 
   handleMenuKeyDown(ev) {
@@ -521,6 +538,10 @@ export class Match {
   syncPointerLockUi() {
     const btn = dom.pointerLockToggle;
     if (!btn || !this.input) return;
+    if (this.replayViewer) {
+      btn.hidden = true;
+      return;
+    }
     btn.hidden = false;
     const supported = this.input.pointerLockSupported();
     const locked = this.input.pointerLocked;
@@ -810,6 +831,7 @@ export class Match {
   }
 
   applyReplayState(state) {
+    this.replayState = state || null;
     const ended =
       state?.ended === true ||
       (Number.isFinite(state?.currentTick) &&
@@ -817,11 +839,117 @@ export class Match {
         state.durationTicks > 0 &&
         state.currentTick >= state.durationTicks);
     this.setReplayConcluded(ended);
+    if (Number.isFinite(state?.speed)) this.setReplaySpeedActive(state.speed);
+    this.updateReplayStatus();
   }
 
   setReplayConcluded(concluded) {
     const status = dom.replaySpeed?.querySelector("#replay-concluded");
     if (status) status.hidden = !concluded;
+  }
+
+  setReplaySpeedActive(speed) {
+    if (!dom.replaySpeed) return;
+    for (const btn of dom.replaySpeed.querySelectorAll(".spd-btn:not(.seek-btn)")) {
+      const btnSpeed = parseFloat(btn.dataset.speed);
+      btn.classList.toggle(
+        "active",
+        Number.isFinite(speed) && Number.isFinite(btnSpeed) && Math.abs(btnSpeed - speed) < 0.001,
+      );
+    }
+  }
+
+  buildReplayVisionControls() {
+    if (!dom.replaySpeed || dom.replaySpeed.querySelector(".replay-vision-controls")) return;
+
+    const group = document.createElement("div");
+    group.className = "replay-vision-controls";
+    group.setAttribute("role", "group");
+    group.setAttribute("aria-label", "Replay fog perspective");
+
+    const all = document.createElement("button");
+    all.type = "button";
+    all.className = "spd-btn vision-btn active";
+    all.dataset.vision = "all";
+    all.textContent = "All vision";
+    all.title = "Show the union of all players' replay vision.";
+    group.appendChild(all);
+
+    for (const player of this.state.players) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "spd-btn vision-btn";
+      btn.dataset.playerId = String(player.id);
+      btn.textContent = player.name || `P${player.id}`;
+      btn.title = "Click for this player. Shift-click to combine players.";
+      btn.style.setProperty("--player-color", player.color || "#aaa");
+      group.appendChild(btn);
+    }
+
+    group.addEventListener("click", (ev) => this.onReplayVisionClick(ev));
+    dom.replaySpeed.appendChild(group);
+
+    const status = document.createElement("span");
+    status.className = "replay-status replay-tick-status";
+    status.textContent = "Replay 0 / 0";
+    dom.replaySpeed.appendChild(status);
+  }
+
+  onReplayVisionClick(ev) {
+    const btn = ev.target.closest(".vision-btn");
+    if (!btn) return;
+    if (btn.dataset.vision === "all") {
+      this.replayVisionSelection.clear();
+      this.net.setReplayVision({ mode: REPLAY_VISION.ALL });
+      this.syncReplayVisionButtons();
+      return;
+    }
+
+    const id = Number(btn.dataset.playerId);
+    if (!Number.isFinite(id)) return;
+    if (ev.shiftKey || ev.metaKey || ev.ctrlKey) {
+      if (this.replayVisionSelection.has(id)) this.replayVisionSelection.delete(id);
+      else this.replayVisionSelection.add(id);
+    } else {
+      this.replayVisionSelection.clear();
+      this.replayVisionSelection.add(id);
+    }
+    if (this.replayVisionSelection.size === 0) {
+      this.net.setReplayVision({ mode: REPLAY_VISION.ALL });
+    } else if (this.replayVisionSelection.size === 1) {
+      this.net.setReplayVision({
+        mode: REPLAY_VISION.PLAYER,
+        playerId: [...this.replayVisionSelection][0],
+      });
+    } else {
+      this.net.setReplayVision({
+        mode: REPLAY_VISION.PLAYERS,
+        playerIds: [...this.replayVisionSelection].sort((a, b) => a - b),
+      });
+    }
+    this.syncReplayVisionButtons();
+  }
+
+  syncReplayVisionButtons() {
+    if (!dom.replaySpeed) return;
+    const allActive = this.replayVisionSelection.size === 0;
+    for (const btn of dom.replaySpeed.querySelectorAll(".vision-btn")) {
+      if (btn.dataset.vision === "all") {
+        btn.classList.toggle("active", allActive);
+        continue;
+      }
+      const id = Number(btn.dataset.playerId);
+      btn.classList.toggle("active", this.replayVisionSelection.has(id));
+    }
+  }
+
+  updateReplayStatus() {
+    const status = dom.replaySpeed?.querySelector(".replay-tick-status");
+    if (!status) return;
+    const current = Number.isFinite(this.replayState?.currentTick) ? this.replayState.currentTick : 0;
+    const duration = Number.isFinite(this.replayState?.durationTicks) ? this.replayState.durationTicks : 0;
+    const speed = Number.isFinite(this.replayState?.speed) ? this.replayState.speed : 2;
+    status.textContent = `Replay ${current} / ${duration} @ ${speed}x`;
   }
 
   /**
@@ -839,15 +967,19 @@ export class Match {
     window.removeEventListener("resize", this.onResize);
     window.removeEventListener("focus", this.onWindowFocus);
     window.removeEventListener("keydown", this.onMenuKeyDown, true);
-    window.removeEventListener("keydown", this.onPointerLockGesture, true);
-    window.removeEventListener("click", this.onPointerLockGesture, true);
+    if (!this.replayViewer) {
+      window.removeEventListener("keydown", this.onPointerLockGesture, true);
+      window.removeEventListener("click", this.onPointerLockGesture, true);
+    }
     document.removeEventListener("visibilitychange", this.onVisibilityChange);
     dom.settingsButton?.removeEventListener("click", this.onSettingsClick);
     dom.debugPathToggle?.removeEventListener("click", this.onDebugPathToggle);
-    dom.pointerLockToggle?.removeEventListener("click", this.onPointerLockToggle);
-    dom.giveUpOpen?.removeEventListener("click", this.onGiveUpOpen);
-    dom.giveUpCancel?.removeEventListener("click", this.onGiveUpCancel);
-    dom.giveUpConfirmButton?.removeEventListener("click", this.onGiveUpConfirm);
+    if (!this.replayViewer) {
+      dom.pointerLockToggle?.removeEventListener("click", this.onPointerLockToggle);
+      dom.giveUpOpen?.removeEventListener("click", this.onGiveUpOpen);
+      dom.giveUpCancel?.removeEventListener("click", this.onGiveUpCancel);
+      dom.giveUpConfirmButton?.removeEventListener("click", this.onGiveUpConfirm);
+    }
     if (dom.replaySpeed) {
       if (this.replaySpeedHandler) {
         dom.replaySpeed.removeEventListener("click", this.replaySpeedHandler);
@@ -855,6 +987,9 @@ export class Match {
       dom.replaySpeed.hidden = true;
       this.setReplayConcluded(false);
       for (const btn of dom.replaySpeed.querySelectorAll(".seek-btn")) btn.hidden = false;
+      dom.replaySpeed.classList.remove("replay-viewer-controls");
+      dom.replaySpeed.querySelector(".replay-vision-controls")?.remove();
+      dom.replaySpeed.querySelector(".replay-tick-status")?.remove();
     }
     if (dom.giveUpOpen) dom.giveUpOpen.hidden = false;
     if (dom.commandCard) dom.commandCard.hidden = false;

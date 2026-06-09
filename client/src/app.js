@@ -25,6 +25,7 @@ import {
 } from "./bootstrap.js";
 import { Match } from "./match.js";
 import { MatchHistory } from "./match_history.js";
+import { ReplayViewer } from "./replay_viewer.js";
 import { StatusBadge } from "./status_badge.js";
 
 /**
@@ -173,7 +174,7 @@ export class App {
       players: payload?.players?.length,
       spectator: payload?.spectator,
     });
-    const startsReplay = !!payload?.replay;
+    const startsReplay = !!payload?.replay || this.devWatch?.kind === "replay";
     const preserveScorePanel = startsReplay && !dom.gameOver.hidden;
 
     // If a previous match somehow lingers, tear it down first.
@@ -188,7 +189,8 @@ export class App {
       this.clearScoreboard();
     }
 
-    this.match = new Match(
+    const MatchClass = startsReplay ? ReplayViewer : Match;
+    this.match = new MatchClass(
       this.net,
       payload,
       (msg) => this.showToast(msg),

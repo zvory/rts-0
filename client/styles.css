@@ -1371,7 +1371,14 @@ input[type="text"]:focus {
   transform: translateX(-50%);
   z-index: 30;
   display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: center;
   gap: 4px;
+  max-width: calc(100vw - 24px);
+}
+#replay-speed.replay-viewer-controls {
+  bottom: 14px;
 }
 .spd-btn {
   appearance: none;
@@ -1405,6 +1412,31 @@ input[type="text"]:focus {
 }
 .seek-btn {
   color: var(--ink);
+}
+.replay-vision-controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 4px;
+  padding-left: 8px;
+  border-left: 1px solid var(--panel-edge);
+}
+.vision-btn {
+  position: relative;
+}
+.vision-btn[data-player-id] {
+  padding-left: 18px;
+}
+.vision-btn[data-player-id]::before {
+  content: "";
+  position: absolute;
+  left: 7px;
+  top: 50%;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--player-color, #aaa);
+  transform: translateY(-50%);
 }
 .replay-status {
   align-self: center;
