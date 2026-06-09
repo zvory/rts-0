@@ -202,8 +202,16 @@ impl Db {
         let limit = limit.clamp(1, 100);
         let rows = sqlx::query(
             r#"
-            select matches.id as id, started_at, ended_at, duration_ms, map_name,
-                   winner_name, outcome, participants, score_screen, local_only,
+            select matches.id as id,
+                   matches.started_at as started_at,
+                   matches.ended_at as ended_at,
+                   matches.duration_ms as duration_ms,
+                   matches.map_name as map_name,
+                   matches.winner_name as winner_name,
+                   matches.outcome as outcome,
+                   matches.participants as participants,
+                   matches.score_screen as score_screen,
+                   matches.local_only as local_only,
                    r.artifact_schema_version as replay_artifact_schema_version,
                    r.build_sha as replay_build_sha,
                    r.map_name as replay_map_name,
@@ -211,7 +219,7 @@ impl Db {
                    r.map_hash as replay_map_hash
             from matches
             left join match_replays r on r.match_id = matches.id
-            where ($2 or not local_only)
+            where ($2 or not matches.local_only)
               and (
                 $2
                 or (
@@ -224,7 +232,7 @@ impl Db {
                   and not (participants @> array['Alpha', 'Bravo']::text[])
                 )
               )
-            order by started_at desc
+            order by matches.started_at desc
             limit $1
             "#,
         )
