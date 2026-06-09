@@ -17,12 +17,12 @@
 
 use std::collections::{HashMap, HashSet};
 use std::fs;
-use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::sync::Mutex as StdMutex;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use tokio::sync::{mpsc, Mutex, Notify};
+use tokio::sync::{mpsc, watch, Mutex, Notify};
 use tokio::time::{interval, MissedTickBehavior};
 use tracing::{debug, error, info, warn};
 
@@ -114,6 +114,87 @@ pub enum RoomEvent {
     SeekReplay { ticks_back: u32 },
     /// Host selects a map by name (lobby phase only; honored only from the host).
     SelectMap { player_id: u32, map: String },
+    /// Process shutdown has begun. Rooms stay alive, but lobby clients should see that starting
+    /// another match is disabled while currently-running matches drain.
+    DrainStarted,
+}
+
+#[derive(Clone)]
+pub(super) struct DrainHandle {
+    inner: Arc<DrainState>,
+}
+
+struct DrainState {
+    draining: AtomicBool,
+    active_matches: AtomicUsize,
+    active_matches_tx: watch::Sender<usize>,
+    connection_shutdown_tx: watch::Sender<bool>,
+}
+
+impl Default for DrainHandle {
+    fn default() -> Self {
+        let (active_matches_tx, _active_matches_rx) = watch::channel(0);
+        let (connection_shutdown_tx, _connection_shutdown_rx) = watch::channel(false);
+        Self {
+            inner: Arc::new(DrainState {
+                draining: AtomicBool::new(false),
+                active_matches: AtomicUsize::new(0),
+                active_matches_tx,
+                connection_shutdown_tx,
+            }),
+        }
+    }
+}
+
+impl DrainHandle {
+    fn begin_draining(&self) {
+        self.inner.draining.store(true, Ordering::SeqCst);
+    }
+
+    pub(super) fn is_draining(&self) -> bool {
+        self.inner.draining.load(Ordering::SeqCst)
+    }
+
+    fn active_matches(&self) -> usize {
+        self.inner.active_matches.load(Ordering::SeqCst)
+    }
+
+    pub(super) fn match_started(&self) {
+        let count = self.inner.active_matches.fetch_add(1, Ordering::SeqCst) + 1;
+        self.inner.active_matches_tx.send_replace(count);
+    }
+
+    pub(super) fn match_finished(&self) {
+        let count = self
+            .inner
+            .active_matches
+            .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |current| {
+                Some(current.saturating_sub(1))
+            })
+            .map(|previous| previous.saturating_sub(1))
+            .unwrap_or(0);
+        self.inner.active_matches_tx.send_replace(count);
+    }
+
+    async fn wait_for_matches_to_drain(&self) {
+        let mut active_matches_rx = self.inner.active_matches_tx.subscribe();
+        loop {
+            if *active_matches_rx.borrow_and_update() == 0 {
+                return;
+            }
+            if active_matches_rx.changed().await.is_err() {
+                return;
+            }
+        }
+    }
+
+    fn request_connection_shutdown(&self) {
+        self.inner.connection_shutdown_tx.send_replace(true);
+    }
+
+    pub(super) fn subscribe_connection_shutdown(&self) -> watch::Receiver<bool> {
+        self.inner.connection_shutdown_tx.subscribe()
+    }
 }
 
 /// Handle the lobby keeps for each live room: just the channel into its task.
@@ -128,6 +209,7 @@ pub struct Lobby {
     rooms: Arc<Mutex<HashMap<String, RoomHandle>>>,
     db: Option<Arc<Db>>,
     match_history_local_only: bool,
+    drain: DrainHandle,
 }
 
 impl Lobby {
@@ -136,6 +218,7 @@ impl Lobby {
             rooms: Arc::new(Mutex::new(HashMap::new())),
             db: None,
             match_history_local_only: false,
+            drain: DrainHandle::default(),
         }
     }
 
@@ -171,13 +254,41 @@ impl Lobby {
         let mode = room_mode_for(&name);
         let db = self.db.clone();
         let match_history_local_only = self.match_history_local_only;
+        let drain = self.drain.clone();
         tokio::spawn(async move {
-            let mut task = RoomTask::new(name.clone(), mode, db, match_history_local_only);
+            let mut task = RoomTask::new(name.clone(), mode, db, match_history_local_only, drain);
             task.run(event_rx).await;
             info!(room = %name, "room task exited");
         });
         info!(room = %room, "room created");
         handle
+    }
+
+    pub async fn begin_draining(&self) {
+        self.drain.begin_draining();
+        let handles: Vec<RoomHandle> = {
+            let rooms = self.rooms.lock().await;
+            rooms.values().cloned().collect()
+        };
+        for handle in handles {
+            let _ = handle.event_tx.try_send(RoomEvent::DrainStarted);
+        }
+    }
+
+    pub fn active_match_count(&self) -> usize {
+        self.drain.active_matches()
+    }
+
+    pub async fn wait_for_matches_to_drain(&self) {
+        self.drain.wait_for_matches_to_drain().await;
+    }
+
+    pub fn request_connection_shutdown(&self) {
+        self.drain.request_connection_shutdown();
+    }
+
+    pub fn subscribe_connection_shutdown(&self) -> watch::Receiver<bool> {
+        self.drain.subscribe_connection_shutdown()
     }
 }
 

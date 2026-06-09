@@ -58,6 +58,11 @@ fn env_truthy(key: &str) -> bool {
 /// (or a stuck never-ready client) is dropped instead of wedging a shared room forever.
 const IDLE_TIMEOUT: Duration = Duration::from_secs(40);
 
+/// On deploy shutdown, keep the process alive long enough for in-progress matches to finish.
+/// Fly's `kill_timeout` is configured to the same duration so the platform's hard stop matches
+/// the app-level drain deadline.
+const DEPLOY_DRAIN_TIMEOUT: Duration = Duration::from_secs(10 * 60);
+
 /// Shared application state handed to every request via axum's `State` extractor.
 #[derive(Clone)]
 struct AppState {
@@ -109,6 +114,7 @@ async fn main() {
         maps_dir: maps_dir.clone(),
         db,
     };
+    let shutdown_lobby = state.lobby.clone();
     // Static files for everything except `/ws`; unknown paths fall back to `index.html` so the
     // single-page client loads regardless of the requested path.
     let static_service =
@@ -146,10 +152,68 @@ async fn main() {
         listener,
         app.into_make_service_with_connect_info::<SocketAddr>(),
     )
+    .with_graceful_shutdown(shutdown_signal(shutdown_lobby))
     .await
     {
         tracing::error!(%err, "server error");
     }
+}
+
+async fn shutdown_signal(lobby: Lobby) {
+    let ctrl_c = async {
+        if let Err(err) = tokio::signal::ctrl_c().await {
+            warn!(%err, "failed to install Ctrl-C shutdown handler");
+            std::future::pending::<()>().await;
+        }
+    };
+
+    #[cfg(unix)]
+    let terminate = async {
+        match tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()) {
+            Ok(mut signal) => {
+                signal.recv().await;
+            }
+            Err(err) => {
+                warn!(%err, "failed to install SIGTERM shutdown handler");
+                std::future::pending::<()>().await;
+            }
+        }
+    };
+
+    #[cfg(not(unix))]
+    let terminate = std::future::pending::<()>();
+
+    tokio::select! {
+        _ = ctrl_c => info!("shutdown requested by Ctrl-C"),
+        _ = terminate => info!("shutdown requested by SIGTERM"),
+    }
+
+    lobby.begin_draining().await;
+    let active_matches = lobby.active_match_count();
+    if active_matches == 0 {
+        info!("shutdown drain complete; no active matches");
+        lobby.request_connection_shutdown();
+        return;
+    }
+
+    info!(
+        active_matches,
+        timeout_secs = DEPLOY_DRAIN_TIMEOUT.as_secs(),
+        "shutdown drain started; waiting for active matches"
+    );
+    tokio::select! {
+        _ = lobby.wait_for_matches_to_drain() => {
+            info!("shutdown drain complete; all matches finished");
+        }
+        _ = tokio::time::sleep(DEPLOY_DRAIN_TIMEOUT) => {
+            warn!(
+                active_matches = lobby.active_match_count(),
+                timeout_secs = DEPLOY_DRAIN_TIMEOUT.as_secs(),
+                "shutdown drain deadline reached; continuing shutdown"
+            );
+        }
+    }
+    lobby.request_connection_shutdown();
 }
 
 /// Axum handler for `GET /ws`: perform the WebSocket upgrade and hand the socket to a task.
@@ -635,11 +699,19 @@ async fn handle_connection(socket: WebSocket, lobby: Lobby) {
 
     // The room this connection has joined, if any. A client must `join` before other actions.
     let mut current_room: Option<lobby::RoomHandle> = None;
+    let mut shutdown_rx = lobby.subscribe_connection_shutdown();
 
     loop {
         // Bound the read so a silent/half-open client is evicted rather than parked forever. The
         // post-loop code emits `Leave`, which cleans up membership and (mid-match) eliminates them.
-        let next = match tokio::time::timeout(IDLE_TIMEOUT, stream.next()).await {
+        let next = tokio::select! {
+            _ = wait_for_connection_shutdown(&mut shutdown_rx) => {
+                debug!(player_id, "server shutdown; closing connection");
+                break;
+            }
+            next = tokio::time::timeout(IDLE_TIMEOUT, stream.next()) => next,
+        };
+        let next = match next {
             Ok(next) => next,
             Err(_) => {
                 debug!(player_id, "idle timeout; closing");
@@ -697,6 +769,17 @@ async fn handle_connection(socket: WebSocket, lobby: Lobby) {
     debug!(player_id, "connection closed");
 }
 
+async fn wait_for_connection_shutdown(shutdown_rx: &mut tokio::sync::watch::Receiver<bool>) {
+    loop {
+        if *shutdown_rx.borrow_and_update() {
+            return;
+        }
+        if shutdown_rx.changed().await.is_err() {
+            return;
+        }
+    }
+}
+
 async fn send_server_message(
     player_id: u32,
     sink: &mut futures_util::stream::SplitSink<WebSocket, Message>,
@@ -710,6 +793,8 @@ async fn send_server_message(
         ServerMessage::Error { .. } => "error",
         ServerMessage::GameOver { .. } => "game_over",
         ServerMessage::Pong { .. } => "pong",
+        #[allow(unreachable_patterns)]
+        _ => "other",
     };
     let serialize_start = Instant::now();
     let encoded = match msg {
@@ -894,6 +979,10 @@ async fn handle_client_message(
                 RoomEvent::SelectMap { player_id, map },
             )
             .await;
+        }
+        #[allow(unreachable_patterns)]
+        _ => {
+            debug!(player_id, "ignoring unsupported client message");
         }
     }
 }
