@@ -1,8 +1,8 @@
 {
   "version": 1,
   "name": "safe-bases",
-  "description": "4-player map with well-protected base positions at the corners.",
-  "_design": "Bases are placed in the corners with wide clear areas. Natural expansions are closer to center. Intended to create longer, more deliberate games with clear defensive positioning.",
+  "description": "inbase naturals.",
+  "_design": "Standard map, except natural expansions are placed near mains.",
   "terrain": [
     "........................................................~~~~~~~~~~~~~~~~~~~~~.................................................",
     "........................................................~~~~~~~~~~~~~~~~~~~~~.................................................",

@@ -444,7 +444,11 @@ mod tests {
         assert!(names.contains(&"no-terrain"), "got: {names:?}");
         // Every entry must have a non-empty description.
         for entry in &available {
-            assert!(!entry.description.is_empty(), "missing description on {}", entry.name);
+            assert!(
+                !entry.description.is_empty(),
+                "missing description on {}",
+                entry.name
+            );
         }
 
         let map = Map::load("default-handcrafted", 2, 0x1234_5678)

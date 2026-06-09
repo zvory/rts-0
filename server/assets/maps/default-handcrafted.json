@@ -2,7 +2,7 @@
   "version": 1,
   "name": "default-handcrafted",
   "description": "4-player symmetrical map with a central lake. Standard competitive layout.",
-  "_design": "4 base pairs in rotational symmetry around a central water feature. Each main has a close natural expansion. The lake forces flanking routes and creates a contested mid. Base protection radii are clear of water and rock.",
+  "_design": "4 base pairs. Each base has a main entrance and two smaller backdoor entrances. Expansions are near the middle of the map and open to attack.",
   "terrain": [
     "........................................................~~~~~~~~~~~~~~~~~~~~~.................................................",
     "........................................................~~~~~~~~~~~~~~~~~~~~~.................................................",
