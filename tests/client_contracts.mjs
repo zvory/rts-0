@@ -1314,15 +1314,7 @@ function fakeAudioContext() {
     const setupButton = renderedButtons.find((button) => button.innerHTML.includes("Set Up"));
     const tearDownButton = renderedButtons.find((button) => button.innerHTML.includes("Tear Down"));
     assert(setupButton?.dataset.hotkey, "AT gun Set Up button should keep its command-card hotkey");
-    assert(tearDownButton && !tearDownButton.dataset.hotkey, "AT gun Tear Down button should not expose a hotkey");
-    assert(!tearDownButton.innerHTML.includes("cmd-hotkey"), "AT gun Tear Down button should not render a hotkey hint");
-    tearDownButton.click();
-    assert(
-      sent.length === 1 &&
-        sent[0].c === "tearDownAtGuns" &&
-        sent[0].units.join(",") === "88",
-      "clicking AT gun Tear Down should still send a teardown command",
-    );
+    assert(!tearDownButton, "AT gun Tear Down should not occupy a command-card slot");
   } finally {
     if (priorDocument === undefined) delete globalThis.document;
     else globalThis.document = priorDocument;

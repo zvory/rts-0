@@ -756,20 +756,6 @@ export class HUD {
             onClick: () => this.state.beginCommandTarget("setupAtGuns"),
           });
         }
-        const tearDownSlot = claimSlot(null);
-        if (tearDownSlot >= 0) {
-          slots[tearDownSlot] = this._cmdButton({
-            icon: "TD",
-            label: "Tear Down",
-            title: "Pack up selected AT guns",
-            enabled: true,
-            cls: "",
-            onClick: () => {
-              this.net.command(cmd.tearDownAtGuns(atGunIds));
-              this.state.endCommandTarget();
-            },
-          });
-        }
       }
 
       for (let i = 0; i < 9; i++) {
