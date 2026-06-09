@@ -25,6 +25,8 @@ pub struct MatchRecord {
     pub participants: Vec<String>,
     /// Full PlayerScore[] from `Game::scores()`, opaque JSON to the DB.
     pub score_screen: serde_json::Value,
+    /// True for developer-local rows that should only be visible from localhost requests.
+    pub local_only: bool,
 }
 
 impl MatchRecord {
@@ -55,6 +57,8 @@ pub struct MatchSummary {
     pub participants: Vec<String>,
     #[serde(rename = "scoreScreen")]
     pub score_screen: serde_json::Value,
+    #[serde(rename = "localOnly")]
+    pub local_only: bool,
 }
 
 #[derive(Clone)]
@@ -85,8 +89,8 @@ impl Db {
             r#"
             insert into matches
                 (started_at, ended_at, duration_ms, map_name,
-                 winner_name, outcome, participants, score_screen)
-            values ($1, $2, $3, $4, $5, $6, $7, $8)
+                 winner_name, outcome, participants, score_screen, local_only)
+            values ($1, $2, $3, $4, $5, $6, $7, $8, $9)
             "#,
         )
         .bind(rec.started_at)
@@ -97,28 +101,37 @@ impl Db {
         .bind(outcome)
         .bind(&rec.participants)
         .bind(&rec.score_screen)
+        .bind(rec.local_only)
         .execute(&self.pool)
         .await;
 
         match result {
-            Ok(_) => info!(map = %rec.map_name, outcome, "match recorded"),
+            Ok(_) => {
+                info!(map = %rec.map_name, outcome, local_only = rec.local_only, "match recorded")
+            }
             Err(err) => error!(%err, map = %rec.map_name, "failed to record match"),
         }
     }
 
     /// Return the most recent matches in newest-first order. `limit` is clamped to [1, 100].
-    pub async fn recent_matches(&self, limit: i64) -> Result<Vec<MatchSummary>, sqlx::Error> {
+    pub async fn recent_matches(
+        &self,
+        limit: i64,
+        include_local: bool,
+    ) -> Result<Vec<MatchSummary>, sqlx::Error> {
         let limit = limit.clamp(1, 100);
         let rows = sqlx::query(
             r#"
             select id, started_at, ended_at, duration_ms, map_name,
-                   winner_name, outcome, participants, score_screen
+                   winner_name, outcome, participants, score_screen, local_only
             from matches
+            where ($2 or not local_only)
             order by started_at desc
             limit $1
             "#,
         )
         .bind(limit)
+        .bind(include_local)
         .fetch_all(&self.pool)
         .await?;
 
@@ -137,6 +150,7 @@ fn row_to_summary(row: PgRow) -> MatchSummary {
         outcome: row.get("outcome"),
         participants: row.get("participants"),
         score_screen: row.get("score_screen"),
+        local_only: row.get("local_only"),
     }
 }
 

@@ -131,7 +131,7 @@ fn connection_sink_keeps_newest_resource_delta_for_same_node() {
 
 #[test]
 fn joining_after_earlier_player_leaves_reuses_open_color() {
-    let mut task = RoomTask::new("r".to_string(), RoomMode::Normal, None);
+    let mut task = RoomTask::new("r".to_string(), RoomMode::Normal, None, false);
 
     join_test_player(&mut task, 1);
     join_test_player(&mut task, 2);
@@ -150,11 +150,12 @@ fn joining_after_earlier_player_leaves_reuses_open_color() {
 
 #[test]
 fn replay_rooms_default_to_1_5x_speed() {
-    let normal = RoomTask::new("r".to_string(), RoomMode::Normal, None);
+    let normal = RoomTask::new("r".to_string(), RoomMode::Normal, None, false);
     let live = RoomTask::new(
         "r".to_string(),
         RoomMode::DevSelfPlay(DevSelfPlayConfig::Live),
         None,
+        false,
     );
     let replay = RoomTask::new(
         "r".to_string(),
@@ -162,6 +163,7 @@ fn replay_rooms_default_to_1_5x_speed() {
             artifact: "demo".to_string(),
         }),
         None,
+        false,
     );
     assert_eq!(normal.current_tick_interval(), Duration::from_millis(33));
     assert_eq!(live.current_tick_interval(), Duration::from_millis(33));
@@ -177,6 +179,7 @@ fn replay_speed_clamped_and_applied() {
             artifact: "demo".to_string(),
         }),
         None,
+        false,
     );
     task.on_set_replay_speed(2.0);
     // 33ms / 2.0 = 16.5ms → rounds to 16ms via div_f32

@@ -141,6 +141,8 @@ pub(super) struct RoomTask {
     slow_tick_count: u32,
     /// Optional persistence sink for resolved matches. `None` disables match-history writes.
     db: Option<Arc<Db>>,
+    /// When true, rows written by this room are hidden from non-localhost match-history reads.
+    match_history_local_only: bool,
     /// Wall-clock start time of the currently-running match. `None` outside `Phase::InGame`.
     match_started_at: Option<chrono::DateTime<chrono::Utc>>,
     /// Map name the active match was started on. Empty outside `Phase::InGame`.
@@ -150,7 +152,12 @@ pub(super) struct RoomTask {
 }
 
 impl RoomTask {
-    pub(super) fn new(room: String, mode: RoomMode, db: Option<Arc<Db>>) -> Self {
+    pub(super) fn new(
+        room: String,
+        mode: RoomMode,
+        db: Option<Arc<Db>>,
+        match_history_local_only: bool,
+    ) -> Self {
         let replay_speed = match &mode {
             RoomMode::DevSelfPlay(DevSelfPlayConfig::Replay { .. }) => 1.5,
             _ => 1.0,
@@ -174,6 +181,7 @@ impl RoomTask {
             replay_speed,
             slow_tick_count: 0,
             db,
+            match_history_local_only,
             match_started_at: None,
             match_map_name: String::new(),
             match_participants: Vec::new(),
@@ -1375,6 +1383,7 @@ impl RoomTask {
                     winner_name,
                     participants: self.match_participants.clone(),
                     score_screen: score_json,
+                    local_only: self.match_history_local_only,
                 };
                 // Detached: a slow Supabase write must never stall the room transitioning back to
                 // lobby. Errors are logged inside `record_match`.
