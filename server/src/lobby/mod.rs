@@ -127,6 +127,7 @@ pub struct RoomHandle {
 pub struct Lobby {
     rooms: Arc<Mutex<HashMap<String, RoomHandle>>>,
     db: Option<Arc<Db>>,
+    match_history_local_only: bool,
 }
 
 impl Lobby {
@@ -134,6 +135,7 @@ impl Lobby {
         Lobby {
             rooms: Arc::new(Mutex::new(HashMap::new())),
             db: None,
+            match_history_local_only: false,
         }
     }
 
@@ -141,6 +143,15 @@ impl Lobby {
     /// (none at construction time) are unaffected.
     pub fn with_db(mut self, db: Option<Arc<Db>>) -> Self {
         self.db = db;
+        self.match_history_local_only = false;
+        self
+    }
+
+    /// Attach a database for match-history persistence with the desired write visibility. New
+    /// rooms inherit both the handle and scope; existing rooms are unaffected.
+    pub fn with_match_history(mut self, db: Option<Arc<Db>>, local_only: bool) -> Self {
+        self.db = db;
+        self.match_history_local_only = local_only;
         self
     }
 
@@ -159,8 +170,9 @@ impl Lobby {
         let name = room.to_string();
         let mode = room_mode_for(&name);
         let db = self.db.clone();
+        let match_history_local_only = self.match_history_local_only;
         tokio::spawn(async move {
-            let mut task = RoomTask::new(name.clone(), mode, db);
+            let mut task = RoomTask::new(name.clone(), mode, db, match_history_local_only);
             task.run(event_rx).await;
             info!(room = %name, "room task exited");
         });

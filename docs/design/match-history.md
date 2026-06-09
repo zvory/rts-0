@@ -26,8 +26,10 @@ Supabase Postgres. Schema in `server/migrations/`. Single table:
 | `outcome`       | `text`          | `'win'` or `'draw'` (CHECK constraint).         |
 | `participants`  | `text[]`        | Display names in seat order (humans then AI).   |
 | `score_screen`  | `jsonb`         | Whole `Vec<PlayerScore>` blob, opaque to SQL.   |
+| `local_only`    | `boolean`       | Hide local developer rows from public servers.  |
 
-Indexes: `(started_at desc)` for the front-page query, `(map_name)` for future filtering.
+Indexes: `(started_at desc)` for the front-page query, a partial `(started_at desc)` index for
+public rows, and `(map_name)` for future filtering.
 
 The `score_screen` JSONB intentionally stores the full payload from `Game::scores()`. The shape
 matches `contract::PlayerScore` (camelCase). Adding fields to `PlayerScore` requires no migration;
@@ -39,7 +41,8 @@ Migrations are versioned SQL files run by `sqlx::migrate!` at server boot. Never
 
 - **Read**: `GET /api/matches?limit=N` — JSON array, newest first, `limit` clamped server-side to
   `[1, 100]`, defaults to 20. Returns `[]` when no DB is configured (so the client never needs
-  to special-case missing-DB).
+  to special-case missing-DB). Local-only rows are included only when the request peer address is
+  loopback; public beta/mainline requests filter them out.
 - **Write**: none. Clients cannot write history. Period.
 
 ## Code seams
@@ -66,28 +69,34 @@ A row is written when **all** of these are true:
 2. `match_human_count >= 2` — at least two human (non-AI) players. Human-vs-AI, AI-only, and
    1-player sandboxes never record.
 3. `is_dev_watch()` is false — dev self-play, scenario, and replay rooms never record.
-4. The server was started with **both** a working DB connection and `RTS_RECORD_MATCHES` truthy.
+4. The server was started with a working DB connection.
 
-Anything else (DB failures, env gate off, dev rooms) silently skips the write. The simulation
-and lobby flow are unaffected.
+Anything else (DB failures, dev rooms, missing DB) silently skips the write. The simulation and
+lobby flow are unaffected.
 
 ## Recording gate (`RTS_RECORD_MATCHES`)
 
-The gate exists because the developer runs many local matches and does not want them polluting
-the shared production DB.
+The gate controls whether recorded rows are public or local-only. It exists because the developer
+runs many local matches and needs them for debugging without polluting shared beta/mainline recent
+matches.
 
-| env state                            | reads work?    | writes happen? |
-| ------------------------------------ | -------------- | -------------- |
-| no `DATABASE_URL`                    | no (returns `[]`) | no          |
-| `DATABASE_URL` set, gate off / unset | yes            | no             |
-| `DATABASE_URL` set, gate on          | yes            | yes            |
+| env state                            | reads work?       | writes happen?      | public servers show row? |
+| ------------------------------------ | ----------------- | ------------------- | ------------------------ |
+| no `DATABASE_URL`                    | no (returns `[]`) | no                  | no                       |
+| `DATABASE_URL` set, gate off / unset | yes               | yes, `local_only`   | no                       |
+| `DATABASE_URL` set, gate on          | yes               | yes, public row     | yes                      |
 
 Truthy values: `1`, `true`, `yes`, `on` (case-insensitive). Anything else, including unset, is
-off. Beta and mainline deploys must set it to `1`. Local `cargo run` reads but does not write.
+off. Beta and mainline deploys must set it to `1`. Local `cargo run` with `DATABASE_URL` set writes
+local-only rows, which are visible from `http://localhost:<port>/api/matches` because that connects
+over loopback, and hidden from public beta/mainline recent matches.
 
 The implementation: `main.rs` connects the pool once, hands the pool to `AppState` for reads, and
-conditionally passes it to `Lobby::with_db(...)`. The lobby propagates the option to each room.
-If a room receives `None`, the `end_match` write branch never fires.
+passes it to `Lobby::with_match_history(...)` with a `local_only` flag derived from
+`RTS_RECORD_MATCHES`. The lobby propagates the option and write scope to each room. If a room
+receives `None`, the `end_match` write branch never fires. `/api/matches` decides whether to
+include local-only rows from the request peer address. Only loopback peers (`127.0.0.1` / `::1`)
+can see them.
 
 ## Failure modes
 

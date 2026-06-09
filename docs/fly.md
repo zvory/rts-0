@@ -65,9 +65,10 @@ override the app name for a different beta app, `./deploy.sh beta` still applies
 
 ## Match-history secrets (Supabase)
 
-Match history persistence is opt-in per environment. Reads require `DATABASE_URL`; writes
-additionally require `RTS_RECORD_MATCHES=1`. Local `cargo run` reads but never writes, so
-local play never pollutes the shared DB.
+Match history persistence requires `DATABASE_URL`. `RTS_RECORD_MATCHES=1` marks writes as public;
+when the gate is off, writes are tagged `local_only` and `/api/matches` hides them unless the
+request peer is loopback. This lets local `cargo run` record debugging games without
+polluting beta/mainline recent matches.
 
 Set these once per Fly app (replace the URL with the rotated password):
 
@@ -99,12 +100,14 @@ Expected boot lines on a recording env:
 INFO rts_server::db: database connected and migrations applied
 ```
 
-(no "match history reads enabled but writes disabled" line; that one only prints when the gate is
-off). Each finished multi-player match logs `match recorded` with map and outcome.
+(no "match history writes enabled as localhost-only rows" line; that one only prints when the
+public gate is off). Each finished multi-player match logs `match recorded` with map, outcome, and
+local-only scope.
 
-If reads return `[]` after a multi-player match: check `RTS_RECORD_MATCHES` is set and not
-`0`/`false`. See [docs/design/match-history.md](design/match-history.md) for the full gate truth
-table.
+If public reads return `[]` after a multi-player match: check `RTS_RECORD_MATCHES` is set and not
+`0`/`false`. If localhost reads do not show a local match, check that `DATABASE_URL` is set and
+that the browser is using `localhost`, `127.0.0.1`, or `[::1]` so the TCP peer is loopback. See
+[docs/design/match-history.md](design/match-history.md) for the full scope table.
 
 ## Stop spending after game night
 

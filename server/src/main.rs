@@ -13,7 +13,7 @@ use std::net::SocketAddr;
 use std::time::{Duration, Instant};
 
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
-use axum::extract::{Query, State};
+use axum::extract::{ConnectInfo, Query, State};
 use axum::http::header;
 use axum::http::StatusCode;
 use axum::response::{Html, IntoResponse, Redirect};
@@ -88,13 +88,14 @@ async fn main() {
 
     let db = rts_server::db::try_connect_from_env().await;
 
-    // Match-history writes are opt-in so local `cargo run` doesn't pollute the shared DB. Beta /
-    // mainline deploys set `RTS_RECORD_MATCHES=1`. Reads (`/api/matches`) work whenever a DB is
-    // connected, so the front page still shows production history even from a local checkout.
+    // Public match-history writes are opt-in. When a DB is configured but the public gate is off,
+    // local `cargo run` still writes rows tagged local-only so debugging games can be inspected
+    // from localhost without polluting beta/mainline recent matches.
     let record_matches = env_truthy("RTS_RECORD_MATCHES");
-    let lobby_db = if record_matches { db.clone() } else { None };
-    if db.is_some() && !record_matches {
-        info!("RTS_RECORD_MATCHES unset; match history reads enabled but writes disabled");
+    let match_history_local_only = !record_matches;
+    let lobby_db = db.clone();
+    if db.is_some() && match_history_local_only {
+        info!("RTS_RECORD_MATCHES unset; match history writes enabled as localhost-only rows");
     }
 
     let version = git_version();
@@ -102,7 +103,7 @@ async fn main() {
     let index_html = build_versioned_index(client_dir, &version);
     let maps_dir = concat!(env!("CARGO_MANIFEST_DIR"), "/assets/maps").to_string();
     let state = AppState {
-        lobby: Lobby::new().with_db(lobby_db),
+        lobby: Lobby::new().with_match_history(lobby_db, match_history_local_only),
         index_html,
         version,
         maps_dir: maps_dir.clone(),
@@ -187,13 +188,15 @@ struct MatchesQuery {
 /// Returns `[]` (200) when no DB is configured so the client doesn't need to special-case.
 async fn matches_handler(
     State(state): State<AppState>,
+    ConnectInfo(remote): ConnectInfo<SocketAddr>,
     Query(params): Query<MatchesQuery>,
 ) -> impl IntoResponse {
     let limit = params.limit.unwrap_or(20);
     let Some(db) = state.db else {
         return Json(Vec::<rts_server::db::MatchSummary>::new()).into_response();
     };
-    match db.recent_matches(limit).await {
+    let include_local = request_allows_local_match_history(&remote);
+    match db.recent_matches(limit, include_local).await {
         Ok(rows) => Json(rows).into_response(),
         Err(err) => {
             warn!(%err, "match history query failed");
@@ -204,6 +207,10 @@ async fn matches_handler(
                 .into_response()
         }
     }
+}
+
+fn request_allows_local_match_history(remote: &SocketAddr) -> bool {
+    remote.ip().is_loopback()
 }
 
 async fn beta_redirect_handler() -> impl IntoResponse {
@@ -513,6 +520,24 @@ mod tests {
         assert!(html.contains("./src/main.js?v=test-version\""));
         assert!(html.contains("./styles.css?v=test-version\""));
         assert!(html.contains("/manifest.webmanifest?v=test-version\""));
+    }
+
+    #[test]
+    fn local_match_history_allowed_for_loopback_remote() {
+        let remote: SocketAddr = "127.0.0.1:50000".parse().unwrap();
+        assert!(request_allows_local_match_history(&remote));
+    }
+
+    #[test]
+    fn local_match_history_allowed_for_ipv6_loopback_remote() {
+        let remote: SocketAddr = "[::1]:50000".parse().unwrap();
+        assert!(request_allows_local_match_history(&remote));
+    }
+
+    #[test]
+    fn local_match_history_rejected_for_public_remote() {
+        let remote: SocketAddr = "203.0.113.10:50000".parse().unwrap();
+        assert!(!request_allows_local_match_history(&remote));
     }
 }
 
