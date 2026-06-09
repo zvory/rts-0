@@ -31,7 +31,8 @@ use crate::db::Db;
 use crate::game::command::SimCommand;
 use crate::game::{Game, PlayerInit};
 use crate::protocol::{
-    Event, LobbyPlayer, PlayerScore, ResourceDelta, ServerMessage, Snapshot, StartPayload,
+    Event, LobbyPlayer, PlayerScore, ReplayVisionRequest, ResourceDelta, ServerMessage, Snapshot,
+    StartPayload,
 };
 use rts_ai::selfplay::{is_safe_artifact_name, LiveSelfPlay, ReplayArtifact, ReplayDriver};
 
@@ -112,6 +113,11 @@ pub enum RoomEvent {
     SetReplaySpeed { speed: f32 },
     /// Rewind a replay by `ticks_back` simulation ticks (replay rooms only; clamped to start).
     SeekReplay { ticks_back: u32 },
+    /// Select replay vision for this viewer only. Ignored outside replay rooms in phase 1.
+    SetReplayVision {
+        player_id: u32,
+        vision: ReplayVisionRequest,
+    },
     /// Host selects a map by name (lobby phase only; honored only from the host).
     SelectMap { player_id: u32, map: String },
 }

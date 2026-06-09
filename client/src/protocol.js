@@ -7,6 +7,7 @@ export const S = Object.freeze({
   LOBBY: "lobby",
   START: "start",
   SNAPSHOT: "snapshot",
+  REPLAY_STATE: "replayState",
   GAME_OVER: "gameOver",
   PONG: "pong",
   ERROR: "error",
@@ -26,6 +27,7 @@ export const C = Object.freeze({
   PING: "ping",
   SET_REPLAY_SPEED: "setReplaySpeed",
   SEEK_REPLAY: "seekReplay",
+  SET_REPLAY_VISION: "setReplayVision",
   SELECT_MAP: "selectMap",
 });
 
@@ -126,6 +128,12 @@ export const NOTICE_SEVERITY = Object.freeze({
 export const ABILITY = Object.freeze({
   CHARGE: "charge",
   SMOKE: "smoke",
+});
+
+export const REPLAY_VISION = Object.freeze({
+  ALL: "all",
+  PLAYER: "player",
+  PLAYERS: "players",
 });
 
 // --- Compact snapshot wire schema (must match protocol.rs) ---
@@ -629,6 +637,16 @@ export const msg = Object.freeze({
   ping: (ts) => ({ t: C.PING, ts }),
   setReplaySpeed: (speed) => ({ t: C.SET_REPLAY_SPEED, speed }),
   seekReplay: (ticksBack) => ({ t: C.SEEK_REPLAY, ticksBack }),
+  setReplayVision: (vision) => ({ t: C.SET_REPLAY_VISION, vision }),
+  replayVisionAll: () => ({ t: C.SET_REPLAY_VISION, vision: { mode: REPLAY_VISION.ALL } }),
+  replayVisionPlayer: (playerId) => ({
+    t: C.SET_REPLAY_VISION,
+    vision: { mode: REPLAY_VISION.PLAYER, playerId },
+  }),
+  replayVisionPlayers: (playerIds) => ({
+    t: C.SET_REPLAY_VISION,
+    vision: { mode: REPLAY_VISION.PLAYERS, playerIds },
+  }),
   selectMap: (map) => ({ t: C.SELECT_MAP, map }),
 });
 

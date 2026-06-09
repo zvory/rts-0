@@ -12,7 +12,8 @@ use serde::{Deserialize, Serialize};
 pub use rts_contract::{
     AbilityCooldownView, AttackReveal, DebugPathPoint, DebugPathView, EntityView, Event, MapInfo,
     NoticeSeverity, OrderPlanMarker, PlayerResourceSnapshot, PlayerScore, PlayerStart,
-    ResourceDelta, ResourceNode, SmokeCloudView, Snapshot, SnapshotNetStatus, StartPayload,
+    ReplayPlaybackState, ReplayStartMetadata, ResourceDelta, ResourceNode, SmokeCloudView,
+    Snapshot, SnapshotNetStatus, StartPayload,
 };
 
 fn is_false(value: &bool) -> bool {
@@ -108,6 +109,8 @@ pub enum ClientMessage {
         #[serde(rename = "ticksBack")]
         ticks_back: u32,
     },
+    /// Select which players' fog to use while viewing a replay. Per-viewer only.
+    SetReplayVision { vision: ReplayVisionRequest },
     /// Host selects a map by name (lobby phase only; ignored from non-hosts).
     SelectMap { map: String },
 }
@@ -195,6 +198,18 @@ pub enum Command {
     },
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(
+    tag = "mode",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+pub enum ReplayVisionRequest {
+    All,
+    Player { player_id: u32 },
+    Players { player_ids: Vec<u32> },
+}
+
 // ---------------------------------------------------------------------------
 // Server -> Client
 // ---------------------------------------------------------------------------
@@ -229,6 +244,8 @@ pub enum ServerMessage {
     Start(StartPayload),
     /// Per-player, fog-filtered world state.
     Snapshot(Snapshot),
+    /// Shared replay playback cursor/state. Sent reliably outside snapshot cadence.
+    ReplayState(ReplayPlaybackState),
     GameOver {
         winner_id: Option<u32>,
         /// "won" | "lost" | "draw"
