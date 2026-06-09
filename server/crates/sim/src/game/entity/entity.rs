@@ -566,6 +566,23 @@ impl Entity {
         self.last_damage_owner = owner;
     }
 
+    pub fn apply_damage(
+        &mut self,
+        amount: u32,
+        attribution: Option<(u32, (f32, f32), u32)>,
+    ) -> bool {
+        if self.hp == 0 || amount == 0 {
+            return false;
+        }
+        self.hp = self.hp.saturating_sub(amount);
+        if let Some((owner, pos, tick)) = attribution {
+            self.last_damage_owner = Some(owner);
+            self.last_damage_tick = Some(tick);
+            self.last_damage_pos = Some(pos);
+        }
+        true
+    }
+
     pub fn last_damage_tick(&self) -> Option<u32> {
         self.last_damage_tick
     }
@@ -639,8 +656,41 @@ impl Entity {
             .unwrap_or(&[])
     }
 
-    pub fn prod_queue_mut(&mut self) -> Option<&mut Vec<ProdItem>> {
-        self.production.as_mut().map(|p| &mut p.queue)
+    pub fn push_production(&mut self, item: ProdItem) -> bool {
+        let Some(p) = self.production.as_mut() else {
+            return false;
+        };
+        p.queue.push(item);
+        true
+    }
+
+    pub fn pop_last_production(&mut self) -> Option<ProdItem> {
+        self.production.as_mut()?.queue.pop()
+    }
+
+    pub fn tick_front_production(&mut self) -> Option<EntityKind> {
+        let front = self.production.as_mut()?.queue.first_mut()?;
+        if front.progress < front.total {
+            front.progress = front.progress.saturating_add(1);
+        }
+        (front.progress >= front.total).then_some(front.unit)
+    }
+
+    pub fn remove_front_production(&mut self) -> Option<ProdItem> {
+        let queue = &mut self.production.as_mut()?.queue;
+        if queue.is_empty() {
+            None
+        } else {
+            Some(queue.remove(0))
+        }
+    }
+
+    pub fn set_front_production_progress(&mut self, progress: u32) -> bool {
+        let Some(front) = self.production.as_mut().and_then(|p| p.queue.first_mut()) else {
+            return false;
+        };
+        front.progress = progress.min(front.total);
+        true
     }
 
     /// Rally point for a unit-producing building, if one has been set.
@@ -712,8 +762,36 @@ impl Entity {
         })
     }
 
+    pub fn advance_construction(&mut self) -> Option<bool> {
+        let c = self.construction.as_mut()?;
+        c.progress = c.progress.saturating_add(1);
+        if c.progress < c.total {
+            return Some(false);
+        }
+        c.progress = c.total;
+        self.construction = None;
+        Some(true)
+    }
+
+    pub fn set_construction_progress(&mut self, progress: u32) -> bool {
+        let Some(c) = self.construction.as_mut() else {
+            return false;
+        };
+        c.progress = progress.min(c.total);
+        true
+    }
+
     pub fn remaining(&self) -> Option<u32> {
         self.resource_node.as_ref().map(|n| n.remaining)
+    }
+
+    pub fn harvest_resources(&mut self, amount: u32) -> u32 {
+        let Some(node) = self.resource_node.as_mut() else {
+            return 0;
+        };
+        let taken = amount.min(node.remaining);
+        node.remaining = node.remaining.saturating_sub(taken);
+        taken
     }
 
     pub fn miner(&self) -> Option<u32> {
@@ -730,6 +808,12 @@ impl Entity {
                 order.execution.phase = GatherPhase::ToNode;
                 order.execution.harvest_progress = 0;
             }
+        }
+    }
+
+    pub fn clear_worker_carry(&mut self) {
+        if let Some(w) = self.worker.as_mut() {
+            w.carry = None;
         }
     }
 

@@ -28,18 +28,7 @@ pub(crate) fn production_system(
                 _ => continue,
             };
             let owner = b.owner;
-            let Some(queue) = b.prod_queue_mut() else {
-                continue;
-            };
-            let front = &mut queue[0];
-            if front.progress < front.total {
-                front.progress = front.progress.saturating_add(1);
-            }
-            if front.progress >= front.total {
-                Some((owner, front.unit))
-            } else {
-                None
-            }
+            b.tick_front_production().map(|unit| (owner, unit))
         };
 
         if let Some((owner, unit)) = ready {
@@ -60,11 +49,7 @@ pub(crate) fn production_system(
                     }
                 }
                 if let Some(b) = entities.get_mut(id) {
-                    if let Some(queue) = b.prod_queue_mut() {
-                        if !queue.is_empty() {
-                            queue.remove(0);
-                        }
-                    }
+                    b.remove_front_production();
                 }
                 if let Some(player) = players.iter_mut().find(|p| p.id == owner) {
                     player.record_entity_created(unit);
@@ -429,9 +414,7 @@ mod tests {
         entities
             .get_mut(id)
             .expect("factory")
-            .prod_queue_mut()
-            .expect("queue")
-            .push(ProdItem {
+            .push_production(ProdItem {
                 unit: EntityKind::Tank,
                 progress: 1,
                 total: 1,
@@ -453,9 +436,7 @@ mod tests {
         entities
             .get_mut(id)
             .expect("barracks")
-            .prod_queue_mut()
-            .expect("queue")
-            .push(ProdItem {
+            .push_production(ProdItem {
                 unit,
                 progress: 1,
                 total: 1,

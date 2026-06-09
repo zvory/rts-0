@@ -73,6 +73,8 @@ const ENTITY_FIELDS: &[&str] = &[
     "ability_cooldowns",
     "ability_uses_remaining",
 ];
+const PLAYER_STATE_FIELD_WRITE_APPROVED_PATHS: &[&str] = &["player_state.rs"];
+const PLAYER_STATE_FIELDS: &[&str] = &["steel", "oil", "supply_used", "supply_cap", "score"];
 
 const ALLOWED_SERVICE_IMPORTS: &[(&str, &[&str])] = &[
     (
@@ -167,6 +169,7 @@ pub struct ArchitectureMetrics {
     pub service_edges: Vec<ServiceEdge>,
     pub broad_mutable_signatures: Vec<FunctionSignature>,
     pub player_state_usages: Vec<PlayerStateUsage>,
+    pub player_state_field_writes: Vec<PlayerStateFieldWrite>,
     pub public_exports: Vec<PublicExport>,
     pub entity_field_writes: Vec<EntityFieldWrite>,
 }
@@ -200,6 +203,14 @@ pub struct PlayerStateUsage {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PlayerStateFieldWrite {
+    pub path: String,
+    pub line: usize,
+    pub field: String,
+    pub code: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PublicExport {
     pub path: String,
     pub line: usize,
@@ -221,6 +232,8 @@ pub struct ArchitectureBaseline {
     pub service_edges: Vec<ServiceEdge>,
     pub broad_mutable_signatures: Vec<FunctionSignature>,
     pub player_state_usages: Vec<PlayerStateUsage>,
+    #[serde(default)]
+    pub player_state_field_writes: Vec<PlayerStateFieldWrite>,
     pub entity_field_writes: Vec<EntityFieldWrite>,
     pub public_export_counts: Vec<PublicExportCount>,
 }
@@ -340,6 +353,7 @@ fn analyze_source_files(files: &[SourceFile]) -> ArchitectureReport {
         check_role_state_boundaries(file, &stripped, &service_roles, &mut report);
         collect_broad_signatures(file, &stripped, &mut report);
         collect_player_state_usages(file, &stripped, &mut report);
+        collect_player_state_field_writes(file, &stripped, &mut report);
         collect_public_exports(file, &stripped, &mut report);
         collect_entity_field_writes(file, &stripped, &mut report);
     }
@@ -360,6 +374,10 @@ fn analyze_source_files(files: &[SourceFile]) -> ArchitectureReport {
         .sort_by_key(player_state_usage_key);
     report
         .metrics
+        .player_state_field_writes
+        .sort_by_key(player_state_field_write_key);
+    report
+        .metrics
         .public_exports
         .sort_by(|a, b| a.path.cmp(&b.path).then(a.line.cmp(&b.line)));
     report
@@ -377,6 +395,7 @@ impl ArchitectureBaseline {
             service_edges: metrics.service_edges.clone(),
             broad_mutable_signatures: metrics.broad_mutable_signatures.clone(),
             player_state_usages: metrics.player_state_usages.clone(),
+            player_state_field_writes: metrics.player_state_field_writes.clone(),
             entity_field_writes: metrics.entity_field_writes.clone(),
             public_export_counts: public_export_counts(metrics),
         }
@@ -401,6 +420,7 @@ fn compare_to_baseline(baseline: &ArchitectureBaseline, report: &mut Architectur
     compare_service_edges(baseline, report);
     compare_broad_mutable_signatures(baseline, report);
     compare_player_state_usages(baseline, report);
+    compare_player_state_field_writes(baseline, report);
     compare_entity_field_writes(baseline, report);
     compare_public_export_counts(baseline, report);
     report.failures.sort();
@@ -516,6 +536,25 @@ fn compare_player_state_usages(baseline: &ArchitectureBaseline, report: &mut Arc
     }
 }
 
+fn compare_player_state_field_writes(
+    baseline: &ArchitectureBaseline,
+    report: &mut ArchitectureReport,
+) {
+    let old = baseline
+        .player_state_field_writes
+        .iter()
+        .map(player_state_field_write_key)
+        .collect::<BTreeSet<_>>();
+    for write in &report.metrics.player_state_field_writes {
+        if !old.contains(&player_state_field_write_key(write)) {
+            report.failures.push(format!(
+                "{}:{}: new direct PlayerState.{} write exceeds the architecture baseline",
+                write.path, write.line, write.field
+            ));
+        }
+    }
+}
+
 fn compare_entity_field_writes(baseline: &ArchitectureBaseline, report: &mut ArchitectureReport) {
     let old = baseline
         .entity_field_writes
@@ -611,6 +650,12 @@ fn baseline_change_summary(
         &mut summary,
     );
     summarize_count_change(
+        "PlayerState field write sites",
+        previous.player_state_field_writes.len(),
+        current.player_state_field_writes.len(),
+        &mut summary,
+    );
+    summarize_count_change(
         "Entity field write sites",
         previous.entity_field_writes.len(),
         current.entity_field_writes.len(),
@@ -657,6 +702,10 @@ fn function_key(signature: &FunctionSignature) -> (String, String) {
 
 fn player_state_usage_key(usage: &PlayerStateUsage) -> (String, String) {
     (usage.path.clone(), usage.code.clone())
+}
+
+fn player_state_field_write_key(write: &PlayerStateFieldWrite) -> (String, String, String) {
+    (write.path.clone(), write.field.clone(), write.code.clone())
 }
 
 fn entity_field_write_key(write: &EntityFieldWrite) -> (String, String, String) {
@@ -952,6 +1001,33 @@ fn collect_player_state_usages(file: &SourceFile, text: &str, report: &mut Archi
     }
 }
 
+fn collect_player_state_field_writes(
+    file: &SourceFile,
+    text: &str,
+    report: &mut ArchitectureReport,
+) {
+    if PLAYER_STATE_FIELD_WRITE_APPROVED_PATHS.contains(&file.rel_path.as_str()) {
+        return;
+    }
+
+    for (index, line) in text.lines().enumerate() {
+        let code = code_before_comment(line);
+        for field in PLAYER_STATE_FIELDS {
+            if contains_field_assignment(code, field) {
+                report
+                    .metrics
+                    .player_state_field_writes
+                    .push(PlayerStateFieldWrite {
+                        path: file.rel_path.clone(),
+                        line: index + 1,
+                        field: (*field).to_string(),
+                        code: normalized_code(code),
+                    });
+            }
+        }
+    }
+}
+
 fn collect_public_exports(file: &SourceFile, text: &str, report: &mut ArchitectureReport) {
     for (index, line) in text.lines().enumerate() {
         let trimmed = line.trim_start();
@@ -1190,17 +1266,24 @@ fn contains_field_assignment(line: &str, field: &str) -> bool {
         return false;
     };
     let before = line[..start].chars().last();
-    if before.is_some_and(|ch| ch == '.' || ch.is_ascii_alphanumeric() || ch == '_') {
+    if before.is_some_and(|ch| ch == '.') {
         return false;
     }
     let after = &line[start + needle.len()..];
     let after = after.trim_start();
-    after.starts_with('=')
-        || after.starts_with("+=")
-        || after.starts_with("-=")
-        || after.starts_with("*=")
-        || after.starts_with("/=")
-        || after.starts_with("%=")
+    starts_with_assignment_operator(after)
+}
+
+fn starts_with_assignment_operator(text: &str) -> bool {
+    if text.starts_with("==") || text.starts_with("=>") {
+        return false;
+    }
+    text.starts_with('=')
+        || text.starts_with("+=")
+        || text.starts_with("-=")
+        || text.starts_with("*=")
+        || text.starts_with("/=")
+        || text.starts_with("%=")
 }
 
 fn strip_cfg_test_modules(text: &str) -> String {
@@ -1463,6 +1546,32 @@ mod tests {
     }
 
     #[test]
+    fn direct_player_state_field_writes_are_recorded() {
+        let report = analyze_source_files(&[source(
+            "services/example.rs",
+            "fn update(player: &mut PlayerState) { player.steel = 0; player.supply_used += 1; }\n",
+        )]);
+
+        assert_eq!(
+            report.metrics.player_state_field_writes,
+            vec![
+                PlayerStateFieldWrite {
+                    path: "services/example.rs".to_string(),
+                    line: 1,
+                    field: "steel".to_string(),
+                    code: "fn update(player: &mut PlayerState) { player.steel = 0; player.supply_used += 1; }".to_string(),
+                },
+                PlayerStateFieldWrite {
+                    path: "services/example.rs".to_string(),
+                    line: 1,
+                    field: "supply_used".to_string(),
+                    code: "fn update(player: &mut PlayerState) { player.steel = 0; player.supply_used += 1; }".to_string(),
+                },
+            ]
+        );
+    }
+
+    #[test]
     fn line_growth_has_a_generous_buffer_before_failing() {
         let original = analyze_source_files(&[source("services/commands.rs", "line\n")]);
         let baseline = baseline("test baseline", &original.metrics);
@@ -1531,6 +1640,31 @@ mod tests {
         compare_to_baseline(&baseline, &mut new_usage);
         assert_eq!(new_usage.failures.len(), 1);
         assert!(new_usage.failures[0].contains("new direct PlayerState usage"));
+    }
+
+    #[test]
+    fn new_player_state_field_write_exceeds_the_baseline() {
+        let original = analyze_source_files(&[source(
+            "services/commands.rs",
+            "fn update(player: &mut P) { player.steel = 0; }\n",
+        )]);
+        let baseline = baseline("test baseline", &original.metrics);
+        let mut same_write_moved = analyze_source_files(&[source(
+            "services/commands.rs",
+            "\n\nfn update(player: &mut P) { player.steel = 0; }\n",
+        )]);
+
+        compare_to_baseline(&baseline, &mut same_write_moved);
+
+        assert!(same_write_moved.failures.is_empty());
+
+        let mut new_write = analyze_source_files(&[source(
+            "services/commands.rs",
+            "fn update(player: &mut P) { player.steel = 0; }\nfn reset(player: &mut P) { player.oil += 1; }\n",
+        )]);
+        compare_to_baseline(&baseline, &mut new_write);
+        assert_eq!(new_write.failures.len(), 1);
+        assert!(new_write.failures[0].contains("new direct PlayerState.oil write"));
     }
 
     #[test]

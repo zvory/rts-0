@@ -521,7 +521,7 @@ pub(super) fn advance_moving_units(
                             m.oil_debt -= whole as f32;
                             if let Some(p) = players.iter_mut().find(|p| p.id == owner) {
                                 let charged = whole.min(p.oil);
-                                p.oil = p.oil.saturating_sub(charged);
+                                p.spend_resources(0, charged);
                                 // If we couldn't pay full amount, drop the unpaid remainder
                                 // so debt does not accumulate while the player has no oil.
                                 if charged < whole {
