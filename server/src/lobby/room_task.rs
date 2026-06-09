@@ -34,6 +34,10 @@ struct AiSlot {
 const AUTOMATED_MATCH_HISTORY_ROOM_PREFIXES: [&str; 4] =
     ["itest-", "ai-itest-", "client-smoke-", "reg-"];
 
+fn server_build_sha() -> &'static str {
+    env!("COMMIT_HASH")
+}
+
 pub(super) fn is_automated_match_history_room(room: &str) -> bool {
     AUTOMATED_MATCH_HISTORY_ROOM_PREFIXES
         .iter()
@@ -115,6 +119,7 @@ pub(super) enum RoomMode {
     Normal,
     DevSelfPlay(DevSelfPlayConfig),
     DevScenario(DevScenarioConfig),
+    Replay { artifact: ReplayArtifactV1 },
 }
 
 #[derive(Clone)]
@@ -580,6 +585,10 @@ impl RoomTask {
             self.on_join_dev_selfplay(player_id, name, msg_tx, ack);
             return;
         }
+        if matches!(self.mode, RoomMode::Replay { .. }) {
+            self.on_join_replay_room(player_id, name, msg_tx, ack);
+            return;
+        }
         if matches!(self.phase, Phase::ReplayViewer(_)) {
             self.on_join_replay_viewer(player_id, name, msg_tx, ack);
             return;
@@ -1019,6 +1028,61 @@ impl RoomTask {
         self.send_replay_state_to(player_id);
     }
 
+    fn on_join_replay_room(
+        &mut self,
+        player_id: u32,
+        name: String,
+        msg_tx: ConnectionSink,
+        ack: tokio::sync::oneshot::Sender<bool>,
+    ) {
+        if self.players.contains_key(&player_id) {
+            let _ = ack.send(false);
+            return;
+        }
+        self.order.push(player_id);
+        self.players.insert(
+            player_id,
+            RoomPlayer {
+                name,
+                color: "#6f8fa8".to_string(),
+                ready: true,
+                spectator: true,
+                msg_tx,
+                head_of_line_count: 0,
+            },
+        );
+        let _ = ack.send(true);
+
+        match &self.phase {
+            Phase::ReplayViewer(_) => {
+                self.send_replay_start_to(player_id);
+                self.send_replay_state_to(player_id);
+            }
+            Phase::Lobby => {
+                let RoomMode::Replay { artifact } = &self.mode else {
+                    return;
+                };
+                match ReplaySession::new(artifact.clone()) {
+                    Ok(session) => self.transition_to_replay_viewer(session),
+                    Err(err) => {
+                        warn!(room = %self.room, error = %err, "persisted replay setup failed");
+                        if let Some(player) = self.players.get(&player_id) {
+                            send_or_log(
+                                &self.room,
+                                player_id,
+                                &player.msg_tx,
+                                ServerMessage::Error {
+                                    msg: "Replay could not be started.".to_string(),
+                                },
+                            );
+                        }
+                    }
+                }
+            }
+            Phase::InGame(_) => {}
+        }
+    }
+
     /// A match may start with at least one active participant and every active human ready.
     /// Spectators can host and watch from the lobby, but they do not block readiness.
     fn can_start(&self) -> bool {
@@ -1211,6 +1275,7 @@ impl RoomTask {
     fn build_dev_session(&self) -> Result<(Game, DevDriver, u32), String> {
         match &self.mode {
             RoomMode::Normal => Err("room is not configured for a dev session".to_string()),
+            RoomMode::Replay { .. } => Err("room is not configured for a dev session".to_string()),
             RoomMode::DevSelfPlay(DevSelfPlayConfig::Live) => {
                 let driver = LiveSelfPlay::default_match();
                 let players = driver.players().to_vec();
@@ -2009,12 +2074,7 @@ impl RoomTask {
     fn end_match(&mut self, winner_id: Option<u32>, scores: Vec<PlayerScore>, game: Option<&Game>) {
         info!(room = %self.room, ?winner_id, "match over");
         let replay_artifact = game.filter(|_| !self.is_dev_watch()).map(|game| {
-            ReplayArtifactV1::capture_from_game(
-                game,
-                option_env!("GIT_SHA").unwrap_or("unknown"),
-                winner_id,
-                scores.clone(),
-            )
+            ReplayArtifactV1::capture_from_game(game, server_build_sha(), winner_id, scores.clone())
         });
 
         // Persist match history only for real public matches. Human-vs-AI, AI-only,
@@ -2029,6 +2089,16 @@ impl RoomTask {
                 let winner_name = winner_id
                     .and_then(|wid| scores.iter().find(|s| s.id == wid).map(|s| s.name.clone()));
                 let score_json = serde_json::to_value(&scores).unwrap_or(serde_json::Value::Null);
+                let replay = replay_artifact
+                    .as_ref()
+                    .and_then(|artifact| match crate::db::MatchReplayRecord::from_artifact(artifact)
+                    {
+                        Ok(replay) => Some(replay),
+                        Err(err) => {
+                            warn!(room = %self.room, error = %err, "failed to serialize replay artifact for match history");
+                            None
+                        }
+                    });
                 let rec = crate::db::MatchRecord {
                     started_at,
                     ended_at,
@@ -2038,6 +2108,7 @@ impl RoomTask {
                     participants: self.match_participants.clone(),
                     score_screen: score_json,
                     local_only: self.match_history_local_only,
+                    replay,
                 };
                 // Detached: a slow Supabase write must never stall the room transitioning back to
                 // lobby. Errors are logged inside `record_match`.
@@ -2264,7 +2335,8 @@ mod tests {
         for _ in 0..ticks {
             game.tick();
         }
-        let artifact = ReplayArtifactV1::capture_from_game(&game, "test-sha", None, game.scores());
+        let artifact =
+            ReplayArtifactV1::capture_from_game(&game, server_build_sha(), None, game.scores());
         (game, artifact)
     }
 
@@ -2477,6 +2549,35 @@ mod tests {
             panic!("replay phase should remain active");
         };
         assert!(replay.game.command_log().is_empty());
+    }
+
+    #[test]
+    fn persisted_replay_room_join_starts_replay_viewer() {
+        let players = replay_test_players(2);
+        let (_live, artifact) = replay_test_artifact(&players, 3);
+        let mut task = RoomTask::new(
+            "persisted-replay-test".to_string(),
+            RoomMode::Replay { artifact },
+            None,
+            false,
+            DrainHandle::default(),
+        );
+        let (msg_tx, mut writer) = ConnectionSink::new();
+        let (ack, mut ack_rx) = tokio::sync::oneshot::channel();
+
+        task.on_join(99, "Viewer".to_string(), false, msg_tx, ack);
+
+        assert_eq!(ack_rx.try_recv(), Ok(true));
+        assert!(matches!(task.phase, Phase::ReplayViewer(_)));
+        assert!(task.players.get(&99).is_some_and(|p| p.spectator));
+        assert!(matches!(
+            writer.reliable_rx.try_recv().unwrap(),
+            ServerMessage::Start(payload) if payload.spectator && payload.replay.is_some()
+        ));
+        assert!(matches!(
+            writer.reliable_rx.try_recv().unwrap(),
+            ServerMessage::ReplayState(_)
+        ));
     }
 
     #[test]

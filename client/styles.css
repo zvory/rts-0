@@ -1704,6 +1704,43 @@ input[type="text"]:focus {
   padding: 0 14px 14px;
   background: rgba(17, 17, 15, 0.4);
 }
+.match-history-detail-wrap {
+  min-width: 520px;
+}
+.match-history-replay {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 34px;
+  padding: 8px 0 2px;
+  color: var(--ink-dim);
+  font-family: var(--mono);
+  font-size: 11px;
+}
+.match-history-replay-button {
+  min-width: 112px;
+  min-height: 28px;
+  padding: 0 12px;
+  border: 1px solid rgba(201, 168, 95, 0.55);
+  border-radius: 4px;
+  background: rgba(201, 168, 95, 0.14);
+  color: var(--accent);
+  font-family: var(--mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.match-history-replay-button:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+.match-history-replay-reason,
+.match-history-replay-error {
+  overflow-wrap: anywhere;
+}
+.match-history-replay-error {
+  color: #d97070;
+}
 .match-history-score-table {
   width: 100%;
   border-collapse: collapse;

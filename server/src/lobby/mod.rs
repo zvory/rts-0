@@ -30,6 +30,7 @@ use tracing::{debug, error, info, warn};
 use crate::config;
 use crate::db::Db;
 use crate::game::command::SimCommand;
+use crate::game::replay::ReplayArtifactV1;
 use crate::game::{Game, PlayerInit};
 use crate::protocol::{
     Event, LobbyPlayer, PlayerScore, ReplayVisionRequest, ResourceDelta, ServerMessage, Snapshot,
@@ -45,7 +46,7 @@ mod snapshots;
 
 pub use connection::{ConnectionSink, ConnectionWriter};
 use dev_replay::room_mode_for;
-use room_task::RoomTask;
+use room_task::{RoomMode, RoomTask};
 pub use snapshots::compact_snapshot_for_wire;
 
 /// Player colors, assigned from the head of the palette. MUST match `client/src/config.js`
@@ -67,10 +68,12 @@ const PLAYER_RELIABLE_CHANNEL_CAP: usize = 64;
 const ROOM_EVENT_CHANNEL_CAP: usize = 1024;
 const DEV_SELFPLAY_ROOM_PREFIX: &str = "__dev_selfplay__";
 const DEV_SCENARIO_ROOM_PREFIX: &str = "__dev_scenario__:";
+const MATCH_REPLAY_ROOM_PREFIX: &str = "__match_replay__";
 const MATCH_SEED_ENV: &str = "RTS_MATCH_SEED";
 
 /// Monotonic source of globally-unique player ids (ids are never reused within a process run).
 static NEXT_PLAYER_ID: AtomicU32 = AtomicU32::new(1);
+static NEXT_MATCH_REPLAY_ROOM_ID: AtomicU32 = AtomicU32::new(1);
 
 /// Allocate a fresh, process-unique player id. Called once per connection.
 pub fn next_player_id() -> u32 {
@@ -316,12 +319,21 @@ impl Lobby {
         room: &str,
         rooms: &mut HashMap<String, RoomHandle>,
     ) -> RoomHandle {
+        let mode = room_mode_for(room);
+        self.create_room_locked_with_mode(room, rooms, mode)
+    }
+
+    fn create_room_locked_with_mode(
+        &self,
+        room: &str,
+        rooms: &mut HashMap<String, RoomHandle>,
+        mode: RoomMode,
+    ) -> RoomHandle {
         let (event_tx, event_rx) = mpsc::channel(ROOM_EVENT_CHANNEL_CAP);
         let handle = RoomHandle { event_tx };
         rooms.insert(room.to_string(), handle.clone());
 
         let name = room.to_string();
-        let mode = room_mode_for(&name);
         let db = self.db.clone();
         let match_history_local_only = self.match_history_local_only;
         let drain = self.drain.clone();
@@ -332,6 +344,26 @@ impl Lobby {
         });
         info!(room = %room, "room created");
         handle
+    }
+
+    /// Create an unguessable, spectator-only replay room backed by a persisted artifact.
+    pub async fn create_replay_room(&self, artifact: ReplayArtifactV1) -> String {
+        let mut rooms = self.rooms.lock().await;
+        loop {
+            let id = NEXT_MATCH_REPLAY_ROOM_ID.fetch_add(1, Ordering::Relaxed);
+            let room = format!("{MATCH_REPLAY_ROOM_PREFIX}:{id:08x}");
+            if rooms.contains_key(&room) {
+                continue;
+            }
+            self.create_room_locked_with_mode(
+                &room,
+                &mut rooms,
+                RoomMode::Replay {
+                    artifact: artifact.clone(),
+                },
+            );
+            return room;
+        }
     }
 
     pub async fn begin_draining(&self, timeout: Duration) {
