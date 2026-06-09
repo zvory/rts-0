@@ -4,6 +4,9 @@
 **/*.rs.bk
 Cargo.lock.orig
 
+#
+.env
+
 # Node (tests)
 **/node_modules
 
