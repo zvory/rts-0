@@ -24,6 +24,10 @@ const COLLISION_PASSES: usize = 8;
 /// non-overlapping. Avoids endless micro-pushes from floating-point noise.
 pub(super) const COLLISION_EPS_PX: f32 = 0.001;
 
+/// Scale applied to the extra lateral nudge that moves stationary blockers away from a moving
+/// vehicle's centerline. The normal overlap-resolution push is unchanged.
+const CENTERLINE_LATERAL_PUSH_SCALE: f32 = 0.5;
+
 /// Resolve unit-unit overlaps with iterative pair-wise pushes so units do not stack on top of
 /// each other. Push direction and depth come from the shared body geometry: infantry resolve as
 /// circles while tanks resolve as oriented hulls. Non-ghost units split the overlap by footing
@@ -326,7 +330,8 @@ fn lateral_offset_one_way(
     };
     let shift = overlap
         .max(config::TILE_SIZE as f32 * 0.125)
-        .min(config::TILE_SIZE as f32 * 0.5);
+        .min(config::TILE_SIZE as f32 * 0.5)
+        * CENTERLINE_LATERAL_PUSH_SCALE;
     Some((side.0 * side_sign * shift, side.1 * side_sign * shift))
 }
 
