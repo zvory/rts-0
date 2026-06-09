@@ -63,7 +63,8 @@ Migrations are versioned SQL files run by `sqlx::migrate!` at server boot. Never
 A row is written when **all** of these are true:
 
 1. The lobby reached `Phase::InGame` (so `match_started_at` was captured).
-2. `match_player_count >= 2` (humans + AI). The 1-player sandbox never records.
+2. `match_human_count >= 2` — at least two human (non-AI) players. Human-vs-AI, AI-only, and
+   1-player sandboxes never record.
 3. `is_dev_watch()` is false — dev self-play, scenario, and replay rooms never record.
 4. The server was started with **both** a working DB connection and `RTS_RECORD_MATCHES` truthy.
 

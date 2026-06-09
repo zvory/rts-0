@@ -128,6 +128,9 @@ pub(super) struct RoomTask {
     /// sandbox never ends while a 2+ player match (including human-vs-AI) resolves to a winner.
     /// `0` outside a match.
     match_player_count: usize,
+    /// Number of human (non-AI) players the in-progress match started with. Only matches where
+    /// this is >= 2 are written to the DB. `0` outside a match.
+    match_human_count: usize,
     /// Connected human players who already received a terminal score screen for the active match.
     outcome_sent: HashSet<u32>,
     dev_driver: Option<DevDriver>,
@@ -163,6 +166,7 @@ impl RoomTask {
             host_id: None,
             phase: Phase::Lobby,
             match_player_count: 0,
+            match_human_count: 0,
             outcome_sent: HashSet::new(),
             dev_driver: None,
             dev_view_player_id: None,
@@ -335,6 +339,7 @@ impl RoomTask {
         if self.players.is_empty() {
             self.phase = Phase::Lobby;
             self.match_player_count = 0;
+            self.match_human_count = 0;
             self.outcome_sent.clear();
             self.host_id = None;
             // Drop AI opponents too: with no humans there is nobody to host them, and a fresh
@@ -610,6 +615,7 @@ impl RoomTask {
         if self.match_player_count < 2 {
             self.phase = Phase::Lobby;
             self.match_player_count = 0;
+            self.match_human_count = 0;
             self.outcome_sent.clear();
             for player in self.players.values_mut() {
                 player.ready = false;
@@ -770,6 +776,7 @@ impl RoomTask {
         };
         let payload = game.start_payload();
         self.match_player_count = inits.len();
+        self.match_human_count = inits.iter().filter(|p| !p.is_ai).count();
         self.match_started_at = Some(chrono::Utc::now());
         self.match_map_name = self.selected_map.clone();
         self.match_participants = inits.iter().map(|p| p.name.clone()).collect();
@@ -1348,11 +1355,10 @@ impl RoomTask {
     fn end_match(&mut self, winner_id: Option<u32>, scores: Vec<PlayerScore>) {
         info!(room = %self.room, ?winner_id, "match over");
 
-        // Persist match history for real (multi-player) matches only. Dev/scenario/replay rooms
-        // and 1-player sandboxes never enter this branch because either the metadata wasn't set or
-        // the player count is below the threshold.
+        // Persist match history only for matches with at least 2 human players. Human-vs-AI,
+        // AI-only, 1-player sandboxes, and dev/scenario/replay rooms are all excluded.
         if let (Some(db), Some(started_at)) = (self.db.clone(), self.match_started_at) {
-            if self.match_player_count >= 2 && !self.is_dev_watch() {
+            if self.match_human_count >= 2 && !self.is_dev_watch() {
                 let ended_at = chrono::Utc::now();
                 let duration_ms = ended_at
                     .signed_duration_since(started_at)
@@ -1413,6 +1419,7 @@ impl RoomTask {
         // Reset for the next match: drop the game, clear ready flags, and re-advertise the lobby.
         self.phase = Phase::Lobby;
         self.match_player_count = 0;
+        self.match_human_count = 0;
         self.outcome_sent.clear();
         for player in self.players.values_mut() {
             player.ready = false;
