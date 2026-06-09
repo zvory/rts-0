@@ -8,8 +8,8 @@ at `2.0x` speed.
 ## Server Work
 
 - Capture `ReplayArtifactV1` in `end_match` before dropping the live `Game`.
-- Send the normal `gameOver` result, but do not leave players stranded on a frozen score screen.
-- Transition the room from `InGame` to `ReplayViewer` with the captured artifact.
+- Send the normal `gameOver` result, but do not leave players stranded on a frozen score screen. 
+- Transition the room from `InGame` to `ReplayViewer` with the captured artifact. Score screen should persist until closed by clicking X or clicking anywhere that isn't the score screen panel.
 - Send a replay start payload to every connected human in the room, including players eliminated
   earlier who already received an individual `gameOver`.
 - Default every viewer's replay fog selection to all players' combined authoritative vision.
@@ -21,8 +21,8 @@ at `2.0x` speed.
 ## Client Flow
 
 - On replay start, tear down the live `Match` instance and construct replay mode.
-- Keep the score result available as an overlay or collapsible panel, but let replay playback begin
-  immediately.
+- Keep the score result available as closable panel, but let replay playback begin
+  immediately behind it.
 - Provide a clear way back to lobby.
 
 ## Verification
