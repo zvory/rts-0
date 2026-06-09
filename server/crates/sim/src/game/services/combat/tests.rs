@@ -880,56 +880,7 @@ fn charged_rifleman_move_order_keeps_path_while_firing() {
 }
 
 #[test]
-fn charging_rifleman_miss_still_emits_attack_event() {
-    let make_entities = || {
-        let mut entities = EntityStore::new();
-        let rifleman_id = entities
-            .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
-            .expect("rifleman should spawn");
-        let enemy_id = entities
-            .spawn_unit(2, EntityKind::Rifleman, 120.0, 100.0)
-            .expect("enemy should spawn");
-        if let Some(rifleman) = entities.get_mut(rifleman_id) {
-            rifleman.set_order(Order::move_to(300.0, 100.0));
-            rifleman.set_path(vec![(300.0, 100.0)]);
-            rifleman.set_path_goal(Some((300.0, 100.0)));
-            rifleman.start_charge(config::RIFLEMAN_CHARGE_TICKS);
-        }
-        (entities, rifleman_id, enemy_id)
-    };
-
-    let (entities, rifleman_id, enemy_id) = make_entities();
-    let map = Map::generate(2, 0x00C0_FFEE);
-    let players = [player_state(1, false), player_state(2, false)];
-    let enemy_hp = entities.get(enemy_id).expect("enemy should exist").hp;
-    let mut missed_events = None;
-    for seed in 0..128 {
-        let (mut seeded_entities, _, _) = make_entities();
-        let events = run_combat_tick_on_map_with_seed(&mut seeded_entities, &players, &map, seed);
-        if seeded_entities
-            .get(enemy_id)
-            .expect("enemy should exist")
-            .hp
-            == enemy_hp
-        {
-            missed_events = Some(events);
-            break;
-        }
-    }
-
-    let events = missed_events.expect("seeded charge shot should miss for at least one seed");
-    assert!(
-        events
-            .get(&1)
-            .expect("attacker owner events should exist")
-            .iter()
-            .any(|event| matches!(event, Event::Attack { from, to, .. } if *from == rifleman_id && *to == enemy_id)),
-        "missed charge shots should still emit attack feedback"
-    );
-}
-
-#[test]
-fn stationary_charged_rifleman_does_not_take_miss_penalty() {
+fn moving_charged_rifleman_does_not_take_miss_penalty() {
     let mut entities = EntityStore::new();
     let rifleman_id = entities
         .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
@@ -938,6 +889,9 @@ fn stationary_charged_rifleman_does_not_take_miss_penalty() {
         .spawn_unit(2, EntityKind::Rifleman, 120.0, 100.0)
         .expect("enemy should spawn");
     if let Some(rifleman) = entities.get_mut(rifleman_id) {
+        rifleman.set_order(Order::move_to(300.0, 100.0));
+        rifleman.set_path(vec![(300.0, 100.0)]);
+        rifleman.set_path_goal(Some((300.0, 100.0)));
         rifleman.start_charge(config::RIFLEMAN_CHARGE_TICKS);
     }
     let enemy_hp = entities.get(enemy_id).expect("enemy should exist").hp;
@@ -947,7 +901,7 @@ fn stationary_charged_rifleman_does_not_take_miss_penalty() {
     assert_eq!(
         entities.get(enemy_id).expect("enemy should exist").hp,
         enemy_hp.saturating_sub(5),
-        "stationary charged riflemen should fire with normal accuracy"
+        "moving charged riflemen should fire with normal accuracy"
     );
 }
 
