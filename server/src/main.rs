@@ -801,6 +801,7 @@ mod tests {
         assert!(html.contains("Scout Car Snaking Corridor"));
         assert!(html.contains("Direct Reverse Order"));
         assert!(html.contains("Vehicle Wall Chokepoint"));
+        assert!(html.contains("Vehicle Corner Wall"));
         assert!(html.contains("Vehicle Small-Unit Block Baseline"));
         assert!(html.contains("<table class=\"scenario-table\">"));
         assert!(html.contains("/dev/scenarios?id=scout_car_snaking_corridor&unit=worker&count=1"));
@@ -811,6 +812,9 @@ mod tests {
         );
         assert!(html.contains("/dev/scenarios?id=scout_car_wall_chokepoint&unit=tank&count=15"));
         assert!(html.contains("/dev/scenarios?id=scout_car_wall_chokepoint&unit=at_team&count=15"));
+        assert!(html.contains("/dev/scenarios?id=vehicle_corner_wall&unit=at_team&count=5"));
+        assert!(html.contains("/dev/scenarios?id=vehicle_corner_wall&unit=scout_car&count=5"));
+        assert!(html.contains("/dev/scenarios?id=vehicle_corner_wall&unit=tank&count=5"));
         assert!(
             html.contains("/dev/scenarios?id=vehicle_small_block_baseline&unit=scout_car&count=5")
         );

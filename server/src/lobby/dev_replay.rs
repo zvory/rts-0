@@ -18,6 +18,7 @@ pub(super) fn room_mode_for(room: &str) -> RoomMode {
                     "scout_car_snaking_corridor" => DevScenarioId::ScoutCarSnakingCorridor,
                     "direct_reverse_order" => DevScenarioId::DirectReverseOrder,
                     "scout_car_wall_chokepoint" => DevScenarioId::ScoutCarWallChokepoint,
+                    "vehicle_corner_wall" => DevScenarioId::VehicleCornerWall,
                     "vehicle_small_block_baseline" => DevScenarioId::VehicleSmallBlockBaseline,
                     _ => return RoomMode::Normal,
                 },
