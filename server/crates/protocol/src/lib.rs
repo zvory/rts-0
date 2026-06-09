@@ -173,7 +173,11 @@ pub enum Command {
         queued: bool,
     },
     Build {
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
         units: Vec<u32>,
+        /// Legacy single-worker build payload accepted for old cached clients/replays.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        worker: Option<u32>,
         building: String,
         tile_x: u32,
         tile_y: u32,
