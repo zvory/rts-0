@@ -50,7 +50,7 @@ pub enum SimCommand {
         queued: bool,
     },
     Build {
-        worker: u32,
+        units: Vec<u32>,
         building: EntityKind,
         tile_x: u32,
         tile_y: u32,
@@ -182,14 +182,14 @@ impl SimCommand {
                 queued,
             },
             protocol::Command::Build {
-                worker,
+                units,
                 building,
                 tile_x,
                 tile_y,
                 queued,
             } => match building.parse::<EntityKind>() {
                 Ok(building) if building.is_building() => SimCommand::Build {
-                    worker,
+                    units,
                     building,
                     tile_x,
                     tile_y,
@@ -306,13 +306,13 @@ impl SimCommand {
                 queued: *queued,
             },
             SimCommand::Build {
-                worker,
+                units,
                 building,
                 tile_x,
                 tile_y,
                 queued,
             } => protocol::Command::Build {
-                worker: *worker,
+                units: units.clone(),
                 building: protocol::kind_to_wire(*building).to_string(),
                 tile_x: *tile_x,
                 tile_y: *tile_y,
@@ -358,7 +358,7 @@ mod tests {
     #[test]
     fn protocol_build_command_translates_kind() {
         let command = protocol::Command::Build {
-            worker: 7,
+            units: vec![7],
             building: kinds::BARRACKS.to_string(),
             tile_x: 4,
             tile_y: 8,
@@ -368,7 +368,7 @@ mod tests {
         assert_eq!(
             SimCommand::from_protocol(command),
             SimCommand::Build {
-                worker: 7,
+                units: vec![7],
                 building: EntityKind::Barracks,
                 tile_x: 4,
                 tile_y: 8,

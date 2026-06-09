@@ -1273,7 +1273,7 @@ fn pending_build_tracker_keeps_moving_worker_past_stale_window() {
     tracker.record_commands(
         10,
         &[Command::Build {
-            worker: 2,
+            units: vec![2],
             building: EntityKind::CityCentre,
             tile_x: 48,
             tile_y: 70,
@@ -1299,7 +1299,7 @@ fn pending_build_tracker_expires_stuck_worker() {
     tracker.record_commands(
         10,
         &[Command::Build {
-            worker: 2,
+            units: vec![2],
             building: EntityKind::CityCentre,
             tile_x: 48,
             tile_y: 70,

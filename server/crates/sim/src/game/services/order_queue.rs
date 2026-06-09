@@ -19,7 +19,7 @@ use crate::game::services::standability;
 use crate::game::services::world_query;
 use crate::game::smoke::SmokeCloudStore;
 use crate::game::PlayerState;
-use crate::protocol::Event;
+use crate::protocol::{Event, NoticeSeverity};
 use crate::rules;
 
 const ATTACK_UNREACHABLE_PROMOTION_CHECKS: u16 = 3;
@@ -129,7 +129,7 @@ pub(crate) fn promote_ready_orders(
             clear_completed_active_order(entities, id);
         }
 
-        let Some(promoted) = pop_next_valid_intent(map, entities, players, fog, id) else {
+        let Some(promoted) = pop_next_valid_intent(map, entities, players, fog, events, id) else {
             continue;
         };
         match promoted {
@@ -219,6 +219,7 @@ fn pop_next_valid_intent(
     entities: &mut EntityStore,
     players: &[PlayerState],
     fog: &Fog,
+    events: &mut std::collections::HashMap<u32, Vec<Event>>,
     id: u32,
 ) -> Option<PromotedIntent> {
     let owner = entities.get(id)?.owner;
@@ -241,7 +242,7 @@ fn pop_next_valid_intent(
                 }
             }
             OrderIntent::Build(build) => {
-                if build_intent_valid(
+                if let Some(msg) = build_intent_promotion_error(
                     map,
                     entities,
                     players,
@@ -251,6 +252,15 @@ fn pop_next_valid_intent(
                     build.tile_x,
                     build.tile_y,
                 ) {
+                    if !msg.is_empty() {
+                        events.entry(owner).or_default().push(Event::Notice {
+                            msg,
+                            x: None,
+                            y: None,
+                            severity: NoticeSeverity::Info,
+                        });
+                    }
+                } else {
                     return Some(PromotedIntent::Build {
                         kind: build.kind,
                         tx: build.tile_x,
@@ -485,7 +495,7 @@ fn gather_intent_valid(entities: &EntityStore, owner: u32, worker: u32, node: u3
 }
 
 #[allow(clippy::too_many_arguments)]
-fn build_intent_valid(
+fn build_intent_promotion_error(
     map: &Map,
     entities: &EntityStore,
     players: &[PlayerState],
@@ -494,24 +504,24 @@ fn build_intent_valid(
     kind: EntityKind,
     tile_x: u32,
     tile_y: u32,
-) -> bool {
+) -> Option<String> {
     if !matches!(entities.get(worker), Some(e) if e.kind == EntityKind::Worker) {
-        return false;
+        return Some(String::new());
     }
     if matches!(entities.get(worker), Some(e)
         if matches!(e.build_phase(), Some(BuildPhase::Constructing { .. })))
     {
-        return false;
+        return Some(String::new());
     }
     if config::building_stats(kind).is_none() {
-        return false;
+        return Some("Unknown building".to_string());
     }
     let owned = world_query::completed_building_kinds(entities, owner);
     if !rules::economy::build_requirement_met(kind, &owned) {
-        return false;
+        return Some("Requirement not met".to_string());
     }
     if tile_x >= map.size || tile_y >= map.size {
-        return false;
+        return Some("Cannot build there".to_string());
     }
     let can_resume =
         resumable_site_for_build_intent(map, entities, owner, kind, tile_x, tile_y).is_some();
@@ -520,17 +530,20 @@ fn build_intent_valid(
             map, entities, kind, tile_x, tile_y, worker,
         )
     {
-        return false;
+        return Some("Cannot build there".to_string());
     }
     let ps = match players.iter().find(|p| p.id == owner) {
         Some(p) => p,
-        None => return false,
+        None => return Some("Not enough resources".to_string()),
     };
     let (cost_steel, cost_oil) = rules::economy::cost(kind);
     if !can_resume && (ps.steel < cost_steel || ps.oil < cost_oil) {
-        return false;
+        return Some(
+            rules::economy::resource_shortage_notice(ps.steel, ps.oil, cost_steel, cost_oil)
+                .to_string(),
+        );
     }
-    true
+    None
 }
 
 #[cfg(test)]
@@ -579,6 +592,14 @@ mod tests {
     }
 
     fn promote_with_players(map: &Map, entities: &mut EntityStore, players: &[PlayerState]) {
+        let _ = promote_with_players_events(map, entities, players);
+    }
+
+    fn promote_with_players_events(
+        map: &Map,
+        entities: &mut EntityStore,
+        players: &[PlayerState],
+    ) -> std::collections::HashMap<u32, Vec<Event>> {
         let mut players: Vec<PlayerState> = players
             .iter()
             .map(|p| PlayerState {
@@ -614,6 +635,7 @@ mod tests {
             &mut events,
             1,
         );
+        events
     }
 
     #[test]
@@ -793,6 +815,33 @@ mod tests {
             "unaffordable build should be skipped and the next move intent should promote"
         );
         assert!(entity.queued_orders().is_empty());
+    }
+
+    #[test]
+    fn queued_build_skip_emits_resource_notice() {
+        let map = flat_map(32);
+        let mut entities = EntityStore::new();
+        let (cc_x, cc_y) = footprint_center(&map, EntityKind::CityCentre, 4, 4);
+        entities
+            .spawn_building(1, EntityKind::CityCentre, cc_x, cc_y, true)
+            .expect("city centre should spawn");
+        let worker = entities
+            .spawn_unit(1, EntityKind::Worker, cc_x + 96.0, cc_y)
+            .expect("worker should spawn");
+        entities
+            .get_mut(worker)
+            .expect("worker should exist")
+            .append_queued_order(OrderIntent::build(EntityKind::Depot, 16, 16));
+        let mut players = vec![player_state(1)];
+        players[0].steel = 0;
+        players[0].oil = 0;
+
+        let events = promote_with_players_events(&map, &mut entities, &players);
+
+        assert!(matches!(
+            events.get(&1).and_then(|events| events.first()),
+            Some(Event::Notice { msg, .. }) if msg == "Not enough steel"
+        ));
     }
 
     #[test]

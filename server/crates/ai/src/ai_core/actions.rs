@@ -226,7 +226,7 @@ pub(crate) fn try_build_at(
         return None;
     }
     ctx.emit_command(Command::Build {
-        worker,
+        units: vec![worker],
         building,
         tile_x,
         tile_y,
@@ -750,8 +750,8 @@ mod tests {
         assert_eq!(ctx.budget().steel, 0);
         assert!(matches!(
             ctx.into_commands().as_slice(),
-            [Command::Build { worker: 10, building, tile_x: 8, tile_y: 8, .. }]
-                if *building == EntityKind::Depot
+            [Command::Build { units, building, tile_x: 8, tile_y: 8, .. }]
+                if units.as_slice() == [10] && *building == EntityKind::Depot
         ));
     }
 

@@ -95,9 +95,8 @@ export function _confirmPlacement(ev = {}) {
     this.state.endPlacement();
     return;
   }
-  const worker = workers[0];
   const queued = !!ev.shiftKey;
-  this.net.command(cmd.build(worker, place.building, place.tileX, place.tileY, queued));
+  this.net.command(cmd.build(workers, place.building, place.tileX, place.tileY, queued));
   if (this.audio) this.audio.play("build_confirm", { category: "ui", priority: 2 });
   // Shift-confirm keeps placement mode active so the player can chain
   // several queued buildings without rearming the command card.

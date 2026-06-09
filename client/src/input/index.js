@@ -892,8 +892,8 @@ export class Input {
    * and no existing entity (unit or building) occupies the same world area.
    */
   /**
-   * Confirm a build placement: if the current ghost is valid and we have a worker
-   * selected, send cmd.build with that worker, then exit placement mode. Invalid
+   * Confirm a build placement: if the current ghost is valid and we have workers
+   * selected, send cmd.build with those workers, then exit placement mode. Invalid
    * clicks are ignored (placement stays active so the player can reposition).
    */
   // --- Keyboard -----------------------------------------------------------

@@ -273,8 +273,10 @@ General rules:
 Allocation rules:
 
 - Point orders (`move`, `attackMove`) apply to every selected owned unit that can receive orders.
-- Target/resource/build orders apply to every selected compatible owned unit after the target or
-  placement has passed issue-time validation.
+- Target/resource orders apply to every selected compatible owned unit after the target has passed
+  issue-time validation. Build orders allocate one compatible selected worker per click after the
+  placement has passed issue-time validation: immediate builds prefer idle workers and then closest
+  worker to the footprint center; queued builds prefer shortest current queue, then closest worker.
 - Legacy Charge has no eligible carriers after the Methamphetamines research conversion. It remains
   decodable for old command logs but does not create queued or immediate ability work.
 - World-targeted abilities, such as Smoke, allocate one ready carrier per click. For queued

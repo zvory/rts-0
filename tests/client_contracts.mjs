@@ -1024,6 +1024,16 @@ function fakeAudioContext() {
       abilityCommand.queued === true,
     "useAbility command builder emits targeted ability wire shape",
   );
+  const buildCommand = cmd.build([7, 8], KIND.DEPOT, 12, 14, true);
+  assert(
+    buildCommand.c === "build" &&
+      buildCommand.units.join(",") === "7,8" &&
+      buildCommand.building === KIND.DEPOT &&
+      buildCommand.tileX === 12 &&
+      buildCommand.tileY === 14 &&
+      buildCommand.queued === true,
+    "build command builder emits selected-worker wire shape",
+  );
 
   assertThrows(
     () => decodeServerMessage({ t: "snapshot", v: COMPACT_SNAPSHOT_VERSION, s: [1], e: [] }),
@@ -1790,7 +1800,7 @@ function fakeAudioContext() {
   input.state.entitiesInterpolated = () => [worker];
   assert(
     input._footprintValid(1, 1, 2, 2, map) === true,
-    "preview should ignore the same first selected worker used for cmd.build",
+    "preview should ignore one selected worker body as an advisory build-placement allowance",
   );
 
   const clickableTank = { id: 10, owner: 1, kind: KIND.TANK, x: 0, y: 0, facing: 0 };

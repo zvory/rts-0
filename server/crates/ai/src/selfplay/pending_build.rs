@@ -112,7 +112,7 @@ impl PendingBuildTracker {
     pub(crate) fn record_commands(&mut self, tick: u32, commands: &[Command]) {
         for command in commands {
             let Command::Build {
-                worker,
+                units,
                 building,
                 tile_x,
                 tile_y,
@@ -124,8 +124,11 @@ impl PendingBuildTracker {
             if config::building_stats(*building).is_none() {
                 continue;
             }
+            let Some(worker) = units.first().copied() else {
+                continue;
+            };
             self.pending.insert(
-                *worker,
+                worker,
                 PendingBuild {
                     kind: *building,
                     tile_x: *tile_x,
