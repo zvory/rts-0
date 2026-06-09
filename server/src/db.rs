@@ -202,7 +202,7 @@ impl Db {
         let limit = limit.clamp(1, 100);
         let rows = sqlx::query(
             r#"
-            select id, started_at, ended_at, duration_ms, map_name,
+            select matches.id as id, started_at, ended_at, duration_ms, map_name,
                    winner_name, outcome, participants, score_screen, local_only,
                    r.artifact_schema_version as replay_artifact_schema_version,
                    r.build_sha as replay_build_sha,
