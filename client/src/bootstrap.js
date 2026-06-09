@@ -154,6 +154,14 @@ export function devWatchConfig() {
   };
 }
 
+export function replayLaunchConfig() {
+  const params = new URLSearchParams(window.location.search);
+  const room = (params.get("replayRoom") || "").trim();
+  if (!room) return null;
+  if (!/^__match_replay__:[A-Za-z0-9_-]+$/.test(room)) return null;
+  return { room };
+}
+
 
 
 /** Cached DOM handles for the pinned ids in index.html (see its DOM contract). */

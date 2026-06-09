@@ -21,6 +21,10 @@ export class MatchHistory {
     this._rows = [];
     /** AbortController for the in-flight request. */
     this._ac = null;
+    /** Row id currently launching a replay, or null. */
+    this._launchingId = null;
+    /** Per-row replay launch errors. */
+    this._launchErrors = new Map();
 
     this._render();
     this.refresh();
@@ -136,7 +140,7 @@ export class MatchHistory {
         detailTr.className = "match-history-detail";
         const detailTd = document.createElement("td");
         detailTd.colSpan = 5;
-        detailTd.appendChild(renderScoreScreen(row.scoreScreen));
+        detailTd.appendChild(this._renderDetail(row));
         detailTr.appendChild(detailTd);
         tbody.appendChild(detailTr);
       }
@@ -148,6 +152,73 @@ export class MatchHistory {
   _toggleRow(id) {
     this._expandedId = this._expandedId === id ? null : id;
     this._renderRows();
+  }
+
+  _renderDetail(row) {
+    const wrap = document.createElement("div");
+    wrap.className = "match-history-detail-wrap";
+    wrap.appendChild(this._renderReplayAction(row));
+    wrap.appendChild(renderScoreScreen(row.scoreScreen));
+    return wrap;
+  }
+
+  _renderReplayAction(row) {
+    const action = document.createElement("div");
+    action.className = "match-history-replay";
+
+    if (row.replayAvailable) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "match-history-replay-button";
+      btn.textContent = this._launchingId === row.id ? "Launching..." : "Watch replay";
+      btn.disabled = this._launchingId === row.id;
+      btn.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        void this._launchReplay(row.id);
+      });
+      action.appendChild(btn);
+    } else if (row.replayUnavailableReason) {
+      const reason = document.createElement("span");
+      reason.className = "match-history-replay-reason";
+      reason.textContent = row.replayUnavailableReason;
+      action.appendChild(reason);
+    }
+
+    const launchError = this._launchErrors.get(row.id);
+    if (launchError) {
+      const error = document.createElement("span");
+      error.className = "match-history-replay-error";
+      error.textContent = launchError;
+      action.appendChild(error);
+    }
+
+    return action;
+  }
+
+  async _launchReplay(id) {
+    if (this._launchingId != null) return;
+    this._launchingId = id;
+    this._launchErrors.delete(id);
+    this._renderRows();
+    try {
+      const res = await this.fetchImpl(`/api/matches/${encodeURIComponent(id)}/replay`, {
+        method: "POST",
+      });
+      if (!res.ok) throw new Error(await replayLaunchError(res));
+      const payload = await res.json();
+      const room = typeof payload?.room === "string" ? payload.room : "";
+      if (!room) throw new Error("Replay launch did not return a room.");
+      const url = new URL("/", window.location.href);
+      url.searchParams.set("replayRoom", room);
+      window.location.assign(url.toString());
+    } catch (err) {
+      this._launchingId = null;
+      this._launchErrors.set(
+        id,
+        err && err.message ? String(err.message) : "Replay could not be launched.",
+      );
+      this._renderRows();
+    }
   }
 }
 
@@ -216,4 +287,16 @@ function renderScoreScreen(scores) {
   table.appendChild(tbody);
   wrap.appendChild(table);
   return wrap;
+}
+
+async function replayLaunchError(res) {
+  try {
+    const payload = await res.json();
+    if (payload && typeof payload.error === "string" && payload.error.trim()) {
+      return payload.error;
+    }
+  } catch {
+    // Fall through to status text.
+  }
+  return `Replay could not be launched (HTTP ${res.status}).`;
 }

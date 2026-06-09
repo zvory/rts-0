@@ -14,6 +14,8 @@ use sqlx::postgres::{PgPoolOptions, PgRow};
 use sqlx::{PgPool, Row};
 use tracing::{error, info, warn};
 
+use crate::game::replay::ReplayArtifactV1;
+
 /// One match-history row to insert.
 #[derive(Debug, Clone)]
 pub struct MatchRecord {
@@ -27,6 +29,8 @@ pub struct MatchRecord {
     pub score_screen: serde_json::Value,
     /// True for developer-local rows that should only be visible from localhost requests.
     pub local_only: bool,
+    /// Optional deterministic replay artifact for replay launch.
+    pub replay: Option<MatchReplayRecord>,
 }
 
 impl MatchRecord {
@@ -36,6 +40,33 @@ impl MatchRecord {
         } else {
             "draw"
         }
+    }
+}
+
+/// One replay artifact row to insert alongside a match-history row.
+#[derive(Debug, Clone)]
+pub struct MatchReplayRecord {
+    pub artifact_schema_version: i32,
+    pub build_sha: String,
+    pub map_name: String,
+    pub map_schema_version: i32,
+    pub map_hash: String,
+    pub duration_ticks: i32,
+    pub artifact_json: serde_json::Value,
+}
+
+impl MatchReplayRecord {
+    pub fn from_artifact(artifact: &ReplayArtifactV1) -> Result<Self, serde_json::Error> {
+        Ok(Self {
+            artifact_schema_version: i32::try_from(artifact.artifact_schema_version)
+                .unwrap_or(i32::MAX),
+            build_sha: artifact.server_build_sha.clone(),
+            map_name: artifact.map_name.clone(),
+            map_schema_version: i32::try_from(artifact.map_schema_version).unwrap_or(i32::MAX),
+            map_hash: artifact.map_content_hash.clone(),
+            duration_ticks: i32::try_from(artifact.duration_ticks).unwrap_or(i32::MAX),
+            artifact_json: serde_json::to_value(artifact)?,
+        })
     }
 }
 
@@ -59,6 +90,21 @@ pub struct MatchSummary {
     pub score_screen: serde_json::Value,
     #[serde(rename = "localOnly")]
     pub local_only: bool,
+    #[serde(rename = "replayAvailable")]
+    pub replay_available: bool,
+    #[serde(rename = "replayUnavailableReason")]
+    pub replay_unavailable_reason: Option<String>,
+    #[serde(skip)]
+    pub replay_metadata: Option<ReplaySummaryMetadata>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ReplaySummaryMetadata {
+    pub artifact_schema_version: i32,
+    pub build_sha: String,
+    pub map_name: String,
+    pub map_schema_version: i32,
+    pub map_hash: String,
 }
 
 #[derive(Clone)]
@@ -85,29 +131,63 @@ impl Db {
     /// Insert one match-history row. Logs on error and swallows it — the caller never blocks.
     pub async fn record_match(&self, rec: MatchRecord) {
         let outcome = rec.outcome();
-        let result = sqlx::query(
-            r#"
+        let result: Result<(), sqlx::Error> = async {
+            let mut tx = self.pool.begin().await?;
+            let match_id: i64 = sqlx::query_scalar(
+                r#"
             insert into matches
                 (started_at, ended_at, duration_ms, map_name,
                  winner_name, outcome, participants, score_screen, local_only)
             values ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            returning id
             "#,
-        )
-        .bind(rec.started_at)
-        .bind(rec.ended_at)
-        .bind(rec.duration_ms)
-        .bind(&rec.map_name)
-        .bind(rec.winner_name.as_deref())
-        .bind(outcome)
-        .bind(&rec.participants)
-        .bind(&rec.score_screen)
-        .bind(rec.local_only)
-        .execute(&self.pool)
+            )
+            .bind(rec.started_at)
+            .bind(rec.ended_at)
+            .bind(rec.duration_ms)
+            .bind(&rec.map_name)
+            .bind(rec.winner_name.as_deref())
+            .bind(outcome)
+            .bind(&rec.participants)
+            .bind(&rec.score_screen)
+            .bind(rec.local_only)
+            .fetch_one(&mut *tx)
+            .await?;
+
+            if let Some(replay) = &rec.replay {
+                sqlx::query(
+                    r#"
+                    insert into match_replays
+                        (match_id, artifact_schema_version, build_sha, map_name,
+                         map_schema_version, map_hash, duration_ticks, artifact_json)
+                    values ($1, $2, $3, $4, $5, $6, $7, $8)
+                    "#,
+                )
+                .bind(match_id)
+                .bind(replay.artifact_schema_version)
+                .bind(&replay.build_sha)
+                .bind(&replay.map_name)
+                .bind(replay.map_schema_version)
+                .bind(&replay.map_hash)
+                .bind(replay.duration_ticks)
+                .bind(&replay.artifact_json)
+                .execute(&mut *tx)
+                .await?;
+            }
+
+            tx.commit().await
+        }
         .await;
 
         match result {
             Ok(_) => {
-                info!(map = %rec.map_name, outcome, local_only = rec.local_only, "match recorded")
+                info!(
+                    map = %rec.map_name,
+                    outcome,
+                    local_only = rec.local_only,
+                    replay = rec.replay.is_some(),
+                    "match recorded"
+                )
             }
             Err(err) => error!(%err, map = %rec.map_name, "failed to record match"),
         }
@@ -123,8 +203,14 @@ impl Db {
         let rows = sqlx::query(
             r#"
             select id, started_at, ended_at, duration_ms, map_name,
-                   winner_name, outcome, participants, score_screen, local_only
+                   winner_name, outcome, participants, score_screen, local_only,
+                   r.artifact_schema_version as replay_artifact_schema_version,
+                   r.build_sha as replay_build_sha,
+                   r.map_name as replay_map_name,
+                   r.map_schema_version as replay_map_schema_version,
+                   r.map_hash as replay_map_hash
             from matches
+            left join match_replays r on r.match_id = matches.id
             where ($2 or not local_only)
               and (
                 $2
@@ -149,9 +235,49 @@ impl Db {
 
         Ok(rows.into_iter().map(row_to_summary).collect())
     }
+
+    /// Load a persisted replay artifact for a match visible to this request scope.
+    pub async fn replay_artifact_for_match(
+        &self,
+        match_id: i64,
+        include_local: bool,
+    ) -> Result<Option<ReplayArtifactV1>, ReplayLoadError> {
+        let row = sqlx::query(
+            r#"
+            select r.artifact_json
+            from match_replays r
+            join matches m on m.id = r.match_id
+            where m.id = $1
+              and ($2 or not m.local_only)
+            "#,
+        )
+        .bind(match_id)
+        .bind(include_local)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(ReplayLoadError::Db)?;
+
+        let Some(row) = row else {
+            return Ok(None);
+        };
+        let value: serde_json::Value = row.get("artifact_json");
+        serde_json::from_value(value)
+            .map(Some)
+            .map_err(ReplayLoadError::Decode)
+    }
 }
 
 fn row_to_summary(row: PgRow) -> MatchSummary {
+    let replay_metadata = row
+        .try_get::<i32, _>("replay_artifact_schema_version")
+        .ok()
+        .map(|artifact_schema_version| ReplaySummaryMetadata {
+            artifact_schema_version,
+            build_sha: row.get("replay_build_sha"),
+            map_name: row.get("replay_map_name"),
+            map_schema_version: row.get("replay_map_schema_version"),
+            map_hash: row.get("replay_map_hash"),
+        });
     MatchSummary {
         id: row.get("id"),
         started_at: row.get("started_at"),
@@ -163,8 +289,30 @@ fn row_to_summary(row: PgRow) -> MatchSummary {
         participants: row.get("participants"),
         score_screen: row.get("score_screen"),
         local_only: row.get("local_only"),
+        replay_available: replay_metadata.is_some(),
+        replay_unavailable_reason: replay_metadata
+            .is_none()
+            .then(|| "Replay was not recorded for this match.".to_string()),
+        replay_metadata,
     }
 }
+
+#[derive(Debug)]
+pub enum ReplayLoadError {
+    Db(sqlx::Error),
+    Decode(serde_json::Error),
+}
+
+impl std::fmt::Display for ReplayLoadError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ReplayLoadError::Db(err) => write!(f, "{err}"),
+            ReplayLoadError::Decode(err) => write!(f, "{err}"),
+        }
+    }
+}
+
+impl std::error::Error for ReplayLoadError {}
 
 /// Best-effort connect at boot. Logs and returns `None` on failure so the server stays usable
 /// without a database (dev environments, transient outages).

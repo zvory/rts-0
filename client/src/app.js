@@ -21,6 +21,7 @@ import {
   diagnostics,
   dom,
   formatScore,
+  replayLaunchConfig,
   wsUrl,
 } from "./bootstrap.js";
 import { Match } from "./match.js";
@@ -45,6 +46,7 @@ export class App {
     /** @type {Net} persistent connection across lobby + matches. */
     this.net = new Net(wsUrl(), diagnostics);
     this.devWatch = devWatchConfig();
+    this.replayLaunch = replayLaunchConfig();
     /**
      * Audio engine. Long-lived across matches: the AudioContext is unlocked
      * by the user's first gesture (anywhere in the page), and we want that
@@ -99,7 +101,8 @@ export class App {
     this.applyDevBanner();
     try {
       await this.net.connect();
-      this.maybeAutoJoinDevWatch();
+      if (this.replayLaunch) this.maybeAutoJoinReplay();
+      else this.maybeAutoJoinDevWatch();
     } catch (err) {
       this.showConnectionWarning();
     }
@@ -124,6 +127,15 @@ export class App {
     if (this.lobby?.roomBlock) this.lobby.roomBlock.hidden = true;
     const label = this.devWatch.kind === "scenario" ? "scenario" : "self-play watch";
     this.lobby.setStatus(`Starting local ${label}...`);
+  }
+
+  maybeAutoJoinReplay() {
+    const name = "Spectator";
+    if (this.lobby?.elName) this.lobby.elName.value = name;
+    if (this.lobby?.elRoom) this.lobby.elRoom.value = this.replayLaunch.room;
+    this.net.join(name, this.replayLaunch.room, true);
+    if (this.lobby?.roomBlock) this.lobby.roomBlock.hidden = true;
+    this.lobby.setStatus("Starting replay...");
   }
 
   /**

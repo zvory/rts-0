@@ -13,7 +13,7 @@ use std::net::SocketAddr;
 use std::time::{Duration, Instant};
 
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
-use axum::extract::{ConnectInfo, Query, State};
+use axum::extract::{ConnectInfo, Path, Query, State};
 use axum::http::header;
 use axum::http::StatusCode;
 use axum::response::{Html, IntoResponse, Redirect};
@@ -21,7 +21,7 @@ use axum::routing::{get, post};
 use axum::Json;
 use axum::Router;
 use futures_util::{SinkExt, StreamExt};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 use tower_http::services::{ServeDir, ServeFile};
 use tracing::{debug, info, warn};
@@ -34,6 +34,8 @@ use rts_server::dev_scenarios::{
     all_dev_scenarios, dev_scenario_blocker_label, dev_scenario_unit_label,
     parse_dev_scenario_launch,
 };
+use rts_server::game::map::Map;
+use rts_server::game::replay::{ReplayArtifactV1, REPLAY_ARTIFACT_SCHEMA_VERSION_V1};
 use rts_server::game::SimCommand;
 use rts_server::lobby::{self, Lobby, RoomEvent};
 use rts_server::perf;
@@ -131,6 +133,10 @@ async fn main() {
         .route("/dev/scenarios", get(dev_scenario_handler))
         .route("/maps/save", post(map_save_handler))
         .route("/api/matches", get(matches_handler))
+        .route(
+            "/api/matches/{id}/replay",
+            post(match_replay_launch_handler),
+        )
         .nest_service("/maps", ServeDir::new(maps_dir))
         .fallback_service(static_service)
         .with_state(state);
@@ -265,7 +271,12 @@ async fn matches_handler(
     };
     let include_local = request_allows_local_match_history(&remote);
     match db.recent_matches(limit, include_local).await {
-        Ok(rows) => Json(rows).into_response(),
+        Ok(mut rows) => {
+            for row in &mut rows {
+                apply_replay_summary_compatibility(row, &state.version);
+            }
+            Json(rows).into_response()
+        }
         Err(err) => {
             warn!(%err, "match history query failed");
             (
@@ -277,8 +288,134 @@ async fn matches_handler(
     }
 }
 
+#[derive(Serialize)]
+struct MatchReplayLaunchResponse {
+    room: String,
+}
+
+#[derive(Serialize)]
+struct ApiError {
+    error: String,
+}
+
+/// POST /api/matches/{id}/replay — create a spectator replay room for a compatible persisted match.
+async fn match_replay_launch_handler(
+    State(state): State<AppState>,
+    ConnectInfo(remote): ConnectInfo<SocketAddr>,
+    Path(match_id): Path<i64>,
+) -> impl IntoResponse {
+    let Some(db) = state.db.clone() else {
+        return (
+            StatusCode::NOT_FOUND,
+            Json(ApiError {
+                error: "Replay is unavailable because match history is not configured.".to_string(),
+            }),
+        )
+            .into_response();
+    };
+    let include_local = request_allows_local_match_history(&remote);
+    let artifact = match db.replay_artifact_for_match(match_id, include_local).await {
+        Ok(Some(artifact)) => artifact,
+        Ok(None) => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(ApiError {
+                    error: "Replay is unavailable for this match.".to_string(),
+                }),
+            )
+                .into_response();
+        }
+        Err(err) => {
+            warn!(%err, match_id, "match replay load failed");
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ApiError {
+                    error: "Replay could not be loaded.".to_string(),
+                }),
+            )
+                .into_response();
+        }
+    };
+
+    if let Some(reason) = replay_incompatibility_reason(&artifact, &state.version) {
+        return (StatusCode::CONFLICT, Json(ApiError { error: reason })).into_response();
+    }
+
+    let room = state.lobby.create_replay_room(artifact).await;
+    Json(MatchReplayLaunchResponse { room }).into_response()
+}
+
 fn request_allows_local_match_history(remote: &SocketAddr) -> bool {
     remote.ip().is_loopback()
+}
+
+fn apply_replay_summary_compatibility(row: &mut rts_server::db::MatchSummary, build_sha: &str) {
+    let Some(meta) = &row.replay_metadata else {
+        row.replay_available = false;
+        row.replay_unavailable_reason = Some("Replay was not recorded for this match.".to_string());
+        return;
+    };
+    if meta.artifact_schema_version != REPLAY_ARTIFACT_SCHEMA_VERSION_V1 as i32 {
+        row.replay_available = false;
+        row.replay_unavailable_reason = Some(format!(
+            "Replay schema {} is not supported by this server.",
+            meta.artifact_schema_version
+        ));
+        return;
+    }
+    if meta.build_sha != build_sha {
+        row.replay_available = false;
+        row.replay_unavailable_reason = Some(format!(
+            "Replay was recorded by server build {}; running build is {}.",
+            meta.build_sha, build_sha
+        ));
+        return;
+    }
+    let running_map = match Map::metadata_for_name(&meta.map_name) {
+        Ok(metadata) => metadata,
+        Err(_) => {
+            row.replay_available = false;
+            row.replay_unavailable_reason = Some(format!(
+                "Replay map {:?} is not available on this server.",
+                meta.map_name
+            ));
+            return;
+        }
+    };
+    if meta.map_schema_version != running_map.schema_version as i32 {
+        row.replay_available = false;
+        row.replay_unavailable_reason = Some(format!(
+            "Replay map {:?} schema is {}; running map schema is {}.",
+            meta.map_name, meta.map_schema_version, running_map.schema_version
+        ));
+        return;
+    }
+    if meta.map_hash != running_map.content_hash {
+        row.replay_available = false;
+        row.replay_unavailable_reason = Some(format!(
+            "Replay map {:?} has changed on this server.",
+            meta.map_name
+        ));
+        return;
+    }
+    row.replay_available = true;
+    row.replay_unavailable_reason = None;
+}
+
+fn replay_incompatibility_reason(artifact: &ReplayArtifactV1, build_sha: &str) -> Option<String> {
+    let running_map = match Map::metadata_for_name(&artifact.map_name) {
+        Ok(metadata) => metadata,
+        Err(_) => {
+            return Some(format!(
+                "Replay map {:?} is not available on this server.",
+                artifact.map_name
+            ));
+        }
+    };
+    artifact
+        .validate_against(build_sha, &running_map)
+        .err()
+        .map(|err| err.to_string())
 }
 
 async fn beta_redirect_handler() -> impl IntoResponse {
@@ -720,6 +857,76 @@ mod tests {
     fn local_match_history_rejected_for_public_remote() {
         let remote: SocketAddr = "203.0.113.10:50000".parse().unwrap();
         assert!(!request_allows_local_match_history(&remote));
+    }
+
+    fn replay_summary_for(
+        meta: Option<rts_server::db::ReplaySummaryMetadata>,
+    ) -> rts_server::db::MatchSummary {
+        rts_server::db::MatchSummary {
+            id: 1,
+            started_at: chrono::Utc::now(),
+            ended_at: chrono::Utc::now(),
+            duration_ms: 1_000,
+            map_name: "Default".to_string(),
+            winner_name: Some("Alpha".to_string()),
+            outcome: "win".to_string(),
+            participants: vec!["Alpha".to_string(), "Bravo".to_string()],
+            score_screen: serde_json::Value::Array(Vec::new()),
+            local_only: false,
+            replay_available: meta.is_some(),
+            replay_unavailable_reason: None,
+            replay_metadata: meta,
+        }
+    }
+
+    #[test]
+    fn replay_summary_marks_current_build_and_map_available() {
+        let map = Map::metadata_for_name("Default").unwrap();
+        let mut row = replay_summary_for(Some(rts_server::db::ReplaySummaryMetadata {
+            artifact_schema_version: REPLAY_ARTIFACT_SCHEMA_VERSION_V1 as i32,
+            build_sha: "current-build".to_string(),
+            map_name: map.name,
+            map_schema_version: map.schema_version as i32,
+            map_hash: map.content_hash,
+        }));
+
+        apply_replay_summary_compatibility(&mut row, "current-build");
+
+        assert!(row.replay_available);
+        assert_eq!(row.replay_unavailable_reason, None);
+    }
+
+    #[test]
+    fn replay_summary_explains_incompatible_build() {
+        let map = Map::metadata_for_name("Default").unwrap();
+        let mut row = replay_summary_for(Some(rts_server::db::ReplaySummaryMetadata {
+            artifact_schema_version: REPLAY_ARTIFACT_SCHEMA_VERSION_V1 as i32,
+            build_sha: "old-build".to_string(),
+            map_name: map.name,
+            map_schema_version: map.schema_version as i32,
+            map_hash: map.content_hash,
+        }));
+
+        apply_replay_summary_compatibility(&mut row, "new-build");
+
+        assert!(!row.replay_available);
+        assert!(row
+            .replay_unavailable_reason
+            .as_deref()
+            .is_some_and(|reason| reason.contains("old-build") && reason.contains("new-build")));
+    }
+
+    #[test]
+    fn replay_summary_explains_missing_artifact() {
+        let mut row = replay_summary_for(None);
+
+        apply_replay_summary_compatibility(&mut row, "current-build");
+
+        assert!(!row.replay_available);
+        assert_eq!(
+            row.replay_unavailable_reason.as_deref(),
+            Some("Replay was not recorded for this match.")
+        );
     }
 }
 

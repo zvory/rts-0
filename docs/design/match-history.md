@@ -13,7 +13,7 @@ and what the scores are, so the server is also the only writer.
 
 ## Storage
 
-Supabase Postgres. Schema in `server/migrations/`. Single table:
+Supabase Postgres. Schema in `server/migrations/`. Match summaries live in `matches`:
 
 | column          | type            | notes                                           |
 | --------------- | --------------- | ----------------------------------------------- |
@@ -35,6 +35,24 @@ The `score_screen` JSONB intentionally stores the full payload from `Game::score
 matches `contract::PlayerScore` (camelCase). Adding fields to `PlayerScore` requires no migration;
 old rows simply lack the new fields.
 
+Replay artifacts live in `match_replays`, keyed one-to-one by `match_id`:
+
+| column                    | type          | notes                                                |
+| ------------------------- | ------------- | ---------------------------------------------------- |
+| `id`                      | `bigserial` PK |                                                      |
+| `match_id`                | `bigint`      | Unique FK to `matches(id)`, cascade delete.          |
+| `artifact_schema_version` | `integer`     | Deterministic replay artifact schema.                |
+| `build_sha`               | `text`        | Server build that recorded the replay.               |
+| `map_name`                | `text`        | Map name captured in the artifact.                   |
+| `map_schema_version`      | `integer`     | Map schema captured in the artifact.                 |
+| `map_hash`                | `text`        | Authored map content hash captured in the artifact.  |
+| `duration_ticks`          | `integer`     | Replay duration in simulation ticks.                 |
+| `artifact_json`           | `jsonb`       | Whole `ReplayArtifactV1` blob.                       |
+| `created_at`/`updated_at` | `timestamptz` | Default to `now()` at insert.                        |
+
+`matches.score_screen` remains score data only. Replay playback never reads replay payloads from
+`score_screen`.
+
 Migrations are versioned SQL files run by `sqlx::migrate!` at server boot. Never hand-apply DDL.
 
 ## Wire
@@ -42,24 +60,36 @@ Migrations are versioned SQL files run by `sqlx::migrate!` at server boot. Never
 - **Read**: `GET /api/matches?limit=N` — JSON array, newest first, `limit` clamped server-side to
   `[1, 100]`, defaults to 20. Returns `[]` when no DB is configured (so the client never needs
   to special-case missing-DB). Local-only rows are included only when the request peer address is
-  loopback; public beta/mainline requests filter them out.
+  loopback; public beta/mainline requests filter them out. Each summary includes
+  `replayAvailable` plus `replayUnavailableReason`. Availability is true only when a replay row
+  exists and its artifact schema, build SHA, map schema, and map content hash are compatible with
+  the running server.
+- **Replay launch**: `POST /api/matches/{id}/replay` — read-only launch request. The server loads
+  the persisted artifact only if the match is visible to the request scope, validates it against
+  the running build and map metadata, creates a spectator replay room, and returns
+  `{ "room": "..." }`. Incompatible or missing replays return a clear JSON `{ "error": "..." }`
+  instead of trying partial playback.
 - **Write**: none. Clients cannot write history. Period.
 
 ## Code seams
 
-- `server/src/db.rs` — `Db` (pool + migrate), `record_match`, `recent_matches`, `MatchRecord`,
-  `MatchSummary`.
+- `server/src/db.rs` — `Db` (pool + migrate), `record_match`, `recent_matches`,
+  `replay_artifact_for_match`, `MatchRecord`, `MatchSummary`.
 - `server/src/main.rs` — `.env` loading, pool construction, `/api/matches` handler, the
+  `POST /api/matches/{id}/replay` launch handler, replay compatibility checks, and the
   `RTS_RECORD_MATCHES` gate.
-- `server/src/lobby/mod.rs` — `Lobby::with_db()` injects an `Option<Arc<Db>>` into spawned rooms.
+- `server/src/lobby/mod.rs` — `Lobby::with_match_history()` injects an `Option<Arc<Db>>` into
+  spawned rooms and can create persisted replay rooms from launch-approved artifacts.
 - `server/src/lobby/room_task.rs` — captures `match_started_at`, `match_map_name`,
-  `match_participants` at `start_match`; writes one row in `end_match` via a **detached**
-  `tokio::spawn`. Detachment is load-bearing: a slow Supabase write must never stall the room
-  transitioning back to lobby.
+  `match_participants` at `start_match`; captures `ReplayArtifactV1` from the ending `Game`;
+  writes the match row and optional replay row in `end_match` via a **detached** `tokio::spawn`.
+  Detachment is load-bearing: a slow Supabase write must never stall the room transitioning back
+  to lobby.
 - `client/src/match_history.js` — fetches and renders the lobby table; row click expands the
-  score screen.
+  score screen and, when compatible, exposes a replay launch action.
 - `client/src/app.js` — mounts `MatchHistory` when the lobby shows; `refresh()` is called from
-  `onBackToLobby` so the freshly-written row appears without a page reload.
+  `onBackToLobby` so the freshly-written row appears without a page reload. `?replayRoom=...`
+  auto-joins a server-created replay room through the normal WebSocket join flow.
 
 ## What gets recorded
 
@@ -75,7 +105,9 @@ A row is written when **all** of these are true:
 5. The server was started with a working DB connection.
 
 Anything else (DB failures, dev rooms, test rooms, missing DB) silently skips the write. The
-simulation and lobby flow are unaffected.
+simulation and lobby flow are unaffected. Replay artifacts use the same eligibility as match rows:
+if a match row is skipped, no replay row is written. Local-only replay visibility follows the
+owning `matches.local_only` row through the launch query.
 
 Public reads also suppress historical bot/test rows that were written before this eligibility
 filter existed, and migration `20260609000002_suppress_automated_match_history.sql` tags those
@@ -115,6 +147,9 @@ can see them.
   `migrations/` filenames are timestamp-prefixed and sequential.
 - **Slow write**: detached task means the room is unblocked. Worst case the row appears seconds
   later in `/api/matches`.
+- **Replay incompatible with current build/map**: summaries show `replayAvailable: false` with a
+  reason, and launch returns `409` with the same class of explanation. The server never attempts
+  best-effort playback across build or map drift.
 
 ## Secrets and rotation
 
