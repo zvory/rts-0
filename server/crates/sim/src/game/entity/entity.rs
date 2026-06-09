@@ -2,7 +2,6 @@ use std::collections::BTreeMap;
 
 use crate::config;
 use crate::game::ability::AbilityKind;
-use crate::game::upgrade::UpgradeKind;
 use crate::protocol::states;
 use crate::rules;
 
@@ -417,15 +416,11 @@ impl Entity {
             .and_then(|m| (self.kind == EntityKind::Tank).then_some(m.lifetime_oil_used))
     }
 
-    pub fn charge_ticks(&self) -> u16 {
+    pub(crate) fn charge_ticks(&self) -> u16 {
         self.movement.as_ref().map(|m| m.charge_ticks).unwrap_or(0)
     }
 
-    pub fn charge_cooldown_ticks(&self) -> u16 {
-        self.ability_cooldown_ticks(AbilityKind::Charge)
-    }
-
-    pub fn start_charge(&mut self, ticks: u16) {
+    pub(crate) fn start_charge(&mut self, ticks: u16) {
         if self.kind == EntityKind::Rifleman {
             if let Some(m) = self.movement.as_mut() {
                 m.charge_ticks = ticks;
@@ -433,7 +428,7 @@ impl Entity {
         }
     }
 
-    pub fn tick_charge(&mut self) {
+    pub(crate) fn tick_charge(&mut self) {
         if let Some(m) = self.movement.as_mut() {
             m.charge_ticks = m.charge_ticks.saturating_sub(1);
         }
@@ -483,14 +478,6 @@ impl Entity {
             *ticks = ticks.saturating_sub(1);
             *ticks > 0
         });
-    }
-
-    pub fn movement_speed_multiplier(&self) -> f32 {
-        if self.kind == EntityKind::Rifleman && self.charge_ticks() > 0 {
-            config::RIFLEMAN_CHARGE_SPEED_MULTIPLIER
-        } else {
-            1.0
-        }
     }
 
     pub fn set_facing(&mut self, facing: f32) {
@@ -696,18 +683,18 @@ impl Entity {
         true
     }
 
-    pub fn research_queue(&self) -> &[ResearchItem] {
+    pub(crate) fn research_queue(&self) -> &[ResearchItem] {
         self.production
             .as_ref()
             .map(|p| p.research_queue.as_slice())
             .unwrap_or(&[])
     }
 
-    pub fn research_queue_mut(&mut self) -> Option<&mut Vec<ResearchItem>> {
+    pub(crate) fn research_queue_mut(&mut self) -> Option<&mut Vec<ResearchItem>> {
         self.production.as_mut().map(|p| &mut p.research_queue)
     }
 
-    pub fn push_research(&mut self, item: ResearchItem) -> bool {
+    pub(crate) fn push_research(&mut self, item: ResearchItem) -> bool {
         let Some(p) = self.production.as_mut() else {
             return false;
         };
@@ -715,7 +702,7 @@ impl Entity {
         true
     }
 
-    pub fn pop_last_research(&mut self) -> Option<ResearchItem> {
+    pub(crate) fn pop_last_research(&mut self) -> Option<ResearchItem> {
         self.production.as_mut()?.research_queue.pop()
     }
 
@@ -955,16 +942,6 @@ impl Entity {
             m.path.clear();
         }
         self.set_target_id(None);
-    }
-}
-
-impl Entity {
-    pub fn has_upgrade_effect(&self, upgrade: UpgradeKind, player_has_upgrade: bool) -> bool {
-        match upgrade {
-            UpgradeKind::Methamphetamines => {
-                self.kind == EntityKind::Rifleman && player_has_upgrade
-            }
-        }
     }
 }
 

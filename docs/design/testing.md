@@ -73,7 +73,7 @@ sampling.
 ## 10. Package-aware test selection policy
 
 The full gate is still `tests/run-all.sh`. Narrower local runs are allowed only when the changed
-files map away from the skipped behavior and the crate-boundary check still passes. Use
+files map away from the skipped behavior and the architecture checks still pass. Use
 `node tests/select-suites.mjs --from=<base-ref>` or pass changed paths directly to see the expected
 suites.
 
@@ -94,6 +94,17 @@ suites.
   client smoke. Include Node integration when protocol decode or network behavior changed.
 
 `scripts/check-crate-boundaries.mjs` is part of the gate and fails on forbidden Cargo package
-edges or server-only imports in lower crates. `tests/select-suites.mjs --verify` keeps the changed
-file mapping itself covered by small examples. CI comments document any intentionally skipped suite;
-that skip becomes invalid when the changed-file mapping selects the skipped behavior.
+edges or server-only imports in lower crates. The sim architecture ratchet is also part of the gate:
+`cargo run --manifest-path server/Cargo.toml -p rts-archcheck -- check-sim-architecture` fails when
+`rts-sim::game` grows new service edges, broad mutable APIs, direct state writes/usages, public API
+surface, or file-size budget over the committed baseline. Prefer reducing coupling first. If the
+growth is intentional, update `server/crates/archcheck/baselines/sim-architecture.json` with:
+
+```bash
+cargo run --manifest-path server/Cargo.toml -p rts-archcheck -- check-sim-architecture --bless --reason "short reason"
+```
+
+Avoid broad allowlist additions unless the same change or a tracked follow-up explains the cleanup
+path. `tests/select-suites.mjs --verify` keeps the changed file mapping itself covered by small
+examples. CI comments document any intentionally skipped suite; that skip becomes invalid when the
+changed-file mapping selects the skipped behavior.

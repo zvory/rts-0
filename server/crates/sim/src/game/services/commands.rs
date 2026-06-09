@@ -278,7 +278,68 @@ pub(crate) fn apply_commands(
                 order_train(entities, players, player, building, unit, events);
             }
             SimCommand::Research { building, upgrade } => {
-                order_research(entities, players, player, building, upgrade, events);
+                let definition = upgrade::definition(upgrade);
+                let ok = matches!(entities.get(building), Some(b)
+                    if b.owner == player && b.is_building() && !b.under_construction()
+                    && b.kind == definition.researched_at);
+                if !ok {
+                    notice(events, player, "Cannot research that here");
+                    continue;
+                }
+                if entities.iter().any(|e| {
+                    e.owner == player
+                        && e.research_queue()
+                            .iter()
+                            .any(|item| item.upgrade == upgrade)
+                }) {
+                    notice(events, player, "Already researching");
+                    continue;
+                }
+
+                let Some(ps) = players.iter_mut().find(|p| p.id == player) else {
+                    continue;
+                };
+                if ps.upgrades.contains(&upgrade) {
+                    notice(events, player, "Already researched");
+                    continue;
+                }
+                if !ps.can_afford(definition.cost_steel, definition.cost_oil) {
+                    notice(
+                        events,
+                        player,
+                        rules::economy::resource_shortage_notice(
+                            ps.steel,
+                            ps.oil,
+                            definition.cost_steel,
+                            definition.cost_oil,
+                        ),
+                    );
+                    continue;
+                }
+                if !ps.spend_resources(definition.cost_steel, definition.cost_oil) {
+                    notice(
+                        events,
+                        player,
+                        rules::economy::resource_shortage_notice(
+                            ps.steel,
+                            ps.oil,
+                            definition.cost_steel,
+                            definition.cost_oil,
+                        ),
+                    );
+                    continue;
+                }
+
+                let queued = entities.get_mut(building).is_some_and(|b| {
+                    b.push_research(ResearchItem {
+                        upgrade,
+                        progress: 0,
+                        total: definition.research_ticks,
+                    })
+                });
+                if !queued {
+                    ps.refund_resources(definition.cost_steel, definition.cost_oil);
+                }
             }
             SimCommand::Cancel { building } => {
                 order_cancel(entities, players, player, building);
@@ -1070,85 +1131,6 @@ fn order_train(
         if let Some(ps) = players.iter_mut().find(|p| p.id == player) {
             ps.refund_resources(cost_steel, cost_oil);
             ps.release_supply(supply);
-        }
-    }
-}
-
-fn order_research(
-    entities: &mut EntityStore,
-    players: &mut [PlayerState],
-    player: u32,
-    building: u32,
-    upgrade: UpgradeKind,
-    events: &mut HashMap<u32, Vec<Event>>,
-) {
-    let definition = upgrade::definition(upgrade);
-    let ok = matches!(entities.get(building), Some(b)
-        if b.owner == player && b.is_building() && !b.under_construction()
-        && b.kind == definition.researched_at);
-    if !ok {
-        notice(events, player, "Cannot research that here");
-        return;
-    }
-    if players
-        .iter()
-        .find(|p| p.id == player)
-        .is_some_and(|p| p.upgrades.contains(&upgrade))
-    {
-        notice(events, player, "Already researched");
-        return;
-    }
-    if entities.iter().any(|e| {
-        e.owner == player
-            && e.research_queue()
-                .iter()
-                .any(|item| item.upgrade == upgrade)
-    }) {
-        notice(events, player, "Already researching");
-        return;
-    }
-
-    let ps = match players.iter_mut().find(|p| p.id == player) {
-        Some(p) => p,
-        None => return,
-    };
-    if !ps.can_afford(definition.cost_steel, definition.cost_oil) {
-        notice(
-            events,
-            player,
-            rules::economy::resource_shortage_notice(
-                ps.steel,
-                ps.oil,
-                definition.cost_steel,
-                definition.cost_oil,
-            ),
-        );
-        return;
-    }
-    if !ps.spend_resources(definition.cost_steel, definition.cost_oil) {
-        notice(
-            events,
-            player,
-            rules::economy::resource_shortage_notice(
-                ps.steel,
-                ps.oil,
-                definition.cost_steel,
-                definition.cost_oil,
-            ),
-        );
-        return;
-    }
-
-    let queued = entities.get_mut(building).is_some_and(|b| {
-        b.push_research(ResearchItem {
-            upgrade,
-            progress: 0,
-            total: definition.research_ticks,
-        })
-    });
-    if !queued {
-        if let Some(ps) = players.iter_mut().find(|p| p.id == player) {
-            ps.refund_resources(definition.cost_steel, definition.cost_oil);
         }
     }
 }
@@ -1998,7 +1980,13 @@ mod tests {
             0,
             "legacy Charge should no longer activate riflemen"
         );
-        assert_eq!(entities.get(rifle).unwrap().charge_cooldown_ticks(), 0);
+        assert_eq!(
+            entities
+                .get(rifle)
+                .unwrap()
+                .ability_cooldown_ticks(AbilityKind::Charge),
+            0
+        );
         assert_eq!(
             entities.get(worker).unwrap().charge_ticks(),
             0,
@@ -2038,7 +2026,10 @@ mod tests {
             )],
         );
         let first_charge_ticks = entities.get(rifle).unwrap().charge_ticks();
-        let first_cooldown_ticks = entities.get(rifle).unwrap().charge_cooldown_ticks();
+        let first_cooldown_ticks = entities
+            .get(rifle)
+            .unwrap()
+            .ability_cooldown_ticks(AbilityKind::Charge);
 
         apply(
             &map,
@@ -2060,7 +2051,10 @@ mod tests {
             "cooldown should block immediate charge reuse"
         );
         assert_eq!(
-            entities.get(rifle).unwrap().charge_cooldown_ticks(),
+            entities
+                .get(rifle)
+                .unwrap()
+                .ability_cooldown_ticks(AbilityKind::Charge),
             first_cooldown_ticks,
             "retrying during cooldown must not refresh the cooldown"
         );
@@ -2085,7 +2079,13 @@ mod tests {
             )],
         );
         assert_eq!(entities.get(rifle).unwrap().charge_ticks(), 0);
-        assert_eq!(entities.get(rifle).unwrap().charge_cooldown_ticks(), 0);
+        assert_eq!(
+            entities
+                .get(rifle)
+                .unwrap()
+                .ability_cooldown_ticks(AbilityKind::Charge),
+            0
+        );
     }
 
     #[test]

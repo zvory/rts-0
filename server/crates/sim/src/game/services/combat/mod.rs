@@ -16,7 +16,6 @@ use crate::game::services::move_coordinator::MoveCoordinator;
 use crate::game::services::occupancy::Occupancy;
 use crate::game::services::spatial::SpatialIndex;
 use crate::game::smoke::SmokeCloudStore;
-use crate::game::upgrade::UpgradeKind;
 use crate::game::PlayerState;
 use crate::protocol::Event;
 use rand::rngs::SmallRng;
@@ -59,7 +58,7 @@ pub(super) const TANK_STANDOFF_REPATH_DELTA_PX: f32 = config::TILE_SIZE as f32;
 pub(crate) fn combat_system(
     map: &Map,
     entities: &mut EntityStore,
-    players: &[PlayerState],
+    _players: &[PlayerState],
     _occ: &Occupancy,
     spatial: &SpatialIndex,
     coordinator: &mut MoveCoordinator<'_>,
@@ -96,12 +95,7 @@ pub(crate) fn combat_system(
             }
             let profile = effective_attack_profile(e);
             let (range_tiles, dmg, cd) = (profile.range_tiles, profile.dmg, profile.cooldown);
-            let cd = if e.kind == EntityKind::Rifleman
-                && players
-                    .iter()
-                    .find(|p| p.id == e.owner)
-                    .is_some_and(|p| p.upgrades.contains(&UpgradeKind::Methamphetamines))
-            {
+            let cd = if e.kind == EntityKind::Rifleman && e.charge_ticks() > 0 {
                 cd.saturating_mul(config::METHAMPHETAMINES_ATTACK_COOLDOWN_NUMERATOR)
                     / config::METHAMPHETAMINES_ATTACK_COOLDOWN_DENOMINATOR
             } else {

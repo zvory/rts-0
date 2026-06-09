@@ -21,6 +21,10 @@ Use when changing tick logic, services, rules, AI, or the `Game` core.
 - `server/crates/ai/src/` — AI opponents and self-play harnesses
 - `server/src/lobby/`, `server/src/main.rs` — only touch sim via `game::Game`
 - `scripts/check-crate-boundaries.mjs` — enforces Cargo package dependency direction
+- `cargo run --manifest-path server/Cargo.toml -p rts-archcheck -- check-sim-architecture` —
+  ratchets `rts-sim::game` internals against
+  `server/crates/archcheck/baselines/sim-architecture.json`; see
+  [plans/clean/phase-5-ci-hooks-agent-workflow.md](../../plans/clean/phase-5-ci-hooks-agent-workflow.md)
 
 ## Invariants
 - `Game::tick()` is **panic-free**: no `unwrap`/`expect`/unchecked indexing; stale ids = no-op;
@@ -28,6 +32,20 @@ Use when changing tick logic, services, rules, AI, or the `Game` core.
 - The room task is the single owner of its `Game`. No locks.
 - `lobby/`/`main.rs` only call the public `Game` API. Don't reach into internals.
 - `rts-sim` must not depend on `rts-ai`, `rts-server`, Axum, or Tokio room machinery.
+
+## When touching `rts-sim::game`
+- Can the new logic be pure policy in `rts-rules` or a pure service helper instead of direct state
+  mutation?
+- Can mutation go through an existing entity/player helper rather than direct field writes?
+- Did this add a new service-to-service import edge?
+- Did this increase a ratcheted file-size or public-export budget?
+
+## Failed sim architecture checks
+- Prefer reducing coupling or moving logic behind an existing helper/API.
+- If growth is intentional, update the baseline with
+  `cargo run --manifest-path server/Cargo.toml -p rts-archcheck -- check-sim-architecture --bless --reason "short reason"`.
+- Avoid broad allowlist additions unless the same change or a tracked follow-up explains the cleanup
+  path.
 
 ## Don't break
 - The `Game` API signatures (§3.1). If you must change one, update

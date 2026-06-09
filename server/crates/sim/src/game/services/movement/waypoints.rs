@@ -58,8 +58,13 @@ pub(super) fn advance_moving_units(
             {
                 continue;
             }
+            let speed_multiplier = if e.kind == EntityKind::Rifleman && e.charge_ticks() > 0 {
+                config::RIFLEMAN_CHARGE_SPEED_MULTIPLIER
+            } else {
+                1.0
+            };
             let speed = config::unit_stats(e.kind)
-                .map(|s| s.speed * e.movement_speed_multiplier())
+                .map(|s| s.speed * speed_multiplier)
                 .unwrap_or(0.0);
             (
                 e.kind,
