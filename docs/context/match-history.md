@@ -7,14 +7,18 @@ scope, or the lobby front-page table.
 - [docs/design/match-history.md](../design/match-history.md) — full design source of truth
 
 ## Code seams
-- `server/src/db.rs` — pool, migrations, `record_match`, `recent_matches`.
-- `server/src/main.rs` — env loading, `/api/matches`, `RTS_RECORD_MATCHES` public/local scope.
-- `server/src/lobby/mod.rs` — `Lobby::with_match_history()` injects pool/scope into rooms.
+- `server/src/db.rs` — pool, migrations, `record_match`, `recent_matches`,
+  `replay_artifact_for_match`.
+- `server/src/main.rs` — env loading, `/api/matches`, `POST /api/matches/{id}/replay`,
+  replay compatibility checks, `RTS_RECORD_MATCHES` public/local scope.
+- `server/src/lobby/mod.rs` — `Lobby::with_match_history()` injects pool/scope into rooms;
+  replay launch creates spectator replay rooms.
 - `server/src/lobby/room_task.rs` — capture metadata at `start_match`, detached write at
   `end_match`.
 - `server/migrations/*.sql` — versioned schema. Never hand-apply DDL.
-- `client/src/match_history.js` — lobby table renderer.
-- `client/src/app.js` — mounts/refreshes the table on lobby show / back-to-lobby.
+- `client/src/match_history.js` — lobby table renderer and replay launch action.
+- `client/src/app.js` — mounts/refreshes the table on lobby show / back-to-lobby; auto-joins
+  `?replayRoom=...` launch pages.
 
 ## Invariants
 - **Server is the only writer.** Clients never write history. `/api/matches` is read-only.
@@ -26,6 +30,8 @@ scope, or the lobby front-page table.
   gate off, local `cargo run` records `local_only` rows that only localhost reads can see.
 - **Score-screen schema.** `score_screen` is JSONB holding `Vec<PlayerScore>` from
   `contract::PlayerScore`. Adding fields requires no migration.
+- **Replay storage.** `match_replays.artifact_json` stores `ReplayArtifactV1`; summaries and
+  launch check artifact schema, build SHA, map schema, and map hash before playback.
 - **TLS to Supabase.** `DATABASE_URL` must include `?sslmode=require`.
 
 ## Cross-capsule triggers
