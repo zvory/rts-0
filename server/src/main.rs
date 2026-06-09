@@ -192,7 +192,7 @@ async fn shutdown_signal(lobby: Lobby) {
 }
 
 async fn run_deploy_drain(lobby: Lobby, timeout: Duration) {
-    lobby.begin_draining().await;
+    lobby.begin_draining(timeout).await;
     let active_matches = lobby.active_match_count();
     if active_matches == 0 {
         info!("shutdown drain complete; no active matches");
@@ -909,6 +909,7 @@ async fn send_server_message(
         ServerMessage::Welcome { .. } => "welcome",
         ServerMessage::Start(_) => "start",
         ServerMessage::ReplayState(_) => "replay_state",
+        ServerMessage::ShutdownWarning { .. } => "shutdown_warning",
         ServerMessage::Error { .. } => "error",
         ServerMessage::GameOver { .. } => "game_over",
         ServerMessage::Pong { .. } => "pong",
@@ -983,7 +984,20 @@ async fn handle_client_message(
                 .filter(|r| !r.trim().is_empty())
                 .unwrap_or_else(|| DEFAULT_ROOM.to_string());
             let name = sanitize_name(name);
-            let handle = lobby.get_or_create(&room_name).await;
+            let handle = match lobby.get_or_create_join_target(&room_name).await {
+                Ok(handle) => handle,
+                Err(notice) => {
+                    let _ = conn_tx.try_send_reliable(ServerMessage::ShutdownWarning {
+                        deadline_unix_ms: notice.deadline_unix_ms,
+                        seconds_remaining: notice.seconds_remaining,
+                    });
+                    let _ = conn_tx.try_send_reliable(ServerMessage::Error {
+                        msg: "Server is draining for deploy; new rooms are disabled.".to_string(),
+                    });
+                    debug!(player_id, room = %room_name, "rejecting new room while server is draining");
+                    return;
+                }
+            };
             // The room decides whether the join is accepted (it may reject a mid-match join). Wait
             // for its ack and only mark ourselves joined on `true`, so a rejected join leaves
             // `current_room` None and the client is free to try another room.
