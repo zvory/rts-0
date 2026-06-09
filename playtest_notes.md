@@ -11,6 +11,10 @@ ecnomy rework:
  - refineries and mines have the same HP as workers and have no armor
  - 
 
+
+ - beta should deploy automatically from github, but the server should wait until all matches are drained (or twenty minutes) whichever is shorter before killing itself
+
+- tanks should not rotate their turrets back ot the centre, unless they start moving 
 - dead infantry should leave a permanent black/red spot on the ground
 - dead vehicles should leave a permanent blackened spot in their silhouette on the ground
 - prevent any player from playing as black or red

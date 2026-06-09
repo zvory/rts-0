@@ -33,5 +33,23 @@ fn main() {
             }
         });
 
-    println!("cargo:rustc-env=COMMIT_HASH={hash}");
+    let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap_or_default();
+    let tag = Command::new("git")
+        .current_dir(&manifest_dir)
+        .args(["tag", "--points-at", "HEAD"])
+        .output()
+        .ok()
+        .filter(|o| o.status.success())
+        .and_then(|o| {
+            let text = String::from_utf8_lossy(&o.stdout).trim().to_string();
+            let first = text.lines().next().map(str::trim).unwrap_or("").to_string();
+            if first.is_empty() { None } else { Some(first) }
+        });
+
+    let version = match tag {
+        Some(t) => format!("{hash} [{t}]"),
+        None => hash,
+    };
+
+    println!("cargo:rustc-env=COMMIT_HASH={version}");
 }
