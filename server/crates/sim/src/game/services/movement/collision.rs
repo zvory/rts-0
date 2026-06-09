@@ -1,5 +1,5 @@
 use crate::config;
-use crate::game::entity::EntityStore;
+use crate::game::entity::{uses_oriented_vehicle_body, EntityKind, EntityStore};
 use crate::game::map::Map;
 use crate::game::services::geometry::{unit_body_for_entity, unit_body_overlap, UnitBody};
 use crate::game::services::occupancy::Occupancy;
@@ -95,41 +95,80 @@ pub(crate) fn resolve_collisions(
             candidates.sort_unstable();
 
             for &b in &candidates {
-                let (b_kind, b_profile, b_facing, bx, by, b_body) = match entities.get(b) {
-                    Some(e) if e.is_unit() => {
-                        let profile = footing_profile(e);
-                        if profile == FootingProfile::Ghost {
-                            continue;
+                let (b_kind, b_profile, b_facing, bx, by, b_path_empty, b_body) =
+                    match entities.get(b) {
+                        Some(e) if e.is_unit() => {
+                            let profile = footing_profile(e);
+                            if profile == FootingProfile::Ghost {
+                                continue;
+                            }
+                            let Some(body) = unit_body_for_entity(e) else {
+                                continue;
+                            };
+                            (
+                                e.kind,
+                                profile,
+                                e.facing(),
+                                e.pos_x,
+                                e.pos_y,
+                                e.path_is_empty(),
+                                body,
+                            )
                         }
-                        let Some(body) = unit_body_for_entity(e) else {
-                            continue;
-                        };
-                        (e.kind, profile, e.facing(), e.pos_x, e.pos_y, body)
-                    }
-                    _ => continue,
-                };
+                        _ => continue,
+                    };
                 // Re-read A so we account for displacement applied by earlier pairs in this pass.
-                let (a_kind, a_facing, ax, ay, a_body) = match entities.get(a) {
-                    Some(e) => {
-                        let Some(body) = unit_body_for_entity(e) else {
-                            break;
-                        };
-                        (e.kind, e.facing(), e.pos_x, e.pos_y, body)
-                    }
-                    None => break,
-                };
+                let (a_kind, a_profile_now, a_facing, ax, ay, a_path_empty, a_body) =
+                    match entities.get(a) {
+                        Some(e) => {
+                            let Some(body) = unit_body_for_entity(e) else {
+                                break;
+                            };
+                            (
+                                e.kind,
+                                footing_profile(e),
+                                e.facing(),
+                                e.pos_x,
+                                e.pos_y,
+                                e.path_is_empty(),
+                                body,
+                            )
+                        }
+                        None => break,
+                    };
 
                 let Some((nx, ny, overlap)) =
                     collision_axis_and_depth(a_body, b_body, ax, ay, bx, by)
                 else {
                     continue;
                 };
+                let a_side = CollisionSide {
+                    id: a,
+                    kind: a_kind,
+                    profile: a_profile_now,
+                    facing: a_facing,
+                    x: ax,
+                    y: ay,
+                    path_empty: a_path_empty,
+                };
+                let b_side = CollisionSide {
+                    id: b,
+                    kind: b_kind,
+                    profile: b_profile,
+                    facing: b_facing,
+                    x: bx,
+                    y: by,
+                    path_empty: b_path_empty,
+                };
+                let (a_lateral, b_lateral) = centerline_lateral_offsets(a_side, b_side, overlap);
                 // Both sides are non-ghost at this point: split overlap by resistance. If one
                 // side's weighted push lands on impassable terrain or a building footprint, the
                 // other side tries to absorb the blocked side's remaining share.
                 let (a_share, b_share) = collision_push_shares(a_profile, b_profile);
-                let a_target = (ax - nx * overlap * a_share, ay - ny * overlap * a_share);
-                let b_target = (bx + nx * overlap * b_share, by + ny * overlap * b_share);
+                let a_base_target = (ax - nx * overlap * a_share, ay - ny * overlap * a_share);
+                let b_base_target = (bx + nx * overlap * b_share, by + ny * overlap * b_share);
+                let a_target = legal_lateral_target(occ, map, a_side, a_base_target, a_lateral);
+                let b_target = legal_lateral_target(occ, map, b_side, b_base_target, b_lateral);
                 let a_ok =
                     unit_static_standable(occ, map, a_kind, a_target.0, a_target.1, a_facing);
                 let b_ok =
@@ -220,6 +259,92 @@ pub(crate) fn resolve_collisions(
         if !moved_any {
             break;
         }
+    }
+}
+
+#[derive(Clone, Copy)]
+struct CollisionSide {
+    id: u32,
+    kind: EntityKind,
+    profile: FootingProfile,
+    facing: f32,
+    x: f32,
+    y: f32,
+    path_empty: bool,
+}
+
+fn centerline_lateral_offsets(
+    a: CollisionSide,
+    b: CollisionSide,
+    overlap: f32,
+) -> ((f32, f32), (f32, f32)) {
+    (
+        lateral_offset_one_way(b, a, overlap).unwrap_or((0.0, 0.0)),
+        lateral_offset_one_way(a, b, overlap).unwrap_or((0.0, 0.0)),
+    )
+}
+
+fn lateral_offset_one_way(
+    pusher: CollisionSide,
+    blocker: CollisionSide,
+    overlap: f32,
+) -> Option<(f32, f32)> {
+    if !uses_oriented_vehicle_body(pusher.kind)
+        || pusher.path_empty
+        || !blocker.path_empty
+        || !pusher.facing.is_finite()
+        || !overlap.is_finite()
+        || overlap <= COLLISION_EPS_PX
+    {
+        return None;
+    }
+    if matches!(blocker.profile, FootingProfile::Ghost) {
+        return None;
+    }
+
+    let forward = (pusher.facing.cos(), pusher.facing.sin());
+    let side = (-forward.1, forward.0);
+    if !forward.0.is_finite() || !forward.1.is_finite() {
+        return None;
+    }
+    let dx = blocker.x - pusher.x;
+    let dy = blocker.y - pusher.y;
+    let ahead = dx * forward.0 + dy * forward.1;
+    if ahead < -COLLISION_EPS_PX {
+        return None;
+    }
+
+    let lateral = dx * side.0 + dy * side.1;
+    let side_sign = if lateral.abs() <= 1.0e-4 {
+        if pusher.id < blocker.id {
+            1.0
+        } else {
+            -1.0
+        }
+    } else {
+        lateral.signum()
+    };
+    let shift = overlap
+        .max(config::TILE_SIZE as f32 * 0.125)
+        .min(config::TILE_SIZE as f32 * 0.5);
+    Some((side.0 * side_sign * shift, side.1 * side_sign * shift))
+}
+
+fn legal_lateral_target(
+    occ: &Occupancy,
+    map: &Map,
+    side: CollisionSide,
+    base_target: (f32, f32),
+    lateral: (f32, f32),
+) -> (f32, f32) {
+    if lateral.0.abs() <= 1.0e-4 && lateral.1.abs() <= 1.0e-4 {
+        return base_target;
+    }
+    let target = (base_target.0 + lateral.0, base_target.1 + lateral.1);
+    if unit_static_standable(occ, map, side.kind, target.0, target.1, side.facing) {
+        target
+    } else {
+        base_target
     }
 }
 
