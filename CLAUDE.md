@@ -99,6 +99,17 @@ cd tests && npm install && node client_smoke.mjs   # headless-Chrome client smok
 There is **no JS build step** (plain ES modules + PixiJS from CDN). The client is served from
 `../client` relative to the server crate, so `cargo run` from `server/` is the whole dev loop.
 
+## Deployed Log Checks
+
+- When investigating behavior that may differ on beta/mainline, including post-deploy regressions,
+  WebSocket/lobby failures, match-history recording, server crashes, restarts, or performance
+  spikes, check Fly logs early with `scripts/fly-logs.sh beta recent` or
+  `scripts/fly-logs.sh mainline recent`.
+- For live reproduction, bound tailing so it cannot stream forever:
+  `timeout 30 scripts/fly-logs.sh beta tail`.
+- `scripts/fly-logs.sh` reads `FLY_API_TOKEN` from the environment, this worktree's ignored
+  `.env`, or the main worktree's ignored `.env`. Never commit, print, or paste the token.
+
 ## Invariants — do not break these
 
 - **Wire protocol is mirrored.** `server/src/protocol.rs` ⇄ `client/src/protocol.js` must agree on
