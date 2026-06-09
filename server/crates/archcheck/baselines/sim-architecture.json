@@ -1,0 +1,1194 @@
+{
+  "reason": "Initial Phase 2 current-state ratchet baseline",
+  "line_counts": [
+    {
+      "path": "ability.rs",
+      "lines": 91
+    },
+    {
+      "path": "command.rs",
+      "lines": 471
+    },
+    {
+      "path": "commands.rs",
+      "lines": 18
+    },
+    {
+      "path": "entity/entity.rs",
+      "lines": 862
+    },
+    {
+      "path": "entity/kind.rs",
+      "lines": 4
+    },
+    {
+      "path": "entity/mod.rs",
+      "lines": 44
+    },
+    {
+      "path": "entity/order.rs",
+      "lines": 398
+    },
+    {
+      "path": "entity/state.rs",
+      "lines": 211
+    },
+    {
+      "path": "entity/store.rs",
+      "lines": 173
+    },
+    {
+      "path": "entity/tests.rs",
+      "lines": 309
+    },
+    {
+      "path": "fog.rs",
+      "lines": 345
+    },
+    {
+      "path": "invariants.rs",
+      "lines": 873
+    },
+    {
+      "path": "map.rs",
+      "lines": 665
+    },
+    {
+      "path": "mod.rs",
+      "lines": 366
+    },
+    {
+      "path": "pathfinding.rs",
+      "lines": 273
+    },
+    {
+      "path": "replay.rs",
+      "lines": 418
+    },
+    {
+      "path": "scoring.rs",
+      "lines": 52
+    },
+    {
+      "path": "services/ability_orders.rs",
+      "lines": 317
+    },
+    {
+      "path": "services/combat/acquisition.rs",
+      "lines": 226
+    },
+    {
+      "path": "services/combat/chase.rs",
+      "lines": 71
+    },
+    {
+      "path": "services/combat/damage.rs",
+      "lines": 277
+    },
+    {
+      "path": "services/combat/events.rs",
+      "lines": 93
+    },
+    {
+      "path": "services/combat/mod.rs",
+      "lines": 295
+    },
+    {
+      "path": "services/combat/projection.rs",
+      "lines": 78
+    },
+    {
+      "path": "services/combat/tests.rs",
+      "lines": 2174
+    },
+    {
+      "path": "services/combat/weapons.rs",
+      "lines": 278
+    },
+    {
+      "path": "services/commands.rs",
+      "lines": 3207
+    },
+    {
+      "path": "services/construction.rs",
+      "lines": 564
+    },
+    {
+      "path": "services/death.rs",
+      "lines": 150
+    },
+    {
+      "path": "services/economy.rs",
+      "lines": 322
+    },
+    {
+      "path": "services/geometry.rs",
+      "lines": 1348
+    },
+    {
+      "path": "services/line_of_sight.rs",
+      "lines": 230
+    },
+    {
+      "path": "services/mod.rs",
+      "lines": 47
+    },
+    {
+      "path": "services/move_coordinator.rs",
+      "lines": 1845
+    },
+    {
+      "path": "services/movement/collision.rs",
+      "lines": 403
+    },
+    {
+      "path": "services/movement/mod.rs",
+      "lines": 83
+    },
+    {
+      "path": "services/movement/pivot_drive.rs",
+      "lines": 286
+    },
+    {
+      "path": "services/movement/scout_car.rs",
+      "lines": 925
+    },
+    {
+      "path": "services/movement/standability.rs",
+      "lines": 82
+    },
+    {
+      "path": "services/movement/steering.rs",
+      "lines": 228
+    },
+    {
+      "path": "services/movement/tests.rs",
+      "lines": 5030
+    },
+    {
+      "path": "services/movement/waypoints.rs",
+      "lines": 693
+    },
+    {
+      "path": "services/occupancy.rs",
+      "lines": 335
+    },
+    {
+      "path": "services/order_planner.rs",
+      "lines": 786
+    },
+    {
+      "path": "services/order_queue.rs",
+      "lines": 1121
+    },
+    {
+      "path": "services/pathing.rs",
+      "lines": 1627
+    },
+    {
+      "path": "services/production.rs",
+      "lines": 528
+    },
+    {
+      "path": "services/spatial.rs",
+      "lines": 115
+    },
+    {
+      "path": "services/standability.rs",
+      "lines": 769
+    },
+    {
+      "path": "services/supply.rs",
+      "lines": 29
+    },
+    {
+      "path": "services/world_query.rs",
+      "lines": 415
+    },
+    {
+      "path": "setup.rs",
+      "lines": 1863
+    },
+    {
+      "path": "smoke.rs",
+      "lines": 265
+    },
+    {
+      "path": "snapshot.rs",
+      "lines": 175
+    },
+    {
+      "path": "systems.rs",
+      "lines": 351
+    },
+    {
+      "path": "tests.rs",
+      "lines": 2212
+    }
+  ],
+  "service_edges": [
+    {
+      "source": "ability_orders",
+      "target": "commands",
+      "path": "services/ability_orders.rs",
+      "line": 7
+    },
+    {
+      "source": "ability_orders",
+      "target": "move_coordinator",
+      "path": "services/ability_orders.rs",
+      "line": 9
+    },
+    {
+      "source": "ability_orders",
+      "target": "world_query",
+      "path": "services/ability_orders.rs",
+      "line": 10
+    },
+    {
+      "source": "combat",
+      "target": "geometry",
+      "path": "services/combat/projection.rs",
+      "line": 3
+    },
+    {
+      "source": "combat",
+      "target": "line_of_sight",
+      "path": "services/combat/acquisition.rs",
+      "line": 4
+    },
+    {
+      "source": "combat",
+      "target": "line_of_sight",
+      "path": "services/combat/damage.rs",
+      "line": 6
+    },
+    {
+      "source": "combat",
+      "target": "line_of_sight",
+      "path": "services/combat/mod.rs",
+      "line": 14
+    },
+    {
+      "source": "combat",
+      "target": "move_coordinator",
+      "path": "services/combat/mod.rs",
+      "line": 15
+    },
+    {
+      "source": "combat",
+      "target": "movement",
+      "path": "services/combat/weapons.rs",
+      "line": 3
+    },
+    {
+      "source": "combat",
+      "target": "occupancy",
+      "path": "services/combat/mod.rs",
+      "line": 16
+    },
+    {
+      "source": "combat",
+      "target": "spatial",
+      "path": "services/combat/acquisition.rs",
+      "line": 5
+    },
+    {
+      "source": "combat",
+      "target": "spatial",
+      "path": "services/combat/mod.rs",
+      "line": 17
+    },
+    {
+      "source": "combat",
+      "target": "world_query",
+      "path": "services/combat/acquisition.rs",
+      "line": 6
+    },
+    {
+      "source": "commands",
+      "target": "ability_orders",
+      "path": "services/commands.rs",
+      "line": 12
+    },
+    {
+      "source": "commands",
+      "target": "construction",
+      "path": "services/commands.rs",
+      "line": 16
+    },
+    {
+      "source": "commands",
+      "target": "move_coordinator",
+      "path": "services/commands.rs",
+      "line": 18
+    },
+    {
+      "source": "commands",
+      "target": "movement",
+      "path": "services/commands.rs",
+      "line": 19
+    },
+    {
+      "source": "commands",
+      "target": "order_planner",
+      "path": "services/commands.rs",
+      "line": 20
+    },
+    {
+      "source": "commands",
+      "target": "spatial",
+      "path": "services/commands.rs",
+      "line": 21
+    },
+    {
+      "source": "commands",
+      "target": "standability",
+      "path": "services/commands.rs",
+      "line": 22
+    },
+    {
+      "source": "commands",
+      "target": "world_query",
+      "path": "services/commands.rs",
+      "line": 23
+    },
+    {
+      "source": "construction",
+      "target": "occupancy",
+      "path": "services/construction.rs",
+      "line": 6
+    },
+    {
+      "source": "construction",
+      "target": "standability",
+      "path": "services/construction.rs",
+      "line": 7
+    },
+    {
+      "source": "economy",
+      "target": "move_coordinator",
+      "path": "services/economy.rs",
+      "line": 5
+    },
+    {
+      "source": "economy",
+      "target": "occupancy",
+      "path": "services/economy.rs",
+      "line": 6
+    },
+    {
+      "source": "economy",
+      "target": "spatial",
+      "path": "services/economy.rs",
+      "line": 7
+    },
+    {
+      "source": "economy",
+      "target": "world_query",
+      "path": "services/economy.rs",
+      "line": 8
+    },
+    {
+      "source": "geometry",
+      "target": "occupancy",
+      "path": "services/geometry.rs",
+      "line": 4
+    },
+    {
+      "source": "move_coordinator",
+      "target": "geometry",
+      "path": "services/move_coordinator.rs",
+      "line": 24
+    },
+    {
+      "source": "move_coordinator",
+      "target": "occupancy",
+      "path": "services/move_coordinator.rs",
+      "line": 29
+    },
+    {
+      "source": "move_coordinator",
+      "target": "pathing",
+      "path": "services/move_coordinator.rs",
+      "line": 32
+    },
+    {
+      "source": "move_coordinator",
+      "target": "standability",
+      "path": "services/move_coordinator.rs",
+      "line": 35
+    },
+    {
+      "source": "movement",
+      "target": "geometry",
+      "path": "services/movement/collision.rs",
+      "line": 4
+    },
+    {
+      "source": "movement",
+      "target": "geometry",
+      "path": "services/movement/pivot_drive.rs",
+      "line": 6
+    },
+    {
+      "source": "movement",
+      "target": "geometry",
+      "path": "services/movement/scout_car.rs",
+      "line": 5
+    },
+    {
+      "source": "movement",
+      "target": "geometry",
+      "path": "services/movement/waypoints.rs",
+      "line": 9
+    },
+    {
+      "source": "movement",
+      "target": "occupancy",
+      "path": "services/movement/collision.rs",
+      "line": 5
+    },
+    {
+      "source": "movement",
+      "target": "occupancy",
+      "path": "services/movement/mod.rs",
+      "line": 12
+    },
+    {
+      "source": "movement",
+      "target": "occupancy",
+      "path": "services/movement/pivot_drive.rs",
+      "line": 7
+    },
+    {
+      "source": "movement",
+      "target": "occupancy",
+      "path": "services/movement/scout_car.rs",
+      "line": 9
+    },
+    {
+      "source": "movement",
+      "target": "occupancy",
+      "path": "services/movement/standability.rs",
+      "line": 5
+    },
+    {
+      "source": "movement",
+      "target": "occupancy",
+      "path": "services/movement/steering.rs",
+      "line": 4
+    },
+    {
+      "source": "movement",
+      "target": "occupancy",
+      "path": "services/movement/waypoints.rs",
+      "line": 10
+    },
+    {
+      "source": "movement",
+      "target": "spatial",
+      "path": "services/movement/collision.rs",
+      "line": 6
+    },
+    {
+      "source": "movement",
+      "target": "spatial",
+      "path": "services/movement/mod.rs",
+      "line": 13
+    },
+    {
+      "source": "movement",
+      "target": "spatial",
+      "path": "services/movement/pivot_drive.rs",
+      "line": 8
+    },
+    {
+      "source": "movement",
+      "target": "spatial",
+      "path": "services/movement/scout_car.rs",
+      "line": 10
+    },
+    {
+      "source": "movement",
+      "target": "spatial",
+      "path": "services/movement/steering.rs",
+      "line": 5
+    },
+    {
+      "source": "movement",
+      "target": "spatial",
+      "path": "services/movement/waypoints.rs",
+      "line": 11
+    },
+    {
+      "source": "movement",
+      "target": "standability",
+      "path": "services/movement/scout_car.rs",
+      "line": 11
+    },
+    {
+      "source": "movement",
+      "target": "standability",
+      "path": "services/movement/standability.rs",
+      "line": 6
+    },
+    {
+      "source": "movement",
+      "target": "standability",
+      "path": "services/movement/waypoints.rs",
+      "line": 12
+    },
+    {
+      "source": "order_queue",
+      "target": "ability_orders",
+      "path": "services/order_queue.rs",
+      "line": 9
+    },
+    {
+      "source": "order_queue",
+      "target": "construction",
+      "path": "services/order_queue.rs",
+      "line": 13
+    },
+    {
+      "source": "order_queue",
+      "target": "line_of_sight",
+      "path": "services/order_queue.rs",
+      "line": 15
+    },
+    {
+      "source": "order_queue",
+      "target": "move_coordinator",
+      "path": "services/order_queue.rs",
+      "line": 16
+    },
+    {
+      "source": "order_queue",
+      "target": "movement",
+      "path": "services/order_queue.rs",
+      "line": 17
+    },
+    {
+      "source": "order_queue",
+      "target": "standability",
+      "path": "services/order_queue.rs",
+      "line": 18
+    },
+    {
+      "source": "order_queue",
+      "target": "world_query",
+      "path": "services/order_queue.rs",
+      "line": 19
+    },
+    {
+      "source": "pathing",
+      "target": "occupancy",
+      "path": "services/pathing.rs",
+      "line": 12
+    },
+    {
+      "source": "pathing",
+      "target": "standability",
+      "path": "services/pathing.rs",
+      "line": 13
+    },
+    {
+      "source": "production",
+      "target": "move_coordinator",
+      "path": "services/production.rs",
+      "line": 3
+    },
+    {
+      "source": "standability",
+      "target": "geometry",
+      "path": "services/standability.rs",
+      "line": 5
+    },
+    {
+      "source": "standability",
+      "target": "occupancy",
+      "path": "services/standability.rs",
+      "line": 10
+    },
+    {
+      "source": "standability",
+      "target": "spatial",
+      "path": "services/standability.rs",
+      "line": 11
+    },
+    {
+      "source": "world_query",
+      "target": "spatial",
+      "path": "services/world_query.rs",
+      "line": 19
+    }
+  ],
+  "broad_mutable_signatures": [
+    {
+      "path": "services/ability_orders.rs",
+      "line": 77,
+      "name": "launch_world_ability"
+    },
+    {
+      "path": "services/ability_orders.rs",
+      "line": 24,
+      "name": "order_or_launch_world_ability"
+    },
+    {
+      "path": "services/commands.rs",
+      "line": 36,
+      "name": "apply_commands"
+    },
+    {
+      "path": "services/commands.rs",
+      "line": 404,
+      "name": "apply_planned_unit_order"
+    },
+    {
+      "path": "services/commands.rs",
+      "line": 1091,
+      "name": "order_cancel"
+    },
+    {
+      "path": "services/commands.rs",
+      "line": 996,
+      "name": "order_train"
+    },
+    {
+      "path": "services/commands.rs",
+      "line": 701,
+      "name": "use_ability"
+    },
+    {
+      "path": "services/construction.rs",
+      "line": 18,
+      "name": "construction_system"
+    },
+    {
+      "path": "services/death.rs",
+      "line": 17,
+      "name": "death_system"
+    },
+    {
+      "path": "services/economy.rs",
+      "line": 103,
+      "name": "gather_harvesting"
+    },
+    {
+      "path": "services/economy.rs",
+      "line": 13,
+      "name": "gather_system"
+    },
+    {
+      "path": "services/movement/mod.rs",
+      "line": 45,
+      "name": "movement_system"
+    },
+    {
+      "path": "services/movement/mod.rs",
+      "line": 67,
+      "name": "movement_system_with_events"
+    },
+    {
+      "path": "services/movement/waypoints.rs",
+      "line": 35,
+      "name": "advance_moving_units"
+    },
+    {
+      "path": "services/order_queue.rs",
+      "line": 88,
+      "name": "promote_ready_orders"
+    },
+    {
+      "path": "services/production.rs",
+      "line": 10,
+      "name": "production_system"
+    },
+    {
+      "path": "systems.rs",
+      "line": 103,
+      "name": "run_tick"
+    }
+  ],
+  "player_state_usages": [
+    {
+      "path": "mod.rs",
+      "line": 96,
+      "code": "players: Vec<PlayerState>,"
+    },
+    {
+      "path": "mod.rs",
+      "line": 64,
+      "code": "pub(crate) struct PlayerState {"
+    },
+    {
+      "path": "scoring.rs",
+      "line": 3,
+      "code": "impl PlayerState {"
+    },
+    {
+      "path": "services/ability_orders.rs",
+      "line": 27,
+      "code": "players: &mut [PlayerState],"
+    },
+    {
+      "path": "services/ability_orders.rs",
+      "line": 80,
+      "code": "players: &mut [PlayerState],"
+    },
+    {
+      "path": "services/ability_orders.rs",
+      "line": 12,
+      "code": "use crate::game::PlayerState;"
+    },
+    {
+      "path": "services/combat/mod.rs",
+      "line": 61,
+      "code": "_players: &[PlayerState],"
+    },
+    {
+      "path": "services/combat/mod.rs",
+      "line": 19,
+      "code": "use crate::game::PlayerState;"
+    },
+    {
+      "path": "services/combat/tests.rs",
+      "line": 49,
+      "code": "PlayerState {"
+    },
+    {
+      "path": "services/combat/tests.rs",
+      "line": 48,
+      "code": "fn player_state(id: u32, is_ai: bool) -> PlayerState {"
+    },
+    {
+      "path": "services/combat/tests.rs",
+      "line": 69,
+      "code": "players: &[PlayerState],"
+    },
+    {
+      "path": "services/combat/tests.rs",
+      "line": 77,
+      "code": "players: &[PlayerState],"
+    },
+    {
+      "path": "services/combat/tests.rs",
+      "line": 85,
+      "code": "players: &[PlayerState],"
+    },
+    {
+      "path": "services/combat/tests.rs",
+      "line": 95,
+      "code": "players: &[PlayerState],"
+    },
+    {
+      "path": "services/commands.rs",
+      "line": 925,
+      "code": "players: &[PlayerState],"
+    },
+    {
+      "path": "services/commands.rs",
+      "line": 39,
+      "code": "players: &mut [PlayerState],"
+    },
+    {
+      "path": "services/commands.rs",
+      "line": 407,
+      "code": "players: &mut [PlayerState],"
+    },
+    {
+      "path": "services/commands.rs",
+      "line": 704,
+      "code": "players: &mut [PlayerState],"
+    },
+    {
+      "path": "services/commands.rs",
+      "line": 998,
+      "code": "players: &mut [PlayerState],"
+    },
+    {
+      "path": "services/commands.rs",
+      "line": 1093,
+      "code": "players: &mut [PlayerState],"
+    },
+    {
+      "path": "services/commands.rs",
+      "line": 25,
+      "code": "use crate::game::PlayerState;"
+    },
+    {
+      "path": "services/construction.rs",
+      "line": 21,
+      "code": "players: &mut [PlayerState],"
+    },
+    {
+      "path": "services/construction.rs",
+      "line": 9,
+      "code": "use crate::game::PlayerState;"
+    },
+    {
+      "path": "services/death.rs",
+      "line": 21,
+      "code": "players: &mut [PlayerState],"
+    },
+    {
+      "path": "services/death.rs",
+      "line": 136,
+      "code": "players: &mut [PlayerState],"
+    },
+    {
+      "path": "services/death.rs",
+      "line": 7,
+      "code": "use crate::game::PlayerState;"
+    },
+    {
+      "path": "services/economy.rs",
+      "line": 16,
+      "code": "players: &mut [PlayerState],"
+    },
+    {
+      "path": "services/economy.rs",
+      "line": 106,
+      "code": "players: &mut [PlayerState],"
+    },
+    {
+      "path": "services/economy.rs",
+      "line": 9,
+      "code": "use crate::game::PlayerState;"
+    },
+    {
+      "path": "services/movement/mod.rs",
+      "line": 48,
+      "code": "players: &mut [PlayerState],"
+    },
+    {
+      "path": "services/movement/mod.rs",
+      "line": 70,
+      "code": "players: &mut [PlayerState],"
+    },
+    {
+      "path": "services/movement/mod.rs",
+      "line": 14,
+      "code": "use crate::game::PlayerState;"
+    },
+    {
+      "path": "services/movement/pivot_drive.rs",
+      "line": 28,
+      "code": "players: &[PlayerState],"
+    },
+    {
+      "path": "services/movement/pivot_drive.rs",
+      "line": 9,
+      "code": "use crate::game::PlayerState;"
+    },
+    {
+      "path": "services/movement/tests.rs",
+      "line": 80,
+      "code": "PlayerState {"
+    },
+    {
+      "path": "services/movement/tests.rs",
+      "line": 79,
+      "code": "fn player_with_oil(id: u32, oil: u32) -> PlayerState {"
+    },
+    {
+      "path": "services/movement/tests.rs",
+      "line": 15,
+      "code": "use crate::game::{PlayerState, ScoreState};"
+    },
+    {
+      "path": "services/movement/waypoints.rs",
+      "line": 38,
+      "code": "players: &mut [PlayerState],"
+    },
+    {
+      "path": "services/movement/waypoints.rs",
+      "line": 13,
+      "code": "use crate::game::PlayerState;"
+    },
+    {
+      "path": "services/order_queue.rs",
+      "line": 220,
+      "code": "players: &[PlayerState],"
+    },
+    {
+      "path": "services/order_queue.rs",
+      "line": 308,
+      "code": "players: &[PlayerState],"
+    },
+    {
+      "path": "services/order_queue.rs",
+      "line": 491,
+      "code": "players: &[PlayerState],"
+    },
+    {
+      "path": "services/order_queue.rs",
+      "line": 91,
+      "code": "players: &mut [PlayerState],"
+    },
+    {
+      "path": "services/order_queue.rs",
+      "line": 21,
+      "code": "use crate::game::PlayerState;"
+    },
+    {
+      "path": "services/production.rs",
+      "line": 13,
+      "code": "players: &mut [PlayerState],"
+    },
+    {
+      "path": "services/production.rs",
+      "line": 4,
+      "code": "use crate::game::PlayerState;"
+    },
+    {
+      "path": "services/supply.rs",
+      "line": 8,
+      "code": "pub(crate) fn recompute_supply(players: &mut [PlayerState], entities: &EntityStore) {"
+    },
+    {
+      "path": "services/supply.rs",
+      "line": 3,
+      "code": "use crate::game::PlayerState;"
+    },
+    {
+      "path": "setup.rs",
+      "line": 552,
+      "code": "let mut ps = PlayerState {"
+    },
+    {
+      "path": "setup.rs",
+      "line": 209,
+      "code": "let player = PlayerState {"
+    },
+    {
+      "path": "setup.rs",
+      "line": 292,
+      "code": "let player = PlayerState {"
+    },
+    {
+      "path": "setup.rs",
+      "line": 362,
+      "code": "let player = PlayerState {"
+    },
+    {
+      "path": "setup.rs",
+      "line": 448,
+      "code": "let player = PlayerState {"
+    },
+    {
+      "path": "setup.rs",
+      "line": 1036,
+      "code": "player: &mut PlayerState,"
+    },
+    {
+      "path": "setup.rs",
+      "line": 1079,
+      "code": "player: &mut PlayerState,"
+    },
+    {
+      "path": "setup.rs",
+      "line": 1224,
+      "code": "players.push(PlayerState {"
+    },
+    {
+      "path": "setup.rs",
+      "line": 1160,
+      "code": "players: &mut Vec<PlayerState>,"
+    },
+    {
+      "path": "snapshot.rs",
+      "line": 172,
+      "code": "fn player(&self, id: u32) -> Option<&PlayerState> {"
+    },
+    {
+      "path": "systems.rs",
+      "line": 106,
+      "code": "players: &mut [PlayerState],"
+    },
+    {
+      "path": "systems.rs",
+      "line": 30,
+      "code": "use crate::game::PlayerState;"
+    }
+  ],
+  "entity_field_writes": [
+    {
+      "path": "tests.rs",
+      "line": 1671,
+      "field": "hp",
+      "code": ".hp = 0;"
+    }
+  ],
+  "public_export_counts": [
+    {
+      "path": "ability.rs",
+      "count": 7
+    },
+    {
+      "path": "command.rs",
+      "count": 5
+    },
+    {
+      "path": "commands.rs",
+      "count": 1
+    },
+    {
+      "path": "entity/entity.rs",
+      "count": 91
+    },
+    {
+      "path": "entity/mod.rs",
+      "count": 1
+    },
+    {
+      "path": "entity/order.rs",
+      "count": 48
+    },
+    {
+      "path": "entity/state.rs",
+      "count": 11
+    },
+    {
+      "path": "entity/store.rs",
+      "count": 17
+    },
+    {
+      "path": "fog.rs",
+      "count": 15
+    },
+    {
+      "path": "invariants.rs",
+      "count": 1
+    },
+    {
+      "path": "map.rs",
+      "count": 16
+    },
+    {
+      "path": "mod.rs",
+      "count": 23
+    },
+    {
+      "path": "pathfinding.rs",
+      "count": 3
+    },
+    {
+      "path": "replay.rs",
+      "count": 13
+    },
+    {
+      "path": "scoring.rs",
+      "count": 4
+    },
+    {
+      "path": "services/ability_orders.rs",
+      "count": 8
+    },
+    {
+      "path": "services/combat/mod.rs",
+      "count": 1
+    },
+    {
+      "path": "services/commands.rs",
+      "count": 3
+    },
+    {
+      "path": "services/construction.rs",
+      "count": 2
+    },
+    {
+      "path": "services/death.rs",
+      "count": 1
+    },
+    {
+      "path": "services/economy.rs",
+      "count": 1
+    },
+    {
+      "path": "services/geometry.rs",
+      "count": 22
+    },
+    {
+      "path": "services/line_of_sight.rs",
+      "count": 5
+    },
+    {
+      "path": "services/mod.rs",
+      "count": 21
+    },
+    {
+      "path": "services/move_coordinator.rs",
+      "count": 13
+    },
+    {
+      "path": "services/movement/collision.rs",
+      "count": 1
+    },
+    {
+      "path": "services/movement/mod.rs",
+      "count": 2
+    },
+    {
+      "path": "services/movement/pivot_drive.rs",
+      "count": 3
+    },
+    {
+      "path": "services/movement/standability.rs",
+      "count": 1
+    },
+    {
+      "path": "services/occupancy.rs",
+      "count": 9
+    },
+    {
+      "path": "services/order_planner.rs",
+      "count": 20
+    },
+    {
+      "path": "services/order_queue.rs",
+      "count": 1
+    },
+    {
+      "path": "services/pathing.rs",
+      "count": 11
+    },
+    {
+      "path": "services/production.rs",
+      "count": 1
+    },
+    {
+      "path": "services/spatial.rs",
+      "count": 6
+    },
+    {
+      "path": "services/standability.rs",
+      "count": 7
+    },
+    {
+      "path": "services/supply.rs",
+      "count": 1
+    },
+    {
+      "path": "services/world_query.rs",
+      "count": 15
+    },
+    {
+      "path": "setup.rs",
+      "count": 25
+    },
+    {
+      "path": "smoke.rs",
+      "count": 18
+    },
+    {
+      "path": "snapshot.rs",
+      "count": 3
+    },
+    {
+      "path": "systems.rs",
+      "count": 1
+    }
+  ]
+}
