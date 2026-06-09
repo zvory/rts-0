@@ -30,6 +30,14 @@ The server treats every client as potentially hostile. Limits live next to the c
   silent player can't wedge a shared room, and frees the room slot.
 - **Join ack**: `RoomEvent::Join` carries a `oneshot<bool>`; a connection only marks itself joined
   on an accept, so a rejected mid-match join doesn't wedge the socket.
+- **Deploy drain**: SIGTERM/Ctrl-C starts a server drain instead of immediately shutting down.
+  The lobby flips into a draining state, existing room tasks continue ticking active normal
+  matches, and new match starts are rejected while lobby clients see `can_start: false`. The
+  process waits until all tracked normal matches finish or `DEPLOY_DRAIN_TIMEOUT` (10 minutes)
+  elapses, whichever comes first, then asks all WebSocket connection tasks to close so Axum
+  graceful shutdown can complete; Fly's `kill_timeout` is set to the same 10-minute ceiling. Dev
+  self-play/replay/scenario rooms are not tracked as deploy blockers because they can intentionally
+  run or auto-restart forever.
 - **Fog is authoritative**: `snapshot_for` and per-recipient event delivery go through
   `rules::projection`, which gates entity views, `target_id` tracers, and death/attack events on
   visibility. Hidden enemies are never sent except inside explicit one-second lingering death

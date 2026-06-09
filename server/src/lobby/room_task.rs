@@ -210,6 +210,8 @@ pub(super) struct RoomTask {
     match_map_name: String,
     /// Display names of every participant (humans + AI) in seat order, for match-history rows.
     match_participants: Vec<String>,
+    drain: DrainHandle,
+    match_tracked_for_drain: bool,
 }
 
 impl RoomTask {
@@ -218,6 +220,7 @@ impl RoomTask {
         mode: RoomMode,
         db: Option<Arc<Db>>,
         match_history_local_only: bool,
+        drain: DrainHandle,
     ) -> Self {
         let replay_speed = match &mode {
             RoomMode::DevSelfPlay(DevSelfPlayConfig::Replay { .. }) => 1.5,
@@ -246,6 +249,8 @@ impl RoomTask {
             match_started_at: None,
             match_map_name: String::new(),
             match_participants: Vec::new(),
+            drain,
+            match_tracked_for_drain: false,
         }
     }
 
@@ -340,6 +345,13 @@ impl RoomTask {
                 self.on_set_replay_vision(player_id, vision)
             }
             RoomEvent::SelectMap { player_id, map } => self.on_select_map(player_id, map),
+            RoomEvent::DrainStarted => self.on_drain_started(),
+        }
+    }
+
+    fn on_drain_started(&mut self) {
+        if matches!(self.phase, Phase::Lobby) {
+            self.broadcast_lobby();
         }
     }
 
@@ -416,6 +428,7 @@ impl RoomTask {
         // mid-match (otherwise a 1-player sandbox — which never "ends" — would poison the room
         // for the next person who joins under the same name). The idle room task lives on cheaply.
         if self.players.is_empty() {
+            self.mark_match_finished_for_drain();
             self.phase = Phase::Lobby;
             self.match_player_count = 0;
             self.match_human_count = 0;
@@ -461,6 +474,20 @@ impl RoomTask {
             return;
         }
         if !matches!(self.phase, Phase::Lobby) {
+            return;
+        }
+        if self.drain.is_draining() {
+            if let Some(player) = self.players.get(&player_id) {
+                send_or_log(
+                    &self.room,
+                    player_id,
+                    &player.msg_tx,
+                    ServerMessage::Error {
+                        msg: "Server is draining for deploy; new matches are disabled.".to_string(),
+                    },
+                );
+            }
+            debug!(room = %self.room, player_id, "ignoring start while server is draining");
             return;
         }
         if self.host_id != Some(player_id) {
@@ -692,6 +719,7 @@ impl RoomTask {
         }
 
         if self.match_player_count < 2 {
+            self.mark_match_finished_for_drain();
             self.phase = Phase::Lobby;
             self.match_player_count = 0;
             self.match_human_count = 0;
@@ -741,7 +769,8 @@ impl RoomTask {
     /// A match may start with at least one active participant and every active human ready.
     /// Spectators can host and watch from the lobby, but they do not block readiness.
     fn can_start(&self) -> bool {
-        self.total_player_count() > 0
+        !self.drain.is_draining()
+            && self.total_player_count() > 0
             && self
                 .players
                 .values()
@@ -899,6 +928,7 @@ impl RoomTask {
         }
 
         info!(room = %self.room, players = self.match_player_count, "match started");
+        self.mark_match_started_for_drain();
         self.phase = Phase::InGame(Box::new(game));
     }
 
@@ -912,6 +942,7 @@ impl RoomTask {
                 return;
             }
         };
+        self.mark_match_started_for_drain();
         self.phase = Phase::InGame(Box::new(game));
         self.match_player_count = 2;
         self.dev_driver = Some(driver);
@@ -1550,6 +1581,7 @@ impl RoomTask {
         }
 
         // Reset for the next match: drop the game, clear ready flags, and re-advertise the lobby.
+        self.mark_match_finished_for_drain();
         self.phase = Phase::Lobby;
         self.match_player_count = 0;
         self.match_human_count = 0;
@@ -1558,6 +1590,20 @@ impl RoomTask {
             player.ready = false;
         }
         self.broadcast_lobby();
+    }
+
+    fn mark_match_started_for_drain(&mut self) {
+        if !self.match_tracked_for_drain && !self.is_dev_watch() {
+            self.match_tracked_for_drain = true;
+            self.drain.match_started();
+        }
+    }
+
+    fn mark_match_finished_for_drain(&mut self) {
+        if self.match_tracked_for_drain {
+            self.match_tracked_for_drain = false;
+            self.drain.match_finished();
+        }
     }
 
     // -- Sending helpers -----------------------------------------------------

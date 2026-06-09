@@ -15,6 +15,10 @@ fn join_test_player(task: &mut RoomTask, player_id: u32) {
     task.on_join(player_id, format!("Player {player_id}"), false, msg_tx, ack);
 }
 
+fn test_drain() -> DrainHandle {
+    DrainHandle::default()
+}
+
 fn test_snapshot(tick: u32, resource_deltas: Vec<ResourceDelta>) -> Snapshot {
     Snapshot {
         tick,
@@ -134,7 +138,7 @@ fn connection_sink_keeps_newest_resource_delta_for_same_node() {
 
 #[test]
 fn joining_after_earlier_player_leaves_reuses_open_color() {
-    let mut task = RoomTask::new("r".to_string(), RoomMode::Normal, None, false);
+    let mut task = RoomTask::new("r".to_string(), RoomMode::Normal, None, false, test_drain());
 
     join_test_player(&mut task, 1);
     join_test_player(&mut task, 2);
@@ -153,12 +157,13 @@ fn joining_after_earlier_player_leaves_reuses_open_color() {
 
 #[test]
 fn replay_rooms_default_to_1_5x_speed() {
-    let normal = RoomTask::new("r".to_string(), RoomMode::Normal, None, false);
+    let normal = RoomTask::new("r".to_string(), RoomMode::Normal, None, false, test_drain());
     let live = RoomTask::new(
         "r".to_string(),
         RoomMode::DevSelfPlay(DevSelfPlayConfig::Live),
         None,
         false,
+        test_drain(),
     );
     let replay = RoomTask::new(
         "r".to_string(),
@@ -167,6 +172,7 @@ fn replay_rooms_default_to_1_5x_speed() {
         }),
         None,
         false,
+        test_drain(),
     );
     assert_eq!(normal.current_tick_interval(), Duration::from_millis(33));
     assert_eq!(live.current_tick_interval(), Duration::from_millis(33));
@@ -183,11 +189,60 @@ fn replay_speed_clamped_and_applied() {
         }),
         None,
         false,
+        test_drain(),
     );
     task.on_set_replay_speed(2.0);
     // 33ms / 2.0 = 16.5ms → rounds to 16ms via div_f32
     assert!(task.current_tick_interval() < Duration::from_millis(17));
     assert!(task.current_tick_interval() > Duration::from_millis(15));
+}
+
+#[test]
+fn drain_handle_tracks_active_matches() {
+    let drain = DrainHandle::default();
+
+    assert!(!drain.is_draining());
+    assert_eq!(drain.active_matches(), 0);
+
+    drain.begin_draining();
+    assert!(drain.is_draining());
+
+    drain.match_started();
+    drain.match_started();
+    assert_eq!(drain.active_matches(), 2);
+
+    drain.match_finished();
+    assert_eq!(drain.active_matches(), 1);
+
+    drain.match_finished();
+    assert_eq!(drain.active_matches(), 0);
+
+    drain.match_finished();
+    assert_eq!(drain.active_matches(), 0);
+}
+
+#[tokio::test]
+async fn drain_waiter_releases_after_last_match_finishes() {
+    let drain = DrainHandle::default();
+    drain.match_started();
+
+    let mut waiter = {
+        let drain = drain.clone();
+        tokio::spawn(async move {
+            drain.wait_for_matches_to_drain().await;
+        })
+    };
+
+    tokio::select! {
+        result = &mut waiter => {
+            result.expect("drain waiter task should not panic");
+            panic!("waiter should remain pending while a match is active");
+        }
+        _ = tokio::time::sleep(Duration::from_millis(20)) => {}
+    }
+
+    drain.match_finished();
+    waiter.await.expect("drain waiter task should not panic");
 }
 
 #[test]
