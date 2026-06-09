@@ -90,7 +90,7 @@ Verify a deploy is recording:
 
 ```bash
 curl https://rts-0-zvorygin-beta.fly.dev/api/matches | head -c 500
-flyctl logs -a rts-0-zvorygin-beta | grep -E 'database connected|match recorded|RTS_RECORD_MATCHES'
+scripts/fly-logs.sh beta recent | rg 'database connected|match recorded|RTS_RECORD_MATCHES'
 ```
 
 Expected boot lines on a recording env:
@@ -105,6 +105,46 @@ off). Each finished multi-player match logs `match recorded` with map and outcom
 If reads return `[]` after a multi-player match: check `RTS_RECORD_MATCHES` is set and not
 `0`/`false`. See [docs/design/match-history.md](design/match-history.md) for the full gate truth
 table.
+
+## Agent log access
+
+Agents can inspect Fly server logs with a read-only Fly token stored in local `.env`.
+`.env` is gitignored; never commit the actual token.
+
+Create or rotate the token from an authenticated Fly session:
+
+```bash
+flyctl tokens create readonly \
+  --org personal \
+  --name codex-rts-logs \
+  --expiry 175200h0m0s
+```
+
+`175200h0m0s` is Fly's default maximum duration: 20 years. Put the returned token in `.env`:
+
+```bash
+FLY_API_TOKEN=fm2_...
+```
+
+Use the repo wrapper so agents get JSON logs and do not need to remember app names:
+
+```bash
+scripts/fly-logs.sh beta recent
+scripts/fly-logs.sh mainline recent
+```
+
+For live tailing, bound the command when an agent runs it so it does not stream forever:
+
+```bash
+timeout 30 scripts/fly-logs.sh beta tail
+```
+
+The wrapper maps `beta` to `rts-0-zvorygin-beta` and `mainline` to `rts-0-zvorygin`, unless
+`FLY_BETA_APP` or `FLY_MAINLINE_APP` override those names. It also accepts a raw app name:
+
+```bash
+scripts/fly-logs.sh rts-0-zvorygin-beta recent --region ewr
+```
 
 ## Stop spending after game night
 
