@@ -12,8 +12,9 @@
 //! 2. In the `Lobby` phase the room broadcasts a `lobby` message on every membership/ready
 //!    change. The host may start the match when everyone is ready.
 //! 3. In the `InGame` phase the room advances [`Game`] once per tick, fans out a fog-filtered
-//!    snapshot to each connected player, and detects game-over. When the match resolves the
-//!    room returns to the `Lobby` phase (ready flags reset) so the same players can rematch.
+//!    snapshot to each connected player, and detects game-over. When a real match resolves the
+//!    room sends `gameOver`, transitions connected humans into post-match replay playback, and
+//!    returns to `Lobby` only after a viewer requests `returnToLobby` for rematch setup.
 
 use std::collections::{HashMap, HashSet};
 use std::fs;
