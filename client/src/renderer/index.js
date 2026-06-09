@@ -27,6 +27,7 @@ import {
   _shadow,
   _slot,
   _tintFor,
+  _vehicleShadow,
 } from "./entities.js";
 import {
   _drawAbilityTargetPreview,
@@ -423,6 +424,7 @@ Object.assign(Renderer.prototype, {
   _deployedWeaponSetupVisual,
   _slot,
   _shadow,
+  _vehicleShadow,
   _sweepSetupVisuals,
   _sweepTankMotion,
   _tankMotionVisual,

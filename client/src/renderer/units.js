@@ -152,11 +152,16 @@ export function _drawUnit(e, colorByOwner, state, pools = {}) {
     : e.kind === KIND.AT_TEAM
       ? recoilVector(weaponFacing, recoil * 0.42)
       : ZERO_OFFSET;
+  const vehicleBody = isVehicleBodyKind(e.kind) ? tankBodyVisual(stat) : null;
 
   // Shadow on its own layer (under all units).
   const sh = this._slot(shadowPool, e.id);
   sh.position.set(e.x + heavyKick.x, e.y + heavyKick.y);
-  this._shadow(sh, 0, 0, isVehicleBodyKind(e.kind) ? tankBodyVisual(stat).shadowRadius : r);
+  if (vehicleBody) {
+    this._vehicleShadow(sh, 0, 0, vehicleBody, facing);
+  } else {
+    this._shadow(sh, 0, 0, r);
+  }
 
   // Body on the unit layer.
   const g = this._slot(unitPool, e.id);
@@ -175,12 +180,12 @@ export function _drawUnit(e, colorByOwner, state, pools = {}) {
   } else if (e.kind === KIND.SCOUT_CAR) {
     // Scout cars currently use the tank-like vehicle movement model server-side.
     // Replace with truck/wheeled movement semantics once that model exists.
-    const body = tankBodyVisual(STATS[e.kind]);
+    const body = vehicleBody;
     const motion = this._tankMotionVisual(e, facing, state, body);
     drawScoutCar(g, body, tint, facing, weaponFacing, motion, recoil);
   } else if (e.kind === KIND.TANK) {
     // Hull follows movement facing; turret/barrel follow weapon facing.
-    const body = tankBodyVisual(STATS[e.kind]);
+    const body = vehicleBody;
     const motion = this._tankMotionVisual(e, facing, state, body);
     drawTankTracks(g, body, facing, motion);
     drawTankHull(g, body, tint, facing);
