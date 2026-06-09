@@ -2101,6 +2101,7 @@ impl RoomTask {
         self.outcome_sent.clear();
         for player in self.players.values_mut() {
             player.ready = false;
+            player.msg_tx.clear_pending_snapshot();
         }
         self.broadcast_lobby();
     }
@@ -2532,12 +2533,19 @@ mod tests {
         task.end_match(Some(players[0].id), game.scores(), Some(&game));
         assert!(matches!(task.phase, Phase::ReplayViewer(_)));
 
+        task.players
+            .get(&players[0].id)
+            .unwrap()
+            .msg_tx
+            .try_send_snapshot(replay_transition_test_snapshot(101));
+
         task.on_return_to_lobby(players[0].id);
 
         assert!(matches!(task.phase, Phase::Lobby));
         assert_eq!(task.match_player_count, 0);
         assert_eq!(task.match_human_count, 0);
         assert!(task.players.values().all(|player| !player.ready));
+        assert!(writer_a.snapshots.take().is_none());
         let messages: Vec<_> =
             std::iter::from_fn(|| writer_a.reliable_rx.try_recv().ok()).collect();
         assert!(messages
