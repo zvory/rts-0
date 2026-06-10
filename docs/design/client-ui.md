@@ -201,8 +201,9 @@ The train command card is driven by the first selected production building type,
 are issued to the selected completed compatible production buildings in round-robin order so a
 multi-building selection spreads queued units across its producers. Train and production-cancel
 hotkeys honor native keyboard repeat: after the OS repeat delay, repeated `keydown` events activate
-only those repeatable command-card buttons. Cancel walks selected producing buildings in reverse
-round-robin order for the displayed producer type.
+only those repeatable command-card buttons. Research buttons that unlock production appear directly
+below the production button they unlock and disappear once complete. Cancel walks selected producing
+buildings in reverse round-robin order for the displayed producer type.
 
 `minimap.js`
 ```js

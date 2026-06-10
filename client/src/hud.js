@@ -868,7 +868,7 @@ export class HUD {
   _renderTrainCard(card, building) {
     const res = this.state.resources || { steel: 0, oil: 0 };
     const trains = this._trainsOf(building.kind);
-    const researches = this._researchesOf(building.kind);
+    const researches = this._availableResearchesOf(building.kind);
     const producingBuildings = this._selectedProducingBuildingsForKind(building.kind);
     const producing = producingBuildings.length > 0;
     const cancelSlot = 8;
@@ -888,18 +888,19 @@ export class HUD {
     if (sig === this._cardSig) return;
     this._cardSig = sig;
 
-    const frag = document.createDocumentFragment();
-    let idx = 0;
+    const slots = new Array(9).fill(null);
     for (const unit of trains) {
       const st = STATS[unit];
       if (!st) continue;
+      const slot = slots.findIndex((entry) => entry == null);
+      if (slot < 0 || slot === cancelSlot) break;
       const availability = this._trainAvailability(unit, res);
       const enabled = availability === "ready";
       const reason = this._trainDisabledReason(unit, res);
-      const btn = this._cmdButton({
+      slots[slot] = this._cmdButton({
         icon: st.icon,
         label: st.label,
-        hotkey: GRID_HOTKEYS[idx++],
+        hotkey: GRID_HOTKEYS[slot],
         cost: st.cost,
         enabled,
         unaffordable: availability === "unaffordable",
@@ -909,18 +910,20 @@ export class HUD {
         onUnavailable: () => this._playNotEnoughForCost(st.cost),
         onClick: () => this._issueTrain(unit),
       });
-      frag.appendChild(btn);
     }
     for (const upgrade of researches) {
       const def = UPGRADES[upgrade];
       if (!def) continue;
+      const preferredSlot = this._researchSlotForUpgrade(upgrade, trains);
+      const slot = this._firstOpenCommandSlot(slots, preferredSlot, cancelSlot);
+      if (slot < 0) continue;
       const availability = this._researchAvailability(upgrade, res);
       const enabled = availability === "ready";
       const reason = this._researchDisabledReason(upgrade, res);
-      const btn = this._cmdButton({
+      slots[slot] = this._cmdButton({
         icon: def.icon,
         label: def.label,
-        hotkey: def.hotkey || GRID_HOTKEYS[idx],
+        hotkey: GRID_HOTKEYS[slot],
         cost: def.cost,
         enabled,
         unaffordable: availability === "unaffordable",
@@ -930,15 +933,10 @@ export class HUD {
         onUnavailable: () => this._playNotEnoughForCost(def.cost),
         onClick: () => this._issueResearch(upgrade),
       });
-      idx++;
-      frag.appendChild(btn);
     }
 
     if (producing) {
-      // Fill any gap between the train buttons and the fixed cancel slot so
-      // the card always renders as a complete 3x3 grid with C in slot 8.
-      this._padCard(frag, idx, cancelSlot);
-      const cancelBtn = this._cmdButton({
+      slots[cancelSlot] = this._cmdButton({
         icon: "CNCL",
         label: "Cancel",
         hotkey: GRID_HOTKEYS[cancelSlot],
@@ -948,13 +946,36 @@ export class HUD {
         repeatable: true,
         onClick: () => this._issueCancelProduction(building.kind),
       });
-      frag.appendChild(cancelBtn);
-    } else {
-      this._padCard(frag, idx);
     }
 
+    const frag = document.createDocumentFragment();
+    for (const slot of slots) {
+      frag.appendChild(slot || this._emptyCommandSlot());
+    }
     card.innerHTML = "";
     card.appendChild(frag);
+  }
+
+  _availableResearchesOf(kind) {
+    const completed = this.state.upgrades || [];
+    return this._researchesOf(kind).filter((upgrade) => !completed.includes(upgrade));
+  }
+
+  _researchSlotForUpgrade(upgrade, trains) {
+    const unitIndex = trains.findIndex((unit) => STATS[unit]?.upgradeRequires === upgrade);
+    if (unitIndex >= 0) return unitIndex + 3;
+    const afterTrainSlot = trains.findIndex((unit) => STATS[unit] == null);
+    return afterTrainSlot >= 0 ? afterTrainSlot : trains.length;
+  }
+
+  _firstOpenCommandSlot(slots, preferredSlot, reservedSlot = -1) {
+    const trySlot = (slot) =>
+      slot >= 0 && slot < slots.length && slot !== reservedSlot && slots[slot] == null;
+    if (trySlot(preferredSlot)) return preferredSlot;
+    for (let slot = 0; slot < slots.length; slot++) {
+      if (trySlot(slot)) return slot;
+    }
+    return -1;
   }
 
   /** Selected own production buildings that can train `unit`, in selection order. */
@@ -1191,10 +1212,14 @@ export class HUD {
    */
   _padCard(frag, filled, target = 9) {
     for (let i = filled; i < target; i++) {
-      const el = document.createElement("div");
-      el.className = "cmd-empty";
-      frag.appendChild(el);
+      frag.appendChild(this._emptyCommandSlot());
     }
+  }
+
+  _emptyCommandSlot() {
+    const el = document.createElement("div");
+    el.className = "cmd-empty";
+    return el;
   }
 
   /**

@@ -161,7 +161,7 @@ Building stats (hp, sight, cost, footprint tiles wxh, buildTicks, extra):
 | barracks                   | Barracks           | 165 | 6     | 150 | 3x2  | 200       | trains rifleman and machine_gunner; requires a City Centre |
 | training_centre            | Training Centre    | 300 | 6     | 100 steel + 50 oil | 3x2  | 560       | shared prerequisite before either advanced path; unlocks machine_gunner training at barracks and researches Methamphetamines; requires a City Centre and Barracks |
 | factory                    | Vehicle Works      | 360 | 6     | 200 steel + 100 oil | 3x3  | 330       | Mobile Warfare path building; trains scout_car immediately and researches Tank Production before tank training; requires a City Centre and Training Centre |
-| steelworks                 | Gun Works          | 300 | 6     | 125 steel + 125 oil | 2x2  | 620       | Superior Firepower path building; researches AT Gun Crews before at_team training; requires a City Centre and Training Centre |
+| steelworks                 | Gun Works          | 300 | 6     | 125 steel + 125 oil | 3x3  | 620       | Superior Firepower path building; researches AT Gun Crews before at_team training; requires a City Centre and Training Centre |
 
 Win: a player is **eliminated** when they own zero buildings (units alone do not keep them
 alive). Last player standing wins; a 1-player match never ends (sandbox/exploration mode). In a

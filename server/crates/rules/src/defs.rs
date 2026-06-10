@@ -302,8 +302,8 @@ pub const BUILDINGS: &[BuildingDef] = &[
             sight_tiles: 6,
             cost_steel: 125,
             cost_oil: 125,
-            foot_w: 2,
-            foot_h: 2,
+            foot_w: 3,
+            foot_h: 3,
             build_ticks: 620,
             provides_supply: 0,
             dmg: 0,
@@ -397,5 +397,14 @@ mod tests {
 
         assert_eq!(depot_hp, 110);
         assert_eq!(barracks_hp, depot_hp * 3 / 2);
+    }
+
+    #[test]
+    fn gun_works_uses_square_vehicle_tech_footprint() {
+        let stats = building_def(EntityKind::Steelworks)
+            .expect("gun works def")
+            .stats;
+
+        assert_eq!((stats.foot_w, stats.foot_h), (3, 3));
     }
 }
