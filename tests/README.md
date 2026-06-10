@@ -9,9 +9,10 @@ fails. The private server runs with `RTS_TEST_TICK_MS=5` by default, so live-ser
 simulated progress instead of real-time 30 Hz wall clock; normal `cargo run` remains 30 Hz.
 If a server is already answering on the port it is reused and left running.
 
-This command is the required local gate for every commit. Run `./scripts/install-hooks.sh` once per
-checkout to install the tracked hooks locally. GitHub Actions also runs this command after pushes to
-`main` as a shared signal, but `main` is intentionally left open for direct pushes.
+This command is the required local gate for ordinary commits. Run `./scripts/install-hooks.sh` once
+per checkout to install the tracked hooks locally. Merge commits intentionally bypass the local hook
+gate. GitHub Actions also runs this command after pushes to `main` as a shared signal, but `main` is
+intentionally left open for direct pushes.
 
 ```bash
 tests/run-all.sh                 # local gate: cargo fmt --check + cargo test + clippy + 3 API suites + client smoke

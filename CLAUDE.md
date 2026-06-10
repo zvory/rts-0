@@ -65,7 +65,7 @@ the server simulates at 30 Hz and sends per-player, fog-filtered snapshots.
 ## Git / GitHub
 
 - The default branch is `main`.
-- committing has a commit hook that silently runs all tests.
+- ordinary commits have a commit hook that silently runs all tests; merge commits bypass it.
 - Commit messages should be detailed. Use a clear subject and include a body when the change has
   gameplay impact, contract changes, testing nuance, or non-obvious reasoning.
 - Work directly on `main` for simple single-agent changes. For parallel worktree changes, use one

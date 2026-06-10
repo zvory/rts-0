@@ -1,4 +1,3 @@
 #!/usr/bin/env bash
-# Gate every local merge commit through the local CI suite before the merge
-# commit is created (a failure aborts the merge). See hooks/_gate-main.sh.
+# Merge commits intentionally bypass the local CI hook. See hooks/_gate-main.sh.
 exec "$(dirname "$0")/_gate-main.sh" pre-merge-commit

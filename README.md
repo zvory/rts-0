@@ -110,13 +110,9 @@ Install the tracked Git hooks in each checkout:
 ./scripts/install-hooks.sh
 ```
 
-The hooks run `./tests/run-all.sh` before every local commit and before every non-fast-forward
-merge commit. Fast-forward merges do not create commits, so they do not run commit hooks. When
-merging feature branches into `main`, use a merge commit so the gate can run:
-
-```bash
-git merge --no-ff <branch>
-```
+The hooks run `./tests/run-all.sh` before ordinary local commits. Merge commits intentionally
+bypass the local hook gate, including non-fast-forward merge commits and conflict-resolution
+commits.
 
 Git does not distribute active local hook configuration through clones. Each checkout needs to run
 the installer once. GitHub Actions also runs `./tests/run-all.sh` after pushes to `main` as a
