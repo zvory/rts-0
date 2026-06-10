@@ -1532,7 +1532,6 @@ input[type="text"]:focus {
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  background: rgba(5, 7, 13, 0.74);
   color: var(--accent);
   font-family: "Germania One", var(--lobby-font);
   font-size: clamp(96px, 18vw, 280px);
