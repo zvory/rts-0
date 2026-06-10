@@ -1,57 +1,62 @@
-# Phase 6 - Capstone Units: Artillery and Command Car
+# Phase 6 - Artillery
 
 ## Objective
 
-Add late-path overpowered tools after the Scout Car, Mortar, AT Gun, and Tank timing foundation is
-playable.
+Add the Superior Firepower late-game capstone after the Scout Car, Mortar, AT Gun, and Tank timing
+foundation is playable.
 
 ## Artillery
 
 - Built at Gun Works.
 - Requires a late Gun Works upgrade.
-- Very slow.
-- Very long range.
+- Costs 300 steel / 100 oil.
+- Like AT Guns, must set up before firing and tear down before moving.
+- Movement and setup behavior matches AT Guns, but Artillery is bigger and slower.
+- Twice the size of the AT Gun.
+- When setting up, shows a cone indicating where it can shoot, like the AT Gun setup cone.
+- Field of fire is 20 degrees total after setup.
+- Minimum range is 10 tiles.
+- Maximum range is 50 tiles.
+- Fires every 3 seconds.
+- Each shot costs 10 steel, paid only when the shot actually fires.
 - Shoots at a point, not a unit.
-- Must set up before firing and tear down before moving.
-- First shot has low accuracy.
-- Accuracy improves over time while maintaining fire.
+- First shot after setup has a CEP of 5 tiles.
+- Accuracy improves while maintaining fire until the fifth shot after setup has a CEP of 2 tiles.
+- On impact, deals 150 armor-piercing damage in a 1-tile radius.
+- Outside the 1-tile radius, deals non-armor-piercing splash damage that falls from 150 damage down
+  to 10 damage at 3 tiles.
+- Deals no splash damage beyond 3 tiles.
 - Intended to let Superior Firepower grind down positions and destroy resource bases if it survives
   the Mobile Warfare stage-two surge.
 
-## Command Car
-
-- Built at Vehicle Works.
-- Requires a late Vehicle Works upgrade.
-- Ability: **Breakthrough!**
-- Breakthrough is an AOE speed boost.
-- Breakthrough bonus is doubled for units in smoke or that recently left smoke.
-- Ability: **Fake Army**
-- Fake Army copies army units in AOE and places the fake force at a target location within range.
-- Fake copies deal no damage.
-- Fake copies have 10% of the real units' HP.
-- Fake copies disappear after 20 seconds.
-
 ## Work
 
-- Implement Artillery first if the immediate need is to test the SF payoff.
-- Implement Command Car after Artillery if the immediate need is an MW tool against entrenched SF.
-- Add any new protocol messages, ability identifiers, fake-unit snapshot representation, and fog
-  projection rules together.
-- Ensure fake units cannot attack, gather, block ownership commands incorrectly, or leak hidden real
-  unit information.
+- Add the Artillery unit definition, Gun Works upgrade, training option, cost, footprint, movement,
+  setup, and teardown behavior.
+- Reuse the AT Gun-style setup command flow and setup cone affordance where possible, adjusted for
+  Artillery's 20-degree field of fire.
+- Add point-fire command handling and UI affordances for Artillery.
+- Track per-setup firing accuracy so the CEP starts at 5 tiles and reaches 2 tiles on the fifth
+  shot.
+- Spend 10 steel only when a shot fires; rejected orders, out-of-range targets, setup delays, and
+  unaffordable shots must not spend steel.
+- Apply the armor-piercing inner blast and non-armor-piercing outer falloff separately.
 - Ensure Artillery point targeting is validated and cannot panic on invalid coordinates.
 
 ## Verification
 
 - Artillery setup, teardown, point fire, accuracy ramp, and range limits are tested.
-- Command Car ability cooldowns, target validation, smoke synergy, fake lifetime, fake HP, and
-  zero-damage behavior are tested.
-- Fog tests cover Artillery events and fake army visibility.
-- Regression tests cover fake units disappearing cleanly without stale ids.
+- Artillery cannot fire inside its 10-tile minimum range, outside its 50-tile maximum range, or
+  outside its 20-degree field of fire.
+- Artillery spends 10 steel only on shots that actually fire.
+- Artillery impact tests cover the 1-tile armor-piercing radius, non-armor-piercing falloff to 3
+  tiles, and no damage beyond 3 tiles.
+- Fog tests cover Artillery fire and impact events without leaking hidden positions.
+- Regression tests cover invalid point targets, unaffordable shots, stale ids, and setup/teardown
+  transitions.
 
 ## Player-Facing Outcome
 
-Late game becomes deliberately explosive: Superior Firepower can start deleting economic positions
-from range, while Mobile Warfare gains tools to force breakthroughs, exploit smoke, and deceive
-defensive lines.
-
+Superior Firepower gains a costly, slow, positional siege weapon that can delete economic positions
+from extreme range if protected, but must commit to a narrow firing arc, minimum range, setup time,
+and ongoing steel ammunition cost.

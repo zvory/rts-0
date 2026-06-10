@@ -78,6 +78,19 @@ unit modest.
 - Requires a Vehicle Works upgrade before training.
 - Mobile Warfare stage-two power spike.
 
+### Artillery
+
+- Built at Gun Works.
+- Late Superior Firepower capstone.
+- Costs 300 steel / 100 oil.
+- Larger, slower AT Gun-style weapon that must set up before firing and tear down before moving.
+- Shoots at a point rather than at a unit.
+- Has 10-50 tile range, a 20-degree field of fire, a 3-second reload, and costs 10 steel per shot
+  when the shot fires.
+- Accuracy ramps from 5-tile CEP on the first shot after setup to 2-tile CEP on the fifth shot.
+- Impact deals 150 armor-piercing damage in a 1-tile radius, then non-armor-piercing splash falloff
+  to 10 damage at 3 tiles.
+
 ### Command Car
 
 - Built at Vehicle Works.
@@ -87,14 +100,6 @@ unit modest.
   location within range.
 - Fake Army copies deal no damage, have 10% of the real units' HP, and disappear after 20 seconds.
 
-### Artillery
-
-- Built at Gun Works.
-- Late Superior Firepower capstone.
-- Very slow, very long-range gun that shoots at a point rather than at a unit.
-- Must set up before firing and tear down before moving.
-- First shot has low accuracy; accuracy improves over time.
-
 ## Phase Index
 
 1. [Phase 1 - Tech Spine and Vehicle Works Framing](phase-1-tech-spine.md)
@@ -102,7 +107,8 @@ unit modest.
 3. [Phase 3 - Gun Works AT Gun Production](phase-3-steelworks-at-gun.md)
 4. [Phase 4 - Mortar Team](phase-4-mortar-team.md)
 5. [Phase 5 - Stage Timing and Playtest Balance](phase-5-stage-timing.md)
-6. [Phase 6 - Capstone Units: Artillery and Command Car](phase-6-capstones.md)
+6. [Phase 6 - Artillery](phase-6-capstones.md)
+7. [Phase 7 - Command Car](phase-7-command-car.md)
 
 ## Deferred Work
 
@@ -110,4 +116,3 @@ unit modest.
   are playable.
 - Hard mutual exclusivity between paths is not part of the first pass. Prefer economic and timing
   pressure first: players may access both paths, but doing so should delay power spikes.
-
