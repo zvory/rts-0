@@ -612,9 +612,10 @@ impl RoomTask {
                 player_id,
                 name,
                 spectator,
+                replay_ok,
                 msg_tx,
                 ack,
-            } => self.on_join(player_id, name, spectator, msg_tx, ack),
+            } => self.on_join(player_id, name, spectator, replay_ok, msg_tx, ack),
             RoomEvent::Leave { player_id } => self.on_leave(player_id),
             RoomEvent::Ready { player_id, ready } => self.on_ready(player_id, ready),
             RoomEvent::StartRequest { player_id } => self.on_start_request(player_id),
@@ -684,6 +685,7 @@ impl RoomTask {
         player_id: u32,
         name: String,
         spectator: bool,
+        replay_ok: bool,
         msg_tx: ConnectionSink,
         ack: tokio::sync::oneshot::Sender<bool>,
     ) {
@@ -695,10 +697,18 @@ impl RoomTask {
             self.mode,
             RoomMode::Replay { .. } | RoomMode::DevSelfPlay(DevSelfPlayConfig::Replay { .. })
         ) {
+            if !replay_ok {
+                self.prompt_for_replay_join(player_id, &msg_tx, ack);
+                return;
+            }
             self.on_join_replay_room(player_id, name, msg_tx, ack);
             return;
         }
         if matches!(self.phase, Phase::ReplayViewer(_)) {
+            if !replay_ok {
+                self.prompt_for_replay_join(player_id, &msg_tx, ack);
+                return;
+            }
             self.on_join_replay_viewer(player_id, name, msg_tx, ack);
             return;
         }
@@ -748,6 +758,23 @@ impl RoomTask {
         if matches!(self.phase, Phase::Lobby) {
             self.broadcast_lobby();
         }
+    }
+
+    fn prompt_for_replay_join(
+        &self,
+        player_id: u32,
+        msg_tx: &ConnectionSink,
+        ack: tokio::sync::oneshot::Sender<bool>,
+    ) {
+        send_or_log(
+            &self.room,
+            player_id,
+            msg_tx,
+            ServerMessage::JoinReplayPrompt {
+                room: self.room.clone(),
+            },
+        );
+        let _ = ack.send(false);
     }
 
     pub(super) fn on_leave(&mut self, player_id: u32) {
@@ -2775,7 +2802,7 @@ mod tests {
         );
         let (msg_tx, _writer) = ConnectionSink::new();
         let (ack, mut ack_rx) = tokio::sync::oneshot::channel();
-        task.on_join(99, "Viewer".to_string(), true, msg_tx, ack);
+        task.on_join(99, "Viewer".to_string(), true, false, msg_tx, ack);
 
         assert_eq!(ack_rx.try_recv(), Ok(true));
         assert_eq!(in_game_tick(&task), 0);
@@ -2803,7 +2830,7 @@ mod tests {
     }
 
     #[test]
-    fn persisted_replay_room_join_starts_replay_viewer() {
+    fn persisted_replay_room_join_prompts_before_playback() {
         let players = replay_test_players(2);
         let (_live, artifact) = replay_test_artifact(&players, 3);
         let mut task = RoomTask::new(
@@ -2816,7 +2843,32 @@ mod tests {
         let (msg_tx, mut writer) = ConnectionSink::new();
         let (ack, mut ack_rx) = tokio::sync::oneshot::channel();
 
-        task.on_join(99, "Viewer".to_string(), false, msg_tx, ack);
+        task.on_join(99, "Viewer".to_string(), false, false, msg_tx, ack);
+
+        assert_eq!(ack_rx.try_recv(), Ok(false));
+        assert!(matches!(task.phase, Phase::Lobby));
+        assert!(!task.players.contains_key(&99));
+        assert!(matches!(
+            writer.reliable_rx.try_recv().unwrap(),
+            ServerMessage::JoinReplayPrompt { room } if room == "persisted-replay-test"
+        ));
+    }
+
+    #[test]
+    fn persisted_replay_room_confirmed_join_starts_replay_viewer() {
+        let players = replay_test_players(2);
+        let (_live, artifact) = replay_test_artifact(&players, 3);
+        let mut task = RoomTask::new(
+            "persisted-replay-confirmed-test".to_string(),
+            RoomMode::Replay { artifact },
+            None,
+            false,
+            DrainHandle::default(),
+        );
+        let (msg_tx, mut writer) = ConnectionSink::new();
+        let (ack, mut ack_rx) = tokio::sync::oneshot::channel();
+
+        task.on_join(99, "Viewer".to_string(), false, true, msg_tx, ack);
 
         assert_eq!(ack_rx.try_recv(), Ok(true));
         assert!(matches!(task.phase, Phase::ReplayViewer(_)));
@@ -2828,6 +2880,32 @@ mod tests {
         assert!(matches!(
             writer.reliable_rx.try_recv().unwrap(),
             ServerMessage::ReplayState(_)
+        ));
+    }
+
+    #[test]
+    fn post_match_replay_join_prompts_before_attaching_viewer() {
+        let players = replay_test_players(2);
+        let (_live, artifact) = replay_test_artifact(&players, 1);
+        let replay = ReplaySession::new(artifact).unwrap();
+        let mut task = RoomTask::new(
+            "post-match-replay-prompt-test".to_string(),
+            RoomMode::Normal,
+            None,
+            false,
+            DrainHandle::default(),
+        );
+        task.phase = Phase::ReplayViewer(Box::new(replay));
+        let (msg_tx, mut writer) = ConnectionSink::new();
+        let (ack, mut ack_rx) = tokio::sync::oneshot::channel();
+
+        task.on_join(99, "Viewer".to_string(), false, false, msg_tx, ack);
+
+        assert_eq!(ack_rx.try_recv(), Ok(false));
+        assert!(!task.players.contains_key(&99));
+        assert!(matches!(
+            writer.reliable_rx.try_recv().unwrap(),
+            ServerMessage::JoinReplayPrompt { room } if room == "post-match-replay-prompt-test"
         ));
     }
 

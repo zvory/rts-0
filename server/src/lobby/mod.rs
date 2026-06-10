@@ -92,6 +92,7 @@ pub enum RoomEvent {
         player_id: u32,
         name: String,
         spectator: bool,
+        replay_ok: bool,
         msg_tx: ConnectionSink,
         ack: tokio::sync::oneshot::Sender<bool>,
     },
