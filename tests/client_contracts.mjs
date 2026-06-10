@@ -1240,7 +1240,15 @@ function fakeAudioContext() {
   assert(STATS[KIND.CITY_CENTRE].cost.steel === 200, "City Centre cost mirrors server");
   assert(
     Array.isArray(STATS[KIND.FACTORY].requires),
-    "Factory should expose all server-side build prerequisites",
+    "Vehicle Works should expose all server-side build prerequisites",
+  );
+  assert(
+    STATS[KIND.FACTORY].label === "Vehicle Works",
+    "factory protocol kind should present as Vehicle Works",
+  );
+  assert(
+    STATS[KIND.STEELWORKS].label === "Gun Works",
+    "steelworks protocol kind should present as Gun Works",
   );
   assert(
     Array.isArray(STATS[KIND.TRAINING_CENTRE].requires),
@@ -1254,37 +1262,39 @@ function fakeAudioContext() {
     STATS[KIND.TRAINING_CENTRE].requires.includes(KIND.BARRACKS),
     "Training Centre should require a Barracks in the command card",
   );
+  assert(STATS[KIND.TRAINING_CENTRE].buildTicks === 560, "Training Centre build time mirrors server");
   assert(
     STATS[KIND.FACTORY].requires.includes(KIND.CITY_CENTRE),
-    "Factory should require a City Centre in the command card",
+    "Vehicle Works should require a City Centre in the command card",
   );
   assert(
     STATS[KIND.FACTORY].requires.includes(KIND.TRAINING_CENTRE),
-    "Factory should require a Training Centre in the command card",
+    "Vehicle Works should require a Training Centre in the command card",
   );
   assert(
     STATS[KIND.FACTORY].trains[0] === KIND.SCOUT_CAR,
-    "Factory should put Scout Car in the leftmost train slot",
+    "Vehicle Works should put Scout Car in the leftmost train slot",
   );
   assert(STATS[KIND.SCOUT_CAR].cost.steel === 125, "Scout Car steel cost mirrors server");
   assert(STATS[KIND.SCOUT_CAR].cost.oil === 50, "Scout Car oil cost mirrors server");
   assert(STATS[KIND.SCOUT_CAR].sight === 10, "Scout Car has the largest mobile sight radius");
   assert(SMOKE_ABILITY_COST.steel === 0 && SMOKE_ABILITY_COST.oil === 0, "Scout Car smoke has no resource cost");
-  assert(!("requires" in ABILITIES[ABILITY.SMOKE]), "Scout Car smoke should be available without Steelworks");
+  assert(!("requires" in ABILITIES[ABILITY.SMOKE]), "Scout Car smoke should be available without Gun Works");
   assert(STATS[KIND.SCOUT_CAR].body.length === 40.8, "Scout Car client body length mirrors server");
   assert(STATS[KIND.SCOUT_CAR].body.width === 21.6, "Scout Car client body width mirrors server");
-  assert(KIND_CODE[KIND.SCOUT_CAR] === 14, "Scout Car compact kind code should follow Steelworks");
+  assert(KIND_CODE[KIND.SCOUT_CAR] === 14, "Scout Car compact kind code should follow steelworks protocol kind");
   assert(
     STATS[KIND.STEELWORKS].footW === 2 && STATS[KIND.STEELWORKS].footH === 2,
-    "Steelworks should be a 2x2 building",
+    "Gun Works should be a 2x2 building",
   );
   assert(
     STATS[KIND.STEELWORKS].cost.steel === 125 && STATS[KIND.STEELWORKS].cost.oil === 125,
-    "Steelworks cost mirrors server",
+    "Gun Works cost mirrors server",
   );
+  assert(STATS[KIND.STEELWORKS].buildTicks === 620, "Gun Works build time mirrors server");
   assert(
     STATS[KIND.STEELWORKS].requires.includes(KIND.TRAINING_CENTRE),
-    "Steelworks should require Training Centre tech in the command card",
+    "Gun Works should require Training Centre tech in the command card",
   );
   assert(!ABILITIES[ABILITY.CHARGE], "client no longer exposes Rifleman Charge as a command-card ability");
   assert(
@@ -1299,11 +1309,11 @@ function fakeAudioContext() {
   );
   assert(
     STATS[KIND.AT_TEAM].requires === KIND.STEELWORKS,
-    "AT Gun training should require a completed Steelworks in the command card",
+    "AT Gun training should require a completed Gun Works in the command card",
   );
   assert(
     STATS[KIND.TANK].requires === KIND.STEELWORKS,
-    "Tank training should require a completed Steelworks in the command card",
+    "Tank training should require a completed Gun Works in the command card until the Vehicle Works unlock phase",
   );
   const playerId = 1;
   const underConstructionTrainingCentre = [
@@ -1312,7 +1322,7 @@ function fakeAudioContext() {
   ];
   assert(
     !playerHasCompletedKind(underConstructionTrainingCentre, playerId, KIND.TRAINING_CENTRE),
-    "Factory should not unlock while the Training Centre is still under construction",
+    "Vehicle Works should not unlock while the Training Centre is still under construction",
   );
   const underConstructionBarracks = [
     { owner: playerId, kind: KIND.CITY_CENTRE, buildProgress: null },
@@ -1328,7 +1338,7 @@ function fakeAudioContext() {
   ];
   assert(
     playerHasCompletedKind(completedTrainingCentre, playerId, KIND.TRAINING_CENTRE),
-    "Factory should unlock once the Training Centre is complete",
+    "Vehicle Works should unlock once the Training Centre is complete",
   );
   assert(formatTankOilUsed(0.04) === "0.0", "tank oil panel rounds tiny values to tenths");
   assert(formatTankOilUsed(9.94) === "9.9", "tank oil panel keeps tenths below ten oil");
@@ -1548,7 +1558,7 @@ function fakeAudioContext() {
     const buildCard = fakeElement("div");
     shortResourceHud._renderBuildCard(buildCard);
     const barracksButton = renderedButtons.find((button) => button.innerHTML.includes("Barracks"));
-    const factoryButton = renderedButtons.find((button) => button.innerHTML.includes("Factory"));
+    const factoryButton = renderedButtons.find((button) => button.innerHTML.includes("Vehicle Works"));
     assert(barracksButton && !barracksButton.disabled, "unlocked unaffordable build button stays clickable");
     assert(
       barracksButton.className.includes("unaffordable"),

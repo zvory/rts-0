@@ -29,6 +29,9 @@ Core unit roles:
   Machine-gun nests
   are the main base-defense tool and should dominate open-ground infantry combat in the
   second stage of the game.
+- **Scout Car** is the Mobile Warfare path-entry unit from Vehicle Works: fast, unarmored,
+  high-vision, and useful for raiding, scouting, and smoke-enabled attacks before heavier armor
+  arrives.
 - **Tank** is the machine-gun breaker and open-ground power unit: immune to rifle and
   machine-gun small-arms fire, strong against static defenses and exposed infantry, but
   vulnerable to other tanks and anti-tank infantry.
@@ -89,7 +92,7 @@ authoritative `rules::defs` records.
   1.25x movement speed (matching tank speed at 2.0 px/tick), fire while moving without an extra
   miss chance, and 25% faster attacks (16 tick cooldown becomes 12).
 - **Scout Car Smoke** (hotkey `D`): Scout cars have a targeted smoke-grenade ability immediately;
-  no completed Steelworks is required. Each scout car spawns with 2 smoke uses; once those uses are
+  no completed Gun Works is required. Each scout car spawns with 2 smoke uses; once those uses are
   depleted, that car cannot use Smoke again. Smoke has no steel or oil cost. Target range: 9 tiles
   from the caster. Launch delay: up to 100 ms at max range, scaling down for closer targets. Cloud
   radius: 2 tiles. Cloud duration: 5 seconds. Cooldown: 20 seconds per caster.
@@ -137,20 +140,20 @@ Unit stats (hp, dmg, range[tiles], cooldown[ticks], speed[px/tick], sight[tiles]
 | worker          | 40  | 4   | 1     | 24 | 1.6   | 7     | 50  | 0   | 1   | 360 (~12s) |
 | rifleman        | 45  | 5   | 4     | 16 | 1.6   | 8     | 50  | 0   | 1   | 300 (~10s) |
 | machine_gunner  | 55  | 4   | 6     | 6  | 1.28  | 8     | 75  | 10  | 2   | 400 (~13s) |
-| at_team         | 45  | 60 deployed / 45 packed | 12 deployed / 5 packed | 72 | 1.152 | 6     | 75  | 25  | 3   | 440 (~15s); requires Steelworks |
+| at_team         | 45  | 60 deployed / 45 packed | 12 deployed / 5 packed | 72 | 1.152 | 6     | 75  | 25  | 3   | 440 (~15s); requires Gun Works (`steelworks` kind) |
 | scout_car       | 150 | 6   | 5     | 6  | 2.35  | 10    | 125 | 50  | 3   | 480 (~16s) |
-| tank            | 292 | 60  | 5     | 72 | 2.0   | 6     | 300 | 150 | 6   | 750 (~25s); requires Steelworks |
+| tank            | 292 | 60  | 5     | 72 | 2.0   | 6     | 300 | 150 | 6   | 750 (~25s); phase-1 compatibility still requires Gun Works (`steelworks` kind) |
 
 Building stats (hp, sight, cost, footprint tiles wxh, buildTicks, extra):
 
-| kind                       | hp  | sight | cost | foot | buildTicks | notes |
-|----------------------------|-----|-------|-----|------|-----------|-------|
-| city_centre          | 600 | 9     | 200 | 3x3  | 400       | trains worker; +10 supply; players start with one free |
-| depot                      | 110 | 4     | 100 | 2x2  | 300       | +8 supply |
-| barracks                   | 165 | 6     | 150 | 3x2  | 200       | trains rifleman, machine_gunner, at_team; requires a City Centre |
-| training_centre   | 300 | 6     | 100 steel + 50 oil | 3x2  | 280       | unlocks machine_gunner training at barracks and researches Methamphetamines; requires a City Centre and Barracks |
-| factory                    | 360 | 6     | 200 steel + 100 oil | 3x3  | 330       | trains scout_car, tank; requires a City Centre and Training Centre |
-| steelworks                 | 300 | 6     | 125 steel + 125 oil | 2x2  | 310       | unlocks at_team training at barracks and tank training; requires a City Centre and Training Centre |
+| kind                       | player-facing name | hp  | sight | cost | foot | buildTicks | notes |
+|----------------------------|--------------------|-----|-------|-----|------|-----------|-------|
+| city_centre                | City Centre        | 600 | 9     | 200 | 3x3  | 400       | trains worker; +10 supply; players start with one free |
+| depot                      | Supply Depot       | 110 | 4     | 100 | 2x2  | 300       | +8 supply |
+| barracks                   | Barracks           | 165 | 6     | 150 | 3x2  | 200       | trains rifleman, machine_gunner, at_team; requires a City Centre |
+| training_centre            | Training Centre    | 300 | 6     | 100 steel + 50 oil | 3x2  | 560       | shared prerequisite before either advanced path; unlocks machine_gunner training at barracks and researches Methamphetamines; requires a City Centre and Barracks |
+| factory                    | Vehicle Works      | 360 | 6     | 200 steel + 100 oil | 3x3  | 330       | Mobile Warfare path building; trains scout_car immediately and tank under phase-1 compatibility rules; requires a City Centre and Training Centre |
+| steelworks                 | Gun Works          | 300 | 6     | 125 steel + 125 oil | 2x2  | 620       | Superior Firepower path building; currently unlocks at_team training at barracks and phase-1 tank training compatibility; requires a City Centre and Training Centre |
 
 Win: a player is **eliminated** when they own zero buildings (units alone do not keep them
 alive). Last player standing wins; a 1-player match never ends (sandbox/exploration mode). In a

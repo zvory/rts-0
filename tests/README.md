@@ -64,7 +64,7 @@ Runs inside the Rust test suite with no live server. Plain `cargo test` runs the
 self-play coverage. Long profile-backed matchups, long AI simulation checks, and the full real-AI
 match are gated behind `RTS_FULL_AI_TESTS=1` because they dominate wall-clock time.
 The tests create scripted API clients that drive `Game` through `enqueue`/`tick`/`snapshot_for`,
-exercising gathering, oil, Depot/Barracks/Factory construction, Rifleman/Tank training, rush
+exercising gathering, oil, Depot/Barracks/Vehicle Works construction, Rifleman/Tank training, rush
 pressure, and combat. Successful runs replay the authoritative tick-stamped command log through a
 fresh game and compare the replayed event stream and final snapshots against the live run. On
 failure it writes normal `ReplayArtifactV1` replay artifacts under the Cargo target dir's

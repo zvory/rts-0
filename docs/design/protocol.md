@@ -152,8 +152,9 @@ Sent once when the match begins. Carries everything static for the whole match.
 Units/buildings arrive via snapshots (so they obey fog), including
 the player's own starting City Centre + workers. When the lobby's `setQuickstart` toggle is
 enabled, every player starts with 99,999 steel and 99,999 oil instead of the default opening
-resources, and each human player also starts with five supply depots, one Steelworks, one Training
-Centre, two Barracks, two Factories, and five of each unit kind. It also sets `debugMode: true`,
+resources, and each human player also starts with five supply depots, one Gun Works
+(`steelworks` kind), one Training Centre, two Barracks, two Vehicle Works (`factory` kind), and
+five of each unit kind. It also sets `debugMode: true`,
 which lets the client expose local movement-waypoint overlay controls for the owner-only
 `debugPath` fields in snapshots.
 Spectator start payloads keep the spectator connection's `playerId`, set `spectator: true`, and
