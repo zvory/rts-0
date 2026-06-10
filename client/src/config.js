@@ -70,6 +70,8 @@ export const SMOKE_ABILITY_COOLDOWN_TICKS = 600;
 export const SCOUT_CAR_SMOKE_USES = 2;
 export const SMOKE_ABILITY_COST = Object.freeze({ steel: 0, oil: 0 });
 export const METHAMPHETAMINES_RESEARCH_TICKS = TICK_HZ * 20;
+export const AT_GUN_UNLOCK_RESEARCH_TICKS = TICK_HZ * 20;
+export const TANK_UNLOCK_RESEARCH_TICKS = TICK_HZ * 20;
 
 // Player colors (server assigns from a matching palette; used as a fallback for blips).
 export const PLAYER_PALETTE = Object.freeze([
@@ -88,11 +90,13 @@ export const STATS = Object.freeze({
   [KIND.MACHINE_GUNNER]: { label: "Machine Gunner", icon: "MG", size: 10, sight: 8,
     rangeTiles: 6, cost: { steel: 75, oil: 10 }, supply: 2, buildTicks: 400, requires: KIND.TRAINING_CENTRE },
   [KIND.AT_TEAM]: { label: "AT Gun", icon: "AT", size: 20, sight: 6, body: AT_GUN_BODY,
-    rangeTiles: AT_GUN_DEPLOYED_RANGE_TILES, cost: { steel: 75, oil: 25 }, supply: 3, buildTicks: 440, requires: KIND.STEELWORKS },
+    rangeTiles: AT_GUN_DEPLOYED_RANGE_TILES, cost: { steel: 75, oil: 25 }, supply: 3, buildTicks: 440,
+    requires: KIND.STEELWORKS, upgradeRequires: UPGRADE.AT_GUN_UNLOCK },
   [KIND.SCOUT_CAR]: { label: "Scout Car", icon: "SC", size: 14.4, sight: 10, body: SCOUT_CAR_BODY,
     rangeTiles: 5, cost: { steel: 125, oil: 50 }, supply: 3, buildTicks: 480 },
   [KIND.TANK]: { label: "Tank", icon: "TK", size: 18, sight: 6, body: TANK_BODY,
-    rangeTiles: 5, cost: { steel: 300, oil: 150 }, supply: 6, buildTicks: 750, requires: KIND.STEELWORKS },
+    rangeTiles: 5, cost: { steel: 300, oil: 150 }, supply: 6, buildTicks: 750,
+    requires: KIND.FACTORY, upgradeRequires: UPGRADE.TANK_UNLOCK },
 
   [KIND.CITY_CENTRE]: { label: "City Centre", icon: "CC", footW: 3, footH: 3, sight: 9,
     cost: { steel: 200, oil: 0 }, buildTicks: 400, trains: [KIND.WORKER] },
@@ -106,9 +110,11 @@ export const STATS = Object.freeze({
     requires: [KIND.CITY_CENTRE, KIND.BARRACKS] },
   [KIND.FACTORY]: { label: "Vehicle Works", icon: "VW", footW: 3, footH: 3, sight: 6,
     cost: { steel: 200, oil: 100 }, buildTicks: 330, trains: [KIND.SCOUT_CAR, KIND.TANK],
+    researches: [UPGRADE.TANK_UNLOCK],
     requires: [KIND.CITY_CENTRE, KIND.TRAINING_CENTRE] },
   [KIND.STEELWORKS]: { label: "Gun Works", icon: "GW", footW: 2, footH: 2, sight: 6,
     cost: { steel: 125, oil: 125 }, buildTicks: 620, trains: [],
+    researches: [UPGRADE.AT_GUN_UNLOCK],
     requires: [KIND.CITY_CENTRE, KIND.TRAINING_CENTRE] },
 
   [KIND.STEEL]: { label: "Steel", size: 22 },
@@ -143,6 +149,26 @@ export const UPGRADES = Object.freeze({
     researchTicks: METHAMPHETAMINES_RESEARCH_TICKS,
     description: "Increase Rifleman Attack and Speed, Shoot While Moving",
     researchedAt: KIND.TRAINING_CENTRE,
+  }),
+  [UPGRADE.AT_GUN_UNLOCK]: Object.freeze({
+    upgrade: UPGRADE.AT_GUN_UNLOCK,
+    label: "AT Gun Crews",
+    icon: "AT+",
+    hotkey: "Q",
+    cost: Object.freeze({ steel: 100, oil: 75 }),
+    researchTicks: AT_GUN_UNLOCK_RESEARCH_TICKS,
+    description: "Unlock AT Gun training",
+    researchedAt: KIND.STEELWORKS,
+  }),
+  [UPGRADE.TANK_UNLOCK]: Object.freeze({
+    upgrade: UPGRADE.TANK_UNLOCK,
+    label: "Tank Production",
+    icon: "TK+",
+    hotkey: "Q",
+    cost: Object.freeze({ steel: 150, oil: 100 }),
+    researchTicks: TANK_UNLOCK_RESEARCH_TICKS,
+    description: "Unlock Tank training",
+    researchedAt: KIND.FACTORY,
   }),
 });
 

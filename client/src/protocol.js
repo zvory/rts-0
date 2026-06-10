@@ -184,10 +184,14 @@ export const SETUP_CODE = Object.freeze({
 
 export const UPGRADE = Object.freeze({
   METHAMPHETAMINES: "methamphetamines",
+  AT_GUN_UNLOCK: "at_gun_unlock",
+  TANK_UNLOCK: "tank_unlock",
 });
 
 export const UPGRADE_CODE = Object.freeze({
   [UPGRADE.METHAMPHETAMINES]: 1,
+  [UPGRADE.AT_GUN_UNLOCK]: 2,
+  [UPGRADE.TANK_UNLOCK]: 3,
 });
 
 export const EVENT_CODE = Object.freeze({

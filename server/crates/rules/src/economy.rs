@@ -128,10 +128,11 @@ mod tests {
             EntityKind::AtTeam,
             &[EntityKind::Steelworks]
         ));
-        assert!(train_requirement_met(
+        assert!(!train_requirement_met(
             EntityKind::Tank,
             &[EntityKind::Steelworks]
         ));
+        assert!(train_requirement_met(EntityKind::Tank, &[EntityKind::Factory]));
 
         assert!(!build_requirement_met(EntityKind::TrainingCentre, &[]));
         assert!(!build_requirement_met(
