@@ -1,5 +1,7 @@
 small countdown before the game starts
 
+tanks still getting stuck on the sides of buildings!
+
 users houdl not be able to end a replay lobby by hitting back to lobby
 
 lat ! 82, slow 2, jit 7373
