@@ -54,7 +54,10 @@ fn worker_has_pass_through_work_order(e: &Entity) -> bool {
 }
 
 pub(super) fn requires_weapon_setup(kind: EntityKind) -> bool {
-    matches!(kind, EntityKind::MachineGunner | EntityKind::AtTeam)
+    matches!(
+        kind,
+        EntityKind::MachineGunner | EntityKind::AtTeam | EntityKind::Artillery
+    )
 }
 
 pub(super) fn footing_resistance(profile: FootingProfile) -> f32 {

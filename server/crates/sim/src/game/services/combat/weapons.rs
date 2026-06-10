@@ -148,6 +148,7 @@ pub(super) fn deployed_weapon_ready_to_move(entities: &mut EntityStore, id: u32)
 pub(super) fn setup_ticks_for(kind: EntityKind) -> u16 {
     match kind {
         EntityKind::AtTeam => config::AT_TEAM_SETUP_TICKS,
+        EntityKind::Artillery => config::ARTILLERY_SETUP_TICKS,
         EntityKind::MortarTeam => config::MORTAR_TEAM_SETUP_TICKS,
         _ => config::MACHINE_GUNNER_SETUP_TICKS,
     }
@@ -156,13 +157,17 @@ pub(super) fn setup_ticks_for(kind: EntityKind) -> u16 {
 fn requires_weapon_setup(kind: EntityKind) -> bool {
     matches!(
         kind,
-        EntityKind::MachineGunner | EntityKind::AtTeam | EntityKind::MortarTeam
+        EntityKind::MachineGunner
+            | EntityKind::AtTeam
+            | EntityKind::MortarTeam
+            | EntityKind::Artillery
     )
 }
 
 pub(super) fn uses_stationary_weapon_aggro(e: &Entity) -> bool {
     matches!(e.kind, EntityKind::MachineGunner | EntityKind::MortarTeam)
         || (e.kind == EntityKind::AtTeam && !matches!(e.weapon_setup(), WeaponSetup::Packed))
+        || (e.kind == EntityKind::Artillery && !matches!(e.weapon_setup(), WeaponSetup::Packed))
 }
 
 pub(super) fn can_fire_while_moving(e: &Entity) -> bool {
@@ -175,7 +180,8 @@ pub(super) fn moving_fire_miss_chance(_e: &Entity) -> f32 {
 }
 
 pub(super) fn at_gun_can_chase(e: &Entity) -> bool {
-    e.kind != EntityKind::AtTeam || matches!(e.weapon_setup(), WeaponSetup::Packed)
+    !matches!(e.kind, EntityKind::AtTeam | EntityKind::Artillery)
+        || matches!(e.weapon_setup(), WeaponSetup::Packed)
 }
 
 pub(super) fn effective_attack_profile(e: &Entity) -> combat_rules::AttackProfile {
@@ -235,7 +241,7 @@ fn at_gun_field_center(e: &Entity) -> Option<f32> {
 }
 
 fn rotate_at_gun_toward_setup_facing(e: &mut Entity) {
-    if e.kind != EntityKind::AtTeam {
+    if !matches!(e.kind, EntityKind::AtTeam | EntityKind::Artillery) {
         return;
     }
     let target = match e.weapon_setup() {
@@ -257,10 +263,12 @@ fn rotate_at_gun_toward_setup_facing(e: &mut Entity) {
 }
 
 fn maybe_begin_at_gun_setup_after_alignment(e: &mut Entity) {
-    if e.kind != EntityKind::AtTeam || !matches!(e.weapon_setup(), WeaponSetup::Packed) {
+    if !matches!(e.kind, EntityKind::AtTeam | EntityKind::Artillery)
+        || !matches!(e.weapon_setup(), WeaponSetup::Packed)
+    {
         return;
     }
-    if !e.path_is_empty() || !matches!(e.order(), Order::Idle) {
+    if !e.path_is_empty() || !matches!(e.order(), Order::Idle | Order::ArtilleryPointFire(_)) {
         return;
     }
     let Some(target) = e.emplacement_facing().filter(|facing| facing.is_finite()) else {
@@ -272,7 +280,7 @@ fn maybe_begin_at_gun_setup_after_alignment(e: &mut Entity) {
         .unwrap_or_else(|| e.facing());
     if angle_delta(current, target).abs() <= AT_GUN_FIRE_TOLERANCE_RAD {
         e.set_weapon_setup(WeaponSetup::SettingUp {
-            ticks: config::AT_TEAM_SETUP_TICKS,
+            ticks: setup_ticks_for(e.kind),
         });
     }
 }

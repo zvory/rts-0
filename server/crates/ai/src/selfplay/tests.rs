@@ -18,11 +18,11 @@ use super::{
     MAX_STALL_TICKS, MAX_TICKS, SAMPLE_EVERY_TICKS, SAVE_REPLAY_ENV, SELFPLAY_ARTIFACT_DIR,
     SELFPLAY_FAILURE_DIR,
 };
-use crate::{AiController, AiThinkContext};
 use crate::ai_core::profiles::{
     RIFLE_FLOOD_FAST_ID, RIFLE_FLOOD_FULL_SATURATION_ID, TECH_TO_TANKS_ID,
 };
 use crate::config;
+use crate::{AiController, AiThinkContext};
 use rts_sim::game::command::SimCommand as Command;
 use rts_sim::game::entity::EntityKind;
 use rts_sim::game::replay::{CommandLogEntry, EventLogEntry, ReplayArtifactV1};
@@ -244,6 +244,8 @@ impl SelfPlayRunner {
                     Event::Death { .. }
                     | Event::Build { .. }
                     | Event::Notice { .. }
+                    | Event::ArtilleryTarget { .. }
+                    | Event::ArtilleryImpact { .. }
                     | Event::MortarImpact { .. }
                     | Event::SmokeLaunch { .. } => None,
                 };

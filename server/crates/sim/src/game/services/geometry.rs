@@ -226,6 +226,11 @@ fn vehicle_body_dimensions(kind: EntityKind) -> (f32, f32, f32) {
             config::AT_GUN_BODY_WIDTH_PX,
             config::AT_GUN_BODY_CLEARANCE_PX,
         ),
+        EntityKind::Artillery => (
+            config::ARTILLERY_BODY_LENGTH_PX,
+            config::ARTILLERY_BODY_WIDTH_PX,
+            config::ARTILLERY_BODY_CLEARANCE_PX,
+        ),
         EntityKind::ScoutCar => (
             config::SCOUT_CAR_BODY_LENGTH_PX,
             config::SCOUT_CAR_BODY_WIDTH_PX,

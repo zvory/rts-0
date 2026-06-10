@@ -189,10 +189,7 @@ fn parse_sites(
             ));
         }
         if out.insert(site.id.clone(), site.clone()).is_some() {
-            return Err(format!(
-                "sites[{i}] duplicates an earlier id {:?}",
-                site.id
-            ));
+            return Err(format!("sites[{i}] duplicates an earlier id {:?}", site.id));
         }
     }
     Ok(out)

@@ -9,6 +9,7 @@ pub enum AbilityKind {
     Charge,
     Smoke,
     MortarFire,
+    PointFire,
 }
 
 impl AbilityKind {
@@ -17,6 +18,7 @@ impl AbilityKind {
             AbilityKind::Charge => protocol::abilities::CHARGE,
             AbilityKind::Smoke => protocol::abilities::SMOKE,
             AbilityKind::MortarFire => protocol::abilities::MORTAR_FIRE,
+            AbilityKind::PointFire => protocol::abilities::POINT_FIRE,
         }
     }
 }
@@ -29,6 +31,7 @@ impl FromStr for AbilityKind {
             protocol::abilities::CHARGE => Ok(AbilityKind::Charge),
             protocol::abilities::SMOKE => Ok(AbilityKind::Smoke),
             protocol::abilities::MORTAR_FIRE => Ok(AbilityKind::MortarFire),
+            protocol::abilities::POINT_FIRE => Ok(AbilityKind::PointFire),
             _ => Err(()),
         }
     }
@@ -61,6 +64,7 @@ pub struct AbilityDefinition {
 const CHARGE_CARRIERS: &[EntityKind] = &[];
 const SMOKE_CARRIERS: &[EntityKind] = &[EntityKind::ScoutCar];
 const MORTAR_FIRE_CARRIERS: &[EntityKind] = &[EntityKind::MortarTeam];
+const POINT_FIRE_CARRIERS: &[EntityKind] = &[EntityKind::Artillery];
 
 pub fn definition(kind: AbilityKind) -> AbilityDefinition {
     match kind {
@@ -96,6 +100,16 @@ pub fn definition(kind: AbilityKind) -> AbilityDefinition {
             cost: ResourceCost { steel: 0, oil: 0 },
             tech_requirement: None,
             may_queue: false,
+        },
+        AbilityKind::PointFire => AbilityDefinition {
+            kind,
+            carriers: POINT_FIRE_CARRIERS,
+            target_mode: AbilityTargetMode::WorldPoint,
+            range_tiles: Some(config::ARTILLERY_MAX_RANGE_TILES),
+            cooldown_ticks: 0,
+            cost: ResourceCost { steel: 0, oil: 0 },
+            tech_requirement: None,
+            may_queue: true,
         },
     }
 }

@@ -47,6 +47,7 @@ import {
   STATE_CODE,
   TERRAIN,
   UPGRADE,
+  UPGRADE_CODE,
   cmd,
   decodeServerMessage,
   msg,
@@ -952,6 +953,7 @@ function fakeAudioContext() {
           [ORDER_STAGE_CODE[ORDER_STAGE.SETUP_AT_GUNS], 128, 160],
           [ORDER_STAGE_CODE[ORDER_STAGE.CHARGE], 176, 208],
           [ORDER_STAGE_CODE[ORDER_STAGE.SMOKE], 192, 224],
+          [ORDER_STAGE_CODE[ORDER_STAGE.POINT_FIRE], 320, 352],
         ],
         87,
         [[ABILITY_CODE[ABILITY.CHARGE], 87, 2]],
@@ -996,7 +998,7 @@ function fakeAudioContext() {
     ],
     r: [[200, 1498]],
     sm: [[50, 320, 352, 2, 120]],
-    u: [1],
+    u: [1, UPGRADE_CODE[UPGRADE.ARTILLERY_UNLOCK]],
     fg: [1, 2, 3, 1],
     ev: [
       [EVENT_CODE[EVENT.ATTACK], 1, 7],
@@ -1004,18 +1006,21 @@ function fakeAudioContext() {
       [EVENT_CODE[EVENT.BUILD], 3, KIND_CODE[KIND.CITY_CENTRE]],
       [EVENT_CODE[EVENT.NOTICE], "Not enough steel"],
       [EVENT_CODE[EVENT.NOTICE], "alert:under_attack", 3, 512, 768],
+      [EVENT_CODE[EVENT.ARTILLERY_TARGET], 320, 352, 3, 120],
+      [EVENT_CODE[EVENT.ARTILLERY_IMPACT], 336, 368, 3],
     ],
   });
 
   assert(decoded.t === "snapshot", "compact snapshot keeps the semantic tag");
   assert(decoded.upgrades[0] === UPGRADE.METHAMPHETAMINES, "compact upgrades decode");
+  assert(decoded.upgrades[1] === UPGRADE.ARTILLERY_UNLOCK, "compact artillery upgrade decodes");
   assert(decoded.tick === 42 && decoded.steel === 100 && decoded.supplyCap === 10, "compact scalars decode");
   assert(decoded.entities.length === 3, "compact entities decode");
   assert(decoded.entities[0].kind === KIND.WORKER, "entity kind code decodes");
   assert(decoded.entities[0].state === STATE.GATHER, "entity state code decodes");
   assert(decoded.entities[0].weaponFacing === 1.75, "entity optional weaponFacing decodes");
   assert(decoded.entities[0].latchedNode === 200, "entity optional latchedNode decodes");
-  assert(decoded.entities[0].orderPlan.length === 4, "entity order plan decodes");
+  assert(decoded.entities[0].orderPlan.length === 5, "entity order plan decodes");
   assert(decoded.entities[0].chargeCooldownLeft === 87, "legacy charge cooldown decodes");
   assert(
     decoded.entities[0].abilities[0].ability === ABILITY.CHARGE &&
@@ -1041,9 +1046,10 @@ function fakeAudioContext() {
     "entity debug path decodes",
   );
   assert(
-    decoded.entities[0].orderPlan[1].kind === ORDER_STAGE.SETUP_AT_GUNS &&
+      decoded.entities[0].orderPlan[1].kind === ORDER_STAGE.SETUP_AT_GUNS &&
       decoded.entities[0].orderPlan[2].kind === ORDER_STAGE.CHARGE &&
-      decoded.entities[0].orderPlan[3].kind === ORDER_STAGE.SMOKE,
+      decoded.entities[0].orderPlan[3].kind === ORDER_STAGE.SMOKE &&
+      decoded.entities[0].orderPlan[4].kind === ORDER_STAGE.POINT_FIRE,
     "order plan stage flavor decodes",
   );
   assert(
@@ -1082,6 +1088,18 @@ function fakeAudioContext() {
   assert(decoded.events[3].severity === NOTICE_SEVERITY.INFO, "legacy notice defaults to info");
   assert(decoded.events[4].severity === NOTICE_SEVERITY.ALERT, "notice severity decodes");
   assert(decoded.events[4].x === 512 && decoded.events[4].y === 768, "notice position decodes");
+  assert(
+    decoded.events[5].e === EVENT.ARTILLERY_TARGET &&
+      decoded.events[5].delayTicks === 120 &&
+      decoded.events[5].radiusTiles === 3,
+    "artillery target event decodes",
+  );
+  assert(
+    decoded.events[6].e === EVENT.ARTILLERY_IMPACT &&
+      decoded.events[6].x === 336 &&
+      decoded.events[6].y === 368,
+    "artillery impact event decodes",
+  );
 
   const abilityCommand = cmd.useAbility(ABILITY.SMOKE, [7, 8], 320, 384, true);
   assert(
@@ -1102,6 +1120,16 @@ function fakeAudioContext() {
       buildCommand.tileY === 14 &&
       buildCommand.queued === true,
     "build command builder emits selected-worker wire shape",
+  );
+  const pointFireCommand = cmd.pointFire([11, 12], 512, 640, true);
+  assert(
+    pointFireCommand.c === "useAbility" &&
+      pointFireCommand.ability === ABILITY.POINT_FIRE &&
+      pointFireCommand.units.join(",") === "11,12" &&
+      pointFireCommand.x === 512 &&
+      pointFireCommand.y === 640 &&
+      pointFireCommand.queued === true,
+    "pointFire command builder emits targeted ability wire shape",
   );
 
   assertThrows(
@@ -1287,6 +1315,11 @@ function fakeAudioContext() {
   assert(STATS[KIND.SCOUT_CAR].body.length === 40.8, "Scout Car client body length mirrors server");
   assert(STATS[KIND.SCOUT_CAR].body.width === 21.6, "Scout Car client body width mirrors server");
   assert(KIND_CODE[KIND.SCOUT_CAR] === 14, "Scout Car compact kind code should follow steelworks protocol kind");
+  assert(KIND_CODE[KIND.ARTILLERY] === 16, "Artillery compact kind code should be reserved");
+  assert(ABILITY_CODE[ABILITY.POINT_FIRE] === 4, "Point Fire compact ability code should be reserved");
+  assert(ORDER_STAGE_CODE[ORDER_STAGE.POINT_FIRE] === 10, "Point Fire compact order stage code should be reserved");
+  assert(EVENT_CODE[EVENT.ARTILLERY_TARGET] === 7, "Artillery target compact event code should be reserved");
+  assert(EVENT_CODE[EVENT.ARTILLERY_IMPACT] === 8, "Artillery impact compact event code should be reserved");
   assert(
     STATS[KIND.STEELWORKS].footW === 3 && STATS[KIND.STEELWORKS].footH === 3,
     "Gun Works should be a 3x3 building",

@@ -39,6 +39,7 @@ pub mod kinds {
     pub const MACHINE_GUNNER: &str = "machine_gunner";
     pub const AT_TEAM: &str = "at_team";
     pub const MORTAR_TEAM: &str = "mortar_team";
+    pub const ARTILLERY: &str = "artillery";
     pub const SCOUT_CAR: &str = "scout_car";
     pub const TANK: &str = "tank";
     pub const CITY_CENTRE: &str = "city_centre";
@@ -68,6 +69,15 @@ pub mod abilities {
     pub const CHARGE: &str = "charge";
     pub const SMOKE: &str = "smoke";
     pub const MORTAR_FIRE: &str = "mortarFire";
+    pub const POINT_FIRE: &str = "pointFire";
+}
+
+/// Permanent upgrade ids used by production/research and snapshot projection.
+pub mod upgrades {
+    pub const METHAMPHETAMINES: &str = "methamphetamines";
+    pub const AT_GUN_UNLOCK: &str = "at_gun_unlock";
+    pub const TANK_UNLOCK: &str = "tank_unlock";
+    pub const ARTILLERY_UNLOCK: &str = "artillery_unlock";
 }
 
 // ---------------------------------------------------------------------------
@@ -340,7 +350,7 @@ pub struct LobbyPlayer {
 ///
 /// [`Snapshot`] remains the semantic source of truth for game code. This format is only a
 /// transport-side optimization for `ServerMessage::Snapshot`.
-pub const COMPACT_SNAPSHOT_VERSION: u8 = 11;
+pub const COMPACT_SNAPSHOT_VERSION: u8 = 12;
 
 /// Serialize one semantic snapshot as a compact JSON text frame payload.
 pub fn serialize_compact_snapshot(snapshot: &Snapshot) -> serde_json::Result<String> {
@@ -783,13 +793,31 @@ impl Serialize for CompactEvent<'_> {
                 seq.serialize_element(delay_ticks)?;
                 seq.end()
             }
-            Event::MortarImpact {
+            Event::MortarImpact { x, y, radius_tiles } => {
+                let mut seq = serializer.serialize_seq(Some(4))?;
+                seq.serialize_element(&6u8)?;
+                seq.serialize_element(x)?;
+                seq.serialize_element(y)?;
+                seq.serialize_element(radius_tiles)?;
+                seq.end()
+            }
+            Event::ArtilleryTarget {
                 x,
                 y,
                 radius_tiles,
+                delay_ticks,
             } => {
+                let mut seq = serializer.serialize_seq(Some(5))?;
+                seq.serialize_element(&7u8)?;
+                seq.serialize_element(x)?;
+                seq.serialize_element(y)?;
+                seq.serialize_element(radius_tiles)?;
+                seq.serialize_element(delay_ticks)?;
+                seq.end()
+            }
+            Event::ArtilleryImpact { x, y, radius_tiles } => {
                 let mut seq = serializer.serialize_seq(Some(4))?;
-                seq.serialize_element(&6u8)?;
+                seq.serialize_element(&8u8)?;
                 seq.serialize_element(x)?;
                 seq.serialize_element(y)?;
                 seq.serialize_element(radius_tiles)?;
@@ -871,6 +899,7 @@ fn kind_code(kind: &str) -> u8 {
         kinds::MACHINE_GUNNER => 3,
         kinds::AT_TEAM => 4,
         kinds::MORTAR_TEAM => 15,
+        kinds::ARTILLERY => 16,
         kinds::TANK => 5,
         kinds::SCOUT_CAR => 14,
         kinds::CITY_CENTRE => 6,
@@ -918,6 +947,7 @@ fn order_stage_code(kind: &str) -> u8 {
         "build" => 5,
         abilities::SMOKE => 6,
         abilities::MORTAR_FIRE => 9,
+        abilities::POINT_FIRE => 10,
         "setupAtGuns" => 7,
         abilities::CHARGE => 8,
         _ => 255,
@@ -929,15 +959,17 @@ fn ability_code(ability: &str) -> u8 {
         abilities::CHARGE => 1,
         abilities::SMOKE => 2,
         abilities::MORTAR_FIRE => 3,
+        abilities::POINT_FIRE => 4,
         _ => 255,
     }
 }
 
 fn upgrade_code(upgrade: &str) -> u8 {
     match upgrade {
-        "methamphetamines" => 1,
-        "at_gun_unlock" => 2,
-        "tank_unlock" => 3,
+        upgrades::METHAMPHETAMINES => 1,
+        upgrades::AT_GUN_UNLOCK => 2,
+        upgrades::TANK_UNLOCK => 3,
+        upgrades::ARTILLERY_UNLOCK => 4,
         _ => 255,
     }
 }
@@ -1028,6 +1060,11 @@ mod tests {
                 kind: abilities::SMOKE.to_string(),
                 x: 192.0,
                 y: 224.0,
+            },
+            OrderPlanMarker {
+                kind: abilities::POINT_FIRE.to_string(),
+                x: 320.0,
+                y: 352.0,
             },
         ];
         worker.charge_cooldown_left = Some(87);
@@ -1129,8 +1166,19 @@ mod tests {
                     y: None,
                     severity: NoticeSeverity::Info,
                 },
+                Event::ArtilleryTarget {
+                    x: 320.0,
+                    y: 352.0,
+                    radius_tiles: 3.0,
+                    delay_ticks: 120,
+                },
+                Event::ArtilleryImpact {
+                    x: 336.0,
+                    y: 368.0,
+                    radius_tiles: 3.0,
+                },
             ],
-            upgrades: Vec::new(),
+            upgrades: vec![upgrades::ARTILLERY_UNLOCK.to_string()],
             player_resources: Vec::new(),
             net_status: SnapshotNetStatus {
                 server_lag_ms: 4,
@@ -1171,7 +1219,8 @@ mod tests {
                 [1, 96.0, 112.0],
                 [7, 128.0, 160.0],
                 [8, 176.0, 208.0],
-                [6, 192.0, 224.0]
+                [6, 192.0, 224.0],
+                [10, 320.0, 352.0]
             ])
         );
         assert_eq!(value["e"][0][22], serde_json::json!(87));
@@ -1190,13 +1239,19 @@ mod tests {
             serde_json::json!([[50, 320.0, 352.0, 2.0, 120]])
         );
         assert_eq!(value["fg"], serde_json::json!([1, 2, 3, 1]));
-        assert_eq!(value["ev"].as_array().unwrap().len(), 4);
+        assert_eq!(value["u"], serde_json::json!([4]));
+        assert_eq!(value["ev"].as_array().unwrap().len(), 6);
         assert_eq!(value["n"], serde_json::json!([4, 17, 2, 2, 3]));
         assert_eq!(
             value["ev"][0][3],
             serde_json::json!([1, 4, 12.0, 24.0, 0.5, 0.75, 3])
         );
         assert_eq!(value["ev"][0][4], serde_json::json!([48.0, 96.0]));
+        assert_eq!(
+            value["ev"][4],
+            serde_json::json!([7, 320.0, 352.0, 3.0, 120])
+        );
+        assert_eq!(value["ev"][5], serde_json::json!([8, 336.0, 368.0, 3.0]));
     }
 
     #[test]

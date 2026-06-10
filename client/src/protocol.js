@@ -67,6 +67,7 @@ export const KIND = Object.freeze({
   MACHINE_GUNNER: "machine_gunner",
   AT_TEAM: "at_team",
   MORTAR_TEAM: "mortar_team",
+  ARTILLERY: "artillery",
   SCOUT_CAR: "scout_car",
   TANK: "tank",
   CITY_CENTRE: "city_centre",
@@ -84,6 +85,7 @@ export const UNIT_KINDS = Object.freeze([
   KIND.MACHINE_GUNNER,
   KIND.AT_TEAM,
   KIND.MORTAR_TEAM,
+  KIND.ARTILLERY,
   KIND.SCOUT_CAR,
   KIND.TANK,
 ]);
@@ -128,6 +130,8 @@ export const EVENT = Object.freeze({
   NOTICE: "notice",
   SMOKE_LAUNCH: "smokeLaunch",
   MORTAR_IMPACT: "mortarImpact",
+  ARTILLERY_TARGET: "artilleryTarget",
+  ARTILLERY_IMPACT: "artilleryImpact",
 });
 
 export const NOTICE_SEVERITY = Object.freeze({
@@ -140,6 +144,7 @@ export const ABILITY = Object.freeze({
   CHARGE: "charge",
   SMOKE: "smoke",
   MORTAR_FIRE: "mortarFire",
+  POINT_FIRE: "pointFire",
 });
 
 export const REPLAY_VISION = Object.freeze({
@@ -149,7 +154,7 @@ export const REPLAY_VISION = Object.freeze({
 });
 
 // --- Compact snapshot wire schema (must match protocol.rs) ---
-export const COMPACT_SNAPSHOT_VERSION = 11;
+export const COMPACT_SNAPSHOT_VERSION = 12;
 
 export const KIND_CODE = Object.freeze({
   [KIND.WORKER]: 1,
@@ -157,6 +162,7 @@ export const KIND_CODE = Object.freeze({
   [KIND.MACHINE_GUNNER]: 3,
   [KIND.AT_TEAM]: 4,
   [KIND.MORTAR_TEAM]: 15,
+  [KIND.ARTILLERY]: 16,
   [KIND.TANK]: 5,
   [KIND.SCOUT_CAR]: 14,
   [KIND.CITY_CENTRE]: 6,
@@ -191,12 +197,14 @@ export const UPGRADE = Object.freeze({
   METHAMPHETAMINES: "methamphetamines",
   AT_GUN_UNLOCK: "at_gun_unlock",
   TANK_UNLOCK: "tank_unlock",
+  ARTILLERY_UNLOCK: "artillery_unlock",
 });
 
 export const UPGRADE_CODE = Object.freeze({
   [UPGRADE.METHAMPHETAMINES]: 1,
   [UPGRADE.AT_GUN_UNLOCK]: 2,
   [UPGRADE.TANK_UNLOCK]: 3,
+  [UPGRADE.ARTILLERY_UNLOCK]: 4,
 });
 
 export const EVENT_CODE = Object.freeze({
@@ -206,6 +214,8 @@ export const EVENT_CODE = Object.freeze({
   [EVENT.NOTICE]: 4,
   [EVENT.SMOKE_LAUNCH]: 5,
   [EVENT.MORTAR_IMPACT]: 6,
+  [EVENT.ARTILLERY_TARGET]: 7,
+  [EVENT.ARTILLERY_IMPACT]: 8,
 });
 
 export const ORDER_STAGE = Object.freeze({
@@ -217,6 +227,7 @@ export const ORDER_STAGE = Object.freeze({
   CHARGE: "charge",
   SMOKE: "smoke",
   MORTAR_FIRE: "mortarFire",
+  POINT_FIRE: "pointFire",
   SETUP_AT_GUNS: "setupAtGuns",
 });
 
@@ -230,12 +241,14 @@ export const ORDER_STAGE_CODE = Object.freeze({
   [ORDER_STAGE.SETUP_AT_GUNS]: 7,
   [ORDER_STAGE.CHARGE]: 8,
   [ORDER_STAGE.MORTAR_FIRE]: 9,
+  [ORDER_STAGE.POINT_FIRE]: 10,
 });
 
 export const ABILITY_CODE = Object.freeze({
   [ABILITY.CHARGE]: 1,
   [ABILITY.SMOKE]: 2,
   [ABILITY.MORTAR_FIRE]: 3,
+  [ABILITY.POINT_FIRE]: 4,
 });
 
 export const NOTICE_SEVERITY_CODE = Object.freeze({
@@ -559,6 +572,23 @@ function decodeCompactEvent(record, index) {
         y: readNumber(fields[2], "event.mortarImpact.y"),
         radiusTiles: readNumber(fields[3], "event.mortarImpact.radiusTiles"),
       };
+    case EVENT.ARTILLERY_TARGET:
+      requireLength(fields, 5, `artillery target event ${index}`);
+      return {
+        e: EVENT.ARTILLERY_TARGET,
+        x: readNumber(fields[1], "event.artilleryTarget.x"),
+        y: readNumber(fields[2], "event.artilleryTarget.y"),
+        radiusTiles: readNumber(fields[3], "event.artilleryTarget.radiusTiles"),
+        delayTicks: readU32(fields[4], "event.artilleryTarget.delayTicks"),
+      };
+    case EVENT.ARTILLERY_IMPACT:
+      requireLength(fields, 4, `artillery impact event ${index}`);
+      return {
+        e: EVENT.ARTILLERY_IMPACT,
+        x: readNumber(fields[1], "event.artilleryImpact.x"),
+        y: readNumber(fields[2], "event.artilleryImpact.y"),
+        radiusTiles: readNumber(fields[3], "event.artilleryImpact.radiusTiles"),
+      };
     default:
       throw new Error(`unknown compact event kind ${eventKind}`);
   }
@@ -722,6 +752,8 @@ export const cmd = Object.freeze({
     if (y != null) command.y = y;
     return withQueued(command, queued);
   },
+  pointFire: (units, x, y, queued = false) =>
+    withQueued({ c: CMD.USE_ABILITY, ability: ABILITY.POINT_FIRE, units, x, y }, queued),
   gather: (units, node, queued = false) =>
     withQueued({ c: CMD.GATHER, units, node }, queued),
   build: (units, building, tileX, tileY, queued = false) =>

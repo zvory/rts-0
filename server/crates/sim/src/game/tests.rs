@@ -4,7 +4,7 @@ use super::scoring::entity_score_value;
 use super::*;
 use crate::game::command::SimCommand as Command;
 use crate::game::entity::{Entity, EntityKind, GatherPhase, Order, WeaponSetup};
-use crate::protocol::{kinds, terrain, AbilityCooldownView, EntityView, OrderPlanMarker};
+use crate::protocol::{kinds, terrain, AbilityCooldownView, EntityView, Event, OrderPlanMarker};
 
 fn human_vs_ai_players() -> [PlayerInit; 2] {
     [
@@ -194,11 +194,112 @@ fn empty_flat_game(players: &[PlayerInit]) -> Game {
     }
     game.smokes = SmokeCloudStore::new();
     game.mortar_shells = MortarShellStore::default();
+    game.artillery_shells = artillery::ArtilleryShellStore::default();
     systems::recompute_supply(&mut game.players, &game.entities);
     game.spatial = services::spatial::SpatialIndex::build(&game.entities, game.map.size);
     let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
     game.fog.recompute(&ids, &game.entities, &game.map);
     game
+}
+
+#[test]
+fn artillery_point_fire_queue_is_terminal() {
+    let players = human_vs_ai_players();
+    let mut game = empty_flat_game(&players);
+    let pos = game.map.tile_center(10, 10);
+    let target = game.map.tile_center(22, 10);
+    let artillery = game
+        .entities
+        .spawn_unit(1, EntityKind::Artillery, pos.0, pos.1)
+        .expect("artillery should spawn");
+
+    game.enqueue(
+        1,
+        Command::UseAbility {
+            ability: ability::AbilityKind::PointFire,
+            units: vec![artillery],
+            x: Some(target.0),
+            y: Some(target.1),
+            queued: true,
+        },
+    );
+    game.enqueue(
+        1,
+        Command::Move {
+            units: vec![artillery],
+            x: target.0 + 64.0,
+            y: target.1,
+            queued: true,
+        },
+    );
+    game.tick();
+
+    let entity = game.entities.get(artillery).expect("artillery exists");
+    assert!(matches!(entity.order(), Order::ArtilleryPointFire(_)));
+    assert!(
+        entity.queued_orders().is_empty(),
+        "later queued move should not be accepted behind terminal Point Fire"
+    );
+}
+
+#[test]
+fn artillery_target_is_owner_only_and_impact_is_global_visual_event() {
+    let players = human_vs_ai_players();
+    let mut game = empty_flat_game(&players);
+    let initial_steel = game.players[0].steel;
+    let pos = game.map.tile_center(10, 10);
+    let target = game.map.tile_center(22, 10);
+    let artillery = game
+        .entities
+        .spawn_unit(1, EntityKind::Artillery, pos.0, pos.1)
+        .expect("artillery should spawn");
+
+    game.enqueue(
+        1,
+        Command::UseAbility {
+            ability: ability::AbilityKind::PointFire,
+            units: vec![artillery],
+            x: Some(target.0),
+            y: Some(target.1),
+            queued: false,
+        },
+    );
+
+    let mut owner_saw_target = false;
+    let mut enemy_saw_target = false;
+    let mut owner_saw_impact = false;
+    let mut enemy_saw_impact = false;
+    for _ in 0..(config::ARTILLERY_SETUP_TICKS as u32 + config::ARTILLERY_SHELL_DELAY_TICKS + 8) {
+        for (pid, events) in game.tick() {
+            for event in events {
+                match event {
+                    Event::ArtilleryTarget { .. } if pid == 1 => owner_saw_target = true,
+                    Event::ArtilleryTarget { .. } if pid == 2 => enemy_saw_target = true,
+                    Event::ArtilleryImpact { .. } if pid == 1 => owner_saw_impact = true,
+                    Event::ArtilleryImpact { .. } if pid == 2 => enemy_saw_impact = true,
+                    _ => {}
+                }
+            }
+        }
+    }
+
+    assert!(
+        owner_saw_target,
+        "firing player should see pre-impact target marker"
+    );
+    assert!(
+        !enemy_saw_target,
+        "enemy should never receive pre-impact artillery target marker"
+    );
+    assert!(owner_saw_impact, "owner should see delayed impact");
+    assert!(
+        enemy_saw_impact,
+        "enemy should see delayed impact as visual-only event"
+    );
+    assert!(
+        game.players[0].steel <= initial_steel - config::ARTILLERY_AMMO_COST_STEEL,
+        "at least one fired shell should spend steel at fire time"
+    );
 }
 
 fn smoke_projection_fixture() -> (Game, u32, u32, u32, (f32, f32)) {

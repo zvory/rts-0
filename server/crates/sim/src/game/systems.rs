@@ -18,6 +18,7 @@
 
 use std::collections::HashMap;
 
+use crate::game::artillery::ArtilleryShellStore;
 use crate::game::command::SimCommand;
 use crate::game::entity::EntityStore;
 use crate::game::fog::{Fog, LingeringSightSource};
@@ -111,6 +112,7 @@ pub(crate) fn run_tick(
     lingering_sight: &mut Vec<LingeringSightSource>,
     smokes: &mut SmokeCloudStore,
     mortar_shells: &mut MortarShellStore,
+    artillery_shells: &mut ArtilleryShellStore,
     pending: Vec<(u32, SimCommand)>,
     events: &mut HashMap<u32, Vec<Event>>,
     tick: u32,
@@ -133,6 +135,7 @@ pub(crate) fn run_tick(
             fog,
             smokes,
             mortar_shells,
+            artillery_shells,
             pending,
             events,
             tick,
@@ -203,6 +206,16 @@ pub(crate) fn run_tick(
             tick,
         );
     });
+    crate::perf::timed(perf.as_deref_mut(), "artillery_point_fire", || {
+        services::commands::artillery_point_fire_system(
+            map,
+            entities,
+            players,
+            artillery_shells,
+            events,
+            tick,
+        );
+    });
     crate::perf::timed(perf.as_deref_mut(), "economy", || {
         services::economy::gather_system(
             map,
@@ -221,6 +234,9 @@ pub(crate) fn run_tick(
     });
     crate::perf::timed(perf.as_deref_mut(), "mortar_impacts", || {
         mortar_shells.resolve_due(map, entities, fog, events, tick);
+    });
+    crate::perf::timed(perf.as_deref_mut(), "artillery_impacts", || {
+        artillery_shells.resolve_due(entities, events, tick);
     });
     crate::perf::timed(perf.as_deref_mut(), "death", || {
         services::death::death_system(
@@ -304,6 +320,7 @@ mod tests {
         let mut lingering_sight = Vec::new();
         let mut smokes = SmokeCloudStore::new();
         let mut mortar_shells = MortarShellStore::default();
+        let mut artillery_shells = ArtilleryShellStore::default();
 
         let worker = entities
             .spawn_unit(1, EntityKind::Worker, 400.0, 390.0)
@@ -331,6 +348,7 @@ mod tests {
             &mut lingering_sight,
             &mut smokes,
             &mut mortar_shells,
+            &mut artillery_shells,
             Vec::new(),
             &mut events,
             1,

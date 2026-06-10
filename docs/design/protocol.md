@@ -44,11 +44,11 @@ crate.
 | `setupAtGuns` | `units: u32[]`, `x: f32`, `y: f32`, `queued?: bool` | Manually emplace owned AT guns toward a world point. When `queued` is true, append a future setup-facing intent for owned completed AT teams only; the stored point is evaluated from the unit's position when the stage promotes. Immediate setup clears movement/target state, records the setup facing, and enters `setting_up`. Other selected units are ignored. |
 | `tearDownAtGuns` | `units: u32[]` | Pack up owned AT guns that are `setting_up` or `deployed`. Other selected units are ignored. |
 | `charge`     | `units: u32[]` | Legacy Rifleman Charge activation. Preserved for old clients/replays, but no longer has eligible carriers. |
-| `useAbility` | `ability: "charge"|"smoke"|"mortarFire"`, `units: u32[]`, `x?: f32`, `y?: f32`, `queued?: bool` | Generic ability command. `charge` is legacy/no-op; `smoke` and `mortarFire` target a world point. Smoke command execution is phased separately from the authoritative smoke world-state/LOS model; mortar fire schedules a delayed area impact. |
+| `useAbility` | `ability: "charge"|"smoke"|"mortarFire"|"pointFire"`, `units: u32[]`, `x?: f32`, `y?: f32`, `queued?: bool` | Generic ability command. `charge` is legacy/no-op; `smoke`, `mortarFire`, and Artillery `pointFire` target a world point. Smoke command execution is phased separately from the authoritative smoke world-state/LOS model; mortar fire schedules a delayed area impact. Artillery point fire is terminal in the unit order queue: once accepted, later queued unit orders are not appended after it. |
 | `gather`     | `units: u32[]`, `node: u32`, `queued?: bool` | Send workers to harvest a resource node. When `queued` is true, store future gather intent instead of replacing the active order. |
 | `build`      | `units: u32[]`, `building: string`, `tileX: u32`, `tileY: u32`, `queued?: bool` | Selected workers construct a building at a tile. The server allocates one compatible worker per build click, first walks that worker to a nearby point outside the requested footprint, then starts construction once it is in range. `building` ∈ building kinds. When `queued` is true, store future build intent instead of replacing the active order. |
 | `train`      | `building: u32`, `unit: string` | Queue a unit at a production building. |
-| `research`   | `building: u32`, `upgrade: string` | Queue a permanent player upgrade at a tech building. Upgrade ids: `methamphetamines` at the Training Centre, `at_gun_unlock` at Gun Works (`steelworks`), and `tank_unlock` at Vehicle Works (`factory`). |
+| `research`   | `building: u32`, `upgrade: string` | Queue a permanent player upgrade at a tech building. Upgrade ids: `methamphetamines` at the Training Centre, `at_gun_unlock` and `artillery_unlock` at Gun Works (`steelworks`), and `tank_unlock` at Vehicle Works (`factory`). |
 | `cancel`     | `building: u32` | Cancel the latest item in a building's production queue. |
 | `stop`       | `units: u32[]` | Clear orders, hold position. |
 | `setRally`   | `building: u32`, `x: f32`, `y: f32`, `kind?: "move"|"attackMove"`, `queued?: bool` | Set or append a unit-producing building rally stage. `kind` defaults to `"move"`. Freshly produced units receive the building's rally plan as active + queued move/attack-move orders, and the building prefers the spawn exit nearest the first stage. Ignored for buildings the player doesn't own, non-producers (depot, training centre), or buildings still under construction. Points are clamped into map bounds. When `queued` is true, append until the four-stage building rally cap is reached; otherwise replace the whole rally plan. |
@@ -204,14 +204,14 @@ transport decode:
 }
 ```
 
-Live WebSocket snapshot frames are sent as compact JSON text, version 11. `client/src/net.js`
+Live WebSocket snapshot frames are sent as compact JSON text, version 12. `client/src/net.js`
 decodes this transport shape back into the semantic object above before dispatching `S.SNAPSHOT`.
 Older object-shaped JSON snapshots remain decodable by the client for fallback/dev use.
 
 ```
 {
   "t": "snapshot",
-  "v": 11,
+  "v": 12,
   "s": [tick, steel, oil, supplyUsed, supplyCap],
   "e": [
     [
@@ -235,12 +235,12 @@ Compact numeric codes:
 
 | Vocabulary | Codes |
 |------------|-------|
-| `kind` | 1 `worker`, 2 `rifleman`, 3 `machine_gunner`, 4 `at_team`, 5 `tank`, 6 `city_centre`, 7 `depot`, 8 `barracks`, 9 `training_centre`, 10 `factory`, 11 `steel`, 12 `oil`, 13 `steelworks`, 14 `scout_car`, 15 `mortar_team` |
+| `kind` | 1 `worker`, 2 `rifleman`, 3 `machine_gunner`, 4 `at_team`, 5 `tank`, 6 `city_centre`, 7 `depot`, 8 `barracks`, 9 `training_centre`, 10 `factory`, 11 `steel`, 12 `oil`, 13 `steelworks`, 14 `scout_car`, 15 `mortar_team`, 16 `artillery` |
 | `state` | 1 `idle`, 2 `move`, 3 `attack`, 4 `gather`, 5 `build`, 6 `train`, 7 `construct`, 8 `dead` |
 | `setupState` | 1 `packed`, 2 `setting_up`, 3 `deployed`, 4 `tearing_down` |
-| `upgrade` | 1 `methamphetamines`, 2 `at_gun_unlock`, 3 `tank_unlock` |
+| `upgrade` | 1 `methamphetamines`, 2 `at_gun_unlock`, 3 `tank_unlock`, 4 `artillery_unlock` |
 | `notice.severity` | 1 `info`, 2 `warn`, 3 `alert` |
-| `EventRecord` | `[1, from, to]` attack, `[1, from, to, reveal?, toPos?]` attack with optional shooter reveal and target position, `[2, id, x, y, kind]` death, `[3, id, kind]` build, `[4, msg]` notice, `[4, msg, severity]` position-free notice with severity, `[4, msg, severity, x, y]` positioned notice, `[5, [fromX, fromY], [toX, toY], delayTicks]` smoke launch, `[6, x, y, radiusTiles]` mortar impact/marker |
+| `EventRecord` | `[1, from, to]` attack, `[1, from, to, reveal?, toPos?]` attack with optional shooter reveal and target position, `[2, id, x, y, kind]` death, `[3, id, kind]` build, `[4, msg]` notice, `[4, msg, severity]` position-free notice with severity, `[4, msg, severity, x, y]` positioned notice, `[5, [fromX, fromY], [toX, toY], delayTicks]` smoke launch, `[6, x, y, radiusTiles]` mortar impact/marker, `[7, x, y, radiusTiles, delayTicks]` artillery target marker, `[8, x, y, radiusTiles]` artillery impact |
 
 Compact entity records are positional arrays. Optional fields keep the semantic order above and
 trailing missing optional fields are omitted; interior missing optional fields are encoded as
@@ -248,7 +248,7 @@ trailing missing optional fields are omitted; interior missing optional fields a
 The `orderPlan` slot is an owner-only array capped at 9 entries. It contains the current active
 stage first, followed by queued unit stages in execution order. Each compact stage is
 `[kind, x, y]`, where `kind` is 1 `move`, 2 `attackMove`, 3 `attack`, 4 `gather`, 5 `build`,
-6 `smoke`, 7 `setupAtGuns`, 8 `charge`, or 9 `mortarFire`.
+6 `smoke`, 7 `setupAtGuns`, 8 `charge`, 9 `mortarFire`, or 10 `pointFire`.
 Stages carry safe world points only, never target ids; hidden attack target stages may be omitted
 rather than leaking enemy positions through fog. Production building rally points are exposed
 separately through `rally` and `rallyPlan` and are not part of `orderPlan`. `rallyPlan` is appended
@@ -256,7 +256,8 @@ after `debugPath` in compact snapshots to preserve older optional slot positions
 capped at four stages, and uses the same `[kind, x, y]` compact stage encoding with `move` and
 `attackMove` stages.
 The `abilities` slot is owner-only and capped at 8 entries. Each compact ability cooldown is
-`[ability, cooldownLeft, remainingUses?]`, where `ability` is 2 `smoke` or 3 `mortarFire`; 1 `charge` is legacy.
+`[ability, cooldownLeft, remainingUses?]`, where `ability` is 2 `smoke`, 3 `mortarFire`, or
+4 `pointFire`; 1 `charge` is legacy.
 `remainingUses` is present for finite-use abilities such as Scout Car Smoke; a value of `0`
 means the ability is depleted and cannot be used by that caster.
 `visionOnly` is true only for non-owned units/buildings visible through lingering death vision;
@@ -286,7 +287,7 @@ events, and positioned notices remain fog-gated and are withheld when smoke hide
 {
   id: u32,
   owner: u32,                    // 0 = neutral (resources), else player id
-  kind: string,                  // EntityKind: "worker","rifleman","machine_gunner","at_team","scout_car","tank","city_centre","depot","barracks","training_centre","factory","steelworks"
+  kind: string,                  // EntityKind: "worker","rifleman","machine_gunner","at_team","mortar_team","artillery","scout_car","tank","city_centre","depot","barracks","training_centre","factory","steelworks"
   x: f32, y: f32,                // world px (center)
   hp: u32, maxHp: u32,
   state: string,                 // "idle","move","attack","gather","build","train","construct","dead"
@@ -303,8 +304,8 @@ events, and positioned notices remain fog-gated and are withheld when smoke hide
   latchedNode?: u32,             // node id the worker is currently harvesting (attached mining)
   // combat feedback:
   targetId?: u32,                // current attack target, for drawing tracers
-  setupState?: string,           // machine_gunner/at_team only: "packed","setting_up","deployed","tearing_down"
-                                  // also present for mortar_team
+  setupState?: string,           // machine_gunner/at_team/mortar_team/artillery only:
+                                  // "packed","setting_up","deployed","tearing_down"
   // unit-producing buildings:
   rally?: [f32, f32],            // first rally point (world px); ONLY ever sent to the owner
   rallyPlan?: [                  // building rally stages; ONLY ever sent to the owner
@@ -312,9 +313,9 @@ events, and positioned notices remain fog-gated and are withheld when smoke hide
   ],
   // tanks:
   oilUsed?: f32,                 // lifetime oil burned by movement, in resource units
-  setupFacing?: f32,             // at_team only: owner-visible deployed arc center; appended after oilUsed in compact snapshots
+  setupFacing?: f32,             // at_team/artillery only: owner-visible deployed arc center; appended after oilUsed in compact snapshots
   orderPlan?: [                  // current + queued order stages; ONLY ever sent to the owner
-    { kind: "move"|"attackMove"|"attack"|"gather"|"build"|"smoke"|"mortarFire"|"setupAtGuns", x: f32, y: f32 }
+    { kind: "move"|"attackMove"|"attack"|"gather"|"build"|"smoke"|"mortarFire"|"pointFire"|"setupAtGuns", x: f32, y: f32 }
   ],
   chargeCooldownLeft?: u16,      // legacy; no longer projected by current server
   abilities?: [                  // owner-only ability affordance/cooldown data
@@ -341,6 +342,8 @@ events, and positioned notices remain fog-gated and are withheld when smoke hide
 { e: "build",  id: u32, kind: string }         // building completed
 { e: "smokeLaunch", fromX: f32, fromY: f32, toX: f32, toY: f32, delayTicks: u32 }
 { e: "mortarImpact", x: f32, y: f32, radiusTiles: f32 }
+{ e: "artilleryTarget", x: f32, y: f32, radiusTiles: f32, delayTicks: u32 }
+{ e: "artilleryImpact", x: f32, y: f32, radiusTiles: f32 }
 { e: "notice", msg: string, severity?: "info"|"warn"|"alert", x?: f32, y?: f32 }
 ```
 Notices default to `severity: "info"` with no position. `alert:`-prefixed notice ids are
@@ -353,6 +356,10 @@ Smoke launch events are owner-visible local feedback for the scout-car canister 
 authoritative smoke cloud appears later in `smokes` after the reported launch delay. Mortar impact
 events are sent to the firing player and to recipients with current visibility at the impact point;
 enemy players do not receive hidden mortar impact markers.
+Artillery target events are sent only to the firing player so enemies never receive pre-impact
+markers, even if they have vision of the gun. Artillery impact events are sent to every active
+recipient after impact as visual-only explosions; they do not reveal terrain, update exploration, or
+carry entity visibility.
 Events are best-effort visual flavor; the client must not depend on receiving them.
 
 ### 2.6 Replay playback state and vision

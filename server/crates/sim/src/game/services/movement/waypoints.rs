@@ -52,14 +52,7 @@ pub(super) fn advance_moving_units(
                 Some(e) if e.is_unit() && !e.path_is_empty() => e,
                 _ => continue,
             };
-            if requires_weapon_setup(e.kind)
-                && matches!(
-                    e.weapon_setup(),
-                    WeaponSetup::SettingUp { .. }
-                        | WeaponSetup::TearingDown { .. }
-                        | WeaponSetup::TearingDownToRedeploy { .. }
-                )
-            {
+            if requires_weapon_setup(e.kind) && !matches!(e.weapon_setup(), WeaponSetup::Packed) {
                 continue;
             }
             let speed_multiplier = if e.kind == EntityKind::Rifleman && e.charge_ticks() > 0 {
@@ -750,7 +743,14 @@ fn pivot_rotation_assist_candidate_legal(
         candidate.0,
         candidate.1,
         probe.blocked_facing,
-    ) && pivot_rotation_assist_segment_legal(occ, map, kind, probe.pos, candidate, probe.original_facing)
+    ) && pivot_rotation_assist_segment_legal(
+        occ,
+        map,
+        kind,
+        probe.pos,
+        candidate,
+        probe.original_facing,
+    )
 }
 
 fn rotation_blocked_by_building(

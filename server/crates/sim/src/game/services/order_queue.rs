@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 
 use crate::config;
+use crate::game::ability::AbilityKind;
 use crate::game::entity::{
     BuildPhase, Entity, EntityKind, EntityStore, MovePhase, Order, OrderIntent, MAX_QUEUED_ORDERS,
 };
@@ -76,6 +77,10 @@ enum PromotedIntent {
         ability: crate::game::ability::AbilityKind,
     },
     SetupAtGuns {
+        x: f32,
+        y: f32,
+    },
+    PointFire {
         x: f32,
         y: f32,
     },
@@ -167,6 +172,10 @@ pub(crate) fn promote_ready_orders(
                 let Some(owner) = entities.get(id).map(|e| e.owner) else {
                     continue;
                 };
+                if ability == AbilityKind::PointFire {
+                    execute_artillery_point_fire(entities, id, x, y);
+                    continue;
+                }
                 order_or_launch_world_ability(
                     map,
                     entities,
@@ -193,11 +202,32 @@ pub(crate) fn promote_ready_orders(
             PromotedIntent::SetupAtGuns { x, y } => {
                 execute_at_gun_setup(entities, id, x, y);
             }
+            PromotedIntent::PointFire { x, y } => {
+                execute_artillery_point_fire(entities, id, x, y);
+            }
         }
     }
 
     for (key, ids) in groups {
         coordinator.order_group_move(entities, key.owner, &ids, key.point(), key.attack_move);
+        begin_artillery_teardown_for_movement(entities, &ids);
+    }
+}
+
+fn begin_artillery_teardown_for_movement(entities: &mut EntityStore, ids: &[u32]) {
+    for id in ids {
+        let Some(e) = entities.get_mut(*id) else {
+            continue;
+        };
+        if e.kind != EntityKind::Artillery {
+            continue;
+        }
+        e.reset_artillery_accuracy();
+        if !matches!(e.weapon_setup(), crate::game::entity::WeaponSetup::Packed) {
+            e.set_weapon_setup(crate::game::entity::WeaponSetup::TearingDown {
+                ticks: config::ARTILLERY_SETUP_TICKS,
+            });
+        }
     }
 }
 
@@ -219,7 +249,7 @@ fn ready_for_next_order(map: &Map, entities: &EntityStore, fog: &Fog, e: &Entity
             !e.queued_orders().is_empty()
                 && attack_order_complete(map, entities, fog, e, order.intent.target)
         }
-        Order::Gather(_) | Order::Build(_) => false,
+        Order::Gather(_) | Order::Build(_) | Order::ArtilleryPointFire(_) => false,
         Order::Ability(_) => matches!(
             e.move_phase(),
             Some(MovePhase::Arrived | MovePhase::PathFailed)
@@ -311,6 +341,14 @@ fn pop_next_valid_intent(
                     });
                 }
             }
+            OrderIntent::PointFire(point) => {
+                if artillery_point_fire_intent_valid(map, entities, owner, id, point.x, point.y) {
+                    return Some(PromotedIntent::PointFire {
+                        x: point.x,
+                        y: point.y,
+                    });
+                }
+            }
             OrderIntent::SelfAbility(ability) => {
                 if self_ability_intent_valid(entities, owner, id, ability.ability) {
                     return Some(PromotedIntent::SelfAbility {
@@ -329,6 +367,65 @@ fn pop_next_valid_intent(
         }
     }
     None
+}
+
+fn artillery_point_fire_intent_valid(
+    map: &Map,
+    entities: &EntityStore,
+    owner: u32,
+    id: u32,
+    x: f32,
+    y: f32,
+) -> bool {
+    if x < 0.0 || y < 0.0 || x >= map.world_size_px() || y >= map.world_size_px() {
+        return false;
+    }
+    let Some(e) = entities.get(id) else {
+        return false;
+    };
+    if e.owner != owner
+        || e.kind != EntityKind::Artillery
+        || e.under_construction()
+        || !e.path_is_empty()
+    {
+        return false;
+    }
+    let dx = x - e.pos_x;
+    let dy = y - e.pos_y;
+    let distance2 = dx * dx + dy * dy;
+    if !distance2.is_finite() {
+        return false;
+    }
+    let min_px = config::ARTILLERY_MIN_RANGE_TILES as f32 * config::TILE_SIZE as f32;
+    let max_px = config::ARTILLERY_MAX_RANGE_TILES as f32 * config::TILE_SIZE as f32;
+    distance2 >= min_px * min_px && distance2 <= max_px * max_px
+}
+
+fn execute_artillery_point_fire(entities: &mut EntityStore, id: u32, x: f32, y: f32) -> bool {
+    let Some(e) = entities.get(id) else {
+        return false;
+    };
+    if e.kind != EntityKind::Artillery || !x.is_finite() || !y.is_finite() {
+        return false;
+    }
+    let facing = (y - e.pos_y).atan2(x - e.pos_x);
+    if !facing.is_finite() {
+        return false;
+    }
+    let Some(e) = entities.get_mut(id) else {
+        return false;
+    };
+    e.clear_active_order();
+    e.set_path_goal(None);
+    e.set_emplacement_facing(Some(facing));
+    e.set_desired_weapon_facing(facing);
+    if matches!(e.weapon_setup(), crate::game::entity::WeaponSetup::Packed) {
+        e.set_weapon_setup(crate::game::entity::WeaponSetup::SettingUp {
+            ticks: config::ARTILLERY_SETUP_TICKS,
+        });
+    }
+    e.set_order(Order::artillery_point_fire(x, y));
+    true
 }
 
 fn world_ability_intent_valid(
@@ -372,7 +469,11 @@ fn setup_at_gun_intent_valid(entities: &EntityStore, id: u32, x: f32, y: f32) ->
     let Some(e) = entities.get(id) else {
         return false;
     };
-    if e.kind != EntityKind::AtTeam || e.under_construction() || !x.is_finite() || !y.is_finite() {
+    if !matches!(e.kind, EntityKind::AtTeam | EntityKind::Artillery)
+        || e.under_construction()
+        || !x.is_finite()
+        || !y.is_finite()
+    {
         return false;
     }
     let facing = (y - e.pos_y).atan2(x - e.pos_x);
@@ -399,13 +500,20 @@ fn execute_at_gun_setup(entities: &mut EntityStore, id: u32, x: f32, y: f32) -> 
     } else {
         e.set_pending_redeploy_facing(Some(facing));
         e.set_weapon_setup(crate::game::entity::WeaponSetup::TearingDownToRedeploy {
-            ticks: config::AT_TEAM_SETUP_TICKS,
+            ticks: setup_ticks_for(e.kind),
         });
     }
     e.reset_gather_state();
     let (px, py) = (e.pos_x, e.pos_y);
     e.reset_stuck(px, py);
     true
+}
+
+fn setup_ticks_for(kind: EntityKind) -> u16 {
+    match kind {
+        EntityKind::Artillery => config::ARTILLERY_SETUP_TICKS,
+        _ => config::AT_TEAM_SETUP_TICKS,
+    }
 }
 
 fn attack_intent_valid(

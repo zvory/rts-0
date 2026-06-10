@@ -180,11 +180,14 @@ pub fn project_entity(
     }
     if matches!(
         entity.kind,
-        EntityKind::MachineGunner | EntityKind::AtTeam | EntityKind::MortarTeam
+        EntityKind::MachineGunner
+            | EntityKind::AtTeam
+            | EntityKind::MortarTeam
+            | EntityKind::Artillery
     ) {
         view.setup_state = Some(entity.weapon_setup().to_protocol_str().to_string());
     }
-    if entity.kind == EntityKind::AtTeam && entity.owner == viewer {
+    if matches!(entity.kind, EntityKind::AtTeam | EntityKind::Artillery) && entity.owner == viewer {
         view.setup_facing = entity.emplacement_facing();
     }
 
@@ -249,7 +252,11 @@ pub fn project_entity(
                 remaining_uses: entity.ability_uses_remaining(*kind),
             })
             .collect();
-        for kind in [ability::AbilityKind::Smoke, ability::AbilityKind::MortarFire] {
+        for kind in [
+            ability::AbilityKind::Smoke,
+            ability::AbilityKind::MortarFire,
+            ability::AbilityKind::PointFire,
+        ] {
             if ability::carried_by(kind, entity.kind)
                 && !view
                     .abilities
@@ -347,6 +354,11 @@ fn active_order_plan_marker(
             order.intent.x,
             order.intent.y,
         ),
+        Order::ArtilleryPointFire(order) => point_marker(
+            protocol::abilities::POINT_FIRE,
+            order.intent.x,
+            order.intent.y,
+        ),
         Order::Idle => None,
     }
 }
@@ -369,6 +381,9 @@ fn intent_plan_marker(
         OrderIntent::Build(build) => build_marker(build.kind, build.tile_x, build.tile_y),
         OrderIntent::WorldAbility(ability) => {
             point_marker(ability.ability.to_protocol_str(), ability.x, ability.y)
+        }
+        OrderIntent::PointFire(point) => {
+            point_marker(protocol::abilities::POINT_FIRE, point.x, point.y)
         }
         OrderIntent::SelfAbility(ability) => point_marker(
             ability.ability.to_protocol_str(),

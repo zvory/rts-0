@@ -30,6 +30,8 @@ pub enum Order {
     Build(BuildOrder),
     /// Move into range of a world-targeted ability, then execute it at the target point.
     Ability(AbilityOrder),
+    /// Artillery repeats point fire at a fixed world position until interrupted.
+    ArtilleryPointFire(ArtilleryPointFireOrder),
 }
 
 impl Order {
@@ -55,6 +57,10 @@ impl Order {
 
     pub fn ability(ability: AbilityKind, x: f32, y: f32, staging_x: f32, staging_y: f32) -> Self {
         Order::Ability(AbilityOrder::new(ability, x, y, staging_x, staging_y))
+    }
+
+    pub fn artillery_point_fire(x: f32, y: f32) -> Self {
+        Order::ArtilleryPointFire(ArtilleryPointFireOrder::new(x, y))
     }
 
     pub fn attack_target(&self) -> Option<u32> {
@@ -114,6 +120,7 @@ pub enum OrderIntent {
     WorldAbility(AbilityIntent),
     SelfAbility(SelfAbilityIntent),
     SetupAtGuns(PointIntent),
+    PointFire(PointIntent),
 }
 
 impl OrderIntent {
@@ -151,6 +158,10 @@ impl OrderIntent {
 
     pub fn setup_at_guns(x: f32, y: f32) -> Self {
         OrderIntent::SetupAtGuns(PointIntent { x, y })
+    }
+
+    pub fn point_fire(x: f32, y: f32) -> Self {
+        OrderIntent::PointFire(PointIntent { x, y })
     }
 }
 
@@ -382,6 +393,19 @@ impl AbilityOrder {
 pub struct AbilityExecution {
     pub phase: MovePhase,
     pub staging: PointIntent,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ArtilleryPointFireOrder {
+    pub intent: PointIntent,
+}
+
+impl ArtilleryPointFireOrder {
+    fn new(x: f32, y: f32) -> Self {
+        ArtilleryPointFireOrder {
+            intent: PointIntent { x, y },
+        }
+    }
 }
 
 /// The phase a gathering worker is in. Kept inside [`GatherOrder`] so the order's intent

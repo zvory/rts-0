@@ -174,6 +174,9 @@ fn vehicle_body_half_width_with_clearance(kind: EntityKind) -> f32 {
         EntityKind::AtTeam | EntityKind::MortarTeam => {
             config::AT_GUN_BODY_WIDTH_PX * 0.5 + config::AT_GUN_BODY_CLEARANCE_PX
         }
+        EntityKind::Artillery => {
+            config::ARTILLERY_BODY_WIDTH_PX * 0.5 + config::ARTILLERY_BODY_CLEARANCE_PX
+        }
         EntityKind::ScoutCar => {
             config::SCOUT_CAR_BODY_WIDTH_PX * 0.5 + config::SCOUT_CAR_BODY_CLEARANCE_PX
         }
@@ -188,7 +191,9 @@ fn traffic_body_half_width(ego_kind: EntityKind, neighbor_kind: EntityKind) -> O
 
 pub(super) fn vehicle_body_turn_rate(kind: EntityKind) -> f32 {
     match kind {
-        EntityKind::AtTeam | EntityKind::MortarTeam => AT_GUN_BODY_TURN_RATE_RAD_PER_TICK,
+        EntityKind::AtTeam | EntityKind::MortarTeam | EntityKind::Artillery => {
+            AT_GUN_BODY_TURN_RATE_RAD_PER_TICK
+        }
         _ => TANK_BODY_TURN_RATE_RAD_PER_TICK,
     }
 }

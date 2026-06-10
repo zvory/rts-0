@@ -296,6 +296,7 @@ impl Game {
             lingering_sight: Vec::new(),
             smokes: SmokeCloudStore::new(),
             mortar_shells: crate::game::mortar::MortarShellStore::default(),
+            artillery_shells: crate::game::artillery::ArtilleryShellStore::default(),
             seed,
             starting_steel: steel,
             starting_oil: oil,

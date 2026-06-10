@@ -8,6 +8,7 @@ pub enum EntityKind {
     MachineGunner,
     AtTeam,
     MortarTeam,
+    Artillery,
     ScoutCar,
     Tank,
     CityCentre,
@@ -21,12 +22,13 @@ pub enum EntityKind {
 }
 
 impl EntityKind {
-    pub const ALL: [EntityKind; 15] = [
+    pub const ALL: [EntityKind; 16] = [
         EntityKind::Worker,
         EntityKind::Rifleman,
         EntityKind::MachineGunner,
         EntityKind::AtTeam,
         EntityKind::MortarTeam,
+        EntityKind::Artillery,
         EntityKind::ScoutCar,
         EntityKind::Tank,
         EntityKind::CityCentre,
@@ -58,6 +60,7 @@ impl EntityKind {
             EntityKind::MachineGunner => "machine_gunner",
             EntityKind::AtTeam => "at_team",
             EntityKind::MortarTeam => "mortar_team",
+            EntityKind::Artillery => "artillery",
             EntityKind::ScoutCar => "scout_car",
             EntityKind::Tank => "tank",
             EntityKind::CityCentre => "city_centre",
@@ -82,6 +85,7 @@ impl FromStr for EntityKind {
             "machine_gunner" => Ok(EntityKind::MachineGunner),
             "at_team" => Ok(EntityKind::AtTeam),
             "mortar_team" => Ok(EntityKind::MortarTeam),
+            "artillery" => Ok(EntityKind::Artillery),
             "scout_car" => Ok(EntityKind::ScoutCar),
             "tank" => Ok(EntityKind::Tank),
             "city_centre" => Ok(EntityKind::CityCentre),
@@ -106,12 +110,19 @@ impl fmt::Display for EntityKind {
 pub fn uses_oriented_vehicle_body(kind: EntityKind) -> bool {
     matches!(
         kind,
-        EntityKind::AtTeam | EntityKind::MortarTeam | EntityKind::ScoutCar | EntityKind::Tank
+        EntityKind::AtTeam
+            | EntityKind::MortarTeam
+            | EntityKind::Artillery
+            | EntityKind::ScoutCar
+            | EntityKind::Tank
     )
 }
 
 pub fn uses_pivot_vehicle_movement(kind: EntityKind) -> bool {
-    matches!(kind, EntityKind::AtTeam | EntityKind::MortarTeam | EntityKind::Tank)
+    matches!(
+        kind,
+        EntityKind::AtTeam | EntityKind::MortarTeam | EntityKind::Artillery | EntityKind::Tank
+    )
 }
 
 pub fn uses_car_movement_semantics(kind: EntityKind) -> bool {
