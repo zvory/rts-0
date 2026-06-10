@@ -1274,6 +1274,60 @@ fn at_team_turns_slowly_before_firing() {
 }
 
 #[test]
+fn mortar_turns_before_auto_firing() {
+    let mut entities = EntityStore::new();
+    let mortar_id = entities
+        .spawn_unit(1, EntityKind::MortarTeam, 100.0, 100.0)
+        .expect("mortar should spawn");
+    entities
+        .spawn_unit(2, EntityKind::Rifleman, 100.0, 20.0)
+        .expect("enemy should spawn");
+    if let Some(mortar) = entities.get_mut(mortar_id) {
+        mortar.set_facing(0.0);
+        mortar.set_weapon_facing(0.0);
+        mortar.set_weapon_setup(WeaponSetup::Deployed);
+    }
+
+    run_combat_tick(&mut entities);
+
+    let mortar = entities.get(mortar_id).expect("mortar should exist");
+    assert!(
+        mortar.facing().abs() <= config::MORTAR_TURN_RATE_RAD_PER_TICK + 0.001,
+        "mortar should only slew by its turn-rate cap, got {:.4}",
+        mortar.facing()
+    );
+    assert_eq!(
+        mortar.attack_cd(),
+        0,
+        "mortar should not fire until its tube is within tolerance"
+    );
+
+    for _ in 0..20 {
+        run_combat_tick(&mut entities);
+        if entities
+            .get(mortar_id)
+            .expect("mortar should exist")
+            .attack_cd()
+            > 0
+        {
+            break;
+        }
+    }
+
+    let mortar = entities.get(mortar_id).expect("mortar should exist");
+    assert!(
+        angle_delta(mortar.facing(), -std::f32::consts::FRAC_PI_2).abs()
+            <= config::MORTAR_FIRE_TOLERANCE_RAD + 0.001,
+        "mortar should face the target before firing, got {:.4}",
+        mortar.facing()
+    );
+    assert!(
+        mortar.attack_cd() > 0,
+        "mortar should eventually fire after rotating into tolerance"
+    );
+}
+
+#[test]
 fn deployed_at_team_clamps_to_field_edge_and_does_not_fire_outside_arc() {
     let mut entities = EntityStore::new();
     let at_id = entities

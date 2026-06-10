@@ -4721,6 +4721,34 @@ fn at_team_facing_turns_gradually_along_path() {
     );
 }
 
+#[test]
+fn mortar_team_facing_turns_gradually_along_path() {
+    let map = flat_map(1);
+    let mut entities = EntityStore::new();
+    let (sx, sy) = map.tile_center(20, 20);
+    let (_, gy) = map.tile_center(20, 26);
+    let mortar = entities
+        .spawn_unit(1, EntityKind::MortarTeam, sx, sy)
+        .expect("mortar should spawn");
+    if let Some(e) = entities.get_mut(mortar) {
+        e.set_facing(0.0);
+    }
+    set_path_direct(&mut entities, mortar, vec![(sx, gy)]);
+
+    let occ = Occupancy::build(&map, &entities);
+    let spatial = SpatialIndex::build(&entities, map.size);
+    movement_system(&map, &mut entities, &mut [], &occ, &spatial, 0);
+
+    let facing = entities
+        .get(mortar)
+        .expect("mortar should exist")
+        .facing();
+    assert!(
+        facing > 0.0 && facing <= AT_GUN_BODY_TURN_RATE_RAD_PER_TICK + 0.0001,
+        "mortar should turn by at most the support-weapon turn-rate constant, got {facing:.4}"
+    );
+}
+
 /// An intermediate waypoint within ARRIVE_RADIUS_INTERMEDIATE_PX is popped in one tick
 /// without waiting for exact arrival. The unit's position must not be snapped.
 #[test]

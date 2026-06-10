@@ -469,6 +469,13 @@ fn planner_facts(
                                 x,
                                 y,
                             )
+                            && ability_orders::world_ability_current_facing_ready(
+                                entities,
+                                id,
+                                ability.kind,
+                                x,
+                                y,
+                            )
                         }),
                     });
                 }

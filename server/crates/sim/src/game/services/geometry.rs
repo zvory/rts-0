@@ -161,7 +161,7 @@ pub(crate) fn unit_body_with_facing(
         return None;
     }
 
-    if kind == EntityKind::AtTeam {
+    if matches!(kind, EntityKind::AtTeam | EntityKind::MortarTeam) {
         let (_, width, clearance) = vehicle_body_dimensions(kind);
         return Some(UnitBody::Circle(CircleBody {
             x,
@@ -221,7 +221,7 @@ pub(crate) fn unit_body_with_facing(
 
 fn vehicle_body_dimensions(kind: EntityKind) -> (f32, f32, f32) {
     match kind {
-        EntityKind::AtTeam => (
+        EntityKind::AtTeam | EntityKind::MortarTeam => (
             config::AT_GUN_BODY_LENGTH_PX,
             config::AT_GUN_BODY_WIDTH_PX,
             config::AT_GUN_BODY_CLEARANCE_PX,

@@ -4,7 +4,9 @@ use crate::config;
 use crate::game::ability::{self, AbilityKind, AbilityTargetMode};
 use crate::game::entity::{EntityKind, EntityStore, MovePhase, Order, WeaponSetup};
 use crate::game::map::Map;
-use crate::game::mortar::MortarShellStore;
+use crate::game::mortar::{
+    mortar_current_facing_ready, rotate_mortar_for_fire, MortarShellStore,
+};
 use crate::game::services::commands::{notice, notice_positioned};
 use crate::game::services::dist2;
 use crate::game::services::move_coordinator::MoveCoordinator;
@@ -48,6 +50,19 @@ pub(crate) fn order_or_launch_world_ability(
         return AbilityOrderResult::Skipped;
     }
     if caster_in_range(map, entities, caster, ability, x, y) {
+        if !world_ability_current_facing_ready(entities, caster, ability, x, y) {
+            let Some((sx, sy)) = entities.get(caster).map(|e| (e.pos_x, e.pos_y)) else {
+                return AbilityOrderResult::Skipped;
+            };
+            if let Some(e) = entities.get_mut(caster) {
+                e.set_order(Order::ability(ability, x, y, sx, sy));
+                e.set_target_id(None);
+                e.set_path(Vec::new());
+                e.set_path_goal(None);
+                e.mark_move_phase(MovePhase::Arrived);
+            }
+            return AbilityOrderResult::Moving;
+        }
         if launch_world_ability(
             map,
             entities,
@@ -99,6 +114,7 @@ pub(crate) fn launch_world_ability(
     if !caster_can_attempt(entities, player, caster, ability)
         || !tech_requirement_met(entities, player, ability)
         || !caster_in_range(map, entities, caster, ability, x, y)
+        || !world_ability_facing_ready(entities, caster, ability, x, y)
     {
         return false;
     }
@@ -265,6 +281,46 @@ pub(crate) fn caster_can_attempt(
 
 fn mortar_ready(kind: EntityKind, setup: WeaponSetup, path_empty: bool, ability: AbilityKind) -> bool {
     ability != AbilityKind::MortarFire || (kind == EntityKind::MortarTeam && path_empty && setup == WeaponSetup::Deployed)
+}
+
+pub(crate) fn world_ability_facing_ready(
+    entities: &mut EntityStore,
+    caster: u32,
+    ability: AbilityKind,
+    x: f32,
+    y: f32,
+) -> bool {
+    if ability != AbilityKind::MortarFire {
+        return true;
+    }
+    let Some(e) = entities.get_mut(caster) else {
+        return false;
+    };
+    if e.kind != EntityKind::MortarTeam {
+        return false;
+    }
+    let target_angle = (y - e.pos_y).atan2(x - e.pos_x);
+    rotate_mortar_for_fire(e, target_angle)
+}
+
+pub(crate) fn world_ability_current_facing_ready(
+    entities: &EntityStore,
+    caster: u32,
+    ability: AbilityKind,
+    x: f32,
+    y: f32,
+) -> bool {
+    if ability != AbilityKind::MortarFire {
+        return true;
+    }
+    let Some(e) = entities.get(caster) else {
+        return false;
+    };
+    if e.kind != EntityKind::MortarTeam {
+        return false;
+    }
+    let target_angle = (y - e.pos_y).atan2(x - e.pos_x);
+    mortar_current_facing_ready(e, target_angle)
 }
 
 pub(crate) fn tech_requirement_met(

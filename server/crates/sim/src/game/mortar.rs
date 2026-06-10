@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::config;
-use crate::game::entity::{EntityKind, EntityStore};
+use crate::game::entity::{Entity, EntityKind, EntityStore};
 use crate::game::fog::Fog;
 use crate::game::map::Map;
 use crate::game::services::dist2;
@@ -22,6 +22,62 @@ struct MortarShell {
 #[derive(Debug, Clone, Default)]
 pub(crate) struct MortarShellStore {
     shells: Vec<MortarShell>,
+}
+
+pub(crate) fn rotate_mortar_for_fire(e: &mut Entity, target_angle: f32) -> bool {
+    if !target_angle.is_finite() {
+        return false;
+    }
+    e.set_desired_weapon_facing(target_angle);
+    let current = e
+        .weapon_facing()
+        .filter(|facing| facing.is_finite())
+        .unwrap_or_else(|| {
+            let facing = e.facing();
+            if facing.is_finite() {
+                facing
+            } else {
+                0.0
+            }
+        });
+    let rotated = rotate_toward(current, target_angle, config::MORTAR_TURN_RATE_RAD_PER_TICK);
+    if rotated.is_finite() {
+        e.set_facing(rotated);
+        e.set_weapon_facing(rotated);
+    } else {
+        return false;
+    }
+    angle_delta(rotated, target_angle).abs() <= config::MORTAR_FIRE_TOLERANCE_RAD
+}
+
+pub(crate) fn mortar_current_facing_ready(e: &Entity, target_angle: f32) -> bool {
+    let current = e
+        .weapon_facing()
+        .filter(|facing| facing.is_finite())
+        .unwrap_or_else(|| e.facing());
+    target_angle.is_finite()
+        && current.is_finite()
+        && angle_delta(current, target_angle).abs() <= config::MORTAR_FIRE_TOLERANCE_RAD
+}
+
+fn rotate_toward(current: f32, desired: f32, max_delta: f32) -> f32 {
+    if !desired.is_finite() || !max_delta.is_finite() {
+        return current;
+    }
+    if !current.is_finite() {
+        return desired;
+    }
+    let delta = angle_delta(current, desired);
+    if delta.abs() <= max_delta {
+        desired
+    } else {
+        current + delta.signum() * max_delta
+    }
+}
+
+fn angle_delta(from: f32, to: f32) -> f32 {
+    (to - from + std::f32::consts::PI).rem_euclid(std::f32::consts::TAU)
+        - std::f32::consts::PI
 }
 
 impl MortarShellStore {
