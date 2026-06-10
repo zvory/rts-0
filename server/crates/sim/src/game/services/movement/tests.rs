@@ -1,6 +1,8 @@
 use super::*;
 use crate::config;
-use crate::game::entity::{EntityKind, EntityStore, GatherPhase, MovePhase, Order, WeaponSetup};
+use crate::game::entity::{
+    BuildPhase, EntityKind, EntityStore, GatherPhase, MovePhase, Order, WeaponSetup,
+};
 use crate::game::map::Map;
 use crate::game::pathfinding::Passability;
 use crate::game::services::geometry::{
@@ -890,6 +892,69 @@ fn harvesting_worker_is_fully_exempt_from_collision() {
         (tank_x, tank_y),
         tank_after,
         "tank must not be pushed by an anchored harvester — anchored units are fully exempt"
+    );
+}
+
+#[test]
+fn worker_traveling_to_gather_ignores_unit_collision() {
+    let map = flat_map(1);
+    let mut entities = EntityStore::new();
+    let (cx, cy) = map.tile_center(20, 20);
+    let node = entities.spawn_node(EntityKind::Steel, cx + 96.0, cy).unwrap();
+    let worker = entities.spawn_unit(1, EntityKind::Worker, cx, cy).unwrap();
+    {
+        let w = entities.get_mut(worker).unwrap();
+        w.set_order(Order::gather(node));
+        w.mark_gather_phase(GatherPhase::ToNode);
+    }
+    let blocker = entities.spawn_unit(2, EntityKind::Tank, cx + 4.0, cy).unwrap();
+    let worker_before = pos(&entities, worker);
+    let blocker_before = pos(&entities, blocker);
+
+    let occ = Occupancy::build(&map, &entities);
+    let spatial = SpatialIndex::build(&entities, map.size);
+    resolve_collisions(&mut entities, &spatial, &map, &occ);
+
+    assert_eq!(
+        worker_before,
+        pos(&entities, worker),
+        "worker on a gather order should not be pushed while traveling to the node"
+    );
+    assert_eq!(
+        blocker_before,
+        pos(&entities, blocker),
+        "worker on a gather order should not push blocking units while traveling to the node"
+    );
+}
+
+#[test]
+fn worker_traveling_to_build_ignores_unit_collision() {
+    let map = flat_map(1);
+    let mut entities = EntityStore::new();
+    let (cx, cy) = map.tile_center(20, 20);
+    let worker = entities.spawn_unit(1, EntityKind::Worker, cx, cy).unwrap();
+    {
+        let w = entities.get_mut(worker).unwrap();
+        w.set_order(Order::build(EntityKind::Depot, 24, 20));
+        w.mark_build_phase(BuildPhase::ToSite);
+    }
+    let blocker = entities.spawn_unit(2, EntityKind::Tank, cx + 4.0, cy).unwrap();
+    let worker_before = pos(&entities, worker);
+    let blocker_before = pos(&entities, blocker);
+
+    let occ = Occupancy::build(&map, &entities);
+    let spatial = SpatialIndex::build(&entities, map.size);
+    resolve_collisions(&mut entities, &spatial, &map, &occ);
+
+    assert_eq!(
+        worker_before,
+        pos(&entities, worker),
+        "worker on a build order should not be pushed while traveling to the site"
+    );
+    assert_eq!(
+        blocker_before,
+        pos(&entities, blocker),
+        "worker on a build order should not push blocking units while traveling to the site"
     );
 }
 

@@ -124,7 +124,7 @@ export class Match {
       () => new Fog(this.state.map.width, this.state.map.height, this.state.map.terrain),
     );
     this.fog.setRevealAll(!!this.devWatch?.noFog);
-    this.hud = this._timeInit("match.hud", () => new HUD(dom.gameScreen, this.state, this.net));
+    this.hud = this._timeInit("match.hud", () => new HUD(dom.gameScreen, this.state, this.net, this.audio));
     this.inputRouter = this._timeInit("match.inputRouter", () => new MatchInputRouter(dom.viewport));
     this.hudInputZone = this._timeInit(
       "match.hudInputZone",

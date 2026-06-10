@@ -1,5 +1,5 @@
 use crate::game::entity::{
-    uses_oriented_vehicle_body, BuildPhase, Entity, EntityKind, GatherPhase, WeaponSetup,
+    uses_oriented_vehicle_body, Entity, EntityKind, Order, WeaponSetup,
 };
 use crate::game::map::Map;
 use crate::game::services::occupancy::Occupancy;
@@ -27,12 +27,7 @@ pub(super) enum FootingProfile {
 }
 
 pub(super) fn footing_profile(e: &Entity) -> FootingProfile {
-    if e.kind == EntityKind::Worker && e.gather_phase() == Some(GatherPhase::Harvesting) {
-        return FootingProfile::Ghost;
-    }
-    if e.kind == EntityKind::Worker
-        && matches!(e.build_phase(), Some(BuildPhase::Constructing { .. }))
-    {
+    if worker_has_pass_through_work_order(e) {
         return FootingProfile::Ghost;
     }
     if requires_weapon_setup(e.kind)
@@ -54,6 +49,10 @@ pub(super) fn footing_profile(e: &Entity) -> FootingProfile {
         return FootingProfile::Firm;
     }
     FootingProfile::Soft
+}
+
+fn worker_has_pass_through_work_order(e: &Entity) -> bool {
+    e.kind == EntityKind::Worker && matches!(e.order(), Order::Gather(_) | Order::Build(_))
 }
 
 pub(super) fn requires_weapon_setup(kind: EntityKind) -> bool {

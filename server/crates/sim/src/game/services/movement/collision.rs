@@ -33,11 +33,11 @@ const CENTERLINE_LATERAL_PUSH_SCALE: f32 = 0.5;
 /// circles while tanks resolve as oriented hulls. Non-ghost units split the overlap by footing
 /// resistance, so lower-resistance units move more.
 ///
-/// **Ghost pass-through exception.** Workers in [`GatherPhase::Harvesting`] or
-/// [`BuildPhase::Constructing`] are latched onto their resource/build site and are *fully
-/// exempt* from collision: they neither push nor are pushed. This is intentional — walking
-/// units must be able to pass through harvesters and active builders without kicking them
-/// backward each tick, which would deadlock the economy or strand construction.
+/// **Ghost pass-through exception.** Workers on gather or build orders are *fully exempt*
+/// from collision: they neither push nor are pushed. This is intentional — work orders must
+/// keep moving through traffic, and walking units must be able to pass through active workers
+/// without kicking them backward each tick, which would deadlock the economy or strand
+/// construction.
 ///
 /// Pushes that would land on impassable terrain or a building footprint are skipped, so a
 /// unit cornered by terrain may keep a small residual overlap. The invariant
