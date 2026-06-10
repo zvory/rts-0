@@ -9,6 +9,10 @@ without pulling in server transport, AI controllers, Axum, Tokio, SQL, or deploy
 
 - Add a new crate such as `server/crates/sim-wasm`.
 - Depend on `rts-sim`, `rts-rules`, `rts-protocol`, and `rts-contract` only.
+- Decide whether `sim-wasm` is a thin wrapper over feature-gated `rts-sim` or a narrower
+  prediction facade. The default should be the narrowest API that can predict the enabled surface;
+  browser code must not accidentally gain access to full-world snapshots, dev-watch helpers,
+  server replay persistence, AI, transport, or database code.
 - Expose a narrow browser API:
   - construct from start payload and player id
   - import an owner-safe authoritative baseline
@@ -21,7 +25,8 @@ without pulling in server transport, AI controllers, Axum, Tokio, SQL, or deploy
   - resolve `rand/getrandom` target support or remove runtime entropy from browser prediction
   - gate any filesystem map loading behind server/native features
   - gate or no-op perf tracing that depends on native-only timing assumptions
-  - avoid `rayon`/thread assumptions in browser builds
+  - gate `rayon`/thread assumptions out of browser builds or prove they are absent from the
+    exported prediction path
 
 ## State Import Strategy
 
@@ -33,8 +38,12 @@ must choose and document one of these safe baselines:
 - `SnapshotPredictionBaseline`: prediction limited to what can be reconstructed from the existing
   snapshot, with many systems disabled.
 
-Prefer `OwnedPredictionBaseline` if owned movement/order prediction needs internal state that
-ordinary snapshots intentionally omit. The baseline must not include hidden enemy state.
+Default to `OwnedPredictionBaseline` for movement/order prediction. Use `SnapshotPredictionBaseline`
+only as an explicit fallback with reduced claims about what can be predicted. Parity tests must
+compare native and WASM behavior from the chosen owner-safe baseline, not against a full
+authoritative server world that contains hidden entities or internal state the browser must never
+receive. The baseline must not include hidden enemy ids, positions, orders, target ids, economy, or
+production state.
 
 ## Build and Loading Work
 
@@ -55,6 +64,9 @@ ordinary snapshots intentionally omit. The baseline must not include hidden enem
   - simple move command
   - queued move commands
   - build command rejected by invalid placement
+- Baseline export/import tests that prove hidden enemy ids, positions, orders, target ids,
+  production state, and economy state are absent while owned movement/order state is sufficient for
+  the enabled prediction surface.
 - Browser smoke test that loads the WASM module and runs 300 local ticks without leaking memory
   beyond a fixed threshold.
 - Bundle-size check with an explicit maximum for initial rollout.
