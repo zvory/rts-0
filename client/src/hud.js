@@ -105,11 +105,13 @@ export class HUD {
    *   element lookups so multiple screens could coexist.
    * @param {import("./state.js").GameState} state shared game state (selection, resources).
    * @param {import("./net.js").Net} net network seam for issuing commands.
+   * @param {import("./audio.js").Audio} [audio] optional audio engine for local UI notices.
    */
-  constructor(rootEl, state, net) {
+  constructor(rootEl, state, net, audio = null) {
     this.root = rootEl;
     this.state = state;
     this.net = net;
+    this.audio = audio;
 
     // Resource / supply bar elements.
     this.elHud = rootEl.querySelector("#hud");
@@ -441,8 +443,9 @@ export class HUD {
    *    in the bottom-right cell (`C` hotkey).
    *  - anything else → empty.
    *
-   * Buttons are disabled when unaffordable (vs `state.resources`) or when tech
-   * requirements are unmet (e.g. factory requires completed prerequisites).
+   * Buttons are hard-disabled when tech requirements are unmet (e.g. factory
+   * requires completed prerequisites). Buttons with available tech but missing
+   * resources stay clickable so clicks/hotkeys can play the relevant notice.
    */
   _renderCommandCard() {
     const card = this.elCommand;
@@ -731,10 +734,12 @@ export class HUD {
           title: this._abilityDisabledReason(affordance),
           hotkey: GRID_HOTKEYS[slot],
           enabled: readyCount > 0 && affordance.affordable,
+          unaffordable: readyCount > 0 && !affordance.affordable,
           countBadge: showReadyCount ? `${readyCount}` : "",
           cooldownClocks: affordance.cooldownClocks,
           cost: definition.cost,
           cls: this._abilityTargetActive(definition.ability) ? "active" : "",
+          onUnavailable: () => this._playNotEnoughForCost(definition.cost),
           onClick: (ev) => {
             if (definition.targetMode === "worldPoint") {
               this.state.beginCommandTarget({ kind: "ability", ability: definition.ability });
@@ -791,10 +796,10 @@ export class HUD {
   _renderBuildCard(card) {
     const res = this.state.resources || { steel: 0, oil: 0 };
 
-    // Signature: which buttons exist + their enabled state. Rebuild only on change.
+    // Signature: which buttons exist + their availability state. Rebuild only on change.
     const sig =
       "build|" +
-      WORKER_BUILDABLE.map((k) => `${k}:${this._canBuild(k, res) ? 1 : 0}`).join(",");
+      WORKER_BUILDABLE.map((k) => `${k}:${this._buildAvailability(k, res)}`).join(",");
     if (sig === this._cardSig) return;
     this._cardSig = sig;
 
@@ -803,7 +808,8 @@ export class HUD {
     for (const kind of WORKER_BUILDABLE) {
       const st = STATS[kind];
       if (!st) continue;
-      const enabled = this._canBuild(kind, res);
+      const availability = this._buildAvailability(kind, res);
+      const enabled = availability === "ready";
       const reason = this._buildDisabledReason(kind, res);
       const btn = this._cmdButton({
         icon: st.icon,
@@ -811,8 +817,10 @@ export class HUD {
         hotkey: GRID_HOTKEYS[idx++],
         cost: st.cost,
         enabled,
+        unaffordable: availability === "unaffordable",
         title: reason,
         tooltipHtml: this._kindTooltipHtml(kind),
+        onUnavailable: () => this._playNotEnoughForCost(st.cost),
         onClick: () => this.state.beginPlacement(kind),
       });
       frag.appendChild(btn);
@@ -832,10 +840,14 @@ export class HUD {
 
   /** A worker can build `kind` if affordable and all tech requirements are satisfied. */
   _canBuild(kind, res) {
+    return this._buildAvailability(kind, res) === "ready";
+  }
+
+  _buildAvailability(kind, res) {
     const st = STATS[kind];
-    if (!st) return false;
-    if (this._requirementsOf(st).some((req) => !this._playerHasCompleteKind(req))) return false;
-    return this._affordable(st.cost, res);
+    if (!st) return "locked";
+    if (this._requirementsOf(st).some((req) => !this._playerHasCompleteKind(req))) return "locked";
+    return this._affordable(st.cost, res) ? "ready" : "unaffordable";
   }
 
   /** Human-readable disabled reason for a build button tooltip ("" when enabled). */
@@ -868,10 +880,10 @@ export class HUD {
       `train|${building.id}|` +
       trains.map((u) => {
         const producerIds = this._selectedProducerBuildingsForUnit(u).map((e) => e.id).join(".");
-        return `${u}:${this._canTrain(u, res) ? 1 : 0}:${producerIds}`;
+        return `${u}:${this._trainAvailability(u, res)}:${producerIds}`;
       }).join(",") +
       `|research:` +
-      researches.map((u) => `${u}:${this._canResearch(u, res) ? 1 : 0}`).join(",") +
+      researches.map((u) => `${u}:${this._researchAvailability(u, res)}`).join(",") +
       `|cancel:${producingBuildings.map((e) => e.id).join(".")}`;
     if (sig === this._cardSig) return;
     this._cardSig = sig;
@@ -881,7 +893,8 @@ export class HUD {
     for (const unit of trains) {
       const st = STATS[unit];
       if (!st) continue;
-      const enabled = this._canTrain(unit, res);
+      const availability = this._trainAvailability(unit, res);
+      const enabled = availability === "ready";
       const reason = this._trainDisabledReason(unit, res);
       const btn = this._cmdButton({
         icon: st.icon,
@@ -889,9 +902,11 @@ export class HUD {
         hotkey: GRID_HOTKEYS[idx++],
         cost: st.cost,
         enabled,
+        unaffordable: availability === "unaffordable",
         title: reason,
         tooltipHtml: this._kindTooltipHtml(unit),
         repeatable: true,
+        onUnavailable: () => this._playNotEnoughForCost(st.cost),
         onClick: () => this._issueTrain(unit),
       });
       frag.appendChild(btn);
@@ -899,7 +914,8 @@ export class HUD {
     for (const upgrade of researches) {
       const def = UPGRADES[upgrade];
       if (!def) continue;
-      const enabled = this._canResearch(upgrade, res);
+      const availability = this._researchAvailability(upgrade, res);
+      const enabled = availability === "ready";
       const reason = this._researchDisabledReason(upgrade, res);
       const btn = this._cmdButton({
         icon: def.icon,
@@ -907,9 +923,11 @@ export class HUD {
         hotkey: def.hotkey || GRID_HOTKEYS[idx],
         cost: def.cost,
         enabled,
+        unaffordable: availability === "unaffordable",
         title: reason,
         tooltipHtml: this._upgradeTooltipHtml(upgrade),
         repeatable: false,
+        onUnavailable: () => this._playNotEnoughForCost(def.cost),
         onClick: () => this._issueResearch(upgrade),
       });
       idx++;
@@ -1025,19 +1043,27 @@ export class HUD {
 
   /** A unit can be trained if affordable and its completed-building tech is present. */
   _canTrain(unit, res) {
+    return this._trainAvailability(unit, res) === "ready";
+  }
+
+  _trainAvailability(unit, res) {
     const st = STATS[unit];
-    if (!st) return false;
-    if (this._requirementsOf(st).some((req) => !this._playerHasCompleteKind(req))) return false;
-    return this._affordable(st.cost, res);
+    if (!st) return "locked";
+    if (this._requirementsOf(st).some((req) => !this._playerHasCompleteKind(req))) return "locked";
+    return this._affordable(st.cost, res) ? "ready" : "unaffordable";
   }
 
   _canResearch(upgrade, res) {
+    return this._researchAvailability(upgrade, res) === "ready";
+  }
+
+  _researchAvailability(upgrade, res) {
     const def = UPGRADES[upgrade];
-    if (!def) return false;
-    if ((this.state.upgrades || []).includes(upgrade)) return false;
+    if (!def) return "locked";
+    if ((this.state.upgrades || []).includes(upgrade)) return "locked";
     if (this._selectedProducingBuildingsForKind(def.researchedAt)
-      .some((e) => e.prodUpgrade === upgrade)) return false;
-    return this._affordable(def.cost, res);
+      .some((e) => e.prodUpgrade === upgrade)) return "locked";
+    return this._affordable(def.cost, res) ? "ready" : "unaffordable";
   }
 
   _researchDisabledReason(upgrade, res) {
@@ -1076,6 +1102,22 @@ export class HUD {
     if (affordance.depletedCount === affordance.carrierIds.length) return "Depleted";
     if (affordance.readyIds.length === 0) return "On cooldown";
     return affordance.definition.title || "";
+  }
+
+  _missingResourceSoundId(cost, res = this.state.resources || { steel: 0, oil: 0 }) {
+    if (!cost) return null;
+    const steelShort = (res.steel ?? 0) < (cost.steel ?? 0);
+    const oilShort = (res.oil ?? 0) < (cost.oil ?? 0);
+    if (steelShort) return "notice_steel";
+    if (oilShort) return "notice_oil";
+    return null;
+  }
+
+  _playNotEnoughForCost(cost) {
+    const soundId = this._missingResourceSoundId(cost);
+    if (soundId && this.audio) {
+      this.audio.play(soundId, { category: "alert", priority: 4 });
+    }
   }
 
   /** Detailed command-card hover for any buildable or trainable kind. */
@@ -1152,20 +1194,25 @@ export class HUD {
    * @param {string} [opts.hotkey] keyboard hint shown in a corner.
    * @param {{steel:number,oil:number}} [opts.cost] cost badge (omitted if absent).
    * @param {boolean} opts.enabled whether the action is currently available.
+   * @param {boolean} [opts.unaffordable] true when tech is available but resources are short.
    * @param {string} [opts.title] tooltip / disabled reason.
    * @param {string} [opts.tooltipHtml] rich hover content rendered inside the button.
    * @param {string} [opts.cls] extra class (e.g. "cancel").
    * @param {string} [opts.countBadge] top-right ready count for partially-available abilities.
    * @param {{count:number,rotationDeg:number}[]} [opts.cooldownClocks] grouped cooldown clocks.
    * @param {boolean} [opts.repeatable] whether native keyboard repeat may trigger this button.
+   * @param {() => void} [opts.onUnavailable] click handler for unaffordable buttons.
    * @param {(ev: MouseEvent) => void} opts.onClick click handler (skipped when disabled).
    * @returns {HTMLButtonElement}
    */
   _cmdButton(opts) {
     const btn = document.createElement("button");
     btn.type = "button";
-    btn.className = "cmd-btn" + (opts.cls ? ` ${opts.cls}` : "");
-    btn.disabled = !opts.enabled;
+    const classes = ["cmd-btn"];
+    if (opts.cls) classes.push(opts.cls);
+    if (opts.unaffordable) classes.push("unaffordable");
+    btn.className = classes.join(" ");
+    btn.disabled = !opts.enabled && !opts.unaffordable;
     if (opts.title) btn.title = opts.title;
     if (opts.hotkey) {
       // Expose the hotkey so Input/keyboard handling and styles.css can find it.
@@ -1204,6 +1251,11 @@ export class HUD {
       btn.addEventListener("click", (ev) => {
         ev.preventDefault();
         opts.onClick(ev);
+      });
+    } else if (opts.unaffordable && typeof opts.onUnavailable === "function") {
+      btn.addEventListener("click", (ev) => {
+        ev.preventDefault();
+        opts.onUnavailable(ev);
       });
     }
     return btn;

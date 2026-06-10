@@ -192,7 +192,7 @@ export function noticeSoundId(msg)
 `hud.js`
 ```js
 export class HUD {
-  constructor(rootEl, state, net)
+  constructor(rootEl, state, net, audio?)
   update()                               // refresh resources/supply, selected panel, command card
   // command card buttons call net.command(...) or state.beginPlacement(...)
 }

@@ -1194,6 +1194,14 @@ input[type="text"]:focus {
 .cmd-btn:disabled .cmd-cost {
   opacity: 0.38;
 }
+.cmd-btn.unaffordable:not(:disabled) .cmd-icon,
+.cmd-btn.unaffordable:not(:disabled) .cmd-label,
+.cmd-btn.unaffordable:not(:disabled) .cmd-hotkey {
+  opacity: 0.68;
+}
+.cmd-btn.unaffordable:not(:disabled) .cmd-cost {
+  opacity: 0.9;
+}
 .cmd-btn .cmd-icon {
   font-family: var(--mono);
   font-size: 22px;
@@ -1291,8 +1299,10 @@ input[type="text"]:focus {
 .cmd-btn .cmd-cost .c-oil {
   color: #8aaf6a;
 }
-/* Unaffordable cost shown in red even though the whole button may be disabled. */
-.cmd-btn.unaffordable .cmd-cost {
+/* Unaffordable cost stays red while the button remains clickable for voice feedback. */
+.cmd-btn.unaffordable .cmd-cost,
+.cmd-btn.unaffordable .cmd-cost .c-steel,
+.cmd-btn.unaffordable .cmd-cost .c-oil {
   color: var(--bad);
 }
 .cmd-btn .cmd-tooltip {
