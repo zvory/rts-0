@@ -443,7 +443,7 @@ export class HUD {
    *    in the bottom-right cell (`C` hotkey).
    *  - anything else → empty.
    *
-   * Buttons are hard-disabled when tech requirements are unmet (e.g. factory
+   * Buttons are hard-disabled when tech requirements are unmet (e.g. Vehicle Works
    * requires completed prerequisites). Buttons with available tech but missing
    * resources stay clickable so clicks/hotkeys can play the relevant notice.
    */
