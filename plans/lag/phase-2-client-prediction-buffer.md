@@ -10,6 +10,9 @@ for delayed authoritative snapshots.
 
 - Add a `PredictionController` or equivalent collaborator wired from `Match`.
 - Keep it separate from `Net`, `Input`, and `Renderer`.
+- Route every live gameplay command through a single controller method, such as
+  `PredictionController.issueCommand(cmd)`, before `Net.command(cmd)` sends it. Do not let input,
+  minimap, HUD, placement, or hotkey paths allocate or attach `clientSeq` independently.
 - Responsibilities:
   - allocate or receive command sequence ids
   - record pending local commands with sequence, local issue time, and latest known server tick
@@ -19,6 +22,8 @@ for delayed authoritative snapshots.
   - provide a single future seam where a WASM predictor can be plugged in
 - Keep `GameState.applySnapshot` authoritative by default. The prediction controller may later feed
   predicted render snapshots into `GameState`, but this phase should not alter visible behavior.
+- Keep replay viewers, spectators, dev-watch passive viewers, and any non-player role on the
+  existing direct authoritative path with no command sequence allocation.
 
 ## Reconciliation Semantics
 
@@ -47,6 +52,9 @@ for delayed authoritative snapshots.
 ## Verification
 
 - Node unit tests for all reconciliation state transitions.
+- Node or browser unit test that exercises representative command sources through the single issue
+  path: viewport right-click, minimap right-click, HUD stop/train/research/cancel, build
+  placement, and rally commands.
 - Node tests for latest-only snapshot behavior matching `ConnectionSink` semantics.
 - Client architecture check updated if a new module area is introduced.
 - Client smoke test still passes with prediction tracking enabled but no visible prediction.

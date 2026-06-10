@@ -40,6 +40,10 @@ Do not predict yet:
   - compare authoritative vs predicted owned entity positions
   - smooth small corrections over a short visual window
   - snap large corrections with metrics recorded
+- Treat prediction divergence caused by hidden enemies, unseen blockers, server-side combat, or
+  coalesced snapshots as a normal reconciliation path. The predictor may move owned units
+  immediately, but authoritative snapshots must be able to correct positions without revealing why
+  the correction happened.
 - Add a visible or logged developer-only prediction status readout.
 
 ## Server Work
@@ -58,6 +62,9 @@ Do not predict yet:
   - assert reconciliation converges after server acknowledgement
 - WASM parity test for the same movement command streams.
 - Node reconciliation tests for dropped/coalesced snapshots.
+- Reconciliation test where the authoritative server path differs because of hidden or
+  non-baselined state; assert the client converges, records a bounded correction, and does not
+  expose hidden ids, positions, or target data in diagnostics.
 - Browser smoke test that clicks a move command and asserts owned unit render position changes
   before any mocked authoritative echo is delivered.
 - Regression test that spectators and replay viewers never receive predicted control.
