@@ -42,6 +42,10 @@ for delayed authoritative snapshots.
 
 ## Test Harness Work
 
+- Extend the Phase 0 tri-state scenario harness with prediction-buffer state summaries. The local
+  lane may still be unavailable in this phase, but remote/client artifacts must show issued
+  command sequences, pending command counts, latest authoritative snapshot tick, and acknowledgement
+  handling after each scripted step.
 - Add a pure Node test harness for prediction buffer behavior.
 - Feed scripted sequences:
   - command 1, 2, 3 issued; snapshot acknowledges 1
@@ -55,6 +59,8 @@ for delayed authoritative snapshots.
 
 ## Verification
 
+- At least one tri-state scenario runs in two-lane mode and records prediction-buffer diagnostics
+  in the browser client lane.
 - Node unit tests for all reconciliation state transitions.
 - Node or browser unit test that exercises representative command sources through the single issue
   path: viewport right-click, minimap right-click, HUD stop/train/research/cancel, build

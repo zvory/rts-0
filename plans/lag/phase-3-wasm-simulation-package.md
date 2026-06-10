@@ -55,6 +55,17 @@ production state.
 - Serve the generated WASM asset from the Rust server's static path or an equivalent checked-in
   development location.
 
+## Tri-State Harness Integration
+
+- Register the native reference or WASM predictor as the Phase 0 harness local lane.
+- Keep scenario definitions unchanged: a scenario that previously ran remote/client should be able
+  to opt into local-lane comparison by enabling a flag or assertion block.
+- Export local-lane state summaries in the same domain shape as remote/client summaries: owned
+  entity positions, active and queued order stages, resources when present in the owner-safe
+  baseline, pending commands, correction metrics, and disabled reasons.
+- Add an explicit unsupported/unknown field policy so the harness distinguishes "not predicted by
+  this phase" from "predicted and divergent."
+
 ## Verification
 
 - `cargo check -p rts-sim-wasm --target wasm32-unknown-unknown`.
@@ -69,6 +80,8 @@ production state.
   the enabled prediction surface.
 - Browser smoke test that loads the WASM module and runs 300 local ticks without leaking memory
   beyond a fixed threshold.
+- Tri-state scenario proving the local lane can initialize, advance no-op ticks, and diff cleanly
+  against remote/client summaries for the supported owner-safe surface.
 - Bundle-size check with an explicit maximum for initial rollout.
 - Architecture check that `rts-sim-wasm` does not depend on `rts-server`, `rts-ai`, Tokio, Axum, or
   SQLx.
