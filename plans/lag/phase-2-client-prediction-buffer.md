@@ -16,8 +16,10 @@ for delayed authoritative snapshots.
 - Responsibilities:
   - allocate or receive command sequence ids
   - record pending local commands with sequence, local issue time, and latest known server tick
-  - receive authoritative snapshots and acknowledgement metadata
+  - receive authoritative snapshots and sim-consumption acknowledgement metadata
   - drop acknowledged commands
+  - optionally record socket/room receipt diagnostics when available, without using them for
+    reconciliation
   - expose pending command count and correction metrics for tests/debug UI
   - provide a single future seam where a WASM predictor can be plugged in
 - Keep `GameState.applySnapshot` authoritative by default. The prediction controller may later feed
@@ -44,6 +46,8 @@ for delayed authoritative snapshots.
 - Feed scripted sequences:
   - command 1, 2, 3 issued; snapshot acknowledges 1
   - snapshot acknowledges 3 while 4 and 5 remain pending
+  - socket/room receipt arrives for command 4 but sim-consumption acknowledgement has not, so
+    command 4 stays pending
   - duplicate snapshots
   - skipped authoritative ticks
   - out-of-date snapshots after a newer snapshot has already been applied

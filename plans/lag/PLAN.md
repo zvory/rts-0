@@ -18,8 +18,10 @@ responsiveness without accepting desyncs, fog leaks, or untestable client/server
 - The browser runs a local `rts-sim` WASM prediction engine for the current player's experience.
 - Client commands are applied immediately to the local predictor and mirrored to the remote server.
 - Server snapshots carry enough acknowledgement data for the client to know which local commands
-  the server has processed. That acknowledgement must survive the actual live compact snapshot
-  transport, not only object-shaped serde snapshots.
+  the authoritative simulation has consumed. Socket/room receipt may be tracked internally for
+  diagnostics, but reconciliation drops pending commands only after sim-consumption acknowledgement.
+  That acknowledgement must survive the actual live compact snapshot transport, not only
+  object-shaped serde snapshots.
 - On each authoritative snapshot, the client rewinds or resets prediction to the server-approved
   state, drops acknowledged commands, reapplies unacknowledged local commands, and renders the
   corrected predicted view.
