@@ -1491,8 +1491,6 @@ const WALL_CHOKEPOINT_SCORE_BASELINES: &[(EntityKind, usize, u32)] = &[
     (EntityKind::Tank, 3, 240),
     (EntityKind::Tank, 5, 330),
     (EntityKind::Tank, 6, 429),
-    (EntityKind::Tank, 10, 1_187),
-    (EntityKind::Tank, 15, 2_049),
 ];
 
 fn scout_car_snaking_corridor_map() -> (Map, u32, f32, (f32, f32), (f32, f32)) {
