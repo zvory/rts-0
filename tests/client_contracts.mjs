@@ -1237,6 +1237,7 @@ function fakeAudioContext() {
   assert(STATS[KIND.SCOUT_CAR].cost.oil === 50, "Scout Car oil cost mirrors server");
   assert(STATS[KIND.SCOUT_CAR].sight === 10, "Scout Car has the largest mobile sight radius");
   assert(SMOKE_ABILITY_COST.steel === 0 && SMOKE_ABILITY_COST.oil === 0, "Scout Car smoke has no resource cost");
+  assert(!("requires" in ABILITIES[ABILITY.SMOKE]), "Scout Car smoke should be available without Steelworks");
   assert(STATS[KIND.SCOUT_CAR].body.length === 40.8, "Scout Car client body length mirrors server");
   assert(STATS[KIND.SCOUT_CAR].body.width === 21.6, "Scout Car client body width mirrors server");
   assert(KIND_CODE[KIND.SCOUT_CAR] === 14, "Scout Car compact kind code should follow Steelworks");

@@ -88,8 +88,8 @@ authoritative `rules::defs` records.
   (~20s). Once complete, all current and future riflemen for that player are permanently charging:
   1.25x movement speed (matching tank speed at 2.0 px/tick), fire while moving without an extra
   miss chance, and 25% faster attacks (16 tick cooldown becomes 12).
-- **Scout Car Smoke** (hotkey `D`): Scout cars gain a targeted smoke-grenade ability once the
-  owner has a completed Steelworks. Each scout car spawns with 2 smoke uses; once those uses are
+- **Scout Car Smoke** (hotkey `D`): Scout cars have a targeted smoke-grenade ability immediately;
+  no completed Steelworks is required. Each scout car spawns with 2 smoke uses; once those uses are
   depleted, that car cannot use Smoke again. Smoke has no steel or oil cost. Target range: 9 tiles
   from the caster. Launch delay: up to 100 ms at max range, scaling down for closer targets. Cloud
   radius: 2 tiles. Cloud duration: 5 seconds. Cooldown: 20 seconds per caster.
