@@ -282,6 +282,86 @@ fn draining_join_sends_warning_and_start_is_blocked() {
     assert_eq!(drain.active_matches(), 0);
 }
 
+#[test]
+fn one_player_start_skips_match_countdown() {
+    let drain = test_drain();
+    let mut task = RoomTask::new(
+        "r".to_string(),
+        RoomMode::Normal,
+        None,
+        false,
+        drain.clone(),
+    );
+    let mut writer = join_test_player_with_writer(&mut task, 1);
+
+    task.on_ready(1, true);
+    task.on_start_request(1);
+
+    let messages: Vec<_> = std::iter::from_fn(|| writer.reliable_rx.try_recv().ok()).collect();
+    assert!(messages
+        .iter()
+        .any(|msg| matches!(msg, ServerMessage::Start(_))));
+    assert!(!messages
+        .iter()
+        .any(|msg| matches!(msg, ServerMessage::MatchCountdown { .. })));
+    assert_eq!(drain.active_matches(), 1);
+}
+
+#[test]
+fn quickstart_skips_match_countdown() {
+    let drain = test_drain();
+    let mut task = RoomTask::new(
+        "r".to_string(),
+        RoomMode::Normal,
+        None,
+        false,
+        drain.clone(),
+    );
+    let mut writer = join_test_player_with_writer(&mut task, 1);
+
+    join_test_player(&mut task, 2);
+    task.on_set_quickstart(1, true);
+    task.on_ready(1, true);
+    task.on_ready(2, true);
+    task.on_start_request(1);
+
+    let messages: Vec<_> = std::iter::from_fn(|| writer.reliable_rx.try_recv().ok()).collect();
+    assert!(messages
+        .iter()
+        .any(|msg| matches!(msg, ServerMessage::Start(_))));
+    assert!(!messages
+        .iter()
+        .any(|msg| matches!(msg, ServerMessage::MatchCountdown { .. })));
+    assert_eq!(drain.active_matches(), 1);
+}
+
+#[test]
+fn normal_multiplayer_start_uses_match_countdown() {
+    let drain = test_drain();
+    let mut task = RoomTask::new(
+        "r".to_string(),
+        RoomMode::Normal,
+        None,
+        false,
+        drain.clone(),
+    );
+    let mut writer = join_test_player_with_writer(&mut task, 1);
+
+    join_test_player(&mut task, 2);
+    task.on_ready(1, true);
+    task.on_ready(2, true);
+    task.on_start_request(1);
+
+    let messages: Vec<_> = std::iter::from_fn(|| writer.reliable_rx.try_recv().ok()).collect();
+    assert!(messages
+        .iter()
+        .any(|msg| matches!(msg, ServerMessage::MatchCountdown { .. })));
+    assert!(!messages
+        .iter()
+        .any(|msg| matches!(msg, ServerMessage::Start(_))));
+    assert_eq!(drain.active_matches(), 0);
+}
+
 #[tokio::test]
 async fn draining_rejects_new_rooms_but_keeps_existing_rooms_joinable() {
     let lobby = Lobby::new();

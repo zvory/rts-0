@@ -973,6 +973,10 @@ impl RoomTask {
             debug!(room = %self.room, "ignoring start; not all players ready");
             return;
         }
+        if self.should_skip_match_countdown() {
+            self.start_match();
+            return;
+        }
         self.start_match_countdown();
     }
 
@@ -1020,7 +1024,7 @@ impl RoomTask {
     }
 
     /// Host-only: toggle the lobby's boosted opening resources.
-    fn on_set_quickstart(&mut self, player_id: u32, enabled: bool) {
+    pub(super) fn on_set_quickstart(&mut self, player_id: u32, enabled: bool) {
         if self.is_live_dev_watch() {
             return;
         }
@@ -1361,6 +1365,10 @@ impl RoomTask {
                 .values()
                 .filter(|p| !p.spectator)
                 .all(|p| p.ready)
+    }
+
+    fn should_skip_match_countdown(&self) -> bool {
+        self.quickstart || self.total_player_count() <= 1
     }
 
     /// Build and broadcast the current `lobby` message to everyone in the room.
