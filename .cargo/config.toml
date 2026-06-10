@@ -3,5 +3,4 @@
 # Multiple agents build this repo from parallel git worktrees. A single static
 # target dir makes final binaries and test artifacts shared mutable state across
 # unrelated branches. Test/helper scripts choose an isolated per-worktree target
-# dir instead, while optional sccache support provides cross-worktree compiler
-# reuse without sharing Cargo's final artifact directory.
+# dir instead.

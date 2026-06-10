@@ -123,9 +123,7 @@ the installer once. GitHub Actions also runs `./tests/run-all.sh` after pushes t
 shared signal, but `main` is intentionally left open for direct pushes.
 
 The local gate uses a per-worktree Cargo target directory under `/tmp/rts-cargo-target/` so
-parallel agents do not share final binaries or test artifacts. Install `sccache` to share compiler
-outputs across worktrees without sharing Cargo's mutable target directory; the gate enables it
-automatically when `RUSTC_WRAPPER` is unset.
+parallel agents do not share final binaries or test artifacts.
 
 ## Deploy
 

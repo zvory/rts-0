@@ -30,8 +30,10 @@ Use when writing or debugging tests, or before claiming a change is done.
   `tests/package-lock.json`. `tests/run-all.sh` links each worktree's ignored
   `tests/node_modules` to the matching cache entry and runs `npm ci` only when that cache is
   missing.
-- Cross-worktree compiler reuse is provided by `sccache` when installed. `tests/run-all.sh` and
-  `scripts/cargo-shared-target.sh` enable it automatically when `RUSTC_WRAPPER` is unset.
+- `sccache` is not enabled automatically. It was tested as a cross-worktree Rust reuse layer, but
+  Rust cache hits stayed at 0% across different per-worktree target dirs because target-dir-specific
+  rustc arguments changed the cache keys. It only produced Rust hits when rebuilding the exact same
+  target directory path.
 - Node tests need a **running** server on the test runner's private port. They are not
   `cargo test`. Start the server first.
 - `tests/run-all.sh` boots its private server with `RTS_TEST_TICK_MS=5` by default so live-server

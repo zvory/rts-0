@@ -3,8 +3,7 @@
 #
 # Final Cargo artifacts must be isolated by worktree so unrelated branches do
 # not overwrite each other's debug binaries, test harnesses, or self-play
-# artifacts. Cross-worktree compilation reuse is handled by sccache when it is
-# installed, not by sharing Cargo's target dir.
+# artifacts.
 set -euo pipefail
 
 repo_root="$(git rev-parse --show-toplevel)"
@@ -25,17 +24,8 @@ else
   export CARGO_TARGET_DIR
 fi
 
-if [ -z "${RUSTC_WRAPPER+x}" ] && command -v sccache >/dev/null 2>&1; then
-  export RUSTC_WRAPPER=sccache
-fi
-
 if [ "${1:-}" = "--print-target-dir" ]; then
   printf '%s\n' "$CARGO_TARGET_DIR"
-  exit 0
-fi
-
-if [ "${1:-}" = "--print-rustc-wrapper" ]; then
-  printf '%s\n' "${RUSTC_WRAPPER:-}"
   exit 0
 fi
 

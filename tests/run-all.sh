@@ -25,7 +25,6 @@
 #   PORT=8090 tests/run-all.sh       # use a different port
 #   RTS_MATCH_SEED=123 tests/run-all.sh  # use a different deterministic map seed
 #   CARGO_TARGET_DIR=/path/to/target tests/run-all.sh  # override the per-worktree Cargo target dir
-#   RUSTC_WRAPPER=sccache tests/run-all.sh             # force a compiler cache wrapper
 #   RTS_NODE_DEPS_CACHE_DIR=/tmp/rts-node-deps tests/run-all.sh
 #   CHROME=/path/to/chrome tests/run-all.sh
 set -uo pipefail
@@ -37,21 +36,13 @@ SERVER_DIR="$REPO_ROOT/server"
 
 # Cargo normally writes build artifacts under each worktree's server/target directory. Local gate
 # runs use a deterministic target dir under /tmp per worktree so fresh worktrees do not clutter the
-# checkout and parallel agents do not share final binaries or test artifacts. Cross-worktree
-# compiler reuse comes from sccache when installed. Callers can still override CARGO_TARGET_DIR.
+# checkout and parallel agents do not share final binaries or test artifacts. Callers can still
+# override CARGO_TARGET_DIR.
 if [ -z "${CARGO_TARGET_DIR:-}" ]; then
   CARGO_TARGET_DIR="$("$REPO_ROOT/scripts/cargo-shared-target.sh" --print-target-dir)"
   export CARGO_TARGET_DIR
 else
   export CARGO_TARGET_DIR
-fi
-if [ -z "${RUSTC_WRAPPER+x}" ]; then
-  RUSTC_WRAPPER="$("$REPO_ROOT/scripts/cargo-shared-target.sh" --print-rustc-wrapper)"
-  if [ -n "$RUSTC_WRAPPER" ]; then
-    export RUSTC_WRAPPER
-  fi
-else
-  export RUSTC_WRAPPER
 fi
 SERVER_BIN="$CARGO_TARGET_DIR/debug/rts-server"
 
@@ -112,9 +103,6 @@ if [ "$NODE_MAJOR" -lt 22 ]; then
 fi
 
 info "Cargo target dir: $CARGO_TARGET_DIR"
-if [ -n "${RUSTC_WRAPPER:-}" ]; then
-  info "Rust compiler wrapper: $RUSTC_WRAPPER"
-fi
 RTS_NODE_DEPS_CACHE_DIR="${RTS_NODE_DEPS_CACHE_DIR:-/tmp/rts-node-deps}"
 
 FAILED=()   # human-readable names of suites that failed
