@@ -8,6 +8,7 @@ export const S = Object.freeze({
   START: "start",
   SNAPSHOT: "snapshot",
   REPLAY_STATE: "replayState",
+  JOIN_REPLAY_PROMPT: "joinReplayPrompt",
   SHUTDOWN_WARNING: "shutdownWarning",
   GAME_OVER: "gameOver",
   PONG: "pong",
@@ -637,12 +638,16 @@ function reverseCodes(table) {
 
 // --- Client -> Server builders ---
 export const msg = Object.freeze({
-  join: (name, room = "main", spectator = false) => ({
-    t: C.JOIN,
-    name,
-    room,
-    spectator: !!spectator,
-  }),
+  join: (name, room = "main", spectator = false, replayOk = false) => {
+    const payload = {
+      t: C.JOIN,
+      name,
+      room,
+      spectator: !!spectator,
+    };
+    if (replayOk) payload.replayOk = true;
+    return payload;
+  },
   ready: (ready) => ({ t: C.READY, ready: !!ready }),
   start: () => ({ t: C.START }),
   addAi: () => ({ t: C.ADD_AI }),
