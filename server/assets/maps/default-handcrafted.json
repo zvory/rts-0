@@ -1,8 +1,8 @@
 {
-  "version": 1,
+  "version": 2,
   "name": "Default",
   "description": "4-player symmetrical map with a central lake. Standard competitive layout.",
-  "_design": "4 base pairs. Each base has a main entrance and two smaller backdoor entrances. Expansions are near the middle of the map and open to attack.",
+  "_design": "4 mains and 4 central natural sites. v2 layouts choose player-count-specific main/natural pairings; adjacent 2-player layouts assign naturals away from the opponent where possible.",
   "terrain": [
     "........................................................~~~~~~~~~~~~~~~~~~~~~.................................................",
     "........................................................~~~~~~~~~~~~~~~~~~~~~.................................................",
@@ -131,80 +131,274 @@
     "......................................................~....~~~~~~~~.~~~~~~....................................................",
     "......................................................~....~......~~~~...~...................................................."
   ],
-  "baseSites": [
+  "sites": [
     {
+      "id": "main_nw",
+      "kind": "main",
       "x": 25,
       "y": 25
     },
     {
+      "id": "main_se",
+      "kind": "main",
+      "x": 100,
+      "y": 100
+    },
+    {
+      "id": "main_ne",
+      "kind": "main",
+      "x": 100,
+      "y": 25
+    },
+    {
+      "id": "main_sw",
+      "kind": "main",
+      "x": 25,
+      "y": 100
+    },
+    {
+      "id": "nat_top",
+      "kind": "natural",
       "x": 63,
       "y": 38
     },
     {
-      "x": 100,
-      "y": 100
-    },
-    {
+      "id": "nat_bottom",
+      "kind": "natural",
       "x": 63,
       "y": 88
     },
     {
-      "x": 100,
-      "y": 25
-    },
-    {
+      "id": "nat_right",
+      "kind": "natural",
       "x": 88,
       "y": 62
     },
     {
-      "x": 25,
-      "y": 100
-    },
-    {
+      "id": "nat_left",
+      "kind": "natural",
       "x": 38,
       "y": 62
     }
   ],
-  "mainSites": [
+  "layouts": [
     {
-      "x": 25,
-      "y": 25
+      "id": "1p_nw",
+      "playerCount": 1,
+      "slots": [
+        {
+          "main": "main_nw",
+          "natural": "nat_top"
+        }
+      ]
     },
     {
-      "x": 100,
-      "y": 100
+      "id": "1p_se",
+      "playerCount": 1,
+      "slots": [
+        {
+          "main": "main_se",
+          "natural": "nat_bottom"
+        }
+      ]
     },
     {
-      "x": 100,
-      "y": 25
+      "id": "1p_ne",
+      "playerCount": 1,
+      "slots": [
+        {
+          "main": "main_ne",
+          "natural": "nat_right"
+        }
+      ]
     },
     {
-      "x": 25,
-      "y": 100
+      "id": "1p_sw",
+      "playerCount": 1,
+      "slots": [
+        {
+          "main": "main_sw",
+          "natural": "nat_left"
+        }
+      ]
+    },
+    {
+      "id": "2p_cross_nw_se",
+      "playerCount": 2,
+      "slots": [
+        {
+          "main": "main_nw",
+          "natural": "nat_top"
+        },
+        {
+          "main": "main_se",
+          "natural": "nat_bottom"
+        }
+      ]
+    },
+    {
+      "id": "2p_cross_ne_sw",
+      "playerCount": 2,
+      "slots": [
+        {
+          "main": "main_ne",
+          "natural": "nat_right"
+        },
+        {
+          "main": "main_sw",
+          "natural": "nat_left"
+        }
+      ]
+    },
+    {
+      "id": "2p_adjacent_top",
+      "playerCount": 2,
+      "slots": [
+        {
+          "main": "main_nw",
+          "natural": "nat_left"
+        },
+        {
+          "main": "main_ne",
+          "natural": "nat_right"
+        }
+      ]
+    },
+    {
+      "id": "2p_adjacent_bottom",
+      "playerCount": 2,
+      "slots": [
+        {
+          "main": "main_sw",
+          "natural": "nat_left"
+        },
+        {
+          "main": "main_se",
+          "natural": "nat_right"
+        }
+      ]
+    },
+    {
+      "id": "2p_adjacent_left",
+      "playerCount": 2,
+      "slots": [
+        {
+          "main": "main_nw",
+          "natural": "nat_top"
+        },
+        {
+          "main": "main_sw",
+          "natural": "nat_bottom"
+        }
+      ]
+    },
+    {
+      "id": "2p_adjacent_right",
+      "playerCount": 2,
+      "slots": [
+        {
+          "main": "main_ne",
+          "natural": "nat_top"
+        },
+        {
+          "main": "main_se",
+          "natural": "nat_bottom"
+        }
+      ]
+    },
+    {
+      "id": "3p_nw_se_ne",
+      "playerCount": 3,
+      "slots": [
+        {
+          "main": "main_nw",
+          "natural": "nat_top"
+        },
+        {
+          "main": "main_se",
+          "natural": "nat_bottom"
+        },
+        {
+          "main": "main_ne",
+          "natural": "nat_right"
+        }
+      ]
+    },
+    {
+      "id": "3p_nw_se_sw",
+      "playerCount": 3,
+      "slots": [
+        {
+          "main": "main_nw",
+          "natural": "nat_top"
+        },
+        {
+          "main": "main_se",
+          "natural": "nat_bottom"
+        },
+        {
+          "main": "main_sw",
+          "natural": "nat_left"
+        }
+      ]
+    },
+    {
+      "id": "3p_nw_ne_sw",
+      "playerCount": 3,
+      "slots": [
+        {
+          "main": "main_nw",
+          "natural": "nat_top"
+        },
+        {
+          "main": "main_ne",
+          "natural": "nat_right"
+        },
+        {
+          "main": "main_sw",
+          "natural": "nat_left"
+        }
+      ]
+    },
+    {
+      "id": "3p_se_ne_sw",
+      "playerCount": 3,
+      "slots": [
+        {
+          "main": "main_se",
+          "natural": "nat_bottom"
+        },
+        {
+          "main": "main_ne",
+          "natural": "nat_right"
+        },
+        {
+          "main": "main_sw",
+          "natural": "nat_left"
+        }
+      ]
+    },
+    {
+      "id": "4p_all",
+      "playerCount": 4,
+      "slots": [
+        {
+          "main": "main_nw",
+          "natural": "nat_top"
+        },
+        {
+          "main": "main_se",
+          "natural": "nat_bottom"
+        },
+        {
+          "main": "main_ne",
+          "natural": "nat_right"
+        },
+        {
+          "main": "main_sw",
+          "natural": "nat_left"
+        }
+      ]
     }
-  ],
-  "naturalSites": [
-    {
-      "x": 63,
-      "y": 38
-    },
-    {
-      "x": 63,
-      "y": 88
-    },
-    {
-      "x": 88,
-      "y": 62
-    },
-    {
-      "x": 38,
-      "y": 62
-    }
-  ],
-  "naturalAssignments": [
-    0,
-    1,
-    2,
-    3
   ]
 }

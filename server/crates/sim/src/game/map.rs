@@ -1,15 +1,15 @@
 //! The tile map: terrain grid, authored map loading, and passability. See
 //! `docs/design/server-sim.md` (`map.rs`).
 //!
-//! The live game loads authored maps from the server asset bundle. Map files define terrain and
-//! ordered base sites; the simulation still derives player starts, expansion sites, starting
-//! buildings, workers, and resource clusters from those sites.
+//! The live game loads authored maps from the server asset bundle. Map files define terrain,
+//! named base sites, and spawn layouts; the simulation still derives player starts, expansion
+//! sites, starting buildings, workers, and resource clusters from those sites.
 //!
 //! Terrain passability here is purely about *terrain* — building footprints are tracked
 //! dynamically by the simulation (a separate occupancy grid in `systems`/`pathfinding`),
 //! not baked into the map.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 
 use crate::config;
@@ -22,7 +22,7 @@ use serde::{Deserialize, Serialize};
 pub use rts_protocol::AvailableMap;
 
 /// The only map schema version this server accepts. Bump when the schema changes incompatibly.
-pub const CURRENT_MAP_VERSION: u32 = 1;
+pub const CURRENT_MAP_VERSION: u32 = 2;
 
 const DEFAULT_MAP_JSON: &str = include_str!("../../../../assets/maps/default-handcrafted.json");
 const MAPS_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../assets/maps");
@@ -63,7 +63,7 @@ pub struct MapMetadata {
 impl Map {
     /// Load the deterministic handcrafted map for `player_count` players.
     ///
-    /// The `seed` is used to shuffle which authored base pair each player draws, so the
+    /// The `seed` selects an authored layout for the player count and shuffles its slots, so the
     /// human/AI seating in the lobby does not pin them to the same corner every match.
     pub fn generate(player_count: usize, seed: u32) -> Map {
         Self::from_authored_json_with_name(player_count, DEFAULT_MAP_NAME, DEFAULT_MAP_JSON, seed)
@@ -208,38 +208,39 @@ impl Map {
             ));
         }
         let (size, terrain) = parse_terrain(&authored.terrain)?;
-        let base_sites = parse_base_sites(size, &authored.base_sites)?;
+        let sites = parse_sites(size, &authored.sites)?;
 
         if player_count == 0 {
             return Err("player_count must be at least 1".to_string());
         }
-        if 2 * player_count > base_sites.len() {
+
+        validate_base_clearance(size, &terrain, &sites)?;
+        if authored.layouts.is_empty() {
+            return Err("layouts must contain at least one spawn layout".to_string());
+        }
+        for layout in &authored.layouts {
+            parse_layout_pairs(layout, &sites)?;
+        }
+
+        let matching_layouts: Vec<_> = authored
+            .layouts
+            .iter()
+            .filter(|layout| layout.player_count as usize == player_count)
+            .collect();
+        if matching_layouts.is_empty() {
             return Err(format!(
-                "map has {} base sites but needs {} (2 per player) for {player_count} players",
-                base_sites.len(),
-                2 * player_count,
+                "map has no spawn layout for {player_count} players"
             ));
         }
 
-        validate_base_clearance(size, &terrain, &base_sites)?;
-
-        // baseSites are interleaved pairs: [start0, expansion0, start1, expansion1, ...].
-        // Even indices are player starts; odd indices are neutral expansion bases.
-        // Shuffle the pairs so the lobby seat order does not pin players to the same corner every
-        // match. Once a start is selected, its authored natural stays attached to it.
-        let total_pairs = base_sites.len() / 2;
-        let authored_pairs: Vec<BasePair> = (0..total_pairs)
-            .map(|i| (base_sites[2 * i], base_sites[2 * i + 1]))
-            .collect();
-        let mut pairs = authored_pairs.clone();
+        // Select a whole authored spawn layout first, then shuffle that layout's slots so lobby
+        // seat order stays random without breaking the authored main-natural pair for each slot.
+        let layout = matching_layouts[(seed as usize) % matching_layouts.len()];
+        let mut pairs = parse_layout_pairs(layout, &sites)?;
         let mut rng = SmallRng::seed_from_u64(seed as u64);
         pairs.shuffle(&mut rng);
-        let selected_pairs: Vec<_> = pairs.into_iter().take(player_count).collect();
-        let starts: Vec<_> = selected_pairs.iter().map(|(start, _)| *start).collect();
-        let expansion_sites = selected_pairs
-            .iter()
-            .map(|(_, expansion)| *expansion)
-            .collect();
+        let starts: Vec<_> = pairs.iter().map(|(start, _)| *start).collect();
+        let expansion_sites = pairs.iter().map(|(_, expansion)| *expansion).collect();
 
         Ok(Map {
             size,
@@ -344,13 +345,39 @@ struct AuthoredMap {
     #[serde(rename = "_design")]
     design: String,
     terrain: Vec<String>,
-    base_sites: Vec<AuthoredSite>,
+    sites: Vec<AuthoredSite>,
+    layouts: Vec<AuthoredLayout>,
 }
 
-#[derive(Debug, Clone, Copy, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct AuthoredSite {
+    id: String,
+    kind: AuthoredSiteKind,
     x: u32,
     y: u32,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+enum AuthoredSiteKind {
+    Main,
+    Natural,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct AuthoredLayout {
+    id: String,
+    player_count: u32,
+    slots: Vec<AuthoredLayoutSlot>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct AuthoredLayoutSlot {
+    main: String,
+    natural: String,
 }
 
 fn parse_terrain(rows: &[String]) -> Result<(u32, Vec<u8>), String> {
@@ -397,41 +424,115 @@ fn parse_terrain(rows: &[String]) -> Result<(u32, Vec<u8>), String> {
     Ok((size_u32, out))
 }
 
-fn parse_base_sites(size: u32, authored: &[AuthoredSite]) -> Result<Vec<(u32, u32)>, String> {
+fn parse_sites(
+    size: u32,
+    authored: &[AuthoredSite],
+) -> Result<HashMap<String, AuthoredSite>, String> {
     if authored.is_empty() {
-        return Err("baseSites must contain at least one site".to_string());
+        return Err("sites must contain at least one site".to_string());
     }
 
-    let mut seen = HashSet::with_capacity(authored.len());
-    let mut out = Vec::with_capacity(authored.len());
+    let mut out = HashMap::with_capacity(authored.len());
+    let mut seen_coords = HashSet::with_capacity(authored.len());
     for (i, site) in authored.iter().enumerate() {
+        if site.id.trim().is_empty() {
+            return Err(format!("sites[{i}] has an empty id"));
+        }
         if site.x >= size || site.y >= size {
             return Err(format!(
-                "baseSites[{i}] = ({},{}) is outside the {size}x{size} map",
+                "sites[{i}] = ({},{}) is outside the {size}x{size} map",
                 site.x, site.y
             ));
         }
-        if !seen.insert((site.x, site.y)) {
+        if !seen_coords.insert((site.x, site.y)) {
             return Err(format!(
-                "baseSites[{i}] duplicates an earlier site at ({},{})",
+                "sites[{i}] duplicates an earlier site at ({},{})",
                 site.x, site.y
             ));
         }
-        out.push((site.x, site.y));
+        if out.insert(site.id.clone(), site.clone()).is_some() {
+            return Err(format!(
+                "sites[{i}] duplicates an earlier id {:?}",
+                site.id
+            ));
+        }
     }
     Ok(out)
+}
+
+fn parse_layout_pairs(
+    layout: &AuthoredLayout,
+    sites: &HashMap<String, AuthoredSite>,
+) -> Result<Vec<BasePair>, String> {
+    if layout.player_count == 0 {
+        return Err(format!("layout {:?} has playerCount 0", layout.id));
+    }
+    if layout.slots.len() != layout.player_count as usize {
+        return Err(format!(
+            "layout {:?} has {} slots but playerCount is {}",
+            layout.id,
+            layout.slots.len(),
+            layout.player_count
+        ));
+    }
+
+    let mut seen_mains = HashSet::with_capacity(layout.slots.len());
+    let mut seen_naturals = HashSet::with_capacity(layout.slots.len());
+    let mut pairs = Vec::with_capacity(layout.slots.len());
+    for (i, slot) in layout.slots.iter().enumerate() {
+        let main = sites.get(&slot.main).ok_or_else(|| {
+            format!(
+                "layout {:?} slot {i} references missing main {:?}",
+                layout.id, slot.main
+            )
+        })?;
+        if main.kind != AuthoredSiteKind::Main {
+            return Err(format!(
+                "layout {:?} slot {i} main {:?} is not a main site",
+                layout.id, slot.main
+            ));
+        }
+
+        let natural = sites.get(&slot.natural).ok_or_else(|| {
+            format!(
+                "layout {:?} slot {i} references missing natural {:?}",
+                layout.id, slot.natural
+            )
+        })?;
+        if natural.kind != AuthoredSiteKind::Natural {
+            return Err(format!(
+                "layout {:?} slot {i} natural {:?} is not a natural site",
+                layout.id, slot.natural
+            ));
+        }
+        if !seen_mains.insert(slot.main.as_str()) {
+            return Err(format!(
+                "layout {:?} assigns main {:?} more than once",
+                layout.id, slot.main
+            ));
+        }
+        if !seen_naturals.insert(slot.natural.as_str()) {
+            return Err(format!(
+                "layout {:?} assigns natural {:?} more than once",
+                layout.id, slot.natural
+            ));
+        }
+        pairs.push(((main.x, main.y), (natural.x, natural.y)));
+    }
+    Ok(pairs)
 }
 
 fn validate_base_clearance(
     size: u32,
     terrain_grid: &[u8],
-    base_sites: &[(u32, u32)],
+    sites: &HashMap<String, AuthoredSite>,
 ) -> Result<(), String> {
-    for (i, &(sx, sy)) in base_sites.iter().enumerate() {
-        let radius = if i % 2 == 1 {
-            EXPANSION_PROTECTION_RADIUS_TILES
-        } else {
+    for site in sites.values() {
+        let (sx, sy) = (site.x, site.y);
+        let radius = if site.kind == AuthoredSiteKind::Main {
             BASE_PROTECTION_RADIUS_TILES
+        } else {
+            EXPANSION_PROTECTION_RADIUS_TILES
         };
         for dy in -radius..=radius {
             for dx in -radius..=radius {
@@ -439,13 +540,15 @@ fn validate_base_clearance(
                 let ty = sy as i32 + dy;
                 if tx < 0 || ty < 0 || tx >= size as i32 || ty >= size as i32 {
                     return Err(format!(
-                        "baseSites[{i}] at ({sx},{sy}) is too close to the map edge"
+                        "site {:?} at ({sx},{sy}) is too close to the map edge",
+                        site.id
                     ));
                 }
                 let idx = (ty as u32 * size + tx as u32) as usize;
                 if terrain_grid[idx] != terrain::GRASS {
                     return Err(format!(
-                        "baseSites[{i}] at ({sx},{sy}) has impassable terrain in its protected area at ({tx},{ty})"
+                        "site {:?} at ({sx},{sy}) has impassable terrain in its protected area at ({tx},{ty})",
+                        site.id
                     ));
                 }
             }
@@ -551,7 +654,7 @@ mod tests {
     }
 
     #[test]
-    fn full_player_count_keeps_their_paired_natural_expansions() {
+    fn selected_layout_keeps_its_paired_natural_expansions() {
         let authored_pairs: HashSet<_> = default_authored_pairs().into_iter().collect();
 
         for seed in 0..16u32 {
@@ -571,25 +674,21 @@ mod tests {
     }
 
     #[test]
-    fn each_player_gets_one_paired_expansion() {
-        let authored_pairs: HashSet<_> = default_authored_pairs().into_iter().collect();
+    fn adjacent_two_player_layout_assigns_naturals_away_from_opponent() {
+        // For two-player Default, seed % 6 selects the authored 2p layout. Seed 2 is the
+        // top-adjacent NW-vs-NE layout; its naturals are left/right, not the shared top natural.
+        let map = Map::generate(2, 2);
+        let pairs: HashSet<_> = map
+            .starts
+            .iter()
+            .copied()
+            .zip(map.expansion_sites.iter().copied())
+            .collect();
 
-        for seed in 0..16u32 {
-            let map = Map::generate(2, seed);
-            assert_eq!(map.starts.len(), 2);
-            assert_eq!(map.expansion_sites.len(), 2);
-            for pair in map
-                .starts
-                .iter()
-                .copied()
-                .zip(map.expansion_sites.iter().copied())
-            {
-                assert!(
-                    authored_pairs.contains(&pair),
-                    "two-player start/expansion pair {pair:?} is not an authored natural pair (seed {seed})"
-                );
-            }
-        }
+        assert_eq!(map.starts.len(), 2);
+        assert_eq!(map.expansion_sites.len(), 2);
+        assert!(pairs.contains(&((25, 25), (38, 62))), "got: {pairs:?}");
+        assert!(pairs.contains(&((100, 25), (88, 62))), "got: {pairs:?}");
     }
 
     #[test]
@@ -602,7 +701,8 @@ mod tests {
               "description": "a future map",
               "_design": "n/a",
               "terrain": [".."],
-              "baseSites": [{"x": 0, "y": 0}, {"x": 1, "y": 0}]
+              "sites": [],
+              "layouts": []
             }"#,
             0,
         )
@@ -616,12 +716,13 @@ mod tests {
         let err = Map::from_authored_json(
             1,
             r#"{
-              "version": 1,
+              "version": 2,
               "name": "bad",
               "description": "bad map",
               "_design": "n/a",
               "terrain": ["..", ".x"],
-              "baseSites": [{"x": 0, "y": 0}]
+              "sites": [],
+              "layouts": []
             }"#,
             0,
         )
@@ -638,12 +739,18 @@ mod tests {
         rows[8].replace_range(8..9, "#");
         let json = format!(
             r#"{{
-              "version": 1,
+              "version": 2,
               "name": "bad-base",
               "description": "bad base map",
               "_design": "n/a",
               "terrain": {},
-              "baseSites": [{{"x": 8, "y": 8}}, {{"x": 24, "y": 24}}]
+              "sites": [
+                {{"id": "main_a", "kind": "main", "x": 8, "y": 8}},
+                {{"id": "nat_a", "kind": "natural", "x": 24, "y": 24}}
+              ],
+              "layouts": [
+                {{"id": "one", "playerCount": 1, "slots": [{{"main": "main_a", "natural": "nat_a"}}]}}
+              ]
             }}"#,
             serde_json::to_string(&rows).unwrap()
         );

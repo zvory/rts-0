@@ -82,6 +82,7 @@
 
       button,
       input[type="number"],
+      input[type="text"],
       select {
         font: inherit;
       }
@@ -104,7 +105,8 @@
         box-shadow: inset 0 0 0 1px rgba(199, 208, 122, 0.38);
       }
 
-      input[type="number"] {
+      input[type="number"],
+      input[type="text"] {
         width: 72px;
         height: 34px;
         border: 1px solid var(--edge);
@@ -212,7 +214,7 @@
       }
 
       .pair-row {
-        grid-template-columns: 1fr 104px;
+        grid-template-columns: 1fr auto;
       }
 
       .base-name {
@@ -347,9 +349,13 @@
         <button type="button" data-mode="box">Box</button>
       </div>
 
-      <h2>Base Sites</h2>
+      <h2>Spawn Layout</h2>
       <div class="base-section">
         <div id="pair-list" class="base-list"></div>
+      </div>
+
+      <h2>Sites</h2>
+      <div class="base-section">
         <div id="natural-list" class="base-list"></div>
       </div>
     </aside>
@@ -381,38 +387,14 @@
         baseText: "#151713",
         start: "#d9e18b",
         expansion: "#b7c5d9",
+        pairLine: "rgba(231,223,197,0.62)",
       });
       const PROTECTION_RADIUS = 7;
       const EXPANSION_PROTECTION_RADIUS = 4;
-      const PAIR_COUNT = 4;
-
-      function siteRadius(i) {
-        return i % 2 === 1 ? EXPANSION_PROTECTION_RADIUS : PROTECTION_RADIUS;
-      }
       const MIN_SIZE = 24;
       const MAX_SIZE = 160;
       const DEFAULT_MAP_URL = "/maps/default-handcrafted.json";
-
-      const MAP_SCHEMA_VERSION = 1;
-
-      const fallbackMap = () =>
-        normalizeEditorSites({
-          version: MAP_SCHEMA_VERSION,
-          name: "blank-handcrafted",
-          description: "",
-          _design: "",
-          terrain: Array.from({ length: 126 }, () => ".".repeat(126)),
-          baseSites: [
-            { x: 10, y: 10 },
-            { x: 48, y: 12 },
-            { x: 85, y: 85 },
-            { x: 85, y: 48 },
-            { x: 85, y: 10 },
-            { x: 48, y: 85 },
-            { x: 10, y: 85 },
-            { x: 12, y: 48 },
-          ],
-        });
+      const MAP_SCHEMA_VERSION = 2;
 
       const canvas = document.getElementById("map-canvas");
       const ctx = canvas.getContext("2d");
@@ -426,170 +408,174 @@
       let map = fallbackMap();
       let selectedTool = "grass";
       let selectedMode = "paint";
-      let selectedSite = { kind: "main", index: 0 };
+      let selectedSiteId = map.sites[0].id;
+      let selectedLayoutId = map.layouts[0].id;
       let pointerDown = false;
       let dragStartTile = null;
       let dragPreviewTile = null;
       let cellSize = 10;
 
       function cloneSite(site) {
-        return { x: site.x, y: site.y };
+        return { id: site.id, kind: site.kind, x: site.x, y: site.y };
       }
 
-      function defaultAssignments() {
-        return Array.from({ length: PAIR_COUNT }, (_, i) => i);
-      }
-
-      function uniqueAssignment(assignments) {
-        const used = new Set();
-        return assignments.length === PAIR_COUNT && assignments.every((value) => {
-          if (!Number.isInteger(value) || value < 0 || value >= PAIR_COUNT || used.has(value)) {
-            return false;
-          }
-          used.add(value);
-          return true;
-        });
-      }
-
-      function buildBaseSites(mainSites, naturalSites, naturalAssignments) {
-        return mainSites.flatMap((main, i) => [
-          cloneSite(main),
-          cloneSite(naturalSites[naturalAssignments[i]]),
-        ]);
-      }
-
-      function normalizeEditorSites(rawMap) {
-        const baseSites = rawMap.baseSites.map(cloneSite);
-        const legacyPairs = Array.from({ length: PAIR_COUNT }, (_, i) => ({
-          main: baseSites[i * 2],
-          natural: baseSites[i * 2 + 1],
-        }));
-        let mainSites = Array.isArray(rawMap.mainSites)
-          ? rawMap.mainSites.slice(0, PAIR_COUNT).map(cloneSite)
-          : legacyPairs.map((pair) => pair.main);
-        let naturalSites = Array.isArray(rawMap.naturalSites)
-          ? rawMap.naturalSites.slice(0, PAIR_COUNT).map(cloneSite)
-          : legacyPairs.map((pair) => pair.natural);
-        let naturalAssignments = Array.isArray(rawMap.naturalAssignments)
-          ? rawMap.naturalAssignments.map(Number)
-          : defaultAssignments();
-
-        if (mainSites.length !== PAIR_COUNT || naturalSites.length !== PAIR_COUNT) {
-          mainSites = legacyPairs.map((pair) => pair.main);
-          naturalSites = legacyPairs.map((pair) => pair.natural);
-        }
-        if (!uniqueAssignment(naturalAssignments)) {
-          naturalAssignments = defaultAssignments();
-        }
-
+      function cloneLayout(layout) {
         return {
-          ...rawMap,
-          mainSites,
-          naturalSites,
-          naturalAssignments,
-          baseSites: buildBaseSites(mainSites, naturalSites, naturalAssignments),
+          id: layout.id,
+          playerCount: layout.playerCount,
+          slots: layout.slots.map(function (slot) {
+            return { main: slot.main, natural: slot.natural };
+          }),
         };
       }
 
-      function syncBaseSites() {
-        map.baseSites = buildBaseSites(map.mainSites, map.naturalSites, map.naturalAssignments);
+      function fallbackMap() {
+        return normalizeMap({
+          version: MAP_SCHEMA_VERSION,
+          name: "blank-handcrafted",
+          description: "",
+          _design: "",
+          terrain: Array.from({ length: 126 }, function () { return ".".repeat(126); }),
+          sites: [
+            { id: "main_nw", kind: "main", x: 25, y: 25 },
+            { id: "main_se", kind: "main", x: 100, y: 100 },
+            { id: "main_ne", kind: "main", x: 100, y: 25 },
+            { id: "main_sw", kind: "main", x: 25, y: 100 },
+            { id: "nat_top", kind: "natural", x: 63, y: 38 },
+            { id: "nat_bottom", kind: "natural", x: 63, y: 88 },
+            { id: "nat_right", kind: "natural", x: 88, y: 62 },
+            { id: "nat_left", kind: "natural", x: 38, y: 62 },
+          ],
+          layouts: [
+            {
+              id: "4p_all",
+              playerCount: 4,
+              slots: [
+                { main: "main_nw", natural: "nat_top" },
+                { main: "main_se", natural: "nat_bottom" },
+                { main: "main_ne", natural: "nat_right" },
+                { main: "main_sw", natural: "nat_left" },
+              ],
+            },
+          ],
+        });
       }
 
-      function flatIndexForSite(kind, index) {
-        if (kind === "main") return index * 2;
-        const pairedMain = map.naturalAssignments.indexOf(index);
-        return pairedMain >= 0 ? pairedMain * 2 + 1 : -1;
+      function mains() {
+        return map.sites.filter(function (site) { return site.kind === "main"; });
       }
 
-      function selectedFlatIndex() {
-        return flatIndexForSite(selectedSite.kind, selectedSite.index);
+      function naturals() {
+        return map.sites.filter(function (site) { return site.kind === "natural"; });
       }
 
-      function selectSite(kind, index) {
-        selectedSite = { kind, index };
+      function siteById(id) {
+        return map.sites.find(function (site) { return site.id === id; }) || null;
+      }
+
+      function currentLayout() {
+        return map.layouts.find(function (layout) { return layout.id === selectedLayoutId; }) || map.layouts[0] || null;
+      }
+
+      function siteRadius(site) {
+        return site.kind === "natural" ? EXPANSION_PROTECTION_RADIUS : PROTECTION_RADIUS;
+      }
+
+      function selectSite(id) {
+        selectedSiteId = id;
         selectedTool = "base";
         syncToolButtons();
         refresh();
       }
 
-      function siteBySelection() {
-        return selectedSite.kind === "main"
-          ? map.mainSites[selectedSite.index]
-          : map.naturalSites[selectedSite.index];
-      }
-
       function setSelectedSite(tile) {
-        if (selectedSite.kind === "main") {
-          map.mainSites[selectedSite.index] = cloneSite(tile);
-        } else {
-          map.naturalSites[selectedSite.index] = cloneSite(tile);
-        }
-        syncBaseSites();
+        const site = siteById(selectedSiteId);
+        if (!site) return;
+        site.x = tile.x;
+        site.y = tile.y;
       }
 
-      function assignNatural(mainIndex, naturalIndex) {
-        const previousMain = map.naturalAssignments.indexOf(naturalIndex);
-        const previousNatural = map.naturalAssignments[mainIndex];
-        map.naturalAssignments[mainIndex] = naturalIndex;
-        if (previousMain >= 0 && previousMain !== mainIndex) {
-          map.naturalAssignments[previousMain] = previousNatural;
-        }
-        syncBaseSites();
-        refresh();
+      function normalizeId(value, fallback) {
+        const id = String(value || "").trim().toLowerCase().replace(/[^a-z0-9_]+/g, "_").replace(/^_+|_+$/g, "");
+        return id || fallback;
       }
 
       function normalizeMap(raw) {
-        const version = Number.isInteger(raw.version) ? raw.version : MAP_SCHEMA_VERSION;
+        const version = Number.isInteger(raw.version) ? raw.version : 0;
+        if (version !== MAP_SCHEMA_VERSION) {
+          throw new Error("map schema version " + version + " is not supported; editor requires version " + MAP_SCHEMA_VERSION);
+        }
         const name = String(raw.name || "handcrafted-map");
         const description = String(raw.description || "");
         const design = String(raw._design || "");
         const rows = Array.isArray(raw.terrain) ? raw.terrain.map(String) : [];
         if (!rows.length) throw new Error("terrain must contain rows");
         const size = rows[0].length;
-        if (size < MIN_SIZE || size > MAX_SIZE) {
-          throw new Error(`size must be between ${MIN_SIZE} and ${MAX_SIZE}`);
-        }
+        if (size < MIN_SIZE || size > MAX_SIZE) throw new Error("size must be between " + MIN_SIZE + " and " + MAX_SIZE);
         if (rows.length !== size) throw new Error("terrain must be square");
-        for (const [y, row] of rows.entries()) {
-          if (row.length !== size) throw new Error(`row ${y} has the wrong width`);
+        for (const pair of rows.entries()) {
+          const y = pair[0];
+          const row = pair[1];
+          if (row.length !== size) throw new Error("row " + y + " has the wrong width");
           for (const ch of row) {
-            if (ch !== "." && ch !== "#" && ch !== "~") {
-              throw new Error(`unknown terrain character "${ch}"`);
-            }
+            if (ch !== "." && ch !== "#" && ch !== "~") throw new Error("unknown terrain character " + ch);
           }
         }
-        const baseSites = Array.isArray(raw.baseSites) ? raw.baseSites : [];
-        if (baseSites.length !== PAIR_COUNT * 2) {
-          throw new Error(`baseSites must contain ${PAIR_COUNT} mains and ${PAIR_COUNT} naturals`);
-        }
-        const sites = baseSites.map((site, i) => {
+        if (!Array.isArray(raw.sites) || raw.sites.length === 0) throw new Error("sites must contain entries");
+        const seenIds = new Set();
+        const seenCoords = new Set();
+        const sites = raw.sites.map(function (site, i) {
+          const id = normalizeId(site.id, "site_" + (i + 1));
+          const kind = site.kind === "natural" ? "natural" : site.kind === "main" ? "main" : null;
           const x = Number(site.x);
           const y = Number(site.y);
-          if (!Number.isInteger(x) || !Number.isInteger(y)) {
-            throw new Error(`baseSites[${i}] must use integer coordinates`);
-          }
-          if (x < 0 || y < 0 || x >= size || y >= size) {
-            throw new Error(`baseSites[${i}] is outside the map`);
-          }
-          return { x, y };
+          if (!kind) throw new Error("sites[" + i + "] kind must be main or natural");
+          if (seenIds.has(id)) throw new Error("duplicate site id " + id);
+          seenIds.add(id);
+          const key = x + "," + y;
+          if (seenCoords.has(key)) throw new Error("duplicate site coordinate " + key);
+          seenCoords.add(key);
+          if (!Number.isInteger(x) || !Number.isInteger(y)) throw new Error("sites[" + i + "] must use integer coordinates");
+          if (x < 0 || y < 0 || x >= size || y >= size) throw new Error("sites[" + i + "] is outside the map");
+          return { id: id, kind: kind, x: x, y: y };
         });
-        const normalized = normalizeEditorSites({ ...raw, version, name, description, _design: design, terrain: rows, baseSites: sites });
-        for (const [collectionName, collection] of [
-          ["mainSites", normalized.mainSites],
-          ["naturalSites", normalized.naturalSites],
-        ]) {
-          collection.forEach((site, i) => {
-            if (site.x < 0 || site.y < 0 || site.x >= size || site.y >= size) {
-              throw new Error(`${collectionName}[${i}] is outside the map`);
-            }
-          });
-        }
-        return normalized;
+        const mainIds = new Set(sites.filter(function (site) { return site.kind === "main"; }).map(function (site) { return site.id; }));
+        const naturalIds = new Set(sites.filter(function (site) { return site.kind === "natural"; }).map(function (site) { return site.id; }));
+        if (!mainIds.size || !naturalIds.size) throw new Error("map needs at least one main and one natural site");
+        if (!Array.isArray(raw.layouts) || raw.layouts.length === 0) throw new Error("layouts must contain entries");
+        const seenLayouts = new Set();
+        const layouts = raw.layouts.map(function (layout, i) {
+          const id = normalizeId(layout.id, "layout_" + (i + 1));
+          if (seenLayouts.has(id)) throw new Error("duplicate layout id " + id);
+          seenLayouts.add(id);
+          const playerCount = Number(layout.playerCount);
+          if (!Number.isInteger(playerCount) || playerCount < 1) throw new Error("layout " + id + " has invalid playerCount");
+          const slots = Array.isArray(layout.slots) ? layout.slots.map(function (slot, slotIndex) {
+            if (!mainIds.has(slot.main)) throw new Error("layout " + id + " slot " + slotIndex + " references missing main " + slot.main);
+            if (!naturalIds.has(slot.natural)) throw new Error("layout " + id + " slot " + slotIndex + " references missing natural " + slot.natural);
+            return { main: slot.main, natural: slot.natural };
+          }) : [];
+          if (slots.length !== playerCount) throw new Error("layout " + id + " slot count must match playerCount");
+          validateUniqueSlots(id, slots);
+          return { id: id, playerCount: playerCount, slots: slots };
+        });
+        return { version: version, name: name, description: description, _design: design, terrain: rows, sites: sites, layouts: layouts };
       }
 
-      function setStatus(text, bad = false) {
+      function validateUniqueSlots(layoutId, slots) {
+        const usedMains = new Set();
+        const usedNaturals = new Set();
+        for (const slot of slots) {
+          if (usedMains.has(slot.main)) throw new Error("layout " + layoutId + " assigns main " + slot.main + " more than once");
+          if (usedNaturals.has(slot.natural)) throw new Error("layout " + layoutId + " assigns natural " + slot.natural + " more than once");
+          usedMains.add(slot.main);
+          usedNaturals.add(slot.natural);
+        }
+      }
+
+      function setStatus(text, bad) {
         statusEl.textContent = text;
-        statusEl.classList.toggle("bad", bad);
+        statusEl.classList.toggle("bad", !!bad);
       }
 
       function terrainAt(x, y) {
@@ -602,19 +588,17 @@
       }
 
       function isProtected(x, y) {
-        return map.baseSites.some((site, i) => {
-          const r = siteRadius(i);
+        return map.sites.some(function (site) {
+          const r = siteRadius(site);
           return Math.abs(site.x - x) <= r && Math.abs(site.y - y) <= r;
         });
       }
 
-      function clearProtectedArea(site, i) {
-        const r = siteRadius(i);
+      function clearProtectedArea(site) {
+        const r = siteRadius(site);
         for (let y = site.y - r; y <= site.y + r; y++) {
           for (let x = site.x - r; x <= site.x + r; x++) {
-            if (x >= 0 && y >= 0 && x < map.terrain.length && y < map.terrain.length) {
-              setTerrainAt(x, y, TERRAIN.grass);
-            }
+            if (x >= 0 && y >= 0 && x < map.terrain.length && y < map.terrain.length) setTerrainAt(x, y, TERRAIN.grass);
           }
         }
       }
@@ -622,43 +606,45 @@
       function validationErrors() {
         const errors = [];
         const size = map.terrain.length;
-        const seen = new Set();
-        map.baseSites.forEach((site, i) => {
-          const key = `${site.x},${site.y}`;
-          if (seen.has(key)) errors.push(`duplicate base site ${i + 1}`);
-          seen.add(key);
-          const r = siteRadius(i);
-          if (
-            site.x < r ||
-            site.y < r ||
-            site.x >= size - r ||
-            site.y >= size - r
-          ) {
-            errors.push(`base ${i + 1} too close to edge`);
-          }
+        const seenCoords = new Set();
+        for (const site of map.sites) {
+          const key = site.x + "," + site.y;
+          if (seenCoords.has(key)) errors.push("duplicate site coordinate " + key);
+          seenCoords.add(key);
+          const r = siteRadius(site);
+          if (site.x < r || site.y < r || site.x >= size - r || site.y >= size - r) errors.push(site.id + " too close to edge");
           for (let y = site.y - r; y <= site.y + r; y++) {
             for (let x = site.x - r; x <= site.x + r; x++) {
               if (x < 0 || y < 0 || x >= size || y >= size) continue;
               if (terrainAt(x, y) !== TERRAIN.grass) {
-                errors.push(`base ${i + 1} protected zone blocked`);
-                return;
+                errors.push(site.id + " protected zone blocked");
+                y = site.y + r + 1;
+                break;
               }
             }
           }
-        });
-        if (!uniqueAssignment(map.naturalAssignments)) {
-          errors.push("each main must use a unique natural");
+        }
+        const mainIds = new Set(mains().map(function (site) { return site.id; }));
+        const naturalIds = new Set(naturals().map(function (site) { return site.id; }));
+        for (const layout of map.layouts) {
+          if (layout.slots.length !== layout.playerCount) errors.push(layout.id + " slot count mismatch");
+          const usedMains = new Set();
+          const usedNaturals = new Set();
+          for (const slot of layout.slots) {
+            if (!mainIds.has(slot.main)) errors.push(layout.id + " missing main " + slot.main);
+            if (!naturalIds.has(slot.natural)) errors.push(layout.id + " missing natural " + slot.natural);
+            if (usedMains.has(slot.main)) errors.push(layout.id + " repeats main " + slot.main);
+            if (usedNaturals.has(slot.natural)) errors.push(layout.id + " repeats natural " + slot.natural);
+            usedMains.add(slot.main);
+            usedNaturals.add(slot.natural);
+          }
         }
         return errors;
       }
 
       function updateStatus() {
         const errors = validationErrors();
-        if (errors.length) {
-          setStatus(errors[0], true);
-        } else {
-          setStatus(`${map.terrain.length}x${map.terrain.length} valid`);
-        }
+        setStatus(errors.length ? errors[0] : map.terrain.length + "x" + map.terrain.length + " valid", errors.length > 0);
       }
 
       function draw() {
@@ -688,8 +674,8 @@
           ctx.stroke();
         }
 
-        map.baseSites.forEach((site, i) => {
-          const r = siteRadius(i);
+        for (const site of map.sites) {
+          const r = siteRadius(site);
           const x = (site.x - r) * cellSize;
           const y = (site.y - r) * cellSize;
           const w = (r * 2 + 1) * cellSize;
@@ -697,30 +683,44 @@
           ctx.fillRect(x, y, w, w);
           ctx.strokeStyle = COLORS.protectEdge;
           ctx.strokeRect(x + 0.5, y + 0.5, w - 1, w - 1);
-        });
+        }
 
-        const selectedIndex = selectedFlatIndex();
-        map.baseSites.forEach((site, i) => {
+        const layout = currentLayout();
+        if (layout) {
+          ctx.strokeStyle = COLORS.pairLine;
+          ctx.lineWidth = 2;
+          for (const slot of layout.slots) {
+            const main = siteById(slot.main);
+            const natural = siteById(slot.natural);
+            if (!main || !natural) continue;
+            ctx.beginPath();
+            ctx.moveTo(main.x * cellSize + cellSize / 2, main.y * cellSize + cellSize / 2);
+            ctx.lineTo(natural.x * cellSize + cellSize / 2, natural.y * cellSize + cellSize / 2);
+            ctx.stroke();
+          }
+        }
+
+        const mainIds = mains().map(function (site) { return site.id; });
+        const naturalIds = naturals().map(function (site) { return site.id; });
+        for (const site of map.sites) {
           const cx = site.x * cellSize + cellSize / 2;
           const cy = site.y * cellSize + cellSize / 2;
           const radius = Math.max(5, cellSize * 0.58);
-          const isMain = i % 2 === 0;
+          const isMain = site.kind === "main";
+          const index = (isMain ? mainIds : naturalIds).indexOf(site.id) + 1;
           ctx.fillStyle = isMain ? COLORS.start : COLORS.expansion;
-          ctx.strokeStyle = i === selectedIndex ? "#ffffff" : "#11110f";
-          ctx.lineWidth = i === selectedIndex ? 3 : 2;
+          ctx.strokeStyle = site.id === selectedSiteId ? "#ffffff" : "#11110f";
+          ctx.lineWidth = site.id === selectedSiteId ? 3 : 2;
           ctx.beginPath();
           ctx.arc(cx, cy, radius, 0, Math.PI * 2);
           ctx.fill();
           ctx.stroke();
           ctx.fillStyle = COLORS.baseText;
-          ctx.font = `700 ${Math.max(10, Math.floor(cellSize * 0.95))}px ${getComputedStyle(document.body).fontFamily}`;
+          ctx.font = "700 " + Math.max(10, Math.floor(cellSize * 0.95)) + "px " + getComputedStyle(document.body).fontFamily;
           ctx.textAlign = "center";
           ctx.textBaseline = "middle";
-          const label = isMain
-            ? `M${Math.floor(i / 2) + 1}`
-            : `N${map.naturalAssignments[Math.floor(i / 2)] + 1}`;
-          ctx.fillText(label, cx, cy + 0.5);
-        });
+          ctx.fillText((isMain ? "M" : "N") + index, cx, cy + 0.5);
+        }
 
         if (pointerDown && selectedMode === "box" && selectedTool !== "base" && dragStartTile && dragPreviewTile) {
           const rect = tileRect(dragStartTile, dragPreviewTile);
@@ -728,62 +728,53 @@
           ctx.fillRect(rect.x0 * cellSize, rect.y0 * cellSize, rect.w * cellSize, rect.h * cellSize);
           ctx.strokeStyle = "#e7dfc5";
           ctx.lineWidth = 2;
-          ctx.strokeRect(
-            rect.x0 * cellSize + 1,
-            rect.y0 * cellSize + 1,
-            rect.w * cellSize - 2,
-            rect.h * cellSize - 2,
-          );
+          ctx.strokeRect(rect.x0 * cellSize + 1, rect.y0 * cellSize + 1, rect.w * cellSize - 2, rect.h * cellSize - 2);
         }
       }
 
       function renderBaseList() {
         pairListEl.replaceChildren();
         naturalListEl.replaceChildren();
-        map.mainSites.forEach((site, i) => {
-          const row = document.createElement("div");
-          row.tabIndex = 0;
-          row.className = `base-row pair-row${selectedSite.kind === "main" && i === selectedSite.index ? " active" : ""}`;
-          const options = map.naturalSites.map((_, naturalIndex) => `
-            <option value="${naturalIndex}"${map.naturalAssignments[i] === naturalIndex ? " selected" : ""}>
-              Natural ${naturalIndex + 1}
-            </option>
-          `).join("");
-          row.innerHTML = `
-            <span>
-              <span class="base-name">Main ${i + 1}</span>
-              <span class="base-kind">${site.x},${site.y} - paired with natural ${map.naturalAssignments[i] + 1}</span>
-            </span>
-            <select aria-label="Natural for main ${i + 1}">${options}</select>
-          `;
-          row.addEventListener("click", (event) => {
-            if (event.target.tagName !== "SELECT") selectSite("main", i);
-          });
-          row.addEventListener("keydown", (event) => {
-            if (event.key === "Enter" || event.key === " ") {
-              event.preventDefault();
-              selectSite("main", i);
-            }
-          });
-          row.querySelector("select").addEventListener("change", (event) => {
-            assignNatural(i, Number(event.target.value));
-          });
-          pairListEl.appendChild(row);
+        const layout = currentLayout();
+        const layoutSelect = document.createElement("select");
+        layoutSelect.setAttribute("aria-label", "Spawn layout");
+        for (const entry of map.layouts) {
+          const opt = document.createElement("option");
+          opt.value = entry.id;
+          opt.textContent = entry.id + " (" + entry.playerCount + "p)";
+          layoutSelect.appendChild(opt);
+        }
+        layoutSelect.value = layout ? layout.id : "";
+        layoutSelect.addEventListener("change", function (event) {
+          selectedLayoutId = event.target.value;
+          refresh();
         });
+        pairListEl.appendChild(layoutSelect);
 
-        map.naturalSites.forEach((site, i) => {
-          const pairedMain = map.naturalAssignments.indexOf(i);
+        if (layout) {
+          layout.slots.forEach(function (slot, i) {
+            const row = document.createElement("div");
+            row.className = "base-row pair-row";
+            const mainOptions = mains().map(function (site) {
+              return '<option value="' + site.id + '"' + (slot.main === site.id ? ' selected' : '') + '>' + site.id + '</option>';
+            }).join("");
+            const naturalOptions = naturals().map(function (site) {
+              return '<option value="' + site.id + '"' + (slot.natural === site.id ? ' selected' : '') + '>' + site.id + '</option>';
+            }).join("");
+            row.innerHTML = '<span><span class="base-name">Slot ' + (i + 1) + '</span><span class="base-kind">' + slot.main + ' -> ' + slot.natural + '</span></span><span><select aria-label="Main for slot ' + (i + 1) + '">' + mainOptions + '</select><select aria-label="Natural for slot ' + (i + 1) + '">' + naturalOptions + '</select></span>';
+            const selects = row.querySelectorAll("select");
+            selects[0].addEventListener("change", function (event) { slot.main = event.target.value; refresh(); });
+            selects[1].addEventListener("change", function (event) { slot.natural = event.target.value; refresh(); });
+            pairListEl.appendChild(row);
+          });
+        }
+
+        map.sites.forEach(function (site) {
           const row = document.createElement("button");
           row.type = "button";
-          row.className = `base-row${selectedSite.kind === "natural" && i === selectedSite.index ? " active" : ""}`;
-          row.innerHTML = `
-            <span>
-              <span class="base-name">Natural ${i + 1}</span>
-              <span class="base-kind">used by main ${pairedMain + 1}</span>
-            </span>
-            <span class="base-coord">${site.x},${site.y}</span>
-          `;
-          row.addEventListener("click", () => selectSite("natural", i));
+          row.className = "base-row" + (selectedSiteId === site.id ? " active" : "");
+          row.innerHTML = '<span><span class="base-name">' + site.id + '</span><span class="base-kind">' + site.kind + '</span></span><span class="base-coord">' + site.x + ',' + site.y + '</span>';
+          row.addEventListener("click", function () { selectSite(site.id); });
           naturalListEl.appendChild(row);
         });
       }
@@ -791,19 +782,21 @@
       function refresh() {
         mapNameEl.textContent = map.name;
         sizeInput.value = String(map.terrain.length);
+        if (!siteById(selectedSiteId) && map.sites[0]) selectedSiteId = map.sites[0].id;
+        if (!currentLayout() && map.layouts[0]) selectedLayoutId = map.layouts[0].id;
         renderBaseList();
         draw();
         updateStatus();
       }
 
       function syncToolButtons() {
-        document.querySelectorAll("[data-tool]").forEach((button) => {
+        document.querySelectorAll("[data-tool]").forEach(function (button) {
           button.classList.toggle("active", button.dataset.tool === selectedTool);
         });
       }
 
       function syncModeButtons() {
-        document.querySelectorAll("[data-mode]").forEach((button) => {
+        document.querySelectorAll("[data-mode]").forEach(function (button) {
           button.classList.toggle("active", button.dataset.mode === selectedMode);
         });
       }
@@ -814,7 +807,7 @@
         const y = Math.floor((event.clientY - rect.top) / cellSize);
         const size = map.terrain.length;
         if (x < 0 || y < 0 || x >= size || y >= size) return null;
-        return { x, y };
+        return { x: x, y: y };
       }
 
       function tileRect(a, b) {
@@ -822,18 +815,18 @@
         const y0 = Math.min(a.y, b.y);
         const x1 = Math.max(a.x, b.x);
         const y1 = Math.max(a.y, b.y);
-        return { x0, y0, x1, y1, w: x1 - x0 + 1, h: y1 - y0 + 1 };
+        return { x0: x0, y0: y0, x1: x1, y1: y1, w: x1 - x0 + 1, h: y1 - y0 + 1 };
       }
 
       function applyTool(tile) {
         if (!tile) return;
         if (selectedTool === "base") {
           setSelectedSite(tile);
-          clearProtectedArea(siteBySelection(), selectedFlatIndex());
+          const site = siteById(selectedSiteId);
+          if (site) clearProtectedArea(site);
           refresh();
           return;
         }
-
         const ch = TERRAIN[selectedTool];
         if (!ch) return;
         if (ch !== TERRAIN.grass && isProtected(tile.x, tile.y)) {
@@ -853,19 +846,12 @@
         let skipped = 0;
         for (let y = rect.y0; y <= rect.y1; y++) {
           for (let x = rect.x0; x <= rect.x1; x++) {
-            if (ch !== TERRAIN.grass && isProtected(x, y)) {
-              skipped++;
-              continue;
-            }
+            if (ch !== TERRAIN.grass && isProtected(x, y)) { skipped++; continue; }
             setTerrainAt(x, y, ch);
           }
         }
         draw();
-        if (skipped > 0) {
-          setStatus("protected base zones must stay grass", true);
-        } else {
-          updateStatus();
-        }
+        skipped > 0 ? setStatus("protected base zones must stay grass", true) : updateStatus();
       }
 
       function resizeMap(nextSize) {
@@ -874,68 +860,57 @@
         const rows = [];
         for (let y = 0; y < size; y++) {
           let row = "";
-          for (let x = 0; x < size; x++) {
-            row += x < oldSize && y < oldSize ? terrainAt(x, y) : TERRAIN.grass;
-          }
+          for (let x = 0; x < size; x++) row += x < oldSize && y < oldSize ? terrainAt(x, y) : TERRAIN.grass;
           rows.push(row);
         }
         map.terrain = rows;
-        map.mainSites = map.mainSites.map((site) => {
-          const r = PROTECTION_RADIUS;
-          return {
-            x: Math.max(r, Math.min(size - r - 1, site.x)),
-            y: Math.max(r, Math.min(size - r - 1, site.y)),
-          };
+        map.sites.forEach(function (site) {
+          const r = siteRadius(site);
+          site.x = Math.max(r, Math.min(size - r - 1, site.x));
+          site.y = Math.max(r, Math.min(size - r - 1, site.y));
         });
-        map.naturalSites = map.naturalSites.map((site) => {
-          const r = EXPANSION_PROTECTION_RADIUS;
-          return {
-            x: Math.max(r, Math.min(size - r - 1, site.x)),
-            y: Math.max(r, Math.min(size - r - 1, site.y)),
-          };
-        });
-        syncBaseSites();
-        map.baseSites.forEach(clearProtectedArea);
+        map.sites.forEach(clearProtectedArea);
         refresh();
       }
 
       async function loadDefault() {
         try {
           const response = await fetch(DEFAULT_MAP_URL, { cache: "no-store" });
-          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          if (!response.ok) throw new Error("HTTP " + response.status);
           map = normalizeMap(await response.json());
-          map.baseSites.forEach(clearProtectedArea);
+          selectedSiteId = map.sites[0].id;
+          selectedLayoutId = map.layouts[0].id;
+          map.sites.forEach(clearProtectedArea);
           refresh();
         } catch (err) {
           map = fallbackMap();
+          selectedSiteId = map.sites[0].id;
+          selectedLayoutId = map.layouts[0].id;
           refresh();
-          setStatus(`default fetch failed: ${err.message}`, true);
+          setStatus("default fetch failed: " + err.message, true);
         }
       }
 
-      function saveMap() {
-        const errors = validationErrors();
-        if (errors.length) {
-          setStatus(errors[0], true);
-          return;
-        }
-        const payload = {
+      function payload() {
+        return {
           version: MAP_SCHEMA_VERSION,
           name: map.name || "handcrafted-map",
           description: map.description || "",
           _design: map._design || "",
           terrain: map.terrain,
-          baseSites: map.baseSites,
-          mainSites: map.mainSites,
-          naturalSites: map.naturalSites,
-          naturalAssignments: map.naturalAssignments,
+          sites: map.sites.map(cloneSite),
+          layouts: map.layouts.map(cloneLayout),
         };
-        const blob = new Blob([JSON.stringify(payload, null, 2) + "\n"], {
-          type: "application/json",
-        });
+      }
+
+      function saveMap() {
+        const errors = validationErrors();
+        if (errors.length) { setStatus(errors[0], true); return; }
+        const out = payload();
+        const blob = new Blob([JSON.stringify(out, null, 2) + "\n"], { type: "application/json" });
         const link = document.createElement("a");
         link.href = URL.createObjectURL(blob);
-        link.download = `${payload.name || "map"}.json`;
+        link.download = (out.name || "map") + ".json";
         document.body.appendChild(link);
         link.click();
         link.remove();
@@ -944,109 +919,79 @@
 
       async function saveMapAs() {
         const errors = validationErrors();
-        if (errors.length) {
-          setStatus(errors[0], true);
-          return;
-        }
+        if (errors.length) { setStatus(errors[0], true); return; }
         const suggested = map.name || "handcrafted-map";
         const raw = window.prompt("Save map as (lowercase letters, digits, hyphens):", suggested);
         if (raw === null) return;
         const name = raw.trim().toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
-        if (!name) {
-          setStatus("invalid name", true);
-          return;
-        }
-        const payload = {
-          version: MAP_SCHEMA_VERSION,
-          name,
-          description: map.description || "",
-          _design: map._design || "",
-          terrain: map.terrain,
-          baseSites: map.baseSites,
-          mainSites: map.mainSites,
-          naturalSites: map.naturalSites,
-          naturalAssignments: map.naturalAssignments,
-        };
+        if (!name) { setStatus("invalid name", true); return; }
+        const out = payload();
+        out.name = name;
         try {
-          setStatus("saving…");
+          setStatus("saving...");
           const resp = await fetch("/maps/save", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ name, payload }),
+            body: JSON.stringify({ name: name, payload: out }),
           });
-          if (!resp.ok) {
-            const msg = await resp.text();
-            setStatus(`save failed: ${msg}`, true);
-            return;
-          }
+          if (!resp.ok) { setStatus("save failed: " + await resp.text(), true); return; }
           map.name = name;
           refresh();
-          setStatus(`saved as ${name}.json`);
+          setStatus("saved as " + name + ".json");
         } catch (err) {
-          setStatus(`save error: ${err.message}`, true);
+          setStatus("save error: " + err.message, true);
         }
       }
 
-      document.getElementById("tools").addEventListener("click", (event) => {
+      document.getElementById("tools").addEventListener("click", function (event) {
         const button = event.target.closest("[data-tool]");
         if (!button) return;
         selectedTool = button.dataset.tool;
         syncToolButtons();
       });
-
-      document.getElementById("modes").addEventListener("click", (event) => {
+      document.getElementById("modes").addEventListener("click", function (event) {
         const button = event.target.closest("[data-mode]");
         if (!button) return;
         selectedMode = button.dataset.mode;
         syncModeButtons();
       });
-
-      canvas.addEventListener("pointerdown", (event) => {
+      canvas.addEventListener("pointerdown", function (event) {
         const tile = canvasTile(event);
         if (!tile) return;
         pointerDown = true;
         dragStartTile = tile;
         dragPreviewTile = tile;
         canvas.setPointerCapture(event.pointerId);
-        if (selectedTool === "base" || selectedMode === "paint") {
-          applyTool(tile);
-        } else {
-          draw();
-        }
+        if (selectedTool === "base" || selectedMode === "paint") applyTool(tile); else draw();
       });
-      canvas.addEventListener("pointermove", (event) => {
+      canvas.addEventListener("pointermove", function (event) {
         if (!pointerDown || selectedTool === "base") return;
         const tile = canvasTile(event);
         if (!tile) return;
         dragPreviewTile = tile;
-        if (selectedMode === "paint") {
-          applyTool(tile);
-        } else {
-          draw();
-        }
+        selectedMode === "paint" ? applyTool(tile) : draw();
       });
-      canvas.addEventListener("pointerup", () => {
-        if (selectedMode === "box" && selectedTool !== "base") {
-          applyBox(dragStartTile, dragPreviewTile);
-        }
+      canvas.addEventListener("pointerup", function () {
+        if (selectedMode === "box" && selectedTool !== "base") applyBox(dragStartTile, dragPreviewTile);
         pointerDown = false;
         dragStartTile = null;
         dragPreviewTile = null;
       });
-      canvas.addEventListener("pointercancel", () => {
+      canvas.addEventListener("pointercancel", function () {
         pointerDown = false;
         dragStartTile = null;
         dragPreviewTile = null;
         draw();
       });
-
-      document.getElementById("load-file").addEventListener("click", () => fileInput.click());
-      fileInput.addEventListener("change", async () => {
+      document.getElementById("load-file").addEventListener("click", function () { fileInput.click(); });
+      fileInput.addEventListener("change", async function () {
         const file = fileInput.files && fileInput.files[0];
         if (!file) return;
         try {
           map = normalizeMap(JSON.parse(await file.text()));
-          map.baseSites.forEach(clearProtectedArea);
+          selectedSiteId = map.sites[0].id;
+          selectedLayoutId = map.layouts[0].id;
+          map.sites.forEach(clearProtectedArea);
           refresh();
         } catch (err) {
           setStatus(err.message, true);
@@ -1057,9 +1002,7 @@
       document.getElementById("save-file").addEventListener("click", saveMap);
       document.getElementById("save-as-file").addEventListener("click", saveMapAs);
       document.getElementById("reset-map").addEventListener("click", loadDefault);
-      document.getElementById("resize-map").addEventListener("click", () => {
-        resizeMap(Number(sizeInput.value));
-      });
+      document.getElementById("resize-map").addEventListener("click", function () { resizeMap(Number(sizeInput.value)); });
 
       syncToolButtons();
       syncModeButtons();

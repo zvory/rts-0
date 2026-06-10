@@ -5,8 +5,8 @@ Computer opponents are **opt-in**: a room has none unless the host adds them fro
 `setQuickstart` toggle labeled "Debug mode", which causes the next match to begin
 with 99,999 steel and 99,999 oil for every player plus a prebuilt human-only army/base loadout.
 They are capped with humans at
-`MAX_PLAYERS = 4` (the hardcoded map has enough ordered `baseSites` for four starts plus neutral
-expansions). AI players are seated after the humans in the lobby player list; their colors come
+`MAX_PLAYERS = 4` (the bundled maps have v2 spawn layouts for one through four active players).
+AI players are seated after the humans in the lobby player list; their colors come
 from the tail of `PLAYER_PALETTE` so they never collide with human colors. They persist across rematches and are cleared only when the room
 empties of humans.
 

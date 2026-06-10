@@ -1,8 +1,8 @@
 {
-  "version": 1,
+  "version": 2,
   "name": "Safer Expansions",
   "description": "inbase naturals.",
-  "_design": "Standard map, except natural expansions are placed near mains.",
+  "_design": "Standard terrain with in-base natural expansions. v2 layouts keep each main paired to its own safe natural for every player count.",
   "terrain": [
     "........................................................~~~~~~~~~~~~~~~~~~~~~.................................................",
     "........................................................~~~~~~~~~~~~~~~~~~~~~.................................................",
@@ -131,80 +131,274 @@
     "......................................................~....~~~~~~~~.~~~~~~....................................................",
     "......................................................~....~......~~~~...~...................................................."
   ],
-  "baseSites": [
+  "sites": [
     {
+      "id": "main_nw",
+      "kind": "main",
       "x": 13,
       "y": 13
     },
     {
-      "x": 38,
-      "y": 14
-    },
-    {
+      "id": "main_se",
+      "kind": "main",
       "x": 110,
       "y": 113
     },
     {
-      "x": 88,
-      "y": 116
-    },
-    {
+      "id": "main_ne",
+      "kind": "main",
       "x": 114,
       "y": 10
     },
     {
-      "x": 114,
-      "y": 41
-    },
-    {
+      "id": "main_sw",
+      "kind": "main",
       "x": 11,
       "y": 114
     },
     {
-      "x": 9,
-      "y": 80
-    }
-  ],
-  "mainSites": [
-    {
-      "x": 13,
-      "y": 13
-    },
-    {
-      "x": 110,
-      "y": 113
-    },
-    {
-      "x": 114,
-      "y": 10
-    },
-    {
-      "x": 11,
-      "y": 114
-    }
-  ],
-  "naturalSites": [
-    {
+      "id": "nat_nw",
+      "kind": "natural",
       "x": 38,
       "y": 14
     },
     {
+      "id": "nat_se",
+      "kind": "natural",
       "x": 88,
       "y": 116
     },
     {
+      "id": "nat_ne",
+      "kind": "natural",
       "x": 114,
       "y": 41
     },
     {
+      "id": "nat_sw",
+      "kind": "natural",
       "x": 9,
       "y": 80
     }
   ],
-  "naturalAssignments": [
-    0,
-    1,
-    2,
-    3
+  "layouts": [
+    {
+      "id": "1p_nw",
+      "playerCount": 1,
+      "slots": [
+        {
+          "main": "main_nw",
+          "natural": "nat_nw"
+        }
+      ]
+    },
+    {
+      "id": "1p_se",
+      "playerCount": 1,
+      "slots": [
+        {
+          "main": "main_se",
+          "natural": "nat_se"
+        }
+      ]
+    },
+    {
+      "id": "1p_ne",
+      "playerCount": 1,
+      "slots": [
+        {
+          "main": "main_ne",
+          "natural": "nat_ne"
+        }
+      ]
+    },
+    {
+      "id": "1p_sw",
+      "playerCount": 1,
+      "slots": [
+        {
+          "main": "main_sw",
+          "natural": "nat_sw"
+        }
+      ]
+    },
+    {
+      "id": "2p_nw_se",
+      "playerCount": 2,
+      "slots": [
+        {
+          "main": "main_nw",
+          "natural": "nat_nw"
+        },
+        {
+          "main": "main_se",
+          "natural": "nat_se"
+        }
+      ]
+    },
+    {
+      "id": "2p_nw_ne",
+      "playerCount": 2,
+      "slots": [
+        {
+          "main": "main_nw",
+          "natural": "nat_nw"
+        },
+        {
+          "main": "main_ne",
+          "natural": "nat_ne"
+        }
+      ]
+    },
+    {
+      "id": "2p_nw_sw",
+      "playerCount": 2,
+      "slots": [
+        {
+          "main": "main_nw",
+          "natural": "nat_nw"
+        },
+        {
+          "main": "main_sw",
+          "natural": "nat_sw"
+        }
+      ]
+    },
+    {
+      "id": "2p_se_ne",
+      "playerCount": 2,
+      "slots": [
+        {
+          "main": "main_se",
+          "natural": "nat_se"
+        },
+        {
+          "main": "main_ne",
+          "natural": "nat_ne"
+        }
+      ]
+    },
+    {
+      "id": "2p_se_sw",
+      "playerCount": 2,
+      "slots": [
+        {
+          "main": "main_se",
+          "natural": "nat_se"
+        },
+        {
+          "main": "main_sw",
+          "natural": "nat_sw"
+        }
+      ]
+    },
+    {
+      "id": "2p_ne_sw",
+      "playerCount": 2,
+      "slots": [
+        {
+          "main": "main_ne",
+          "natural": "nat_ne"
+        },
+        {
+          "main": "main_sw",
+          "natural": "nat_sw"
+        }
+      ]
+    },
+    {
+      "id": "3p_nw_se_ne",
+      "playerCount": 3,
+      "slots": [
+        {
+          "main": "main_nw",
+          "natural": "nat_nw"
+        },
+        {
+          "main": "main_se",
+          "natural": "nat_se"
+        },
+        {
+          "main": "main_ne",
+          "natural": "nat_ne"
+        }
+      ]
+    },
+    {
+      "id": "3p_nw_se_sw",
+      "playerCount": 3,
+      "slots": [
+        {
+          "main": "main_nw",
+          "natural": "nat_nw"
+        },
+        {
+          "main": "main_se",
+          "natural": "nat_se"
+        },
+        {
+          "main": "main_sw",
+          "natural": "nat_sw"
+        }
+      ]
+    },
+    {
+      "id": "3p_nw_ne_sw",
+      "playerCount": 3,
+      "slots": [
+        {
+          "main": "main_nw",
+          "natural": "nat_nw"
+        },
+        {
+          "main": "main_ne",
+          "natural": "nat_ne"
+        },
+        {
+          "main": "main_sw",
+          "natural": "nat_sw"
+        }
+      ]
+    },
+    {
+      "id": "3p_se_ne_sw",
+      "playerCount": 3,
+      "slots": [
+        {
+          "main": "main_se",
+          "natural": "nat_se"
+        },
+        {
+          "main": "main_ne",
+          "natural": "nat_ne"
+        },
+        {
+          "main": "main_sw",
+          "natural": "nat_sw"
+        }
+      ]
+    },
+    {
+      "id": "4p_all",
+      "playerCount": 4,
+      "slots": [
+        {
+          "main": "main_nw",
+          "natural": "nat_nw"
+        },
+        {
+          "main": "main_se",
+          "natural": "nat_se"
+        },
+        {
+          "main": "main_ne",
+          "natural": "nat_ne"
+        },
+        {
+          "main": "main_sw",
+          "natural": "nat_sw"
+        }
+      ]
+    }
   ]
 }
