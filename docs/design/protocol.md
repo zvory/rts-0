@@ -27,7 +27,7 @@ crate.
 | `giveUp`   | — | Give up the active match. The server eliminates that player and sends their score screen. |
 | `returnToLobby` | — | Leave post-match replay playback and return a normal match room to a clean lobby for rematch setup. Ignored outside replay playback and ignored by dedicated replay rooms created for match-history/dev replay viewing. |
 | `ping`     | `ts: number` | Latency probe; server replies with `pong`. |
-| `netReport` | `report: ClientNetReport` | Periodic client-observed network/render health aggregate. Server logs it for diagnostics only; it never affects simulation state. |
+| `netReport` | `report: ClientNetReport` | Periodic client-observed network/render health aggregate. Server logs notable reports for diagnostics only; it never affects simulation state. |
 | `setReplaySpeed` | `speed: f32` | Set replay/dev-watch playback speed multiplier; ignored outside replay rooms and dev watch playback. For dev scenario watch rooms only, `0` pauses the authoritative simulation. Other accepted speeds are clamped. |
 | `stepDevTick` | — | Advance a paused dev scenario watch room by one authoritative simulation tick. Ignored outside paused dev scenario rooms. |
 | `seekReplay` | `ticksBack: u32` | Rewind a replay by N simulation ticks; pass a large value (e.g. `2^31-1`) to reset to tick 0. Ignored outside replay rooms. Compatibility wrapper around absolute replay seek. |
@@ -88,9 +88,10 @@ in a match:
   headOfLineCount: u32      // latest per-client pending-snapshot replacement count seen
 }
 ```
-The server only logs this message with the connection's `player_id` and room name. Values are
-advisory because clients are untrusted; use them to diagnose transport/browser behavior, not as
-gameplay authority.
+The server logs this message only when the aggregate contains notable lag, jitter, browser frame
+stalls, WebSocket backlog, or server tick/scheduler pressure, alongside the connection's
+`player_id` and room name. Values are advisory because clients are untrusted; use them to diagnose
+transport/browser behavior, not as gameplay authority.
 
 ### 2.2 Server → Client (`ServerMessage`)
 
