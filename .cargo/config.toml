@@ -1,8 +1,7 @@
-[build]
-# Keep normal `cargo build/test/clippy` commands fast in git worktrees.
+# Project Cargo configuration intentionally does not set `build.target-dir`.
 #
-# Without this, each `/tmp/rts-worktrees/<branch>/server` checkout writes to its
-# own `server/target` and recompiles dependencies from scratch. Cargo safely
-# serializes concurrent writers with its target-dir locks, and callers can still
-# override this with `CARGO_TARGET_DIR=/path/to/target`.
-target-dir = "/tmp/rts-cargo-target/rts-0-server"
+# Multiple agents build this repo from parallel git worktrees. A single static
+# target dir makes final binaries and test artifacts shared mutable state across
+# unrelated branches. Test/helper scripts choose an isolated per-worktree target
+# dir instead, while optional sccache support provides cross-worktree compiler
+# reuse without sharing Cargo's final artifact directory.

@@ -1,21 +1,41 @@
 #!/usr/bin/env bash
-# Run cargo with the shared server target dir used by worktree test runs.
+# Run cargo with the per-worktree server target dir used by local gate runs.
 #
-# Repo-level `.cargo/config.toml` makes normal `cargo test ...` commands use the same shared
-# cache automatically. This wrapper remains for scripts that want to print the configured target
-# dir and for callers that prefer an explicit cargo entry point.
+# Final Cargo artifacts must be isolated by worktree so unrelated branches do
+# not overwrite each other's debug binaries, test harnesses, or self-play
+# artifacts. Cross-worktree compilation reuse is handled by sccache when it is
+# installed, not by sharing Cargo's target dir.
 set -euo pipefail
 
-SHARED_TARGET_DIR="/tmp/rts-cargo-target/rts-0-server"
+repo_root="$(git rev-parse --show-toplevel)"
+repo_name="$(basename "$repo_root")"
+repo_hash="$(
+  if command -v shasum >/dev/null 2>&1; then
+    printf '%s' "$repo_root" | shasum -a 256 | awk '{ print substr($1, 1, 12) }'
+  else
+    printf '%s' "$repo_root" | cksum | awk '{ print $1 }'
+  fi
+)"
+TARGET_BASE_DIR="${RTS_CARGO_TARGET_BASE_DIR:-/tmp/rts-cargo-target}"
+WORKTREE_TARGET_DIR="$TARGET_BASE_DIR/${repo_name}-${repo_hash}-server"
 
 if [ -z "${CARGO_TARGET_DIR:-}" ]; then
-  export CARGO_TARGET_DIR="$SHARED_TARGET_DIR"
+  export CARGO_TARGET_DIR="$WORKTREE_TARGET_DIR"
 else
   export CARGO_TARGET_DIR
 fi
 
+if [ -z "${RUSTC_WRAPPER+x}" ] && command -v sccache >/dev/null 2>&1; then
+  export RUSTC_WRAPPER=sccache
+fi
+
 if [ "${1:-}" = "--print-target-dir" ]; then
   printf '%s\n' "$CARGO_TARGET_DIR"
+  exit 0
+fi
+
+if [ "${1:-}" = "--print-rustc-wrapper" ]; then
+  printf '%s\n' "${RUSTC_WRAPPER:-}"
   exit 0
 fi
 

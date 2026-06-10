@@ -21,9 +21,11 @@ Use when writing or debugging tests, or before claiming a change is done.
   enforce `rts-sim::game` internal architecture ratchets
 
 ## Invariants
-- Repo-level Cargo config uses `/tmp/rts-cargo-target/rts-0-server` as the shared target dir, so
-  plain Cargo commands in worktrees reuse dependency builds. Override with `CARGO_TARGET_DIR` if a
-  task needs an isolated cache.
+- Local gate scripts use a per-worktree Cargo target dir under `/tmp/rts-cargo-target/`, so
+  parallel worktrees do not share final binaries, test harnesses, or self-play artifacts. Override
+  with `CARGO_TARGET_DIR` if a task needs a specific target location.
+- Cross-worktree compiler reuse is provided by `sccache` when installed. `tests/run-all.sh` and
+  `scripts/cargo-shared-target.sh` enable it automatically when `RUSTC_WRAPPER` is unset.
 - Node tests need a **running** server on the test runner's private port. They are not
   `cargo test`. Start the server first.
 - `tests/run-all.sh` boots its private server with `RTS_TEST_TICK_MS=5` by default so live-server
@@ -31,7 +33,7 @@ Use when writing or debugging tests, or before claiming a change is done.
 - After any change, run all relevant Node suites + `cargo test` and confirm green. Use
   `RTS_FULL_AI_TESTS=1 cargo test` when touching AI strategy, profile-backed self-play, replay
   determinism, or balance behavior that depends on long AI matches. The commit hook silently runs
-  the fast gate; don't rely on it as your only check.
+  the full local gate; don't rely on it as your only check for changes that need `--full-ai`.
 - A suite can be skipped only when `tests/select-suites.mjs` maps the changed files away from that
   behavior and both architecture checks still pass:
   `scripts/check-crate-boundaries.mjs` and `rts-archcheck check-sim-architecture`.

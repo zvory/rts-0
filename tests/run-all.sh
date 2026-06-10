@@ -24,7 +24,8 @@
 #   tests/run-all.sh --no-client     # skip the headless-browser smoke test
 #   PORT=8090 tests/run-all.sh       # use a different port
 #   RTS_MATCH_SEED=123 tests/run-all.sh  # use a different deterministic map seed
-#   CARGO_TARGET_DIR=/path/to/target tests/run-all.sh  # override the shared Cargo cache
+#   CARGO_TARGET_DIR=/path/to/target tests/run-all.sh  # override the per-worktree Cargo target dir
+#   RUSTC_WRAPPER=sccache tests/run-all.sh             # force a compiler cache wrapper
 #   CHROME=/path/to/chrome tests/run-all.sh
 set -uo pipefail
 
@@ -33,15 +34,23 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 SERVER_DIR="$REPO_ROOT/server"
 
-# Cargo normally writes build artifacts under each worktree's server/target directory. Repo-level
-# `.cargo/config.toml` points normal Cargo commands at a shared cache so fresh worktrees do not
-# compile dependencies from scratch. Resolve the same default here so this script can find the
-# server binary deterministically; callers can still override it with CARGO_TARGET_DIR.
+# Cargo normally writes build artifacts under each worktree's server/target directory. Local gate
+# runs use a deterministic target dir under /tmp per worktree so fresh worktrees do not clutter the
+# checkout and parallel agents do not share final binaries or test artifacts. Cross-worktree
+# compiler reuse comes from sccache when installed. Callers can still override CARGO_TARGET_DIR.
 if [ -z "${CARGO_TARGET_DIR:-}" ]; then
   CARGO_TARGET_DIR="$("$REPO_ROOT/scripts/cargo-shared-target.sh" --print-target-dir)"
   export CARGO_TARGET_DIR
 else
   export CARGO_TARGET_DIR
+fi
+if [ -z "${RUSTC_WRAPPER+x}" ]; then
+  RUSTC_WRAPPER="$("$REPO_ROOT/scripts/cargo-shared-target.sh" --print-rustc-wrapper)"
+  if [ -n "$RUSTC_WRAPPER" ]; then
+    export RUSTC_WRAPPER
+  fi
+else
+  export RUSTC_WRAPPER
 fi
 SERVER_BIN="$CARGO_TARGET_DIR/debug/rts-server"
 
@@ -102,6 +111,9 @@ if [ "$NODE_MAJOR" -lt 22 ]; then
 fi
 
 info "Cargo target dir: $CARGO_TARGET_DIR"
+if [ -n "${RUSTC_WRAPPER:-}" ]; then
+  info "Rust compiler wrapper: $RUSTC_WRAPPER"
+fi
 
 FAILED=()   # human-readable names of suites that failed
 SKIPPED=()  # suites we deliberately did not run
