@@ -7,6 +7,8 @@ foundation is playable.
 
 ## Artillery
 
+Working checklist: [artillery-checklist.md](artillery-checklist.md).
+
 - Built at Gun Works.
 - Requires a late Gun Works upgrade.
 - Costs 300 steel / 100 oil.
