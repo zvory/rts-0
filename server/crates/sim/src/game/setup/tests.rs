@@ -132,8 +132,7 @@ fn debug_starting_loadout_adds_inert_enemy_at_gun_battery_without_profile() {
 
     let center_index = (DEBUG_INERT_RIFLEMAN_SCREEN_COUNT.saturating_sub(1)) as f32 * 0.5;
     for (i, (front_tiles, side_tiles, facing)) in rifle_offsets.into_iter().enumerate() {
-        let expected_side =
-            (i as f32 - center_index) * DEBUG_INERT_RIFLEMAN_SCREEN_SPACING_TILES;
+        let expected_side = (i as f32 - center_index) * DEBUG_INERT_RIFLEMAN_SCREEN_SPACING_TILES;
         assert!(
             (front_tiles - DEBUG_INERT_RIFLEMAN_SCREEN_FRONT_TILES).abs() <= 0.001,
             "rifleman screen should stand five tiles in front of the AT guns"

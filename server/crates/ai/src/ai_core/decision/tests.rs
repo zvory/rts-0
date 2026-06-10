@@ -180,6 +180,7 @@ fn observation(economy: AiEconomy, owned: Vec<AiEntitySummary>) -> AiObservation
         resources,
         visible_enemies: Vec::new(),
         pending_builds: Vec::new(),
+        upgrades: Vec::new(),
     }
 }
 
@@ -537,9 +538,10 @@ fn fast_flood_initial_affordable_proxy_uses_hidden_edge_target() {
                 tile_x,
                 tile_y,
                 ..
-            } if *building == EntityKind::Barracks => {
-                units.first().copied().map(|worker| (worker, (*tile_x, *tile_y)))
-            }
+            } if *building == EntityKind::Barracks => units
+                .first()
+                .copied()
+                .map(|worker| (worker, (*tile_x, *tile_y))),
             _ => None,
         })
         .collect();
@@ -592,9 +594,10 @@ fn fast_flood_builds_proxy_barracks_with_reserved_worker_once_affordable() {
                 tile_x,
                 tile_y,
                 ..
-            } if *building == EntityKind::Barracks => {
-                units.first().copied().map(|worker| (worker, (*tile_x, *tile_y)))
-            }
+            } if *building == EntityKind::Barracks => units
+                .first()
+                .copied()
+                .map(|worker| (worker, (*tile_x, *tile_y))),
             _ => None,
         })
         .collect();
@@ -1189,6 +1192,7 @@ fn steel_expansion_tanks_places_expansion_cc_in_range_of_whole_resource_line() {
         resources,
         visible_enemies: Vec::new(),
         pending_builds: Vec::new(),
+        upgrades: Vec::new(),
     };
 
     let mut placeable = |_: EntityKind, tx: u32, ty: u32| tx < map_size && ty < map_size;
@@ -1296,6 +1300,7 @@ fn steel_expansion_tanks_prefers_closer_natural_resource_cluster() {
         resources,
         visible_enemies: Vec::new(),
         pending_builds: Vec::new(),
+        upgrades: Vec::new(),
     };
 
     let mut placeable = |_: EntityKind, tx: u32, ty: u32| tx < map_size && ty < map_size;
@@ -1379,6 +1384,7 @@ fn expansion_site_selection_prefers_oil_over_steel_only_output() {
         resources,
         visible_enemies: Vec::new(),
         pending_builds: Vec::new(),
+        upgrades: Vec::new(),
     };
     let expansion = STEEL_EXPANSION_TANKS.expansion.unwrap();
 
@@ -1504,6 +1510,7 @@ fn steel_expansion_tanks_prefers_safer_natural_when_distances_are_similar() {
         resources,
         visible_enemies: Vec::new(),
         pending_builds: Vec::new(),
+        upgrades: Vec::new(),
     };
 
     let mut placeable = |_: EntityKind, tx: u32, ty: u32| tx < map_size && ty < map_size;
@@ -1642,7 +1649,7 @@ fn steel_expansion_tanks_builds_steelworks_before_training_at_teams() {
 }
 
 #[test]
-fn steel_expansion_tanks_balances_machine_gunner_and_at_team_training() {
+fn steel_expansion_tanks_researches_at_gun_crews_before_training_at_teams() {
     let observation = with_expansion_resources(observation(
         AiEconomy {
             steel: 500,
@@ -1656,7 +1663,7 @@ fn steel_expansion_tanks_balances_machine_gunner_and_at_team_training() {
             building(12, EntityKind::Barracks, Some(0)),
             building(13, EntityKind::Barracks, Some(0)),
             building(14, EntityKind::TrainingCentre, None),
-            building(15, EntityKind::Steelworks, None),
+            building(15, EntityKind::Steelworks, Some(0)),
             worker(60, AiEntityState::Idle),
         ],
     ));
@@ -1667,6 +1674,40 @@ fn steel_expansion_tanks_balances_machine_gunner_and_at_team_training() {
         &mut AiDecisionMemory::for_profile(&STEEL_EXPANSION_TANKS),
     );
 
+    assert!(decision.intents.contains(&AiIntent::Research {
+        upgrade: UpgradeKind::AtGunUnlock
+    }));
+    assert!(!decision.intents.contains(&AiIntent::Train {
+        kind: EntityKind::AtTeam
+    }));
+}
+
+#[test]
+fn steel_expansion_tanks_balances_machine_gunner_and_at_team_training() {
+    let mut observation = with_expansion_resources(observation(
+        AiEconomy {
+            steel: 500,
+            oil: 200,
+            supply_used: 10,
+            supply_cap: 40,
+        },
+        vec![
+            building(10, EntityKind::CityCentre, Some(0)),
+            building(11, EntityKind::CityCentre, Some(0)),
+            building(12, EntityKind::Barracks, Some(0)),
+            building(13, EntityKind::Barracks, Some(0)),
+            building(14, EntityKind::TrainingCentre, None),
+            building(15, EntityKind::Steelworks, Some(0)),
+            worker(60, AiEntityState::Idle),
+        ],
+    ));
+    observation.upgrades.push(UpgradeKind::AtGunUnlock);
+
+    let decision = decide(
+        &observation,
+        &STEEL_EXPANSION_TANKS,
+        &mut AiDecisionMemory::for_profile(&STEEL_EXPANSION_TANKS),
+    );
     assert!(decision.intents.contains(&AiIntent::Train {
         kind: EntityKind::MachineGunner
     }));
@@ -1677,7 +1718,7 @@ fn steel_expansion_tanks_balances_machine_gunner_and_at_team_training() {
 
 #[test]
 fn steel_expansion_tanks_counts_queued_machine_gunners_when_balancing_support() {
-    let observation = with_expansion_resources(observation(
+    let mut observation = with_expansion_resources(observation(
         AiEconomy {
             steel: 500,
             oil: 200,
@@ -1690,9 +1731,10 @@ fn steel_expansion_tanks_counts_queued_machine_gunners_when_balancing_support() 
             building_training(12, EntityKind::Barracks, EntityKind::MachineGunner),
             building(13, EntityKind::Barracks, Some(0)),
             building(15, EntityKind::TrainingCentre, None),
-            building(16, EntityKind::Steelworks, None),
+            building(16, EntityKind::Steelworks, Some(0)),
         ],
     ));
+    observation.upgrades.push(UpgradeKind::AtGunUnlock);
 
     let decision = decide(
         &observation,
@@ -1703,12 +1745,6 @@ fn steel_expansion_tanks_counts_queued_machine_gunners_when_balancing_support() 
     assert!(decision.intents.contains(&AiIntent::Train {
         kind: EntityKind::AtTeam
     }));
-    assert!(
-        !decision.intents.contains(&AiIntent::Train {
-            kind: EntityKind::MachineGunner
-        }),
-        "pending machine gunners should count toward the support mix"
-    );
 }
 
 #[test]
@@ -1949,7 +1985,7 @@ fn steel_expansion_tanks_switches_to_factory_at_fifty_supply() {
 
 #[test]
 fn steel_expansion_tanks_trains_only_tanks_after_fifty_supply() {
-    let observation = with_expansion_resources(observation(
+    let mut observation = with_expansion_resources(observation(
         AiEconomy {
             steel: 500,
             oil: 300,
@@ -1965,6 +2001,7 @@ fn steel_expansion_tanks_trains_only_tanks_after_fifty_supply() {
             building(15, EntityKind::Steelworks, None),
         ],
     ));
+    observation.upgrades.push(UpgradeKind::TankUnlock);
 
     let decision = decide(
         &observation,
@@ -2129,7 +2166,7 @@ fn full_saturation_builds_factory_after_expansion_is_planned() {
 
 #[test]
 fn full_saturation_trains_tanks_after_tech_transition_completes() {
-    let observation = with_expansion_resources(observation(
+    let mut observation = with_expansion_resources(observation(
         AiEconomy {
             steel: 300,
             oil: 150,
@@ -2145,6 +2182,7 @@ fn full_saturation_trains_tanks_after_tech_transition_completes() {
             building(15, EntityKind::Steelworks, None),
         ],
     ));
+    observation.upgrades.push(UpgradeKind::TankUnlock);
 
     let decision = decide(
         &observation,
@@ -2162,7 +2200,7 @@ fn full_saturation_trains_tanks_after_tech_transition_completes() {
 
 #[test]
 fn tech_to_tanks_trains_tank_before_spending_barracks_budget() {
-    let observation = observation(
+    let mut observation = observation(
         AiEconomy {
             steel: 300,
             oil: 150,
@@ -2174,13 +2212,14 @@ fn tech_to_tanks_trains_tank_before_spending_barracks_budget() {
             building(11, EntityKind::Barracks, Some(0)),
             building(12, EntityKind::TrainingCentre, None),
             building(13, EntityKind::Factory, Some(0)),
-            building(14, EntityKind::Steelworks, None),
+            building(14, EntityKind::Steelworks, Some(0)),
             worker(20, AiEntityState::Gather),
             worker(21, AiEntityState::Gather),
             worker(22, AiEntityState::Gather),
             worker(23, AiEntityState::Gather),
         ],
     );
+    observation.upgrades.push(UpgradeKind::TankUnlock);
 
     let decision = decide(
         &observation,
@@ -2211,13 +2250,14 @@ fn infantry_heavy_home_threat_prefers_machine_gunners_before_tanks() {
             building(11, EntityKind::Barracks, Some(0)),
             building(12, EntityKind::TrainingCentre, None),
             building(13, EntityKind::Factory, Some(0)),
-            building(14, EntityKind::Steelworks, None),
+            building(14, EntityKind::Steelworks, Some(0)),
             worker(20, AiEntityState::Gather),
             worker(21, AiEntityState::Gather),
             worker(22, AiEntityState::Gather),
             worker(23, AiEntityState::Gather),
         ],
     );
+    observation.upgrades.push(UpgradeKind::AtGunUnlock);
     observation
         .visible_enemies
         .push(enemy(90, EntityKind::Rifleman, 10.5 * ts, 10.5 * ts));
@@ -2262,6 +2302,7 @@ fn lone_rifle_near_base_does_not_trigger_defensive_panic() {
             worker(21, AiEntityState::Gather),
         ],
     );
+    observation.upgrades.push(UpgradeKind::AtGunUnlock);
     observation
         .visible_enemies
         .push(enemy(90, EntityKind::Rifleman, 10.5 * ts, 10.5 * ts));
@@ -2292,13 +2333,14 @@ fn armor_heavy_home_threat_prefers_at_teams_before_tanks() {
             building(11, EntityKind::Barracks, Some(0)),
             building(12, EntityKind::TrainingCentre, None),
             building(13, EntityKind::Factory, Some(0)),
-            building(14, EntityKind::Steelworks, None),
+            building(14, EntityKind::Steelworks, Some(0)),
             worker(20, AiEntityState::Gather),
             worker(21, AiEntityState::Gather),
             worker(22, AiEntityState::Gather),
             worker(23, AiEntityState::Gather),
         ],
     );
+    observation.upgrades.push(UpgradeKind::AtGunUnlock);
     observation
         .visible_enemies
         .push(enemy(90, EntityKind::Tank, 10.5 * ts, 10.5 * ts));

@@ -208,13 +208,9 @@ fn measure_vehicle_small_block_clear_time(
     pair_count: usize,
     blocker: Option<EntityKind>,
 ) -> VehicleSmallBlockTiming {
-    let setup = Game::new_vehicle_small_block_baseline_scenario(
-        vehicle,
-        pair_count,
-        blocker,
-        0x5150_0004,
-    )
-    .expect("scenario setup should succeed");
+    let setup =
+        Game::new_vehicle_small_block_baseline_scenario(vehicle, pair_count, blocker, 0x5150_0004)
+            .expect("scenario setup should succeed");
     let mut game = setup.game;
     let units = setup.units;
     game.enqueue(
@@ -400,12 +396,7 @@ fn experimental_direct_reverse_and_corner_wall_clear_time_matrix() {
         match (result.clear_ticks, result.clear_seconds) {
             (Some(ticks), Some(seconds)) => println!(
                 "{:>24} | {:>14} | {:>5} | {:>11} | {:>13.2} | {:?}",
-                result.scenario,
-                result.unit,
-                result.count,
-                ticks,
-                seconds,
-                result.final_state
+                result.scenario, result.unit, result.count, ticks, seconds, result.final_state
             ),
             _ => println!(
                 "{:>24} | {:>14} | {:>5} | {:>11} | {:>13} | {:?}",
@@ -425,13 +416,9 @@ fn assert_vehicle_small_block_baseline_setup(
     pair_count: usize,
     blocker: Option<EntityKind>,
 ) {
-    let setup = Game::new_vehicle_small_block_baseline_scenario(
-        vehicle,
-        pair_count,
-        blocker,
-        0x5150_0004,
-    )
-    .expect("scenario setup should succeed");
+    let setup =
+        Game::new_vehicle_small_block_baseline_scenario(vehicle, pair_count, blocker, 0x5150_0004)
+            .expect("scenario setup should succeed");
     assert_eq!(
         setup.units.len(),
         pair_count,
@@ -491,8 +478,7 @@ fn assert_vehicle_small_block_baseline_setup(
         );
     }
     if blocker.is_some() {
-        for (vehicle_pos, blocker_pos) in vehicle_positions.iter().zip(blocker_positions.iter())
-        {
+        for (vehicle_pos, blocker_pos) in vehicle_positions.iter().zip(blocker_positions.iter()) {
             assert!(
                 (vehicle_pos.0 - blocker_pos.0).abs() <= 0.001,
                 "{vehicle} blocker should be directly north on the same x"

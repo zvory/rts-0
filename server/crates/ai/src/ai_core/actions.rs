@@ -7,6 +7,7 @@ use crate::config;
 use rts_rules;
 use rts_sim::game::command::SimCommand as Command;
 use rts_sim::game::entity::EntityKind;
+use rts_sim::game::upgrade::{self, UpgradeKind};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct SpendBudget {
@@ -71,6 +72,11 @@ impl SpendBudget {
         }
         let (steel, oil) = rts_rules::economy::cost(kind);
         self.reserve_cost(steel, oil, 0)
+    }
+
+    pub(crate) fn reserve_upgrade(&mut self, kind: UpgradeKind) -> bool {
+        let definition = upgrade::definition(kind);
+        self.reserve_cost(definition.cost_steel, definition.cost_oil, 0)
     }
 
     fn reserve_cost(&mut self, steel: u32, oil: u32, supply: u32) -> bool {
@@ -244,6 +250,7 @@ pub(crate) struct TrainUnitsRequest<'a> {
     pub(crate) buildings: &'a [ProductionBuildingFact],
     pub(crate) unit_priorities: &'a [EntityKind],
     pub(crate) completed_building_kinds: &'a [EntityKind],
+    pub(crate) completed_upgrades: &'a [UpgradeKind],
     pub(crate) max_queue_depth: usize,
     pub(crate) save_for_tech: bool,
     pub(crate) current_counts: &'a [(EntityKind, usize)],
@@ -255,6 +262,38 @@ pub(crate) struct TrainUnitsRequest<'a> {
 pub(crate) struct TrainAction {
     pub(crate) building: u32,
     pub(crate) unit: EntityKind,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct ResearchAction {
+    pub(crate) building: u32,
+    pub(crate) upgrade: UpgradeKind,
+}
+
+pub(crate) fn try_research_upgrade(
+    ctx: &mut AiActionContext<'_>,
+    buildings: &[ProductionBuildingFact],
+    upgrade: UpgradeKind,
+) -> Option<ResearchAction> {
+    let definition = upgrade::definition(upgrade);
+    let building = buildings
+        .iter()
+        .find(|building| building.kind == definition.researched_at && building.queue_len == 0)?;
+    if ctx.reservations.production_building_reserved(building.id) {
+        return None;
+    }
+    if !ctx.budget.reserve_upgrade(upgrade) {
+        return None;
+    }
+    ctx.reservations.reserve_production_building(building.id);
+    ctx.emit_command(Command::Research {
+        building: building.id,
+        upgrade,
+    });
+    Some(ResearchAction {
+        building: building.id,
+        upgrade,
+    })
 }
 
 pub(crate) fn train_units(
@@ -278,15 +317,16 @@ pub(crate) fn train_units(
             continue;
         }
 
-        let Some(unit) = train_unit_choice(
-            request.unit_priorities,
-            rts_rules::economy::trainable_units(building.kind),
-            request.completed_building_kinds,
-            &current_counts,
-            &max_counts,
-            request.balance_unit_priorities,
-            &ctx.budget,
-        ) else {
+        let Some(unit) = train_unit_choice(TrainUnitChoiceRequest {
+            unit_priorities: request.unit_priorities,
+            trainable: rts_rules::economy::trainable_units(building.kind),
+            completed_building_kinds: request.completed_building_kinds,
+            completed_upgrades: request.completed_upgrades,
+            current_counts: &current_counts,
+            max_counts: &max_counts,
+            balance_unit_priorities: request.balance_unit_priorities,
+            budget: &ctx.budget,
+        }) else {
             continue;
         };
 
@@ -308,38 +348,58 @@ pub(crate) fn train_units(
     trained
 }
 
-fn train_unit_choice(
-    unit_priorities: &[EntityKind],
-    trainable: &[EntityKind],
-    completed_building_kinds: &[EntityKind],
-    current_counts: &BTreeMap<EntityKind, usize>,
-    max_counts: &BTreeMap<EntityKind, usize>,
+struct TrainUnitChoiceRequest<'a> {
+    unit_priorities: &'a [EntityKind],
+    trainable: &'a [EntityKind],
+    completed_building_kinds: &'a [EntityKind],
+    completed_upgrades: &'a [UpgradeKind],
+    current_counts: &'a BTreeMap<EntityKind, usize>,
+    max_counts: &'a BTreeMap<EntityKind, usize>,
     balance_unit_priorities: bool,
-    budget: &SpendBudget,
-) -> Option<EntityKind> {
-    let eligible = unit_priorities
-        .iter()
-        .copied()
-        .enumerate()
-        .filter(|(_, unit)| trainable.contains(unit))
-        .filter(|(_, unit)| {
-            rts_rules::economy::train_requirement_met(*unit, completed_building_kinds)
-        })
-        .filter(|(_, unit)| {
-            let current = current_counts.get(unit).copied().unwrap_or(0);
-            max_counts
-                .get(unit)
-                .map(|max| current < *max)
-                .unwrap_or(true)
-                && budget.can_afford_unit(*unit)
-        });
+    budget: &'a SpendBudget,
+}
 
-    if balance_unit_priorities {
+fn train_unit_choice(request: TrainUnitChoiceRequest<'_>) -> Option<EntityKind> {
+    let mut eligible = Vec::new();
+    for (index, unit) in request.unit_priorities.iter().copied().enumerate() {
+        if !request.trainable.contains(&unit) {
+            continue;
+        }
+        if !rts_rules::economy::train_requirement_met(unit, request.completed_building_kinds) {
+            continue;
+        }
+        if upgrade::required_for_unit(unit)
+            .is_some_and(|upgrade| !request.completed_upgrades.contains(&upgrade))
+        {
+            continue;
+        }
+        let current = request.current_counts.get(&unit).copied().unwrap_or(0);
+        if request
+            .max_counts
+            .get(&unit)
+            .map(|max| current >= *max)
+            .unwrap_or(false)
+        {
+            continue;
+        }
+        if !request.budget.can_afford_unit(unit) {
+            continue;
+        }
+        eligible.push((index, unit));
+    }
+
+    if request.balance_unit_priorities {
         eligible
-            .min_by_key(|(index, unit)| (current_counts.get(unit).copied().unwrap_or(0), *index))
+            .into_iter()
+            .min_by_key(|(index, unit)| {
+                (
+                    request.current_counts.get(unit).copied().unwrap_or(0),
+                    *index,
+                )
+            })
             .map(|(_, unit)| unit)
     } else {
-        eligible.map(|(_, unit)| unit).next()
+        eligible.into_iter().map(|(_, unit)| unit).next()
     }
 }
 
@@ -670,6 +730,7 @@ mod tests {
             resources,
             visible_enemies: Vec::new(),
             pending_builds: Vec::new(),
+            upgrades: Vec::new(),
         }
     }
 
@@ -823,6 +884,7 @@ mod tests {
                 buildings: facts.production_buildings(EntityKind::CityCentre),
                 unit_priorities: &[EntityKind::Worker],
                 completed_building_kinds: facts.complete_building_kinds(),
+                completed_upgrades: facts.completed_upgrades(),
                 max_queue_depth: 1,
                 save_for_tech: false,
                 current_counts: &[(EntityKind::Worker, 0)],
@@ -848,6 +910,7 @@ mod tests {
             vec![
                 production_building(20, EntityKind::Barracks, 0),
                 production_building(21, EntityKind::Barracks, 0),
+                production_building(22, EntityKind::Steelworks, 0),
             ],
             Vec::new(),
         );
@@ -860,6 +923,7 @@ mod tests {
                 buildings: facts.production_buildings(EntityKind::Barracks),
                 unit_priorities: &[EntityKind::MachineGunner, EntityKind::AtTeam],
                 completed_building_kinds: facts.complete_building_kinds(),
+                completed_upgrades: facts.completed_upgrades(),
                 max_queue_depth: 1,
                 save_for_tech: false,
                 current_counts: &[],
@@ -881,6 +945,7 @@ mod tests {
             vec![
                 production_building(20, EntityKind::Barracks, 0),
                 production_building(21, EntityKind::Barracks, 0),
+                production_building(22, EntityKind::Steelworks, 0),
                 complete_building(30, EntityKind::TrainingCentre),
             ],
             Vec::new(),
@@ -894,6 +959,7 @@ mod tests {
                 buildings: facts.production_buildings(EntityKind::Barracks),
                 unit_priorities: &[EntityKind::MachineGunner, EntityKind::AtTeam],
                 completed_building_kinds: facts.complete_building_kinds(),
+                completed_upgrades: facts.completed_upgrades(),
                 max_queue_depth: 1,
                 save_for_tech: false,
                 current_counts: &[],
@@ -907,7 +973,7 @@ mod tests {
             vec![EntityKind::MachineGunner, EntityKind::MachineGunner]
         );
 
-        let with_steelworks = observation(
+        let mut with_steelworks = observation(
             AiEconomy {
                 steel: 500,
                 oil: 200,
@@ -917,11 +983,13 @@ mod tests {
             vec![
                 production_building(20, EntityKind::Barracks, 0),
                 production_building(21, EntityKind::Barracks, 0),
+                production_building(22, EntityKind::Steelworks, 0),
                 complete_building(30, EntityKind::TrainingCentre),
                 complete_building(31, EntityKind::Steelworks),
             ],
             Vec::new(),
         );
+        with_steelworks.upgrades.push(UpgradeKind::AtGunUnlock);
         let facts = AiFacts::from_observation(&with_steelworks);
         let mut ctx = AiActionContext::new(&facts, budget_from_observation(&with_steelworks));
 
@@ -931,6 +999,7 @@ mod tests {
                 buildings: facts.production_buildings(EntityKind::Barracks),
                 unit_priorities: &[EntityKind::MachineGunner, EntityKind::AtTeam],
                 completed_building_kinds: facts.complete_building_kinds(),
+                completed_upgrades: facts.completed_upgrades(),
                 max_queue_depth: 1,
                 save_for_tech: false,
                 current_counts: &[],
@@ -941,7 +1010,27 @@ mod tests {
 
         assert_eq!(
             trained.iter().map(|action| action.unit).collect::<Vec<_>>(),
-            vec![EntityKind::MachineGunner, EntityKind::AtTeam]
+            vec![EntityKind::MachineGunner, EntityKind::MachineGunner]
+        );
+
+        let trained = train_units(
+            &mut ctx,
+            TrainUnitsRequest {
+                buildings: facts.production_buildings(EntityKind::Steelworks),
+                unit_priorities: &[EntityKind::MachineGunner, EntityKind::AtTeam],
+                completed_building_kinds: facts.complete_building_kinds(),
+                completed_upgrades: facts.completed_upgrades(),
+                max_queue_depth: 1,
+                save_for_tech: false,
+                current_counts: &[(EntityKind::MachineGunner, 2)],
+                max_counts: &[],
+                balance_unit_priorities: true,
+            },
+        );
+
+        assert_eq!(
+            trained.iter().map(|action| action.unit).collect::<Vec<_>>(),
+            vec![EntityKind::AtTeam]
         );
     }
 

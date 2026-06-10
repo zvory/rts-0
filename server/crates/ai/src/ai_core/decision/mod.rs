@@ -20,6 +20,7 @@ use crate::config;
 use rts_rules;
 use rts_sim::game::command::SimCommand as Command;
 use rts_sim::game::entity::EntityKind;
+use rts_sim::game::upgrade::{self, UpgradeKind};
 
 mod defense;
 mod expansion;
@@ -80,6 +81,9 @@ pub(crate) enum AiIntent {
     Train {
         kind: EntityKind,
     },
+    Research {
+        upgrade: UpgradeKind,
+    },
     Gather {
         resource: EntityKind,
         assignments: usize,
@@ -104,6 +108,7 @@ pub(crate) struct AiDecisionMemory {
     defensive_panic_started_tick: Option<u32>,
     defensive_panic_last_tick: Option<u32>,
     defensive_panic_response: DefensivePanicResponse,
+    pending_upgrades: BTreeSet<UpgradeKind>,
 }
 
 impl AiDecisionMemory {
@@ -119,6 +124,7 @@ impl AiDecisionMemory {
             defensive_panic_started_tick: None,
             defensive_panic_last_tick: None,
             defensive_panic_response: DefensivePanicResponse::Riflemen,
+            pending_upgrades: BTreeSet::new(),
         }
     }
 
@@ -170,6 +176,7 @@ impl AiDecisionMemory {
         self.defensive_panic_started_tick = None;
         self.defensive_panic_last_tick = None;
         self.defensive_panic_response = DefensivePanicResponse::Riflemen;
+        self.pending_upgrades.clear();
     }
 
     fn ensure_attack_policy(&mut self, profile: &AiProfile, attack: AttackPolicy) {
@@ -253,6 +260,9 @@ where
     F: FnMut(EntityKind, u32, u32) -> bool,
 {
     memory.ensure_profile(profile);
+    memory
+        .pending_upgrades
+        .retain(|upgrade| !observation.upgrades.contains(upgrade));
 
     let facts = AiFacts::from_observation(observation);
     let budget = SpendBudget::with_committed_steel(
@@ -450,6 +460,7 @@ where
             buildings: facts.production_buildings(EntityKind::CityCentre),
             unit_priorities: &[EntityKind::Worker],
             completed_building_kinds: facts.complete_building_kinds(),
+            completed_upgrades: facts.completed_upgrades(),
             max_queue_depth: 1,
             save_for_tech: save_worker_training_for_tech,
             current_counts: &[(EntityKind::Worker, facts.worker_count)],
@@ -462,6 +473,13 @@ where
 
     let production_unit_counts =
         unit_counts_for_priorities(observation, &facts, production_policy.unit_priorities);
+    queue_required_unit_unlocks(
+        &mut actions,
+        &facts,
+        production_policy.unit_priorities,
+        memory,
+        &mut intents,
+    );
     for building_kind in production_building_order(production_policy.unit_priorities) {
         let buildings = facts.production_buildings(building_kind);
         if buildings.is_empty() {
@@ -471,22 +489,24 @@ where
             .save_for_first_tech_unit
             .unwrap_or(EntityKind::Worker);
         let save_for_tech = (save_for_unplanned_expansion
-            || save_for_first_tech_unit
+            || (save_for_first_tech_unit && !planned_train_in_intents(&intents, key_tech_unit))
             || save_for_required_tech_building)
             && !rts_rules::economy::trainable_units(building_kind).contains(&key_tech_unit);
-        for trained in actions::train_units(
+        let trained_units = actions::train_units(
             &mut actions,
             TrainUnitsRequest {
                 buildings,
                 unit_priorities: production_policy.unit_priorities,
                 completed_building_kinds: facts.complete_building_kinds(),
+                completed_upgrades: facts.completed_upgrades(),
                 max_queue_depth: production_policy.queue_depth,
                 save_for_tech,
                 current_counts: &production_unit_counts,
                 max_counts: &[],
                 balance_unit_priorities: production_policy.balance_unit_priorities,
             },
-        ) {
+        );
+        for trained in trained_units {
             intents.push(AiIntent::Train { kind: trained.unit });
         }
     }
@@ -709,6 +729,12 @@ fn planned_in_intents(intents: &[AiIntent], kind: EntityKind) -> usize {
         .count()
 }
 
+fn planned_train_in_intents(intents: &[AiIntent], kind: EntityKind) -> bool {
+    intents
+        .iter()
+        .any(|intent| matches!(intent, AiIntent::Train { kind: trained } if *trained == kind))
+}
+
 fn visible_combat_target_for_wave(observation: &AiObservation, unit_ids: &[u32]) -> Option<u32> {
     let center = group_center(observation, unit_ids)?;
     let max_distance = OUTBOUND_WAVE_VISIBLE_TARGET_RADIUS_TILES * observation.map.tile_size as f32;
@@ -741,6 +767,40 @@ fn outbound_wave_target_priority(kind: EntityKind) -> u8 {
         EntityKind::MachineGunner | EntityKind::AtTeam => 1,
         EntityKind::Rifleman | EntityKind::ScoutCar => 2,
         _ => 3,
+    }
+}
+
+fn queue_required_unit_unlocks(
+    actions: &mut AiActionContext<'_>,
+    facts: &AiFacts,
+    unit_priorities: &[EntityKind],
+    memory: &mut AiDecisionMemory,
+    intents: &mut Vec<AiIntent>,
+) {
+    for unit in unit_priorities {
+        let Some(upgrade) = upgrade::required_for_unit(*unit) else {
+            continue;
+        };
+        if facts.completed_upgrades().contains(&upgrade)
+            || memory.pending_upgrades.contains(&upgrade)
+        {
+            continue;
+        }
+        let definition = upgrade::definition(upgrade);
+        if facts.complete_building_count(definition.researched_at) == 0 {
+            continue;
+        }
+        let Some(researched) = actions::try_research_upgrade(
+            actions,
+            facts.production_buildings(definition.researched_at),
+            upgrade,
+        ) else {
+            continue;
+        };
+        memory.pending_upgrades.insert(researched.upgrade);
+        intents.push(AiIntent::Research {
+            upgrade: researched.upgrade,
+        });
     }
 }
 

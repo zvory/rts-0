@@ -24,7 +24,7 @@ mod setup;
 pub(crate) mod smoke;
 mod snapshot;
 mod systems;
-pub(crate) mod upgrade;
+pub mod upgrade;
 
 use std::collections::{BTreeSet, HashMap};
 

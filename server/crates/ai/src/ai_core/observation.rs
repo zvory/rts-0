@@ -2,6 +2,7 @@ use std::collections::BTreeMap;
 
 use rts_rules;
 use rts_sim::game::entity::{EntityKind, NEUTRAL};
+use rts_sim::game::upgrade::UpgradeKind;
 use rts_sim::protocol::{states, EntityView, Snapshot, StartPayload};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -119,6 +120,7 @@ pub(crate) struct AiObservation {
     pub(crate) resources: Vec<AiResourceSummary>,
     pub(crate) visible_enemies: Vec<AiEntitySummary>,
     pub(crate) pending_builds: Vec<AiBuildIntent>,
+    pub(crate) upgrades: Vec<UpgradeKind>,
 }
 
 impl AiObservation {
@@ -215,6 +217,13 @@ impl AiObservation {
         let mut pending_builds: Vec<AiBuildIntent> = pending_builds.into_iter().collect();
         pending_builds.sort_unstable();
         pending_builds.dedup();
+        let mut upgrades: Vec<UpgradeKind> = snapshot
+            .upgrades
+            .iter()
+            .filter_map(|upgrade| upgrade.parse::<UpgradeKind>().ok())
+            .collect();
+        upgrades.sort_unstable();
+        upgrades.dedup();
 
         Some(Self {
             player_id,
@@ -227,6 +236,7 @@ impl AiObservation {
             resources,
             visible_enemies,
             pending_builds,
+            upgrades,
         })
     }
 }

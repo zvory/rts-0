@@ -1544,12 +1544,17 @@ mod tests {
         let map = flat_map(24);
         for (producer, unit, upgrade, setup_extra) in [
             (
-                EntityKind::Barracks,
+                EntityKind::Steelworks,
                 EntityKind::AtTeam,
                 UpgradeKind::AtGunUnlock,
-                Some(EntityKind::Steelworks),
+                None,
             ),
-            (EntityKind::Factory, EntityKind::Tank, UpgradeKind::TankUnlock, None),
+            (
+                EntityKind::Factory,
+                EntityKind::Tank,
+                UpgradeKind::TankUnlock,
+                None,
+            ),
         ] {
             let mut entities = EntityStore::new();
             let (px, py) = footprint_center(&map, producer, 6, 6);
@@ -1564,10 +1569,18 @@ mod tests {
             }
             let mut players = vec![player_state(1), player_state(2)];
             let command = SimCommand::Train { building, unit };
-            let events =
-                apply_with_players(&map, &mut entities, &mut players, vec![(1, command.clone())]);
+            let events = apply_with_players(
+                &map,
+                &mut entities,
+                &mut players,
+                vec![(1, command.clone())],
+            );
             assert!(
-                entities.get(building).expect("producer").prod_queue().is_empty(),
+                entities
+                    .get(building)
+                    .expect("producer")
+                    .prod_queue()
+                    .is_empty(),
                 "{unit:?} should not queue before {upgrade:?} finishes"
             );
             assert!(matches!(

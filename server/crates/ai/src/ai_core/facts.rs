@@ -6,6 +6,7 @@ use crate::ai_core::observation::{
 use crate::config;
 use rts_rules;
 use rts_sim::game::entity::EntityKind;
+use rts_sim::game::upgrade::UpgradeKind;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) struct BuildingCounts {
@@ -52,6 +53,7 @@ pub(crate) struct AiFacts {
     pub(crate) nearest_public_enemy_base: Option<EnemyBaseFact>,
     building_counts: BTreeMap<EntityKind, BuildingCounts>,
     complete_building_kinds: Vec<EntityKind>,
+    completed_upgrades: Vec<UpgradeKind>,
     production_buildings: BTreeMap<EntityKind, Vec<ProductionBuildingFact>>,
     unit_counts: BTreeMap<EntityKind, usize>,
     free_combat_units: BTreeMap<EntityKind, Vec<u32>>,
@@ -178,6 +180,7 @@ impl AiFacts {
             nearest_public_enemy_base,
             building_counts,
             complete_building_kinds,
+            completed_upgrades: observation.upgrades.clone(),
             production_buildings,
             unit_counts,
             free_combat_units,
@@ -208,6 +211,10 @@ impl AiFacts {
     #[allow(dead_code)]
     pub(crate) fn complete_building_kinds(&self) -> &[EntityKind] {
         &self.complete_building_kinds
+    }
+
+    pub(crate) fn completed_upgrades(&self) -> &[UpgradeKind] {
+        &self.completed_upgrades
     }
 
     #[allow(dead_code)]
@@ -342,6 +349,7 @@ mod tests {
             resources: Vec::new(),
             visible_enemies: Vec::new(),
             pending_builds: Vec::new(),
+            upgrades: Vec::new(),
         }
     }
 

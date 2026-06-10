@@ -222,7 +222,6 @@ impl Game {
     }
 }
 
-
 pub struct DevScenarioSetup {
     pub game: Game,
     pub player_id: u32,

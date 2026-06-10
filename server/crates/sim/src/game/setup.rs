@@ -367,7 +367,6 @@ fn dev_map_metadata(name: &str) -> MapMetadata {
     }
 }
 
-
 fn spawn_base_resources(entities: &mut EntityStore, map: &Map, tile: (u32, u32)) {
     let (tx, ty) = tile;
     let (hx, hy) = map.tile_center(tx, ty);

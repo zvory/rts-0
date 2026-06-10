@@ -101,15 +101,15 @@ mod tests {
         );
         assert_eq!(
             trainable_units(EntityKind::Barracks),
-            &[
-                EntityKind::Rifleman,
-                EntityKind::MachineGunner,
-                EntityKind::AtTeam
-            ]
+            &[EntityKind::Rifleman, EntityKind::MachineGunner]
         );
         assert_eq!(
             trainable_units(EntityKind::Factory),
             &[EntityKind::ScoutCar, EntityKind::Tank]
+        );
+        assert_eq!(
+            trainable_units(EntityKind::Steelworks),
+            &[EntityKind::AtTeam]
         );
 
         assert!(train_requirement_met(EntityKind::Rifleman, &[]));
@@ -132,7 +132,10 @@ mod tests {
             EntityKind::Tank,
             &[EntityKind::Steelworks]
         ));
-        assert!(train_requirement_met(EntityKind::Tank, &[EntityKind::Factory]));
+        assert!(train_requirement_met(
+            EntityKind::Tank,
+            &[EntityKind::Factory]
+        ));
 
         assert!(!build_requirement_met(EntityKind::TrainingCentre, &[]));
         assert!(!build_requirement_met(

@@ -1275,6 +1275,10 @@ function fakeAudioContext() {
     STATS[KIND.FACTORY].trains[0] === KIND.SCOUT_CAR,
     "Vehicle Works should put Scout Car in the leftmost train slot",
   );
+  assert(
+    STATS[KIND.FACTORY].trains.includes(KIND.TANK),
+    "Vehicle Works should train Tanks after the unlock",
+  );
   assert(STATS[KIND.SCOUT_CAR].cost.steel === 125, "Scout Car steel cost mirrors server");
   assert(STATS[KIND.SCOUT_CAR].cost.oil === 50, "Scout Car oil cost mirrors server");
   assert(STATS[KIND.SCOUT_CAR].sight === 10, "Scout Car has the largest mobile sight radius");
@@ -1292,6 +1296,14 @@ function fakeAudioContext() {
     "Gun Works cost mirrors server",
   );
   assert(STATS[KIND.STEELWORKS].buildTicks === 620, "Gun Works build time mirrors server");
+  assert(
+    STATS[KIND.STEELWORKS].trains.includes(KIND.AT_TEAM),
+    "Gun Works should train AT Guns after the unlock",
+  );
+  assert(
+    !STATS[KIND.BARRACKS].trains.includes(KIND.AT_TEAM),
+    "Barracks should no longer train AT Guns",
+  );
   assert(
     STATS[KIND.STEELWORKS].requires.includes(KIND.TRAINING_CENTRE),
     "Gun Works should require Training Centre tech in the command card",
@@ -1312,8 +1324,8 @@ function fakeAudioContext() {
     "AT Gun training should require a completed Gun Works in the command card",
   );
   assert(
-    STATS[KIND.TANK].requires === KIND.STEELWORKS,
-    "Tank training should require a completed Gun Works in the command card until the Vehicle Works unlock phase",
+    STATS[KIND.TANK].requires === KIND.FACTORY,
+    "Tank training should require a completed Vehicle Works in the command card",
   );
   const playerId = 1;
   const underConstructionTrainingCentre = [

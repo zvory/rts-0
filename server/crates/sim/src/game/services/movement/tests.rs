@@ -900,14 +900,18 @@ fn worker_traveling_to_gather_ignores_unit_collision() {
     let map = flat_map(1);
     let mut entities = EntityStore::new();
     let (cx, cy) = map.tile_center(20, 20);
-    let node = entities.spawn_node(EntityKind::Steel, cx + 96.0, cy).unwrap();
+    let node = entities
+        .spawn_node(EntityKind::Steel, cx + 96.0, cy)
+        .unwrap();
     let worker = entities.spawn_unit(1, EntityKind::Worker, cx, cy).unwrap();
     {
         let w = entities.get_mut(worker).unwrap();
         w.set_order(Order::gather(node));
         w.mark_gather_phase(GatherPhase::ToNode);
     }
-    let blocker = entities.spawn_unit(2, EntityKind::Tank, cx + 4.0, cy).unwrap();
+    let blocker = entities
+        .spawn_unit(2, EntityKind::Tank, cx + 4.0, cy)
+        .unwrap();
     let worker_before = pos(&entities, worker);
     let blocker_before = pos(&entities, blocker);
 
@@ -938,7 +942,9 @@ fn worker_traveling_to_build_ignores_unit_collision() {
         w.set_order(Order::build(EntityKind::Depot, 24, 20));
         w.mark_build_phase(BuildPhase::ToSite);
     }
-    let blocker = entities.spawn_unit(2, EntityKind::Tank, cx + 4.0, cy).unwrap();
+    let blocker = entities
+        .spawn_unit(2, EntityKind::Tank, cx + 4.0, cy)
+        .unwrap();
     let worker_before = pos(&entities, worker);
     let blocker_before = pos(&entities, blocker);
 
