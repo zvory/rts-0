@@ -674,6 +674,45 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
   replayControlsMatch.onReplayVisionClick({ target: visionButtons[0], shiftKey: false });
   assert(replayControlsMatch.net.visions.at(-1).mode === "all", "all replay fog control restores union vision");
 
+  const noticeAudioMatch = Object.create(Match.prototype);
+  const playedNotices = [];
+  let minimapPings = 0;
+  noticeAudioMatch.toast = () => {};
+  noticeAudioMatch.audio = {
+    play(id, opts) {
+      playedNotices.push({ id, opts });
+    },
+  };
+  noticeAudioMatch.minimap = {
+    ping() {
+      minimapPings += 1;
+    },
+    pulseBorder() {},
+  };
+  noticeAudioMatch.camera = { x: 0, y: 0, viewW: 100, viewH: 100, zoom: 1 };
+  noticeAudioMatch.replayViewer = true;
+  noticeAudioMatch.handleNotice({
+    e: EVENT.NOTICE,
+    msg: "alert:under_attack",
+    severity: NOTICE_SEVERITY.ALERT,
+    x: 512,
+    y: 768,
+  });
+  assert(playedNotices.length === 0, "replay notice alerts do not play audio");
+  assert(minimapPings === 1, "replay notice alerts still ping the minimap");
+  noticeAudioMatch.replayViewer = false;
+  noticeAudioMatch.handleNotice({
+    e: EVENT.NOTICE,
+    msg: "alert:under_attack",
+    severity: NOTICE_SEVERITY.ALERT,
+    x: 512,
+    y: 768,
+  });
+  assert(
+    playedNotices[0]?.id === "notice_under_attack",
+    "live notice alerts still play audio outside the current viewport",
+  );
+
   const storageValues = new Map();
   globalThis.window.localStorage = {
     getItem(key) {
