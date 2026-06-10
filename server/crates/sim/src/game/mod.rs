@@ -15,6 +15,7 @@ pub mod entity;
 pub(crate) mod fog;
 mod invariants;
 pub mod map;
+mod mortar;
 mod pathfinding;
 mod player_state;
 pub mod replay;
@@ -39,6 +40,7 @@ use serde::{Deserialize, Serialize};
 use entity::{BuildPhase, EntityKind, EntityStore};
 use fog::{Fog, LingeringSightSource};
 use map::Map;
+use mortar::MortarShellStore;
 pub use map::MapMetadata;
 use rand::rngs::SmallRng;
 use rand::SeedableRng;
@@ -115,6 +117,8 @@ pub struct Game {
     lingering_sight: Vec<LingeringSightSource>,
     /// Neutral smoke clouds that block authoritative fog and combat LOS without being entities.
     smokes: SmokeCloudStore,
+    /// Delayed mortar shell impacts waiting to resolve area damage.
+    mortar_shells: MortarShellStore,
     /// Match seed retained for replay metadata/API compatibility. The current hardcoded map
     /// ignores it until lobby map selection or randomized maps are reintroduced.
     seed: u32,
@@ -189,6 +193,7 @@ impl Game {
             &mut self.rng,
             &mut self.lingering_sight,
             &mut self.smokes,
+            &mut self.mortar_shells,
             pending,
             &mut events,
             self.tick,

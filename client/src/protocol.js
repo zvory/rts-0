@@ -66,6 +66,7 @@ export const KIND = Object.freeze({
   RIFLEMAN: "rifleman",
   MACHINE_GUNNER: "machine_gunner",
   AT_TEAM: "at_team",
+  MORTAR_TEAM: "mortar_team",
   SCOUT_CAR: "scout_car",
   TANK: "tank",
   CITY_CENTRE: "city_centre",
@@ -82,6 +83,7 @@ export const UNIT_KINDS = Object.freeze([
   KIND.RIFLEMAN,
   KIND.MACHINE_GUNNER,
   KIND.AT_TEAM,
+  KIND.MORTAR_TEAM,
   KIND.SCOUT_CAR,
   KIND.TANK,
 ]);
@@ -125,6 +127,7 @@ export const EVENT = Object.freeze({
   BUILD: "build",
   NOTICE: "notice",
   SMOKE_LAUNCH: "smokeLaunch",
+  MORTAR_IMPACT: "mortarImpact",
 });
 
 export const NOTICE_SEVERITY = Object.freeze({
@@ -136,6 +139,7 @@ export const NOTICE_SEVERITY = Object.freeze({
 export const ABILITY = Object.freeze({
   CHARGE: "charge",
   SMOKE: "smoke",
+  MORTAR_FIRE: "mortarFire",
 });
 
 export const REPLAY_VISION = Object.freeze({
@@ -145,13 +149,14 @@ export const REPLAY_VISION = Object.freeze({
 });
 
 // --- Compact snapshot wire schema (must match protocol.rs) ---
-export const COMPACT_SNAPSHOT_VERSION = 10;
+export const COMPACT_SNAPSHOT_VERSION = 11;
 
 export const KIND_CODE = Object.freeze({
   [KIND.WORKER]: 1,
   [KIND.RIFLEMAN]: 2,
   [KIND.MACHINE_GUNNER]: 3,
   [KIND.AT_TEAM]: 4,
+  [KIND.MORTAR_TEAM]: 15,
   [KIND.TANK]: 5,
   [KIND.SCOUT_CAR]: 14,
   [KIND.CITY_CENTRE]: 6,
@@ -200,6 +205,7 @@ export const EVENT_CODE = Object.freeze({
   [EVENT.BUILD]: 3,
   [EVENT.NOTICE]: 4,
   [EVENT.SMOKE_LAUNCH]: 5,
+  [EVENT.MORTAR_IMPACT]: 6,
 });
 
 export const ORDER_STAGE = Object.freeze({
@@ -210,6 +216,7 @@ export const ORDER_STAGE = Object.freeze({
   BUILD: "build",
   CHARGE: "charge",
   SMOKE: "smoke",
+  MORTAR_FIRE: "mortarFire",
   SETUP_AT_GUNS: "setupAtGuns",
 });
 
@@ -222,11 +229,13 @@ export const ORDER_STAGE_CODE = Object.freeze({
   [ORDER_STAGE.SMOKE]: 6,
   [ORDER_STAGE.SETUP_AT_GUNS]: 7,
   [ORDER_STAGE.CHARGE]: 8,
+  [ORDER_STAGE.MORTAR_FIRE]: 9,
 });
 
 export const ABILITY_CODE = Object.freeze({
   [ABILITY.CHARGE]: 1,
   [ABILITY.SMOKE]: 2,
+  [ABILITY.MORTAR_FIRE]: 3,
 });
 
 export const NOTICE_SEVERITY_CODE = Object.freeze({
@@ -542,6 +551,14 @@ function decodeCompactEvent(record, index) {
         delayTicks: readU32(fields[3], "event.smokeLaunch.delayTicks"),
       };
     }
+    case EVENT.MORTAR_IMPACT:
+      requireLength(fields, 4, `mortar impact event ${index}`);
+      return {
+        e: EVENT.MORTAR_IMPACT,
+        x: readNumber(fields[1], "event.mortarImpact.x"),
+        y: readNumber(fields[2], "event.mortarImpact.y"),
+        radiusTiles: readNumber(fields[3], "event.mortarImpact.radiusTiles"),
+      };
     default:
       throw new Error(`unknown compact event kind ${eventKind}`);
   }

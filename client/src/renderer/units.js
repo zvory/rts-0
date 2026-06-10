@@ -135,6 +135,36 @@ function drawWorkerBusyIndicator(g, r) {
   g.lineTo(r * 0.55, -r * 1.15);
 }
 
+function drawMortarTeam(g, r, tint, facing, setup, recoil) {
+  const tubeAngle = facing - Math.PI * 0.22;
+  drawInfantryBase(g, r * 0.58, tint, facing + 0.45);
+  const left = polar(facing + Math.PI * 0.9, r * 0.72);
+  const right = polar(facing - Math.PI * 0.9, r * 0.72);
+  g.beginFill(tint);
+  g.drawCircle(left.x, left.y, r * 0.34);
+  g.drawCircle(right.x, right.y, r * 0.34);
+  g.endFill();
+
+  const base = polar(tubeAngle + Math.PI, r * 0.28);
+  const muzzle = polar(tubeAngle, r * 0.95 - recoil * 0.5);
+  g.lineStyle(7, 0x1b1712, setup.barrel ? 0.98 : 0.45);
+  g.moveTo(base.x, base.y);
+  g.lineTo(muzzle.x, muzzle.y);
+  g.lineStyle(3, 0xd8d0b0, 0.9);
+  g.moveTo(base.x, base.y);
+  g.lineTo(muzzle.x, muzzle.y);
+  const bipod = setup.prongFactor ?? 0;
+  if (bipod > 0) {
+    g.lineStyle(2, 0x1b1712, 0.9);
+    const footA = polar(tubeAngle + 0.75, r * (0.65 + 0.35 * bipod));
+    const footB = polar(tubeAngle - 0.75, r * (0.65 + 0.35 * bipod));
+    g.moveTo(0, 0);
+    g.lineTo(footA.x, footA.y);
+    g.moveTo(0, 0);
+    g.lineTo(footB.x, footB.y);
+  }
+}
+
 export function _drawUnit(e, colorByOwner, state, pools = {}) {
   const shadowPool = pools.shadow || "unitShadows";
   const unitPool = pools.unit || "units";
@@ -177,6 +207,8 @@ export function _drawUnit(e, colorByOwner, state, pools = {}) {
     }
   } else if (e.kind === KIND.AT_TEAM) {
     drawAtGun(g, r, tint, facing, weaponFacing, this._deployedWeaponSetupVisual(e), recoil);
+  } else if (e.kind === KIND.MORTAR_TEAM) {
+    drawMortarTeam(g, r, tint, facing, this._deployedWeaponSetupVisual(e), recoil);
   } else if (e.kind === KIND.SCOUT_CAR) {
     // Scout cars currently use the tank-like vehicle movement model server-side.
     // Replace with truck/wheeled movement semantics once that model exists.
@@ -224,6 +256,7 @@ export function _drawUnit(e, colorByOwner, state, pools = {}) {
     e.kind !== KIND.RIFLEMAN &&
     e.kind !== KIND.MACHINE_GUNNER &&
     e.kind !== KIND.AT_TEAM &&
+    e.kind !== KIND.MORTAR_TEAM &&
     e.kind !== KIND.SCOUT_CAR &&
     e.kind !== KIND.TANK
   ) {

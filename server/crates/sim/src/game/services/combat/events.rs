@@ -12,7 +12,7 @@ pub(super) fn attack_reveal_for(attacker: Option<&Entity>) -> Option<AttackRevea
     }
     let setup_state = matches!(
         attacker.kind,
-        EntityKind::MachineGunner | EntityKind::AtTeam
+        EntityKind::MachineGunner | EntityKind::AtTeam | EntityKind::MortarTeam
     )
     .then(|| attacker.weapon_setup().to_protocol_str().to_string());
     Some(AttackReveal {

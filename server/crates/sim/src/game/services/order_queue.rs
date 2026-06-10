@@ -6,6 +6,7 @@ use crate::game::entity::{
 };
 use crate::game::fog::Fog;
 use crate::game::map::Map;
+use crate::game::mortar::MortarShellStore;
 use crate::game::services::ability_orders::{
     active_ability_order_ready, launch_self_ability, launch_world_ability,
     order_or_launch_world_ability,
@@ -92,6 +93,7 @@ pub(crate) fn promote_ready_orders(
     fog: &Fog,
     coordinator: &mut MoveCoordinator<'_>,
     smokes: &mut SmokeCloudStore,
+    mortar_shells: &mut MortarShellStore,
     events: &mut std::collections::HashMap<u32, Vec<Event>>,
     tick: u32,
 ) {
@@ -120,7 +122,20 @@ pub(crate) fn promote_ready_orders(
                 None => continue,
             };
             let launched = launch_world_ability(
-                map, entities, players, smokes, events, owner, id, ability, x, y, tick, false, true,
+                map,
+                entities,
+                players,
+                smokes,
+                mortar_shells,
+                events,
+                owner,
+                id,
+                ability,
+                x,
+                y,
+                tick,
+                false,
+                true,
             );
             if !launched {
                 clear_completed_active_order(entities, id);
@@ -155,6 +170,7 @@ pub(crate) fn promote_ready_orders(
                     players,
                     coordinator,
                     smokes,
+                    mortar_shells,
                     events,
                     owner,
                     id,
@@ -624,6 +640,7 @@ mod tests {
         let player_ids: Vec<u32> = players.iter().map(|p| p.id).collect();
         fog.recompute(&player_ids, entities, map);
         let mut smokes = SmokeCloudStore::new();
+        let mut mortar_shells = MortarShellStore::default();
         let mut events = std::collections::HashMap::new();
         promote_ready_orders(
             map,
@@ -632,6 +649,7 @@ mod tests {
             &fog,
             &mut coordinator,
             &mut smokes,
+            &mut mortar_shells,
             &mut events,
             1,
         );

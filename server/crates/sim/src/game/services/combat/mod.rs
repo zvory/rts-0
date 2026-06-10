@@ -10,6 +10,7 @@ use crate::config;
 use crate::game::entity::{fires_while_moving, AttackPhase, EntityKind, EntityStore, Order};
 use crate::game::fog::Fog;
 use crate::game::map::Map;
+use crate::game::mortar::MortarShellStore;
 use crate::game::services::dist2;
 use crate::game::services::line_of_sight::LineOfSight;
 use crate::game::services::move_coordinator::MoveCoordinator;
@@ -64,6 +65,7 @@ pub(crate) fn combat_system(
     coordinator: &mut MoveCoordinator<'_>,
     fog: &Fog,
     smokes: &SmokeCloudStore,
+    mortar_shells: &mut MortarShellStore,
     rng: &mut SmallRng,
     events: &mut HashMap<u32, Vec<Event>>,
     tick: u32,
@@ -240,6 +242,14 @@ pub(crate) fn combat_system(
             }
             let ready = matches!(entities.get(id), Some(e) if e.attack_cd() == 0);
             if ready {
+                if matches!(entities.get(id).map(|e| e.kind), Some(EntityKind::MortarTeam)) {
+                    let (mx, my) = mortar_aim_point(entities, tid, tick);
+                    mortar_shells.schedule(owner, id, mx, my, tick);
+                    if let Some(e) = entities.get_mut(id) {
+                        e.set_attack_cd(cd_reset);
+                    }
+                    continue;
+                }
                 let extra_miss_chance =
                     entities.get(id).map(moving_fire_miss_chance).unwrap_or(0.0);
                 apply_damage(
@@ -298,4 +308,33 @@ pub(crate) fn combat_system(
             }
         }
     }
+}
+
+fn mortar_aim_point(entities: &EntityStore, target: u32, tick: u32) -> (f32, f32) {
+    let Some(t) = entities.get(target) else {
+        return (0.0, 0.0);
+    };
+    let mut x = t.pos_x;
+    let mut y = t.pos_y;
+    if let Some((gx, gy)) = t.move_intent() {
+        let dx = gx - t.pos_x;
+        let dy = gy - t.pos_y;
+        let dist = (dx * dx + dy * dy).sqrt();
+        if dist > f32::EPSILON && dist.is_finite() {
+            let speed = config::unit_stats(t.kind).map(|stats| stats.speed).unwrap_or(0.0);
+            let lead = (speed * config::MORTAR_SHELL_DELAY_TICKS as f32).min(dist);
+            x += dx / dist * lead;
+            y += dy / dist * lead;
+        }
+    }
+    let error = config::MORTAR_AUTOFIRE_ERROR_TILES * config::TILE_SIZE as f32;
+    if error > 0.0 {
+        let angle = ((target ^ tick) as f32 * 1.618_034).rem_euclid(std::f32::consts::TAU);
+        let radius = ((((target.wrapping_mul(1103515245).wrapping_add(tick)) >> 8) & 1023) as f32
+            / 1023.0)
+            * error;
+        x += angle.cos() * radius;
+        y += angle.sin() * radius;
+    }
+    (x, y)
 }

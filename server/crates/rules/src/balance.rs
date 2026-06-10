@@ -30,6 +30,13 @@ pub const SCOUT_CAR_RECOVERY_COOLDOWN_TICKS: u16 = TICK_HZ as u16;
 
 pub const MACHINE_GUNNER_SETUP_TICKS: u16 = TICK_HZ as u16;
 pub const AT_TEAM_SETUP_TICKS: u16 = (TICK_HZ as u16) * 3 / 2;
+pub const MORTAR_TEAM_SETUP_TICKS: u16 = TICK_HZ as u16;
+pub const MORTAR_SHELL_DELAY_TICKS: u32 = TICK_HZ * 3 / 2;
+pub const MORTAR_OUTER_RADIUS_TILES: f32 = 1.5;
+pub const MORTAR_INNER_RADIUS_TILES: f32 = 0.5;
+pub const MORTAR_OUTER_DAMAGE: u32 = 30;
+pub const MORTAR_INNER_DAMAGE: u32 = 60;
+pub const MORTAR_AUTOFIRE_ERROR_TILES: f32 = 0.35;
 pub const AT_GUN_PACKED_RANGE_TILES: u32 = 5;
 pub const AT_GUN_DEPLOYED_RANGE_TILES: u32 = 12;
 pub const AT_GUN_PACKED_DAMAGE_MULTIPLIER: f32 = 0.75;
@@ -126,7 +133,7 @@ impl UnitStats {
 pub fn unit_radius_tiles(kind: EntityKind) -> u32 {
     if matches!(
         kind,
-        EntityKind::AtTeam | EntityKind::ScoutCar | EntityKind::Tank
+        EntityKind::AtTeam | EntityKind::MortarTeam | EntityKind::ScoutCar | EntityKind::Tank
     ) {
         return 0;
     }

@@ -69,6 +69,10 @@ export const SMOKE_CLOUD_DURATION_TICKS = TICK_HZ * 5;
 export const SMOKE_ABILITY_COOLDOWN_TICKS = 600;
 export const SCOUT_CAR_SMOKE_USES = 2;
 export const SMOKE_ABILITY_COST = Object.freeze({ steel: 0, oil: 0 });
+export const MORTAR_SHELL_DELAY_TICKS = TICK_HZ * 1.5;
+export const MORTAR_OUTER_RADIUS_TILES = 1.5;
+export const MORTAR_INNER_RADIUS_TILES = 0.5;
+export const MORTAR_FIRE_COOLDOWN_TICKS = TICK_HZ * 2;
 export const METHAMPHETAMINES_RESEARCH_TICKS = TICK_HZ * 20;
 export const AT_GUN_UNLOCK_RESEARCH_TICKS = TICK_HZ * 20;
 export const TANK_UNLOCK_RESEARCH_TICKS = TICK_HZ * 20;
@@ -92,6 +96,9 @@ export const STATS = Object.freeze({
   [KIND.AT_TEAM]: { label: "AT Gun", icon: "AT", size: 20, sight: 6, body: AT_GUN_BODY,
     rangeTiles: AT_GUN_DEPLOYED_RANGE_TILES, cost: { steel: 75, oil: 25 }, supply: 3, buildTicks: 440,
     requires: KIND.STEELWORKS, upgradeRequires: UPGRADE.AT_GUN_UNLOCK },
+  [KIND.MORTAR_TEAM]: { label: "Mortar Team", icon: "MT", size: 18, sight: 7,
+    rangeTiles: 9, cost: { steel: 100, oil: 25 }, supply: 3, buildTicks: 460,
+    requires: KIND.STEELWORKS },
   [KIND.SCOUT_CAR]: { label: "Scout Car", icon: "SC", size: 14.4, sight: 10, body: SCOUT_CAR_BODY,
     rangeTiles: 5, cost: { steel: 125, oil: 50 }, supply: 3, buildTicks: 480 },
   [KIND.TANK]: { label: "Tank", icon: "TK", size: 18, sight: 6, body: TANK_BODY,
@@ -113,7 +120,7 @@ export const STATS = Object.freeze({
     researches: [UPGRADE.TANK_UNLOCK],
     requires: [KIND.CITY_CENTRE, KIND.TRAINING_CENTRE] },
   [KIND.STEELWORKS]: { label: "Gun Works", icon: "GW", footW: 3, footH: 3, sight: 6,
-    cost: { steel: 125, oil: 125 }, buildTicks: 620, trains: [KIND.AT_TEAM],
+    cost: { steel: 125, oil: 125 }, buildTicks: 620, trains: [KIND.MORTAR_TEAM, KIND.AT_TEAM],
     researches: [UPGRADE.AT_GUN_UNLOCK],
     requires: [KIND.CITY_CENTRE, KIND.TRAINING_CENTRE] },
 
@@ -135,6 +142,20 @@ export const ABILITIES = Object.freeze({
     cost: SMOKE_ABILITY_COST,
     radiusTiles: SMOKE_CLOUD_RADIUS_TILES,
     durationTicks: SMOKE_CLOUD_DURATION_TICKS,
+    queued: false,
+  }),
+  [ABILITY.MORTAR_FIRE]: Object.freeze({
+    ability: ABILITY.MORTAR_FIRE,
+    label: "Fire",
+    icon: "FIR",
+    hotkey: "X",
+    title: "Target mortar fire",
+    carriers: Object.freeze([KIND.MORTAR_TEAM]),
+    targetMode: "worldPoint",
+    rangeTiles: 9,
+    cooldownTicks: MORTAR_FIRE_COOLDOWN_TICKS,
+    cost: Object.freeze({ steel: 0, oil: 0 }),
+    radiusTiles: MORTAR_OUTER_RADIUS_TILES,
     queued: false,
   }),
 });

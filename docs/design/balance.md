@@ -16,7 +16,7 @@ or regime-specific iconography.
 
 MVP scope:
 - No air forces.
-- No artillery or mortars yet.
+- No late-game artillery yet; Mortar Teams provide the current early delayed-area fire tool.
 - No mines, morale, logistics, suppression-depth model, or detailed tank armor model yet. Tanks
   do have a simple hull-facing armor rule for anti-tank damage.
 
@@ -39,6 +39,9 @@ Core unit roles:
   range with reduced damage, or manually set up into a longer-ranged fixed field of fire.
   Deployed guns are dangerous from the side or rear, but weak or inefficient against regular
   infantry and cannot fire outside their emplacement arc.
+- **Mortar Team** is the Superior Firepower path-entry pressure unit from Gun Works: it sets up
+  before firing, cannot shoot while moving, and lands delayed area shells that punish static
+  positions and clumped units.
 
 Terrain rules:
 - **Open ground** favors machine guns and tanks.
@@ -78,6 +81,12 @@ authoritative `rules::defs` records.
 
 - `TICK_HZ = 30`, `SNAPSHOT_EVERY_N_TICKS = 1`.
 - `MACHINE_GUNNER_SETUP_TICKS = 30` (~1s setup or teardown for support weapons).
+- Mortar Teams use `MORTAR_TEAM_SETUP_TICKS = 30` (~1s setup), `MORTAR_SHELL_DELAY_TICKS = 45`
+  (~1.5s travel), `MORTAR_OUTER_RADIUS_TILES = 1.5`, `MORTAR_INNER_RADIUS_TILES = 0.5`,
+  `MORTAR_OUTER_DAMAGE = 30`, `MORTAR_INNER_DAMAGE = 60`, and `MORTAR_AUTOFIRE_ERROR_TILES = 0.35`.
+  The inner radius uses semi-armor-piercing damage against armored targets: it applies half of the
+  normal non-AP armor reduction instead of the full reduction. Manual Fire uses hotkey `X`; autocast
+  is enabled by default through normal idle/attack-move acquisition.
 - AT guns use `AT_GUN_PACKED_RANGE_TILES = 5`, `AT_GUN_DEPLOYED_RANGE_TILES = 12`,
   `AT_GUN_PACKED_DAMAGE_MULTIPLIER = 0.75`, and
   `AT_GUN_FIELD_OF_FIRE_RAD = PI / 4` (45 degrees total).
@@ -148,6 +157,7 @@ Unit stats (hp, dmg, range[tiles], cooldown[ticks], speed[px/tick], sight[tiles]
 | worker          | 40  | 4   | 1     | 24 | 1.6   | 7     | 50  | 0   | 1   | 360 (~12s) |
 | rifleman        | 45  | 5   | 4     | 16 | 1.6   | 8     | 50  | 0   | 1   | 300 (~10s) |
 | machine_gunner  | 55  | 4   | 6     | 6  | 1.28  | 8     | 75  | 10  | 2   | 400 (~13s) |
+| mortar_team     | 50  | 30 outer / 60 inner AOE | 9 | 60 | 1.12 | 7 | 100 | 25 | 3 | 460 (~15s); trained at Gun Works (`steelworks` kind) |
 | at_team         | 45  | 60 deployed / 45 packed | 12 deployed / 5 packed | 72 | 1.152 | 6     | 75  | 25  | 3   | 440 (~15s); requires Gun Works (`steelworks` kind) and AT Gun Crews (`at_gun_unlock`) |
 | scout_car       | 150 | 6   | 5     | 6  | 2.35  | 10    | 125 | 50  | 3   | 480 (~16s) |
 | tank            | 292 | 60  | 5     | 72 | 2.0   | 6     | 300 | 150 | 6   | 750 (~25s); requires Vehicle Works (`factory` kind) and Tank Production (`tank_unlock`) |
@@ -161,7 +171,7 @@ Building stats (hp, sight, cost, footprint tiles wxh, buildTicks, extra):
 | barracks                   | Barracks           | 165 | 6     | 150 | 3x2  | 200       | trains rifleman and machine_gunner; requires a City Centre |
 | training_centre            | Training Centre    | 300 | 6     | 100 steel + 50 oil | 3x2  | 560       | shared prerequisite before either advanced path; unlocks machine_gunner training at barracks and researches Methamphetamines; requires a City Centre and Barracks |
 | factory                    | Vehicle Works      | 360 | 6     | 200 steel + 100 oil | 3x3  | 330       | Mobile Warfare path building; trains scout_car immediately and researches Tank Production before tank training; requires a City Centre and Training Centre |
-| steelworks                 | Gun Works          | 300 | 6     | 125 steel + 125 oil | 3x3  | 620       | Superior Firepower path building; researches AT Gun Crews before at_team training; requires a City Centre and Training Centre |
+| steelworks                 | Gun Works          | 300 | 6     | 125 steel + 125 oil | 3x3  | 620       | Superior Firepower path building; trains mortar_team immediately and researches AT Gun Crews before at_team training; requires a City Centre and Training Centre |
 
 Win: a player is **eliminated** when they own zero buildings (units alone do not keep them
 alive). Last player standing wins; a 1-player match never ends (sandbox/exploration mode). In a

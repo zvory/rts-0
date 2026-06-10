@@ -178,7 +178,10 @@ pub fn project_entity(
             }
         }
     }
-    if matches!(entity.kind, EntityKind::MachineGunner | EntityKind::AtTeam) {
+    if matches!(
+        entity.kind,
+        EntityKind::MachineGunner | EntityKind::AtTeam | EntityKind::MortarTeam
+    ) {
         view.setup_state = Some(entity.weapon_setup().to_protocol_str().to_string());
     }
     if entity.kind == EntityKind::AtTeam && entity.owner == viewer {
@@ -246,7 +249,7 @@ pub fn project_entity(
                 remaining_uses: entity.ability_uses_remaining(*kind),
             })
             .collect();
-        for kind in [ability::AbilityKind::Smoke] {
+        for kind in [ability::AbilityKind::Smoke, ability::AbilityKind::MortarFire] {
             if ability::carried_by(kind, entity.kind)
                 && !view
                     .abilities

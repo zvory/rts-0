@@ -110,10 +110,18 @@ export function _drawCommandFeedback(state) {
     const t = clamp01(age / 650);
     const alpha = (1 - t) * 0.95;
     const r = 12 + t * 10;
-    const color = f.kind === "attack" ? COLORS.selectEnemy : COLORS.selectOwn;
+    const color = f.kind === "attack" || f.kind === "mortar" ? COLORS.selectEnemy : COLORS.selectOwn;
 
     g.lineStyle(2, color, alpha);
-    if (f.kind === "attack") {
+    if (f.kind === "mortar") {
+      const splash = Number.isFinite(f.radiusTiles) ? f.radiusTiles * 32 : 48;
+      drawDashedCircle(g, f.x, f.y, splash, 14);
+      g.drawCircle(f.x, f.y, r * 0.45);
+      g.moveTo(f.x - r * 0.7, f.y);
+      g.lineTo(f.x + r * 0.7, f.y);
+      g.moveTo(f.x, f.y - r * 0.7);
+      g.lineTo(f.x, f.y + r * 0.7);
+    } else if (f.kind === "attack") {
       g.moveTo(f.x - r, f.y - r);
       g.lineTo(f.x + r, f.y + r);
       g.moveTo(f.x + r, f.y - r);

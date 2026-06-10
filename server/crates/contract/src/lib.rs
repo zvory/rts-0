@@ -364,6 +364,11 @@ pub enum Event {
         to_y: f32,
         delay_ticks: u32,
     },
+    MortarImpact {
+        x: f32,
+        y: f32,
+        radius_tiles: f32,
+    },
     Notice {
         msg: String,
         #[serde(default, skip_serializing_if = "Option::is_none")]

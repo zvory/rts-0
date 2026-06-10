@@ -55,7 +55,7 @@ pub struct NodeDef {
 
 const WORKER_ONLY: &[EntityKind] = &[EntityKind::Worker];
 const BARRACKS_UNITS: &[EntityKind] = &[EntityKind::Rifleman, EntityKind::MachineGunner];
-const STEELWORKS_UNITS: &[EntityKind] = &[EntityKind::AtTeam];
+const STEELWORKS_UNITS: &[EntityKind] = &[EntityKind::MortarTeam, EntityKind::AtTeam];
 const FACTORY_UNITS: &[EntityKind] = &[EntityKind::ScoutCar, EntityKind::Tank];
 const CITY_CENTRE_REQUIRED: &[EntityKind] = &[EntityKind::CityCentre];
 const CITY_CENTRE_AND_BARRACKS_REQUIRED: &[EntityKind] =
@@ -147,6 +147,27 @@ pub const UNITS: &[UnitDef] = &[
         armor_class: ArmorClass::Small,
         weapon: WeaponClass::AntiTank,
         target_priority: TargetPriority::PrefersArmored,
+        trained_at: Some(EntityKind::Steelworks),
+        train_requires: STEELWORKS_REQUIRED,
+    },
+    UnitDef {
+        kind: EntityKind::MortarTeam,
+        stats: balance::UnitStats {
+            hp: 50,
+            dmg: balance::MORTAR_OUTER_DAMAGE,
+            range_tiles: 9,
+            cooldown: 60,
+            speed: 1.12,
+            sight_tiles: 7,
+            cost_steel: 100,
+            cost_oil: 25,
+            supply: 3,
+            build_ticks: 460,
+            radius: 18.0,
+        },
+        armor_class: ArmorClass::Small,
+        weapon: WeaponClass::SmallArms,
+        target_priority: TargetPriority::Default,
         trained_at: Some(EntityKind::Steelworks),
         train_requires: STEELWORKS_REQUIRED,
     },

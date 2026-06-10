@@ -107,6 +107,7 @@ fn run_combat_tick_on_map_with_seed_and_smokes(
     let mut events = HashMap::from([(1, Vec::new()), (2, Vec::new())]);
 
     let mut rng = SmallRng::seed_from_u64(rng_seed);
+    let mut mortar_shells = crate::game::mortar::MortarShellStore::default();
     combat_system(
         map,
         entities,
@@ -116,6 +117,7 @@ fn run_combat_tick_on_map_with_seed_and_smokes(
         &mut coordinator,
         &fog,
         smokes,
+        &mut mortar_shells,
         &mut rng,
         &mut events,
         10,
@@ -519,6 +521,7 @@ fn attack_move_resumes_original_destination_after_target_is_gone() {
     let mut fog = Fog::new(map.size);
     fog.recompute(&[1], &entities, &map);
     let smokes = SmokeCloudStore::new();
+    let mut mortar_shells = crate::game::mortar::MortarShellStore::default();
     let mut events = HashMap::from([(1, Vec::new())]);
 
     let mut rng = SmallRng::seed_from_u64(0);
@@ -531,6 +534,7 @@ fn attack_move_resumes_original_destination_after_target_is_gone() {
         &mut coordinator,
         &fog,
         &smokes,
+        &mut mortar_shells,
         &mut rng,
         &mut events,
         10,

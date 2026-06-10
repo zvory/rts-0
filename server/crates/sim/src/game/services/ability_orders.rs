@@ -2,8 +2,9 @@ use std::collections::HashMap;
 
 use crate::config;
 use crate::game::ability::{self, AbilityKind, AbilityTargetMode};
-use crate::game::entity::{EntityStore, MovePhase, Order};
+use crate::game::entity::{EntityKind, EntityStore, MovePhase, Order, WeaponSetup};
 use crate::game::map::Map;
+use crate::game::mortar::MortarShellStore;
 use crate::game::services::commands::{notice, notice_positioned};
 use crate::game::services::dist2;
 use crate::game::services::move_coordinator::MoveCoordinator;
@@ -27,6 +28,7 @@ pub(crate) fn order_or_launch_world_ability(
     players: &mut [PlayerState],
     coordinator: &mut MoveCoordinator<'_>,
     smokes: &mut SmokeCloudStore,
+    mortar_shells: &mut MortarShellStore,
     events: &mut HashMap<u32, Vec<Event>>,
     player: u32,
     caster: u32,
@@ -51,6 +53,7 @@ pub(crate) fn order_or_launch_world_ability(
             entities,
             players,
             smokes,
+            mortar_shells,
             events,
             player,
             caster,
@@ -79,6 +82,7 @@ pub(crate) fn launch_world_ability(
     entities: &mut EntityStore,
     players: &mut [PlayerState],
     smokes: &mut SmokeCloudStore,
+    mortar_shells: &mut MortarShellStore,
     events: &mut HashMap<u32, Vec<Event>>,
     player: u32,
     caster: u32,
@@ -123,6 +127,36 @@ pub(crate) fn launch_world_ability(
 
     match ability {
         AbilityKind::Charge => false,
+        AbilityKind::MortarFire => {
+            let Some(caster_pos) = entities.get(caster).map(|e| (e.pos_x, e.pos_y)) else {
+                return false;
+            };
+            let Some(e) = entities.get_mut(caster) else {
+                return false;
+            };
+            if !ps.spend_resources(definition.cost.steel, definition.cost.oil) {
+                return false;
+            }
+            e.start_ability_cooldown(ability, definition.cooldown_ticks);
+            if !preserve_active_order {
+                e.clear_active_order();
+            }
+            mortar_shells.schedule(player, caster, x, y, tick);
+            events.entry(player).or_default().push(Event::MortarImpact {
+                x,
+                y,
+                radius_tiles: config::MORTAR_OUTER_RADIUS_TILES,
+            });
+            notice_positioned(
+                events,
+                player,
+                "Mortar fire",
+                crate::protocol::NoticeSeverity::Info,
+                caster_pos.0,
+                caster_pos.1,
+            );
+            true
+        }
         AbilityKind::Smoke => {
             let Some(caster_pos) = entities.get(caster).map(|e| (e.pos_x, e.pos_y)) else {
                 return false;
@@ -193,7 +227,7 @@ pub(crate) fn launch_self_ability(
             e.start_ability_cooldown(ability, definition.cooldown_ticks);
             true
         }
-        AbilityKind::Smoke => false,
+        AbilityKind::Smoke | AbilityKind::MortarFire => false,
     }
 }
 
@@ -235,8 +269,13 @@ pub(crate) fn caster_can_attempt(
             && e.is_unit()
             && !e.under_construction()
             && ability::carried_by(ability, e.kind)
+            && mortar_ready(e.kind, e.weapon_setup(), e.path_is_empty(), ability)
             && e.ability_uses_remaining(ability).unwrap_or(1) > 0
             && e.ability_cooldown_ticks(ability) == 0)
+}
+
+fn mortar_ready(kind: EntityKind, setup: WeaponSetup, path_empty: bool, ability: AbilityKind) -> bool {
+    ability != AbilityKind::MortarFire || (kind == EntityKind::MortarTeam && path_empty && setup == WeaponSetup::Deployed)
 }
 
 pub(crate) fn tech_requirement_met(

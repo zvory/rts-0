@@ -7,6 +7,7 @@ pub enum EntityKind {
     Rifleman,
     MachineGunner,
     AtTeam,
+    MortarTeam,
     ScoutCar,
     Tank,
     CityCentre,
@@ -20,11 +21,12 @@ pub enum EntityKind {
 }
 
 impl EntityKind {
-    pub const ALL: [EntityKind; 14] = [
+    pub const ALL: [EntityKind; 15] = [
         EntityKind::Worker,
         EntityKind::Rifleman,
         EntityKind::MachineGunner,
         EntityKind::AtTeam,
+        EntityKind::MortarTeam,
         EntityKind::ScoutCar,
         EntityKind::Tank,
         EntityKind::CityCentre,
@@ -55,6 +57,7 @@ impl EntityKind {
             EntityKind::Rifleman => "rifleman",
             EntityKind::MachineGunner => "machine_gunner",
             EntityKind::AtTeam => "at_team",
+            EntityKind::MortarTeam => "mortar_team",
             EntityKind::ScoutCar => "scout_car",
             EntityKind::Tank => "tank",
             EntityKind::CityCentre => "city_centre",
@@ -78,6 +81,7 @@ impl FromStr for EntityKind {
             "rifleman" => Ok(EntityKind::Rifleman),
             "machine_gunner" => Ok(EntityKind::MachineGunner),
             "at_team" => Ok(EntityKind::AtTeam),
+            "mortar_team" => Ok(EntityKind::MortarTeam),
             "scout_car" => Ok(EntityKind::ScoutCar),
             "tank" => Ok(EntityKind::Tank),
             "city_centre" => Ok(EntityKind::CityCentre),
