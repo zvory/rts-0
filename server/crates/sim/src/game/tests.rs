@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use super::scoring::entity_score_value;
 use super::*;
 use crate::game::command::SimCommand as Command;
-use crate::game::entity::{Entity, EntityKind, GatherPhase, Order};
+use crate::game::entity::{Entity, EntityKind, GatherPhase, Order, WeaponSetup};
 use crate::protocol::{kinds, terrain, AbilityCooldownView, EntityView, OrderPlanMarker};
 
 fn human_vs_ai_players() -> [PlayerInit; 2] {
@@ -184,6 +184,23 @@ fn flat_tank_move_fixture() -> (Game, u32, (f32, f32)) {
     (game, tank, goal)
 }
 
+fn empty_flat_game(players: &[PlayerInit]) -> Game {
+    let mut game = Game::new_for_replay(players, 0x1234_5678);
+    for tile in &mut game.map.terrain {
+        *tile = crate::protocol::terrain::GRASS;
+    }
+    for id in game.entities.ids() {
+        game.entities.remove(id);
+    }
+    game.smokes = SmokeCloudStore::new();
+    game.mortar_shells = MortarShellStore::default();
+    systems::recompute_supply(&mut game.players, &game.entities);
+    game.spatial = services::spatial::SpatialIndex::build(&game.entities, game.map.size);
+    let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
+    game.fog.recompute(&ids, &game.entities, &game.map);
+    game
+}
+
 fn smoke_projection_fixture() -> (Game, u32, u32, u32, (f32, f32)) {
     let players = [
         PlayerInit {
@@ -236,6 +253,95 @@ fn smoke_projection_fixture() -> (Game, u32, u32, u32, (f32, f32)) {
     game.fog
         .recompute_with_smoke(&ids, &game.entities, &game.map, &game.smokes);
     (game, observer, friendly, enemy, smoke_pos)
+}
+
+#[test]
+fn manual_mortar_fire_impacts_without_toast_notice() {
+    let players = [
+        PlayerInit {
+            id: 1,
+            name: "One".into(),
+            color: "#fff".into(),
+            is_ai: false,
+        },
+        PlayerInit {
+            id: 2,
+            name: "Two".into(),
+            color: "#000".into(),
+            is_ai: false,
+        },
+    ];
+    let mut game = empty_flat_game(&players);
+    let mortar_pos = game.map.tile_center(8, 8);
+    let target_pos = game.map.tile_center(12, 8);
+    let mortar = game
+        .entities
+        .spawn_unit(1, EntityKind::MortarTeam, mortar_pos.0, mortar_pos.1)
+        .expect("mortar should spawn");
+    game.entities
+        .get_mut(mortar)
+        .expect("mortar should exist")
+        .set_weapon_setup(WeaponSetup::Deployed);
+    let target = game
+        .entities
+        .spawn_unit(2, EntityKind::Rifleman, target_pos.0, target_pos.1)
+        .expect("target should spawn");
+    systems::recompute_supply(&mut game.players, &game.entities);
+    game.spatial = services::spatial::SpatialIndex::build(&game.entities, game.map.size);
+    let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
+    game.fog.recompute(&ids, &game.entities, &game.map);
+
+    game.enqueue(
+        1,
+        Command::UseAbility {
+            ability: ability::AbilityKind::MortarFire,
+            units: vec![mortar],
+            x: Some(target_pos.0),
+            y: Some(target_pos.1),
+            queued: false,
+        },
+    );
+    let accepted_events = game.tick();
+    let owner_events = accepted_events
+        .iter()
+        .find(|(player_id, _)| *player_id == 1)
+        .map(|(_, events)| events.as_slice())
+        .unwrap_or(&[]);
+    assert!(
+        owner_events
+            .iter()
+            .all(|event| !matches!(event, Event::Notice { msg, .. } if msg == "Mortar fire")),
+        "accepted mortar command should use impact feedback instead of a toast notice: {owner_events:?}"
+    );
+    let hp_before_impact = game
+        .entities
+        .get(target)
+        .expect("target should still exist")
+        .hp;
+
+    let mut impact_events = Vec::new();
+    for _ in 0..config::MORTAR_SHELL_DELAY_TICKS {
+        impact_events = game.tick();
+    }
+
+    assert!(
+        game.entities
+            .get(target)
+            .is_none_or(|target_after| target_after.hp < hp_before_impact),
+        "manual mortar fire should damage or kill units at the targeted impact point"
+    );
+    let owner_events = impact_events
+        .iter()
+        .find(|(player_id, _)| *player_id == 1)
+        .map(|(_, events)| events.as_slice())
+        .unwrap_or(&[]);
+    assert!(
+        owner_events
+            .iter()
+            .any(|event| matches!(event, Event::MortarImpact { x, y, .. }
+                if (*x - target_pos.0).abs() < 0.001 && (*y - target_pos.1).abs() < 0.001)),
+        "delayed mortar impact should emit a visible impact marker: {owner_events:?}"
+    );
 }
 
 #[test]
