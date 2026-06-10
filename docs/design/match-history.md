@@ -88,8 +88,9 @@ Migrations are versioned SQL files run by `sqlx::migrate!` at server boot. Never
 - `client/src/match_history.js` — fetches and renders the lobby table; row click expands the
   score screen and, when compatible, exposes a replay launch action.
 - `client/src/app.js` — mounts `MatchHistory` when the lobby shows; `refresh()` is called from
-  `onBackToLobby` so the freshly-written row appears without a page reload. `?replayRoom=...`
-  auto-joins a server-created replay room through the normal WebSocket join flow.
+  normal-room `onBackToLobby` so the freshly-written row appears without a page reload.
+  `?replayRoom=...` auto-joins a server-created replay room through the normal WebSocket join
+  flow, and its back-to-lobby action navigates to `/` so only that viewer leaves the replay room.
 
 ## What gets recorded
 
