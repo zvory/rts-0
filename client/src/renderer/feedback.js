@@ -7,6 +7,7 @@ import {
   RESOURCE_AMOUNTS,
   AT_GUN_DEPLOYED_RANGE_TILES,
   AT_GUN_FIELD_OF_FIRE_RAD,
+  MORTAR_INNER_RADIUS_TILES,
   MINING_CC_RANGE_TILES,
   isProducerBuilding,
 } from "../config.js";
@@ -33,6 +34,7 @@ import {
   drawTankHull,
   drawTankTracks,
   finiteNumber,
+  hash2,
   hexToInt,
   isImpassableAt,
   isVehicleBodyKind,
@@ -432,6 +434,104 @@ export function _drawSmokeCanisters(state) {
     g.beginFill(0x2b2b2b, alpha * 0.7);
     g.drawCircle(px - ux * 1.2 - uy * 0.7, py - uy * 1.2 + ux * 0.7, 1.2);
     g.endFill();
+  }
+}
+
+export function _drawMortarLaunches(state) {
+  const g = this._feedbackGfx;
+  if (!state || typeof state.liveMortarLaunches !== "function") return;
+  const now = performance.now();
+  const launches = state.liveMortarLaunches(now);
+  if (!launches.length) return;
+
+  for (const launch of launches) {
+    const age = now - launch.createdAt;
+    const fade = 1 - clamp01(age / 360);
+    const r = 11;
+    g.lineStyle(0, 0x000000, 0);
+    g.beginFill(0x8a806b, 0.24 * fade);
+    g.drawPolygon([
+      launch.x - r * 0.95, launch.y - r * 0.14,
+      launch.x - r * 0.5, launch.y - r * 0.58,
+      launch.x + r * 0.22, launch.y - r * 0.5,
+      launch.x + r * 0.86, launch.y - r * 0.16,
+      launch.x + r * 0.64, launch.y + r * 0.38,
+      launch.x - r * 0.18, launch.y + r * 0.52,
+      launch.x - r * 0.82, launch.y + r * 0.28,
+    ]);
+    g.endFill();
+    g.beginFill(0xc0b092, 0.18 * fade);
+    g.drawCircle(launch.x - 4, launch.y + 1, 4.5);
+    g.drawCircle(launch.x + 4, launch.y - 2, 3.8);
+    g.endFill();
+  }
+}
+
+export function _drawMortarImpacts(state) {
+  const g = this._feedbackGfx;
+  if (!state || typeof state.liveMortarImpacts !== "function") return;
+  const now = performance.now();
+  const impacts = state.liveMortarImpacts(now);
+  if (!impacts.length) return;
+  const ts = (this._map && this._map.tileSize) || 32;
+  const innerRadius = MORTAR_INNER_RADIUS_TILES * ts;
+
+  for (const impact of impacts) {
+    const outerRadius = Math.max(innerRadius + 8, impact.radiusTiles * ts);
+    g.lineStyle(0, 0x000000, 0);
+    g.beginFill(0xff4500, 0.23);
+    drawJaggedBlob(g, impact.x, impact.y, outerRadius, 18, impact.seed + 11, 0.7, 1.0);
+    g.endFill();
+    g.beginFill(0xff8c3a, 0.16);
+    drawJaggedBlob(g, impact.x, impact.y, outerRadius * 0.72, 14, impact.seed + 23, 0.74, 1.0);
+    g.endFill();
+
+    g.beginFill(0x2a2119, 0.28);
+    drawJaggedBlob(g, impact.x, impact.y, innerRadius * 1.18, 10, impact.seed + 37, 0.72, 1.0);
+    g.endFill();
+    g.lineStyle(3, 0xffffff, 0.95);
+    drawJaggedRing(g, impact.x, impact.y, innerRadius, 12, impact.seed + 41, 0.72, 1.18);
+    g.lineStyle(1.8, 0xfff2d0, 0.7);
+    drawJaggedRing(g, impact.x, impact.y, innerRadius * 0.72, 9, impact.seed + 53, 0.78, 1.08);
+
+    drawShrapnel(g, impact.x, impact.y, innerRadius * 0.78, outerRadius, impact.seed);
+  }
+}
+
+function drawJaggedBlob(g, cx, cy, radius, points, seed, minScale, maxScale) {
+  const poly = [];
+  for (let i = 0; i < points; i += 1) {
+    const a = (i / points) * Math.PI * 2;
+    const n = hash2(seed + i * 17, seed - i * 31);
+    const r = radius * (minScale + (maxScale - minScale) * n);
+    poly.push(cx + Math.cos(a) * r, cy + Math.sin(a) * r);
+  }
+  g.drawPolygon(poly);
+}
+
+function drawJaggedRing(g, cx, cy, radius, points, seed, minScale, maxScale) {
+  for (let i = 0; i <= points; i += 1) {
+    const j = i % points;
+    const a = (j / points) * Math.PI * 2;
+    const n = hash2(seed + j * 19, seed + j * 7);
+    const r = radius * (minScale + (maxScale - minScale) * n);
+    const x = cx + Math.cos(a) * r;
+    const y = cy + Math.sin(a) * r;
+    if (i === 0) g.moveTo(x, y);
+    else g.lineTo(x, y);
+  }
+}
+
+function drawShrapnel(g, cx, cy, innerRadius, outerRadius, seed) {
+  g.lineStyle(1.5, 0x2b2119, 0.56);
+  const count = 18;
+  for (let i = 0; i < count; i += 1) {
+    const a = (i / count) * Math.PI * 2 + hash2(seed + i * 5, seed + 99) * 0.18;
+    const start = innerRadius + hash2(seed + i * 13, seed + 3) * innerRadius * 0.55;
+    const len = 5 + hash2(seed + i * 29, seed + 77) * 11;
+    const end = Math.min(outerRadius * 0.94, start + len);
+    g.moveTo(cx + Math.cos(a) * start, cy + Math.sin(a) * start);
+    g.lineTo(cx + Math.cos(a) * end, cy + Math.sin(a) * end);
   }
 }
 

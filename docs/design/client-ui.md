@@ -281,8 +281,10 @@ and unit layer):
 - Units: low-detail hard-edged silhouettes tinted by player color, with a dark drop shadow,
   dark outline, HP bar above when damaged/selected, and glowing selection ring when selected.
   Distinct silhouette per kind (engineer: compact block; rifleman / machine gunner: shared
-  infantry body with oversized role weapons; AT team: wheeled gun; scout car: boxy WW2-style truck
-  silhouette with enclosed wheels and a rear-top machine-gunner; tank: chunky flat-shaded armor).
+  infantry body with oversized role weapons; AT team: wheeled gun; mortar team: crewless
+  M1938-inspired small wheeled mortar that travels low and deploys upright; scout car: boxy
+  WW2-style truck silhouette with enclosed wheels and a rear-top machine-gunner; tank: chunky
+  flat-shaded armor).
   Riflemen carry a rifle, AT teams field a wheeled anti-tank gun with a long recoiling barrel,
   carriage, two wheels, and animated deployment bracing, and machine gunners carry an MG42-style
   long machine gun across the body while packed that extends forward with bracing during
