@@ -352,7 +352,8 @@ fn write_replay_artifact(
         })
         .join(name);
     fs::create_dir_all(&dir).map_err(|err| err.to_string())?;
-    let artifact = ReplayArtifactV1::capture_from_game(game, server_build_sha(), None, game.scores());
+    let artifact =
+        ReplayArtifactV1::capture_from_game(game, server_build_sha(), None, game.scores());
     let json = serde_json::to_vec_pretty(&artifact).map_err(|err| err.to_string())?;
     fs::write(dir.join("replay.json"), json).map_err(|err| err.to_string())?;
     Ok(dir)

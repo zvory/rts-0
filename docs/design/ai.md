@@ -64,7 +64,8 @@ treating the rush as a pure all-in: it resumes worker production toward main ste
 starts oil workers after a steel floor, adds a home
 Barracks, builds a Training Centre, and switches production toward Machine Gunners / AT teams with
 Riflemen as the fallback until support tech is ready. Machine Gunners come online with the Training
-Centre; AT teams require the follow-up Gun Works (`steelworks` kind).
+Centre; AT teams train from the follow-up Gun Works (`steelworks` kind) after AT Gun Crews
+research.
 `rifle_flood_full_saturation` saturates the observed main-base steel line before assigning oil
 workers, so the oil timing follows the map's current steel patch count instead of a hardcoded worker
 number. At 50 supply it independently pivots into the tank tech path and becomes eligible to expand
@@ -81,8 +82,9 @@ the AI classifies the visible local threat by weapon DPS: tank-dominated pressur
 local DPS) prioritizes AT teams, infantry-dominated pressure prioritizes Machine Gunners, mixed
 pressure asks for a support mix, and no-DPS pressure falls back to Riflemen. Support panic only uses
 already-completed support tech: Machine Gunners need a Training Centre and AT teams need a
-Gun Works. It may pull workers onto oil for those support counters; if the relevant support tech
-is absent, Barracks production falls back to Riflemen and panic mode does not create tech buildings.
+Gun Works plus AT Gun Crews research. It may pull workers onto oil for those support counters; if
+the relevant support tech is absent, production falls back to Riflemen and panic mode does not
+create tech buildings.
 If the pressure persists through the panic window, the AI asks for an additional Barracks before
 resuming its normal profile once the threat has cleared.
 `steel_expansion_tanks` is a defensive economic support profile: it saves for a second City
@@ -90,7 +92,7 @@ Centre near a neutral steel expansion before building any non-Depot tech structu
 expansion sites must cover the full local resource line, then are ranked by own distance divided
 by nearest living enemy-start distance so similarly close naturals prefer the base farther from
 enemies. Once that expansion City Centre is planned, it builds Barracks and Training Centre tech, staffs
-oil, produces Machine Gunners before Gun Works and then AT teams toward a one-for-one support mix, and keeps those
+oil, produces Machine Gunners before Gun Works and then AT teams from Gun Works toward a one-for-one support mix, and keeps those
 support units staged in a short line on the enemy-facing side of its main-base steel cluster
 instead of launching outbound attack waves.
 After 50 supply used, it switches to a Vehicle Works tech path, stops Machine Gunner / AT team

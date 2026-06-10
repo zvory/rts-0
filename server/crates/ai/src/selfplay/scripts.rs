@@ -184,6 +184,7 @@ impl ProfileBackedScript {
                 AiIntent::Move { .. }
                 | AiIntent::Build { .. }
                 | AiIntent::Train { .. }
+                | AiIntent::Research { .. }
                 | AiIntent::Gather { .. } => {}
             }
         }

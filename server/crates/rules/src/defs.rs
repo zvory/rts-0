@@ -54,11 +54,8 @@ pub struct NodeDef {
 }
 
 const WORKER_ONLY: &[EntityKind] = &[EntityKind::Worker];
-const BARRACKS_UNITS: &[EntityKind] = &[
-    EntityKind::Rifleman,
-    EntityKind::MachineGunner,
-    EntityKind::AtTeam,
-];
+const BARRACKS_UNITS: &[EntityKind] = &[EntityKind::Rifleman, EntityKind::MachineGunner];
+const STEELWORKS_UNITS: &[EntityKind] = &[EntityKind::AtTeam];
 const FACTORY_UNITS: &[EntityKind] = &[EntityKind::ScoutCar, EntityKind::Tank];
 const CITY_CENTRE_REQUIRED: &[EntityKind] = &[EntityKind::CityCentre];
 const CITY_CENTRE_AND_BARRACKS_REQUIRED: &[EntityKind] =
@@ -150,7 +147,7 @@ pub const UNITS: &[UnitDef] = &[
         armor_class: ArmorClass::Small,
         weapon: WeaponClass::AntiTank,
         target_priority: TargetPriority::PrefersArmored,
-        trained_at: Some(EntityKind::Barracks),
+        trained_at: Some(EntityKind::Steelworks),
         train_requires: STEELWORKS_REQUIRED,
     },
     UnitDef {
@@ -315,7 +312,7 @@ pub const BUILDINGS: &[BuildingDef] = &[
         },
         armor_class: ArmorClass::Armored,
         weapon: WeaponClass::None,
-        trains: &[],
+        trains: STEELWORKS_UNITS,
         build_requires: FACTORY_REQUIRED,
     },
 ];

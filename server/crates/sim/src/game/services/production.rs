@@ -381,18 +381,25 @@ mod tests {
     fn no_rally_at_gun_spawn_uses_rotation_safe_circular_body() {
         let map = flat_map(32);
         let mut entities = EntityStore::new();
-        let barracks = spawn_barracks_training(&map, &mut entities, 10, 10, EntityKind::AtTeam);
+        let gun_works = spawn_building_training(
+            &map,
+            &mut entities,
+            10,
+            10,
+            EntityKind::Steelworks,
+            EntityKind::AtTeam,
+        );
         let mut players = vec![player(1)];
 
         tick_production(&map, &mut entities, &mut players);
 
         assert!(
             entities
-                .get(barracks)
-                .expect("barracks")
+                .get(gun_works)
+                .expect("gun works")
                 .prod_queue()
                 .is_empty(),
-            "AT gun should spawn when a no-rally barracks exit is available"
+            "AT gun should spawn when a no-rally Gun Works exit is available"
         );
         let at_gun = entities
             .iter()
@@ -464,20 +471,21 @@ mod tests {
         id
     }
 
-    fn spawn_barracks_training(
+    fn spawn_building_training(
         map: &Map,
         entities: &mut EntityStore,
         tile_x: u32,
         tile_y: u32,
+        building: EntityKind,
         unit: EntityKind,
     ) -> u32 {
-        let (x, y) = footprint_center(map, EntityKind::Barracks, tile_x, tile_y);
+        let (x, y) = footprint_center(map, building, tile_x, tile_y);
         let id = entities
-            .spawn_building(1, EntityKind::Barracks, x, y, true)
-            .expect("barracks should spawn");
+            .spawn_building(1, building, x, y, true)
+            .expect("producer should spawn");
         entities
             .get_mut(id)
-            .expect("barracks")
+            .expect("producer")
             .push_production(ProdItem {
                 unit,
                 progress: 1,

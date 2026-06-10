@@ -1,6 +1,4 @@
-use crate::game::entity::{
-    uses_oriented_vehicle_body, Entity, EntityKind, Order, WeaponSetup,
-};
+use crate::game::entity::{uses_oriented_vehicle_body, Entity, EntityKind, Order, WeaponSetup};
 use crate::game::map::Map;
 use crate::game::services::occupancy::Occupancy;
 use crate::game::services::standability as static_standability;

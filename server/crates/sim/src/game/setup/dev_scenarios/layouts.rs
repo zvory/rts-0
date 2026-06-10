@@ -119,7 +119,13 @@ pub(super) fn vehicle_corner_wall_map(
     let wall_top_y = map.size / 2 - 8;
     let wall_bottom_y = wall_top_y + 16;
 
-    block_rect_tiles(&mut map, wall_left_x, wall_top_y, wall_right_x, wall_bottom_y);
+    block_rect_tiles(
+        &mut map,
+        wall_left_x,
+        wall_top_y,
+        wall_right_x,
+        wall_bottom_y,
+    );
 
     let ts = config::TILE_SIZE as f32;
     let lead_x = wall_left_x as f32 * ts - ts;
@@ -347,4 +353,3 @@ pub(super) fn snaking_corridor_spawn_spacing(unit: EntityKind) -> Result<(f32, f
         }
     }
 }
-

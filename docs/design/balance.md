@@ -92,8 +92,7 @@ authoritative `rules::defs` records.
   1.25x movement speed (matching tank speed at 2.0 px/tick), fire while moving without an extra
   miss chance, and 25% faster attacks (16 tick cooldown becomes 12).
 - **AT Gun Crews** (Gun Works research, protocol id `at_gun_unlock`): costs 100 steel / 75 oil
-  and takes 600 ticks (~20s). Once complete, that player can train AT Guns from Barracks under the
-  phase-2 compatibility production layout.
+  and takes 600 ticks (~20s). Once complete, that player can train AT Guns from Gun Works.
 - **Tank Production** (Vehicle Works research, protocol id `tank_unlock`): costs 150 steel /
   100 oil and takes 600 ticks (~20s). Once complete, that player can train Tanks from Vehicle
   Works. Scout Cars remain immediately trainable from Vehicle Works.
@@ -159,10 +158,10 @@ Building stats (hp, sight, cost, footprint tiles wxh, buildTicks, extra):
 |----------------------------|--------------------|-----|-------|-----|------|-----------|-------|
 | city_centre                | City Centre        | 600 | 9     | 200 | 3x3  | 400       | trains worker; +10 supply; players start with one free |
 | depot                      | Supply Depot       | 110 | 4     | 100 | 2x2  | 300       | +8 supply |
-| barracks                   | Barracks           | 165 | 6     | 150 | 3x2  | 200       | trains rifleman, machine_gunner, at_team; requires a City Centre |
+| barracks                   | Barracks           | 165 | 6     | 150 | 3x2  | 200       | trains rifleman and machine_gunner; requires a City Centre |
 | training_centre            | Training Centre    | 300 | 6     | 100 steel + 50 oil | 3x2  | 560       | shared prerequisite before either advanced path; unlocks machine_gunner training at barracks and researches Methamphetamines; requires a City Centre and Barracks |
 | factory                    | Vehicle Works      | 360 | 6     | 200 steel + 100 oil | 3x3  | 330       | Mobile Warfare path building; trains scout_car immediately and researches Tank Production before tank training; requires a City Centre and Training Centre |
-| steelworks                 | Gun Works          | 300 | 6     | 125 steel + 125 oil | 2x2  | 620       | Superior Firepower path building; researches AT Gun Crews before at_team training at barracks under the phase-2 compatibility layout; requires a City Centre and Training Centre |
+| steelworks                 | Gun Works          | 300 | 6     | 125 steel + 125 oil | 2x2  | 620       | Superior Firepower path building; researches AT Gun Crews before at_team training; requires a City Centre and Training Centre |
 
 Win: a player is **eliminated** when they own zero buildings (units alone do not keep them
 alive). Last player standing wins; a 1-player match never ends (sandbox/exploration mode). In a

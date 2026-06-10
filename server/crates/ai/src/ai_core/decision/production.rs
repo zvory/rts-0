@@ -1,7 +1,8 @@
 use super::*;
 
-pub(super) const PRODUCTION_BUILDINGS: [EntityKind; 3] = [
+pub(super) const PRODUCTION_BUILDINGS: [EntityKind; 4] = [
     EntityKind::Factory,
+    EntityKind::Steelworks,
     EntityKind::Barracks,
     EntityKind::CityCentre,
 ];
