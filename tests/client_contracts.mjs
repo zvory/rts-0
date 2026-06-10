@@ -1288,8 +1288,8 @@ function fakeAudioContext() {
   assert(STATS[KIND.SCOUT_CAR].body.width === 21.6, "Scout Car client body width mirrors server");
   assert(KIND_CODE[KIND.SCOUT_CAR] === 14, "Scout Car compact kind code should follow steelworks protocol kind");
   assert(
-    STATS[KIND.STEELWORKS].footW === 2 && STATS[KIND.STEELWORKS].footH === 2,
-    "Gun Works should be a 2x2 building",
+    STATS[KIND.STEELWORKS].footW === 3 && STATS[KIND.STEELWORKS].footH === 3,
+    "Gun Works should be a 3x3 building",
   );
   assert(
     STATS[KIND.STEELWORKS].cost.steel === 125 && STATS[KIND.STEELWORKS].cost.oil === 125,
@@ -1542,6 +1542,69 @@ function fakeAudioContext() {
         sent[1].upgrade === UPGRADE.METHAMPHETAMINES,
       "Methamphetamines hotkey should send a research command",
     );
+
+    renderedButtons.length = 0;
+    const selectedFactory = {
+      id: 78,
+      owner: playerId,
+      kind: KIND.FACTORY,
+      buildProgress: null,
+    };
+    const factoryHud = Object.create(HUD.prototype);
+    factoryHud.state = {
+      playerId,
+      resources: { steel: 300, oil: 150 },
+      upgrades: [],
+      selectedEntities: () => [selectedFactory],
+      entitiesInterpolated: () => [selectedFactory],
+    };
+    factoryHud.net = { command: (command) => sent.push(command) };
+    factoryHud._cardSig = null;
+    factoryHud._trainRoundRobin = new Map();
+    factoryHud._cancelRoundRobin = new Map();
+    factoryHud._resourceIcons = {};
+    factoryHud._renderTrainCard(fakeElement("div"), selectedFactory);
+    const scoutCarButton = renderedButtons.find((button) => button.innerHTML.includes("Scout Car"));
+    const tankButton = renderedButtons.find((button) => button.innerHTML.includes("Tank"));
+    const tankResearchButton = renderedButtons.find((button) => button.innerHTML.includes("TK+"));
+    assert(scoutCarButton?.dataset.hotkey === "Q", "Scout Car training should keep the Q slot");
+    assert(tankButton?.dataset.hotkey === "W", "Tank training should occupy the top-middle W slot");
+    assert(tankResearchButton?.dataset.hotkey === "S", "Tank Production research should appear below Tank");
+
+    renderedButtons.length = 0;
+    factoryHud.state.upgrades = [UPGRADE.TANK_UNLOCK];
+    factoryHud._cardSig = null;
+    factoryHud._renderTrainCard(fakeElement("div"), selectedFactory);
+    assert(
+      !renderedButtons.some((button) => button.innerHTML.includes("TK+")),
+      "completed Tank Production research should disappear from the command card",
+    );
+
+    renderedButtons.length = 0;
+    const selectedGunWorks = {
+      id: 79,
+      owner: playerId,
+      kind: KIND.STEELWORKS,
+      buildProgress: null,
+    };
+    const gunWorksHud = Object.create(HUD.prototype);
+    gunWorksHud.state = {
+      playerId,
+      resources: { steel: 100, oil: 75 },
+      upgrades: [],
+      selectedEntities: () => [selectedGunWorks],
+      entitiesInterpolated: () => [selectedGunWorks],
+    };
+    gunWorksHud.net = { command: (command) => sent.push(command) };
+    gunWorksHud._cardSig = null;
+    gunWorksHud._trainRoundRobin = new Map();
+    gunWorksHud._cancelRoundRobin = new Map();
+    gunWorksHud._resourceIcons = {};
+    gunWorksHud._renderTrainCard(fakeElement("div"), selectedGunWorks);
+    const atGunButton = renderedButtons.find((button) => button.innerHTML.includes("AT Gun"));
+    const atResearchButton = renderedButtons.find((button) => button.innerHTML.includes("AT+"));
+    assert(atGunButton?.dataset.hotkey === "Q", "AT Gun training should occupy the top-left Q slot");
+    assert(atResearchButton?.dataset.hotkey === "A", "AT Gun Crews research should appear below AT Gun");
 
     renderedButtons.length = 0;
     const playedNotices = [];
