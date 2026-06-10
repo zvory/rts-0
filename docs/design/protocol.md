@@ -25,7 +25,7 @@ crate.
 | `setSpectator` | `spectator: bool` | Switch between active player and spectator role while still in the lobby. Ignored after the match starts; switching to active player is ignored if the active seats are full. |
 | `command`  | `cmd: Command` | Issue a gameplay command (see below). Ignored unless in-game. |
 | `giveUp`   | — | Give up the active match. The server eliminates that player and sends their score screen. |
-| `returnToLobby` | — | Leave post-match replay playback and return the room to a clean lobby for rematch setup. Ignored outside replay rooms. |
+| `returnToLobby` | — | Leave post-match replay playback and return a normal match room to a clean lobby for rematch setup. Ignored outside replay playback and ignored by dedicated replay rooms created for match-history/dev replay viewing. |
 | `ping`     | `ts: number` | Latency probe; server replies with `pong`. |
 | `setReplaySpeed` | `speed: f32` | Set replay/dev-watch playback speed multiplier; ignored outside replay rooms and dev watch playback. For dev scenario watch rooms only, `0` pauses the authoritative simulation. Other accepted speeds are clamped. |
 | `stepDevTick` | — | Advance a paused dev scenario watch room by one authoritative simulation tick. Ignored outside paused dev scenario rooms. |
@@ -137,9 +137,11 @@ loadable only through the dev self-play room path.
 When a real multi-player match ends, the server sends the normal `gameOver` score payload, clears
 pending latest-only live snapshots for connected humans, and then sends a replay `start` payload
 at tick 0 plus `replayState`. Post-match replay defaults every viewer to all active players'
-combined authoritative vision and starts at `2.0x` speed. `returnToLobby` exits this replay phase,
-drops the replay simulation, clears ready flags, and broadcasts a normal lobby snapshot for the
-next match.
+combined authoritative vision and starts at `2.0x` speed. In a normal match room,
+`returnToLobby` exits this replay phase, drops the replay simulation, clears ready flags, and
+broadcasts a normal lobby snapshot for the next match. Dedicated replay rooms created for
+match-history or dev replay viewing ignore `returnToLobby`; they keep the shared replay session
+alive until viewers disconnect and the room empties.
 
 ### 2.4 `snapshot` payload (per-player, fog-filtered)
 `Snapshot` remains the semantic shape used by server game code and by client modules after
