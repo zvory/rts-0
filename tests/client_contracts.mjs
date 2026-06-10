@@ -1174,6 +1174,7 @@ function fakeAudioContext() {
   assertHasMethod(net, "returnToLobby", "Net");
   assertHasMethod(net, "command", "Net");
   assertHasMethod(net, "ping", "Net");
+  assertHasMethod(net, "netReport", "Net");
   assertHasGetter(net, "playerId", "Net");
   assert(net.playerId === null, "Net.playerId should be null before welcome");
   assertHasMethod(net, "addAi", "Net");
@@ -1181,6 +1182,8 @@ function fakeAudioContext() {
   assertHasMethod(net, "setQuickstart", "Net");
   assertHasMethod(net, "setReplaySpeed", "Net");
   assertHasMethod(net, "setReplayVision", "Net");
+  assert(msg.netReport({ schemaVersion: 1 }).t === "netReport", "net-report builder tag");
+  assert(msg.netReport({ schemaVersion: 1 }).report.schemaVersion === 1, "net-report builder payload");
   assert(msg.returnToLobby().t === "returnToLobby", "return-to-lobby builder tag");
   assert(msg.replayVisionAll().t === "setReplayVision", "replay all-vision builder tag");
   assert(msg.replayVisionAll().vision.mode === "all", "replay all-vision builder payload");

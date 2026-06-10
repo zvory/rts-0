@@ -39,7 +39,9 @@ use rts_server::game::replay::{ReplayArtifactV1, REPLAY_ARTIFACT_SCHEMA_VERSION_
 use rts_server::game::SimCommand;
 use rts_server::lobby::{self, Lobby, RoomEvent};
 use rts_server::perf;
-use rts_server::protocol::{serialize_compact_snapshot, ClientMessage, ServerMessage};
+use rts_server::protocol::{
+    serialize_compact_snapshot, ClientMessage, ClientNetReport, ServerMessage,
+};
 
 /// Default room name used when a client's `join` omits `room`.
 const DEFAULT_ROOM: &str = "main";
@@ -1028,6 +1030,7 @@ async fn handle_connection(socket: WebSocket, lobby: Lobby) {
 
     // The room this connection has joined, if any. A client must `join` before other actions.
     let mut current_room: Option<lobby::RoomHandle> = None;
+    let mut current_room_name: Option<String> = None;
     let mut shutdown_rx = lobby.subscribe_connection_shutdown();
 
     loop {
@@ -1071,7 +1074,15 @@ async fn handle_connection(socket: WebSocket, lobby: Lobby) {
                         continue;
                     }
                 };
-                handle_client_message(player_id, parsed, &lobby, &conn_tx, &mut current_room).await;
+                handle_client_message(
+                    player_id,
+                    parsed,
+                    &lobby,
+                    &conn_tx,
+                    &mut current_room,
+                    &mut current_room_name,
+                )
+                .await;
             }
             Message::Binary(_) => {
                 // The protocol is JSON text only; ignore stray binary frames.
@@ -1175,6 +1186,7 @@ async fn handle_client_message(
     lobby: &Lobby,
     conn_tx: &lobby::ConnectionSink,
     current_room: &mut Option<lobby::RoomHandle>,
+    current_room_name: &mut Option<String>,
 ) {
     match msg {
         ClientMessage::Join {
@@ -1229,7 +1241,10 @@ async fn handle_client_message(
                 return;
             }
             match ack_rx.await {
-                Ok(true) => *current_room = Some(handle),
+                Ok(true) => {
+                    *current_room = Some(handle);
+                    *current_room_name = Some(room_name);
+                }
                 Ok(false) => {
                     debug!(player_id, room = %room_name, "join rejected by room");
                 }
@@ -1313,6 +1328,9 @@ async fn handle_client_message(
             // Answer directly so latency probes work regardless of room state.
             let _ = conn_tx.try_send_reliable(ServerMessage::Pong { ts });
         }
+        ClientMessage::NetReport { report } => {
+            log_client_net_report(player_id, current_room_name.as_deref(), report);
+        }
         ClientMessage::SetReplaySpeed { speed } => {
             send_room_event(
                 player_id,
@@ -1361,6 +1379,35 @@ async fn handle_client_message(
             debug!(player_id, "ignoring unsupported client message");
         }
     }
+}
+
+fn log_client_net_report(player_id: u32, current_room_name: Option<&str>, report: ClientNetReport) {
+    let room = current_room_name.unwrap_or("");
+    info!(
+        event = "client_net_report",
+        player_id,
+        room = %room,
+        schema_version = report.schema_version,
+        elapsed_ms = report.elapsed_ms,
+        match_tick = report.match_tick,
+        rtt_ms = report.rtt_ms,
+        rtt_max_ms = report.rtt_max_ms,
+        bad_rtt_samples = report.bad_rtt_samples,
+        snapshot_jitter_ms = report.snapshot_jitter_ms,
+        snapshot_gap_max_ms = report.snapshot_gap_max_ms,
+        jitter_samples = report.jitter_samples,
+        snapshots = report.snapshots,
+        frame_gap_max_ms = report.frame_gap_max_ms,
+        fps_estimate = report.fps_estimate,
+        hidden = report.hidden,
+        focused = report.focused,
+        ws_buffered_bytes = report.ws_buffered_bytes,
+        server_tick_ms = report.server_tick_ms,
+        server_lag_ms = report.server_lag_ms,
+        slow_tick_count = report.slow_tick_count,
+        head_of_line_count = report.head_of_line_count,
+        "client network report"
+    );
 }
 
 /// Forward a [`RoomEvent`] to the connection's room, if it has joined one. Logs and ignores the
