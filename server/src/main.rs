@@ -1181,6 +1181,7 @@ async fn handle_client_message(
             name,
             room,
             spectator,
+            ..
         } => {
             // Re-joining a different room is not supported; the first join wins. Subsequent
             // joins from the same connection are ignored to keep room membership unambiguous.
