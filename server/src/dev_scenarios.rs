@@ -445,7 +445,28 @@ const VEHICLE_SMALL_BLOCK_BASELINE_LAUNCHES: [DevScenarioLaunch; 30] = [
     },
 ];
 
-const DEV_SCENARIOS: [DevScenarioSpec; 5] = [
+const FACTORY_ZERO_GAP_PERPENDICULAR_LAUNCHES: [DevScenarioLaunch; 3] = [
+    DevScenarioLaunch {
+        id: "factory_zero_gap_perpendicular",
+        unit: EntityKind::AtTeam,
+        count: 1,
+        blocker: None,
+    },
+    DevScenarioLaunch {
+        id: "factory_zero_gap_perpendicular",
+        unit: EntityKind::ScoutCar,
+        count: 1,
+        blocker: None,
+    },
+    DevScenarioLaunch {
+        id: "factory_zero_gap_perpendicular",
+        unit: EntityKind::Tank,
+        count: 1,
+        blocker: None,
+    },
+];
+
+const DEV_SCENARIOS: [DevScenarioSpec; 6] = [
     DevScenarioSpec {
         id: "scout_car_snaking_corridor",
         title: "Scout Car Snaking Corridor",
@@ -476,6 +497,12 @@ const DEV_SCENARIOS: [DevScenarioSpec; 5] = [
         title: "Vehicle Small-Unit Block Baseline",
         description: "Vehicles start almost bumper-to-bumper with optional small-unit blockers one tile north of each vehicle, then all vehicles move 20 tiles north.",
         launches: &VEHICLE_SMALL_BLOCK_BASELINE_LAUNCHES,
+    },
+    DevScenarioSpec {
+        id: "factory_zero_gap_perpendicular",
+        title: "Factory Zero-Gap Perpendicular",
+        description: "One vehicle starts flush against the east side of a factory, waits half a second, then moves ten tiles directly east.",
+        launches: &FACTORY_ZERO_GAP_PERPENDICULAR_LAUNCHES,
     },
 ];
 
@@ -658,6 +685,15 @@ mod tests {
             })
         );
         assert_eq!(
+            parse_dev_scenario_room("factory_zero_gap_perpendicular:unit=tank:count=1"),
+            Some(DevScenarioLaunch {
+                id: "factory_zero_gap_perpendicular",
+                unit: EntityKind::Tank,
+                count: 1,
+                blocker: None,
+            })
+        );
+        assert_eq!(
             parse_dev_scenario_launch(
                 "vehicle_small_block_baseline",
                 "scout_car",
@@ -717,6 +753,14 @@ mod tests {
         );
         assert_eq!(
             parse_dev_scenario_launch("vehicle_small_block_baseline", "tank", "5", Some("tank")),
+            None
+        );
+        assert_eq!(
+            parse_dev_scenario_launch("factory_zero_gap_perpendicular", "worker", "1", None),
+            None
+        );
+        assert_eq!(
+            parse_dev_scenario_launch("factory_zero_gap_perpendicular", "tank", "3", None),
             None
         );
         assert_eq!(

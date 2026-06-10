@@ -23,6 +23,7 @@ struct DevScenarioTiming {
     scenario: &'static str,
     unit: EntityKind,
     count: usize,
+    issue_delay_ticks: u32,
     clear_ticks: Option<u32>,
     clear_seconds: Option<f32>,
     final_state: Vec<String>,
@@ -167,6 +168,10 @@ fn measure_dev_scenario_clear_time(
 ) -> DevScenarioTiming {
     let mut game = setup.game;
     let units = setup.units;
+    while game.tick_count() < setup.issue_after_ticks {
+        game.tick();
+    }
+    let issued_at = game.tick_count();
     game.enqueue(
         setup.player_id,
         SimCommand::Move {
@@ -181,11 +186,12 @@ fn measure_dev_scenario_clear_time(
     for _ in 0..max_ticks {
         game.tick();
         if dev_scenario_units_clear(&game, &units) {
-            let ticks = game.tick_count();
+            let ticks = game.tick_count().saturating_sub(issued_at);
             return DevScenarioTiming {
                 scenario,
                 unit,
                 count,
+                issue_delay_ticks: setup.issue_after_ticks,
                 clear_ticks: Some(ticks),
                 clear_seconds: Some(ticks as f32 / config::TICK_HZ as f32),
                 final_state: describe_dev_scenario_state(&game, &units),
@@ -197,6 +203,7 @@ fn measure_dev_scenario_clear_time(
         scenario,
         unit,
         count,
+        issue_delay_ticks: setup.issue_after_ticks,
         clear_ticks: None,
         clear_seconds: None,
         final_state: describe_dev_scenario_state(&game, &units),
@@ -365,6 +372,56 @@ fn vehicle_corner_wall_scenario_supports_all_vehicle_counts() {
 }
 
 #[test]
+fn factory_zero_gap_perpendicular_scenario_matches_authored_layout() {
+    for unit in [EntityKind::AtTeam, EntityKind::ScoutCar, EntityKind::Tank] {
+        let setup = Game::new_factory_zero_gap_perpendicular_scenario(unit, 1, 0x5150_0009)
+            .expect("scenario setup should succeed");
+        assert_eq!(setup.issue_after_ticks, config::TICK_HZ / 2);
+        assert_eq!(setup.units.len(), 1);
+        assert_eq!(owned_kind_count(&setup.game, 1, EntityKind::Factory), 1);
+        assert_eq!(owned_kind_count(&setup.game, 1, unit), 1);
+
+        let factory = setup
+            .game
+            .entities
+            .iter()
+            .find(|e| e.kind == EntityKind::Factory)
+            .expect("factory should exist");
+        let rect = services::geometry::building_rect_for_entity(&setup.game.map, factory)
+            .expect("factory rect should exist");
+        let unit_entity = setup
+            .game
+            .entities
+            .get(setup.units[0])
+            .expect("scenario unit should exist");
+        let body = services::geometry::unit_body_for_entity(unit_entity)
+            .expect("scenario unit should have a movement body");
+        let body_aabb = body.aabb();
+        let gap = body_aabb.min_x - rect.max_x;
+        assert!(
+            (0.0..=0.025).contains(&gap),
+            "{unit} should start visually zero-gap against factory east side, got {gap:.4}px"
+        );
+        assert!(
+            (unit_entity.pos_y - (rect.min_y + rect.max_y) * 0.5).abs() <= 0.001,
+            "{unit} should be centered along the factory side"
+        );
+        assert!(
+            (unit_entity.facing() + std::f32::consts::FRAC_PI_2).abs() <= 0.001,
+            "{unit} should begin with its hull north/south"
+        );
+        assert!(
+            (setup.goal.0 - unit_entity.pos_x - config::TILE_SIZE as f32 * 10.0).abs() <= 0.001,
+            "{unit} move goal should be ten tiles east"
+        );
+        assert!(
+            (setup.goal.1 - unit_entity.pos_y).abs() <= 0.001,
+            "{unit} move goal should be perpendicular to the hull on the same y axis"
+        );
+    }
+}
+
+#[test]
 fn experimental_direct_reverse_and_corner_wall_clear_time_matrix() {
     let mut results = Vec::new();
     for unit in [EntityKind::AtTeam, EntityKind::ScoutCar, EntityKind::Tank] {
@@ -391,18 +448,71 @@ fn experimental_direct_reverse_and_corner_wall_clear_time_matrix() {
     }
 
     println!("EXPERIMENTAL_DIRECT_REVERSE_AND_CORNER_WALL_CLEAR_TIMES");
-    println!("scenario | unit | count | clear_ticks | clear_seconds | final_state");
+    println!(
+        "scenario | unit | count | issue_delay_ticks | clear_ticks | clear_seconds | final_state"
+    );
     for result in &results {
         match (result.clear_ticks, result.clear_seconds) {
             (Some(ticks), Some(seconds)) => println!(
-                "{:>24} | {:>14} | {:>5} | {:>11} | {:>13.2} | {:?}",
-                result.scenario, result.unit, result.count, ticks, seconds, result.final_state
-            ),
-            _ => println!(
-                "{:>24} | {:>14} | {:>5} | {:>11} | {:>13} | {:?}",
+                "{:>24} | {:>14} | {:>5} | {:>17} | {:>11} | {:>13.2} | {:?}",
                 result.scenario,
                 result.unit,
                 result.count,
+                result.issue_delay_ticks,
+                ticks,
+                seconds,
+                result.final_state
+            ),
+            _ => println!(
+                "{:>24} | {:>14} | {:>5} | {:>17} | {:>11} | {:>13} | {:?}",
+                result.scenario,
+                result.unit,
+                result.count,
+                result.issue_delay_ticks,
+                "timeout",
+                "timeout",
+                result.final_state
+            ),
+        }
+    }
+}
+
+#[test]
+fn experimental_factory_zero_gap_perpendicular_clear_time_matrix() {
+    let mut results = Vec::new();
+    for unit in [EntityKind::AtTeam, EntityKind::ScoutCar, EntityKind::Tank] {
+        let setup = Game::new_factory_zero_gap_perpendicular_scenario(unit, 1, 0x5150_0010)
+            .expect("scenario setup should succeed");
+        results.push(measure_dev_scenario_clear_time(
+            "factory_zero_gap_perpendicular",
+            unit,
+            1,
+            setup,
+        ));
+    }
+
+    println!("FACTORY_ZERO_GAP_PERPENDICULAR_CLEAR_TIMES");
+    println!(
+        "scenario | unit | count | issue_delay_ticks | clear_ticks | clear_seconds | final_state"
+    );
+    for result in &results {
+        match (result.clear_ticks, result.clear_seconds) {
+            (Some(ticks), Some(seconds)) => println!(
+                "{:>32} | {:>14} | {:>5} | {:>17} | {:>11} | {:>13.2} | {:?}",
+                result.scenario,
+                result.unit,
+                result.count,
+                result.issue_delay_ticks,
+                ticks,
+                seconds,
+                result.final_state
+            ),
+            _ => println!(
+                "{:>32} | {:>14} | {:>5} | {:>17} | {:>11} | {:>13} | {:?}",
+                result.scenario,
+                result.unit,
+                result.count,
+                result.issue_delay_ticks,
                 "timeout",
                 "timeout",
                 result.final_state

@@ -21,6 +21,7 @@ pub(super) fn room_mode_for(room: &str) -> RoomMode {
                     "scout_car_wall_chokepoint" => DevScenarioId::ScoutCarWallChokepoint,
                     "vehicle_corner_wall" => DevScenarioId::VehicleCornerWall,
                     "vehicle_small_block_baseline" => DevScenarioId::VehicleSmallBlockBaseline,
+                    "factory_zero_gap_perpendicular" => DevScenarioId::FactoryZeroGapPerpendicular,
                     _ => return RoomMode::Normal,
                 },
                 unit: launch.unit,

@@ -37,6 +37,7 @@ impl Game {
             player_id,
             units,
             goal,
+            issue_after_ticks: 0,
         })
     }
 
@@ -88,6 +89,7 @@ impl Game {
             player_id,
             units: vec![unit_id],
             goal,
+            issue_after_ticks: 0,
         })
     }
 
@@ -126,6 +128,7 @@ impl Game {
             player_id,
             units,
             goal,
+            issue_after_ticks: 0,
         })
     }
 
@@ -164,6 +167,7 @@ impl Game {
             player_id,
             units,
             goal,
+            issue_after_ticks: 0,
         })
     }
 
@@ -218,6 +222,50 @@ impl Game {
             player_id,
             units,
             goal,
+            issue_after_ticks: 0,
+        })
+    }
+
+    pub fn new_factory_zero_gap_perpendicular_scenario(
+        unit: EntityKind,
+        unit_count: usize,
+        seed: u32,
+    ) -> Result<DevScenarioSetup, String> {
+        if !matches!(
+            unit,
+            EntityKind::AtTeam | EntityKind::ScoutCar | EntityKind::Tank
+        ) {
+            return Err(format!("unsupported factory-zero-gap unit {unit}"));
+        }
+        if unit_count != 1 {
+            return Err(format!(
+                "unsupported factory-zero-gap unit count {unit_count}"
+            ));
+        }
+
+        let (map, start_tile, factory_pos, unit_start, goal) =
+            factory_zero_gap_perpendicular_map(unit);
+        let mut entities = EntityStore::new();
+        entities
+            .spawn_building(1, EntityKind::Factory, factory_pos.0, factory_pos.1, true)
+            .ok_or_else(|| "failed to spawn factory".to_string())?;
+        let units = spawn_factory_zero_gap_perpendicular_units(&mut entities, unit, unit_start)?;
+        let player_id = 1;
+        let game = build_dev_scenario_game(
+            map,
+            entities,
+            player_id,
+            start_tile,
+            seed,
+            "dev:factory_zero_gap_perpendicular",
+        );
+
+        Ok(DevScenarioSetup {
+            game,
+            player_id,
+            units,
+            goal,
+            issue_after_ticks: config::TICK_HZ / 2,
         })
     }
 }
@@ -227,6 +275,7 @@ pub struct DevScenarioSetup {
     pub player_id: u32,
     pub units: Vec<u32>,
     pub goal: (f32, f32),
+    pub issue_after_ticks: u32,
 }
 
 fn build_dev_scenario_game(
