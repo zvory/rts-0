@@ -9,7 +9,7 @@ use crate::game::map::Map;
 use crate::game::mortar::MortarShellStore;
 use crate::game::services::ability_orders::{
     active_ability_order_ready, launch_self_ability, launch_world_ability,
-    order_or_launch_world_ability,
+    order_or_launch_world_ability, world_ability_facing_ready,
 };
 use crate::game::services::construction::resumable_site_for_build_intent;
 use crate::game::services::dist2;
@@ -121,6 +121,9 @@ pub(crate) fn promote_ready_orders(
                 Some(e) => e.owner,
                 None => continue,
             };
+            if !world_ability_facing_ready(entities, id, ability, x, y) {
+                continue;
+            }
             let launched = launch_world_ability(
                 map,
                 entities,

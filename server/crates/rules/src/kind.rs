@@ -106,12 +106,12 @@ impl fmt::Display for EntityKind {
 pub fn uses_oriented_vehicle_body(kind: EntityKind) -> bool {
     matches!(
         kind,
-        EntityKind::AtTeam | EntityKind::ScoutCar | EntityKind::Tank
+        EntityKind::AtTeam | EntityKind::MortarTeam | EntityKind::ScoutCar | EntityKind::Tank
     )
 }
 
 pub fn uses_pivot_vehicle_movement(kind: EntityKind) -> bool {
-    matches!(kind, EntityKind::AtTeam | EntityKind::Tank)
+    matches!(kind, EntityKind::AtTeam | EntityKind::MortarTeam | EntityKind::Tank)
 }
 
 pub fn uses_car_movement_semantics(kind: EntityKind) -> bool {
