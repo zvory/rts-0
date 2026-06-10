@@ -1,3 +1,29 @@
+small countdown before the game starts
+
+
+lat ! 82, slow 2, jit 7373
+
+make alerts silent on replays
+
+make tanks take up multiple spots in the selection box
+
+
+replay playback should not end if one player in the replay leaves
+
+
+confirm if scout car starts with smoke grenade
+
+
+sometimes refreshing puts the player back in the replay they were just in
+
+
+workers on build orders should ignore unit blockage 
+
+
+when seeking in replays, add a visual indicator that it's working, and progress so far. potentially, could also play visual feedback as the game speeds forwrad
+
+create checkpoints for replays
+
 - continue developing queued orders
 
 - make missed shots literally miss, and can hit another unit
