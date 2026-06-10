@@ -3,23 +3,25 @@
 ## Objective
 
 Implement the Superior Firepower path-entry unit. Mortar Teams should let SF players pressure
-static defenses and punish clumped units before they reach AT Guns or Artillery.
+static defenses, deter attacks and harassment, and punish clumped units before they reach AT Guns or Artillery.
 
 ## Unit Behavior
 
-- Built at Steelworks.
-- Shells take 2 seconds to land.
+- Built at Gun Works.
+- Shells take 1.5 seconds to land.
 - Fires every 2 seconds.
-- No impact marker is shown to enemies or the firing player.
-- Deals small AOE damage.
-- Semi armor piercing: armored targets only apply half of normal armored damage reduction.
+- No impact marker is shown to enemies, but they are shown to the firing player.
+- Deals 30 AOE damage in a 1.5 tile radius. Within a .5 tile radius, does 60 damage, and deals semi-armor piercing damage (applies only half of normal damage reduction)
 - Requires 1 second of setup before firing, automatically like Machine Gunners.
 - Cannot fire while moving.
+- It should look like a heavy mortar and two guys beside it.
 
 ## Autocast
 
 - Mortar Teams fire automatically by default.
-- Autocast predicts target position 2 seconds ahead.
+- Fire ability is on X and has a swirl overlay when set to autocast. Right clicking wil disable autocast and allow players to fire manually with a range preview.
+- Autocast predicts target position 1.5 seconds ahead.
+  - If the taret is predicted to exit the mortar's range in 1.5, uhh, idk what to do. Should the mortar hold fire, or predict the unit will curve inwards into the radius?
 - Prediction includes built-in error so shots are dangerous but not perfectly reliable.
 - Multiple autocast Mortar Teams should stagger fire timing.
 - Multiple autocast Mortar Teams should prefer different targets when possible.
@@ -39,7 +41,7 @@ static defenses and punish clumped units before they reach AT Guns or Artillery.
 
 ## Verification
 
-- Mortar Teams train from Steelworks.
+- Mortar Teams train from Gun Works.
 - Mortar Teams set up before firing.
 - Delayed shells land after the intended delay.
 - AOE damage is bounded and does not panic on stale or dead targets.

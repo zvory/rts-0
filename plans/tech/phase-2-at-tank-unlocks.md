@@ -7,7 +7,7 @@ should be available at path entry, while AT Guns and Tanks require commitment.
 
 ## Work
 
-- Add a Steelworks research upgrade that unlocks AT Gun training.
+- Add a Gun Works research upgrade that unlocks AT Gun training.
 - Add a Vehicle Works research upgrade that unlocks Tank training.
 - Keep Scout Cars trainable immediately from Vehicle Works.
 - Make the client command card show locked AT Gun and Tank buttons with clear requirement text.
@@ -23,8 +23,8 @@ should be available at path entry, while AT Guns and Tanks require commitment.
 
 ## Verification
 
-- Unit tests cover rejected AT Gun training before the Steelworks upgrade.
-- Unit tests cover accepted AT Gun training after the Steelworks upgrade.
+- Unit tests cover rejected AT Gun training before the Gun Works upgrade.
+- Unit tests cover accepted AT Gun training after the Gun Works upgrade.
 - Unit tests cover rejected Tank training before the Vehicle Works upgrade.
 - Unit tests cover accepted Tank training after the Vehicle Works upgrade.
 - Client HUD shows correct locked/unlocked train states.

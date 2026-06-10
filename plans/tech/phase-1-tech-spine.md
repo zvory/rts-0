@@ -12,7 +12,7 @@ making the path structure explicit.
 - Prefer keeping the internal kind as `factory` for now to avoid unnecessary protocol migration.
 - Confirm Training Centre remains the shared prerequisite before either advanced path.
 - Confirm Vehicle Works trains Scout Cars immediately.
-- Confirm Steelworks is the Superior Firepower path building.
+- Confirm Gun Works is the Superior Firepower path building.
 - Update balance/design docs that describe unit roles and production buildings.
 
 ## Verification

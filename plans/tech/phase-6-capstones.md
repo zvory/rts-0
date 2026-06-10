@@ -7,8 +7,8 @@ playable.
 
 ## Artillery
 
-- Built at Steelworks.
-- Requires a late Steelworks upgrade.
+- Built at Gun Works.
+- Requires a late Gun Works upgrade.
 - Very slow.
 - Very long range.
 - Shoots at a point, not a unit.

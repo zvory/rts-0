@@ -1,12 +1,12 @@
 small countdown before the game starts
 
+users houdl not be able to end a replay lobby by hitting back to lobby
 
 lat ! 82, slow 2, jit 7373
 
 make alerts silent on replays
 
 make tanks take up multiple spots in the selection box
-
 
 replay playback should not end if one player in the replay leaves
 
@@ -24,10 +24,12 @@ when seeking in replays, add a visual indicator that it's working, and progress 
 
 create checkpoints for replays
 
-- continue developing queued orders
 
-- make missed shots literally miss, and can hit another unit
-- 
+-------
+
+- map editor hsould allow placement of resources in custom fashion
+
+
 
 
 ecnomy rework:
@@ -37,7 +39,6 @@ ecnomy rework:
  - refineries and mines have the same HP as workers and have no armor
  - 
 
-- map editor hsould allow placement of resources in custom fashion
 
 - when the game is won or lost, it should automatically scrub back to the beginning of the replay, and start playing back at 2x speed. players can close the victory screen to see the replay better. 
 

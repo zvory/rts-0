@@ -31,9 +31,9 @@ unit modest.
 | Stage | Superior Firepower | Mobile Warfare |
 |-------|--------------------|----------------|
 | Shared | Training Centre: Machine Gunner, later Stormtrooper | Training Centre: Machine Gunner, later Stormtrooper |
-| Path entry | Steelworks: Mortar Team | Vehicle Works: Scout Car |
-| Commitment unlock | Steelworks upgrade: AT Gun | Vehicle Works upgrade: Tank |
-| Late power | Steelworks upgrade: Artillery | Vehicle Works upgrade: Command Car |
+| Path entry | Gun Works: Mortar Team | Vehicle Works: Scout Car |
+| Commitment unlock | Gun Works upgrade: AT Gun | Vehicle Works upgrade: Tank |
+| Late power | Gun Works upgrade: Artillery | Vehicle Works upgrade: Command Car |
 
 ## Unit Notes
 
@@ -49,7 +49,7 @@ unit modest.
 
 ### Mortar Team
 
-- Built at Steelworks.
+- Built at Gun Works.
 - Path-entry Superior Firepower unit.
 - Shells take 2 seconds to land and fire every 2 seconds.
 - No marker indicates where rounds will hit.
@@ -62,8 +62,8 @@ unit modest.
 
 ### AT Gun
 
-- Built at Steelworks.
-- Requires a Steelworks upgrade before training.
+- Built at Gun Works.
+- Requires a Gun Works upgrade before training.
 - Superior Firepower commitment unlock and primary answer to Tanks.
 
 ### Scout Car
@@ -89,7 +89,7 @@ unit modest.
 
 ### Artillery
 
-- Built at Steelworks.
+- Built at Gun Works.
 - Late Superior Firepower capstone.
 - Very slow, very long-range gun that shoots at a point rather than at a unit.
 - Must set up before firing and tear down before moving.
@@ -99,7 +99,7 @@ unit modest.
 
 1. [Phase 1 - Tech Spine and Vehicle Works Framing](phase-1-tech-spine.md)
 2. [Phase 2 - AT Gun and Tank Unlock Upgrades](phase-2-at-tank-unlocks.md)
-3. [Phase 3 - Steelworks AT Gun Production](phase-3-steelworks-at-gun.md)
+3. [Phase 3 - Gun Works AT Gun Production](phase-3-steelworks-at-gun.md)
 4. [Phase 4 - Mortar Team](phase-4-mortar-team.md)
 5. [Phase 5 - Stage Timing and Playtest Balance](phase-5-stage-timing.md)
 6. [Phase 6 - Capstone Units: Artillery and Command Car](phase-6-capstones.md)
