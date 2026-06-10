@@ -94,7 +94,10 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   ok(true, "match can start with one human ready + one AI");
   A.send({ t: "start" });
 
-  const start = await A.waitNext((m) => m.t === "start", 3000, "A start");
+  const countdown = await A.waitNext((m) => m.t === "matchCountdown", 3000, "A countdown");
+  ok(countdown.durationMs === 3000 && countdown.words.join(" ") === "Drei! Zwei! Eins!",
+     `countdown words/duration are correct (${countdown.words?.join(" ")}, ${countdown.durationMs}ms)`);
+  const start = await A.waitNext((m) => m.t === "start", 6000, "A start");
   ok(start.players.length === 2, `start lists 2 players (human + AI) (${start.players.length})`);
   const sa = start.players.find((p) => p.id === A.playerId);
   const sai = start.players.find((p) => p.id !== A.playerId);

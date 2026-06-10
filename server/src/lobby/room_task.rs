@@ -33,6 +33,18 @@ struct AiSlot {
 
 const AUTOMATED_MATCH_HISTORY_ROOM_PREFIXES: [&str; 4] =
     ["itest-", "ai-itest-", "client-smoke-", "reg-"];
+const MATCH_COUNTDOWN_WORDS: [&str; 3] = ["Drei!", "Zwei!", "Eins!"];
+
+fn match_countdown_duration() -> Duration {
+    #[cfg(test)]
+    {
+        Duration::from_millis(1)
+    }
+    #[cfg(not(test))]
+    {
+        Duration::from_secs(3)
+    }
+}
 
 fn server_build_sha() -> &'static str {
     env!("COMMIT_HASH")
@@ -493,6 +505,9 @@ pub(super) struct RoomTask {
     match_map_name: String,
     /// Display names of every participant (humans + AI) in seat order, for match-history rows.
     match_participants: Vec<String>,
+    /// Pre-match countdown deadline. While set, lobby membership/settings are frozen and the
+    /// match starts on the first room tick at or after this instant.
+    match_countdown_deadline: Option<TokioInstant>,
     drain: DrainHandle,
     match_tracked_for_drain: bool,
 }
@@ -529,6 +544,7 @@ impl RoomTask {
             match_started_at: None,
             match_map_name: String::new(),
             match_participants: Vec::new(),
+            match_countdown_deadline: None,
             drain,
             match_tracked_for_drain: false,
         }
@@ -712,6 +728,19 @@ impl RoomTask {
             self.on_join_replay_viewer(player_id, name, msg_tx, ack);
             return;
         }
+        if self.match_countdown_deadline.is_some() {
+            send_or_log(
+                &self.room,
+                player_id,
+                &msg_tx,
+                ServerMessage::Error {
+                    msg: "Match is starting in this room — try another room.".to_string(),
+                },
+            );
+            debug!(room = %self.room, player_id, "rejecting join; match countdown active");
+            let _ = ack.send(false);
+            return;
+        }
         if self.players.contains_key(&player_id) {
             // Defensive: a connection should only ever join once.
             let _ = ack.send(false);
@@ -793,6 +822,7 @@ impl RoomTask {
         if self.players.is_empty() {
             self.mark_match_finished_for_drain();
             self.phase = Phase::Lobby;
+            self.match_countdown_deadline = None;
             self.match_player_count = 0;
             self.match_human_count = 0;
             self.outcome_sent.clear();
@@ -824,6 +854,9 @@ impl RoomTask {
         if self.is_live_dev_watch() {
             return;
         }
+        if self.match_countdown_deadline.is_some() {
+            return;
+        }
         if let Phase::Lobby = self.phase {
             if let Some(player) = self.players.get_mut(&player_id) {
                 if player.spectator {
@@ -840,6 +873,9 @@ impl RoomTask {
             return;
         }
         if !matches!(self.phase, Phase::Lobby) {
+            return;
+        }
+        if self.match_countdown_deadline.is_some() {
             return;
         }
         if self.drain.is_draining() {
@@ -864,13 +900,16 @@ impl RoomTask {
             debug!(room = %self.room, "ignoring start; not all players ready");
             return;
         }
-        self.start_match();
+        self.start_match_countdown();
     }
 
     /// Host-only: seat a computer opponent. Ignored outside the lobby, from non-hosts, or once
     /// the room is full (humans + AI == [`MAX_PLAYERS`]).
     fn on_add_ai(&mut self, player_id: u32) {
         if self.is_live_dev_watch() {
+            return;
+        }
+        if self.match_countdown_deadline.is_some() {
             return;
         }
         if !matches!(self.phase, Phase::Lobby) || self.host_id != Some(player_id) {
@@ -893,6 +932,9 @@ impl RoomTask {
         if self.is_live_dev_watch() {
             return;
         }
+        if self.match_countdown_deadline.is_some() {
+            return;
+        }
         if !matches!(self.phase, Phase::Lobby) || self.host_id != Some(player_id) {
             return;
         }
@@ -907,6 +949,9 @@ impl RoomTask {
     /// Host-only: toggle the lobby's boosted opening resources.
     fn on_set_quickstart(&mut self, player_id: u32, enabled: bool) {
         if self.is_live_dev_watch() {
+            return;
+        }
+        if self.match_countdown_deadline.is_some() {
             return;
         }
         if !matches!(self.phase, Phase::Lobby) || self.host_id != Some(player_id) {
@@ -924,6 +969,9 @@ impl RoomTask {
         if self.is_live_dev_watch() {
             return;
         }
+        if self.match_countdown_deadline.is_some() {
+            return;
+        }
         if !matches!(self.phase, Phase::Lobby) || self.host_id != Some(player_id) {
             return;
         }
@@ -936,6 +984,9 @@ impl RoomTask {
 
     fn on_set_spectator(&mut self, player_id: u32, spectator: bool) {
         if self.is_live_dev_watch() {
+            return;
+        }
+        if self.match_countdown_deadline.is_some() {
             return;
         }
         if !matches!(self.phase, Phase::Lobby) {
@@ -1226,6 +1277,10 @@ impl RoomTask {
     /// A match may start with at least one active participant and every active human ready.
     /// Spectators can host and watch from the lobby, but they do not block readiness.
     fn can_start(&self) -> bool {
+        self.match_countdown_deadline.is_none() && self.can_start_now()
+    }
+
+    fn can_start_now(&self) -> bool {
         !self.drain.is_draining()
             && self.total_player_count() > 0
             && self
@@ -1275,9 +1330,42 @@ impl RoomTask {
         self.broadcast(&msg);
     }
 
+    fn start_match_countdown(&mut self) {
+        let duration = match_countdown_duration();
+        self.match_countdown_deadline = Some(TokioInstant::now() + duration);
+        self.broadcast_lobby();
+        let msg = ServerMessage::MatchCountdown {
+            duration_ms: duration.as_millis() as u32,
+            words: MATCH_COUNTDOWN_WORDS
+                .iter()
+                .map(|word| (*word).to_string())
+                .collect(),
+        };
+        self.broadcast(&msg);
+        info!(room = %self.room, "match countdown started");
+    }
+
+    fn finish_match_countdown_if_due(&mut self) -> bool {
+        let Some(deadline) = self.match_countdown_deadline else {
+            return false;
+        };
+        if TokioInstant::now() < deadline {
+            return true;
+        }
+        self.match_countdown_deadline = None;
+        if self.can_start_now() {
+            self.start_match();
+        } else {
+            debug!(room = %self.room, "match countdown aborted; start preconditions changed");
+            self.broadcast_lobby();
+        }
+        true
+    }
+
     /// Transition from `Lobby` to `InGame`: create the simulation and send each player their
     /// own `start` payload. Only called from `on_start_request` once preconditions hold.
     fn start_match(&mut self) {
+        self.match_countdown_deadline = None;
         self.reset_match_net_status();
         let mut inits: Vec<PlayerInit> = self
             .active_human_ids()
@@ -1657,6 +1745,9 @@ impl RoomTask {
         }
         if matches!(self.phase, Phase::ReplayViewer(_)) {
             self.on_tick_replay_viewer(scheduled);
+            return;
+        }
+        if self.finish_match_countdown_if_due() {
             return;
         }
         // Take ownership of the game for the duration of the tick so we can both mutate it and

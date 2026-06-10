@@ -56,9 +56,15 @@ export class Lobby {
     this._playerCount = 0;
     /** @type {Array<() => void>} subscribers for the server `start` message. */
     this._startCbs = [];
+    /** @type {HTMLElement|null} large pre-match countdown overlay. */
+    this._countdownEl = null;
+    /** @type {number[]} active countdown timeout ids. */
+    this._countdownTimers = [];
+    this._countdownActive = false;
 
     // Bound handlers kept so they can be removed in destroy().
     this._onLobby = (m) => this._renderLobby(m);
+    this._onMatchCountdown = (m) => this._renderMatchCountdown(m);
     this._onStart = () => this._handleStart();
     this._onJoinReplayPrompt = (m) => this._handleJoinReplayPrompt(m);
     this._onError = (m) => this.setStatus((m && m.msg) || "Error", true);
@@ -174,6 +180,7 @@ export class Lobby {
 
   _wireNet() {
     this.net.on(S.LOBBY, this._onLobby);
+    this.net.on(S.MATCH_COUNTDOWN, this._onMatchCountdown);
     this.net.on(S.START, this._onStart);
     this.net.on(S.JOIN_REPLAY_PROMPT, this._onJoinReplayPrompt);
     this.net.on(S.ERROR, this._onError);
@@ -184,11 +191,13 @@ export class Lobby {
   /** Tear down listeners (not normally needed for a single-screen lifetime). */
   destroy() {
     this.net.off(S.LOBBY, this._onLobby);
+    this.net.off(S.MATCH_COUNTDOWN, this._onMatchCountdown);
     this.net.off(S.START, this._onStart);
     this.net.off(S.JOIN_REPLAY_PROMPT, this._onJoinReplayPrompt);
     this.net.off(S.ERROR, this._onError);
     this.net.off("open", this._onOpen);
     this.net.off("close", this._onClose);
+    this._clearCountdown();
   }
 
   // --- Rendering -------------------------------------------------------------
@@ -324,7 +333,7 @@ export class Lobby {
     if (!this.btnAddAi) return;
     const isHost = this.net.playerId != null && this.net.playerId === this._hostId;
     this.btnAddAi.hidden = !isHost;
-    this.btnAddAi.disabled = this._playerCount >= MAX_PLAYERS;
+    this.btnAddAi.disabled = this._countdownActive || this._playerCount >= MAX_PLAYERS;
   }
 
   /** Show the debug mode toggle only to the host and keep it synced. */
@@ -332,7 +341,7 @@ export class Lobby {
     if (!this.chkQuickstart) return;
     const isHost = this.net.playerId != null && this.net.playerId === this._hostId;
     this.chkQuickstart.hidden = !isHost;
-    this.chkQuickstart.disabled = !isHost;
+    this.chkQuickstart.disabled = this._countdownActive || !isHost;
     this.chkQuickstartInput.checked = !!this._quickstart;
   }
 
@@ -356,7 +365,7 @@ export class Lobby {
         }
       }
       this.selMap.value = this._selectedMap;
-      this.selMap.disabled = !isHost;
+      this.selMap.disabled = this._countdownActive || !isHost;
       this.selMap.hidden = !isHost;
     }
     if (this.elMapDisplay) {
@@ -371,7 +380,7 @@ export class Lobby {
   _reflectStartButton() {
     if (!this.btnStart) return;
     const isHost = this.net.playerId != null && this.net.playerId === this._hostId;
-    this.btnStart.disabled = !(isHost && this._canStart);
+    this.btnStart.disabled = this._countdownActive || !(isHost && this._canStart);
     this.btnStart.classList.toggle("host-only", isHost);
   }
 
@@ -380,7 +389,7 @@ export class Lobby {
     if (!this.btnReady) return;
     this.btnReady.textContent = this._ready ? "Unready" : "Ready";
     if (this._spectator) this.btnReady.textContent = "Observing";
-    this.btnReady.disabled = this._spectator;
+    this.btnReady.disabled = this._countdownActive || this._spectator;
     this.btnReady.classList.toggle("active", this._ready);
     this.btnReady.setAttribute("aria-pressed", this._ready ? "true" : "false");
   }
@@ -402,6 +411,7 @@ export class Lobby {
 
   /** The server signaled match start: fire subscribers (main.js switches screens). */
   _handleStart() {
+    this._clearCountdown();
     for (const cb of this._startCbs) {
       try {
         cb();
@@ -409,6 +419,64 @@ export class Lobby {
         // A faulty subscriber must not break the others or the lobby.
       }
     }
+  }
+
+  _renderMatchCountdown(m) {
+    const words = Array.isArray(m?.words) && m.words.length
+      ? m.words.map((word) => String(word))
+      : ["Drei!", "Zwei!", "Eins!"];
+    const durationMs = Math.max(1000, Number(m?.durationMs) || words.length * 1000);
+    const wordMs = Math.max(250, durationMs / words.length);
+
+    this._clearCountdown();
+    this._countdownActive = true;
+    this._reflectReadyButton();
+    this._reflectStartButton();
+    this._reflectAddAiButton();
+    this._reflectQuickstart();
+    this._reflectMap();
+    this.setStatus("Match starting...");
+
+    const overlay = document.createElement("div");
+    overlay.className = "match-countdown";
+    overlay.setAttribute("role", "status");
+    overlay.setAttribute("aria-live", "assertive");
+    this._countdownEl = overlay;
+    this.root.appendChild(overlay);
+
+    const showWord = (word) => {
+      if (!this._countdownEl) return;
+      this._countdownEl.textContent = word;
+      this._countdownEl.classList.remove("pulse");
+      // Restart the animation for each word.
+      void this._countdownEl.offsetWidth;
+      this._countdownEl.classList.add("pulse");
+    };
+
+    words.forEach((word, index) => {
+      const delay = Math.round(index * wordMs);
+      if (delay <= 0) {
+        showWord(word);
+      } else {
+        this._countdownTimers.push(window.setTimeout(() => showWord(word), delay));
+      }
+    });
+    this._countdownTimers.push(window.setTimeout(() => this._clearCountdown(), durationMs + 1000));
+  }
+
+  _clearCountdown() {
+    for (const timer of this._countdownTimers) window.clearTimeout(timer);
+    this._countdownTimers = [];
+    this._countdownActive = false;
+    if (this._countdownEl) {
+      this._countdownEl.remove();
+      this._countdownEl = null;
+    }
+    this._reflectReadyButton();
+    this._reflectStartButton();
+    this._reflectAddAiButton();
+    this._reflectQuickstart();
+    this._reflectMap();
   }
 
   _handleJoinReplayPrompt(m) {
