@@ -695,7 +695,7 @@ export class Match {
       else this.minimap?.pulseBorder();
     }
 
-    if (!this.audio) return;
+    if (this.replayViewer || !this.audio) return;
     if (alertId === UNDER_ATTACK_ID && hasPos && this.pointInViewport(ev.x, ev.y, VIEWPORT_ALERT_MARGIN_PX)) {
       return;
     }
