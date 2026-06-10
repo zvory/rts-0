@@ -1480,6 +1480,41 @@ input[type="text"]:focus {
   pointer-events: none;
   animation: toast-in 0.16s ease-out;
 }
+
+/* --- Pre-match countdown --- */
+.match-countdown {
+  position: absolute;
+  inset: 25vh 0;
+  z-index: calc(var(--overlay-z) + 1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: rgba(5, 7, 13, 0.74);
+  color: var(--accent);
+  font-family: "Germania One", var(--lobby-font);
+  font-size: clamp(96px, 18vw, 280px);
+  line-height: 1;
+  letter-spacing: 0;
+  text-align: center;
+  text-shadow:
+    5px 5px 0 #191710,
+    0 0 28px rgba(236, 199, 103, 0.36);
+  pointer-events: none;
+}
+.match-countdown.pulse {
+  animation: countdown-pulse 0.22s ease-out;
+}
+@keyframes countdown-pulse {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
 @keyframes toast-in {
   from {
     opacity: 0;

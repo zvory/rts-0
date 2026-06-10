@@ -5,6 +5,7 @@
 export const S = Object.freeze({
   WELCOME: "welcome",
   LOBBY: "lobby",
+  MATCH_COUNTDOWN: "matchCountdown",
   START: "start",
   SNAPSHOT: "snapshot",
   REPLAY_STATE: "replayState",

@@ -722,7 +722,7 @@ mod tests {
     }
 
     async fn wait_for_active_match_count(lobby: &Lobby, expected: usize) {
-        tokio::time::timeout(Duration::from_secs(1), async {
+        tokio::time::timeout(Duration::from_secs(4), async {
             loop {
                 if lobby.active_match_count() == expected {
                     return;
@@ -1129,6 +1129,7 @@ async fn send_server_message(
     let message_kind = match &msg {
         ServerMessage::Snapshot(_) => "snapshot",
         ServerMessage::Lobby { .. } => "lobby",
+        ServerMessage::MatchCountdown { .. } => "match_countdown",
         ServerMessage::Welcome { .. } => "welcome",
         ServerMessage::Start(_) => "start",
         ServerMessage::ReplayState(_) => "replay_state",

@@ -277,6 +277,11 @@ pub enum ServerMessage {
         /// All available maps (populated from disk at broadcast time).
         maps: Vec<AvailableMap>,
     },
+    /// Reliable pre-match countdown shown to every lobby participant before the `start` payload.
+    MatchCountdown {
+        duration_ms: u32,
+        words: Vec<String>,
+    },
     /// Match start (flattened: carries StartPayload's fields alongside `"t":"start"`).
     Start(StartPayload),
     /// Per-player, fog-filtered world state.

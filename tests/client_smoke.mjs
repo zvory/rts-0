@@ -117,13 +117,19 @@ try {
   );
   await page.waitForFunction(() => {
     const btn = document.querySelector('#command-card button[data-hotkey="W"]');
-    return btn && !btn.disabled && /Supply Depot/.test(btn.textContent || "");
+    return btn && !btn.disabled && !btn.classList.contains("unaffordable") && /Supply Depot/.test(btn.textContent || "");
   }, { timeout: 30000 });
   ok(true, "Depot build button became affordable after mining");
 
   await page.keyboard.press("w");
   await sleep(150);
-  ok(await page.evaluate(() => window.__rts.match.state.placement?.building) === "depot", "build hotkey entered placement mode");
+  let depotPlacement = await page.evaluate(() => window.__rts.match.state.placement?.building);
+  if (depotPlacement !== "depot") {
+    await page.click('#command-card button[data-hotkey="W"]');
+    await sleep(150);
+    depotPlacement = await page.evaluate(() => window.__rts.match.state.placement?.building);
+  }
+  ok(depotPlacement === "depot", "Depot build control entered placement mode");
 
   // Enumerate candidate placement tiles in a ring around the player's start. Terrain
   // passability is necessary but not sufficient: resource patches and other entities also

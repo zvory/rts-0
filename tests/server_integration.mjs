@@ -78,9 +78,16 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   ok(true, "canStart after both ready");
   A.send({ t: "start" });
 
-  const startA = await A.waitFor((m) => m.t === "start", 3000, "A start");
-  const startB = await B.waitFor((m) => m.t === "start", 3000, "B start");
-  const startC = await C.waitFor((m) => m.t === "start", 3000, "C start");
+  const countdownA = await A.waitFor((m) => m.t === "matchCountdown", 3000, "A countdown");
+  const countdownB = await B.waitFor((m) => m.t === "matchCountdown", 3000, "B countdown");
+  const countdownC = await C.waitFor((m) => m.t === "matchCountdown", 3000, "C countdown");
+  ok(countdownA.durationMs === 3000 && countdownA.words.join(" ") === "Drei! Zwei! Eins!",
+     `countdown words/duration are correct (${countdownA.words?.join(" ")}, ${countdownA.durationMs}ms)`);
+  ok(countdownB.durationMs === 3000 && countdownC.durationMs === 3000, "all lobby participants receive countdown");
+
+  const startA = await A.waitFor((m) => m.t === "start", 6000, "A start");
+  const startB = await B.waitFor((m) => m.t === "start", 6000, "B start");
+  const startC = await C.waitFor((m) => m.t === "start", 6000, "C start");
   ok(startA.map.terrain.length === startA.map.width * startA.map.height,
      `start map ${startA.map.width}x${startA.map.height}, terrain len=${startA.map.terrain.length}`);
   ok(startA.players.length === 2, `start lists 2 players`);
