@@ -1390,6 +1390,48 @@ input[type="text"]:focus {
 #replay-speed.replay-viewer-controls {
   bottom: 14px;
 }
+.replay-timeline {
+  flex-basis: 100%;
+  display: flex;
+  justify-content: center;
+  order: 10;
+  margin-top: 3px;
+}
+.replay-timeline-track {
+  position: relative;
+  width: min(720px, calc(100vw - 44px));
+  height: 18px;
+  appearance: none;
+  border: 1px solid var(--panel-edge);
+  border-radius: var(--radius-sm);
+  background: rgba(17, 17, 15, 0.9);
+  cursor: pointer;
+  overflow: hidden;
+}
+.replay-timeline-track:hover {
+  border-color: var(--accent);
+}
+.replay-timeline-progress {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--replay-progress, 0%);
+  background: rgba(236, 199, 103, 0.24);
+  pointer-events: none;
+}
+.replay-timeline-marks {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.replay-timeline-mark {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  width: 2px;
+  transform: translateX(-1px);
+  background: var(--accent);
+  box-shadow: 0 0 0 1px rgba(17, 17, 15, 0.75);
+}
 .spd-btn {
   appearance: none;
   border: 1px solid var(--panel-edge);

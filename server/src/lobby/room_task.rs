@@ -355,6 +355,11 @@ impl ReplaySession {
         ReplayPlaybackState {
             current_tick: self.current_tick(),
             duration_ticks: self.duration_ticks,
+            keyframe_ticks: self
+                .keyframes
+                .iter()
+                .map(|keyframe| keyframe.tick)
+                .collect(),
             speed: self.speed,
             paused: self.speed == 0.0,
             ended: self.current_tick() >= self.duration_ticks,
@@ -2840,6 +2845,7 @@ mod tests {
         replay.set_speed(42, 99.0);
         assert_eq!(replay.state().speed, ReplaySession::MAX_SPEED);
         assert_eq!(replay.state().controller_id, Some(42));
+        assert_eq!(replay.state().keyframe_ticks, vec![0]);
 
         let target = replay.seek_back("test", 1, 42, u32::MAX).unwrap();
         assert_eq!(target, 0);

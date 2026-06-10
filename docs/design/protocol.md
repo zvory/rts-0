@@ -356,12 +356,16 @@ Events are best-effort visual flavor; the client must not depend on receiving th
   t: "replayState",
   currentTick: u32,
   durationTicks: u32,
+  keyframeTicks: u32[],
   speed: f32,
   paused: bool,
   ended: bool,
   controllerId?: u32
 }
 ```
+`keyframeTicks` lists the replay keyframes the server has recorded so far. Clients may display
+them as seek marks, but a seek target is not limited to these ticks; the server restores the nearest
+recorded keyframe at or before the requested tick and fast-forwards from there.
 
 `ReplayVisionRequest` selects fog/vision per viewer:
 ```

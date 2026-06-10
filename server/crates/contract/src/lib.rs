@@ -41,6 +41,7 @@ pub struct ReplayStartMetadata {
 pub struct ReplayPlaybackState {
     pub current_tick: u32,
     pub duration_ticks: u32,
+    pub keyframe_ticks: Vec<u32>,
     pub speed: f32,
     pub paused: bool,
     pub ended: bool,
