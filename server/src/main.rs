@@ -45,6 +45,13 @@ use rts_server::protocol::{
 
 /// Default room name used when a client's `join` omits `room`.
 const DEFAULT_ROOM: &str = "main";
+const NET_REPORT_LATENCY_ISSUE_MS: u16 = 180;
+const NET_REPORT_JITTER_ISSUE_MS: u16 = 20;
+const NET_REPORT_SNAPSHOT_GAP_ISSUE_MS: u16 = 100;
+const NET_REPORT_FRAME_GAP_ISSUE_MS: u16 = 100;
+const NET_REPORT_WS_BUFFERED_BYTES_ISSUE: u32 = 64 * 1024;
+const NET_REPORT_SERVER_TICK_ISSUE_MS: u16 = 33;
+const NET_REPORT_SERVER_LAG_ISSUE_MS: u16 = 33;
 
 /// Treat unset/empty/`0`/`false`/`no`/`off` as falsy; anything else is true.
 fn env_truthy(key: &str) -> bool {
@@ -734,6 +741,58 @@ mod tests {
         .expect("active match count did not settle");
     }
 
+    fn clean_net_report() -> ClientNetReport {
+        ClientNetReport {
+            schema_version: 1,
+            elapsed_ms: 10_000,
+            match_tick: 300,
+            rtt_ms: 40,
+            rtt_max_ms: 70,
+            bad_rtt_samples: 0,
+            snapshot_jitter_ms: 3,
+            snapshot_gap_max_ms: 45,
+            jitter_samples: 0,
+            snapshots: 300,
+            frame_gap_max_ms: 18,
+            fps_estimate: 60,
+            hidden: false,
+            focused: true,
+            ws_buffered_bytes: 0,
+            server_tick_ms: 4,
+            server_lag_ms: 0,
+            slow_tick_count: 0,
+            head_of_line_count: 0,
+        }
+    }
+
+    #[test]
+    fn clean_net_reports_are_not_notable() {
+        assert!(!is_notable_net_report(&clean_net_report()));
+    }
+
+    #[test]
+    fn laggy_net_reports_are_notable() {
+        let mut report = clean_net_report();
+        report.rtt_max_ms = NET_REPORT_LATENCY_ISSUE_MS;
+        assert!(is_notable_net_report(&report));
+
+        let mut report = clean_net_report();
+        report.jitter_samples = 1;
+        assert!(is_notable_net_report(&report));
+
+        let mut report = clean_net_report();
+        report.snapshot_gap_max_ms = NET_REPORT_SNAPSHOT_GAP_ISSUE_MS;
+        assert!(is_notable_net_report(&report));
+
+        let mut report = clean_net_report();
+        report.ws_buffered_bytes = NET_REPORT_WS_BUFFERED_BYTES_ISSUE;
+        assert!(is_notable_net_report(&report));
+
+        let mut report = clean_net_report();
+        report.server_tick_ms = NET_REPORT_SERVER_TICK_ISSUE_MS;
+        assert!(is_notable_net_report(&report));
+    }
+
     #[tokio::test]
     async fn deploy_drain_waits_for_active_match_to_finish() {
         let lobby = Lobby::new();
@@ -1396,6 +1455,10 @@ async fn handle_client_message(
 }
 
 fn log_client_net_report(player_id: u32, current_room_name: Option<&str>, report: ClientNetReport) {
+    if !is_notable_net_report(&report) {
+        return;
+    }
+
     let room = current_room_name.unwrap_or("");
     info!(
         event = "client_net_report",
@@ -1422,6 +1485,19 @@ fn log_client_net_report(player_id: u32, current_room_name: Option<&str>, report
         head_of_line_count = report.head_of_line_count,
         "client network report"
     );
+}
+
+fn is_notable_net_report(report: &ClientNetReport) -> bool {
+    report.rtt_ms >= NET_REPORT_LATENCY_ISSUE_MS
+        || report.rtt_max_ms >= NET_REPORT_LATENCY_ISSUE_MS
+        || report.bad_rtt_samples > 0
+        || report.snapshot_jitter_ms >= NET_REPORT_JITTER_ISSUE_MS
+        || report.jitter_samples > 0
+        || report.snapshot_gap_max_ms >= NET_REPORT_SNAPSHOT_GAP_ISSUE_MS
+        || report.frame_gap_max_ms >= NET_REPORT_FRAME_GAP_ISSUE_MS
+        || report.ws_buffered_bytes >= NET_REPORT_WS_BUFFERED_BYTES_ISSUE
+        || report.server_tick_ms >= NET_REPORT_SERVER_TICK_ISSUE_MS
+        || report.server_lag_ms >= NET_REPORT_SERVER_LAG_ISSUE_MS
 }
 
 /// Forward a [`RoomEvent`] to the connection's room, if it has joined one. Logs and ignores the
