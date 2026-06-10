@@ -128,9 +128,6 @@ pub(crate) fn launch_world_ability(
     match ability {
         AbilityKind::Charge => false,
         AbilityKind::MortarFire => {
-            let Some(caster_pos) = entities.get(caster).map(|e| (e.pos_x, e.pos_y)) else {
-                return false;
-            };
             let Some(e) = entities.get_mut(caster) else {
                 return false;
             };
@@ -147,14 +144,6 @@ pub(crate) fn launch_world_ability(
                 y,
                 radius_tiles: config::MORTAR_OUTER_RADIUS_TILES,
             });
-            notice_positioned(
-                events,
-                player,
-                "Mortar fire",
-                crate::protocol::NoticeSeverity::Info,
-                caster_pos.0,
-                caster_pos.1,
-            );
             true
         }
         AbilityKind::Smoke => {
