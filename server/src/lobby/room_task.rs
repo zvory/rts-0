@@ -155,6 +155,7 @@ pub(super) enum DevScenarioId {
     ScoutCarWallChokepoint,
     VehicleCornerWall,
     VehicleSmallBlockBaseline,
+    FactoryZeroGapPerpendicular,
 }
 
 enum DevDriver {
@@ -166,6 +167,7 @@ struct DevScenarioDriver {
     player_id: u32,
     units: Vec<u32>,
     goal: (f32, f32),
+    issue_after_ticks: u32,
     issued: bool,
 }
 
@@ -512,6 +514,9 @@ impl ReplaySession {
 impl DevScenarioDriver {
     fn enqueue_for_tick(&mut self, game: &mut Game) {
         if self.issued {
+            return;
+        }
+        if game.tick_count() < self.issue_after_ticks {
             return;
         }
         self.issued = true;
@@ -1597,6 +1602,7 @@ impl RoomTask {
                         player_id: setup.player_id,
                         units: setup.units,
                         goal: setup.goal,
+                        issue_after_ticks: setup.issue_after_ticks,
                         issued: false,
                     };
                     Ok((setup.game, DevDriver::Scenario(driver), setup.player_id))
@@ -1611,6 +1617,7 @@ impl RoomTask {
                         player_id: setup.player_id,
                         units: setup.units,
                         goal: setup.goal,
+                        issue_after_ticks: setup.issue_after_ticks,
                         issued: false,
                     };
                     Ok((setup.game, DevDriver::Scenario(driver), setup.player_id))
@@ -1625,6 +1632,7 @@ impl RoomTask {
                         player_id: setup.player_id,
                         units: setup.units,
                         goal: setup.goal,
+                        issue_after_ticks: setup.issue_after_ticks,
                         issued: false,
                     };
                     Ok((setup.game, DevDriver::Scenario(driver), setup.player_id))
@@ -1639,6 +1647,7 @@ impl RoomTask {
                         player_id: setup.player_id,
                         units: setup.units,
                         goal: setup.goal,
+                        issue_after_ticks: setup.issue_after_ticks,
                         issued: false,
                     };
                     Ok((setup.game, DevDriver::Scenario(driver), setup.player_id))
@@ -1654,6 +1663,22 @@ impl RoomTask {
                         player_id: setup.player_id,
                         units: setup.units,
                         goal: setup.goal,
+                        issue_after_ticks: setup.issue_after_ticks,
+                        issued: false,
+                    };
+                    Ok((setup.game, DevDriver::Scenario(driver), setup.player_id))
+                }
+                DevScenarioId::FactoryZeroGapPerpendicular => {
+                    let setup = Game::new_factory_zero_gap_perpendicular_scenario(
+                        config.unit,
+                        config.count,
+                        match_seed(),
+                    )?;
+                    let driver = DevScenarioDriver {
+                        player_id: setup.player_id,
+                        units: setup.units,
+                        goal: setup.goal,
+                        issue_after_ticks: setup.issue_after_ticks,
                         issued: false,
                     };
                     Ok((setup.game, DevDriver::Scenario(driver), setup.player_id))

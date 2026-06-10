@@ -1,5 +1,7 @@
 use super::*;
 
+const ZERO_GAP_STANDABLE_EPS_PX: f32 = 0.02;
+
 pub(super) fn flat_dev_map(player_count: usize) -> Map {
     let mut map = Map::generate(player_count, 0xC0FF_EE01);
     for terrain in &mut map.terrain {
@@ -197,6 +199,38 @@ pub(super) fn vehicle_small_block_baseline_map(
     (map, center_tile, vehicle_starts, blocker_starts, goal)
 }
 
+#[allow(clippy::type_complexity)]
+pub(super) fn factory_zero_gap_perpendicular_map(
+    unit: EntityKind,
+) -> (Map, (u32, u32), (f32, f32), (f32, f32), (f32, f32)) {
+    let mut map = flat_dev_map(1);
+    let factory_tile = (map.size / 2 - 6, map.size / 2);
+    let factory_pos =
+        services::occupancy::footprint_center(&map, EntityKind::Factory, factory_tile.0, factory_tile.1);
+    let rect = services::geometry::building_rect_for_footprint(
+        EntityKind::Factory,
+        factory_tile.0,
+        factory_tile.1,
+    )
+    .expect("factory footprint should have a rect");
+    let ts = config::TILE_SIZE as f32;
+    let side_radius = vehicle_zero_gap_side_radius(unit);
+    let unit_start = (
+        rect.max_x + side_radius + ZERO_GAP_STANDABLE_EPS_PX,
+        (rect.min_y + rect.max_y) * 0.5,
+    );
+    let goal = (unit_start.0 + ts * 10.0, unit_start.1);
+    let start_tile = (
+        ((unit_start.0 / ts).floor() as u32).min(map.size - 1),
+        ((unit_start.1 / ts).floor() as u32).min(map.size - 1),
+    );
+    if let Some(slot) = map.starts.get_mut(0) {
+        *slot = start_tile;
+    }
+
+    (map, start_tile, factory_pos, unit_start, goal)
+}
+
 pub(super) fn spawn_snaking_corridor_units(
     entities: &mut EntityStore,
     unit: EntityKind,
@@ -293,6 +327,21 @@ pub(super) fn spawn_vehicle_small_block_baseline_blockers(
     Ok(())
 }
 
+pub(super) fn spawn_factory_zero_gap_perpendicular_units(
+    entities: &mut EntityStore,
+    unit: EntityKind,
+    start: (f32, f32),
+) -> Result<Vec<u32>, String> {
+    let north = -std::f32::consts::FRAC_PI_2;
+    let spawned = entities
+        .spawn_unit(1, unit, start.0, start.1)
+        .ok_or_else(|| format!("failed to spawn {unit}"))?;
+    if let Some(e) = entities.get_mut(spawned) {
+        e.set_facing(north);
+    }
+    Ok(vec![spawned])
+}
+
 pub(super) fn wall_chokepoint_spawn_spacing(unit: EntityKind) -> f32 {
     match unit {
         EntityKind::AtTeam => config::AT_GUN_BODY_WIDTH_PX + config::AT_GUN_BODY_CLEARANCE_PX * 4.0,
@@ -327,6 +376,17 @@ pub(super) fn vehicle_small_block_baseline_vehicle_spacing(vehicle: EntityKind) 
         EntityKind::ScoutCar => config::SCOUT_CAR_BODY_WIDTH_PX + 2.0,
         EntityKind::Tank => config::TANK_BODY_WIDTH_PX + 2.0,
         _ => unreachable!("vehicle small-block baseline only supports vehicles"),
+    }
+}
+
+pub(super) fn vehicle_zero_gap_side_radius(unit: EntityKind) -> f32 {
+    match unit {
+        EntityKind::AtTeam => config::AT_GUN_BODY_WIDTH_PX * 0.5 + config::AT_GUN_BODY_CLEARANCE_PX,
+        EntityKind::ScoutCar => {
+            config::SCOUT_CAR_BODY_WIDTH_PX * 0.5 + config::SCOUT_CAR_BODY_CLEARANCE_PX
+        }
+        EntityKind::Tank => config::TANK_BODY_WIDTH_PX * 0.5 + config::TANK_BODY_CLEARANCE_PX,
+        _ => unreachable!("factory zero-gap only supports vehicles"),
     }
 }
 

@@ -830,6 +830,7 @@ mod tests {
         assert!(html.contains(
             "/dev/scenarios?id=vehicle_small_block_baseline&unit=tank&count=5&blocker=at_team"
         ));
+        assert!(html.contains("/dev/scenarios?id=factory_zero_gap_perpendicular&unit=tank&count=1"));
     }
 
     #[test]
