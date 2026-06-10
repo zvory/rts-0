@@ -129,7 +129,6 @@ export const ABILITIES = Object.freeze({
     cost: SMOKE_ABILITY_COST,
     radiusTiles: SMOKE_CLOUD_RADIUS_TILES,
     durationTicks: SMOKE_CLOUD_DURATION_TICKS,
-    requires: KIND.STEELWORKS,
     queued: false,
   }),
 });

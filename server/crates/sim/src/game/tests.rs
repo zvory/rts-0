@@ -453,10 +453,6 @@ fn smoke_command_fixture() -> (Game, u32, (f32, f32), (f32, f32)) {
         .entities
         .spawn_unit(1, EntityKind::ScoutCar, scout_pos.0, scout_pos.1)
         .expect("scout car should spawn");
-    let (sx, sy) = services::occupancy::footprint_center(&game.map, EntityKind::Steelworks, 4, 4);
-    game.entities
-        .spawn_building(1, EntityKind::Steelworks, sx, sy, true)
-        .expect("steelworks should spawn");
     systems::recompute_supply(&mut game.players, &game.entities);
     game.spatial = services::spatial::SpatialIndex::build(&game.entities, game.map.size);
     let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
@@ -465,6 +461,40 @@ fn smoke_command_fixture() -> (Game, u32, (f32, f32), (f32, f32)) {
     game.assert_invariants();
 
     (game, scout, target, second_target)
+}
+
+#[test]
+fn scout_car_smoke_requires_no_steelworks() {
+    let (mut game, scout, _target, _) = smoke_command_fixture();
+    let target = game.map.tile_center(12, 8);
+    assert!(
+        !game
+            .entities
+            .iter()
+            .any(|e| e.owner == 1 && e.kind == EntityKind::Steelworks),
+        "fixture should not contain Steelworks"
+    );
+
+    game.enqueue(
+        1,
+        Command::UseAbility {
+            ability: ability::AbilityKind::Smoke,
+            units: vec![scout],
+            x: Some(target.0),
+            y: Some(target.1),
+            queued: false,
+        },
+    );
+    game.tick();
+
+    assert!(
+        game.entities
+            .get(scout)
+            .expect("scout should exist")
+            .ability_cooldown_ticks(ability::AbilityKind::Smoke)
+            > 0,
+        "Scout Car smoke should be available before Steelworks and start cooldown"
+    );
 }
 
 fn queued_move_fixture_with_lobby_debug(

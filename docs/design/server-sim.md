@@ -195,7 +195,7 @@ and a `definition` match arm; no other files need to change for the definition i
   movement order via `MoveCoordinator`.
 - `launch_world_ability` — deducts resources, sets the caster's cooldown, clears the active order,
   and executes the effect (currently: schedules a smoke cloud). Guards: caster exists + alive + owner
-  + not under construction + correct kind + not on cooldown + tech present + in range + affordable.
+  + not under construction + correct kind + not on cooldown + required tech present + in range + affordable.
   All guards are checked without panicking; missing/stale casters are no-ops.
 - `caster_can_attempt`, `tech_requirement_met`, `caster_in_range` — pure predicates used by both
   command validation and order-queue promotion.
