@@ -244,6 +244,7 @@ impl SelfPlayRunner {
                     Event::Death { .. }
                     | Event::Build { .. }
                     | Event::Notice { .. }
+                    | Event::MortarImpact { .. }
                     | Event::SmokeLaunch { .. } => None,
                 };
                 progressed |= self

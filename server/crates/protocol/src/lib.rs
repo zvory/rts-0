@@ -38,6 +38,7 @@ pub mod kinds {
     pub const RIFLEMAN: &str = "rifleman";
     pub const MACHINE_GUNNER: &str = "machine_gunner";
     pub const AT_TEAM: &str = "at_team";
+    pub const MORTAR_TEAM: &str = "mortar_team";
     pub const SCOUT_CAR: &str = "scout_car";
     pub const TANK: &str = "tank";
     pub const CITY_CENTRE: &str = "city_centre";
@@ -66,6 +67,7 @@ pub mod states {
 pub mod abilities {
     pub const CHARGE: &str = "charge";
     pub const SMOKE: &str = "smoke";
+    pub const MORTAR_FIRE: &str = "mortarFire";
 }
 
 // ---------------------------------------------------------------------------
@@ -338,7 +340,7 @@ pub struct LobbyPlayer {
 ///
 /// [`Snapshot`] remains the semantic source of truth for game code. This format is only a
 /// transport-side optimization for `ServerMessage::Snapshot`.
-pub const COMPACT_SNAPSHOT_VERSION: u8 = 10;
+pub const COMPACT_SNAPSHOT_VERSION: u8 = 11;
 
 /// Serialize one semantic snapshot as a compact JSON text frame payload.
 pub fn serialize_compact_snapshot(snapshot: &Snapshot) -> serde_json::Result<String> {
@@ -781,6 +783,18 @@ impl Serialize for CompactEvent<'_> {
                 seq.serialize_element(delay_ticks)?;
                 seq.end()
             }
+            Event::MortarImpact {
+                x,
+                y,
+                radius_tiles,
+            } => {
+                let mut seq = serializer.serialize_seq(Some(4))?;
+                seq.serialize_element(&6u8)?;
+                seq.serialize_element(x)?;
+                seq.serialize_element(y)?;
+                seq.serialize_element(radius_tiles)?;
+                seq.end()
+            }
             Event::Notice {
                 msg,
                 x,
@@ -856,6 +870,7 @@ fn kind_code(kind: &str) -> u8 {
         kinds::RIFLEMAN => 2,
         kinds::MACHINE_GUNNER => 3,
         kinds::AT_TEAM => 4,
+        kinds::MORTAR_TEAM => 15,
         kinds::TANK => 5,
         kinds::SCOUT_CAR => 14,
         kinds::CITY_CENTRE => 6,
@@ -902,6 +917,7 @@ fn order_stage_code(kind: &str) -> u8 {
         "gather" => 4,
         "build" => 5,
         abilities::SMOKE => 6,
+        abilities::MORTAR_FIRE => 9,
         "setupAtGuns" => 7,
         abilities::CHARGE => 8,
         _ => 255,
@@ -912,6 +928,7 @@ fn ability_code(ability: &str) -> u8 {
     match ability {
         abilities::CHARGE => 1,
         abilities::SMOKE => 2,
+        abilities::MORTAR_FIRE => 3,
         _ => 255,
     }
 }

@@ -22,6 +22,7 @@ use crate::game::command::SimCommand;
 use crate::game::entity::EntityStore;
 use crate::game::fog::{Fog, LingeringSightSource};
 use crate::game::map::Map;
+use crate::game::mortar::MortarShellStore;
 use crate::game::services;
 use crate::game::services::occupancy::Occupancy;
 use crate::game::services::pathing::PathingService;
@@ -109,6 +110,7 @@ pub(crate) fn run_tick(
     rng: &mut SmallRng,
     lingering_sight: &mut Vec<LingeringSightSource>,
     smokes: &mut SmokeCloudStore,
+    mortar_shells: &mut MortarShellStore,
     pending: Vec<(u32, SimCommand)>,
     events: &mut HashMap<u32, Vec<Event>>,
     tick: u32,
@@ -130,6 +132,7 @@ pub(crate) fn run_tick(
             &mut coordinator,
             fog,
             smokes,
+            mortar_shells,
             pending,
             events,
             tick,
@@ -164,6 +167,7 @@ pub(crate) fn run_tick(
             fog,
             &mut coordinator,
             smokes,
+            mortar_shells,
             events,
             tick,
         );
@@ -193,6 +197,7 @@ pub(crate) fn run_tick(
             &mut coordinator,
             fog,
             smokes,
+            mortar_shells,
             rng,
             events,
             tick,
@@ -213,6 +218,9 @@ pub(crate) fn run_tick(
     });
     crate::perf::timed(perf.as_deref_mut(), "construction", || {
         services::construction::construction_system(map, entities, players, events);
+    });
+    crate::perf::timed(perf.as_deref_mut(), "mortar_impacts", || {
+        mortar_shells.resolve_due(map, entities, fog, events, tick);
     });
     crate::perf::timed(perf.as_deref_mut(), "death", || {
         services::death::death_system(
@@ -295,6 +303,7 @@ mod tests {
         let mut events: HashMap<u32, Vec<Event>> = HashMap::new();
         let mut lingering_sight = Vec::new();
         let mut smokes = SmokeCloudStore::new();
+        let mut mortar_shells = MortarShellStore::default();
 
         let worker = entities
             .spawn_unit(1, EntityKind::Worker, 400.0, 390.0)
@@ -321,6 +330,7 @@ mod tests {
             &mut SmallRng::seed_from_u64(0),
             &mut lingering_sight,
             &mut smokes,
+            &mut mortar_shells,
             Vec::new(),
             &mut events,
             1,

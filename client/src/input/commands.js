@@ -1,4 +1,4 @@
-import { cmd, PASSABLE, isUnit, isBuilding, isResource, KIND, ORDER_STAGE } from "../protocol.js";
+import { ABILITY, cmd, PASSABLE, isUnit, isBuilding, isResource, KIND, ORDER_STAGE } from "../protocol.js";
 import { ABILITIES, MINING_CC_RANGE_TILES, STATS, TANK_BODY, isProducerBuilding } from "../config.js";
 import { DEFAULT_HIT_RADIUS, DEFAULT_TILE_SIZE, HIT_PAD_PX, OWN_HIT_BONUS, ZOOM_STEP } from "./constants.js";
 import { commandHotkeyFromEvent } from "./placement.js";
@@ -110,7 +110,13 @@ export function _issueTargetedCommand(p, ev = {}) {
       : ownUnits;
     if (units.length === 0) return;
     this.net.command(cmd.useAbility(ability, units, world.x, world.y, !!ev.shiftKey));
-    this.state.addCommandFeedback("attack", world.x, world.y, !!ev.shiftKey);
+    this.state.addCommandFeedback(
+      ability === ABILITY.MORTAR_FIRE ? "mortar" : "attack",
+      world.x,
+      world.y,
+      !!ev.shiftKey,
+      definition?.radiusTiles,
+    );
     return;
   }
   if (this.state.commandTarget === "move") {

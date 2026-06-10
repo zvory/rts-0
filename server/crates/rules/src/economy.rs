@@ -109,16 +109,21 @@ mod tests {
         );
         assert_eq!(
             trainable_units(EntityKind::Steelworks),
-            &[EntityKind::AtTeam]
+            &[EntityKind::MortarTeam, EntityKind::AtTeam]
         );
 
         assert!(train_requirement_met(EntityKind::Rifleman, &[]));
         assert!(!train_requirement_met(EntityKind::MachineGunner, &[]));
+        assert!(!train_requirement_met(EntityKind::MortarTeam, &[]));
         assert!(!train_requirement_met(EntityKind::AtTeam, &[]));
         assert!(!train_requirement_met(EntityKind::Tank, &[]));
         assert!(train_requirement_met(
             EntityKind::MachineGunner,
             &[EntityKind::TrainingCentre]
+        ));
+        assert!(train_requirement_met(
+            EntityKind::MortarTeam,
+            &[EntityKind::Steelworks]
         ));
         assert!(!train_requirement_met(
             EntityKind::AtTeam,

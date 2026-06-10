@@ -222,6 +222,8 @@ export class GameState {
         this.weaponRecoilById.set(ev.from, now);
       } else if (ev && ev.e === "smokeLaunch") {
         this.addSmokeCanister(ev, now);
+      } else if (ev && ev.e === "mortarImpact") {
+        this.addCommandFeedback("mortar", ev.x, ev.y, false, ev.radiusTiles);
       }
     }
     if (this.muzzleFlashes.length > 256) {
@@ -735,8 +737,15 @@ export class GameState {
    * @param {number} y
    * @param {boolean=} append
    */
-  addCommandFeedback(kind, x, y, append = false) {
-    this.commandFeedback.push({ kind, x, y, append: !!append, createdAt: performance.now() });
+  addCommandFeedback(kind, x, y, append = false, radiusTiles = null) {
+    this.commandFeedback.push({
+      kind,
+      x,
+      y,
+      append: !!append,
+      radiusTiles,
+      createdAt: performance.now(),
+    });
     if (this.commandFeedback.length > 12) {
       this.commandFeedback.splice(0, this.commandFeedback.length - 12);
     }

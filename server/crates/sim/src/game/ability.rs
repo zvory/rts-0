@@ -8,6 +8,7 @@ use crate::protocol;
 pub enum AbilityKind {
     Charge,
     Smoke,
+    MortarFire,
 }
 
 impl AbilityKind {
@@ -15,6 +16,7 @@ impl AbilityKind {
         match self {
             AbilityKind::Charge => protocol::abilities::CHARGE,
             AbilityKind::Smoke => protocol::abilities::SMOKE,
+            AbilityKind::MortarFire => protocol::abilities::MORTAR_FIRE,
         }
     }
 }
@@ -26,6 +28,7 @@ impl FromStr for AbilityKind {
         match s {
             protocol::abilities::CHARGE => Ok(AbilityKind::Charge),
             protocol::abilities::SMOKE => Ok(AbilityKind::Smoke),
+            protocol::abilities::MORTAR_FIRE => Ok(AbilityKind::MortarFire),
             _ => Err(()),
         }
     }
@@ -57,6 +60,7 @@ pub struct AbilityDefinition {
 
 const CHARGE_CARRIERS: &[EntityKind] = &[];
 const SMOKE_CARRIERS: &[EntityKind] = &[EntityKind::ScoutCar];
+const MORTAR_FIRE_CARRIERS: &[EntityKind] = &[EntityKind::MortarTeam];
 
 pub fn definition(kind: AbilityKind) -> AbilityDefinition {
     match kind {
@@ -82,6 +86,16 @@ pub fn definition(kind: AbilityKind) -> AbilityDefinition {
             },
             tech_requirement: None,
             may_queue: true,
+        },
+        AbilityKind::MortarFire => AbilityDefinition {
+            kind,
+            carriers: MORTAR_FIRE_CARRIERS,
+            target_mode: AbilityTargetMode::WorldPoint,
+            range_tiles: Some(9),
+            cooldown_ticks: 60,
+            cost: ResourceCost { steel: 0, oil: 0 },
+            tech_requirement: None,
+            may_queue: false,
         },
     }
 }

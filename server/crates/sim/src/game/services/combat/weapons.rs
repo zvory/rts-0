@@ -86,7 +86,7 @@ pub(super) fn tick_deployed_weapon_setup(e: &mut Entity) {
 }
 
 pub(super) fn begin_idle_deployed_weapon_setup(e: &mut Entity) {
-    if e.kind != EntityKind::MachineGunner {
+    if !matches!(e.kind, EntityKind::MachineGunner | EntityKind::MortarTeam) {
         return;
     }
     if !e.path_is_empty() {
@@ -148,16 +148,20 @@ pub(super) fn deployed_weapon_ready_to_move(entities: &mut EntityStore, id: u32)
 pub(super) fn setup_ticks_for(kind: EntityKind) -> u16 {
     match kind {
         EntityKind::AtTeam => config::AT_TEAM_SETUP_TICKS,
+        EntityKind::MortarTeam => config::MORTAR_TEAM_SETUP_TICKS,
         _ => config::MACHINE_GUNNER_SETUP_TICKS,
     }
 }
 
 fn requires_weapon_setup(kind: EntityKind) -> bool {
-    matches!(kind, EntityKind::MachineGunner | EntityKind::AtTeam)
+    matches!(
+        kind,
+        EntityKind::MachineGunner | EntityKind::AtTeam | EntityKind::MortarTeam
+    )
 }
 
 pub(super) fn uses_stationary_weapon_aggro(e: &Entity) -> bool {
-    matches!(e.kind, EntityKind::MachineGunner)
+    matches!(e.kind, EntityKind::MachineGunner | EntityKind::MortarTeam)
         || (e.kind == EntityKind::AtTeam && !matches!(e.weapon_setup(), WeaponSetup::Packed))
 }
 
