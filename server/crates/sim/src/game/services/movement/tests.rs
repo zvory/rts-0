@@ -1448,6 +1448,7 @@ struct WallChokepointTiming {
     unit: EntityKind,
     unit_count: usize,
     clear_ticks: Vec<Option<u32>>,
+    final_state: Vec<String>,
 }
 
 const SNAKING_CORRIDOR_REGRESSION_BASELINES: &[(EntityKind, usize, u32)] = &[
@@ -1675,6 +1676,7 @@ fn measure_wall_chokepoint_clear_times(
         unit,
         unit_count,
         clear_ticks,
+        final_state: describe_units(&entities, &units),
     }
 }
 
@@ -1729,10 +1731,11 @@ fn wall_chokepoint_timing_summary(results: &[WallChokepointTiming]) -> Vec<Strin
                 })
                 .collect();
             format!(
-                "{} count={}: [{}]",
+                "{} count={}: [{}] final={:?}",
                 result.unit,
                 result.unit_count,
-                clear_ticks.join(", ")
+                clear_ticks.join(", "),
+                result.final_state
             )
         })
         .collect()
