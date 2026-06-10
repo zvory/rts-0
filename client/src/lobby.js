@@ -60,6 +60,7 @@ export class Lobby {
     // Bound handlers kept so they can be removed in destroy().
     this._onLobby = (m) => this._renderLobby(m);
     this._onStart = () => this._handleStart();
+    this._onJoinReplayPrompt = (m) => this._handleJoinReplayPrompt(m);
     this._onError = (m) => this.setStatus((m && m.msg) || "Error", true);
     this._onOpen = () => this.setStatus("Connected.");
     this._onClose = () => this.setStatus("Disconnected from server.", true);
@@ -174,6 +175,7 @@ export class Lobby {
   _wireNet() {
     this.net.on(S.LOBBY, this._onLobby);
     this.net.on(S.START, this._onStart);
+    this.net.on(S.JOIN_REPLAY_PROMPT, this._onJoinReplayPrompt);
     this.net.on(S.ERROR, this._onError);
     this.net.on("open", this._onOpen);
     this.net.on("close", this._onClose);
@@ -183,6 +185,7 @@ export class Lobby {
   destroy() {
     this.net.off(S.LOBBY, this._onLobby);
     this.net.off(S.START, this._onStart);
+    this.net.off(S.JOIN_REPLAY_PROMPT, this._onJoinReplayPrompt);
     this.net.off(S.ERROR, this._onError);
     this.net.off("open", this._onOpen);
     this.net.off("close", this._onClose);
@@ -406,6 +409,25 @@ export class Lobby {
         // A faulty subscriber must not break the others or the lobby.
       }
     }
+  }
+
+  _handleJoinReplayPrompt(m) {
+    const room = (m?.room || "").trim() || ((this.elRoom && this.elRoom.value.trim()) || "main");
+    this._joined = false;
+    this.setStatus(`Room "${room}" is watching a replay.`, true);
+    const ok = window.confirm(`"${room}" is watching a replay. Join as a spectator?`);
+    if (!ok) return;
+
+    const name = (this.elName && this.elName.value.trim()) || "Commander";
+    this._persistName(name);
+    if (this.elRoom) this.elRoom.value = room;
+    this.net.join(name, room, true, true);
+    this._joined = true;
+    this._spectator = true;
+    if (this.chkSpectatorInput) this.chkSpectatorInput.checked = true;
+    if (this.roomBlock) this.roomBlock.hidden = false;
+    this.setStatus(`Joining replay in "${room}"...`);
+    this._reflectReadyButton();
   }
 
   // --- Name persistence ------------------------------------------------------

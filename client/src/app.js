@@ -123,7 +123,7 @@ export class App {
     const name = "Spectator";
     if (this.lobby?.elName) this.lobby.elName.value = name;
     if (this.lobby?.elRoom) this.lobby.elRoom.value = this.devWatch.room;
-    this.net.join(name, this.devWatch.room, true);
+    this.net.join(name, this.devWatch.room, true, this.devWatch.kind === "replay");
     if (this.lobby?.roomBlock) this.lobby.roomBlock.hidden = true;
     const label = this.devWatch.kind === "scenario" ? "scenario" : "self-play watch";
     this.lobby.setStatus(`Starting local ${label}...`);
@@ -133,7 +133,7 @@ export class App {
     const name = "Spectator";
     if (this.lobby?.elName) this.lobby.elName.value = name;
     if (this.lobby?.elRoom) this.lobby.elRoom.value = this.replayLaunch.room;
-    this.net.join(name, this.replayLaunch.room, true);
+    this.net.join(name, this.replayLaunch.room, true, true);
     if (this.lobby?.roomBlock) this.lobby.roomBlock.hidden = true;
     this.lobby.setStatus("Starting replay...");
   }

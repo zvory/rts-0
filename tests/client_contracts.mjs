@@ -1181,6 +1181,11 @@ function fakeAudioContext() {
   assertHasMethod(net, "setQuickstart", "Net");
   assertHasMethod(net, "setReplaySpeed", "Net");
   assertHasMethod(net, "setReplayVision", "Net");
+  assert(!("replayOk" in msg.join("A", "main")), "join builder omits replayOk by default");
+  assert(
+    msg.join("A", "main", false, true).replayOk === true,
+    "join builder can confirm replay joins",
+  );
   assert(msg.returnToLobby().t === "returnToLobby", "return-to-lobby builder tag");
   assert(msg.replayVisionAll().t === "setReplayVision", "replay all-vision builder tag");
   assert(msg.replayVisionAll().vision.mode === "all", "replay all-vision builder payload");

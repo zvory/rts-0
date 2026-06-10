@@ -109,9 +109,10 @@ export class Net {
    * @param {string} name display name
    * @param {string} [room] room id; defaults to "main" via the builder.
    * @param {boolean} [spectator=false] join as an observer instead of a player.
+   * @param {boolean} [replayOk=false] confirm joining replay playback if the room is in replay.
    */
-  join(name, room, spectator = false) {
-    this._send(msg.join(name, room, spectator));
+  join(name, room, spectator = false, replayOk = false) {
+    this._send(msg.join(name, room, spectator, replayOk));
   }
 
   /**

@@ -693,6 +693,7 @@ mod tests {
                 player_id: TEST_PLAYER_ID,
                 name: "Drain Test".to_string(),
                 spectator: false,
+                replay_ok: false,
                 msg_tx,
                 ack: ack_tx,
             })
@@ -1120,6 +1121,7 @@ async fn send_server_message(
         ServerMessage::Welcome { .. } => "welcome",
         ServerMessage::Start(_) => "start",
         ServerMessage::ReplayState(_) => "replay_state",
+        ServerMessage::JoinReplayPrompt { .. } => "join_replay_prompt",
         ServerMessage::ShutdownWarning { .. } => "shutdown_warning",
         ServerMessage::Error { .. } => "error",
         ServerMessage::GameOver { .. } => "game_over",
@@ -1181,7 +1183,7 @@ async fn handle_client_message(
             name,
             room,
             spectator,
-            ..
+            replay_ok,
         } => {
             // Re-joining a different room is not supported; the first join wins. Subsequent
             // joins from the same connection are ignored to keep room membership unambiguous.
@@ -1220,6 +1222,7 @@ async fn handle_client_message(
                     player_id,
                     name,
                     spectator,
+                    replay_ok,
                     msg_tx: conn_tx.clone(),
                     ack: ack_tx,
                 })

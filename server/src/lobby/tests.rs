@@ -12,13 +12,27 @@ use crate::protocol::{kinds, EntityView, Event, ResourceDelta};
 fn join_test_player(task: &mut RoomTask, player_id: u32) {
     let (msg_tx, _writer) = ConnectionSink::new();
     let (ack, _ack_rx) = tokio::sync::oneshot::channel();
-    task.on_join(player_id, format!("Player {player_id}"), false, msg_tx, ack);
+    task.on_join(
+        player_id,
+        format!("Player {player_id}"),
+        false,
+        false,
+        msg_tx,
+        ack,
+    );
 }
 
 fn join_test_player_with_writer(task: &mut RoomTask, player_id: u32) -> ConnectionWriter {
     let (msg_tx, writer) = ConnectionSink::new();
     let (ack, _ack_rx) = tokio::sync::oneshot::channel();
-    task.on_join(player_id, format!("Player {player_id}"), false, msg_tx, ack);
+    task.on_join(
+        player_id,
+        format!("Player {player_id}"),
+        false,
+        false,
+        msg_tx,
+        ack,
+    );
     writer
 }
 

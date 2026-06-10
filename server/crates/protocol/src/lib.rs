@@ -83,6 +83,9 @@ pub enum ClientMessage {
         room: Option<String>,
         #[serde(default)]
         spectator: bool,
+        #[serde(rename = "replayOk")]
+        #[serde(default)]
+        replay_ok: bool,
     },
     /// Toggle ready state in the lobby.
     Ready { ready: bool },
@@ -254,6 +257,11 @@ pub enum ServerMessage {
     Snapshot(Snapshot),
     /// Shared replay playback cursor/state. Sent reliably outside snapshot cadence.
     ReplayState(ReplayPlaybackState),
+    /// The requested room is currently replay playback. The client should confirm before retrying
+    /// `join` with `replayOk: true`.
+    JoinReplayPrompt {
+        room: String,
+    },
     /// Server shutdown drain has started. Existing matches may continue until the deadline, but
     /// new match starts are disabled.
     ShutdownWarning {
