@@ -14,8 +14,8 @@ checkout to install the tracked hooks locally. GitHub Actions also runs this com
 `main` as a shared signal, but `main` is intentionally left open for direct pushes.
 
 ```bash
-tests/run-all.sh                 # fast gate: cargo fmt --check + cargo test + clippy + 3 API suites + client smoke
-tests/run-all.sh --full-ai       # fast gate plus long AI self-play/simulation coverage
+tests/run-all.sh                 # local gate: cargo fmt --check + cargo test + clippy + 3 API suites + client smoke
+tests/run-all.sh --full-ai       # local gate plus long AI self-play/simulation coverage
 tests/run-all.sh --no-rust       # skip Rust fmt/test/lint
 tests/run-all.sh --no-client     # skip the headless-browser smoke test
 tests/run-all.sh -v              # print suite timings and pass/fail lines

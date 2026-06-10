@@ -17,7 +17,7 @@
 # game progress instead of real-time 30 Hz wall clock. Normal `cargo run` remains 30 Hz.
 #
 # Usage:
-#   tests/run-all.sh                 # fast gate (silent unless failing)
+#   tests/run-all.sh                 # local gate (silent unless failing)
 #   tests/run-all.sh --full-ai       # also run long AI self-play/simulation coverage
 #   tests/run-all.sh -v              # verbose: print headers and passes
 #   tests/run-all.sh --no-rust       # skip Rust fmt/test/lint
@@ -76,7 +76,7 @@ done
 if [ "$RUN_FULL_AI" = "1" ]; then
   echo "running all tests, including full AI coverage, silently; this can take several minutes"
 else
-  echo "running fast test gate silently"
+  echo "running local test gate silently"
 fi
 
 if ! command -v node >/dev/null 2>&1; then
