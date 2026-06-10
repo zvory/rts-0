@@ -83,6 +83,8 @@ export class Match {
     this.replaySpeedHandler = null;
     this.replayVisionSelection = new Set();
     this.replayState = null;
+    this.replaySeekPending = false;
+    this.replaySeekTargetTick = null;
     this.giveUpSent = false;
     this.matchPingTimer = undefined;
     this.netReportTimer = undefined;
@@ -174,6 +176,11 @@ export class Match {
       this.noteSnapshotArrival(now);
       this.state.applySnapshot(m);
       this.lastSnapshotTick = Number.isFinite(m?.tick) ? m.tick : this.lastSnapshotTick;
+      if (this.replayViewer && Number.isFinite(m?.tick)) {
+        this.replayState = { ...(this.replayState || {}), currentTick: m.tick };
+        this.updateReplayStatus();
+        this.updateReplayTimeline();
+      }
       this.lastServerNetStatus = m?.netStatus || null;
       this.applyServerNetStatus();
       this.stopInactiveMachineGunSounds();
@@ -249,6 +256,8 @@ export class Match {
           const ticksBack = parseInt(btn.dataset.seekBack, 10);
           if (!isFinite(ticksBack) || ticksBack <= 0) return;
           this.setReplayConcluded(false);
+          const currentTick = Number.isFinite(this.replayState?.currentTick) ? this.replayState.currentTick : 0;
+          this.setReplaySeekPending(Math.max(0, currentTick - ticksBack));
           this.net.seekReplay(ticksBack);
           return;
         }
@@ -928,6 +937,7 @@ export class Match {
 
   applyReplayState(state) {
     this.replayState = state || null;
+    this.setReplaySeekPending(null, false);
     const ended =
       state?.ended === true ||
       (Number.isFinite(state?.currentTick) &&
@@ -937,6 +947,7 @@ export class Match {
     this.setReplayConcluded(ended);
     if (Number.isFinite(state?.speed)) this.setReplaySpeedActive(state.speed);
     this.updateReplayStatus();
+    this.updateReplayTimeline();
   }
 
   setReplayConcluded(concluded) {
@@ -989,6 +1000,82 @@ export class Match {
     status.className = "replay-status replay-tick-status";
     status.textContent = "Replay 0 / 0";
     dom.replaySpeed.appendChild(status);
+
+    this.buildReplayTimeline();
+  }
+
+  buildReplayTimeline() {
+    if (!dom.replaySpeed || dom.replaySpeed.querySelector(".replay-timeline")) return;
+
+    const wrap = document.createElement("div");
+    wrap.className = "replay-timeline";
+
+    const track = document.createElement("button");
+    track.type = "button";
+    track.className = "replay-timeline-track";
+    track.setAttribute("aria-label", "Seek replay timeline");
+    track.title = "Click to seek replay";
+    track.addEventListener("click", (ev) => this.onReplayTimelineClick(ev));
+
+    const progress = document.createElement("span");
+    progress.className = "replay-timeline-progress";
+    track.appendChild(progress);
+
+    const marks = document.createElement("span");
+    marks.className = "replay-timeline-marks";
+    track.appendChild(marks);
+
+    wrap.appendChild(track);
+    dom.replaySpeed.appendChild(wrap);
+    this.updateReplayTimeline();
+  }
+
+  onReplayTimelineClick(ev) {
+    const track = ev.currentTarget;
+    const duration = Number.isFinite(this.replayState?.durationTicks) ? this.replayState.durationTicks : 0;
+    if (!track || duration <= 0) return;
+    const rect = track.getBoundingClientRect();
+    if (!rect.width) return;
+    const ratio = Math.max(0, Math.min(1, (ev.clientX - rect.left) / rect.width));
+    const tick = Math.round(ratio * duration);
+    this.setReplayConcluded(false);
+    this.setReplaySeekPending(tick);
+    this.net.seekReplayTo(tick);
+  }
+
+  setReplaySeekPending(targetTick, pending = true) {
+    this.replaySeekPending = !!pending;
+    this.replaySeekTargetTick = this.replaySeekPending && Number.isFinite(targetTick) ? targetTick : null;
+    this.updateReplayStatus();
+    this.updateReplayTimeline();
+  }
+
+  updateReplayTimeline() {
+    const timeline = dom.replaySpeed?.querySelector(".replay-timeline");
+    if (!timeline) return;
+    const duration = Number.isFinite(this.replayState?.durationTicks) ? this.replayState.durationTicks : 0;
+    const current = Number.isFinite(this.replayState?.currentTick) ? this.replayState.currentTick : 0;
+    const ratio = duration > 0 ? Math.max(0, Math.min(1, current / duration)) : 0;
+    timeline.querySelector(".replay-timeline-progress")?.style.setProperty("--replay-progress", `${ratio * 100}%`);
+
+    const marks = timeline.querySelector(".replay-timeline-marks");
+    if (!marks) return;
+    const keyframeTicks = Array.isArray(this.replayState?.keyframeTicks) ? this.replayState.keyframeTicks : [];
+    const normalized = [...new Set(keyframeTicks)]
+      .filter((tick) => Number.isFinite(tick) && tick >= 0 && (duration <= 0 || tick <= duration))
+      .sort((a, b) => a - b);
+    const signature = `${duration}:${normalized.join(",")}`;
+    if (marks.dataset.signature === signature) return;
+    marks.dataset.signature = signature;
+    marks.replaceChildren();
+    for (const tick of normalized) {
+      const mark = document.createElement("span");
+      mark.className = "replay-timeline-mark";
+      const left = duration > 0 ? (tick / duration) * 100 : 0;
+      mark.style.left = `${Math.max(0, Math.min(100, left))}%`;
+      mark.title = `Keyframe ${tick}`;
+      marks.appendChild(mark);
+    }
   }
 
   onReplayVisionClick(ev) {
@@ -1045,7 +1132,10 @@ export class Match {
     const current = Number.isFinite(this.replayState?.currentTick) ? this.replayState.currentTick : 0;
     const duration = Number.isFinite(this.replayState?.durationTicks) ? this.replayState.durationTicks : 0;
     const speed = Number.isFinite(this.replayState?.speed) ? this.replayState.speed : 2;
-    status.textContent = `Replay ${current} / ${duration} @ ${speed}x`;
+    const seeking = this.replaySeekPending
+      ? ` · Seeking${Number.isFinite(this.replaySeekTargetTick) ? ` ${this.replaySeekTargetTick}` : ""}...`
+      : "";
+    status.textContent = `Replay ${current} / ${duration} @ ${speed}x${seeking}`;
   }
 
   /**
@@ -1091,6 +1181,7 @@ export class Match {
       dom.replaySpeed.classList.remove("replay-viewer-controls");
       dom.replaySpeed.querySelector(".replay-vision-controls")?.remove();
       dom.replaySpeed.querySelector(".replay-tick-status")?.remove();
+      dom.replaySpeed.querySelector(".replay-timeline")?.remove();
     }
     if (dom.giveUpOpen) dom.giveUpOpen.hidden = false;
     if (dom.commandCard) dom.commandCard.hidden = false;

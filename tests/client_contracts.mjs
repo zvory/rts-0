@@ -597,6 +597,10 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
         this.children.push(child);
         return child;
       },
+      replaceChildren(...children) {
+        this.children = [];
+        for (const child of children) this.appendChild(child);
+      },
       addEventListener(type, handler) {
         this._listeners.set(type, handler);
       },
@@ -607,6 +611,9 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
       closest(selector) {
         if (selector.startsWith(".") && this.classList.contains(selector.slice(1))) return this;
         return this.parentNode?.closest?.(selector) || null;
+      },
+      getBoundingClientRect() {
+        return { left: 0, width: 200 };
       },
       querySelector(selector) {
         return this.querySelectorAll(selector)[0] || null;
@@ -649,8 +656,12 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
   };
   replayControlsMatch.net = {
     visions: [],
+    seekTargets: [],
     setReplayVision(vision) {
       this.visions.push(vision);
+    },
+    seekReplayTo(tick) {
+      this.seekTargets.push(tick);
     },
   };
   replayControlsMatch.replayVisionSelection = new Set();
@@ -673,6 +684,25 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
   );
   replayControlsMatch.onReplayVisionClick({ target: visionButtons[0], shiftKey: false });
   assert(replayControlsMatch.net.visions.at(-1).mode === "all", "all replay fog control restores union vision");
+  replayControlsMatch.applyReplayState({
+    currentTick: 100,
+    durationTicks: 1_000,
+    keyframeTicks: [0, 400, 800],
+    speed: 2,
+    paused: false,
+    ended: false,
+  });
+  assert(
+    replayControls.querySelectorAll(".replay-timeline-mark").length === 3,
+    "replay timeline renders server keyframe marks",
+  );
+  const timelineTrack = replayControls.querySelector(".replay-timeline-track");
+  replayControlsMatch.onReplayTimelineClick({ currentTarget: timelineTrack, clientX: 100 });
+  assert(replayControlsMatch.net.seekTargets.at(-1) === 500, "replay timeline click seeks to the clicked tick");
+  assert(
+    replayControls.querySelector(".replay-tick-status").textContent.includes("Seeking 500"),
+    "replay timeline shows a pending seek indicator",
+  );
 
   const noticeAudioMatch = Object.create(Match.prototype);
   const playedNotices = [];
