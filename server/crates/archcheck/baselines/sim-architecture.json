@@ -1,5 +1,5 @@
 {
-  "reason": "phase 4 mortar team adds command and delayed-impact wiring",
+  "reason": "Accept waypoint movement service growth from latest main",
   "line_counts": [
     {
       "path": "ability.rs",
@@ -51,7 +51,11 @@
     },
     {
       "path": "map.rs",
-      "lines": 772
+      "lines": 495
+    },
+    {
+      "path": "map/authored.rs",
+      "lines": 296
     },
     {
       "path": "mod.rs",
@@ -79,7 +83,7 @@
     },
     {
       "path": "services/ability_orders.rs",
-      "lines": 357
+      "lines": 346
     },
     {
       "path": "services/combat/acquisition.rs",
@@ -175,11 +179,11 @@
     },
     {
       "path": "services/movement/waypoints.rs",
-      "lines": 698
+      "lines": 812
     },
     {
       "path": "services/occupancy.rs",
-      "lines": 335
+      "lines": 343
     },
     {
       "path": "services/order_planner.rs",
@@ -219,15 +223,15 @@
     },
     {
       "path": "setup/dev_scenarios.rs",
-      "lines": 280
+      "lines": 329
     },
     {
       "path": "setup/dev_scenarios/layouts.rs",
-      "lines": 355
+      "lines": 415
     },
     {
       "path": "setup/dev_scenarios/tests.rs",
-      "lines": 649
+      "lines": 759
     },
     {
       "path": "setup/tests.rs",
@@ -247,7 +251,7 @@
     },
     {
       "path": "tests.rs",
-      "lines": 2242
+      "lines": 2348
     },
     {
       "path": "upgrade.rs",
@@ -511,7 +515,7 @@
       "source": "movement",
       "target": "occupancy",
       "path": "services/movement/waypoints.rs",
-      "line": 10
+      "line": 12
     },
     {
       "source": "movement",
@@ -547,7 +551,7 @@
       "source": "movement",
       "target": "spatial",
       "path": "services/movement/waypoints.rs",
-      "line": 11
+      "line": 13
     },
     {
       "source": "movement",
@@ -565,7 +569,7 @@
       "source": "movement",
       "target": "standability",
       "path": "services/movement/waypoints.rs",
-      "line": 12
+      "line": 14
     },
     {
       "source": "order_queue",
@@ -720,7 +724,7 @@
     },
     {
       "path": "services/movement/waypoints.rs",
-      "line": 35,
+      "line": 39,
       "name": "advance_moving_units"
     },
     {
@@ -937,12 +941,12 @@
     },
     {
       "path": "services/movement/waypoints.rs",
-      "line": 38,
+      "line": 42,
       "code": "players: &mut [PlayerState],"
     },
     {
       "path": "services/movement/waypoints.rs",
-      "line": 13,
+      "line": 15,
       "code": "use crate::game::PlayerState;"
     },
     {
@@ -1040,13 +1044,13 @@
     },
     {
       "path": "tests.rs",
-      "line": 376,
+      "line": 482,
       "field": "oil",
       "code": "game.players[0].oil = 0;"
     },
     {
       "path": "tests.rs",
-      "line": 375,
+      "line": 481,
       "field": "steel",
       "code": "game.players[0].steel = 0;"
     }
@@ -1102,79 +1106,79 @@
     },
     {
       "path": "services/movement/waypoints.rs",
-      "line": 381,
+      "line": 385,
       "field": "pos_x",
       "code": "e.pos_x = x.clamp(0.0, map.world_size_px() - 0.01);"
     },
     {
       "path": "services/movement/waypoints.rs",
-      "line": 382,
+      "line": 386,
       "field": "pos_y",
       "code": "e.pos_y = y.clamp(0.0, map.world_size_px() - 0.01);"
     },
     {
       "path": "tests.rs",
-      "line": 1701,
+      "line": 1807,
       "field": "hp",
       "code": ".hp = 0;"
     },
     {
       "path": "tests.rs",
-      "line": 337,
+      "line": 443,
       "field": "hp",
       "code": "e.hp = 0;"
     },
     {
       "path": "tests.rs",
-      "line": 1552,
+      "line": 1658,
       "field": "hp",
       "code": "entity.hp = 0;"
     },
     {
       "path": "tests.rs",
-      "line": 1885,
+      "line": 1991,
       "field": "pos_x",
       "code": "holder_entity.pos_x = node_x;"
     },
     {
       "path": "tests.rs",
-      "line": 1893,
+      "line": 1999,
       "field": "pos_x",
       "code": "ordered_entity.pos_x = node_x + 4.0;"
     },
     {
       "path": "tests.rs",
-      "line": 286,
+      "line": 392,
       "field": "pos_x",
       "code": "unit.pos_x = smoke_pos.0;"
     },
     {
       "path": "tests.rs",
-      "line": 1949,
+      "line": 2055,
       "field": "pos_x",
       "code": "worker_entity.pos_x = node_x + worker_radius + node_radius - 1.0;"
     },
     {
       "path": "tests.rs",
-      "line": 1886,
+      "line": 1992,
       "field": "pos_y",
       "code": "holder_entity.pos_y = node_y;"
     },
     {
       "path": "tests.rs",
-      "line": 1894,
+      "line": 2000,
       "field": "pos_y",
       "code": "ordered_entity.pos_y = node_y;"
     },
     {
       "path": "tests.rs",
-      "line": 287,
+      "line": 393,
       "field": "pos_y",
       "code": "unit.pos_y = smoke_pos.1;"
     },
     {
       "path": "tests.rs",
-      "line": 1950,
+      "line": 2056,
       "field": "pos_y",
       "code": "worker_entity.pos_y = node_y;"
     }
@@ -1306,7 +1310,7 @@
     },
     {
       "path": "services/occupancy.rs",
-      "count": 9
+      "count": 10
     },
     {
       "path": "services/order_planner.rs",
@@ -1346,7 +1350,7 @@
     },
     {
       "path": "setup/dev_scenarios.rs",
-      "count": 6
+      "count": 7
     },
     {
       "path": "smoke.rs",

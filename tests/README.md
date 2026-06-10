@@ -20,17 +20,23 @@ tests/run-all.sh --no-rust       # skip Rust fmt/test/lint
 tests/run-all.sh --no-client     # skip the headless-browser smoke test
 tests/run-all.sh -v              # print suite timings and pass/fail lines
 PORT=8090 tests/run-all.sh       # use a different port
-CARGO_TARGET_DIR=/tmp/rts-target tests/run-all.sh  # override the shared Cargo target cache
+CARGO_TARGET_DIR=/tmp/rts-target tests/run-all.sh  # override the per-worktree Cargo target dir
+RUSTC_WRAPPER=sccache tests/run-all.sh             # force a compiler cache wrapper
 CHROME=/path/to/chrome tests/run-all.sh
 ```
 
 The client smoke test self-skips (not a failure) when `puppeteer-core` or a Chrome binary is
-missing. By default, repo-level Cargo config sends every checkout and worktree to the shared
-target directory at `/tmp/rts-cargo-target/rts-0-server`, so plain `cargo build`, `cargo test`,
-and `cargo clippy` reuse dependency builds instead of compiling from scratch in every worktree.
-Override with `CARGO_TARGET_DIR=/path/to/target` when you need an isolated cache.
+missing. By default, the local gate and Cargo helper use an isolated target directory for each
+worktree under `/tmp/rts-cargo-target/`. This keeps final binaries, test harnesses, and self-play
+artifacts branch-local while keeping the checkout clean. Override with
+`CARGO_TARGET_DIR=/path/to/target` when you need a specific target location.
 
-For scripts that need to print the shared target dir or for explicit wrapper usage:
+Cross-worktree build reuse comes from `sccache`, not from a shared Cargo target dir. If `sccache`
+is installed and `RUSTC_WRAPPER` is unset, `tests/run-all.sh` and `scripts/cargo-shared-target.sh`
+will use it automatically. Set `RUSTC_WRAPPER=` to disable the wrapper for a run, or set
+`RUSTC_WRAPPER=/path/to/wrapper` to force a different compiler wrapper.
+
+For scripts that need to print the default target dir or for explicit wrapper usage:
 
 ```bash
 scripts/cargo-shared-target.sh test --manifest-path server/Cargo.toml self_play -- --nocapture
