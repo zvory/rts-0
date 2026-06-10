@@ -61,6 +61,12 @@ export class Lobby {
     /** @type {number[]} active countdown timeout ids. */
     this._countdownTimers = [];
     this._countdownActive = false;
+    /**
+     * @type {{root: HTMLElement, title: HTMLElement, body: HTMLElement, cancel: HTMLButtonElement, confirm: HTMLButtonElement}|null}
+     */
+    this._replayPrompt = null;
+    this._pendingReplayRoom = "";
+    this._promptReturnFocus = null;
 
     // Bound handlers kept so they can be removed in destroy().
     this._onLobby = (m) => this._renderLobby(m);
@@ -70,8 +76,10 @@ export class Lobby {
     this._onError = (m) => this.setStatus((m && m.msg) || "Error", true);
     this._onOpen = () => this.setStatus("Connected.");
     this._onClose = () => this.setStatus("Disconnected from server.", true);
+    this._onReplayPromptKeydown = (ev) => this._handleReplayPromptKeydown(ev);
 
     this._restoreName();
+    this._buildReplayPrompt();
     this._wireDom();
     this._wireNet();
   }
@@ -198,6 +206,9 @@ export class Lobby {
     this.net.off("open", this._onOpen);
     this.net.off("close", this._onClose);
     this._clearCountdown();
+    this._hideReplayPrompt(false);
+    this._replayPrompt?.root.remove();
+    this._replayPrompt = null;
   }
 
   // --- Rendering -------------------------------------------------------------
@@ -412,6 +423,7 @@ export class Lobby {
   /** The server signaled match start: fire subscribers (main.js switches screens). */
   _handleStart() {
     this._clearCountdown();
+    this._hideReplayPrompt(false);
     for (const cb of this._startCbs) {
       try {
         cb();
@@ -483,9 +495,10 @@ export class Lobby {
     const room = (m?.room || "").trim() || ((this.elRoom && this.elRoom.value.trim()) || "main");
     this._joined = false;
     this.setStatus(`Room "${room}" is watching a replay.`, true);
-    const ok = window.confirm(`"${room}" is watching a replay. Join as a spectator?`);
-    if (!ok) return;
+    this._showReplayPrompt(room);
+  }
 
+  _joinReplayRoom(room) {
     const name = (this.elName && this.elName.value.trim()) || "Commander";
     this._persistName(name);
     if (this.elRoom) this.elRoom.value = room;
@@ -496,6 +509,102 @@ export class Lobby {
     if (this.roomBlock) this.roomBlock.hidden = false;
     this.setStatus(`Joining replay in "${room}"...`);
     this._reflectReadyButton();
+  }
+
+  _buildReplayPrompt() {
+    if (this._replayPrompt) return;
+
+    const root = document.createElement("div");
+    root.className = "lobby-alert";
+    root.hidden = true;
+    root.addEventListener("click", (ev) => {
+      if (ev.target === root) this._hideReplayPrompt(true);
+    });
+
+    const dialog = document.createElement("div");
+    dialog.className = "lobby-alert-box";
+    dialog.setAttribute("role", "dialog");
+    dialog.setAttribute("aria-modal", "true");
+    dialog.setAttribute("aria-labelledby", "replay-join-title");
+    dialog.setAttribute("aria-describedby", "replay-join-body");
+
+    const eyebrow = document.createElement("div");
+    eyebrow.className = "lobby-alert-eyebrow";
+    eyebrow.textContent = "Replay channel";
+
+    const title = document.createElement("h2");
+    title.id = "replay-join-title";
+
+    const body = document.createElement("p");
+    body.id = "replay-join-body";
+
+    const actions = document.createElement("div");
+    actions.className = "lobby-alert-actions";
+
+    const cancel = document.createElement("button");
+    cancel.type = "button";
+    cancel.className = "btn";
+    cancel.textContent = "Stand down";
+    cancel.addEventListener("click", () => this._hideReplayPrompt(true));
+
+    const confirm = document.createElement("button");
+    confirm.type = "button";
+    confirm.className = "btn primary";
+    confirm.textContent = "Join as spectator";
+    confirm.addEventListener("click", () => {
+      const room = this._pendingReplayRoom || "main";
+      this._hideReplayPrompt(false);
+      this._joinReplayRoom(room);
+    });
+
+    actions.append(cancel, confirm);
+    dialog.append(eyebrow, title, body, actions);
+    root.appendChild(dialog);
+    this.root.appendChild(root);
+    this._replayPrompt = { root, title, body, cancel, confirm };
+  }
+
+  _showReplayPrompt(room) {
+    if (!this._replayPrompt) this._buildReplayPrompt();
+    if (!this._replayPrompt) return;
+    this._pendingReplayRoom = room;
+    this._promptReturnFocus =
+      document.activeElement instanceof HTMLElement ? document.activeElement : this.btnJoin;
+    this._replayPrompt.title.textContent = `Join replay in "${room}"?`;
+    this._replayPrompt.body.textContent =
+      "This room is already playing back a finished battle. Joining will place you in observer mode without changing the room for current viewers.";
+    this._replayPrompt.root.hidden = false;
+    document.addEventListener("keydown", this._onReplayPromptKeydown);
+    window.setTimeout(() => this._replayPrompt?.confirm.focus(), 0);
+  }
+
+  _hideReplayPrompt(restoreFocus) {
+    if (!this._replayPrompt || this._replayPrompt.root.hidden) return;
+    this._replayPrompt.root.hidden = true;
+    document.removeEventListener("keydown", this._onReplayPromptKeydown);
+    const returnFocus = this._promptReturnFocus;
+    this._promptReturnFocus = null;
+    this._pendingReplayRoom = "";
+    if (restoreFocus && returnFocus instanceof HTMLElement) returnFocus.focus();
+  }
+
+  _handleReplayPromptKeydown(ev) {
+    if (!this._replayPrompt || this._replayPrompt.root.hidden) return;
+    if (ev.key === "Escape") {
+      ev.preventDefault();
+      this._hideReplayPrompt(true);
+      return;
+    }
+    if (ev.key !== "Tab") return;
+
+    const focusables = [this._replayPrompt.cancel, this._replayPrompt.confirm];
+    const current = document.activeElement;
+    const currentIndex = focusables.indexOf(current);
+    const nextIndex = ev.shiftKey
+      ? (currentIndex <= 0 ? focusables.length : currentIndex) - 1
+      : (currentIndex + 1) % focusables.length;
+    ev.preventDefault();
+    focusables[nextIndex].focus();
   }
 
   // --- Name persistence ------------------------------------------------------
