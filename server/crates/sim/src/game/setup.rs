@@ -268,7 +268,12 @@ impl Game {
         }
 
         if starting_loadout == StartingLoadout::DebugHuman {
-            spawn_debug_inert_enemy_at_guns(&mut entities, &map, &mut player_states, players);
+            spawn_debug_inert_enemy_mortar_corner(
+                &mut entities,
+                &map,
+                &mut player_states,
+                players,
+            );
         }
 
         // Always spawn resources on the neutral expansion sites. Claimed sites get a full start;
@@ -551,15 +556,13 @@ fn spawn_debug_human_start(
 }
 
 const DEBUG_INERT_ENEMY_ID: u32 = 900_001;
-const DEBUG_INERT_AT_GUN_COUNT: usize = 5;
-const DEBUG_INERT_AT_GUN_SPACING_TILES: f32 = 4.0;
-const DEBUG_INERT_RIFLEMAN_SCREEN_COUNT: usize = 12;
-const DEBUG_INERT_RIFLEMAN_SCREEN_SPACING_TILES: f32 = 2.0;
-const DEBUG_INERT_RIFLEMAN_SCREEN_FRONT_TILES: f32 = 5.0;
+const DEBUG_INERT_MORTAR_COUNT: usize = 5;
+const DEBUG_INERT_MORTAR_CLUMP_RADIUS_TILES: f32 = 2.0;
+const DEBUG_INERT_DEPOT_CARDINAL_OFFSET_TILES: f32 = 5.0;
 
-/// Add a static enemy AT-gun battery and rifle screen to debug starts without creating an AI
+/// Add a static enemy mortar/scout-car clump to debug starts without creating an AI
 /// controller/profile.
-fn spawn_debug_inert_enemy_at_guns(
+fn spawn_debug_inert_enemy_mortar_corner(
     entities: &mut EntityStore,
     map: &Map,
     players: &mut Vec<PlayerState>,
@@ -576,61 +579,56 @@ fn spawn_debug_inert_enemy_at_guns(
         return;
     };
 
-    let max_tile = map.size.saturating_sub(1);
-    let battery_tile = (
-        max_tile.saturating_sub(human_start.0.min(max_tile)),
-        max_tile.saturating_sub(human_start.1.min(max_tile)),
-    );
-    let battery_center = map.tile_center(battery_tile.0, battery_tile.1);
+    let clump_tile = debug_clockwise_adjacent_corner_tile(map, human_start);
+    let clump_center = map.tile_center(clump_tile.0, clump_tile.1);
     let map_center = map.world_size_px() * 0.5;
-    let to_center = (map_center - battery_center.0, map_center - battery_center.1);
+    let to_center = (map_center - clump_center.0, map_center - clump_center.1);
     let center_facing = to_center.1.atan2(to_center.0);
     if !center_facing.is_finite() {
         return;
     }
 
-    let side = (-center_facing.sin(), center_facing.cos());
-    let forward = (center_facing.cos(), center_facing.sin());
     let ts = config::TILE_SIZE as f32;
-    let center_index = (DEBUG_INERT_AT_GUN_COUNT.saturating_sub(1)) as f32 * 0.5;
-    for i in 0..DEBUG_INERT_AT_GUN_COUNT {
-        let offset = (i as f32 - center_index) * DEBUG_INERT_AT_GUN_SPACING_TILES * ts;
-        let x = battery_center.0 + side.0 * offset;
-        let y = battery_center.1 + side.1 * offset;
+    const MORTAR_OFFSETS: [(f32, f32); DEBUG_INERT_MORTAR_COUNT] =
+        [(0.0, -1.0), (1.0, 0.0), (0.0, 1.0), (-1.0, 0.0), (1.0, -1.0)];
+    for (dx, dy) in MORTAR_OFFSETS {
+        let x = clump_center.0 + dx * DEBUG_INERT_MORTAR_CLUMP_RADIUS_TILES * ts;
+        let y = clump_center.1 + dy * DEBUG_INERT_MORTAR_CLUMP_RADIUS_TILES * ts;
         let facing = (map_center - y).atan2(map_center - x);
-        let Some(id) = entities.spawn_unit(DEBUG_INERT_ENEMY_ID, EntityKind::AtTeam, x, y) else {
+        let Some(id) = entities.spawn_unit(DEBUG_INERT_ENEMY_ID, EntityKind::MortarTeam, x, y)
+        else {
             continue;
         };
         if let Some(e) = entities.get_mut(id) {
             e.set_facing(facing);
             e.set_weapon_facing(facing);
             e.set_desired_weapon_facing(facing);
-            e.set_emplacement_facing(Some(facing));
             e.set_weapon_setup(WeaponSetup::Deployed);
         }
     }
 
-    let screen_center = (
-        battery_center.0 + forward.0 * DEBUG_INERT_RIFLEMAN_SCREEN_FRONT_TILES * ts,
-        battery_center.1 + forward.1 * DEBUG_INERT_RIFLEMAN_SCREEN_FRONT_TILES * ts,
-    );
-    let center_index = (DEBUG_INERT_RIFLEMAN_SCREEN_COUNT.saturating_sub(1)) as f32 * 0.5;
-    for i in 0..DEBUG_INERT_RIFLEMAN_SCREEN_COUNT {
-        let offset = (i as f32 - center_index) * DEBUG_INERT_RIFLEMAN_SCREEN_SPACING_TILES * ts;
-        let x = screen_center.0 + side.0 * offset;
-        let y = screen_center.1 + side.1 * offset;
-        if let Some(id) = entities.spawn_unit(DEBUG_INERT_ENEMY_ID, EntityKind::Rifleman, x, y) {
-            if let Some(e) = entities.get_mut(id) {
-                e.set_facing(center_facing);
-            }
+    if let Some(id) =
+        entities.spawn_unit(DEBUG_INERT_ENEMY_ID, EntityKind::ScoutCar, clump_center.0, clump_center.1)
+    {
+        if let Some(e) = entities.get_mut(id) {
+            e.set_facing(center_facing);
+            e.set_weapon_facing(center_facing);
+            e.set_desired_weapon_facing(center_facing);
         }
+    }
+
+    const DEPOT_OFFSETS: [(f32, f32); 4] = [(0.0, -1.0), (1.0, 0.0), (0.0, 1.0), (-1.0, 0.0)];
+    for (dx, dy) in DEPOT_OFFSETS {
+        let x = clump_center.0 + dx * DEBUG_INERT_DEPOT_CARDINAL_OFFSET_TILES * ts;
+        let y = clump_center.1 + dy * DEBUG_INERT_DEPOT_CARDINAL_OFFSET_TILES * ts;
+        entities.spawn_building(DEBUG_INERT_ENEMY_ID, EntityKind::Depot, x, y, true);
     }
 
     players.push(PlayerState {
         id: DEBUG_INERT_ENEMY_ID,
-        name: "Inert AT Battery".to_string(),
+        name: "Inert Mortar Corner".to_string(),
         color: "#8d2f2f".to_string(),
-        start_tile: battery_tile,
+        start_tile: clump_tile,
         steel: 0,
         oil: 0,
         supply_used: 0,
@@ -639,6 +637,13 @@ fn spawn_debug_inert_enemy_at_guns(
         score: ScoreState::default(),
         upgrades: Default::default(),
     });
+}
+
+fn debug_clockwise_adjacent_corner_tile(map: &Map, start: (u32, u32)) -> (u32, u32) {
+    let max_tile = map.size.saturating_sub(1);
+    let start_x = start.0.min(max_tile);
+    let start_y = start.1.min(max_tile);
+    (max_tile.saturating_sub(start_y), start_x)
 }
 
 fn debug_offset_world(
