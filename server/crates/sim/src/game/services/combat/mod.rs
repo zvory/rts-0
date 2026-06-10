@@ -10,7 +10,7 @@ use crate::config;
 use crate::game::entity::{fires_while_moving, AttackPhase, EntityKind, EntityStore, Order};
 use crate::game::fog::Fog;
 use crate::game::map::Map;
-use crate::game::mortar::MortarShellStore;
+use crate::game::mortar::{rotate_mortar_for_fire, MortarShellStore};
 use crate::game::services::dist2;
 use crate::game::services::line_of_sight::LineOfSight;
 use crate::game::services::move_coordinator::MoveCoordinator;
@@ -93,6 +93,9 @@ pub(crate) fn combat_system(
             // drag them off the resource node and stall the economy. An explicit Attack
             // order overrides Gather upstream, so this only suppresses auto-acquisition.
             if matches!(e.order(), Order::Gather(_)) {
+                continue;
+            }
+            if e.kind == EntityKind::MortarTeam && matches!(e.order(), Order::Ability(_)) {
                 continue;
             }
             let profile = effective_attack_profile(e);
@@ -203,6 +206,8 @@ pub(crate) fn combat_system(
                     rotate_vehicle_weapon_for_combat(e, target_angle);
                 } else if e.kind == EntityKind::AtTeam {
                     rotate_at_gun_for_combat(e, target_angle);
+                } else if e.kind == EntityKind::MortarTeam {
+                    rotate_mortar_for_fire(e, target_angle);
                 } else if target_angle.is_finite() {
                     e.set_facing(target_angle);
                     mirror_weapon_to_body(e, target_angle);
@@ -222,6 +227,8 @@ pub(crate) fn combat_system(
                     weapon_aligned = rotate_vehicle_weapon_for_combat(e, target_angle);
                 } else if e.kind == EntityKind::AtTeam {
                     weapon_aligned = rotate_at_gun_for_combat(e, target_angle);
+                } else if e.kind == EntityKind::MortarTeam {
+                    weapon_aligned = rotate_mortar_for_fire(e, target_angle);
                 } else if target_angle.is_finite() {
                     e.set_facing(target_angle);
                     mirror_weapon_to_body(e, target_angle);
@@ -290,6 +297,8 @@ pub(crate) fn combat_system(
                     rotate_vehicle_weapon_for_combat(e, target_angle);
                 } else if e.kind == EntityKind::AtTeam {
                     rotate_at_gun_for_combat(e, target_angle);
+                } else if e.kind == EntityKind::MortarTeam {
+                    rotate_mortar_for_fire(e, target_angle);
                 } else if target_angle.is_finite() {
                     mirror_weapon_to_body(e, e.facing());
                 }

@@ -345,6 +345,95 @@ fn manual_mortar_fire_impacts_without_toast_notice() {
 }
 
 #[test]
+fn manual_mortar_fire_waits_for_tube_alignment() {
+    let players = [
+        PlayerInit {
+            id: 1,
+            name: "One".into(),
+            color: "#fff".into(),
+            is_ai: false,
+        },
+        PlayerInit {
+            id: 2,
+            name: "Two".into(),
+            color: "#000".into(),
+            is_ai: false,
+        },
+    ];
+    let mut game = empty_flat_game(&players);
+    let mortar_pos = game.map.tile_center(8, 8);
+    let target_pos = game.map.tile_center(8, 4);
+    let mortar = game
+        .entities
+        .spawn_unit(1, EntityKind::MortarTeam, mortar_pos.0, mortar_pos.1)
+        .expect("mortar should spawn");
+    if let Some(mortar_entity) = game.entities.get_mut(mortar) {
+        mortar_entity.set_facing(0.0);
+        mortar_entity.set_weapon_facing(0.0);
+        mortar_entity.set_weapon_setup(WeaponSetup::Deployed);
+    }
+    let target = game
+        .entities
+        .spawn_unit(2, EntityKind::Rifleman, target_pos.0, target_pos.1)
+        .expect("target should spawn");
+    systems::recompute_supply(&mut game.players, &game.entities);
+    game.spatial = services::spatial::SpatialIndex::build(&game.entities, game.map.size);
+    let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
+    game.fog.recompute(&ids, &game.entities, &game.map);
+
+    game.enqueue(
+        1,
+        Command::UseAbility {
+            ability: ability::AbilityKind::MortarFire,
+            units: vec![mortar],
+            x: Some(target_pos.0),
+            y: Some(target_pos.1),
+            queued: false,
+        },
+    );
+
+    game.tick();
+    let mortar_entity = game.entities.get(mortar).expect("mortar should exist");
+    assert_eq!(
+        mortar_entity.ability_cooldown_ticks(ability::AbilityKind::MortarFire),
+        0,
+        "manual mortar fire should not launch while the tube is still turning"
+    );
+    assert!(
+        mortar_entity.facing().abs() <= config::MORTAR_TURN_RATE_RAD_PER_TICK + 0.001,
+        "mortar should begin turning toward the manual target, got {:.4}",
+        mortar_entity.facing()
+    );
+
+    let mut launched = false;
+    for _ in 0..20 {
+        game.tick();
+        let mortar_entity = game.entities.get(mortar).expect("mortar should exist");
+        if mortar_entity.ability_cooldown_ticks(ability::AbilityKind::MortarFire) > 0 {
+            launched = true;
+            break;
+        }
+    }
+    assert!(launched, "manual mortar fire should launch once aligned");
+    let hp_before_impact = game
+        .entities
+        .get(target)
+        .expect("target should still exist")
+        .hp;
+
+    for _ in 0..config::MORTAR_SHELL_DELAY_TICKS {
+        game.tick();
+    }
+
+    assert!(
+        game.entities
+            .get(target)
+            .is_none_or(|target_after| target_after.hp < hp_before_impact),
+        "manual mortar fire should damage or kill units after the delayed impact"
+    );
+}
+
+#[test]
 fn snapshot_projects_visible_smoke_but_hides_enemy_inside_it() {
     let (game, _observer, _friendly, enemy, _smoke_pos) = smoke_projection_fixture();
 

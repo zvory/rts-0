@@ -156,7 +156,7 @@ function drawMortarTeam(g, r, tint, facing, weaponFacing, setup, recoil) {
 
   const axleL = offsetPoint(rotatePoint(wheelX, -wheelY, a), carriageKick);
   const axleR = offsetPoint(rotatePoint(wheelX, wheelY, a), carriageKick);
-  g.lineStyle(3, 0x1a1712, 0.9);
+  g.lineStyle(2, 0x1a1712, 0.9);
   g.moveTo(axleL.x, axleL.y);
   g.lineTo(axleR.x, axleR.y);
   drawGunTire(g, axleL.x, axleL.y, tireLength, tireWidth, a);
@@ -165,10 +165,10 @@ function drawMortarTeam(g, r, tint, facing, weaponFacing, setup, recoil) {
   const base = offsetPoint(rotatePoint(-r * 0.16, 0, a), carriageKick);
   const tow = offsetPoint(rotatePoint(lerp(-r * 1.2, -r * 0.72, deploy), 0, a), carriageKick);
   const bipodRoot = offsetPoint(rotatePoint(r * 0.22, 0, a), carriageKick);
-  const footSpread = lerp(r * 0.16, r * 0.7, deploy);
-  const footForward = lerp(r * 0.72, r * 1.08, deploy);
+  const footSpread = lerp(r * 0.12, r * 0.46, deploy);
+  const footForward = lerp(r * 0.52, r * 0.82, deploy);
 
-  g.lineStyle(4, 0xd8d0b0, 0.88);
+  g.lineStyle(2, 0xb7b08f, 0.86);
   g.moveTo(tow.x, tow.y);
   g.lineTo(base.x, base.y);
   const footL = offsetPoint(rotatePoint(footForward, -footSpread, a), carriageKick);
@@ -185,17 +185,17 @@ function drawMortarTeam(g, r, tint, facing, weaponFacing, setup, recoil) {
   drawFreeRotatedRect(g, base.x, base.y, r * 0.34, r * 0.5, a);
   g.endFill();
 
-  const tubeRear = offsetPoint(rotatePoint(-r * 0.22, 0, a), kick);
-  const muzzleDist = lerp(r * 1.3, r * 0.92, deploy);
+  const tubeRear = offsetPoint(rotatePoint(-r * 0.14, 0, a), kick);
+  const muzzleDist = lerp(r * 1.02, r * 0.74, deploy);
   const muzzle = offsetPoint(rotatePoint(muzzleDist, 0, a), kick);
-  g.lineStyle(r * 0.34, 0x1b1712, 0.98);
+  g.lineStyle(r * 0.22, 0x263f22, 0.98);
   g.moveTo(tubeRear.x, tubeRear.y);
   g.lineTo(muzzle.x, muzzle.y);
-  g.lineStyle(r * 0.16, 0xd8d0b0, 0.68);
+  g.lineStyle(r * 0.08, 0x58734c, 0.66);
   g.moveTo(tubeRear.x + Math.sin(a) * r * 0.08, tubeRear.y - Math.cos(a) * r * 0.08);
   g.lineTo(muzzle.x + Math.sin(a) * r * 0.08, muzzle.y - Math.cos(a) * r * 0.08);
-  g.beginFill(0x241d17, 0.98);
-  drawFreeRotatedRect(g, muzzle.x, muzzle.y, r * 0.24, r * 0.42, a);
+  g.beginFill(0x1c2c19, 0.98);
+  drawFreeRotatedRect(g, muzzle.x, muzzle.y, r * 0.16, r * 0.28, a);
   g.endFill();
 }
 
