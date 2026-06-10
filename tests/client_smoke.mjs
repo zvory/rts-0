@@ -4,9 +4,10 @@
 // (round-trips through the server and the depot appears) -> train-card rendering.
 // Fails on ANY console/page error.
 //
-// Requires puppeteer-core and a local Chrome:
-//   cd tests && npm install
-//   node client_smoke.mjs              (server must be running on :8081)
+// Requires a local Chrome. `tests/run-all.sh` hydrates puppeteer-core through the shared
+// lockfile-keyed cache before running this script:
+//   tests/run-all.sh --no-rust
+//   node tests/client_smoke.mjs        (server must be running on :8081)
 // Env: RTS_URL (default http://127.0.0.1:8081/), CHROME (path to a Chrome/Chromium binary).
 import puppeteer from "puppeteer-core";
 import fs from "node:fs";

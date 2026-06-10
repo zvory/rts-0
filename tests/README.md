@@ -22,12 +22,18 @@ tests/run-all.sh -v              # print suite timings and pass/fail lines
 PORT=8090 tests/run-all.sh       # use a different port
 CARGO_TARGET_DIR=/tmp/rts-target tests/run-all.sh  # override the per-worktree Cargo target dir
 RUSTC_WRAPPER=sccache tests/run-all.sh             # force a compiler cache wrapper
+RTS_NODE_DEPS_CACHE_DIR=/tmp/rts-node-deps tests/run-all.sh  # override shared Node deps cache
 CHROME=/path/to/chrome tests/run-all.sh
 ```
 
-The client smoke test self-skips (not a failure) when `puppeteer-core` or a Chrome binary is
-missing. By default, the local gate and Cargo helper use an isolated target directory for each
-worktree under `/tmp/rts-cargo-target/`. This keeps final binaries, test harnesses, and self-play
+The client smoke test self-skips (not a failure) only when a Chrome binary is missing. When Chrome
+is available, `run-all.sh` hydrates `puppeteer-core` into a shared dependency cache keyed by the
+SHA-256 hash of `tests/package-lock.json`, then links this worktree's ignored `tests/node_modules`
+to the matching cache entry. Hydration uses `npm ci`, so a lockfile/package mismatch fails the
+gate instead of silently reusing the wrong dependency tree.
+
+By default, the local gate and Cargo helper use an isolated target directory for each worktree
+under `/tmp/rts-cargo-target/`. This keeps final binaries, test harnesses, and self-play
 artifacts branch-local while keeping the checkout clean. Override with
 `CARGO_TARGET_DIR=/path/to/target` when you need a specific target location.
 
@@ -105,15 +111,17 @@ cargo run --bin ai-matchup -- --list-profiles
 Loads the real client in headless Chrome and asserts it renders the PixiJS scene and that
 the full UI command loop works: box-select → build placement (which round-trips through the
 server and shows the new building) → train-card rendering. Fails on **any** console or page
-error. Needs `puppeteer-core` and a local Chrome binary.
+error. Needs a local Chrome binary; `run-all.sh` installs/reuses `puppeteer-core` through the
+shared lockfile-keyed cache.
 
 ```bash
-cd tests && npm install
-node client_smoke.mjs
+tests/run-all.sh --no-rust
+# or, after run-all has hydrated tests/node_modules:
+node tests/client_smoke.mjs
 # env: RTS_URL (default http://127.0.0.1:8081/), CHROME (path to Chrome/Chromium)
 ```
 
 > CI note: `run-all.sh` is the CI entry point — it builds the server, launches it, waits for
 > `GET /` to return 200, checks Rust formatting, runs every suite, and exits non-zero on any
 > failure. In a headless CI image without Chrome, the client smoke test self-skips; pass
-> `CHROME=...` to include it.
+> `CHROME=...` to include it. If Chrome is present but dependency hydration fails, the gate fails.

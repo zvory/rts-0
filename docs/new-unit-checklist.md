@@ -195,7 +195,7 @@ Minimum verification before merge:
 - [ ] `node tests/regression.mjs` with a running server, if protocol, hardening, or network behavior
       changed.
 - [ ] `node tests/ai_integration.mjs` with a running server, if AI/lobby behavior changed.
-- [ ] `cd tests && npm install && node client_smoke.mjs` if client rendering/input/UI changed.
+- [ ] `tests/run-all.sh --no-rust` if client rendering/input/UI changed.
 - [ ] Architecture checks if server architecture or crate boundaries changed.
 
 Exit criteria:

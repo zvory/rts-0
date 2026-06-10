@@ -92,7 +92,7 @@ cargo run --manifest-path server/Cargo.toml -p rts-archcheck -- check-sim-archit
 node tests/server_integration.mjs     # dep-free, full server pipeline
 node tests/regression.mjs             # dep-free, hardening/DoS/robustness guards
 node tests/ai_integration.mjs         # dep-free, AI opponent lobby flow (add/remove/start)
-cd tests && npm install && node client_smoke.mjs   # headless-Chrome client smoke
+tests/run-all.sh --no-rust            # live Node suites + headless-Chrome smoke with shared deps
 
 # Simulation behavior, including scripted self-play (no running server needed): cd server && cargo test
 ```

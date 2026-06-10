@@ -11,7 +11,8 @@ Use when writing or debugging tests, or before claiming a change is done.
 - `node tests/regression.mjs` — dep-free, hardening/DoS/robustness guards
 - `node tests/ai_integration.mjs` — dep-free, AI opponent lobby flow
 - `node tests/minimap_input_contracts.mjs` — dep-free minimap/router pointer-lock input contracts
-- `cd tests && npm install && node client_smoke.mjs` — headless-Chrome client smoke
+- `tests/run-all.sh --no-rust` — live Node suites plus headless-Chrome client smoke; hydrates
+  `puppeteer-core` through the shared lockfile-keyed cache
 - `cd server && cargo test` — simulation behavior + fast scripted self-play (no running server needed)
 - `cd server && RTS_FULL_AI_TESTS=1 cargo test` — includes long AI self-play/simulation coverage
 - `tests/run-all.sh --full-ai` — local gate plus long AI self-play/simulation coverage
@@ -24,6 +25,11 @@ Use when writing or debugging tests, or before claiming a change is done.
 - Local gate scripts use a per-worktree Cargo target dir under `/tmp/rts-cargo-target/`, so
   parallel worktrees do not share final binaries, test harnesses, or self-play artifacts. Override
   with `CARGO_TARGET_DIR` if a task needs a specific target location.
+- Browser smoke dependencies are shared across worktrees under
+  `${RTS_NODE_DEPS_CACHE_DIR:-/tmp/rts-node-deps}` and keyed by the SHA-256 hash of
+  `tests/package-lock.json`. `tests/run-all.sh` links each worktree's ignored
+  `tests/node_modules` to the matching cache entry and runs `npm ci` only when that cache is
+  missing.
 - Cross-worktree compiler reuse is provided by `sccache` when installed. `tests/run-all.sh` and
   `scripts/cargo-shared-target.sh` enable it automatically when `RUSTC_WRAPPER` is unset.
 - Node tests need a **running** server on the test runner's private port. They are not
