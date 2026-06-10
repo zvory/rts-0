@@ -155,7 +155,10 @@ the player's own starting City Centre + workers. When the lobby's `setQuickstart
 enabled, every player starts with 99,999 steel and 99,999 oil instead of the default opening
 resources, and each human player also starts with five supply depots, one Gun Works
 (`steelworks` kind), one Training Centre, two Barracks, two Vehicle Works (`factory` kind), and
-five of each unit kind. It also sets `debugMode: true`,
+five of each unit kind. Debug mode also adds one inert enemy player in the clockwise-adjacent
+corner from the first human start, with five deployed Mortar Teams clumped around one Scout Car
+and four enemy Supply Depots five tiles north/east/south/west of the clump. It also sets
+`debugMode: true`,
 which lets the client expose local movement-waypoint overlay controls for the owner-only
 `debugPath` fields in snapshots.
 Spectator start payloads keep the spectator connection's `playerId`, set `spectator: true`, and
