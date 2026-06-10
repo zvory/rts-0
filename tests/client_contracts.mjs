@@ -1489,6 +1489,67 @@ function fakeAudioContext() {
     );
 
     renderedButtons.length = 0;
+    const playedNotices = [];
+    let placements = 0;
+    const selectedWorker = { id: 90, owner: playerId, kind: KIND.WORKER };
+    const completedCityCentre = { id: 91, owner: playerId, kind: KIND.CITY_CENTRE, buildProgress: null };
+    const shortResourceHud = Object.create(HUD.prototype);
+    shortResourceHud.state = {
+      playerId,
+      resources: { steel: 100, oil: 0 },
+      selectedEntities: () => [selectedWorker],
+      entitiesInterpolated: () => [selectedWorker, completedCityCentre],
+      beginPlacement() {
+        placements += 1;
+      },
+    };
+    shortResourceHud.net = { command: (command) => sent.push(command) };
+    shortResourceHud.audio = {
+      play(id) {
+        playedNotices.push(id);
+      },
+    };
+    shortResourceHud._cardSig = null;
+    shortResourceHud._resourceIcons = {};
+
+    const buildCard = fakeElement("div");
+    shortResourceHud._renderBuildCard(buildCard);
+    const barracksButton = renderedButtons.find((button) => button.innerHTML.includes("Barracks"));
+    const factoryButton = renderedButtons.find((button) => button.innerHTML.includes("Factory"));
+    assert(barracksButton && !barracksButton.disabled, "unlocked unaffordable build button stays clickable");
+    assert(
+      barracksButton.className.includes("unaffordable"),
+      "unlocked unaffordable build button gets the intermediate visual class",
+    );
+    assert(factoryButton?.disabled, "tech-locked build button stays hard-disabled");
+
+    barracksButton.click();
+    assert(placements === 0, "clicking an unaffordable build button should not enter placement");
+    assert(
+      playedNotices[0] === "notice_steel",
+      "clicking an unaffordable build button plays the missing-steel voice line",
+    );
+
+    globalThis.document.getElementById = (id) => {
+      assert(id === "command-card", "unaffordable build hotkey should query the command card");
+      return {
+        querySelectorAll(selector) {
+          assert(selector === "button[data-hotkey]", "unaffordable build hotkey should query hotkey buttons");
+          return [barracksButton];
+        },
+      };
+    };
+    input.state = shortResourceHud.state;
+    input._activateCommandHotkey({
+      code: `Key${barracksButton.dataset.hotkey}`,
+      shiftKey: false,
+      repeat: false,
+      preventDefault() {},
+    });
+    assert(placements === 0, "unaffordable build hotkey should not enter placement");
+    assert(playedNotices[1] === "notice_steel", "unaffordable build hotkey plays the missing-steel voice line");
+
+    renderedButtons.length = 0;
     sent.length = 0;
     const selectedAtGun = { id: 88, owner: playerId, kind: KIND.AT_TEAM, setupState: SETUP.DEPLOYED };
     const atGunHud = Object.create(HUD.prototype);
