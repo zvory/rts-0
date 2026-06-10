@@ -7,9 +7,12 @@ authoritative. The browser should run a local Rust simulation through WASM for p
 same player commands to the remote server, and reconcile local prediction against authoritative
 server snapshots as they arrive.
 
-This is not a diagnostic plan. The working premise is that network latency is the player-facing
-problem and that local prediction is the chosen fix. The plan is staged so the game gains local
-responsiveness without accepting desyncs, fog leaks, or untestable client/server divergence.
+This is not primarily a diagnostic plan. The working premise is that network latency is the
+player-facing problem and that local prediction is the chosen fix. The plan is staged so the game
+gains local responsiveness without accepting desyncs, fog leaks, or untestable client/server
+divergence. The testing centerpiece is a tick-steppable tri-state scenario harness: every prediction
+behavior should be inspectable as remote authoritative state, local prediction/reference state, and
+browser client state over the same scripted clicks and ticks.
 
 ## Core Model
 
@@ -43,9 +46,35 @@ responsiveness without accepting desyncs, fog leaks, or untestable client/server
   switch until the reconciliation loop is proven.
 - Never make the client authoritative. Client prediction is a rendering and responsiveness layer;
   rejection by the server must always win.
+- Promote every hard-to-debug prediction bug into a named tri-state scenario before fixing it when
+  practical, so future agents and humans can replay the same clicks, ticks, snapshots, and diffs.
+
+## Testing Centerpiece: Tri-State Scenarios
+
+All lag/prediction work should orbit a legible scenario harness that can step and inspect three
+lanes for the same authored situation:
+
+- Remote authoritative lane: a real server room and WebSocket path, driven by scripted commands and
+  explicit tick advancement where dev-mode control is available.
+- Local prediction/reference lane: initially a placeholder adapter, later a native `rts-sim`
+  reference and the browser-safe WASM predictor from Phase 3.
+- Browser client lane: the real client `GameState`, prediction controller state, debug marks, and
+  rendered/client-facing snapshot state after each delivered authoritative snapshot.
+
+Phase 0 builds the harness around the lanes that exist today: remote authoritative server behavior
+and browser client state. It must define the local-lane adapter contract up front, but it does not
+need to fabricate a predictor before the constituent crate exists. Later phases register the native
+and WASM local lanes without changing how scenarios are authored.
+
+Each scenario should be both human-inspectable and CI-runnable. A failing run should write an
+artifact containing the scenario definition, command/click timeline, authoritative snapshots,
+client debug marks, optional local-lane frames, and domain-aware diffs. The goal is that a person or
+agent can answer, at step N and tick T: what did the server consume, what did local prediction
+believe, what did the browser render, and where did those lanes diverge?
 
 ## Phase Index
 
+0. [Phase 0 - Tri-State Scenario Harness](phase-0-tri-state-scenario-harness.md)
 1. [Phase 1 - Prediction Protocol Contract](phase-1-prediction-protocol-contract.md)
 2. [Phase 2 - Client Prediction Buffer and Reconciliation Skeleton](phase-2-client-prediction-buffer.md)
 3. [Phase 3 - WASM Simulation Package](phase-3-wasm-simulation-package.md)
@@ -65,8 +94,11 @@ responsiveness without accepting desyncs, fog leaks, or untestable client/server
 
 ## Required Verification Themes
 
-Every implementation phase must include programmatic verification in at least one of these forms:
+Every implementation phase must either add or run relevant tri-state scenarios, then include
+programmatic verification in at least one of these forms:
 
+- tri-state scenario checks comparing remote authoritative state, local prediction/reference state
+  when available, and browser client state over scripted clicks/ticks
 - protocol round-trip tests for Rust and JS mirrors
 - deterministic native replay tests
 - native-vs-WASM parity tests using the same command streams
