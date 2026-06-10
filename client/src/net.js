@@ -218,6 +218,14 @@ export class Net {
   }
 
   /**
+   * Seek a replay to an absolute simulation tick (replay rooms only).
+   * @param {number} tick
+   */
+  seekReplayTo(tick) {
+    this._send(msg.seekReplayTo(tick));
+  }
+
+  /**
    * Select replay vision for this viewer only.
    * @param {object} vision replay vision payload from protocol.js builders/constants
    */

@@ -118,6 +118,8 @@ pub enum ClientMessage {
         #[serde(rename = "ticksBack")]
         ticks_back: u32,
     },
+    /// Seek a replay to an absolute simulation tick (replay rooms only; clamped to duration).
+    SeekReplayTo { tick: u32 },
     /// Select which players' fog to use while viewing a replay. Per-viewer only.
     SetReplayVision { vision: ReplayVisionRequest },
     /// Host selects a map by name (lobby phase only; ignored from non-hosts).
@@ -962,6 +964,17 @@ mod tests {
                 assert_eq!(report.head_of_line_count, 7);
             }
             other => panic!("expected net report, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn seek_replay_to_deserializes_absolute_tick() {
+        let msg: ClientMessage = serde_json::from_str(r#"{"t":"seekReplayTo","tick":4100}"#)
+            .expect("seekReplayTo should deserialize");
+
+        match msg {
+            ClientMessage::SeekReplayTo { tick } => assert_eq!(tick, 4_100),
+            other => panic!("expected seekReplayTo, got {other:?}"),
         }
     }
 

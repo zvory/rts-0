@@ -190,11 +190,18 @@ struct ReplaySession {
     artifact: ReplayArtifactV1,
     game: Box<Game>,
     next_command: usize,
+    keyframes: Vec<ReplayKeyframe>,
     duration_ticks: u32,
     speed: f32,
     viewer_vision: HashMap<u32, ReplayVisionSelection>,
     last_controller_id: Option<u32>,
     last_seek_at: Option<StdInstant>,
+}
+
+struct ReplayKeyframe {
+    tick: u32,
+    game: Box<Game>,
+    next_command: usize,
 }
 
 impl ReplaySession {
@@ -205,6 +212,7 @@ impl ReplaySession {
     const MAX_DURATION_TICKS: u32 = 30 * 60 * 60;
     const MAX_COMMAND_LOG_ENTRIES: usize = 200_000;
     const SEEK_COOLDOWN: Duration = Duration::from_millis(500);
+    const KEYFRAME_INTERVAL_TICKS: u32 = 2_000;
 
     #[allow(dead_code)]
     fn new(artifact: ReplayArtifactV1) -> Result<Self, String> {
@@ -212,6 +220,11 @@ impl ReplaySession {
         let duration_ticks = artifact.duration_ticks;
         let build_start = StdInstant::now();
         let game = Box::new(Self::build_game(&artifact)?);
+        let keyframes = vec![ReplayKeyframe {
+            tick: 0,
+            game: Box::new(game.clone_for_replay_keyframe()),
+            next_command: 0,
+        }];
         info!(
             map = %artifact.map_name,
             duration_ticks,
@@ -224,6 +237,7 @@ impl ReplaySession {
             artifact,
             game,
             next_command: 0,
+            keyframes,
             duration_ticks,
             speed: Self::DEFAULT_SPEED,
             viewer_vision: HashMap::new(),
@@ -383,6 +397,27 @@ impl ReplaySession {
         self.game.tick_with_perf(perf).into_iter().collect()
     }
 
+    fn record_keyframe_if_due(&mut self) {
+        let tick = self.current_tick();
+        if tick == 0 || !tick.is_multiple_of(Self::KEYFRAME_INTERVAL_TICKS) {
+            return;
+        }
+        match self
+            .keyframes
+            .binary_search_by_key(&tick, |keyframe| keyframe.tick)
+        {
+            Ok(_) => (),
+            Err(index) => self.keyframes.insert(
+                index,
+                ReplayKeyframe {
+                    tick,
+                    game: Box::new(self.game.clone_for_replay_keyframe()),
+                    next_command: self.next_command,
+                },
+            ),
+        }
+    }
+
     fn seek_back(
         &mut self,
         room: &str,
@@ -390,19 +425,30 @@ impl ReplaySession {
         controller_id: u32,
         ticks_back: u32,
     ) -> Result<u32, String> {
+        let target_tick = self
+            .current_tick()
+            .saturating_sub(ticks_back)
+            .min(self.duration_ticks);
+        self.seek_to(room, viewer_count, controller_id, target_tick)
+    }
+
+    fn seek_to(
+        &mut self,
+        room: &str,
+        viewer_count: usize,
+        controller_id: u32,
+        target_tick: u32,
+    ) -> Result<u32, String> {
         if self
             .last_seek_at
             .is_some_and(|last_seek| last_seek.elapsed() < Self::SEEK_COOLDOWN)
         {
             return Err("Replay seek ignored; wait before seeking again.".to_string());
         }
-        let target_tick = self
-            .current_tick()
-            .saturating_sub(ticks_back)
-            .min(self.duration_ticks);
         let from_tick = self.current_tick();
+        let target_tick = target_tick.min(self.duration_ticks);
         let seek_start = StdInstant::now();
-        self.rebuild_to(target_tick)?;
+        let keyframe_tick = self.rebuild_to(target_tick)?;
         self.last_seek_at = Some(StdInstant::now());
         self.last_controller_id = Some(controller_id);
         info!(
@@ -411,22 +457,38 @@ impl ReplaySession {
             viewer_count,
             from_tick,
             to_tick = target_tick,
+            keyframe_tick,
             duration_ticks = self.duration_ticks,
             command_count = self.artifact.command_log.len(),
+            keyframe_count = self.keyframes.len(),
             rebuild_ms = seek_start.elapsed().as_millis(),
             "replay seek rebuilt"
         );
         Ok(target_tick)
     }
 
-    fn rebuild_to(&mut self, target_tick: u32) -> Result<(), String> {
-        *self.game = Self::build_game(&self.artifact)?;
-        self.next_command = 0;
-        for _ in 0..target_tick {
+    fn rebuild_to(&mut self, target_tick: u32) -> Result<u32, String> {
+        let (keyframe_tick, keyframe_game, keyframe_next_command) = self
+            .keyframes
+            .iter()
+            .rev()
+            .find(|keyframe| keyframe.tick <= target_tick)
+            .map(|keyframe| {
+                (
+                    keyframe.tick,
+                    keyframe.game.clone_for_replay_keyframe(),
+                    keyframe.next_command,
+                )
+            })
+            .ok_or_else(|| "replay has no valid keyframe".to_string())?;
+        *self.game = keyframe_game;
+        self.next_command = keyframe_next_command;
+        while self.current_tick() < target_tick {
             self.enqueue_for_current_tick()?;
             self.game.tick();
+            self.record_keyframe_if_due();
         }
-        Ok(())
+        Ok(keyframe_tick)
     }
 }
 
@@ -639,6 +701,7 @@ impl RoomTask {
                 player_id,
                 ticks_back,
             } => self.on_seek_replay(player_id, ticks_back),
+            RoomEvent::SeekReplayTo { player_id, tick } => self.on_seek_replay_to(player_id, tick),
             RoomEvent::SetReplayVision { player_id, vision } => {
                 self.on_set_replay_vision(player_id, vision)
             }
@@ -1987,6 +2050,7 @@ impl RoomTask {
                     return;
                 }
             };
+            session.record_keyframe_if_due();
             self.fanout_replay_snapshots(
                 &session,
                 per_player_events,
@@ -2067,6 +2131,48 @@ impl RoomTask {
             }
             let viewer_count = self.players.len();
             let seek_result = session.seek_back(&self.room, viewer_count, player_id, ticks_back);
+            let starts = if seek_result.is_ok() {
+                self.order
+                    .iter()
+                    .filter_map(|viewer_id| {
+                        self.players.get(viewer_id).map(|player| {
+                            (
+                                *viewer_id,
+                                player.msg_tx.clone(),
+                                session.start_payload_for(*viewer_id),
+                            )
+                        })
+                    })
+                    .collect::<Vec<_>>()
+            } else {
+                Vec::new()
+            };
+            let state = seek_result.as_ref().ok().map(|_| session.state());
+            match seek_result {
+                Ok(_) => {
+                    for (viewer_id, msg_tx, start) in starts {
+                        send_or_log(&self.room, viewer_id, &msg_tx, ServerMessage::Start(start));
+                    }
+                    if let Some(state) = state {
+                        self.broadcast(&ServerMessage::ReplayState(state));
+                    }
+                }
+                Err(err) => {
+                    warn!(room = %self.room, error = %err, "replay seek failed");
+                    self.send_dev_error(&err);
+                }
+            }
+        }
+    }
+
+    /// Seek a replay to an absolute tick. No-op outside replay rooms or when no game is active.
+    fn on_seek_replay_to(&mut self, player_id: u32, tick: u32) {
+        if let Phase::ReplayViewer(session) = &mut self.phase {
+            if !self.players.contains_key(&player_id) {
+                return;
+            }
+            let viewer_count = self.players.len();
+            let seek_result = session.seek_to(&self.room, viewer_count, player_id, tick);
             let starts = if seek_result.is_ok() {
                 self.order
                     .iter()
@@ -2520,6 +2626,44 @@ mod tests {
             assert_eq!(
                 replay.game.snapshot_for(player.id),
                 live.snapshot_for(player.id)
+            );
+        }
+    }
+
+    #[test]
+    fn replay_session_records_keyframes_and_restores_nearest_before_seek_target() {
+        let players = replay_test_players(2);
+        let (_live, artifact) = replay_test_artifact(&players, 4_500);
+        let mut replay = ReplaySession::new(artifact).unwrap();
+
+        while replay.current_tick() < replay.duration_ticks {
+            replay.enqueue_for_current_tick().unwrap();
+            replay.tick(None);
+            replay.record_keyframe_if_due();
+        }
+
+        assert_eq!(
+            replay
+                .keyframes
+                .iter()
+                .map(|keyframe| keyframe.tick)
+                .collect::<Vec<_>>(),
+            vec![0, 2_000, 4_000]
+        );
+
+        let restored_from = replay.rebuild_to(4_100).unwrap();
+
+        assert_eq!(restored_from, 4_000);
+        assert_eq!(replay.current_tick(), 4_100);
+
+        let mut expected = replay_test_game(&players, 0x5150_2202);
+        while expected.tick_count() < 4_100 {
+            expected.tick();
+        }
+        for player in &players {
+            assert_eq!(
+                replay.game.snapshot_for(player.id),
+                expected.snapshot_for(player.id)
             );
         }
     }

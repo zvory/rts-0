@@ -154,6 +154,7 @@ impl TerrainPassability<'_> {
 
 type CacheKey = (EntityKind, (i32, i32), (i32, i32), u32, RouteShape, u64);
 
+#[derive(Clone)]
 struct CacheEntry {
     tile_path: Vec<(i32, i32)>,
     last_used: u32,
@@ -164,6 +165,7 @@ struct CacheEntry {
 /// Holds an LRU cache so multiple units heading to the same destination, or the same unit
 /// repathing across ticks, can reuse prior A* work. Cached paths are verified against the
 /// current occupancy before reuse.
+#[derive(Clone)]
 pub struct PathingService {
     default_budget: usize,
     cache: HashMap<CacheKey, CacheEntry>,

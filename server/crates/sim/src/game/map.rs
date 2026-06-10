@@ -40,7 +40,7 @@ pub const BASE_PROTECTION_RADIUS_TILES: i32 = 7;
 pub const EXPANSION_PROTECTION_RADIUS_TILES: i32 = 4;
 
 /// The terrain grid plus the selected start and expansion tiles.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Map {
     /// Side length in tiles (square map).
     pub size: u32,

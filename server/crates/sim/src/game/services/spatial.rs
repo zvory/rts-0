@@ -11,7 +11,7 @@ use crate::game::entity::EntityStore;
 ///
 /// Map sizes are at most ~96×96, so a dense Vec-of-Vecs (~9k cells) is cheap to clear and
 /// refill each tick. Each cell stores the ids of entities whose center falls on that tile.
-#[derive(Debug, Default)]
+#[derive(Debug, Clone, Default)]
 pub struct SpatialIndex {
     size: u32,
     cells: Vec<Vec<u32>>,

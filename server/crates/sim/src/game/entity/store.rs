@@ -7,7 +7,7 @@ use super::{Entity, EntityKind, GatherPhase};
 /// Ids increase monotonically and are never reused. All access is fallible so the tick loop
 /// can freely reference ids that may have been removed (dead units, depleted state) without
 /// risking a panic.
-#[derive(Debug, Default)]
+#[derive(Debug, Clone, Default)]
 pub struct EntityStore {
     next_id: u32,
     map: HashMap<u32, Entity>,

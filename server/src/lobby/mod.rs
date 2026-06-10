@@ -122,6 +122,8 @@ pub enum RoomEvent {
     StepDevTick { player_id: u32 },
     /// Rewind a replay by `ticks_back` simulation ticks (replay rooms only; clamped to start).
     SeekReplay { player_id: u32, ticks_back: u32 },
+    /// Seek a replay to an absolute simulation tick (replay rooms only; clamped to duration).
+    SeekReplayTo { player_id: u32, tick: u32 },
     /// Select replay vision for this viewer only. Ignored outside replay rooms in phase 1.
     SetReplayVision {
         player_id: u32,
