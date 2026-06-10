@@ -109,7 +109,8 @@ authoritative `rules::defs` records.
   `server/assets/maps/default-handcrafted.json` (126×126 today), served for tooling at
   `/maps/default-handcrafted.json`. The current asset is the original 96×96 handcrafted map
   padded with 15 passable grass tiles on every edge.
-  Its JSON uses row strings (`.` grass, `#` rock, `~` water) plus ordered `baseSites`.
+  Its JSON uses row strings (`.` grass, `#` rock, `~` water), named `sites`, and authored
+  player-count-specific spawn `layouts`.
 - Start: `STARTING_STEEL = 75`, `STARTING_OIL = 0`, `STARTING_WORKERS = 4`,
   one City Centre at the player's start tile, 18 steel patches + 3 oil patches nearby.
 - Supply: City Centre gives `+10`, Depot gives `+8`, hard cap `200`.
@@ -126,12 +127,14 @@ authoritative `rules::defs` records.
   does not reserve it. Extra workers that arrive while the slot is taken go idle. The slot
   is advisory and self-heals — it's only honored while the recorded worker is alive and
   actively harvesting that node, so death / re-order / retarget free it automatically.
-- Starting layout: each base site gets 18 steel patches and 3 oil patches. `baseSites` are stored
-  as interleaved pairs: `[start0, expansion0, start1, expansion1, ...]`. The pairs are shuffled
-  by the match seed, and the first N shuffled starts become the active player starts. Each selected
-  start always keeps its authored paired neutral expansion. Sites not selected as an active start
-  or active expansion are unused, giving exactly 2N active bases on the map. Shuffling stops the
-  lobby seat order from pinning the human/AI to the same corner every match.
+- Starting layout: each active main or natural site gets 18 steel patches and 3 oil patches.
+  Map schema v2 stores named main/natural `sites` plus explicit spawn `layouts`. Each layout
+  declares a `playerCount` and a list of slots, where each slot pairs one main with one natural.
+  At match start the seed selects one layout for the active player count, then shuffles that
+  layout's slots so lobby seat order does not pin a human/AI to the same corner. The authored
+  main-natural pair inside each slot stays intact, which lets maps define different fair naturals
+  for adjacent, cross, safe-base, or other spawn constellations. Sites not selected by the chosen
+  layout are unused, giving exactly 2N active bases on the map.
 
 Unit stats (hp, dmg, range[tiles], cooldown[ticks], speed[px/tick], sight[tiles], cost, supply, buildTicks):
 
