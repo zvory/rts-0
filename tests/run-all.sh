@@ -8,7 +8,7 @@
 #   3. Rust fast scripted tests     (cargo test — deterministic, in-process, no server)
 #   4. Rust lint                    (cargo clippy)
 #   5. Node API suites              (server_integration, regression, ai_integration)
-#   6. Headless client smoke        (client_smoke — only if puppeteer-core + Chrome are present)
+#   6. Headless client smoke        (client_smoke — hydrates shared deps; needs Chrome)
 #
 # The server is built in debug (overflow checks ON — the hardening regression tests rely on a
 # bad Build coord being caught, not silently wrapped) and booted on a private free port. The
@@ -26,6 +26,7 @@
 #   RTS_MATCH_SEED=123 tests/run-all.sh  # use a different deterministic map seed
 #   CARGO_TARGET_DIR=/path/to/target tests/run-all.sh  # override the per-worktree Cargo target dir
 #   RUSTC_WRAPPER=sccache tests/run-all.sh             # force a compiler cache wrapper
+#   RTS_NODE_DEPS_CACHE_DIR=/tmp/rts-node-deps tests/run-all.sh
 #   CHROME=/path/to/chrome tests/run-all.sh
 set -uo pipefail
 
@@ -68,7 +69,7 @@ for arg in "$@"; do
     --port) echo "use --port=N or PORT=N" >&2; exit 2 ;;
     --port=*) PORT="${arg#*=}" ;;
     -v|--verbose) VERBOSE=1 ;;
-    -h|--help) sed -n '2,28p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help) sed -n '2,30p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "unknown arg: $arg" >&2; exit 2 ;;
   esac
 done
@@ -114,6 +115,7 @@ info "Cargo target dir: $CARGO_TARGET_DIR"
 if [ -n "${RUSTC_WRAPPER:-}" ]; then
   info "Rust compiler wrapper: $RUSTC_WRAPPER"
 fi
+RTS_NODE_DEPS_CACHE_DIR="${RTS_NODE_DEPS_CACHE_DIR:-/tmp/rts-node-deps}"
 
 FAILED=()   # human-readable names of suites that failed
 SKIPPED=()  # suites we deliberately did not run
@@ -258,6 +260,138 @@ collect_bg_results() {
   BG_PIDS=(); BG_NAMES=(); BG_RESULT_FILES=()
 }
 
+hash_file() {
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha256sum "$1" | awk '{print $1}'
+  elif command -v shasum >/dev/null 2>&1; then
+    shasum -a 256 "$1" | awk '{print $1}'
+  else
+    return 1
+  fi
+}
+
+hydrate_client_deps() {
+  local package_json="$SCRIPT_DIR/package.json"
+  local package_lock="$SCRIPT_DIR/package-lock.json"
+  local local_node_modules="$SCRIPT_DIR/node_modules"
+  local hash cache_dir cache_node_modules ready lock_dir tmp_dir logf
+  local start deadline
+  local lock_acquired=0
+
+  if [ ! -f "$package_json" ] || [ ! -f "$package_lock" ]; then
+    warn "client smoke dependencies cannot be hydrated: tests/package.json or tests/package-lock.json is missing"
+    return 1
+  fi
+  if ! command -v npm >/dev/null 2>&1; then
+    warn "client smoke dependencies cannot be hydrated: npm not found on PATH"
+    return 1
+  fi
+  hash="$(hash_file "$package_lock")" || {
+    warn "client smoke dependencies cannot be hydrated: no SHA-256 tool found"
+    return 1
+  }
+
+  cache_dir="$RTS_NODE_DEPS_CACHE_DIR/$hash"
+  cache_node_modules="$cache_dir/node_modules"
+  ready="$cache_dir/.ready"
+  lock_dir="$cache_dir.lock"
+
+  if [ ! -f "$ready" ] || [ ! -d "$cache_node_modules/puppeteer-core" ]; then
+    mkdir -p "$RTS_NODE_DEPS_CACHE_DIR" 2>/dev/null || {
+      warn "client smoke dependencies cannot be hydrated: could not create $RTS_NODE_DEPS_CACHE_DIR"
+      return 1
+    }
+
+    start=$SECONDS
+    deadline=$((SECONDS + 180))
+    while ! mkdir "$lock_dir" 2>/dev/null; do
+      if [ -f "$ready" ] && [ -d "$cache_node_modules/puppeteer-core" ]; then
+        break
+      fi
+      if [ "$SECONDS" -ge "$deadline" ]; then
+        warn "client smoke dependencies cannot be hydrated: timed out waiting for $lock_dir after $(elapsed_since "$start")"
+        return 1
+      fi
+      info "waiting for client dependency cache lock: $lock_dir"
+      sleep 1
+    done
+    if [ -d "$lock_dir" ] && { [ ! -f "$ready" ] || [ ! -d "$cache_node_modules/puppeteer-core" ]; }; then
+      lock_acquired=1
+    fi
+
+    if [ "$lock_acquired" = "1" ]; then
+      tmp_dir="$RTS_NODE_DEPS_CACHE_DIR/.tmp-$hash-$$"
+      logf="$(mktemp -t rts-npm-ci.XXXXXX)"
+      rm -rf "$tmp_dir" 2>/dev/null
+      mkdir -p "$tmp_dir" || {
+        warn "client smoke dependencies cannot be hydrated: could not create $tmp_dir"
+        rmdir "$lock_dir" 2>/dev/null
+        rm -f "$logf" 2>/dev/null
+        return 1
+      }
+      cp "$package_json" "$package_lock" "$tmp_dir/" || {
+        warn "client smoke dependencies cannot be hydrated: could not stage package files"
+        rm -rf "$tmp_dir" 2>/dev/null
+        rmdir "$lock_dir" 2>/dev/null
+        rm -f "$logf" 2>/dev/null
+        return 1
+      }
+
+      info "hydrating client dependency cache: $cache_dir"
+      if (cd "$tmp_dir" && npm ci --ignore-scripts --no-audit --fund=false) >"$logf" 2>&1; then
+        rm -rf "$cache_dir" 2>/dev/null
+        mv "$tmp_dir" "$cache_dir" || {
+          warn "client smoke dependencies cannot be hydrated: could not publish $cache_dir"
+          cat "$logf"
+          rm -rf "$tmp_dir" 2>/dev/null
+          rmdir "$lock_dir" 2>/dev/null
+          rm -f "$logf" 2>/dev/null
+          return 1
+        }
+        touch "$ready"
+        rm -f "$logf"
+      else
+        warn "client smoke dependencies cannot be hydrated: npm ci failed"
+        cat "$logf"
+        rm -rf "$tmp_dir" 2>/dev/null
+        rmdir "$lock_dir" 2>/dev/null
+        rm -f "$logf" 2>/dev/null
+        return 1
+      fi
+      rmdir "$lock_dir" 2>/dev/null
+    fi
+  fi
+
+  if [ ! -d "$cache_node_modules/puppeteer-core" ]; then
+    warn "client smoke dependencies cannot be hydrated: cache missing puppeteer-core at $cache_node_modules"
+    return 1
+  fi
+
+  if [ -L "$local_node_modules" ]; then
+    local target
+    target="$(readlink "$local_node_modules")"
+    if [ "$target" != "$cache_node_modules" ]; then
+      rm "$local_node_modules" || {
+        warn "client smoke dependencies cannot be linked: could not replace $local_node_modules"
+        return 1
+      }
+    fi
+  elif [ -e "$local_node_modules" ]; then
+    info "replacing local client dependencies with shared cache link: $local_node_modules"
+    rm -rf "$local_node_modules" || {
+      warn "client smoke dependencies cannot be linked: could not replace $local_node_modules"
+      return 1
+    }
+  fi
+
+  if [ ! -e "$local_node_modules" ]; then
+    ln -s "$cache_node_modules" "$local_node_modules" || {
+      warn "client smoke dependencies cannot be linked: could not symlink $local_node_modules -> $cache_node_modules"
+      return 1
+    }
+  fi
+}
+
 run_rust_suites_bg() {
   if [ "$RUN_RUST" = "1" ]; then
     run_suite_bg "Architecture: crate boundaries" \
@@ -327,16 +461,13 @@ if [ "${SERVER_HEALTHY:-0}" = "1" ]; then
         fi
       done
     fi
-    have_puppeteer=0
-    [ -d "$SCRIPT_DIR/node_modules/puppeteer-core" ] && have_puppeteer=1
-    if [ "$have_puppeteer" = "1" ] && [ -n "${CHROME:-}" ] && [ -x "$CHROME" ]; then
-      CHROME="$CHROME" run_suite_bg "Client smoke (headless Chrome)" node "$SCRIPT_DIR/client_smoke.mjs"
-    elif [ "$have_puppeteer" != "1" ]; then
-      info "skipping client smoke: puppeteer-core not installed (cd tests && npm install)"
-      SKIPPED+=("Client smoke (no puppeteer-core)")
-    else
+    if [ -z "${CHROME:-}" ] || [ ! -x "$CHROME" ]; then
       info "skipping client smoke: no Chrome found (set CHROME=/path/to/chrome to override)"
       SKIPPED+=("Client smoke (no Chrome)")
+    elif hydrate_client_deps; then
+      CHROME="$CHROME" run_suite_bg "Client smoke (headless Chrome)" node "$SCRIPT_DIR/client_smoke.mjs"
+    else
+      FAILED+=("Client smoke dependency hydration")
     fi
   else
     SKIPPED+=("Client smoke (--no-client)")

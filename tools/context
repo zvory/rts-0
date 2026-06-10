@@ -50,8 +50,7 @@ Do not start by reading:
 - server/src/game/**             (server sim is not the seam for input bugs)
 
 Run:
-- cd server && cargo run
-- (then) cd tests && node client_smoke.mjs
+- tests/run-all.sh --no-rust
 
 Invariants:
 - Modules receive collaborators via DI from main.js; do NOT cross-import.
@@ -89,8 +88,7 @@ Do not start by reading:
 - server/src/**                   (rendering does not cross the wire)
 
 Run:
-- cd server && cargo run
-- cd tests && node client_smoke.mjs
+- tests/run-all.sh --no-rust
 
 Invariants:
 - PixiJS is the global PIXI (v7). Do NOT `import` it.
