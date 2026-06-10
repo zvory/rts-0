@@ -18,6 +18,7 @@ use super::{
     MAX_STALL_TICKS, MAX_TICKS, SAMPLE_EVERY_TICKS, SAVE_REPLAY_ENV, SELFPLAY_ARTIFACT_DIR,
     SELFPLAY_FAILURE_DIR,
 };
+use crate::{AiController, AiThinkContext};
 use crate::ai_core::profiles::{
     RIFLE_FLOOD_FAST_ID, RIFLE_FLOOD_FULL_SATURATION_ID, TECH_TO_TANKS_ID,
 };
@@ -1399,6 +1400,10 @@ fn real_ai_vs_real_ai() {
         },
     ];
     let mut game = Game::new(&players, 0x1234_5678);
+    let mut controllers: Vec<AiController> = players
+        .iter()
+        .map(|player| AiController::new(player.id))
+        .collect();
 
     let mut event_log = Vec::new();
     let mut max_barracks_alive: BTreeMap<u32, usize> = BTreeMap::new();
@@ -1449,6 +1454,30 @@ fn real_ai_vs_real_ai() {
 
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         for tick in 1..=TICKS {
+            let start = game.start_payload();
+            let alive_players = game.alive_players();
+            let mut commands = Vec::new();
+            for controller in &mut controllers {
+                let player_id = controller.player_id();
+                if !alive_players.contains(&player_id) {
+                    continue;
+                }
+                let snapshot = game.snapshot_for(player_id);
+                commands.extend(
+                    controller
+                        .think(AiThinkContext {
+                            start: &start,
+                            snapshot: &snapshot,
+                            retreat_commands: game.worker_retreat_commands_for(player_id),
+                        })
+                        .into_iter()
+                        .map(|command| (player_id, command)),
+                );
+            }
+            for (player_id, command) in commands {
+                game.enqueue(player_id, command);
+            }
+
             let tick_result =
                 std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| game.tick()));
             let tick_output = match tick_result {
