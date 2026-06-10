@@ -51,6 +51,11 @@ export const AT_GUN_BODY = Object.freeze({
   width: 24.0,
   clearance: 1.0,
 });
+export const ARTILLERY_BODY = Object.freeze({
+  length: 64.0,
+  width: 48.0,
+  clearance: 1.0,
+});
 export const SCOUT_CAR_BODY = Object.freeze({
   length: 40.8,
   width: 21.6,
@@ -61,6 +66,12 @@ export const SCOUT_CAR_BODY = Object.freeze({
 export const MINING_CC_RANGE_TILES = 7.0;
 export const AT_GUN_DEPLOYED_RANGE_TILES = 12;
 export const AT_GUN_FIELD_OF_FIRE_RAD = Math.PI / 4;
+export const ARTILLERY_MIN_RANGE_TILES = 10;
+export const ARTILLERY_MAX_RANGE_TILES = 50;
+export const ARTILLERY_FIELD_OF_FIRE_RAD = 20 * Math.PI / 180;
+export const ARTILLERY_SHELL_DELAY_TICKS = TICK_HZ * 4;
+export const ARTILLERY_OUTER_RADIUS_TILES = 3;
+export const ARTILLERY_AMMO_COST = Object.freeze({ steel: 10, oil: 0 });
 export const RIFLEMAN_CHARGE_COOLDOWN_TICKS = 150;
 export const SMOKE_ABILITY_RANGE_TILES = 9;
 export const SMOKE_LAUNCH_MAX_DELAY_MS = 100;
@@ -75,6 +86,7 @@ export const MORTAR_INNER_RADIUS_TILES = 0.5;
 export const MORTAR_FIRE_COOLDOWN_TICKS = TICK_HZ * 2;
 export const METHAMPHETAMINES_RESEARCH_TICKS = TICK_HZ * 20;
 export const AT_GUN_UNLOCK_RESEARCH_TICKS = TICK_HZ * 20;
+export const ARTILLERY_UNLOCK_RESEARCH_TICKS = TICK_HZ * 30;
 export const TANK_UNLOCK_RESEARCH_TICKS = TICK_HZ * 20;
 
 // Player colors (server assigns from a matching palette; used as a fallback for blips).
@@ -99,6 +111,10 @@ export const STATS = Object.freeze({
   [KIND.MORTAR_TEAM]: { label: "Mortar Team", icon: "MT", size: 18, sight: 7,
     rangeTiles: 9, cost: { steel: 100, oil: 25 }, supply: 3, buildTicks: 460,
     requires: KIND.STEELWORKS },
+  [KIND.ARTILLERY]: { label: "Artillery", icon: "AR", size: 24, sight: 4, body: ARTILLERY_BODY,
+    rangeTiles: ARTILLERY_MAX_RANGE_TILES, minRangeTiles: ARTILLERY_MIN_RANGE_TILES,
+    cost: { steel: 300, oil: 100 }, supply: 5, buildTicks: 750,
+    requires: KIND.STEELWORKS, upgradeRequires: UPGRADE.ARTILLERY_UNLOCK },
   [KIND.SCOUT_CAR]: { label: "Scout Car", icon: "SC", size: 14.4, sight: 10, body: SCOUT_CAR_BODY,
     rangeTiles: 5, cost: { steel: 125, oil: 50 }, supply: 3, buildTicks: 480 },
   [KIND.TANK]: { label: "Tank", icon: "TK", size: 18, sight: 6, body: TANK_BODY,
@@ -120,8 +136,9 @@ export const STATS = Object.freeze({
     researches: [UPGRADE.TANK_UNLOCK],
     requires: [KIND.CITY_CENTRE, KIND.TRAINING_CENTRE] },
   [KIND.STEELWORKS]: { label: "Gun Works", icon: "GW", footW: 3, footH: 3, sight: 6,
-    cost: { steel: 125, oil: 125 }, buildTicks: 620, trains: [KIND.MORTAR_TEAM, KIND.AT_TEAM],
-    researches: [UPGRADE.AT_GUN_UNLOCK],
+    cost: { steel: 125, oil: 125 }, buildTicks: 620,
+    trains: [KIND.MORTAR_TEAM, KIND.AT_TEAM, KIND.ARTILLERY],
+    researches: [UPGRADE.AT_GUN_UNLOCK, UPGRADE.ARTILLERY_UNLOCK],
     requires: [KIND.CITY_CENTRE, KIND.TRAINING_CENTRE] },
 
   [KIND.STEEL]: { label: "Steel", size: 22 },
@@ -158,6 +175,22 @@ export const ABILITIES = Object.freeze({
     radiusTiles: MORTAR_OUTER_RADIUS_TILES,
     queued: false,
   }),
+  [ABILITY.POINT_FIRE]: Object.freeze({
+    ability: ABILITY.POINT_FIRE,
+    label: "Point Fire",
+    icon: "PF",
+    hotkey: "X",
+    title: "Target artillery fire",
+    carriers: Object.freeze([KIND.ARTILLERY]),
+    targetMode: "worldPoint",
+    rangeTiles: ARTILLERY_MAX_RANGE_TILES,
+    minRangeTiles: ARTILLERY_MIN_RANGE_TILES,
+    cooldownTicks: TICK_HZ * 3,
+    cost: ARTILLERY_AMMO_COST,
+    radiusTiles: ARTILLERY_OUTER_RADIUS_TILES,
+    delayTicks: ARTILLERY_SHELL_DELAY_TICKS,
+    queued: true,
+  }),
 });
 
 export const UPGRADES = Object.freeze({
@@ -177,6 +210,15 @@ export const UPGRADES = Object.freeze({
     cost: Object.freeze({ steel: 100, oil: 75 }),
     researchTicks: AT_GUN_UNLOCK_RESEARCH_TICKS,
     description: "Unlock AT Gun training",
+    researchedAt: KIND.STEELWORKS,
+  }),
+  [UPGRADE.ARTILLERY_UNLOCK]: Object.freeze({
+    upgrade: UPGRADE.ARTILLERY_UNLOCK,
+    label: "Unlock Artillery",
+    icon: "AR+",
+    cost: Object.freeze({ steel: 200, oil: 200 }),
+    researchTicks: ARTILLERY_UNLOCK_RESEARCH_TICKS,
+    description: "Unlocks production of Artillery",
     researchedAt: KIND.STEELWORKS,
   }),
   [UPGRADE.TANK_UNLOCK]: Object.freeze({

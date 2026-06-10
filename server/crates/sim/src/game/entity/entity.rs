@@ -66,7 +66,7 @@ impl Entity {
             last_damage_tick: None,
             last_damage_pos: None,
             movement: Some(MovementState::default()),
-            combat: if s.dmg > 0 {
+            combat: if s.dmg > 0 || kind == EntityKind::Artillery {
                 Some(CombatState::default())
             } else {
                 None
@@ -542,6 +542,27 @@ impl Entity {
         }
     }
 
+    pub fn artillery_shots_fired(&self) -> u16 {
+        self.combat
+            .as_ref()
+            .map(|c| c.artillery_shots_fired)
+            .unwrap_or(0)
+    }
+
+    pub fn increment_artillery_shots_fired(&mut self) -> u16 {
+        let Some(c) = self.combat.as_mut() else {
+            return 0;
+        };
+        c.artillery_shots_fired = c.artillery_shots_fired.saturating_add(1);
+        c.artillery_shots_fired
+    }
+
+    pub fn reset_artillery_accuracy(&mut self) {
+        if let Some(c) = self.combat.as_mut() {
+            c.artillery_shots_fired = 0;
+        }
+    }
+
     pub fn tick_attack_cd(&mut self) {
         if let Some(c) = self.combat.as_mut() {
             c.attack_cd = c.attack_cd.saturating_sub(1);
@@ -597,6 +618,7 @@ impl Entity {
         if let Some(c) = self.combat.as_mut() {
             if matches!(setup, WeaponSetup::Packed) {
                 c.emplacement_facing = None;
+                c.artillery_shots_fired = 0;
             }
             c.setup = setup;
         }
@@ -918,6 +940,7 @@ impl Entity {
             Order::Gather(_) => states::GATHER,
             Order::Build(_) => states::BUILD,
             Order::Ability(_) => states::MOVE,
+            Order::ArtilleryPointFire(_) => states::ATTACK,
         }
     }
 
@@ -930,6 +953,7 @@ impl Entity {
             m.path.clear();
         }
         self.set_target_id(None);
+        self.reset_artillery_accuracy();
     }
 
     /// Reset only the active order (idle + clear path + drop target latch). Leaves any

@@ -2,6 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use crate::config;
 use crate::game::ability::{self, AbilityKind, AbilityTargetMode};
+use crate::game::artillery::ArtilleryShellStore;
 use crate::game::command::SimCommand;
 use crate::game::entity::{
     BuildPhase, EntityKind, EntityStore, Order, OrderIntent, ProdItem, RallyIntent, RallyKind,
@@ -44,6 +45,7 @@ pub(crate) fn apply_commands(
     fog: &Fog,
     smokes: &mut SmokeCloudStore,
     mortar_shells: &mut MortarShellStore,
+    artillery_shells: &mut ArtilleryShellStore,
     pending: Vec<(u32, SimCommand)>,
     events: &mut HashMap<u32, Vec<Event>>,
     tick: u32,
@@ -72,6 +74,7 @@ pub(crate) fn apply_commands(
                     fog,
                     smokes,
                     mortar_shells,
+                    artillery_shells,
                     events,
                     player,
                     &planner_facts(entities, player, &units, false, None),
@@ -101,6 +104,7 @@ pub(crate) fn apply_commands(
                     fog,
                     smokes,
                     mortar_shells,
+                    artillery_shells,
                     events,
                     player,
                     &planner_facts(entities, player, &units, false, None),
@@ -132,6 +136,7 @@ pub(crate) fn apply_commands(
                     fog,
                     smokes,
                     mortar_shells,
+                    artillery_shells,
                     events,
                     player,
                     &planner_facts(entities, player, &units, false, None),
@@ -162,6 +167,7 @@ pub(crate) fn apply_commands(
                     fog,
                     smokes,
                     mortar_shells,
+                    artillery_shells,
                     events,
                     player,
                     &facts,
@@ -177,7 +183,7 @@ pub(crate) fn apply_commands(
                     let Some(e) = entities.get_mut(id) else {
                         continue;
                     };
-                    if e.kind != EntityKind::AtTeam {
+                    if !matches!(e.kind, EntityKind::AtTeam | EntityKind::Artillery) {
                         continue;
                     }
                     if matches!(
@@ -187,7 +193,7 @@ pub(crate) fn apply_commands(
                         e.clear_orders();
                         e.set_path_goal(None);
                         e.set_weapon_setup(WeaponSetup::TearingDown {
-                            ticks: config::AT_TEAM_SETUP_TICKS,
+                            ticks: setup_ticks_for(e.kind),
                         });
                     } else if matches!(e.weapon_setup(), WeaponSetup::Packed) {
                         e.set_emplacement_facing(None);
@@ -211,6 +217,7 @@ pub(crate) fn apply_commands(
                     fog,
                     smokes,
                     mortar_shells,
+                    artillery_shells,
                     events,
                     player,
                     AbilityUse {
@@ -243,6 +250,7 @@ pub(crate) fn apply_commands(
                     fog,
                     smokes,
                     mortar_shells,
+                    artillery_shells,
                     events,
                     player,
                     &planner_facts(entities, player, &units, false, None),
@@ -278,6 +286,7 @@ pub(crate) fn apply_commands(
                     fog,
                     smokes,
                     mortar_shells,
+                    artillery_shells,
                     events,
                     player,
                     &planner_facts(entities, player, &units, false, None),
@@ -441,6 +450,10 @@ fn planner_facts(
             let mut facts = planner::UnitFacts::new(id);
             facts.pos = planner::Point::new(e.pos_x, e.pos_y);
             facts.queue_len = e.queued_orders().len();
+            facts.queue_terminal = e
+                .queued_orders()
+                .iter()
+                .any(|intent| matches!(intent, OrderIntent::PointFire(_)));
             facts.active_build = matches!(e.order(), Order::Build(_));
             facts.activity = match e.order() {
                 Order::Idle => planner::UnitActivity::Idle,
@@ -452,7 +465,7 @@ fn planner_facts(
             facts.can_attack = e.can_attack();
             facts.can_gather = e.kind == EntityKind::Worker;
             facts.can_build = e.kind == EntityKind::Worker || build_notice_compat;
-            facts.can_setup_at_gun = e.kind == EntityKind::AtTeam;
+            facts.can_setup_at_gun = matches!(e.kind, EntityKind::AtTeam | EntityKind::Artillery);
             if let Some(ability) = ability {
                 if ability_orders::caster_can_attempt(entities, player, id, ability.kind)
                     && ability.tech_ready
@@ -497,6 +510,7 @@ fn apply_planned_unit_order(
     fog: &Fog,
     smokes: &mut SmokeCloudStore,
     mortar_shells: &mut MortarShellStore,
+    artillery_shells: &mut ArtilleryShellStore,
     events: &mut HashMap<u32, Vec<Event>>,
     player: u32,
     facts: &[planner::UnitFacts],
@@ -575,6 +589,21 @@ fn apply_planned_unit_order(
                     let Some(ability) = ability_from_planner(ability) else {
                         continue;
                     };
+                    if ability == AbilityKind::PointFire {
+                        order_artillery_point_fire(
+                            map,
+                            entities,
+                            players,
+                            artillery_shells,
+                            events,
+                            player,
+                            unit,
+                            target.x,
+                            target.y,
+                            tick,
+                        );
+                        continue;
+                    }
                     if !immediate_unit_can_replace(entities, player, unit) {
                         continue;
                     }
@@ -606,6 +635,18 @@ fn apply_planned_unit_order(
                 }
             },
             planner::PlannedAction::AppendQueued { unit, intent } => {
+                if let planner::OrderIntent::WorldAbility { ability, target } = intent {
+                    if ability_from_planner(ability) == Some(AbilityKind::PointFire) {
+                        if artillery_point_fire_target_valid(
+                            map, entities, player, unit, target.x, target.y,
+                        ) {
+                            if let Some(e) = entities.get_mut(unit) {
+                                e.append_queued_order(OrderIntent::point_fire(target.x, target.y));
+                            }
+                        }
+                        continue;
+                    }
+                }
                 if let Some(intent) = entity_order_intent_from_planner(intent) {
                     if matches!(intent, OrderIntent::Attack(_))
                         && !matches!(
@@ -642,6 +683,21 @@ fn apply_planned_unit_order(
                         launch_self_ability(entities, player, unit, ability);
                     }
                     planner::AbilityTarget::WorldPoint(point) => {
+                        if ability == AbilityKind::PointFire {
+                            order_artillery_point_fire(
+                                map,
+                                entities,
+                                players,
+                                artillery_shells,
+                                events,
+                                player,
+                                unit,
+                                point.x,
+                                point.y,
+                                tick,
+                            );
+                            continue;
+                        }
                         launch_world_ability(
                             map,
                             entities,
@@ -668,11 +724,13 @@ fn apply_planned_unit_order(
         clear_queued_orders(entities, &move_units);
         clear_staged_at_gun_setup(entities, &move_units);
         coordinator.order_group_move(entities, player, &move_units, goal, false);
+        begin_artillery_teardown_for_movement(entities, &move_units);
     }
     if let Some(goal) = attack_move_goal {
         clear_queued_orders(entities, &attack_move_units);
         clear_staged_at_gun_setup(entities, &attack_move_units);
         coordinator.order_group_move(entities, player, &attack_move_units, goal, true);
+        begin_artillery_teardown_for_movement(entities, &attack_move_units);
     }
 
     for planner_notice in output.notices {
@@ -769,6 +827,7 @@ fn ability_to_planner(ability: AbilityKind) -> planner::AbilityId {
         AbilityKind::Charge => planner::AbilityId(0),
         AbilityKind::Smoke => planner::AbilityId(1),
         AbilityKind::MortarFire => planner::AbilityId(2),
+        AbilityKind::PointFire => planner::AbilityId(3),
     }
 }
 
@@ -777,6 +836,7 @@ fn ability_from_planner(ability: planner::AbilityId) -> Option<AbilityKind> {
         0 => Some(AbilityKind::Charge),
         1 => Some(AbilityKind::Smoke),
         2 => Some(AbilityKind::MortarFire),
+        3 => Some(AbilityKind::PointFire),
         _ => None,
     }
 }
@@ -799,6 +859,7 @@ fn use_ability(
     fog: &Fog,
     smokes: &mut SmokeCloudStore,
     mortar_shells: &mut MortarShellStore,
+    artillery_shells: &mut ArtilleryShellStore,
     events: &mut HashMap<u32, Vec<Event>>,
     player: u32,
     request: AbilityUse,
@@ -807,6 +868,46 @@ fn use_ability(
     let ability = request.ability;
     let definition = ability::definition(ability);
     if request.queued && !definition.may_queue {
+        return;
+    }
+    if ability == AbilityKind::PointFire {
+        let Some(x) = request.x else {
+            return;
+        };
+        let Some(y) = request.y else {
+            return;
+        };
+        let Some((x, y)) = SmokeCloudStore::clamp_point_to_map(map, x, y) else {
+            return;
+        };
+        for unit in dedupe_cap_units(request.units) {
+            if request.queued {
+                if artillery_point_fire_target_valid(map, entities, player, unit, x, y) {
+                    if let Some(e) = entities.get_mut(unit) {
+                        if !e
+                            .queued_orders()
+                            .iter()
+                            .any(|intent| matches!(intent, OrderIntent::PointFire(_)))
+                        {
+                            e.append_queued_order(OrderIntent::point_fire(x, y));
+                        }
+                    }
+                }
+            } else {
+                order_artillery_point_fire(
+                    map,
+                    entities,
+                    players,
+                    artillery_shells,
+                    events,
+                    player,
+                    unit,
+                    x,
+                    y,
+                    tick,
+                );
+            }
+        }
         return;
     }
     let planner_id = ability_to_planner(ability);
@@ -878,6 +979,7 @@ fn use_ability(
         fog,
         smokes,
         mortar_shells,
+        artillery_shells,
         events,
         player,
         &facts,
@@ -886,11 +988,239 @@ fn use_ability(
     );
 }
 
+#[allow(clippy::too_many_arguments)]
+fn order_artillery_point_fire(
+    map: &Map,
+    entities: &mut EntityStore,
+    players: &mut [PlayerState],
+    artillery_shells: &mut ArtilleryShellStore,
+    events: &mut HashMap<u32, Vec<Event>>,
+    player: u32,
+    unit: u32,
+    x: f32,
+    y: f32,
+    tick: u32,
+) -> bool {
+    if !artillery_point_fire_target_valid(map, entities, player, unit, x, y) {
+        return false;
+    }
+    let Some(e) = entities.get_mut(unit) else {
+        return false;
+    };
+    let facing = (y - e.pos_y).atan2(x - e.pos_x);
+    if !facing.is_finite() {
+        return false;
+    }
+    entities.release_miner(unit);
+    let Some(e) = entities.get_mut(unit) else {
+        return false;
+    };
+    e.clear_orders();
+    e.set_path_goal(None);
+    e.set_target_id(None);
+    e.set_emplacement_facing(Some(facing));
+    e.set_desired_weapon_facing(facing);
+    e.reset_gather_state();
+    let (px, py) = (e.pos_x, e.pos_y);
+    e.reset_stuck(px, py);
+    if matches!(e.weapon_setup(), WeaponSetup::Packed) {
+        e.set_weapon_setup(WeaponSetup::SettingUp {
+            ticks: config::ARTILLERY_SETUP_TICKS,
+        });
+    } else if !matches!(e.weapon_setup(), WeaponSetup::Deployed) {
+        return true;
+    }
+    e.set_order(Order::artillery_point_fire(x, y));
+    try_fire_artillery(
+        entities,
+        players,
+        artillery_shells,
+        events,
+        player,
+        unit,
+        x,
+        y,
+        tick,
+    )
+}
+
+fn artillery_point_fire_target_valid(
+    map: &Map,
+    entities: &EntityStore,
+    player: u32,
+    unit: u32,
+    x: f32,
+    y: f32,
+) -> bool {
+    let Some((x, y)) = SmokeCloudStore::clamp_point_to_map(map, x, y) else {
+        return false;
+    };
+    let Some(e) = entities.get(unit) else {
+        return false;
+    };
+    if e.owner != player
+        || e.kind != EntityKind::Artillery
+        || e.hp == 0
+        || e.under_construction()
+        || !e.path_is_empty()
+    {
+        return false;
+    }
+    let dx = x - e.pos_x;
+    let dy = y - e.pos_y;
+    let distance2 = dx * dx + dy * dy;
+    if !distance2.is_finite() {
+        return false;
+    }
+    let min_px = config::ARTILLERY_MIN_RANGE_TILES as f32 * config::TILE_SIZE as f32;
+    let max_px = config::ARTILLERY_MAX_RANGE_TILES as f32 * config::TILE_SIZE as f32;
+    if distance2 < min_px * min_px || distance2 > max_px * max_px {
+        return false;
+    }
+    if matches!(e.weapon_setup(), WeaponSetup::Deployed) {
+        let Some(center) = e
+            .emplacement_facing()
+            .or_else(|| e.weapon_facing())
+            .filter(|facing| facing.is_finite())
+        else {
+            return false;
+        };
+        let target_angle = dy.atan2(dx);
+        if !target_angle.is_finite()
+            || angle_delta(center, target_angle).abs() > config::ARTILLERY_FIELD_OF_FIRE_RAD * 0.5
+        {
+            return false;
+        }
+    }
+    true
+}
+
+#[allow(clippy::too_many_arguments)]
+fn try_fire_artillery(
+    entities: &mut EntityStore,
+    players: &mut [PlayerState],
+    artillery_shells: &mut ArtilleryShellStore,
+    events: &mut HashMap<u32, Vec<Event>>,
+    player: u32,
+    unit: u32,
+    x: f32,
+    y: f32,
+    tick: u32,
+) -> bool {
+    let ready = matches!(entities.get(unit), Some(e)
+        if e.owner == player
+            && e.kind == EntityKind::Artillery
+            && e.hp > 0
+            && e.attack_cd() == 0
+            && matches!(e.weapon_setup(), WeaponSetup::Deployed));
+    if !ready {
+        return false;
+    }
+    let Some(ps) = players.iter_mut().find(|p| p.id == player) else {
+        return false;
+    };
+    if ps.steel < config::ARTILLERY_AMMO_COST_STEEL {
+        notice(events, player, "Not enough steel");
+        if let Some(e) = entities.get_mut(unit) {
+            e.set_attack_cd(config::ARTILLERY_RELOAD_TICKS);
+        }
+        return false;
+    }
+    if !ps.spend_resources(config::ARTILLERY_AMMO_COST_STEEL, 0) {
+        notice(events, player, "Not enough steel");
+        return false;
+    }
+    let (target_x, target_y) = {
+        let Some(e) = entities.get_mut(unit) else {
+            ps.refund_resources(config::ARTILLERY_AMMO_COST_STEEL, 0);
+            return false;
+        };
+        let shot_number = e.increment_artillery_shots_fired();
+        e.set_attack_cd(config::ARTILLERY_RELOAD_TICKS);
+        artillery_scattered_point(unit, tick, x, y, shot_number)
+    };
+    artillery_shells.schedule(player, unit, target_x, target_y, tick);
+    events
+        .entry(player)
+        .or_default()
+        .push(Event::ArtilleryTarget {
+            x: target_x,
+            y: target_y,
+            radius_tiles: config::ARTILLERY_OUTER_RADIUS_TILES,
+            delay_ticks: config::ARTILLERY_SHELL_DELAY_TICKS,
+        });
+    true
+}
+
+fn artillery_scattered_point(unit: u32, tick: u32, x: f32, y: f32, shot_number: u16) -> (f32, f32) {
+    let max_step = config::ARTILLERY_ACCURACY_SHOTS_TO_MIN
+        .saturating_sub(1)
+        .max(1) as f32;
+    let progress = (shot_number.saturating_sub(1) as f32 / max_step).clamp(0.0, 1.0);
+    let error_tiles = config::ARTILLERY_INITIAL_ERROR_TILES
+        + (config::ARTILLERY_MIN_ERROR_TILES - config::ARTILLERY_INITIAL_ERROR_TILES) * progress;
+    let radius_px = error_tiles.max(0.0) * config::TILE_SIZE as f32;
+    if radius_px <= f32::EPSILON {
+        return (x, y);
+    }
+    let seed = unit
+        .wrapping_mul(1_103_515_245)
+        .wrapping_add(tick)
+        .wrapping_add((shot_number as u32).wrapping_mul(97_531));
+    let angle = (seed as f32 * 1.618_034).rem_euclid(std::f32::consts::TAU);
+    let radial = (((seed.rotate_left(13) >> 8) & 1023) as f32 / 1023.0).sqrt() * radius_px;
+    (x + angle.cos() * radial, y + angle.sin() * radial)
+}
+
+pub(crate) fn artillery_point_fire_system(
+    map: &Map,
+    entities: &mut EntityStore,
+    players: &mut [PlayerState],
+    artillery_shells: &mut ArtilleryShellStore,
+    events: &mut HashMap<u32, Vec<Event>>,
+    tick: u32,
+) {
+    let orders: Vec<(u32, u32, f32, f32)> = entities
+        .ids()
+        .into_iter()
+        .filter_map(|id| {
+            let e = entities.get(id)?;
+            let Order::ArtilleryPointFire(order) = e.order() else {
+                return None;
+            };
+            Some((id, e.owner, order.intent.x, order.intent.y))
+        })
+        .collect();
+    for (id, owner, x, y) in orders {
+        if !artillery_point_fire_target_valid(map, entities, owner, id, x, y) {
+            if let Some(e) = entities.get_mut(id) {
+                e.clear_active_order();
+            }
+            continue;
+        }
+        try_fire_artillery(
+            entities,
+            players,
+            artillery_shells,
+            events,
+            owner,
+            id,
+            x,
+            y,
+            tick,
+        );
+    }
+}
+
 fn execute_at_gun_setup(entities: &mut EntityStore, id: u32, x: f32, y: f32) -> bool {
     let Some(e) = entities.get(id) else {
         return false;
     };
-    if e.kind != EntityKind::AtTeam || e.under_construction() || !x.is_finite() || !y.is_finite() {
+    if !matches!(e.kind, EntityKind::AtTeam | EntityKind::Artillery)
+        || e.under_construction()
+        || !x.is_finite()
+        || !y.is_finite()
+    {
         return false;
     }
     let facing = (y - e.pos_y).atan2(x - e.pos_x);
@@ -909,13 +1239,20 @@ fn execute_at_gun_setup(entities: &mut EntityStore, id: u32, x: f32, y: f32) -> 
     } else {
         e.set_pending_redeploy_facing(Some(facing));
         e.set_weapon_setup(WeaponSetup::TearingDownToRedeploy {
-            ticks: config::AT_TEAM_SETUP_TICKS,
+            ticks: setup_ticks_for(e.kind),
         });
     }
     e.reset_gather_state();
     let (px, py) = (e.pos_x, e.pos_y);
     e.reset_stuck(px, py);
     true
+}
+
+fn setup_ticks_for(kind: EntityKind) -> u16 {
+    match kind {
+        EntityKind::Artillery => config::ARTILLERY_SETUP_TICKS,
+        _ => config::AT_TEAM_SETUP_TICKS,
+    }
 }
 
 fn choose_smoke_caster(
@@ -976,6 +1313,23 @@ fn clear_staged_at_gun_setup(entities: &mut EntityStore, ids: &[u32]) {
         if e.kind == EntityKind::AtTeam {
             e.set_emplacement_facing(None);
             e.set_pending_redeploy_facing(None);
+        }
+    }
+}
+
+fn begin_artillery_teardown_for_movement(entities: &mut EntityStore, ids: &[u32]) {
+    for id in ids {
+        let Some(e) = entities.get_mut(*id) else {
+            continue;
+        };
+        if e.kind != EntityKind::Artillery {
+            continue;
+        }
+        e.reset_artillery_accuracy();
+        if !matches!(e.weapon_setup(), WeaponSetup::Packed) {
+            e.set_weapon_setup(WeaponSetup::TearingDown {
+                ticks: config::ARTILLERY_SETUP_TICKS,
+            });
         }
     }
 }
@@ -1307,6 +1661,7 @@ mod tests {
         fog.recompute(&[1], &entities, &map);
         let mut smokes = SmokeCloudStore::new();
         let mut mortar_shells = MortarShellStore::default();
+        let mut artillery_shells = ArtilleryShellStore::default();
         let mut events = HashMap::new();
 
         apply_commands(
@@ -1318,6 +1673,7 @@ mod tests {
             &fog,
             &mut smokes,
             &mut mortar_shells,
+            &mut artillery_shells,
             vec![(
                 1,
                 SimCommand::Build {
@@ -1377,6 +1733,7 @@ mod tests {
         fog.recompute(&[1], &entities, &map);
         let mut smokes = SmokeCloudStore::new();
         let mut mortar_shells = MortarShellStore::default();
+        let mut artillery_shells = ArtilleryShellStore::default();
         let mut events = HashMap::new();
 
         apply_commands(
@@ -1388,6 +1745,7 @@ mod tests {
             &fog,
             &mut smokes,
             &mut mortar_shells,
+            &mut artillery_shells,
             vec![(
                 1,
                 SimCommand::Build {
@@ -1445,6 +1803,7 @@ mod tests {
         fog.recompute(&[1], &entities, &map);
         let mut smokes = SmokeCloudStore::new();
         let mut mortar_shells = MortarShellStore::default();
+        let mut artillery_shells = ArtilleryShellStore::default();
         let mut events = HashMap::new();
 
         apply_commands(
@@ -1456,6 +1815,7 @@ mod tests {
             &fog,
             &mut smokes,
             &mut mortar_shells,
+            &mut artillery_shells,
             vec![(
                 1,
                 SimCommand::Build {
@@ -1521,6 +1881,7 @@ mod tests {
         fog.recompute(&[1], &entities, &map);
         let mut smokes = SmokeCloudStore::new();
         let mut mortar_shells = MortarShellStore::default();
+        let mut artillery_shells = ArtilleryShellStore::default();
         let mut events = HashMap::new();
 
         apply_commands(
@@ -1532,6 +1893,7 @@ mod tests {
             &fog,
             &mut smokes,
             &mut mortar_shells,
+            &mut artillery_shells,
             vec![(
                 1,
                 SimCommand::Build {
@@ -3496,6 +3858,7 @@ mod tests {
         fog.recompute(&[1, 2], entities, map);
         let mut events = HashMap::new();
         let mut mortar_shells = MortarShellStore::default();
+        let mut artillery_shells = ArtilleryShellStore::default();
         apply_commands(
             map,
             entities,
@@ -3505,6 +3868,7 @@ mod tests {
             &fog,
             smokes,
             &mut mortar_shells,
+            &mut artillery_shells,
             pending,
             &mut events,
             1,

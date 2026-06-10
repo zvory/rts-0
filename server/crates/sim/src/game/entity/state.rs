@@ -105,6 +105,8 @@ impl Default for MovementState {
 pub struct CombatState {
     /// Ticks until this entity may attack again (0 = ready).
     pub attack_cd: u32,
+    /// Artillery consecutive shots since its current deployment/move reset.
+    pub artillery_shots_fired: u16,
     /// Current attack/interaction target id. Combat uses enemy ids; gather/build commands use
     /// this for client feedback while the order executes.
     pub target_id: Option<u32>,
@@ -125,6 +127,7 @@ impl Default for CombatState {
     fn default() -> Self {
         CombatState {
             attack_cd: 0,
+            artillery_shots_fired: 0,
             target_id: None,
             setup: WeaponSetup::Packed,
             weapon_facing: 0.0,

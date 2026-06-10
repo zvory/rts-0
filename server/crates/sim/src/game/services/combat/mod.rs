@@ -242,7 +242,10 @@ pub(crate) fn combat_system(
             }
             let ready = matches!(entities.get(id), Some(e) if e.attack_cd() == 0);
             if ready {
-                if matches!(entities.get(id).map(|e| e.kind), Some(EntityKind::MortarTeam)) {
+                if matches!(
+                    entities.get(id).map(|e| e.kind),
+                    Some(EntityKind::MortarTeam)
+                ) {
                     let (mx, my) = mortar_aim_point(entities, tid, tick);
                     mortar_shells.schedule(owner, id, mx, my, tick);
                     if let Some(e) = entities.get_mut(id) {
@@ -321,7 +324,9 @@ fn mortar_aim_point(entities: &EntityStore, target: u32, tick: u32) -> (f32, f32
         let dy = gy - t.pos_y;
         let dist = (dx * dx + dy * dy).sqrt();
         if dist > f32::EPSILON && dist.is_finite() {
-            let speed = config::unit_stats(t.kind).map(|stats| stats.speed).unwrap_or(0.0);
+            let speed = config::unit_stats(t.kind)
+                .map(|stats| stats.speed)
+                .unwrap_or(0.0);
             let lead = (speed * config::MORTAR_SHELL_DELAY_TICKS as f32).min(dist);
             x += dx / dist * lead;
             y += dy / dist * lead;

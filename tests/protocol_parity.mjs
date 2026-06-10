@@ -14,6 +14,7 @@ import {
   SETUP_CODE,
   STATE_CODE,
   TERRAIN,
+  UPGRADE_CODE,
 } from "../client/src/protocol.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -70,6 +71,7 @@ const rustConstants = new Map([
   ...extractModuleStringConstants("kinds"),
   ...extractModuleStringConstants("states"),
   ...extractModuleStringConstants("abilities"),
+  ...extractModuleStringConstants("upgrades"),
 ]);
 
 function resolveRustPattern(pattern) {
@@ -129,6 +131,7 @@ assertSameCodes("setup state", extractCodeFunction("setup_state_code"), SETUP_CO
 assertSameCodes("event", extractEventCodes(), EVENT_CODE);
 assertSameCodes("order stage", extractCodeFunction("order_stage_code"), ORDER_STAGE_CODE);
 assertSameCodes("ability", extractCodeFunction("ability_code"), ABILITY_CODE);
+assertSameCodes("upgrade", extractCodeFunction("upgrade_code"), UPGRADE_CODE);
 assertSameCodes("notice severity", extractCodeFunction("notice_severity_code"), NOTICE_SEVERITY_CODE);
 
 console.log("✅ protocol_parity.mjs: Rust compact protocol codes match JS decoder maps");

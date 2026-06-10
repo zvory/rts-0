@@ -205,8 +205,12 @@ pub(super) fn factory_zero_gap_perpendicular_map(
 ) -> (Map, (u32, u32), (f32, f32), (f32, f32), (f32, f32)) {
     let mut map = flat_dev_map(1);
     let factory_tile = (map.size / 2 - 6, map.size / 2);
-    let factory_pos =
-        services::occupancy::footprint_center(&map, EntityKind::Factory, factory_tile.0, factory_tile.1);
+    let factory_pos = services::occupancy::footprint_center(
+        &map,
+        EntityKind::Factory,
+        factory_tile.0,
+        factory_tile.1,
+    );
     let rect = services::geometry::building_rect_for_footprint(
         EntityKind::Factory,
         factory_tile.0,

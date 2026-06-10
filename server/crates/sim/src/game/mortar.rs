@@ -116,7 +116,12 @@ fn resolve_shell(
 
 fn mortar_damage(victim_kind: EntityKind, base: u32) -> u32 {
     if !combat::is_armored(victim_kind) {
-        return combat::effective_damage(EntityKind::MortarTeam, victim_kind, base, Some(TerrainKind::Open));
+        return combat::effective_damage(
+            EntityKind::MortarTeam,
+            victim_kind,
+            base,
+            Some(TerrainKind::Open),
+        );
     }
     ((base as f32) * 0.625).round() as u32
 }

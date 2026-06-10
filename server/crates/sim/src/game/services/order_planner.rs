@@ -53,6 +53,7 @@ pub struct UnitFacts {
     pub can_gather: bool,
     pub can_build: bool,
     pub can_setup_at_gun: bool,
+    pub queue_terminal: bool,
     pub abilities: Vec<AbilityFacts>,
 }
 
@@ -69,6 +70,7 @@ impl UnitFacts {
             can_gather: false,
             can_build: false,
             can_setup_at_gun: false,
+            queue_terminal: false,
             abilities: Vec::new(),
         }
     }
@@ -256,7 +258,15 @@ pub fn plan_order(
             tile_y,
             target,
             placement_valid: true,
-        } if target.valid() => plan_build(config, request.mode, &ordered_facts, kind, tile_x, tile_y, target),
+        } if target.valid() => plan_build(
+            config,
+            request.mode,
+            &ordered_facts,
+            kind,
+            tile_x,
+            tile_y,
+            target,
+        ),
         RequestedOrder::SetupAtGuns { face_toward } if face_toward.valid() => plan_filtered_units(
             config,
             request.mode,
@@ -356,7 +366,8 @@ fn plan_build(
             }
         }
         IssueMode::Queue => {
-            if let Some(unit) = choose_queued_build_worker(&builders, config.max_queue_len, target) {
+            if let Some(unit) = choose_queued_build_worker(&builders, config.max_queue_len, target)
+            {
                 append_or_notice(config, &mut out, unit, intent);
             } else {
                 for unit in builders {
@@ -509,6 +520,9 @@ fn append_or_notice(
     unit: &UnitFacts,
     intent: OrderIntent,
 ) {
+    if unit.queue_terminal {
+        return;
+    }
     if unit.queue_len >= config.max_queue_len {
         out.notices.push(PlannerNotice::QueueFull { unit: unit.id });
         return;

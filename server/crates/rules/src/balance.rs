@@ -41,6 +41,20 @@ pub const AT_GUN_PACKED_RANGE_TILES: u32 = 5;
 pub const AT_GUN_DEPLOYED_RANGE_TILES: u32 = 12;
 pub const AT_GUN_PACKED_DAMAGE_MULTIPLIER: f32 = 0.75;
 pub const AT_GUN_FIELD_OF_FIRE_RAD: f32 = 40.0_f32 * std::f32::consts::PI / 180.0;
+pub const ARTILLERY_SETUP_TICKS: u16 = (TICK_HZ as u16) * 3;
+pub const ARTILLERY_RELOAD_TICKS: u32 = TICK_HZ * 3;
+pub const ARTILLERY_SHELL_DELAY_TICKS: u32 = TICK_HZ * 4;
+pub const ARTILLERY_MIN_RANGE_TILES: u32 = 10;
+pub const ARTILLERY_MAX_RANGE_TILES: u32 = 50;
+pub const ARTILLERY_FIELD_OF_FIRE_RAD: f32 = 20.0_f32 * std::f32::consts::PI / 180.0;
+pub const ARTILLERY_AMMO_COST_STEEL: u32 = 10;
+pub const ARTILLERY_INNER_RADIUS_TILES: f32 = 1.0;
+pub const ARTILLERY_OUTER_RADIUS_TILES: f32 = 3.0;
+pub const ARTILLERY_INNER_DAMAGE: u32 = 150;
+pub const ARTILLERY_OUTER_MIN_DAMAGE: u32 = 10;
+pub const ARTILLERY_INITIAL_ERROR_TILES: f32 = 5.0;
+pub const ARTILLERY_MIN_ERROR_TILES: f32 = 2.0;
+pub const ARTILLERY_ACCURACY_SHOTS_TO_MIN: u16 = 5;
 
 pub const TANK_OIL_COST_PER_PX: f32 = 20.0 / (96.0 * TILE_SIZE as f32);
 pub const SCOUT_CAR_OIL_COST_PER_PX: f32 = 5.0 / (96.0 * TILE_SIZE as f32);
@@ -57,6 +71,9 @@ pub const METHAMPHETAMINES_ATTACK_COOLDOWN_DENOMINATOR: u32 = 4;
 pub const AT_GUN_UNLOCK_COST_STEEL: u32 = 100;
 pub const AT_GUN_UNLOCK_COST_OIL: u32 = 75;
 pub const AT_GUN_UNLOCK_RESEARCH_TICKS: u32 = TICK_HZ * 20;
+pub const ARTILLERY_UNLOCK_COST_STEEL: u32 = 200;
+pub const ARTILLERY_UNLOCK_COST_OIL: u32 = 200;
+pub const ARTILLERY_UNLOCK_RESEARCH_TICKS: u32 = TICK_HZ * 30;
 pub const TANK_UNLOCK_COST_STEEL: u32 = 150;
 pub const TANK_UNLOCK_COST_OIL: u32 = 100;
 pub const TANK_UNLOCK_RESEARCH_TICKS: u32 = TICK_HZ * 20;
@@ -103,6 +120,9 @@ pub const TANK_BODY_CLEARANCE_PX: f32 = 1.5;
 pub const AT_GUN_BODY_LENGTH_PX: f32 = 42.0;
 pub const AT_GUN_BODY_WIDTH_PX: f32 = 24.0;
 pub const AT_GUN_BODY_CLEARANCE_PX: f32 = 1.0;
+pub const ARTILLERY_BODY_LENGTH_PX: f32 = 64.0;
+pub const ARTILLERY_BODY_WIDTH_PX: f32 = 48.0;
+pub const ARTILLERY_BODY_CLEARANCE_PX: f32 = 1.0;
 pub const SCOUT_CAR_BODY_LENGTH_PX: f32 = 40.8;
 pub const SCOUT_CAR_BODY_WIDTH_PX: f32 = 21.6;
 pub const SCOUT_CAR_BODY_CLEARANCE_PX: f32 = 1.0;
@@ -133,7 +153,11 @@ impl UnitStats {
 pub fn unit_radius_tiles(kind: EntityKind) -> u32 {
     if matches!(
         kind,
-        EntityKind::AtTeam | EntityKind::MortarTeam | EntityKind::ScoutCar | EntityKind::Tank
+        EntityKind::AtTeam
+            | EntityKind::MortarTeam
+            | EntityKind::Artillery
+            | EntityKind::ScoutCar
+            | EntityKind::Tank
     ) {
         return 0;
     }

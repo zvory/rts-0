@@ -9,6 +9,7 @@
 //! enemy entities on tiles they currently see.
 
 pub(crate) mod ability;
+mod artillery;
 pub mod command;
 mod commands;
 pub mod entity;
@@ -37,11 +38,12 @@ use crate::protocol::{
 use crate::rules::{economy as economy_rules, projection};
 use serde::{Deserialize, Serialize};
 
+use artillery::ArtilleryShellStore;
 use entity::{BuildPhase, EntityKind, EntityStore};
 use fog::{Fog, LingeringSightSource};
 use map::Map;
-use mortar::MortarShellStore;
 pub use map::MapMetadata;
+use mortar::MortarShellStore;
 use rand::rngs::SmallRng;
 use rand::SeedableRng;
 use replay::CommandLogEntry;
@@ -119,6 +121,8 @@ pub struct Game {
     smokes: SmokeCloudStore,
     /// Delayed mortar shell impacts waiting to resolve area damage.
     mortar_shells: MortarShellStore,
+    /// Delayed artillery shell impacts waiting to resolve area damage.
+    artillery_shells: ArtilleryShellStore,
     /// Match seed retained for replay metadata/API compatibility. The current hardcoded map
     /// ignores it until lobby map selection or randomized maps are reintroduced.
     seed: u32,
@@ -194,6 +198,7 @@ impl Game {
             &mut self.lingering_sight,
             &mut self.smokes,
             &mut self.mortar_shells,
+            &mut self.artillery_shells,
             pending,
             &mut events,
             self.tick,

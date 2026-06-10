@@ -126,7 +126,7 @@ pub(crate) fn launch_world_ability(
     }
 
     match ability {
-        AbilityKind::Charge => false,
+        AbilityKind::Charge | AbilityKind::PointFire => false,
         AbilityKind::MortarFire => {
             let Some(e) = entities.get_mut(caster) else {
                 return false;
@@ -216,7 +216,7 @@ pub(crate) fn launch_self_ability(
             e.start_ability_cooldown(ability, definition.cooldown_ticks);
             true
         }
-        AbilityKind::Smoke | AbilityKind::MortarFire => false,
+        AbilityKind::Smoke | AbilityKind::MortarFire | AbilityKind::PointFire => false,
     }
 }
 
@@ -263,8 +263,14 @@ pub(crate) fn caster_can_attempt(
             && e.ability_cooldown_ticks(ability) == 0)
 }
 
-fn mortar_ready(kind: EntityKind, setup: WeaponSetup, path_empty: bool, ability: AbilityKind) -> bool {
-    ability != AbilityKind::MortarFire || (kind == EntityKind::MortarTeam && path_empty && setup == WeaponSetup::Deployed)
+fn mortar_ready(
+    kind: EntityKind,
+    setup: WeaponSetup,
+    path_empty: bool,
+    ability: AbilityKind,
+) -> bool {
+    ability != AbilityKind::MortarFire
+        || (kind == EntityKind::MortarTeam && path_empty && setup == WeaponSetup::Deployed)
 }
 
 pub(crate) fn tech_requirement_met(

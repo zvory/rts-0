@@ -160,13 +160,114 @@ Exit criteria:
 
 ## Phase 2: Contract And Wire Design
 
-Not started. Read `docs/context/protocol.md` before changing snapshots, commands, events, or
-wire-visible unit state.
+Read `docs/context/protocol.md`, then updated the Rust/JS protocol mirrors and
+`docs/design/protocol.md`.
+
+- [x] Confirm whether the existing unit kind encoding is enough or a new tag is needed.
+  - Added new unit kind string/code: `artillery` / compact kind code `16`.
+- [x] Confirm whether snapshots need new fields for movement, attack, setup, ability, projectile,
+      or status state.
+  - No new entity snapshot fields are required for the first pass.
+  - Artillery reuses existing `facing`, `weaponFacing`, `setupState`, `setupFacing`, `orderPlan`,
+    and owner-only `abilities` fields.
+- [x] Confirm whether client commands need new order types or fields.
+  - No new top-level command discriminator is needed.
+  - Point Fire uses existing `useAbility` with new ability id `pointFire`, `units`, `x`, `y`, and
+    optional `queued`.
+  - Added `cmd.pointFire(...)` as a JS builder for the same wire shape.
+- [x] Define how queued movement, queued attacks, queued abilities, cancellation, and interrupted
+      orders appear on the wire.
+  - Added owner-only `pointFire` order-plan marker / compact stage code `10`.
+  - Point Fire remains terminal in the order queue by rule; runtime implementation must reject later
+    queued stages after an accepted Point Fire.
+  - Stop, move, teardown, redirect, and invalid/unaffordable fire feedback continue to use existing
+    command and notice channels.
+- [x] Define whether new transient events are required.
+  - Added owner-only `artilleryTarget` event / compact event code `7`:
+    `{x, y, radiusTiles, delayTicks}`.
+  - Added visual-only `artilleryImpact` event / compact event code `8`:
+    `{x, y, radiusTiles}`.
+- [x] Verify every event is player-facing and intentionally consumed; do not leak debug-only events
+      such as raw fire markers into lobby or match messages.
+  - `artilleryTarget` is player-facing pre-impact feedback for the firing player only.
+  - `artilleryImpact` is player-facing explosion feedback for all recipients after impact.
+- [x] Verify fog gating for entity views, target ids, projectile/tracer state, death events, impact
+      positions, and ability effects.
+  - Contract requires enemies never receive `artilleryTarget`, even with vision of the gun.
+  - Contract requires `artilleryImpact` to be sent to all active recipients after impact without
+    revealing terrain, updating exploration, or carrying entity visibility.
+- [x] Verify inbound command validation: dedupe, cap, range-check, overflow-check, and reject invalid
+      target or coordinate data.
+  - Contract uses existing `useAbility` fields so unit-list dedupe/cap and coordinate finite/range
+    validation must be implemented in the simulation command pass.
+  - Point Fire target remains a world position, not an entity id.
+- [x] Add or update protocol tests for new tags, fields, commands, events, and fog-filtered payloads.
+  - Updated Rust compact snapshot tests.
+  - Updated JS protocol contract tests and parity coverage.
+
+Exit criteria:
+
+- [x] The server and client agree on every tag, field name, and shape.
+- [x] The wire format is tested before client visuals are considered complete.
 
 ## Phase 3: Simulation Implementation
 
-Not started. Read `docs/context/server-sim.md` before changing game systems, services, orders,
-combat, movement, production, AI, or self-play behavior.
+Read `docs/context/server-sim.md` before changing game systems, services, orders, combat,
+movement, production, AI, or self-play behavior.
+
+- [x] Add authoritative Artillery unit kind, stable rule ids, build definition, and Gun Works
+      training gate.
+  - `EntityKind::Artillery` uses compact kind code `16`.
+  - Artillery trains from Gun Works for 300 steel / 100 oil, 5 supply, 750 ticks, with 150 HP,
+    4-tile sight, 0.922 px/tick speed, tank-style pivot movement, and a large support-gun body.
+- [x] Add Gun Works `ArtilleryUnlock` research and production prerequisite.
+  - `UpgradeKind::ArtilleryUnlock` costs 200 steel / 200 oil and takes 900 ticks.
+- [x] Add the new `Hard` armor behavior.
+  - Non-armor-piercing damage is reduced by 25%; armor-piercing damage applies in full.
+- [x] Add authoritative Point Fire command translation and validation.
+  - Point Fire uses `useAbility` / `pointFire` with a world-position target.
+  - Inbound unit lists are deduped/capped through the existing command path.
+  - Non-finite targets are rejected and finite targets are clamped before range checks.
+  - Invalid min-range, max-range, wrong-unit, under-construction, moving, or deployed-arc targets
+    are rejected without moving the unit or spending steel.
+- [x] Add Point Fire queue semantics.
+  - Point Fire projects as a `pointFire` order-plan stage.
+  - Point Fire is terminal: later queued orders are not accepted after an accepted queued Point
+    Fire.
+- [x] Add Artillery setup, teardown, and deployed movement restrictions.
+  - Point Fire starts setup facing the target point when packed.
+  - Deployed, setting-up, and tearing-down Artillery cannot move.
+  - Movement and teardown reset Artillery accuracy.
+- [x] Add range, arc, reload, ammunition, shell delay, scatter, and impact damage behavior.
+  - Minimum range is 10 tiles; maximum range is 50 tiles.
+  - Deployed arc is 20 degrees total.
+  - Setup, teardown, and reload are 3 seconds each.
+  - Steel is paid only when a shot actually fires; unaffordable shots hold the order and retry
+    after the reload delay.
+  - Shells land 4 seconds after firing.
+  - Scatter improves from 5 tiles toward 2 tiles across maintained fire after setup.
+  - Impacts deal 150 armor-piercing damage inside 1 tile and non-armor-piercing splash falloff to
+    10 damage at 3 tiles.
+  - Splash damages friendly and enemy units/buildings; neutral resource nodes are excluded.
+- [x] Add fog-safe Artillery event emission.
+  - `artilleryTarget` is emitted only to the firing owner.
+  - `artilleryImpact` is emitted to all players after impact and does not update fog or exploration.
+- [x] Keep AI ignoring Artillery for the first pass.
+  - AI combat classification treats Artillery as unavailable/non-combat for now.
+- [x] Add focused simulation coverage.
+  - Covered terminal queued Point Fire promotion.
+  - Covered owner-only target events, global impact events, and steel spent at fire time.
+- [x] Update architecture baseline for the intentional simulation growth.
+  - Blessed the new order/shell executor surface with reason:
+    `artillery point-fire simulation adds order and shell executor`.
+
+Exit criteria:
+
+- [x] Authoritative rules exist for production, unlock, armor, movement, setup, Point Fire, shell
+      scheduling, impact damage, and event visibility.
+- [x] The new simulation paths are panic-conscious on command/tick inputs and reuse checked command
+      validation where client data enters the sim.
+- [x] Focused Rust simulation/rules/protocol/contract coverage passes.
 
 ## Phase 4: Client Commands, UI, And Debug Mode
 

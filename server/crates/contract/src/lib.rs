@@ -369,6 +369,17 @@ pub enum Event {
         y: f32,
         radius_tiles: f32,
     },
+    ArtilleryTarget {
+        x: f32,
+        y: f32,
+        radius_tiles: f32,
+        delay_ticks: u32,
+    },
+    ArtilleryImpact {
+        x: f32,
+        y: f32,
+        radius_tiles: f32,
+    },
     Notice {
         msg: String,
         #[serde(default, skip_serializing_if = "Option::is_none")]

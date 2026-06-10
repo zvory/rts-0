@@ -11,6 +11,7 @@ use crate::EntityKind;
 pub enum ArmorClass {
     Small,
     Armored,
+    Hard,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -55,7 +56,11 @@ pub struct NodeDef {
 
 const WORKER_ONLY: &[EntityKind] = &[EntityKind::Worker];
 const BARRACKS_UNITS: &[EntityKind] = &[EntityKind::Rifleman, EntityKind::MachineGunner];
-const STEELWORKS_UNITS: &[EntityKind] = &[EntityKind::MortarTeam, EntityKind::AtTeam];
+const STEELWORKS_UNITS: &[EntityKind] = &[
+    EntityKind::MortarTeam,
+    EntityKind::AtTeam,
+    EntityKind::Artillery,
+];
 const FACTORY_UNITS: &[EntityKind] = &[EntityKind::ScoutCar, EntityKind::Tank];
 const CITY_CENTRE_REQUIRED: &[EntityKind] = &[EntityKind::CityCentre];
 const CITY_CENTRE_AND_BARRACKS_REQUIRED: &[EntityKind] =
@@ -167,6 +172,27 @@ pub const UNITS: &[UnitDef] = &[
         },
         armor_class: ArmorClass::Small,
         weapon: WeaponClass::SmallArms,
+        target_priority: TargetPriority::Default,
+        trained_at: Some(EntityKind::Steelworks),
+        train_requires: STEELWORKS_REQUIRED,
+    },
+    UnitDef {
+        kind: EntityKind::Artillery,
+        stats: balance::UnitStats {
+            hp: 150,
+            dmg: 0,
+            range_tiles: balance::ARTILLERY_MAX_RANGE_TILES,
+            cooldown: balance::ARTILLERY_RELOAD_TICKS,
+            speed: 0.922,
+            sight_tiles: 4,
+            cost_steel: 300,
+            cost_oil: 100,
+            supply: 5,
+            build_ticks: 750,
+            radius: 24.0,
+        },
+        armor_class: ArmorClass::Hard,
+        weapon: WeaponClass::None,
         target_priority: TargetPriority::Default,
         trained_at: Some(EntityKind::Steelworks),
         train_requires: STEELWORKS_REQUIRED,

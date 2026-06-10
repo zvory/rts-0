@@ -51,7 +51,7 @@ pub fn is_armored(kind: EntityKind) -> bool {
     let armor_class = defs::unit_def(kind)
         .map(|d| d.armor_class)
         .or_else(|| defs::building_def(kind).map(|d| d.armor_class));
-    armor_class == Some(ArmorClass::Armored)
+    matches!(armor_class, Some(ArmorClass::Armored | ArmorClass::Hard))
 }
 
 /// AP weapons deal full damage to armored targets.
@@ -91,10 +91,13 @@ pub fn effective_damage(
     base_dmg: u32,
     victim_terrain: Option<TerrainKind>,
 ) -> u32 {
-    let armor_adjusted = if !is_ap(attacker_kind) && is_armored(victim_kind) {
-        base_dmg / 4
-    } else {
-        base_dmg
+    let armor_class = defs::unit_def(victim_kind)
+        .map(|d| d.armor_class)
+        .or_else(|| defs::building_def(victim_kind).map(|d| d.armor_class));
+    let armor_adjusted = match (is_ap(attacker_kind), armor_class) {
+        (false, Some(ArmorClass::Armored)) => base_dmg / 4,
+        (false, Some(ArmorClass::Hard)) => ((base_dmg as f32) * 0.75).round() as u32,
+        _ => base_dmg,
     };
     let terrain = victim_terrain.unwrap_or(TerrainKind::Open);
     (armor_adjusted as f32 * terrain::cover_modifier(victim_kind, terrain)).round() as u32
