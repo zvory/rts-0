@@ -1364,6 +1364,14 @@ async fn handle_client_message(
             )
             .await;
         }
+        ClientMessage::SeekReplayTo { tick } => {
+            send_room_event(
+                player_id,
+                current_room,
+                RoomEvent::SeekReplayTo { player_id, tick },
+            )
+            .await;
+        }
         ClientMessage::SetReplayVision { vision } => {
             send_room_event(
                 player_id,

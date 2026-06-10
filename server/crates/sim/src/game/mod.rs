@@ -63,6 +63,7 @@ pub struct PlayerInit {
 
 /// Per-player economy and bookkeeping carried for the whole match. Visible to `systems` (the
 /// only other module that mutates economy), but not part of the public API.
+#[derive(Clone)]
 pub(crate) struct PlayerState {
     pub(crate) id: u32,
     pub(crate) name: String,
@@ -92,6 +93,7 @@ pub(crate) struct ScoreState {
 }
 
 /// The authoritative match state.
+#[derive(Clone)]
 pub struct Game {
     map: Map,
     entities: EntityStore,
@@ -131,6 +133,15 @@ pub struct Game {
 }
 
 impl Game {
+    /// Clone the complete authoritative simulation state for replay seek keyframes.
+    ///
+    /// This is intentionally narrower than exposing checkpoint serialization: replay playback
+    /// runs in-process on the room task, so an owned clone keeps all internal service state
+    /// deterministic without making snapshots part of the restore contract.
+    pub fn clone_for_replay_keyframe(&self) -> Self {
+        self.clone()
+    }
+
     /// Advance the simulation by one tick and return per-player transient events.
     ///
     /// Ordered per `docs/design/server-sim.md`: drain+apply commands → movement → combat → gather →

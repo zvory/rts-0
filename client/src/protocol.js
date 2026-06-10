@@ -33,6 +33,7 @@ export const C = Object.freeze({
   SET_REPLAY_SPEED: "setReplaySpeed",
   STEP_DEV_TICK: "stepDevTick",
   SEEK_REPLAY: "seekReplay",
+  SEEK_REPLAY_TO: "seekReplayTo",
   SET_REPLAY_VISION: "setReplayVision",
   SELECT_MAP: "selectMap",
 });
@@ -664,6 +665,7 @@ export const msg = Object.freeze({
   setReplaySpeed: (speed) => ({ t: C.SET_REPLAY_SPEED, speed }),
   stepDevTick: () => ({ t: C.STEP_DEV_TICK }),
   seekReplay: (ticksBack) => ({ t: C.SEEK_REPLAY, ticksBack }),
+  seekReplayTo: (tick) => ({ t: C.SEEK_REPLAY_TO, tick }),
   setReplayVision: (vision) => ({ t: C.SET_REPLAY_VISION, vision }),
   replayVisionAll: () => ({ t: C.SET_REPLAY_VISION, vision: { mode: REPLAY_VISION.ALL } }),
   replayVisionPlayer: (playerId) => ({
