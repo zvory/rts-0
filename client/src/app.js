@@ -327,6 +327,10 @@ export class App {
 
   /** "Back to lobby" button: tear down the match and restore the lobby. */
   onBackToLobby() {
+    if (this.replayLaunch) {
+      window.location.assign(new URL("/", window.location.href).toString());
+      return;
+    }
     if (this.inReplayPlayback) this.net.returnToLobby();
     if (this.match) {
       this.match.destroy();

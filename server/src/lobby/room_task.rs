@@ -2260,6 +2260,12 @@ impl RoomTask {
         if !self.players.contains_key(&player_id) || !matches!(self.phase, Phase::ReplayViewer(_)) {
             return;
         }
+        if matches!(
+            self.mode,
+            RoomMode::Replay { .. } | RoomMode::DevSelfPlay(DevSelfPlayConfig::Replay { .. })
+        ) {
+            return;
+        }
         self.return_to_lobby();
     }
 
@@ -3009,5 +3015,41 @@ mod tests {
         assert!(messages
             .iter()
             .any(|msg| matches!(msg, ServerMessage::Lobby { can_start, .. } if !can_start)));
+    }
+
+    #[test]
+    fn dedicated_replay_room_return_to_lobby_does_not_stop_other_viewers() {
+        let players = replay_test_players(2);
+        let (_game, artifact) = replay_test_artifact(&players, 2);
+        let mut task = RoomTask::new(
+            "persisted-replay-return-test".to_string(),
+            RoomMode::Replay { artifact },
+            None,
+            false,
+            DrainHandle::default(),
+        );
+        let (msg_tx_a, _writer_a) = ConnectionSink::new();
+        let (ack_a, mut ack_rx_a) = tokio::sync::oneshot::channel();
+        let (msg_tx_b, writer_b) = ConnectionSink::new();
+        let (ack_b, mut ack_rx_b) = tokio::sync::oneshot::channel();
+
+        task.on_join(99, "Viewer A".to_string(), true, true, msg_tx_a, ack_a);
+        task.on_join(100, "Viewer B".to_string(), true, true, msg_tx_b, ack_b);
+
+        assert_eq!(ack_rx_a.try_recv(), Ok(true));
+        assert_eq!(ack_rx_b.try_recv(), Ok(true));
+        assert!(matches!(task.phase, Phase::ReplayViewer(_)));
+
+        task.on_return_to_lobby(99);
+
+        assert!(matches!(task.phase, Phase::ReplayViewer(_)));
+        assert!(task.players.contains_key(&99));
+        assert!(task.players.contains_key(&100));
+
+        task.on_tick_replay_viewer(TokioInstant::now());
+        assert!(
+            writer_b.snapshots.take().is_some(),
+            "other viewers should keep receiving replay snapshots"
+        );
     }
 }
