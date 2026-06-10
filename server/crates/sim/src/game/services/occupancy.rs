@@ -108,6 +108,14 @@ impl<'a> Occupancy<'a> {
     pub(crate) fn static_fingerprint(&self) -> u64 {
         self.static_fingerprint
     }
+
+    pub(crate) fn building_blocked_at_tile(&self, tx: i32, ty: i32) -> bool {
+        let size = self.map.size as i32;
+        if tx < 0 || ty < 0 || tx >= size || ty >= size {
+            return false;
+        }
+        self.blocked[(ty * self.map.size as i32 + tx) as usize]
+    }
 }
 
 impl Passability for Occupancy<'_> {

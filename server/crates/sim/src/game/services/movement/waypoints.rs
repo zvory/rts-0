@@ -6,7 +6,9 @@ use crate::game::entity::{
     EntityKind, EntityStore, MovePhase, Order, WeaponSetup,
 };
 use crate::game::map::Map;
-use crate::game::services::geometry::unit_body_for_entity;
+use crate::game::services::geometry::{
+    tile_rect, unit_body_for_entity, unit_body_intersects_rect, unit_body_with_facing,
+};
 use crate::game::services::occupancy::Occupancy;
 use crate::game::services::spatial::SpatialIndex;
 use crate::game::services::standability as static_standability;
@@ -26,6 +28,8 @@ use super::steering::{inject_sidestep, steered_candidate, steering_path_dir};
 use super::{ARRIVE_EPS, MAX_UNIT_BOUNDING_RADIUS_PX};
 
 const TANK_ROTATION_UNJAM_EPS: f32 = 1.0e-4;
+const PIVOT_ROTATION_ASSIST_STEP_SCALE: f32 = 0.25;
+const PIVOT_ROTATION_ASSIST_MAX_STEPS: u32 = 4;
 const SCOUT_CAR_RECOVERY_SEARCH_STEP_PX: f32 = config::TILE_SIZE as f32 * 0.5;
 
 /// Advance every moving unit along its waypoint path at its speed. Clamps the final landing
@@ -658,29 +662,46 @@ fn pivot_vehicle_rotation_unjam_candidate(
     if !forward.0.is_finite() || !forward.1.is_finite() {
         return None;
     }
+    let blocked_by_building =
+        rotation_blocked_by_building(occ, kind, probe.pos, probe.blocked_facing);
+    let route_dir = probe
+        .route_target
+        .and_then(|target| normalized_dir(probe.pos, target));
 
     let mut best = None;
     let mut best_score = f32::INFINITY;
+
+    if blocked_by_building {
+        if let Some(dir) = route_dir {
+            for step in 1..=PIVOT_ROTATION_ASSIST_MAX_STEPS {
+                let distance = probe.step_px * PIVOT_ROTATION_ASSIST_STEP_SCALE * step as f32;
+                let candidate = (
+                    probe.pos.0 + dir.0 * distance,
+                    probe.pos.1 + dir.1 * distance,
+                );
+                if !pivot_rotation_assist_candidate_legal(occ, map, kind, probe, candidate) {
+                    continue;
+                }
+
+                let route_score = probe
+                    .route_target
+                    .map(|target| distance_between(candidate, target))
+                    .unwrap_or(0.0);
+                let score = route_score + distance * 0.2;
+                if score + TANK_ROTATION_UNJAM_EPS < best_score {
+                    best = Some(candidate);
+                    best_score = score;
+                }
+            }
+        }
+    }
+
     for sign in [1.0_f32, -1.0] {
         let candidate = (
             probe.pos.0 + forward.0 * probe.step_px * sign,
             probe.pos.1 + forward.1 * probe.step_px * sign,
         );
-        if !unit_static_standable(
-            occ,
-            map,
-            kind,
-            candidate.0,
-            candidate.1,
-            probe.original_facing,
-        ) || !unit_static_standable(
-            occ,
-            map,
-            kind,
-            candidate.0,
-            candidate.1,
-            probe.blocked_facing,
-        ) {
+        if !pivot_rotation_assist_candidate_legal(occ, map, kind, probe, candidate) {
             continue;
         }
 
@@ -695,4 +716,97 @@ fn pivot_vehicle_rotation_unjam_candidate(
     }
 
     best
+}
+
+fn normalized_dir(from: (f32, f32), to: (f32, f32)) -> Option<(f32, f32)> {
+    let dx = to.0 - from.0;
+    let dy = to.1 - from.1;
+    let dist = (dx * dx + dy * dy).sqrt();
+    (dist.is_finite() && dist > 1.0e-4).then_some((dx / dist, dy / dist))
+}
+
+fn pivot_rotation_assist_candidate_legal(
+    occ: &Occupancy,
+    map: &Map,
+    kind: EntityKind,
+    probe: PivotVehicleRotationUnjamProbe,
+    candidate: (f32, f32),
+) -> bool {
+    if !candidate.0.is_finite() || !candidate.1.is_finite() {
+        return false;
+    }
+
+    unit_static_standable(
+        occ,
+        map,
+        kind,
+        candidate.0,
+        candidate.1,
+        probe.original_facing,
+    ) && unit_static_standable(
+        occ,
+        map,
+        kind,
+        candidate.0,
+        candidate.1,
+        probe.blocked_facing,
+    ) && pivot_rotation_assist_segment_legal(occ, map, kind, probe.pos, candidate, probe.original_facing)
+}
+
+fn rotation_blocked_by_building(
+    occ: &Occupancy,
+    kind: EntityKind,
+    pos: (f32, f32),
+    facing: f32,
+) -> bool {
+    let Some(body) = unit_body_with_facing(kind, pos.0, pos.1, facing) else {
+        return false;
+    };
+    let aabb = body.aabb();
+    let ts = config::TILE_SIZE as f32;
+    let min_tx = (aabb.min_x / ts).floor() as i32;
+    let max_tx = (aabb.max_x / ts).floor() as i32;
+    let min_ty = (aabb.min_y / ts).floor() as i32;
+    let max_ty = (aabb.max_y / ts).floor() as i32;
+
+    for ty in min_ty..=max_ty {
+        for tx in min_tx..=max_tx {
+            if !occ.building_blocked_at_tile(tx, ty) {
+                continue;
+            }
+            if unit_body_intersects_rect(body, tile_rect(tx, ty)) {
+                return true;
+            }
+        }
+    }
+
+    false
+}
+
+fn pivot_rotation_assist_segment_legal(
+    occ: &Occupancy,
+    map: &Map,
+    kind: EntityKind,
+    from: (f32, f32),
+    to: (f32, f32),
+    facing: f32,
+) -> bool {
+    let distance = distance_between(from, to);
+    if !distance.is_finite() {
+        return false;
+    }
+    let steps = (distance / probe_step_px()).ceil().max(1.0) as u32;
+    for i in 0..=steps {
+        let t = i as f32 / steps as f32;
+        let x = from.0 + (to.0 - from.0) * t;
+        let y = from.1 + (to.1 - from.1) * t;
+        if !unit_static_standable(occ, map, kind, x, y, facing) {
+            return false;
+        }
+    }
+    true
+}
+
+fn probe_step_px() -> f32 {
+    config::TILE_SIZE as f32 * 0.125
 }
