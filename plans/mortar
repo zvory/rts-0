@@ -1,0 +1,138 @@
+# Mortar Follow-Up Plan
+
+## Goal
+
+Break the mortar polish/gameplay request into small, independently reviewable changes.
+
+Requested changes:
+- Mortar impacts should deal friendly fire at the normal damage rate.
+- Mortars should render a visible black shell projectile fired from the mortar.
+- The shell should read like an overhead arc: compressed near launch, stretched near midpoint,
+  compressed again before impact.
+- Autocast mortars should avoid firing at target points where friendly units or buildings would be
+  damaged, assuming friendly units hold their current positions.
+- Dust cloud animation should be doubled in size, thicker, and last twice as long.
+- Mortar wheels should be slightly thinner, less circular, and more pill shaped.
+- Attack preview red dotted lines and crosshair should use a darker hue.
+- Mortar attack previews should remain visible until the mortar round hits.
+- Multi-selected mortars should support holding `X` / fire hotkey and clicking repeatedly to fire
+  multiple mortars without the second click deselecting the group.
+- Scout cars should get the same repeated hotkey-click behavior.
+- Reflect the final behavior in the relevant design docs.
+
+## Phase 1 - Friendly Fire And Autocast Safety
+
+Server behavior:
+- Change mortar AOE resolution so friendly units and buildings take the same impact damage as enemy
+  entities when inside the mortar impact radius.
+- Keep fog/event projection safe: friendly fire must not reveal hidden enemy positions to players
+  who could not otherwise see them.
+- Update autocast target selection so a mortar rejects an attack point if any owned unit or owned
+  building would be inside the damaging impact area, using current positions only.
+- Keep manual fire dangerous: player-commanded mortar fire should still be allowed onto friendly
+  units/buildings.
+
+Tests:
+- Mortar impact damages friendly units at the same rate as enemies.
+- Mortar impact damages friendly buildings when inside radius.
+- Autocast refuses or skips a shot that would hit owned units/buildings.
+- Autocast still fires at valid targets when no owned entity would be hit.
+- Manual fire can still be ordered onto a point that contains owned entities.
+
+Patch notes:
+- Mortar shells now cause full friendly fire.
+- Autocast mortars avoid shots that would hit your own current unit/building positions.
+
+## Phase 2 - Projectile And Impact Preview Lifetime
+
+Protocol/client behavior:
+- Represent mortar launch-to-impact timing on the client well enough to draw a projectile and keep
+  the warning preview alive until impact.
+- Prefer using existing mortar target/impact events if they already carry enough timing and
+  position data. If not, add the smallest protocol extension needed and mirror it in
+  `server/src/protocol.rs`, `client/src/protocol.js`, and `docs/design/protocol.md`.
+- Render a black mortar shell traveling from the firing mortar toward the impact point.
+- Animate shell shape over flight progress:
+  - launch: slightly compressed, suggesting it is pointing upward;
+  - midpoint: slightly stretched;
+  - pre-impact: compressed again before disappearing into the impact.
+- Keep the red dotted attack line/crosshair visible until the associated mortar round hits.
+- Use a darker red hue for the dotted line and crosshair.
+
+Tests/checks:
+- Manual mortar fire shows a projectile from launcher to target.
+- Autocast mortar fire shows the same projectile for the firing player.
+- The preview disappears when the round impacts, not earlier.
+- Hidden enemy mortar fire still does not leak forbidden positions.
+
+Patch notes:
+- Mortar fire now has a visible shell and longer warning marker so players can dodge, including
+  around their own autocast shots.
+
+## Phase 3 - Dust Cloud And Mortar Art Polish
+
+Client rendering:
+- Double the mortar impact dust cloud size.
+- Make the dust thicker/more opaque or denser.
+- Make the dust animation last twice as long.
+- Adjust mortar wheels to be slightly thinner.
+- Make wheels less circular and more pill shaped.
+
+Checks:
+- Mortar impacts remain readable at normal zoom.
+- Larger/longer dust does not obscure too much battlefield state.
+- Mortar art remains visually distinct from AT guns and machine gunners.
+
+Patch notes:
+- Mortar impacts have larger, thicker, longer-lasting dust clouds.
+- Mortar wheels have a slimmer pill-shaped profile.
+
+## Phase 4 - Repeated Hotkey Targeting For Mortars And Scout Cars
+
+Client input behavior:
+- When multiple mortars are selected and the player holds `X` or the fire hotkey, repeated clicks
+  should issue repeated fire commands instead of treating the second click as a normal selection
+  click.
+- Preserve selection while the hotkey-targeting mode is active.
+- Each click should pick an eligible selected mortar, so multiple mortars can be assigned across
+  multiple clicks.
+- Apply the same repeated hotkey-click behavior to scout cars for their relevant command.
+- Keep existing normal click selection behavior when no command hotkey is held.
+
+Tests/checks:
+- Multi-select mortars, hold `X`, click several target points: selection remains intact and
+  multiple mortar commands are issued.
+- Multi-select scout cars, hold the relevant hotkey, click several target points: selection remains
+  intact and multiple commands are issued.
+- Releasing the hotkey returns clicks to normal selection/command behavior.
+
+Patch notes:
+- Holding the fire hotkey now supports repeated point targeting for selected Mortars and Scout
+  Cars without losing selection.
+
+## Phase 5 - Design Documentation
+
+Update docs after behavior is implemented:
+- `docs/design/server-sim.md`: mortar friendly-fire behavior, autocast safety assumptions, and any
+  command/autocast rules that belong in the sim contract.
+- `docs/design/client-ui.md`: shell projectile, longer warning preview, darker preview color,
+  dust cloud animation, wheel art adjustment, and repeated hotkey targeting behavior.
+- `docs/design/protocol.md`: only if mortar launch/preview/projectile data requires a wire change.
+- Refresh relevant `docs/context/*.md` section pointers only if design document structure shifts.
+
+## Suggested Implementation Order
+
+1. Friendly fire and autocast safety.
+2. Projectile/preview lifetime, including protocol only if required.
+3. Dust and mortar art polish.
+4. Repeated hotkey targeting for mortars and scout cars.
+5. Design docs and final verification.
+
+## Final Verification
+
+- `cd server && cargo test`
+- `cd server && cargo fmt`
+- `cd server && cargo clippy`
+- `cargo run --manifest-path server/Cargo.toml -p rts-archcheck -- check-sim-architecture`
+- If client input/rendering changed substantially, run the live server and the relevant Node/browser
+  smoke checks from the repo instructions.
