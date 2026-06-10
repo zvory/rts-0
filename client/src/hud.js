@@ -1050,6 +1050,7 @@ export class HUD {
     const st = STATS[unit];
     if (!st) return "locked";
     if (this._requirementsOf(st).some((req) => !this._playerHasCompleteKind(req))) return "locked";
+    if (st.upgradeRequires && !(this.state.upgrades || []).includes(st.upgradeRequires)) return "locked";
     return this._affordable(st.cost, res) ? "ready" : "unaffordable";
   }
 
@@ -1083,6 +1084,11 @@ export class HUD {
     const missing = this._requirementsOf(st).find((req) => !this._playerHasCompleteKind(req));
     if (missing) {
       const reqLabel = (STATS[missing] && STATS[missing].label) || missing;
+      return `Requires ${reqLabel}`;
+    }
+    if (st.upgradeRequires && !(this.state.upgrades || []).includes(st.upgradeRequires)) {
+      const reqLabel = (UPGRADES[st.upgradeRequires] && UPGRADES[st.upgradeRequires].label) ||
+        st.upgradeRequires;
       return `Requires ${reqLabel}`;
     }
     if (!this._affordable(st.cost, res)) return "Not enough resources";
@@ -1126,8 +1132,13 @@ export class HUD {
     if (!st) return "";
     const cost = st.cost || {};
     const requirements = this._requirementsOf(st);
-    const requirementLabels = requirements.length > 0
+    const upgradeRequirement = st.upgradeRequires
+      ? ((UPGRADES[st.upgradeRequires] && UPGRADES[st.upgradeRequires].label) || st.upgradeRequires)
+      : null;
+    const requirementLabels = requirements.length > 0 || upgradeRequirement
       ? requirements.map((req) => (STATS[req] && STATS[req].label) || req).join(", ")
+        + (requirements.length > 0 && upgradeRequirement ? ", " : "")
+        + (upgradeRequirement || "")
       : "None";
     const buildSeconds = Math.max(0, (st.buildTicks || 0) / TICK_HZ);
     const buildTime = Number.isInteger(buildSeconds)

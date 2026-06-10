@@ -919,6 +919,8 @@ fn ability_code(ability: &str) -> u8 {
 fn upgrade_code(upgrade: &str) -> u8 {
     match upgrade {
         "methamphetamines" => 1,
+        "at_gun_unlock" => 2,
+        "tank_unlock" => 3,
         _ => 255,
     }
 }

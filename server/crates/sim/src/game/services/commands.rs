@@ -1103,6 +1103,10 @@ fn order_train(
         Some(p) => p,
         None => return,
     };
+    if upgrade::required_for_unit(unit).is_some_and(|upgrade| !ps.upgrades.contains(&upgrade)) {
+        notice(events, player, "Upgrade required");
+        return;
+    }
     let (cost_steel, cost_oil) = rules::economy::cost(unit);
     let supply = rules::economy::supply_cost(unit);
     if ps.steel < cost_steel || ps.oil < cost_oil {
@@ -1533,6 +1537,50 @@ mod tests {
             events.get(&1).is_none_or(Vec::is_empty),
             "resume order should not emit a resource shortage notice"
         );
+    }
+
+    #[test]
+    fn at_gun_and_tank_training_require_finished_unlock_upgrades() {
+        let map = flat_map(24);
+        for (producer, unit, upgrade, setup_extra) in [
+            (
+                EntityKind::Barracks,
+                EntityKind::AtTeam,
+                UpgradeKind::AtGunUnlock,
+                Some(EntityKind::Steelworks),
+            ),
+            (EntityKind::Factory, EntityKind::Tank, UpgradeKind::TankUnlock, None),
+        ] {
+            let mut entities = EntityStore::new();
+            let (px, py) = footprint_center(&map, producer, 6, 6);
+            let building = entities
+                .spawn_building(1, producer, px, py, true)
+                .expect("producer should spawn");
+            if let Some(kind) = setup_extra {
+                let (x, y) = footprint_center(&map, kind, 10, 6);
+                entities
+                    .spawn_building(1, kind, x, y, true)
+                    .expect("tech building should spawn");
+            }
+            let mut players = vec![player_state(1), player_state(2)];
+            let command = SimCommand::Train { building, unit };
+            let events =
+                apply_with_players(&map, &mut entities, &mut players, vec![(1, command.clone())]);
+            assert!(
+                entities.get(building).expect("producer").prod_queue().is_empty(),
+                "{unit:?} should not queue before {upgrade:?} finishes"
+            );
+            assert!(matches!(
+                events.get(&1).and_then(|events| events.first()),
+                Some(Event::Notice { msg, .. }) if msg == "Upgrade required"
+            ));
+
+            players[0].upgrades.insert(upgrade);
+            apply_with_players(&map, &mut entities, &mut players, vec![(1, command)]);
+            let queue = entities.get(building).expect("producer").prod_queue();
+            assert_eq!(queue.len(), 1);
+            assert_eq!(queue[0].unit, unit);
+        }
     }
 
     #[test]

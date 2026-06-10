@@ -65,6 +65,7 @@ const CITY_CENTRE_AND_BARRACKS_REQUIRED: &[EntityKind] =
     &[EntityKind::CityCentre, EntityKind::Barracks];
 const TRAINING_CENTRE_REQUIRED: &[EntityKind] = &[EntityKind::TrainingCentre];
 const STEELWORKS_REQUIRED: &[EntityKind] = &[EntityKind::Steelworks];
+const FACTORY_BUILDING_REQUIRED: &[EntityKind] = &[EntityKind::Factory];
 const FACTORY_REQUIRED: &[EntityKind] = &[EntityKind::CityCentre, EntityKind::TrainingCentre];
 
 pub const UNITS: &[UnitDef] = &[
@@ -171,7 +172,7 @@ pub const UNITS: &[UnitDef] = &[
         weapon: WeaponClass::AntiTank,
         target_priority: TargetPriority::Default,
         trained_at: Some(EntityKind::Factory),
-        train_requires: STEELWORKS_REQUIRED,
+        train_requires: FACTORY_BUILDING_REQUIRED,
     },
     UnitDef {
         kind: EntityKind::ScoutCar,
