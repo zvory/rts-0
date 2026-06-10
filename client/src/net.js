@@ -183,6 +183,19 @@ export class Net {
   }
 
   /**
+   * Report client-observed network/render health to the server logs.
+   * @param {object} report bounded aggregate metrics
+   */
+  netReport(report) {
+    this._send(msg.netReport(report));
+  }
+
+  /** Bytes queued by the browser for this WebSocket, if available. */
+  get bufferedAmount() {
+    return this.ws?.bufferedAmount || 0;
+  }
+
+  /**
    * Set replay/dev-watch playback speed. Dev-watch accepts 0 as paused.
    * @param {number} speed multiplier, e.g. 0.5, 1, 2, 4, 8
    */

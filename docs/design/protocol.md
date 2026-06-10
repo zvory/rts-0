@@ -27,6 +27,7 @@ crate.
 | `giveUp`   | — | Give up the active match. The server eliminates that player and sends their score screen. |
 | `returnToLobby` | — | Leave post-match replay playback and return a normal match room to a clean lobby for rematch setup. Ignored outside replay playback and ignored by dedicated replay rooms created for match-history/dev replay viewing. |
 | `ping`     | `ts: number` | Latency probe; server replies with `pong`. |
+| `netReport` | `report: ClientNetReport` | Periodic client-observed network/render health aggregate. Server logs it for diagnostics only; it never affects simulation state. |
 | `setReplaySpeed` | `speed: f32` | Set replay/dev-watch playback speed multiplier; ignored outside replay rooms and dev watch playback. For dev scenario watch rooms only, `0` pauses the authoritative simulation. Other accepted speeds are clamped. |
 | `stepDevTick` | — | Advance a paused dev scenario watch room by one authoritative simulation tick. Ignored outside paused dev scenario rooms. |
 | `seekReplay` | `ticksBack: u32` | Rewind a replay by N simulation ticks; pass a large value (e.g. `2^31-1`) to reset to tick 0. Ignored outside replay rooms. The room rate-limits accepted seeks. Accepted seeks rebuild the game from the artifact, fast-forward to `current - N`, re-send `start`, and emit `replayState`. |
@@ -60,6 +61,35 @@ future unit intents; `stop` clears both active and queued unit orders.
 Production building rally plans are capped at four total stages. A non-queued rally replaces the
 whole plan; a queued rally appends if space remains and establishes the first stage when the plan is
 empty.
+
+`ClientNetReport` is an untrusted, rate-limited diagnostic aggregate emitted by the browser while
+in a match:
+```
+{
+  schemaVersion: u8,        // currently 1
+  elapsedMs: u32,           // client-side aggregation window duration
+  matchTick: u32,           // latest snapshot tick observed by this client
+  rttMs: u16,               // latest app-level ping round-trip sample
+  rttMaxMs: u16,            // max round-trip sample in this report window
+  badRttSamples: u32,       // samples at/above the client's latency warning threshold
+  snapshotJitterMs: u16,    // current max receive jitter over the client's short jitter window
+  snapshotGapMaxMs: u16,    // largest observed interval between received snapshots
+  jitterSamples: u32,       // jitter incidents in this report window
+  snapshots: u32,           // snapshots received in this report window
+  frameGapMaxMs: u16,       // largest requestAnimationFrame gap in this report window
+  fpsEstimate: u16,         // coarse average client frame rate for this report window
+  hidden: bool,             // document.hidden when the report was sent
+  focused: bool,            // document.hasFocus() when available
+  wsBufferedBytes: u32,     // browser WebSocket bufferedAmount
+  serverTickMs: u16,        // latest server tick work duration seen in snapshot netStatus
+  serverLagMs: u16,         // latest scheduler lag seen in snapshot netStatus
+  slowTickCount: u32,       // latest server slow-tick count seen by this client
+  headOfLineCount: u32      // latest per-client pending-snapshot replacement count seen
+}
+```
+The server only logs this message with the connection's `player_id` and room name. Values are
+advisory because clients are untrusted; use them to diagnose transport/browser behavior, not as
+gameplay authority.
 
 ### 2.2 Server → Client (`ServerMessage`)
 

@@ -107,6 +107,8 @@ pub enum ClientMessage {
     ReturnToLobby,
     /// Latency probe.
     Ping { ts: f64 },
+    /// Client-observed network/render health aggregate for server logs.
+    NetReport { report: ClientNetReport },
     /// Set replay/dev-watch playback speed multiplier. Dev watch accepts `0` as paused.
     SetReplaySpeed { speed: f32 },
     /// Advance a paused dev-watch room by one simulation tick. Ignored outside dev watch.
@@ -120,6 +122,30 @@ pub enum ClientMessage {
     SetReplayVision { vision: ReplayVisionRequest },
     /// Host selects a map by name (lobby phase only; ignored from non-hosts).
     SelectMap { map: String },
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct ClientNetReport {
+    pub schema_version: u8,
+    pub elapsed_ms: u32,
+    pub match_tick: u32,
+    pub rtt_ms: u16,
+    pub rtt_max_ms: u16,
+    pub bad_rtt_samples: u32,
+    pub snapshot_jitter_ms: u16,
+    pub snapshot_gap_max_ms: u16,
+    pub jitter_samples: u32,
+    pub snapshots: u32,
+    pub frame_gap_max_ms: u16,
+    pub fps_estimate: u16,
+    pub hidden: bool,
+    pub focused: bool,
+    pub ws_buffered_bytes: u32,
+    pub server_tick_ms: u16,
+    pub server_lag_ms: u16,
+    pub slow_tick_count: u32,
+    pub head_of_line_count: u32,
 }
 
 /// A gameplay command. Validated when applied, not when received.
@@ -901,6 +927,43 @@ fn notice_severity_code(severity: NoticeSeverity) -> u8 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn client_net_report_deserializes() {
+        let raw = r#"{
+            "t":"netReport",
+            "report":{
+                "schemaVersion":1,
+                "elapsedMs":10000,
+                "matchTick":300,
+                "rttMs":82,
+                "rttMaxMs":240,
+                "badRttSamples":3,
+                "snapshotJitterMs":48,
+                "snapshotGapMaxMs":420,
+                "jitterSamples":12,
+                "snapshots":289,
+                "frameGapMaxMs":37,
+                "fpsEstimate":58,
+                "hidden":false,
+                "focused":true,
+                "wsBufferedBytes":0,
+                "serverTickMs":30,
+                "serverLagMs":1,
+                "slowTickCount":2,
+                "headOfLineCount":7
+            }
+        }"#;
+        let msg: ClientMessage = serde_json::from_str(raw).unwrap();
+        match msg {
+            ClientMessage::NetReport { report } => {
+                assert_eq!(report.schema_version, 1);
+                assert_eq!(report.snapshot_gap_max_ms, 420);
+                assert_eq!(report.head_of_line_count, 7);
+            }
+            other => panic!("expected net report, got {other:?}"),
+        }
+    }
 
     fn representative_snapshot() -> Snapshot {
         let mut worker = EntityView::new(1, 1, kinds::WORKER, 10.0, 20.0, 40, 40, states::GATHER);

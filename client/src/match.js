@@ -27,6 +27,7 @@ import { dom, isTextEntry } from "./bootstrap.js";
 const KAR98K_GAIN = 0.25;
 const MG_BURST_GAIN = 0.7;
 const MATCH_PING_MS = 2000;
+const NET_REPORT_MS = 10000;
 const LATENCY_ISSUE_MS = 180;
 const JITTER_ISSUE_MS = 20;
 const JITTER_WINDOW = 8;
@@ -84,10 +85,14 @@ export class Match {
     this.replayState = null;
     this.giveUpSent = false;
     this.matchPingTimer = undefined;
+    this.netReportTimer = undefined;
     this.lastLatencySampleAt = 0;
     this.snapshotJitterDeltas = [];
     this.lastSnapshotArrivedAt = null;
+    this.lastSnapshotTick = 0;
     this.lastServerNetStatus = null;
+    this.netReportStartedAt = performance.now();
+    this.netReportStats = this.createNetReportStats();
     this.autoPointerLockUntil = 0;
     this.pointerLockPanEnabled = this.readPointerLockPanEnabled();
     this.pointerLockDiagnosticShown = false;
@@ -168,6 +173,7 @@ export class Match {
       const now = performance.now();
       this.noteSnapshotArrival(now);
       this.state.applySnapshot(m);
+      this.lastSnapshotTick = Number.isFinite(m?.tick) ? m.tick : this.lastSnapshotTick;
       this.lastServerNetStatus = m?.netStatus || null;
       this.applyServerNetStatus();
       this.stopInactiveMachineGunSounds();
@@ -214,6 +220,7 @@ export class Match {
 
     this.rafId = requestAnimationFrame(this.tickFn);
     this.startMatchPings();
+    this.startNetReports();
     this.publishStatusBadge();
     this.requestAutomaticPointerLock({ requireGesture: false });
 
@@ -275,9 +282,42 @@ export class Match {
     }
   }
 
+  startNetReports() {
+    this.stopNetReports();
+    this.netReportTimer = window.setInterval(() => this.sendNetReport(), NET_REPORT_MS);
+  }
+
+  stopNetReports() {
+    if (this.netReportTimer !== undefined) {
+      clearInterval(this.netReportTimer);
+      this.netReportTimer = undefined;
+    }
+  }
+
+  createNetReportStats() {
+    return {
+      rttMaxMs: 0,
+      badRttSamples: 0,
+      snapshotGapMaxMs: 0,
+      jitterSamples: 0,
+      snapshots: 0,
+      frameGapMaxMs: 0,
+      frameCount: 0,
+      frameTotalMs: 0,
+    };
+  }
+
+  resetNetReportStats() {
+    this.netReportStartedAt = performance.now();
+    this.netReportStats = this.createNetReportStats();
+  }
+
   noteSnapshotArrival(now) {
+    this.netReportStats.snapshots += 1;
     if (!document.hidden && this.lastSnapshotArrivedAt != null) {
-      const delta = Math.abs((now - this.lastSnapshotArrivedAt) - SNAPSHOT_MS);
+      const gap = now - this.lastSnapshotArrivedAt;
+      this.netReportStats.snapshotGapMaxMs = Math.max(this.netReportStats.snapshotGapMaxMs, gap);
+      const delta = Math.abs(gap - SNAPSHOT_MS);
       this.snapshotJitterDeltas.push(delta);
       if (this.snapshotJitterDeltas.length > JITTER_WINDOW) {
         this.snapshotJitterDeltas.splice(0, this.snapshotJitterDeltas.length - JITTER_WINDOW);
@@ -287,6 +327,7 @@ export class Match {
       this.health.issues.jitter.active = jitterActive;
       if (jitterActive) {
         this.health.issues.jitter.count += 1;
+        this.netReportStats.jitterSamples += 1;
       }
     }
     this.lastSnapshotArrivedAt = now;
@@ -311,7 +352,47 @@ export class Match {
     this.health.issues.latency.active = latencyActive;
     if (latencyActive) {
       this.health.issues.latency.count += 1;
+      this.netReportStats.badRttSamples += 1;
     }
+    if (Number.isFinite(this.net.latency)) {
+      this.netReportStats.rttMaxMs = Math.max(this.netReportStats.rttMaxMs, this.net.latency);
+    }
+  }
+
+  sendNetReport() {
+    const stats = this.netReportStats;
+    const elapsedMs = performance.now() - this.netReportStartedAt;
+    const avgFrameMs = stats.frameCount > 0 ? stats.frameTotalMs / stats.frameCount : 0;
+    const report = {
+      schemaVersion: 1,
+      elapsedMs: clampU32(elapsedMs),
+      matchTick: clampU32(this.lastSnapshotTick),
+      rttMs: clampU16(this.health.latencyMs),
+      rttMaxMs: clampU16(stats.rttMaxMs),
+      badRttSamples: clampU32(stats.badRttSamples),
+      snapshotJitterMs: clampU16(this.health.jitterMs),
+      snapshotGapMaxMs: clampU16(stats.snapshotGapMaxMs),
+      jitterSamples: clampU32(stats.jitterSamples),
+      snapshots: clampU32(stats.snapshots),
+      frameGapMaxMs: clampU16(stats.frameGapMaxMs),
+      fpsEstimate: clampU16(avgFrameMs > 0 ? 1000 / avgFrameMs : 0),
+      hidden: !!document.hidden,
+      focused: typeof document.hasFocus === "function" ? document.hasFocus() : true,
+      wsBufferedBytes: clampU32(this.net.bufferedAmount),
+      serverTickMs: clampU16(this.health.serverTickMs),
+      serverLagMs: clampU16(this.health.serverLagMs),
+      slowTickCount: clampU32(this.health.issues.slowTick.count),
+      headOfLineCount: clampU32(this.health.issues.headOfLine.count),
+    };
+    this.net.netReport(report);
+    this.diagnostics?.count("client.send.netReport", {
+      rttMs: report.rttMs,
+      rttMaxMs: report.rttMaxMs,
+      snapshotGapMaxMs: report.snapshotGapMaxMs,
+      jitterSamples: report.jitterSamples,
+      wsBufferedBytes: report.wsBufferedBytes,
+    });
+    this.resetNetReportStats();
   }
 
   publishStatusBadge() {
@@ -786,7 +867,13 @@ export class Match {
     if (!this.running) return;
 
     const dt = (now - this.lastFrame) / 1000; // seconds since last frame
+    const frameGapMs = now - this.lastFrame;
     this.lastFrame = now;
+    if (Number.isFinite(frameGapMs) && frameGapMs >= 0) {
+      this.netReportStats.frameCount += 1;
+      this.netReportStats.frameTotalMs += frameGapMs;
+      this.netReportStats.frameGapMaxMs = Math.max(this.netReportStats.frameGapMaxMs, frameGapMs);
+    }
     this.refreshLatencyHealth();
 
     const alpha = this.computeAlpha();
@@ -967,8 +1054,10 @@ export class Match {
    * build a fresh Match on the next `start`. Best-effort and idempotent.
    */
   destroy() {
+    this.sendNetReport();
     this.stop();
     this.stopMatchPings();
+    this.stopNetReports();
     this.stopAllMachineGunSounds();
     this.pointerLockRetryToken += 1;
     this.net.off(S.SNAPSHOT, this.onSnapshot);
@@ -1020,4 +1109,16 @@ export class Match {
       }
     }
   }
+}
+
+function clampU16(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n <= 0) return 0;
+  return Math.min(65535, Math.round(n));
+}
+
+function clampU32(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n <= 0) return 0;
+  return Math.min(4294967295, Math.round(n));
 }
