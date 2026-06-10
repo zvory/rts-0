@@ -1,3 +1,5 @@
+lobby system which allows spectating live matches, and joining replay rooms 
+
 small countdown before the game starts
 
 tanks still getting stuck on the sides of buildings!
