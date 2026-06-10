@@ -145,7 +145,7 @@ function drawWorkerBusyIndicator(g, r) {
 function drawMortarTeam(g, r, tint, facing, weaponFacing, setup, recoil) {
   const deploy = clamp01(setup.prongFactor);
   const travelA = facing;
-  const fireA = weaponFacing - Math.PI * 0.22;
+  const fireA = weaponFacing - Math.PI * 0.22 + Math.PI / 4;
   const a = angleLerp(travelA, fireA, smoothstep01(deploy));
   const kick = recoilVector(a, recoil);
   const carriageKick = recoilVector(a, recoil * 0.18);
@@ -168,11 +168,12 @@ function drawMortarTeam(g, r, tint, facing, weaponFacing, setup, recoil) {
   const footSpread = lerp(r * 0.12, r * 0.46, deploy);
   const footForward = lerp(r * 0.52, r * 0.82, deploy);
 
-  g.lineStyle(2, 0xb7b08f, 0.86);
+  g.lineStyle(2, tint, 0.9);
   g.moveTo(tow.x, tow.y);
   g.lineTo(base.x, base.y);
   const footL = offsetPoint(rotatePoint(footForward, -footSpread, a), carriageKick);
   const footR = offsetPoint(rotatePoint(footForward, footSpread, a), carriageKick);
+  g.lineStyle(2, 0x3f5f32, 0.9);
   g.moveTo(bipodRoot.x, bipodRoot.y);
   g.lineTo(footL.x, footL.y);
   g.moveTo(bipodRoot.x, bipodRoot.y);
@@ -181,7 +182,7 @@ function drawMortarTeam(g, r, tint, facing, weaponFacing, setup, recoil) {
   g.beginFill(tint, 0.95);
   drawRotatedRectOffset(g, -r * 0.08, 0, r * 0.58, r * 0.42, a, carriageKick);
   g.endFill();
-  g.beginFill(lightenColor(tint, 0.1), 0.9);
+  g.beginFill(tint, 0.92);
   drawFreeRotatedRect(g, base.x, base.y, r * 0.34, r * 0.5, a);
   g.endFill();
 
