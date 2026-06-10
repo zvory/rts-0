@@ -18,15 +18,19 @@ import {
 } from "./palette.js";
 import {
   angleDelta,
+  angleLerp,
   clamp01,
   dashedLine,
   drawAtGun,
   drawFacingWedge,
+  drawFreeRotatedRect,
+  drawGunTire,
   drawImpassableEdge,
   drawInfantryBase,
   drawInfantryMachineGun,
   drawInfantryRifle,
   drawRotatedRect,
+  drawRotatedRectOffset,
   drawScoutCar,
   drawTankFuelCue,
   drawTankHull,
@@ -35,12 +39,15 @@ import {
   hexToInt,
   isImpassableAt,
   isVehicleBodyKind,
+  lerp,
   lightenColor,
   muzzleFlashRadius,
   normRect,
+  offsetPoint,
   polar,
   recoilVector,
   rectEdgePointTowardCenter,
+  rotatePoint,
   smoothstep01,
   tankBodyVisual,
   terrainColor,
@@ -135,34 +142,61 @@ function drawWorkerBusyIndicator(g, r) {
   g.lineTo(r * 0.55, -r * 1.15);
 }
 
-function drawMortarTeam(g, r, tint, facing, setup, recoil) {
-  const tubeAngle = facing - Math.PI * 0.22;
-  drawInfantryBase(g, r * 0.58, tint, facing + 0.45);
-  const left = polar(facing + Math.PI * 0.9, r * 0.72);
-  const right = polar(facing - Math.PI * 0.9, r * 0.72);
-  g.beginFill(tint);
-  g.drawCircle(left.x, left.y, r * 0.34);
-  g.drawCircle(right.x, right.y, r * 0.34);
+function drawMortarTeam(g, r, tint, facing, weaponFacing, setup, recoil) {
+  const deploy = clamp01(setup.prongFactor);
+  const travelA = facing;
+  const fireA = weaponFacing - Math.PI * 0.22;
+  const a = angleLerp(travelA, fireA, smoothstep01(deploy));
+  const kick = recoilVector(a, recoil);
+  const carriageKick = recoilVector(a, recoil * 0.18);
+  const wheelX = lerp(-r * 0.42, -r * 0.28, deploy);
+  const wheelY = r * 0.52;
+  const tireLength = r * 0.46;
+  const tireWidth = r * 0.26;
+
+  const axleL = offsetPoint(rotatePoint(wheelX, -wheelY, a), carriageKick);
+  const axleR = offsetPoint(rotatePoint(wheelX, wheelY, a), carriageKick);
+  g.lineStyle(3, 0x1a1712, 0.9);
+  g.moveTo(axleL.x, axleL.y);
+  g.lineTo(axleR.x, axleR.y);
+  drawGunTire(g, axleL.x, axleL.y, tireLength, tireWidth, a);
+  drawGunTire(g, axleR.x, axleR.y, tireLength, tireWidth, a);
+
+  const base = offsetPoint(rotatePoint(-r * 0.16, 0, a), carriageKick);
+  const tow = offsetPoint(rotatePoint(lerp(-r * 1.2, -r * 0.72, deploy), 0, a), carriageKick);
+  const bipodRoot = offsetPoint(rotatePoint(r * 0.22, 0, a), carriageKick);
+  const footSpread = lerp(r * 0.16, r * 0.7, deploy);
+  const footForward = lerp(r * 0.72, r * 1.08, deploy);
+
+  g.lineStyle(4, 0xd8d0b0, 0.88);
+  g.moveTo(tow.x, tow.y);
+  g.lineTo(base.x, base.y);
+  const footL = offsetPoint(rotatePoint(footForward, -footSpread, a), carriageKick);
+  const footR = offsetPoint(rotatePoint(footForward, footSpread, a), carriageKick);
+  g.moveTo(bipodRoot.x, bipodRoot.y);
+  g.lineTo(footL.x, footL.y);
+  g.moveTo(bipodRoot.x, bipodRoot.y);
+  g.lineTo(footR.x, footR.y);
+
+  g.beginFill(tint, 0.95);
+  drawRotatedRectOffset(g, -r * 0.08, 0, r * 0.58, r * 0.42, a, carriageKick);
+  g.endFill();
+  g.beginFill(lightenColor(tint, 0.1), 0.9);
+  drawFreeRotatedRect(g, base.x, base.y, r * 0.34, r * 0.5, a);
   g.endFill();
 
-  const base = polar(tubeAngle + Math.PI, r * 0.28);
-  const muzzle = polar(tubeAngle, r * 0.95 - recoil * 0.5);
-  g.lineStyle(7, 0x1b1712, setup.barrel ? 0.98 : 0.45);
-  g.moveTo(base.x, base.y);
+  const tubeRear = offsetPoint(rotatePoint(-r * 0.22, 0, a), kick);
+  const muzzleDist = lerp(r * 1.3, r * 0.92, deploy);
+  const muzzle = offsetPoint(rotatePoint(muzzleDist, 0, a), kick);
+  g.lineStyle(r * 0.34, 0x1b1712, 0.98);
+  g.moveTo(tubeRear.x, tubeRear.y);
   g.lineTo(muzzle.x, muzzle.y);
-  g.lineStyle(3, 0xd8d0b0, 0.9);
-  g.moveTo(base.x, base.y);
-  g.lineTo(muzzle.x, muzzle.y);
-  const bipod = setup.prongFactor ?? 0;
-  if (bipod > 0) {
-    g.lineStyle(2, 0x1b1712, 0.9);
-    const footA = polar(tubeAngle + 0.75, r * (0.65 + 0.35 * bipod));
-    const footB = polar(tubeAngle - 0.75, r * (0.65 + 0.35 * bipod));
-    g.moveTo(0, 0);
-    g.lineTo(footA.x, footA.y);
-    g.moveTo(0, 0);
-    g.lineTo(footB.x, footB.y);
-  }
+  g.lineStyle(r * 0.16, 0xd8d0b0, 0.68);
+  g.moveTo(tubeRear.x + Math.sin(a) * r * 0.08, tubeRear.y - Math.cos(a) * r * 0.08);
+  g.lineTo(muzzle.x + Math.sin(a) * r * 0.08, muzzle.y - Math.cos(a) * r * 0.08);
+  g.beginFill(0x241d17, 0.98);
+  drawFreeRotatedRect(g, muzzle.x, muzzle.y, r * 0.24, r * 0.42, a);
+  g.endFill();
 }
 
 export function _drawUnit(e, colorByOwner, state, pools = {}) {
@@ -181,6 +215,8 @@ export function _drawUnit(e, colorByOwner, state, pools = {}) {
     ? recoilVector(weaponFacing, recoil * 0.85)
     : e.kind === KIND.AT_TEAM
       ? recoilVector(weaponFacing, recoil * 0.42)
+      : e.kind === KIND.MORTAR_TEAM
+        ? recoilVector(weaponFacing, recoil * 0.28)
       : ZERO_OFFSET;
   const vehicleBody = isVehicleBodyKind(e.kind) ? tankBodyVisual(stat) : null;
 
@@ -208,7 +244,7 @@ export function _drawUnit(e, colorByOwner, state, pools = {}) {
   } else if (e.kind === KIND.AT_TEAM) {
     drawAtGun(g, r, tint, facing, weaponFacing, this._deployedWeaponSetupVisual(e), recoil);
   } else if (e.kind === KIND.MORTAR_TEAM) {
-    drawMortarTeam(g, r, tint, facing, this._deployedWeaponSetupVisual(e), recoil);
+    drawMortarTeam(g, r, tint, facing, weaponFacing, this._deployedWeaponSetupVisual(e), recoil);
   } else if (e.kind === KIND.SCOUT_CAR) {
     // Scout cars currently use the tank-like vehicle movement model server-side.
     // Replace with truck/wheeled movement semantics once that model exists.

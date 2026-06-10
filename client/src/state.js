@@ -8,7 +8,7 @@
 
 import { RESOURCE_AMOUNTS } from "./config.js";
 import { CommandComposer } from "./input/command_composer.js";
-import { KIND, PASSABLE, STATE, isBuilding, isResource, isUnit } from "./protocol.js";
+import { ABILITY, KIND, PASSABLE, STATE, isBuilding, isResource, isUnit } from "./protocol.js";
 
 const TWO_PI = Math.PI * 2;
 const SHOT_REVEAL_MS = 1500;
@@ -16,6 +16,7 @@ const WEAPON_RECOIL_MS = Object.freeze({
   [KIND.RIFLEMAN]: 420,
   [KIND.MACHINE_GUNNER]: 160,
   [KIND.AT_TEAM]: 820,
+  [KIND.MORTAR_TEAM]: 520,
   [KIND.SCOUT_CAR]: 160,
   [KIND.TANK]: 650,
 });
@@ -123,8 +124,16 @@ export class GameState {
 
     /** @type {Array<{from:number,to:number,createdAt:number}>} */
     this.muzzleFlashes = [];
+    /** @type {Array<{x:number,y:number,createdAt:number}>} */
+    this.mortarLaunches = [];
+    /** @type {Array<{x:number,y:number,radiusTiles:number,seed:number,createdAt:number}>} */
+    this.mortarImpacts = [];
     /** @type {Map<number, number>} attacker id -> latest shot receive time. */
     this.weaponRecoilById = new Map();
+    /** @type {Map<number, number>} mortar id -> latest seen mortar-fire cooldown. */
+    this.mortarCooldownById = new Map();
+    /** @type {Array<{x:number,y:number,createdAt:number}>} */
+    this.pendingMortarTargets = [];
     /** @type {Map<number, object>} attacker id -> temporary fog reveal entity. */
     this.shotRevealsById = new Map();
   }
@@ -193,6 +202,7 @@ export class GameState {
     this._curRecvTime = now;
     this._curById = new Map();
     for (const e of entities) this._curById.set(e.id, e);
+    this._applyMortarLaunches(now);
     for (const id of this.weaponRecoilById.keys()) {
       if (!this._curById.has(id)) this.weaponRecoilById.delete(id);
     }
@@ -223,7 +233,7 @@ export class GameState {
       } else if (ev && ev.e === "smokeLaunch") {
         this.addSmokeCanister(ev, now);
       } else if (ev && ev.e === "mortarImpact") {
-        this.addCommandFeedback("mortar", ev.x, ev.y, false, ev.radiusTiles);
+        this.addMortarImpact(ev, now);
       }
     }
     if (this.muzzleFlashes.length > 256) {
@@ -232,6 +242,49 @@ export class GameState {
     if (this.smokeCanisters.length > 64) {
       this.smokeCanisters.splice(0, this.smokeCanisters.length - 64);
     }
+    if (this.mortarLaunches.length > 32) {
+      this.mortarLaunches.splice(0, this.mortarLaunches.length - 32);
+    }
+    if (this.mortarImpacts.length > 32) {
+      this.mortarImpacts.splice(0, this.mortarImpacts.length - 32);
+    }
+  }
+
+  _applyMortarLaunches(now) {
+    const liveMortars = new Set();
+    for (const e of this._curById.values()) {
+      if (e.kind !== KIND.MORTAR_TEAM) continue;
+      liveMortars.add(e.id);
+      const cooldown = mortarFireCooldownLeft(e);
+      const prevCooldown = this.mortarCooldownById.get(e.id) || 0;
+      if (cooldown > 0 && (prevCooldown <= 0 || cooldown > prevCooldown + 2)) {
+        this.mortarLaunches.push({ x: e.x, y: e.y, createdAt: now });
+        this.weaponRecoilById.set(e.id, now);
+      }
+      if (cooldown > 0) this.mortarCooldownById.set(e.id, cooldown);
+      else this.mortarCooldownById.delete(e.id);
+    }
+    for (const id of [...this.mortarCooldownById.keys()]) {
+      if (!liveMortars.has(id)) this.mortarCooldownById.delete(id);
+    }
+  }
+
+  addMortarImpact(ev, now = performance.now()) {
+    if (!Number.isFinite(ev.x) || !Number.isFinite(ev.y)) return;
+    const pendingIndex = this.pendingMortarTargets.findIndex(
+      (p) => now - p.createdAt <= 700 && Math.hypot(p.x - ev.x, p.y - ev.y) <= 2,
+    );
+    if (pendingIndex >= 0) {
+      this.pendingMortarTargets.splice(pendingIndex, 1);
+      return;
+    }
+    this.mortarImpacts.push({
+      x: ev.x,
+      y: ev.y,
+      radiusTiles: Number.isFinite(ev.radiusTiles) ? ev.radiusTiles : 1.5,
+      seed: Math.floor(ev.x * 13 + ev.y * 7 + now) >>> 0,
+      createdAt: now,
+    });
   }
 
   addSmokeCanister(ev, now = performance.now()) {
@@ -264,6 +317,28 @@ export class GameState {
   liveSmokeCanisters(now) {
     this.smokeCanisters = this.smokeCanisters.filter((f) => now - f.createdAt <= f.durationMs);
     return this.smokeCanisters;
+  }
+
+  /**
+   * Return live mortar launch dust puffs, pruning expired ones.
+   * @param {number} now
+   * @returns {Array<{x:number,y:number,createdAt:number}>}
+   */
+  liveMortarLaunches(now) {
+    const ttlMs = 360;
+    this.mortarLaunches = this.mortarLaunches.filter((f) => now - f.createdAt <= ttlMs);
+    return this.mortarLaunches;
+  }
+
+  /**
+   * Return live mortar impact explosions, pruning expired ones.
+   * @param {number} now
+   * @returns {Array<{x:number,y:number,radiusTiles:number,seed:number,createdAt:number}>}
+   */
+  liveMortarImpacts(now) {
+    const ttlMs = 500;
+    this.mortarImpacts = this.mortarImpacts.filter((f) => now - f.createdAt <= ttlMs);
+    return this.mortarImpacts;
   }
 
   /**
@@ -738,6 +813,12 @@ export class GameState {
    * @param {boolean=} append
    */
   addCommandFeedback(kind, x, y, append = false, radiusTiles = null) {
+    if (kind === "mortar" && Number.isFinite(x) && Number.isFinite(y)) {
+      this.pendingMortarTargets.push({ x, y, createdAt: performance.now() });
+      this.pendingMortarTargets = this.pendingMortarTargets.filter(
+        (p) => performance.now() - p.createdAt <= 700,
+      );
+    }
     this.commandFeedback.push({
       kind,
       x,
@@ -837,4 +918,10 @@ function recoilCurve(t) {
   }
   const settle = (progress - 0.18) / 0.82;
   return Math.cos(settle * Math.PI * 0.5) * 0.88;
+}
+
+function mortarFireCooldownLeft(e) {
+  if (!Array.isArray(e.abilities)) return 0;
+  const rec = e.abilities.find((a) => a && a.ability === ABILITY.MORTAR_FIRE);
+  return rec && Number.isFinite(rec.cooldownLeft) ? rec.cooldownLeft : 0;
 }
