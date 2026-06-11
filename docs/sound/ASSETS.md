@@ -1,6 +1,8 @@
 # Sound Assets
 
 See `SOUND_NOTES.md` for full review notes, rejection reasons, and source tracking policy.
+See `COMBAT_EXAMPLES.md` for the downloaded CC0 mortar, artillery, tank-hit, and AT-hit example
+sets and their source links.
 
 ## Format
 
