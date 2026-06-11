@@ -1500,10 +1500,25 @@ function fakeAudioContext() {
       dataset: {},
       disabled: false,
       innerHTML: "",
-      style: {},
+      style: {
+        values: {},
+        setProperty(name, value) {
+          this.values[name] = value;
+        },
+      },
       appendChild(child) {
         if (child?.nodeType === "fragment") this.children.push(...child.children);
         else this.children.push(child);
+      },
+      querySelector(selector) {
+        const abilityMatch = selector.match(/^button\[data-ability="([^"]+)"\]$/);
+        if (abilityMatch) {
+          return this.children.find((child) => child.dataset?.ability === abilityMatch[1]) || null;
+        }
+        return null;
+      },
+      querySelectorAll() {
+        return [];
       },
       addEventListener(type, listener) {
         listeners.set(type, listener);
@@ -1587,6 +1602,48 @@ function fakeAudioContext() {
         sent[0].building === 77 &&
         sent[0].upgrade === UPGRADE.METHAMPHETAMINES,
       "Clicking Methamphetamines should send a research command",
+    );
+
+    const mortarButtonsBefore = renderedButtons.length;
+    const selectedMortar = {
+      id: 501,
+      owner: playerId,
+      kind: KIND.MORTAR_TEAM,
+      abilities: [{
+        ability: ABILITY.MORTAR_FIRE,
+        cooldownLeft: 30,
+        autocastEnabled: true,
+      }],
+    };
+    const mortarHud = Object.create(HUD.prototype);
+    mortarHud.state = {
+      playerId,
+      resources: { steel: 100, oil: 100 },
+      commandTarget: null,
+      selectedEntities: () => [selectedMortar],
+      entitiesInterpolated: () => [selectedMortar],
+      beginCommandTarget(target) {
+        this.commandTarget = target;
+      },
+      endCommandTarget() {
+        this.commandTarget = null;
+      },
+    };
+    mortarHud.net = { command: (command) => sent.push(command) };
+    mortarHud.audio = null;
+    mortarHud._cardSig = null;
+    mortarHud.elCommand = fakeElement("div");
+    mortarHud._renderUnitCard(mortarHud.elCommand, [selectedMortar]);
+    const mortarButtonCount = renderedButtons.length;
+    assert(
+      mortarButtonCount > mortarButtonsBefore,
+      "selected Mortar Team should render an ability command button",
+    );
+    selectedMortar.abilities[0].cooldownLeft = 29;
+    mortarHud._renderUnitCard(mortarHud.elCommand, [selectedMortar]);
+    assert(
+      renderedButtons.length === mortarButtonCount,
+      "Mortar Fire cooldown ticks should update in place without rebuilding the command button",
     );
 
     globalThis.document.getElementById = (id) => {
