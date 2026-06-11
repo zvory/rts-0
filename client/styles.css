@@ -68,9 +68,6 @@ body {
   color: var(--ink);
   font-family: var(--font);
   font-size: 14px;
-  -webkit-font-smoothing: none;
-  text-rendering: geometricPrecision;
-  image-rendering: pixelated;
 }
 
 #app {
