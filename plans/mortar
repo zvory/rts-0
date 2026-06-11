@@ -12,7 +12,13 @@ Requested changes:
 - Autocast mortars should avoid firing at target points where friendly units or buildings would be
   damaged, assuming friendly units hold their current positions.
 - Dust cloud animation should be doubled in size, thicker, and last twice as long.
+- Change the mortar explosion color from orangered to orangeyellow.
 - Mortar wheels should be slightly thinner, less circular, and more pill shaped.
+- Mortar legs should use the owning player's team color.
+- Selected Mortar Teams should display their firing range as a dotted line.
+- When Mortar Teams have autocast enabled, the Fire hotkey on the command card should show a
+  swirling autocast animation.
+- Right-clicking the Mortar Team Fire command-card button should disable autocast.
 - Attack preview red dotted lines and crosshair should use a darker hue.
 - Mortar attack previews should remain visible until the mortar round hits.
 - Multi-selected mortars should support holding `X` / fire hotkey and clicking repeatedly to fire
@@ -75,19 +81,45 @@ Client rendering:
 - Double the mortar impact dust cloud size.
 - Make the dust thicker/more opaque or denser.
 - Make the dust animation last twice as long.
+- Shift the mortar explosion palette from orangered toward a clearer orange-yellow blast.
 - Adjust mortar wheels to be slightly thinner.
 - Make wheels less circular and more pill shaped.
+- Team-color the mortar legs so the deployed weapon reads as belonging to the owning player.
 
 Checks:
 - Mortar impacts remain readable at normal zoom.
 - Larger/longer dust does not obscure too much battlefield state.
 - Mortar art remains visually distinct from AT guns and machine gunners.
+- Team-colored legs remain visible against terrain and do not make the mortar body unreadable.
 
 Patch notes:
-- Mortar impacts have larger, thicker, longer-lasting dust clouds.
-- Mortar wheels have a slimmer pill-shaped profile.
+- Mortar impacts have larger, thicker, longer-lasting dust clouds with a more orange-yellow blast.
+- Mortar wheels have a slimmer pill-shaped profile, and mortar legs now use team color.
 
-## Phase 4 - Repeated Hotkey Targeting For Mortars And Scout Cars
+## Phase 4 - Mortar Range And Autocast Command Affordances
+
+Client UI behavior:
+- Draw a dotted firing-range circle for each selected owned Mortar Team, using the same range value
+  as the mortar fire command preview.
+- Show a swirling autocast animation on the Mortar Team Fire command-card button while autocast is
+  enabled.
+- Add command-card right-click handling for the Mortar Team Fire button that disables autocast for
+  the selected Mortar Teams.
+- If autocast state is not already represented on the wire when this phase is implemented, add the
+  smallest server/protocol/client extension needed to expose and toggle it.
+
+Tests/checks:
+- Selecting one or more Mortar Teams shows dotted range circles centered on each selected mortar.
+- Range circles disappear when mortars are deselected or when a non-mortar selection replaces them.
+- The Fire button's autocast swirl is visible only while autocast is enabled.
+- Right-clicking the Fire button disables autocast for the selected mortars without arming manual
+  targeting.
+
+Patch notes:
+- Selected Mortar Teams now show their firing range.
+- Mortar autocast has a visible command-card state and can be disabled from the Fire button.
+
+## Phase 5 - Repeated Hotkey Targeting For Mortars And Scout Cars
 
 Client input behavior:
 - When multiple mortars are selected and the player holds `X` or the fire hotkey, repeated clicks
@@ -110,14 +142,17 @@ Patch notes:
 - Holding the fire hotkey now supports repeated point targeting for selected Mortars and Scout
   Cars without losing selection.
 
-## Phase 5 - Design Documentation
+## Phase 6 - Design Documentation
 
 Update docs after behavior is implemented:
 - `docs/design/server-sim.md`: mortar friendly-fire behavior, autocast safety assumptions, and any
   command/autocast rules that belong in the sim contract.
 - `docs/design/client-ui.md`: shell projectile, longer warning preview, darker preview color,
-  dust cloud animation, wheel art adjustment, and repeated hotkey targeting behavior.
-- `docs/design/protocol.md`: only if mortar launch/preview/projectile data requires a wire change.
+  dust cloud animation, orange-yellow impact color, wheel/leg art adjustment, selected range
+  display, autocast command-card animation, right-click autocast toggle, and repeated hotkey
+  targeting behavior.
+- `docs/design/protocol.md`: only if mortar launch/preview/projectile data or autocast toggle state
+  requires a wire change.
 - Refresh relevant `docs/context/*.md` section pointers only if design document structure shifts.
 
 ## Suggested Implementation Order
@@ -125,8 +160,9 @@ Update docs after behavior is implemented:
 1. Friendly fire and autocast safety.
 2. Projectile/preview lifetime, including protocol only if required.
 3. Dust and mortar art polish.
-4. Repeated hotkey targeting for mortars and scout cars.
-5. Design docs and final verification.
+4. Selected range display and autocast command affordances.
+5. Repeated hotkey targeting for mortars and scout cars.
+6. Design docs and final verification.
 
 ## Final Verification
 
