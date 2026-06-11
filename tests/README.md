@@ -37,6 +37,11 @@ under `/tmp/rts-cargo-target/`. This keeps final binaries, test harnesses, and s
 artifacts branch-local while keeping the checkout clean. Override with
 `CARGO_TARGET_DIR=/path/to/target` when you need a specific target location.
 
+Installed repo hooks run `scripts/cleanup-worktrees.sh --auto` after commits and merges on `main`.
+Auto cleanup removes only clean `zvorygin/*` worktrees whose branch is already contained in local
+`main`, their matching target dirs, and a small bounded number of old target dirs that do not map to
+any active worktree. Use `scripts/cleanup-worktrees.sh --dry-run` to inspect what would be removed.
+
 We tested `sccache` as the cross-worktree Rust reuse layer and do not enable it automatically.
 It cached Rust outputs when rebuilding the same target directory path, but produced 0% Rust cache
 hits across different per-worktree target directories because Cargo passes target-dir-specific

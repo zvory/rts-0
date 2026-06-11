@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# Opportunistically clean merged worktrees after successful merges on main.
+set -euo pipefail
+
+repo_root="$(git rev-parse --show-toplevel)"
+"$repo_root/scripts/cleanup-worktrees.sh" --auto || {
+  echo "post-merge: worktree cleanup skipped after an error" >&2
+}
