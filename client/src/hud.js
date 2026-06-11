@@ -113,6 +113,12 @@ export class HUD {
     this.elSteel = rootEl.querySelector("#res-steel");
     this.elOil = rootEl.querySelector("#res-oil");
     this.elSupply = rootEl.querySelector("#res-supply");
+    // Cache the initial top-bar resource icon markup so command-card hovers and
+    // replay rows stay in sync with the shared HUD icons.
+    this._resourceIcons = this._readResourceIconHtml();
+    if (this.elHud && (!this.elSteel || !this.elOil || !this.elSupply)) {
+      this._restoreSinglePlayerResourceShell();
+    }
 
     // Selected-units panel + command card containers.
     this.elSelected = rootEl.querySelector("#selected-panel");
@@ -131,9 +137,6 @@ export class HUD {
     this._resSig = null;
     // Signature for the inert control-group tabs.
     this._controlGroupSig = null;
-    // Cache the initial top-bar resource icon markup so command-card hovers and
-    // replay rows stay in sync with the shared HUD icons.
-    this._resourceIcons = this._readResourceIconHtml();
   }
 
   /**
@@ -180,16 +183,8 @@ export class HUD {
   _renderSinglePlayerResources() {
     const r = this.state.resources || { steel: 0, oil: 0, supplyUsed: 0, supplyCap: 0 };
     // Restore static HUD content if we previously switched to multi-player mode.
-    if (this._resSig && this._resSig.startsWith("multi:")) {
-      if (this.elHud) {
-        this.elHud.innerHTML =
-          `<div class="res">${this._resourceIcon("steel")}<span id="res-steel">0</span></div>` +
-          `<div class="res">${this._resourceIcon("oil")}<span id="res-oil">0</span></div>` +
-          `<div class="res">${this._resourceIcon("supply")}<span id="res-supply">0 / 0</span></div>`;
-        this.elSteel = this.elHud.querySelector("#res-steel");
-        this.elOil = this.elHud.querySelector("#res-oil");
-        this.elSupply = this.elHud.querySelector("#res-supply");
-      }
+    if ((this._resSig && this._resSig.startsWith("multi:")) || !this.elSteel || !this.elOil || !this.elSupply) {
+      this._restoreSinglePlayerResourceShell();
       this._resSig = null;
     }
     if (this.elSteel) this.elSteel.textContent = String(r.steel ?? 0);
@@ -201,6 +196,17 @@ export class HUD {
       // Flag over-cap (blocked production) so styles.css can color it.
       this.elSupply.classList.toggle("supply-capped", cap > 0 && used >= cap);
     }
+  }
+
+  _restoreSinglePlayerResourceShell() {
+    if (!this.elHud) return;
+    this.elHud.innerHTML =
+      `<div class="res">${this._resourceIcon("steel")}<span id="res-steel">0</span></div>` +
+      `<div class="res">${this._resourceIcon("oil")}<span id="res-oil">0</span></div>` +
+      `<div class="res">${this._resourceIcon("supply")}<span id="res-supply">0 / 0</span></div>`;
+    this.elSteel = this.elHud.querySelector("#res-steel");
+    this.elOil = this.elHud.querySelector("#res-oil");
+    this.elSupply = this.elHud.querySelector("#res-supply");
   }
 
   /** Render one resource row per player, with a color-coded dot identifying each player. */
@@ -1499,7 +1505,7 @@ export class HUD {
   }
 
   _resourceIcon(kind) {
-    return this._resourceIcons[kind] ||
+    return this._resourceIcons?.[kind] ||
       `<span class="res-icon ${kind}">${RESOURCE_ICON_FALLBACKS[kind] || ""}</span>`;
   }
 }

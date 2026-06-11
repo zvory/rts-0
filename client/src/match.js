@@ -152,10 +152,11 @@ export class Match {
     // Draw the static terrain once into the renderer's cached layer.
     this._timeInit("match.staticMap", () => this.renderer.buildStaticMap(this.state.map));
 
-    // Size the camera to the map and the current viewport, then center on home.
+    // Size the camera to the map and the current viewport, then restore a carried view or center on home.
     this._timeInit("match.bounds", () => {
       this.applyBounds();
-      this.centerOnHome();
+      if (options.initialCamera) this.camera.setView(options.initialCamera);
+      else this.centerOnHome();
     });
 
     // --- Render loop state. ---
@@ -604,6 +605,14 @@ export class Match {
     const h = dom.viewport.clientHeight;
     this.renderer.resize(w, h);
     this.applyBounds();
+  }
+
+  cameraView() {
+    return {
+      x: this.camera?.x,
+      y: this.camera?.y,
+      zoom: this.camera?.zoom,
+    };
   }
 
   /**
