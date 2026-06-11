@@ -1286,6 +1286,7 @@ fn mortar_turns_before_auto_firing() {
         mortar.set_facing(0.0);
         mortar.set_weapon_facing(0.0);
         mortar.set_weapon_setup(WeaponSetup::Deployed);
+        mortar.set_autocast_enabled(AbilityKind::MortarFire, true);
     }
 
     run_combat_tick(&mut entities);
@@ -1344,6 +1345,7 @@ fn mortar_autocast_skips_shot_that_would_hit_owned_unit() {
         mortar.set_facing(0.0);
         mortar.set_weapon_facing(0.0);
         mortar.set_weapon_setup(WeaponSetup::Deployed);
+        mortar.set_autocast_enabled(AbilityKind::MortarFire, true);
     }
 
     run_combat_tick(&mut entities);
@@ -1373,6 +1375,7 @@ fn mortar_autocast_skips_shot_that_would_hit_owned_building() {
         mortar.set_facing(0.0);
         mortar.set_weapon_facing(0.0);
         mortar.set_weapon_setup(WeaponSetup::Deployed);
+        mortar.set_autocast_enabled(AbilityKind::MortarFire, true);
     }
 
     run_combat_tick(&mut entities);
@@ -1398,6 +1401,7 @@ fn mortar_autocast_fires_when_predicted_impact_is_clear_of_owned_entities() {
         mortar.set_facing(0.0);
         mortar.set_weapon_facing(0.0);
         mortar.set_weapon_setup(WeaponSetup::Deployed);
+        mortar.set_autocast_enabled(AbilityKind::MortarFire, true);
     }
 
     run_combat_tick(&mut entities);
@@ -1429,6 +1433,7 @@ fn mortar_autocast_fires_over_blocking_terrain_with_spotter_vision() {
         mortar.set_facing(0.0);
         mortar.set_weapon_facing(0.0);
         mortar.set_weapon_setup(WeaponSetup::Deployed);
+        mortar.set_autocast_enabled(AbilityKind::MortarFire, true);
     }
 
     run_combat_tick_on_map(
@@ -1460,6 +1465,7 @@ fn mortar_autocast_does_not_fire_at_hidden_target_behind_blocking_terrain() {
         mortar.set_facing(0.0);
         mortar.set_weapon_facing(0.0);
         mortar.set_weapon_setup(WeaponSetup::Deployed);
+        mortar.set_autocast_enabled(AbilityKind::MortarFire, true);
     }
 
     run_combat_tick_on_map(
@@ -1489,7 +1495,6 @@ fn mortar_autocast_disabled_holds_fire_without_blocking_manual_state() {
         mortar.set_facing(0.0);
         mortar.set_weapon_facing(0.0);
         mortar.set_weapon_setup(WeaponSetup::Deployed);
-        mortar.set_autocast_enabled(AbilityKind::MortarFire, false);
     }
 
     run_combat_tick(&mut entities);
@@ -1498,7 +1503,7 @@ fn mortar_autocast_disabled_holds_fire_without_blocking_manual_state() {
     assert_eq!(
         mortar.autocast_enabled(AbilityKind::MortarFire),
         Some(false),
-        "autocast toggle should remain disabled"
+        "mortar autocast should default to disabled"
     );
     assert_eq!(
         mortar.attack_cd(),

@@ -689,6 +689,58 @@ fn manual_mortar_fire_impacts_without_toast_notice() {
 }
 
 #[test]
+fn set_autocast_command_enables_mortar_autocast_from_default_off() {
+    let players = [
+        PlayerInit {
+            id: 1,
+            name: "One".into(),
+            color: "#fff".into(),
+            is_ai: false,
+        },
+        PlayerInit {
+            id: 2,
+            name: "Two".into(),
+            color: "#000".into(),
+            is_ai: false,
+        },
+    ];
+    let mut game = empty_flat_game(&players);
+    let mortar_pos = game.map.tile_center(8, 8);
+    let mortar = game
+        .entities
+        .spawn_unit(1, EntityKind::MortarTeam, mortar_pos.0, mortar_pos.1)
+        .expect("mortar should spawn");
+
+    assert_eq!(
+        game.entities
+            .get(mortar)
+            .expect("mortar should exist")
+            .autocast_enabled(ability::AbilityKind::MortarFire),
+        Some(false),
+        "mortar autocast should start disabled"
+    );
+
+    game.enqueue(
+        1,
+        Command::SetAutocast {
+            ability: ability::AbilityKind::MortarFire,
+            units: vec![mortar],
+            enabled: true,
+        },
+    );
+    game.tick();
+
+    assert_eq!(
+        game.entities
+            .get(mortar)
+            .expect("mortar should exist")
+            .autocast_enabled(ability::AbilityKind::MortarFire),
+        Some(true),
+        "setAutocast should enable mortar autofire"
+    );
+}
+
+#[test]
 fn hidden_mortar_launch_is_not_sent_but_impact_reveals_attacker_to_victim() {
     let players = [
         PlayerInit {
