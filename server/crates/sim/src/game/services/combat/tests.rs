@@ -1328,6 +1328,88 @@ fn mortar_turns_before_auto_firing() {
 }
 
 #[test]
+fn mortar_autocast_skips_shot_that_would_hit_owned_unit() {
+    let mut entities = EntityStore::new();
+    let mortar_id = entities
+        .spawn_unit(1, EntityKind::MortarTeam, 100.0, 100.0)
+        .expect("mortar should spawn");
+    let enemy_id = entities
+        .spawn_unit(2, EntityKind::Rifleman, 220.0, 100.0)
+        .expect("enemy should spawn");
+    let (impact_x, impact_y) = mortar_aim_point(&entities, enemy_id, 10);
+    entities
+        .spawn_unit(1, EntityKind::Rifleman, impact_x, impact_y + 24.0)
+        .expect("friendly should spawn");
+    if let Some(mortar) = entities.get_mut(mortar_id) {
+        mortar.set_facing(0.0);
+        mortar.set_weapon_facing(0.0);
+        mortar.set_weapon_setup(WeaponSetup::Deployed);
+    }
+
+    run_combat_tick(&mut entities);
+
+    let mortar = entities.get(mortar_id).expect("mortar should exist");
+    assert_eq!(
+        mortar.attack_cd(),
+        0,
+        "autocast mortar should hold fire when the predicted impact would hit an owned unit"
+    );
+}
+
+#[test]
+fn mortar_autocast_skips_shot_that_would_hit_owned_building() {
+    let mut entities = EntityStore::new();
+    let mortar_id = entities
+        .spawn_unit(1, EntityKind::MortarTeam, 100.0, 100.0)
+        .expect("mortar should spawn");
+    let enemy_id = entities
+        .spawn_unit(2, EntityKind::Rifleman, 220.0, 100.0)
+        .expect("enemy should spawn");
+    let (impact_x, impact_y) = mortar_aim_point(&entities, enemy_id, 10);
+    entities
+        .spawn_building(1, EntityKind::Depot, impact_x, impact_y + 40.0, true)
+        .expect("depot should spawn");
+    if let Some(mortar) = entities.get_mut(mortar_id) {
+        mortar.set_facing(0.0);
+        mortar.set_weapon_facing(0.0);
+        mortar.set_weapon_setup(WeaponSetup::Deployed);
+    }
+
+    run_combat_tick(&mut entities);
+
+    let mortar = entities.get(mortar_id).expect("mortar should exist");
+    assert_eq!(
+        mortar.attack_cd(),
+        0,
+        "autocast mortar should hold fire when the predicted impact would hit an owned building"
+    );
+}
+
+#[test]
+fn mortar_autocast_fires_when_predicted_impact_is_clear_of_owned_entities() {
+    let mut entities = EntityStore::new();
+    let mortar_id = entities
+        .spawn_unit(1, EntityKind::MortarTeam, 100.0, 100.0)
+        .expect("mortar should spawn");
+    entities
+        .spawn_unit(2, EntityKind::Rifleman, 220.0, 100.0)
+        .expect("enemy should spawn");
+    if let Some(mortar) = entities.get_mut(mortar_id) {
+        mortar.set_facing(0.0);
+        mortar.set_weapon_facing(0.0);
+        mortar.set_weapon_setup(WeaponSetup::Deployed);
+    }
+
+    run_combat_tick(&mut entities);
+
+    let mortar = entities.get(mortar_id).expect("mortar should exist");
+    assert!(
+        mortar.attack_cd() > 0,
+        "autocast mortar should fire when no owned entity is inside the predicted impact"
+    );
+}
+
+#[test]
 fn deployed_at_team_clamps_to_field_edge_and_does_not_fire_outside_arc() {
     let mut entities = EntityStore::new();
     let at_id = entities

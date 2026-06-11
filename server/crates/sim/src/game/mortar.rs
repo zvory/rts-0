@@ -76,8 +76,7 @@ fn rotate_toward(current: f32, desired: f32, max_delta: f32) -> f32 {
 }
 
 fn angle_delta(from: f32, to: f32) -> f32 {
-    (to - from + std::f32::consts::PI).rem_euclid(std::f32::consts::TAU)
-        - std::f32::consts::PI
+    (to - from + std::f32::consts::PI).rem_euclid(std::f32::consts::TAU) - std::f32::consts::PI
 }
 
 impl MortarShellStore {
@@ -139,7 +138,7 @@ fn resolve_shell(
         let Some(target) = entities.get(id) else {
             continue;
         };
-        if target.owner == shell.owner || target.owner == 0 || target.hp == 0 || target.is_node() {
+        if target.owner == 0 || target.hp == 0 || target.is_node() {
             continue;
         }
         let d2 = dist2(shell.x, shell.y, target.pos_x, target.pos_y);
