@@ -148,18 +148,19 @@ Patch notes:
 - [x] Holding the fire hotkey now supports repeated point targeting for selected Mortars and Scout
   Cars without losing selection.
 
-## Phase 6 - Design Documentation
+## Phase 6 - Design Documentation - Done
 
 Update docs after behavior is implemented:
-- `docs/design/server-sim.md`: mortar friendly-fire behavior, autocast safety assumptions, and any
-  command/autocast rules that belong in the sim contract.
-- `docs/design/client-ui.md`: shell projectile, longer warning preview, darker preview color,
+- [x] `docs/design/server-sim.md`: mortar friendly-fire behavior, autocast safety assumptions, and
+  command/autocast rules that belong in the sim contract are documented.
+- [x] `docs/design/client-ui.md`: shell projectile, longer warning preview, darker preview color,
   dust cloud animation, orange-yellow impact color, wheel/leg art adjustment, selected range
   display, autocast command-card animation, right-click autocast toggle, and repeated hotkey
-  targeting behavior.
-- `docs/design/protocol.md`: only if mortar launch/preview/projectile data or autocast toggle state
-  requires a wire change.
-- Refresh relevant `docs/context/*.md` section pointers only if design document structure shifts.
+  targeting behavior are documented.
+- [x] `docs/design/protocol.md`: wire-visible mortar launch/impact payloads and autocast state are
+  documented.
+- [x] Relevant `docs/context/*.md` section pointers did not need refresh because document structure
+  did not shift.
 
 ## Suggested Implementation Order
 

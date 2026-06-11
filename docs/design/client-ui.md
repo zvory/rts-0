@@ -247,6 +247,9 @@ the input module enters targeted cursor mode:
 - Left-click: build a `useAbility` command with the ability name, filtered carrier ids, world
   coords, and the `queued` flag (from Shift). Clear cursor mode unless the physical command hotkey
   is still held for repeated Mortar Team Fire (`X`) or Scout Car Smoke (`D`) targeting.
+- While the physical hotkey remains held, repeated left-clicks keep the current selection intact and
+  keep targeted mode armed so multi-selected Mortar Teams and Scout Cars can distribute repeated
+  point commands without the next click falling back to normal selection.
 - Right-click / Escape: cancel cursor mode, `state.commandTarget = null`.
 - Minimap right-click also fires an ability command if in targeted mode.
 Selected owned Mortar Teams also draw dotted firing-range circles even when the Fire command is not
