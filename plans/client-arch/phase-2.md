@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Pending implementation.
+- [x] Implemented.
 
 ## Objective
 
@@ -29,11 +29,11 @@ neutral module instead of under `input/`.
 
 Mark each segment complete as it lands:
 
-- [ ] Move `command_composer.js` to the neutral client path without changing its public API.
-- [ ] Update all client, test, and docs imports or path references.
-- [ ] Remove the old architecture-checker allowlist entry if Phase 1 has landed.
-- [ ] Run command-targeting, minimap, and context-menu contract tests.
-- [ ] Run client smoke when practical and record any skipped verification with a reason.
+- [x] Move `command_composer.js` to the neutral client path without changing its public API.
+- [x] Update all client, test, and docs imports or path references.
+- [x] Remove the old architecture-checker allowlist entry if Phase 1 has landed.
+- [x] Run command-targeting, minimap, and context-menu contract tests.
+- [x] Run client smoke when practical and record any skipped verification with a reason.
 
 ## Verification
 

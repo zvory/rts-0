@@ -56,7 +56,7 @@ import {
   msg,
 } from "../client/src/protocol.js";
 import { Input, footprintValidAgainstEntities } from "../client/src/input/index.js";
-import { CommandComposer } from "../client/src/input/command_composer.js";
+import { CommandComposer } from "../client/src/command_composer.js";
 import { _controlGroupSaveModifierActive } from "../client/src/input/control_groups.js";
 import { ReplayCameraInput } from "../client/src/replay_camera_input.js";
 import {

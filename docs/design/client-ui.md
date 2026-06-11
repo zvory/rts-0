@@ -160,7 +160,7 @@ snapshot's owner-only `orderPlan` for accepted markers. Production-building-only
 or append building rally stages and rely on owner-only `rallyPlan` for accepted markers. Attack
 targeting with only production buildings selected creates `attackMove` rally stages.
 
-`input/command_composer.js` owns command-target arming lifetime for command-card targets. Input and
+`command_composer.js` owns command-target arming lifetime for command-card targets. Input and
 minimap clicks call `GameState.issueCommandTarget`, so held keys, Shift preservation, and repeated
 queued target clicks use one composer path instead of command-specific sticky flags. A plain
 targeted-order hotkey tap arms the target after keyup; pressing the same targeted-order hotkey again

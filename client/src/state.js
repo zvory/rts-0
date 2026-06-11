@@ -7,7 +7,7 @@
 // server never sees them directly (only the resulting commands).
 
 import { RESOURCE_AMOUNTS } from "./config.js";
-import { CommandComposer } from "./input/command_composer.js";
+import { CommandComposer } from "./command_composer.js";
 import { KIND, PASSABLE, STATE, isBuilding, isResource, isUnit } from "./protocol.js";
 
 const TWO_PI = Math.PI * 2;
