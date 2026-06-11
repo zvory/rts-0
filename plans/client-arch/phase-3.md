@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Pending implementation.
+- [x] Implemented.
 
 ## Objective
 
@@ -37,11 +37,11 @@ Move network-health bookkeeping out of `Match` into a small, non-visual collabor
 
 Mark each segment complete as it lands:
 
-- [ ] Add `MatchHealth` with the agreed constructor and public methods.
-- [ ] Move latency, jitter, server-status, and issue-state bookkeeping out of `Match`.
-- [ ] Keep `StatusBadge` and visible status payload shape unchanged.
-- [ ] Add focused dependency-free tests for the health thresholds and payloads.
-- [ ] Run verification and record whether client smoke was run or skipped.
+- [x] Add `MatchHealth` with the agreed constructor and public methods.
+- [x] Move latency, jitter, server-status, and issue-state bookkeeping out of `Match`.
+- [x] Keep `StatusBadge` and visible status payload shape unchanged.
+- [x] Add focused dependency-free tests for the health thresholds and payloads.
+- [x] Run verification and record whether client smoke was run or skipped.
 
 ## Verification
 
@@ -49,6 +49,14 @@ Mark each segment complete as it lands:
 - `node scripts/check-client-architecture.mjs` if Phase 1 has landed
 - `node tests/select-suites.mjs client/src/match.js client/src/match_health.js`
 - Client smoke when practical.
+
+Completed verification:
+
+- `node tests/client_contracts.mjs` - passed.
+- `node scripts/check-client-architecture.mjs` - passed.
+- `node tests/select-suites.mjs client/src/match.js client/src/match_health.js` - selected
+  `client-architecture`, `js-protocol-contracts`, `node-minimap-input-contracts`, `client-smoke`.
+- `tests/run-all.sh --no-rust` - passed, including client smoke.
 
 ## Manual Test Prompt
 

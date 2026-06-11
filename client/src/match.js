@@ -11,6 +11,7 @@ import { Input } from "./input/index.js";
 import { automaticPointerLockDisabledForTests, shouldRequestPointerLock } from "./input/cursor_lock.js";
 import { DomClickInputZone, MatchInputRouter } from "./input/router.js";
 import { Minimap } from "./minimap.js";
+import { MatchHealth } from "./match_health.js";
 import { Renderer } from "./renderer/index.js";
 import { ReplayCameraInput } from "./replay_camera_input.js";
 import { GameState } from "./state.js";
@@ -28,9 +29,6 @@ const KAR98K_GAIN = 0.25;
 const MG_BURST_GAIN = 0.7;
 const MATCH_PING_MS = 2000;
 const NET_REPORT_MS = 10000;
-const LATENCY_ISSUE_MS = 180;
-const JITTER_ISSUE_MS = 20;
-const JITTER_WINDOW = 8;
 const AUTO_POINTER_LOCK_SUPPRESS_MS = 1200;
 const INSTALLED_APP_POINTER_LOCK_RETRY_ATTEMPTS = 4;
 const INSTALLED_APP_POINTER_LOCK_RETRY_DELAY_MS = 120;
@@ -89,30 +87,13 @@ export class Match {
     this.matchPingTimer = undefined;
     this.netReportTimer = undefined;
     this.skipFinalNetReport = false;
-    this.lastLatencySampleAt = 0;
-    this.snapshotJitterDeltas = [];
-    this.lastSnapshotArrivedAt = null;
     this.lastSnapshotTick = 0;
-    this.lastServerNetStatus = null;
-    this.netReportStartedAt = performance.now();
-    this.netReportStats = this.createNetReportStats();
+    this.health = new MatchHealth({ net: this.net, statusBadge: this.statusBadge, snapshotMs: SNAPSHOT_MS });
     this.autoPointerLockUntil = 0;
     this.pointerLockPanEnabled = this.readPointerLockPanEnabled();
     this.pointerLockDiagnosticShown = false;
     this.pointerLockRetryToken = 0;
     this.pointerLockRetry = null;
-    this.health = {
-      latencyMs: null,
-      serverTickMs: null,
-      serverLagMs: null,
-      jitterMs: null,
-      issues: {
-        latency: { active: false, count: 0 },
-        slowTick: { active: false, count: 0 },
-        headOfLine: { active: false, count: 0 },
-        jitter: { active: false, count: 0 },
-      },
-    };
 
     // --- Build the module graph from the static start payload (docs/design/client-ui.md §4.1). ---
     this.state = this._timeInit("match.state", () => new GameState(payload));
@@ -174,7 +155,7 @@ export class Match {
     // --- Listeners (bound so they can be removed on destroy). ---
     this.onSnapshot = (m) => {
       const now = performance.now();
-      this.noteSnapshotArrival(now);
+      this.health.noteSnapshotArrival(now, document.hidden);
       this.state.applySnapshot(m);
       this.lastSnapshotTick = Number.isFinite(m?.tick) ? m.tick : this.lastSnapshotTick;
       if (this.replayViewer && Number.isFinite(m?.tick)) {
@@ -182,8 +163,7 @@ export class Match {
         this.updateReplayStatus();
         this.updateReplayTimeline();
       }
-      this.lastServerNetStatus = m?.netStatus || null;
-      this.applyServerNetStatus();
+      this.health.applyServerNetStatus(m?.netStatus || null);
       this.stopInactiveMachineGunSounds();
       this.handleSnapshotEvents(m.events || []);
     };
@@ -229,7 +209,7 @@ export class Match {
     this.rafId = requestAnimationFrame(this.tickFn);
     this.startMatchPings();
     this.startNetReports();
-    this.publishStatusBadge();
+    this.health.publish();
     this.requestAutomaticPointerLock({ requireGesture: false });
 
     // Show speed controls for replay and scenario dev-watch rooms.
@@ -304,83 +284,19 @@ export class Match {
     }
   }
 
-  createNetReportStats() {
-    return {
-      rttMaxMs: 0,
-      badRttSamples: 0,
-      snapshotGapMaxMs: 0,
-      jitterSamples: 0,
-      snapshots: 0,
-      frameGapMaxMs: 0,
-      frameCount: 0,
-      frameTotalMs: 0,
-    };
-  }
-
-  resetNetReportStats() {
-    this.netReportStartedAt = performance.now();
-    this.netReportStats = this.createNetReportStats();
-  }
-
-  noteSnapshotArrival(now) {
-    this.netReportStats.snapshots += 1;
-    if (!document.hidden && this.lastSnapshotArrivedAt != null) {
-      const gap = now - this.lastSnapshotArrivedAt;
-      this.netReportStats.snapshotGapMaxMs = Math.max(this.netReportStats.snapshotGapMaxMs, gap);
-      const delta = Math.abs(gap - SNAPSHOT_MS);
-      this.snapshotJitterDeltas.push(delta);
-      if (this.snapshotJitterDeltas.length > JITTER_WINDOW) {
-        this.snapshotJitterDeltas.splice(0, this.snapshotJitterDeltas.length - JITTER_WINDOW);
-      }
-      this.health.jitterMs = Math.max(...this.snapshotJitterDeltas, 0);
-      const jitterActive = delta >= JITTER_ISSUE_MS;
-      this.health.issues.jitter.active = jitterActive;
-      if (jitterActive) {
-        this.health.issues.jitter.count += 1;
-        this.netReportStats.jitterSamples += 1;
-      }
-    }
-    this.lastSnapshotArrivedAt = now;
-  }
-
-  applyServerNetStatus() {
-    const status = this.lastServerNetStatus;
-    if (!status) return;
-    this.health.serverTickMs = status.tickMs;
-    this.health.serverLagMs = status.serverLagMs;
-    this.health.issues.slowTick.active = !!status.slowTick;
-    this.health.issues.slowTick.count = status.slowTickCount || 0;
-    this.health.issues.headOfLine.active = !!status.headOfLine;
-    this.health.issues.headOfLine.count = status.headOfLineCount || 0;
-  }
-
-  refreshLatencyHealth() {
-    if (this.net.latencyUpdatedAt === this.lastLatencySampleAt) return;
-    this.lastLatencySampleAt = this.net.latencyUpdatedAt;
-    this.health.latencyMs = this.net.latency;
-    const latencyActive = Number.isFinite(this.net.latency) && this.net.latency >= LATENCY_ISSUE_MS;
-    this.health.issues.latency.active = latencyActive;
-    if (latencyActive) {
-      this.health.issues.latency.count += 1;
-      this.netReportStats.badRttSamples += 1;
-    }
-    if (Number.isFinite(this.net.latency)) {
-      this.netReportStats.rttMaxMs = Math.max(this.netReportStats.rttMaxMs, this.net.latency);
-    }
-  }
-
   sendNetReport() {
-    const stats = this.netReportStats;
-    const elapsedMs = performance.now() - this.netReportStartedAt;
+    const stats = this.health.reportStats;
+    const metrics = this.health.metrics();
+    const elapsedMs = performance.now() - this.health.reportStartedAt;
     const avgFrameMs = stats.frameCount > 0 ? stats.frameTotalMs / stats.frameCount : 0;
     const report = {
       schemaVersion: 1,
       elapsedMs: clampU32(elapsedMs),
       matchTick: clampU32(this.lastSnapshotTick),
-      rttMs: clampU16(this.health.latencyMs),
+      rttMs: clampU16(metrics.latencyMs),
       rttMaxMs: clampU16(stats.rttMaxMs),
       badRttSamples: clampU32(stats.badRttSamples),
-      snapshotJitterMs: clampU16(this.health.jitterMs),
+      snapshotJitterMs: clampU16(metrics.jitterMs),
       snapshotGapMaxMs: clampU16(stats.snapshotGapMaxMs),
       jitterSamples: clampU32(stats.jitterSamples),
       snapshots: clampU32(stats.snapshots),
@@ -389,10 +305,10 @@ export class Match {
       hidden: !!document.hidden,
       focused: typeof document.hasFocus === "function" ? document.hasFocus() : true,
       wsBufferedBytes: clampU32(this.net.bufferedAmount),
-      serverTickMs: clampU16(this.health.serverTickMs),
-      serverLagMs: clampU16(this.health.serverLagMs),
-      slowTickCount: clampU32(this.health.issues.slowTick.count),
-      headOfLineCount: clampU32(this.health.issues.headOfLine.count),
+      serverTickMs: clampU16(metrics.serverTickMs),
+      serverLagMs: clampU16(metrics.serverLagMs),
+      slowTickCount: clampU32(metrics.issues.slowTick.count),
+      headOfLineCount: clampU32(metrics.issues.headOfLine.count),
     };
     this.net.netReport(report);
     this.diagnostics?.count("client.send.netReport", {
@@ -402,17 +318,7 @@ export class Match {
       jitterSamples: report.jitterSamples,
       wsBufferedBytes: report.wsBufferedBytes,
     });
-    this.resetNetReportStats();
-  }
-
-  publishStatusBadge() {
-    this.statusBadge?.setMatchMetrics({
-      latencyMs: this.health.latencyMs,
-      serverTickMs: this.health.serverTickMs,
-      serverLagMs: this.health.serverLagMs,
-      jitterMs: this.health.jitterMs,
-      issues: this.health.issues,
-    });
+    this.health.resetReportStats();
   }
 
   applySpectatorUi() {
@@ -880,11 +786,9 @@ export class Match {
     const frameGapMs = now - this.lastFrame;
     this.lastFrame = now;
     if (Number.isFinite(frameGapMs) && frameGapMs >= 0) {
-      this.netReportStats.frameCount += 1;
-      this.netReportStats.frameTotalMs += frameGapMs;
-      this.netReportStats.frameGapMaxMs = Math.max(this.netReportStats.frameGapMaxMs, frameGapMs);
+      this.health.noteFrameGap(frameGapMs);
     }
-    this.refreshLatencyHealth();
+    this.health.refreshLatency();
 
     const alpha = this.computeAlpha();
 
@@ -903,7 +807,7 @@ export class Match {
     this.renderer.render(this.state, this.camera, this.fog, alpha);
     this.hud.update();
     this.minimap.render();
-    this.publishStatusBadge();
+    this.health.publish();
 
     this.rafId = requestAnimationFrame(this.tickFn);
   }

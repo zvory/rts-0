@@ -9,6 +9,7 @@ import { Net } from "../client/src/net.js";
 import { GameState } from "../client/src/state.js";
 import { Camera } from "../client/src/camera.js";
 import { Fog } from "../client/src/fog.js";
+import { MatchHealth } from "../client/src/match_health.js";
 import {
   AT_GUN_DEPLOYED_RANGE_TILES,
   AT_GUN_FIELD_OF_FIRE_RAD,
@@ -108,6 +109,82 @@ function assertHasGetter(obj, name, msgPrefix = "") {
   assert(
     d && typeof d.get === "function",
     `${msgPrefix || "Object"} missing getter "${name}"`,
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Match health
+// ---------------------------------------------------------------------------
+
+{
+  const net = { latency: null, latencyUpdatedAt: 0 };
+  let badgePayload = null;
+  const health = new MatchHealth({
+    net,
+    statusBadge: { setMatchMetrics(metrics) { badgePayload = metrics; } },
+    snapshotMs: 33,
+  });
+
+  net.latency = 179;
+  net.latencyUpdatedAt = 1;
+  health.refreshLatency();
+  assert(health.metrics().latencyMs === 179, "MatchHealth records latest latency sample");
+  assert(!health.metrics().issues.latency.active, "latency below threshold stays inactive");
+  assert(health.metrics().issues.latency.count === 0, "latency below threshold does not count as bad RTT");
+
+  net.latency = 180;
+  net.latencyUpdatedAt = 2;
+  health.refreshLatency();
+  assert(health.metrics().issues.latency.active, "latency at threshold marks active issue");
+  assert(health.metrics().issues.latency.count === 1, "latency issue count increments on bad sample");
+  assert(health.reportStats.badRttSamples === 1, "bad RTT samples feed net report stats");
+  health.refreshLatency();
+  assert(health.metrics().issues.latency.count === 1, "unchanged latency timestamp does not double-count");
+
+  health.noteSnapshotArrival(100, false);
+  health.noteSnapshotArrival(133, false);
+  assert(health.metrics().jitterMs === 0, "on-cadence snapshots report zero jitter");
+  health.noteSnapshotArrival(187, false);
+  assert(health.metrics().jitterMs === 21, "snapshot jitter records max delta in window");
+  assert(health.metrics().issues.jitter.active, "snapshot jitter threshold marks active issue");
+  assert(health.metrics().issues.jitter.count === 1, "snapshot jitter issue count increments");
+  assert(health.reportStats.jitterSamples === 1, "jitter samples feed net report stats");
+
+  let now = 187;
+  for (let i = 0; i < 8; i += 1) {
+    now += 34;
+    health.noteSnapshotArrival(now, false);
+  }
+  assert(health.metrics().jitterMs === 1, "snapshot jitter window drops old outlier samples");
+  assert(!health.metrics().issues.jitter.active, "jitter active state follows the latest visible delta");
+  const jitterBeforeHidden = health.metrics().jitterMs;
+  health.noteSnapshotArrival(now + 500, true);
+  assert(health.metrics().jitterMs === jitterBeforeHidden, "hidden document snapshots do not update jitter");
+
+  health.applyServerNetStatus({
+    tickMs: 44,
+    serverLagMs: 120,
+    slowTick: true,
+    slowTickCount: 3,
+    headOfLine: true,
+    headOfLineCount: 4,
+  });
+  assert(health.metrics().serverTickMs === 44, "server tick timing propagates to metrics");
+  assert(health.metrics().serverLagMs === 120, "server lag timing propagates to metrics");
+  assert(health.metrics().issues.slowTick.active, "slow tick status propagates to issues");
+  assert(health.metrics().issues.slowTick.count === 3, "slow tick count propagates to issues");
+  assert(health.metrics().issues.headOfLine.active, "head-of-line status propagates to issues");
+  assert(health.metrics().issues.headOfLine.count === 4, "head-of-line count propagates to issues");
+
+  health.publish();
+  assert(badgePayload !== null, "MatchHealth publishes status badge payload");
+  assert(
+    Object.keys(badgePayload).join(",") === "latencyMs,serverTickMs,serverLagMs,jitterMs,issues",
+    "status badge payload shape stays unchanged",
+  );
+  assert(
+    Object.keys(badgePayload.issues).join(",") === "latency,slowTick,headOfLine,jitter",
+    "status badge issue payload shape stays unchanged",
   );
 }
 
