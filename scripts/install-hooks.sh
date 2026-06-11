@@ -11,3 +11,4 @@ git config branch.main.mergeOptions --no-ff
 echo "Installed repo hooks:"
 echo "  core.hooksPath=$(git config --get core.hooksPath)"
 echo "  branch.main.mergeOptions=$(git config --get branch.main.mergeOptions)"
+echo "  post-commit/post-merge cleanup=enabled on main"

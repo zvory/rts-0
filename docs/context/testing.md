@@ -25,6 +25,8 @@ Use when writing or debugging tests, or before claiming a change is done.
 - Local gate scripts use a per-worktree Cargo target dir under `/tmp/rts-cargo-target/`, so
   parallel worktrees do not share final binaries, test harnesses, or self-play artifacts. Override
   with `CARGO_TARGET_DIR` if a task needs a specific target location.
+- Installed hooks run `scripts/cleanup-worktrees.sh --auto` after commits and merges on `main` to
+  remove clean merged `zvorygin/*` worktrees and amortize stale Cargo target cleanup.
 - Browser smoke dependencies are shared across worktrees under
   `${RTS_NODE_DEPS_CACHE_DIR:-/tmp/rts-node-deps}` and keyed by the SHA-256 hash of
   `tests/package-lock.json`. `tests/run-all.sh` links each worktree's ignored

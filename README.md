@@ -112,7 +112,9 @@ Install the tracked Git hooks in each checkout:
 
 The hooks run `./tests/run-all.sh` before ordinary local commits. Merge commits intentionally
 bypass the local hook gate, including non-fast-forward merge commits and conflict-resolution
-commits.
+commits. After commits and merges on `main`, the hooks also run
+`scripts/cleanup-worktrees.sh --auto` to remove clean, already-merged `zvorygin/*` worktrees and a
+small bounded batch of stale per-worktree Cargo target dirs.
 
 Git does not distribute active local hook configuration through clones. Each checkout needs to run
 the installer once. GitHub Actions also runs `./tests/run-all.sh` after pushes to `main` as a
@@ -120,6 +122,13 @@ shared signal, but `main` is intentionally left open for direct pushes.
 
 The local gate uses a per-worktree Cargo target directory under `/tmp/rts-cargo-target/` so
 parallel agents do not share final binaries or test artifacts.
+
+To preview or force cleanup manually:
+
+```bash
+scripts/cleanup-worktrees.sh --dry-run
+scripts/cleanup-worktrees.sh
+```
 
 ## Deploy
 
