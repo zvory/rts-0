@@ -189,7 +189,7 @@ pub const UNITS: &[UnitDef] = &[
             cost_oil: 100,
             supply: 5,
             build_ticks: 750,
-            radius: 24.0,
+            radius: 18.0,
         },
         armor_class: ArmorClass::Hard,
         weapon: WeaponClass::None,

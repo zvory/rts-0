@@ -204,6 +204,15 @@ function drawArtillery(g, body, tint, facing, weaponFacing, setup, recoil, motio
   const deploy = clamp01(setup.prongFactor);
   drawTankTracks(g, body, facing, motion);
 
+  if (deploy < 0.35 && motion.activity > 0.05) {
+    const dustAlpha = 0.12 + motion.activity * 0.16;
+    const rear = rotatePoint(-body.halfLen - 7, 0, facing);
+    g.beginFill(0x8a806b, dustAlpha);
+    g.drawCircle(rear.x - Math.cos(facing) * 5, rear.y - Math.sin(facing) * 5, body.halfWidth * 0.42);
+    g.drawCircle(rear.x - Math.cos(facing) * 13, rear.y - Math.sin(facing) * 13, body.halfWidth * 0.28);
+    g.endFill();
+  }
+
   g.beginFill(tint, 0.97);
   g.drawPolygon(rotatedArtilleryHull(body, facing));
   g.endFill();
@@ -221,6 +230,12 @@ function drawArtillery(g, body, tint, facing, weaponFacing, setup, recoil, motio
   g.lineTo(trailL.x, trailL.y);
   g.moveTo(trailRoot.x, trailRoot.y);
   g.lineTo(trailR.x, trailR.y);
+  if (deploy > 0.02) {
+    g.lineStyle(2.5, 0x15120f, 0.82 * deploy);
+    for (const foot of [trailL, trailR]) {
+      drawFreeRotatedRect(g, foot.x, foot.y, body.halfWidth * 0.52, body.halfWidth * 0.2, weaponFacing);
+    }
+  }
 
   const tireLength = body.halfWidth * 0.58;
   const tireWidth = body.halfWidth * 0.25;
@@ -238,8 +253,8 @@ function drawArtillery(g, body, tint, facing, weaponFacing, setup, recoil, motio
 
   const kick = recoilVector(weaponFacing, recoil * 0.8);
   const breech = offsetPoint(rotatePoint(body.halfLen * 0.18, 0, weaponFacing), kick);
-  const muzzle = offsetPoint(rotatePoint(body.halfLen * 1.52, 0, weaponFacing), kick);
-  g.lineStyle(8, 0x241d17, 0.98);
+  const muzzle = offsetPoint(rotatePoint(body.halfLen * 1.64, 0, weaponFacing), kick);
+  g.lineStyle(7, 0x241d17, 0.98);
   g.moveTo(breech.x, breech.y);
   g.lineTo(muzzle.x, muzzle.y);
   g.lineStyle(2.5, 0xd8d0b0, 0.58);
@@ -248,6 +263,12 @@ function drawArtillery(g, body, tint, facing, weaponFacing, setup, recoil, motio
   g.beginFill(0x3d3528, 0.98);
   drawFreeRotatedRect(g, breech.x, breech.y, body.halfLen * 0.34, body.halfWidth * 0.44, weaponFacing);
   g.endFill();
+  if (recoil > 0.1) {
+    const flash = offsetPoint(rotatePoint(body.halfLen * 1.72, 0, weaponFacing), kick);
+    g.beginFill(0xfff2d0, clamp01(recoil / 10) * 0.64);
+    g.drawCircle(flash.x, flash.y, 5 + recoil * 0.4);
+    g.endFill();
+  }
 }
 
 function rotatedArtilleryHull(body, facing) {

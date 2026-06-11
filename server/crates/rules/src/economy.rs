@@ -192,6 +192,21 @@ mod tests {
         assert_eq!(supply_cost(EntityKind::AtTeam), 3);
         assert_eq!(cost(EntityKind::Artillery), (300, 100));
         assert_eq!(supply_cost(EntityKind::Artillery), 5);
+        assert_eq!(
+            defs::unit_def(EntityKind::Artillery).map(|d| d.stats.radius),
+            defs::unit_def(EntityKind::Tank).map(|d| d.stats.radius),
+            "artillery should use the same selection/collision radius as tanks"
+        );
+        assert_eq!(
+            crate::balance::ARTILLERY_BODY_LENGTH_PX,
+            crate::balance::TANK_BODY_LENGTH_PX,
+            "artillery body length should match tanks"
+        );
+        assert_eq!(
+            crate::balance::ARTILLERY_BODY_WIDTH_PX,
+            crate::balance::TANK_BODY_WIDTH_PX,
+            "artillery body width should match tanks"
+        );
         assert_eq!(supply_cost(EntityKind::ScoutCar), 3);
         assert_eq!(cost(EntityKind::Steelworks), (125, 125));
         assert_eq!(supply_cost(EntityKind::Tank), 6);

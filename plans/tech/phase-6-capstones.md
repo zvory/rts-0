@@ -13,8 +13,8 @@ Working checklist: [artillery-checklist.md](artillery-checklist.md).
 - Requires a late Gun Works upgrade.
 - Costs 300 steel / 100 oil.
 - Like AT Guns, must set up before firing and tear down before moving.
-- Movement and setup behavior matches AT Guns, but Artillery is bigger and slower.
-- Twice the size of the AT Gun.
+- Movement and setup behavior matches AT Guns, but Artillery is slower and uses a tank-sized
+  footprint.
 - When setting up, shows a cone indicating where it can shoot, like the AT Gun setup cone.
 - Field of fire is 20 degrees total after setup.
 - Minimum range is 10 tiles.
