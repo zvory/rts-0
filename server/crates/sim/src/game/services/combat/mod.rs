@@ -82,7 +82,7 @@ pub(crate) fn combat_system(
 
     for id in entities.ids() {
         // Determine this attacker's combat parameters.
-        let (owner, px, py, range_px, acquire_px, dmg, cd_reset, mode, is_unit) = {
+        let (owner, px, py, range_px, acquire_px, dmg, cd_reset, mode, is_unit, is_mortar_team) = {
             let e = match entities.get(id) {
                 Some(e) => e,
                 None => continue,
@@ -137,6 +137,7 @@ pub(crate) fn combat_system(
                 cd,
                 mode,
                 e.is_unit(),
+                e.kind == EntityKind::MortarTeam,
             )
         };
         if dmg == 0 {
@@ -199,7 +200,7 @@ pub(crate) fn combat_system(
         let terrain_clear = los.clear_between_world_points((px, py), (tx, ty));
         let friendly_blocked = terrain_clear
             && friendly_hard_blocker_between(map, entities, id, owner, (px, py), (tx, ty));
-        let clear_shot = terrain_clear && !friendly_blocked;
+        let clear_shot = is_mortar_team || (terrain_clear && !friendly_blocked);
 
         if friendly_blocked && matches!(mode, CombatMode::Ordered) {
             if let Some(e) = entities.get_mut(id) {
