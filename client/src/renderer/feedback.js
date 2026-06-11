@@ -656,25 +656,30 @@ export function _drawMortarShells(state) {
     const dx = shell.toX - shell.fromX;
     const dy = shell.toY - shell.fromY;
     const len = Math.hypot(dx, dy);
-    const ux = len > 0.001 ? dx / len : 1;
-    const uy = len > 0.001 ? dy / len : 0;
-    const arc = Math.sin(Math.PI * t) * Math.min(44, Math.max(12, len * 0.075));
+    const arcHeight = Math.min(44, Math.max(12, len * 0.075));
+    const arc = Math.sin(Math.PI * t) * arcHeight;
     const x = shell.fromX + dx * eased;
     const y = shell.fromY + dy * eased - arc;
     const stretch = Math.sin(Math.PI * t);
     const shellLen = 5.5 + stretch * 6.5;
     const shellWidth = 4.2 - stretch * 1.2;
-    const angle = Math.atan2(dy, dx);
+    const groundSpeed = 6 * t * (1 - t);
+    const tangentX = dx * groundSpeed;
+    const tangentY = dy * groundSpeed - Math.PI * Math.cos(Math.PI * t) * arcHeight;
+    const tangentLen = Math.hypot(tangentX, tangentY);
+    const angle = tangentLen > 0.001 ? Math.atan2(tangentY, tangentX) : Math.atan2(dy, dx);
+    const ux = Math.cos(angle);
+    const uy = Math.sin(angle);
     const shadowAlpha = 0.22 * (1 - stretch * 0.55);
 
     g.lineStyle(0, 0x000000, 0);
     g.beginFill(0x050505, shadowAlpha);
     g.drawEllipse(shell.fromX + dx * eased, shell.fromY + dy * eased, 4.4, 2.2);
     g.endFill();
-    g.beginFill(0x050505, 0.96);
+    g.beginFill(0x050505, 1);
     drawRotatedRect(g, x, y, shellLen, shellWidth, angle);
     g.endFill();
-    g.beginFill(0x2d2d2d, 0.72);
+    g.beginFill(0x2d2d2d, 1);
     drawRotatedRect(
       g,
       x - uy * shellWidth * 0.24,
