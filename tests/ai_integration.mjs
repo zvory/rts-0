@@ -110,8 +110,8 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const firstSnap = await A.waitNext((m) => m.t === "snapshot" && m.entities.length > 0, 3000, "first snapshot");
   ok(firstSnap.entities.some((e) => e.owner === A.playerId && e.kind === "city_centre"), "human owns its City Centre in-match");
   const tick0 = firstSnap.tick;
-  await sleep(1500);
-  ok(A.lastSnapshot && A.lastSnapshot.tick > tick0, `match advancing (tick ${tick0} -> ${A.lastSnapshot?.tick})`);
+  const advancedSnap = await A.waitNext((m) => m.t === "snapshot" && m.tick > tick0, 3000, "advancing snapshot");
+  ok(advancedSnap.tick > tick0, `match advancing (tick ${tick0} -> ${advancedSnap.tick})`);
   ok(!A.msgs.some((m) => m.t === "gameOver"), "match still running (not prematurely resolved)");
 
   A.ws.close();
