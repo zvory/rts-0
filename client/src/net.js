@@ -233,6 +233,11 @@ export class Net {
     this._send(msg.setReplayVision(vision));
   }
 
+  /** Request a practice branch room from the current authoritative replay tick. */
+  requestReplayBranch() {
+    this._send(msg.requestReplayBranch());
+  }
+
   /**
    * Host selects a map by name (lobby phase only).
    * @param {string} map map display name

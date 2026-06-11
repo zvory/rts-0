@@ -134,6 +134,8 @@ pub enum ClientMessage {
     SeekReplayTo { tick: u32 },
     /// Select which players' fog to use while viewing a replay. Per-viewer only.
     SetReplayVision { vision: ReplayVisionRequest },
+    /// Request a new practice branch room from this replay room's current authoritative tick.
+    RequestReplayBranch,
     /// Host selects a map by name (lobby phase only; ignored from non-hosts).
     SelectMap { map: String },
 }
@@ -279,6 +281,16 @@ pub struct AvailableMap {
     pub description: String,
 }
 
+/// Original replay seat announced when a practice branch room is created.
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ReplayBranchSeat {
+    pub player_id: u32,
+    pub name: String,
+    pub color: String,
+    pub claimable: bool,
+}
+
 #[derive(Debug, Clone, Serialize)]
 #[serde(tag = "t", rename_all = "camelCase", rename_all_fields = "camelCase")]
 pub enum ServerMessage {
@@ -311,6 +323,12 @@ pub enum ServerMessage {
     /// `join` with `replayOk: true`.
     JoinReplayPrompt {
         room: String,
+    },
+    /// A practice branch room was created from the current replay tick.
+    ReplayBranchCreated {
+        branch_room: String,
+        source_tick: u32,
+        seats: Vec<ReplayBranchSeat>,
     },
     /// Server shutdown drain has started. Existing matches may continue until the deadline, but
     /// new match starts are disabled.
@@ -1079,6 +1097,37 @@ mod tests {
             ClientMessage::SeekReplayTo { tick } => assert_eq!(tick, 4_100),
             other => panic!("expected seekReplayTo, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn request_replay_branch_deserializes() {
+        let msg: ClientMessage = serde_json::from_str(r#"{"t":"requestReplayBranch"}"#)
+            .expect("requestReplayBranch should deserialize");
+
+        assert!(matches!(msg, ClientMessage::RequestReplayBranch));
+    }
+
+    #[test]
+    fn replay_branch_created_serializes_contract_shape() {
+        let msg = ServerMessage::ReplayBranchCreated {
+            branch_room: "__replay_branch__:00000001".to_string(),
+            source_tick: 123,
+            seats: vec![ReplayBranchSeat {
+                player_id: 7,
+                name: "Player 7".to_string(),
+                color: "#4878c8".to_string(),
+                claimable: true,
+            }],
+        };
+        let json = serde_json::to_value(msg).expect("branch message should serialize");
+
+        assert_eq!(json["t"], "replayBranchCreated");
+        assert_eq!(json["branchRoom"], "__replay_branch__:00000001");
+        assert_eq!(json["sourceTick"], 123);
+        assert_eq!(json["seats"][0]["playerId"], 7);
+        assert_eq!(json["seats"][0]["name"], "Player 7");
+        assert_eq!(json["seats"][0]["color"], "#4878c8");
+        assert_eq!(json["seats"][0]["claimable"], true);
     }
 
     fn representative_snapshot() -> Snapshot {

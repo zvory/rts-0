@@ -1440,6 +1440,9 @@ async fn handle_client_message(
             )
             .await;
         }
+        ClientMessage::RequestReplayBranch => {
+            request_replay_branch(player_id, lobby, conn_tx, current_room).await;
+        }
         ClientMessage::SelectMap { map } => {
             send_room_event(
                 player_id,
@@ -1452,6 +1455,61 @@ async fn handle_client_message(
         _ => {
             debug!(player_id, "ignoring unsupported client message");
         }
+    }
+}
+
+async fn request_replay_branch(
+    player_id: u32,
+    lobby: &Lobby,
+    conn_tx: &lobby::ConnectionSink,
+    current_room: &Option<lobby::RoomHandle>,
+) {
+    let Some(handle) = current_room else {
+        debug!(player_id, "ignoring replay branch request before join");
+        return;
+    };
+    let (reply_tx, reply_rx) = tokio::sync::oneshot::channel();
+    if handle
+        .event_tx
+        .send(RoomEvent::RequestReplayBranch {
+            player_id,
+            reply: reply_tx,
+        })
+        .await
+        .is_err()
+    {
+        warn!(player_id, "room task gone; cannot request replay branch");
+        return;
+    }
+    let seed = match reply_rx.await {
+        Ok(Ok(seed)) => seed,
+        Ok(Err(msg)) => {
+            let _ = conn_tx.try_send_reliable(ServerMessage::Error { msg });
+            return;
+        }
+        Err(_) => {
+            warn!(player_id, "room dropped replay branch reply");
+            return;
+        }
+    };
+    let source_tick = seed.source_tick;
+    let seats = seed.seats.clone();
+    let branch_room = lobby.create_replay_branch_room(seed).await;
+    if handle
+        .event_tx
+        .send(RoomEvent::AnnounceReplayBranch {
+            branch_room: branch_room.clone(),
+            source_tick,
+            seats: seats.clone(),
+        })
+        .await
+        .is_err()
+    {
+        let _ = conn_tx.try_send_reliable(ServerMessage::ReplayBranchCreated {
+            branch_room,
+            source_tick,
+            seats,
+        });
     }
 }
 
