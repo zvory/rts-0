@@ -1092,6 +1092,7 @@ async fn handle_connection(socket: WebSocket, lobby: Lobby) {
     // The room this connection has joined, if any. A client must `join` before other actions.
     let mut current_room: Option<lobby::RoomHandle> = None;
     let mut current_room_name: Option<String> = None;
+    let mut current_player_name: Option<String> = None;
     let mut shutdown_rx = lobby.subscribe_connection_shutdown();
 
     loop {
@@ -1142,6 +1143,7 @@ async fn handle_connection(socket: WebSocket, lobby: Lobby) {
                     &conn_tx,
                     &mut current_room,
                     &mut current_room_name,
+                    &mut current_player_name,
                 )
                 .await;
             }
@@ -1194,6 +1196,8 @@ async fn send_server_message(
         ServerMessage::Start(_) => "start",
         ServerMessage::ReplayState(_) => "replay_state",
         ServerMessage::JoinReplayPrompt { .. } => "join_replay_prompt",
+        ServerMessage::ReplayBranchCreated { .. } => "replay_branch_created",
+        ServerMessage::ReplayBranchStaging { .. } => "replay_branch_staging",
         ServerMessage::ShutdownWarning { .. } => "shutdown_warning",
         ServerMessage::Error { .. } => "error",
         ServerMessage::GameOver { .. } => "game_over",
@@ -1250,6 +1254,7 @@ async fn handle_client_message(
     conn_tx: &lobby::ConnectionSink,
     current_room: &mut Option<lobby::RoomHandle>,
     current_room_name: &mut Option<String>,
+    current_player_name: &mut Option<String>,
 ) {
     match msg {
         ClientMessage::Join {
@@ -1259,19 +1264,19 @@ async fn handle_client_message(
             replay_ok,
             ..
         } => {
-            // Re-joining a different room is not supported; the first join wins. Subsequent
-            // joins from the same connection are ignored to keep room membership unambiguous.
-            if current_room.is_some() {
-                debug!(
-                    player_id,
-                    "ignoring extra join on already-joined connection"
-                );
-                return;
-            }
             let room_name = room
                 .filter(|r| !r.trim().is_empty())
                 .unwrap_or_else(|| DEFAULT_ROOM.to_string());
             let name = sanitize_name(name);
+            if current_room_name.as_deref() == Some(room_name.as_str()) {
+                debug!(player_id, room = %room_name, "ignoring duplicate join for current room");
+                return;
+            }
+            if let Some(handle) = current_room.take() {
+                let _ = handle.event_tx.send(RoomEvent::Leave { player_id }).await;
+                *current_room_name = None;
+                *current_player_name = None;
+            }
             let handle = match lobby.get_or_create_join_target(&room_name).await {
                 Ok(handle) => handle,
                 Err(notice) => {
@@ -1294,7 +1299,7 @@ async fn handle_client_message(
                 .event_tx
                 .send(RoomEvent::Join {
                     player_id,
-                    name,
+                    name: name.clone(),
                     spectator,
                     replay_ok,
                     msg_tx: conn_tx.clone(),
@@ -1310,6 +1315,7 @@ async fn handle_client_message(
                 Ok(true) => {
                     *current_room = Some(handle);
                     *current_room_name = Some(room_name);
+                    *current_player_name = Some(name);
                 }
                 Ok(false) => {
                     debug!(player_id, room = %room_name, "join rejected by room");
@@ -1442,6 +1448,27 @@ async fn handle_client_message(
         }
         ClientMessage::RequestReplayBranch => {
             request_replay_branch(player_id, lobby, conn_tx, current_room).await;
+        }
+        ClientMessage::ClaimReplayBranchSeat {
+            player_id: seat_player_id,
+        } => {
+            send_room_event(
+                player_id,
+                current_room,
+                RoomEvent::ClaimReplayBranchSeat {
+                    player_id,
+                    seat_player_id,
+                },
+            )
+            .await;
+        }
+        ClientMessage::ReleaseReplayBranchSeat => {
+            send_room_event(
+                player_id,
+                current_room,
+                RoomEvent::ReleaseReplayBranchSeat { player_id },
+            )
+            .await;
         }
         ClientMessage::SelectMap { map } => {
             send_room_event(

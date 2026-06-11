@@ -583,6 +583,8 @@ pub(super) struct RoomTask {
     match_human_count: usize,
     /// Connected human players who already received a terminal score screen for the active match.
     outcome_sent: HashSet<u32>,
+    /// Replay branch staging claims: original replay player id -> connected viewer id.
+    branch_claims: HashMap<u32, u32>,
     dev_driver: Option<DevDriver>,
     dev_view_player_id: Option<u32>,
     ai_controllers: Vec<AiController>,
@@ -630,6 +632,7 @@ impl RoomTask {
             match_player_count: 0,
             match_human_count: 0,
             outcome_sent: HashSet::new(),
+            branch_claims: HashMap::new(),
             dev_driver: None,
             dev_view_player_id: None,
             ai_controllers: Vec::new(),
@@ -764,6 +767,13 @@ impl RoomTask {
                 source_tick,
                 seats,
             } => self.on_announce_replay_branch(branch_room, source_tick, seats),
+            RoomEvent::ClaimReplayBranchSeat {
+                player_id,
+                seat_player_id,
+            } => self.on_claim_replay_branch_seat(player_id, seat_player_id),
+            RoomEvent::ReleaseReplayBranchSeat { player_id } => {
+                self.on_release_replay_branch_seat(player_id)
+            }
             RoomEvent::SelectMap { player_id, map } => self.on_select_map(player_id, map),
             RoomEvent::DrainStarted(notice) => self.on_drain_started(notice),
         }
@@ -826,23 +836,8 @@ impl RoomTask {
             self.on_join_replay_room(player_id, name, msg_tx, ack);
             return;
         }
-        if let RoomMode::ReplayBranch { seed } = &self.mode {
-            send_or_log(
-                &self.room,
-                player_id,
-                &msg_tx,
-                ServerMessage::Error {
-                    msg: "Replay branch staging is not available yet.".to_string(),
-                },
-            );
-            debug!(
-                room = %self.room,
-                player_id,
-                source_tick = seed.source_tick,
-                seat_count = seed.seats.len(),
-                "rejecting branch room join before staging runtime is implemented"
-            );
-            let _ = ack.send(false);
+        if matches!(self.mode, RoomMode::ReplayBranch { .. }) {
+            self.on_join_replay_branch(player_id, name, msg_tx, ack);
             return;
         }
         if matches!(self.phase, Phase::ReplayViewer(_)) {
@@ -936,8 +931,11 @@ impl RoomTask {
             return;
         };
         let was_spectator = removed.spectator;
+        let branch_controlled_player_id = self.branch_controlled_player_id(player_id);
         self.order.retain(|&id| id != player_id);
         self.outcome_sent.remove(&player_id);
+        self.branch_claims
+            .retain(|_, claimant| *claimant != player_id);
         self.reassign_host_if_needed();
         debug!(room = %self.room, player_id, "left");
 
@@ -951,6 +949,7 @@ impl RoomTask {
             self.match_player_count = 0;
             self.match_human_count = 0;
             self.outcome_sent.clear();
+            self.branch_claims.clear();
             self.host_id = None;
             // Drop AI opponents too: with no humans there is nobody to host them, and a fresh
             // joiner under this room name should start from a clean lobby.
@@ -962,11 +961,17 @@ impl RoomTask {
         }
 
         match &mut self.phase {
-            Phase::Lobby => self.broadcast_lobby(),
+            Phase::Lobby => {
+                if matches!(self.mode, RoomMode::ReplayBranch { .. }) {
+                    self.broadcast_replay_branch_staging();
+                } else {
+                    self.broadcast_lobby();
+                }
+            }
             Phase::InGame(game) => {
                 // Remove their army so the match can still resolve to a winner.
                 if !was_spectator {
-                    game.eliminate(player_id);
+                    game.eliminate(branch_controlled_player_id.unwrap_or(player_id));
                 }
             }
             Phase::ReplayViewer(session) => {
@@ -1019,6 +1024,14 @@ impl RoomTask {
         }
         if self.host_id != Some(player_id) {
             debug!(room = %self.room, player_id, "ignoring start from non-host");
+            return;
+        }
+        if matches!(self.mode, RoomMode::ReplayBranch { .. }) {
+            if self.replay_branch_can_start() {
+                self.start_replay_branch_match();
+            } else {
+                debug!(room = %self.room, "ignoring branch start; not all seats claimed");
+            }
             return;
         }
         if !self.can_start() {
@@ -1166,6 +1179,9 @@ impl RoomTask {
     }
 
     fn spectator_visible_player_ids(&self) -> Vec<u32> {
+        if let Some(seed) = self.replay_branch_seed() {
+            return seed.seats.iter().map(|seat| seat.player_id).collect();
+        }
         let mut ids: Vec<u32> = self.active_human_ids().collect();
         ids.extend(self.ai_players.iter().map(|ai| ai.id));
         ids
@@ -1205,6 +1221,9 @@ impl RoomTask {
         if self.is_live_dev_watch() {
             return;
         }
+        let sim_player_id = self
+            .branch_controlled_player_id(player_id)
+            .unwrap_or(player_id);
         // Commands are ignored unless in-game and the sender is actually in this room. The
         // simulation itself validates ownership/affordability when it applies the command.
         if let Phase::InGame(game) = &mut self.phase {
@@ -1214,7 +1233,7 @@ impl RoomTask {
                 .map(|p| !p.spectator)
                 .unwrap_or(false);
             if active_player && !self.outcome_sent.contains(&player_id) {
-                game.enqueue(player_id, cmd);
+                game.enqueue(sim_player_id, cmd);
             }
         }
     }
@@ -1231,6 +1250,9 @@ impl RoomTask {
         if !active_player || self.outcome_sent.contains(&player_id) {
             return;
         }
+        let sim_player_id = self
+            .branch_controlled_player_id(player_id)
+            .unwrap_or(player_id);
 
         let mut game = match std::mem::replace(&mut self.phase, Phase::Lobby) {
             Phase::Lobby => {
@@ -1245,7 +1267,7 @@ impl RoomTask {
         };
 
         debug!(room = %self.room, player_id, "player gave up");
-        game.eliminate(player_id);
+        game.eliminate(sim_player_id);
         let alive = game.alive_players();
         let scores = game.scores();
 
@@ -1342,6 +1364,35 @@ impl RoomTask {
         let _ = ack.send(true);
         self.send_replay_start_to(player_id);
         self.send_replay_state_to(player_id);
+    }
+
+    fn on_join_replay_branch(
+        &mut self,
+        player_id: u32,
+        name: String,
+        msg_tx: ConnectionSink,
+        ack: tokio::sync::oneshot::Sender<bool>,
+    ) {
+        if self.players.contains_key(&player_id) {
+            let _ = ack.send(false);
+            return;
+        }
+        self.order.push(player_id);
+        self.players.insert(
+            player_id,
+            RoomPlayer {
+                name,
+                color: "#6f8fa8".to_string(),
+                ready: true,
+                spectator: true,
+                msg_tx,
+                head_of_line_count: 0,
+            },
+        );
+        self.reassign_host_if_needed();
+        let _ = ack.send(true);
+        self.send_current_shutdown_warning_to(player_id);
+        self.broadcast_replay_branch_staging();
     }
 
     fn on_join_replay_room(
@@ -1464,6 +1515,132 @@ impl RoomTask {
             maps: Map::list_available(),
         };
         self.broadcast(&msg);
+    }
+
+    fn replay_branch_seed(&self) -> Option<&ReplayBranchSeed> {
+        match &self.mode {
+            RoomMode::ReplayBranch { seed } => Some(seed),
+            _ => None,
+        }
+    }
+
+    fn branch_controlled_player_id(&self, connection_id: u32) -> Option<u32> {
+        self.branch_claims
+            .iter()
+            .find_map(|(seat_player_id, claimant)| {
+                (*claimant == connection_id).then_some(*seat_player_id)
+            })
+    }
+
+    fn replay_branch_can_start(&self) -> bool {
+        let Some(seed) = self.replay_branch_seed() else {
+            return false;
+        };
+        !self.drain.is_draining()
+            && seed
+                .seats
+                .iter()
+                .filter(|seat| seat.claimable)
+                .all(|seat| self.branch_claims.contains_key(&seat.player_id))
+    }
+
+    fn replay_branch_staging_message(&self) -> Option<ServerMessage> {
+        let seed = self.replay_branch_seed()?;
+        let mut seated_viewers = HashSet::new();
+        let seats = seed
+            .seats
+            .iter()
+            .map(|seat| {
+                let claimed_by = self.branch_claims.get(&seat.player_id).copied();
+                if let Some(id) = claimed_by {
+                    seated_viewers.insert(id);
+                }
+                let claimed_by_name =
+                    claimed_by.and_then(|id| self.players.get(&id).map(|p| p.name.clone()));
+                ReplayBranchStagingSeat {
+                    player_id: seat.player_id,
+                    name: seat.name.clone(),
+                    color: seat.color.clone(),
+                    claimable: seat.claimable,
+                    claimed_by,
+                    claimed_by_name,
+                }
+            })
+            .collect();
+        let viewers = self
+            .order
+            .iter()
+            .filter(|id| !seated_viewers.contains(id))
+            .filter_map(|id| {
+                self.players.get(id).map(|player| ReplayBranchViewer {
+                    id: *id,
+                    name: player.name.clone(),
+                })
+            })
+            .collect();
+        Some(ServerMessage::ReplayBranchStaging {
+            branch_room: self.room.clone(),
+            source_tick: seed.source_tick,
+            host_id: self.host_id.unwrap_or(0),
+            seats,
+            viewers,
+            can_start: self.replay_branch_can_start(),
+        })
+    }
+
+    fn broadcast_replay_branch_staging(&self) {
+        if let Some(msg) = self.replay_branch_staging_message() {
+            self.broadcast(&msg);
+        }
+    }
+
+    fn on_claim_replay_branch_seat(&mut self, player_id: u32, seat_player_id: u32) {
+        let Some(seed) = self.replay_branch_seed() else {
+            return;
+        };
+        if !matches!(self.phase, Phase::Lobby) {
+            return;
+        }
+        let Some(seat) = seed
+            .seats
+            .iter()
+            .find(|seat| seat.player_id == seat_player_id)
+        else {
+            return;
+        };
+        if !seat.claimable || !self.players.contains_key(&player_id) {
+            return;
+        }
+        let seat_color = seat.color.clone();
+        self.branch_claims
+            .retain(|_, claimant| *claimant != player_id);
+        self.branch_claims.insert(seat_player_id, player_id);
+        if let Some(player) = self.players.get_mut(&player_id) {
+            player.spectator = false;
+            player.ready = true;
+            player.color = seat_color;
+        }
+        self.broadcast_replay_branch_staging();
+    }
+
+    fn on_release_replay_branch_seat(&mut self, player_id: u32) {
+        if !matches!(self.mode, RoomMode::ReplayBranch { .. })
+            || !matches!(self.phase, Phase::Lobby)
+        {
+            return;
+        }
+        let before = self.branch_claims.len();
+        self.branch_claims
+            .retain(|_, claimant| *claimant != player_id);
+        if before == self.branch_claims.len() {
+            return;
+        }
+        if let Some(player) = self.players.get_mut(&player_id) {
+            player.spectator = true;
+            player.ready = true;
+            player.color = "#6f8fa8".to_string();
+        }
+        self.broadcast_replay_branch_staging();
     }
 
     fn start_match_countdown(&mut self) {
@@ -1609,6 +1786,56 @@ impl RoomTask {
         }
 
         info!(room = %self.room, players = self.match_player_count, "match started");
+        self.mark_match_started_for_drain();
+        self.phase = Phase::InGame(Box::new(game));
+    }
+
+    fn start_replay_branch_match(&mut self) {
+        let Some(seed) = self.replay_branch_seed().cloned() else {
+            return;
+        };
+        self.match_countdown_deadline = None;
+        self.reset_match_net_status();
+        let game = seed.game.clone_for_replay_keyframe();
+        let payload = game.start_payload();
+        self.match_player_count = seed.seats.iter().filter(|seat| seat.claimable).count();
+        self.match_human_count = self.match_player_count;
+        self.match_started_at = Some(chrono::Utc::now());
+        self.match_map_name = seed.source_replay.map_name.clone();
+        self.match_participants = seed.seats.iter().map(|seat| seat.name.clone()).collect();
+        self.outcome_sent.clear();
+        self.ai_controllers.clear();
+
+        let recipients = self.order.clone();
+        for id in recipients {
+            let controlled_player_id = self.branch_controlled_player_id(id);
+            if let Some(player) = self.players.get_mut(&id) {
+                player.spectator = controlled_player_id.is_none();
+                if let Some(seat_id) = controlled_player_id {
+                    if let Some(seat) = seed.seats.iter().find(|seat| seat.player_id == seat_id) {
+                        player.color = seat.color.clone();
+                    }
+                }
+                let per_player = StartPayload {
+                    player_id: controlled_player_id.unwrap_or(id),
+                    spectator: controlled_player_id.is_none(),
+                    ..payload.clone()
+                };
+                send_or_log(
+                    &self.room,
+                    id,
+                    &player.msg_tx,
+                    ServerMessage::Start(per_player),
+                );
+            }
+        }
+
+        info!(
+            room = %self.room,
+            source_tick = seed.source_tick,
+            players = self.match_player_count,
+            "replay branch match started"
+        );
         self.mark_match_started_for_drain();
         self.phase = Phase::InGame(Box::new(game));
     }
@@ -1966,15 +2193,16 @@ impl RoomTask {
             let Some(player) = self.players.get(id) else {
                 continue;
             };
+            let sim_player_id = self.branch_controlled_player_id(*id).unwrap_or(*id);
             let snapshot_start = StdInstant::now();
             let mut snapshot = if player.spectator {
                 game.snapshot_for_spectator(&spectator_visible_players)
             } else {
-                game.snapshot_for(*id)
+                game.snapshot_for(sim_player_id)
             };
             if player.spectator {
                 snapshot.events.extend(full_vision_events.clone());
-            } else if let Some(mut events) = per_player_events.remove(id) {
+            } else if let Some(mut events) = per_player_events.remove(&sim_player_id) {
                 snapshot.events.append(&mut events);
             }
             let snapshot_duration = snapshot_start.elapsed();
@@ -2516,8 +2744,9 @@ impl RoomTask {
             let you = if player.spectator {
                 "draw"
             } else {
+                let sim_player_id = self.branch_controlled_player_id(*id).unwrap_or(*id);
                 match winner_id {
-                    Some(w) if w == *id => "won",
+                    Some(w) if w == sim_player_id => "won",
                     Some(_) => "lost",
                     None => "draw",
                 }

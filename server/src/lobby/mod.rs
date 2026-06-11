@@ -33,8 +33,8 @@ use crate::game::command::SimCommand;
 use crate::game::replay::ReplayArtifactV1;
 use crate::game::{Game, PlayerInit};
 use crate::protocol::{
-    Event, LobbyPlayer, PlayerScore, ReplayBranchSeat, ReplayStartMetadata, ReplayVisionRequest,
-    ResourceDelta, ServerMessage, Snapshot, StartPayload,
+    Event, LobbyPlayer, PlayerScore, ReplayBranchSeat, ReplayBranchStagingSeat, ReplayBranchViewer,
+    ReplayStartMetadata, ReplayVisionRequest, ResourceDelta, ServerMessage, Snapshot, StartPayload,
 };
 use rts_ai::selfplay::{is_safe_artifact_name, LiveSelfPlay};
 
@@ -149,6 +149,10 @@ pub enum RoomEvent {
         source_tick: u32,
         seats: Vec<ReplayBranchSeat>,
     },
+    /// Claim one original replay seat in a branch staging room.
+    ClaimReplayBranchSeat { player_id: u32, seat_player_id: u32 },
+    /// Release this viewer's current replay branch seat claim.
+    ReleaseReplayBranchSeat { player_id: u32 },
     /// Host selects a map by name (lobby phase only; honored only from the host).
     SelectMap { player_id: u32, map: String },
     /// Process shutdown has begun. Rooms stay alive, but lobby clients should see that starting

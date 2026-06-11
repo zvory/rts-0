@@ -11,6 +11,7 @@ export const S = Object.freeze({
   REPLAY_STATE: "replayState",
   JOIN_REPLAY_PROMPT: "joinReplayPrompt",
   REPLAY_BRANCH_CREATED: "replayBranchCreated",
+  REPLAY_BRANCH_STAGING: "replayBranchStaging",
   SHUTDOWN_WARNING: "shutdownWarning",
   GAME_OVER: "gameOver",
   PONG: "pong",
@@ -37,6 +38,8 @@ export const C = Object.freeze({
   SEEK_REPLAY_TO: "seekReplayTo",
   SET_REPLAY_VISION: "setReplayVision",
   REQUEST_REPLAY_BRANCH: "requestReplayBranch",
+  CLAIM_REPLAY_BRANCH_SEAT: "claimReplayBranchSeat",
+  RELEASE_REPLAY_BRANCH_SEAT: "releaseReplayBranchSeat",
   SELECT_MAP: "selectMap",
 });
 
@@ -753,6 +756,8 @@ export const msg = Object.freeze({
   seekReplayTo: (tick) => ({ t: C.SEEK_REPLAY_TO, tick }),
   setReplayVision: (vision) => ({ t: C.SET_REPLAY_VISION, vision }),
   requestReplayBranch: () => ({ t: C.REQUEST_REPLAY_BRANCH }),
+  claimReplayBranchSeat: (playerId) => ({ t: C.CLAIM_REPLAY_BRANCH_SEAT, playerId }),
+  releaseReplayBranchSeat: () => ({ t: C.RELEASE_REPLAY_BRANCH_SEAT }),
   replayVisionAll: () => ({ t: C.SET_REPLAY_VISION, vision: { mode: REPLAY_VISION.ALL } }),
   replayVisionPlayer: (playerId) => ({
     t: C.SET_REPLAY_VISION,

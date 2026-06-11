@@ -1266,6 +1266,9 @@ function fakeAudioContext() {
   assertHasMethod(net, "setQuickstart", "Net");
   assertHasMethod(net, "setReplaySpeed", "Net");
   assertHasMethod(net, "setReplayVision", "Net");
+  assertHasMethod(net, "requestReplayBranch", "Net");
+  assertHasMethod(net, "claimReplayBranchSeat", "Net");
+  assertHasMethod(net, "releaseReplayBranchSeat", "Net");
   assert(!("replayOk" in msg.join("A", "main")), "join builder omits replayOk by default");
   assert(
     msg.join("A", "main", false, true).replayOk === true,
@@ -1284,6 +1287,105 @@ function fakeAudioContext() {
     msg.replayVisionPlayers([1, 2]).vision.playerIds.join(",") === "1,2",
     "replay subset vision builder payload",
   );
+  assert(msg.requestReplayBranch().t === "requestReplayBranch", "replay branch request builder tag");
+  assert(
+    JSON.stringify(msg.claimReplayBranchSeat(7)) === JSON.stringify({ t: "claimReplayBranchSeat", playerId: 7 }),
+    "branch seat claim builder shape",
+  );
+  assert(
+    JSON.stringify(msg.releaseReplayBranchSeat()) === JSON.stringify({ t: "releaseReplayBranchSeat" }),
+    "branch seat release builder shape",
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Replay branch staging
+// ---------------------------------------------------------------------------
+{
+  const { BranchStaging } = await import("../client/src/branch_staging.js");
+  function fakeEl(tag = "div") {
+    const el = {
+      tagName: tag.toUpperCase(),
+      children: [],
+      dataset: {},
+      style: {},
+      hidden: false,
+      disabled: false,
+      textContent: "",
+      className: "",
+      classList: {
+        add(cls) {
+          if (!el.className.split(/\s+/).includes(cls)) el.className = `${el.className} ${cls}`.trim();
+        },
+        remove(cls) {
+          el.className = el.className.split(/\s+/).filter((c) => c && c !== cls).join(" ");
+        },
+        contains(cls) {
+          return el.className.split(/\s+/).includes(cls);
+        },
+      },
+      setAttribute(name, value) {
+        this[name] = value;
+      },
+      appendChild(child) {
+        child.parentNode = this;
+        this.children.push(child);
+        return child;
+      },
+      append(...children) {
+        for (const child of children) this.appendChild(child);
+      },
+      replaceChildren(...children) {
+        this.children = [];
+        for (const child of children) this.appendChild(child);
+      },
+      addEventListener(type, handler) {
+        this[`on${type}`] = handler;
+      },
+      remove() {},
+    };
+    return el;
+  }
+  const priorDocument = globalThis.document;
+  globalThis.document = { createElement: fakeEl };
+  const sent = [];
+  const handlers = new Map();
+  const net = {
+    playerId: 10,
+    on(type, handler) { handlers.set(type, handler); },
+    off(type) { handlers.delete(type); },
+    claimReplayBranchSeat(id) { sent.push(["claim", id]); },
+    releaseReplayBranchSeat() { sent.push(["release"]); },
+    start() { sent.push(["start"]); },
+  };
+  const root = fakeEl("section");
+  const staging = new BranchStaging(root, net);
+  staging.show();
+  handlers.get("replayBranchStaging")({
+    t: "replayBranchStaging",
+    branchRoom: "__replay_branch__:abc",
+    sourceTick: 1200,
+    hostId: 10,
+    canStart: false,
+    seats: [
+      { playerId: 1, name: "Alpha", color: "#4878c8", claimable: true },
+      { playerId: 2, name: "Bravo", color: "#c84848", claimable: true, claimedBy: 11, claimedByName: "Other" },
+    ],
+    viewers: [{ id: 10, name: "Me" }],
+  });
+  assert(root.classList.contains("branch-staging-active"), "branch staging marks active root");
+  const box = root.children[0];
+  assert(box.className === "branch-staging-box", "branch staging renders focused room box");
+  const seatList = box.children.find((child) => child.className === "branch-seat-list");
+  assert(seatList.children.length === 2, "branch staging renders original seats");
+  const claimButton = seatList.children[0].children[2];
+  claimButton.onclick();
+  assert(sent[0][0] === "claim" && sent[0][1] === 1, "claim button sends branch seat claim");
+  const startButton = box.children.find((child) => child.className === "branch-actions").children[0];
+  assert(startButton.hidden === false, "host sees start button");
+  assert(startButton.disabled === true, "start disabled until all seats claimed");
+  staging.destroy();
+  globalThis.document = priorDocument;
 }
 
 // ---------------------------------------------------------------------------

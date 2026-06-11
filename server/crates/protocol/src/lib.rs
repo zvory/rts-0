@@ -136,6 +136,13 @@ pub enum ClientMessage {
     SetReplayVision { vision: ReplayVisionRequest },
     /// Request a new practice branch room from this replay room's current authoritative tick.
     RequestReplayBranch,
+    /// Claim one original replay seat in a practice branch staging room.
+    ClaimReplayBranchSeat {
+        #[serde(rename = "playerId")]
+        player_id: u32,
+    },
+    /// Release this viewer's claimed replay branch seat.
+    ReleaseReplayBranchSeat,
     /// Host selects a map by name (lobby phase only; ignored from non-hosts).
     SelectMap { map: String },
 }
@@ -291,6 +298,28 @@ pub struct ReplayBranchSeat {
     pub claimable: bool,
 }
 
+/// Seat state in a practice branch staging room.
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ReplayBranchStagingSeat {
+    pub player_id: u32,
+    pub name: String,
+    pub color: String,
+    pub claimable: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub claimed_by: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub claimed_by_name: Option<String>,
+}
+
+/// Unseated viewer in a practice branch staging room.
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ReplayBranchViewer {
+    pub id: u32,
+    pub name: String,
+}
+
 #[derive(Debug, Clone, Serialize)]
 #[serde(tag = "t", rename_all = "camelCase", rename_all_fields = "camelCase")]
 pub enum ServerMessage {
@@ -329,6 +358,15 @@ pub enum ServerMessage {
         branch_room: String,
         source_tick: u32,
         seats: Vec<ReplayBranchSeat>,
+    },
+    /// Current claim state for a practice branch staging room.
+    ReplayBranchStaging {
+        branch_room: String,
+        source_tick: u32,
+        host_id: u32,
+        seats: Vec<ReplayBranchStagingSeat>,
+        viewers: Vec<ReplayBranchViewer>,
+        can_start: bool,
     },
     /// Server shutdown drain has started. Existing matches may continue until the deadline, but
     /// new match starts are disabled.
@@ -1108,6 +1146,21 @@ mod tests {
     }
 
     #[test]
+    fn replay_branch_seat_messages_deserialize() {
+        let msg: ClientMessage =
+            serde_json::from_str(r#"{"t":"claimReplayBranchSeat","playerId":7}"#)
+                .expect("claimReplayBranchSeat should deserialize");
+        match msg {
+            ClientMessage::ClaimReplayBranchSeat { player_id } => assert_eq!(player_id, 7),
+            other => panic!("expected claimReplayBranchSeat, got {other:?}"),
+        }
+
+        let msg: ClientMessage = serde_json::from_str(r#"{"t":"releaseReplayBranchSeat"}"#)
+            .expect("releaseReplayBranchSeat should deserialize");
+        assert!(matches!(msg, ClientMessage::ReleaseReplayBranchSeat));
+    }
+
+    #[test]
     fn replay_branch_created_serializes_contract_shape() {
         let msg = ServerMessage::ReplayBranchCreated {
             branch_room: "__replay_branch__:00000001".to_string(),
@@ -1128,6 +1181,39 @@ mod tests {
         assert_eq!(json["seats"][0]["name"], "Player 7");
         assert_eq!(json["seats"][0]["color"], "#4878c8");
         assert_eq!(json["seats"][0]["claimable"], true);
+    }
+
+    #[test]
+    fn replay_branch_staging_serializes_contract_shape() {
+        let msg = ServerMessage::ReplayBranchStaging {
+            branch_room: "__replay_branch__:00000001".to_string(),
+            source_tick: 123,
+            host_id: 42,
+            seats: vec![ReplayBranchStagingSeat {
+                player_id: 7,
+                name: "Player 7".to_string(),
+                color: "#4878c8".to_string(),
+                claimable: true,
+                claimed_by: Some(42),
+                claimed_by_name: Some("Commander".to_string()),
+            }],
+            viewers: vec![ReplayBranchViewer {
+                id: 43,
+                name: "Observer".to_string(),
+            }],
+            can_start: false,
+        };
+        let json = serde_json::to_value(msg).expect("staging message should serialize");
+
+        assert_eq!(json["t"], "replayBranchStaging");
+        assert_eq!(json["branchRoom"], "__replay_branch__:00000001");
+        assert_eq!(json["sourceTick"], 123);
+        assert_eq!(json["hostId"], 42);
+        assert_eq!(json["seats"][0]["playerId"], 7);
+        assert_eq!(json["seats"][0]["claimedBy"], 42);
+        assert_eq!(json["seats"][0]["claimedByName"], "Commander");
+        assert_eq!(json["viewers"][0]["id"], 43);
+        assert_eq!(json["canStart"], false);
     }
 
     fn representative_snapshot() -> Snapshot {

@@ -12,6 +12,7 @@
 
 import { Net } from "./net.js";
 import { Lobby } from "./lobby.js";
+import { BranchStaging } from "./branch_staging.js";
 import { Audio, SOUND_MANIFEST } from "./audio.js";
 import { S } from "./protocol.js";
 import { TOAST_MS } from "./alerts.js";
@@ -59,6 +60,7 @@ export class App {
     this.statusBadge = new StatusBadge(dom.version);
     /** @type {Lobby} */
     this.lobby = new Lobby(dom.lobbyScreen, this.net);
+    this.branchStaging = new BranchStaging(dom.branchScreen, this.net);
     /** @type {MatchHistory|null} Lazy-init when the lobby first shows. */
     this.matchHistory = null;
     /** @type {Match|null} the currently running match, if any. */
@@ -80,6 +82,7 @@ export class App {
     this.onGameOverOverlayClick = this.onGameOverOverlayClick.bind(this);
     this.onOpen = this.onOpen.bind(this);
     this.onClose = this.onClose.bind(this);
+    this.onReplayBranchCreated = this.onReplayBranchCreated.bind(this);
     this.inReplayPlayback = false;
   }
 
@@ -88,6 +91,7 @@ export class App {
     this.net.on(S.START, this.onStart);
     this.net.on(S.ERROR, this.onError);
     this.net.on(S.GAME_OVER, this.onGameOver);
+    this.net.on(S.REPLAY_BRANCH_CREATED, this.onReplayBranchCreated);
     this.net.on(S.SHUTDOWN_WARNING, this.onShutdownWarning);
     this.net.on("open", this.onOpen);
     this.net.on("close", this.onClose);
@@ -211,6 +215,7 @@ export class App {
     this.inReplayPlayback = startsReplay;
 
     dom.lobbyScreen.hidden = true;
+    this.branchStaging.hide();
     if (dom.devLinks) dom.devLinks.hidden = true;
     dom.gameScreen.hidden = false;
     if (!preserveScorePanel) {
@@ -229,6 +234,27 @@ export class App {
       diagnostics,
     );
     diagnostics.mark("app.onStart.end");
+  }
+
+  onReplayBranchCreated(m) {
+    const branchRoom = (m?.branchRoom || "").trim();
+    if (!branchRoom) return;
+    if (this.match) {
+      this.match.destroy();
+      this.match = null;
+    }
+    this.inReplayPlayback = false;
+    this.statusBadge.clearMatchMetrics();
+    dom.gameOver.hidden = true;
+    this.clearScoreboard();
+    dom.gameScreen.hidden = true;
+    dom.lobbyScreen.hidden = true;
+    if (dom.devLinks) dom.devLinks.hidden = true;
+    this.branchStaging.show();
+
+    const name = (this.lobby?.elName && this.lobby.elName.value.trim()) || "Commander";
+    if (this.lobby?.elRoom) this.lobby.elRoom.value = branchRoom;
+    this.net.join(name, branchRoom, true, true);
   }
 
   /**
@@ -341,6 +367,7 @@ export class App {
     dom.gameOver.hidden = true;
     this.clearScoreboard();
     dom.gameScreen.hidden = true;
+    if (dom.branchScreen) this.branchStaging.hide();
     dom.lobbyScreen.hidden = false;
     if (dom.devLinks) dom.devLinks.hidden = false;
     this.lobby.show();

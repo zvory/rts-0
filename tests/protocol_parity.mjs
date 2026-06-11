@@ -146,11 +146,33 @@ assert(
   "requestReplayBranch builder must emit the exact wire shape",
 );
 assert(
+  rust.includes("ClaimReplayBranchSeat") &&
+    C.CLAIM_REPLAY_BRANCH_SEAT === "claimReplayBranchSeat",
+  "claimReplayBranchSeat client message tag must match Rust",
+);
+assert(
+  JSON.stringify(msg.claimReplayBranchSeat(7)) ===
+    JSON.stringify({ t: "claimReplayBranchSeat", playerId: 7 }),
+  "claimReplayBranchSeat builder must emit the exact wire shape",
+);
+assert(
+  rust.includes("ReleaseReplayBranchSeat") &&
+    C.RELEASE_REPLAY_BRANCH_SEAT === "releaseReplayBranchSeat",
+  "releaseReplayBranchSeat client message tag must match Rust",
+);
+assert(
   rust.includes("ReplayBranchCreated") && S.REPLAY_BRANCH_CREATED === "replayBranchCreated",
   "replayBranchCreated server message tag must match Rust",
 );
 for (const field of ["branch_room", "source_tick", "seats", "player_id", "claimable"]) {
   assert(rust.includes(field), `replayBranchCreated Rust contract is missing ${field}`);
+}
+assert(
+  rust.includes("ReplayBranchStaging") && S.REPLAY_BRANCH_STAGING === "replayBranchStaging",
+  "replayBranchStaging server message tag must match Rust",
+);
+for (const field of ["host_id", "claimed_by", "claimed_by_name", "viewers", "can_start"]) {
+  assert(rust.includes(field), `replayBranchStaging Rust contract is missing ${field}`);
 }
 
 console.log("✅ protocol_parity.mjs: Rust compact protocol codes match JS decoder maps");

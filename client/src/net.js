@@ -238,6 +238,16 @@ export class Net {
     this._send(msg.requestReplayBranch());
   }
 
+  /** Claim an original replay player seat in a branch staging room. */
+  claimReplayBranchSeat(playerId) {
+    this._send(msg.claimReplayBranchSeat(playerId));
+  }
+
+  /** Release our current replay branch seat claim. */
+  releaseReplayBranchSeat() {
+    this._send(msg.releaseReplayBranchSeat());
+  }
+
   /**
    * Host selects a map by name (lobby phase only).
    * @param {string} map map display name
