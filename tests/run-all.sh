@@ -7,7 +7,7 @@
 #   2. Rust formatting              (cargo fmt --check)
 #   3. Rust fast scripted tests     (cargo test — deterministic, in-process, no server)
 #   4. Rust lint                    (cargo clippy)
-#   5. Node API suites              (server_integration, regression, ai_integration)
+#   5. Node API suites              (protocol/UI units, server_integration, regression, ai_integration)
 #   6. Headless client smoke        (client_smoke — hydrates shared deps; needs Chrome)
 #
 # The server is built in debug (overflow checks ON — the hardening regression tests rely on a
@@ -413,6 +413,8 @@ run_rust_suites_bg() {
 
 run_suite_bg "JS protocol contracts" \
   node "$SCRIPT_DIR/protocol_parity.mjs"
+run_suite_bg "JS HUD command card" \
+  node "$SCRIPT_DIR/hud_command_card.mjs"
 
 # --- 1. Build server first (both cargo build and cargo test share the target dir and
 #        serialize via cargo's file lock, so we build once, then run both in parallel

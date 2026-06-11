@@ -253,7 +253,7 @@ export function buildTrainCard(ctx, building) {
   for (const upgrade of researches) {
     const def = UPGRADES[upgrade];
     if (!def) continue;
-    const preferredSlot = researchSlotForUpgrade(upgrade, trains);
+    const preferredSlot = researchSlotForUpgrade(building.kind, upgrade, trains);
     const slot = firstOpenCommandSlot(slots, preferredSlot, cancelSlot);
     if (slot < 0) continue;
     const availability = researchAvailability(ctx, upgrade, resources);
@@ -556,9 +556,11 @@ function selectedProducingBuildingsForKind(ctx, kind) {
   );
 }
 
-function researchSlotForUpgrade(upgrade, trains) {
+function researchSlotForUpgrade(buildingKind, upgrade, trains) {
   const unitIndex = trains.findIndex((unit) => STATS[unit]?.upgradeRequires === upgrade);
   if (unitIndex >= 0) return unitIndex + 3;
+  const researchIndex = researchesOf(buildingKind).indexOf(upgrade);
+  if (researchIndex >= 0) return researchIndex;
   const afterTrainSlot = trains.findIndex((unit) => STATS[unit] == null);
   return afterTrainSlot >= 0 ? afterTrainSlot : trains.length;
 }
