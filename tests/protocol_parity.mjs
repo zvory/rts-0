@@ -146,11 +146,42 @@ assert(
   "requestReplayBranch builder must emit the exact wire shape",
 );
 assert(
+  rust.includes("ClaimBranchSeat") && C.CLAIM_BRANCH_SEAT === "claimBranchSeat",
+  "claimBranchSeat client message tag must match Rust",
+);
+assert(
+  JSON.stringify(msg.claimBranchSeat(7)) === JSON.stringify({ t: "claimBranchSeat", playerId: 7 }),
+  "claimBranchSeat builder must emit the exact wire shape",
+);
+assert(
+  rust.includes("ReleaseBranchSeat") && C.RELEASE_BRANCH_SEAT === "releaseBranchSeat",
+  "releaseBranchSeat client message tag must match Rust",
+);
+assert(
+  JSON.stringify(msg.releaseBranchSeat(7)) === JSON.stringify({ t: "releaseBranchSeat", playerId: 7 }),
+  "releaseBranchSeat builder must emit the exact wire shape",
+);
+assert(
+  rust.includes("StartBranch") && C.START_BRANCH === "startBranch",
+  "startBranch client message tag must match Rust",
+);
+assert(
+  JSON.stringify(msg.startBranch()) === JSON.stringify({ t: "startBranch" }),
+  "startBranch builder must emit the exact wire shape",
+);
+assert(
   rust.includes("ReplayBranchCreated") && S.REPLAY_BRANCH_CREATED === "replayBranchCreated",
   "replayBranchCreated server message tag must match Rust",
 );
 for (const field of ["branch_room", "source_tick", "seats", "player_id", "claimable"]) {
   assert(rust.includes(field), `replayBranchCreated Rust contract is missing ${field}`);
+}
+assert(
+  rust.includes("BranchStaging") && S.BRANCH_STAGING === "branchStaging",
+  "branchStaging server message tag must match Rust",
+);
+for (const field of ["host_id", "claimant_id", "occupants", "can_start"]) {
+  assert(rust.includes(field), `branchStaging Rust contract is missing ${field}`);
 }
 
 console.log("✅ protocol_parity.mjs: Rust compact protocol codes match JS decoder maps");

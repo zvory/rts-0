@@ -124,6 +124,7 @@ enum Phase {
     Lobby,
     InGame(Box<Game>),
     ReplayViewer(Box<ReplaySession>),
+    BranchStaging(Box<BranchStagingState>),
 }
 
 #[derive(Clone)]
@@ -217,6 +218,91 @@ struct ReplayKeyframe {
     tick: u32,
     game: Box<Game>,
     next_command: usize,
+}
+
+struct BranchStagingState {
+    seed: ReplayBranchSeed,
+    claimed_by_seat: HashMap<u32, u32>,
+}
+
+impl BranchStagingState {
+    fn new(seed: ReplayBranchSeed) -> Self {
+        Self {
+            seed,
+            claimed_by_seat: HashMap::new(),
+        }
+    }
+
+    fn source_tick(&self) -> u32 {
+        self.seed.source_tick
+    }
+
+    fn can_start(&self) -> bool {
+        self.seed
+            .seats
+            .iter()
+            .filter(|seat| seat.claimable)
+            .all(|seat| self.claimed_by_seat.contains_key(&seat.player_id))
+    }
+
+    fn claimant_for_occupant(&self, occupant_id: u32) -> Option<u32> {
+        self.claimed_by_seat
+            .iter()
+            .find_map(|(seat_player_id, claimant_id)| {
+                (*claimant_id == occupant_id).then_some(*seat_player_id)
+            })
+    }
+
+    fn claim(&mut self, occupant_id: u32, seat_player_id: u32) -> Result<(), &'static str> {
+        if !self
+            .seed
+            .seats
+            .iter()
+            .any(|seat| seat.player_id == seat_player_id && seat.claimable)
+        {
+            return Err("unknown branch seat");
+        }
+        if self.claimant_for_occupant(occupant_id).is_some() {
+            return Err("occupant already claimed a branch seat");
+        }
+        if self.claimed_by_seat.contains_key(&seat_player_id) {
+            return Err("branch seat already claimed");
+        }
+        self.claimed_by_seat.insert(seat_player_id, occupant_id);
+        Ok(())
+    }
+
+    fn release(&mut self, occupant_id: u32, seat_player_id: u32) -> bool {
+        if self.claimed_by_seat.get(&seat_player_id) != Some(&occupant_id) {
+            return false;
+        }
+        self.claimed_by_seat.remove(&seat_player_id);
+        true
+    }
+
+    fn release_occupant(&mut self, occupant_id: u32) {
+        self.claimed_by_seat
+            .retain(|_, claimant_id| *claimant_id != occupant_id);
+    }
+
+    fn seats_for_message(&self, players: &HashMap<u32, RoomPlayer>) -> Vec<BranchStagingSeat> {
+        self.seed
+            .seats
+            .iter()
+            .map(|seat| {
+                let claimant_id = self.claimed_by_seat.get(&seat.player_id).copied();
+                let claimant_name =
+                    claimant_id.and_then(|id| players.get(&id).map(|p| p.name.clone()));
+                BranchStagingSeat {
+                    player_id: seat.player_id,
+                    name: seat.name.clone(),
+                    color: seat.color.clone(),
+                    claimant_id,
+                    claimant_name,
+                }
+            })
+            .collect()
+    }
 }
 
 impl ReplaySession {
@@ -699,6 +785,7 @@ impl RoomTask {
         }
         match &self.phase {
             Phase::ReplayViewer(session) => session.speed,
+            Phase::BranchStaging(_) => 1.0,
             _ => self.replay_speed,
         }
     }
@@ -759,6 +846,15 @@ impl RoomTask {
             RoomEvent::RequestReplayBranch { player_id, reply } => {
                 let _ = reply.send(self.on_request_replay_branch(player_id));
             }
+            RoomEvent::ClaimBranchSeat {
+                player_id,
+                seat_player_id,
+            } => self.on_claim_branch_seat(player_id, seat_player_id),
+            RoomEvent::ReleaseBranchSeat {
+                player_id,
+                seat_player_id,
+            } => self.on_release_branch_seat(player_id, seat_player_id),
+            RoomEvent::StartBranch { player_id } => self.on_start_branch(player_id),
             RoomEvent::AnnounceReplayBranch {
                 branch_room,
                 source_tick,
@@ -826,23 +922,10 @@ impl RoomTask {
             self.on_join_replay_room(player_id, name, msg_tx, ack);
             return;
         }
-        if let RoomMode::ReplayBranch { seed } = &self.mode {
-            send_or_log(
-                &self.room,
-                player_id,
-                &msg_tx,
-                ServerMessage::Error {
-                    msg: "Replay branch staging is not available yet.".to_string(),
-                },
-            );
-            debug!(
-                room = %self.room,
-                player_id,
-                source_tick = seed.source_tick,
-                seat_count = seed.seats.len(),
-                "rejecting branch room join before staging runtime is implemented"
-            );
-            let _ = ack.send(false);
+        if matches!(self.mode, RoomMode::ReplayBranch { .. })
+            || matches!(self.phase, Phase::BranchStaging(_))
+        {
+            self.on_join_branch_staging(player_id, name, msg_tx, ack);
             return;
         }
         if matches!(self.phase, Phase::ReplayViewer(_)) {
@@ -957,10 +1040,14 @@ impl RoomTask {
             self.ai_players.clear();
             self.dev_driver = None;
             self.dev_view_player_id = None;
+            if matches!(self.mode, RoomMode::ReplayBranch { .. }) {
+                self.mode = RoomMode::Normal;
+            }
             debug!(room = %self.room, "room emptied; reset to lobby");
             return;
         }
 
+        let mut broadcast_branch_staging = false;
         match &mut self.phase {
             Phase::Lobby => self.broadcast_lobby(),
             Phase::InGame(game) => {
@@ -972,6 +1059,13 @@ impl RoomTask {
             Phase::ReplayViewer(session) => {
                 session.viewer_vision.remove(&player_id);
             }
+            Phase::BranchStaging(staging) => {
+                staging.release_occupant(player_id);
+                broadcast_branch_staging = true;
+            }
+        }
+        if broadcast_branch_staging {
+            self.broadcast_branch_staging();
         }
     }
 
@@ -1242,6 +1336,10 @@ impl RoomTask {
                 self.phase = Phase::ReplayViewer(session);
                 return;
             }
+            Phase::BranchStaging(staging) => {
+                self.phase = Phase::BranchStaging(staging);
+                return;
+            }
         };
 
         debug!(room = %self.room, player_id, "player gave up");
@@ -1389,7 +1487,47 @@ impl RoomTask {
                 }
             },
             Phase::InGame(_) => {}
+            Phase::BranchStaging(_) => {}
         }
+    }
+
+    fn on_join_branch_staging(
+        &mut self,
+        player_id: u32,
+        name: String,
+        msg_tx: ConnectionSink,
+        ack: tokio::sync::oneshot::Sender<bool>,
+    ) {
+        if self.players.contains_key(&player_id) {
+            let _ = ack.send(false);
+            return;
+        }
+        if !matches!(self.phase, Phase::BranchStaging(_)) {
+            let seed = match &self.mode {
+                RoomMode::ReplayBranch { seed } => seed.clone(),
+                _ => {
+                    let _ = ack.send(false);
+                    return;
+                }
+            };
+            self.phase = Phase::BranchStaging(Box::new(BranchStagingState::new(seed)));
+        }
+        self.order.push(player_id);
+        self.players.insert(
+            player_id,
+            RoomPlayer {
+                name,
+                color: "#6f8fa8".to_string(),
+                ready: true,
+                spectator: true,
+                msg_tx,
+                head_of_line_count: 0,
+            },
+        );
+        self.reassign_host_if_needed();
+        let _ = ack.send(true);
+        self.send_current_shutdown_warning_to(player_id);
+        self.broadcast_branch_staging();
     }
 
     fn replay_session_for_mode(&self) -> Result<ReplaySession, String> {
@@ -1922,6 +2060,10 @@ impl RoomTask {
                 self.phase = Phase::ReplayViewer(session);
                 return;
             }
+            Phase::BranchStaging(staging) => {
+                self.phase = Phase::BranchStaging(staging);
+                return;
+            }
         };
         let scheduler_lag = scheduled.elapsed();
         let tick_start = StdInstant::now();
@@ -2085,6 +2227,10 @@ impl RoomTask {
             Phase::InGame(game) => game,
             Phase::ReplayViewer(session) => {
                 self.phase = Phase::ReplayViewer(session);
+                return;
+            }
+            Phase::BranchStaging(staging) => {
+                self.phase = Phase::BranchStaging(staging);
                 return;
             }
         };
@@ -2319,6 +2465,53 @@ impl RoomTask {
         session.branch_seed()
     }
 
+    fn on_claim_branch_seat(&mut self, player_id: u32, seat_player_id: u32) {
+        if !self.players.contains_key(&player_id) {
+            return;
+        }
+        let result = match &mut self.phase {
+            Phase::BranchStaging(staging) => staging.claim(player_id, seat_player_id),
+            _ => return,
+        };
+        match result {
+            Ok(()) => self.broadcast_branch_staging(),
+            Err(err) => self.send_error_to(player_id, err),
+        }
+    }
+
+    fn on_release_branch_seat(&mut self, player_id: u32, seat_player_id: u32) {
+        if !self.players.contains_key(&player_id) {
+            return;
+        }
+        let released = match &mut self.phase {
+            Phase::BranchStaging(staging) => staging.release(player_id, seat_player_id),
+            _ => return,
+        };
+        if released {
+            self.broadcast_branch_staging();
+        }
+    }
+
+    fn on_start_branch(&mut self, player_id: u32) {
+        if self.host_id != Some(player_id) {
+            return;
+        }
+        let Some(staging) = self.branch_staging() else {
+            return;
+        };
+        if !staging.can_start() {
+            self.send_error_to(
+                player_id,
+                "All original branch seats must be claimed before launch.",
+            );
+            return;
+        }
+        self.send_error_to(
+            player_id,
+            "Replay branch launch is not available until the branch promotion phase.",
+        );
+    }
+
     fn on_announce_replay_branch(
         &self,
         branch_room: String,
@@ -2333,6 +2526,41 @@ impl RoomTask {
             source_tick,
             seats,
         });
+    }
+
+    fn branch_staging(&self) -> Option<&BranchStagingState> {
+        match &self.phase {
+            Phase::BranchStaging(staging) => Some(staging),
+            _ => None,
+        }
+    }
+
+    fn branch_staging_message(&self, staging: &BranchStagingState) -> ServerMessage {
+        let occupants = self
+            .order
+            .iter()
+            .filter_map(|id| {
+                self.players.get(id).map(|player| BranchStagingOccupant {
+                    id: *id,
+                    name: player.name.clone(),
+                })
+            })
+            .collect();
+        ServerMessage::BranchStaging {
+            room: self.room.clone(),
+            source_tick: staging.source_tick(),
+            host_id: self.host_id.unwrap_or(0),
+            seats: staging.seats_for_message(&self.players),
+            occupants,
+            can_start: staging.can_start(),
+        }
+    }
+
+    fn broadcast_branch_staging(&self) {
+        let Some(staging) = self.branch_staging() else {
+            return;
+        };
+        self.broadcast(&self.branch_staging_message(staging));
     }
 
     /// Rewind a replay by `ticks_back` ticks. Pass `u32::MAX` to reset to the start.
@@ -2650,6 +2878,20 @@ impl RoomTask {
         }
     }
 
+    fn send_error_to(&self, player_id: u32, msg: &str) {
+        let Some(player) = self.players.get(&player_id) else {
+            return;
+        };
+        send_or_log(
+            &self.room,
+            player_id,
+            &player.msg_tx,
+            ServerMessage::Error {
+                msg: msg.to_string(),
+            },
+        );
+    }
+
     fn reset_match_net_status(&mut self) {
         self.slow_tick_count = 0;
         for player in self.players.values_mut() {
@@ -2737,6 +2979,16 @@ mod tests {
         (game, artifact)
     }
 
+    fn replay_branch_test_seed(players: &[PlayerInit], ticks: u32) -> ReplayBranchSeed {
+        let (_live, artifact) = replay_test_artifact(players, ticks);
+        let mut replay = ReplaySession::new(artifact).unwrap();
+        while replay.current_tick() < ticks {
+            replay.enqueue_for_current_tick().unwrap();
+            replay.tick(None);
+        }
+        replay.branch_seed().unwrap()
+    }
+
     fn write_selfplay_replay_test_artifact(
         name: &str,
         artifact: &ReplayArtifactV1,
@@ -2772,6 +3024,30 @@ mod tests {
         writer
     }
 
+    fn add_branch_occupant(task: &mut RoomTask, id: u32) -> ConnectionWriter {
+        let (msg_tx, writer) = ConnectionSink::new();
+        task.order.push(id);
+        task.players.insert(
+            id,
+            RoomPlayer {
+                name: format!("Viewer {id}"),
+                color: "#6f8fa8".to_string(),
+                ready: true,
+                spectator: true,
+                msg_tx,
+                head_of_line_count: 0,
+            },
+        );
+        task.reassign_host_if_needed();
+        writer
+    }
+
+    fn branch_staging_messages(writer: &mut ConnectionWriter) -> Vec<ServerMessage> {
+        std::iter::from_fn(|| writer.reliable_rx.try_recv().ok())
+            .filter(|msg| matches!(msg, ServerMessage::BranchStaging { .. }))
+            .collect()
+    }
+
     fn replay_transition_test_snapshot(tick: u32) -> Snapshot {
         Snapshot {
             tick,
@@ -2794,6 +3070,7 @@ mod tests {
         match &task.phase {
             Phase::InGame(game) => game.tick_count(),
             Phase::ReplayViewer(session) => session.current_tick(),
+            Phase::BranchStaging(staging) => staging.source_tick(),
             Phase::Lobby => 0,
         }
     }
@@ -3310,6 +3587,218 @@ mod tests {
                     && seats[0].player_id == players[0].id
             ));
         }
+    }
+
+    #[test]
+    fn branch_staging_seat_claims_are_exclusive() {
+        let players = replay_test_players(2);
+        let seed = replay_branch_test_seed(&players, 2);
+        let mut task = RoomTask::new(
+            "branch-exclusive-test".to_string(),
+            RoomMode::ReplayBranch { seed: seed.clone() },
+            None,
+            false,
+            DrainHandle::default(),
+        );
+        let mut writer_a = add_branch_occupant(&mut task, 100);
+        let mut writer_b = add_branch_occupant(&mut task, 101);
+        task.phase = Phase::BranchStaging(Box::new(BranchStagingState::new(seed)));
+
+        task.on_claim_branch_seat(100, players[0].id);
+        task.on_claim_branch_seat(101, players[0].id);
+
+        let messages = branch_staging_messages(&mut writer_a);
+        let last = messages.last().expect("branch staging update");
+        assert!(matches!(
+            last,
+            ServerMessage::BranchStaging { seats, .. }
+                if seats[0].claimant_id == Some(100)
+        ));
+        assert!(
+            std::iter::from_fn(|| writer_b.reliable_rx.try_recv().ok()).any(|msg| {
+                matches!(msg, ServerMessage::Error { msg } if msg.contains("already claimed"))
+            })
+        );
+    }
+
+    #[test]
+    fn branch_staging_one_occupant_cannot_claim_multiple_seats() {
+        let players = replay_test_players(2);
+        let seed = replay_branch_test_seed(&players, 0);
+        let mut task = RoomTask::new(
+            "branch-single-claim-test".to_string(),
+            RoomMode::ReplayBranch { seed: seed.clone() },
+            None,
+            false,
+            DrainHandle::default(),
+        );
+        let mut writer = add_branch_occupant(&mut task, 100);
+        task.phase = Phase::BranchStaging(Box::new(BranchStagingState::new(seed)));
+
+        task.on_claim_branch_seat(100, players[0].id);
+        task.on_claim_branch_seat(100, players[1].id);
+
+        assert!(std::iter::from_fn(|| writer.reliable_rx.try_recv().ok()).any(|msg| {
+            matches!(msg, ServerMessage::Error { msg } if msg.contains("already claimed a branch seat"))
+        }));
+        let Phase::BranchStaging(staging) = &task.phase else {
+            panic!("branch staging should stay active");
+        };
+        assert_eq!(staging.claimant_for_occupant(100), Some(players[0].id));
+        assert!(!staging.claimed_by_seat.contains_key(&players[1].id));
+    }
+
+    #[test]
+    fn branch_staging_requires_all_original_seats_before_can_start() {
+        let players = replay_test_players(2);
+        let seed = replay_branch_test_seed(&players, 0);
+        let mut task = RoomTask::new(
+            "branch-can-start-test".to_string(),
+            RoomMode::ReplayBranch { seed: seed.clone() },
+            None,
+            false,
+            DrainHandle::default(),
+        );
+        let mut writer_a = add_branch_occupant(&mut task, 100);
+        let _writer_b = add_branch_occupant(&mut task, 101);
+        task.phase = Phase::BranchStaging(Box::new(BranchStagingState::new(seed)));
+
+        task.broadcast_branch_staging();
+        task.on_claim_branch_seat(100, players[0].id);
+        task.on_claim_branch_seat(101, players[1].id);
+
+        let updates = branch_staging_messages(&mut writer_a);
+        assert!(matches!(
+            updates.first(),
+            Some(ServerMessage::BranchStaging {
+                can_start: false,
+                ..
+            })
+        ));
+        assert!(matches!(
+            updates.last(),
+            Some(ServerMessage::BranchStaging {
+                can_start: true,
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn branch_staging_allows_release_and_reclaim() {
+        let players = replay_test_players(2);
+        let seed = replay_branch_test_seed(&players, 0);
+        let mut task = RoomTask::new(
+            "branch-release-test".to_string(),
+            RoomMode::ReplayBranch { seed: seed.clone() },
+            None,
+            false,
+            DrainHandle::default(),
+        );
+        let _writer_a = add_branch_occupant(&mut task, 100);
+        let mut writer_b = add_branch_occupant(&mut task, 101);
+        task.phase = Phase::BranchStaging(Box::new(BranchStagingState::new(seed)));
+
+        task.on_claim_branch_seat(100, players[0].id);
+        task.on_release_branch_seat(100, players[0].id);
+        task.on_claim_branch_seat(101, players[0].id);
+
+        let updates = branch_staging_messages(&mut writer_b);
+        assert!(matches!(
+            updates.last(),
+            Some(ServerMessage::BranchStaging { seats, .. })
+                if seats[0].claimant_id == Some(101)
+        ));
+        let Phase::BranchStaging(staging) = &task.phase else {
+            panic!("branch staging should stay active");
+        };
+        assert_eq!(staging.claimant_for_occupant(100), None);
+        assert_eq!(staging.claimant_for_occupant(101), Some(players[0].id));
+    }
+
+    #[test]
+    fn branch_staging_leave_releases_claim_and_reassigns_host() {
+        let players = replay_test_players(2);
+        let seed = replay_branch_test_seed(&players, 0);
+        let mut task = RoomTask::new(
+            "branch-leave-test".to_string(),
+            RoomMode::ReplayBranch { seed: seed.clone() },
+            None,
+            false,
+            DrainHandle::default(),
+        );
+        let _writer_a = add_branch_occupant(&mut task, 100);
+        let mut writer_b = add_branch_occupant(&mut task, 101);
+        task.phase = Phase::BranchStaging(Box::new(BranchStagingState::new(seed)));
+        task.on_claim_branch_seat(100, players[0].id);
+
+        task.on_leave(100);
+
+        assert_eq!(task.host_id, Some(101));
+        let updates = branch_staging_messages(&mut writer_b);
+        assert!(matches!(
+            updates.last(),
+            Some(ServerMessage::BranchStaging { seats, host_id: 101, .. })
+                if seats[0].claimant_id.is_none()
+        ));
+    }
+
+    #[test]
+    fn branch_staging_rejects_normal_lobby_only_controls() {
+        let players = replay_test_players(2);
+        let seed = replay_branch_test_seed(&players, 0);
+        let mut task = RoomTask::new(
+            "branch-lobby-controls-test".to_string(),
+            RoomMode::ReplayBranch { seed: seed.clone() },
+            None,
+            false,
+            DrainHandle::default(),
+        );
+        let mut writer = add_branch_occupant(&mut task, 100);
+        task.phase = Phase::BranchStaging(Box::new(BranchStagingState::new(seed)));
+        task.host_id = Some(100);
+
+        task.on_ready(100, true);
+        task.on_add_ai(100);
+        task.on_remove_ai(100, 999);
+        task.on_set_quickstart(100, true);
+        task.on_set_spectator(100, false);
+        task.on_select_map(100, "Badlands".to_string());
+        task.on_start_request(100);
+
+        assert!(task.ai_players.is_empty());
+        assert!(!task.quickstart);
+        assert_eq!(task.selected_map, "Default");
+        assert!(matches!(task.phase, Phase::BranchStaging(_)));
+        assert!(!std::iter::from_fn(|| writer.reliable_rx.try_recv().ok())
+            .any(|msg| matches!(msg, ServerMessage::Lobby { .. } | ServerMessage::Start(_))));
+    }
+
+    #[test]
+    fn empty_branch_room_drops_frozen_state_and_resets_room_name() {
+        let players = replay_test_players(2);
+        let seed = replay_branch_test_seed(&players, 1);
+        let mut task = RoomTask::new(
+            "branch-empty-test".to_string(),
+            RoomMode::ReplayBranch { seed },
+            None,
+            false,
+            DrainHandle::default(),
+        );
+        let (msg_tx, _writer) = ConnectionSink::new();
+        let (ack_tx, mut ack_rx) = tokio::sync::oneshot::channel();
+
+        task.on_join(100, "Viewer".to_string(), true, false, msg_tx, ack_tx);
+        assert_eq!(ack_rx.try_recv(), Ok(true));
+        assert_eq!(task.host_id, Some(100));
+        assert!(matches!(task.phase, Phase::BranchStaging(_)));
+
+        task.on_leave(100);
+
+        assert!(matches!(task.phase, Phase::Lobby));
+        assert!(matches!(task.mode, RoomMode::Normal));
+        assert!(task.players.is_empty());
+        assert_eq!(task.host_id, None);
     }
 
     #[test]

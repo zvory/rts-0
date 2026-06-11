@@ -1443,6 +1443,40 @@ async fn handle_client_message(
         ClientMessage::RequestReplayBranch => {
             request_replay_branch(player_id, lobby, conn_tx, current_room).await;
         }
+        ClientMessage::ClaimBranchSeat {
+            player_id: seat_player_id,
+        } => {
+            send_room_event(
+                player_id,
+                current_room,
+                RoomEvent::ClaimBranchSeat {
+                    player_id,
+                    seat_player_id,
+                },
+            )
+            .await;
+        }
+        ClientMessage::ReleaseBranchSeat {
+            player_id: seat_player_id,
+        } => {
+            send_room_event(
+                player_id,
+                current_room,
+                RoomEvent::ReleaseBranchSeat {
+                    player_id,
+                    seat_player_id,
+                },
+            )
+            .await;
+        }
+        ClientMessage::StartBranch => {
+            send_room_event(
+                player_id,
+                current_room,
+                RoomEvent::StartBranch { player_id },
+            )
+            .await;
+        }
         ClientMessage::SelectMap { map } => {
             send_room_event(
                 player_id,

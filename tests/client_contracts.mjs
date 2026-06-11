@@ -1266,6 +1266,10 @@ function fakeAudioContext() {
   assertHasMethod(net, "setQuickstart", "Net");
   assertHasMethod(net, "setReplaySpeed", "Net");
   assertHasMethod(net, "setReplayVision", "Net");
+  assertHasMethod(net, "requestReplayBranch", "Net");
+  assertHasMethod(net, "claimBranchSeat", "Net");
+  assertHasMethod(net, "releaseBranchSeat", "Net");
+  assertHasMethod(net, "startBranch", "Net");
   assert(!("replayOk" in msg.join("A", "main")), "join builder omits replayOk by default");
   assert(
     msg.join("A", "main", false, true).replayOk === true,
@@ -1274,6 +1278,10 @@ function fakeAudioContext() {
   assert(msg.netReport({ schemaVersion: 1 }).t === "netReport", "net-report builder tag");
   assert(msg.netReport({ schemaVersion: 1 }).report.schemaVersion === 1, "net-report builder payload");
   assert(msg.returnToLobby().t === "returnToLobby", "return-to-lobby builder tag");
+  assert(msg.requestReplayBranch().t === "requestReplayBranch", "replay branch builder tag");
+  assert(msg.claimBranchSeat(7).t === "claimBranchSeat", "branch seat claim builder tag");
+  assert(msg.releaseBranchSeat(7).t === "releaseBranchSeat", "branch seat release builder tag");
+  assert(msg.startBranch().t === "startBranch", "branch start builder tag");
   assert(msg.replayVisionAll().t === "setReplayVision", "replay all-vision builder tag");
   assert(msg.replayVisionAll().vision.mode === "all", "replay all-vision builder payload");
   assert(

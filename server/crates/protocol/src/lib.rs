@@ -136,6 +136,18 @@ pub enum ClientMessage {
     SetReplayVision { vision: ReplayVisionRequest },
     /// Request a new practice branch room from this replay room's current authoritative tick.
     RequestReplayBranch,
+    /// Claim one original player seat in a replay branch staging room.
+    ClaimBranchSeat {
+        #[serde(rename = "playerId")]
+        player_id: u32,
+    },
+    /// Release one original player seat in a replay branch staging room.
+    ReleaseBranchSeat {
+        #[serde(rename = "playerId")]
+        player_id: u32,
+    },
+    /// Host asks to launch a replay branch from staging.
+    StartBranch,
     /// Host selects a map by name (lobby phase only; ignored from non-hosts).
     SelectMap { map: String },
 }
@@ -291,6 +303,27 @@ pub struct ReplayBranchSeat {
     pub claimable: bool,
 }
 
+/// Original replay seat plus current claimant in a branch staging room.
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct BranchStagingSeat {
+    pub player_id: u32,
+    pub name: String,
+    pub color: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub claimant_id: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub claimant_name: Option<String>,
+}
+
+/// Human occupant viewing a branch staging room without necessarily claiming a seat.
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct BranchStagingOccupant {
+    pub id: u32,
+    pub name: String,
+}
+
 #[derive(Debug, Clone, Serialize)]
 #[serde(tag = "t", rename_all = "camelCase", rename_all_fields = "camelCase")]
 pub enum ServerMessage {
@@ -329,6 +362,15 @@ pub enum ServerMessage {
         branch_room: String,
         source_tick: u32,
         seats: Vec<ReplayBranchSeat>,
+    },
+    /// Current state of a replay branch staging room.
+    BranchStaging {
+        room: String,
+        source_tick: u32,
+        host_id: u32,
+        seats: Vec<BranchStagingSeat>,
+        occupants: Vec<BranchStagingOccupant>,
+        can_start: bool,
     },
     /// Server shutdown drain has started. Existing matches may continue until the deadline, but
     /// new match starts are disabled.
@@ -1108,6 +1150,24 @@ mod tests {
     }
 
     #[test]
+    fn branch_staging_client_messages_deserialize() {
+        let claim: ClientMessage = serde_json::from_str(r#"{"t":"claimBranchSeat","playerId":7}"#)
+            .expect("claimBranchSeat should deserialize");
+        let release: ClientMessage =
+            serde_json::from_str(r#"{"t":"releaseBranchSeat","playerId":7}"#)
+                .expect("releaseBranchSeat should deserialize");
+        let start: ClientMessage =
+            serde_json::from_str(r#"{"t":"startBranch"}"#).expect("startBranch should deserialize");
+
+        assert!(matches!(claim, ClientMessage::ClaimBranchSeat { player_id: 7 }));
+        assert!(matches!(
+            release,
+            ClientMessage::ReleaseBranchSeat { player_id: 7 }
+        ));
+        assert!(matches!(start, ClientMessage::StartBranch));
+    }
+
+    #[test]
     fn replay_branch_created_serializes_contract_shape() {
         let msg = ServerMessage::ReplayBranchCreated {
             branch_room: "__replay_branch__:00000001".to_string(),
@@ -1128,6 +1188,38 @@ mod tests {
         assert_eq!(json["seats"][0]["name"], "Player 7");
         assert_eq!(json["seats"][0]["color"], "#4878c8");
         assert_eq!(json["seats"][0]["claimable"], true);
+    }
+
+    #[test]
+    fn branch_staging_serializes_contract_shape() {
+        let msg = ServerMessage::BranchStaging {
+            room: "__replay_branch__:00000001".to_string(),
+            source_tick: 123,
+            host_id: 100,
+            seats: vec![BranchStagingSeat {
+                player_id: 7,
+                name: "Player 7".to_string(),
+                color: "#4878c8".to_string(),
+                claimant_id: Some(100),
+                claimant_name: Some("Viewer 100".to_string()),
+            }],
+            occupants: vec![BranchStagingOccupant {
+                id: 100,
+                name: "Viewer 100".to_string(),
+            }],
+            can_start: true,
+        };
+        let json = serde_json::to_value(msg).expect("branch staging should serialize");
+
+        assert_eq!(json["t"], "branchStaging");
+        assert_eq!(json["room"], "__replay_branch__:00000001");
+        assert_eq!(json["sourceTick"], 123);
+        assert_eq!(json["hostId"], 100);
+        assert_eq!(json["seats"][0]["playerId"], 7);
+        assert_eq!(json["seats"][0]["claimantId"], 100);
+        assert_eq!(json["seats"][0]["claimantName"], "Viewer 100");
+        assert_eq!(json["occupants"][0]["id"], 100);
+        assert_eq!(json["canStart"], true);
     }
 
     fn representative_snapshot() -> Snapshot {

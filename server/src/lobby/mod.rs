@@ -33,8 +33,8 @@ use crate::game::command::SimCommand;
 use crate::game::replay::ReplayArtifactV1;
 use crate::game::{Game, PlayerInit};
 use crate::protocol::{
-    Event, LobbyPlayer, PlayerScore, ReplayBranchSeat, ReplayStartMetadata, ReplayVisionRequest,
-    ResourceDelta, ServerMessage, Snapshot, StartPayload,
+    BranchStagingOccupant, BranchStagingSeat, Event, LobbyPlayer, PlayerScore, ReplayBranchSeat,
+    ReplayStartMetadata, ReplayVisionRequest, ResourceDelta, ServerMessage, Snapshot, StartPayload,
 };
 use rts_ai::selfplay::{is_safe_artifact_name, LiveSelfPlay};
 
@@ -143,6 +143,12 @@ pub enum RoomEvent {
         player_id: u32,
         reply: tokio::sync::oneshot::Sender<Result<ReplayBranchSeed, String>>,
     },
+    /// Claim one original replay seat in branch staging.
+    ClaimBranchSeat { player_id: u32, seat_player_id: u32 },
+    /// Release one original replay seat in branch staging.
+    ReleaseBranchSeat { player_id: u32, seat_player_id: u32 },
+    /// Host asks to launch the branch from staging.
+    StartBranch { player_id: u32 },
     /// Announce a successfully-created branch room to all current replay viewers.
     AnnounceReplayBranch {
         branch_room: String,

@@ -34,6 +34,9 @@ crate.
 | `seekReplayTo` | `tick: u32` | Seek a replay to an absolute simulation tick, clamped to the replay duration. Ignored outside replay rooms. The room rate-limits accepted seeks. Accepted seeks restore the nearest recorded replay keyframe at or before the target tick, fast-forward the remaining ticks, re-send `start`, and emit `replayState`. Replay rooms record authoritative keyframes every 2,000 ticks while playback/seek fast-forwarding advances. |
 | `setReplayVision` | `vision: ReplayVisionRequest` | Select replay fog/vision for this viewer only. Ignored outside replay rooms. The server validates the request and applies it to that viewer's subsequent snapshot projection. |
 | `requestReplayBranch` | — | Request creation of a new practice branch room from this replay room's current authoritative server tick. Ignored before join; rejected outside replay playback. The server rejects replays with AI seats in the first implementation and returns `error`. On success, the source replay room broadcasts `replayBranchCreated` to all current viewers. |
+| `claimBranchSeat` | `playerId: u32` | Claim one original replay player seat in a replay branch staging room. Ignored outside branch staging. Rejected with `error` if the seat is unknown, already claimed, or this occupant already claimed another seat. |
+| `releaseBranchSeat` | `playerId: u32` | Release one original replay player seat currently claimed by this occupant in branch staging. Ignored outside branch staging or when the occupant does not own that claim. |
+| `startBranch` | — | Host asks to launch the staged replay branch. Ignored outside branch staging and from non-hosts. The server rejects launch until every original active seat is claimed; live promotion is handled by the branch promotion phase. |
 
 `Command` (the `cmd` object) — `c` is the command discriminator:
 
@@ -107,6 +110,7 @@ transport/browser behavior, not as gameplay authority.
 | `replayState` | `Replay playback state` (see 2.6). |
 | `joinReplayPrompt` | `room: string` — the requested room is currently replay playback; clients should confirm before retrying `join` with `replayOk: true`. |
 | `replayBranchCreated` | `branchRoom: string`, `sourceTick: u32`, `seats: ReplayBranchSeat[]` — a separate practice branch room has been created from the source replay's current authoritative tick. |
+| `branchStaging` | `room: string`, `sourceTick: u32`, `hostId: u32`, `seats: BranchStagingSeat[]`, `occupants: BranchStagingOccupant[]`, `canStart: bool` — reliable current state for a replay branch staging room. Sent after joins, leaves, claims, and releases. |
 | `shutdownWarning` | `deadlineUnixMs: u64`, `secondsRemaining: u64` — deploy/termination drain has started; active matches may continue until the deadline, but new match starts are disabled. |
 | `gameOver` | `winnerId: u32 | null`, `you: "won" | "lost" | "draw"`, `scores: PlayerScore[]` |
 | `pong`     | `ts: number` (echo of the ping ts) |
@@ -127,6 +131,13 @@ unit/building entity created for that player, including starting entities.
 listed in original replay player order. `claimable` is false only for unsupported original seats;
 the first implementation rejects AI-seat replays before creating a branch, so successful branch
 creation currently reports all seats as claimable.
+
+`BranchStagingSeat`: `{ playerId: u32, name: string, color: string, claimantId?: u32,
+claimantName?: string }`. Seats are listed in original replay player order. A missing claimant
+means that original seat is still available to claim.
+
+`BranchStagingOccupant`: `{ id: u32, name: string }`. Occupants are all human viewers currently in
+the branch staging room, whether they have claimed an original seat or are remaining spectators.
 
 ### 2.3 `start` payload
 Sent once when the match begins. Carries everything static for the whole match.
