@@ -37,11 +37,11 @@ contract tests.
 
 Mark each segment complete as it lands:
 
-- [ ] Add `ReplayControls` and move only replay/scenario control ownership into it.
-- [ ] Preserve existing DOM structure, classes, text, `data-*` attributes, and hidden/class toggles.
-- [ ] Delegate replay state updates and teardown from `Match` to `ReplayControls`.
-- [ ] Add DOM contract tests for speed, seek, scenario step, vision selection, and `destroy()`.
-- [ ] Run verification and record any visual or browser-smoke gaps in the final handoff.
+- [x] Add `ReplayControls` and move only replay/scenario control ownership into it.
+- [x] Preserve existing DOM structure, classes, text, `data-*` attributes, and hidden/class toggles.
+- [x] Delegate replay state updates and teardown from `Match` to `ReplayControls`.
+- [x] Add DOM contract tests for speed, seek, scenario step, vision selection, and `destroy()`.
+- [x] Run verification and record any visual or browser-smoke gaps in the final handoff.
 
 ## Verification
 

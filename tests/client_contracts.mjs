@@ -674,6 +674,7 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
   };
   const { Match } = await import("../client/src/match.js");
   const { ReplayViewer } = await import("../client/src/replay_viewer.js");
+  const { ReplayControls } = await import("../client/src/replay_controls.js");
   const { dom } = await import("../client/src/bootstrap.js");
   assert(ReplayViewer.prototype instanceof Match, "ReplayViewer reuses Match rendering lifecycle");
   assert(!("command" in ReplayCameraInput.prototype), "Replay camera input has no gameplay command API");
@@ -720,9 +721,16 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
       addEventListener(type, handler) {
         this._listeners.set(type, handler);
       },
+      removeEventListener(type, handler) {
+        if (this._listeners.get(type) === handler) this._listeners.delete(type);
+      },
+      dispatchEvent(ev) {
+        this._listeners.get(ev.type)?.(ev);
+      },
       remove() {
         if (!this.parentNode) return;
         this.parentNode.children = this.parentNode.children.filter((child) => child !== this);
+        this.parentNode = null;
       },
       closest(selector) {
         if (selector.startsWith(".") && this.classList.contains(selector.slice(1))) return this;
@@ -737,9 +745,16 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
       querySelectorAll(selector) {
         const out = [];
         const matches = (node) => {
+          if (selector.includes(",")) {
+            return selector.split(",").some((part) => {
+              const trimmed = part.trim();
+              return trimmed.startsWith(".") && node.classList?.contains(trimmed.slice(1));
+            });
+          }
           if (selector === ".spd-btn:not(.seek-btn)") {
             return node.classList?.contains("spd-btn") && !node.classList?.contains("seek-btn");
           }
+          if (selector.startsWith("#")) return node.id === selector.slice(1);
           if (selector.startsWith(".")) return node.classList?.contains(selector.slice(1));
           return false;
         };
@@ -761,46 +776,88 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
   const speed2 = fakeEl("button");
   speed2.className = "spd-btn";
   speed2.dataset.speed = "2";
+  const speed0 = fakeEl("button");
+  speed0.className = "spd-btn dev-pause-btn";
+  speed0.dataset.speed = "0";
+  const seekBack = fakeEl("button");
+  seekBack.className = "spd-btn seek-btn";
+  seekBack.dataset.seekBack = "90";
+  const stepDev = fakeEl("button");
+  stepDev.className = "spd-btn dev-step-btn";
+  stepDev.dataset.stepDevTick = "";
+  const concluded = fakeEl("span");
+  concluded.id = "replay-concluded";
   replayControls.appendChild(speed2);
+  replayControls.appendChild(speed0);
+  replayControls.appendChild(seekBack);
+  replayControls.appendChild(stepDev);
+  replayControls.appendChild(concluded);
   dom.replaySpeed = replayControls;
-  const replayControlsMatch = Object.create(Match.prototype);
-  replayControlsMatch.state = {
+  const replayNet = {
+    speeds: [],
+    seekBacks: [],
+    seekTargets: [],
+    visions: [],
+    branches: 0,
+    steps: 0,
+    setReplaySpeed(speed) {
+      this.speeds.push(speed);
+    },
+    seekReplay(ticksBack) {
+      this.seekBacks.push(ticksBack);
+    },
+    seekReplayTo(tick) {
+      this.seekTargets.push(tick);
+    },
+    setReplayVision(vision) {
+      this.visions.push(vision);
+    },
+    requestReplayBranch() {
+      this.branches += 1;
+    },
+    stepDevTick() {
+      this.steps += 1;
+    },
+  };
+  const replayState = {
     players: [
       { id: 1, name: "Alpha", color: "#f00" },
       { id: 2, name: "Bravo", color: "#0f0" },
     ],
   };
-  replayControlsMatch.net = {
-    visions: [],
-    seekTargets: [],
-    setReplayVision(vision) {
-      this.visions.push(vision);
-    },
-    seekReplayTo(tick) {
-      this.seekTargets.push(tick);
-    },
-  };
-  replayControlsMatch.replayVisionSelection = new Set();
-  replayControlsMatch.buildReplayVisionControls();
-  replayControlsMatch.setReplaySpeedActive(2);
+  const replayUi = new ReplayControls({
+    net: replayNet,
+    state: replayState,
+    replayViewer: true,
+    isReplay: true,
+    isScenario: false,
+  });
   assert(speed2.classList.contains("active"), "replay speed defaults can mark 2x active");
+  assert(replayControls.classList.contains("replay-viewer-controls"), "replay viewer controls keep wrapper class");
+  assert(!seekBack.hidden, "replay seek buttons stay visible in replay mode");
+  assert(stepDev.hidden, "scenario step controls stay hidden in replay mode");
+  replayControls._listeners.get("click")({ target: speed2 });
+  assert(replayNet.speeds.at(-1) === 2, "speed click sends net.setReplaySpeed");
+  replayUi.applyReplayState({ currentTick: 120, durationTicks: 1_000, speed: 2 });
+  replayControls._listeners.get("click")({ target: seekBack });
+  assert(replayNet.seekBacks.at(-1) === 90, "seek click sends net.seekReplay");
   const visionButtons = replayControls.querySelectorAll(".vision-btn");
   assert(visionButtons.length === 3, "replay viewer builds all-player and per-player fog controls");
-  replayControlsMatch.onReplayVisionClick({ target: visionButtons[1], shiftKey: false });
+  replayUi.onReplayVisionClick({ target: visionButtons[1], shiftKey: false });
   assert(
-    replayControlsMatch.net.visions.at(-1).mode === "player" &&
-      replayControlsMatch.net.visions.at(-1).playerId === 1,
+    replayNet.visions.at(-1).mode === "player" &&
+      replayNet.visions.at(-1).playerId === 1,
     "single replay fog click sends a per-viewer player vision request",
   );
-  replayControlsMatch.onReplayVisionClick({ target: visionButtons[2], shiftKey: true });
+  replayUi.onReplayVisionClick({ target: visionButtons[2], shiftKey: true });
   assert(
-    replayControlsMatch.net.visions.at(-1).mode === "players" &&
-      replayControlsMatch.net.visions.at(-1).playerIds.join(",") === "1,2",
+    replayNet.visions.at(-1).mode === "players" &&
+      replayNet.visions.at(-1).playerIds.join(",") === "1,2",
     "shift-click replay fog controls send a selected-players request",
   );
-  replayControlsMatch.onReplayVisionClick({ target: visionButtons[0], shiftKey: false });
-  assert(replayControlsMatch.net.visions.at(-1).mode === "all", "all replay fog control restores union vision");
-  replayControlsMatch.applyReplayState({
+  replayUi.onReplayVisionClick({ target: visionButtons[0], shiftKey: false });
+  assert(replayNet.visions.at(-1).mode === "all", "all replay fog control restores union vision");
+  replayUi.applyReplayState({
     currentTick: 100,
     durationTicks: 1_000,
     keyframeTicks: [0, 400, 800],
@@ -813,12 +870,51 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
     "replay timeline renders server keyframe marks",
   );
   const timelineTrack = replayControls.querySelector(".replay-timeline-track");
-  replayControlsMatch.onReplayTimelineClick({ currentTarget: timelineTrack, clientX: 100 });
-  assert(replayControlsMatch.net.seekTargets.at(-1) === 500, "replay timeline click seeks to the clicked tick");
+  replayUi.onReplayTimelineClick({ currentTarget: timelineTrack, clientX: 100 });
+  assert(replayNet.seekTargets.at(-1) === 500, "replay timeline click seeks to the clicked tick");
   assert(
     replayControls.querySelector(".replay-tick-status").textContent.includes("Seeking 500"),
     "replay timeline shows a pending seek indicator",
   );
+  replayUi.destroy();
+  assert(replayControls.hidden, "destroy hides replay controls");
+  assert(!replayControls.classList.contains("replay-viewer-controls"), "destroy clears replay wrapper class");
+  assert(!seekBack.hidden, "destroy restores seek controls visible");
+  assert(stepDev.hidden, "destroy restores scenario step controls hidden");
+  assert(!replayControls.querySelector(".replay-branch-btn"), "destroy removes generated replay branch button");
+  assert(!replayControls.querySelector(".replay-vision-controls"), "destroy removes generated vision controls");
+  assert(!replayControls.querySelector(".replay-tick-status"), "destroy removes generated status");
+  assert(!replayControls.querySelector(".replay-timeline"), "destroy removes generated timeline");
+  assert(replayControls._listeners.size === 0, "destroy removes replay speed click listener");
+
+  const scenarioControls = fakeEl("div");
+  const scenarioSpeed0 = fakeEl("button");
+  scenarioSpeed0.className = "spd-btn dev-pause-btn";
+  scenarioSpeed0.dataset.speed = "0";
+  const scenarioStep = fakeEl("button");
+  scenarioStep.className = "spd-btn dev-step-btn";
+  scenarioStep.dataset.stepDevTick = "";
+  const scenarioSeek = fakeEl("button");
+  scenarioSeek.className = "spd-btn seek-btn";
+  scenarioSeek.dataset.seekBack = "30";
+  scenarioControls.appendChild(scenarioSpeed0);
+  scenarioControls.appendChild(scenarioStep);
+  scenarioControls.appendChild(scenarioSeek);
+  dom.replaySpeed = scenarioControls;
+  const scenarioUi = new ReplayControls({
+    net: replayNet,
+    state: replayState,
+    replayViewer: false,
+    isReplay: false,
+    isScenario: true,
+  });
+  assert(scenarioSeek.hidden, "scenario mode hides replay seek buttons");
+  assert(!scenarioStep.hidden, "scenario mode shows step controls");
+  scenarioControls._listeners.get("click")({ target: scenarioStep });
+  assert(replayNet.steps === 1, "scenario step sends net.stepDevTick");
+  scenarioControls._listeners.get("click")({ target: scenarioSpeed0 });
+  assert(replayNet.speeds.at(-1) === 0, "scenario pause speed sends net.setReplaySpeed");
+  scenarioUi.destroy();
 
   const noticeAudioMatch = Object.create(Match.prototype);
   const playedNotices = [];
