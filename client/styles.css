@@ -1804,10 +1804,12 @@ input[type="text"]:focus {
   inset: 0;
   z-index: var(--overlay-z);
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
+  padding-top: clamp(28px, 7vh, 72px);
   background: rgba(5, 7, 13, 0.18);
   backdrop-filter: none;
+  box-sizing: border-box;
 }
 .game-over-box {
   position: relative;
@@ -1816,17 +1818,17 @@ input[type="text"]:focus {
   border: 1px solid var(--panel-edge);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
-  width: min(960px, calc(100vw - 48px));
-  max-height: calc(100vh - 48px);
+  width: min(860px, calc(100vw - 48px));
+  max-height: calc(100vh - clamp(48px, 12vh, 120px));
   overflow: auto;
-  padding: 32px 40px;
+  padding: 18px 22px 20px;
 }
 .game-over-close {
   position: absolute;
-  top: 10px;
-  right: 10px;
-  width: 32px;
-  height: 32px;
+  top: 8px;
+  right: 8px;
+  width: 28px;
+  height: 28px;
   border: 1px solid rgba(91, 83, 65, 0.8);
   border-radius: var(--radius-sm);
   background: rgba(17, 17, 15, 0.72);
@@ -1842,8 +1844,8 @@ input[type="text"]:focus {
   outline: none;
 }
 #game-over-text {
-  margin: 0 0 22px;
-  font-size: 44px;
+  margin: 0 0 12px;
+  font-size: 34px;
   font-weight: 800;
   letter-spacing: 0.06em;
 }
@@ -1860,27 +1862,27 @@ input[type="text"]:focus {
   color: var(--supply);
 }
 .scoreboard {
-  margin: 0 0 24px;
+  margin: 0 0 14px;
   overflow-x: auto;
 }
 .score-table {
   width: 100%;
-  min-width: 760px;
+  min-width: 700px;
   border-collapse: collapse;
   table-layout: fixed;
   color: var(--ink);
-  font-size: 13px;
+  font-size: 12px;
   letter-spacing: 0;
 }
 .score-table th,
 .score-table td {
   border-bottom: 1px solid rgba(91, 83, 65, 0.72);
-  padding: 9px 10px;
+  padding: 6px 8px;
   vertical-align: middle;
 }
 .score-table th {
   color: var(--ink-dim);
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
   text-align: right;
   text-transform: uppercase;
@@ -1888,7 +1890,7 @@ input[type="text"]:focus {
 }
 .score-table th:first-child,
 .score-table td:first-child {
-  width: 28%;
+  width: 24%;
   text-align: left;
 }
 .score-table tbody tr.you {
@@ -1902,16 +1904,16 @@ input[type="text"]:focus {
 }
 .score-swatch {
   display: inline-block;
-  width: 12px;
-  height: 12px;
+  width: 10px;
+  height: 10px;
   border: 1px solid rgba(231, 223, 197, 0.45);
   box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.35);
-  margin-right: 8px;
+  margin-right: 6px;
   vertical-align: middle;
 }
 .score-name {
   display: inline-block;
-  max-width: calc(100% - 24px);
+  max-width: calc(100% - 20px);
   overflow: hidden;
   text-overflow: ellipsis;
   vertical-align: middle;
@@ -1949,13 +1951,22 @@ input[type="text"]:focus {
     height: 198px;
   }
   #game-over-text {
-    font-size: 36px;
+    font-size: 30px;
   }
   .game-over-box {
-    padding: 26px 28px;
+    padding: 16px 18px 18px;
+    width: min(820px, calc(100vw - 32px));
+  }
+  #game-over {
+    padding-top: 24px;
   }
   .score-table {
-    font-size: 12px;
+    font-size: 11px;
+    min-width: 660px;
+  }
+  .score-table th,
+  .score-table td {
+    padding: 5px 6px;
   }
 }
 
