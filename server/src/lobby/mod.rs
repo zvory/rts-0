@@ -33,8 +33,8 @@ use crate::game::command::SimCommand;
 use crate::game::replay::ReplayArtifactV1;
 use crate::game::{Game, PlayerInit};
 use crate::protocol::{
-    Event, LobbyPlayer, PlayerScore, ReplayVisionRequest, ResourceDelta, ServerMessage, Snapshot,
-    StartPayload,
+    Event, LobbyPlayer, PlayerScore, ReplayBranchSeat, ReplayStartMetadata, ReplayVisionRequest,
+    ResourceDelta, ServerMessage, Snapshot, StartPayload,
 };
 use rts_ai::selfplay::{is_safe_artifact_name, LiveSelfPlay};
 
@@ -69,6 +69,7 @@ const ROOM_EVENT_CHANNEL_CAP: usize = 1024;
 const DEV_SELFPLAY_ROOM_PREFIX: &str = "__dev_selfplay__";
 const DEV_SCENARIO_ROOM_PREFIX: &str = "__dev_scenario__:";
 const MATCH_REPLAY_ROOM_PREFIX: &str = "__match_replay__";
+const REPLAY_BRANCH_ROOM_PREFIX: &str = "__replay_branch__";
 const MATCH_SEED_ENV: &str = "RTS_MATCH_SEED";
 
 /// Monotonic source of globally-unique player ids (ids are never reused within a process run).
@@ -80,9 +81,17 @@ pub fn next_player_id() -> u32 {
     NEXT_PLAYER_ID.fetch_add(1, Ordering::Relaxed)
 }
 
+/// Frozen server-side seed for a future practice branch staging room.
+#[derive(Clone)]
+pub struct ReplayBranchSeed {
+    pub source_replay: ReplayStartMetadata,
+    pub source_tick: u32,
+    pub game: Box<Game>,
+    pub seats: Vec<ReplayBranchSeat>,
+}
+
 /// Internal message from a connection (or the lobby) to a room task. The room task is the
 /// only consumer; see module docs.
-#[derive(Debug)]
 pub enum RoomEvent {
     /// A player joins this room. `msg_tx` is the connection's outbound sink. `ack` carries the
     /// accept/reject decision back to the connection: `true` once the player is actually in the
@@ -128,6 +137,17 @@ pub enum RoomEvent {
     SetReplayVision {
         player_id: u32,
         vision: ReplayVisionRequest,
+    },
+    /// A replay viewer requested a frozen practice branch seed from the current replay tick.
+    RequestReplayBranch {
+        player_id: u32,
+        reply: tokio::sync::oneshot::Sender<Result<ReplayBranchSeed, String>>,
+    },
+    /// Announce a successfully-created branch room to all current replay viewers.
+    AnnounceReplayBranch {
+        branch_room: String,
+        source_tick: u32,
+        seats: Vec<ReplayBranchSeat>,
     },
     /// Host selects a map by name (lobby phase only; honored only from the host).
     SelectMap { player_id: u32, map: String },
@@ -366,6 +386,26 @@ impl Lobby {
                 RoomMode::Replay {
                     artifact: artifact.clone(),
                 },
+            );
+            return room;
+        }
+    }
+
+    /// Create an unguessable room holding frozen state for a future replay practice branch.
+    pub async fn create_replay_branch_room(&self, seed: ReplayBranchSeed) -> String {
+        let mut rooms = self.rooms.lock().await;
+        loop {
+            let room = format!(
+                "{REPLAY_BRANCH_ROOM_PREFIX}:{:032x}",
+                rand::random::<u128>()
+            );
+            if rooms.contains_key(&room) {
+                continue;
+            }
+            self.create_room_locked_with_mode(
+                &room,
+                &mut rooms,
+                RoomMode::ReplayBranch { seed: seed.clone() },
             );
             return room;
         }

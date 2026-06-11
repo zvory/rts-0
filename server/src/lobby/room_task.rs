@@ -132,6 +132,7 @@ pub(super) enum RoomMode {
     DevSelfPlay(DevSelfPlayConfig),
     DevScenario(DevScenarioConfig),
     Replay { artifact: ReplayArtifactV1 },
+    ReplayBranch { seed: ReplayBranchSeed },
 }
 
 #[derive(Clone)]
@@ -371,6 +372,30 @@ impl ReplaySession {
 
     fn current_tick(&self) -> u32 {
         self.game.tick_count()
+    }
+
+    fn branch_seed(&self) -> Result<ReplayBranchSeed, String> {
+        if self.artifact.players.iter().any(|player| player.is_ai) {
+            return Err("Replay branching does not support replays with AI seats yet.".to_string());
+        }
+        let source_tick = self.current_tick();
+        let seats = self
+            .artifact
+            .players
+            .iter()
+            .map(|player| ReplayBranchSeat {
+                player_id: player.id,
+                name: player.name.clone(),
+                color: player.color.clone(),
+                claimable: true,
+            })
+            .collect();
+        Ok(ReplayBranchSeed {
+            source_replay: self.artifact.start_metadata(),
+            source_tick,
+            game: Box::new(self.game.clone_for_replay_keyframe()),
+            seats,
+        })
     }
 
     fn set_speed(&mut self, controller_id: u32, speed: f32) {
@@ -731,6 +756,14 @@ impl RoomTask {
             RoomEvent::SetReplayVision { player_id, vision } => {
                 self.on_set_replay_vision(player_id, vision)
             }
+            RoomEvent::RequestReplayBranch { player_id, reply } => {
+                let _ = reply.send(self.on_request_replay_branch(player_id));
+            }
+            RoomEvent::AnnounceReplayBranch {
+                branch_room,
+                source_tick,
+                seats,
+            } => self.on_announce_replay_branch(branch_room, source_tick, seats),
             RoomEvent::SelectMap { player_id, map } => self.on_select_map(player_id, map),
             RoomEvent::DrainStarted(notice) => self.on_drain_started(notice),
         }
@@ -791,6 +824,25 @@ impl RoomTask {
                 return;
             }
             self.on_join_replay_room(player_id, name, msg_tx, ack);
+            return;
+        }
+        if let RoomMode::ReplayBranch { seed } = &self.mode {
+            send_or_log(
+                &self.room,
+                player_id,
+                &msg_tx,
+                ServerMessage::Error {
+                    msg: "Replay branch staging is not available yet.".to_string(),
+                },
+            );
+            debug!(
+                room = %self.room,
+                player_id,
+                source_tick = seed.source_tick,
+                seat_count = seed.seats.len(),
+                "rejecting branch room join before staging runtime is implemented"
+            );
+            let _ = ack.send(false);
             return;
         }
         if matches!(self.phase, Phase::ReplayViewer(_)) {
@@ -1346,6 +1398,9 @@ impl RoomTask {
             RoomMode::DevSelfPlay(DevSelfPlayConfig::Replay { artifact }) => {
                 load_replay_artifact(artifact)?
             }
+            RoomMode::ReplayBranch { .. } => {
+                return Err("room is not configured for replay playback".to_string());
+            }
             _ => return Err("room is not configured for replay playback".to_string()),
         };
         ReplaySession::new(artifact)
@@ -1585,6 +1640,9 @@ impl RoomTask {
         match &self.mode {
             RoomMode::Normal => Err("room is not configured for a dev session".to_string()),
             RoomMode::Replay { .. } => Err("room is not configured for a dev session".to_string()),
+            RoomMode::ReplayBranch { .. } => {
+                Err("room is not configured for a dev session".to_string())
+            }
             RoomMode::DevSelfPlay(DevSelfPlayConfig::Replay { .. }) => {
                 Err("saved self-play replays use the replay viewer".to_string())
             }
@@ -2249,6 +2307,32 @@ impl RoomTask {
             }
             session.set_vision(player_id, vision);
         }
+    }
+
+    fn on_request_replay_branch(&self, player_id: u32) -> Result<ReplayBranchSeed, String> {
+        if !self.players.contains_key(&player_id) {
+            return Err("Cannot branch replay: viewer is not in this room.".to_string());
+        }
+        let Phase::ReplayViewer(session) = &self.phase else {
+            return Err("Cannot branch replay outside replay playback.".to_string());
+        };
+        session.branch_seed()
+    }
+
+    fn on_announce_replay_branch(
+        &self,
+        branch_room: String,
+        source_tick: u32,
+        seats: Vec<ReplayBranchSeat>,
+    ) {
+        if !matches!(self.phase, Phase::ReplayViewer(_)) {
+            return;
+        }
+        self.broadcast(&ServerMessage::ReplayBranchCreated {
+            branch_room,
+            source_tick,
+            seats,
+        });
     }
 
     /// Rewind a replay by `ticks_back` ticks. Pass `u32::MAX` to reset to the start.
@@ -3082,6 +3166,150 @@ mod tests {
             panic!("replay phase should remain active");
         };
         assert!(replay.game.command_log().is_empty());
+    }
+
+    #[test]
+    fn replay_branch_request_rejects_outside_replay_viewer() {
+        let mut task = RoomTask::new(
+            "branch-outside-replay-test".to_string(),
+            RoomMode::Normal,
+            None,
+            false,
+            DrainHandle::default(),
+        );
+        let _writer = add_test_room_player(&mut task, 99, true);
+
+        let err = match task.on_request_replay_branch(99) {
+            Ok(_) => panic!("branch request outside replay should fail"),
+            Err(err) => err,
+        };
+
+        assert!(
+            err.contains("outside replay playback"),
+            "unexpected branch reject: {err}"
+        );
+        assert!(matches!(task.phase, Phase::Lobby));
+    }
+
+    #[test]
+    fn replay_branch_seed_captures_current_authoritative_tick() {
+        let players = replay_test_players(2);
+        let (_live, artifact) = replay_test_artifact(&players, 5);
+        let mut replay = ReplaySession::new(artifact).unwrap();
+        for _ in 0..3 {
+            replay.enqueue_for_current_tick().unwrap();
+            replay.tick(None);
+        }
+        let mut task = RoomTask::new(
+            "branch-current-tick-test".to_string(),
+            RoomMode::Normal,
+            None,
+            false,
+            DrainHandle::default(),
+        );
+        let _writer = add_test_room_player(&mut task, 99, true);
+        task.phase = Phase::ReplayViewer(Box::new(replay));
+
+        let seed = task.on_request_replay_branch(99).unwrap();
+
+        assert_eq!(seed.source_tick, 3);
+        assert_eq!(seed.game.tick_count(), 3);
+        assert_eq!(seed.source_replay.duration_ticks, 5);
+        assert_eq!(seed.seats.len(), 2);
+        assert!(seed.seats.iter().all(|seat| seat.claimable));
+    }
+
+    #[test]
+    fn replay_branch_request_keeps_source_replay_session_intact() {
+        let players = replay_test_players(2);
+        let (_live, artifact) = replay_test_artifact(&players, 4);
+        let replay = ReplaySession::new(artifact).unwrap();
+        let mut task = RoomTask::new(
+            "branch-source-intact-test".to_string(),
+            RoomMode::Normal,
+            None,
+            false,
+            DrainHandle::default(),
+        );
+        let _writer = add_test_room_player(&mut task, 99, true);
+        task.phase = Phase::ReplayViewer(Box::new(replay));
+
+        let seed = task.on_request_replay_branch(99).unwrap();
+        let Phase::ReplayViewer(session) = &task.phase else {
+            panic!("source room should remain a replay viewer");
+        };
+
+        assert_eq!(session.current_tick(), 0);
+        assert_eq!(session.duration_ticks, 4);
+        assert_eq!(session.artifact.command_log.len(), 0);
+        assert_eq!(seed.game.tick_count(), session.current_tick());
+    }
+
+    #[test]
+    fn replay_branch_request_rejects_ai_seats_without_creating_seed() {
+        let mut players = replay_test_players(2);
+        players[1].is_ai = true;
+        let (_live, artifact) = replay_test_artifact(&players, 1);
+        let replay = ReplaySession::new(artifact).unwrap();
+        let mut task = RoomTask::new(
+            "branch-ai-reject-test".to_string(),
+            RoomMode::Normal,
+            None,
+            false,
+            DrainHandle::default(),
+        );
+        let _writer = add_test_room_player(&mut task, 99, true);
+        task.phase = Phase::ReplayViewer(Box::new(replay));
+
+        let err = match task.on_request_replay_branch(99) {
+            Ok(_) => panic!("branch request with AI seats should fail"),
+            Err(err) => err,
+        };
+
+        assert!(err.contains("AI seats"), "unexpected branch reject: {err}");
+        assert!(matches!(task.phase, Phase::ReplayViewer(_)));
+    }
+
+    #[test]
+    fn replay_branch_announcement_broadcasts_to_all_viewers() {
+        let players = replay_test_players(2);
+        let (_live, artifact) = replay_test_artifact(&players, 0);
+        let replay = ReplaySession::new(artifact).unwrap();
+        let mut task = RoomTask::new(
+            "branch-broadcast-test".to_string(),
+            RoomMode::Normal,
+            None,
+            false,
+            DrainHandle::default(),
+        );
+        let mut writer_a = add_test_room_player(&mut task, 100, true);
+        let mut writer_b = add_test_room_player(&mut task, 101, true);
+        task.phase = Phase::ReplayViewer(Box::new(replay));
+
+        task.on_announce_replay_branch(
+            "__replay_branch__:00000001".to_string(),
+            12,
+            vec![ReplayBranchSeat {
+                player_id: players[0].id,
+                name: players[0].name.clone(),
+                color: players[0].color.clone(),
+                claimable: true,
+            }],
+        );
+
+        for writer in [&mut writer_a, &mut writer_b] {
+            let msg = writer.reliable_rx.try_recv().expect("branch message");
+            assert!(matches!(
+                msg,
+                ServerMessage::ReplayBranchCreated {
+                    branch_room,
+                    source_tick: 12,
+                    seats
+                } if branch_room == "__replay_branch__:00000001"
+                    && seats.len() == 1
+                    && seats[0].player_id == players[0].id
+            ));
+        }
     }
 
     #[test]

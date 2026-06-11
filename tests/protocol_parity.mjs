@@ -11,10 +11,13 @@ import {
   KIND_CODE,
   NOTICE_SEVERITY_CODE,
   ORDER_STAGE_CODE,
+  C,
+  S,
   SETUP_CODE,
   STATE_CODE,
   TERRAIN,
   UPGRADE_CODE,
+  msg,
 } from "../client/src/protocol.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -133,5 +136,21 @@ assertSameCodes("order stage", extractCodeFunction("order_stage_code"), ORDER_ST
 assertSameCodes("ability", extractCodeFunction("ability_code"), ABILITY_CODE);
 assertSameCodes("upgrade", extractCodeFunction("upgrade_code"), UPGRADE_CODE);
 assertSameCodes("notice severity", extractCodeFunction("notice_severity_code"), NOTICE_SEVERITY_CODE);
+
+assert(
+  rust.includes("RequestReplayBranch") && C.REQUEST_REPLAY_BRANCH === "requestReplayBranch",
+  "requestReplayBranch client message tag must match Rust",
+);
+assert(
+  JSON.stringify(msg.requestReplayBranch()) === JSON.stringify({ t: "requestReplayBranch" }),
+  "requestReplayBranch builder must emit the exact wire shape",
+);
+assert(
+  rust.includes("ReplayBranchCreated") && S.REPLAY_BRANCH_CREATED === "replayBranchCreated",
+  "replayBranchCreated server message tag must match Rust",
+);
+for (const field of ["branch_room", "source_tick", "seats", "player_id", "claimable"]) {
+  assert(rust.includes(field), `replayBranchCreated Rust contract is missing ${field}`);
+}
 
 console.log("✅ protocol_parity.mjs: Rust compact protocol codes match JS decoder maps");

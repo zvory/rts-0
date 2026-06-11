@@ -33,6 +33,7 @@ crate.
 | `seekReplay` | `ticksBack: u32` | Rewind a replay by N simulation ticks; pass a large value (e.g. `2^31-1`) to reset to tick 0. Ignored outside replay rooms. Compatibility wrapper around absolute replay seek. |
 | `seekReplayTo` | `tick: u32` | Seek a replay to an absolute simulation tick, clamped to the replay duration. Ignored outside replay rooms. The room rate-limits accepted seeks. Accepted seeks restore the nearest recorded replay keyframe at or before the target tick, fast-forward the remaining ticks, re-send `start`, and emit `replayState`. Replay rooms record authoritative keyframes every 2,000 ticks while playback/seek fast-forwarding advances. |
 | `setReplayVision` | `vision: ReplayVisionRequest` | Select replay fog/vision for this viewer only. Ignored outside replay rooms. The server validates the request and applies it to that viewer's subsequent snapshot projection. |
+| `requestReplayBranch` | — | Request creation of a new practice branch room from this replay room's current authoritative server tick. Ignored before join; rejected outside replay playback. The server rejects replays with AI seats in the first implementation and returns `error`. On success, the source replay room broadcasts `replayBranchCreated` to all current viewers. |
 
 `Command` (the `cmd` object) — `c` is the command discriminator:
 
@@ -105,6 +106,7 @@ transport/browser behavior, not as gameplay authority.
 | `snapshot` | `Per-player snapshot` (see 2.4). |
 | `replayState` | `Replay playback state` (see 2.6). |
 | `joinReplayPrompt` | `room: string` — the requested room is currently replay playback; clients should confirm before retrying `join` with `replayOk: true`. |
+| `replayBranchCreated` | `branchRoom: string`, `sourceTick: u32`, `seats: ReplayBranchSeat[]` — a separate practice branch room has been created from the source replay's current authoritative tick. |
 | `shutdownWarning` | `deadlineUnixMs: u64`, `secondsRemaining: u64` — deploy/termination drain has started; active matches may continue until the deadline, but new match starts are disabled. |
 | `gameOver` | `winnerId: u32 | null`, `you: "won" | "lost" | "draw"`, `scores: PlayerScore[]` |
 | `pong`     | `ts: number` (echo of the ping ts) |
@@ -120,6 +122,11 @@ unitsKilled: u32, unitsLost: u32, buildingsKilled: u32, buildingsLost: u32 }`. `
 frozen server snapshot taken when that recipient gets `gameOver`; it is not live-updated while a
 3-4 player match continues. Unit/structure score is the configured steel+oil value of every
 unit/building entity created for that player, including starting entities.
+
+`ReplayBranchSeat`: `{ playerId: u32, name: string, color: string, claimable: bool }`. Seats are
+listed in original replay player order. `claimable` is false only for unsupported original seats;
+the first implementation rejects AI-seat replays before creating a branch, so successful branch
+creation currently reports all seats as claimable.
 
 ### 2.3 `start` payload
 Sent once when the match begins. Carries everything static for the whole match.
