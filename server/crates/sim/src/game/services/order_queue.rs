@@ -415,6 +415,7 @@ fn execute_artillery_point_fire(entities: &mut EntityStore, id: u32, x: f32, y: 
     if !facing.is_finite() {
         return false;
     }
+    let inside_field_of_fire = artillery_point_inside_field_of_fire(e, facing);
     let Some(e) = entities.get_mut(id) else {
         return false;
     };
@@ -423,10 +424,27 @@ fn execute_artillery_point_fire(entities: &mut EntityStore, id: u32, x: f32, y: 
     }
     e.clear_active_order();
     e.set_path_goal(None);
-    e.set_emplacement_facing(Some(facing));
-    e.set_desired_weapon_facing(facing);
+    if !inside_field_of_fire {
+        e.set_pending_redeploy_facing(Some(facing));
+        e.set_weapon_setup(crate::game::entity::WeaponSetup::TearingDownToRedeploy {
+            ticks: setup_ticks_for(e.kind),
+        });
+    } else {
+        e.set_desired_weapon_facing(facing);
+    }
     e.set_order(Order::artillery_point_fire(x, y));
     true
+}
+
+fn artillery_point_inside_field_of_fire(e: &Entity, target_angle: f32) -> bool {
+    let Some(center) = e
+        .emplacement_facing()
+        .or_else(|| e.weapon_facing())
+        .filter(|facing| facing.is_finite())
+    else {
+        return false;
+    };
+    angle_delta(center, target_angle).abs() <= config::ARTILLERY_FIELD_OF_FIRE_RAD * 0.5
 }
 
 fn world_ability_intent_valid(
@@ -1254,6 +1272,43 @@ mod tests {
         let unit = entities.get(at).expect("at gun should exist");
         assert!(matches!(unit.order(), Order::AttackMove(_)));
         assert!(unit.queued_orders().is_empty());
+    }
+
+    #[test]
+    fn queued_artillery_point_fire_outside_arc_redeploys_on_promotion() {
+        let map = flat_map(64);
+        let mut entities = EntityStore::new();
+        let pos = (320.0, 320.0);
+        let angle = config::ARTILLERY_FIELD_OF_FIRE_RAD;
+        let distance = config::TILE_SIZE as f32 * 22.0;
+        let target = (pos.0 + angle.cos() * distance, pos.1 + angle.sin() * distance);
+        let artillery = entities
+            .spawn_unit(1, EntityKind::Artillery, pos.0, pos.1)
+            .expect("artillery should spawn");
+        {
+            let unit = entities.get_mut(artillery).expect("artillery should exist");
+            unit.set_weapon_setup(WeaponSetup::Deployed);
+            unit.set_emplacement_facing(Some(0.0));
+            unit.set_weapon_facing(0.0);
+            unit.append_queued_order(OrderIntent::point_fire(target.0, target.1));
+        }
+
+        promote(&map, &mut entities);
+
+        let unit = entities.get(artillery).expect("artillery should exist");
+        assert!(matches!(
+            unit.weapon_setup(),
+            WeaponSetup::TearingDownToRedeploy { .. }
+        ));
+        assert!(matches!(unit.order(), Order::ArtilleryPointFire(_)));
+        assert!(
+            (unit.pending_redeploy_facing().unwrap_or_default() - angle).abs() < 0.001,
+            "queued outside-arc point fire should redeploy toward the requested target"
+        );
+        assert!(
+            unit.emplacement_facing().unwrap_or_default().abs() < 0.001,
+            "queued point fire must not walk the active field of fire before redeploy"
+        );
     }
 
     #[test]

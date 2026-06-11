@@ -664,9 +664,11 @@ fn apply_planned_unit_order(
             planner::PlannedAction::AppendQueued { unit, intent } => {
                 if let planner::OrderIntent::WorldAbility { ability, target } = intent {
                     if ability_from_planner(ability) == Some(AbilityKind::PointFire) {
-                        if artillery_point_fire_target_valid(
+                        if artillery_point_fire_command_target(
                             map, entities, player, unit, target.x, target.y,
-                        ) {
+                        )
+                        .is_some()
+                        {
                             if let Some(e) = entities.get_mut(unit) {
                                 e.append_queued_order(OrderIntent::point_fire(target.x, target.y));
                             }
@@ -910,7 +912,8 @@ fn use_ability(
         };
         for unit in dedupe_cap_units(request.units) {
             if request.queued {
-                if artillery_point_fire_target_valid(map, entities, player, unit, x, y) {
+                if artillery_point_fire_command_target(map, entities, player, unit, x, y).is_some()
+                {
                     if let Some(e) = entities.get_mut(unit) {
                         if !e
                             .queued_orders()
@@ -1029,16 +1032,10 @@ fn order_artillery_point_fire(
     y: f32,
     tick: u32,
 ) -> bool {
-    if !artillery_point_fire_target_valid(map, entities, player, unit, x, y) {
-        return false;
-    }
-    let Some(e) = entities.get_mut(unit) else {
+    let Some(target) = artillery_point_fire_command_target(map, entities, player, unit, x, y)
+    else {
         return false;
     };
-    let facing = (y - e.pos_y).atan2(x - e.pos_x);
-    if !facing.is_finite() {
-        return false;
-    }
     entities.release_miner(unit);
     let Some(e) = entities.get_mut(unit) else {
         return false;
@@ -1046,15 +1043,19 @@ fn order_artillery_point_fire(
     e.clear_orders();
     e.set_path_goal(None);
     e.set_target_id(None);
-    e.set_emplacement_facing(Some(facing));
-    e.set_desired_weapon_facing(facing);
     e.reset_gather_state();
     let (px, py) = (e.pos_x, e.pos_y);
     e.reset_stuck(px, py);
-    if !matches!(e.weapon_setup(), WeaponSetup::Deployed) {
+    if !target.inside_field_of_fire {
+        e.set_pending_redeploy_facing(Some(target.facing));
+        e.set_weapon_setup(WeaponSetup::TearingDownToRedeploy {
+            ticks: setup_ticks_for(e.kind),
+        });
+        e.set_order(Order::artillery_point_fire(target.x, target.y));
         return true;
     }
-    e.set_order(Order::artillery_point_fire(x, y));
+    e.set_desired_weapon_facing(target.facing);
+    e.set_order(Order::artillery_point_fire(target.x, target.y));
     try_fire_artillery(
         entities,
         players,
@@ -1062,10 +1063,31 @@ fn order_artillery_point_fire(
         events,
         player,
         unit,
-        x,
-        y,
+        target.x,
+        target.y,
         tick,
     )
+}
+
+#[derive(Clone, Copy)]
+struct ArtilleryPointFireTarget {
+    x: f32,
+    y: f32,
+    facing: f32,
+    inside_field_of_fire: bool,
+}
+
+fn artillery_point_fire_command_target(
+    map: &Map,
+    entities: &EntityStore,
+    player: u32,
+    unit: u32,
+    x: f32,
+    y: f32,
+) -> Option<ArtilleryPointFireTarget> {
+    let target = artillery_point_fire_target(map, entities, player, unit, x, y)?;
+    let e = entities.get(unit)?;
+    matches!(e.weapon_setup(), WeaponSetup::Deployed).then_some(target)
 }
 
 fn artillery_point_fire_target_valid(
@@ -1076,48 +1098,55 @@ fn artillery_point_fire_target_valid(
     x: f32,
     y: f32,
 ) -> bool {
-    let Some((x, y)) = SmokeCloudStore::clamp_point_to_map(map, x, y) else {
-        return false;
-    };
-    let Some(e) = entities.get(unit) else {
-        return false;
-    };
+    artillery_point_fire_command_target(map, entities, player, unit, x, y)
+        .is_some_and(|target| target.inside_field_of_fire)
+}
+
+fn artillery_point_fire_target(
+    map: &Map,
+    entities: &EntityStore,
+    player: u32,
+    unit: u32,
+    x: f32,
+    y: f32,
+) -> Option<ArtilleryPointFireTarget> {
+    let (x, y) = SmokeCloudStore::clamp_point_to_map(map, x, y)?;
+    let e = entities.get(unit)?;
     if e.owner != player
         || e.kind != EntityKind::Artillery
         || e.hp == 0
         || e.under_construction()
         || !e.path_is_empty()
     {
-        return false;
+        return None;
     }
     let dx = x - e.pos_x;
     let dy = y - e.pos_y;
     let distance2 = dx * dx + dy * dy;
     if !distance2.is_finite() {
-        return false;
+        return None;
     }
     let min_px = config::ARTILLERY_MIN_RANGE_TILES as f32 * config::TILE_SIZE as f32;
     let max_px = config::ARTILLERY_MAX_RANGE_TILES as f32 * config::TILE_SIZE as f32;
     if distance2 < min_px * min_px || distance2 > max_px * max_px {
-        return false;
+        return None;
     }
-    if !matches!(e.weapon_setup(), WeaponSetup::Deployed) {
-        return false;
-    }
-    let Some(center) = e
+    let center = e
         .emplacement_facing()
         .or_else(|| e.weapon_facing())
-        .filter(|facing| facing.is_finite())
-    else {
-        return false;
-    };
-    let target_angle = dy.atan2(dx);
-    if !target_angle.is_finite()
-        || angle_delta(center, target_angle).abs() > config::ARTILLERY_FIELD_OF_FIRE_RAD * 0.5
-    {
-        return false;
+        .filter(|facing| facing.is_finite())?;
+    let facing = dy.atan2(dx);
+    if !facing.is_finite() {
+        return None;
     }
-    true
+    let inside_field_of_fire =
+        angle_delta(center, facing).abs() <= config::ARTILLERY_FIELD_OF_FIRE_RAD * 0.5;
+    Some(ArtilleryPointFireTarget {
+        x,
+        y,
+        facing,
+        inside_field_of_fire,
+    })
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -1219,6 +1248,18 @@ pub(crate) fn artillery_point_fire_system(
         .collect();
     for (id, owner, x, y) in orders {
         if !artillery_point_fire_target_valid(map, entities, owner, id, x, y) {
+            if matches!(
+                entities.get(id).map(|e| e.weapon_setup()),
+                Some(
+                    WeaponSetup::Packed
+                        | WeaponSetup::SettingUp { .. }
+                        | WeaponSetup::TearingDown { .. }
+                        | WeaponSetup::TearingDownToRedeploy { .. }
+                )
+            ) && artillery_point_fire_target(map, entities, owner, id, x, y).is_some()
+            {
+                continue;
+            }
             if let Some(e) = entities.get_mut(id) {
                 e.clear_active_order();
             }
@@ -3584,6 +3625,109 @@ mod tests {
             1,
             "non-AT units skip setup but keep later compatible stages"
         );
+    }
+
+    #[test]
+    fn artillery_point_fire_inside_arc_keeps_setup_facing_fixed() {
+        let map = flat_map(64);
+        let mut entities = EntityStore::new();
+        let mut players = vec![player_state(1), player_state(2)];
+        let pos = (320.0, 320.0);
+        let angle = config::ARTILLERY_FIELD_OF_FIRE_RAD * 0.45;
+        let distance = config::TILE_SIZE as f32 * 22.0;
+        let target = (pos.0 + angle.cos() * distance, pos.1 + angle.sin() * distance);
+        let artillery = entities
+            .spawn_unit(1, EntityKind::Artillery, pos.0, pos.1)
+            .expect("artillery should spawn");
+        {
+            let unit = entities.get_mut(artillery).expect("artillery should exist");
+            unit.set_weapon_setup(WeaponSetup::Deployed);
+            unit.set_emplacement_facing(Some(0.0));
+            unit.set_weapon_facing(0.0);
+        }
+
+        let events = apply_with_players(
+            &map,
+            &mut entities,
+            &mut players,
+            vec![(
+                1,
+                SimCommand::UseAbility {
+                    ability: AbilityKind::PointFire,
+                    units: vec![artillery],
+                    x: Some(target.0),
+                    y: Some(target.1),
+                    queued: false,
+                },
+            )],
+        );
+
+        let unit = entities.get(artillery).expect("artillery should exist");
+        assert!(matches!(unit.weapon_setup(), WeaponSetup::Deployed));
+        assert!(matches!(unit.order(), Order::ArtilleryPointFire(_)));
+        assert!(
+            unit.emplacement_facing().unwrap_or_default().abs() < 0.001,
+            "in-arc point fire must not recenter the deployed field of fire"
+        );
+        assert_eq!(
+            players[0].steel,
+            1_000 - config::ARTILLERY_AMMO_COST_STEEL
+        );
+        assert!(events.get(&1).is_some_and(|events| events
+            .iter()
+            .any(|event| matches!(event, Event::ArtilleryTarget { from, .. } if *from == artillery))));
+    }
+
+    #[test]
+    fn artillery_point_fire_outside_arc_starts_redeploy_without_firing() {
+        let map = flat_map(64);
+        let mut entities = EntityStore::new();
+        let mut players = vec![player_state(1), player_state(2)];
+        let pos = (320.0, 320.0);
+        let angle = config::ARTILLERY_FIELD_OF_FIRE_RAD;
+        let distance = config::TILE_SIZE as f32 * 22.0;
+        let target = (pos.0 + angle.cos() * distance, pos.1 + angle.sin() * distance);
+        let artillery = entities
+            .spawn_unit(1, EntityKind::Artillery, pos.0, pos.1)
+            .expect("artillery should spawn");
+        {
+            let unit = entities.get_mut(artillery).expect("artillery should exist");
+            unit.set_weapon_setup(WeaponSetup::Deployed);
+            unit.set_emplacement_facing(Some(0.0));
+            unit.set_weapon_facing(0.0);
+        }
+
+        let events = apply_with_players(
+            &map,
+            &mut entities,
+            &mut players,
+            vec![(
+                1,
+                SimCommand::UseAbility {
+                    ability: AbilityKind::PointFire,
+                    units: vec![artillery],
+                    x: Some(target.0),
+                    y: Some(target.1),
+                    queued: false,
+                },
+            )],
+        );
+
+        let unit = entities.get(artillery).expect("artillery should exist");
+        assert!(matches!(
+            unit.weapon_setup(),
+            WeaponSetup::TearingDownToRedeploy { .. }
+        ));
+        assert!(matches!(unit.order(), Order::ArtilleryPointFire(_)));
+        assert!(
+            (unit.pending_redeploy_facing().unwrap_or_default() - angle).abs() < 0.001,
+            "outside-arc point fire should store the requested redeploy facing"
+        );
+        assert_eq!(players[0].steel, 1_000);
+        assert!(events
+            .values()
+            .flat_map(|events| events.iter())
+            .all(|event| !matches!(event, Event::ArtilleryTarget { .. })));
     }
 
     #[test]
