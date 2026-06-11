@@ -25,6 +25,11 @@ After guardrails pass, consider narrowly predicting:
 
 Do not predict actual enemy HP, death, resource denial, or win/loss state.
 
+## Verification
+
+Use the following fog, desync, and security checks as the required verification surface for this
+phase.
+
 ## Fog Verification
 
 - Add tests that construct a map with hidden enemies just outside visibility.
@@ -57,6 +62,18 @@ Do not predict actual enemy HP, death, resource denial, or win/loss state.
 - Regression test that normal clients cannot request full-world baselines.
 - Regression test that command metadata cannot be forged to mark commands accepted or skip server
   validation.
+
+## Manual Testing Focus
+
+Play or replay a fog-heavy encounter with prediction enabled and confirm hidden enemies remain
+hidden until the authoritative reveal. Manual review should focus on corrections, attack feedback,
+and spectator/replay behavior rather than broad balance or combat tuning.
+
+## Handoff Expectations
+
+At handoff, state which combat and fog behaviors are predicted, which remain authoritative-only, and
+the negative fog-leak scenarios that passed. Call out any residual desync or correction cases that
+Phase 7 must keep behind the rollout flag.
 
 ## Player-Facing Outcome
 

@@ -72,6 +72,48 @@ client debug marks, optional local-lane frames, and domain-aware diffs. The goal
 agent can answer, at step N and tick T: what did the server consume, what did local prediction
 believe, what did the browser render, and where did those lanes diverge?
 
+## Phase Summaries
+
+Phase 0 builds the tri-state scenario harness before prediction changes gameplay behavior. It
+captures remote authoritative state and browser client state now, while defining the local lane
+contract that Phase 3 will fill in. The result is a repeatable way to turn lag and prediction bugs
+into inspectable scenario artifacts.
+
+Phase 1 adds the protocol contract for sequenced commands and authoritative snapshot
+acknowledgements. It keeps gameplay behavior unchanged, but makes every live command correlate with
+the simulation tick stream that consumed it. This gives later reconciliation code a reliable signal
+for dropping or replaying pending local commands.
+
+Phase 2 adds the client-side prediction buffer and reconciliation skeleton behind disabled runtime
+paths. It records pending commands, reads authoritative acknowledgements, and exposes diagnostics
+without changing the rendered match by default. This phase proves the browser can safely track the
+state needed for prediction before local simulation is enabled.
+
+Phase 3 packages the Rust simulation surface for browser-safe local prediction. It defines how an
+owner-safe baseline enters the local lane, verifies native and WASM parity, and registers the local
+lane with the Phase 0 harness. This phase should still avoid visible prediction unless a developer
+flag explicitly turns it on.
+
+Phase 4 enables owned-unit movement prediction as the first player-visible prediction surface. It
+predicts only safe local movement behavior, reconciles against authoritative snapshots, and measures
+correction distance under delayed snapshots. The player-facing goal is that move commands feel
+immediate while the server remains authoritative.
+
+Phase 5 expands prediction around command acceptance, rejection, and UI optimism. It makes accepted
+commands feel responsive while ensuring server rejection, resource validation, and command failure
+notices always win. This phase should improve perceived responsiveness without letting local UI
+optimism become authority.
+
+Phase 6 hardens prediction around combat, fog, and cross-player boundaries. It either keeps combat
+unpredicted or adds only tightly scoped owner-safe prediction after negative fog and desync tests
+exist. The main outcome is confidence that prediction cannot leak hidden state or mask
+authoritative combat results.
+
+Phase 7 rolls prediction out under measured performance budgets and removes obsolete delay-oriented
+paths only after the earlier gates pass. It verifies CPU, memory, bundle size, frame timing, and
+scenario coverage across realistic network profiles. This phase is where prediction becomes the
+default player experience if the evidence supports it.
+
 ## Phase Index
 
 0. [Phase 0 - Tri-State Scenario Harness](phase-0-tri-state-scenario-harness.md)
@@ -106,3 +148,15 @@ programmatic verification in at least one of these forms:
 - browser smoke tests that assert visible command response before authoritative echo
 - fog leak tests that prove prediction baselines expose no hidden enemy state
 - performance tests with explicit CPU, memory, bundle-size, and frame-time budgets
+
+## Implementation and Handoff Rules
+
+Implement one phase at a time. Each phase should be committed, merged to `main`, and pushed before
+the next phase begins. When a phase is complete, mark that phase document as done in the same
+implementation commit.
+
+After implementing each phase, the agent must provide a handoff message for the next agent. The
+handoff must summarize what changed, list verification commands and results, identify the next
+phase or follow-up work, and name the core features that should be manually tested. Manual testing
+notes should cover the changed player-facing surface and core prediction behavior, not an
+exhaustive matrix.

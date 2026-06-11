@@ -70,6 +70,19 @@ for delayed authoritative snapshots.
 - Client smoke test still passes with prediction tracking enabled but no visible prediction.
 - Test that replay viewer and spectator modes never allocate gameplay command sequence ids.
 
+## Manual Testing Focus
+
+Play a short local match with prediction disabled and confirm visible behavior matches the
+pre-prediction authoritative flow. Use debug output or scenario artifacts to inspect pending-command
+counts, acknowledgement drops, and correction diagnostics while issuing several rapid commands.
+
+## Handoff Expectations
+
+At handoff, describe the prediction-controller state machine, the diagnostics exposed to the
+tri-state harness, and any disabled code paths that Phase 3 or Phase 4 must activate. Include the
+manual debug view or artifact fields a future agent should inspect when reconciliation behaves
+unexpectedly.
+
 ## Player-Facing Outcome
 
 No intended gameplay change. This phase adds the local bookkeeping needed to safely run prediction

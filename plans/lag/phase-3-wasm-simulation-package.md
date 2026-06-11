@@ -86,6 +86,19 @@ production state.
 - Architecture check that `rts-sim-wasm` does not depend on `rts-server`, `rts-ai`, Tokio, Axum, or
   SQLx.
 
+## Manual Testing Focus
+
+Load the client with the developer prediction flag enabled and confirm the WASM package initializes
+without blocking normal match start or command execution. Inspect a tri-state artifact with all
+three lanes and verify the local lane is present, named, and comparable even if visible prediction
+is still disabled.
+
+## Handoff Expectations
+
+At handoff, include the WASM build command, generated artifact location, bundle-size delta, and the
+baseline import limitations that Phase 4 must respect. Identify which state fields are parity-tested
+and which are intentionally excluded because they are not owner-safe or not yet predicted.
+
 ## Player-Facing Outcome
 
 No visible prediction yet unless a developer flag is enabled. This phase proves the browser can run

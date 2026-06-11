@@ -80,6 +80,19 @@ snapshot correlate cleanly.
   consumed, without changing deterministic replay command logs.
 - Protocol documentation update in `docs/design/protocol.md` in the same change.
 
+## Manual Testing Focus
+
+Start a normal match and exercise the major command paths: right-click move, minimap command, build
+placement, training, rally, and at least one command-card ability if available. The manual check is
+that commands still execute normally while debug or network logs show increasing command sequence
+ids and authoritative snapshot acknowledgements.
+
+## Handoff Expectations
+
+At handoff, list every command path that was updated to allocate `clientSeq`, the compact snapshot
+version change if one was required, and the exact acknowledgement fields now available to Phase 2.
+Call out any command path that still needs a targeted browser or integration test.
+
 ## Player-Facing Outcome
 
 No gameplay change yet. This phase creates the acknowledgement contract that makes later immediate

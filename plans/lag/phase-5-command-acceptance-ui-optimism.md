@@ -63,6 +63,19 @@ accept/reject tests.
 - Protocol mirror tests for any new command-result metadata.
 - Replay test proving command-result metadata does not alter deterministic simulation.
 
+## Manual Testing Focus
+
+Under artificial latency, try both valid and invalid build, train, research, and ability commands.
+Manual testing should confirm accepted commands feel responsive, rejected commands show clear
+authoritative feedback, and optimistic UI state never leaves resources, units, or buildings stuck in
+the wrong state.
+
+## Handoff Expectations
+
+At handoff, list which command families support optimistic feedback, which remain
+authoritative-only, and the user-visible rejection paths that were manually checked. Include any
+server validation cases that need new tri-state scenarios before prediction expands further.
+
 ## Player-Facing Outcome
 
 Command UI feels responsive immediately, while invalid commands still settle to the server's

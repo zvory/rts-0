@@ -111,6 +111,19 @@ The artifact must include enough context for an agent or human to reproduce the 
 - Local-lane adapter contract test using the Phase 0 unavailable/stub adapter.
 - Documentation in this plan explaining how a new regression scenario should be added.
 
+## Manual Testing Focus
+
+Run one visible or artifact-backed scenario and confirm the recorded timeline is understandable:
+setup, scripted actions, remote snapshots, browser state summaries, and assertion results should be
+easy to follow. Manual review should focus on whether a future prediction bug could be reproduced
+from the artifact, not on multiplayer feel.
+
+## Handoff Expectations
+
+At handoff, include the scenario runner command, the artifact path for at least one successful or
+forced-failure run, and any local-lane contract gaps that Phase 3 must fill. Name the next scenario
+types that should be added when command acknowledgement and local prediction exist.
+
 ## Player-Facing Outcome
 
 No gameplay change. This phase makes future lag/prediction work inspectable before the local
