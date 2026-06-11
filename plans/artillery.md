@@ -10,12 +10,12 @@
   - Artillery should not automatically set up from a Point Fire order.
   - Point Fire should require an already deployed artillery piece in arc and in range.
   - Movement or teardown should continue to reset artillery accuracy.
-- Increase artillery shell travel time from 4 seconds to 5 seconds.
+- [x] Increase artillery shell travel time from 4 seconds to 5 seconds.
   - Update server timing, client mirrored timing, target-marker lifetime, docs, and tests together.
-- Improve invalid minimum-range targeting feedback.
+- [x] Improve invalid minimum-range targeting feedback.
   - While Point Fire targeting is armed, hovering inside artillery minimum range should draw an `X` at the target cursor instead of a valid crosshair.
   - The max-range affordance should remain readable while the target is invalid.
-- Make the minimum-range dotted line a deeper hue.
+- [x] Make the minimum-range dotted line a deeper hue.
   - Use a darker, less bright red for the inner minimum-range ring so it reads as a danger/invalid boundary without competing with the target marker.
 - Verify and, if needed, fix artillery damage against buildings.
   - If the center of the shell lands anywhere inside a building footprint, the building should take full inner-radius armor-piercing damage.
@@ -41,7 +41,7 @@
 - Artillery Point Fire while packed does not start setup and does not fire.
 - Artillery manually set up with `Z` can Point Fire once deployed, in arc, and outside minimum range.
 - Artillery Point Fire inside minimum range is rejected and does not spend steel.
-- Artillery shell delay is 5 seconds in server config, client config, and target-marker rendering.
+- [x] Artillery shell delay is 5 seconds in server config, client config, and target-marker rendering.
 - Artillery shell landing inside a building footprint deals full inner armor-piercing damage.
 - Artillery shell landing outside the footprint but within splash range uses footprint-distance falloff.
 - Protocol/client contract tests cover any added artillery firing-unit id.
