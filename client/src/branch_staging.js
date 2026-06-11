@@ -6,8 +6,12 @@ export class BranchStaging {
     this.net = net;
     this._active = false;
     this._last = null;
+    this._countdownEl = null;
+    this._countdownTimers = [];
     this._onStaging = (m) => this.render(m);
+    this._onMatchCountdown = (m) => this.renderCountdown(m);
     this.net.on(S.BRANCH_STAGING, this._onStaging);
+    this.net.on(S.MATCH_COUNTDOWN, this._onMatchCountdown);
   }
 
   show() {
@@ -20,6 +24,7 @@ export class BranchStaging {
   hide() {
     this._active = false;
     this._last = null;
+    this.clearCountdown();
     this.root.classList.remove("branch-staging-active");
     this.root.hidden = true;
     this.root.replaceChildren();
@@ -27,6 +32,7 @@ export class BranchStaging {
 
   destroy() {
     this.net.off(S.BRANCH_STAGING, this._onStaging);
+    this.net.off(S.MATCH_COUNTDOWN, this._onMatchCountdown);
     this.hide();
   }
 
@@ -126,5 +132,50 @@ export class BranchStaging {
 
     row.append(swatch, body, action);
     return row;
+  }
+
+  renderCountdown(m) {
+    if (!this._active) return;
+    const words = Array.isArray(m?.words) && m.words.length
+      ? m.words.map((word) => String(word))
+      : ["Drei!", "Zwei!", "Eins!"];
+    const durationMs = Math.max(1000, Number(m?.durationMs) || words.length * 1000);
+    const wordMs = Math.max(250, durationMs / words.length);
+
+    this.clearCountdown();
+
+    const overlay = document.createElement("div");
+    overlay.className = "match-countdown";
+    overlay.setAttribute("role", "status");
+    overlay.setAttribute("aria-live", "assertive");
+    this._countdownEl = overlay;
+    this.root.appendChild(overlay);
+
+    const showWord = (word) => {
+      if (!this._countdownEl) return;
+      this._countdownEl.textContent = word;
+      this._countdownEl.classList.remove("pulse");
+      void this._countdownEl.offsetWidth;
+      this._countdownEl.classList.add("pulse");
+    };
+
+    words.forEach((word, index) => {
+      const delay = Math.round(index * wordMs);
+      if (delay <= 0) {
+        showWord(word);
+      } else {
+        this._countdownTimers.push(globalThis.setTimeout(() => showWord(word), delay));
+      }
+    });
+    this._countdownTimers.push(globalThis.setTimeout(() => this.clearCountdown(), durationMs + 1000));
+  }
+
+  clearCountdown() {
+    for (const timer of this._countdownTimers) globalThis.clearTimeout(timer);
+    this._countdownTimers = [];
+    if (this._countdownEl) {
+      this._countdownEl.remove();
+      this._countdownEl = null;
+    }
   }
 }
