@@ -16,7 +16,7 @@
 //     placement/targeting; S also falls back to stop when no card button is active.
 //     Number keys recall control groups; double-tap jumps to the densest visible
 //     cluster. Alt/Ctrl/Cmd+number replaces a group, and Shift+number adds to it;
-//     on Windows, browser saves use Alt+number and desktop saves use Ctrl+number.
+//     on Windows, tabbed browser saves use Alt+number and installed-app saves use Ctrl+number.
 //   - Mouse wheel = camera zoom toward the cursor.
 //   - Arrow-key pan state is OWNED here and exposed via `this.keys` so the camera can
 //     read it in Camera.update(dt, input) — see the `keys` field documentation below.
@@ -59,7 +59,7 @@ import {
 } from "./control_groups.js";
 import {
   cursorLockSupported,
-  desktopRuntime,
+  installedAppRuntime,
   enterCursorLock,
   exitCursorLock,
 } from "./cursor_lock.js";
@@ -357,8 +357,8 @@ export class Input {
     return cursorLockSupported(this._browserPointerLockSupported());
   }
 
-  desktopRuntime() {
-    return desktopRuntime();
+  installedAppRuntime() {
+    return installedAppRuntime();
   }
 
   _browserPointerLockSupported() {
@@ -399,7 +399,7 @@ export class Input {
   pointerLockDebugSnapshot() {
     const target = this._pointerLockTarget();
     return {
-      desktopRuntime: this.desktopRuntime(),
+      installedAppRuntime: this.installedAppRuntime(),
       pointerLocked: this.pointerLocked,
       pointerLockElementMatches: this._browserPointerLockElement() === target,
       pointerLockElementIsViewport: this._browserPointerLockElement() === this.dom,

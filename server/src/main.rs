@@ -984,7 +984,7 @@ mod tests {
             html.contains(
                 "\"/src/renderer/terrain.js\": \"/src/renderer/terrain.js?v=test-version\""
             ),
-            "nested ES modules must be versioned so desktop webviews do not run stale renderer code"
+            "nested ES modules must be versioned so browser clients do not run stale renderer code"
         );
         assert!(html.contains("./src/main.js?v=test-version\""));
         assert!(html.contains("./styles.css?v=test-version\""));

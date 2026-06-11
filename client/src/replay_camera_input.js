@@ -75,7 +75,7 @@ export class ReplayCameraInput {
     return false;
   }
 
-  desktopRuntime() {
+  installedAppRuntime() {
     return false;
   }
 

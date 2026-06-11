@@ -32,8 +32,8 @@ const LATENCY_ISSUE_MS = 180;
 const JITTER_ISSUE_MS = 20;
 const JITTER_WINDOW = 8;
 const AUTO_POINTER_LOCK_SUPPRESS_MS = 1200;
-const DESKTOP_POINTER_LOCK_RETRY_ATTEMPTS = 4;
-const DESKTOP_POINTER_LOCK_RETRY_DELAY_MS = 120;
+const INSTALLED_APP_POINTER_LOCK_RETRY_ATTEMPTS = 4;
+const INSTALLED_APP_POINTER_LOCK_RETRY_DELAY_MS = 120;
 const POINTER_LOCK_PAN_STORAGE_KEY = "rts.lockCursorPan";
 
 const COMBAT_SOUNDS = Object.freeze({
@@ -456,11 +456,11 @@ export class Match {
     if (!this.pointerLockPanEnabled) return;
     if (!this.input || !this.input.pointerLockSupported()) return;
     if (automaticPointerLockDisabledForTests()) return;
-    const isDesktop = this.input.desktopRuntime();
-    if (!shouldRequestPointerLock({ desktopRuntime: isDesktop, requireGesture })) return;
+    const isInstalledApp = this.input.installedAppRuntime();
+    if (!shouldRequestPointerLock({ installedAppRuntime: isInstalledApp, requireGesture })) return;
     if (this.input.pointerLocked) return;
     this.autoPointerLockUntil = performance.now() + AUTO_POINTER_LOCK_SUPPRESS_MS;
-    const maxAttempts = isDesktop && requireGesture ? DESKTOP_POINTER_LOCK_RETRY_ATTEMPTS : 1;
+    const maxAttempts = isInstalledApp && requireGesture ? INSTALLED_APP_POINTER_LOCK_RETRY_ATTEMPTS : 1;
     this.pointerLockRetryToken += 1;
     void this.runPointerLockRetryBurst(this.pointerLockRetryToken, maxAttempts);
   }
@@ -487,7 +487,7 @@ export class Match {
         this.pointerLockRetry.stopped = "already-locked";
         break;
       }
-      if (this.input.desktopRuntime() && typeof document.hasFocus === "function" && !document.hasFocus()) {
+      if (this.input.installedAppRuntime() && typeof document.hasFocus === "function" && !document.hasFocus()) {
         this.pointerLockRetry.stopped = "document-not-focused";
         break;
       }
@@ -509,7 +509,7 @@ export class Match {
   }
 
   waitPointerLockRetryDelay() {
-    return new Promise((resolve) => window.setTimeout(resolve, DESKTOP_POINTER_LOCK_RETRY_DELAY_MS));
+    return new Promise((resolve) => window.setTimeout(resolve, INSTALLED_APP_POINTER_LOCK_RETRY_DELAY_MS));
   }
 
   automaticPointerLockActive() {
@@ -608,7 +608,7 @@ export class Match {
   }
 
   recordPointerLockDiagnostic(err = null) {
-    if (!this.input?.desktopRuntime()) return;
+    if (!this.input?.installedAppRuntime()) return;
     const snapshot = {
       at: new Date().toISOString(),
       error: this.pointerLockErrorSummary(err),
@@ -618,8 +618,8 @@ export class Match {
     if (typeof window !== "undefined") window.__rtsPointerLockDebug = snapshot;
     if (this.pointerLockDiagnosticShown) return;
     this.pointerLockDiagnosticShown = true;
-    console.warn("[RTS_POINTER_LOCK_DESKTOP]", snapshot);
-    this.toast("Desktop cursor lock failed. Inspect window.__rtsPointerLockDebug.");
+    console.warn("[RTS_POINTER_LOCK_INSTALLED_APP]", snapshot);
+    this.toast("Installed-app cursor lock failed. Inspect window.__rtsPointerLockDebug.");
   }
 
   pointerLockErrorSummary(err) {
