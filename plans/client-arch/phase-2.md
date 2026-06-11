@@ -1,5 +1,9 @@
 # Phase 2 - Neutral Command Targeting Boundary
 
+## Phase Status
+
+- [ ] Pending implementation.
+
 ## Objective
 
 Remove the current concrete boundary inversion where `GameState` imports an input implementation
@@ -53,6 +57,12 @@ At handoff, ask the user to do this quick browser check:
 > 3. Shift-issue a targeted order and confirm queued behavior still works.
 > 4. Click the minimap to issue or route a command if the selected units support it.
 > 5. Report any stuck targeting cursor, lost Shift queueing, or console error.
+
+## Handoff Expectations
+
+In the final handoff, include the completed segment checklist, exact verification output summary,
+and the filled manual testing prompt above. Tell the next agent to start Phase 3 only after this
+phase is committed, merged to `main`, and pushed.
 
 ## Safety Notes
 

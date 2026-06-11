@@ -1,5 +1,9 @@
 # Phase 5 - Command Card Descriptor Layer
 
+## Phase Status
+
+- [ ] Pending implementation.
+
 ## Objective
 
 Prepare `HUD` for safer long-term improvement by separating command-card decision logic from DOM
@@ -69,6 +73,12 @@ At handoff, ask the user to do this command-card pass:
 > 7. Enter spectator/replay mode if available and confirm command cards stay hidden or inert.
 > 8. Report changed labels, missing icons/hotkeys/tooltips, wrong disabled states, misfired
 >    commands, or console errors.
+
+## Handoff Expectations
+
+In the final handoff, include the completed segment checklist, exact verification output summary,
+and the filled manual testing prompt above. Tell the next agent to start Phase 6 only after this
+phase is committed, merged to `main`, and pushed.
 
 ## Safety Notes
 
