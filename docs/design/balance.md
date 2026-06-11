@@ -43,8 +43,8 @@ Core unit roles:
   before firing, cannot shoot while moving, and lands delayed area shells that punish static
   positions and clumped units.
 - **Artillery** is the Superior Firepower late capstone from Gun Works: it uses a tank-sized
-  tracked body, must deploy into a narrow firing arc, cannot shoot inside its minimum range, and
-  spends steel on each long-range point-fire shell.
+  gameplay footprint but reads as an exposed field piece, must deploy into a narrow firing arc,
+  cannot shoot inside its minimum range, and spends steel on each long-range point-fire shell.
 
 Terrain rules:
 - **Open ground** favors machine guns and tanks.
@@ -98,8 +98,9 @@ authoritative `rules::defs` records.
 - Artillery uses `ARTILLERY_MIN_RANGE_TILES = 10`, `ARTILLERY_MAX_RANGE_TILES = 50`,
   `ARTILLERY_FIELD_OF_FIRE_RAD = 20 degrees total`, `ARTILLERY_RELOAD_TICKS = 90` (~3s),
   `ARTILLERY_SHELL_DELAY_TICKS = 120` (~4s), and `ARTILLERY_AMMO_COST_STEEL = 10`.
-  Its body length, width, clearance, and selection radius match the Tank; its long barrel and
-  deployed spades carry the visual distinction instead of a larger footprint. Impacts deal
+  Its body length, width, clearance, and selection radius match the Tank; its exposed carriage,
+  long barrel, large wheels, and deployed spades carry the visual distinction instead of a larger
+  footprint. Impacts deal
   150 armor-piercing damage within 1 tile and non-armor-piercing falloff down to 10 damage at
   3 tiles, including friendly fire.
 - `TANK_OIL_COST_PER_PX = 20 / (96 * TILE_SIZE)`: tank movement still uses the original

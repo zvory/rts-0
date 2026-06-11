@@ -207,7 +207,6 @@ function drawMortarTeam(g, r, tint, facing, weaponFacing, setup, recoil) {
 
 function drawArtillery(g, body, tint, facing, weaponFacing, setup, recoil, motion) {
   const deploy = clamp01(setup.prongFactor);
-  drawTankTracks(g, body, facing, motion);
 
   if (deploy < 0.35 && motion.activity > 0.05) {
     const dustAlpha = 0.12 + motion.activity * 0.16;
@@ -218,78 +217,82 @@ function drawArtillery(g, body, tint, facing, weaponFacing, setup, recoil, motio
     g.endFill();
   }
 
-  g.beginFill(tint, 0.97);
-  g.drawPolygon(rotatedArtilleryHull(body, facing));
-  g.endFill();
-  g.beginFill(0x1a1712, 0.2);
-  drawRotatedRect(g, -body.halfLen * 0.08, 0, body.halfLen * 1.34, body.halfWidth * 0.92, facing);
-  g.endFill();
+  const carriageFacing = deploy > 0.02 ? weaponFacing : facing;
+  const trailSpread = body.halfWidth * (0.18 + deploy * 0.95);
+  const trailRear = -body.halfLen * (0.58 + deploy * 0.62);
+  const trailRoot = rotatePoint(-body.halfLen * 0.12, 0, carriageFacing);
+  const trailL = rotatePoint(trailRear, -trailSpread, carriageFacing);
+  const trailR = rotatePoint(trailRear, trailSpread, carriageFacing);
+  const axleL = rotatePoint(-body.halfLen * 0.18, -body.halfWidth * 0.82, carriageFacing);
+  const axleR = rotatePoint(-body.halfLen * 0.18, body.halfWidth * 0.82, carriageFacing);
+  const cradle = rotatePoint(body.halfLen * 0.02, 0, carriageFacing);
 
-  const trailSpread = body.halfWidth * (0.44 + deploy * 0.46);
-  const trailRear = -body.halfLen * (0.34 + deploy * 0.28);
-  const trailRoot = rotatePoint(-body.halfLen * 0.08, 0, weaponFacing);
-  const trailL = rotatePoint(trailRear, -trailSpread, weaponFacing);
-  const trailR = rotatePoint(trailRear, trailSpread, weaponFacing);
-  g.lineStyle(4, 0x2a2119, 0.92 * deploy);
+  g.lineStyle(3, 0x17120e, 0.9);
+  g.moveTo(axleL.x, axleL.y);
+  g.lineTo(axleR.x, axleR.y);
+  g.lineStyle(3.5, 0x2a2119, 0.9);
   g.moveTo(trailRoot.x, trailRoot.y);
   g.lineTo(trailL.x, trailL.y);
   g.moveTo(trailRoot.x, trailRoot.y);
   g.lineTo(trailR.x, trailR.y);
+  g.lineStyle(2, 0x5d4a34, 0.78);
+  g.moveTo(cradle.x, cradle.y);
+  g.lineTo(trailRoot.x, trailRoot.y);
   if (deploy > 0.02) {
     g.lineStyle(2.5, 0x15120f, 0.82 * deploy);
     for (const foot of [trailL, trailR]) {
-      drawFreeRotatedRect(g, foot.x, foot.y, body.halfWidth * 0.52, body.halfWidth * 0.2, weaponFacing);
+      drawFreeRotatedRect(g, foot.x, foot.y, body.halfWidth * 0.72, body.halfWidth * 0.22, carriageFacing);
     }
   }
 
-  const tireLength = body.halfWidth * 0.58;
-  const tireWidth = body.halfWidth * 0.25;
-  for (const y of [-body.halfWidth * 0.74, body.halfWidth * 0.74]) {
-    const wheel = rotatePoint(-body.halfLen * 0.15, y, facing);
-    drawGunTire(g, wheel.x, wheel.y, tireLength, tireWidth, facing);
+  const tireLength = body.halfWidth * 0.95;
+  const tireWidth = body.halfWidth * 0.42;
+  for (const wheel of [axleL, axleR]) {
+    drawGunTire(g, wheel.x, wheel.y, tireLength, tireWidth, carriageFacing);
   }
 
-  g.beginFill(0x1a1712, 0.3);
-  drawRotatedRect(g, body.halfLen * 0.1, 0, body.halfLen * 0.92, body.halfWidth * 0.74, weaponFacing);
+  g.beginFill(tint, 0.9);
+  drawFreeRotatedRect(g, cradle.x, cradle.y, body.halfLen * 0.52, body.halfWidth * 0.58, carriageFacing);
   g.endFill();
-  g.beginFill(tint, 0.98);
-  drawRotatedRect(g, body.halfLen * 0.07, 0, body.halfLen * 0.68, body.halfWidth * 0.64, weaponFacing);
+  g.beginFill(0x2a2119, 0.9);
+  drawFreeRotatedRect(
+    g,
+    cradle.x - Math.cos(carriageFacing) * body.halfLen * 0.1,
+    cradle.y - Math.sin(carriageFacing) * body.halfLen * 0.1,
+    body.halfLen * 0.24,
+    body.halfWidth * 0.36,
+    carriageFacing,
+  );
   g.endFill();
 
   const kick = recoilVector(weaponFacing, recoil * 0.8);
-  const breech = offsetPoint(rotatePoint(body.halfLen * 0.18, 0, weaponFacing), kick);
-  const muzzle = offsetPoint(rotatePoint(body.halfLen * 1.64, 0, weaponFacing), kick);
-  g.lineStyle(7, 0x241d17, 0.98);
+  const breech = offsetPoint(rotatePoint(body.halfLen * 0.04, 0, weaponFacing), kick);
+  const muzzle = offsetPoint(rotatePoint(body.halfLen * 1.82, 0, weaponFacing), kick);
+  g.lineStyle(8, 0x241d17, 0.98);
   g.moveTo(breech.x, breech.y);
   g.lineTo(muzzle.x, muzzle.y);
-  g.lineStyle(2.5, 0xd8d0b0, 0.58);
+  g.lineStyle(2.2, 0xd8d0b0, 0.62);
   g.moveTo(breech.x + Math.sin(weaponFacing) * 3, breech.y - Math.cos(weaponFacing) * 3);
   g.lineTo(muzzle.x + Math.sin(weaponFacing) * 3, muzzle.y - Math.cos(weaponFacing) * 3);
   g.beginFill(0x3d3528, 0.98);
-  drawFreeRotatedRect(g, breech.x, breech.y, body.halfLen * 0.34, body.halfWidth * 0.44, weaponFacing);
+  drawFreeRotatedRect(g, breech.x, breech.y, body.halfLen * 0.38, body.halfWidth * 0.62, weaponFacing);
+  g.endFill();
+  g.beginFill(tint, 0.88);
+  drawFreeRotatedRect(
+    g,
+    breech.x - Math.cos(weaponFacing) * body.halfLen * 0.18,
+    breech.y - Math.sin(weaponFacing) * body.halfLen * 0.18,
+    body.halfLen * 0.2,
+    body.halfWidth * 0.5,
+    weaponFacing,
+  );
   g.endFill();
   if (recoil > 0.1) {
-    const flash = offsetPoint(rotatePoint(body.halfLen * 1.72, 0, weaponFacing), kick);
+    const flash = offsetPoint(rotatePoint(body.halfLen * 1.9, 0, weaponFacing), kick);
     g.beginFill(0xfff2d0, clamp01(recoil / 10) * 0.64);
     g.drawCircle(flash.x, flash.y, 5 + recoil * 0.4);
     g.endFill();
   }
-}
-
-function rotatedArtilleryHull(body, facing) {
-  const nose = body.halfLen;
-  const rear = -body.halfLen;
-  const w = body.halfWidth;
-  return [
-    rotatePoint(rear + 5, -w + 5, facing),
-    rotatePoint(nose - 8, -w + 4, facing),
-    rotatePoint(nose, -w * 0.48, facing),
-    rotatePoint(nose, w * 0.48, facing),
-    rotatePoint(nose - 8, w - 4, facing),
-    rotatePoint(rear + 5, w - 5, facing),
-    rotatePoint(rear, w * 0.64, facing),
-    rotatePoint(rear, -w * 0.64, facing),
-  ].flatMap((p) => [p.x, p.y]);
 }
 
 function unitVehicleBody(kind, stat) {
@@ -323,7 +326,9 @@ export function _drawUnit(e, colorByOwner, state, pools = {}) {
   // Shadow on its own layer (under all units).
   const sh = this._slot(shadowPool, e.id);
   sh.position.set(e.x + heavyKick.x, e.y + heavyKick.y);
-  if (vehicleBody) {
+  if (e.kind === KIND.ARTILLERY) {
+    this._shadow(sh, 0, 0, Math.max(r, vehicleBody?.shadowRadius || r) * 0.82);
+  } else if (vehicleBody) {
     this._vehicleShadow(sh, 0, 0, vehicleBody, facing);
   } else {
     this._shadow(sh, 0, 0, r);
