@@ -747,7 +747,7 @@ export class HUD {
     let idx = 0;
 
     if (workerSelected) {
-      // Workers mirror the standard unit layout: Q=Move, A=Attack, S=Hold.
+      // Workers mirror the standard unit layout: Q=Move, A=Attack, S=Stop.
       frag.appendChild(this._cmdButton({
         icon: "MV",
         label: "Move",
@@ -772,9 +772,9 @@ export class HUD {
         onClick: () => this.state.beginCommandTarget("attack"),
       }));
       frag.appendChild(this._cmdButton({
-        icon: "HD",
-        label: "Hold",
-        title: "Hold position / stop selected units",
+        icon: "ST",
+        label: "Stop",
+        title: "Stop selected units",
         hotkey: GRID_HOTKEYS[4],
         enabled: unitIds.length > 0,
         cls: "",
@@ -797,7 +797,7 @@ export class HUD {
         onClick: () => this.state.openWorkerBuildMenu(),
       }));
     } else {
-      // Non-worker units: Q=Move, W/E=empty, A=Attack, S=Hold; abilities/AT slot in D/Z/X/C.
+      // Non-worker units: Q=Move, W/E=empty, A=Attack, S=Stop; abilities/AT slot in D/Z/X/C.
       const slots = new Array(9).fill(null);
       slots[0] = this._cmdButton({
         icon: "MV",
@@ -818,9 +818,9 @@ export class HUD {
         onClick: () => this.state.beginCommandTarget("attack"),
       });
       slots[4] = this._cmdButton({
-        icon: "HD",
-        label: "Hold",
-        title: "Hold position / stop selected units",
+        icon: "ST",
+        label: "Stop",
+        title: "Stop selected units",
         hotkey: GRID_HOTKEYS[4],
         enabled: unitIds.length > 0,
         cls: "",
