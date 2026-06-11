@@ -19,6 +19,8 @@ Files that failed any of these were deleted immediately.
 
 | File | Notes | Source |
 |------|-------|--------|
+| combat/examples/combat_mortar_launch_04.mp3 | Keeper from the reviewed mortar launch batch. Almost good and preferred over 01/02/03/05, but too long; trim before integration. | https://opengameart.org/content/25-cc0-bang-firework-sfx |
+| combat/examples/combat_artillery_fire_05.mp3 | Keeper from the reviewed artillery fire batch. Good; use this over 01/02/03/04. | https://opengameart.org/content/25-cc0-bang-firework-sfx |
 | combat_tank_cannon_01.mp3 | Fine. A bit loud. | unknown |
 | combat_kar98k_02.mp3 | Good. Keep as variation. | unknown |
 | combat_kar98k_03.mp3 | Primary. Trimmed to 1.35s — bolt action removed. Original retained as combat_kar98k_03_with_bolt_action.mp3. | unknown |
@@ -30,6 +32,62 @@ Files that failed any of these were deleted immediately.
 | buildings/buildings_construction_start_01.mp3 | Primary — all construction. Trimmed to 1.9s. Shovel into grass+dirt. Original retained as _full.mp3. | https://freesound.org/people/dr19/sounds/353907/ |
 
 ## Rejections and Criteria
+
+**combat/examples/combat_mortar_launch_01.mp3** — Rejected after A/B review. Marginal keep only if nothing better could be found; deleted after 04 was selected.
+
+**combat/examples/combat_mortar_launch_02.mp3** — Rejected after A/B review. Marginal keep and better than 01, but outclassed by 04; deleted.
+
+**combat/examples/combat_mortar_launch_03.mp3** — Rejected after A/B review. Best of 01–03 but still bad; deleted after 04 was selected.
+
+**combat/examples/combat_mortar_launch_05.mp3** — Rejected after A/B review. Outclassed by 04; deleted.
+
+**combat/examples/combat_mortar_explosion_01.mp3** — Rejected. The mortar explosion batch sounds like 8-bit/MIDI-style game effects rather than realistic combat audio. Deleted.
+
+**combat/examples/combat_mortar_explosion_02.mp3** — Rejected. Same 8-bit/MIDI-style character as the rest of the batch. Deleted.
+
+**combat/examples/combat_mortar_explosion_03.mp3** — Rejected. Same 8-bit/MIDI-style character as the rest of the batch. Deleted.
+
+**combat/examples/combat_mortar_explosion_04.mp3** — Rejected. Same 8-bit/MIDI-style character as the rest of the batch. Deleted.
+
+**combat/examples/combat_mortar_explosion_05.mp3** — Rejected. Same 8-bit/MIDI-style character as the rest of the batch. Deleted.
+
+**combat/examples/combat_artillery_fire_01.mp3** — Rejected. No good; reads as 8-bit/synthetic rather than realistic artillery fire. Deleted.
+
+**combat/examples/combat_artillery_fire_02.mp3** — Rejected. Same 8-bit/synthetic problem as 01. Deleted.
+
+**combat/examples/combat_artillery_fire_03.mp3** — Rejected after batch review. Marginal keep in isolation, but outclassed by 05. Deleted.
+
+**combat/examples/combat_artillery_fire_04.mp3** — Rejected. Terrible and outclassed by 05. Deleted.
+
+**combat/examples/combat_artillery_explosion_01.mp3** — Rejected. Same retro/8-bit-style problem as the mortar explosion batch; not usable for realistic artillery. Deleted.
+
+**combat/examples/combat_artillery_explosion_02.mp3** — Rejected. Dogshit; not usable for realistic artillery. Deleted.
+
+**combat/examples/combat_artillery_explosion_03.mp3** — Rejected. Bad; not usable for realistic artillery. Deleted.
+
+**combat/examples/combat_artillery_explosion_04.mp3** — Rejected. Terrible; not usable for realistic artillery. Deleted.
+
+**combat/examples/combat_artillery_explosion_05.mp3** — Rejected. Horrible; not usable for realistic artillery. Deleted.
+
+**combat/examples/combat_tank_round_hit_01.mp3** — Rejected. Terrible; reads like a generic metal impact or water-tank hit, not an armored vehicle hit. Deleted.
+
+**combat/examples/combat_tank_round_hit_02.mp3** — Rejected. Terrible; same wrong-source problem as the rest of the tank round hit batch. Deleted.
+
+**combat/examples/combat_tank_round_hit_03.mp3** — Rejected. Wrong character for armored vehicle impact. Deleted.
+
+**combat/examples/combat_tank_round_hit_04.mp3** — Rejected. Wrong character for armored vehicle impact. Deleted.
+
+**combat/examples/combat_tank_round_hit_05.mp3** — Rejected. Wrong character for armored vehicle impact. Deleted.
+
+**combat/examples/combat_at_round_hit_tank_01.mp3** — Deferred/deleted. Not bad in isolation, but skip AT hit variants until mortar and tank hit sounds have acceptable coverage.
+
+**combat/examples/combat_at_round_hit_tank_02.mp3** — Deferred/deleted. Same category-level deferral as the rest of the AT hit batch.
+
+**combat/examples/combat_at_round_hit_tank_03.mp3** — Deferred/deleted. Same category-level deferral as the rest of the AT hit batch.
+
+**combat/examples/combat_at_round_hit_tank_04.mp3** — Deferred/deleted. Same category-level deferral as the rest of the AT hit batch.
+
+**combat/examples/combat_at_round_hit_tank_05.mp3** — Deferred/deleted. Same category-level deferral as the rest of the AT hit batch.
 
 **units_tank_engine_loop_01.mp3** — Rejected.
 
@@ -109,6 +167,10 @@ Samples reviewed:
 
 - Grass infantry footstep pack: need clean, light steps on grass, 6–10 variations
 - Tank engine running (moving): download https://freesound.org/people/C-V/sounds/565597/ to match idle_03
+- Realistic mortar explosion recordings: avoid retro/game-style, synthetic, 8-bit, or MIDI-like explosion packs
+- Realistic artillery explosion recordings: this batch produced no keepers; fetch a new round later
+- Armored vehicle hit impacts: avoid ambiguous "tank" searches that return water-tank/generic metal hits; search for armor impact, vehicle shell hit, anti-tank hit, or ricochet/penetration source material
+- AT round hit variants: defer until mortar and tank hit sounds have acceptable matching coverage
 - Sources unknown for most new keepers — track down before ship
 
 ## Out of scope — first pass

@@ -44,6 +44,8 @@ with licensed recordings before any commercial distribution.
 | `combat/combat_kar98k_03_with_bolt_action.mp3` | Kar98k original (bolt retained) | unknown | unknown |
 | `combat/combat_mg42_burst_02.mp3` | MG42 primary — clean isolated burst | unknown | unknown |
 | `combat/combat_mg42_burst_03.mp3` | MG42 backup | unknown | unknown |
+| `combat/combat_mortar_launch_04.mp3` | Mortar launch — selected from CC0 examples; too long, trim before final polish | https://opengameart.org/content/25-cc0-bang-firework-sfx | CC0 |
+| `combat/combat_artillery_fire_05.mp3` | Artillery fire — selected from CC0 examples | https://opengameart.org/content/25-cc0-bang-firework-sfx | CC0 |
 | `combat/combat_tank_cannon_01.mp3` | Tank cannon (a bit loud) | unknown | unknown |
 | `combat/combat_tank_cannon_06.mp3` | Tank cannon primary — extracted from US Army video, some compression artifacts | https://freesound.org/people/qubodup/sounds/161343/ | CC0 |
 | `units/units_tank_engine_idle_03.mp3` | Tank engine idle primary — clean, long, authentic | https://freesound.org/people/C-V/sounds/565598/ | unknown |
