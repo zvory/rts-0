@@ -266,6 +266,11 @@ function rotatedArtilleryHull(body, facing) {
   ].flatMap((p) => [p.x, p.y]);
 }
 
+function unitVehicleBody(kind, stat) {
+  if (kind === KIND.ARTILLERY) return tankBodyVisual(stat);
+  return isVehicleBodyKind(kind) ? tankBodyVisual(stat) : null;
+}
+
 export function _drawUnit(e, colorByOwner, state, pools = {}) {
   const shadowPool = pools.shadow || "unitShadows";
   const unitPool = pools.unit || "units";
@@ -287,7 +292,7 @@ export function _drawUnit(e, colorByOwner, state, pools = {}) {
       : e.kind === KIND.MORTAR_TEAM
         ? recoilVector(weaponFacing, recoil * 0.28)
       : ZERO_OFFSET;
-  const vehicleBody = isVehicleBodyKind(e.kind) ? tankBodyVisual(stat) : null;
+  const vehicleBody = unitVehicleBody(e.kind, stat);
 
   // Shadow on its own layer (under all units).
   const sh = this._slot(shadowPool, e.id);

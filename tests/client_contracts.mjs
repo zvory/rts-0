@@ -67,6 +67,7 @@ import {
   shouldRequestPointerLock,
 } from "../client/src/input/cursor_lock.js";
 import { DomClickInputZone, MatchInputRouter } from "../client/src/input/router.js";
+import { _drawUnit, _tankMotionVisual } from "../client/src/renderer/units.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -152,6 +153,20 @@ async function testDevWatchScenarioConfig() {
     if (priorWindow === undefined) delete globalThis.window;
     else globalThis.window = priorWindow;
   }
+}
+
+class FakeGraphics {
+  constructor() {
+    this.position = { set() {} };
+  }
+  lineStyle() {}
+  beginFill() {}
+  endFill() {}
+  drawPolygon() {}
+  drawCircle() {}
+  drawRect() {}
+  moveTo() {}
+  lineTo() {}
 }
 
 await testDevWatchScenarioConfig();
@@ -2602,6 +2617,43 @@ function fakeAudioContext() {
   pointFireInput.mouse = { x: selectedArtillery.x + ARTILLERY_MIN_RANGE_TILES * 32 + 16, y: selectedArtillery.y };
   pointFireInput._refreshAbilityTargetPreview();
   assert(pointFireInput.state.abilityTargetPreview?.hoverInRange === true, "Point Fire preview accepts targets past minimum range");
+}
+
+{
+  const artilleryEntity = {
+    id: 700,
+    owner: 1,
+    kind: KIND.ARTILLERY,
+    x: 128,
+    y: 160,
+    facing: 0,
+    weaponFacing: 0,
+    setupState: SETUP.PACKED,
+    state: STATE.IDLE,
+  };
+  const fakePools = new Map();
+  const fakeRenderer = {
+    _tankMotion: new Map(),
+    _tankMotionVisual,
+    _slot(pool, id) {
+      const key = `${pool}:${id}`;
+      if (!fakePools.has(key)) fakePools.set(key, new FakeGraphics());
+      return fakePools.get(key);
+    },
+    _tintFor() {
+      return 0x4878c8;
+    },
+    _vehicleShadow() {},
+    _shadow() {},
+    _deployedWeaponSetupVisual() {
+      return { prongFactor: 0, barrel: false };
+    },
+  };
+  _drawUnit.call(fakeRenderer, artilleryEntity, new Map([[1, 0x4878c8]]), {
+    playerId: 1,
+    resources: { oil: 10 },
+  });
+  assert(fakePools.has("units:700"), "Artillery renderer draws without a null vehicle body");
 }
 
 // ---------------------------------------------------------------------------
