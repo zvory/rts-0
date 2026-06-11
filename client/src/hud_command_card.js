@@ -330,9 +330,9 @@ function holdDescriptor(unitIds, slot) {
     kind: "button",
     action: "stop",
     intent: { type: "stop", unitIds },
-    icon: "HD",
-    label: "Hold",
-    title: "Hold position / stop selected units",
+    icon: "ST",
+    label: "Stop",
+    title: "Stop selected units",
     hotkey: GRID_HOTKEYS[slot],
     enabled: unitIds.length > 0,
   };
