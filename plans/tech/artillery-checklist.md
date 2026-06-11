@@ -295,11 +295,10 @@ Read `docs/context/client-ui.md` before changing rendering, HUD, input, or match
 ## Phase 5: Visual Design And Animation
 
 - [x] Stationary appearance is specified.
-  - Tank-sized tracked hull with a longer artillery barrel, heavy breech, side wheels, and muted
-    team-color hull panels.
+  - Tank-sized gameplay footprint with an exposed field-gun carriage, large wheels, split trails,
+    heavy breech, long barrel, and muted team-color cradle panels.
 - [x] Moving appearance is specified if different.
-  - Packed Artillery keeps its trails tucked in and shows light rear dust while the tracks are
-    active.
+  - Packed Artillery keeps its trails tucked in and shows light rear dust while moving.
 - [x] Attacking appearance is specified.
   - Point Fire uses recoil, a short muzzle flash, owner-only target crosshair, and a descending
     shell cue during the 4-second travel delay.
