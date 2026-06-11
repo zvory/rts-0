@@ -16,9 +16,13 @@ then refresh the capsule's section list if structure changed.
 | Node integration tests, regression, client smoke    | [testing.md](testing.md)               |
 | Hardening limits, server bind, build/run pipeline   | [deployment.md](deployment.md)         |
 | Match history persistence and `/api/matches`        | [match-history.md](match-history.md)   |
+| Multi-phase or phased implementation planning       | [planning.md](planning.md)             |
 
 Read the relevant design doc only when changing cross-file contracts (protocol ⇄ client,
 `Game` API, balance mirror, fog rules). Otherwise, the capsule + the code is enough.
 
 For new unit work, start with [docs/new-unit-checklist.md](../new-unit-checklist.md), then read the
 task-specific capsules it references as each phase begins.
+
+For any multi-phase or phased implementation plan, read [planning.md](planning.md) before writing
+the plan.
