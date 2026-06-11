@@ -1358,12 +1358,26 @@ function fakeAudioContext() {
       addEventListener(type, handler) {
         this[`on${type}`] = handler;
       },
-      remove() {},
+      remove() {
+        if (!this.parentNode) return;
+        this.parentNode.children = this.parentNode.children.filter((child) => child !== this);
+        this.parentNode = null;
+      },
     };
     return el;
   }
   const priorDocument = globalThis.document;
+  const priorSetTimeout = globalThis.setTimeout;
+  const priorClearTimeout = globalThis.clearTimeout;
+  let nextTimer = 1;
+  const timers = new Map();
   globalThis.document = { createElement: fakeEl };
+  globalThis.setTimeout = (fn) => {
+    const id = nextTimer++;
+    timers.set(id, fn);
+    return id;
+  };
+  globalThis.clearTimeout = (id) => timers.delete(id);
   const sent = [];
   const handlers = new Map();
   const net = {
@@ -1400,8 +1414,22 @@ function fakeAudioContext() {
   const startButton = box.children.find((child) => child.className === "branch-actions").children[0];
   assert(startButton.hidden === false, "host sees start button");
   assert(startButton.disabled === true, "start disabled until all seats claimed");
+  handlers.get("matchCountdown")({
+    t: "matchCountdown",
+    durationMs: 3000,
+    words: ["Drei!", "Zwei!", "Eins!"],
+  });
+  const countdown = root.children.find((child) => child.className.includes("match-countdown"));
+  assert(countdown?.textContent === "Drei!", "branch staging renders the visible countdown overlay");
+  staging.hide();
+  assert(
+    !root.children.some((child) => child.className.includes("match-countdown")),
+    "branch staging clears countdown overlay when hidden",
+  );
   staging.destroy();
   globalThis.document = priorDocument;
+  globalThis.setTimeout = priorSetTimeout;
+  globalThis.clearTimeout = priorClearTimeout;
 }
 
 // ---------------------------------------------------------------------------
