@@ -7,6 +7,7 @@
 use std::collections::HashMap;
 
 use crate::config;
+use crate::game::ability::AbilityKind;
 use crate::game::entity::{fires_while_moving, AttackPhase, EntityKind, EntityStore, Order};
 use crate::game::fog::Fog;
 use crate::game::map::Map;
@@ -253,6 +254,14 @@ pub(crate) fn combat_system(
                     entities.get(id).map(|e| e.kind),
                     Some(EntityKind::MortarTeam)
                 ) {
+                    if !matches!(
+                        entities
+                            .get(id)
+                            .and_then(|e| e.autocast_enabled(AbilityKind::MortarFire)),
+                        Some(true)
+                    ) {
+                        continue;
+                    }
                     let (mx, my) = mortar_aim_point(entities, tid, tick);
                     if mortar_autocast_would_hit_owned_entity(entities, owner, mx, my) {
                         continue;

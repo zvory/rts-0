@@ -438,6 +438,29 @@ impl Entity {
         self.ability_cooldowns.get(&ability).copied().unwrap_or(0)
     }
 
+    pub fn autocast_enabled(&self, ability: AbilityKind) -> Option<bool> {
+        match (self.kind, ability) {
+            (EntityKind::MortarTeam, AbilityKind::MortarFire) => Some(
+                self.combat
+                    .as_ref()
+                    .map(|c| c.autocast_enabled)
+                    .unwrap_or(true),
+            ),
+            _ => None,
+        }
+    }
+
+    pub fn set_autocast_enabled(&mut self, ability: AbilityKind, enabled: bool) {
+        if matches!(
+            (self.kind, ability),
+            (EntityKind::MortarTeam, AbilityKind::MortarFire)
+        ) {
+            if let Some(c) = self.combat.as_mut() {
+                c.autocast_enabled = enabled;
+            }
+        }
+    }
+
     pub fn ability_uses_remaining(&self, ability: AbilityKind) -> Option<u16> {
         match (self.kind, ability) {
             (EntityKind::ScoutCar, AbilityKind::Smoke) => Some(

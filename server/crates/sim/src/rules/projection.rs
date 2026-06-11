@@ -250,6 +250,7 @@ pub fn project_entity(
                 ability: kind.to_protocol_str().to_string(),
                 cooldown_left: *cooldown_left,
                 remaining_uses: entity.ability_uses_remaining(*kind),
+                autocast_enabled: entity.autocast_enabled(*kind),
             })
             .collect();
         for kind in [
@@ -267,6 +268,7 @@ pub fn project_entity(
                     ability: kind.to_protocol_str().to_string(),
                     cooldown_left: 0,
                     remaining_uses: entity.ability_uses_remaining(kind),
+                    autocast_enabled: entity.autocast_enabled(kind),
                 });
             }
         }

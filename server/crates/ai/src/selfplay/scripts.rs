@@ -144,6 +144,7 @@ pub(super) fn is_combat_command(command: &Command, combat_intent_units: &BTreeSe
         Command::SetupAtGuns { .. }
         | Command::TearDownAtGuns { .. }
         | Command::UseAbility { .. }
+        | Command::SetAutocast { .. }
         | Command::Gather { .. }
         | Command::Build { .. }
         | Command::Train { .. }

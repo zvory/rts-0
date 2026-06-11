@@ -121,6 +121,8 @@ pub struct CombatState {
     pub emplacement_facing: Option<f32>,
     /// Pending facing to apply when a TearingDownToRedeploy phase completes.
     pub pending_redeploy_facing: Option<f32>,
+    /// Whether this support weapon may acquire and fire at targets without a point-fire command.
+    pub autocast_enabled: bool,
 }
 
 impl Default for CombatState {
@@ -134,6 +136,7 @@ impl Default for CombatState {
             desired_weapon_facing: 0.0,
             emplacement_facing: None,
             pending_redeploy_facing: None,
+            autocast_enabled: true,
         }
     }
 }

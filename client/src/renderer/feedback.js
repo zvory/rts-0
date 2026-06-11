@@ -9,6 +9,7 @@ import {
   AT_GUN_FIELD_OF_FIRE_RAD,
   ARTILLERY_FIELD_OF_FIRE_RAD,
   ARTILLERY_MAX_RANGE_TILES,
+  ABILITIES,
   MORTAR_INNER_RADIUS_TILES,
   MINING_CC_RANGE_TILES,
   isProducerBuilding,
@@ -331,6 +332,22 @@ export function _drawAbilityTargetPreview(state) {
   g.lineTo(preview.mouseX, preview.mouseY + radiusPx * 0.45);
 }
 
+export function _drawSelectedMortarRanges(state) {
+  if (!state || typeof state.selectedEntities !== "function") return;
+  const g = this._feedbackGfx;
+  const tileSize = (this._map && this._map.tileSize) || 32;
+  const rangeTiles = ABILITIES[ABILITY.MORTAR_FIRE]?.rangeTiles || STATS[KIND.MORTAR_TEAM]?.rangeTiles || 0;
+  if (!(rangeTiles > 0)) return;
+  const radius = rangeTiles * tileSize;
+
+  for (const e of state.selectedEntities()) {
+    if (e.owner !== state.playerId || e.kind !== KIND.MORTAR_TEAM) continue;
+    if (!finiteNumber(e.x) || !finiteNumber(e.y)) continue;
+    g.lineStyle(1.4, 0x6fa3ff, 0.7);
+    dashedCircle(g, e.x, e.y, radius, 64);
+  }
+}
+
 function dashedCircle(g, cx, cy, radius, segments) {
   if (!(radius > 0)) return;
   const count = Math.max(12, segments | 0);
@@ -594,24 +611,37 @@ export function _drawMortarImpacts(state) {
   const innerRadius = MORTAR_INNER_RADIUS_TILES * ts;
 
   for (const impact of impacts) {
+    const age = now - impact.createdAt;
+    const t = clamp01(age / 1000);
+    const blastFade = 1 - smoothstep01(Math.max(0, t - 0.36) / 0.28);
+    const dustFade = 1 - smoothstep01(Math.max(0, t - 0.48) / 0.52);
     const outerRadius = Math.max(innerRadius + 8, impact.radiusTiles * ts);
+    const dustRadius = outerRadius * 2;
     g.lineStyle(0, 0x000000, 0);
-    g.beginFill(0xff4500, 0.23);
-    drawJaggedBlob(g, impact.x, impact.y, outerRadius, 18, impact.seed + 11, 0.7, 1.0);
+
+    g.beginFill(0xffb22e, 0.28 * blastFade);
+    drawJaggedBlob(g, impact.x, impact.y, outerRadius * 1.05, 18, impact.seed + 11, 0.7, 1.0);
     g.endFill();
-    g.beginFill(0xff8c3a, 0.16);
-    drawJaggedBlob(g, impact.x, impact.y, outerRadius * 0.72, 14, impact.seed + 23, 0.74, 1.0);
+    g.beginFill(0xffd65a, 0.2 * blastFade);
+    drawJaggedBlob(g, impact.x, impact.y, outerRadius * 0.7, 14, impact.seed + 23, 0.74, 1.0);
     g.endFill();
 
-    g.beginFill(0x2a2119, 0.28);
-    drawJaggedBlob(g, impact.x, impact.y, innerRadius * 1.18, 10, impact.seed + 37, 0.72, 1.0);
+    g.beginFill(0x6f5c45, 0.3 * dustFade);
+    drawJaggedBlob(g, impact.x, impact.y, dustRadius, 26, impact.seed + 31, 0.62, 1.0);
     g.endFill();
-    g.lineStyle(3, 0xffffff, 0.95);
+    g.beginFill(0xa08d70, 0.2 * dustFade);
+    drawJaggedBlob(g, impact.x, impact.y, dustRadius * 0.74, 22, impact.seed + 43, 0.68, 1.0);
+    g.endFill();
+
+    g.beginFill(0x2a2119, 0.24 * dustFade);
+    drawJaggedBlob(g, impact.x, impact.y, innerRadius * 1.55, 14, impact.seed + 37, 0.72, 1.0);
+    g.endFill();
+    g.lineStyle(3, 0xffffff, 0.95 * blastFade);
     drawJaggedRing(g, impact.x, impact.y, innerRadius, 12, impact.seed + 41, 0.72, 1.18);
-    g.lineStyle(1.8, 0xfff2d0, 0.7);
+    g.lineStyle(1.8, 0xfff2d0, 0.7 * blastFade);
     drawJaggedRing(g, impact.x, impact.y, innerRadius * 0.72, 9, impact.seed + 53, 0.78, 1.08);
 
-    drawShrapnel(g, impact.x, impact.y, innerRadius * 0.78, outerRadius, impact.seed);
+    drawShrapnel(g, impact.x, impact.y, innerRadius * 0.78, outerRadius, impact.seed, 0.56 * dustFade);
   }
 }
 
@@ -689,8 +719,8 @@ function drawJaggedRing(g, cx, cy, radius, points, seed, minScale, maxScale) {
   }
 }
 
-function drawShrapnel(g, cx, cy, innerRadius, outerRadius, seed) {
-  g.lineStyle(1.5, 0x2b2119, 0.56);
+function drawShrapnel(g, cx, cy, innerRadius, outerRadius, seed, alpha = 0.56) {
+  g.lineStyle(1.5, 0x2b2119, alpha);
   const count = 18;
   for (let i = 0; i < count; i += 1) {
     const a = (i / count) * Math.PI * 2 + hash2(seed + i * 5, seed + 99) * 0.18;

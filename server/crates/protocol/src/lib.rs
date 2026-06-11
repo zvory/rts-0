@@ -209,6 +209,11 @@ pub enum Command {
         #[serde(default, skip_serializing_if = "is_false")]
         queued: bool,
     },
+    SetAutocast {
+        ability: String,
+        units: Vec<u32>,
+        enabled: bool,
+    },
     Gather {
         units: Vec<u32>,
         node: u32,
@@ -350,7 +355,7 @@ pub struct LobbyPlayer {
 ///
 /// [`Snapshot`] remains the semantic source of truth for game code. This format is only a
 /// transport-side optimization for `ServerMessage::Snapshot`.
-pub const COMPACT_SNAPSHOT_VERSION: u8 = 13;
+pub const COMPACT_SNAPSHOT_VERSION: u8 = 14;
 
 /// Serialize one semantic snapshot as a compact JSON text frame payload.
 pub fn serialize_compact_snapshot(snapshot: &Snapshot) -> serde_json::Result<String> {
@@ -674,16 +679,21 @@ impl Serialize for CompactAbilityCooldown<'_> {
         S: Serializer,
     {
         let ability = self.0;
-        let len = if ability.remaining_uses.is_some() {
-            3
-        } else {
-            2
-        };
+        let mut len = 2;
+        if ability.remaining_uses.is_some() {
+            len = 3;
+        }
+        if ability.autocast_enabled.is_some() {
+            len = 4;
+        }
         let mut seq = serializer.serialize_seq(Some(len))?;
         seq.serialize_element(&ability_code(&ability.ability))?;
         seq.serialize_element(&ability.cooldown_left)?;
-        if ability.remaining_uses.is_some() {
+        if len > 2 {
             seq.serialize_element(&ability.remaining_uses)?;
+        }
+        if len > 3 {
+            seq.serialize_element(&ability.autocast_enabled)?;
         }
         seq.end()
     }
@@ -1109,6 +1119,7 @@ mod tests {
             ability: abilities::CHARGE.to_string(),
             cooldown_left: 87,
             remaining_uses: Some(2),
+            autocast_enabled: None,
         }];
         worker.vision_only = true;
 

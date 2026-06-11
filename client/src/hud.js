@@ -546,6 +546,15 @@ export class HUD {
       : null;
   }
 
+  _abilityAutocastEnabled(entity, ability) {
+    const projected = Array.isArray(entity.abilities)
+      ? entity.abilities.find((entry) => entry.ability === ability)
+      : null;
+    return projected && typeof projected.autocastEnabled === "boolean"
+      ? projected.autocastEnabled
+      : false;
+  }
+
   _selectedAbilityAffordances(sel) {
     const ownUnits = this._selectedOwnUnits(sel);
     const res = this.state.resources || { steel: 0, oil: 0 };
@@ -565,6 +574,9 @@ export class HUD {
         const depletedCount = carriers.filter(
           (e) => this._abilityRemainingUses(e, definition.ability) === 0,
         ).length;
+        const autocastEnabledIds = carriers
+          .filter((e) => this._abilityAutocastEnabled(e, definition.ability))
+          .map((e) => e.id);
         return {
           definition,
           unlocked,
@@ -572,6 +584,7 @@ export class HUD {
           depletedCount,
           carrierIds: carriers.map((e) => e.id),
           readyIds: readyUnits.map((e) => e.id),
+          autocastEnabledIds,
           cooldownClocks: groupCooldownClocks(cooldowns, definition.cooldownTicks),
         };
       })
@@ -618,6 +631,7 @@ export class HUD {
         `${affordance.definition.ability}:${affordance.unlocked ? 1 : 0}:${affordance.affordable ? 1 : 0}:` +
         `${affordance.depletedCount}:` +
         `${affordance.readyIds.join(".")}:` +
+        `${affordance.autocastEnabledIds.join(".")}:` +
         `${affordance.cooldownClocks.map((group) => `${group.count}:${Math.round(group.cooldownLeft)}`).join(",")}`,
       ).join("|")}|` +
       (workerSelected ? "worker-main" : "no-build");
@@ -738,8 +752,22 @@ export class HUD {
           countBadge: showReadyCount ? `${readyCount}` : "",
           cooldownClocks: affordance.cooldownClocks,
           cost: definition.cost,
-          cls: this._abilityTargetActive(definition.ability) ? "active" : "",
+          cls: [
+            this._abilityTargetActive(definition.ability) ? "active" : "",
+            affordance.autocastEnabledIds.length > 0 ? "autocast-enabled" : "",
+          ].filter(Boolean).join(" "),
           onUnavailable: () => this._playNotEnoughForCost(definition.cost),
+          onContextMenu: definition.ability === ABILITY.MORTAR_FIRE
+            ? (ev) => {
+                ev.preventDefault();
+                this.net.command(cmd.setAutocast(
+                  definition.ability,
+                  affordance.carrierIds,
+                  false,
+                ));
+                this.state.endCommandTarget();
+              }
+            : null,
           onClick: (ev) => {
             if (definition.targetMode === "worldPoint") {
               this.state.beginCommandTarget({ kind: "ability", ability: definition.ability });
@@ -1238,6 +1266,7 @@ export class HUD {
    * @param {{count:number,rotationDeg:number}[]} [opts.cooldownClocks] grouped cooldown clocks.
    * @param {boolean} [opts.repeatable] whether native keyboard repeat may trigger this button.
    * @param {() => void} [opts.onUnavailable] click handler for unaffordable buttons.
+   * @param {(ev: MouseEvent) => void} [opts.onContextMenu] right-click handler.
    * @param {(ev: MouseEvent) => void} opts.onClick click handler (skipped when disabled).
    * @returns {HTMLButtonElement}
    */
@@ -1255,6 +1284,12 @@ export class HUD {
       btn.dataset.hotkey = opts.hotkey;
     }
     if (opts.repeatable) btn.dataset.repeatable = "true";
+    if (typeof opts.onContextMenu === "function") {
+      btn.addEventListener("contextmenu", (ev) => {
+        ev.preventDefault();
+        opts.onContextMenu(ev);
+      });
+    }
 
     const costHtml = opts.cost
       ? `<span class="cmd-cost">` +

@@ -230,6 +230,19 @@ pub(crate) fn apply_commands(
                     tick,
                 );
             }
+            SimCommand::SetAutocast {
+                ability,
+                units,
+                enabled,
+            } => {
+                for id in dedupe_cap_units(units) {
+                    if owns_unit(entities, player, id) {
+                        if let Some(e) = entities.get_mut(id) {
+                            e.set_autocast_enabled(ability, enabled);
+                        }
+                    }
+                }
+            }
             SimCommand::Gather {
                 units,
                 node,

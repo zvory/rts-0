@@ -136,6 +136,7 @@ fn legacy_view_of(game: &Game, e: &Entity, viewer: u32, fogged: bool) -> EntityV
                     ability: kind.to_protocol_str().to_string(),
                     cooldown_left: e.ability_cooldown_ticks(kind),
                     remaining_uses: e.ability_uses_remaining(kind),
+                    autocast_enabled: e.autocast_enabled(kind),
                 });
             }
         }

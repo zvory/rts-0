@@ -151,8 +151,8 @@ function drawMortarTeam(g, r, tint, facing, weaponFacing, setup, recoil) {
   const carriageKick = recoilVector(a, recoil * 0.18);
   const wheelX = lerp(-r * 0.42, -r * 0.28, deploy);
   const wheelY = r * 0.52;
-  const tireLength = r * 0.46;
-  const tireWidth = r * 0.26;
+  const tireLength = r * 0.54;
+  const tireWidth = r * 0.18;
 
   const axleL = offsetPoint(rotatePoint(wheelX, -wheelY, a), carriageKick);
   const axleR = offsetPoint(rotatePoint(wheelX, wheelY, a), carriageKick);
@@ -173,7 +173,12 @@ function drawMortarTeam(g, r, tint, facing, weaponFacing, setup, recoil) {
   g.lineTo(base.x, base.y);
   const footL = offsetPoint(rotatePoint(footForward, -footSpread, a), carriageKick);
   const footR = offsetPoint(rotatePoint(footForward, footSpread, a), carriageKick);
-  g.lineStyle(2, 0x3f5f32, 0.9);
+  g.lineStyle(3.2, 0x15120f, 0.72);
+  g.moveTo(bipodRoot.x, bipodRoot.y);
+  g.lineTo(footL.x, footL.y);
+  g.moveTo(bipodRoot.x, bipodRoot.y);
+  g.lineTo(footR.x, footR.y);
+  g.lineStyle(2, tint, 0.92);
   g.moveTo(bipodRoot.x, bipodRoot.y);
   g.lineTo(footL.x, footL.y);
   g.moveTo(bipodRoot.x, bipodRoot.y);

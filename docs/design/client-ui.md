@@ -236,7 +236,7 @@ For spectator starts, `match.js` hides the command card and give-up action, comp
 the server-filtered union snapshot, and keeps the ordinary renderer/minimap/HUD pointed at snapshots
 with `playerResources`.
 
-### 4.1a Targeted ability mode (Smoke)
+### 4.1a Targeted ability mode (Smoke, Mortar Fire, Point Fire)
 
 `input/commands.js` exposes `_onAbilityTarget` and `_refreshAbilityTargetPreview` for world-point
 abilities. When the HUD command card calls `state.commandTarget = { kind: "ability", ability }`,
@@ -245,9 +245,14 @@ the input module enters targeted cursor mode:
   carriers (`ABILITIES[ability].carriers`), test whether any carrier is within range of the cursor,
   update `state.abilityTargetPreview` for the renderer.
 - Left-click: build a `useAbility` command with the ability name, filtered carrier ids, world
-  coords, and the `queued` flag (from Shift). Clear cursor mode; exit ability targeting.
+  coords, and the `queued` flag (from Shift). Clear cursor mode unless the physical command hotkey
+  is still held for repeated Mortar Team Fire (`X`) or Scout Car Smoke (`D`) targeting.
 - Right-click / Escape: cancel cursor mode, `state.commandTarget = null`.
 - Minimap right-click also fires an ability command if in targeted mode.
+Selected owned Mortar Teams also draw dotted firing-range circles even when the Fire command is not
+armed. The Mortar Team Fire command-card button shows an autocast swirl while any selected mortar's
+owner-only `mortarFire` affordance has `autocastEnabled`; right-clicking that button sends
+`setAutocast(mortarFire, enabled=false)` and does not arm manual targeting.
 
 `state.js` holds `commandTarget` (null or `{ kind, ability }`) and `abilityTargetPreview`
 (null or `{ ability, x, y, rangeCenters, inRange }`). `commandTarget` is a transient UI state;
@@ -295,8 +300,11 @@ and unit layer):
   shell arcing from the mortar to the impact point, and a darker red dotted line/crosshair warning
   that lasts until the reported shell delay elapses or the impact event arrives. The shell
   compresses near launch and impact and stretches near mid-flight so it reads as an overhead round
-  rather than a flat tracer. Mortar impact events that include a shooter reveal show the mortar
-  briefly above fog for players whose units or buildings were hit by indirect fire.
+  rather than a flat tracer. Mortar impacts draw a larger, denser, longer-lived dust cloud with an
+  orange-yellow blast core that fades before the dust so battlefield state remains readable. Mortar
+  Team art uses a small upright tube, slim pill-shaped wheels, and team-colored support legs.
+  Mortar impact events that include a shooter reveal show the mortar briefly above fog for players
+  whose units or buildings were hit by indirect fire.
   Entities marked `visionOnly` by the server are drawn on the ordinary building/unit layers below
   the fog overlay, excluded from local fog-source computation and hit-testing, and treated as
   visual intel only.
