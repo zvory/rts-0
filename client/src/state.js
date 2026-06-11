@@ -114,7 +114,7 @@ export class GameState {
     this.resourceMiningPreview = null;
     /** @type {null | {mouseX:number, mouseY:number, guns:Array<object>}} */
     this.atGunSetupPreview = null;
-    /** @type {null | {ability:string, mouseX:number, mouseY:number, carriers:Array<object>, rangePx:number, hoverInRange:boolean}} */
+    /** @type {null | {ability:string, mouseX:number, mouseY:number, carriers:Array<object>, rangePx:number, hoverInRange:boolean, hoverInsideMinRange?:boolean}} */
     this.abilityTargetPreview = null;
     /** @type {Array<{id:number,x:number,y:number,radiusTiles:number,expiresIn:number}>} */
     this.smokes = [];
@@ -982,7 +982,7 @@ export class GameState {
 
   /**
    * Set or clear the armed-ability targeting preview (range circles + hover validity).
-   * @param {null | {ability:string, mouseX:number, mouseY:number, carriers:Array<object>, rangePx:number, hoverInRange:boolean}} preview
+   * @param {null | {ability:string, mouseX:number, mouseY:number, carriers:Array<object>, rangePx:number, hoverInRange:boolean, hoverInsideMinRange?:boolean}} preview
    */
   updateAbilityTargetPreview(preview) {
     this.abilityTargetPreview = preview;

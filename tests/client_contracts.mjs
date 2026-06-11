@@ -14,6 +14,7 @@ import {
   AT_GUN_FIELD_OF_FIRE_RAD,
   ARTILLERY_MAX_RANGE_TILES,
   ARTILLERY_MIN_RANGE_TILES,
+  ARTILLERY_SHELL_DELAY_TICKS,
   MINING_CC_RANGE_TILES,
   RIFLEMAN_CHARGE_COOLDOWN_TICKS,
   SMOKE_ABILITY_COST,
@@ -68,6 +69,7 @@ import {
 } from "../client/src/input/cursor_lock.js";
 import { DomClickInputZone, MatchInputRouter } from "../client/src/input/router.js";
 import { _drawUnit, _tankMotionVisual } from "../client/src/renderer/units.js";
+import { _drawAbilityTargetPreview } from "../client/src/renderer/feedback.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -167,6 +169,23 @@ class FakeGraphics {
   drawRect() {}
   moveTo() {}
   lineTo() {}
+  arc() {}
+}
+
+class RecordingGraphics extends FakeGraphics {
+  constructor() {
+    super();
+    this.calls = [];
+  }
+  lineStyle(width, color, alpha) {
+    this.calls.push(["lineStyle", width, color, alpha]);
+  }
+  moveTo(x, y) {
+    this.calls.push(["moveTo", x, y]);
+  }
+  lineTo(x, y) {
+    this.calls.push(["lineTo", x, y]);
+  }
 }
 
 await testDevWatchScenarioConfig();
@@ -1024,7 +1043,7 @@ function fakeAudioContext() {
       [EVENT_CODE[EVENT.NOTICE], "Not enough steel"],
       [EVENT_CODE[EVENT.NOTICE], "alert:under_attack", 3, 512, 768],
       [EVENT_CODE[EVENT.MORTAR_LAUNCH], 9, [256, 272], [320, 352], 1.5, 68],
-      [EVENT_CODE[EVENT.ARTILLERY_TARGET], 320, 352, 3, 120],
+      [EVENT_CODE[EVENT.ARTILLERY_TARGET], 320, 352, 3, ARTILLERY_SHELL_DELAY_TICKS],
       [EVENT_CODE[EVENT.ARTILLERY_IMPACT], 336, 368, 3],
     ],
   });
@@ -1116,7 +1135,7 @@ function fakeAudioContext() {
   );
   assert(
     decoded.events[6].e === EVENT.ARTILLERY_TARGET &&
-      decoded.events[6].delayTicks === 120 &&
+      decoded.events[6].delayTicks === ARTILLERY_SHELL_DELAY_TICKS &&
       decoded.events[6].radiusTiles === 3,
     "artillery target event decodes",
   );
@@ -1365,8 +1384,10 @@ function fakeAudioContext() {
   assert(
     ABILITIES[ABILITY.POINT_FIRE].carriers.includes(KIND.ARTILLERY) &&
       ABILITIES[ABILITY.POINT_FIRE].rangeTiles === ARTILLERY_MAX_RANGE_TILES &&
-      ABILITIES[ABILITY.POINT_FIRE].minRangeTiles === ARTILLERY_MIN_RANGE_TILES,
-    "Point Fire ability exposes Artillery carrier, max range, and minimum range",
+      ABILITIES[ABILITY.POINT_FIRE].minRangeTiles === ARTILLERY_MIN_RANGE_TILES &&
+      ABILITIES[ABILITY.POINT_FIRE].delayTicks === ARTILLERY_SHELL_DELAY_TICKS &&
+      ARTILLERY_SHELL_DELAY_TICKS === 150,
+    "Point Fire ability exposes Artillery carrier, max range, minimum range, and 5-second delay",
   );
   assert(
     STATS[KIND.STEELWORKS].footW === 3 && STATS[KIND.STEELWORKS].footH === 3,
@@ -1970,7 +1991,7 @@ function fakeAudioContext() {
     supplyCap: 10,
     entities: [],
     events: [
-      { e: EVENT.ARTILLERY_TARGET, x: 320, y: 352, radiusTiles: 3, delayTicks: 120 },
+      { e: EVENT.ARTILLERY_TARGET, x: 320, y: 352, radiusTiles: 3, delayTicks: ARTILLERY_SHELL_DELAY_TICKS },
       { e: EVENT.ARTILLERY_IMPACT, x: 336, y: 368, radiusTiles: 3 },
     ],
   });
@@ -2691,6 +2712,7 @@ function fakeAudioContext() {
   pointFireInput.mouse = { x: selectedArtillery.x + ARTILLERY_MIN_RANGE_TILES * 32 - 8, y: selectedArtillery.y };
   pointFireInput._refreshAbilityTargetPreview();
   assert(pointFireInput.state.abilityTargetPreview?.hoverInRange === false, "Point Fire preview rejects the minimum range dead zone");
+  assert(pointFireInput.state.abilityTargetPreview?.hoverInsideMinRange === true, "Point Fire preview identifies minimum range invalidity");
   assert(
     pointFireInput.state.abilityTargetPreview?.minRangePx === ARTILLERY_MIN_RANGE_TILES * 32,
     "Point Fire preview exposes minimum range in pixels",
@@ -2698,6 +2720,37 @@ function fakeAudioContext() {
   pointFireInput.mouse = { x: selectedArtillery.x + ARTILLERY_MIN_RANGE_TILES * 32 + 16, y: selectedArtillery.y };
   pointFireInput._refreshAbilityTargetPreview();
   assert(pointFireInput.state.abilityTargetPreview?.hoverInRange === true, "Point Fire preview accepts targets past minimum range");
+  assert(pointFireInput.state.abilityTargetPreview?.hoverInsideMinRange === false, "Point Fire preview clears minimum range invalidity outside the dead zone");
+
+  const previewGfx = new RecordingGraphics();
+  _drawAbilityTargetPreview.call(
+    { _feedbackGfx: previewGfx },
+    { abilityTargetPreview: { ...pointFireInput.state.abilityTargetPreview, carriers: [] } },
+  );
+  const validHorizontalStroke = previewGfx.calls.some(
+    (call, i, calls) =>
+      call[0] === "moveTo" &&
+      call[2] === pointFireInput.state.abilityTargetPreview.mouseY &&
+      calls[i + 1]?.[0] === "lineTo" &&
+      calls[i + 1]?.[2] === pointFireInput.state.abilityTargetPreview.mouseY,
+  );
+  assert(validHorizontalStroke, "Point Fire valid cursor keeps the crosshair stroke");
+
+  pointFireInput.mouse = { x: selectedArtillery.x + ARTILLERY_MIN_RANGE_TILES * 32 - 8, y: selectedArtillery.y };
+  pointFireInput._refreshAbilityTargetPreview();
+  const invalidGfx = new RecordingGraphics();
+  _drawAbilityTargetPreview.call(
+    { _feedbackGfx: invalidGfx },
+    { abilityTargetPreview: { ...pointFireInput.state.abilityTargetPreview, carriers: [] } },
+  );
+  const invalidDiagonalStroke = invalidGfx.calls.some(
+    (call, i, calls) =>
+      call[0] === "moveTo" &&
+      call[2] < pointFireInput.state.abilityTargetPreview.mouseY &&
+      calls[i + 1]?.[0] === "lineTo" &&
+      calls[i + 1]?.[2] > pointFireInput.state.abilityTargetPreview.mouseY,
+  );
+  assert(invalidDiagonalStroke, "Point Fire invalid minimum-range cursor draws an X");
 }
 
 {
