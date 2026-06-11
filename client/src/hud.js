@@ -619,14 +619,16 @@ export class HUD {
   _renderUnitCard(card, sel) {
     const ownUnits = this._selectedOwnUnits(sel);
     const unitIds = ownUnits.map((e) => e.id);
-    const atGunIds = ownUnits.filter((e) => e.kind === KIND.AT_TEAM).map((e) => e.id);
+    const setupGunIds = ownUnits
+      .filter((e) => e.kind === KIND.AT_TEAM || e.kind === KIND.ARTILLERY)
+      .map((e) => e.id);
     const abilityAffordances = this._selectedAbilityAffordances(sel);
     const hasArmyUnit = ownUnits.some((e) => e.kind !== KIND.WORKER);
     const workerSelected = !hasArmyUnit && ownUnits.some((e) => e.kind === KIND.WORKER);
 
     const sig =
       `units|${unitIds.join(".")}|target:${this._commandTargetSig()}|` +
-      `|at:${atGunIds.join(".")}|` +
+      `|setup:${setupGunIds.join(".")}|` +
       `|abilities:${abilityAffordances.map((affordance) =>
         `${affordance.definition.ability}:${affordance.unlocked ? 1 : 0}:${affordance.affordable ? 1 : 0}:` +
         `${affordance.depletedCount}:` +
@@ -789,13 +791,13 @@ export class HUD {
         });
       }
 
-      if (atGunIds.length > 0) {
+      if (setupGunIds.length > 0) {
         const setupSlot = claimSlot(null);
         if (setupSlot >= 0) {
           slots[setupSlot] = this._cmdButton({
             icon: "SET",
             label: "Set Up",
-            title: "Set up selected AT guns toward a target point",
+            title: "Set up selected support weapons toward a target point",
             hotkey: GRID_HOTKEYS[setupSlot],
             enabled: true,
             cls: this.state.commandTarget === "setupAtGuns" ? "active" : "",

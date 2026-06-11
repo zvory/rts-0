@@ -415,7 +415,7 @@ pub struct LobbyPlayer {
 ///
 /// [`Snapshot`] remains the semantic source of truth for game code. This format is only a
 /// transport-side optimization for `ServerMessage::Snapshot`.
-pub const COMPACT_SNAPSHOT_VERSION: u8 = 14;
+pub const COMPACT_SNAPSHOT_VERSION: u8 = 15;
 
 /// Serialize one semantic snapshot as a compact JSON text frame payload.
 pub fn serialize_compact_snapshot(snapshot: &Snapshot) -> serde_json::Result<String> {
@@ -909,6 +909,7 @@ impl Serialize for CompactEvent<'_> {
                 seq.end()
             }
             Event::ArtilleryTarget {
+                from,
                 x,
                 y,
                 radius_tiles,
@@ -916,8 +917,8 @@ impl Serialize for CompactEvent<'_> {
             } => {
                 let mut seq = serializer.serialize_seq(Some(5))?;
                 seq.serialize_element(&7u8)?;
-                seq.serialize_element(x)?;
-                seq.serialize_element(y)?;
+                seq.serialize_element(from)?;
+                seq.serialize_element(&[x, y])?;
                 seq.serialize_element(radius_tiles)?;
                 seq.serialize_element(delay_ticks)?;
                 seq.end()
@@ -1365,6 +1366,7 @@ mod tests {
                     delay_ticks: 68,
                 },
                 Event::ArtilleryTarget {
+                    from: 10,
                     x: 320.0,
                     y: 352.0,
                     radius_tiles: 3.0,
@@ -1451,7 +1453,7 @@ mod tests {
         );
         assert_eq!(
             value["ev"][5],
-            serde_json::json!([7, 320.0, 352.0, 3.0, 120])
+            serde_json::json!([7, 10, [320.0, 352.0], 3.0, 120])
         );
         assert_eq!(value["ev"][6], serde_json::json!([8, 336.0, 368.0, 3.0]));
     }

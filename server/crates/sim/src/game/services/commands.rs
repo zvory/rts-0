@@ -1098,20 +1098,21 @@ fn artillery_point_fire_target_valid(
     if distance2 < min_px * min_px || distance2 > max_px * max_px {
         return false;
     }
-    if matches!(e.weapon_setup(), WeaponSetup::Deployed) {
-        let Some(center) = e
-            .emplacement_facing()
-            .or_else(|| e.weapon_facing())
-            .filter(|facing| facing.is_finite())
-        else {
-            return false;
-        };
-        let target_angle = dy.atan2(dx);
-        if !target_angle.is_finite()
-            || angle_delta(center, target_angle).abs() > config::ARTILLERY_FIELD_OF_FIRE_RAD * 0.5
-        {
-            return false;
-        }
+    if !matches!(e.weapon_setup(), WeaponSetup::Deployed) {
+        return false;
+    }
+    let Some(center) = e
+        .emplacement_facing()
+        .or_else(|| e.weapon_facing())
+        .filter(|facing| facing.is_finite())
+    else {
+        return false;
+    };
+    let target_angle = dy.atan2(dx);
+    if !target_angle.is_finite()
+        || angle_delta(center, target_angle).abs() > config::ARTILLERY_FIELD_OF_FIRE_RAD * 0.5
+    {
+        return false;
     }
     true
 }
@@ -1165,6 +1166,7 @@ fn try_fire_artillery(
         .entry(player)
         .or_default()
         .push(Event::ArtilleryTarget {
+            from: unit,
             x: target_x,
             y: target_y,
             radius_tiles: config::ARTILLERY_OUTER_RADIUS_TILES,

@@ -693,6 +693,42 @@ export function _drawArtilleryTargets(state) {
   }
 }
 
+export function _drawArtilleryLaunches(state) {
+  const g = this._feedbackGfx;
+  if (!state || typeof state.liveArtilleryLaunches !== "function") return;
+  const now = performance.now();
+  const launches = state.liveArtilleryLaunches(now);
+  if (!launches.length) return;
+
+  for (const launch of launches) {
+    const age = now - launch.createdAt;
+    const t = clamp01(age / 820);
+    const fade = 1 - smoothstep01(Math.max(0, t - 0.42) / 0.58);
+    const burst = 1 + smoothstep01(t) * 1.25;
+    const rearX = launch.x - Math.cos(launch.facing) * 22;
+    const rearY = launch.y - Math.sin(launch.facing) * 22;
+    g.lineStyle(0, 0x000000, 0);
+    g.beginFill(0x6f5c45, 0.32 * fade);
+    drawJaggedBlob(g, rearX, rearY, 28 * burst, 18, launch.seed + 17, 0.58, 1.0);
+    g.endFill();
+    g.beginFill(0xa08d70, 0.22 * fade);
+    drawJaggedBlob(g, launch.x, launch.y, 20 * burst, 14, launch.seed + 31, 0.62, 1.0);
+    g.endFill();
+    g.beginFill(0x2a2119, 0.16 * fade);
+    drawJaggedBlob(
+      g,
+      rearX - Math.cos(launch.facing) * 10,
+      rearY - Math.sin(launch.facing) * 10,
+      15 * burst,
+      10,
+      launch.seed + 43,
+      0.7,
+      1.0,
+    );
+    g.endFill();
+  }
+}
+
 export function _drawArtilleryImpacts(state) {
   const g = this._feedbackGfx;
   if (!state || typeof state.liveArtilleryImpacts !== "function") return;

@@ -5,6 +5,7 @@ use super::*;
 use crate::game::command::SimCommand as Command;
 use crate::game::entity::{Entity, EntityKind, GatherPhase, Order, WeaponSetup};
 use crate::protocol::{kinds, terrain, AbilityCooldownView, EntityView, Event, OrderPlanMarker};
+use crate::rules::{combat, terrain::TerrainKind};
 
 fn human_vs_ai_players() -> [PlayerInit; 2] {
     [
@@ -213,6 +214,7 @@ fn artillery_point_fire_queue_is_terminal() {
         .entities
         .spawn_unit(1, EntityKind::Artillery, pos.0, pos.1)
         .expect("artillery should spawn");
+    deploy_artillery_toward(&mut game, artillery, target);
 
     game.enqueue(
         1,
@@ -254,6 +256,7 @@ fn artillery_target_is_owner_only_and_impact_is_global_visual_event() {
         .entities
         .spawn_unit(1, EntityKind::Artillery, pos.0, pos.1)
         .expect("artillery should spawn");
+    deploy_artillery_toward(&mut game, artillery, target);
 
     game.enqueue(
         1,
@@ -301,6 +304,218 @@ fn artillery_target_is_owner_only_and_impact_is_global_visual_event() {
         game.players[0].steel <= initial_steel - config::ARTILLERY_AMMO_COST_STEEL,
         "at least one fired shell should spend steel at fire time"
     );
+}
+
+#[test]
+fn packed_artillery_point_fire_does_not_auto_setup_or_fire() {
+    let players = human_vs_ai_players();
+    let mut game = empty_flat_game(&players);
+    let initial_steel = game.players[0].steel;
+    let pos = game.map.tile_center(10, 10);
+    let target = game.map.tile_center(22, 10);
+    let artillery = game
+        .entities
+        .spawn_unit(1, EntityKind::Artillery, pos.0, pos.1)
+        .expect("artillery should spawn");
+
+    game.enqueue(
+        1,
+        Command::UseAbility {
+            ability: ability::AbilityKind::PointFire,
+            units: vec![artillery],
+            x: Some(target.0),
+            y: Some(target.1),
+            queued: false,
+        },
+    );
+    let events = game.tick();
+
+    let entity = game.entities.get(artillery).expect("artillery exists");
+    assert!(matches!(entity.weapon_setup(), WeaponSetup::Packed));
+    assert!(!matches!(entity.order(), Order::ArtilleryPointFire(_)));
+    assert_eq!(game.players[0].steel, initial_steel);
+    assert!(
+        events
+            .iter()
+            .flat_map(|(_, events)| events)
+            .all(|event| !matches!(event, Event::ArtilleryTarget { .. })),
+        "packed point fire should not emit a target marker"
+    );
+}
+
+#[test]
+fn manually_deployed_artillery_can_point_fire() {
+    let players = human_vs_ai_players();
+    let mut game = empty_flat_game(&players);
+    let initial_steel = game.players[0].steel;
+    let pos = game.map.tile_center(10, 10);
+    let setup_target = game.map.tile_center(18, 10);
+    let fire_target = game.map.tile_center(22, 10);
+    let artillery = game
+        .entities
+        .spawn_unit(1, EntityKind::Artillery, pos.0, pos.1)
+        .expect("artillery should spawn");
+
+    game.enqueue(
+        1,
+        Command::SetupAtGuns {
+            units: vec![artillery],
+            x: setup_target.0,
+            y: setup_target.1,
+            queued: false,
+        },
+    );
+    for _ in 0..=config::ARTILLERY_SETUP_TICKS {
+        game.tick();
+    }
+    assert!(matches!(
+        game.entities
+            .get(artillery)
+            .expect("artillery exists")
+            .weapon_setup(),
+        WeaponSetup::Deployed
+    ));
+
+    game.enqueue(
+        1,
+        Command::UseAbility {
+            ability: ability::AbilityKind::PointFire,
+            units: vec![artillery],
+            x: Some(fire_target.0),
+            y: Some(fire_target.1),
+            queued: false,
+        },
+    );
+    let events = game.tick();
+
+    assert_eq!(
+        game.players[0].steel,
+        initial_steel - config::ARTILLERY_AMMO_COST_STEEL
+    );
+    assert!(
+        events.iter().any(|(pid, events)| {
+            *pid == 1
+                && events
+                    .iter()
+                    .any(|event| matches!(event, Event::ArtilleryTarget { from, .. } if *from == artillery))
+        }),
+        "manual setup should allow artillery point fire and identify the firing gun"
+    );
+}
+
+#[test]
+fn artillery_point_fire_inside_minimum_range_does_not_spend_steel() {
+    let players = human_vs_ai_players();
+    let mut game = empty_flat_game(&players);
+    let initial_steel = game.players[0].steel;
+    let pos = game.map.tile_center(10, 10);
+    let min_px = config::ARTILLERY_MIN_RANGE_TILES as f32 * config::TILE_SIZE as f32;
+    let too_close = (pos.0 + min_px - 8.0, pos.1);
+    let artillery = game
+        .entities
+        .spawn_unit(1, EntityKind::Artillery, pos.0, pos.1)
+        .expect("artillery should spawn");
+    deploy_artillery_toward(&mut game, artillery, too_close);
+
+    game.enqueue(
+        1,
+        Command::UseAbility {
+            ability: ability::AbilityKind::PointFire,
+            units: vec![artillery],
+            x: Some(too_close.0),
+            y: Some(too_close.1),
+            queued: false,
+        },
+    );
+    let events = game.tick();
+
+    assert_eq!(game.players[0].steel, initial_steel);
+    assert!(
+        events
+            .iter()
+            .flat_map(|(_, events)| events)
+            .all(|event| !matches!(event, Event::ArtilleryTarget { .. })),
+        "minimum-range rejection should not fire or create a target marker"
+    );
+}
+
+#[test]
+fn artillery_shell_inside_building_footprint_deals_full_inner_ap_damage() {
+    let players = human_vs_ai_players();
+    let mut game = empty_flat_game(&players);
+    let depot = game
+        .entities
+        .spawn_building(2, EntityKind::Depot, 160.0, 160.0, true)
+        .expect("depot should spawn");
+    let before = game.entities.get(depot).expect("depot exists").hp;
+
+    resolve_test_artillery_shell(&mut game, 160.0, 160.0);
+
+    let after = game.entities.get(depot).expect("depot survives").hp;
+    let expected = combat::effective_damage(
+        EntityKind::Artillery,
+        EntityKind::Depot,
+        config::ARTILLERY_INNER_DAMAGE,
+        Some(TerrainKind::Open),
+    );
+    assert_eq!(before - after, expected);
+}
+
+#[test]
+fn artillery_shell_outside_building_uses_footprint_distance_falloff() {
+    let players = human_vs_ai_players();
+    let mut game = empty_flat_game(&players);
+    let depot = game
+        .entities
+        .spawn_building(2, EntityKind::Depot, 160.0, 160.0, true)
+        .expect("depot should spawn");
+    let stats = config::building_stats(EntityKind::Depot).expect("depot stats");
+    let ts = config::TILE_SIZE as f32;
+    let half_w = stats.foot_w as f32 * ts * 0.5;
+    let inner = config::ARTILLERY_INNER_RADIUS_TILES * ts;
+    let outer = config::ARTILLERY_OUTER_RADIUS_TILES * ts;
+    let gap = inner + (outer - inner) * 0.5;
+    let before = game.entities.get(depot).expect("depot exists").hp;
+
+    resolve_test_artillery_shell(&mut game, 160.0 + half_w + gap, 160.0);
+
+    let after = game.entities.get(depot).expect("depot survives").hp;
+    let expected = {
+        let t = ((gap - inner) / (outer - inner)).clamp(0.0, 1.0);
+        let base = (config::ARTILLERY_INNER_DAMAGE as f32
+            + (config::ARTILLERY_OUTER_MIN_DAMAGE as f32 - config::ARTILLERY_INNER_DAMAGE as f32)
+                * t)
+            .round() as u32;
+        combat::effective_damage(
+            EntityKind::Rifleman,
+            EntityKind::Depot,
+            base,
+            Some(TerrainKind::Open),
+        )
+    };
+    assert_eq!(before - after, expected);
+}
+
+fn resolve_test_artillery_shell(game: &mut Game, x: f32, y: f32) {
+    let mut events = HashMap::new();
+    events.insert(1, Vec::new());
+    game.artillery_shells.schedule(1, 1, x, y, game.tick);
+    game.artillery_shells.resolve_due(
+        &mut game.entities,
+        &mut events,
+        game.tick + config::ARTILLERY_SHELL_DELAY_TICKS,
+    );
+}
+
+fn deploy_artillery_toward(game: &mut Game, artillery: u32, target: (f32, f32)) {
+    let entity = game
+        .entities
+        .get_mut(artillery)
+        .expect("artillery should exist");
+    let facing = (target.1 - entity.pos_y).atan2(target.0 - entity.pos_x);
+    entity.set_weapon_setup(WeaponSetup::Deployed);
+    entity.set_emplacement_facing(Some(facing));
+    entity.set_desired_weapon_facing(facing);
 }
 
 fn smoke_projection_fixture() -> (Game, u32, u32, u32, (f32, f32)) {

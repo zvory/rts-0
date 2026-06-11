@@ -226,6 +226,11 @@ function drawArtillery(g, body, tint, facing, weaponFacing, setup, recoil, motio
   const axleL = rotatePoint(-body.halfLen * 0.18, -body.halfWidth * 0.82, carriageFacing);
   const axleR = rotatePoint(-body.halfLen * 0.18, body.halfWidth * 0.82, carriageFacing);
   const cradle = rotatePoint(body.halfLen * 0.02, 0, carriageFacing);
+  const carriageKick = recoilVector(weaponFacing, recoil * 0.42);
+  for (const p of [trailRoot, trailL, trailR, axleL, axleR, cradle]) {
+    p.x += carriageKick.x;
+    p.y += carriageKick.y;
+  }
 
   g.lineStyle(3, 0x17120e, 0.9);
   g.moveTo(axleL.x, axleL.y);
@@ -265,7 +270,7 @@ function drawArtillery(g, body, tint, facing, weaponFacing, setup, recoil, motio
   );
   g.endFill();
 
-  const kick = recoilVector(weaponFacing, recoil * 0.8);
+  const kick = recoilVector(weaponFacing, recoil * 1.35);
   const breech = offsetPoint(rotatePoint(body.halfLen * 0.04, 0, weaponFacing), kick);
   const muzzle = offsetPoint(rotatePoint(body.halfLen * 1.82, 0, weaponFacing), kick);
   g.lineStyle(8, 0x241d17, 0.98);

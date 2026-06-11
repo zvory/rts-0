@@ -135,6 +135,8 @@ export class GameState {
     this.mortarImpacts = [];
     /** @type {Array<{x:number,y:number,radiusTiles:number,delayTicks:number,seed:number,createdAt:number}>} */
     this.artilleryTargets = [];
+    /** @type {Array<{x:number,y:number,facing:number,seed:number,createdAt:number}>} */
+    this.artilleryLaunches = [];
     /** @type {Array<{x:number,y:number,radiusTiles:number,seed:number,createdAt:number}>} */
     this.artilleryImpacts = [];
     /** @type {Map<number, number>} attacker id -> latest shot receive time. */
@@ -269,6 +271,9 @@ export class GameState {
     if (this.artilleryTargets.length > 48) {
       this.artilleryTargets.splice(0, this.artilleryTargets.length - 48);
     }
+    if (this.artilleryLaunches.length > 32) {
+      this.artilleryLaunches.splice(0, this.artilleryLaunches.length - 32);
+    }
     if (this.artilleryImpacts.length > 32) {
       this.artilleryImpacts.splice(0, this.artilleryImpacts.length - 32);
     }
@@ -335,6 +340,24 @@ export class GameState {
 
   addArtilleryTarget(ev, now = performance.now()) {
     if (!Number.isFinite(ev.x) || !Number.isFinite(ev.y)) return;
+    if (typeof ev.from === "number") {
+      this.weaponRecoilById.set(ev.from, now);
+      const shooter = this.entityById(ev.from);
+      if (shooter && Number.isFinite(shooter.x) && Number.isFinite(shooter.y)) {
+        const facing = Number.isFinite(shooter.weaponFacing)
+          ? shooter.weaponFacing
+          : Number.isFinite(shooter.facing)
+            ? shooter.facing
+            : 0;
+        this.artilleryLaunches.push({
+          x: shooter.x,
+          y: shooter.y,
+          facing,
+          seed: Math.floor(shooter.x * 23 + shooter.y * 29 + now) >>> 0,
+          createdAt: now,
+        });
+      }
+    }
     this.artilleryTargets.push({
       x: ev.x,
       y: ev.y,
@@ -441,6 +464,17 @@ export class GameState {
       return now - f.createdAt <= ttlMs;
     });
     return this.artilleryTargets;
+  }
+
+  /**
+   * Return live owner-only artillery launch dust puffs, pruning expired ones.
+   * @param {number} now
+   * @returns {Array<{x:number,y:number,facing:number,seed:number,createdAt:number}>}
+   */
+  liveArtilleryLaunches(now) {
+    const ttlMs = 820;
+    this.artilleryLaunches = this.artilleryLaunches.filter((f) => now - f.createdAt <= ttlMs);
+    return this.artilleryLaunches;
   }
 
   /**

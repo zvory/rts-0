@@ -1043,7 +1043,7 @@ function fakeAudioContext() {
       [EVENT_CODE[EVENT.NOTICE], "Not enough steel"],
       [EVENT_CODE[EVENT.NOTICE], "alert:under_attack", 3, 512, 768],
       [EVENT_CODE[EVENT.MORTAR_LAUNCH], 9, [256, 272], [320, 352], 1.5, 68],
-      [EVENT_CODE[EVENT.ARTILLERY_TARGET], 320, 352, 3, ARTILLERY_SHELL_DELAY_TICKS],
+      [EVENT_CODE[EVENT.ARTILLERY_TARGET], 10, [320, 352], 3, ARTILLERY_SHELL_DELAY_TICKS],
       [EVENT_CODE[EVENT.ARTILLERY_IMPACT], 336, 368, 3],
     ],
   });
@@ -1135,6 +1135,7 @@ function fakeAudioContext() {
   );
   assert(
     decoded.events[6].e === EVENT.ARTILLERY_TARGET &&
+      decoded.events[6].from === 10 &&
       decoded.events[6].delayTicks === ARTILLERY_SHELL_DELAY_TICKS &&
       decoded.events[6].radiusTiles === 3,
     "artillery target event decodes",
@@ -1925,13 +1926,14 @@ function fakeAudioContext() {
     renderedButtons.length = 0;
     sent.length = 0;
     const selectedAtGun = { id: 88, owner: playerId, kind: KIND.AT_TEAM, setupState: SETUP.DEPLOYED };
+    const selectedArtillery = { id: 89, owner: playerId, kind: KIND.ARTILLERY, setupState: SETUP.PACKED };
     const atGunHud = Object.create(HUD.prototype);
     atGunHud.state = {
       playerId,
       resources: { steel: 0, oil: 0 },
       commandTarget: null,
-      selectedEntities: () => [selectedAtGun],
-      entitiesInterpolated: () => [selectedAtGun],
+      selectedEntities: () => [selectedAtGun, selectedArtillery],
+      entitiesInterpolated: () => [selectedAtGun, selectedArtillery],
       beginCommandTarget(kind) {
         this.commandTarget = kind;
       },
@@ -1948,6 +1950,26 @@ function fakeAudioContext() {
     const tearDownButton = renderedButtons.find((button) => button.innerHTML.includes("Tear Down"));
     assert(setupButton?.dataset.hotkey, "AT gun Set Up button should keep its command-card hotkey");
     assert(!tearDownButton, "AT gun Tear Down should not occupy a command-card slot");
+
+    const setupCommands = [];
+    const setupInput = Object.create(Input.prototype);
+    setupInput.state = {
+      playerId,
+      commandTarget: "setupAtGuns",
+      selectedEntities: () => [selectedAtGun, selectedArtillery],
+      addCommandFeedback() {},
+    };
+    setupInput.net = { command: (command) => setupCommands.push(command) };
+    setupInput._worldAt = (x, y) => ({ x, y });
+    setupInput._selectedOwnUnitIds = () => [selectedAtGun.id, selectedArtillery.id];
+    setupInput._issueTargetedCommand({ x: 160, y: 192 }, { shiftKey: true });
+    assert(
+      setupCommands[0]?.c === "setupAtGuns" &&
+        setupCommands[0].units.includes(selectedAtGun.id) &&
+        setupCommands[0].units.includes(selectedArtillery.id) &&
+        setupCommands[0].queued === true,
+      "setupAtGuns targeting includes selected artillery as setup-capable support weapons",
+    );
   } finally {
     if (priorDocument === undefined) delete globalThis.document;
     else globalThis.document = priorDocument;
@@ -2079,13 +2101,15 @@ function fakeAudioContext() {
     oil: 0,
     supplyUsed: 0,
     supplyCap: 10,
-    entities: [],
+    entities: [{ id: 10, owner: 1, kind: KIND.ARTILLERY, x: 300, y: 340, hp: 100, maxHp: 100, state: STATE.IDLE, weaponFacing: 0 }],
     events: [
-      { e: EVENT.ARTILLERY_TARGET, x: 320, y: 352, radiusTiles: 3, delayTicks: ARTILLERY_SHELL_DELAY_TICKS },
+      { e: EVENT.ARTILLERY_TARGET, from: 10, x: 320, y: 352, radiusTiles: 3, delayTicks: ARTILLERY_SHELL_DELAY_TICKS },
       { e: EVENT.ARTILLERY_IMPACT, x: 336, y: 368, radiusTiles: 3 },
     ],
   });
   assert(artilleryState.liveArtilleryTargets(performance.now()).length === 1, "artillery target event creates a live marker");
+  assert(artilleryState.liveArtilleryLaunches(performance.now()).length === 1, "artillery target event creates launch dust");
+  assert(artilleryState.weaponRecoil(10, KIND.ARTILLERY, performance.now()) > 0, "artillery target event starts firing-gun recoil");
   assert(artilleryState.liveArtilleryImpacts(performance.now()).length === 1, "artillery impact event creates a live explosion");
   assert(
     artilleryState.visibleTiles.length === 0,
