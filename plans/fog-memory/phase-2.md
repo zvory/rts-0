@@ -6,8 +6,8 @@ Status: implemented
 
 Make artillery use remembered building intel as player-facing coordinate context, without adding
 hidden building entity targeting. Artillery remains a world-point `pointFire` ability; remembered
-building silhouettes let the player know where previously scouted structures were so they can aim
-at those stale positions.
+buildings render normally below the fog overlay so players know where previously scouted structures
+were and can aim at those stale positions.
 
 ## Scope
 
@@ -58,8 +58,8 @@ at those stale positions.
 ## Manual Testing Focus
 
 - Never-scouted fogged enemy buildings should not render as stale intel.
-- After scouting an enemy building and losing vision, the remembered silhouette should render under
-  fog so artillery can point-fire the remembered location.
+- After scouting an enemy building and losing vision, the remembered building should render normally
+  below the fog overlay so artillery can point-fire the remembered location.
 - If the enemy destroys or changes that building out of sight, artillery may waste fire on stale
   intel but must not reveal the live outcome until vision/impact rules allow it.
 - Current visible artillery targeting should feel unchanged.
@@ -67,11 +67,11 @@ at those stale positions.
 ## Handoff
 
 Artillery flows using memory: none as entity targets. Artillery `pointFire` remains a world-point
-command. Memory is exposed as non-selectable stale building silhouettes so the player has last-seen
-coordinates to aim at.
+command. Memory is exposed as non-selectable remembered buildings below the fog overlay so the
+player has last-seen coordinates to aim at.
 
 Flows still requiring live visibility: explicit `Attack` target ids and live entity projection.
 
-Player-facing patch note: previously scouted enemy buildings now leave stale fog silhouettes until
-their footprint is scouted again, giving artillery and other coordinate commands a last-known
+Player-facing patch note: previously scouted enemy buildings now remain visible below the fog layer
+until their footprint is scouted again, giving artillery and other coordinate commands a last-known
 position to aim at without revealing hidden current state.

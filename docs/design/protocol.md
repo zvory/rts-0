@@ -298,12 +298,12 @@ with points encoded as `[x, y]`; `waypoints` is capped at 128 entries for transp
 
 `RememberedBuilding`: `{ id, owner, kind, x, y, footprint, observedTick }`. These records are
 recipient-only last-seen enemy building memory, sent only when the building is not currently
-projected as a live visible entity. They are stale intel for fog silhouettes and coordinate
-targeting context; clients must not make them selectable live entities or issue entity-targeted
-commands against them. `footprint` is an array of `[tileX, tileY]` cells from the last visible
-state. The record intentionally omits hidden live HP, current build progress, and destruction
-state. Artillery `pointFire` remains a world-coordinate ability; remembered buildings help the
-player know where to aim but do not become target ids.
+projected as a live visible entity. They are stale intel for normal building rendering below the
+fog overlay and coordinate targeting context; clients must not make them selectable live entities
+or issue entity-targeted commands against them. `footprint` is an array of `[tileX, tileY]` cells
+from the last visible state. The record intentionally omits hidden live HP, current build progress,
+and destruction state. Artillery `pointFire` remains a world-coordinate ability; remembered
+buildings help the player know where to aim but do not become target ids.
 
 `ResourceDelta`: `{ id: u32, remaining: u32 }`. Resource node positions/kinds are static and come
 from `start.map.resources`; clients keep last-known `remaining` locally. The server sends

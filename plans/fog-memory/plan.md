@@ -30,10 +30,11 @@ See [phase-2.md](phase-2.md).
 
 ## Phase 3: Expose Remembered Building Intel To The Client
 
-If player-facing UI needs stale building silhouettes or target affordances, add a protocol field for
-remembered-but-not-currently-visible building views. The server remains authoritative and sends only
-the recipient player's remembered records, never live hidden state, and the client renders them as
-non-selectable stale intel under fog. This phase should update `server/crates/protocol`,
+If player-facing UI needs remembered building rendering or target affordances, add a protocol field
+for remembered-but-not-currently-visible building views. The server remains authoritative and sends
+only the recipient player's remembered records, never live hidden state, and the client renders them
+as normal non-selectable buildings below the fog overlay. This phase should update
+`server/crates/protocol`,
 `client/src/protocol.js`, `docs/design/protocol.md`, and the relevant UI modules together.
 
 See [phase-3.md](phase-3.md).

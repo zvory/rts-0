@@ -5,7 +5,7 @@ Status: implemented with phase 2 after artillery targeting semantics were clarif
 ## Goal
 
 Expose server-authoritative remembered building intel to the client only if needed for player
-feedback, targeting affordances, or stale silhouettes under fog.
+feedback, targeting affordances, or normal remembered building rendering under fog.
 
 ## Scope
 
@@ -13,7 +13,8 @@ feedback, targeting affordances, or stale silhouettes under fog.
 - Include only recipient-owned memory records that are not currently visible as live entities.
 - Mark the records as stale/non-interactive so the client does not treat them as live selectable
   entities.
-- Render remembered buildings under fog in a distinct stale-intel style if UI support is required.
+- Render remembered buildings with the normal building renderer below the fog overlay if UI support
+  is required.
 - Keep target commands validated server-side; client rendering is advisory only.
 
 ## Important Design Choices
@@ -46,7 +47,8 @@ feedback, targeting affordances, or stale silhouettes under fog.
 
 ## Manual Testing Focus
 
-- Scout an enemy building, leave vision, and confirm the stale marker appears only for that player.
+- Scout an enemy building, leave vision, and confirm the remembered building remains rendered below
+  fog only for that player.
 - Confirm stale markers disappear or update when the building is scouted again according to phase 1
   lifecycle rules.
 - Confirm stale markers cannot be selected as live enemy entities if that is not intended.
@@ -59,8 +61,8 @@ Snapshot shape: `Snapshot.rememberedBuildings` / compact `mb` contains
 that are not currently visible as live entities. Compact snapshot version is 17.
 
 Client rendering behavior: remembered buildings are stored outside the live entity index and drawn
-as dim, non-selectable footprint silhouettes beneath the fog overlay. They are not selection or
-attack-target entities.
+through the normal building renderer beneath the fog overlay. They are not selection or
+attack-target entities, and they do not get live-entity overlays like HP bars or selection rings.
 
 Restriction: records intentionally omit hidden live HP, current build progress, and destruction
 state. Hidden destruction remains stale until the remembered footprint is scouted again.
