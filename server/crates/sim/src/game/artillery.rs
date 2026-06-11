@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
 use crate::config;
-use crate::game::entity::{EntityKind, EntityStore};
-use crate::game::services::dist2;
+use crate::game::entity::{Entity, EntityKind, EntityStore};
+use crate::game::services::geometry::RectBody;
 use crate::protocol::Event;
 use crate::rules::combat;
 use crate::rules::terrain::TerrainKind;
@@ -72,7 +72,7 @@ fn resolve_shell(
         if target.owner == 0 || target.hp == 0 || target.is_node() {
             continue;
         }
-        let d2 = dist2(shell.x, shell.y, target.pos_x, target.pos_y);
+        let d2 = impact_distance2_to_target(shell.x, shell.y, target);
         if d2 <= outer2 {
             hits.push((id, d2));
         }
@@ -121,6 +121,39 @@ fn artillery_damage(victim_kind: EntityKind, d2: f32, inner2: f32, outer2: f32) 
         base,
         Some(TerrainKind::Open),
     )
+}
+
+fn impact_distance2_to_target(x: f32, y: f32, target: &Entity) -> f32 {
+    if let Some(rect) = building_rect_for_entity_center(target) {
+        return point_rect_distance2(x, y, rect);
+    }
+    let dx = x - target.pos_x;
+    let dy = y - target.pos_y;
+    dx * dx + dy * dy
+}
+
+fn building_rect_for_entity_center(e: &Entity) -> Option<RectBody> {
+    let stats = config::building_stats(e.kind)?;
+    if !e.pos_x.is_finite() || !e.pos_y.is_finite() || stats.foot_w == 0 || stats.foot_h == 0 {
+        return None;
+    }
+    let ts = config::TILE_SIZE as f32;
+    let half_w = stats.foot_w as f32 * ts * 0.5;
+    let half_h = stats.foot_h as f32 * ts * 0.5;
+    Some(RectBody {
+        min_x: e.pos_x - half_w,
+        min_y: e.pos_y - half_h,
+        max_x: e.pos_x + half_w,
+        max_y: e.pos_y + half_h,
+    })
+}
+
+fn point_rect_distance2(x: f32, y: f32, rect: RectBody) -> f32 {
+    let nearest_x = x.clamp(rect.min_x, rect.max_x);
+    let nearest_y = y.clamp(rect.min_y, rect.max_y);
+    let dx = x - nearest_x;
+    let dy = y - nearest_y;
+    dx * dx + dy * dy
 }
 
 fn emit_impact(events: &mut HashMap<u32, Vec<Event>>, x: f32, y: f32) {

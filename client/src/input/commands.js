@@ -168,7 +168,7 @@ export function _selectedOwnAtGunIds() {
   const me = this.state.playerId;
   return this.state
     .selectedEntities()
-    .filter((e) => e.owner === me && e.kind === KIND.AT_TEAM)
+    .filter((e) => e.owner === me && (e.kind === KIND.AT_TEAM || e.kind === KIND.ARTILLERY))
     .map((e) => e.id);
 }
 
@@ -247,7 +247,7 @@ export function _refreshAtGunSetupPreview() {
   const me = this.state.playerId;
   const guns = this.state
     .selectedEntities()
-    .filter((e) => e.owner === me && e.kind === KIND.AT_TEAM);
+    .filter((e) => e.owner === me && (e.kind === KIND.AT_TEAM || e.kind === KIND.ARTILLERY));
   if (guns.length === 0) {
     this.state.updateAtGunSetupPreview(null);
     return;

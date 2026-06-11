@@ -2,11 +2,11 @@
 
 ## Requested fixes
 
-- Add a dramatic artillery recoil animation when a shell fires.
+- [x] Add a dramatic artillery recoil animation when a shell fires.
   - The gun should visibly kick back farther than tanks, with the barrel/carriage snapping rearward and recovering over a longer heavy-weapon timing.
   - The shot should kick up a large dust cloud around the gun position at fire time.
   - Prefer driving this from the owner-visible artillery fire/target event so the specific firing gun recoils reliably.
-- Require manual artillery setup with `Z`, matching AT gun setup flow.
+- [x] Require manual artillery setup with `Z`, matching AT gun setup flow.
   - Artillery should not automatically set up from a Point Fire order.
   - Point Fire should require an already deployed artillery piece in arc and in range.
   - Movement or teardown should continue to reset artillery accuracy.
@@ -17,7 +17,7 @@
   - The max-range affordance should remain readable while the target is invalid.
 - [x] Make the minimum-range dotted line a deeper hue.
   - Use a darker, less bright red for the inner minimum-range ring so it reads as a danger/invalid boundary without competing with the target marker.
-- Verify and, if needed, fix artillery damage against buildings.
+- [x] Verify and, if needed, fix artillery damage against buildings.
   - If the center of the shell lands anywhere inside a building footprint, the building should take full inner-radius armor-piercing damage.
   - Building splash should be based on distance to the footprint, not only distance to the building center.
   - Confirm the inner artillery damage path actually uses armor-piercing damage against armored and hard targets.
@@ -38,13 +38,13 @@
 
 ## Tests to add or update
 
-- Artillery Point Fire while packed does not start setup and does not fire.
-- Artillery manually set up with `Z` can Point Fire once deployed, in arc, and outside minimum range.
-- Artillery Point Fire inside minimum range is rejected and does not spend steel.
+- [x] Artillery Point Fire while packed does not start setup and does not fire.
+- [x] Artillery manually set up with `Z` can Point Fire once deployed, in arc, and outside minimum range.
+- [x] Artillery Point Fire inside minimum range is rejected and does not spend steel.
 - [x] Artillery shell delay is 5 seconds in server config, client config, and target-marker rendering.
-- Artillery shell landing inside a building footprint deals full inner armor-piercing damage.
-- Artillery shell landing outside the footprint but within splash range uses footprint-distance falloff.
-- Protocol/client contract tests cover any added artillery firing-unit id.
+- [x] Artillery shell landing inside a building footprint deals full inner armor-piercing damage.
+- [x] Artillery shell landing outside the footprint but within splash range uses footprint-distance falloff.
+- [x] Protocol/client contract tests cover any added artillery firing-unit id.
 
 ## Patch-note bullets
 

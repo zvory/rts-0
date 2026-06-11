@@ -385,6 +385,7 @@ pub enum Event {
         reveal: Option<AttackReveal>,
     },
     ArtilleryTarget {
+        from: u32,
         x: f32,
         y: f32,
         radius_tiles: f32,

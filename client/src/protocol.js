@@ -162,7 +162,7 @@ export const REPLAY_VISION = Object.freeze({
 });
 
 // --- Compact snapshot wire schema (must match protocol.rs) ---
-export const COMPACT_SNAPSHOT_VERSION = 14;
+export const COMPACT_SNAPSHOT_VERSION = 15;
 
 export const KIND_CODE = Object.freeze({
   [KIND.WORKER]: 1,
@@ -610,15 +610,18 @@ function decodeCompactEvent(record, index) {
         }
         return ev;
       }
-    case EVENT.ARTILLERY_TARGET:
+    case EVENT.ARTILLERY_TARGET: {
       requireLength(fields, 5, `artillery target event ${index}`);
+      const target = decodeCompactPoint(fields[2], "event.artilleryTarget.target");
       return {
         e: EVENT.ARTILLERY_TARGET,
-        x: readNumber(fields[1], "event.artilleryTarget.x"),
-        y: readNumber(fields[2], "event.artilleryTarget.y"),
+        from: readU32(fields[1], "event.artilleryTarget.from"),
+        x: target[0],
+        y: target[1],
         radiusTiles: readNumber(fields[3], "event.artilleryTarget.radiusTiles"),
         delayTicks: readU32(fields[4], "event.artilleryTarget.delayTicks"),
       };
+    }
     case EVENT.ARTILLERY_IMPACT:
       requireLength(fields, 4, `artillery impact event ${index}`);
       return {
