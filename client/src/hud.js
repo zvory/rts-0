@@ -19,12 +19,7 @@ import {
   UPGRADES,
   WORKER_BUILDABLE,
 } from "./config.js";
-
-// Command-card hotkeys follow the keyboard grid (3 columns):
-//   Q W E
-//   A S D
-//   Z X C
-const GRID_HOTKEYS = Object.freeze(["Q", "W", "E", "A", "S", "D", "Z", "X", "C"]);
+import { GRID_HOTKEYS, buildCommandCardDescriptors } from "./hud_command_card.js";
 const RESOURCE_ICON_FALLBACKS = Object.freeze({
   steel: "▰",
   oil: "⬤",
@@ -450,28 +445,133 @@ export class HUD {
   _renderCommandCard() {
     const card = this.elCommand;
     if (!card) return;
-    if (this.state.spectator) {
-      if (this._cardSig !== "spectator") {
+    const descriptorCard = buildCommandCardDescriptors(this._commandDescriptorContext());
+    if (descriptorCard.kind === "spectator") {
+      if (this._cardSig !== descriptorCard.signature) {
         card.innerHTML = "";
-        this._cardSig = "spectator";
+        this._cardSig = descriptorCard.signature;
       }
       return;
     }
-
-    const sel = this.state.selectedEntities() || [];
-    const primary = this._commandSubject(sel);
-
-    if (!primary) {
-      this._renderEmptyCard(card);
+    if (descriptorCard.signature === this._cardSig) {
+      if (descriptorCard.abilityAffordances) {
+        this._syncAbilityCooldownClocks(descriptorCard.abilityAffordances);
+      }
       return;
     }
+    this._cardSig = descriptorCard.signature;
+    this._renderDescriptorCard(card, descriptorCard);
+  }
 
-    if (this.state.commandCardMode === "workerBuild" && this._workerOnlySelection(sel)) {
-      this._renderBuildCard(card);
-    } else if (this._selectedOwnUnits(sel).length > 0) {
-      this._renderUnitCard(card, sel);
+  _commandDescriptorContext() {
+    return {
+      spectator: this.state.spectator,
+      playerId: this.state.playerId,
+      selection: this.state.selectedEntities() || [],
+      resources: this.state.resources || { steel: 0, oil: 0 },
+      upgrades: this.state.upgrades || [],
+      commandCardMode: this.state.commandCardMode,
+      commandTarget: this.state.commandTarget,
+      groupCooldownClocks,
+      playerHasCompleteKind: (kind) => this._playerHasCompleteKind(kind),
+    };
+  }
+
+  _renderDescriptorCard(card, descriptorCard) {
+    const frag = document.createDocumentFragment();
+    const slots = Array.isArray(descriptorCard.slots) ? descriptorCard.slots : [];
+    for (let i = 0; i < 9; i++) {
+      const descriptor = slots[i] || null;
+      frag.appendChild(descriptor ? this._cmdButton(this._descriptorButtonOptions(descriptor)) : this._emptyCommandSlot());
+    }
+    card.innerHTML = "";
+    card.appendChild(frag);
+  }
+
+  _descriptorButtonOptions(descriptor) {
+    return {
+      icon: descriptor.icon,
+      label: descriptor.label,
+      ability: descriptor.ability,
+      hotkey: descriptor.hotkey,
+      cost: descriptor.cost,
+      enabled: descriptor.enabled,
+      unaffordable: descriptor.unaffordable,
+      title: descriptor.title,
+      tooltipHtml: descriptor.tooltipKind
+        ? this._kindTooltipHtml(descriptor.tooltipKind)
+        : descriptor.tooltipUpgrade
+          ? this._upgradeTooltipHtml(descriptor.tooltipUpgrade)
+          : descriptor.tooltipHtml,
+      cls: descriptor.cls,
+      countBadge: descriptor.countBadge,
+      cooldownClocks: descriptor.cooldownClocks,
+      repeatable: descriptor.repeatable,
+      onUnavailable: descriptor.onUnavailableIntent
+        ? () => this._dispatchCommandIntent(descriptor.onUnavailableIntent)
+        : null,
+      onContextMenu: descriptor.contextIntent
+        ? () => this._dispatchCommandIntent(descriptor.contextIntent)
+        : null,
+      onClick: (ev) => this._dispatchCommandIntent(descriptor.intent, ev),
+    };
+  }
+
+  _dispatchCommandIntent(intent, ev = {}) {
+    if (!intent || typeof intent !== "object") return;
+    switch (intent.type) {
+      case "beginCommandTarget":
+        this.state.beginCommandTarget(intent.target);
+        return;
+      case "openWorkerBuildMenu":
+        this.state.openWorkerBuildMenu();
+        return;
+      case "closeCommandCardMenu":
+        this.state.closeCommandCardMenu();
+        return;
+      case "beginPlacement":
+        this.state.beginPlacement(intent.building);
+        return;
+      case "stop":
+        this.net.command(cmd.stop(intent.unitIds || []));
+        this.state.endCommandTarget();
+        return;
+      case "train":
+        this._issueTrain(intent.unit);
+        return;
+      case "cancelProduction":
+        this._issueCancelProduction(intent.buildingKind);
+        return;
+      case "research":
+        this._issueResearch(intent.upgrade);
+        return;
+      case "ability":
+        this._dispatchAbilityIntent(intent, ev);
+        return;
+      case "setAutocast":
+        this.net.command(cmd.setAutocast(intent.ability, intent.unitIds || [], !!intent.enabled));
+        this.state.endCommandTarget();
+        return;
+      case "playNotEnough":
+        this._playNotEnoughForCost(intent.cost);
+        return;
+      default:
+        return;
+    }
+  }
+
+  _dispatchAbilityIntent(intent, ev = {}) {
+    if (intent.targetMode === "worldPoint") {
+      this.state.beginCommandTarget({ kind: "ability", ability: intent.ability });
     } else {
-      this._renderTrainCard(card, primary);
+      this.net.command(cmd.useAbility(
+        intent.ability,
+        intent.readyIds || [],
+        null,
+        null,
+        !!ev.shiftKey,
+      ));
+      this.state.endCommandTarget();
     }
   }
 
