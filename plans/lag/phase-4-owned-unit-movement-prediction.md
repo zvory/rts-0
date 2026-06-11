@@ -73,6 +73,18 @@ Do not predict yet:
   - fail if simple movement corrections exceed a documented threshold under deterministic test
     conditions.
 
+## Manual Testing Focus
+
+Run a match under artificial latency and issue basic owned-unit move and queued move commands. The
+manual check is that owned units begin moving immediately, corrections are visible only when needed,
+and disabling prediction restores the old authoritative-only response.
+
+## Handoff Expectations
+
+At handoff, report correction-distance measurements from the movement scenarios, the prediction flag
+used for manual testing, and any movement cases intentionally left authoritative-only. Note whether
+Phase 5 can build on the same pending-command lifecycle or needs additional command result metadata.
+
 ## Player-Facing Outcome
 
 Move commands feel immediate for owned units. The server still decides the real result, and

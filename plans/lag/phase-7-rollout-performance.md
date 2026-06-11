@@ -65,6 +65,18 @@ correct and measured.
 - Rollback test proving prediction can be disabled mid-session and the client returns to
   authoritative snapshots without corrupting selection, camera, fog, or HUD state.
 
+## Manual Testing Focus
+
+Run a normal match and at least one artificial-latency match with prediction enabled by default.
+Manual testing should focus on command feel, visible correction quality, frame pacing, and whether
+turning the prediction flag off still provides a reliable fallback.
+
+## Handoff Expectations
+
+At handoff, include the final rollout flag state, performance measurements against the stated
+budgets, and the list of legacy delay paths removed or intentionally retained. Name any remaining
+prediction caveats that should be watched in playtests after rollout.
+
 ## Player-Facing Outcome
 
 Prediction becomes the normal live-match experience. Owned commands respond immediately while
