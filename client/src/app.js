@@ -214,6 +214,7 @@ export class App {
     if (this.match) this.match.destroy();
     this.inReplayPlayback = startsReplay;
 
+    dom.gameScreen.classList.remove("branch-background");
     dom.lobbyScreen.hidden = true;
     this.branchStaging.hide();
     if (dom.devLinks) dom.devLinks.hidden = true;
@@ -240,14 +241,19 @@ export class App {
     const branchRoom = (m?.branchRoom || "").trim();
     if (!branchRoom) return;
     if (this.match) {
-      this.match.destroy();
-      this.match = null;
+      if (typeof this.match.freezeForBranchStagingBackground === "function") {
+        this.match.freezeForBranchStagingBackground();
+      } else {
+        this.match.destroy();
+        this.match = null;
+      }
     }
     this.inReplayPlayback = false;
     this.statusBadge.clearMatchMetrics();
     dom.gameOver.hidden = true;
     this.clearScoreboard();
-    dom.gameScreen.hidden = true;
+    dom.gameScreen.hidden = false;
+    dom.gameScreen.classList.add("branch-background");
     dom.lobbyScreen.hidden = true;
     if (dom.devLinks) dom.devLinks.hidden = true;
     this.branchStaging.show();
@@ -367,6 +373,7 @@ export class App {
     dom.gameOver.hidden = true;
     this.clearScoreboard();
     dom.gameScreen.hidden = true;
+    dom.gameScreen.classList.remove("branch-background");
     if (dom.branchScreen) this.branchStaging.hide();
     dom.lobbyScreen.hidden = false;
     if (dom.devLinks) dom.devLinks.hidden = false;

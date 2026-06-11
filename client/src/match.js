@@ -88,6 +88,7 @@ export class Match {
     this.giveUpSent = false;
     this.matchPingTimer = undefined;
     this.netReportTimer = undefined;
+    this.skipFinalNetReport = false;
     this.lastLatencySampleAt = 0;
     this.snapshotJitterDeltas = [];
     this.lastSnapshotArrivedAt = null;
@@ -935,6 +936,36 @@ export class Match {
     }
   }
 
+  /**
+   * Freeze the current rendered frame for a non-interactive overlay. This keeps
+   * Pixi resources alive so App can show the map behind branch seat claiming,
+   * but detaches replay/live message handlers before the socket joins another
+   * room. A later destroy() still owns the full resource teardown.
+   */
+  freezeForBranchStagingBackground() {
+    this.sendNetReport();
+    this.skipFinalNetReport = true;
+    this.stop();
+    this.stopMatchPings();
+    this.stopNetReports();
+    this.stopAllMachineGunSounds();
+    this.net.off(S.SNAPSHOT, this.onSnapshot);
+    this.net.off(S.REPLAY_STATE, this.onReplayState);
+    window.removeEventListener("keydown", this.onMenuKeyDown, true);
+    document.removeEventListener("visibilitychange", this.onVisibilityChange);
+    dom.settingsButton?.removeEventListener("click", this.onSettingsClick);
+    dom.debugPathToggle?.removeEventListener("click", this.onDebugPathToggle);
+    if (dom.replaySpeed && this.replaySpeedHandler) {
+      dom.replaySpeed.removeEventListener("click", this.replaySpeedHandler);
+      this.replaySpeedHandler = null;
+    }
+    if (dom.replaySpeed) dom.replaySpeed.hidden = true;
+    if (this.input && typeof this.input.destroy === "function") {
+      this.input.destroy();
+      this.input = null;
+    }
+  }
+
   applyReplayState(state) {
     this.replayState = state || null;
     this.setReplaySeekPending(null, false);
@@ -1154,7 +1185,7 @@ export class Match {
    * build a fresh Match on the next `start`. Best-effort and idempotent.
    */
   destroy() {
-    this.sendNetReport();
+    if (!this.skipFinalNetReport) this.sendNetReport();
     this.stop();
     this.stopMatchPings();
     this.stopNetReports();
