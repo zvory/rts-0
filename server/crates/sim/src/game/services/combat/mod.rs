@@ -254,6 +254,9 @@ pub(crate) fn combat_system(
                     Some(EntityKind::MortarTeam)
                 ) {
                     let (mx, my) = mortar_aim_point(entities, tid, tick);
+                    if mortar_autocast_would_hit_owned_entity(entities, owner, mx, my) {
+                        continue;
+                    }
                     mortar_shells.schedule(owner, id, mx, my, tick);
                     if let Some(e) = entities.get_mut(id) {
                         e.set_attack_cd(cd_reset);
@@ -351,4 +354,19 @@ fn mortar_aim_point(entities: &EntityStore, target: u32, tick: u32) -> (f32, f32
         y += angle.sin() * radius;
     }
     (x, y)
+}
+
+fn mortar_autocast_would_hit_owned_entity(
+    entities: &EntityStore,
+    owner: u32,
+    x: f32,
+    y: f32,
+) -> bool {
+    let outer_radius = config::MORTAR_OUTER_RADIUS_TILES * config::TILE_SIZE as f32;
+    let outer2 = outer_radius * outer_radius;
+    entities.ids().into_iter().any(|id| {
+        entities.get(id).is_some_and(|e| {
+            e.owner == owner && e.hp > 0 && !e.is_node() && dist2(x, y, e.pos_x, e.pos_y) <= outer2
+        })
+    })
 }

@@ -215,6 +215,13 @@ kind-specific data from `rules::defs`. `config.rs` holds scalar constants and co
 wrappers such as `unit_stats(kind)` / `building_stats(kind)`, which return the stats embedded in
 defs.
 
+Mortar shells are delayed AOE effects resolved by `game::mortar` after their flight timer expires.
+They damage friendly and enemy units/buildings with the same falloff and armor rules; resource nodes
+are ignored. Idle/attack-move autocast is conservative: before scheduling a shell, combat checks the
+predicted impact point against owned units and buildings at their current positions and holds fire if
+any would be inside the damaging radius. Manual mortar fire is intentionally allowed onto friendly
+positions, so players can still take risky shots deliberately.
+
 `server/crates/archcheck` classifies each top-level service module before accepting
 service-to-service imports. The roles are intentionally coarse:
 

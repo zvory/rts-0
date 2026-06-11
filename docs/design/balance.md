@@ -86,7 +86,9 @@ authoritative `rules::defs` records.
   `MORTAR_OUTER_DAMAGE = 30`, `MORTAR_INNER_DAMAGE = 60`, and `MORTAR_AUTOFIRE_ERROR_TILES = 0.35`.
   The inner radius uses semi-armor-piercing damage against armored targets: it applies half of the
   normal non-AP armor reduction instead of the full reduction. Manual Fire uses hotkey `X`; autocast
-  is enabled by default through normal idle/attack-move acquisition.
+  is enabled by default through normal idle/attack-move acquisition. Mortar impacts apply the same
+  damage to friendly and enemy units/buildings; autocast skips predicted impact points that would
+  hit any owned unit or building at its current position, while manual fire remains unrestricted.
 - AT guns use `AT_GUN_PACKED_RANGE_TILES = 5`, `AT_GUN_DEPLOYED_RANGE_TILES = 12`,
   `AT_GUN_PACKED_DAMAGE_MULTIPLIER = 0.75`, and
   `AT_GUN_FIELD_OF_FIRE_RAD = PI / 4` (45 degrees total).
