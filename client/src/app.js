@@ -207,7 +207,7 @@ export class App {
       players: payload?.players?.length,
       spectator: payload?.spectator,
     });
-    const startsReplay = !!payload?.replay || this.devWatch?.kind === "replay";
+    const startsReplay = !!payload?.replay;
     const preserveScorePanel = startsReplay && !dom.gameOver.hidden;
 
     // If a previous match somehow lingers, tear it down first.

@@ -285,6 +285,18 @@ impl BranchStagingState {
             .retain(|_, claimant_id| *claimant_id != occupant_id);
     }
 
+    fn connection_to_seat_map(&self) -> Option<HashMap<u32, u32>> {
+        if !self.can_start() {
+            return None;
+        }
+        Some(
+            self.claimed_by_seat
+                .iter()
+                .map(|(seat_player_id, occupant_id)| (*occupant_id, *seat_player_id))
+                .collect(),
+        )
+    }
+
     fn seats_for_message(&self, players: &HashMap<u32, RoomPlayer>) -> Vec<BranchStagingSeat> {
         self.seed
             .seats
@@ -669,6 +681,8 @@ pub(super) struct RoomTask {
     match_human_count: usize,
     /// Connected human players who already received a terminal score screen for the active match.
     outcome_sent: HashSet<u32>,
+    /// In replay branch live matches, connected ids differ from original replay player ids.
+    branch_live_seat_by_connection: HashMap<u32, u32>,
     dev_driver: Option<DevDriver>,
     dev_view_player_id: Option<u32>,
     ai_controllers: Vec<AiController>,
@@ -716,6 +730,7 @@ impl RoomTask {
             match_player_count: 0,
             match_human_count: 0,
             outcome_sent: HashSet::new(),
+            branch_live_seat_by_connection: HashMap::new(),
             dev_driver: None,
             dev_view_player_id: None,
             ai_controllers: Vec::new(),
@@ -800,6 +815,7 @@ impl RoomTask {
     fn should_record_match_history(&self) -> bool {
         self.match_human_count >= 2
             && !self.is_live_dev_watch()
+            && !matches!(self.mode, RoomMode::ReplayBranch { .. })
             && !is_automated_match_history_room(&self.room)
             && !match_history_participants_are_automated(&self.match_participants)
     }
@@ -1034,6 +1050,7 @@ impl RoomTask {
             self.match_player_count = 0;
             self.match_human_count = 0;
             self.outcome_sent.clear();
+            self.branch_live_seat_by_connection.clear();
             self.host_id = None;
             // Drop AI opponents too: with no humans there is nobody to host them, and a fresh
             // joiner under this room name should start from a clean lobby.
@@ -1048,13 +1065,18 @@ impl RoomTask {
         }
 
         let mut broadcast_branch_staging = false;
+        let removed_live_seat_id = (!was_spectator).then(|| {
+            self.live_seat_id_for_connection(player_id)
+                .unwrap_or(player_id)
+        });
         match &mut self.phase {
             Phase::Lobby => self.broadcast_lobby(),
             Phase::InGame(game) => {
                 // Remove their army so the match can still resolve to a winner.
-                if !was_spectator {
-                    game.eliminate(player_id);
+                if let Some(seat_id) = removed_live_seat_id {
+                    game.eliminate(seat_id);
                 }
+                self.branch_live_seat_by_connection.remove(&player_id);
             }
             Phase::ReplayViewer(session) => {
                 session.viewer_vision.remove(&player_id);
@@ -1260,9 +1282,38 @@ impl RoomTask {
     }
 
     fn spectator_visible_player_ids(&self) -> Vec<u32> {
+        if !self.branch_live_seat_by_connection.is_empty() {
+            return self
+                .branch_live_seat_by_connection
+                .values()
+                .copied()
+                .collect();
+        }
         let mut ids: Vec<u32> = self.active_human_ids().collect();
         ids.extend(self.ai_players.iter().map(|ai| ai.id));
         ids
+    }
+
+    fn live_seat_id_for_connection(&self, connection_id: u32) -> Option<u32> {
+        self.branch_live_seat_by_connection
+            .get(&connection_id)
+            .copied()
+            .or_else(|| {
+                self.players
+                    .contains_key(&connection_id)
+                    .then_some(connection_id)
+            })
+    }
+
+    fn live_connection_is_player(&self, connection_id: u32) -> bool {
+        self.players
+            .get(&connection_id)
+            .map(|p| !p.spectator)
+            .unwrap_or(false)
+            && (self.branch_live_seat_by_connection.is_empty()
+                || self
+                    .branch_live_seat_by_connection
+                    .contains_key(&connection_id))
     }
 
     fn reassign_host_if_needed(&mut self) {
@@ -1299,16 +1350,17 @@ impl RoomTask {
         if self.is_live_dev_watch() {
             return;
         }
+        let live_seat_id = (self.live_connection_is_player(player_id)
+            && !self.outcome_sent.contains(&player_id))
+        .then(|| {
+            self.live_seat_id_for_connection(player_id)
+                .unwrap_or(player_id)
+        });
         // Commands are ignored unless in-game and the sender is actually in this room. The
         // simulation itself validates ownership/affordability when it applies the command.
         if let Phase::InGame(game) = &mut self.phase {
-            let active_player = self
-                .players
-                .get(&player_id)
-                .map(|p| !p.spectator)
-                .unwrap_or(false);
-            if active_player && !self.outcome_sent.contains(&player_id) {
-                game.enqueue(player_id, cmd);
+            if let Some(seat_id) = live_seat_id {
+                game.enqueue(seat_id, cmd);
             }
         }
     }
@@ -1317,14 +1369,12 @@ impl RoomTask {
         if self.is_live_dev_watch() {
             return;
         }
-        let active_player = self
-            .players
-            .get(&player_id)
-            .map(|p| !p.spectator)
-            .unwrap_or(false);
-        if !active_player || self.outcome_sent.contains(&player_id) {
+        if !self.live_connection_is_player(player_id) || self.outcome_sent.contains(&player_id) {
             return;
         }
+        let seat_id = self
+            .live_seat_id_for_connection(player_id)
+            .unwrap_or(player_id);
 
         let mut game = match std::mem::replace(&mut self.phase, Phase::Lobby) {
             Phase::Lobby => {
@@ -1343,7 +1393,7 @@ impl RoomTask {
         };
 
         debug!(room = %self.room, player_id, "player gave up");
-        game.eliminate(player_id);
+        game.eliminate(seat_id);
         let alive = game.alive_players();
         let scores = game.scores();
 
@@ -1371,6 +1421,7 @@ impl RoomTask {
             self.phase = Phase::Lobby;
             self.match_player_count = 0;
             self.match_human_count = 0;
+            self.branch_live_seat_by_connection.clear();
             self.outcome_sent.clear();
             for player in self.players.values_mut() {
                 player.ready = false;
@@ -1551,6 +1602,9 @@ impl RoomTask {
     }
 
     fn can_start_now(&self) -> bool {
+        if let Phase::BranchStaging(staging) = &self.phase {
+            return !self.drain.is_draining() && staging.can_start();
+        }
         !self.drain.is_draining()
             && self.total_player_count() > 0
             && self
@@ -1607,7 +1661,11 @@ impl RoomTask {
     fn start_match_countdown(&mut self) {
         let duration = match_countdown_duration();
         self.match_countdown_deadline = Some(TokioInstant::now() + duration);
-        self.broadcast_lobby();
+        if matches!(self.phase, Phase::BranchStaging(_)) {
+            self.broadcast_branch_staging();
+        } else {
+            self.broadcast_lobby();
+        }
         let msg = ServerMessage::MatchCountdown {
             duration_ms: duration.as_millis() as u32,
             words: MATCH_COUNTDOWN_WORDS
@@ -1628,10 +1686,18 @@ impl RoomTask {
         }
         self.match_countdown_deadline = None;
         if self.can_start_now() {
-            self.start_match();
+            if matches!(self.phase, Phase::BranchStaging(_)) {
+                self.start_branch_live();
+            } else {
+                self.start_match();
+            }
         } else {
             debug!(room = %self.room, "match countdown aborted; start preconditions changed");
-            self.broadcast_lobby();
+            if matches!(self.phase, Phase::BranchStaging(_)) {
+                self.broadcast_branch_staging();
+            } else {
+                self.broadcast_lobby();
+            }
         }
         true
     }
@@ -1747,6 +1813,85 @@ impl RoomTask {
         }
 
         info!(room = %self.room, players = self.match_player_count, "match started");
+        self.mark_match_started_for_drain();
+        self.phase = Phase::InGame(Box::new(game));
+    }
+
+    fn start_branch_live(&mut self) {
+        self.match_countdown_deadline = None;
+        self.reset_match_net_status();
+        let staging = match std::mem::replace(&mut self.phase, Phase::Lobby) {
+            Phase::BranchStaging(staging) => staging,
+            other => {
+                self.phase = other;
+                return;
+            }
+        };
+        let Some(seat_by_connection) = staging.connection_to_seat_map() else {
+            self.phase = Phase::BranchStaging(staging);
+            self.broadcast_branch_staging();
+            return;
+        };
+        if !seat_by_connection
+            .keys()
+            .all(|connection_id| self.players.contains_key(connection_id))
+        {
+            self.phase = Phase::BranchStaging(staging);
+            self.broadcast_branch_staging();
+            return;
+        }
+
+        let game = staging.seed.game.clone_for_replay_keyframe();
+        let payload = game.start_payload();
+        let active_seats: HashSet<u32> = seat_by_connection.values().copied().collect();
+        self.branch_live_seat_by_connection = seat_by_connection;
+        self.match_player_count = active_seats.len();
+        self.match_human_count = active_seats.len();
+        self.match_started_at = Some(chrono::Utc::now());
+        self.match_map_name = staging.seed.source_replay.map_name.clone();
+        self.match_participants = staging
+            .seed
+            .seats
+            .iter()
+            .filter(|seat| active_seats.contains(&seat.player_id))
+            .map(|seat| seat.name.clone())
+            .collect();
+        self.outcome_sent.clear();
+        self.ai_controllers.clear();
+        self.dev_driver = None;
+        self.dev_view_player_id = None;
+
+        for &connection_id in &self.order {
+            let Some(player) = self.players.get_mut(&connection_id) else {
+                continue;
+            };
+            let mapped_seat = self
+                .branch_live_seat_by_connection
+                .get(&connection_id)
+                .copied();
+            player.spectator = mapped_seat.is_none();
+            player.ready = false;
+            player.msg_tx.clear_pending_snapshot();
+            let per_player = StartPayload {
+                player_id: mapped_seat.unwrap_or(connection_id),
+                spectator: mapped_seat.is_none(),
+                replay: None,
+                ..payload.clone()
+            };
+            send_or_log(
+                &self.room,
+                connection_id,
+                &player.msg_tx,
+                ServerMessage::Start(per_player),
+            );
+        }
+
+        info!(
+            room = %self.room,
+            players = self.match_player_count,
+            source_tick = staging.seed.source_tick,
+            "replay branch promoted to live match"
+        );
         self.mark_match_started_for_drain();
         self.phase = Phase::InGame(Box::new(game));
     }
@@ -2108,15 +2253,16 @@ impl RoomTask {
             let Some(player) = self.players.get(id) else {
                 continue;
             };
+            let mapped_seat = self.branch_live_seat_by_connection.get(id).copied();
             let snapshot_start = StdInstant::now();
             let mut snapshot = if player.spectator {
                 game.snapshot_for_spectator(&spectator_visible_players)
             } else {
-                game.snapshot_for(*id)
+                game.snapshot_for(mapped_seat.unwrap_or(*id))
             };
             if player.spectator {
                 snapshot.events.extend(full_vision_events.clone());
-            } else if let Some(mut events) = per_player_events.remove(id) {
+            } else if let Some(mut events) = per_player_events.remove(&mapped_seat.unwrap_or(*id)) {
                 snapshot.events.append(&mut events);
             }
             let snapshot_duration = snapshot_start.elapsed();
@@ -2496,6 +2642,16 @@ impl RoomTask {
         if self.host_id != Some(player_id) {
             return;
         }
+        if self.match_countdown_deadline.is_some() {
+            return;
+        }
+        if self.drain.is_draining() {
+            self.send_error_to(
+                player_id,
+                "Server is draining for deploy; new matches are disabled.",
+            );
+            return;
+        }
         let Some(staging) = self.branch_staging() else {
             return;
         };
@@ -2506,10 +2662,7 @@ impl RoomTask {
             );
             return;
         }
-        self.send_error_to(
-            player_id,
-            "Replay branch launch is not available until the branch promotion phase.",
-        );
+        self.start_match_countdown();
     }
 
     fn on_announce_replay_branch(
@@ -2552,7 +2705,9 @@ impl RoomTask {
             host_id: self.host_id.unwrap_or(0),
             seats: staging.seats_for_message(&self.players),
             occupants,
-            can_start: staging.can_start(),
+            can_start: self.match_countdown_deadline.is_none()
+                && !self.drain.is_draining()
+                && staging.can_start(),
         }
     }
 
@@ -2657,8 +2812,11 @@ impl RoomTask {
             .iter()
             .copied()
             .filter(|id| {
-                self.players.get(id).map(|p| !p.spectator).unwrap_or(false)
-                    && !alive.contains(id)
+                self.live_connection_is_player(*id)
+                    && self
+                        .live_seat_id_for_connection(*id)
+                        .map(|seat_id| !alive.contains(&seat_id))
+                        .unwrap_or(false)
                     && !self.outcome_sent.contains(id)
             })
             .collect();
@@ -2744,8 +2902,9 @@ impl RoomTask {
             let you = if player.spectator {
                 "draw"
             } else {
+                let seat_id = self.live_seat_id_for_connection(*id).unwrap_or(*id);
                 match winner_id {
-                    Some(w) if w == *id => "won",
+                    Some(w) if w == seat_id => "won",
                     Some(_) => "lost",
                     None => "draw",
                 }
@@ -2787,6 +2946,7 @@ impl RoomTask {
         self.match_player_count = 0;
         self.match_human_count = 0;
         self.outcome_sent.clear();
+        self.branch_live_seat_by_connection.clear();
         for player in self.players.values_mut() {
             player.ready = false;
             player.msg_tx.clear_pending_snapshot();
@@ -2823,6 +2983,7 @@ impl RoomTask {
         self.match_player_count = 0;
         self.match_human_count = 0;
         self.outcome_sent.clear();
+        self.branch_live_seat_by_connection.clear();
         for player in self.players.values_mut() {
             player.ready = false;
             player.msg_tx.clear_pending_snapshot();
@@ -3772,6 +3933,151 @@ mod tests {
         assert!(matches!(task.phase, Phase::BranchStaging(_)));
         assert!(!std::iter::from_fn(|| writer.reliable_rx.try_recv().ok())
             .any(|msg| matches!(msg, ServerMessage::Lobby { .. } | ServerMessage::Start(_))));
+    }
+
+    #[test]
+    fn branch_start_countdown_promotes_to_live_start_payloads() {
+        let players = replay_test_players(2);
+        let seed = replay_branch_test_seed(&players, 3);
+        let mut task = RoomTask::new(
+            "branch-promote-test".to_string(),
+            RoomMode::ReplayBranch { seed: seed.clone() },
+            None,
+            false,
+            DrainHandle::default(),
+        );
+        let mut writer_a = add_branch_occupant(&mut task, 100);
+        let mut writer_b = add_branch_occupant(&mut task, 101);
+        let mut writer_spectator = add_branch_occupant(&mut task, 102);
+        task.phase = Phase::BranchStaging(Box::new(BranchStagingState::new(seed)));
+
+        task.on_claim_branch_seat(100, players[0].id);
+        task.on_claim_branch_seat(101, players[1].id);
+        task.on_start_branch(100);
+
+        assert!(std::iter::from_fn(|| writer_a.reliable_rx.try_recv().ok())
+            .any(|msg| matches!(msg, ServerMessage::MatchCountdown { .. })));
+        std::thread::sleep(match_countdown_duration().saturating_mul(2));
+        task.on_tick(TokioInstant::now());
+
+        assert!(matches!(task.phase, Phase::InGame(_)));
+        assert_eq!(
+            task.branch_live_seat_by_connection.get(&100),
+            Some(&players[0].id)
+        );
+        assert_eq!(
+            task.branch_live_seat_by_connection.get(&101),
+            Some(&players[1].id)
+        );
+        assert!(!task.branch_live_seat_by_connection.contains_key(&102));
+        assert!(!task.players.get(&100).unwrap().spectator);
+        assert!(!task.players.get(&101).unwrap().spectator);
+        assert!(task.players.get(&102).unwrap().spectator);
+
+        let starts_b: Vec<_> =
+            std::iter::from_fn(|| writer_b.reliable_rx.try_recv().ok()).collect();
+        assert!(starts_b.iter().any(|msg| {
+            matches!(msg, ServerMessage::Start(payload)
+                if payload.player_id == players[1].id && !payload.spectator && payload.replay.is_none())
+        }));
+        let starts_spectator: Vec<_> =
+            std::iter::from_fn(|| writer_spectator.reliable_rx.try_recv().ok()).collect();
+        assert!(starts_spectator.iter().any(|msg| {
+            matches!(msg, ServerMessage::Start(payload)
+                if payload.player_id == 102 && payload.spectator && payload.replay.is_none())
+        }));
+    }
+
+    #[test]
+    fn branch_live_commands_and_snapshots_use_mapped_original_seats() {
+        let players = replay_test_players(2);
+        let seed = replay_branch_test_seed(&players, 0);
+        let mut task = RoomTask::new(
+            "branch-live-map-test".to_string(),
+            RoomMode::ReplayBranch { seed: seed.clone() },
+            None,
+            false,
+            DrainHandle::default(),
+        );
+        let writer_a = add_branch_occupant(&mut task, 100);
+        let writer_b = add_branch_occupant(&mut task, 101);
+        let writer_spectator = add_branch_occupant(&mut task, 102);
+        let mut staging = BranchStagingState::new(seed);
+        staging.claim(100, players[0].id).unwrap();
+        staging.claim(101, players[1].id).unwrap();
+        task.phase = Phase::BranchStaging(Box::new(staging));
+        task.start_branch_live();
+
+        task.on_command(
+            100,
+            SimCommand::Stop {
+                units: vec![1, 2, 3],
+            },
+        );
+        task.on_command(
+            102,
+            SimCommand::Stop {
+                units: vec![4, 5, 6],
+            },
+        );
+        task.on_tick(TokioInstant::now());
+
+        let snapshot_a = writer_a.snapshots.take().expect("claimed A snapshot");
+        let snapshot_b = writer_b.snapshots.take().expect("claimed B snapshot");
+        let snapshot_spectator = writer_spectator
+            .snapshots
+            .take()
+            .expect("spectator snapshot");
+        let Phase::InGame(game) = &task.phase else {
+            panic!("branch should be live");
+        };
+        assert_eq!(game.command_log().len(), 1);
+        assert_eq!(game.command_log()[0].player_id, players[0].id);
+        assert_eq!(
+            snapshot_a.visible_tiles,
+            game.snapshot_for(players[0].id).visible_tiles
+        );
+        assert_eq!(
+            snapshot_b.visible_tiles,
+            game.snapshot_for(players[1].id).visible_tiles
+        );
+        assert_eq!(
+            snapshot_spectator.visible_tiles,
+            game.snapshot_for_spectator(&[players[0].id, players[1].id])
+                .visible_tiles
+        );
+    }
+
+    #[test]
+    fn branch_live_give_up_resolves_by_original_seat_and_skips_public_history() {
+        let players = replay_test_players(2);
+        let seed = replay_branch_test_seed(&players, 0);
+        let mut task = RoomTask::new(
+            "branch-give-up-test".to_string(),
+            RoomMode::ReplayBranch { seed: seed.clone() },
+            None,
+            false,
+            DrainHandle::default(),
+        );
+        let mut writer_a = add_branch_occupant(&mut task, 100);
+        let _writer_b = add_branch_occupant(&mut task, 101);
+        let mut staging = BranchStagingState::new(seed);
+        staging.claim(100, players[0].id).unwrap();
+        staging.claim(101, players[1].id).unwrap();
+        task.phase = Phase::BranchStaging(Box::new(staging));
+        task.start_branch_live();
+
+        assert!(!task.should_record_match_history());
+        task.on_give_up(100);
+
+        assert!(matches!(task.phase, Phase::ReplayViewer(_)));
+        assert!(
+            std::iter::from_fn(|| writer_a.reliable_rx.try_recv().ok()).any(|msg| {
+                matches!(msg, ServerMessage::GameOver { winner_id: Some(id), you, .. }
+                if id == players[1].id && you == "lost")
+            })
+        );
+        assert!(task.branch_live_seat_by_connection.is_empty());
     }
 
     #[test]
