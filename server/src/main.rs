@@ -765,6 +765,89 @@ mod tests {
         }
     }
 
+    #[tokio::test]
+    async fn join_to_different_room_transfers_connection_and_leaves_previous_room() {
+        let lobby = Lobby::new();
+        let (conn_tx, mut writer) = lobby::ConnectionSink::new();
+        let mut current_room = None;
+        let mut current_room_name = None;
+
+        handle_client_message(
+            TEST_PLAYER_ID,
+            ClientMessage::Join {
+                name: "Transfer Test".to_string(),
+                room: Some("transfer-source".to_string()),
+                spectator: false,
+                replay_ok: false,
+            },
+            &lobby,
+            &conn_tx,
+            &mut current_room,
+            &mut current_room_name,
+        )
+        .await;
+        assert_eq!(current_room_name.as_deref(), Some("transfer-source"));
+        let source_handle = current_room.clone().expect("source room should be joined");
+
+        handle_client_message(
+            TEST_PLAYER_ID,
+            ClientMessage::Join {
+                name: "Transfer Test".to_string(),
+                room: Some("transfer-target".to_string()),
+                spectator: true,
+                replay_ok: false,
+            },
+            &lobby,
+            &conn_tx,
+            &mut current_room,
+            &mut current_room_name,
+        )
+        .await;
+        assert_eq!(current_room_name.as_deref(), Some("transfer-target"));
+        assert!(
+            std::iter::from_fn(|| writer.reliable_rx.try_recv().ok()).any(|msg| {
+                matches!(msg, ServerMessage::Lobby { room, .. } if room == "transfer-target")
+            })
+        );
+
+        let (probe_tx, _probe_writer) = lobby::ConnectionSink::new();
+        let (ack_tx, ack_rx) = tokio::sync::oneshot::channel();
+        source_handle
+            .event_tx
+            .send(RoomEvent::Join {
+                player_id: TEST_PLAYER_ID,
+                name: "Transfer Probe".to_string(),
+                spectator: false,
+                replay_ok: false,
+                msg_tx: probe_tx,
+                ack: ack_tx,
+            })
+            .await
+            .expect("source room should still accept events");
+        assert_eq!(
+            ack_rx.await,
+            Ok(true),
+            "transfer should remove the player from the previous room"
+        );
+
+        source_handle
+            .event_tx
+            .send(RoomEvent::Leave {
+                player_id: TEST_PLAYER_ID,
+            })
+            .await
+            .expect("source cleanup leave should send");
+        if let Some(handle) = current_room {
+            handle
+                .event_tx
+                .send(RoomEvent::Leave {
+                    player_id: TEST_PLAYER_ID,
+                })
+                .await
+                .expect("target cleanup leave should send");
+        }
+    }
+
     #[test]
     fn clean_net_reports_are_not_notable() {
         assert!(!is_notable_net_report(&clean_net_report()));
@@ -1259,18 +1342,17 @@ async fn handle_client_message(
             replay_ok,
             ..
         } => {
-            // Re-joining a different room is not supported; the first join wins. Subsequent
-            // joins from the same connection are ignored to keep room membership unambiguous.
-            if current_room.is_some() {
-                debug!(
-                    player_id,
-                    "ignoring extra join on already-joined connection"
-                );
-                return;
-            }
             let room_name = room
                 .filter(|r| !r.trim().is_empty())
                 .unwrap_or_else(|| DEFAULT_ROOM.to_string());
+            if current_room_name.as_deref() == Some(room_name.as_str()) {
+                debug!(
+                    player_id,
+                    room = %room_name,
+                    "ignoring duplicate join on already-joined connection"
+                );
+                return;
+            }
             let name = sanitize_name(name);
             let handle = match lobby.get_or_create_join_target(&room_name).await {
                 Ok(handle) => handle,
@@ -1286,9 +1368,11 @@ async fn handle_client_message(
                     return;
                 }
             };
+            let previous_room = current_room.clone();
+            let previous_room_name = current_room_name.clone();
             // The room decides whether the join is accepted (it may reject a mid-match join). Wait
-            // for its ack and only mark ourselves joined on `true`, so a rejected join leaves
-            // `current_room` None and the client is free to try another room.
+            // for its ack and only switch membership on `true`, so a rejected transfer leaves the
+            // client in its previous room and a rejected first join leaves it free to try another.
             let (ack_tx, ack_rx) = tokio::sync::oneshot::channel();
             let sent = handle
                 .event_tx
@@ -1308,6 +1392,15 @@ async fn handle_client_message(
             }
             match ack_rx.await {
                 Ok(true) => {
+                    if let Some(previous) = previous_room {
+                        let _ = previous.event_tx.send(RoomEvent::Leave { player_id }).await;
+                        debug!(
+                            player_id,
+                            from = previous_room_name.as_deref().unwrap_or(""),
+                            to = %room_name,
+                            "transferred connection to room"
+                        );
+                    }
                     *current_room = Some(handle);
                     *current_room_name = Some(room_name);
                 }
