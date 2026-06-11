@@ -1,6 +1,21 @@
+attempting to join a replay in progress doesn't give you vision, it's all fog, but when reclaiming position from this all fog mode, the top bar actualy works
+
+when host leaves the replay, it seems to kill the repolay?
+
+
+add an are you sure you want to close the tab, because control w kill the tab
+
+
+
 when one player leaves the match it should watch the replay
 
 mortar teams shoudl should even if they don't hav eline of sight
+
+when resuming from replay, the top bar hud which displayes resources and supply does not work, it's frozen at the dol values
+
+whenresuming from replay, it should rpeserve the camera location form the replay, and not jump back to the camera start location
+
+seeking backwards should also not reset the camera location
 
 
 -----
