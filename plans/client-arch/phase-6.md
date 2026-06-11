@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Pending implementation.
+- [x] Implemented.
 
 ## Objective
 
@@ -34,12 +34,12 @@ the new checks and extracted seams into everyday workflow, not tribal knowledge.
 
 Mark each segment complete as it lands:
 
-- [ ] Update `docs/design/client-ui.md` with the current architecture rules.
-- [ ] Refresh `docs/context/client-ui.md` with the current module map and checker command.
-- [ ] Add the future-client-change checklist covering teardown, imports, command cards, rendering,
+- [x] Update `docs/design/client-ui.md` with the current architecture rules.
+- [x] Refresh `docs/context/client-ui.md` with the current module map and checker command.
+- [x] Add the future-client-change checklist covering teardown, imports, command cards, rendering,
   and mirrored contracts.
-- [ ] Document large-file ratchet handling and suite-selection expectations.
-- [ ] Verify docs links and record the commands/results in the final handoff.
+- [x] Document large-file ratchet handling and suite-selection expectations.
+- [x] Verify docs links and record the commands/results in the final handoff.
 
 ## Verification
 

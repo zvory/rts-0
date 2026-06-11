@@ -357,4 +357,53 @@ and unit layer):
   iconography. Avoid flags, stars, crosses, eagles, skulls, sickles, hammers, and historically
   specific insignia.
 
+### 4.3 Client architecture workflow
+
+Client modules are organized by area and checked by `node scripts/check-client-architecture.mjs`.
+The checker classifies every `client/src/**/*.js` file, reports the largest files and fan-in/out
+baseline, rejects unclassified files, and rejects cross-area imports that are not allowed by rule or
+by an explicit allowlist reason in the script.
+
+Current areas:
+- `app-shell`: `main.js`, `app.js`, `match.js`, match health, replay viewer/control wiring.
+- `model`: `state.js`, `command_composer.js`.
+- `transport`: `net.js`, `protocol.js`.
+- `rules-mirror`: `config.js`.
+- `ui`: HUD, command card, lobby, match history, minimap, status badge, branch staging.
+- `input`: `input/` plus `replay_camera_input.js`.
+- `renderer`: `renderer/`.
+- `platform`: bootstrap, audio, combat audio, alerts, fog, camera.
+
+Import rules:
+- `protocol.js` and `config.js` are shared mirrors and may be imported where needed.
+- Files in the same area may import each other.
+- `app-shell` files may compose other areas; prefer adding new cross-area wiring in `match.js` or
+  `app.js` instead of importing collaborators from feature modules.
+- Non-shell cross-area imports should normally become dependency injection through `Match`, `App`,
+  or a facade. If one is intentional, update `ALLOWED_CROSS_AREA_IMPORTS` in
+  `scripts/check-client-architecture.mjs` with a reason.
+
+Future client changes should use this checklist:
+- Did this add a DOM/window listener, timer, WebSocket handler, Pixi object, texture, or other GPU
+  resource? Add or update `destroy()`, and make sure `Match.destroy()` or the owning shell calls it.
+- Did this add a non-shell cross-area import? Prefer dependency injection through `Match`/`App`; if
+  an import is still the right tradeoff, add a checker allowlist reason.
+- Did this change command-card behavior? Add descriptor coverage or DOM contract coverage for the
+  visible command-card contract.
+- Did this change rendering? Run the client smoke suite and add a targeted check where practical.
+- Did this touch `protocol.js` or `config.js`? Update the mirrored server file and the relevant
+  design/context docs in the same change.
+
+Large-file handling is ratcheted, not churn-driven. Do not split a large file only to reduce byte
+count. When adding behavior to an already large file, first look for a focused collaborator,
+descriptor, or area-local helper that reduces coupling. Update checker baselines or allowlists only
+with a written reason in the script and the change handoff.
+
+Client-related suite selection lives in `tests/select-suites.mjs`. For `client/src/` changes it
+selects `client-architecture`, `js-protocol-contracts`, `node-minimap-input-contracts`, and
+`client-smoke`; client transport/protocol changes also select `node-server-integration`.
+Architecture-policy files such as `scripts/check-client-architecture.mjs`,
+`tests/select-suites.mjs`, and `plans/client-arch/*` select `client-architecture`. Docs-only
+changes select `docs-only` unless another rule applies.
+
 ---
