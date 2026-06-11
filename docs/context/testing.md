@@ -61,6 +61,44 @@ open "http://localhost:<port>/dev/selfplay?replay=manual_worker_rush_latest"
 
 Do **not** use the Browser skill for this flow.
 
+## Dev scenarios
+Game-backed dev scenarios are live, no-fog watcher rooms for inspecting authored simulation
+situations through the normal Pixi client. Start a local server, then open the index:
+
+```
+open "http://localhost:<port>/dev/scenarios"
+```
+
+The index lists every supported launch and links to the current URL shape:
+
+```
+/dev/scenarios?id=<scenario_id>&unit=<unit>&count=<count>[&blocker=<unit|none>]
+```
+
+The handler redirects into the normal client with `watchScenario=1`; the client auto-joins a
+reserved spectator room named:
+
+```
+__dev_scenario__:<scenario_id>:unit=<unit>:count=<count>[:blocker=<unit|none>]
+```
+
+Current scenario ids:
+
+- `scout_car_snaking_corridor` — movement/pathing through the snaking stone corridor.
+- `direct_reverse_order` — one vehicle ordered directly behind its current facing.
+- `scout_car_wall_chokepoint` — vehicle groups moving through a narrow wall gap.
+- `vehicle_corner_wall` — vehicle groups cornering around a wall spur.
+- `vehicle_small_block_baseline` — vehicles moving through optional small-unit blockers.
+- `factory_zero_gap_perpendicular` — one vehicle starting flush against a factory and moving east.
+
+The watcher shows movement debug path overlays by default. Replay speed controls are reused for
+dev scenarios: `Pause` sets the simulation speed to zero, and `Step` advances exactly one
+authoritative tick while paused. Normal seek/reset controls are replay-only.
+
+Scenario setup is server-side only under `server/crates/sim/src/game/setup/dev_scenarios.rs`; do
+not expose arbitrary spawning or map editing through client commands. Scenario artifact recording
+under `target/scenario-artifacts/` is not currently implemented.
+
 ## Gotchas
 - A 1-player match is a never-ending sandbox; only 2+ player matches resolve to a winner.
 - Empty rooms reset to lobby so a room name is never stuck mid-match.
