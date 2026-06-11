@@ -640,19 +640,30 @@ export function drawRotatedLine(g, cx, cy, x1, y1, x2, y2, a) {
   g.lineTo(cx + p2.x, cy + p2.y);
 }
 
-export function drawFacingWedge(g, x, y, radius, facing, width, color, fillAlpha, lineAlpha) {
+export function drawFacingWedge(g, x, y, radius, facing, width, color, fillAlpha, lineAlpha, innerRadius = 0) {
   const half = width / 2;
   const start = facing - half;
   const end = facing + half;
+  const inner = Math.max(0, Math.min(innerRadius || 0, radius));
   const sx = x + Math.cos(start) * radius;
   const sy = y + Math.sin(start) * radius;
 
   g.lineStyle(1.5, color, lineAlpha);
   g.beginFill(color, fillAlpha);
-  g.moveTo(x, y);
-  g.lineTo(sx, sy);
-  g.arc(x, y, radius, start, end);
-  g.lineTo(x, y);
+  if (inner > 0) {
+    const exInner = x + Math.cos(end) * inner;
+    const eyInner = y + Math.sin(end) * inner;
+    g.moveTo(sx, sy);
+    g.arc(x, y, radius, start, end);
+    g.lineTo(exInner, eyInner);
+    g.arc(x, y, inner, end, start, true);
+    g.lineTo(sx, sy);
+  } else {
+    g.moveTo(x, y);
+    g.lineTo(sx, sy);
+    g.arc(x, y, radius, start, end);
+    g.lineTo(x, y);
+  }
   g.endFill();
 }
 

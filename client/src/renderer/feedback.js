@@ -9,6 +9,7 @@ import {
   AT_GUN_FIELD_OF_FIRE_RAD,
   ARTILLERY_FIELD_OF_FIRE_RAD,
   ARTILLERY_MAX_RANGE_TILES,
+  ARTILLERY_MIN_RANGE_TILES,
   ABILITIES,
   MORTAR_INNER_RADIUS_TILES,
   MINING_CC_RANGE_TILES,
@@ -54,6 +55,7 @@ import {
 } from "./shared.js";
 
 const MORTAR_WARNING_COLOR = 0x9f1f1f;
+const FIELD_OF_FIRE_COLOR = 0x4aa3ff;
 
 export function _drawPlacement(state, fog) {
   const g = this._placementGfx;
@@ -263,20 +265,26 @@ export function _drawAtGunSetupPreview(state) {
   if (!state || typeof state.selectedEntities !== "function") return;
   const g = this._feedbackGfx;
   const tileSize = (this._map && this._map.tileSize) || 32;
-  const radius = AT_GUN_DEPLOYED_RANGE_TILES * tileSize;
-  const color = 0x4aa3ff;
 
   for (const e of state.selectedEntities()) {
     if (e.owner !== state.playerId || (e.kind !== KIND.AT_TEAM && e.kind !== KIND.ARTILLERY)) continue;
     if (e.setupState !== SETUP.DEPLOYED) continue;
     const facing = finiteNumber(e.setupFacing) ? e.setupFacing : finiteNumber(e.facing) ? e.facing : null;
     if (facing == null) continue;
-    const weaponRadius = e.kind === KIND.ARTILLERY
-      ? ARTILLERY_MAX_RANGE_TILES * tileSize
-      : radius;
-    const weaponArc = e.kind === KIND.ARTILLERY ? ARTILLERY_FIELD_OF_FIRE_RAD : AT_GUN_FIELD_OF_FIRE_RAD;
-    const weaponColor = e.kind === KIND.ARTILLERY ? 0xffd15c : color;
-    drawFacingWedge(g, e.x, e.y, weaponRadius, facing, weaponArc, weaponColor, 0.045, 0.2);
+    const weapon = fieldOfFireProfile(e.kind, tileSize);
+    if (!weapon) continue;
+    drawFacingWedge(
+      g,
+      e.x,
+      e.y,
+      weapon.maxRadius,
+      facing,
+      weapon.arc,
+      FIELD_OF_FIRE_COLOR,
+      0.045,
+      0.2,
+      weapon.minRadius,
+    );
   }
 
   const preview = state.atGunSetupPreview;
@@ -285,7 +293,20 @@ export function _drawAtGunSetupPreview(state) {
     if (!finiteNumber(e.x) || !finiteNumber(e.y)) continue;
     const facing = Math.atan2(preview.mouseY - e.y, preview.mouseX - e.x);
     if (!Number.isFinite(facing)) continue;
-    drawFacingWedge(g, e.x, e.y, radius, facing, AT_GUN_FIELD_OF_FIRE_RAD, color, 0.16, 0.58);
+    const weapon = fieldOfFireProfile(e.kind, tileSize);
+    if (!weapon) continue;
+    drawFacingWedge(
+      g,
+      e.x,
+      e.y,
+      weapon.maxRadius,
+      facing,
+      weapon.arc,
+      FIELD_OF_FIRE_COLOR,
+      0.16,
+      0.58,
+      weapon.minRadius,
+    );
   }
 }
 
@@ -293,29 +314,31 @@ export function _drawAbilityTargetPreview(state) {
   const preview = state?.abilityTargetPreview;
   if (!preview || !Array.isArray(preview.carriers)) return;
   const g = this._feedbackGfx;
-  const rangeColor = 0x6fa3ff;
+  const rangeColor = FIELD_OF_FIRE_COLOR;
   const minRangeColor = 0x8f2d2a;
 
   for (const carrier of preview.carriers) {
     if (!finiteNumber(carrier.x) || !finiteNumber(carrier.y)) continue;
-    g.lineStyle(1.5, rangeColor, 0.85);
-    dashedCircle(g, carrier.x, carrier.y, preview.rangePx, 64);
-    if (preview.minRangePx > 0) {
-      g.lineStyle(1.3, minRangeColor, 0.82);
-      dashedCircle(g, carrier.x, carrier.y, preview.minRangePx, 42);
-      const facing = Math.atan2(preview.mouseY - carrier.y, preview.mouseX - carrier.x);
-      if (preview.ability === ABILITY.POINT_FIRE && Number.isFinite(facing)) {
-        drawFacingWedge(
-          g,
-          carrier.x,
-          carrier.y,
-          preview.rangePx,
-          facing,
-          ARTILLERY_FIELD_OF_FIRE_RAD,
-          0xffd15c,
-          0.035,
-          0.22,
-        );
+    const facing = Math.atan2(preview.mouseY - carrier.y, preview.mouseX - carrier.x);
+    if (preview.ability === ABILITY.POINT_FIRE && Number.isFinite(facing)) {
+      drawFacingWedge(
+        g,
+        carrier.x,
+        carrier.y,
+        preview.rangePx,
+        facing,
+        ARTILLERY_FIELD_OF_FIRE_RAD,
+        FIELD_OF_FIRE_COLOR,
+        0.06,
+        0.38,
+        preview.minRangePx,
+      );
+    } else {
+      g.lineStyle(1.5, rangeColor, 0.85);
+      dashedCircle(g, carrier.x, carrier.y, preview.rangePx, 64);
+      if (preview.minRangePx > 0) {
+        g.lineStyle(1.3, minRangeColor, 0.82);
+        dashedCircle(g, carrier.x, carrier.y, preview.minRangePx, 42);
       }
     }
   }
@@ -340,6 +363,24 @@ export function _drawAbilityTargetPreview(state) {
     g.moveTo(preview.mouseX, preview.mouseY - radiusPx * 0.45);
     g.lineTo(preview.mouseX, preview.mouseY + radiusPx * 0.45);
   }
+}
+
+function fieldOfFireProfile(kind, tileSize) {
+  if (kind === KIND.ARTILLERY) {
+    return {
+      minRadius: ARTILLERY_MIN_RANGE_TILES * tileSize,
+      maxRadius: ARTILLERY_MAX_RANGE_TILES * tileSize,
+      arc: ARTILLERY_FIELD_OF_FIRE_RAD,
+    };
+  }
+  if (kind === KIND.AT_TEAM) {
+    return {
+      minRadius: 0,
+      maxRadius: AT_GUN_DEPLOYED_RANGE_TILES * tileSize,
+      arc: AT_GUN_FIELD_OF_FIRE_RAD,
+    };
+  }
+  return null;
 }
 
 export function _drawSelectedMortarRanges(state) {
