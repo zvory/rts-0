@@ -271,6 +271,7 @@ fn artillery_target_is_owner_only_and_impact_is_global_visual_event() {
 
     let mut owner_saw_target = false;
     let mut enemy_saw_target = false;
+    let mut enemy_saw_artillery_reveal = false;
     let mut owner_saw_impact = false;
     let mut enemy_saw_impact = false;
     for _ in 0..(config::ARTILLERY_SETUP_TICKS as u32 + config::ARTILLERY_SHELL_DELAY_TICKS + 8) {
@@ -279,6 +280,13 @@ fn artillery_target_is_owner_only_and_impact_is_global_visual_event() {
                 match event {
                     Event::ArtilleryTarget { .. } if pid == 1 => owner_saw_target = true,
                     Event::ArtilleryTarget { .. } if pid == 2 => enemy_saw_target = true,
+                    Event::Attack {
+                        from,
+                        reveal: Some(reveal),
+                        ..
+                    } if pid == 2 && from == artillery && reveal.kind == kinds::ARTILLERY => {
+                        enemy_saw_artillery_reveal = true
+                    }
                     Event::ArtilleryImpact { .. } if pid == 1 => owner_saw_impact = true,
                     Event::ArtilleryImpact { .. } if pid == 2 => enemy_saw_impact = true,
                     _ => {}
@@ -294,6 +302,10 @@ fn artillery_target_is_owner_only_and_impact_is_global_visual_event() {
     assert!(
         !enemy_saw_target,
         "enemy should never receive pre-impact artillery target marker"
+    );
+    assert!(
+        enemy_saw_artillery_reveal,
+        "enemy should briefly see the firing artillery even through fog"
     );
     assert!(owner_saw_impact, "owner should see delayed impact");
     assert!(
