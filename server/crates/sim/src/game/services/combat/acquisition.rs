@@ -204,15 +204,23 @@ fn target_currently_fireable(
     !smokes.point_inside(px, py)
         && !smokes.point_inside(target.pos_x, target.pos_y)
         && target_visible_to_owner(fog, smokes, owner, target)
-        && los.clear_between_world_points((px, py), (target.pos_x, target.pos_y))
-        && !friendly_hard_blocker_between(
-            map,
-            entities,
-            self_id,
-            owner,
-            (px, py),
-            (target.pos_x, target.pos_y),
-        )
+        && (attacker_uses_indirect_fire(entities, self_id)
+            || (los.clear_between_world_points((px, py), (target.pos_x, target.pos_y))
+                && !friendly_hard_blocker_between(
+                    map,
+                    entities,
+                    self_id,
+                    owner,
+                    (px, py),
+                    (target.pos_x, target.pos_y),
+                )))
+}
+
+fn attacker_uses_indirect_fire(entities: &EntityStore, self_id: u32) -> bool {
+    matches!(
+        entities.get(self_id).map(|e| e.kind),
+        Some(EntityKind::MortarTeam)
+    )
 }
 
 fn target_visible_to_owner(

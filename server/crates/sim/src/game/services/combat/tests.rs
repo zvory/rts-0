@@ -1410,6 +1410,73 @@ fn mortar_autocast_fires_when_predicted_impact_is_clear_of_owned_entities() {
 }
 
 #[test]
+fn mortar_autocast_fires_over_blocking_terrain_with_spotter_vision() {
+    let map = map_with_rock_at((4, 3));
+    let mortar_pos = map.tile_center(2, 3);
+    let target_pos = map.tile_center(6, 3);
+    let spotter_pos = map.tile_center(6, 6);
+    let mut entities = EntityStore::new();
+    let mortar_id = entities
+        .spawn_unit(1, EntityKind::MortarTeam, mortar_pos.0, mortar_pos.1)
+        .expect("mortar should spawn");
+    entities
+        .spawn_unit(2, EntityKind::Rifleman, target_pos.0, target_pos.1)
+        .expect("enemy should spawn");
+    entities
+        .spawn_unit(1, EntityKind::Rifleman, spotter_pos.0, spotter_pos.1)
+        .expect("spotter should spawn");
+    if let Some(mortar) = entities.get_mut(mortar_id) {
+        mortar.set_facing(0.0);
+        mortar.set_weapon_facing(0.0);
+        mortar.set_weapon_setup(WeaponSetup::Deployed);
+    }
+
+    run_combat_tick_on_map(
+        &mut entities,
+        &[player_state(1, false), player_state(2, false)],
+        &map,
+    );
+
+    let mortar = entities.get(mortar_id).expect("mortar should exist");
+    assert!(
+        mortar.attack_cd() > 0,
+        "mortar autocast should fire indirectly at owner-visible targets behind LOS blockers"
+    );
+}
+
+#[test]
+fn mortar_autocast_does_not_fire_at_hidden_target_behind_blocking_terrain() {
+    let map = map_with_rock_at((4, 3));
+    let mortar_pos = map.tile_center(2, 3);
+    let target_pos = map.tile_center(6, 3);
+    let mut entities = EntityStore::new();
+    let mortar_id = entities
+        .spawn_unit(1, EntityKind::MortarTeam, mortar_pos.0, mortar_pos.1)
+        .expect("mortar should spawn");
+    entities
+        .spawn_unit(2, EntityKind::Rifleman, target_pos.0, target_pos.1)
+        .expect("enemy should spawn");
+    if let Some(mortar) = entities.get_mut(mortar_id) {
+        mortar.set_facing(0.0);
+        mortar.set_weapon_facing(0.0);
+        mortar.set_weapon_setup(WeaponSetup::Deployed);
+    }
+
+    run_combat_tick_on_map(
+        &mut entities,
+        &[player_state(1, false), player_state(2, false)],
+        &map,
+    );
+
+    let mortar = entities.get(mortar_id).expect("mortar should exist");
+    assert_eq!(
+        mortar.attack_cd(),
+        0,
+        "mortar autocast should still require the target to be visible to the owner"
+    );
+}
+
+#[test]
 fn mortar_autocast_disabled_holds_fire_without_blocking_manual_state() {
     let mut entities = EntityStore::new();
     let mortar_id = entities
