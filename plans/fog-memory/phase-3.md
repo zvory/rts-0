@@ -1,6 +1,6 @@
 # Phase 3: Expose Remembered Building Intel To The Client
 
-Status: planned
+Status: implemented with phase 2 after artillery targeting semantics were clarified
 
 ## Goal
 
@@ -54,6 +54,13 @@ feedback, targeting affordances, or stale silhouettes under fog.
 
 ## Handoff
 
-The handoff should document the snapshot shape, compact protocol version, client rendering behavior,
-and any deliberate non-interactive restrictions. It should point the next agent to the accepted UI
-behavior before pathing work begins.
+Snapshot shape: `Snapshot.rememberedBuildings` / compact `mb` contains
+`{ id, owner, kind, x, y, footprint, observedTick }` for recipient-only remembered enemy buildings
+that are not currently visible as live entities. Compact snapshot version is 17.
+
+Client rendering behavior: remembered buildings are stored outside the live entity index and drawn
+as dim, non-selectable footprint silhouettes beneath the fog overlay. They are not selection or
+attack-target entities.
+
+Restriction: records intentionally omit hidden live HP, current build progress, and destruction
+state. Hidden destruction remains stale until the remembered footprint is scouted again.

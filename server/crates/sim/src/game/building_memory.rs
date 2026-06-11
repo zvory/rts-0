@@ -61,15 +61,10 @@ impl BuildingMemory {
         });
     }
 
-    pub(crate) fn get(
-        &self,
-        player_id: u32,
-        building_id: u32,
-    ) -> Option<&BuildingMemoryEntry> {
+    pub(crate) fn get(&self, player_id: u32, building_id: u32) -> Option<&BuildingMemoryEntry> {
         self.entries.get(&(player_id, building_id))
     }
 
-    #[cfg(test)]
     pub(crate) fn entries_for_player(
         &self,
         player_id: u32,
@@ -79,6 +74,14 @@ impl BuildingMemory {
             .filter_map(move |(&(entry_player, _), entry)| {
                 (entry_player == player_id).then_some(entry)
             })
+    }
+
+    #[cfg(test)]
+    pub(crate) fn entries_for_player_for_test(
+        &self,
+        player_id: u32,
+    ) -> impl Iterator<Item = &BuildingMemoryEntry> {
+        self.entries_for_player(player_id)
     }
 }
 
@@ -167,7 +170,10 @@ mod tests {
         assert_eq!(entry.owner, 2);
         assert_eq!(entry.kind, EntityKind::Depot);
         assert_eq!((entry.x, entry.y), depot_pos);
-        assert_eq!(entry.hp, config::building_stats(EntityKind::Depot).unwrap().hp);
+        assert_eq!(
+            entry.hp,
+            config::building_stats(EntityKind::Depot).unwrap().hp
+        );
         assert_eq!(
             entry.max_hp,
             config::building_stats(EntityKind::Depot).unwrap().hp
@@ -177,7 +183,9 @@ mod tests {
         assert_eq!(entry.observed_tick, 7);
         assert!(!entry.footprint.is_empty());
         assert!(
-            memory.entries_for_player(2).all(|entry| entry.id != depot),
+            memory
+                .entries_for_player_for_test(2)
+                .all(|entry| entry.id != depot),
             "owners do not record their own buildings as enemy memory"
         );
     }

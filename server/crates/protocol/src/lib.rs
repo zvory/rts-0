@@ -12,8 +12,8 @@ use serde::{Deserialize, Serialize};
 pub use rts_contract::{
     AbilityCooldownView, AttackReveal, DebugPathPoint, DebugPathView, EntityView, Event, MapInfo,
     NoticeSeverity, OrderPlanMarker, PlayerResourceSnapshot, PlayerScore, PlayerStart,
-    ReplayPlaybackState, ReplayStartMetadata, ResourceDelta, ResourceNode, SmokeCloudView,
-    Snapshot, SnapshotNetStatus, StartPayload,
+    RememberedBuildingView, ReplayPlaybackState, ReplayStartMetadata, ResourceDelta, ResourceNode,
+    SmokeCloudView, Snapshot, SnapshotNetStatus, StartPayload,
 };
 
 fn is_false(value: &bool) -> bool {
@@ -416,7 +416,7 @@ pub struct LobbyPlayer {
 ///
 /// [`Snapshot`] remains the semantic source of truth for game code. This format is only a
 /// transport-side optimization for `ServerMessage::Snapshot`.
-pub const COMPACT_SNAPSHOT_VERSION: u8 = 16;
+pub const COMPACT_SNAPSHOT_VERSION: u8 = 17;
 
 /// Serialize one semantic snapshot as a compact JSON text frame payload.
 pub fn serialize_compact_snapshot(snapshot: &Snapshot) -> serde_json::Result<String> {
@@ -477,6 +477,16 @@ impl Serialize for CompactSnapshot<'_> {
         if !snapshot.visible_tiles.is_empty() {
             map.serialize_entry("fg", &encode_visibility_runs(&snapshot.visible_tiles))?;
         }
+        if !snapshot.remembered_buildings.is_empty() {
+            map.serialize_entry(
+                "mb",
+                &snapshot
+                    .remembered_buildings
+                    .iter()
+                    .map(CompactRememberedBuilding)
+                    .collect::<Vec<_>>(),
+            )?;
+        }
         if !snapshot.events.is_empty() {
             map.serialize_entry(
                 "ev",
@@ -527,6 +537,26 @@ fn encode_visibility_runs(visible_tiles: &[u8]) -> Vec<u32> {
     }
     runs.push(len);
     runs
+}
+
+struct CompactRememberedBuilding<'a>(&'a RememberedBuildingView);
+
+impl Serialize for CompactRememberedBuilding<'_> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let building = self.0;
+        let mut seq = serializer.serialize_seq(Some(7))?;
+        seq.serialize_element(&building.id)?;
+        seq.serialize_element(&building.owner)?;
+        seq.serialize_element(&kind_code(&building.kind))?;
+        seq.serialize_element(&building.x)?;
+        seq.serialize_element(&building.y)?;
+        seq.serialize_element(&building.footprint)?;
+        seq.serialize_element(&building.observed_tick)?;
+        seq.end()
+    }
 }
 
 struct CompactSmokeCloud<'a>(&'a SmokeCloudView);
@@ -1162,7 +1192,10 @@ mod tests {
         let start: ClientMessage =
             serde_json::from_str(r#"{"t":"startBranch"}"#).expect("startBranch should deserialize");
 
-        assert!(matches!(claim, ClientMessage::ClaimBranchSeat { player_id: 7 }));
+        assert!(matches!(
+            claim,
+            ClientMessage::ClaimBranchSeat { player_id: 7 }
+        ));
         assert!(matches!(
             release,
             ClientMessage::ReleaseBranchSeat { player_id: 7 }
@@ -1327,6 +1360,15 @@ mod tests {
                 expires_in: 120,
             }],
             visible_tiles: vec![1, 1, 0, 0, 0, 1],
+            remembered_buildings: vec![RememberedBuildingView {
+                id: 99,
+                owner: 2,
+                kind: kinds::DEPOT.to_string(),
+                x: 640.0,
+                y: 672.0,
+                footprint: vec![[20, 21], [21, 21]],
+                observed_tick: 39,
+            }],
             events: vec![
                 Event::Attack {
                     from: 1,
@@ -1441,6 +1483,10 @@ mod tests {
             serde_json::json!([[50, 320.0, 352.0, 2.0, 120]])
         );
         assert_eq!(value["fg"], serde_json::json!([1, 2, 3, 1]));
+        assert_eq!(
+            value["mb"],
+            serde_json::json!([[99, 2, 7, 640.0, 672.0, [[20, 21], [21, 21]], 39]])
+        );
         assert_eq!(value["u"], serde_json::json!([4]));
         assert_eq!(value["ev"].as_array().unwrap().len(), 7);
         assert_eq!(value["n"], serde_json::json!([4, 17, 2, 2, 3]));
@@ -1481,6 +1527,7 @@ mod tests {
             resource_deltas: Vec::new(),
             smokes: Vec::new(),
             visible_tiles: Vec::new(),
+            remembered_buildings: Vec::new(),
             events: Vec::new(),
             upgrades: Vec::new(),
             player_resources: Vec::new(),

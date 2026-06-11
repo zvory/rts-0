@@ -128,3 +128,47 @@ export function _drawBuilding(e, colorByOwner, state) {
   const queueDepth = (e.prodQueue ?? 0) - 1;
   this._queueLabel(e, e.x, y0 + 14, queueDepth, bodyAlpha);
 }
+
+export function _drawRememberedBuilding(e, colorByOwner) {
+  const stat = STATS[e.kind] || {};
+  const ts = (this._map && this._map.tileSize) || 32;
+  const w = (stat.footW || 2) * ts;
+  const h = (stat.footH || 2) * ts;
+  const tint = this._tintFor(e.owner, colorByOwner);
+  const x0 = e.x - w / 2;
+  const y0 = e.y - h / 2;
+  const alpha = 0.34;
+
+  const sh = this._slot("buildingShadows", e.id);
+  sh.position.set(0, 0);
+  sh.beginFill(COLORS.shadow, 0.12);
+  sh.drawRect(x0 + 3, y0 + 5, w, h);
+  sh.endFill();
+
+  const g = this._slot("buildings", e.id);
+  g.position.set(0, 0);
+  g.lineStyle(0);
+  g.beginFill(0x11141a, 0.2);
+  g.drawRect(x0, y0, w, h);
+  g.endFill();
+  g.beginFill(tint, alpha);
+  if (Array.isArray(e.footprint) && e.footprint.length > 0) {
+    for (const tile of e.footprint) {
+      if (!Array.isArray(tile) || tile.length < 2) continue;
+      const tx = tile[0];
+      const ty = tile[1];
+      if (!Number.isFinite(tx) || !Number.isFinite(ty)) continue;
+      g.drawRect(tx * ts + 2, ty * ts + 2, ts - 4, ts - 4);
+    }
+  } else {
+    g.drawRect(x0 + 2, y0 + 2, w - 4, h - 4);
+  }
+  g.endFill();
+
+  g.lineStyle(2, 0xc8c0a8, 0.34);
+  g.drawRect(x0 + 1, y0 + 1, w - 2, h - 2);
+  g.lineStyle(1, tint, 0.32);
+  g.drawRect(x0 + 5, y0 + 5, w - 10, h - 10);
+
+  this._icon(e, e.x, e.y, Math.min(w, h) * 0.44, 0.32);
+}

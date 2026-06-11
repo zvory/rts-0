@@ -33,8 +33,8 @@ use std::collections::{BTreeSet, HashMap};
 
 use crate::config;
 use crate::protocol::{
-    Event, MapInfo, PlayerResourceSnapshot, PlayerScore, PlayerStart, ResourceDelta, ResourceNode,
-    Snapshot, StartPayload,
+    Event, MapInfo, PlayerResourceSnapshot, PlayerScore, PlayerStart, RememberedBuildingView,
+    ResourceDelta, ResourceNode, Snapshot, StartPayload,
 };
 use crate::rules::{economy as economy_rules, projection};
 use serde::{Deserialize, Serialize};
@@ -410,5 +410,7 @@ impl Game {
     }
 }
 
+#[cfg(test)]
+mod snapshot_memory_tests;
 #[cfg(test)]
 mod tests;

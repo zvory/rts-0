@@ -164,7 +164,7 @@ export const REPLAY_VISION = Object.freeze({
 });
 
 // --- Compact snapshot wire schema (must match protocol.rs) ---
-export const COMPACT_SNAPSHOT_VERSION = 16;
+export const COMPACT_SNAPSHOT_VERSION = 17;
 
 export const KIND_CODE = Object.freeze({
   [KIND.WORKER]: 1,
@@ -286,6 +286,8 @@ const MAX_COMPACT_ORDER_PLAN = 9;
 const MAX_COMPACT_ABILITIES = 8;
 const MAX_COMPACT_DEBUG_WAYPOINTS = 128;
 const MAX_COMPACT_VISIBLE_TILES = 65536;
+const MAX_COMPACT_REMEMBERED_BUILDINGS = 20000;
+const MAX_COMPACT_BUILDING_FOOTPRINT = 64;
 
 /**
  * Expand server messages into the semantic shapes the rest of the client expects.
@@ -322,6 +324,11 @@ function decodeCompactSnapshot(raw) {
     ).map(decodeCompactResourceDelta),
     smokes: readOptionalArray(raw.sm, "smokes", MAX_COMPACT_SMOKES).map(decodeCompactSmoke),
     visibleTiles: decodeVisibilityRuns(raw.fg),
+    rememberedBuildings: readOptionalArray(
+      raw.mb,
+      "rememberedBuildings",
+      MAX_COMPACT_REMEMBERED_BUILDINGS,
+    ).map(decodeCompactRememberedBuilding),
     events: readOptionalArray(raw.ev, "events", MAX_COMPACT_EVENTS).map(decodeCompactEvent),
     playerResources: readOptionalArray(raw.pr, "playerResources", 32).map(
       decodeCompactPlayerResource,
@@ -350,6 +357,33 @@ function decodeVisibilityRuns(record) {
     value = value === 1 ? 0 : 1;
   }
   return out;
+}
+
+function decodeCompactRememberedBuilding(record, index) {
+  const fields = readArray(record, `remembered building ${index}`, 7);
+  if (fields.length !== 7) throw new Error(`remembered building ${index} field count mismatch`);
+  return {
+    id: readU32(fields[0], "rememberedBuilding.id"),
+    owner: readU32(fields[1], "rememberedBuilding.owner"),
+    kind: readCode(fields[2], KIND_BY_CODE, "rememberedBuilding.kind"),
+    x: readNumber(fields[3], "rememberedBuilding.x"),
+    y: readNumber(fields[4], "rememberedBuilding.y"),
+    footprint: readArray(
+      fields[5],
+      "rememberedBuilding.footprint",
+      MAX_COMPACT_BUILDING_FOOTPRINT,
+    ).map((tile, tileIndex) => {
+      const pair = readArray(tile, `rememberedBuilding.footprint.${tileIndex}`, 2);
+      if (pair.length !== 2) {
+        throw new Error(`rememberedBuilding.footprint.${tileIndex} field count mismatch`);
+      }
+      return [
+        readU32(pair[0], `rememberedBuilding.footprint.${tileIndex}.x`),
+        readU32(pair[1], `rememberedBuilding.footprint.${tileIndex}.y`),
+      ];
+    }),
+    observedTick: readU32(fields[6], "rememberedBuilding.observedTick"),
+  };
 }
 
 function decodeCompactSmoke(record, index) {
