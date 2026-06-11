@@ -29,12 +29,33 @@ Move network-health bookkeeping out of `Match` into a small, non-visual collabor
   - slow tick/head-of-line server status propagation
   - status payload shape
 
+## Implementation Segments
+
+Mark each segment complete as it lands:
+
+- [ ] Add `MatchHealth` with the agreed constructor and public methods.
+- [ ] Move latency, jitter, server-status, and issue-state bookkeeping out of `Match`.
+- [ ] Keep `StatusBadge` and visible status payload shape unchanged.
+- [ ] Add focused dependency-free tests for the health thresholds and payloads.
+- [ ] Run verification and record whether client smoke was run or skipped.
+
 ## Verification
 
 - `node tests/client_contracts.mjs`
 - `node scripts/check-client-architecture.mjs` if Phase 1 has landed
 - `node tests/select-suites.mjs client/src/match.js client/src/match_health.js`
 - Client smoke when practical.
+
+## Manual Test Prompt
+
+At handoff, ask the user to do this quick browser check:
+
+> Manual testing requested, 5-10 minutes:
+> 1. Start or join a match and leave it running for about one minute.
+> 2. Watch the status badge and confirm it still appears, updates, and clears normally.
+> 3. Switch tabs briefly, return to the match, and confirm the badge does not get stuck in a stale
+>    warning state.
+> 4. Report any missing badge text, persistent warning after recovery, or console error.
 
 ## Safety Notes
 

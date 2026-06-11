@@ -21,6 +21,16 @@ neutral module instead of under `input/`.
 - If Phase 1 has landed, remove the `state -> input/command_composer.js` allowlist entry instead of
   adding a permanent exception.
 
+## Implementation Segments
+
+Mark each segment complete as it lands:
+
+- [ ] Move `command_composer.js` to the neutral client path without changing its public API.
+- [ ] Update all client, test, and docs imports or path references.
+- [ ] Remove the old architecture-checker allowlist entry if Phase 1 has landed.
+- [ ] Run command-targeting, minimap, and context-menu contract tests.
+- [ ] Run client smoke when practical and record any skipped verification with a reason.
+
 ## Verification
 
 - `rg "input/command_composer|./command_composer|../client/src/input/command_composer" client tests docs`
@@ -31,6 +41,18 @@ neutral module instead of under `input/`.
 - Client smoke when practical:
   - start the server
   - `node tests/client_smoke.mjs`
+
+## Manual Test Prompt
+
+At handoff, ask the user to do this quick browser check:
+
+> Manual testing requested, 5-10 minutes:
+> 1. Start a match and select units that can receive targeted commands.
+> 2. Use a command-card targeted ability/order, then click in the world and confirm the order still
+>    issues.
+> 3. Shift-issue a targeted order and confirm queued behavior still works.
+> 4. Click the minimap to issue or route a command if the selected units support it.
+> 5. Report any stuck targeting cursor, lost Shift queueing, or console error.
 
 ## Safety Notes
 
