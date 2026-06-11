@@ -13,6 +13,7 @@ export class ReplayControls {
     this.replaySeekPending = false;
     this.replaySeekTargetTick = null;
     this.replaySpeedHandler = null;
+    this.lastReplaySpeed = 2;
 
     if (!dom.replaySpeed || (!this.isReplay && !this.isScenario)) return;
 
@@ -48,16 +49,31 @@ export class ReplayControls {
       this.net.seekReplay(ticksBack);
       return;
     }
+    if (btn.dataset.replayPauseToggle !== undefined) {
+      if (!this.isReplay) return;
+      const speed = this.isReplayPaused() ? this.lastReplaySpeed : 0;
+      this.net.setReplaySpeed(speed);
+      this.replayState = { ...(this.replayState || {}), speed, paused: speed === 0 };
+      this.setReplaySpeedActive(speed);
+      this.updateReplayPauseButton();
+      this.updateReplayStatus();
+      return;
+    }
     const speed = parseFloat(btn.dataset.speed);
     if (!isFinite(speed)) return;
     if (speed === 0 && !this.isScenario) return;
+    if (this.isReplay && speed > 0) this.lastReplaySpeed = speed;
     this.net.setReplaySpeed(speed);
+    if (this.isReplay) this.replayState = { ...(this.replayState || {}), speed, paused: speed === 0 };
     this.setReplaySpeedActive(speed);
+    this.updateReplayPauseButton();
+    this.updateReplayStatus();
   }
 
   applyReplayState(state) {
     this.replayState = state || null;
     this.setReplaySeekPending(null, false);
+    if (Number.isFinite(state?.speed) && state.speed > 0) this.lastReplaySpeed = state.speed;
     const ended =
       state?.ended === true ||
       (Number.isFinite(state?.currentTick) &&
@@ -66,6 +82,7 @@ export class ReplayControls {
         state.currentTick >= state.durationTicks);
     this.setReplayConcluded(ended);
     if (Number.isFinite(state?.speed)) this.setReplaySpeedActive(state.speed);
+    this.updateReplayPauseButton();
     this.updateReplayStatus();
     this.updateReplayTimeline();
   }
@@ -85,6 +102,7 @@ export class ReplayControls {
   setReplaySpeedActive(speed) {
     if (!dom.replaySpeed) return;
     for (const btn of dom.replaySpeed.querySelectorAll(".spd-btn:not(.seek-btn)")) {
+      if (btn.dataset.speed === undefined) continue;
       const btnSpeed = parseFloat(btn.dataset.speed);
       btn.classList.toggle(
         "active",
@@ -93,14 +111,37 @@ export class ReplayControls {
     }
   }
 
+  isReplayPaused() {
+    return this.replayState?.paused === true || this.replayState?.speed === 0;
+  }
+
+  updateReplayPauseButton() {
+    const btn = dom.replaySpeed?.querySelector(".replay-pause-btn");
+    if (!btn) return;
+    const paused = this.isReplayPaused();
+    btn.textContent = paused ? "Resume" : "Pause";
+    btn.title = paused ? "Resume replay playback." : "Pause replay playback.";
+    btn.classList.toggle("active", paused);
+  }
+
   buildReplayVisionControls() {
     if (!dom.replaySpeed || dom.replaySpeed.querySelector(".replay-vision-controls")) return;
+
+    if (!dom.replaySpeed.querySelector(".replay-pause-btn")) {
+      const pause = document.createElement("button");
+      pause.type = "button";
+      pause.className = "spd-btn replay-pause-btn";
+      pause.dataset.replayPauseToggle = "1";
+      pause.textContent = "Pause";
+      pause.title = "Pause replay playback.";
+      dom.replaySpeed.appendChild(pause);
+    }
 
     if (!dom.replaySpeed.querySelector(".replay-branch-btn")) {
       const resume = document.createElement("button");
       resume.type = "button";
       resume.className = "spd-btn replay-branch-btn";
-      resume.textContent = "Resume";
+      resume.textContent = "Resume play from here";
       resume.title = "Create a practice branch from the current replay tick.";
       resume.addEventListener("click", () => this.net.requestReplayBranch());
       dom.replaySpeed.appendChild(resume);
@@ -288,6 +329,7 @@ export class ReplayControls {
       btn.hidden = true;
     }
     dom.replaySpeed.classList.remove("replay-viewer-controls");
+    dom.replaySpeed.querySelector(".replay-pause-btn")?.remove();
     dom.replaySpeed.querySelector(".replay-branch-btn")?.remove();
     dom.replaySpeed.querySelector(".replay-vision-controls")?.remove();
     dom.replaySpeed.querySelector(".replay-tick-status")?.remove();

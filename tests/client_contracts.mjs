@@ -836,9 +836,19 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
   assert(replayControls.classList.contains("replay-viewer-controls"), "replay viewer controls keep wrapper class");
   assert(!seekBack.hidden, "replay seek buttons stay visible in replay mode");
   assert(stepDev.hidden, "scenario step controls stay hidden in replay mode");
+  const pauseReplay = replayControls.querySelector(".replay-pause-btn");
+  assert(pauseReplay?.textContent === "Pause", "replay viewer builds a pause button");
+  const branchReplay = replayControls.querySelector(".replay-branch-btn");
+  assert(branchReplay?.textContent === "Resume play from here", "replay branch button describes resuming from the current tick");
   replayControls._listeners.get("click")({ target: speed2 });
   assert(replayNet.speeds.at(-1) === 2, "speed click sends net.setReplaySpeed");
   replayUi.applyReplayState({ currentTick: 120, durationTicks: 1_000, speed: 2 });
+  replayControls._listeners.get("click")({ target: pauseReplay });
+  assert(replayNet.speeds.at(-1) === 0, "replay pause button sends zero playback speed");
+  assert(pauseReplay.textContent === "Resume", "paused replay button switches to resume");
+  replayControls._listeners.get("click")({ target: pauseReplay });
+  assert(replayNet.speeds.at(-1) === 2, "replay resume button restores the last non-zero speed");
+  assert(pauseReplay.textContent === "Pause", "resumed replay button switches back to pause");
   replayControls._listeners.get("click")({ target: seekBack });
   assert(replayNet.seekBacks.at(-1) === 90, "seek click sends net.seekReplay");
   const visionButtons = replayControls.querySelectorAll(".vision-btn");
@@ -881,6 +891,7 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
   assert(!replayControls.classList.contains("replay-viewer-controls"), "destroy clears replay wrapper class");
   assert(!seekBack.hidden, "destroy restores seek controls visible");
   assert(stepDev.hidden, "destroy restores scenario step controls hidden");
+  assert(!replayControls.querySelector(".replay-pause-btn"), "destroy removes generated replay pause button");
   assert(!replayControls.querySelector(".replay-branch-btn"), "destroy removes generated replay branch button");
   assert(!replayControls.querySelector(".replay-vision-controls"), "destroy removes generated vision controls");
   assert(!replayControls.querySelector(".replay-tick-status"), "destroy removes generated status");

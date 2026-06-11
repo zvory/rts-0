@@ -320,6 +320,7 @@ impl BranchStagingState {
 impl ReplaySession {
     #[allow(dead_code)]
     const DEFAULT_SPEED: f32 = 2.0;
+    const PAUSED_SPEED: f32 = 0.0;
     const MIN_SPEED: f32 = 0.125;
     const MAX_SPEED: f32 = 8.0;
     const MAX_DURATION_TICKS: u32 = 30 * 60 * 60;
@@ -462,7 +463,7 @@ impl ReplaySession {
                 .map(|keyframe| keyframe.tick)
                 .collect(),
             speed: self.speed,
-            paused: self.speed == 0.0,
+            paused: self.speed == Self::PAUSED_SPEED,
             ended: self.current_tick() >= self.duration_ticks,
             controller_id: self.last_controller_id,
         }
@@ -497,7 +498,11 @@ impl ReplaySession {
     }
 
     fn set_speed(&mut self, controller_id: u32, speed: f32) {
-        self.speed = speed.clamp(Self::MIN_SPEED, Self::MAX_SPEED);
+        self.speed = if speed == Self::PAUSED_SPEED {
+            Self::PAUSED_SPEED
+        } else {
+            speed.clamp(Self::MIN_SPEED, Self::MAX_SPEED)
+        };
         self.last_controller_id = Some(controller_id);
     }
 
@@ -799,6 +804,7 @@ impl RoomTask {
             return 1.0;
         }
         match &self.phase {
+            Phase::ReplayViewer(session) if session.speed == ReplaySession::PAUSED_SPEED => 1.0,
             Phase::ReplayViewer(session) => session.speed,
             Phase::BranchStaging(_) => 1.0,
             _ => self.replay_speed,
@@ -2186,6 +2192,10 @@ impl RoomTask {
             return;
         }
         if matches!(self.phase, Phase::ReplayViewer(_)) {
+            if matches!(&self.phase, Phase::ReplayViewer(session) if session.speed == ReplaySession::PAUSED_SPEED)
+            {
+                return;
+            }
             self.on_tick_replay_viewer(scheduled);
             return;
         }
@@ -3420,9 +3430,41 @@ mod tests {
         assert_eq!(replay.state().controller_id, Some(42));
         assert_eq!(replay.state().keyframe_ticks, vec![0]);
 
+        replay.set_speed(42, 0.0);
+        assert_eq!(replay.state().speed, ReplaySession::PAUSED_SPEED);
+        assert!(replay.state().paused);
+
         let target = replay.seek_back("test", 1, 42, u32::MAX).unwrap();
         assert_eq!(target, 0);
         assert_eq!(replay.state().current_tick, 0);
+    }
+
+    #[test]
+    fn paused_replay_viewer_does_not_advance_on_scheduled_tick() {
+        let players = replay_test_players(2);
+        let (_live, artifact) = replay_test_artifact(&players, 3);
+        let replay = ReplaySession::new(artifact).unwrap();
+        let mut task = RoomTask::new(
+            "replay-pause-test".to_string(),
+            RoomMode::Normal,
+            None,
+            false,
+            DrainHandle::default(),
+        );
+        add_test_room_player(&mut task, 99, true);
+        task.phase = Phase::ReplayViewer(Box::new(replay));
+
+        task.on_set_replay_speed(99, 0.0);
+        assert_eq!(
+            task.current_tick_interval(),
+            Duration::from_millis(config::TICK_MS)
+        );
+        task.on_tick(TokioInstant::now());
+        assert_eq!(in_game_tick(&task), 0);
+
+        task.on_set_replay_speed(99, 1.0);
+        task.on_tick(TokioInstant::now());
+        assert_eq!(in_game_tick(&task), 1);
     }
 
     #[test]
