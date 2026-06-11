@@ -1051,11 +1051,7 @@ fn order_artillery_point_fire(
     e.reset_gather_state();
     let (px, py) = (e.pos_x, e.pos_y);
     e.reset_stuck(px, py);
-    if matches!(e.weapon_setup(), WeaponSetup::Packed) {
-        e.set_weapon_setup(WeaponSetup::SettingUp {
-            ticks: config::ARTILLERY_SETUP_TICKS,
-        });
-    } else if !matches!(e.weapon_setup(), WeaponSetup::Deployed) {
+    if !matches!(e.weapon_setup(), WeaponSetup::Deployed) {
         return true;
     }
     e.set_order(Order::artillery_point_fire(x, y));

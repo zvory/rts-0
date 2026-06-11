@@ -11,6 +11,7 @@ import {
 } from "../config.js";
 import { KIND, SETUP, STATE, isBuilding, isResource } from "../protocol.js";
 import {
+  ARTILLERY_DEPLOYED_WEAPON_ANIM_MS,
   DEPLOYED_WEAPON_ANIM_MS,
   SWEEP_EVICT_FRAMES,
   WEAPON_RECOIL_PX,
@@ -64,7 +65,10 @@ export function _deployedWeaponSetupVisual(e) {
   }
   const rec = this._setupVisuals.get(e.id);
   const elapsed = now - rec.changedAt;
-  const t = smoothstep01(elapsed / DEPLOYED_WEAPON_ANIM_MS);
+  const durationMs = e.kind === KIND.ARTILLERY
+    ? ARTILLERY_DEPLOYED_WEAPON_ANIM_MS
+    : DEPLOYED_WEAPON_ANIM_MS;
+  const t = smoothstep01(elapsed / durationMs);
 
   if (setupState === SETUP.SETTING_UP) {
     return { prongFactor: t, barrel: false };
@@ -284,21 +288,21 @@ function drawArtillery(g, body, tint, facing, weaponFacing, setup, recoil, motio
   );
   g.endFill();
   if (recoil > 0.1) {
-    const flash = offsetPoint(rotatePoint(body.halfLen * 1.9, 0, weaponFacing), kick);
+    const flash = offsetPoint(rotatePoint(body.halfLen * 2.16, 0, weaponFacing), kick);
     const flashAlpha = clamp01(recoil / 10);
-    const flashLen = 18 + recoil * 1.8;
-    const flashWidth = 9 + recoil * 0.75;
-    const tip = offsetPoint(flash, rotatePoint(flashLen, 0, weaponFacing));
-    const left = offsetPoint(flash, rotatePoint(-flashLen * 0.24, -flashWidth, weaponFacing));
-    const right = offsetPoint(flash, rotatePoint(-flashLen * 0.24, flashWidth, weaponFacing));
+    const flashLen = 9 + recoil * 0.9;
+    const flashWidth = 4.5 + recoil * 0.38;
+    const tip = offsetPoint(flash, rotatePoint(-flashLen * 0.3, 0, weaponFacing));
+    const left = offsetPoint(flash, rotatePoint(flashLen, -flashWidth, weaponFacing));
+    const right = offsetPoint(flash, rotatePoint(flashLen, flashWidth, weaponFacing));
     g.beginFill(0xffd84a, flashAlpha * 0.78);
     g.drawPolygon([tip.x, tip.y, left.x, left.y, right.x, right.y]);
     g.endFill();
     g.beginFill(0xfff2d0, flashAlpha * 0.9);
-    g.drawCircle(flash.x, flash.y, 7 + recoil * 0.55);
+    g.drawCircle(flash.x, flash.y, 3.5 + recoil * 0.28);
     g.endFill();
     g.beginFill(0xfff06a, flashAlpha * 0.58);
-    g.drawCircle(flash.x, flash.y, 12 + recoil * 0.8);
+    g.drawCircle(flash.x, flash.y, 6 + recoil * 0.4);
     g.endFill();
   }
 }
