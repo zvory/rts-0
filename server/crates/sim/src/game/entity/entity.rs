@@ -67,7 +67,7 @@ impl Entity {
             last_damage_pos: None,
             movement: Some(MovementState::default()),
             combat: if s.dmg > 0 || kind == EntityKind::Artillery {
-                Some(CombatState::default())
+                Some(initial_combat_state(kind))
             } else {
                 None
             },
@@ -444,7 +444,7 @@ impl Entity {
                 self.combat
                     .as_ref()
                     .map(|c| c.autocast_enabled)
-                    .unwrap_or(true),
+                    .unwrap_or(false),
             ),
             _ => None,
         }
@@ -998,6 +998,14 @@ fn initial_ability_uses(kind: EntityKind) -> BTreeMap<AbilityKind, u16> {
         uses.insert(AbilityKind::Smoke, config::SCOUT_CAR_SMOKE_USES);
     }
     uses
+}
+
+fn initial_combat_state(kind: EntityKind) -> CombatState {
+    let mut combat = CombatState::default();
+    if kind == EntityKind::MortarTeam {
+        combat.autocast_enabled = false;
+    }
+    combat
 }
 
 fn normalize_angle(angle: f32) -> f32 {
