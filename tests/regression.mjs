@@ -58,7 +58,44 @@ async function soloStart(room) {
   return { c, snap };
 }
 
+async function debugSoloStart(room) {
+  const c = new Client(); await c.open();
+  await c.waitFor((m) => m.t === "welcome");
+  c.send({ t: "join", name: "DebugReg", room });
+  await c.waitFor((m) => m.t === "lobby");
+  c.send({ t: "setQuickstart", enabled: true });
+  await c.waitFor((m) => m.t === "lobby" && m.quickstart === true);
+  c.send({ t: "ready", ready: true });
+  await c.waitFor((m) => m.t === "lobby" && m.canStart);
+  c.send({ t: "start" });
+  const start = await c.waitFor((m) => m.t === "start");
+  const snap = await c.waitFor((m) => m.t === "snapshot" && m.entities.length > 0);
+  return { c, start, snap };
+}
+
 (async () => {
+  // 0) Debug/quickstart solo matches must still be a real player view, not an empty/spectator
+  //    view: the host should have resources, supply, visible tiles, and selectable owned units.
+  {
+    const room = "reg-debug-solo-" + Math.floor(performance.now());
+    const { c, start, snap } = await debugSoloStart(room);
+    const own = snap.entities.filter((e) => e.owner === c.playerId);
+    const ownWorkers = own.filter((e) => e.kind === "worker");
+    const ownCityCentres = own.filter((e) => e.kind === "city_centre");
+    const visibleTiles = (snap.visibleTiles || []).filter(Boolean).length;
+    ok(start.playerId === c.playerId && start.spectator === false,
+       `DEBUG SOLO: start is stamped as host player (start=${start.playerId}, welcome=${c.playerId}, spectator=${start.spectator})`);
+    ok(snap.steel > 0 && snap.oil > 0,
+       `DEBUG SOLO: snapshot carries host resources (steel=${snap.steel}, oil=${snap.oil})`);
+    ok(snap.supplyCap > 0 && snap.supplyUsed > 0,
+       `DEBUG SOLO: snapshot carries host supply (${snap.supplyUsed}/${snap.supplyCap})`);
+    ok(visibleTiles > 0,
+       `DEBUG SOLO: snapshot carries authoritative visible tiles (${visibleTiles})`);
+    ok(ownCityCentres.length === 1 && ownWorkers.length > 0,
+       `DEBUG SOLO: host sees own selectable base units (cc=${ownCityCentres.length}, workers=${ownWorkers.length}, own=${own.length})`);
+    c.ws.close();
+  }
+
   // 1) Malicious build with overflow-range coordinates must not crash the room.
   {
     const room = "reg-build-" + Math.floor(performance.now());
