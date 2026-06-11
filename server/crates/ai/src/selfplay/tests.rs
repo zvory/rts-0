@@ -346,6 +346,34 @@ impl SelfPlayRunner {
     }
 }
 
+#[test]
+fn selfplay_failure_artifact_writes_unified_replay_schema() {
+    let players = vec![PlayerInit {
+        id: 1,
+        name: "Failure Artifact".to_string(),
+        color: "#ffffff".to_string(),
+        is_ai: false,
+    }];
+    let game = Game::new(&players, 0x1234_5678);
+    let start = game.start_payload();
+    let runner = SelfPlayRunner::new("failure_artifact_schema", game, start, players, Vec::new());
+
+    let dir = runner
+        .write_failure_artifact(&SelfPlayFailure::new("schema check"))
+        .unwrap();
+    let json = fs::read_to_string(dir.join("replay.json")).unwrap();
+    let artifact: ReplayArtifactV1 = serde_json::from_str(&json).unwrap();
+
+    assert_eq!(
+        artifact.artifact_schema_version,
+        rts_sim::game::replay::REPLAY_ARTIFACT_SCHEMA_VERSION_V1
+    );
+    assert_eq!(artifact.seed, 0x1234_5678);
+    assert_eq!(artifact.players[0].name, "Failure Artifact");
+
+    let _ = fs::remove_dir_all(dir);
+}
+
 fn requested_replay_artifact_name(test_name: &str) -> Result<Option<String>, String> {
     let Some(raw) = env::var_os(SAVE_REPLAY_ENV) else {
         return Ok(None);
@@ -1435,7 +1463,7 @@ fn real_ai_vs_real_ai() {
         let artifact_name = format!("real_ai_vs_real_ai_failure_{ts}");
         let dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("target")
-            .join("selfplay-artifacts")
+            .join("selfplay-failures")
             .join(&artifact_name);
         if std::fs::create_dir_all(&dir).is_ok() {
             let artifact = ReplayArtifactV1::capture_from_game(

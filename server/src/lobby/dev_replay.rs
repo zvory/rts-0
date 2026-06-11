@@ -71,7 +71,7 @@ pub(super) fn load_replay_artifact(name: &str) -> Result<ReplayArtifactV1, Strin
                 .map_err(|e| format!("failed to parse replay artifact JSON: {e}"))?;
             let Some(schema) = value.get("artifactSchemaVersion") else {
                 return Err(
-                    "unsupported legacy self-play replay artifact: expected ReplayArtifactV1"
+                    "unsupported replay artifact format: expected ReplayArtifactV1 with artifactSchemaVersion"
                         .to_string(),
                 );
             };
@@ -156,7 +156,7 @@ mod tests {
 
         let err = load_replay_artifact(&name).unwrap_err();
 
-        assert!(err.contains("unsupported legacy self-play replay artifact"));
+        assert!(err.contains("unsupported replay artifact format"));
         let _ = std::fs::remove_dir_all(&dir);
     }
 }

@@ -2653,6 +2653,24 @@ mod tests {
         (game, artifact)
     }
 
+    fn write_selfplay_replay_test_artifact(
+        name: &str,
+        artifact: &ReplayArtifactV1,
+    ) -> std::path::PathBuf {
+        let dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("target")
+            .join("selfplay-artifacts")
+            .join(name);
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(
+            dir.join("replay.json"),
+            serde_json::to_vec_pretty(artifact).unwrap(),
+        )
+        .unwrap();
+        dir
+    }
+
     fn add_test_room_player(task: &mut RoomTask, id: u32, ready: bool) -> ConnectionWriter {
         let (msg_tx, writer) = ConnectionSink::new();
         task.order.push(id);
@@ -3161,6 +3179,45 @@ mod tests {
             writer.reliable_rx.try_recv().unwrap(),
             ServerMessage::ReplayState(_)
         ));
+    }
+
+    #[test]
+    fn saved_selfplay_replay_join_uses_replay_viewer_runtime() {
+        let players = replay_test_players(2);
+        let (_live, artifact) = replay_test_artifact(&players, 3);
+        let artifact_name = format!("room_task_saved_selfplay_{}", std::process::id());
+        let artifact_dir = write_selfplay_replay_test_artifact(&artifact_name, &artifact);
+        let mut task = RoomTask::new(
+            "saved-selfplay-replay-test".to_string(),
+            RoomMode::DevSelfPlay(DevSelfPlayConfig::Replay {
+                artifact: artifact_name,
+            }),
+            None,
+            false,
+            DrainHandle::default(),
+        );
+        let (msg_tx, mut writer) = ConnectionSink::new();
+        let (ack, mut ack_rx) = tokio::sync::oneshot::channel();
+
+        task.on_join(99, "Viewer".to_string(), false, true, msg_tx, ack);
+
+        assert_eq!(ack_rx.try_recv(), Ok(true));
+        let Phase::ReplayViewer(session) = &task.phase else {
+            panic!("saved self-play replay should start the shared replay viewer runtime");
+        };
+        assert_eq!(session.artifact.command_log, artifact.command_log);
+        assert_eq!(session.vision_player_ids_for(99), vec![1, 2]);
+        assert!(task.players.get(&99).is_some_and(|p| p.spectator));
+        assert!(matches!(
+            writer.reliable_rx.try_recv().unwrap(),
+            ServerMessage::Start(payload) if payload.spectator && payload.replay.is_some()
+        ));
+        assert!(matches!(
+            writer.reliable_rx.try_recv().unwrap(),
+            ServerMessage::ReplayState(_)
+        ));
+
+        let _ = std::fs::remove_dir_all(artifact_dir);
     }
 
     #[test]
