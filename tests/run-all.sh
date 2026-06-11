@@ -3,7 +3,7 @@
 # non-zero if anything failed. This is the canonical "is the build green?" command.
 #
 # What it runs, in order:
-#   1. Architecture policy          (crate boundaries + sim architecture + test-selector self-check)
+#   1. Architecture policy          (crate boundaries + sim/client architecture + test-selector self-check)
 #   2. Rust formatting              (cargo fmt --check)
 #   3. Rust fast scripted tests     (cargo test — deterministic, in-process, no server)
 #   4. Rust lint                    (cargo clippy)
@@ -386,6 +386,8 @@ run_rust_suites_bg() {
       node "$REPO_ROOT/scripts/check-crate-boundaries.mjs"
     run_suite_bg "Architecture: sim game internals" \
       cargo run --manifest-path "$SERVER_DIR/Cargo.toml" -p rts-archcheck -- check-sim-architecture
+    run_suite_bg "Architecture: client modules" \
+      node "$REPO_ROOT/scripts/check-client-architecture.mjs"
     run_suite_bg "Architecture: test selection policy" \
       node "$SCRIPT_DIR/select-suites.mjs" --verify
     run_suite_bg "Rust format (cargo fmt --check)" \

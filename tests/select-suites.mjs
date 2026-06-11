@@ -11,6 +11,7 @@ const suiteOrder = [
   "cargo-test-ai",
   "cargo-test-server",
   "cargo-clippy",
+  "client-architecture",
   "js-protocol-contracts",
   "node-server-integration",
   "node-regression",
@@ -74,6 +75,12 @@ export function selectSuites(files) {
     const normalized = pathname.split(path.sep).join("/");
     const rustCode = normalized.startsWith("server/") && normalized.endsWith(".rs");
     const ciOrScript = normalized.startsWith(".github/") || normalized.startsWith("scripts/") || normalized === "tests/run-all.sh";
+    const clientArchitecturePolicy =
+      normalized.startsWith("client/src/") ||
+      normalized === "scripts/check-client-architecture.mjs" ||
+      normalized === "tests/run-all.sh" ||
+      normalized === "tests/select-suites.mjs" ||
+      normalized.startsWith("plans/client-arch/");
     docsOnly &&= normalized.startsWith("docs/") || normalized.startsWith("plans/") || normalized.endsWith(".md");
 
     if (rustCode || normalized.startsWith("server/Cargo.")) {
@@ -82,6 +89,10 @@ export function selectSuites(files) {
 
     if (ciOrScript) {
       addAll(suites, ["crate-boundaries", "cargo-fmt", "cargo-test-server", "cargo-clippy", "node-regression"]);
+    }
+
+    if (clientArchitecturePolicy) {
+      suites.add("client-architecture");
     }
 
     if (normalized.startsWith("server/crates/contract/") || isProtocolShape(normalized)) {
@@ -125,7 +136,7 @@ export function selectSuites(files) {
     }
 
     if (normalized.startsWith("client/")) {
-      addAll(suites, ["js-protocol-contracts", "node-minimap-input-contracts", "client-smoke"]);
+      addAll(suites, ["client-architecture", "js-protocol-contracts", "node-minimap-input-contracts", "client-smoke"]);
       if (normalized.includes("net") || normalized.includes("protocol")) {
         suites.add("node-server-integration");
       }
@@ -165,6 +176,9 @@ function verify() {
     [["server/crates/sim/src/game/systems.rs"], ["cargo-test-sim", "node-server-integration"]],
     [["server/crates/ai/src/ai_core/profiles.rs"], ["cargo-test-ai", "node-ai-integration", "full-ai"]],
     [["server/src/lobby/room_task.rs"], ["cargo-test-server", "node-server-integration", "node-regression", "node-ai-integration", "client-smoke"]],
+    [["client/src/match.js"], ["client-architecture", "js-protocol-contracts", "node-minimap-input-contracts", "client-smoke"]],
+    [["scripts/check-client-architecture.mjs"], ["client-architecture"]],
+    [["plans/client-arch/phase-1.md"], ["client-architecture"]],
     [["docs/design/architecture.md"], ["docs-only"]],
   ];
 
