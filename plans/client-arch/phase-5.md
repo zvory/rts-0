@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Pending implementation.
+- [x] Implemented.
 
 ## Objective
 
@@ -39,13 +39,13 @@ availability easier to test.
 
 Mark each segment complete as it lands:
 
-- [ ] Add the pure command-card descriptor layer with plain-object button descriptors.
-- [ ] Convert `HUD` command-card rendering to consume descriptors while preserving existing output.
-- [ ] Preserve command dispatch, hotkeys, repeatability, enabled/disabled behavior, and tooltips.
-- [ ] Add descriptor-level tests for worker build, production, hotkeys, targeting, upgrades, and
+- [x] Add the pure command-card descriptor layer with plain-object button descriptors.
+- [x] Convert `HUD` command-card rendering to consume descriptors while preserving existing output.
+- [x] Preserve command dispatch, hotkeys, repeatability, enabled/disabled behavior, and tooltips.
+- [x] Add descriptor-level tests for worker build, production, hotkeys, targeting, upgrades, and
   spectator/replay hidden states.
-- [ ] Add DOM-property tests for any changed command-card HTML generation.
-- [ ] Run verification and record the exact changed command families in the final handoff.
+- [x] Add DOM-property tests for any changed command-card HTML generation.
+- [x] Run verification and record the exact changed command families in the final handoff.
 
 ## Verification
 

@@ -29,6 +29,7 @@ import {
   groupCooldownClocks,
   playerHasCompletedKind,
 } from "../client/src/hud.js";
+import { buildCommandCardDescriptors } from "../client/src/hud_command_card.js";
 import { Audio, noticeSoundId } from "../client/src/audio.js";
 import {
   attackKindHasCombatSound,
@@ -110,6 +111,225 @@ function assertHasGetter(obj, name, msgPrefix = "") {
     d && typeof d.get === "function",
     `${msgPrefix || "Object"} missing getter "${name}"`,
   );
+}
+
+function commandCardCtx({
+  selection = [],
+  entities = selection,
+  resources = { steel: 1000, oil: 1000 },
+  upgrades = [],
+  playerId = 1,
+  commandCardMode = null,
+  commandTarget = null,
+  spectator = false,
+} = {}) {
+  return {
+    spectator,
+    playerId,
+    selection,
+    resources,
+    upgrades,
+    commandCardMode,
+    commandTarget,
+    groupCooldownClocks,
+    playerHasCompleteKind: (kind) => playerHasCompletedKind(entities, playerId, kind),
+  };
+}
+
+function commandButtons(card) {
+  return card.slots.filter(Boolean);
+}
+
+function buttonByAction(card, action) {
+  return commandButtons(card).find((button) => button.action === action);
+}
+
+function buttonByLabel(card, label) {
+  return commandButtons(card).find((button) => button.label === label);
+}
+
+function withFakeDocument(fn) {
+  const priorDocument = globalThis.document;
+  const created = [];
+  globalThis.document = {
+    createElement(tagName) {
+      const el = {
+        tagName: String(tagName).toUpperCase(),
+        className: "",
+        dataset: {},
+        disabled: false,
+        title: "",
+        type: "",
+        innerHTML: "",
+        listeners: {},
+        style: { setProperty() {} },
+        addEventListener(type, handler) {
+          this.listeners[type] = handler;
+        },
+        querySelectorAll() {
+          return [];
+        },
+      };
+      created.push(el);
+      return el;
+    },
+    createDocumentFragment() {
+      return { children: [], appendChild(child) { this.children.push(child); } };
+    },
+  };
+  try {
+    return fn(created);
+  } finally {
+    if (priorDocument === undefined) delete globalThis.document;
+    else globalThis.document = priorDocument;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Command card descriptors
+// ---------------------------------------------------------------------------
+
+{
+  const spectatorCard = buildCommandCardDescriptors(commandCardCtx({ spectator: true }));
+  assert(spectatorCard.kind === "spectator", "spectator command card should be hidden");
+  assert(spectatorCard.slots.length === 0, "spectator command card should emit no slots");
+
+  const worker = { id: 10, owner: 1, kind: KIND.WORKER };
+  const cityCentre = { id: 11, owner: 1, kind: KIND.CITY_CENTRE };
+  const buildCard = buildCommandCardDescriptors(commandCardCtx({
+    selection: [worker],
+    entities: [worker, cityCentre],
+    commandCardMode: "workerBuild",
+    resources: { steel: 175, oil: 0 },
+  }));
+  assert(buildCard.kind === "workerBuild", "worker build menu should use build descriptor card");
+  assert(buildCard.slots.length === 9, "worker build card keeps a 3x3 grid");
+  assert(buildCard.slots[0].intent.type === "beginPlacement", "worker build button should start placement");
+  assert(buildCard.slots[0].label === "City Centre", "worker build first slot should stay City Centre");
+  assert(buildCard.slots[0].hotkey === "Q", "worker build hotkey Q should be preserved");
+  assert(buildCard.slots[0].unaffordable, "unaffordable build buttons stay clickable for feedback");
+  assert(buildCard.slots[3].label === "Training Centre", "worker build menu should include Training Centre");
+  assert(!buildCard.slots[3].enabled, "locked build buttons should be disabled");
+  assert(buildCard.slots[3].title === "Requires Barracks", "locked build tooltip should explain requirement");
+  assert(buildCard.slots[8].intent.type === "closeCommandCardMenu", "worker return button should close submenu");
+
+  const barracks = { id: 20, owner: 1, kind: KIND.BARRACKS, buildProgress: null };
+  const producingBarracks = {
+    id: 21,
+    owner: 1,
+    kind: KIND.BARRACKS,
+    buildProgress: null,
+    state: STATE.TRAIN,
+    prodQueue: 1,
+  };
+  const trainCard = buildCommandCardDescriptors(commandCardCtx({
+    selection: [barracks, producingBarracks],
+    entities: [cityCentre, barracks, producingBarracks],
+    resources: { steel: 60, oil: 0 },
+  }));
+  assert(trainCard.kind === "train", "production building should use train descriptor card");
+  assert(trainCard.slots[0].label === "Rifleman", "Barracks first train slot should be Rifleman");
+  assert(trainCard.slots[0].repeatable, "train hotkeys should remain repeatable");
+  assert(trainCard.slots[0].intent.type === "train", "train button should carry train intent");
+  assert(trainCard.slots[8].label === "Cancel", "production cancel should stay in C slot");
+  assert(trainCard.slots[8].hotkey === "C", "cancel hotkey should stay C");
+  assert(trainCard.slots[8].repeatable, "cancel hotkey should remain repeatable");
+  assert(trainCard.slots[1].label === "Machine Gunner", "Barracks second train slot should be Machine Gunner");
+  assert(!trainCard.slots[1].enabled, "requirement-gated train button should be disabled");
+  assert(trainCard.slots[1].title === "Requires Training Centre", "train locked tooltip should name requirement");
+
+  const scoutCar = {
+    id: 30,
+    owner: 1,
+    kind: KIND.SCOUT_CAR,
+    abilities: [{ ability: ABILITY.SMOKE, cooldownLeft: 0, remainingUses: 2 }],
+  };
+  const abilityCard = buildCommandCardDescriptors(commandCardCtx({
+    selection: [scoutCar],
+    commandTarget: { kind: "ability", ability: ABILITY.SMOKE },
+  }));
+  const smoke = buttonByAction(abilityCard, "ability");
+  assert(smoke.label === "Smoke", "ability button should expose ability label");
+  assert(smoke.hotkey === "D", "ability preferred hotkey should be preserved");
+  assert(smoke.intent.targetMode === "worldPoint", "world-point ability should carry targeting intent");
+  assert(smoke.cls.includes("active"), "active ability targeting should keep active class");
+  assert(smoke.enabled, "ready affordable ability should be enabled");
+
+  const artillery = {
+    id: 31,
+    owner: 1,
+    kind: KIND.ARTILLERY,
+    abilities: [{ ability: ABILITY.POINT_FIRE, cooldownLeft: 0, remainingUses: null }],
+  };
+  const pointFireCard = buildCommandCardDescriptors(commandCardCtx({
+    selection: [artillery],
+    entities: [{ id: 40, owner: 1, kind: KIND.STEELWORKS }, artillery],
+    resources: { steel: 0, oil: 0 },
+  }));
+  const pointFire = buttonByLabel(pointFireCard, "Point Fire");
+  assert(pointFire.unaffordable, "unaffordable ability should stay clickable");
+  assert(pointFire.onUnavailableIntent.type === "playNotEnough", "unaffordable ability should play resource notice");
+
+  const steelworks = { id: 50, owner: 1, kind: KIND.STEELWORKS, buildProgress: null };
+  const upgradeCard = buildCommandCardDescriptors(commandCardCtx({
+    selection: [steelworks],
+    entities: [
+      { id: 51, owner: 1, kind: KIND.CITY_CENTRE },
+      { id: 52, owner: 1, kind: KIND.TRAINING_CENTRE },
+      steelworks,
+    ],
+    resources: { steel: 125, oil: 125 },
+  }));
+  const atGun = buttonByLabel(upgradeCard, "AT Gun");
+  const atUnlock = buttonByLabel(upgradeCard, "AT Gun Crews");
+  assert(atGun && !atGun.enabled, "upgrade-gated unit should be disabled before research");
+  assert(atGun.title === "Requires AT Gun Crews", "upgrade-gated unit tooltip should name missing upgrade");
+  assert(atUnlock && atUnlock.enabled, "available affordable upgrade should be enabled");
+  assert(atUnlock.intent.type === "research", "upgrade button should carry research intent");
+
+  withFakeDocument(() => {
+    let clicked = false;
+    const button = HUD.prototype._cmdButton({
+      icon: "RF",
+      label: "Rifleman",
+      hotkey: "Q",
+      cost: { steel: 50, oil: 0 },
+      enabled: true,
+      repeatable: true,
+      tooltipHtml: `<span class="cmd-tooltip-title">Rifleman</span>`,
+      onClick: () => { clicked = true; },
+    });
+    assert(button.type === "button", "command button type should remain button");
+    assert(button.className === "cmd-btn", "enabled command button class should remain cmd-btn");
+    assert(button.dataset.hotkey === "Q", "command button should expose hotkey dataset");
+    assert(button.dataset.repeatable === "true", "repeatable command button should expose repeatable dataset");
+    assert(!button.disabled, "enabled command button should not be disabled");
+    assert(button.innerHTML.includes("cmd-icon"), "command button should render icon span");
+    assert(button.innerHTML.includes("cmd-label"), "command button should render label span");
+    assert(button.innerHTML.includes("cmd-hotkey"), "command button should render hotkey span");
+    assert(button.innerHTML.includes("cmd-cost"), "command button should render cost span");
+    assert(button.innerHTML.includes("cmd-tooltip"), "command button should render rich tooltip span");
+    button.listeners.click({ preventDefault() {} });
+    assert(clicked, "enabled command button click should dispatch handler");
+  });
+
+  withFakeDocument(() => {
+    let unavailable = false;
+    const button = HUD.prototype._cmdButton({
+      icon: "TK",
+      label: "Tank",
+      hotkey: "W",
+      enabled: false,
+      unaffordable: true,
+      title: "Not enough resources",
+      onUnavailable: () => { unavailable = true; },
+    });
+    assert(button.className === "cmd-btn unaffordable", "unaffordable command class should be preserved");
+    assert(!button.disabled, "unaffordable command should stay clickable");
+    assert(button.title === "Not enough resources", "command title should preserve disabled reason");
+    button.listeners.click({ preventDefault() {} });
+    assert(unavailable, "unaffordable command click should dispatch unavailable handler");
+  });
 }
 
 // ---------------------------------------------------------------------------
