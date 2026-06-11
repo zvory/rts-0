@@ -1,4 +1,4 @@
-import { ABILITY, KIND, SETUP, STATE, isBuilding, isUnit } from "./protocol.js";
+import { ABILITY, KIND, ORDER_STAGE, SETUP, STATE, isBuilding, isUnit } from "./protocol.js";
 import {
   ABILITIES,
   STATS,
@@ -459,7 +459,14 @@ function abilityUnitReady(entity, definition) {
 }
 
 function abilityRequiresSetup(entity, definition) {
-  return definition.ability === ABILITY.POINT_FIRE && entity.setupState !== SETUP.DEPLOYED;
+  return definition.ability === ABILITY.POINT_FIRE &&
+    entity.setupState !== SETUP.DEPLOYED &&
+    !hasPointFireOrder(entity);
+}
+
+function hasPointFireOrder(entity) {
+  return Array.isArray(entity?.orderPlan) &&
+    entity.orderPlan.some((marker) => marker?.kind === ORDER_STAGE.POINT_FIRE);
 }
 
 function affordable(cost, resources) {

@@ -5,7 +5,7 @@ use crate::game::ability::{self, AbilityKind, AbilityTargetMode};
 use crate::game::artillery::ArtilleryShellStore;
 use crate::game::command::SimCommand;
 use crate::game::entity::{
-    BuildPhase, EntityKind, EntityStore, Order, OrderIntent, ProdItem, RallyIntent, RallyKind,
+    BuildPhase, Entity, EntityKind, EntityStore, Order, OrderIntent, ProdItem, RallyIntent, RallyKind,
     ResearchItem, WeaponSetup, MAX_QUEUED_ORDERS,
 };
 use crate::game::fog::Fog;
@@ -1087,7 +1087,7 @@ fn artillery_point_fire_command_target(
 ) -> Option<ArtilleryPointFireTarget> {
     let target = artillery_point_fire_target(map, entities, player, unit, x, y)?;
     let e = entities.get(unit)?;
-    matches!(e.weapon_setup(), WeaponSetup::Deployed).then_some(target)
+    artillery_can_accept_point_fire_command(e).then_some(target)
 }
 
 fn artillery_point_fire_target_valid(
@@ -1131,9 +1131,7 @@ fn artillery_point_fire_target(
     if distance2 < min_px * min_px || distance2 > max_px * max_px {
         return None;
     }
-    let center = e
-        .emplacement_facing()
-        .or_else(|| e.weapon_facing())
+    let center = artillery_point_fire_field_center(e)
         .filter(|facing| facing.is_finite())?;
     let facing = dy.atan2(dx);
     if !facing.is_finite() {
@@ -1147,6 +1145,25 @@ fn artillery_point_fire_target(
         facing,
         inside_field_of_fire,
     })
+}
+
+fn artillery_can_accept_point_fire_command(e: &Entity) -> bool {
+    matches!(e.weapon_setup(), WeaponSetup::Deployed)
+        || (matches!(e.order(), Order::ArtilleryPointFire(_))
+            && matches!(
+                e.weapon_setup(),
+                WeaponSetup::TearingDownToRedeploy { .. }
+                    | WeaponSetup::Packed
+                    | WeaponSetup::SettingUp { .. }
+            ))
+}
+
+fn artillery_point_fire_field_center(e: &Entity) -> Option<f32> {
+    match e.weapon_setup() {
+        WeaponSetup::TearingDownToRedeploy { .. } => e.pending_redeploy_facing(),
+        WeaponSetup::Packed | WeaponSetup::SettingUp { .. } => e.emplacement_facing(),
+        _ => e.emplacement_facing().or_else(|| e.weapon_facing()),
+    }
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -3679,11 +3696,12 @@ mod tests {
     }
 
     #[test]
-    fn artillery_point_fire_outside_arc_starts_redeploy_without_firing() {
+    fn artillery_point_fire_outside_arc_replaces_active_fire_with_redeploy() {
         let map = flat_map(64);
         let mut entities = EntityStore::new();
         let mut players = vec![player_state(1), player_state(2)];
         let pos = (320.0, 320.0);
+        let old_target = (pos.0 + config::TILE_SIZE as f32 * 22.0, pos.1);
         let angle = config::ARTILLERY_FIELD_OF_FIRE_RAD;
         let distance = config::TILE_SIZE as f32 * 22.0;
         let target = (pos.0 + angle.cos() * distance, pos.1 + angle.sin() * distance);
@@ -3695,6 +3713,8 @@ mod tests {
             unit.set_weapon_setup(WeaponSetup::Deployed);
             unit.set_emplacement_facing(Some(0.0));
             unit.set_weapon_facing(0.0);
+            unit.set_attack_cd(config::ARTILLERY_RELOAD_TICKS);
+            unit.set_order(Order::artillery_point_fire(old_target.0, old_target.1));
         }
 
         let events = apply_with_players(
@@ -3728,6 +3748,74 @@ mod tests {
             .values()
             .flat_map(|events| events.iter())
             .all(|event| !matches!(event, Event::ArtilleryTarget { .. })));
+        let Order::ArtilleryPointFire(order) = unit.order() else {
+            panic!("retarget should keep an artillery point-fire order");
+        };
+        assert!((order.intent.x - target.0).abs() < 0.001);
+        assert!((order.intent.y - target.1).abs() < 0.001);
+    }
+
+    #[test]
+    fn artillery_point_fire_can_retarget_while_redeploying() {
+        let map = flat_map(64);
+        let mut entities = EntityStore::new();
+        let mut players = vec![player_state(1), player_state(2)];
+        let pos = (320.0, 320.0);
+        let old_angle = config::ARTILLERY_FIELD_OF_FIRE_RAD;
+        let new_angle = -config::ARTILLERY_FIELD_OF_FIRE_RAD;
+        let distance = config::TILE_SIZE as f32 * 22.0;
+        let old_target = (
+            pos.0 + old_angle.cos() * distance,
+            pos.1 + old_angle.sin() * distance,
+        );
+        let target = (
+            pos.0 + new_angle.cos() * distance,
+            pos.1 + new_angle.sin() * distance,
+        );
+        let artillery = entities
+            .spawn_unit(1, EntityKind::Artillery, pos.0, pos.1)
+            .expect("artillery should spawn");
+        {
+            let unit = entities.get_mut(artillery).expect("artillery should exist");
+            unit.set_weapon_setup(WeaponSetup::TearingDownToRedeploy {
+                ticks: config::ARTILLERY_SETUP_TICKS,
+            });
+            unit.set_emplacement_facing(Some(0.0));
+            unit.set_pending_redeploy_facing(Some(old_angle));
+            unit.set_weapon_facing(0.0);
+            unit.set_order(Order::artillery_point_fire(old_target.0, old_target.1));
+        }
+
+        apply_with_players(
+            &map,
+            &mut entities,
+            &mut players,
+            vec![(
+                1,
+                SimCommand::UseAbility {
+                    ability: AbilityKind::PointFire,
+                    units: vec![artillery],
+                    x: Some(target.0),
+                    y: Some(target.1),
+                    queued: false,
+                },
+            )],
+        );
+
+        let unit = entities.get(artillery).expect("artillery should exist");
+        assert!(matches!(
+            unit.weapon_setup(),
+            WeaponSetup::TearingDownToRedeploy { .. }
+        ));
+        let Order::ArtilleryPointFire(order) = unit.order() else {
+            panic!("retarget should keep an artillery point-fire order");
+        };
+        assert!((order.intent.x - target.0).abs() < 0.001);
+        assert!((order.intent.y - target.1).abs() < 0.001);
+        assert!(
+            (unit.pending_redeploy_facing().unwrap_or_default() - new_angle).abs() < 0.001,
+            "retargeting during redeploy should update the pending facing"
+        );
     }
 
     #[test]
