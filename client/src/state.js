@@ -118,6 +118,8 @@ export class GameState {
     this.abilityTargetPreview = null;
     /** @type {Array<{id:number,x:number,y:number,radiusTiles:number,expiresIn:number}>} */
     this.smokes = [];
+    /** @type {Array<{id:number,owner:number,kind:string,x:number,y:number,footprint:Array<[number,number]>,observedTick:number}>} */
+    this.rememberedBuildings = [];
     /** @type {Array<{fromX:number,fromY:number,toX:number,toY:number,durationMs:number,createdAt:number}>} */
     this.smokeCanisters = [];
     /** @type {number[]|Uint8Array} row-major current server-authoritative visibility. */
@@ -224,6 +226,9 @@ export class GameState {
     this.playerResources = msg.playerResources || [];
     this.upgrades = Array.isArray(msg.upgrades) ? msg.upgrades : [];
     this.smokes = Array.isArray(msg.smokes) ? msg.smokes : [];
+    this.rememberedBuildings = Array.isArray(msg.rememberedBuildings)
+      ? msg.rememberedBuildings
+      : [];
     this.visibleTiles = Array.isArray(msg.visibleTiles) || msg.visibleTiles instanceof Uint8Array
       ? msg.visibleTiles
       : [];

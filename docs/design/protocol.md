@@ -212,6 +212,7 @@ transport decode:
   resourceDeltas?: ResourceDelta[], // visible resource remaining updates; omitted when empty
   smokes?: SmokeCloud[],         // active smoke clouds visible to this recipient; omitted when empty
   visibleTiles?: u8[],           // row-major current server visibility; 1 = visible, 0 = fogged
+  rememberedBuildings?: RememberedBuilding[], // recipient-only stale enemy building intel
   events: Event[],               // transient things to surface (see 2.5)
   upgrades?: string[],           // completed permanent upgrades for this recipient
   playerResources?: {id, steel, oil, supplyUsed, supplyCap}[], // all players; spectator/replay mode only
@@ -226,14 +227,14 @@ transport decode:
 }
 ```
 
-Live WebSocket snapshot frames are sent as compact JSON text, version 16. `client/src/net.js`
+Live WebSocket snapshot frames are sent as compact JSON text, version 17. `client/src/net.js`
 decodes this transport shape back into the semantic object above before dispatching `S.SNAPSHOT`.
 Older object-shaped JSON snapshots remain decodable by the client for fallback/dev use.
 
 ```
 {
   "t": "snapshot",
-  "v": 12,
+  "v": 17,
   "s": [tick, steel, oil, supplyUsed, supplyCap],
   "e": [
     [
@@ -247,6 +248,7 @@ Older object-shaped JSON snapshots remain decodable by the client for fallback/d
   "r": [[id, remaining]],         // omitted when empty
   "sm": [[id, x, y, radiusTiles, expiresIn]], // omitted when empty
   "fg": [firstValue, runLen, ...], // RLE visibleTiles; omitted when empty/no-fog
+  "mb": [[id, owner, kind, x, y, [[tileX, tileY], ...], observedTick]], // rememberedBuildings; omitted when empty
   "ev": [EventRecord],            // omitted when empty
   "pr": [[id, steel, oil, supplyUsed, supplyCap]], // omitted in normal play; present in spectator/replay
   "n": [serverLagMs, tickMs, flags, slowTickCount, headOfLineCount]
@@ -293,6 +295,15 @@ staticBlockedTicks, totalWaypoints }`, where `waypoints` are remaining `{x, y}` 
 points in traversal order and `waypoints[0]` is the current movement target. The compact slot
 encodes this as `[waypoints, goal, lastRepathTick, stuckTicks, staticBlockedTicks, totalWaypoints]`,
 with points encoded as `[x, y]`; `waypoints` is capped at 128 entries for transport.
+
+`RememberedBuilding`: `{ id, owner, kind, x, y, footprint, observedTick }`. These records are
+recipient-only last-seen enemy building memory, sent only when the building is not currently
+projected as a live visible entity. They are stale intel for fog silhouettes and coordinate
+targeting context; clients must not make them selectable live entities or issue entity-targeted
+commands against them. `footprint` is an array of `[tileX, tileY]` cells from the last visible
+state. The record intentionally omits hidden live HP, current build progress, and destruction
+state. Artillery `pointFire` remains a world-coordinate ability; remembered buildings help the
+player know where to aim but do not become target ids.
 
 `ResourceDelta`: `{ id: u32, remaining: u32 }`. Resource node positions/kinds are static and come
 from `start.map.resources`; clients keep last-known `remaining` locally. The server sends

@@ -16,7 +16,7 @@
 
 import { COLORS } from "../config.js";
 import { isUnit, isBuilding, isResource } from "../protocol.js";
-import { _drawBuilding } from "./buildings.js";
+import { _drawBuilding, _drawRememberedBuilding } from "./buildings.js";
 import {
   _drawSelectionAndHp,
   _hpBar,
@@ -197,6 +197,9 @@ export class Renderer {
       liveIds.add(e.id);
       if (isResource(e.kind)) this._drawResource(e, fog);
       else if (isBuilding(e.kind)) this._drawBuilding(e, colorByOwner, state);
+    }
+    for (const e of state.rememberedBuildings || []) {
+      this._drawRememberedBuilding(e, colorByOwner);
     }
     for (const e of regularEntities) {
       liveIds.add(e.id);
@@ -447,6 +450,7 @@ Object.assign(Renderer.prototype, {
   _drawUnit,
   _drawShotRevealUnit,
   _drawBuilding,
+  _drawRememberedBuilding,
   _drawResource,
   _drawSelectionAndHp,
   _ringRadius,

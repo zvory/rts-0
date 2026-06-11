@@ -104,6 +104,11 @@ impl Game {
         // Deterministic order (stable for tests / replays).
         entities.sort_by_key(|v| v.id);
         resource_deltas.sort_by_key(|d| d.id);
+        let remembered_buildings = if fogged {
+            self.remembered_building_views_for(player, fog)
+        } else {
+            Vec::new()
+        };
         let mut smokes = if fogged && !include_player_resources {
             self.smokes
                 .iter()
@@ -162,6 +167,7 @@ impl Game {
             } else {
                 Vec::new()
             },
+            remembered_buildings,
             // Events are delivered via the `tick()` return value, not the snapshot.
             events: Vec::new(),
             upgrades: ps
@@ -179,5 +185,41 @@ impl Game {
 
     fn player(&self, id: u32) -> Option<&PlayerState> {
         self.players.iter().find(|p| p.id == id)
+    }
+
+    fn remembered_building_views_for(&self, player: u32, fog: &Fog) -> Vec<RememberedBuildingView> {
+        let mut views = self
+            .building_memory
+            .entries_for_player(player)
+            .filter(|entry| {
+                !self.entities.get(entry.id).is_some_and(|entity| {
+                    projection::project_entity(
+                        player,
+                        entity,
+                        projection::EntityProjectionContext {
+                            fog,
+                            actionable_fog: Some(fog),
+                            smokes: Some(&self.smokes),
+                            fogged: true,
+                            entities: &self.entities,
+                            target: None,
+                            include_debug_path: false,
+                        },
+                    )
+                    .is_some()
+                })
+            })
+            .map(|entry| RememberedBuildingView {
+                id: entry.id,
+                owner: entry.owner,
+                kind: crate::protocol::kind_to_wire(entry.kind).to_string(),
+                x: entry.x,
+                y: entry.y,
+                footprint: entry.footprint.iter().map(|&(tx, ty)| [tx, ty]).collect(),
+                observed_tick: entry.observed_tick,
+            })
+            .collect::<Vec<_>>();
+        views.sort_by_key(|view| view.id);
+        views
     }
 }

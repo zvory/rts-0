@@ -113,6 +113,10 @@ pub struct Snapshot {
     /// Populated only for fog-filtered snapshots; clients keep explored history locally.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub visible_tiles: Vec<u8>,
+    /// Recipient-only stale enemy building intel. These records are last-seen memory, not live
+    /// entities: clients may render them as non-interactive fog silhouettes.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub remembered_buildings: Vec<RememberedBuildingView>,
     pub events: Vec<Event>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub upgrades: Vec<String>,
@@ -121,6 +125,18 @@ pub struct Snapshot {
     pub player_resources: Vec<PlayerResourceSnapshot>,
     /// Per-recipient server/network diagnostics for the current match.
     pub net_status: SnapshotNetStatus,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct RememberedBuildingView {
+    pub id: u32,
+    pub owner: u32,
+    pub kind: String,
+    pub x: f32,
+    pub y: f32,
+    pub footprint: Vec<[u32; 2]>,
+    pub observed_tick: u32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
