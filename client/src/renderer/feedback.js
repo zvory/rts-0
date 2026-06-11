@@ -7,11 +7,13 @@ import {
   RESOURCE_AMOUNTS,
   AT_GUN_DEPLOYED_RANGE_TILES,
   AT_GUN_FIELD_OF_FIRE_RAD,
+  ARTILLERY_FIELD_OF_FIRE_RAD,
+  ARTILLERY_MAX_RANGE_TILES,
   MORTAR_INNER_RADIUS_TILES,
   MINING_CC_RANGE_TILES,
   isProducerBuilding,
 } from "../config.js";
-import { KIND, ORDER_STAGE, SETUP, STATE, isBuilding, isResource, isUnit } from "../protocol.js";
+import { ABILITY, KIND, ORDER_STAGE, SETUP, STATE, isBuilding, isResource, isUnit } from "../protocol.js";
 import {
   DEPLOYED_WEAPON_ANIM_MS,
   SWEEP_EVICT_FRAMES,
@@ -112,10 +114,12 @@ export function _drawCommandFeedback(state) {
     const t = clamp01(age / 650);
     const alpha = (1 - t) * 0.95;
     const r = 12 + t * 10;
-    const color = f.kind === "attack" || f.kind === "mortar" ? COLORS.selectEnemy : COLORS.selectOwn;
+    const color = f.kind === "attack" || f.kind === "mortar" || f.kind === "artillery"
+      ? COLORS.selectEnemy
+      : COLORS.selectOwn;
 
     g.lineStyle(2, color, alpha);
-    if (f.kind === "mortar") {
+    if (f.kind === "mortar" || f.kind === "artillery") {
       const splash = Number.isFinite(f.radiusTiles) ? f.radiusTiles * 32 : 48;
       drawDashedCircle(g, f.x, f.y, splash, 14);
       g.drawCircle(f.x, f.y, r * 0.45);
@@ -123,6 +127,10 @@ export function _drawCommandFeedback(state) {
       g.lineTo(f.x + r * 0.7, f.y);
       g.moveTo(f.x, f.y - r * 0.7);
       g.lineTo(f.x, f.y + r * 0.7);
+      if (f.kind === "artillery") {
+        g.lineStyle(1.5, 0xffd15c, alpha * 0.82);
+        drawDashedCircle(g, f.x, f.y, splash * 0.45, 10);
+      }
     } else if (f.kind === "attack") {
       g.moveTo(f.x - r, f.y - r);
       g.lineTo(f.x + r, f.y + r);
@@ -168,19 +176,24 @@ export function _drawOrderPlan(state) {
     let fromY = e.y;
     for (let i = 0; i < markers.length; i += 1) {
       const marker = markers[i];
-      const hostile = marker.kind === ORDER_STAGE.ATTACK || marker.kind === ORDER_STAGE.ATTACK_MOVE;
+      const pointFire = marker.kind === ORDER_STAGE.POINT_FIRE;
+      const hostile = marker.kind === ORDER_STAGE.ATTACK || marker.kind === ORDER_STAGE.ATTACK_MOVE || pointFire;
       const attackMove = marker.kind === ORDER_STAGE.ATTACK_MOVE;
-      const color = hostile ? attackColor : moveColor;
+      const color = pointFire ? 0xffd15c : hostile ? attackColor : moveColor;
       const alpha = i === 0 ? 0.68 : 0.48;
       g.lineStyle(2, color, alpha);
-      if (attackMove) {
+      if (attackMove || pointFire) {
         dashedLine(g, fromX, fromY, marker.x, marker.y, 12, 8);
       } else {
         g.moveTo(fromX, fromY);
         g.lineTo(marker.x, marker.y);
       }
 
-      drawQueuedPointMarker(g, marker.x, marker.y, color, hostile);
+      if (pointFire) {
+        drawPointFireMarker(g, marker.x, marker.y, color, 0.92);
+      } else {
+        drawQueuedPointMarker(g, marker.x, marker.y, color, hostile);
+      }
       fromX = marker.x;
       fromY = marker.y;
     }
@@ -249,11 +262,16 @@ export function _drawAtGunSetupPreview(state) {
   const color = 0x4aa3ff;
 
   for (const e of state.selectedEntities()) {
-    if (e.owner !== state.playerId || e.kind !== KIND.AT_TEAM) continue;
+    if (e.owner !== state.playerId || (e.kind !== KIND.AT_TEAM && e.kind !== KIND.ARTILLERY)) continue;
     if (e.setupState !== SETUP.DEPLOYED) continue;
     const facing = finiteNumber(e.setupFacing) ? e.setupFacing : finiteNumber(e.facing) ? e.facing : null;
     if (facing == null) continue;
-    drawFacingWedge(g, e.x, e.y, radius, facing, AT_GUN_FIELD_OF_FIRE_RAD, color, 0.08, 0.26);
+    const weaponRadius = e.kind === KIND.ARTILLERY
+      ? ARTILLERY_MAX_RANGE_TILES * tileSize
+      : radius;
+    const weaponArc = e.kind === KIND.ARTILLERY ? ARTILLERY_FIELD_OF_FIRE_RAD : AT_GUN_FIELD_OF_FIRE_RAD;
+    const weaponColor = e.kind === KIND.ARTILLERY ? 0xffd15c : color;
+    drawFacingWedge(g, e.x, e.y, weaponRadius, facing, weaponArc, weaponColor, 0.045, 0.2);
   }
 
   const preview = state.atGunSetupPreview;
@@ -276,6 +294,24 @@ export function _drawAbilityTargetPreview(state) {
     if (!finiteNumber(carrier.x) || !finiteNumber(carrier.y)) continue;
     g.lineStyle(1.5, rangeColor, 0.85);
     dashedCircle(g, carrier.x, carrier.y, preview.rangePx, 64);
+    if (preview.minRangePx > 0) {
+      g.lineStyle(1.3, 0xd64d45, 0.72);
+      dashedCircle(g, carrier.x, carrier.y, preview.minRangePx, 42);
+      const facing = Math.atan2(preview.mouseY - carrier.y, preview.mouseX - carrier.x);
+      if (preview.ability === ABILITY.POINT_FIRE && Number.isFinite(facing)) {
+        drawFacingWedge(
+          g,
+          carrier.x,
+          carrier.y,
+          preview.rangePx,
+          facing,
+          ARTILLERY_FIELD_OF_FIRE_RAD,
+          0xffd15c,
+          0.035,
+          0.22,
+        );
+      }
+    }
   }
 
   const cursorColor = preview.hoverInRange ? COLORS.selectOwn : COLORS.selectNeutral;
@@ -498,6 +534,56 @@ export function _drawMortarImpacts(state) {
   }
 }
 
+export function _drawArtilleryTargets(state) {
+  const g = this._feedbackGfx;
+  if (!state || typeof state.liveArtilleryTargets !== "function") return;
+  const now = performance.now();
+  const targets = state.liveArtilleryTargets(now);
+  if (!targets.length) return;
+  const ts = (this._map && this._map.tileSize) || 32;
+
+  for (const target of targets) {
+    const ttlMs = Math.max(900, ((target.delayTicks || 0) / 30) * 1000 + 350);
+    const t = clamp01((now - target.createdAt) / ttlMs);
+    const fade = 1 - smoothstep01(Math.max(0, t - 0.72) / 0.28);
+    const radius = Math.max(24, (target.radiusTiles || 3) * ts);
+    g.lineStyle(2.5, 0xffd15c, 0.9 * fade);
+    drawDashedCircle(g, target.x, target.y, radius, 28);
+    g.lineStyle(2, 0xfff2d0, 0.78 * fade);
+    g.moveTo(target.x - 18, target.y);
+    g.lineTo(target.x + 18, target.y);
+    g.moveTo(target.x, target.y - 18);
+    g.lineTo(target.x, target.y + 18);
+    g.lineStyle(1.5, 0x2a2119, 0.6 * fade);
+    drawDashedCircle(g, target.x, target.y, radius * (0.34 + 0.08 * Math.sin(t * Math.PI)), 12);
+  }
+}
+
+export function _drawArtilleryImpacts(state) {
+  const g = this._feedbackGfx;
+  if (!state || typeof state.liveArtilleryImpacts !== "function") return;
+  const now = performance.now();
+  const impacts = state.liveArtilleryImpacts(now);
+  if (!impacts.length) return;
+  const ts = (this._map && this._map.tileSize) || 32;
+
+  for (const impact of impacts) {
+    const age = now - impact.createdAt;
+    const fade = 1 - clamp01(age / 850);
+    const outerRadius = Math.max(48, impact.radiusTiles * ts);
+    const shock = outerRadius * (1.0 + (1 - fade) * 0.34);
+    g.lineStyle(4, 0xfff2d0, 0.92 * fade);
+    drawJaggedRing(g, impact.x, impact.y, shock * 0.45, 16, impact.seed + 3, 0.78, 1.15);
+    g.beginFill(0xff7a28, 0.28 * fade);
+    drawJaggedBlob(g, impact.x, impact.y, shock, 22, impact.seed + 11, 0.62, 1.0);
+    g.endFill();
+    g.beginFill(0x3b2a1c, 0.34 * fade);
+    drawJaggedBlob(g, impact.x, impact.y, shock * 0.62, 14, impact.seed + 23, 0.72, 1.0);
+    g.endFill();
+    drawShrapnel(g, impact.x, impact.y, outerRadius * 0.28, outerRadius * 1.08, impact.seed + 37);
+  }
+}
+
 function drawJaggedBlob(g, cx, cy, radius, points, seed, minScale, maxScale) {
   const poly = [];
   for (let i = 0; i < points; i += 1) {
@@ -597,6 +683,17 @@ function drawQueuedPointMarker(g, x, y, color, attackMove) {
   g.beginFill(color, 0.9);
   g.drawCircle(x, y, 2.5);
   g.endFill();
+}
+
+function drawPointFireMarker(g, x, y, color, alpha = 0.95) {
+  g.lineStyle(2.5, color, alpha);
+  g.drawCircle(x, y, 10);
+  g.moveTo(x - 13, y);
+  g.lineTo(x + 13, y);
+  g.moveTo(x, y - 13);
+  g.lineTo(x, y + 13);
+  g.lineStyle(1.5, color, alpha * 0.78);
+  drawDashedCircle(g, x, y, 18, 12);
 }
 
 function drawDebugCurrentWaypoint(g, x, y, color) {

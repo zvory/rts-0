@@ -12,6 +12,8 @@ import { Fog } from "../client/src/fog.js";
 import {
   AT_GUN_DEPLOYED_RANGE_TILES,
   AT_GUN_FIELD_OF_FIRE_RAD,
+  ARTILLERY_MAX_RANGE_TILES,
+  ARTILLERY_MIN_RANGE_TILES,
   MINING_CC_RANGE_TILES,
   RIFLEMAN_CHARGE_COOLDOWN_TICKS,
   SMOKE_ABILITY_COST,
@@ -1321,6 +1323,19 @@ function fakeAudioContext() {
   assert(EVENT_CODE[EVENT.ARTILLERY_TARGET] === 7, "Artillery target compact event code should be reserved");
   assert(EVENT_CODE[EVENT.ARTILLERY_IMPACT] === 8, "Artillery impact compact event code should be reserved");
   assert(
+    STATS[KIND.ARTILLERY].cost.steel === 300 &&
+      STATS[KIND.ARTILLERY].cost.oil === 100 &&
+      STATS[KIND.ARTILLERY].supply === 5,
+    "Artillery cost and supply mirror server",
+  );
+  assert(STATS[KIND.ARTILLERY].upgradeRequires === UPGRADE.ARTILLERY_UNLOCK, "Artillery training requires its unlock");
+  assert(
+    ABILITIES[ABILITY.POINT_FIRE].carriers.includes(KIND.ARTILLERY) &&
+      ABILITIES[ABILITY.POINT_FIRE].rangeTiles === ARTILLERY_MAX_RANGE_TILES &&
+      ABILITIES[ABILITY.POINT_FIRE].minRangeTiles === ARTILLERY_MIN_RANGE_TILES,
+    "Point Fire ability exposes Artillery carrier, max range, and minimum range",
+  );
+  assert(
     STATS[KIND.STEELWORKS].footW === 3 && STATS[KIND.STEELWORKS].footH === 3,
     "Gun Works should be a 3x3 building",
   );
@@ -1623,7 +1638,7 @@ function fakeAudioContext() {
     const gunWorksHud = Object.create(HUD.prototype);
     gunWorksHud.state = {
       playerId,
-      resources: { steel: 100, oil: 75 },
+      resources: { steel: 300, oil: 200 },
       upgrades: [],
       selectedEntities: () => [selectedGunWorks],
       entitiesInterpolated: () => [selectedGunWorks],
@@ -1634,10 +1649,16 @@ function fakeAudioContext() {
     gunWorksHud._cancelRoundRobin = new Map();
     gunWorksHud._resourceIcons = {};
     gunWorksHud._renderTrainCard(fakeElement("div"), selectedGunWorks);
+    const mortarButton = renderedButtons.find((button) => button.innerHTML.includes("Mortar Team"));
     const atGunButton = renderedButtons.find((button) => button.innerHTML.includes("AT Gun"));
+    const artilleryButton = renderedButtons.find((button) => button.innerHTML.includes("Artillery"));
     const atResearchButton = renderedButtons.find((button) => button.innerHTML.includes("AT+"));
-    assert(atGunButton?.dataset.hotkey === "Q", "AT Gun training should occupy the top-left Q slot");
-    assert(atResearchButton?.dataset.hotkey === "A", "AT Gun Crews research should appear below AT Gun");
+    const artilleryResearchButton = renderedButtons.find((button) => button.innerHTML.includes("AR+"));
+    assert(mortarButton?.dataset.hotkey === "Q", "Mortar Team training should occupy the top-left Q slot");
+    assert(atGunButton?.dataset.hotkey === "W", "AT Gun training should occupy the top-middle W slot");
+    assert(artilleryButton?.dataset.hotkey === "E", "Artillery training should occupy the top-right E slot");
+    assert(atResearchButton?.dataset.hotkey === "S", "AT Gun Crews research should appear below AT Gun");
+    assert(artilleryResearchButton?.dataset.hotkey === "D", "Unlock Artillery research should appear below Artillery");
 
     renderedButtons.length = 0;
     const playedNotices = [];
@@ -1849,6 +1870,26 @@ function fakeAudioContext() {
   assert(state.atGunSetupPreview?.guns?.[0]?.id === 9, "AT setup preview stores selected guns");
   state.endCommandTarget();
   assert(state.atGunSetupPreview === null, "ending command target clears AT setup preview");
+
+  const artilleryState = new GameState({ ...start, map: { ...start.map, resources: [] } });
+  artilleryState.applySnapshot({
+    tick: 10,
+    steel: 0,
+    oil: 0,
+    supplyUsed: 0,
+    supplyCap: 10,
+    entities: [],
+    events: [
+      { e: EVENT.ARTILLERY_TARGET, x: 320, y: 352, radiusTiles: 3, delayTicks: 120 },
+      { e: EVENT.ARTILLERY_IMPACT, x: 336, y: 368, radiusTiles: 3 },
+    ],
+  });
+  assert(artilleryState.liveArtilleryTargets(performance.now()).length === 1, "artillery target event creates a live marker");
+  assert(artilleryState.liveArtilleryImpacts(performance.now()).length === 1, "artillery impact event creates a live explosion");
+  assert(
+    artilleryState.visibleTiles.length === 0,
+    "artillery visual events do not stamp or extend client fog visibility",
+  );
 
   // Interpolation clamps alpha to [0,1]
   const entsNeg = state.entitiesInterpolated(-0.5);
@@ -2517,6 +2558,50 @@ function fakeAudioContext() {
   hotkeyTargetedInput._handleKeyUp({ code: "ShiftLeft", preventDefault() {} });
   assert(hotkeyTargetedInput.state.commandTarget === null, "Shift release clears the queued hotkey target");
   globalThis.document = originalDocument;
+
+  const artilleryCommands = [];
+  const artilleryFeedback = [];
+  const selectedArtillery = { id: 44, owner: 1, kind: KIND.ARTILLERY, x: 100, y: 100 };
+  const pointFireInput = Object.create(Input.prototype);
+  pointFireInput.mouse = { x: 900, y: 100 };
+  pointFireInput.state = {
+    playerId: 1,
+    map: { tileSize: 32 },
+    commandTarget: { kind: "ability", ability: ABILITY.POINT_FIRE },
+    selectedEntities: () => [selectedArtillery],
+    updateAbilityTargetPreview(preview) {
+      this.abilityTargetPreview = preview;
+    },
+    addCommandFeedback(kind, x, y, queued, radiusTiles) {
+      artilleryFeedback.push({ kind, x, y, queued, radiusTiles });
+    },
+  };
+  pointFireInput.net = { command: (command) => artilleryCommands.push(command) };
+  pointFireInput._worldAt = (x, y) => ({ x, y });
+  pointFireInput._selectedOwnUnitIds = () => [selectedArtillery.id];
+  pointFireInput._issueTargetedCommand({ x: 920, y: 116 }, { shiftKey: true });
+  assert(
+    artilleryCommands[0]?.c === "useAbility" &&
+      artilleryCommands[0].ability === ABILITY.POINT_FIRE &&
+      artilleryCommands[0].units[0] === selectedArtillery.id &&
+      artilleryCommands[0].queued === true,
+    "Point Fire targeting issues the dedicated pointFire ability command",
+  );
+  assert(
+    artilleryFeedback[0]?.kind === "artillery" && artilleryFeedback[0].radiusTiles === ABILITIES[ABILITY.POINT_FIRE].radiusTiles,
+    "Point Fire targeting shows artillery command feedback with splash radius",
+  );
+
+  pointFireInput.mouse = { x: selectedArtillery.x + ARTILLERY_MIN_RANGE_TILES * 32 - 8, y: selectedArtillery.y };
+  pointFireInput._refreshAbilityTargetPreview();
+  assert(pointFireInput.state.abilityTargetPreview?.hoverInRange === false, "Point Fire preview rejects the minimum range dead zone");
+  assert(
+    pointFireInput.state.abilityTargetPreview?.minRangePx === ARTILLERY_MIN_RANGE_TILES * 32,
+    "Point Fire preview exposes minimum range in pixels",
+  );
+  pointFireInput.mouse = { x: selectedArtillery.x + ARTILLERY_MIN_RANGE_TILES * 32 + 16, y: selectedArtillery.y };
+  pointFireInput._refreshAbilityTargetPreview();
+  assert(pointFireInput.state.abilityTargetPreview?.hoverInRange === true, "Point Fire preview accepts targets past minimum range");
 }
 
 // ---------------------------------------------------------------------------
