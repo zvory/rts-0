@@ -10,6 +10,7 @@
 
 pub(crate) mod ability;
 mod artillery;
+mod building_memory;
 pub mod command;
 mod commands;
 pub mod entity;
@@ -39,6 +40,7 @@ use crate::rules::{economy as economy_rules, projection};
 use serde::{Deserialize, Serialize};
 
 use artillery::ArtilleryShellStore;
+use building_memory::{BuildingMemory, BuildingMemoryEntry};
 use entity::{BuildPhase, EntityKind, EntityStore};
 use fog::{Fog, LingeringSightSource};
 use map::Map;
@@ -102,6 +104,7 @@ pub struct Game {
     map: Map,
     entities: EntityStore,
     fog: Fog,
+    building_memory: BuildingMemory,
     players: Vec<PlayerState>,
     /// Commands received this tick window, drained at the start of [`tick`]. Each carries the
     /// issuing player so ownership can be validated on apply.
@@ -214,6 +217,7 @@ impl Game {
             self.fog
                 .recompute_with_smoke(&ids, &self.entities, &self.map, &self.smokes);
         });
+        self.refresh_building_memory(&ids);
 
         // In debug builds, assert that the world state is internally consistent.
         // Panics here mean a system violated a documented invariant.
@@ -339,6 +343,7 @@ impl Game {
         let ids: Vec<u32> = self.players.iter().map(|p| p.id).collect();
         self.fog
             .recompute_with_smoke(&ids, &self.entities, &self.map, &self.smokes);
+        self.refresh_building_memory(&ids);
     }
 
     pub fn tick_count(&self) -> u32 {
@@ -359,6 +364,7 @@ impl Game {
         let ids: Vec<u32> = self.players.iter().map(|p| p.id).collect();
         self.fog
             .recompute_with_smoke(&ids, &self.entities, &self.map, &self.smokes);
+        self.refresh_building_memory(&ids);
         Some(id)
     }
 
@@ -383,6 +389,25 @@ impl Game {
     }
 
     // --- internal helpers ------------------------------------------------------
+    fn refresh_building_memory(&mut self, player_ids: &[u32]) {
+        self.building_memory.refresh(
+            player_ids,
+            &self.entities,
+            &self.fog,
+            &self.map,
+            &self.smokes,
+            self.tick,
+        );
+    }
+
+    #[allow(dead_code)]
+    pub(crate) fn building_memory_for(
+        &self,
+        player: u32,
+        building: u32,
+    ) -> Option<&BuildingMemoryEntry> {
+        self.building_memory.get(player, building)
+    }
 }
 
 #[cfg(test)]

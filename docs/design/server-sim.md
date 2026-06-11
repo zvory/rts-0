@@ -21,6 +21,7 @@ crates/
     entity/      # Entity, EntityKind, Order state machines, grouped state, and EntityStore
     pathfinding.rs # A* over the tile grid, with optional turn-cost route shaping for tanks
     fog.rs       # per-player live visibility grid plus snapshot-only lingering death sight sources
+    building_memory.rs # server-only per-player last-seen enemy building records
     systems.rs   # orchestrator: runs services in order each tick
     services/    # per-tick services: commands, order_planner, move_coordinator, movement (incl. unit collision), combat, economy, production, construction, death, occupancy, supply, pathing, geometry, standability, line_of_sight
     replay.rs    # tick-stamped command log replay harness for determinism checks
@@ -352,6 +353,16 @@ auto-acquisition and firing both use the smoke-aware LOS query; explicit attack 
 toward terrain- or smoke-blocked targets but cannot fire until the shot is clear. Future forest
 visibility/cover rules should extend the terrain rules and this service instead of adding ad hoc
 checks to fog or combat.
+
+`game::building_memory::BuildingMemory` is server-only stale intel owned by `Game`. After live,
+smoke-aware fog is recomputed, the store records one latest-seen entry per
+`(viewer_player_id, enemy_building_entity_id)` for non-neutral buildings currently projectable to
+that viewer through actionable fog. Records copy id, owner, kind, center position, footprint tiles,
+hp/max hp, construction progress/completion state, and the tick observed. Snapshot-only lingering
+death vision is intentionally not used for refreshes, so it cannot create actionable intel for
+future commands. If a remembered building no longer exists, the record remains while its footprint
+is hidden and is removed once the viewer scouts any remembered footprint tile. This keeps hidden
+destruction stale until the location is checked without adding any wire-protocol fields.
 
 `services::geometry` owns shared body primitives: infantry unit bodies are circles centered on
 `(x, y)` with the configured unit radius, tanks use an oriented vehicle hull derived from their

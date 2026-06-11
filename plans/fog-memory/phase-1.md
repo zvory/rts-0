@@ -1,6 +1,6 @@
 # Phase 1: Server-Side Building Memory
 
-Status: planned
+Status: implemented
 
 ## Goal
 
