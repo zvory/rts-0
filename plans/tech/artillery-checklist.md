@@ -65,7 +65,7 @@ Working checklist for `plans/tech/phase-6-capstones.md`, following
     tank, and has a new Hard armor class that reduces non-armor-piercing damage by 25%.
   - Artillery automatically sets up toward point-fire targets, takes 3 seconds to set up or tear
     down, and cannot rotate while deployed.
-  - Artillery shells take 4 seconds to land after firing.
+  - Artillery shells take 5 seconds to land after firing.
   - Artillery impact is planned to deal 150 armor-piercing damage in a 1-tile radius, with
     non-armor-piercing splash falloff to 10 damage at 3 tiles.
   - Artillery damage includes friendly fire.
@@ -129,7 +129,7 @@ Read: `docs/context/balance.md`, `docs/design/balance.md`.
   - Setup: 3 seconds. Teardown: 3 seconds.
   - Reload: 3 seconds.
   - Ammunition cost: 10 steel, paid only when a shot actually fires.
-  - Shell travel: 4 seconds after firing.
+  - Shell travel: 5 seconds after firing.
   - Accuracy starts at 5-tile CEP on the first shot after setup and improves to 2-tile CEP on the
     fifth shot after setup while maintaining fire.
   - Impact deals 150 armor-piercing damage in a 1-tile radius.
@@ -244,7 +244,7 @@ movement, production, AI, or self-play behavior.
   - Setup, teardown, and reload are 3 seconds each.
   - Steel is paid only when a shot actually fires; unaffordable shots hold the order and retry
     after the reload delay.
-  - Shells land 4 seconds after firing.
+  - Shells land 5 seconds after firing.
   - Scatter improves from 5 tiles toward 2 tiles across maintained fire after setup.
   - Impacts deal 150 armor-piercing damage inside 1 tile and non-armor-piercing splash falloff to
     10 damage at 3 tiles.
@@ -301,7 +301,7 @@ Read `docs/context/client-ui.md` before changing rendering, HUD, input, or match
   - Packed Artillery keeps its trails tucked in and shows light rear dust while moving.
 - [x] Attacking appearance is specified.
   - Point Fire uses recoil, a short muzzle flash, owner-only target crosshair, and a descending
-    shell cue during the 4-second travel delay.
+    shell cue during the 5-second travel delay.
 - [x] Setup, deployed, channeling, ability, construction, damaged, and death states are specified if
       relevant.
   - Setup/teardown reuses the AT Gun-style support-weapon animation timing; deployed Artillery

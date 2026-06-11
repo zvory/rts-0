@@ -215,8 +215,12 @@ export function _refreshAbilityTargetPreview() {
   const minRangePx = (definition.minRangeTiles || 0) * tileSize;
   const world = this._worldAt(this.mouse.x, this.mouse.y);
   let hoverInRange = false;
+  let hoverInsideMinRange = false;
   for (const c of carriers) {
     const dist = Math.hypot(world.x - c.x, world.y - c.y);
+    if (minRangePx > 0 && dist < minRangePx) {
+      hoverInsideMinRange = true;
+    }
     if (dist <= rangePx && dist >= minRangePx) {
       hoverInRange = true;
       break;
@@ -231,6 +235,7 @@ export function _refreshAbilityTargetPreview() {
     minRangePx,
     radiusPx: (definition.radiusTiles || 0) * tileSize,
     hoverInRange,
+    hoverInsideMinRange,
   });
 }
 

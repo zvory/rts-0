@@ -294,13 +294,14 @@ export function _drawAbilityTargetPreview(state) {
   if (!preview || !Array.isArray(preview.carriers)) return;
   const g = this._feedbackGfx;
   const rangeColor = 0x6fa3ff;
+  const minRangeColor = 0x8f2d2a;
 
   for (const carrier of preview.carriers) {
     if (!finiteNumber(carrier.x) || !finiteNumber(carrier.y)) continue;
     g.lineStyle(1.5, rangeColor, 0.85);
     dashedCircle(g, carrier.x, carrier.y, preview.rangePx, 64);
     if (preview.minRangePx > 0) {
-      g.lineStyle(1.3, 0xd64d45, 0.72);
+      g.lineStyle(1.3, minRangeColor, 0.82);
       dashedCircle(g, carrier.x, carrier.y, preview.minRangePx, 42);
       const facing = Math.atan2(preview.mouseY - carrier.y, preview.mouseX - carrier.x);
       if (preview.ability === ABILITY.POINT_FIRE && Number.isFinite(facing)) {
@@ -319,17 +320,26 @@ export function _drawAbilityTargetPreview(state) {
     }
   }
 
-  const cursorColor = preview.hoverInRange ? COLORS.selectOwn : COLORS.selectNeutral;
+  const cursorInvalid = preview.hoverInsideMinRange === true;
+  const cursorColor = preview.hoverInRange ? COLORS.selectOwn : cursorInvalid ? minRangeColor : COLORS.selectNeutral;
   const radiusPx = preview.radiusPx || 24;
   g.lineStyle(2, cursorColor, 0.95);
   g.beginFill(cursorColor, 0.18);
   g.drawCircle(preview.mouseX, preview.mouseY, radiusPx);
   g.endFill();
   g.lineStyle(2, cursorColor, 0.85);
-  g.moveTo(preview.mouseX - radiusPx * 0.45, preview.mouseY);
-  g.lineTo(preview.mouseX + radiusPx * 0.45, preview.mouseY);
-  g.moveTo(preview.mouseX, preview.mouseY - radiusPx * 0.45);
-  g.lineTo(preview.mouseX, preview.mouseY + radiusPx * 0.45);
+  if (cursorInvalid) {
+    const arm = radiusPx * 0.44;
+    g.moveTo(preview.mouseX - arm, preview.mouseY - arm);
+    g.lineTo(preview.mouseX + arm, preview.mouseY + arm);
+    g.moveTo(preview.mouseX + arm, preview.mouseY - arm);
+    g.lineTo(preview.mouseX - arm, preview.mouseY + arm);
+  } else {
+    g.moveTo(preview.mouseX - radiusPx * 0.45, preview.mouseY);
+    g.lineTo(preview.mouseX + radiusPx * 0.45, preview.mouseY);
+    g.moveTo(preview.mouseX, preview.mouseY - radiusPx * 0.45);
+    g.lineTo(preview.mouseX, preview.mouseY + radiusPx * 0.45);
+  }
 }
 
 export function _drawSelectedMortarRanges(state) {
