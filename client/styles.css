@@ -545,48 +545,62 @@ input[type="text"]:focus {
 
 /* ======================== Replay Branch Staging ======================== */
 #branch-screen {
+  z-index: 20;
   display: flex;
   align-items: flex-start;
   justify-content: center;
-  padding: min(10vh, 72px) 24px 32px;
+  padding: min(7vh, 44px) 16px 24px;
   overflow-y: auto;
   font-family: var(--lobby-font);
-  background:
-    linear-gradient(45deg, rgba(255, 255, 255, 0.035) 25%, transparent 25% 75%, rgba(0, 0, 0, 0.08) 75%),
-    linear-gradient(45deg, rgba(0, 0, 0, 0.08) 25%, transparent 25% 75%, rgba(255, 255, 255, 0.035) 75%),
-    var(--void);
-  background-position: 0 0, 8px 8px;
-  background-size: 16px 16px;
+  background: rgba(9, 11, 12, 0.42);
+}
+
+#game-screen.branch-background #hud,
+#game-screen.branch-background #minimap-wrap,
+#game-screen.branch-background #selection-area,
+#game-screen.branch-background #command-card,
+#game-screen.branch-background #game-menu,
+#game-screen.branch-background #replay-speed {
+  opacity: 0;
+  pointer-events: none;
+}
+
+#game-screen.branch-background #viewport {
+  cursor: default;
 }
 
 .branch-staging-box {
-  width: min(640px, 100%);
-  padding: 28px;
+  width: min(520px, 100%);
+  padding: 18px;
   border: 1px solid var(--panel-edge);
   border-radius: var(--radius);
-  background: rgba(39, 37, 31, 0.98);
+  background: rgba(31, 30, 26, 0.94);
   box-shadow: var(--shadow), inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
+.branch-staging-box .logo {
+  font-size: 28px;
+}
+
 .branch-staging-status {
-  margin: 8px 0 22px;
+  margin: 4px 0 14px;
   text-align: center;
   color: var(--ink-dim);
-  font-size: 14px;
+  font-size: 12px;
 }
 
 .branch-seat-list {
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
 
 .branch-seat {
   display: grid;
-  grid-template-columns: 16px minmax(0, 1fr) auto;
-  gap: 12px;
+  grid-template-columns: 12px minmax(0, 1fr) auto;
+  gap: 10px;
   align-items: center;
-  min-height: 68px;
-  padding: 12px;
+  min-height: 50px;
+  padding: 8px 10px;
   border: 1px solid var(--panel-edge);
   border-radius: var(--radius-sm);
   background: var(--void);
@@ -598,8 +612,8 @@ input[type="text"]:focus {
 }
 
 .branch-seat .player-color {
-  width: 14px;
-  height: 36px;
+  width: 10px;
+  height: 28px;
   border: 1px solid rgba(255, 255, 255, 0.25);
   border-radius: 2px;
 }
@@ -612,20 +626,26 @@ input[type="text"]:focus {
 .branch-viewers h2 {
   margin: 0;
   color: var(--ink);
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 400;
   letter-spacing: 0;
 }
 
 .branch-seat p {
-  margin: 4px 0 0;
+  margin: 2px 0 0;
   color: var(--ink-dim);
   font-size: 12px;
 }
 
+.branch-seat .btn,
+.branch-actions .btn {
+  padding: 7px 11px;
+  font-size: 13px;
+}
+
 .branch-viewers {
-  margin-top: 20px;
-  padding-top: 16px;
+  margin-top: 14px;
+  padding-top: 12px;
   border-top: 1px solid var(--panel-edge);
 }
 
@@ -655,7 +675,7 @@ input[type="text"]:focus {
 .branch-actions {
   display: flex;
   justify-content: flex-end;
-  margin-top: 22px;
+  margin-top: 14px;
 }
 
 /* Player row pieces (class names emitted by lobby.js). */
