@@ -84,68 +84,68 @@ Patch notes:
 ## Phase 3 - Dust Cloud And Mortar Art Polish
 
 Client rendering:
-- Double the mortar impact dust cloud size.
-- Make the dust thicker/more opaque or denser.
-- Make the dust animation last twice as long.
-- Shift the mortar explosion palette from orangered toward a clearer orange-yellow blast.
-- Adjust mortar wheels to be slightly thinner.
-- Make wheels less circular and more pill shaped.
-- Team-color the mortar legs so the deployed weapon reads as belonging to the owning player.
+- [x] Double the mortar impact dust cloud size.
+- [x] Make the dust thicker/more opaque or denser.
+- [x] Make the dust animation last twice as long.
+- [x] Shift the mortar explosion palette from orangered toward a clearer orange-yellow blast.
+- [x] Adjust mortar wheels to be slightly thinner.
+- [x] Make wheels less circular and more pill shaped.
+- [x] Team-color the mortar legs so the deployed weapon reads as belonging to the owning player.
 
 Checks:
-- Mortar impacts remain readable at normal zoom.
-- Larger/longer dust does not obscure too much battlefield state.
-- Mortar art remains visually distinct from AT guns and machine gunners.
-- Team-colored legs remain visible against terrain and do not make the mortar body unreadable.
+- [x] Mortar impacts remain readable at normal zoom.
+- [x] Larger/longer dust does not obscure too much battlefield state.
+- [x] Mortar art remains visually distinct from AT guns and machine gunners.
+- [x] Team-colored legs remain visible against terrain and do not make the mortar body unreadable.
 
 Patch notes:
-- Mortar impacts have larger, thicker, longer-lasting dust clouds with a more orange-yellow blast.
-- Mortar wheels have a slimmer pill-shaped profile, and mortar legs now use team color.
+- [x] Mortar impacts have larger, thicker, longer-lasting dust clouds with a more orange-yellow blast.
+- [x] Mortar wheels have a slimmer pill-shaped profile, and mortar legs now use team color.
 
 ## Phase 4 - Mortar Range And Autocast Command Affordances
 
 Client UI behavior:
-- Draw a dotted firing-range circle for each selected owned Mortar Team, using the same range value
+- [x] Draw a dotted firing-range circle for each selected owned Mortar Team, using the same range value
   as the mortar fire command preview.
-- Show a swirling autocast animation on the Mortar Team Fire command-card button while autocast is
+- [x] Show a swirling autocast animation on the Mortar Team Fire command-card button while autocast is
   enabled.
-- Add command-card right-click handling for the Mortar Team Fire button that disables autocast for
+- [x] Add command-card right-click handling for the Mortar Team Fire button that disables autocast for
   the selected Mortar Teams.
-- If autocast state is not already represented on the wire when this phase is implemented, add the
+- [x] If autocast state is not already represented on the wire when this phase is implemented, add the
   smallest server/protocol/client extension needed to expose and toggle it.
 
 Tests/checks:
-- Selecting one or more Mortar Teams shows dotted range circles centered on each selected mortar.
-- Range circles disappear when mortars are deselected or when a non-mortar selection replaces them.
-- The Fire button's autocast swirl is visible only while autocast is enabled.
-- Right-clicking the Fire button disables autocast for the selected mortars without arming manual
+- [x] Selecting one or more Mortar Teams shows dotted range circles centered on each selected mortar.
+- [x] Range circles disappear when mortars are deselected or when a non-mortar selection replaces them.
+- [x] The Fire button's autocast swirl is visible only while autocast is enabled.
+- [x] Right-clicking the Fire button disables autocast for the selected mortars without arming manual
   targeting.
 
 Patch notes:
-- Selected Mortar Teams now show their firing range.
-- Mortar autocast has a visible command-card state and can be disabled from the Fire button.
+- [x] Selected Mortar Teams now show their firing range.
+- [x] Mortar autocast has a visible command-card state and can be disabled from the Fire button.
 
 ## Phase 5 - Repeated Hotkey Targeting For Mortars And Scout Cars
 
 Client input behavior:
-- When multiple mortars are selected and the player holds `X` or the fire hotkey, repeated clicks
+- [x] When multiple mortars are selected and the player holds `X` or the fire hotkey, repeated clicks
   should issue repeated fire commands instead of treating the second click as a normal selection
   click.
-- Preserve selection while the hotkey-targeting mode is active.
-- Each click should pick an eligible selected mortar, so multiple mortars can be assigned across
+- [x] Preserve selection while the hotkey-targeting mode is active.
+- [x] Each click should pick an eligible selected mortar, so multiple mortars can be assigned across
   multiple clicks.
-- Apply the same repeated hotkey-click behavior to scout cars for their relevant command.
-- Keep existing normal click selection behavior when no command hotkey is held.
+- [x] Apply the same repeated hotkey-click behavior to scout cars for their relevant command.
+- [x] Keep existing normal click selection behavior when no command hotkey is held.
 
 Tests/checks:
-- Multi-select mortars, hold `X`, click several target points: selection remains intact and
+- [x] Multi-select mortars, hold `X`, click several target points: selection remains intact and
   multiple mortar commands are issued.
-- Multi-select scout cars, hold the relevant hotkey, click several target points: selection remains
+- [x] Multi-select scout cars, hold the relevant hotkey, click several target points: selection remains
   intact and multiple commands are issued.
-- Releasing the hotkey returns clicks to normal selection/command behavior.
+- [x] Releasing the hotkey returns clicks to normal selection/command behavior.
 
 Patch notes:
-- Holding the fire hotkey now supports repeated point targeting for selected Mortars and Scout
+- [x] Holding the fire hotkey now supports repeated point targeting for selected Mortars and Scout
   Cars without losing selection.
 
 ## Phase 6 - Design Documentation
@@ -165,9 +165,9 @@ Update docs after behavior is implemented:
 
 1. Friendly fire and autocast safety. Done.
 2. Projectile/preview lifetime, including protocol only if required.
-3. Dust and mortar art polish.
-4. Selected range display and autocast command affordances.
-5. Repeated hotkey targeting for mortars and scout cars.
+3. Dust and mortar art polish. Done.
+4. Selected range display and autocast command affordances. Done.
+5. Repeated hotkey targeting for mortars and scout cars. Done.
 6. Design docs and final verification.
 
 ## Final Verification

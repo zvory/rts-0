@@ -1,4 +1,4 @@
-import { cmd, PASSABLE, isUnit, isBuilding, isResource, KIND } from "../protocol.js";
+import { ABILITY, cmd, PASSABLE, isUnit, isBuilding, isResource, KIND } from "../protocol.js";
 import { MINING_CC_RANGE_TILES, STATS, TANK_BODY, isProducerBuilding } from "../config.js";
 import { DEFAULT_HIT_RADIUS, DEFAULT_TILE_SIZE, HIT_PAD_PX, OWN_HIT_BONUS, ZOOM_STEP } from "./constants.js";
 import { isTextEntry } from "./placement.js";
@@ -47,7 +47,11 @@ export function _handleKeyDown(ev) {
     if (commandHotkey.armed?.quickCast) {
       this._quickCastCommandTarget(ev);
     }
-    if (ev.shiftKey && this.state.commandTarget && typeof this.state.holdCommandTarget === "function") {
+    if (
+      this.state?.commandTarget &&
+      typeof this.state.holdCommandTarget === "function" &&
+      (ev.shiftKey || repeatedWorldAbilityHotkeyTarget(this.state.commandTarget))
+    ) {
       this.state.holdCommandTarget(this.state.commandTarget, ev.code, ev.shiftKey);
     }
     return;
@@ -72,6 +76,13 @@ export function _handleKeyDown(ev) {
     default:
       return;
   }
+}
+
+function repeatedWorldAbilityHotkeyTarget(target) {
+  return target?.kind === "ability" && (
+    target.ability === ABILITY.MORTAR_FIRE ||
+    target.ability === ABILITY.SMOKE
+  );
 }
 
 export function _handleKeyUp(ev) {

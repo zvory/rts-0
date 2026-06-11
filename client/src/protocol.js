@@ -47,6 +47,7 @@ export const CMD = Object.freeze({
   TEAR_DOWN_AT_GUNS: "tearDownAtGuns",
   CHARGE: "charge",
   USE_ABILITY: "useAbility",
+  SET_AUTOCAST: "setAutocast",
   GATHER: "gather",
   BUILD: "build",
   TRAIN: "train",
@@ -155,7 +156,7 @@ export const REPLAY_VISION = Object.freeze({
 });
 
 // --- Compact snapshot wire schema (must match protocol.rs) ---
-export const COMPACT_SNAPSHOT_VERSION = 13;
+export const COMPACT_SNAPSHOT_VERSION = 14;
 
 export const KIND_CODE = Object.freeze({
   [KIND.WORKER]: 1,
@@ -465,14 +466,17 @@ function assignAbilities(target, fields, index) {
 }
 
 function readAbilityCooldown(record, label) {
-  const fields = readArray(record, label, 3);
-  if (fields.length !== 2 && fields.length !== 3) throw new Error(`${label} field count mismatch`);
+  const fields = readArray(record, label, 4);
+  if (fields.length < 2 || fields.length > 4) throw new Error(`${label} field count mismatch`);
   const ability = {
     ability: readCode(fields[0], ABILITY_BY_CODE, `${label}.ability`),
     cooldownLeft: readU32(fields[1], `${label}.cooldownLeft`),
   };
   if (fields.length > 2 && fields[2] != null) {
     ability.remainingUses = readU32(fields[2], `${label}.remainingUses`);
+  }
+  if (fields.length > 3 && fields[3] != null) {
+    ability.autocastEnabled = readBool(fields[3], `${label}.autocastEnabled`);
   }
   return ability;
 }
@@ -780,6 +784,7 @@ export const cmd = Object.freeze({
     if (y != null) command.y = y;
     return withQueued(command, queued);
   },
+  setAutocast: (ability, units, enabled) => ({ c: CMD.SET_AUTOCAST, ability, units, enabled }),
   pointFire: (units, x, y, queued = false) =>
     withQueued({ c: CMD.USE_ABILITY, ability: ABILITY.POINT_FIRE, units, x, y }, queued),
   gather: (units, node, queued = false) =>

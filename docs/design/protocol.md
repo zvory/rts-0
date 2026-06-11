@@ -45,6 +45,7 @@ crate.
 | `tearDownAtGuns` | `units: u32[]` | Pack up owned AT guns that are `setting_up` or `deployed`. Other selected units are ignored. |
 | `charge`     | `units: u32[]` | Legacy Rifleman Charge activation. Preserved for old clients/replays, but no longer has eligible carriers. |
 | `useAbility` | `ability: "charge"|"smoke"|"mortarFire"|"pointFire"`, `units: u32[]`, `x?: f32`, `y?: f32`, `queued?: bool` | Generic ability command. `charge` is legacy/no-op; `smoke`, `mortarFire`, and Artillery `pointFire` target a world point. Smoke command execution is phased separately from the authoritative smoke world-state/LOS model; mortar fire schedules a delayed area impact. Artillery point fire is terminal in the unit order queue: once accepted, later queued unit orders are not appended after it. |
+| `setAutocast` | `ability: "mortarFire"`, `units: u32[]`, `enabled: bool` | Toggle server-authoritative autocast for owned Mortar Teams. Other unit/ability combinations are ignored. |
 | `gather`     | `units: u32[]`, `node: u32`, `queued?: bool` | Send workers to harvest a resource node. When `queued` is true, store future gather intent instead of replacing the active order. |
 | `build`      | `units: u32[]`, `building: string`, `tileX: u32`, `tileY: u32`, `queued?: bool` | Selected workers construct a building at a tile. The server allocates one compatible worker per build click, first walks that worker to a nearby point outside the requested footprint, then starts construction once it is in range. `building` ∈ building kinds. When `queued` is true, store future build intent instead of replacing the active order. |
 | `train`      | `building: u32`, `unit: string` | Queue a unit at a production building. |
@@ -259,10 +260,12 @@ after `debugPath` in compact snapshots to preserve older optional slot positions
 capped at four stages, and uses the same `[kind, x, y]` compact stage encoding with `move` and
 `attackMove` stages.
 The `abilities` slot is owner-only and capped at 8 entries. Each compact ability cooldown is
-`[ability, cooldownLeft, remainingUses?]`, where `ability` is 2 `smoke`, 3 `mortarFire`, or
-4 `pointFire`; 1 `charge` is legacy.
+`[ability, cooldownLeft, remainingUses?, autocastEnabled?]`, where `ability` is 2 `smoke`,
+3 `mortarFire`, or 4 `pointFire`; 1 `charge` is legacy.
 `remainingUses` is present for finite-use abilities such as Scout Car Smoke; a value of `0`
 means the ability is depleted and cannot be used by that caster.
+`autocastEnabled` is present for Mortar Team `mortarFire` so the command card can display and
+toggle autocast without exposing enemy data.
 `visionOnly` is true only for non-owned units/buildings visible through lingering death vision;
 clients render them below the fog overlay and must not select or issue targeted commands against
 them. In `n.flags`, bit 0 = `slowTick` and bit 1 = `headOfLine`.
@@ -322,7 +325,8 @@ events, and positioned notices remain fog-gated and are withheld when smoke hide
   ],
   chargeCooldownLeft?: u16,      // legacy; no longer projected by current server
   abilities?: [                  // owner-only ability affordance/cooldown data
-    { ability: "smoke", cooldownLeft: u16, remainingUses?: u16 }
+    { ability: "smoke"|"mortarFire"|"pointFire", cooldownLeft: u16,
+      remainingUses?: u16, autocastEnabled?: bool }
   ],
   visionOnly?: bool,             // true = visible only through one-second death vision; visual intel only
   debugPath?: {                  // lobby Debug mode only; remaining movement path; ONLY ever sent to the owner

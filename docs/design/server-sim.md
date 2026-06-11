@@ -219,7 +219,9 @@ They damage friendly and enemy units/buildings with the same falloff and armor r
 are ignored. Idle/attack-move autocast is conservative: before scheduling a shell, combat checks the
 predicted impact point against owned units and buildings at their current positions and holds fire if
 any would be inside the damaging radius. Manual mortar fire is intentionally allowed onto friendly
-positions, so players can still take risky shots deliberately.
+positions, so players can still take risky shots deliberately. Mortar autocast is stored on the
+authoritative combat state and can be disabled through `SetAutocast(mortarFire, enabled=false)`;
+disabled mortars still accept manual `mortarFire` commands.
 
 `server/crates/archcheck` classifies each top-level service module before accepting
 service-to-service imports. The roles are intentionally coarse:

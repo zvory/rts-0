@@ -39,6 +39,7 @@ import {
   _drawMuzzleFlashes,
   _drawMortarImpacts,
   _drawMortarLaunches,
+  _drawSelectedMortarRanges,
   _drawMortarShells,
   _drawMortarTargets,
   _drawOrderPlan,
@@ -226,6 +227,7 @@ export class Renderer {
     this._drawMortarImpacts(state);
     this._drawArtilleryTargets(state);
     this._drawArtilleryImpacts(state);
+    this._drawSelectedMortarRanges(state);
     this._drawAbilityTargetPreview(state);
     this._drawAtGunSetupPreview(state);
     this._drawOrderPlan(state);
@@ -457,6 +459,7 @@ Object.assign(Renderer.prototype, {
   _drawArtilleryTargets,
   _drawArtilleryImpacts,
   _drawAbilityTargetPreview,
+  _drawSelectedMortarRanges,
   _drawSmokes,
   _drawAtGunSetupPreview,
   _drawOrderPlan,

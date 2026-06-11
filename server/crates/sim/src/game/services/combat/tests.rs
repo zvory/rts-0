@@ -1410,6 +1410,37 @@ fn mortar_autocast_fires_when_predicted_impact_is_clear_of_owned_entities() {
 }
 
 #[test]
+fn mortar_autocast_disabled_holds_fire_without_blocking_manual_state() {
+    let mut entities = EntityStore::new();
+    let mortar_id = entities
+        .spawn_unit(1, EntityKind::MortarTeam, 100.0, 100.0)
+        .expect("mortar should spawn");
+    entities
+        .spawn_unit(2, EntityKind::Rifleman, 220.0, 100.0)
+        .expect("enemy should spawn");
+    if let Some(mortar) = entities.get_mut(mortar_id) {
+        mortar.set_facing(0.0);
+        mortar.set_weapon_facing(0.0);
+        mortar.set_weapon_setup(WeaponSetup::Deployed);
+        mortar.set_autocast_enabled(AbilityKind::MortarFire, false);
+    }
+
+    run_combat_tick(&mut entities);
+
+    let mortar = entities.get(mortar_id).expect("mortar should exist");
+    assert_eq!(
+        mortar.autocast_enabled(AbilityKind::MortarFire),
+        Some(false),
+        "autocast toggle should remain disabled"
+    );
+    assert_eq!(
+        mortar.attack_cd(),
+        0,
+        "disabled autocast mortar should hold fire against visible in-range targets"
+    );
+}
+
+#[test]
 fn deployed_at_team_clamps_to_field_edge_and_does_not_fire_outside_arc() {
     let mut entities = EntityStore::new();
     let at_id = entities

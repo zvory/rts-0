@@ -425,7 +425,7 @@ export class GameState {
    * @returns {Array<{x:number,y:number,radiusTiles:number,seed:number,createdAt:number}>}
    */
   liveMortarImpacts(now) {
-    const ttlMs = 500;
+    const ttlMs = 1000;
     this.mortarImpacts = this.mortarImpacts.filter((f) => now - f.createdAt <= ttlMs);
     return this.mortarImpacts;
   }

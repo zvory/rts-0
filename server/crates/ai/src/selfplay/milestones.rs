@@ -481,6 +481,7 @@ impl PlayerMilestones {
             | Command::SetupAtGuns { .. }
             | Command::TearDownAtGuns { .. }
             | Command::UseAbility { .. }
+            | Command::SetAutocast { .. }
             | Command::Gather { .. }
             | Command::Build { .. }
             | Command::Train { .. }

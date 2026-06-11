@@ -44,6 +44,11 @@ pub enum SimCommand {
         y: Option<f32>,
         queued: bool,
     },
+    SetAutocast {
+        ability: AbilityKind,
+        units: Vec<u32>,
+        enabled: bool,
+    },
     Gather {
         units: Vec<u32>,
         node: u32,
@@ -172,6 +177,20 @@ impl SimCommand {
                     reason: CommandRejection::Ability,
                 },
             },
+            protocol::Command::SetAutocast {
+                ability,
+                units,
+                enabled,
+            } => match ability.parse::<AbilityKind>() {
+                Ok(ability) => SimCommand::SetAutocast {
+                    ability,
+                    units,
+                    enabled,
+                },
+                Err(_) => SimCommand::Rejected {
+                    reason: CommandRejection::Ability,
+                },
+            },
             protocol::Command::Gather {
                 units,
                 node,
@@ -295,6 +314,15 @@ impl SimCommand {
                 x: *x,
                 y: *y,
                 queued: *queued,
+            },
+            SimCommand::SetAutocast {
+                ability,
+                units,
+                enabled,
+            } => protocol::Command::SetAutocast {
+                ability: ability.to_protocol_str().to_string(),
+                units: units.clone(),
+                enabled: *enabled,
             },
             SimCommand::Gather {
                 units,
