@@ -1,5 +1,9 @@
 # Phase 1 - Client Architecture Checker
 
+## Phase Status
+
+- [ ] Pending implementation.
+
 ## Objective
 
 Add a lightweight architecture checker for `client/src` that prevents new coupling while accepting
@@ -56,6 +60,12 @@ test selection. At handoff, tell the user:
 
 > Manual testing: none expected. This phase has no runtime client behavior change. Please review
 > only if the checker or suite selection behaves unexpectedly.
+
+## Handoff Expectations
+
+In the final handoff, include the completed segment checklist, exact verification output summary,
+and the manual testing note above. Tell the next agent to start Phase 2 only after this phase is
+committed, merged to `main`, and pushed.
 
 ## Safety Notes
 

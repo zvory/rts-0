@@ -1,5 +1,9 @@
 # Phase 6 - Agent Workflow and Documentation
 
+## Phase Status
+
+- [ ] Pending implementation.
+
 ## Objective
 
 Make the client architecture rules visible to future agents and cheap to follow. This phase turns
@@ -51,6 +55,12 @@ tell the user:
 > Manual testing: none expected for docs-only workflow updates. If runtime client code changed,
 > manually smoke only that changed surface and explain why it was touched in this documentation
 > phase.
+
+## Handoff Expectations
+
+In the final handoff, include the completed segment checklist, exact verification output summary,
+and the manual testing note above. Since this is the last planned phase, state any follow-up gaps
+that remain instead of pointing to another numbered phase.
 
 ## Safety Notes
 

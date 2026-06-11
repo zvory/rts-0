@@ -1,5 +1,9 @@
 # Phase 3 - Match Health Extraction
 
+## Phase Status
+
+- [ ] Pending implementation.
+
 ## Objective
 
 Move network-health bookkeeping out of `Match` into a small, non-visual collaborator. This reduces
@@ -56,6 +60,12 @@ At handoff, ask the user to do this quick browser check:
 > 3. Switch tabs briefly, return to the match, and confirm the badge does not get stuck in a stale
 >    warning state.
 > 4. Report any missing badge text, persistent warning after recovery, or console error.
+
+## Handoff Expectations
+
+In the final handoff, include the completed segment checklist, exact verification output summary,
+and the filled manual testing prompt above. Tell the next agent to start Phase 4 only after this
+phase is committed, merged to `main`, and pushed.
 
 ## Safety Notes
 

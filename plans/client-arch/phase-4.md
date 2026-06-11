@@ -1,5 +1,9 @@
 # Phase 4 - Replay Controls Extraction
 
+## Phase Status
+
+- [ ] Pending implementation.
+
 ## Objective
 
 Move replay and scenario speed/vision control logic out of `Match` while preserving identical DOM
@@ -59,6 +63,12 @@ At handoff, ask the user to do this focused replay/scenario check:
 > 5. Switch replay vision targets in both single-player and multi-player replay states if available.
 > 6. Leave/re-enter the replay or scenario and report duplicated controls, stale status text,
 >    broken selected states, or console errors.
+
+## Handoff Expectations
+
+In the final handoff, include the completed segment checklist, exact verification output summary,
+and the filled manual testing prompt above. Tell the next agent to start Phase 5 only after this
+phase is committed, merged to `main`, and pushed.
 
 ## Safety Notes
 
