@@ -31,6 +31,18 @@ availability easier to test.
   - spectator/replay hidden command card behavior if applicable
 - Avoid broad selected-panel or resource-bar changes in this phase.
 
+## Implementation Segments
+
+Mark each segment complete as it lands:
+
+- [ ] Add the pure command-card descriptor layer with plain-object button descriptors.
+- [ ] Convert `HUD` command-card rendering to consume descriptors while preserving existing output.
+- [ ] Preserve command dispatch, hotkeys, repeatability, enabled/disabled behavior, and tooltips.
+- [ ] Add descriptor-level tests for worker build, production, hotkeys, targeting, upgrades, and
+  spectator/replay hidden states.
+- [ ] Add DOM-property tests for any changed command-card HTML generation.
+- [ ] Run verification and record the exact changed command families in the final handoff.
+
 ## Verification
 
 - `node tests/client_contracts.mjs`
@@ -38,6 +50,25 @@ availability easier to test.
 - Client smoke when practical.
 - For any changed command-card HTML generation, add a test that compares important class/data/text
   properties rather than relying on screenshot inspection.
+
+## Manual Test Prompt
+
+At handoff, ask the user to do this command-card pass:
+
+> Manual testing requested, 20-30 minutes:
+> 1. Select a worker, open/close the build menu, place a building, and confirm affordability and
+>    disabled states look unchanged.
+> 2. Select one production building, train units by click and hotkey, then hold a repeatable train
+>    hotkey long enough to confirm repeat behavior.
+> 3. Select multiple compatible production buildings and confirm training still spreads across them.
+> 4. Queue and cancel production, including cancel hotkeys where available.
+> 5. Use at least one targeted ability/order button and confirm the targeting cursor and issued
+>    command are unchanged.
+> 6. Check upgrade-gated buttons before and after requirements are met if the current scenario makes
+>    that practical.
+> 7. Enter spectator/replay mode if available and confirm command cards stay hidden or inert.
+> 8. Report changed labels, missing icons/hotkeys/tooltips, wrong disabled states, misfired
+>    commands, or console errors.
 
 ## Safety Notes
 

@@ -33,11 +33,29 @@ the current client shape. This phase should not change runtime client behavior.
 - Add a suite name such as `client-architecture` to `tests/select-suites.mjs`, selected for
   `client/src/**`, `scripts/check-client-architecture.mjs`, and this plan/check docs.
 
+## Implementation Segments
+
+Mark each segment complete as it lands:
+
+- [ ] Add the client architecture checker script and current module-area classification.
+- [ ] Add conservative import-rule enforcement and explicit current-state allowlist reasons.
+- [ ] Add prototype-grafting guardrails and baseline file-size/fan-in/fan-out reporting.
+- [ ] Wire the checker into `tests/run-all.sh` and suite selection.
+- [ ] Run verification and record the exact results in the final handoff.
+
 ## Verification
 
 - `node scripts/check-client-architecture.mjs`
 - `node tests/select-suites.mjs --verify`
 - `tests/run-all.sh --no-client` should include and pass the client architecture check.
+
+## Manual Test Prompt
+
+No manual UI test should be required for this phase because it only reads source files and updates
+test selection. At handoff, tell the user:
+
+> Manual testing: none expected. This phase has no runtime client behavior change. Please review
+> only if the checker or suite selection behaves unexpectedly.
 
 ## Safety Notes
 

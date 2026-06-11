@@ -50,3 +50,19 @@ they add enforcement and remove the current concrete boundary inversion without 
 Phases 3 through 5 should be done one at a time, with each phase landing only after its contract
 tests and smoke test pass. If any phase starts requiring visual judgment to prove correctness, stop
 and add a narrower programmatic check before continuing.
+
+## Agent Progress And Handoff Rules
+
+Each phase file has an "Implementation Segments" checklist. Agents must mark each segment complete
+as they finish it, not only at the end. If a segment becomes unnecessary, mark it complete with a
+short note explaining why it was skipped.
+
+At handoff, agents must include:
+
+- the final completed segment checklist
+- the verification commands they ran and their results
+- the "Manual Test Prompt" from that phase, filled in with anything that changed or could not be
+  verified automatically
+
+Manual testing should stay scoped to the changed surface. If an agent believes a broader manual pass
+is needed, they should say which automated or contract check is missing before asking for it.
