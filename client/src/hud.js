@@ -662,7 +662,14 @@ export class HUD {
   }
 
   _abilityRequiresSetup(entity, definition) {
-    return definition.ability === ABILITY.POINT_FIRE && entity.setupState !== SETUP.DEPLOYED;
+    return definition.ability === ABILITY.POINT_FIRE &&
+      entity.setupState !== SETUP.DEPLOYED &&
+      !this._hasPointFireOrder(entity);
+  }
+
+  _hasPointFireOrder(entity) {
+    return Array.isArray(entity?.orderPlan) &&
+      entity.orderPlan.some((marker) => marker?.kind === ORDER_STAGE.POINT_FIRE);
   }
 
   _selectedAbilityAffordances(sel) {

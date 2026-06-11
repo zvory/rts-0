@@ -287,6 +287,22 @@ function withFakeDocument(fn) {
     packedPointFire.title === "Set up artillery before using Point Fire",
     "packed artillery Point Fire should explain the setup requirement",
   );
+  const redeployingArtillery = {
+    ...artillery,
+    id: 33,
+    setupState: SETUP.TEARING_DOWN,
+    orderPlan: [{ kind: ORDER_STAGE.POINT_FIRE, x: 720, y: 360 }],
+  };
+  const redeployingPointFireCard = buildCommandCardDescriptors(commandCardCtx({
+    selection: [redeployingArtillery],
+    entities: [{ id: 40, owner: 1, kind: KIND.STEELWORKS }, redeployingArtillery],
+    resources: { steel: 1000, oil: 1000 },
+  }));
+  const redeployingPointFire = buttonByLabel(redeployingPointFireCard, "Point Fire");
+  assert(
+    redeployingPointFire.enabled,
+    "artillery already redeploying for Point Fire should allow retargeting",
+  );
 
   const steelworks = { id: 50, owner: 1, kind: KIND.STEELWORKS, buildProgress: null };
   const upgradeCard = buildCommandCardDescriptors(commandCardCtx({
