@@ -200,6 +200,72 @@ function drawMortarTeam(g, r, tint, facing, weaponFacing, setup, recoil) {
   g.endFill();
 }
 
+function drawArtillery(g, body, tint, facing, weaponFacing, setup, recoil, motion) {
+  const deploy = clamp01(setup.prongFactor);
+  drawTankTracks(g, body, facing, motion);
+
+  g.beginFill(tint, 0.97);
+  g.drawPolygon(rotatedArtilleryHull(body, facing));
+  g.endFill();
+  g.beginFill(0x1a1712, 0.2);
+  drawRotatedRect(g, -body.halfLen * 0.08, 0, body.halfLen * 1.34, body.halfWidth * 0.92, facing);
+  g.endFill();
+
+  const trailSpread = body.halfWidth * (0.44 + deploy * 0.46);
+  const trailRear = -body.halfLen * (0.34 + deploy * 0.28);
+  const trailRoot = rotatePoint(-body.halfLen * 0.08, 0, weaponFacing);
+  const trailL = rotatePoint(trailRear, -trailSpread, weaponFacing);
+  const trailR = rotatePoint(trailRear, trailSpread, weaponFacing);
+  g.lineStyle(4, 0x2a2119, 0.92 * deploy);
+  g.moveTo(trailRoot.x, trailRoot.y);
+  g.lineTo(trailL.x, trailL.y);
+  g.moveTo(trailRoot.x, trailRoot.y);
+  g.lineTo(trailR.x, trailR.y);
+
+  const tireLength = body.halfWidth * 0.58;
+  const tireWidth = body.halfWidth * 0.25;
+  for (const y of [-body.halfWidth * 0.74, body.halfWidth * 0.74]) {
+    const wheel = rotatePoint(-body.halfLen * 0.15, y, facing);
+    drawGunTire(g, wheel.x, wheel.y, tireLength, tireWidth, facing);
+  }
+
+  g.beginFill(0x1a1712, 0.3);
+  drawRotatedRect(g, body.halfLen * 0.1, 0, body.halfLen * 0.92, body.halfWidth * 0.74, weaponFacing);
+  g.endFill();
+  g.beginFill(tint, 0.98);
+  drawRotatedRect(g, body.halfLen * 0.07, 0, body.halfLen * 0.68, body.halfWidth * 0.64, weaponFacing);
+  g.endFill();
+
+  const kick = recoilVector(weaponFacing, recoil * 0.8);
+  const breech = offsetPoint(rotatePoint(body.halfLen * 0.18, 0, weaponFacing), kick);
+  const muzzle = offsetPoint(rotatePoint(body.halfLen * 1.52, 0, weaponFacing), kick);
+  g.lineStyle(8, 0x241d17, 0.98);
+  g.moveTo(breech.x, breech.y);
+  g.lineTo(muzzle.x, muzzle.y);
+  g.lineStyle(2.5, 0xd8d0b0, 0.58);
+  g.moveTo(breech.x + Math.sin(weaponFacing) * 3, breech.y - Math.cos(weaponFacing) * 3);
+  g.lineTo(muzzle.x + Math.sin(weaponFacing) * 3, muzzle.y - Math.cos(weaponFacing) * 3);
+  g.beginFill(0x3d3528, 0.98);
+  drawFreeRotatedRect(g, breech.x, breech.y, body.halfLen * 0.34, body.halfWidth * 0.44, weaponFacing);
+  g.endFill();
+}
+
+function rotatedArtilleryHull(body, facing) {
+  const nose = body.halfLen;
+  const rear = -body.halfLen;
+  const w = body.halfWidth;
+  return [
+    rotatePoint(rear + 5, -w + 5, facing),
+    rotatePoint(nose - 8, -w + 4, facing),
+    rotatePoint(nose, -w * 0.48, facing),
+    rotatePoint(nose, w * 0.48, facing),
+    rotatePoint(nose - 8, w - 4, facing),
+    rotatePoint(rear + 5, w - 5, facing),
+    rotatePoint(rear, w * 0.64, facing),
+    rotatePoint(rear, -w * 0.64, facing),
+  ].flatMap((p) => [p.x, p.y]);
+}
+
 export function _drawUnit(e, colorByOwner, state, pools = {}) {
   const shadowPool = pools.shadow || "unitShadows";
   const unitPool = pools.unit || "units";
@@ -214,6 +280,8 @@ export function _drawUnit(e, colorByOwner, state, pools = {}) {
   const recoil = weaponRecoilOffset(e.kind, recoilProgress);
   const heavyKick = e.kind === KIND.TANK
     ? recoilVector(weaponFacing, recoil * 0.85)
+    : e.kind === KIND.ARTILLERY
+      ? recoilVector(weaponFacing, recoil * 0.65)
     : e.kind === KIND.AT_TEAM
       ? recoilVector(weaponFacing, recoil * 0.42)
       : e.kind === KIND.MORTAR_TEAM
@@ -246,6 +314,10 @@ export function _drawUnit(e, colorByOwner, state, pools = {}) {
     drawAtGun(g, r, tint, facing, weaponFacing, this._deployedWeaponSetupVisual(e), recoil);
   } else if (e.kind === KIND.MORTAR_TEAM) {
     drawMortarTeam(g, r, tint, facing, weaponFacing, this._deployedWeaponSetupVisual(e), recoil);
+  } else if (e.kind === KIND.ARTILLERY) {
+    const body = vehicleBody;
+    const motion = this._tankMotionVisual(e, facing, state, body);
+    drawArtillery(g, body, tint, facing, weaponFacing, this._deployedWeaponSetupVisual(e), recoil, motion);
   } else if (e.kind === KIND.SCOUT_CAR) {
     // Scout cars currently use the tank-like vehicle movement model server-side.
     // Replace with truck/wheeled movement semantics once that model exists.
@@ -294,6 +366,7 @@ export function _drawUnit(e, colorByOwner, state, pools = {}) {
     e.kind !== KIND.MACHINE_GUNNER &&
     e.kind !== KIND.AT_TEAM &&
     e.kind !== KIND.MORTAR_TEAM &&
+    e.kind !== KIND.ARTILLERY &&
     e.kind !== KIND.SCOUT_CAR &&
     e.kind !== KIND.TANK
   ) {

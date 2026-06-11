@@ -17,6 +17,7 @@ const WEAPON_RECOIL_MS = Object.freeze({
   [KIND.MACHINE_GUNNER]: 160,
   [KIND.AT_TEAM]: 820,
   [KIND.MORTAR_TEAM]: 520,
+  [KIND.ARTILLERY]: 980,
   [KIND.SCOUT_CAR]: 160,
   [KIND.TANK]: 650,
 });
@@ -128,6 +129,10 @@ export class GameState {
     this.mortarLaunches = [];
     /** @type {Array<{x:number,y:number,radiusTiles:number,seed:number,createdAt:number}>} */
     this.mortarImpacts = [];
+    /** @type {Array<{x:number,y:number,radiusTiles:number,delayTicks:number,seed:number,createdAt:number}>} */
+    this.artilleryTargets = [];
+    /** @type {Array<{x:number,y:number,radiusTiles:number,seed:number,createdAt:number}>} */
+    this.artilleryImpacts = [];
     /** @type {Map<number, number>} attacker id -> latest shot receive time. */
     this.weaponRecoilById = new Map();
     /** @type {Map<number, number>} mortar id -> latest seen mortar-fire cooldown. */
@@ -234,6 +239,10 @@ export class GameState {
         this.addSmokeCanister(ev, now);
       } else if (ev && ev.e === "mortarImpact") {
         this.addMortarImpact(ev, now);
+      } else if (ev && ev.e === "artilleryTarget") {
+        this.addArtilleryTarget(ev, now);
+      } else if (ev && ev.e === "artilleryImpact") {
+        this.addArtilleryImpact(ev, now);
       }
     }
     if (this.muzzleFlashes.length > 256) {
@@ -247,6 +256,12 @@ export class GameState {
     }
     if (this.mortarImpacts.length > 32) {
       this.mortarImpacts.splice(0, this.mortarImpacts.length - 32);
+    }
+    if (this.artilleryTargets.length > 48) {
+      this.artilleryTargets.splice(0, this.artilleryTargets.length - 48);
+    }
+    if (this.artilleryImpacts.length > 32) {
+      this.artilleryImpacts.splice(0, this.artilleryImpacts.length - 32);
     }
   }
 
@@ -283,6 +298,29 @@ export class GameState {
       y: ev.y,
       radiusTiles: Number.isFinite(ev.radiusTiles) ? ev.radiusTiles : 1.5,
       seed: Math.floor(ev.x * 13 + ev.y * 7 + now) >>> 0,
+      createdAt: now,
+    });
+  }
+
+  addArtilleryTarget(ev, now = performance.now()) {
+    if (!Number.isFinite(ev.x) || !Number.isFinite(ev.y)) return;
+    this.artilleryTargets.push({
+      x: ev.x,
+      y: ev.y,
+      radiusTiles: Number.isFinite(ev.radiusTiles) ? ev.radiusTiles : 3,
+      delayTicks: Number.isFinite(ev.delayTicks) ? Math.max(0, ev.delayTicks) : 0,
+      seed: Math.floor(ev.x * 17 + ev.y * 11 + now) >>> 0,
+      createdAt: now,
+    });
+  }
+
+  addArtilleryImpact(ev, now = performance.now()) {
+    if (!Number.isFinite(ev.x) || !Number.isFinite(ev.y)) return;
+    this.artilleryImpacts.push({
+      x: ev.x,
+      y: ev.y,
+      radiusTiles: Number.isFinite(ev.radiusTiles) ? ev.radiusTiles : 3,
+      seed: Math.floor(ev.x * 19 + ev.y * 23 + now) >>> 0,
       createdAt: now,
     });
   }
@@ -339,6 +377,30 @@ export class GameState {
     const ttlMs = 500;
     this.mortarImpacts = this.mortarImpacts.filter((f) => now - f.createdAt <= ttlMs);
     return this.mortarImpacts;
+  }
+
+  /**
+   * Return live owner-only artillery target markers, pruning after the shell lands.
+   * @param {number} now
+   * @returns {Array<{x:number,y:number,radiusTiles:number,delayTicks:number,seed:number,createdAt:number}>}
+   */
+  liveArtilleryTargets(now) {
+    this.artilleryTargets = this.artilleryTargets.filter((f) => {
+      const ttlMs = Math.max(900, ((f.delayTicks || 0) / 30) * 1000 + 350);
+      return now - f.createdAt <= ttlMs;
+    });
+    return this.artilleryTargets;
+  }
+
+  /**
+   * Return live visual-only artillery impact explosions, pruning expired ones.
+   * @param {number} now
+   * @returns {Array<{x:number,y:number,radiusTiles:number,seed:number,createdAt:number}>}
+   */
+  liveArtilleryImpacts(now) {
+    const ttlMs = 850;
+    this.artilleryImpacts = this.artilleryImpacts.filter((f) => now - f.createdAt <= ttlMs);
+    return this.artilleryImpacts;
   }
 
   /**

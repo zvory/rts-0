@@ -271,8 +271,26 @@ Exit criteria:
 
 ## Phase 4: Client Commands, UI, And Debug Mode
 
-Not started. Read `docs/context/client-ui.md` before changing rendering, HUD, input, or match
-modules.
+Read `docs/context/client-ui.md` before changing rendering, HUD, input, or match modules.
+
+- [x] Wire Artillery into client HUD training/research affordances.
+  - Gun Works command card mirrors the server train order: Mortar Team (`Q`), AT Gun (`W`),
+    Artillery (`E`), with AT Gun Crews (`S`) and Unlock Artillery (`D`) below their unlocked
+    units.
+- [x] Add Point Fire command UI for selected Artillery via `useAbility` / `pointFire`.
+  - Selected Artillery exposes Point Fire on `X`; issuing it uses `cmd.pointFire(...)`.
+  - The targeted preview shows maximum range, minimum dead zone, splash radius, and firing corridor.
+- [x] Render Point Fire command feedback and owner-only order-plan markers.
+  - Local issued commands and server-accepted `pointFire` stages draw artillery crosshair markers.
+- [x] Consume and render `artilleryTarget` and `artilleryImpact` events without changing fog or
+      exploration.
+  - `artilleryTarget` creates an owner-only pre-impact marker with shell-delay lifetime.
+  - `artilleryImpact` creates a short-lived explosion at the impact point.
+- [x] Add client/debug-mode affordances needed to test Artillery.
+  - Debug human starts now include five Artillery units alongside the other combat units.
+- [x] Add focused client contract coverage.
+  - Covered Gun Works train/research slots, Artillery/Point Fire config, artillery event local
+    state, and Point Fire input/preview behavior.
 
 ## Phase 5: Visual Design And Animation
 

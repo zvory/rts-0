@@ -6,6 +6,7 @@ import { WEAPON_RECOIL_PX, ZERO_OFFSET } from "./palette.js";
 
 /** Per-attacker muzzle-flash radius in world px. 0 means no flash for this kind. */
 export function muzzleFlashRadius(kind) {
+  if (kind === KIND.ARTILLERY) return 22;
   if (kind === KIND.TANK) return 18;
   if (kind === KIND.AT_TEAM) return 15;
   if (kind === KIND.SCOUT_CAR) return 9;
@@ -164,7 +165,7 @@ export function tankBodyVisual(stat = {}) {
 }
 
 export function isVehicleBodyKind(kind) {
-  return kind === KIND.AT_TEAM || kind === KIND.TANK || kind === KIND.SCOUT_CAR;
+  return kind === KIND.AT_TEAM || kind === KIND.ARTILLERY || kind === KIND.TANK || kind === KIND.SCOUT_CAR;
 }
 
 export function drawTankTracks(g, body, facing, motion) {

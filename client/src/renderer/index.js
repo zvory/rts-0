@@ -31,6 +31,8 @@ import {
 } from "./entities.js";
 import {
   _drawAbilityTargetPreview,
+  _drawArtilleryImpacts,
+  _drawArtilleryTargets,
   _drawAtGunSetupPreview,
   _drawCommandFeedback,
   _drawDebugPathOverlay,
@@ -218,6 +220,8 @@ export class Renderer {
     this._drawCommandFeedback(state);
     this._drawMortarLaunches(state);
     this._drawMortarImpacts(state);
+    this._drawArtilleryTargets(state);
+    this._drawArtilleryImpacts(state);
     this._drawAbilityTargetPreview(state);
     this._drawAtGunSetupPreview(state);
     this._drawOrderPlan(state);
@@ -446,6 +450,8 @@ Object.assign(Renderer.prototype, {
   _drawPlacement,
   _drawCommandFeedback,
   _drawSmokeCanisters,
+  _drawArtilleryTargets,
+  _drawArtilleryImpacts,
   _drawAbilityTargetPreview,
   _drawSmokes,
   _drawAtGunSetupPreview,

@@ -509,6 +509,7 @@ fn spawn_debug_human_start(
         (EntityKind::MachineGunner, 5),
         (EntityKind::MortarTeam, 5),
         (EntityKind::AtTeam, 5),
+        (EntityKind::Artillery, 5),
         (EntityKind::ScoutCar, 5),
         (EntityKind::Tank, 5),
     ];

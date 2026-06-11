@@ -109,9 +109,12 @@ export function _issueTargetedCommand(p, ev = {}) {
           .map((e) => e.id)
       : ownUnits;
     if (units.length === 0) return;
-    this.net.command(cmd.useAbility(ability, units, world.x, world.y, !!ev.shiftKey));
+    const command = ability === ABILITY.POINT_FIRE
+      ? cmd.pointFire(units, world.x, world.y, !!ev.shiftKey)
+      : cmd.useAbility(ability, units, world.x, world.y, !!ev.shiftKey);
+    this.net.command(command);
     this.state.addCommandFeedback(
-      ability === ABILITY.MORTAR_FIRE ? "mortar" : "attack",
+      ability === ABILITY.MORTAR_FIRE ? "mortar" : ability === ABILITY.POINT_FIRE ? "artillery" : "attack",
       world.x,
       world.y,
       !!ev.shiftKey,
@@ -209,10 +212,12 @@ export function _refreshAbilityTargetPreview() {
   }
   const tileSize = this.state.map?.tileSize || 32;
   const rangePx = definition.rangeTiles * tileSize;
+  const minRangePx = (definition.minRangeTiles || 0) * tileSize;
   const world = this._worldAt(this.mouse.x, this.mouse.y);
   let hoverInRange = false;
   for (const c of carriers) {
-    if (Math.hypot(world.x - c.x, world.y - c.y) <= rangePx) {
+    const dist = Math.hypot(world.x - c.x, world.y - c.y);
+    if (dist <= rangePx && dist >= minRangePx) {
       hoverInRange = true;
       break;
     }
@@ -223,6 +228,7 @@ export function _refreshAbilityTargetPreview() {
     mouseY: world.y,
     carriers,
     rangePx,
+    minRangePx,
     radiusPx: (definition.radiusTiles || 0) * tileSize,
     hoverInRange,
   });
