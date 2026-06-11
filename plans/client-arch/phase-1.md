@@ -2,7 +2,7 @@
 
 ## Phase Status
 
-- [ ] Pending implementation.
+- [x] Implemented.
 
 ## Objective
 
@@ -41,11 +41,11 @@ the current client shape. This phase should not change runtime client behavior.
 
 Mark each segment complete as it lands:
 
-- [ ] Add the client architecture checker script and current module-area classification.
-- [ ] Add conservative import-rule enforcement and explicit current-state allowlist reasons.
-- [ ] Add prototype-grafting guardrails and baseline file-size/fan-in/fan-out reporting.
-- [ ] Wire the checker into `tests/run-all.sh` and suite selection.
-- [ ] Run verification and record the exact results in the final handoff.
+- [x] Add the client architecture checker script and current module-area classification.
+- [x] Add conservative import-rule enforcement and explicit current-state allowlist reasons.
+- [x] Add prototype-grafting guardrails and baseline file-size/fan-in/fan-out reporting.
+- [x] Wire the checker into `tests/run-all.sh` and suite selection.
+- [x] Run verification and record the exact results in the final handoff.
 
 ## Verification
 
