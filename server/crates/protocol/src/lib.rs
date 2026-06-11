@@ -46,6 +46,7 @@ pub mod kinds {
     pub const DEPOT: &str = "depot";
     pub const BARRACKS: &str = "barracks";
     pub const TRAINING_CENTRE: &str = "training_centre";
+    pub const RESEARCH_COMPLEX: &str = "research_complex";
     pub const FACTORY: &str = "factory";
     pub const STEELWORKS: &str = "steelworks";
     pub const STEEL: &str = "steel";
@@ -415,7 +416,7 @@ pub struct LobbyPlayer {
 ///
 /// [`Snapshot`] remains the semantic source of truth for game code. This format is only a
 /// transport-side optimization for `ServerMessage::Snapshot`.
-pub const COMPACT_SNAPSHOT_VERSION: u8 = 15;
+pub const COMPACT_SNAPSHOT_VERSION: u8 = 16;
 
 /// Serialize one semantic snapshot as a compact JSON text frame payload.
 pub fn serialize_compact_snapshot(snapshot: &Snapshot) -> serde_json::Result<String> {
@@ -1018,6 +1019,7 @@ fn kind_code(kind: &str) -> u8 {
         kinds::STEEL => 11,
         kinds::OIL => 12,
         kinds::STEELWORKS => 13,
+        kinds::RESEARCH_COMPLEX => 17,
         _ => 255,
     }
 }

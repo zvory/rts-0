@@ -488,7 +488,8 @@ function trainDisabledReason(ctx, unit, resources) {
   const missing = requirementsOf(st).find((req) => !playerHasCompleteKind(ctx, req));
   if (missing) return `Requires ${STATS[missing]?.label || missing}`;
   if (st.upgradeRequires && !(ctx.upgrades || []).includes(st.upgradeRequires)) {
-    return `Requires ${UPGRADES[st.upgradeRequires]?.label || st.upgradeRequires}`;
+    return st.upgradeRequiresText ||
+      `Requires ${UPGRADES[st.upgradeRequires]?.label || st.upgradeRequires}`;
   }
   if (!affordable(st.cost, resources)) return "Not enough resources";
   return "";
@@ -505,6 +506,7 @@ function researchAvailability(ctx, upgrade, resources) {
   if ((ctx.upgrades || []).includes(upgrade)) return "locked";
   if (selectedProducingBuildingsForKind(ctx, def.researchedAt)
     .some((e) => e.prodUpgrade === upgrade)) return "locked";
+  if (def.requiresUpgrade && !(ctx.upgrades || []).includes(def.requiresUpgrade)) return "locked";
   return affordable(def.cost, resources) ? "ready" : "unaffordable";
 }
 
@@ -514,6 +516,9 @@ function researchDisabledReason(ctx, upgrade, resources) {
   if ((ctx.upgrades || []).includes(upgrade)) return "Researched";
   if (selectedProducingBuildingsForKind(ctx, def.researchedAt)
     .some((e) => e.prodUpgrade === upgrade)) return "Researching";
+  if (def.requiresUpgrade && !(ctx.upgrades || []).includes(def.requiresUpgrade)) {
+    return def.requiresText || `Requires ${UPGRADES[def.requiresUpgrade]?.label || def.requiresUpgrade}`;
+  }
   if (!affordable(def.cost, resources)) return "Not enough resources";
   return "";
 }

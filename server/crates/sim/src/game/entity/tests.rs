@@ -69,6 +69,10 @@ fn finished_building_kinds_have_exact_state_groups() {
             groups(false, false, true, false, false, false),
         ),
         (
+            EntityKind::ResearchComplex,
+            groups(false, false, true, false, false, false),
+        ),
+        (
             EntityKind::Factory,
             groups(false, false, true, false, false, false),
         ),
@@ -92,6 +96,7 @@ fn unfinished_buildings_add_construction_state_only() {
         EntityKind::Depot,
         EntityKind::Barracks,
         EntityKind::TrainingCentre,
+        EntityKind::ResearchComplex,
         EntityKind::Factory,
         EntityKind::Steelworks,
     ];

@@ -211,15 +211,17 @@ const SUPPORT_WEAPONS_AND_RIFLE: [EntityKind; 3] = [
 
 const FAST_TECH_PATH: [EntityKind; 1] = [EntityKind::Barracks];
 const FULL_TECH_PATH: [EntityKind; 1] = [EntityKind::Barracks];
-const TANK_TECH_PATH: [EntityKind; 4] = [
+const TANK_TECH_PATH: [EntityKind; 5] = [
     EntityKind::Barracks,
     EntityKind::TrainingCentre,
+    EntityKind::ResearchComplex,
     EntityKind::Factory,
     EntityKind::Steelworks,
 ];
-const SUPPORT_TECH_PATH: [EntityKind; 3] = [
+const SUPPORT_TECH_PATH: [EntityKind; 4] = [
     EntityKind::Barracks,
     EntityKind::TrainingCentre,
+    EntityKind::ResearchComplex,
     EntityKind::Steelworks,
 ];
 
@@ -644,6 +646,7 @@ mod tests {
             &[
                 EntityKind::Barracks,
                 EntityKind::TrainingCentre,
+                EntityKind::ResearchComplex,
                 EntityKind::Steelworks
             ]
         );
@@ -659,6 +662,7 @@ mod tests {
             &[
                 EntityKind::Barracks,
                 EntityKind::TrainingCentre,
+                EntityKind::ResearchComplex,
                 EntityKind::Factory,
                 EntityKind::Steelworks
             ]
@@ -699,6 +703,7 @@ mod tests {
             &[
                 EntityKind::Barracks,
                 EntityKind::TrainingCentre,
+                EntityKind::ResearchComplex,
                 EntityKind::Factory,
                 EntityKind::Steelworks
             ]
@@ -726,6 +731,7 @@ mod tests {
             &[
                 EntityKind::Barracks,
                 EntityKind::TrainingCentre,
+                EntityKind::ResearchComplex,
                 EntityKind::Steelworks
             ]
         );
@@ -749,6 +755,7 @@ mod tests {
             &[
                 EntityKind::Barracks,
                 EntityKind::TrainingCentre,
+                EntityKind::ResearchComplex,
                 EntityKind::Factory,
                 EntityKind::Steelworks
             ]

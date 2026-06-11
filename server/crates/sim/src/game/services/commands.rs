@@ -336,6 +336,13 @@ pub(crate) fn apply_commands(
                     notice(events, player, "Already researched");
                     continue;
                 }
+                if definition
+                    .requires_upgrade
+                    .is_some_and(|required| !ps.upgrades.contains(&required))
+                {
+                    notice(events, player, "Requirement not met");
+                    continue;
+                }
                 if !ps.can_afford(definition.cost_steel, definition.cost_oil) {
                     notice(
                         events,
@@ -2003,6 +2010,111 @@ mod tests {
             assert_eq!(queue.len(), 1);
             assert_eq!(queue[0].unit, unit);
         }
+    }
+
+    #[test]
+    fn advanced_unlocks_research_only_at_research_complex() {
+        let map = flat_map(24);
+        for (wrong_building_kind, upgrade) in [
+            (EntityKind::Steelworks, UpgradeKind::AtGunUnlock),
+            (EntityKind::Steelworks, UpgradeKind::ArtilleryUnlock),
+            (EntityKind::Factory, UpgradeKind::TankUnlock),
+        ] {
+            let mut entities = EntityStore::new();
+            let (wrong_x, wrong_y) = footprint_center(&map, wrong_building_kind, 4, 4);
+            let wrong_building = entities
+                .spawn_building(1, wrong_building_kind, wrong_x, wrong_y, true)
+                .expect("wrong research building should spawn");
+            let (rd_x, rd_y) = footprint_center(&map, EntityKind::ResearchComplex, 10, 4);
+            let research_complex = entities
+                .spawn_building(1, EntityKind::ResearchComplex, rd_x, rd_y, true)
+                .expect("research complex should spawn");
+            let mut players = vec![player_state(1), player_state(2)];
+            if upgrade == UpgradeKind::ArtilleryUnlock {
+                players[0].upgrades.insert(UpgradeKind::AtGunUnlock);
+            }
+
+            let events = apply_with_players(
+                &map,
+                &mut entities,
+                &mut players,
+                vec![(
+                    1,
+                    SimCommand::Research {
+                        building: wrong_building,
+                        upgrade,
+                    },
+                )],
+            );
+            assert!(entities
+                .get(wrong_building)
+                .expect("wrong building")
+                .research_queue()
+                .is_empty());
+            assert!(matches!(
+                events.get(&1).and_then(|events| events.first()),
+                Some(Event::Notice { msg, .. }) if msg == "Cannot research that here"
+            ));
+
+            apply_with_players(
+                &map,
+                &mut entities,
+                &mut players,
+                vec![(
+                    1,
+                    SimCommand::Research {
+                        building: research_complex,
+                        upgrade,
+                    },
+                )],
+            );
+            let queue = entities
+                .get(research_complex)
+                .expect("research complex")
+                .research_queue();
+            assert_eq!(queue.len(), 1);
+            assert_eq!(queue[0].upgrade, upgrade);
+        }
+    }
+
+    #[test]
+    fn artillery_research_requires_at_gun_research() {
+        let map = flat_map(24);
+        let mut entities = EntityStore::new();
+        let (rd_x, rd_y) = footprint_center(&map, EntityKind::ResearchComplex, 6, 6);
+        let research_complex = entities
+            .spawn_building(1, EntityKind::ResearchComplex, rd_x, rd_y, true)
+            .expect("research complex should spawn");
+        let mut players = vec![player_state(1), player_state(2)];
+        let command = SimCommand::Research {
+            building: research_complex,
+            upgrade: UpgradeKind::ArtilleryUnlock,
+        };
+
+        let events = apply_with_players(
+            &map,
+            &mut entities,
+            &mut players,
+            vec![(1, command.clone())],
+        );
+        assert!(entities
+            .get(research_complex)
+            .expect("research complex")
+            .research_queue()
+            .is_empty());
+        assert!(matches!(
+            events.get(&1).and_then(|events| events.first()),
+            Some(Event::Notice { msg, .. }) if msg == "Requirement not met"
+        ));
+
+        players[0].upgrades.insert(UpgradeKind::AtGunUnlock);
+        apply_with_players(&map, &mut entities, &mut players, vec![(1, command)]);
+        let queue = entities
+            .get(research_complex)
+            .expect("research complex")
+            .research_queue();
+        assert_eq!(queue.len(), 1);
+        assert_eq!(queue[0].upgrade, UpgradeKind::ArtilleryUnlock);
     }
 
     #[test]

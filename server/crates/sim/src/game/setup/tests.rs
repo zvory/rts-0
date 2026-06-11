@@ -33,6 +33,7 @@ fn debug_starting_loadout_applies_to_humans_only() {
     assert_eq!(owned_kind_count(&game, 1, EntityKind::Depot), 15);
     assert_eq!(owned_kind_count(&game, 1, EntityKind::Steelworks), 1);
     assert_eq!(owned_kind_count(&game, 1, EntityKind::TrainingCentre), 1);
+    assert_eq!(owned_kind_count(&game, 1, EntityKind::ResearchComplex), 1);
     assert_eq!(owned_kind_count(&game, 1, EntityKind::Barracks), 2);
     assert_eq!(owned_kind_count(&game, 1, EntityKind::Factory), 2);
     for kind in [

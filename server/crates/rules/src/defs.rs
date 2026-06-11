@@ -66,6 +66,8 @@ const CITY_CENTRE_REQUIRED: &[EntityKind] = &[EntityKind::CityCentre];
 const CITY_CENTRE_AND_BARRACKS_REQUIRED: &[EntityKind] =
     &[EntityKind::CityCentre, EntityKind::Barracks];
 const TRAINING_CENTRE_REQUIRED: &[EntityKind] = &[EntityKind::TrainingCentre];
+const CITY_CENTRE_AND_TRAINING_CENTRE_REQUIRED: &[EntityKind] =
+    &[EntityKind::CityCentre, EntityKind::TrainingCentre];
 const STEELWORKS_REQUIRED: &[EntityKind] = &[EntityKind::Steelworks];
 const FACTORY_BUILDING_REQUIRED: &[EntityKind] = &[EntityKind::Factory];
 const FACTORY_REQUIRED: &[EntityKind] = &[EntityKind::CityCentre, EntityKind::TrainingCentre];
@@ -343,6 +345,26 @@ pub const BUILDINGS: &[BuildingDef] = &[
         build_requires: FACTORY_REQUIRED,
     },
     BuildingDef {
+        kind: EntityKind::ResearchComplex,
+        stats: balance::BuildingStats {
+            hp: 165,
+            sight_tiles: 6,
+            cost_steel: 100,
+            cost_oil: 100,
+            foot_w: 3,
+            foot_h: 3,
+            build_ticks: balance::TICK_HZ * 15,
+            provides_supply: 0,
+            dmg: 0,
+            range_tiles: 0,
+            cooldown: 0,
+        },
+        armor_class: ArmorClass::Armored,
+        weapon: WeaponClass::None,
+        trains: &[],
+        build_requires: CITY_CENTRE_AND_TRAINING_CENTRE_REQUIRED,
+    },
+    BuildingDef {
         kind: EntityKind::Steelworks,
         stats: balance::BuildingStats {
             hp: 300,
@@ -453,5 +475,17 @@ mod tests {
             .stats;
 
         assert_eq!((stats.foot_w, stats.foot_h), (3, 3));
+    }
+
+    #[test]
+    fn research_complex_uses_requested_independent_stats() {
+        let stats = building_def(EntityKind::ResearchComplex)
+            .expect("research complex def")
+            .stats;
+
+        assert_eq!(stats.hp, 165);
+        assert_eq!((stats.cost_steel, stats.cost_oil), (100, 100));
+        assert_eq!((stats.foot_w, stats.foot_h), (3, 3));
+        assert_eq!(stats.build_ticks, balance::TICK_HZ * 15);
     }
 }

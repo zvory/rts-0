@@ -53,10 +53,10 @@ crate.
 | `gather`     | `units: u32[]`, `node: u32`, `queued?: bool` | Send workers to harvest a resource node. When `queued` is true, store future gather intent instead of replacing the active order. |
 | `build`      | `units: u32[]`, `building: string`, `tileX: u32`, `tileY: u32`, `queued?: bool` | Selected workers construct a building at a tile. The server allocates one compatible worker per build click, first walks that worker to a nearby point outside the requested footprint, then starts construction once it is in range. `building` ∈ building kinds. When `queued` is true, store future build intent instead of replacing the active order. |
 | `train`      | `building: u32`, `unit: string` | Queue a unit at a production building. |
-| `research`   | `building: u32`, `upgrade: string` | Queue a permanent player upgrade at a tech building. Upgrade ids: `methamphetamines` at the Training Centre, `at_gun_unlock` and `artillery_unlock` at Gun Works (`steelworks`), and `tank_unlock` at Vehicle Works (`factory`). |
+| `research`   | `building: u32`, `upgrade: string` | Queue a permanent player upgrade at a tech building. Upgrade ids: `methamphetamines` at the Training Centre; `at_gun_unlock`, `artillery_unlock`, and `tank_unlock` at the R&D Complex (`research_complex`). `artillery_unlock` requires completed `at_gun_unlock`. |
 | `cancel`     | `building: u32` | Cancel the latest item in a building's production queue. |
 | `stop`       | `units: u32[]` | Clear orders, hold position. |
-| `setRally`   | `building: u32`, `x: f32`, `y: f32`, `kind?: "move"|"attackMove"`, `queued?: bool` | Set or append a unit-producing building rally stage. `kind` defaults to `"move"`. Freshly produced units receive the building's rally plan as active + queued move/attack-move orders, and the building prefers the spawn exit nearest the first stage. Ignored for buildings the player doesn't own, non-producers (depot, training centre), or buildings still under construction. Points are clamped into map bounds. When `queued` is true, append until the four-stage building rally cap is reached; otherwise replace the whole rally plan. |
+| `setRally`   | `building: u32`, `x: f32`, `y: f32`, `kind?: "move"|"attackMove"`, `queued?: bool` | Set or append a unit-producing building rally stage. `kind` defaults to `"move"`. Freshly produced units receive the building's rally plan as active + queued move/attack-move orders, and the building prefers the spawn exit nearest the first stage. Ignored for buildings the player doesn't own, non-producers (depot, training centre, research_complex), or buildings still under construction. Points are clamped into map bounds. When `queued` is true, append until the four-stage building rally cap is reached; otherwise replace the whole rally plan. |
 
 Servers MUST ignore commands referencing entities the player does not own, unknown ids,
 illegal placements, or unaffordable actions (fail silently or emit a `notice` event).
@@ -173,8 +173,8 @@ Units/buildings arrive via snapshots (so they obey fog), including
 the player's own starting City Centre + workers. When the lobby's `setQuickstart` toggle is
 enabled, every player starts with 99,999 steel and 99,999 oil instead of the default opening
 resources, and each human player also starts with five supply depots, one Gun Works
-(`steelworks` kind), one Training Centre, two Barracks, two Vehicle Works (`factory` kind), and
-five of each unit kind. Debug mode also adds one inert enemy player in the clockwise-adjacent
+(`steelworks` kind), one R&D Complex (`research_complex` kind), one Training Centre, two Barracks,
+two Vehicle Works (`factory` kind), and five of each unit kind. Debug mode also adds one inert enemy player in the clockwise-adjacent
 corner from the first human start, with five deployed Mortar Teams clumped around one Scout Car
 and four enemy Supply Depots five tiles north/east/south/west of the clump. It also sets
 `debugMode: true`,
@@ -226,7 +226,7 @@ transport decode:
 }
 ```
 
-Live WebSocket snapshot frames are sent as compact JSON text, version 15. `client/src/net.js`
+Live WebSocket snapshot frames are sent as compact JSON text, version 16. `client/src/net.js`
 decodes this transport shape back into the semantic object above before dispatching `S.SNAPSHOT`.
 Older object-shaped JSON snapshots remain decodable by the client for fallback/dev use.
 
@@ -257,7 +257,7 @@ Compact numeric codes:
 
 | Vocabulary | Codes |
 |------------|-------|
-| `kind` | 1 `worker`, 2 `rifleman`, 3 `machine_gunner`, 4 `at_team`, 5 `tank`, 6 `city_centre`, 7 `depot`, 8 `barracks`, 9 `training_centre`, 10 `factory`, 11 `steel`, 12 `oil`, 13 `steelworks`, 14 `scout_car`, 15 `mortar_team`, 16 `artillery` |
+| `kind` | 1 `worker`, 2 `rifleman`, 3 `machine_gunner`, 4 `at_team`, 5 `tank`, 6 `city_centre`, 7 `depot`, 8 `barracks`, 9 `training_centre`, 10 `factory`, 11 `steel`, 12 `oil`, 13 `steelworks`, 14 `scout_car`, 15 `mortar_team`, 16 `artillery`, 17 `research_complex` |
 | `state` | 1 `idle`, 2 `move`, 3 `attack`, 4 `gather`, 5 `build`, 6 `train`, 7 `construct`, 8 `dead` |
 | `setupState` | 1 `packed`, 2 `setting_up`, 3 `deployed`, 4 `tearing_down` |
 | `upgrade` | 1 `methamphetamines`, 2 `at_gun_unlock`, 3 `tank_unlock`, 4 `artillery_unlock` |
@@ -311,7 +311,7 @@ events, and positioned notices remain fog-gated and are withheld when smoke hide
 {
   id: u32,
   owner: u32,                    // 0 = neutral (resources), else player id
-  kind: string,                  // EntityKind: "worker","rifleman","machine_gunner","at_team","mortar_team","artillery","scout_car","tank","city_centre","depot","barracks","training_centre","factory","steelworks"
+  kind: string,                  // EntityKind: "worker","rifleman","machine_gunner","at_team","mortar_team","artillery","scout_car","tank","city_centre","depot","barracks","training_centre","research_complex","factory","steelworks"
   x: f32, y: f32,                // world px (center)
   hp: u32, maxHp: u32,
   state: string,                 // "idle","move","attack","gather","build","train","construct","dead"
