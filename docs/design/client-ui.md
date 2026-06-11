@@ -45,8 +45,8 @@ export class Net {
   setQuickstart(enabled)
   command(cmd)                           // cmd built via protocol.js builders
   ping()
-  setReplaySpeed(speed)                  // dev replay rooms only
-  seekReplay(ticksBack)                  // dev replay rooms only; pass huge N for full reset
+  setReplaySpeed(speed)                  // replay rooms and dev-watch scenarios
+  seekReplay(ticksBack)                  // replay rooms; pass huge N for full reset
   requestReplayBranch()
   claimBranchSeat(playerId)
   releaseBranchSeat(playerId)

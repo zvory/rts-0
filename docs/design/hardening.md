@@ -35,10 +35,10 @@ The server treats every client as potentially hostile. Limits live next to the c
   hour at 30 Hz, more than 200k command-log entries, commands for unknown players, tick 0 commands,
   out-of-order commands, and commands after the artifact duration. Accepted replay seeks are
   rate-limited to one every 500 ms per replay room. Long seeks are allowed because long games are a
-  normal replay-analysis case; until checkpointing exists, accepted seeks rebuild from tick 0 and
-  fast-forward to the target tick. Replay setup and accepted seeks log build/rebuild duration,
-  viewer/player counts, duration, and command counts so long artifacts and expensive controls are
-  visible in server logs.
+  normal replay-analysis case; accepted seeks restore the nearest recorded replay keyframe at or
+  before the target tick and fast-forward from there. Replay setup and accepted seeks log
+  build/rebuild duration, viewer/player counts, duration, and command counts so long artifacts and
+  expensive controls are visible in server logs.
 - **Deploy drain**: SIGTERM/Ctrl-C starts a server drain instead of immediately shutting down.
   The lobby flips into a draining state, existing room tasks continue ticking active normal
   matches, and new match starts are rejected while lobby clients see `can_start: false`. The
