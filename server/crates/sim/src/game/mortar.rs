@@ -5,7 +5,7 @@ use crate::game::entity::{Entity, EntityKind, EntityStore};
 use crate::game::fog::Fog;
 use crate::game::map::Map;
 use crate::game::services::dist2;
-use crate::protocol::Event;
+use crate::protocol::{self, AttackReveal, Event};
 use crate::rules::combat;
 use crate::rules::projection;
 use crate::rules::terrain::TerrainKind;
@@ -80,7 +80,19 @@ fn angle_delta(from: f32, to: f32) -> f32 {
 }
 
 impl MortarShellStore {
-    pub(crate) fn schedule(&mut self, owner: u32, attacker: u32, x: f32, y: f32, tick: u32) {
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn schedule(
+        &mut self,
+        events: &mut HashMap<u32, Vec<Event>>,
+        fog: &Fog,
+        owner: u32,
+        attacker: u32,
+        from_x: f32,
+        from_y: f32,
+        x: f32,
+        y: f32,
+        tick: u32,
+    ) {
         self.shells.push(MortarShell {
             owner,
             attacker,
@@ -88,6 +100,7 @@ impl MortarShellStore {
             y,
             impact_tick: tick.saturating_add(config::MORTAR_SHELL_DELAY_TICKS),
         });
+        emit_launch(events, fog, owner, attacker, from_x, from_y, x, y);
     }
 
     pub(crate) fn resolve_due(
@@ -111,6 +124,34 @@ impl MortarShellStore {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
+fn emit_launch(
+    events: &mut HashMap<u32, Vec<Event>>,
+    fog: &Fog,
+    owner: u32,
+    attacker: u32,
+    from_x: f32,
+    from_y: f32,
+    to_x: f32,
+    to_y: f32,
+) {
+    let player_ids: Vec<u32> = events.keys().copied().collect();
+    for pid in player_ids {
+        if pid != owner && !fog.is_visible_world(pid, from_x, from_y) {
+            continue;
+        }
+        events.entry(pid).or_default().push(Event::MortarLaunch {
+            from: attacker,
+            from_x,
+            from_y,
+            to_x,
+            to_y,
+            radius_tiles: config::MORTAR_OUTER_RADIUS_TILES,
+            delay_ticks: config::MORTAR_SHELL_DELAY_TICKS,
+        });
+    }
+}
+
 fn resolve_shell(
     _map: &Map,
     entities: &mut EntityStore,
@@ -131,8 +172,6 @@ fn resolve_shell(
         return;
     }
 
-    emit_impact(events, fog, shell.owner, shell.x, shell.y);
-
     let mut hits = Vec::new();
     for id in entities.ids() {
         let Some(target) = entities.get(id) else {
@@ -152,6 +191,8 @@ fn resolve_shell(
         }
     }
     hits.sort_by_key(|(id, _, _, _, _)| *id);
+    let reveal = mortar_reveal_for(entities.get(shell.attacker));
+    let mut reveal_recipients = Vec::new();
     for (id, base, victim_owner, tx, ty) in hits {
         let effective = entities
             .get(id)
@@ -164,9 +205,37 @@ fn resolve_shell(
             target.apply_damage(effective, Some((shell.owner, (shell.x, shell.y), tick)))
         });
         if damaged {
+            if victim_owner != 0 && victim_owner != shell.owner && reveal.is_some() {
+                reveal_recipients.push(victim_owner);
+            }
             push_under_attack_notice(events, fog, shell.owner, victim_owner, tx, ty);
         }
     }
+    reveal_recipients.sort_unstable();
+    reveal_recipients.dedup();
+    emit_impact(
+        events,
+        fog,
+        shell.owner,
+        shell.attacker,
+        reveal.as_ref(),
+        &reveal_recipients,
+        shell.x,
+        shell.y,
+    );
+}
+
+fn mortar_reveal_for(attacker: Option<&Entity>) -> Option<AttackReveal> {
+    let attacker = attacker?;
+    Some(AttackReveal {
+        owner: attacker.owner,
+        kind: protocol::kind_to_wire(attacker.kind).to_string(),
+        x: attacker.pos_x,
+        y: attacker.pos_y,
+        facing: Some(attacker.facing()),
+        weapon_facing: attacker.weapon_facing(),
+        setup_state: Some(attacker.weapon_setup().to_protocol_str().to_string()),
+    })
 }
 
 fn mortar_damage(victim_kind: EntityKind, base: u32) -> u32 {
@@ -181,16 +250,29 @@ fn mortar_damage(victim_kind: EntityKind, base: u32) -> u32 {
     ((base as f32) * 0.625).round() as u32
 }
 
-fn emit_impact(events: &mut HashMap<u32, Vec<Event>>, fog: &Fog, owner: u32, x: f32, y: f32) {
+#[allow(clippy::too_many_arguments)]
+fn emit_impact(
+    events: &mut HashMap<u32, Vec<Event>>,
+    fog: &Fog,
+    owner: u32,
+    attacker: u32,
+    reveal: Option<&AttackReveal>,
+    reveal_recipients: &[u32],
+    x: f32,
+    y: f32,
+) {
     let player_ids: Vec<u32> = events.keys().copied().collect();
     for pid in player_ids {
-        if pid != owner && !fog.is_visible_world(pid, x, y) {
+        let reveal_to_recipient = reveal_recipients.binary_search(&pid).is_ok();
+        if pid != owner && !reveal_to_recipient && !fog.is_visible_world(pid, x, y) {
             continue;
         }
         events.entry(pid).or_default().push(Event::MortarImpact {
+            from: reveal_to_recipient.then_some(attacker),
             x,
             y,
             radius_tiles: config::MORTAR_OUTER_RADIUS_TILES,
+            reveal: reveal_to_recipient.then(|| reveal.cloned()).flatten(),
         });
     }
 }

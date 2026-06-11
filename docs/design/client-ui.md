@@ -291,6 +291,12 @@ and unit layer):
   setup/deployment. Units that fire from outside current vision are shown briefly above the fog
   as semi-transparent silhouettes with the same recoil animation and a yellow tracer to the hit
   point.
+  Mortar launch events draw launch dust/recoil for recipients that can see the mortar, a black
+  shell arcing from the mortar to the impact point, and a darker red dotted line/crosshair warning
+  that lasts until the reported shell delay elapses or the impact event arrives. The shell
+  compresses near launch and impact and stretches near mid-flight so it reads as an overhead round
+  rather than a flat tracer. Mortar impact events that include a shooter reveal show the mortar
+  briefly above fog for players whose units or buildings were hit by indirect fire.
   Entities marked `visionOnly` by the server are drawn on the ordinary building/unit layers below
   the fog overlay, excluded from local fog-source computation and hit-testing, and treated as
   visual intel only.

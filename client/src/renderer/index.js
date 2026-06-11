@@ -39,6 +39,8 @@ import {
   _drawMuzzleFlashes,
   _drawMortarImpacts,
   _drawMortarLaunches,
+  _drawMortarShells,
+  _drawMortarTargets,
   _drawOrderPlan,
   _drawPlacement,
   _drawRallyPoints,
@@ -218,7 +220,9 @@ export class Renderer {
     this._drawFog(fog);
     this._drawSmokeCanisters(state);
     this._drawCommandFeedback(state);
+    this._drawMortarTargets(state);
     this._drawMortarLaunches(state);
+    this._drawMortarShells(state);
     this._drawMortarImpacts(state);
     this._drawArtilleryTargets(state);
     this._drawArtilleryImpacts(state);
@@ -461,6 +465,8 @@ Object.assign(Renderer.prototype, {
   _drawResourceMiningPreview,
   _drawMuzzleFlashes,
   _drawMortarLaunches,
+  _drawMortarTargets,
+  _drawMortarShells,
   _drawMortarImpacts,
   drawSelectionBox,
   _sweep,

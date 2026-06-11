@@ -49,31 +49,37 @@ Patch notes:
 - [x] Mortar shells now cause full friendly fire.
 - [x] Autocast mortars avoid shots that would hit your own current unit/building positions.
 
-## Phase 2 - Projectile And Impact Preview Lifetime
+## Phase 2 - Projectile And Impact Preview Lifetime - Done
 
 Protocol/client behavior:
-- Represent mortar launch-to-impact timing on the client well enough to draw a projectile and keep
+- [x] Represent mortar launch-to-impact timing on the client well enough to draw a projectile and keep
   the warning preview alive until impact.
-- Prefer using existing mortar target/impact events if they already carry enough timing and
+- [x] Prefer using existing mortar target/impact events if they already carry enough timing and
   position data. If not, add the smallest protocol extension needed and mirror it in
   `server/src/protocol.rs`, `client/src/protocol.js`, and `docs/design/protocol.md`.
-- Render a black mortar shell traveling from the firing mortar toward the impact point.
-- Animate shell shape over flight progress:
+- [x] Render a black mortar shell traveling from the firing mortar toward the impact point.
+- [x] Animate shell shape over flight progress:
   - launch: slightly compressed, suggesting it is pointing upward;
   - midpoint: slightly stretched;
   - pre-impact: compressed again before disappearing into the impact.
-- Keep the red dotted attack line/crosshair visible until the associated mortar round hits.
-- Use a darker red hue for the dotted line and crosshair.
+- [x] Keep the red dotted attack line/crosshair visible until the associated mortar round hits.
+- [x] Use a darker red hue for the dotted line and crosshair.
+- [x] Keep launch visuals fog-safe: non-owners see launch dust, recoil, shell, and warning only if
+  they can see the firing mortar at launch.
+- [x] Reveal a hidden firing mortar above fog to victim players when the mortar impact damages their
+  units or buildings.
 
 Tests/checks:
-- Manual mortar fire shows a projectile from launcher to target.
-- Autocast mortar fire shows the same projectile for the firing player.
-- The preview disappears when the round impacts, not earlier.
-- Hidden enemy mortar fire still does not leak forbidden positions.
+- [x] Manual mortar fire shows a projectile from launcher to target.
+- [x] Autocast mortar fire shows the same projectile for the firing player.
+- [x] The preview disappears when the round impacts, not earlier.
+- [x] Hidden enemy mortar fire still does not leak forbidden launch positions.
+- [x] Hidden mortar impact reveal is sent only to victim players whose entities are damaged.
 
 Patch notes:
-- Mortar fire now has a visible shell and longer warning marker so players can dodge, including
+- [x] Mortar fire now has a visible shell and longer warning marker so players can dodge, including
   around their own autocast shots.
+- [x] Mortars revealed by indirect hits briefly appear above fog for the damaged player.
 
 ## Phase 3 - Dust Cloud And Mortar Art Polish
 

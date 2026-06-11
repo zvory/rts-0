@@ -1,5 +1,5 @@
 {
-  "reason": "artillery point-fire simulation adds order and shell executor",
+  "reason": "mortar launch projectile and impact reveal events",
   "line_counts": [
     {
       "path": "ability.rs",
@@ -67,7 +67,7 @@
     },
     {
       "path": "mortar.rs",
-      "lines": 163
+      "lines": 298
     },
     {
       "path": "pathfinding.rs",
@@ -255,7 +255,7 @@
     },
     {
       "path": "tests.rs",
-      "lines": 2449
+      "lines": 2788
     },
     {
       "path": "upgrade.rs",

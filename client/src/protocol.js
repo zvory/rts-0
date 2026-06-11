@@ -129,6 +129,7 @@ export const EVENT = Object.freeze({
   BUILD: "build",
   NOTICE: "notice",
   SMOKE_LAUNCH: "smokeLaunch",
+  MORTAR_LAUNCH: "mortarLaunch",
   MORTAR_IMPACT: "mortarImpact",
   ARTILLERY_TARGET: "artilleryTarget",
   ARTILLERY_IMPACT: "artilleryImpact",
@@ -154,7 +155,7 @@ export const REPLAY_VISION = Object.freeze({
 });
 
 // --- Compact snapshot wire schema (must match protocol.rs) ---
-export const COMPACT_SNAPSHOT_VERSION = 12;
+export const COMPACT_SNAPSHOT_VERSION = 13;
 
 export const KIND_CODE = Object.freeze({
   [KIND.WORKER]: 1,
@@ -216,6 +217,7 @@ export const EVENT_CODE = Object.freeze({
   [EVENT.MORTAR_IMPACT]: 6,
   [EVENT.ARTILLERY_TARGET]: 7,
   [EVENT.ARTILLERY_IMPACT]: 8,
+  [EVENT.MORTAR_LAUNCH]: 9,
 });
 
 export const ORDER_STAGE = Object.freeze({
@@ -507,7 +509,7 @@ function decodeCompactResourceDelta(record, index) {
 }
 
 function decodeCompactEvent(record, index) {
-  const fields = readArray(record, `event ${index}`, 5);
+  const fields = readArray(record, `event ${index}`, 6);
   if (fields.length < 1) throw new Error(`event ${index} is too short`);
   const eventKind = readCode(fields[0], EVENT_BY_CODE, "event.kind");
   switch (eventKind) {
@@ -564,14 +566,40 @@ function decodeCompactEvent(record, index) {
         delayTicks: readU32(fields[3], "event.smokeLaunch.delayTicks"),
       };
     }
-    case EVENT.MORTAR_IMPACT:
-      requireLength(fields, 4, `mortar impact event ${index}`);
+    case EVENT.MORTAR_LAUNCH: {
+      requireLength(fields, 6, `mortar launch event ${index}`);
+      const fromPoint = decodeCompactPoint(fields[2], "event.mortarLaunch.from");
+      const to = decodeCompactPoint(fields[3], "event.mortarLaunch.to");
       return {
+        e: EVENT.MORTAR_LAUNCH,
+        from: readU32(fields[1], "event.mortarLaunch.from"),
+        fromX: fromPoint[0],
+        fromY: fromPoint[1],
+        toX: to[0],
+        toY: to[1],
+        radiusTiles: readNumber(fields[4], "event.mortarLaunch.radiusTiles"),
+        delayTicks: readU32(fields[5], "event.mortarLaunch.delayTicks"),
+      };
+    }
+    case EVENT.MORTAR_IMPACT:
+      if (fields.length !== 4 && fields.length !== 5 && fields.length !== 6) {
+        throw new Error(`mortar impact event ${index} field count mismatch`);
+      }
+      {
+        const ev = {
         e: EVENT.MORTAR_IMPACT,
         x: readNumber(fields[1], "event.mortarImpact.x"),
         y: readNumber(fields[2], "event.mortarImpact.y"),
         radiusTiles: readNumber(fields[3], "event.mortarImpact.radiusTiles"),
-      };
+        };
+        if (fields.length > 4 && fields[4] != null) {
+          ev.from = readU32(fields[4], "event.mortarImpact.from");
+        }
+        if (fields.length > 5 && fields[5] != null) {
+          ev.reveal = decodeCompactAttackReveal(fields[5], index);
+        }
+        return ev;
+      }
     case EVENT.ARTILLERY_TARGET:
       requireLength(fields, 5, `artillery target event ${index}`);
       return {

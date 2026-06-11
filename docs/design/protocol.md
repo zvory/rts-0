@@ -243,7 +243,7 @@ Compact numeric codes:
 | `setupState` | 1 `packed`, 2 `setting_up`, 3 `deployed`, 4 `tearing_down` |
 | `upgrade` | 1 `methamphetamines`, 2 `at_gun_unlock`, 3 `tank_unlock`, 4 `artillery_unlock` |
 | `notice.severity` | 1 `info`, 2 `warn`, 3 `alert` |
-| `EventRecord` | `[1, from, to]` attack, `[1, from, to, reveal?, toPos?]` attack with optional shooter reveal and target position, `[2, id, x, y, kind]` death, `[3, id, kind]` build, `[4, msg]` notice, `[4, msg, severity]` position-free notice with severity, `[4, msg, severity, x, y]` positioned notice, `[5, [fromX, fromY], [toX, toY], delayTicks]` smoke launch, `[6, x, y, radiusTiles]` mortar impact/marker, `[7, x, y, radiusTiles, delayTicks]` artillery target marker, `[8, x, y, radiusTiles]` artillery impact |
+| `EventRecord` | `[1, from, to]` attack, `[1, from, to, reveal?, toPos?]` attack with optional shooter reveal and target position, `[2, id, x, y, kind]` death, `[3, id, kind]` build, `[4, msg]` notice, `[4, msg, severity]` position-free notice with severity, `[4, msg, severity, x, y]` positioned notice, `[5, [fromX, fromY], [toX, toY], delayTicks]` smoke launch, `[6, x, y, radiusTiles]` mortar impact/marker, `[6, x, y, radiusTiles, from?, reveal?]` mortar impact with optional shooter reveal, `[7, x, y, radiusTiles, delayTicks]` artillery target marker, `[8, x, y, radiusTiles]` artillery impact, `[9, from, [fromX, fromY], [toX, toY], radiusTiles, delayTicks]` mortar launch |
 
 Compact entity records are positional arrays. Optional fields keep the semantic order above and
 trailing missing optional fields are omitted; interior missing optional fields are encoded as
@@ -344,7 +344,9 @@ events, and positioned notices remain fog-gated and are withheld when smoke hide
 { e: "death",  id: u32, x: f32, y: f32, kind } // for death poofs
 { e: "build",  id: u32, kind: string }         // building completed
 { e: "smokeLaunch", fromX: f32, fromY: f32, toX: f32, toY: f32, delayTicks: u32 }
-{ e: "mortarImpact", x: f32, y: f32, radiusTiles: f32 }
+{ e: "mortarLaunch", from: u32, fromX: f32, fromY: f32, toX: f32, toY: f32, radiusTiles: f32, delayTicks: u32 }
+{ e: "mortarImpact", from?: u32, x: f32, y: f32, radiusTiles: f32,
+  reveal?: { owner: u32, kind: string, x: f32, y: f32, facing?: f32, weaponFacing?: f32, setupState?: string } }
 { e: "artilleryTarget", x: f32, y: f32, radiusTiles: f32, delayTicks: u32 }
 { e: "artilleryImpact", x: f32, y: f32, radiusTiles: f32 }
 { e: "notice", msg: string, severity?: "info"|"warn"|"alert", x?: f32, y?: f32 }
@@ -356,9 +358,14 @@ position after normal fog/visibility filtering. Unit attack events include `reve
 that fires from fog can be rendered briefly as a semi-transparent, non-interactive silhouette above
 the fog overlay; `toPos` lets tracers draw even when the hit target is no longer in the snapshot.
 Smoke launch events are owner-visible local feedback for the scout-car canister animation; the
-authoritative smoke cloud appears later in `smokes` after the reported launch delay. Mortar impact
-events are sent to the firing player and to recipients with current visibility at the impact point;
-enemy players do not receive hidden mortar impact markers.
+authoritative smoke cloud appears later in `smokes` after the reported launch delay. Mortar launch
+events are sent to the firing player and to other recipients that currently see the mortar, with
+shooter id, shell origin, impact point, radius, and delay so the client can draw launch dust,
+recoil, the projectile, and the warning marker until detonation. Mortar impact events are sent to
+the firing player, to recipients with current visibility at the impact point, and to players whose
+entities were damaged by the shell. A damaged victim owner receives `from` + `reveal` so the
+attacking mortar can be shown briefly above fog after indirect fire lands. Enemy players do not
+receive hidden mortar launch data or hidden mortar impact markers unless their entities were hit.
 Artillery target events are sent only to the firing player so enemies never receive pre-impact
 markers, even if they have vision of the gun. Artillery impact events are sent to every active
 recipient after impact as visual-only explosions; they do not reveal terrain, update exploration, or
