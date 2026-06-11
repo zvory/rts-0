@@ -168,6 +168,7 @@ export function replayLaunchConfig() {
 export const dom = {
   version: document.getElementById("version"),
   lobbyScreen: document.getElementById("lobby-screen"),
+  branchScreen: document.getElementById("branch-screen"),
   gameScreen: document.getElementById("game-screen"),
   viewport: document.getElementById("viewport"),
   minimap: document.getElementById("minimap"),

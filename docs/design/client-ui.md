@@ -47,7 +47,22 @@ export class Net {
   ping()
   setReplaySpeed(speed)                  // dev replay rooms only
   seekReplay(ticksBack)                  // dev replay rooms only; pass huge N for full reset
+  requestReplayBranch()
+  claimBranchSeat(playerId)
+  releaseBranchSeat(playerId)
+  startBranch()
   get playerId()
+}
+```
+
+`branch_staging.js`
+```js
+export class BranchStaging {
+  constructor(rootEl, net)
+  show()
+  hide()
+  destroy()
+  render(msg)                            // branchStaging payload
 }
 ```
 

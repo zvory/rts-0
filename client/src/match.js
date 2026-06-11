@@ -969,6 +969,16 @@ export class Match {
   buildReplayVisionControls() {
     if (!dom.replaySpeed || dom.replaySpeed.querySelector(".replay-vision-controls")) return;
 
+    if (!dom.replaySpeed.querySelector(".replay-branch-btn")) {
+      const resume = document.createElement("button");
+      resume.type = "button";
+      resume.className = "spd-btn replay-branch-btn";
+      resume.textContent = "Resume";
+      resume.title = "Create a practice branch from the current replay tick.";
+      resume.addEventListener("click", () => this.net.requestReplayBranch());
+      dom.replaySpeed.appendChild(resume);
+    }
+
     const group = document.createElement("div");
     group.className = "replay-vision-controls";
     group.setAttribute("role", "group");
@@ -1179,6 +1189,7 @@ export class Match {
         btn.hidden = true;
       }
       dom.replaySpeed.classList.remove("replay-viewer-controls");
+      dom.replaySpeed.querySelector(".replay-branch-btn")?.remove();
       dom.replaySpeed.querySelector(".replay-vision-controls")?.remove();
       dom.replaySpeed.querySelector(".replay-tick-status")?.remove();
       dom.replaySpeed.querySelector(".replay-timeline")?.remove();
