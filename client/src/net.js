@@ -196,7 +196,7 @@ export class Net {
   }
 
   /**
-   * Set replay/dev-watch playback speed. Dev-watch accepts 0 as paused.
+   * Set replay/dev-watch playback speed. 0 pauses playback.
    * @param {number} speed multiplier, e.g. 0.5, 1, 2, 4, 8
    */
   setReplaySpeed(speed) {

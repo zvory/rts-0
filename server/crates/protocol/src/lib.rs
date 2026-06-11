@@ -121,7 +121,7 @@ pub enum ClientMessage {
     Ping { ts: f64 },
     /// Client-observed network/render health aggregate for server logs.
     NetReport { report: ClientNetReport },
-    /// Set replay/dev-watch playback speed multiplier. Dev watch accepts `0` as paused.
+    /// Set replay/dev-watch playback speed multiplier. `0` pauses replay and dev-watch playback.
     SetReplaySpeed { speed: f32 },
     /// Advance a paused dev-watch room by one simulation tick. Ignored outside dev watch.
     StepDevTick,
