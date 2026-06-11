@@ -1,15 +1,18 @@
 // Dependency-free checks for viewport right-click menu suppression.
 
 import { Input } from "../client/src/input/index.js";
+import { KIND } from "../client/src/protocol.js";
 
 function assert(cond, msg) {
   if (!cond) throw new Error(msg || "Assertion failed");
 }
 
-function mouseEvent({ button = 0, shiftKey = false } = {}) {
+function mouseEvent({ button = 0, shiftKey = false, ctrlKey = false, metaKey = false } = {}) {
   return {
     button,
     shiftKey,
+    ctrlKey,
+    metaKey,
     clientX: 100,
     clientY: 120,
     prevented: false,
@@ -21,6 +24,20 @@ function mouseEvent({ button = 0, shiftKey = false } = {}) {
       this.stopped = true;
     },
   };
+}
+
+function withNavigator(value, fn) {
+  const prior = Object.getOwnPropertyDescriptor(globalThis, "navigator");
+  Object.defineProperty(globalThis, "navigator", {
+    configurable: true,
+    value,
+  });
+  try {
+    fn();
+  } finally {
+    if (prior) Object.defineProperty(globalThis, "navigator", prior);
+    else delete globalThis.navigator;
+  }
 }
 
 function inputHarness() {
@@ -57,5 +74,46 @@ function inputHarness() {
   assert(rightClicks.length === 2, "later contextmenu still issues a normal right-click order");
   assert(rightClicks[1].shiftKey === false, "later contextmenu does not inherit stale Shift state");
 }
+
+withNavigator({ platform: "MacIntel", userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0)" }, () => {
+  const { input, rightClicks } = inputHarness();
+  const selectionClicks = [];
+  input.state = {
+    playerId: 1,
+    placement: null,
+    commandTarget: null,
+  };
+  input._worldAt = (x, y) => ({ x, y });
+  input._entityAtWorld = () => ({ id: 7, owner: 1, kind: KIND.WORKER, x: 100, y: 120 });
+  input._commitClickSelection = (p, additive, ctrl) => selectionClicks.push({ p, additive, ctrl });
+
+  const menu = mouseEvent({ button: 2, ctrlKey: true });
+  input._handleContextMenu(menu);
+
+  assert(menu.prevented, "Mac Ctrl+contextmenu suppresses native default");
+  assert(menu.stopped, "Mac Ctrl+contextmenu stops propagation");
+  assert(selectionClicks.length === 1, "Mac Ctrl+contextmenu on an own unit commits selection");
+  assert(selectionClicks[0].ctrl === true, "Mac Ctrl+contextmenu uses control-click selection semantics");
+  assert(rightClicks.length === 0, "Mac Ctrl+contextmenu on an own unit does not issue a right-click order");
+});
+
+withNavigator({ platform: "Win32", userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" }, () => {
+  const { input, rightClicks } = inputHarness();
+  const selectionClicks = [];
+  input.state = {
+    playerId: 1,
+    placement: null,
+    commandTarget: null,
+  };
+  input._worldAt = (x, y) => ({ x, y });
+  input._entityAtWorld = () => ({ id: 7, owner: 1, kind: KIND.WORKER, x: 100, y: 120 });
+  input._commitClickSelection = (p, additive, ctrl) => selectionClicks.push({ p, additive, ctrl });
+
+  const menu = mouseEvent({ button: 2, ctrlKey: true });
+  input._handleContextMenu(menu);
+
+  assert(selectionClicks.length === 0, "non-Mac Ctrl+contextmenu does not use Mac selection handling");
+  assert(rightClicks.length === 1, "non-Mac Ctrl+contextmenu still issues a right-click order");
+});
 
 console.log("input_context_menu_contracts: ok");

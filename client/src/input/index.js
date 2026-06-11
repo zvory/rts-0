@@ -28,6 +28,7 @@
 // against the interpolated positions from state so clicks line up with what is drawn.
 
 import { DRAG_THRESHOLD_PX } from "./constants.js";
+import { isBuilding, isUnit } from "../protocol.js";
 import {
   _activateCommandHotkey,
   _cancel,
@@ -81,6 +82,13 @@ const POINTER_LOCK_RESULT_TIMEOUT_MS = 700;
 const POINTER_LOCK_RAW_INPUT_OPTIONS = Object.freeze({ unadjustedMovement: true });
 const CONTEXT_MENU_EVENT_OPTIONS = { capture: true };
 const CONTEXT_MENU_SUPPRESS_MS = 500;
+
+function isMacPlatform() {
+  const nav = globalThis.navigator;
+  const platform = `${nav?.userAgentData?.platform || nav?.platform || ""}`;
+  if (/\bMac/i.test(platform)) return true;
+  return /\bMacintosh\b|\bMac OS X\b/i.test(`${nav?.userAgent || ""}`);
+}
 
 /**
  * Translates raw DOM pointer/keyboard gestures on the viewport into selection
@@ -795,6 +803,7 @@ export class Input {
     const p = this._eventScreenPos(ev);
     if (!this.pointerLocked) this._trackMouse(p);
     if (this._routeLockedPointerDown(ev, { ...p, button: 2 })) return;
+    if (this._handleMacControlClickSelection(p, ev)) return;
     this._onRightClick(p, ev);
   }
 
@@ -825,6 +834,19 @@ export class Input {
     this._drag = { x0: p.x, y0: p.y, x1: p.x, y1: p.y };
     this._dragging = false;
     void ev;
+  }
+
+  _handleMacControlClickSelection(p, ev) {
+    if (!ev.ctrlKey || ev.metaKey || !isMacPlatform()) return false;
+    if (this.state.placement || this.state.commandTarget) return false;
+
+    const world = this._worldAt(p.x, p.y);
+    const hit = this._entityAtWorld(world.x, world.y, /*ownPreferred=*/ true);
+    if (!hit || hit.owner !== this.state.playerId) return false;
+    if (!isUnit(hit.kind) && !isBuilding(hit.kind)) return false;
+
+    this._commitClickSelection(p, ev.shiftKey, true);
+    return true;
   }
 
   _startPanDrag(p, button) {
