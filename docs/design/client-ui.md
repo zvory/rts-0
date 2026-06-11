@@ -147,7 +147,7 @@ export class Input {
   // installs listeners; translates gestures into selection + protocol commands.
   // number keys recall control groups; double-tap jumps the camera to the largest
   // local cluster. Alt/Ctrl/Cmd+number replaces a group, Shift+number adds to it.
-  // On Windows, browser saves use Alt+number and desktop saves use Ctrl+number.
+  // On Windows, tabbed browser saves use Alt+number and installed-app saves use Ctrl+number.
   // optional pointer-lock mode traps the browser cursor and drives a visible
   // virtual cursor for edge pan on multi-monitor setups.
   update(dt)                             // continuous handling (edge scroll handled by camera)

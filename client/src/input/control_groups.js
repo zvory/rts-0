@@ -16,9 +16,9 @@ export function _controlGroupIsWindowsPlatform() {
 
 export function _controlGroupSaveModifierActive(ev, runtime = {}) {
   const isWindows = runtime.isWindows ?? _controlGroupIsWindowsPlatform();
-  const isDesktop = !!runtime.isDesktop;
+  const isInstalledApp = !!runtime.isInstalledApp;
   if (isWindows) {
-    return isDesktop
+    return isInstalledApp
       ? ev.ctrlKey && !ev.altKey && !ev.metaKey
       : ev.altKey && !ev.ctrlKey && !ev.metaKey;
   }
@@ -30,7 +30,7 @@ export function _handleControlGroupHotkey(ev) {
   if (slot == null || this.state.spectator) return false;
 
   const save = _controlGroupSaveModifierActive(ev, {
-    isDesktop: typeof this.desktopRuntime === "function" && this.desktopRuntime(),
+    isInstalledApp: typeof this.installedAppRuntime === "function" && this.installedAppRuntime(),
   }) && !ev.shiftKey;
   const add = ev.shiftKey && !ev.altKey && !ev.ctrlKey && !ev.metaKey;
   const recall = !ev.altKey && !ev.ctrlKey && !ev.metaKey && !ev.shiftKey;

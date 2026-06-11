@@ -62,9 +62,9 @@ import { ReplayCameraInput } from "../client/src/replay_camera_input.js";
 import {
   automaticPointerLockDisabledForTests,
   cursorLockSupported,
-  desktopRuntime,
   enterCursorLock,
   exitCursorLock,
+  installedAppRuntime,
   shouldRequestPointerLock,
 } from "../client/src/input/cursor_lock.js";
 import { DomClickInputZone, MatchInputRouter } from "../client/src/input/router.js";
@@ -190,11 +190,6 @@ class RecordingGraphics extends FakeGraphics {
 
 await testDevWatchScenarioConfig();
 
-function resetTauriGlobals() {
-  delete globalThis.__TAURI__;
-  delete globalThis.__TAURI_INTERNALS__;
-}
-
 assert(noticeSoundId("alert:under_attack") === "notice_under_attack", "under-attack notice has dedicated sound id");
 assert(noticeSoundId("Not enough supply") === "notice_supply", "supply notice routes to supply voice line");
 assert(noticeSoundId("Build more depots") === "notice_supply", "depot notice routes to supply voice line");
@@ -218,29 +213,29 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
   });
 
   assert(
-    _controlGroupSaveModifierActive(ev({ altKey: true }), { isWindows: true, isDesktop: false }),
+    _controlGroupSaveModifierActive(ev({ altKey: true }), { isWindows: true, isInstalledApp: false }),
     "Windows browser control-group save uses Alt+number",
   );
   assert(
-    !_controlGroupSaveModifierActive(ev({ ctrlKey: true }), { isWindows: true, isDesktop: false }),
+    !_controlGroupSaveModifierActive(ev({ ctrlKey: true }), { isWindows: true, isInstalledApp: false }),
     "Windows browser control-group save does not use Ctrl+number",
   );
   assert(
-    _controlGroupSaveModifierActive(ev({ ctrlKey: true }), { isWindows: true, isDesktop: true }),
-    "Windows desktop control-group save uses Ctrl+number",
+    _controlGroupSaveModifierActive(ev({ ctrlKey: true }), { isWindows: true, isInstalledApp: true }),
+    "Windows installed-app control-group save uses Ctrl+number",
   );
   assert(
-    !_controlGroupSaveModifierActive(ev({ altKey: true }), { isWindows: true, isDesktop: true }),
-    "Windows desktop control-group save does not use Alt+number",
+    !_controlGroupSaveModifierActive(ev({ altKey: true }), { isWindows: true, isInstalledApp: true }),
+    "Windows installed-app control-group save does not use Alt+number",
   );
   assert(
-    _controlGroupSaveModifierActive(ev({ metaKey: true }), { isWindows: false, isDesktop: false }),
+    _controlGroupSaveModifierActive(ev({ metaKey: true }), { isWindows: false, isInstalledApp: false }),
     "non-Windows control-group save keeps the existing modifier set",
   );
   assert(
     !_controlGroupSaveModifierActive(
       ev({ altKey: true, ctrlKey: true }),
-      { isWindows: true, isDesktop: false },
+      { isWindows: true, isInstalledApp: false },
     ),
     "Windows browser control-group save requires a clean Alt modifier",
   );
@@ -351,17 +346,26 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
 // Pointer lock bridge
 // ---------------------------------------------------------------------------
 {
-  resetTauriGlobals();
-  assert(cursorLockSupported(true), "browser pointer lock keeps cursor lock available outside Tauri");
+  const priorMatchMedia = globalThis.matchMedia;
+  const priorNavigatorDescriptor = Object.getOwnPropertyDescriptor(globalThis, "navigator");
+  globalThis.matchMedia = (query) => ({ matches: query === "(display-mode: standalone)" });
+  Object.defineProperty(globalThis, "navigator", {
+    configurable: true,
+    value: { standalone: false },
+  });
+  assert(installedAppRuntime(), "standalone display mode marks an installed app runtime");
+  globalThis.matchMedia = () => ({ matches: false });
+  Object.defineProperty(globalThis, "navigator", {
+    configurable: true,
+    value: { standalone: false },
+  });
+  assert(!installedAppRuntime(), "regular browser tabs are not installed app runtimes");
+  if (priorMatchMedia === undefined) delete globalThis.matchMedia;
+  else globalThis.matchMedia = priorMatchMedia;
+  if (priorNavigatorDescriptor) Object.defineProperty(globalThis, "navigator", priorNavigatorDescriptor);
+  else delete globalThis.navigator;
 
-  const invocations = [];
-  globalThis.__TAURI_INTERNALS__ = {
-    invoke: async (cmdName, args) => {
-      invocations.push([cmdName, args]);
-    },
-  };
-  assert(desktopRuntime(), "Tauri globals still mark the desktop runtime");
-  assert(cursorLockSupported(true), "desktop runtime still uses browser pointer lock support");
+  assert(cursorLockSupported(true), "browser pointer lock keeps cursor lock available");
   let browserFallbackCalled = 0;
   const mode = await enterCursorLock(
     async () => {
@@ -370,9 +374,8 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
     },
     { x: 42, y: 64 },
   );
-  assert(mode === "browser", "Tauri runtime still selects browser Pointer Lock");
-  assert(browserFallbackCalled === 1, "browser Pointer Lock fallback is invoked in Tauri");
-  assert(invocations.length === 0, "cursor lock does not call Tauri cursor IPC");
+  assert(mode === "browser", "cursor lock uses browser Pointer Lock");
+  assert(browserFallbackCalled === 1, "browser Pointer Lock is invoked once");
 
   let browserExitCalled = false;
   await exitCursorLock("browser", () => {
@@ -398,7 +401,6 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
   prefixedInput._exitBrowserPointerLock();
   assert(webkitExitCalled, "WebKit-prefixed Pointer Lock exit is called");
   globalThis.document = priorDocument;
-  resetTauriGlobals();
 }
 
 {
@@ -803,7 +805,7 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
   lockedPolicyMatch.input = {
     pointerLocked: true,
     pointerLockSupported: () => true,
-    desktopRuntime: () => false,
+    installedAppRuntime: () => false,
   };
   lockedPolicyMatch.pointerLockPanEnabled = true;
   lockedPolicyMatch.pointerLockRetryToken = 0;
@@ -819,7 +821,7 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
   disabledPolicyMatch.input = {
     pointerLocked: false,
     pointerLockSupported: () => true,
-    desktopRuntime: () => false,
+    installedAppRuntime: () => false,
   };
   disabledPolicyMatch.pointerLockPanEnabled = false;
   disabledPolicyMatch.pointerLockRetryToken = 0;
@@ -835,7 +837,7 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
   unlockedPolicyMatch.input = {
     pointerLocked: false,
     pointerLockSupported: () => true,
-    desktopRuntime: () => true,
+    installedAppRuntime: () => true,
   };
   unlockedPolicyMatch.pointerLockPanEnabled = true;
   unlockedPolicyMatch.autoPointerLockUntil = 0;
@@ -846,14 +848,14 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
     return Promise.resolve();
   };
   unlockedPolicyMatch.requestAutomaticPointerLock({ requireGesture: true });
-  assert(requestedRetry?.maxAttempts === 4, "desktop gesture aggressively retries raw Pointer Lock while unlocked");
+  assert(requestedRetry?.maxAttempts === 4, "installed-app gesture retries raw Pointer Lock while unlocked");
 
   const retryMatch = Object.create(Match.prototype);
   retryMatch.running = true;
   retryMatch.input = {
     pointerLocked: false,
     pointerLockSupported: () => true,
-    desktopRuntime: () => false,
+    installedAppRuntime: () => false,
     async requestPointerLock() {
       return false;
     },
@@ -873,15 +875,15 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
 
 {
   assert(
-    !shouldRequestPointerLock({ desktopRuntime: true, requireGesture: false }),
-    "desktop Pointer Lock skips non-gesture automatic requests",
+    !shouldRequestPointerLock({ installedAppRuntime: true, requireGesture: false }),
+    "installed-app Pointer Lock skips non-gesture automatic requests",
   );
   assert(
-    shouldRequestPointerLock({ desktopRuntime: true, requireGesture: true }),
-    "desktop Pointer Lock runs from user gesture requests",
+    shouldRequestPointerLock({ installedAppRuntime: true, requireGesture: true }),
+    "installed-app Pointer Lock runs from user gesture requests",
   );
   assert(
-    shouldRequestPointerLock({ desktopRuntime: false, requireGesture: false }),
+    shouldRequestPointerLock({ installedAppRuntime: false, requireGesture: false }),
     "browser Pointer Lock keeps non-gesture automatic attempts",
   );
   const priorLocation = globalThis.location;
