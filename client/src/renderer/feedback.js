@@ -265,6 +265,9 @@ export function _drawAtGunSetupPreview(state) {
   if (!state || typeof state.selectedEntities !== "function") return;
   const g = this._feedbackGfx;
   const tileSize = (this._map && this._map.tileSize) || 32;
+  const pointFirePreview = state.abilityTargetPreview?.ability === ABILITY.POINT_FIRE
+    ? state.abilityTargetPreview
+    : null;
 
   for (const e of state.selectedEntities()) {
     if (e.owner !== state.playerId || (e.kind !== KIND.AT_TEAM && e.kind !== KIND.ARTILLERY)) continue;
@@ -273,6 +276,13 @@ export function _drawAtGunSetupPreview(state) {
     if (facing == null) continue;
     const weapon = fieldOfFireProfile(e.kind, tileSize);
     if (!weapon) continue;
+    if (
+      pointFirePreview &&
+      e.kind === KIND.ARTILLERY &&
+      !pointInsideFieldOfFire(e, pointFirePreview.mouseX, pointFirePreview.mouseY, weapon, facing)
+    ) {
+      continue;
+    }
     drawFacingWedge(
       g,
       e.x,
@@ -321,6 +331,20 @@ export function _drawAbilityTargetPreview(state) {
     if (!finiteNumber(carrier.x) || !finiteNumber(carrier.y)) continue;
     const facing = Math.atan2(preview.mouseY - carrier.y, preview.mouseX - carrier.x);
     if (preview.ability === ABILITY.POINT_FIRE && Number.isFinite(facing)) {
+      const weapon = fieldOfFireProfile(carrier.kind, (this._map && this._map.tileSize) || 32);
+      const staticFacing = finiteNumber(carrier.setupFacing)
+        ? carrier.setupFacing
+        : finiteNumber(carrier.facing)
+          ? carrier.facing
+          : null;
+      if (
+        !weapon ||
+        carrier.setupState !== SETUP.DEPLOYED ||
+        (staticFacing != null &&
+          pointInsideFieldOfFire(carrier, preview.mouseX, preview.mouseY, weapon, staticFacing))
+      ) {
+        continue;
+      }
       drawFacingWedge(
         g,
         carrier.x,
@@ -381,6 +405,17 @@ function fieldOfFireProfile(kind, tileSize) {
     };
   }
   return null;
+}
+
+function pointInsideFieldOfFire(e, x, y, weapon, facing) {
+  if (!finiteNumber(e?.x) || !finiteNumber(e?.y) || !finiteNumber(x) || !finiteNumber(y)) return false;
+  if (!finiteNumber(facing)) return false;
+  const dx = x - e.x;
+  const dy = y - e.y;
+  const dist = Math.hypot(dx, dy);
+  if (dist < (weapon.minRadius || 0) || dist > weapon.maxRadius) return false;
+  const targetFacing = Math.atan2(dy, dx);
+  return Math.abs(angleDelta(facing, targetFacing)) <= weapon.arc / 2 + 0.001;
 }
 
 export function _drawSelectedMortarRanges(state) {

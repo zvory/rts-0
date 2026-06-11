@@ -208,15 +208,6 @@ function drawMortarTeam(g, r, tint, facing, weaponFacing, setup, recoil) {
 function drawArtillery(g, body, tint, facing, weaponFacing, setup, recoil, motion) {
   const deploy = clamp01(setup.prongFactor);
 
-  if (deploy < 0.35 && motion.activity > 0.05) {
-    const dustAlpha = 0.12 + motion.activity * 0.16;
-    const rear = rotatePoint(-body.halfLen - 7, 0, facing);
-    g.beginFill(0x8a806b, dustAlpha);
-    g.drawCircle(rear.x - Math.cos(facing) * 5, rear.y - Math.sin(facing) * 5, body.halfWidth * 0.42);
-    g.drawCircle(rear.x - Math.cos(facing) * 13, rear.y - Math.sin(facing) * 13, body.halfWidth * 0.28);
-    g.endFill();
-  }
-
   const carriageFacing = deploy > 0.02 ? weaponFacing : facing;
   const trailSpread = body.halfWidth * (0.18 + deploy * 0.95);
   const trailRear = -body.halfLen * (0.58 + deploy * 0.62);
@@ -294,8 +285,20 @@ function drawArtillery(g, body, tint, facing, weaponFacing, setup, recoil, motio
   g.endFill();
   if (recoil > 0.1) {
     const flash = offsetPoint(rotatePoint(body.halfLen * 1.9, 0, weaponFacing), kick);
-    g.beginFill(0xfff2d0, clamp01(recoil / 10) * 0.64);
-    g.drawCircle(flash.x, flash.y, 5 + recoil * 0.4);
+    const flashAlpha = clamp01(recoil / 10);
+    const flashLen = 18 + recoil * 1.8;
+    const flashWidth = 9 + recoil * 0.75;
+    const tip = offsetPoint(flash, rotatePoint(flashLen, 0, weaponFacing));
+    const left = offsetPoint(flash, rotatePoint(-flashLen * 0.24, -flashWidth, weaponFacing));
+    const right = offsetPoint(flash, rotatePoint(-flashLen * 0.24, flashWidth, weaponFacing));
+    g.beginFill(0xffd84a, flashAlpha * 0.78);
+    g.drawPolygon([tip.x, tip.y, left.x, left.y, right.x, right.y]);
+    g.endFill();
+    g.beginFill(0xfff2d0, flashAlpha * 0.9);
+    g.drawCircle(flash.x, flash.y, 7 + recoil * 0.55);
+    g.endFill();
+    g.beginFill(0xfff06a, flashAlpha * 0.58);
+    g.drawCircle(flash.x, flash.y, 12 + recoil * 0.8);
     g.endFill();
   }
 }
