@@ -303,10 +303,7 @@ fn artillery_target_is_owner_only_and_impact_is_global_visual_event() {
         !enemy_saw_target,
         "enemy should never receive pre-impact artillery target marker"
     );
-    assert!(
-        enemy_saw_artillery_reveal,
-        "enemy should briefly see the firing artillery even through fog"
-    );
+    assert!(enemy_saw_artillery_reveal);
     assert!(owner_saw_impact, "owner should see delayed impact");
     assert!(
         enemy_saw_impact,
