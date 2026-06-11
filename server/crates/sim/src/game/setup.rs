@@ -292,6 +292,7 @@ impl Game {
             map,
             entities,
             fog,
+            building_memory: BuildingMemory::default(),
             players: player_states,
             pending: Vec::new(),
             command_log: Vec::new(),
@@ -315,6 +316,7 @@ impl Game {
         let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
         game.fog
             .recompute_with_smoke(&ids, &game.entities, &game.map, &game.smokes);
+        game.refresh_building_memory(&ids);
         game
     }
 
