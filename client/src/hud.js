@@ -632,10 +632,13 @@ export class HUD {
         `${affordance.depletedCount}:` +
         `${affordance.readyIds.join(".")}:` +
         `${affordance.autocastEnabledIds.join(".")}:` +
-        `${affordance.cooldownClocks.map((group) => `${group.count}:${Math.round(group.cooldownLeft)}`).join(",")}`,
+        `${affordance.cooldownClocks.map((group) => group.count).join(",")}`,
       ).join("|")}|` +
       (workerSelected ? "worker-main" : "no-build");
-    if (sig === this._cardSig) return;
+    if (sig === this._cardSig) {
+      this._syncAbilityCooldownClocks(abilityAffordances);
+      return;
+    }
     this._cardSig = sig;
 
     const frag = document.createDocumentFragment();
@@ -746,6 +749,7 @@ export class HUD {
           icon: definition.icon,
           label: definition.label,
           title: this._abilityDisabledReason(affordance),
+          ability: definition.ability,
           hotkey: GRID_HOTKEYS[slot],
           enabled: readyCount > 0 && affordance.affordable,
           unaffordable: readyCount > 0 && !affordance.affordable,
@@ -1250,11 +1254,34 @@ export class HUD {
     return el;
   }
 
+  _syncAbilityCooldownClocks(abilityAffordances) {
+    if (!this.elCommand || typeof this.elCommand.querySelector !== "function") return;
+    for (const affordance of abilityAffordances) {
+      const button = this.elCommand.querySelector(
+        `button[data-ability="${affordance.definition.ability}"]`,
+      );
+      if (!button) continue;
+      this._syncCooldownClockElement(button, affordance.cooldownClocks);
+    }
+  }
+
+  _syncCooldownClockElement(button, cooldownClocks) {
+    const clocks = Array.isArray(cooldownClocks) ? cooldownClocks : [];
+    const arms = typeof button.querySelectorAll === "function"
+      ? Array.from(button.querySelectorAll(".cmd-cd-arm"))
+      : [];
+    if (arms.length !== clocks.length) return;
+    for (let i = 0; i < arms.length; i++) {
+      arms[i].style.setProperty("--cooldown-rotation", `${clocks[i].rotationDeg.toFixed(1)}deg`);
+    }
+  }
+
   /**
    * Build a command-card button element.
    * @param {object} opts
    * @param {string} [opts.icon] glyph shown large.
    * @param {string} opts.label visible name.
+   * @param {string} [opts.ability] ability id for dynamic cooldown-clock refreshes.
    * @param {string} [opts.hotkey] keyboard hint shown in a corner.
    * @param {{steel:number,oil:number}} [opts.cost] cost badge (omitted if absent).
    * @param {boolean} opts.enabled whether the action is currently available.
@@ -1283,6 +1310,7 @@ export class HUD {
       // Expose the hotkey so Input/keyboard handling and styles.css can find it.
       btn.dataset.hotkey = opts.hotkey;
     }
+    if (opts.ability) btn.dataset.ability = opts.ability;
     if (opts.repeatable) btn.dataset.repeatable = "true";
     if (typeof opts.onContextMenu === "function") {
       btn.addEventListener("contextmenu", (ev) => {
