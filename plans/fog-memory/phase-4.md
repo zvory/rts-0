@@ -7,6 +7,12 @@ Status: planned
 Resolve gameplay semantics before changing A* so the implementation has clear answers for hidden
 blockers, discovery, and order transitions.
 
+## Groundwork
+
+See [phase-4-groundwork.md](phase-4-groundwork.md) for the current behavior inventory, tradeoff
+analysis, recommended defaults, remaining user-confirmation questions, and phase 5/6 test
+scenarios.
+
 ## Required User Prompts
 
 Ask the user to decide or confirm:
