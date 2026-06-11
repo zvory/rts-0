@@ -2,7 +2,7 @@
 // These cover the pointer-lock virtual-cursor path without launching a browser.
 
 import { MatchInputRouter } from "../client/src/input/router.js";
-import { CommandComposer } from "../client/src/input/command_composer.js";
+import { CommandComposer } from "../client/src/command_composer.js";
 import { Minimap } from "../client/src/minimap.js";
 import { KIND } from "../client/src/protocol.js";
 

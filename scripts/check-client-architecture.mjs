@@ -14,6 +14,7 @@ const AREA_BY_FILE = new Map(Object.entries({
   "replay_viewer.js": "app-shell",
 
   "state.js": "model",
+  "command_composer.js": "model",
 
   "net.js": "transport",
   "protocol.js": "transport",
@@ -42,12 +43,7 @@ const AREA_PREFIXES = [
   ["input/", "input"],
 ];
 
-const ALLOWED_CROSS_AREA_IMPORTS = new Map([
-  [
-    "state.js -> input/command_composer.js",
-    "Current command targeting state lives in GameState while the pure command composer is under input; remove after command arming is owned fully by input or model.",
-  ],
-]);
+const ALLOWED_CROSS_AREA_IMPORTS = new Map();
 
 const ALLOWED_PROTOTYPE_GRAFTS = new Set([
   "input/index.js:Input",
