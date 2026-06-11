@@ -184,11 +184,11 @@ Spectator start payloads keep the spectator connection's `playerId`, set `specta
 list only active match players in `players`.
 
 Replay start payloads include `replay` metadata so the client can display or cache a
-self-describing playback session. The server validates production replay artifacts before playback:
-artifact schema version, server build SHA, map name, map schema version, and map content hash must
-match the running server/map asset or the replay is rejected with a clear error. Legacy
-`/dev/selfplay?replay=...` artifacts are intentionally not production replay artifacts; they remain
-loadable only through the dev self-play room path.
+self-describing playback session. The server validates replay artifacts before playback: artifact
+schema version, server build SHA, map name, map schema version, and map content hash must match the
+running server/map asset or the replay is rejected with a clear error. Saved self-play artifacts use
+the same `ReplayArtifactV1` contract as post-match and match-history replays; pre-unified dev-only
+artifact payloads are rejected instead of falling back to a separate loader.
 
 When a real multi-player match ends, the server sends the normal `gameOver` score payload, clears
 pending latest-only live snapshots for connected humans, and then sends a replay `start` payload
