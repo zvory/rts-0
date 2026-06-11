@@ -185,6 +185,70 @@ function withFakeDocument(fn) {
   }
 }
 
+function fakeClassList() {
+  const values = new Set();
+  return {
+    add(value) { values.add(value); },
+    remove(value) { values.delete(value); },
+    contains(value) { return values.has(value); },
+    toggle(value, enabled) {
+      if (enabled) values.add(value);
+      else values.delete(value);
+    },
+  };
+}
+
+function fakeHudRootWithoutResourceSpans() {
+  const ids = new Map();
+  const hud = {
+    _html: "",
+    get innerHTML() {
+      return this._html;
+    },
+    set innerHTML(value) {
+      this._html = String(value);
+      ids.clear();
+      for (const id of ["res-steel", "res-oil", "res-supply"]) {
+        if (this._html.includes(`id="${id}"`)) {
+          ids.set(id, { id, textContent: "", classList: fakeClassList() });
+        }
+      }
+    },
+    querySelector(selector) {
+      if (selector.startsWith("#")) return ids.get(selector.slice(1)) || null;
+      return null;
+    },
+  };
+  return {
+    ids,
+    root: {
+      querySelector(selector) {
+        if (selector === "#hud") return hud;
+        return hud.querySelector(selector);
+      },
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// HUD resource bar
+// ---------------------------------------------------------------------------
+{
+  const { root, ids } = fakeHudRootWithoutResourceSpans();
+  const state = {
+    resources: { steel: 325, oil: 80, supplyUsed: 7, supplyCap: 14 },
+    playerResources: [],
+  };
+  const hud = new HUD(root, state, {}, null);
+  assert(ids.has("res-steel"), "HUD constructor restores steel span after replay resource rows");
+  assert(ids.has("res-oil"), "HUD constructor restores oil span after replay resource rows");
+  assert(ids.has("res-supply"), "HUD constructor restores supply span after replay resource rows");
+  hud._renderSinglePlayerResources();
+  assert(ids.get("res-steel").textContent === "325", "restored HUD steel span updates from live resources");
+  assert(ids.get("res-oil").textContent === "80", "restored HUD oil span updates from live resources");
+  assert(ids.get("res-supply").textContent === "7 / 14", "restored HUD supply span updates from live supply");
+}
+
 // ---------------------------------------------------------------------------
 // Command card descriptors
 // ---------------------------------------------------------------------------
@@ -3539,6 +3603,7 @@ function fakeAudioContext() {
   assertHasMethod(cam, "screenToWorld", "Camera");
   assertHasMethod(cam, "centerOn", "Camera");
   assertHasMethod(cam, "setBounds", "Camera");
+  assertHasMethod(cam, "setView", "Camera");
 
   cam.setBounds(1000, 800, 800, 600);
   cam.centerOn(500, 400);
@@ -3550,6 +3615,11 @@ function fakeAudioContext() {
   const back = cam.screenToWorld(screen.x, screen.y);
   assert(Math.abs(back.x - world.x) < 0.001, "worldToScreen / screenToWorld inverse x");
   assert(Math.abs(back.y - world.y) < 0.001, "worldToScreen / screenToWorld inverse y");
+
+  cam.setView({ x: 120, y: 140, zoom: 1.25 });
+  assertApprox(cam.x, 120, 0.001, "Camera.setView restores x");
+  assertApprox(cam.y, 140, 0.001, "Camera.setView restores y");
+  assertApprox(cam.zoom, 1.25, 0.001, "Camera.setView restores zoom");
 }
 
 // ---------------------------------------------------------------------------

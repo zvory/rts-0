@@ -84,6 +84,7 @@ export class App {
     this.onClose = this.onClose.bind(this);
     this.onReplayBranchCreated = this.onReplayBranchCreated.bind(this);
     this.inReplayPlayback = false;
+    this.pendingCameraView = null;
   }
 
   /** Connect, wire global server messages, and show the lobby. */
@@ -210,6 +211,9 @@ export class App {
     const startsReplay = !!payload?.replay;
     const preserveScorePanel = startsReplay && !dom.gameOver.hidden;
 
+    const carriedCamera = this.takeMatchCameraView() || this.pendingCameraView;
+    this.pendingCameraView = null;
+
     // If a previous match somehow lingers, tear it down first.
     if (this.match) this.match.destroy();
     this.inReplayPlayback = startsReplay;
@@ -233,6 +237,7 @@ export class App {
       this.audio,
       this.statusBadge,
       diagnostics,
+      { initialCamera: carriedCamera },
     );
     diagnostics.mark("app.onStart.end");
   }
@@ -241,6 +246,7 @@ export class App {
     const branchRoom = (m?.branchRoom || "").trim();
     if (!branchRoom) return;
     if (this.match) {
+      this.pendingCameraView = this.takeMatchCameraView();
       if (typeof this.match.freezeForBranchStagingBackground === "function") {
         this.match.freezeForBranchStagingBackground();
       } else {
@@ -261,6 +267,14 @@ export class App {
     const name = (this.lobby?.elName && this.lobby.elName.value.trim()) || "Commander";
     if (this.lobby?.elRoom) this.lobby.elRoom.value = branchRoom;
     this.net.join(name, branchRoom, true, true);
+  }
+
+  takeMatchCameraView() {
+    if (!this.match || typeof this.match.cameraView !== "function") return null;
+    const view = this.match.cameraView();
+    return Number.isFinite(view?.x) && Number.isFinite(view?.y) && Number.isFinite(view?.zoom)
+      ? view
+      : null;
   }
 
   /**

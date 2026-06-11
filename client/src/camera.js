@@ -55,6 +55,23 @@ export class Camera {
   }
 
   /**
+   * Restore a previously captured viewport.
+   * @param {{x?:number,y?:number,zoom?:number}|null} view
+   */
+  setView(view) {
+    if (!view) return;
+    const zoom = Number(view.zoom);
+    if (Number.isFinite(zoom)) {
+      this.zoom = Math.max(CAMERA.minZoom, Math.min(CAMERA.maxZoom, zoom));
+    }
+    const x = Number(view.x);
+    const y = Number(view.y);
+    if (Number.isFinite(x)) this.x = x;
+    if (Number.isFinite(y)) this.y = y;
+    this._clamp();
+  }
+
+  /**
    * Advance the camera one frame: apply keyboard + screen-edge panning, then clamp.
    * @param {number} dt seconds since the previous frame
    * @param {object} [input] read-only view of current input state
