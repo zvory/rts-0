@@ -153,8 +153,8 @@ The server treats every client as potentially hostile. Limits live next to the c
   100 steel / 100 oil and taking 600 ticks. Once completed, all current and future owned riflemen
   use the charging movement/fire model permanently, move at tank speed, and attack 25% faster.
   Legacy `charge` commands remain decodable but have no eligible carriers.
-- **Stage-two unit unlock research**: Gun Works can queue `at_gun_unlock` for 100 steel / 75 oil
-  over 600 ticks, unlocking AT Gun training at Gun Works for that player. Vehicle Works can queue
+- **Stage-two unit unlock research**: R&D Complex can queue `at_gun_unlock` for 200 steel / 75 oil
+  over 600 ticks, unlocking AT Gun training at Gun Works for that player. R&D Complex can queue
   `tank_unlock` for 150 steel / 100 oil over 600 ticks, unlocking Tank training at Vehicle Works
   for that player. Server-side train validation checks both the producer kind and the completed
   player upgrade set, so clients cannot bypass these locks by sending `train` commands directly.
