@@ -16,7 +16,7 @@ crate.
 
 | `t`        | Fields | Meaning |
 |------------|--------|---------|
-| `join`     | `name: string`, `room?: string`, `spectator?: bool`, `replayOk?: bool` | Join (or create) a room. `room` defaults to `"main"`. If `spectator` is true, join as a lobby-time observer instead of a match participant. If the target room is replay playback, the first join is rejected with `joinReplayPrompt`; retry with `replayOk: true` only after user confirmation. |
+| `join`     | `name: string`, `room?: string`, `spectator?: bool`, `replayOk?: bool` | Join (or create) a room. `room` defaults to `"main"`. If `spectator` is true, join as a lobby-time observer instead of a match participant. If the target room is replay playback, the first join is rejected with `joinReplayPrompt`; retry with `replayOk: true` only after user confirmation. If the same WebSocket is already in a different room and the new room accepts the join, the connection transfers to the new room and leaves the previous room. |
 | `ready`    | `ready: bool` | Toggle ready state in the lobby. |
 | `start`    | — | Host asks to start the match (only honored from the room host). |
 | `addAi`    | — | Host adds a computer opponent to the room (lobby phase only, host-only). |
