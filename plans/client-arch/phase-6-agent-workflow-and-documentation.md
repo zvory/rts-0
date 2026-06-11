@@ -26,11 +26,31 @@ the new checks and extracted seams into everyday workflow, not tribal knowledge.
   - update/baseline ratchets only with a reason
 - If Phase 1 added suite selection, document which suite names should run for client changes.
 
+## Implementation Segments
+
+Mark each segment complete as it lands:
+
+- [ ] Update `docs/design/client-ui.md` with the current architecture rules.
+- [ ] Refresh `docs/context/client-ui.md` with the current module map and checker command.
+- [ ] Add the future-client-change checklist covering teardown, imports, command cards, rendering,
+  and mirrored contracts.
+- [ ] Document large-file ratchet handling and suite-selection expectations.
+- [ ] Verify docs links and record the commands/results in the final handoff.
+
 ## Verification
 
 - `node scripts/check-client-architecture.mjs` if Phase 1 has landed
 - `node tests/select-suites.mjs --verify`
 - Documentation links in `docs/context/client-ui.md` resolve to existing files.
+
+## Manual Test Prompt
+
+No manual UI test should be required for this phase unless runtime client files changed. At handoff,
+tell the user:
+
+> Manual testing: none expected for docs-only workflow updates. If runtime client code changed,
+> manually smoke only that changed surface and explain why it was touched in this documentation
+> phase.
 
 ## Safety Notes
 

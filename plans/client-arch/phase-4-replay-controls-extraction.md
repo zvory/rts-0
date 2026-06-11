@@ -29,6 +29,16 @@ contract tests.
   - replay vision single-player and multi-player selection send the same payloads as before
   - `destroy()` removes generated vision/status nodes and restores hidden states
 
+## Implementation Segments
+
+Mark each segment complete as it lands:
+
+- [ ] Add `ReplayControls` and move only replay/scenario control ownership into it.
+- [ ] Preserve existing DOM structure, classes, text, `data-*` attributes, and hidden/class toggles.
+- [ ] Delegate replay state updates and teardown from `Match` to `ReplayControls`.
+- [ ] Add DOM contract tests for speed, seek, scenario step, vision selection, and `destroy()`.
+- [ ] Run verification and record any visual or browser-smoke gaps in the final handoff.
+
 ## Verification
 
 - `node tests/client_contracts.mjs`
@@ -36,6 +46,19 @@ contract tests.
 - Client smoke when practical.
 - Manual visual check is optional, not the primary proof. The phase is only complete when DOM
   contract tests cover the extracted behavior.
+
+## Manual Test Prompt
+
+At handoff, ask the user to do this focused replay/scenario check:
+
+> Manual testing requested, 10-20 minutes:
+> 1. Open a replay or dev scenario that exposes replay controls.
+> 2. Click each speed button and confirm playback speed and selected button state change as before.
+> 3. Use seek/reset controls and confirm the replay jumps without leaving duplicate controls.
+> 4. In a scenario, pause and step once; confirm only one tick advances.
+> 5. Switch replay vision targets in both single-player and multi-player replay states if available.
+> 6. Leave/re-enter the replay or scenario and report duplicated controls, stale status text,
+>    broken selected states, or console errors.
 
 ## Safety Notes
 
