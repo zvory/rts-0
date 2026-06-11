@@ -52,9 +52,9 @@ export const AT_GUN_BODY = Object.freeze({
   clearance: 1.0,
 });
 export const ARTILLERY_BODY = Object.freeze({
-  length: 64.0,
-  width: 48.0,
-  clearance: 1.0,
+  length: TANK_BODY.length,
+  width: TANK_BODY.width,
+  clearance: TANK_BODY.clearance,
 });
 export const SCOUT_CAR_BODY = Object.freeze({
   length: 40.8,
@@ -111,7 +111,7 @@ export const STATS = Object.freeze({
   [KIND.MORTAR_TEAM]: { label: "Mortar Team", icon: "MT", size: 18, sight: 7,
     rangeTiles: 9, cost: { steel: 100, oil: 25 }, supply: 3, buildTicks: 460,
     requires: KIND.STEELWORKS },
-  [KIND.ARTILLERY]: { label: "Artillery", icon: "AR", size: 24, sight: 4, body: ARTILLERY_BODY,
+  [KIND.ARTILLERY]: { label: "Artillery", icon: "AR", size: 18, sight: 4, body: ARTILLERY_BODY,
     rangeTiles: ARTILLERY_MAX_RANGE_TILES, minRangeTiles: ARTILLERY_MIN_RANGE_TILES,
     cost: { steel: 300, oil: 100 }, supply: 5, buildTicks: 750,
     requires: KIND.STEELWORKS, upgradeRequires: UPGRADE.ARTILLERY_UNLOCK },

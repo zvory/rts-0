@@ -61,8 +61,8 @@ Working checklist for `plans/tech/phase-6-capstones.md`, following
   - Artillery is planned as a 300 steel / 100 oil, 5-supply siege unit with 150 HP, 10-50 tile point
     fire, a 20-degree firing arc, 3-second reload, and 10 steel ammunition cost per fired shot.
   - Artillery has 4-tile sight, tank-length build time, and moves 20% slower than AT Guns.
-  - Artillery uses tank-style oriented pivot movement, reads visually as roughly 2x1.5 tiles, and
-    has a new Hard armor class that reduces non-armor-piercing damage by 25%.
+  - Artillery uses tank-style oriented pivot movement, uses the same footprint/selection size as a
+    tank, and has a new Hard armor class that reduces non-armor-piercing damage by 25%.
   - Artillery automatically sets up toward point-fire targets, takes 3 seconds to set up or tear
     down, and cannot rotate while deployed.
   - Artillery shells take 4 seconds to land after firing.
@@ -105,10 +105,10 @@ Read: `docs/context/balance.md`, `docs/design/balance.md`.
 - [x] Sight range is specified.
   - 4 tiles.
 - [x] Collision size, selection size, and render size are specified.
-  - Visual/readability target is roughly 2 tiles by 1.5 tiles, larger than a tank and about twice
-    the AT Gun's footprint.
-  - Collision implementation may use capsule or shaved-down geometry as long as movement remains
-    usable in snaking/depth pathing scenarios.
+  - Visual/readability target uses the same footprint and selection size as a tank, with the long
+    barrel and deployed spades carrying the artillery silhouette.
+  - Collision implementation uses a tank-sized oriented body so the unit remains usable in
+    snaking/depth pathing scenarios.
 - [x] Movement speed is specified.
   - 20% slower than AT Guns. Current AT Gun speed is 1.152 px/tick, so Artillery target speed is
     0.922 px/tick before final constant rounding.
@@ -294,7 +294,41 @@ Read `docs/context/client-ui.md` before changing rendering, HUD, input, or match
 
 ## Phase 5: Visual Design And Animation
 
-Not started.
+- [x] Stationary appearance is specified.
+  - Tank-sized tracked hull with a longer artillery barrel, heavy breech, side wheels, and muted
+    team-color hull panels.
+- [x] Moving appearance is specified if different.
+  - Packed Artillery keeps its trails tucked in and shows light rear dust while the tracks are
+    active.
+- [x] Attacking appearance is specified.
+  - Point Fire uses recoil, a short muzzle flash, owner-only target crosshair, and a descending
+    shell cue during the 4-second travel delay.
+- [x] Setup, deployed, channeling, ability, construction, damaged, and death states are specified if
+      relevant.
+  - Setup/teardown reuses the AT Gun-style support-weapon animation timing; deployed Artillery
+    spreads rear spades/feet and keeps the barrel visible on its setup facing.
+  - Construction, damage, and death continue to use existing generic unit visuals for this pass.
+- [x] Facing, turret, barrel, projectile, tracer, recoil, muzzle flash, impact, and area indicators
+      are specified if relevant.
+  - Facing follows tank-style hull movement; weapon facing follows setup/point-fire facing.
+  - Artillery targets show outer splash and inner danger rings; impacts use a larger jagged blast,
+    shock ring, and shrapnel strokes.
+- [x] Selection, hover, health, range, ability radius, and targeting affordances are specified.
+  - Selection/health use the tank-sized unit radius.
+  - Selected deployed Artillery shows its 50-tile, 20-degree firing wedge; Point Fire targeting
+    shows max range, 10-tile dead zone, splash radius, and firing corridor.
+- [x] Fog, occlusion, minimap, and team-color readability are checked.
+  - Impact events remain visual-only and do not reveal terrain or update exploration. Enemies only
+    see the impact, not the pre-impact target marker.
+  - Minimap behavior stays generic for units; no special Artillery blip is added in this pass.
+- [x] Placeholder art is clearly labeled if final art is deferred.
+  - Final authored sprites, bespoke construction/damaged/death states, and stronger shell travel
+    polish are deferred to a later art pass.
+
+Exit criteria:
+
+- [x] The unit is visually distinguishable from existing units at normal zoom.
+- [x] Missing visual polish is documented as follow-up instead of silently skipped.
 
 ## Phase 6: Audio Design
 

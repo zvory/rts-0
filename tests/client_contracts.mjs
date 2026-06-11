@@ -2100,6 +2100,12 @@ function fakeAudioContext() {
   assert(STATS[KIND.TANK].body.width === 28.8, "tank client body width mirrors server");
   assert(STATS[KIND.AT_TEAM].body.length === 42.0, "AT gun client body length mirrors server");
   assert(STATS[KIND.AT_TEAM].body.width === 24.0, "AT gun client body width mirrors server");
+  assert(STATS[KIND.ARTILLERY].size === STATS[KIND.TANK].size, "Artillery selection size should match tank size");
+  assert(
+    STATS[KIND.ARTILLERY].body.length === STATS[KIND.TANK].body.length &&
+      STATS[KIND.ARTILLERY].body.width === STATS[KIND.TANK].body.width,
+    "Artillery client body should match tank footprint",
+  );
 
   const input = Object.create(Input.prototype);
   input.state = {

@@ -547,6 +547,9 @@ export function _drawArtilleryTargets(state) {
     const t = clamp01((now - target.createdAt) / ttlMs);
     const fade = 1 - smoothstep01(Math.max(0, t - 0.72) / 0.28);
     const radius = Math.max(24, (target.radiusTiles || 3) * ts);
+    const descend = smoothstep01(t);
+    const shellX = target.x - 26 + descend * 26;
+    const shellY = target.y - 92 + descend * 92;
     g.lineStyle(2.5, 0xffd15c, 0.9 * fade);
     drawDashedCircle(g, target.x, target.y, radius, 28);
     g.lineStyle(2, 0xfff2d0, 0.78 * fade);
@@ -556,6 +559,16 @@ export function _drawArtilleryTargets(state) {
     g.lineTo(target.x, target.y + 18);
     g.lineStyle(1.5, 0x2a2119, 0.6 * fade);
     drawDashedCircle(g, target.x, target.y, radius * (0.34 + 0.08 * Math.sin(t * Math.PI)), 12);
+    g.lineStyle(2, 0x2a2119, 0.58 * fade);
+    g.moveTo(shellX - 12, shellY - 18);
+    g.lineTo(shellX, shellY);
+    g.lineStyle(0, 0x000000, 0);
+    g.beginFill(0xfff2d0, 0.9 * fade);
+    g.drawCircle(shellX, shellY, 3.5 + descend * 1.5);
+    g.endFill();
+    g.beginFill(0x2a2119, 0.2 * fade);
+    g.drawCircle(target.x, target.y, 3 + descend * 8);
+    g.endFill();
   }
 }
 
