@@ -3,10 +3,9 @@ use std::collections::HashMap;
 use crate::config;
 use crate::game::ability::{self, AbilityKind, AbilityTargetMode};
 use crate::game::entity::{EntityKind, EntityStore, MovePhase, Order, WeaponSetup};
+use crate::game::fog::Fog;
 use crate::game::map::Map;
-use crate::game::mortar::{
-    mortar_current_facing_ready, rotate_mortar_for_fire, MortarShellStore,
-};
+use crate::game::mortar::{mortar_current_facing_ready, rotate_mortar_for_fire, MortarShellStore};
 use crate::game::services::commands::{notice, notice_positioned};
 use crate::game::services::dist2;
 use crate::game::services::move_coordinator::MoveCoordinator;
@@ -28,6 +27,7 @@ pub(crate) fn order_or_launch_world_ability(
     map: &Map,
     entities: &mut EntityStore,
     players: &mut [PlayerState],
+    fog: &Fog,
     coordinator: &mut MoveCoordinator<'_>,
     smokes: &mut SmokeCloudStore,
     mortar_shells: &mut MortarShellStore,
@@ -67,6 +67,7 @@ pub(crate) fn order_or_launch_world_ability(
             map,
             entities,
             players,
+            fog,
             smokes,
             mortar_shells,
             events,
@@ -96,6 +97,7 @@ pub(crate) fn launch_world_ability(
     map: &Map,
     entities: &mut EntityStore,
     players: &mut [PlayerState],
+    fog: &Fog,
     smokes: &mut SmokeCloudStore,
     mortar_shells: &mut MortarShellStore,
     events: &mut HashMap<u32, Vec<Event>>,
@@ -144,6 +146,9 @@ pub(crate) fn launch_world_ability(
     match ability {
         AbilityKind::Charge | AbilityKind::PointFire => false,
         AbilityKind::MortarFire => {
+            let Some((from_x, from_y)) = entities.get(caster).map(|e| (e.pos_x, e.pos_y)) else {
+                return false;
+            };
             let Some(e) = entities.get_mut(caster) else {
                 return false;
             };
@@ -154,12 +159,7 @@ pub(crate) fn launch_world_ability(
             if !preserve_active_order {
                 e.clear_active_order();
             }
-            mortar_shells.schedule(player, caster, x, y, tick);
-            events.entry(player).or_default().push(Event::MortarImpact {
-                x,
-                y,
-                radius_tiles: config::MORTAR_OUTER_RADIUS_TILES,
-            });
+            mortar_shells.schedule(events, fog, player, caster, from_x, from_y, x, y, tick);
             true
         }
         AbilityKind::Smoke => {

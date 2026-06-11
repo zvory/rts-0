@@ -52,6 +52,8 @@ import {
   weaponRecoilOffset,
 } from "./shared.js";
 
+const MORTAR_WARNING_COLOR = 0x9f1f1f;
+
 export function _drawPlacement(state, fog) {
   const g = this._placementGfx;
   g.clear();
@@ -114,9 +116,11 @@ export function _drawCommandFeedback(state) {
     const t = clamp01(age / 650);
     const alpha = (1 - t) * 0.95;
     const r = 12 + t * 10;
-    const color = f.kind === "attack" || f.kind === "mortar" || f.kind === "artillery"
-      ? COLORS.selectEnemy
-      : COLORS.selectOwn;
+    const color = f.kind === "mortar" || f.kind === "artillery"
+      ? MORTAR_WARNING_COLOR
+      : f.kind === "attack"
+        ? COLORS.selectEnemy
+        : COLORS.selectOwn;
 
     g.lineStyle(2, color, alpha);
     if (f.kind === "mortar" || f.kind === "artillery") {
@@ -499,6 +503,83 @@ export function _drawMortarLaunches(state) {
     g.beginFill(0xc0b092, 0.18 * fade);
     g.drawCircle(launch.x - 4, launch.y + 1, 4.5);
     g.drawCircle(launch.x + 4, launch.y - 2, 3.8);
+    g.endFill();
+  }
+}
+
+export function _drawMortarTargets(state) {
+  const g = this._feedbackGfx;
+  if (!state || typeof state.liveMortarTargets !== "function") return;
+  const now = performance.now();
+  const targets = state.liveMortarTargets(now);
+  if (!targets.length) return;
+  const ts = (this._map && this._map.tileSize) || 32;
+
+  for (const target of targets) {
+    const duration = Math.max(1, target.durationMs || 1);
+    const age = now - target.createdAt;
+    const t = clamp01(age / duration);
+    const fade = 1 - smoothstep01(Math.max(0, t - 0.78) / 0.22);
+    const radius = Math.max(20, (target.radiusTiles || 1.5) * ts);
+    const pulse = 1 + Math.sin(t * Math.PI * 5) * 0.035;
+
+    if (finiteNumber(target.fromX) && finiteNumber(target.fromY)) {
+      g.lineStyle(1.8, MORTAR_WARNING_COLOR, 0.72 * fade);
+      dashedLine(g, target.fromX, target.fromY, target.x, target.y, 10, 7);
+    }
+    g.lineStyle(2.3, MORTAR_WARNING_COLOR, 0.9 * fade);
+    drawDashedCircle(g, target.x, target.y, radius * pulse, 24);
+    g.lineStyle(2, MORTAR_WARNING_COLOR, 0.86 * fade);
+    g.moveTo(target.x - 14, target.y);
+    g.lineTo(target.x + 14, target.y);
+    g.moveTo(target.x, target.y - 14);
+    g.lineTo(target.x, target.y + 14);
+    g.lineStyle(1.4, 0x421010, 0.52 * fade);
+    drawDashedCircle(g, target.x, target.y, radius * 0.45, 12);
+  }
+}
+
+export function _drawMortarShells(state) {
+  const g = this._feedbackGfx;
+  if (!state || typeof state.liveMortarShells !== "function") return;
+  const now = performance.now();
+  const shells = state.liveMortarShells(now);
+  if (!shells.length) return;
+
+  for (const shell of shells) {
+    const duration = Math.max(1, shell.durationMs || 1);
+    const t = clamp01((now - shell.createdAt) / duration);
+    const eased = t * t * (3 - 2 * t);
+    const dx = shell.toX - shell.fromX;
+    const dy = shell.toY - shell.fromY;
+    const len = Math.hypot(dx, dy);
+    const ux = len > 0.001 ? dx / len : 1;
+    const uy = len > 0.001 ? dy / len : 0;
+    const arc = Math.sin(Math.PI * t) * Math.min(44, Math.max(12, len * 0.075));
+    const x = shell.fromX + dx * eased;
+    const y = shell.fromY + dy * eased - arc;
+    const stretch = Math.sin(Math.PI * t);
+    const shellLen = 5.5 + stretch * 6.5;
+    const shellWidth = 4.2 - stretch * 1.2;
+    const angle = Math.atan2(dy, dx);
+    const shadowAlpha = 0.22 * (1 - stretch * 0.55);
+
+    g.lineStyle(0, 0x000000, 0);
+    g.beginFill(0x050505, shadowAlpha);
+    g.drawEllipse(shell.fromX + dx * eased, shell.fromY + dy * eased, 4.4, 2.2);
+    g.endFill();
+    g.beginFill(0x050505, 0.96);
+    drawRotatedRect(g, x, y, shellLen, shellWidth, angle);
+    g.endFill();
+    g.beginFill(0x2d2d2d, 0.72);
+    drawRotatedRect(
+      g,
+      x - uy * shellWidth * 0.24,
+      y + ux * shellWidth * 0.24,
+      shellLen * 0.55,
+      shellWidth * 0.35,
+      angle,
+    );
     g.endFill();
   }
 }

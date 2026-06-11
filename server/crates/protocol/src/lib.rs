@@ -350,7 +350,7 @@ pub struct LobbyPlayer {
 ///
 /// [`Snapshot`] remains the semantic source of truth for game code. This format is only a
 /// transport-side optimization for `ServerMessage::Snapshot`.
-pub const COMPACT_SNAPSHOT_VERSION: u8 = 12;
+pub const COMPACT_SNAPSHOT_VERSION: u8 = 13;
 
 /// Serialize one semantic snapshot as a compact JSON text frame payload.
 pub fn serialize_compact_snapshot(snapshot: &Snapshot) -> serde_json::Result<String> {
@@ -793,12 +793,49 @@ impl Serialize for CompactEvent<'_> {
                 seq.serialize_element(delay_ticks)?;
                 seq.end()
             }
-            Event::MortarImpact { x, y, radius_tiles } => {
-                let mut seq = serializer.serialize_seq(Some(4))?;
+            Event::MortarLaunch {
+                from,
+                from_x,
+                from_y,
+                to_x,
+                to_y,
+                radius_tiles,
+                delay_ticks,
+            } => {
+                let mut seq = serializer.serialize_seq(Some(6))?;
+                seq.serialize_element(&9u8)?;
+                seq.serialize_element(from)?;
+                seq.serialize_element(&[from_x, from_y])?;
+                seq.serialize_element(&[to_x, to_y])?;
+                seq.serialize_element(radius_tiles)?;
+                seq.serialize_element(delay_ticks)?;
+                seq.end()
+            }
+            Event::MortarImpact {
+                from,
+                x,
+                y,
+                radius_tiles,
+                reveal,
+            } => {
+                let len = if reveal.is_some() {
+                    6
+                } else if from.is_some() {
+                    5
+                } else {
+                    4
+                };
+                let mut seq = serializer.serialize_seq(Some(len))?;
                 seq.serialize_element(&6u8)?;
                 seq.serialize_element(x)?;
                 seq.serialize_element(y)?;
                 seq.serialize_element(radius_tiles)?;
+                if len > 4 {
+                    seq.serialize_element(from)?;
+                }
+                if len > 5 {
+                    seq.serialize_element(&reveal.as_ref().map(CompactAttackReveal))?;
+                }
                 seq.end()
             }
             Event::ArtilleryTarget {
@@ -1166,6 +1203,15 @@ mod tests {
                     y: None,
                     severity: NoticeSeverity::Info,
                 },
+                Event::MortarLaunch {
+                    from: 9,
+                    from_x: 256.0,
+                    from_y: 272.0,
+                    to_x: 320.0,
+                    to_y: 352.0,
+                    radius_tiles: 1.5,
+                    delay_ticks: 68,
+                },
                 Event::ArtilleryTarget {
                     x: 320.0,
                     y: 352.0,
@@ -1240,7 +1286,7 @@ mod tests {
         );
         assert_eq!(value["fg"], serde_json::json!([1, 2, 3, 1]));
         assert_eq!(value["u"], serde_json::json!([4]));
-        assert_eq!(value["ev"].as_array().unwrap().len(), 6);
+        assert_eq!(value["ev"].as_array().unwrap().len(), 7);
         assert_eq!(value["n"], serde_json::json!([4, 17, 2, 2, 3]));
         assert_eq!(
             value["ev"][0][3],
@@ -1249,9 +1295,13 @@ mod tests {
         assert_eq!(value["ev"][0][4], serde_json::json!([48.0, 96.0]));
         assert_eq!(
             value["ev"][4],
+            serde_json::json!([9, 9, [256.0, 272.0], [320.0, 352.0], 1.5, 68])
+        );
+        assert_eq!(
+            value["ev"][5],
             serde_json::json!([7, 320.0, 352.0, 3.0, 120])
         );
-        assert_eq!(value["ev"][5], serde_json::json!([8, 336.0, 368.0, 3.0]));
+        assert_eq!(value["ev"][6], serde_json::json!([8, 336.0, 368.0, 3.0]));
     }
 
     #[test]

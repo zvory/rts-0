@@ -409,6 +409,33 @@ fn manual_mortar_fire_impacts_without_toast_notice() {
         .map(|(_, events)| events.as_slice())
         .unwrap_or(&[]);
     assert!(
+        owner_events.iter().any(|event| matches!(
+            event,
+            Event::MortarLaunch { from, to_x, to_y, delay_ticks, .. }
+                if *from == mortar
+                    && (*to_x - target_pos.0).abs() < 0.001
+                    && (*to_y - target_pos.1).abs() < 0.001
+                    && *delay_ticks == config::MORTAR_SHELL_DELAY_TICKS
+        )),
+        "accepted mortar command should emit a launch marker with impact timing: {owner_events:?}"
+    );
+    let enemy_events = accepted_events
+        .iter()
+        .find(|(player_id, _)| *player_id == 2)
+        .map(|(_, events)| events.as_slice())
+        .unwrap_or(&[]);
+    assert!(
+        enemy_events.iter().any(|event| matches!(
+            event,
+            Event::MortarLaunch { from, to_x, to_y, delay_ticks, .. }
+                if (*to_x - target_pos.0).abs() < 0.001
+                    && (*to_y - target_pos.1).abs() < 0.001
+                    && *from == mortar
+                    && *delay_ticks == config::MORTAR_SHELL_DELAY_TICKS
+        )),
+        "enemy with vision of the mortar should see launch dust/recoil timing: {enemy_events:?}"
+    );
+    assert!(
         owner_events
             .iter()
             .all(|event| !matches!(event, Event::Notice { msg, .. } if msg == "Mortar fire")),
@@ -442,6 +469,107 @@ fn manual_mortar_fire_impacts_without_toast_notice() {
             .any(|event| matches!(event, Event::MortarImpact { x, y, .. }
                 if (*x - target_pos.0).abs() < 0.001 && (*y - target_pos.1).abs() < 0.001)),
         "delayed mortar impact should emit a visible impact marker: {owner_events:?}"
+    );
+}
+
+#[test]
+fn hidden_mortar_launch_is_not_sent_but_impact_reveals_attacker_to_victim() {
+    let players = [
+        PlayerInit {
+            id: 1,
+            name: "One".into(),
+            color: "#fff".into(),
+            is_ai: false,
+        },
+        PlayerInit {
+            id: 2,
+            name: "Two".into(),
+            color: "#000".into(),
+            is_ai: false,
+        },
+    ];
+    let mut game = empty_flat_game(&players);
+    let mortar_pos = game.map.tile_center(8, 8);
+    let target_pos = game.map.tile_center(17, 8);
+    let mortar = game
+        .entities
+        .spawn_unit(1, EntityKind::MortarTeam, mortar_pos.0, mortar_pos.1)
+        .expect("mortar should spawn");
+    game.entities
+        .get_mut(mortar)
+        .expect("mortar should exist")
+        .set_weapon_setup(WeaponSetup::Deployed);
+    let target = game
+        .entities
+        .spawn_unit(2, EntityKind::Rifleman, target_pos.0, target_pos.1)
+        .expect("target should spawn");
+    systems::recompute_supply(&mut game.players, &game.entities);
+    game.spatial = services::spatial::SpatialIndex::build(&game.entities, game.map.size);
+    let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
+    game.fog.recompute(&ids, &game.entities, &game.map);
+    assert!(
+        !game.fog.is_visible_world(2, mortar_pos.0, mortar_pos.1),
+        "test setup requires the mortar to be hidden before it fires"
+    );
+
+    game.enqueue(
+        1,
+        Command::UseAbility {
+            ability: ability::AbilityKind::MortarFire,
+            units: vec![mortar],
+            x: Some(target_pos.0),
+            y: Some(target_pos.1),
+            queued: false,
+        },
+    );
+    let accepted_events = game.tick();
+    let enemy_events = accepted_events
+        .iter()
+        .find(|(player_id, _)| *player_id == 2)
+        .map(|(_, events)| events.as_slice())
+        .unwrap_or(&[]);
+    assert!(
+        enemy_events
+            .iter()
+            .all(|event| !matches!(event, Event::MortarLaunch { .. })),
+        "hidden mortar launch should not leak dust/recoil/shell data: {enemy_events:?}"
+    );
+
+    let hp_before_impact = game
+        .entities
+        .get(target)
+        .expect("target should still exist")
+        .hp;
+    let mut impact_events = Vec::new();
+    for _ in 0..config::MORTAR_SHELL_DELAY_TICKS {
+        impact_events = game.tick();
+    }
+    assert!(
+        game.entities
+            .get(target)
+            .is_none_or(|target_after| target_after.hp < hp_before_impact),
+        "test setup requires the mortar impact to damage the victim"
+    );
+    let enemy_events = impact_events
+        .iter()
+        .find(|(player_id, _)| *player_id == 2)
+        .map(|(_, events)| events.as_slice())
+        .unwrap_or(&[]);
+    assert!(
+        enemy_events.iter().any(|event| matches!(
+            event,
+            Event::MortarImpact {
+                from: Some(from),
+                reveal: Some(reveal),
+                x,
+                y,
+                ..
+            } if *from == mortar
+                && reveal.kind == kinds::MORTAR_TEAM
+                && (*x - target_pos.0).abs() < 0.001
+                && (*y - target_pos.1).abs() < 0.001
+        )),
+        "victim should receive a mortar impact reveal after being hit: {enemy_events:?}"
     );
 }
 

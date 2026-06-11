@@ -8,7 +8,7 @@
 
 import { RESOURCE_AMOUNTS } from "./config.js";
 import { CommandComposer } from "./input/command_composer.js";
-import { ABILITY, KIND, PASSABLE, STATE, isBuilding, isResource, isUnit } from "./protocol.js";
+import { KIND, PASSABLE, STATE, isBuilding, isResource, isUnit } from "./protocol.js";
 
 const TWO_PI = Math.PI * 2;
 const SHOT_REVEAL_MS = 1500;
@@ -127,6 +127,10 @@ export class GameState {
     this.muzzleFlashes = [];
     /** @type {Array<{x:number,y:number,createdAt:number}>} */
     this.mortarLaunches = [];
+    /** @type {Array<{fromX:number,fromY:number,toX:number,toY:number,radiusTiles:number,durationMs:number,seed:number,createdAt:number}>} */
+    this.mortarShells = [];
+    /** @type {Array<{fromX:number,fromY:number,x:number,y:number,radiusTiles:number,durationMs:number,seed:number,createdAt:number}>} */
+    this.mortarTargets = [];
     /** @type {Array<{x:number,y:number,radiusTiles:number,seed:number,createdAt:number}>} */
     this.mortarImpacts = [];
     /** @type {Array<{x:number,y:number,radiusTiles:number,delayTicks:number,seed:number,createdAt:number}>} */
@@ -135,8 +139,6 @@ export class GameState {
     this.artilleryImpacts = [];
     /** @type {Map<number, number>} attacker id -> latest shot receive time. */
     this.weaponRecoilById = new Map();
-    /** @type {Map<number, number>} mortar id -> latest seen mortar-fire cooldown. */
-    this.mortarCooldownById = new Map();
     /** @type {Array<{x:number,y:number,createdAt:number}>} */
     this.pendingMortarTargets = [];
     /** @type {Map<number, object>} attacker id -> temporary fog reveal entity. */
@@ -207,7 +209,6 @@ export class GameState {
     this._curRecvTime = now;
     this._curById = new Map();
     for (const e of entities) this._curById.set(e.id, e);
-    this._applyMortarLaunches(now);
     for (const id of this.weaponRecoilById.keys()) {
       if (!this._curById.has(id)) this.weaponRecoilById.delete(id);
     }
@@ -237,6 +238,8 @@ export class GameState {
         this.weaponRecoilById.set(ev.from, now);
       } else if (ev && ev.e === "smokeLaunch") {
         this.addSmokeCanister(ev, now);
+      } else if (ev && ev.e === "mortarLaunch") {
+        this.addMortarLaunch(ev, now);
       } else if (ev && ev.e === "mortarImpact") {
         this.addMortarImpact(ev, now);
       } else if (ev && ev.e === "artilleryTarget") {
@@ -254,6 +257,12 @@ export class GameState {
     if (this.mortarLaunches.length > 32) {
       this.mortarLaunches.splice(0, this.mortarLaunches.length - 32);
     }
+    if (this.mortarShells.length > 32) {
+      this.mortarShells.splice(0, this.mortarShells.length - 32);
+    }
+    if (this.mortarTargets.length > 32) {
+      this.mortarTargets.splice(0, this.mortarTargets.length - 32);
+    }
     if (this.mortarImpacts.length > 32) {
       this.mortarImpacts.splice(0, this.mortarImpacts.length - 32);
     }
@@ -265,34 +274,56 @@ export class GameState {
     }
   }
 
-  _applyMortarLaunches(now) {
-    const liveMortars = new Set();
-    for (const e of this._curById.values()) {
-      if (e.kind !== KIND.MORTAR_TEAM) continue;
-      liveMortars.add(e.id);
-      const cooldown = mortarFireCooldownLeft(e);
-      const prevCooldown = this.mortarCooldownById.get(e.id) || 0;
-      if (cooldown > 0 && (prevCooldown <= 0 || cooldown > prevCooldown + 2)) {
-        this.mortarLaunches.push({ x: e.x, y: e.y, createdAt: now });
-        this.weaponRecoilById.set(e.id, now);
-      }
-      if (cooldown > 0) this.mortarCooldownById.set(e.id, cooldown);
-      else this.mortarCooldownById.delete(e.id);
+  addMortarLaunch(ev, now = performance.now()) {
+    if (
+      !Number.isFinite(ev.fromX) ||
+      !Number.isFinite(ev.fromY) ||
+      !Number.isFinite(ev.toX) ||
+      !Number.isFinite(ev.toY)
+    ) {
+      return;
     }
-    for (const id of [...this.mortarCooldownById.keys()]) {
-      if (!liveMortars.has(id)) this.mortarCooldownById.delete(id);
+    const delayTicks = Number.isFinite(ev.delayTicks) ? Math.max(0, ev.delayTicks) : 0;
+    const durationMs = Math.max(1, (delayTicks / 30) * 1000);
+    const radiusTiles = Number.isFinite(ev.radiusTiles) ? ev.radiusTiles : 1.5;
+    const seed = Math.floor(ev.toX * 13 + ev.toY * 7 + now) >>> 0;
+    if (typeof ev.from === "number") {
+      this.weaponRecoilById.set(ev.from, now);
     }
+    this.pendingMortarTargets = this.pendingMortarTargets.filter(
+      (p) => Math.hypot(p.x - ev.toX, p.y - ev.toY) > 2,
+    );
+    this.mortarLaunches.push({ x: ev.fromX, y: ev.fromY, createdAt: now });
+    this.mortarShells.push({
+      fromX: ev.fromX,
+      fromY: ev.fromY,
+      toX: ev.toX,
+      toY: ev.toY,
+      radiusTiles,
+      durationMs,
+      seed,
+      createdAt: now,
+    });
+    this.mortarTargets.push({
+      fromX: ev.fromX,
+      fromY: ev.fromY,
+      x: ev.toX,
+      y: ev.toY,
+      radiusTiles,
+      durationMs,
+      seed,
+      createdAt: now,
+    });
   }
 
   addMortarImpact(ev, now = performance.now()) {
     if (!Number.isFinite(ev.x) || !Number.isFinite(ev.y)) return;
-    const pendingIndex = this.pendingMortarTargets.findIndex(
-      (p) => now - p.createdAt <= 700 && Math.hypot(p.x - ev.x, p.y - ev.y) <= 2,
+    this.mortarTargets = this.mortarTargets.filter(
+      (target) => Math.hypot(target.x - ev.x, target.y - ev.y) > 2,
     );
-    if (pendingIndex >= 0) {
-      this.pendingMortarTargets.splice(pendingIndex, 1);
-      return;
-    }
+    this.mortarShells = this.mortarShells.filter(
+      (shell) => Math.hypot(shell.toX - ev.x, shell.toY - ev.y) > 2,
+    );
     this.mortarImpacts.push({
       x: ev.x,
       y: ev.y,
@@ -366,6 +397,26 @@ export class GameState {
     const ttlMs = 360;
     this.mortarLaunches = this.mortarLaunches.filter((f) => now - f.createdAt <= ttlMs);
     return this.mortarLaunches;
+  }
+
+  /**
+   * Return live mortar shell projectiles, pruning after expected impact.
+   * @param {number} now
+   * @returns {Array<{fromX:number,fromY:number,toX:number,toY:number,radiusTiles:number,durationMs:number,seed:number,createdAt:number}>}
+   */
+  liveMortarShells(now) {
+    this.mortarShells = this.mortarShells.filter((f) => now - f.createdAt <= f.durationMs + 120);
+    return this.mortarShells;
+  }
+
+  /**
+   * Return live mortar target warnings, pruning after expected impact.
+   * @param {number} now
+   * @returns {Array<{fromX:number,fromY:number,x:number,y:number,radiusTiles:number,durationMs:number,seed:number,createdAt:number}>}
+   */
+  liveMortarTargets(now) {
+    this.mortarTargets = this.mortarTargets.filter((f) => now - f.createdAt <= f.durationMs + 120);
+    return this.mortarTargets;
   }
 
   /**
@@ -518,7 +569,13 @@ export class GameState {
 
   _applyAttackReveals(events, now) {
     for (const ev of events) {
-      if (!ev || ev.e !== "attack" || typeof ev.from !== "number") continue;
+      if (
+        !ev ||
+        (ev.e !== "attack" && ev.e !== "mortarImpact") ||
+        typeof ev.from !== "number"
+      ) {
+        continue;
+      }
       const reveal = this._normalizeAttackReveal(ev, now);
       if (!reveal) continue;
       this.shotRevealsById.set(ev.from, reveal);
@@ -531,6 +588,8 @@ export class GameState {
     if (!Number.isFinite(r.x) || !Number.isFinite(r.y)) return null;
     const targetPos = Array.isArray(ev.toPos) && ev.toPos.length === 2
       ? { x: ev.toPos[0], y: ev.toPos[1] }
+      : Number.isFinite(ev.x) && Number.isFinite(ev.y)
+        ? { x: ev.x, y: ev.y }
       : null;
     const targetAngle = targetPos && Number.isFinite(targetPos.x) && Number.isFinite(targetPos.y)
       ? Math.atan2(targetPos.y - r.y, targetPos.x - r.x)
@@ -980,10 +1039,4 @@ function recoilCurve(t) {
   }
   const settle = (progress - 0.18) / 0.82;
   return Math.cos(settle * Math.PI * 0.5) * 0.88;
-}
-
-function mortarFireCooldownLeft(e) {
-  if (!Array.isArray(e.abilities)) return 0;
-  const rec = e.abilities.find((a) => a && a.ability === ABILITY.MORTAR_FIRE);
-  return rec && Number.isFinite(rec.cooldownLeft) ? rec.cooldownLeft : 0;
 }

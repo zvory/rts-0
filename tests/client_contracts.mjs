@@ -1008,6 +1008,7 @@ function fakeAudioContext() {
       [EVENT_CODE[EVENT.BUILD], 3, KIND_CODE[KIND.CITY_CENTRE]],
       [EVENT_CODE[EVENT.NOTICE], "Not enough steel"],
       [EVENT_CODE[EVENT.NOTICE], "alert:under_attack", 3, 512, 768],
+      [EVENT_CODE[EVENT.MORTAR_LAUNCH], 9, [256, 272], [320, 352], 1.5, 68],
       [EVENT_CODE[EVENT.ARTILLERY_TARGET], 320, 352, 3, 120],
       [EVENT_CODE[EVENT.ARTILLERY_IMPACT], 336, 368, 3],
     ],
@@ -1091,15 +1092,23 @@ function fakeAudioContext() {
   assert(decoded.events[4].severity === NOTICE_SEVERITY.ALERT, "notice severity decodes");
   assert(decoded.events[4].x === 512 && decoded.events[4].y === 768, "notice position decodes");
   assert(
-    decoded.events[5].e === EVENT.ARTILLERY_TARGET &&
-      decoded.events[5].delayTicks === 120 &&
-      decoded.events[5].radiusTiles === 3,
+    decoded.events[5].e === EVENT.MORTAR_LAUNCH &&
+      decoded.events[5].from === 9 &&
+      decoded.events[5].fromX === 256 &&
+      decoded.events[5].toY === 352 &&
+      decoded.events[5].delayTicks === 68,
+    "mortar launch event decodes",
+  );
+  assert(
+    decoded.events[6].e === EVENT.ARTILLERY_TARGET &&
+      decoded.events[6].delayTicks === 120 &&
+      decoded.events[6].radiusTiles === 3,
     "artillery target event decodes",
   );
   assert(
-    decoded.events[6].e === EVENT.ARTILLERY_IMPACT &&
-      decoded.events[6].x === 336 &&
-      decoded.events[6].y === 368,
+    decoded.events[7].e === EVENT.ARTILLERY_IMPACT &&
+      decoded.events[7].x === 336 &&
+      decoded.events[7].y === 368,
     "artillery impact event decodes",
   );
 
@@ -1322,6 +1331,7 @@ function fakeAudioContext() {
   assert(ORDER_STAGE_CODE[ORDER_STAGE.POINT_FIRE] === 10, "Point Fire compact order stage code should be reserved");
   assert(EVENT_CODE[EVENT.ARTILLERY_TARGET] === 7, "Artillery target compact event code should be reserved");
   assert(EVENT_CODE[EVENT.ARTILLERY_IMPACT] === 8, "Artillery impact compact event code should be reserved");
+  assert(EVENT_CODE[EVENT.MORTAR_LAUNCH] === 9, "Mortar launch compact event code should be reserved");
   assert(
     STATS[KIND.ARTILLERY].cost.steel === 300 &&
       STATS[KIND.ARTILLERY].cost.oil === 100 &&

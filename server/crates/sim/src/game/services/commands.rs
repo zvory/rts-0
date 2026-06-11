@@ -481,8 +481,7 @@ fn planner_facts(
                                 ability.kind,
                                 x,
                                 y,
-                            )
-                            && ability_orders::world_ability_current_facing_ready(
+                            ) && ability_orders::world_ability_current_facing_ready(
                                 entities,
                                 id,
                                 ability.kind,
@@ -622,6 +621,7 @@ fn apply_planned_unit_order(
                         map,
                         entities,
                         players,
+                        fog,
                         coordinator,
                         smokes,
                         mortar_shells,
@@ -709,6 +709,7 @@ fn apply_planned_unit_order(
                             map,
                             entities,
                             players,
+                            fog,
                             smokes,
                             mortar_shells,
                             events,

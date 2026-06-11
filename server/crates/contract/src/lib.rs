@@ -364,10 +364,23 @@ pub enum Event {
         to_y: f32,
         delay_ticks: u32,
     },
+    MortarLaunch {
+        from: u32,
+        from_x: f32,
+        from_y: f32,
+        to_x: f32,
+        to_y: f32,
+        radius_tiles: f32,
+        delay_ticks: u32,
+    },
     MortarImpact {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        from: Option<u32>,
         x: f32,
         y: f32,
         radius_tiles: f32,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        reveal: Option<AttackReveal>,
     },
     ArtilleryTarget {
         x: f32,

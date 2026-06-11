@@ -246,6 +246,7 @@ impl SelfPlayRunner {
                     | Event::Notice { .. }
                     | Event::ArtilleryTarget { .. }
                     | Event::ArtilleryImpact { .. }
+                    | Event::MortarLaunch { .. }
                     | Event::MortarImpact { .. }
                     | Event::SmokeLaunch { .. } => None,
                 };
