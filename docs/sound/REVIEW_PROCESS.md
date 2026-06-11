@@ -2,6 +2,12 @@
 
 Use this process when auditioning candidate sound effects.
 
+## Selection Criteria
+
+- Prefer realistic, real-world recordings or convincing naturalistic edits.
+- Reject sounds that read as retro/game-style, 8-bit, MIDI-like, synthetic, cartoonish, or obviously generated unless the intended role explicitly calls for that style.
+- For combat sounds, search for source material with real transient impact, pressure, low-end body, and believable decay instead of generic arcade SFX packs.
+
 ## Flow
 
 1. Play candidate files one by one.

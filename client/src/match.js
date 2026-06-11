@@ -28,6 +28,8 @@ import { dom, isTextEntry } from "./bootstrap.js";
 
 const KAR98K_GAIN = 0.25;
 const MG_BURST_GAIN = 0.7;
+const MORTAR_LAUNCH_GAIN = 0.85;
+const ARTILLERY_FIRE_GAIN = 1.2;
 const MATCH_PING_MS = 2000;
 const NET_REPORT_MS = 10000;
 const AUTO_POINTER_LOCK_SUPPRESS_MS = 1200;
@@ -60,6 +62,19 @@ const COMBAT_SOUNDS = Object.freeze({
     ids: ["combat_mg_burst_02", "combat_mg_burst_03"],
     priority: 2.5,
     gain: MG_BURST_GAIN,
+  },
+});
+
+const POINT_FIRE_SOUNDS = Object.freeze({
+  [EVENT.MORTAR_LAUNCH]: {
+    id: "combat_mortar_launch_04",
+    priority: 3.5,
+    gain: MORTAR_LAUNCH_GAIN,
+  },
+  [EVENT.ARTILLERY_TARGET]: {
+    id: "combat_artillery_fire_05",
+    priority: 4.5,
+    gain: ARTILLERY_FIRE_GAIN,
   },
 });
 
@@ -641,6 +656,8 @@ export class Match {
         this.handleNotice(ev);
       } else if (ev && ev.e === EVENT.ATTACK) {
         this.playAttackSound(ev);
+      } else if (ev && (ev.e === EVENT.MORTAR_LAUNCH || ev.e === EVENT.ARTILLERY_TARGET)) {
+        this.playPointFireSound(ev);
       }
     }
   }
@@ -717,6 +734,29 @@ export class Match {
       key,
     });
     if (played && key) this.activeMachineGunSoundKeys.set(ev.from, key);
+  }
+
+  playPointFireSound(ev) {
+    if (!this.audio) return;
+    const spec = POINT_FIRE_SOUNDS[ev.e];
+    if (!spec) return;
+    let pos = null;
+    if (ev.e === EVENT.MORTAR_LAUNCH && Number.isFinite(ev.fromX) && Number.isFinite(ev.fromY)) {
+      pos = { x: ev.fromX, y: ev.fromY };
+    } else if (ev.e === EVENT.ARTILLERY_TARGET && typeof ev.from === "number") {
+      const from = this.state.entityById(ev.from);
+      if (from && Number.isFinite(from.x) && Number.isFinite(from.y)) pos = from;
+    }
+    if (!pos) return;
+    const from = typeof ev.from === "number" ? this.state.entityById(ev.from) : null;
+    const category = from && from.owner === this.state.playerId ? "combat_self" : "combat_other";
+    this.audio.play(spec.id, {
+      x: pos.x,
+      y: pos.y,
+      category,
+      priority: spec.priority,
+      gain: spec.gain,
+    });
   }
 
   stopInactiveMachineGunSounds() {
