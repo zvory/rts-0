@@ -2820,6 +2820,49 @@ function fakeAudioContext() {
   assert(hotkeyTargetedInput.state.commandTarget === null, "Shift release clears the queued hotkey target");
   globalThis.document = originalDocument;
 
+  const placementKeyInput = Object.create(Input.prototype);
+  let placementEnded = 0;
+  let commandTargetShiftReleased = 0;
+  let shiftKeyupPrevented = false;
+  placementKeyInput.state = {
+    placement: { building: KIND.DEPOT, tileX: 2, tileY: 3, valid: true },
+    releaseCommandTargetShift() {
+      commandTargetShiftReleased += 1;
+    },
+    endPlacement() {
+      placementEnded += 1;
+      this.placement = null;
+    },
+  };
+  placementKeyInput._handleKeyUp({
+    code: "ShiftRight",
+    preventDefault() {
+      shiftKeyupPrevented = true;
+    },
+  });
+  assert(commandTargetShiftReleased === 1, "Shift release still clears command-target preservation");
+  assert(placementEnded === 1 && placementKeyInput.state.placement === null, "Shift release clears build placement");
+  assert(shiftKeyupPrevented === true, "Shift placement release prevents browser default");
+
+  const placementBlurInput = Object.create(Input.prototype);
+  let blurPlacementEnded = 0;
+  placementBlurInput.pointerLocked = false;
+  placementBlurInput.keys = { up: true, down: true, left: true, right: true };
+  placementBlurInput.mouse = { x: 1, y: 2 };
+  placementBlurInput._spacePan = true;
+  placementBlurInput._panDrag = { x: 1, y: 2, button: 1 };
+  placementBlurInput._drag = null;
+  placementBlurInput.state = {
+    placement: { building: KIND.DEPOT, tileX: 2, tileY: 3, valid: true },
+    endCommandTarget() {},
+    endPlacement() {
+      blurPlacementEnded += 1;
+      this.placement = null;
+    },
+  };
+  placementBlurInput._handleBlur();
+  assert(blurPlacementEnded === 1 && placementBlurInput.state.placement === null, "window blur clears build placement");
+
   const artilleryCommands = [];
   const artilleryFeedback = [];
   const selectedArtillery = { id: 44, owner: 1, kind: KIND.ARTILLERY, x: 100, y: 100 };

@@ -159,6 +159,8 @@ gather, build/resume, and placement build commands set `queued: true` and rely o
 snapshot's owner-only `orderPlan` for accepted markers. Production-building-only right-clicks set
 or append building rally stages and rely on owner-only `rallyPlan` for accepted markers. Attack
 targeting with only production buildings selected creates `attackMove` rally stages.
+Shift-confirmed build placement keeps placement mode armed while Shift is physically held, allowing
+multiple queued building placements; releasing Shift or losing window focus clears placement mode.
 
 `command_composer.js` owns command-target arming lifetime for command-card targets. Input and
 minimap clicks call `GameState.issueCommandTarget`, so held keys, Shift preservation, and repeated

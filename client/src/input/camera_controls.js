@@ -112,6 +112,9 @@ export function _handleKeyUp(ev) {
       if (typeof this.state.releaseCommandTargetShift === "function") {
         this.state.releaseCommandTargetShift();
       }
+      if (this.state.placement && typeof this.state.endPlacement === "function") {
+        this.state.endPlacement();
+      }
       ev.preventDefault();
       return;
     case "KeyA":
@@ -136,6 +139,7 @@ export function _handleBlur() {
   this.mouse = null;
   this._spacePan = false;
   if (typeof this.state.endCommandTarget === "function") this.state.endCommandTarget();
+  if (this.state.placement && typeof this.state.endPlacement === "function") this.state.endPlacement();
   this._panDrag = null;
   if (this._drag) {
     this._drag = null;
