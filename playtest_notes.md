@@ -1,3 +1,10 @@
+when one player leaves the match it should watch the replay
+
+mortar teams shoudl should even if they don't hav eline of sight
+
+
+-----
+
 lobby system which allows spectating live matches, and joining replay rooms 
 
 
