@@ -389,6 +389,7 @@ fn artillery_point_fire_intent_valid(
         || e.kind != EntityKind::Artillery
         || e.under_construction()
         || !e.path_is_empty()
+        || !matches!(e.weapon_setup(), crate::game::entity::WeaponSetup::Deployed)
     {
         return false;
     }
@@ -417,15 +418,13 @@ fn execute_artillery_point_fire(entities: &mut EntityStore, id: u32, x: f32, y: 
     let Some(e) = entities.get_mut(id) else {
         return false;
     };
+    if !matches!(e.weapon_setup(), crate::game::entity::WeaponSetup::Deployed) {
+        return false;
+    }
     e.clear_active_order();
     e.set_path_goal(None);
     e.set_emplacement_facing(Some(facing));
     e.set_desired_weapon_facing(facing);
-    if matches!(e.weapon_setup(), crate::game::entity::WeaponSetup::Packed) {
-        e.set_weapon_setup(crate::game::entity::WeaponSetup::SettingUp {
-            ticks: config::ARTILLERY_SETUP_TICKS,
-        });
-    }
     e.set_order(Order::artillery_point_fire(x, y));
     true
 }

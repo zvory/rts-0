@@ -97,7 +97,8 @@ authoritative `rules::defs` records.
   `AT_GUN_FIELD_OF_FIRE_RAD = PI / 4` (45 degrees total).
 - Artillery uses `ARTILLERY_MIN_RANGE_TILES = 10`, `ARTILLERY_MAX_RANGE_TILES = 50`,
   `ARTILLERY_FIELD_OF_FIRE_RAD = 20 degrees total`, `ARTILLERY_RELOAD_TICKS = 90` (~3s),
-  `ARTILLERY_SHELL_DELAY_TICKS = 150` (~5s), and `ARTILLERY_AMMO_COST_STEEL = 10`.
+  `ARTILLERY_SETUP_TICKS = 90` (~3s), `ARTILLERY_SHELL_DELAY_TICKS = 150` (~5s), and
+  `ARTILLERY_AMMO_COST_STEEL = 10`.
   Repeated fire from the same deployed gun tightens from `ARTILLERY_INITIAL_ERROR_TILES = 10.0`
   to `ARTILLERY_MIN_ERROR_TILES = 2.0` over 5 shots; moving resets that accuracy ramp.
   Its body length, width, clearance, and selection radius match the Tank; its exposed carriage,

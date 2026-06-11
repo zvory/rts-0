@@ -1,4 +1,4 @@
-import { ABILITY, KIND, STATE, isBuilding, isUnit } from "./protocol.js";
+import { ABILITY, KIND, SETUP, STATE, isBuilding, isUnit } from "./protocol.js";
 import {
   ABILITIES,
   STATS,
@@ -95,7 +95,7 @@ export function buildUnitCard(ctx, selection) {
     `|setup:${setupGunIds.join(".")}|` +
     `|abilities:${abilityAffordances.map((affordance) =>
       `${affordance.definition.ability}:${affordance.unlocked ? 1 : 0}:${affordance.affordable ? 1 : 0}:` +
-      `${affordance.depletedCount}:` +
+      `${affordance.depletedCount}:${affordance.setupBlockedCount}:` +
       `${affordance.readyIds.join(".")}:` +
       `${affordance.autocastEnabledIds.join(".")}:` +
       `${affordance.cooldownClocks.map((group) => group.count).join(",")}`,
@@ -347,15 +347,15 @@ export function selectedAbilityAffordances(ctx, selection) {
       if (carriers.length === 0) return null;
       const unlocked = abilityUnlocked(ctx, definition);
       const canAfford = affordable(definition.cost, resources);
-      const readyUnits = carriers.filter((e) =>
-        abilityCooldownLeft(e, definition.ability) === 0 &&
-        abilityRemainingUses(e, definition.ability) !== 0
-      );
+      const readyUnits = carriers.filter((e) => abilityUnitReady(e, definition));
       const cooldowns = carriers.map((e) =>
         abilityCooldownLeft(e, definition.ability),
       );
       const depletedCount = carriers.filter(
         (e) => abilityRemainingUses(e, definition.ability) === 0,
+      ).length;
+      const setupBlockedCount = carriers.filter((e) =>
+        abilityRequiresSetup(e, definition),
       ).length;
       const autocastEnabledIds = carriers
         .filter((e) => abilityAutocastEnabled(e, definition.ability))
@@ -365,6 +365,7 @@ export function selectedAbilityAffordances(ctx, selection) {
         unlocked,
         affordable: canAfford,
         depletedCount,
+        setupBlockedCount,
         carrierIds: carriers.map((e) => e.id),
         readyIds: readyUnits.map((e) => e.id),
         autocastEnabledIds,
@@ -451,6 +452,16 @@ function abilityAutocastEnabled(entity, ability) {
     : false;
 }
 
+function abilityUnitReady(entity, definition) {
+  return abilityCooldownLeft(entity, definition.ability) === 0 &&
+    abilityRemainingUses(entity, definition.ability) !== 0 &&
+    !abilityRequiresSetup(entity, definition);
+}
+
+function abilityRequiresSetup(entity, definition) {
+  return definition.ability === ABILITY.POINT_FIRE && entity.setupState !== SETUP.DEPLOYED;
+}
+
 function affordable(cost, resources) {
   if (!cost) return true;
   const steel = resources.steel ?? 0;
@@ -529,8 +540,11 @@ function abilityDisabledReason(ctx, affordance) {
       .find((req) => !playerHasCompleteKind(ctx, req));
     if (missing) return `Requires ${STATS[missing]?.label || missing}`;
   }
-  if (!affordance.affordable) return "Not enough resources";
   if (affordance.depletedCount === affordance.carrierIds.length) return "Depleted";
+  if (affordance.setupBlockedCount === affordance.carrierIds.length) {
+    return "Set up artillery before using Point Fire";
+  }
+  if (!affordance.affordable) return "Not enough resources";
   if (affordance.readyIds.length === 0) return "On cooldown";
   return affordance.definition.title || "";
 }

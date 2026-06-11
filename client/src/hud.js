@@ -10,7 +10,7 @@
 // mutates game state directly.
 
 import { ABILITY, cmd } from "./protocol.js";
-import { KIND, STATE, isBuilding, isUnit } from "./protocol.js";
+import { KIND, SETUP, STATE, isBuilding, isUnit } from "./protocol.js";
 import {
   ABILITIES,
   PLAYER_PALETTE,
@@ -655,6 +655,16 @@ export class HUD {
       : false;
   }
 
+  _abilityUnitReady(entity, definition) {
+    return this._abilityCooldownLeft(entity, definition.ability) === 0 &&
+      this._abilityRemainingUses(entity, definition.ability) !== 0 &&
+      !this._abilityRequiresSetup(entity, definition);
+  }
+
+  _abilityRequiresSetup(entity, definition) {
+    return definition.ability === ABILITY.POINT_FIRE && entity.setupState !== SETUP.DEPLOYED;
+  }
+
   _selectedAbilityAffordances(sel) {
     const ownUnits = this._selectedOwnUnits(sel);
     const res = this.state.resources || { steel: 0, oil: 0 };
@@ -664,15 +674,15 @@ export class HUD {
         if (carriers.length === 0) return null;
         const unlocked = this._abilityUnlocked(definition);
         const affordable = this._affordable(definition.cost, res);
-        const readyUnits = carriers.filter((e) =>
-          this._abilityCooldownLeft(e, definition.ability) === 0 &&
-          this._abilityRemainingUses(e, definition.ability) !== 0
-        );
+        const readyUnits = carriers.filter((e) => this._abilityUnitReady(e, definition));
         const cooldowns = carriers.map((e) =>
           this._abilityCooldownLeft(e, definition.ability),
         );
         const depletedCount = carriers.filter(
           (e) => this._abilityRemainingUses(e, definition.ability) === 0,
+        ).length;
+        const setupBlockedCount = carriers.filter((e) =>
+          this._abilityRequiresSetup(e, definition),
         ).length;
         const autocastEnabledIds = carriers
           .filter((e) => this._abilityAutocastEnabled(e, definition.ability))
@@ -682,6 +692,7 @@ export class HUD {
           unlocked,
           affordable,
           depletedCount,
+          setupBlockedCount,
           carrierIds: carriers.map((e) => e.id),
           readyIds: readyUnits.map((e) => e.id),
           autocastEnabledIds,
@@ -731,7 +742,7 @@ export class HUD {
       `|setup:${setupGunIds.join(".")}|` +
       `|abilities:${abilityAffordances.map((affordance) =>
         `${affordance.definition.ability}:${affordance.unlocked ? 1 : 0}:${affordance.affordable ? 1 : 0}:` +
-        `${affordance.depletedCount}:` +
+        `${affordance.depletedCount}:${affordance.setupBlockedCount}:` +
         `${affordance.readyIds.join(".")}:` +
         `${affordance.autocastEnabledIds.join(".")}:` +
         `${affordance.cooldownClocks.map((group) => group.count).join(",")}`,
@@ -1262,8 +1273,11 @@ export class HUD {
         return `Requires ${reqLabel}`;
       }
     }
-    if (!affordance.affordable) return "Not enough resources";
     if (affordance.depletedCount === affordance.carrierIds.length) return "Depleted";
+    if (affordance.setupBlockedCount === affordance.carrierIds.length) {
+      return "Set up artillery before using Point Fire";
+    }
+    if (!affordance.affordable) return "Not enough resources";
     if (affordance.readyIds.length === 0) return "On cooldown";
     return affordance.definition.title || "";
   }

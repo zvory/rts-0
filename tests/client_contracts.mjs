@@ -259,6 +259,7 @@ function withFakeDocument(fn) {
     id: 31,
     owner: 1,
     kind: KIND.ARTILLERY,
+    setupState: SETUP.DEPLOYED,
     abilities: [{ ability: ABILITY.POINT_FIRE, cooldownLeft: 0, remainingUses: null }],
   };
   const pointFireCard = buildCommandCardDescriptors(commandCardCtx({
@@ -269,6 +270,23 @@ function withFakeDocument(fn) {
   const pointFire = buttonByLabel(pointFireCard, "Point Fire");
   assert(pointFire.unaffordable, "unaffordable ability should stay clickable");
   assert(pointFire.onUnavailableIntent.type === "playNotEnough", "unaffordable ability should play resource notice");
+
+  const packedArtillery = {
+    ...artillery,
+    id: 32,
+    setupState: SETUP.PACKED,
+  };
+  const packedPointFireCard = buildCommandCardDescriptors(commandCardCtx({
+    selection: [packedArtillery],
+    entities: [{ id: 40, owner: 1, kind: KIND.STEELWORKS }, packedArtillery],
+    resources: { steel: 1000, oil: 1000 },
+  }));
+  const packedPointFire = buttonByLabel(packedPointFireCard, "Point Fire");
+  assert(!packedPointFire.enabled, "packed artillery Point Fire should be visible but disabled");
+  assert(
+    packedPointFire.title === "Set up artillery before using Point Fire",
+    "packed artillery Point Fire should explain the setup requirement",
+  );
 
   const steelworks = { id: 50, owner: 1, kind: KIND.STEELWORKS, buildProgress: null };
   const upgradeCard = buildCommandCardDescriptors(commandCardCtx({
