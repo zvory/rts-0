@@ -1219,6 +1219,7 @@ export class HUD {
     if ((this.state.upgrades || []).includes(upgrade)) return "locked";
     if (this._selectedProducingBuildingsForKind(def.researchedAt)
       .some((e) => e.prodUpgrade === upgrade)) return "locked";
+    if (def.requiresUpgrade && !(this.state.upgrades || []).includes(def.requiresUpgrade)) return "locked";
     return this._affordable(def.cost, res) ? "ready" : "unaffordable";
   }
 
@@ -1228,6 +1229,9 @@ export class HUD {
     if ((this.state.upgrades || []).includes(upgrade)) return "Researched";
     if (this._selectedProducingBuildingsForKind(def.researchedAt)
       .some((e) => e.prodUpgrade === upgrade)) return "Researching";
+    if (def.requiresUpgrade && !(this.state.upgrades || []).includes(def.requiresUpgrade)) {
+      return def.requiresText || `Requires ${UPGRADES[def.requiresUpgrade]?.label || def.requiresUpgrade}`;
+    }
     if (!this._affordable(def.cost, res)) return "Not enough resources";
     return "";
   }
@@ -1242,9 +1246,8 @@ export class HUD {
       return `Requires ${reqLabel}`;
     }
     if (st.upgradeRequires && !(this.state.upgrades || []).includes(st.upgradeRequires)) {
-      const reqLabel = (UPGRADES[st.upgradeRequires] && UPGRADES[st.upgradeRequires].label) ||
-        st.upgradeRequires;
-      return `Requires ${reqLabel}`;
+      return st.upgradeRequiresText ||
+        `Requires ${(UPGRADES[st.upgradeRequires] && UPGRADES[st.upgradeRequires].label) || st.upgradeRequires}`;
     }
     if (!this._affordable(st.cost, res)) return "Not enough resources";
     return "";
@@ -1288,7 +1291,8 @@ export class HUD {
     const cost = st.cost || {};
     const requirements = this._requirementsOf(st);
     const upgradeRequirement = st.upgradeRequires
-      ? ((UPGRADES[st.upgradeRequires] && UPGRADES[st.upgradeRequires].label) || st.upgradeRequires)
+      ? (st.upgradeRequiresText ||
+        ((UPGRADES[st.upgradeRequires] && UPGRADES[st.upgradeRequires].label) || st.upgradeRequires))
       : null;
     const requirementLabels = requirements.length > 0 || upgradeRequirement
       ? requirements.map((req) => (STATS[req] && STATS[req].label) || req).join(", ")

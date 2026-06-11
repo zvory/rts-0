@@ -147,6 +147,8 @@ pub(super) fn next_tank_resource_goal(
     }
     let kind = if facts.complete_building_count(EntityKind::TrainingCentre) == 0 {
         EntityKind::TrainingCentre
+    } else if facts.complete_building_count(EntityKind::ResearchComplex) == 0 {
+        EntityKind::ResearchComplex
     } else if facts.complete_building_count(EntityKind::Factory) == 0 {
         EntityKind::Factory
     } else if facts.complete_building_count(EntityKind::Steelworks) == 0 {

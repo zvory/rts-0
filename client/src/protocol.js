@@ -81,6 +81,7 @@ export const KIND = Object.freeze({
   DEPOT: "depot",
   BARRACKS: "barracks",
   TRAINING_CENTRE: "training_centre",
+  RESEARCH_COMPLEX: "research_complex",
   FACTORY: "factory",
   STEELWORKS: "steelworks",
   STEEL: "steel",
@@ -101,6 +102,7 @@ export const BUILDING_KINDS = Object.freeze([
   KIND.DEPOT,
   KIND.BARRACKS,
   KIND.TRAINING_CENTRE,
+  KIND.RESEARCH_COMPLEX,
   KIND.FACTORY,
   KIND.STEELWORKS,
 ]);
@@ -162,7 +164,7 @@ export const REPLAY_VISION = Object.freeze({
 });
 
 // --- Compact snapshot wire schema (must match protocol.rs) ---
-export const COMPACT_SNAPSHOT_VERSION = 15;
+export const COMPACT_SNAPSHOT_VERSION = 16;
 
 export const KIND_CODE = Object.freeze({
   [KIND.WORKER]: 1,
@@ -177,6 +179,7 @@ export const KIND_CODE = Object.freeze({
   [KIND.DEPOT]: 7,
   [KIND.BARRACKS]: 8,
   [KIND.TRAINING_CENTRE]: 9,
+  [KIND.RESEARCH_COMPLEX]: 17,
   [KIND.FACTORY]: 10,
   [KIND.STEEL]: 11,
   [KIND.OIL]: 12,

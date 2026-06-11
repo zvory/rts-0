@@ -817,6 +817,9 @@ fn tech_to_tanks_delays_oil_until_steel_floor_and_builds_tank_tech() {
     );
 
     assert!(decision.intents.contains(&AiIntent::Build {
+        kind: EntityKind::ResearchComplex
+    }));
+    assert!(decision.intents.contains(&AiIntent::Build {
         kind: EntityKind::Factory
     }));
     assert!(decision.intents.contains(&AiIntent::Build {
@@ -849,6 +852,7 @@ fn tech_to_tanks_delays_oil_until_steel_floor_and_builds_tank_tech() {
         building(10, EntityKind::CityCentre, Some(0)),
         building(11, EntityKind::Barracks, Some(0)),
         building(12, EntityKind::TrainingCentre, None),
+        building(13, EntityKind::ResearchComplex, None),
     ];
     steel_floor_owned.extend((0..8).map(|i| steel_worker(20 + i, 100 + i)));
     steel_floor_owned.extend((0..3).map(|i| worker(40 + i, AiEntityState::Idle)));
@@ -1638,7 +1642,7 @@ fn steel_expansion_tanks_builds_steelworks_before_training_at_teams() {
     );
 
     assert!(decision.intents.contains(&AiIntent::Build {
-        kind: EntityKind::Steelworks
+        kind: EntityKind::ResearchComplex
     }));
     assert!(decision.intents.contains(&AiIntent::Train {
         kind: EntityKind::MachineGunner
@@ -1663,7 +1667,8 @@ fn steel_expansion_tanks_researches_at_gun_crews_before_training_at_teams() {
             building(12, EntityKind::Barracks, Some(0)),
             building(13, EntityKind::Barracks, Some(0)),
             building(14, EntityKind::TrainingCentre, None),
-            building(15, EntityKind::Steelworks, Some(0)),
+            building(15, EntityKind::ResearchComplex, Some(0)),
+            building(16, EntityKind::Steelworks, Some(0)),
             worker(60, AiEntityState::Idle),
         ],
     ));
@@ -1962,6 +1967,7 @@ fn steel_expansion_tanks_switches_to_factory_at_fifty_supply() {
             building(12, EntityKind::Barracks, Some(0)),
             building(13, EntityKind::Barracks, Some(0)),
             building(14, EntityKind::TrainingCentre, None),
+            building(15, EntityKind::ResearchComplex, None),
             worker(60, AiEntityState::Idle),
         ],
     ));
@@ -2109,6 +2115,7 @@ fn full_saturation_prioritizes_second_city_centre_at_fifty_supply() {
             building(10, EntityKind::CityCentre, Some(0)),
             building(11, EntityKind::Barracks, Some(0)),
             building(12, EntityKind::TrainingCentre, None),
+            building(13, EntityKind::ResearchComplex, None),
             worker(60, AiEntityState::Idle),
         ],
     ));
@@ -2143,6 +2150,7 @@ fn full_saturation_builds_factory_after_expansion_is_planned() {
             building(10, EntityKind::CityCentre, Some(0)),
             building(11, EntityKind::Barracks, Some(0)),
             building(12, EntityKind::TrainingCentre, None),
+            building(13, EntityKind::ResearchComplex, None),
             worker(60, AiEntityState::Idle),
         ],
     ));
@@ -2178,8 +2186,9 @@ fn full_saturation_trains_tanks_after_tech_transition_completes() {
             building(11, EntityKind::CityCentre, Some(0)),
             building(12, EntityKind::Barracks, Some(0)),
             building(13, EntityKind::TrainingCentre, None),
-            building(14, EntityKind::Factory, Some(0)),
-            building(15, EntityKind::Steelworks, None),
+            building(14, EntityKind::ResearchComplex, None),
+            building(15, EntityKind::Factory, Some(0)),
+            building(16, EntityKind::Steelworks, None),
         ],
     ));
     observation.upgrades.push(UpgradeKind::TankUnlock);
@@ -2211,8 +2220,9 @@ fn tech_to_tanks_trains_tank_before_spending_barracks_budget() {
             building(10, EntityKind::CityCentre, Some(0)),
             building(11, EntityKind::Barracks, Some(0)),
             building(12, EntityKind::TrainingCentre, None),
-            building(13, EntityKind::Factory, Some(0)),
-            building(14, EntityKind::Steelworks, Some(0)),
+            building(13, EntityKind::ResearchComplex, None),
+            building(14, EntityKind::Factory, Some(0)),
+            building(15, EntityKind::Steelworks, Some(0)),
             worker(20, AiEntityState::Gather),
             worker(21, AiEntityState::Gather),
             worker(22, AiEntityState::Gather),

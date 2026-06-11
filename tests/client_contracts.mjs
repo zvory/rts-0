@@ -281,11 +281,26 @@ function withFakeDocument(fn) {
     resources: { steel: 125, oil: 125 },
   }));
   const atGun = buttonByLabel(upgradeCard, "AT Gun");
-  const atUnlock = buttonByLabel(upgradeCard, "AT Gun Crews");
   assert(atGun && !atGun.enabled, "upgrade-gated unit should be disabled before research");
-  assert(atGun.title === "Requires AT Gun Crews", "upgrade-gated unit tooltip should name missing upgrade");
+  assert(atGun.title === "Requires research in R&D Complex", "upgrade-gated unit tooltip should name R&D research");
+  assert(!buttonByLabel(upgradeCard, "AT Gun Crews"), "Gun Works should not expose R&D research");
+
+  const researchComplex = { id: 53, owner: 1, kind: KIND.RESEARCH_COMPLEX, buildProgress: null };
+  const researchCard = buildCommandCardDescriptors(commandCardCtx({
+    selection: [researchComplex],
+    entities: [
+      { id: 51, owner: 1, kind: KIND.CITY_CENTRE },
+      { id: 52, owner: 1, kind: KIND.TRAINING_CENTRE },
+      researchComplex,
+    ],
+    resources: { steel: 200, oil: 200 },
+  }));
+  const atUnlock = buttonByLabel(researchCard, "AT Gun Crews");
+  const artilleryUnlock = buttonByLabel(researchCard, "Unlock Artillery");
   assert(atUnlock && atUnlock.enabled, "available affordable upgrade should be enabled");
   assert(atUnlock.intent.type === "research", "upgrade button should carry research intent");
+  assert(artilleryUnlock && !artilleryUnlock.enabled, "Artillery research should show disabled before AT Gun research");
+  assert(artilleryUnlock.title === "Requires AT Gun Research", "Artillery research should name missing AT prerequisite");
 
   withFakeDocument(() => {
     let clicked = false;
@@ -1894,6 +1909,7 @@ function fakeAudioContext() {
   assert(STATS[KIND.SCOUT_CAR].body.width === 21.6, "Scout Car client body width mirrors server");
   assert(KIND_CODE[KIND.SCOUT_CAR] === 14, "Scout Car compact kind code should follow steelworks protocol kind");
   assert(KIND_CODE[KIND.ARTILLERY] === 16, "Artillery compact kind code should be reserved");
+  assert(KIND_CODE[KIND.RESEARCH_COMPLEX] === 17, "R&D Complex compact kind code should be reserved");
   assert(ABILITY_CODE[ABILITY.POINT_FIRE] === 4, "Point Fire compact ability code should be reserved");
   assert(ORDER_STAGE_CODE[ORDER_STAGE.POINT_FIRE] === 10, "Point Fire compact order stage code should be reserved");
   assert(EVENT_CODE[EVENT.ARTILLERY_TARGET] === 7, "Artillery target compact event code should be reserved");
@@ -1928,12 +1944,34 @@ function fakeAudioContext() {
     "Gun Works should train AT Guns after the unlock",
   );
   assert(
+    !STATS[KIND.STEELWORKS].researches,
+    "Gun Works should no longer expose advanced unlock research",
+  );
+  assert(
     !STATS[KIND.BARRACKS].trains.includes(KIND.AT_TEAM),
     "Barracks should no longer train AT Guns",
   );
   assert(
     STATS[KIND.STEELWORKS].requires.includes(KIND.TRAINING_CENTRE),
     "Gun Works should require Training Centre tech in the command card",
+  );
+  assert(
+    STATS[KIND.RESEARCH_COMPLEX].label === "R&D Complex" &&
+      STATS[KIND.RESEARCH_COMPLEX].footW === 3 &&
+      STATS[KIND.RESEARCH_COMPLEX].footH === 3,
+    "R&D Complex should be a 3x3 command-card building",
+  );
+  assert(
+    STATS[KIND.RESEARCH_COMPLEX].cost.steel === 100 &&
+      STATS[KIND.RESEARCH_COMPLEX].cost.oil === 100 &&
+      STATS[KIND.RESEARCH_COMPLEX].buildTicks === 450,
+    "R&D Complex cost and build time mirror server",
+  );
+  assert(
+    STATS[KIND.RESEARCH_COMPLEX].researches.includes(UPGRADE.AT_GUN_UNLOCK) &&
+      STATS[KIND.RESEARCH_COMPLEX].researches.includes(UPGRADE.ARTILLERY_UNLOCK) &&
+      STATS[KIND.RESEARCH_COMPLEX].researches.includes(UPGRADE.TANK_UNLOCK),
+    "R&D Complex should expose AT Gun, Artillery, and Tank research",
   );
   assert(!ABILITIES[ABILITY.CHARGE], "client no longer exposes Rifleman Charge as a command-card ability");
   assert(
@@ -1947,12 +1985,12 @@ function fakeAudioContext() {
     "Methamphetamines research cost and time mirror server",
   );
   assert(
-    STATS[KIND.AT_TEAM].requires === KIND.STEELWORKS,
-    "AT Gun training should require a completed Gun Works in the command card",
+    STATS[KIND.AT_TEAM].upgradeRequiresText === "Requires research in R&D Complex",
+    "AT Gun training should explain the R&D Complex research requirement",
   );
   assert(
-    STATS[KIND.TANK].requires === KIND.FACTORY,
-    "Tank training should require a completed Vehicle Works in the command card",
+    STATS[KIND.TANK].upgradeRequiresText === "Requires research in R&D Complex",
+    "Tank training should explain the R&D Complex research requirement",
   );
   const playerId = 1;
   const underConstructionTrainingCentre = [
@@ -2253,7 +2291,7 @@ function fakeAudioContext() {
     const tankResearchButton = renderedButtons.find((button) => button.innerHTML.includes("TK+"));
     assert(scoutCarButton?.dataset.hotkey === "Q", "Scout Car training should keep the Q slot");
     assert(tankButton?.dataset.hotkey === "W", "Tank training should occupy the top-middle W slot");
-    assert(tankResearchButton?.dataset.hotkey === "S", "Tank Production research should appear below Tank");
+    assert(!tankResearchButton, "Tank Production research should move out of Vehicle Works");
 
     renderedButtons.length = 0;
     factoryHud.state.upgrades = [UPGRADE.TANK_UNLOCK];
@@ -2293,8 +2331,45 @@ function fakeAudioContext() {
     assert(mortarButton?.dataset.hotkey === "Q", "Mortar Team training should occupy the top-left Q slot");
     assert(atGunButton?.dataset.hotkey === "W", "AT Gun training should occupy the top-middle W slot");
     assert(artilleryButton?.dataset.hotkey === "E", "Artillery training should occupy the top-right E slot");
-    assert(atResearchButton?.dataset.hotkey === "S", "AT Gun Crews research should appear below AT Gun");
-    assert(artilleryResearchButton?.dataset.hotkey === "D", "Unlock Artillery research should appear below Artillery");
+    assert(!atResearchButton, "AT Gun Crews research should move out of Gun Works");
+    assert(!artilleryResearchButton, "Unlock Artillery research should move out of Gun Works");
+
+    renderedButtons.length = 0;
+    const selectedResearchComplex = {
+      id: 80,
+      owner: playerId,
+      kind: KIND.RESEARCH_COMPLEX,
+      buildProgress: null,
+    };
+    const rdHud = Object.create(HUD.prototype);
+    rdHud.state = {
+      playerId,
+      resources: { steel: 500, oil: 500 },
+      upgrades: [],
+      selectedEntities: () => [selectedResearchComplex],
+      entitiesInterpolated: () => [selectedResearchComplex],
+    };
+    rdHud.net = { command: (command) => sent.push(command) };
+    rdHud._cardSig = null;
+    rdHud._trainRoundRobin = new Map();
+    rdHud._cancelRoundRobin = new Map();
+    rdHud._resourceIcons = {};
+    rdHud._renderTrainCard(fakeElement("div"), selectedResearchComplex);
+    const rdAtResearchButton = renderedButtons.find((button) => button.innerHTML.includes("AT+"));
+    const rdArtilleryResearchButton = renderedButtons.find((button) => button.innerHTML.includes("AR+"));
+    const rdTankResearchButton = renderedButtons.find((button) => button.innerHTML.includes("TK+"));
+    assert(rdAtResearchButton?.dataset.hotkey === "Q", "AT Gun Crews research should appear in R&D Complex");
+    assert(rdTankResearchButton?.dataset.hotkey === "E", "Tank Production research should appear in R&D Complex");
+    assert(rdArtilleryResearchButton?.dataset.hotkey === "W", "Unlock Artillery research should appear in R&D Complex");
+    assert(rdArtilleryResearchButton?.disabled, "Artillery research should be disabled before AT Gun research");
+    assert(rdArtilleryResearchButton?.title === "Requires AT Gun Research", "Artillery research should name AT Gun prerequisite");
+
+    renderedButtons.length = 0;
+    rdHud.state.upgrades = [UPGRADE.AT_GUN_UNLOCK];
+    rdHud._cardSig = null;
+    rdHud._renderTrainCard(fakeElement("div"), selectedResearchComplex);
+    const unlockedArtilleryResearchButton = renderedButtons.find((button) => button.innerHTML.includes("AR+"));
+    assert(unlockedArtilleryResearchButton && !unlockedArtilleryResearchButton.disabled, "Artillery research should enable after AT Gun research");
 
     renderedButtons.length = 0;
     const playedNotices = [];

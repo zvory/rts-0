@@ -498,6 +498,7 @@ fn spawn_debug_human_start(
         (EntityKind::Barracks, -1.5, 12.0),
         (EntityKind::Barracks, 4.0, 12.0),
         (EntityKind::Steelworks, 9.0, 12.0),
+        (EntityKind::ResearchComplex, 9.0, 15.0),
         (EntityKind::Factory, -4.0, 17.0),
         (EntityKind::Factory, 4.0, 17.0),
     ];

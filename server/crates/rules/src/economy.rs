@@ -107,6 +107,7 @@ mod tests {
             trainable_units(EntityKind::Factory),
             &[EntityKind::ScoutCar, EntityKind::Tank]
         );
+        assert_eq!(trainable_units(EntityKind::ResearchComplex), &[]);
         assert_eq!(
             trainable_units(EntityKind::Steelworks),
             &[
@@ -178,6 +179,15 @@ mod tests {
             EntityKind::Factory,
             &[EntityKind::CityCentre, EntityKind::TrainingCentre]
         ));
+        assert!(!build_requirement_met(EntityKind::ResearchComplex, &[]));
+        assert!(!build_requirement_met(
+            EntityKind::ResearchComplex,
+            &[EntityKind::TrainingCentre]
+        ));
+        assert!(build_requirement_met(
+            EntityKind::ResearchComplex,
+            &[EntityKind::CityCentre, EntityKind::TrainingCentre]
+        ));
         assert!(!build_requirement_met(EntityKind::Steelworks, &[]));
         assert!(build_requirement_met(
             EntityKind::Steelworks,
@@ -191,6 +201,7 @@ mod tests {
         assert_eq!(cost(EntityKind::Depot), (100, 0));
         assert_eq!(supply_cost(EntityKind::AtTeam), 3);
         assert_eq!(cost(EntityKind::Artillery), (300, 100));
+        assert_eq!(cost(EntityKind::ResearchComplex), (100, 100));
         assert_eq!(supply_cost(EntityKind::Artillery), 5);
         assert_eq!(
             defs::unit_def(EntityKind::Artillery).map(|d| d.stats.radius),
