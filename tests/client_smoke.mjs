@@ -104,7 +104,7 @@ try {
       .sort((a, b) => a.id - b.id);
     const n = Math.min(workers.length, steel.length);
     for (let i = 0; i < n; i++) {
-      m.net.command({ c: "gather", units: [workers[i].id], node: steel[i].id });
+      m.commandIssuer.issueCommand({ c: "gather", units: [workers[i].id], node: steel[i].id });
     }
     return { workers: workers.length, nodes: steel.length, assigned: n };
   });

@@ -92,25 +92,25 @@ function isMacPlatform() {
 
 /**
  * Translates raw DOM pointer/keyboard gestures on the viewport into selection
- * mutations (on `state`) and protocol commands (via `net.command`).
+ * mutations (on `state`) and protocol commands (via `commandIssuer.issueCommand`).
  */
 export class Input {
   /**
    * @param {HTMLElement} domElement the #viewport element that receives listeners
    * @param {import("../camera.js").Camera} camera world<->screen transforms & zoom
    * @param {import("../state.js").GameState} state selection + placement + entities
-   * @param {import("../net.js").Net} net command sender
+   * @param {{issueCommand(command: object): object|boolean}} commandIssuer gameplay command seam
    * @param {import("../renderer/index.js").Renderer} renderer for drawSelectionBox
    * @param {import("../fog.js").Fog} fog kept for parity / future hit-test filtering
    * @param {import("../audio.js").Audio} [audio] optional audio engine for local cues
    * @param {import("./router.js").MatchInputRouter} [inputRouter] optional UI input router
    * @param {import("../hotkey_profiles.js").HotkeyProfileService} [hotkeyProfiles] active hotkey profile service.
    */
-  constructor(domElement, camera, state, net, renderer, fog, audio, inputRouter = null, hotkeyProfiles = null) {
+  constructor(domElement, camera, state, commandIssuer, renderer, fog, audio, inputRouter = null, hotkeyProfiles = null) {
     this.dom = domElement;
     this.camera = camera;
     this.state = state;
-    this.net = net;
+    this.commandIssuer = commandIssuer;
     this.renderer = renderer;
     this.fog = fog;
     this.audio = audio || null;

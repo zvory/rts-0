@@ -11,6 +11,7 @@ src/
   protocol.js     # PINNED — message tag constants + builder helpers (mirror of §2)
   config.js       # PINNED — render/UI constants: colors, sizes, costs, sight (mirror balance)
   net.js          # Net: WebSocket wrapper, typed send helpers, event emitter
+  prediction_controller.js # PredictionController: local command sequence/buffer bookkeeping
   state.js        # GameState: holds prev+current snapshot, selection, camera, placement
   camera.js       # Camera: pan/zoom, world<->screen transforms, edge/keyboard/pointer-lock scroll
   renderer/       # Pixi app facade plus layers, terrain, entities, units, buildings,
@@ -46,7 +47,7 @@ export class Net {
   addAi()
   removeAi(id)
   setQuickstart(enabled)
-  command(cmd)                           // cmd built via protocol.js builders
+  command(cmd, clientSeq)                // lower-level sequenced gameplay command envelope
   ping()
   setReplaySpeed(speed)                  // replay rooms and dev-watch scenarios
   seekReplay(ticksBack)                  // replay rooms; pass huge N for full reset
@@ -57,6 +58,28 @@ export class Net {
   get playerId()
 }
 ```
+
+`prediction_controller.js`
+```js
+export class PredictionController {
+  constructor({sendCommand, enabled, now?, commandTimeoutMs?})
+  issueCommand(cmd)                      // allocates clientSeq, records pending, calls sendCommand(cmd, seq)
+  applyAuthoritativeSnapshot(snapshot)   // consumes snapshot.netStatus sim-consumption ack metadata
+  applySimAcknowledgement(clientSeq, serverTick?)
+  recordSocketReceipt(clientSeq, detail?)// diagnostic only; does not reconcile
+  recordCommandRejection(clientSeq, reason?)
+  enterPredicting(), beginResync(correction?), finishResync()
+  reset({enabled?})
+  debugSummary()                         // pending count/seqs, latest authoritative tick, ack/correction metrics
+  get pendingCommandCount()
+}
+```
+Live player command sources receive a `commandIssuer` seam from `Match` and call
+`commandIssuer.issueCommand(cmd)`. The controller owns browser-local `clientSeq` allocation and
+passes the sequenced envelope to `Net.command(cmd, clientSeq)`. Replay viewers, spectators, and
+dev-watch passive viewers keep prediction disabled and do not allocate gameplay command sequence ids.
+`GameState.applySnapshot` remains authoritative in Phase 2; prediction diagnostics are bookkeeping
+only until a later WASM predictor supplies predicted render snapshots.
 
 `branch_staging.js`
 ```js
@@ -170,7 +193,7 @@ local stamping remains a fallback for older/dev object snapshots.
 `input/index.js`
 ```js
 export class Input {
-  constructor(domElement, camera, state, net, renderer, fog, audio?, inputRouter?)
+  constructor(domElement, camera, state, commandIssuer, renderer, fog, audio?, inputRouter?)
   // installs listeners; translates gestures into selection + protocol commands.
   // number keys recall control groups; double-tap jumps the camera to the largest
   // local cluster. Alt/Ctrl/Cmd+number replaces a group, Shift+number adds to it.
@@ -178,7 +201,7 @@ export class Input {
   // optional pointer-lock mode traps the browser cursor and drives a visible
   // virtual cursor for edge pan on multi-monitor setups.
   update(dt)                             // continuous handling (edge scroll handled by camera)
-  // emits nothing to return; mutates state.selection / state.placement and calls net.command
+  // emits nothing to return; mutates state.selection / state.placement and calls commandIssuer.issueCommand
 }
 ```
 Shift-right-click appends queued orders only for selected units: move, attack-move, attack,
@@ -236,9 +259,9 @@ export function noticeSoundId(msg)
 `hud.js`
 ```js
 export class HUD {
-  constructor(rootEl, state, net, audio?)
+  constructor(rootEl, state, commandIssuer, audio?)
   update()                               // refresh resources/supply, selected panel, command card
-  // command card buttons call net.command(...) or state.beginPlacement(...)
+  // command card buttons call commandIssuer.issueCommand(...) or state.beginPlacement(...)
 }
 ```
 The train command card is driven by the first selected production building type, but train clicks
@@ -252,7 +275,7 @@ buildings in reverse round-robin order for the displayed producer type.
 `minimap.js`
 ```js
 export class Minimap {
-  constructor(canvasEl, state, camera, fog, net, inputRouter?)
+  constructor(canvasEl, state, camera, fog, commandIssuer, inputRouter?)
   render()                               // draw terrain + fog + entity blips + viewport rect
   inputZone()                            // router zone for locked/unlocked minimap interaction
   // click/drag -> camera.centerOn or issue move command (right-click)
@@ -431,5 +454,3 @@ selects `client-architecture`, `js-protocol-contracts`, `node-minimap-input-cont
 Architecture-policy files such as `scripts/check-client-architecture.mjs`,
 `tests/select-suites.mjs`, and `plans/client-arch/*` select `client-architecture`. Docs-only
 changes select `docs-only` unless another rule applies.
-
----

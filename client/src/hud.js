@@ -6,7 +6,7 @@
 // The HUD is plain DOM (not Pixi). It is rebuilt cheaply each frame from `state`; the
 // only stateful trick is reusing command-card buttons between frames so that holding a
 // stable selection does not thrash the DOM (and so hotkeys keep working). All gameplay
-// effects go through `net.command(...)` or `state.beginPlacement(...)` — the HUD never
+// effects go through `commandIssuer.issueCommand(...)` or `state.beginPlacement(...)` — the HUD never
 // mutates game state directly.
 
 import { ABILITY, cmd } from "./protocol.js";
@@ -99,14 +99,14 @@ export class HUD {
    * @param {HTMLElement} rootEl the game screen root (`#game-screen`); used to scope
    *   element lookups so multiple screens could coexist.
    * @param {import("./state.js").GameState} state shared game state (selection, resources).
-   * @param {import("./net.js").Net} net network seam for issuing commands.
+   * @param {{issueCommand(command: object): object|boolean}} commandIssuer gameplay command seam.
    * @param {import("./audio.js").Audio} [audio] optional audio engine for local UI notices.
    * @param {import("./hotkey_profiles.js").HotkeyProfileService} [hotkeyProfiles] active hotkey resolver.
    */
-  constructor(rootEl, state, net, audio = null, hotkeyProfiles = null) {
+  constructor(rootEl, state, commandIssuer, audio = null, hotkeyProfiles = null) {
     this.root = rootEl;
     this.state = state;
-    this.net = net;
+    this.commandIssuer = commandIssuer;
     this.audio = audio;
     this.hotkeyProfiles = hotkeyProfiles;
 
@@ -545,7 +545,7 @@ export class HUD {
         this.state.beginPlacement(intent.building);
         return;
       case "stop":
-        this.net.command(cmd.stop(intent.unitIds || []));
+        this.commandIssuer.issueCommand(cmd.stop(intent.unitIds || []));
         this.state.endCommandTarget();
         return;
       case "train":
@@ -561,7 +561,7 @@ export class HUD {
         this._dispatchAbilityIntent(intent, ev);
         return;
       case "setAutocast":
-        this.net.command(cmd.setAutocast(intent.ability, intent.unitIds || [], !!intent.enabled));
+        this.commandIssuer.issueCommand(cmd.setAutocast(intent.ability, intent.unitIds || [], !!intent.enabled));
         this.state.endCommandTarget();
         return;
       case "playNotEnough":
@@ -576,7 +576,7 @@ export class HUD {
     if (intent.targetMode === "worldPoint") {
       this.state.beginCommandTarget({ kind: "ability", ability: intent.ability });
     } else {
-      this.net.command(cmd.useAbility(
+      this.commandIssuer.issueCommand(cmd.useAbility(
         intent.ability,
         intent.readyIds || [],
         null,
@@ -809,7 +809,7 @@ export class HUD {
         enabled: unitIds.length > 0,
         cls: "",
         onClick: () => {
-          this.net.command(cmd.stop(unitIds));
+          this.commandIssuer.issueCommand(cmd.stop(unitIds));
           this.state.endCommandTarget();
         },
       }));
@@ -855,7 +855,7 @@ export class HUD {
         enabled: unitIds.length > 0,
         cls: "",
         onClick: () => {
-          this.net.command(cmd.stop(unitIds));
+          this.commandIssuer.issueCommand(cmd.stop(unitIds));
           this.state.endCommandTarget();
         },
       });
@@ -896,7 +896,7 @@ export class HUD {
           onContextMenu: definition.ability === ABILITY.MORTAR_FIRE
             ? (ev) => {
                 ev.preventDefault();
-                this.net.command(cmd.setAutocast(
+                this.commandIssuer.issueCommand(cmd.setAutocast(
                   definition.ability,
                   affordance.carrierIds,
                   false,
@@ -908,7 +908,7 @@ export class HUD {
             if (definition.targetMode === "worldPoint") {
               this.state.beginCommandTarget({ kind: "ability", ability: definition.ability });
             } else {
-              this.net.command(cmd.useAbility(
+              this.commandIssuer.issueCommand(cmd.useAbility(
                 definition.ability,
                 affordance.readyIds,
                 null,
@@ -1198,14 +1198,14 @@ export class HUD {
   _issueTrain(unit) {
     const building = this._nextProducerBuildingForUnit(unit);
     if (!building) return;
-    this.net.command(cmd.train(building.id, unit));
+    this.commandIssuer.issueCommand(cmd.train(building.id, unit));
   }
 
   /** Cancel one production item from the next selected producer in reverse order. */
   _issueCancelProduction(kind) {
     const building = this._previousProducingBuildingForKind(kind);
     if (!building) return;
-    this.net.command(cmd.cancel(building.id));
+    this.commandIssuer.issueCommand(cmd.cancel(building.id));
   }
 
   _issueResearch(upgrade) {
@@ -1215,7 +1215,7 @@ export class HUD {
       (e) => this._isOwn(e) && e.kind === def.researchedAt && e.buildProgress == null,
     );
     if (!building) return;
-    this.net.command(cmd.research(building.id, upgrade));
+    this.commandIssuer.issueCommand(cmd.research(building.id, upgrade));
   }
 
   // --- Shared helpers --------------------------------------------------------

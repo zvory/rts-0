@@ -107,14 +107,14 @@ function minimapHarness({ selected = [], commandTarget = null, commandsEnabled =
       centers.push({ x, y });
     },
   };
-  const net = {
+  const commandIssuer = {
     sent: [],
-    command(command) {
+    issueCommand(command) {
       this.sent.push(command);
     },
   };
-  const minimap = new Minimap(canvas, state, camera, null, net, router, { commandsEnabled });
-  return { router, canvas, state, camera, net, minimap, centers, commands, endedTargets };
+  const minimap = new Minimap(canvas, state, camera, null, commandIssuer, router, { commandsEnabled });
+  return { router, canvas, state, camera, net: commandIssuer, commandIssuer, minimap, centers, commands, endedTargets };
 }
 
 function lockedEvent(clientX, clientY, button = 0, extra = {}) {

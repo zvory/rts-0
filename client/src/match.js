@@ -12,6 +12,7 @@ import { automaticPointerLockDisabledForTests, shouldRequestPointerLock } from "
 import { DomClickInputZone, MatchInputRouter } from "./input/router.js";
 import { Minimap } from "./minimap.js";
 import { MatchHealth } from "./match_health.js";
+import { PredictionController } from "./prediction_controller.js";
 import { Renderer } from "./renderer/index.js";
 import { ReplayCameraInput } from "./replay_camera_input.js";
 import { ReplayControls } from "./replay_controls.js";
@@ -104,6 +105,13 @@ export class Match {
     this.skipFinalNetReport = false;
     this.lastSnapshotTick = 0;
     this.health = new MatchHealth({ net: this.net, statusBadge: this.statusBadge, snapshotMs: SNAPSHOT_MS });
+    this.prediction = new PredictionController({
+      enabled: !this.replayViewer && !payload?.spectator,
+      sendCommand: (command, clientSeq) => this.net.command(command, clientSeq),
+    });
+    this.commandIssuer = {
+      issueCommand: (command) => this.prediction.issueCommand(command),
+    };
     this.autoPointerLockUntil = 0;
     this.pointerLockPanEnabled = this.readPointerLockPanEnabled();
     this.pointerLockDiagnosticShown = false;
@@ -125,7 +133,7 @@ export class Match {
     this.fog.setRevealAll(!!this.devWatch?.noFog);
     this.hud = this._timeInit(
       "match.hud",
-      () => new HUD(dom.gameScreen, this.state, this.net, this.audio, this.hotkeyProfiles),
+      () => new HUD(dom.gameScreen, this.state, this.commandIssuer, this.audio, this.hotkeyProfiles),
     );
     this.inputRouter = this._timeInit("match.inputRouter", () => new MatchInputRouter(dom.viewport));
     this.hudInputZone = this._timeInit(
@@ -135,7 +143,7 @@ export class Match {
     this.unregisterHudInputZone = this.inputRouter.registerZone(this.hudInputZone);
     this.minimap = this._timeInit(
       "match.minimap",
-      () => new Minimap(dom.minimap, this.state, this.camera, this.fog, this.net, this.inputRouter, {
+      () => new Minimap(dom.minimap, this.state, this.camera, this.fog, this.commandIssuer, this.inputRouter, {
         commandsEnabled: !this.replayViewer,
       }),
     );
@@ -147,7 +155,7 @@ export class Match {
           dom.viewport,
           this.camera,
           this.state,
-          this.net,
+          this.commandIssuer,
           this.renderer,
           this.fog,
           this.audio,
@@ -176,6 +184,7 @@ export class Match {
     this.onSnapshot = (m) => {
       const now = performance.now();
       this.health.noteSnapshotArrival(now, document.hidden);
+      this.prediction.applyAuthoritativeSnapshot(m);
       this.state.applySnapshot(m);
       this.lastSnapshotTick = Number.isFinite(m?.tick) ? m.tick : this.lastSnapshotTick;
       this.replayControls?.noteSnapshotTick(m?.tick);
