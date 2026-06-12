@@ -91,6 +91,7 @@ export class Match {
     this.audio = audio;
     this.statusBadge = statusBadge;
     this.diagnostics = diagnostics;
+    this.hotkeyProfiles = options.hotkeyProfiles || null;
     this.replayViewer = !!options.replayViewer;
     this.missingCombatSoundKinds = new Set();
     this.activeMachineGunSoundKeys = new Map();
@@ -120,7 +121,10 @@ export class Match {
       () => new Fog(this.state.map.width, this.state.map.height, this.state.map.terrain),
     );
     this.fog.setRevealAll(!!this.devWatch?.noFog);
-    this.hud = this._timeInit("match.hud", () => new HUD(dom.gameScreen, this.state, this.net, this.audio));
+    this.hud = this._timeInit(
+      "match.hud",
+      () => new HUD(dom.gameScreen, this.state, this.net, this.audio, this.hotkeyProfiles),
+    );
     this.inputRouter = this._timeInit("match.inputRouter", () => new MatchInputRouter(dom.viewport));
     this.hudInputZone = this._timeInit(
       "match.hudInputZone",
@@ -146,6 +150,7 @@ export class Match {
           this.fog,
           this.audio,
           this.inputRouter,
+          this.hotkeyProfiles,
         ),
     );
 

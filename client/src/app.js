@@ -29,6 +29,11 @@ import { Match } from "./match.js";
 import { MatchHistory } from "./match_history.js";
 import { ReplayViewer } from "./replay_viewer.js";
 import { StatusBadge } from "./status_badge.js";
+import {
+  HotkeyProfileService,
+  buildHotkeyCommandCatalog,
+} from "./hotkey_profiles.js";
+import { buildCommandCardContextCatalog } from "./hud_command_card.js";
 
 /**
  * App-level heartbeat interval (ms). The server drops connections idle for 40s,
@@ -66,6 +71,10 @@ export class App {
     void this.audio.preload(SOUND_MANIFEST);
     if (dom.settingsMenu) buildAudioSettings(this.audio, dom.settingsMenu);
     this.statusBadge = new StatusBadge(dom.version);
+    this.hotkeyProfiles = new HotkeyProfileService({
+      catalog: buildHotkeyCommandCatalog(buildCommandCardContextCatalog()),
+    });
+    globalThis.rtsHotkeys = this.hotkeyProfiles;
     /** @type {Lobby} */
     this.lobby = new Lobby(dom.lobbyScreen, this.net);
     this.branchStaging = new BranchStaging(dom.branchScreen, this.net);
@@ -248,7 +257,7 @@ export class App {
       this.audio,
       this.statusBadge,
       diagnostics,
-      { initialCamera: carriedCamera },
+      { initialCamera: carriedCamera, hotkeyProfiles: this.hotkeyProfiles },
     );
     diagnostics.mark("app.onStart.end");
   }
