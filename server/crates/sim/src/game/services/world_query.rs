@@ -388,6 +388,13 @@ mod tests {
                 100.0,
             )
             .unwrap();
+        let forgiving = s
+            .spawn_node(
+                EntityKind::Steel,
+                100.0 + (config::CC_RESOURCE_MAX_DIST_TILES + 1.5) * ts,
+                100.0,
+            )
+            .unwrap();
         let far = s
             .spawn_node(
                 EntityKind::Steel,
@@ -407,6 +414,7 @@ mod tests {
         let unfinished_near = s.spawn_node(EntityKind::Steel, 100.0, 300.0).unwrap();
 
         assert!(resource_has_completed_mining_cc(&s, 1, near));
+        assert!(resource_has_completed_mining_cc(&s, 1, forgiving));
         assert!(!resource_has_completed_mining_cc(&s, 1, far));
         assert!(!resource_has_completed_mining_cc(&s, 2, unfinished_near));
         s.remove(unfinished_cc);

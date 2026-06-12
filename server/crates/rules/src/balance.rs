@@ -117,7 +117,8 @@ pub const OIL_PATCHES_PER_BASE: u32 = 3;
 
 pub const CC_RESOURCE_MIN_DIST_TILES: f32 = 3.5;
 pub const CC_RESOURCE_MAX_DIST_TILES: f32 = 7.0;
-pub const MINING_CC_RANGE_TILES: f32 = CC_RESOURCE_MAX_DIST_TILES;
+// Two-tile mining buffer beyond authored/base resource cluster placement.
+pub const MINING_CC_RANGE_TILES: f32 = 9.0;
 pub const STEEL_BLOCK_DIST_TILES: f32 = 5.0;
 pub const OIL_DIST_TILES: f32 = 6.0;
 

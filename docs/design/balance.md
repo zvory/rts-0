@@ -167,10 +167,11 @@ authoritative `rules::defs` records.
 - Attached mining: workers walk to a patch, latch onto it, and mine in place.
   Every `HARVEST_TICKS = 40` the load (`STEEL_LOAD = 2` / `OIL_LOAD = 2`) is deposited
   directly into the player's economy only if the resource node is within
-  `MINING_CC_RANGE_TILES = 7.0` tiles of a completed City Centre owned by that player.
-  The range matches `CC_RESOURCE_MAX_DIST_TILES`, so each starting City Centre can mine
-  every patch in its main-base cluster. If no completed City Centre is close enough, workers ignore
-  new gather orders for that patch and active miners scatter roughly one tile away from the patch.
+  `MINING_CC_RANGE_TILES = 9.0` tiles of a completed City Centre owned by that player.
+  Starting resources are placed within `CC_RESOURCE_MAX_DIST_TILES = 7.0`, giving City Centres a
+  two-tile mining buffer around the authored/base resource cluster. If no completed City Centre is
+  close enough, workers ignore new gather orders for that patch and active miners scatter roughly
+  one tile away from the patch.
   When a patch empties the worker goes idle (no automatic retarget).
 - One worker per patch: each node has a single harvest slot (`Entity::miner`). A patch is
   occupied only after the worker reaches `GatherPhase::Harvesting`; right-clicking a patch

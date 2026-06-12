@@ -2556,7 +2556,7 @@ function fakeAudioContext() {
 // Config
 // ---------------------------------------------------------------------------
 {
-  assert(MINING_CC_RANGE_TILES === 7, "client mirrors the server mining City Centre range");
+  assert(MINING_CC_RANGE_TILES === 9, "client mirrors the server mining City Centre range");
   assert(STATS[KIND.CITY_CENTRE].cost.steel === 200, "City Centre cost mirrors server");
   assert(
     Array.isArray(STATS[KIND.FACTORY].requires),
