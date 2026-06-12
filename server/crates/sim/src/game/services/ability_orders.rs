@@ -43,14 +43,16 @@ pub(crate) fn order_or_launch_world_ability(
     let Some((x, y)) = SmokeCloudStore::clamp_point_to_map(map, x, y) else {
         return AbilityOrderResult::Skipped;
     };
-    if !caster_can_attempt(entities, player, caster, ability) {
+    if !caster_can_accept_order(entities, player, caster, ability) {
         return AbilityOrderResult::Skipped;
     }
     if !tech_requirement_met(entities, player, ability) {
         return AbilityOrderResult::Skipped;
     }
     if caster_in_range(map, entities, caster, ability, x, y) {
-        if !world_ability_current_facing_ready(entities, caster, ability, x, y) {
+        if !caster_can_attempt(entities, player, caster, ability)
+            || !world_ability_current_facing_ready(entities, caster, ability, x, y)
+        {
             let Some((sx, sy)) = entities.get(caster).map(|e| (e.pos_x, e.pos_y)) else {
                 return AbilityOrderResult::Skipped;
             };
@@ -269,17 +271,37 @@ pub(crate) fn caster_can_attempt(
     ability: AbilityKind,
 ) -> bool {
     matches!(entities.get(caster),
-        Some(e) if e.owner == player
-            && e.hp > 0
-            && e.is_unit()
-            && !e.under_construction()
-            && ability::carried_by(ability, e.kind)
-            && mortar_ready(e.kind, e.weapon_setup(), e.path_is_empty(), ability)
-            && e.ability_uses_remaining(ability).unwrap_or(1) > 0
-            && e.ability_cooldown_ticks(ability) == 0)
+        Some(e) if caster_base_ready(e, player, ability)
+            && ability_launch_ready(e.kind, e.weapon_setup(), e.path_is_empty(), ability))
 }
 
-fn mortar_ready(
+pub(crate) fn caster_can_accept_order(
+    entities: &EntityStore,
+    player: u32,
+    caster: u32,
+    ability: AbilityKind,
+) -> bool {
+    matches!(entities.get(caster),
+        Some(e) if caster_base_ready(e, player, ability)
+            && ability_order_ready(e.kind, e.weapon_setup(), ability))
+}
+
+fn caster_base_ready(e: &crate::game::entity::Entity, player: u32, ability: AbilityKind) -> bool {
+    e.owner == player
+        && e.hp > 0
+        && e.is_unit()
+        && !e.under_construction()
+        && ability::carried_by(ability, e.kind)
+        && e.ability_uses_remaining(ability).unwrap_or(1) > 0
+        && e.ability_cooldown_ticks(ability) == 0
+}
+
+fn ability_order_ready(kind: EntityKind, setup: WeaponSetup, ability: AbilityKind) -> bool {
+    ability != AbilityKind::MortarFire
+        || (kind == EntityKind::MortarTeam && setup == WeaponSetup::Deployed)
+}
+
+fn ability_launch_ready(
     kind: EntityKind,
     setup: WeaponSetup,
     path_empty: bool,

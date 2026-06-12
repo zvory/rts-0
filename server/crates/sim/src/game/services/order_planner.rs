@@ -86,6 +86,10 @@ impl UnitFacts {
     fn can_execute_ability_without_interrupt(&self, ability: AbilityId) -> bool {
         matches!(self.ability(ability), Some(a) if a.ready_at_issue && a.can_execute_without_interrupt)
     }
+
+    fn can_interrupt_with_ability(&self, ability: AbilityId) -> bool {
+        matches!(self.ability(ability), Some(a) if a.ready_at_issue && a.can_interrupt_active_order)
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -97,6 +101,11 @@ pub struct AbilityFacts {
     /// For a moving scout car and an in-range smoke target, this lets reactive smoke
     /// launch while the move order and future queue remain intact.
     pub can_execute_without_interrupt: bool,
+    /// True when this ability may replace a non-idle active order.
+    ///
+    /// Mortar Fire uses this to make a manual fire order interrupt movement, while Smoke keeps its
+    /// reactive noninterrupting behavior and otherwise falls back to idle carriers only.
+    pub can_interrupt_active_order: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -470,6 +479,12 @@ fn choose_immediate_world_ability_unit<'a>(
                 .copied()
                 .find(|u| matches!(u.activity, UnitActivity::Idle))
         })
+        .or_else(|| {
+            units
+                .iter()
+                .copied()
+                .find(|u| u.can_interrupt_with_ability(ability))
+        })
 }
 
 fn choose_queued_world_ability_unit<'a>(
@@ -553,6 +568,7 @@ mod tests {
 
     const SMOKE: AbilityId = AbilityId(1);
     const CHARGE: AbilityId = AbilityId(2);
+    const MORTAR_FIRE: AbilityId = AbilityId(3);
 
     fn smoke_click(units: &[UnitId], mode: IssueMode, x: f32) -> OrderRequest {
         OrderRequest {
@@ -584,6 +600,7 @@ mod tests {
             ability,
             ready_at_issue: ready,
             can_execute_without_interrupt: false,
+            can_interrupt_active_order: false,
         });
         unit
     }
@@ -597,6 +614,21 @@ mod tests {
             ability,
             ready_at_issue: ready,
             can_execute_without_interrupt: true,
+            can_interrupt_active_order: false,
+        });
+        unit
+    }
+
+    fn with_interrupting_ability(
+        mut unit: UnitFacts,
+        ability: AbilityId,
+        ready: bool,
+    ) -> UnitFacts {
+        unit.abilities.push(AbilityFacts {
+            ability,
+            ready_at_issue: ready,
+            can_execute_without_interrupt: false,
+            can_interrupt_active_order: true,
         });
         unit
     }
@@ -805,6 +837,25 @@ mod tests {
         );
 
         assert_eq!(replace_units(&out), vec![2]);
+    }
+
+    #[test]
+    fn immediate_world_ability_can_replace_moving_carrier_when_allowed() {
+        let config = PlannerConfig::default();
+        let mut moving = with_interrupting_ability(unit(1), MORTAR_FIRE, true);
+        moving.activity = UnitActivity::Moving;
+
+        let request = OrderRequest {
+            units: vec![1],
+            mode: IssueMode::Immediate,
+            order: RequestedOrder::UseAbility {
+                ability: MORTAR_FIRE,
+                target: AbilityTarget::WorldPoint(Point::new(256.0, 128.0)),
+            },
+        };
+        let out = plan_order(config, &[moving], &request);
+
+        assert_eq!(replace_units(&out), vec![1]);
     }
 
     #[test]
