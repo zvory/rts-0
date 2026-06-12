@@ -168,8 +168,8 @@ export class HUD {
     this._controlGroupSig = null;
   }
 
-  _issueCommand(command) {
-    return issueGameplayCommand(this.commandIssuer, command);
+  _issueCommand(command, options = {}) {
+    return issueGameplayCommand(this.commandIssuer, command, options);
   }
 
   // --- Resource / supply bar -------------------------------------------------
@@ -413,9 +413,11 @@ export class HUD {
         e.prodKind ||
         "";
       const queued = queue > 1 ? ` (+${queue - 1})` : "";
+      const pending = e.optimisticProduction ? ` <span class="sel-prod-pending">pending</span>` : "";
       prodHtml =
-        `<div class="sel-prod-label">${kindLabel}${queued}</div>` +
-        `<div class="sel-prod-bar"><div class="sel-prod-fill" style="width:${pct}%"></div></div>`;
+        `<div class="sel-prod-label">${kindLabel}${queued}${pending}</div>` +
+        `<div class="sel-prod-bar${e.optimisticProduction ? " optimistic" : ""}">` +
+        `<div class="sel-prod-fill" style="width:${pct}%"></div></div>`;
     }
 
     const tankOilHtml = e.kind === KIND.TANK
@@ -690,7 +692,15 @@ export class HUD {
   _issueTrain(unit) {
     const building = this._nextProducerBuildingForUnit(unit);
     if (!building) return;
-    this._issueCommand(cmd.train(building.id, unit));
+    this._issueCommand(cmd.train(building.id, unit), {
+      optimism: {
+        family: "train",
+        building: building.id,
+        unit,
+        prodQueue: building.prodQueue ?? 0,
+        prodKind: building.prodKind || null,
+      },
+    });
   }
 
   /** Cancel one production item from the next selected producer in reverse order. */
@@ -939,9 +949,9 @@ export class HUD {
   }
 }
 
-function issueGameplayCommand(sender, command) {
+function issueGameplayCommand(sender, command, options = {}) {
   if (sender && typeof sender.issueCommand === "function") {
-    return sender.issueCommand(command);
+    return sender.issueCommand(command, options);
   }
   if (sender && typeof sender.command === "function" && sender.command.length < 2) {
     return sender.command(command);

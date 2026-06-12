@@ -875,10 +875,10 @@ function drawShrapnel(g, cx, cy, innerRadius, outerRadius, seed, alpha = 0.56) {
 export function _drawRallyPoints(state) {
   if (!state || typeof state.selectedEntities !== "function") return;
   const g = this._feedbackGfx;
-  const color = COLORS.selectOwn;
   for (const e of state.selectedEntities()) {
     if (e.owner !== state.playerId) continue;
     if (!isBuilding(e.kind) || !isProducerBuilding(e.kind)) continue;
+    const color = e.optimisticRally ? 0x7ee7ff : COLORS.selectOwn;
     const plan = Array.isArray(e.rallyPlan) && e.rallyPlan.length > 0
       ? e.rallyPlan
       : e.rally
@@ -891,7 +891,7 @@ export function _drawRallyPoints(state) {
     for (let i = 0; i < plan.length; i += 1) {
       const stage = plan[i];
       const attackMove = stage.kind === "attackMove";
-      g.lineStyle(2, color, i === 0 ? 0.55 : 0.35);
+      g.lineStyle(e.optimisticRally ? 2.5 : 2, color, i === 0 ? 0.55 : 0.35);
       g.moveTo(fromX, fromY);
       g.lineTo(stage.x, stage.y);
       if (i === 0 && !attackMove) {

@@ -187,6 +187,146 @@ function sentSeqs(sent) {
 }
 
 {
+  const controller = new PredictionController({
+    now: () => 1000,
+    sendCommand: () => true,
+    uiConfirmationSnapshots: 4,
+  });
+  controller.applyAuthoritativeSnapshot({
+    tick: 1,
+    entities: [{ id: 20, owner: 1, kind: "barracks", prodQueue: 0 }],
+    netStatus: { lastSimConsumedClientSeq: 0 },
+  });
+  controller.issueCommand({ c: "train", building: 20, unit: "rifleman" });
+  let ui = controller.optimisticUiState();
+  assert(ui.production.length === 1, "train optimism appears immediately");
+  assert(ui.production[0].optimisticQueue === 1, "train optimism exposes predicted queue depth");
+  controller.applyAuthoritativeSnapshot({
+    tick: 3,
+    entities: [{ id: 20, owner: 1, kind: "barracks", prodKind: "rifleman", prodQueue: 1 }],
+    netStatus: { lastSimConsumedClientSeq: 1 },
+  });
+  ui = controller.optimisticUiState();
+  assert(ui.production.length === 0, "authoritative production queue confirms train optimism");
+  assert(controller.debugSummary().uiConfirmedCount === 1, "train confirmation is counted");
+}
+
+{
+  const controller = new PredictionController({
+    now: () => 2000,
+    sendCommand: () => true,
+    uiConfirmationSnapshots: 2,
+  });
+  controller.applyAuthoritativeSnapshot({
+    tick: 1,
+    entities: [{ id: 20, owner: 1, kind: "barracks", prodQueue: 0 }],
+    netStatus: { lastSimConsumedClientSeq: 0 },
+  });
+  controller.issueCommand({ c: "train", building: 20, unit: "rifleman" });
+  controller.applyAuthoritativeSnapshot({
+    tick: 2,
+    entities: [{ id: 20, owner: 1, kind: "barracks", prodQueue: 0 }],
+    netStatus: { lastSimConsumedClientSeq: 1 },
+  });
+  assert(controller.optimisticUiState().production.length === 1, "unconfirmed train optimism survives first snapshot");
+  controller.applyAuthoritativeSnapshot({
+    tick: 3,
+    entities: [{ id: 20, owner: 1, kind: "barracks", prodQueue: 0 }],
+    netStatus: { lastSimConsumedClientSeq: 1 },
+  });
+  assert(controller.optimisticUiState().production.length === 0, "unconfirmed train optimism expires");
+  assert(controller.debugSummary().uiExpiredCount === 1, "train expiration is counted");
+}
+
+{
+  const controller = new PredictionController({
+    now: () => 2500,
+    sendCommand: () => true,
+    uiConfirmationSnapshots: 4,
+  });
+  controller.applyAuthoritativeSnapshot({
+    tick: 1,
+    entities: [{ id: 20, owner: 1, kind: "barracks", prodQueue: 0 }],
+    netStatus: { lastSimConsumedClientSeq: 0 },
+  });
+  controller.issueCommand({ c: "train", building: 20, unit: "rifleman" });
+  controller.issueCommand({ c: "train", building: 20, unit: "rifleman" });
+  let ui = controller.optimisticUiState();
+  assert(ui.production.map((entry) => entry.optimisticQueue).join(",") === "1,2", "repeated train optimism stacks queue depths");
+  controller.applyAuthoritativeSnapshot({
+    tick: 2,
+    entities: [{ id: 20, owner: 1, kind: "barracks", prodKind: "rifleman", prodQueue: 1 }],
+    netStatus: { lastSimConsumedClientSeq: 2 },
+  });
+  ui = controller.optimisticUiState();
+  assert(ui.production.length === 1 && ui.production[0].optimisticQueue === 2, "partial train confirmation leaves later queue optimism pending");
+}
+
+{
+  const controller = new PredictionController({
+    now: () => 3000,
+    sendCommand: () => true,
+    uiConfirmationSnapshots: 4,
+  });
+  controller.applyAuthoritativeSnapshot({
+    tick: 10,
+    entities: [{
+      id: 30,
+      owner: 1,
+      kind: "city_centre",
+      rallyPlan: [{ kind: "move", x: 100, y: 100 }],
+    }],
+    netStatus: { lastSimConsumedClientSeq: 0 },
+  });
+  controller.issueCommand({ c: "setRally", building: 30, x: 160, y: 180, kind: "attackMove", queued: true });
+  let ui = controller.optimisticUiState();
+  assert(ui.rally.length === 1, "rally optimism appears immediately");
+  assert(ui.rally[0].plan.length === 2 && ui.rally[0].plan[1].kind === "attackMove", "queued rally optimism appends to known plan");
+  controller.applyAuthoritativeSnapshot({
+    tick: 14,
+    entities: [{
+      id: 30,
+      owner: 1,
+      kind: "city_centre",
+      rallyPlan: [
+        { kind: "move", x: 100, y: 100 },
+        { kind: "attackMove", x: 160, y: 180 },
+      ],
+    }],
+    netStatus: { lastSimConsumedClientSeq: 1 },
+  });
+  assert(controller.optimisticUiState().rally.length === 0, "coalesced snapshot can confirm rally optimism");
+}
+
+{
+  const state = new GameState({
+    playerId: 1,
+    spectator: false,
+    map: { width: 8, height: 8, tileSize: 32, terrain: new Array(64).fill(0), resources: [] },
+    players: [{ id: 1, name: "A", color: "#f00", startTileX: 1, startTileY: 1 }],
+  });
+  state.applySnapshot({
+    tick: 1,
+    steel: 0,
+    oil: 0,
+    supplyUsed: 1,
+    supplyCap: 10,
+    entities: [{ id: 30, owner: 1, kind: "city_centre", x: 64, y: 64, hp: 500, maxHp: 500 }],
+    events: [],
+  });
+  state.setSelection([30]);
+  state.setOptimisticCommandState({
+    production: [{ building: 30, unit: "worker", optimisticQueue: 1 }],
+    rally: [{ building: 30, plan: [{ kind: "move", x: 220, y: 240 }] }],
+  });
+  const selected = state.selectedEntities()[0];
+  assert(selected.optimisticProduction === true && selected.prodQueue === 1, "selected building exposes optimistic production");
+  assert(selected.optimisticRally === true && selected.rallyPlan[0].x === 220, "selected building exposes optimistic rally plan");
+  const rendered = state.entitiesInterpolated(1).find((e) => e.id === 30);
+  assert(rendered.optimisticProduction === true, "rendered building exposes optimistic production");
+}
+
+{
   const files = [
     ["client/src/input/commands.js", "viewport right-click and hotkeys"],
     ["client/src/input/placement.js", "build placement"],
