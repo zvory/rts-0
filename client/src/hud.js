@@ -170,6 +170,10 @@ export class HUD {
     this._controlGroupSig = null;
   }
 
+  _issueCommand(command) {
+    return issueGameplayCommand(this.commandIssuer, command);
+  }
+
   // --- Resource / supply bar -------------------------------------------------
 
   /** Mirror `state.resources` into the top bar, or all players' resources in replay mode. */
@@ -545,7 +549,7 @@ export class HUD {
         this.state.beginPlacement(intent.building);
         return;
       case "stop":
-        this.commandIssuer.issueCommand(cmd.stop(intent.unitIds || []));
+        this._issueCommand(cmd.stop(intent.unitIds || []));
         this.state.endCommandTarget();
         return;
       case "train":
@@ -561,7 +565,7 @@ export class HUD {
         this._dispatchAbilityIntent(intent, ev);
         return;
       case "setAutocast":
-        this.commandIssuer.issueCommand(cmd.setAutocast(intent.ability, intent.unitIds || [], !!intent.enabled));
+        this._issueCommand(cmd.setAutocast(intent.ability, intent.unitIds || [], !!intent.enabled));
         this.state.endCommandTarget();
         return;
       case "playNotEnough":
@@ -576,7 +580,7 @@ export class HUD {
     if (intent.targetMode === "worldPoint") {
       this.state.beginCommandTarget({ kind: "ability", ability: intent.ability });
     } else {
-      this.commandIssuer.issueCommand(cmd.useAbility(
+      this._issueCommand(cmd.useAbility(
         intent.ability,
         intent.readyIds || [],
         null,
@@ -809,7 +813,7 @@ export class HUD {
         enabled: unitIds.length > 0,
         cls: "",
         onClick: () => {
-          this.commandIssuer.issueCommand(cmd.stop(unitIds));
+          this._issueCommand(cmd.stop(unitIds));
           this.state.endCommandTarget();
         },
       }));
@@ -855,7 +859,7 @@ export class HUD {
         enabled: unitIds.length > 0,
         cls: "",
         onClick: () => {
-          this.commandIssuer.issueCommand(cmd.stop(unitIds));
+          this._issueCommand(cmd.stop(unitIds));
           this.state.endCommandTarget();
         },
       });
@@ -896,7 +900,7 @@ export class HUD {
           onContextMenu: definition.ability === ABILITY.MORTAR_FIRE
             ? (ev) => {
                 ev.preventDefault();
-                this.commandIssuer.issueCommand(cmd.setAutocast(
+                this._issueCommand(cmd.setAutocast(
                   definition.ability,
                   affordance.carrierIds,
                   false,
@@ -908,7 +912,7 @@ export class HUD {
             if (definition.targetMode === "worldPoint") {
               this.state.beginCommandTarget({ kind: "ability", ability: definition.ability });
             } else {
-              this.commandIssuer.issueCommand(cmd.useAbility(
+              this._issueCommand(cmd.useAbility(
                 definition.ability,
                 affordance.readyIds,
                 null,
@@ -1198,14 +1202,14 @@ export class HUD {
   _issueTrain(unit) {
     const building = this._nextProducerBuildingForUnit(unit);
     if (!building) return;
-    this.commandIssuer.issueCommand(cmd.train(building.id, unit));
+    this._issueCommand(cmd.train(building.id, unit));
   }
 
   /** Cancel one production item from the next selected producer in reverse order. */
   _issueCancelProduction(kind) {
     const building = this._previousProducingBuildingForKind(kind);
     if (!building) return;
-    this.commandIssuer.issueCommand(cmd.cancel(building.id));
+    this._issueCommand(cmd.cancel(building.id));
   }
 
   _issueResearch(upgrade) {
@@ -1215,7 +1219,7 @@ export class HUD {
       (e) => this._isOwn(e) && e.kind === def.researchedAt && e.buildProgress == null,
     );
     if (!building) return;
-    this.commandIssuer.issueCommand(cmd.research(building.id, upgrade));
+    this._issueCommand(cmd.research(building.id, upgrade));
   }
 
   // --- Shared helpers --------------------------------------------------------
@@ -1520,4 +1524,14 @@ export class HUD {
     return this._resourceIcons?.[kind] ||
       `<span class="res-icon ${kind}">${RESOURCE_ICON_FALLBACKS[kind] || ""}</span>`;
   }
+}
+
+function issueGameplayCommand(sender, command) {
+  if (sender && typeof sender.issueCommand === "function") {
+    return sender.issueCommand(command);
+  }
+  if (sender && typeof sender.command === "function" && sender.command.length < 2) {
+    return sender.command(command);
+  }
+  return false;
 }

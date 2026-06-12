@@ -25,7 +25,7 @@ export function _onRightClick(p, ev = {}) {
     if (producers.length > 0) {
       const world = this._worldAt(p.x, p.y);
       for (const building of producers) {
-        this.commandIssuer.issueCommand(cmd.setRally(building, world.x, world.y, queued, ORDER_STAGE.MOVE));
+        this._issueCommand(cmd.setRally(building, world.x, world.y, queued, ORDER_STAGE.MOVE));
       }
       this.state.addCommandFeedback("move", world.x, world.y, queued);
     }
@@ -38,7 +38,7 @@ export function _onRightClick(p, ev = {}) {
   if (workers.length > 0) {
     const resource = this._resourceAtWorld(world.x, world.y);
     if (resource && resource.remaining !== 0) {
-      this.commandIssuer.issueCommand(cmd.gather(workers, resource.id, queued));
+      this._issueCommand(cmd.gather(workers, resource.id, queued));
       this.state.addCommandFeedback("move", world.x, world.y, queued);
       return;
     }
@@ -48,28 +48,28 @@ export function _onRightClick(p, ev = {}) {
   if (target && target.owner === me && _isOwnIncompleteBuilding(target)) {
     const resume = _resumeConstructionIntent(target, this.state.map);
     if (resume && workers.length > 0) {
-      this.commandIssuer.issueCommand(cmd.build(workers, resume.building, resume.tileX, resume.tileY, queued));
+      this._issueCommand(cmd.build(workers, resume.building, resume.tileX, resume.tileY, queued));
       this.state.addCommandFeedback("move", target.x, target.y, queued);
       return;
     }
   }
   if (target && target.owner !== me && target.owner !== 0 && !isResource(target.kind)) {
     // Enemy entity -> attack.
-    this.commandIssuer.issueCommand(cmd.attack(ownUnits, target.id, queued));
+    this._issueCommand(cmd.attack(ownUnits, target.id, queued));
     this.state.addCommandFeedback("attack", target.x, target.y, queued);
     return;
   }
   if (target && isResource(target.kind) && target.remaining !== 0) {
     // Resource node -> gather, but only with the workers in the selection.
     if (workers.length > 0) {
-      this.commandIssuer.issueCommand(cmd.gather(workers, target.id, queued));
+      this._issueCommand(cmd.gather(workers, target.id, queued));
       this.state.addCommandFeedback("move", world.x, world.y, queued);
       return;
     }
     // Selection has no workers: fall through to a move onto the node's position.
   }
   // Default -> move to the world point.
-  this.commandIssuer.issueCommand(cmd.move(ownUnits, world.x, world.y, queued));
+  this._issueCommand(cmd.move(ownUnits, world.x, world.y, queued));
   this.state.addCommandFeedback("move", world.x, world.y, queued);
 }
 
@@ -83,7 +83,7 @@ export function _issueTargetedCommand(p, ev = {}) {
     if (this.state.commandTarget === "move" || this.state.commandTarget === "attack") {
       const kind = this.state.commandTarget === "attack" ? ORDER_STAGE.ATTACK_MOVE : ORDER_STAGE.MOVE;
       for (const building of producers) {
-        this.commandIssuer.issueCommand(cmd.setRally(building, world.x, world.y, queued, kind));
+        this._issueCommand(cmd.setRally(building, world.x, world.y, queued, kind));
       }
       this.state.addCommandFeedback(kind === ORDER_STAGE.ATTACK_MOVE ? "attack" : "move", world.x, world.y, queued);
     }
@@ -93,7 +93,7 @@ export function _issueTargetedCommand(p, ev = {}) {
     const atGuns = this._selectedOwnAtGunIds();
     if (atGuns.length > 0) {
       const queued = !!ev.shiftKey;
-      this.commandIssuer.issueCommand(cmd.setupAtGuns(atGuns, world.x, world.y, queued));
+      this._issueCommand(cmd.setupAtGuns(atGuns, world.x, world.y, queued));
       this.state.addCommandFeedback("move", world.x, world.y, queued);
     }
     return;
@@ -112,7 +112,7 @@ export function _issueTargetedCommand(p, ev = {}) {
     const command = ability === ABILITY.POINT_FIRE
       ? cmd.pointFire(units, world.x, world.y, !!ev.shiftKey)
       : cmd.useAbility(ability, units, world.x, world.y, !!ev.shiftKey);
-    this.commandIssuer.issueCommand(command);
+    this._issueCommand(command);
     this.state.addCommandFeedback(
       ability === ABILITY.MORTAR_FIRE ? "mortar" : ability === ABILITY.POINT_FIRE ? "artillery" : "attack",
       world.x,
@@ -123,7 +123,7 @@ export function _issueTargetedCommand(p, ev = {}) {
     return;
   }
   if (this.state.commandTarget === "move") {
-    this.commandIssuer.issueCommand(cmd.move(ownUnits, world.x, world.y, !!ev.shiftKey));
+    this._issueCommand(cmd.move(ownUnits, world.x, world.y, !!ev.shiftKey));
     this.state.addCommandFeedback("move", world.x, world.y, !!ev.shiftKey);
     return;
   }
@@ -131,12 +131,12 @@ export function _issueTargetedCommand(p, ev = {}) {
   const target = this._entityAtWorld(world.x, world.y, /*ownPreferred=*/ false);
   const me = this.state.playerId;
   if (target && target.owner !== me && target.owner !== 0 && !isResource(target.kind)) {
-    this.commandIssuer.issueCommand(cmd.attack(ownUnits, target.id, !!ev.shiftKey));
+    this._issueCommand(cmd.attack(ownUnits, target.id, !!ev.shiftKey));
     this.state.addCommandFeedback("attack", target.x, target.y, !!ev.shiftKey);
     return;
   }
 
-  this.commandIssuer.issueCommand(cmd.attackMove(ownUnits, world.x, world.y, !!ev.shiftKey));
+  this._issueCommand(cmd.attackMove(ownUnits, world.x, world.y, !!ev.shiftKey));
   this.state.addCommandFeedback("attack", world.x, world.y, !!ev.shiftKey);
 }
 
@@ -361,7 +361,7 @@ export function _quickCastCommandTarget(ev = {}) {
 export function _issueStop() {
   const ownUnits = this._selectedOwnUnitIds();
   if (ownUnits.length === 0) return;
-  this.commandIssuer.issueCommand(cmd.stop(ownUnits));
+  this._issueCommand(cmd.stop(ownUnits));
 }
 
 export function _cancel() {

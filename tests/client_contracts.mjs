@@ -2498,7 +2498,7 @@ function fakeAudioContext() {
     selectedEntities: () => selectedProductionBuildings,
   };
   hud.commandIssuer = {
-    issueCommand: (command) => trained.push(command),
+    command: (command) => trained.push(command),
   };
   hud._trainRoundRobin = new Map();
   hud._cancelRoundRobin = new Map();
@@ -3826,6 +3826,33 @@ function fakeAudioContext() {
   };
   placementBlurInput._handleBlur();
   assert(blurPlacementEnded === 1 && placementBlurInput.state.placement === null, "window blur clears build placement");
+
+  const placementConfirmInput = Object.create(Input.prototype);
+  const placementCommands = [];
+  let confirmedPlacementEnded = 0;
+  placementConfirmInput.commandIssuer = {
+    command(command) {
+      placementCommands.push(command);
+    },
+  };
+  placementConfirmInput.state = {
+    placement: { building: KIND.DEPOT, tileX: 4, tileY: 5, valid: true },
+    endPlacement() {
+      confirmedPlacementEnded += 1;
+      this.placement = null;
+    },
+  };
+  placementConfirmInput._selectedWorkerIds = () => [77];
+  placementConfirmInput._confirmPlacement();
+  assert(
+    placementCommands.length === 1 &&
+      placementCommands[0].c === "build" &&
+      placementCommands[0].building === KIND.DEPOT &&
+      placementCommands[0].tileX === 4 &&
+      placementCommands[0].tileY === 5,
+    "build placement confirm should send through a legacy one-argument command sender",
+  );
+  assert(confirmedPlacementEnded === 1, "build placement confirm exits placement after sending");
 
   const artilleryCommands = [];
   const artilleryFeedback = [];
