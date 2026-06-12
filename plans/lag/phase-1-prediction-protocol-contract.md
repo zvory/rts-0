@@ -1,5 +1,9 @@
 # Phase 1 - Prediction Protocol Contract
 
+Status: Done ahead of harness backfill. The protocol contract exists, but Phase 2.5 must add
+artifact-backed scenarios that prove command sequencing and sim-consumption acknowledgements are
+legible through the real remote/client lanes.
+
 ## Objective
 
 Add the wire-level contract needed for client prediction and server reconciliation. This phase

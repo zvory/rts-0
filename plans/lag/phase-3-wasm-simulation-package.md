@@ -1,11 +1,14 @@
 # Phase 3 - WASM Simulation Package
 
-Status: Done.
+Status: Done ahead of harness backfill.
 
 Implemented as `server/crates/sim-wasm`, a `wasm-bindgen` browser facade over a narrow
 owner-safe prediction model. The crate depends only on `rts-sim`, `rts-rules`, `rts-protocol`,
 `rts-contract`, and serialization/binding support; the boundary checker rejects server, AI, Tokio,
 Axum, and SQL dependencies.
+
+Phase 3.5 must still register this predictor as the tri-state local lane and convert the current
+smoke/parity checks into artifact-backed scenario coverage.
 
 ## Objective
 

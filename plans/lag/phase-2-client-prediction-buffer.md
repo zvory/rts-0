@@ -1,5 +1,8 @@
 # Phase 2 - Client Prediction Buffer and Reconciliation Skeleton
 
+Status: Done ahead of harness backfill. The browser prediction controller exists with focused JS
+coverage, but Phase 2.5 must expose the same lifecycle in scenario artifacts.
+
 ## Objective
 
 Build the browser-side prediction manager without running WASM yet. It should buffer local commands,
