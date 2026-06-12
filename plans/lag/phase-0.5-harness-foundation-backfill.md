@@ -1,5 +1,11 @@
 # Phase 0.5 - Harness Foundation Backfill
 
+Status: Done.
+
+Implemented in `tests/tri_state/` with a Node runner, ES-module scenarios, WebSocket and
+Puppeteer lanes, a Phase 3.5 local-lane unavailable stub, stable artifacts under
+`server/target/tri-state-scenarios/`, and harness documentation in `tests/README.md`.
+
 ## Objective
 
 Build the missing scenario harness foundation around the code that exists today. This phase should
