@@ -409,9 +409,12 @@ export class ClientLane {
 
   async recordCommandRejection(clientSeq, reason) {
     const result = await this.page.evaluate(({ clientSeq, reason }) => {
-      const controller = window.__rts?.match?.prediction;
+      const match = window.__rts?.match;
+      const controller = match?.prediction;
       if (!controller) return { error: "prediction controller unavailable" };
-      return controller.recordCommandRejection(clientSeq, reason);
+      const summary = controller.recordCommandRejection(clientSeq, reason);
+      match.state?.setOptimisticCommandState?.(controller.optimisticUiState());
+      return summary;
     }, { clientSeq, reason });
     if (result?.error) throw new Error(result.error);
     this.artifacts.client({ event: "command.rejection", clientSeq, reason, predictionDebug: result });
@@ -493,6 +496,13 @@ export class ClientLane {
         wasm: match?.predictionAdapter?.diagnostics?.() || null,
         published: window.__rtsPredictionDebug || null,
       };
+    });
+  }
+
+  async optimisticCommandState() {
+    return this.page.evaluate(() => {
+      const match = window.__rts?.match;
+      return match?.prediction?.optimisticUiState?.() || { production: [], rally: [] };
     });
   }
 

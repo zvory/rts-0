@@ -476,6 +476,8 @@ if [ "${SERVER_HEALTHY:-0}" = "1" ]; then
         node "$SCRIPT_DIR/tri_state/run.mjs" --scenario phase-0.5
       CHROME="$CHROME" run_suite "Tri-state scenarios: phase 2.5" \
         node "$SCRIPT_DIR/tri_state/run.mjs" --scenario phase-2.5
+      CHROME="$CHROME" run_suite "Tri-state scenarios: phase 5" \
+        node "$SCRIPT_DIR/tri_state/run.mjs" --scenario phase-5
       if [ -f "$REPO_ROOT/client/vendor/sim-wasm/rts_sim_wasm.js" ] && [ -f "$REPO_ROOT/client/vendor/sim-wasm/rts_sim_wasm_bg.wasm" ]; then
         CHROME="$CHROME" run_suite "Tri-state scenarios: phase 3.5" \
           node "$SCRIPT_DIR/tri_state/run.mjs" --scenario phase-3.5

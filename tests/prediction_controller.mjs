@@ -1,5 +1,9 @@
 import fs from "node:fs";
-import { PredictionController, PREDICTION_STATE } from "../client/src/prediction_controller.js";
+import {
+  COMMAND_PREDICTION_POLICIES,
+  PredictionController,
+  PREDICTION_STATE,
+} from "../client/src/prediction_controller.js";
 import { GameState } from "../client/src/state.js";
 
 function assert(cond, msg) {
@@ -213,6 +217,26 @@ function sentSeqs(sent) {
 
 {
   const controller = new PredictionController({
+    now: () => 1500,
+    sendCommand: () => true,
+    uiConfirmationSnapshots: 4,
+  });
+  controller.applyAuthoritativeSnapshot({
+    tick: 1,
+    entities: [{ id: 20, owner: 1, kind: "barracks", prodKind: "rifleman", prodQueue: 1 }],
+    netStatus: { lastSimConsumedClientSeq: 0 },
+  });
+  controller.issueCommand({ c: "train", building: 20, unit: "machine_gunner" });
+  controller.applyAuthoritativeSnapshot({
+    tick: 2,
+    entities: [{ id: 20, owner: 1, kind: "barracks", prodKind: "rifleman", prodQueue: 2 }],
+    netStatus: { lastSimConsumedClientSeq: 1 },
+  });
+  assert(controller.optimisticUiState().production.length === 1, "different authoritative prodKind does not confirm train optimism");
+}
+
+{
+  const controller = new PredictionController({
     now: () => 2000,
     sendCommand: () => true,
     uiConfirmationSnapshots: 2,
@@ -236,6 +260,23 @@ function sentSeqs(sent) {
   });
   assert(controller.optimisticUiState().production.length === 0, "unconfirmed train optimism expires");
   assert(controller.debugSummary().uiExpiredCount === 1, "train expiration is counted");
+}
+
+{
+  const controller = new PredictionController({
+    now: () => 2250,
+    sendCommand: () => true,
+  });
+  controller.applyAuthoritativeSnapshot({
+    tick: 1,
+    entities: [{ id: 20, owner: 1, kind: "barracks", prodQueue: 0 }],
+    netStatus: { lastSimConsumedClientSeq: 0 },
+  });
+  controller.issueCommand({ c: "train", building: 20, unit: "rifleman" });
+  assert(controller.optimisticUiState().production.length === 1, "train optimism is present before rejection");
+  controller.recordCommandRejection(1, "Not enough steel");
+  assert(controller.optimisticUiState().production.length === 0, "rejection clears matching train optimism");
+  assert(controller.debugSummary().uiRejectedCount === 1, "rejected optimism is counted");
 }
 
 {
@@ -296,6 +337,23 @@ function sentSeqs(sent) {
     netStatus: { lastSimConsumedClientSeq: 1 },
   });
   assert(controller.optimisticUiState().rally.length === 0, "coalesced snapshot can confirm rally optimism");
+}
+
+{
+  const controller = new PredictionController({
+    now: () => 3500,
+    sendCommand: () => true,
+  });
+  controller.applyAuthoritativeSnapshot({
+    tick: 1,
+    entities: [{ id: 10, owner: 1, kind: "worker" }],
+    netStatus: { lastSimConsumedClientSeq: 0 },
+  });
+  controller.issueCommand({ c: "build", units: [10], building: "depot", tileX: 1, tileY: 1 });
+  assert(controller.optimisticUiState().production.length === 0, "build commands remain authoritative-only");
+  assert(COMMAND_PREDICTION_POLICIES.build.uiOptimism === false, "build policy documents no UI optimism");
+  assert(COMMAND_PREDICTION_POLICIES.research.uiOptimism === false, "research policy documents no UI optimism");
+  assert(COMMAND_PREDICTION_POLICIES.useAbility.uiOptimism === false, "ability policy documents no UI optimism");
 }
 
 {
