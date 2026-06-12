@@ -80,7 +80,7 @@ pub const UNITS: &[UnitDef] = &[
             dmg: 4,
             range_tiles: 1,
             cooldown: 24,
-            speed: 1.6,
+            speed: 2.0,
             sight_tiles: 7,
             cost_steel: 50,
             cost_oil: 0,
@@ -466,6 +466,14 @@ mod tests {
 
         assert_eq!(depot_hp, 110);
         assert_eq!(barracks_hp, depot_hp * 3 / 2);
+    }
+
+    #[test]
+    fn workers_move_at_tank_speed() {
+        let worker_speed = unit_def(EntityKind::Worker).expect("worker def").stats.speed;
+        let tank_speed = unit_def(EntityKind::Tank).expect("tank def").stats.speed;
+
+        assert_eq!(worker_speed, tank_speed);
     }
 
     #[test]
