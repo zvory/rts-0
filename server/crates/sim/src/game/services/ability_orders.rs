@@ -161,7 +161,7 @@ pub(crate) fn launch_world_ability(
             if !preserve_active_order {
                 e.clear_active_order();
             }
-            mortar_shells.schedule(events, fog, player, caster, from_x, from_y, x, y, tick);
+            mortar_shells.schedule(events, fog, player, caster, from_x, from_y, x, y, tick, false);
             true
         }
         AbilityKind::Smoke => {

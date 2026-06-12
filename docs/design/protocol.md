@@ -434,13 +434,15 @@ that fires from fog can be rendered briefly as a semi-transparent, non-interacti
 the fog overlay; `toPos` lets tracers draw even when the hit target is no longer in the snapshot.
 Smoke launch events are owner-visible local feedback for the scout-car canister animation; the
 authoritative smoke cloud appears later in `smokes` after the reported launch delay. Mortar launch
-events are sent to the firing player and to other recipients that currently see the mortar, with
-shooter id, shell origin, impact point, radius, and delay so the client can draw launch dust,
-recoil, the projectile, and the warning marker until detonation. Mortar impact events are sent to
-the firing player, to recipients with current visibility at the impact point, and to players whose
-entities were damaged by the shell. A damaged victim owner receives `from` + `reveal` so the
-attacking mortar can be shown briefly above fog after indirect fire lands. Enemy players do not
-receive hidden mortar launch data or hidden mortar impact markers unless their entities were hit.
+events are always sent to the firing player, with shooter id, shell origin, impact point, radius,
+and delay so the client can draw launch dust, recoil, the projectile, and the warning marker until
+detonation. Autocast mortar launch events are also sent to other recipients that currently see the
+mortar; manual launch events are owner-only so enemy clients do not receive the pre-impact warning
+marker. Mortar impact events are sent to the firing player, to recipients with current visibility
+at the impact point, and to players whose entities were damaged by the shell. A damaged victim
+owner receives `from` + `reveal` so the attacking mortar can be shown briefly above fog after
+indirect fire lands. Enemy players do not receive hidden mortar launch data or hidden mortar impact
+markers unless their entities were hit.
 Artillery target events are sent only to the firing player so enemies never receive pre-impact
 markers, even if they have vision of the gun. The `from` id lets the firing client recoil the
 specific gun and draw launch dust. Other players receive a visual-only `attack` event with a

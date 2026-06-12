@@ -313,7 +313,14 @@ export class GameState {
     this.pendingMortarTargets = this.pendingMortarTargets.filter(
       (p) => Math.hypot(p.x - ev.toX, p.y - ev.toY) > 2,
     );
-    this.mortarLaunches.push({ x: ev.fromX, y: ev.fromY, createdAt: now });
+    this.mortarLaunches.push({
+      x: ev.fromX,
+      y: ev.fromY,
+      toX: ev.toX,
+      toY: ev.toY,
+      seed,
+      createdAt: now,
+    });
     this.mortarShells.push({
       fromX: ev.fromX,
       fromY: ev.fromY,
