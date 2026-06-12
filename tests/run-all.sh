@@ -413,6 +413,12 @@ run_rust_suites_bg() {
 
 run_suite_bg "JS protocol contracts" \
   node "$SCRIPT_DIR/protocol_parity.mjs"
+run_suite_bg "JS client contracts" \
+  node "$SCRIPT_DIR/client_contracts.mjs"
+run_suite_bg "JS prediction controller" \
+  node "$SCRIPT_DIR/prediction_controller.mjs"
+run_suite_bg "JS minimap input contracts" \
+  node "$SCRIPT_DIR/minimap_input_contracts.mjs"
 run_suite_bg "JS HUD command card" \
   node "$SCRIPT_DIR/hud_command_card.mjs"
 

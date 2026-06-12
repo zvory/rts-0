@@ -6,6 +6,7 @@
 // (Renderer, Input, HUD, Minimap, Lobby) are not instantiated here.
 
 import { Net } from "../client/src/net.js";
+import { PredictionController, PREDICTION_STATE } from "../client/src/prediction_controller.js";
 import { GameState } from "../client/src/state.js";
 import { Camera } from "../client/src/camera.js";
 import { Fog } from "../client/src/fog.js";
@@ -1964,12 +1965,9 @@ function fakeAudioContext() {
       sent.push(JSON.parse(json));
     },
   };
-  net.command(cmd.stop([1]));
-  net.command(cmd.stop([2]));
-  assert(sent[0].clientSeq === 1 && sent[1].clientSeq === 2, "Net.command allocates increasing clientSeq values");
-  net._onMessage({ data: JSON.stringify({ t: "start", playerId: 1, spectator: false }) });
-  net.command(cmd.stop([3]));
-  assert(sent[2].clientSeq === 1, "Net.command resets clientSeq on match start");
+  assertThrows(() => net.command(cmd.stop([1])), "Net.command requires controller-provided clientSeq");
+  net.command(cmd.stop([1]), 7);
+  assert(sent[0].clientSeq === 7, "Net.command sends the provided clientSeq");
   assert(!("replayOk" in msg.join("A", "main")), "join builder omits replayOk by default");
   assert(
     msg.join("A", "main", false, true).replayOk === true,
@@ -1992,6 +1990,58 @@ function fakeAudioContext() {
     msg.replayVisionPlayers([1, 2]).vision.playerIds.join(",") === "1,2",
     "replay subset vision builder payload",
   );
+}
+
+// ---------------------------------------------------------------------------
+// PredictionController
+// ---------------------------------------------------------------------------
+{
+  let clock = 100;
+  const sent = [];
+  const prediction = new PredictionController({
+    now: () => clock,
+    commandTimeoutMs: 50,
+    sendCommand(command, clientSeq) {
+      sent.push({ command, clientSeq });
+      return true;
+    },
+  });
+  assert(prediction.debugSummary().mode === PREDICTION_STATE.TRACKING, "PredictionController starts tracking");
+  prediction.issueCommand(cmd.stop([1]));
+  prediction.issueCommand(cmd.stop([2]));
+  prediction.issueCommand(cmd.stop([3]));
+  assert(sent.map((entry) => entry.clientSeq).join(",") === "1,2,3", "PredictionController allocates sequences");
+  prediction.applyAuthoritativeSnapshot({
+    tick: 10,
+    netStatus: { lastSimConsumedClientSeq: 1, lastSimConsumedClientTick: 9 },
+  });
+  assert(prediction.pendingCommandCount === 2, "PredictionController drops acknowledged commands");
+  assert(prediction.debugSummary().pendingClientSeqs.join(",") === "2,3", "ack 1 leaves 2 and 3 pending");
+  prediction.applyAuthoritativeSnapshot({ tick: 10, netStatus: { lastSimConsumedClientSeq: 1 } });
+  assert(prediction.debugSummary().duplicateSnapshotCount === 1, "duplicate snapshots are tracked");
+  prediction.applyAuthoritativeSnapshot({ tick: 12, netStatus: { lastSimConsumedClientSeq: 1 } });
+  assert(prediction.debugSummary().skippedSnapshotCount === 1, "skipped authoritative ticks are tolerated");
+  prediction.applyAuthoritativeSnapshot({ tick: 11, netStatus: { lastSimConsumedClientSeq: 3 } });
+  assert(prediction.pendingCommandCount === 2, "stale snapshots do not ack commands");
+  assert(prediction.debugSummary().staleSnapshotCount === 1, "stale snapshot is counted");
+  prediction.issueCommand(cmd.stop([4]));
+  prediction.issueCommand(cmd.stop([5]));
+  prediction.applyAuthoritativeSnapshot({ tick: 13, netStatus: { lastSimConsumedClientSeq: 3 } });
+  assert(prediction.debugSummary().pendingClientSeqs.join(",") === "4,5", "ack 3 drops older commands");
+  prediction.recordSocketReceipt(4, { serverTick: 13 });
+  assert(prediction.pendingCommandCount === 2, "socket receipt does not reconcile command 4");
+  prediction.recordCommandRejection(5, "invalid target");
+  assert(prediction.pendingCommandCount === 2, "command rejection notice alone does not consume sim ack");
+  clock = 200;
+  assert(prediction.expireTimedOutCommands() === 2, "timed out pending commands are marked");
+  prediction.applyAuthoritativeSnapshot({ tick: 14, netStatus: { lastSimConsumedClientSeq: 5 } });
+  assert(prediction.pendingCommandCount === 0, "later sim ack clears timed-out/rejected pending commands");
+  prediction.beginResync({ dx: 3 });
+  assert(prediction.debugSummary().mode === PREDICTION_STATE.RESYNCING, "resync state is exposed");
+  prediction.finishResync();
+  assert(prediction.debugSummary().mode === PREDICTION_STATE.TRACKING, "resync returns to tracking");
+  prediction.reset();
+  assert(prediction.debugSummary().nextClientSeq === 1, "PredictionController reset restarts sequence ids");
 }
 
 // ---------------------------------------------------------------------------
@@ -2309,8 +2359,8 @@ function fakeAudioContext() {
     playerId,
     selectedEntities: () => selectedProductionBuildings,
   };
-  hud.net = {
-    command: (command) => trained.push(command),
+  hud.commandIssuer = {
+    issueCommand: (command) => trained.push(command),
   };
   hud._trainRoundRobin = new Map();
   hud._cancelRoundRobin = new Map();
@@ -2444,7 +2494,7 @@ function fakeAudioContext() {
         this.commandTarget = null;
       },
     };
-    researchHud.net = { command: (command) => sent.push(command) };
+    researchHud.commandIssuer = { issueCommand: (command) => sent.push(command) };
     researchHud._cardSig = null;
     researchHud._resourceIcons = {};
 
@@ -2488,7 +2538,7 @@ function fakeAudioContext() {
         this.commandTarget = null;
       },
     };
-    mortarHud.net = { command: (command) => sent.push(command) };
+    mortarHud.commandIssuer = { issueCommand: (command) => sent.push(command) };
     mortarHud.audio = null;
     mortarHud._cardSig = null;
     mortarHud.elCommand = fakeElement("div");
@@ -2547,7 +2597,7 @@ function fakeAudioContext() {
       selectedEntities: () => [selectedFactory],
       entitiesInterpolated: () => [selectedFactory],
     };
-    factoryHud.net = { command: (command) => sent.push(command) };
+    factoryHud.commandIssuer = { issueCommand: (command) => sent.push(command) };
     factoryHud._cardSig = null;
     factoryHud._trainRoundRobin = new Map();
     factoryHud._cancelRoundRobin = new Map();
@@ -2584,7 +2634,7 @@ function fakeAudioContext() {
       selectedEntities: () => [selectedGunWorks],
       entitiesInterpolated: () => [selectedGunWorks],
     };
-    gunWorksHud.net = { command: (command) => sent.push(command) };
+    gunWorksHud.commandIssuer = { issueCommand: (command) => sent.push(command) };
     gunWorksHud._cardSig = null;
     gunWorksHud._trainRoundRobin = new Map();
     gunWorksHud._cancelRoundRobin = new Map();
@@ -2616,7 +2666,7 @@ function fakeAudioContext() {
       selectedEntities: () => [selectedResearchComplex],
       entitiesInterpolated: () => [selectedResearchComplex],
     };
-    rdHud.net = { command: (command) => sent.push(command) };
+    rdHud.commandIssuer = { issueCommand: (command) => sent.push(command) };
     rdHud._cardSig = null;
     rdHud._trainRoundRobin = new Map();
     rdHud._cancelRoundRobin = new Map();
@@ -2655,7 +2705,7 @@ function fakeAudioContext() {
         placements += 1;
       },
     };
-    shortResourceHud.net = { command: (command) => sent.push(command) };
+    shortResourceHud.commandIssuer = { issueCommand: (command) => sent.push(command) };
     shortResourceHud.audio = {
       play(id) {
         playedNotices.push(id);
@@ -2719,7 +2769,7 @@ function fakeAudioContext() {
         this.commandTarget = null;
       },
     };
-    atGunHud.net = { command: (command) => sent.push(command) };
+    atGunHud.commandIssuer = { issueCommand: (command) => sent.push(command) };
     atGunHud._cardSig = null;
 
     const atGunCard = fakeElement("div");
@@ -2737,7 +2787,7 @@ function fakeAudioContext() {
       selectedEntities: () => [selectedAtGun, selectedArtillery],
       addCommandFeedback() {},
     };
-    setupInput.net = { command: (command) => setupCommands.push(command) };
+    setupInput.commandIssuer = { issueCommand: (command) => setupCommands.push(command) };
     setupInput._worldAt = (x, y) => ({ x, y });
     setupInput._selectedOwnUnitIds = () => [selectedAtGun.id, selectedArtillery.id];
     setupInput._issueTargetedCommand({ x: 160, y: 192 }, { shiftKey: true });
@@ -3165,13 +3215,14 @@ function fakeAudioContext() {
     selectedEntities: () => [overlappingWorker],
     addCommandFeedback() {},
   };
-  input.net = { sent: [], command(command) { this.sent.push(command); } };
+  const rightClickCommands = [];
+  input.commandIssuer = { issueCommand(command) { rightClickCommands.push(command); } };
   input._worldAt = (x, y) => ({ x, y });
   input._onRightClick({ x: 100, y: 100 });
   assert(
-    input.net.sent.length === 1 &&
-      input.net.sent[0].c === "gather" &&
-      input.net.sent[0].node === overlappingSteel.id,
+    rightClickCommands.length === 1 &&
+      rightClickCommands[0].c === "gather" &&
+      rightClickCommands[0].node === overlappingSteel.id,
     "worker right-click should prioritize an overlapped resource patch over the worker body",
   );
 
@@ -3183,23 +3234,23 @@ function fakeAudioContext() {
     selectedEntities: () => [moveUnit],
     addCommandFeedback() {},
   };
-  input.net = { sent: [], command(command) { this.sent.push(command); } };
+  rightClickCommands.length = 0;
   input._onRightClick({ x: 180, y: 180 }, { shiftKey: true });
   assert(
-    input.net.sent.length === 1 &&
-      input.net.sent[0].c === "move" &&
-      input.net.sent[0].queued === true,
+    rightClickCommands.length === 1 &&
+      rightClickCommands[0].c === "move" &&
+      rightClickCommands[0].queued === true,
     "Shift terrain right-click should send queued move",
   );
 
   const enemyUnit = { id: 41, owner: 2, kind: KIND.RIFLEMAN, x: 180, y: 180 };
   input.state.entitiesInterpolated = () => [moveUnit, enemyUnit];
-  input.net.sent = [];
+  rightClickCommands.length = 0;
   input._onRightClick({ x: 180, y: 180 }, { shiftKey: true });
   assert(
-    input.net.sent.length === 1 &&
-      input.net.sent[0].c === "attack" &&
-      input.net.sent[0].queued === true,
+    rightClickCommands.length === 1 &&
+      rightClickCommands[0].c === "attack" &&
+      rightClickCommands[0].queued === true,
     "Shift right-click on enemies should send queued attack",
   );
 
@@ -3408,7 +3459,7 @@ function fakeAudioContext() {
   };
   targetedInput.state.commandComposer.arm("attack");
   targetedInput.renderer = { drawSelectionBox() {} };
-  targetedInput.net = { command: (command) => sentCommands.push(command) };
+  targetedInput.commandIssuer = { issueCommand: (command) => sentCommands.push(command) };
   targetedInput._worldAt = (x, y) => ({ x, y });
   targetedInput._entityAtWorld = () => ownBuilding;
   targetedInput._selectedOwnUnitIds = () => [7];
@@ -3655,7 +3706,7 @@ function fakeAudioContext() {
       artilleryFeedback.push({ kind, x, y, queued, radiusTiles });
     },
   };
-  pointFireInput.net = { command: (command) => artilleryCommands.push(command) };
+  pointFireInput.commandIssuer = { issueCommand: (command) => artilleryCommands.push(command) };
   pointFireInput._worldAt = (x, y) => ({ x, y });
   pointFireInput._selectedOwnUnitIds = () => [selectedArtillery.id];
   pointFireInput._issueTargetedCommand({ x: 920, y: 116 }, { shiftKey: true });

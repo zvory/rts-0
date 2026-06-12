@@ -12,7 +12,8 @@ Use when changing rendering, input, HUD, lobby UI, or any module under `client/s
 ## Code map
 - `app-shell`: `main.js`, `app.js`, `match.js`, `match_health.js`, `replay_controls.js`,
   `replay_viewer.js` — app lifecycle, dependency injection, replay shell.
-- `model`: `state.js`, `command_composer.js` — client snapshot state and command-target lifetime.
+- `model`: `state.js`, `command_composer.js`, `prediction_controller.js` — client snapshot state,
+  command-target lifetime, and local command prediction bookkeeping.
 - `transport`: `net.js`, `protocol.js` — WebSocket wrapper and wire mirror.
 - `rules-mirror`: `config.js` — UI/render/fog subset of mirrored balance.
 - `ui`: `hud.js`, `hud_command_card.js`, `lobby.js`, `match_history.js`, `status_badge.js`,

@@ -48,15 +48,15 @@ export class Minimap {
    * @param {import("./state.js").GameState} state shared game state.
    * @param {import("./camera.js").Camera} camera the game camera (for the viewport rect + recenter).
    * @param {import("./fog.js").Fog} fog the local fog overlay grids.
-   * @param {import("./net.js").Net} net network seam for right-click move orders.
+   * @param {{issueCommand(command: object): object|boolean}} commandIssuer gameplay command seam.
    */
-  constructor(canvasEl, state, camera, fog, net, inputRouter = null, options = {}) {
+  constructor(canvasEl, state, camera, fog, commandIssuer, inputRouter = null, options = {}) {
     this.canvas = canvasEl;
     this.ctx = canvasEl.getContext("2d");
     this.state = state;
     this.camera = camera;
     this.fog = fog;
-    this.net = net;
+    this.commandIssuer = commandIssuer;
     this.inputRouter = inputRouter;
     this.commandsEnabled = options.commandsEnabled !== false;
     this._unregisterInputZone = null;
@@ -481,13 +481,13 @@ export class Minimap {
       if (producers.length === 0) return;
       const kind = this.state.commandTarget === "attack" ? ORDER_STAGE.ATTACK_MOVE : ORDER_STAGE.MOVE;
       for (const building of producers) {
-        this.net.command(cmd.setRally(building, wx, wy, queued, kind));
+        this.commandIssuer.issueCommand(cmd.setRally(building, wx, wy, queued, kind));
       }
       this.state.addCommandFeedback(kind === ORDER_STAGE.ATTACK_MOVE ? "attack" : "move", wx, wy, queued);
       return;
     }
     if (this.state.commandTarget === "attack") {
-      this.net.command(cmd.attackMove(unitIds, wx, wy, queued));
+      this.commandIssuer.issueCommand(cmd.attackMove(unitIds, wx, wy, queued));
       this.state.addCommandFeedback("attack", wx, wy, queued);
       return;
     }
@@ -501,11 +501,11 @@ export class Minimap {
             .map((e) => e.id)
         : unitIds;
       if (abilityUnits.length === 0) return;
-      this.net.command(cmd.useAbility(ability, abilityUnits, wx, wy, queued));
+      this.commandIssuer.issueCommand(cmd.useAbility(ability, abilityUnits, wx, wy, queued));
       this.state.addCommandFeedback("attack", wx, wy, queued);
       return;
     }
-    this.net.command(cmd.move(unitIds, wx, wy, queued));
+    this.commandIssuer.issueCommand(cmd.move(unitIds, wx, wy, queued));
     this.state.addCommandFeedback("move", wx, wy, queued);
   }
 }
