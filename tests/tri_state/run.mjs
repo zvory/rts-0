@@ -29,6 +29,19 @@ const SCENARIO_GROUPS = Object.freeze({
     "owner_safe_baseline_no_hidden_enemy_leak",
     "unsupported_command_is_explicit",
   ],
+  "phase-4.5": [
+    "move_predicts_before_authoritative_echo",
+    "move_converges_after_ack_5_ticks",
+    "move_converges_after_ack_10_ticks",
+    "move_converges_after_ack_20_ticks",
+    "coalesced_snapshots_replay_pending",
+    "dropped_snapshot_does_not_stick_pending",
+    "queued_move_order_stages_survive_replay",
+    "stop_corrects_predicted_motion",
+    "hidden_blocker_correction_no_leak",
+    "prediction_disabled_authoritative_only",
+    "spectator_replay_no_prediction",
+  ],
 });
 
 async function main() {
@@ -117,7 +130,7 @@ export async function runScenario(scenario, args = {}) {
 }
 
 async function executeStep(context, step) {
-  const { lanes, artifacts } = context;
+  const { scenario, lanes, artifacts } = context;
   switch (step.op) {
     case "selectOwn":
       await lanes.remote?.selectOwn(step.kind, step.index);
@@ -152,6 +165,9 @@ async function executeStep(context, step) {
         lanes.remote?.waitForSnapshot(step),
         lanes.client?.waitForSnapshot(step),
       ].filter(Boolean));
+      break;
+    case "waitMs":
+      await new Promise((resolve) => setTimeout(resolve, Math.max(0, Number(step.ms) || 0)));
       break;
     case "waitForAck":
       await Promise.all([
@@ -190,6 +206,59 @@ async function executeStep(context, step) {
       });
       artifacts.diff({ assertion: step.op, diff });
       if (!diff.ok) throw new Error(`owned ${step.unit}[${step.index || 0}] position diverged: ${JSON.stringify(diff)}`);
+      break;
+    }
+    case "assertClientAuthoritativeOwnedStable": {
+      requireClientLane(lanes, step.op);
+      const diff = compareSummaryOwnedStable({
+        before: context.captures.get(step.before)?.client,
+        after: context.captures.get(step.after)?.client || context.lastCapture?.client || await lanes.client.summary(),
+        kind: step.unit,
+        index: step.index || 0,
+        tolerancePx: step.tolerancePx,
+      });
+      artifacts.diff({ assertion: step.op, diff, network: scenario.network });
+      if (!diff.ok) throw new Error(`client authoritative ${step.unit} was not stable: ${JSON.stringify(diff)}`);
+      break;
+    }
+    case "assertClientRenderedOwnedAdvanced": {
+      requireClientLane(lanes, step.op);
+      const diff = compareSummaryOwnedAdvanced({
+        before: renderedSummary(context.captures.get(step.before)?.client),
+        after: renderedSummary(context.captures.get(step.after)?.client || context.lastCapture?.client || await lanes.client.summary()),
+        kind: step.unit,
+        index: step.index || 0,
+        minDistancePx: step.minDistancePx,
+      });
+      artifacts.diff({ assertion: step.op, diff, network: scenario.network });
+      if (!diff.ok) throw new Error(`client rendered ${step.unit} did not advance: ${JSON.stringify(diff)}`);
+      break;
+    }
+    case "assertClientRenderedOwnedStable": {
+      requireClientLane(lanes, step.op);
+      const diff = compareSummaryOwnedStable({
+        before: renderedSummary(context.captures.get(step.before)?.client),
+        after: renderedSummary(context.captures.get(step.after)?.client || context.lastCapture?.client || await lanes.client.summary()),
+        kind: step.unit,
+        index: step.index || 0,
+        tolerancePx: step.tolerancePx,
+      });
+      artifacts.diff({ assertion: step.op, diff, network: scenario.network });
+      if (!diff.ok) throw new Error(`client rendered ${step.unit} was not stable: ${JSON.stringify(diff)}`);
+      break;
+    }
+    case "assertClientRenderedConverged": {
+      requireClientLane(lanes, step.op);
+      const summary = context.lastCapture?.client || await lanes.client.summary();
+      const diff = compareOwnedPosition({
+        remote: summary,
+        client: renderedSummary(summary),
+        kind: step.unit,
+        index: step.index || 0,
+        tolerancePx: step.tolerancePx,
+      });
+      artifacts.diff({ assertion: step.op, diff, network: scenario.network });
+      if (!diff.ok) throw new Error(`client rendered ${step.unit} did not converge: ${JSON.stringify(diff)}`);
       break;
     }
     case "assertOrderPlansMatch": {
@@ -270,9 +339,34 @@ async function executeStep(context, step) {
     case "assertLocalCorrectionAtMost": {
       const summary = lanes.local.summary();
       const actual = Number(summary.correctionMagnitude) || 0;
-      const diff = { assertion: step.op, ok: actual <= step.maxPx, actual, expected: `<=${step.maxPx}` };
+      const diff = { assertion: step.op, ok: actual <= step.maxPx, actual, expected: `<=${step.maxPx}`, network: scenario.network };
       artifacts.diff(diff);
       if (!diff.ok) throw new Error(`local correction too large: ${JSON.stringify(diff)}`);
+      break;
+    }
+    case "assertClientCorrectionBudget": {
+      requireClientLane(lanes, step.op);
+      const debug = await lanes.client.predictionDebug();
+      const controller = debug?.controller || {};
+      const diff = {
+        assertion: step.op,
+        ok: (controller.maxCorrectionDistance || 0) <= step.maxPx
+          && (controller.snapCorrectionCount || 0) <= step.maxSnapCorrections
+          && (step.maxCorrectionCount == null || (controller.correctionCount || 0) <= step.maxCorrectionCount),
+        maxCorrectionDistance: round(controller.maxCorrectionDistance || 0),
+        correctionCount: controller.correctionCount || 0,
+        snapCorrectionCount: controller.snapCorrectionCount || 0,
+        pendingCommandCount: controller.pendingCommandCount || 0,
+        latestAckSeq: controller.latestAckSeq || 0,
+        networkProfile: scenario.network?.name || scenario.network?.mode || "direct",
+        expected: {
+          maxPx: step.maxPx,
+          maxSnapCorrections: step.maxSnapCorrections,
+          maxCorrectionCount: step.maxCorrectionCount ?? null,
+        },
+      };
+      artifacts.diff(diff);
+      if (!diff.ok) throw new Error(`client correction budget exceeded: ${JSON.stringify(diff)}`);
       break;
     }
     case "assertLocalBaselineOwnerSafe": {
@@ -299,6 +393,17 @@ async function executeStep(context, step) {
       const diff = comparePredictionSummary(controller, step);
       artifacts.diff({ assertion: step.op, diff, controller });
       if (!diff.ok) throw new Error(`client prediction assertion failed: ${JSON.stringify(diff)}`);
+      break;
+    }
+    case "waitForClientPredictionReady": {
+      requireClientLane(lanes, step.op);
+      const debug = await lanes.client.waitForPredictionReady(step);
+      artifacts.timeline({ event: "client.predictionReady", debug });
+      break;
+    }
+    case "advanceClientPredictionVisual": {
+      requireClientLane(lanes, step.op);
+      artifacts.timeline({ event: "client.advancePredictionVisual", result: await lanes.client.advancePredictionVisual() });
       break;
     }
     case "injectClientSnapshot":
@@ -370,6 +475,34 @@ function compareLocalStable({ before, after, kind, index = 0, tolerancePx = 0.01
   };
 }
 
+function compareSummaryOwnedStable({ before, after, kind, index = 0, tolerancePx = 0.01 }) {
+  const a = ownEntityByKind(before, kind, index);
+  const b = ownEntityByKind(after, kind, index);
+  if (!a || !b) return { ok: false, reason: `missing owned ${kind}[${index}]`, before: a, after: b };
+  const distance = Math.hypot((a.x || 0) - (b.x || 0), (a.y || 0) - (b.y || 0));
+  return {
+    ok: distance <= tolerancePx,
+    distance: round(distance),
+    tolerancePx,
+    before: { id: a.id, x: a.x, y: a.y, tick: before?.tick },
+    after: { id: b.id, x: b.x, y: b.y, tick: after?.tick },
+  };
+}
+
+function compareSummaryOwnedAdvanced({ before, after, kind, index = 0, minDistancePx = 1 }) {
+  const a = ownEntityByKind(before, kind, index);
+  const b = ownEntityByKind(after, kind, index);
+  if (!a || !b) return { ok: false, reason: `missing owned ${kind}[${index}]`, before: a, after: b };
+  const distance = Math.hypot((a.x || 0) - (b.x || 0), (a.y || 0) - (b.y || 0));
+  return {
+    ok: distance >= minDistancePx,
+    distance: round(distance),
+    minDistancePx,
+    before: { id: a.id, x: a.x, y: a.y, tick: before?.tick },
+    after: { id: b.id, x: b.x, y: b.y, tick: after?.tick },
+  };
+}
+
 function compareLocalAdvanced({ before, after, kind, index = 0, minDistancePx = 1 }) {
   const a = ownEntityByKind(before, kind, index);
   const b = ownEntityByKind(after, kind, index);
@@ -382,6 +515,10 @@ function compareLocalAdvanced({ before, after, kind, index = 0, minDistancePx = 
     before: { id: a.id, x: a.x, y: a.y, tick: before?.tick },
     after: { id: b.id, x: b.x, y: b.y, tick: after?.tick },
   };
+}
+
+function renderedSummary(summary) {
+  return summary?.rendered || null;
 }
 
 function compareLocalOrderPlan({ summary, kind, index = 0, expected = [] }) {
@@ -410,6 +547,12 @@ function assertOwnerSafeBaseline(summary) {
 function comparePredictionSummary(controller, step) {
   const checks = [];
   const add = (name, ok, actual, expected) => checks.push({ name, ok, actual, expected });
+  if (step.enabled != null) {
+    add("enabled", controller.enabled === step.enabled, controller.enabled, step.enabled);
+  }
+  if (step.mode != null) {
+    add("mode", controller.mode === step.mode, controller.mode, step.mode);
+  }
   if (step.pendingClientSeqs) {
     add(
       "pendingClientSeqs",
