@@ -27,6 +27,7 @@ export class SimWasmPredictionAdapter {
     if (this.ready || this.loading || this.disabledReason) return this.ready;
     this.loading = true;
     try {
+      await assertModuleAvailable(WASM_GLUE_PATH);
       const module = await this.importModule(WASM_GLUE_PATH);
       await module.default();
       this.module = module;
@@ -126,4 +127,13 @@ export class SimWasmPredictionAdapter {
 function errorMessage(err) {
   if (err instanceof Error) return err.message;
   return String(err);
+}
+
+async function assertModuleAvailable(path) {
+  if (typeof fetch !== "function") return;
+  const response = await fetch(path, { method: "GET", cache: "no-store" });
+  const contentType = response.headers?.get?.("content-type") || "";
+  if (!response.ok || !/\bjavascript\b|\becmascript\b|\btext\/plain\b/.test(contentType)) {
+    throw new Error("prediction WASM glue is not available; run scripts/build-sim-wasm.sh");
+  }
 }

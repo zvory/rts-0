@@ -96,7 +96,9 @@ export class Match {
     this.diagnostics = diagnostics;
     this.hotkeyProfiles = options.hotkeyProfiles || null;
     this.settings = options.settings || null;
+    this.onPredictionEnabledChange = options.onPredictionEnabledChange || null;
     this.replayViewer = !!options.replayViewer;
+    this.predictionStateMismatchLogged = false;
     this.missingCombatSoundKinds = new Set();
     this.activeMachineGunSoundKeys = new Map();
     this.replayControls = null;
@@ -111,7 +113,7 @@ export class Match {
       playerId: payload?.playerId,
     });
     this.prediction = new PredictionController({
-      enabled: !this.replayViewer && !payload?.spectator,
+      enabled: !!options.predictionEnabled && !this.replayViewer && !payload?.spectator,
       predictor: this.predictionAdapter,
       sendCommand: (command, clientSeq) => this.net.command(command, clientSeq),
     });
@@ -326,8 +328,12 @@ export class Match {
   }
 
   applyPredictedSnapshot() {
+    if (!this.predictionStateCompatible()) {
+      this.disablePredictionForStateMismatch();
+      return;
+    }
     if (!this.prediction.enabled || !this.predictionAdapter.ready) {
-      this.state.clearPredictedSnapshot();
+      this.state.clearPredictedSnapshot?.();
       this.publishPredictionDebug();
       return;
     }
@@ -340,6 +346,10 @@ export class Match {
   }
 
   advancePredictionVisual() {
+    if (!this.predictionStateCompatible()) {
+      this.disablePredictionForStateMismatch();
+      return;
+    }
     if (!this.prediction.enabled || !this.predictionAdapter.ready) return;
     const snapshot = this.predictionAdapter.advanceVisual();
     if (snapshot) {
@@ -364,6 +374,35 @@ export class Match {
     };
     if (typeof window !== "undefined") window.__rtsPredictionDebug = debug;
     console.info("[RTS_PREDICTION]", debug);
+  }
+
+  predictionStateCompatible() {
+    return typeof this.state?.setPredictedSnapshot === "function";
+  }
+
+  disablePredictionForStateMismatch() {
+    if (!this.prediction.enabled) return;
+    this.prediction.reset({ enabled: false });
+    if (!this.predictionStateMismatchLogged) {
+      this.predictionStateMismatchLogged = true;
+      this.logPredictionStatus("disabled-state-mismatch");
+    }
+  }
+
+  setPredictionEnabled(enabled) {
+    const allowed = !!enabled && !this.replayViewer && !this.state?.spectator;
+    this.prediction.reset({ enabled: allowed });
+    if (!allowed) {
+      this.state?.clearPredictedSnapshot?.();
+      this.publishPredictionDebug();
+      this.mountSettings({ keepOpen: true });
+      return;
+    }
+    void this.predictionAdapter.init().then((ready) => {
+      if (ready) this.logPredictionStatus("ready");
+      else this.logPredictionStatus("disabled");
+      this.mountSettings({ keepOpen: true });
+    });
   }
 
   applySpectatorUi() {
@@ -602,6 +641,16 @@ export class Match {
         game: {
           kind,
           spectator,
+          prediction: {
+            state: () => ({
+              hidden: spectator || this.replayViewer,
+              enabled: !!this.prediction.enabled,
+              active: !!this.predictionAdapter?.ready,
+              pending: !!this.predictionAdapter?.loading,
+              available: !this.replayViewer && !this.state?.spectator,
+            }),
+            onToggle: () => this.onPredictionEnabledChange?.(!this.prediction.enabled),
+          },
           pointerLock: this.replayViewer ? null : {
             state: () => ({
               hidden: false,

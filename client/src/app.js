@@ -26,6 +26,7 @@ import {
 } from "./bootstrap.js";
 import { Match } from "./match.js";
 import { MatchHistory } from "./match_history.js";
+import { readPredictionEnabled, writePredictionEnabled } from "./prediction_settings.js";
 import { ReplayViewer } from "./replay_viewer.js";
 import { StatusBadge } from "./status_badge.js";
 import {
@@ -108,6 +109,7 @@ export class App {
     this.inReplayPlayback = false;
     this.allowUnloadWithoutWarning = false;
     this.pendingCameraView = null;
+    this.predictionEnabled = readPredictionEnabled();
     this.mountLobbySettings();
   }
 
@@ -267,6 +269,8 @@ export class App {
         initialCamera: carriedCamera,
         hotkeyProfiles: this.hotkeyProfiles,
         settings: this.settings,
+        predictionEnabled: this.predictionEnabled,
+        onPredictionEnabledChange: (enabled) => this.setPredictionEnabled(enabled),
       },
     );
     diagnostics.mark("app.onStart.end");
@@ -437,9 +441,35 @@ export class App {
       tabs: buildSettingsTabs({
         audio: this.audio,
         hotkeyProfiles: this.hotkeyProfiles,
-        game: { kind: "lobby" },
+        game: {
+          kind: "lobby",
+          prediction: {
+            state: () => ({
+              enabled: this.predictionEnabled,
+              active: false,
+              available: true,
+            }),
+            onToggle: () => this.setPredictionEnabled(!this.predictionEnabled),
+          },
+        },
       }),
     });
+  }
+
+  setPredictionEnabled(enabled) {
+    this.predictionEnabled = !!enabled;
+    writePredictionEnabled(this.predictionEnabled);
+    if (this.match && typeof this.match.setPredictionEnabled === "function") {
+      this.match.setPredictionEnabled(this.predictionEnabled);
+    }
+    if (this.settings?.isOpen()) {
+      if (this.match && typeof this.match.mountSettings === "function") {
+        this.match.mountSettings({ keepOpen: true });
+      } else {
+        this.mountLobbySettings();
+        this.settings.open({ focus: false });
+      }
+    }
   }
 
   onBeforeUnload(ev) {

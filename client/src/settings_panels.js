@@ -48,8 +48,38 @@ export function buildGiveUpAction({ visible, onOpen }) {
 
 function renderGamePanel(root, game) {
   root.classList.add("settings-game-panel");
+  if (game?.prediction) renderPredictionControl(root, game.prediction);
   if (game?.pointerLock) renderPointerLockControl(root, game.pointerLock);
   renderContextSummary(root, game);
+}
+
+function renderPredictionControl(root, prediction) {
+  const button = document.createElement("button");
+  button.id = "prediction-toggle";
+  button.type = "button";
+  button.className = "settings-toggle";
+  button.setAttribute("role", "switch");
+  button.addEventListener("click", () => {
+    prediction.onToggle?.();
+    sync();
+  });
+  root.appendChild(button);
+
+  function sync() {
+    const state = prediction.state?.() || {};
+    const enabled = !!state.enabled;
+    button.hidden = !!state.hidden;
+    button.disabled = state.available === false;
+    button.setAttribute("aria-checked", String(enabled));
+    button.textContent = enabled
+      ? (state.pending ? "Movement prediction: on (loading)" : "Movement prediction: on")
+      : "Movement prediction: off";
+    button.title = enabled
+      ? "Predict owned movement locally before authoritative snapshots arrive."
+      : "Use authoritative server snapshots only for owned movement.";
+  }
+  sync();
+  prediction.onMount?.(sync);
 }
 
 function renderPointerLockControl(root, pointerLock) {
