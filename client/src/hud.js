@@ -10,7 +10,7 @@
 // mutates game state directly.
 
 import { cmd } from "./protocol.js";
-import { KIND, STATE, isBuilding } from "./protocol.js";
+import { ABILITY, KIND, STATE, isBuilding } from "./protocol.js";
 import {
   PLAYER_PALETTE,
   STATS,
@@ -23,6 +23,10 @@ const RESOURCE_ICON_FALLBACKS = Object.freeze({
   oil: "⬤",
   supply: "▲",
 });
+const BREAKTHROUGH_VOICE_IDS = Object.freeze([
+  "unit_breakthrough_todes_rit_01",
+  "unit_breakthrough_koste_es_01",
+]);
 
 /** True if `playerId` owns at least one completed entity of `kind` in `entities`. */
 export function playerHasCompletedKind(entities, playerId, kind) {
@@ -586,6 +590,10 @@ export class HUD {
         null,
         !!ev.shiftKey,
       ));
+      if (intent.ability === ABILITY.BREAKTHROUGH && this.audio) {
+        const id = this.audio.pickVariant(BREAKTHROUGH_VOICE_IDS);
+        if (id) this.audio.play(id, { category: "unit_voice", priority: 3 });
+      }
       this.state.endCommandTarget();
     }
   }

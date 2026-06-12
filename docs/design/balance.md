@@ -149,7 +149,7 @@ authoritative `rules::defs` records.
 - **Command Car Breakthrough!** (hotkey `E`): Command Cars have a self-targeted instant area speed
   boost. It affects owned units within 7 tiles of the Command Car, lasts 180 ticks (~6s), has a
   750-tick (~25s) per-caster cooldown, has no resource cost, can be queued, and can be cast while
-  the Command Car is moving. Affected units move at 1.2x speed, or 1.4x speed while inside smoke or
+  the Command Car is moving. Affected units move at 1.4x speed, or 1.8x speed while inside smoke or
   during the 60-tick (~2s) recent-smoke grace window after leaving smoke. Multiple Breakthrough
   effects do not stack; a shorter refresh cannot reduce an active buff. Enemies see the status only
   when the affected unit is otherwise visible through authoritative fog. Fake Army and allied-unit
