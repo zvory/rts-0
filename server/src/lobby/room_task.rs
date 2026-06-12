@@ -2988,13 +2988,7 @@ impl RoomTask {
         if !self.players.contains_key(&player_id) || !matches!(self.phase, Phase::ReplayViewer(_)) {
             return;
         }
-        if matches!(
-            self.mode,
-            RoomMode::Replay { .. } | RoomMode::DevSelfPlay(DevSelfPlayConfig::Replay { .. })
-        ) {
-            return;
-        }
-        self.return_to_lobby();
+        self.on_leave(player_id);
     }
 
     fn return_to_lobby(&mut self) {
@@ -4398,7 +4392,7 @@ mod tests {
     }
 
     #[test]
-    fn replay_viewer_can_return_to_clean_lobby_for_rematch() {
+    fn replay_viewer_return_detaches_only_requesting_viewer() {
         let players = replay_test_players(2);
         let (game, _artifact) = replay_test_artifact(&players, 1);
         let mut task = RoomTask::new(
@@ -4408,7 +4402,40 @@ mod tests {
             false,
             DrainHandle::default(),
         );
-        let mut writer_a = add_test_room_player(&mut task, players[0].id, true);
+        let _writer_a = add_test_room_player(&mut task, players[0].id, true);
+        let writer_b = add_test_room_player(&mut task, players[1].id, true);
+        task.match_player_count = 2;
+        task.match_human_count = 2;
+
+        task.end_match(Some(players[0].id), game.scores(), Some(&game));
+        assert!(matches!(task.phase, Phase::ReplayViewer(_)));
+
+        task.on_return_to_lobby(players[0].id);
+
+        assert!(matches!(task.phase, Phase::ReplayViewer(_)));
+        assert!(!task.players.contains_key(&players[0].id));
+        assert!(task.players.contains_key(&players[1].id));
+        assert_eq!(task.host_id, Some(players[1].id));
+
+        task.on_tick_replay_viewer(TokioInstant::now());
+        assert!(
+            writer_b.snapshots.take().is_some(),
+            "remaining viewers should keep receiving replay snapshots"
+        );
+    }
+
+    #[test]
+    fn replay_viewer_return_resets_room_when_last_viewer_leaves() {
+        let players = replay_test_players(2);
+        let (game, _artifact) = replay_test_artifact(&players, 1);
+        let mut task = RoomTask::new(
+            "post-match-empty-test".to_string(),
+            RoomMode::Normal,
+            None,
+            false,
+            DrainHandle::default(),
+        );
+        let _writer_a = add_test_room_player(&mut task, players[0].id, true);
         let _writer_b = add_test_room_player(&mut task, players[1].id, true);
         task.match_player_count = 2;
         task.match_human_count = 2;
@@ -4416,24 +4443,14 @@ mod tests {
         task.end_match(Some(players[0].id), game.scores(), Some(&game));
         assert!(matches!(task.phase, Phase::ReplayViewer(_)));
 
-        task.players
-            .get(&players[0].id)
-            .unwrap()
-            .msg_tx
-            .try_send_snapshot(replay_transition_test_snapshot(101));
-
         task.on_return_to_lobby(players[0].id);
+        task.on_return_to_lobby(players[1].id);
 
         assert!(matches!(task.phase, Phase::Lobby));
+        assert!(task.players.is_empty());
+        assert_eq!(task.host_id, None);
         assert_eq!(task.match_player_count, 0);
         assert_eq!(task.match_human_count, 0);
-        assert!(task.players.values().all(|player| !player.ready));
-        assert!(writer_a.snapshots.take().is_none());
-        let messages: Vec<_> =
-            std::iter::from_fn(|| writer_a.reliable_rx.try_recv().ok()).collect();
-        assert!(messages
-            .iter()
-            .any(|msg| matches!(msg, ServerMessage::Lobby { can_start, .. } if !can_start)));
     }
 
     #[test]
@@ -4462,7 +4479,7 @@ mod tests {
         task.on_return_to_lobby(99);
 
         assert!(matches!(task.phase, Phase::ReplayViewer(_)));
-        assert!(task.players.contains_key(&99));
+        assert!(!task.players.contains_key(&99));
         assert!(task.players.contains_key(&100));
 
         task.on_tick_replay_viewer(TokioInstant::now());
