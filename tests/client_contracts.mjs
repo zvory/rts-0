@@ -2610,6 +2610,11 @@ function fakeAudioContext() {
       },
     };
   }
+  function renderCommandCard(hud) {
+    if (!hud.elCommand) hud.elCommand = fakeElement("div");
+    hud._renderCommandCard();
+    return hud.elCommand;
+  }
   try {
     globalThis.document = {
       createDocumentFragment() {
@@ -2663,8 +2668,7 @@ function fakeAudioContext() {
     researchHud._cardSig = null;
     researchHud._resourceIcons = {};
 
-    const card = fakeElement("div");
-    researchHud._renderTrainCard(card, selectedTrainingCentre);
+    renderCommandCard(researchHud);
     const researchButton = renderedButtons.find((button) => button.innerHTML.includes("Methamphetamines"));
     assert(researchButton && !researchButton.disabled, "Methamphetamines command-card button renders enabled");
     assert(researchButton.dataset.hotkey === "Q", "Methamphetamines command-card button uses Q as its hotkey");
@@ -2706,15 +2710,14 @@ function fakeAudioContext() {
     mortarHud.commandIssuer = { issueCommand: (command) => sent.push(command) };
     mortarHud.audio = null;
     mortarHud._cardSig = null;
-    mortarHud.elCommand = fakeElement("div");
-    mortarHud._renderUnitCard(mortarHud.elCommand, [selectedMortar]);
+    renderCommandCard(mortarHud);
     const mortarButtonCount = renderedButtons.length;
     assert(
       mortarButtonCount > mortarButtonsBefore,
       "selected Mortar Team should render an ability command button",
     );
     selectedMortar.abilities[0].cooldownLeft = 29;
-    mortarHud._renderUnitCard(mortarHud.elCommand, [selectedMortar]);
+    renderCommandCard(mortarHud);
     assert(
       renderedButtons.length === mortarButtonCount,
       "Mortar Fire cooldown ticks should update in place without rebuilding the command button",
@@ -2767,7 +2770,7 @@ function fakeAudioContext() {
     factoryHud._trainRoundRobin = new Map();
     factoryHud._cancelRoundRobin = new Map();
     factoryHud._resourceIcons = {};
-    factoryHud._renderTrainCard(fakeElement("div"), selectedFactory);
+    renderCommandCard(factoryHud);
     const scoutCarButton = renderedButtons.find((button) => button.innerHTML.includes("Scout Car"));
     const tankButton = renderedButtons.find((button) => button.innerHTML.includes("Tank"));
     const tankResearchButton = renderedButtons.find((button) => button.innerHTML.includes("TK+"));
@@ -2778,7 +2781,7 @@ function fakeAudioContext() {
     renderedButtons.length = 0;
     factoryHud.state.upgrades = [UPGRADE.TANK_UNLOCK];
     factoryHud._cardSig = null;
-    factoryHud._renderTrainCard(fakeElement("div"), selectedFactory);
+    renderCommandCard(factoryHud);
     assert(
       !renderedButtons.some((button) => button.innerHTML.includes("TK+")),
       "completed Tank Production research should disappear from the command card",
@@ -2804,7 +2807,7 @@ function fakeAudioContext() {
     gunWorksHud._trainRoundRobin = new Map();
     gunWorksHud._cancelRoundRobin = new Map();
     gunWorksHud._resourceIcons = {};
-    gunWorksHud._renderTrainCard(fakeElement("div"), selectedGunWorks);
+    renderCommandCard(gunWorksHud);
     const mortarButton = renderedButtons.find((button) => button.innerHTML.includes("Mortar Team"));
     const atGunButton = renderedButtons.find((button) => button.innerHTML.includes("AT Gun"));
     const artilleryButton = renderedButtons.find((button) => button.innerHTML.includes("Artillery"));
@@ -2836,7 +2839,7 @@ function fakeAudioContext() {
     rdHud._trainRoundRobin = new Map();
     rdHud._cancelRoundRobin = new Map();
     rdHud._resourceIcons = {};
-    rdHud._renderTrainCard(fakeElement("div"), selectedResearchComplex);
+    renderCommandCard(rdHud);
     const rdAtResearchButton = renderedButtons.find((button) => button.innerHTML.includes("AT+"));
     const rdArtilleryResearchButton = renderedButtons.find((button) => button.innerHTML.includes("AR+"));
     const rdTankResearchButton = renderedButtons.find((button) => button.innerHTML.includes("TK+"));
@@ -2851,7 +2854,7 @@ function fakeAudioContext() {
     renderedButtons.length = 0;
     rdHud.state.upgrades = [UPGRADE.AT_GUN_UNLOCK];
     rdHud._cardSig = null;
-    rdHud._renderTrainCard(fakeElement("div"), selectedResearchComplex);
+    renderCommandCard(rdHud);
     const unlockedArtilleryResearchButton = renderedButtons.find((button) => button.innerHTML.includes("AR+"));
     assert(unlockedArtilleryResearchButton && !unlockedArtilleryResearchButton.disabled, "Artillery research should enable after AT Gun research");
 
@@ -2879,8 +2882,8 @@ function fakeAudioContext() {
     shortResourceHud._cardSig = null;
     shortResourceHud._resourceIcons = {};
 
-    const buildCard = fakeElement("div");
-    shortResourceHud._renderBuildCard(buildCard);
+    shortResourceHud.state.commandCardMode = "workerBuild";
+    renderCommandCard(shortResourceHud);
     const barracksButton = renderedButtons.find((button) => button.innerHTML.includes("Barracks"));
     const factoryButton = renderedButtons.find((button) => button.innerHTML.includes("Vehicle Works"));
     assert(barracksButton && !barracksButton.disabled, "unlocked unaffordable build button stays clickable");
@@ -2937,8 +2940,7 @@ function fakeAudioContext() {
     atGunHud.commandIssuer = { issueCommand: (command) => sent.push(command) };
     atGunHud._cardSig = null;
 
-    const atGunCard = fakeElement("div");
-    atGunHud._renderUnitCard(atGunCard, [selectedAtGun]);
+    renderCommandCard(atGunHud);
     const setupButton = renderedButtons.find((button) => button.innerHTML.includes("Set Up"));
     const tearDownButton = renderedButtons.find((button) => button.innerHTML.includes("Tear Down"));
     assert(setupButton?.dataset.hotkey, "AT gun Set Up button should keep its command-card hotkey");
@@ -3770,7 +3772,7 @@ function fakeAudioContext() {
         querySelectorAll(selector) {
           assert(selector === "button[data-hotkey]", "command hotkeys should query hotkey buttons");
           return [{
-            dataset: { hotkey: "A" },
+            dataset: { hotkey: "Y" },
             disabled: false,
             click() {
               hotkeyTargetedInput.state.beginCommandTarget("attack", { now: 100 + hotkeyIssues.length * 100 });
@@ -3781,12 +3783,17 @@ function fakeAudioContext() {
     },
   };
   hotkeyTargetedInput._handleKeyDown(keyEvent("KeyA"));
-  hotkeyTargetedInput._handleKeyUp({ code: "KeyA", shiftKey: false, preventDefault() {} });
+  assert(
+    hotkeyTargetedInput.state.commandTarget === null && hotkeyIssues.length === 0,
+    "unbound legacy A key should not arm attack when Attack is rebound",
+  );
+  hotkeyTargetedInput._handleKeyDown(keyEvent("KeyY"));
+  hotkeyTargetedInput._handleKeyUp({ code: "KeyY", shiftKey: false, preventDefault() {} });
   assert(
     hotkeyTargetedInput.state.commandTarget === "attack",
     "plain targeted-order hotkey tap should stay armed after keyup",
   );
-  hotkeyTargetedInput._handleKeyDown(keyEvent("KeyA"));
+  hotkeyTargetedInput._handleKeyDown(keyEvent("KeyY"));
   assert(
     hotkeyIssues.some((entry) => entry.issuedAt === hotkeyTargetedInput.mouse && entry.queued === false),
     "second same targeted-order hotkey should quick-cast at the cursor",
@@ -3796,8 +3803,8 @@ function fakeAudioContext() {
     "unqueued quick-cast should consume the armed targeted order",
   );
 
-  hotkeyTargetedInput._handleKeyDown(keyEvent("KeyA", { shiftKey: true }));
-  hotkeyTargetedInput._handleKeyDown(keyEvent("KeyA", { shiftKey: true }));
+  hotkeyTargetedInput._handleKeyDown(keyEvent("KeyY", { shiftKey: true }));
+  hotkeyTargetedInput._handleKeyDown(keyEvent("KeyY", { shiftKey: true }));
   assert(
     hotkeyIssues.some((entry) => entry.issuedAt === hotkeyTargetedInput.mouse && entry.queued === true),
     "Shift double-tap targeted-order hotkey should quick-cast a queued order at the cursor",
@@ -3806,7 +3813,7 @@ function fakeAudioContext() {
     hotkeyTargetedInput.state.commandTarget === "attack",
     "Shift quick-cast should keep the targeted order armed until Shift is released",
   );
-  hotkeyTargetedInput._handleKeyUp({ code: "KeyA", shiftKey: true, preventDefault() {} });
+  hotkeyTargetedInput._handleKeyUp({ code: "KeyY", shiftKey: true, preventDefault() {} });
   hotkeyTargetedInput._handleKeyUp({ code: "ShiftLeft", preventDefault() {} });
   assert(hotkeyTargetedInput.state.commandTarget === null, "Shift release clears the queued hotkey target");
   globalThis.document = originalDocument;

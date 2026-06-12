@@ -11,9 +11,9 @@
 //   - Build placement mode (started by the HUD via state.beginPlacement): track the
 //     hovered tile, validate the footprint, drive the renderer ghost via
 //     state.updatePlacement, confirm with a valid left-click, cancel with right/Esc.
-//   - Keyboard: command-card grid hotkeys (QWE/ASD/ZXC) activate buttons directly;
-//     production train/cancel buttons honor native key repeat; Esc cancels
-//     placement/targeting; S also falls back to stop when no card button is active.
+//   - Keyboard: rendered command-card hotkeys activate buttons directly; custom
+//     profiles change the key labels and matching. Production train/cancel buttons
+//     honor native key repeat; Esc cancels placement/targeting.
 //     Number keys recall control groups; double-tap jumps to the densest visible
 //     cluster. Alt/Ctrl/Cmd+number replaces a group, and Shift+number adds to it;
 //     on Windows, tabbed browser saves use Alt+number and installed-app saves use Ctrl+number.
@@ -32,8 +32,6 @@ import { isBuilding, isUnit } from "../protocol.js";
 import {
   _activateCommandHotkey,
   _cancel,
-  _enterAttackMove,
-  _issueStop,
   _issueTargetedCommand,
   _nearestOwnCompletedCityCentre,
   _onRightClick,
@@ -974,8 +972,6 @@ Object.assign(Input.prototype, {
   _handleKeyUp,
   _handleBlur,
   _activateCommandHotkey,
-  _enterAttackMove,
-  _issueStop,
   _cancel,
   _handleWheel,
 });
