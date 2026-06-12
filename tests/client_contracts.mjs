@@ -78,6 +78,12 @@ import { DomClickInputZone, MatchInputRouter } from "../client/src/input/router.
 import { _drawUnit, _tankMotionVisual } from "../client/src/renderer/units.js";
 import { _drawAbilityTargetPreview } from "../client/src/renderer/feedback.js";
 import { buildGiveUpAction, buildSettingsTabs } from "../client/src/settings_panels.js";
+import {
+  HOTKEY_PRESET_CLASSIC,
+  HOTKEY_PROFILE_SCHEMA_VERSION,
+  HotkeyProfileService,
+  buildHotkeyCommandCatalog,
+} from "../client/src/hotkey_profiles.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -239,6 +245,8 @@ function fakeHudRootWithoutResourceSpans() {
 function withFakeSettingsDocument(fn) {
   const priorDocument = globalThis.document;
   const priorHTMLElement = globalThis.HTMLElement;
+  const priorWindow = globalThis.window;
+  const windowListeners = {};
   class FakeElement {
     constructor(tagName) {
       this.tagName = String(tagName).toUpperCase();
@@ -246,9 +254,11 @@ function withFakeSettingsDocument(fn) {
       this.type = "";
       this.className = "";
       this.textContent = "";
+      this.innerHTML = "";
       this.hidden = false;
       this.disabled = false;
       this.value = "";
+      this.dataset = {};
       this.children = [];
       this.attributes = new Map();
       this.listeners = {};
@@ -274,6 +284,12 @@ function withFakeSettingsDocument(fn) {
     addEventListener(type, handler) {
       this.listeners[type] = handler;
     }
+    replaceChildren(...children) {
+      this.children = [...children];
+    }
+    click(init = {}) {
+      this.listeners.click?.({ preventDefault() {}, ...init });
+    }
   }
   globalThis.HTMLElement = FakeElement;
   globalThis.document = {
@@ -281,13 +297,24 @@ function withFakeSettingsDocument(fn) {
       return new FakeElement(tagName);
     },
   };
+  globalThis.window = {
+    addEventListener(type, handler) {
+      windowListeners[type] = handler;
+    },
+    removeEventListener(type, handler) {
+      if (windowListeners[type] === handler) delete windowListeners[type];
+    },
+    listeners: windowListeners,
+  };
   try {
-    return fn();
+    return fn(windowListeners);
   } finally {
     if (priorDocument === undefined) delete globalThis.document;
     else globalThis.document = priorDocument;
     if (priorHTMLElement === undefined) delete globalThis.HTMLElement;
     else globalThis.HTMLElement = priorHTMLElement;
+    if (priorWindow === undefined) delete globalThis.window;
+    else globalThis.window = priorWindow;
   }
 }
 
@@ -298,6 +325,32 @@ function findFakeById(root, id) {
     if (found) return found;
   }
   return null;
+}
+
+function findFakes(root, predicate, out = []) {
+  if (predicate(root)) out.push(root);
+  for (const child of root.children || []) findFakes(child, predicate, out);
+  return out;
+}
+
+function memoryStorage(seed = {}) {
+  const data = new Map(Object.entries(seed));
+  return {
+    getItem(key) {
+      return data.has(key) ? data.get(key) : null;
+    },
+    setItem(key, value) {
+      data.set(key, String(value));
+    },
+    data,
+  };
+}
+
+function hotkeyService() {
+  return new HotkeyProfileService({
+    storage: memoryStorage(),
+    catalog: buildHotkeyCommandCatalog(buildCommandCardContextCatalog()),
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -360,6 +413,91 @@ function findFakeById(root, id) {
     assert(toggle, "settings: debug tab renders movement waypoint control with pinned id");
     toggle.listeners.click();
     assert(debugToggled, "settings: debug waypoint control calls injected toggle");
+  });
+
+  withFakeSettingsDocument((windowListeners) => {
+    const hotkeys = hotkeyService();
+    const hotkeyTab = buildSettingsTabs({ hotkeyProfiles: hotkeys }).find((tab) => tab.id === "hotkeys");
+    const root = document.createElement("div");
+    const cleanup = hotkeyTab.render(root, { kind: "match" });
+
+    const preview = findFakeById(root, "hotkey-command-card-preview");
+    assert(preview, "hotkey editor: renders command-card preview");
+    assert(findFakes(preview, (el) => el.tagName === "BUTTON").length > 0,
+      "hotkey editor: preview exposes clickable command buttons");
+
+    const clone = findFakeById(root, "hotkey-clone-profile");
+    clone.listeners.click();
+    const moveButton = findFakes(root, (el) => el.dataset?.commandId === "unit.move")[0];
+    assert(moveButton?.dataset.slotIndex === "0", "hotkey editor: command slot stays fixed before rebind");
+    moveButton.listeners.click({ preventDefault() {} });
+    assert(findFakes(root, (el) => /Press a letter/.test(el.textContent || "")).length > 0,
+      "hotkey editor: clicking a command starts key capture");
+    windowListeners.keydown({
+      key: "1",
+      code: "Digit1",
+      preventDefault() {},
+      stopPropagation() {},
+    });
+    assert(findFakeById(root, "hotkey-save-profile").disabled,
+      "hotkey editor: unsupported keys keep valid save blocked");
+    assert(findFakes(root, (el) => /Use a single A-Z letter/.test(el.textContent || "")).length > 0,
+      "hotkey editor: unsupported key warning is visible");
+
+    moveButton.listeners.click({ preventDefault() {} });
+    windowListeners.keydown({
+      key: "M",
+      code: "KeyM",
+      preventDefault() {},
+      stopPropagation() {},
+    });
+    const reboundMove = findFakes(root, (el) => el.dataset?.commandId === "unit.move")[0];
+    assert(reboundMove?.dataset.hotkey === "M", "hotkey editor: valid rebind updates preview label");
+    assert(reboundMove?.dataset.slotIndex === "0", "hotkey editor: rebind does not move the command slot");
+
+    const save = findFakeById(root, "hotkey-save-profile");
+    assert(!save.disabled, "hotkey editor: valid cloned profile can be saved");
+    save.listeners.click();
+    assert(hotkeys.getActiveProfile().bindings["unit.move"] === "M",
+      "hotkey editor: saved profile applies immediately as the active profile");
+
+    cleanup();
+  });
+
+  withFakeSettingsDocument(() => {
+    const hotkeys = hotkeyService();
+    const hotkeyTab = buildSettingsTabs({ hotkeyProfiles: hotkeys }).find((tab) => tab.id === "hotkeys");
+    const root = document.createElement("div");
+    hotkeyTab.render(root, {});
+    findFakeById(root, "hotkey-new-blank-profile").listeners.click();
+    assert(findFakeById(root, "hotkey-save-profile").disabled,
+      "hotkey editor: blank direct profiles cannot save with unresolved commands");
+    assert(findFakes(root, (el) => /is unbound/.test(el.textContent || "")).length > 0,
+      "hotkey editor: unresolved bindings are displayed");
+  });
+
+  withFakeSettingsDocument(() => {
+    const hotkeys = hotkeyService();
+    const classic = hotkeys.profileById(HOTKEY_PRESET_CLASSIC);
+    hotkeys.customProfiles = [{
+      schemaVersion: HOTKEY_PROFILE_SCHEMA_VERSION,
+      id: "custom.conflict-editor",
+      type: "custom",
+      mode: "direct",
+      name: "Conflict Editor",
+      description: "",
+      basePresetId: HOTKEY_PRESET_CLASSIC,
+      bindings: { ...classic.bindings, "unit.move": "A", "unit.attack": "A" },
+    }];
+    hotkeys.setActiveProfile("custom.conflict-editor");
+
+    const hotkeyTab = buildSettingsTabs({ hotkeyProfiles: hotkeys }).find((tab) => tab.id === "hotkeys");
+    const root = document.createElement("div");
+    hotkeyTab.render(root, {});
+    assert(findFakeById(root, "hotkey-save-profile").disabled,
+      "hotkey editor: same-context duplicate keys block save");
+    assert(findFakes(root, (el) => /Worker Commands/.test(el.textContent || "") && /Move/.test(el.textContent || "")).length > 0,
+      "hotkey editor: conflict messages name affected commands and context");
   });
 }
 

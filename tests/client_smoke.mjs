@@ -187,6 +187,17 @@ try {
 
   await page.click("#settings-button");
   await page.waitForFunction(() => !document.getElementById("settings-menu")?.hidden, { timeout: 2000 });
+  await page.click('[data-settings-tab="hotkeys"]');
+  await page.click("#hotkey-clone-profile");
+  await page.click('#hotkey-command-card-preview [data-command-id="unit.move"]');
+  await page.keyboard.press("b");
+  await page.waitForFunction(() => {
+    const save = document.getElementById("hotkey-save-profile");
+    return save && !save.disabled;
+  }, { timeout: 2000 });
+  await page.click("#hotkey-save-profile");
+  await page.waitForFunction(() => window.__rts?.hotkeyProfiles?.getActiveProfile?.()?.bindings?.["unit.move"] === "B", { timeout: 2000 });
+  ok(true, "HOTKEYS: settings editor saved a changed Move binding");
   await page.keyboard.press("Escape");
   await sleep(100);
   const afterMenuEscape = await page.evaluate(() => ({
@@ -195,6 +206,29 @@ try {
   }));
   ok(afterMenuEscape.menuHidden && afterMenuEscape.selected === 1,
      `ESCAPE: closes open settings menu without clearing selection (hidden=${afterMenuEscape.menuHidden}, selected=${afterMenuEscape.selected})`);
+
+  const changedHotkey = await page.evaluate(() => {
+    const m = window.__rts.match, s = m.state;
+    const worker = s.entitiesInterpolated(1).find((e) => e.owner === s.playerId && e.kind === "worker");
+    if (!worker) return { worker: false, hotkey: null, target: null };
+    s.setSelection([worker.id]);
+    m.hud.update();
+    return {
+      worker: true,
+      hotkey: document.querySelector('#command-card [data-command-id="unit.move"]')?.dataset.hotkey || null,
+      target: s.commandTarget,
+    };
+  });
+  ok(changedHotkey.worker && changedHotkey.hotkey === "B",
+    `HOTKEYS: live command card shows changed Move binding (${changedHotkey.hotkey})`);
+  await page.keyboard.press("b");
+  await sleep(150);
+  ok(await page.evaluate(() => window.__rts.match.state.commandTarget === "move"),
+    "HOTKEYS: changed Move binding activates the live command card");
+  await page.keyboard.press("Escape");
+  await sleep(100);
+  ok(await page.evaluate(() => window.__rts.match.state.commandTarget == null && window.__rts.match.state.selection.size === 1),
+    "HOTKEYS: Escape cancels changed-key Move targeting before gameplay cancel");
 
   await page.keyboard.press("Escape");
   await sleep(100);

@@ -154,6 +154,50 @@ function workerCard() {
 
 {
   const hotkeys = service();
+  const classic = hotkeys.profileById(HOTKEY_PRESET_CLASSIC);
+  const draft = hotkeys.validateDraftProfile({
+    ...classic,
+    id: "custom.draft",
+    type: "custom",
+    bindings: { ...classic.bindings, "unit.move": "A", "unit.attack": "A" },
+  });
+  assert.equal(draft.ok, false, "draft validator reports same-context duplicate keys");
+  assert(draft.errors.some((error) =>
+    error.code === "duplicateKey" &&
+    error.contextId === "worker-main" &&
+    error.commandIds.includes("unit.move") &&
+    error.commandIds.includes("unit.attack")
+  ), "draft duplicate key names the affected context and commands");
+}
+
+{
+  const hotkeys = service();
+  const classic = hotkeys.profileById(HOTKEY_PRESET_CLASSIC);
+  const draft = hotkeys.validateDraftProfile({
+    ...classic,
+    id: "custom.exclusive",
+    type: "custom",
+    bindings: { ...classic.bindings, "worker.buildMenu": "Y", "worker.return": "Y" },
+  });
+  assert.equal(draft.ok, true, "same key is allowed across mutually exclusive command-card contexts");
+}
+
+{
+  const hotkeys = service();
+  const draft = hotkeys.validateDraftProfile({
+    schemaVersion: HOTKEY_PROFILE_SCHEMA_VERSION,
+    id: "custom.blank",
+    type: "custom",
+    mode: "direct",
+    name: "Blank",
+    bindings: {},
+  });
+  assert.equal(draft.ok, false, "draft validator blocks unresolved direct profiles");
+  assert(draft.errors.some((error) => error.code === "unresolvedCommand"), "unresolved commands are reported");
+}
+
+{
+  const hotkeys = service();
   const parsed = hotkeys.parseProfilePayload({
     schemaVersion: HOTKEY_PROFILE_SCHEMA_VERSION,
     id: "import.partial",

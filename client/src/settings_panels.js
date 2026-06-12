@@ -1,3 +1,5 @@
+import { renderHotkeyEditor } from "./hotkey_editor.js";
+
 export function buildSettingsTabs({
   audio,
   hotkeyProfiles = null,
@@ -94,34 +96,7 @@ function renderContextSummary(root, game) {
 }
 
 function renderHotkeysPanel(root, hotkeyProfiles, context) {
-  root.classList.add("settings-hotkeys-panel");
-  if (!hotkeyProfiles) {
-    renderMutedText(root, "Grid");
-    return;
-  }
-
-  const row = document.createElement("label");
-  row.className = "settings-select-row";
-  const text = document.createElement("span");
-  text.textContent = "Profile";
-  const select = document.createElement("select");
-  for (const profile of hotkeyProfiles.allProfiles()) {
-    const option = document.createElement("option");
-    option.value = profile.id;
-    option.textContent = profile.name;
-    select.appendChild(option);
-  }
-  select.value = hotkeyProfiles.getActiveProfile()?.id || "";
-  select.addEventListener("change", () => hotkeyProfiles.setActiveProfile(select.value));
-  row.append(text, select);
-  root.appendChild(row);
-
-  const meta = document.createElement("div");
-  meta.className = "settings-context-row";
-  const scope = document.createElement("span");
-  scope.textContent = context?.replay ? "Replay" : context?.spectator ? "Spectator" : "Player";
-  meta.appendChild(scope);
-  root.appendChild(meta);
+  return renderHotkeyEditor(root, hotkeyProfiles, context);
 }
 
 function renderAudioPanel(root, audio) {

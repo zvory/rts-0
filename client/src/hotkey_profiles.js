@@ -28,6 +28,7 @@ export function buildHotkeyCommandCatalog(cards = []) {
   for (const entry of cards || []) {
     const card = entry?.card || entry;
     const contextId = entry?.id || card?.signature || `context-${contexts.length}`;
+    const contextLabel = entry?.label || labelFromContextId(contextId);
     const commandIds = [];
     for (const slot of card?.slots || []) {
       if (!slot?.commandId) continue;
@@ -40,12 +41,14 @@ export function buildHotkeyCommandCatalog(cards = []) {
         });
       }
     }
-    contexts.push({ id: contextId, commandIds });
+    contexts.push({ id: contextId, label: contextLabel, card, commandIds });
   }
   return Object.freeze({
     commands: Object.freeze([...commands.values()].map(Object.freeze)),
     contexts: Object.freeze(contexts.map((ctx) => Object.freeze({
       id: ctx.id,
+      label: ctx.label,
+      card: ctx.card,
       commandIds: Object.freeze([...ctx.commandIds]),
     }))),
   });
@@ -167,6 +170,20 @@ export class HotkeyProfileService {
     return parsed;
   }
 
+  validateDraftProfile(profile) {
+    const parsed = this.parseProfilePayload(profile, { allowUnresolved: true, fillMissing: false });
+    const errors = [...parsed.errors];
+    const warnings = [...parsed.warnings];
+    if (parsed.profile.mode === "direct") {
+      for (const command of this.catalog.commands || []) {
+        if (!parsed.profile.bindings[command.commandId]) {
+          errors.push({ code: "unresolvedCommand", commandId: command.commandId });
+        }
+      }
+    }
+    return { ...parsed, ok: errors.length === 0, errors, warnings };
+  }
+
   importProfile(payload, { targetId = null, activate = false } = {}) {
     const parsed = this.parseProfilePayload(payload, { allowUnresolved: false });
     if (!parsed.ok) return parsed;
@@ -198,7 +215,7 @@ export class HotkeyProfileService {
     };
   }
 
-  parseProfilePayload(payload, { allowUnresolved = true } = {}) {
+  parseProfilePayload(payload, { allowUnresolved = true, fillMissing = true } = {}) {
     const errors = [];
     const warnings = [];
     const raw = payload && typeof payload === "object" ? payload : {};
@@ -230,6 +247,11 @@ export class HotkeyProfileService {
     if (mode === "direct") {
       for (const command of this.catalog.commands || []) {
         if (bindings[command.commandId]) continue;
+        if (!fillMissing) {
+          warnings.push({ code: "missingCommandUnresolved", commandId: command.commandId });
+          if (!allowUnresolved) errors.push({ code: "unresolvedCommand", commandId: command.commandId });
+          continue;
+        }
         const fallback = this._fallbackKeyForCommand(command);
         if (fallback) {
           bindings[command.commandId] = fallback;
@@ -395,4 +417,12 @@ function firstFreeKey(used) {
 
 function freezeProfile(profile) {
   return Object.freeze({ ...profile, bindings: Object.freeze({ ...profile.bindings }) });
+}
+
+function labelFromContextId(id) {
+  return String(id || "")
+    .split(/[-_.:]+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ") || "Command Card";
 }
