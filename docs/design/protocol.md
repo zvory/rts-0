@@ -454,7 +454,9 @@ Events are best-effort visual flavor; the client must not depend on receiving th
 
 ### 2.6 Replay playback state and vision
 
-`replayState` is a reliable server message that carries the shared playback cursor/state:
+`replayState` is a reliable server message that carries the shared playback cursor/state. Replay
+rooms send it for playback cursor changes; dev scenario watch rooms also send it after pause/resume
+and one-tick step controls so clients can confirm the authoritative dev-watch speed and tick:
 ```
 {
   t: "replayState",

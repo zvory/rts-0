@@ -2176,6 +2176,28 @@ impl RoomTask {
         self.broadcast(&msg);
     }
 
+    fn broadcast_dev_watch_state(&self) {
+        if !matches!(self.mode, RoomMode::DevScenario(_)) {
+            return;
+        }
+        let Phase::InGame(game) = &self.phase else {
+            return;
+        };
+        self.broadcast(&ServerMessage::ReplayState(ReplayPlaybackState {
+            current_tick: game.tick_count(),
+            duration_ticks: 0,
+            keyframe_ticks: Vec::new(),
+            speed: if self.dev_watch_paused {
+                0.0
+            } else {
+                self.replay_speed
+            },
+            paused: self.dev_watch_paused,
+            ended: false,
+            controller_id: None,
+        }));
+    }
+
     fn fanout_replay_snapshots(
         &mut self,
         session: &ReplaySession,
@@ -2650,12 +2672,14 @@ impl RoomTask {
         }
         if speed == 0.0 {
             self.dev_watch_paused = true;
+            self.broadcast_dev_watch_state();
             return;
         }
         self.dev_watch_paused = false;
         // Clamp to sensible range matching the UI buttons (0.125× – 8×).
         let clamped = speed.clamp(0.125, 8.0);
         self.replay_speed = clamped;
+        self.broadcast_dev_watch_state();
     }
 
     fn on_step_dev_tick(&mut self, player_id: u32) {
@@ -2666,6 +2690,7 @@ impl RoomTask {
             return;
         }
         self.on_tick_dev_selfplay(TokioInstant::now());
+        self.broadcast_dev_watch_state();
     }
 
     fn on_set_replay_vision(&mut self, player_id: u32, vision: ReplayVisionRequest) {
@@ -4291,14 +4316,20 @@ mod tests {
             false,
             DrainHandle::default(),
         );
-        let (msg_tx, _writer) = ConnectionSink::new();
+        let (msg_tx, mut writer) = ConnectionSink::new();
         let (ack, mut ack_rx) = tokio::sync::oneshot::channel();
         task.on_join(99, "Viewer".to_string(), true, false, msg_tx, ack);
 
         assert_eq!(ack_rx.try_recv(), Ok(true));
         assert_eq!(in_game_tick(&task), 0);
+        while writer.reliable_rx.try_recv().is_ok() {}
 
         task.on_set_replay_speed(99, 0.0);
+        assert!(matches!(
+            writer.reliable_rx.try_recv().unwrap(),
+            ServerMessage::ReplayState(state)
+                if state.paused && state.speed == 0.0 && state.current_tick == 0
+        ));
         task.on_tick(TokioInstant::now());
         assert_eq!(
             in_game_tick(&task),
@@ -4308,10 +4339,25 @@ mod tests {
 
         task.on_step_dev_tick(99);
         assert_eq!(in_game_tick(&task), 1);
+        assert!(matches!(
+            writer.reliable_rx.try_recv().unwrap(),
+            ServerMessage::ReplayState(state)
+                if state.paused && state.speed == 0.0 && state.current_tick == 1
+        ));
         task.on_step_dev_tick(99);
         assert_eq!(in_game_tick(&task), 2);
+        assert!(matches!(
+            writer.reliable_rx.try_recv().unwrap(),
+            ServerMessage::ReplayState(state)
+                if state.paused && state.speed == 0.0 && state.current_tick == 2
+        ));
 
         task.on_set_replay_speed(99, 1.0);
+        assert!(matches!(
+            writer.reliable_rx.try_recv().unwrap(),
+            ServerMessage::ReplayState(state)
+                if !state.paused && state.speed == 1.0 && state.current_tick == 2
+        ));
         task.on_tick(TokioInstant::now());
         assert_eq!(
             in_game_tick(&task),

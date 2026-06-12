@@ -441,6 +441,12 @@ export class ClientLane {
 
   async setReplaySpeed(speed) {
     await this.page.evaluate((speed) => window.__rts.match.net.setReplaySpeed(speed), speed);
+    if (speed === 0) {
+      await this.page.waitForFunction(
+        () => window.__rts?.match?.replayControls?.replayState?.paused === true,
+        { timeout: 5000 },
+      );
+    }
     this.artifacts.client({ event: "setReplaySpeed", speed });
   }
 
