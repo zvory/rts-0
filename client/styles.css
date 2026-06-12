@@ -945,16 +945,19 @@ input[type="text"]:focus {
   bottom: 44px;
   width: min(420px, calc(100vw - 24px));
   min-width: 280px;
-  max-height: min(560px, calc(100vh - 90px));
+  max-height: min(720px, calc(100vh - 329px));
   display: flex;
   flex-direction: column;
   gap: 10px;
   padding: 10px;
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: scroll;
+  scrollbar-gutter: stable;
 }
 #game-menu[data-settings-context="lobby"] #settings-menu {
   top: 44px;
   bottom: auto;
+  max-height: min(720px, calc(100vh - 80px));
 }
 .settings-header {
   display: grid;
