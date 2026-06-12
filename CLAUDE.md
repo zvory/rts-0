@@ -28,6 +28,15 @@ the server simulates at 30 Hz and sends per-player, fog-filtered snapshots.
 - Keep patch notes factual and evidence-backed. If the impact is uncertain, say what changed and
   what should be watched in playtests instead of guessing.
 
+## New Unit Workflow
+
+- New-unit work is requirements-gated. If a task references the new unit checklist or asks to start a
+  new unit, begin with Phase 0 and Phase 1 only.
+- Do not implement Rust, JS, protocol, balance, art, tests, or other implementation files until the
+  unit brief and rules/balance spec are complete and the user explicitly authorizes implementation.
+- Before that gate, only edit planning, checklist, and design documents. Stop after the brief/spec
+  handoff unless the user explicitly says to proceed with implementation code.
+
 ## Parallel Worktrees
 
 - For parallel feature work (which is always the case), each terminal/agent must work in its own
