@@ -108,10 +108,10 @@ export class Match {
     this.skipFinalNetReport = false;
     this.lastSnapshotTick = 0;
     this.health = new MatchHealth({ net: this.net, statusBadge: this.statusBadge, snapshotMs: SNAPSHOT_MS });
-    this.predictionAdapter = new SimWasmPredictionAdapter({
-      startInfo: payload,
-      playerId: payload?.playerId,
-    });
+    this.predictionStartInfo = payload;
+    this.predictionPlayerId = payload?.playerId;
+    this.predictionAdapter = this.createPredictionAdapter();
+    this.predictionInitToken = 0;
     this.prediction = new PredictionController({
       enabled: !!options.predictionEnabled && !this.replayViewer && !payload?.spectator,
       predictor: this.predictionAdapter,
@@ -244,12 +244,7 @@ export class Match {
     this.startNetReports();
     this.health.publish();
     this.requestAutomaticPointerLock({ requireGesture: false });
-    if (this.prediction.enabled) {
-      this.predictionAdapter.init().then((ready) => {
-        if (ready) this.logPredictionStatus("ready");
-        else this.logPredictionStatus("disabled");
-      });
-    }
+    if (this.prediction.enabled) this.initPredictionAdapter();
 
     // Show speed controls for replay and scenario dev-watch rooms.
     const isReplay = !!payload?.replay;
@@ -399,17 +394,48 @@ export class Match {
     const allowed = !!enabled && !this.replayViewer && !this.state?.spectator;
     this.prediction.reset({ enabled: allowed, preserveClientSeq: true });
     if (!allowed) {
+      this.predictionInitToken += 1;
+      this.resetPredictionAdapter();
       this.state?.clearPredictedSnapshot?.();
       this.state?.setOptimisticCommandState?.(null);
       this.publishPredictionDebug();
       this.mountSettings({ keepOpen: true });
       return;
     }
-    void this.predictionAdapter.init().then((ready) => {
+    this.initPredictionAdapter({ remountSettings: true });
+  }
+
+  initPredictionAdapter({ remountSettings = false } = {}) {
+    const token = ++this.predictionInitToken;
+    const adapter = this.predictionAdapter;
+    void adapter.init().then((ready) => {
+      if (token !== this.predictionInitToken) {
+        adapter.destroy();
+        return;
+      }
+      if (!this.prediction.enabled) {
+        adapter.destroy();
+        this.publishPredictionDebug();
+        if (remountSettings) this.mountSettings({ keepOpen: true });
+        return;
+      }
       if (ready) this.logPredictionStatus("ready");
       else this.logPredictionStatus("disabled");
-      this.mountSettings({ keepOpen: true });
+      if (remountSettings) this.mountSettings({ keepOpen: true });
     });
+  }
+
+  createPredictionAdapter() {
+    return new SimWasmPredictionAdapter({
+      startInfo: this.predictionStartInfo,
+      playerId: this.predictionPlayerId,
+    });
+  }
+
+  resetPredictionAdapter() {
+    this.predictionAdapter?.destroy();
+    this.predictionAdapter = this.createPredictionAdapter();
+    if (this.prediction) this.prediction.predictor = this.predictionAdapter;
   }
 
   applySpectatorUi() {
@@ -652,8 +678,8 @@ export class Match {
             state: () => ({
               hidden: spectator || this.replayViewer,
               enabled: !!this.prediction.enabled,
-              active: !!this.predictionAdapter?.ready,
-              pending: !!this.predictionAdapter?.loading,
+              active: !!this.prediction.enabled && !!this.predictionAdapter?.ready,
+              pending: !!this.prediction.enabled && !!this.predictionAdapter?.loading,
               available: !this.replayViewer && !this.state?.spectator,
             }),
             onToggle: () => this.onPredictionEnabledChange?.(!this.prediction.enabled),
@@ -999,6 +1025,7 @@ export class Match {
     window.removeEventListener("keydown", this.onMenuKeyDown, true);
     document.removeEventListener("visibilitychange", this.onVisibilityChange);
     this.replayControls?.destroy();
+    this.predictionInitToken += 1;
     this.predictionAdapter?.destroy();
     this.replayControls = null;
     if (this.input && typeof this.input.destroy === "function") {
@@ -1038,6 +1065,7 @@ export class Match {
       dom.giveUpConfirmButton?.removeEventListener("click", this.onGiveUpConfirm);
     }
     this.replayControls?.destroy();
+    this.predictionInitToken += 1;
     this.predictionAdapter?.destroy();
     this.replayControls = null;
     if (dom.commandCard) dom.commandCard.hidden = false;
