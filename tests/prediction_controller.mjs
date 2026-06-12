@@ -73,10 +73,19 @@ function sentSeqs(sent) {
 }
 
 {
-  const controller = new PredictionController({ enabled: false, sendCommand: () => true });
+  const sent = [];
+  const controller = new PredictionController({
+    enabled: false,
+    sendCommand(command, clientSeq) {
+      sent.push({ command, clientSeq });
+      return true;
+    },
+  });
   assert(controller.debugSummary().mode === PREDICTION_STATE.DISABLED, "disabled mode is exposed");
   const result = controller.issueCommand({ c: "stop", units: [1] });
-  assert(result === false, "disabled controller does not send gameplay commands");
+  assert(result.sent === true && result.predicted === false, "disabled controller still sends gameplay commands");
+  assert(result.clientSeq == null, "disabled controller does not attach prediction sequence ids");
+  assert(sent.length === 1 && sent[0].clientSeq === undefined, "disabled sends use legacy unsequenced commands");
   assert(controller.debugSummary().nextClientSeq === 1, "disabled controller does not allocate sequence ids");
 }
 

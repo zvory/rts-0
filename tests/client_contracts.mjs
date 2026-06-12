@@ -2297,6 +2297,20 @@ function fakeAudioContext() {
   assert(prediction.debugSummary().mode === PREDICTION_STATE.TRACKING, "resync returns to tracking");
   prediction.reset();
   assert(prediction.debugSummary().nextClientSeq === 1, "PredictionController reset restarts sequence ids");
+
+  const disabledSent = [];
+  const disabledPrediction = new PredictionController({
+    enabled: false,
+    sendCommand(command, clientSeq) {
+      disabledSent.push({ command, clientSeq });
+      return true;
+    },
+  });
+  const disabledIssued = disabledPrediction.issueCommand(cmd.move([7], 120, 160));
+  assert(disabledIssued.sent && !disabledIssued.predicted, "PredictionController disabled mode still sends commands");
+  assert(disabledIssued.clientSeq == null, "PredictionController disabled mode omits prediction sequence ids");
+  assert(disabledSent.length === 1 && disabledSent[0].clientSeq === undefined, "disabled commands use legacy send shape");
+  assert(disabledPrediction.debugSummary().nextClientSeq === 1, "disabled commands do not consume sequence ids");
 }
 
 // ---------------------------------------------------------------------------
