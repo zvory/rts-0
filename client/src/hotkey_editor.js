@@ -32,6 +32,7 @@ export class HotkeyEditor {
     this.selectedContextId = hotkeyProfiles?.catalog?.contexts?.find((entry) => hasCommands(entry))?.id || "empty";
     this.pendingCommandId = "";
     this.invalidCapture = "";
+    this.importStatus = null;
     this.draft = this._draftFromProfile(this.hotkeyProfiles?.profileById(this.selectedProfileId));
     this.onKeyDown = (ev) => this._handleKeyDown(ev);
     globalThis.window?.addEventListener?.("keydown", this.onKeyDown, true);
@@ -91,6 +92,7 @@ export class HotkeyEditor {
       this.draft = this._draftFromProfile(this.hotkeyProfiles.profileById(select.value));
       this.pendingCommandId = "";
       this.invalidCapture = "";
+      this.importStatus = null;
       this.render();
     });
 
@@ -161,6 +163,7 @@ export class HotkeyEditor {
       this.selectedContextId = select.value;
       this.pendingCommandId = "";
       this.invalidCapture = "";
+      this.importStatus = null;
       this.render();
     });
     row.append(label, select);
@@ -208,11 +211,18 @@ export class HotkeyEditor {
     const wrap = document.createElement("div");
     wrap.className = "hotkey-diagnostics";
     wrap.setAttribute("role", "status");
+    wrap.setAttribute("aria-live", "polite");
     if (this.pendingCommandId) {
       wrap.appendChild(message("info", `Press a letter for ${this._commandLabel(this.pendingCommandId)}.`));
     }
     if (this.invalidCapture) {
       wrap.appendChild(message("error", this.invalidCapture));
+    }
+    if (this.importStatus) {
+      wrap.appendChild(message(this.importStatus.kind, this.importStatus.text));
+    }
+    for (const entry of [...(this.hotkeyProfiles.diagnostics?.errors || []), ...(this.hotkeyProfiles.diagnostics?.warnings || [])].slice(0, 4)) {
+      wrap.appendChild(message(entry.code === "storageParseFailed" ? "error" : "warn", this._diagnosticText(entry)));
     }
     for (const entry of [...validation.errors, ...validation.warnings].slice(0, 8)) {
       wrap.appendChild(message(entry.code === "unknownCommand" || entry.code === "missingCommandUnresolved" ? "warn" : "error",
@@ -238,6 +248,7 @@ export class HotkeyEditor {
       this.selectedProfileId = this.draft.id;
       this.pendingCommandId = "";
       this.invalidCapture = "";
+      this.importStatus = null;
       this.render();
     });
 
@@ -250,6 +261,7 @@ export class HotkeyEditor {
       this.selectedProfileId = this.draft.id;
       this.pendingCommandId = "";
       this.invalidCapture = "";
+      this.importStatus = null;
       this.render();
     });
 
@@ -270,10 +282,36 @@ export class HotkeyEditor {
       this.draft = this._draftFromProfile(result.profile);
       this.pendingCommandId = "";
       this.invalidCapture = "";
+      this.importStatus = null;
       this.render();
     });
 
-    row.append(clone, blank, save);
+    const exportButton = document.createElement("button");
+    exportButton.id = "hotkey-export-profile";
+    exportButton.type = "button";
+    exportButton.textContent = "Export";
+    exportButton.disabled = !this.hotkeyProfiles.exportProfile(this.selectedProfileId);
+    exportButton.addEventListener("click", () => this._exportSelectedProfile());
+
+    const importInput = document.createElement("input");
+    importInput.id = "hotkey-import-file";
+    importInput.type = "file";
+    importInput.accept = "application/json,.json";
+    importInput.hidden = true;
+    importInput.addEventListener("change", async () => {
+      const file = importInput.files?.[0] || null;
+      importInput.value = "";
+      if (!file) return;
+      await this._importFile(file);
+    });
+
+    const importButton = document.createElement("button");
+    importButton.id = "hotkey-import-profile";
+    importButton.type = "button";
+    importButton.textContent = "Import";
+    importButton.addEventListener("click", () => importInput.click());
+
+    row.append(clone, blank, save, exportButton, importButton, importInput);
     return row;
   }
 
@@ -285,11 +323,17 @@ export class HotkeyEditor {
     }
     this.pendingCommandId = commandId;
     this.invalidCapture = "";
+    this.importStatus = null;
     this.render();
   }
 
   _handleKeyDown(ev) {
     if (!this.pendingCommandId) return;
+    if (ev.repeat) {
+      ev.preventDefault?.();
+      ev.stopPropagation?.();
+      return;
+    }
     ev.preventDefault?.();
     ev.stopPropagation?.();
     if (ev.code === "Escape") {
@@ -307,6 +351,51 @@ export class HotkeyEditor {
     this.draft.bindings[this.pendingCommandId] = key;
     this.pendingCommandId = "";
     this.invalidCapture = "";
+    this.render();
+  }
+
+  _exportSelectedProfile() {
+    const json = this.hotkeyProfiles.exportProfileJson(this.selectedProfileId);
+    if (!json) return;
+    const filename = `${safeFilename(this.hotkeyProfiles.profileById(this.selectedProfileId)?.name || "hotkeys")}.json`;
+    const blob = new Blob([json], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    link.rel = "noopener";
+    document.body?.appendChild?.(link);
+    link.click();
+    link.remove?.();
+    URL.revokeObjectURL(url);
+    this.importStatus = { kind: "ok", text: "Profile exported." };
+    this.render();
+  }
+
+  async _importFile(file) {
+    let text = "";
+    try {
+      text = await file.text();
+    } catch {
+      this.importStatus = { kind: "error", text: "Import file could not be read." };
+      this.render();
+      return;
+    }
+    const result = this.hotkeyProfiles.parseImportText(text, { activate: true });
+    if (!result.ok) {
+      this.importStatus = {
+        kind: "error",
+        text: this._diagnosticText(result.errors[0] || { code: "importParseFailed" }),
+      };
+      this.render();
+      return;
+    }
+    this.selectedProfileId = result.profile.id;
+    this.draft = this._draftFromProfile(result.profile);
+    this.pendingCommandId = "";
+    this.invalidCapture = "";
+    const warning = result.warnings[0] ? ` ${this._diagnosticText(result.warnings[0])}` : "";
+    this.importStatus = { kind: result.warnings.length ? "warn" : "ok", text: `Imported ${result.profile.name}.${warning}` };
     this.render();
   }
 
@@ -358,6 +447,10 @@ export class HotkeyEditor {
         return "Profile id is missing.";
       case "invalidMode":
         return "Profile mode is invalid.";
+      case "storageParseFailed":
+        return "Stored hotkey profiles could not be read.";
+      case "importParseFailed":
+        return "Import file is not valid JSON.";
       default:
         return "Profile has unresolved hotkey issues.";
     }
@@ -451,4 +544,12 @@ function message(kind, text) {
   row.className = `hotkey-message ${kind}`;
   row.textContent = text;
   return row;
+}
+
+function safeFilename(value) {
+  return String(value || "hotkeys")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, "-")
+    .replace(/^-+|-+$/g, "") || "hotkeys";
 }

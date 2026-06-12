@@ -229,6 +229,101 @@ function workerCard() {
 
 {
   const hotkeys = service();
+  globalThis.__RTS_BUILD__ = "test-build";
+  const exported = hotkeys.exportProfile(HOTKEY_PRESET_CLASSIC);
+  assert.equal(exported.schemaVersion, HOTKEY_PROFILE_SCHEMA_VERSION, "export includes schema version");
+  assert.equal(exported.profileId, HOTKEY_PRESET_CLASSIC, "export uses player-facing profileId metadata");
+  assert.equal(exported.name, "Classic RTS", "export includes profile name");
+  assert.equal(exported.description.length > 0, true, "export includes profile description");
+  assert.equal(exported.createdWithBuild, "test-build", "export includes build metadata");
+  assert.equal(exported.basePreset, HOTKEY_PRESET_CLASSIC, "preset exports name their base preset");
+  assert.equal(exported.bindings["unit.move"], "M", "export includes hotkey bindings");
+  delete globalThis.__RTS_BUILD__;
+}
+
+{
+  const hotkeys = service();
+  const imported = hotkeys.importProfile({
+    schemaVersion: HOTKEY_PROFILE_SCHEMA_VERSION,
+    profileId: HOTKEY_PRESET_CLASSIC,
+    mode: "direct",
+    name: "Classic RTS",
+    description: "Imported preset",
+    basePreset: HOTKEY_PRESET_CLASSIC,
+    bindings: hotkeys.profileById(HOTKEY_PRESET_CLASSIC).bindings,
+  });
+  assert.equal(imported.ok, true, "preset-shaped export imports as a custom profile");
+  assert.equal(imported.profile.type, "custom", "imported payloads are stored as custom profiles");
+  assert.equal(imported.profile.id, "custom.classicRts", "import rewrites preset ids away from preset namespace");
+  assert.equal(imported.profile.name, "Classic RTS 2", "import rewrites colliding display names");
+}
+
+{
+  const hotkeys = service();
+  const imported = hotkeys.importProfile({
+    schemaVersion: HOTKEY_PROFILE_SCHEMA_VERSION,
+    id: "custom.direct",
+    type: "custom",
+    mode: "direct",
+    name: "Direct",
+    bindings: {
+      "unit.move": "M",
+      "unit.attack": "A",
+      "unit.stop": "S",
+      "worker.buildMenu": "B",
+      "unknown.command": "U",
+    },
+  });
+  assert.equal(imported.ok, true, "unknown imported commands are non-fatal");
+  assert(imported.warnings.some((warning) => warning.code === "unknownCommand"), "unknown imported commands are reported");
+  assert.equal(imported.profile.bindings["unknown.command"], undefined, "unknown imported commands are ignored");
+}
+
+{
+  const hotkeys = service();
+  const invalid = hotkeys.importProfile({
+    schemaVersion: HOTKEY_PROFILE_SCHEMA_VERSION,
+    id: "custom.bad-import",
+    mode: "direct",
+    name: "Bad Import",
+    bindings: {
+      "unit.move": "1",
+      "unit.attack": "A",
+      "unit.stop": "S",
+      "worker.buildMenu": "B",
+    },
+  });
+  assert.equal(invalid.ok, false, "invalid imported keys are fatal");
+  assert(invalid.errors.some((error) => error.code === "invalidKey"), "invalid imported keys are reported");
+}
+
+{
+  const hotkeys = service();
+  const conflict = hotkeys.importProfile({
+    schemaVersion: HOTKEY_PROFILE_SCHEMA_VERSION,
+    id: "custom.bad-conflict-import",
+    mode: "direct",
+    name: "Conflict Import",
+    bindings: {
+      "unit.move": "A",
+      "unit.attack": "A",
+      "unit.stop": "S",
+      "worker.buildMenu": "B",
+    },
+  });
+  assert.equal(conflict.ok, false, "same-context imported duplicate keys are fatal");
+  assert(conflict.errors.some((error) => error.code === "duplicateKey"), "same-context imported duplicates are reported");
+}
+
+{
+  const hotkeys = service();
+  const parsed = hotkeys.parseImportText("{bad json");
+  assert.equal(parsed.ok, false, "invalid import JSON is rejected");
+  assert(parsed.errors.some((error) => error.code === "importParseFailed"), "invalid import JSON is diagnosed");
+}
+
+{
+  const hotkeys = service();
   const imported = hotkeys.importProfile({
     schemaVersion: HOTKEY_PROFILE_SCHEMA_VERSION,
     id: "custom.direct",
@@ -274,7 +369,7 @@ function workerCard() {
     mode: "grid",
     name: "Replace",
     bindings: {},
-  });
+  }, { targetId: "custom.replace" });
   const profile = hotkeys.profileById("custom.replace");
   assert.equal(profile.mode, "grid", "imports replace the target profile payload");
   assert.deepEqual(profile.bindings, {}, "replacement import does not merge old bindings");

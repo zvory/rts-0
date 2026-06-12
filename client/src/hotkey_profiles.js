@@ -7,6 +7,7 @@ export const HOTKEY_PRESET_GRID = "preset.grid";
 export const HOTKEY_PRESET_CLASSIC = "preset.classicRts";
 
 const VALID_KEY_RE = /^[A-Z]$/;
+const DEFAULT_EXPORT_BUILD = "unknown";
 
 const CORE_CLASSIC_BINDINGS = Object.freeze({
   "unit.move": "M",
@@ -156,7 +157,7 @@ export class HotkeyProfileService {
   saveCustomProfile(profile) {
     const parsed = this.parseProfilePayload(profile, { allowUnresolved: false });
     if (!parsed.ok) return parsed;
-    if (parsed.profile.type === "preset") {
+    if (parsed.profile.type === "preset" || this.presets.some((preset) => preset.id === parsed.profile.id)) {
       return {
         ok: false,
         profile: parsed.profile,
@@ -184,13 +185,28 @@ export class HotkeyProfileService {
     return { ...parsed, ok: errors.length === 0, errors, warnings };
   }
 
+  runtimeDiagnostics(profile = this.getActiveProfile()) {
+    const parsed = this.parseProfilePayload(profile, { allowUnresolved: true, fillMissing: false });
+    return {
+      ...parsed,
+      ok: parsed.errors.length === 0,
+      errors: parsed.errors,
+      warnings: parsed.warnings,
+    };
+  }
+
   importProfile(payload, { targetId = null, activate = false } = {}) {
     const parsed = this.parseProfilePayload(payload, { allowUnresolved: false });
     if (!parsed.ok) return parsed;
+    const id = targetId || this._uniqueProfileId(parsed.profile.id || "custom.imported");
+    const name = targetId
+      ? parsed.profile.name
+      : this._uniqueProfileName(parsed.profile.name || "Imported Hotkeys", id);
     const profile = {
       ...parsed.profile,
-      id: targetId || parsed.profile.id,
+      id,
       type: "custom",
+      name,
       bindings: { ...parsed.profile.bindings },
     };
     this._replaceCustomProfile(profile);
@@ -203,10 +219,42 @@ export class HotkeyProfileService {
   exportProfile(id = this.activeProfileId) {
     const profile = this.profileById(id);
     if (!profile) return null;
+    const basePreset = profile.basePresetId || (profile.type === "preset" ? profile.id : null);
+    return {
+      schemaVersion: HOTKEY_PROFILE_SCHEMA_VERSION,
+      profileId: profile.id,
+      mode: profile.mode,
+      name: profile.name,
+      description: profile.description || "",
+      createdWithBuild: createdWithBuild(),
+      basePreset,
+      bindings: { ...profile.bindings },
+    };
+  }
+
+  exportProfileJson(id = this.activeProfileId) {
+    const payload = this.exportProfile(id);
+    return payload ? `${JSON.stringify(payload, null, 2)}\n` : "";
+  }
+
+  parseImportText(text, options = {}) {
+    try {
+      return this.importProfile(JSON.parse(String(text || "")), options);
+    } catch {
+      return {
+        ok: false,
+        profile: null,
+        errors: [{ code: "importParseFailed" }],
+        warnings: [],
+      };
+    }
+  }
+
+  storedProfilePayload(profile) {
     return {
       schemaVersion: HOTKEY_PROFILE_SCHEMA_VERSION,
       id: profile.id,
-      type: profile.type,
+      type: "custom",
       mode: profile.mode,
       name: profile.name,
       description: profile.description || "",
@@ -225,7 +273,12 @@ export class HotkeyProfileService {
     }
     const mode = raw.mode === "grid" || raw.mode === "direct" ? raw.mode : "";
     if (!mode) errors.push({ code: "invalidMode", mode: raw.mode });
-    const id = typeof raw.id === "string" && raw.id.trim() ? raw.id.trim() : "";
+    const idSource = typeof raw.id === "string" && raw.id.trim()
+      ? raw.id
+      : typeof raw.profileId === "string" && raw.profileId.trim()
+        ? raw.profileId
+        : "";
+    const id = idSource.trim();
     if (!id) errors.push({ code: "missingId" });
     const type = raw.type === "preset" ? "preset" : "custom";
     const sourceBindings = raw.bindings && typeof raw.bindings === "object" ? raw.bindings : {};
@@ -271,7 +324,11 @@ export class HotkeyProfileService {
       mode,
       name: typeof raw.name === "string" && raw.name.trim() ? raw.name.trim() : "Custom Hotkeys",
       description: typeof raw.description === "string" ? raw.description : "",
-      basePresetId: typeof raw.basePresetId === "string" ? raw.basePresetId : null,
+      basePresetId: typeof raw.basePresetId === "string"
+        ? raw.basePresetId
+        : typeof raw.basePreset === "string"
+          ? raw.basePreset
+          : null,
       bindings,
     };
     return { ok: errors.length === 0, profile, errors, warnings };
@@ -312,7 +369,7 @@ export class HotkeyProfileService {
       if (parsed.ok && parsed.profile.type === "custom") {
         profiles.push(parsed.profile);
       } else {
-        errors.push(...parsed.errors.map((error) => ({ ...error, profileId: entry?.id || null })));
+        errors.push(...parsed.errors.map((error) => ({ ...error, profileId: entry?.id || entry?.profileId || null })));
       }
     }
     return { profiles, errors, warnings };
@@ -327,7 +384,7 @@ export class HotkeyProfileService {
   _writeCustomProfiles() {
     this._storageSet(this.profilesKey, JSON.stringify({
       schemaVersion: HOTKEY_PROFILE_SCHEMA_VERSION,
-      profiles: this.customProfiles,
+      profiles: this.customProfiles.map((profile) => this.storedProfilePayload(profile)),
     }));
   }
 
@@ -360,6 +417,32 @@ export class HotkeyProfileService {
     }
   }
 
+  _uniqueProfileId(seed) {
+    const cleanSeed = String(seed || "custom.imported").trim() || "custom.imported";
+    const base = cleanSeed.startsWith("custom.") ? cleanSeed : `custom.${cleanSeed.replace(/^preset\./, "")}`;
+    let candidate = base;
+    let idx = 2;
+    while (this.hasProfile(candidate)) {
+      candidate = `${base}.${idx}`;
+      idx += 1;
+    }
+    return candidate;
+  }
+
+  _uniqueProfileName(seed, id) {
+    const base = String(seed || "Imported Hotkeys").trim() || "Imported Hotkeys";
+    const names = new Set(this.allProfiles().map((profile) => profile.name));
+    if (!names.has(base)) return base;
+    const suffix = id.match(/\.([0-9]+)$/)?.[1];
+    let idx = suffix ? Number(suffix) : 2;
+    let candidate = `${base} ${idx}`;
+    while (names.has(candidate)) {
+      idx += 1;
+      candidate = `${base} ${idx}`;
+    }
+    return candidate;
+  }
+
   _storageGet(key) {
     try {
       return this.storage?.getItem?.(key) || "";
@@ -376,6 +459,10 @@ export class HotkeyProfileService {
       return false;
     }
   }
+}
+
+function createdWithBuild() {
+  return String(globalThis.__RTS_BUILD__ || globalThis.__RTS_VERSION__ || DEFAULT_EXPORT_BUILD);
 }
 
 function buildClassicBindings(catalog) {

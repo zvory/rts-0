@@ -515,8 +515,11 @@ export class App {
       const res = await fetch("/version", { cache: "no-store" });
       if (!res.ok) throw new Error(`version request failed: ${res.status}`);
       const text = await res.text();
-      this.statusBadge.setVersion(text.trim() || "unknown");
+      const version = text.trim() || "unknown";
+      globalThis.__RTS_BUILD__ = version;
+      this.statusBadge.setVersion(version);
     } catch {
+      globalThis.__RTS_BUILD__ = "unknown";
       this.statusBadge.setVersion("unknown");
     }
   }

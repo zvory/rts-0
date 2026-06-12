@@ -354,6 +354,33 @@ function hotkeyService() {
   });
 }
 
+{
+  const hotkeys = hotkeyService();
+  for (const method of [
+    "allProfiles",
+    "getActiveProfile",
+    "profileById",
+    "setActiveProfile",
+    "createCustomFromPreset",
+    "saveCustomProfile",
+    "validateDraftProfile",
+    "runtimeDiagnostics",
+    "importProfile",
+    "exportProfile",
+    "exportProfileJson",
+    "parseImportText",
+    "resolveCard",
+    "resolveSlot",
+  ]) {
+    assertHasMethod(hotkeys, method, "HotkeyProfileService");
+  }
+  const exported = hotkeys.exportProfile(HOTKEY_PRESET_CLASSIC);
+  assert(exported.profileId === HOTKEY_PRESET_CLASSIC, "hotkeys: export uses profileId metadata");
+  assert(typeof exported.createdWithBuild === "string", "hotkeys: export includes build metadata");
+  const imported = hotkeys.importProfile(exported);
+  assert(imported.ok && imported.profile.type === "custom", "hotkeys: imports are stored as custom profiles");
+}
+
 // ---------------------------------------------------------------------------
 // HUD resource bar
 // ---------------------------------------------------------------------------
