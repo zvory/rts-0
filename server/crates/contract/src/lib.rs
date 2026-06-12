@@ -15,6 +15,13 @@ pub struct StartPayload {
     pub player_id: u32,
     #[serde(default)]
     pub spectator: bool,
+    /// Build id of the server/client bundle that produced this live start payload. Prediction is
+    /// enabled only when this matches the browser bundle id.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub prediction_build_id: Option<String>,
+    /// Prediction protocol version supported by this live match. Omitted for spectators/replays.
+    #[serde(default, skip_serializing_if = "is_zero_u32")]
+    pub prediction_version: u32,
     #[serde(default, skip_serializing_if = "is_false")]
     pub debug_mode: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]

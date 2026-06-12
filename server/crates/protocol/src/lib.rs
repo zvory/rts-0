@@ -183,6 +183,24 @@ pub struct ClientNetReport {
     pub server_lag_ms: u16,
     pub slow_tick_count: u32,
     pub head_of_line_count: u32,
+    #[serde(default)]
+    pub prediction_mode: String,
+    #[serde(default)]
+    pub pending_command_count: u16,
+    #[serde(default)]
+    pub acknowledged_command_latency_ms: u16,
+    #[serde(default)]
+    pub correction_distance_px: u16,
+    #[serde(default)]
+    pub correction_count: u32,
+    #[serde(default)]
+    pub prediction_disable_count: u32,
+    #[serde(default)]
+    pub wasm_tick_ms: u16,
+    #[serde(default)]
+    pub wasm_memory_bytes: u32,
+    #[serde(default)]
+    pub prediction_replay_ticks: u16,
 }
 
 /// A gameplay command. Validated when applied, not when received.

@@ -31,6 +31,24 @@ function sentSeqs(sent) {
 
 {
   const sent = [];
+  let now = 100;
+  const controller = new PredictionController({
+    now: () => now,
+    sendCommand(command, clientSeq) {
+      sent.push({ command, clientSeq });
+      return true;
+    },
+  });
+  controller.issueCommand({ c: "stop", units: [1] });
+  now = 180;
+  controller.applyAuthoritativeSnapshot({ tick: 30, netStatus: { lastSimConsumedClientSeq: 1 } });
+  const summary = controller.debugSummary();
+  assert(summary.ackLatencyMs === 80, "ack latency records issue-to-sim-consumption duration");
+  assert(summary.maxAckLatencyMs === 80, "max ack latency tracks observed latency");
+}
+
+{
+  const sent = [];
   const controller = new PredictionController({
     now: () => 2000,
     sendCommand(command, clientSeq) {
@@ -104,7 +122,8 @@ function sentSeqs(sent) {
     },
   });
   controller.issueCommand({ c: "stop", units: [1] });
-  controller.reset({ enabled: false, preserveClientSeq: true });
+  controller.reset({ enabled: false, preserveClientSeq: true, reason: "user-disabled" });
+  assert(controller.debugSummary().disableReasons["user-disabled"] === 1, "disable reasons are counted");
   controller.issueCommand({ c: "stop", units: [2] });
   controller.reset({ enabled: true, preserveClientSeq: true });
   controller.issueCommand({ c: "stop", units: [3] });

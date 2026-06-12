@@ -1871,6 +1871,13 @@ impl RoomTask {
                 let per_player = StartPayload {
                     player_id: id,
                     spectator: player.spectator,
+                    prediction_build_id: (!player.spectator)
+                        .then(|| server_build_sha().to_string()),
+                    prediction_version: if player.spectator {
+                        0
+                    } else {
+                        PREDICTION_PROTOCOL_VERSION
+                    },
                     ..payload.clone()
                 };
                 send_or_log(
@@ -1945,6 +1952,12 @@ impl RoomTask {
             let per_player = StartPayload {
                 player_id: mapped_seat.unwrap_or(connection_id),
                 spectator: mapped_seat.is_none(),
+                prediction_build_id: mapped_seat.map(|_| server_build_sha().to_string()),
+                prediction_version: if mapped_seat.is_some() {
+                    PREDICTION_PROTOCOL_VERSION
+                } else {
+                    0
+                },
                 replay: None,
                 ..payload.clone()
             };
@@ -2116,6 +2129,8 @@ impl RoomTask {
         let per_player = StartPayload {
             player_id: self.dev_view_player_id.unwrap_or(watcher_id),
             spectator: true,
+            prediction_build_id: None,
+            prediction_version: 0,
             ..game.start_payload()
         };
         send_or_log(

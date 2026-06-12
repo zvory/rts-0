@@ -27,6 +27,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "..");
 const rustProtocolPath = path.join(repoRoot, "server/crates/protocol/src/lib.rs");
 const rust = fs.readFileSync(rustProtocolPath, "utf8");
+const rustContractPath = path.join(repoRoot, "server/crates/contract/src/lib.rs");
+const rustContract = fs.readFileSync(rustContractPath, "utf8");
 
 function assert(cond, msg) {
   if (!cond) throw new Error(msg || "Assertion failed");
@@ -147,6 +149,10 @@ assert(
 assert(
   rust.includes("PREDICTION_PROTOCOL_VERSION") && PREDICTION_PROTOCOL_VERSION === 1,
   "prediction protocol version must match Rust",
+);
+assert(
+  rustContract.includes("prediction_build_id") && rustContract.includes("prediction_version"),
+  "start payload must expose prediction compatibility metadata",
 );
 assert(
   rust.includes("COMPACT_SNAPSHOT_VERSION: u8 = 19") && COMPACT_SNAPSHOT_VERSION === 19,

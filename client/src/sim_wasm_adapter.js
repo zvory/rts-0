@@ -1,5 +1,6 @@
 const WASM_GLUE_PATH = "../vendor/sim-wasm/rts_sim_wasm.js";
 const SNAP_CORRECTION_PX = 96;
+const DEFAULT_REPLAY_BUDGET_MS = 4;
 
 export class SimWasmPredictionAdapter {
   constructor({
@@ -7,6 +8,7 @@ export class SimWasmPredictionAdapter {
     playerId,
     now = () => performance.now(),
     importModule = (path) => import(path),
+    replayBudgetMs = DEFAULT_REPLAY_BUDGET_MS,
   } = {}) {
     this.startInfo = startInfo;
     this.playerId = playerId;
@@ -21,11 +23,20 @@ export class SimWasmPredictionAdapter {
     this.lastAdvanceAt = null;
     this.maxCorrectionDistance = 0;
     this.snapCorrectionCount = 0;
+    this.startupMs = null;
+    this.lastTickMs = 0;
+    this.maxTickMs = 0;
+    this.lastReplayTicks = 0;
+    this.maxReplayTicks = 0;
+    this.replayBudgetMs = replayBudgetMs;
+    this.budgetExceededCount = 0;
+    this.memoryBytes = 0;
   }
 
   async init() {
     if (this.ready || this.loading || this.disabledReason) return this.ready;
     this.loading = true;
+    const startedAt = this.now();
     try {
       await assertModuleAvailable(WASM_GLUE_PATH);
       const module = await this.importModule(WASM_GLUE_PATH);
@@ -36,7 +47,9 @@ export class SimWasmPredictionAdapter {
         this.playerId,
       );
       this.ready = true;
+      this.startupMs = this.now() - startedAt;
       this.lastAdvanceAt = this.now();
+      this.refreshMemoryBytes();
       return true;
     } catch (err) {
       this.disabledReason = errorMessage(err);
@@ -57,21 +70,25 @@ export class SimWasmPredictionAdapter {
   enqueueCommand(clientSeq, command) {
     if (!this.ready || !this.predictor) return false;
     this.predictor.enqueueCommandJson(clientSeq, JSON.stringify(command));
-    this.predictor.advanceTicks(1);
+    this.measureTicks(() => this.predictor.advanceTicks(1), 1);
     this.lastPredictedTick = this.renderSnapshot()?.tick ?? this.lastPredictedTick;
     return true;
   }
 
   reconcile(authoritativeSnapshot, pendingCommands = []) {
     if (!this.ready || !this.predictor || !this.module || !authoritativeSnapshot) return null;
-    const baselineJson = this.module.WasmPredictor.baselineFromSnapshotJson(
-      JSON.stringify(authoritativeSnapshot),
-      this.playerId,
-    );
-    this.predictor.importBaselineJson(baselineJson);
-    for (const pending of pendingCommands) {
-      this.predictor.enqueueCommandJson(pending.clientSeq, JSON.stringify(pending.cmd));
-    }
+    const replayTicks = Math.max(0, pendingCommands?.length || 0);
+    const elapsed = this.measureTicks(() => {
+      const baselineJson = this.module.WasmPredictor.baselineFromSnapshotJson(
+        JSON.stringify(authoritativeSnapshot),
+        this.playerId,
+      );
+      this.predictor.importBaselineJson(baselineJson);
+      for (const pending of pendingCommands) {
+        this.predictor.enqueueCommandJson(pending.clientSeq, JSON.stringify(pending.cmd));
+      }
+    }, replayTicks);
+    if (elapsed > this.replayBudgetMs) this.budgetExceededCount += 1;
     const diagnostics = this.diagnostics();
     const correction = Number(diagnostics?.correctionMagnitude) || 0;
     this.maxCorrectionDistance = Math.max(this.maxCorrectionDistance, correction);
@@ -84,6 +101,7 @@ export class SimWasmPredictionAdapter {
       snapCorrection: correction > SNAP_CORRECTION_PX,
       maxCorrectionDistance: this.maxCorrectionDistance,
       snapCorrectionCount: this.snapCorrectionCount,
+      replayBudgetExceeded: elapsed > this.replayBudgetMs,
     };
   }
 
@@ -94,7 +112,7 @@ export class SimWasmPredictionAdapter {
     const elapsedMs = Math.max(0, now - this.lastAdvanceAt);
     const ticks = Math.min(8, Math.floor(elapsedMs / (1000 / 30)));
     if (ticks > 0) {
-      this.predictor.advanceTicks(ticks);
+      this.measureTicks(() => this.predictor.advanceTicks(ticks), ticks);
       this.lastAdvanceAt += ticks * (1000 / 30);
     }
     const snapshot = this.renderSnapshot();
@@ -120,7 +138,34 @@ export class SimWasmPredictionAdapter {
       ...JSON.parse(this.predictor.diagnosticsJson()),
       maxCorrectionDistance: this.maxCorrectionDistance,
       snapCorrectionCount: this.snapCorrectionCount,
+      startupMs: this.startupMs,
+      lastTickMs: this.lastTickMs,
+      maxTickMs: this.maxTickMs,
+      lastReplayTicks: this.lastReplayTicks,
+      maxReplayTicks: this.maxReplayTicks,
+      replayBudgetMs: this.replayBudgetMs,
+      budgetExceededCount: this.budgetExceededCount,
+      memoryBytes: this.refreshMemoryBytes(),
     };
+  }
+
+  measureTicks(fn, ticks) {
+    const startedAt = this.now();
+    fn();
+    const elapsed = this.now() - startedAt;
+    this.lastTickMs = elapsed;
+    this.maxTickMs = Math.max(this.maxTickMs, elapsed);
+    this.lastReplayTicks = ticks;
+    this.maxReplayTicks = Math.max(this.maxReplayTicks, ticks);
+    this.refreshMemoryBytes();
+    return elapsed;
+  }
+
+  refreshMemoryBytes() {
+    const memory = this.module?.memory || this.module?.wasm?.memory;
+    const bytes = memory?.buffer?.byteLength;
+    if (Number.isFinite(bytes)) this.memoryBytes = bytes;
+    return this.memoryBytes;
   }
 }
 

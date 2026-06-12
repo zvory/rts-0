@@ -760,6 +760,15 @@ mod tests {
             server_lag_ms: 0,
             slow_tick_count: 0,
             head_of_line_count: 0,
+            prediction_mode: String::new(),
+            pending_command_count: 0,
+            acknowledged_command_latency_ms: 0,
+            correction_distance_px: 0,
+            correction_count: 0,
+            prediction_disable_count: 0,
+            wasm_tick_ms: 0,
+            wasm_memory_bytes: 0,
+            prediction_replay_ticks: 0,
         }
     }
 
@@ -1671,6 +1680,15 @@ fn log_client_net_report(player_id: u32, current_room_name: Option<&str>, report
         server_lag_ms = report.server_lag_ms,
         slow_tick_count = report.slow_tick_count,
         head_of_line_count = report.head_of_line_count,
+        prediction_mode = %report.prediction_mode,
+        pending_command_count = report.pending_command_count,
+        acknowledged_command_latency_ms = report.acknowledged_command_latency_ms,
+        correction_distance_px = report.correction_distance_px,
+        correction_count = report.correction_count,
+        prediction_disable_count = report.prediction_disable_count,
+        wasm_tick_ms = report.wasm_tick_ms,
+        wasm_memory_bytes = report.wasm_memory_bytes,
+        prediction_replay_ticks = report.prediction_replay_ticks,
         "client network report"
     );
 }
@@ -1686,6 +1704,13 @@ fn is_notable_net_report(report: &ClientNetReport) -> bool {
         || report.ws_buffered_bytes >= NET_REPORT_WS_BUFFERED_BYTES_ISSUE
         || report.server_tick_ms >= NET_REPORT_SERVER_TICK_ISSUE_MS
         || report.server_lag_ms >= NET_REPORT_SERVER_LAG_ISSUE_MS
+        || report.pending_command_count >= 8
+        || report.acknowledged_command_latency_ms >= NET_REPORT_LATENCY_ISSUE_MS
+        || report.correction_distance_px >= 32
+        || report.correction_count > 0
+        || report.prediction_disable_count > 0
+        || report.wasm_tick_ms >= NET_REPORT_FRAME_GAP_ISSUE_MS
+        || report.prediction_replay_ticks >= 8
 }
 
 /// Forward a [`RoomEvent`] to the connection's room, if it has joined one. Logs and ignores the
