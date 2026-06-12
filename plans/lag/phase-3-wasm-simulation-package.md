@@ -1,5 +1,12 @@
 # Phase 3 - WASM Simulation Package
 
+Status: Done.
+
+Implemented as `server/crates/sim-wasm`, a `wasm-bindgen` browser facade over a narrow
+owner-safe prediction model. The crate depends only on `rts-sim`, `rts-rules`, `rts-protocol`,
+`rts-contract`, and serialization/binding support; the boundary checker rejects server, AI, Tokio,
+Axum, and SQL dependencies.
+
 ## Objective
 
 Create a browser-loadable Rust simulation package that can run deterministic local prediction
@@ -98,6 +105,29 @@ is still disabled.
 At handoff, include the WASM build command, generated artifact location, bundle-size delta, and the
 baseline import limitations that Phase 4 must respect. Identify which state fields are parity-tested
 and which are intentionally excluded because they are not owner-safe or not yet predicted.
+
+## Phase 3 Handoff
+
+- Build/check command: `cargo check --manifest-path server/Cargo.toml -p rts-sim-wasm --target wasm32-unknown-unknown`.
+- Browser asset command: `scripts/build-sim-wasm.sh` after installing `wasm-bindgen-cli` version
+  `0.2.123`.
+- Generated browser assets: `client/vendor/sim-wasm/rts_sim_wasm.js` and
+  `client/vendor/sim-wasm/rts_sim_wasm_bg.wasm`.
+- Bundle-size check: `scripts/check-sim-wasm-size.sh`; current raw release artifact is
+  `997716` bytes against the initial `1250000` byte ceiling. The generated
+  `wasm-bindgen` browser `.wasm` is `514873` bytes.
+- Baseline strategy: `OwnedPredictionBaseline`. It imports owned entities, owner economy/supply
+  fields, and visible enemy obstacles without enemy ids. Hidden enemy ids, positions, orders,
+  target ids, economy, production, fog reconstruction, resource node state, abilities, combat, and
+  construction are intentionally excluded or marked unsupported.
+- Parity-tested fields: local construction from the same start payload/baseline, no-op ticks,
+  simple movement, queued movement order stages, pending command diagnostics, correction magnitude,
+  owner-safe baseline export, and invalid build-command unsupported reporting.
+  These tests compare the native and WASM-facing JSON facade behavior from the same owner-safe
+  baseline, not hidden full-world server state.
+- Phase 4 should connect this package to the client only for owned unit movement/order prediction
+  first. Any broader prediction must add a new owner-safe baseline field and a test proving it does
+  not expose hidden enemy or internal production/economy state.
 
 ## Player-Facing Outcome
 
