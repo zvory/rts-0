@@ -92,6 +92,7 @@ impl MortarShellStore {
         x: f32,
         y: f32,
         tick: u32,
+        reveal_launch_to_enemies: bool,
     ) {
         self.shells.push(MortarShell {
             owner,
@@ -100,7 +101,17 @@ impl MortarShellStore {
             y,
             impact_tick: tick.saturating_add(config::MORTAR_SHELL_DELAY_TICKS),
         });
-        emit_launch(events, fog, owner, attacker, from_x, from_y, x, y);
+        emit_launch(
+            events,
+            fog,
+            owner,
+            attacker,
+            from_x,
+            from_y,
+            x,
+            y,
+            reveal_launch_to_enemies,
+        );
     }
 
     pub(crate) fn resolve_due(
@@ -134,10 +145,13 @@ fn emit_launch(
     from_y: f32,
     to_x: f32,
     to_y: f32,
+    reveal_launch_to_enemies: bool,
 ) {
     let player_ids: Vec<u32> = events.keys().copied().collect();
     for pid in player_ids {
-        if pid != owner && !fog.is_visible_world(pid, from_x, from_y) {
+        if pid != owner
+            && (!reveal_launch_to_enemies || !fog.is_visible_world(pid, from_x, from_y))
+        {
             continue;
         }
         events.entry(pid).or_default().push(Event::MortarLaunch {

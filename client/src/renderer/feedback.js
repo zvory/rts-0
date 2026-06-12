@@ -591,7 +591,37 @@ export function _drawMortarLaunches(state) {
     const age = now - launch.createdAt;
     const fade = 1 - clamp01(age / 360);
     const r = 11;
+    const dx = finiteNumber(launch.toX) ? launch.toX - launch.x : 1;
+    const dy = finiteNumber(launch.toY) ? launch.toY - launch.y : 0;
+    const len = Math.hypot(dx, dy) || 1;
+    const ux = dx / len;
+    const uy = dy / len;
+    const flashFade = 1 - clamp01(age / 150);
+    const flashLen = 22;
+    const flashWidth = 8;
     g.lineStyle(0, 0x000000, 0);
+    g.beginFill(0xfff3b0, 0.88 * flashFade);
+    g.drawPolygon([
+      launch.x + ux * 2 - uy * 2.8,
+      launch.y + uy * 2 + ux * 2.8,
+      launch.x + ux * flashLen,
+      launch.y + uy * flashLen,
+      launch.x + ux * 5 + uy * flashWidth,
+      launch.y + uy * 5 - ux * flashWidth,
+    ]);
+    g.endFill();
+    g.beginFill(0xff8b23, 0.48 * flashFade);
+    g.drawPolygon([
+      launch.x - uy * 4.5,
+      launch.y + ux * 4.5,
+      launch.x + ux * 16,
+      launch.y + uy * 16,
+      launch.x + uy * 4.5,
+      launch.y - ux * 4.5,
+      launch.x - ux * 5,
+      launch.y - uy * 5,
+    ]);
+    g.endFill();
     g.beginFill(0x8a806b, 0.24 * fade);
     g.drawPolygon([
       launch.x - r * 0.95, launch.y - r * 0.14,
@@ -661,8 +691,8 @@ export function _drawMortarShells(state) {
     const x = shell.fromX + dx * eased;
     const y = shell.fromY + dy * eased - arc;
     const stretch = Math.sin(Math.PI * t);
-    const shellLen = 5.5 + stretch * 6.5;
-    const shellWidth = 4.2 - stretch * 1.2;
+    const shellLen = (5.5 + stretch * 6.5) * 1.25;
+    const shellWidth = (4.2 - stretch * 1.2) * 1.25;
     const groundSpeed = 6 * t * (1 - t);
     const tangentX = dx * groundSpeed;
     const tangentY = dy * groundSpeed - Math.PI * Math.cos(Math.PI * t) * arcHeight;

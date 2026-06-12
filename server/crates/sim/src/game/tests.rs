@@ -650,15 +650,10 @@ fn manual_mortar_fire_impacts_without_toast_notice() {
         .map(|(_, events)| events.as_slice())
         .unwrap_or(&[]);
     assert!(
-        enemy_events.iter().any(|event| matches!(
-            event,
-            Event::MortarLaunch { from, to_x, to_y, delay_ticks, .. }
-                if (*to_x - target_pos.0).abs() < 0.001
-                    && (*to_y - target_pos.1).abs() < 0.001
-                    && *from == mortar
-                    && *delay_ticks == config::MORTAR_SHELL_DELAY_TICKS
-        )),
-        "enemy with vision of the mortar should see launch dust/recoil timing: {enemy_events:?}"
+        enemy_events
+            .iter()
+            .all(|event| !matches!(event, Event::MortarLaunch { .. })),
+        "manual mortar fire should not reveal launch preview markers to enemies: {enemy_events:?}"
     );
     assert!(
         owner_events
@@ -751,6 +746,70 @@ fn set_autocast_command_enables_mortar_autocast_from_default_off() {
             .autocast_enabled(ability::AbilityKind::MortarFire),
         Some(true),
         "setAutocast should enable mortar autofire"
+    );
+}
+
+#[test]
+fn visible_autocast_mortar_launch_is_sent_to_enemy() {
+    let players = [
+        PlayerInit {
+            id: 1,
+            name: "One".into(),
+            color: "#fff".into(),
+            is_ai: false,
+        },
+        PlayerInit {
+            id: 2,
+            name: "Two".into(),
+            color: "#000".into(),
+            is_ai: false,
+        },
+    ];
+    let mut game = empty_flat_game(&players);
+    let mortar_pos = game.map.tile_center(8, 8);
+    let target_pos = game.map.tile_center(12, 8);
+    let mortar = game
+        .entities
+        .spawn_unit(1, EntityKind::MortarTeam, mortar_pos.0, mortar_pos.1)
+        .expect("mortar should spawn");
+    {
+        let mortar_entity = game
+            .entities
+            .get_mut(mortar)
+            .expect("mortar should exist");
+        mortar_entity.set_weapon_setup(WeaponSetup::Deployed);
+        mortar_entity.set_autocast_enabled(ability::AbilityKind::MortarFire, true);
+    }
+    game.entities
+        .spawn_unit(2, EntityKind::Rifleman, target_pos.0, target_pos.1)
+        .expect("target should spawn");
+    game.players[0]
+        .upgrades
+        .insert(upgrade::UpgradeKind::MortarAutocast);
+    systems::recompute_supply(&mut game.players, &game.entities);
+    game.spatial = services::spatial::SpatialIndex::build(&game.entities, game.map.size);
+    let ids: Vec<u32> = game.players.iter().map(|p| p.id).collect();
+    game.fog.recompute(&ids, &game.entities, &game.map);
+    assert!(
+        game.fog.is_visible_world(2, mortar_pos.0, mortar_pos.1),
+        "test setup requires the enemy to see the autocasting mortar"
+    );
+
+    let events = game.tick();
+    let enemy_events = events
+        .iter()
+        .find(|(player_id, _)| *player_id == 2)
+        .map(|(_, events)| events.as_slice())
+        .unwrap_or(&[]);
+
+    assert!(
+        enemy_events.iter().any(|event| matches!(
+            event,
+            Event::MortarLaunch { from, delay_ticks, .. }
+                if *from == mortar
+                    && *delay_ticks == config::MORTAR_SHELL_DELAY_TICKS
+        )),
+        "visible autocast mortar fire should show enemy launch preview markers: {enemy_events:?}"
     );
 }
 
