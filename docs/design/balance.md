@@ -178,7 +178,7 @@ Unit stats (hp, dmg, range[tiles], cooldown[ticks], speed[px/tick], sight[tiles]
 
 | kind            | hp  | dmg | range | cd | speed | sight | steel | oil | sup | buildTicks |
 |-----------------|-----|-----|-------|----|-------|-------|-----|-----|-----|-----------|
-| worker          | 40  | 4   | 1     | 24 | 1.6   | 7     | 50  | 0   | 1   | 360 (~12s) |
+| worker          | 40  | 4   | 1     | 24 | 2.0   | 7     | 50  | 0   | 1   | 360 (~12s) |
 | rifleman        | 45  | 5   | 4     | 16 | 1.6   | 8     | 50  | 0   | 1   | 300 (~10s) |
 | machine_gunner  | 55  | 4   | 6     | 6  | 1.28  | 8     | 75  | 10  | 2   | 400 (~13s) |
 | mortar_team     | 50  | 30 outer / 60 inner AOE | 9 | 60 | 1.12 | 7 | 100 | 50 | 3 | 460 (~15s); trained at Gun Works (`steelworks` kind) |
