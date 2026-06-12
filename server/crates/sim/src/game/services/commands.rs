@@ -235,6 +235,13 @@ pub(crate) fn apply_commands(
                 units,
                 enabled,
             } => {
+                if ability == AbilityKind::MortarFire
+                    && !players.iter().any(|p| {
+                        p.id == player && p.upgrades.contains(&UpgradeKind::MortarAutocast)
+                    })
+                {
+                    continue;
+                }
                 for id in dedupe_cap_units(units) {
                     if owns_unit(entities, player, id) {
                         if let Some(e) = entities.get_mut(id) {
@@ -2095,6 +2102,7 @@ mod tests {
             (EntityKind::Steelworks, UpgradeKind::AtGunUnlock),
             (EntityKind::Steelworks, UpgradeKind::ArtilleryUnlock),
             (EntityKind::Factory, UpgradeKind::TankUnlock),
+            (EntityKind::Steelworks, UpgradeKind::MortarAutocast),
         ] {
             let mut entities = EntityStore::new();
             let (wrong_x, wrong_y) = footprint_center(&map, wrong_building_kind, 4, 4);
@@ -2151,6 +2159,42 @@ mod tests {
             assert_eq!(queue.len(), 1);
             assert_eq!(queue[0].upgrade, upgrade);
         }
+    }
+
+    #[test]
+    fn set_mortar_autocast_requires_completed_research() {
+        let map = flat_map(24);
+        let mut entities = EntityStore::new();
+        let mortar = entities
+            .spawn_unit(1, EntityKind::MortarTeam, 100.0, 100.0)
+            .expect("mortar should spawn");
+        let command = SimCommand::SetAutocast {
+            ability: AbilityKind::MortarFire,
+            units: vec![mortar],
+            enabled: true,
+        };
+        let mut players = vec![player_state(1), player_state(2)];
+
+        apply_with_players(&map, &mut entities, &mut players, vec![(1, command.clone())]);
+        assert_eq!(
+            entities
+                .get(mortar)
+                .expect("mortar should exist")
+                .autocast_enabled(AbilityKind::MortarFire),
+            Some(false),
+            "pre-research autocast command should be ignored"
+        );
+
+        players[0].upgrades.insert(UpgradeKind::MortarAutocast);
+        apply_with_players(&map, &mut entities, &mut players, vec![(1, command)]);
+        assert_eq!(
+            entities
+                .get(mortar)
+                .expect("mortar should exist")
+                .autocast_enabled(AbilityKind::MortarFire),
+            Some(true),
+            "researched autocast command should be accepted"
+        );
     }
 
     #[test]

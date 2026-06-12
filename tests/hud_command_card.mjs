@@ -29,6 +29,7 @@ function slotIds(card) {
   assert.equal(ids[0], `research:${UPGRADE.AT_GUN_UNLOCK}`);
   assert.equal(ids[1], `research:${UPGRADE.ARTILLERY_UNLOCK}`);
   assert.equal(ids[2], `research:${UPGRADE.TANK_UNLOCK}`);
+  assert.equal(ids[3], `research:${UPGRADE.MORTAR_AUTOCAST}`);
 }
 
 {
@@ -36,6 +37,7 @@ function slotIds(card) {
   assert.equal(ids[0], null);
   assert.equal(ids[1], `research:${UPGRADE.ARTILLERY_UNLOCK}`);
   assert.equal(ids[2], `research:${UPGRADE.TANK_UNLOCK}`);
+  assert.equal(ids[3], `research:${UPGRADE.MORTAR_AUTOCAST}`);
 }
 
 {
@@ -43,4 +45,5 @@ function slotIds(card) {
   assert.equal(ids[0], null);
   assert.equal(ids[1], null);
   assert.equal(ids[2], `research:${UPGRADE.TANK_UNLOCK}`);
+  assert.equal(ids[3], `research:${UPGRADE.MORTAR_AUTOCAST}`);
 }

@@ -89,6 +89,7 @@ export const METHAMPHETAMINES_RESEARCH_TICKS = TICK_HZ * 20;
 export const AT_GUN_UNLOCK_RESEARCH_TICKS = TICK_HZ * 20;
 export const ARTILLERY_UNLOCK_RESEARCH_TICKS = TICK_HZ * 30;
 export const TANK_UNLOCK_RESEARCH_TICKS = TICK_HZ * 20;
+export const MORTAR_AUTOCAST_RESEARCH_TICKS = TICK_HZ * 20;
 
 // Player colors (server assigns from a matching palette; used as a fallback for blips).
 export const PLAYER_PALETTE = Object.freeze([
@@ -137,7 +138,12 @@ export const STATS = Object.freeze({
     requires: [KIND.CITY_CENTRE, KIND.BARRACKS] },
   [KIND.RESEARCH_COMPLEX]: { label: "R&D Complex", icon: "RD", footW: 3, footH: 3, sight: 6,
     cost: { steel: 100, oil: 100 }, buildTicks: TICK_HZ * 15, trains: [],
-    researches: [UPGRADE.AT_GUN_UNLOCK, UPGRADE.ARTILLERY_UNLOCK, UPGRADE.TANK_UNLOCK],
+    researches: [
+      UPGRADE.AT_GUN_UNLOCK,
+      UPGRADE.ARTILLERY_UNLOCK,
+      UPGRADE.TANK_UNLOCK,
+      UPGRADE.MORTAR_AUTOCAST,
+    ],
     requires: [KIND.CITY_CENTRE, KIND.TRAINING_CENTRE] },
   [KIND.FACTORY]: { label: "Vehicle Works", icon: "VW", footW: 3, footH: 3, sight: 6,
     cost: { steel: 125, oil: 125 }, buildTicks: 620, trains: [KIND.SCOUT_CAR, KIND.TANK],
@@ -236,6 +242,15 @@ export const UPGRADES = Object.freeze({
     cost: Object.freeze({ steel: 150, oil: 100 }),
     researchTicks: TANK_UNLOCK_RESEARCH_TICKS,
     description: "Unlock Tank training",
+    researchedAt: KIND.RESEARCH_COMPLEX,
+  }),
+  [UPGRADE.MORTAR_AUTOCAST]: Object.freeze({
+    upgrade: UPGRADE.MORTAR_AUTOCAST,
+    label: "Mortar Autocast",
+    icon: "MT+",
+    cost: Object.freeze({ steel: 150, oil: 150 }),
+    researchTicks: MORTAR_AUTOCAST_RESEARCH_TICKS,
+    description: "Enable Mortar Team autocast by default",
     researchedAt: KIND.RESEARCH_COMPLEX,
   }),
 });

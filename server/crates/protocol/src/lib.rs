@@ -79,6 +79,7 @@ pub mod upgrades {
     pub const AT_GUN_UNLOCK: &str = "at_gun_unlock";
     pub const TANK_UNLOCK: &str = "tank_unlock";
     pub const ARTILLERY_UNLOCK: &str = "artillery_unlock";
+    pub const MORTAR_AUTOCAST: &str = "mortar_autocast";
 }
 
 // ---------------------------------------------------------------------------
@@ -1110,6 +1111,7 @@ fn upgrade_code(upgrade: &str) -> u8 {
         upgrades::AT_GUN_UNLOCK => 2,
         upgrades::TANK_UNLOCK => 3,
         upgrades::ARTILLERY_UNLOCK => 4,
+        upgrades::MORTAR_AUTOCAST => 5,
         _ => 255,
     }
 }

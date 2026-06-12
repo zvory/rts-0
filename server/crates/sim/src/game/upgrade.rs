@@ -6,6 +6,7 @@ const METHAMPHETAMINES: &str = "methamphetamines";
 const AT_GUN_UNLOCK: &str = "at_gun_unlock";
 const ARTILLERY_UNLOCK: &str = "artillery_unlock";
 const TANK_UNLOCK: &str = "tank_unlock";
+const MORTAR_AUTOCAST: &str = "mortar_autocast";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum UpgradeKind {
@@ -13,6 +14,7 @@ pub enum UpgradeKind {
     AtGunUnlock,
     ArtilleryUnlock,
     TankUnlock,
+    MortarAutocast,
 }
 
 impl UpgradeKind {
@@ -22,6 +24,7 @@ impl UpgradeKind {
             UpgradeKind::AtGunUnlock => AT_GUN_UNLOCK,
             UpgradeKind::ArtilleryUnlock => ARTILLERY_UNLOCK,
             UpgradeKind::TankUnlock => TANK_UNLOCK,
+            UpgradeKind::MortarAutocast => MORTAR_AUTOCAST,
         }
     }
 }
@@ -35,6 +38,7 @@ impl FromStr for UpgradeKind {
             AT_GUN_UNLOCK => Ok(UpgradeKind::AtGunUnlock),
             ARTILLERY_UNLOCK => Ok(UpgradeKind::ArtilleryUnlock),
             TANK_UNLOCK => Ok(UpgradeKind::TankUnlock),
+            MORTAR_AUTOCAST => Ok(UpgradeKind::MortarAutocast),
             _ => Err(()),
         }
     }
@@ -55,6 +59,7 @@ pub const ALL: &[UpgradeKind] = &[
     UpgradeKind::AtGunUnlock,
     UpgradeKind::ArtilleryUnlock,
     UpgradeKind::TankUnlock,
+    UpgradeKind::MortarAutocast,
 ];
 
 pub fn researchable_upgrades(building: EntityKind) -> Vec<UpgradeKind> {
@@ -97,6 +102,14 @@ pub fn definition(kind: UpgradeKind) -> UpgradeDefinition {
             cost_steel: crate::config::TANK_UNLOCK_COST_STEEL,
             cost_oil: crate::config::TANK_UNLOCK_COST_OIL,
             research_ticks: crate::config::TANK_UNLOCK_RESEARCH_TICKS,
+        },
+        UpgradeKind::MortarAutocast => UpgradeDefinition {
+            kind,
+            researched_at: EntityKind::ResearchComplex,
+            requires_upgrade: None,
+            cost_steel: crate::config::MORTAR_AUTOCAST_COST_STEEL,
+            cost_oil: crate::config::MORTAR_AUTOCAST_COST_OIL,
+            research_ticks: crate::config::MORTAR_AUTOCAST_RESEARCH_TICKS,
         },
     }
 }

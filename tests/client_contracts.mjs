@@ -2021,6 +2021,7 @@ function fakeAudioContext() {
   assert(EVENT_CODE[EVENT.ARTILLERY_TARGET] === 7, "Artillery target compact event code should be reserved");
   assert(EVENT_CODE[EVENT.ARTILLERY_IMPACT] === 8, "Artillery impact compact event code should be reserved");
   assert(EVENT_CODE[EVENT.MORTAR_LAUNCH] === 9, "Mortar launch compact event code should be reserved");
+  assert(UPGRADE_CODE[UPGRADE.MORTAR_AUTOCAST] === 5, "Mortar Autocast compact upgrade code should be reserved");
   assert(
     STATS[KIND.ARTILLERY].cost.steel === 300 &&
       STATS[KIND.ARTILLERY].cost.oil === 100 &&
@@ -2076,8 +2077,9 @@ function fakeAudioContext() {
   assert(
     STATS[KIND.RESEARCH_COMPLEX].researches.includes(UPGRADE.AT_GUN_UNLOCK) &&
       STATS[KIND.RESEARCH_COMPLEX].researches.includes(UPGRADE.ARTILLERY_UNLOCK) &&
-      STATS[KIND.RESEARCH_COMPLEX].researches.includes(UPGRADE.TANK_UNLOCK),
-    "R&D Complex should expose AT Gun, Artillery, and Tank research",
+      STATS[KIND.RESEARCH_COMPLEX].researches.includes(UPGRADE.TANK_UNLOCK) &&
+      STATS[KIND.RESEARCH_COMPLEX].researches.includes(UPGRADE.MORTAR_AUTOCAST),
+    "R&D Complex should expose AT Gun, Artillery, Tank, and Mortar Autocast research",
   );
   assert(!ABILITIES[ABILITY.CHARGE], "client no longer exposes Rifleman Charge as a command-card ability");
   assert(
@@ -2089,6 +2091,12 @@ function fakeAudioContext() {
       UPGRADES[UPGRADE.METHAMPHETAMINES].cost.oil === 100 &&
       UPGRADES[UPGRADE.METHAMPHETAMINES].researchTicks === 600,
     "Methamphetamines research cost and time mirror server",
+  );
+  assert(
+    UPGRADES[UPGRADE.MORTAR_AUTOCAST].cost.steel === 150 &&
+      UPGRADES[UPGRADE.MORTAR_AUTOCAST].cost.oil === 150 &&
+      UPGRADES[UPGRADE.MORTAR_AUTOCAST].researchTicks === 600,
+    "Mortar Autocast research cost and time mirror server",
   );
   assert(
     STATS[KIND.AT_TEAM].upgradeRequiresText === "Requires research in R&D Complex",
@@ -2464,8 +2472,10 @@ function fakeAudioContext() {
     const rdAtResearchButton = renderedButtons.find((button) => button.innerHTML.includes("AT+"));
     const rdArtilleryResearchButton = renderedButtons.find((button) => button.innerHTML.includes("AR+"));
     const rdTankResearchButton = renderedButtons.find((button) => button.innerHTML.includes("TK+"));
+    const rdMortarAutocastButton = renderedButtons.find((button) => button.innerHTML.includes("MT+"));
     assert(rdAtResearchButton?.dataset.hotkey === "Q", "AT Gun Crews research should appear in R&D Complex");
     assert(rdTankResearchButton?.dataset.hotkey === "E", "Tank Production research should appear in R&D Complex");
+    assert(rdMortarAutocastButton?.dataset.hotkey === "A", "Mortar Autocast research should appear in R&D Complex");
     assert(rdArtilleryResearchButton?.dataset.hotkey === "W", "Unlock Artillery research should appear in R&D Complex");
     assert(rdArtilleryResearchButton?.disabled, "Artillery research should be disabled before AT Gun research");
     assert(rdArtilleryResearchButton?.title === "Requires AT Gun Research", "Artillery research should name AT Gun prerequisite");

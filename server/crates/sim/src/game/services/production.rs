@@ -1,6 +1,8 @@
 use crate::game::entity::EntityStore;
 use crate::game::map::Map;
 use crate::game::services::move_coordinator::MoveCoordinator;
+use crate::game::upgrade::UpgradeKind;
+use crate::game::{ability::AbilityKind, entity::EntityKind};
 use crate::game::PlayerState;
 
 /// Advance each building's front production item; on completion spawn the unit adjacent to the
@@ -46,6 +48,9 @@ pub(crate) fn production_system(
             if let Some(player) = players.iter_mut().find(|p| p.id == owner) {
                 player.upgrades.insert(upgrade);
             }
+            if upgrade == UpgradeKind::MortarAutocast {
+                set_owned_mortar_autocast(entities, owner, true);
+            }
             if let Some(b) = entities.get_mut(id) {
                 if let Some(queue) = b.research_queue_mut() {
                     if !queue.is_empty() {
@@ -84,6 +89,14 @@ pub(crate) fn production_system(
             let spawn_facing = first_rally
                 .and_then(|rally| coordinator.rally_spawn_facing(entities, unit, (sx, sy), rally));
             if let Some(spawned) = entities.spawn_unit(owner, unit, sx, sy) {
+                let mortar_autocast_researched = players
+                    .iter()
+                    .any(|p| p.id == owner && p.upgrades.contains(&UpgradeKind::MortarAutocast));
+                if unit == EntityKind::MortarTeam && mortar_autocast_researched {
+                    if let Some(e) = entities.get_mut(spawned) {
+                        e.set_autocast_enabled(AbilityKind::MortarFire, true);
+                    }
+                }
                 if let Some(facing) = spawn_facing {
                     if let Some(e) = entities.get_mut(spawned) {
                         e.set_facing(facing);
@@ -115,10 +128,20 @@ pub(crate) fn production_system(
     }
 }
 
+fn set_owned_mortar_autocast(entities: &mut EntityStore, owner: u32, enabled: bool) {
+    for id in entities.ids() {
+        if let Some(e) = entities.get_mut(id) {
+            if e.owner == owner && e.kind == EntityKind::MortarTeam {
+                e.set_autocast_enabled(AbilityKind::MortarFire, enabled);
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::game::entity::{EntityKind, Order, ProdItem, RallyIntent, RallyKind};
+    use crate::game::entity::{EntityKind, Order, ProdItem, RallyIntent, RallyKind, ResearchItem};
     use crate::game::map::Map;
     use crate::game::services::occupancy::{footprint_center, Occupancy};
     use crate::game::services::pathing::PathingService;
@@ -156,6 +179,67 @@ mod tests {
             produced.1,
             produced.2,
         ));
+    }
+
+    #[test]
+    fn mortar_autocast_research_enables_existing_mortars() {
+        let map = flat_map(24);
+        let mut entities = EntityStore::new();
+        let mortar = entities
+            .spawn_unit(1, EntityKind::MortarTeam, 160.0, 160.0)
+            .expect("mortar should spawn");
+        let (x, y) = footprint_center(&map, EntityKind::ResearchComplex, 10, 10);
+        let research_complex = entities
+            .spawn_building(1, EntityKind::ResearchComplex, x, y, true)
+            .expect("research complex should spawn");
+        entities
+            .get_mut(research_complex)
+            .expect("research complex")
+            .push_research(ResearchItem {
+                upgrade: UpgradeKind::MortarAutocast,
+                progress: 1,
+                total: 1,
+            });
+        let mut players = vec![player(1)];
+
+        tick_production(&map, &mut entities, &mut players);
+
+        assert!(players[0].upgrades.contains(&UpgradeKind::MortarAutocast));
+        assert_eq!(
+            entities
+                .get(mortar)
+                .expect("mortar should exist")
+                .autocast_enabled(AbilityKind::MortarFire),
+            Some(true)
+        );
+    }
+
+    #[test]
+    fn produced_mortars_start_with_autocast_after_research() {
+        let map = flat_map(24);
+        let mut entities = EntityStore::new();
+        spawn_building_training(
+            &map,
+            &mut entities,
+            10,
+            10,
+            EntityKind::Steelworks,
+            EntityKind::MortarTeam,
+        );
+        let mut player = player(1);
+        player.upgrades.insert(UpgradeKind::MortarAutocast);
+        let mut players = vec![player];
+
+        tick_production(&map, &mut entities, &mut players);
+
+        let mortar = entities
+            .iter()
+            .find(|e| e.owner == 1 && e.kind == EntityKind::MortarTeam)
+            .expect("produced mortar should exist");
+        assert_eq!(
+            mortar.autocast_enabled(AbilityKind::MortarFire),
+            Some(true)
+        );
     }
 
     #[test]

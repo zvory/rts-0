@@ -8,7 +8,8 @@ use crate::game::services::occupancy::Occupancy;
 use crate::game::services::pathing::PathingService;
 use crate::game::services::spatial::SpatialIndex;
 use crate::game::smoke::SmokeCloudStore;
-use crate::game::ScoreState;
+use crate::game::upgrade::UpgradeKind;
+use crate::game::{PlayerState, ScoreState};
 use crate::protocol::{terrain, NoticeSeverity};
 use crate::rules::combat as combat_rules;
 use rand::SeedableRng;
@@ -62,7 +63,9 @@ fn player_state(id: u32, is_ai: bool) -> PlayerState {
 }
 
 fn run_combat_tick(entities: &mut EntityStore) -> HashMap<u32, Vec<Event>> {
-    run_combat_tick_with_players(entities, &[player_state(1, false), player_state(2, false)])
+    let mut player = player_state(1, false);
+    player.upgrades.insert(UpgradeKind::MortarAutocast);
+    run_combat_tick_with_players(entities, &[player, player_state(2, false)])
 }
 
 fn run_combat_tick_with_players(
@@ -108,10 +111,15 @@ fn run_combat_tick_on_map_with_seed_and_smokes(
 
     let mut rng = SmallRng::seed_from_u64(rng_seed);
     let mut mortar_shells = crate::game::mortar::MortarShellStore::default();
+    let mortar_autocast_researched = |owner| {
+        players
+            .iter()
+            .any(|p| p.id == owner && p.upgrades.contains(&UpgradeKind::MortarAutocast))
+    };
     combat_system(
         map,
         entities,
-        players,
+        &mortar_autocast_researched,
         &occ,
         &spatial,
         &mut coordinator,
@@ -525,10 +533,11 @@ fn attack_move_resumes_original_destination_after_target_is_gone() {
     let mut events = HashMap::from([(1, Vec::new())]);
 
     let mut rng = SmallRng::seed_from_u64(0);
+    let mortar_autocast_researched = |_owner| false;
     combat_system(
         &map,
         &mut entities,
-        &[player_state(1, false)],
+        &mortar_autocast_researched,
         &occ,
         &spatial,
         &mut coordinator,
@@ -1436,11 +1445,9 @@ fn mortar_autocast_fires_over_blocking_terrain_with_spotter_vision() {
         mortar.set_autocast_enabled(AbilityKind::MortarFire, true);
     }
 
-    run_combat_tick_on_map(
-        &mut entities,
-        &[player_state(1, false), player_state(2, false)],
-        &map,
-    );
+    let mut player = player_state(1, false);
+    player.upgrades.insert(UpgradeKind::MortarAutocast);
+    run_combat_tick_on_map(&mut entities, &[player, player_state(2, false)], &map);
 
     let mortar = entities.get(mortar_id).expect("mortar should exist");
     assert!(
@@ -1509,6 +1516,35 @@ fn mortar_autocast_disabled_holds_fire_without_blocking_manual_state() {
         mortar.attack_cd(),
         0,
         "disabled autocast mortar should hold fire against visible in-range targets"
+    );
+}
+
+#[test]
+fn mortar_autocast_requires_research_even_if_entity_flag_is_enabled() {
+    let mut entities = EntityStore::new();
+    let mortar_id = entities
+        .spawn_unit(1, EntityKind::MortarTeam, 100.0, 100.0)
+        .expect("mortar should spawn");
+    entities
+        .spawn_unit(2, EntityKind::Rifleman, 220.0, 100.0)
+        .expect("enemy should spawn");
+    if let Some(mortar) = entities.get_mut(mortar_id) {
+        mortar.set_facing(0.0);
+        mortar.set_weapon_facing(0.0);
+        mortar.set_weapon_setup(WeaponSetup::Deployed);
+        mortar.set_autocast_enabled(AbilityKind::MortarFire, true);
+    }
+
+    run_combat_tick_with_players(
+        &mut entities,
+        &[player_state(1, false), player_state(2, false)],
+    );
+
+    let mortar = entities.get(mortar_id).expect("mortar should exist");
+    assert_eq!(
+        mortar.attack_cd(),
+        0,
+        "mortar autocast should not fire before Mortar Autocast research completes"
     );
 }
 

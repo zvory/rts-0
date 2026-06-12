@@ -18,7 +18,6 @@ use crate::game::services::move_coordinator::MoveCoordinator;
 use crate::game::services::occupancy::Occupancy;
 use crate::game::services::spatial::SpatialIndex;
 use crate::game::smoke::SmokeCloudStore;
-use crate::game::PlayerState;
 use crate::protocol::Event;
 use rand::rngs::SmallRng;
 
@@ -60,7 +59,7 @@ pub(super) const TANK_STANDOFF_REPATH_DELTA_PX: f32 = config::TILE_SIZE as f32;
 pub(crate) fn combat_system(
     map: &Map,
     entities: &mut EntityStore,
-    _players: &[PlayerState],
+    mortar_autocast_researched: &dyn Fn(u32) -> bool,
     _occ: &Occupancy,
     spatial: &SpatialIndex,
     coordinator: &mut MoveCoordinator<'_>,
@@ -260,7 +259,8 @@ pub(crate) fn combat_system(
                             .get(id)
                             .and_then(|e| e.autocast_enabled(AbilityKind::MortarFire)),
                         Some(true)
-                    ) {
+                    ) || !mortar_autocast_researched(owner)
+                    {
                         continue;
                     }
                     let (mx, my) = mortar_aim_point(entities, tid, tick);
