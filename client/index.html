@@ -123,16 +123,6 @@
           <div id="selected-panel"></div>
         </div>
 
-        <!-- Above-card settings menu -->
-        <div id="game-menu">
-          <button id="settings-button" type="button" aria-label="Settings" title="Settings">⚙</button>
-          <div id="settings-menu" class="hud-panel" role="menu" hidden>
-            <button id="pointer-lock-toggle" type="button" role="menuitemcheckbox" aria-checked="false">Lock cursor pan</button>
-            <button id="debug-path-toggle" type="button" role="menuitemcheckbox" aria-checked="false" hidden>Movement waypoints</button>
-            <button id="give-up-open" type="button" role="menuitem">Give up</button>
-          </div>
-        </div>
-
         <!-- Bottom-right command card -->
         <div id="command-card"></div>
 
@@ -177,6 +167,10 @@
       </section>
 
       <!-- Transient notice toast -->
+      <div id="game-menu" data-settings-context="lobby">
+        <button id="settings-button" type="button" aria-label="Settings" title="Settings">⚙</button>
+        <div id="settings-menu" class="hud-panel" role="dialog" aria-modal="false" aria-labelledby="settings-title" hidden></div>
+      </div>
       <div id="toast" hidden></div>
     </div>
 

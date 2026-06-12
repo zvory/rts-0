@@ -25,6 +25,7 @@ import {
   noticeDisplayText,
 } from "./alerts.js";
 import { dom, isTextEntry } from "./bootstrap.js";
+import { buildGiveUpAction, buildSettingsTabs } from "./settings_panels.js";
 
 const KAR98K_GAIN = 0.25;
 const MG_BURST_GAIN = 0.7;
@@ -92,6 +93,7 @@ export class Match {
     this.statusBadge = statusBadge;
     this.diagnostics = diagnostics;
     this.hotkeyProfiles = options.hotkeyProfiles || null;
+    this.settings = options.settings || null;
     this.replayViewer = !!options.replayViewer;
     this.missingCombatSoundKinds = new Set();
     this.activeMachineGunSoundKeys = new Map();
@@ -187,12 +189,11 @@ export class Match {
     this.onWindowFocus = this.handleWindowFocus.bind(this);
     this.onVisibilityChange = this.handleVisibilityChange.bind(this);
     this.onPointerLockGesture = this.handlePointerLockGesture.bind(this);
-    this.onSettingsClick = this.toggleSettingsMenu.bind(this);
-    this.onDebugPathToggle = this.toggleDebugPathOverlays.bind(this);
     this.onGiveUpOpen = this.openGiveUpConfirm.bind(this);
     this.onGiveUpCancel = this.closeGiveUpConfirm.bind(this);
     this.onGiveUpConfirm = this.requestGiveUp.bind(this);
     this.onPointerLockToggle = this.togglePointerLock.bind(this);
+    this.onDebugPathToggle = this.toggleDebugPathOverlays.bind(this);
     this.onPointerLockChange = this.handlePointerLockChange.bind(this);
     this.onPointerLockError = this.handlePointerLockError.bind(this);
     if (!this.replayViewer) {
@@ -209,16 +210,11 @@ export class Match {
       window.addEventListener("click", this.onPointerLockGesture, true);
     }
     document.addEventListener("visibilitychange", this.onVisibilityChange);
-    dom.settingsButton?.addEventListener("click", this.onSettingsClick);
-    dom.debugPathToggle?.addEventListener("click", this.onDebugPathToggle);
     if (!this.replayViewer) {
-      dom.pointerLockToggle?.addEventListener("click", this.onPointerLockToggle);
-      dom.giveUpOpen?.addEventListener("click", this.onGiveUpOpen);
       dom.giveUpCancel?.addEventListener("click", this.onGiveUpCancel);
       dom.giveUpConfirmButton?.addEventListener("click", this.onGiveUpConfirm);
     }
-    this.syncDebugPathUi();
-    this.syncPointerLockUi();
+    this.mountSettings();
 
     this.rafId = requestAnimationFrame(this.tickFn);
     this.startMatchPings();
@@ -309,10 +305,8 @@ export class Match {
 
   applySpectatorUi() {
     const spectator = !!this.state?.spectator || this.replayViewer;
-    if (dom.giveUpOpen) dom.giveUpOpen.hidden = spectator;
     if (dom.commandCard) dom.commandCard.hidden = spectator;
     if (dom.giveUpConfirm) dom.giveUpConfirm.hidden = true;
-    if (dom.pointerLockToggle && this.replayViewer) dom.pointerLockToggle.hidden = true;
   }
 
   handleMenuKeyDown(ev) {
@@ -323,10 +317,10 @@ export class Match {
       this.closeGiveUpConfirm();
       return;
     }
-    if (dom.settingsMenu && !dom.settingsMenu.hidden) {
+    if (this.settings?.isOpen()) {
       ev.preventDefault();
       ev.stopPropagation();
-      this.closeSettingsMenu();
+      this.settings.close({ restoreFocus: true });
     }
   }
 
@@ -408,19 +402,8 @@ export class Match {
     return performance.now() <= this.autoPointerLockUntil;
   }
 
-  toggleSettingsMenu() {
-    if (!dom.settingsMenu || this.giveUpSent) return;
-    if (dom.giveUpConfirm && !dom.giveUpConfirm.hidden) this.closeGiveUpConfirm();
-    this.syncPointerLockUi();
-    this.syncDebugPathUi();
-    dom.settingsMenu.hidden = !dom.settingsMenu.hidden;
-    dom.settingsButton?.setAttribute("aria-expanded", String(!dom.settingsMenu.hidden));
-  }
-
   closeSettingsMenu() {
-    if (!dom.settingsMenu) return;
-    dom.settingsMenu.hidden = true;
-    dom.settingsButton?.setAttribute("aria-expanded", "false");
+    this.settings?.close();
   }
 
   openGiveUpConfirm() {
@@ -528,36 +511,55 @@ export class Match {
   }
 
   syncPointerLockUi() {
-    const btn = dom.pointerLockToggle;
-    if (!btn || !this.input) return;
-    if (this.replayViewer) {
-      btn.hidden = true;
-      return;
-    }
-    btn.hidden = false;
-    const supported = this.input.pointerLockSupported();
-    const locked = this.input.pointerLocked;
-    btn.disabled = !supported;
-    btn.setAttribute("aria-checked", String(this.pointerLockPanEnabled));
-    btn.textContent = this.pointerLockPanEnabled
-      ? (locked ? "Lock cursor pan: on (Esc)" : "Lock cursor pan: on")
-      : "Lock cursor pan: off";
-    btn.title = supported
-      ? "Aggressively trap the cursor in the game view for multi-monitor edge panning."
-      : "Cursor lock is not supported by this browser.";
+    if (this.settings?.isOpen()) this.mountSettings({ keepOpen: true });
   }
 
   syncDebugPathUi() {
-    const btn = dom.debugPathToggle;
-    if (!btn || !this.state) return;
-    const available = !!this.state.debugPathOverlaysAvailable;
-    btn.hidden = !available;
-    btn.disabled = !available;
-    btn.setAttribute("aria-checked", String(available && this.state.debugPathOverlaysEnabled));
-    btn.textContent = this.state.debugPathOverlaysEnabled
-      ? "Movement waypoints: on"
-      : "Movement waypoints: off";
-    btn.title = "Show the current and queued movement path waypoints.";
+    if (this.settings?.isOpen()) this.mountSettings({ keepOpen: true });
+  }
+
+  mountSettings({ keepOpen = false } = {}) {
+    if (!this.settings) return;
+    const spectator = !!this.state?.spectator || this.replayViewer;
+    const kind = this.replayViewer ? "replay" : spectator ? "spectator" : "match";
+    const wasOpen = keepOpen && this.settings.isOpen();
+    this.settings.setContext({
+      kind,
+      spectator,
+      replay: this.replayViewer,
+      actions: [
+        buildGiveUpAction({
+          visible: !spectator && !this.giveUpSent,
+          onOpen: this.onGiveUpOpen,
+        }),
+      ],
+      tabs: buildSettingsTabs({
+        audio: this.audio,
+        hotkeyProfiles: this.hotkeyProfiles,
+        game: {
+          kind,
+          spectator,
+          pointerLock: this.replayViewer ? null : {
+            state: () => ({
+              hidden: false,
+              supported: !!this.input?.pointerLockSupported(),
+              enabled: this.pointerLockPanEnabled,
+              locked: !!this.input?.pointerLocked,
+            }),
+            onToggle: this.onPointerLockToggle,
+          },
+        },
+        debug: {
+          available: !!this.state?.debugPathOverlaysAvailable,
+          state: () => ({
+            available: !!this.state?.debugPathOverlaysAvailable,
+            enabled: !!this.state?.debugPathOverlaysEnabled,
+          }),
+          onToggle: this.onDebugPathToggle,
+        },
+      }),
+    });
+    if (wasOpen) this.settings.open({ focus: false });
   }
 
   readPointerLockPanEnabled() {
@@ -876,8 +878,6 @@ export class Match {
     this.net.off(S.REPLAY_STATE, this.onReplayState);
     window.removeEventListener("keydown", this.onMenuKeyDown, true);
     document.removeEventListener("visibilitychange", this.onVisibilityChange);
-    dom.settingsButton?.removeEventListener("click", this.onSettingsClick);
-    dom.debugPathToggle?.removeEventListener("click", this.onDebugPathToggle);
     this.replayControls?.destroy();
     this.replayControls = null;
     if (this.input && typeof this.input.destroy === "function") {
@@ -912,17 +912,12 @@ export class Match {
       window.removeEventListener("click", this.onPointerLockGesture, true);
     }
     document.removeEventListener("visibilitychange", this.onVisibilityChange);
-    dom.settingsButton?.removeEventListener("click", this.onSettingsClick);
-    dom.debugPathToggle?.removeEventListener("click", this.onDebugPathToggle);
     if (!this.replayViewer) {
-      dom.pointerLockToggle?.removeEventListener("click", this.onPointerLockToggle);
-      dom.giveUpOpen?.removeEventListener("click", this.onGiveUpOpen);
       dom.giveUpCancel?.removeEventListener("click", this.onGiveUpCancel);
       dom.giveUpConfirmButton?.removeEventListener("click", this.onGiveUpConfirm);
     }
     this.replayControls?.destroy();
     this.replayControls = null;
-    if (dom.giveUpOpen) dom.giveUpOpen.hidden = false;
     if (dom.commandCard) dom.commandCard.hidden = false;
     if (this.unregisterHudInputZone) {
       this.unregisterHudInputZone();

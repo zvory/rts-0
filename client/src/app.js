@@ -17,7 +17,6 @@ import { Audio, SOUND_MANIFEST } from "./audio.js";
 import { S } from "./protocol.js";
 import { TOAST_MS } from "./alerts.js";
 import {
-  buildAudioSettings,
   devWatchConfig,
   diagnostics,
   dom,
@@ -34,6 +33,8 @@ import {
   buildHotkeyCommandCatalog,
 } from "./hotkey_profiles.js";
 import { buildCommandCardContextCatalog } from "./hud_command_card.js";
+import { SettingsContainer } from "./settings_container.js";
+import { buildSettingsTabs } from "./settings_panels.js";
 
 /**
  * App-level heartbeat interval (ms). The server drops connections idle for 40s,
@@ -69,12 +70,15 @@ export class App {
      */
     this.audio = new Audio();
     void this.audio.preload(SOUND_MANIFEST);
-    if (dom.settingsMenu) buildAudioSettings(this.audio, dom.settingsMenu);
     this.statusBadge = new StatusBadge(dom.version);
     this.hotkeyProfiles = new HotkeyProfileService({
       catalog: buildHotkeyCommandCatalog(buildCommandCardContextCatalog()),
     });
     globalThis.rtsHotkeys = this.hotkeyProfiles;
+    this.settings = new SettingsContainer({
+      button: dom.settingsButton,
+      menu: dom.settingsMenu,
+    });
     /** @type {Lobby} */
     this.lobby = new Lobby(dom.lobbyScreen, this.net);
     this.branchStaging = new BranchStaging(dom.branchScreen, this.net);
@@ -104,6 +108,7 @@ export class App {
     this.inReplayPlayback = false;
     this.allowUnloadWithoutWarning = false;
     this.pendingCameraView = null;
+    this.mountLobbySettings();
   }
 
   /** Connect, wire global server messages, and show the lobby. */
@@ -122,6 +127,7 @@ export class App {
 
     void this.loadVersion();
     this.lobby.show();
+    this.mountLobbySettings();
     this._mountMatchHistory();
     this.applyDevBanner();
     try {
@@ -257,7 +263,11 @@ export class App {
       this.audio,
       this.statusBadge,
       diagnostics,
-      { initialCamera: carriedCamera, hotkeyProfiles: this.hotkeyProfiles },
+      {
+        initialCamera: carriedCamera,
+        hotkeyProfiles: this.hotkeyProfiles,
+        settings: this.settings,
+      },
     );
     diagnostics.mark("app.onStart.end");
   }
@@ -413,9 +423,23 @@ export class App {
     dom.lobbyScreen.hidden = false;
     if (dom.devLinks) dom.devLinks.hidden = false;
     this.lobby.show();
+    this.mountLobbySettings();
     // A new match row may have just been written server-side; pull the freshest list.
     if (this.matchHistory) this.matchHistory.refresh();
     else this._mountMatchHistory();
+  }
+
+  mountLobbySettings() {
+    this.settings?.setContext({
+      kind: "lobby",
+      spectator: false,
+      replay: false,
+      tabs: buildSettingsTabs({
+        audio: this.audio,
+        hotkeyProfiles: this.hotkeyProfiles,
+        game: { kind: "lobby" },
+      }),
+    });
   }
 
   onBeforeUnload(ev) {

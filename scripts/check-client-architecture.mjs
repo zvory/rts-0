@@ -31,6 +31,8 @@ const AREA_BY_FILE = new Map(Object.entries({
   "status_badge.js": "ui",
   "minimap.js": "ui",
   "branch_staging.js": "ui",
+  "settings_container.js": "ui",
+  "settings_panels.js": "ui",
 
   "replay_camera_input.js": "input",
 

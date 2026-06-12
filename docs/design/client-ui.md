@@ -21,6 +21,8 @@ src/
   hud.js          # HUD: resources/supply bar, selected panel, command card (build/train)
   minimap.js      # Minimap: draw terrain+entities+viewport; click to move camera/command
   lobby.js        # Lobby screen: name entry, player list, ready/start buttons
+  settings_container.js # Reusable settings shell: opener, tabs, focus, teardown
+  settings_panels.js # Portable settings tab panel descriptors
   main.js         # Entry point: starts App
   app.js          # Lobby/app shell lifecycle and persistent Net/Audio ownership
   match.js        # Match lifecycle, module dependency wiring, render loop, transient events
@@ -66,6 +68,30 @@ export class BranchStaging {
   render(msg)                            // branchStaging payload
 }
 ```
+
+`settings_container.js`
+```js
+export class SettingsContainer {
+  constructor({ button, menu, title })
+  setContext({ kind, spectator, replay, actions, tabs }) // mounts context-specific tabs/actions
+  setTabs(tabs)                         // [{id,label,visible,render(panel, context)}]
+  open({ focus }), close({ restoreFocus }), toggle()
+  isOpen()
+  destroy()
+}
+```
+
+`settings_panels.js`
+```js
+buildSettingsTabs({ audio, hotkeyProfiles, game, debug })
+buildGiveUpAction({ visible, onOpen })
+```
+
+The long-lived `SettingsContainer` is constructed by `App` with `#settings-button` and the
+`#settings-menu` mount point. `App` mounts the lobby context; `Match`/`ReplayViewer` remount live,
+spectator, and replay contexts through dependency-injected collaborators. The stable rendered ids
+inside the settings mount point are `#pointer-lock-toggle`, `#debug-path-toggle`, and
+`#give-up-open`; they may not exist until their owning tab/action is visible.
 
 `state.js`
 ```js
@@ -369,7 +395,7 @@ Current areas:
 - `model`: `state.js`, `command_composer.js`.
 - `transport`: `net.js`, `protocol.js`.
 - `rules-mirror`: `config.js`.
-- `ui`: HUD, command card, lobby, match history, minimap, status badge, branch staging.
+- `ui`: HUD, command card, lobby, match history, minimap, status badge, branch staging, settings.
 - `input`: `input/` plus `replay_camera_input.js`.
 - `renderer`: `renderer/`.
 - `platform`: bootstrap, audio, combat audio, alerts, fog, camera.

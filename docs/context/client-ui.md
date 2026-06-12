@@ -16,7 +16,8 @@ Use when changing rendering, input, HUD, lobby UI, or any module under `client/s
 - `transport`: `net.js`, `protocol.js` — WebSocket wrapper and wire mirror.
 - `rules-mirror`: `config.js` — UI/render/fog subset of mirrored balance.
 - `ui`: `hud.js`, `hud_command_card.js`, `lobby.js`, `match_history.js`, `status_badge.js`,
-  `minimap.js`, `branch_staging.js` — DOM/HUD/lobby/minimap surfaces.
+  `minimap.js`, `branch_staging.js`, `settings_container.js`, `settings_panels.js` —
+  DOM/HUD/lobby/minimap/settings surfaces.
 - `input`: `input/` plus `replay_camera_input.js` — input facade and area-local collaborators.
 - `renderer`: `renderer/` — Pixi facade, layers, terrain, entity, fog, feedback, art helpers.
 - `platform`: `bootstrap.js`, `audio.js`, `combat_audio.js`, `alerts.js`, `fog.js`, `camera.js`

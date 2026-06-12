@@ -76,6 +76,7 @@ import {
 import { DomClickInputZone, MatchInputRouter } from "../client/src/input/router.js";
 import { _drawUnit, _tankMotionVisual } from "../client/src/renderer/units.js";
 import { _drawAbilityTargetPreview } from "../client/src/renderer/feedback.js";
+import { buildGiveUpAction, buildSettingsTabs } from "../client/src/settings_panels.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -234,6 +235,70 @@ function fakeHudRootWithoutResourceSpans() {
   };
 }
 
+function withFakeSettingsDocument(fn) {
+  const priorDocument = globalThis.document;
+  const priorHTMLElement = globalThis.HTMLElement;
+  class FakeElement {
+    constructor(tagName) {
+      this.tagName = String(tagName).toUpperCase();
+      this.id = "";
+      this.type = "";
+      this.className = "";
+      this.textContent = "";
+      this.hidden = false;
+      this.disabled = false;
+      this.value = "";
+      this.children = [];
+      this.attributes = new Map();
+      this.listeners = {};
+      this.classList = {
+        add: (value) => {
+          this.className = this.className ? `${this.className} ${value}` : value;
+        },
+      };
+    }
+    append(...children) {
+      this.children.push(...children);
+    }
+    appendChild(child) {
+      this.children.push(child);
+      return child;
+    }
+    setAttribute(name, value) {
+      this.attributes.set(name, String(value));
+    }
+    getAttribute(name) {
+      return this.attributes.get(name) || null;
+    }
+    addEventListener(type, handler) {
+      this.listeners[type] = handler;
+    }
+  }
+  globalThis.HTMLElement = FakeElement;
+  globalThis.document = {
+    createElement(tagName) {
+      return new FakeElement(tagName);
+    },
+  };
+  try {
+    return fn();
+  } finally {
+    if (priorDocument === undefined) delete globalThis.document;
+    else globalThis.document = priorDocument;
+    if (priorHTMLElement === undefined) delete globalThis.HTMLElement;
+    else globalThis.HTMLElement = priorHTMLElement;
+  }
+}
+
+function findFakeById(root, id) {
+  if (root.id === id) return root;
+  for (const child of root.children || []) {
+    const found = findFakeById(child, id);
+    if (found) return found;
+  }
+  return null;
+}
+
 // ---------------------------------------------------------------------------
 // HUD resource bar
 // ---------------------------------------------------------------------------
@@ -251,6 +316,50 @@ function fakeHudRootWithoutResourceSpans() {
   assert(ids.get("res-steel").textContent === "325", "restored HUD steel span updates from live resources");
   assert(ids.get("res-oil").textContent === "80", "restored HUD oil span updates from live resources");
   assert(ids.get("res-supply").textContent === "7 / 14", "restored HUD supply span updates from live supply");
+}
+
+// ---------------------------------------------------------------------------
+// Unified settings tabs
+// ---------------------------------------------------------------------------
+
+{
+  const tabs = buildSettingsTabs({ audio: {}, game: { kind: "lobby" } }).filter((tab) => tab.visible !== false);
+  assert(tabs.map((tab) => tab.id).join(",") === "game,hotkeys,audio", "settings: lobby shows game, hotkeys, and audio tabs");
+
+  const debugTabs = buildSettingsTabs({
+    audio: {},
+    game: { kind: "match" },
+    debug: { available: true },
+  }).filter((tab) => tab.visible !== false);
+  assert(debugTabs.map((tab) => tab.id).join(",") === "game,hotkeys,audio,debug", "settings: debug tab is conditional");
+
+  withFakeSettingsDocument(() => {
+    let giveUpOpened = false;
+    const action = buildGiveUpAction({ visible: true, onOpen: () => { giveUpOpened = true; } });
+    const button = action.render();
+    assert(button.id === "give-up-open", "settings: live give-up action keeps pinned id");
+    button.listeners.click();
+    assert(giveUpOpened, "settings: live give-up action calls injected opener");
+    assert(buildGiveUpAction({ visible: false, onOpen: () => {} }).render() === null,
+      "settings: spectator/replay contexts omit give-up action");
+  });
+
+  withFakeSettingsDocument(() => {
+    let debugToggled = false;
+    const [debugTab] = buildSettingsTabs({
+      debug: {
+        available: true,
+        state: () => ({ available: true, enabled: false }),
+        onToggle: () => { debugToggled = true; },
+      },
+    }).filter((tab) => tab.id === "debug");
+    const root = document.createElement("div");
+    debugTab.render(root, {});
+    const toggle = findFakeById(root, "debug-path-toggle");
+    assert(toggle, "settings: debug tab renders movement waypoint control with pinned id");
+    toggle.listeners.click();
+    assert(debugToggled, "settings: debug waypoint control calls injected toggle");
+  });
 }
 
 // ---------------------------------------------------------------------------
