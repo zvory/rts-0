@@ -122,6 +122,36 @@ try {
       : `PREDICTION: WASM adapter unavailable for smoke (${predictionSmoke.reason})`,
   );
 
+  const predictionOffSmoke = await page.evaluate(() => {
+    const app = window.__rts, m = app.match, s = m.state;
+    app.setPredictionEnabled(false);
+    const worker = s.entitiesInterpolated(1, { includePrediction: false })
+      .find((e) => e.owner === s.playerId && e.kind === "worker");
+    if (!worker) return { worker: false };
+    const issued = m.commandIssuer.issueCommand({
+      c: "move",
+      units: [worker.id],
+      x: worker.x,
+      y: worker.y + 96,
+    });
+    return {
+      worker: true,
+      issued,
+      enabled: m.prediction.enabled,
+      pending: m.prediction.pendingCommandCount,
+    };
+  });
+  ok(
+    predictionOffSmoke.worker &&
+      predictionOffSmoke.enabled === false &&
+      predictionOffSmoke.issued?.sent &&
+      Number.isInteger(predictionOffSmoke.issued?.clientSeq) &&
+      predictionOffSmoke.issued.clientSeq > 0 &&
+      predictionOffSmoke.issued?.predicted === false &&
+      predictionOffSmoke.pending === 0,
+    `PREDICTION OFF: command sends sequenced authoritative order (seq=${predictionOffSmoke.issued?.clientSeq}, pending=${predictionOffSmoke.pending})`,
+  );
+
   // Interpolation must be live: GameState exposes recv timestamps so alpha isn't pinned to 1.
   const interp = await page.evaluate(() => {
     const s = window.__rts.match.state;
