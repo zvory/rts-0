@@ -10,7 +10,7 @@ position-grinding payoff.
 Working checklist: [command-car-checklist.md](command-car-checklist.md).
 
 - Built at Vehicle Works.
-- Requires Tank Production and a late Vehicle Works upgrade named Command Car.
+- Requires Tank Production and a late R&D Complex research named Command Car.
 - Costs 150 steel / 75 oil.
 - Has no weapon.
 - Ability: **Breakthrough!**
@@ -20,8 +20,8 @@ Working checklist: [command-car-checklist.md](command-car-checklist.md).
 
 ## Work
 
-- Add any new protocol messages, ability identifiers, Breakthrough status representation, and fog
-  projection rules together.
+- Add any new protocol messages, ability identifiers, upgrade identifiers, Breakthrough status
+  representation, and fog projection rules together.
 - Do not implement Fake Army, fake-unit snapshot representation, fake-unit fog projection, fake
   attacks, fake HP, fake lifetime, or fake cleanup in this pass.
 - Implement Command Car after Artillery so Mobile Warfare gains a late tool against entrenched

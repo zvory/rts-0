@@ -6,6 +6,7 @@ const METHAMPHETAMINES: &str = "methamphetamines";
 const AT_GUN_UNLOCK: &str = "at_gun_unlock";
 const ARTILLERY_UNLOCK: &str = "artillery_unlock";
 const TANK_UNLOCK: &str = "tank_unlock";
+const COMMAND_CAR_UNLOCK: &str = "command_car_unlock";
 const MORTAR_AUTOCAST: &str = "mortar_autocast";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -14,6 +15,7 @@ pub enum UpgradeKind {
     AtGunUnlock,
     ArtilleryUnlock,
     TankUnlock,
+    CommandCarUnlock,
     MortarAutocast,
 }
 
@@ -24,6 +26,7 @@ impl UpgradeKind {
             UpgradeKind::AtGunUnlock => AT_GUN_UNLOCK,
             UpgradeKind::ArtilleryUnlock => ARTILLERY_UNLOCK,
             UpgradeKind::TankUnlock => TANK_UNLOCK,
+            UpgradeKind::CommandCarUnlock => COMMAND_CAR_UNLOCK,
             UpgradeKind::MortarAutocast => MORTAR_AUTOCAST,
         }
     }
@@ -38,6 +41,7 @@ impl FromStr for UpgradeKind {
             AT_GUN_UNLOCK => Ok(UpgradeKind::AtGunUnlock),
             ARTILLERY_UNLOCK => Ok(UpgradeKind::ArtilleryUnlock),
             TANK_UNLOCK => Ok(UpgradeKind::TankUnlock),
+            COMMAND_CAR_UNLOCK => Ok(UpgradeKind::CommandCarUnlock),
             MORTAR_AUTOCAST => Ok(UpgradeKind::MortarAutocast),
             _ => Err(()),
         }
@@ -59,6 +63,7 @@ pub const ALL: &[UpgradeKind] = &[
     UpgradeKind::AtGunUnlock,
     UpgradeKind::ArtilleryUnlock,
     UpgradeKind::TankUnlock,
+    UpgradeKind::CommandCarUnlock,
     UpgradeKind::MortarAutocast,
 ];
 
@@ -103,6 +108,14 @@ pub fn definition(kind: UpgradeKind) -> UpgradeDefinition {
             cost_oil: crate::config::TANK_UNLOCK_COST_OIL,
             research_ticks: crate::config::TANK_UNLOCK_RESEARCH_TICKS,
         },
+        UpgradeKind::CommandCarUnlock => UpgradeDefinition {
+            kind,
+            researched_at: EntityKind::ResearchComplex,
+            requires_upgrade: Some(UpgradeKind::TankUnlock),
+            cost_steel: crate::config::COMMAND_CAR_UNLOCK_COST_STEEL,
+            cost_oil: crate::config::COMMAND_CAR_UNLOCK_COST_OIL,
+            research_ticks: crate::config::COMMAND_CAR_UNLOCK_RESEARCH_TICKS,
+        },
         UpgradeKind::MortarAutocast => UpgradeDefinition {
             kind,
             researched_at: EntityKind::ResearchComplex,
@@ -119,6 +132,7 @@ pub fn required_for_unit(unit: EntityKind) -> Option<UpgradeKind> {
         EntityKind::AtTeam => Some(UpgradeKind::AtGunUnlock),
         EntityKind::Artillery => Some(UpgradeKind::ArtilleryUnlock),
         EntityKind::Tank => Some(UpgradeKind::TankUnlock),
+        EntityKind::CommandCar => Some(UpgradeKind::CommandCarUnlock),
         _ => None,
     }
 }

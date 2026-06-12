@@ -11,6 +11,7 @@ pub enum EntityKind {
     Artillery,
     ScoutCar,
     Tank,
+    CommandCar,
     CityCentre,
     Depot,
     Barracks,
@@ -23,7 +24,7 @@ pub enum EntityKind {
 }
 
 impl EntityKind {
-    pub const ALL: [EntityKind; 17] = [
+    pub const ALL: [EntityKind; 18] = [
         EntityKind::Worker,
         EntityKind::Rifleman,
         EntityKind::MachineGunner,
@@ -32,6 +33,7 @@ impl EntityKind {
         EntityKind::Artillery,
         EntityKind::ScoutCar,
         EntityKind::Tank,
+        EntityKind::CommandCar,
         EntityKind::CityCentre,
         EntityKind::Depot,
         EntityKind::Barracks,
@@ -65,6 +67,7 @@ impl EntityKind {
             EntityKind::Artillery => "artillery",
             EntityKind::ScoutCar => "scout_car",
             EntityKind::Tank => "tank",
+            EntityKind::CommandCar => "command_car",
             EntityKind::CityCentre => "city_centre",
             EntityKind::Depot => "depot",
             EntityKind::Barracks => "barracks",
@@ -91,6 +94,7 @@ impl FromStr for EntityKind {
             "artillery" => Ok(EntityKind::Artillery),
             "scout_car" => Ok(EntityKind::ScoutCar),
             "tank" => Ok(EntityKind::Tank),
+            "command_car" => Ok(EntityKind::CommandCar),
             "city_centre" => Ok(EntityKind::CityCentre),
             "depot" => Ok(EntityKind::Depot),
             "barracks" => Ok(EntityKind::Barracks),
@@ -119,6 +123,7 @@ pub fn uses_oriented_vehicle_body(kind: EntityKind) -> bool {
             | EntityKind::Artillery
             | EntityKind::ScoutCar
             | EntityKind::Tank
+            | EntityKind::CommandCar
     )
 }
 
@@ -130,7 +135,7 @@ pub fn uses_pivot_vehicle_movement(kind: EntityKind) -> bool {
 }
 
 pub fn uses_car_movement_semantics(kind: EntityKind) -> bool {
-    matches!(kind, EntityKind::ScoutCar)
+    matches!(kind, EntityKind::ScoutCar | EntityKind::CommandCar)
 }
 
 pub fn fires_while_moving(kind: EntityKind) -> bool {

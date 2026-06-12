@@ -161,6 +161,7 @@ pub(crate) fn run_tick(
             &pre_command.spatial,
             tick,
             events,
+            smokes,
         );
     });
     crate::perf::timed(perf.as_deref_mut(), "promote_queued_orders", || {

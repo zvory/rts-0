@@ -57,6 +57,12 @@ pub(super) fn advance_moving_units(
             }
             let speed_multiplier = if e.kind == EntityKind::Rifleman && e.charge_ticks() > 0 {
                 config::RIFLEMAN_CHARGE_SPEED_MULTIPLIER
+            } else if e.breakthrough_ticks() > 0 {
+                if e.recent_smoke_ticks() > 0 {
+                    config::BREAKTHROUGH_SMOKE_SPEED_MULTIPLIER
+                } else {
+                    config::BREAKTHROUGH_BASE_SPEED_MULTIPLIER
+                }
             } else {
                 1.0
             };
@@ -82,7 +88,7 @@ pub(super) fn advance_moving_units(
         let is_car = uses_car_movement_semantics(kind);
         let vehicle_oil_cost_per_px = match kind {
             EntityKind::Tank => Some(config::TANK_OIL_COST_PER_PX),
-            EntityKind::ScoutCar => Some(config::SCOUT_CAR_OIL_COST_PER_PX),
+            EntityKind::ScoutCar | EntityKind::CommandCar => Some(config::SCOUT_CAR_OIL_COST_PER_PX),
             _ => None,
         };
         // Experimental vehicle fuel rule: an oil-starved vehicle pauses before retrying so sparse
@@ -541,7 +547,7 @@ pub(super) fn advance_moving_units(
 }
 
 fn inject_scout_car_reverse_recovery(e: &mut Entity, map: &Map, occ: &Occupancy) {
-    if e.kind != EntityKind::ScoutCar {
+    if !matches!(e.kind, EntityKind::ScoutCar | EntityKind::CommandCar) {
         return;
     }
     let Some(movement) = e.movement.as_ref() else {

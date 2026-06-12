@@ -37,11 +37,12 @@ Working checklist for `plans/tech/phase-7-command-car.md`, following
     implementation pass.
 - [x] Decide whether this unit is allowed in the initial implementation, debug-only, or hidden until
       later polish.
-  - Available in normal matches immediately after the Vehicle Works Command Car unlock is
+  - Available in normal matches immediately after the R&D Complex Command Car unlock is
     researched.
 - [x] Start patch-note bullets for player-facing changes and keep them updated through the work.
   - Mobile Warfare gains Command Car as a late Vehicle Works capstone after Tank Production.
-  - Vehicle Works can research Command Car for 150 steel / 150 oil over 30 seconds.
+  - R&D Complex can research Command Car for 150 steel / 150 oil over 30 seconds after Tank
+    Production.
   - Command Car is planned as a 150 steel / 75 oil, 4-supply support vehicle with 225 HP, Scout
     Car speed, Scout Car sight, Scout Car movement-oil cost, and Scout Car collision/selection/
     render size.
@@ -80,10 +81,10 @@ Read: `docs/context/balance.md`, `docs/design/balance.md`.
   - 450 ticks, approximately 15 seconds at 30 Hz.
 - [x] Research prerequisite, tech prerequisite, or unlock timing is specified.
   - Requires Tank Production to be researched first.
-  - Requires Vehicle Works research `Command Car`: 150 steel / 150 oil, 900 ticks
+  - Requires R&D Complex research `Command Car`: 150 steel / 150 oil, 900 ticks
     (30 seconds), UI description "Unlocks production of Command Cars".
-  - Upgrade hotkey should be inserted beside the Tank Production upgrade hotkey, using the next
-    clear command-card slot to the right if available.
+  - Upgrade hotkey: `S`, inserted beside the Tank Production upgrade in the R&D Complex command
+    card.
 - [x] Hit points are specified.
   - 225 HP, 50% more than the Scout Car's current 150 HP.
 - [x] Armor, armored status, tags, status immunities, or special vulnerabilities are specified.
@@ -112,7 +113,7 @@ Read: `docs/context/balance.md`, `docs/design/balance.md`.
   - No damage, no projectile, and no target attack.
 - [x] Abilities are specified, including cost, cooldown, range, target rules, queued behavior, and
       cancellation behavior.
-  - Breakthrough! hotkey: implementation should choose an available Command Car command-card slot.
+  - Breakthrough! hotkey: `D`.
   - Breakthrough! is centered on the caster.
   - Radius: 7 tiles.
   - Duration: 180 ticks, approximately 6 seconds at 30 Hz.

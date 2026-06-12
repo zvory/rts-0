@@ -170,7 +170,7 @@ pub(crate) fn unit_body_with_facing(
         }));
     }
 
-    if kind == EntityKind::ScoutCar {
+    if matches!(kind, EntityKind::ScoutCar | EntityKind::CommandCar) {
         let (length, width, clearance) = vehicle_body_dimensions(kind);
         let radius = width * 0.5 + clearance;
         let half_segment = (length * 0.5 - width * 0.5).max(0.0);
@@ -231,7 +231,7 @@ fn vehicle_body_dimensions(kind: EntityKind) -> (f32, f32, f32) {
             config::ARTILLERY_BODY_WIDTH_PX,
             config::ARTILLERY_BODY_CLEARANCE_PX,
         ),
-        EntityKind::ScoutCar => (
+        EntityKind::ScoutCar | EntityKind::CommandCar => (
             config::SCOUT_CAR_BODY_LENGTH_PX,
             config::SCOUT_CAR_BODY_WIDTH_PX,
             config::SCOUT_CAR_BODY_CLEARANCE_PX,

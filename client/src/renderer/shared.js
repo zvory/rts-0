@@ -9,7 +9,7 @@ export function muzzleFlashRadius(kind) {
   if (kind === KIND.ARTILLERY) return 11;
   if (kind === KIND.TANK) return 18;
   if (kind === KIND.AT_TEAM) return 15;
-  if (kind === KIND.SCOUT_CAR) return 9;
+  if (kind === KIND.SCOUT_CAR || kind === KIND.COMMAND_CAR) return 9;
   if (kind === KIND.MACHINE_GUNNER) return 9;
   if (kind === KIND.RIFLEMAN) return 7;
   return 0;
@@ -165,7 +165,11 @@ export function tankBodyVisual(stat = {}) {
 }
 
 export function isVehicleBodyKind(kind) {
-  return kind === KIND.AT_TEAM || kind === KIND.ARTILLERY || kind === KIND.TANK || kind === KIND.SCOUT_CAR;
+  return kind === KIND.AT_TEAM ||
+    kind === KIND.ARTILLERY ||
+    kind === KIND.TANK ||
+    kind === KIND.SCOUT_CAR ||
+    kind === KIND.COMMAND_CAR;
 }
 
 export function drawTankTracks(g, body, facing, motion) {

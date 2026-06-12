@@ -42,6 +42,7 @@ pub mod kinds {
     pub const ARTILLERY: &str = "artillery";
     pub const SCOUT_CAR: &str = "scout_car";
     pub const TANK: &str = "tank";
+    pub const COMMAND_CAR: &str = "command_car";
     pub const CITY_CENTRE: &str = "city_centre";
     pub const DEPOT: &str = "depot";
     pub const BARRACKS: &str = "barracks";
@@ -71,6 +72,7 @@ pub mod abilities {
     pub const SMOKE: &str = "smoke";
     pub const MORTAR_FIRE: &str = "mortarFire";
     pub const POINT_FIRE: &str = "pointFire";
+    pub const BREAKTHROUGH: &str = "breakthrough";
 }
 
 /// Permanent upgrade ids used by production/research and snapshot projection.
@@ -79,6 +81,7 @@ pub mod upgrades {
     pub const AT_GUN_UNLOCK: &str = "at_gun_unlock";
     pub const TANK_UNLOCK: &str = "tank_unlock";
     pub const ARTILLERY_UNLOCK: &str = "artillery_unlock";
+    pub const COMMAND_CAR_UNLOCK: &str = "command_car_unlock";
     pub const MORTAR_AUTOCAST: &str = "mortar_autocast";
 }
 
@@ -423,7 +426,7 @@ pub struct LobbyPlayer {
 /// transport-side optimization for `ServerMessage::Snapshot`.
 pub const PREDICTION_PROTOCOL_VERSION: u32 = 1;
 
-pub const COMPACT_SNAPSHOT_VERSION: u8 = 18;
+pub const COMPACT_SNAPSHOT_VERSION: u8 = 19;
 
 /// Serialize one semantic snapshot as a compact JSON text frame payload.
 pub fn serialize_compact_snapshot(snapshot: &Snapshot) -> serde_json::Result<String> {
@@ -676,17 +679,20 @@ impl Serialize for CompactEntity<'_> {
         if !entity.abilities.is_empty() {
             len = 24;
         }
-        if entity.vision_only {
+        if entity.breakthrough_ticks.is_some() {
             len = 25;
         }
-        if entity.debug_path.is_some() {
+        if entity.vision_only {
             len = 26;
         }
-        if !entity.rally_plan.is_empty() {
+        if entity.debug_path.is_some() {
             len = 27;
         }
-        if prod_upgrade.is_some() {
+        if !entity.rally_plan.is_empty() {
             len = 28;
+        }
+        if prod_upgrade.is_some() {
+            len = 29;
         }
 
         let mut seq = serializer.serialize_seq(Some(len))?;
@@ -759,12 +765,15 @@ impl Serialize for CompactEntity<'_> {
             )?;
         }
         if len > 24 {
-            seq.serialize_element(&entity.vision_only)?;
+            seq.serialize_element(&entity.breakthrough_ticks)?;
         }
         if len > 25 {
-            seq.serialize_element(&entity.debug_path.as_ref().map(CompactDebugPath))?;
+            seq.serialize_element(&entity.vision_only)?;
         }
         if len > 26 {
+            seq.serialize_element(&entity.debug_path.as_ref().map(CompactDebugPath))?;
+        }
+        if len > 27 {
             seq.serialize_element(
                 &entity
                     .rally_plan
@@ -773,7 +782,7 @@ impl Serialize for CompactEntity<'_> {
                     .collect::<Vec<_>>(),
             )?;
         }
-        if len > 27 {
+        if len > 28 {
             seq.serialize_element(&prod_upgrade)?;
         }
         seq.end()
@@ -1068,6 +1077,7 @@ fn kind_code(kind: &str) -> u8 {
         kinds::OIL => 12,
         kinds::STEELWORKS => 13,
         kinds::RESEARCH_COMPLEX => 17,
+        kinds::COMMAND_CAR => 18,
         _ => 255,
     }
 }
@@ -1106,6 +1116,7 @@ fn order_stage_code(kind: &str) -> u8 {
         abilities::SMOKE => 6,
         abilities::MORTAR_FIRE => 9,
         abilities::POINT_FIRE => 10,
+        abilities::BREAKTHROUGH => 11,
         "setupAtGuns" => 7,
         abilities::CHARGE => 8,
         _ => 255,
@@ -1118,6 +1129,7 @@ fn ability_code(ability: &str) -> u8 {
         abilities::SMOKE => 2,
         abilities::MORTAR_FIRE => 3,
         abilities::POINT_FIRE => 4,
+        abilities::BREAKTHROUGH => 5,
         _ => 255,
     }
 }
@@ -1129,6 +1141,7 @@ fn upgrade_code(upgrade: &str) -> u8 {
         upgrades::TANK_UNLOCK => 3,
         upgrades::ARTILLERY_UNLOCK => 4,
         upgrades::MORTAR_AUTOCAST => 5,
+        upgrades::COMMAND_CAR_UNLOCK => 6,
         _ => 255,
     }
 }
@@ -1512,12 +1525,13 @@ mod tests {
         );
         assert_eq!(value["e"][0][22], serde_json::json!(87));
         assert_eq!(value["e"][0][23], serde_json::json!([[1, 87, 2]]));
-        assert_eq!(value["e"][0][24], serde_json::json!(true));
+        assert_eq!(value["e"][0][24], serde_json::Value::Null);
+        assert_eq!(value["e"][0][25], serde_json::json!(true));
         // Rally point rides in slot 18 of the producing building's record.
         assert_eq!(value["e"][2][18], serde_json::json!([256.0, 512.0]));
         // Rally plan is appended after the legacy optional slots so earlier compact positions stay stable.
         assert_eq!(
-            value["e"][2][26],
+            value["e"][2][27],
             serde_json::json!([[1, 256.0, 512.0], [2, 320.0, 544.0]])
         );
         assert_eq!(value["r"], serde_json::json!([[200, 1498]]));

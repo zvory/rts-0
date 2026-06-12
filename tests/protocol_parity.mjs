@@ -149,7 +149,7 @@ assert(
   "prediction protocol version must match Rust",
 );
 assert(
-  rust.includes("COMPACT_SNAPSHOT_VERSION: u8 = 18") && COMPACT_SNAPSHOT_VERSION === 18,
+  rust.includes("COMPACT_SNAPSHOT_VERSION: u8 = 19") && COMPACT_SNAPSHOT_VERSION === 19,
   "compact snapshot version must match Rust",
 );
 const decodedAck = decodeServerMessage({

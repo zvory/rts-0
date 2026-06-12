@@ -77,9 +77,19 @@ pub const ARTILLERY_UNLOCK_RESEARCH_TICKS: u32 = TICK_HZ * 30;
 pub const TANK_UNLOCK_COST_STEEL: u32 = 150;
 pub const TANK_UNLOCK_COST_OIL: u32 = 100;
 pub const TANK_UNLOCK_RESEARCH_TICKS: u32 = TICK_HZ * 20;
+pub const COMMAND_CAR_UNLOCK_COST_STEEL: u32 = 150;
+pub const COMMAND_CAR_UNLOCK_COST_OIL: u32 = 150;
+pub const COMMAND_CAR_UNLOCK_RESEARCH_TICKS: u32 = TICK_HZ * 30;
 pub const MORTAR_AUTOCAST_COST_STEEL: u32 = 150;
 pub const MORTAR_AUTOCAST_COST_OIL: u32 = 150;
 pub const MORTAR_AUTOCAST_RESEARCH_TICKS: u32 = TICK_HZ * 20;
+
+pub const BREAKTHROUGH_RADIUS_TILES: f32 = 7.0;
+pub const BREAKTHROUGH_DURATION_TICKS: u16 = (TICK_HZ as u16) * 6;
+pub const BREAKTHROUGH_COOLDOWN_TICKS: u16 = (TICK_HZ as u16) * 25;
+pub const BREAKTHROUGH_BASE_SPEED_MULTIPLIER: f32 = 1.2;
+pub const BREAKTHROUGH_SMOKE_SPEED_MULTIPLIER: f32 = 1.4;
+pub const BREAKTHROUGH_RECENT_SMOKE_TICKS: u16 = (TICK_HZ as u16) * 2;
 
 pub const SMOKE_ABILITY_RANGE_TILES: u32 = 9;
 pub const SMOKE_LAUNCH_MAX_DELAY_TICKS: u32 = TICK_HZ / 10;
@@ -161,6 +171,7 @@ pub fn unit_radius_tiles(kind: EntityKind) -> u32 {
             | EntityKind::Artillery
             | EntityKind::ScoutCar
             | EntityKind::Tank
+            | EntityKind::CommandCar
     ) {
         return 0;
     }

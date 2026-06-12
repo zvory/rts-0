@@ -77,6 +77,7 @@ export const KIND = Object.freeze({
   ARTILLERY: "artillery",
   SCOUT_CAR: "scout_car",
   TANK: "tank",
+  COMMAND_CAR: "command_car",
   CITY_CENTRE: "city_centre",
   DEPOT: "depot",
   BARRACKS: "barracks",
@@ -96,6 +97,7 @@ export const UNIT_KINDS = Object.freeze([
   KIND.ARTILLERY,
   KIND.SCOUT_CAR,
   KIND.TANK,
+  KIND.COMMAND_CAR,
 ]);
 export const BUILDING_KINDS = Object.freeze([
   KIND.CITY_CENTRE,
@@ -155,6 +157,7 @@ export const ABILITY = Object.freeze({
   SMOKE: "smoke",
   MORTAR_FIRE: "mortarFire",
   POINT_FIRE: "pointFire",
+  BREAKTHROUGH: "breakthrough",
 });
 
 export const REPLAY_VISION = Object.freeze({
@@ -165,7 +168,7 @@ export const REPLAY_VISION = Object.freeze({
 
 // --- Compact snapshot wire schema (must match protocol.rs) ---
 export const PREDICTION_PROTOCOL_VERSION = 1;
-export const COMPACT_SNAPSHOT_VERSION = 18;
+export const COMPACT_SNAPSHOT_VERSION = 19;
 
 export const KIND_CODE = Object.freeze({
   [KIND.WORKER]: 1,
@@ -181,6 +184,7 @@ export const KIND_CODE = Object.freeze({
   [KIND.BARRACKS]: 8,
   [KIND.TRAINING_CENTRE]: 9,
   [KIND.RESEARCH_COMPLEX]: 17,
+  [KIND.COMMAND_CAR]: 18,
   [KIND.FACTORY]: 10,
   [KIND.STEEL]: 11,
   [KIND.OIL]: 12,
@@ -210,6 +214,7 @@ export const UPGRADE = Object.freeze({
   AT_GUN_UNLOCK: "at_gun_unlock",
   TANK_UNLOCK: "tank_unlock",
   ARTILLERY_UNLOCK: "artillery_unlock",
+  COMMAND_CAR_UNLOCK: "command_car_unlock",
   MORTAR_AUTOCAST: "mortar_autocast",
 });
 
@@ -219,6 +224,7 @@ export const UPGRADE_CODE = Object.freeze({
   [UPGRADE.TANK_UNLOCK]: 3,
   [UPGRADE.ARTILLERY_UNLOCK]: 4,
   [UPGRADE.MORTAR_AUTOCAST]: 5,
+  [UPGRADE.COMMAND_CAR_UNLOCK]: 6,
 });
 
 export const EVENT_CODE = Object.freeze({
@@ -243,6 +249,7 @@ export const ORDER_STAGE = Object.freeze({
   SMOKE: "smoke",
   MORTAR_FIRE: "mortarFire",
   POINT_FIRE: "pointFire",
+  BREAKTHROUGH: "breakthrough",
   SETUP_AT_GUNS: "setupAtGuns",
 });
 
@@ -257,6 +264,7 @@ export const ORDER_STAGE_CODE = Object.freeze({
   [ORDER_STAGE.CHARGE]: 8,
   [ORDER_STAGE.MORTAR_FIRE]: 9,
   [ORDER_STAGE.POINT_FIRE]: 10,
+  [ORDER_STAGE.BREAKTHROUGH]: 11,
 });
 
 export const ABILITY_CODE = Object.freeze({
@@ -264,6 +272,7 @@ export const ABILITY_CODE = Object.freeze({
   [ABILITY.SMOKE]: 2,
   [ABILITY.MORTAR_FIRE]: 3,
   [ABILITY.POINT_FIRE]: 4,
+  [ABILITY.BREAKTHROUGH]: 5,
 });
 
 export const NOTICE_SEVERITY_CODE = Object.freeze({
@@ -435,7 +444,7 @@ function decodeCompactPlayerResource(record, index) {
 }
 
 function decodeCompactEntity(record, index) {
-  const fields = readArray(record, `entity ${index}`, 28);
+  const fields = readArray(record, `entity ${index}`, 29);
   if (fields.length < 8) throw new Error(`entity ${index} is too short`);
   const entity = {
     id: readU32(fields[0], "entity.id"),
@@ -464,10 +473,11 @@ function decodeCompactEntity(record, index) {
   assignOrderPlan(entity, fields, 21);
   assignOptional(entity, "chargeCooldownLeft", fields, 22, readU32);
   assignAbilities(entity, fields, 23);
-  assignOptional(entity, "visionOnly", fields, 24, readBool);
-  assignDebugPath(entity, fields, 25);
-  assignRallyPlan(entity, fields, 26);
-  assignOptionalCode(entity, "prodUpgrade", fields, 27, UPGRADE_BY_CODE);
+  assignOptional(entity, "breakthroughTicks", fields, 24, readU32);
+  assignOptional(entity, "visionOnly", fields, 25, readBool);
+  assignDebugPath(entity, fields, 26);
+  assignRallyPlan(entity, fields, 27);
+  assignOptionalCode(entity, "prodUpgrade", fields, 28, UPGRADE_BY_CODE);
   return entity;
 }
 

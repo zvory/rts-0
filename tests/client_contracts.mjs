@@ -2007,6 +2007,7 @@ function fakeAudioContext() {
         ],
         87,
         [[ABILITY_CODE[ABILITY.CHARGE], 87, 2]],
+        66,
         true,
         [[[112, 128], [144, 160]], [192, 224], 12, 2, 1, 2],
       ],
@@ -2088,6 +2089,7 @@ function fakeAudioContext() {
       decoded.entities[0].orderPlan[0].y === 112,
     "entity active order stage decodes",
   );
+  assert(decoded.entities[0].breakthroughTicks === 66, "entity breakthrough status decodes");
   assert(decoded.entities[0].visionOnly === true, "entity visionOnly flag decodes");
   assert(
     decoded.entities[0].debugPath.waypoints[0].x === 112 &&
@@ -2597,6 +2599,10 @@ function fakeAudioContext() {
     STATS[KIND.FACTORY].trains.includes(KIND.TANK),
     "Vehicle Works should train Tanks after the unlock",
   );
+  assert(
+    STATS[KIND.FACTORY].trains[2] === KIND.COMMAND_CAR,
+    "Vehicle Works should put Command Car in the top-right train slot",
+  );
   assert(STATS[KIND.SCOUT_CAR].cost.steel === 125, "Scout Car steel cost mirrors server");
   assert(STATS[KIND.SCOUT_CAR].cost.oil === 50, "Scout Car oil cost mirrors server");
   assert(STATS[KIND.SCOUT_CAR].sight === 10, "Scout Car has the largest mobile sight radius");
@@ -2607,12 +2613,32 @@ function fakeAudioContext() {
   assert(KIND_CODE[KIND.SCOUT_CAR] === 14, "Scout Car compact kind code should follow steelworks protocol kind");
   assert(KIND_CODE[KIND.ARTILLERY] === 16, "Artillery compact kind code should be reserved");
   assert(KIND_CODE[KIND.RESEARCH_COMPLEX] === 17, "R&D Complex compact kind code should be reserved");
+  assert(KIND_CODE[KIND.COMMAND_CAR] === 18, "Command Car compact kind code should be reserved");
   assert(ABILITY_CODE[ABILITY.POINT_FIRE] === 4, "Point Fire compact ability code should be reserved");
+  assert(ABILITY_CODE[ABILITY.BREAKTHROUGH] === 5, "Breakthrough compact ability code should be reserved");
   assert(ORDER_STAGE_CODE[ORDER_STAGE.POINT_FIRE] === 10, "Point Fire compact order stage code should be reserved");
+  assert(ORDER_STAGE_CODE[ORDER_STAGE.BREAKTHROUGH] === 11, "Breakthrough compact order stage code should be reserved");
   assert(EVENT_CODE[EVENT.ARTILLERY_TARGET] === 7, "Artillery target compact event code should be reserved");
   assert(EVENT_CODE[EVENT.ARTILLERY_IMPACT] === 8, "Artillery impact compact event code should be reserved");
   assert(EVENT_CODE[EVENT.MORTAR_LAUNCH] === 9, "Mortar launch compact event code should be reserved");
   assert(UPGRADE_CODE[UPGRADE.MORTAR_AUTOCAST] === 5, "Mortar Autocast compact upgrade code should be reserved");
+  assert(UPGRADE_CODE[UPGRADE.COMMAND_CAR_UNLOCK] === 6, "Command Car unlock compact upgrade code should be reserved");
+  assert(
+    STATS[KIND.COMMAND_CAR].cost.steel === 150 &&
+      STATS[KIND.COMMAND_CAR].cost.oil === 75 &&
+      STATS[KIND.COMMAND_CAR].supply === 4 &&
+      STATS[KIND.COMMAND_CAR].sight === 10 &&
+      STATS[KIND.COMMAND_CAR].body.length === STATS[KIND.SCOUT_CAR].body.length,
+    "Command Car stats mirror the planned server values and Scout Car body",
+  );
+  assert(
+    ABILITIES[ABILITY.BREAKTHROUGH].carriers.includes(KIND.COMMAND_CAR) &&
+      ABILITIES[ABILITY.BREAKTHROUGH].targetMode === "self" &&
+      ABILITIES[ABILITY.BREAKTHROUGH].radiusTiles === 7 &&
+      ABILITIES[ABILITY.BREAKTHROUGH].durationTicks === 180 &&
+      ABILITIES[ABILITY.BREAKTHROUGH].cooldownTicks === 750,
+    "Breakthrough ability exposes Command Car carrier, self target, radius, duration, and cooldown",
+  );
   assert(
     STATS[KIND.ARTILLERY].cost.steel === 300 &&
       STATS[KIND.ARTILLERY].cost.oil === 100 &&
@@ -2669,8 +2695,9 @@ function fakeAudioContext() {
     STATS[KIND.RESEARCH_COMPLEX].researches.includes(UPGRADE.AT_GUN_UNLOCK) &&
       STATS[KIND.RESEARCH_COMPLEX].researches.includes(UPGRADE.ARTILLERY_UNLOCK) &&
       STATS[KIND.RESEARCH_COMPLEX].researches.includes(UPGRADE.TANK_UNLOCK) &&
+      STATS[KIND.RESEARCH_COMPLEX].researches.includes(UPGRADE.COMMAND_CAR_UNLOCK) &&
       STATS[KIND.RESEARCH_COMPLEX].researches.includes(UPGRADE.MORTAR_AUTOCAST),
-    "R&D Complex should expose AT Gun, Artillery, Tank, and Mortar Autocast research",
+    "R&D Complex should expose AT Gun, Artillery, Tank, Command Car, and Mortar Autocast research",
   );
   assert(!ABILITIES[ABILITY.CHARGE], "client no longer exposes Rifleman Charge as a command-card ability");
   assert(
@@ -2946,6 +2973,45 @@ function fakeAudioContext() {
       "Mortar Fire cooldown ticks should update in place without rebuilding the command button",
     );
 
+    renderedButtons.length = 0;
+    const selectedCommandCar = {
+      id: 601,
+      owner: playerId,
+      kind: KIND.COMMAND_CAR,
+      abilities: [{
+        ability: ABILITY.BREAKTHROUGH,
+        cooldownLeft: 0,
+      }],
+    };
+    const commandCarHud = Object.create(HUD.prototype);
+    commandCarHud.state = {
+      playerId,
+      resources: { steel: 100, oil: 100 },
+      commandTarget: null,
+      selectedEntities: () => [selectedCommandCar],
+      entitiesInterpolated: () => [selectedCommandCar],
+      endCommandTarget() {
+        this.commandTarget = null;
+      },
+    };
+    commandCarHud.commandIssuer = { issueCommand: (command) => sent.push(command) };
+    commandCarHud.audio = null;
+    commandCarHud._cardSig = null;
+    renderCommandCard(commandCarHud);
+    const breakthroughButton = renderedButtons.find((button) => button.innerHTML.includes("Breakthrough"));
+    assert(breakthroughButton?.dataset.hotkey === "D", "Breakthrough should use the D command-card slot");
+    breakthroughButton.click({ shiftKey: true });
+    const breakthroughCommand = sent[sent.length - 1];
+    assert(
+      breakthroughCommand?.c === "useAbility" &&
+        breakthroughCommand.ability === ABILITY.BREAKTHROUGH &&
+        breakthroughCommand.units[0] === selectedCommandCar.id &&
+        breakthroughCommand.queued === true &&
+        !("x" in breakthroughCommand) &&
+        !("y" in breakthroughCommand),
+      "Clicking Breakthrough should issue a queued self-target ability command without coordinates",
+    );
+
     globalThis.document.getElementById = (id) => {
       assert(id === "command-card", "Methamphetamines hotkey should query the command card");
       return {
@@ -2965,11 +3031,11 @@ function fakeAudioContext() {
     };
     const hotkeyResult = input._activateCommandHotkey(hotkeyEv);
     assert(hotkeyResult?.handled === true, "Methamphetamines hotkey should activate the command-card button");
+    const hotkeyCommand = sent[sent.length - 1];
     assert(
-      sent.length === 2 &&
-        sent[1].c === "research" &&
-        sent[1].building === 77 &&
-        sent[1].upgrade === UPGRADE.METHAMPHETAMINES,
+      hotkeyCommand?.c === "research" &&
+        hotkeyCommand.building === 77 &&
+        hotkeyCommand.upgrade === UPGRADE.METHAMPHETAMINES,
       "Methamphetamines hotkey should send a research command",
     );
 
@@ -2996,9 +3062,12 @@ function fakeAudioContext() {
     renderCommandCard(factoryHud);
     const scoutCarButton = renderedButtons.find((button) => button.innerHTML.includes("Scout Car"));
     const tankButton = renderedButtons.find((button) => button.innerHTML.includes("Tank"));
+    const commandCarButton = renderedButtons.find((button) => button.innerHTML.includes("Command Car"));
     const tankResearchButton = renderedButtons.find((button) => button.innerHTML.includes("TK+"));
     assert(scoutCarButton?.dataset.hotkey === "Q", "Scout Car training should keep the Q slot");
     assert(tankButton?.dataset.hotkey === "W", "Tank training should occupy the top-middle W slot");
+    assert(commandCarButton?.dataset.hotkey === "E", "Command Car training should occupy the top-right E slot");
+    assert(commandCarButton?.disabled, "Command Car training should be disabled before its R&D unlock");
     assert(!tankResearchButton, "Tank Production research should move out of Vehicle Works");
 
     renderedButtons.length = 0;
@@ -3066,10 +3135,14 @@ function fakeAudioContext() {
     const rdAtResearchButton = renderedButtons.find((button) => button.innerHTML.includes("AT+"));
     const rdArtilleryResearchButton = renderedButtons.find((button) => button.innerHTML.includes("AR+"));
     const rdTankResearchButton = renderedButtons.find((button) => button.innerHTML.includes("TK+"));
+    const rdCommandCarResearchButton = renderedButtons.find((button) => button.innerHTML.includes("CC+"));
     const rdMortarAutocastButton = renderedButtons.find((button) => button.innerHTML.includes("MT+"));
     assert(rdAtResearchButton?.dataset.hotkey === "Q", "AT Gun Crews research should appear in R&D Complex");
     assert(rdTankResearchButton?.dataset.hotkey === "E", "Tank Production research should appear in R&D Complex");
     assert(rdMortarAutocastButton?.dataset.hotkey === "A", "Mortar Autocast research should appear in R&D Complex");
+    assert(rdCommandCarResearchButton?.dataset.hotkey === "S", "Command Car research should appear in R&D Complex");
+    assert(rdCommandCarResearchButton?.disabled, "Command Car research should be disabled before Tank Production");
+    assert(rdCommandCarResearchButton?.title === "Requires Tank Production", "Command Car research should name Tank prerequisite");
     assert(rdArtilleryResearchButton?.dataset.hotkey === "W", "Unlock Artillery research should appear in R&D Complex");
     assert(rdArtilleryResearchButton?.disabled, "Artillery research should be disabled before AT Gun research");
     assert(rdArtilleryResearchButton?.title === "Requires AT Gun Research", "Artillery research should name AT Gun prerequisite");
@@ -3080,6 +3153,13 @@ function fakeAudioContext() {
     renderCommandCard(rdHud);
     const unlockedArtilleryResearchButton = renderedButtons.find((button) => button.innerHTML.includes("AR+"));
     assert(unlockedArtilleryResearchButton && !unlockedArtilleryResearchButton.disabled, "Artillery research should enable after AT Gun research");
+
+    renderedButtons.length = 0;
+    rdHud.state.upgrades = [UPGRADE.TANK_UNLOCK];
+    rdHud._cardSig = null;
+    renderCommandCard(rdHud);
+    const unlockedCommandCarResearchButton = renderedButtons.find((button) => button.innerHTML.includes("CC+"));
+    assert(unlockedCommandCarResearchButton && !unlockedCommandCarResearchButton.disabled, "Command Car research should enable after Tank Production");
 
     renderedButtons.length = 0;
     const playedNotices = [];

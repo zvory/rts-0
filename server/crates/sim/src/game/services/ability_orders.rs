@@ -146,7 +146,7 @@ pub(crate) fn launch_world_ability(
     }
 
     match ability {
-        AbilityKind::Charge | AbilityKind::PointFire => false,
+        AbilityKind::Charge | AbilityKind::PointFire | AbilityKind::Breakthrough => false,
         AbilityKind::MortarFire => {
             let Some((from_x, from_y)) = entities.get(caster).map(|e| (e.pos_x, e.pos_y)) else {
                 return false;
@@ -232,6 +232,33 @@ pub(crate) fn launch_self_ability(
             };
             e.start_charge(config::RIFLEMAN_CHARGE_TICKS);
             e.start_ability_cooldown(ability, definition.cooldown_ticks);
+            true
+        }
+        AbilityKind::Breakthrough => {
+            let Some((caster_x, caster_y)) = entities.get(caster).map(|e| (e.pos_x, e.pos_y))
+            else {
+                return false;
+            };
+            let radius_px = config::BREAKTHROUGH_RADIUS_TILES * config::TILE_SIZE as f32;
+            let radius2 = radius_px * radius_px;
+            for id in entities.ids() {
+                let Some(unit) = entities.get(id) else {
+                    continue;
+                };
+                if unit.owner != player || unit.hp == 0 || !unit.is_unit() || unit.under_construction()
+                {
+                    continue;
+                }
+                if dist2(caster_x, caster_y, unit.pos_x, unit.pos_y) > radius2 {
+                    continue;
+                }
+                if let Some(unit) = entities.get_mut(id) {
+                    unit.start_breakthrough(config::BREAKTHROUGH_DURATION_TICKS);
+                }
+            }
+            if let Some(e) = entities.get_mut(caster) {
+                e.start_ability_cooldown(ability, definition.cooldown_ticks);
+            }
             true
         }
         AbilityKind::Smoke | AbilityKind::MortarFire | AbilityKind::PointFire => false,

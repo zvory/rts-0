@@ -73,7 +73,10 @@ pub(super) fn plan_scout_car_motion(
     current: (f32, f32),
     budget: f32,
 ) -> Option<ScoutCarMotionPlan> {
-    if e.kind != EntityKind::ScoutCar || !budget.is_finite() || budget <= 0.0 {
+    if !matches!(e.kind, EntityKind::ScoutCar | EntityKind::CommandCar)
+        || !budget.is_finite()
+        || budget <= 0.0
+    {
         return None;
     }
     if e.next_waypoint()
@@ -322,7 +325,7 @@ fn vehicle_route_context(
         lookahead,
         route_dir,
         final_goal,
-        reverse_waypoint: if e.kind == EntityKind::ScoutCar {
+        reverse_waypoint: if matches!(e.kind, EntityKind::ScoutCar | EntityKind::CommandCar) {
             scout_car_reverse_waypoint(e, current.0, current.1)
         } else {
             None

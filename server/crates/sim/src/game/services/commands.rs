@@ -878,6 +878,7 @@ fn ability_to_planner(ability: AbilityKind) -> planner::AbilityId {
         AbilityKind::Smoke => planner::AbilityId(1),
         AbilityKind::MortarFire => planner::AbilityId(2),
         AbilityKind::PointFire => planner::AbilityId(3),
+        AbilityKind::Breakthrough => planner::AbilityId(4),
     }
 }
 
@@ -887,6 +888,7 @@ fn ability_from_planner(ability: planner::AbilityId) -> Option<AbilityKind> {
         1 => Some(AbilityKind::Smoke),
         2 => Some(AbilityKind::MortarFire),
         3 => Some(AbilityKind::PointFire),
+        4 => Some(AbilityKind::Breakthrough),
         _ => None,
     }
 }

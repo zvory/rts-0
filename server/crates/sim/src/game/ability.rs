@@ -10,6 +10,7 @@ pub enum AbilityKind {
     Smoke,
     MortarFire,
     PointFire,
+    Breakthrough,
 }
 
 impl AbilityKind {
@@ -19,6 +20,7 @@ impl AbilityKind {
             AbilityKind::Smoke => protocol::abilities::SMOKE,
             AbilityKind::MortarFire => protocol::abilities::MORTAR_FIRE,
             AbilityKind::PointFire => protocol::abilities::POINT_FIRE,
+            AbilityKind::Breakthrough => protocol::abilities::BREAKTHROUGH,
         }
     }
 }
@@ -32,6 +34,7 @@ impl FromStr for AbilityKind {
             protocol::abilities::SMOKE => Ok(AbilityKind::Smoke),
             protocol::abilities::MORTAR_FIRE => Ok(AbilityKind::MortarFire),
             protocol::abilities::POINT_FIRE => Ok(AbilityKind::PointFire),
+            protocol::abilities::BREAKTHROUGH => Ok(AbilityKind::Breakthrough),
             _ => Err(()),
         }
     }
@@ -65,6 +68,7 @@ const CHARGE_CARRIERS: &[EntityKind] = &[];
 const SMOKE_CARRIERS: &[EntityKind] = &[EntityKind::ScoutCar];
 const MORTAR_FIRE_CARRIERS: &[EntityKind] = &[EntityKind::MortarTeam];
 const POINT_FIRE_CARRIERS: &[EntityKind] = &[EntityKind::Artillery];
+const BREAKTHROUGH_CARRIERS: &[EntityKind] = &[EntityKind::CommandCar];
 
 pub fn definition(kind: AbilityKind) -> AbilityDefinition {
     match kind {
@@ -107,6 +111,16 @@ pub fn definition(kind: AbilityKind) -> AbilityDefinition {
             target_mode: AbilityTargetMode::WorldPoint,
             range_tiles: Some(config::ARTILLERY_MAX_RANGE_TILES),
             cooldown_ticks: 0,
+            cost: ResourceCost { steel: 0, oil: 0 },
+            tech_requirement: None,
+            may_queue: true,
+        },
+        AbilityKind::Breakthrough => AbilityDefinition {
+            kind,
+            carriers: BREAKTHROUGH_CARRIERS,
+            target_mode: AbilityTargetMode::SelfTarget,
+            range_tiles: None,
+            cooldown_ticks: config::BREAKTHROUGH_COOLDOWN_TICKS,
             cost: ResourceCost { steel: 0, oil: 0 },
             tech_requirement: None,
             may_queue: true,

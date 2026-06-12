@@ -434,6 +434,41 @@ impl Entity {
         }
     }
 
+    pub(crate) fn breakthrough_ticks(&self) -> u16 {
+        self.movement
+            .as_ref()
+            .map(|m| m.breakthrough_ticks)
+            .unwrap_or(0)
+    }
+
+    pub(crate) fn recent_smoke_ticks(&self) -> u16 {
+        self.movement
+            .as_ref()
+            .map(|m| m.recent_smoke_ticks)
+            .unwrap_or(0)
+    }
+
+    pub(crate) fn start_breakthrough(&mut self, ticks: u16) {
+        if self.is_unit() {
+            if let Some(m) = self.movement.as_mut() {
+                m.breakthrough_ticks = m.breakthrough_ticks.max(ticks);
+            }
+        }
+    }
+
+    pub(crate) fn mark_in_smoke_for_breakthrough(&mut self, grace_ticks: u16) {
+        if let Some(m) = self.movement.as_mut() {
+            m.recent_smoke_ticks = grace_ticks;
+        }
+    }
+
+    pub(crate) fn tick_breakthrough_status(&mut self) {
+        if let Some(m) = self.movement.as_mut() {
+            m.breakthrough_ticks = m.breakthrough_ticks.saturating_sub(1);
+            m.recent_smoke_ticks = m.recent_smoke_ticks.saturating_sub(1);
+        }
+    }
+
     pub fn ability_cooldown_ticks(&self, ability: AbilityKind) -> u16 {
         self.ability_cooldowns.get(&ability).copied().unwrap_or(0)
     }

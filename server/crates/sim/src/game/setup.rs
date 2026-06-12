@@ -515,6 +515,7 @@ fn spawn_debug_human_start(
         (EntityKind::Artillery, 5),
         (EntityKind::ScoutCar, 5),
         (EntityKind::Tank, 5),
+        (EntityKind::CommandCar, 5),
     ];
 
     for &(kind, side_tiles, back_tiles) in DEBUG_BUILDINGS {
@@ -545,11 +546,11 @@ fn spawn_debug_human_start(
             let row = slot / 6;
             let col = slot % 6;
             let side_tiles = if col < 3 {
-                -16.0 + col as f32 * 3.0
+                -8.0 + col as f32 * 3.0
             } else {
-                10.0 + (col - 3) as f32 * 3.0
+                2.0 + (col - 3) as f32 * 3.0
             };
-            let back_tiles = -2.0 + row as f32 * 2.0;
+            let back_tiles = -3.0 + row as f32;
             let (x, y) = debug_offset_world(map, start, side_tiles, back_tiles);
             if entities.spawn_unit(player.id, kind, x, y).is_some() {
                 player.record_entity_created(kind);

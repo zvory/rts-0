@@ -111,8 +111,8 @@ authoritative `rules::defs` records.
   96-tile calibration, so driving the wider 126-tile map costs proportionally more oil than
   before.
 - `SCOUT_CAR_OIL_COST_PER_PX = 5 / (96 * TILE_SIZE)`: scout cars burn oil for movement at
-  half the previous tank movement rate. Tanks and scout cars cannot advance while their owner has
-  zero oil.
+  half the previous tank movement rate. Command Cars use this same movement-oil cost. Tanks, scout
+  cars, and command cars cannot advance while their owner has zero oil.
 - **Methamphetamines** (Training Centre research): costs 100 steel / 100 oil and takes 600 ticks
   (~20s). Once complete, all current and future riflemen for that player are permanently charging:
   1.25x movement speed (matching tank speed at 2.0 px/tick), fire while moving without an extra
@@ -125,6 +125,9 @@ authoritative `rules::defs` records.
 - **Tank Production** (R&D Complex research, protocol id `tank_unlock`): costs 150 steel /
   100 oil and takes 600 ticks (~20s). Once complete, that player can train Tanks from Vehicle
   Works. Scout Cars remain immediately trainable from Vehicle Works.
+- **Command Car** (R&D Complex research, protocol id `command_car_unlock`): costs 150 steel /
+  150 oil and takes 900 ticks (~30s). It requires completed Tank Production research. Once
+  complete, that player can train Command Cars from Vehicle Works.
 - **Mortar Autocast** (R&D Complex research, protocol id `mortar_autocast`): costs 150 steel /
   150 oil and takes 600 ticks (~20s). Mortar Team autocast is unavailable before completion. Once
   complete, all current and future Mortar Teams for that player start with autocast enabled; players
@@ -143,6 +146,14 @@ authoritative `rules::defs` records.
   visible to the player occupying it.
   Cooldown duration (20s) exceeds cloud duration (5s), so each scout car has at most one active
   cloud at a time.
+- **Command Car Breakthrough!** (hotkey `D`): Command Cars have a self-targeted instant area speed
+  boost. It affects owned units within 7 tiles of the Command Car, lasts 180 ticks (~6s), has a
+  750-tick (~25s) per-caster cooldown, has no resource cost, can be queued, and can be cast while
+  the Command Car is moving. Affected units move at 1.2x speed, or 1.4x speed while inside smoke or
+  during the 60-tick (~2s) recent-smoke grace window after leaving smoke. Multiple Breakthrough
+  effects do not stack; a shorter refresh cannot reduce an active buff. Enemies see the status only
+  when the affected unit is otherwise visible through authoritative fog. Fake Army and allied-unit
+  support are deferred.
 - Map: `TILE_SIZE = 32` px. The live map is the hardcoded handcrafted asset at
   `server/assets/maps/default-handcrafted.json` (126×126 today), served for tooling at
   `/maps/default-handcrafted.json`. The current asset is the original 96×96 handcrafted map
@@ -186,6 +197,7 @@ Unit stats (hp, dmg, range[tiles], cooldown[ticks], speed[px/tick], sight[tiles]
 | artillery       | 150 | 150 AP inner / 150-10 outer AOE | 10-50 point fire | 90 | 0.922 | 5 | 300 | 100 | 5 | 750 (~25s); requires Gun Works (`steelworks` kind), AT Gun Crews (`at_gun_unlock`), and Unlock Artillery (`artillery_unlock`) researched in R&D Complex; tank-sized footprint |
 | scout_car       | 150 | 6   | 5     | 6  | 2.35  | 10    | 125 | 50  | 3   | 480 (~16s) |
 | tank            | 292 | 60  | 5     | 72 | 2.0   | 6     | 300 | 150 | 6   | 750 (~25s); requires Vehicle Works (`factory` kind) and Tank Production (`tank_unlock`) researched in R&D Complex |
+| command_car     | 225 | 0   | 0     | 0  | 2.35  | 10    | 150 | 75  | 4   | 450 (~15s); requires Vehicle Works (`factory` kind) and Command Car (`command_car_unlock`) researched in R&D Complex; no weapon; Scout Car-style movement/body |
 
 Building stats (hp, sight, cost, footprint tiles wxh, buildTicks, extra):
 
@@ -195,8 +207,8 @@ Building stats (hp, sight, cost, footprint tiles wxh, buildTicks, extra):
 | depot                      | Supply Depot       | 110 | 4     | 100 | 2x2  | 300       | +8 supply |
 | barracks                   | Barracks           | 165 | 6     | 150 | 3x2  | 200       | trains rifleman and machine_gunner; requires a City Centre |
 | training_centre            | Training Centre    | 300 | 6     | 100 steel + 50 oil | 3x2  | 560       | shared prerequisite before either advanced path; unlocks machine_gunner training at barracks and researches Methamphetamines; requires a City Centre and Barracks |
-| research_complex           | R&D Complex        | 165 | 6     | 100 steel + 100 oil | 3x3  | 450       | research-only building for AT Gun Crews, Unlock Artillery, Tank Production, and Mortar Autocast; requires a City Centre and Training Centre |
-| factory                    | Vehicle Works      | 360 | 6     | 125 steel + 125 oil | 3x3  | 620       | Mobile Warfare path building; trains scout_car immediately and researches Tank Production before tank training; requires a City Centre and Training Centre |
+| research_complex           | R&D Complex        | 165 | 6     | 100 steel + 100 oil | 3x3  | 450       | research-only building for AT Gun Crews, Unlock Artillery, Tank Production, Command Car, and Mortar Autocast; requires a City Centre and Training Centre |
+| factory                    | Vehicle Works      | 360 | 6     | 125 steel + 125 oil | 3x3  | 620       | Mobile Warfare path building; trains scout_car immediately, trains tank after Tank Production research, and trains command_car after Command Car research; requires a City Centre and Training Centre |
 | steelworks                 | Gun Works          | 300 | 6     | 125 steel + 125 oil | 3x3  | 620       | Superior Firepower path building; trains mortar_team immediately and trains AT Guns/Artillery after R&D Complex research; requires a City Centre and Training Centre |
 
 Win: a player is **eliminated** when they own zero buildings (units alone do not keep them

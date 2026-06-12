@@ -89,7 +89,11 @@ export const METHAMPHETAMINES_RESEARCH_TICKS = TICK_HZ * 20;
 export const AT_GUN_UNLOCK_RESEARCH_TICKS = TICK_HZ * 20;
 export const ARTILLERY_UNLOCK_RESEARCH_TICKS = TICK_HZ * 30;
 export const TANK_UNLOCK_RESEARCH_TICKS = TICK_HZ * 20;
+export const COMMAND_CAR_UNLOCK_RESEARCH_TICKS = TICK_HZ * 30;
 export const MORTAR_AUTOCAST_RESEARCH_TICKS = TICK_HZ * 20;
+export const BREAKTHROUGH_RADIUS_TILES = 7;
+export const BREAKTHROUGH_DURATION_TICKS = TICK_HZ * 6;
+export const BREAKTHROUGH_COOLDOWN_TICKS = TICK_HZ * 25;
 
 // Player colors (server assigns from a matching palette; used as a fallback for blips).
 export const PLAYER_PALETTE = Object.freeze([
@@ -125,6 +129,10 @@ export const STATS = Object.freeze({
     rangeTiles: 5, cost: { steel: 300, oil: 150 }, supply: 6, buildTicks: 750,
     requires: KIND.FACTORY, upgradeRequires: UPGRADE.TANK_UNLOCK,
     upgradeRequiresText: "Requires research in R&D Complex" },
+  [KIND.COMMAND_CAR]: { label: "Command Car", icon: "CAR", size: 14.4, sight: 10, body: SCOUT_CAR_BODY,
+    rangeTiles: 0, cost: { steel: 150, oil: 75 }, supply: 4, buildTicks: TICK_HZ * 15,
+    requires: KIND.FACTORY, upgradeRequires: UPGRADE.COMMAND_CAR_UNLOCK,
+    upgradeRequiresText: "Requires research in R&D Complex" },
 
   [KIND.CITY_CENTRE]: { label: "City Centre", icon: "CC", footW: 3, footH: 3, sight: 9,
     cost: { steel: 200, oil: 0 }, buildTicks: 400, trains: [KIND.WORKER] },
@@ -143,10 +151,12 @@ export const STATS = Object.freeze({
       UPGRADE.ARTILLERY_UNLOCK,
       UPGRADE.TANK_UNLOCK,
       UPGRADE.MORTAR_AUTOCAST,
+      UPGRADE.COMMAND_CAR_UNLOCK,
     ],
     requires: [KIND.CITY_CENTRE, KIND.TRAINING_CENTRE] },
   [KIND.FACTORY]: { label: "Vehicle Works", icon: "VW", footW: 3, footH: 3, sight: 6,
-    cost: { steel: 125, oil: 125 }, buildTicks: 620, trains: [KIND.SCOUT_CAR, KIND.TANK],
+    cost: { steel: 125, oil: 125 }, buildTicks: 620,
+    trains: [KIND.SCOUT_CAR, KIND.TANK, KIND.COMMAND_CAR],
     requires: [KIND.CITY_CENTRE, KIND.TRAINING_CENTRE] },
   [KIND.STEELWORKS]: { label: "Gun Works", icon: "GW", footW: 3, footH: 3, sight: 6,
     cost: { steel: 125, oil: 125 }, buildTicks: 620,
@@ -203,6 +213,21 @@ export const ABILITIES = Object.freeze({
     delayTicks: ARTILLERY_SHELL_DELAY_TICKS,
     queued: true,
   }),
+  [ABILITY.BREAKTHROUGH]: Object.freeze({
+    ability: ABILITY.BREAKTHROUGH,
+    label: "Breakthrough!",
+    icon: "BRK",
+    hotkey: "D",
+    title: "Speed up nearby owned units; stronger in smoke",
+    carriers: Object.freeze([KIND.COMMAND_CAR]),
+    targetMode: "self",
+    rangeTiles: null,
+    cooldownTicks: BREAKTHROUGH_COOLDOWN_TICKS,
+    cost: Object.freeze({ steel: 0, oil: 0 }),
+    radiusTiles: BREAKTHROUGH_RADIUS_TILES,
+    durationTicks: BREAKTHROUGH_DURATION_TICKS,
+    queued: true,
+  }),
 });
 
 export const UPGRADES = Object.freeze({
@@ -243,6 +268,17 @@ export const UPGRADES = Object.freeze({
     researchTicks: TANK_UNLOCK_RESEARCH_TICKS,
     description: "Unlock Tank training",
     researchedAt: KIND.RESEARCH_COMPLEX,
+  }),
+  [UPGRADE.COMMAND_CAR_UNLOCK]: Object.freeze({
+    upgrade: UPGRADE.COMMAND_CAR_UNLOCK,
+    label: "Command Car",
+    icon: "CC+",
+    cost: Object.freeze({ steel: 150, oil: 150 }),
+    researchTicks: COMMAND_CAR_UNLOCK_RESEARCH_TICKS,
+    description: "Unlocks production of Command Cars",
+    researchedAt: KIND.RESEARCH_COMPLEX,
+    requiresUpgrade: UPGRADE.TANK_UNLOCK,
+    requiresText: "Requires Tank Production",
   }),
   [UPGRADE.MORTAR_AUTOCAST]: Object.freeze({
     upgrade: UPGRADE.MORTAR_AUTOCAST,

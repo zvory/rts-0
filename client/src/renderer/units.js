@@ -366,12 +366,22 @@ export function _drawUnit(e, colorByOwner, state, pools = {}) {
     const body = vehicleBody;
     const motion = this._tankMotionVisual(e, facing, state, body);
     drawArtillery(g, body, tint, facing, weaponFacing, this._deployedWeaponSetupVisual(e), recoil, motion);
-  } else if (e.kind === KIND.SCOUT_CAR) {
+  } else if (e.kind === KIND.SCOUT_CAR || e.kind === KIND.COMMAND_CAR) {
     // Scout cars currently use the tank-like vehicle movement model server-side.
     // Replace with truck/wheeled movement semantics once that model exists.
     const body = vehicleBody;
     const motion = this._tankMotionVisual(e, facing, state, body);
     drawScoutCar(g, body, tint, facing, weaponFacing, motion, recoil);
+    if (e.kind === KIND.COMMAND_CAR) {
+      g.beginFill(0xd8c267, 0.95);
+      g.drawCircle(-body.halfLen * 0.1, -body.halfWidth * 0.32, 2.6);
+      g.drawCircle(-body.halfLen * 0.1, body.halfWidth * 0.32, 2.6);
+      g.endFill();
+      if (e.breakthroughTicks > 0) {
+        g.lineStyle(2, 0xf2d16b, 0.82);
+        g.drawCircle(0, 0, body.shadowRadius * 0.72);
+      }
+    }
   } else if (e.kind === KIND.TANK) {
     // Hull follows movement facing; turret/barrel follow weapon facing.
     const body = vehicleBody;
@@ -416,6 +426,7 @@ export function _drawUnit(e, colorByOwner, state, pools = {}) {
     e.kind !== KIND.MORTAR_TEAM &&
     e.kind !== KIND.ARTILLERY &&
     e.kind !== KIND.SCOUT_CAR &&
+    e.kind !== KIND.COMMAND_CAR &&
     e.kind !== KIND.TANK
   ) {
     const fp = polar(facing, r + 3);

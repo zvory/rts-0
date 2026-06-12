@@ -32,8 +32,8 @@ unit modest.
 |-------|--------------------|----------------|
 | Shared | Training Centre: Machine Gunner, later Stormtrooper | Training Centre: Machine Gunner, later Stormtrooper |
 | Path entry | Gun Works: Mortar Team | Vehicle Works: Scout Car |
-| Commitment unlock | Gun Works upgrade: AT Gun | Vehicle Works upgrade: Tank |
-| Late power | Gun Works upgrade: Artillery | Vehicle Works upgrade: Command Car |
+| Commitment unlock | R&D Complex upgrade: AT Gun | R&D Complex upgrade: Tank |
+| Late power | R&D Complex upgrade: Artillery | R&D Complex upgrade: Command Car |
 
 ## Unit Notes
 
@@ -96,9 +96,8 @@ unit modest.
 - Built at Vehicle Works.
 - Late Mobile Warfare capstone.
 - Ability: **Breakthrough!** AOE speed boost, doubled for units in smoke or that recently left smoke.
-- Ability: **Fake Army** creates fake copies of army units in AOE and places them at a target
-  location within range.
-- Fake Army copies deal no damage, have 10% of the real units' HP, and disappear after 20 seconds.
+- **Fake Army is deferred**. Older concepts for decoy army copies are not part of the Phase 7
+  implementation.
 
 ## Phase Index
 

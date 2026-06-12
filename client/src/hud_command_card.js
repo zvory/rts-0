@@ -102,12 +102,24 @@ export function buildCommandCardContextCatalog() {
     setupState: SETUP.DEPLOYED,
     abilities: [{ ability: ABILITY.POINT_FIRE, cooldownLeft: 0, remainingUses: null }],
   };
-  const allEntities = [...baseEntities, worker, rifleman, scoutCar, mortar, artillery];
+  const commandCar = {
+    id: 15,
+    owner: playerId,
+    kind: KIND.COMMAND_CAR,
+    abilities: [{ ability: ABILITY.BREAKTHROUGH, cooldownLeft: 0, remainingUses: null }],
+  };
+  const allEntities = [...baseEntities, worker, rifleman, scoutCar, mortar, artillery, commandCar];
   const ctx = (selection, overrides = {}) => ({
     playerId,
     selection,
     resources: { steel: 1000, oil: 1000 },
-    upgrades: [UPGRADE.METHAMPHETAMINES, UPGRADE.AT_GUN_UNLOCK, UPGRADE.ARTILLERY_UNLOCK, UPGRADE.TANK_UNLOCK],
+    upgrades: [
+      UPGRADE.METHAMPHETAMINES,
+      UPGRADE.AT_GUN_UNLOCK,
+      UPGRADE.ARTILLERY_UNLOCK,
+      UPGRADE.TANK_UNLOCK,
+      UPGRADE.COMMAND_CAR_UNLOCK,
+    ],
     groupCooldownClocks: () => [],
     playerHasCompleteKind: (kind) => allEntities.some((e) =>
       e.owner === playerId && e.kind === kind && e.buildProgress == null
@@ -118,7 +130,7 @@ export function buildCommandCardContextCatalog() {
     { id: "empty", card: buildCommandCardDescriptors(ctx([])) },
     { id: "worker-main", card: buildCommandCardDescriptors(ctx([worker])) },
     { id: "worker-build", card: buildCommandCardDescriptors(ctx([worker], { commandCardMode: "workerBuild" })) },
-    { id: "mixed-army-support", card: buildCommandCardDescriptors(ctx([rifleman, scoutCar, mortar, artillery])) },
+    { id: "mixed-army-support", card: buildCommandCardDescriptors(ctx([rifleman, scoutCar, mortar, artillery, commandCar])) },
     { id: "city-centre-train", card: buildCommandCardDescriptors(ctx([baseEntities[0]])) },
     { id: "factory-train", card: buildCommandCardDescriptors(ctx([baseEntities[4]])) },
     { id: "gun-works-train", card: buildCommandCardDescriptors(ctx([baseEntities[5]])) },

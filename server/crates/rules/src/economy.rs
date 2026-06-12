@@ -105,7 +105,11 @@ mod tests {
         );
         assert_eq!(
             trainable_units(EntityKind::Factory),
-            &[EntityKind::ScoutCar, EntityKind::Tank]
+            &[
+                EntityKind::ScoutCar,
+                EntityKind::Tank,
+                EntityKind::CommandCar
+            ]
         );
         assert_eq!(trainable_units(EntityKind::ResearchComplex), &[]);
         assert_eq!(

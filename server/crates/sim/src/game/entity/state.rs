@@ -75,6 +75,10 @@ pub struct MovementState {
     pub oil_starved_pause_ticks: u16,
     /// Ticks remaining for Rifleman Charge. Used only by riflemen.
     pub charge_ticks: u16,
+    /// Ticks remaining for Command Car Breakthrough movement boost.
+    pub breakthrough_ticks: u16,
+    /// Ticks remaining after this unit last stood in smoke. Breakthrough uses this for synergy.
+    pub recent_smoke_ticks: u16,
 }
 
 impl Default for MovementState {
@@ -96,6 +100,8 @@ impl Default for MovementState {
             oil_debt: 0.0,
             oil_starved_pause_ticks: 0,
             charge_ticks: 0,
+            breakthrough_ticks: 0,
+            recent_smoke_ticks: 0,
         }
     }
 }

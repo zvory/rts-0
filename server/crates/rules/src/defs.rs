@@ -61,7 +61,11 @@ const STEELWORKS_UNITS: &[EntityKind] = &[
     EntityKind::AtTeam,
     EntityKind::Artillery,
 ];
-const FACTORY_UNITS: &[EntityKind] = &[EntityKind::ScoutCar, EntityKind::Tank];
+const FACTORY_UNITS: &[EntityKind] = &[
+    EntityKind::ScoutCar,
+    EntityKind::Tank,
+    EntityKind::CommandCar,
+];
 const CITY_CENTRE_REQUIRED: &[EntityKind] = &[EntityKind::CityCentre];
 const CITY_CENTRE_AND_BARRACKS_REQUIRED: &[EntityKind] =
     &[EntityKind::CityCentre, EntityKind::Barracks];
@@ -240,6 +244,27 @@ pub const UNITS: &[UnitDef] = &[
         target_priority: TargetPriority::Default,
         trained_at: Some(EntityKind::Factory),
         train_requires: &[],
+    },
+    UnitDef {
+        kind: EntityKind::CommandCar,
+        stats: balance::UnitStats {
+            hp: 225,
+            dmg: 0,
+            range_tiles: 0,
+            cooldown: 0,
+            speed: 2.35,
+            sight_tiles: 10,
+            cost_steel: 150,
+            cost_oil: 75,
+            supply: 4,
+            build_ticks: balance::TICK_HZ * 15,
+            radius: 9.6,
+        },
+        armor_class: ArmorClass::Small,
+        weapon: WeaponClass::None,
+        target_priority: TargetPriority::Default,
+        trained_at: Some(EntityKind::Factory),
+        train_requires: FACTORY_BUILDING_REQUIRED,
     },
 ];
 

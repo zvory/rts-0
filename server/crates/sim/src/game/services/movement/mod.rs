@@ -7,11 +7,13 @@
 
 use std::collections::HashMap;
 
+use crate::config;
 use crate::game::entity::EntityKind;
 use crate::game::entity::EntityStore;
 use crate::game::map::Map;
 use crate::game::services::occupancy::Occupancy;
 use crate::game::services::spatial::SpatialIndex;
+use crate::game::smoke::SmokeCloudStore;
 use crate::game::PlayerState;
 use crate::protocol::Event;
 
@@ -52,6 +54,7 @@ pub(crate) fn movement_system(
     tick: u32,
 ) {
     let mut ignored_events = HashMap::new();
+    let smokes = SmokeCloudStore::new();
     movement_system_with_events(
         map,
         entities,
@@ -60,6 +63,7 @@ pub(crate) fn movement_system(
         spatial,
         tick,
         &mut ignored_events,
+        &smokes,
     );
 }
 
@@ -73,6 +77,7 @@ pub(crate) fn movement_system_with_events(
     spatial: &SpatialIndex,
     tick: u32,
     events: &mut HashMap<u32, Vec<Event>>,
+    smokes: &SmokeCloudStore,
 ) {
     for id in entities.ids() {
         let has_meth = entities
@@ -89,10 +94,21 @@ pub(crate) fn movement_system_with_events(
             }
         }
     }
+    for id in entities.ids() {
+        let in_smoke = entities
+            .get(id)
+            .is_some_and(|e| e.is_unit() && smokes.point_inside(e.pos_x, e.pos_y));
+        if in_smoke {
+            if let Some(e) = entities.get_mut(id) {
+                e.mark_in_smoke_for_breakthrough(config::BREAKTHROUGH_RECENT_SMOKE_TICKS);
+            }
+        }
+    }
     waypoints::advance_moving_units(map, entities, players, occ, spatial, tick, events);
     for id in entities.ids() {
         if let Some(e) = entities.get_mut(id) {
             e.tick_charge();
+            e.tick_breakthrough_status();
             e.tick_ability_cooldowns();
         }
     }

@@ -257,6 +257,7 @@ pub fn project_entity(
             ability::AbilityKind::Smoke,
             ability::AbilityKind::MortarFire,
             ability::AbilityKind::PointFire,
+            ability::AbilityKind::Breakthrough,
         ] {
             if ability::carried_by(kind, entity.kind)
                 && !view
@@ -272,6 +273,10 @@ pub fn project_entity(
                 });
             }
         }
+    }
+
+    if entity.breakthrough_ticks() > 0 {
+        view.breakthrough_ticks = Some(entity.breakthrough_ticks());
     }
 
     if let Some(progress) = entity.build_progress_fraction() {
