@@ -132,3 +132,37 @@ node tests/client_smoke.mjs
 > `GET /` to return 200, checks Rust formatting, runs every suite, and exits non-zero on any
 > failure. In a headless CI image without Chrome, the client smoke test self-skips; pass
 > `CHROME=...` to include it. If Chrome is present but dependency hydration fails, the gate fails.
+
+## Tri-State lag scenarios
+
+`tests/tri_state/` is the lag/prediction scenario harness. It runs authored ES-module scenarios,
+records lane artifacts under `server/target/tri-state-scenarios/<scenario>/<run-id>/`, and compares
+the lanes with domain-aware summaries. Phase 0.5 includes a direct WebSocket authoritative lane, a
+real browser client lane, and an explicit local-lane unavailable stub until the WASM lane is wired
+in Phase 3.5.
+
+Run the no-server harness contract checks:
+
+```bash
+node tests/tri_state/self_test.mjs
+```
+
+Run one live scenario after starting the server and after `tests/run-all.sh` has hydrated
+`tests/node_modules`:
+
+```bash
+node tests/tri_state/run.mjs --scenario remote_client_basic_move
+node tests/tri_state/run.mjs --scenario queued_order_visibility
+node tests/tri_state/run.mjs --scenario dev_scenario_step_tick
+```
+
+Run the intentionally failing artifact scenario without failing the shell:
+
+```bash
+node tests/tri_state/run.mjs --scenario forced_failure_artifact --allow-failure
+```
+
+Add new regressions as small files under `tests/tri_state/scenarios/` that import helpers from
+`tests/tri_state/dsl.mjs`. Prefer command-level steps first (`selectOwn`, `issue`,
+`waitForSnapshot`, `capture`, then assertions). Add pointer or HUD steps only when the regression
+depends on input routing or UI behavior.
