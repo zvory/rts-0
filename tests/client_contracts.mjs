@@ -79,6 +79,7 @@ import { DomClickInputZone, MatchInputRouter } from "../client/src/input/router.
 import { _drawUnit, _tankMotionVisual } from "../client/src/renderer/units.js";
 import { _drawAbilityTargetPreview } from "../client/src/renderer/feedback.js";
 import { buildGiveUpAction, buildSettingsTabs } from "../client/src/settings_panels.js";
+import { readPredictionEnabled, writePredictionEnabled } from "../client/src/prediction_settings.js";
 import {
   HOTKEY_PRESET_CLASSIC,
   HOTKEY_PROFILE_SCHEMA_VERSION,
@@ -424,6 +425,46 @@ function hotkeyService() {
     assert(giveUpOpened, "settings: live give-up action calls injected opener");
     assert(buildGiveUpAction({ visible: false, onOpen: () => {} }).render() === null,
       "settings: spectator/replay contexts omit give-up action");
+  });
+
+  {
+    const values = new Map();
+    const storage = {
+      getItem(key) {
+        return values.has(key) ? values.get(key) : null;
+      },
+      setItem(key, value) {
+        values.set(key, value);
+      },
+      removeItem(key) {
+        values.delete(key);
+      },
+    };
+    assert(readPredictionEnabled(storage), "prediction setting defaults on");
+    writePredictionEnabled(false, storage);
+    assert(!readPredictionEnabled(storage), "prediction setting persists disabled state");
+    writePredictionEnabled(true, storage);
+    assert(readPredictionEnabled(storage), "prediction setting clears override when re-enabled");
+  }
+
+  withFakeSettingsDocument(() => {
+    let predictionToggled = false;
+    const [gameTab] = buildSettingsTabs({
+      game: {
+        kind: "match",
+        prediction: {
+          state: () => ({ enabled: true, active: true, available: true }),
+          onToggle: () => { predictionToggled = true; },
+        },
+      },
+    }).filter((tab) => tab.id === "game");
+    const root = document.createElement("div");
+    gameTab.render(root, {});
+    const toggle = findFakeById(root, "prediction-toggle");
+    assert(toggle, "settings: game tab renders movement prediction control with pinned id");
+    assert(toggle.getAttribute("aria-checked") === "true", "settings: prediction toggle reflects enabled state");
+    toggle.listeners.click();
+    assert(predictionToggled, "settings: prediction control calls injected toggle");
   });
 
   withFakeSettingsDocument(() => {
@@ -1622,6 +1663,55 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
   assert(storagePolicyMatch.readPointerLockPanEnabled(), "lock cursor pan opt-in persists");
   storagePolicyMatch.writePointerLockPanEnabled(false);
   assert(!storagePolicyMatch.readPointerLockPanEnabled(), "lock cursor pan opt-out clears persisted opt-in");
+
+  const predictionPolicyMatch = Object.create(Match.prototype);
+  predictionPolicyMatch.replayViewer = false;
+  predictionPolicyMatch.state = {
+    spectator: false,
+    clearPredictedSnapshot() {
+      this.clearedPrediction = true;
+    },
+  };
+  predictionPolicyMatch.prediction = {
+    enabled: true,
+    reset({ enabled }) {
+      this.enabled = enabled;
+    },
+  };
+  let predictionAdapterInit = 0;
+  predictionPolicyMatch.predictionAdapter = {
+    ready: false,
+    diagnostics: () => ({ ready: false }),
+    init: async () => {
+      predictionAdapterInit += 1;
+      return true;
+    },
+  };
+  predictionPolicyMatch.publishPredictionDebug = () => {};
+  predictionPolicyMatch.mountSettings = () => {};
+  predictionPolicyMatch.logPredictionStatus = () => {};
+  predictionPolicyMatch.setPredictionEnabled(false);
+  assert(!predictionPolicyMatch.prediction.enabled, "prediction setting can disable live prediction");
+  assert(predictionPolicyMatch.state.clearedPrediction, "disabling prediction clears local predicted overlay");
+  predictionPolicyMatch.setPredictionEnabled(true);
+  await Promise.resolve();
+  assert(predictionPolicyMatch.prediction.enabled, "prediction setting can re-enable live prediction");
+  assert(predictionAdapterInit === 1, "re-enabling prediction initializes the WASM adapter");
+
+  const mismatchMatch = Object.create(Match.prototype);
+  mismatchMatch.prediction = {
+    enabled: true,
+    reset({ enabled }) {
+      this.enabled = enabled;
+    },
+  };
+  mismatchMatch.predictionStateMismatchLogged = false;
+  let mismatchStatus = null;
+  mismatchMatch.logPredictionStatus = (status) => { mismatchStatus = status; };
+  mismatchMatch.state = {};
+  mismatchMatch.advancePredictionVisual();
+  assert(!mismatchMatch.prediction.enabled, "stale cached state module disables prediction instead of crashing");
+  assert(mismatchStatus === "disabled-state-mismatch", "state mismatch is logged for diagnostics");
 
   const lockedPolicyMatch = Object.create(Match.prototype);
   lockedPolicyMatch.input = {

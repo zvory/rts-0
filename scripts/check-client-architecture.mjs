@@ -19,6 +19,7 @@ const AREA_BY_FILE = new Map(Object.entries({
   "command_composer.js": "model",
   "prediction_controller.js": "model",
   "sim_wasm_adapter.js": "model",
+  "prediction_settings.js": "platform",
 
   "net.js": "transport",
   "protocol.js": "transport",
