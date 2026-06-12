@@ -561,7 +561,11 @@ export class ClientLane {
   }
 
   async currentTick() {
-    return this.page.evaluate(() => window.__rts?.match?.state?._cur?.tick ?? null);
+    return this.page.evaluate(() => {
+      const replayTick = window.__rts?.match?.replayControls?.replayState?.currentTick;
+      if (Number.isFinite(replayTick)) return replayTick;
+      return window.__rts?.match?.state?._cur?.tick ?? null;
+    });
   }
 
   async ownEntity(kind, index = 0) {
