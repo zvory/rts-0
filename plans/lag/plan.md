@@ -79,6 +79,11 @@ captures remote authoritative state and browser client state now, while defining
 contract that Phase 3 will fill in. The result is a repeatable way to turn lag and prediction bugs
 into inspectable scenario artifacts.
 
+Phase 0.5 backfills the missing harness foundation after later prediction work landed ahead of it.
+It turns the Phase 0 design into a concrete Node runner, scenario DSL, lane interfaces, artifact
+writer, and first two-lane remote/client scenarios. This phase does not expand prediction; it makes
+the already-built netcode inspectable.
+
 Phase 1 adds the protocol contract for sequenced commands and authoritative snapshot
 acknowledgements. It keeps gameplay behavior unchanged, but makes every live command correlate with
 the simulation tick stream that consumed it. This gives later reconciliation code a reliable signal
@@ -89,15 +94,31 @@ paths. It records pending commands, reads authoritative acknowledgements, and ex
 without changing the rendered match by default. This phase proves the browser can safely track the
 state needed for prediction before local simulation is enabled.
 
+Phase 2.5 backfills scenario coverage for the Phase 1 and Phase 2 work that already landed. It
+adds DSL scenarios for command sequencing, sim-consumption acknowledgements, pending command drops,
+stale/coalesced snapshots, and prediction-controller diagnostics in the browser lane. This phase
+should be completed before trusting later prediction changes because it proves the ACK lifecycle is
+legible in artifacts.
+
 Phase 3 packages the Rust simulation surface for browser-safe local prediction. It defines how an
 owner-safe baseline enters the local lane, verifies native and WASM parity, and registers the local
 lane with the Phase 0 harness. This phase should still avoid visible prediction unless a developer
 flag explicitly turns it on.
 
+Phase 3.5 backfills the tri-state local lane integration for the WASM predictor that already
+exists. It wires `rts-sim-wasm` into the scenario runner, records local-lane summaries beside
+remote/client summaries, and adds owner-safe baseline leak checks as named scenarios. This phase
+converts current WASM smoke/parity coverage into artifact-backed three-lane coverage.
+
 Phase 4 enables owned-unit movement prediction as the first player-visible prediction surface. It
 predicts only safe local movement behavior, reconciles against authoritative snapshots, and measures
 correction distance under delayed snapshots. The player-facing goal is that move commands feel
 immediate while the server remains authoritative.
+
+Phase 4.5 backfills movement-prediction scenarios across realistic network conditions. It adds
+delayed, dropped, jittered, burst, and coalesced snapshot profiles, then asserts immediate local
+movement, bounded correction, convergence after acknowledgement, and no fog leaks. This phase is
+the bridge between the already-shipped movement predictor and the later command/fog rollout work.
 
 Phase 5 expands prediction around command acceptance, rejection, and UI optimism. It makes accepted
 commands feel responsive while ensuring server rejection, resource validation, and command failure
@@ -117,13 +138,34 @@ default player experience if the evidence supports it.
 ## Phase Index
 
 0. [Phase 0 - Tri-State Scenario Harness](phase-0-tri-state-scenario-harness.md)
+0.5. [Phase 0.5 - Harness Foundation Backfill](phase-0.5-harness-foundation-backfill.md)
 1. [Phase 1 - Prediction Protocol Contract](phase-1-prediction-protocol-contract.md)
 2. [Phase 2 - Client Prediction Buffer and Reconciliation Skeleton](phase-2-client-prediction-buffer.md)
+2.5. [Phase 2.5 - Prediction Buffer Scenario Backfill](phase-2.5-prediction-buffer-scenario-backfill.md)
 3. [Phase 3 - WASM Simulation Package](phase-3-wasm-simulation-package.md)
+3.5. [Phase 3.5 - WASM Local Lane Backfill](phase-3.5-wasm-local-lane-backfill.md)
 4. [Phase 4 - Owned Unit Movement Prediction](phase-4-owned-unit-movement-prediction.md)
+4.5. [Phase 4.5 - Movement Prediction Scenario Backfill](phase-4.5-movement-prediction-scenario-backfill.md)
 5. [Phase 5 - Command Acceptance, Rejection, and UI Optimism](phase-5-command-acceptance-ui-optimism.md)
 6. [Phase 6 - Combat, Fog, and Cross-Player Guardrails](phase-6-combat-fog-cross-player-guardrails.md)
 7. [Phase 7 - Rollout, Performance Budgets, and Removal of Legacy Delay Paths](phase-7-rollout-performance.md)
+
+## Current Implementation Status
+
+- Phase 0: not implemented. The design exists, but the scenario DSL, three-lane runner, network
+  profile controller, artifact writer, and CI scenario suite need backfill.
+- Phase 1: implemented ahead of harness backfill. `clientSeq` command envelopes, sim-consumption
+  acknowledgement metadata, and compact snapshot transport support exist.
+- Phase 2: implemented ahead of harness backfill. `PredictionController` and focused JS state
+  transition coverage exist, but artifact-backed two-lane scenarios do not.
+- Phase 3: implemented ahead of harness backfill. `rts-sim-wasm`, native/WASM-facing parity
+  coverage, generated browser assets, and WASM smoke coverage exist, but the local lane is not
+  registered in a tri-state runner.
+- Phase 4: implemented ahead of harness backfill. Owned-unit movement prediction is wired through
+  the browser adapter and smoke-tested, but delayed/dropped/coalesced network scenarios are not
+  covered by a DSL harness.
+- Phases 5, 6, and 7 should wait for the 0.5, 2.5, 3.5, and 4.5 backfill phases unless the change
+  is a narrow bug fix with its own focused regression.
 
 ## Non-Goals
 

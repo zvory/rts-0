@@ -1,5 +1,8 @@
 # Phase 0 - Tri-State Scenario Harness
 
+Status: Designed, not implemented. Later prediction phases landed before this harness existed; use
+Phase 0.5 and the later `.5` backfill phases to build the harness around the current code.
+
 ## Objective
 
 Create the testing and inspection harness before prediction gets complex. The harness should let
@@ -123,6 +126,10 @@ from the artifact, not on multiplayer feel.
 At handoff, include the scenario runner command, the artifact path for at least one successful or
 forced-failure run, and any local-lane contract gaps that Phase 3 must fill. Name the next scenario
 types that should be added when command acknowledgement and local prediction exist.
+
+Because Phase 3 and Phase 4 are now already implemented, the actual handoff should point directly
+to Phase 2.5, Phase 3.5, and Phase 4.5 so the existing prediction code is pulled into the harness
+without rewriting the shipped predictor.
 
 ## Player-Facing Outcome
 

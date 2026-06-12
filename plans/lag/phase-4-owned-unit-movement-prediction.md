@@ -1,6 +1,10 @@
 # Phase 4 - Owned Unit Movement Prediction
 
-Status: Done
+Status: Done ahead of harness backfill.
+
+Owned-unit movement prediction is wired into the browser path. Phase 4.5 must still backfill the
+delayed/dropped/coalesced snapshot scenarios, correction budgets, and artifact-backed fog guardrails
+that should have existed before player-visible prediction shipped.
 
 ## Objective
 
