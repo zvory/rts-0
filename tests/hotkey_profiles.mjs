@@ -1,0 +1,237 @@
+import assert from "node:assert/strict";
+
+import {
+  HOTKEY_PRESET_CLASSIC,
+  HOTKEY_PRESET_GRID,
+  HOTKEY_PROFILE_SCHEMA_VERSION,
+  HOTKEY_STORAGE_ACTIVE_KEY,
+  HOTKEY_STORAGE_PROFILES_KEY,
+  HotkeyProfileService,
+  buildHotkeyCommandCatalog,
+} from "../client/src/hotkey_profiles.js";
+import {
+  buildCommandCardContextCatalog,
+  buildCommandCardDescriptors,
+} from "../client/src/hud_command_card.js";
+import { KIND } from "../client/src/protocol.js";
+
+function memoryStorage(seed = {}) {
+  const data = new Map(Object.entries(seed));
+  return {
+    getItem(key) {
+      return data.has(key) ? data.get(key) : null;
+    },
+    setItem(key, value) {
+      data.set(key, String(value));
+    },
+    removeItem(key) {
+      data.delete(key);
+    },
+    data,
+  };
+}
+
+function service(storage = memoryStorage()) {
+  return new HotkeyProfileService({
+    storage,
+    catalog: buildHotkeyCommandCatalog(buildCommandCardContextCatalog()),
+  });
+}
+
+function workerCard() {
+  const worker = { id: 20, owner: 1, kind: KIND.WORKER };
+  return buildCommandCardDescriptors({
+    playerId: 1,
+    selection: [worker],
+    resources: { steel: 1000, oil: 1000 },
+    upgrades: [],
+    playerHasCompleteKind: () => true,
+    groupCooldownClocks: () => [],
+  });
+}
+
+{
+  const hotkeys = service();
+  assert(Object.isFrozen(hotkeys.profileById(HOTKEY_PRESET_GRID)), "Grid preset is immutable");
+  assert(Object.isFrozen(hotkeys.profileById(HOTKEY_PRESET_CLASSIC).bindings), "Classic preset bindings are immutable");
+  assert.equal(hotkeys.getActiveProfile().id, HOTKEY_PRESET_GRID, "Grid is the default active profile");
+}
+
+{
+  const hotkeys = service();
+  const cloned = hotkeys.createCustomFromPreset(HOTKEY_PRESET_CLASSIC, {
+    id: "custom.classic",
+    name: "My Classic",
+  });
+  assert.equal(cloned.ok, true, "preset cloning succeeds");
+  assert.equal(cloned.profile.type, "custom", "cloned preset is editable custom profile");
+  assert.equal(cloned.profile.basePresetId, HOTKEY_PRESET_CLASSIC, "clone keeps preset ancestry");
+  assert.equal(hotkeys.setActiveProfile("custom.classic"), true, "custom profile can become active");
+  assert.equal(hotkeys.getActiveProfile().id, "custom.classic", "active profile selection updates");
+}
+
+{
+  const hotkeys = service();
+  const editedPreset = hotkeys.saveCustomProfile({
+    ...hotkeys.exportProfile(HOTKEY_PRESET_GRID),
+    bindings: { "unit.move": "M" },
+  });
+  assert.equal(editedPreset.ok, false, "presets cannot be edited directly");
+  assert(editedPreset.errors.some((error) => error.code === "presetImmutable"), "preset edit rejection is reported");
+}
+
+{
+  const storage = memoryStorage();
+  const hotkeys = service(storage);
+  const saved = hotkeys.saveCustomProfile({
+    schemaVersion: HOTKEY_PROFILE_SCHEMA_VERSION,
+    id: "custom.direct",
+    type: "custom",
+    mode: "direct",
+    name: "Direct",
+    bindings: {
+      "unit.move": "M",
+      "unit.attack": "A",
+      "unit.stop": "S",
+      "worker.buildMenu": "B",
+    },
+  });
+  assert.equal(saved.ok, true, "custom direct profile saves");
+  hotkeys.setActiveProfile("custom.direct");
+
+  const reloaded = service(storage);
+  assert.equal(reloaded.getActiveProfile().id, "custom.direct", "active profile persists through local storage");
+  assert(storage.data.has(HOTKEY_STORAGE_PROFILES_KEY), "custom profiles are written to storage");
+  assert.equal(storage.data.get(HOTKEY_STORAGE_ACTIVE_KEY), "custom.direct", "active id is written to storage");
+}
+
+{
+  const hotkeys = service(memoryStorage({
+    [HOTKEY_STORAGE_PROFILES_KEY]: "{bad json",
+    [HOTKEY_STORAGE_ACTIVE_KEY]: "missing",
+  }));
+  assert.equal(hotkeys.getActiveProfile().id, HOTKEY_PRESET_GRID, "bad storage falls back to Grid");
+  assert(hotkeys.diagnostics.errors.some((error) => error.code === "storageParseFailed"), "bad storage is diagnosed");
+}
+
+{
+  const hotkeys = service();
+  const invalid = hotkeys.saveCustomProfile({
+    schemaVersion: HOTKEY_PROFILE_SCHEMA_VERSION,
+    id: "custom.bad",
+    type: "custom",
+    mode: "direct",
+    name: "Bad",
+    bindings: {
+      "unit.move": "1",
+      "unit.attack": "A",
+      "unknown.command": "U",
+    },
+  });
+  assert.equal(invalid.ok, false, "invalid keys block saving");
+  assert(invalid.errors.some((error) => error.code === "invalidKey"), "invalid key is reported");
+  assert(invalid.warnings.some((warning) => warning.code === "unknownCommand"), "unknown command is a warning");
+}
+
+{
+  const hotkeys = service();
+  const conflict = hotkeys.saveCustomProfile({
+    schemaVersion: HOTKEY_PROFILE_SCHEMA_VERSION,
+    id: "custom.conflict",
+    type: "custom",
+    mode: "direct",
+    name: "Conflict",
+    bindings: {
+      "unit.move": "A",
+      "unit.attack": "A",
+      "unit.stop": "S",
+      "worker.buildMenu": "B",
+    },
+  });
+  assert.equal(conflict.ok, false, "same-context duplicate keys block saving");
+  assert(conflict.errors.some((error) => error.code === "duplicateKey"), "duplicate key is reported");
+}
+
+{
+  const hotkeys = service();
+  const parsed = hotkeys.parseProfilePayload({
+    schemaVersion: HOTKEY_PROFILE_SCHEMA_VERSION,
+    id: "import.partial",
+    type: "custom",
+    mode: "direct",
+    name: "Partial",
+    bindings: {
+      "unit.move": "M",
+    },
+  });
+  assert.equal(parsed.ok, true, "missing known commands are filled during import parsing");
+  assert.equal(parsed.profile.bindings["unit.attack"], "A", "missing command falls back to rendered grid slot");
+  assert(parsed.warnings.some((warning) => warning.code === "missingCommandFallback"), "fallback is diagnosed");
+}
+
+{
+  const hotkeys = service();
+  const unsupported = hotkeys.parseProfilePayload({
+    schemaVersion: 999,
+    id: "future",
+    type: "custom",
+    mode: "grid",
+    name: "Future",
+    bindings: {},
+  });
+  assert.equal(unsupported.ok, false, "unsupported schema versions are rejected");
+  assert(unsupported.errors.some((error) => error.code === "unsupportedSchemaVersion"), "schema error is reported");
+}
+
+{
+  const hotkeys = service();
+  const imported = hotkeys.importProfile({
+    schemaVersion: HOTKEY_PROFILE_SCHEMA_VERSION,
+    id: "custom.direct",
+    type: "custom",
+    mode: "direct",
+    name: "Direct",
+    bindings: {
+      "unit.move": "M",
+      "unit.attack": "A",
+      "unit.stop": "S",
+      "worker.buildMenu": "B",
+    },
+  }, { activate: true });
+  assert.equal(imported.ok, true, "profile import succeeds");
+  const direct = hotkeys.resolveCard(workerCard());
+  assert.equal(direct.slots[0].hotkey, "M", "direct profiles change command labels");
+  assert.equal(direct.slots[0].slotIndex, 0, "direct profiles do not move command slots");
+
+  hotkeys.setActiveProfile(HOTKEY_PRESET_GRID);
+  const grid = hotkeys.resolveCard(workerCard());
+  assert.equal(grid.slots[0].hotkey, "Q", "Grid follows the rendered slot");
+}
+
+{
+  const hotkeys = service();
+  hotkeys.importProfile({
+    schemaVersion: HOTKEY_PROFILE_SCHEMA_VERSION,
+    id: "custom.replace",
+    type: "custom",
+    mode: "direct",
+    name: "Replace",
+    bindings: {
+      "unit.move": "M",
+      "unit.attack": "A",
+      "unit.stop": "S",
+      "worker.buildMenu": "B",
+    },
+  });
+  hotkeys.importProfile({
+    schemaVersion: HOTKEY_PROFILE_SCHEMA_VERSION,
+    id: "custom.replace",
+    type: "custom",
+    mode: "grid",
+    name: "Replace",
+    bindings: {},
+  });
+  const profile = hotkeys.profileById("custom.replace");
+  assert.equal(profile.mode, "grid", "imports replace the target profile payload");
+  assert.deepEqual(profile.bindings, {}, "replacement import does not merge old bindings");
+}

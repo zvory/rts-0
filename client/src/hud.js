@@ -101,12 +101,14 @@ export class HUD {
    * @param {import("./state.js").GameState} state shared game state (selection, resources).
    * @param {import("./net.js").Net} net network seam for issuing commands.
    * @param {import("./audio.js").Audio} [audio] optional audio engine for local UI notices.
+   * @param {import("./hotkey_profiles.js").HotkeyProfileService} [hotkeyProfiles] active hotkey resolver.
    */
-  constructor(rootEl, state, net, audio = null) {
+  constructor(rootEl, state, net, audio = null, hotkeyProfiles = null) {
     this.root = rootEl;
     this.state = state;
     this.net = net;
     this.audio = audio;
+    this.hotkeyProfiles = hotkeyProfiles;
 
     // Resource / supply bar elements.
     this.elHud = rootEl.querySelector("#hud");
@@ -451,21 +453,23 @@ export class HUD {
   _renderCommandCard() {
     const card = this.elCommand;
     if (!card) return;
-    const descriptorCard = buildCommandCardDescriptors(this._commandDescriptorContext());
+    let descriptorCard = buildCommandCardDescriptors(this._commandDescriptorContext());
+    if (this.hotkeyProfiles) descriptorCard = this.hotkeyProfiles.resolveCard(descriptorCard);
+    const cardSig = `${descriptorCard.signature}|hotkeys:${this.hotkeyProfiles?.revision || 0}`;
     if (descriptorCard.kind === "spectator") {
-      if (this._cardSig !== descriptorCard.signature) {
+      if (this._cardSig !== cardSig) {
         card.innerHTML = "";
-        this._cardSig = descriptorCard.signature;
+        this._cardSig = cardSig;
       }
       return;
     }
-    if (descriptorCard.signature === this._cardSig) {
+    if (cardSig === this._cardSig) {
       if (descriptorCard.abilityAffordances) {
         this._syncAbilityCooldownClocks(descriptorCard.abilityAffordances);
       }
       return;
     }
-    this._cardSig = descriptorCard.signature;
+    this._cardSig = cardSig;
     this._renderDescriptorCard(card, descriptorCard);
   }
 
