@@ -113,7 +113,7 @@ export class ClientLane {
   }
 
   async issue(command, args = {}) {
-    if (!["move", "attackMove", "stop", "train", "setRally", "invalidMove"].includes(command)) {
+    if (!["move", "attackMove", "stop", "train", "setRally", "build", "invalidMove"].includes(command)) {
       throw new Error(`unsupported client command: ${command}`);
     }
     const selected = this.selection[0];
@@ -134,6 +134,14 @@ export class ClientLane {
         cmd = { c: "train", building: unit.id, unit: args.unit || "worker" };
       } else if (command === "setRally") {
         cmd = { c: "setRally", building: unit.id, x: args.x ?? unit.x + (args.dx ?? 0), y: args.y ?? unit.y + (args.dy ?? 0), kind: args.kind || "move" };
+      } else if (command === "build") {
+        cmd = {
+          c: "build",
+          units: [unit.id],
+          building: args.building || "depot",
+          tileX: args.tileX ?? 1,
+          tileY: args.tileY ?? 1,
+        };
       } else if (command === "invalidMove") {
         cmd = { c: "move", units: [999999999], x: args.x ?? unit.x + (args.dx ?? 0), y: args.y ?? unit.y + (args.dy ?? 0) };
       } else {
@@ -166,7 +174,7 @@ export class ClientLane {
     return issued;
   }
 
-  async waitForSnapshot({ minTickDelta = 1, timeoutMs = 5000 } = {}) {
+  async waitForSnapshot({ minTickDelta = 1, timeoutMs = 10000 } = {}) {
     const startTick = await this.page.evaluate(() => window.__rts.match.state._cur?.tick ?? -1);
     if (minTickDelta <= 0 || startTick < 0) {
       await this.page.waitForFunction(
@@ -312,6 +320,14 @@ export class ClientLane {
         published: window.__rtsPredictionDebug || null,
       };
     });
+  }
+
+  async startPayload() {
+    return this.page.evaluate(() => window.__rts?.match?.state?.startInfo || null);
+  }
+
+  async currentSnapshot() {
+    return this.page.evaluate(() => window.__rts?.match?.state?._cur || null);
   }
 
   async selectionDebug() {

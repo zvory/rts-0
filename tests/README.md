@@ -137,9 +137,10 @@ node tests/client_smoke.mjs
 
 `tests/tri_state/` is the lag/prediction scenario harness. It runs authored ES-module scenarios,
 records lane artifacts under `server/target/tri-state-scenarios/<scenario>/<run-id>/`, and compares
-the lanes with domain-aware summaries. Phase 0.5 includes a direct WebSocket authoritative lane, a
-real browser client lane, and an explicit local-lane unavailable stub until the WASM lane is wired
-in Phase 3.5.
+the lanes with domain-aware summaries. The live-room harness includes a direct WebSocket
+authoritative lane, a real browser client lane, and a WASM local lane backed by
+`rts-sim-wasm`. When generated WASM assets are absent, the local lane records an explicit
+`wasmAssetsMissing` disabled reason instead of omitting local artifacts.
 
 Run the no-server harness contract checks:
 
@@ -168,6 +169,19 @@ pending-command drops, stale/duplicate/skipped snapshot diagnostics, receipt dia
 diagnostics, and command timeout reporting. The receipt/rejection scenarios use browser-lane
 controller diagnostics because the production wire protocol intentionally exposes only
 sim-consumption ACKs in snapshots.
+
+Run the Phase 3.5 WASM local-lane scenarios after generating browser assets:
+
+```bash
+scripts/build-sim-wasm.sh
+node tests/sim_wasm_smoke.mjs
+node tests/tri_state/run.mjs --scenario phase-3.5
+node tests/tri_state/run.mjs --scenario local_lane_simple_move
+```
+
+Phase 3.5 scenarios assert local initialization from the browser start payload, owner-safe baseline
+import, no-op determinism, simple and queued movement summaries, pending command sequences,
+correction magnitude, owner-safe baseline artifacts, and explicit unsupported-command reasons.
 
 Run the intentionally failing artifact scenario without failing the shell:
 

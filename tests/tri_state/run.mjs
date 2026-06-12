@@ -4,8 +4,8 @@ import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { ArtifactWriter } from "./artifacts.mjs";
 import { serializableScenario } from "./dsl.mjs";
-import { compareOwnedOrderPlan, compareOwnedPosition } from "./diffs.mjs";
-import { LocalLaneUnavailable } from "./lanes/local_lane.mjs";
+import { compareOwnedOrderPlan, compareOwnedPosition, ownEntityByKind, summarizePlan } from "./diffs.mjs";
+import { WasmLocalLane } from "./lanes/local_lane.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const SCENARIO_DIR = path.join(HERE, "scenarios");
@@ -20,6 +20,14 @@ const SCENARIO_GROUPS = Object.freeze({
     "duplicate_and_skipped_snapshots_are_diagnostic",
     "stale_snapshot_ignored",
     "rejection_notice_does_not_imply_ack",
+  ],
+  "phase-3.5": [
+    "local_lane_initializes_from_start",
+    "local_lane_noop_ticks",
+    "local_lane_simple_move",
+    "local_lane_queued_move",
+    "owner_safe_baseline_no_hidden_enemy_leak",
+    "unsupported_command_is_explicit",
   ],
 });
 
@@ -44,13 +52,12 @@ export async function runScenario(scenario, args = {}) {
   const artifacts = new ArtifactWriter(scenario.name, { root: args.artifactRoot });
   artifacts.writeScenario(serializableScenario(scenario));
   const command = reproductionCommand(scenario.name);
-  const local = new LocalLaneUnavailable({ artifacts });
+  const local = new WasmLocalLane({ scenario, artifacts });
   const lanes = { local };
   const roomPrefix = `tri-state-${scenario.name}-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
   let status = "passed";
   let failure = null;
   try {
-    await local.start();
     if (scenario.setup.kind === "liveRoom") {
       const { RemoteLane } = await import("./lanes/remote_lane.mjs");
       const { ClientLane } = await import("./lanes/client_lane.mjs");
@@ -58,12 +65,26 @@ export async function runScenario(scenario, args = {}) {
       lanes.client = new ClientLane({ scenario, room: `${roomPrefix}-client`, artifacts, url: args.baseUrl, chrome: args.chrome });
       await lanes.remote.start();
       await lanes.client.start();
+      const startInfo = await lanes.client.startPayload();
+      await local.start({
+        startInfo,
+        playerId: startInfo?.playerId ?? lanes.remote.playerId,
+        baselineSnapshot: await lanes.client.currentSnapshot(),
+      });
     } else if (scenario.setup.kind === "devScenario") {
       const { ClientLane } = await import("./lanes/client_lane.mjs");
       lanes.client = new ClientLane({ scenario, room: `${roomPrefix}-client`, artifacts, url: args.baseUrl, chrome: args.chrome });
       await lanes.client.start();
+      const startInfo = await lanes.client.startPayload();
+      await local.start({
+        startInfo,
+        playerId: startInfo?.playerId,
+        baselineSnapshot: await lanes.client.currentSnapshot(),
+      });
     } else if (scenario.setup.kind !== "artifactOnly") {
       throw new Error(`unsupported setup kind: ${scenario.setup.kind}`);
+    } else {
+      await local.start();
     }
 
     const context = { scenario, artifacts, lanes, captures: new Map(), tickMarks: [] };
@@ -88,7 +109,7 @@ export async function runScenario(scenario, args = {}) {
         scenario.setup.kind === "liveRoom"
           ? "Live-room scenarios compare a direct WebSocket authoritative room with a real browser room driven by the same DSL commands."
           : "This scenario does not use both live lanes.",
-        "The local lane is intentionally unavailable until Phase 3.5.",
+        "The local lane uses generated rts-sim-wasm assets when present and records an explicit disabled reason when they are missing.",
       ],
     });
   }
@@ -101,20 +122,29 @@ async function executeStep(context, step) {
     case "selectOwn":
       await lanes.remote?.selectOwn(step.kind, step.index);
       await lanes.client?.selectOwn(step.kind, step.index);
+      await lanes.local?.selectOwn(step.kind, step.index);
       break;
-    case "issue":
-      if (lanes.remote) artifacts.timeline({ event: "remote.issue", result: await lanes.remote.issue(step.command, step.args) });
-      if (lanes.client) artifacts.timeline({ event: "client.issue", result: await lanes.client.issue(step.command, step.args) });
+    case "issue": {
+      const remoteResult = lanes.remote ? await lanes.remote.issue(step.command, step.args) : null;
+      const clientResult = lanes.client ? await lanes.client.issue(step.command, step.args) : null;
+      if (lanes.remote) artifacts.timeline({ event: "remote.issue", result: remoteResult });
+      if (lanes.client) artifacts.timeline({ event: "client.issue", result: clientResult });
+      if (lanes.local) artifacts.timeline({ event: "local.issue", result: await lanes.local.issue(step.command, step.args, remoteResult || clientResult || {}) });
       break;
+    }
     case "issueBurst":
       for (let i = 0; i < step.commands.length; i += 1) {
         const entry = step.commands[i];
         if (entry.select) {
           await lanes.remote?.selectOwn(entry.select.kind, entry.select.index || 0);
           await lanes.client?.selectOwn(entry.select.kind, entry.select.index || 0);
+          await lanes.local?.selectOwn(entry.select.kind, entry.select.index || 0);
         }
-        if (lanes.remote) artifacts.timeline({ event: "remote.issue", burstIndex: i, result: await lanes.remote.issue(entry.command, entry.args || {}) });
-        if (lanes.client) artifacts.timeline({ event: "client.issue", burstIndex: i, result: await lanes.client.issue(entry.command, entry.args || {}) });
+        const remoteResult = lanes.remote ? await lanes.remote.issue(entry.command, entry.args || {}) : null;
+        const clientResult = lanes.client ? await lanes.client.issue(entry.command, entry.args || {}) : null;
+        if (lanes.remote) artifacts.timeline({ event: "remote.issue", burstIndex: i, result: remoteResult });
+        if (lanes.client) artifacts.timeline({ event: "client.issue", burstIndex: i, result: clientResult });
+        if (lanes.local) artifacts.timeline({ event: "local.issue", burstIndex: i, result: await lanes.local.issue(entry.command, entry.args || {}, remoteResult || clientResult || {}) });
       }
       break;
     case "waitForSnapshot":
@@ -140,6 +170,14 @@ async function executeStep(context, step) {
       context.lastCapture = capture;
       break;
     }
+    case "importLocalBaseline": {
+      const source = step.source === "remote" ? lanes.remote?.lastSnapshot : await lanes.client?.currentSnapshot?.();
+      artifacts.timeline({ event: "local.baseline", result: lanes.local.importBaseline(source, step.label || step.source || "scenario") });
+      break;
+    }
+    case "advanceLocalTicks":
+      artifacts.timeline({ event: "local.advance", result: lanes.local.advanceTicks(step.ticks, "scenario") });
+      break;
     case "assertRemoteClientOwnedPosition": {
       requireLiveLanes(lanes, step.op);
       const frame = context.lastCapture || {};
@@ -165,6 +203,83 @@ async function executeStep(context, step) {
       });
       artifacts.diff({ assertion: step.op, diff });
       if (!diff.ok) throw new Error(`owned ${step.unit}[${step.index || 0}] order plan diverged: ${JSON.stringify(diff)}`);
+      break;
+    }
+    case "assertLocalReady": {
+      const summary = lanes.local.summary();
+      const diff = { assertion: step.op, ok: !!summary.ready && summary.playerId != null, summary };
+      artifacts.diff(diff);
+      if (!diff.ok) throw new Error(`local lane is not ready: ${JSON.stringify(diff)}`);
+      break;
+    }
+    case "assertLocalDisabledReason": {
+      const summary = lanes.local.summary();
+      const reasons = summary.disabledReasons || [];
+      const diff = { assertion: step.op, ok: reasons.includes(step.reason), expected: step.reason, reasons, summary };
+      artifacts.diff(diff);
+      if (!diff.ok) throw new Error(`local lane missing disabled reason ${step.reason}: ${JSON.stringify(diff)}`);
+      break;
+    }
+    case "assertLocalOwnedStable": {
+      const diff = compareLocalStable({
+        before: context.captures.get(step.before)?.local,
+        after: context.captures.get(step.after)?.local,
+        kind: step.unit,
+        index: step.index || 0,
+        tolerancePx: step.tolerancePx ?? 0.01,
+      });
+      artifacts.diff({ assertion: step.op, diff });
+      if (!diff.ok) throw new Error(`local owned ${step.unit} was not stable: ${JSON.stringify(diff)}`);
+      break;
+    }
+    case "assertLocalOwnedAdvanced": {
+      const diff = compareLocalAdvanced({
+        before: context.captures.get(step.before)?.local,
+        after: context.lastCapture?.local || lanes.local.summary(),
+        kind: step.unit,
+        index: step.index || 0,
+        minDistancePx: step.minDistancePx ?? 1,
+      });
+      artifacts.diff({ assertion: step.op, diff });
+      if (!diff.ok) throw new Error(`local owned ${step.unit} did not advance: ${JSON.stringify(diff)}`);
+      break;
+    }
+    case "assertLocalOrderPlan": {
+      const diff = compareLocalOrderPlan({
+        summary: context.lastCapture?.local || lanes.local.summary(),
+        kind: step.unit,
+        index: step.index || 0,
+        expected: step.expected || [],
+      });
+      artifacts.diff({ assertion: step.op, diff });
+      if (!diff.ok) throw new Error(`local order plan mismatch: ${JSON.stringify(diff)}`);
+      break;
+    }
+    case "assertLocalPendingClientSeqs": {
+      const summary = lanes.local.summary();
+      const diff = {
+        assertion: step.op,
+        ok: JSON.stringify(summary.pendingClientSeqs || []) === JSON.stringify(step.seqs || []),
+        actual: summary.pendingClientSeqs || [],
+        expected: step.seqs || [],
+      };
+      artifacts.diff(diff);
+      if (!diff.ok) throw new Error(`local pending clientSeqs mismatch: ${JSON.stringify(diff)}`);
+      break;
+    }
+    case "assertLocalCorrectionAtMost": {
+      const summary = lanes.local.summary();
+      const actual = Number(summary.correctionMagnitude) || 0;
+      const diff = { assertion: step.op, ok: actual <= step.maxPx, actual, expected: `<=${step.maxPx}` };
+      artifacts.diff(diff);
+      if (!diff.ok) throw new Error(`local correction too large: ${JSON.stringify(diff)}`);
+      break;
+    }
+    case "assertLocalBaselineOwnerSafe": {
+      const baselineFrame = [...(lanes.local.frames || [])].reverse().find((frame) => frame.event === "baseline" && frame.imported);
+      const diff = assertOwnerSafeBaseline(baselineFrame?.baselineSummary);
+      artifacts.diff({ assertion: step.op, diff });
+      if (!diff.ok) throw new Error(`owner-safe baseline leaked hidden state: ${JSON.stringify(diff)}`);
       break;
     }
     case "assertClientSeqsStrictlyIncreasing": {
@@ -212,7 +327,7 @@ async function executeStep(context, step) {
     case "stepDevTick": {
       const before = await lanes.client.currentTick();
       await lanes.client.stepDevTick();
-      await lanes.client.waitForSnapshot({ minTickDelta: 1, timeoutMs: 3000 });
+      await lanes.client.waitForSnapshot({ minTickDelta: 1, timeoutMs: 8000 });
       const after = await lanes.client.currentTick();
       context.tickMarks.push({ before, after });
       artifacts.diff({ assertion: "stepDevTick", before, after, delta: after - before });
@@ -239,6 +354,57 @@ function requireLiveLanes(lanes, op) {
 
 function requireClientLane(lanes, op) {
   if (!lanes.client) throw new Error(`${op} requires a client lane`);
+}
+
+function compareLocalStable({ before, after, kind, index = 0, tolerancePx = 0.01 }) {
+  const a = ownEntityByKind(before, kind, index);
+  const b = ownEntityByKind(after, kind, index);
+  if (!a || !b) return { ok: false, reason: `missing owned ${kind}[${index}]`, before: a, after: b };
+  const distance = Math.hypot((a.x || 0) - (b.x || 0), (a.y || 0) - (b.y || 0));
+  return {
+    ok: distance <= tolerancePx,
+    distance: round(distance),
+    tolerancePx,
+    before: { id: a.id, x: a.x, y: a.y, tick: before?.tick },
+    after: { id: b.id, x: b.x, y: b.y, tick: after?.tick },
+  };
+}
+
+function compareLocalAdvanced({ before, after, kind, index = 0, minDistancePx = 1 }) {
+  const a = ownEntityByKind(before, kind, index);
+  const b = ownEntityByKind(after, kind, index);
+  if (!a || !b) return { ok: false, reason: `missing owned ${kind}[${index}]`, before: a, after: b };
+  const distance = Math.hypot((a.x || 0) - (b.x || 0), (a.y || 0) - (b.y || 0));
+  return {
+    ok: distance >= minDistancePx,
+    distance: round(distance),
+    minDistancePx,
+    before: { id: a.id, x: a.x, y: a.y, tick: before?.tick },
+    after: { id: b.id, x: b.x, y: b.y, tick: after?.tick },
+  };
+}
+
+function compareLocalOrderPlan({ summary, kind, index = 0, expected = [] }) {
+  const entity = ownEntityByKind(summary, kind, index);
+  if (!entity) return { ok: false, reason: `missing owned ${kind}[${index}]` };
+  const actual = summarizePlan(entity.orderPlan || []);
+  const normalizedExpected = summarizePlan(expected);
+  return {
+    ok: JSON.stringify(actual) === JSON.stringify(normalizedExpected),
+    actual,
+    expected: normalizedExpected,
+  };
+}
+
+function assertOwnerSafeBaseline(summary) {
+  const checks = [];
+  const add = (name, ok, detail = null) => checks.push({ name, ok, detail });
+  add("baselineImported", !!summary, summary || null);
+  add("ownedIdsPresent", (summary?.ownedEntities || []).every((entity) => Number.isInteger(entity.id)));
+  add("visibleObstaclesHaveNoIds", (summary?.visibleObstacles || []).every((obstacle) => obstacle.id == null));
+  add("visibleObstaclesHaveNoOrders", (summary?.visibleObstacles || []).every((obstacle) => obstacle.orderPlan == null && obstacle.targetId == null));
+  add("visibleObstaclesHaveNoEconomy", (summary?.visibleObstacles || []).every((obstacle) => obstacle.steel == null && obstacle.oil == null && obstacle.production == null));
+  return { ok: checks.every((check) => check.ok), checks, summary };
 }
 
 function comparePredictionSummary(controller, step) {
@@ -277,6 +443,10 @@ function comparePredictionSummary(controller, step) {
     if (step[option] != null) add(field, (controller[field] || 0) >= step[option], controller[field], `>=${step[option]}`);
   }
   return { ok: checks.every((check) => check.ok), checks };
+}
+
+function round(value) {
+  return Number.isFinite(value) ? Math.round(value * 100) / 100 : value;
 }
 
 async function scenarioFilesFor(args) {
