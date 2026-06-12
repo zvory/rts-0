@@ -105,7 +105,7 @@ export class RemoteLane {
   }
 
   async issue(command, args = {}) {
-    if (!["move", "attackMove", "stop", "train", "setRally", "build", "invalidMove"].includes(command)) {
+    if (!["move", "attackMove", "attack", "stop", "train", "setRally", "build", "invalidMove"].includes(command)) {
       throw new Error(`unsupported remote command: ${command}`);
     }
     const unit = this.selectedEntity();
@@ -126,6 +126,8 @@ export class RemoteLane {
       };
     } else if (command === "invalidMove") {
       cmd = { c: "move", units: [999999999], x: args.x ?? unit.x + (args.dx ?? 0), y: args.y ?? unit.y + (args.dy ?? 0) };
+    } else if (command === "attack") {
+      cmd = { c: "attack", units: [unit.id], target: args.target ?? 999999999, queued: !!args.queued };
     } else {
       cmd = {
         c: command,
