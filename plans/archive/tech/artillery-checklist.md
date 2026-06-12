@@ -1,6 +1,6 @@
 # Artillery Unit Checklist
 
-Working checklist for `plans/tech/phase-6-capstones.md`, following
+Working checklist for `plans/archive/tech/phase-6-capstones.md`, following
 `docs/new-unit-checklist.md`.
 
 ## Phase 0: Unit Brief

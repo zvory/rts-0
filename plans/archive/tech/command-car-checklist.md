@@ -1,6 +1,6 @@
 # Command Car Unit Checklist
 
-Working checklist for `plans/tech/phase-7-command-car.md`, following
+Working checklist for `plans/archive/tech/phase-7-command-car.md`, following
 `docs/new-unit-checklist.md`.
 
 ## Phase 0: Unit Brief
