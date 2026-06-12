@@ -151,6 +151,8 @@ try {
       predictionOffSmoke.pending === 0,
     `PREDICTION OFF: command sends sequenced authoritative order (seq=${predictionOffSmoke.issued?.clientSeq}, pending=${predictionOffSmoke.pending})`,
   );
+  await page.evaluate(() => window.__rts.setPredictionEnabled(true));
+  await page.waitForFunction(() => window.__rts.match.prediction.enabled === true, { timeout: 2000 });
 
   // Interpolation must be live: GameState exposes recv timestamps so alpha isn't pinned to 1.
   const interp = await page.evaluate(() => {
@@ -258,6 +260,144 @@ try {
     return !!document.querySelector('#command-card [data-hotkey="Q"]');
   });
   ok(trainBtn, "TRAIN CARD: selecting the City Centre shows a Worker train button");
+  await page.waitForFunction(() => {
+    const btn = document.querySelector('#command-card [data-hotkey="Q"]');
+    return btn && !btn.disabled && !btn.classList.contains("unaffordable");
+  }, { timeout: 30000 });
+  ok(true, "TRAIN CARD: Worker train button is affordable before accepted optimism scenario");
+
+  const trainOptimism = await page.evaluate(() => {
+    const m = window.__rts.match;
+    const s = m.state;
+    const cityCentre = s.entitiesInterpolated(1, { includePrediction: false })
+      .find((e) => e.owner === s.playerId && e.kind === "city_centre");
+    if (!cityCentre) return { cityCentre: false };
+    s.setSelection([cityCentre.id]);
+    m.hud.update();
+    const beforeAuthoritative = s.entityById(cityCentre.id);
+    const issued = m.commandIssuer.issueCommand({ c: "train", building: cityCentre.id, unit: "worker" });
+    m.hud.update();
+    const optimistic = s.selectedEntities()[0];
+    const authoritative = s.entitiesInterpolated(1, { includePrediction: false })
+      .find((e) => e.id === cityCentre.id);
+    const debug = m.prediction.debugSummary();
+    return {
+      cityCentre: true,
+      issued,
+      beforeQueue: beforeAuthoritative?.prodQueue || 0,
+      optimisticQueue: optimistic?.prodQueue || 0,
+      optimisticProduction: !!optimistic?.optimisticProduction,
+      authoritativeQueue: authoritative?.prodQueue || 0,
+      optimisticUiCount: debug.optimisticUiCount,
+    };
+  });
+  ok(
+    trainOptimism.cityCentre &&
+      trainOptimism.issued?.sent &&
+      trainOptimism.optimisticProduction &&
+      trainOptimism.optimisticQueue === trainOptimism.beforeQueue + 1 &&
+      trainOptimism.authoritativeQueue === trainOptimism.beforeQueue &&
+      trainOptimism.optimisticUiCount >= 1,
+    `TRI-LANE TRAIN OPTIMISM: client queue advances before authoritative echo (before=${trainOptimism.beforeQueue}, optimistic=${trainOptimism.optimisticQueue}, authoritative=${trainOptimism.authoritativeQueue})`,
+  );
+  await page.waitForFunction(() => {
+    const m = window.__rts.match;
+    const s = m.state;
+    const cc = s.entitiesInterpolated(1).find((e) => e.owner === s.playerId && e.kind === "city_centre");
+    return cc && !cc.optimisticProduction && (cc.prodQueue || 0) >= 1;
+  }, { timeout: 5000 });
+  ok(true, "TRI-LANE TRAIN CONFIRM: authoritative production queue replaces local optimism");
+
+  const rallyOptimism = await page.evaluate(() => {
+    const m = window.__rts.match;
+    const s = m.state;
+    const cityCentre = s.entitiesInterpolated(1, { includePrediction: false })
+      .find((e) => e.owner === s.playerId && e.kind === "city_centre");
+    if (!cityCentre) return { cityCentre: false };
+    s.setSelection([cityCentre.id]);
+    m.hud.update();
+    const x = cityCentre.x + 220;
+    const y = cityCentre.y + 120;
+    const issued = m.commandIssuer.issueCommand({
+      c: "setRally",
+      building: cityCentre.id,
+      x,
+      y,
+      kind: "attackMove",
+      queued: false,
+    });
+    const optimistic = s.selectedEntities()[0];
+    const authoritative = s.entitiesInterpolated(1, { includePrediction: false })
+      .find((e) => e.id === cityCentre.id);
+    const optimisticStage = optimistic?.rallyPlan?.[0] || null;
+    return {
+      cityCentre: true,
+      issued,
+      target: { x, y },
+      optimisticRally: !!optimistic?.optimisticRally,
+      optimisticStage,
+      authoritativeStage: authoritative?.rallyPlan?.[0] || null,
+      optimisticUiCount: m.prediction.debugSummary().optimisticUiCount,
+    };
+  });
+  ok(
+    rallyOptimism.cityCentre &&
+      rallyOptimism.issued?.sent &&
+      rallyOptimism.optimisticRally &&
+      rallyOptimism.optimisticStage?.kind === "attackMove" &&
+      Math.abs(rallyOptimism.optimisticStage.x - rallyOptimism.target.x) < 1 &&
+      Math.abs(rallyOptimism.optimisticStage.y - rallyOptimism.target.y) < 1 &&
+      (
+        !rallyOptimism.authoritativeStage ||
+        Math.abs(rallyOptimism.authoritativeStage.x - rallyOptimism.target.x) >= 1 ||
+        Math.abs(rallyOptimism.authoritativeStage.y - rallyOptimism.target.y) >= 1
+      ) &&
+      rallyOptimism.optimisticUiCount >= 1,
+    `TRI-LANE RALLY OPTIMISM: client rally marker advances before authoritative echo (optimistic=${JSON.stringify(rallyOptimism.optimisticStage)}, authoritative=${JSON.stringify(rallyOptimism.authoritativeStage)})`,
+  );
+  await page.waitForFunction(() => {
+    const m = window.__rts.match;
+    const s = m.state;
+    const cc = s.entitiesInterpolated(1).find((e) => e.owner === s.playerId && e.kind === "city_centre");
+    const stage = cc?.rallyPlan?.[0];
+    return cc && !cc.optimisticRally && stage?.kind === "attackMove";
+  }, { timeout: 5000 });
+  ok(true, "TRI-LANE RALLY CONFIRM: authoritative rally plan replaces local optimism");
+
+  const invalidTrainOptimism = await page.evaluate(() => {
+    const m = window.__rts.match;
+    const s = m.state;
+    const cityCentre = s.entitiesInterpolated(1, { includePrediction: false })
+      .find((e) => e.owner === s.playerId && e.kind === "city_centre");
+    if (!cityCentre) return { cityCentre: false };
+    s.setSelection([cityCentre.id]);
+    const beforeQueue = cityCentre.prodQueue || 0;
+    const issued = m.commandIssuer.issueCommand({ c: "train", building: cityCentre.id, unit: "tank" });
+    const optimistic = s.selectedEntities()[0];
+    return {
+      cityCentre: true,
+      issued,
+      beforeQueue,
+      optimisticQueue: optimistic?.prodQueue || 0,
+      optimisticProduction: !!optimistic?.optimisticProduction,
+      optimisticUiCount: m.prediction.debugSummary().optimisticUiCount,
+    };
+  });
+  ok(
+    invalidTrainOptimism.cityCentre &&
+      invalidTrainOptimism.issued?.sent &&
+      invalidTrainOptimism.optimisticProduction &&
+      invalidTrainOptimism.optimisticQueue === invalidTrainOptimism.beforeQueue + 1,
+    `TRI-LANE TRAIN REJECT: invalid train shows reversible optimism first (before=${invalidTrainOptimism.beforeQueue}, optimistic=${invalidTrainOptimism.optimisticQueue})`,
+  );
+  await page.waitForFunction((beforeQueue) => {
+    const m = window.__rts.match;
+    const s = m.state;
+    const cc = s.entitiesInterpolated(1).find((e) => e.owner === s.playerId && e.kind === "city_centre");
+    const debug = m.prediction.debugSummary();
+    return cc && !cc.optimisticProduction && (cc.prodQueue || 0) === beforeQueue && debug.uiExpiredCount >= 1;
+  }, { timeout: 5000 }, invalidTrainOptimism.beforeQueue);
+  ok(true, "TRI-LANE TRAIN REJECT: unconfirmed invalid train optimism expires back to authoritative queue");
 
   await page.click("#settings-button");
   await page.waitForFunction(() => !document.getElementById("settings-menu")?.hidden, { timeout: 2000 });
