@@ -5,7 +5,7 @@ import path from "node:path";
 import assert from "node:assert/strict";
 import { ArtifactWriter } from "./artifacts.mjs";
 import { forceFailure, scenario, selectOwn } from "./dsl.mjs";
-import { LocalLaneUnavailable } from "./lanes/local_lane.mjs";
+import { WasmLocalLane } from "./lanes/local_lane.mjs";
 
 const root = fs.mkdtempSync(path.join(os.tmpdir(), "rts-tri-state-test-"));
 
@@ -37,12 +37,26 @@ const root = fs.mkdtempSync(path.join(os.tmpdir(), "rts-tri-state-test-"));
 
 {
   const writer = new ArtifactWriter("local_lane_contract", { root, runId: "run" });
-  const lane = new LocalLaneUnavailable({ artifacts: writer });
-  const frame = await lane.start();
-  assert.equal(frame.localLane, "unavailable");
-  assert.match(frame.reason, /Phase 3\.5/);
+  const lane = new WasmLocalLane({
+    artifacts: writer,
+    gluePath: path.join(root, "missing-glue.js"),
+    wasmPath: path.join(root, "missing.wasm"),
+  });
+  const frame = await lane.start({
+    startInfo: {
+      playerId: 1,
+      spectator: false,
+      debugMode: false,
+      tick: 0,
+      map: { width: 1, height: 1, tileSize: 32, terrain: [0], resources: [] },
+      players: [{ id: 1, name: "A", color: "#f00", startTileX: 0, startTileY: 0 }],
+    },
+  });
+  assert.equal(frame.localLane, "wasm");
+  assert.equal(frame.disabledReason, "wasmAssetsMissing");
   await lane.capture("sample");
-  assert.match(fs.readFileSync(path.join(writer.dir, "local.jsonl"), "utf8"), /"localLane":"unavailable"/);
+  assert.match(fs.readFileSync(path.join(writer.dir, "local.jsonl"), "utf8"), /"localLane":"wasm"/);
+  assert.match(fs.readFileSync(path.join(writer.dir, "local.jsonl"), "utf8"), /"disabledReason":"wasmAssetsMissing"/);
 }
 
 {

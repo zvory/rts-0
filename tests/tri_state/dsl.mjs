@@ -15,6 +15,7 @@ export function scenario(name, definition) {
       prediction: setup.prediction || "disabled",
       quickstart: setup.quickstart !== false,
       devScenario: setup.devScenario || null,
+      localBaseline: setup.localBaseline || "initial",
     },
     network: definition.network || { mode: "direct" },
     steps,
@@ -48,12 +49,52 @@ export function capture(label) {
   return { op: "capture", label };
 }
 
+export function importLocalBaseline(options = {}) {
+  return { op: "importLocalBaseline", source: "client", ...options };
+}
+
+export function advanceLocalTicks(ticks) {
+  return { op: "advanceLocalTicks", ticks };
+}
+
 export function assertRemoteClientOwnedPosition(options = {}) {
   return { op: "assertRemoteClientOwnedPosition", tolerancePx: 1, ...options };
 }
 
 export function assertOrderPlansMatch(options = {}) {
   return { op: "assertOrderPlansMatch", ...options };
+}
+
+export function assertLocalReady(options = {}) {
+  return { op: "assertLocalReady", ...options };
+}
+
+export function assertLocalDisabledReason(reason) {
+  return { op: "assertLocalDisabledReason", reason };
+}
+
+export function assertLocalOwnedStable(options = {}) {
+  return { op: "assertLocalOwnedStable", ...options };
+}
+
+export function assertLocalOwnedAdvanced(options = {}) {
+  return { op: "assertLocalOwnedAdvanced", ...options };
+}
+
+export function assertLocalOrderPlan(options = {}) {
+  return { op: "assertLocalOrderPlan", ...options };
+}
+
+export function assertLocalPendingClientSeqs(seqs) {
+  return { op: "assertLocalPendingClientSeqs", seqs };
+}
+
+export function assertLocalCorrectionAtMost(maxPx) {
+  return { op: "assertLocalCorrectionAtMost", maxPx };
+}
+
+export function assertLocalBaselineOwnerSafe() {
+  return { op: "assertLocalBaselineOwnerSafe" };
 }
 
 export function assertClientSeqsStrictlyIncreasing(options = {}) {
