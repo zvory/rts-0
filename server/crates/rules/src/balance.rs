@@ -110,8 +110,8 @@ pub const QUICKSTART_OIL: u32 = 99_999;
 pub const STEEL_LOAD: u32 = 2;
 pub const OIL_LOAD: u32 = 2;
 pub const HARVEST_TICKS: u32 = 40;
-pub const STEEL_PATCH_AMOUNT: u32 = 1500;
-pub const OIL_GEYSER_AMOUNT: u32 = 5000;
+pub const STEEL_PATCH_AMOUNT: u32 = 1000;
+pub const OIL_GEYSER_AMOUNT: u32 = 3333;
 pub const STEEL_PATCHES_PER_BASE: u32 = 18;
 pub const OIL_PATCHES_PER_BASE: u32 = 3;
 

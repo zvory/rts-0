@@ -3353,8 +3353,8 @@ function fakeAudioContext() {
   assert(state.map.width === 4, "GameState.map");
   assert(state.map.resources.length === 2, "GameState keeps start payload resources");
   assert(state.resourceById.get(200).kind === KIND.STEEL, "GameState indexes resources by id");
-  assert(state.resourceById.get(200).remaining === 1500, "steel defaults to full known amount");
-  assert(state.resourceById.get(201).remaining === 5000, "oil defaults to full known amount");
+  assert(state.resourceById.get(200).remaining === 1000, "steel defaults to full known amount");
+  assert(state.resourceById.get(201).remaining === 3333, "oil defaults to full known amount");
   assert(Array.isArray(state.players), "GameState.players");
   assertHasMethod(state, "applySnapshot", "GameState");
   assertHasMethod(state, "entitiesInterpolated", "GameState");
@@ -3423,7 +3423,7 @@ function fakeAudioContext() {
   });
   assert(state.prevRecvTime !== null, "prevRecvTime set after two snapshots");
   assert(state.entityById(200).remaining === 0, "visible resource death tombstones known resource");
-  assert(state.entityById(201).remaining === 5000, "untouched resources keep their last-known amount");
+  assert(state.entityById(201).remaining === 3333, "untouched resources keep their last-known amount");
   state.updateResourceMiningPreview({
     resourceId: 200,
     resourceX: 64,
@@ -3726,7 +3726,7 @@ function fakeAudioContext() {
   );
 
   const overlappingWorker = { id: 30, owner: 1, kind: KIND.WORKER, x: 100, y: 100 };
-  const overlappingSteel = { id: 31, owner: 0, kind: KIND.STEEL, x: 104, y: 100, remaining: 1500 };
+  const overlappingSteel = { id: 31, owner: 0, kind: KIND.STEEL, x: 104, y: 100, remaining: 1000 };
   input.state = {
     playerId: 1,
     map: { tileSize: 32 },
