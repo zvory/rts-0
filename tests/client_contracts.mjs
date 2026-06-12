@@ -1671,32 +1671,132 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
     clearPredictedSnapshot() {
       this.clearedPrediction = true;
     },
+    setOptimisticCommandState(state) {
+      this.optimisticState = state;
+    },
   };
   predictionPolicyMatch.prediction = {
     enabled: true,
+    predictor: null,
     reset({ enabled }) {
       this.enabled = enabled;
     },
   };
+  predictionPolicyMatch.predictionInitToken = 0;
   let predictionAdapterInit = 0;
+  let predictionAdapterDestroy = 0;
+  let predictionAdapterId = 0;
+  const makePredictionAdapter = () => {
+    const adapter = {
+      id: ++predictionAdapterId,
+      ready: false,
+      loading: false,
+      destroyed: false,
+      diagnostics: () => ({ ready: adapter.ready, loading: adapter.loading }),
+      init: async () => {
+        predictionAdapterInit += 1;
+        adapter.loading = true;
+        await Promise.resolve();
+        adapter.loading = false;
+        adapter.ready = true;
+        return true;
+      },
+      destroy: () => {
+        predictionAdapterDestroy += 1;
+        adapter.destroyed = true;
+        adapter.ready = false;
+        adapter.loading = false;
+      },
+    };
+    return adapter;
+  };
+  predictionPolicyMatch.createPredictionAdapter = makePredictionAdapter;
   predictionPolicyMatch.predictionAdapter = {
     ready: false,
+    loading: false,
     diagnostics: () => ({ ready: false }),
-    init: async () => {
-      predictionAdapterInit += 1;
-      return true;
-    },
+    init: async () => true,
+    destroy: () => { predictionAdapterDestroy += 1; },
   };
+  predictionPolicyMatch.prediction.predictor = predictionPolicyMatch.predictionAdapter;
   predictionPolicyMatch.publishPredictionDebug = () => {};
   predictionPolicyMatch.mountSettings = () => {};
   predictionPolicyMatch.logPredictionStatus = () => {};
   predictionPolicyMatch.setPredictionEnabled(false);
   assert(!predictionPolicyMatch.prediction.enabled, "prediction setting can disable live prediction");
   assert(predictionPolicyMatch.state.clearedPrediction, "disabling prediction clears local predicted overlay");
+  assert(predictionPolicyMatch.state.optimisticState === null, "disabling prediction clears optimistic command UI");
+  assert(predictionPolicyMatch.prediction.predictor === predictionPolicyMatch.predictionAdapter,
+    "disabling prediction replaces the controller predictor with a fresh inactive adapter");
+  assert(predictionAdapterDestroy === 1, "disabling prediction destroys the active WASM adapter");
   predictionPolicyMatch.setPredictionEnabled(true);
+  await Promise.resolve();
   await Promise.resolve();
   assert(predictionPolicyMatch.prediction.enabled, "prediction setting can re-enable live prediction");
   assert(predictionAdapterInit === 1, "re-enabling prediction initializes the WASM adapter");
+  assert(predictionPolicyMatch.predictionAdapter.ready, "re-enabled prediction owns a ready fresh adapter");
+
+  const staleInitMatch = Object.create(Match.prototype);
+  staleInitMatch.replayViewer = false;
+  staleInitMatch.state = { spectator: false };
+  staleInitMatch.predictionInitToken = 0;
+  staleInitMatch.prediction = {
+    enabled: true,
+    predictor: null,
+    reset({ enabled }) {
+      this.enabled = enabled;
+    },
+  };
+  let resolveStaleInit = null;
+  const staleAdapter = {
+    destroyed: false,
+    ready: false,
+    loading: true,
+    diagnostics: () => ({ ready: staleAdapter.ready, loading: staleAdapter.loading }),
+    init: () => new Promise((resolve) => {
+      resolveStaleInit = () => {
+        staleAdapter.loading = false;
+        staleAdapter.ready = true;
+        resolve(true);
+      };
+    }),
+    destroy: () => {
+      staleAdapter.destroyed = true;
+      staleAdapter.ready = false;
+      staleAdapter.loading = false;
+    },
+  };
+  let freshAdapter = null;
+  staleInitMatch.createPredictionAdapter = () => {
+    freshAdapter = {
+      destroyed: false,
+      ready: false,
+      loading: false,
+      diagnostics: () => ({ ready: freshAdapter.ready, loading: freshAdapter.loading }),
+      init: async () => {
+        freshAdapter.ready = true;
+        return true;
+      },
+      destroy: () => {
+        freshAdapter.destroyed = true;
+        freshAdapter.ready = false;
+      },
+    };
+    return freshAdapter;
+  };
+  staleInitMatch.predictionAdapter = staleAdapter;
+  staleInitMatch.prediction.predictor = staleAdapter;
+  staleInitMatch.publishPredictionDebug = () => {};
+  staleInitMatch.mountSettings = () => {};
+  staleInitMatch.logPredictionStatus = () => {};
+  staleInitMatch.initPredictionAdapter();
+  staleInitMatch.setPredictionEnabled(false);
+  staleInitMatch.setPredictionEnabled(true);
+  await Promise.resolve();
+  resolveStaleInit();
+  await Promise.resolve();
+  assert(staleAdapter.destroyed, "stale in-flight prediction init is destroyed after the toggle-off token changes");
+  assert(freshAdapter.ready && !freshAdapter.destroyed, "stale init completion does not destroy the re-enabled adapter");
 
   const mismatchMatch = Object.create(Match.prototype);
   mismatchMatch.prediction = {
