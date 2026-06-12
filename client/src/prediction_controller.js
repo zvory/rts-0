@@ -52,10 +52,11 @@ export class PredictionController {
     this.snapCorrectionCount = 0;
   }
 
-  reset({ enabled = this.enabled } = {}) {
+  reset({ enabled = this.enabled, preserveClientSeq = false } = {}) {
+    const nextClientSeq = this.nextClientSeq;
     this.enabled = !!enabled;
     this.mode = this.enabled ? PREDICTION_STATE.TRACKING : PREDICTION_STATE.DISABLED;
-    this.nextClientSeq = 1;
+    this.nextClientSeq = preserveClientSeq ? nextClientSeq : 1;
     this.pending = [];
     this.pendingBySeq.clear();
     this.latestAuthoritativeTick = null;
@@ -78,11 +79,12 @@ export class PredictionController {
   }
 
   issueCommand(cmd) {
-    if (!this.enabled) {
-      const sent = this.sendCommand ? this.sendCommand(cmd) : false;
-      return { clientSeq: null, sent: !!sent, predicted: false };
-    }
     const clientSeq = this._allocateClientSeq();
+    if (!this.enabled) {
+      this.issuedCount += 1;
+      const sent = this.sendCommand ? this.sendCommand(cmd, clientSeq) : false;
+      return { clientSeq, sent: !!sent, predicted: false };
+    }
     const issuedAt = this.now();
     const pending = {
       clientSeq,

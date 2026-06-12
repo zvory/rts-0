@@ -77,6 +77,7 @@ function sentSeqs(sent) {
   const controller = new PredictionController({
     enabled: false,
     sendCommand(command, clientSeq) {
+      assert(Number.isInteger(clientSeq) && clientSeq > 0, "disabled sends still carry a valid clientSeq");
       sent.push({ command, clientSeq });
       return true;
     },
@@ -84,9 +85,26 @@ function sentSeqs(sent) {
   assert(controller.debugSummary().mode === PREDICTION_STATE.DISABLED, "disabled mode is exposed");
   const result = controller.issueCommand({ c: "stop", units: [1] });
   assert(result.sent === true && result.predicted === false, "disabled controller still sends gameplay commands");
-  assert(result.clientSeq == null, "disabled controller does not attach prediction sequence ids");
-  assert(sent.length === 1 && sent[0].clientSeq === undefined, "disabled sends use legacy unsequenced commands");
-  assert(controller.debugSummary().nextClientSeq === 1, "disabled controller does not allocate sequence ids");
+  assert(result.clientSeq === 1, "disabled controller attaches protocol sequence ids");
+  assert(sent.length === 1 && sent[0].clientSeq === 1, "disabled sends use sequenced protocol commands");
+  assert(controller.debugSummary().pendingCommandCount === 0, "disabled controller does not track prediction pending commands");
+  assert(controller.debugSummary().nextClientSeq === 2, "disabled controller advances sequence ids");
+}
+
+{
+  const sent = [];
+  const controller = new PredictionController({
+    sendCommand(command, clientSeq) {
+      sent.push({ command, clientSeq });
+      return true;
+    },
+  });
+  controller.issueCommand({ c: "stop", units: [1] });
+  controller.reset({ enabled: false, preserveClientSeq: true });
+  controller.issueCommand({ c: "stop", units: [2] });
+  controller.reset({ enabled: true, preserveClientSeq: true });
+  controller.issueCommand({ c: "stop", units: [3] });
+  assert(sentSeqs(sent) === "1,2,3", "prediction toggles preserve monotonic command sequence ids");
 }
 
 {

@@ -2302,15 +2302,34 @@ function fakeAudioContext() {
   const disabledPrediction = new PredictionController({
     enabled: false,
     sendCommand(command, clientSeq) {
+      assert(Number.isInteger(clientSeq) && clientSeq > 0, "disabled PredictionController sends valid clientSeq");
       disabledSent.push({ command, clientSeq });
       return true;
     },
   });
   const disabledIssued = disabledPrediction.issueCommand(cmd.move([7], 120, 160));
   assert(disabledIssued.sent && !disabledIssued.predicted, "PredictionController disabled mode still sends commands");
-  assert(disabledIssued.clientSeq == null, "PredictionController disabled mode omits prediction sequence ids");
-  assert(disabledSent.length === 1 && disabledSent[0].clientSeq === undefined, "disabled commands use legacy send shape");
-  assert(disabledPrediction.debugSummary().nextClientSeq === 1, "disabled commands do not consume sequence ids");
+  assert(disabledIssued.clientSeq === 1, "PredictionController disabled mode still emits protocol sequence ids");
+  assert(disabledSent.length === 1 && disabledSent[0].clientSeq === 1, "disabled commands use sequenced protocol send shape");
+  assert(disabledPrediction.pendingCommandCount === 0, "disabled commands are not tracked as prediction pending");
+  assert(disabledPrediction.debugSummary().nextClientSeq === 2, "disabled commands consume sequence ids");
+
+  const toggledSent = [];
+  const toggledPrediction = new PredictionController({
+    sendCommand(command, clientSeq) {
+      toggledSent.push({ command, clientSeq });
+      return true;
+    },
+  });
+  toggledPrediction.issueCommand(cmd.stop([1]));
+  toggledPrediction.reset({ enabled: false, preserveClientSeq: true });
+  toggledPrediction.issueCommand(cmd.stop([2]));
+  toggledPrediction.reset({ enabled: true, preserveClientSeq: true });
+  toggledPrediction.issueCommand(cmd.stop([3]));
+  assert(
+    toggledSent.map((entry) => entry.clientSeq).join(",") === "1,2,3",
+    "PredictionController preserves command sequence ids across prediction toggles",
+  );
 }
 
 // ---------------------------------------------------------------------------

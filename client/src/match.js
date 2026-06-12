@@ -382,7 +382,7 @@ export class Match {
 
   disablePredictionForStateMismatch() {
     if (!this.prediction.enabled) return;
-    this.prediction.reset({ enabled: false });
+    this.prediction.reset({ enabled: false, preserveClientSeq: true });
     if (!this.predictionStateMismatchLogged) {
       this.predictionStateMismatchLogged = true;
       this.logPredictionStatus("disabled-state-mismatch");
@@ -391,7 +391,7 @@ export class Match {
 
   setPredictionEnabled(enabled) {
     const allowed = !!enabled && !this.replayViewer && !this.state?.spectator;
-    this.prediction.reset({ enabled: allowed });
+    this.prediction.reset({ enabled: allowed, preserveClientSeq: true });
     if (!allowed) {
       this.state?.clearPredictedSnapshot?.();
       this.publishPredictionDebug();
