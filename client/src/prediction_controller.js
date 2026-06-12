@@ -79,7 +79,8 @@ export class PredictionController {
 
   issueCommand(cmd) {
     if (!this.enabled) {
-      return false;
+      const sent = this.sendCommand ? this.sendCommand(cmd) : false;
+      return { clientSeq: null, sent: !!sent, predicted: false };
     }
     const clientSeq = this._allocateClientSeq();
     const issuedAt = this.now();
