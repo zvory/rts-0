@@ -7,34 +7,35 @@ position-grinding payoff.
 
 ## Command Car
 
+Working checklist: [command-car-checklist.md](command-car-checklist.md).
+
 - Built at Vehicle Works.
-- Requires a late Vehicle Works upgrade.
+- Requires Tank Production and a late Vehicle Works upgrade named Command Car.
+- Costs 150 steel / 75 oil.
+- Has no weapon.
 - Ability: **Breakthrough!**
-- Breakthrough is an AOE speed boost.
+- Breakthrough is a centered AOE speed boost.
 - Breakthrough bonus is doubled for units in smoke or that recently left smoke.
-- Ability: **Fake Army**
-- Fake Army copies army units in AOE and places the fake force at a target location within range.
-- Fake copies deal no damage.
-- Fake copies have 10% of the real units' HP.
-- Fake copies disappear after 20 seconds.
+- Fake Army is deferred out of this implementation pass.
 
 ## Work
 
-- Add any new protocol messages, ability identifiers, fake-unit snapshot representation, and fog
+- Add any new protocol messages, ability identifiers, Breakthrough status representation, and fog
   projection rules together.
-- Ensure fake units cannot attack, gather, block ownership commands incorrectly, or leak hidden real
-  unit information.
+- Do not implement Fake Army, fake-unit snapshot representation, fake-unit fog projection, fake
+  attacks, fake HP, fake lifetime, or fake cleanup in this pass.
 - Implement Command Car after Artillery so Mobile Warfare gains a late tool against entrenched
   Superior Firepower.
 
 ## Verification
 
-- Command Car ability cooldowns, target validation, smoke synergy, fake lifetime, fake HP, and
-  zero-damage behavior are tested.
-- Fog tests cover fake army visibility.
-- Regression tests cover fake units disappearing cleanly without stale ids.
+- Command Car unlock, production, ability cooldown, owned-unit targeting, queued casting, moving
+  casts, smoke synergy, duration, and non-stacking behavior are tested.
+- Fog tests cover Breakthrough visibility without leaking effects on hidden units.
+- Regression tests cover stale ids, duplicate commands, and command cleanup without implementing
+  Fake Army.
 
 ## Player-Facing Outcome
 
-Mobile Warfare gains tools to force breakthroughs, exploit smoke, and deceive defensive lines after
-Superior Firepower's Artillery timing comes online.
+Mobile Warfare gains a tool to force breakthroughs and exploit smoke after Superior Firepower's
+Artillery timing comes online. Fake Army deception is intentionally deferred.
