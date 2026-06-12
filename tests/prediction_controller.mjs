@@ -88,7 +88,7 @@ function sentSeqs(sent) {
   ];
   for (const [file, label] of files) {
     const source = fs.readFileSync(new URL(`../${file}`, import.meta.url), "utf8");
-    assert(source.includes("commandIssuer.issueCommand"), `${file} routes ${label} through commandIssuer`);
+    assert(source.includes("this._issueCommand"), `${file} routes ${label} through the guarded command issuer`);
     assert(!source.includes(".net.command("), `${file} does not send gameplay commands through Net`);
   }
 }

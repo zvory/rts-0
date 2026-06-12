@@ -57,7 +57,7 @@ function fakeCanvas(rect = { left: 100, top: 200, width: 242, height: 242 }) {
   };
 }
 
-function minimapHarness({ selected = [], commandTarget = null, commandsEnabled = true } = {}) {
+function minimapHarness({ selected = [], commandTarget = null, commandsEnabled = true, legacySender = false } = {}) {
   installWindowStub();
   const viewport = {
     getBoundingClientRect() {
@@ -107,12 +107,19 @@ function minimapHarness({ selected = [], commandTarget = null, commandsEnabled =
       centers.push({ x, y });
     },
   };
-  const commandIssuer = {
-    sent: [],
-    issueCommand(command) {
-      this.sent.push(command);
-    },
-  };
+  const commandIssuer = legacySender
+    ? {
+        sent: [],
+        command(command) {
+          this.sent.push(command);
+        },
+      }
+    : {
+        sent: [],
+        issueCommand(command) {
+          this.sent.push(command);
+        },
+      };
   const minimap = new Minimap(canvas, state, camera, null, commandIssuer, router, { commandsEnabled });
   return { router, canvas, state, camera, net: commandIssuer, commandIssuer, minimap, centers, commands, endedTargets };
 }
@@ -158,6 +165,15 @@ function lockedEvent(clientX, clientY, button = 0, extra = {}) {
   h.minimap.destroy();
 }
 
+// Legacy one-argument senders still work for minimap right-clicks while Match uses PredictionController.
+{
+  const selected = [{ id: 7, owner: 1, kind: KIND.RIFLEMAN }];
+  const h = minimapHarness({ selected, legacySender: true });
+  assert(h.router.pointerDown(lockedEvent(180, 280, 2)), "legacy minimap right-click is consumed");
+  assert(h.net.sent.length === 1 && h.net.sent[0].c === "move", "legacy minimap right-click sends move");
+  h.minimap.destroy();
+}
+
 // Right-click with no selected controllable units is consumed by the minimap but sends no order.
 {
   const h = minimapHarness();
@@ -187,6 +203,15 @@ function lockedEvent(clientX, clientY, button = 0, extra = {}) {
   assert(h.net.sent[0].queued !== true, "plain minimap attack target does not queue attack-move");
   assert(h.state.commandTarget === null, "attack command-target exits after minimap click");
   assert(h.endedTargets.length === 1, "endCommandTarget is called");
+  h.minimap.destroy();
+}
+
+// Legacy one-argument senders still work for minimap attack-move target clicks.
+{
+  const selected = [{ id: 9, owner: 1, kind: KIND.RIFLEMAN }];
+  const h = minimapHarness({ selected, commandTarget: "attack", legacySender: true });
+  assert(h.router.pointerDown(lockedEvent(150, 250, 0)), "legacy attack-move minimap click is consumed");
+  assert(h.net.sent.length === 1 && h.net.sent[0].c === "attackMove", "legacy minimap attack target sends attack-move");
   h.minimap.destroy();
 }
 

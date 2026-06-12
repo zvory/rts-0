@@ -226,6 +226,10 @@ export class Input {
     }
   }
 
+  _issueCommand(command) {
+    return issueGameplayCommand(this.commandIssuer, command);
+  }
+
   /**
    * Per-frame continuous work. Pan-key handling lives on the camera (it reads
    * `this.keys`); placement hover is refreshed here so the ghost tracks the cursor
@@ -927,6 +931,16 @@ export class Input {
   /** Number-key control groups: save/add/recall, with recall double-tap camera jump. */
   // --- Mouse wheel: zoom toward cursor ------------------------------------
 
+}
+
+function issueGameplayCommand(sender, command) {
+  if (sender && typeof sender.issueCommand === "function") {
+    return sender.issueCommand(command);
+  }
+  if (sender && typeof sender.command === "function" && sender.command.length < 2) {
+    return sender.command(command);
+  }
+  return false;
 }
 
 Object.assign(Input.prototype, {

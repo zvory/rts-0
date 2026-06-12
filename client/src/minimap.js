@@ -360,6 +360,10 @@ export class Minimap {
     window.removeEventListener("mouseup", this._onWinMouseUp);
   }
 
+  _issueCommand(command) {
+    return issueGameplayCommand(this.commandIssuer, command);
+  }
+
   inputZone() {
     return {
       priority: 100,
@@ -481,13 +485,13 @@ export class Minimap {
       if (producers.length === 0) return;
       const kind = this.state.commandTarget === "attack" ? ORDER_STAGE.ATTACK_MOVE : ORDER_STAGE.MOVE;
       for (const building of producers) {
-        this.commandIssuer.issueCommand(cmd.setRally(building, wx, wy, queued, kind));
+        this._issueCommand(cmd.setRally(building, wx, wy, queued, kind));
       }
       this.state.addCommandFeedback(kind === ORDER_STAGE.ATTACK_MOVE ? "attack" : "move", wx, wy, queued);
       return;
     }
     if (this.state.commandTarget === "attack") {
-      this.commandIssuer.issueCommand(cmd.attackMove(unitIds, wx, wy, queued));
+      this._issueCommand(cmd.attackMove(unitIds, wx, wy, queued));
       this.state.addCommandFeedback("attack", wx, wy, queued);
       return;
     }
@@ -501,11 +505,21 @@ export class Minimap {
             .map((e) => e.id)
         : unitIds;
       if (abilityUnits.length === 0) return;
-      this.commandIssuer.issueCommand(cmd.useAbility(ability, abilityUnits, wx, wy, queued));
+      this._issueCommand(cmd.useAbility(ability, abilityUnits, wx, wy, queued));
       this.state.addCommandFeedback("attack", wx, wy, queued);
       return;
     }
-    this.commandIssuer.issueCommand(cmd.move(unitIds, wx, wy, queued));
+    this._issueCommand(cmd.move(unitIds, wx, wy, queued));
     this.state.addCommandFeedback("move", wx, wy, queued);
   }
+}
+
+function issueGameplayCommand(sender, command) {
+  if (sender && typeof sender.issueCommand === "function") {
+    return sender.issueCommand(command);
+  }
+  if (sender && typeof sender.command === "function" && sender.command.length < 2) {
+    return sender.command(command);
+  }
+  return false;
 }
