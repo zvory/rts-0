@@ -1,5 +1,6 @@
 const U32_MAX = 0xffffffff;
 const DEFAULT_COMMAND_TIMEOUT_MS = 15000;
+const DEFAULT_UI_CONFIRMATION_SNAPSHOTS = 4;
 
 export const PREDICTION_STATE = Object.freeze({
   DISABLED: "disabled",
@@ -23,16 +24,20 @@ export class PredictionController {
     enabled = true,
     now = () => performance.now(),
     commandTimeoutMs = DEFAULT_COMMAND_TIMEOUT_MS,
+    uiConfirmationSnapshots = DEFAULT_UI_CONFIRMATION_SNAPSHOTS,
   } = {}) {
     this.sendCommand = sendCommand;
     this.predictor = predictor;
     this.enabled = !!enabled;
     this.now = now;
     this.commandTimeoutMs = commandTimeoutMs;
+    this.uiConfirmationSnapshots = uiConfirmationSnapshots;
     this.mode = this.enabled ? PREDICTION_STATE.TRACKING : PREDICTION_STATE.DISABLED;
     this.nextClientSeq = 1;
     this.pending = [];
     this.pendingBySeq = new Map();
+    this.optimisticUi = [];
+    this.latestEntitiesById = new Map();
     this.latestAuthoritativeTick = null;
     this.latestAckSeq = 0;
     this.latestAckTick = null;
@@ -50,6 +55,8 @@ export class PredictionController {
     this.lastRejected = null;
     this.maxCorrectionDistance = 0;
     this.snapCorrectionCount = 0;
+    this.uiConfirmedCount = 0;
+    this.uiExpiredCount = 0;
   }
 
   reset({ enabled = this.enabled, preserveClientSeq = false } = {}) {
@@ -59,6 +66,8 @@ export class PredictionController {
     this.nextClientSeq = preserveClientSeq ? nextClientSeq : 1;
     this.pending = [];
     this.pendingBySeq.clear();
+    this.optimisticUi = [];
+    this.latestEntitiesById.clear();
     this.latestAuthoritativeTick = null;
     this.latestAckSeq = 0;
     this.latestAckTick = null;
@@ -76,9 +85,11 @@ export class PredictionController {
     this.lastRejected = null;
     this.maxCorrectionDistance = 0;
     this.snapCorrectionCount = 0;
+    this.uiConfirmedCount = 0;
+    this.uiExpiredCount = 0;
   }
 
-  issueCommand(cmd) {
+  issueCommand(cmd, options = {}) {
     const clientSeq = this._allocateClientSeq();
     if (!this.enabled) {
       this.issuedCount += 1;
@@ -100,6 +111,16 @@ export class PredictionController {
     };
     this.pending.push(pending);
     this.pendingBySeq.set(clientSeq, pending);
+    const optimistic = buildOptimisticUiCommand(
+      cmd,
+      clientSeq,
+      issuedAt,
+      this.latestAuthoritativeTick,
+      this.latestEntitiesById,
+      this.optimisticUi,
+      options,
+    );
+    if (optimistic) this.optimisticUi.push(optimistic);
     this.issuedCount += 1;
     let predicted = false;
     try {
@@ -130,6 +151,7 @@ export class PredictionController {
       }
     }
     if (tick != null) this.latestAuthoritativeTick = tick;
+    this.latestEntitiesById = entitiesById(snapshot.entities);
 
     const netStatus = snapshot.netStatus || {};
     const ackSeq = finiteU32(netStatus.lastSimConsumedClientSeq);
@@ -138,6 +160,7 @@ export class PredictionController {
       this.applySimAcknowledgement(ackSeq, ackTick);
     }
     this.reconcilePredictor(snapshot);
+    this.reconcileOptimisticUi(snapshot, tick);
     this.expireTimedOutCommands();
     return this.debugSummary();
   }
@@ -253,6 +276,50 @@ export class PredictionController {
     return count;
   }
 
+  reconcileOptimisticUi(snapshot, tick = null) {
+    if (!this.enabled || this.optimisticUi.length === 0) return;
+    const entities = this.latestEntitiesById;
+    const kept = [];
+    for (const entry of this.optimisticUi) {
+      if (tick != null && entry.lastSeenTick !== tick) {
+        entry.snapshotsSeen += 1;
+        entry.lastSeenTick = tick;
+      }
+      if (optimisticUiConfirmed(entry, entities)) {
+        this.uiConfirmedCount += 1;
+        continue;
+      }
+      if (entry.snapshotsSeen >= this.uiConfirmationSnapshots) {
+        this.uiExpiredCount += 1;
+        continue;
+      }
+      kept.push(entry);
+    }
+    this.optimisticUi = kept;
+  }
+
+  optimisticUiState() {
+    const production = [];
+    const rally = [];
+    for (const entry of this.optimisticUi) {
+      if (entry.family === "train") {
+        production.push({
+          clientSeq: entry.clientSeq,
+          building: entry.building,
+          unit: entry.unit,
+          optimisticQueue: entry.optimisticQueue,
+        });
+      } else if (entry.family === "rally") {
+        rally.push({
+          clientSeq: entry.clientSeq,
+          building: entry.building,
+          plan: entry.expectedPlan.map((stage) => ({ ...stage })),
+        });
+      }
+    }
+    return { production, rally };
+  }
+
   get pendingCommandCount() {
     return this.pending.length;
   }
@@ -275,6 +342,10 @@ export class PredictionController {
       receiptCount: this.receiptCount,
       rejectionCount: this.rejectionCount,
       timedOutCount: this.timedOutCount,
+      optimisticUiCount: this.optimisticUi.length,
+      optimisticUiClientSeqs: this.optimisticUi.map((entry) => entry.clientSeq),
+      uiConfirmedCount: this.uiConfirmedCount,
+      uiExpiredCount: this.uiExpiredCount,
       correctionCount: this.correctionCount,
       maxCorrectionDistance: this.maxCorrectionDistance,
       snapCorrectionCount: this.snapCorrectionCount,
@@ -296,6 +367,116 @@ function finiteU32(value) {
   const n = Number(value);
   if (!Number.isFinite(n) || n < 0) return null;
   return Math.min(U32_MAX, Math.trunc(n));
+}
+
+function entitiesById(entities) {
+  const out = new Map();
+  for (const entity of entities || []) {
+    if (entity && typeof entity.id === "number") out.set(entity.id, entity);
+  }
+  return out;
+}
+
+function buildOptimisticUiCommand(cmd, clientSeq, issuedAt, tick, entities, optimisticUi, options) {
+  if (!cmd || typeof cmd !== "object") return null;
+  if (cmd.c === "train") return optimisticTrain(cmd, clientSeq, issuedAt, tick, entities, optimisticUi, options);
+  if (cmd.c === "setRally") return optimisticRally(cmd, clientSeq, issuedAt, tick, entities);
+  return null;
+}
+
+function optimisticTrain(cmd, clientSeq, issuedAt, tick, entities, optimisticUi, options) {
+  const building = finiteU32(cmd.building);
+  if (building == null || typeof cmd.unit !== "string") return null;
+  const entity = entities.get(building) || {};
+  const baselineQueue = finiteU32(entity.prodQueue) ?? 0;
+  const pendingQueue = (optimisticUi || [])
+    .filter((entry) => entry.family === "train" && entry.building === building)
+    .reduce((max, entry) => Math.max(max, entry.optimisticQueue || 0), baselineQueue);
+  return {
+    family: "train",
+    clientSeq,
+    issuedAt,
+    issuedTick: tick,
+    lastSeenTick: tick,
+    snapshotsSeen: 0,
+    building,
+    unit: cmd.unit,
+    baselineQueue,
+    baselineProdKind: typeof entity.prodKind === "string" ? entity.prodKind : null,
+    optimisticQueue: Math.max(pendingQueue + 1, 1),
+    metadata: options?.optimism || null,
+  };
+}
+
+function optimisticRally(cmd, clientSeq, issuedAt, tick, entities) {
+  const building = finiteU32(cmd.building);
+  const x = finiteNumber(cmd.x);
+  const y = finiteNumber(cmd.y);
+  if (building == null || x == null || y == null) return null;
+  const entity = entities.get(building) || {};
+  const currentPlan = rallyPlanOf(entity);
+  const stage = {
+    kind: cmd.kind === "attackMove" ? "attackMove" : "move",
+    x,
+    y,
+  };
+  const expectedPlan = cmd.queued ? currentPlan.concat(stage).slice(0, 4) : [stage];
+  return {
+    family: "rally",
+    clientSeq,
+    issuedAt,
+    issuedTick: tick,
+    lastSeenTick: tick,
+    snapshotsSeen: 0,
+    building,
+    expectedPlan,
+  };
+}
+
+function optimisticUiConfirmed(entry, entities) {
+  const entity = entities.get(entry.building);
+  if (!entity) return false;
+  if (entry.family === "train") {
+    const queue = finiteU32(entity.prodQueue) ?? 0;
+    return queue >= entry.optimisticQueue;
+  }
+  if (entry.family === "rally") {
+    return rallyPlansEqual(rallyPlanOf(entity), entry.expectedPlan);
+  }
+  return false;
+}
+
+function rallyPlanOf(entity) {
+  if (Array.isArray(entity?.rallyPlan) && entity.rallyPlan.length > 0) {
+    return entity.rallyPlan.map(normalizeRallyStage).filter(Boolean);
+  }
+  if (Array.isArray(entity?.rally) && entity.rally.length === 2) {
+    const x = finiteNumber(entity.rally[0]);
+    const y = finiteNumber(entity.rally[1]);
+    if (x != null && y != null) return [{ kind: "move", x, y }];
+  }
+  return [];
+}
+
+function normalizeRallyStage(stage) {
+  const x = finiteNumber(stage?.x);
+  const y = finiteNumber(stage?.y);
+  if (x == null || y == null) return null;
+  return { kind: stage.kind === "attackMove" ? "attackMove" : "move", x, y };
+}
+
+function rallyPlansEqual(a, b) {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i += 1) {
+    if (a[i].kind !== b[i].kind) return false;
+    if (Math.abs(a[i].x - b[i].x) > 0.5 || Math.abs(a[i].y - b[i].y) > 0.5) return false;
+  }
+  return true;
+}
+
+function finiteNumber(value) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
 }
 
 function errorMessage(err) {

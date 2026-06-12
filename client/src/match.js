@@ -118,7 +118,11 @@ export class Match {
       sendCommand: (command, clientSeq) => this.net.command(command, clientSeq),
     });
     this.commandIssuer = {
-      issueCommand: (command) => this.prediction.issueCommand(command),
+      issueCommand: (command, options = {}) => {
+        const issued = this.prediction.issueCommand(command, options);
+        this.state?.setOptimisticCommandState(this.prediction.optimisticUiState());
+        return issued;
+      },
     };
     this.autoPointerLockUntil = 0;
     this.pointerLockPanEnabled = this.readPointerLockPanEnabled();
@@ -194,6 +198,7 @@ export class Match {
       this.health.noteSnapshotArrival(now, document.hidden);
       this.prediction.applyAuthoritativeSnapshot(m);
       this.state.applySnapshot(m);
+      this.state.setOptimisticCommandState(this.prediction.optimisticUiState());
       this.applyPredictedSnapshot();
       this.lastSnapshotTick = Number.isFinite(m?.tick) ? m.tick : this.lastSnapshotTick;
       this.replayControls?.noteSnapshotTick(m?.tick);
@@ -383,6 +388,7 @@ export class Match {
   disablePredictionForStateMismatch() {
     if (!this.prediction.enabled) return;
     this.prediction.reset({ enabled: false, preserveClientSeq: true });
+    this.state?.setOptimisticCommandState?.(null);
     if (!this.predictionStateMismatchLogged) {
       this.predictionStateMismatchLogged = true;
       this.logPredictionStatus("disabled-state-mismatch");
@@ -394,6 +400,7 @@ export class Match {
     this.prediction.reset({ enabled: allowed, preserveClientSeq: true });
     if (!allowed) {
       this.state?.clearPredictedSnapshot?.();
+      this.state?.setOptimisticCommandState?.(null);
       this.publishPredictionDebug();
       this.mountSettings({ keepOpen: true });
       return;

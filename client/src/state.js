@@ -153,6 +153,8 @@ export class GameState {
     this.predictedById = new Map();
     this.predictionCorrectionById = new Map();
     this.predictionDiagnostics = null;
+    this.optimisticProductionByBuilding = new Map();
+    this.optimisticRallyByBuilding = new Map();
   }
 
   /** Maximum number of entities the local selection may contain. */
@@ -564,12 +566,12 @@ export class GameState {
         if (typeof prior.weaponFacing === "number" && typeof e.weaponFacing === "number") {
           next.weaponFacing = lerpAngle(prior.weaponFacing, e.weaponFacing, t);
         }
-        out.push(includePrediction ? this._applyPredictedEntity(next, now) : next);
+        out.push(includePrediction ? this._applyOptimisticEntity(this._applyPredictedEntity(next, now)) : next);
       } else {
         // No previous sample: render at the current position (a shallow copy
         // keeps callers from mutating the live snapshot entity).
         const next = { ...e };
-        out.push(includePrediction ? this._applyPredictedEntity(next, now) : next);
+        out.push(includePrediction ? this._applyOptimisticEntity(this._applyPredictedEntity(next, now)) : next);
       }
     }
     return out;
@@ -581,7 +583,25 @@ export class GameState {
    * @returns {object|undefined}
    */
   entityById(id) {
-    return this.predictedById.get(id) || this._curById.get(id);
+    const entity = this.predictedById.get(id) || this._curById.get(id);
+    return entity ? this._applyOptimisticEntity({ ...entity }) : entity;
+  }
+
+  setOptimisticCommandState(state = null) {
+    this.optimisticProductionByBuilding.clear();
+    this.optimisticRallyByBuilding.clear();
+    for (const entry of state?.production || []) {
+      if (typeof entry?.building !== "number") continue;
+      this.optimisticProductionByBuilding.set(entry.building, { ...entry, predicted: true });
+    }
+    for (const entry of state?.rally || []) {
+      if (typeof entry?.building !== "number" || !Array.isArray(entry.plan)) continue;
+      this.optimisticRallyByBuilding.set(entry.building, {
+        ...entry,
+        plan: entry.plan.map((stage) => ({ ...stage, predicted: true })),
+        predicted: true,
+      });
+    }
   }
 
   setPredictedSnapshot(snapshot, diagnostics = null, { smoothCorrections = false } = {}) {
@@ -636,6 +656,24 @@ export class GameState {
         out.x += correction.dx * remaining;
         out.y += correction.dy * remaining;
       }
+    }
+    return out;
+  }
+
+  _applyOptimisticEntity(entity) {
+    if (!entity || entity.owner !== this.playerId || !isBuilding(entity.kind)) return entity;
+    const out = { ...entity };
+    const production = this.optimisticProductionByBuilding.get(entity.id);
+    if (production) {
+      out.prodQueue = Math.max(out.prodQueue ?? 0, production.optimisticQueue ?? 1);
+      if (!out.prodKind) out.prodKind = production.unit;
+      if (out.prodProgress == null) out.prodProgress = 0;
+      out.optimisticProduction = true;
+    }
+    const rally = this.optimisticRallyByBuilding.get(entity.id);
+    if (rally) {
+      out.rallyPlan = rally.plan.map((stage) => ({ ...stage }));
+      out.optimisticRally = true;
     }
     return out;
   }
@@ -747,7 +785,7 @@ export class GameState {
     const out = [];
     for (const id of this.selection) {
       const e = this._curById.get(id);
-      if (e && !e.shotReveal && !e.visionOnly) out.push(e);
+      if (e && !e.shotReveal && !e.visionOnly) out.push(this._applyOptimisticEntity(e));
     }
     return out;
   }
