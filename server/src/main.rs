@@ -35,7 +35,9 @@ use rts_server::dev_scenarios::{
     parse_dev_scenario_launch,
 };
 use rts_server::game::map::Map;
-use rts_server::game::replay::{ReplayArtifactV1, REPLAY_ARTIFACT_SCHEMA_VERSION_V1};
+use rts_server::game::replay::{
+    ReplayArtifactV1, ReplayValidationError, REPLAY_ARTIFACT_SCHEMA_VERSION_V1,
+};
 use rts_server::game::SimCommand;
 use rts_server::lobby::{self, Lobby, RoomEvent};
 use rts_server::perf;
@@ -373,11 +375,8 @@ fn apply_replay_summary_compatibility(row: &mut rts_server::db::MatchSummary, bu
         return;
     }
     if meta.build_sha != build_sha {
-        row.replay_available = false;
-        row.replay_unavailable_reason = Some(format!(
-            "Replay was recorded by server build {}; running build is {}.",
-            meta.build_sha, build_sha
-        ));
+        row.replay_available = true;
+        row.replay_unavailable_reason = Some(replay_build_warning(build_sha, &meta.build_sha));
         return;
     }
     let running_map = match Map::metadata_for_name(&meta.map_name) {
@@ -424,7 +423,16 @@ fn replay_incompatibility_reason(artifact: &ReplayArtifactV1, build_sha: &str) -
     artifact
         .validate_against(build_sha, &running_map)
         .err()
-        .map(|err| err.to_string())
+        .and_then(|err| match err {
+            ReplayValidationError::BuildShaMismatch { .. } => None,
+            err => Some(err.to_string()),
+        })
+}
+
+fn replay_build_warning(server_build_sha: &str, replay_build_sha: &str) -> String {
+    format!(
+        "Replay Potentially Incompatible With Current Server (server: {server_build_sha}, replay: {replay_build_sha})"
+    )
 }
 
 async fn beta_redirect_handler() -> impl IntoResponse {
@@ -1047,7 +1055,7 @@ mod tests {
     }
 
     #[test]
-    fn replay_summary_explains_incompatible_build() {
+    fn replay_summary_warns_but_allows_incompatible_build() {
         let map = Map::metadata_for_name("Default").unwrap();
         let mut row = replay_summary_for(Some(rts_server::db::ReplaySummaryMetadata {
             artifact_schema_version: REPLAY_ARTIFACT_SCHEMA_VERSION_V1 as i32,
@@ -1059,11 +1067,13 @@ mod tests {
 
         apply_replay_summary_compatibility(&mut row, "new-build");
 
-        assert!(!row.replay_available);
-        assert!(row
-            .replay_unavailable_reason
-            .as_deref()
-            .is_some_and(|reason| reason.contains("old-build") && reason.contains("new-build")));
+        assert!(row.replay_available);
+        assert_eq!(
+            row.replay_unavailable_reason.as_deref(),
+            Some(
+                "Replay Potentially Incompatible With Current Server (server: new-build, replay: old-build)"
+            )
+        );
     }
 
     #[test]
