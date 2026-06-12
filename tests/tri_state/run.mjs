@@ -65,6 +65,9 @@ async function main() {
     const scenario = (await import(pathToFileURL(file).href)).default;
     const result = await runScenario(scenario, args);
     console.log(`${result.status === "passed" ? "PASS" : "FAIL"} ${scenario.name} ${result.artifactDir}`);
+    if (result.status !== "passed" && result.failure) {
+      console.error(result.failure.stack || result.failure.message || JSON.stringify(result.failure));
+    }
     if (result.status !== "passed") failed += 1;
   }
   if (failed > 0 && !args.allowFailure) process.exit(1);
