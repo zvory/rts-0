@@ -75,9 +75,9 @@ the server simulates at 30 Hz and sends per-player, fog-filtered snapshots.
 
 - The default branch is `main`.
 - ordinary commits have a commit hook that silently runs all tests; merge commits bypass it.
-- Use the commit hook for full-suite coverage instead of running large local test sets yourself.
-  During development, run only targeted tests that match the files or contracts changed. For
-  docs-only changes, commit with `--no-verify`.
+- Use the commit hook for full-suite coverage only when the change is ready to merge. During
+  development, run only targeted tests that match the files or contracts changed instead of running
+  large local test sets yourself. For docs-only changes, commit with `--no-verify`.
 - Commit messages should be detailed. Use a clear subject and include a body when the change has
   gameplay impact, contract changes, testing nuance, or non-obvious reasoning.
 - Work directly on `main` for simple single-agent changes. For parallel worktree changes, use one
@@ -111,8 +111,9 @@ tests/run-all.sh --no-rust            # live Node suites + headless-Chrome smoke
 
 Do not run broad test bundles by default. Pick the smallest relevant target for the changed area
 (for example a focused Rust test, one live Node suite for touched server/client behavior, or an
-architecture check for seam changes), then rely on the normal commit hook when full coverage is
-needed. Use `git commit --no-verify` for documentation-only changes.
+architecture check for seam changes), then rely on the normal commit hook for full coverage only
+when making the final merge-ready commit. Use `git commit --no-verify` for documentation-only
+changes.
 
 There is **no JS build step** (plain ES modules + PixiJS from CDN). The client is served from
 `../client` relative to the server crate, so `cargo run` from `server/` is the whole dev loop.
