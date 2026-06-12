@@ -18,7 +18,7 @@ export default scenario("remote_client_basic_move", {
   steps: [
     selectOwn("worker", 0),
     issue("move", { dx: 160, dy: 0 }),
-    waitForSnapshot({ minTickDelta: 5 }),
+    waitForSnapshot({ minTickDelta: 160 }),
     capture("after-authoritative-move"),
     assertRemoteClientOwnedPosition({ unit: "worker", tolerancePx: 4 }),
   ],

@@ -19,6 +19,7 @@ export class ClientLane {
     this.page = null;
     this.profileDir = null;
     this.selection = [];
+    this.issuedCommands = [];
   }
 
   async start() {
@@ -112,7 +113,7 @@ export class ClientLane {
   }
 
   async issue(command, args = {}) {
-    if (command !== "move" && command !== "attackMove") {
+    if (!["move", "attackMove", "stop", "train", "setRally", "invalidMove"].includes(command)) {
       throw new Error(`unsupported client command: ${command}`);
     }
     const selected = this.selection[0];
@@ -126,16 +127,42 @@ export class ClientLane {
       const unit = owned[selected.index] || null;
       if (!unit) return { error: `selected ${selected.kind}[${selected.index}] disappeared` };
       state.setSelection([unit.id]);
-      const cmd = {
-        c: command,
-        units: [unit.id],
-        x: unit.x + (args.dx ?? 0),
-        y: unit.y + (args.dy ?? 0),
-      };
+      let cmd;
+      if (command === "stop") {
+        cmd = { c: "stop", units: [unit.id] };
+      } else if (command === "train") {
+        cmd = { c: "train", building: unit.id, unit: args.unit || "worker" };
+      } else if (command === "setRally") {
+        cmd = { c: "setRally", building: unit.id, x: args.x ?? unit.x + (args.dx ?? 0), y: args.y ?? unit.y + (args.dy ?? 0), kind: args.kind || "move" };
+      } else if (command === "invalidMove") {
+        cmd = { c: "move", units: [999999999], x: args.x ?? unit.x + (args.dx ?? 0), y: args.y ?? unit.y + (args.dy ?? 0) };
+      } else {
+        cmd = {
+          c: command,
+          units: [unit.id],
+          x: args.x ?? unit.x + (args.dx ?? 0),
+          y: args.y ?? unit.y + (args.dy ?? 0),
+        };
+      }
       if (args.queued) cmd.queued = true;
-      return match.commandIssuer.issueCommand(cmd);
+      const issued = match.commandIssuer.issueCommand(cmd);
+      return {
+        ...issued,
+        command: cmd,
+        latestKnownAuthoritativeTick: match.prediction?.debugSummary?.().latestAuthoritativeTick ?? null,
+        predictionDebug: match.prediction?.debugSummary?.() || null,
+      };
     }, { command, args, selected });
     if (issued?.error) throw new Error(issued.error);
+    const record = {
+      clientSeq: issued.clientSeq,
+      kind: issued.command?.c || command,
+      issueStep: this.issuedCommands.length,
+      latestKnownAuthoritativeTick: issued.latestKnownAuthoritativeTick,
+      command: issued.command,
+    };
+    this.issuedCommands.push(record);
+    this.artifacts.client({ event: "command.issued", ...record, predictionDebug: issued.predictionDebug });
     return issued;
   }
 
@@ -154,6 +181,88 @@ export class ClientLane {
       { startTick, minTickDelta },
     );
     return this.summary();
+  }
+
+  async waitForAck(clientSeq, { timeoutMs = 5000 } = {}) {
+    await this.page.waitForFunction(
+      (clientSeq) => (window.__rts?.match?.state?._cur?.netStatus?.lastSimConsumedClientSeq || 0) >= clientSeq,
+      { timeout: timeoutMs },
+      clientSeq,
+    );
+    return this.summary();
+  }
+
+  async injectSnapshot(kind, options = {}) {
+    const result = await this.page.evaluate(({ kind, options }) => {
+      const match = window.__rts?.match;
+      const cur = match?.state?._cur;
+      if (!match?.prediction || !cur) return { error: "prediction controller or current snapshot unavailable" };
+      const snapshot = structuredClone(cur);
+      if (kind === "duplicate") {
+        snapshot.netStatus = { ...(snapshot.netStatus || {}), lastSimConsumedClientSeq: options.ackSeq ?? snapshot.netStatus?.lastSimConsumedClientSeq ?? 0 };
+      } else if (kind === "stale") {
+        snapshot.tick = Math.max(0, Number(snapshot.tick || 0) - (options.tickBack ?? 1));
+        snapshot.netStatus = { ...(snapshot.netStatus || {}), lastSimConsumedClientSeq: options.ackSeq ?? snapshot.netStatus?.lastSimConsumedClientSeq ?? 0 };
+      } else if (kind === "skipped") {
+        snapshot.tick = Number(snapshot.tick || 0) + (options.tickDelta ?? 3);
+        snapshot.netStatus = { ...(snapshot.netStatus || {}), lastSimConsumedClientSeq: options.ackSeq ?? snapshot.netStatus?.lastSimConsumedClientSeq ?? 0 };
+      } else {
+        return { error: `unsupported injected snapshot kind: ${kind}` };
+      }
+      const before = match.prediction.debugSummary();
+      const after = match.prediction.applyAuthoritativeSnapshot(snapshot);
+      return { kind, snapshotTick: snapshot.tick, before, after };
+    }, { kind, options });
+    if (result?.error) throw new Error(result.error);
+    this.artifacts.client({ event: "snapshot.injected", ...result });
+    return result;
+  }
+
+  async setSnapshotDelivery(enabled) {
+    const result = await this.page.evaluate((enabled) => {
+      const match = window.__rts?.match;
+      if (!match?.net || !match?.onSnapshot) return { error: "match snapshot handler unavailable" };
+      if (enabled) match.net.on("snapshot", match.onSnapshot);
+      else match.net.off("snapshot", match.onSnapshot);
+      return { enabled };
+    }, enabled);
+    if (result?.error) throw new Error(result.error);
+    this.artifacts.client({ event: "snapshot.delivery", enabled });
+    return result;
+  }
+
+  async recordSocketReceipt(clientSeq, detail = {}) {
+    const result = await this.page.evaluate(({ clientSeq, detail }) => {
+      const controller = window.__rts?.match?.prediction;
+      if (!controller) return { error: "prediction controller unavailable" };
+      return controller.recordSocketReceipt(clientSeq, detail);
+    }, { clientSeq, detail });
+    if (result?.error) throw new Error(result.error);
+    this.artifacts.client({ event: "socket.receipt", clientSeq, detail, predictionDebug: result });
+    return result;
+  }
+
+  async recordCommandRejection(clientSeq, reason) {
+    const result = await this.page.evaluate(({ clientSeq, reason }) => {
+      const controller = window.__rts?.match?.prediction;
+      if (!controller) return { error: "prediction controller unavailable" };
+      return controller.recordCommandRejection(clientSeq, reason);
+    }, { clientSeq, reason });
+    if (result?.error) throw new Error(result.error);
+    this.artifacts.client({ event: "command.rejection", clientSeq, reason, predictionDebug: result });
+    return result;
+  }
+
+  async expireCommands(elapsedMs = 20000) {
+    const result = await this.page.evaluate((elapsedMs) => {
+      const controller = window.__rts?.match?.prediction;
+      if (!controller) return { error: "prediction controller unavailable" };
+      const expired = controller.expireTimedOutCommands(performance.now() + elapsedMs);
+      return { expired, summary: controller.debugSummary() };
+    }, elapsedMs);
+    if (result?.error) throw new Error(result.error);
+    this.artifacts.client({ event: "command.timeout", elapsedMs, ...result });
+    return result;
   }
 
   async setReplaySpeed(speed) {
@@ -189,11 +298,20 @@ export class ClientLane {
       };
     });
     const playerId = await this.page.evaluate(() => window.__rts?.match?.state?.playerId ?? null);
-    return summarizeSnapshot(snapshot, playerId);
+    const summary = summarizeSnapshot(snapshot, playerId);
+    if (summary) summary.issuedCommands = this.issuedCommands.map(compactIssuedCommand);
+    return summary;
   }
 
   async predictionDebug() {
-    return this.page.evaluate(() => window.__rtsPredictionDebug || null);
+    return this.page.evaluate(() => {
+      const match = window.__rts?.match;
+      return {
+        controller: match?.prediction?.debugSummary?.() || null,
+        wasm: match?.predictionAdapter?.diagnostics?.() || null,
+        published: window.__rtsPredictionDebug || null,
+      };
+    });
   }
 
   async selectionDebug() {
@@ -214,4 +332,13 @@ export class ClientLane {
   async close() {
     if (this.browser) await this.browser.close();
   }
+}
+
+function compactIssuedCommand(entry) {
+  return {
+    clientSeq: entry.clientSeq,
+    kind: entry.kind,
+    issueStep: entry.issueStep,
+    latestKnownAuthoritativeTick: entry.latestKnownAuthoritativeTick,
+  };
 }

@@ -17,8 +17,8 @@ export default scenario("queued_order_visibility", {
   network: { mode: "direct" },
   steps: [
     selectOwn("worker", 0),
-    issue("move", { dx: 96, dy: 0 }),
-    issue("attackMove", { dx: 192, dy: 64, queued: true }),
+    issue("move", { x: 3392, y: 3216 }),
+    issue("attackMove", { x: 3488, y: 3280, queued: true }),
     waitForSnapshot({ minTickDelta: 3 }),
     capture("after-queued-orders"),
     assertOrderPlansMatch({ unit: "worker" }),
