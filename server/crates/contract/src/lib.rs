@@ -161,6 +161,21 @@ pub struct SnapshotNetStatus {
     #[serde(default, skip_serializing_if = "is_false")]
     pub head_of_line: bool,
     pub head_of_line_count: u32,
+    /// Live player prediction/reconciliation protocol version. `0` means no prediction ACK is
+    /// available for this recipient, which is used for spectators and replay viewers.
+    #[serde(default, skip_serializing_if = "is_zero_u32")]
+    pub prediction_version: u32,
+    /// Highest contiguous client-local gameplay command sequence consumed by the authoritative
+    /// simulation tick stream for this live player.
+    #[serde(default, skip_serializing_if = "is_zero_u32")]
+    pub last_sim_consumed_client_seq: u32,
+    /// Authoritative tick that consumed `last_sim_consumed_client_seq`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_sim_consumed_client_tick: Option<u32>,
+}
+
+fn is_zero_u32(value: &u32) -> bool {
+    *value == 0
 }
 
 /// Resources for one player, included in no-fog snapshots so replay viewers see all players.

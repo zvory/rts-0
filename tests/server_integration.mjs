@@ -23,6 +23,7 @@ class Client {
     this.msgs = [];
     this.rawSnapshots = [];
     this.waiters = [];
+    this.nextClientSeq = 1;
     this.ws.onmessage = (e) => {
       const raw = JSON.parse(e.data);
       if (raw.t === "snapshot") this.rawSnapshots.push(raw);
@@ -36,6 +37,7 @@ class Client {
   }
   open() { return new Promise((res, rej) => { this.ws.onopen = () => res(); this.ws.onclose = () => rej(new Error("closed before open")); }); }
   send(o) { this.ws.send(JSON.stringify(o)); }
+  command(cmd) { this.send({ t: "command", clientSeq: this.nextClientSeq++, cmd }); }
   waitFor(test, timeoutMs = 5000, label = "message") {
     const hit = this.msgs.find(test);
     if (hit) return Promise.resolve(hit);
@@ -106,6 +108,8 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   ok(snap.oil === 0, `A starts with 0 oil (${snap.oil})`);
   ok(snap.supplyCap === 10, `A supply cap = 10 (${snap.supplyCap})`);
   ok(snap.supplyUsed === 4, `A supply used = 4 (${snap.supplyUsed})`);
+  ok(snap.netStatus?.predictionVersion === 1 && snap.netStatus?.lastSimConsumedClientSeq === 0,
+     `prediction ACK fields start at zero (v=${snap.netStatus?.predictionVersion}, seq=${snap.netStatus?.lastSimConsumedClientSeq})`);
   const mine = snap.entities.filter((e) => e.owner === A.playerId);
   ok(mine.filter((e) => e.kind === "city_centre").length === 1, `A owns 1 City Centre`);
   const workers = mine.filter((e) => e.kind === "worker");
@@ -124,10 +128,12 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
      `SPECTATOR: observer has no personal economy (${specSnap.steel}/${specSnap.oil}/${specSnap.supplyUsed}/${specSnap.supplyCap})`);
   ok(Array.isArray(specSnap.playerResources) && specSnap.playerResources.length === 2,
      `SPECTATOR: observer sees all player resources (${specSnap.playerResources?.length})`);
+  ok(!("predictionVersion" in (specSnap.netStatus || {})),
+     "SPECTATOR: observer snapshots do not carry prediction ACK metadata");
   ok(!specSnap.entities.some((e) => e.owner === C.playerId),
      "SPECTATOR: observer owns no entities");
 
-  A.send({ t: "command", cmd: { c: "gather", units: workers.map((w) => w.id), node: steelNodes[0].id } });
+  A.command({ c: "gather", units: workers.map((w) => w.id), node: steelNodes[0].id });
   let sawLatch = false, peak = snap.steel;
   for (let i = 0; i < 30; i++) {
     await sleep(500);
@@ -139,9 +145,11 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   }
   ok(peak > 75, `GATHER: steel rose above 75 (peak=${peak})`);
   ok(sawLatch, `GATHER: a worker latched onto steel`);
+  ok(A.lastSnapshot?.netStatus?.lastSimConsumedClientSeq >= 1,
+     `GATHER: server acknowledged consumed clientSeq ${A.lastSnapshot?.netStatus?.lastSimConsumedClientSeq}`);
 
   const beforeTrain = A.lastSnapshot.steel;
-  A.send({ t: "command", cmd: { c: "train", building: mine.find((e) => e.kind === "city_centre").id, unit: "worker" } });
+  A.command({ c: "train", building: mine.find((e) => e.kind === "city_centre").id, unit: "worker" });
   await sleep(1200);
   // The 4 workers keep mining during this 1.2s window, so income partially offsets the 50 spent.
   // At 30 Hz that window is ~36 ticks — enough for a couple of attached-mining ticks — so allow a
@@ -150,6 +158,8 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   ok(A.lastSnapshot.steel <= beforeTrain - 50 + trainIncomeMargin, `TRAIN: steel dropped ~50 (before=${beforeTrain}, after=${A.lastSnapshot.steel})`);
   const cityCentre = A.lastSnapshot.entities.find((e) => e.kind === "city_centre" && e.owner === A.playerId);
   ok(cityCentre && (cityCentre.prodKind === "worker" || (cityCentre.prodQueue || 0) >= 1), `TRAIN: City Centre shows production (queue=${cityCentre?.prodQueue})`);
+  ok(A.lastSnapshot?.netStatus?.lastSimConsumedClientSeq >= 2,
+     `TRAIN: server acknowledged consumed clientSeq ${A.lastSnapshot?.netStatus?.lastSimConsumedClientSeq}`);
 
   B.send({ t: "giveUp" });
   const overB = await B.waitFor((m) => m.t === "gameOver", 4000, "B gameOver after giveUp");

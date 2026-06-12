@@ -17,6 +17,9 @@ import {
   STATE_CODE,
   TERRAIN,
   UPGRADE_CODE,
+  COMPACT_SNAPSHOT_VERSION,
+  PREDICTION_PROTOCOL_VERSION,
+  decodeServerMessage,
   msg,
 } from "../client/src/protocol.js";
 
@@ -137,6 +140,28 @@ assertSameCodes("ability", extractCodeFunction("ability_code"), ABILITY_CODE);
 assertSameCodes("upgrade", extractCodeFunction("upgrade_code"), UPGRADE_CODE);
 assertSameCodes("notice severity", extractCodeFunction("notice_severity_code"), NOTICE_SEVERITY_CODE);
 
+assert(
+  rust.includes("client_seq") && JSON.stringify(msg.command({ c: "stop", units: [1] }, 9)) === JSON.stringify({ t: "command", clientSeq: 9, cmd: { c: "stop", units: [1] } }),
+  "command builder must emit clientSeq envelope",
+);
+assert(
+  rust.includes("PREDICTION_PROTOCOL_VERSION") && PREDICTION_PROTOCOL_VERSION === 1,
+  "prediction protocol version must match Rust",
+);
+assert(
+  rust.includes("COMPACT_SNAPSHOT_VERSION: u8 = 18") && COMPACT_SNAPSHOT_VERSION === 18,
+  "compact snapshot version must match Rust",
+);
+const decodedAck = decodeServerMessage({
+  t: "snapshot",
+  v: COMPACT_SNAPSHOT_VERSION,
+  s: [12, 75, 0, 4, 10],
+  e: [],
+  n: [1, 2, 0, 3, 4, PREDICTION_PROTOCOL_VERSION, 7, 12],
+});
+assert(decodedAck.netStatus.predictionVersion === PREDICTION_PROTOCOL_VERSION, "compact predictionVersion decodes");
+assert(decodedAck.netStatus.lastSimConsumedClientSeq === 7, "compact consumed client seq decodes");
+assert(decodedAck.netStatus.lastSimConsumedClientTick === 12, "compact consumed client tick decodes");
 assert(
   rust.includes("RequestReplayBranch") && C.REQUEST_REPLAY_BRANCH === "requestReplayBranch",
   "requestReplayBranch client message tag must match Rust",

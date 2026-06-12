@@ -120,7 +120,11 @@ pub enum RoomEvent {
     /// A connected human switched between active player and spectator role in the lobby.
     SetSpectator { player_id: u32, spectator: bool },
     /// A gameplay command (ignored unless the room is in-game and the sender is in the room).
-    Command { player_id: u32, cmd: SimCommand },
+    Command {
+        player_id: u32,
+        client_seq: u32,
+        cmd: SimCommand,
+    },
     /// A connected player intentionally gave up the active match.
     GiveUp { player_id: u32 },
     /// A replay viewer asked to leave playback and return their connection to the lobby screen.

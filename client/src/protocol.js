@@ -164,7 +164,8 @@ export const REPLAY_VISION = Object.freeze({
 });
 
 // --- Compact snapshot wire schema (must match protocol.rs) ---
-export const COMPACT_SNAPSHOT_VERSION = 17;
+export const PREDICTION_PROTOCOL_VERSION = 1;
+export const COMPACT_SNAPSHOT_VERSION = 18;
 
 export const KIND_CODE = Object.freeze({
   [KIND.WORKER]: 1,
@@ -401,10 +402,10 @@ function decodeCompactSmoke(record, index) {
 }
 
 function decodeCompactNetStatus(record) {
-  const fields = readArray(record, "netStatus", 5);
-  if (fields.length !== 5) throw new Error("netStatus field count mismatch");
+  const fields = readArray(record, "netStatus", 8);
+  if (fields.length !== 5 && fields.length !== 8) throw new Error("netStatus field count mismatch");
   const flags = readU32(fields[2], "netStatus.flags");
-  return {
+  const status = {
     serverLagMs: readU32(fields[0], "netStatus.serverLagMs"),
     tickMs: readU32(fields[1], "netStatus.tickMs"),
     slowTick: !!(flags & 1),
@@ -412,6 +413,13 @@ function decodeCompactNetStatus(record) {
     headOfLine: !!(flags & 2),
     headOfLineCount: readU32(fields[4], "netStatus.headOfLineCount"),
   };
+  if (fields.length === 8) {
+    status.predictionVersion = readU32(fields[5], "netStatus.predictionVersion");
+    status.lastSimConsumedClientSeq = readU32(fields[6], "netStatus.lastSimConsumedClientSeq");
+    status.lastSimConsumedClientTick =
+      fields[7] == null ? null : readU32(fields[7], "netStatus.lastSimConsumedClientTick");
+  }
+  return status;
 }
 
 function decodeCompactPlayerResource(record, index) {
@@ -788,7 +796,7 @@ export const msg = Object.freeze({
   removeAi: (id) => ({ t: C.REMOVE_AI, id }),
   setQuickstart: (enabled) => ({ t: C.SET_QUICKSTART, enabled: !!enabled }),
   setSpectator: (spectator) => ({ t: C.SET_SPECTATOR, spectator: !!spectator }),
-  command: (cmd) => ({ t: C.COMMAND, cmd }),
+  command: (cmd, clientSeq) => ({ t: C.COMMAND, clientSeq, cmd }),
   giveUp: () => ({ t: C.GIVE_UP }),
   returnToLobby: () => ({ t: C.RETURN_TO_LOBBY }),
   ping: (ts) => ({ t: C.PING, ts }),
