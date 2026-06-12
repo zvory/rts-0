@@ -240,7 +240,7 @@ export class ClientLane {
     url.searchParams.set("count", String(config.count));
     if (config.blocker) url.searchParams.set("blocker", config.blocker);
     url.searchParams.set("rtsNoAutoPointerLock", "1");
-    await this.page.goto(url.href, { waitUntil: "networkidle2", timeout: 15000 });
+    await this.page.goto(url.href, { waitUntil: "domcontentloaded", timeout: 30000 });
     await this.waitForMatch();
     await this.setReplaySpeed(1);
     await this.waitForSnapshot({ minTickDelta: 0 });
