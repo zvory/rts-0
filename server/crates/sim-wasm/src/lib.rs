@@ -259,6 +259,7 @@ impl CorePredictor {
             .map(|entity| (entity.id, entity))
             .collect();
         self.visible_obstacles = baseline.visible_obstacles;
+        self.pending.clear();
         self.disabled_reasons.clear();
         Ok(())
     }
@@ -906,6 +907,36 @@ mod tests {
         assert_eq!(summary.owned_entities[0].queued_order_stages[0].y, 104.0);
         predictor.advance_ticks(2);
         assert_eq!(predictor.render_snapshot().entities[0].state, "move");
+    }
+
+    #[test]
+    fn importing_authoritative_baseline_clears_replayed_pending_commands() {
+        let baseline = OwnedPredictionBaseline::from_snapshot(1, &snapshot());
+        let mut predictor = predictor_from_start_payload(start_payload(), 1);
+        predictor.import_baseline(baseline.clone()).unwrap();
+        predictor.enqueue_command(
+            7,
+            Command::Move {
+                units: vec![101],
+                x: 140.0,
+                y: 100.0,
+                queued: false,
+            },
+        );
+        assert_eq!(predictor.diagnostics().pending_client_seqs, vec![7]);
+
+        predictor.import_baseline(baseline).unwrap();
+        assert!(predictor.diagnostics().pending_client_seqs.is_empty());
+        predictor.enqueue_command(
+            7,
+            Command::Move {
+                units: vec![101],
+                x: 140.0,
+                y: 100.0,
+                queued: false,
+            },
+        );
+        assert_eq!(predictor.diagnostics().pending_client_seqs, vec![7]);
     }
 
     #[test]
