@@ -1,5 +1,9 @@
 # Phase 7 - Rollout, Performance Budgets, and Removal of Legacy Delay Paths
 
+Status: Done. Prediction remains default-enabled for compatible live active-player sessions, but
+now has an explicit server/client compatibility gate, richer per-session diagnostics, and a
+main-thread replay budget fallback to tracking-only mode.
+
 ## Objective
 
 Ship local prediction broadly once correctness and performance gates are stable, then simplify
@@ -81,3 +85,20 @@ prediction caveats that should be watched in playtests after rollout.
 
 Prediction becomes the normal live-match experience. Owned commands respond immediately while
 remote authority, fog correctness, and replay determinism remain intact.
+
+## Implementation Notes
+
+- Live active-player `start` payloads now include `predictionBuildId` and `predictionVersion`.
+  Clients disable prediction automatically on version/build mismatch, while spectators and replays
+  continue to omit prediction compatibility metadata.
+- Client net reports now include pending command count, issue-to-sim-ack latency, correction
+  distance/frequency, disable counts, WASM tick/replay work, and WASM memory footprint. The server
+  logs notable prediction reports alongside existing network/render reports.
+- The single-thread WASM path has a 4 ms replay-work budget. If measured replay work exceeds it,
+  visual prediction falls back to tracking-only command sequencing without corrupting selection,
+  fog, camera, HUD, or authoritative snapshots.
+- `window.__rtsPredictionDebug` now exports compatibility, controller, and WASM diagnostics for
+  developer inspection/log export.
+- Legacy interpolation and snapshot coalescing paths were intentionally retained. This phase did
+  not remove artificial command delay because no prediction-only command delay path was found in
+  the current client flow.

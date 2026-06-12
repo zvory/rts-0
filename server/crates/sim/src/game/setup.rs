@@ -355,6 +355,8 @@ impl Game {
         StartPayload {
             player_id: 0,
             spectator: false,
+            prediction_build_id: None,
+            prediction_version: 0,
             debug_mode: self.debug_path_overlays,
             replay: None,
             tick: self.tick,

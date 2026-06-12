@@ -104,13 +104,23 @@ in a match:
   serverTickMs: u16,        // latest server tick work duration seen in snapshot netStatus
   serverLagMs: u16,         // latest scheduler lag seen in snapshot netStatus
   slowTickCount: u32,       // latest server slow-tick count seen by this client
-  headOfLineCount: u32      // latest per-client pending-snapshot replacement count seen
+  headOfLineCount: u32,     // latest per-client pending-snapshot replacement count seen
+  predictionMode: string,   // disabled, tracking, predicting, or resyncing
+  pendingCommandCount: u16,
+  acknowledgedCommandLatencyMs: u16, // latest local issue -> sim-ack latency
+  correctionDistancePx: u16,         // largest correction observed by the client
+  correctionCount: u32,
+  predictionDisableCount: u32,
+  wasmTickMs: u16,          // latest measured WASM prediction/replay work duration
+  wasmMemoryBytes: u32,     // current WASM memory buffer size, when available
+  predictionReplayTicks: u16 // latest local replay/advance ticks processed in one measured step
 }
 ```
 The server logs this message only when the aggregate contains notable lag, jitter, browser frame
-stalls, WebSocket backlog, or server tick/scheduler pressure, alongside the connection's
-`player_id` and room name. Values are advisory because clients are untrusted; use them to diagnose
-transport/browser behavior, not as gameplay authority.
+stalls, WebSocket backlog, server tick/scheduler pressure, or prediction correction/fallback
+signals, alongside the connection's `player_id` and room name. Values are advisory because clients
+are untrusted; use them to diagnose transport/browser/prediction behavior, not as gameplay
+authority.
 
 ### 2.2 Server → Client (`ServerMessage`)
 
@@ -160,6 +170,8 @@ Sent once when the match begins. Carries everything static for the whole match.
   t: "start",
   playerId: u32,                 // your id (repeat of welcome for convenience)
   spectator: bool,               // true when this connection is observing only
+  predictionBuildId?: string,    // live active players only; server/client bundle id
+  predictionVersion?: u32,       // live active players only; currently 1
   debugMode?: bool,              // true when movement path diagnostics are available
   replay?: {                     // present for production replay playback
     artifactSchemaVersion: u32,
@@ -196,6 +208,11 @@ which lets the client expose local movement-waypoint overlay controls for the ow
 `debugPath` fields in snapshots.
 Spectator start payloads keep the spectator connection's `playerId`, set `spectator: true`, and
 list only active match players in `players`.
+
+Prediction start compatibility metadata is present only for live active players. Clients MUST keep
+prediction disabled unless `predictionVersion` matches their supported prediction protocol version
+and, when both sides know a build id, `predictionBuildId` matches the client bundle id. Mismatches
+fall back to authoritative snapshots/tracking instead of running local visual reconciliation.
 
 Replay start payloads include `replay` metadata so the client can display or cache a
 self-describing playback session. The server validates replay artifacts before playback: artifact

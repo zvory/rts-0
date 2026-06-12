@@ -76,12 +76,16 @@ export class PredictionController {
     this.uiConfirmedCount = 0;
     this.uiExpiredCount = 0;
     this.uiRejectedCount = 0;
+    this.ackLatencyMs = null;
+    this.maxAckLatencyMs = 0;
+    this.disableReasons = {};
   }
 
-  reset({ enabled = this.enabled, preserveClientSeq = false } = {}) {
+  reset({ enabled = this.enabled, preserveClientSeq = false, reason = null } = {}) {
     const nextClientSeq = this.nextClientSeq;
     this.enabled = !!enabled;
     this.mode = this.enabled ? PREDICTION_STATE.TRACKING : PREDICTION_STATE.DISABLED;
+    if (!this.enabled && reason) this.recordDisableReason(reason);
     this.nextClientSeq = preserveClientSeq ? nextClientSeq : 1;
     this.pending = [];
     this.pendingBySeq.clear();
@@ -107,6 +111,13 @@ export class PredictionController {
     this.uiConfirmedCount = 0;
     this.uiExpiredCount = 0;
     this.uiRejectedCount = 0;
+    this.ackLatencyMs = null;
+    this.maxAckLatencyMs = 0;
+  }
+
+  recordDisableReason(reason) {
+    const key = typeof reason === "string" && reason ? reason : "unknown";
+    this.disableReasons[key] = (this.disableReasons[key] || 0) + 1;
   }
 
   issueCommand(cmd, options = {}) {
@@ -196,6 +207,11 @@ export class PredictionController {
     const kept = [];
     for (const pending of this.pending) {
       if (pending.clientSeq <= ackSeq) {
+        const latency = this.now() - pending.issuedAt;
+        if (Number.isFinite(latency) && latency >= 0) {
+          this.ackLatencyMs = latency;
+          this.maxAckLatencyMs = Math.max(this.maxAckLatencyMs, latency);
+        }
         this.pendingBySeq.delete(pending.clientSeq);
         this.acknowledgedCount += 1;
       } else {
@@ -386,6 +402,10 @@ export class PredictionController {
       correctionCount: this.correctionCount,
       maxCorrectionDistance: this.maxCorrectionDistance,
       snapCorrectionCount: this.snapCorrectionCount,
+      ackLatencyMs: this.ackLatencyMs,
+      maxAckLatencyMs: this.maxAckLatencyMs,
+      disableReasons: { ...this.disableReasons },
+      disableCount: Object.values(this.disableReasons).reduce((sum, count) => sum + count, 0),
       lastReceipt: this.lastReceipt,
       lastRejected: this.lastRejected,
       lastCorrection: this.lastCorrection,

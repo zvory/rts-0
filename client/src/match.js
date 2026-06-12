@@ -19,7 +19,7 @@ import { ReplayControls } from "./replay_controls.js";
 import { SimWasmPredictionAdapter } from "./sim_wasm_adapter.js";
 import { GameState } from "./state.js";
 import { INTERP_DELAY_MS, SNAPSHOT_MS } from "./config.js";
-import { EVENT, KIND, NOTICE_SEVERITY, S } from "./protocol.js";
+import { EVENT, KIND, NOTICE_SEVERITY, PREDICTION_PROTOCOL_VERSION, S } from "./protocol.js";
 import {
   UNDER_ATTACK_ID,
   VIEWPORT_ALERT_MARGIN_PX,
@@ -35,6 +35,7 @@ const MORTAR_LAUNCH_GAIN = 0.85;
 const ARTILLERY_FIRE_GAIN = 1.2;
 const MATCH_PING_MS = 2000;
 const NET_REPORT_MS = 10000;
+const PREDICTION_REPLAY_BUDGET_MS = 4;
 const AUTO_POINTER_LOCK_SUPPRESS_MS = 1200;
 const INSTALLED_APP_POINTER_LOCK_RETRY_ATTEMPTS = 4;
 const INSTALLED_APP_POINTER_LOCK_RETRY_DELAY_MS = 120;
@@ -110,13 +111,17 @@ export class Match {
     this.health = new MatchHealth({ net: this.net, statusBadge: this.statusBadge, snapshotMs: SNAPSHOT_MS });
     this.predictionStartInfo = payload;
     this.predictionPlayerId = payload?.playerId;
+    this.predictionCompatibility = predictionCompatibility(payload);
     this.predictionAdapter = this.createPredictionAdapter();
     this.predictionInitToken = 0;
     this.prediction = new PredictionController({
-      enabled: !!options.predictionEnabled && !this.replayViewer && !payload?.spectator,
+      enabled: !!options.predictionEnabled && !this.replayViewer && !payload?.spectator && this.predictionCompatibility.ok,
       predictor: this.predictionAdapter,
       sendCommand: (command, clientSeq) => this.net.command(command, clientSeq),
     });
+    if (!!options.predictionEnabled && !this.prediction.enabled && this.predictionCompatibility.reason) {
+      this.prediction.recordDisableReason(this.predictionCompatibility.reason);
+    }
     this.commandIssuer = {
       issueCommand: (command, options = {}) => {
         const issued = this.prediction.issueCommand(command, options);
@@ -315,6 +320,7 @@ export class Match {
       serverLagMs: clampU16(metrics.serverLagMs),
       slowTickCount: clampU32(metrics.issues.slowTick.count),
       headOfLineCount: clampU32(metrics.issues.headOfLine.count),
+      ...this.predictionReportFields(),
     };
     this.net.netReport(report);
     this.diagnostics?.count("client.send.netReport", {
@@ -323,6 +329,9 @@ export class Match {
       snapshotGapMaxMs: report.snapshotGapMaxMs,
       jitterSamples: report.jitterSamples,
       wsBufferedBytes: report.wsBufferedBytes,
+      predictionMode: report.predictionMode,
+      pendingCommandCount: report.pendingCommandCount,
+      correctionDistancePx: report.correctionDistancePx,
     });
     this.health.resetReportStats();
   }
@@ -339,7 +348,9 @@ export class Match {
     }
     const snapshot = this.predictionAdapter.renderSnapshot();
     if (!snapshot) return;
-    this.state.setPredictedSnapshot(snapshot, this.predictionAdapter.diagnostics(), {
+    const diagnostics = this.predictionAdapter.diagnostics();
+    if (this.disablePredictionForReplayBudget(diagnostics)) return;
+    this.state.setPredictedSnapshot(snapshot, diagnostics, {
       smoothCorrections: true,
     });
     this.publishPredictionDebug();
@@ -353,14 +364,27 @@ export class Match {
     if (!this.prediction.enabled || !this.predictionAdapter.ready) return;
     const snapshot = this.predictionAdapter.advanceVisual();
     if (snapshot) {
-      this.state.setPredictedSnapshot(snapshot, this.predictionAdapter.diagnostics());
+      const diagnostics = this.predictionAdapter.diagnostics();
+      if (this.disablePredictionForReplayBudget(diagnostics)) return;
+      this.state.setPredictedSnapshot(snapshot, diagnostics);
       this.publishPredictionDebug();
     }
+  }
+
+  disablePredictionForReplayBudget(diagnostics) {
+    if (!this.prediction.enabled || !(diagnostics?.budgetExceededCount > 0)) return false;
+    this.prediction.reset({ enabled: true, preserveClientSeq: true, reason: "replay-budget-exceeded" });
+    this.resetPredictionAdapter();
+    this.state?.clearPredictedSnapshot?.();
+    this.publishPredictionDebug();
+    this.logPredictionStatus("tracking-replay-budget-exceeded");
+    return true;
   }
 
   publishPredictionDebug() {
     if (typeof window === "undefined") return;
     window.__rtsPredictionDebug = {
+      compatibility: this.predictionCompatibility,
       controller: this.prediction.debugSummary(),
       wasm: this.predictionAdapter.diagnostics(),
     };
@@ -369,6 +393,7 @@ export class Match {
   logPredictionStatus(status) {
     const debug = {
       status,
+      compatibility: this.predictionCompatibility,
       controller: this.prediction.debugSummary(),
       wasm: this.predictionAdapter.diagnostics(),
     };
@@ -382,7 +407,7 @@ export class Match {
 
   disablePredictionForStateMismatch() {
     if (!this.prediction.enabled) return;
-    this.prediction.reset({ enabled: false, preserveClientSeq: true });
+    this.prediction.reset({ enabled: false, preserveClientSeq: true, reason: "state-mismatch" });
     this.state?.setOptimisticCommandState?.(null);
     if (!this.predictionStateMismatchLogged) {
       this.predictionStateMismatchLogged = true;
@@ -391,8 +416,14 @@ export class Match {
   }
 
   setPredictionEnabled(enabled) {
-    const allowed = !!enabled && !this.replayViewer && !this.state?.spectator;
-    this.prediction.reset({ enabled: allowed, preserveClientSeq: true });
+    const blockedReason = predictionBlockedReason({
+      enabled,
+      replayViewer: this.replayViewer,
+      spectator: this.state?.spectator,
+      compatibility: this.predictionCompatibility,
+    });
+    const allowed = !blockedReason;
+    this.prediction.reset({ enabled: allowed, preserveClientSeq: true, reason: blockedReason });
     if (!allowed) {
       this.predictionInitToken += 1;
       this.resetPredictionAdapter();
@@ -420,7 +451,10 @@ export class Match {
         return;
       }
       if (ready) this.logPredictionStatus("ready");
-      else this.logPredictionStatus("disabled");
+      else {
+        this.prediction.recordDisableReason(adapter.disabledReason || "wasm-unavailable");
+        this.logPredictionStatus("disabled");
+      }
       if (remountSettings) this.mountSettings({ keepOpen: true });
     });
   }
@@ -429,6 +463,7 @@ export class Match {
     return new SimWasmPredictionAdapter({
       startInfo: this.predictionStartInfo,
       playerId: this.predictionPlayerId,
+      replayBudgetMs: PREDICTION_REPLAY_BUDGET_MS,
     });
   }
 
@@ -436,6 +471,22 @@ export class Match {
     this.predictionAdapter?.destroy();
     this.predictionAdapter = this.createPredictionAdapter();
     if (this.prediction) this.prediction.predictor = this.predictionAdapter;
+  }
+
+  predictionReportFields() {
+    const controller = this.prediction.debugSummary();
+    const wasm = this.predictionAdapter.diagnostics();
+    return {
+      predictionMode: String(controller.mode || "disabled"),
+      pendingCommandCount: clampU16(controller.pendingCommandCount),
+      acknowledgedCommandLatencyMs: clampU16(controller.ackLatencyMs),
+      correctionDistancePx: clampU16(controller.maxCorrectionDistance),
+      correctionCount: clampU32(controller.correctionCount),
+      predictionDisableCount: clampU32(controller.disableCount),
+      wasmTickMs: clampU16(wasm.lastTickMs),
+      wasmMemoryBytes: clampU32(wasm.memoryBytes),
+      predictionReplayTicks: clampU16(wasm.lastReplayTicks),
+    };
   }
 
   applySpectatorUi() {
@@ -1084,6 +1135,66 @@ export class Match {
       }
     }
   }
+}
+
+function predictionCompatibility(payload) {
+  const serverVersion = Number(payload?.predictionVersion) || 0;
+  if (serverVersion !== PREDICTION_PROTOCOL_VERSION) {
+    return {
+      ok: false,
+      reason: serverVersion ? "prediction-version-mismatch" : "prediction-unavailable",
+      clientVersion: PREDICTION_PROTOCOL_VERSION,
+      serverVersion,
+      clientBuildId: clientBuildId(),
+      serverBuildId: payload?.predictionBuildId || null,
+    };
+  }
+  const client = clientBuildId();
+  const server = typeof payload?.predictionBuildId === "string" ? payload.predictionBuildId : "";
+  if (client && server && client !== server) {
+    return {
+      ok: false,
+      reason: "prediction-build-mismatch",
+      clientVersion: PREDICTION_PROTOCOL_VERSION,
+      serverVersion,
+      clientBuildId: client,
+      serverBuildId: server,
+    };
+  }
+  return {
+    ok: true,
+    reason: null,
+    clientVersion: PREDICTION_PROTOCOL_VERSION,
+    serverVersion,
+    clientBuildId: client || null,
+    serverBuildId: server || null,
+  };
+}
+
+function predictionBlockedReason({ enabled, replayViewer, spectator, compatibility }) {
+  if (!enabled) return "user-disabled";
+  if (replayViewer) return "replay-viewer";
+  if (spectator) return "spectator";
+  if (compatibility && !compatibility.ok) return compatibility.reason || "compatibility-mismatch";
+  return null;
+}
+
+function clientBuildId() {
+  if (typeof globalThis.__RTS_BUILD__ === "string" && globalThis.__RTS_BUILD__ !== "unknown") {
+    return globalThis.__RTS_BUILD__;
+  }
+  const scripts = typeof document !== "undefined" ? Array.from(document.scripts || []) : [];
+  for (const script of scripts) {
+    const src = script?.src || "";
+    if (!src.includes("/src/main.js")) continue;
+    try {
+      const version = new URL(src, window.location.href).searchParams.get("v");
+      if (version) return version;
+    } catch {
+      // Ignore malformed script URLs and fall through to unknown build compatibility.
+    }
+  }
+  return "";
 }
 
 function clampU16(value) {

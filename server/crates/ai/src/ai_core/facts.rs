@@ -408,6 +408,8 @@ mod tests {
         let start = StartPayload {
             player_id: 1,
             spectator: false,
+            prediction_build_id: None,
+            prediction_version: 0,
             debug_mode: false,
             replay: None,
             tick: 0,
