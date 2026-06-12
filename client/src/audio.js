@@ -751,6 +751,8 @@ export const SOUND_MANIFEST = Object.freeze([
   { id: "combat_mg_burst_03",  url: "/assets/sound/combat/combat_mg42_burst_03.mp3", category: "combat_other" },
   { id: "combat_mortar_launch_04", url: "/assets/sound/combat/combat_mortar_launch_04.mp3", category: "combat_other" },
   { id: "combat_artillery_fire_05", url: "/assets/sound/combat/combat_artillery_fire_05.mp3", category: "combat_other" },
+  { id: "unit_breakthrough_todes_rit_01", url: "/assets/sound/units/units_breakthrough_todes_rit_01.mp3", category: "unit_voice" },
+  { id: "unit_breakthrough_koste_es_01", url: "/assets/sound/units/units_breakthrough_koste_es_01.mp3", category: "unit_voice" },
   { id: "victory",             url: "/assets/sound/ui/ui_victory_01.mp3",             category: "ui" },
   { id: "defeat",              url: "/assets/sound/ui/ui_defeat_01.mp3",              category: "ui" },
 ]);
