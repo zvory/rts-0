@@ -6,7 +6,7 @@ use rand::SeedableRng;
 use serde::Deserialize;
 
 use super::{
-    BasePair, Map, BASE_PROTECTION_RADIUS_TILES, CURRENT_MAP_VERSION,
+    BaseSlot, Map, BASE_PROTECTION_RADIUS_TILES, CURRENT_MAP_VERSION,
     EXPANSION_PROTECTION_RADIUS_TILES,
 };
 use crate::protocol::terrain;
@@ -53,13 +53,16 @@ pub(super) fn load(player_count: usize, json: &str, seed: u32) -> Result<Map, St
     }
 
     // Select a whole authored spawn layout first, then shuffle that layout's slots so lobby
-    // seat order stays random without breaking the authored main-natural pair for each slot.
+    // seat order stays random without breaking the authored main/naturals grouping for each slot.
     let layout = matching_layouts[(seed as usize) % matching_layouts.len()];
-    let mut pairs = parse_layout_pairs(layout, &sites)?;
+    let mut slots = parse_layout_pairs(layout, &sites)?;
     let mut rng = SmallRng::seed_from_u64(seed as u64);
-    pairs.shuffle(&mut rng);
-    let starts: Vec<_> = pairs.iter().map(|(start, _)| *start).collect();
-    let expansion_sites = pairs.iter().map(|(_, expansion)| *expansion).collect();
+    slots.shuffle(&mut rng);
+    let starts: Vec<_> = slots.iter().map(|(start, _)| *start).collect();
+    let expansion_sites = slots
+        .iter()
+        .flat_map(|(_, expansions)| expansions.iter().copied())
+        .collect();
 
     Ok(Map {
         size,
@@ -115,7 +118,10 @@ struct AuthoredLayout {
 #[serde(rename_all = "camelCase")]
 struct AuthoredLayoutSlot {
     main: String,
-    natural: String,
+    #[serde(default)]
+    natural: Option<String>,
+    #[serde(default)]
+    naturals: Vec<String>,
 }
 
 fn parse_terrain(rows: &[String]) -> Result<(u32, Vec<u8>), String> {
@@ -198,7 +204,7 @@ fn parse_sites(
 fn parse_layout_pairs(
     layout: &AuthoredLayout,
     sites: &HashMap<String, AuthoredSite>,
-) -> Result<Vec<BasePair>, String> {
+) -> Result<Vec<BaseSlot>, String> {
     if layout.player_count == 0 {
         return Err(format!("layout {:?} has playerCount 0", layout.id));
     }
@@ -213,7 +219,7 @@ fn parse_layout_pairs(
 
     let mut seen_mains = HashSet::with_capacity(layout.slots.len());
     let mut seen_naturals = HashSet::with_capacity(layout.slots.len());
-    let mut pairs = Vec::with_capacity(layout.slots.len());
+    let mut slots = Vec::with_capacity(layout.slots.len());
     for (i, slot) in layout.slots.iter().enumerate() {
         let main = sites.get(&slot.main).ok_or_else(|| {
             format!(
@@ -228,33 +234,69 @@ fn parse_layout_pairs(
             ));
         }
 
-        let natural = sites.get(&slot.natural).ok_or_else(|| {
-            format!(
-                "layout {:?} slot {i} references missing natural {:?}",
-                layout.id, slot.natural
-            )
-        })?;
-        if natural.kind != AuthoredSiteKind::Natural {
-            return Err(format!(
-                "layout {:?} slot {i} natural {:?} is not a natural site",
-                layout.id, slot.natural
-            ));
-        }
         if !seen_mains.insert(slot.main.as_str()) {
             return Err(format!(
                 "layout {:?} assigns main {:?} more than once",
                 layout.id, slot.main
             ));
         }
-        if !seen_naturals.insert(slot.natural.as_str()) {
-            return Err(format!(
-                "layout {:?} assigns natural {:?} more than once",
-                layout.id, slot.natural
-            ));
+
+        let natural_ids = slot_natural_ids(slot).map_err(|err| {
+            format!(
+                "layout {:?} slot {i} has invalid naturals: {err}",
+                layout.id
+            )
+        })?;
+        let mut expansions = Vec::with_capacity(natural_ids.len());
+        for natural_id in natural_ids {
+            let natural = sites.get(natural_id).ok_or_else(|| {
+                format!(
+                    "layout {:?} slot {i} references missing natural {:?}",
+                    layout.id, natural_id
+                )
+            })?;
+            if natural.kind != AuthoredSiteKind::Natural {
+                return Err(format!(
+                    "layout {:?} slot {i} natural {:?} is not a natural site",
+                    layout.id, natural_id
+                ));
+            }
+            if !seen_naturals.insert(natural_id) {
+                return Err(format!(
+                    "layout {:?} assigns natural {:?} more than once",
+                    layout.id, natural_id
+                ));
+            }
+            expansions.push((natural.x, natural.y));
         }
-        pairs.push(((main.x, main.y), (natural.x, natural.y)));
+        slots.push(((main.x, main.y), expansions));
     }
-    Ok(pairs)
+    Ok(slots)
+}
+
+fn slot_natural_ids(slot: &AuthoredLayoutSlot) -> Result<Vec<&str>, String> {
+    let mut out = Vec::new();
+    if let Some(natural) = slot.natural.as_deref() {
+        if !natural.trim().is_empty() {
+            out.push(natural);
+        }
+    }
+    for natural in &slot.naturals {
+        if !natural.trim().is_empty() {
+            out.push(natural.as_str());
+        }
+    }
+    if out.is_empty() {
+        return Err("at least one natural is required".to_string());
+    }
+
+    let mut seen = HashSet::with_capacity(out.len());
+    for natural in &out {
+        if !seen.insert(*natural) {
+            return Err(format!("natural {natural:?} is listed more than once"));
+        }
+    }
+    Ok(out)
 }
 
 fn validate_base_clearance(

@@ -29,7 +29,7 @@ const FNV_OFFSET_BASIS: u64 = 0xcbf2_9ce4_8422_2325;
 const FNV_PRIME: u64 = 0x0000_0100_0000_01b3;
 
 type Tile = (u32, u32);
-type BasePair = (Tile, Tile);
+type BaseSlot = (Tile, Vec<Tile>);
 
 /// Radius around a player start site (even index) that must remain passable.
 pub const BASE_PROTECTION_RADIUS_TILES: i32 = 7;
@@ -358,7 +358,6 @@ mod tests {
         let authored_expansions: &[(u32, u32)] = &[(63, 38), (63, 88), (88, 62), (38, 62)];
         for seed in 0..16u32 {
             let map = Map::generate(4, seed);
-            assert_eq!(map.starts.len(), map.expansion_sites.len());
             // Every assigned expansion must come from the authored pool.
             for expansion in &map.expansion_sites {
                 assert!(
@@ -378,19 +377,20 @@ mod tests {
 
     #[test]
     fn selected_layout_keeps_its_paired_natural_expansions() {
-        let authored_pairs: HashSet<_> = default_authored_pairs().into_iter().collect();
+        let authored_slots: HashSet<_> = default_authored_slots().into_iter().collect();
 
         for seed in 0..16u32 {
             let map = Map::generate(4, seed);
-            for pair in map
+            for slot in map
                 .starts
                 .iter()
                 .copied()
                 .zip(map.expansion_sites.iter().copied())
+                .map(|(start, expansion)| (start, vec![expansion]))
             {
                 assert!(
-                    authored_pairs.contains(&pair),
-                    "start/expansion pair {pair:?} is not an authored natural pair (seed {seed})"
+                    authored_slots.contains(&slot),
+                    "start/expansion slot {slot:?} is not an authored natural pairing (seed {seed})"
                 );
             }
         }
@@ -412,6 +412,17 @@ mod tests {
         assert_eq!(map.expansion_sites.len(), 2);
         assert!(pairs.contains(&((25, 25), (38, 62))), "got: {pairs:?}");
         assert!(pairs.contains(&((100, 25), (88, 62))), "got: {pairs:?}");
+    }
+
+    #[test]
+    fn safer_expansions_grants_two_naturals_per_player() {
+        for player_count in 1..=4 {
+            let map = Map::load("Safer Expansions", player_count, 0x1234_5678)
+                .expect("safer expansions should load from bundled assets");
+
+            assert_eq!(map.starts.len(), player_count);
+            assert_eq!(map.expansion_sites.len(), player_count * 2);
+        }
     }
 
     #[test]
@@ -484,12 +495,40 @@ mod tests {
         assert!(err.contains("impassable terrain"));
     }
 
-    fn default_authored_pairs() -> [BasePair; 4] {
+    #[test]
+    fn authored_map_supports_multiple_naturals_per_slot() {
+        let rows = vec![".".repeat(40); 40];
+        let json = format!(
+            r#"{{
+              "version": 2,
+              "name": "three-base",
+              "description": "three-base map",
+              "_design": "n/a",
+              "terrain": {},
+              "sites": [
+                {{"id": "main_a", "kind": "main", "x": 8, "y": 8}},
+                {{"id": "nat_a", "kind": "natural", "x": 24, "y": 8}},
+                {{"id": "nat_b", "kind": "natural", "x": 24, "y": 24}}
+              ],
+              "layouts": [
+                {{"id": "one", "playerCount": 1, "slots": [{{"main": "main_a", "naturals": ["nat_a", "nat_b"]}}]}}
+              ]
+            }}"#,
+            serde_json::to_string(&rows).unwrap()
+        );
+
+        let map = Map::from_authored_json(1, &json, 0).expect("three-base map should load");
+
+        assert_eq!(map.starts, vec![(8, 8)]);
+        assert_eq!(map.expansion_sites, vec![(24, 8), (24, 24)]);
+    }
+
+    fn default_authored_slots() -> [BaseSlot; 4] {
         [
-            ((25, 25), (63, 38)),
-            ((100, 100), (63, 88)),
-            ((100, 25), (88, 62)),
-            ((25, 100), (38, 62)),
+            ((25, 25), vec![(63, 38)]),
+            ((100, 100), vec![(63, 88)]),
+            ((100, 25), vec![(88, 62)]),
+            ((25, 100), vec![(38, 62)]),
         ]
     }
 }

@@ -391,6 +391,7 @@
       });
       const PROTECTION_RADIUS = 7;
       const EXPANSION_PROTECTION_RADIUS = 4;
+      const NATURALS_PER_SLOT = 2;
       const MIN_SIZE = 24;
       const MAX_SIZE = 160;
       const DEFAULT_MAP_URL = "/maps/default-handcrafted.json";
@@ -424,7 +425,7 @@
           id: layout.id,
           playerCount: layout.playerCount,
           slots: layout.slots.map(function (slot) {
-            return { main: slot.main, natural: slot.natural };
+            return { main: slot.main, naturals: slot.naturals.slice() };
           }),
         };
       }
@@ -451,10 +452,10 @@
               id: "4p_all",
               playerCount: 4,
               slots: [
-                { main: "main_nw", natural: "nat_top" },
-                { main: "main_se", natural: "nat_bottom" },
-                { main: "main_ne", natural: "nat_right" },
-                { main: "main_sw", natural: "nat_left" },
+                { main: "main_nw", naturals: ["nat_top"] },
+                { main: "main_se", naturals: ["nat_bottom"] },
+                { main: "main_ne", naturals: ["nat_right"] },
+                { main: "main_sw", naturals: ["nat_left"] },
               ],
             },
           ],
@@ -552,8 +553,11 @@
           if (!Number.isInteger(playerCount) || playerCount < 1) throw new Error("layout " + id + " has invalid playerCount");
           const slots = Array.isArray(layout.slots) ? layout.slots.map(function (slot, slotIndex) {
             if (!mainIds.has(slot.main)) throw new Error("layout " + id + " slot " + slotIndex + " references missing main " + slot.main);
-            if (!naturalIds.has(slot.natural)) throw new Error("layout " + id + " slot " + slotIndex + " references missing natural " + slot.natural);
-            return { main: slot.main, natural: slot.natural };
+            const slotNaturals = normalizeSlotNaturals(slot, "layout " + id + " slot " + slotIndex);
+            for (const natural of slotNaturals) {
+              if (!naturalIds.has(natural)) throw new Error("layout " + id + " slot " + slotIndex + " references missing natural " + natural);
+            }
+            return { main: slot.main, naturals: slotNaturals };
           }) : [];
           if (slots.length !== playerCount) throw new Error("layout " + id + " slot count must match playerCount");
           validateUniqueSlots(id, slots);
@@ -562,14 +566,32 @@
         return { version: version, name: name, description: description, _design: design, terrain: rows, sites: sites, layouts: layouts };
       }
 
+      function normalizeSlotNaturals(slot, label) {
+        const raw = Array.isArray(slot.naturals) ? slot.naturals : slot.natural ? [slot.natural] : [];
+        const out = [];
+        const seen = new Set();
+        for (const value of raw) {
+          const id = String(value || "").trim();
+          if (!id) continue;
+          if (seen.has(id)) throw new Error(label + " repeats natural " + id);
+          seen.add(id);
+          out.push(id);
+        }
+        if (!out.length) throw new Error(label + " needs at least one natural");
+        if (out.length > NATURALS_PER_SLOT) throw new Error(label + " supports at most " + NATURALS_PER_SLOT + " naturals");
+        return out;
+      }
+
       function validateUniqueSlots(layoutId, slots) {
         const usedMains = new Set();
         const usedNaturals = new Set();
         for (const slot of slots) {
           if (usedMains.has(slot.main)) throw new Error("layout " + layoutId + " assigns main " + slot.main + " more than once");
-          if (usedNaturals.has(slot.natural)) throw new Error("layout " + layoutId + " assigns natural " + slot.natural + " more than once");
           usedMains.add(slot.main);
-          usedNaturals.add(slot.natural);
+          for (const natural of slot.naturals) {
+            if (usedNaturals.has(natural)) throw new Error("layout " + layoutId + " assigns natural " + natural + " more than once");
+            usedNaturals.add(natural);
+          }
         }
       }
 
@@ -632,11 +654,15 @@
           const usedNaturals = new Set();
           for (const slot of layout.slots) {
             if (!mainIds.has(slot.main)) errors.push(layout.id + " missing main " + slot.main);
-            if (!naturalIds.has(slot.natural)) errors.push(layout.id + " missing natural " + slot.natural);
             if (usedMains.has(slot.main)) errors.push(layout.id + " repeats main " + slot.main);
-            if (usedNaturals.has(slot.natural)) errors.push(layout.id + " repeats natural " + slot.natural);
             usedMains.add(slot.main);
-            usedNaturals.add(slot.natural);
+            if (!Array.isArray(slot.naturals) || slot.naturals.length < 1) errors.push(layout.id + " slot missing natural");
+            if (slot.naturals.length > NATURALS_PER_SLOT) errors.push(layout.id + " slot has too many naturals");
+            for (const natural of slot.naturals) {
+              if (!naturalIds.has(natural)) errors.push(layout.id + " missing natural " + natural);
+              if (usedNaturals.has(natural)) errors.push(layout.id + " repeats natural " + natural);
+              usedNaturals.add(natural);
+            }
           }
         }
         return errors;
@@ -691,12 +717,15 @@
           ctx.lineWidth = 2;
           for (const slot of layout.slots) {
             const main = siteById(slot.main);
-            const natural = siteById(slot.natural);
-            if (!main || !natural) continue;
-            ctx.beginPath();
-            ctx.moveTo(main.x * cellSize + cellSize / 2, main.y * cellSize + cellSize / 2);
-            ctx.lineTo(natural.x * cellSize + cellSize / 2, natural.y * cellSize + cellSize / 2);
-            ctx.stroke();
+            if (!main) continue;
+            for (const naturalId of slot.naturals) {
+              const natural = siteById(naturalId);
+              if (!natural) continue;
+              ctx.beginPath();
+              ctx.moveTo(main.x * cellSize + cellSize / 2, main.y * cellSize + cellSize / 2);
+              ctx.lineTo(natural.x * cellSize + cellSize / 2, natural.y * cellSize + cellSize / 2);
+              ctx.stroke();
+            }
           }
         }
 
@@ -758,13 +787,30 @@
             const mainOptions = mains().map(function (site) {
               return '<option value="' + site.id + '"' + (slot.main === site.id ? ' selected' : '') + '>' + site.id + '</option>';
             }).join("");
-            const naturalOptions = naturals().map(function (site) {
-              return '<option value="' + site.id + '"' + (slot.natural === site.id ? ' selected' : '') + '>' + site.id + '</option>';
+            const naturalSummary = slot.naturals.join(", ");
+            const naturalSelects = Array.from({ length: NATURALS_PER_SLOT }, function (_, naturalIndex) {
+              const selected = slot.naturals[naturalIndex] || "";
+              const blank = naturalIndex === 0 ? "" : '<option value="">None</option>';
+              const options = naturals().map(function (site) {
+                return '<option value="' + site.id + '"' + (selected === site.id ? ' selected' : '') + '>' + site.id + '</option>';
+              }).join("");
+              return '<select aria-label="Natural ' + (naturalIndex + 1) + ' for slot ' + (i + 1) + '" data-natural-index="' + naturalIndex + '">' + blank + options + '</select>';
             }).join("");
-            row.innerHTML = '<span><span class="base-name">Slot ' + (i + 1) + '</span><span class="base-kind">' + slot.main + ' -> ' + slot.natural + '</span></span><span><select aria-label="Main for slot ' + (i + 1) + '">' + mainOptions + '</select><select aria-label="Natural for slot ' + (i + 1) + '">' + naturalOptions + '</select></span>';
+            row.innerHTML = '<span><span class="base-name">Slot ' + (i + 1) + '</span><span class="base-kind">' + slot.main + ' -> ' + naturalSummary + '</span></span><span><select aria-label="Main for slot ' + (i + 1) + '">' + mainOptions + '</select>' + naturalSelects + '</span>';
             const selects = row.querySelectorAll("select");
             selects[0].addEventListener("change", function (event) { slot.main = event.target.value; refresh(); });
-            selects[1].addEventListener("change", function (event) { slot.natural = event.target.value; refresh(); });
+            selects.forEach(function (select, selectIndex) {
+              if (selectIndex === 0) return;
+              select.addEventListener("change", function (event) {
+                const next = slot.naturals.slice();
+                const naturalIndex = Number(event.target.dataset.naturalIndex);
+                if (event.target.value) next[naturalIndex] = event.target.value; else next.splice(naturalIndex, 1);
+                slot.naturals = next.filter(function (value, index, values) {
+                  return value && values.indexOf(value) === index;
+                });
+                refresh();
+              });
+            });
             pairListEl.appendChild(row);
           });
         }
