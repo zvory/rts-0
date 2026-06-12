@@ -36,6 +36,14 @@ import { StatusBadge } from "./status_badge.js";
  */
 const HEARTBEAT_MS = 15000;
 
+export function shouldWarnBeforeUnload({
+  match = null,
+  inReplayPlayback = false,
+  allowUnloadWithoutWarning = false,
+} = {}) {
+  return !allowUnloadWithoutWarning && (!!match || !!inReplayPlayback);
+}
+
 /**
  * The whole application. A single instance is created on load. It can host
  * many sequential matches: a live match can roll straight into post-match replay
@@ -83,7 +91,9 @@ export class App {
     this.onOpen = this.onOpen.bind(this);
     this.onClose = this.onClose.bind(this);
     this.onReplayBranchCreated = this.onReplayBranchCreated.bind(this);
+    this.onBeforeUnload = this.onBeforeUnload.bind(this);
     this.inReplayPlayback = false;
+    this.allowUnloadWithoutWarning = false;
     this.pendingCameraView = null;
   }
 
@@ -99,6 +109,7 @@ export class App {
     dom.gameOverButton.addEventListener("click", this.onBackToLobby);
     dom.gameOverClose?.addEventListener("click", this.onCloseScorePanel);
     dom.gameOver.addEventListener("click", this.onGameOverOverlayClick);
+    window.addEventListener("beforeunload", this.onBeforeUnload);
 
     void this.loadVersion();
     this.lobby.show();
@@ -374,6 +385,7 @@ export class App {
   /** "Back to lobby" button: tear down the match and restore the lobby. */
   onBackToLobby() {
     if (this.replayLaunch) {
+      this.allowUnloadWithoutWarning = true;
       window.location.assign(new URL("/", window.location.href).toString());
       return;
     }
@@ -395,6 +407,13 @@ export class App {
     // A new match row may have just been written server-side; pull the freshest list.
     if (this.matchHistory) this.matchHistory.refresh();
     else this._mountMatchHistory();
+  }
+
+  onBeforeUnload(ev) {
+    if (!shouldWarnBeforeUnload(this)) return;
+    ev.preventDefault();
+    ev.returnValue = true;
+    return true;
   }
 
   onCloseScorePanel() {

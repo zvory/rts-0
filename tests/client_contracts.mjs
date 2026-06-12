@@ -1008,9 +1008,17 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
   const { Match } = await import("../client/src/match.js");
   const { ReplayViewer } = await import("../client/src/replay_viewer.js");
   const { ReplayControls } = await import("../client/src/replay_controls.js");
+  const { shouldWarnBeforeUnload } = await import("../client/src/app.js");
   const { dom } = await import("../client/src/bootstrap.js");
   assert(ReplayViewer.prototype instanceof Match, "ReplayViewer reuses Match rendering lifecycle");
   assert(!("command" in ReplayCameraInput.prototype), "Replay camera input has no gameplay command API");
+  assert(!shouldWarnBeforeUnload(), "lobby state does not warn before unload");
+  assert(shouldWarnBeforeUnload({ match: {} }), "live match warns before unload");
+  assert(shouldWarnBeforeUnload({ inReplayPlayback: true }), "replay playback warns before unload");
+  assert(
+    !shouldWarnBeforeUnload({ match: {}, allowUnloadWithoutWarning: true }),
+    "intentional app navigation bypasses unload warning",
+  );
 
   function fakeEl(tag = "div") {
     const el = {
