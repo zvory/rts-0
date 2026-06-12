@@ -16,6 +16,7 @@ import { PredictionController } from "./prediction_controller.js";
 import { Renderer } from "./renderer/index.js";
 import { ReplayCameraInput } from "./replay_camera_input.js";
 import { ReplayControls } from "./replay_controls.js";
+import { SimWasmPredictionAdapter } from "./sim_wasm_adapter.js";
 import { GameState } from "./state.js";
 import { INTERP_DELAY_MS, SNAPSHOT_MS } from "./config.js";
 import { EVENT, KIND, NOTICE_SEVERITY, S } from "./protocol.js";
@@ -105,8 +106,13 @@ export class Match {
     this.skipFinalNetReport = false;
     this.lastSnapshotTick = 0;
     this.health = new MatchHealth({ net: this.net, statusBadge: this.statusBadge, snapshotMs: SNAPSHOT_MS });
+    this.predictionAdapter = new SimWasmPredictionAdapter({
+      startInfo: payload,
+      playerId: payload?.playerId,
+    });
     this.prediction = new PredictionController({
       enabled: !this.replayViewer && !payload?.spectator,
+      predictor: this.predictionAdapter,
       sendCommand: (command, clientSeq) => this.net.command(command, clientSeq),
     });
     this.commandIssuer = {
@@ -186,6 +192,7 @@ export class Match {
       this.health.noteSnapshotArrival(now, document.hidden);
       this.prediction.applyAuthoritativeSnapshot(m);
       this.state.applySnapshot(m);
+      this.applyPredictedSnapshot();
       this.lastSnapshotTick = Number.isFinite(m?.tick) ? m.tick : this.lastSnapshotTick;
       this.replayControls?.noteSnapshotTick(m?.tick);
       this.health.applyServerNetStatus(m?.netStatus || null);
@@ -230,6 +237,12 @@ export class Match {
     this.startNetReports();
     this.health.publish();
     this.requestAutomaticPointerLock({ requireGesture: false });
+    if (this.prediction.enabled) {
+      this.predictionAdapter.init().then((ready) => {
+        if (ready) this.logPredictionStatus("ready");
+        else this.logPredictionStatus("disabled");
+      });
+    }
 
     // Show speed controls for replay and scenario dev-watch rooms.
     const isReplay = !!payload?.replay;
@@ -310,6 +323,47 @@ export class Match {
       wsBufferedBytes: report.wsBufferedBytes,
     });
     this.health.resetReportStats();
+  }
+
+  applyPredictedSnapshot() {
+    if (!this.prediction.enabled || !this.predictionAdapter.ready) {
+      this.state.clearPredictedSnapshot();
+      this.publishPredictionDebug();
+      return;
+    }
+    const snapshot = this.predictionAdapter.renderSnapshot();
+    if (!snapshot) return;
+    this.state.setPredictedSnapshot(snapshot, this.predictionAdapter.diagnostics(), {
+      smoothCorrections: true,
+    });
+    this.publishPredictionDebug();
+  }
+
+  advancePredictionVisual() {
+    if (!this.prediction.enabled || !this.predictionAdapter.ready) return;
+    const snapshot = this.predictionAdapter.advanceVisual();
+    if (snapshot) {
+      this.state.setPredictedSnapshot(snapshot, this.predictionAdapter.diagnostics());
+      this.publishPredictionDebug();
+    }
+  }
+
+  publishPredictionDebug() {
+    if (typeof window === "undefined") return;
+    window.__rtsPredictionDebug = {
+      controller: this.prediction.debugSummary(),
+      wasm: this.predictionAdapter.diagnostics(),
+    };
+  }
+
+  logPredictionStatus(status) {
+    const debug = {
+      status,
+      controller: this.prediction.debugSummary(),
+      wasm: this.predictionAdapter.diagnostics(),
+    };
+    if (typeof window !== "undefined") window.__rtsPredictionDebug = debug;
+    console.info("[RTS_PREDICTION]", debug);
   }
 
   applySpectatorUi() {
@@ -832,6 +886,7 @@ export class Match {
       );
     }
     this.input.update(dt);
+    this.advancePredictionVisual();
     this.fog.update(this.ownEntities(), this.state.map.tileSize, this.state.visibleTiles);
 
     this.renderer.render(this.state, this.camera, this.fog, alpha);
@@ -851,7 +906,7 @@ export class Match {
    */
   ownEntities() {
     const all = this.state
-      .entitiesInterpolated(1)
+      .entitiesInterpolated(1, { includePrediction: false })
       .filter((e) => !e.shotReveal && !e.visionOnly);
     if (this.state.spectator) {
       return all.filter((e) => e.owner !== 0);
@@ -888,6 +943,7 @@ export class Match {
     window.removeEventListener("keydown", this.onMenuKeyDown, true);
     document.removeEventListener("visibilitychange", this.onVisibilityChange);
     this.replayControls?.destroy();
+    this.predictionAdapter?.destroy();
     this.replayControls = null;
     if (this.input && typeof this.input.destroy === "function") {
       this.input.destroy();
@@ -926,6 +982,7 @@ export class Match {
       dom.giveUpConfirmButton?.removeEventListener("click", this.onGiveUpConfirm);
     }
     this.replayControls?.destroy();
+    this.predictionAdapter?.destroy();
     this.replayControls = null;
     if (dom.commandCard) dom.commandCard.hidden = false;
     if (this.unregisterHudInputZone) {

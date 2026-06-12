@@ -19,11 +19,13 @@ export const PREDICTION_STATE = Object.freeze({
 export class PredictionController {
   constructor({
     sendCommand = null,
+    predictor = null,
     enabled = true,
     now = () => performance.now(),
     commandTimeoutMs = DEFAULT_COMMAND_TIMEOUT_MS,
   } = {}) {
     this.sendCommand = sendCommand;
+    this.predictor = predictor;
     this.enabled = !!enabled;
     this.now = now;
     this.commandTimeoutMs = commandTimeoutMs;
@@ -46,6 +48,8 @@ export class PredictionController {
     this.lastCorrection = null;
     this.lastReceipt = null;
     this.lastRejected = null;
+    this.maxCorrectionDistance = 0;
+    this.snapCorrectionCount = 0;
   }
 
   reset({ enabled = this.enabled } = {}) {
@@ -69,6 +73,8 @@ export class PredictionController {
     this.lastCorrection = null;
     this.lastReceipt = null;
     this.lastRejected = null;
+    this.maxCorrectionDistance = 0;
+    this.snapCorrectionCount = 0;
   }
 
   issueCommand(cmd) {
@@ -92,9 +98,16 @@ export class PredictionController {
     this.pending.push(pending);
     this.pendingBySeq.set(clientSeq, pending);
     this.issuedCount += 1;
+    let predicted = false;
+    try {
+      predicted = !!this.predictor?.enqueueCommand(clientSeq, cmd);
+    } catch (err) {
+      this.lastCorrection = { error: errorMessage(err), phase: "enqueue" };
+    }
+    if (predicted) this.enterPredicting();
     const sent = this.sendCommand ? this.sendCommand(cmd, clientSeq) : false;
     pending.sendAccepted = !!sent;
-    return { clientSeq, sent: !!sent };
+    return { clientSeq, sent: !!sent, predicted };
   }
 
   applyAuthoritativeSnapshot(snapshot, { allowStale = false } = {}) {
@@ -121,6 +134,7 @@ export class PredictionController {
       const ackTick = finiteU32(netStatus.lastSimConsumedClientTick);
       this.applySimAcknowledgement(ackSeq, ackTick);
     }
+    this.reconcilePredictor(snapshot);
     this.expireTimedOutCommands();
     return this.debugSummary();
   }
@@ -195,6 +209,34 @@ export class PredictionController {
     if (this.enabled) this.mode = PREDICTION_STATE.TRACKING;
   }
 
+  reconcilePredictor(snapshot) {
+    if (!this.enabled || !this.predictor) return null;
+    try {
+      const result = this.predictor.reconcile(snapshot, this.pending);
+      if (!result) return null;
+      const distance = Number(result.correctionDistance) || 0;
+      this.maxCorrectionDistance = Math.max(this.maxCorrectionDistance, distance);
+      if (result.snapCorrection) this.snapCorrectionCount += 1;
+      if (distance > 0.01) {
+        this.beginResync({
+          distance,
+          snap: !!result.snapCorrection,
+          tick: finiteU32(snapshot?.tick),
+        });
+      } else if (this.mode === PREDICTION_STATE.RESYNCING) {
+        this.finishResync();
+      } else if (this.pending.length > 0) {
+        this.enterPredicting();
+      } else if (this.mode === PREDICTION_STATE.PREDICTING) {
+        this.mode = PREDICTION_STATE.TRACKING;
+      }
+      return result;
+    } catch (err) {
+      this.beginResync({ error: errorMessage(err), phase: "reconcile" });
+      return null;
+    }
+  }
+
   expireTimedOutCommands(now = this.now()) {
     if (!this.enabled || !(this.commandTimeoutMs > 0)) return 0;
     let count = 0;
@@ -231,6 +273,8 @@ export class PredictionController {
       rejectionCount: this.rejectionCount,
       timedOutCount: this.timedOutCount,
       correctionCount: this.correctionCount,
+      maxCorrectionDistance: this.maxCorrectionDistance,
+      snapCorrectionCount: this.snapCorrectionCount,
       lastReceipt: this.lastReceipt,
       lastRejected: this.lastRejected,
       lastCorrection: this.lastCorrection,
@@ -249,4 +293,9 @@ function finiteU32(value) {
   const n = Number(value);
   if (!Number.isFinite(n) || n < 0) return null;
   return Math.min(U32_MAX, Math.trunc(n));
+}
+
+function errorMessage(err) {
+  if (err instanceof Error) return err.message;
+  return String(err);
 }

@@ -78,6 +78,50 @@ try {
   });
   ok(own.cityCentre === 1 && own.w === 4, `client sees own City Centre + 4 workers (cityCentre=${own.cityCentre}, workers=${own.w})`);
 
+  await page.waitForFunction(() => {
+    const wasm = window.__rtsPredictionDebug?.wasm;
+    return wasm?.ready || wasm?.disabledReason;
+  }, { timeout: 5000 }).catch(() => {});
+  const predictionSmoke = await page.evaluate(() => {
+    const m = window.__rts.match, s = m.state;
+    const wasm = window.__rtsPredictionDebug?.wasm || null;
+    if (!wasm?.ready) return { ready: false, reason: wasm?.disabledReason || "not-ready" };
+    const worker = s.entitiesInterpolated(1, { includePrediction: false })
+      .find((e) => e.owner === s.playerId && e.kind === "worker");
+    if (!worker) return { ready: true, worker: false };
+    s.setSelection([worker.id]);
+    const before = { x: worker.x, y: worker.y };
+    const issued = m.commandIssuer.issueCommand({
+      c: "move",
+      units: [worker.id],
+      x: worker.x + 180,
+      y: worker.y,
+    });
+    m.advancePredictionVisual();
+    const predicted = s.entitiesInterpolated(1).find((e) => e.id === worker.id);
+    const authoritative = s.entitiesInterpolated(1, { includePrediction: false }).find((e) => e.id === worker.id);
+    return {
+      ready: true,
+      worker: true,
+      issued,
+      before,
+      predicted: predicted ? { x: predicted.x, y: predicted.y } : null,
+      authoritative: authoritative ? { x: authoritative.x, y: authoritative.y } : null,
+      debug: window.__rtsPredictionDebug,
+    };
+  });
+  ok(
+    !predictionSmoke.ready || (
+      predictionSmoke.worker &&
+      predictionSmoke.issued?.predicted &&
+      predictionSmoke.predicted?.x > predictionSmoke.before.x &&
+      predictionSmoke.authoritative?.x === predictionSmoke.before.x
+    ),
+    predictionSmoke.ready
+      ? `PREDICTION: owned move advances before authoritative echo (before=${predictionSmoke.before?.x}, predicted=${predictionSmoke.predicted?.x}, authoritative=${predictionSmoke.authoritative?.x})`
+      : `PREDICTION: WASM adapter unavailable for smoke (${predictionSmoke.reason})`,
+  );
+
   // Interpolation must be live: GameState exposes recv timestamps so alpha isn't pinned to 1.
   const interp = await page.evaluate(() => {
     const s = window.__rts.match.state;

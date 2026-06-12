@@ -12,6 +12,8 @@ import { KIND, PASSABLE, STATE, isBuilding, isResource, isUnit } from "./protoco
 
 const TWO_PI = Math.PI * 2;
 const SHOT_REVEAL_MS = 1500;
+const PREDICTION_SMOOTH_MS = 120;
+const PREDICTION_SMOOTH_MAX_PX = 96;
 const WEAPON_RECOIL_MS = Object.freeze({
   [KIND.RIFLEMAN]: 420,
   [KIND.MACHINE_GUNNER]: 160,
@@ -147,6 +149,10 @@ export class GameState {
     this.pendingMortarTargets = [];
     /** @type {Map<number, object>} attacker id -> temporary fog reveal entity. */
     this.shotRevealsById = new Map();
+    /** @type {Map<number, object>} owned predicted entity id -> predicted entity view. */
+    this.predictedById = new Map();
+    this.predictionCorrectionById = new Map();
+    this.predictionDiagnostics = null;
   }
 
   /** Maximum number of entities the local selection may contain. */
@@ -539,9 +545,10 @@ export class GameState {
    * @param {number} alpha blend factor in [0,1]; 0 = previous, 1 = current.
    * @returns {Array<object>}
    */
-  entitiesInterpolated(alpha) {
+  entitiesInterpolated(alpha, { includePrediction = true } = {}) {
     if (!this._cur) return [];
     const t = alpha < 0 ? 0 : alpha > 1 ? 1 : alpha;
+    const now = performance.now();
     const out = [];
     for (const e of this._cur.entities || []) {
       const prior = this._prevById.get(e.id);
@@ -557,11 +564,12 @@ export class GameState {
         if (typeof prior.weaponFacing === "number" && typeof e.weaponFacing === "number") {
           next.weaponFacing = lerpAngle(prior.weaponFacing, e.weaponFacing, t);
         }
-        out.push(next);
+        out.push(includePrediction ? this._applyPredictedEntity(next, now) : next);
       } else {
         // No previous sample: render at the current position (a shallow copy
         // keeps callers from mutating the live snapshot entity).
-        out.push({ ...e });
+        const next = { ...e };
+        out.push(includePrediction ? this._applyPredictedEntity(next, now) : next);
       }
     }
     return out;
@@ -573,7 +581,63 @@ export class GameState {
    * @returns {object|undefined}
    */
   entityById(id) {
-    return this._curById.get(id);
+    return this.predictedById.get(id) || this._curById.get(id);
+  }
+
+  setPredictedSnapshot(snapshot, diagnostics = null, { smoothCorrections = false } = {}) {
+    const predicted = new Map();
+    for (const entity of snapshot?.entities || []) {
+      if (entity?.owner !== this.playerId || !isUnit(entity.kind)) continue;
+      predicted.set(entity.id, { ...entity, predicted: true });
+    }
+    const now = performance.now();
+    const corrections = new Map();
+    if (smoothCorrections) {
+      for (const [id, next] of predicted) {
+        const prev = this.predictedById.get(id);
+        if (!prev) continue;
+        const dx = prev.x - next.x;
+        const dy = prev.y - next.y;
+        const distance = Math.hypot(dx, dy);
+        if (distance > 0.01 && distance <= PREDICTION_SMOOTH_MAX_PX) {
+          corrections.set(id, { dx, dy, startedAt: now, durationMs: PREDICTION_SMOOTH_MS });
+        }
+      }
+    }
+    this.predictedById = predicted;
+    this.predictionCorrectionById = corrections;
+    this.predictionDiagnostics = diagnostics;
+  }
+
+  clearPredictedSnapshot() {
+    this.predictedById.clear();
+    this.predictionCorrectionById.clear();
+    this.predictionDiagnostics = null;
+  }
+
+  _applyPredictedEntity(entity, now) {
+    const predicted = this.predictedById.get(entity.id);
+    if (!predicted || entity.owner !== this.playerId || !isUnit(entity.kind)) return entity;
+    const out = {
+      ...entity,
+      ...predicted,
+      hp: entity.hp,
+      maxHp: entity.maxHp,
+      owner: entity.owner,
+      predicted: true,
+    };
+    const correction = this.predictionCorrectionById.get(entity.id);
+    if (correction) {
+      const age = now - correction.startedAt;
+      if (age >= correction.durationMs) {
+        this.predictionCorrectionById.delete(entity.id);
+      } else {
+        const remaining = 1 - age / correction.durationMs;
+        out.x += correction.dx * remaining;
+        out.y += correction.dy * remaining;
+      }
+    }
+    return out;
   }
 
   _normalizeResource(node, index) {

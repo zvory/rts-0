@@ -1,5 +1,7 @@
 # Phase 4 - Owned Unit Movement Prediction
 
+Status: Done
+
 ## Objective
 
 Use the WASM predictor for the first player-visible lag fix: selected owned units should begin
@@ -89,3 +91,23 @@ Phase 5 can build on the same pending-command lifecycle or needs additional comm
 
 Move commands feel immediate for owned units. The server still decides the real result, and
 corrections are smoothed when prediction differs.
+
+## Implementation Notes
+
+- `PredictionController` now forwards locally issued commands into the WASM predictor before
+  sending them to the server.
+- Authoritative snapshots rebuild the owner-safe WASM baseline, drop acknowledged commands, replay
+  unacknowledged commands, and record correction distance diagnostics.
+- `GameState` overlays predicted owned-unit positions for rendering while authoritative reads remain
+  available for fog so predicted movement does not expand visibility.
+- Developer diagnostics are exposed at `window.__rtsPredictionDebug` and logged when the adapter
+  becomes ready or unavailable.
+
+## Verification Notes
+
+- Focused JS prediction/controller coverage includes immediate enqueue, replay after coalesced
+  snapshots, acknowledgement drops, and the predicted-render vs authoritative-fog read split.
+- Native `rts-sim-wasm` coverage confirms authoritative baseline imports clear pending commands
+  before replay.
+- Browser smoke includes a prediction check when generated WASM assets are available: an owned move
+  command advances the predicted render position while the authoritative read remains unchanged.

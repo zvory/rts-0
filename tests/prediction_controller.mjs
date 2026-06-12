@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import { PredictionController, PREDICTION_STATE } from "../client/src/prediction_controller.js";
+import { GameState } from "../client/src/state.js";
 
 function assert(cond, msg) {
   if (!cond) throw new Error(msg || "Assertion failed");
@@ -80,6 +81,85 @@ function sentSeqs(sent) {
 }
 
 {
+  const calls = [];
+  const fakePredictor = {
+    enqueueCommand(clientSeq, command) {
+      calls.push(["enqueue", clientSeq, command.c]);
+      return command.c === "move";
+    },
+    reconcile(snapshot, pending) {
+      calls.push(["reconcile", snapshot.tick, pending.map((entry) => entry.clientSeq).join(",")]);
+      return { correctionDistance: 4, snapCorrection: false };
+    },
+  };
+  const controller = new PredictionController({
+    predictor: fakePredictor,
+    sendCommand: () => true,
+  });
+  const issued = controller.issueCommand({ c: "move", units: [1], x: 120, y: 100 });
+  assert(issued.predicted === true, "predictable movement command is enqueued locally");
+  controller.applyAuthoritativeSnapshot({ tick: 12, netStatus: { lastSimConsumedClientSeq: 0 } });
+  const summary = controller.debugSummary();
+  assert(summary.mode === PREDICTION_STATE.RESYNCING, "correction enters resync mode");
+  assert(summary.maxCorrectionDistance === 4, "correction distance is tracked");
+  assert(
+    calls.some((call) => call[0] === "reconcile" && call[2] === "1"),
+    "unacknowledged commands are replayed after authoritative snapshot",
+  );
+}
+
+{
+  const fakePredictor = {
+    enqueueCommand() {
+      return true;
+    },
+    reconcile(snapshot, pending) {
+      return {
+        correctionDistance: pending.length === 0 ? 0 : 1,
+        snapCorrection: false,
+      };
+    },
+  };
+  const controller = new PredictionController({
+    predictor: fakePredictor,
+    sendCommand: () => true,
+  });
+  controller.issueCommand({ c: "move", units: [1], x: 120, y: 100 });
+  controller.applyAuthoritativeSnapshot({ tick: 1, netStatus: { lastSimConsumedClientSeq: 1 } });
+  const summary = controller.debugSummary();
+  assert(summary.pendingCommandCount === 0, "acknowledged command is dropped before replay");
+  assert(summary.mode === PREDICTION_STATE.TRACKING, "no correction returns to tracking mode");
+}
+
+{
+  const state = new GameState({
+    playerId: 1,
+    spectator: false,
+    map: { width: 8, height: 8, tileSize: 32, terrain: new Array(64).fill(0), resources: [] },
+    players: [{ id: 1, name: "A", color: "#f00", startTileX: 1, startTileY: 1 }],
+  });
+  state.applySnapshot({
+    tick: 1,
+    steel: 0,
+    oil: 0,
+    supplyUsed: 1,
+    supplyCap: 10,
+    entities: [{ id: 10, owner: 1, kind: "worker", x: 32, y: 32, hp: 40, maxHp: 40, state: "idle" }],
+    events: [],
+  });
+  state.setPredictedSnapshot({
+    tick: 3,
+    entities: [{ id: 10, owner: 1, kind: "worker", x: 52, y: 32, hp: 40, maxHp: 40, state: "move" }],
+  });
+  assert(state.entitiesInterpolated(1)[0].x === 52, "render reads predicted owned position");
+  assert(
+    state.entitiesInterpolated(1, { includePrediction: false })[0].x === 32,
+    "authoritative reads can ignore prediction for fog",
+  );
+  assert(state.entityById(10).x === 52, "entityById exposes predicted owned position for local UX");
+}
+
+{
   const files = [
     ["client/src/input/commands.js", "viewport right-click and hotkeys"],
     ["client/src/input/placement.js", "build placement"],
@@ -91,6 +171,10 @@ function sentSeqs(sent) {
     assert(source.includes("this._issueCommand"), `${file} routes ${label} through the guarded command issuer`);
     assert(!source.includes(".net.command("), `${file} does not send gameplay commands through Net`);
   }
+  const matchSource = fs.readFileSync(new URL("../client/src/match.js", import.meta.url), "utf8");
+  assert(matchSource.includes("new SimWasmPredictionAdapter"), "Match wires the WASM prediction adapter");
+  assert(matchSource.includes("predictor: this.predictionAdapter"), "PredictionController receives the adapter");
+  assert(matchSource.includes("advancePredictionVisual"), "Match advances predicted movement before render");
 }
 
 console.log("prediction_controller: ok");
