@@ -174,6 +174,7 @@ export function buildWorkerBuildCard(ctx) {
       unaffordable: availability === "unaffordable",
       title: buildDisabledReason(ctx, kind, resources),
       tooltipKind: kind,
+      onUnavailableIntent: { type: "playNotEnough", cost: st.cost },
     });
     idx++;
   }

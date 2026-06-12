@@ -340,12 +340,6 @@ export function _activateCommandHotkey(ev) {
   return false;
 }
 
-export function _enterAttackMove(options = {}) {
-  // Only meaningful when own units or producer buildings are selected.
-  if (this._selectedOwnUnitIds().length === 0 && this._selectedProducerBuildingIds().length === 0) return;
-  return this.state.beginCommandTarget("attack", options);
-}
-
 export function _quickCastCommandTarget(ev = {}) {
   if (!this.state.commandTarget || !this.mouse) return false;
   this._issueTargetedCommand(this.mouse, ev);
@@ -356,12 +350,6 @@ export function _quickCastCommandTarget(ev = {}) {
     this.state.endCommandTarget();
   }
   return true;
-}
-
-export function _issueStop() {
-  const ownUnits = this._selectedOwnUnitIds();
-  if (ownUnits.length === 0) return;
-  this._issueCommand(cmd.stop(ownUnits));
 }
 
 export function _cancel() {

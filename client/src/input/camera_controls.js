@@ -1,6 +1,5 @@
-import { ABILITY, cmd, PASSABLE, isUnit, isBuilding, isResource, KIND } from "../protocol.js";
-import { MINING_CC_RANGE_TILES, STATS, TANK_BODY, isProducerBuilding } from "../config.js";
-import { DEFAULT_HIT_RADIUS, DEFAULT_TILE_SIZE, HIT_PAD_PX, OWN_HIT_BONUS, ZOOM_STEP } from "./constants.js";
+import { ABILITY } from "../protocol.js";
+import { ZOOM_STEP } from "./constants.js";
 import { isTextEntry } from "./placement.js";
 
 export function _handleKeyDown(ev) {
@@ -58,24 +57,6 @@ export function _handleKeyDown(ev) {
   }
   if (ev.repeat) return;
   if (this._handleControlGroupHotkey(ev)) return;
-
-  switch (ev.code) {
-    case "KeyA":
-      if (this._enterAttackMove({ shiftKey: ev.shiftKey })?.quickCast) {
-        this._quickCastCommandTarget(ev);
-      }
-      if (ev.shiftKey && this.state.commandTarget === "attack" && typeof this.state.holdCommandTarget === "function") {
-        this.state.holdCommandTarget("attack", "KeyA", ev.shiftKey);
-      }
-      ev.preventDefault();
-      return;
-    case "KeyS":
-      this._issueStop();
-      ev.preventDefault();
-      return;
-    default:
-      return;
-  }
 }
 
 function repeatedWorldAbilityHotkeyTarget(target) {
@@ -114,14 +95,6 @@ export function _handleKeyUp(ev) {
       }
       if (this.state.placement && typeof this.state.endPlacement === "function") {
         this.state.endPlacement();
-      }
-      ev.preventDefault();
-      return;
-    case "KeyA":
-      if (typeof this.state.releaseCommandTargetKey === "function") {
-        this.state.releaseCommandTargetKey("KeyA", ev.shiftKey);
-      } else if (this.state.commandTarget === "attack") {
-        this.state.endCommandTarget();
       }
       ev.preventDefault();
       return;

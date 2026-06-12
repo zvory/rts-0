@@ -246,9 +246,9 @@ multiple queued building placements; releasing Shift or losing window focus clea
 `command_composer.js` owns command-target arming lifetime for command-card targets. Input and
 minimap clicks call `GameState.issueCommandTarget`, so held keys, Shift preservation, and repeated
 queued target clicks use one composer path instead of command-specific sticky flags. A plain
-targeted-order hotkey tap arms the target after keyup; pressing the same targeted-order hotkey again
-inside the quick-cast window issues it at the current cursor world point. Shift does the same with
-`queued: true` and keeps the target armed until Shift is released.
+targeted-order command-card hotkey tap arms the target after keyup; pressing the same resolved
+hotkey again inside the quick-cast window issues it at the current cursor world point. Shift does
+the same with `queued: true` and keeps the target armed until Shift is released.
 
 `input/router.js`
 ```js
@@ -290,7 +290,7 @@ export function noticeSoundId(msg)
 `hud.js`
 ```js
 export class HUD {
-  constructor(rootEl, state, commandIssuer, audio?)
+  constructor(rootEl, state, commandIssuer, audio?, hotkeyProfiles?)
   update()                               // refresh resources/supply, selected panel, command card
   // command card buttons call commandIssuer.issueCommand(...) or state.beginPlacement(...)
 }
@@ -343,9 +343,9 @@ the input module enters targeted cursor mode:
   carriers (`ABILITIES[ability].carriers`), test whether any carrier is within range of the cursor,
   update `state.abilityTargetPreview` for the renderer.
 - Left-click: build a `useAbility` command with the ability name, filtered carrier ids, world
-  coords, and the `queued` flag (from Shift). Clear cursor mode unless the physical command hotkey
-  is still held for repeated Mortar Team Fire (`X`) or Scout Car Smoke (`D`) targeting.
-- While the physical hotkey remains held, repeated left-clicks keep the current selection intact and
+  coords, and the `queued` flag (from Shift). Clear cursor mode unless the resolved command-card
+  hotkey is still held for repeated world-point targeting.
+- While the resolved hotkey remains held, repeated left-clicks keep the current selection intact and
   keep targeted mode armed so multi-selected Mortar Teams and Scout Cars can distribute repeated
   point commands without the next click falling back to normal selection.
 - Right-click / Escape: cancel cursor mode, `state.commandTarget = null`.
