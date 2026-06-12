@@ -23,7 +23,7 @@ crate.
 | `removeAi` | `id: u32` | Host removes a previously-added AI opponent by id (lobby phase only, host-only). |
 | `setQuickstart` | `enabled: bool` | Host toggles "Debug mode" for the next match in this room. |
 | `setSpectator` | `spectator: bool` | Switch between active player and spectator role while still in the lobby. Ignored after the match starts; switching to active player is ignored if the active seats are full. |
-| `command`  | `cmd: Command` | Issue a gameplay command (see below). Ignored unless in-game. |
+| `command`  | `clientSeq: u32`, `cmd: Command` | Issue a gameplay command (see below). Ignored unless in-game. `clientSeq` is a browser-local, per-match, per-connection sequence id for prediction/reconciliation. |
 | `giveUp`   | — | Give up the active match. The server eliminates that player and sends their score screen. |
 | `returnToLobby` | — | Leave replay playback for this connection only. Other viewers stay in the replay; the room resets to a clean lobby only after the last viewer leaves. Ignored outside replay playback. |
 | `ping`     | `ts: number` | Latency probe; server replies with `pong`. |
@@ -37,6 +37,13 @@ crate.
 | `claimBranchSeat` | `playerId: u32` | Claim one original replay player seat in a replay branch staging room. Ignored outside branch staging. Rejected with `error` if the seat is unknown, already claimed, or this occupant already claimed another seat. |
 | `releaseBranchSeat` | `playerId: u32` | Release one original replay player seat currently claimed by this occupant in branch staging. Ignored outside branch staging or when the occupant does not own that claim. |
 | `startBranch` | — | Host asks to launch the staged replay branch. Ignored outside branch staging and from non-hosts. The server rejects launch until every original active seat is claimed; live promotion is handled by the branch promotion phase. |
+
+Live player `command` messages MUST include `clientSeq`; unsequenced live commands are
+protocol-invalid and are not executed. The browser resets allocation to `1` on every `start`
+payload and increments monotonically for every gameplay command sent through the live transport.
+`0` is reserved/invalid. The sequence range does not wrap within a match; exhausting `u32` ends
+client command allocation for that match rather than reusing earlier ids. `clientSeq` belongs to
+the transport envelope only and is intentionally absent from replay/simulation command DTOs.
 
 `Command` (the `cmd` object) — `c` is the command discriminator:
 
@@ -67,6 +74,13 @@ future unit intents; `stop` clears both active and queued unit orders.
 Production building rally plans are capped at four total stages. A non-queued rally replaces the
 whole plan; a queued rally appends if space remains and establishes the first stage when the plan is
 empty.
+
+Prediction acknowledgement has two milestones. Socket/room receipt means the server parsed a
+sequenced command and queued it for the room; this is diagnostics-only and is not exposed as the
+reconciliation acknowledgement. Sim consumption means the authoritative tick stream drained the
+queued command into the simulation; snapshots expose only this milestone. Sim consumption does not
+mean the command succeeded: ownership, affordability, visibility, placement, and other
+authoritative validation can still make the command a no-op.
 
 `ClientNetReport` is an untrusted, rate-limited diagnostic aggregate emitted by the browser while
 in a match:
@@ -222,19 +236,22 @@ transport decode:
     slowTick: bool,           // true when the room was at/over its tick budget this tick
     slowTickCount: u32,       // number of slow-tick incidents so far this match
     headOfLine: bool,         // true when an older unsent snapshot was still pending for this client
-    headOfLineCount: u32      // number of pending-snapshot replacements so far this match
+    headOfLineCount: u32,     // number of pending-snapshot replacements so far this match
+    predictionVersion?: u32,  // live active players only; currently 1
+    lastSimConsumedClientSeq?: u32,  // highest contiguous local clientSeq consumed by the sim
+    lastSimConsumedClientTick?: u32 | null // authoritative tick that consumed that sequence
   }
 }
 ```
 
-Live WebSocket snapshot frames are sent as compact JSON text, version 17. `client/src/net.js`
+Live WebSocket snapshot frames are sent as compact JSON text, version 18. `client/src/net.js`
 decodes this transport shape back into the semantic object above before dispatching `S.SNAPSHOT`.
 Older object-shaped JSON snapshots remain decodable by the client for fallback/dev use.
 
 ```
 {
   "t": "snapshot",
-  "v": 17,
+  "v": 18,
   "s": [tick, steel, oil, supplyUsed, supplyCap],
   "e": [
     [
@@ -251,7 +268,8 @@ Older object-shaped JSON snapshots remain decodable by the client for fallback/d
   "mb": [[id, owner, kind, x, y, [[tileX, tileY], ...], observedTick]], // rememberedBuildings; omitted when empty
   "ev": [EventRecord],            // omitted when empty
   "pr": [[id, steel, oil, supplyUsed, supplyCap]], // omitted in normal play; present in spectator/replay
-  "n": [serverLagMs, tickMs, flags, slowTickCount, headOfLineCount]
+  "n": [serverLagMs, tickMs, flags, slowTickCount, headOfLineCount,
+        predictionVersion?, lastSimConsumedClientSeq?, lastSimConsumedClientTick?]
 }
 ```
 
@@ -289,6 +307,8 @@ toggle autocast without exposing enemy data.
 `visionOnly` is true only for non-owned units/buildings visible through lingering death vision;
 clients render them below the fog overlay and must not select or issue targeted commands against
 them. In `n.flags`, bit 0 = `slowTick` and bit 1 = `headOfLine`.
+The optional compact `n` prediction fields are present only for live active player snapshots.
+Spectators, replay viewers, and dev full-world viewers omit prediction acknowledgement metadata.
 `debugPath` is present only in lobby Debug mode matches, only for the owner, and only while the unit
 has remaining movement waypoints. It carries `{ waypoints, goal, lastRepathTick, stuckTicks,
 staticBlockedTicks, totalWaypoints }`, where `waypoints` are remaining `{x, y}` world-pixel path

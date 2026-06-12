@@ -14,6 +14,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 class Client {
   constructor() {
     this.ws = new WebSocket(URL); this.playerId = null; this.lastSnapshot = null; this.msgs = []; this.waiters = [];
+    this.nextClientSeq = 1;
     this.ws.onmessage = (e) => {
       const m = decodeServerMessage(JSON.parse(e.data)); this.msgs.push(m);
       if (m.t === "welcome") this.playerId = m.playerId;
@@ -30,6 +31,7 @@ class Client {
     });
   }
   send(o) { this.ws.send(JSON.stringify(o)); }
+  command(cmd) { this.send({ t: "command", clientSeq: this.nextClientSeq++, cmd }); }
   waitFor(test, t = 5000, label = "msg") {
     const hit = this.msgs.find(test); if (hit) return Promise.resolve(hit);
     return new Promise((resolve, reject) => {
@@ -101,11 +103,33 @@ async function debugSoloStart(room) {
     const room = "reg-build-" + Math.floor(performance.now());
     const { c, snap } = await soloStart(room);
     const worker = snap.entities.find((e) => e.owner === c.playerId && e.kind === "worker");
-    c.send({ t: "command", cmd: { c: "build", units: [worker.id], building: "city_centre", tileX: 4294967295, tileY: 0 } });
+    c.command({ c: "build", units: [worker.id], building: "city_centre", tileX: 4294967295, tileY: 0 });
     const tickBefore = c.lastSnapshot.tick;
     await c.waitFor((m) => m.t === "snapshot" && m.tick > tickBefore, 3000, "post-overflow snapshot");
     const alive = c.lastSnapshot && c.lastSnapshot.tick > tickBefore;
     ok(alive, `OVERFLOW BUILD: room still ticking after huge tile coords (tick ${tickBefore} -> ${c.lastSnapshot?.tick})`);
+    c.ws.close();
+  }
+
+  // 1b) Live gameplay commands without clientSeq are protocol-invalid and must not execute.
+  {
+    const room = "reg-command-seq-" + Math.floor(performance.now());
+    const { c, snap } = await soloStart(room);
+    const cityCentre = snap.entities.find((e) => e.owner === c.playerId && e.kind === "city_centre");
+    c.send({ t: "command", cmd: { c: "train", building: cityCentre.id, unit: "worker" } });
+    const tickBefore = c.lastSnapshot.tick;
+    const after = await c.waitFor((m) => m.t === "snapshot" && m.tick > tickBefore + 5, 3000, "post-unsequenced command snapshots");
+    const ccAfter = after.entities.find((e) => e.id === cityCentre.id);
+    ok(after.steel === snap.steel && !ccAfter?.prodKind && !ccAfter?.prodQueue,
+       `COMMAND SEQ: unsequenced train was ignored (steel=${after.steel}, prod=${ccAfter?.prodKind || "none"})`);
+    c.command({ c: "train", building: cityCentre.id, unit: "worker" });
+    const executed = await c.waitFor(
+      (m) => m.t === "snapshot" && m.netStatus?.lastSimConsumedClientSeq >= 1,
+      3000,
+      "sequenced command ack",
+    );
+    ok(executed.netStatus.predictionVersion === 1 && executed.netStatus.lastSimConsumedClientSeq === 1,
+       `COMMAND SEQ: sequenced command was consumed and acknowledged (${executed.netStatus.lastSimConsumedClientSeq})`);
     c.ws.close();
   }
 
@@ -118,7 +142,7 @@ async function debugSoloStart(room) {
     const units = new Array(20000).fill(worker.id); // 20k repeated owned id (~tens of KB, under cap)
     const tickBefore = c.lastSnapshot.tick;
     const t0 = performance.now();
-    c.send({ t: "command", cmd: { c: "move", units, x: 1500, y: 1500 } });
+    c.command({ c: "move", units, x: 1500, y: 1500 });
     await c.waitFor((m) => m.t === "snapshot" && m.tick > tickBefore + 5, 3000, "post-dedupe snapshots");
     const dt = performance.now() - t0;
     ok(c.lastSnapshot && c.lastSnapshot.tick > tickBefore + 5,
@@ -132,7 +156,7 @@ async function debugSoloStart(room) {
     const { c, snap } = await soloStart(room);
     const worker = snap.entities.find((e) => e.owner === c.playerId && e.kind === "worker");
     const huge = new Array(500000).fill(worker.id); // ~1MB JSON, exceeds the WS frame cap
-    c.send({ t: "command", cmd: { c: "move", units: huge, x: 10, y: 10 } });
+    c.command({ c: "move", units: huge, x: 10, y: 10 });
     await c.closed(800);
     // Server must still be healthy: a brand-new connection still gets a welcome.
     const probe = new Client();
@@ -223,8 +247,8 @@ async function debugSoloStart(room) {
       const leftWorkers = leftSnap.entities.filter((e) => e.owner === left.playerId && e.kind === "worker").map((e) => e.id);
       const rightWorkers = rightSnap.entities.filter((e) => e.owner === right.playerId && e.kind === "worker").map((e) => e.id);
       const observerStartIndex = observer.msgs.length;
-      left.send({ t: "command", cmd: { c: "attackMove", units: leftWorkers, x: targetX, y: targetY } });
-      right.send({ t: "command", cmd: { c: "attackMove", units: rightWorkers, x: targetX, y: targetY } });
+      left.command({ c: "attackMove", units: leftWorkers, x: targetX, y: targetY });
+      right.command({ c: "attackMove", units: rightWorkers, x: targetX, y: targetY });
 
       const hasCombatEvent = (m) => m.t === "snapshot" && (m.events || []).some((ev) => ev.e === "attack" || ev.e === "death");
       let combatMsg = null;

@@ -7,7 +7,7 @@ use super::*;
 use crate::game::entity::EntityKind;
 use crate::game::map::Map;
 use crate::game::replay::{ReplayArtifactV1, ReplayValidationError};
-use crate::protocol::{ReplayPlaybackState, SnapshotNetStatus};
+use crate::protocol::{ReplayPlaybackState, SnapshotNetStatus, PREDICTION_PROTOCOL_VERSION};
 use rand::rngs::SmallRng;
 use rand::SeedableRng;
 use rts_ai::{AiController, AiThinkContext};
@@ -22,6 +22,15 @@ pub(super) struct RoomPlayer {
     spectator: bool,
     msg_tx: ConnectionSink,
     head_of_line_count: u32,
+    last_received_client_seq: u32,
+    last_sim_consumed_client_seq: u32,
+    last_sim_consumed_client_tick: Option<u32>,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct PendingClientCommandAck {
+    connection_id: u32,
+    client_seq: u32,
 }
 
 /// A computer opponent seated in a room. Has an id (for the lobby list / removal) and a name, but
@@ -708,6 +717,7 @@ pub(super) struct RoomTask {
     /// by zero and resume can restore the previous non-zero multiplier.
     dev_watch_paused: bool,
     slow_tick_count: u32,
+    pending_client_command_acks: Vec<PendingClientCommandAck>,
     /// Optional persistence sink for resolved matches. `None` disables match-history writes.
     db: Option<Arc<Db>>,
     /// When true, rows written by this room are hidden from non-localhost match-history reads.
@@ -753,6 +763,7 @@ impl RoomTask {
             replay_speed: 1.0,
             dev_watch_paused: false,
             slow_tick_count: 0,
+            pending_client_command_acks: Vec::new(),
             db,
             match_history_local_only,
             match_started_at: None,
@@ -861,7 +872,11 @@ impl RoomTask {
                 player_id,
                 spectator,
             } => self.on_set_spectator(player_id, spectator),
-            RoomEvent::Command { player_id, cmd } => self.on_command(player_id, cmd),
+            RoomEvent::Command {
+                player_id,
+                client_seq,
+                cmd,
+            } => self.on_command(player_id, client_seq, cmd),
             RoomEvent::GiveUp { player_id } => self.on_give_up(player_id),
             RoomEvent::ReturnToLobby { player_id } => self.on_return_to_lobby(player_id),
             RoomEvent::SetReplaySpeed { player_id, speed } => {
@@ -1018,6 +1033,9 @@ impl RoomTask {
                 spectator,
                 msg_tx,
                 head_of_line_count: 0,
+                last_received_client_seq: 0,
+                last_sim_consumed_client_seq: 0,
+                last_sim_consumed_client_tick: None,
             },
         );
         self.reassign_host_if_needed();
@@ -1363,8 +1381,12 @@ impl RoomTask {
         PLAYER_PALETTE[idx].to_string()
     }
 
-    fn on_command(&mut self, player_id: u32, cmd: SimCommand) {
+    fn on_command(&mut self, player_id: u32, client_seq: u32, cmd: SimCommand) {
         if self.is_live_dev_watch() {
+            return;
+        }
+        if client_seq == 0 {
+            debug!(room = %self.room, player_id, "ignoring command with reserved clientSeq 0");
             return;
         }
         let live_seat_id = (self.live_connection_is_player(player_id)
@@ -1377,7 +1399,26 @@ impl RoomTask {
         // simulation itself validates ownership/affordability when it applies the command.
         if let Phase::InGame(game) = &mut self.phase {
             if let Some(seat_id) = live_seat_id {
+                let Some(player) = self.players.get_mut(&player_id) else {
+                    return;
+                };
+                if client_seq <= player.last_received_client_seq {
+                    debug!(
+                        room = %self.room,
+                        player_id,
+                        client_seq,
+                        last_received = player.last_received_client_seq,
+                        "ignoring stale or wrapped command sequence"
+                    );
+                    return;
+                }
+                player.last_received_client_seq = client_seq;
                 game.enqueue(seat_id, cmd);
+                self.pending_client_command_acks
+                    .push(PendingClientCommandAck {
+                        connection_id: player_id,
+                        client_seq,
+                    });
             }
         }
     }
@@ -1472,6 +1513,9 @@ impl RoomTask {
                 spectator: true,
                 msg_tx,
                 head_of_line_count: 0,
+                last_received_client_seq: 0,
+                last_sim_consumed_client_seq: 0,
+                last_sim_consumed_client_tick: None,
             },
         );
         let _ = ack.send(true);
@@ -1503,6 +1547,9 @@ impl RoomTask {
                 spectator: true,
                 msg_tx,
                 head_of_line_count: 0,
+                last_received_client_seq: 0,
+                last_sim_consumed_client_seq: 0,
+                last_sim_consumed_client_tick: None,
             },
         );
         let _ = ack.send(true);
@@ -1531,6 +1578,9 @@ impl RoomTask {
                 spectator: true,
                 msg_tx,
                 head_of_line_count: 0,
+                last_received_client_seq: 0,
+                last_sim_consumed_client_seq: 0,
+                last_sim_consumed_client_tick: None,
             },
         );
         let _ = ack.send(true);
@@ -1590,6 +1640,9 @@ impl RoomTask {
                 spectator: true,
                 msg_tx,
                 head_of_line_count: 0,
+                last_received_client_seq: 0,
+                last_sim_consumed_client_seq: 0,
+                last_sim_consumed_client_tick: None,
             },
         );
         self.reassign_host_if_needed();
@@ -2256,6 +2309,7 @@ impl RoomTask {
                 return;
             }
         };
+        self.record_consumed_client_sequences(game.tick_count());
         let full_vision_events = crate::perf::timed(perf.as_mut(), "event_union", || {
             union_events(per_player_events.values())
         });
@@ -3070,8 +3124,25 @@ impl RoomTask {
 
     fn reset_match_net_status(&mut self) {
         self.slow_tick_count = 0;
+        self.pending_client_command_acks.clear();
         for player in self.players.values_mut() {
             player.head_of_line_count = 0;
+            player.last_received_client_seq = 0;
+            player.last_sim_consumed_client_seq = 0;
+            player.last_sim_consumed_client_tick = None;
+        }
+    }
+
+    fn record_consumed_client_sequences(&mut self, tick: u32) {
+        let pending = std::mem::take(&mut self.pending_client_command_acks);
+        for ack in pending {
+            let Some(player) = self.players.get_mut(&ack.connection_id) else {
+                continue;
+            };
+            if ack.client_seq == player.last_sim_consumed_client_seq.saturating_add(1) {
+                player.last_sim_consumed_client_seq = ack.client_seq;
+                player.last_sim_consumed_client_tick = Some(tick);
+            }
         }
     }
 
@@ -3083,6 +3154,7 @@ impl RoomTask {
         slow_tick: bool,
     ) -> SnapshotNetStatus {
         let head_of_line = player.msg_tx.has_pending_snapshot();
+        let include_prediction_ack = !player.spectator;
         SnapshotNetStatus {
             server_lag_ms: saturating_duration_ms_u16(scheduler_lag),
             tick_ms: saturating_duration_ms_u16(tick_elapsed),
@@ -3092,6 +3164,21 @@ impl RoomTask {
             head_of_line_count: player
                 .head_of_line_count
                 .saturating_add(u32::from(head_of_line)),
+            prediction_version: if include_prediction_ack {
+                PREDICTION_PROTOCOL_VERSION
+            } else {
+                0
+            },
+            last_sim_consumed_client_seq: if include_prediction_ack {
+                player.last_sim_consumed_client_seq
+            } else {
+                0
+            },
+            last_sim_consumed_client_tick: if include_prediction_ack {
+                player.last_sim_consumed_client_tick
+            } else {
+                None
+            },
         }
     }
 }
@@ -3195,6 +3282,9 @@ mod tests {
                 spectator: false,
                 msg_tx,
                 head_of_line_count: 0,
+                last_received_client_seq: 0,
+                last_sim_consumed_client_seq: 0,
+                last_sim_consumed_client_tick: None,
             },
         );
         writer
@@ -3212,6 +3302,9 @@ mod tests {
                 spectator: true,
                 msg_tx,
                 head_of_line_count: 0,
+                last_received_client_seq: 0,
+                last_sim_consumed_client_seq: 0,
+                last_sim_consumed_client_tick: None,
             },
         );
         task.reassign_host_if_needed();
@@ -3654,6 +3747,7 @@ mod tests {
 
         task.on_command(
             players[0].id,
+            1,
             SimCommand::Stop {
                 units: vec![1, 2, 3],
             },
@@ -4069,12 +4163,14 @@ mod tests {
 
         task.on_command(
             100,
+            1,
             SimCommand::Stop {
                 units: vec![1, 2, 3],
             },
         );
         task.on_command(
             102,
+            1,
             SimCommand::Stop {
                 units: vec![4, 5, 6],
             },

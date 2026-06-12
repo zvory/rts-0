@@ -1471,12 +1471,13 @@ async fn handle_client_message(
             )
             .await;
         }
-        ClientMessage::Command { cmd } => {
+        ClientMessage::Command { client_seq, cmd } => {
             send_room_event(
                 player_id,
                 current_room,
                 RoomEvent::Command {
                     player_id,
+                    client_seq,
                     cmd: SimCommand::from_protocol(cmd),
                 },
             )

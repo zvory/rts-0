@@ -114,7 +114,11 @@ pub enum ClientMessage {
     /// Switch between player and spectator role while still in the lobby.
     SetSpectator { spectator: bool },
     /// Issue a gameplay command (ignored unless in-game).
-    Command { cmd: Command },
+    Command {
+        #[serde(rename = "clientSeq")]
+        client_seq: u32,
+        cmd: Command,
+    },
     /// Give up the current match, removing this player's army and showing the score screen.
     GiveUp,
     /// Leave replay playback and return the room to a clean lobby.
@@ -417,7 +421,9 @@ pub struct LobbyPlayer {
 ///
 /// [`Snapshot`] remains the semantic source of truth for game code. This format is only a
 /// transport-side optimization for `ServerMessage::Snapshot`.
-pub const COMPACT_SNAPSHOT_VERSION: u8 = 17;
+pub const PREDICTION_PROTOCOL_VERSION: u32 = 1;
+
+pub const COMPACT_SNAPSHOT_VERSION: u8 = 18;
 
 /// Serialize one semantic snapshot as a compact JSON text frame payload.
 pub fn serialize_compact_snapshot(snapshot: &Snapshot) -> serde_json::Result<String> {
@@ -587,14 +593,25 @@ impl Serialize for CompactNetStatus<'_> {
     {
         let status = self.0;
         let flags = u8::from(status.slow_tick) | (u8::from(status.head_of_line) << 1);
-        [
-            status.server_lag_ms as u32,
-            status.tick_ms as u32,
-            flags as u32,
-            status.slow_tick_count,
-            status.head_of_line_count,
-        ]
-        .serialize(serializer)
+        let mut len = 5;
+        if status.prediction_version != 0
+            || status.last_sim_consumed_client_seq != 0
+            || status.last_sim_consumed_client_tick.is_some()
+        {
+            len = 8;
+        }
+        let mut seq = serializer.serialize_seq(Some(len))?;
+        seq.serialize_element(&(status.server_lag_ms as u32))?;
+        seq.serialize_element(&(status.tick_ms as u32))?;
+        seq.serialize_element(&(flags as u32))?;
+        seq.serialize_element(&status.slow_tick_count)?;
+        seq.serialize_element(&status.head_of_line_count)?;
+        if len > 5 {
+            seq.serialize_element(&status.prediction_version)?;
+            seq.serialize_element(&status.last_sim_consumed_client_seq)?;
+            seq.serialize_element(&status.last_sim_consumed_client_tick)?;
+        }
+        seq.end()
     }
 }
 
@@ -1433,8 +1450,32 @@ mod tests {
                 slow_tick_count: 2,
                 head_of_line: true,
                 head_of_line_count: 3,
+                prediction_version: PREDICTION_PROTOCOL_VERSION,
+                last_sim_consumed_client_seq: 8,
+                last_sim_consumed_client_tick: Some(42),
             },
         }
+    }
+
+    #[test]
+    fn command_messages_require_client_sequence_envelope() {
+        let msg: ClientMessage = serde_json::from_str(
+            r#"{"t":"command","clientSeq":7,"cmd":{"c":"move","units":[1,2],"x":10.0,"y":20.0}}"#,
+        )
+        .expect("sequenced command should deserialize");
+
+        match msg {
+            ClientMessage::Command { client_seq, cmd } => {
+                assert_eq!(client_seq, 7);
+                assert!(matches!(cmd, Command::Move { units, .. } if units == vec![1, 2]));
+            }
+            other => panic!("unexpected message: {other:?}"),
+        }
+
+        let missing_seq = serde_json::from_str::<ClientMessage>(
+            r#"{"t":"command","cmd":{"c":"move","units":[1],"x":10.0,"y":20.0}}"#,
+        );
+        assert!(missing_seq.is_err());
     }
 
     #[test]
@@ -1491,7 +1532,10 @@ mod tests {
         );
         assert_eq!(value["u"], serde_json::json!([4]));
         assert_eq!(value["ev"].as_array().unwrap().len(), 7);
-        assert_eq!(value["n"], serde_json::json!([4, 17, 2, 2, 3]));
+        assert_eq!(
+            value["n"],
+            serde_json::json!([4, 17, 2, 2, 3, PREDICTION_PROTOCOL_VERSION, 8, 42])
+        );
         assert_eq!(
             value["ev"][0][3],
             serde_json::json!([1, 4, 12.0, 24.0, 0.5, 0.75, 3])

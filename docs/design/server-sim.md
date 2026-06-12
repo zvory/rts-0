@@ -126,12 +126,13 @@ impl Game {
 pub struct PlayerInit { pub id: u32, pub name: String, pub color: String, pub is_ai: bool }
 pub struct CommandLogEntry { pub tick: u32, pub player_id: u32, pub command: Command }
 ```
-`SimCommand` is the internal command enum from `game::command`; `ClientMessage::Command` and
-replay artifacts are translated into it at the boundary. `game::upgrade::UpgradeKind` is public
-because `SimCommand::Research` carries it and external AI controllers construct ordinary
-`SimCommand`s. `CommandLogEntry.command` remains the serde `Command` from `rts-protocol` so replay
-JSON stays wire-compatible. `StartPayload`, `Snapshot`, `Event`, and `PlayerScore` are also serde
-types from `rts-protocol`.
+`SimCommand` is the internal command enum from `game::command`; live `ClientMessage::Command`
+envelopes and replay artifacts are translated into it at the boundary. Live transport metadata
+such as `clientSeq` stays in the room/connection layer and is not part of the sim command or replay
+command-log contract. `game::upgrade::UpgradeKind` is public because `SimCommand::Research` carries
+it and external AI controllers construct ordinary `SimCommand`s. `CommandLogEntry.command` remains
+the serde `Command` from `rts-protocol` so replay JSON stays wire-compatible. `StartPayload`,
+`Snapshot`, `Event`, and `PlayerScore` are also serde types from `rts-protocol`.
 
 `PlayerInit.is_ai` marks a computer-controlled player. AI players are full players in every
 respect (they get a start position, City Centre, workers, economy, and count toward

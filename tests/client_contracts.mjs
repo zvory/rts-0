@@ -41,6 +41,7 @@ import {
 } from "../client/src/combat_audio.js";
 import {
   COMPACT_SNAPSHOT_VERSION,
+  PREDICTION_PROTOCOL_VERSION,
   ABILITY,
   ABILITY_CODE,
   EVENT,
@@ -1617,7 +1618,7 @@ function fakeAudioContext() {
     t: "snapshot",
     v: COMPACT_SNAPSHOT_VERSION,
     s: [42, 100, 25, 3, 10],
-    n: [0, 0, 0, 0, 0],
+    n: [0, 0, 0, 0, 0, PREDICTION_PROTOCOL_VERSION, 7, 42],
     e: [
       [
         1,
@@ -1709,6 +1710,9 @@ function fakeAudioContext() {
   assert(decoded.upgrades[0] === UPGRADE.METHAMPHETAMINES, "compact upgrades decode");
   assert(decoded.upgrades[1] === UPGRADE.ARTILLERY_UNLOCK, "compact artillery upgrade decodes");
   assert(decoded.tick === 42 && decoded.steel === 100 && decoded.supplyCap === 10, "compact scalars decode");
+  assert(decoded.netStatus.predictionVersion === PREDICTION_PROTOCOL_VERSION, "compact prediction version decodes");
+  assert(decoded.netStatus.lastSimConsumedClientSeq === 7, "compact consumed client sequence decodes");
+  assert(decoded.netStatus.lastSimConsumedClientTick === 42, "compact consumed client tick decodes");
   assert(decoded.entities.length === 3, "compact entities decode");
   assert(decoded.entities[0].kind === KIND.WORKER, "entity kind code decodes");
   assert(decoded.entities[0].state === STATE.GATHER, "entity state code decodes");
@@ -1823,6 +1827,11 @@ function fakeAudioContext() {
       buildCommand.tileY === 14 &&
       buildCommand.queued === true,
     "build command builder emits selected-worker wire shape",
+  );
+  assert(
+    JSON.stringify(msg.command(cmd.stop([7]), 3)) ===
+      JSON.stringify({ t: "command", clientSeq: 3, cmd: { c: "stop", units: [7] } }),
+    "command message builder wraps gameplay commands with clientSeq",
   );
   const pointFireCommand = cmd.pointFire([11, 12], 512, 640, true);
   assert(
@@ -1947,6 +1956,20 @@ function fakeAudioContext() {
   assertHasMethod(net, "claimBranchSeat", "Net");
   assertHasMethod(net, "releaseBranchSeat", "Net");
   assertHasMethod(net, "startBranch", "Net");
+  const sent = [];
+  net.ws = {
+    readyState: WebSocket.OPEN,
+    bufferedAmount: 0,
+    send(json) {
+      sent.push(JSON.parse(json));
+    },
+  };
+  net.command(cmd.stop([1]));
+  net.command(cmd.stop([2]));
+  assert(sent[0].clientSeq === 1 && sent[1].clientSeq === 2, "Net.command allocates increasing clientSeq values");
+  net._onMessage({ data: JSON.stringify({ t: "start", playerId: 1, spectator: false }) });
+  net.command(cmd.stop([3]));
+  assert(sent[2].clientSeq === 1, "Net.command resets clientSeq on match start");
   assert(!("replayOk" in msg.join("A", "main")), "join builder omits replayOk by default");
   assert(
     msg.join("A", "main", false, true).replayOk === true,

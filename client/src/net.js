@@ -31,6 +31,8 @@ export class Net {
     this.latencyUpdatedAt = 0;
     /** performance.now() stamp of the last ping(), used to compute latency. */
     this._lastPingSent = null;
+    /** Client-local gameplay command sequence. Reset when a match start payload arrives. */
+    this._nextClientSeq = 1;
   }
 
   /** Our server-assigned player id, or null before the welcome message. */
@@ -159,7 +161,7 @@ export class Net {
    * @param {object} cmd a command object built via protocol.js `cmd.*`.
    */
   command(cmd) {
-    this._send(msg.command(cmd));
+    this._send(msg.command(cmd, this._allocateClientSeq()));
   }
 
   /** Give up the active match and request the score screen. */
@@ -285,6 +287,13 @@ export class Net {
     return true;
   }
 
+  _allocateClientSeq() {
+    if (this._nextClientSeq > 0xffffffff) {
+      throw new Error("client command sequence exhausted for this match");
+    }
+    return this._nextClientSeq++;
+  }
+
   /**
    * Parse an incoming frame, apply built-in side effects (welcome/pong), then
    * dispatch to handlers registered for its tag.
@@ -307,6 +316,9 @@ export class Net {
     switch (m.t) {
       case S.WELCOME:
         if (typeof m.playerId === "number") this._playerId = m.playerId;
+        break;
+      case S.START:
+        this._nextClientSeq = 1;
         break;
       case S.PONG:
         // Prefer the echoed ts so concurrent pings stay correctly paired.
