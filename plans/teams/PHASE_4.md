@@ -11,9 +11,9 @@ Replace direct owner comparisons in client gameplay modules with `GameState` hel
 
 High-risk files:
 
-- `client/src/input.js`
+- `client/src/input/`
 - `client/src/hud.js`
-- `client/src/renderer.js`
+- `client/src/renderer/`
 - `client/src/minimap.js`
 - `client/src/main.js`
 
@@ -83,9 +83,9 @@ Score screen:
 
 - `docs/design/*.md`
 - `client/src/state.js`
-- `client/src/input.js`
+- `client/src/input/`
 - `client/src/hud.js`
-- `client/src/renderer.js`
+- `client/src/renderer/`
 - `client/src/minimap.js`
 - `client/src/main.js`
 - `client/styles.css`

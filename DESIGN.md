@@ -28,11 +28,13 @@ that point to the relevant design file and code.
 
 ## Global Invariants
 
-- **Wire protocol is mirrored.** `server/src/protocol.rs` and `client/src/protocol.js` must agree
-  on every tag, field name, and shape. Change both together and update
+- **Wire protocol is mirrored.** `server/crates/protocol/src/lib.rs`,
+  `server/src/protocol.rs`, and `client/src/protocol.js` must agree on every tag, field name, and
+  shape. Change them together and update
   [docs/design/protocol.md](docs/design/protocol.md).
-- **Balance is mirrored.** `server/src/config.rs` is authoritative; `client/src/config.js` mirrors
-  the UI/render/fog subset. Change both together and update
+- **Balance is mirrored.** `server/crates/rules/src/balance.rs` is authoritative;
+  `server/src/config.rs` is a compatibility shim, and `client/src/config.js` mirrors the
+  UI/render/fog subset. Change the authoritative Rust values and client mirror together and update
   [docs/design/balance.md](docs/design/balance.md).
 - **The `Game` API is the seam.** `lobby.rs`/`main.rs` touch the simulation only through the public
   API in `game/mod.rs`. Keep signatures stable; if one changes, update

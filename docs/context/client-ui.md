@@ -59,8 +59,8 @@ Use when changing rendering, input, HUD, lobby UI, or any module under `client/s
 - `client/src/` changes select `client-architecture`, `js-protocol-contracts`,
   `node-minimap-input-contracts`, and `client-smoke`.
 - Client transport/protocol changes also select `node-server-integration`.
-- `scripts/check-client-architecture.mjs`, `tests/select-suites.mjs`, and `plans/client-arch/*`
-  select `client-architecture`.
+- `scripts/check-client-architecture.mjs`, `tests/select-suites.mjs`, and
+  `plans/archive/client-arch/*` select `client-architecture`.
 - Verify selector rules with `node tests/select-suites.mjs --verify`.
 
 ## Cross-capsule triggers

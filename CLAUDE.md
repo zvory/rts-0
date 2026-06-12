@@ -122,10 +122,13 @@ There is **no JS build step** (plain ES modules + PixiJS from CDN). The client i
 
 ## Invariants — do not break these
 
-- **Wire protocol is mirrored.** `server/src/protocol.rs` ⇄ `client/src/protocol.js` must agree on
-  every tag, field name, and shape. Change both together (and `docs/design/protocol.md`).
-- **Balance is mirrored.** `server/src/config.rs` is authoritative; `client/src/config.js` mirrors
-  the UI/render/fog subset (costs, supply, sight, sizes). Change both together.
+- **Wire protocol is mirrored.** `server/crates/protocol/src/lib.rs` ⇄ `server/src/protocol.rs`
+  ⇄ `client/src/protocol.js` must agree on every tag, field name, and shape. Change them together
+  (and `docs/design/protocol.md`).
+- **Balance is mirrored.** `server/crates/rules/src/balance.rs` is authoritative;
+  `server/src/config.rs` is a compatibility shim; `client/src/config.js` mirrors the
+  UI/render/fog subset (costs, supply, sight, sizes). Change the authoritative Rust values and
+  client mirror together.
 - **The `Game` API is the seam.** `lobby.rs`/`main.rs` touch the simulation only through the public
   API in `game/mod.rs` (documented in `docs/design/server-sim.md`). Keep the signatures stable; if
   you must change one, update the doc and all callers.

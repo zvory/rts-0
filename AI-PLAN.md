@@ -18,7 +18,7 @@ AI rollout order, and AI-specific handoff tasks.
 
 ## Current State
 
-The live gameplay AI is currently a thin `AiController` adapter in `server/src/game/ai.rs`. It
+The live gameplay AI is currently a thin `AiController` adapter in `server/crates/ai/src/live.rs`. It
 uses the shared `ai_core` live observation, facts, action helpers, decision loop, and the default
 `rifle_flood_full_saturation` profile. It:
 
@@ -30,21 +30,21 @@ uses the shared `ai_core` live observation, facts, action helpers, decision loop
 - stages riflemen forward
 - launches escalating rifleman waves at public enemy start tiles
 
-Shared helper extraction has started in `server/src/game/ai_shared.rs`:
+Shared helper extraction has started in `server/crates/ai/src/ai_shared.rs`:
 
 - deterministic near-base build-site search
 - worker saturation target helpers for entity and snapshot views
 - local spend reservation
 - basic attack-wave readiness
 
-Shared AI core scaffolding has started in `server/src/game/ai_core/`:
+Shared AI core scaffolding has started in `server/crates/ai/src/ai_core/`:
 
 - deterministic live-state and self-play snapshot observations
 - reusable facts for worker/building/production/supply/combat-unit/public-base queries
 - main-base steel saturation centralized under the facts layer while `ai_shared` keeps
   compatibility entry points
 
-Self-play still has separate scripted RTS logic in `server/src/game/selfplay.rs`, including
+Self-play still has separate scripted RTS logic in `server/crates/ai/src/selfplay/`, including
 `BuildTechAttackScript`, `EconomyScript`, `WorkerRushScript`, and `MineOnlyScript`. Those scripts
 duplicate worker assignment, production, pending-build tracking, tech progression, and attack
 logic that should eventually live in the shared AI core.
@@ -99,14 +99,14 @@ derived facts.
 
 This is the intended direction. Adjust names only if the implementation reveals a better local fit.
 
-- `server/src/game/ai.rs`
+- `server/crates/ai/src/live.rs`
   - live AI adapter
   - `AiController` state and cadence
   - profile selection wiring for real AI players
-- `server/src/game/ai_shared.rs`
+- `server/crates/ai/src/ai_shared.rs`
   - temporary compatibility home for already-extracted helpers
   - should shrink over time as helpers move into the shared core
-- `server/src/game/ai_core/`
+- `server/crates/ai/src/ai_core/`
   - `mod.rs`
   - `observation.rs`
   - `facts.rs`
@@ -114,28 +114,27 @@ This is the intended direction. Adjust names only if the implementation reveals 
   - `decision.rs`
   - `profiles.rs`
   - optional `tactics.rs` only when needed
-- `server/src/game/selfplay.rs`
+- `server/crates/ai/src/selfplay/`
   - test orchestration
   - artifact writing
   - milestone assertions
   - adapter from self-play `PlayerView` to shared AI core
 
-Keep `ai.rs` as a file for the live adapter while the new core is introduced. Avoid creating an
-`ai/` directory unless `ai.rs` is deliberately moved, because Rust cannot use both module shapes
-for the same module name.
+Keep live AI, self-play, and the shared AI core inside `server/crates/ai` so the server shell
+continues to depend on AI through the crate boundary rather than owning AI modules directly.
 
 ## Phase Map
 
 | Phase | Detailed Plan | Status | Main Output |
 | --- | --- | --- | --- |
-| AI-0 | [Boundary and invariants](docs/ai/phase-00-boundary-and-invariants.md) | complete | One AI architecture contract and handoff rules |
-| AI-1 | [Shared world model](docs/ai/phase-01-shared-world-model.md) | in progress: observation/facts scaffolding exists | Deterministic AI observations and reusable facts |
-| AI-2 | [Action synthesis](docs/ai/phase-02-action-synthesis.md) | not started | Shared command builder with budget and reservation semantics |
-| AI-3 | [Decision loop and profiles](docs/ai/phase-03-decision-loop-and-profiles.md) | not started | `rifle_flood_fast`, `rifle_flood_full_saturation`, `tech_to_tanks` profiles |
-| AI-4 | [Live AI migration](docs/ai/phase-04-live-ai-migration.md) | complete | `AiController` delegates to the shared core |
-| AI-5 | [Self-play migration](docs/ai/phase-05-selfplay-migration.md) | not started | Self-play scripts replaced or reduced by shared profiles |
-| AI-6 | [Matchup tests](docs/ai/phase-06-matchup-tests.md) | complete | Personality-vs-personality coverage and replay checks |
-| AI-7 | [Future behavior expansion](docs/ai/phase-07-future-behavior-expansion.md) | future | Proxy, eco, standard, MG, AT, tank, and terrain-aware behavior |
+| AI-0 | Boundary and invariants | complete | One AI architecture contract and handoff rules |
+| AI-1 | Shared world model | in progress: observation/facts scaffolding exists | Deterministic AI observations and reusable facts |
+| AI-2 | Action synthesis | not started | Shared command builder with budget and reservation semantics |
+| AI-3 | Decision loop and profiles | not started | `rifle_flood_fast`, `rifle_flood_full_saturation`, `tech_to_tanks` profiles |
+| AI-4 | Live AI migration | complete | `AiController` delegates to the shared core |
+| AI-5 | Self-play migration | not started | Self-play scripts replaced or reduced by shared profiles |
+| AI-6 | Matchup tests | complete | Personality-vs-personality coverage and replay checks |
+| AI-7 | Future behavior expansion | future | Proxy, eco, standard, MG, AT, tank, and terrain-aware behavior |
 
 ## Dependency Gates
 

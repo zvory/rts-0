@@ -7,7 +7,7 @@ and select enemy players as enemies.
 
 ## Observation Model
 
-Update `server/src/game/ai_core/observation.rs`.
+Update `server/crates/ai/src/ai_core/observation.rs`.
 
 Add `team_id` to:
 
@@ -24,7 +24,7 @@ Update self-play snapshot observation similarly so tests and replay adapters rem
 
 ## Facts and Decisions
 
-Update `server/src/game/ai_core/facts.rs` and `decision.rs`.
+Update `server/crates/ai/src/ai_core/facts.rs` and `server/crates/ai/src/ai_core/decision/`.
 
 Required behavior:
 
@@ -45,7 +45,7 @@ Do not add:
 
 ## Live AI Adapter
 
-Update `server/src/game/ai.rs`.
+Update `server/crates/ai/src/live.rs`.
 
 The live adapter should continue to instantiate one `AiController` per AI player. It should not
 introduce a team controller.
@@ -60,12 +60,12 @@ same team relationships.
 ## Files to Touch
 
 - `docs/design/*.md`
-- `server/src/game/ai.rs`
-- `server/src/game/ai_core/observation.rs`
-- `server/src/game/ai_core/facts.rs`
-- `server/src/game/ai_core/decision.rs`
-- `server/src/game/selfplay.rs`
-- `server/src/game/replay.rs`
+- `server/crates/ai/src/live.rs`
+- `server/crates/ai/src/ai_core/observation.rs`
+- `server/crates/ai/src/ai_core/facts.rs`
+- `server/crates/ai/src/ai_core/decision/`
+- `server/crates/ai/src/selfplay/`
+- `server/crates/sim/src/game/replay.rs`
 - AI unit tests and self-play fixtures
 
 ## Tests

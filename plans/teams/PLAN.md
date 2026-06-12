@@ -76,8 +76,9 @@ advertise the shapes above.
 
 ## Non-Negotiable Invariants
 
-1. Protocol mirrors stay in sync: `server/src/protocol.rs`, `client/src/protocol.js`, and
-   `docs/design/protocol.md` must be changed together for every wire field.
+1. Protocol mirrors stay in sync: `server/crates/protocol/src/lib.rs`, `server/src/protocol.rs`,
+   `client/src/protocol.js`, and `docs/design/protocol.md` must be changed together for every
+   wire field.
 2. Player economies stay isolated. No team resource pool, no shared tech, no shared supply, no
    allied worker building, and no allied production commands.
 3. Allies are not enemies. Raw `attack` commands, auto-acquisition, overpenetration, target tracers,

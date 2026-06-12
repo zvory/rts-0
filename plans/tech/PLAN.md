@@ -106,7 +106,8 @@ unit modest.
 2. [Phase 2 - AT Gun and Tank Unlock Upgrades](phase-2-at-tank-unlocks.md)
 3. [Phase 3 - Gun Works AT Gun Production](phase-3-steelworks-at-gun.md)
 4. [Phase 4 - Mortar Team](phase-4-mortar-team.md)
-5. [Phase 5 - Stage Timing and Playtest Balance](phase-5-stage-timing.md)
+5. Phase 5 - Stage Timing and Playtest Balance (no standalone phase file; track tuning notes in
+   this plan or the active balance/playtest notes)
 6. [Phase 6 - Artillery](phase-6-capstones.md)
 7. [Phase 7 - Command Car](phase-7-command-car.md)
 

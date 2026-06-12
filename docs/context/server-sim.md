@@ -23,8 +23,7 @@ Use when changing tick logic, services, rules, AI, or the `Game` core.
 - `scripts/check-crate-boundaries.mjs` — enforces Cargo package dependency direction
 - `cargo run --manifest-path server/Cargo.toml -p rts-archcheck -- check-sim-architecture` —
   ratchets `rts-sim::game` internals against
-  `server/crates/archcheck/baselines/sim-architecture.json`; see
-  [plans/clean/phase-5-ci-hooks-agent-workflow.md](../../plans/clean/phase-5-ci-hooks-agent-workflow.md)
+  `server/crates/archcheck/baselines/sim-architecture.json`.
 
 ## Invariants
 - `Game::tick()` is **panic-free**: no `unwrap`/`expect`/unchecked indexing; stale ids = no-op;
