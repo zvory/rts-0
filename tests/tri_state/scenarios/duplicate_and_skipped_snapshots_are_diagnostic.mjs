@@ -24,6 +24,7 @@ export default scenario("duplicate_and_skipped_snapshots_are_diagnostic", {
       { command: "move", args: { dx: 64, dy: 0, queued: true } },
     ]),
     injectClientSnapshot("duplicate", { ackSeq: 0 }),
+    injectClientSnapshot("duplicate", { ackSeq: 0 }),
     injectClientSnapshot("skipped", { ackSeq: 1, tickDelta: 4 }),
     capture("diagnostic-snapshots"),
     assertClientPrediction({

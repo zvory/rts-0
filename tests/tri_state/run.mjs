@@ -42,6 +42,11 @@ const SCENARIO_GROUPS = Object.freeze({
     "prediction_disabled_authoritative_only",
     "spectator_replay_no_prediction",
   ],
+  "phase-5": [
+    "train_optimistic_queue_confirms_after_ack",
+    "train_optimism_rejection_clears_by_seq",
+    "rally_optimistic_marker_confirms_after_ack",
+  ],
 });
 
 async function main() {
@@ -395,6 +400,14 @@ async function executeStep(context, step) {
       if (!diff.ok) throw new Error(`client prediction assertion failed: ${JSON.stringify(diff)}`);
       break;
     }
+    case "assertClientOptimisticUi": {
+      requireClientLane(lanes, step.op);
+      const state = await lanes.client.optimisticCommandState();
+      const diff = compareOptimisticUiState(state, step);
+      artifacts.diff({ assertion: step.op, diff, state });
+      if (!diff.ok) throw new Error(`client optimistic UI assertion failed: ${JSON.stringify(diff)}`);
+      break;
+    }
     case "waitForClientPredictionReady": {
       requireClientLane(lanes, step.op);
       const debug = await lanes.client.waitForPredictionReady(step);
@@ -571,6 +584,9 @@ function comparePredictionSummary(controller, step) {
     ["receiptCount", "receiptCount"],
     ["rejectionCount", "rejectionCount"],
     ["timedOutCount", "timedOutCount"],
+    ["uiConfirmedCount", "uiConfirmedCount"],
+    ["uiExpiredCount", "uiExpiredCount"],
+    ["uiRejectedCount", "uiRejectedCount"],
   ]) {
     if (step[option] != null) add(field, controller[field] === step[option], controller[field], step[option]);
   }
@@ -582,8 +598,34 @@ function comparePredictionSummary(controller, step) {
     ["minReceiptCount", "receiptCount"],
     ["minRejectionCount", "rejectionCount"],
     ["minTimedOutCount", "timedOutCount"],
+    ["minUiConfirmedCount", "uiConfirmedCount"],
+    ["minUiExpiredCount", "uiExpiredCount"],
+    ["minUiRejectedCount", "uiRejectedCount"],
   ]) {
     if (step[option] != null) add(field, (controller[field] || 0) >= step[option], controller[field], `>=${step[option]}`);
+  }
+  return { ok: checks.every((check) => check.ok), checks };
+}
+
+function compareOptimisticUiState(state, step) {
+  const checks = [];
+  const add = (name, ok, actual, expected) => checks.push({ name, ok, actual, expected });
+  if (step.productionCount != null) {
+    add("productionCount", (state.production || []).length === step.productionCount, (state.production || []).length, step.productionCount);
+  }
+  if (step.rallyCount != null) {
+    add("rallyCount", (state.rally || []).length === step.rallyCount, (state.rally || []).length, step.rallyCount);
+  }
+  if (step.productionQueue != null) {
+    add(
+      "productionQueue",
+      (state.production || [])[0]?.optimisticQueue === step.productionQueue,
+      (state.production || [])[0]?.optimisticQueue,
+      step.productionQueue,
+    );
+  }
+  if (step.rallyPlanLength != null) {
+    add("rallyPlanLength", (state.rally || [])[0]?.plan?.length === step.rallyPlanLength, (state.rally || [])[0]?.plan?.length, step.rallyPlanLength);
   }
   return { ok: checks.every((check) => check.ok), checks };
 }

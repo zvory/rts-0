@@ -134,6 +134,10 @@ export function assertClientPrediction(options = {}) {
   return { op: "assertClientPrediction", ...options };
 }
 
+export function assertClientOptimisticUi(options = {}) {
+  return { op: "assertClientOptimisticUi", ...options };
+}
+
 export function waitForClientPredictionReady(options = {}) {
   return { op: "waitForClientPredictionReady", timeoutMs: 8000, ...options };
 }

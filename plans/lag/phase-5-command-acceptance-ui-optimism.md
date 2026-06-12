@@ -1,5 +1,9 @@
 # Phase 5 - Command Acceptance, Rejection, and UI Optimism
 
+Status: Implemented for production queue and rally-plan optimism. Build placement, research,
+setup/teardown, and ability targeting remain authoritative-only until their command-specific
+accept/reject scenarios exist.
+
 ## Objective
 
 Expand prediction from movement-only visuals into command acceptance feedback while keeping
@@ -75,6 +79,16 @@ the wrong state.
 At handoff, list which command families support optimistic feedback, which remain
 authoritative-only, and the user-visible rejection paths that were manually checked. Include any
 server validation cases that need new tri-state scenarios before prediction expands further.
+
+## Implementation Notes
+
+- `PredictionController` owns explicit per-command-family policies. `train` and `setRally` publish
+  reversible optimistic UI because owner-only snapshots can confirm them through `prodQueue` /
+  `prodKind` and `rallyPlan`.
+- Rejections tied to `clientSeq` clear the matching optimistic affordance immediately and are
+  counted separately from timeout expiry.
+- Phase 5 tri-state scenarios cover train confirmation, rally confirmation, and rejection-driven
+  optimism removal. The remaining command families are policy-marked as authoritative-only.
 
 ## Player-Facing Outcome
 

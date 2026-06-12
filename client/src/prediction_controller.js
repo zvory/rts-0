@@ -2,6 +2,24 @@ const U32_MAX = 0xffffffff;
 const DEFAULT_COMMAND_TIMEOUT_MS = 15000;
 const DEFAULT_UI_CONFIRMATION_SNAPSHOTS = 4;
 
+export const COMMAND_PREDICTION_POLICIES = Object.freeze({
+  train: Object.freeze({
+    family: "train",
+    uiOptimism: true,
+    confirmation: "ownerProductionSnapshot",
+  }),
+  setRally: Object.freeze({
+    family: "rally",
+    uiOptimism: true,
+    confirmation: "ownerRallyPlanSnapshot",
+  }),
+  build: Object.freeze({ family: "build", uiOptimism: false, confirmation: "authoritativeOnly" }),
+  research: Object.freeze({ family: "research", uiOptimism: false, confirmation: "authoritativeOnly" }),
+  useAbility: Object.freeze({ family: "ability", uiOptimism: false, confirmation: "authoritativeOnly" }),
+  setupAtGuns: Object.freeze({ family: "setup", uiOptimism: false, confirmation: "authoritativeOnly" }),
+  tearDownAtGuns: Object.freeze({ family: "teardown", uiOptimism: false, confirmation: "authoritativeOnly" }),
+});
+
 export const PREDICTION_STATE = Object.freeze({
   DISABLED: "disabled",
   TRACKING: "tracking",
@@ -57,6 +75,7 @@ export class PredictionController {
     this.snapCorrectionCount = 0;
     this.uiConfirmedCount = 0;
     this.uiExpiredCount = 0;
+    this.uiRejectedCount = 0;
   }
 
   reset({ enabled = this.enabled, preserveClientSeq = false } = {}) {
@@ -87,6 +106,7 @@ export class PredictionController {
     this.snapCorrectionCount = 0;
     this.uiConfirmedCount = 0;
     this.uiExpiredCount = 0;
+    this.uiRejectedCount = 0;
   }
 
   issueCommand(cmd, options = {}) {
@@ -217,7 +237,18 @@ export class PredictionController {
     }
     this.lastRejected = { clientSeq: seq, reason, rejectedAt };
     this.rejectionCount += 1;
+    this.dropOptimisticUiForSeq(seq, "rejected");
     return this.debugSummary();
+  }
+
+  dropOptimisticUiForSeq(clientSeq, reason = "dropped") {
+    const seq = finiteU32(clientSeq);
+    if (seq == null || this.optimisticUi.length === 0) return 0;
+    const before = this.optimisticUi.length;
+    this.optimisticUi = this.optimisticUi.filter((entry) => entry.clientSeq !== seq);
+    const dropped = before - this.optimisticUi.length;
+    if (dropped > 0 && reason === "rejected") this.uiRejectedCount += dropped;
+    return dropped;
   }
 
   enterPredicting() {
@@ -305,15 +336,19 @@ export class PredictionController {
       if (entry.family === "train") {
         production.push({
           clientSeq: entry.clientSeq,
+          family: entry.family,
           building: entry.building,
           unit: entry.unit,
           optimisticQueue: entry.optimisticQueue,
+          predicted: true,
         });
       } else if (entry.family === "rally") {
         rally.push({
           clientSeq: entry.clientSeq,
+          family: entry.family,
           building: entry.building,
-          plan: entry.expectedPlan.map((stage) => ({ ...stage })),
+          plan: entry.expectedPlan.map((stage) => ({ ...stage, predicted: true })),
+          predicted: true,
         });
       }
     }
@@ -346,6 +381,8 @@ export class PredictionController {
       optimisticUiClientSeqs: this.optimisticUi.map((entry) => entry.clientSeq),
       uiConfirmedCount: this.uiConfirmedCount,
       uiExpiredCount: this.uiExpiredCount,
+      uiRejectedCount: this.uiRejectedCount,
+      optimisticUiByFamily: optimisticUiByFamily(this.optimisticUi),
       correctionCount: this.correctionCount,
       maxCorrectionDistance: this.maxCorrectionDistance,
       snapCorrectionCount: this.snapCorrectionCount,
@@ -379,8 +416,10 @@ function entitiesById(entities) {
 
 function buildOptimisticUiCommand(cmd, clientSeq, issuedAt, tick, entities, optimisticUi, options) {
   if (!cmd || typeof cmd !== "object") return null;
-  if (cmd.c === "train") return optimisticTrain(cmd, clientSeq, issuedAt, tick, entities, optimisticUi, options);
-  if (cmd.c === "setRally") return optimisticRally(cmd, clientSeq, issuedAt, tick, entities);
+  const policy = COMMAND_PREDICTION_POLICIES[cmd.c];
+  if (!policy?.uiOptimism) return null;
+  if (policy.family === "train") return optimisticTrain(cmd, clientSeq, issuedAt, tick, entities, optimisticUi, options);
+  if (policy.family === "rally") return optimisticRally(cmd, clientSeq, issuedAt, tick, entities);
   return null;
 }
 
@@ -438,7 +477,8 @@ function optimisticUiConfirmed(entry, entities) {
   if (!entity) return false;
   if (entry.family === "train") {
     const queue = finiteU32(entity.prodQueue) ?? 0;
-    return queue >= entry.optimisticQueue;
+    if (queue < entry.optimisticQueue) return false;
+    return typeof entity.prodKind !== "string" || entity.prodKind === entry.unit;
   }
   if (entry.family === "rally") {
     return rallyPlansEqual(rallyPlanOf(entity), entry.expectedPlan);
@@ -477,6 +517,14 @@ function rallyPlansEqual(a, b) {
 function finiteNumber(value) {
   const n = Number(value);
   return Number.isFinite(n) ? n : null;
+}
+
+function optimisticUiByFamily(entries) {
+  const out = {};
+  for (const entry of entries || []) {
+    out[entry.family] = (out[entry.family] || 0) + 1;
+  }
+  return out;
 }
 
 function errorMessage(err) {
