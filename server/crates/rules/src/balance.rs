@@ -139,6 +139,9 @@ pub const ARTILLERY_BODY_CLEARANCE_PX: f32 = TANK_BODY_CLEARANCE_PX;
 pub const SCOUT_CAR_BODY_LENGTH_PX: f32 = 40.8;
 pub const SCOUT_CAR_BODY_WIDTH_PX: f32 = 21.6;
 pub const SCOUT_CAR_BODY_CLEARANCE_PX: f32 = 1.0;
+pub const COMMAND_CAR_BODY_LENGTH_PX: f32 = 34.8;
+pub const COMMAND_CAR_BODY_WIDTH_PX: f32 = 18.4;
+pub const COMMAND_CAR_BODY_CLEARANCE_PX: f32 = 1.0;
 
 // --- Stats ------------------------------------------------------------------
 
