@@ -146,7 +146,7 @@ authoritative `rules::defs` records.
   visible to the player occupying it.
   Cooldown duration (20s) exceeds cloud duration (5s), so each scout car has at most one active
   cloud at a time.
-- **Command Car Breakthrough!** (hotkey `D`): Command Cars have a self-targeted instant area speed
+- **Command Car Breakthrough!** (hotkey `E`): Command Cars have a self-targeted instant area speed
   boost. It affects owned units within 7 tiles of the Command Car, lasts 180 ticks (~6s), has a
   750-tick (~25s) per-caster cooldown, has no resource cost, can be queued, and can be cast while
   the Command Car is moving. Affected units move at 1.2x speed, or 1.4x speed while inside smoke or
@@ -197,7 +197,7 @@ Unit stats (hp, dmg, range[tiles], cooldown[ticks], speed[px/tick], sight[tiles]
 | artillery       | 150 | 150 AP inner / 150-10 outer AOE | 10-50 point fire | 90 | 0.922 | 5 | 300 | 100 | 5 | 750 (~25s); requires Gun Works (`steelworks` kind), AT Gun Crews (`at_gun_unlock`), and Unlock Artillery (`artillery_unlock`) researched in R&D Complex; tank-sized footprint |
 | scout_car       | 150 | 6   | 5     | 6  | 2.35  | 10    | 125 | 50  | 3   | 480 (~16s) |
 | tank            | 292 | 60  | 5     | 72 | 2.0   | 6     | 300 | 150 | 6   | 750 (~25s); requires Vehicle Works (`factory` kind) and Tank Production (`tank_unlock`) researched in R&D Complex |
-| command_car     | 225 | 0   | 0     | 0  | 2.35  | 10    | 150 | 75  | 4   | 450 (~15s); requires Vehicle Works (`factory` kind) and Command Car (`command_car_unlock`) researched in R&D Complex; no weapon; Scout Car-style movement/body |
+| command_car     | 225 | 0   | 0     | 0  | 2.35  | 10    | 150 | 75  | 4   | 450 (~15s); requires Vehicle Works (`factory` kind) and Command Car (`command_car_unlock`) researched in R&D Complex; no weapon; Scout Car-style movement with a smaller jeep-sized body |
 
 Building stats (hp, sight, cost, footprint tiles wxh, buildTicks, extra):
 

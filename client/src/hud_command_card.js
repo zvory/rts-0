@@ -268,6 +268,7 @@ export function buildUnitCard(ctx, selection) {
     if (!affordance.unlocked) continue;
     const definition = affordance.definition;
     const readyCount = affordance.readyIds.length;
+    const abilityReadyIds = intentReadyIds(definition, affordance);
     const showReadyCount = readyCount < affordance.carrierIds.length;
     const preferred = definition.hotkey ? GRID_HOTKEYS.indexOf(definition.hotkey) : -1;
     const slot = claimSlot(preferred);
@@ -281,7 +282,7 @@ export function buildUnitCard(ctx, selection) {
         type: "ability",
         ability: definition.ability,
         targetMode: definition.targetMode,
-        readyIds: affordance.readyIds,
+        readyIds: abilityReadyIds,
       },
       icon: definition.icon,
       label: definition.label,
@@ -487,11 +488,49 @@ export function selectedAbilityAffordances(ctx, selection) {
         setupBlockedCount,
         carrierIds: carriers.map((e) => e.id),
         readyIds: readyUnits.map((e) => e.id),
+        readyUnits,
         autocastEnabledIds,
         cooldownClocks: ctx.groupCooldownClocks(cooldowns, definition.cooldownTicks),
       };
     })
     .filter(Boolean);
+}
+
+function intentReadyIds(definition, affordance) {
+  if (definition.targetMode !== "self" || affordance.readyUnits.length <= 1) {
+    return affordance.readyIds;
+  }
+  const center = averagePosition(affordance.readyUnits);
+  let best = affordance.readyUnits[0];
+  let bestDist = distanceSqToCenter(best, center);
+  for (const unit of affordance.readyUnits.slice(1)) {
+    const dist = distanceSqToCenter(unit, center);
+    if (dist < bestDist || (dist === bestDist && unit.id < best.id)) {
+      best = unit;
+      bestDist = dist;
+    }
+  }
+  return [best.id];
+}
+
+function averagePosition(units) {
+  let x = 0;
+  let y = 0;
+  let count = 0;
+  for (const unit of units) {
+    if (!Number.isFinite(unit.x) || !Number.isFinite(unit.y)) continue;
+    x += unit.x;
+    y += unit.y;
+    count++;
+  }
+  return count > 0 ? { x: x / count, y: y / count } : null;
+}
+
+function distanceSqToCenter(unit, center) {
+  if (!center || !Number.isFinite(unit.x) || !Number.isFinite(unit.y)) return 0;
+  const dx = unit.x - center.x;
+  const dy = unit.y - center.y;
+  return dx * dx + dy * dy;
 }
 
 function isOwn(ctx, e) {

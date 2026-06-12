@@ -27,6 +27,7 @@ import {
   drawFreeRotatedRect,
   drawGunTire,
   drawImpassableEdge,
+  drawCommandCar,
   drawInfantryBase,
   drawInfantryMachineGun,
   drawInfantryRifle,
@@ -371,8 +372,8 @@ export function _drawUnit(e, colorByOwner, state, pools = {}) {
     // Replace with truck/wheeled movement semantics once that model exists.
     const body = vehicleBody;
     const motion = this._tankMotionVisual(e, facing, state, body);
-    drawScoutCar(g, body, tint, facing, weaponFacing, motion, recoil);
     if (e.kind === KIND.COMMAND_CAR) {
+      drawCommandCar(g, body, tint, facing, motion);
       g.beginFill(0xd8c267, 0.95);
       g.drawCircle(-body.halfLen * 0.1, -body.halfWidth * 0.32, 2.6);
       g.drawCircle(-body.halfLen * 0.1, body.halfWidth * 0.32, 2.6);
@@ -381,6 +382,8 @@ export function _drawUnit(e, colorByOwner, state, pools = {}) {
         g.lineStyle(2, 0xf2d16b, 0.82);
         g.drawCircle(0, 0, body.shadowRadius * 0.72);
       }
+    } else {
+      drawScoutCar(g, body, tint, facing, weaponFacing, motion, recoil);
     }
   } else if (e.kind === KIND.TANK) {
     // Hull follows movement facing; turret/barrel follow weapon facing.

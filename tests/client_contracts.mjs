@@ -2628,8 +2628,10 @@ function fakeAudioContext() {
       STATS[KIND.COMMAND_CAR].cost.oil === 75 &&
       STATS[KIND.COMMAND_CAR].supply === 4 &&
       STATS[KIND.COMMAND_CAR].sight === 10 &&
-      STATS[KIND.COMMAND_CAR].body.length === STATS[KIND.SCOUT_CAR].body.length,
-    "Command Car stats mirror the planned server values and Scout Car body",
+      STATS[KIND.COMMAND_CAR].size < STATS[KIND.SCOUT_CAR].size &&
+      STATS[KIND.COMMAND_CAR].body.length < STATS[KIND.SCOUT_CAR].body.length &&
+      STATS[KIND.COMMAND_CAR].body.width < STATS[KIND.SCOUT_CAR].body.width,
+    "Command Car stats mirror the planned server values and use a smaller body than Scout Car",
   );
   assert(
     ABILITIES[ABILITY.BREAKTHROUGH].carriers.includes(KIND.COMMAND_CAR) &&
@@ -2999,7 +3001,7 @@ function fakeAudioContext() {
     commandCarHud._cardSig = null;
     renderCommandCard(commandCarHud);
     const breakthroughButton = renderedButtons.find((button) => button.innerHTML.includes("Breakthrough"));
-    assert(breakthroughButton?.dataset.hotkey === "D", "Breakthrough should use the D command-card slot");
+    assert(breakthroughButton?.dataset.hotkey === "E", "Breakthrough should use the E command-card slot");
     breakthroughButton.click({ shiftKey: true });
     const breakthroughCommand = sent[sent.length - 1];
     assert(
@@ -3010,6 +3012,53 @@ function fakeAudioContext() {
         !("x" in breakthroughCommand) &&
         !("y" in breakthroughCommand),
       "Clicking Breakthrough should issue a queued self-target ability command without coordinates",
+    );
+
+    const leftCommandCar = {
+      ...selectedCommandCar,
+      id: 602,
+      x: 0,
+      y: 0,
+    };
+    const centralCommandCar = {
+      ...selectedCommandCar,
+      id: 603,
+      x: 9,
+      y: 0,
+    };
+    const rightCommandCar = {
+      ...selectedCommandCar,
+      id: 604,
+      x: 30,
+      y: 0,
+    };
+    const coolingDownCommandCar = {
+      ...selectedCommandCar,
+      id: 605,
+      x: 10,
+      y: 0,
+      abilities: [{
+        ability: ABILITY.BREAKTHROUGH,
+        cooldownLeft: 5,
+      }],
+    };
+    commandCarHud.state.selectedEntities = () => [
+      leftCommandCar,
+      centralCommandCar,
+      rightCommandCar,
+      coolingDownCommandCar,
+    ];
+    commandCarHud.state.entitiesInterpolated = commandCarHud.state.selectedEntities;
+    commandCarHud._cardSig = null;
+    renderedButtons.length = 0;
+    renderCommandCard(commandCarHud);
+    const multiBreakthroughButton = renderedButtons.find((button) => button.innerHTML.includes("Breakthrough"));
+    multiBreakthroughButton.click({});
+    const multiBreakthroughCommand = sent[sent.length - 1];
+    assert(
+      multiBreakthroughCommand.units.length === 1 &&
+        multiBreakthroughCommand.units[0] === centralCommandCar.id,
+      "Breakthrough should issue from the most central ready Command Car only",
     );
 
     globalThis.document.getElementById = (id) => {
@@ -4303,6 +4352,50 @@ function fakeAudioContext() {
     resources: { oil: 10 },
   });
   assert(fakePools.has("units:700"), "Artillery renderer draws without a null vehicle body");
+}
+
+{
+  const commandCarEntity = {
+    id: 701,
+    owner: 1,
+    kind: KIND.COMMAND_CAR,
+    x: 128,
+    y: 160,
+    facing: 0,
+    weaponFacing: 0,
+    state: STATE.IDLE,
+    breakthroughTicks: 0,
+  };
+  const fakePools = new Map();
+  const fakeRenderer = {
+    _tankMotion: new Map(),
+    _tankMotionVisual,
+    _slot(pool, id) {
+      const key = `${pool}:${id}`;
+      if (!fakePools.has(key)) fakePools.set(key, new RecordingGraphics());
+      return fakePools.get(key);
+    },
+    _tintFor() {
+      return 0x4878c8;
+    },
+    _vehicleShadow() {},
+    _shadow() {},
+    _deployedWeaponSetupVisual() {
+      return { prongFactor: 0, barrel: false };
+    },
+  };
+  _drawUnit.call(fakeRenderer, commandCarEntity, new Map([[1, 0x4878c8]]), {
+    playerId: 1,
+    resources: { oil: 10 },
+  });
+  const unitGraphics = fakePools.get("units:701");
+  const longLine = unitGraphics.calls.some((call, i, calls) => {
+    if (call[0] !== "moveTo" || calls[i + 1]?.[0] !== "lineTo") return false;
+    const dx = calls[i + 1][1] - call[1];
+    const dy = calls[i + 1][2] - call[2];
+    return Math.hypot(dx, dy) > STATS[KIND.COMMAND_CAR].body.length * 0.75;
+  });
+  assert(!longLine, "Command Car renderer should not draw the Scout Car rear machine-gun line");
 }
 
 // ---------------------------------------------------------------------------

@@ -366,6 +366,49 @@ export function drawScoutCar(g, body, tint, facing, weaponFacing, motion, recoil
   g.lineTo(nose.x, nose.y);
 }
 
+export function drawCommandCar(g, body, tint, facing, motion) {
+  const sideAlpha = lerp(0.58, 0.82, motion.activity);
+  const noseShoulderX = body.halfLen * 0.2;
+  const noseHalfWidth = body.halfWidth * 0.58;
+
+  g.beginFill(tint);
+  g.drawPolygon(rotatedPolygon([
+    -body.halfLen, -body.halfWidth * 0.82,
+    noseShoulderX, -body.halfWidth * 0.82,
+    body.halfLen, -noseHalfWidth,
+    body.halfLen, noseHalfWidth,
+    noseShoulderX, body.halfWidth * 0.82,
+    -body.halfLen, body.halfWidth * 0.82,
+  ], facing));
+  g.endFill();
+
+  g.beginFill(0x15120f, sideAlpha);
+  drawRotatedRect(g, -body.halfLen * 0.08, -body.halfWidth * 0.78, body.halfLen * 1.58, body.halfWidth * 0.18, facing);
+  drawRotatedRect(g, -body.halfLen * 0.08, body.halfWidth * 0.78, body.halfLen * 1.58, body.halfWidth * 0.18, facing);
+  g.endFill();
+
+  g.beginFill(lightenColor(tint, 0.1), 0.98);
+  drawRotatedRect(g, -body.halfLen * 0.25, 0, body.halfLen * 0.72, body.halfWidth * 1.18, facing);
+  g.endFill();
+
+  g.beginFill(0x211b14, 0.78);
+  drawRotatedRect(g, body.halfLen * 0.52, 0, body.halfLen * 0.24, body.halfWidth * 0.78, facing);
+  drawRotatedRect(g, -body.halfLen * 0.34, -body.halfWidth * 0.28, body.halfLen * 0.2, body.halfWidth * 0.26, facing);
+  drawRotatedRect(g, -body.halfLen * 0.34, body.halfWidth * 0.28, body.halfLen * 0.2, body.halfWidth * 0.26, facing);
+  g.endFill();
+
+  g.lineStyle(2, 0xd8d0b0, 0.62);
+  const windshieldA = rotatePoint(body.halfLen * 0.16, -body.halfWidth * 0.48, facing);
+  const windshieldB = rotatePoint(body.halfLen * 0.16, body.halfWidth * 0.48, facing);
+  g.moveTo(windshieldA.x, windshieldA.y);
+  g.lineTo(windshieldB.x, windshieldB.y);
+
+  const nose = polar(facing, body.halfLen - 1.5);
+  g.lineStyle(2, 0xd8d0b0, 0.74);
+  g.moveTo(nose.x - Math.cos(facing) * 3.5, nose.y - Math.sin(facing) * 3.5);
+  g.lineTo(nose.x, nose.y);
+}
+
 export function drawRotatedRectOutline(g, cx, cy, w, h, a) {
   const hw = w / 2;
   const hh = h / 2;

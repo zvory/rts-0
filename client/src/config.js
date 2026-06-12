@@ -61,6 +61,11 @@ export const SCOUT_CAR_BODY = Object.freeze({
   width: 21.6,
   clearance: 1.0,
 });
+export const COMMAND_CAR_BODY = Object.freeze({
+  length: 34.8,
+  width: 18.4,
+  clearance: 1.0,
+});
 
 // Workers can mine a resource only when a completed City Centre is within this many tiles.
 export const MINING_CC_RANGE_TILES = 7.0;
@@ -129,7 +134,7 @@ export const STATS = Object.freeze({
     rangeTiles: 5, cost: { steel: 300, oil: 150 }, supply: 6, buildTicks: 750,
     requires: KIND.FACTORY, upgradeRequires: UPGRADE.TANK_UNLOCK,
     upgradeRequiresText: "Requires research in R&D Complex" },
-  [KIND.COMMAND_CAR]: { label: "Command Car", icon: "CAR", size: 14.4, sight: 10, body: SCOUT_CAR_BODY,
+  [KIND.COMMAND_CAR]: { label: "Command Car", icon: "CAR", size: 12.6, sight: 10, body: COMMAND_CAR_BODY,
     rangeTiles: 0, cost: { steel: 150, oil: 75 }, supply: 4, buildTicks: TICK_HZ * 15,
     requires: KIND.FACTORY, upgradeRequires: UPGRADE.COMMAND_CAR_UNLOCK,
     upgradeRequiresText: "Requires research in R&D Complex" },
@@ -217,7 +222,7 @@ export const ABILITIES = Object.freeze({
     ability: ABILITY.BREAKTHROUGH,
     label: "Breakthrough!",
     icon: "BRK",
-    hotkey: "D",
+    hotkey: "E",
     title: "Speed up nearby owned units; stronger in smoke",
     carriers: Object.freeze([KIND.COMMAND_CAR]),
     targetMode: "self",
