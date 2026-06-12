@@ -47,6 +47,10 @@ const SCENARIO_GROUPS = Object.freeze({
     "train_optimism_rejection_clears_by_seq",
     "rally_optimistic_marker_confirms_after_ack",
   ],
+  "phase-6": [
+    "combat_command_authoritative_only",
+    "spectator_replay_no_prediction",
+  ],
 });
 
 async function main() {
@@ -292,6 +296,28 @@ async function executeStep(context, step) {
       const diff = { assertion: step.op, ok: reasons.includes(step.reason), expected: step.reason, reasons, summary };
       artifacts.diff(diff);
       if (!diff.ok) throw new Error(`local lane missing disabled reason ${step.reason}: ${JSON.stringify(diff)}`);
+      break;
+    }
+    case "assertLocalUnsupportedField": {
+      const summary = lanes.local.summary();
+      const fields = summary.unsupportedFields || [];
+      const diff = { assertion: step.op, ok: fields.includes(step.field), expected: step.field, fields };
+      artifacts.diff(diff);
+      if (!diff.ok) throw new Error(`local lane missing unsupported field ${step.field}: ${JSON.stringify(diff)}`);
+      break;
+    }
+    case "assertLocalRenderOwnedOnly": {
+      const frame = [...(lanes.local.frames || [])].reverse().find((entry) => entry.renderSnapshot);
+      const entities = frame?.renderSnapshot?.entities || [];
+      const playerId = lanes.local.playerId;
+      const diff = {
+        assertion: step.op,
+        ok: frame && playerId != null && entities.every((entity) => entity.owner === playerId),
+        playerId,
+        entities,
+      };
+      artifacts.diff(diff);
+      if (!diff.ok) throw new Error(`local render snapshot included non-owned entities: ${JSON.stringify(diff)}`);
       break;
     }
     case "assertLocalOwnedStable": {

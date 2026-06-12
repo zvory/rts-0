@@ -388,6 +388,8 @@ run_rust_suites_bg() {
       cargo run --manifest-path "$SERVER_DIR/Cargo.toml" -p rts-archcheck -- check-sim-architecture
     run_suite_bg "Architecture: client modules" \
       node "$REPO_ROOT/scripts/check-client-architecture.mjs"
+    run_suite_bg "Architecture: prediction guardrails" \
+      node "$REPO_ROOT/scripts/check-prediction-guardrails.mjs"
     run_suite_bg "Architecture: test selection policy" \
       node "$SCRIPT_DIR/select-suites.mjs" --verify
     run_suite_bg "Rust format (cargo fmt --check)" \
@@ -483,10 +485,13 @@ if [ "${SERVER_HEALTHY:-0}" = "1" ]; then
           node "$SCRIPT_DIR/tri_state/run.mjs" --scenario phase-3.5
         CHROME="$CHROME" run_suite "Tri-state scenarios: phase 4.5" \
           node "$SCRIPT_DIR/tri_state/run.mjs" --scenario phase-4.5
+        CHROME="$CHROME" run_suite "Tri-state scenarios: phase 6" \
+          node "$SCRIPT_DIR/tri_state/run.mjs" --scenario phase-6
       else
         info "skipping WASM-backed tri-state scenarios: generated sim-wasm assets missing"
         SKIPPED+=("Tri-state scenarios: phase 3.5 (missing sim-wasm assets)")
         SKIPPED+=("Tri-state scenarios: phase 4.5 (missing sim-wasm assets)")
+        SKIPPED+=("Tri-state scenarios: phase 6 (missing sim-wasm assets)")
       fi
     else
       FAILED+=("Client smoke dependency hydration")

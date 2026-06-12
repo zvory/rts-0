@@ -823,6 +823,62 @@ mod tests {
     }
 
     #[test]
+    fn render_snapshot_excludes_visible_obstacles_and_fog_state() {
+        let baseline = OwnedPredictionBaseline::from_snapshot(1, &snapshot());
+        let mut predictor = predictor_from_start_payload(start_payload(), 1);
+        predictor.import_baseline(baseline).unwrap();
+
+        let rendered = predictor.render_snapshot();
+        assert_eq!(rendered.entities.len(), 1);
+        assert_eq!(rendered.entities[0].owner, 1);
+        assert_eq!(rendered.entities[0].id, 101);
+        assert!(rendered.visible_tiles.is_empty());
+        assert!(rendered.events.is_empty());
+        assert!(rendered.smokes.is_empty());
+        assert!(rendered.remembered_buildings.is_empty());
+
+        let diagnostics = predictor.diagnostics();
+        assert!(diagnostics
+            .unsupported_fields
+            .contains(&"combat".to_string()));
+        assert!(diagnostics
+            .unsupported_fields
+            .contains(&"fogReconstruction".to_string()));
+        assert_eq!(diagnostics.visible_obstacle_count, 1);
+    }
+
+    #[test]
+    fn attack_command_is_authoritative_only() {
+        let baseline = OwnedPredictionBaseline::from_snapshot(1, &snapshot());
+        let mut predictor = predictor_from_start_payload(start_payload(), 1);
+        predictor.import_baseline(baseline).unwrap();
+        let before = predictor.render_snapshot();
+
+        predictor.enqueue_command(
+            7,
+            Command::Attack {
+                units: vec![101],
+                target: 202,
+                queued: false,
+            },
+        );
+
+        let after = predictor.render_snapshot();
+        assert_eq!(after.entities[0].x, before.entities[0].x);
+        assert_eq!(after.entities[0].y, before.entities[0].y);
+        assert_eq!(after.entities[0].hp, before.entities[0].hp);
+        assert_eq!(after.events.len(), 0);
+        let diagnostics = predictor.diagnostics();
+        assert_eq!(diagnostics.pending_client_seqs, vec![7]);
+        assert!(diagnostics
+            .disabled_reasons
+            .contains(&"commandUnsupported".to_string()));
+        assert!(diagnostics
+            .unsupported_fields
+            .contains(&"combat".to_string()));
+    }
+
+    #[test]
     fn no_op_ticks_are_deterministic() {
         let baseline = OwnedPredictionBaseline {
             tick: 1,

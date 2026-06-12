@@ -133,6 +133,58 @@ async function debugSoloStart(room) {
     c.ws.close();
   }
 
+  // 1c) Normal clients have no full-world prediction-baseline request path. A forged message is
+  //     malformed, does not produce a baseline payload, and leaves the socket in the match.
+  {
+    const room = "reg-baseline-request-" + Math.floor(performance.now());
+    const { c } = await soloStart(room);
+    const tickBefore = c.lastSnapshot.tick;
+    const startIndex = c.msgs.length;
+    c.send({ t: "predictionBaseline", fullWorld: true, includeHidden: true });
+    await c.waitFor((m) => m.t === "error" && /malformed/.test(m.msg || ""), 3000, "forged baseline rejection");
+    await c.waitFor((m) => m.t === "snapshot" && m.tick > tickBefore, 3000, "post-baseline-request snapshot");
+    const leaked = c.msgs.slice(startIndex).some((m) =>
+      m.t === "predictionBaseline" ||
+      m.t === "fullWorld" ||
+      m.fullWorld === true ||
+      m.includeHidden === true ||
+      Array.isArray(m.baseline?.entities)
+    );
+    ok(!leaked, "PREDICTION BASELINE: forged full-world request produced no baseline/full-world payload");
+    ok(c.lastSnapshot.tick > tickBefore, "PREDICTION BASELINE: socket stayed in the live match after forged request");
+    c.ws.close();
+  }
+
+  // 1d) Command metadata inside the command body is untrusted. It must not mark a command as
+  //     accepted or skip server validation.
+  {
+    const room = "reg-forged-command-meta-" + Math.floor(performance.now());
+    const { c, snap } = await soloStart(room);
+    const cityCentre = snap.entities.find((e) => e.owner === c.playerId && e.kind === "city_centre");
+    c.send({
+      t: "command",
+      clientSeq: 1,
+      accepted: true,
+      lastSimConsumedClientSeq: 1,
+      cmd: {
+        c: "train",
+        building: cityCentre.id + 1000000,
+        unit: "worker",
+        accepted: true,
+        lastSimConsumedClientSeq: 1,
+      },
+    });
+    const after = await c.waitFor(
+      (m) => m.t === "snapshot" && m.netStatus?.lastSimConsumedClientSeq >= 1,
+      3000,
+      "forged command metadata ack",
+    );
+    const ccAfter = after.entities.find((e) => e.id === cityCentre.id);
+    ok(!ccAfter?.prodKind && !ccAfter?.prodQueue,
+       "COMMAND META: forged accepted metadata did not bypass server command validation");
+    c.ws.close();
+  }
+
   // 2a) Heavily-duplicated units[] (under the frame cap) must not stall the room: the
   //     per-command dedupe collapses N copies of one id into a single pathfind.
   {

@@ -93,6 +93,14 @@ export function assertLocalDisabledReason(reason) {
   return { op: "assertLocalDisabledReason", reason };
 }
 
+export function assertLocalUnsupportedField(field) {
+  return { op: "assertLocalUnsupportedField", field };
+}
+
+export function assertLocalRenderOwnedOnly() {
+  return { op: "assertLocalRenderOwnedOnly" };
+}
+
 export function assertLocalOwnedStable(options = {}) {
   return { op: "assertLocalOwnedStable", ...options };
 }
