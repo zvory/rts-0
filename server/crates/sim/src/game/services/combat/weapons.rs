@@ -247,7 +247,6 @@ fn rotate_at_gun_toward_setup_facing(e: &mut Entity) {
     let target = match e.weapon_setup() {
         WeaponSetup::Packed => e.emplacement_facing(),
         WeaponSetup::SettingUp { .. } => e.emplacement_facing(),
-        WeaponSetup::TearingDownToRedeploy { .. } => e.pending_redeploy_facing(),
         _ => None,
     };
     let Some(target) = target.filter(|facing| facing.is_finite()) else {

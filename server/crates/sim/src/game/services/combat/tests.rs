@@ -1584,43 +1584,74 @@ fn deployed_at_team_clamps_to_field_edge_and_does_not_fire_outside_arc() {
 }
 
 #[test]
-fn at_team_redeploy_rotates_during_teardown_and_setup() {
-    let mut entities = EntityStore::new();
-    let at_id = entities
-        .spawn_unit(1, EntityKind::AtTeam, 100.0, 100.0)
-        .expect("at team should spawn");
-    let target = std::f32::consts::FRAC_PI_2;
-    if let Some(at) = entities.get_mut(at_id) {
-        at.set_emplacement_facing(Some(0.0));
-        at.set_pending_redeploy_facing(Some(target));
-        at.set_facing(0.0);
-        at.set_weapon_facing(0.0);
-        at.set_weapon_setup(WeaponSetup::TearingDownToRedeploy {
-            ticks: config::AT_TEAM_SETUP_TICKS,
-        });
-    }
+fn support_weapon_redeploy_rotates_after_teardown_completes() {
+    for (kind, setup_ticks, label) in [
+        (EntityKind::AtTeam, config::AT_TEAM_SETUP_TICKS, "AT gun"),
+        (
+            EntityKind::Artillery,
+            config::ARTILLERY_SETUP_TICKS,
+            "artillery",
+        ),
+    ] {
+        let mut entities = EntityStore::new();
+        let id = entities
+            .spawn_unit(1, kind, 100.0, 100.0)
+            .expect("support weapon should spawn");
+        let target = std::f32::consts::FRAC_PI_2;
+        if let Some(unit) = entities.get_mut(id) {
+            unit.set_emplacement_facing(Some(0.0));
+            unit.set_pending_redeploy_facing(Some(target));
+            unit.set_facing(0.0);
+            unit.set_weapon_facing(0.0);
+            unit.set_weapon_setup(WeaponSetup::TearingDownToRedeploy { ticks: setup_ticks });
+        }
 
-    run_combat_tick(&mut entities);
-
-    let facing_after_one_tick = entities.get(at_id).expect("at should exist").facing();
-    assert!(
-        facing_after_one_tick > 0.0
-            && facing_after_one_tick <= AT_GUN_TURN_RATE_RAD_PER_TICK + 0.001,
-        "AT gun should start rotating toward its redeploy facing immediately, got {:.4}",
-        facing_after_one_tick
-    );
-
-    for _ in 0..(config::AT_TEAM_SETUP_TICKS as usize * 2) {
         run_combat_tick(&mut entities);
-    }
 
-    let at = entities.get(at_id).expect("at should exist");
-    assert_eq!(at.weapon_setup(), WeaponSetup::Deployed);
-    assert!(
-        (at.facing() - target).abs() <= AT_GUN_TURN_RATE_RAD_PER_TICK + 0.001,
-        "AT gun should finish redeploy facing the requested direction, got {:.4}",
-        at.facing()
-    );
+        let unit = entities.get(id).expect("support weapon should exist");
+        assert_eq!(
+            unit.facing(),
+            0.0,
+            "{label} should not rotate before teardown completes"
+        );
+        assert!(matches!(
+            unit.weapon_setup(),
+            WeaponSetup::TearingDownToRedeploy { .. }
+        ));
+
+        for _ in 1..setup_ticks {
+            run_combat_tick(&mut entities);
+        }
+
+        let unit = entities.get(id).expect("support weapon should exist");
+        assert_eq!(unit.weapon_setup(), WeaponSetup::Packed);
+        assert!(
+            unit.facing().abs() <= 0.001,
+            "{label} should still face its original direction when teardown finishes, got {:.4}",
+            unit.facing()
+        );
+
+        run_combat_tick(&mut entities);
+
+        let unit = entities.get(id).expect("support weapon should exist");
+        assert!(
+            unit.facing() > 0.0 && unit.facing() <= AT_GUN_TURN_RATE_RAD_PER_TICK + 0.001,
+            "{label} should start rotating only after it is packed, got {:.4}",
+            unit.facing()
+        );
+
+        for _ in 0..(setup_ticks as usize * 2) {
+            run_combat_tick(&mut entities);
+        }
+
+        let unit = entities.get(id).expect("support weapon should exist");
+        assert_eq!(unit.weapon_setup(), WeaponSetup::Deployed);
+        assert!(
+            (unit.facing() - target).abs() <= AT_GUN_TURN_RATE_RAD_PER_TICK + 0.001,
+            "{label} should finish redeploy facing the requested direction, got {:.4}",
+            unit.facing()
+        );
+    }
 }
 
 #[test]
