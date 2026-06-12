@@ -14,7 +14,7 @@
 //! 3. In the `InGame` phase the room advances [`Game`] once per tick, fans out a fog-filtered
 //!    snapshot to each connected player, and detects game-over. When a real match resolves the
 //!    room sends `gameOver`, transitions connected humans into post-match replay playback, and
-//!    returns to `Lobby` only after a viewer requests `returnToLobby` for rematch setup.
+//!    returns to `Lobby` only after every replay viewer has left.
 
 use std::collections::{HashMap, HashSet};
 use std::fs;
@@ -123,7 +123,7 @@ pub enum RoomEvent {
     Command { player_id: u32, cmd: SimCommand },
     /// A connected player intentionally gave up the active match.
     GiveUp { player_id: u32 },
-    /// A replay viewer asked to return the room to the lobby for a rematch.
+    /// A replay viewer asked to leave playback and return their connection to the lobby screen.
     ReturnToLobby { player_id: u32 },
     /// Set replay/dev-watch playback speed multiplier; ignored outside replay/dev watch rooms.
     SetReplaySpeed { player_id: u32, speed: f32 },
