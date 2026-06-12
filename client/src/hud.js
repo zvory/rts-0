@@ -496,6 +496,8 @@ export class HUD {
 
   _descriptorButtonOptions(descriptor) {
     return {
+      commandId: descriptor.commandId,
+      slotIndex: descriptor.slotIndex,
       icon: descriptor.icon,
       label: descriptor.label,
       ability: descriptor.ability,
@@ -1412,6 +1414,8 @@ export class HUD {
   /**
    * Build a command-card button element.
    * @param {object} opts
+   * @param {string} [opts.commandId] stable command identity for hotkey/profile tooling.
+   * @param {number} [opts.slotIndex] rendered command-card grid slot.
    * @param {string} [opts.icon] glyph shown large.
    * @param {string} opts.label visible name.
    * @param {string} [opts.ability] ability id for dynamic cooldown-clock refreshes.
@@ -1443,6 +1447,8 @@ export class HUD {
       // Expose the hotkey so Input/keyboard handling and styles.css can find it.
       btn.dataset.hotkey = opts.hotkey;
     }
+    if (opts.commandId) btn.dataset.commandId = opts.commandId;
+    if (Number.isInteger(opts.slotIndex)) btn.dataset.slotIndex = String(opts.slotIndex);
     if (opts.ability) btn.dataset.ability = opts.ability;
     if (opts.repeatable) btn.dataset.repeatable = "true";
     if (typeof opts.onContextMenu === "function") {
