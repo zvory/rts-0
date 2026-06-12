@@ -6,6 +6,15 @@ commits; do not try to design, implement, test, tune, polish, and ship a unit in
 Each unit should get its own working checklist copied from this file. Keep unfinished items visible
 so reviewers can see what is complete, what is deferred, and what still needs a separate pass.
 
+## Mandatory Workflow Gate
+
+When starting any new unit, development begins with requirements, not implementation. Do not edit
+implementation code until Phase 0 and Phase 1 are complete, written down, and reviewed. The only
+allowed files before that gate are planning, checklist, and design documents.
+
+After Phase 0 and Phase 1 are complete, stop and hand off the brief/spec unless the user explicitly
+says to proceed with implementation code.
+
 ## Phase 0: Unit Brief
 
 Create a short unit brief before touching implementation code.
@@ -23,6 +32,8 @@ Exit criteria:
 
 - [ ] The brief is written down in the task, issue, design note, or commit body.
 - [ ] Known unknowns are explicit instead of implied.
+- [ ] No implementation files have been edited.
+- [ ] The next step is either user review or a clearly scoped implementation phase.
 
 ## Phase 1: Rules And Balance Specification
 
@@ -54,6 +65,8 @@ Exit criteria:
 
 - [ ] The unit's numbers and rules can be reviewed without reading implementation code.
 - [ ] Any unresolved tuning item is marked as deferred and assigned to a later pass.
+- [ ] No implementation files have been edited.
+- [ ] The next step is either user review or a clearly scoped implementation phase.
 
 ## Phase 2: Contract And Wire Design
 
