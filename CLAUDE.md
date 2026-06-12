@@ -75,6 +75,9 @@ the server simulates at 30 Hz and sends per-player, fog-filtered snapshots.
 
 - The default branch is `main`.
 - ordinary commits have a commit hook that silently runs all tests; merge commits bypass it.
+- Use the commit hook for full-suite coverage instead of running large local test sets yourself.
+  During development, run only targeted tests that match the files or contracts changed. For
+  docs-only changes, commit with `--no-verify`.
 - Commit messages should be detailed. Use a clear subject and include a body when the change has
   gameplay impact, contract changes, testing nuance, or non-obvious reasoning.
 - Work directly on `main` for simple single-agent changes. For parallel worktree changes, use one
@@ -97,7 +100,7 @@ cd server && cargo run            # add --release for the fast build
 cd server && cargo build && cargo clippy && cargo fmt
 cargo run --manifest-path server/Cargo.toml -p rts-archcheck -- check-sim-architecture
 
-# Tests — start the server first, then (from repo root):
+# Targeted tests — start the server first for live Node suites, then (from repo root):
 node tests/server_integration.mjs     # dep-free, full server pipeline
 node tests/regression.mjs             # dep-free, hardening/DoS/robustness guards
 node tests/ai_integration.mjs         # dep-free, AI opponent lobby flow (add/remove/start)
@@ -105,6 +108,11 @@ tests/run-all.sh --no-rust            # live Node suites + headless-Chrome smoke
 
 # Simulation behavior, including scripted self-play (no running server needed): cd server && cargo test
 ```
+
+Do not run broad test bundles by default. Pick the smallest relevant target for the changed area
+(for example a focused Rust test, one live Node suite for touched server/client behavior, or an
+architecture check for seam changes), then rely on the normal commit hook when full coverage is
+needed. Use `git commit --no-verify` for documentation-only changes.
 
 There is **no JS build step** (plain ES modules + PixiJS from CDN). The client is served from
 `../client` relative to the server crate, so `cargo run` from `server/` is the whole dev loop.
@@ -167,8 +175,9 @@ There is **no JS build step** (plain ES modules + PixiJS from CDN). The client i
 
 - Debug builds have overflow checks **on** (a bad `Build` coord can panic in `cargo run` but
   silently wrap in `--release`) — that's why placement math is `checked_*`. Keep it that way.
-- Tests need a **running** server on the test runner's private port; they are not `cargo test` (they're Node scripts that
-  drive the live server/client end to end). After any change, run all three and confirm green.
+- Live Node tests need a **running** server on the test runner's private port; they are not
+  `cargo test` (they're Node scripts that drive the live server/client end to end). Run only the
+  suite that matches the changed area unless the user explicitly asks for broader local coverage.
 - If a self-play test fails and the reason is not immediately obvious, do **not** sink time into
   speculative debugging first. Start a fresh server on its own port, then use
   the macOS `open` command to open a local self-play spectation replay so the user can inspect the
