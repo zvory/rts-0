@@ -81,7 +81,7 @@ const DEPLOY_DRAIN_TIMEOUT: Duration = Duration::from_secs(295);
 struct AppState {
     lobby: Lobby,
     version: String,
-    /// `index.html` with `?v=<COMMIT_HASH>` appended to all JS/CSS asset URLs, computed once at
+    /// `index.html` with `?v=<build id>` appended to all JS/CSS asset URLs, computed once at
     /// startup so cache-busting survives browser caches without a hard refresh.
     index_html: String,
     maps_dir: String,
@@ -116,7 +116,7 @@ async fn main() {
         info!("RTS_RECORD_MATCHES unset; match history writes enabled as localhost-only rows");
     }
 
-    let version = git_version();
+    let version = rts_server::build_info::build_id().to_string();
     let client_dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../client");
     let index_html = build_versioned_index(client_dir, &version);
     let maps_dir = concat!(env!("CARGO_MANIFEST_DIR"), "/assets/maps").to_string();
@@ -612,16 +612,6 @@ fn dev_scenario_index_html() -> String {
           </body>\
         </html>"
     )
-}
-
-/// Return the short git commit SHA that identifies this build.
-///
-/// The hash is resolved at **compile time** by `build.rs` and baked into the binary via
-/// `cargo:rustc-env=COMMIT_HASH`. This works both for local `cargo run` (where `.git` is
-/// available at build time) and for deployed Docker images (where `.git` is present in the
-/// builder layer or injected via a `COMMIT_HASH` build arg).
-fn git_version() -> String {
-    env!("COMMIT_HASH").to_string()
 }
 
 /// Read `index.html`, inject a versioned import map for all `/src/*.js` modules, and append

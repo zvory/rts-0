@@ -2,6 +2,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::env;
 use std::fs;
 use std::path::PathBuf;
+use std::process::Command;
+use std::sync::OnceLock;
 
 use serde::Serialize;
 
@@ -37,7 +39,41 @@ impl SelfPlayFailure {
 }
 
 pub fn server_build_sha() -> &'static str {
-    env!("COMMIT_HASH")
+    static BUILD_ID: OnceLock<String> = OnceLock::new();
+    BUILD_ID.get_or_init(resolve_build_id).as_str()
+}
+
+fn resolve_build_id() -> String {
+    if let Some(id) = env_build_id() {
+        return id;
+    }
+    git_output(env!("CARGO_MANIFEST_DIR"), &["rev-parse", "--short=12", "HEAD"])
+        .unwrap_or_else(|| "unknown".to_string())
+}
+
+fn env_build_id() -> Option<String> {
+    ["COMMIT_HASH", "RTS_BUILD_SHA", "RTS_BUILD_ID"]
+        .iter()
+        .filter_map(|key| env::var(key).ok())
+        .map(|value| value.trim().to_string())
+        .find(|value| !value.is_empty())
+}
+
+fn git_output(current_dir: &str, args: &[&str]) -> Option<String> {
+    let output = Command::new("git")
+        .current_dir(current_dir)
+        .args(args)
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let text = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    if text.is_empty() {
+        None
+    } else {
+        Some(text)
+    }
 }
 
 #[derive(Debug, Clone)]

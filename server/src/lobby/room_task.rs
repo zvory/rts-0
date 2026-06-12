@@ -56,7 +56,7 @@ fn match_countdown_duration() -> Duration {
 }
 
 fn server_build_sha() -> &'static str {
-    env!("COMMIT_HASH")
+    crate::build_info::build_id()
 }
 
 pub(super) fn is_automated_match_history_room(room: &str) -> bool {

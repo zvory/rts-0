@@ -219,8 +219,9 @@ does not move.
 ./deploy.sh beta 5a29d29
 ```
 
-The deployed commit is passed into the Docker build as `COMMIT_HASH`, so `/version` and client
-asset cache-busting reflect the selected revision.
+The deployed commit is written into the runtime image as `COMMIT_HASH`, so `/version` and client
+asset cache-busting reflect the selected revision without baking the SHA into Rust compile
+artifacts.
 
 ## Custom domains
 

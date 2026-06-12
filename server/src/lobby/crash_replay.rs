@@ -5,8 +5,12 @@ use super::*;
 /// are emitted to the log so an operator can copy them out of terminal output even if the
 /// disk write later disappears or the box is ephemeral.
 pub(super) fn dump_crash_replay(room: &str, game: &Game, reason: &str) {
-    let artifact =
-        ReplayArtifactV1::capture_from_game(game, env!("COMMIT_HASH"), None, game.scores());
+    let artifact = ReplayArtifactV1::capture_from_game(
+        game,
+        crate::build_info::build_id(),
+        None,
+        game.scores(),
+    );
     let json = match serde_json::to_string_pretty(&artifact) {
         Ok(s) => s,
         Err(e) => {
