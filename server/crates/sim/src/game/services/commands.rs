@@ -12,7 +12,7 @@ use crate::game::fog::Fog;
 use crate::game::map::Map;
 use crate::game::mortar::MortarShellStore;
 use crate::game::services::ability_orders::{
-    self, caster_can_attempt, launch_self_ability, launch_world_ability,
+    self, caster_can_accept_order, launch_self_ability, launch_world_ability,
     order_or_launch_world_ability, tech_requirement_met,
 };
 use crate::game::services::construction::resumable_site_for_build_intent;
@@ -494,28 +494,33 @@ fn planner_facts(
             facts.can_build = e.kind == EntityKind::Worker || build_notice_compat;
             facts.can_setup_at_gun = matches!(e.kind, EntityKind::AtTeam | EntityKind::Artillery);
             if let Some(ability) = ability {
-                if ability_orders::caster_can_attempt(entities, player, id, ability.kind)
+                if ability_orders::caster_can_accept_order(entities, player, id, ability.kind)
                     && ability.tech_ready
                 {
                     facts.abilities.push(planner::AbilityFacts {
                         ability: ability.id,
                         ready_at_issue: true,
                         can_execute_without_interrupt: ability.target.is_some_and(|(x, y)| {
-                            ability_orders::caster_in_range(
-                                ability.map,
-                                entities,
-                                id,
-                                ability.kind,
-                                x,
-                                y,
-                            ) && ability_orders::world_ability_current_facing_ready(
-                                entities,
-                                id,
-                                ability.kind,
-                                x,
-                                y,
-                            )
+                            world_ability_can_execute_without_interrupt(ability.kind)
+                                && ability_orders::caster_in_range(
+                                    ability.map,
+                                    entities,
+                                    id,
+                                    ability.kind,
+                                    x,
+                                    y,
+                                )
+                                && ability_orders::world_ability_current_facing_ready(
+                                    entities,
+                                    id,
+                                    ability.kind,
+                                    x,
+                                    y,
+                                )
                         }),
+                        can_interrupt_active_order: world_ability_may_interrupt_active_order(
+                            ability.kind,
+                        ),
                     });
                 }
             }
@@ -531,6 +536,14 @@ struct AbilityFactInput<'a> {
     tech_ready: bool,
     target: Option<(f32, f32)>,
     map: &'a Map,
+}
+
+fn world_ability_can_execute_without_interrupt(ability: AbilityKind) -> bool {
+    ability == AbilityKind::Smoke
+}
+
+fn world_ability_may_interrupt_active_order(ability: AbilityKind) -> bool {
+    ability == AbilityKind::MortarFire
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -974,7 +987,7 @@ fn use_ability(
         if let Some((x, y)) = target_point {
             let eligible: Vec<u32> = dedupe_cap_units(request.units.clone())
                 .into_iter()
-                .filter(|id| caster_can_attempt(entities, player, *id, ability))
+                .filter(|id| caster_can_accept_order(entities, player, *id, ability))
                 .collect();
             match choose_smoke_caster(map, entities, ability, &eligible, x, y) {
                 Some(caster) => vec![caster],
@@ -3160,6 +3173,58 @@ mod tests {
             scout_entity.queued_orders(),
             before_queue.as_slice(),
             "reactive in-range smoke should preserve queued future orders"
+        );
+    }
+
+    #[test]
+    fn mortar_fire_replaces_active_move_order() {
+        let map = flat_map(32);
+        let mut entities = EntityStore::new();
+        let mortar = entities
+            .spawn_unit(1, EntityKind::MortarTeam, 100.0, 100.0)
+            .expect("mortar should spawn");
+        {
+            let mortar_entity = entities.get_mut(mortar).expect("mortar should exist");
+            mortar_entity.set_weapon_setup(WeaponSetup::Deployed);
+            mortar_entity.set_order(Order::move_to(640.0, 100.0));
+            mortar_entity.set_path(vec![(160.0, 100.0), (640.0, 100.0)]);
+            mortar_entity.set_path_goal(Some((640.0, 100.0)));
+            mortar_entity.append_queued_order(OrderIntent::move_to(704.0, 100.0));
+        }
+
+        apply(
+            &map,
+            &mut entities,
+            vec![(
+                1,
+                SimCommand::UseAbility {
+                    ability: AbilityKind::MortarFire,
+                    units: vec![mortar],
+                    x: Some(180.0),
+                    y: Some(100.0),
+                    queued: false,
+                },
+            )],
+        );
+
+        let mortar_entity = entities.get(mortar).expect("mortar should remain alive");
+        assert!(
+            matches!(mortar_entity.order(), Order::Ability(order)
+                if order.intent.ability == AbilityKind::MortarFire),
+            "manual Mortar Fire should replace the active move with an ability order"
+        );
+        assert!(
+            mortar_entity.path_is_empty(),
+            "replacing movement should stop the current path"
+        );
+        assert_eq!(
+            mortar_entity.path_goal(),
+            None,
+            "in-range Mortar Fire should hold at the current position"
+        );
+        assert!(
+            mortar_entity.queued_orders().is_empty(),
+            "non-queued Mortar Fire should clear future queued orders"
         );
     }
 

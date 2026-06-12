@@ -304,7 +304,9 @@ Allocation rules:
   replacing the active order. This is the reactive smoke case: a moving scout car that already has
   the target in range may launch smoke and continue its previous move and queued plan. If a
   world-targeted ability cannot execute noninterruptingly, the immediate order may replace the
-  chosen idle caster's active order with an ability movement order.
+  chosen idle caster's active order with an ability movement order. Abilities may also explicitly
+  allow interrupting a moving caster; manual Mortar Fire uses that path so a non-queued fire order
+  stops the mortar's current movement and clears future queued intents.
 - AT-gun setup is a queueable facing intent for selected AT teams only. The stored point means
   "face toward this world point from wherever the gun is when the setup stage promotes"; mixed
   selections ignore non-AT units for setup but keep them for later compatible orders.
