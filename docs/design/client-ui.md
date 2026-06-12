@@ -110,6 +110,37 @@ buildSettingsTabs({ audio, hotkeyProfiles, game, debug })
 buildGiveUpAction({ visible, onOpen })
 ```
 
+`hotkey_profiles.js`
+```js
+export class HotkeyProfileService {
+  constructor({storage?, catalog?, profilesKey?, activeKey?})
+  allProfiles()
+  getActiveProfile()
+  profileById(id)
+  setActiveProfile(id)
+  createCustomFromPreset(presetId, metadata?)
+  saveCustomProfile(profile)
+  validateDraftProfile(profile)
+  runtimeDiagnostics(profile?)
+  importProfile(payload, {targetId?, activate?}?)
+  exportProfile(id?)
+  exportProfileJson(id?)
+  parseImportText(text, options?)
+  resolveCard(card, profile?)
+  resolveSlot(slot, profile?)
+}
+
+buildHotkeyCommandCatalog(cards)
+normalizeHotkey(value)
+```
+
+Exported hotkey JSON is intentionally client-local: `schemaVersion`, `profileId`, `mode`, `name`,
+`description`, `createdWithBuild`, `basePreset`, and `bindings`. Imports validate known command ids
+against the current command-card catalog, ignore unknown commands with warnings, reject invalid keys
+and same-context duplicates, and store accepted payloads as custom profiles. Untargeted imports
+rewrite ids/names to avoid local collisions; targeted imports replace the whole target profile
+payload instead of merging individual bindings.
+
 The long-lived `SettingsContainer` is constructed by `App` with `#settings-button` and the
 `#settings-menu` mount point. `App` mounts the lobby context; `Match`/`ReplayViewer` remount live,
 spectator, and replay contexts through dependency-injected collaborators. The stable rendered ids

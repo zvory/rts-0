@@ -1104,11 +1104,14 @@ input[type="text"]:focus {
 }
 .hotkey-actions {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 6px;
 }
 .hotkey-actions button {
   text-align: center;
+}
+.hotkey-actions input[hidden] {
+  display: none;
 }
 .audio-settings {
   display: flex;
