@@ -1,4 +1,4 @@
-import { ABILITY, KIND, ORDER_STAGE, SETUP, STATE, isBuilding, isUnit } from "./protocol.js";
+import { ABILITY, KIND, ORDER_STAGE, SETUP, STATE, UPGRADE, isBuilding, isUnit } from "./protocol.js";
 import {
   ABILITIES,
   STATS,
@@ -12,12 +12,126 @@ import {
 //   Z X C
 export const GRID_HOTKEYS = Object.freeze(["Q", "W", "E", "A", "S", "D", "Z", "X", "C"]);
 
+export function gridHotkeyForSlot(slotIndex) {
+  return GRID_HOTKEYS[slotIndex] || "";
+}
+
+function card(kind, signature, slots, extras = {}) {
+  return {
+    kind,
+    signature,
+    ...extras,
+    slots: slots.map((slot, slotIndex) => slot ? renderedDescriptor(slot, slotIndex) : null),
+  };
+}
+
+function renderedDescriptor(descriptor, slotIndex) {
+  const commandId = descriptor.commandId || descriptor.id;
+  return {
+    ...descriptor,
+    commandId,
+    slotIndex,
+    hotkey: gridHotkeyForSlot(slotIndex),
+  };
+}
+
+export function commandCardActivationCandidates(renderedCard, commandId) {
+  return (renderedCard?.slots || [])
+    .filter((slot) => slot?.commandId === commandId)
+    .map((slot) => ({
+      commandId: slot.commandId,
+      slotIndex: slot.slotIndex,
+      hotkey: slot.hotkey,
+      label: slot.label,
+      enabled: !!slot.enabled,
+    }));
+}
+
+export function duplicateCommandIdsForCard(renderedCard) {
+  const firstByCommandId = new Map();
+  const duplicates = [];
+  for (const slot of renderedCard?.slots || []) {
+    if (!slot?.commandId) continue;
+    const first = firstByCommandId.get(slot.commandId);
+    if (first) {
+      duplicates.push({
+        commandId: slot.commandId,
+        firstSlotIndex: first.slotIndex,
+        duplicateSlotIndex: slot.slotIndex,
+      });
+      continue;
+    }
+    firstByCommandId.set(slot.commandId, slot);
+  }
+  return duplicates;
+}
+
+export function buildCommandCardContextCatalog() {
+  const playerId = 1;
+  const baseEntities = [
+    { id: 1, owner: playerId, kind: KIND.CITY_CENTRE, buildProgress: null },
+    { id: 2, owner: playerId, kind: KIND.BARRACKS, buildProgress: null },
+    { id: 3, owner: playerId, kind: KIND.TRAINING_CENTRE, buildProgress: null },
+    { id: 4, owner: playerId, kind: KIND.RESEARCH_COMPLEX, buildProgress: null },
+    { id: 5, owner: playerId, kind: KIND.FACTORY, buildProgress: null },
+    { id: 6, owner: playerId, kind: KIND.STEELWORKS, buildProgress: null },
+  ];
+  const worker = { id: 10, owner: playerId, kind: KIND.WORKER };
+  const rifleman = {
+    id: 11,
+    owner: playerId,
+    kind: KIND.RIFLEMAN,
+    abilities: [{ ability: ABILITY.CHARGE, cooldownLeft: 0, remainingUses: null }],
+  };
+  const scoutCar = {
+    id: 12,
+    owner: playerId,
+    kind: KIND.SCOUT_CAR,
+    abilities: [{ ability: ABILITY.SMOKE, cooldownLeft: 0, remainingUses: 1 }],
+  };
+  const mortar = {
+    id: 13,
+    owner: playerId,
+    kind: KIND.MORTAR_TEAM,
+    abilities: [{ ability: ABILITY.MORTAR_FIRE, cooldownLeft: 0, remainingUses: null }],
+  };
+  const artillery = {
+    id: 14,
+    owner: playerId,
+    kind: KIND.ARTILLERY,
+    setupState: SETUP.DEPLOYED,
+    abilities: [{ ability: ABILITY.POINT_FIRE, cooldownLeft: 0, remainingUses: null }],
+  };
+  const allEntities = [...baseEntities, worker, rifleman, scoutCar, mortar, artillery];
+  const ctx = (selection, overrides = {}) => ({
+    playerId,
+    selection,
+    resources: { steel: 1000, oil: 1000 },
+    upgrades: [UPGRADE.METHAMPHETAMINES, UPGRADE.AT_GUN_UNLOCK, UPGRADE.ARTILLERY_UNLOCK, UPGRADE.TANK_UNLOCK],
+    groupCooldownClocks: () => [],
+    playerHasCompleteKind: (kind) => allEntities.some((e) =>
+      e.owner === playerId && e.kind === kind && e.buildProgress == null
+    ),
+    ...overrides,
+  });
+  return [
+    { id: "empty", card: buildCommandCardDescriptors(ctx([])) },
+    { id: "worker-main", card: buildCommandCardDescriptors(ctx([worker])) },
+    { id: "worker-build", card: buildCommandCardDescriptors(ctx([worker], { commandCardMode: "workerBuild" })) },
+    { id: "mixed-army-support", card: buildCommandCardDescriptors(ctx([rifleman, scoutCar, mortar, artillery])) },
+    { id: "city-centre-train", card: buildCommandCardDescriptors(ctx([baseEntities[0]])) },
+    { id: "factory-train", card: buildCommandCardDescriptors(ctx([baseEntities[4]])) },
+    { id: "gun-works-train", card: buildCommandCardDescriptors(ctx([baseEntities[5]])) },
+    { id: "research-complex", card: buildCommandCardDescriptors(ctx([baseEntities[3]], { upgrades: [] })) },
+  ];
+}
+
 export function buildCommandCardDescriptors(ctx) {
   if (ctx?.spectator) return { kind: "spectator", signature: "spectator", slots: [] };
 
   const selection = ctx?.selection || [];
   const primary = commandSubject(ctx, selection);
-  if (!primary) return { kind: "empty", signature: "empty", slots: new Array(9).fill(null) };
+  if (!primary) return card("empty", "empty", new Array(9).fill(null));
 
   if (ctx.commandCardMode === "workerBuild" && workerOnlySelection(ctx, selection)) {
     return buildWorkerBuildCard(ctx);
@@ -49,36 +163,33 @@ export function buildWorkerBuildCard(ctx) {
     sigParts.push(`${kind}:${availability}`);
     slots.push({
       id: `build:${kind}`,
+      commandId: `build.${kind}`,
       kind: "button",
       action: "build",
       intent: { type: "beginPlacement", building: kind },
       icon: st.icon,
       label: st.label,
-      hotkey: GRID_HOTKEYS[idx++],
       cost: st.cost,
       enabled: availability === "ready",
       unaffordable: availability === "unaffordable",
       title: buildDisabledReason(ctx, kind, resources),
       tooltipKind: kind,
     });
+    idx++;
   }
   while (slots.length < 8) slots.push(null);
   slots.push({
     id: "worker:return",
+    commandId: "worker.return",
     kind: "button",
     action: "returnWorker",
     intent: { type: "closeCommandCardMenu" },
     icon: "RTN",
     label: "Worker",
-    hotkey: GRID_HOTKEYS[8],
     enabled: true,
     title: "Return to worker commands",
   });
-  return {
-    kind: "workerBuild",
-    signature: `build|${sigParts.join(",")}`,
-    slots,
-  };
+  return card("workerBuild", `build|${sigParts.join(",")}`, slots);
 }
 
 export function buildUnitCard(ctx, selection) {
@@ -103,11 +214,7 @@ export function buildUnitCard(ctx, selection) {
     (workerSelected ? "worker-main" : "no-build");
 
   if (workerSelected) {
-    return {
-      kind: "unit",
-      signature,
-      abilityAffordances,
-      slots: [
+    return card("unit", signature, [
         moveDescriptor(ctx, unitIds, 0),
         null,
         null,
@@ -116,19 +223,18 @@ export function buildUnitCard(ctx, selection) {
         null,
         {
           id: "worker:build-menu",
+          commandId: "worker.buildMenu",
           kind: "button",
           action: "openWorkerBuildMenu",
           intent: { type: "openWorkerBuildMenu" },
           icon: "BLD",
           label: "Build",
           title: "Open worker build menu",
-          hotkey: GRID_HOTKEYS[6],
           enabled: unitIds.length > 0,
         },
         null,
         null,
-      ],
-    };
+      ], { abilityAffordances });
   }
 
   const slots = new Array(9).fill(null);
@@ -155,6 +261,7 @@ export function buildUnitCard(ctx, selection) {
     if (slot < 0) continue;
     slots[slot] = {
       id: `ability:${definition.ability}`,
+      commandId: `ability.${definition.ability}`,
       kind: "button",
       action: "ability",
       intent: {
@@ -167,7 +274,6 @@ export function buildUnitCard(ctx, selection) {
       label: definition.label,
       title: abilityDisabledReason(ctx, affordance),
       ability: definition.ability,
-      hotkey: GRID_HOTKEYS[slot],
       enabled: readyCount > 0 && affordance.affordable,
       unaffordable: readyCount > 0 && !affordance.affordable,
       countBadge: showReadyCount ? `${readyCount}` : "",
@@ -194,20 +300,20 @@ export function buildUnitCard(ctx, selection) {
     if (setupSlot >= 0) {
       slots[setupSlot] = {
         id: "unit:setup",
+        commandId: "unit.setupSupportWeapon",
         kind: "button",
         action: "setupAtGuns",
         intent: { type: "beginCommandTarget", target: "setupAtGuns" },
         icon: "SET",
         label: "Set Up",
         title: "Set up selected support weapons toward a target point",
-        hotkey: GRID_HOTKEYS[setupSlot],
         enabled: true,
         cls: ctx.commandTarget === "setupAtGuns" ? "active" : "",
       };
     }
   }
 
-  return { kind: "unit", signature, abilityAffordances, slots };
+  return card("unit", signature, slots, { abilityAffordances });
 }
 
 export function buildTrainCard(ctx, building) {
@@ -235,12 +341,12 @@ export function buildTrainCard(ctx, building) {
     const availability = trainAvailability(ctx, unit, resources);
     slots[slot] = {
       id: `train:${unit}`,
+      commandId: `train.${unit}`,
       kind: "button",
       action: "train",
       intent: { type: "train", unit },
       icon: st.icon,
       label: st.label,
-      hotkey: GRID_HOTKEYS[slot],
       cost: st.cost,
       enabled: availability === "ready",
       unaffordable: availability === "unaffordable",
@@ -259,12 +365,12 @@ export function buildTrainCard(ctx, building) {
     const availability = researchAvailability(ctx, upgrade, resources);
     slots[slot] = {
       id: `research:${upgrade}`,
+      commandId: `research.${upgrade}`,
       kind: "button",
       action: "research",
       intent: { type: "research", upgrade },
       icon: def.icon,
       label: def.label,
-      hotkey: GRID_HOTKEYS[slot],
       cost: def.cost,
       enabled: availability === "ready",
       unaffordable: availability === "unaffordable",
@@ -278,12 +384,12 @@ export function buildTrainCard(ctx, building) {
   if (producingBuildings.length > 0) {
     slots[cancelSlot] = {
       id: `cancel:${building.kind}`,
+      commandId: `production.cancel.${building.kind}`,
       kind: "button",
       action: "cancel",
       intent: { type: "cancelProduction", buildingKind: building.kind },
       icon: "CNCL",
       label: "Cancel",
-      hotkey: GRID_HOTKEYS[cancelSlot],
       enabled: true,
       cls: "cancel",
       title: "Cancel latest queued production",
@@ -291,19 +397,19 @@ export function buildTrainCard(ctx, building) {
     };
   }
 
-  return { kind: "train", signature, slots };
+  return card("train", signature, slots);
 }
 
 function moveDescriptor(ctx, unitIds, slot) {
   return {
     id: "unit:move",
+    commandId: "unit.move",
     kind: "button",
     action: "move",
     intent: { type: "beginCommandTarget", target: "move" },
     icon: "MV",
     label: "Move",
     title: "Move to a target point",
-    hotkey: GRID_HOTKEYS[slot],
     enabled: unitIds.length > 0,
     cls: ctx.commandTarget === "move" ? "active" : "",
   };
@@ -312,13 +418,13 @@ function moveDescriptor(ctx, unitIds, slot) {
 function attackDescriptor(ctx, unitIds, slot) {
   return {
     id: "unit:attack",
+    commandId: "unit.attack",
     kind: "button",
     action: "attack",
     intent: { type: "beginCommandTarget", target: "attack" },
     icon: "AT",
     label: "Attack",
     title: "Attack a target or attack-move to a point",
-    hotkey: GRID_HOTKEYS[slot],
     enabled: unitIds.length > 0,
     cls: ctx.commandTarget === "attack" ? "active" : "",
   };
@@ -327,13 +433,13 @@ function attackDescriptor(ctx, unitIds, slot) {
 function holdDescriptor(unitIds, slot) {
   return {
     id: "unit:hold",
+    commandId: "unit.stop",
     kind: "button",
     action: "stop",
     intent: { type: "stop", unitIds },
     icon: "ST",
     label: "Stop",
     title: "Stop selected units",
-    hotkey: GRID_HOTKEYS[slot],
     enabled: unitIds.length > 0,
   };
 }

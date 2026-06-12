@@ -29,7 +29,11 @@ import {
   groupCooldownClocks,
   playerHasCompletedKind,
 } from "../client/src/hud.js";
-import { buildCommandCardDescriptors } from "../client/src/hud_command_card.js";
+import {
+  buildCommandCardContextCatalog,
+  buildCommandCardDescriptors,
+  duplicateCommandIdsForCard,
+} from "../client/src/hud_command_card.js";
 import { Audio, noticeSoundId } from "../client/src/audio.js";
 import {
   attackKindHasCombatSound,
@@ -269,6 +273,8 @@ function fakeHudRootWithoutResourceSpans() {
   assert(buildCard.kind === "workerBuild", "worker build menu should use build descriptor card");
   assert(buildCard.slots.length === 9, "worker build card keeps a 3x3 grid");
   assert(buildCard.slots[0].intent.type === "beginPlacement", "worker build button should start placement");
+  assert(buildCard.slots[0].commandId === `build.${KIND.CITY_CENTRE}`, "worker build button should expose stable command identity");
+  assert(buildCard.slots[0].slotIndex === 0, "worker build button should expose rendered slot index");
   assert(buildCard.slots[0].label === "City Centre", "worker build first slot should stay City Centre");
   assert(buildCard.slots[0].hotkey === "Q", "worker build hotkey Q should be preserved");
   assert(buildCard.slots[0].unaffordable, "unaffordable build buttons stay clickable for feedback");
@@ -276,6 +282,7 @@ function fakeHudRootWithoutResourceSpans() {
   assert(!buildCard.slots[3].enabled, "locked build buttons should be disabled");
   assert(buildCard.slots[3].title === "Requires Barracks", "locked build tooltip should explain requirement");
   assert(buildCard.slots[8].intent.type === "closeCommandCardMenu", "worker return button should close submenu");
+  assert(buildCard.slots[8].commandId === "worker.return", "worker return should expose stable command identity");
 
   const barracks = { id: 20, owner: 1, kind: KIND.BARRACKS, buildProgress: null };
   const producingBarracks = {
@@ -293,11 +300,14 @@ function fakeHudRootWithoutResourceSpans() {
   }));
   assert(trainCard.kind === "train", "production building should use train descriptor card");
   assert(trainCard.slots[0].label === "Rifleman", "Barracks first train slot should be Rifleman");
+  assert(trainCard.slots[0].commandId === `train.${KIND.RIFLEMAN}`, "train button should expose stable train identity");
+  assert(trainCard.slots[0].slotIndex === 0, "train button should expose rendered slot index");
   assert(trainCard.slots[0].repeatable, "train hotkeys should remain repeatable");
   assert(trainCard.slots[0].intent.type === "train", "train button should carry train intent");
   assert(trainCard.slots[8].label === "Cancel", "production cancel should stay in C slot");
   assert(trainCard.slots[8].hotkey === "C", "cancel hotkey should stay C");
   assert(trainCard.slots[8].repeatable, "cancel hotkey should remain repeatable");
+  assert(trainCard.slots[8].commandId === `production.cancel.${KIND.BARRACKS}`, "cancel button should expose stable production cancel identity");
   assert(trainCard.slots[1].label === "Machine Gunner", "Barracks second train slot should be Machine Gunner");
   assert(!trainCard.slots[1].enabled, "requirement-gated train button should be disabled");
   assert(trainCard.slots[1].title === "Requires Training Centre", "train locked tooltip should name requirement");
@@ -314,6 +324,8 @@ function fakeHudRootWithoutResourceSpans() {
   }));
   const smoke = buttonByAction(abilityCard, "ability");
   assert(smoke.label === "Smoke", "ability button should expose ability label");
+  assert(smoke.commandId === `ability.${ABILITY.SMOKE}`, "ability button should expose stable ability identity");
+  assert(smoke.slotIndex === 5, "ability button should expose rendered slot index");
   assert(smoke.hotkey === "D", "ability preferred hotkey should be preserved");
   assert(smoke.intent.targetMode === "worldPoint", "world-point ability should carry targeting intent");
   assert(smoke.cls.includes("active"), "active ability targeting should keep active class");
@@ -396,15 +408,22 @@ function fakeHudRootWithoutResourceSpans() {
   const atUnlock = buttonByLabel(researchCard, "AT Gun Crews");
   const artilleryUnlock = buttonByLabel(researchCard, "Unlock Artillery");
   assert(atUnlock && atUnlock.enabled, "available affordable upgrade should be enabled");
+  assert(atUnlock.commandId === `research.${UPGRADE.AT_GUN_UNLOCK}`, "research button should expose stable research identity");
   assert(atUnlock.intent.type === "research", "upgrade button should carry research intent");
   assert(artilleryUnlock && !artilleryUnlock.enabled, "Artillery research should show disabled before AT Gun research");
   assert(artilleryUnlock.title === "Requires AT Gun Research", "Artillery research should name missing AT prerequisite");
+
+  const catalog = buildCommandCardContextCatalog();
+  assert(catalog.some((entry) => entry.id === "worker-build"), "command-card context catalog includes worker build context");
+  assert(catalog.every((entry) => duplicateCommandIdsForCard(entry.card).length === 0), "catalog contexts have unique command identities");
 
   withFakeDocument(() => {
     let clicked = false;
     const button = HUD.prototype._cmdButton({
       icon: "RF",
       label: "Rifleman",
+      commandId: "train.rifleman",
+      slotIndex: 0,
       hotkey: "Q",
       cost: { steel: 50, oil: 0 },
       enabled: true,
@@ -414,6 +433,8 @@ function fakeHudRootWithoutResourceSpans() {
     });
     assert(button.type === "button", "command button type should remain button");
     assert(button.className === "cmd-btn", "enabled command button class should remain cmd-btn");
+    assert(button.dataset.commandId === "train.rifleman", "command button should expose command identity dataset");
+    assert(button.dataset.slotIndex === "0", "command button should expose rendered slot dataset");
     assert(button.dataset.hotkey === "Q", "command button should expose hotkey dataset");
     assert(button.dataset.repeatable === "true", "repeatable command button should expose repeatable dataset");
     assert(!button.disabled, "enabled command button should not be disabled");

@@ -1,6 +1,6 @@
 # Phase 0 - Command Identity and Context Contract
 
-Status: Not Started
+Status: Complete
 
 ## Goal
 
@@ -66,3 +66,21 @@ and rendered contexts independently from DOM buttons.
 The handoff should list the stable command identities introduced, describe the context catalog API,
 and call out any legacy HUD render methods or tests that were retired or kept. It should tell the
 next agent whether Phase 1 can treat the descriptor contract as stable for profile validation.
+
+## Handoff
+
+- Stable command identities now live on rendered descriptors as `commandId`: `unit.move`,
+  `unit.attack`, `unit.stop`, `worker.buildMenu`, `worker.return`, `build.<kind>`,
+  `train.<kind>`, `research.<upgrade>`, `ability.<ability>`, `unit.setupSupportWeapon`, and
+  `production.cancel.<buildingKind>`.
+- Rendered descriptors expose `slotIndex` and resolve the visible Grid label from that slot through
+  `gridHotkeyForSlot()`. Descriptor construction no longer hard-codes per-button hotkey labels.
+- `buildCommandCardContextCatalog()` enumerates representative rendered cards for empty, worker,
+  worker-build, mixed support/ability, production, and research contexts. `duplicateCommandIdsForCard()`
+  and `commandCardActivationCandidates()` provide validation inputs for future profile checks.
+- Runtime activation still uses DOM buttons by `data-hotkey` and therefore preserves current Grid
+  behavior. Buttons rendered through the descriptor path now also expose `data-command-id` and
+  `data-slot-index`; activation diagnostics return those values when present.
+- Legacy private HUD render helpers remain supported because existing tests still exercise them.
+  They are not the new command identity contract surface; Phase 1 should build profile validation
+  against `hud_command_card.js` descriptors and the catalog API.

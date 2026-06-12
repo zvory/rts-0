@@ -331,6 +331,9 @@ export function _activateCommandHotkey(ev) {
     }
     return {
       handled: true,
+      commandId: btn.dataset.commandId || null,
+      hotkey: btn.dataset.hotkey || null,
+      slotIndex: btn.dataset.slotIndex != null ? Number(btn.dataset.slotIndex) : null,
       armed: this.state?.lastCommandTargetArm || null,
     };
   }

@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 
-import { buildCommandCardDescriptors } from "../client/src/hud_command_card.js";
-import { KIND, UPGRADE } from "../client/src/protocol.js";
+import {
+  buildCommandCardContextCatalog,
+  buildCommandCardDescriptors,
+  commandCardActivationCandidates,
+  duplicateCommandIdsForCard,
+} from "../client/src/hud_command_card.js";
+import { ABILITY, KIND, UPGRADE } from "../client/src/protocol.js";
 
 const researchComplex = {
   id: 10,
@@ -24,11 +29,28 @@ function slotIds(card) {
   return card.slots.map((slot) => slot?.id || null);
 }
 
+function slotCommandIds(card) {
+  return card.slots.map((slot) => slot?.commandId || null);
+}
+
+function buttonSlots(card) {
+  return card.slots.filter(Boolean).map((slot) => ({
+    commandId: slot.commandId,
+    slotIndex: slot.slotIndex,
+    hotkey: slot.hotkey,
+  }));
+}
+
 {
   const ids = slotIds(rAndDCard());
   assert.equal(ids[0], `research:${UPGRADE.AT_GUN_UNLOCK}`);
   assert.equal(ids[1], `research:${UPGRADE.ARTILLERY_UNLOCK}`);
   assert.equal(ids[2], `research:${UPGRADE.TANK_UNLOCK}`);
+  assert.deepEqual(slotCommandIds(rAndDCard()).slice(0, 3), [
+    `research.${UPGRADE.AT_GUN_UNLOCK}`,
+    `research.${UPGRADE.ARTILLERY_UNLOCK}`,
+    `research.${UPGRADE.TANK_UNLOCK}`,
+  ]);
 }
 
 {
@@ -43,4 +65,90 @@ function slotIds(card) {
   assert.equal(ids[0], null);
   assert.equal(ids[1], null);
   assert.equal(ids[2], `research:${UPGRADE.TANK_UNLOCK}`);
+}
+
+{
+  const worker = { id: 20, owner: 1, kind: KIND.WORKER };
+  const workerCard = buildCommandCardDescriptors({
+    playerId: 1,
+    selection: [worker],
+    resources: { steel: 1000, oil: 1000 },
+    upgrades: [],
+    playerHasCompleteKind: () => true,
+    groupCooldownClocks: () => [],
+  });
+  assert.deepEqual(buttonSlots(workerCard), [
+    { commandId: "unit.move", slotIndex: 0, hotkey: "Q" },
+    { commandId: "unit.attack", slotIndex: 3, hotkey: "A" },
+    { commandId: "unit.stop", slotIndex: 4, hotkey: "S" },
+    { commandId: "worker.buildMenu", slotIndex: 6, hotkey: "Z" },
+  ]);
+
+  const buildCard = buildCommandCardDescriptors({
+    playerId: 1,
+    selection: [worker],
+    commandCardMode: "workerBuild",
+    resources: { steel: 1000, oil: 1000 },
+    upgrades: [],
+    playerHasCompleteKind: () => true,
+    groupCooldownClocks: () => [],
+  });
+  assert.equal(buildCard.slots[0].commandId, `build.${KIND.CITY_CENTRE}`);
+  assert.equal(buildCard.slots[0].slotIndex, 0);
+  assert.equal(buildCard.slots[0].hotkey, "Q");
+  assert.equal(buildCard.slots[8].commandId, "worker.return");
+  assert.equal(buildCard.slots[8].hotkey, "C");
+}
+
+{
+  const scoutCar = {
+    id: 30,
+    owner: 1,
+    kind: KIND.SCOUT_CAR,
+    abilities: [{ ability: ABILITY.SMOKE, cooldownLeft: 0, remainingUses: 1 }],
+  };
+  const abilityCard = buildCommandCardDescriptors({
+    playerId: 1,
+    selection: [scoutCar],
+    resources: { steel: 1000, oil: 1000 },
+    upgrades: [],
+    playerHasCompleteKind: () => true,
+    groupCooldownClocks: () => [],
+  });
+  const smoke = abilityCard.slots.find((slot) => slot?.commandId === `ability.${ABILITY.SMOKE}`);
+  assert.equal(smoke.slotIndex, 5);
+  assert.equal(smoke.hotkey, "D");
+  assert.deepEqual(commandCardActivationCandidates(abilityCard, `ability.${ABILITY.SMOKE}`), [{
+    commandId: `ability.${ABILITY.SMOKE}`,
+    slotIndex: 5,
+    hotkey: "D",
+    label: "Smoke",
+    enabled: true,
+  }]);
+}
+
+{
+  const catalog = buildCommandCardContextCatalog();
+  assert(catalog.length >= 8, "catalog should include representative command-card contexts");
+  assert(catalog.some((entry) => entry.id === "mixed-army-support"), "catalog includes mixed support/ability context");
+  for (const entry of catalog) {
+    assert.equal(duplicateCommandIdsForCard(entry.card).length, 0, `${entry.id} has duplicate command ids`);
+    for (const slot of entry.card.slots) {
+      if (!slot) continue;
+      assert.equal(typeof slot.commandId, "string", `${entry.id} command has identity`);
+      assert.equal(slot.hotkey, ["Q", "W", "E", "A", "S", "D", "Z", "X", "C"][slot.slotIndex]);
+    }
+  }
+
+  assert.deepEqual(duplicateCommandIdsForCard({
+    slots: [
+      { commandId: "unit.move", slotIndex: 0 },
+      null,
+      { commandId: "unit.move", slotIndex: 2 },
+    ],
+  }), [{
+    commandId: "unit.move",
+    firstSlotIndex: 0,
+    duplicateSlotIndex: 2,
+  }]);
 }
