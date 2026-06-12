@@ -7,7 +7,8 @@ displaying a team id. Existing two-player games should still behave as FFA with 
 
 ## Server Protocol
 
-Update `server/src/protocol.rs` and mirror in `client/src/protocol.js`.
+Update `server/crates/protocol/src/lib.rs`, `server/src/protocol.rs`, and mirror in
+`client/src/protocol.js`.
 
 Add team identity to:
 
@@ -30,7 +31,7 @@ normalized by lobby code. Entity owner `0` remains neutral and is unrelated to t
 
 ## Game Data Model
 
-Add a reusable team type and helpers. A small `server/src/game/teams.rs` module is preferred over
+Add a reusable team type and helpers. A small `server/crates/sim/src/game/teams.rs` module is preferred over
 scattered methods.
 
 Required concepts:
@@ -75,10 +76,11 @@ payloads.
 ## Files to Touch
 
 - `docs/design/*.md`
+- `server/crates/protocol/src/lib.rs`
 - `server/src/protocol.rs`
 - `client/src/protocol.js`
-- `server/src/game/mod.rs`
-- new `server/src/game/teams.rs`
+- `server/crates/sim/src/game/mod.rs`
+- new `server/crates/sim/src/game/teams.rs`
 - `client/src/state.js`
 - test fixtures that construct `PlayerInit`, `PlayerStart`, `LobbyPlayer`, or `PlayerScore`
 

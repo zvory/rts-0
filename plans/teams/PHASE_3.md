@@ -7,7 +7,7 @@ from all allied current-vision sources over time.
 
 ## Server Fog
 
-Update `server/src/game/fog.rs`.
+Update `server/crates/sim/src/game/fog.rs`.
 
 Current behavior stores one current-visibility grid per player and stamps only that player's own
 entities. Replace this with team-aware recompute behavior.
@@ -28,7 +28,7 @@ Keep `Fog` current-only on the server. Do not add explored-history server state.
 
 ## Projection Rules
 
-Update `server/src/rules/projection.rs`.
+Update `server/crates/sim/src/rules/projection.rs`.
 
 Entity visibility:
 
@@ -78,15 +78,15 @@ explored history as soon as allied entities appear in snapshots.
 ## Files to Touch
 
 - `docs/design/*.md`
-- `server/src/game/fog.rs`
-- `server/src/game/mod.rs`
-- `server/src/rules/projection.rs`
-- `server/src/game/services/combat.rs`
-- `server/src/game/services/construction.rs`
-- `server/src/game/services/death.rs`
+- `server/crates/sim/src/game/fog.rs`
+- `server/crates/sim/src/game/mod.rs`
+- `server/crates/sim/src/rules/projection.rs`
+- `server/crates/sim/src/game/services/combat/`
+- `server/crates/sim/src/game/services/construction.rs`
+- `server/crates/sim/src/game/services/death.rs`
 - `client/src/main.js`
 - `client/src/state.js`
-- tests under `server/src/game/*`
+- tests under `server/crates/sim/src/game/*`
 - `tests/server_integration.mjs`
 
 ## Tests

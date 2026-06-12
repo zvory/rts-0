@@ -8,7 +8,7 @@ encoding those shapes into the map model.
 
 ## Map API
 
-Update `server/src/game/map.rs` and `Game::new_inner`.
+Update `server/crates/sim/src/game/map.rs` and the `Game` construction helpers.
 
 Recommended API:
 
@@ -62,11 +62,11 @@ For the current map:
 ## Files to Touch
 
 - `docs/design/*.md`
-- `server/src/game/map.rs`
-- `server/src/game/mod.rs`
-- `server/src/game/selfplay.rs` if fixtures need explicit FFA teams
-- `server/src/game/replay.rs`
-- map assignment tests in `server/src/game/map.rs`
+- `server/crates/sim/src/game/map.rs`
+- `server/crates/sim/src/game/mod.rs`
+- `server/crates/ai/src/selfplay/` if fixtures need explicit FFA teams
+- `server/crates/sim/src/game/replay.rs`
+- map assignment tests in `server/crates/sim/src/game/map.rs`
 
 ## Tests
 

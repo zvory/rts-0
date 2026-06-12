@@ -483,5 +483,5 @@ Client-related suite selection lives in `tests/select-suites.mjs`. For `client/s
 selects `client-architecture`, `js-protocol-contracts`, `node-minimap-input-contracts`, and
 `client-smoke`; client transport/protocol changes also select `node-server-integration`.
 Architecture-policy files such as `scripts/check-client-architecture.mjs`,
-`tests/select-suites.mjs`, and `plans/client-arch/*` select `client-architecture`. Docs-only
-changes select `docs-only` unless another rule applies.
+`tests/select-suites.mjs`, and `plans/archive/client-arch/*` select `client-architecture`.
+Docs-only changes select `docs-only` unless another rule applies.

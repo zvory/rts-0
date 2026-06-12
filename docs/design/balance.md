@@ -1,6 +1,6 @@
 ## 5. Balance definitions & constants
-Kind-specific server balance lives in `server/src/rules/defs.rs`; terrain movement/cover/
-concealment hooks live in `server/src/rules/terrain.rs` and currently return the all-open-ground
+Kind-specific server balance lives in `server/crates/rules/src/defs.rs`; terrain movement/cover/
+concealment hooks live in `server/crates/rules/src/terrain.rs` and currently return the all-open-ground
 defaults. `config.rs` is the thin constants module for timings, tile size, starting resources,
 supply caps, mining amounts, and other scalar simulation constants; its `unit_stats(kind)` and
 `building_stats(kind)` helpers read the defs table.

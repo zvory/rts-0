@@ -80,7 +80,7 @@ export function selectSuites(files) {
       normalized === "scripts/check-client-architecture.mjs" ||
       normalized === "tests/run-all.sh" ||
       normalized === "tests/select-suites.mjs" ||
-      normalized.startsWith("plans/client-arch/");
+      normalized.startsWith("plans/archive/client-arch/");
     docsOnly &&= normalized.startsWith("docs/") || normalized.startsWith("plans/") || normalized.endsWith(".md");
 
     if (rustCode || normalized.startsWith("server/Cargo.")) {
@@ -178,7 +178,7 @@ function verify() {
     [["server/src/lobby/room_task.rs"], ["cargo-test-server", "node-server-integration", "node-regression", "node-ai-integration", "client-smoke"]],
     [["client/src/match.js"], ["client-architecture", "js-protocol-contracts", "node-minimap-input-contracts", "client-smoke"]],
     [["scripts/check-client-architecture.mjs"], ["client-architecture"]],
-    [["plans/client-arch/phase-1.md"], ["client-architecture"]],
+    [["plans/archive/client-arch/phase-1.md"], ["client-architecture"]],
     [["docs/design/architecture.md"], ["docs-only"]],
   ];
 

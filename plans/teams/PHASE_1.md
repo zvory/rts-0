@@ -7,7 +7,7 @@ see teams but cannot mutate them.
 
 ## Server Lobby Behavior
 
-Update `server/src/lobby.rs`.
+Update `server/src/lobby/`.
 
 Room state should store:
 
@@ -81,8 +81,9 @@ Keep the lobby utilitarian. This is an operational pre-match screen, not a landi
 ## Files to Touch
 
 - `docs/design/*.md`
+- `server/crates/protocol/src/lib.rs`
 - `server/src/protocol.rs`
-- `server/src/lobby.rs`
+- `server/src/lobby/`
 - `client/src/protocol.js`
 - `client/src/net.js`
 - `client/src/lobby.js`

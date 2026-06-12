@@ -22,7 +22,7 @@ Do not let services compare `owner != player` for hostility after this phase.
 
 ## Command Validation
 
-Update `server/src/game/services/commands.rs`.
+Update `server/crates/sim/src/game/services/commands.rs`.
 
 - Raw `attack` commands must reject allied targets.
 - Move, gather, build, train, cancel, and stop remain own-only.
@@ -33,8 +33,8 @@ Update `server/src/game/services/commands.rs`.
 
 Update:
 
-- `server/src/game/services/world_query.rs`
-- `server/src/game/services/combat.rs`
+- `server/crates/sim/src/game/services/world_query.rs`
+- `server/crates/sim/src/game/services/combat/`
 
 Required changes:
 
@@ -81,14 +81,14 @@ Do not aggregate team scores in this phase.
 ## Files to Touch
 
 - `docs/design/*.md`
-- `server/src/game/teams.rs`
-- `server/src/game/mod.rs`
-- `server/src/game/services/commands.rs`
-- `server/src/game/services/world_query.rs`
-- `server/src/game/services/combat.rs`
-- `server/src/game/services/death.rs`
-- `server/src/lobby.rs`
-- tests under `server/src/game/*`
+- `server/crates/sim/src/game/teams.rs`
+- `server/crates/sim/src/game/mod.rs`
+- `server/crates/sim/src/game/services/commands.rs`
+- `server/crates/sim/src/game/services/world_query.rs`
+- `server/crates/sim/src/game/services/combat/`
+- `server/crates/sim/src/game/services/death.rs`
+- `server/src/lobby/`
+- tests under `server/crates/sim/src/game/*`
 - `tests/regression.mjs`
 
 ## Tests

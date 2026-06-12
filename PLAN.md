@@ -42,7 +42,7 @@ Gates:
 - [ ] Add deterministic `WorldHash` per tick over entity ids, kinds, owners, positions, hp,
   orders, resources, production/construction state, and fog-relevant state.
 - [ ] Add first-divergent-tick diagnostics for replay mismatch.
-- [ ] Add golden replay fixtures under `server/tests/replays/`.
+- [ ] Add golden replay fixtures alongside the Rust replay tests.
 - [ ] Add generated legal/illegal command-stream tests where practical.
 
 Gates:
@@ -275,7 +275,7 @@ Depends on:
 ### 6.3 Advanced AI Tech Progression
 
 - [ ] Follow [AI-PLAN.md](AI-PLAN.md) for the detailed dependency chain and rollout order.
-- [ ] Use the linked `docs/ai/phase-*.md` files as the serial implementation handoff plan.
+- [ ] Use the AI phase table in [AI-PLAN.md](AI-PLAN.md) as the serial implementation handoff plan.
 - [ ] Keep one shared AI knowledge and action layer used by both live AI and self-play.
 - [ ] Add at least three simple strategy profiles:
   `rifle_flood_fast`, `rifle_flood_full_saturation`, and `tech_to_tanks`.
