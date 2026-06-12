@@ -163,6 +163,15 @@ scripts/fly-logs.sh beta recent
 scripts/fly-logs.sh mainline recent
 ```
 
+For older logs inside Fly's retention window, use search mode. It calls Fly's HTTP logs API and
+pages forward from `--from`, instead of only returning the small `flyctl logs --no-tail` buffer:
+
+```bash
+scripts/fly-logs.sh beta search --from 2026-06-11T22:00:00Z --to 2026-06-11T23:30:00Z
+scripts/fly-logs.sh beta search --from 2026-06-11T22:00:00Z --to 2026-06-11T23:30:00Z \
+  --filter 'performance tick summary|client network report'
+```
+
 For live tailing, bound the command when an agent runs it so it does not stream forever:
 
 ```bash
