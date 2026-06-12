@@ -1,5 +1,7 @@
 # Phase 4.5 - Movement Prediction Scenario Backfill
 
+Status: Done.
+
 ## Objective
 
 Backfill the delayed, dropped, jittered, burst, and coalesced network scenarios that should guard
@@ -89,3 +91,29 @@ movement scenarios are stable enough to catch regressions.
 
 No new prediction surface. This phase makes the already-enabled owned movement prediction
 regression-testable under realistic network trouble.
+
+## Implementation Notes
+
+- The tri-state browser lane can install deterministic WebSocket transport profiles before the
+  page loads. Profiles support command latency, snapshot latency, seeded jitter, snapshot drops,
+  burst delivery, latest-only coalescing, and head-of-line snapshot delay. The active profile and
+  delivery events are written into client artifacts.
+- Browser captures now record both authoritative entity summaries and rendered summaries with
+  prediction included, so scenarios can assert that prediction changes only the rendered path while
+  authoritative reads remain stable.
+- Phase 4.5 scenarios cover immediate predicted movement, 5/10/20 tick convergence, coalesced
+  snapshots, dropped snapshots, queued move replay, stop correction, owner-safe hidden-state
+  diagnostics, prediction-off fallback, and spectator/dev-watch prediction disablement.
+- Initial correction budgets are intentionally generous and scenario-local: simple convergence
+  cases allow 96/128/160 px, queued/stop/hidden-state cases allow 192 px, and coalesced/dropped
+  cases allow 160 px. These should be ratcheted down after more artifact history.
+
+## Verification Notes
+
+- Generated WASM assets were built with `scripts/build-sim-wasm.sh`.
+- Passed serially against a local server on `127.0.0.1:8097`: phase 0.5, phase 2.5, phase 3.5,
+  and phase 4.5 tri-state scenario groups.
+- Passed focused checks: `node tests/prediction_controller.mjs`, `node tests/sim_wasm_smoke.mjs`,
+  and `node tests/client_smoke.mjs`.
+- A success artifact was produced by the phase 4.5 group, and a forced-failure artifact was
+  produced with `node tests/tri_state/run.mjs --scenario forced_failure_artifact --allow-failure`.

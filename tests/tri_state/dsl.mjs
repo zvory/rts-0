@@ -41,6 +41,10 @@ export function waitForSnapshot(options = {}) {
   return { op: "waitForSnapshot", ...options };
 }
 
+export function waitMs(ms) {
+  return { op: "waitMs", ms };
+}
+
 export function waitForAck(clientSeq, options = {}) {
   return { op: "waitForAck", clientSeq, ...options };
 }
@@ -59,6 +63,22 @@ export function advanceLocalTicks(ticks) {
 
 export function assertRemoteClientOwnedPosition(options = {}) {
   return { op: "assertRemoteClientOwnedPosition", tolerancePx: 1, ...options };
+}
+
+export function assertClientAuthoritativeOwnedStable(options = {}) {
+  return { op: "assertClientAuthoritativeOwnedStable", tolerancePx: 0.01, ...options };
+}
+
+export function assertClientRenderedOwnedAdvanced(options = {}) {
+  return { op: "assertClientRenderedOwnedAdvanced", minDistancePx: 1, ...options };
+}
+
+export function assertClientRenderedOwnedStable(options = {}) {
+  return { op: "assertClientRenderedOwnedStable", tolerancePx: 0.01, ...options };
+}
+
+export function assertClientRenderedConverged(options = {}) {
+  return { op: "assertClientRenderedConverged", tolerancePx: 2, ...options };
 }
 
 export function assertOrderPlansMatch(options = {}) {
@@ -93,6 +113,15 @@ export function assertLocalCorrectionAtMost(maxPx) {
   return { op: "assertLocalCorrectionAtMost", maxPx };
 }
 
+export function assertClientCorrectionBudget(options = {}) {
+  return {
+    op: "assertClientCorrectionBudget",
+    maxPx: options.maxPx ?? 256,
+    maxSnapCorrections: options.maxSnapCorrections ?? 4,
+    ...options,
+  };
+}
+
 export function assertLocalBaselineOwnerSafe() {
   return { op: "assertLocalBaselineOwnerSafe" };
 }
@@ -103,6 +132,14 @@ export function assertClientSeqsStrictlyIncreasing(options = {}) {
 
 export function assertClientPrediction(options = {}) {
   return { op: "assertClientPrediction", ...options };
+}
+
+export function waitForClientPredictionReady(options = {}) {
+  return { op: "waitForClientPredictionReady", timeoutMs: 8000, ...options };
+}
+
+export function advanceClientPredictionVisual(options = {}) {
+  return { op: "advanceClientPredictionVisual", ...options };
 }
 
 export function injectClientSnapshot(kind, options = {}) {

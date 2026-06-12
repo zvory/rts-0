@@ -20,6 +20,7 @@ export class ClientLane {
     this.profileDir = null;
     this.selection = [];
     this.issuedCommands = [];
+    this.networkProfile = normalizeNetworkProfile(scenario.network);
   }
 
   async start() {
@@ -50,9 +51,165 @@ export class ClientLane {
   async startLiveRoom() {
     const url = new URL(this.url);
     url.searchParams.set("rtsNoAutoPointerLock", "1");
-    await this.page.evaluateOnNewDocument((prediction) => {
+    await this.page.evaluateOnNewDocument((prediction, networkProfile) => {
       window.localStorage.setItem("rts.prediction.enabled", prediction === "enabled" ? "1" : "0");
-    }, this.scenario.setup.prediction);
+      installTriStateNetworkProfile(networkProfile);
+
+      function installTriStateNetworkProfile(profile) {
+        if (!profile || profile.mode === "direct") return;
+        const NativeWebSocket = window.WebSocket;
+        const events = [];
+        const profileState = {
+          rng: seededRng(profile.seed || 1),
+          snapshotSeen: 0,
+          snapshotDropped: 0,
+          snapshotCoalesced: 0,
+          pendingCoalesced: null,
+          burstQueue: [],
+          disconnectScheduled: false,
+        };
+        window.__rtsTriStateNetwork = { profile, events };
+
+        class ProfiledWebSocket extends NativeWebSocket {
+          constructor(...args) {
+            super(...args);
+            this.__rtsOnMessage = null;
+            this.__rtsFlushTimer = null;
+          }
+
+          set onmessage(handler) {
+            this.__rtsOnMessage = typeof handler === "function" ? handler : null;
+            super.onmessage = (event) => deliverInbound(this, event, null);
+          }
+
+          get onmessage() {
+            return this.__rtsOnMessage;
+          }
+
+          addEventListener(type, listener, options) {
+            if (type === "message") {
+              return super.addEventListener(type, (event) => deliverInbound(this, event, listener), options);
+            }
+            return super.addEventListener(type, listener, options);
+          }
+
+          send(data) {
+            const delayMs = outboundDelayMs(data, profile, profileState);
+            if (delayMs > 0) {
+              events.push({ event: "command.delay", delayMs });
+              window.setTimeout(() => super.send(data), delayMs);
+              return;
+            }
+            return super.send(data);
+          }
+        }
+
+        Object.defineProperty(ProfiledWebSocket, "OPEN", { value: NativeWebSocket.OPEN });
+        Object.defineProperty(ProfiledWebSocket, "CONNECTING", { value: NativeWebSocket.CONNECTING });
+        Object.defineProperty(ProfiledWebSocket, "CLOSING", { value: NativeWebSocket.CLOSING });
+        Object.defineProperty(ProfiledWebSocket, "CLOSED", { value: NativeWebSocket.CLOSED });
+        window.WebSocket = ProfiledWebSocket;
+
+        function deliverInbound(socket, event, listener = null) {
+          const parsed = parseMessage(event.data);
+          if (parsed?.t !== "snapshot") {
+            if (listener) listener.call(socket, event);
+            if (socket.__rtsOnMessage) socket.__rtsOnMessage.call(socket, event);
+            return;
+          }
+          const delivery = snapshotDelivery(profile, profileState);
+          events.push({
+            event: "snapshot.profile",
+            tick: parsed.tick,
+            action: delivery.action,
+            delayMs: delivery.delayMs,
+          });
+          if (delivery.action === "drop") return;
+          if (delivery.action === "coalesce") {
+            profileState.pendingCoalesced = { socket, event, listener };
+            if (!socket.__rtsFlushTimer) {
+              socket.__rtsFlushTimer = window.setTimeout(() => {
+                const pending = profileState.pendingCoalesced;
+                profileState.pendingCoalesced = null;
+                socket.__rtsFlushTimer = null;
+                if (pending) dispatch(pending.socket, pending.event, pending.listener);
+              }, delivery.delayMs);
+            }
+            return;
+          }
+          if (delivery.action === "burst") {
+            profileState.burstQueue.push({ socket, event, listener });
+            if (profileState.burstQueue.length < delivery.burstSize) return;
+            const burst = profileState.burstQueue.splice(0);
+            window.setTimeout(() => {
+              for (const pending of burst) dispatch(pending.socket, pending.event, pending.listener);
+            }, delivery.delayMs);
+            return;
+          }
+          window.setTimeout(() => dispatch(socket, event, listener), delivery.delayMs);
+        }
+
+        function dispatch(socket, event, listener) {
+          if (listener) listener.call(socket, event);
+          if (socket.__rtsOnMessage) socket.__rtsOnMessage.call(socket, event);
+        }
+
+        function snapshotDelivery(profile, state) {
+          state.snapshotSeen += 1;
+          if (profile.snapshotDropEvery > 0 && state.snapshotSeen % profile.snapshotDropEvery === 0) {
+            state.snapshotDropped += 1;
+            return { action: "drop", delayMs: 0 };
+          }
+          let delayMs = ticksToMs(profile.snapshotLatencyTicks || 0, profile);
+          if (profile.snapshotJitterTicks > 0) {
+            const span = ticksToMs(profile.snapshotJitterTicks, profile);
+            delayMs += Math.round((state.rng() * 2 - 1) * span);
+          }
+          if (profile.headOfLineEvery > 0 && state.snapshotSeen % profile.headOfLineEvery === 0) {
+            delayMs += ticksToMs(profile.headOfLineTicks || 0, profile);
+          }
+          delayMs = Math.max(0, delayMs);
+          if (profile.coalesceSnapshots) {
+            state.snapshotCoalesced += 1;
+            return { action: "coalesce", delayMs: Math.max(delayMs, ticksToMs(profile.coalesceWindowTicks || 1, profile)) };
+          }
+          if (profile.snapshotBurstSize > 1) {
+            return { action: "burst", delayMs, burstSize: profile.snapshotBurstSize };
+          }
+          return { action: "delay", delayMs };
+        }
+
+        function outboundDelayMs(data, profile, state) {
+          const parsed = parseMessage(data);
+          if (parsed?.t !== "command") return 0;
+          let delayMs = ticksToMs(profile.commandLatencyTicks || 0, profile);
+          if (profile.commandJitterTicks > 0) {
+            delayMs += Math.round((state.rng() * 2 - 1) * ticksToMs(profile.commandJitterTicks, profile));
+          }
+          return Math.max(0, delayMs);
+        }
+
+        function parseMessage(data) {
+          try {
+            return JSON.parse(String(data));
+          } catch {
+            return null;
+          }
+        }
+
+        function ticksToMs(ticks, profile) {
+          return Math.max(0, Number(ticks) || 0) * (Number(profile.tickMs) || 33);
+        }
+
+        function seededRng(seed) {
+          let state = Number(seed) >>> 0;
+          return () => {
+            state = (1664525 * state + 1013904223) >>> 0;
+            return state / 0x100000000;
+          };
+        }
+      }
+    }, this.scenario.setup.prediction, this.networkProfile);
     await this.page.goto(url.href, { waitUntil: "networkidle2", timeout: 15000 });
     await this.page.waitForFunction(() => window.__rts?.net?.playerId != null, { timeout: 5000 });
     await this.page.evaluate((room, quickstart) => {
@@ -273,6 +430,10 @@ export class ClientLane {
     return result;
   }
 
+  async networkDebug() {
+    return this.page.evaluate(() => window.__rtsTriStateNetwork || null);
+  }
+
   async setReplaySpeed(speed) {
     await this.page.evaluate((speed) => window.__rts.match.net.setReplaySpeed(speed), speed);
     this.artifacts.client({ event: "setReplaySpeed", speed });
@@ -291,6 +452,7 @@ export class ClientLane {
       summary,
       predictionDebug: await this.predictionDebug(),
       selection: await this.selectionDebug(),
+      network: await this.networkDebug(),
     });
     return summary;
   }
@@ -305,9 +467,21 @@ export class ClientLane {
         entities: state.entitiesInterpolated(1, { includePrediction: false }),
       };
     });
+    const renderedSnapshot = await this.page.evaluate(() => {
+      const match = window.__rts?.match;
+      const state = match?.state;
+      if (!state?._cur) return null;
+      return {
+        ...state._cur,
+        entities: state.entitiesInterpolated(1, { includePrediction: true }),
+      };
+    });
     const playerId = await this.page.evaluate(() => window.__rts?.match?.state?.playerId ?? null);
     const summary = summarizeSnapshot(snapshot, playerId);
-    if (summary) summary.issuedCommands = this.issuedCommands.map(compactIssuedCommand);
+    if (summary) {
+      summary.issuedCommands = this.issuedCommands.map(compactIssuedCommand);
+      summary.rendered = summarizeSnapshot(renderedSnapshot, playerId);
+    }
     return summary;
   }
 
@@ -320,6 +494,37 @@ export class ClientLane {
         published: window.__rtsPredictionDebug || null,
       };
     });
+  }
+
+  async waitForPredictionReady({ timeoutMs = 8000 } = {}) {
+    await this.page.evaluate(() => {
+      const match = window.__rts?.match;
+      if (match?.prediction?.enabled && !match?.predictionAdapter?.ready && !match?.predictionAdapter?.loading) {
+        match.initPredictionAdapter?.();
+      }
+    });
+    await this.page.waitForFunction(() => {
+      const match = window.__rts?.match;
+      return !!match?.prediction?.enabled && !!match?.predictionAdapter?.ready;
+    }, { timeout: timeoutMs });
+    return this.predictionDebug();
+  }
+
+  async advancePredictionVisual() {
+    const result = await this.page.evaluate(() => {
+      const match = window.__rts?.match;
+      if (!match?.advancePredictionVisual) return { error: "match prediction visual method unavailable" };
+      match.advancePredictionVisual();
+      return {
+        predictionDebug: {
+          controller: match.prediction?.debugSummary?.() || null,
+          wasm: match.predictionAdapter?.diagnostics?.() || null,
+        },
+      };
+    });
+    if (result?.error) throw new Error(result.error);
+    this.artifacts.client({ event: "prediction.advanceVisual", ...result });
+    return result;
   }
 
   async startPayload() {
@@ -348,6 +553,27 @@ export class ClientLane {
   async close() {
     if (this.browser) await this.browser.close();
   }
+}
+
+function normalizeNetworkProfile(network = {}) {
+  if (!network || network.mode == null || network.mode === "direct") return { mode: "direct" };
+  const tickMs = Number(network.tickMs ?? process.env.RTS_TEST_TICK_MS ?? 33) || 33;
+  return {
+    mode: "profile",
+    name: network.name || "unnamed-profile",
+    tickMs,
+    seed: Number(network.seed ?? 1) || 1,
+    commandLatencyTicks: Number(network.commandLatencyTicks ?? 0) || 0,
+    commandJitterTicks: Number(network.commandJitterTicks ?? 0) || 0,
+    snapshotLatencyTicks: Number(network.snapshotLatencyTicks ?? 0) || 0,
+    snapshotJitterTicks: Number(network.snapshotJitterTicks ?? 0) || 0,
+    snapshotDropEvery: Number(network.snapshotDropEvery ?? 0) || 0,
+    snapshotBurstSize: Number(network.snapshotBurstSize ?? 0) || 0,
+    coalesceSnapshots: !!network.coalesceSnapshots,
+    coalesceWindowTicks: Number(network.coalesceWindowTicks ?? 1) || 1,
+    headOfLineEvery: Number(network.headOfLineEvery ?? 0) || 0,
+    headOfLineTicks: Number(network.headOfLineTicks ?? 0) || 0,
+  };
 }
 
 function compactIssuedCommand(entry) {
