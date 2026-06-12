@@ -4,6 +4,7 @@
 //! dedicated workspace crates. This crate is the server shell and developer-tool
 //! surface around those packages.
 
+pub mod build_info;
 pub(crate) mod config;
 pub mod db;
 pub mod dev_scenarios;

@@ -124,8 +124,12 @@ mod tests {
         std::fs::create_dir_all(&dir).unwrap();
         let players = test_players();
         let game = Game::new(&players, 0x1234_5678);
-        let artifact =
-            ReplayArtifactV1::capture_from_game(&game, env!("COMMIT_HASH"), None, game.scores());
+        let artifact = ReplayArtifactV1::capture_from_game(
+            &game,
+            crate::build_info::build_id(),
+            None,
+            game.scores(),
+        );
         std::fs::write(
             dir.join("replay.json"),
             serde_json::to_vec_pretty(&artifact).unwrap(),
