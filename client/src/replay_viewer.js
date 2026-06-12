@@ -5,6 +5,8 @@ export class ReplayViewer extends Match {
     super(net, payload, toast, devWatch, audio, statusBadge, diagnostics, {
       replayViewer: true,
       initialCamera: options.initialCamera,
+      hotkeyProfiles: options.hotkeyProfiles,
+      settings: options.settings,
     });
   }
 }
