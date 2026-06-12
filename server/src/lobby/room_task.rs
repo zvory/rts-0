@@ -6,7 +6,7 @@ use super::snapshots::{compact_snapshot_for_wire, union_events};
 use super::*;
 use crate::game::entity::EntityKind;
 use crate::game::map::Map;
-use crate::game::replay::ReplayArtifactV1;
+use crate::game::replay::{ReplayArtifactV1, ReplayValidationError};
 use crate::protocol::{ReplayPlaybackState, SnapshotNetStatus};
 use rand::rngs::SmallRng;
 use rand::SeedableRng;
@@ -426,6 +426,17 @@ impl ReplaySession {
             .map_err(|err| format!("cannot load replay map metadata: {err}"))?;
         artifact
             .validate_against(server_build_sha(), &metadata)
+            .or_else(|err| match err {
+                ReplayValidationError::BuildShaMismatch { artifact, running } => {
+                    warn!(
+                        replay_build_sha = %artifact,
+                        server_build_sha = %running,
+                        "replay build differs from current server; attempting playback"
+                    );
+                    Ok(())
+                }
+                err => Err(err),
+            })
             .map_err(|err| err.to_string())?;
         let map = Map::load(&artifact.map_name, artifact.players.len(), artifact.seed)
             .map_err(|err| format!("cannot load replay map: {err}"))?;
@@ -3484,6 +3495,17 @@ mod tests {
             err.contains("wait before seeking again"),
             "unexpected seek reject: {err}"
         );
+    }
+
+    #[test]
+    fn replay_session_allows_build_sha_mismatch() {
+        let players = replay_test_players(2);
+        let (_live, mut artifact) = replay_test_artifact(&players, 1);
+        artifact.server_build_sha = "older-build".to_string();
+
+        let replay = ReplaySession::new(artifact).unwrap();
+
+        assert_eq!(replay.current_tick(), 0);
     }
 
     #[test]

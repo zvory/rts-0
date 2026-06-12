@@ -177,7 +177,8 @@ export class MatchHistory {
         void this._launchReplay(row.id);
       });
       action.appendChild(btn);
-    } else if (row.replayUnavailableReason) {
+    }
+    if (row.replayUnavailableReason) {
       const reason = document.createElement("span");
       reason.className = "match-history-replay-reason";
       reason.textContent = row.replayUnavailableReason;
