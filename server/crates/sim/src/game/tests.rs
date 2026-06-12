@@ -728,6 +728,9 @@ fn set_autocast_command_enables_mortar_autocast_from_default_off() {
         Some(false),
         "mortar autocast should start disabled"
     );
+    game.players[0]
+        .upgrades
+        .insert(upgrade::UpgradeKind::MortarAutocast);
 
     game.enqueue(
         1,

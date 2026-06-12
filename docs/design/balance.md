@@ -89,9 +89,10 @@ authoritative `rules::defs` records.
   `MORTAR_OUTER_DAMAGE = 30`, `MORTAR_INNER_DAMAGE = 60`, and `MORTAR_AUTOFIRE_ERROR_TILES = 0.35`.
   The inner radius uses semi-armor-piercing damage against armored targets: it applies half of the
   normal non-AP armor reduction instead of the full reduction. Manual Fire uses hotkey `X`; autocast
-  is enabled by default through normal idle/attack-move acquisition. Mortar impacts apply the same
-  damage to friendly and enemy units/buildings; autocast skips predicted impact points that would
-  hit any owned unit or building at its current position, while manual fire remains unrestricted.
+  uses normal idle/attack-move acquisition after Mortar Autocast research completes. Mortar impacts
+  apply the same damage to friendly and enemy units/buildings; autocast skips predicted impact
+  points that would hit any owned unit or building at its current position, while manual fire remains
+  unrestricted.
 - AT guns use `AT_GUN_PACKED_RANGE_TILES = 5`, `AT_GUN_DEPLOYED_RANGE_TILES = 12`,
   `AT_GUN_PACKED_DAMAGE_MULTIPLIER = 0.75`, and
   `AT_GUN_FIELD_OF_FIRE_RAD = PI / 4` (45 degrees total).
@@ -124,6 +125,10 @@ authoritative `rules::defs` records.
 - **Tank Production** (R&D Complex research, protocol id `tank_unlock`): costs 150 steel /
   100 oil and takes 600 ticks (~20s). Once complete, that player can train Tanks from Vehicle
   Works. Scout Cars remain immediately trainable from Vehicle Works.
+- **Mortar Autocast** (R&D Complex research, protocol id `mortar_autocast`): costs 150 steel /
+  150 oil and takes 600 ticks (~20s). Mortar Team autocast is unavailable before completion. Once
+  complete, all current and future Mortar Teams for that player start with autocast enabled; players
+  can still turn autocast off per selected Mortar Team.
 - **Scout Car Smoke** (hotkey `D`): Scout cars have a targeted smoke-grenade ability immediately;
   no completed Gun Works is required. Each scout car spawns with 2 smoke uses; once those uses are
   depleted, that car cannot use Smoke again. Smoke has no steel or oil cost. Target range: 9 tiles
@@ -190,7 +195,7 @@ Building stats (hp, sight, cost, footprint tiles wxh, buildTicks, extra):
 | depot                      | Supply Depot       | 110 | 4     | 100 | 2x2  | 300       | +8 supply |
 | barracks                   | Barracks           | 165 | 6     | 150 | 3x2  | 200       | trains rifleman and machine_gunner; requires a City Centre |
 | training_centre            | Training Centre    | 300 | 6     | 100 steel + 50 oil | 3x2  | 560       | shared prerequisite before either advanced path; unlocks machine_gunner training at barracks and researches Methamphetamines; requires a City Centre and Barracks |
-| research_complex           | R&D Complex        | 165 | 6     | 100 steel + 100 oil | 3x3  | 450       | research-only building for AT Gun Crews, Unlock Artillery, and Tank Production; requires a City Centre and Training Centre |
+| research_complex           | R&D Complex        | 165 | 6     | 100 steel + 100 oil | 3x3  | 450       | research-only building for AT Gun Crews, Unlock Artillery, Tank Production, and Mortar Autocast; requires a City Centre and Training Centre |
 | factory                    | Vehicle Works      | 360 | 6     | 125 steel + 125 oil | 3x3  | 620       | Mobile Warfare path building; trains scout_car immediately and researches Tank Production before tank training; requires a City Centre and Training Centre |
 | steelworks                 | Gun Works          | 300 | 6     | 125 steel + 125 oil | 3x3  | 620       | Superior Firepower path building; trains mortar_team immediately and trains AT Guns/Artillery after R&D Complex research; requires a City Centre and Training Centre |
 

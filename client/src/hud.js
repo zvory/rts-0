@@ -1074,7 +1074,7 @@ export class HUD {
     for (const upgrade of researches) {
       const def = UPGRADES[upgrade];
       if (!def) continue;
-      const preferredSlot = this._researchSlotForUpgrade(upgrade, trains);
+      const preferredSlot = this._researchSlotForUpgrade(building.kind, upgrade, trains);
       const slot = this._firstOpenCommandSlot(slots, preferredSlot, cancelSlot);
       if (slot < 0) continue;
       const availability = this._researchAvailability(upgrade, res);
@@ -1121,9 +1121,11 @@ export class HUD {
     return this._researchesOf(kind).filter((upgrade) => !completed.includes(upgrade));
   }
 
-  _researchSlotForUpgrade(upgrade, trains) {
+  _researchSlotForUpgrade(buildingKind, upgrade, trains) {
     const unitIndex = trains.findIndex((unit) => STATS[unit]?.upgradeRequires === upgrade);
     if (unitIndex >= 0) return unitIndex + 3;
+    const researchIndex = this._researchesOf(buildingKind).indexOf(upgrade);
+    if (researchIndex >= 0) return researchIndex;
     const afterTrainSlot = trains.findIndex((unit) => STATS[unit] == null);
     return afterTrainSlot >= 0 ? afterTrainSlot : trains.length;
   }

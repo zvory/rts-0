@@ -209,6 +209,7 @@ export const UPGRADE = Object.freeze({
   AT_GUN_UNLOCK: "at_gun_unlock",
   TANK_UNLOCK: "tank_unlock",
   ARTILLERY_UNLOCK: "artillery_unlock",
+  MORTAR_AUTOCAST: "mortar_autocast",
 });
 
 export const UPGRADE_CODE = Object.freeze({
@@ -216,6 +217,7 @@ export const UPGRADE_CODE = Object.freeze({
   [UPGRADE.AT_GUN_UNLOCK]: 2,
   [UPGRADE.TANK_UNLOCK]: 3,
   [UPGRADE.ARTILLERY_UNLOCK]: 4,
+  [UPGRADE.MORTAR_AUTOCAST]: 5,
 });
 
 export const EVENT_CODE = Object.freeze({

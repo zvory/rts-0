@@ -46,10 +46,12 @@ function buttonSlots(card) {
   assert.equal(ids[0], `research:${UPGRADE.AT_GUN_UNLOCK}`);
   assert.equal(ids[1], `research:${UPGRADE.ARTILLERY_UNLOCK}`);
   assert.equal(ids[2], `research:${UPGRADE.TANK_UNLOCK}`);
-  assert.deepEqual(slotCommandIds(rAndDCard()).slice(0, 3), [
+  assert.equal(ids[3], `research:${UPGRADE.MORTAR_AUTOCAST}`);
+  assert.deepEqual(slotCommandIds(rAndDCard()).slice(0, 4), [
     `research.${UPGRADE.AT_GUN_UNLOCK}`,
     `research.${UPGRADE.ARTILLERY_UNLOCK}`,
     `research.${UPGRADE.TANK_UNLOCK}`,
+    `research.${UPGRADE.MORTAR_AUTOCAST}`,
   ]);
 }
 
@@ -58,6 +60,7 @@ function buttonSlots(card) {
   assert.equal(ids[0], null);
   assert.equal(ids[1], `research:${UPGRADE.ARTILLERY_UNLOCK}`);
   assert.equal(ids[2], `research:${UPGRADE.TANK_UNLOCK}`);
+  assert.equal(ids[3], `research:${UPGRADE.MORTAR_AUTOCAST}`);
 }
 
 {
@@ -65,6 +68,7 @@ function buttonSlots(card) {
   assert.equal(ids[0], null);
   assert.equal(ids[1], null);
   assert.equal(ids[2], `research:${UPGRADE.TANK_UNLOCK}`);
+  assert.equal(ids[3], `research:${UPGRADE.MORTAR_AUTOCAST}`);
 }
 
 {
