@@ -8,7 +8,7 @@
 #   3. Rust fast scripted tests     (cargo test — deterministic, in-process, no server)
 #   4. Rust lint                    (cargo clippy)
 #   5. Node API suites              (protocol/UI units, server_integration, regression, ai_integration)
-#   6. Headless client smoke        (client_smoke — hydrates shared deps; needs Chrome)
+#   6. Headless browser suites      (client_smoke + tri-state lag scenarios; needs Chrome)
 #
 # The server is built in debug (overflow checks ON — the hardening regression tests rely on a
 # bad Build coord being caught, not silently wrapped) and booted on a private free port. The
@@ -417,6 +417,8 @@ run_suite_bg "JS client contracts" \
   node "$SCRIPT_DIR/client_contracts.mjs"
 run_suite_bg "JS prediction controller" \
   node "$SCRIPT_DIR/prediction_controller.mjs"
+run_suite_bg "JS tri-state harness self-test" \
+  node "$SCRIPT_DIR/tri_state/self_test.mjs"
 run_suite_bg "JS minimap input contracts" \
   node "$SCRIPT_DIR/minimap_input_contracts.mjs"
 run_suite_bg "JS HUD command card" \
@@ -443,6 +445,11 @@ if [ "${SERVER_HEALTHY:-0}" = "1" ]; then
   run_suite_bg "API: regression"         node "$SCRIPT_DIR/regression.mjs"
   run_suite_bg "API: ai_integration"     node "$SCRIPT_DIR/ai_integration.mjs"
 
+  # Browser suites are latency-sensitive and each may drive its own Chrome/WebSocket room. Keep
+  # them off the already-parallel background batch so snapshot-lane comparisons are not distorted
+  # by local browser/server head-of-line pressure.
+  collect_bg_results
+
   if [ "$RUN_CLIENT" = "1" ]; then
     # Auto-detect Chrome if not set: macOS app bundle, then common Linux paths.
     if [ -z "${CHROME:-}" ]; then
@@ -460,15 +467,22 @@ if [ "${SERVER_HEALTHY:-0}" = "1" ]; then
       done
     fi
     if [ -z "${CHROME:-}" ] || [ ! -x "$CHROME" ]; then
-      info "skipping client smoke: no Chrome found (set CHROME=/path/to/chrome to override)"
+      info "skipping browser suites: no Chrome found (set CHROME=/path/to/chrome to override)"
       SKIPPED+=("Client smoke (no Chrome)")
+      SKIPPED+=("Tri-state lag scenarios (no Chrome)")
     elif hydrate_client_deps; then
-      CHROME="$CHROME" run_suite_bg "Client smoke (headless Chrome)" node "$SCRIPT_DIR/client_smoke.mjs"
+      CHROME="$CHROME" run_suite "Client smoke (headless Chrome)" node "$SCRIPT_DIR/client_smoke.mjs"
+      CHROME="$CHROME" run_suite "Tri-state scenarios: phase 0.5" \
+        node "$SCRIPT_DIR/tri_state/run.mjs" --scenario phase-0.5
+      CHROME="$CHROME" run_suite "Tri-state scenarios: phase 2.5" \
+        node "$SCRIPT_DIR/tri_state/run.mjs" --scenario phase-2.5
     else
       FAILED+=("Client smoke dependency hydration")
+      FAILED+=("Tri-state scenario dependency hydration")
     fi
   else
     SKIPPED+=("Client smoke (--no-client)")
+    SKIPPED+=("Tri-state lag scenarios (--no-client)")
   fi
 else
   warn "server not healthy — skipping all live-server suites"

@@ -29,8 +29,19 @@ export function issue(command, args = {}) {
   return { op: "issue", command, args };
 }
 
+export function issueBurst(commands) {
+  if (!Array.isArray(commands) || commands.length === 0) {
+    throw new Error("issueBurst requires at least one command");
+  }
+  return { op: "issueBurst", commands };
+}
+
 export function waitForSnapshot(options = {}) {
   return { op: "waitForSnapshot", ...options };
+}
+
+export function waitForAck(clientSeq, options = {}) {
+  return { op: "waitForAck", clientSeq, ...options };
 }
 
 export function capture(label) {
@@ -43,6 +54,34 @@ export function assertRemoteClientOwnedPosition(options = {}) {
 
 export function assertOrderPlansMatch(options = {}) {
   return { op: "assertOrderPlansMatch", ...options };
+}
+
+export function assertClientSeqsStrictlyIncreasing(options = {}) {
+  return { op: "assertClientSeqsStrictlyIncreasing", ...options };
+}
+
+export function assertClientPrediction(options = {}) {
+  return { op: "assertClientPrediction", ...options };
+}
+
+export function injectClientSnapshot(kind, options = {}) {
+  return { op: "injectClientSnapshot", kind, ...options };
+}
+
+export function setClientSnapshotDelivery(enabled) {
+  return { op: "setClientSnapshotDelivery", enabled: !!enabled };
+}
+
+export function recordSocketReceipt(clientSeq, detail = {}) {
+  return { op: "recordSocketReceipt", clientSeq, detail };
+}
+
+export function recordCommandRejection(clientSeq, reason = "test rejection diagnostic") {
+  return { op: "recordCommandRejection", clientSeq, reason };
+}
+
+export function expireClientCommands(options = {}) {
+  return { op: "expireClientCommands", ...options };
 }
 
 export function setReplaySpeed(speed) {

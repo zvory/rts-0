@@ -17,6 +17,7 @@ export class RemoteLane {
     this.waiters = [];
     this.nextClientSeq = 1;
     this.selection = [];
+    this.issuedCommands = [];
   }
 
   async start() {
@@ -84,6 +85,15 @@ export class RemoteLane {
   command(command) {
     const clientSeq = this.nextClientSeq++;
     this.send({ t: "command", clientSeq, cmd: command });
+    const record = {
+      clientSeq,
+      kind: command.c,
+      issueStep: this.issuedCommands.length,
+      latestKnownAuthoritativeTick: this.lastSnapshot?.tick ?? null,
+      command,
+    };
+    this.issuedCommands.push(record);
+    this.artifacts.remote({ event: "command.issued", ...record });
     return { clientSeq };
   }
 
@@ -95,20 +105,27 @@ export class RemoteLane {
   }
 
   async issue(command, args = {}) {
-    if (command !== "move" && command !== "attackMove") {
+    if (!["move", "attackMove", "stop", "train", "setRally", "invalidMove"].includes(command)) {
       throw new Error(`unsupported remote command: ${command}`);
     }
     const unit = this.selectedEntity();
-    const target = {
-      x: unit.x + (args.dx ?? 0),
-      y: unit.y + (args.dy ?? 0),
-    };
-    const cmd = {
-      c: command,
-      units: [unit.id],
-      x: target.x,
-      y: target.y,
-    };
+    let cmd;
+    if (command === "stop") {
+      cmd = { c: "stop", units: [unit.id] };
+    } else if (command === "train") {
+      cmd = { c: "train", building: unit.id, unit: args.unit || "worker" };
+    } else if (command === "setRally") {
+      cmd = { c: "setRally", building: unit.id, x: args.x ?? unit.x + (args.dx ?? 0), y: args.y ?? unit.y + (args.dy ?? 0), kind: args.kind || "move" };
+    } else if (command === "invalidMove") {
+      cmd = { c: "move", units: [999999999], x: args.x ?? unit.x + (args.dx ?? 0), y: args.y ?? unit.y + (args.dy ?? 0) };
+    } else {
+      cmd = {
+        c: command,
+        units: [unit.id],
+        x: args.x ?? unit.x + (args.dx ?? 0),
+        y: args.y ?? unit.y + (args.dy ?? 0),
+      };
+    }
     if (args.queued) cmd.queued = true;
     const sent = this.command(cmd);
     return { command: cmd, ...sent };
@@ -131,6 +148,14 @@ export class RemoteLane {
     );
   }
 
+  async waitForAck(clientSeq, { timeoutMs = 5000 } = {}) {
+    return this.waitFor(
+      (message) => message.t === "snapshot" && (message.netStatus?.lastSimConsumedClientSeq || 0) >= clientSeq,
+      timeoutMs,
+      `ack ${clientSeq}`,
+    );
+  }
+
   capture(label) {
     const summary = this.summary();
     this.artifacts.remote({ event: "capture", label, summary });
@@ -138,7 +163,9 @@ export class RemoteLane {
   }
 
   summary() {
-    return summarizeSnapshot(this.lastSnapshot, this.playerId);
+    const summary = summarizeSnapshot(this.lastSnapshot, this.playerId);
+    if (summary) summary.issuedCommands = this.issuedCommands.map(compactIssuedCommand);
+    return summary;
   }
 
   waitFor(test, timeoutMs, label) {
@@ -188,4 +215,13 @@ function compactMessage(message) {
     };
   }
   return message;
+}
+
+function compactIssuedCommand(entry) {
+  return {
+    clientSeq: entry.clientSeq,
+    kind: entry.kind,
+    issueStep: entry.issueStep,
+    latestKnownAuthoritativeTick: entry.latestKnownAuthoritativeTick,
+  };
 }

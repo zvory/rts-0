@@ -15,7 +15,7 @@ gate. GitHub Actions also runs this command after pushes to `main` as a shared s
 intentionally left open for direct pushes.
 
 ```bash
-tests/run-all.sh                 # local gate: cargo fmt --check + cargo test + clippy + 3 API suites + client smoke
+tests/run-all.sh                 # local gate: cargo fmt --check + cargo test + clippy + API suites + client smoke + tri-state scenarios
 tests/run-all.sh --full-ai       # local gate plus long AI self-play/simulation coverage
 tests/run-all.sh --no-rust       # skip Rust fmt/test/lint
 tests/run-all.sh --no-client     # skip the headless-browser smoke test
@@ -155,6 +155,19 @@ node tests/tri_state/run.mjs --scenario remote_client_basic_move
 node tests/tri_state/run.mjs --scenario queued_order_visibility
 node tests/tri_state/run.mjs --scenario dev_scenario_step_tick
 ```
+
+Run the lag backfill groups that are wired into `tests/run-all.sh`:
+
+```bash
+node tests/tri_state/run.mjs --scenario phase-0.5
+node tests/tri_state/run.mjs --scenario phase-2.5
+```
+
+Phase 2.5 scenarios exercise browser command sequencing, sim-consumption ACK handling,
+pending-command drops, stale/duplicate/skipped snapshot diagnostics, receipt diagnostics, rejection
+diagnostics, and command timeout reporting. The receipt/rejection scenarios use browser-lane
+controller diagnostics because the production wire protocol intentionally exposes only
+sim-consumption ACKs in snapshots.
 
 Run the intentionally failing artifact scenario without failing the shell:
 

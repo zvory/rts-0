@@ -10,6 +10,18 @@ import { LocalLaneUnavailable } from "./lanes/local_lane.mjs";
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const SCENARIO_DIR = path.join(HERE, "scenarios");
 const DEFAULT_SCENARIOS = ["remote_client_basic_move", "queued_order_visibility", "dev_scenario_step_tick"];
+const SCENARIO_GROUPS = Object.freeze({
+  "phase-0.5": DEFAULT_SCENARIOS,
+  "phase-2.5": [
+    "client_seq_monotonic_all_paths",
+    "ack_drops_consumed_pending_commands",
+    "ack_three_leaves_four_five_pending",
+    "socket_receipt_not_reconciliation_ack",
+    "duplicate_and_skipped_snapshots_are_diagnostic",
+    "stale_snapshot_ignored",
+    "rejection_notice_does_not_imply_ack",
+  ],
+});
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
@@ -94,10 +106,27 @@ async function executeStep(context, step) {
       if (lanes.remote) artifacts.timeline({ event: "remote.issue", result: await lanes.remote.issue(step.command, step.args) });
       if (lanes.client) artifacts.timeline({ event: "client.issue", result: await lanes.client.issue(step.command, step.args) });
       break;
+    case "issueBurst":
+      for (let i = 0; i < step.commands.length; i += 1) {
+        const entry = step.commands[i];
+        if (entry.select) {
+          await lanes.remote?.selectOwn(entry.select.kind, entry.select.index || 0);
+          await lanes.client?.selectOwn(entry.select.kind, entry.select.index || 0);
+        }
+        if (lanes.remote) artifacts.timeline({ event: "remote.issue", burstIndex: i, result: await lanes.remote.issue(entry.command, entry.args || {}) });
+        if (lanes.client) artifacts.timeline({ event: "client.issue", burstIndex: i, result: await lanes.client.issue(entry.command, entry.args || {}) });
+      }
+      break;
     case "waitForSnapshot":
       await Promise.all([
         lanes.remote?.waitForSnapshot(step),
         lanes.client?.waitForSnapshot(step),
+      ].filter(Boolean));
+      break;
+    case "waitForAck":
+      await Promise.all([
+        lanes.remote?.waitForAck(step.clientSeq, step),
+        lanes.client?.waitForAck(step.clientSeq, step),
       ].filter(Boolean));
       break;
     case "capture": {
@@ -138,6 +167,45 @@ async function executeStep(context, step) {
       if (!diff.ok) throw new Error(`owned ${step.unit}[${step.index || 0}] order plan diverged: ${JSON.stringify(diff)}`);
       break;
     }
+    case "assertClientSeqsStrictlyIncreasing": {
+      const commands = lanes.client?.issuedCommands || [];
+      const seqs = commands.map((entry) => entry.clientSeq);
+      const ok = seqs.every((seq, index) => index === 0 || seq > seqs[index - 1]);
+      const expectedCount = step.count ?? null;
+      const diff = { assertion: step.op, ok: ok && (expectedCount == null || seqs.length === expectedCount), seqs, expectedCount };
+      artifacts.diff(diff);
+      if (!diff.ok) throw new Error(`clientSeqs are not strictly increasing: ${JSON.stringify(diff)}`);
+      break;
+    }
+    case "assertClientPrediction": {
+      requireClientLane(lanes, step.op);
+      const debug = await lanes.client.predictionDebug();
+      const controller = debug?.controller || {};
+      const diff = comparePredictionSummary(controller, step);
+      artifacts.diff({ assertion: step.op, diff, controller });
+      if (!diff.ok) throw new Error(`client prediction assertion failed: ${JSON.stringify(diff)}`);
+      break;
+    }
+    case "injectClientSnapshot":
+      requireClientLane(lanes, step.op);
+      artifacts.timeline({ event: "client.injectSnapshot", result: await lanes.client.injectSnapshot(step.kind, step) });
+      break;
+    case "setClientSnapshotDelivery":
+      requireClientLane(lanes, step.op);
+      artifacts.timeline({ event: "client.snapshotDelivery", result: await lanes.client.setSnapshotDelivery(step.enabled) });
+      break;
+    case "recordSocketReceipt":
+      requireClientLane(lanes, step.op);
+      artifacts.timeline({ event: "client.socketReceipt", result: await lanes.client.recordSocketReceipt(step.clientSeq, step.detail || {}) });
+      break;
+    case "recordCommandRejection":
+      requireClientLane(lanes, step.op);
+      artifacts.timeline({ event: "client.commandRejection", result: await lanes.client.recordCommandRejection(step.clientSeq, step.reason) });
+      break;
+    case "expireClientCommands":
+      requireClientLane(lanes, step.op);
+      artifacts.timeline({ event: "client.expireCommands", result: await lanes.client.expireCommands(step.elapsedMs) });
+      break;
     case "setReplaySpeed":
       await lanes.client?.setReplaySpeed(step.speed);
       break;
@@ -169,6 +237,48 @@ function requireLiveLanes(lanes, op) {
   if (!lanes.remote || !lanes.client) throw new Error(`${op} requires remote and client lanes`);
 }
 
+function requireClientLane(lanes, op) {
+  if (!lanes.client) throw new Error(`${op} requires a client lane`);
+}
+
+function comparePredictionSummary(controller, step) {
+  const checks = [];
+  const add = (name, ok, actual, expected) => checks.push({ name, ok, actual, expected });
+  if (step.pendingClientSeqs) {
+    add(
+      "pendingClientSeqs",
+      JSON.stringify(controller.pendingClientSeqs || []) === JSON.stringify(step.pendingClientSeqs),
+      controller.pendingClientSeqs || [],
+      step.pendingClientSeqs,
+    );
+  }
+  for (const [option, field] of [
+    ["pendingCommandCount", "pendingCommandCount"],
+    ["latestAckSeq", "latestAckSeq"],
+    ["acknowledgedCount", "acknowledgedCount"],
+    ["staleSnapshotCount", "staleSnapshotCount"],
+    ["duplicateSnapshotCount", "duplicateSnapshotCount"],
+    ["skippedSnapshotCount", "skippedSnapshotCount"],
+    ["receiptCount", "receiptCount"],
+    ["rejectionCount", "rejectionCount"],
+    ["timedOutCount", "timedOutCount"],
+  ]) {
+    if (step[option] != null) add(field, controller[field] === step[option], controller[field], step[option]);
+  }
+  for (const [option, field] of [
+    ["minAcknowledgedCount", "acknowledgedCount"],
+    ["minStaleSnapshotCount", "staleSnapshotCount"],
+    ["minDuplicateSnapshotCount", "duplicateSnapshotCount"],
+    ["minSkippedSnapshotCount", "skippedSnapshotCount"],
+    ["minReceiptCount", "receiptCount"],
+    ["minRejectionCount", "rejectionCount"],
+    ["minTimedOutCount", "timedOutCount"],
+  ]) {
+    if (step[option] != null) add(field, (controller[field] || 0) >= step[option], controller[field], `>=${step[option]}`);
+  }
+  return { ok: checks.every((check) => check.ok), checks };
+}
+
 async function scenarioFilesFor(args) {
   const all = fs.readdirSync(SCENARIO_DIR)
     .filter((name) => name.endsWith(".mjs"))
@@ -179,6 +289,9 @@ async function scenarioFilesFor(args) {
     return DEFAULT_SCENARIOS.map((name) => path.join(SCENARIO_DIR, `${name}.mjs`));
   }
   return args.scenarios.flatMap((pattern) => {
+    if (SCENARIO_GROUPS[pattern]) {
+      return SCENARIO_GROUPS[pattern].map((name) => path.join(SCENARIO_DIR, `${name}.mjs`));
+    }
     if (pattern.includes("*")) {
       const regex = new RegExp(`^${pattern.replaceAll(".", "\\.").replaceAll("*", ".*")}\\.mjs$`);
       return all.filter((file) => regex.test(path.basename(file)));
