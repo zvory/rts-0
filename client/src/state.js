@@ -241,7 +241,9 @@ export class GameState {
         const targetPos = Array.isArray(ev.toPos) && ev.toPos.length === 2
           ? { x: ev.toPos[0], y: ev.toPos[1] }
           : null;
-        this.muzzleFlashes.push({ from: ev.from, to: ev.to, targetPos, createdAt: now });
+        if (ev.from !== ev.to) {
+          this.muzzleFlashes.push({ from: ev.from, to: ev.to, targetPos, createdAt: now });
+        }
         this.weaponRecoilById.set(ev.from, now);
       } else if (ev && ev.e === "smokeLaunch") {
         this.addSmokeCanister(ev, now);

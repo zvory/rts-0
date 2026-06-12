@@ -5,8 +5,8 @@ use crate::game::ability::{self, AbilityKind, AbilityTargetMode};
 use crate::game::artillery::ArtilleryShellStore;
 use crate::game::command::SimCommand;
 use crate::game::entity::{
-    BuildPhase, Entity, EntityKind, EntityStore, Order, OrderIntent, ProdItem, RallyIntent, RallyKind,
-    ResearchItem, WeaponSetup, MAX_QUEUED_ORDERS,
+    BuildPhase, Entity, EntityKind, EntityStore, Order, OrderIntent, ProdItem, RallyIntent,
+    RallyKind, ResearchItem, WeaponSetup, MAX_QUEUED_ORDERS,
 };
 use crate::game::fog::Fog;
 use crate::game::map::Map;
@@ -26,7 +26,7 @@ use crate::game::services::world_query;
 use crate::game::smoke::SmokeCloudStore;
 use crate::game::upgrade::{self, UpgradeKind};
 use crate::game::PlayerState;
-use crate::protocol::{Event, NoticeSeverity};
+use crate::protocol::{self, AttackReveal, Event, NoticeSeverity};
 use crate::rules;
 
 /// Max unique unit ids honored per multi-unit command. Caps the per-id work a single command can
@@ -1131,8 +1131,7 @@ fn artillery_point_fire_target(
     if distance2 < min_px * min_px || distance2 > max_px * max_px {
         return None;
     }
-    let center = artillery_point_fire_field_center(e)
-        .filter(|facing| facing.is_finite())?;
+    let center = artillery_point_fire_field_center(e).filter(|facing| facing.is_finite())?;
     let facing = dy.atan2(dx);
     if !facing.is_finite() {
         return None;
@@ -1210,6 +1209,15 @@ fn try_fire_artillery(
         e.set_attack_cd(config::ARTILLERY_RELOAD_TICKS);
         artillery_scattered_point(unit, tick, x, y, shot_number)
     };
+    let reveal = entities.get(unit).map(|attacker| AttackReveal {
+        owner: attacker.owner,
+        kind: protocol::kind_to_wire(attacker.kind).to_string(),
+        x: attacker.pos_x,
+        y: attacker.pos_y,
+        facing: Some(attacker.facing()),
+        weapon_facing: attacker.weapon_facing(),
+        setup_state: Some(attacker.weapon_setup().to_protocol_str().to_string()),
+    });
     artillery_shells.schedule(player, unit, target_x, target_y, tick);
     events
         .entry(player)
@@ -1221,6 +1229,20 @@ fn try_fire_artillery(
             radius_tiles: config::ARTILLERY_OUTER_RADIUS_TILES,
             delay_ticks: config::ARTILLERY_SHELL_DELAY_TICKS,
         });
+    if let Some(reveal) = reveal {
+        let player_ids: Vec<u32> = events.keys().copied().collect();
+        for pid in player_ids {
+            if pid == player {
+                continue;
+            }
+            events.entry(pid).or_default().push(Event::Attack {
+                from: unit,
+                to: unit,
+                reveal: Some(reveal.clone()),
+                to_pos: None,
+            });
+        }
+    }
     true
 }
 
@@ -3652,7 +3674,10 @@ mod tests {
         let pos = (320.0, 320.0);
         let angle = config::ARTILLERY_FIELD_OF_FIRE_RAD * 0.45;
         let distance = config::TILE_SIZE as f32 * 22.0;
-        let target = (pos.0 + angle.cos() * distance, pos.1 + angle.sin() * distance);
+        let target = (
+            pos.0 + angle.cos() * distance,
+            pos.1 + angle.sin() * distance,
+        );
         let artillery = entities
             .spawn_unit(1, EntityKind::Artillery, pos.0, pos.1)
             .expect("artillery should spawn");
@@ -3686,13 +3711,10 @@ mod tests {
             unit.emplacement_facing().unwrap_or_default().abs() < 0.001,
             "in-arc point fire must not recenter the deployed field of fire"
         );
-        assert_eq!(
-            players[0].steel,
-            1_000 - config::ARTILLERY_AMMO_COST_STEEL
-        );
-        assert!(events.get(&1).is_some_and(|events| events
-            .iter()
-            .any(|event| matches!(event, Event::ArtilleryTarget { from, .. } if *from == artillery))));
+        assert_eq!(players[0].steel, 1_000 - config::ARTILLERY_AMMO_COST_STEEL);
+        assert!(events.get(&1).is_some_and(|events| events.iter().any(
+            |event| matches!(event, Event::ArtilleryTarget { from, .. } if *from == artillery)
+        )));
     }
 
     #[test]
@@ -3704,7 +3726,10 @@ mod tests {
         let old_target = (pos.0 + config::TILE_SIZE as f32 * 22.0, pos.1);
         let angle = config::ARTILLERY_FIELD_OF_FIRE_RAD;
         let distance = config::TILE_SIZE as f32 * 22.0;
-        let target = (pos.0 + angle.cos() * distance, pos.1 + angle.sin() * distance);
+        let target = (
+            pos.0 + angle.cos() * distance,
+            pos.1 + angle.sin() * distance,
+        );
         let artillery = entities
             .spawn_unit(1, EntityKind::Artillery, pos.0, pos.1)
             .expect("artillery should spawn");

@@ -2723,6 +2723,33 @@ function fakeAudioContext() {
     "artillery visual events do not stamp or extend client fog visibility",
   );
 
+  const artilleryRevealState = new GameState({ ...start, map: { ...start.map, resources: [] } });
+  artilleryRevealState.applySnapshot({
+    tick: 11,
+    steel: 0,
+    oil: 0,
+    supplyUsed: 0,
+    supplyCap: 10,
+    entities: [],
+    events: [{
+      e: EVENT.ATTACK,
+      from: 99,
+      to: 99,
+      reveal: {
+        owner: 2,
+        kind: KIND.ARTILLERY,
+        x: 512,
+        y: 544,
+        facing: 0,
+        weaponFacing: 0,
+        setupState: SETUP.DEPLOYED,
+      },
+    }],
+  });
+  assert(artilleryRevealState.entityById(99)?.shotReveal === true, "artillery self-attack event creates a fog shot reveal");
+  assert(artilleryRevealState.liveMuzzleFlashes(performance.now()).length === 0, "artillery self-reveal does not draw a tracer");
+  assert(artilleryRevealState.weaponRecoil(99, KIND.ARTILLERY, performance.now()) > 0, "artillery self-reveal still recoils the gun");
+
   // Interpolation clamps alpha to [0,1]
   const entsNeg = state.entitiesInterpolated(-0.5);
   const entsOver = state.entitiesInterpolated(1.5);

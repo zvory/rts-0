@@ -400,8 +400,10 @@ entities were damaged by the shell. A damaged victim owner receives `from` + `re
 attacking mortar can be shown briefly above fog after indirect fire lands. Enemy players do not
 receive hidden mortar launch data or hidden mortar impact markers unless their entities were hit.
 Artillery target events are sent only to the firing player so enemies never receive pre-impact
-markers or firing-gun ids, even if they have vision of the gun. The `from` id lets the firing
-client recoil the specific gun and draw launch dust. Artillery impact events are sent to every
+markers, even if they have vision of the gun. The `from` id lets the firing client recoil the
+specific gun and draw launch dust. Other players receive a visual-only `attack` event with a
+shooter `reveal` when artillery fires, so the firing gun is briefly shown above fog without
+revealing terrain, exploration, or the target point. Artillery impact events are sent to every
 active recipient after impact as visual-only explosions; they do not reveal terrain, update
 exploration, or carry entity visibility.
 Events are best-effort visual flavor; the client must not depend on receiving them.
