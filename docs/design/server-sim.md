@@ -57,8 +57,9 @@ impl Game {
     /// Loads the hardcoded handcrafted map, selects one authored spawn layout for the player
     /// count by `seed`, shuffles that layout's slots, assigns the slots to players in lobby order,
     /// and spawns each player's starting City Centre + STARTING_WORKERS workers + nearby steel/oil
-    /// resource clusters. Each selected slot keeps its authored main-natural pair, so maps can
-    /// define different fair naturals for adjacent, cross, safe-base, or other spawn layouts.
+    /// resource clusters. Each selected slot keeps its authored main/naturals grouping, so maps
+    /// can define different fair naturals for adjacent, cross, safe-base, or other spawn layouts
+    /// and can grant more than one neutral expansion per player.
     /// AI players are spawned as normal match participants; external AI orchestration owns any
     /// controller/profile selection.
     pub fn new(players: &[PlayerInit], seed: u32) -> Game;
