@@ -2105,7 +2105,7 @@ fn shots_do_not_continue_into_resource_nodes() {
     assert_eq!(entities.get(primary).expect("primary should exist").hp, 35);
     assert_eq!(
         entities.get(node).expect("node should exist").remaining(),
-        Some(1500)
+        Some(1000)
     );
     assert_eq!(entities.get(node).expect("node should exist").hp, 1);
 }

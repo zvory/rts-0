@@ -161,7 +161,8 @@ authoritative `rules::defs` records.
   Its JSON uses row strings (`.` grass, `#` rock, `~` water), named `sites`, and authored
   player-count-specific spawn `layouts`.
 - Start: `STARTING_STEEL = 75`, `STARTING_OIL = 0`, `STARTING_WORKERS = 4`,
-  one City Centre at the player's start tile, 18 steel patches + 3 oil patches nearby.
+  one City Centre at the player's start tile, 18 steel patches with 1,000 steel each + 3 oil
+  patches with 3,333 oil each nearby.
 - Supply: City Centre gives `+10`, Depot gives `+8`, hard cap `200`.
 - Attached mining: workers walk to a patch, latch onto it, and mine in place.
   Every `HARVEST_TICKS = 40` the load (`STEEL_LOAD = 2` / `OIL_LOAD = 2`) is deposited
