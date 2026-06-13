@@ -10,18 +10,6 @@ export function cursorLockSupported(browserPointerLockSupported) {
   return browserPointerLockSupported;
 }
 
-export function shouldRequestPointerLock({ installedAppRuntime: isInstalledApp, requireGesture }) {
-  return !isInstalledApp || !!requireGesture;
-}
-
-export function automaticPointerLockDisabledForTests() {
-  try {
-    return new URLSearchParams(globalThis.location?.search || "").has("rtsNoAutoPointerLock");
-  } catch {
-    return false;
-  }
-}
-
 export async function enterCursorLock(enterBrowserPointerLock, cursor = null) {
   void cursor;
   const browserLocked = await enterBrowserPointerLock();

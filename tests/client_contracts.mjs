@@ -72,12 +72,10 @@ import { _controlGroupSaveModifierActive } from "../client/src/input/control_gro
 import { Minimap } from "../client/src/minimap.js";
 import { ReplayCameraInput } from "../client/src/replay_camera_input.js";
 import {
-  automaticPointerLockDisabledForTests,
   cursorLockSupported,
   enterCursorLock,
   exitCursorLock,
   installedAppRuntime,
-  shouldRequestPointerLock,
 } from "../client/src/input/cursor_lock.js";
 import { DomClickInputZone, MatchInputRouter } from "../client/src/input/router.js";
 import { _drawUnit, _tankMotionVisual } from "../client/src/renderer/units.js";
@@ -1853,25 +1851,6 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
     "live notice alerts still play audio outside the current viewport",
   );
 
-  const storageValues = new Map();
-  globalThis.window.localStorage = {
-    getItem(key) {
-      return storageValues.has(key) ? storageValues.get(key) : null;
-    },
-    setItem(key, value) {
-      storageValues.set(key, value);
-    },
-    removeItem(key) {
-      storageValues.delete(key);
-    },
-  };
-  const storagePolicyMatch = Object.create(Match.prototype);
-  assert(!storagePolicyMatch.readPointerLockPanEnabled(), "lock cursor pan defaults off without stored opt-in");
-  storagePolicyMatch.writePointerLockPanEnabled(true);
-  assert(storagePolicyMatch.readPointerLockPanEnabled(), "lock cursor pan opt-in persists");
-  storagePolicyMatch.writePointerLockPanEnabled(false);
-  assert(!storagePolicyMatch.readPointerLockPanEnabled(), "lock cursor pan opt-out clears persisted opt-in");
-
   const predictionPolicyMatch = Object.create(Match.prototype);
   predictionPolicyMatch.replayViewer = false;
   predictionPolicyMatch.state = {
@@ -2021,98 +2000,38 @@ assert(noticeSoundId("Not enough resources") === null, "generic resource notices
   assert(!mismatchMatch.prediction.enabled, "stale cached state module disables prediction instead of crashing");
   assert(mismatchStatus === "disabled-state-mismatch", "state mismatch is logged for diagnostics");
 
-  const lockedPolicyMatch = Object.create(Match.prototype);
-  lockedPolicyMatch.input = {
-    pointerLocked: true,
-    pointerLockSupported: () => true,
-    installedAppRuntime: () => false,
-  };
-  lockedPolicyMatch.pointerLockPanEnabled = true;
-  lockedPolicyMatch.pointerLockRetryToken = 0;
-  let requestedRetry = null;
-  lockedPolicyMatch.runPointerLockRetryBurst = (token, maxAttempts) => {
-    requestedRetry = { token, maxAttempts };
-    return Promise.resolve();
-  };
-  lockedPolicyMatch.requestAutomaticPointerLock({ requireGesture: true });
-  assert(requestedRetry === null, "automatic Pointer Lock does not churn an already locked raw session");
-
-  const disabledPolicyMatch = Object.create(Match.prototype);
-  disabledPolicyMatch.input = {
+  const manualPointerLockMatch = Object.create(Match.prototype);
+  let toggledPointerLock = 0;
+  let closedSettings = 0;
+  manualPointerLockMatch.input = {
     pointerLocked: false,
     pointerLockSupported: () => true,
-    installedAppRuntime: () => false,
-  };
-  disabledPolicyMatch.pointerLockPanEnabled = false;
-  disabledPolicyMatch.pointerLockRetryToken = 0;
-  requestedRetry = null;
-  disabledPolicyMatch.runPointerLockRetryBurst = (token, maxAttempts) => {
-    requestedRetry = { token, maxAttempts };
-    return Promise.resolve();
-  };
-  disabledPolicyMatch.requestAutomaticPointerLock({ requireGesture: true });
-  assert(requestedRetry === null, "automatic Pointer Lock is gated behind the lock cursor pan setting");
-
-  const unlockedPolicyMatch = Object.create(Match.prototype);
-  unlockedPolicyMatch.input = {
-    pointerLocked: false,
-    pointerLockSupported: () => true,
-    installedAppRuntime: () => true,
-  };
-  unlockedPolicyMatch.pointerLockPanEnabled = true;
-  unlockedPolicyMatch.autoPointerLockUntil = 0;
-  unlockedPolicyMatch.pointerLockRetryToken = 0;
-  requestedRetry = null;
-  unlockedPolicyMatch.runPointerLockRetryBurst = (token, maxAttempts) => {
-    requestedRetry = { token, maxAttempts };
-    return Promise.resolve();
-  };
-  unlockedPolicyMatch.requestAutomaticPointerLock({ requireGesture: true });
-  assert(requestedRetry?.maxAttempts === 4, "installed-app gesture retries raw Pointer Lock while unlocked");
-
-  const retryMatch = Object.create(Match.prototype);
-  retryMatch.running = true;
-  retryMatch.input = {
-    pointerLocked: false,
-    pointerLockSupported: () => true,
-    installedAppRuntime: () => false,
-    async requestPointerLock() {
-      return false;
+    togglePointerLock() {
+      toggledPointerLock += 1;
     },
   };
-  retryMatch.autoPointerLockUntil = 0;
-  retryMatch.pointerLockRetryToken = 7;
-  retryMatch.waitPointerLockRetryDelay = async () => {};
-  await retryMatch.runPointerLockRetryBurst(7, 2);
-  assert(retryMatch.pointerLockRetry.attempts === 2, "raw Pointer Lock retry keeps trying while unlocked");
-  assert(retryMatch.pointerLockRetry.stopped === "exhausted", "raw Pointer Lock retry exhausts without plain fallback");
+  manualPointerLockMatch.closeSettingsMenu = () => {
+    closedSettings += 1;
+  };
+  manualPointerLockMatch.syncPointerLockUi = () => {};
+  manualPointerLockMatch.togglePointerLock();
+  assert(toggledPointerLock === 1, "manual cursor-lock action is the only Pointer Lock request path");
+  assert(closedSettings === 1, "manual cursor-lock request closes settings before requesting lock");
+
+  let unsupportedToast = null;
+  manualPointerLockMatch.input.pointerLockSupported = () => false;
+  manualPointerLockMatch.toast = (msg) => {
+    unsupportedToast = msg;
+  };
+  manualPointerLockMatch.togglePointerLock();
+  assert(toggledPointerLock === 1, "unsupported cursor-lock action does not request Pointer Lock");
+  assert(unsupportedToast === "Cursor lock is not supported by this browser.",
+    "unsupported cursor lock surfaces the existing support message");
 
   if (priorWindow === undefined) delete globalThis.window;
   else globalThis.window = priorWindow;
   if (priorDocument === undefined) delete globalThis.document;
   else globalThis.document = priorDocument;
-}
-
-{
-  assert(
-    !shouldRequestPointerLock({ installedAppRuntime: true, requireGesture: false }),
-    "installed-app Pointer Lock skips non-gesture automatic requests",
-  );
-  assert(
-    shouldRequestPointerLock({ installedAppRuntime: true, requireGesture: true }),
-    "installed-app Pointer Lock runs from user gesture requests",
-  );
-  assert(
-    shouldRequestPointerLock({ installedAppRuntime: false, requireGesture: false }),
-    "browser Pointer Lock keeps non-gesture automatic attempts",
-  );
-  const priorLocation = globalThis.location;
-  globalThis.location = { search: "?rtsNoAutoPointerLock=1" };
-  assert(automaticPointerLockDisabledForTests(), "test URL flag disables automatic Pointer Lock requests");
-  globalThis.location = { search: "" };
-  assert(!automaticPointerLockDisabledForTests(), "automatic Pointer Lock is enabled by default");
-  if (priorLocation === undefined) delete globalThis.location;
-  else globalThis.location = priorLocation;
 }
 
 function fakeAudioParam(value = 1) {

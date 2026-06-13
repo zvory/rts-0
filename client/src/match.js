@@ -8,7 +8,6 @@ import {
 import { Fog } from "./fog.js";
 import { HUD } from "./hud.js";
 import { Input } from "./input/index.js";
-import { automaticPointerLockDisabledForTests, shouldRequestPointerLock } from "./input/cursor_lock.js";
 import { DomClickInputZone, MatchInputRouter } from "./input/router.js";
 import { Minimap } from "./minimap.js";
 import { MatchHealth } from "./match_health.js";
@@ -37,10 +36,6 @@ const ARTILLERY_FIRE_GAIN = 1.2;
 const MATCH_PING_MS = 2000;
 const NET_REPORT_MS = 10000;
 const PREDICTION_REPLAY_BUDGET_MS = 4;
-const AUTO_POINTER_LOCK_SUPPRESS_MS = 1200;
-const INSTALLED_APP_POINTER_LOCK_RETRY_ATTEMPTS = 4;
-const INSTALLED_APP_POINTER_LOCK_RETRY_DELAY_MS = 120;
-const POINTER_LOCK_PAN_STORAGE_KEY = "rts.lockCursorPan";
 
 const COMBAT_SOUNDS = Object.freeze({
   [KIND.TANK]: {
@@ -132,11 +127,7 @@ export class Match {
         return issued;
       },
     };
-    this.autoPointerLockUntil = 0;
-    this.pointerLockPanEnabled = this.readPointerLockPanEnabled();
     this.pointerLockDiagnosticShown = false;
-    this.pointerLockRetryToken = 0;
-    this.pointerLockRetry = null;
 
     // --- Build the module graph from the static start payload (docs/design/client-ui.md §4.1). ---
     this.state = this._timeInit("match.state", () => new GameState(payload));
@@ -218,9 +209,6 @@ export class Match {
     this.onReplayAnalysis = (m) => this.replayAnalysisOverlay?.applyReplayAnalysis(m);
     this.onResize = this.handleResize.bind(this);
     this.onMenuKeyDown = this.handleMenuKeyDown.bind(this);
-    this.onWindowFocus = this.handleWindowFocus.bind(this);
-    this.onVisibilityChange = this.handleVisibilityChange.bind(this);
-    this.onPointerLockGesture = this.handlePointerLockGesture.bind(this);
     this.onGiveUpOpen = this.openGiveUpConfirm.bind(this);
     this.onGiveUpCancel = this.closeGiveUpConfirm.bind(this);
     this.onGiveUpConfirm = this.requestGiveUp.bind(this);
@@ -236,13 +224,7 @@ export class Match {
     this.net.on(S.REPLAY_STATE, this.onReplayState);
     this.net.on(S.REPLAY_ANALYSIS, this.onReplayAnalysis);
     window.addEventListener("resize", this.onResize);
-    window.addEventListener("focus", this.onWindowFocus);
     window.addEventListener("keydown", this.onMenuKeyDown, true);
-    if (!this.replayViewer) {
-      window.addEventListener("keydown", this.onPointerLockGesture, true);
-      window.addEventListener("click", this.onPointerLockGesture, true);
-    }
-    document.addEventListener("visibilitychange", this.onVisibilityChange);
     if (!this.replayViewer) {
       dom.giveUpCancel?.addEventListener("click", this.onGiveUpCancel);
       dom.giveUpConfirmButton?.addEventListener("click", this.onGiveUpConfirm);
@@ -253,7 +235,6 @@ export class Match {
     this.startMatchPings();
     this.startNetReports();
     this.health.publish();
-    this.requestAutomaticPointerLock({ requireGesture: false });
     if (this.prediction.enabled) this.initPredictionAdapter();
 
     // Show speed controls for replay and scenario dev-watch rooms.
@@ -524,84 +505,6 @@ export class Match {
     }
   }
 
-  handleWindowFocus() {
-    this.requestAutomaticPointerLock({ requireGesture: false });
-  }
-
-  handleVisibilityChange() {
-    if (!document.hidden) this.requestAutomaticPointerLock({ requireGesture: false });
-  }
-
-  handlePointerLockGesture(ev) {
-    if (ev.code === "Escape" || isTextEntry(ev.target)) return;
-    if (ev.type === "click" && !dom.viewport?.contains(ev.target)) return;
-    this.requestAutomaticPointerLock({ requireGesture: true });
-  }
-
-  requestAutomaticPointerLock({ requireGesture = false } = {}) {
-    if (!this.pointerLockPanEnabled) return;
-    if (!this.input || !this.input.pointerLockSupported()) return;
-    if (automaticPointerLockDisabledForTests()) return;
-    const isInstalledApp = this.input.installedAppRuntime();
-    if (!shouldRequestPointerLock({ installedAppRuntime: isInstalledApp, requireGesture })) return;
-    if (this.input.pointerLocked) return;
-    this.autoPointerLockUntil = performance.now() + AUTO_POINTER_LOCK_SUPPRESS_MS;
-    const maxAttempts = isInstalledApp && requireGesture ? INSTALLED_APP_POINTER_LOCK_RETRY_ATTEMPTS : 1;
-    this.pointerLockRetryToken += 1;
-    void this.runPointerLockRetryBurst(this.pointerLockRetryToken, maxAttempts);
-  }
-
-  async runPointerLockRetryBurst(token, maxAttempts) {
-    this.pointerLockRetry = {
-      startedAt: new Date().toISOString(),
-      attempts: 0,
-      maxAttempts,
-      lastResult: null,
-      stopped: null,
-    };
-
-    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-      if (token !== this.pointerLockRetryToken || !this.running) {
-        this.pointerLockRetry.stopped = "superseded";
-        break;
-      }
-      if (!this.input || !this.input.pointerLockSupported()) {
-        this.pointerLockRetry.stopped = "unavailable";
-        break;
-      }
-      if (this.input.pointerLocked) {
-        this.pointerLockRetry.stopped = "already-locked";
-        break;
-      }
-      if (this.input.installedAppRuntime() && typeof document.hasFocus === "function" && !document.hasFocus()) {
-        this.pointerLockRetry.stopped = "document-not-focused";
-        break;
-      }
-
-      this.pointerLockRetry.attempts = attempt;
-      const locked = await this.input.requestPointerLock();
-      this.pointerLockRetry.lastResult = locked ? "locked" : "not-locked";
-      if (locked || this.input.pointerLocked) {
-        this.pointerLockRetry.stopped = "locked";
-        break;
-      }
-      if (attempt < maxAttempts) await this.waitPointerLockRetryDelay();
-    }
-
-    if (!this.pointerLockRetry.stopped) this.pointerLockRetry.stopped = "exhausted";
-    window.setTimeout(() => {
-      if (performance.now() >= this.autoPointerLockUntil) this.autoPointerLockUntil = 0;
-    }, AUTO_POINTER_LOCK_SUPPRESS_MS);
-  }
-
-  waitPointerLockRetryDelay() {
-    return new Promise((resolve) => window.setTimeout(resolve, INSTALLED_APP_POINTER_LOCK_RETRY_DELAY_MS));
-  }
-
-  automaticPointerLockActive() {
-    return performance.now() <= this.autoPointerLockUntil;
-  }
-
   closeSettingsMenu() {
     this.settings?.close();
   }
@@ -645,16 +548,8 @@ export class Match {
       this.syncPointerLockUi();
       return;
     }
-    this.autoPointerLockUntil = 0;
-    this.pointerLockPanEnabled = !this.pointerLockPanEnabled;
-    this.writePointerLockPanEnabled(this.pointerLockPanEnabled);
-    this.pointerLockRetryToken += 1;
-    if (this.pointerLockPanEnabled) {
-      this.closeSettingsMenu();
-      void this.input.requestPointerLock();
-    } else if (this.input.pointerLocked) {
-      void this.input.exitPointerLock();
-    }
+    if (!this.input.pointerLocked) this.closeSettingsMenu();
+    void this.input.togglePointerLock();
     this.syncPointerLockUi();
   }
 
@@ -670,14 +565,13 @@ export class Match {
   handlePointerLockChange(locked) {
     if (locked) {
       this.closeSettingsMenu();
-      if (!this.automaticPointerLockActive()) this.toast("Cursor locked. Press Esc to unlock.");
+      this.toast("Cursor locked. Press Esc to unlock.");
     }
     this.syncPointerLockUi();
   }
 
   handlePointerLockError(err) {
     this.recordPointerLockDiagnostic(err);
-    if (this.automaticPointerLockActive()) return;
     this.toast("Cursor lock was blocked. Click the game view and try again.");
     this.syncPointerLockUi();
   }
@@ -687,7 +581,6 @@ export class Match {
     const snapshot = {
       at: new Date().toISOString(),
       error: this.pointerLockErrorSummary(err),
-      retry: this.pointerLockRetry,
       support: this.input.pointerLockDebugSnapshot(),
     };
     if (typeof window !== "undefined") window.__rtsPointerLockDebug = snapshot;
@@ -753,7 +646,7 @@ export class Match {
             state: () => ({
               hidden: false,
               supported: !!this.input?.pointerLockSupported(),
-              enabled: this.pointerLockPanEnabled,
+              enabled: !!this.input?.pointerLocked,
               locked: !!this.input?.pointerLocked,
             }),
             onToggle: this.onPointerLockToggle,
@@ -770,23 +663,6 @@ export class Match {
       }),
     });
     if (wasOpen) this.settings.open({ focus: false });
-  }
-
-  readPointerLockPanEnabled() {
-    try {
-      return window.localStorage.getItem(POINTER_LOCK_PAN_STORAGE_KEY) === "1";
-    } catch {
-      return false;
-    }
-  }
-
-  writePointerLockPanEnabled(enabled) {
-    try {
-      if (enabled) window.localStorage.setItem(POINTER_LOCK_PAN_STORAGE_KEY, "1");
-      else window.localStorage.removeItem(POINTER_LOCK_PAN_STORAGE_KEY);
-    } catch {
-      // Private browsing or storage policy failures should only make the setting session-local.
-    }
   }
 
   /** Compute world/viewport sizes and push them into the camera. */
@@ -1100,7 +976,6 @@ export class Match {
     this.net.off(S.REPLAY_STATE, this.onReplayState);
     this.net.off(S.REPLAY_ANALYSIS, this.onReplayAnalysis);
     window.removeEventListener("keydown", this.onMenuKeyDown, true);
-    document.removeEventListener("visibilitychange", this.onVisibilityChange);
     this.replayControls?.destroy();
     this.replayAnalysisOverlay?.destroy();
     this.predictionInitToken += 1;
@@ -1128,18 +1003,11 @@ export class Match {
     this.stopMatchPings();
     this.stopNetReports();
     this.stopAllMachineGunSounds();
-    this.pointerLockRetryToken += 1;
     this.net.off(S.SNAPSHOT, this.onSnapshot);
     this.net.off(S.REPLAY_STATE, this.onReplayState);
     this.net.off(S.REPLAY_ANALYSIS, this.onReplayAnalysis);
     window.removeEventListener("resize", this.onResize);
-    window.removeEventListener("focus", this.onWindowFocus);
     window.removeEventListener("keydown", this.onMenuKeyDown, true);
-    if (!this.replayViewer) {
-      window.removeEventListener("keydown", this.onPointerLockGesture, true);
-      window.removeEventListener("click", this.onPointerLockGesture, true);
-    }
-    document.removeEventListener("visibilitychange", this.onVisibilityChange);
     if (!this.replayViewer) {
       dom.giveUpCancel?.removeEventListener("click", this.onGiveUpCancel);
       dom.giveUpConfirmButton?.removeEventListener("click", this.onGiveUpConfirm);
