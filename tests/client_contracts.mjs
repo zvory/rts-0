@@ -343,6 +343,7 @@ function withFakeOverlayDocument(fn) {
       this.dataset = {};
       this.children = [];
       this.parentNode = null;
+      this.focused = false;
       this.listeners = {};
       this.attributes = new Map();
       this.classList = {
@@ -383,6 +384,9 @@ function withFakeOverlayDocument(fn) {
     }
     removeEventListener(type, handler) {
       if (this.listeners[type] === handler) delete this.listeners[type];
+    }
+    focus() {
+      this.focused = true;
     }
     setAttribute(name, value) {
       this.attributes.set(name, String(value));
@@ -5036,6 +5040,71 @@ function fakeAudioContext() {
     const replacedUnitText = textWithin(root);
     assert(replacedUnitText.includes("Engineer"), "units tab renders replacement analysis after seek");
     assert(!replacedUnitText.includes("Tank"), "units tab drops stale rows after seek replacement");
+
+    restored.selectedTab = "units-lost";
+    overlay.render();
+    assert(
+      textWithin(root).includes("No units lost"),
+      "units lost tab handles analysis with no loss rows cleanly",
+    );
+    overlay.applyReplayAnalysis({
+      tick: 30,
+      players: [
+        {
+          id: 1,
+          units: [],
+          production: [],
+          unitsLost: [
+            { kind: KIND.RIFLEMAN, count: 2, steelValue: 100, oilValue: 0 },
+            { kind: KIND.TANK, count: 1, steelValue: 300, oilValue: 150 },
+          ],
+          resourcesLost: { steel: 400, oil: 150 },
+        },
+        {
+          id: 2,
+          units: [],
+          production: [],
+          unitsLost: [{ kind: KIND.WORKER, count: 3, steelValue: 150, oilValue: 0 }],
+          resourcesLost: { steel: 150, oil: 0 },
+        },
+      ],
+    });
+    const unitsLostText = textWithin(root);
+    assert(
+      unitsLostText.includes("Total lost") && unitsLostText.includes("3") && unitsLostText.includes("400") && unitsLostText.includes("150"),
+      "units lost tab includes per-player totals with steel and oil value lost",
+    );
+    assert(
+      unitsLostText.includes("Rifleman") && unitsLostText.includes("Tank") && unitsLostText.includes("Engineer"),
+      "units lost tab renders per-kind loss rows for multiple players",
+    );
+
+    restored.selectedTab = "resources-lost";
+    overlay.render();
+    const resourcesLostText = textWithin(root);
+    assert(
+      resourcesLostText.includes("Dead unit value")
+        && resourcesLostText.includes("Spent steel and oil value of units that died")
+        && resourcesLostText.includes("Total")
+        && resourcesLostText.includes("550")
+        && resourcesLostText.includes("150"),
+      "resources lost tab labels the narrow Phase 3 definition and totals killed unit value",
+    );
+    assert(
+      resourcesLostText.includes("Red") && resourcesLostText.includes("Blue"),
+      "resources lost tab renders per-player killed unit value",
+    );
+
+    const tabButtons = root.querySelectorAll(".replay-analysis-tab");
+    const firstTab = tabButtons[0];
+    overlayRoot.listeners.keydown?.({
+      target: firstTab,
+      key: "End",
+      preventDefault() {},
+      stopPropagation() {},
+    });
+    assert(restored.selectedTab === "resources-lost", "replay analysis keyboard End selects the last tab");
+    assert(tabButtons[tabButtons.length - 1].focused === true, "replay analysis keyboard navigation focuses the selected tab");
 
     overlay.destroy();
     assert(root.children.length === 0, "replay analysis overlay removes generated DOM on destroy");

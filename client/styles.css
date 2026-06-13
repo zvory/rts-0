@@ -1906,6 +1906,14 @@ input[type="text"]:focus {
   border-color: var(--accent);
   color: var(--ink);
 }
+.replay-analysis-tab:focus-visible,
+.replay-analysis-actions button:focus-visible,
+.replay-analysis-show:focus-visible {
+  border-color: var(--accent);
+  color: var(--ink);
+  outline: 2px solid rgba(236, 199, 103, 0.45);
+  outline-offset: 2px;
+}
 .replay-analysis-tab.active {
   border-color: var(--accent);
   color: var(--accent);
@@ -1961,6 +1969,11 @@ input[type="text"]:focus {
 .replay-analysis-empty {
   color: var(--ink-dim);
 }
+.replay-analysis-note {
+  color: var(--ink-dim);
+  font-size: 10px;
+  line-height: 1.35;
+}
 .replay-analysis-player-heading {
   display: grid;
   grid-template-columns: 10px minmax(0, 1fr);
@@ -1996,7 +2009,8 @@ input[type="text"]:focus {
   line-height: 1;
 }
 .replay-production-row,
-.replay-units-row {
+.replay-units-row,
+.replay-resources-lost-row {
   display: grid;
   align-items: center;
   gap: 6px;
@@ -2006,7 +2020,8 @@ input[type="text"]:focus {
   grid-template-columns: 25px minmax(0, 1fr) minmax(36px, auto) minmax(32px, auto);
 }
 .replay-production-main,
-.replay-units-label {
+.replay-units-label,
+.replay-resources-lost-name {
   overflow: hidden;
   color: var(--ink);
   font-weight: 700;
@@ -2017,7 +2032,9 @@ input[type="text"]:focus {
 .replay-production-queue,
 .replay-units-count,
 .replay-units-steel,
-.replay-units-oil {
+.replay-units-oil,
+.replay-resources-lost-steel,
+.replay-resources-lost-oil {
   justify-self: end;
   color: var(--ink-faint);
   font-variant-numeric: tabular-nums;
@@ -2025,14 +2042,21 @@ input[type="text"]:focus {
 .replay-units-row {
   grid-template-columns: 25px minmax(0, 1fr) minmax(24px, auto) minmax(40px, auto) minmax(34px, auto);
 }
-.replay-units-row.is-total {
+.replay-resources-lost-row {
+  grid-template-columns: 10px minmax(0, 1fr) minmax(44px, auto) minmax(38px, auto);
+}
+.replay-units-row.is-total,
+.replay-resources-lost-row.is-total {
   border-bottom: 1px solid rgba(231, 223, 197, 0.1);
   padding-bottom: 3px;
 }
 .replay-units-row.is-total .replay-units-label,
 .replay-units-row.is-total .replay-units-count,
 .replay-units-row.is-total .replay-units-steel,
-.replay-units-row.is-total .replay-units-oil {
+.replay-units-row.is-total .replay-units-oil,
+.replay-resources-lost-row.is-total .replay-resources-lost-name,
+.replay-resources-lost-row.is-total .replay-resources-lost-steel,
+.replay-resources-lost-row.is-total .replay-resources-lost-oil {
   color: var(--accent);
   font-weight: 800;
 }
@@ -2044,9 +2068,14 @@ input[type="text"]:focus {
   content: "S ";
   color: #b8b8b8;
 }
-.replay-units-oil::before {
+.replay-units-oil::before,
+.replay-resources-lost-oil::before {
   content: "O ";
   color: #8f8a7b;
+}
+.replay-resources-lost-steel::before {
+  content: "S ";
+  color: #b8b8b8;
 }
 .replay-army-value-empty {
   color: var(--ink-dim);

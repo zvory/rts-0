@@ -5,6 +5,8 @@ const STORAGE_KEY = "rts.replayAnalysisOverlay";
 const ARMY_VALUE_TAB_ID = "army-value";
 const PRODUCTION_TAB_ID = "production";
 const UNITS_TAB_ID = "units";
+const UNITS_LOST_TAB_ID = "units-lost";
+const RESOURCES_LOST_TAB_ID = "resources-lost";
 
 export const REPLAY_ANALYSIS_TABS = Object.freeze([
   { id: ARMY_VALUE_TAB_ID, label: "Army value" },
@@ -73,6 +75,7 @@ export class ReplayAnalysisOverlay {
     this.showButton = null;
     this.analysis = null;
     this.onClick = (ev) => this.handleClick(ev);
+    this.onKeyDown = (ev) => this.handleKeyDown(ev);
     this.mount();
   }
 
@@ -83,6 +86,7 @@ export class ReplayAnalysisOverlay {
     this.el.className = "replay-analysis-overlay";
     this.el.setAttribute("aria-label", "Replay analysis");
     this.el.addEventListener("click", this.onClick);
+    this.el.addEventListener("keydown", this.onKeyDown);
 
     this.panel = document.createElement("section");
     this.panel.className = "replay-analysis-panel hud-panel";
@@ -165,6 +169,36 @@ export class ReplayAnalysisOverlay {
     this.render();
   }
 
+  handleKeyDown(ev) {
+    const target = ev.target instanceof Element ? ev.target : null;
+    const tab = target?.closest(".replay-analysis-tab");
+    if (!tab || !this.tabsEl?.contains(tab)) return;
+
+    const tabs = [...this.tabsEl.querySelectorAll(".replay-analysis-tab")];
+    const currentIndex = tabs.indexOf(tab);
+    if (currentIndex < 0) return;
+
+    let nextIndex = currentIndex;
+    if (ev.key === "ArrowRight" || ev.key === "ArrowDown") {
+      nextIndex = (currentIndex + 1) % tabs.length;
+    } else if (ev.key === "ArrowLeft" || ev.key === "ArrowUp") {
+      nextIndex = (currentIndex - 1 + tabs.length) % tabs.length;
+    } else if (ev.key === "Home") {
+      nextIndex = 0;
+    } else if (ev.key === "End") {
+      nextIndex = tabs.length - 1;
+    } else {
+      return;
+    }
+
+    ev.preventDefault();
+    ev.stopPropagation();
+    const nextTab = tabs[nextIndex];
+    this.preferences.selectedTab = nextTab.dataset.tabId;
+    this.render();
+    nextTab.focus?.();
+  }
+
   render() {
     if (!this.el || !this.panel || !this.tabsEl || !this.bodyEl || !this.showButton) return;
     const selectedTab = validTabId(this.preferences.selectedTab)
@@ -211,7 +245,12 @@ export class ReplayAnalysisOverlay {
     const selected = validTabId(this.preferences.selectedTab)
       ? this.preferences.selectedTab
       : REPLAY_ANALYSIS_TABS[0].id;
-    if (selected === PRODUCTION_TAB_ID || selected === UNITS_TAB_ID) {
+    if (
+      selected === PRODUCTION_TAB_ID
+      || selected === UNITS_TAB_ID
+      || selected === UNITS_LOST_TAB_ID
+      || selected === RESOURCES_LOST_TAB_ID
+    ) {
       const tab = REPLAY_ANALYSIS_TABS.find((item) => item.id === selected);
       this.renderBody(tab);
     }
@@ -235,6 +274,14 @@ export class ReplayAnalysisOverlay {
     }
     if (tab.id === UNITS_TAB_ID) {
       this.bodyEl.replaceChildren(this.renderUnits(this.analysis));
+      return;
+    }
+    if (tab.id === UNITS_LOST_TAB_ID) {
+      this.bodyEl.replaceChildren(this.renderUnitsLost(this.analysis));
+      return;
+    }
+    if (tab.id === RESOURCES_LOST_TAB_ID) {
+      this.bodyEl.replaceChildren(this.renderResourcesLost(this.analysis));
       return;
     }
     this.bodyEl.replaceChildren(this.renderPlaceholder(tab));
@@ -378,6 +425,94 @@ export class ReplayAnalysisOverlay {
     return wrap;
   }
 
+  renderUnitsLost(analysis) {
+    const wrap = this.renderAnalysisMetric("replay-units-lost", "Destroyed units");
+    const rows = playerAnalysisRows({ analysis, players: this.getPlayers() });
+    if (!analysis) {
+      wrap.appendChild(renderEmptyMetric("Waiting for replay analysis"));
+      return wrap;
+    }
+    if (!rows.some((row) => row.unitsLost.length > 0)) {
+      wrap.appendChild(renderEmptyMetric("No units lost"));
+      return wrap;
+    }
+
+    for (const player of rows) {
+      const unitsLost = [...player.unitsLost].sort(compareKindRows(this.stats));
+      if (!unitsLost.length) continue;
+      wrap.appendChild(this.renderPlayerHeading(player));
+
+      const total = unitsLost.reduce((acc, unit) => {
+        acc.count += unit.count;
+        acc.steel += unit.steelValue;
+        acc.oil += unit.oilValue;
+        return acc;
+      }, { count: 0, steel: 0, oil: 0 });
+      wrap.appendChild(renderUnitRow({
+        className: "replay-units-row replay-units-lost-row is-total",
+        label: "Total lost",
+        icon: "#",
+        count: total.count,
+        steel: total.steel,
+        oil: total.oil,
+      }));
+
+      for (const unit of unitsLost) {
+        wrap.appendChild(renderUnitRow({
+          className: "replay-units-row replay-units-lost-row",
+          label: kindLabel(unit.kind, this.stats),
+          icon: itemIcon(unit.kind, "unit", this.stats),
+          count: unit.count,
+          steel: unit.steelValue,
+          oil: unit.oilValue,
+        }));
+      }
+    }
+    return wrap;
+  }
+
+  renderResourcesLost(analysis) {
+    const wrap = this.renderAnalysisMetric("replay-resources-lost", "Dead unit value");
+    const note = document.createElement("div");
+    note.className = "replay-analysis-note";
+    note.textContent = "Spent steel and oil value of units that died. Buildings, cancelled queues, refunds, harvesting, and stockpile changes are excluded.";
+    wrap.appendChild(note);
+
+    const rows = playerAnalysisRows({ analysis, players: this.getPlayers() });
+    if (!analysis) {
+      wrap.appendChild(renderEmptyMetric("Waiting for replay analysis"));
+      return wrap;
+    }
+    if (!rows.length) {
+      wrap.appendChild(renderEmptyMetric("No players"));
+      return wrap;
+    }
+
+    const total = rows.reduce((acc, player) => {
+      acc.steel += player.resourcesLost.steel;
+      acc.oil += player.resourcesLost.oil;
+      return acc;
+    }, { steel: 0, oil: 0 });
+    wrap.appendChild(renderResourceLostRow({
+      className: "replay-resources-lost-row is-total",
+      name: "Total",
+      color: "#e7dfc5",
+      steel: total.steel,
+      oil: total.oil,
+    }));
+
+    for (const player of rows) {
+      wrap.appendChild(renderResourceLostRow({
+        className: "replay-resources-lost-row",
+        name: player.name,
+        color: player.color,
+        steel: player.resourcesLost.steel,
+        oil: player.resourcesLost.oil,
+      }));
+    }
+    return wrap;
+  }
+
   renderAnalysisMetric(className, headingText) {
     const wrap = document.createElement("div");
     wrap.className = `replay-analysis-metric ${className}`;
@@ -420,6 +555,7 @@ export class ReplayAnalysisOverlay {
   destroy() {
     if (this.el) {
       this.el.removeEventListener("click", this.onClick);
+      this.el.removeEventListener("keydown", this.onKeyDown);
       this.el.remove();
     }
     this.el = null;
@@ -498,6 +634,8 @@ function playerAnalysisRows({ analysis, players }) {
       color: meta.color || "#e7dfc5",
       units: player.units,
       production: player.production,
+      unitsLost: player.unitsLost,
+      resourcesLost: player.resourcesLost,
     });
   }
   rows.sort((a, b) => a.id - b.id);
@@ -536,6 +674,31 @@ function renderUnitRow({ className, icon, label, count, steel, oil }) {
   oilEl.textContent = formatValue(oil);
 
   row.append(iconEl, labelEl, countEl, steelEl, oilEl);
+  return row;
+}
+
+function renderResourceLostRow({ className, name, color, steel, oil }) {
+  const row = document.createElement("div");
+  row.className = className;
+
+  const swatch = document.createElement("span");
+  swatch.className = "replay-analysis-player-swatch";
+  swatch.setAttribute("style", `background:${safeCssColor(color)};`);
+  swatch.setAttribute("aria-hidden", "true");
+
+  const nameEl = document.createElement("span");
+  nameEl.className = "replay-resources-lost-name";
+  nameEl.textContent = name;
+
+  const steelEl = document.createElement("span");
+  steelEl.className = "replay-resources-lost-steel";
+  steelEl.textContent = formatValue(steel);
+
+  const oilEl = document.createElement("span");
+  oilEl.className = "replay-resources-lost-oil";
+  oilEl.textContent = formatValue(oil);
+
+  row.append(swatch, nameEl, steelEl, oilEl);
   return row;
 }
 
