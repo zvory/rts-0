@@ -105,6 +105,18 @@ main-base patches.
 The live lobby AI uses this shared core through `AiController`, which only owns live identity,
 profile id, cadence, and persistent decision memory. Profiles are still not client-selectable.
 
+**Self-play scorecards.** The `ai-matchup` and `ai-balance-matrix` developer tools emit
+profile-agnostic baseline scorecards from public self-play commands and snapshots. Per-player
+results include army value, building value, final worker count, final unit counts, command count,
+attack command count, damage events dealt, deduplicated deaths, first attack command, first
+Rifleman attack command, first Scout Car completion, first Scout Car harassment command, first
+expansion City Centre planned/completed, and first Tank completion. Match-level results include
+winner or tick-cap status, first damage, attack events, death events, replay verification status,
+and optional replay artifact path. Compact baseline scenario metadata for opening pressure,
+mid-game expansion, tank tech, and blocked-goal pressure lives in
+`server/crates/ai/src/selfplay/scenarios.rs` so later profile phases can compare the same authored
+fixtures without rewriting the harness.
+
 Spectators never count toward win/elimination and receive a neutral final scoreboard result.
 
 **Win/elimination.** AI players count as match players: a 1-human + N-AI match is a real match

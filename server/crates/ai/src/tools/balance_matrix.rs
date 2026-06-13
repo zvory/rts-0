@@ -44,6 +44,20 @@ struct MatchupAggregate {
     army_b_total: u64,
     buildings_a_total: u64,
     buildings_b_total: u64,
+    workers_a_total: u64,
+    workers_b_total: u64,
+    damage_a_total: u64,
+    damage_b_total: u64,
+    deaths_a_total: u64,
+    deaths_b_total: u64,
+    first_tank_a_total: u64,
+    first_tank_a_count: u32,
+    first_tank_b_total: u64,
+    first_tank_b_count: u32,
+    expansion_a_total: u64,
+    expansion_a_count: u32,
+    expansion_b_total: u64,
+    expansion_b_count: u32,
 }
 
 pub fn run_from_env() {
@@ -176,6 +190,40 @@ impl MatchupAggregate {
         self.buildings_b_total = self
             .buildings_b_total
             .saturating_add(player_b.building_value as u64);
+        self.workers_a_total = self
+            .workers_a_total
+            .saturating_add(player_a.worker_count as u64);
+        self.workers_b_total = self
+            .workers_b_total
+            .saturating_add(player_b.worker_count as u64);
+        self.damage_a_total = self
+            .damage_a_total
+            .saturating_add(player_a.damage_dealt_events as u64);
+        self.damage_b_total = self
+            .damage_b_total
+            .saturating_add(player_b.damage_dealt_events as u64);
+        self.deaths_a_total = self
+            .deaths_a_total
+            .saturating_add(player_a.death_count as u64);
+        self.deaths_b_total = self
+            .deaths_b_total
+            .saturating_add(player_b.death_count as u64);
+        if let Some(tick) = player_a.first_tank_tick {
+            self.first_tank_a_total = self.first_tank_a_total.saturating_add(tick as u64);
+            self.first_tank_a_count = self.first_tank_a_count.saturating_add(1);
+        }
+        if let Some(tick) = player_b.first_tank_tick {
+            self.first_tank_b_total = self.first_tank_b_total.saturating_add(tick as u64);
+            self.first_tank_b_count = self.first_tank_b_count.saturating_add(1);
+        }
+        if let Some(tick) = player_a.first_expansion_city_centre_planned_tick {
+            self.expansion_a_total = self.expansion_a_total.saturating_add(tick as u64);
+            self.expansion_a_count = self.expansion_a_count.saturating_add(1);
+        }
+        if let Some(tick) = player_b.first_expansion_city_centre_planned_tick {
+            self.expansion_b_total = self.expansion_b_total.saturating_add(tick as u64);
+            self.expansion_b_count = self.expansion_b_count.saturating_add(1);
+        }
 
         if let Some(winner) = &result.winner {
             if winner.player_id == 1 {
@@ -342,13 +390,34 @@ fn replay_name(profile_a: &str, profile_b: &str, seed: u32) -> String {
 
 fn print_table(aggregates: &[MatchupAggregate]) {
     println!(
-        "{:<72} {:>4} {:>3} {:>3} {:>3} {:>7} {:>7} {:>7} {:>7} {:>7} {:>7} {:>7}",
-        "matchup", "runs", "W", "L", "D", "rawD", "tbW", "tbL", "armyA", "bldgA", "armyB", "bldgB",
+        "{:<72} {:>4} {:>3} {:>3} {:>3} {:>7} {:>7} {:>7} {:>7} {:>7} {:>7} {:>7} {:>5} {:>5} {:>5} {:>5} {:>5} {:>5} {:>7} {:>7} {:>7} {:>7}",
+        "matchup",
+        "runs",
+        "W",
+        "L",
+        "D",
+        "rawD",
+        "tbW",
+        "tbL",
+        "armyA",
+        "bldgA",
+        "armyB",
+        "bldgB",
+        "wrkA",
+        "wrkB",
+        "dmgA",
+        "dmgB",
+        "lostA",
+        "lostB",
+        "tankA",
+        "tankB",
+        "expA",
+        "expB",
     );
     for aggregate in aggregates {
         let runs = aggregate.runs.max(1) as u64;
         println!(
-            "{:<72} {:>4} {:>3} {:>3} {:>3} {:>7} {:>7} {:>7} {:>7} {:>7} {:>7} {:>7}",
+            "{:<72} {:>4} {:>3} {:>3} {:>3} {:>7} {:>7} {:>7} {:>7} {:>7} {:>7} {:>7} {:>5} {:>5} {:>5} {:>5} {:>5} {:>5} {:>7} {:>7} {:>7} {:>7}",
             format!("{} vs {}", aggregate.profile_a, aggregate.profile_b),
             aggregate.runs,
             aggregate.wins_a,
@@ -361,12 +430,30 @@ fn print_table(aggregates: &[MatchupAggregate]) {
             aggregate.buildings_a_total / runs,
             aggregate.army_b_total / runs,
             aggregate.buildings_b_total / runs,
+            aggregate.workers_a_total / runs,
+            aggregate.workers_b_total / runs,
+            aggregate.damage_a_total / runs,
+            aggregate.damage_b_total / runs,
+            aggregate.deaths_a_total / runs,
+            aggregate.deaths_b_total / runs,
+            average_tick_text(aggregate.first_tank_a_total, aggregate.first_tank_a_count),
+            average_tick_text(aggregate.first_tank_b_total, aggregate.first_tank_b_count),
+            average_tick_text(aggregate.expansion_a_total, aggregate.expansion_a_count),
+            average_tick_text(aggregate.expansion_b_total, aggregate.expansion_b_count),
         );
     }
     println!();
     println!("W/L/D are from the left profile's perspective.");
     println!("Tick-cap draws are counted in rawD; non-tied army value resolves them into W or L.");
-    println!("armyA/bldgA/armyB/bldgB are per-run averages.");
+    println!("army/bldg/wrk/dmg are per-run averages; tank/exp are average first ticks, or '-' if never seen.");
+}
+
+fn average_tick_text(total: u64, count: u32) -> String {
+    if count == 0 {
+        "-".to_string()
+    } else {
+        (total / count as u64).to_string()
+    }
 }
 
 fn print_profiles() {

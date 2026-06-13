@@ -11,6 +11,7 @@ mod milestones;
 pub(crate) mod pending_build;
 pub(crate) mod player_view;
 mod replay;
+pub mod scenarios;
 mod scripts;
 mod validation;
 
@@ -28,6 +29,7 @@ pub use replay::{
     available_profile_ids, canonical_profile_id, run_profile_matchup_result, ProfileMatchupOptions,
     ProfileMatchupPlayerResult, ProfileMatchupResult, ProfileMatchupWinner,
 };
+pub use scenarios::{available_baseline_scenarios, BaselineScenario};
 
 const MAX_TICKS: u32 = 9_600;
 const MAX_STALL_TICKS: u32 = 1_800;

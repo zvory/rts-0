@@ -14,6 +14,7 @@ use crate::ai_core::profiles::{
     profile_by_id, required_profiles, RIFLE_FLOOD_FULL_SATURATION_ID, STEEL_EXPANSION_TANKS_ID,
     TECH_TO_TANKS_ID,
 };
+use rts_sim::game::entity::EntityKind;
 use rts_sim::game::replay::{
     replay_commands, CommandLogEntry, EventLogEntry, PlayerSnapshot, ReplayArtifactV1,
     ReplayOutcome,
@@ -47,8 +48,11 @@ fn resolve_build_id() -> String {
     if let Some(id) = env_build_id() {
         return id;
     }
-    git_output(env!("CARGO_MANIFEST_DIR"), &["rev-parse", "--short=12", "HEAD"])
-        .unwrap_or_else(|| "unknown".to_string())
+    git_output(
+        env!("CARGO_MANIFEST_DIR"),
+        &["rev-parse", "--short=12", "HEAD"],
+    )
+    .unwrap_or_else(|| "unknown".to_string())
 }
 
 fn env_build_id() -> Option<String> {
@@ -121,9 +125,17 @@ pub struct ProfileMatchupPlayerResult {
     pub alive: bool,
     pub army_value: u32,
     pub building_value: u32,
+    pub worker_count: u32,
     pub command_count: usize,
     pub attack_command_count: usize,
+    pub damage_dealt_events: usize,
+    pub death_count: usize,
     pub first_attack_command_tick: Option<u32>,
+    pub first_rifleman_attack_command_tick: Option<u32>,
+    pub first_scout_car_tick: Option<u32>,
+    pub first_scout_car_harass_command_tick: Option<u32>,
+    pub first_expansion_city_centre_planned_tick: Option<u32>,
+    pub first_expansion_city_centre_completed_tick: Option<u32>,
     pub first_tank_tick: Option<u32>,
     pub final_counts: BTreeMap<String, u32>,
 }
@@ -184,10 +196,10 @@ pub fn run_profile_matchup_result(
         Box::new(ProfileBackedScript::new(2, profile_b.id)),
     ];
     let mut event_log = Vec::new();
-    let mut first_tank_tick: BTreeMap<u32, u32> = BTreeMap::new();
     let mut first_damage_tick = None;
     let mut attack_events = 0usize;
     let mut death_events = 0usize;
+    let mut scorecard = ScorecardCollector::default();
 
     while game.tick_count() < options.max_ticks {
         let alive = game.alive_players();
@@ -200,7 +212,7 @@ pub fn run_profile_matchup_result(
         for script in &mut scripts {
             let player_id = script.player_id();
             let snapshot = game.snapshot_for(player_id);
-            observe_first_tank_tick(tick, player_id, &snapshot, &mut first_tank_tick);
+            scorecard.observe_snapshot(tick, player_id, &snapshot);
             let view = PlayerView {
                 player_id,
                 tick,
@@ -212,9 +224,11 @@ pub fn run_profile_matchup_result(
             }
         }
         for (player_id, command) in commands {
+            scorecard.observe_command(tick, player_id, &command, &game.snapshot_for(player_id));
             game.enqueue(player_id, command);
         }
 
+        scorecard.observe_full_snapshot(&game.snapshot_full_for(players[0].id));
         let tick_events = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| game.tick()))
             .map_err(|payload| {
                 format!(
@@ -225,8 +239,9 @@ pub fn run_profile_matchup_result(
         let event_tick = game.tick_count();
         for player in &players {
             let snapshot = game.snapshot_for(player.id);
-            observe_first_tank_tick(event_tick, player.id, &snapshot, &mut first_tank_tick);
+            scorecard.observe_snapshot(event_tick, player.id, &snapshot);
         }
+        let full_snapshot = game.snapshot_full_for(players[0].id);
         for (player_id, events) in tick_events {
             for event in events {
                 match &event {
@@ -239,6 +254,7 @@ pub fn run_profile_matchup_result(
                     }
                     _ => {}
                 }
+                scorecard.observe_event(&event, &full_snapshot);
                 event_log.push(EventLogEntry {
                     tick: event_tick,
                     player_id,
@@ -282,11 +298,25 @@ pub fn run_profile_matchup_result(
     let final_counts = final_unit_counts(&game, &players);
     let final_values = final_material_values(&game, &players);
     let command_stats = command_stats_by_player(game.command_log());
+    let final_worker_counts = final_counts
+        .iter()
+        .map(|(player_id, counts)| {
+            (
+                *player_id,
+                counts.get(kinds::WORKER).copied().unwrap_or_default(),
+            )
+        })
+        .collect::<BTreeMap<_, _>>();
     let players = players
         .iter()
         .map(|player| {
             let stats = command_stats.get(&player.id);
             let values = final_values.get(&player.id).copied().unwrap_or_default();
+            let score = scorecard
+                .players
+                .get(&player.id)
+                .cloned()
+                .unwrap_or_default();
             ProfileMatchupPlayerResult {
                 player_id: player.id,
                 profile: if player.id == 1 {
@@ -297,10 +327,23 @@ pub fn run_profile_matchup_result(
                 alive: alive.contains(&player.id),
                 army_value: values.army,
                 building_value: values.buildings,
+                worker_count: final_worker_counts
+                    .get(&player.id)
+                    .copied()
+                    .unwrap_or_default(),
                 command_count: stats.map(|s| s.command_count).unwrap_or_default(),
                 attack_command_count: stats.map(|s| s.attack_command_count).unwrap_or_default(),
+                damage_dealt_events: score.damage_dealt_events,
+                death_count: score.death_count,
                 first_attack_command_tick: stats.and_then(|s| s.first_attack_command_tick),
-                first_tank_tick: first_tank_tick.get(&player.id).copied(),
+                first_rifleman_attack_command_tick: score.first_rifleman_attack_command_tick,
+                first_scout_car_tick: score.first_scout_car_tick,
+                first_scout_car_harass_command_tick: score.first_scout_car_harass_command_tick,
+                first_expansion_city_centre_planned_tick: score
+                    .first_expansion_city_centre_planned_tick,
+                first_expansion_city_centre_completed_tick: score
+                    .first_expansion_city_centre_completed_tick,
+                first_tank_tick: score.first_tank_tick,
                 final_counts: final_counts.get(&player.id).cloned().unwrap_or_default(),
             }
         })
@@ -359,22 +402,172 @@ fn command_stats_by_player(commands: &[CommandLogEntry]) -> BTreeMap<u32, Comman
     stats
 }
 
-fn observe_first_tank_tick(
-    tick: u32,
-    player_id: u32,
-    snapshot: &Snapshot,
-    first_tank_tick: &mut BTreeMap<u32, u32>,
-) {
-    if first_tank_tick.contains_key(&player_id) {
-        return;
+#[derive(Clone, Default)]
+struct PlayerScorecard {
+    first_rifleman_attack_command_tick: Option<u32>,
+    first_scout_car_tick: Option<u32>,
+    first_scout_car_harass_command_tick: Option<u32>,
+    first_expansion_city_centre_planned_tick: Option<u32>,
+    first_expansion_city_centre_completed_tick: Option<u32>,
+    first_tank_tick: Option<u32>,
+    damage_dealt_events: usize,
+    death_count: usize,
+}
+
+#[derive(Default)]
+struct ScorecardCollector {
+    players: BTreeMap<u32, PlayerScorecard>,
+    entity_owners: BTreeMap<u32, u32>,
+    counted_deaths: BTreeSet<u32>,
+}
+
+impl ScorecardCollector {
+    fn observe_full_snapshot(&mut self, snapshot: &Snapshot) {
+        for entity in &snapshot.entities {
+            self.entity_owners.insert(entity.id, entity.owner);
+        }
     }
-    if snapshot
-        .entities
-        .iter()
-        .any(|entity| entity.owner == player_id && entity.kind == kinds::TANK)
-    {
-        first_tank_tick.insert(player_id, tick);
+
+    fn observe_snapshot(&mut self, tick: u32, player_id: u32, snapshot: &Snapshot) {
+        let score = self.players.entry(player_id).or_default();
+        let complete_city_centres = snapshot
+            .entities
+            .iter()
+            .filter(|entity| {
+                entity.owner == player_id
+                    && entity.kind == kinds::CITY_CENTRE
+                    && entity.build_progress.is_none()
+            })
+            .count();
+        if complete_city_centres >= 2 {
+            score
+                .first_expansion_city_centre_completed_tick
+                .get_or_insert(tick);
+        }
+        if snapshot
+            .entities
+            .iter()
+            .any(|entity| entity.owner == player_id && entity.kind == kinds::SCOUT_CAR)
+        {
+            score.first_scout_car_tick.get_or_insert(tick);
+        }
+        if snapshot
+            .entities
+            .iter()
+            .any(|entity| entity.owner == player_id && entity.kind == kinds::TANK)
+        {
+            score.first_tank_tick.get_or_insert(tick);
+        }
     }
+
+    fn observe_command(
+        &mut self,
+        tick: u32,
+        player_id: u32,
+        command: &rts_sim::game::command::SimCommand,
+        snapshot: &Snapshot,
+    ) {
+        let score = self.players.entry(player_id).or_default();
+        if matches!(
+            command,
+            rts_sim::game::command::SimCommand::Build {
+                building: EntityKind::CityCentre,
+                ..
+            }
+        ) && snapshot
+            .entities
+            .iter()
+            .filter(|entity| entity.owner == player_id && entity.kind == kinds::CITY_CENTRE)
+            .count()
+            >= 1
+        {
+            score
+                .first_expansion_city_centre_planned_tick
+                .get_or_insert(tick);
+        }
+
+        let Some(units) = command_units(command) else {
+            return;
+        };
+        let unit_kinds = units
+            .iter()
+            .filter_map(|unit_id| {
+                snapshot
+                    .entities
+                    .iter()
+                    .find(|entity| entity.id == *unit_id && entity.owner == player_id)
+                    .and_then(|entity| entity.kind.parse::<EntityKind>().ok())
+            })
+            .collect::<Vec<_>>();
+        if is_attack_command(command) && unit_kinds.contains(&EntityKind::Rifleman) {
+            score.first_rifleman_attack_command_tick.get_or_insert(tick);
+        }
+        if is_harass_command(command) && unit_kinds.contains(&EntityKind::ScoutCar) {
+            score
+                .first_scout_car_harass_command_tick
+                .get_or_insert(tick);
+        }
+    }
+
+    fn observe_event(&mut self, event: &Event, full_snapshot: &Snapshot) {
+        match event {
+            Event::Attack { from, .. } => {
+                if let Some(attacker) = full_snapshot
+                    .entities
+                    .iter()
+                    .find(|entity| entity.id == *from)
+                {
+                    self.players
+                        .entry(attacker.owner)
+                        .or_default()
+                        .damage_dealt_events += 1;
+                }
+            }
+            Event::Death { id, .. } if self.counted_deaths.insert(*id) => {
+                if let Some(owner) = self.entity_owners.get(id).copied() {
+                    self.players.entry(owner).or_default().death_count += 1;
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
+fn command_units(command: &rts_sim::game::command::SimCommand) -> Option<&[u32]> {
+    match command {
+        rts_sim::game::command::SimCommand::Move { units, .. }
+        | rts_sim::game::command::SimCommand::AttackMove { units, .. }
+        | rts_sim::game::command::SimCommand::Attack { units, .. }
+        | rts_sim::game::command::SimCommand::SetupAtGuns { units, .. }
+        | rts_sim::game::command::SimCommand::TearDownAtGuns { units }
+        | rts_sim::game::command::SimCommand::UseAbility { units, .. }
+        | rts_sim::game::command::SimCommand::SetAutocast { units, .. }
+        | rts_sim::game::command::SimCommand::Gather { units, .. }
+        | rts_sim::game::command::SimCommand::Stop { units } => Some(units),
+        rts_sim::game::command::SimCommand::Build { units, .. } => Some(units),
+        rts_sim::game::command::SimCommand::Train { .. }
+        | rts_sim::game::command::SimCommand::Research { .. }
+        | rts_sim::game::command::SimCommand::Cancel { .. }
+        | rts_sim::game::command::SimCommand::SetRally { .. }
+        | rts_sim::game::command::SimCommand::Rejected { .. } => None,
+    }
+}
+
+fn is_attack_command(command: &rts_sim::game::command::SimCommand) -> bool {
+    matches!(
+        command,
+        rts_sim::game::command::SimCommand::AttackMove { .. }
+            | rts_sim::game::command::SimCommand::Attack { .. }
+    )
+}
+
+fn is_harass_command(command: &rts_sim::game::command::SimCommand) -> bool {
+    matches!(
+        command,
+        rts_sim::game::command::SimCommand::Move { .. }
+            | rts_sim::game::command::SimCommand::AttackMove { .. }
+            | rts_sim::game::command::SimCommand::Attack { .. }
+    )
 }
 
 fn write_replay_artifact(
@@ -563,4 +756,137 @@ fn final_material_values(game: &Game, players: &[PlayerInit]) -> BTreeMap<u32, M
         }
     }
     values
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{available_profile_ids, canonical_profile_id, ScorecardCollector};
+    use crate::ai_core::profiles::RIFLE_FLOOD_FULL_SATURATION_ID;
+    use rts_sim::game::command::SimCommand;
+    use rts_sim::game::entity::EntityKind;
+    use rts_sim::protocol::kinds;
+    use rts_sim::protocol::{EntityView, Event, Snapshot, SnapshotNetStatus};
+
+    #[test]
+    fn full_saturation_baseline_is_selectable() {
+        assert_eq!(
+            canonical_profile_id("rifle_flood_full_saturation"),
+            Some(RIFLE_FLOOD_FULL_SATURATION_ID)
+        );
+        assert_eq!(
+            canonical_profile_id("saturation"),
+            Some(RIFLE_FLOOD_FULL_SATURATION_ID)
+        );
+        assert!(available_profile_ids().contains(&RIFLE_FLOOD_FULL_SATURATION_ID));
+    }
+
+    #[test]
+    fn scorecard_collector_records_phase_one_fields() {
+        let mut collector = ScorecardCollector::default();
+        let snapshot = snapshot(vec![
+            entity(1, 1, kinds::WORKER),
+            entity(2, 1, kinds::RIFLEMAN),
+            entity(3, 1, kinds::SCOUT_CAR),
+            entity(4, 1, kinds::TANK),
+            entity(5, 1, kinds::CITY_CENTRE),
+            entity(6, 1, kinds::CITY_CENTRE),
+        ]);
+
+        collector.observe_snapshot(100, 1, &snapshot);
+        collector.observe_command(
+            110,
+            1,
+            &SimCommand::AttackMove {
+                units: vec![2],
+                x: 500.0,
+                y: 500.0,
+                queued: false,
+            },
+            &snapshot,
+        );
+        collector.observe_command(
+            120,
+            1,
+            &SimCommand::Move {
+                units: vec![3],
+                x: 600.0,
+                y: 600.0,
+                queued: false,
+            },
+            &snapshot,
+        );
+        collector.observe_command(
+            130,
+            1,
+            &SimCommand::Build {
+                units: vec![1],
+                building: EntityKind::CityCentre,
+                tile_x: 20,
+                tile_y: 20,
+                queued: false,
+            },
+            &snapshot,
+        );
+        collector.observe_full_snapshot(&snapshot);
+        collector.observe_event(
+            &Event::Attack {
+                from: 2,
+                to: 99,
+                reveal: None,
+                to_pos: None,
+            },
+            &snapshot,
+        );
+        collector.observe_event(
+            &Event::Death {
+                id: 2,
+                x: 0.0,
+                y: 0.0,
+                kind: kinds::RIFLEMAN.to_string(),
+            },
+            &snapshot,
+        );
+        collector.observe_event(
+            &Event::Death {
+                id: 2,
+                x: 0.0,
+                y: 0.0,
+                kind: kinds::RIFLEMAN.to_string(),
+            },
+            &snapshot,
+        );
+
+        let score = collector.players.get(&1).expect("player scorecard");
+        assert_eq!(score.first_scout_car_tick, Some(100));
+        assert_eq!(score.first_tank_tick, Some(100));
+        assert_eq!(score.first_expansion_city_centre_completed_tick, Some(100));
+        assert_eq!(score.first_rifleman_attack_command_tick, Some(110));
+        assert_eq!(score.first_scout_car_harass_command_tick, Some(120));
+        assert_eq!(score.first_expansion_city_centre_planned_tick, Some(130));
+        assert_eq!(score.damage_dealt_events, 1);
+        assert_eq!(score.death_count, 1);
+    }
+
+    fn snapshot(entities: Vec<EntityView>) -> Snapshot {
+        Snapshot {
+            tick: 0,
+            steel: 0,
+            oil: 0,
+            supply_used: 0,
+            supply_cap: 0,
+            entities,
+            resource_deltas: Vec::new(),
+            smokes: Vec::new(),
+            visible_tiles: Vec::new(),
+            remembered_buildings: Vec::new(),
+            events: Vec::new(),
+            upgrades: Vec::new(),
+            player_resources: Vec::new(),
+            net_status: SnapshotNetStatus::default(),
+        }
+    }
+
+    fn entity(id: u32, owner: u32, kind: &str) -> EntityView {
+        EntityView::new(id, owner, kind, id as f32, 0.0, 100, 100, "idle")
+    }
 }
