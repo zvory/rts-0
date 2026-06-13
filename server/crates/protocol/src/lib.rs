@@ -394,6 +394,9 @@ pub enum ServerMessage {
     Snapshot(Snapshot),
     /// Shared replay playback cursor/state. Sent reliably outside snapshot cadence.
     ReplayState(ReplayPlaybackState),
+    /// Authoritative replay analysis data for spectator overlays. Sent reliably for replay
+    /// playback only, beside replay cursor/start updates.
+    ReplayAnalysis(ReplayAnalysisPayload),
     /// The requested room is currently replay playback. The client should confirm before retrying
     /// `join` with `replayOk: true`.
     JoinReplayPrompt {
@@ -434,6 +437,52 @@ pub enum ServerMessage {
     Error {
         msg: String,
     },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct ReplayAnalysisPayload {
+    pub tick: u32,
+    pub players: Vec<ReplayAnalysisPlayer>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct ReplayAnalysisPlayer {
+    pub id: u32,
+    pub units: Vec<ReplayAnalysisKindCount>,
+    pub production: Vec<ReplayAnalysisProduction>,
+    pub units_lost: Vec<ReplayAnalysisKindCount>,
+    pub resources_lost: ReplayAnalysisResourcesLost,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct ReplayAnalysisKindCount {
+    pub kind: String,
+    pub count: u32,
+    pub steel_value: u32,
+    pub oil_value: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct ReplayAnalysisProduction {
+    pub building_id: u32,
+    pub building_kind: String,
+    pub item_kind: String,
+    /// `"unit"` or `"upgrade"`.
+    pub item_type: String,
+    /// 0.0..1.0 completion of the front queued item.
+    pub progress: f32,
+    pub queue_depth: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ReplayAnalysisResourcesLost {
+    pub steel: u32,
+    pub oil: u32,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -1293,6 +1342,50 @@ mod tests {
         assert_eq!(json["seats"][0]["name"], "Player 7");
         assert_eq!(json["seats"][0]["color"], "#4878c8");
         assert_eq!(json["seats"][0]["claimable"], true);
+    }
+
+    #[test]
+    fn replay_analysis_serializes_contract_shape() {
+        let msg = ServerMessage::ReplayAnalysis(ReplayAnalysisPayload {
+            tick: 77,
+            players: vec![ReplayAnalysisPlayer {
+                id: 1,
+                units: vec![ReplayAnalysisKindCount {
+                    kind: kinds::RIFLEMAN.to_string(),
+                    count: 3,
+                    steel_value: 180,
+                    oil_value: 0,
+                }],
+                production: vec![ReplayAnalysisProduction {
+                    building_id: 10,
+                    building_kind: kinds::BARRACKS.to_string(),
+                    item_kind: kinds::MACHINE_GUNNER.to_string(),
+                    item_type: "unit".to_string(),
+                    progress: 0.5,
+                    queue_depth: 2,
+                }],
+                units_lost: vec![ReplayAnalysisKindCount {
+                    kind: kinds::WORKER.to_string(),
+                    count: 1,
+                    steel_value: 50,
+                    oil_value: 0,
+                }],
+                resources_lost: ReplayAnalysisResourcesLost { steel: 50, oil: 0 },
+            }],
+        });
+        let json = serde_json::to_value(msg).expect("replay analysis should serialize");
+
+        assert_eq!(json["t"], "replayAnalysis");
+        assert_eq!(json["tick"], 77);
+        assert_eq!(json["players"][0]["id"], 1);
+        assert_eq!(json["players"][0]["units"][0]["kind"], "rifleman");
+        assert_eq!(json["players"][0]["units"][0]["count"], 3);
+        assert_eq!(json["players"][0]["units"][0]["steelValue"], 180);
+        assert_eq!(json["players"][0]["production"][0]["buildingId"], 10);
+        assert_eq!(json["players"][0]["production"][0]["itemType"], "unit");
+        assert_eq!(json["players"][0]["production"][0]["queueDepth"], 2);
+        assert_eq!(json["players"][0]["unitsLost"][0]["kind"], "worker");
+        assert_eq!(json["players"][0]["resourcesLost"]["steel"], 50);
     }
 
     #[test]

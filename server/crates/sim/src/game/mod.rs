@@ -9,6 +9,7 @@
 //! enemy entities on tiles they currently see.
 
 pub(crate) mod ability;
+mod analysis;
 mod artillery;
 mod building_memory;
 pub mod command;
@@ -30,7 +31,7 @@ mod systems;
 pub mod teams;
 pub mod upgrade;
 
-use std::collections::{BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use crate::config;
 use crate::protocol::{
@@ -101,6 +102,7 @@ pub(crate) struct ScoreState {
     units_lost: u32,
     buildings_killed: u32,
     buildings_lost: u32,
+    units_lost_by_kind: BTreeMap<EntityKind, u32>,
 }
 
 /// The authoritative match state.

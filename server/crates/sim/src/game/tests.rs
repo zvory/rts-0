@@ -2844,6 +2844,90 @@ fn scores_record_kills_and_losses_on_death() {
 }
 
 #[test]
+fn replay_analysis_reports_authoritative_inventory_production_and_losses() {
+    let players = human_vs_ai_players();
+    let mut game =
+        Game::new_for_replay_with_starting_resources(&players, 5_000, 5_000, 0xA11A_0001);
+    let city_centre = game
+        .entities
+        .iter()
+        .find(|e| e.owner == 1 && e.kind == EntityKind::CityCentre)
+        .map(|e| e.id)
+        .expect("player city centre should exist");
+    game.enqueue(
+        1,
+        Command::Train {
+            building: city_centre,
+            unit: EntityKind::Worker,
+        },
+    );
+    game.tick();
+
+    let victim_unit = game
+        .entities
+        .iter()
+        .find(|e| e.owner == 2 && e.kind == EntityKind::Worker)
+        .map(|e| e.id)
+        .expect("victim unit should exist");
+    let entity = game
+        .entities
+        .get_mut(victim_unit)
+        .expect("victim unit should still exist");
+    entity.hp = 0;
+    entity.set_last_damage_owner(Some(1));
+    let mut events: HashMap<u32, Vec<Event>> =
+        game.players.iter().map(|p| (p.id, Vec::new())).collect();
+    let mut lingering_sight = Vec::new();
+    let tick = game.tick_count();
+    services::death::death_system(
+        &mut game.entities,
+        &game.fog,
+        &game.smokes,
+        &mut game.players,
+        &mut lingering_sight,
+        &mut events,
+        tick,
+    );
+
+    let analysis = game.replay_analysis();
+    assert_eq!(analysis.tick, game.tick_count());
+    let player_one = analysis
+        .players
+        .iter()
+        .find(|player| player.id == 1)
+        .expect("player one analysis should exist");
+    assert!(player_one
+        .units
+        .iter()
+        .any(|row| row.kind == "worker" && row.count == config::STARTING_WORKERS));
+    assert!(player_one.production.iter().any(|row| {
+        row.building_id == city_centre
+            && row.building_kind == "city_centre"
+            && row.item_kind == "worker"
+            && row.item_type == "unit"
+            && row.queue_depth == 1
+            && row.progress > 0.0
+    }));
+    let player_two = analysis
+        .players
+        .iter()
+        .find(|player| player.id == 2)
+        .expect("player two analysis should exist");
+    assert!(player_two
+        .units_lost
+        .iter()
+        .any(|row| row.kind == "worker" && row.count == 1 && row.steel_value > 0));
+    assert_eq!(
+        player_two.resources_lost.steel,
+        player_two.units_lost[0].steel_value
+    );
+    assert_eq!(
+        player_two.resources_lost.oil,
+        player_two.units_lost[0].oil_value
+    );
+}
+
+#[test]
 fn phase4_projection_matches_legacy_snapshot_entities() {
     let players = human_vs_ai_players();
     let mut game = Game::new(&players, 0xCAFE_BABE);

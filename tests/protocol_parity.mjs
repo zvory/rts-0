@@ -234,5 +234,24 @@ assert(
 for (const field of ["host_id", "team_id", "claimant_id", "occupants", "can_start"]) {
   assert(rust.includes(field), `branchStaging Rust contract is missing ${field}`);
 }
+assert(
+  rust.includes("ReplayAnalysis") && S.REPLAY_ANALYSIS === "replayAnalysis",
+  "replayAnalysis server message tag must match Rust",
+);
+for (const field of ["units_lost", "resources_lost", "steel_value", "oil_value", "queue_depth"]) {
+  assert(rust.includes(field), `replayAnalysis Rust contract is missing ${field}`);
+}
+const replayAnalysis = decodeServerMessage({
+  t: S.REPLAY_ANALYSIS,
+  tick: 9,
+  players: [{
+    id: 1,
+    units: [{ kind: "worker", count: 2, steelValue: 100, oilValue: 0 }],
+    production: [{ buildingId: 7, buildingKind: "city_centre", itemKind: "worker", itemType: "unit", progress: 0.25, queueDepth: 1 }],
+    unitsLost: [],
+    resourcesLost: { steel: 0, oil: 0 },
+  }],
+});
+assert(replayAnalysis.t === "replayAnalysis" && replayAnalysis.players[0].production[0].queueDepth === 1, "replayAnalysis passes through decode");
 
 console.log("✅ protocol_parity.mjs: Rust compact protocol codes match JS decoder maps");

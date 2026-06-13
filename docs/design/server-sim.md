@@ -112,6 +112,9 @@ impl Game {
     /// Frozen score-screen rows for every match participant, in start/lobby order.
     pub fn scores(&self) -> Vec<PlayerScore>;
 
+    /// Authoritative replay-only analysis state for spectator overlays.
+    pub fn replay_analysis(&self) -> ReplayAnalysisPayload;
+
     /// Remove all of a player's entities (e.g. on disconnect) so the match can resolve.
     pub fn eliminate(&mut self, player: u32);
 

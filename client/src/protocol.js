@@ -9,6 +9,7 @@ export const S = Object.freeze({
   START: "start",
   SNAPSHOT: "snapshot",
   REPLAY_STATE: "replayState",
+  REPLAY_ANALYSIS: "replayAnalysis",
   JOIN_REPLAY_PROMPT: "joinReplayPrompt",
   REPLAY_BRANCH_CREATED: "replayBranchCreated",
   BRANCH_STAGING: "branchStaging",
