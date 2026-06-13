@@ -1930,6 +1930,13 @@ input[type="text"]:focus {
 .replay-analysis-placeholder span {
   color: var(--ink-faint);
 }
+.replay-analysis-metric {
+  display: grid;
+  gap: 6px;
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 11px;
+}
 .replay-army-value {
   display: grid;
   gap: 6px;
@@ -1943,6 +1950,103 @@ input[type="text"]:focus {
   font-weight: 800;
   letter-spacing: 0;
   text-transform: uppercase;
+}
+.replay-analysis-metric-heading {
+  color: var(--ink-faint);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+.replay-analysis-empty {
+  color: var(--ink-dim);
+}
+.replay-analysis-player-heading {
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr);
+  align-items: center;
+  gap: 7px;
+  margin-top: 4px;
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: 800;
+}
+.replay-analysis-player-swatch {
+  width: 8px;
+  height: 8px;
+  border: 1px solid rgba(231, 223, 197, 0.42);
+  border-radius: 50%;
+}
+.replay-analysis-player-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.replay-analysis-kind-icon {
+  display: grid;
+  place-items: center;
+  min-width: 25px;
+  height: 18px;
+  border: 1px solid rgba(231, 223, 197, 0.18);
+  border-radius: var(--radius-sm);
+  background: rgba(17, 17, 15, 0.62);
+  color: var(--accent);
+  font-size: 9px;
+  font-weight: 900;
+  line-height: 1;
+}
+.replay-production-row,
+.replay-units-row {
+  display: grid;
+  align-items: center;
+  gap: 6px;
+  min-height: 22px;
+}
+.replay-production-row {
+  grid-template-columns: 25px minmax(0, 1fr) minmax(36px, auto) minmax(32px, auto);
+}
+.replay-production-main,
+.replay-units-label {
+  overflow: hidden;
+  color: var(--ink);
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.replay-production-progress,
+.replay-production-queue,
+.replay-units-count,
+.replay-units-steel,
+.replay-units-oil {
+  justify-self: end;
+  color: var(--ink-faint);
+  font-variant-numeric: tabular-nums;
+}
+.replay-units-row {
+  grid-template-columns: 25px minmax(0, 1fr) minmax(24px, auto) minmax(40px, auto) minmax(34px, auto);
+}
+.replay-units-row.is-total {
+  border-bottom: 1px solid rgba(231, 223, 197, 0.1);
+  padding-bottom: 3px;
+}
+.replay-units-row.is-total .replay-units-label,
+.replay-units-row.is-total .replay-units-count,
+.replay-units-row.is-total .replay-units-steel,
+.replay-units-row.is-total .replay-units-oil {
+  color: var(--accent);
+  font-weight: 800;
+}
+.replay-units-count::before {
+  content: "x";
+  color: var(--ink-dim);
+}
+.replay-units-steel::before {
+  content: "S ";
+  color: #b8b8b8;
+}
+.replay-units-oil::before {
+  content: "O ";
+  color: #8f8a7b;
 }
 .replay-army-value-empty {
   color: var(--ink-dim);

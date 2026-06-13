@@ -4946,9 +4946,107 @@ function fakeAudioContext() {
     assert(restored.visible === true, "replay analysis show action updates shared preferences");
     assert(restored.collapsed === false, "replay analysis show expands the panel");
 
+    restored.selectedTab = "production";
+    overlay.render();
+    assert(
+      textWithin(root).includes("Waiting for replay analysis"),
+      "production tab shows a loading state before analysis arrives",
+    );
+    overlay.applyReplayAnalysis({ tick: 1, players: [{ id: 1, units: [], production: [] }, { id: 2, units: [], production: [] }] });
+    assert(
+      textWithin(root).includes("No active production"),
+      "production tab handles empty production cleanly",
+    );
+
+    overlay.applyReplayAnalysis({
+      tick: 12,
+      players: [
+        {
+          id: 1,
+          units: [],
+          production: [
+            {
+              buildingId: 11,
+              buildingKind: KIND.BARRACKS,
+              itemKind: KIND.MACHINE_GUNNER,
+              itemType: "unit",
+              progress: 0.42,
+              queueDepth: 2,
+            },
+          ],
+        },
+        {
+          id: 2,
+          units: [],
+          production: [
+            {
+              buildingId: 21,
+              buildingKind: KIND.RESEARCH_COMPLEX,
+              itemKind: UPGRADE.TANK_UNLOCK,
+              itemType: "upgrade",
+              progress: 0.75,
+              queueDepth: 1,
+            },
+          ],
+        },
+      ],
+    });
+    const productionText = textWithin(root);
+    assert(productionText.includes("Red"), "production tab groups rows by first player");
+    assert(productionText.includes("Blue"), "production tab groups rows by second player");
+    assert(
+      productionText.includes("Machine Gunner at Barracks") && productionText.includes("42") && productionText.includes("Q 2"),
+      "production tab renders active unit production with progress and queue depth",
+    );
+    assert(
+      productionText.includes("Tank Production at R&D Complex") && productionText.includes("75"),
+      "production tab renders active research with mirrored upgrade labels",
+    );
+
+    restored.selectedTab = "units";
+    overlay.render();
+    overlay.applyReplayAnalysis({
+      tick: 20,
+      players: [
+        {
+          id: 1,
+          units: [
+            { kind: KIND.RIFLEMAN, count: 3, steelValue: 150, oilValue: 0 },
+            { kind: KIND.TANK, count: 1, steelValue: 300, oilValue: 150 },
+          ],
+          production: [],
+        },
+        {
+          id: 2,
+          units: [{ kind: KIND.WORKER, count: 2, steelValue: 100, oilValue: 0 }],
+          production: [],
+        },
+      ],
+    });
+    const unitText = textWithin(root);
+    assert(unitText.includes("Total") && unitText.includes("4") && unitText.includes("450") && unitText.includes("150"),
+      "units tab includes totals for the current player group");
+    assert(unitText.includes("Rifleman") && unitText.includes("Tank"), "units tab renders per-kind unit rows");
+    assert(unitText.includes("Blue") && unitText.includes("Engineer"), "units tab renders multiple players");
+
+    overlay.applyReplayAnalysis({
+      tick: 5,
+      players: [{ id: 1, units: [{ kind: KIND.WORKER, count: 1, steelValue: 50, oilValue: 0 }], production: [] }],
+    });
+    const replacedUnitText = textWithin(root);
+    assert(replacedUnitText.includes("Engineer"), "units tab renders replacement analysis after seek");
+    assert(!replacedUnitText.includes("Tank"), "units tab drops stale rows after seek replacement");
+
     overlay.destroy();
     assert(root.children.length === 0, "replay analysis overlay removes generated DOM on destroy");
   });
+}
+
+function textWithin(node) {
+  if (!node) return "";
+  let out = node.textContent || "";
+  for (const child of node.children || []) out += ` ${textWithin(child)}`;
+  return out;
 }
 
 console.log("✅ client_contracts.mjs: all contract assertions passed");

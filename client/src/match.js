@@ -215,6 +215,7 @@ export class Match {
       this.handleSnapshotEvents(m.events || []);
     };
     this.onReplayState = (m) => this.applyReplayState(m);
+    this.onReplayAnalysis = (m) => this.replayAnalysisOverlay?.applyReplayAnalysis(m);
     this.onResize = this.handleResize.bind(this);
     this.onMenuKeyDown = this.handleMenuKeyDown.bind(this);
     this.onWindowFocus = this.handleWindowFocus.bind(this);
@@ -233,6 +234,7 @@ export class Match {
     }
     this.net.on(S.SNAPSHOT, this.onSnapshot);
     this.net.on(S.REPLAY_STATE, this.onReplayState);
+    this.net.on(S.REPLAY_ANALYSIS, this.onReplayAnalysis);
     window.addEventListener("resize", this.onResize);
     window.addEventListener("focus", this.onWindowFocus);
     window.addEventListener("keydown", this.onMenuKeyDown, true);
@@ -1096,6 +1098,7 @@ export class Match {
     this.stopAllMachineGunSounds();
     this.net.off(S.SNAPSHOT, this.onSnapshot);
     this.net.off(S.REPLAY_STATE, this.onReplayState);
+    this.net.off(S.REPLAY_ANALYSIS, this.onReplayAnalysis);
     window.removeEventListener("keydown", this.onMenuKeyDown, true);
     document.removeEventListener("visibilitychange", this.onVisibilityChange);
     this.replayControls?.destroy();
@@ -1128,6 +1131,7 @@ export class Match {
     this.pointerLockRetryToken += 1;
     this.net.off(S.SNAPSHOT, this.onSnapshot);
     this.net.off(S.REPLAY_STATE, this.onReplayState);
+    this.net.off(S.REPLAY_ANALYSIS, this.onReplayAnalysis);
     window.removeEventListener("resize", this.onResize);
     window.removeEventListener("focus", this.onWindowFocus);
     window.removeEventListener("keydown", this.onMenuKeyDown, true);

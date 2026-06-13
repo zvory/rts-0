@@ -1,8 +1,10 @@
-import { STATS } from "./config.js";
+import { STATS, UPGRADES } from "./config.js";
 import { isUnit } from "./protocol.js";
 
 const STORAGE_KEY = "rts.replayAnalysisOverlay";
 const ARMY_VALUE_TAB_ID = "army-value";
+const PRODUCTION_TAB_ID = "production";
+const UNITS_TAB_ID = "units";
 
 export const REPLAY_ANALYSIS_TABS = Object.freeze([
   { id: ARMY_VALUE_TAB_ID, label: "Army value" },
@@ -69,6 +71,7 @@ export class ReplayAnalysisOverlay {
     this.tabsEl = null;
     this.bodyEl = null;
     this.showButton = null;
+    this.analysis = null;
     this.onClick = (ev) => this.handleClick(ev);
     this.mount();
   }
@@ -202,6 +205,18 @@ export class ReplayAnalysisOverlay {
     this.renderBody(REPLAY_ANALYSIS_TABS[0]);
   }
 
+  applyReplayAnalysis(payload) {
+    this.analysis = normalizeReplayAnalysisPayload(payload);
+    if (!this.bodyEl || this.bodyEl.hidden) return;
+    const selected = validTabId(this.preferences.selectedTab)
+      ? this.preferences.selectedTab
+      : REPLAY_ANALYSIS_TABS[0].id;
+    if (selected === PRODUCTION_TAB_ID || selected === UNITS_TAB_ID) {
+      const tab = REPLAY_ANALYSIS_TABS.find((item) => item.id === selected);
+      this.renderBody(tab);
+    }
+  }
+
   renderBody(tab) {
     if (!this.bodyEl) return;
     if (tab.id === ARMY_VALUE_TAB_ID) {
@@ -212,6 +227,14 @@ export class ReplayAnalysisOverlay {
         stats: this.stats,
       });
       this.bodyEl.replaceChildren(this.renderArmyValue(rows));
+      return;
+    }
+    if (tab.id === PRODUCTION_TAB_ID) {
+      this.bodyEl.replaceChildren(this.renderProduction(this.analysis));
+      return;
+    }
+    if (tab.id === UNITS_TAB_ID) {
+      this.bodyEl.replaceChildren(this.renderUnits(this.analysis));
       return;
     }
     this.bodyEl.replaceChildren(this.renderPlaceholder(tab));
@@ -263,6 +286,125 @@ export class ReplayAnalysisOverlay {
     return wrap;
   }
 
+  renderProduction(analysis) {
+    const wrap = this.renderAnalysisMetric("replay-production", "Current queues");
+    const rows = playerAnalysisRows({ analysis, players: this.getPlayers() });
+    if (!analysis) {
+      wrap.appendChild(renderEmptyMetric("Waiting for replay analysis"));
+      return wrap;
+    }
+    if (!rows.some((row) => row.production.length > 0)) {
+      wrap.appendChild(renderEmptyMetric("No active production"));
+      return wrap;
+    }
+
+    for (const player of rows) {
+      if (!player.production.length) continue;
+      wrap.appendChild(this.renderPlayerHeading(player));
+      for (const item of player.production) {
+        const row = document.createElement("div");
+        row.className = "replay-production-row";
+
+        const icon = document.createElement("span");
+        icon.className = "replay-analysis-kind-icon";
+        icon.textContent = itemIcon(item.itemKind, item.itemType, this.stats);
+
+        const main = document.createElement("span");
+        main.className = "replay-production-main";
+        const itemLabel = itemLabelFor(item.itemKind, item.itemType, this.stats);
+        const buildingLabel = kindLabel(item.buildingKind, this.stats);
+        main.textContent = `${itemLabel} at ${buildingLabel}`;
+
+        const progress = document.createElement("span");
+        progress.className = "replay-production-progress";
+        progress.textContent = `${formatPercent(item.progress)}%`;
+        progress.title = "Production progress";
+
+        const queue = document.createElement("span");
+        queue.className = "replay-production-queue";
+        queue.textContent = `Q ${formatValue(item.queueDepth)}`;
+        queue.title = "Queue depth";
+
+        row.append(icon, main, progress, queue);
+        wrap.appendChild(row);
+      }
+    }
+    return wrap;
+  }
+
+  renderUnits(analysis) {
+    const wrap = this.renderAnalysisMetric("replay-units", "Current army");
+    const rows = playerAnalysisRows({ analysis, players: this.getPlayers() });
+    if (!analysis) {
+      wrap.appendChild(renderEmptyMetric("Waiting for replay analysis"));
+      return wrap;
+    }
+    if (!rows.some((row) => row.units.length > 0)) {
+      wrap.appendChild(renderEmptyMetric("No units"));
+      return wrap;
+    }
+
+    for (const player of rows) {
+      const units = [...player.units].sort(compareKindRows(this.stats));
+      if (!units.length) continue;
+      wrap.appendChild(this.renderPlayerHeading(player));
+
+      const total = units.reduce((acc, unit) => {
+        acc.count += unit.count;
+        acc.steel += unit.steelValue;
+        acc.oil += unit.oilValue;
+        return acc;
+      }, { count: 0, steel: 0, oil: 0 });
+      wrap.appendChild(renderUnitRow({
+        className: "replay-units-row is-total",
+        label: "Total",
+        icon: "#",
+        count: total.count,
+        steel: total.steel,
+        oil: total.oil,
+      }));
+
+      for (const unit of units) {
+        wrap.appendChild(renderUnitRow({
+          className: "replay-units-row",
+          label: kindLabel(unit.kind, this.stats),
+          icon: itemIcon(unit.kind, "unit", this.stats),
+          count: unit.count,
+          steel: unit.steelValue,
+          oil: unit.oilValue,
+        }));
+      }
+    }
+    return wrap;
+  }
+
+  renderAnalysisMetric(className, headingText) {
+    const wrap = document.createElement("div");
+    wrap.className = `replay-analysis-metric ${className}`;
+    const heading = document.createElement("div");
+    heading.className = "replay-analysis-metric-heading";
+    heading.textContent = headingText;
+    wrap.appendChild(heading);
+    return wrap;
+  }
+
+  renderPlayerHeading(player) {
+    const heading = document.createElement("div");
+    heading.className = "replay-analysis-player-heading";
+
+    const swatch = document.createElement("span");
+    swatch.className = "replay-analysis-player-swatch";
+    swatch.setAttribute("style", `background:${safeCssColor(player.color)};`);
+    swatch.setAttribute("aria-hidden", "true");
+
+    const name = document.createElement("span");
+    name.className = "replay-analysis-player-name";
+    name.textContent = player.name;
+
+    heading.append(swatch, name);
+    return heading;
+  }
+
   renderPlaceholder(tab) {
     const wrap = document.createElement("div");
     wrap.className = "replay-analysis-placeholder";
@@ -286,6 +428,115 @@ export class ReplayAnalysisOverlay {
     this.bodyEl = null;
     this.showButton = null;
   }
+}
+
+function normalizeReplayAnalysisPayload(payload) {
+  if (!payload || typeof payload !== "object") return null;
+  return {
+    tick: Math.max(0, Math.trunc(Number(payload.tick) || 0)),
+    players: Array.isArray(payload.players)
+      ? payload.players.map(normalizeAnalysisPlayer).filter(Boolean)
+      : [],
+  };
+}
+
+function normalizeAnalysisPlayer(player) {
+  const id = Number(player?.id);
+  if (!Number.isFinite(id) || id <= 0) return null;
+  return {
+    id,
+    units: normalizeKindRows(player.units),
+    production: normalizeProductionRows(player.production),
+    unitsLost: normalizeKindRows(player.unitsLost),
+    resourcesLost: {
+      steel: Math.max(0, Math.trunc(Number(player.resourcesLost?.steel) || 0)),
+      oil: Math.max(0, Math.trunc(Number(player.resourcesLost?.oil) || 0)),
+    },
+  };
+}
+
+function normalizeKindRows(rows) {
+  if (!Array.isArray(rows)) return [];
+  return rows.map((row) => ({
+    kind: String(row?.kind || ""),
+    count: Math.max(0, Math.trunc(Number(row?.count) || 0)),
+    steelValue: Math.max(0, Math.trunc(Number(row?.steelValue) || 0)),
+    oilValue: Math.max(0, Math.trunc(Number(row?.oilValue) || 0)),
+  })).filter((row) => row.kind && row.count > 0);
+}
+
+function normalizeProductionRows(rows) {
+  if (!Array.isArray(rows)) return [];
+  return rows.map((row) => ({
+    buildingId: Math.max(0, Math.trunc(Number(row?.buildingId) || 0)),
+    buildingKind: String(row?.buildingKind || ""),
+    itemKind: String(row?.itemKind || ""),
+    itemType: row?.itemType === "upgrade" ? "upgrade" : "unit",
+    progress: clamp01(Number(row?.progress) || 0),
+    queueDepth: Math.max(0, Math.trunc(Number(row?.queueDepth) || 0)),
+  })).filter((row) => row.buildingKind && row.itemKind);
+}
+
+function playerAnalysisRows({ analysis, players }) {
+  const metadata = new Map();
+  for (const player of players || []) {
+    const id = Number(player?.id);
+    if (!Number.isFinite(id) || id <= 0) continue;
+    metadata.set(id, {
+      id,
+      name: player?.name || `Player ${id}`,
+      color: player?.color || "#e7dfc5",
+    });
+  }
+
+  const rows = [];
+  for (const player of analysis?.players || []) {
+    const meta = metadata.get(player.id) || {};
+    rows.push({
+      id: player.id,
+      name: meta.name || `Player ${player.id}`,
+      color: meta.color || "#e7dfc5",
+      units: player.units,
+      production: player.production,
+    });
+  }
+  rows.sort((a, b) => a.id - b.id);
+  return rows;
+}
+
+function renderEmptyMetric(text) {
+  const empty = document.createElement("div");
+  empty.className = "replay-analysis-empty";
+  empty.textContent = text;
+  return empty;
+}
+
+function renderUnitRow({ className, icon, label, count, steel, oil }) {
+  const row = document.createElement("div");
+  row.className = className;
+
+  const iconEl = document.createElement("span");
+  iconEl.className = "replay-analysis-kind-icon";
+  iconEl.textContent = icon;
+
+  const labelEl = document.createElement("span");
+  labelEl.className = "replay-units-label";
+  labelEl.textContent = label;
+
+  const countEl = document.createElement("span");
+  countEl.className = "replay-units-count";
+  countEl.textContent = formatValue(count);
+
+  const steelEl = document.createElement("span");
+  steelEl.className = "replay-units-steel";
+  steelEl.textContent = formatValue(steel);
+
+  const oilEl = document.createElement("span");
+  oilEl.className = "replay-units-oil";
+  oilEl.textContent = formatValue(oil);
+
+  row.append(iconEl, labelEl, countEl, steelEl, oilEl);
+  return row;
 }
 
 export function calculateViewportArmyValue({
@@ -362,8 +613,55 @@ function circleIntersectsBounds(x, y, radius, bounds) {
   );
 }
 
+function compareKindRows(stats) {
+  return (a, b) => {
+    const labelCmp = kindLabel(a.kind, stats).localeCompare(kindLabel(b.kind, stats));
+    if (labelCmp !== 0) return labelCmp;
+    return a.kind.localeCompare(b.kind);
+  };
+}
+
+function kindLabel(kind, stats = STATS) {
+  return stats?.[kind]?.label || kindToTitle(kind);
+}
+
+function itemLabelFor(kind, itemType, stats = STATS) {
+  if (itemType === "upgrade") return UPGRADES?.[kind]?.label || kindToTitle(kind);
+  return kindLabel(kind, stats);
+}
+
+function itemIcon(kind, itemType, stats = STATS) {
+  const icon = itemType === "upgrade" ? UPGRADES?.[kind]?.icon : stats?.[kind]?.icon;
+  return icon || kindToIcon(kind);
+}
+
+function kindToTitle(kind) {
+  return String(kind || "Unknown")
+    .split("_")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function kindToIcon(kind) {
+  const parts = String(kind || "?").split("_").filter(Boolean);
+  const text = parts.length > 1
+    ? parts.map((part) => part.charAt(0)).join("")
+    : String(kind || "?").slice(0, 3);
+  return text.toUpperCase() || "?";
+}
+
+function formatPercent(value) {
+  return String(Math.round(clamp01(value) * 100));
+}
+
 function formatValue(value) {
   return String(Math.max(0, Math.round(Number(value) || 0)));
+}
+
+function clamp01(value) {
+  if (!Number.isFinite(value)) return 0;
+  return Math.min(1, Math.max(0, value));
 }
 
 function safeCssColor(color) {
