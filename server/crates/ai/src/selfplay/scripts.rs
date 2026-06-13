@@ -10,9 +10,7 @@ use crate::ai_core::actions::{self, AiActionContext, ResourceAssignmentPolicy, S
 use crate::ai_core::decision::{decide_profile, AiDecisionMemory, AiIntent};
 use crate::ai_core::facts::AiFacts;
 use crate::ai_core::observation::AiObservation;
-use crate::ai_core::profiles::{
-    profile_by_id, AiProfile, RIFLE_FLOOD_FULL_SATURATION, RIFLE_FLOOD_FULL_SATURATION_ID,
-};
+use crate::ai_core::profiles::{profile_by_id, AiProfile, AI_1_0_TECH, AI_1_0_TECH_ID};
 use crate::ai_shared;
 use rts_sim::game::command::SimCommand as Command;
 use rts_sim::game::entity::EntityKind;
@@ -44,12 +42,7 @@ impl ProfileBackedScript {
     }
 
     pub(super) fn economy_only(player_id: u32) -> Self {
-        Self::with_combat(
-            player_id,
-            RIFLE_FLOOD_FULL_SATURATION_ID,
-            false,
-            "profile-economy",
-        )
+        Self::with_combat(player_id, AI_1_0_TECH_ID, false, "profile-economy")
     }
 
     fn with_combat(
@@ -58,7 +51,7 @@ impl ProfileBackedScript {
         allow_combat_commands: bool,
         script_name: &'static str,
     ) -> Self {
-        let profile = profile_by_id(profile_id).unwrap_or(&RIFLE_FLOOD_FULL_SATURATION);
+        let profile = profile_by_id(profile_id).unwrap_or(&AI_1_0_TECH);
         Self {
             player_id,
             profile,
@@ -246,7 +239,7 @@ pub(super) struct WorkerRushScript {
 }
 
 // Intentionally retained as special harness coverage: this is an all-in worker pull, not a normal
-// strategy profile. The profile-backed `rifle_flood_fast` covers early rifle pressure separately.
+// strategy profile.
 impl WorkerRushScript {
     pub(super) fn new(player_id: u32, target_player_id: u32) -> Self {
         WorkerRushScript {

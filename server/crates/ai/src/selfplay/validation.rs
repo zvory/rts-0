@@ -83,7 +83,11 @@ fn known_kind(kind: &str) -> bool {
             | kinds::RIFLEMAN
             | kinds::MACHINE_GUNNER
             | kinds::ANTI_TANK_GUN
+            | kinds::MORTAR_TEAM
+            | kinds::ARTILLERY
+            | kinds::SCOUT_CAR
             | kinds::TANK
+            | kinds::COMMAND_CAR
             | kinds::CITY_CENTRE
             | kinds::DEPOT
             | kinds::BARRACKS

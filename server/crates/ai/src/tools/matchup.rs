@@ -310,17 +310,9 @@ fn print_profiles() {
     }
     println!();
     println!("aliases:");
-    println!("  rush -> rifle_flood_fast");
-    println!("  fast -> rifle_flood_fast");
-    println!("  saturation -> rifle_flood_full_saturation");
-    println!("  full -> rifle_flood_full_saturation");
-    println!("  macro -> rifle_flood_full_saturation");
-    println!("  tech -> tech_to_tanks");
-    println!("  tanks -> tech_to_tanks");
-    println!("  expand -> steel_expansion_tanks");
-    println!("  expansion -> steel_expansion_tanks");
-    println!("  steel -> steel_expansion_tanks");
-    println!("  steel_tanks -> steel_expansion_tanks");
+    println!("  ai -> ai_1_0_tech");
+    println!("  ai1 -> ai_1_0_tech");
+    println!("  default -> ai_1_0_tech");
 }
 
 fn print_usage() {
@@ -341,9 +333,8 @@ Options:
   -h, --help             Print this help
 
 Examples:
-  cargo run --bin ai-matchup -- rush tech
-  cargo run --bin ai-matchup -- expand tech
-  cargo run --bin ai-matchup -- saturation tech --seed 7 --ticks 20000 --json
+  cargo run --bin ai-matchup -- ai ai
+  cargo run --bin ai-matchup -- default ai_1_0_tech --seed 7 --ticks 20000 --json
 "
     );
 }

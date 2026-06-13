@@ -1,6 +1,6 @@
 use super::player_view::PlayerView;
 use super::scripts::{ProfileBackedScript, ScriptedPlayer};
-use crate::ai_core::profiles::TECH_TO_TANKS_ID;
+use crate::ai_core::profiles::AI_1_0_TECH_ID;
 use rts_sim::game::{Game, PlayerInit};
 
 pub struct LiveSelfPlay {
@@ -27,8 +27,8 @@ impl LiveSelfPlay {
             },
         ];
         let scripts: Vec<Box<dyn ScriptedPlayer>> = vec![
-            Box::new(ProfileBackedScript::new(players[0].id, TECH_TO_TANKS_ID)),
-            Box::new(ProfileBackedScript::new(players[1].id, TECH_TO_TANKS_ID)),
+            Box::new(ProfileBackedScript::new(players[0].id, AI_1_0_TECH_ID)),
+            Box::new(ProfileBackedScript::new(players[1].id, AI_1_0_TECH_ID)),
         ];
         Self { players, scripts }
     }
