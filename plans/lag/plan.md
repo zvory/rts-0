@@ -135,6 +135,18 @@ paths only after the earlier gates pass. It verifies CPU, memory, bundle size, f
 scenario coverage across realistic network profiles. This phase is where prediction becomes the
 default player experience if the evidence supports it.
 
+Phase 8 adds conservative local extrapolation for already-started production and research progress.
+It only advances progress bars for active queue items that the server has already shown in an
+authoritative snapshot, and it never predicts queue acceptance, resource spending, completion, spawn,
+or upgrade application. The player-facing goal is to keep safe, already-confirmed timers visually
+moving during short snapshot gaps without hiding authoritative correction.
+
+Phase 8.5 evaluates guarded construction-progress extrapolation separately from production timers.
+It only considers scaffolds that already exist in authoritative snapshots and must prove that worker
+interruptions, deaths, blocked construction, cancellation, and enemy denial snap back cleanly. This
+phase may remain design-only or disabled-by-default if the scenarios show construction progress is
+too state-dependent to predict safely.
+
 ## Phase Index
 
 0. [Phase 0 - Tri-State Scenario Harness](phase-0-tri-state-scenario-harness.md)
@@ -149,6 +161,8 @@ default player experience if the evidence supports it.
 5. [Phase 5 - Command Acceptance, Rejection, and UI Optimism](phase-5-command-acceptance-ui-optimism.md)
 6. [Phase 6 - Combat, Fog, and Cross-Player Guardrails](phase-6-combat-fog-cross-player-guardrails.md)
 7. [Phase 7 - Rollout, Performance Budgets, and Removal of Legacy Delay Paths](phase-7-rollout-performance.md)
+8. [Phase 8 - Safe Production and Research Progress Extrapolation](phase-8-safe-production-research-progress.md)
+8.5. [Phase 8.5 - Guarded Construction Progress Extrapolation](phase-8.5-guarded-construction-progress.md)
 
 ## Current Implementation Status
 
@@ -164,8 +178,16 @@ default player experience if the evidence supports it.
 - Phase 4: implemented ahead of harness backfill. Owned-unit movement prediction is wired through
   the browser adapter and smoke-tested, but delayed/dropped/coalesced network scenarios are not
   covered by a DSL harness.
-- Phases 5, 6, and 7 should wait for the 0.5, 2.5, 3.5, and 4.5 backfill phases unless the change
-  is a narrow bug fix with its own focused regression.
+- Phase 5: implemented for production queue and rally-plan optimism. Build, research, setup,
+  teardown, and ability command acceptance remain authoritative-only.
+- Phase 6: implemented. Combat, fog reconstruction, hidden/enemy state, economy gathering,
+  production simulation, construction simulation, resource node state, and abilities remain
+  unsupported in the WASM predictor.
+- Phase 7: implemented. Prediction is default-enabled for compatible live active-player sessions
+  with compatibility and performance fallback gates.
+- Phases 8 and 8.5 are not implemented. They should add narrow, UI-only extrapolation for
+  already-authoritative progress before considering any broader economy, production, or
+  construction simulation.
 
 ## Non-Goals
 
