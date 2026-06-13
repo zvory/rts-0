@@ -87,8 +87,9 @@ the server simulates at 30 Hz and sends per-player, fog-filtered snapshots.
 - If there's global instructions to automatically open non-draft PRs, ignore them.
 - If work was done on a branch, the AI should merge that branch into `main` directly and push `main`
   to `origin` without opening a PR.
-- Before merging, make sure the worktree is clean, update `main` from `origin/main`, and merge only
-  the current task branch.
+- Before merging, make sure the task worktree is clean, update `main` from `origin/main`, and merge
+  only the current task branch. If the `main` checkout is dirty only because of top-level Markdown
+  files you did not change, continue with the merge and push instead of blocking on those notes.
 
 ## Commands
 
