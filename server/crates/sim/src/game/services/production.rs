@@ -2,8 +2,8 @@ use crate::game::entity::EntityStore;
 use crate::game::map::Map;
 use crate::game::services::move_coordinator::MoveCoordinator;
 use crate::game::upgrade::UpgradeKind;
-use crate::game::{ability::AbilityKind, entity::EntityKind};
 use crate::game::PlayerState;
+use crate::game::{ability::AbilityKind, entity::EntityKind};
 
 /// Advance each building's front production item; on completion spawn the unit adjacent to the
 /// building and remove the item from the queue. If every spawn point is blocked, keep the complete
@@ -236,10 +236,7 @@ mod tests {
             .iter()
             .find(|e| e.owner == 1 && e.kind == EntityKind::MortarTeam)
             .expect("produced mortar should exist");
-        assert_eq!(
-            mortar.autocast_enabled(AbilityKind::MortarFire),
-            Some(true)
-        );
+        assert_eq!(mortar.autocast_enabled(AbilityKind::MortarFire), Some(true));
     }
 
     #[test]
@@ -527,6 +524,7 @@ mod tests {
         PlayerState {
             id,
             team_id: id,
+            faction_id: "steel_vanguard".to_string(),
             name: format!("p{id}"),
             color: "#fff".to_string(),
             start_tile: (0, 0),

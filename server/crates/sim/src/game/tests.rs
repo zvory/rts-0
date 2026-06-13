@@ -12,6 +12,7 @@ fn human_vs_ai_players() -> [PlayerInit; 2] {
         PlayerInit {
             id: 1,
             team_id: 1,
+            faction_id: "steel_vanguard".to_string(),
             name: "Human".into(),
             color: "#fff".into(),
             is_ai: false,
@@ -19,6 +20,7 @@ fn human_vs_ai_players() -> [PlayerInit; 2] {
         PlayerInit {
             id: 2,
             team_id: 2,
+            faction_id: "steel_vanguard".to_string(),
             name: "Computer".into(),
             color: "#000".into(),
             is_ai: true,
@@ -162,6 +164,7 @@ fn flat_tank_move_fixture() -> (Game, u32, (f32, f32)) {
     let players = [PlayerInit {
         id: 1,
         team_id: 1,
+        faction_id: "steel_vanguard".to_string(),
         name: "Solo".into(),
         color: "#fff".into(),
         is_ai: false,
@@ -529,6 +532,7 @@ fn artillery_shell_damages_allied_entities_without_last_damage_attribution() {
         PlayerInit {
             id: 1,
             team_id: 7,
+            faction_id: "steel_vanguard".to_string(),
             name: "One".into(),
             color: "#fff".into(),
             is_ai: false,
@@ -536,6 +540,7 @@ fn artillery_shell_damages_allied_entities_without_last_damage_attribution() {
         PlayerInit {
             id: 2,
             team_id: 7,
+            faction_id: "steel_vanguard".to_string(),
             name: "Two".into(),
             color: "#aaa".into(),
             is_ai: false,
@@ -594,6 +599,7 @@ fn smoke_projection_fixture() -> (Game, u32, u32, u32, (f32, f32)) {
         PlayerInit {
             id: 1,
             team_id: 1,
+            faction_id: "steel_vanguard".to_string(),
             name: "One".into(),
             color: "#fff".into(),
             is_ai: false,
@@ -601,6 +607,7 @@ fn smoke_projection_fixture() -> (Game, u32, u32, u32, (f32, f32)) {
         PlayerInit {
             id: 2,
             team_id: 2,
+            faction_id: "steel_vanguard".to_string(),
             name: "Two".into(),
             color: "#000".into(),
             is_ai: false,
@@ -650,6 +657,7 @@ fn team_fog_fixture() -> (Game, u32, u32, u32, (f32, f32)) {
         PlayerInit {
             id: 1,
             team_id: 1,
+            faction_id: "steel_vanguard".to_string(),
             name: "One".into(),
             color: "#fff".into(),
             is_ai: false,
@@ -657,6 +665,7 @@ fn team_fog_fixture() -> (Game, u32, u32, u32, (f32, f32)) {
         PlayerInit {
             id: 2,
             team_id: 1,
+            faction_id: "steel_vanguard".to_string(),
             name: "Two".into(),
             color: "#bbb".into(),
             is_ai: false,
@@ -664,6 +673,7 @@ fn team_fog_fixture() -> (Game, u32, u32, u32, (f32, f32)) {
         PlayerInit {
             id: 3,
             team_id: 3,
+            faction_id: "steel_vanguard".to_string(),
             name: "Three".into(),
             color: "#000".into(),
             is_ai: false,
@@ -794,6 +804,7 @@ fn team_current_vision_keeps_smoke_blocking() {
         PlayerInit {
             id: 1,
             team_id: 1,
+            faction_id: "steel_vanguard".to_string(),
             name: "One".into(),
             color: "#fff".into(),
             is_ai: false,
@@ -801,6 +812,7 @@ fn team_current_vision_keeps_smoke_blocking() {
         PlayerInit {
             id: 2,
             team_id: 1,
+            faction_id: "steel_vanguard".to_string(),
             name: "Two".into(),
             color: "#bbb".into(),
             is_ai: false,
@@ -808,6 +820,7 @@ fn team_current_vision_keeps_smoke_blocking() {
         PlayerInit {
             id: 3,
             team_id: 3,
+            faction_id: "steel_vanguard".to_string(),
             name: "Three".into(),
             color: "#000".into(),
             is_ai: false,
@@ -865,6 +878,7 @@ fn manual_mortar_fire_impacts_without_toast_notice() {
         PlayerInit {
             id: 1,
             team_id: 1,
+            faction_id: "steel_vanguard".to_string(),
             name: "One".into(),
             color: "#fff".into(),
             is_ai: false,
@@ -872,6 +886,7 @@ fn manual_mortar_fire_impacts_without_toast_notice() {
         PlayerInit {
             id: 2,
             team_id: 2,
+            faction_id: "steel_vanguard".to_string(),
             name: "Two".into(),
             color: "#000".into(),
             is_ai: false,
@@ -978,6 +993,7 @@ fn set_autocast_command_enables_mortar_autocast_from_default_off() {
         PlayerInit {
             id: 1,
             team_id: 1,
+            faction_id: "steel_vanguard".to_string(),
             name: "One".into(),
             color: "#fff".into(),
             is_ai: false,
@@ -985,6 +1001,7 @@ fn set_autocast_command_enables_mortar_autocast_from_default_off() {
         PlayerInit {
             id: 2,
             team_id: 2,
+            faction_id: "steel_vanguard".to_string(),
             name: "Two".into(),
             color: "#000".into(),
             is_ai: false,
@@ -1037,6 +1054,7 @@ fn visible_autocast_mortar_launch_is_sent_to_enemy() {
         PlayerInit {
             id: 1,
             team_id: 1,
+            faction_id: "steel_vanguard".to_string(),
             name: "One".into(),
             color: "#fff".into(),
             is_ai: false,
@@ -1044,6 +1062,7 @@ fn visible_autocast_mortar_launch_is_sent_to_enemy() {
         PlayerInit {
             id: 2,
             team_id: 2,
+            faction_id: "steel_vanguard".to_string(),
             name: "Two".into(),
             color: "#000".into(),
             is_ai: false,
@@ -1100,6 +1119,7 @@ fn hidden_mortar_launch_is_not_sent_but_impact_reveals_attacker_to_victim() {
         PlayerInit {
             id: 1,
             team_id: 1,
+            faction_id: "steel_vanguard".to_string(),
             name: "One".into(),
             color: "#fff".into(),
             is_ai: false,
@@ -1107,6 +1127,7 @@ fn hidden_mortar_launch_is_not_sent_but_impact_reveals_attacker_to_victim() {
         PlayerInit {
             id: 2,
             team_id: 2,
+            faction_id: "steel_vanguard".to_string(),
             name: "Two".into(),
             color: "#000".into(),
             is_ai: false,
@@ -1203,6 +1224,7 @@ fn manual_mortar_fire_waits_for_tube_alignment() {
         PlayerInit {
             id: 1,
             team_id: 1,
+            faction_id: "steel_vanguard".to_string(),
             name: "One".into(),
             color: "#fff".into(),
             is_ai: false,
@@ -1210,6 +1232,7 @@ fn manual_mortar_fire_waits_for_tube_alignment() {
         PlayerInit {
             id: 2,
             team_id: 2,
+            faction_id: "steel_vanguard".to_string(),
             name: "Two".into(),
             color: "#000".into(),
             is_ai: false,
@@ -1294,6 +1317,7 @@ fn manual_mortar_fire_damages_friendly_units_at_enemy_rate() {
         PlayerInit {
             id: 1,
             team_id: 1,
+            faction_id: "steel_vanguard".to_string(),
             name: "One".into(),
             color: "#fff".into(),
             is_ai: false,
@@ -1301,6 +1325,7 @@ fn manual_mortar_fire_damages_friendly_units_at_enemy_rate() {
         PlayerInit {
             id: 2,
             team_id: 2,
+            faction_id: "steel_vanguard".to_string(),
             name: "Two".into(),
             color: "#000".into(),
             is_ai: false,
@@ -1360,6 +1385,7 @@ fn manual_mortar_fire_damages_allied_units_without_kill_credit() {
         PlayerInit {
             id: 1,
             team_id: 7,
+            faction_id: "steel_vanguard".to_string(),
             name: "One".into(),
             color: "#fff".into(),
             is_ai: false,
@@ -1367,6 +1393,7 @@ fn manual_mortar_fire_damages_allied_units_without_kill_credit() {
         PlayerInit {
             id: 2,
             team_id: 7,
+            faction_id: "steel_vanguard".to_string(),
             name: "Two".into(),
             color: "#aaa".into(),
             is_ai: false,
@@ -1374,6 +1401,7 @@ fn manual_mortar_fire_damages_allied_units_without_kill_credit() {
         PlayerInit {
             id: 3,
             team_id: 3,
+            faction_id: "steel_vanguard".to_string(),
             name: "Three".into(),
             color: "#000".into(),
             is_ai: false,
@@ -1442,6 +1470,7 @@ fn manual_mortar_fire_damages_friendly_buildings() {
         PlayerInit {
             id: 1,
             team_id: 1,
+            faction_id: "steel_vanguard".to_string(),
             name: "One".into(),
             color: "#fff".into(),
             is_ai: false,
@@ -1449,6 +1478,7 @@ fn manual_mortar_fire_damages_friendly_buildings() {
         PlayerInit {
             id: 2,
             team_id: 2,
+            faction_id: "steel_vanguard".to_string(),
             name: "Two".into(),
             color: "#000".into(),
             is_ai: false,
@@ -1693,6 +1723,7 @@ fn smoke_command_fixture() -> (Game, u32, (f32, f32), (f32, f32)) {
     let players = [PlayerInit {
         id: 1,
         team_id: 1,
+        faction_id: "steel_vanguard".to_string(),
         name: "Solo".into(),
         color: "#fff".into(),
         is_ai: false,
@@ -1761,6 +1792,7 @@ fn command_car_requires_rd_unlock_then_trains_at_factory() {
     let players = [PlayerInit {
         id: 1,
         team_id: 1,
+        faction_id: "steel_vanguard".to_string(),
         name: "Solo".into(),
         color: "#fff".into(),
         is_ai: false,
@@ -1988,6 +2020,7 @@ fn queued_move_fixture_with_lobby_debug(
     let players = [PlayerInit {
         id: 1,
         team_id: 1,
+        faction_id: "steel_vanguard".to_string(),
         name: "Solo".into(),
         color: "#fff".into(),
         is_ai: false,
@@ -2042,6 +2075,7 @@ fn mixed_queued_fixture() -> MixedQueuedFixture {
         PlayerInit {
             id: 1,
             team_id: 1,
+            faction_id: "steel_vanguard".to_string(),
             name: "Alpha".into(),
             color: "#fff".into(),
             is_ai: false,
@@ -2049,6 +2083,7 @@ fn mixed_queued_fixture() -> MixedQueuedFixture {
         PlayerInit {
             id: 2,
             team_id: 2,
+            faction_id: "steel_vanguard".to_string(),
             name: "Bravo".into(),
             color: "#000".into(),
             is_ai: false,
@@ -2132,6 +2167,7 @@ fn phase_six_intent_fixture() -> PhaseSixIntentFixture {
         PlayerInit {
             id: 1,
             team_id: 1,
+            faction_id: "steel_vanguard".to_string(),
             name: "Alpha".into(),
             color: "#fff".into(),
             is_ai: false,
@@ -2139,6 +2175,7 @@ fn phase_six_intent_fixture() -> PhaseSixIntentFixture {
         PlayerInit {
             id: 2,
             team_id: 2,
+            faction_id: "steel_vanguard".to_string(),
             name: "Bravo".into(),
             color: "#000".into(),
             is_ai: false,
@@ -3238,6 +3275,7 @@ fn death_vision_lingers_for_five_seconds_as_visual_only_intel() {
         PlayerInit {
             id: 1,
             team_id: 1,
+            faction_id: "steel_vanguard".to_string(),
             name: "One".into(),
             color: "#fff".into(),
             is_ai: false,
@@ -3245,6 +3283,7 @@ fn death_vision_lingers_for_five_seconds_as_visual_only_intel() {
         PlayerInit {
             id: 2,
             team_id: 2,
+            faction_id: "steel_vanguard".to_string(),
             name: "Two".into(),
             color: "#000".into(),
             is_ai: false,
@@ -3350,6 +3389,7 @@ fn human_only_match_has_no_ai_players() {
     let players = [PlayerInit {
         id: 1,
         team_id: 1,
+        faction_id: "steel_vanguard".to_string(),
         name: "Solo".into(),
         color: "#fff".into(),
         is_ai: false,
@@ -3363,6 +3403,7 @@ fn replay_games_preserve_ai_identity_without_controllers() {
     let players = [PlayerInit {
         id: 1,
         team_id: 1,
+        faction_id: "steel_vanguard".to_string(),
         name: "Computer".into(),
         color: "#fff".into(),
         is_ai: true,
@@ -3388,6 +3429,7 @@ fn gather_command_ignores_nodes_without_nearby_completed_cc() {
     let players = [PlayerInit {
         id: 1,
         team_id: 1,
+        faction_id: "steel_vanguard".to_string(),
         name: "Solo".into(),
         color: "#fff".into(),
         is_ai: false,
@@ -3442,6 +3484,7 @@ fn gather_command_to_occupied_patch_is_ignored() {
     let players = [PlayerInit {
         id: 1,
         team_id: 1,
+        faction_id: "steel_vanguard".to_string(),
         name: "Solo".into(),
         color: "#fff".into(),
         is_ai: false,
@@ -3509,6 +3552,7 @@ fn worker_already_touching_resource_body_starts_harvesting() {
     let players = [PlayerInit {
         id: 1,
         team_id: 1,
+        faction_id: "steel_vanguard".to_string(),
         name: "Solo".into(),
         color: "#fff".into(),
         is_ai: false,
@@ -3561,6 +3605,7 @@ fn active_mining_stops_when_nearby_cc_is_removed() {
     let players = [PlayerInit {
         id: 1,
         team_id: 1,
+        faction_id: "steel_vanguard".to_string(),
         name: "Solo".into(),
         color: "#fff".into(),
         is_ai: false,
@@ -3674,6 +3719,7 @@ fn resource_snapshots_include_remaining_even_through_fog() {
         PlayerInit {
             id: 1,
             team_id: 1,
+            faction_id: "steel_vanguard".to_string(),
             name: "A".into(),
             color: "#fff".into(),
             is_ai: false,
@@ -3681,6 +3727,7 @@ fn resource_snapshots_include_remaining_even_through_fog() {
         PlayerInit {
             id: 2,
             team_id: 2,
+            faction_id: "steel_vanguard".to_string(),
             name: "B".into(),
             color: "#000".into(),
             is_ai: false,
@@ -3708,6 +3755,7 @@ fn no_commands_one_player_is_deterministic() {
     let players = [PlayerInit {
         id: 1,
         team_id: 1,
+        faction_id: "steel_vanguard".to_string(),
         name: "Solo".into(),
         color: "#fff".into(),
         is_ai: false,
@@ -3755,6 +3803,7 @@ fn spawn_resource_distances_are_fair_and_symmetric() {
             .map(|id| PlayerInit {
                 id,
                 team_id: id,
+                faction_id: "steel_vanguard".to_string(),
                 name: format!("P{id}"),
                 color: "#fff".into(),
                 is_ai: false,

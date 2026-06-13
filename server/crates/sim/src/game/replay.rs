@@ -10,7 +10,7 @@ use super::{Game, MapMetadata, PlayerInit, StartingLoadout};
 use crate::game::command::SimCommand;
 use crate::protocol::{Command, Event, PlayerScore, ReplayStartMetadata, Snapshot};
 
-pub const REPLAY_ARTIFACT_SCHEMA_VERSION_V1: u32 = 1;
+pub const REPLAY_ARTIFACT_SCHEMA_VERSION_V2: u32 = 2;
 
 /// One authoritative gameplay command, stamped with the simulation tick that applied it.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -67,7 +67,7 @@ impl ReplayArtifactV1 {
     ) -> Self {
         let map = game.map_metadata();
         ReplayArtifactV1 {
-            artifact_schema_version: REPLAY_ARTIFACT_SCHEMA_VERSION_V1,
+            artifact_schema_version: REPLAY_ARTIFACT_SCHEMA_VERSION_V2,
             server_build_sha: server_build_sha.into(),
             map_name: map.name.clone(),
             map_schema_version: map.schema_version,
@@ -102,10 +102,10 @@ impl ReplayArtifactV1 {
         expected_server_build_sha: &str,
         running_map: &MapMetadata,
     ) -> Result<(), ReplayValidationError> {
-        if self.artifact_schema_version != REPLAY_ARTIFACT_SCHEMA_VERSION_V1 {
+        if self.artifact_schema_version != REPLAY_ARTIFACT_SCHEMA_VERSION_V2 {
             return Err(ReplayValidationError::UnsupportedArtifactSchema {
                 found: self.artifact_schema_version,
-                expected: REPLAY_ARTIFACT_SCHEMA_VERSION_V1,
+                expected: REPLAY_ARTIFACT_SCHEMA_VERSION_V2,
             });
         }
         if self.server_build_sha != expected_server_build_sha {
@@ -335,11 +335,13 @@ impl std::error::Error for ReplayError {}
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::protocol::DEFAULT_FACTION_ID;
 
     fn players() -> [PlayerInit; 1] {
         [PlayerInit {
             id: 1,
             team_id: 1,
+            faction_id: DEFAULT_FACTION_ID.to_string(),
             name: "Replay".into(),
             color: "#fff".into(),
             is_ai: false,
@@ -368,7 +370,7 @@ mod tests {
 
         assert_eq!(
             artifact.artifact_schema_version,
-            REPLAY_ARTIFACT_SCHEMA_VERSION_V1
+            REPLAY_ARTIFACT_SCHEMA_VERSION_V2
         );
         assert_eq!(artifact.server_build_sha, "test-sha");
         assert_eq!(artifact.map_name, "Default");
@@ -380,6 +382,7 @@ mod tests {
             ReplayStartingLoadoutMode::Standard
         );
         assert_eq!(artifact.players, players);
+        assert_eq!(artifact.players[0].faction_id, DEFAULT_FACTION_ID);
         assert_eq!(artifact.duration_ticks, 1);
         assert_eq!(artifact.winner_id, Some(1));
         assert_eq!(artifact.winner_team_id, Some(1));
@@ -388,9 +391,9 @@ mod tests {
     }
 
     #[test]
-    fn replay_artifact_defaults_missing_winner_team_for_old_json() {
+    fn replay_artifact_requires_faction_schema_and_defaults_missing_winner_team() {
         let json = serde_json::json!({
-            "artifactSchemaVersion": REPLAY_ARTIFACT_SCHEMA_VERSION_V1,
+            "artifactSchemaVersion": REPLAY_ARTIFACT_SCHEMA_VERSION_V2,
             "serverBuildSha": "test-sha",
             "mapName": "Default",
             "mapSchemaVersion": 1,
@@ -401,6 +404,8 @@ mod tests {
             "startingLoadoutMode": "standard",
             "players": [{
                 "id": 1,
+                "team_id": 1,
+                "faction_id": DEFAULT_FACTION_ID,
                 "name": "Replay",
                 "color": "#fff",
                 "is_ai": false
@@ -413,9 +418,37 @@ mod tests {
 
         let artifact: ReplayArtifactV1 = serde_json::from_value(json).unwrap();
 
-        assert_eq!(artifact.players[0].team_id, 0);
+        assert_eq!(artifact.players[0].team_id, 1);
+        assert_eq!(artifact.players[0].faction_id, DEFAULT_FACTION_ID);
         assert_eq!(artifact.winner_id, Some(1));
         assert_eq!(artifact.winner_team_id, None);
+
+        let old_json = serde_json::json!({
+            "artifactSchemaVersion": 1,
+            "serverBuildSha": "test-sha",
+            "mapName": "Default",
+            "mapSchemaVersion": 1,
+            "mapContentHash": "hash",
+            "seed": 1,
+            "startingSteel": 75,
+            "startingOil": 0,
+            "startingLoadoutMode": "standard",
+            "players": [{
+                "id": 1,
+                "team_id": 1,
+                "name": "Replay",
+                "color": "#fff",
+                "is_ai": false
+            }],
+            "durationTicks": 0,
+            "commandLog": [],
+            "winnerId": 1,
+            "finalScores": []
+        });
+        assert!(
+            serde_json::from_value::<ReplayArtifactV1>(old_json).is_err(),
+            "pre-faction replay artifacts without player factionId should not load"
+        );
     }
 
     #[test]

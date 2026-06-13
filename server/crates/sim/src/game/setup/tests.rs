@@ -13,6 +13,7 @@ fn standard_starting_loadout_matches_phase0_inventory() {
         PlayerInit {
             id: 1,
             team_id: 1,
+            faction_id: "steel_vanguard".to_string(),
             name: "One".to_string(),
             color: "#cc1111".to_string(),
             is_ai: false,
@@ -20,6 +21,7 @@ fn standard_starting_loadout_matches_phase0_inventory() {
         PlayerInit {
             id: 2,
             team_id: 2,
+            faction_id: "steel_vanguard".to_string(),
             name: "Two".to_string(),
             color: "#1133bb".to_string(),
             is_ai: false,
@@ -32,6 +34,7 @@ fn standard_starting_loadout_matches_phase0_inventory() {
     assert_eq!(game.starting_loadout(), StartingLoadout::Standard);
 
     for player in &game.players {
+        assert_eq!(player.faction_id, DEFAULT_FACTION_ID);
         assert_eq!(player.steel, config::STARTING_STEEL);
         assert_eq!(player.oil, config::STARTING_OIL);
         assert_eq!(player.supply_cap, config::CITY_CENTRE_SUPPLY);
@@ -61,6 +64,16 @@ fn standard_starting_loadout_matches_phase0_inventory() {
         .entities
         .iter()
         .any(|e| e.owner == 0 && e.kind == EntityKind::Oil));
+
+    let start = game.start_payload();
+    assert!(start
+        .players
+        .iter()
+        .all(|player| player.faction_id == DEFAULT_FACTION_ID));
+    assert!(game
+        .player_inits()
+        .iter()
+        .all(|player| player.faction_id == DEFAULT_FACTION_ID));
 }
 
 #[test]
@@ -69,6 +82,7 @@ fn debug_starting_loadout_applies_to_humans_only() {
         PlayerInit {
             id: 1,
             team_id: 1,
+            faction_id: "steel_vanguard".to_string(),
             name: "Human".to_string(),
             color: "#cc1111".to_string(),
             is_ai: false,
@@ -76,6 +90,7 @@ fn debug_starting_loadout_applies_to_humans_only() {
         PlayerInit {
             id: 2,
             team_id: 2,
+            faction_id: "steel_vanguard".to_string(),
             name: "AI".to_string(),
             color: "#1133bb".to_string(),
             is_ai: true,
@@ -120,6 +135,7 @@ fn debug_starting_loadout_adds_inert_enemy_mortar_corner_without_profile() {
     let players = [PlayerInit {
         id: 1,
         team_id: 1,
+        faction_id: "steel_vanguard".to_string(),
         name: "Human".to_string(),
         color: "#cc1111".to_string(),
         is_ai: false,

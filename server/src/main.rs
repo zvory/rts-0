@@ -35,7 +35,7 @@ use rts_server::dev_scenarios::{
 };
 use rts_server::game::map::Map;
 use rts_server::game::replay::{
-    ReplayArtifactV1, ReplayValidationError, REPLAY_ARTIFACT_SCHEMA_VERSION_V1,
+    ReplayArtifactV1, ReplayValidationError, REPLAY_ARTIFACT_SCHEMA_VERSION_V2,
 };
 use rts_server::game::SimCommand;
 use rts_server::lobby::{self, Lobby, RoomEvent};
@@ -360,7 +360,7 @@ fn apply_replay_summary_compatibility(row: &mut rts_server::db::MatchSummary, bu
         row.replay_unavailable_reason = Some("Replay was not recorded for this match.".to_string());
         return;
     };
-    if meta.artifact_schema_version != REPLAY_ARTIFACT_SCHEMA_VERSION_V1 as i32 {
+    if meta.artifact_schema_version != REPLAY_ARTIFACT_SCHEMA_VERSION_V2 as i32 {
         row.replay_available = false;
         row.replay_unavailable_reason = Some(format!(
             "Replay schema {} is not supported by this server.",
@@ -974,7 +974,7 @@ mod tests {
     fn replay_summary_marks_current_build_and_map_available() {
         let map = Map::metadata_for_name("Default").unwrap();
         let mut row = replay_summary_for(Some(rts_server::db::ReplaySummaryMetadata {
-            artifact_schema_version: REPLAY_ARTIFACT_SCHEMA_VERSION_V1 as i32,
+            artifact_schema_version: REPLAY_ARTIFACT_SCHEMA_VERSION_V2 as i32,
             build_sha: "current-build".to_string(),
             map_name: map.name,
             map_schema_version: map.schema_version as i32,
@@ -991,7 +991,7 @@ mod tests {
     fn replay_summary_warns_but_allows_incompatible_build() {
         let map = Map::metadata_for_name("Default").unwrap();
         let mut row = replay_summary_for(Some(rts_server::db::ReplaySummaryMetadata {
-            artifact_schema_version: REPLAY_ARTIFACT_SCHEMA_VERSION_V1 as i32,
+            artifact_schema_version: REPLAY_ARTIFACT_SCHEMA_VERSION_V2 as i32,
             build_sha: "old-build".to_string(),
             map_name: map.name,
             map_schema_version: map.schema_version as i32,

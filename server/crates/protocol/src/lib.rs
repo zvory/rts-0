@@ -13,7 +13,7 @@ pub use rts_contract::{
     AbilityCooldownView, AttackReveal, DebugPathPoint, DebugPathView, EntityView, Event, MapInfo,
     NoticeSeverity, OrderPlanMarker, PlayerResourceSnapshot, PlayerScore, PlayerStart,
     RememberedBuildingView, ReplayPlaybackState, ReplayStartMetadata, ResourceDelta, ResourceNode,
-    SmokeCloudView, Snapshot, SnapshotNetStatus, StartPayload, TeamId,
+    SmokeCloudView, Snapshot, SnapshotNetStatus, StartPayload, TeamId, DEFAULT_FACTION_ID,
 };
 
 fn is_false(value: &bool) -> bool {
@@ -338,6 +338,7 @@ pub struct AvailableMap {
 pub struct ReplayBranchSeat {
     pub player_id: u32,
     pub team_id: TeamId,
+    pub faction_id: String,
     pub name: String,
     pub color: String,
     pub claimable: bool,
@@ -349,6 +350,7 @@ pub struct ReplayBranchSeat {
 pub struct BranchStagingSeat {
     pub player_id: u32,
     pub team_id: TeamId,
+    pub faction_id: String,
     pub name: String,
     pub color: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -491,6 +493,7 @@ pub struct ObserverAnalysisResourcesLost {
 pub struct LobbyPlayer {
     pub id: u32,
     pub team_id: TeamId,
+    pub faction_id: String,
     pub name: String,
     pub ready: bool,
     pub color: String,
@@ -1328,6 +1331,7 @@ mod tests {
             seats: vec![ReplayBranchSeat {
                 player_id: 7,
                 team_id: 7,
+                faction_id: DEFAULT_FACTION_ID.to_string(),
                 name: "Player 7".to_string(),
                 color: "#4878c8".to_string(),
                 claimable: true,
@@ -1340,6 +1344,7 @@ mod tests {
         assert_eq!(json["sourceTick"], 123);
         assert_eq!(json["seats"][0]["playerId"], 7);
         assert_eq!(json["seats"][0]["teamId"], 7);
+        assert_eq!(json["seats"][0]["factionId"], DEFAULT_FACTION_ID);
         assert_eq!(json["seats"][0]["name"], "Player 7");
         assert_eq!(json["seats"][0]["color"], "#4878c8");
         assert_eq!(json["seats"][0]["claimable"], true);
@@ -1398,6 +1403,7 @@ mod tests {
             seats: vec![BranchStagingSeat {
                 player_id: 7,
                 team_id: 7,
+                faction_id: DEFAULT_FACTION_ID.to_string(),
                 name: "Player 7".to_string(),
                 color: "#4878c8".to_string(),
                 claimant_id: Some(100),
@@ -1417,6 +1423,7 @@ mod tests {
         assert_eq!(json["hostId"], 100);
         assert_eq!(json["seats"][0]["playerId"], 7);
         assert_eq!(json["seats"][0]["teamId"], 7);
+        assert_eq!(json["seats"][0]["factionId"], DEFAULT_FACTION_ID);
         assert_eq!(json["seats"][0]["claimantId"], 100);
         assert_eq!(json["seats"][0]["claimantName"], "Viewer 100");
         assert_eq!(json["occupants"][0]["id"], 100);

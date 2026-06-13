@@ -51,6 +51,7 @@ fn player_state(id: u32, is_ai: bool) -> PlayerState {
     PlayerState {
         id,
         team_id: id,
+        faction_id: "steel_vanguard".to_string(),
         name: format!("Player {id}"),
         color: "#fff".to_string(),
         start_tile: (4, 4),
@@ -487,7 +488,9 @@ fn anti_tank_gun_tank_preference_ignores_allied_tanks() {
     let spatial = SpatialIndex::build(&entities, map.size);
     let fog = visible_fog(&map, &entities);
     let smokes = SmokeCloudStore::new();
-    let attacker = entities.get(anti_tank_gun).expect("anti-tank gun should exist");
+    let attacker = entities
+        .get(anti_tank_gun)
+        .expect("anti-tank gun should exist");
 
     let target = resolve_target(
         &map,
@@ -1820,7 +1823,10 @@ fn mortar_autocast_velocity_clears_when_target_stops_to_fire() {
         enemy.set_attack_cd(10);
     }
 
-    run_combat_tick_with_players(&mut entities, &[player_state(1, false), player_state(2, false)]);
+    run_combat_tick_with_players(
+        &mut entities,
+        &[player_state(1, false), player_state(2, false)],
+    );
 
     let target = entities.get(target_id).expect("target should exist");
     assert!(
@@ -2119,7 +2125,11 @@ fn deployed_anti_tank_gun_clamps_to_field_edge_and_does_not_fire_outside_arc() {
 #[test]
 fn support_weapon_redeploy_rotates_after_teardown_completes() {
     for (kind, setup_ticks, label) in [
-        (EntityKind::AntiTankGun, config::ANTI_TANK_GUN_SETUP_TICKS, "anti-tank gun"),
+        (
+            EntityKind::AntiTankGun,
+            config::ANTI_TANK_GUN_SETUP_TICKS,
+            "anti-tank gun",
+        ),
         (
             EntityKind::Artillery,
             config::ARTILLERY_SETUP_TICKS,

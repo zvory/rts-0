@@ -5,7 +5,7 @@
 //
 // Usage: start the server (`cd server && cargo run`), then `node tests/server_integration.mjs`.
 // Override the endpoint with RTS_WS (default ws://127.0.0.1:8081/ws).
-import { COMPACT_SNAPSHOT_VERSION } from "../client/src/protocol.js";
+import { COMPACT_SNAPSHOT_VERSION, DEFAULT_FACTION_ID } from "../client/src/protocol.js";
 import {
   assertCountdownProtocol,
   assertDistinctStartTiles,
@@ -44,6 +44,7 @@ const { ok } = assertions;
   ok(lob.players.length === 3, `lobby shows 2 players and 1 spectator: ${lob.players.map((p) => p.name).join(", ")}`);
   ok(lob.hostId === A.playerId, `host is A (${lob.hostId})`);
   ok(lob.players.every((p) => /^#/.test(p.color)), `players have hex colors: ${lob.players.map((p) => p.color).join(",")}`);
+  ok(lob.players.every((p) => p.factionId === DEFAULT_FACTION_ID), `lobby defaults all seats to ${DEFAULT_FACTION_ID}`);
   ok(lob.players.find((p) => p.id === C.playerId)?.isSpectator === true, "lobby marks C as spectator");
 
   await readyPlayers([A, B]);
@@ -63,6 +64,7 @@ const { ok } = assertions;
   ok(startA.playerId === A.playerId && startB.playerId === B.playerId, `each start carries own playerId`);
   ok(startC.playerId === C.playerId && startC.spectator === true, `spectator start carries observer id and flag`);
   ok(startC.players.length === 2 && !startC.players.some((p) => p.id === C.playerId), "spectator is not seated in start players");
+  ok(startA.players.every((p) => p.factionId === DEFAULT_FACTION_ID), `start players carry ${DEFAULT_FACTION_ID} factionId`);
   const a = startA.players.find((p) => p.id === A.playerId);
   const b = startA.players.find((p) => p.id === B.playerId);
   ok(a && b && (a.startTileX !== b.startTileX || a.startTileY !== b.startTileY),

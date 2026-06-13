@@ -500,7 +500,8 @@ fn planner_facts(
             facts.can_attack = e.can_attack();
             facts.can_gather = e.kind == EntityKind::Worker;
             facts.can_build = e.kind == EntityKind::Worker || build_notice_compat;
-            facts.can_setup_anti_tank_gun = matches!(e.kind, EntityKind::AntiTankGun | EntityKind::Artillery);
+            facts.can_setup_anti_tank_gun =
+                matches!(e.kind, EntityKind::AntiTankGun | EntityKind::Artillery);
             if let Some(ability) = ability {
                 if ability_orders::caster_can_accept_order(entities, player, id, ability.kind)
                     && ability.tech_ready
@@ -875,9 +876,9 @@ fn entity_order_intent_from_planner(intent: planner::OrderIntent) -> Option<Orde
         planner::OrderIntent::SelfAbility { ability } => {
             ability_from_planner(ability).map(OrderIntent::self_ability)
         }
-        planner::OrderIntent::SetupAntiTankGuns { face_toward } => {
-            Some(OrderIntent::setup_anti_tank_guns(face_toward.x, face_toward.y))
-        }
+        planner::OrderIntent::SetupAntiTankGuns { face_toward } => Some(
+            OrderIntent::setup_anti_tank_guns(face_toward.x, face_toward.y),
+        ),
     }
 }
 
@@ -1830,8 +1831,10 @@ mod tests {
         let mut smokes = SmokeCloudStore::new();
         let mut mortar_shells = MortarShellStore::default();
         let mut artillery_shells = ArtilleryShellStore::default();
-        let mut events: HashMap<u32, Vec<Event>> =
-            players.iter().map(|player| (player.id, Vec::new())).collect();
+        let mut events: HashMap<u32, Vec<Event>> = players
+            .iter()
+            .map(|player| (player.id, Vec::new()))
+            .collect();
 
         apply_commands(
             &map,
@@ -1903,8 +1906,10 @@ mod tests {
         let mut smokes = SmokeCloudStore::new();
         let mut mortar_shells = MortarShellStore::default();
         let mut artillery_shells = ArtilleryShellStore::default();
-        let mut events: HashMap<u32, Vec<Event>> =
-            players.iter().map(|player| (player.id, Vec::new())).collect();
+        let mut events: HashMap<u32, Vec<Event>> = players
+            .iter()
+            .map(|player| (player.id, Vec::new()))
+            .collect();
 
         apply_commands(
             &map,
@@ -4439,8 +4444,10 @@ mod tests {
         let mut coordinator = MoveCoordinator::new(&mut pathing, map, &occ, 1);
         let mut fog = Fog::new(map.size);
         fog.recompute(&[1, 2], entities, map);
-        let mut events: HashMap<u32, Vec<Event>> =
-            players.iter().map(|player| (player.id, Vec::new())).collect();
+        let mut events: HashMap<u32, Vec<Event>> = players
+            .iter()
+            .map(|player| (player.id, Vec::new()))
+            .collect();
         let mut mortar_shells = MortarShellStore::default();
         let mut artillery_shells = ArtilleryShellStore::default();
         apply_commands(
@@ -4473,6 +4480,7 @@ mod tests {
         PlayerState {
             id,
             team_id: id,
+            faction_id: "steel_vanguard".to_string(),
             name: format!("Player {id}"),
             color: "#fff".to_string(),
             start_tile: (0, 0),

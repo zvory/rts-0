@@ -19,6 +19,7 @@ import {
   UPGRADE_CODE,
   COMPACT_SNAPSHOT_VERSION,
   PREDICTION_PROTOCOL_VERSION,
+  DEFAULT_FACTION_ID,
   decodeServerMessage,
   msg,
 } from "../client/src/protocol.js";
@@ -155,6 +156,12 @@ assert(
   "start payload must expose prediction compatibility metadata",
 );
 assert(
+  rustContract.includes("DEFAULT_FACTION_ID") &&
+    rustContract.includes("faction_id") &&
+    DEFAULT_FACTION_ID === "steel_vanguard",
+  "start/player contract must expose the canonical default faction id",
+);
+assert(
   rust.includes("COMPACT_SNAPSHOT_VERSION: u8 = 19") && COMPACT_SNAPSHOT_VERSION === 19,
   "compact snapshot version must match Rust",
 );
@@ -224,14 +231,14 @@ assert(
   rust.includes("ReplayBranchCreated") && S.REPLAY_BRANCH_CREATED === "replayBranchCreated",
   "replayBranchCreated server message tag must match Rust",
 );
-for (const field of ["branch_room", "source_tick", "seats", "player_id", "team_id", "claimable"]) {
+for (const field of ["branch_room", "source_tick", "seats", "player_id", "team_id", "faction_id", "claimable"]) {
   assert(rust.includes(field), `replayBranchCreated Rust contract is missing ${field}`);
 }
 assert(
   rust.includes("BranchStaging") && S.BRANCH_STAGING === "branchStaging",
   "branchStaging server message tag must match Rust",
 );
-for (const field of ["host_id", "team_id", "claimant_id", "occupants", "can_start"]) {
+for (const field of ["host_id", "team_id", "faction_id", "claimant_id", "occupants", "can_start"]) {
   assert(rust.includes(field), `branchStaging Rust contract is missing ${field}`);
 }
 assert(

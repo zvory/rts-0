@@ -1,5 +1,5 @@
 {
-  "reason": "Phase 5 team-aware victory helpers on Game API",
+  "reason": "Phase 1 faction identity adds PlayerInit fields to game tests",
   "line_counts": [
     {
       "path": "ability.rs",
@@ -267,7 +267,7 @@
     },
     {
       "path": "tests.rs",
-      "lines": 3514
+      "lines": 3885
     },
     {
       "path": "upgrade.rs",

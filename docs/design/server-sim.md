@@ -141,7 +141,7 @@ impl Game {
 }
 
 pub type TeamId = u32;
-pub struct PlayerInit { pub id: u32, pub team_id: TeamId, pub name: String, pub color: String, pub is_ai: bool }
+pub struct PlayerInit { pub id: u32, pub team_id: TeamId, pub faction_id: String, pub name: String, pub color: String, pub is_ai: bool }
 pub struct CommandLogEntry { pub tick: u32, pub player_id: u32, pub command: Command }
 ```
 `SimCommand` is the internal command enum from `game::command`; live `ClientMessage::Command`
@@ -164,6 +164,10 @@ seated player a unique nonzero team by default; deserialized or hand-built fixtu
 on `Game` are available for future team-aware systems: `team_of_player`, `same_team_player`,
 `same_team_owner`, `is_enemy_player`, `is_enemy_owner`, and `allied_player_ids`. Neutral owner `0`
 is never allied with a player.
+
+`PlayerInit.faction_id` is canonical faction identity. The default current faction is
+`steel_vanguard`, and Phase 1 stores it on player state, start payload players, and replay player
+metadata without changing starting entities, resources, or command legality.
 
 Command validation, queued attack promotion, combat target acquisition, direct damage attribution,
 shot interception, overpenetration, support-weapon splash attribution, worker-retreat metadata, and

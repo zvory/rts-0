@@ -7,7 +7,9 @@ use super::*;
 use crate::game::entity::EntityKind;
 use crate::game::map::Map;
 use crate::game::replay::{ReplayArtifactV1, ReplayValidationError};
-use crate::protocol::{ReplayPlaybackState, SnapshotNetStatus, PREDICTION_PROTOCOL_VERSION};
+use crate::protocol::{
+    ReplayPlaybackState, SnapshotNetStatus, DEFAULT_FACTION_ID, PREDICTION_PROTOCOL_VERSION,
+};
 use crate::structured_log::{self, MatchEndedLog, MatchStartedLog};
 use rand::rngs::SmallRng;
 use rand::SeedableRng;
@@ -378,6 +380,7 @@ impl BranchStagingState {
                 BranchStagingSeat {
                     player_id: seat.player_id,
                     team_id: seat.team_id,
+                    faction_id: seat.faction_id.clone(),
                     name: seat.name.clone(),
                     color: seat.color.clone(),
                     claimant_id,
@@ -577,6 +580,7 @@ impl ReplaySession {
             .map(|player| ReplayBranchSeat {
                 player_id: player.id,
                 team_id: normalize_start_team_id(player.id, player.team_id),
+                faction_id: player.faction_id.clone(),
                 name: player.name.clone(),
                 color: player.color.clone(),
                 claimable: true,
@@ -2020,6 +2024,7 @@ impl RoomTask {
                     } else {
                         self.team_id_for_active_seat(*id)
                     },
+                    faction_id: DEFAULT_FACTION_ID.to_string(),
                     name: p.name.clone(),
                     ready: p.ready,
                     color: p.color.clone(),
@@ -2032,6 +2037,7 @@ impl RoomTask {
             players.push(LobbyPlayer {
                 id: ai.id,
                 team_id: ai.team_id,
+                faction_id: DEFAULT_FACTION_ID.to_string(),
                 name: ai.name.clone(),
                 ready: true,
                 color: Self::ai_color(seat),
@@ -2107,6 +2113,7 @@ impl RoomTask {
                 self.players.get(&id).map(|p| PlayerInit {
                     id,
                     team_id: self.team_id_for_active_seat(id),
+                    faction_id: DEFAULT_FACTION_ID.to_string(),
                     name: p.name.clone(),
                     color: p.color.clone(),
                     is_ai: false,
@@ -2119,6 +2126,7 @@ impl RoomTask {
             inits.push(PlayerInit {
                 id: ai.id,
                 team_id: ai.team_id,
+                faction_id: DEFAULT_FACTION_ID.to_string(),
                 name: ai.name.clone(),
                 color: Self::ai_color(seat),
                 is_ai: true,
@@ -3745,6 +3753,7 @@ mod tests {
             .map(|id| PlayerInit {
                 id,
                 team_id: id,
+                faction_id: "steel_vanguard".to_string(),
                 name: format!("Player {id}"),
                 color: PLAYER_PALETTE[(id as usize - 1) % PLAYER_PALETTE.len()].to_string(),
                 is_ai: false,
@@ -4456,7 +4465,7 @@ mod tests {
     }
 
     #[test]
-    fn replay_branch_seed_preserves_team_ids_and_defaults_old_artifacts() {
+    fn replay_branch_seed_preserves_team_and_faction_ids() {
         let mut players = replay_test_players(4);
         players[0].team_id = 1;
         players[1].team_id = 1;
@@ -4473,6 +4482,10 @@ mod tests {
                 .collect::<Vec<_>>(),
             vec![1, 1, 2, 2]
         );
+        assert!(seed
+            .seats
+            .iter()
+            .all(|seat| seat.faction_id == DEFAULT_FACTION_ID));
 
         let mut old_players = replay_test_players(2);
         old_players[0].team_id = 0;
@@ -4489,6 +4502,10 @@ mod tests {
                 .collect::<Vec<_>>(),
             vec![1, 2]
         );
+        assert!(old_seed
+            .seats
+            .iter()
+            .all(|seat| seat.faction_id == DEFAULT_FACTION_ID));
     }
 
     #[test]
@@ -4564,6 +4581,7 @@ mod tests {
             vec![ReplayBranchSeat {
                 player_id: players[0].id,
                 team_id: players[0].team_id,
+                faction_id: players[0].faction_id.clone(),
                 name: players[0].name.clone(),
                 color: players[0].color.clone(),
                 claimable: true,

@@ -6,6 +6,7 @@
 use serde::{Deserialize, Serialize};
 
 pub type TeamId = u32;
+pub const DEFAULT_FACTION_ID: &str = "steel_vanguard";
 
 fn is_false(value: &bool) -> bool {
     !*value
@@ -87,6 +88,7 @@ pub struct PlayerStart {
     pub id: u32,
     #[serde(default)]
     pub team_id: TeamId,
+    pub faction_id: String,
     pub name: String,
     pub color: String,
     pub start_tile_x: u32,

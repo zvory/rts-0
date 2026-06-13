@@ -167,6 +167,7 @@ mod tests {
             PlayerInit {
                 id: 1,
                 team_id: 0,
+                faction_id: "steel_vanguard".to_string(),
                 name: "Alpha".to_string(),
                 color: "#4878c8".to_string(),
                 is_ai: false,
@@ -174,6 +175,7 @@ mod tests {
             PlayerInit {
                 id: 2,
                 team_id: 0,
+                faction_id: "steel_vanguard".to_string(),
                 name: "Bravo".to_string(),
                 color: "#c84848".to_string(),
                 is_ai: false,
@@ -194,6 +196,7 @@ mod tests {
             PlayerInit {
                 id: 1,
                 team_id: 10,
+                faction_id: "steel_vanguard".to_string(),
                 name: "Alpha".to_string(),
                 color: "#4878c8".to_string(),
                 is_ai: false,
@@ -201,6 +204,7 @@ mod tests {
             PlayerInit {
                 id: 2,
                 team_id: 10,
+                faction_id: "steel_vanguard".to_string(),
                 name: "Bravo".to_string(),
                 color: "#c84848".to_string(),
                 is_ai: false,
@@ -208,6 +212,7 @@ mod tests {
             PlayerInit {
                 id: 3,
                 team_id: 30,
+                faction_id: "steel_vanguard".to_string(),
                 name: "Charlie".to_string(),
                 color: "#48a868".to_string(),
                 is_ai: false,
@@ -227,6 +232,7 @@ mod tests {
             PlayerInit {
                 id: 1,
                 team_id: 7,
+                faction_id: "steel_vanguard".to_string(),
                 name: "Alpha".to_string(),
                 color: "#4878c8".to_string(),
                 is_ai: false,
@@ -234,6 +240,7 @@ mod tests {
             PlayerInit {
                 id: 2,
                 team_id: 7,
+                faction_id: "steel_vanguard".to_string(),
                 name: "Bravo".to_string(),
                 color: "#c84848".to_string(),
                 is_ai: false,
@@ -241,6 +248,7 @@ mod tests {
             PlayerInit {
                 id: 3,
                 team_id: 3,
+                faction_id: "steel_vanguard".to_string(),
                 name: "Charlie".to_string(),
                 color: "#48a868".to_string(),
                 is_ai: false,
