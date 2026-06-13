@@ -37,8 +37,13 @@ pub(super) fn plan_frontal_wave(
     attack: AttackPolicy,
     memory: &mut AiDecisionMemory,
     profile: &AiProfile,
+    excluded_units: &BTreeSet<u32>,
 ) -> FrontalWavePlan {
-    let ready_units = actions::select_ready_combat_units(&observation.owned, attack.unit_kinds);
+    let ready_units = actions::select_ready_combat_units_excluding(
+        &observation.owned,
+        attack.unit_kinds,
+        excluded_units,
+    );
     let desired_size = memory.desired_attack_size_for(profile, attack, observation.tick);
     let attack_due = memory.attack_due_for(profile, attack, observation.tick);
     let required_unit_ready = attack

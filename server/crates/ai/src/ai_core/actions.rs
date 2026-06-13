@@ -720,9 +720,19 @@ pub(crate) fn select_ready_combat_units(
     units: &[AiEntitySummary],
     kinds: &[EntityKind],
 ) -> Vec<u32> {
+    select_ready_combat_units_excluding(units, kinds, &BTreeSet::new())
+}
+
+pub(crate) fn select_ready_combat_units_excluding(
+    units: &[AiEntitySummary],
+    kinds: &[EntityKind],
+    excluded_units: &BTreeSet<u32>,
+) -> Vec<u32> {
     let mut selected: Vec<u32> = units
         .iter()
-        .filter(|unit| unit.free_for_combat && kinds.contains(&unit.kind))
+        .filter(|unit| {
+            unit.free_for_combat && kinds.contains(&unit.kind) && !excluded_units.contains(&unit.id)
+        })
         .map(|unit| unit.id)
         .collect();
     selected.sort_unstable();
