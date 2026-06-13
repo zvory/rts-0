@@ -1,71 +1,71 @@
-# Phase 6 - Team-Aware Starts on Authored Maps
+# Phase 6 - Shared Current Vision
 
 Status: planned.
 
 ## Goal
 
-Bias start placement so teammates spawn near each other on authored maps. The algorithm should stay
-generic over team sizes and map layouts, not hardcode 1v2, 1v3, 2v2, or four fixed corners.
+Make authoritative current line of sight shared across living teammates. This phase should focus on
+fog grids and `visibleTiles`, leaving allied projection details and transient event privacy to the
+next phase.
 
 ## Scope
 
-- Extend map generation/loading to accept ordered player/team assignments.
-- Preserve `Map::generate(player_count, seed)` or a compatibility wrapper for singleton-team FFA
-  tests and callers.
-- For authored maps, select candidate layouts matching player count, then assign layout slots to
-  players using team-aware scoring.
-- Keep FFA behavior as close as practical to today's seeded layout/slot shuffle.
-- For team games, prefer:
-  - lower teammate spread
-  - higher nearest enemy-team distance
-  - balanced team exposure where possible
-  - deterministic seed-influenced tie breaks
-- Preserve authored main/natural pairings and avoid duplicate expansion assignment.
-- Add a synthetic larger authored layout test so the implementation does not assume exactly four
-  starts or two teams.
+- Recompute authoritative current fog by team, or stamp each entity's sight into every living
+  teammate's player grid.
+- Keep neutral resource nodes from granting vision.
+- Preserve smoke blocking and lingering death sight semantics under team vision.
+- Ensure `visibleTiles` sent to each player reflects team current vision.
+- Ensure a living player with no own entities but living teammates still receives team current
+  vision.
+- Ensure defeated/disconnected/eliminated teammates stop contributing live sight.
+- Keep command authority and resource/upgrades snapshots local-player-only.
+- Do not broaden allied entity detail projection, remembered buildings, target tracers, or
+  support-fire marker event fanout in this phase except where needed to prove fog grids.
 
 ## Expected Touch Points
 
 - `docs/design/server-sim.md`
-- `docs/design/testing.md`
-- `server/crates/sim/src/game/map.rs`
-- `server/crates/sim/src/game/map/authored.rs`
-- `server/crates/sim/src/game/setup.rs`
-- `server/crates/sim/src/game/replay.rs`
-- `server/crates/ai/src/selfplay/` fixtures if explicit FFA teams are required
-- authored map tests and fixtures
+- `docs/design/protocol.md`
+- `docs/design/hardening.md`
+- `server/crates/sim/src/game/teams.rs`
+- `server/crates/sim/src/game/fog.rs`
+- `server/crates/sim/src/game/snapshot.rs`
+- `server/crates/sim/src/game/mod.rs`
 - `tests/team_integration.mjs`
+- `tests/regression.mjs`
 
 ## Verification
 
 ```bash
-cd server && cargo test map --workspace
-cd server && cargo test setup --workspace
+cd server && cargo test fog --workspace
+cd server && cargo test team --workspace
 node tests/team_integration.mjs
+node tests/regression.mjs
 ```
 
 Required automated scenarios:
 
-- FFA assignment remains deterministic for a seed.
-- 2v2 places teammate pairs closer than a random opposite-corner baseline on current authored maps.
-- 1v2 places the two-player team together when the layout supports it.
-- 1v3 is deterministic and best-effort on four-start maps.
-- A synthetic map with more than four starts can assign arbitrary team sizes without fixed arrays.
-- Start payload reports correct `teamId` next to assigned start tiles.
+- Ally scout reveals an enemy to a teammate's snapshot.
+- Enemy outside all allied sight is absent from every teammate snapshot.
+- Player with no own entities but living allies still receives team `visibleTiles`.
+- Defeated/eliminated teammate sight no longer contributes to team current vision.
+- Smoke still blocks non-owner/team visibility under team fog.
+- Lingering death sight remains snapshot-only and follows the documented team rules.
+- Shared `visibleTiles` updates cause client explored history to accumulate in a headless or
+  smoke-testable path.
 
 ## Acceptance Criteria
 
-- Team starts are together-biased on current authored maps.
-- FFA start assignment remains compatible enough for existing tests and player expectations.
-- Map assignment accepts vector player/team data and does not encode lobby preset names.
-- Replay capture/playback preserves start assignment through player/team data and seed.
+- Server-authoritative shared current vision works for every living teammate.
+- Hidden enemies remain hidden from the whole opposing team when no living teammate sees them.
+- Resource, supply, upgrades, and command authority remain local-player-only.
 
 ## Manual Testing Focus
 
-Use a dev/scenario or automated start payload dump to inspect one 2v2 start assignment visually if
-the automated distance assertions are hard to interpret.
+None expected unless the explored-history behavior needs a visual sanity check. Prefer a scripted
+scenario URL over manual multi-tab setup.
 
 ## Handoff Requirements
 
-The phase handoff must describe the scoring algorithm, note any FFA behavior differences, and list
-the authored maps covered by tests.
+The phase handoff must explain the team-fog implementation choice, define defeated/disconnected
+vision behavior, and list any projection or event surfaces intentionally deferred.

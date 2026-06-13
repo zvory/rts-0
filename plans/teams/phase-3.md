@@ -1,54 +1,41 @@
-# Phase 3 - Team-Safe Simulation Combat and Victory
+# Phase 3 - Team-Safe Command Targeting
 
 Status: planned.
 
 ## Goal
 
-Make team relationships authoritative for hostility and match resolution. Allies should not attack
-or damage each other through normal hostile-target logic, and a team should lose only when every
-member is defeated.
+Make authoritative command validation and target selection treat allies as non-hostile. This phase
+is deliberately limited to choosing or retaining targets; damage, notices, fog, and victory remain
+unchanged.
 
 ## Scope
 
-- Replace hostile checks in simulation services with the central relationship API.
+- Replace hostile target checks in command validation and target acquisition with the central
+  relationship API.
 - Raw `Attack` commands against allies must be ignored or rejected safely.
-- Auto-acquisition, ordered attack retention, AT-team tank preference, moving fire retention, and
-  building attacks must ignore allies.
-- Overpenetration and support-weapon area damage must not damage allies unless a future explicit
-  friendly-fire rule is added.
-- Last-damage owner and kill credit should record only enemy damage.
-- Worker retreat should react to enemy damage, not allied/non-hostile damage.
-- Under-attack notices should go to the victim's team, not only the victim owner.
-- Team victory should replace per-player victory in team games:
-  - one-player FFA remains unchanged
-  - one-player sandbox remains never-ending
-  - a player losing all buildings should not receive a losing `gameOver` while any teammate keeps
-    the team alive
-  - final `gameOver` should include `winnerTeamId`
-- Keep economies, build authority, production, and resources per-player.
+- Auto-acquisition, attack-move acquisition, ordered attack retention, AT-team tank preference,
+  moving-fire retention, and building attacks must ignore allies.
+- Keep strict owner checks for command authority, production, gather/build/train/research/cancel,
+  control surfaces, and economy.
+- Add or update the raw-owner audit list so remaining `owner == player` or `owner != player` checks
+  are classified as strict ownership, neutral/resource handling, or follow-up hostile surfaces.
+- Do not change direct damage, overpenetration, mortar/artillery area effects, kill credit, worker
+  retreat, under-attack notices, team victory, shared vision, or client selection behavior in this
+  phase.
 
 ## Expected Touch Points
 
 - `docs/design/server-sim.md`
-- `docs/design/protocol.md`
 - `docs/design/hardening.md`
 - `server/crates/sim/src/game/teams.rs`
-- `server/crates/sim/src/game/mod.rs`
 - `server/crates/sim/src/game/services/world_query.rs`
 - `server/crates/sim/src/game/services/commands.rs`
 - `server/crates/sim/src/game/services/combat/`
-- `server/crates/sim/src/game/mortar.rs`
-- `server/crates/sim/src/game/artillery.rs`
 - `server/crates/sim/src/game/services/ability_orders.rs`
-- `server/crates/sim/src/game/services/death.rs`
-- `server/crates/sim/src/game/scoring.rs`
-- `server/src/lobby/room_task.rs`
 - `tests/team_integration.mjs`
 - `tests/regression.mjs`
 
 ## Verification
-
-Rust tests should cover the rules close to the simulation:
 
 ```bash
 cd server && cargo test team --workspace
@@ -61,32 +48,28 @@ Required Rust scenarios:
 
 - Allied riflemen near each other do not auto-acquire.
 - Raw attack command against an ally is ignored.
-- Ordered attackers drop an allied target.
-- Overpenetration does not damage an allied entity behind an enemy.
-- Mortar and artillery area damage do not damage allies under the selected team rules.
-- Kill credit is not awarded for allied damage.
-- A 2v2 does not end when one player on a team loses all buildings.
-- A 2v2 ends when all players on one team are defeated.
+- Ordered attackers drop or refuse an allied target.
+- Attack-move and building attack acquisition ignore allied entities.
+- AT-team tank preference chooses enemy tanks and not allied tanks.
 
 Required Node scenarios:
 
-- Malicious client cannot attack allied entity ids.
-- Defeated player on a living team does not receive early `gameOver`.
-- Final team victory sends winning result to every surviving connected teammate.
+- Malicious client cannot assign allied entity ids as hostile attack targets.
+- FFA command targeting remains behavior-compatible because every player has a singleton team.
 
 ## Acceptance Criteria
 
-- No simulation hostile behavior depends on raw owner inequality.
-- FFA remains compatible because every player has a singleton team.
-- Team victory and defeat are authoritative in the room task.
-- Regression tests cover malicious allied-target commands.
+- No command validation or target acquisition hostile behavior depends on raw owner inequality.
+- Strict own-control checks are documented and remain strict.
+- Team setup tests can create allied seats, and allied targets are not accepted as hostile command
+  targets.
 
 ## Manual Testing Focus
 
-Optional single-browser check of a scripted 2v2 AI setup only if automated team victory coverage is
-ambiguous.
+None expected unless a targeted test cannot cover a command path; prefer adding a scriptable
+scenario first.
 
 ## Handoff Requirements
 
-The phase handoff must list every hostile surface audited, call out any known remaining raw owner
-comparisons that are intentionally own-control checks, and describe the team victory tests.
+The phase handoff must list the command/targeting surfaces audited, name any raw owner comparisons
+left for later damage/event phases, and identify the tests that prove allied targets are rejected.
