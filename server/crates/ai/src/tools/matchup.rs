@@ -224,20 +224,43 @@ fn print_table(result: &ProfileMatchupResult) {
     }
     println!();
     println!(
-        "{:<8} {:<32} {:<6} {:>6} {:>6} {:>6} {:>6} {:>9} {:>9}  final counts",
-        "player", "profile", "alive", "army", "bldg", "cmds", "atk", "firstAtk", "firstTank"
+        "{:<8} {:<32} {:<6} {:>6} {:>6} {:>4} {:>6} {:>6} {:>6} {:>5} {:>9} {:>9} {:>9} {:>9} {:>9}  final counts",
+        "player",
+        "profile",
+        "alive",
+        "army",
+        "bldg",
+        "wrk",
+        "cmds",
+        "atk",
+        "dmg",
+        "lost",
+        "firstAtk",
+        "rifleAtk",
+        "scout",
+        "expand",
+        "firstTank"
     );
     for player in &result.players {
         println!(
-            "{:<8} {:<32} {:<6} {:>6} {:>6} {:>6} {:>6} {:>9} {:>9}  {}",
+            "{:<8} {:<32} {:<6} {:>6} {:>6} {:>4} {:>6} {:>6} {:>6} {:>5} {:>9} {:>9} {:>9} {:>9} {:>9}  {}",
             player.player_id,
             player.profile,
             player.alive,
             player.army_value,
             player.building_value,
+            player.worker_count,
             player.command_count,
             player.attack_command_count,
+            player.damage_dealt_events,
+            player.death_count,
             tick_text(player.first_attack_command_tick),
+            tick_text(player.first_rifleman_attack_command_tick),
+            tick_text(player.first_scout_car_tick),
+            planned_completed_tick_text(
+                player.first_expansion_city_centre_planned_tick,
+                player.first_expansion_city_centre_completed_tick
+            ),
             tick_text(player.first_tank_tick),
             format_counts(&player.final_counts)
         );
@@ -258,6 +281,15 @@ fn winner_text(result: &ProfileMatchupResult) -> String {
 fn tick_text(tick: Option<u32>) -> String {
     tick.map(|tick| tick.to_string())
         .unwrap_or_else(|| "-".to_string())
+}
+
+fn planned_completed_tick_text(planned: Option<u32>, completed: Option<u32>) -> String {
+    match (planned, completed) {
+        (Some(planned), Some(completed)) => format!("{planned}/{completed}"),
+        (Some(planned), None) => format!("{planned}/-"),
+        (None, Some(completed)) => format!("-/{completed}"),
+        (None, None) => "-".to_string(),
+    }
 }
 
 fn format_counts(counts: &std::collections::BTreeMap<String, u32>) -> String {

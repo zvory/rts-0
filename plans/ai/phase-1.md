@@ -1,6 +1,6 @@
 # Phase 1 - Baseline Metrics and Scenario Gates
 
-Status: Not implemented.
+Status: Implemented.
 
 ## Objective
 
@@ -70,3 +70,16 @@ metric that still cannot be measured automatically.
 ## Player-Facing Outcome
 
 No intended gameplay change. This phase improves the evidence used to build and tune AI 1.0.
+
+## Implementation Notes
+
+- Matchup scorecards now report first Rifleman attack command, first Scout Car completion and
+  harassment command, first expansion City Centre planned/completed, first Tank completion, final
+  army/building value, final worker count, final unit counts, command counts, attack command counts,
+  damage events dealt, deduplicated deaths, and winner or tick-cap outcome.
+- Baseline scenarios for opening pressure, mid-game expansion, tank tech, and blocked-goal pressure
+  live in `server/crates/ai/src/selfplay/scenarios.rs`.
+- The bounded seed-0 `rifle_flood_full_saturation` vs `tech_to_tanks` baseline at 8,000 ticks
+  reaches the tick cap with no winner. Current notable scorecard values: first damage tick 4,884;
+  full-saturation Rifleman attack tick 1,703; tech expansion planned/completed at 5,968/6,773; no
+  Tank completed by tick 8,000.
