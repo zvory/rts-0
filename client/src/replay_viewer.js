@@ -7,6 +7,7 @@ export class ReplayViewer extends Match {
       initialCamera: options.initialCamera,
       hotkeyProfiles: options.hotkeyProfiles,
       settings: options.settings,
+      replayAnalysisOverlayPreferences: options.replayAnalysisOverlayPreferences,
     });
   }
 }

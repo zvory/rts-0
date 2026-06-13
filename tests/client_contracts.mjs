@@ -86,6 +86,11 @@ import {
   HotkeyProfileService,
   buildHotkeyCommandCatalog,
 } from "../client/src/hotkey_profiles.js";
+import {
+  REPLAY_ANALYSIS_TABS,
+  ReplayAnalysisOverlay,
+  createReplayAnalysisOverlayPreferences,
+} from "../client/src/replay_analysis_overlay.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -318,6 +323,137 @@ function withFakeSettingsDocument(fn) {
     if (priorWindow === undefined) delete globalThis.window;
     else globalThis.window = priorWindow;
   }
+}
+
+function withFakeOverlayDocument(fn) {
+  const priorDocument = globalThis.document;
+  const priorElement = globalThis.Element;
+
+  class FakeElement {
+    constructor(tagName) {
+      this.tagName = String(tagName).toUpperCase();
+      this.id = "";
+      this.type = "";
+      this.className = "";
+      this.textContent = "";
+      this.title = "";
+      this.hidden = false;
+      this.tabIndex = 0;
+      this.dataset = {};
+      this.children = [];
+      this.parentNode = null;
+      this.listeners = {};
+      this.attributes = new Map();
+      this.classList = {
+        add: (value) => this.setClass(value, true),
+        remove: (value) => this.setClass(value, false),
+        toggle: (value, enabled) => this.setClass(value, !!enabled),
+        contains: (value) => this.className.split(/\s+/).includes(value),
+      };
+    }
+    setClass(value, enabled) {
+      const classes = new Set(this.className.split(/\s+/).filter(Boolean));
+      if (enabled) classes.add(value);
+      else classes.delete(value);
+      this.className = [...classes].join(" ");
+    }
+    append(...children) {
+      for (const child of children) this.appendChild(child);
+    }
+    appendChild(child) {
+      child.parentNode = this;
+      this.children.push(child);
+      return child;
+    }
+    replaceChildren(...children) {
+      for (const child of this.children) child.parentNode = null;
+      this.children = [];
+      this.append(...children);
+    }
+    remove() {
+      if (!this.parentNode) return;
+      const siblings = this.parentNode.children;
+      const index = siblings.indexOf(this);
+      if (index >= 0) siblings.splice(index, 1);
+      this.parentNode = null;
+    }
+    addEventListener(type, handler) {
+      this.listeners[type] = handler;
+    }
+    removeEventListener(type, handler) {
+      if (this.listeners[type] === handler) delete this.listeners[type];
+    }
+    setAttribute(name, value) {
+      this.attributes.set(name, String(value));
+    }
+    getAttribute(name) {
+      return this.attributes.get(name) || null;
+    }
+    contains(node) {
+      for (let cur = node; cur; cur = cur.parentNode) {
+        if (cur === this) return true;
+      }
+      return false;
+    }
+    closest(selector) {
+      for (let cur = this; cur; cur = cur.parentNode) {
+        if (matchesSelector(cur, selector)) return cur;
+      }
+      return null;
+    }
+    querySelector(selector) {
+      return this.querySelectorAll(selector)[0] || null;
+    }
+    querySelectorAll(selector) {
+      const results = [];
+      const visit = (node) => {
+        if (matchesSelector(node, selector)) results.push(node);
+        for (const child of node.children) visit(child);
+      };
+      for (const child of this.children) visit(child);
+      return results;
+    }
+  }
+
+  function matchesSelector(node, selector) {
+    if (!node) return false;
+    if (selector === "button") return node.tagName === "BUTTON";
+    if (selector.startsWith(".")) return node.classList.contains(selector.slice(1));
+    if (selector.startsWith("#")) return node.id === selector.slice(1);
+    return false;
+  }
+
+  globalThis.Element = FakeElement;
+  globalThis.document = {
+    createElement(tagName) {
+      return new FakeElement(tagName);
+    },
+  };
+
+  try {
+    return fn({ FakeElement });
+  } finally {
+    if (priorDocument === undefined) delete globalThis.document;
+    else globalThis.document = priorDocument;
+    if (priorElement === undefined) delete globalThis.Element;
+    else globalThis.Element = priorElement;
+  }
+}
+
+function fakeStorage(initial = {}) {
+  const values = new Map(Object.entries(initial));
+  return {
+    getItem(key) {
+      return values.has(key) ? values.get(key) : null;
+    },
+    setItem(key, value) {
+      values.set(key, String(value));
+    },
+    removeItem(key) {
+      values.delete(key);
+    },
+    values,
+  };
 }
 
 function findFakeById(root, id) {
@@ -4716,6 +4852,55 @@ function fakeAudioContext() {
     "worker attacks are silent instead of falling back to rifle shots",
   );
   assert(attackKindHasCombatSound(KIND.RIFLEMAN), "rifleman attacks still play combat sounds");
+}
+
+// ---------------------------------------------------------------------------
+// Replay analysis overlay
+// ---------------------------------------------------------------------------
+{
+  const storage = fakeStorage();
+  const prefs = createReplayAnalysisOverlayPreferences(storage);
+  prefs.selectedTab = "units-lost";
+  prefs.visible = false;
+  prefs.collapsed = true;
+
+  const restored = createReplayAnalysisOverlayPreferences(storage);
+  assert(restored.selectedTab === "units-lost", "replay analysis selected tab persists");
+  assert(restored.visible === false, "replay analysis visible state persists");
+  assert(restored.collapsed === true, "replay analysis collapsed state persists");
+
+  restored.selectedTab = "not-a-tab";
+  assert(
+    restored.selectedTab === REPLAY_ANALYSIS_TABS[0].id,
+    "replay analysis rejects unknown tab ids",
+  );
+
+  withFakeOverlayDocument(({ FakeElement }) => {
+    const root = new FakeElement("section");
+    const overlay = new ReplayAnalysisOverlay({ root, preferences: restored });
+    assert(root.children.length === 1, "replay analysis overlay mounts generated DOM");
+    const overlayRoot = root.children[0];
+
+    const unitsTab = root.querySelector(".replay-analysis-tab");
+    assert(unitsTab, "replay analysis renders tab buttons");
+    overlayRoot.listeners.click?.({ target: unitsTab, preventDefault() {}, stopPropagation() {} });
+    assert(
+      restored.selectedTab === unitsTab.dataset.tabId,
+      "replay analysis tab clicks update shared preferences",
+    );
+
+    const hide = root.querySelector(".replay-analysis-hide");
+    overlayRoot.listeners.click?.({ target: hide, preventDefault() {}, stopPropagation() {} });
+    assert(restored.visible === false, "replay analysis hide action updates shared preferences");
+
+    const show = root.querySelector(".replay-analysis-show");
+    overlayRoot.listeners.click?.({ target: show, preventDefault() {}, stopPropagation() {} });
+    assert(restored.visible === true, "replay analysis show action updates shared preferences");
+    assert(restored.collapsed === false, "replay analysis show expands the panel");
+
+    overlay.destroy();
+    assert(root.children.length === 0, "replay analysis overlay removes generated DOM on destroy");
+  });
 }
 
 console.log("✅ client_contracts.mjs: all contract assertions passed");
