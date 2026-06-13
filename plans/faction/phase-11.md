@@ -1,68 +1,68 @@
-# Phase 11 - Roster Expansion, Integration, and Rollout
+# Phase 11 - Second Faction Combat and Signature Ability Slice
 
 Status: Designed, not implemented.
 
 ## Objective
 
-Expand the second faction only as far as the approved brief allows, then harden mixed-faction play
-for regular playtesting. This phase decides rollout readiness, AI restrictions, documentation, and
-remaining balance risks.
+Add the second faction's first combat loop: one baseline combat unit plus one signature
+ability-heavy unit. This phase should make the faction mechanically legible in a short match without
+trying to complete the whole roster.
 
 ## Scope
 
-- Add approved additional units, buildings, upgrades, abilities, and progression slices
-  incrementally, each with targeted tests and patch-note bullets.
-- Add lobby selection UX for faction choice if it was not exposed earlier.
-- Keep AI current-faction-only with validation and UI messaging unless a separate approved AI scope
-  implements second-faction AI.
-- Update self-play/dev scenario tools so faction choice is explicit where needed.
-- Audit replay, branch, match history, spectator, debug mode, quickstart, dev scenario, and
-  post-match flows under the new non-backcompat schema.
-- Run fog/security checks for every second-faction ability and event.
-- Review performance impact of extra catalog lookups, generic resources, ability systems, and
-  renderer additions.
-- Update design docs and context capsules so future faction work starts from the new architecture.
-- Decide whether faction choice is ready for normal selection or should remain dev/local only.
+- Add the approved baseline combat unit with stats, cost, supply/capacity use, production path,
+  renderer data, command-card affordances, and tests.
+- Add the approved signature ability-heavy unit and its ability or abilities.
+- Use existing ability registry and effect hooks where possible; add only tightly scoped hooks if
+  the approved ability cannot be implemented cleanly.
+- Add fog-safe events, notices, cooldown/charge projection, Steel/Oil costs, and client visuals for
+  the signature ability.
+- Keep AI blocked for the new faction unless explicitly approved.
+- Keep prediction disabled for the new faction unless WASM support is intentionally implemented.
+- Update the lifecycle matrix if the new combat or ability slice changes replay, branch, spectator,
+  fog, prediction, or dev scenario behavior.
+- Collect factual patch-note bullets for stats, economy costs, ability behavior, UI, and expected
+  playtest watch points.
 
 ## Expected Touch Points
 
-- `server/src/lobby/`
-- `server/crates/ai/src/` only for validation/restriction unless AI support is approved
-- `server/crates/sim/src/game/replay.rs`
-- `server/crates/sim/src/game/setup/dev_scenarios/`
-- `client/src/lobby.js`
-- `client/src/match_history.js`
-- `client/src/replay_viewer.js`
-- `client/src/match.js`
-- `tests/`
-- `docs/context/`
-- `docs/design/`
-- `plans/faction/`
+- `server/crates/rules/src/`
+- `server/crates/sim/src/game/`
+- `server/crates/protocol/src/lib.rs`
+- `server/src/protocol.rs`
+- `client/src/protocol.js`
+- `client/src/config.js`
+- `client/src/hud_command_card.js`
+- `client/src/renderer/`
+- generated or checked client catalog artifacts/scripts
+- `docs/design/balance.md`
+- `docs/design/protocol.md`
+- `docs/design/client-ui.md`
+- `docs/design/server-sim.md`
 
 ## Verification
 
-- Server integration tests for faction selection, AI restriction, and mixed-faction starts.
-- Replay/branch tests preserving faction identity and catalogs under the new schema.
-- AI integration tests for restriction messaging, or broader AI tests only if AI support is enabled.
-- Client smoke test for lobby faction selection and in-match HUD.
-- Fog/security regression tests for mixed-faction ability events.
-- Architecture checks for client and sim if module boundaries changed.
-- Targeted performance or self-play tests if new mechanics add heavy tick work.
-- Balance docs and patch notes updated for every player-facing stat/mechanic added.
+- Focused Rust tests for new unit stats, production, costs, supply/capacity, and command legality.
+- Rust ability tests for carrier eligibility, target mode, costs, cooldowns, charges, events, and
+  wrong-faction rejection.
+- Fog/security regression tests for every new event or reveal.
+- Protocol parity tests for every new kind, ability, event, or upgrade id.
+- Client command-card descriptor tests for the new combat and ability units.
+- Targeted client smoke or dev scenario test for rendering and command issuance.
+- Balance docs updated with player-facing stats and ability behavior.
 
 ## Manual Testing Focus
 
-Create a mixed-faction lobby, start a match, verify each player receives the right faction start,
-play through basic production and combat, surrender or finish the match, then inspect replay or
-post-match flow. Verify unsupported AI faction choices are clearly blocked.
+Play a short local/dev match as the new faction and verify production, combat readability, ability
+targeting, cooldown/charges, Steel/Oil cost, fog behavior, defeat/win behavior, and current-faction
+regression.
 
 ## Handoff Expectations
 
-The handoff must state whether faction selection is ready for normal playtesting, whether AI support
-is enabled or intentionally blocked, which docs/context capsules were updated, remaining balance
-risks, and recommended playtest scenarios.
+The handoff must include patch-note bullets, implemented unit/ability details, verification
+commands/results, lifecycle matrix updates, known balance risks, and the next roster/progression
+items proposed for Phase 12.
 
 ## Player-Facing Outcome
 
-Faction choice becomes a supported playtest feature, or remains intentionally dev-gated with clear
-remaining work.
+The new faction has a small but playable combat identity suitable for focused playtesting.

@@ -25,6 +25,9 @@ architecture checks. It should leave gameplay unchanged.
   - prediction/WASM assumptions around start payloads, snapshots, commands, and current resources
   - replay, branch, dev scenario, spectator, quickstart, match-history, and post-match replay flows
 - Add or extend focused tests that lock current behavior before refactors begin.
+- Add an initial faction lifecycle matrix that lists every match creation, playback, replay branch,
+  spectator, dev scenario, self-play, quickstart/debug, AI, prediction, and match-history path that
+  later phases must keep updated.
 - Add architecture-check coverage or a script/report that can flag new direct special cases outside
   approved modules.
 - Document the approved places for temporary current-faction compatibility shims while the
@@ -59,10 +62,10 @@ generated inventory/report and whether it identifies the right files for future 
 
 ## Handoff Expectations
 
-The handoff must list the inventory artifacts, new tests/checkers, and the most important current
-gameplay assumptions that Phase 1 must avoid breaking. It should also name any special cases that
-were found but not yet covered by tests, and any old replay/protocol surfaces that are safe to break
-under the approved no-backcompat policy.
+The handoff must list the inventory artifacts, lifecycle matrix, new tests/checkers, and the most
+important current gameplay assumptions that Phase 1 must avoid breaking. It should also name any
+special cases that were found but not yet covered by tests, and any old replay/protocol surfaces
+that are safe to break under the approved no-backcompat policy.
 
 ## Player-Facing Outcome
 

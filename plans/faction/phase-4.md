@@ -1,79 +1,74 @@
-# Phase 4 - Faction Starting Loadouts
+# Phase 4 - Steel/Oil Resource Policy Hardening
 
 Status: Designed, not implemented.
 
 ## Objective
 
-Move starting entities, starting resources, supply rules, opening upgrades, and resource-node usage
-into faction loadout definitions. Prove that a fixture faction can start with a different economy
-and no steel/oil mining dependency without implementing the real second faction roster.
+Keep Steel, Oil, and Supply as the shared economy contract for all factions in this plan, and make
+that decision explicit in code, docs, and tests. Current-faction gameplay and wire resource payloads
+should remain unchanged while command validation, costs, supply, scoring, replay analysis, and HUD
+mirrors become ready for faction-specific catalogs that still price things in Steel/Oil/Supply.
 
 ## Scope
 
-- Define faction loadout data in the Rust-authoritative faction catalog.
-- Move current-faction City Centre, Worker ring, starting resources, and starting supply into the
-  current faction loadout.
-- Allow loadouts to define starting units, buildings, completed construction state, initial
-  resources, initial capacities, opening upgrades/flags, and debug-mode additions.
-- Make map resource spawning loadout-aware enough that factions can ignore universal steel/oil
-  resources without breaking current-faction opponents.
-- Avoid faction-specific map resource objects unless an approved faction brief explicitly requires
-  them.
-- Add a fixture faction or test-only fixture loadout with a different resource set and no steel/oil
-  mining requirement.
-- Enforce illegal cross-faction economy/build/train/research commands with server-side notices or
-  no-ops.
-- Keep match history and score calculations sensible for fixture entities and zero/alternate-cost
-  definitions.
-- Keep AI slots current-faction-only; fixture factions are human/dev/test only.
+- Document Steel, Oil, and Supply as the global faction economy contract for this plan.
+- Keep fixed `steel`, `oil`, `supplyUsed`, and `supplyCap` snapshot/player-resource payloads.
+- Keep start-payload map resource nodes as Steel/Oil nodes.
+- Keep replay artifacts, match-history replay payloads, branch keyframes, replay analysis, score
+  screens, and compact snapshots on the current Steel/Oil/Supply schema.
+- Move or wrap cost, affordability, spend, refund, and supply helpers so gameplay callers can pass
+  faction-catalog cost data while still using Steel/Oil/Supply fields.
+- Add server-side validation proving a player can only spend resources on kinds, upgrades, and
+  abilities legal for that player's faction.
+- Add tests or architecture-check notes identifying the approved modules where direct Steel/Oil/
+  Supply references are expected, so future generic-resource work has a clear migration inventory.
+- Keep prediction/WASM unchanged for the current faction and disabled for non-default factions
+  unless an explicit later phase updates it.
+- Add a short deferred-generic-resources note to the relevant design docs if this phase edits them.
+- Update the lifecycle matrix if this phase changes replay analysis, score, spectator resources,
+  compact snapshots, or prediction assumptions.
 
 ## Expected Touch Points
 
 - `server/crates/rules/src/`
-- `server/crates/sim/src/game/setup.rs`
-- `server/crates/sim/src/game/setup/dev_scenarios/`
 - `server/crates/sim/src/game/player_state.rs`
 - `server/crates/sim/src/game/services/economy.rs`
 - `server/crates/sim/src/game/services/construction.rs`
 - `server/crates/sim/src/game/services/production.rs`
-- `server/crates/sim/src/game/services/supply.rs`
-- `server/crates/sim/src/game/snapshot.rs`
-- `server/crates/contract/src/lib.rs`
-- `server/crates/protocol/src/lib.rs`
-- `server/src/lobby/`
-- `client/src/state.js`
-- `client/src/hud.js`
+- `server/crates/sim/src/game/scoring.rs`
+- `server/crates/sim/src/game/analysis.rs`
 - `client/src/config.js`
-- `docs/design/protocol.md`
+- `client/src/hud_command_card.js`
+- `client/src/replay_analysis_overlay.js`
+- `tests/sim_wasm_smoke.mjs`
 - `docs/design/balance.md`
-- `docs/design/server-sim.md`
+- `docs/design/protocol.md` only if documenting the deferred generic-resource decision there
 
 ## Verification
 
-- Rust tests for default current-faction start parity: starting entities, resources, supply,
-  upgrades, fog, and resource nodes.
-- Rust tests for fixture-faction starts with alternate resources and no steel/oil mining
-  dependency.
-- Server integration test for mixed current-faction plus fixture-faction match start.
-- Command tests proving fixture players cannot issue current-faction-only economy/build/train
-  commands.
-- Fog tests proving resource node visibility and fixture economy data do not leak hidden enemy
-  state.
-- Client HUD tests for fixture resource display if the fixture is exposed through a dev path.
+- Rust tests proving current-faction Steel/Oil/Supply start, spend, refund, supply reservation, and
+  score behavior remain unchanged.
+- Rust command tests proving faction-illegal build/train/research/ability attempts do not spend
+  Steel/Oil or reserve Supply.
+- Rust or JS tests proving replay analysis and score values still report Steel/Oil consistently.
+- Client command-card tests proving current-faction costs, affordability, and shortage display are
+  unchanged.
+- Prediction/WASM smoke or client contract proving non-default factions remain prediction-disabled
+  unless explicitly supported.
 
 ## Manual Testing Focus
 
-Verify current-faction gathering and spending still work. If a fixture faction is exposed in a dev
-path, verify it starts with its fixture loadout, shows the right resources, does not need steel/oil
-mining, and cannot issue current-faction commands.
+Start a normal current-faction match and verify Steel, Oil, Supply, gathering, spending, training,
+researching, spectator resource rows, score screens, and replay-analysis display still look correct.
 
 ## Handoff Expectations
 
-The handoff must describe the loadout schema, current-faction parity evidence, fixture faction
-limitations, any remaining resource-node assumptions, and the mixed-faction test command/result.
-It should tell Phase 5 how abilities attach to faction catalog definitions.
+The handoff must document that Steel/Oil/Supply remain the resource payload shape, name the approved
+direct-resource modules, list any helper wrappers added for faction-catalog costs, and tell Phase 5
+how to define faction starting Steel/Oil/Supply and supply rules.
 
 ## Player-Facing Outcome
 
-The current faction should play unchanged. Internally, starting state is faction-defined and test
-fixtures prove alternate economy starts are possible.
+The current faction should look and play unchanged. The faction architecture now explicitly supports
+different costs and starts within the existing Steel/Oil/Supply economy, with truly generic
+resources deferred to a later standalone migration.

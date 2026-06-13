@@ -17,12 +17,16 @@ and client state without adding a second real faction or changing current gamepl
 - Record faction id in replay artifacts, replay branch seeds, branch seats, dev starts, and
   match-history replay payloads using the new schema. Do not preserve compatibility with old
   pre-faction artifacts.
+- Define the first versioned replay/start schema replacement for faction identity. If existing
+  global start-resource or loadout fields remain temporarily, document them as compatibility shims
+  with a Phase 5 removal or replacement path.
 - Update protocol docs and mirrors in the same commit as any wire contract changes.
 - Keep UI selection minimal: either hidden/defaulted, or a disabled/internal fixture only.
 - Keep AI slots current-faction-only; AI selection for other factions remains invalid until an
   explicit AI phase.
 - Add the start-payload/client-state wiring needed to disable prediction for non-default factions
   in later phases.
+- Update the lifecycle matrix with the faction id field locations and default assignment behavior.
 
 ## Expected Touch Points
 
@@ -43,6 +47,8 @@ and client state without adding a second real faction or changing current gamepl
 - Protocol parity tests for the added start-player faction field.
 - Replay/branch serialization tests proving the new faction field is recorded in artifacts,
   branch seats, and replay start payloads. No old-artifact compatibility test is required.
+- Schema test or fixture proving faction identity is loaded from the recorded replay/branch schema,
+  not inferred from current lobby/client state.
 - Focused server integration test that a normal match starts with unchanged starting entities,
   resources, and supply.
 
@@ -54,8 +60,9 @@ Workers, visible resources, command card, training, and gathering should be unch
 ## Handoff Expectations
 
 The handoff must name the faction id field locations, the replay/artifact schema fields that were
-intentionally broken or replaced, and the exact tests that prove current starts are unchanged. It
-should tell Phase 2 where to attach faction-aware rules catalog lookups.
+intentionally broken or replaced, any temporary start-resource/loadout shims, and the exact tests
+that prove current starts are unchanged. It should tell Phase 2 where to attach faction-aware rules
+catalog lookups and tell Phase 3 what lifecycle rows still need assignment validation.
 
 ## Player-Facing Outcome
 
