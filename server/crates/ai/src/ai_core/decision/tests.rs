@@ -382,6 +382,158 @@ fn trace_goal(
 }
 
 #[test]
+fn economy_manager_plan_tracks_steel_and_oil_targets() {
+    let mut owned = vec![building(10, EntityKind::CityCentre, Some(0))];
+    owned.extend((0..17).map(|i| steel_worker(20 + i, 100 + i)));
+    owned.push(worker(60, AiEntityState::Idle));
+    let observation = observation(
+        AiEconomy {
+            steel: 1_000,
+            oil: 1_000,
+            supply_used: 50,
+            supply_cap: 70,
+        },
+        owned,
+    );
+    let facts = AiFacts::from_observation(&observation);
+
+    let plan = plan_economy(
+        &observation,
+        &facts,
+        &RIFLE_FLOOD_FULL_SATURATION,
+        false,
+        None,
+    );
+
+    assert_eq!(plan.target_steel_workers, 18);
+    assert_eq!(plan.current_steel_workers, 17);
+    assert_eq!(plan.desired_oil_workers, 0);
+    assert_eq!(plan.target_workers, 18);
+}
+
+#[test]
+fn economy_manager_plan_allows_oil_after_steel_floor() {
+    let mut owned = vec![building(10, EntityKind::CityCentre, Some(0))];
+    owned.extend((0..8).map(|i| steel_worker(20 + i, 100 + i)));
+    owned.extend((0..3).map(|i| worker(40 + i, AiEntityState::Idle)));
+    let observation = observation(
+        AiEconomy {
+            steel: 1_000,
+            oil: 1_000,
+            supply_used: 11,
+            supply_cap: 20,
+        },
+        owned,
+    );
+    let facts = AiFacts::from_observation(&observation);
+
+    let plan = plan_economy(&observation, &facts, &TECH_TO_TANKS, false, None);
+
+    assert_eq!(plan.target_steel_workers, 12);
+    assert_eq!(plan.current_steel_workers, 8);
+    assert_eq!(plan.desired_oil_workers, 3);
+}
+
+#[test]
+fn supply_goal_reports_depot_budget_blocker_when_capped() {
+    let observation = observation(
+        AiEconomy {
+            steel: 0,
+            oil: 0,
+            supply_used: 10,
+            supply_cap: 10,
+        },
+        vec![
+            building(10, EntityKind::CityCentre, Some(0)),
+            building(11, EntityKind::Barracks, Some(0)),
+            worker(20, AiEntityState::Idle),
+        ],
+    );
+
+    let decision = decide(
+        &observation,
+        &RIFLE_FLOOD_FULL_SATURATION,
+        &mut AiDecisionMemory::for_profile(&RIFLE_FLOOD_FULL_SATURATION),
+    );
+
+    assert!(
+        trace_goal(&decision, trace::StrategicGoal::Supply)
+            .blockers
+            .contains(&trace::GoalBlocker::BudgetSteel)
+    );
+    assert!(
+        trace_goal(&decision, trace::StrategicGoal::Production)
+            .blockers
+            .contains(&trace::GoalBlocker::SupplyCap)
+    );
+}
+
+#[test]
+fn expansion_manager_reports_missing_prerequisite_building() {
+    let observation = with_expansion_resources(observation(
+        AiEconomy {
+            steel: 500,
+            oil: 0,
+            supply_used: 30,
+            supply_cap: 60,
+        },
+        vec![building(10, EntityKind::CityCentre, Some(0))],
+    ));
+    let facts = AiFacts::from_observation(&observation);
+
+    let plan = super::expansion::plan_expansion(
+        &observation,
+        &facts,
+        &RIFLE_FLOOD_FULL_SATURATION,
+        false,
+        false,
+    );
+
+    assert!(!plan.should_save);
+    assert_eq!(plan.policy, RIFLE_FLOOD_FULL_SATURATION.expansion);
+    assert_eq!(
+        plan.blockers,
+        vec![super::expansion::ExpansionBlocker::MissingRequiredBuilding]
+    );
+}
+
+#[test]
+fn expansion_trace_reports_no_valid_site_when_all_sites_are_blocked() {
+    let mut owned = vec![building(10, EntityKind::CityCentre, Some(0))];
+    owned.extend((0..8).map(|i| steel_worker(40 + i, 100 + i)));
+    let observation = with_expansion_resources(observation(
+        AiEconomy {
+            steel: 1_000,
+            oil: 500,
+            supply_used: 12,
+            supply_cap: 30,
+        },
+        owned,
+    ));
+    let mut memory = AiDecisionMemory::for_profile(&STEEL_EXPANSION_TANKS);
+    let decision = decide_profile(
+        &observation,
+        &STEEL_EXPANSION_TANKS,
+        &mut memory,
+        ai_shared::BuildSearch {
+            min_radius: 0,
+            max_radius: 0,
+            prefer_away_from_center: false,
+            prefer_toward_center: false,
+        },
+        |_, _, _| false,
+    );
+
+    assert!(
+        trace_goal(&decision, trace::StrategicGoal::Expansion)
+            .blockers
+            .contains(&trace::GoalBlocker::MissingPrerequisite(
+                "no_expansion_site"
+            ))
+    );
+}
+
+#[test]
 fn manager_trace_formats_goals_and_blockers_deterministically() {
     let observation = observation(
         AiEconomy {

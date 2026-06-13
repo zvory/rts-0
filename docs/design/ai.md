@@ -43,13 +43,15 @@ shared action layer prevents it from over-committing resources/supply it does no
 
 **Shared AI core.** `rts_ai::ai_core` has deterministic profile data (`profiles.rs`) and a generic
 ranked decision loop (`decision.rs`) that emits ordinary `SimCommand`s through shared action helpers.
-The decision loop also emits a trace-only manager skeleton: every think records typed strategic
-goals for economy, supply, expansion, tech, production, local defense, frontal attack, and
-harassment, plus stable blocker labels, high-level intent labels, command labels emitted through
-`AiActionContext`, and budget/reservation deltas. This trace is derived from the existing decision
-order and does not choose actions by itself. Later manager phases should move one goal family at a
-time behind these typed outputs while keeping final command emission in `AiActionContext` and
-`ai_core::actions`.
+The decision loop also emits manager traces: every think records typed strategic goals for economy,
+supply, expansion, tech, production, local defense, frontal attack, and harassment, plus stable
+blocker labels, high-level intent labels, command labels emitted through `AiActionContext`, and
+budget/reservation deltas. Economy and expansion now have explicit plan records. The economy plan
+owns worker targets, steel/oil assignment counts, occupied resource nodes, and post-expansion
+local-assignment bounds. The expansion plan owns due/save decisions, tech-blocking state, and
+blocked reasons such as defensive panic, missing prerequisite building, missing defenders, pending
+City Centre, no candidate resources, or no valid site. Final command emission still goes through
+`AiActionContext` and `ai_core::actions`.
 The first code-defined profiles are `rifle_flood_fast`, `rifle_flood_full_saturation`,
 `tech_to_tanks`, and `steel_expansion_tanks`; they parameterize worker targets, supply buffers,
 building/tech goals, production priorities, resource timing, expansion timing, and attack

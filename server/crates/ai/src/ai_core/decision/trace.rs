@@ -4,6 +4,7 @@ use crate::ai_core::observation::AiObservation;
 use crate::ai_core::profiles::AiProfile;
 use rts_sim::game::entity::EntityKind;
 
+use super::expansion::ExpansionBlocker;
 use super::AiIntent;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -149,6 +150,7 @@ pub(super) struct TraceInput<'a> {
     pub(super) reservations: ReservationCounts,
     pub(super) wants_depot: bool,
     pub(super) save_for_expansion: bool,
+    pub(super) expansion_blockers: &'a [ExpansionBlocker],
     pub(super) expansion_blocks_tech_path: bool,
     pub(super) save_for_unplanned_expansion: bool,
     pub(super) save_for_required_tech_building: bool,
@@ -261,9 +263,9 @@ fn blockers_for_goal(
             }
         }
         StrategicGoal::Expansion => {
-            if !input.save_for_expansion {
-                blockers.push(GoalBlocker::MissingPrerequisite("expansion_not_due"));
-            } else {
+            if !input.expansion_blockers.is_empty() {
+                blockers.extend(input.expansion_blockers.iter().map(expansion_blocker_trace));
+            } else if input.save_for_expansion {
                 push_budget_blockers(&mut blockers, input.end_budget, EntityKind::CityCentre);
                 if input.facts.available_builder_count() == 0 {
                     blockers.push(GoalBlocker::NoBuilder);
@@ -326,6 +328,28 @@ fn blockers_for_goal(
         blockers.push(GoalBlocker::MissingPrerequisite("not_due"));
     }
     blockers
+}
+
+fn expansion_blocker_trace(blocker: &ExpansionBlocker) -> GoalBlocker {
+    match blocker {
+        ExpansionBlocker::NotDue => GoalBlocker::MissingPrerequisite("expansion_not_due"),
+        ExpansionBlocker::DefensivePanic => GoalBlocker::DefensivePanic,
+        ExpansionBlocker::MissingRequiredBuilding => {
+            GoalBlocker::MissingPrerequisite("expansion_required_building")
+        }
+        ExpansionBlocker::MissingDefensiveUnits => {
+            GoalBlocker::MissingPrerequisite("expansion_defenders")
+        }
+        ExpansionBlocker::RequirementNotMet => {
+            GoalBlocker::MissingPrerequisite("city_centre_requirement")
+        }
+        ExpansionBlocker::AlreadyAtTarget => GoalBlocker::MissingPrerequisite("expansion_done"),
+        ExpansionBlocker::MaxPending => GoalBlocker::MissingPrerequisite("expansion_pending"),
+        ExpansionBlocker::NoCandidateResources => {
+            GoalBlocker::MissingPrerequisite("no_expansion_resources")
+        }
+        ExpansionBlocker::NoValidSite => GoalBlocker::MissingPrerequisite("no_expansion_site"),
+    }
 }
 
 fn push_attack_blockers(blockers: &mut Vec<GoalBlocker>, input: TraceInput<'_>) {

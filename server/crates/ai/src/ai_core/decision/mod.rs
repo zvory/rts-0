@@ -39,12 +39,12 @@ use self::defense::{
     DEFENSIVE_PANIC_GRACE_TICKS, DEFENSIVE_PANIC_RIFLE_TECH_PATH, DEFENSIVE_PANIC_SUSTAINED_TICKS,
 };
 use self::expansion::{
-    expansion_blocks_tech_path, should_save_for_expansion, try_build_expansion_city_centre,
+    plan_expansion, ExpansionBlocker, try_build_expansion_city_centre,
 };
 use self::geometry::tile_center;
 use self::policies::{
     active_attack_policy, active_barracks_curve, active_production_policy,
-    active_required_tech_path, active_worker_policy, recovery_delay_ticks,
+    active_required_tech_path, recovery_delay_ticks,
 };
 use self::production::{
     production_building_order, production_uses_building, should_save_for_first_tech_unit,
@@ -58,9 +58,10 @@ use self::raids::{
     select_rifle_raid_units,
 };
 use self::resources::{
-    desired_oil_workers, max_worker_resource_assignment_distance_px, occupied_resource_nodes,
-    resource_worker_counts, target_steel_workers_for_profile,
+    plan_economy,
 };
+#[cfg(test)]
+use self::resources::{desired_oil_workers, target_steel_workers_for_profile};
 use self::trace::{build_manager_trace, ManagerOutputTrace, TraceInput};
 
 const OUTBOUND_WAVE_VISIBLE_TARGET_RADIUS_TILES: f32 = 14.0;
@@ -308,10 +309,15 @@ where
     let builder_pools = [idle_builders.as_slice(), gathering_builders.as_slice()];
     let save_for_required_tech_building =
         should_save_for_required_tech_building(&facts, required_tech_path, production_policy);
-    let expansion_blocks_tech_path = !defensive_panic.active
-        && expansion_blocks_tech_path(observation, &facts, profile, recovery_active);
-    let save_for_expansion = !defensive_panic.active
-        && should_save_for_expansion(observation, &facts, profile, recovery_active);
+    let mut expansion_plan = plan_expansion(
+        observation,
+        &facts,
+        profile,
+        recovery_active,
+        defensive_panic.active,
+    );
+    let expansion_blocks_tech_path = expansion_plan.blocks_tech_path;
+    let save_for_expansion = expansion_plan.should_save;
     let proxy_barracks_active =
         !defensive_panic.active && should_use_proxy_barracks(&facts, profile);
 
@@ -348,8 +354,8 @@ where
         });
     }
 
-    if save_for_expansion
-        && try_build_expansion_city_centre(
+    if save_for_expansion {
+        if try_build_expansion_city_centre(
             observation,
             &facts,
             &mut actions,
@@ -359,10 +365,13 @@ where
             &mut placeable,
         )
         .is_some()
-    {
-        intents.push(AiIntent::Build {
-            kind: EntityKind::CityCentre,
-        });
+        {
+            intents.push(AiIntent::Build {
+                kind: EntityKind::CityCentre,
+            });
+        } else if expansion_plan.blockers.is_empty() {
+            expansion_plan.blockers.push(ExpansionBlocker::NoValidSite);
+        }
     }
     let save_for_unplanned_expansion =
         save_for_expansion && planned_in_intents(&intents, EntityKind::CityCentre) == 0;
@@ -393,19 +402,12 @@ where
         }
     }
 
-    let worker_policy = active_worker_policy(profile, recovery_active);
-    let complete_gate_count = worker_policy
-        .pressure_until_complete
-        .map(|kind| facts.complete_building_count(kind))
-        .unwrap_or(usize::MAX);
-    let target_steel_workers =
-        worker_policy.target_steel_workers(facts.target_steel_workers, complete_gate_count);
-    let target_steel_workers = target_steel_workers_for_profile(
+    let economy_plan = plan_economy(
         observation,
         &facts,
         profile,
         recovery_active,
-        target_steel_workers,
+        panic_plan.map(|plan| plan.oil_workers),
     );
     let target_barracks = if defensive_panic.active {
         defensive_panic_barracks_target(defensive_panic)
@@ -413,7 +415,7 @@ where
         active_barracks_curve(profile, recovery_active).target(
             observation.economy.steel,
             facts.worker_count,
-            target_steel_workers,
+            economy_plan.target_steel_workers,
         )
     };
     if production_uses_building(production_policy, EntityKind::Barracks)
@@ -441,23 +443,11 @@ where
         });
     }
 
-    let desired_oil_workers = if let Some(plan) = panic_plan {
-        plan.oil_workers
-    } else {
-        desired_oil_workers(
-            observation,
-            &facts,
-            profile,
-            recovery_active,
-            target_steel_workers,
-        )
-    };
-    let target_workers = target_steel_workers.saturating_add(desired_oil_workers);
     let save_for_first_tech_unit = should_save_for_first_tech_unit(&facts, production_policy);
     let save_worker_training_for_tech = defensive_panic.active
         || save_for_unplanned_expansion
         || save_for_first_tech_unit
-        || (save_for_required_tech_building && facts.worker_count >= target_workers);
+        || (save_for_required_tech_building && facts.worker_count >= economy_plan.target_workers);
     for trained in actions::train_units(
         &mut actions,
         TrainUnitsRequest {
@@ -468,7 +458,7 @@ where
             max_queue_depth: 1,
             save_for_tech: save_worker_training_for_tech,
             current_counts: &[(EntityKind::Worker, facts.worker_count)],
-            max_counts: &[(EntityKind::Worker, target_workers)],
+            max_counts: &[(EntityKind::Worker, economy_plan.target_workers)],
             balance_unit_priorities: false,
         },
     ) {
@@ -515,12 +505,7 @@ where
         }
     }
 
-    let occupied_nodes = occupied_resource_nodes(observation);
     let skipped_workers = BTreeSet::new();
-    let resource_counts = resource_worker_counts(observation);
-    let max_worker_resource_distance_px =
-        max_worker_resource_assignment_distance_px(observation, &facts, profile, recovery_active);
-    let current_oil_workers = resource_counts.get(&EntityKind::Oil).copied().unwrap_or(0);
     let panic_support_oil = panic_plan.map(|plan| plan.oil_workers > 0).unwrap_or(false);
     let mut panic_oil_candidates = Vec::new();
     if panic_support_oil {
@@ -534,7 +519,7 @@ where
     } else {
         facts.idle_workers.as_slice()
     };
-    if desired_oil_workers > current_oil_workers {
+    if economy_plan.desired_oil_workers > economy_plan.current_oil_workers {
         let assigned = actions::assign_workers_to_resource(
             &mut actions,
             ResourceAssignmentPolicy {
@@ -543,11 +528,13 @@ where
                 resource_kind: EntityKind::Oil,
                 candidate_worker_ids: Some(oil_candidate_workers),
                 skip_workers: &skipped_workers,
-                pre_reserved_nodes: &occupied_nodes,
+                pre_reserved_nodes: &economy_plan.occupied_nodes,
                 idle_only: !panic_support_oil,
                 allow_latched_reassignment: panic_support_oil,
-                max_assignments: Some(desired_oil_workers - current_oil_workers),
-                max_worker_resource_distance_px,
+                max_assignments: Some(
+                    economy_plan.desired_oil_workers - economy_plan.current_oil_workers,
+                ),
+                max_worker_resource_distance_px: economy_plan.max_worker_resource_distance_px,
             },
         );
         if !assigned.is_empty() {
@@ -558,11 +545,7 @@ where
         }
     }
 
-    let current_steel_workers = resource_counts
-        .get(&EntityKind::Steel)
-        .copied()
-        .unwrap_or(0);
-    if target_steel_workers > current_steel_workers {
+    if economy_plan.target_steel_workers > economy_plan.current_steel_workers {
         let assigned = actions::assign_workers_to_resource(
             &mut actions,
             ResourceAssignmentPolicy {
@@ -571,11 +554,13 @@ where
                 resource_kind: EntityKind::Steel,
                 candidate_worker_ids: Some(&facts.idle_workers),
                 skip_workers: &skipped_workers,
-                pre_reserved_nodes: &occupied_nodes,
+                pre_reserved_nodes: &economy_plan.occupied_nodes,
                 idle_only: true,
                 allow_latched_reassignment: false,
-                max_assignments: Some(target_steel_workers - current_steel_workers),
-                max_worker_resource_distance_px,
+                max_assignments: Some(
+                    economy_plan.target_steel_workers - economy_plan.current_steel_workers,
+                ),
+                max_worker_resource_distance_px: economy_plan.max_worker_resource_distance_px,
             },
         );
         if !assigned.is_empty() {
@@ -731,6 +716,7 @@ where
         reservations: actions.reservations().counts(),
         wants_depot: wants_depot(&facts, profile),
         save_for_expansion,
+        expansion_blockers: &expansion_plan.blockers,
         expansion_blocks_tech_path,
         save_for_unplanned_expansion,
         save_for_required_tech_building,
