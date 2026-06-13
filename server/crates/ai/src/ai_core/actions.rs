@@ -682,6 +682,16 @@ pub(crate) fn move_units(
     x: f32,
     y: f32,
 ) -> Option<Vec<u32>> {
+    move_units_with_queue(ctx, units, x, y, false)
+}
+
+pub(crate) fn move_units_with_queue(
+    ctx: &mut AiActionContext<'_>,
+    units: impl IntoIterator<Item = u32>,
+    x: f32,
+    y: f32,
+    queued: bool,
+) -> Option<Vec<u32>> {
     let mut units: Vec<u32> = units.into_iter().collect();
     units.sort_unstable();
     units.dedup();
@@ -692,7 +702,7 @@ pub(crate) fn move_units(
         units: units.clone(),
         x,
         y,
-        queued: false,
+        queued,
     });
     Some(units)
 }
