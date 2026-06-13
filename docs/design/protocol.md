@@ -261,7 +261,7 @@ transport decode:
   tick: u32,
   steel: u32, oil: u32,       // your resources
   supplyUsed: u32, supplyCap: u32,
-  entities: Entity[],            // your non-resource entities (always) + enemies on live/death-vision-visible tiles
+  entities: Entity[],            // your non-resource entities (always) + entities visible to living-team current/death vision
   resourceDeltas?: ResourceDelta[], // visible resource remaining updates; omitted when empty
   smokes?: SmokeCloud[],         // active smoke clouds visible to this recipient; omitted when empty
   visibleTiles?: u8[],           // row-major current server visibility; 1 = visible, 0 = fogged
@@ -282,6 +282,15 @@ transport decode:
   }
 }
 ```
+
+For normal active-player snapshots, entity visibility and `visibleTiles` are projected from the
+server-authoritative union of current fog grids contributed by living teammates on the recipient's
+team. A defeated/disconnected teammate stops contributing live sight; if that player's team still
+has a living member, their own connection continues to receive the surviving team's current
+visibility. `steel`, `oil`, supply, `upgrades`, owner-only production queues, rallies, ability
+state, and command authority remain recipient-local. Snapshot-only lingering death sight may make
+non-owned units/buildings visible as `visionOnly`; those views are visual intel only and do not
+refresh remembered buildings or validate targeted commands.
 
 Live WebSocket snapshot frames are sent as compact JSON text, version 19. `client/src/net.js`
 decodes this transport shape back into the semantic object above before dispatching `S.SNAPSHOT`.

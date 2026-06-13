@@ -348,11 +348,12 @@ impl Game {
         // ------------------------------------------------------------------
         for &pid in &player_ids {
             let snap = self.snapshot_for(pid);
+            let live_fog = self.team_current_fog_for(pid, &self.fog);
             for v in &snap.entities {
                 if v.owner == pid || v.owner == NEUTRAL {
                     continue;
                 }
-                let live_visible = self.fog.is_visible_world(pid, v.x, v.y);
+                let live_visible = live_fog.is_visible_world(pid, v.x, v.y);
                 // Enemy entities must either be live-visible or explicitly marked as
                 // visual-only lingering death intel.
                 if v.vision_only {

@@ -20,7 +20,7 @@ crates/
     map.rs       # Map: handcrafted terrain asset loading, passability, base-site validation
     entity/      # Entity, EntityKind, Order state machines, grouped state, and EntityStore
     pathfinding.rs # A* over the tile grid, with optional turn-cost route shaping for tanks
-    fog.rs       # per-player live visibility grid plus snapshot-only lingering death sight sources
+    fog.rs       # per-player live visibility grids; snapshots union living teammate grids
     building_memory.rs # server-only per-player last-seen enemy building records
     systems.rs   # orchestrator: runs services in order each tick
     services/    # per-tick services: commands, order_planner, move_coordinator, movement (incl. unit collision), combat, economy, production, construction, death, occupancy, supply, pathing, geometry, standability, line_of_sight
@@ -97,7 +97,8 @@ impl Game {
     /// Advance the simulation by one tick. Returns per-player transient events.
     pub fn tick(&mut self) -> Vec<(u32 /*player*/, Vec<Event>)>;
 
-    /// Build the fog-filtered snapshot for one player at the current tick.
+    /// Build the fog-filtered snapshot for one player at the current tick. Entity visibility and
+    /// visibleTiles use the union of living teammates' current fog; resources/upgrades stay local.
     pub fn snapshot_for(&self, player: u32) -> Snapshot;
 
     /// Build a spectator snapshot from the union of all active players' current fog.
@@ -170,10 +171,15 @@ idle auto-acquisition, shoot-while-moving target retention, AT-team tank prefere
 building target acquisition, direct-fire damage attribution, and overpenetration victims. Raw
 `owner == player` checks remain correct for strict authority and economy surfaces such as
 selected-unit ownership, production/research/cancel authority, build/gather ownership, rally
-control, supply, upgrades, and resource spending. Remaining raw owner comparisons in fog/event
-projection are intentionally owner-only. Victory resolution is team-aware: the room task ends 2+
-player matches only when at most one nonzero team still has an alive member, and a defeated player
-does not receive an individual loss screen while any teammate keeps that team alive.
+control, supply, upgrades, and resource spending. Snapshot entity visibility and `visibleTiles`
+use the union of current fog from living teammates on the recipient's team. A defeated or
+disconnected teammate has no live entities and no longer contributes current sight; a defeated
+player whose team still has a living member still receives that surviving team vision. Remaining
+raw owner comparisons in command authority, economy, event fanout, remembered-building memory, and
+private projection details are intentionally owner-only for now. Victory resolution is team-aware:
+the room task ends 2+ player matches only when at most one nonzero team still has an alive member,
+and a defeated player does not receive an individual loss screen while any teammate keeps that team
+alive.
 
 ### 3.2 Concurrency model
 - One tokio task per **room** owns its `Game` and runs the tick loop (`tokio::time::interval`).
@@ -402,6 +408,13 @@ auto-acquisition and firing both use the smoke-aware LOS query; explicit attack 
 toward terrain- or smoke-blocked targets but cannot fire until the shot is clear. Future forest
 visibility/cover rules should extend the terrain rules and this service instead of adding ad hoc
 checks to fog or combat.
+
+`Game` still recomputes raw live fog per player after each tick, because command validation,
+combat targeting, event visibility, and building-memory refreshes depend on owner-local current
+vision. Normal player snapshots then build a temporary team-current fog by unioning the raw live
+grids of living teammates only. Snapshot-only lingering death sight is layered after live fog and
+then unioned for projection, so lingering views remain non-actionable (`visionOnly`) and cannot
+validate commands or refresh remembered buildings. Neutral resource nodes never stamp vision.
 
 `game::building_memory::BuildingMemory` is server-only stale intel owned by `Game`. After live,
 smoke-aware fog is recomputed, the store records one latest-seen entry per

@@ -49,10 +49,13 @@ The server treats every client as potentially hostile. Limits live next to the c
   run or auto-restart forever.
 - **Fog is authoritative**: `snapshot_for` and per-recipient event delivery go through
   `rules::projection`, which gates entity views, `target_id` tracers, and death/attack events on
-  visibility. Hidden enemies are never sent except inside explicit one-second lingering death
-  vision, where entity views are marked `visionOnly` and remain non-actionable. Visibility is
-  terrain-aware: stone blocks sight beyond itself on both the server fog grid and the client
-  cosmetic fog overlay.
+  visibility. Normal active-player snapshots use the union of current fog from living teammates,
+  while command validation, economy, remembered-building refreshes, private projection details, and
+  event fanout stay owner-local. Defeated/disconnected teammates stop contributing live sight, and
+  neutral resources never grant vision. Hidden enemies are never sent except inside explicit
+  one-second lingering death vision, where entity views are marked `visionOnly` and remain
+  non-actionable. Visibility is terrain-aware: stone blocks sight beyond itself on both the server
+  fog grid and the client cosmetic fog overlay.
 - **Team-safe hostile command targeting**: explicit `Attack` commands, queued attack promotion, and
   target acquisition reject allied owners through the authoritative team relationship snapshot,
   not raw owner inequality. A malicious client can still send arbitrary entity ids, but allied,
