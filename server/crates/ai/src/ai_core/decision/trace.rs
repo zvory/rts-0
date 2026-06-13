@@ -5,6 +5,7 @@ use crate::ai_core::profiles::AiProfile;
 use rts_sim::game::entity::EntityKind;
 
 use super::expansion::ExpansionBlocker;
+use super::frontal::FrontalWaveBlocker;
 use super::AiIntent;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -35,6 +36,10 @@ pub(crate) enum GoalBlocker {
     NoProductionBuilding,
     NoReadyUnits,
     AttackCadence,
+    WaitingForUnits,
+    WaitingForTank,
+    WaitingForMethamphetamines,
+    Staging,
     DeferredForExpansion,
     DeferredForTech,
     DefensivePanic,
@@ -160,6 +165,7 @@ pub(super) struct TraceInput<'a> {
     pub(super) ready_units: usize,
     pub(super) attack_size: usize,
     pub(super) attack_due: bool,
+    pub(super) frontal_wave_blockers: &'a [FrontalWaveBlocker],
     pub(super) rifle_raid_policy: bool,
     pub(super) rifle_raid_units: usize,
     pub(super) required_tech_path: &'a [EntityKind],
@@ -208,22 +214,33 @@ fn goal_trace(goal: StrategicGoal, input: TraceInput<'_>) -> GoalTrace {
             ) || matches!(intent, AiIntent::Research { .. })
         }),
         StrategicGoal::Economy => input.intents.iter().any(|intent| {
-            matches!(intent, AiIntent::Train { kind: EntityKind::Worker })
-                || matches!(intent, AiIntent::Gather { .. })
+            matches!(
+                intent,
+                AiIntent::Train {
+                    kind: EntityKind::Worker
+                }
+            ) || matches!(intent, AiIntent::Gather { .. })
         }),
-        StrategicGoal::LocalDefense => input.local_threat_active
-            && input
-                .intents
-                .iter()
-                .any(|intent| matches!(intent, AiIntent::Attack { .. })),
-        StrategicGoal::FrontalAttack => !input.rifle_raid_policy
-            && input.intents.iter().any(|intent| {
-                matches!(intent, AiIntent::Attack { .. } | AiIntent::Stage { .. })
-            }),
-        StrategicGoal::Harassment => input.rifle_raid_policy
-            && input.intents.iter().any(|intent| {
-                matches!(intent, AiIntent::Attack { .. } | AiIntent::Move { .. })
-            }),
+        StrategicGoal::LocalDefense => {
+            input.local_threat_active
+                && input
+                    .intents
+                    .iter()
+                    .any(|intent| matches!(intent, AiIntent::Attack { .. }))
+        }
+        StrategicGoal::FrontalAttack => {
+            !input.rifle_raid_policy
+                && input.intents.iter().any(|intent| {
+                    matches!(intent, AiIntent::Attack { .. } | AiIntent::Stage { .. })
+                })
+        }
+        StrategicGoal::Harassment => {
+            input.rifle_raid_policy
+                && input
+                    .intents
+                    .iter()
+                    .any(|intent| matches!(intent, AiIntent::Attack { .. } | AiIntent::Move { .. }))
+        }
     };
     let mut blockers = blockers_for_goal(goal, input, selected);
     blockers.sort();
@@ -246,6 +263,21 @@ fn blockers_for_goal(
     selected: bool,
 ) -> Vec<GoalBlocker> {
     if selected {
+        if goal == StrategicGoal::FrontalAttack
+            && !input.rifle_raid_policy
+            && input
+                .intents
+                .iter()
+                .any(|intent| matches!(intent, AiIntent::Stage { .. }))
+        {
+            let mut blockers: Vec<GoalBlocker> = input
+                .frontal_wave_blockers
+                .iter()
+                .map(frontal_wave_blocker_trace)
+                .collect();
+            blockers.push(GoalBlocker::Staging);
+            return blockers;
+        }
         return Vec::new();
     }
     let mut blockers = Vec::new();
@@ -313,12 +345,19 @@ fn blockers_for_goal(
             if input.rifle_raid_policy {
                 blockers.push(GoalBlocker::MissingPrerequisite("raid_policy_active"));
             } else {
-                push_attack_blockers(&mut blockers, input);
+                blockers.extend(
+                    input
+                        .frontal_wave_blockers
+                        .iter()
+                        .map(frontal_wave_blocker_trace),
+                );
             }
         }
         StrategicGoal::Harassment => {
             if !input.rifle_raid_policy {
-                blockers.push(GoalBlocker::MissingPrerequisite("harassment_policy_inactive"));
+                blockers.push(GoalBlocker::MissingPrerequisite(
+                    "harassment_policy_inactive",
+                ));
             } else if input.rifle_raid_units == 0 {
                 blockers.push(GoalBlocker::NoReadyUnits);
             }
@@ -352,12 +391,13 @@ fn expansion_blocker_trace(blocker: &ExpansionBlocker) -> GoalBlocker {
     }
 }
 
-fn push_attack_blockers(blockers: &mut Vec<GoalBlocker>, input: TraceInput<'_>) {
-    if input.ready_units == 0 || input.ready_units < input.attack_size {
-        blockers.push(GoalBlocker::NoReadyUnits);
-    }
-    if !input.attack_due {
-        blockers.push(GoalBlocker::AttackCadence);
+fn frontal_wave_blocker_trace(blocker: &FrontalWaveBlocker) -> GoalBlocker {
+    match blocker {
+        FrontalWaveBlocker::WaitingForUnits => GoalBlocker::WaitingForUnits,
+        FrontalWaveBlocker::WaitingForTank => GoalBlocker::WaitingForTank,
+        FrontalWaveBlocker::WaitingForMethamphetamines => GoalBlocker::WaitingForMethamphetamines,
+        FrontalWaveBlocker::Staging => GoalBlocker::Staging,
+        FrontalWaveBlocker::AttackCadence => GoalBlocker::AttackCadence,
     }
 }
 
@@ -383,17 +423,28 @@ fn intent_matches_goal(goal: StrategicGoal, intent: &AiIntent) -> bool {
     match goal {
         StrategicGoal::Economy => matches!(
             intent,
-            AiIntent::Train { kind: EntityKind::Worker } | AiIntent::Gather { .. }
+            AiIntent::Train {
+                kind: EntityKind::Worker
+            } | AiIntent::Gather { .. }
         ),
-        StrategicGoal::Supply => matches!(intent, AiIntent::Build { kind: EntityKind::Depot }),
+        StrategicGoal::Supply => matches!(
+            intent,
+            AiIntent::Build {
+                kind: EntityKind::Depot
+            }
+        ),
         StrategicGoal::Expansion => {
-            matches!(intent, AiIntent::Build { kind: EntityKind::CityCentre })
+            matches!(
+                intent,
+                AiIntent::Build {
+                    kind: EntityKind::CityCentre
+                }
+            )
         }
         StrategicGoal::Tech => matches!(intent, AiIntent::Build { .. } | AiIntent::Research { .. }),
-        StrategicGoal::Production => matches!(
-            intent,
-            AiIntent::Train { .. } | AiIntent::Research { .. }
-        ),
+        StrategicGoal::Production => {
+            matches!(intent, AiIntent::Train { .. } | AiIntent::Research { .. })
+        }
         StrategicGoal::LocalDefense | StrategicGoal::FrontalAttack => {
             matches!(intent, AiIntent::Attack { .. } | AiIntent::Stage { .. })
         }

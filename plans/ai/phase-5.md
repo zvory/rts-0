@@ -1,6 +1,6 @@
 # Phase 5 - Frontal Wave Attack Manager
 
-Status: Not implemented.
+Status: Implemented.
 
 ## Objective
 
@@ -61,6 +61,13 @@ The handoff must state the frontal-wave gates, expected first-attack timing wind
 metrics that improved or regressed. It should tell Phase 6 how harassment groups can coexist with
 frontal-wave reservations. It must also state whether Methamphetamines is enforced before first
 Tank production or only before Tank attack launch, and include the observed timing impact.
+
+Implementation note: Methamphetamines is enforced before first Tank production. Tank-capable
+profiles still queue Tank research, but Tank priorities fall back to non-Tank units until
+Methamphetamines completes; Tank frontal waves also refuse to launch without the upgrade.
+In the bounded `ai_1_0_tech` vs `rifle_flood_full_saturation` sample at seed `1090519044` and
+14,000 ticks, first Rifleman attack stayed at tick 1703, expansion planned/completed stayed at
+7571/8432, first Scout Car moved to 9227, and first Tank moved to 10457.
 
 ## Player-Facing Outcome
 
