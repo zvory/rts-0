@@ -58,3 +58,28 @@ production lag diagnosis.
 Tick summaries separate simulation, snapshot fanout, scheduler lag, room shape, entity counts,
 snapshot coalescing, and the slowest concrete simulation phase. Snapshot and writer lines identify
 whether lag is in per-player projection/compaction, JSON serialization, or socket writes.
+
+## Structured server logging
+
+Server logs in `server/src` must go through `server/src/structured_log.rs`. Use the helper macros
+for ordinary logs:
+
+```rust
+crate::log_info!(room = %room, "room created");
+crate::log_warn!(room = %room, error = %err, "room task failed");
+```
+
+Use a named helper function in `structured_log.rs` when a log needs stable fields, correlation, or
+issue classification. Current high-signal helpers cover:
+
+- `client_net_report` with `build_id` and `primary_issue`.
+- `performance tick summary` rows include `match_run_id` when emitted by a live room.
+- `match_started` with `match_run_id`, map, seed, participants, build, and player counts.
+- `match_ended` with `match_run_id`, duration, tick count, slow-tick count, head-of-line max, and
+  replay/history context.
+
+`scripts/check-structured-logging.sh` fails if new direct `tracing::{info,warn,error,debug,trace}`
+calls are added under `server` outside the helper. The only exception is
+`server/crates/sim/src/perf.rs`, which is the centralized simulation performance logging surface and
+cannot depend back on the server crate. `tests/run-all.sh` runs that check as part of the
+architecture policy gate.

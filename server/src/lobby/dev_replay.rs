@@ -37,7 +37,7 @@ pub(super) fn match_seed() -> u32 {
     if let Ok(raw) = std::env::var(MATCH_SEED_ENV) {
         match raw.parse::<u32>() {
             Ok(seed) => return seed,
-            Err(err) => warn!(
+            Err(err) => crate::log_warn!(
                 env = MATCH_SEED_ENV,
                 value = %raw,
                 error = %err,

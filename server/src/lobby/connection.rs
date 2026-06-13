@@ -147,11 +147,11 @@ pub(super) fn send_or_log(
         ServerMessage::Snapshot(snapshot) => match tx.try_send_snapshot(snapshot) {
             SnapshotSendStatus::Stored => Some(SnapshotSendStatus::Stored),
             SnapshotSendStatus::Replaced => {
-                debug!(room = %room, player_id, "coalesced pending snapshot");
+                crate::log_debug!(room = %room, player_id, "coalesced pending snapshot");
                 Some(SnapshotSendStatus::Replaced)
             }
             SnapshotSendStatus::Closed => {
-                debug!(room = %room, player_id, "snapshot sink closed; client gone");
+                crate::log_debug!(room = %room, player_id, "snapshot sink closed; client gone");
                 Some(SnapshotSendStatus::Closed)
             }
         },
@@ -159,10 +159,10 @@ pub(super) fn send_or_log(
             if let Err(err) = tx.try_send_reliable(reliable) {
                 match err {
                     mpsc::error::TrySendError::Full(_) => {
-                        warn!(room = %room, player_id, "reliable outbound queue full; dropping message");
+                        crate::log_warn!(room = %room, player_id, "reliable outbound queue full; dropping message");
                     }
                     mpsc::error::TrySendError::Closed(_) => {
-                        debug!(room = %room, player_id, "reliable outbound channel closed; client gone");
+                        crate::log_debug!(room = %room, player_id, "reliable outbound channel closed; client gone");
                     }
                 }
             }

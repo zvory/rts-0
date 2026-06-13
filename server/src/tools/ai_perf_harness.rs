@@ -364,6 +364,7 @@ fn run_harness(config: CliConfig) -> Result<HarnessSummary, String> {
             perf_report.record_tick(game.current_tick(), total, counts, perf_tick);
             perf_tick.finish(perf::TickContext {
                 room: ROOM_NAME,
+                match_run_id: "",
                 tick: game.current_tick(),
                 scheduler_lag: Duration::ZERO,
                 total,

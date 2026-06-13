@@ -25,7 +25,6 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use tokio::sync::{mpsc, watch, Mutex, Notify};
 use tokio::time::{interval, MissedTickBehavior};
-use tracing::{debug, error, info, warn};
 
 use crate::config;
 use crate::db::Db;
@@ -375,9 +374,9 @@ impl Lobby {
         tokio::spawn(async move {
             let mut task = RoomTask::new(name.clone(), mode, db, match_history_local_only, drain);
             task.run(event_rx).await;
-            info!(room = %name, "room task exited");
+            crate::log_info!(room = %name, "room task exited");
         });
-        info!(room = %room, "room created");
+        crate::log_info!(room = %room, "room created");
         handle
     }
 

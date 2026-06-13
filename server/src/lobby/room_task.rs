@@ -8,6 +8,7 @@ use crate::game::entity::EntityKind;
 use crate::game::map::Map;
 use crate::game::replay::{ReplayArtifactV1, ReplayValidationError};
 use crate::protocol::{ReplayPlaybackState, SnapshotNetStatus, PREDICTION_PROTOCOL_VERSION};
+use crate::structured_log::{self, MatchEndedLog, MatchStartedLog};
 use rand::rngs::SmallRng;
 use rand::SeedableRng;
 use rts_ai::{AiController, AiThinkContext};
@@ -348,7 +349,7 @@ impl ReplaySession {
             game: Box::new(game.clone_for_replay_keyframe()),
             next_command: 0,
         }];
-        info!(
+        crate::log_info!(
             map = %artifact.map_name,
             duration_ticks,
             command_count = artifact.command_log.len(),
@@ -437,7 +438,7 @@ impl ReplaySession {
             .validate_against(server_build_sha(), &metadata)
             .or_else(|err| match err {
                 ReplayValidationError::BuildShaMismatch { artifact, running } => {
-                    warn!(
+                    crate::log_warn!(
                         replay_build_sha = %artifact,
                         server_build_sha = %running,
                         "replay build differs from current server; attempting playback"
@@ -618,7 +619,7 @@ impl ReplaySession {
         let keyframe_tick = self.rebuild_to(target_tick)?;
         self.last_seek_at = Some(StdInstant::now());
         self.last_controller_id = Some(controller_id);
-        info!(
+        crate::log_info!(
             room = %room,
             controller_id,
             viewer_count,
@@ -724,6 +725,8 @@ pub(super) struct RoomTask {
     match_history_local_only: bool,
     /// Wall-clock start time of the currently-running match. `None` outside `Phase::InGame`.
     match_started_at: Option<chrono::DateTime<chrono::Utc>>,
+    /// Correlates every high-signal log line for one live match attempt.
+    match_run_id: Option<String>,
     /// Map name the active match was started on. Empty outside `Phase::InGame`.
     match_map_name: String,
     /// Display names of every participant (humans + AI) in seat order, for match-history rows.
@@ -767,6 +770,7 @@ impl RoomTask {
             db,
             match_history_local_only,
             match_started_at: None,
+            match_run_id: None,
             match_map_name: String::new(),
             match_participants: Vec::new(),
             match_countdown_deadline: None,
@@ -993,7 +997,7 @@ impl RoomTask {
                     msg: "Match is starting in this room — try another room.".to_string(),
                 },
             );
-            debug!(room = %self.room, player_id, "rejecting join; match countdown active");
+            crate::log_debug!(room = %self.room, player_id, "rejecting join; match countdown active");
             let _ = ack.send(false);
             return;
         }
@@ -1014,7 +1018,7 @@ impl RoomTask {
                     msg: "Match already in progress in this room — try another room.".to_string(),
                 },
             );
-            debug!(room = %self.room, player_id, "rejecting join; match in progress");
+            crate::log_debug!(room = %self.room, player_id, "rejecting join; match in progress");
             let _ = ack.send(false);
             return;
         }
@@ -1039,7 +1043,7 @@ impl RoomTask {
             },
         );
         self.reassign_host_if_needed();
-        debug!(room = %self.room, player_id, "joined");
+        crate::log_debug!(room = %self.room, player_id, "joined");
         // The player is now in the room; tell the connection it may mark itself joined.
         let _ = ack.send(true);
         self.send_current_shutdown_warning_to(player_id);
@@ -1073,7 +1077,7 @@ impl RoomTask {
         self.order.retain(|&id| id != player_id);
         self.outcome_sent.remove(&player_id);
         self.reassign_host_if_needed();
-        debug!(room = %self.room, player_id, "left");
+        crate::log_debug!(room = %self.room, player_id, "left");
 
         // If the room emptied out, fully reset it to a clean lobby so its name is never stuck
         // mid-match (otherwise a 1-player sandbox — which never "ends" — would poison the room
@@ -1095,7 +1099,7 @@ impl RoomTask {
             if matches!(self.mode, RoomMode::ReplayBranch { .. }) {
                 self.mode = RoomMode::Normal;
             }
-            debug!(room = %self.room, "room emptied; reset to lobby");
+            crate::log_debug!(room = %self.room, "room emptied; reset to lobby");
             return;
         }
 
@@ -1165,15 +1169,15 @@ impl RoomTask {
                     },
                 );
             }
-            debug!(room = %self.room, player_id, "ignoring start while server is draining");
+            crate::log_debug!(room = %self.room, player_id, "ignoring start while server is draining");
             return;
         }
         if self.host_id != Some(player_id) {
-            debug!(room = %self.room, player_id, "ignoring start from non-host");
+            crate::log_debug!(room = %self.room, player_id, "ignoring start from non-host");
             return;
         }
         if !self.can_start() {
-            debug!(room = %self.room, "ignoring start; not all players ready");
+            crate::log_debug!(room = %self.room, "ignoring start; not all players ready");
             return;
         }
         if self.should_skip_match_countdown() {
@@ -1196,13 +1200,13 @@ impl RoomTask {
             return;
         }
         if self.total_player_count() >= MAX_PLAYERS {
-            debug!(room = %self.room, "ignoring add-ai; room full");
+            crate::log_debug!(room = %self.room, "ignoring add-ai; room full");
             return;
         }
         let id = next_player_id();
         let name = format!("Computer {}", self.ai_players.len() + 1);
         self.ai_players.push(AiSlot { id, name });
-        debug!(room = %self.room, ai_id = id, "AI opponent added");
+        crate::log_debug!(room = %self.room, ai_id = id, "AI opponent added");
         self.broadcast_lobby();
     }
 
@@ -1221,7 +1225,7 @@ impl RoomTask {
         let before = self.ai_players.len();
         self.ai_players.retain(|a| a.id != target);
         if self.ai_players.len() != before {
-            debug!(room = %self.room, ai_id = target, "AI opponent removed");
+            crate::log_debug!(room = %self.room, ai_id = target, "AI opponent removed");
             self.broadcast_lobby();
         }
     }
@@ -1239,7 +1243,7 @@ impl RoomTask {
         }
         if self.quickstart != enabled {
             self.quickstart = enabled;
-            debug!(room = %self.room, enabled, "quickstart toggled");
+            crate::log_debug!(room = %self.room, enabled, "quickstart toggled");
             self.broadcast_lobby();
         }
     }
@@ -1257,7 +1261,7 @@ impl RoomTask {
         }
         if self.selected_map != map {
             self.selected_map = map;
-            debug!(room = %self.room, map = %self.selected_map, "map selected");
+            crate::log_debug!(room = %self.room, map = %self.selected_map, "map selected");
             self.broadcast_lobby();
         }
     }
@@ -1284,7 +1288,7 @@ impl RoomTask {
             }
         } else {
             if self.total_player_count() >= MAX_PLAYERS {
-                debug!(room = %self.room, player_id, "ignoring player role switch; room full");
+                crate::log_debug!(room = %self.room, player_id, "ignoring player role switch; room full");
                 return;
             }
             let color = self.next_human_color();
@@ -1386,7 +1390,7 @@ impl RoomTask {
             return;
         }
         if client_seq == 0 {
-            debug!(room = %self.room, player_id, "ignoring command with reserved clientSeq 0");
+            crate::log_debug!(room = %self.room, player_id, "ignoring command with reserved clientSeq 0");
             return;
         }
         let live_seat_id = (self.live_connection_is_player(player_id)
@@ -1403,7 +1407,7 @@ impl RoomTask {
                     return;
                 };
                 if client_seq <= player.last_received_client_seq {
-                    debug!(
+                    crate::log_debug!(
                         room = %self.room,
                         player_id,
                         client_seq,
@@ -1450,7 +1454,7 @@ impl RoomTask {
             }
         };
 
-        debug!(room = %self.room, player_id, "player gave up");
+        crate::log_debug!(room = %self.room, player_id, "player gave up");
         game.eliminate(seat_id);
         let alive = game.alive_players();
         let scores = game.scores();
@@ -1593,7 +1597,7 @@ impl RoomTask {
             Phase::Lobby => match self.replay_session_for_mode() {
                 Ok(session) => self.transition_to_replay_viewer(session),
                 Err(err) => {
-                    warn!(room = %self.room, error = %err, "replay setup failed");
+                    crate::log_warn!(room = %self.room, error = %err, "replay setup failed");
                     if let Some(player) = self.players.get(&player_id) {
                         send_or_log(
                             &self.room,
@@ -1744,7 +1748,7 @@ impl RoomTask {
                 .collect(),
         };
         self.broadcast(&msg);
-        info!(room = %self.room, "match countdown started");
+        crate::log_info!(room = %self.room, "match countdown started");
     }
 
     fn finish_match_countdown_if_due(&mut self) -> bool {
@@ -1762,7 +1766,7 @@ impl RoomTask {
                 self.start_match();
             }
         } else {
-            debug!(room = %self.room, "match countdown aborted; start preconditions changed");
+            crate::log_debug!(room = %self.room, "match countdown aborted; start preconditions changed");
             if matches!(self.phase, Phase::BranchStaging(_)) {
                 self.broadcast_branch_staging();
             } else {
@@ -1811,7 +1815,7 @@ impl RoomTask {
             Ok(metadata) => metadata,
             Err(err) => {
                 let msg = format!("Cannot load map \"{}\": {err}", self.selected_map);
-                warn!(room = %self.room, error = %err, "map metadata load failed at start");
+                crate::log_warn!(room = %self.room, error = %err, "map metadata load failed at start");
                 if let Some(host_id) = self.host_id {
                     if let Some(player) = self.players.get(&host_id) {
                         send_or_log(
@@ -1829,7 +1833,7 @@ impl RoomTask {
             Ok(m) => m,
             Err(err) => {
                 let msg = format!("Cannot load map \"{}\": {err}", self.selected_map);
-                warn!(room = %self.room, error = %err, "map load failed at start");
+                crate::log_warn!(room = %self.room, error = %err, "map load failed at start");
                 if let Some(host_id) = self.host_id {
                     if let Some(player) = self.players.get(&host_id) {
                         send_or_log(
@@ -1860,6 +1864,8 @@ impl RoomTask {
         self.match_player_count = inits.len();
         self.match_human_count = inits.iter().filter(|p| !p.is_ai).count();
         self.match_started_at = Some(chrono::Utc::now());
+        let match_run_id = structured_log::new_match_run_id(&self.room);
+        self.match_run_id = Some(match_run_id);
         self.match_map_name = self.selected_map.clone();
         self.match_participants = inits.iter().map(|p| p.name.clone()).collect();
         self.outcome_sent.clear();
@@ -1889,7 +1895,18 @@ impl RoomTask {
             }
         }
 
-        info!(room = %self.room, players = self.match_player_count, "match started");
+        structured_log::log_match_started(MatchStartedLog {
+            room: &self.room,
+            match_run_id: self.match_run_id.as_deref().unwrap_or(""),
+            mode: "live",
+            map: &self.match_map_name,
+            seed,
+            players: self.match_player_count,
+            humans: self.match_human_count,
+            ai: self.ai_players.len(),
+            quickstart: self.quickstart,
+            participants: &self.match_participants,
+        });
         self.mark_match_started_for_drain();
         self.phase = Phase::InGame(Box::new(game));
     }
@@ -1925,6 +1942,8 @@ impl RoomTask {
         self.match_player_count = active_seats.len();
         self.match_human_count = active_seats.len();
         self.match_started_at = Some(chrono::Utc::now());
+        let match_run_id = structured_log::new_match_run_id(&self.room);
+        self.match_run_id = Some(match_run_id);
         self.match_map_name = staging.seed.source_replay.map_name.clone();
         self.match_participants = staging
             .seed
@@ -1969,12 +1988,18 @@ impl RoomTask {
             );
         }
 
-        info!(
-            room = %self.room,
-            players = self.match_player_count,
-            source_tick = staging.seed.source_tick,
-            "replay branch promoted to live match"
-        );
+        structured_log::log_match_started(MatchStartedLog {
+            room: &self.room,
+            match_run_id: self.match_run_id.as_deref().unwrap_or(""),
+            mode: "replay_branch",
+            map: &self.match_map_name,
+            seed: staging.seed.source_replay.seed,
+            players: self.match_player_count,
+            humans: self.match_human_count,
+            ai: 0,
+            quickstart: false,
+            participants: &self.match_participants,
+        });
         self.mark_match_started_for_drain();
         self.phase = Phase::InGame(Box::new(game));
     }
@@ -1984,7 +2009,7 @@ impl RoomTask {
         let (game, driver, view_player_id) = match self.build_dev_session() {
             Ok(session) => session,
             Err(err) => {
-                warn!(room = %self.room, error = %err, "dev session bootstrap failed");
+                crate::log_warn!(room = %self.room, error = %err, "dev session bootstrap failed");
                 self.send_dev_error(&err);
                 return;
             }
@@ -1999,7 +2024,7 @@ impl RoomTask {
         for player_id in recipients {
             self.send_dev_start_to(player_id);
         }
-        info!(room = %self.room, "dev session started");
+        crate::log_info!(room = %self.room, "dev session started");
     }
 
     fn build_dev_session(&self) -> Result<(Game, DevDriver, u32), String> {
@@ -2619,7 +2644,7 @@ impl RoomTask {
 
         if session.current_tick() < session.duration_ticks {
             if let Err(err) = session.enqueue_for_current_tick() {
-                warn!(room = %self.room, error = %err, "replay command enqueue failed");
+                crate::log_warn!(room = %self.room, error = %err, "replay command enqueue failed");
                 self.send_dev_error(&err);
                 self.phase = Phase::ReplayViewer(session);
                 return;
@@ -2869,7 +2894,7 @@ impl RoomTask {
                     }
                 }
                 Err(err) => {
-                    warn!(room = %self.room, error = %err, "replay seek failed");
+                    crate::log_warn!(room = %self.room, error = %err, "replay seek failed");
                     self.send_dev_error(&err);
                 }
             }
@@ -2911,7 +2936,7 @@ impl RoomTask {
                     }
                 }
                 Err(err) => {
-                    warn!(room = %self.room, error = %err, "replay seek failed");
+                    crate::log_warn!(room = %self.room, error = %err, "replay seek failed");
                     self.send_dev_error(&err);
                 }
             }
@@ -2959,16 +2984,45 @@ impl RoomTask {
 
     /// Resolve a finished match: tell everyone who won and start post-match replay playback.
     fn end_match(&mut self, winner_id: Option<u32>, scores: Vec<PlayerScore>, game: Option<&Game>) {
-        info!(room = %self.room, ?winner_id, "match over");
+        let ended_at = chrono::Utc::now();
+        let duration_ms = self.match_started_at.map(|started_at| {
+            ended_at
+                .signed_duration_since(started_at)
+                .num_milliseconds()
+                .clamp(0, i32::MAX as i64)
+        });
+        let duration_ticks = game.map(Game::tick_count);
+        let max_head_of_line_count = self
+            .players
+            .values()
+            .map(|player| player.head_of_line_count)
+            .max()
+            .unwrap_or(0);
         let replay_artifact = game.filter(|_| !self.is_live_dev_watch()).map(|game| {
             ReplayArtifactV1::capture_from_game(game, server_build_sha(), winner_id, scores.clone())
+        });
+        let will_record_history = self.db.is_some()
+            && self.match_started_at.is_some()
+            && self.should_record_match_history();
+        structured_log::log_match_ended(MatchEndedLog {
+            room: &self.room,
+            match_run_id: self.match_run_id.as_deref(),
+            map: &self.match_map_name,
+            participants: &self.match_participants,
+            winner_id,
+            duration_ms,
+            duration_ticks,
+            slow_tick_count: self.slow_tick_count,
+            max_head_of_line_count,
+            score_count: scores.len(),
+            replay_captured: replay_artifact.is_some(),
+            will_record_history,
         });
 
         // Persist match history only for real public matches. Human-vs-AI, AI-only,
         // 1-player sandboxes, dev/scenario/replay rooms, and automated test rooms are excluded.
         if let (Some(db), Some(started_at)) = (self.db.clone(), self.match_started_at) {
             if self.should_record_match_history() {
-                let ended_at = chrono::Utc::now();
                 let duration_ms = ended_at
                     .signed_duration_since(started_at)
                     .num_milliseconds()
@@ -2982,7 +3036,7 @@ impl RoomTask {
                     {
                         Ok(replay) => Some(replay),
                         Err(err) => {
-                            warn!(room = %self.room, error = %err, "failed to serialize replay artifact for match history");
+                            crate::log_warn!(room = %self.room, error = %err, "failed to serialize replay artifact for match history");
                             None
                         }
                     });
@@ -3003,6 +3057,7 @@ impl RoomTask {
             }
         }
         self.match_started_at = None;
+        self.match_run_id = None;
         self.match_map_name.clear();
         self.match_participants.clear();
 
@@ -3046,7 +3101,7 @@ impl RoomTask {
                     return;
                 }
                 Err(err) => {
-                    warn!(room = %self.room, error = %err, "post-match replay setup failed");
+                    crate::log_warn!(room = %self.room, error = %err, "post-match replay setup failed");
                     self.broadcast(&ServerMessage::Error {
                         msg: "Post-match replay could not be started.".to_string(),
                     });
@@ -3071,7 +3126,7 @@ impl RoomTask {
             self.send_replay_start_to(id);
             self.send_replay_state_to(id);
         }
-        info!(
+        crate::log_info!(
             room = %self.room,
             viewer_count = self.players.len(),
             "replay viewer active"
@@ -3091,6 +3146,7 @@ impl RoomTask {
         self.phase = Phase::Lobby;
         self.match_player_count = 0;
         self.match_human_count = 0;
+        self.match_run_id = None;
         self.outcome_sent.clear();
         self.branch_live_seat_by_connection.clear();
         for player in self.players.values_mut() {
@@ -3128,6 +3184,7 @@ impl RoomTask {
         };
         perf.finish(crate::perf::TickContext {
             room: &self.room,
+            match_run_id: self.match_run_id.as_deref().unwrap_or(""),
             tick: game.current_tick(),
             scheduler_lag,
             total: tick_start.elapsed(),

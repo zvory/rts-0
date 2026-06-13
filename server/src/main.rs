@@ -24,7 +24,6 @@ use futures_util::{SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 use tower_http::services::{ServeDir, ServeFile};
-use tracing::{debug, info, warn};
 use tracing_subscriber::EnvFilter;
 
 use std::sync::Arc;
@@ -41,19 +40,11 @@ use rts_server::game::replay::{
 use rts_server::game::SimCommand;
 use rts_server::lobby::{self, Lobby, RoomEvent};
 use rts_server::perf;
-use rts_server::protocol::{
-    serialize_compact_snapshot, ClientMessage, ClientNetReport, ServerMessage,
-};
+use rts_server::protocol::{serialize_compact_snapshot, ClientMessage, ServerMessage};
+use rts_server::structured_log;
 
 /// Default room name used when a client's `join` omits `room`.
 const DEFAULT_ROOM: &str = "main";
-const NET_REPORT_LATENCY_ISSUE_MS: u16 = 180;
-const NET_REPORT_JITTER_ISSUE_MS: u16 = 20;
-const NET_REPORT_SNAPSHOT_GAP_ISSUE_MS: u16 = 100;
-const NET_REPORT_FRAME_GAP_ISSUE_MS: u16 = 100;
-const NET_REPORT_WS_BUFFERED_BYTES_ISSUE: u32 = 64 * 1024;
-const NET_REPORT_SERVER_TICK_ISSUE_MS: u16 = 33;
-const NET_REPORT_SERVER_LAG_ISSUE_MS: u16 = 33;
 
 /// Treat unset/empty/`0`/`false`/`no`/`off` as falsy; anything else is true.
 fn env_truthy(key: &str) -> bool {
@@ -113,7 +104,9 @@ async fn main() {
     let match_history_local_only = !record_matches;
     let lobby_db = db.clone();
     if db.is_some() && match_history_local_only {
-        info!("RTS_RECORD_MATCHES unset; match history writes enabled as localhost-only rows");
+        rts_server::log_info!(
+            "RTS_RECORD_MATCHES unset; match history writes enabled as localhost-only rows"
+        );
     }
 
     let version = rts_server::build_info::build_id().to_string();
@@ -157,13 +150,13 @@ async fn main() {
         Ok(l) => l,
         Err(err) => {
             // A failed bind is fatal and there is nothing to keep alive, so report and exit.
-            tracing::error!(%addr, %err, "failed to bind listen address");
+            rts_server::log_error!(%addr, %err, "failed to bind listen address");
             std::process::exit(1);
         }
     };
 
     let bound = listener.local_addr().map(|a| a.to_string()).unwrap_or(addr);
-    info!("Bewegungskrieg server listening — open http://{bound}/");
+    rts_server::log_info!("Bewegungskrieg server listening — open http://{bound}/");
 
     if let Err(err) = axum::serve(
         listener,
@@ -172,14 +165,14 @@ async fn main() {
     .with_graceful_shutdown(shutdown_signal(shutdown_lobby))
     .await
     {
-        tracing::error!(%err, "server error");
+        rts_server::log_error!(%err, "server error");
     }
 }
 
 async fn shutdown_signal(lobby: Lobby) {
     let ctrl_c = async {
         if let Err(err) = tokio::signal::ctrl_c().await {
-            warn!(%err, "failed to install Ctrl-C shutdown handler");
+            rts_server::log_warn!(%err, "failed to install Ctrl-C shutdown handler");
             std::future::pending::<()>().await;
         }
     };
@@ -191,7 +184,7 @@ async fn shutdown_signal(lobby: Lobby) {
                 signal.recv().await;
             }
             Err(err) => {
-                warn!(%err, "failed to install SIGTERM shutdown handler");
+                rts_server::log_warn!(%err, "failed to install SIGTERM shutdown handler");
                 std::future::pending::<()>().await;
             }
         }
@@ -201,8 +194,8 @@ async fn shutdown_signal(lobby: Lobby) {
     let terminate = std::future::pending::<()>();
 
     tokio::select! {
-        _ = ctrl_c => info!("shutdown requested by Ctrl-C"),
-        _ = terminate => info!("shutdown requested by SIGTERM"),
+        _ = ctrl_c => rts_server::log_info!("shutdown requested by Ctrl-C"),
+        _ = terminate => rts_server::log_info!("shutdown requested by SIGTERM"),
     }
 
     run_deploy_drain(lobby, DEPLOY_DRAIN_TIMEOUT).await;
@@ -212,22 +205,22 @@ async fn run_deploy_drain(lobby: Lobby, timeout: Duration) {
     lobby.begin_draining(timeout).await;
     let active_matches = lobby.active_match_count();
     if active_matches == 0 {
-        info!("shutdown drain complete; no active matches");
+        rts_server::log_info!("shutdown drain complete; no active matches");
         lobby.request_connection_shutdown();
         return;
     }
 
-    info!(
+    rts_server::log_info!(
         active_matches,
         timeout_secs = timeout.as_secs(),
         "shutdown drain started; waiting for active matches"
     );
     tokio::select! {
         _ = lobby.wait_for_matches_to_drain() => {
-            info!("shutdown drain complete; all matches finished");
+            rts_server::log_info!("shutdown drain complete; all matches finished");
         }
         _ = tokio::time::sleep(timeout) => {
-            warn!(
+            rts_server::log_warn!(
                 active_matches = lobby.active_match_count(),
                 timeout_secs = timeout.as_secs(),
                 "shutdown drain deadline reached; continuing shutdown"
@@ -289,7 +282,7 @@ async fn matches_handler(
             Json(rows).into_response()
         }
         Err(err) => {
-            warn!(%err, "match history query failed");
+            rts_server::log_warn!(%err, "match history query failed");
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "match history unavailable",
@@ -337,7 +330,7 @@ async fn match_replay_launch_handler(
                 .into_response();
         }
         Err(err) => {
-            warn!(%err, match_id, "match replay load failed");
+            rts_server::log_warn!(%err, match_id, "match replay load failed");
             return (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(ApiError {
@@ -623,7 +616,7 @@ fn dev_scenario_index_html() -> String {
 fn build_versioned_index(client_dir: &str, version: &str) -> String {
     let path = format!("{client_dir}/index.html");
     let html = std::fs::read_to_string(&path).unwrap_or_else(|err| {
-        tracing::error!(%path, %err, "failed to read index.html");
+        rts_server::log_error!(%path, %err, "failed to read index.html");
         String::new()
     });
 
@@ -739,39 +732,6 @@ mod tests {
         .expect("active match count did not settle");
     }
 
-    fn clean_net_report() -> ClientNetReport {
-        ClientNetReport {
-            schema_version: 1,
-            elapsed_ms: 10_000,
-            match_tick: 300,
-            rtt_ms: 40,
-            rtt_max_ms: 70,
-            bad_rtt_samples: 0,
-            snapshot_jitter_ms: 3,
-            snapshot_gap_max_ms: 45,
-            jitter_samples: 0,
-            snapshots: 300,
-            frame_gap_max_ms: 18,
-            fps_estimate: 60,
-            hidden: false,
-            focused: true,
-            ws_buffered_bytes: 0,
-            server_tick_ms: 4,
-            server_lag_ms: 0,
-            slow_tick_count: 0,
-            head_of_line_count: 0,
-            prediction_mode: String::new(),
-            pending_command_count: 0,
-            acknowledged_command_latency_ms: 0,
-            correction_distance_px: 0,
-            correction_count: 0,
-            prediction_disable_count: 0,
-            wasm_tick_ms: 0,
-            wasm_memory_bytes: 0,
-            prediction_replay_ticks: 0,
-        }
-    }
-
     #[tokio::test]
     async fn join_to_different_room_transfers_connection_and_leaves_previous_room() {
         let lobby = Lobby::new();
@@ -853,34 +813,6 @@ mod tests {
                 .await
                 .expect("target cleanup leave should send");
         }
-    }
-
-    #[test]
-    fn clean_net_reports_are_not_notable() {
-        assert!(!is_notable_net_report(&clean_net_report()));
-    }
-
-    #[test]
-    fn laggy_net_reports_are_notable() {
-        let mut report = clean_net_report();
-        report.rtt_max_ms = NET_REPORT_LATENCY_ISSUE_MS;
-        assert!(is_notable_net_report(&report));
-
-        let mut report = clean_net_report();
-        report.jitter_samples = 1;
-        assert!(is_notable_net_report(&report));
-
-        let mut report = clean_net_report();
-        report.snapshot_gap_max_ms = NET_REPORT_SNAPSHOT_GAP_ISSUE_MS;
-        assert!(is_notable_net_report(&report));
-
-        let mut report = clean_net_report();
-        report.ws_buffered_bytes = NET_REPORT_WS_BUFFERED_BYTES_ISSUE;
-        assert!(is_notable_net_report(&report));
-
-        let mut report = clean_net_report();
-        report.server_tick_ms = NET_REPORT_SERVER_TICK_ISSUE_MS;
-        assert!(is_notable_net_report(&report));
     }
 
     #[tokio::test]
@@ -1103,7 +1035,7 @@ mod tests {
 /// Bad input is logged and skipped; we never panic on the read path.
 async fn handle_connection(socket: WebSocket, lobby: Lobby) {
     let player_id = lobby::next_player_id();
-    debug!(player_id, "connection opened");
+    rts_server::log_debug!(player_id, "connection opened");
 
     let (mut sink, mut stream) = socket.split();
 
@@ -1191,7 +1123,7 @@ async fn handle_connection(socket: WebSocket, lobby: Lobby) {
         // post-loop code emits `Leave`, which cleans up membership and (mid-match) eliminates them.
         let next = tokio::select! {
             _ = wait_for_connection_shutdown(&mut shutdown_rx) => {
-                debug!(player_id, "server shutdown; closing connection");
+                rts_server::log_debug!(player_id, "server shutdown; closing connection");
                 break;
             }
             next = tokio::time::timeout(IDLE_TIMEOUT, stream.next()) => next,
@@ -1199,7 +1131,7 @@ async fn handle_connection(socket: WebSocket, lobby: Lobby) {
         let next = match next {
             Ok(next) => next,
             Err(_) => {
-                debug!(player_id, "idle timeout; closing");
+                rts_server::log_debug!(player_id, "idle timeout; closing");
                 break;
             }
         };
@@ -1209,7 +1141,7 @@ async fn handle_connection(socket: WebSocket, lobby: Lobby) {
         let frame = match frame {
             Ok(f) => f,
             Err(err) => {
-                debug!(player_id, %err, "websocket read error; closing");
+                rts_server::log_debug!(player_id, %err, "websocket read error; closing");
                 break;
             }
         };
@@ -1220,7 +1152,7 @@ async fn handle_connection(socket: WebSocket, lobby: Lobby) {
                     Ok(m) => m,
                     Err(err) => {
                         // Malformed input is the client's problem; tell it and keep the socket.
-                        debug!(player_id, %err, text = %text, "ignoring malformed client message");
+                        rts_server::log_debug!(player_id, %err, text = %text, "ignoring malformed client message");
                         let _ = conn_tx.try_send_reliable(ServerMessage::Error {
                             msg: "malformed message".to_string(),
                         });
@@ -1239,13 +1171,13 @@ async fn handle_connection(socket: WebSocket, lobby: Lobby) {
             }
             Message::Binary(_) => {
                 // The protocol is JSON text only; ignore stray binary frames.
-                debug!(player_id, "ignoring unexpected binary frame");
+                rts_server::log_debug!(player_id, "ignoring unexpected binary frame");
             }
             Message::Ping(_) | Message::Pong(_) => {
                 // axum answers protocol-level pings automatically; nothing to do.
             }
             Message::Close(_) => {
-                debug!(player_id, "client sent close");
+                rts_server::log_debug!(player_id, "client sent close");
                 break;
             }
         }
@@ -1259,7 +1191,7 @@ async fn handle_connection(socket: WebSocket, lobby: Lobby) {
     // flushes any pending latest snapshot.
     drop(conn_tx);
     let _ = writer.await;
-    debug!(player_id, "connection closed");
+    rts_server::log_debug!(player_id, "connection closed");
 }
 
 async fn wait_for_connection_shutdown(shutdown_rx: &mut tokio::sync::watch::Receiver<bool>) {
@@ -1324,7 +1256,7 @@ async fn send_server_message(
         }
         Err(err) => {
             // Should never happen for our own types, but never let it kill the task.
-            warn!(player_id, %err, "failed to serialize server message");
+            rts_server::log_warn!(player_id, %err, "failed to serialize server message");
         }
     }
     true
@@ -1355,7 +1287,7 @@ async fn handle_client_message(
                 .filter(|r| !r.trim().is_empty())
                 .unwrap_or_else(|| DEFAULT_ROOM.to_string());
             if current_room_name.as_deref() == Some(room_name.as_str()) {
-                debug!(
+                rts_server::log_debug!(
                     player_id,
                     room = %room_name,
                     "ignoring duplicate join on already-joined connection"
@@ -1373,7 +1305,7 @@ async fn handle_client_message(
                     let _ = conn_tx.try_send_reliable(ServerMessage::Error {
                         msg: "Server is draining for deploy; new rooms are disabled.".to_string(),
                     });
-                    debug!(player_id, room = %room_name, "rejecting new room while server is draining");
+                    rts_server::log_debug!(player_id, room = %room_name, "rejecting new room while server is draining");
                     return;
                 }
             };
@@ -1396,14 +1328,14 @@ async fn handle_client_message(
                 .await
                 .is_ok();
             if !sent {
-                warn!(player_id, room = %room_name, "room task gone; cannot join");
+                rts_server::log_warn!(player_id, room = %room_name, "room task gone; cannot join");
                 return;
             }
             match ack_rx.await {
                 Ok(true) => {
                     if let Some(previous) = previous_room {
                         let _ = previous.event_tx.send(RoomEvent::Leave { player_id }).await;
-                        debug!(
+                        rts_server::log_debug!(
                             player_id,
                             from = previous_room_name.as_deref().unwrap_or(""),
                             to = %room_name,
@@ -1414,10 +1346,10 @@ async fn handle_client_message(
                     *current_room_name = Some(room_name);
                 }
                 Ok(false) => {
-                    debug!(player_id, room = %room_name, "join rejected by room");
+                    rts_server::log_debug!(player_id, room = %room_name, "join rejected by room");
                 }
                 Err(_) => {
-                    warn!(player_id, room = %room_name, "room dropped join ack; cannot join");
+                    rts_server::log_warn!(player_id, room = %room_name, "room dropped join ack; cannot join");
                 }
             }
         }
@@ -1499,7 +1431,7 @@ async fn handle_client_message(
             let _ = conn_tx.try_send_reliable(ServerMessage::Pong { ts });
         }
         ClientMessage::NetReport { report } => {
-            log_client_net_report(player_id, current_room_name.as_deref(), report);
+            structured_log::log_client_net_report(player_id, current_room_name.as_deref(), report);
         }
         ClientMessage::SetReplaySpeed { speed } => {
             send_room_event(
@@ -1591,7 +1523,7 @@ async fn handle_client_message(
         }
         #[allow(unreachable_patterns)]
         _ => {
-            debug!(player_id, "ignoring unsupported client message");
+            rts_server::log_debug!(player_id, "ignoring unsupported client message");
         }
     }
 }
@@ -1603,7 +1535,7 @@ async fn request_replay_branch(
     current_room: &Option<lobby::RoomHandle>,
 ) {
     let Some(handle) = current_room else {
-        debug!(player_id, "ignoring replay branch request before join");
+        rts_server::log_debug!(player_id, "ignoring replay branch request before join");
         return;
     };
     let (reply_tx, reply_rx) = tokio::sync::oneshot::channel();
@@ -1616,7 +1548,7 @@ async fn request_replay_branch(
         .await
         .is_err()
     {
-        warn!(player_id, "room task gone; cannot request replay branch");
+        rts_server::log_warn!(player_id, "room task gone; cannot request replay branch");
         return;
     }
     let seed = match reply_rx.await {
@@ -1626,7 +1558,7 @@ async fn request_replay_branch(
             return;
         }
         Err(_) => {
-            warn!(player_id, "room dropped replay branch reply");
+            rts_server::log_warn!(player_id, "room dropped replay branch reply");
             return;
         }
     };
@@ -1651,68 +1583,6 @@ async fn request_replay_branch(
     }
 }
 
-fn log_client_net_report(player_id: u32, current_room_name: Option<&str>, report: ClientNetReport) {
-    if !is_notable_net_report(&report) {
-        return;
-    }
-
-    let room = current_room_name.unwrap_or("");
-    info!(
-        event = "client_net_report",
-        player_id,
-        room = %room,
-        schema_version = report.schema_version,
-        elapsed_ms = report.elapsed_ms,
-        match_tick = report.match_tick,
-        rtt_ms = report.rtt_ms,
-        rtt_max_ms = report.rtt_max_ms,
-        bad_rtt_samples = report.bad_rtt_samples,
-        snapshot_jitter_ms = report.snapshot_jitter_ms,
-        snapshot_gap_max_ms = report.snapshot_gap_max_ms,
-        jitter_samples = report.jitter_samples,
-        snapshots = report.snapshots,
-        frame_gap_max_ms = report.frame_gap_max_ms,
-        fps_estimate = report.fps_estimate,
-        hidden = report.hidden,
-        focused = report.focused,
-        ws_buffered_bytes = report.ws_buffered_bytes,
-        server_tick_ms = report.server_tick_ms,
-        server_lag_ms = report.server_lag_ms,
-        slow_tick_count = report.slow_tick_count,
-        head_of_line_count = report.head_of_line_count,
-        prediction_mode = %report.prediction_mode,
-        pending_command_count = report.pending_command_count,
-        acknowledged_command_latency_ms = report.acknowledged_command_latency_ms,
-        correction_distance_px = report.correction_distance_px,
-        correction_count = report.correction_count,
-        prediction_disable_count = report.prediction_disable_count,
-        wasm_tick_ms = report.wasm_tick_ms,
-        wasm_memory_bytes = report.wasm_memory_bytes,
-        prediction_replay_ticks = report.prediction_replay_ticks,
-        "client network report"
-    );
-}
-
-fn is_notable_net_report(report: &ClientNetReport) -> bool {
-    report.rtt_ms >= NET_REPORT_LATENCY_ISSUE_MS
-        || report.rtt_max_ms >= NET_REPORT_LATENCY_ISSUE_MS
-        || report.bad_rtt_samples > 0
-        || report.snapshot_jitter_ms >= NET_REPORT_JITTER_ISSUE_MS
-        || report.jitter_samples > 0
-        || report.snapshot_gap_max_ms >= NET_REPORT_SNAPSHOT_GAP_ISSUE_MS
-        || report.frame_gap_max_ms >= NET_REPORT_FRAME_GAP_ISSUE_MS
-        || report.ws_buffered_bytes >= NET_REPORT_WS_BUFFERED_BYTES_ISSUE
-        || report.server_tick_ms >= NET_REPORT_SERVER_TICK_ISSUE_MS
-        || report.server_lag_ms >= NET_REPORT_SERVER_LAG_ISSUE_MS
-        || report.pending_command_count >= 8
-        || report.acknowledged_command_latency_ms >= NET_REPORT_LATENCY_ISSUE_MS
-        || report.correction_distance_px >= 32
-        || report.correction_count > 0
-        || report.prediction_disable_count > 0
-        || report.wasm_tick_ms >= NET_REPORT_FRAME_GAP_ISSUE_MS
-        || report.prediction_replay_ticks >= 8
-}
-
 /// Forward a [`RoomEvent`] to the connection's room, if it has joined one. Logs and ignores the
 /// message otherwise (a client acting before `join`).
 async fn send_room_event(
@@ -1723,10 +1593,10 @@ async fn send_room_event(
     match current_room {
         Some(handle) => {
             if handle.event_tx.send(event).await.is_err() {
-                warn!(player_id, "room task gone; dropping event");
+                rts_server::log_warn!(player_id, "room task gone; dropping event");
             }
         }
-        None => debug!(player_id, "ignoring event before join"),
+        None => rts_server::log_debug!(player_id, "ignoring event before join"),
     }
 }
 
@@ -1777,16 +1647,16 @@ async fn map_save_handler(
             b
         }
         Err(e) => {
-            warn!(%e, "map save: payload serialization failed");
+            rts_server::log_warn!(%e, "map save: payload serialization failed");
             return (StatusCode::BAD_REQUEST, "invalid payload").into_response();
         }
     };
 
     if let Err(e) = tokio::fs::write(&path, &json_bytes).await {
-        warn!(%e, ?path, "map save: write failed");
+        rts_server::log_warn!(%e, ?path, "map save: write failed");
         return (StatusCode::INTERNAL_SERVER_ERROR, "write failed").into_response();
     }
 
-    info!(?path, "map saved");
+    rts_server::log_info!(?path, "map saved");
     (StatusCode::OK, filename).into_response()
 }

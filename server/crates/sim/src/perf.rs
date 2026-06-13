@@ -64,6 +64,7 @@ pub struct TickPerf {
 #[derive(Clone, Copy, Debug)]
 pub struct TickContext<'a> {
     pub room: &'a str,
+    pub match_run_id: &'a str,
     pub tick: u32,
     pub scheduler_lag: Duration,
     pub total: Duration,
@@ -277,6 +278,7 @@ impl TickPerf {
             target: PERF_TARGET,
             event = "tick",
             room = %context.room,
+            match_run_id = %context.match_run_id,
             tick = context.tick,
             tick_ms = millis(context.total),
             scheduler_lag_ms = millis(context.scheduler_lag),

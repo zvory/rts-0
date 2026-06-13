@@ -10,6 +10,7 @@ pub mod db;
 pub mod dev_scenarios;
 pub mod lobby;
 pub mod protocol;
+pub mod structured_log;
 pub mod tools;
 
 pub use rts_ai as ai;

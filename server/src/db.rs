@@ -12,7 +12,6 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::postgres::{PgPoolOptions, PgRow};
 use sqlx::{PgPool, Row};
-use tracing::{error, info, warn};
 
 use crate::game::replay::ReplayArtifactV1;
 
@@ -124,7 +123,7 @@ impl Db {
             .await?;
 
         sqlx::migrate!("./migrations").run(&pool).await?;
-        info!("database connected and migrations applied");
+        crate::log_info!("database connected and migrations applied");
         Ok(Self { pool })
     }
 
@@ -181,7 +180,7 @@ impl Db {
 
         match result {
             Ok(_) => {
-                info!(
+                crate::log_info!(
                     map = %rec.map_name,
                     outcome,
                     local_only = rec.local_only,
@@ -189,7 +188,7 @@ impl Db {
                     "match recorded"
                 )
             }
-            Err(err) => error!(%err, map = %rec.map_name, "failed to record match"),
+            Err(err) => crate::log_error!(%err, map = %rec.map_name, "failed to record match"),
         }
     }
 
@@ -328,14 +327,14 @@ pub async fn try_connect_from_env() -> Option<Arc<Db>> {
     let url = match std::env::var("DATABASE_URL") {
         Ok(u) if !u.trim().is_empty() => u,
         _ => {
-            warn!("DATABASE_URL not set; match history disabled");
+            crate::log_warn!("DATABASE_URL not set; match history disabled");
             return None;
         }
     };
     match Db::connect(&url).await {
         Ok(db) => Some(Arc::new(db)),
         Err(err) => {
-            error!(%err, "failed to connect to database; match history disabled");
+            crate::log_error!(%err, "failed to connect to database; match history disabled");
             None
         }
     }

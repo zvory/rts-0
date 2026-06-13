@@ -14,7 +14,7 @@ pub(super) fn dump_crash_replay(room: &str, game: &Game, reason: &str) {
     let json = match serde_json::to_string_pretty(&artifact) {
         Ok(s) => s,
         Err(e) => {
-            error!(room = %room, reason = %reason, error = %e, "tick panic: failed to serialize crash replay");
+            crate::log_error!(room = %room, reason = %reason, error = %e, "tick panic: failed to serialize crash replay");
             return;
         }
     };
@@ -34,7 +34,7 @@ pub(super) fn dump_crash_replay(room: &str, game: &Game, reason: &str) {
     let path = dir.join("replay.json");
     match fs::create_dir_all(&dir).and_then(|_| fs::write(&path, &json)) {
         Ok(_) => {
-            error!(
+            crate::log_error!(
                 room = %room,
                 tick = game.tick_count(),
                 reason = %reason,
@@ -43,7 +43,7 @@ pub(super) fn dump_crash_replay(room: &str, game: &Game, reason: &str) {
             );
         }
         Err(e) => {
-            error!(
+            crate::log_error!(
                 room = %room,
                 tick = game.tick_count(),
                 reason = %reason,
@@ -52,7 +52,7 @@ pub(super) fn dump_crash_replay(room: &str, game: &Game, reason: &str) {
             );
         }
     }
-    error!(
+    crate::log_error!(
         room = %room,
         reason = %reason,
         "tick panic: full crash replay follows (artifact name: {dir_name})\n----BEGIN CRASH REPLAY----\n{json}\n----END CRASH REPLAY----"
