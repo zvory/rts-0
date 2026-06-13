@@ -267,6 +267,12 @@ gather, build/resume, and placement build commands set `queued: true` and rely o
 snapshot's owner-only `orderPlan` for accepted markers. Production-building-only right-clicks set
 or append building rally stages and rely on owner-only `rallyPlan` for accepted markers. Attack
 targeting with only production buildings selected creates `attackMove` rally stages.
+Selection and targeting use `GameState` relationship helpers where the distinction is own/ally/enemy:
+single-click may select an allied entity for read-only inspection, box selection and same-kind
+selection stay own-only, and right-clicking own or allied entities with own units selected falls
+through to ordinary move-to-point behavior instead of attack. Command emission, prediction,
+optimistic production/rally, control groups, build/gather/train/research/cancel, and ability
+execution remain strict local-owner checks.
 Shift-confirmed build placement keeps placement mode armed while Shift is physically held, allowing
 multiple queued building placements; releasing Shift or losing window focus clears placement mode.
 

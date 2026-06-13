@@ -846,7 +846,11 @@ export class Input {
 
     const world = this._worldAt(p.x, p.y);
     const hit = this._entityAtWorld(world.x, world.y, /*ownPreferred=*/ true);
-    if (!hit || hit.owner !== this.state.playerId) return false;
+    if (!hit) return false;
+    const own = typeof this.state?.isOwnOwner === "function"
+      ? this.state.isOwnOwner(hit.owner)
+      : hit.owner === this.state.playerId;
+    if (!own) return false;
     if (!isUnit(hit.kind) && !isBuilding(hit.kind)) return false;
 
     this._commitClickSelection(p, ev.shiftKey, true);

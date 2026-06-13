@@ -256,10 +256,11 @@ export class Minimap {
     }
   }
 
-  /** Blip color for an entity: own=green, enemy=red, neutral(resources)=yellow. */
+  /** Blip color for an entity: own=green, ally=blue, enemy=player color/red, neutral=yellow. */
   _blipColor(e) {
     if (e.owner === 0 || isResource(e.kind)) return hex(COLORS.selectNeutral);
-    if (e.owner === this.state.playerId) return hex(COLORS.selectOwn);
+    if (ownOwner(this.state, e.owner)) return hex(COLORS.selectOwn);
+    if (allyOwner(this.state, e.owner)) return hex(COLORS.selectAlly);
     // Enemy: prefer the player's assigned color if we know it, else the enemy tint.
     const player = this._playerById(e.owner);
     return (player && player.color) || hex(COLORS.selectEnemy);
@@ -474,13 +475,13 @@ export class Minimap {
     const unitIds = [];
     for (const e of sel) {
       // Only own, controllable units take move orders (skip buildings/resources/enemies).
-      if (e.owner === this.state.playerId && isUnit(e.kind)) {
+      if (ownOwner(this.state, e.owner) && isUnit(e.kind)) {
         unitIds.push(e.id);
       }
     }
     if (unitIds.length === 0) {
       const producers = sel
-        .filter((e) => e.owner === this.state.playerId && isProducerBuilding(e.kind))
+        .filter((e) => ownOwner(this.state, e.owner) && isProducerBuilding(e.kind))
         .map((e) => e.id);
       if (producers.length === 0) return;
       const kind = this.state.commandTarget === "attack" ? ORDER_STAGE.ATTACK_MOVE : ORDER_STAGE.MOVE;
@@ -501,7 +502,7 @@ export class Minimap {
       const carriers = definition?.carriers;
       const abilityUnits = Array.isArray(carriers)
         ? sel
-            .filter((e) => e.owner === this.state.playerId && carriers.includes(e.kind))
+            .filter((e) => ownOwner(this.state, e.owner) && carriers.includes(e.kind))
             .map((e) => e.id)
         : unitIds;
       if (abilityUnits.length === 0) return;
@@ -512,6 +513,16 @@ export class Minimap {
     this._issueCommand(cmd.move(unitIds, wx, wy, queued));
     this.state.addCommandFeedback("move", wx, wy, queued);
   }
+}
+
+function ownOwner(state, owner) {
+  return typeof state?.isOwnOwner === "function"
+    ? state.isOwnOwner(owner)
+    : Number(owner) === state?.playerId;
+}
+
+function allyOwner(state, owner) {
+  return typeof state?.isAllyOwner === "function" && state.isAllyOwner(owner);
 }
 
 function issueGameplayCommand(sender, command) {

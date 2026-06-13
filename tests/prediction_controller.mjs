@@ -404,6 +404,41 @@ function sentSeqs(sent) {
 }
 
 {
+  const state = new GameState({
+    playerId: 1,
+    spectator: false,
+    map: { width: 8, height: 8, tileSize: 32, terrain: new Array(64).fill(0), resources: [] },
+    players: [
+      { id: 1, teamId: 1, name: "A", color: "#f00", startTileX: 1, startTileY: 1 },
+      { id: 2, teamId: 1, name: "B", color: "#0f0", startTileX: 2, startTileY: 2 },
+    ],
+  });
+  state.applySnapshot({
+    tick: 1,
+    steel: 0,
+    oil: 0,
+    supplyUsed: 1,
+    supplyCap: 10,
+    entities: [
+      { id: 10, owner: 1, kind: "worker", x: 32, y: 32, hp: 40, maxHp: 40, state: "idle" },
+      { id: 11, owner: 2, kind: "worker", x: 96, y: 32, hp: 40, maxHp: 40, state: "idle" },
+    ],
+    events: [],
+  });
+  state.setPredictedSnapshot({
+    tick: 2,
+    entities: [
+      { id: 10, owner: 1, kind: "worker", x: 48, y: 32, hp: 40, maxHp: 40, state: "move" },
+      { id: 11, owner: 2, kind: "worker", x: 128, y: 32, hp: 40, maxHp: 40, state: "move" },
+    ],
+  });
+  const rendered = state.entitiesInterpolated(1);
+  assert(rendered.find((e) => e.id === 10)?.predicted === true, "prediction applies to own units");
+  const ally = rendered.find((e) => e.id === 11);
+  assert(ally && ally.predicted !== true && ally.x === 96, "prediction remains own-unit-only for allied units");
+}
+
+{
   const files = [
     ["client/src/input/commands.js", "viewport right-click and hotkeys"],
     ["client/src/input/placement.js", "build placement"],

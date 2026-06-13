@@ -28,6 +28,7 @@ export const COLORS = Object.freeze({
   hpMid: 0xc7a24a,
   hpLow: 0xb64a3f,
   selectOwn: 0xc7d07a,
+  selectAlly: 0x7ab8d0,
   selectEnemy: 0xd47a5f,
   selectNeutral: 0xc9b56a,
   dragBox: 0xc7d07a,

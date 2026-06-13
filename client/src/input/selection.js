@@ -14,13 +14,13 @@ export function _commitClickSelection(p, additive, ctrl) {
     if (!additive) this.state.clearSelection();
     return;
   }
-  if (ctrl && isUnit(hit.kind) && hit.owner === this.state.playerId) {
+  if (ctrl && isUnit(hit.kind) && ownOwner(this.state, hit.owner)) {
     const ids = this._closestOwnUnitKindInViewport(hit.kind, hit.x, hit.y, hit);
     if (additive) this.state.addToSelection(ids);
     else this.state.setSelection(ids);
     return;
   }
-  if (ctrl && isBuilding(hit.kind) && hit.owner === this.state.playerId) {
+  if (ctrl && isBuilding(hit.kind) && ownOwner(this.state, hit.owner)) {
     const ids = this._ownBuildingsOfKindInViewport(hit.kind);
     if (additive) this.state.addToSelection(ids);
     else this.state.setSelection(ids);
@@ -44,12 +44,11 @@ export function _ownBuildingsOfKindInViewport(kind) {
   const maxX = Math.max(topLeft.x, botRight.x);
   const minY = Math.min(topLeft.y, botRight.y);
   const maxY = Math.max(topLeft.y, botRight.y);
-  const me = this.state.playerId;
   return this.state
     .entitiesInterpolated(1)
     .filter(
       (e) =>
-        e.owner === me &&
+        ownOwner(this.state, e.owner) &&
         e.kind === kind &&
         e.x >= minX && e.x <= maxX &&
         e.y >= minY && e.y <= maxY,
@@ -74,13 +73,12 @@ export function _closestOwnUnitKindInViewport(kind, anchorX, anchorY, anchor = n
   const maxX = Math.max(topLeft.x, botRight.x);
   const minY = Math.min(topLeft.y, botRight.y);
   const maxY = Math.max(topLeft.y, botRight.y);
-  const me = this.state.playerId;
   const anchorGroup = anchor ? _unitSelectionGroup(anchor) : kind;
   return this.state
     .entitiesInterpolated(1)
     .filter(
       (e) =>
-        e.owner === me &&
+        ownOwner(this.state, e.owner) &&
         (anchor ? _unitSelectionGroup(e) === anchorGroup : e.kind === kind) &&
         e.x >= minX && e.x <= maxX &&
         e.y >= minY && e.y <= maxY,
@@ -103,14 +101,13 @@ export function _commitBoxSelection(drag, additive) {
   const maxY = Math.max(a.y, b.y);
 
   const entities = this.state.entitiesInterpolated(1);
-  const me = this.state.playerId;
   const spectator = !!this.state.spectator;
 
   const units = [];
   const buildings = [];
   for (const e of entities) {
     if (e.shotReveal || e.visionOnly) continue;
-    if (!spectator && e.owner !== me) continue;
+    if (!spectator && !ownOwner(this.state, e.owner)) continue;
     if (spectator && e.owner === 0) continue;
     if (!this._entityIntersectsRect(e, minX, minY, maxX, maxY)) continue;
     if (isUnit(e.kind)) units.push(e.id);
@@ -144,7 +141,6 @@ export function _closestIdsToPoint(ids, screenX, screenY) {
 
 export function _entityAtWorld(wx, wy, ownPreferred) {
   const entities = this.state.entitiesInterpolated(1);
-  const me = this.state.playerId;
   const tileSize = this.state.map ? this.state.map.tileSize : DEFAULT_TILE_SIZE;
 
   let best = null;
@@ -156,7 +152,7 @@ export function _entityAtWorld(wx, wy, ownPreferred) {
     const dy = wy - e.y;
     const dist = Math.hypot(dx, dy);
     // Bias toward own entities when requested by subtracting a large bonus.
-    const ownBonus = ownPreferred && e.owner === me ? OWN_HIT_BONUS : 0;
+    const ownBonus = ownPreferred && ownOwner(this.state, e.owner) ? OWN_HIT_BONUS : 0;
     const score = dist - ownBonus;
     if (score < bestScore) {
       bestScore = score;
@@ -164,6 +160,12 @@ export function _entityAtWorld(wx, wy, ownPreferred) {
     }
   }
   return best;
+}
+
+function ownOwner(state, owner) {
+  return typeof state?.isOwnOwner === "function"
+    ? state.isOwnOwner(owner)
+    : Number(owner) === state?.playerId;
 }
 
 export function _resourceAtWorld(wx, wy) {

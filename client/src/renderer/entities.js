@@ -110,8 +110,9 @@ export function _drawSelectionAndHp(e, selection, state) {
     g.position.set(e.x, e.y);
     const ring = this._ringRadius(e);
     let color;
-    if (e.owner === state.playerId) color = COLORS.selectOwn;
-    else if (e.owner === 0) color = COLORS.selectNeutral;
+    if (ownOwner(state, e.owner)) color = COLORS.selectOwn;
+    else if (allyOwner(state, e.owner)) color = COLORS.selectAlly;
+    else if (neutralOwner(state, e.owner)) color = COLORS.selectNeutral;
     else color = COLORS.selectEnemy;
     // Glow + crisp ring.
     g.lineStyle(4, color, 0.25);
@@ -125,6 +126,22 @@ export function _drawSelectionAndHp(e, selection, state) {
     g.position.set(0, 0);
     this._hpBar(g, e);
   }
+}
+
+function ownOwner(state, owner) {
+  return typeof state?.isOwnOwner === "function"
+    ? state.isOwnOwner(owner)
+    : Number(owner) === state?.playerId;
+}
+
+function allyOwner(state, owner) {
+  return typeof state?.isAllyOwner === "function" && state.isAllyOwner(owner);
+}
+
+function neutralOwner(state, owner) {
+  return typeof state?.isNeutralOwner === "function"
+    ? state.isNeutralOwner(owner)
+    : Number(owner) === 0;
 }
 
 export function _ringRadius(e) {

@@ -32,7 +32,6 @@ export function _onRightClick(p, ev = {}) {
     return;
   }
 
-  const me = this.state.playerId;
   const world = this._worldAt(p.x, p.y);
   const workers = this._selectedWorkerIds();
   if (workers.length > 0) {
@@ -45,7 +44,7 @@ export function _onRightClick(p, ev = {}) {
   }
 
   const target = this._entityAtWorld(world.x, world.y, /*ownPreferred=*/ false);
-  if (target && target.owner === me && _isOwnIncompleteBuilding(target)) {
+  if (target && ownOwner(this.state, target.owner) && _isOwnIncompleteBuilding(target)) {
     const resume = _resumeConstructionIntent(target, this.state.map);
     if (resume && workers.length > 0) {
       this._issueCommand(cmd.build(workers, resume.building, resume.tileX, resume.tileY, queued));
@@ -53,7 +52,7 @@ export function _onRightClick(p, ev = {}) {
       return;
     }
   }
-  if (target && target.owner !== me && target.owner !== 0 && !isResource(target.kind)) {
+  if (target && enemyOwner(this.state, target.owner) && !isResource(target.kind)) {
     // Enemy entity -> attack.
     this._issueCommand(cmd.attack(ownUnits, target.id, queued));
     this.state.addCommandFeedback("attack", target.x, target.y, queued);
@@ -105,7 +104,7 @@ export function _issueTargetedCommand(p, ev = {}) {
     const units = Array.isArray(carriers)
       ? this.state
           .selectedEntities()
-          .filter((e) => e.owner === this.state.playerId && carriers.includes(e.kind))
+          .filter((e) => ownOwner(this.state, e.owner) && carriers.includes(e.kind))
           .map((e) => e.id)
       : ownUnits;
     if (units.length === 0) return;
@@ -129,8 +128,7 @@ export function _issueTargetedCommand(p, ev = {}) {
   }
 
   const target = this._entityAtWorld(world.x, world.y, /*ownPreferred=*/ false);
-  const me = this.state.playerId;
-  if (target && target.owner !== me && target.owner !== 0 && !isResource(target.kind)) {
+  if (target && enemyOwner(this.state, target.owner) && !isResource(target.kind)) {
     this._issueCommand(cmd.attack(ownUnits, target.id, !!ev.shiftKey));
     this.state.addCommandFeedback("attack", target.x, target.y, !!ev.shiftKey);
     return;
@@ -141,34 +139,30 @@ export function _issueTargetedCommand(p, ev = {}) {
 }
 
 export function _selectedOwnUnitIds() {
-  const me = this.state.playerId;
   return this.state
     .selectedEntities()
-    .filter((e) => e.owner === me && isUnit(e.kind))
+    .filter((e) => ownOwner(this.state, e.owner) && isUnit(e.kind))
     .map((e) => e.id);
 }
 
 export function _selectedProducerBuildingIds() {
-  const me = this.state.playerId;
   return this.state
     .selectedEntities()
-    .filter((e) => e.owner === me && isBuilding(e.kind) && isProducerBuilding(e.kind))
+    .filter((e) => ownOwner(this.state, e.owner) && isBuilding(e.kind) && isProducerBuilding(e.kind))
     .map((e) => e.id);
 }
 
 export function _selectedWorkerIds() {
-  const me = this.state.playerId;
   return this.state
     .selectedEntities()
-    .filter((e) => e.owner === me && e.kind === KIND.WORKER)
+    .filter((e) => ownOwner(this.state, e.owner) && e.kind === KIND.WORKER)
     .map((e) => e.id);
 }
 
 export function _selectedOwnAtGunIds() {
-  const me = this.state.playerId;
   return this.state
     .selectedEntities()
-    .filter((e) => e.owner === me && (e.kind === KIND.AT_TEAM || e.kind === KIND.ARTILLERY))
+    .filter((e) => ownOwner(this.state, e.owner) && (e.kind === KIND.AT_TEAM || e.kind === KIND.ARTILLERY))
     .map((e) => e.id);
 }
 
@@ -202,10 +196,9 @@ export function _refreshAbilityTargetPreview() {
     this.state.updateAbilityTargetPreview(null);
     return;
   }
-  const me = this.state.playerId;
   const carriers = this.state
     .selectedEntities()
-    .filter((e) => e.owner === me && definition.carriers.includes(e.kind));
+    .filter((e) => ownOwner(this.state, e.owner) && definition.carriers.includes(e.kind));
   if (carriers.length === 0) {
     this.state.updateAbilityTargetPreview(null);
     return;
@@ -244,10 +237,9 @@ export function _refreshAtGunSetupPreview() {
     this.state.updateAtGunSetupPreview(null);
     return;
   }
-  const me = this.state.playerId;
   const guns = this.state
     .selectedEntities()
-    .filter((e) => e.owner === me && (e.kind === KIND.AT_TEAM || e.kind === KIND.ARTILLERY));
+    .filter((e) => ownOwner(this.state, e.owner) && (e.kind === KIND.AT_TEAM || e.kind === KIND.ARTILLERY));
   if (guns.length === 0) {
     this.state.updateAtGunSetupPreview(null);
     return;
@@ -288,11 +280,10 @@ export function _refreshResourceMiningPreview() {
 }
 
 export function _nearestOwnCompletedCityCentre(x, y) {
-  const me = this.state.playerId;
   let best = null;
   for (const e of this.state.entitiesInterpolated(1)) {
     if (
-      e.owner !== me ||
+      !ownOwner(this.state, e.owner) ||
       e.kind !== KIND.CITY_CENTRE ||
       (typeof e.buildProgress === "number" && e.buildProgress < 1)
     ) {
@@ -304,6 +295,18 @@ export function _nearestOwnCompletedCityCentre(x, y) {
     }
   }
   return best;
+}
+
+function ownOwner(state, owner) {
+  return typeof state?.isOwnOwner === "function"
+    ? state.isOwnOwner(owner)
+    : Number(owner) === state?.playerId;
+}
+
+function enemyOwner(state, owner) {
+  if (typeof state?.isEnemyOwner === "function") return state.isEnemyOwner(owner);
+  const ownerId = Number(owner);
+  return Number.isInteger(ownerId) && ownerId !== 0 && ownerId !== state?.playerId;
 }
 
 export function _activateCommandHotkey(ev) {

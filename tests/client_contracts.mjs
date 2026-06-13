@@ -17,6 +17,7 @@ import {
   ARTILLERY_MAX_RANGE_TILES,
   ARTILLERY_MIN_RANGE_TILES,
   ARTILLERY_SHELL_DELAY_TICKS,
+  COLORS,
   MINING_CC_RANGE_TILES,
   RIFLEMAN_CHARGE_COOLDOWN_TICKS,
   SMOKE_ABILITY_COST,
@@ -66,6 +67,7 @@ import {
 import { Input, footprintValidAgainstEntities } from "../client/src/input/index.js";
 import { CommandComposer } from "../client/src/command_composer.js";
 import { _controlGroupSaveModifierActive } from "../client/src/input/control_groups.js";
+import { Minimap } from "../client/src/minimap.js";
 import { ReplayCameraInput } from "../client/src/replay_camera_input.js";
 import {
   automaticPointerLockDisabledForTests,
@@ -3576,6 +3578,17 @@ function fakeAudioContext() {
   const allyState = new GameState({ ...start, playerId: 2 });
   assert(allyState.isAllyOwner(3), "GameState.isAllyOwner detects shared team");
   assert(!allyState.isEnemyOwner(3), "GameState.isEnemyOwner excludes shared team");
+  const localTeamState = new GameState({
+    ...start,
+    players: [
+      { id: 1, teamId: 7, name: "A", color: "#ff0000", startTileX: 1, startTileY: 1 },
+      { id: 2, teamId: 7, name: "B", color: "#00ff00", startTileX: 2, startTileY: 2 },
+      { id: 3, teamId: 8, name: "C", color: "#0000ff", startTileX: 3, startTileY: 3 },
+    ],
+  });
+  assert(localTeamState.isAllyOwner(2), "GameState.isAllyOwner classifies local-player allies from start.players");
+  assert(localTeamState.isEnemyOwner(3), "GameState.isEnemyOwner classifies hostile teams from start.players");
+  assert(!localTeamState.isEnemyOwner(2), "GameState.isEnemyOwner excludes local-player allies");
   assertHasMethod(state, "applySnapshot", "GameState");
   assertHasMethod(state, "entitiesInterpolated", "GameState");
   assertHasGetter(state, "prevRecvTime", "GameState");
@@ -3873,6 +3886,103 @@ function fakeAudioContext() {
     events: [{ e: "death", id: 101, x: 10, y: 0, kind: KIND.WORKER }],
   });
   assert(cgState.controlGroups[1].join(",") === "100,102,103", "dead entities disappear from control groups");
+
+  const teamSelectionState = new GameState({
+    ...start,
+    map: { ...start.map, width: 12, height: 12, resources: [] },
+    players: [
+      { id: 1, teamId: 1, name: "A", color: "#ff0000", startTileX: 1, startTileY: 1 },
+      { id: 2, teamId: 1, name: "B", color: "#00ff00", startTileX: 2, startTileY: 2 },
+      { id: 3, teamId: 2, name: "C", color: "#0000ff", startTileX: 3, startTileY: 3 },
+    ],
+  });
+  const ownWorker = { id: 201, owner: 1, kind: KIND.WORKER, x: 32, y: 32, hp: 40, maxHp: 40, state: STATE.IDLE };
+  const allyWorker = { id: 202, owner: 2, kind: KIND.WORKER, x: 64, y: 32, hp: 40, maxHp: 40, state: STATE.IDLE };
+  const enemyWorker = { id: 203, owner: 3, kind: KIND.WORKER, x: 96, y: 32, hp: 40, maxHp: 40, state: STATE.IDLE };
+  teamSelectionState.applySnapshot({
+    tick: 0,
+    steel: 100,
+    oil: 100,
+    supplyUsed: 1,
+    supplyCap: 10,
+    entities: [ownWorker, allyWorker, enemyWorker],
+    events: [],
+  });
+  const selectionInput = Object.create(Input.prototype);
+  selectionInput.state = teamSelectionState;
+  selectionInput.camera = { screenToWorld: (x, y) => ({ x, y }) };
+  selectionInput.dom = { clientWidth: 400, clientHeight: 300 };
+  selectionInput._worldAt = Input.prototype._worldAt;
+  selectionInput._entityAtWorld = Input.prototype._entityAtWorld;
+  selectionInput._worldPointHitsEntity = Input.prototype._worldPointHitsEntity;
+  selectionInput._entityIntersectsRect = Input.prototype._entityIntersectsRect;
+  selectionInput._closestIdsToPoint = Input.prototype._closestIdsToPoint;
+  selectionInput._commitClickSelection = Input.prototype._commitClickSelection;
+  selectionInput._commitBoxSelection = Input.prototype._commitBoxSelection;
+  selectionInput._ownBuildingsOfKindInViewport = Input.prototype._ownBuildingsOfKindInViewport;
+  selectionInput._closestOwnUnitKindInViewport = Input.prototype._closestOwnUnitKindInViewport;
+  selectionInput._commitClickSelection({ x: allyWorker.x, y: allyWorker.y }, false, false);
+  assert(
+    Array.from(teamSelectionState.selection).join(",") === String(allyWorker.id),
+    "single-click can select an allied entity for inspection",
+  );
+  selectionInput._commitBoxSelection({ x0: 0, y0: 0, x1: 120, y1: 64 }, false);
+  assert(
+    Array.from(teamSelectionState.selection).join(",") === String(ownWorker.id),
+    "box selection skips allied and enemy units",
+  );
+  selectionInput._commitClickSelection({ x: allyWorker.x, y: allyWorker.y }, true, false);
+  assert(
+    Array.from(teamSelectionState.selection).join(",") === `${ownWorker.id},${allyWorker.id}`,
+    "shift-click can add an allied inspection target to the current selection",
+  );
+  teamSelectionState.setControlGroup(2, teamSelectionState.selection);
+  assert(
+    teamSelectionState.controlGroups[2].join(",") === String(ownWorker.id),
+    "mixed own/allied selections save only own entities into control groups",
+  );
+  const allyOnlyCard = buildCommandCardDescriptors(commandCardCtx({
+    playerId: 1,
+    selection: [allyWorker],
+    entities: [ownWorker, allyWorker],
+  }));
+  assert(commandButtons(allyOnlyCard).length === 0, "allied-only inspection selection exposes no command buttons");
+  const mixedCard = buildCommandCardDescriptors(commandCardCtx({
+    playerId: 1,
+    selection: [ownWorker, allyWorker],
+    entities: [ownWorker, allyWorker],
+  }));
+  const stopIntent = buttonByAction(mixedCard, "stop")?.intent;
+  assert(
+    stopIntent?.unitIds?.join(",") === String(ownWorker.id),
+    "mixed own/allied command card emits commands only for own entity ids",
+  );
+  const alliedRightClickCommands = [];
+  const rightClickInput = Object.create(Input.prototype);
+  rightClickInput.state = teamSelectionState;
+  rightClickInput.camera = selectionInput.camera;
+  rightClickInput._worldAt = Input.prototype._worldAt;
+  rightClickInput._entityAtWorld = Input.prototype._entityAtWorld;
+  rightClickInput._worldPointHitsEntity = Input.prototype._worldPointHitsEntity;
+  rightClickInput._resourceAtWorld = Input.prototype._resourceAtWorld;
+  rightClickInput._selectedOwnUnitIds = Input.prototype._selectedOwnUnitIds;
+  rightClickInput._selectedWorkerIds = Input.prototype._selectedWorkerIds;
+  rightClickInput._selectedProducerBuildingIds = Input.prototype._selectedProducerBuildingIds;
+  rightClickInput._issueCommand = (command) => alliedRightClickCommands.push(command);
+  teamSelectionState.setSelection([ownWorker.id]);
+  rightClickInput._onRightClick({ x: allyWorker.x, y: allyWorker.y });
+  assert(
+    alliedRightClickCommands.length === 1 &&
+      alliedRightClickCommands[0].c === "move" &&
+      alliedRightClickCommands[0].units.join(",") === String(ownWorker.id),
+    "right-clicking an allied entity with own units selected sends move, not attack",
+  );
+  const minimapLike = Object.create(Minimap.prototype);
+  minimapLike.state = teamSelectionState;
+  assert(
+    minimapLike._blipColor(allyWorker) === `#${COLORS.selectAlly.toString(16).padStart(6, "0")}`,
+    "minimap blip color distinguishes allies from enemies",
+  );
 
   // Placement is local-only
   state.beginPlacement("barracks");

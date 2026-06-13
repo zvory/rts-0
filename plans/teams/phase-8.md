@@ -1,6 +1,6 @@
 # Phase 8 - Client Command Safety and Ally Inspection
 
-Status: planned.
+Status: done.
 
 ## Goal
 
@@ -98,3 +98,16 @@ right-click an allied unit with own units selected.
 
 The phase handoff must distinguish relationship replacements from strict ownership checks and name
 the tests that prove no allied command is emitted.
+
+## Implementation Notes
+
+- Relationship replacements: client attack targeting now uses `GameState.isEnemyOwner`, and renderer
+  and minimap inspection colors distinguish own, ally, enemy, and neutral/resource.
+- Strict ownership checks retained: command emission, control groups, prediction, optimistic UI,
+  production/rally commands, build/gather/train/research/cancel, and ability execution remain
+  local-player-only.
+- Contract coverage proving allied command safety:
+  `node tests/client_contracts.mjs`,
+  `node tests/input_context_menu_contracts.mjs`,
+  `node tests/minimap_input_contracts.mjs`, and
+  `node tests/prediction_controller.mjs`.
