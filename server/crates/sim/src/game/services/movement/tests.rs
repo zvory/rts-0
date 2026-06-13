@@ -2972,6 +2972,44 @@ fn infantry_skips_lateral_waypoint_when_next_segment_reachable() {
 }
 
 #[test]
+fn worker_keeps_lateral_waypoint_when_next_segment_reachable() {
+    let map = flat_map(1);
+    let mut entities = EntityStore::new();
+    let (sx, sy) = map.tile_center(20, 20);
+    let lateral_offset = config::VEHICLE_WAYPOINT_ACCEPTANCE_RADIUS_PX + 10.0;
+    let start = (sx, sy + lateral_offset);
+    let intermediate = (sx + config::TILE_SIZE as f32, sy);
+    let goal = (sx + config::TILE_SIZE as f32 * 4.0, sy);
+    let worker = entities
+        .spawn_unit(1, EntityKind::Worker, start.0, start.1)
+        .expect("worker should spawn");
+    if let Some(e) = entities.get_mut(worker) {
+        e.set_order(Order::move_to(goal.0, goal.1));
+    }
+    set_path_direct(&mut entities, worker, vec![intermediate, goal]);
+
+    let occ = Occupancy::build(&map, &entities);
+    assert!(
+        standability::unit_static_segment_standable(&map, &occ, EntityKind::Worker, start, goal),
+        "fixture requires the worker body to have a legal direct route segment"
+    );
+    let spatial = SpatialIndex::build(&entities, map.size);
+    movement_system(&map, &mut entities, &mut [], &occ, &spatial, 0);
+
+    let e = entities.get(worker).expect("worker should exist");
+    assert_eq!(
+        e.movement.as_ref().map(|m| m.path.len()),
+        Some(2),
+        "workers should not consume intermediate waypoints via route skipping"
+    );
+    assert_eq!(e.next_waypoint(), Some(intermediate));
+    assert!(
+        e.pos_x > start.0 && e.pos_y < start.1,
+        "worker should move toward the intermediate waypoint instead of skipping to the route"
+    );
+}
+
+#[test]
 fn infantry_route_skip_stops_before_blocked_corner() {
     let map = flat_map(1);
     let mut entities = EntityStore::new();
