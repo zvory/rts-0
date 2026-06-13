@@ -5193,6 +5193,13 @@ function fakeAudioContext() {
     assert(root.children.length === 1, "observer analysis overlay mounts generated DOM");
     const overlayRoot = root.children[0];
     assert(root.querySelector(".replay-army-value-row"), "observer analysis renders army value rows");
+    assert(
+      findFakes(root, (el) => el.classList.contains("replay-army-value-steel"))
+        .some((cell) => cell.querySelector(".steel"))
+        && findFakes(root, (el) => el.classList.contains("replay-army-value-oil"))
+          .some((cell) => cell.querySelector(".oil")),
+      "observer analysis army value uses shared steel and oil icons",
+    );
 
     const unitsTab = root.querySelector(".replay-analysis-tab");
     assert(unitsTab, "observer analysis renders tab buttons");
@@ -5293,6 +5300,13 @@ function fakeAudioContext() {
       "units tab includes totals for the current player group");
     assert(unitText.includes("Rifleman") && unitText.includes("Tank"), "units tab renders per-kind unit rows");
     assert(unitText.includes("Blue") && unitText.includes("Engineer"), "units tab renders multiple players");
+    assert(
+      findFakes(root, (el) => el.classList.contains("replay-units-steel"))
+        .some((cell) => cell.querySelector(".steel"))
+        && findFakes(root, (el) => el.classList.contains("replay-units-oil"))
+          .some((cell) => cell.querySelector(".oil")),
+      "units tab uses shared steel and oil icons for resource values",
+    );
 
     overlay.applyObserverAnalysis({
       tick: 5,

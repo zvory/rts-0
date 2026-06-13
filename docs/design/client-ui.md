@@ -20,6 +20,7 @@ src/
   input/          # lifecycle facade plus selection, commands, placement, shared camera navigation, UI input routing
   audio.js        # Audio: Web Audio context, buses, one-shots, spatialization
   hud.js          # HUD: resources/supply bar, selected panel, command card (build/train)
+  resource_icons.js # Shared DOM resource icon helpers for HUD and observer analysis
   minimap.js      # Minimap: draw terrain+entities+viewport; click to move camera/command
   lobby.js        # Lobby screen: name entry, player list, ready/start buttons
   settings_container.js # Reusable settings shell: opener, tabs, focus, teardown
