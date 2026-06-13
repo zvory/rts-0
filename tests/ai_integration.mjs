@@ -10,56 +10,31 @@
 //
 // Usage: start the server (`cd server && cargo run`), then `node tests/ai_integration.mjs`.
 // Override the endpoint with RTS_WS (default ws://127.0.0.1:8081/ws).
-import { decodeServerMessage } from "../client/src/protocol.js";
+import {
+  addAi,
+  assertCountdownProtocol,
+  closeClients,
+  connectClient,
+  createAssertions,
+  removeAi,
+  sleep,
+  startMatch,
+  uniqueRoom,
+} from "./team_harness.mjs";
 
-const URL = process.env.RTS_WS || "ws://127.0.0.1:8081/ws";
-const ROOM = "ai-itest-" + Math.floor(performance.now());
-
-let failures = 0;
-const VERBOSE = !!process.env.RTS_VERBOSE;
-const ok = (cond, msg) => { if (!cond) { console.log("  FAIL " + msg); failures++; } else if (VERBOSE) { console.log("  PASS " + msg); } };
-
-class Client {
-  constructor(tag) {
-    this.tag = tag;
-    this.ws = new WebSocket(URL);
-    this.playerId = null;
-    this.lastSnapshot = null;
-    this.msgs = [];
-    this.waiters = [];
-    this.ws.onmessage = (e) => {
-      const m = decodeServerMessage(JSON.parse(e.data));
-      this.msgs.push(m);
-      if (m.t === "welcome") this.playerId = m.playerId;
-      if (m.t === "snapshot") this.lastSnapshot = m;
-      this.waiters = this.waiters.filter((w) => !w.test(m) || (w.resolve(m), false));
-    };
-    this.ws.onerror = (e) => console.log(`[${tag}] ws error`, e.message || e.type || e);
-  }
-  open() { return new Promise((res, rej) => { this.ws.onopen = () => res(); this.ws.onclose = () => rej(new Error("closed before open")); }); }
-  send(o) { this.ws.send(JSON.stringify(o)); }
-  // Wait for a NEW message matching `test` (ignores already-received ones, so repeated lobby
-  // updates with the same shape can be awaited in sequence).
-  waitNext(test, timeoutMs = 5000, label = "message") {
-    return new Promise((resolve, reject) => {
-      const t = setTimeout(() => reject(new Error(`[${this.tag}] timeout waiting for ${label}`)), timeoutMs);
-      this.waiters.push({ test, resolve: (m) => { clearTimeout(t); resolve(m); } });
-    });
-  }
-}
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const ROOM = uniqueRoom("ai-itest");
+const assertions = createAssertions();
+const { ok } = assertions;
 
 (async () => {
-  const A = new Client("A"); await A.open();
-  await A.waitNext((m) => m.t === "welcome", 3000, "A welcome");
+  const A = await connectClient("A");
   A.send({ t: "join", name: "Host", room: ROOM });
   const solo = await A.waitNext((m) => m.t === "lobby", 3000, "A lobby");
   ok(solo.players.length === 1 && solo.hostId === A.playerId, `host alone in lobby (host=${solo.hostId})`);
 
   // Add an AI opponent.
-  A.send({ t: "addAi" });
-  const withAi = await A.waitNext((m) => m.t === "lobby" && m.players.length === 2, 3000, "lobby with AI");
-  const ai = withAi.players.find((p) => p.isAi);
+  const [ai] = await addAi(A);
+  const withAi = A.msgs.filter((m) => m.t === "lobby").at(-1);
   const human = withAi.players.find((p) => p.id === A.playerId);
   ok(!!ai, "addAi seated a computer opponent");
   ok(ai && ai.isAi === true && human && human.isAi === false, "isAi flag distinguishes AI from human");
@@ -68,16 +43,14 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   ok(ai && ai.id !== A.playerId, "AI got its own player id");
 
   // Add a second AI, then remove the first — exercises both controls and the cap accounting.
-  A.send({ t: "addAi" });
-  const withTwo = await A.waitNext((m) => m.t === "lobby" && m.players.length === 3, 3000, "lobby with 2 AI");
+  await addAi(A);
+  const withTwo = A.msgs.filter((m) => m.t === "lobby").at(-1);
   ok(withTwo.players.filter((p) => p.isAi).length === 2, "second addAi seated a third player");
-  A.send({ t: "removeAi", id: ai.id });
-  const removed = await A.waitNext((m) => m.t === "lobby" && m.players.length === 2, 3000, "lobby after remove");
+  const removed = await removeAi(A, ai.id);
   ok(!removed.players.some((p) => p.id === ai.id), "removeAi unseated the targeted AI");
 
   // A non-host cannot add AIs: B joins, sends addAi, and the player count must not change.
-  const B = new Client("B"); await B.open();
-  await B.waitNext((m) => m.t === "welcome", 3000, "B welcome");
+  const B = await connectClient("B");
   B.send({ t: "join", name: "Guest", room: ROOM });
   await A.waitNext((m) => m.t === "lobby" && m.players.length === 3, 3000, "lobby with B");
   B.send({ t: "addAi" });
@@ -85,19 +58,17 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const last = A.msgs.filter((m) => m.t === "lobby").at(-1);
   ok(last.players.length === 3, `non-host addAi ignored (still ${last.players.length} players)`);
   // Drop B so the start is a clean 1-human + 1-AI match.
-  B.ws.close();
+  closeClients(B);
   await A.waitNext((m) => m.t === "lobby" && m.players.length === 2, 3000, "lobby after B leaves");
 
   // Start: only the host needs to be ready (the AI doesn't gate canStart).
-  A.send({ t: "ready", ready: true });
+  A.ready(true);
   await A.waitNext((m) => m.t === "lobby" && m.canStart, 3000, "canStart with just host ready");
   ok(true, "match can start with one human ready + one AI");
-  A.send({ t: "start" });
 
-  const countdown = await A.waitNext((m) => m.t === "matchCountdown", 3000, "A countdown");
-  ok(countdown.durationMs === 3000 && countdown.words.join(" ") === "Drei! Zwei! Eins!",
-     `countdown words/duration are correct (${countdown.words?.join(" ")}, ${countdown.durationMs}ms)`);
-  const start = await A.waitNext((m) => m.t === "start", 6000, "A start");
+  const { countdowns, starts } = await startMatch(A, [A]);
+  assertCountdownProtocol(ok, countdowns[0]);
+  const [start] = starts;
   ok(start.players.length === 2, `start lists 2 players (human + AI) (${start.players.length})`);
   const sa = start.players.find((p) => p.id === A.playerId);
   const sai = start.players.find((p) => p.id !== A.playerId);
@@ -114,8 +85,8 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   ok(advancedSnap.tick > tick0, `match advancing (tick ${tick0} -> ${advancedSnap.tick})`);
   ok(!A.msgs.some((m) => m.t === "gameOver"), "match still running (not prematurely resolved)");
 
-  A.ws.close();
+  closeClients(A);
   await sleep(200);
-  if (failures > 0) console.log(`\n${failures} FAILURE(S) ❌`);
-  process.exit(failures === 0 ? 0 : 1);
+  if (assertions.failures > 0) console.log(`\n${assertions.failures} FAILURE(S)`);
+  process.exit(assertions.failures === 0 ? 0 : 1);
 })().catch((e) => { console.log("TEST ERROR:", e.message); process.exit(2); });

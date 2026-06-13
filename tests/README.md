@@ -77,6 +77,19 @@ node tests/server_integration.mjs
 # override endpoint: RTS_WS=ws://host:port/ws node tests/server_integration.mjs
 ```
 
+## Team integration harness baseline (no dependencies)
+
+Drives a live room through multi-client setup, AI seating/removal, readiness, match start,
+snapshot waits, and game-over waits using shared helpers in `tests/team_harness.mjs`. Phase 0 keeps
+the assertions FFA-compatible and documents where later team phases should add `teamId` checks and
+1v2, 1v3, and 2v2 scenarios. The suite does not start its own server; start one first or use
+`tests/run-all.sh`, which boots a private server and sets `RTS_WS`.
+
+```bash
+node tests/team_integration.mjs
+# override endpoint: RTS_WS=ws://host:port/ws node tests/team_integration.mjs
+```
+
 ## Headless simulation self-play
 
 Runs inside the Rust test suite with no live server. Plain `cargo test` runs the fast scripted
