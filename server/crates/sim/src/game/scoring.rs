@@ -13,6 +13,8 @@ impl PlayerState {
     pub(crate) fn record_entity_lost(&mut self, kind: EntityKind) {
         if kind.is_unit() {
             self.score.units_lost = self.score.units_lost.saturating_add(1);
+            let count = self.score.units_lost_by_kind.entry(kind).or_insert(0);
+            *count = count.saturating_add(1);
         } else if kind.is_building() {
             self.score.buildings_lost = self.score.buildings_lost.saturating_add(1);
         }

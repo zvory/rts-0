@@ -138,6 +138,7 @@ authority.
 | `start`    | `Game start payload` (see 2.3). |
 | `snapshot` | `Per-player snapshot` (see 2.4). |
 | `replayState` | `Replay playback state` (see 2.6). |
+| `replayAnalysis` | `Replay analysis state` (see 2.7). |
 | `joinReplayPrompt` | `room: string` — the requested room is currently replay playback; clients should confirm before retrying `join` with `replayOk: true`. |
 | `replayBranchCreated` | `branchRoom: string`, `sourceTick: u32`, `seats: ReplayBranchSeat[]` — a separate practice branch room has been created from the source replay's current authoritative tick. |
 | `branchStaging` | `room: string`, `sourceTick: u32`, `hostId: u32`, `seats: BranchStagingSeat[]`, `occupants: BranchStagingOccupant[]`, `canStart: bool` — reliable current state for a replay branch staging room. Sent after joins, leaves, claims, and releases. |
@@ -509,5 +510,49 @@ The server rejects unknown player ids, empty subsets, and duplicate subset ids. 
 not shared between viewers unless a later protocol explicitly adds shared-view control. Replay
 snapshots are spectator-style authoritative fog snapshots from the selected real player ids; the
 default is the union of all replay players.
+
+### 2.7 Replay analysis state
+
+`replayAnalysis` is a replay-only reliable server message for overlay/tab data that cannot be
+derived safely from the browser's current projected snapshot. It is sent to replay viewers after
+replay `start`/`replayState`, after accepted seeks, after replay vision changes, and during replay
+playback ticks. It is not sent during live matches or dev scenario watch rooms.
+```
+{
+  t: "replayAnalysis",
+  tick: u32,
+  players: [
+    {
+      id: u32,
+      units: [{ kind: string, count: u32, steelValue: u32, oilValue: u32 }],
+      production: [
+        {
+          buildingId: u32,
+          buildingKind: string,
+          itemKind: string,
+          itemType: "unit" | "upgrade",
+          progress: f32,
+          queueDepth: u32
+        }
+      ],
+      unitsLost: [{ kind: string, count: u32, steelValue: u32, oilValue: u32 }],
+      resourcesLost: { steel: u32, oil: u32 }
+    }
+  ]
+}
+```
+`players` lists every active replay player. `units` is the current living unit inventory by kind.
+`production` has one row for each owned building with a non-empty unit or research queue; `progress`
+is the front item's completion fraction and `queueDepth` is that queue's total item count.
+`steelValue` and `oilValue` are aggregate row values (`count * configured cost`), not per-unit
+costs. `unitsLost` is the authoritative unit-death count by kind. `resourcesLost` is intentionally
+narrow: the spent steel/oil value of units that died, matching `unitsLost`; it does not include
+buildings, current spending, cancelled production, refunds, harvesting, or stockpile deltas.
+
+Replay analysis uses an all-player spectator policy independent of each viewer's replay vision
+selection. It is replay-only data for analysis overlays, not a live-player information surface.
+The server recomputes the payload from the current authoritative replay `Game` state after normal
+playback ticks and after `ReplaySession::rebuild_to()` restores a keyframe and fast-forwards to the
+target tick. Analysis state is not serialized separately in `ReplayKeyframe`.
 
 ---
