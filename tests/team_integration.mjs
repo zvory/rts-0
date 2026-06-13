@@ -4,6 +4,7 @@ import {
   addAiToTeam,
   assertCountdownProtocol,
   assertLobbyProtocol,
+  assertScoreProtocol,
   assertStartProtocol,
   closeClients,
   connectClient,
@@ -14,6 +15,7 @@ import {
   startMatch,
   startMatchDirect,
   uniqueRoom,
+  waitForGameOver,
 } from "./team_harness.mjs";
 
 const assertions = createAssertions();
@@ -126,6 +128,39 @@ async function alliedAttackTargetCommandIsIgnored() {
   closeClients(A, B);
 }
 
+async function twoVsTwoResolvesByTeam() {
+  const room = uniqueRoom("team-victory");
+  const A = await joinNamed("victory-A", room, "Alpha");
+  const B = await joinNamed("victory-B", room, "Bravo");
+  const C = await joinNamed("victory-C", room, "Charlie");
+  const D = await joinNamed("victory-D", room, "Delta");
+  await A.waitFor((msg) => msg.t === "lobby" && msg.players.length === 4, 3000, "team victory lobby");
+  await setTeamPreset(A, "2v2");
+  await readyPlayers([A, B, C, D]);
+  await startMatch(A, [A, B, C, D]);
+
+  B.send({ t: "giveUp" });
+  await sleep(500);
+  ok(!B.msgs.some((msg) => msg.t === "gameOver"),
+    "2v2: defeated player on living team does not receive early gameOver");
+
+  C.send({ t: "giveUp" });
+  await sleep(300);
+  ok(!C.msgs.some((msg) => msg.t === "gameOver"),
+    "2v2: first defeated player on enemy team waits until the whole team is defeated");
+
+  D.send({ t: "giveUp" });
+  const overs = await waitForGameOver([A, B, C, D], { timeoutMs: 5000 });
+  for (const over of overs) assertScoreProtocol(ok, over, { expectedPlayers: 4 });
+  ok(overs.every((over) => over.winnerTeamId === 1),
+    `2v2: final gameOver carries winning team id 1 (${overs.map((over) => over.winnerTeamId).join(",")})`);
+  ok(overs[0].winnerId === A.playerId,
+    `2v2: winnerId compatibility uses first living winning seat (${overs[0].winnerId}/${A.playerId})`);
+  ok(overs[0].you === "won" && overs[1].you === "won" && overs[2].you === "lost" && overs[3].you === "lost",
+    `2v2: teammates share final verdicts (${overs.map((over) => over.you).join(",")})`);
+  closeClients(A, B, C, D);
+}
+
 async function hostOnlyAndInvalidMutationsAreIgnored() {
   const room = uniqueRoom("team-invalid");
   const A = await joinNamed("invalid-A", room, "Alpha");
@@ -179,6 +214,7 @@ async function main() {
   await assertPresetStarts({ preset: "1v3", aiTeams: [2, 2, 2], expectedTeams: [1, 2, 2, 2] });
   await twoVsTwoStartsWithHumanAndAis();
   await alliedAttackTargetCommandIsIgnored();
+  await twoVsTwoResolvesByTeam();
   await hostOnlyAndInvalidMutationsAreIgnored();
 
   await sleep(200);

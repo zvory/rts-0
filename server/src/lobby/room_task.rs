@@ -1755,26 +1755,19 @@ impl RoomTask {
         crate::log_debug!(room = %self.room, player_id, "player gave up");
         game.eliminate(seat_id);
         let alive = game.alive_players();
+        let alive_teams = game.alive_team_ids();
         let scores = game.scores();
 
-        if self.match_player_count >= 2 && alive.len() <= 1 {
-            self.end_match(alive.first().copied(), scores, Some(&game));
+        if self.match_player_count >= 2 && alive_teams.len() <= 1 {
+            let winner_id = alive_teams
+                .first()
+                .and_then(|team_id| game.first_alive_player_on_team(*team_id));
+            self.end_match(winner_id, scores, Some(&game));
             return;
         }
 
-        if let Some(player) = self.players.get(&player_id) {
-            send_or_log(
-                &self.room,
-                player_id,
-                &player.msg_tx,
-                ServerMessage::GameOver {
-                    winner_id: None,
-                    winner_team_id: None,
-                    you: "lost".to_string(),
-                    scores,
-                },
-            );
-            self.outcome_sent.insert(player_id);
+        if self.match_player_count >= 2 {
+            self.send_new_defeats(&game, &alive);
         }
 
         if self.match_player_count < 2 {
@@ -2759,12 +2752,16 @@ impl RoomTask {
         // Check for game over. A 1-player match never ends (sandbox/exploration mode).
         let outcome_start = StdInstant::now();
         let alive = game.alive_players();
-        if self.match_player_count >= 2 && alive.len() <= 1 {
+        let alive_teams = game.alive_team_ids();
+        if self.match_player_count >= 2 && alive_teams.len() <= 1 {
             if let Some(perf) = perf.as_mut() {
                 perf.record_phase("outcome_checks", outcome_start.elapsed());
             }
             self.finish_perf_tick(perf.as_ref(), &game, scheduler_lag, tick_start);
-            self.end_match(alive.first().copied(), game.scores(), Some(&game));
+            let winner_id = alive_teams
+                .first()
+                .and_then(|team_id| game.first_alive_player_on_team(*team_id));
+            self.end_match(winner_id, game.scores(), Some(&game));
             // end_match drops the live game and moves to replay or lobby; do not restore it.
             return;
         }
@@ -3264,7 +3261,9 @@ impl RoomTask {
                 self.live_connection_is_player(*id)
                     && self
                         .live_seat_id_for_connection(*id)
-                        .map(|seat_id| !alive.contains(&seat_id))
+                        .map(|seat_id| {
+                            !alive.contains(&seat_id) && !game.team_has_alive_player(seat_id)
+                        })
                         .unwrap_or(false)
                     && !self.outcome_sent.contains(id)
             })
@@ -3292,17 +3291,25 @@ impl RoomTask {
         }
     }
 
-    /// Resolve a finished match: tell everyone who won and start post-match replay playback.
-    fn end_match(&mut self, winner_id: Option<u32>, scores: Vec<PlayerScore>, game: Option<&Game>) {
-        let winner_team_id = winner_id.and_then(|id| {
-            game.and_then(|game| game.team_of_player(id)).or_else(|| {
+    fn team_id_for_score_seat(
+        game: Option<&Game>,
+        scores: &[PlayerScore],
+        seat_id: u32,
+    ) -> Option<TeamId> {
+        game.and_then(|game| game.team_of_player(seat_id))
+            .or_else(|| {
                 scores
                     .iter()
-                    .find(|score| score.id == id)
+                    .find(|score| score.id == seat_id)
                     .map(|score| score.team_id)
                     .filter(|team_id| *team_id != 0)
             })
-        });
+    }
+
+    /// Resolve a finished match: tell everyone who won and start post-match replay playback.
+    fn end_match(&mut self, winner_id: Option<u32>, scores: Vec<PlayerScore>, game: Option<&Game>) {
+        let winner_team_id =
+            winner_id.and_then(|id| Self::team_id_for_score_seat(game, &scores, id));
         let ended_at = chrono::Utc::now();
         let duration_ms = self.match_started_at.map(|started_at| {
             ended_at
@@ -3392,10 +3399,13 @@ impl RoomTask {
                 "draw"
             } else {
                 let seat_id = self.live_seat_id_for_connection(*id).unwrap_or(*id);
-                match winner_id {
-                    Some(w) if w == seat_id => "won",
-                    Some(_) => "lost",
-                    None => "draw",
+                let seat_team_id = Self::team_id_for_score_seat(game, &scores, seat_id);
+                match (winner_team_id, winner_id) {
+                    (Some(winner_team_id), _) if seat_team_id == Some(winner_team_id) => "won",
+                    (Some(_), _) => "lost",
+                    (None, Some(winner_id)) if winner_id == seat_id => "won",
+                    (None, Some(_)) => "lost",
+                    (None, None) => "draw",
                 }
             }
             .to_string();

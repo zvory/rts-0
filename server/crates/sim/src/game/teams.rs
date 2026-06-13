@@ -56,6 +56,35 @@ impl TeamRelations {
 }
 
 impl Game {
+    pub fn alive_team_ids(&self) -> Vec<TeamId> {
+        let mut teams = Vec::new();
+        for player_id in self.alive_players() {
+            let Some(team_id) = self.team_of_player(player_id) else {
+                continue;
+            };
+            if team_id != 0 && !teams.contains(&team_id) {
+                teams.push(team_id);
+            }
+        }
+        teams
+    }
+
+    pub fn first_alive_player_on_team(&self, team_id: TeamId) -> Option<u32> {
+        if team_id == 0 {
+            return None;
+        }
+        self.alive_players()
+            .into_iter()
+            .find(|player_id| self.team_of_player(*player_id) == Some(team_id))
+    }
+
+    pub fn team_has_alive_player(&self, player_id: u32) -> bool {
+        let Some(team_id) = self.team_of_player(player_id) else {
+            return false;
+        };
+        self.first_alive_player_on_team(team_id).is_some()
+    }
+
     pub fn team_of_player(&self, player_id: u32) -> Option<TeamId> {
         self.players
             .iter()
@@ -162,5 +191,41 @@ mod tests {
         assert!(!game.is_enemy_player(1, 2));
         assert!(game.is_enemy_player(1, 3));
         assert_eq!(game.allied_player_ids(1), vec![2]);
+    }
+
+    #[test]
+    fn alive_team_helpers_follow_living_team_members() {
+        let players = [
+            PlayerInit {
+                id: 1,
+                team_id: 7,
+                name: "Alpha".to_string(),
+                color: "#4878c8".to_string(),
+                is_ai: false,
+            },
+            PlayerInit {
+                id: 2,
+                team_id: 7,
+                name: "Bravo".to_string(),
+                color: "#c84848".to_string(),
+                is_ai: false,
+            },
+            PlayerInit {
+                id: 3,
+                team_id: 3,
+                name: "Charlie".to_string(),
+                color: "#48a868".to_string(),
+                is_ai: false,
+            },
+        ];
+        let mut game = Game::new_for_replay(&players, 0x7E_AC);
+        game.eliminate(1);
+        assert_eq!(game.alive_team_ids(), vec![7, 3]);
+        assert_eq!(game.first_alive_player_on_team(7), Some(2));
+        assert!(game.team_has_alive_player(1));
+
+        game.eliminate(2);
+        assert_eq!(game.alive_team_ids(), vec![3]);
+        assert!(!game.team_has_alive_player(1));
     }
 }
