@@ -7,12 +7,14 @@ fn players() -> [PlayerInit; 2] {
     [
         PlayerInit {
             id: 1,
+            team_id: 1,
             name: "One".into(),
             color: "#fff".into(),
             is_ai: false,
         },
         PlayerInit {
             id: 2,
+            team_id: 2,
             name: "Two".into(),
             color: "#000".into(),
             is_ai: true,

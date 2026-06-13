@@ -164,12 +164,14 @@ pub fn run_profile_matchup_result(
     let players = vec![
         PlayerInit {
             id: 1,
+            team_id: 1,
             name: profile_a.id.to_string(),
             color: "#4cc9f0".to_string(),
             is_ai: true,
         },
         PlayerInit {
             id: 2,
+            team_id: 2,
             name: profile_b.id.to_string(),
             color: "#f72585".to_string(),
             is_ai: true,

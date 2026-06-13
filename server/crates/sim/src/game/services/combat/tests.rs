@@ -49,6 +49,7 @@ fn visible_fog(map: &Map, entities: &EntityStore) -> Fog {
 fn player_state(id: u32, is_ai: bool) -> PlayerState {
     PlayerState {
         id,
+        team_id: id,
         name: format!("Player {id}"),
         color: "#fff".to_string(),
         start_tile: (4, 4),

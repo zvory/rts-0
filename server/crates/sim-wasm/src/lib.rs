@@ -760,6 +760,7 @@ mod tests {
             players: vec![
                 PlayerStart {
                     id: 1,
+                    team_id: 1,
                     name: "A".to_string(),
                     color: "#f00".to_string(),
                     start_tile_x: 5,
@@ -767,6 +768,7 @@ mod tests {
                 },
                 PlayerStart {
                     id: 2,
+                    team_id: 2,
                     name: "B".to_string(),
                     color: "#00f".to_string(),
                     start_tile_x: 50,

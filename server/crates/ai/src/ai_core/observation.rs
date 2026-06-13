@@ -333,6 +333,7 @@ mod tests {
             players: vec![
                 PlayerStart {
                     id: 2,
+                    team_id: 2,
                     name: "Bravo".into(),
                     color: "#222".into(),
                     start_tile_x: 48,
@@ -340,6 +341,7 @@ mod tests {
                 },
                 PlayerStart {
                     id: 1,
+                    team_id: 1,
                     name: "Alpha".into(),
                     color: "#111".into(),
                     start_tile_x: 8,

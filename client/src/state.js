@@ -50,15 +50,17 @@ export class GameState {
     /** @type {object} the full §2.3 start payload, kept for reference. */
     this.startInfo = startInfo;
     /** @type {{width:number,height:number,tileSize:number,terrain:number[]}} */
-    this.map = startInfo.map;
-    this.map.resources = (this.map.resources || []).map((node, index) =>
-      this._normalizeResource(node, index),
-    );
+    this.map = {
+      ...startInfo.map,
+      resources: (startInfo.map?.resources || []).map((node, index) =>
+        this._normalizeResource(node, index),
+      ),
+    };
     /** @type {Map<number, object>} id -> static resource node with last-known remaining. */
     this.resourceById = new Map();
     for (const node of this.map.resources) this.resourceById.set(node.id, node);
-    /** @type {Array<{id:number,name:string,color:string,startTileX:number,startTileY:number}>} */
-    this.players = startInfo.players || [];
+    /** @type {Array<{id:number,teamId:number,name:string,color:string,startTileX:number,startTileY:number}>} */
+    this.players = (startInfo.players || []).map((player) => this._normalizePlayer(player));
 
     // --- snapshot buffering for interpolation ---
     /** @type {object|null} previous snapshot (older of the two we keep). */
@@ -165,6 +167,40 @@ export class GameState {
   /** World pixels per tile. */
   get tileSize() {
     return this.map.tileSize;
+  }
+
+  playerById(id) {
+    const playerId = Number(id);
+    return this.players.find((player) => player.id === playerId) || null;
+  }
+
+  teamIdForPlayer(id) {
+    const player = this.playerById(id);
+    return player ? player.teamId : null;
+  }
+
+  isOwnOwner(owner) {
+    return Number(owner) === this.playerId;
+  }
+
+  isAllyOwner(owner) {
+    const ownerId = Number(owner);
+    if (!Number.isInteger(ownerId) || ownerId === 0 || ownerId === this.playerId) return false;
+    const ownTeam = this.teamIdForPlayer(this.playerId);
+    const ownerTeam = this.teamIdForPlayer(ownerId);
+    return ownTeam != null && ownerTeam != null && ownTeam !== 0 && ownTeam === ownerTeam;
+  }
+
+  isEnemyOwner(owner) {
+    const ownerId = Number(owner);
+    if (!Number.isInteger(ownerId) || ownerId === 0 || ownerId === this.playerId) return false;
+    const ownTeam = this.teamIdForPlayer(this.playerId);
+    const ownerTeam = this.teamIdForPlayer(ownerId);
+    return ownTeam != null && ownerTeam != null && ownTeam !== ownerTeam;
+  }
+
+  isNeutralOwner(owner) {
+    return Number(owner) === 0;
   }
 
   /**
@@ -1179,6 +1215,16 @@ export class GameState {
     const terrain = this.terrainAt(tileX, tileY);
     if (terrain == null) return false;
     return !!PASSABLE[terrain];
+  }
+
+  _normalizePlayer(player) {
+    const id = Number(player?.id) >>> 0;
+    const rawTeamId = Number(player?.teamId);
+    return {
+      ...player,
+      id,
+      teamId: Number.isInteger(rawTeamId) && rawTeamId > 0 ? rawTeamId >>> 0 : id,
+    };
   }
 }
 

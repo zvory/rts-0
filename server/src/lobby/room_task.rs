@@ -317,6 +317,7 @@ impl BranchStagingState {
                     claimant_id.and_then(|id| players.get(&id).map(|p| p.name.clone()));
                 BranchStagingSeat {
                     player_id: seat.player_id,
+                    team_id: seat.team_id,
                     name: seat.name.clone(),
                     color: seat.color.clone(),
                     claimant_id,
@@ -505,6 +506,7 @@ impl ReplaySession {
             .iter()
             .map(|player| ReplayBranchSeat {
                 player_id: player.id,
+                team_id: player.team_id,
                 name: player.name.clone(),
                 color: player.color.clone(),
                 claimable: true,
@@ -1471,6 +1473,7 @@ impl RoomTask {
                 &player.msg_tx,
                 ServerMessage::GameOver {
                     winner_id: None,
+                    winner_team_id: None,
                     you: "lost".to_string(),
                     scores,
                 },
@@ -1702,6 +1705,7 @@ impl RoomTask {
             .filter_map(|id| {
                 self.players.get(id).map(|p| LobbyPlayer {
                     id: *id,
+                    team_id: if p.spectator { 0 } else { *id },
                     name: p.name.clone(),
                     ready: p.ready,
                     color: p.color.clone(),
@@ -1713,6 +1717,7 @@ impl RoomTask {
         for (seat, ai) in self.ai_players.iter().enumerate() {
             players.push(LobbyPlayer {
                 id: ai.id,
+                team_id: ai.id,
                 name: ai.name.clone(),
                 ready: true,
                 color: Self::ai_color(seat),
@@ -1786,6 +1791,7 @@ impl RoomTask {
             .filter_map(|id| {
                 self.players.get(&id).map(|p| PlayerInit {
                     id,
+                    team_id: id,
                     name: p.name.clone(),
                     color: p.color.clone(),
                     is_ai: false,
@@ -1797,6 +1803,7 @@ impl RoomTask {
         for (seat, ai) in self.ai_players.iter().enumerate() {
             inits.push(PlayerInit {
                 id: ai.id,
+                team_id: ai.id,
                 name: ai.name.clone(),
                 color: Self::ai_color(seat),
                 is_ai: true,
@@ -2974,6 +2981,7 @@ impl RoomTask {
                 &player.msg_tx,
                 ServerMessage::GameOver {
                     winner_id: None,
+                    winner_team_id: None,
                     you: "lost".to_string(),
                     scores: scores.clone(),
                 },
@@ -2984,6 +2992,15 @@ impl RoomTask {
 
     /// Resolve a finished match: tell everyone who won and start post-match replay playback.
     fn end_match(&mut self, winner_id: Option<u32>, scores: Vec<PlayerScore>, game: Option<&Game>) {
+        let winner_team_id = winner_id.and_then(|id| {
+            game.and_then(|game| game.team_of_player(id)).or_else(|| {
+                scores
+                    .iter()
+                    .find(|score| score.id == id)
+                    .map(|score| score.team_id)
+                    .filter(|team_id| *team_id != 0)
+            })
+        });
         let ended_at = chrono::Utc::now();
         let duration_ms = self.match_started_at.map(|started_at| {
             ended_at
@@ -3086,6 +3103,7 @@ impl RoomTask {
                 &player.msg_tx,
                 ServerMessage::GameOver {
                     winner_id,
+                    winner_team_id,
                     you,
                     scores: scores.clone(),
                 },
@@ -3315,6 +3333,7 @@ mod tests {
         (1..=count as u32)
             .map(|id| PlayerInit {
                 id,
+                team_id: id,
                 name: format!("Player {id}"),
                 color: PLAYER_PALETTE[(id as usize - 1) % PLAYER_PALETTE.len()].to_string(),
                 is_ai: false,
@@ -3985,6 +4004,7 @@ mod tests {
             12,
             vec![ReplayBranchSeat {
                 player_id: players[0].id,
+                team_id: players[0].team_id,
                 name: players[0].name.clone(),
                 color: players[0].color.clone(),
                 claimable: true,

@@ -4387,6 +4387,7 @@ mod tests {
     fn player_state(id: u32) -> PlayerState {
         PlayerState {
             id,
+            team_id: id,
             name: format!("Player {id}"),
             color: "#fff".to_string(),
             start_tile: (0, 0),

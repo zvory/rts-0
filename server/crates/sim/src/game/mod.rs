@@ -27,6 +27,7 @@ mod setup;
 pub(crate) mod smoke;
 mod snapshot;
 mod systems;
+pub mod teams;
 pub mod upgrade;
 
 use std::collections::{BTreeSet, HashMap};
@@ -53,6 +54,7 @@ pub(crate) use setup::StartingLoadout;
 use smoke::SmokeCloudStore;
 
 pub use crate::game::command::SimCommand;
+pub use teams::TeamId;
 
 const AI_WORKER_RETREAT_TILES: f32 = 5.0;
 
@@ -60,6 +62,8 @@ const AI_WORKER_RETREAT_TILES: f32 = 5.0;
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct PlayerInit {
     pub id: u32,
+    #[serde(default)]
+    pub team_id: TeamId,
     pub name: String,
     pub color: String,
     /// When true this player is a computer opponent: it has no socket and is driven by the
@@ -72,6 +76,7 @@ pub struct PlayerInit {
 #[derive(Clone)]
 pub(crate) struct PlayerState {
     pub(crate) id: u32,
+    pub(crate) team_id: TeamId,
     pub(crate) name: String,
     pub(crate) color: String,
     pub(crate) start_tile: (u32, u32),
@@ -381,6 +386,7 @@ impl Game {
             .iter()
             .map(|p| PlayerInit {
                 id: p.id,
+                team_id: p.team_id,
                 name: p.name.clone(),
                 color: p.color.clone(),
                 is_ai: p.is_ai,

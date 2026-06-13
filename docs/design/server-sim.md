@@ -124,7 +124,8 @@ impl Game {
     pub fn player_inits(&self) -> Vec<PlayerInit>;
 }
 
-pub struct PlayerInit { pub id: u32, pub name: String, pub color: String, pub is_ai: bool }
+pub type TeamId = u32;
+pub struct PlayerInit { pub id: u32, pub team_id: TeamId, pub name: String, pub color: String, pub is_ai: bool }
 pub struct CommandLogEntry { pub tick: u32, pub player_id: u32, pub command: Command }
 ```
 `SimCommand` is the internal command enum from `game::command`; live `ClientMessage::Command`
@@ -140,6 +141,13 @@ respect (they get a start position, City Centre, workers, economy, and count tow
 win/elimination); the only difference is they have no socket. `Game` does not own AI controllers;
 the room task or tool harness asks `rts-ai` controllers for ordinary `SimCommand`s and enqueues
 them through this API before ticking — see §8.
+
+`PlayerInit.team_id` is canonical team identity. Phase 1 preserves FFA gameplay by assigning each
+seated player a unique nonzero team by default; deserialized or hand-built fixtures with
+`team_id == 0` are normalized to `team_id = id` when constructing a `Game`. Relationship helpers
+on `Game` are available for future team-aware systems: `team_of_player`, `same_team_player`,
+`same_team_owner`, `is_enemy_player`, `is_enemy_owner`, and `allied_player_ids`. Neutral owner `0`
+is never allied with a player.
 
 ### 3.2 Concurrency model
 - One tokio task per **room** owns its `Game` and runs the tick loop (`tokio::time::interval`).

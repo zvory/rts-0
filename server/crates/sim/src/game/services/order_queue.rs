@@ -719,6 +719,7 @@ mod tests {
     fn player_state(id: u32) -> PlayerState {
         PlayerState {
             id,
+            team_id: id,
             name: format!("Player {id}"),
             color: "#fff".to_string(),
             start_tile: (0, 0),
@@ -750,6 +751,7 @@ mod tests {
             .iter()
             .map(|p| PlayerState {
                 id: p.id,
+                team_id: p.id,
                 name: p.name.clone(),
                 color: p.color.clone(),
                 start_tile: p.start_tile,

@@ -177,6 +177,7 @@ export function assertLobbyProtocol(ok, lobby, { expectedPlayers, hostId } = {})
   ok(lobby.maps.some((map) => map.name === lobby.map), `LOBBY: selected map is present (${lobby.map})`);
   for (const player of lobby.players) {
     ok(typeof player.id === "number", `LOBBY: player id is numeric (${player.name}/${player.id})`);
+    ok(typeof player.teamId === "number", `LOBBY: teamId is numeric for ${player.name} (${player.teamId})`);
     ok(typeof player.name === "string" && player.name.length > 0, `LOBBY: player has name (${player.name})`);
     ok(/^#/.test(player.color), `LOBBY: player has hex color (${player.color})`);
     ok(typeof player.ready === "boolean", `LOBBY: ready is boolean for ${player.name}`);
@@ -203,6 +204,8 @@ export function assertStartProtocol(ok, start, { playerId, expectedPlayers, spec
   if (expectedPlayers != null) ok(start.players.length === expectedPlayers, `START: lists ${expectedPlayers} active players`);
   for (const player of start.players || []) {
     ok(typeof player.id === "number", `START: player id is numeric (${player.id})`);
+    ok(typeof player.teamId === "number" && player.teamId > 0,
+      `START: player teamId is nonzero (${player.teamId})`);
     ok(typeof player.name === "string" && player.name.length > 0, `START: player has name (${player.name})`);
     ok(/^#/.test(player.color), `START: player has hex color (${player.color})`);
     ok(Number.isInteger(player.startTileX) && Number.isInteger(player.startTileY),
@@ -224,11 +227,15 @@ export function assertDistinctStartTiles(ok, start) {
 
 export function assertScoreProtocol(ok, gameOver, { expectedPlayers } = {}) {
   ok(gameOver?.t === "gameOver", "SCORE: gameOver message has stable tag");
+  ok(gameOver.winnerTeamId == null || typeof gameOver.winnerTeamId === "number",
+    `SCORE: winnerTeamId is nullable numeric (${gameOver.winnerTeamId})`);
   ok(["won", "lost", "draw"].includes(gameOver.you), `SCORE: result verdict is stable (${gameOver.you})`);
   ok(Array.isArray(gameOver.scores), `SCORE: scores is an array (${gameOver.scores?.length})`);
   if (expectedPlayers != null) ok(gameOver.scores.length === expectedPlayers, `SCORE: lists ${expectedPlayers} players`);
   for (const score of gameOver.scores || []) {
     ok(typeof score.id === "number", `SCORE: player id is numeric (${score.id})`);
+    ok(typeof score.teamId === "number" && score.teamId > 0,
+      `SCORE: player teamId is nonzero for ${score.name} (${score.teamId})`);
     ok(typeof score.name === "string" && score.name.length > 0, `SCORE: player has name (${score.name})`);
     ok(typeof score.unitScore === "number", `SCORE: unitScore is numeric for ${score.name}`);
     ok(typeof score.structureScore === "number", `SCORE: structureScore is numeric for ${score.name}`);

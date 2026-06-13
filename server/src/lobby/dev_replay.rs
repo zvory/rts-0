@@ -110,6 +110,7 @@ mod tests {
     fn test_players() -> Vec<PlayerInit> {
         vec![PlayerInit {
             id: 1,
+            team_id: 1,
             name: "Loader".to_string(),
             color: "#ffffff".to_string(),
             is_ai: false,

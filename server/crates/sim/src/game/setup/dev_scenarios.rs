@@ -288,6 +288,7 @@ fn build_dev_scenario_game(
 ) -> Game {
     let players = [PlayerInit {
         id: player_id,
+        team_id: player_id,
         name: "Scenario".to_string(),
         color: "#4878c8".to_string(),
         is_ai: false,

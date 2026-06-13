@@ -3344,6 +3344,8 @@ function fakeAudioContext() {
     },
     players: [
       { id: 1, name: "A", color: "#ff0000", startTileX: 1, startTileY: 1 },
+      { id: 2, teamId: 7, name: "B", color: "#00ff00", startTileX: 2, startTileY: 2 },
+      { id: 3, teamId: 7, name: "C", color: "#0000ff", startTileX: 3, startTileY: 3 },
     ],
   };
   const state = new GameState(start);
@@ -3356,6 +3358,15 @@ function fakeAudioContext() {
   assert(state.resourceById.get(200).remaining === 1000, "steel defaults to full known amount");
   assert(state.resourceById.get(201).remaining === 3333, "oil defaults to full known amount");
   assert(Array.isArray(state.players), "GameState.players");
+  assert(state.playerById(1)?.teamId === 1, "GameState defaults missing teamId to singleton FFA");
+  assert(state.teamIdForPlayer(2) === 7, "GameState.teamIdForPlayer returns explicit team");
+  assert(state.isOwnOwner(1), "GameState.isOwnOwner detects local owner");
+  assert(state.isAllyOwner(2) === false, "GameState.isAllyOwner treats singleton FFA as non-allied");
+  assert(state.isEnemyOwner(2), "GameState.isEnemyOwner detects another team");
+  assert(state.isNeutralOwner(0), "GameState.isNeutralOwner detects neutral owner");
+  const allyState = new GameState({ ...start, playerId: 2 });
+  assert(allyState.isAllyOwner(3), "GameState.isAllyOwner detects shared team");
+  assert(!allyState.isEnemyOwner(3), "GameState.isEnemyOwner excludes shared team");
   assertHasMethod(state, "applySnapshot", "GameState");
   assertHasMethod(state, "entitiesInterpolated", "GameState");
   assertHasGetter(state, "prevRecvTime", "GameState");
