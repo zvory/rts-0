@@ -370,10 +370,7 @@ fn decide(
     )
 }
 
-fn trace_goal(
-    decision: &AiDecision,
-    goal: trace::StrategicGoal,
-) -> &trace::GoalTrace {
+fn trace_goal(decision: &AiDecision, goal: trace::StrategicGoal) -> &trace::GoalTrace {
     decision
         .trace
         .goals
@@ -457,16 +454,12 @@ fn supply_goal_reports_depot_budget_blocker_when_capped() {
         &mut AiDecisionMemory::for_profile(&RIFLE_FLOOD_FULL_SATURATION),
     );
 
-    assert!(
-        trace_goal(&decision, trace::StrategicGoal::Supply)
-            .blockers
-            .contains(&trace::GoalBlocker::BudgetSteel)
-    );
-    assert!(
-        trace_goal(&decision, trace::StrategicGoal::Production)
-            .blockers
-            .contains(&trace::GoalBlocker::SupplyCap)
-    );
+    assert!(trace_goal(&decision, trace::StrategicGoal::Supply)
+        .blockers
+        .contains(&trace::GoalBlocker::BudgetSteel));
+    assert!(trace_goal(&decision, trace::StrategicGoal::Production)
+        .blockers
+        .contains(&trace::GoalBlocker::SupplyCap));
 }
 
 #[test]
@@ -525,13 +518,11 @@ fn expansion_trace_reports_no_valid_site_when_all_sites_are_blocked() {
         |_, _, _| false,
     );
 
-    assert!(
-        trace_goal(&decision, trace::StrategicGoal::Expansion)
-            .blockers
-            .contains(&trace::GoalBlocker::MissingPrerequisite(
-                "no_expansion_site"
-            ))
-    );
+    assert!(trace_goal(&decision, trace::StrategicGoal::Expansion)
+        .blockers
+        .contains(&trace::GoalBlocker::MissingPrerequisite(
+            "no_expansion_site"
+        )));
 }
 
 #[test]
@@ -580,14 +571,12 @@ fn manager_trace_formats_goals_and_blockers_deterministically() {
     );
     assert_eq!(
         trace_goal(&first, trace::StrategicGoal::FrontalAttack).blockers,
-        vec![trace::GoalBlocker::NoReadyUnits]
+        vec![trace::GoalBlocker::WaitingForUnits]
     );
-    assert!(
-        first
-            .trace
-            .format_compact()
-            .contains("goal=FrontalAttack status=Skipped blockers=NoReadyUnits")
-    );
+    assert!(first
+        .trace
+        .format_compact()
+        .contains("goal=FrontalAttack status=Skipped blockers=WaitingForUnits"));
 }
 
 #[test]
@@ -613,21 +602,19 @@ fn manager_trace_records_emitted_command_labels() {
     );
 
     assert_eq!(decision.trace.commands.len(), decision.commands.len());
-    assert!(decision.trace.commands.iter().any(|entry| {
-        entry.starts_with("train building=1 unit=Worker")
-    }));
-    assert!(
-        trace_goal(&decision, trace::StrategicGoal::Economy)
-            .intents
-            .iter()
-            .any(|intent| intent == "train:Worker")
-    );
-    assert!(
-        decision
-            .trace
-            .format_compact()
-            .contains("command=train building=1 unit=Worker")
-    );
+    assert!(decision
+        .trace
+        .commands
+        .iter()
+        .any(|entry| { entry.starts_with("train building=1 unit=Worker") }));
+    assert!(trace_goal(&decision, trace::StrategicGoal::Economy)
+        .intents
+        .iter()
+        .any(|intent| intent == "train:Worker"));
+    assert!(decision
+        .trace
+        .format_compact()
+        .contains("command=train building=1 unit=Worker"));
 }
 
 fn enemy_start_tile(observation: &AiObservation) -> (u32, u32) {
@@ -1240,7 +1227,7 @@ fn ai_1_0_saves_for_tank_tech_and_uses_scout_cars_while_blocked() {
         vec![
             building(10, EntityKind::CityCentre, Some(0)),
             building(11, EntityKind::Barracks, Some(0)),
-            building(12, EntityKind::TrainingCentre, None),
+            building(12, EntityKind::TrainingCentre, Some(0)),
             building(13, EntityKind::ResearchComplex, Some(0)),
             building(14, EntityKind::Factory, Some(0)),
         ],
@@ -1251,6 +1238,9 @@ fn ai_1_0_saves_for_tank_tech_and_uses_scout_cars_while_blocked() {
 
     assert!(decision.intents.contains(&AiIntent::Research {
         upgrade: UpgradeKind::TankUnlock
+    }));
+    assert!(decision.intents.contains(&AiIntent::Research {
+        upgrade: UpgradeKind::Methamphetamines
     }));
     assert!(decision.intents.contains(&AiIntent::Train {
         kind: EntityKind::ScoutCar
@@ -1269,10 +1259,24 @@ fn ai_1_0_saves_for_tank_tech_and_uses_scout_cars_while_blocked() {
         &mut AiDecisionMemory::for_profile(&AI_1_0_TECH),
     );
 
-    assert!(unlocked.intents.contains(&AiIntent::Train {
+    assert!(!unlocked.intents.contains(&AiIntent::Train {
         kind: EntityKind::Tank
     }));
-    assert!(!unlocked.intents.contains(&AiIntent::Train {
+    assert!(unlocked.intents.contains(&AiIntent::Train {
+        kind: EntityKind::ScoutCar
+    }));
+
+    observation.upgrades.push(UpgradeKind::Methamphetamines);
+    let meth_unlocked = decide(
+        &observation,
+        &AI_1_0_TECH,
+        &mut AiDecisionMemory::for_profile(&AI_1_0_TECH),
+    );
+
+    assert!(meth_unlocked.intents.contains(&AiIntent::Train {
+        kind: EntityKind::Tank
+    }));
+    assert!(!meth_unlocked.intents.contains(&AiIntent::Train {
         kind: EntityKind::ScoutCar
     }));
 }
@@ -2495,6 +2499,7 @@ fn steel_expansion_tanks_trains_only_tanks_after_fifty_supply() {
         ],
     ));
     observation.upgrades.push(UpgradeKind::TankUnlock);
+    observation.upgrades.push(UpgradeKind::Methamphetamines);
 
     let decision = decide(
         &observation,
@@ -2532,6 +2537,8 @@ fn steel_expansion_tanks_attacks_with_three_or_more_tanks_after_transition() {
             combat(31, EntityKind::Tank),
         ],
     ));
+    let mut two_tanks = two_tanks;
+    two_tanks.upgrades.push(UpgradeKind::Methamphetamines);
     let two_tank_decision = decide(
         &two_tanks,
         &STEEL_EXPANSION_TANKS,
@@ -2566,6 +2573,8 @@ fn steel_expansion_tanks_attacks_with_three_or_more_tanks_after_transition() {
             combat(41, EntityKind::AntiTankGun),
         ],
     ));
+    let mut three_tanks = three_tanks;
+    three_tanks.upgrades.push(UpgradeKind::Methamphetamines);
     let three_tank_decision = decide(
         &three_tanks,
         &STEEL_EXPANSION_TANKS,
@@ -2586,6 +2595,86 @@ fn steel_expansion_tanks_attacks_with_three_or_more_tanks_after_transition() {
             )
         }),
         "three ready tanks should attack as a group"
+    );
+}
+
+#[test]
+fn tank_wave_waits_for_methamphetamines_before_attacking() {
+    let observation = with_expansion_resources(observation(
+        AiEconomy {
+            steel: 0,
+            oil: 0,
+            supply_used: 50,
+            supply_cap: 130,
+        },
+        vec![
+            building(10, EntityKind::CityCentre, Some(0)),
+            building(11, EntityKind::CityCentre, Some(0)),
+            building(12, EntityKind::Barracks, Some(0)),
+            building(13, EntityKind::TrainingCentre, None),
+            building(14, EntityKind::Factory, Some(0)),
+            combat(30, EntityKind::Tank),
+            combat(31, EntityKind::Tank),
+            combat(32, EntityKind::Tank),
+        ],
+    ));
+
+    let decision = decide(
+        &observation,
+        &STEEL_EXPANSION_TANKS,
+        &mut AiDecisionMemory::for_profile(&STEEL_EXPANSION_TANKS),
+    );
+
+    assert!(
+        !decision
+            .intents
+            .iter()
+            .any(|intent| matches!(intent, AiIntent::Attack { .. })),
+        "tank frontal waves should not launch before Methamphetamines"
+    );
+    assert_eq!(
+        trace_goal(&decision, trace::StrategicGoal::FrontalAttack).blockers,
+        vec![
+            trace::GoalBlocker::WaitingForMethamphetamines,
+            trace::GoalBlocker::Staging,
+        ]
+    );
+    assert!(decision.intents.iter().any(|intent| {
+        matches!(
+            intent,
+            AiIntent::Stage { units } if units.as_slice() == [30, 31, 32]
+        )
+    }));
+}
+
+#[test]
+fn frontal_wave_readiness_reports_required_tank_gate() {
+    let mut owned = vec![building(10, EntityKind::CityCentre, Some(0))];
+    owned.extend((0..6).map(|i| combat(30 + i, EntityKind::Rifleman)));
+    let observation = observation(
+        AiEconomy {
+            steel: 0,
+            oil: 0,
+            supply_used: 6,
+            supply_cap: 20,
+        },
+        owned,
+    );
+    let mut memory = AiDecisionMemory::for_profile(&TECH_TO_TANKS);
+
+    let plan = frontal::plan_frontal_wave(
+        &observation,
+        TECH_TO_TANKS.attack,
+        &mut memory,
+        &TECH_TO_TANKS,
+    );
+
+    assert_eq!(
+        plan.blockers,
+        vec![
+            frontal::FrontalWaveBlocker::WaitingForTank,
+            frontal::FrontalWaveBlocker::WaitingForMethamphetamines,
+        ]
     );
 }
 
@@ -2679,6 +2768,7 @@ fn full_saturation_trains_tanks_after_tech_transition_completes() {
         ],
     ));
     observation.upgrades.push(UpgradeKind::TankUnlock);
+    observation.upgrades.push(UpgradeKind::Methamphetamines);
 
     let decision = decide(
         &observation,
@@ -2717,6 +2807,7 @@ fn tech_to_tanks_trains_tank_before_spending_barracks_budget() {
         ],
     );
     observation.upgrades.push(UpgradeKind::TankUnlock);
+    observation.upgrades.push(UpgradeKind::Methamphetamines);
 
     let decision = decide(
         &observation,

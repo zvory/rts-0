@@ -46,11 +46,14 @@ ranked decision loop (`decision.rs`) that emits ordinary `SimCommand`s through s
 The decision loop also emits manager traces: every think records typed strategic goals for economy,
 supply, expansion, tech, production, local defense, frontal attack, and harassment, plus stable
 blocker labels, high-level intent labels, command labels emitted through `AiActionContext`, and
-budget/reservation deltas. Economy and expansion now have explicit plan records. The economy plan
-owns worker targets, steel/oil assignment counts, occupied resource nodes, and post-expansion
-local-assignment bounds. The expansion plan owns due/save decisions, tech-blocking state, and
-blocked reasons such as defensive panic, missing prerequisite building, missing defenders, pending
-City Centre, no candidate resources, or no valid site. Final command emission still goes through
+budget/reservation deltas. Economy, expansion, and frontal-wave attack now have explicit plan
+records. The economy plan owns worker targets, steel/oil assignment counts, occupied resource
+nodes, and post-expansion local-assignment bounds. The expansion plan owns due/save decisions,
+tech-blocking state, and blocked reasons such as defensive panic, missing prerequisite building,
+missing defenders, pending City Centre, no candidate resources, or no valid site. The frontal-wave
+plan owns ready combat groups, required-unit readiness, attack reissue cadence, staging, visible
+combat target selection, and blockers such as waiting for units, waiting for a required Tank,
+waiting for Methamphetamines, and cadence. Final command emission still goes through
 `AiActionContext` and `ai_core::actions`.
 The first code-defined profiles are `rifle_flood_fast`, `rifle_flood_full_saturation`,
 `tech_to_tanks`, `steel_expansion_tanks`, and `ai_1_0_tech`; they parameterize worker targets,
@@ -91,12 +94,20 @@ for the Vehicle Works step, delays oil workers until at least eight workers are 
 uses ready combat units to clear visible threats in its home resource line before attacking out,
 and treats a single completed tank as a valid minimum attack wave.
 `ai_1_0_tech` is the selectable AI 1.0 tech spine and is not in the live random profile pool yet. It
-opens with Riflemen, expands off a completed Training Centre, builds Research Complex and Factory
-without adding Machine Gunners, Anti-Tank Guns, Artillery, or Command Cars, produces Scout Cars while
-Tank research is blocked or pending, then prioritizes Tanks once Tank research completes. In the
-Phase 4 bounded sample `ai_1_0_tech` vs `rifle_flood_full_saturation` at seed `1090519044` and
-14,000 ticks, it issued its first Rifleman attack at tick 1703, planned/completed expansion at
-7571/8432, completed its first Scout Car at 9179, and completed its first Tank at 10409.
+opens with four-Rifleman frontal waves, expands off a completed Training Centre, builds Research
+Complex and Factory without adding Machine Gunners, Anti-Tank Guns, Artillery, or Command Cars,
+produces Scout Cars while Tank research or Methamphetamines is blocked or pending, then prioritizes
+Tanks once both Tank research and Methamphetamines complete. Tank frontal waves require a Tank in
+the ready group and Methamphetamines before launch; while waiting, ready Tank groups stage toward
+the enemy instead of dribbling into attack orders. Methamphetamines is enforced before first Tank
+production, not only before Tank attack launch, so Tank production and Tank-wave readiness cannot
+race ahead of the upgrade. In the Phase 4 bounded sample `ai_1_0_tech` vs
+`rifle_flood_full_saturation` at seed `1090519044` and 14,000 ticks, before this Methamphetamine
+gate was added, it issued its first Rifleman attack at tick 1703, planned/completed expansion at
+7571/8432, completed its first Scout Car at 9179, and completed its first Tank at 10409. With the
+Phase 5 gate in the same bounded sample, first Rifleman attack stayed at tick 1703,
+planned/completed expansion stayed at 7571/8432, first Scout Car moved to 9227, and first Tank
+moved to 10457.
 All profiles share a defensive panic mode. Visible enemy units near the AI's base, home resource
 line, or workers temporarily suspend expansion, worker training, and non-defensive tech spending
 only when their steel+oil value is at least 75% of the AI's own local unit value. While panicking,

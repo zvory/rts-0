@@ -24,6 +24,7 @@ use rts_sim::game::upgrade::{self, UpgradeKind};
 
 mod defense;
 mod expansion;
+mod frontal;
 mod geometry;
 mod policies;
 mod production;
@@ -38,9 +39,9 @@ use self::defense::{
     stages_expansion_defensive_line, DefensivePanic, DefensivePanicResponse, ALL_COMBAT_UNITS,
     DEFENSIVE_PANIC_GRACE_TICKS, DEFENSIVE_PANIC_RIFLE_TECH_PATH, DEFENSIVE_PANIC_SUSTAINED_TICKS,
 };
-use self::expansion::{
-    plan_expansion, ExpansionBlocker, try_build_expansion_city_centre,
-};
+use self::expansion::{plan_expansion, try_build_expansion_city_centre, ExpansionBlocker};
+use self::frontal::{issue_frontal_wave, plan_frontal_wave};
+#[cfg(test)]
 use self::geometry::tile_center;
 use self::policies::{
     active_attack_policy, active_barracks_curve, active_production_policy,
@@ -57,14 +58,10 @@ use self::raids::{
     rifle_raid_move_target, rifle_raid_unit_target, rifle_raid_units_to_resume,
     select_rifle_raid_units,
 };
-use self::resources::{
-    plan_economy,
-};
+use self::resources::plan_economy;
 #[cfg(test)]
 use self::resources::{desired_oil_workers, target_steel_workers_for_profile};
 use self::trace::{build_manager_trace, ManagerOutputTrace, TraceInput};
-
-const OUTBOUND_WAVE_VISIBLE_TARGET_RADIUS_TILES: f32 = 14.0;
 
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct AiDecision {
@@ -465,8 +462,26 @@ where
         intents.push(AiIntent::Train { kind: trained.unit });
     }
 
-    let production_unit_counts =
-        unit_counts_for_priorities(observation, &facts, production_policy.unit_priorities);
+    let tank_methamphetamines_pending = production_policy
+        .unit_priorities
+        .contains(&EntityKind::Tank)
+        && !facts
+            .completed_upgrades()
+            .contains(&UpgradeKind::Methamphetamines);
+    if tank_methamphetamines_pending {
+        queue_upgrade_if_available(
+            &mut actions,
+            &facts,
+            memory,
+            &mut intents,
+            UpgradeKind::Methamphetamines,
+        );
+    }
+    let effective_unit_priorities = effective_unit_priorities_for_upgrades(
+        production_policy.unit_priorities,
+        facts.completed_upgrades(),
+    );
+    let effective_unit_priorities = effective_unit_priorities.as_slice();
     queue_required_unit_unlocks(
         &mut actions,
         &facts,
@@ -474,7 +489,9 @@ where
         memory,
         &mut intents,
     );
-    for building_kind in production_building_order(production_policy.unit_priorities) {
+    let production_unit_counts =
+        unit_counts_for_priorities(observation, &facts, effective_unit_priorities);
+    for building_kind in production_building_order(effective_unit_priorities) {
         let buildings = facts.production_buildings(building_kind);
         if buildings.is_empty() {
             continue;
@@ -490,7 +507,7 @@ where
             &mut actions,
             TrainUnitsRequest {
                 buildings,
-                unit_priorities: production_policy.unit_priorities,
+                unit_priorities: effective_unit_priorities,
                 completed_building_kinds: facts.complete_building_kinds(),
                 completed_upgrades: facts.completed_upgrades(),
                 max_queue_depth: production_policy.queue_depth,
@@ -571,11 +588,10 @@ where
         }
     }
 
-    let ready_units =
-        actions::select_ready_combat_units(&observation.owned, attack_policy.unit_kinds);
-    let ready_units_count = ready_units.len();
-    let attack_size = memory.desired_attack_size_for(profile, attack_policy, observation.tick);
-    let attack_due = memory.attack_due_for(profile, attack_policy, observation.tick);
+    let frontal_wave = plan_frontal_wave(observation, attack_policy, memory, profile);
+    let ready_units_count = frontal_wave.ready_units.len();
+    let attack_size = frontal_wave.desired_size;
+    let attack_due = frontal_wave.attack_due;
     let local_ready_units =
         actions::select_ready_combat_units(&observation.owned, &ALL_COMBAT_UNITS);
     let rifle_raid_policy = is_rifle_raid_policy(attack_policy);
@@ -584,7 +600,10 @@ where
     } else {
         Vec::new()
     };
-    if !ready_units.is_empty() || !local_ready_units.is_empty() || !rifle_raid_units.is_empty() {
+    if !frontal_wave.ready_units.is_empty()
+        || !local_ready_units.is_empty()
+        || !rifle_raid_units.is_empty()
+    {
         let mut handled_local_defense = false;
         let mut local_defense_assigned = BTreeSet::new();
         let mut local_defense_targets = BTreeSet::new();
@@ -642,63 +661,30 @@ where
             }
         }
 
-        if !handled_local_defense && !handled_raid_target && !ready_units.is_empty() {
+        if !handled_local_defense && !handled_raid_target && !frontal_wave.ready_units.is_empty() {
             if let Some(enemy_base) = facts.nearest_public_enemy_base {
-                let required_unit_ready = attack_policy
-                    .required_unit
-                    .map(|kind| {
-                        observation
-                            .owned
-                            .iter()
-                            .any(|entity| entity.kind == kind && ready_units.contains(&entity.id))
-                    })
-                    .unwrap_or(true);
-                if required_unit_ready
-                    && ready_units.len() >= attack_size
-                    && attack_due
-                {
-                    let attack_units = if rifle_raid_policy {
+                if rifle_raid_policy && frontal_wave.should_attack() {
+                    let attack_units = {
                         let (x, y) = rifle_raid_move_target(observation, enemy_base);
-                        actions::move_units(&mut actions, ready_units, x, y)
-                    } else if let Some(target) =
-                        visible_combat_target_for_wave(observation, &ready_units)
-                    {
-                        actions::attack_units(&mut actions, ready_units, target)
-                    } else {
-                        actions::attack_move_units(
-                            &mut actions,
-                            ready_units,
-                            enemy_base.x,
-                            enemy_base.y,
-                        )
+                        actions::move_units(&mut actions, frontal_wave.ready_units.clone(), x, y)
                     };
                     if let Some(units) = attack_units {
                         memory.note_attack_for(profile, attack_policy, observation.tick);
                         intents.push(AiIntent::Attack { units });
                     }
-                } else if !ready_units.is_empty() {
-                    let staged = if stages_expansion_defensive_line(profile, attack_policy) {
-                        stage_main_steel_defensive_line(
-                            &mut actions,
-                            observation,
-                            &ready_units,
-                            enemy_base,
-                            attack_policy.stage_distance_tiles,
-                        )
-                    } else {
-                        let own_base =
-                            tile_center(observation.own_start_tile, observation.map.tile_size);
-                        actions::stage_units_toward(
-                            &mut actions,
-                            ready_units,
-                            own_base,
-                            (enemy_base.x, enemy_base.y),
-                            observation.map.tile_size,
-                            attack_policy.stage_distance_tiles,
-                        )
-                    };
-                    if let Some(units) = staged {
-                        intents.push(AiIntent::Stage { units });
+                } else if !rifle_raid_policy {
+                    if let Some(intent) = issue_frontal_wave(
+                        &mut actions,
+                        observation,
+                        profile,
+                        attack_policy,
+                        &frontal_wave,
+                        enemy_base,
+                    ) {
+                        if matches!(intent, AiIntent::Attack { .. }) {
+                            memory.note_attack_for(profile, attack_policy, observation.tick);
+                        }
+                        intents.push(intent);
                     }
                 }
             }
@@ -726,6 +712,7 @@ where
         ready_units: ready_units_count,
         attack_size,
         attack_due,
+        frontal_wave_blockers: &frontal_wave.blockers,
         rifle_raid_policy,
         rifle_raid_units: rifle_raid_units.len(),
         required_tech_path,
@@ -752,38 +739,41 @@ fn planned_train_in_intents(intents: &[AiIntent], kind: EntityKind) -> bool {
         .any(|intent| matches!(intent, AiIntent::Train { kind: trained } if *trained == kind))
 }
 
-fn visible_combat_target_for_wave(observation: &AiObservation, unit_ids: &[u32]) -> Option<u32> {
-    let center = group_center(observation, unit_ids)?;
-    let max_distance = OUTBOUND_WAVE_VISIBLE_TARGET_RADIUS_TILES * observation.map.tile_size as f32;
-    let max_distance2 = max_distance * max_distance;
-    observation
-        .visible_enemies
+fn effective_unit_priorities_for_upgrades(
+    unit_priorities: &[EntityKind],
+    completed_upgrades: &[UpgradeKind],
+) -> Vec<EntityKind> {
+    let methamphetamines_ready = completed_upgrades.contains(&UpgradeKind::Methamphetamines);
+    unit_priorities
         .iter()
-        .filter(|enemy| enemy.kind.is_unit() && enemy.kind != EntityKind::Worker)
-        .map(|enemy| {
-            let distance2 = geometry::dist2(center.0, center.1, enemy.x, enemy.y);
-            (
-                enemy.id,
-                outbound_wave_target_priority(enemy.kind),
-                distance2,
-            )
-        })
-        .filter(|(_, _, distance2)| *distance2 <= max_distance2)
-        .min_by(|left, right| {
-            left.1
-                .cmp(&right.1)
-                .then_with(|| left.2.total_cmp(&right.2))
-                .then_with(|| left.0.cmp(&right.0))
-        })
-        .map(|(id, _, _)| id)
+        .copied()
+        .filter(|unit| *unit != EntityKind::Tank || methamphetamines_ready)
+        .collect()
 }
 
-fn outbound_wave_target_priority(kind: EntityKind) -> u8 {
-    match kind {
-        EntityKind::Tank => 0,
-        EntityKind::MachineGunner | EntityKind::AntiTankGun => 1,
-        EntityKind::Rifleman | EntityKind::ScoutCar => 2,
-        _ => 3,
+fn queue_upgrade_if_available(
+    actions: &mut AiActionContext<'_>,
+    facts: &AiFacts,
+    memory: &mut AiDecisionMemory,
+    intents: &mut Vec<AiIntent>,
+    upgrade: UpgradeKind,
+) {
+    if facts.completed_upgrades().contains(&upgrade) || memory.pending_upgrades.contains(&upgrade) {
+        return;
+    }
+    let definition = upgrade::definition(upgrade);
+    if facts.complete_building_count(definition.researched_at) == 0 {
+        return;
+    }
+    if let Some(researched) = actions::try_research_upgrade(
+        actions,
+        facts.production_buildings(definition.researched_at),
+        upgrade,
+    ) {
+        memory.pending_upgrades.insert(researched.upgrade);
+        intents.push(AiIntent::Research {
+            upgrade: researched.upgrade,
+        });
     }
 }
 
@@ -798,26 +788,7 @@ fn queue_required_unit_unlocks(
         let Some(upgrade) = upgrade::required_for_unit(*unit) else {
             continue;
         };
-        if facts.completed_upgrades().contains(&upgrade)
-            || memory.pending_upgrades.contains(&upgrade)
-        {
-            continue;
-        }
-        let definition = upgrade::definition(upgrade);
-        if facts.complete_building_count(definition.researched_at) == 0 {
-            continue;
-        }
-        let Some(researched) = actions::try_research_upgrade(
-            actions,
-            facts.production_buildings(definition.researched_at),
-            upgrade,
-        ) else {
-            continue;
-        };
-        memory.pending_upgrades.insert(researched.upgrade);
-        intents.push(AiIntent::Research {
-            upgrade: researched.upgrade,
-        });
+        queue_upgrade_if_available(actions, facts, memory, intents, upgrade);
     }
 }
 
