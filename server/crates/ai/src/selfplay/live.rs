@@ -13,12 +13,14 @@ impl LiveSelfPlay {
         let players = vec![
             PlayerInit {
                 id: 1,
+                team_id: 1,
                 name: "Alpha Script".to_string(),
                 color: "#6f8fa8".to_string(),
                 is_ai: true,
             },
             PlayerInit {
                 id: 2,
+                team_id: 2,
                 name: "Bravo Script".to_string(),
                 color: "#b2775f".to_string(),
                 is_ai: true,

@@ -38,6 +38,7 @@ impl Game {
             .iter()
             .map(|p| PlayerScore {
                 id: p.id,
+                team_id: p.team_id,
                 name: p.name.clone(),
                 color: p.color.clone(),
                 unit_score: p.score.unit_score,

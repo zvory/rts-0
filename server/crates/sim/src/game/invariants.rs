@@ -681,12 +681,14 @@ mod tests {
         let players = [
             PlayerInit {
                 id: 1,
+                team_id: 1,
                 name: "A".into(),
                 color: "#fff".into(),
                 is_ai: false,
             },
             PlayerInit {
                 id: 2,
+                team_id: 2,
                 name: "B".into(),
                 color: "#000".into(),
                 is_ai: true,
@@ -702,12 +704,14 @@ mod tests {
         let players = [
             PlayerInit {
                 id: 1,
+                team_id: 1,
                 name: "A".into(),
                 color: "#fff".into(),
                 is_ai: false,
             },
             PlayerInit {
                 id: 2,
+                team_id: 2,
                 name: "B".into(),
                 color: "#000".into(),
                 is_ai: true,
@@ -721,6 +725,7 @@ mod tests {
     fn unit_body_vs_building_invariant_catches_manual_bad_state() {
         let players = [PlayerInit {
             id: 1,
+            team_id: 1,
             name: "Solo".into(),
             color: "#fff".into(),
             is_ai: false,
@@ -795,6 +800,7 @@ mod tests {
     fn resource_body_vs_building_invariant_catches_manual_bad_state() {
         let players = [PlayerInit {
             id: 1,
+            team_id: 1,
             name: "Solo".into(),
             color: "#fff".into(),
             is_ai: false,
@@ -848,6 +854,7 @@ mod tests {
     fn invariants_hold_in_no_command_sandbox() {
         let players = [PlayerInit {
             id: 1,
+            team_id: 1,
             name: "Solo".into(),
             color: "#fff".into(),
             is_ai: false,

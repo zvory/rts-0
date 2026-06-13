@@ -204,14 +204,14 @@ assert(
   rust.includes("ReplayBranchCreated") && S.REPLAY_BRANCH_CREATED === "replayBranchCreated",
   "replayBranchCreated server message tag must match Rust",
 );
-for (const field of ["branch_room", "source_tick", "seats", "player_id", "claimable"]) {
+for (const field of ["branch_room", "source_tick", "seats", "player_id", "team_id", "claimable"]) {
   assert(rust.includes(field), `replayBranchCreated Rust contract is missing ${field}`);
 }
 assert(
   rust.includes("BranchStaging") && S.BRANCH_STAGING === "branchStaging",
   "branchStaging server message tag must match Rust",
 );
-for (const field of ["host_id", "claimant_id", "occupants", "can_start"]) {
+for (const field of ["host_id", "team_id", "claimant_id", "occupants", "can_start"]) {
   assert(rust.includes(field), `branchStaging Rust contract is missing ${field}`);
 }
 

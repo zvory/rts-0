@@ -153,7 +153,13 @@ export class GameState {
   playerId
   startInfo                              // §2.3 payload
   map                                    // {width,height,tileSize,terrain}
-  players                                // [{id,name,color,startTileX,startTileY}]
+  players                                // [{id,teamId,name,color,startTileX,startTileY}]
+  playerById(id)
+  teamIdForPlayer(id)
+  isOwnOwner(owner)
+  isAllyOwner(owner)
+  isEnemyOwner(owner)
+  isNeutralOwner(owner)
   // snapshot buffering for interpolation:
   applySnapshot(msg)                     // pushes msg, keeps prev+current, stamps recvTime
   entitiesInterpolated(alpha)            // -> entities with lerped x,y,facing,weaponFacing

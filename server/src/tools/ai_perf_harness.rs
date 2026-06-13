@@ -439,24 +439,28 @@ fn four_ai_players() -> Vec<PlayerInit> {
     vec![
         PlayerInit {
             id: 1,
+            team_id: 1,
             name: "Perf AI 1".to_string(),
             color: "#4878c8".to_string(),
             is_ai: true,
         },
         PlayerInit {
             id: 2,
+            team_id: 2,
             name: "Perf AI 2".to_string(),
             color: "#c84848".to_string(),
             is_ai: true,
         },
         PlayerInit {
             id: 3,
+            team_id: 3,
             name: "Perf AI 3".to_string(),
             color: "#30a090".to_string(),
             is_ai: true,
         },
         PlayerInit {
             id: 4,
+            team_id: 4,
             name: "Perf AI 4".to_string(),
             color: "#8040c8".to_string(),
             is_ai: true,

@@ -247,6 +247,7 @@ impl Game {
             let start = map.starts.get(i).copied().unwrap_or((0, 0));
             let mut ps = PlayerState {
                 id: p.id,
+                team_id: super::teams::normalize_team_id(p.id, p.team_id),
                 name: p.name.clone(),
                 color: p.color.clone(),
                 start_tile: start,
@@ -346,6 +347,7 @@ impl Game {
             .iter()
             .map(|p| PlayerStart {
                 id: p.id,
+                team_id: p.team_id,
                 name: p.name.clone(),
                 color: p.color.clone(),
                 start_tile_x: p.start_tile.0,
@@ -633,6 +635,7 @@ fn spawn_debug_inert_enemy_mortar_corner(
 
     players.push(PlayerState {
         id: DEBUG_INERT_ENEMY_ID,
+        team_id: DEBUG_INERT_ENEMY_ID,
         name: "Inert Mortar Corner".to_string(),
         color: "#8d2f2f".to_string(),
         start_tile: clump_tile,

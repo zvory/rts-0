@@ -422,6 +422,7 @@ mod tests {
             },
             players: vec![PlayerStart {
                 id: 1,
+                team_id: 1,
                 name: "Alpha".into(),
                 color: "#111".into(),
                 start_tile_x: 10,

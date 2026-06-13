@@ -336,6 +336,7 @@ mod tests {
     fn players() -> [PlayerInit; 1] {
         [PlayerInit {
             id: 1,
+            team_id: 1,
             name: "Replay".into(),
             color: "#fff".into(),
             is_ai: false,

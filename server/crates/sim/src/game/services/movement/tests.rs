@@ -81,6 +81,7 @@ fn flat_map(player_count: usize) -> Map {
 fn player_with_oil(id: u32, oil: u32) -> PlayerState {
     PlayerState {
         id,
+        team_id: id,
         name: format!("p{id}"),
         color: "#ffffff".to_string(),
         start_tile: (0, 0),

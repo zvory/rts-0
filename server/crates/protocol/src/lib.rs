@@ -13,7 +13,7 @@ pub use rts_contract::{
     AbilityCooldownView, AttackReveal, DebugPathPoint, DebugPathView, EntityView, Event, MapInfo,
     NoticeSeverity, OrderPlanMarker, PlayerResourceSnapshot, PlayerScore, PlayerStart,
     RememberedBuildingView, ReplayPlaybackState, ReplayStartMetadata, ResourceDelta, ResourceNode,
-    SmokeCloudView, Snapshot, SnapshotNetStatus, StartPayload,
+    SmokeCloudView, Snapshot, SnapshotNetStatus, StartPayload, TeamId,
 };
 
 fn is_false(value: &bool) -> bool {
@@ -325,6 +325,7 @@ pub struct AvailableMap {
 #[serde(rename_all = "camelCase")]
 pub struct ReplayBranchSeat {
     pub player_id: u32,
+    pub team_id: TeamId,
     pub name: String,
     pub color: String,
     pub claimable: bool,
@@ -335,6 +336,7 @@ pub struct ReplayBranchSeat {
 #[serde(rename_all = "camelCase")]
 pub struct BranchStagingSeat {
     pub player_id: u32,
+    pub team_id: TeamId,
     pub name: String,
     pub color: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -407,6 +409,7 @@ pub enum ServerMessage {
     },
     GameOver {
         winner_id: Option<u32>,
+        winner_team_id: Option<TeamId>,
         /// "won" | "lost" | "draw"
         you: String,
         /// Frozen per-player score snapshot for the score screen.
@@ -424,6 +427,7 @@ pub enum ServerMessage {
 #[serde(rename_all = "camelCase")]
 pub struct LobbyPlayer {
     pub id: u32,
+    pub team_id: TeamId,
     pub name: String,
     pub ready: bool,
     pub color: String,
@@ -1260,6 +1264,7 @@ mod tests {
             source_tick: 123,
             seats: vec![ReplayBranchSeat {
                 player_id: 7,
+                team_id: 7,
                 name: "Player 7".to_string(),
                 color: "#4878c8".to_string(),
                 claimable: true,
@@ -1271,6 +1276,7 @@ mod tests {
         assert_eq!(json["branchRoom"], "__replay_branch__:00000001");
         assert_eq!(json["sourceTick"], 123);
         assert_eq!(json["seats"][0]["playerId"], 7);
+        assert_eq!(json["seats"][0]["teamId"], 7);
         assert_eq!(json["seats"][0]["name"], "Player 7");
         assert_eq!(json["seats"][0]["color"], "#4878c8");
         assert_eq!(json["seats"][0]["claimable"], true);
@@ -1284,6 +1290,7 @@ mod tests {
             host_id: 100,
             seats: vec![BranchStagingSeat {
                 player_id: 7,
+                team_id: 7,
                 name: "Player 7".to_string(),
                 color: "#4878c8".to_string(),
                 claimant_id: Some(100),
@@ -1302,6 +1309,7 @@ mod tests {
         assert_eq!(json["sourceTick"], 123);
         assert_eq!(json["hostId"], 100);
         assert_eq!(json["seats"][0]["playerId"], 7);
+        assert_eq!(json["seats"][0]["teamId"], 7);
         assert_eq!(json["seats"][0]["claimantId"], 100);
         assert_eq!(json["seats"][0]["claimantName"], "Viewer 100");
         assert_eq!(json["occupants"][0]["id"], 100);

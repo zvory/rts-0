@@ -39,7 +39,8 @@ async function main() {
   B.send({ t: "join", name: "Bravo", room: ROOM });
   const lobbyB = await A.waitFor((msg) => msg.t === "lobby" && msg.players.length === 2, 3000, "two-human lobby");
   assertLobbyProtocol(ok, lobbyB, { expectedPlayers: 2, hostId: A.playerId });
-  ok(!("teamId" in lobbyB.players[0]), "TEAMS PHASE 0: lobby players do not expose teamId yet");
+  ok(lobbyB.players.every((player) => player.teamId === player.id),
+    "TEAMS PHASE 1: lobby defaults every active player to a singleton team");
 
   const [ai] = await addAi(A);
   const lobbyWithAi = A.msgs.filter((msg) => msg.t === "lobby").at(-1);
@@ -56,7 +57,8 @@ async function main() {
   assertStartProtocol(ok, startA, { playerId: A.playerId, expectedPlayers: 2, spectator: false });
   assertStartProtocol(ok, startB, { playerId: B.playerId, expectedPlayers: 2, spectator: false });
   assertDistinctStartTiles(ok, startA);
-  ok(!startA.players.some((player) => "teamId" in player), "TEAMS PHASE 0: start players do not expose teamId yet");
+  ok(startA.players.every((player) => player.teamId === player.id),
+    "TEAMS PHASE 1: start payload preserves singleton FFA teams");
 
   const snap = await A.waitFor((msg) => msg.t === "snapshot" && msg.entities.length > 0, 3000, "A first snapshot");
   ok(snap.entities.some((entity) => entity.owner === A.playerId && entity.kind === "city_centre"),
@@ -66,7 +68,10 @@ async function main() {
   const [overA, overB] = await waitForGameOver([A, B]);
   assertScoreProtocol(ok, overA, { expectedPlayers: 2 });
   ok(overA.you === "won" && overB.you === "lost", `game-over helper waits for both verdicts (${overA.you}/${overB.you})`);
-  ok(!overA.scores.some((score) => "teamId" in score), "TEAMS PHASE 0: scores do not expose teamId yet");
+  ok(overA.winnerTeamId === overA.winnerId,
+    `TEAMS PHASE 1: FFA winnerTeamId matches winnerId (${overA.winnerTeamId}/${overA.winnerId})`);
+  ok(overA.scores.every((score) => score.teamId === score.id),
+    "TEAMS PHASE 1: score rows preserve singleton FFA teams");
 
   closeClients(A, B);
   await sleep(200);

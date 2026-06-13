@@ -11,12 +11,14 @@ fn human_vs_ai_players() -> [PlayerInit; 2] {
     [
         PlayerInit {
             id: 1,
+            team_id: 1,
             name: "Human".into(),
             color: "#fff".into(),
             is_ai: false,
         },
         PlayerInit {
             id: 2,
+            team_id: 2,
             name: "Computer".into(),
             color: "#000".into(),
             is_ai: true,
@@ -159,6 +161,7 @@ fn legacy_view_of(game: &Game, e: &Entity, viewer: u32, fogged: bool) -> EntityV
 fn flat_tank_move_fixture() -> (Game, u32, (f32, f32)) {
     let players = [PlayerInit {
         id: 1,
+        team_id: 1,
         name: "Solo".into(),
         color: "#fff".into(),
         is_ai: false,
@@ -531,12 +534,14 @@ fn smoke_projection_fixture() -> (Game, u32, u32, u32, (f32, f32)) {
     let players = [
         PlayerInit {
             id: 1,
+            team_id: 1,
             name: "One".into(),
             color: "#fff".into(),
             is_ai: false,
         },
         PlayerInit {
             id: 2,
+            team_id: 2,
             name: "Two".into(),
             color: "#000".into(),
             is_ai: false,
@@ -586,12 +591,14 @@ fn manual_mortar_fire_impacts_without_toast_notice() {
     let players = [
         PlayerInit {
             id: 1,
+            team_id: 1,
             name: "One".into(),
             color: "#fff".into(),
             is_ai: false,
         },
         PlayerInit {
             id: 2,
+            team_id: 2,
             name: "Two".into(),
             color: "#000".into(),
             is_ai: false,
@@ -697,12 +704,14 @@ fn set_autocast_command_enables_mortar_autocast_from_default_off() {
     let players = [
         PlayerInit {
             id: 1,
+            team_id: 1,
             name: "One".into(),
             color: "#fff".into(),
             is_ai: false,
         },
         PlayerInit {
             id: 2,
+            team_id: 2,
             name: "Two".into(),
             color: "#000".into(),
             is_ai: false,
@@ -754,12 +763,14 @@ fn visible_autocast_mortar_launch_is_sent_to_enemy() {
     let players = [
         PlayerInit {
             id: 1,
+            team_id: 1,
             name: "One".into(),
             color: "#fff".into(),
             is_ai: false,
         },
         PlayerInit {
             id: 2,
+            team_id: 2,
             name: "Two".into(),
             color: "#000".into(),
             is_ai: false,
@@ -818,12 +829,14 @@ fn hidden_mortar_launch_is_not_sent_but_impact_reveals_attacker_to_victim() {
     let players = [
         PlayerInit {
             id: 1,
+            team_id: 1,
             name: "One".into(),
             color: "#fff".into(),
             is_ai: false,
         },
         PlayerInit {
             id: 2,
+            team_id: 2,
             name: "Two".into(),
             color: "#000".into(),
             is_ai: false,
@@ -919,12 +932,14 @@ fn manual_mortar_fire_waits_for_tube_alignment() {
     let players = [
         PlayerInit {
             id: 1,
+            team_id: 1,
             name: "One".into(),
             color: "#fff".into(),
             is_ai: false,
         },
         PlayerInit {
             id: 2,
+            team_id: 2,
             name: "Two".into(),
             color: "#000".into(),
             is_ai: false,
@@ -1008,12 +1023,14 @@ fn manual_mortar_fire_damages_friendly_units_at_enemy_rate() {
     let players = [
         PlayerInit {
             id: 1,
+            team_id: 1,
             name: "One".into(),
             color: "#fff".into(),
             is_ai: false,
         },
         PlayerInit {
             id: 2,
+            team_id: 2,
             name: "Two".into(),
             color: "#000".into(),
             is_ai: false,
@@ -1072,12 +1089,14 @@ fn manual_mortar_fire_damages_friendly_buildings() {
     let players = [
         PlayerInit {
             id: 1,
+            team_id: 1,
             name: "One".into(),
             color: "#fff".into(),
             is_ai: false,
         },
         PlayerInit {
             id: 2,
+            team_id: 2,
             name: "Two".into(),
             color: "#000".into(),
             is_ai: false,
@@ -1321,6 +1340,7 @@ fn queued_move_fixture() -> (Game, u32, (f32, f32), (f32, f32), (f32, f32)) {
 fn smoke_command_fixture() -> (Game, u32, (f32, f32), (f32, f32)) {
     let players = [PlayerInit {
         id: 1,
+        team_id: 1,
         name: "Solo".into(),
         color: "#fff".into(),
         is_ai: false,
@@ -1388,6 +1408,7 @@ fn scout_car_smoke_requires_no_steelworks() {
 fn command_car_requires_rd_unlock_then_trains_at_factory() {
     let players = [PlayerInit {
         id: 1,
+        team_id: 1,
         name: "Solo".into(),
         color: "#fff".into(),
         is_ai: false,
@@ -1602,6 +1623,7 @@ fn queued_move_fixture_with_lobby_debug(
 ) -> (Game, u32, (f32, f32), (f32, f32), (f32, f32)) {
     let players = [PlayerInit {
         id: 1,
+        team_id: 1,
         name: "Solo".into(),
         color: "#fff".into(),
         is_ai: false,
@@ -1655,12 +1677,14 @@ fn mixed_queued_fixture() -> MixedQueuedFixture {
     let players = [
         PlayerInit {
             id: 1,
+            team_id: 1,
             name: "Alpha".into(),
             color: "#fff".into(),
             is_ai: false,
         },
         PlayerInit {
             id: 2,
+            team_id: 2,
             name: "Bravo".into(),
             color: "#000".into(),
             is_ai: false,
@@ -1743,12 +1767,14 @@ fn phase_six_intent_fixture() -> PhaseSixIntentFixture {
     let players = [
         PlayerInit {
             id: 1,
+            team_id: 1,
             name: "Alpha".into(),
             color: "#fff".into(),
             is_ai: false,
         },
         PlayerInit {
             id: 2,
+            team_id: 2,
             name: "Bravo".into(),
             color: "#000".into(),
             is_ai: false,
@@ -2755,12 +2781,14 @@ fn death_vision_lingers_for_five_seconds_as_visual_only_intel() {
     let players = [
         PlayerInit {
             id: 1,
+            team_id: 1,
             name: "One".into(),
             color: "#fff".into(),
             is_ai: false,
         },
         PlayerInit {
             id: 2,
+            team_id: 2,
             name: "Two".into(),
             color: "#000".into(),
             is_ai: false,
@@ -2865,6 +2893,7 @@ fn death_vision_lingers_for_five_seconds_as_visual_only_intel() {
 fn human_only_match_has_no_ai_players() {
     let players = [PlayerInit {
         id: 1,
+        team_id: 1,
         name: "Solo".into(),
         color: "#fff".into(),
         is_ai: false,
@@ -2877,6 +2906,7 @@ fn human_only_match_has_no_ai_players() {
 fn replay_games_preserve_ai_identity_without_controllers() {
     let players = [PlayerInit {
         id: 1,
+        team_id: 1,
         name: "Computer".into(),
         color: "#fff".into(),
         is_ai: true,
@@ -2901,6 +2931,7 @@ fn replay_games_preserve_ai_identity_without_controllers() {
 fn gather_command_ignores_nodes_without_nearby_completed_cc() {
     let players = [PlayerInit {
         id: 1,
+        team_id: 1,
         name: "Solo".into(),
         color: "#fff".into(),
         is_ai: false,
@@ -2954,6 +2985,7 @@ fn gather_command_ignores_nodes_without_nearby_completed_cc() {
 fn gather_command_to_occupied_patch_is_ignored() {
     let players = [PlayerInit {
         id: 1,
+        team_id: 1,
         name: "Solo".into(),
         color: "#fff".into(),
         is_ai: false,
@@ -3020,6 +3052,7 @@ fn gather_command_to_occupied_patch_is_ignored() {
 fn worker_already_touching_resource_body_starts_harvesting() {
     let players = [PlayerInit {
         id: 1,
+        team_id: 1,
         name: "Solo".into(),
         color: "#fff".into(),
         is_ai: false,
@@ -3071,6 +3104,7 @@ fn worker_already_touching_resource_body_starts_harvesting() {
 fn active_mining_stops_when_nearby_cc_is_removed() {
     let players = [PlayerInit {
         id: 1,
+        team_id: 1,
         name: "Solo".into(),
         color: "#fff".into(),
         is_ai: false,
@@ -3183,12 +3217,14 @@ fn resource_snapshots_include_remaining_even_through_fog() {
     let players = [
         PlayerInit {
             id: 1,
+            team_id: 1,
             name: "A".into(),
             color: "#fff".into(),
             is_ai: false,
         },
         PlayerInit {
             id: 2,
+            team_id: 2,
             name: "B".into(),
             color: "#000".into(),
             is_ai: false,
@@ -3215,6 +3251,7 @@ fn resource_snapshots_include_remaining_even_through_fog() {
 fn no_commands_one_player_is_deterministic() {
     let players = [PlayerInit {
         id: 1,
+        team_id: 1,
         name: "Solo".into(),
         color: "#fff".into(),
         is_ai: false,
@@ -3261,6 +3298,7 @@ fn spawn_resource_distances_are_fair_and_symmetric() {
         let players: Vec<PlayerInit> = (1..=pc)
             .map(|id| PlayerInit {
                 id,
+                team_id: id,
                 name: format!("P{id}"),
                 color: "#fff".into(),
                 is_ai: false,

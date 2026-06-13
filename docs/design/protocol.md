@@ -140,27 +140,34 @@ authority.
 | `replayBranchCreated` | `branchRoom: string`, `sourceTick: u32`, `seats: ReplayBranchSeat[]` — a separate practice branch room has been created from the source replay's current authoritative tick. |
 | `branchStaging` | `room: string`, `sourceTick: u32`, `hostId: u32`, `seats: BranchStagingSeat[]`, `occupants: BranchStagingOccupant[]`, `canStart: bool` — reliable current state for a replay branch staging room. Sent after joins, leaves, claims, and releases. |
 | `shutdownWarning` | `deadlineUnixMs: u64`, `secondsRemaining: u64` — deploy/termination drain has started; active matches may continue until the deadline, but new match starts are disabled. |
-| `gameOver` | `winnerId: u32 | null`, `you: "won" | "lost" | "draw"`, `scores: PlayerScore[]` |
+| `gameOver` | `winnerId: u32 | null`, `winnerTeamId: u32 | null`, `you: "won" | "lost" | "draw"`, `scores: PlayerScore[]` |
 | `pong`     | `ts: number` (echo of the ping ts) |
 | `error`    | `msg: string` |
 
-`LobbyPlayer`: `{ id: u32, name: string, ready: bool, color: string, isAi: bool, isSpectator: bool }`. `isAi` is
+`LobbyPlayer`: `{ id: u32, teamId: u32, name: string, ready: bool, color: string, isAi: bool, isSpectator: bool }`. `isAi` is
 true for computer opponents (always shown ready; the client renders an "AI" tag and a host-only
 remove control instead of a ready toggle). `isSpectator` is true for human observers; they do not
 consume active map starts, block readiness, or count toward win/loss.
 
-`PlayerScore`: `{ id: u32, name: string, color: string, unitScore: u32, structureScore: u32,
+`teamId` is nonzero for active match players and AI seats. Phase 1 keeps FFA semantics by assigning
+each seated player a unique singleton team by default. Spectator lobby rows may carry `teamId: 0`
+because they are not match players.
+
+`PlayerScore`: `{ id: u32, teamId: u32, name: string, color: string, unitScore: u32, structureScore: u32,
 unitsKilled: u32, unitsLost: u32, buildingsKilled: u32, buildingsLost: u32 }`. `scores` is a
 frozen server snapshot taken when that recipient gets `gameOver`; it is not live-updated while a
 3-4 player match continues. Unit/structure score is the configured steel+oil value of every
 unit/building entity created for that player, including starting entities.
 
-`ReplayBranchSeat`: `{ playerId: u32, name: string, color: string, claimable: bool }`. Seats are
+`winnerTeamId` is the winning team's id when a winner exists, otherwise `null`. During singleton-team
+FFA it matches `winnerId`; `winnerId` remains for FFA compatibility.
+
+`ReplayBranchSeat`: `{ playerId: u32, teamId: u32, name: string, color: string, claimable: bool }`. Seats are
 listed in original replay player order. `claimable` is false only for unsupported original seats;
 the first implementation rejects AI-seat replays before creating a branch, so successful branch
 creation currently reports all seats as claimable.
 
-`BranchStagingSeat`: `{ playerId: u32, name: string, color: string, claimantId?: u32,
+`BranchStagingSeat`: `{ playerId: u32, teamId: u32, name: string, color: string, claimantId?: u32,
 claimantName?: string }`. Seats are listed in original replay player order. A missing claimant
 means that original seat is still available to claim.
 
@@ -196,7 +203,7 @@ Sent once when the match begins. Carries everything static for the whole match.
     // render them on the minimap before fog-of-war reveals them.
     resources: [ { id: u32, kind: "steel"|"oil", x: f32, y: f32 } ]
   },
-  players: [ { id, name, color, startTileX, startTileY } ], // active match players only
+  players: [ { id, teamId, name, color, startTileX, startTileY } ], // active match players only
 }
 ```
 Units/buildings arrive via snapshots (so they obey fog), including
@@ -212,6 +219,10 @@ which lets the client expose local movement-waypoint overlay controls for the ow
 `debugPath` fields in snapshots.
 Spectator start payloads keep the spectator connection's `playerId`, set `spectator: true`, and
 list only active match players in `players`.
+
+For compatibility with hand-built fixtures and older replay artifacts, missing `teamId` values at
+simulation/replay/test-helper boundaries default to singleton FFA: the player's own nonzero `id`.
+Current live server payloads always emit explicit nonzero `teamId` values for active players.
 
 Prediction start compatibility metadata is present only for live active players. Clients MUST keep
 prediction disabled unless `predictionVersion` matches their supported prediction protocol version

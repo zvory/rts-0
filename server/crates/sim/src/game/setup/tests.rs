@@ -12,12 +12,14 @@ fn debug_starting_loadout_applies_to_humans_only() {
     let players = [
         PlayerInit {
             id: 1,
+            team_id: 1,
             name: "Human".to_string(),
             color: "#cc1111".to_string(),
             is_ai: false,
         },
         PlayerInit {
             id: 2,
+            team_id: 2,
             name: "AI".to_string(),
             color: "#1133bb".to_string(),
             is_ai: true,
@@ -61,6 +63,7 @@ fn debug_starting_loadout_applies_to_humans_only() {
 fn debug_starting_loadout_adds_inert_enemy_mortar_corner_without_profile() {
     let players = [PlayerInit {
         id: 1,
+        team_id: 1,
         name: "Human".to_string(),
         color: "#cc1111".to_string(),
         is_ai: false,

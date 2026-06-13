@@ -5,6 +5,8 @@
 
 use serde::{Deserialize, Serialize};
 
+pub type TeamId = u32;
+
 fn is_false(value: &bool) -> bool {
     !*value
 }
@@ -83,6 +85,8 @@ pub struct ResourceNode {
 #[serde(rename_all = "camelCase")]
 pub struct PlayerStart {
     pub id: u32,
+    #[serde(default)]
+    pub team_id: TeamId,
     pub name: String,
     pub color: String,
     pub start_tile_x: u32,
@@ -93,6 +97,8 @@ pub struct PlayerStart {
 #[serde(rename_all = "camelCase")]
 pub struct PlayerScore {
     pub id: u32,
+    #[serde(default)]
+    pub team_id: TeamId,
     pub name: String,
     pub color: String,
     pub unit_score: u32,

@@ -351,6 +351,7 @@ impl SelfPlayRunner {
 fn selfplay_failure_artifact_writes_unified_replay_schema() {
     let players = vec![PlayerInit {
         id: 1,
+        team_id: 1,
         name: "Failure Artifact".to_string(),
         color: "#ffffff".to_string(),
         is_ai: false,
@@ -534,6 +535,7 @@ fn run_profile_matchup(config: MatchupConfig) {
         .iter()
         .map(|player| PlayerInit {
             id: player.id,
+            team_id: player.id,
             name: player.name.to_string(),
             color: player.color.to_string(),
             is_ai: true,
@@ -857,12 +859,14 @@ fn profile_matchup_rifle_flood_full_saturation_vs_tech_to_tanks_20k_result() {
     let players = vec![
         PlayerInit {
             id: 1,
+            team_id: 1,
             name: "Full Saturation".into(),
             color: "#4cc9f0".into(),
             is_ai: true,
         },
         PlayerInit {
             id: 2,
+            team_id: 2,
             name: "Tech Tanks".into(),
             color: "#f72585".into(),
             is_ai: true,
@@ -977,12 +981,14 @@ fn profile_backed_self_play_exercises_tech_to_tanks() {
     let players = vec![
         PlayerInit {
             id: 1,
+            team_id: 1,
             name: "Tank Profile A".into(),
             color: "#4cc9f0".into(),
             is_ai: true,
         },
         PlayerInit {
             id: 2,
+            team_id: 2,
             name: "Tank Profile B".into(),
             color: "#f72585".into(),
             is_ai: true,
@@ -1026,12 +1032,14 @@ fn scripted_self_play_worker_rush_vs_economy() {
     let players = vec![
         PlayerInit {
             id: 1,
+            team_id: 1,
             name: "Worker Rush".into(),
             color: "#e71d36".into(),
             is_ai: false,
         },
         PlayerInit {
             id: 2,
+            team_id: 2,
             name: "Economy".into(),
             color: "#3a86ff".into(),
             is_ai: true,
@@ -1090,12 +1098,14 @@ fn scripted_self_play_mine_only_steel_fairness() {
     let players = vec![
         PlayerInit {
             id: 1,
+            team_id: 1,
             name: "Miner A".into(),
             color: "#4cc9f0".into(),
             is_ai: false,
         },
         PlayerInit {
             id: 2,
+            team_id: 2,
             name: "Miner B".into(),
             color: "#f72585".into(),
             is_ai: false,
@@ -1254,6 +1264,7 @@ fn pending_tracker_start_payload() -> StartPayload {
         },
         players: vec![PlayerStart {
             id: 1,
+            team_id: 1,
             name: "Alpha".into(),
             color: "#4cc9f0".into(),
             start_tile_x: 10,
@@ -1365,12 +1376,14 @@ fn identical_scripted_runs_are_identical() {
     let players = vec![
         PlayerInit {
             id: 1,
+            team_id: 1,
             name: "A".into(),
             color: "#4cc9f0".into(),
             is_ai: false,
         },
         PlayerInit {
             id: 2,
+            team_id: 2,
             name: "B".into(),
             color: "#f72585".into(),
             is_ai: false,
@@ -1426,12 +1439,14 @@ fn real_ai_vs_real_ai() {
     let players = vec![
         PlayerInit {
             id: 1,
+            team_id: 1,
             name: "AI Alpha".into(),
             color: "#4cc9f0".into(),
             is_ai: true,
         },
         PlayerInit {
             id: 2,
+            team_id: 2,
             name: "AI Beta".into(),
             color: "#f72585".into(),
             is_ai: true,
