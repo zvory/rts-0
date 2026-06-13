@@ -14,11 +14,14 @@ continue to behave as one-player-per-team FFA.
 - Add `team_id` to `PlayerInit` and `PlayerState`.
 - Add relationship helpers such as `team_of_player`, `same_team_player`, `same_team_owner`,
   `is_enemy_player`, `is_enemy_owner`, and `allied_player_ids`.
+- Add or update fixture constructors so hand-built Rust and JS tests can default missing team fields
+  to singleton-team FFA without repeated boilerplate.
 - Thread `teamId` through:
   - `LobbyPlayer`
   - `PlayerStart`
   - `PlayerScore`
   - replay player specs and fixtures
+  - branch staging seat metadata, or explicitly reject team replay branching until the replay phase
   - `gameOver` as `winnerTeamId: u32 | null`, while keeping `winnerId` for FFA compatibility
 - Add `GameState` helpers:
   - `playerById(id)`
@@ -66,9 +69,13 @@ broad during development, but the phase commit should pass the contract-focused 
 
 - Lobby/start/score/game-over payloads carry team identity.
 - Replay and sim-wasm fixtures parse and emit the new fields.
+- Old or hand-built fixtures without explicit team fields have documented singleton-FFA defaults at
+  every deserialization/test-helper boundary.
 - FFA defaults assign one unique nonzero team per seated player.
 - Relationship helper tests prove singleton FFA players are enemies and neutral owner `0` is never
   allied with a player.
+- Branch/replay structures either carry team ids immediately or fail clearly for team-specific
+  artifacts until the replay phase completes.
 - No combat, fog, start-location, or victory behavior changes are introduced yet.
 
 ## Manual Testing Focus

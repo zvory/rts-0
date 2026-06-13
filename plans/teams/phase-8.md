@@ -1,88 +1,100 @@
-# Phase 8 - End-to-End Hardening and Release Audit
+# Phase 8 - Client Command Safety and Ally Inspection
 
 Status: planned.
 
 ## Goal
 
-Finish teams as a robust end-to-end feature with automated coverage as the main confidence source.
-Manual testing should be a short sanity check, not the primary way to validate team games.
+Make the in-match client understand own, ally, enemy, and neutral relationships. Allied units should
+be inspectable and visually understandable, but they must not become group-commandable or
+accidentally attackable through normal UI paths.
 
 ## Scope
 
-- Finalize `tests/team_integration.mjs` as the canonical multi-client team suite.
-- Add or update regression tests for malicious team/lobby/combat/fog inputs.
-- Audit raw owner comparisons and document intentional own-control checks.
-- Audit compact snapshot encoding/decoding and protocol parity for all new fields.
-- Audit docs and context capsules so future agents know where team relationships live.
-- Ensure selector rules include the right team tests for server, client, protocol, AI, replay, and
-  map changes.
-- Add a scriptable dev scenario or test-only endpoint if needed for visual team checks without
-  manual room setup.
+- Replace gameplay direct owner comparisons with `GameState` relationship helpers where the logic is
+  about relationship, not strict command ownership.
+- Keep own-control checks strict for:
+  - command emission
+  - prediction
+  - optimistic production/rally
+  - control groups
+  - build/gather/train/research/cancel/ability execution
+- Selection rules:
+  - single-click own entities behaves as today.
+  - single-click allied entity selects it for inspection.
+  - box selection selects own units only, with existing own-building fallback.
+  - ctrl/meta same-kind selection selects own entities only.
+  - shift-add direct click may include an allied inspection target, but must not create a
+    commandable mixed group.
+- Right-click rules:
+  - enemy target issues attack.
+  - resource target with selected workers issues gather.
+  - own or allied entity target falls through to ordinary move-to-point behavior.
+- HUD and command card:
+  - allied-only selections show read-only inspection details.
+  - no command buttons emit commands for allied-only selections.
+  - resources/supply/upgrades remain local-player-only.
+- Renderer and minimap should distinguish own, ally, enemy, and neutral/resource in contract-tested
+  ways.
+- Prediction and sim-wasm client adapters must parse team fields and remain own-unit-only.
+- Keep normal lobby exposure for non-FFA team presets gated until this phase's client command-safety
+  tests pass.
 
 ## Expected Touch Points
 
-- `docs/context/*.md`
-- `docs/design/*.md`
-- `tests/team_integration.mjs`
-- `tests/regression.mjs`
-- `tests/server_integration.mjs`
+- `docs/design/client-ui.md`
+- `client/src/state.js`
+- `client/src/input/`
+- `client/src/hud.js`
+- `client/src/hud_command_card.js`
+- `client/src/minimap.js`
+- `client/src/match.js`
+- `client/src/renderer/`
+- `client/src/prediction_controller.js`
+- `client/src/sim_wasm_adapter.js`
+- `client/styles.css`
 - `tests/client_contracts.mjs`
+- `tests/input_context_menu_contracts.mjs`
+- `tests/minimap_input_contracts.mjs`
+- `tests/prediction_controller.mjs`
 - `tests/client_smoke.mjs`
-- `tests/select-suites.mjs`
-- `tests/run-all.sh`
-- `scripts/check-client-architecture.mjs` if client module boundaries changed
-- `server/crates/archcheck/` baseline only if architectural growth is intentional and justified
+- `tests/team_integration.mjs`
 
 ## Verification
 
-Run focused suites first, then the final broad pass:
-
 ```bash
-node tests/team_integration.mjs
-node tests/regression.mjs
 node tests/client_contracts.mjs
-node tests/select-suites.mjs --verify
-cd server && cargo fmt && cargo clippy && cargo test
-cargo run --manifest-path server/Cargo.toml -p rts-archcheck -- check-sim-architecture
-node tests/server_integration.mjs
-node tests/ai_integration.mjs
-node tests/sim_wasm_smoke.mjs
-cd tests && npm install && node client_smoke.mjs
+node tests/input_context_menu_contracts.mjs
+node tests/minimap_input_contracts.mjs
+node tests/prediction_controller.mjs
+node tests/team_integration.mjs
+node tests/client_smoke.mjs
+node scripts/check-client-architecture.mjs
 ```
 
-If `tests/run-all.sh` has been updated to include the new team suite, run it as the final wrapper
-instead of duplicating equivalent commands.
+Required automated scenarios:
 
-Required end-to-end scenarios:
-
-- Solo sandbox still starts and does not resolve to a winner.
-- FFA remains default and reports singleton teams.
-- 1v2, 1v3, and 2v2 start from scripted lobby setup.
-- Team victory resolves correctly for all supported team shapes.
-- Allies share vision and see allied support-fire markers.
-- Allied units are inspectable, not commandable, and not attackable from normal UI.
-- Non-host and malicious clients cannot mutate teams or attack allies.
-- Replays and match history preserve team ids and winner team.
+- `isAllyOwner` and `isEnemyOwner` classify from `start.players`.
+- Box selection skips allied units.
+- Single-click can select an allied entity for inspection.
+- Allied-only selection produces no command emission.
+- Mixed own/allied selection cannot create commands for allied entity ids.
+- Right-clicking an allied entity with own units selected sends move, not attack.
+- Minimap or renderer contract distinguishes ally from enemy.
+- Prediction remains own-unit-only.
 
 ## Acceptance Criteria
 
-- Team games work end to end for supported short-run presets.
-- Automated tests cover lobby setup, combat safety, fog/projection privacy, client command safety,
-  AI safety, replay preservation, and score outcomes.
-- Manual testing burden is reduced to one short browser pass using scripted setup.
-- Documentation describes the final team relationship model and testing workflow.
+- Allied units are inspectable but not commandable.
+- Allied units are not attackable through normal UI command targeting.
+- Own-only command and prediction paths stay own-only.
+- Remaining direct owner comparisons are documented as strict ownership checks or queued follow-up.
 
 ## Manual Testing Focus
 
-Use scripted setup, not hand-built multi-tab rooms, to check:
-
-- lobby preset controls
-- allied single-click inspection
-- right-click allied unit behavior
-- shared mortar/artillery markers
-- score screen team column and winning-team highlight
+One browser pass using scripted setup if available: click an allied unit, box near allied units, and
+right-click an allied unit with own units selected.
 
 ## Handoff Requirements
 
-The final handoff must summarize the automated coverage, list any manual checks performed, name any
-known follow-up work, and explain the player-facing gameplay impact.
+The phase handoff must distinguish relationship replacements from strict ownership checks and name
+the tests that prove no allied command is emitted.

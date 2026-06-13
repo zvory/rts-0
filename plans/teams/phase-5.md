@@ -1,102 +1,75 @@
-# Phase 5 - Client Team Model, Inspection, and Command Safety
+# Phase 5 - Team Victory and Game-Over Semantics
 
 Status: planned.
 
 ## Goal
 
-Make the client understand own, ally, enemy, and neutral relationships. Allied units should be
-inspectable and visually understandable, but they must not become group-commandable or accidentally
-attackable through normal UI paths.
+Make match resolution team-aware without mixing it into combat or fog work. A team should lose only
+when every member is defeated, and final game-over messages should explain both player and team
+outcomes.
 
 ## Scope
 
-- Replace gameplay direct owner comparisons with `GameState` relationship helpers where the logic is
-  about relationship, not strict command ownership.
-- Keep own-control checks strict for:
-  - command emission
-  - prediction
-  - optimistic production/rally
-  - control groups
-  - build/gather/train/research/cancel/ability execution
-- Selection rules:
-  - single-click own entities behaves as today
-  - single-click allied entity selects it for inspection
-  - box selection selects own units only, with existing own-building fallback
-  - ctrl/meta same-kind selection selects own entities only
-  - shift-add direct click may include an allied inspection target, but must not create a commandable
-    mixed group
-- Right-click rules:
-  - enemy target issues attack
-  - resource target with selected workers issues gather
-  - own or allied entity target falls through to ordinary move-to-point behavior
-- HUD and command card:
-  - allied-only selections show read-only inspection details
-  - no command buttons emit commands for allied-only selections
-  - resources/supply/upgrades remain local-player only
-- Renderer and minimap:
-  - distinguish own, ally, enemy, and neutral/resource
-  - keep entity body color per owner, not per team, unless a later art pass changes this deliberately
-- Score UI:
-  - add Team column
-  - highlight all rows whose `teamId` matches `winnerTeamId`
-  - keep `winnerId` support for singleton FFA compatibility
+- Add team-aware alive/defeated helpers on the `Game` API or lobby-facing simulation seam.
+- Team victory should replace per-player victory in team games:
+  - singleton FFA remains behavior-compatible.
+  - one-player sandbox remains never-ending.
+  - a player losing all buildings should not receive a losing `gameOver` while any teammate keeps
+    the team alive.
+  - final `gameOver` should include `winnerTeamId`.
+- Keep `winnerId` for FFA compatibility. For multi-player team wins, define whether `winnerId` is
+  `null`, the first living winner by stable order, or another compatibility value, and document it in
+  protocol docs.
+- Score rows remain per-player and include `teamId`.
+- Detached match-history recording should continue to receive per-player score rows; schema changes
+  are deferred unless required for `winnerTeamId`.
+- Branch live seat mapping must evaluate outcomes by original match seat/team, not by connection id.
 
 ## Expected Touch Points
 
-- `docs/design/client-ui.md`
-- `client/src/state.js`
-- `client/src/input/`
-- `client/src/hud.js`
-- `client/src/hud_command_card.js`
-- `client/src/minimap.js`
-- `client/src/match.js`
-- `client/src/app.js`
-- `client/src/renderer/`
-- `client/src/prediction_controller.js`
-- `client/src/sim_wasm_adapter.js`
-- `client/styles.css`
-- `tests/client_contracts.mjs`
-- `tests/input_context_menu_contracts.mjs`
-- `tests/minimap_input_contracts.mjs`
-- `tests/client_smoke.mjs`
+- `docs/design/server-sim.md`
+- `docs/design/protocol.md`
+- `server/crates/sim/src/game/teams.rs`
+- `server/crates/sim/src/game/mod.rs`
+- `server/crates/sim/src/game/scoring.rs`
+- `server/src/lobby/room_task.rs`
+- `server/crates/protocol/src/lib.rs`
+- `server/src/protocol.rs`
+- `client/src/protocol.js`
 - `tests/team_integration.mjs`
+- `tests/server_integration.mjs`
 
 ## Verification
 
 ```bash
-node tests/client_contracts.mjs
-node tests/input_context_menu_contracts.mjs
-node tests/minimap_input_contracts.mjs
+cd server && cargo test team --workspace
 node tests/team_integration.mjs
-node tests/client_smoke.mjs
-node scripts/check-client-architecture.mjs
+node tests/server_integration.mjs
+node tests/protocol_parity.mjs
 ```
 
-Required automated scenarios:
+Required scenarios:
 
-- `isAllyOwner` and `isEnemyOwner` classify from `start.players`.
-- Box selection skips allied units.
-- Single-click can select an allied entity for inspection.
-- Allied-only selection produces no command emission.
-- Right-clicking an allied entity with own units selected sends move, not attack.
-- Minimap or renderer contract distinguishes ally from enemy.
-- Score table renders Team column and highlights all winning-team rows.
-- Prediction remains own-unit-only.
+- Solo sandbox starts and does not resolve to a winner.
+- A 2v2 does not end when one player on a team loses all buildings.
+- A 2v2 ends when all players on one team are defeated.
+- Defeated player on a living team does not receive early `gameOver`.
+- Final team victory sends winning result to every connected teammate on the winning team.
+- FFA still resolves with the same `winnerId` semantics as today.
 
 ## Acceptance Criteria
 
-- Allied units are inspectable but not commandable.
-- Allied units are not attackable through normal UI command targeting.
-- Own-only command and prediction paths stay own-only.
-- Team score display is clear and test-covered.
+- Team victory and defeat are authoritative in the room task.
+- Game-over payloads carry `winnerTeamId` and documented `winnerId` compatibility behavior.
+- Score rows remain per-player and team-stamped.
+- No shared economy, shared production, or shared command authority is introduced.
 
 ## Manual Testing Focus
 
-One browser pass: click an allied unit, box near allied units, right-click an allied unit with own
-units selected, and inspect the score screen. Prefer using an automated setup URL or scripted team
-room created by `tests/team_integration.mjs`.
+Optional single-browser check of a scripted 2v2 AI setup only if automated team victory coverage is
+ambiguous.
 
 ## Handoff Requirements
 
-The phase handoff must distinguish relationship replacements from strict ownership checks and name
-the tests that prove no allied command is emitted.
+The phase handoff must describe winner-id compatibility decisions, team defeat tests, and any match
+history implications deferred to the replay/history phase.

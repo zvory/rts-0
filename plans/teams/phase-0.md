@@ -16,8 +16,9 @@ four browser tabs.
   Phase 1.
 - Add a placeholder or initial `tests/team_integration.mjs` that verifies today's FFA-compatible
   baseline and documents future scenario slots.
-- Add small Rust test helpers for constructing `PlayerInit`, `PlayerStart`, `PlayerScore`, and team
-  relationship fixtures once Phase 1 adds team fields.
+- Add small Rust/JS fixture helpers or identify the right helper locations for constructing
+  `PlayerInit`, `PlayerStart`, `PlayerScore`, replay player specs, branch seats, and start payloads
+  once Phase 1 adds team fields.
 - Update `tests/select-suites.mjs` only if needed so future teams-plan files and team-related code
   select the new team integration suite.
 
@@ -49,6 +50,8 @@ the port behavior in the test file.
 - A scripted test can create a room, connect multiple clients, add AIs, ready humans, start a match,
   and observe start/snapshot/game-over messages without manual browser interaction.
 - The helper API is general enough for 1v2, 1v3, and 2v2 scenarios once team commands exist.
+- The team integration suite states whether it starts its own server or requires an already-running
+  server, and documents the port behavior.
 - Existing FFA, AI seating, and server integration behavior still pass.
 - Future phases can add team assertions without copying WebSocket orchestration into every test.
 

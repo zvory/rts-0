@@ -1,96 +1,79 @@
-# Phase 4 - Shared Vision, Projection, and Event Delivery
+# Phase 4 - Team-Safe Damage, Effects, and Notices
 
 Status: planned.
 
 ## Goal
 
-Make allied line of sight and events work without leaking hidden enemy information. Allies should
-share current vision, explored history should naturally accumulate on the client, and support-fire
-markers such as mortar fire should be visible to teammates.
+Make damage resolution and combat feedback respect team relationships. Allies should not be damaged,
+credited, or treated as hostile through direct-fire, overpenetration, support-weapon, or damage
+reaction paths under the initial no-friendly-fire rule.
 
 ## Scope
 
-- Recompute authoritative current fog by team, or stamp each entity's sight into every allied
-  player's grid.
-- Keep neutral resource nodes from granting vision.
-- Preserve smoke blocking and lingering death sight semantics under team vision.
-- Project full allied entity details:
-  - hp/state/facing/setup state
-  - production kind/progress/queue length
-  - research progress/queue length
-  - build progress
-  - worker latched node
-  - safe combat target ids and weapon facing
-- Keep local-player-only details private where appropriate:
-  - resources
-  - supply
-  - upgrades
-  - rally and order plans unless deliberately made ally-visible
-  - command authority
-- Deliver team-safe events:
-  - allies receive events for allied attacks, deaths, construction, mortar launches, mortar impacts,
-    artillery target markers, artillery impacts, smoke launches, and under-attack notices as
-    appropriate
-  - enemies receive events only when their team can currently see the relevant origin or target
-  - hidden enemy positions and `targetId` tracers must not leak to any team member
-- Ensure `visibleTiles` sent to each player reflects team current vision.
-- Ensure remembered buildings are based on team-visible observations without duplicating or leaking
-  stale hidden positions incorrectly.
+- Replace hostile checks in direct damage and damage attribution with the relationship API.
+- Overpenetration must not damage allied entities behind an enemy.
+- Mortar and artillery area damage must not damage allies unless a future explicit friendly-fire rule
+  is added.
+- Smoke, point-fire, mortar-fire, and other ability effect paths must classify allies separately from
+  enemies where they interact with damage or attack feedback.
+- Last-damage owner, last-damage position, kill credit, and score increments should record only enemy
+  damage/kills.
+- Worker retreat should react to enemy damage, not allied or non-hostile damage.
+- Under-attack notices should go to the victim's team where appropriate, but this phase should not
+  broaden fog/event visibility beyond the owner/team recipients explicitly tested here.
+- Keep victory/game-over semantics unchanged until the next phase.
 
 ## Expected Touch Points
 
 - `docs/design/server-sim.md`
 - `docs/design/protocol.md`
 - `docs/design/hardening.md`
-- `server/crates/sim/src/game/fog.rs`
-- `server/crates/sim/src/game/snapshot.rs`
-- `server/crates/sim/src/rules/projection.rs`
-- `server/crates/sim/src/game/building_memory.rs`
+- `server/crates/sim/src/game/teams.rs`
 - `server/crates/sim/src/game/mortar.rs`
 - `server/crates/sim/src/game/artillery.rs`
-- `server/crates/sim/src/game/smoke.rs`
-- `server/crates/sim/src/game/services/combat/events.rs`
+- `server/crates/sim/src/game/services/combat/`
 - `server/crates/sim/src/game/services/death.rs`
+- `server/crates/sim/src/game/scoring.rs`
+- `server/crates/sim/src/game/services/ability_orders.rs`
 - `tests/team_integration.mjs`
 - `tests/regression.mjs`
-- `tests/tri_state/scenarios/` if a compact hidden-target leak scenario is useful
 
 ## Verification
 
 ```bash
-cd server && cargo test fog --workspace
-cd server && cargo test projection --workspace
 cd server && cargo test team --workspace
-node tests/team_integration.mjs
+cd server && cargo test combat --workspace
 node tests/regression.mjs
+node tests/team_integration.mjs
 ```
 
-Required automated scenarios:
+Required Rust scenarios:
 
-- Ally scout reveals an enemy to a teammate's snapshot.
-- Enemy outside all allied sight is absent from every teammate snapshot.
-- Allied production building exposes full read-only details.
-- Player with no own entities but living allies still receives team vision.
-- Mortar launch/target markers are visible to the firing player's allies.
-- Artillery point-fire markers and launch/impact events follow explicit team visibility rules.
-- Hidden enemy `targetId`, death positions, attack reveals, and remembered buildings do not leak
-  through ally sharing.
-- Shared `visibleTiles` updates cause client explored history to accumulate from allied vision in a
-  headless or smoke-testable path.
+- Overpenetration does not damage an allied entity behind an enemy.
+- Mortar and artillery area damage do not damage allies under the selected team rules.
+- Kill credit is not awarded for allied or non-hostile damage.
+- Last-damage owner/position are not updated by allied or non-hostile damage.
+- Worker retreat is triggered by enemy damage and not by allied/non-hostile damage.
+- Under-attack notices are sent to the victim's team and not to unrelated players.
+
+Required Node scenarios:
+
+- A malicious client cannot use allied attack ids or support-fire commands to damage allied units.
+- FFA damage and scoring behavior remains compatible.
 
 ## Acceptance Criteria
 
-- Server-authoritative shared current vision works for every teammate.
-- Allied full-detail snapshots work without granting command authority.
-- Support-fire markers are visible to allies.
-- Hidden enemy data remains hidden from the whole opposing team.
+- Damage, score attribution, and damage reaction behavior use central relationship helpers.
+- Initial team games have no friendly fire through normal combat and support-weapon paths.
+- Remaining raw owner comparisons are documented as strict ownership, neutral/resource logic, or
+  explicit follow-up work.
 
 ## Manual Testing Focus
 
-Use one scripted browser/dev scenario, if available, to visually confirm allied mortar/artillery
-markers and fog dimming. Manual multi-tab setup should not be required.
+None expected unless support-weapon behavior needs a one-off visual inspection. Prefer a scripted
+dev scenario if visual inspection is needed.
 
 ## Handoff Requirements
 
-The phase handoff must identify the projection privacy rules, list event types audited, and note any
-event intentionally kept owner-only.
+The phase handoff must list every damage/effect surface audited, describe the friendly-fire rule
+implemented, and call out any intentionally owner-only notices or feedback.
