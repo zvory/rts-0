@@ -352,6 +352,9 @@ export class Lobby {
   constructor(rootEl, net)
   show(), hide()
   // renders player list + ready/start/spectator role; calls net.join/ready/start/setSpectator.
+  // Host lobby controls expose team presets (ffa, solo, 1v2, 1v3, 2v2), grouped team rows,
+  // per-seat team assignment, and per-team AI add buttons through Net setTeamPreset/setTeam/addAi.
+  // Non-hosts see the selected preset and team labels without mutation controls.
   onGameStart(cb)                        // main.js subscribes to transition to game screen
 }
 ```
@@ -362,7 +365,9 @@ export class Lobby {
 (compute `alpha` from snapshot timing, `camera.update`,
 `audio.setListener`, `input.update`, `fog.update`, `renderer.render`, `hud.update`,
 `minimap.render`); on each snapshot it applies state and triggers transient event audio exactly
-once; on `gameOver` show the victory/defeat overlay with the frozen score table.
+once; on `gameOver` show the victory/defeat overlay with the frozen score table. The score table
+includes a Team column, highlights every row matching `winnerTeamId`, and falls back to `winnerId`
+for singleton FFA compatibility.
 For spectator starts, `match.js` hides the command card and give-up action, computes local fog from
 the server-filtered union snapshot, and keeps the ordinary renderer/minimap/HUD pointed at snapshots
 with `playerResources`.

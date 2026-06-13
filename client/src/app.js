@@ -29,6 +29,7 @@ import { MatchHistory } from "./match_history.js";
 import { readPredictionEnabled, writePredictionEnabled } from "./prediction_settings.js";
 import { createReplayAnalysisOverlayPreferences } from "./replay_analysis_overlay.js";
 import { ReplayViewer } from "./replay_viewer.js";
+import { formatTeamLabel, scoreRowIsWinner } from "./scoreboard.js";
 import { StatusBadge } from "./status_badge.js";
 import {
   HotkeyProfileService,
@@ -317,7 +318,7 @@ export class App {
   /**
    * Match resolved. Show the overlay with the right verdict; the button
    * (wired in start()) returns to the lobby and tears the match down.
-   * @param {{winnerId: number|null, you: "won"|"lost"|"draw"}} m
+   * @param {{winnerId: number|null, winnerTeamId?: number|null, you: "won"|"lost"|"draw"}} m
    */
   onGameOver(m) {
     const verdict = m && m.you ? m.you : "draw";
@@ -327,7 +328,11 @@ export class App {
     else if (verdict === "lost") this.audio.play("defeat", { category: "ui", priority: 5 });
     dom.gameOverText.textContent = text;
     dom.gameOverText.dataset.verdict = verdict; // lets CSS tint win/lose/draw
-    this.renderScoreboard(Array.isArray(m?.scores) ? m.scores : [], m?.winnerId ?? null);
+    this.renderScoreboard(
+      Array.isArray(m?.scores) ? m.scores : [],
+      m?.winnerId ?? null,
+      m?.winnerTeamId ?? null,
+    );
     dom.gameOver.hidden = false;
     // Freeze the loop but keep the final frame visible behind the overlay.
     if (this.match) this.match.stop();
@@ -337,8 +342,9 @@ export class App {
    * Render the frozen score snapshot carried by the gameOver message.
    * @param {Array<object>} scores
    * @param {number|null} winnerId
+   * @param {number|null} winnerTeamId
    */
-  renderScoreboard(scores, winnerId) {
+  renderScoreboard(scores, winnerId, winnerTeamId = null) {
     const root = dom.gameOverScores;
     if (!root) return;
     root.replaceChildren();
@@ -353,6 +359,7 @@ export class App {
     const header = document.createElement("tr");
     const columns = [
       ["player", "Player"],
+      ["teamId", "Team"],
       ["unitScore", "Unit score"],
       ["structureScore", "Structure score"],
       ["unitsKilled", "Units killed"],
@@ -374,7 +381,7 @@ export class App {
       const tr = document.createElement("tr");
       const id = Number(score?.id);
       if (Number.isFinite(id) && id === this.net.playerId) tr.classList.add("you");
-      if (winnerId != null && Number.isFinite(id) && id === Number(winnerId)) {
+      if (scoreRowIsWinner(score, winnerId, winnerTeamId)) {
         tr.classList.add("winner");
       }
 
@@ -389,7 +396,12 @@ export class App {
       player.append(swatch, name);
       tr.appendChild(player);
 
-      for (const [key] of columns.slice(1)) {
+      const team = document.createElement("td");
+      team.className = "score-team";
+      team.textContent = formatTeamLabel(score?.teamId);
+      tr.appendChild(team);
+
+      for (const [key] of columns.slice(2)) {
         const td = document.createElement("td");
         td.className = "score-number";
         td.textContent = formatScore(score?.[key]);
