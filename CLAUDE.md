@@ -78,6 +78,9 @@ the server simulates at 30 Hz and sends per-player, fog-filtered snapshots.
 - Use the commit hook for full-suite coverage only when the change is ready to merge. During
   development, run only targeted tests that match the files or contracts changed instead of running
   large local test sets yourself. For docs-only changes, commit with `--no-verify`.
+- If the commit hook fails because of a confirmed unrelated change, commit the task changes with
+  `--no-verify`, merge the task branch, and continue. Do not stop to check whether `main` is
+  currently failing.
 - Commit messages should be detailed. Use a clear subject and include a body when the change has
   gameplay impact, contract changes, testing nuance, or non-obvious reasoning.
 - Work directly on `main` for simple single-agent changes. For parallel worktree changes, use one
