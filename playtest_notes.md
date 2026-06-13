@@ -1,3 +1,7 @@
+when a mortar is autocasting on a unit that is attack moved but stantionary, it keeps predicted their attack will not be at their location
+
+
+
 make it so tanks take up more selection slots
 
 

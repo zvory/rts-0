@@ -28,7 +28,7 @@ artifacts, and a consistent stream of increasingly sophisticated attacks.
   the back of the enemy steel line.
 - Do not require split attacks, retreat/regroup, mortar dodging, offensive worker use, building
   ignore logic, or focused unit targeting for the first launch version.
-- Scout Cars should eventually use smoke against enemy combat units, especially Machine Gunners,
+- Scout Cars should eventually use smoke against enemy combat units, especially Machine Gunners or other staionary support weapons,
   rather than smoking workers.
 
 ## Core Model
@@ -79,7 +79,7 @@ tests while keeping the current saturation AI unchanged. The outcome is a debugg
 that can explain what phase it is in, what goal it is pursuing, and why a goal is blocked.
 
 Phase 3 implements the economy, build, and production managers for the 1.0 plan. It makes the new
-AI saturate steel, expand earlier for oil, build the required tech path, produce Riflemen, then
+AI saturate steel, produce Riflemen and attack with them, expand earlier for oil, build the required tech path, then
 Scout Cars, then Tanks, and avoid supply stalls. The outcome is a macro-capable fair AI that can
 reach the required tech arc from both opening and seeded mid-game states.
 
