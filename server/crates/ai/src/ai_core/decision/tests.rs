@@ -1,5 +1,7 @@
 use super::defense::main_steel_cluster_center;
-use super::expansion::{expansion_candidate_resources, expansion_city_centre_site};
+use super::expansion::{
+    expansion_candidate_resources, expansion_city_centre_site, nearest_enemy_start_distance2,
+};
 use super::geometry::{
     building_center, dist2, footprint_edge_distance_tiles, normalized_direction,
     point_line_distance2, squared,
@@ -165,12 +167,14 @@ fn observation(economy: AiEconomy, owned: Vec<AiEntitySummary>) -> AiObservation
         players: vec![
             AiPlayerSummary {
                 id: 1,
+                team_id: 1,
                 start_tile: (8, 8),
                 is_ai: true,
                 is_alive: true,
             },
             AiPlayerSummary {
                 id: 2,
+                team_id: 2,
                 start_tile: (48, 48),
                 is_ai: false,
                 is_alive: true,
@@ -178,6 +182,7 @@ fn observation(economy: AiEconomy, owned: Vec<AiEntitySummary>) -> AiObservation
         ],
         owned,
         resources,
+        visible_allies: Vec::new(),
         visible_enemies: Vec::new(),
         pending_builds: Vec::new(),
         upgrades: Vec::new(),
@@ -214,6 +219,53 @@ fn with_enemy_main_resources(mut observation: AiObservation) -> AiObservation {
     ));
     observation.resources.sort_by_key(|resource| resource.id);
     observation
+}
+
+#[test]
+fn expansion_enemy_start_distance_ignores_allied_starts() {
+    let mut observation = observation(
+        AiEconomy {
+            steel: 0,
+            oil: 0,
+            supply_used: 0,
+            supply_cap: 0,
+        },
+        Vec::new(),
+    );
+    observation.own_start_tile = (8, 8);
+    observation.players = vec![
+        AiPlayerSummary {
+            id: 1,
+            team_id: 7,
+            start_tile: (8, 8),
+            is_ai: true,
+            is_alive: true,
+        },
+        AiPlayerSummary {
+            id: 2,
+            team_id: 7,
+            start_tile: (10, 8),
+            is_ai: true,
+            is_alive: true,
+        },
+        AiPlayerSummary {
+            id: 3,
+            team_id: 3,
+            start_tile: (24, 8),
+            is_ai: true,
+            is_alive: true,
+        },
+    ];
+    let ally_center = tile_center((10, 8), observation.map.tile_size);
+    let enemy_center = tile_center((24, 8), observation.map.tile_size);
+
+    let distance2 = nearest_enemy_start_distance2(&observation, ally_center.0, ally_center.1)
+        .expect("enemy start should be considered");
+
+    assert_eq!(
+        distance2,
+        dist2(ally_center.0, ally_center.1, enemy_center.0, enemy_center.1)
+    );
 }
 
 fn enemy_base_fact(observation: &AiObservation) -> EnemyBaseFact {
@@ -1181,12 +1233,14 @@ fn steel_expansion_tanks_places_expansion_cc_in_range_of_whole_resource_line() {
         players: vec![
             AiPlayerSummary {
                 id: 1,
+                team_id: 1,
                 start_tile: (10, 85),
                 is_ai: true,
                 is_alive: true,
             },
             AiPlayerSummary {
                 id: 2,
+                team_id: 2,
                 start_tile: (85, 10),
                 is_ai: false,
                 is_alive: true,
@@ -1194,6 +1248,7 @@ fn steel_expansion_tanks_places_expansion_cc_in_range_of_whole_resource_line() {
         ],
         owned,
         resources,
+        visible_allies: Vec::new(),
         visible_enemies: Vec::new(),
         pending_builds: Vec::new(),
         upgrades: Vec::new(),
@@ -1289,12 +1344,14 @@ fn steel_expansion_tanks_prefers_closer_natural_resource_cluster() {
         players: vec![
             AiPlayerSummary {
                 id: 1,
+                team_id: 1,
                 start_tile: (10, 85),
                 is_ai: true,
                 is_alive: true,
             },
             AiPlayerSummary {
                 id: 2,
+                team_id: 2,
                 start_tile: (85, 10),
                 is_ai: false,
                 is_alive: true,
@@ -1302,6 +1359,7 @@ fn steel_expansion_tanks_prefers_closer_natural_resource_cluster() {
         ],
         owned,
         resources,
+        visible_allies: Vec::new(),
         visible_enemies: Vec::new(),
         pending_builds: Vec::new(),
         upgrades: Vec::new(),
@@ -1373,12 +1431,14 @@ fn expansion_site_selection_prefers_oil_over_steel_only_output() {
         players: vec![
             AiPlayerSummary {
                 id: 1,
+                team_id: 1,
                 start_tile: (10, 85),
                 is_ai: true,
                 is_alive: true,
             },
             AiPlayerSummary {
                 id: 2,
+                team_id: 2,
                 start_tile: (86, 10),
                 is_ai: false,
                 is_alive: true,
@@ -1386,6 +1446,7 @@ fn expansion_site_selection_prefers_oil_over_steel_only_output() {
         ],
         owned,
         resources,
+        visible_allies: Vec::new(),
         visible_enemies: Vec::new(),
         pending_builds: Vec::new(),
         upgrades: Vec::new(),
@@ -1423,12 +1484,14 @@ fn expansion_site_selection_filters_resource_range_before_placeable() {
     observation.players = vec![
         AiPlayerSummary {
             id: 1,
+            team_id: 1,
             start_tile: observation.own_start_tile,
             is_ai: true,
             is_alive: true,
         },
         AiPlayerSummary {
             id: 2,
+            team_id: 2,
             start_tile: (88, 88),
             is_ai: false,
             is_alive: true,
@@ -1499,12 +1562,14 @@ fn steel_expansion_tanks_prefers_safer_natural_when_distances_are_similar() {
         players: vec![
             AiPlayerSummary {
                 id: 1,
+                team_id: 1,
                 start_tile: (10, 85),
                 is_ai: true,
                 is_alive: true,
             },
             AiPlayerSummary {
                 id: 2,
+                team_id: 2,
                 start_tile: (85, 85),
                 is_ai: false,
                 is_alive: true,
@@ -1512,6 +1577,7 @@ fn steel_expansion_tanks_prefers_safer_natural_when_distances_are_similar() {
         ],
         owned,
         resources,
+        visible_allies: Vec::new(),
         visible_enemies: Vec::new(),
         pending_builds: Vec::new(),
         upgrades: Vec::new(),

@@ -47,8 +47,11 @@ fn resolve_build_id() -> String {
     if let Some(id) = env_build_id() {
         return id;
     }
-    git_output(env!("CARGO_MANIFEST_DIR"), &["rev-parse", "--short=12", "HEAD"])
-        .unwrap_or_else(|| "unknown".to_string())
+    git_output(
+        env!("CARGO_MANIFEST_DIR"),
+        &["rev-parse", "--short=12", "HEAD"],
+    )
+    .unwrap_or_else(|| "unknown".to_string())
 }
 
 fn env_build_id() -> Option<String> {
@@ -206,6 +209,7 @@ pub fn run_profile_matchup_result(
                 tick,
                 start: &start,
                 snapshot: &snapshot,
+                alive_player_ids: &alive,
             };
             for command in script.commands(view) {
                 commands.push((player_id, command));

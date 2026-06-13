@@ -381,7 +381,7 @@ pub(super) fn nearest_enemy_start_distance2(
     observation
         .players
         .iter()
-        .filter(|player| player.id != observation.player_id && player.is_alive)
+        .filter(|player| player.is_alive && observation.is_enemy_player(player.id))
         .map(|player| {
             let center = tile_center(player.start_tile, observation.map.tile_size);
             dist2(x, y, center.0, center.1)

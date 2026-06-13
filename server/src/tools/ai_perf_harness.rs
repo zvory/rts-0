@@ -424,6 +424,7 @@ fn enqueue_live_ai_commands(game: &mut Game, controllers: &mut [AiController]) {
                 .think(AiThinkContext {
                     start: &start,
                     snapshot: &snapshot,
+                    alive_player_ids: &alive,
                     retreat_commands: game.worker_retreat_commands_for(player_id),
                 })
                 .into_iter()

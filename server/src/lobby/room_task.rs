@@ -2835,10 +2835,11 @@ impl RoomTask {
                 return;
             }
             let start = game.start_payload();
+            let alive_player_ids = game.alive_players();
             let mut commands = Vec::new();
             for controller in &mut self.ai_controllers {
                 let player_id = controller.player_id();
-                if !game.alive_players().contains(&player_id) {
+                if !alive_player_ids.contains(&player_id) {
                     continue;
                 }
                 let snapshot = game.snapshot_for(player_id);
@@ -2847,6 +2848,7 @@ impl RoomTask {
                         .think(AiThinkContext {
                             start: &start,
                             snapshot: &snapshot,
+                            alive_player_ids: &alive_player_ids,
                             retreat_commands: game.worker_retreat_commands_for(player_id),
                         })
                         .into_iter()

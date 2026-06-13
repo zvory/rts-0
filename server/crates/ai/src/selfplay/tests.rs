@@ -168,6 +168,7 @@ impl SelfPlayRunner {
                     tick,
                     start: &self.start,
                     snapshot,
+                    alive_player_ids: &alive,
                 };
                 for command in script.commands(view) {
                     commands.push((pid, script.name(), command));
@@ -896,6 +897,7 @@ fn profile_matchup_rifle_flood_full_saturation_vs_tech_to_tanks_20k_result() {
                 tick,
                 start: &start,
                 snapshot: &snapshot,
+                alive_player_ids: &alive,
             };
             for command in script.commands(view) {
                 commands.push((player_id, command));
@@ -1123,6 +1125,7 @@ fn scripted_self_play_mine_only_steel_fairness() {
         .iter()
         .map(|p| (p.id, game.snapshot_for(p.id)))
         .collect();
+    let alive_player_ids = game.alive_players();
     let mut commands = Vec::new();
     for script in &mut scripts {
         let pid = script.player_id();
@@ -1134,6 +1137,7 @@ fn scripted_self_play_mine_only_steel_fairness() {
             tick: 0,
             start: &start,
             snapshot,
+            alive_player_ids: &alive_player_ids,
         };
         commands.extend(
             script
@@ -1178,6 +1182,8 @@ fn assert_scripted_runs_identical_for_ticks(
     ticks: u32,
 ) {
     for tick in 0..ticks {
+        let alive_a = game_a.alive_players();
+        let alive_b = game_b.alive_players();
         let snapshots_a: BTreeMap<u32, Snapshot> = players
             .iter()
             .map(|p| (p.id, game_a.snapshot_for(p.id)))
@@ -1205,6 +1211,7 @@ fn assert_scripted_runs_identical_for_ticks(
                 tick,
                 start,
                 snapshot,
+                alive_player_ids: &alive_a,
             };
             commands_a.extend(
                 script
@@ -1224,6 +1231,7 @@ fn assert_scripted_runs_identical_for_ticks(
                 tick,
                 start,
                 snapshot,
+                alive_player_ids: &alive_b,
             };
             commands_b.extend(
                 script
@@ -1313,6 +1321,7 @@ fn pending_tracker_view<'a>(
         tick,
         start,
         snapshot,
+        alive_player_ids: &[1],
     }
 }
 
@@ -1521,6 +1530,7 @@ fn real_ai_vs_real_ai() {
                         .think(AiThinkContext {
                             start: &start,
                             snapshot: &snapshot,
+                            alive_player_ids: &alive_players,
                             retreat_commands: game.worker_retreat_commands_for(player_id),
                         })
                         .into_iter()

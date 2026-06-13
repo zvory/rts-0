@@ -37,6 +37,7 @@ pub fn random_live_profile_id(rng: &mut impl Rng) -> &'static str {
 pub struct AiThinkContext<'a> {
     pub start: &'a StartPayload,
     pub snapshot: &'a Snapshot,
+    pub alive_player_ids: &'a [u32],
     pub retreat_commands: Vec<SimCommand>,
 }
 
@@ -94,13 +95,15 @@ impl AiController {
             tick,
             start: context.start,
             snapshot: context.snapshot,
+            alive_player_ids: context.alive_player_ids,
         };
         self.pending_builds.observe(view);
-        let Some(observation) = AiObservation::from_selfplay_snapshot(
+        let Some(observation) = AiObservation::from_snapshot_with_alive(
             context.start,
             context.snapshot,
             self.player,
             self.pending_builds.intents(),
+            Some(context.alive_player_ids),
         ) else {
             return commands;
         };

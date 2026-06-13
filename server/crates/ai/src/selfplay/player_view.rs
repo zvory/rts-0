@@ -22,6 +22,7 @@ pub(crate) struct PlayerView<'a> {
     pub(crate) tick: u32,
     pub(crate) start: &'a StartPayload,
     pub(crate) snapshot: &'a Snapshot,
+    pub(crate) alive_player_ids: &'a [u32],
 }
 
 impl PlayerView<'_> {
@@ -29,11 +30,12 @@ impl PlayerView<'_> {
         self,
         pending_builds: impl IntoIterator<Item = AiBuildIntent>,
     ) -> Option<AiObservation> {
-        AiObservation::from_selfplay_snapshot(
+        AiObservation::from_snapshot_with_alive(
             self.start,
             self.snapshot,
             self.player_id,
             pending_builds,
+            Some(self.alive_player_ids),
         )
     }
 }

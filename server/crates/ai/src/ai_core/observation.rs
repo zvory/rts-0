@@ -3,6 +3,7 @@ use std::collections::BTreeMap;
 use rts_rules;
 use rts_sim::game::entity::{EntityKind, NEUTRAL};
 use rts_sim::game::upgrade::UpgradeKind;
+use rts_sim::game::TeamId;
 use rts_sim::protocol::{states, EntityView, Snapshot, StartPayload};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -23,6 +24,7 @@ pub(crate) struct AiEconomy {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct AiPlayerSummary {
     pub(crate) id: u32,
+    pub(crate) team_id: TeamId,
     pub(crate) start_tile: (u32, u32),
     pub(crate) is_ai: bool,
     pub(crate) is_alive: bool,
@@ -118,17 +120,29 @@ pub(crate) struct AiObservation {
     pub(crate) players: Vec<AiPlayerSummary>,
     pub(crate) owned: Vec<AiEntitySummary>,
     pub(crate) resources: Vec<AiResourceSummary>,
+    pub(crate) visible_allies: Vec<AiEntitySummary>,
     pub(crate) visible_enemies: Vec<AiEntitySummary>,
     pub(crate) pending_builds: Vec<AiBuildIntent>,
     pub(crate) upgrades: Vec<UpgradeKind>,
 }
 
 impl AiObservation {
+    #[allow(dead_code)]
     pub(crate) fn from_selfplay_snapshot(
         start: &StartPayload,
         snapshot: &Snapshot,
         player_id: u32,
         pending_builds: impl IntoIterator<Item = AiBuildIntent>,
+    ) -> Option<Self> {
+        Self::from_snapshot_with_alive(start, snapshot, player_id, pending_builds, None)
+    }
+
+    pub(crate) fn from_snapshot_with_alive(
+        start: &StartPayload,
+        snapshot: &Snapshot,
+        player_id: u32,
+        pending_builds: impl IntoIterator<Item = AiBuildIntent>,
+        alive_player_ids: Option<&[u32]>,
     ) -> Option<Self> {
         let own_start_tile = start
             .players
@@ -152,12 +166,19 @@ impl AiObservation {
             .iter()
             .map(|p| AiPlayerSummary {
                 id: p.id,
+                team_id: p.team_id,
                 start_tile: (p.start_tile_x, p.start_tile_y),
                 is_ai: false,
-                is_alive: true,
+                is_alive: alive_player_ids
+                    .map(|ids| ids.contains(&p.id))
+                    .unwrap_or(true),
             })
             .collect();
         players.sort_by_key(|p| p.id);
+        let own_team_id = players
+            .iter()
+            .find(|player| player.id == player_id)
+            .map(|player| player.team_id)?;
 
         let mut owned: Vec<AiEntitySummary> = snapshot
             .entities
@@ -207,12 +228,30 @@ impl AiObservation {
         let mut visible_enemies: Vec<AiEntitySummary> = snapshot
             .entities
             .iter()
-            .filter(|e| e.owner != NEUTRAL && e.owner != player_id)
+            .filter(|e| {
+                e.owner != NEUTRAL
+                    && e.owner != player_id
+                    && entity_owner_is_enemy(&players, player_id, own_team_id, e.owner)
+            })
             .filter(|e| !e.vision_only)
             .filter_map(AiEntitySummary::from_entity_view)
             .filter(|e| e.kind.is_unit() || e.kind.is_building())
             .collect();
         visible_enemies.sort_by_key(|e| e.id);
+
+        let mut visible_allies: Vec<AiEntitySummary> = snapshot
+            .entities
+            .iter()
+            .filter(|e| {
+                e.owner != NEUTRAL
+                    && e.owner != player_id
+                    && entity_owner_is_ally(&players, own_team_id, e.owner)
+            })
+            .filter(|e| !e.vision_only)
+            .filter_map(AiEntitySummary::from_entity_view)
+            .filter(|e| e.kind.is_unit() || e.kind.is_building())
+            .collect();
+        visible_allies.sort_by_key(|e| e.id);
 
         let mut pending_builds: Vec<AiBuildIntent> = pending_builds.into_iter().collect();
         pending_builds.sort_unstable();
@@ -234,11 +273,52 @@ impl AiObservation {
             players,
             owned,
             resources,
+            visible_allies,
             visible_enemies,
             pending_builds,
             upgrades,
         })
     }
+
+    pub(crate) fn is_enemy_player(&self, player_id: u32) -> bool {
+        let Some(own) = self
+            .players
+            .iter()
+            .find(|player| player.id == self.player_id)
+        else {
+            return false;
+        };
+        player_id != self.player_id
+            && self
+                .players
+                .iter()
+                .find(|player| player.id == player_id)
+                .map(|player| player.team_id != own.team_id || own.team_id == 0)
+                .unwrap_or(false)
+    }
+}
+
+fn entity_owner_is_enemy(
+    players: &[AiPlayerSummary],
+    player_id: u32,
+    own_team_id: TeamId,
+    owner: u32,
+) -> bool {
+    owner != player_id
+        && players
+            .iter()
+            .find(|player| player.id == owner)
+            .map(|player| player.team_id != own_team_id || own_team_id == 0)
+            .unwrap_or(false)
+}
+
+fn entity_owner_is_ally(players: &[AiPlayerSummary], own_team_id: TeamId, owner: u32) -> bool {
+    own_team_id != 0
+        && players
+            .iter()
+            .find(|player| player.id == owner)
+            .map(|player| player.team_id == own_team_id)
+            .unwrap_or(false)
 }
 
 impl AiEntitySummary {
@@ -424,6 +504,61 @@ mod tests {
             vec![30]
         );
         assert_eq!(observation.pending_builds.len(), 1);
+    }
+
+    #[test]
+    fn selfplay_observation_classifies_visible_allies_separately_from_enemies() {
+        let mut start = start_payload();
+        start.players.push(PlayerStart {
+            id: 3,
+            team_id: 1,
+            name: "Charlie".into(),
+            color: "#333".into(),
+            start_tile_x: 10,
+            start_tile_y: 10,
+        });
+        let mut snapshot = empty_snapshot(7);
+        snapshot.entities = vec![
+            EntityView::new(
+                20,
+                2,
+                rts_sim::protocol::kind_to_wire(EntityKind::Rifleman),
+                96.0,
+                96.0,
+                1,
+                1,
+                states::IDLE,
+            ),
+            EntityView::new(
+                30,
+                3,
+                rts_sim::protocol::kind_to_wire(EntityKind::Rifleman),
+                64.0,
+                64.0,
+                1,
+                1,
+                states::IDLE,
+            ),
+        ];
+
+        let observation = AiObservation::from_selfplay_snapshot(&start, &snapshot, 1, []).unwrap();
+
+        assert_eq!(
+            observation
+                .visible_enemies
+                .iter()
+                .map(|entity| entity.id)
+                .collect::<Vec<_>>(),
+            vec![20]
+        );
+        assert_eq!(
+            observation
+                .visible_allies
+                .iter()
+                .map(|entity| entity.id)
+                .collect::<Vec<_>>(),
+            vec![30]
+        );
     }
 
     #[test]

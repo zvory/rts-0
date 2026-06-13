@@ -33,9 +33,13 @@ instead of reaching into entity stores from the server layer.
 (`DECISION_INTERVAL` ticks), builds a constrained snapshot-backed `AiObservation` and delegates RTS
 decisions to `rts_ai::ai_core::decision::decide_profile`. Live lobby AIs randomly choose from the
 server-side live profile pool at match start without a lobby protocol or UI change. Each controller
-keeps its chosen profile for the whole match. It does not micro, scout,
-or choose hidden enemy unit positions. A local per-think budget in the shared action layer prevents
-it from over-committing resources/supply it does not have.
+keeps its chosen profile for the whole match. Team relationships are observation-only safety
+inputs: player summaries carry `teamId`, visible allied entities are classified separately from
+`visible_enemies`, public base targeting ignores allied starts, and live decisions receive the
+current living player set so attack waves keep choosing living enemies. AI teammates still do not
+share economy, production, command authority, build orders, attack plans, or a team controller.
+It does not micro, scout, or choose hidden enemy unit positions. A local per-think budget in the
+shared action layer prevents it from over-committing resources/supply it does not have.
 
 **Shared AI core.** `rts_ai::ai_core` has deterministic profile data (`profiles.rs`) and a generic
 ranked decision loop (`decision.rs`) that emits ordinary `SimCommand`s through shared action helpers.

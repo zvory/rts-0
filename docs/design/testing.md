@@ -92,6 +92,10 @@ suites.
 - `rts-ai`: run AI package tests and `node tests/ai_integration.mjs`. Run
   `RTS_FULL_AI_TESTS=1 cargo test` or `tests/run-all.sh --full-ai` when strategy profiles,
   profile-backed self-play, replay determinism, or long-match balance behavior changed.
+  Default AI package coverage includes team-safety assertions for `teamId` observation,
+  visible-ally exclusion from `visible_enemies`, allied-start exclusion from public enemy base /
+  expansion safety, live alive-player target filtering, and real-AI self-play remaining
+  per-player rather than shared-team controlled.
 - `rts-server`: run server/lobby tests, Node live-server integration/regression suites, and client
   smoke when connection, snapshot delivery, room lifecycle, or served client behavior changes.
 - `client/`: run JS protocol/client contract checks, minimap/input contracts where relevant, and

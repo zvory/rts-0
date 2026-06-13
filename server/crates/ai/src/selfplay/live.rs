@@ -40,6 +40,7 @@ impl LiveSelfPlay {
     pub fn enqueue_for_tick(&mut self, game: &mut Game) {
         let tick = game.tick_count();
         let start = game.start_payload();
+        let alive_player_ids = game.alive_players();
         let mut commands = Vec::new();
         for script in &mut self.scripts {
             let player_id = script.player_id();
@@ -49,6 +50,7 @@ impl LiveSelfPlay {
                 tick,
                 start: &start,
                 snapshot: &snapshot,
+                alive_player_ids: &alive_player_ids,
             };
             for command in script.commands(view) {
                 commands.push((player_id, command));

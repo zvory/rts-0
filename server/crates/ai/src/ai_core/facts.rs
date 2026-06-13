@@ -270,7 +270,7 @@ fn nearest_public_enemy_base(observation: &AiObservation) -> Option<EnemyBaseFac
     for player in observation
         .players
         .iter()
-        .filter(|p| p.id != observation.player_id && p.is_alive)
+        .filter(|p| p.is_alive && observation.is_enemy_player(p.id))
     {
         let x = player.start_tile.0 as f32 * ts + ts * 0.5;
         let y = player.start_tile.1 as f32 * ts + ts * 0.5;
@@ -345,12 +345,14 @@ mod tests {
             own_start_tile: (10, 20),
             players: vec![AiPlayerSummary {
                 id: 1,
+                team_id: 1,
                 start_tile: (10, 20),
                 is_ai: false,
                 is_alive: true,
             }],
             owned: Vec::new(),
             resources: Vec::new(),
+            visible_allies: Vec::new(),
             visible_enemies: Vec::new(),
             pending_builds: Vec::new(),
             upgrades: Vec::new(),
@@ -504,18 +506,21 @@ mod tests {
         observation.players = vec![
             AiPlayerSummary {
                 id: 1,
+                team_id: 1,
                 start_tile: (10, 10),
                 is_ai: false,
                 is_alive: true,
             },
             AiPlayerSummary {
                 id: 3,
+                team_id: 3,
                 start_tile: (12, 10),
                 is_ai: false,
                 is_alive: true,
             },
             AiPlayerSummary {
                 id: 2,
+                team_id: 2,
                 start_tile: (8, 10),
                 is_ai: false,
                 is_alive: true,
@@ -534,19 +539,55 @@ mod tests {
         observation.players = vec![
             AiPlayerSummary {
                 id: 1,
+                team_id: 1,
                 start_tile: (10, 10),
                 is_ai: false,
                 is_alive: true,
             },
             AiPlayerSummary {
                 id: 2,
+                team_id: 2,
                 start_tile: (11, 10),
                 is_ai: false,
                 is_alive: false,
             },
             AiPlayerSummary {
                 id: 3,
+                team_id: 3,
                 start_tile: (14, 10),
+                is_ai: false,
+                is_alive: true,
+            },
+        ];
+
+        let facts = AiFacts::from_observation(&observation);
+
+        assert_eq!(facts.nearest_public_enemy_base.unwrap().player_id, 3);
+    }
+
+    #[test]
+    fn nearest_enemy_start_tile_ignores_allied_players() {
+        let mut observation = base_observation();
+        observation.own_start_tile = (10, 10);
+        observation.players = vec![
+            AiPlayerSummary {
+                id: 1,
+                team_id: 7,
+                start_tile: (10, 10),
+                is_ai: false,
+                is_alive: true,
+            },
+            AiPlayerSummary {
+                id: 2,
+                team_id: 7,
+                start_tile: (11, 10),
+                is_ai: false,
+                is_alive: true,
+            },
+            AiPlayerSummary {
+                id: 3,
+                team_id: 3,
+                start_tile: (16, 10),
                 is_ai: false,
                 is_alive: true,
             },
