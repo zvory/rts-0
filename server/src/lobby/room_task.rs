@@ -576,7 +576,7 @@ impl ReplaySession {
             .iter()
             .map(|player| ReplayBranchSeat {
                 player_id: player.id,
-                team_id: player.team_id,
+                team_id: normalize_start_team_id(player.id, player.team_id),
                 name: player.name.clone(),
                 color: player.color.clone(),
                 claimable: true,
@@ -3412,6 +3412,7 @@ impl RoomTask {
             map: &self.match_map_name,
             participants: &self.match_participants,
             winner_id,
+            winner_team_id,
             duration_ms,
             duration_ticks,
             slow_tick_count: self.slow_tick_count,
@@ -4377,6 +4378,42 @@ mod tests {
         assert_eq!(seed.source_replay.duration_ticks, 5);
         assert_eq!(seed.seats.len(), 2);
         assert!(seed.seats.iter().all(|seat| seat.claimable));
+    }
+
+    #[test]
+    fn replay_branch_seed_preserves_team_ids_and_defaults_old_artifacts() {
+        let mut players = replay_test_players(4);
+        players[0].team_id = 1;
+        players[1].team_id = 1;
+        players[2].team_id = 2;
+        players[3].team_id = 2;
+        let (_live, artifact) = replay_test_artifact(&players, 0);
+        let replay = ReplaySession::new(artifact).unwrap();
+        let seed = replay.branch_seed().unwrap();
+
+        assert_eq!(
+            seed.seats
+                .iter()
+                .map(|seat| seat.team_id)
+                .collect::<Vec<_>>(),
+            vec![1, 1, 2, 2]
+        );
+
+        let mut old_players = replay_test_players(2);
+        old_players[0].team_id = 0;
+        old_players[1].team_id = 0;
+        let (_live, old_artifact) = replay_test_artifact(&old_players, 0);
+        let old_replay = ReplaySession::new(old_artifact).unwrap();
+        let old_seed = old_replay.branch_seed().unwrap();
+
+        assert_eq!(
+            old_seed
+                .seats
+                .iter()
+                .map(|seat| seat.team_id)
+                .collect::<Vec<_>>(),
+            vec![1, 2]
+        );
     }
 
     #[test]

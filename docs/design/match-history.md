@@ -33,7 +33,8 @@ public rows, and `(map_name)` for future filtering.
 
 The `score_screen` JSONB intentionally stores the full payload from `Game::scores()`. The shape
 matches `contract::PlayerScore` (camelCase). Adding fields to `PlayerScore` requires no migration;
-old rows simply lack the new fields.
+old rows simply lack the new fields. Team-capable rows include each player's `teamId`, so grouped
+team results are recoverable without adding SQL columns.
 
 Replay artifacts live in `match_replays`, keyed one-to-one by `match_id`:
 
@@ -51,7 +52,9 @@ Replay artifacts live in `match_replays`, keyed one-to-one by `match_id`:
 | `created_at`/`updated_at` | `timestamptz` | Default to `now()` at insert.                        |
 
 `matches.score_screen` remains score data only. Replay playback never reads replay payloads from
-`score_screen`.
+`score_screen`. The replay `artifact_json` carries `players[].teamId`, `winnerId`,
+`winnerTeamId`, and `finalScores[].teamId`; `winner_name` remains the display-compatible name for
+the first living player represented by `winnerId`.
 
 Migrations are versioned SQL files run by `sqlx::migrate!` at server boot. Never hand-apply DDL.
 

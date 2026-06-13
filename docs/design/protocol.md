@@ -243,6 +243,12 @@ running server/map asset or the replay is rejected with a clear error. Saved sel
 the same `ReplayArtifactV1` contract as post-match and match-history replays; pre-unified dev-only
 artifact payloads are rejected instead of falling back to a separate loader.
 
+`ReplayArtifactV1` stores ordered `players[]` with each original `teamId`, the compatibility
+`winnerId`, optional `winnerTeamId`, and `finalScores[]` with each row's `teamId`. Missing
+`players[].teamId`, `finalScores[].teamId`, or `winnerTeamId` in older singleton-FFA artifacts
+defaults through the documented singleton team behavior; new captures always include explicit
+nonzero player and score team ids, and include `winnerTeamId` when there is a winning team.
+
 When a real multi-player match ends, the server sends the normal `gameOver` score payload, clears
 pending latest-only live snapshots for connected humans, and then sends a replay `start` payload
 at tick 0 plus `replayState`. Post-match replay defaults every viewer to all active players'

@@ -31,8 +31,9 @@ const start = {
     resources: [],
   },
   players: [
-    { id: 1, name: "A", color: "#f00", startTileX: 5, startTileY: 5 },
-    { id: 2, name: "B", color: "#00f", startTileX: 50, startTileY: 50 },
+    { id: 1, teamId: 1, name: "A", color: "#f00", startTileX: 5, startTileY: 5 },
+    { id: 2, teamId: 1, name: "B", color: "#0f0", startTileX: 8, startTileY: 5 },
+    { id: 3, teamId: 2, name: "C", color: "#00f", startTileX: 50, startTileY: 50 },
   ],
 };
 const baseline = {
@@ -53,7 +54,14 @@ const baseline = {
       state: "idle",
     },
   ],
-  visibleObstacles: [],
+  visibleObstacles: [
+    {
+      kind: "rifleman",
+      x: 140,
+      y: 100,
+      radius: 9,
+    },
+  ],
 };
 
 if (global.gc) global.gc();
@@ -68,6 +76,7 @@ const rendered = JSON.parse(predictor.renderSnapshotJson());
 const diagnostics = JSON.parse(predictor.diagnosticsJson());
 assert(rendered.tick === 300, `expected tick 300, got ${rendered.tick}`);
 assert(rendered.entities.length === 1, "expected one owned entity");
+assert(rendered.entities[0].owner === 1, "prediction render remains scoped to owned entities");
 assert(rendered.entities[0].x > 100, "worker advanced along move command");
 assert(diagnostics.pendingCommands === 1, "pending command diagnostics survive smoke");
 

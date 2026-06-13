@@ -1,6 +1,6 @@
 # Phase 12 - Replay, Branch, Sim-Wasm, Logs, and Match History
 
-Status: planned.
+Status: implemented.
 
 ## Goal
 
@@ -83,3 +83,18 @@ reasonable. Do not manually replay full matches.
 
 The phase handoff must list replay artifact/schema implications, branch behavior decisions,
 sim-wasm compatibility, and match-history/logging decisions.
+
+## Implementation Notes
+
+- Replay artifact schema stays at `ReplayArtifactV1`; `winnerTeamId` is an optional/defaulted JSON
+  field to avoid schema churn while new captures preserve team outcomes explicitly.
+- Replay artifacts preserve original `players[].teamId` and `finalScores[].teamId`. Older
+  singleton-FFA artifacts that omit player or score team ids continue to load through the existing
+  `teamId == 0 -> playerId` compatibility path.
+- Replay branch creation preserves original team ids for team artifacts and normalizes missing old
+  artifact team ids before exposing branch seats.
+- Sim-wasm continues to parse current team-bearing start payloads but keeps prediction scoped to
+  owned entities only; team relationships are not used for shared local control.
+- Match history keeps the existing SQL schema. `score_screen` JSON carries team-aware score rows,
+  replay `artifact_json` carries `winnerTeamId`, and structured `match_ended` logs include both
+  `winner_id` and `winner_team_id`.
