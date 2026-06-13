@@ -30,6 +30,7 @@ mod production;
 mod proxy;
 mod raids;
 mod resources;
+mod trace;
 
 use self::defense::{
     defensive_panic_barracks_target, defensive_panic_plan, defensive_panic_response,
@@ -60,6 +61,7 @@ use self::resources::{
     desired_oil_workers, max_worker_resource_assignment_distance_px, occupied_resource_nodes,
     resource_worker_counts, target_steel_workers_for_profile,
 };
+use self::trace::{build_manager_trace, ManagerOutputTrace, TraceInput};
 
 const OUTBOUND_WAVE_VISIBLE_TARGET_RADIUS_TILES: f32 = 14.0;
 
@@ -68,6 +70,7 @@ pub(crate) struct AiDecision {
     pub(crate) profile_id: &'static str,
     pub(crate) intents: Vec<AiIntent>,
     pub(crate) commands: Vec<Command>,
+    pub(crate) trace: ManagerOutputTrace,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -272,6 +275,7 @@ where
         observation.economy.supply_cap,
         facts.committed_steel,
     );
+    let start_budget = budget;
     let mut actions = AiActionContext::new(&facts, budget);
     let mut intents = Vec::new();
 
@@ -584,6 +588,9 @@ where
 
     let ready_units =
         actions::select_ready_combat_units(&observation.owned, attack_policy.unit_kinds);
+    let ready_units_count = ready_units.len();
+    let attack_size = memory.desired_attack_size_for(profile, attack_policy, observation.tick);
+    let attack_due = memory.attack_due_for(profile, attack_policy, observation.tick);
     let local_ready_units =
         actions::select_ready_combat_units(&observation.owned, &ALL_COMBAT_UNITS);
     let rifle_raid_policy = is_rifle_raid_policy(attack_policy);
@@ -661,11 +668,9 @@ where
                             .any(|entity| entity.kind == kind && ready_units.contains(&entity.id))
                     })
                     .unwrap_or(true);
-                let attack_size =
-                    memory.desired_attack_size_for(profile, attack_policy, observation.tick);
                 if required_unit_ready
                     && ready_units.len() >= attack_size
-                    && memory.attack_due_for(profile, attack_policy, observation.tick)
+                    && attack_due
                 {
                     let attack_units = if rifle_raid_policy {
                         let (x, y) = rifle_raid_move_target(observation, enemy_base);
@@ -715,10 +720,36 @@ where
         }
     }
 
+    let trace = build_manager_trace(TraceInput {
+        observation,
+        profile,
+        facts: &facts,
+        intents: &intents,
+        command_trace: actions.command_trace(),
+        start_budget,
+        end_budget: *actions.budget(),
+        reservations: actions.reservations().counts(),
+        wants_depot: wants_depot(&facts, profile),
+        save_for_expansion,
+        expansion_blocks_tech_path,
+        save_for_unplanned_expansion,
+        save_for_required_tech_building,
+        save_worker_training_for_tech,
+        defensive_panic_active: defensive_panic.active,
+        local_threat_active: local_threat_response.is_some(),
+        ready_units: ready_units_count,
+        attack_size,
+        attack_due,
+        rifle_raid_policy,
+        rifle_raid_units: rifle_raid_units.len(),
+        required_tech_path,
+    });
+
     AiDecision {
         profile_id: profile.id,
         intents,
         commands: actions.into_commands(),
+        trace,
     }
 }
 

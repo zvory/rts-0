@@ -229,6 +229,14 @@ impl AiFacts {
             .unwrap_or(&[])
     }
 
+    pub(crate) fn production_building_count(&self) -> usize {
+        self.production_buildings.values().map(Vec::len).sum()
+    }
+
+    pub(crate) fn available_builder_count(&self) -> usize {
+        self.build_capable_workers.len()
+    }
+
     #[allow(dead_code)]
     pub(crate) fn free_combat_units(&self, kind: EntityKind) -> &[u32] {
         self.free_combat_units

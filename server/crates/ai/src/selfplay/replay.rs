@@ -22,6 +22,8 @@ use rts_sim::game::replay::{
 use rts_sim::game::{Game, PlayerInit};
 use rts_sim::protocol::{kinds, Command as WireCommand, Event, Snapshot};
 
+const PROFILE_MATCHUP_TRACE_TAIL: usize = 24;
+
 #[derive(Debug)]
 pub struct SelfPlayFailure {
     pub reason: String,
@@ -108,6 +110,7 @@ pub struct ProfileMatchupResult {
     pub event_count: usize,
     pub replay_verified: bool,
     pub replay_artifact: Option<String>,
+    pub ai_trace_tail: Vec<ProfileMatchupTraceEntry>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -138,6 +141,15 @@ pub struct ProfileMatchupPlayerResult {
     pub first_expansion_city_centre_completed_tick: Option<u32>,
     pub first_tank_tick: Option<u32>,
     pub final_counts: BTreeMap<String, u32>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProfileMatchupTraceEntry {
+    pub tick: u32,
+    pub player_id: u32,
+    pub profile: String,
+    pub lines: Vec<String>,
 }
 
 pub fn available_profile_ids() -> Vec<&'static str> {
@@ -200,6 +212,7 @@ pub fn run_profile_matchup_result(
     let mut attack_events = 0usize;
     let mut death_events = 0usize;
     let mut scorecard = ScorecardCollector::default();
+    let mut ai_trace_tail = Vec::new();
 
     while game.tick_count() < options.max_ticks {
         let alive = game.alive_players();
@@ -222,6 +235,17 @@ pub fn run_profile_matchup_result(
             };
             for command in script.commands(view) {
                 commands.push((player_id, command));
+            }
+            if let Some(lines) = script.last_trace_lines() {
+                ai_trace_tail.push(ProfileMatchupTraceEntry {
+                    tick,
+                    player_id,
+                    profile: script.name().to_string(),
+                    lines: lines.to_vec(),
+                });
+                if ai_trace_tail.len() > PROFILE_MATCHUP_TRACE_TAIL {
+                    ai_trace_tail.remove(0);
+                }
             }
         }
         for (player_id, command) in commands {
@@ -365,6 +389,7 @@ pub fn run_profile_matchup_result(
         event_count: event_log.len(),
         replay_verified,
         replay_artifact,
+        ai_trace_tail,
     })
 }
 
@@ -761,7 +786,10 @@ fn final_material_values(game: &Game, players: &[PlayerInit]) -> BTreeMap<u32, M
 
 #[cfg(test)]
 mod tests {
-    use super::{available_profile_ids, canonical_profile_id, ScorecardCollector};
+    use super::{
+        available_profile_ids, canonical_profile_id, run_profile_matchup_result,
+        ProfileMatchupOptions, ScorecardCollector,
+    };
     use crate::ai_core::profiles::RIFLE_FLOOD_FULL_SATURATION_ID;
     use rts_sim::game::command::SimCommand;
     use rts_sim::game::entity::EntityKind;
@@ -866,6 +894,29 @@ mod tests {
         assert_eq!(score.first_expansion_city_centre_planned_tick, Some(130));
         assert_eq!(score.damage_dealt_events, 1);
         assert_eq!(score.death_count, 1);
+    }
+
+    #[test]
+    fn profile_matchup_result_includes_ai_trace_tail() {
+        let result = run_profile_matchup_result(ProfileMatchupOptions {
+            profile_a: RIFLE_FLOOD_FULL_SATURATION_ID.to_string(),
+            profile_b: RIFLE_FLOOD_FULL_SATURATION_ID.to_string(),
+            seed: 7,
+            max_ticks: 12,
+            verify_replay: false,
+            save_replay_name: None,
+            replay_dir: None,
+        })
+        .expect("short profile matchup should run");
+
+        assert!(!result.ai_trace_tail.is_empty());
+        assert!(result.ai_trace_tail.len() <= super::PROFILE_MATCHUP_TRACE_TAIL);
+        assert!(
+            result.ai_trace_tail.iter().any(|entry| entry
+                .lines
+                .iter()
+                .any(|line| line.contains("goal=Economy")))
+        );
     }
 
     fn snapshot(entities: Vec<EntityView>) -> Snapshot {

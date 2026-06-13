@@ -369,6 +369,114 @@ fn decide(
     )
 }
 
+fn trace_goal(
+    decision: &AiDecision,
+    goal: trace::StrategicGoal,
+) -> &trace::GoalTrace {
+    decision
+        .trace
+        .goals
+        .iter()
+        .find(|entry| entry.goal == goal)
+        .expect("trace should include every strategic goal")
+}
+
+#[test]
+fn manager_trace_formats_goals_and_blockers_deterministically() {
+    let observation = observation(
+        AiEconomy {
+            steel: 0,
+            oil: 0,
+            supply_used: 0,
+            supply_cap: 0,
+        },
+        Vec::new(),
+    );
+
+    let first = decide(
+        &observation,
+        &RIFLE_FLOOD_FULL_SATURATION,
+        &mut AiDecisionMemory::for_profile(&RIFLE_FLOOD_FULL_SATURATION),
+    );
+    let second = decide(
+        &observation,
+        &RIFLE_FLOOD_FULL_SATURATION,
+        &mut AiDecisionMemory::for_profile(&RIFLE_FLOOD_FULL_SATURATION),
+    );
+
+    assert_eq!(first.commands, second.commands);
+    assert_eq!(first.intents, second.intents);
+    assert_eq!(first.trace.format_compact(), second.trace.format_compact());
+    assert_eq!(
+        first
+            .trace
+            .goals
+            .iter()
+            .map(|entry| entry.goal)
+            .collect::<Vec<_>>(),
+        vec![
+            trace::StrategicGoal::Economy,
+            trace::StrategicGoal::Supply,
+            trace::StrategicGoal::Expansion,
+            trace::StrategicGoal::Tech,
+            trace::StrategicGoal::Production,
+            trace::StrategicGoal::LocalDefense,
+            trace::StrategicGoal::FrontalAttack,
+            trace::StrategicGoal::Harassment,
+        ]
+    );
+    assert_eq!(
+        trace_goal(&first, trace::StrategicGoal::FrontalAttack).blockers,
+        vec![trace::GoalBlocker::NoReadyUnits]
+    );
+    assert!(
+        first
+            .trace
+            .format_compact()
+            .contains("goal=FrontalAttack status=Skipped blockers=NoReadyUnits")
+    );
+}
+
+#[test]
+fn manager_trace_records_emitted_command_labels() {
+    let observation = observation(
+        AiEconomy {
+            steel: 500,
+            oil: 0,
+            supply_used: 5,
+            supply_cap: 10,
+        },
+        vec![
+            building(1, EntityKind::CityCentre, Some(0)),
+            worker(10, AiEntityState::Idle),
+            worker(11, AiEntityState::Idle),
+        ],
+    );
+
+    let decision = decide(
+        &observation,
+        &RIFLE_FLOOD_FULL_SATURATION,
+        &mut AiDecisionMemory::for_profile(&RIFLE_FLOOD_FULL_SATURATION),
+    );
+
+    assert_eq!(decision.trace.commands.len(), decision.commands.len());
+    assert!(decision.trace.commands.iter().any(|entry| {
+        entry.starts_with("train building=1 unit=Worker")
+    }));
+    assert!(
+        trace_goal(&decision, trace::StrategicGoal::Economy)
+            .intents
+            .iter()
+            .any(|intent| intent == "train:Worker")
+    );
+    assert!(
+        decision
+            .trace
+            .format_compact()
+            .contains("command=train building=1 unit=Worker")
+    );
+}
+
 fn enemy_start_tile(observation: &AiObservation) -> (u32, u32) {
     observation
         .players

@@ -35,9 +35,16 @@ impl SpendBudget {
         }
     }
 
-    #[cfg(test)]
     pub(crate) fn free_supply(&self) -> u32 {
         self.free_supply
+    }
+
+    pub(crate) fn steel(&self) -> u32 {
+        self.steel
+    }
+
+    pub(crate) fn oil(&self) -> u32 {
+        self.oil
     }
 
     pub(crate) fn can_afford_unit(&self, kind: EntityKind) -> bool {
@@ -128,6 +135,7 @@ pub(crate) struct AiActionContext<'a> {
     budget: SpendBudget,
     reservations: AiReservations,
     emitted: Vec<Command>,
+    command_trace: Vec<String>,
 }
 
 impl<'a> AiActionContext<'a> {
@@ -137,10 +145,10 @@ impl<'a> AiActionContext<'a> {
             budget,
             reservations: AiReservations::default(),
             emitted: Vec::new(),
+            command_trace: Vec::new(),
         }
     }
 
-    #[cfg(test)]
     pub(crate) fn budget(&self) -> &SpendBudget {
         &self.budget
     }
@@ -149,7 +157,12 @@ impl<'a> AiActionContext<'a> {
         &self.reservations
     }
 
+    pub(crate) fn command_trace(&self) -> &[String] {
+        &self.command_trace
+    }
+
     pub(crate) fn emit_command(&mut self, command: Command) {
+        self.command_trace.push(command_trace_label(&command));
         self.emitted.push(command);
     }
 
@@ -171,6 +184,155 @@ impl<'a> AiActionContext<'a> {
     pub(crate) fn reserve_worker(&mut self, worker: u32) -> bool {
         self.reservations.reserve_worker(worker)
     }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct ReservationCounts {
+    pub(crate) workers: usize,
+    pub(crate) resource_nodes: usize,
+    pub(crate) production_buildings: usize,
+}
+
+impl AiReservations {
+    pub(crate) fn counts(&self) -> ReservationCounts {
+        ReservationCounts {
+            workers: self.workers.len(),
+            resource_nodes: self.resource_nodes.len(),
+            production_buildings: self.production_buildings.len(),
+        }
+    }
+}
+
+fn command_trace_label(command: &Command) -> String {
+    match command {
+        Command::Move {
+            units,
+            x,
+            y,
+            queued,
+        } => format!(
+            "move units={} x={:.1} y={:.1} queued={}",
+            id_list(units),
+            x,
+            y,
+            queued
+        ),
+        Command::Attack {
+            units,
+            target,
+            queued,
+        } => format!(
+            "attack units={} target={} queued={}",
+            id_list(units),
+            target,
+            queued
+        ),
+        Command::AttackMove {
+            units,
+            x,
+            y,
+            queued,
+        } => format!(
+            "attack_move units={} x={:.1} y={:.1} queued={}",
+            id_list(units),
+            x,
+            y,
+            queued
+        ),
+        Command::Gather {
+            units,
+            node,
+            queued,
+        } => format!(
+            "gather units={} node={} queued={}",
+            id_list(units),
+            node,
+            queued
+        ),
+        Command::Build {
+            units,
+            building,
+            tile_x,
+            tile_y,
+            queued,
+        } => format!(
+            "build units={} building={:?} tile={},{} queued={}",
+            id_list(units),
+            building,
+            tile_x,
+            tile_y,
+            queued
+        ),
+        Command::Train { building, unit } => {
+            format!("train building={} unit={:?}", building, unit)
+        }
+        Command::Research { building, upgrade } => {
+            format!("research building={} upgrade={:?}", building, upgrade)
+        }
+        Command::Cancel { building } => format!("cancel building={}", building),
+        Command::Stop { units } => format!("stop units={}", id_list(units)),
+        Command::SetRally {
+            building,
+            x,
+            y,
+            kind,
+            queued,
+        } => {
+            format!(
+                "set_rally building={} x={:.1} y={:.1} kind={:?} queued={}",
+                building, x, y, kind, queued
+            )
+        }
+        Command::SetupAtGuns {
+            units,
+            x,
+            y,
+            queued,
+        } => {
+            format!(
+                "setup_at_guns units={} x={:.1} y={:.1} queued={}",
+                id_list(units),
+                x,
+                y,
+                queued
+            )
+        }
+        Command::TearDownAtGuns { units } => {
+            format!("tear_down_at_guns units={}", id_list(units))
+        }
+        Command::UseAbility {
+            units,
+            ability,
+            x,
+            y,
+            queued,
+        } => format!(
+            "use_ability units={} ability={:?} x={:?} y={:?} queued={}",
+            id_list(units),
+            ability,
+            x,
+            y,
+            queued
+        ),
+        Command::SetAutocast {
+            units,
+            ability,
+            enabled,
+        } => format!(
+            "set_autocast units={} ability={:?} enabled={}",
+            id_list(units),
+            ability,
+            enabled
+        ),
+        Command::Rejected { reason } => format!("rejected reason={:?}", reason),
+    }
+}
+
+fn id_list(ids: &[u32]) -> String {
+    ids.iter()
+        .map(u32::to_string)
+        .collect::<Vec<_>>()
+        .join(",")
 }
 
 pub(crate) struct BuildPlacementRequest<'a, F>

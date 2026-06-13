@@ -21,6 +21,9 @@ pub(super) trait ScriptedPlayer: Send {
     fn player_id(&self) -> u32;
     fn name(&self) -> &'static str;
     fn commands(&mut self, view: PlayerView<'_>) -> Vec<Command>;
+    fn last_trace_lines(&self) -> Option<&[String]> {
+        None
+    }
 }
 
 pub(super) struct ProfileBackedScript {
@@ -32,6 +35,7 @@ pub(super) struct ProfileBackedScript {
     active_attack_units: BTreeMap<u32, u32>,
     allow_combat_commands: bool,
     script_name: &'static str,
+    last_trace_lines: Option<Vec<String>>,
 }
 
 impl ProfileBackedScript {
@@ -64,6 +68,7 @@ impl ProfileBackedScript {
             active_attack_units: BTreeMap::new(),
             allow_combat_commands,
             script_name,
+            last_trace_lines: None,
         }
     }
 
@@ -85,6 +90,7 @@ impl ScriptedPlayer for ProfileBackedScript {
     }
 
     fn commands(&mut self, view: PlayerView<'_>) -> Vec<Command> {
+        self.last_trace_lines = None;
         if !self.should_think(view.tick) {
             return Vec::new();
         }
@@ -117,6 +123,7 @@ impl ScriptedPlayer for ProfileBackedScript {
         debug_assert_eq!(decision.profile_id, self.profile.id);
 
         let combat_intent_units = combat_intent_units(&decision.intents);
+        self.last_trace_lines = Some(decision.trace.format_lines());
         let mut commands =
             self.filter_repeated_stage_commands(view.tick, &decision.intents, decision.commands);
         if !self.allow_combat_commands {
@@ -124,6 +131,10 @@ impl ScriptedPlayer for ProfileBackedScript {
         }
         self.pending_builds.record_commands(view.tick, &commands);
         commands
+    }
+
+    fn last_trace_lines(&self) -> Option<&[String]> {
+        self.last_trace_lines.as_deref()
     }
 }
 
