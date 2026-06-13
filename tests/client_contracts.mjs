@@ -89,6 +89,7 @@ import {
 import {
   REPLAY_ANALYSIS_TABS,
   ReplayAnalysisOverlay,
+  calculateViewportArmyValue,
   createReplayAnalysisOverlayPreferences,
 } from "../client/src/replay_analysis_overlay.js";
 
@@ -4858,6 +4859,45 @@ function fakeAudioContext() {
 // Replay analysis overlay
 // ---------------------------------------------------------------------------
 {
+  const players = [
+    { id: 1, name: "Red", color: "#cc1111" },
+    { id: 2, name: "Blue", color: "#1133bb" },
+  ];
+  const calculatorRows = calculateViewportArmyValue({
+    players,
+    cameraBounds: { x: 0, y: 0, width: 100, height: 100 },
+    stats: {
+      [KIND.RIFLEMAN]: { size: 9, cost: { steel: 50, oil: 0 } },
+      [KIND.TANK]: { size: 18, cost: { steel: 300, oil: 150 } },
+      [KIND.BARRACKS]: { size: 24, cost: { steel: 150, oil: 0 } },
+    },
+    entities: [
+      { id: 1, owner: 1, kind: KIND.RIFLEMAN, x: 20, y: 20 },
+      { id: 2, owner: 1, kind: KIND.TANK, x: 150, y: 20 },
+      { id: 3, owner: 2, kind: KIND.TANK, x: 99, y: 50 },
+      { id: 4, owner: 2, kind: KIND.BARRACKS, x: 20, y: 20 },
+      { id: 5, owner: 1, kind: KIND.RIFLEMAN, x: 40, y: 40, shotReveal: true },
+      { id: 6, owner: 1, kind: KIND.RIFLEMAN, x: 60, y: 40, visionOnly: true },
+      { id: 7, owner: 1, kind: KIND.STEEL, x: 25, y: 25 },
+      { id: 8, owner: 2, kind: KIND.MACHINE_GUNNER, x: 30, y: 30 },
+    ],
+  });
+  const redValue = calculatorRows.find((row) => row.owner === 1);
+  const blueValue = calculatorRows.find((row) => row.owner === 2);
+  assert(redValue.steel === 100 && redValue.oil === 0, "army value counts visible units and visionOnly units");
+  assert(blueValue.steel === 300 && blueValue.oil === 150, "army value groups costs by owner");
+  assert(calculatorRows.length === 2, "army value keeps known player rows only for known owners");
+
+  const emptyRows = calculateViewportArmyValue({
+    players,
+    cameraBounds: { x: 500, y: 500, width: 100, height: 100 },
+    entities: [{ id: 9, owner: 1, kind: KIND.RIFLEMAN, x: 20, y: 20 }],
+  });
+  assert(
+    emptyRows.every((row) => row.steel === 0 && row.oil === 0),
+    "army value reports zero for players with no visible on-screen units",
+  );
+
   const storage = fakeStorage();
   const prefs = createReplayAnalysisOverlayPreferences(storage);
   prefs.selectedTab = "units-lost";
@@ -4877,9 +4917,17 @@ function fakeAudioContext() {
 
   withFakeOverlayDocument(({ FakeElement }) => {
     const root = new FakeElement("section");
-    const overlay = new ReplayAnalysisOverlay({ root, preferences: restored });
+    restored.selectedTab = "army-value";
+    const overlay = new ReplayAnalysisOverlay({
+      root,
+      preferences: restored,
+      getPlayers: () => players,
+      getCameraBounds: () => ({ x: 0, y: 0, width: 100, height: 100 }),
+      getEntities: () => [{ id: 1, owner: 1, kind: KIND.RIFLEMAN, x: 20, y: 20 }],
+    });
     assert(root.children.length === 1, "replay analysis overlay mounts generated DOM");
     const overlayRoot = root.children[0];
+    assert(root.querySelector(".replay-army-value-row"), "replay analysis renders army value rows");
 
     const unitsTab = root.querySelector(".replay-analysis-tab");
     assert(unitsTab, "replay analysis renders tab buttons");

@@ -1930,6 +1930,57 @@ input[type="text"]:focus {
 .replay-analysis-placeholder span {
   color: var(--ink-faint);
 }
+.replay-army-value {
+  display: grid;
+  gap: 6px;
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 11px;
+}
+.replay-army-value-heading {
+  color: var(--ink-faint);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+.replay-army-value-empty {
+  color: var(--ink-dim);
+}
+.replay-army-value-row {
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr) minmax(40px, auto) minmax(34px, auto);
+  align-items: center;
+  gap: 7px;
+  min-height: 20px;
+}
+.replay-army-value-swatch {
+  width: 8px;
+  height: 8px;
+  border: 1px solid rgba(231, 223, 197, 0.42);
+  border-radius: 50%;
+}
+.replay-army-value-name {
+  overflow: hidden;
+  color: var(--ink);
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.replay-army-value-steel,
+.replay-army-value-oil {
+  justify-self: end;
+  color: var(--ink-faint);
+  font-variant-numeric: tabular-nums;
+}
+.replay-army-value-steel::before {
+  content: "S ";
+  color: #b8b8b8;
+}
+.replay-army-value-oil::before {
+  content: "O ";
+  color: #8f8a7b;
+}
 .replay-analysis-show {
   pointer-events: auto;
   margin-left: auto;

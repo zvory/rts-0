@@ -270,6 +270,9 @@ export class Match {
       this.replayAnalysisOverlay = new ReplayAnalysisOverlay({
         root: dom.gameScreen,
         preferences: this.replayAnalysisOverlayPreferences || undefined,
+        getEntities: () => this.state.entitiesInterpolated(1, { includePrediction: false }),
+        getCameraBounds: () => this.cameraWorldBounds(),
+        getPlayers: () => this.state.players,
       });
     }
     this.applySpectatorUi();
@@ -827,6 +830,16 @@ export class Match {
     };
   }
 
+  cameraWorldBounds() {
+    const zoom = this.camera?.zoom || 1;
+    return {
+      x: this.camera?.x || 0,
+      y: this.camera?.y || 0,
+      width: (this.camera?.viewW || 0) / zoom,
+      height: (this.camera?.viewH || 0) / zoom,
+    };
+  }
+
   /**
    * Interpolation alpha for this frame. We render slightly in the past
    * (INTERP_DELAY_MS) and blend between the two most recent snapshots based on
@@ -1034,6 +1047,7 @@ export class Match {
     this.renderer.render(this.state, this.camera, this.fog, alpha);
     this.hud.update();
     this.minimap.render();
+    this.replayAnalysisOverlay?.update();
     this.health.publish();
 
     this.rafId = requestAnimationFrame(this.tickFn);

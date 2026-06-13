@@ -1,6 +1,6 @@
 # Phase 2 - Viewport Army Value Overlay
 
-Status: Not implemented.
+Status: Done.
 
 ## Objective
 
@@ -19,10 +19,10 @@ Army value in this phase means:
 - grouped by entity `owner`
 - based on `STATS[kind].cost` from the client balance mirror
 
-`visionOnly` shot/death-reveal entities need an explicit product decision during implementation.
-The recommended default is to exclude `shotReveal` temporary attack reveals and include or exclude
-`visionOnly` lingering death-vision units based on whether the overlay is meant to describe visible
-fight state or actionable current vision. Document the final choice in this phase file and handoff.
+`shotReveal` temporary attack reveals are excluded because they are short-lived muzzle-position
+projections rather than current on-screen army presence. `visionOnly` lingering death-vision units
+are included while the server projects them because this overlay describes the replay viewer's
+currently visible fight state, not whether the entity is actionable command vision.
 
 ## Scope
 
@@ -77,8 +77,27 @@ The handoff must state the exact army-value definition, the treatment of `vision
 `shotReveal`, the test coverage added, and any layout compromises. The next agent should proceed
 to Phase 3 only after the client-only overlay is stable through replay seeking.
 
+## Implementation Handoff
+
+- Army value is computed client-only from the current replay snapshot entities, the current camera
+  world bounds, `state.players`, and `STATS[kind].cost`. It counts units only, groups by owner, uses
+  full steel/oil cost, treats missing costs as zero, and keeps zero-value rows for known players.
+- Viewport inclusion uses the unit render radius from `STATS[kind].size` so units partially inside
+  the camera viewport are counted. Buildings, resources, neutral entities, off-screen units, and
+  `shotReveal` attack pings are ignored.
+- `visionOnly` lingering death-vision units are included while visible in the replay-projected
+  snapshot. This matches visible fight-state analysis; Phase 3+ should call out any later global
+  analysis fields that instead represent actionable or fully authoritative hidden state.
+- The readout is rendered only inside the Army Value tab in the Phase 1 overlay shell. Layout is a
+  compact top-right panel with player swatches, names, and tabular steel/oil columns; long names
+  ellipsize to avoid overlapping replay controls, the minimap, or the resource HUD.
+- Added calculator and overlay DOM coverage in `tests/client_contracts.mjs`. Verified with
+  `node tests/client_contracts.mjs` and `node scripts/check-client-architecture.mjs`.
+- Automated replay UI smoke was not added in this phase. Manual verification should open a replay,
+  pan/zoom over a fight, switch replay vision, and seek to confirm values rebuild with the snapshot
+  and viewport before Phase 3 starts.
+
 ## Player-Facing Outcome
 
 Replay viewers can judge the visible equipment value in a fight before or during engagement,
 without clicking units or inferring composition manually.
-
