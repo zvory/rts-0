@@ -1,61 +1,68 @@
-# Phase 2 - Live Spectator Analysis Delivery
+# Phase 2 - Shared Observer Analysis Contract
 
 Status: Planned.
 
 ## Objective
 
-Send the shared observer analysis payload to live spectator connections during normal in-game
-ticks. Active players must not receive this payload in live matches.
+Turn the current replay-only analysis contract into a shared observer analysis contract while
+preserving existing behavior. After this phase, replay playback should behave exactly as it does
+after Phase 1, but code and documentation should no longer imply that the analysis system can only
+ever be used by replays.
 
 ## Scope
 
-- Add a live in-game server delivery path beside the existing spectator snapshot fanout.
-- Compute observer analysis once per tick only when at least one eligible live spectator exists.
-- Send the payload only to connections whose room player state is `spectator: true`.
-- Preserve replay playback, replay seek, replay vision, and replay branch behavior.
-- Decide whether live delivery should be every tick or throttled; document the choice in
-  `docs/design/protocol.md` if it affects semantics.
-- Add focused server tests proving live spectators receive analysis and active players do not.
-- Keep branch live rooms in mind: claimed branch seats are active-player views; unclaimed
-  spectators are observer views.
+- Rename internal Rust and JS symbols where practical from replay-specific names toward observer
+  analysis names.
+- Keep the existing wire tag `replayAnalysis` unless the implementation deliberately includes a
+  compatibility path for a new tag. A cosmetic tag rename is not required for this plan.
+- Update comments on `ServerMessage`, `Game::replay_analysis()` or its renamed equivalent, and the
+  client overlay input path.
+- Update `docs/design/protocol.md` so the payload is documented as observer analysis for replay
+  viewers and live spectators, with active-player exclusion called out directly.
+- Refresh `docs/context/protocol.md` section labels if the protocol design section heading changes.
+- Keep the Phase 1 observer camera/input contract intact. Do not reintroduce replay-only camera
+  listeners while renaming replay analysis client code.
+- Do not send analysis to live spectators yet.
 
 ## Expected Touch Points
 
+- `server/crates/protocol/src/lib.rs`
+- `server/crates/sim/src/game/analysis.rs`
 - `server/src/lobby/room_task.rs`
-- `server/crates/sim/src/game/analysis.rs` if the public helper was renamed in Phase 1
+- `client/src/protocol.js`
+- `client/src/match.js`
+- `client/src/replay_analysis_overlay.js` or a renamed replacement
 - `docs/design/protocol.md`
-- `tests/server_integration.mjs` if live end-to-end coverage is useful
-- Focused room-task Rust tests near existing spectator and replay analysis tests
+- `docs/context/protocol.md` only if section names change
+- `docs/design/client-ui.md` if overlay/input module names are changed
+- `tests/protocol_parity.mjs`
+- Existing focused Rust protocol serialization tests
 
 ## Verification
 
-Run focused server and protocol checks:
+Run focused checks that cover protocol shape and client imports:
 
 ```bash
-cd server && cargo test live_spectator
 node tests/protocol_parity.mjs
+node scripts/check-client-architecture.mjs
+cd server && cargo test -p rts-protocol replay_analysis_serializes_contract_shape
 ```
 
-If an end-to-end Node assertion is added, start the server on the test port and run:
-
-```bash
-node tests/server_integration.mjs
-```
+Adjust the exact Rust test filter if the test is renamed with the contract.
 
 ## Manual Testing Focus
 
-Start a live match with two active players and one spectator. Confirm the spectator connection
-receives observer analysis updates while active players do not receive the analysis message. Confirm
-the spectator still receives the normal union-fog snapshot and that the match remains playable.
+Open a replay and confirm the analysis overlay still appears, receives data, survives seek-driven
+viewer rebuilds, and keeps the same tab behavior as before. Confirm the Phase 1 replay camera
+gestures still work. Confirm a normal live active-player match does not show observer analysis.
 
 ## Handoff Expectations
 
-The handoff must describe the live delivery cadence, where the active-player exclusion is enforced,
-and which tests prove the privacy boundary. It should tell Phase 3 whether the client can rely on
-the same message shape for live spectators and replay viewers.
+The handoff must list the final contract names, whether the wire tag stayed as `replayAnalysis`,
+and which compatibility assumptions Phase 3 must preserve. It should also call out any remaining
+user-visible replay-only copy that Phase 4 should clean up.
 
 ## Player-Facing Outcome
 
-Live spectators have server-authored analysis data available, but the client overlay may still need
-Phase 3 before it is visible in the UI.
-
+No intended player-facing analysis change. This phase pays down naming and documentation debt so
+live spectator support can be added cleanly while preserving the repaired replay navigation.

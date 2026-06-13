@@ -1,66 +1,82 @@
-# Phase 1 - Shared Observer Analysis Contract
+# Phase 1 - Shared Observer Camera Input
 
 Status: Planned.
 
 ## Objective
 
-Turn the current replay-only analysis contract into a shared observer analysis contract while
-preserving existing behavior. After this phase, replay playback should behave exactly as it does
-today, but code and documentation should no longer imply that the analysis system can only ever be
-used by replays.
+Remove replay-only camera/navigation duplication before adding more observer UI. Replay viewers
+should regain middle-mouse drag panning and share the same basic camera navigation behavior as live
+match views, while remaining command-free. Live spectators should keep their current inspection
+behavior, active players should keep full gameplay input, and later observer analysis work should
+have one stable input foundation instead of another special replay path.
 
 ## Scope
 
-- Rename internal Rust and JS symbols where practical from replay-specific names toward observer
-  analysis names.
-- Keep the existing wire tag `replayAnalysis` unless the implementation deliberately includes a
-  compatibility path for a new tag. A cosmetic tag rename is not required for this plan.
-- Update comments on `ServerMessage`, `Game::replay_analysis()` or its renamed equivalent, and the
-  client overlay input path.
-- Update `docs/design/protocol.md` so the payload is documented as observer analysis for replay
-  viewers and live spectators, with active-player exclusion called out directly.
-- Refresh `docs/context/protocol.md` section labels if the protocol design section heading changes.
-- Do not send analysis to live spectators yet.
+- Extract a small shared camera/navigation input collaborator from the live `Input` path, or create
+  an equivalent shared helper with the same ownership model. It should own viewport mouse tracking,
+  wheel zoom, pan-key state, middle-mouse drag panning, Space+left-drag panning if retained for
+  parity, and listener teardown.
+- Compose that helper into live `Input` and replay/observer input instead of copying wheel/key/drag
+  logic between classes.
+- Fix replay middle-mouse drag panning. A replay viewer middle-drag should call the same
+  `Camera.panByScreenDelta` behavior used by live matches.
+- Keep replay viewers command-free: no gameplay command issuer API, no build placement, no command
+  hotkeys, no replay-only command surface.
+- Preserve live spectator behavior unless deliberately changed and documented. Today live
+  spectators use the full `Input` path for camera navigation and read-only selection inspection;
+  do not accidentally remove that inspection path while fixing replay input.
+- Preserve active-player behavior, including command targeting, selection, build placement,
+  minimap routing, pointer lock, control groups, and command hotkeys.
+- Decide explicitly whether replay viewers should gain Space+left-drag panning as part of camera
+  parity. If not, document why middle-drag and wheel/key parity are sufficient.
+- Update `docs/design/client-ui.md` and `docs/context/client-ui.md` so replay/observer camera input
+  has an explicit module contract and does not live only as an undocumented `ReplayCameraInput`
+  exception.
 
 ## Expected Touch Points
 
-- `server/crates/protocol/src/lib.rs`
-- `server/crates/sim/src/game/analysis.rs`
-- `server/src/lobby/room_task.rs`
-- `client/src/protocol.js`
+- `client/src/input/index.js`
+- `client/src/input/camera_controls.js`
+- new `client/src/input/*` helper if extracting camera navigation
+- `client/src/replay_camera_input.js`, or a renamed observer input wrapper
 - `client/src/match.js`
-- `client/src/replay_analysis_overlay.js` or a renamed replacement
-- `docs/design/protocol.md`
-- `docs/context/protocol.md` only if section names change
-- `tests/protocol_parity.mjs`
-- Existing focused Rust protocol serialization tests
+- `client/src/camera.js` only if the public camera navigation seam needs documentation/comments
+- `client/src/input/router.js` only if shared navigation needs routed DOM/pointer-lock events
+- `tests/client_contracts.mjs`
+- `tests/input_context_menu_contracts.mjs` only if existing mouse routing coverage moves
+- `docs/design/client-ui.md`
+- `docs/context/client-ui.md`
 
 ## Verification
 
-Run focused checks that cover protocol shape and client imports:
+Run focused checks that cover input contracts and client module boundaries:
 
 ```bash
-node tests/protocol_parity.mjs
+node tests/client_contracts.mjs
+node tests/input_context_menu_contracts.mjs
 node scripts/check-client-architecture.mjs
-cd server && cargo test -p rts-protocol replay_analysis_serializes_contract_shape
 ```
 
-Adjust the exact Rust test filter if the test is renamed with the contract.
+Add or update a focused client contract that proves replay middle-mouse drag pans the camera and
+that replay wheel zoom still anchors on the cursor. If a shared helper is introduced, cover the
+helper directly rather than only the replay wrapper.
 
 ## Manual Testing Focus
 
-Open a replay and confirm the analysis overlay still appears, receives data, survives seek-driven
-viewer rebuilds, and keeps the same tab behavior as before. Confirm a normal live active-player
-match does not show observer analysis.
+Open a replay and confirm mouse-wheel zoom, middle-mouse drag pan, keyboard/edge pan, replay speed
+controls, timeline seek, and vision controls still work. Start a normal live match and confirm
+middle-drag, Space+left-drag if supported, selection, right-click commands, command-card targeting,
+and minimap interactions still work. Join as a live spectator and confirm camera navigation and
+read-only selection inspection behave as before.
 
 ## Handoff Expectations
 
-The handoff must list the final contract names, whether the wire tag stayed as `replayAnalysis`,
-and which compatibility assumptions Phase 2 must preserve. It should also call out any remaining
-user-visible replay-only copy that Phase 3 should clean up.
+The handoff must name the shared camera/input module, list which gestures are guaranteed shared
+between replay viewers and live match views, and call out any intentional mode differences for
+replay viewers, live spectators, and active players. It should also tell Phase 4 which input module
+the observer overlay must avoid interfering with.
 
 ## Player-Facing Outcome
 
-No intended player-facing change. This phase pays down naming and documentation debt so live
-spectator support can be added cleanly.
-
+Replay viewers regain middle-mouse drag camera panning. Camera navigation behavior becomes harder
+to regress because replay and live views no longer maintain separate copies of basic camera input.

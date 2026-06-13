@@ -1,62 +1,62 @@
-# Phase 3 - Unified Client Overlay
+# Phase 3 - Live Spectator Analysis Delivery
 
 Status: Planned.
 
 ## Objective
 
-Mount and polish one observer analysis overlay for both replay viewers and live spectators. The
-overlay should no longer present itself as replay-only in user-visible text, storage names where
-migration is easy, or module contracts.
+Send the shared observer analysis payload to live spectator connections during normal in-game
+ticks. Active players must not receive this payload in live matches.
 
 ## Scope
 
-- Mount the analysis overlay when the start payload is replay playback or live spectator mode.
-- Keep command UI hidden for spectators as it is today, and ensure the observer overlay does not
-  interfere with camera, minimap, or settings controls.
-- Rename or wrap `ReplayAnalysisOverlay` into an observer-oriented module if Phase 1 did not already
-  do so.
-- Update visible labels, aria labels, empty states, and preference storage names where practical.
-  If local-storage migration is needed, keep old replay preference keys readable.
-- Verify `destroy()` and branch staging freeze paths remove the overlay cleanly.
-- Add or update client contract coverage for replay and live spectator mounting decisions.
-- Add a smoke or manual browser check for a live spectator seeing the overlay during an active game.
+- Add a live in-game server delivery path beside the existing spectator snapshot fanout.
+- Compute observer analysis once per tick only when at least one eligible live spectator exists.
+- Send the payload only to connections whose room player state is `spectator: true`.
+- Preserve replay playback, replay seek, replay vision, replay branch behavior, and the Phase 1
+  replay camera/navigation fixes.
+- Decide whether live delivery should be every tick or throttled; document the choice in
+  `docs/design/protocol.md` if it affects semantics.
+- Add focused server tests proving live spectators receive analysis and active players do not.
+- Keep branch live rooms in mind: claimed branch seats are active-player views; unclaimed
+  spectators are observer views.
 
 ## Expected Touch Points
 
-- `client/src/app.js`
-- `client/src/match.js`
-- `client/src/replay_analysis_overlay.js` or renamed observer overlay module
-- `client/styles.css`
-- `tests/client_contracts.mjs`
-- `tests/client_smoke.mjs` if browser coverage is extended
-- `docs/design/client-ui.md` if exported module names/contracts change
+- `server/src/lobby/room_task.rs`
+- `server/crates/sim/src/game/analysis.rs` if the public helper was renamed in Phase 2
+- `docs/design/protocol.md`
+- `tests/server_integration.mjs` if live end-to-end coverage is useful
+- Focused room-task Rust tests near existing spectator and replay analysis tests
 
 ## Verification
 
-Run focused client checks:
+Run focused server and protocol checks:
 
 ```bash
-node tests/client_contracts.mjs
-node scripts/check-client-architecture.mjs
+cd server && cargo test live_spectator
+node tests/protocol_parity.mjs
 ```
 
-If browser smoke coverage is added or touched, run the relevant smoke path through the existing
-test harness with a running server.
+If an end-to-end Node assertion is added, start the server on the test port and run:
+
+```bash
+node tests/server_integration.mjs
+```
 
 ## Manual Testing Focus
 
-Open a replay and confirm the overlay still works across tab switches, collapse/show, and seeks.
-Start a live game with a spectator and confirm the same overlay appears, updates, and can be hidden
-or collapsed. Confirm active players still do not see the overlay and can issue commands normally.
+Start a live match with two active players and one spectator. Confirm the spectator connection
+receives observer analysis updates while active players do not receive the analysis message. Confirm
+the spectator still receives the normal union-fog snapshot and that the match remains playable.
 
 ## Handoff Expectations
 
-The handoff must describe the final client module names, preference-storage compatibility, and the
-manual replay/live spectator checks performed. It should also list any remaining cleanup that was
-intentionally left out, such as CSS class aliases kept for compatibility.
+The handoff must describe the live delivery cadence, where the active-player exclusion is enforced,
+and which tests prove the privacy boundary. It should tell Phase 4 whether the client can rely on
+the same message shape for live spectators and replay viewers.
 
 ## Player-Facing Outcome
 
-Replay viewers and live spectators get the same observer analysis panel for army value, production,
-unit counts, losses, and resources-lost tabs.
+Live spectators have server-authored analysis data available, but the client overlay may still need
+Phase 4 before it is visible in the UI.
 
