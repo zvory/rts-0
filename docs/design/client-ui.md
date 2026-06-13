@@ -97,6 +97,7 @@ export class BranchStaging {
 `observer_analysis_overlay.js`
 ```js
 export const OBSERVER_ANALYSIS_TABS
+shouldMountObserverAnalysisOverlay({ payload, replayViewer })
 createObserverAnalysisOverlayPreferences(storage?)
 export class ObserverAnalysisOverlay {
   constructor({ root, preferences, getEntities, getCameraBounds, getPlayers, stats })
@@ -105,13 +106,15 @@ export class ObserverAnalysisOverlay {
   destroy()
 }
 ```
-`App` owns one observer analysis preference object and passes it through replay `Match` rebuilds so
-selected tab, visible state, and collapsed state survive replay seek-triggered `start` messages.
-The overlay owns its generated DOM and is read-only. The Army Value tab is client-side and
-viewport-specific; Production, Units, Units Lost, and Resources Lost render the latest
-server-authored `replayAnalysis` payload. Resources Lost follows the protocol's narrow definition:
-spent steel/oil value of units that died, excluding buildings, stockpile changes, harvesting,
-refunds, and cancelled queues.
+`App` owns one observer analysis preference object and passes it through replay and live spectator
+`Match` rebuilds so selected tab, visible state, and collapsed state survive replay
+seek-triggered `start` messages and spectator rematches. Preferences are stored under
+`rts.observerAnalysisOverlay`; clients still read the old `rts.replayAnalysisOverlay` key for
+compatibility. The overlay owns its generated DOM and is read-only. The Army Value tab is
+client-side and viewport-specific; Production, Units, Units Lost, and Resources Lost render the
+latest server-authored `replayAnalysis` payload. Resources Lost follows the protocol's narrow
+definition: spent steel/oil value of units that died, excluding buildings, stockpile changes,
+harvesting, refunds, and cancelled queues.
 
 `settings_container.js`
 ```js

@@ -13,7 +13,7 @@ import { Minimap } from "./minimap.js";
 import { MatchHealth } from "./match_health.js";
 import { PredictionController } from "./prediction_controller.js";
 import { Renderer } from "./renderer/index.js";
-import { ObserverAnalysisOverlay } from "./observer_analysis_overlay.js";
+import { ObserverAnalysisOverlay, shouldMountObserverAnalysisOverlay } from "./observer_analysis_overlay.js";
 import { ReplayCameraInput } from "./replay_camera_input.js";
 import { ReplayControls } from "./replay_controls.js";
 import { SimWasmPredictionAdapter } from "./sim_wasm_adapter.js";
@@ -249,7 +249,7 @@ export class Match {
         isScenario,
       });
     }
-    if (this.replayViewer && isReplay) {
+    if (shouldMountObserverAnalysisOverlay({ payload, replayViewer: this.replayViewer })) {
       this.observerAnalysisOverlay = new ObserverAnalysisOverlay({
         root: dom.gameScreen,
         preferences: this.observerAnalysisOverlayPreferences || undefined,

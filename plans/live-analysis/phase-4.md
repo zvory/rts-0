@@ -1,6 +1,6 @@
 # Phase 4 - Unified Client Overlay
 
-Status: Planned.
+Status: Done.
 
 ## Objective
 

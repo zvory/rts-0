@@ -1,7 +1,8 @@
 import { STATS, UPGRADES } from "./config.js";
 import { isUnit } from "./protocol.js";
 
-const STORAGE_KEY = "rts.replayAnalysisOverlay";
+const STORAGE_KEY = "rts.observerAnalysisOverlay";
+const LEGACY_STORAGE_KEY = "rts.replayAnalysisOverlay";
 const ARMY_VALUE_TAB_ID = "army-value";
 const PRODUCTION_TAB_ID = "production";
 const UNITS_TAB_ID = "units";
@@ -15,6 +16,10 @@ export const OBSERVER_ANALYSIS_TABS = Object.freeze([
   { id: "units-lost", label: "Units lost" },
   { id: "resources-lost", label: "Resources lost" },
 ]);
+
+export function shouldMountObserverAnalysisOverlay({ payload, replayViewer = false } = {}) {
+  return (!!replayViewer && !!payload?.replay) || (!!payload?.spectator && !payload?.replay);
+}
 
 export function createObserverAnalysisOverlayPreferences(storage = safeLocalStorage()) {
   const fallback = {
@@ -852,7 +857,7 @@ function safeLocalStorage() {
 function readStoredPreferences(storage) {
   if (!storage) return {};
   try {
-    const raw = storage.getItem(STORAGE_KEY);
+    const raw = storage.getItem(STORAGE_KEY) || storage.getItem(LEGACY_STORAGE_KEY);
     return raw ? JSON.parse(raw) : {};
   } catch {
     return {};
@@ -864,6 +869,6 @@ function writeStoredPreferences(storage, state) {
   try {
     storage.setItem(STORAGE_KEY, JSON.stringify(state));
   } catch {
-    // Storage failures should not break replay viewing.
+    // Storage failures should not break observer viewing.
   }
 }

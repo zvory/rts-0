@@ -94,6 +94,7 @@ import {
   ObserverAnalysisOverlay,
   calculateViewportArmyValue,
   createObserverAnalysisOverlayPreferences,
+  shouldMountObserverAnalysisOverlay,
 } from "../client/src/observer_analysis_overlay.js";
 
 // ---------------------------------------------------------------------------
@@ -5146,6 +5147,37 @@ function fakeAudioContext() {
   assert(
     restored.selectedTab === OBSERVER_ANALYSIS_TABS[0].id,
     "observer analysis rejects unknown tab ids",
+  );
+
+  const legacyStorage = fakeStorage();
+  legacyStorage.setItem("rts.replayAnalysisOverlay", JSON.stringify({
+    selectedTab: "production",
+    visible: false,
+    collapsed: true,
+  }));
+  const migrated = createObserverAnalysisOverlayPreferences(legacyStorage);
+  assert(migrated.selectedTab === "production", "observer analysis reads legacy replay preference key");
+  migrated.visible = true;
+  assert(
+    legacyStorage.getItem("rts.observerAnalysisOverlay") !== null,
+    "observer analysis writes the observer preference key after reading legacy preferences",
+  );
+
+  assert(
+    shouldMountObserverAnalysisOverlay({ payload: { replay: true, spectator: true }, replayViewer: true }),
+    "observer analysis mounts for replay viewers",
+  );
+  assert(
+    shouldMountObserverAnalysisOverlay({ payload: { spectator: true }, replayViewer: false }),
+    "observer analysis mounts for live spectators",
+  );
+  assert(
+    !shouldMountObserverAnalysisOverlay({ payload: { spectator: false }, replayViewer: false }),
+    "observer analysis stays hidden for active players",
+  );
+  assert(
+    !shouldMountObserverAnalysisOverlay({ payload: { replay: true, spectator: true }, replayViewer: false }),
+    "observer analysis does not mount for non-viewer replay start payloads",
   );
 
   withFakeOverlayDocument(({ FakeElement }) => {
