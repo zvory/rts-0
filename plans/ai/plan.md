@@ -28,8 +28,8 @@ artifacts, and a consistent stream of increasingly sophisticated attacks.
   the back of the enemy steel line.
 - Do not require split attacks, retreat/regroup, mortar dodging, offensive worker use, building
   ignore logic, or focused unit targeting for the first launch version.
-- Scout Cars should eventually use smoke against enemy combat units, especially Machine Gunners,
-  rather than smoking workers.
+- Scout Cars should eventually use smoke against enemy combat units, especially Machine Gunners or
+  other stationary support weapons, rather than smoking workers.
 
 ## Core Model
 
@@ -48,6 +48,12 @@ than the launch opponent needs.
 The current `rifle_flood_full_saturation` behavior should stay available as a named baseline and
 rollback option. The new AI should be built alongside it first, then promoted to the live-lobby
 default only after matchup and scenario tests show that it is not worse.
+
+The existing AI action layer is part of this model, not something to replace. Managers should
+choose typed goals, blockers, and high-level action intents, then route executable work through
+`AiActionContext` and the helpers in `server/crates/ai/src/ai_core/actions.rs`. Extend that shared
+action layer when a new action family is needed so budget reservation, worker/building reservation,
+stable ordering, and final `SimCommand` emission stay centralized.
 
 ## Testing Strategy
 
@@ -111,6 +117,9 @@ tanks, and able to apply recurring staged pressure.
 ## Overall Constraints
 
 - Keep AI commands on the ordinary simulation command path.
+- Keep final `SimCommand` emission centralized in `AiActionContext` / `ai_core::actions`; managers
+  choose actions/intents and should not hand-roll parallel command generation, resource budgeting,
+  or reservation policy.
 - Do not mutate `Game` state directly from AI code.
 - Keep the old saturation AI around as `rifle_flood_full_saturation` and preserve tests that prove
   it still runs.

@@ -24,7 +24,9 @@ phase selection, manager interfaces, goal blockers, and command traces, but only
   - desired target
   - current progress
   - blocker, if any
-  - emitted command, if any
+  - selected high-level action or emitted command, if any
+- Reuse the existing `AiActionContext` / `ai_core::actions` seam for executable work instead of
+  introducing a second command-emission path.
 - Add an AI decision trace structure that can be used by tests now and exposed in debug surfaces
   later.
 - Add parity tests proving the old live AI profile still runs and remains selectable.
@@ -53,4 +55,5 @@ phase selection, manager interfaces, goal blockers, and command traces, but only
 ## Handoff
 
 The handoff should describe the phase model, the trace format, the profile id names, and which
-manager behaviors are still stubbed for Phase 3.
+manager behaviors are still stubbed for Phase 3. It should also call out any new action helper
+added to `ai_core::actions` so later managers use the shared reservation and command path.

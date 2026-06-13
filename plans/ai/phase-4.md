@@ -19,6 +19,8 @@ saturation rifle-wave profile without adding advanced micro.
   - route Scout Cars toward the back side of the enemy steel line rather than the shortest path to
     the public enemy start
   - use ordinary movement/attack commands and public/fog-respecting information
+  - choose harassment intents at the manager layer, then execute through shared action helpers so
+    unit id normalization and final `SimCommand` shapes stay consistent with the rest of the AI
   - keep behavior simple enough to be robust on current 1v1 maps
 - Local defense:
   - preserve simple base-defense behavior from existing AI where it does not conflict with staged
@@ -39,7 +41,8 @@ saturation rifle-wave profile without adding advanced micro.
 
 - Fast tests for wave readiness, staging, and no-trickle behavior.
 - Fast tests for Scout Car rear-steel-line route target selection on supported map layouts.
-- Fast tests proving harassment commands use ordinary legal command shapes.
+- Fast tests proving harassment actions use the shared action layer and produce ordinary legal
+  command shapes.
 - Short scenario tests for:
   - Rifleman frontal wave
   - Scout Car harassment from an already-teched state

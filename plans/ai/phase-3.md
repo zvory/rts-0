@@ -26,6 +26,9 @@ and avoid common macro bugs from authored states and normal starts.
   - transition into Scout Cars when tech is ready
   - transition into Tanks when tank tech is ready
   - keep queues bounded and reserve resources so managers do not overspend the same steel/oil
+- Route build, train, research, and gather execution through `AiActionContext` / `ai_core::actions`.
+  If a manager needs a new macro action, add or extend a shared action helper rather than emitting
+  raw commands and duplicating budget or reservation logic inside the manager.
 - Keep Machine Gunners, AT Teams, Artillery, and Command Cars out of the required launch path for
   this phase unless existing rules require a small defensive fallback.
 
@@ -46,6 +49,7 @@ and avoid common macro bugs from authored states and normal starts.
   - Scout Car phase -> required tech and production
   - Tank phase -> required tech, unlock, and production
   - unaffordable or no-builder states -> no invalid command spam
+  - competing managers cannot double-spend the same resources or reserve the same worker/building
 - Short scenario tests that jump directly to expansion, Scout Car, and Tank states.
 - A bounded normal-start smoke proving the new profile reaches at least Rifleman, expansion, and
   Scout Car milestones.
