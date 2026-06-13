@@ -437,6 +437,15 @@ async function executeStep(context, step) {
       if (!diff.ok) throw new Error(`client optimistic UI assertion failed: ${JSON.stringify(diff)}`);
       break;
     }
+    case "assertClientRenderedProductionProgress": {
+      requireClientLane(lanes, step.op);
+      const summary = renderedSummary(await lanes.client.summary());
+      const entity = ownEntityByKind(summary, step.kind, step.index || 0);
+      const diff = compareProductionProgress(entity, step);
+      artifacts.diff({ assertion: step.op, diff, summary });
+      if (!diff.ok) throw new Error(`client production progress assertion failed: ${JSON.stringify(diff)}`);
+      break;
+    }
     case "waitForClientPredictionReady": {
       requireClientLane(lanes, step.op);
       const debug = await lanes.client.waitForPredictionReady(step);
@@ -657,6 +666,24 @@ function compareOptimisticUiState(state, step) {
     add("rallyPlanLength", (state.rally || [])[0]?.plan?.length === step.rallyPlanLength, (state.rally || [])[0]?.plan?.length, step.rallyPlanLength);
   }
   return { ok: checks.every((check) => check.ok), checks };
+}
+
+function compareProductionProgress(entity, step) {
+  if (!entity) {
+    return { ok: false, reason: `missing owned ${step.kind || "entity"}[${step.index || 0}]` };
+  }
+  const checks = [];
+  const add = (name, ok, actual, expected) => checks.push({ name, ok, actual, expected });
+  if (step.minProgress != null) {
+    add("minProgress", (entity.prodProgress ?? 0) >= step.minProgress, entity.prodProgress, `>=${step.minProgress}`);
+  }
+  if (step.maxProgress != null) {
+    add("maxProgress", (entity.prodProgress ?? 0) <= step.maxProgress, entity.prodProgress, `<=${step.maxProgress}`);
+  }
+  if (step.predicted != null) {
+    add("predicted", entity.progressPredicted === step.predicted, entity.progressPredicted, step.predicted);
+  }
+  return { ok: checks.every((check) => check.ok), entity, checks };
 }
 
 function round(value) {

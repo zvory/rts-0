@@ -1,0 +1,127 @@
+import { ProgressExtrapolator, PROGRESS_EXTRAPOLATION_MAX } from "../client/src/progress_extrapolator.js";
+import { KIND, STATE, UPGRADE } from "../client/src/protocol.js";
+import { GameState } from "../client/src/state.js";
+
+function assert(cond, msg) {
+  if (!cond) throw new Error(msg || "Assertion failed");
+}
+
+function approx(actual, expected, epsilon, msg) {
+  assert(Math.abs(actual - expected) <= epsilon, `${msg}: expected ${expected}, got ${actual}`);
+}
+
+function building(extra = {}) {
+  return {
+    id: 10,
+    owner: 1,
+    kind: KIND.CITY_CENTRE,
+    state: STATE.IDLE,
+    prodKind: KIND.WORKER,
+    prodQueue: 1,
+    prodProgress: 0.25,
+    ...extra,
+  };
+}
+
+{
+  const ex = new ProgressExtrapolator({ playerId: 1 });
+  ex.updateFromSnapshot([building()], 1000);
+  const out = ex.apply(building(), 1500);
+  assert(out.prodProgress > 0.25, "unit production advances after authoritative baseline");
+  assert(out.progressPredicted === true, "unit production is marked as extrapolated");
+}
+
+{
+  const ex = new ProgressExtrapolator({ playerId: 1 });
+  const entity = building({
+    kind: KIND.RESEARCH_COMPLEX,
+    prodKind: undefined,
+    prodUpgrade: UPGRADE.TANK_UNLOCK,
+    prodProgress: 0.4,
+  });
+  ex.updateFromSnapshot([entity], 0);
+  const out = ex.apply(entity, 1000);
+  assert(out.prodProgress > 0.4, "research advances after authoritative baseline");
+}
+
+{
+  const ex = new ProgressExtrapolator({ playerId: 1 });
+  const entity = building({ prodProgress: 0.97 });
+  ex.updateFromSnapshot([entity], 0);
+  const out = ex.apply(entity, 60_000);
+  approx(out.prodProgress, PROGRESS_EXTRAPOLATION_MAX, 0.0001, "progress clamps below completion");
+}
+
+{
+  const ex = new ProgressExtrapolator({ playerId: 1 });
+  ex.updateFromSnapshot([building({ prodProgress: 0.5 })], 0);
+  const predicted = ex.apply(building({ prodProgress: 0.5 }), 1000).prodProgress;
+  ex.updateFromSnapshot([building({ prodProgress: 0.45 })], 1000);
+  const corrected = ex.apply(building({ prodProgress: 0.45 }), 1000).prodProgress;
+  assert(predicted > corrected, "lower authoritative correction resets display progress");
+  assert(ex.diagnostics().correctionCount === 1, "correction is counted");
+}
+
+{
+  const ex = new ProgressExtrapolator({ playerId: 1 });
+  ex.updateFromSnapshot([building()], 0);
+  const changed = building({ prodKind: KIND.RIFLEMAN, kind: KIND.BARRACKS, prodProgress: 0.1 });
+  ex.updateFromSnapshot([changed], 1000);
+  assert(ex.apply(changed, 2000).prodProgress > 0.1, "new identity starts a fresh baseline");
+  assert(ex.apply(building(), 2000).progressPredicted !== true, "old identity no longer extrapolates");
+}
+
+{
+  const ex = new ProgressExtrapolator({ playerId: 1 });
+  ex.updateFromSnapshot([building()], 0);
+  ex.updateFromSnapshot([building({ prodQueue: 0, prodKind: undefined, prodProgress: undefined })], 1000);
+  const out = ex.apply(building({ prodQueue: 0, prodKind: undefined, prodProgress: undefined }), 2000);
+  assert(out.progressPredicted !== true, "cancellation clears extrapolation");
+  assert(ex.diagnostics().activeBars === 0, "cancelled production is not active");
+}
+
+{
+  const ex = new ProgressExtrapolator({ playerId: 1 });
+  const entity = building();
+  const resources = { steel: 500, oil: 200, supplyUsed: 3, supplyCap: 10, upgrades: [] };
+  ex.updateFromSnapshot([entity], 0);
+  ex.apply(entity, 1000);
+  assert(resources.steel === 500 && resources.oil === 200, "resources are not affected");
+  assert(resources.supplyUsed === 3 && resources.supplyCap === 10, "supply is not affected");
+  assert(resources.upgrades.length === 0, "upgrades are not affected");
+}
+
+{
+  const state = new GameState({
+    playerId: 1,
+    spectator: false,
+    map: { width: 8, height: 8, tileSize: 32, terrain: new Array(64).fill(0), resources: [] },
+    players: [{ id: 1, name: "A", color: "#f00", startTileX: 1, startTileY: 1 }],
+  });
+  state.applySnapshot({
+    tick: 1,
+    steel: 500,
+    oil: 200,
+    supplyUsed: 1,
+    supplyCap: 10,
+    entities: [building({ x: 64, y: 64, hp: 500, maxHp: 500 })],
+    events: [],
+  });
+  state.setSelection([10]);
+  for (const baseline of state.progressExtrapolator.active.values()) baseline.recvTime -= 500;
+  const byId = state.entityById(10);
+  const selected = state.selectedEntities()[0];
+  const rendered = state.entitiesInterpolated(1).find((entity) => entity.id === 10);
+  assert(byId.prodProgress > 0.25, "entityById exposes extrapolated production progress");
+  approx(selected.prodProgress, byId.prodProgress, 0.02, "selectedEntities sees the same display progress");
+  approx(rendered.prodProgress, byId.prodProgress, 0.02, "entitiesInterpolated sees the same display progress");
+  state.setOptimisticCommandState({ production: [{ building: 10, unit: KIND.WORKER, optimisticQueue: 2 }] });
+  const optimistic = state.entityById(10);
+  assert(optimistic.optimisticProduction === true, "optimistic train marker remains separate");
+  assert(optimistic.prodProgress > 0.25, "optimistic queue layering does not suppress active progress");
+  assert(state.resources.steel === 500 && state.resources.oil === 200, "GameState resources stay authoritative");
+  assert(state.resources.supplyUsed === 1 && state.resources.supplyCap === 10, "GameState supply stays authoritative");
+  assert(state.upgrades.length === 0, "GameState upgrades stay authoritative");
+}
+
+console.log("progress_extrapolator: ok");

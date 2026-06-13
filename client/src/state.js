@@ -8,6 +8,7 @@
 
 import { RESOURCE_AMOUNTS } from "./config.js";
 import { CommandComposer } from "./command_composer.js";
+import { ProgressExtrapolator } from "./progress_extrapolator.js";
 import { KIND, PASSABLE, STATE, isBuilding, isResource, isUnit } from "./protocol.js";
 
 const TWO_PI = Math.PI * 2;
@@ -157,6 +158,7 @@ export class GameState {
     this.predictionDiagnostics = null;
     this.optimisticProductionByBuilding = new Map();
     this.optimisticRallyByBuilding = new Map();
+    this.progressExtrapolator = new ProgressExtrapolator({ playerId: this.playerId });
   }
 
   /** Maximum number of entities the local selection may contain. */
@@ -252,6 +254,7 @@ export class GameState {
     const entities = wireEntities
       .concat(this._resourceEntityViews())
       .concat(this._shotRevealEntityViews(now, visibleIds));
+    this.progressExtrapolator.updateFromSnapshot(entities, now);
 
     this._cur = { ...msg, entities };
     this._curRecvTime = now;
@@ -609,12 +612,12 @@ export class GameState {
         if (typeof prior.weaponFacing === "number" && typeof e.weaponFacing === "number") {
           next.weaponFacing = lerpAngle(prior.weaponFacing, e.weaponFacing, t);
         }
-        out.push(includePrediction ? this._applyOptimisticEntity(this._applyPredictedEntity(next, now)) : next);
+        out.push(includePrediction ? this._applyDisplayEntity(this._applyPredictedEntity(next, now), now) : next);
       } else {
         // No previous sample: render at the current position (a shallow copy
         // keeps callers from mutating the live snapshot entity).
         const next = { ...e };
-        out.push(includePrediction ? this._applyOptimisticEntity(this._applyPredictedEntity(next, now)) : next);
+        out.push(includePrediction ? this._applyDisplayEntity(this._applyPredictedEntity(next, now), now) : next);
       }
     }
     return out;
@@ -627,7 +630,11 @@ export class GameState {
    */
   entityById(id) {
     const entity = this.predictedById.get(id) || this._curById.get(id);
-    return entity ? this._applyOptimisticEntity({ ...entity }) : entity;
+    return entity ? this._applyDisplayEntity({ ...entity }, performance.now()) : entity;
+  }
+
+  progressPredictionDebug() {
+    return this.progressExtrapolator.diagnostics();
   }
 
   setOptimisticCommandState(state = null) {
@@ -701,6 +708,10 @@ export class GameState {
       }
     }
     return out;
+  }
+
+  _applyDisplayEntity(entity, now) {
+    return this._applyOptimisticEntity(this.progressExtrapolator.apply(entity, now));
   }
 
   _applyOptimisticEntity(entity) {
@@ -828,7 +839,7 @@ export class GameState {
     const out = [];
     for (const id of this.selection) {
       const e = this._curById.get(id);
-      if (e && !e.shotReveal && !e.visionOnly) out.push(this._applyOptimisticEntity(e));
+      if (e && !e.shotReveal && !e.visionOnly) out.push(this._applyDisplayEntity(e, performance.now()));
     }
     return out;
   }
