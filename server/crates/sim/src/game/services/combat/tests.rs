@@ -1641,6 +1641,62 @@ fn mortar_turns_before_auto_firing() {
 }
 
 #[test]
+fn mortar_autocast_does_not_lead_stationary_attack_move_targets() {
+    let error_px = config::MORTAR_AUTOFIRE_ERROR_TILES * config::TILE_SIZE as f32;
+    let target_kinds = [
+        EntityKind::Worker,
+        EntityKind::Rifleman,
+        EntityKind::MachineGunner,
+        EntityKind::AtTeam,
+        EntityKind::MortarTeam,
+        EntityKind::Tank,
+        EntityKind::ScoutCar,
+        EntityKind::CommandCar,
+        EntityKind::Artillery,
+    ];
+
+    for target_kind in target_kinds {
+        let mut entities = EntityStore::new();
+        let target_id = entities
+            .spawn_unit(2, target_kind, 220.0, 100.0)
+            .expect("target should spawn");
+        if let Some(target) = entities.get_mut(target_id) {
+            target.set_order(Order::attack_move_to(500.0, 100.0));
+            target.set_path(Vec::new());
+            target.set_path_goal(Some((500.0, 100.0)));
+            target.mark_move_phase(MovePhase::Moving);
+        }
+
+        let (aim_x, aim_y) = mortar_aim_point(&entities, target_id, 10);
+        let offset = dist2(aim_x, aim_y, 220.0, 100.0).sqrt();
+        assert!(
+            offset <= error_px + 0.001,
+            "{target_kind:?} stationary attack-move target should only receive normal mortar error, got offset {offset:.2}"
+        );
+    }
+}
+
+#[test]
+fn mortar_autocast_still_leads_actively_moving_attack_move_targets() {
+    let mut entities = EntityStore::new();
+    let target_id = entities
+        .spawn_unit(2, EntityKind::Rifleman, 220.0, 100.0)
+        .expect("target should spawn");
+    if let Some(target) = entities.get_mut(target_id) {
+        target.set_order(Order::attack_move_to(500.0, 100.0));
+        target.set_path(vec![(500.0, 100.0)]);
+        target.set_path_goal(Some((500.0, 100.0)));
+        target.mark_move_phase(MovePhase::Moving);
+    }
+
+    let (aim_x, _aim_y) = mortar_aim_point(&entities, target_id, 10);
+    assert!(
+        aim_x > 270.0,
+        "actively moving attack-move target should still be led along its route, got x={aim_x:.2}"
+    );
+}
+
+#[test]
 fn mortar_autocast_skips_shot_that_would_hit_owned_unit() {
     let mut entities = EntityStore::new();
     let mortar_id = entities
