@@ -4,6 +4,88 @@ use super::geometry::{
 use super::policies::active_expansion_policy;
 use super::*;
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub(super) enum ExpansionBlocker {
+    NotDue,
+    DefensivePanic,
+    MissingRequiredBuilding,
+    MissingDefensiveUnits,
+    RequirementNotMet,
+    AlreadyAtTarget,
+    MaxPending,
+    NoCandidateResources,
+    NoValidSite,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) struct ExpansionPlan {
+    pub(super) policy: Option<ExpansionPolicy>,
+    pub(super) should_save: bool,
+    pub(super) blocks_tech_path: bool,
+    pub(super) blockers: Vec<ExpansionBlocker>,
+}
+
+pub(super) fn plan_expansion(
+    observation: &AiObservation,
+    facts: &AiFacts,
+    profile: &AiProfile,
+    recovery_active: bool,
+    defensive_panic_active: bool,
+) -> ExpansionPlan {
+    if defensive_panic_active {
+        return ExpansionPlan {
+            policy: None,
+            should_save: false,
+            blocks_tech_path: false,
+            blockers: vec![ExpansionBlocker::DefensivePanic],
+        };
+    }
+    let Some(expansion) = active_expansion(observation, profile, recovery_active) else {
+        return ExpansionPlan {
+            policy: None,
+            should_save: false,
+            blocks_tech_path: false,
+            blockers: vec![ExpansionBlocker::NotDue],
+        };
+    };
+
+    let building_count = facts.building_count(EntityKind::CityCentre);
+    let blocks_tech_path = expansion.blocks_tech_path && building_count < expansion.target_city_centres;
+    let mut blockers = Vec::new();
+    if building_count >= expansion.target_city_centres {
+        blockers.push(ExpansionBlocker::AlreadyAtTarget);
+    }
+    let counts = facts.building_counts(EntityKind::CityCentre);
+    if counts.incomplete + counts.intended >= profile.buildings.max_pending_per_kind {
+        blockers.push(ExpansionBlocker::MaxPending);
+    }
+    if facts.complete_building_count(expansion.required_complete_building) == 0 {
+        blockers.push(ExpansionBlocker::MissingRequiredBuilding);
+    }
+    if facts.unit_count(expansion.defensive_unit) < expansion.defensive_unit_count {
+        blockers.push(ExpansionBlocker::MissingDefensiveUnits);
+    }
+    if !rts_rules::economy::build_requirement_met(
+        EntityKind::CityCentre,
+        facts.complete_building_kinds(),
+    ) {
+        blockers.push(ExpansionBlocker::RequirementNotMet);
+    }
+    if expansion_candidate_resources(observation).is_empty() {
+        blockers.push(ExpansionBlocker::NoCandidateResources);
+    }
+    blockers.sort();
+    blockers.dedup();
+    let should_save = blockers.is_empty();
+
+    ExpansionPlan {
+        policy: Some(expansion),
+        should_save,
+        blocks_tech_path,
+        blockers,
+    }
+}
+
 pub(super) fn active_expansion(
     observation: &AiObservation,
     profile: &AiProfile,

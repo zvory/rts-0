@@ -6,6 +6,71 @@ use super::*;
 pub(super) const EXPANSION_LOCAL_RESOURCE_ASSIGNMENT_RADIUS_TILES: f32 =
     config::MINING_CC_RANGE_TILES + 3.0;
 
+#[derive(Clone, Debug, PartialEq)]
+pub(super) struct EconomyPlan {
+    pub(super) target_steel_workers: usize,
+    pub(super) desired_oil_workers: usize,
+    pub(super) target_workers: usize,
+    pub(super) current_steel_workers: usize,
+    pub(super) current_oil_workers: usize,
+    pub(super) resource_counts: BTreeMap<EntityKind, usize>,
+    pub(super) occupied_nodes: BTreeSet<u32>,
+    pub(super) max_worker_resource_distance_px: Option<f32>,
+}
+
+pub(super) fn plan_economy(
+    observation: &AiObservation,
+    facts: &AiFacts,
+    profile: &AiProfile,
+    recovery_active: bool,
+    panic_oil_workers: Option<usize>,
+) -> EconomyPlan {
+    let worker_policy = active_worker_policy(profile, recovery_active);
+    let complete_gate_count = worker_policy
+        .pressure_until_complete
+        .map(|kind| facts.complete_building_count(kind))
+        .unwrap_or(usize::MAX);
+    let base_steel_target =
+        worker_policy.target_steel_workers(facts.target_steel_workers, complete_gate_count);
+    let target_steel_workers = target_steel_workers_for_profile(
+        observation,
+        facts,
+        profile,
+        recovery_active,
+        base_steel_target,
+    );
+    let desired_oil_workers = panic_oil_workers.unwrap_or_else(|| {
+        desired_oil_workers(
+            observation,
+            facts,
+            profile,
+            recovery_active,
+            target_steel_workers,
+        )
+    });
+    let resource_counts = resource_worker_counts(observation);
+    let current_steel_workers = resource_counts
+        .get(&EntityKind::Steel)
+        .copied()
+        .unwrap_or(0);
+    let current_oil_workers = resource_counts.get(&EntityKind::Oil).copied().unwrap_or(0);
+    EconomyPlan {
+        target_steel_workers,
+        desired_oil_workers,
+        target_workers: target_steel_workers.saturating_add(desired_oil_workers),
+        current_steel_workers,
+        current_oil_workers,
+        resource_counts,
+        occupied_nodes: occupied_resource_nodes(observation),
+        max_worker_resource_distance_px: max_worker_resource_assignment_distance_px(
+            observation,
+            facts,
+            profile,
+            recovery_active,
+        ),
+    }
+}
+
 pub(super) fn target_steel_workers_for_profile(
     observation: &AiObservation,
     facts: &AiFacts,
