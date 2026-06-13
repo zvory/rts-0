@@ -1,72 +1,80 @@
-# Phase 3 - Steel/Oil Resource Policy Hardening
+# Phase 3 - Assignment, Lifecycle, and Command Identity Guardrails
 
 Status: Designed, not implemented.
 
 ## Objective
 
-Keep Steel, Oil, and Supply as the shared economy contract for all factions in this plan, and make
-that decision explicit in code, docs, and tests. Current-faction gameplay and wire resource payloads
-should remain unchanged while command validation, costs, supply, scoring, replay analysis, and HUD
-mirrors become ready for faction-specific catalogs that still price things in Steel/Oil/Supply.
+Make every faction assignment path explicit before faction-specific resources, starts, or client UI
+are expanded. This phase should close the gaps where a non-default faction could be created by a
+dev path, replay branch, quickstart, AI slot, hotkey profile, or stale client descriptor without a
+clear validation rule.
 
 ## Scope
 
-- Document Steel, Oil, and Supply as the global faction economy contract for this plan.
-- Keep fixed `steel`, `oil`, `supplyUsed`, and `supplyCap` snapshot/player-resource payloads.
-- Keep start-payload map resource nodes as Steel/Oil nodes.
-- Keep replay artifacts, match-history replay payloads, branch keyframes, replay analysis, score
-  screens, and compact snapshots on the current Steel/Oil/Supply schema.
-- Move or wrap cost, affordability, spend, refund, and supply helpers so gameplay callers can pass
-  faction-catalog cost data while still using Steel/Oil/Supply fields.
-- Add server-side validation proving a player can only spend resources on kinds, upgrades, and
-  abilities legal for that player's faction.
-- Add tests or architecture-check notes identifying the approved modules where direct Steel/Oil/
-  Supply references are expected, so future generic-resource work has a clear migration inventory.
-- Keep prediction/WASM unchanged for the current faction and disabled for non-default factions
-  unless an explicit later phase updates it.
-- Add a short deferred-generic-resources note to the relevant design docs if this phase edits them.
+- Add and maintain a faction lifecycle matrix that lists every match creation and playback path:
+  normal lobby start, quickstart/debug start, AI add/remove/start, fixture/dev faction start,
+  replay playback, replay branch staging and launch, dev scenarios, self-play, match history replay,
+  spectator/no-fog viewing, and post-match replay.
+- Define the authoritative faction assignment source for each path:
+  - default hidden current-faction assignment for normal play
+  - explicit test/dev fixture assignment for architecture coverage
+  - explicit rejection or fallback for unsupported AI faction assignment
+  - replay/branch assignment copied from the recorded schema, not recomputed from client state
+- Add a server-side validation helper that resolves requested faction ids into one of:
+  accepted playable faction, accepted fixture/dev-only faction, default current faction, or rejected
+  unsupported faction.
+- Keep normal lobby faction selection hidden or disabled unless a later phase exposes it; do not
+  leave Phase 10 dependent on an unnamed dev path.
+- Define stable command identity rules before client faction menus expand:
+  command ids must include enough namespace to distinguish command kind, faction, entity kind,
+  upgrade id, and ability id where collisions are possible.
+- Update hotkey profile validation/import behavior so commands for unavailable factions can be
+  preserved as unresolved/inactive instead of corrupting active profiles.
+- Add AI fail-closed tests for every path that can create or assign a seat.
+- Add prediction fail-closed tests proving unsupported factions disable prediction before the WASM
+  adapter is initialized.
+- Do not add real second-faction gameplay content in this phase.
 
 ## Expected Touch Points
 
-- `server/crates/rules/src/`
-- `server/crates/sim/src/game/player_state.rs`
-- `server/crates/sim/src/game/services/economy.rs`
-- `server/crates/sim/src/game/services/construction.rs`
-- `server/crates/sim/src/game/services/production.rs`
-- `server/crates/sim/src/game/scoring.rs`
-- `server/crates/sim/src/game/analysis.rs`
-- `client/src/config.js`
-- `client/src/hud_command_card.js`
-- `client/src/replay_analysis_overlay.js`
-- `tests/sim_wasm_smoke.mjs`
-- `docs/design/balance.md`
-- `docs/design/protocol.md` only if documenting the deferred generic-resource decision there
+- `plans/faction/` for the lifecycle matrix
+- `server/src/lobby/`
+- `server/crates/sim/src/game/setup.rs`
+- `server/crates/sim/src/game/setup/dev_scenarios/`
+- `server/crates/sim/src/game/replay.rs`
+- `server/crates/ai/src/` only for validation/restriction seams
+- `client/src/hotkey_profiles.js`
+- `client/src/state.js`
+- `client/src/sim_wasm_adapter.js`
+- `tests/`
+- `docs/design/protocol.md`
+- `docs/design/server-sim.md`
+- `docs/design/client-ui.md`
 
 ## Verification
 
-- Rust tests proving current-faction Steel/Oil/Supply start, spend, refund, supply reservation, and
-  score behavior remain unchanged.
-- Rust command tests proving faction-illegal build/train/research/ability attempts do not spend
-  Steel/Oil or reserve Supply.
-- Rust or JS tests proving replay analysis and score values still report Steel/Oil consistently.
-- Client command-card tests proving current-faction costs, affordability, and shortage display are
-  unchanged.
-- Prediction/WASM smoke or client contract proving non-default factions remain prediction-disabled
-  unless explicitly supported.
+- Faction lifecycle matrix added and referenced by this plan.
+- Server integration or focused Rust tests for default lobby assignment, fixture/dev assignment,
+  AI rejection, quickstart/debug defaults, replay playback assignment, replay branch assignment, and
+  dev scenario assignment.
+- Hotkey profile tests proving unresolved commands from unavailable factions do not break active
+  current-faction hotkeys.
+- Prediction-disable test proving unsupported factions do not initialize WASM prediction.
+- Protocol/replay tests proving faction assignment is loaded from recorded schema for replay and
+  branch flows.
 
 ## Manual Testing Focus
 
-Start a normal current-faction match and verify Steel, Oil, Supply, gathering, spending, training,
-researching, spectator resource rows, score screens, and replay-analysis display still look correct.
+Start a normal match and confirm it still defaults to the current faction. If a fixture/dev path is
+exposed, start it explicitly and confirm unsupported AI/prediction states are clearly blocked.
 
 ## Handoff Expectations
 
-The handoff must document that Steel/Oil/Supply remain the resource payload shape, name the approved
-direct-resource modules, list any helper wrappers added for faction-catalog costs, and tell Phase 4
-how to define faction starting Steel/Oil/Supply and supply rules.
+The handoff must name the lifecycle matrix file, the validation helper, every faction assignment
+source, the command-id namespace rule, hotkey unresolved-command behavior, and the exact dev path
+later phases should use for fixture or second-faction starts before normal lobby selection exists.
 
 ## Player-Facing Outcome
 
-The current faction should look and play unchanged. The faction architecture now explicitly supports
-different costs and starts within the existing Steel/Oil/Supply economy, with truly generic
-resources deferred to a later standalone migration.
+No intended gameplay change. Faction choice remains hidden for normal play, but internal/dev/test
+paths now have explicit assignment, validation, hotkey, AI, replay, and prediction behavior.

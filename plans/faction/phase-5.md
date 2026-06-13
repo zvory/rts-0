@@ -1,64 +1,87 @@
-# Phase 5 - Ability Registry Parity
+# Phase 5 - Faction Starting Loadouts
 
 Status: Designed, not implemented.
 
 ## Objective
 
-Route existing ability discovery, validation, cooldown projection, remaining uses, costs, and
-command-card affordances through faction-aware registry definitions while preserving current
-behavior. This phase is a parity refactor, not a new ability-effect framework.
+Move starting entities, starting Steel/Oil/Supply values, supply rules, opening upgrades, and
+resource-node usage into faction loadout definitions. Prove that a fixture faction can start with a
+different loadout and command set inside the existing economy without implementing the real second
+faction roster.
 
 ## Scope
 
-- Add a faction-aware ability registry with stable ids, labels, carriers, target mode, range,
-  cooldown, charges, resource cost, queue behavior, tech requirement, and autocast metadata.
-- Represent existing Smoke, Mortar Fire, Artillery Point Fire, Breakthrough, and legacy Charge in
-  the registry.
-- Keep current one-off effect implementations intact where practical.
-- Route command validation, carrier eligibility, target-mode validation, resource cost checks,
-  cooldown projection, remaining uses, autocast availability, and command-card discovery through
-  the registry.
-- Reject wrong-faction ability use on the server.
-- Update generated or mechanically checked client ability descriptors so the command card mirrors
-  Rust registry data.
-- Keep protocol ids and compact ability projection synchronized with the registry.
+- Define faction loadout data in the Rust-authoritative faction catalog.
+- Move current-faction City Centre, Worker ring, starting resources, and starting supply into the
+  current faction loadout.
+- Replace or explicitly retire any temporary global `starting_steel`, `starting_oil`, or
+  `starting_loadout` replay/start schema shims left from Phase 1. Replay and branch reconstruction
+  must derive per-player starts from recorded faction/loadout data, not a single global resource
+  pair.
+- Allow loadouts to define starting units, buildings, completed construction state, initial Steel,
+  initial Oil, initial supply capacity, opening upgrades/flags, and debug-mode additions.
+- Keep map resource spawning on the current universal Steel/Oil nodes.
+- Do not add faction-specific map resource objects in this plan.
+- Add a fixture faction or test-only fixture loadout with different starting entities, resources,
+  supply, and legal commands while still using Steel/Oil/Supply.
+- Enforce illegal cross-faction economy/build/train/research commands with server-side notices or
+  no-ops.
+- Keep match history and score calculations sensible for fixture entities and zero/alternate
+  Steel/Oil-cost definitions.
+- Keep AI slots current-faction-only; fixture factions are human/dev/test only.
+- Update the lifecycle matrix with the fixture/dev start path, replay reconstruction behavior, and
+  any remaining intentionally current-faction-only paths.
 
 ## Expected Touch Points
 
 - `server/crates/rules/src/`
-- `server/crates/sim/src/game/ability.rs`
-- `server/crates/sim/src/game/services/ability_orders.rs`
-- `server/crates/sim/src/game/services/commands.rs`
+- `server/crates/sim/src/game/setup.rs`
+- `server/crates/sim/src/game/setup/dev_scenarios/`
+- `server/crates/sim/src/game/player_state.rs`
+- `server/crates/sim/src/game/services/economy.rs`
+- `server/crates/sim/src/game/services/construction.rs`
+- `server/crates/sim/src/game/services/production.rs`
+- `server/crates/sim/src/game/services/supply.rs`
 - `server/crates/sim/src/game/snapshot.rs`
+- `server/crates/contract/src/lib.rs`
 - `server/crates/protocol/src/lib.rs`
-- `client/src/protocol.js`
+- `server/src/lobby/`
+- `client/src/state.js`
+- `client/src/hud.js`
 - `client/src/config.js`
-- `client/src/hud_command_card.js`
-- `tests/hud_command_card.mjs`
 - `docs/design/protocol.md`
-- `docs/design/server-sim.md`
 - `docs/design/balance.md`
+- `docs/design/server-sim.md`
 
 ## Verification
 
-- Rust ability registry tests for all existing abilities.
-- Rust command tests for carrier eligibility, wrong-faction carriers, target modes, resource costs,
-  cooldowns, charges, queueing, autocast gating, and invalid ids.
-- Client descriptor tests proving existing ability buttons, hotkeys, labels, costs, and cooldown
-  clocks are unchanged.
-- Protocol parity tests for ability ids and compact ability projection.
-- Focused debug-mode sim/client test for existing ability availability.
+- Rust tests for default current-faction start parity: starting entities, resources, supply,
+  upgrades, fog, and resource nodes.
+- Rust tests for fixture-faction starts with alternate Steel/Oil/Supply values and no illegal
+  current-faction command access.
+- Replay/branch tests proving faction loadout and starting resources survive reconstruction from
+  the new schema.
+- Server integration test for mixed current-faction plus fixture-faction match start.
+- Command tests proving fixture players cannot issue current-faction-only economy/build/train
+  commands.
+- Fog tests proving resource node visibility and fixture start data do not leak hidden enemy state.
+- Client HUD tests proving fixture starts still display the shared Steel/Oil/Supply resources if the
+  fixture is exposed through a dev path.
 
 ## Manual Testing Focus
 
-In debug mode, verify Scout Car Smoke, Mortar Fire, Artillery Point Fire, and Command Car
-Breakthrough still appear on the correct units and execute as before.
+Verify current-faction gathering and spending still work. If a fixture faction is exposed in a dev
+path, verify it starts with its fixture loadout, shows Steel/Oil/Supply correctly, and cannot issue
+current-faction commands.
 
 ## Handoff Expectations
 
-The handoff must list the ability registry fields, remaining one-off effect code, generated/client
-mirror status, and the recipe for adding a registry-backed ability in Phase 6 or Phase 10.
+The handoff must describe the loadout schema, current-faction parity evidence, fixture faction
+limitations, the replay/branch schema replacement, the explicit Steel/Oil map-resource assumption,
+and the mixed-faction test command/result.
+It should tell Phase 6 how abilities attach to faction catalog definitions.
 
 ## Player-Facing Outcome
 
-No intended current-faction balance change. Existing abilities are now cataloged and faction-aware.
+The current faction should play unchanged. Internally, starting state is faction-defined and test
+fixtures prove alternate faction starts are possible without changing the global economy.

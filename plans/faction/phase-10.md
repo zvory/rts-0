@@ -1,26 +1,31 @@
-# Phase 10 - Second Faction Combat and Signature Ability Slice
+# Phase 10 - Second Faction Start and Economy Slice
 
 Status: Designed, not implemented.
 
 ## Objective
 
-Add the second faction's first combat loop: one baseline combat unit plus one signature
-ability-heavy unit. This phase should make the faction mechanically legible in a short match without
-trying to complete the whole roster.
+Implement the second faction's start, Steel/Oil/Supply tuning, and first production path from the
+approved brief/spec. This phase should produce a narrow playable economy slice, not the full
+faction.
 
 ## Scope
 
-- Add the approved baseline combat unit with stats, cost, supply/capacity use, production path,
-  renderer data, command-card affordances, and tests.
-- Add the approved signature ability-heavy unit and its ability or abilities.
-- Use existing ability registry and effect hooks where possible; add only tightly scoped hooks if
-  the approved ability cannot be implemented cleanly.
-- Add fog-safe events, notices, cooldown/charge projection, Steel/Oil costs, and client visuals for
-  the signature ability.
-- Keep AI blocked for the new faction unless explicitly approved.
-- Keep prediction disabled for the new faction unless WASM support is intentionally implemented.
-- Collect factual patch-note bullets for stats, economy costs, ability behavior, UI, and expected
-  playtest watch points.
+- Add the real second faction id and Rust catalog entry.
+- Expose the second faction only through the Phase 9-approved assignment path unless this phase
+  explicitly implements normal lobby selection.
+- Add the approved starting loadout, starting Steel/Oil/Supply values, supply/capacity rules, and
+  first production anchor.
+- Add the minimum builder/producer path or equivalent mechanic needed to create one basic unit path.
+- Add client command-card entries, hotkeys, and readable placeholder/final art for the start and
+  first production path while keeping the shared Steel/Oil/Supply HUD.
+- Keep server catalog strictness: reject current-faction build/train/research/economy commands from
+  second-faction players and reject second-faction commands from current-faction players.
+- Keep AI unable to select or be assigned the second faction.
+- Disable prediction for the second faction unless the approved brief and implementation explicitly
+  add WASM support.
+- Update the lifecycle matrix with the real faction start path, AI rejection behavior, replay
+  reconstruction behavior, and prediction-disabled state.
+- Collect factual patch-note bullets for Steel/Oil/Supply costs, start, production, and UI changes.
 
 ## Expected Touch Points
 
@@ -28,8 +33,10 @@ trying to complete the whole roster.
 - `server/crates/sim/src/game/`
 - `server/crates/protocol/src/lib.rs`
 - `server/src/protocol.rs`
+- `server/src/lobby/`
 - `client/src/protocol.js`
 - `client/src/config.js`
+- `client/src/hud.js`
 - `client/src/hud_command_card.js`
 - `client/src/renderer/`
 - generated or checked client catalog artifacts/scripts
@@ -40,26 +47,30 @@ trying to complete the whole roster.
 
 ## Verification
 
-- Focused Rust tests for new unit stats, production, costs, supply/capacity, and command legality.
-- Rust ability tests for carrier eligibility, target mode, costs, cooldowns, charges, events, and
-  wrong-faction rejection.
-- Fog/security regression tests for every new event or reveal.
-- Protocol parity tests for every new kind, ability, event, or upgrade id.
-- Client command-card descriptor tests for the new combat and ability units.
-- Targeted client smoke or dev scenario test for rendering and command issuance.
-- Balance docs updated with player-facing stats and ability behavior.
+- Rust tests for second-faction start loadout, Steel/Oil/Supply values, supply/capacity, and
+  production legality.
+- Rust command tests for illegal cross-faction commands in both directions.
+- Protocol parity tests for new faction/kind ids touched by this slice and unchanged resource
+  payload assumptions.
+- Client command-card descriptor tests for start/economy/production commands.
+- Server integration test for mixed current-faction plus second-faction match start.
+- Prediction-disable test for second-faction starts if WASM is not updated.
+- Replay/branch schema test for the second-faction start slice if replay or branch start is exposed.
+- Balance docs updated with player-facing Steel/Oil/Supply start/economy/production data.
 
 ## Manual Testing Focus
 
-Play a short local/dev match as the new faction and verify production, combat readability, ability
-targeting, cooldown/charges, Steel/Oil cost, fog behavior, defeat/win behavior, and current-faction
-regression.
+Start a local match as the second faction and verify start entities, Steel/Oil/Supply display, first
+production path, command legality, AI restriction, and prediction-disabled state. Also start a
+current-faction match and verify the original start and economy were not regressed.
 
 ## Handoff Expectations
 
-The handoff must include patch-note bullets, implemented unit/ability details, verification
-commands/results, known balance risks, and the next roster/progression items proposed for Phase 11.
+The handoff must include patch-note bullets, the implemented start/economy/production list, the
+assignment path used, lifecycle matrix updates, tests run, known limitations, and exactly what
+Phase 11 may add next.
 
 ## Player-Facing Outcome
 
-The new faction has a small but playable combat identity suitable for focused playtesting.
+Players can enter a dev/local match as the new faction and exercise its starting economy and first
+production path.

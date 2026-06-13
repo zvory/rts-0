@@ -1,77 +1,71 @@
-# Phase 7 - Client Faction Surface
+# Phase 7 - Ability Effect Hooks
 
 Status: Designed, not implemented.
 
 ## Objective
 
-Make the browser client render and command different faction catalogs using the generated or
-mechanically checked client mirror. Preserve the current HUD while adding fixture-faction coverage
-for alternate build menus, production, and abilities within the shared Steel/Oil/Supply economy.
+Add only the reusable ability effect hooks needed by known current abilities or architecture
+fixtures. This phase must not depend on the real second-faction brief, which is approved later in
+Phase 9, and it should avoid building a generic scripting engine before real mechanics prove the
+needed shapes.
 
 ## Scope
 
-- Make client config/catalog access faction-aware.
-- Consume generated or mechanically checked faction data rather than hand-maintaining divergent
-  client descriptors.
-- Support faction-specific build menus instead of one global `WORKER_BUILDABLE` list.
-- Support faction-specific train/research/ability buttons.
-- Keep HUD resource rendering on the existing Steel/Oil/Supply payload while ensuring catalog costs
-  and affordability checks are faction-aware.
-- Add visual fallbacks for unknown or fixture units/buildings so protocol additions do not render
-  blank.
-- Update hotkey profile behavior so new faction command ids are stable and do not collide
-  accidentally.
-- Disable prediction in the client when the start payload says the selected faction is unsupported
-  by WASM.
-- Keep no-framework/no-build-step client conventions.
-- Preserve current faction command card DOM/classes/hotkeys unless a documented migration is
-  required.
+- Identify from current ability parity and fixture needs which reusable effect classes are required.
+- Add focused hooks only when current parity or fixture coverage needs concrete patterns such as:
+  - self buff
+  - targeted world effect
+  - delayed projectile or delayed impact
+  - area effect
+  - toggle/autocast
+  - limited charges
+- Steel/Oil-consuming activation
+- Keep complex one-off implementations acceptable when they remain clearer than generic hooks.
+- Ensure hooks receive faction/player context so wrong-faction effects cannot trigger.
+- Ensure every effect event remains fog-safe and does not reveal hidden enemy entities or positions.
+- Keep `Game::tick()` panic-free when ability definitions are missing, stale caster ids are used, or
+  target positions are invalid.
+- Update ability docs with the split between registry metadata and effect implementation.
 
 ## Expected Touch Points
 
-- `client/src/config.js`
-- generated or checked client catalog artifacts/scripts
+- `server/crates/sim/src/game/ability.rs`
+- `server/crates/sim/src/game/services/ability_orders.rs`
+- `server/crates/sim/src/game/services/commands.rs`
+- `server/crates/sim/src/game/services/combat/`
+- `server/crates/sim/src/game/smoke.rs`
+- `server/crates/sim/src/game/mortar.rs`
+- `server/crates/sim/src/game/artillery.rs`
+- `server/crates/sim/src/game/snapshot.rs`
+- `server/crates/protocol/src/lib.rs`
 - `client/src/protocol.js`
-- `client/src/state.js`
-- `client/src/hud.js`
+- `client/src/config.js`
 - `client/src/hud_command_card.js`
-- `client/src/input/`
-- `client/src/renderer/units.js`
-- `client/src/renderer/buildings.js`
-- `client/src/hotkey_profiles.js`
-- `client/src/match.js`
-- `client/src/sim_wasm_adapter.js`
-- `tests/client_contracts.mjs`
-- `tests/hud_command_card.mjs`
-- `tests/protocol_parity.mjs`
-- `docs/design/client-ui.md`
+- `docs/design/protocol.md`
+- `docs/design/server-sim.md`
+- `docs/design/balance.md`
 
 ## Verification
 
-- Command-card descriptor tests for current faction parity.
-- Command-card descriptor tests for fixture faction build/train/research/ability cards.
-- Client protocol parity tests for faction and ability fields, plus unchanged Steel/Oil/Supply
-  resource decoding.
-- Generated-client-catalog or parity tests proving JS descriptors match Rust.
-- Hotkey profile tests for new command ids.
-- Prediction-disable test for unsupported non-default factions.
-- Client architecture checker if imports or module boundaries change.
-- Client smoke test when visible HUD/rendering behavior changes.
+- Rust tests for each reusable hook that is added.
+- Rust regression tests proving existing ability effects remain behaviorally unchanged.
+- Fog/security tests for every event or reveal produced by the hooks.
+- Command tests for stale ids, invalid target positions, wrong-faction effects, and missing
+  definitions.
+- Client descriptor tests if any hook changes projection, charges, cooldowns, or event rendering.
 
 ## Manual Testing Focus
 
-Start current-faction debug mode and verify the command card, build placement, resources, training,
-researching, ability buttons, and prediction status. If fixture faction is exposed in a dev path,
-verify its Steel/Oil/Supply display and command card show only fixture-legal actions.
+Use debug mode to execute every current ability and inspect that visuals, cooldowns, resource costs,
+autocast state, and fog behavior are unchanged.
 
 ## Handoff Expectations
 
-The handoff must identify the client catalog entry points, generated/parity-check command, added
-descriptor tests, prediction-disable behavior, and any visual fallbacks that are intentionally
-temporary. It should tell Phase 8 what real faction UI data the brief/spec must provide.
+The handoff must list the hooks that exist, the effect code intentionally left one-off, and the
+specific extension points Phase 11 may use if the approved second-faction signature ability needs
+additional tightly scoped hooks.
 
 ## Player-Facing Outcome
 
-The current UI should look and behave unchanged. The client becomes capable of presenting a
-different faction's tech tree and ability set through data-backed descriptors while keeping the
-shared Steel/Oil/Supply HUD.
+No intended current-faction balance change. The ability system has practical extension points, but
+second-faction-specific hooks wait until the faction brief is approved and Phase 11 needs them.
