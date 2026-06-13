@@ -8,7 +8,9 @@ use std::collections::HashMap;
 
 use crate::config;
 use crate::game::ability::AbilityKind;
-use crate::game::entity::{fires_while_moving, AttackPhase, EntityKind, EntityStore, Order};
+use crate::game::entity::{
+    fires_while_moving, AttackPhase, Entity, EntityKind, EntityStore, MovePhase, Order,
+};
 use crate::game::fog::Fog;
 use crate::game::map::Map;
 use crate::game::mortar::{rotate_mortar_for_fire, MortarShellStore};
@@ -344,7 +346,7 @@ fn mortar_aim_point(entities: &EntityStore, target: u32, tick: u32) -> (f32, f32
     };
     let mut x = t.pos_x;
     let mut y = t.pos_y;
-    if let Some((gx, gy)) = t.move_intent() {
+    if let Some((gx, gy)) = mortar_lead_goal(t) {
         let dx = gx - t.pos_x;
         let dy = gy - t.pos_y;
         let dist = (dx * dx + dy * dy).sqrt();
@@ -367,6 +369,13 @@ fn mortar_aim_point(entities: &EntityStore, target: u32, tick: u32) -> (f32, f32
         y += angle.sin() * radius;
     }
     (x, y)
+}
+
+fn mortar_lead_goal(target: &Entity) -> Option<(f32, f32)> {
+    if target.path_is_empty() || target.move_phase() != Some(MovePhase::Moving) {
+        return None;
+    }
+    target.move_intent()
 }
 
 fn mortar_autocast_would_hit_same_team_entity(
