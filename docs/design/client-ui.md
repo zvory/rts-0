@@ -17,7 +17,7 @@ src/
   renderer/       # Pixi app facade plus layers, terrain, entities, units, buildings,
                   # resources, fog overlay, feedback, and renderer-local palette helpers
   fog.js          # Fog overlay: accumulate explored, compute visible from own entities
-  input/          # lifecycle facade plus selection, commands, placement, camera controls, UI input routing
+  input/          # lifecycle facade plus selection, commands, placement, shared camera navigation, UI input routing
   audio.js        # Audio: Web Audio context, buses, one-shots, spatialization
   hud.js          # HUD: resources/supply bar, selected panel, command card (build/train)
   minimap.js      # Minimap: draw terrain+entities+viewport; click to move camera/command
@@ -262,6 +262,28 @@ export class Input {
   // emits nothing to return; mutates state.selection / state.placement and calls commandIssuer.issueCommand
 }
 ```
+`input/camera_navigation.js`
+```js
+export class CameraNavigationInput {
+  constructor(domElement, camera, options?)
+  // shared command-free camera gesture state for live input and replay/observer wrappers:
+  // viewport mouse tracking, mouse-wheel cursor-anchored zoom, configured pan keys,
+  // middle-mouse drag panning, optional Space+left-drag panning, blur release, and teardown.
+  // exposes keys + mouse for Camera.update(dt, input)
+  static replayPanKeyCodes()
+  install()
+  destroy()
+}
+```
+Live `Input` composes `CameraNavigationInput` for camera gestures, then layers pointer lock,
+selection, placement, command-card targeting, command hotkeys, minimap routing, and gameplay command
+issuance on top. Replay viewers use the same helper through `ReplayCameraInput`, with replay WASD
+pan-key aliases and no gameplay command issuer API. Replay middle-drag and Space+left-drag pan
+through `Camera.panByScreenDelta`; mouse-wheel zoom, keyboard pan state, edge scroll state, and blur
+release are shared observer navigation behavior. Live spectators still use the live `Input` path so
+read-only selection inspection remains available while command emission stays gated by local-owner
+checks.
+
 Shift-right-click appends queued orders only for selected units: move, attack-move, attack,
 gather, build/resume, and placement build commands set `queued: true` and rely on the server
 snapshot's owner-only `orderPlan` for accepted markers. Production-building-only right-clicks set
@@ -488,7 +510,8 @@ Current areas:
 - `transport`: `net.js`, `protocol.js`.
 - `rules-mirror`: `config.js`.
 - `ui`: HUD, command card, lobby, match history, minimap, status badge, branch staging, settings.
-- `input`: `input/` plus `replay_camera_input.js`.
+- `input`: `input/` plus `replay_camera_input.js`; `input/camera_navigation.js` is the shared
+  command-free camera gesture helper for live input and replay/observer wrappers.
 - `renderer`: `renderer/`.
 - `platform`: bootstrap, audio, combat audio, alerts, fog, camera.
 

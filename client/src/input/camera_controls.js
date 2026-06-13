@@ -14,19 +14,11 @@ export function _handleKeyDown(ev) {
 
   switch (ev.code) {
     case "ArrowUp":
-      this.keys.up = true;
-      ev.preventDefault();
-      return;
     case "ArrowDown":
-      this.keys.down = true;
-      ev.preventDefault();
-      return;
     case "ArrowLeft":
-      this.keys.left = true;
-      ev.preventDefault();
-      return;
     case "ArrowRight":
-      this.keys.right = true;
+      if (this.cameraNavigation) this.cameraNavigation.handleKeyDown(ev);
+      else setPanKey(this.keys, ev.code, true);
       ev.preventDefault();
       return;
     case "Escape":
@@ -34,7 +26,8 @@ export function _handleKeyDown(ev) {
       ev.preventDefault();
       return;
     case "Space":
-      this._spacePan = true;
+      if (this.cameraNavigation) this.cameraNavigation.handleKeyDown(ev);
+      else this._spacePan = true;
       ev.preventDefault();
       return;
     default:
@@ -69,23 +62,16 @@ function repeatedWorldAbilityHotkeyTarget(target) {
 export function _handleKeyUp(ev) {
   switch (ev.code) {
     case "ArrowUp":
-      this.keys.up = false;
-      ev.preventDefault();
-      return;
     case "ArrowDown":
-      this.keys.down = false;
-      ev.preventDefault();
-      return;
     case "ArrowLeft":
-      this.keys.left = false;
-      ev.preventDefault();
-      return;
     case "ArrowRight":
-      this.keys.right = false;
+      if (this.cameraNavigation) this.cameraNavigation.handleKeyUp(ev);
+      else setPanKey(this.keys, ev.code, false);
       ev.preventDefault();
       return;
     case "Space":
-      this._spacePan = false;
+      if (this.cameraNavigation) this.cameraNavigation.handleKeyUp(ev);
+      else this._spacePan = false;
       ev.preventDefault();
       return;
     case "ShiftLeft":
@@ -108,12 +94,16 @@ export function _handleKeyUp(ev) {
 
 export function _handleBlur() {
   if (this.pointerLocked) this.exitPointerLock();
-  this.keys.up = this.keys.down = this.keys.left = this.keys.right = false;
-  this.mouse = null;
-  this._spacePan = false;
+  if (this.cameraNavigation) {
+    this.cameraNavigation.release();
+  } else {
+    if (this.keys) this.keys.up = this.keys.down = this.keys.left = this.keys.right = false;
+    this.mouse = null;
+    this._spacePan = false;
+    this._panDrag = null;
+  }
   if (typeof this.state.endCommandTarget === "function") this.state.endCommandTarget();
   if (this.state.placement && typeof this.state.endPlacement === "function") this.state.endPlacement();
-  this._panDrag = null;
   if (this._drag) {
     this._drag = null;
     this._dragging = false;
@@ -122,10 +112,32 @@ export function _handleBlur() {
 }
 
 export function _handleWheel(ev) {
+  if (this.cameraNavigation) {
+    this.cameraNavigation.handleWheel(ev);
+    return;
+  }
   ev.preventDefault();
   const p = this._screenPos(ev);
-  // Anchor the zoom on the cursor; setZoom clamps zoom AND re-clamps x/y so we
-  // never reveal void outside the map near an edge.
   const factor = ev.deltaY < 0 ? 1 + ZOOM_STEP : 1 / (1 + ZOOM_STEP);
   this.camera.setZoom(this.camera.zoom * factor, p.x, p.y);
+}
+
+function setPanKey(keys, code, down) {
+  if (!keys) return;
+  switch (code) {
+    case "ArrowUp":
+      keys.up = down;
+      return;
+    case "ArrowDown":
+      keys.down = down;
+      return;
+    case "ArrowLeft":
+      keys.left = down;
+      return;
+    case "ArrowRight":
+      keys.right = down;
+      return;
+    default:
+      return;
+  }
 }
